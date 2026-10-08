@@ -23,7 +23,7 @@ import {
  * means, and a table listed in SYSTEM_WIDE is exempt from BOTH gates — so a
  * tenant-carrying table parked there is invisible to the whole apparatus and
  * the gate can never go red for it. That is what happened to
- * `ClaimEvidenceLink` and `EvidenceReminder` (TASK-MTU6HUB8FUHMG B-1).
+ * `ClaimEvidenceLink` (TASK-MTU6HUB8FUHMG B-1).
  *
  * These are file-level assertions on purpose: they hold with no database, which
  * is exactly when the live gate cannot run and something has to still be true.
@@ -87,8 +87,10 @@ describe('RLS model classification (scripts/rls-models.ts)', () => {
   });
 });
 
-describe('B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data', () => {
-  const tables = ['ClaimEvidenceLink', 'EvidenceReminder'] as const;
+describe('B-1 — ClaimEvidenceLink is tenant data', () => {
+  // EvidenceReminder was in this list until TASK-MUXVOWBNIIQKD dropped the
+  // unused model; its recipientEmails assertion went with it.
+  const tables = ['ClaimEvidenceLink'] as const;
 
   test.each(tables)('%s has a required tenantId in schema.prisma', (name) => {
     const body = modelBodies().get(name);
@@ -106,13 +108,6 @@ describe('B-1 — ClaimEvidenceLink and EvidenceReminder are tenant data', () =>
   test.each(tables)('%s is under strict tenant_isolation in prisma/rls.sql', (name) => {
     expect(policyTables('tenant_isolation')).toContain(name);
     expect(policyTables('tenant_or_shared')).not.toContain(name);
-  });
-
-  test('EvidenceReminder carries personal data, so it is indexed by tenant', () => {
-    const body = modelBodies().get('EvidenceReminder') as string;
-    // recipientEmails is why this table is not a harmless scheduling row.
-    expect(/recipientEmails\s+String\[\]/.test(body)).toBe(true);
-    expect(/@@index\(\[tenantId\]\)/.test(body)).toBe(true);
   });
 });
 

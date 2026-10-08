@@ -17,7 +17,7 @@ import { evidenceExpiringDedupeKey, recordNotifications, type NewNotification } 
  *     EXPIRING_SOON_DAYS. The query below only narrows the scan; the badge
  *     function decides, so the bell cannot say "expiring" while the list says
  *     "unverified".
- *   - `EvidenceReminder` is not used: the notification's `dedupeKey` is the only
+ *   - No reminder table: the notification's `dedupeKey` is the only
  *     state. One notification per (document, validUntil): a second run writes
  *     nothing, a renewed document (new `validUntil`) is announced again.
  *

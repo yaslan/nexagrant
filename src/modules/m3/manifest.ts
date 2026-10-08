@@ -22,6 +22,6 @@ export const m3Manifest: ModuleManifest = {
     { id: 'evidence:read', minRole: Role.MEMBER },
     { id: 'evidence:write', minRole: Role.WRITER },
   ],
-  tables: ['Evidence', 'Claim', 'ClaimEvidenceLink', 'EvidenceReminder'],
+  tables: ['Evidence', 'Claim', 'ClaimEvidenceLink'],
   isActive: true,
 };

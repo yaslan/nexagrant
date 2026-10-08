@@ -12,11 +12,11 @@ import { resolve } from 'node:path';
  * System-wide tables: no tenantId, no policy expected.
  *
  * Membership here is an exemption from both gates, so it is only ever correct
- * for a table that holds no tenant data at all. `ClaimEvidenceLink` and
- * `EvidenceReminder` sat in this set until TASK-MTU6HUB8FUHMG B-1 while joining
- * one tenant's Claim to that tenant's Evidence — and, in the reminder's case,
- * carrying its people's e-mail addresses. They had no RLS at all, and both
- * gates were programmed to look away, so the gate could never go red for them.
+ * for a table that holds no tenant data at all. `ClaimEvidenceLink` sat in this
+ * set until TASK-MTU6HUB8FUHMG B-1 while joining one tenant's Claim to that
+ * tenant's Evidence. It had no RLS at all, and both gates were programmed to
+ * look away, so the gate could never go red for it. (`EvidenceReminder` was in
+ * the same position and was dropped outright by TASK-MUXVOWBNIIQKD.)
  *
  * A table belongs here because it has no tenant, never because adding it makes
  * the gate quiet. `rls-coverage.test.ts` asserts no member carries a tenantId.

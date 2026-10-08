@@ -1049,7 +1049,6 @@ model Evidence {
 
   claimLinks         ClaimEvidenceLink[]
   proposalUsages     ProposalUsage[]
-  reminders          EvidenceReminder[]
 
   // One row per stored object (D-3, TASK-MUNTTZ94LJWBC): confirming the same
   // key twice made two rows, and deleting either removed the other's file.
@@ -1107,23 +1106,6 @@ model ProposalUsage {
   evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, opportunityId])
-}
-
-// `recipientEmails` is personal data, so a row here is tenant data twice over:
-// it hangs off one tenant's Evidence and it names that tenant's people. Carried
-// on the row so RLS can see it (TASK-MTU6HUB8FUHMG B-1).
-model EvidenceReminder {
-  id                 String               @id @default(cuid())
-  tenantId           String
-  evidenceId         String
-  notifyAt           DateTime
-  sent               Boolean              @default(false)
-  recipientEmails    String[]
-
-  evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([sent, notifyAt])
 }
 
 // ───────────────────────── M2 Concept Note ─────────────────────────
