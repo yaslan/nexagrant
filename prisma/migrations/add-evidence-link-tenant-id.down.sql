@@ -11,11 +11,20 @@
 -- Idempotent; no row in any other table is touched.
 
 DROP POLICY IF EXISTS tenant_isolation ON "ClaimEvidenceLink";
-DROP POLICY IF EXISTS tenant_isolation ON "EvidenceReminder";
 ALTER TABLE "ClaimEvidenceLink" NO FORCE ROW LEVEL SECURITY;
-ALTER TABLE "EvidenceReminder"  NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "ClaimEvidenceLink" DISABLE ROW LEVEL SECURITY;
-ALTER TABLE "EvidenceReminder"  DISABLE ROW LEVEL SECURITY;
+
+-- EvidenceReminder was dropped later (drop-evidence-reminder.sql,
+-- TASK-MUXVOWBNIIQKD); skip its statements when the table is gone.
+DO $$
+BEGIN
+  IF to_regclass('"EvidenceReminder"') IS NULL THEN
+    RETURN;
+  END IF;
+  DROP POLICY IF EXISTS tenant_isolation ON "EvidenceReminder";
+  ALTER TABLE "EvidenceReminder" NO FORCE ROW LEVEL SECURITY;
+  ALTER TABLE "EvidenceReminder" DISABLE ROW LEVEL SECURITY;
+END $$;
 
 DROP INDEX IF EXISTS "EvidenceReminder_sent_notifyAt_idx";
 DROP INDEX IF EXISTS "EvidenceReminder_tenantId_idx";
