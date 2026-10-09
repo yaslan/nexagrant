@@ -5,6 +5,7 @@ import { withTenant } from '@/lib/db';
 import { tenantScopeOf } from '@/lib/tenant';
 import { canAccessStatus, type ModuleDenyReason } from '@/lib/modules/state-machine';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
+import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
 
 /**
  * The module gate — the one place that turns a `ModuleState` row into an answer.
@@ -40,7 +41,9 @@ export interface ModuleAccessResult {
 
 /** Thrown by `assertModuleAccess`, so a caller can tell a gate refusal from a crash. */
 export class ModuleAccessError extends Error {
-  readonly code = 'MODULE_ACCESS_DENIED';
+  readonly code = MODULE_UNAVAILABLE_DIGEST;
+  /** Kept by Next.js across the action boundary: src/lib/module-unavailable.ts. */
+  readonly digest = MODULE_UNAVAILABLE_DIGEST;
 
   constructor(
     readonly moduleId: ModuleId,

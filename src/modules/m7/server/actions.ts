@@ -57,6 +57,9 @@ export async function createTtoItem({
 }
 
 export async function matchTtoItemToCalls(itemId: string) {
+  // The page gate is not enough: an action is a public POST endpoint, callable
+  // with M7 off or outside the plan (TASK-MUUS5HE3OW0CT).
+  await assertModuleAccess('M7');
   // Reads only (TASK-MUN80UOUPB2A4): nothing here is written, so an expired
   // pilot may still see it and no edit permission is needed.
   const { tenantId } = await requireTenantAction({ readOnly: true });

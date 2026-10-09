@@ -1,5 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
+import trMessages from '../../messages/tr.json';
+import enMessages from '../../messages/en.json';
 import { prisma } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
@@ -80,7 +82,18 @@ const FABRICATED_TOPIC_TITLES = [
 ];
 
 const GATED_ITEM_TITLE = 'E2E M7 gated create item';
+
+/**
+ * The module refusal as the page says it, in the page's own locale. Next's route
+ * announcer is also `role="alert"`, so the band is matched by its text.
+ */
+async function moduleRefusal(page: Page) {
+  const lang = await page.evaluate(() => document.documentElement.lang);
+  const text = (lang.startsWith('tr') ? trMessages : enMessages).Common.moduleUnavailable;
+  return page.getByRole('alert').filter({ hasText: text });
+}
 const MATCH_ITEM_TITLE = 'E2E M7 match item';
+const GATED_MATCH_ITEM_TITLE = 'E2E M7 gated match item';
 
 const SPEC_TENANTS = [TENANT, ISOLATION_TENANT];
 
@@ -600,6 +613,8 @@ test.describe('M7 TTO Accelerator', () => {
       const written = await prisma.ttoPortfolioItem.count({ where: { tenantId: TENANT, title: GATED_ITEM_TITLE } });
       expect(written).toBe(0);
       await expect(page.locator('h4', { hasText: GATED_ITEM_TITLE })).toHaveCount(0);
+      // The refusal is said, not swallowed (TASK-MUUS5HE3OW0CT follow-up).
+      await expect(await moduleRefusal(page)).toBeVisible();
       await page.screenshot({ path: `${SHOTS}/11-bug1-gated-create.png`, fullPage: true });
     } finally {
       await prisma.moduleState.update({
@@ -663,6 +678,52 @@ test.describe('M7 TTO Accelerator', () => {
       }
       await expect(page.getByText(/HORIZON-CL5-2026-D3-01|EIC-ACC-2026-STEP/)).toHaveCount(0);
       await page.screenshot({ path: `${SHOTS}/13-bug3-matching-empty.png`, fullPage: true });
+    } finally {
+      await prisma.ttoPortfolioItem.delete({ where: { id: item.id } });
+    }
+  });
+
+  test('14 — matchTtoItemToCalls is gated too, and the refusal is shown', async ({ page }) => {
+    const item = await prisma.ttoPortfolioItem.create({
+      data: {
+        tenantId: TENANT,
+        title: GATED_MATCH_ITEM_TITLE,
+        trl: 4,
+        patentStatus: 'pending',
+        summary: 'Item matched while M7 is off',
+        keywords: ['e2e'],
+      },
+    });
+    try {
+      await signInAs(page, sessionToken(M7_MEMBER));
+      await page.goto(TTO_BASE_URL);
+      await expectHydrated(page.locator('body'));
+      const card = page.locator('div.rounded-2xl', { has: page.locator('h4', { hasText: GATED_MATCH_ITEM_TITLE }) });
+      await expect(card).toHaveCount(1);
+
+      await prisma.moduleState.update({
+        where: { tenantId_moduleId: { tenantId: TENANT, moduleId: 'M7' } },
+        data: { status: 'OFF' },
+      });
+      try {
+        const posted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('/tto'));
+        await card.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).click();
+        await posted;
+        await expect(await moduleRefusal(page)).toBeVisible();
+        // No result modal over it: a refusal is not "no matching call found".
+        await expect(page.getByText(/AB Çağrı Eşleştirme Sonucu/)).toHaveCount(0);
+        await page.screenshot({ path: `${SHOTS}/14-gated-match-message.png`, fullPage: true });
+      } finally {
+        await prisma.moduleState.update({
+          where: { tenantId_moduleId: { tenantId: TENANT, moduleId: 'M7' } },
+          data: { status: 'ON' },
+        });
+      }
+
+      // Control: module back on, the same button answers with the honest empty result.
+      await card.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).click();
+      await expect(page.getByText('AB Çağrı Eşleştirme Sonucu (0)')).toBeVisible();
+      await expect(await moduleRefusal(page)).toHaveCount(0);
     } finally {
       await prisma.ttoPortfolioItem.delete({ where: { id: item.id } });
     }
