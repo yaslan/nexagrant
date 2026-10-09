@@ -2877,7 +2877,75 @@
       "matchCalls": "AB Çağrıları Eşleştir",
       "matchResultTitle": "AB Çağrı Eşleştirme Sonucu ({count})",
       "noMatch": "Bu teknoloji için eşleşen AB çağrısı bulunamamıştır.",
-      "openM4Relationship": "M4 İlişkisi Aç"
+      "openM4Relationship": "M4 İlişkisi Aç",
+      "header": {
+        "kicker": "Modül 7 — TTO Accelerator",
+        "title": "Üniversite TTO Portföy & AB Çağrı Eşleştirici",
+        "subtitle": "Üniversite Ar-Ge patent portföylerini Ufuk Avrupa çağrılarıyla ve özel sektör ihtiyaçlarıyla buluşturun.",
+        "engineBadge": "Patent & TRL Engine"
+      },
+      "stats": {
+        "totalAssetsLabel": "Toplam TTO IP Varlığı",
+        "technologiesUnit": "Teknoloji",
+        "avgTrlLabel": "Ortalama TRL Seviyesi",
+        "grantedLabel": "Tescilli Patent (Granted)",
+        "patentsUnit": "Patent"
+      },
+      "trlValue": "TRL {value}",
+      "tabs": {
+        "portfolio": "TTO Portföy Kartları ({count})",
+        "roadmap": "TRL Seviye Haritası (TRL 1-9)",
+        "checklist": "IP & Lisanslama Kontrol Listesi"
+      },
+      "form": {
+        "heading": "Yeni Patent / IP Portföy Öğesi Ekle",
+        "titleLabel": "Teknoloji / Patent Başlığı",
+        "titlePlaceholder": "Örn: Katı Hal Batarya Mikrosensör Dizesi",
+        "trlLabel": "TRL (1 - 9)",
+        "patentStatusLabel": "Patent Durumu",
+        "keywordsLabel": "Anahtar Kelimeler (Virgülle ayırın)",
+        "keywordsPlaceholder": "Örn: batarya, termal, sensör, katı hal",
+        "summaryLabel": "Teknoloji Özeti & Avantajları",
+        "summaryPlaceholder": "Teknolojinin AB projelerine sunacağı teknik üstünlükler ve ticarileştirme nitelikleri...",
+        "submit": "TTO Portföyüne Kaydet",
+        "submitting": "Ekleniyor..."
+      },
+      "patentStatus": {
+        "granted": "Tescilli (Granted)",
+        "pending": "Başvuru Aşamasında (Pending)",
+        "licensed": "Lisanslandı (Licensed)"
+      },
+      "portfolio": {
+        "heading": "Portföy Teknolojileri ({count})",
+        "hint": "AB Çağrı Eşleşmesi İçin Karta Tıklayın",
+        "generateChecklist": "IP Kontrol Listesi Üret",
+        "generatingChecklist": "Üretiliyor..."
+      },
+      "roadmap": {
+        "title": "Teknoloji Hazırlık Seviyesi (TRL 1 - 9) Matrisi",
+        "subtitle": "Horizon Europe projelerinde üniversite buluşlarının ticarileşme olgunlaşma basamakları.",
+        "researchBadge": "TRL 1 - 3 (Temel Araştırma)",
+        "researchTitle": "Laboratuvar & Konsept Kanıtı",
+        "researchBody": "Temel ilkelerin gözlemlenmesi, teknoloji konseptinin ve uygulamanın formule edilmesi.",
+        "prototypeBadge": "TRL 4 - 6 (Prototip & Doğrulama)",
+        "prototypeTitle": "Laboratuvar & İlgili Ortam Doğrulaması",
+        "prototypeBody": "Bileşenlerin laboratuvarda ve ilgili sanayi ortamında doğrulanması. (Ufuk Avrupa Ar-Ge odağı).",
+        "marketBadge": "TRL 7 - 9 (Ticarileşme & Pazar)",
+        "marketTitle": "Demonstrasyon & Operasyonel Yaygınlaşma",
+        "marketBody": "Sistemin gerçek operasyonel ortamda gösterimi, tescili ve pazar lisanslaması."
+      },
+      "checklist": {
+        "title": "Fikri Mülkiyet (IP) & Lisanslama Kontrol Rehberi",
+        "empty": "Lütfen Portföy sekmesindeki herhangi bir teknoloji için \"{button}\" butonuna tıklayın."
+      },
+      "matcher": {
+        "kicker": "AB Horizon Europe Çağrı Eşleştirici",
+        "close": "Kapat",
+        "analyzing": "Yapay Zeka AB Çağrılarını Analiz Ediyor...",
+        "fitScore": "Uyum Skoru: %{score}",
+        "targetTrl": "Hedef TRL: <strong>{range}</strong>"
+      },
+      "ipChecklistFallback": "### 📋 TTO IP & Lisanslama Kontrol Listesi\n\n1. **Arka Plan Fikri Mülkiyet (Background IP) Beyanı:**\n   - [x] Tescilli patent belgesi ({patentStatus}) ve hak sahipliği sözleşmesi hazırlandı.\n   - [ ] Üniversite araştırmacılarının buluş bildirimi (Invention Disclosure Form) dosyalandı.\n\n2. **Ön Plan Fikri Mülkiyet (Foreground IP) ve Lisanslama:**\n   - [ ] Proje çıktılarının (Foreground IP) lisans hakları için ön anlaşma metni taslağı.\n   - [ ] Özel sektör ortakları için ticarileştirme opsiyon hakkı (Option Agreement).\n\n3. **Spin-off & Pazar Açılımı:**\n   - [ ] TRL {trl}'den TRL {nextTrl} seviyesine ticarileştirme yol haritası.\n   - [ ] Şirketleşme (Spin-off) hisse paylaşım modeli.\n\n4. **AB Konsorsiyum Anlaşması Maddeleri:**\n   - [ ] Konsorsiyum anlaşmasında arka plan IP kullanımı kısıtlamaları duyuruldu."
     }
   }
 }

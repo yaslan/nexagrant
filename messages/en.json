@@ -2877,7 +2877,75 @@
       "matchCalls": "Match EU calls",
       "matchResultTitle": "EU call matching result ({count})",
       "noMatch": "No matching EU call was found for this technology.",
-      "openM4Relationship": "Open M4 relationship"
+      "openM4Relationship": "Open M4 relationship",
+      "header": {
+        "kicker": "Module 7 — TTO Accelerator",
+        "title": "University TTO Portfolio & EU Call Matcher",
+        "subtitle": "Connect university R&D patent portfolios with Horizon Europe calls and private-sector needs.",
+        "engineBadge": "Patent & TRL Engine"
+      },
+      "stats": {
+        "totalAssetsLabel": "Total TTO IP assets",
+        "technologiesUnit": "Technologies",
+        "avgTrlLabel": "Average TRL",
+        "grantedLabel": "Granted patents",
+        "patentsUnit": "Patents"
+      },
+      "trlValue": "TRL {value}",
+      "tabs": {
+        "portfolio": "TTO portfolio cards ({count})",
+        "roadmap": "TRL level map (TRL 1-9)",
+        "checklist": "IP & licensing checklist"
+      },
+      "form": {
+        "heading": "Add a new patent / IP portfolio item",
+        "titleLabel": "Technology / patent title",
+        "titlePlaceholder": "e.g. Solid-state battery micro-sensor array",
+        "trlLabel": "TRL (1 - 9)",
+        "patentStatusLabel": "Patent status",
+        "keywordsLabel": "Keywords (comma separated)",
+        "keywordsPlaceholder": "e.g. battery, thermal, sensor, solid state",
+        "summaryLabel": "Technology summary & advantages",
+        "summaryPlaceholder": "The technical strengths and commercial qualities this technology brings to EU projects...",
+        "submit": "Save to TTO portfolio",
+        "submitting": "Saving..."
+      },
+      "patentStatus": {
+        "granted": "Granted",
+        "pending": "Pending",
+        "licensed": "Licensed"
+      },
+      "portfolio": {
+        "heading": "Portfolio technologies ({count})",
+        "hint": "Click a card to match it to EU calls",
+        "generateChecklist": "Generate IP checklist",
+        "generatingChecklist": "Generating..."
+      },
+      "roadmap": {
+        "title": "Technology Readiness Level (TRL 1 - 9) matrix",
+        "subtitle": "The commercialisation maturity steps of university inventions in Horizon Europe projects.",
+        "researchBadge": "TRL 1 - 3 (Basic research)",
+        "researchTitle": "Laboratory & proof of concept",
+        "researchBody": "Basic principles observed; technology concept and application formulated.",
+        "prototypeBadge": "TRL 4 - 6 (Prototype & validation)",
+        "prototypeTitle": "Validation in the lab & relevant environment",
+        "prototypeBody": "Components validated in the laboratory and in a relevant industrial environment (the Horizon Europe R&D focus).",
+        "marketBadge": "TRL 7 - 9 (Commercialisation & market)",
+        "marketTitle": "Demonstration & operational roll-out",
+        "marketBody": "System demonstrated in a real operational environment, registered and licensed to the market."
+      },
+      "checklist": {
+        "title": "Intellectual property (IP) & licensing checklist guide",
+        "empty": "Click \"{button}\" on any technology in the Portfolio tab."
+      },
+      "matcher": {
+        "kicker": "EU Horizon Europe call matcher",
+        "close": "Close",
+        "analyzing": "AI is analysing EU calls...",
+        "fitScore": "Fit score: {score}%",
+        "targetTrl": "Target TRL: <strong>{range}</strong>"
+      },
+      "ipChecklistFallback": "### 📋 TTO IP & licensing checklist\n\n1. **Background IP declaration:**\n   - [x] Registered patent document ({patentStatus}) and ownership agreement prepared.\n   - [ ] Invention Disclosure Forms of the university researchers filed.\n\n2. **Foreground IP and licensing:**\n   - [ ] Draft pre-agreement on licence rights to the project results (Foreground IP).\n   - [ ] Commercialisation option right for private-sector partners (Option Agreement).\n\n3. **Spin-off & market entry:**\n   - [ ] Commercialisation roadmap from TRL {trl} to TRL {nextTrl}.\n   - [ ] Spin-off equity sharing model.\n\n4. **EU consortium agreement clauses:**\n   - [ ] Restrictions on the use of background IP declared in the consortium agreement."
     }
   }
 }
