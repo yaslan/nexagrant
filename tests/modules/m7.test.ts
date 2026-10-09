@@ -1,6 +1,13 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { createTtoItem, matchTtoItemToCalls, generateIpChecklist } from '../../src/modules/m7/server/actions';
-import { resetScope, setScope, FakeTenantScopeError } from '../helpers/tenant-scope-mock';
+import {
+  resetScope,
+  setScope,
+  FakeTenantScopeError,
+  FakeModuleAccessError,
+  setModuleOpen,
+  resetModuleAccess,
+} from '../helpers/tenant-scope-mock';
 import { generateText } from '../../src/lib/llm';
 
 const h = vi.hoisted(() => ({
@@ -32,6 +39,7 @@ vi.mock('../../src/lib/llm', () => ({
 describe('M7 TTO Accelerator Module', () => {
   beforeEach(() => {
     resetScope();
+    resetModuleAccess();
     vi.clearAllMocks();
     h.ttoCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'tto-123',
@@ -89,6 +97,24 @@ describe('M7 TTO Accelerator Module', () => {
 
     const res = await matchTtoItemToCalls('tto-from-other-tenant');
     expect(res.matchedTopics).toEqual([]);
+  });
+
+  // TASK-MUUS5HE3OW0CT — both actions are public POST endpoints; the page gate
+  // does not cover a direct call with M7 off or outside the plan.
+  test('createTtoItem refuses before writing when M7 is closed', async () => {
+    setModuleOpen(false);
+
+    await expect(
+      createTtoItem({ title: 'Gated', trl: 5, patentStatus: 'granted', summary: '', keywords: [] })
+    ).rejects.toBeInstanceOf(FakeModuleAccessError);
+    expect(h.ttoCreate).not.toHaveBeenCalled();
+  });
+
+  test('matchTtoItemToCalls refuses before reading when M7 is closed', async () => {
+    setModuleOpen(false);
+
+    await expect(matchTtoItemToCalls('tto-123')).rejects.toBeInstanceOf(FakeModuleAccessError);
+    expect(h.ttoFindFirst).not.toHaveBeenCalled();
   });
 
   test('generateIpChecklist generates tailored TTO IP protection checklist', async () => {
