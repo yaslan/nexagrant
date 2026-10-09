@@ -131,7 +131,18 @@ Canlı DB'de sıra (CI'daki `Prepare database` adımıyla aynı, `.github/workfl
   - `R1_SONUC | DUR_MUKERRER` (mükerrer çiftler üstte listelenir) → **DUR.** Temizlik kararı patronundur (K1 türetilmiş veridir, yeniden hesaplanır). Bu durumda 3. adım `topicmatch-per-opportunity/migration.sql` içinde `could not create unique index … is duplicated` ile durur (exit 3). Veri silmez, eski anahtar yerinde kalır (ölçüldü: satır sayısı ve içerik md5'i önce ve sonra aynı; `docs/agent-results/TASK-MUOG51GJ3PUOG-devop-fb-ekler/B2-migration-durur.txt`). Mükerrerleri elle silmeyin.
   - `R1_SONUC | RLS_KOR` → sayım güvenilmez: rol FORCE RLS altında satırları göremiyor (`system_scope` politikası yok ve rol süper kullanıcı değil). Süper kullanıcıyla ya da `pnpm db:rls` sonrası yeniden koşun.
   Betik `SET LOCAL app.system_scope = 'on'` ile yalnız kendi işlemi için RLS kapsamını açar. Bu satırı çıkarmayın: `TopicMatch` FORCE RLS altındadır ve süper kullanıcı olmayan rol kapsam olmadan 0 satır görür; mükerrer varken `NULLS_DISTINCT` diye yanlış "devam" sonucu çıkar (ölçüldü, aynı ekler `B3-rls-kapsam.txt`).
-- [ ] 1. `pnpm exec prisma db push` — **`--accept-data-loss` VERMEYİN**. Veri kaybı gerektiren bir fark varsa komut durur; o durumda dur ve incele. `DATABASE_URL` §2.1'deki `verify-full&sslrootcert` sonekini taşır; Prisma CLI'nın TLS doğrulamasını `prisma.config.ts` kurar (TASK-MUOG51GJ3PUOG Y-1). Önce salt-okuma kontrol: `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code > /dev/null; echo $?` → `0` (fark yok) ya da `2` (fark var) bağlandı demektir; `P1011 … certificate was not trusted` → CA ya da ana bilgisayar adı yanlış, **dur** (doğrulamasız bağlanmaz). `sslrootcert not found` → CA yolu yanlış.
+- [ ] 1. `pnpm exec prisma db push` — **`--accept-data-loss` VERMEYİN**. Veri kaybı gerektiren bir fark varsa komut durur; o durumda dur ve incele. `DATABASE_URL` §2.1'deki `verify-full&sslrootcert` sonekini taşır; Prisma CLI'nın TLS doğrulamasını `prisma.config.ts` kurar (TASK-MUOG51GJ3PUOG Y-1). Önce salt-okuma kontrol: `pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code > /dev/null; echo $?` → `0` (fark yok) ya da `2` (fark var) bağlandı demektir; `P1011 … certificate was not trusted` → CA ya da ana bilgisayar adı yanlış, **dur** (doğrulamasız bağlanmaz). `sslrootcert not found` → CA yolu yanlış. **Not:** macOS host'unda Prisma CLI canlı Supabase'e P1011 ile bağlanamaz (Darwin Security.framework, EKU doğrulaması eksikliği — ölçüldü TASK-MUOG51GJ3PUOG-devop-fb-risk1.md). **Çözüm:** Bu adımı Linux konteynerinden koşun:
+  ```bash
+  docker run --rm \
+    -v <repo-path>:/src:ro \
+    -v <certs-path>:/src/certs:ro \
+    -e DATABASE_URL="<postgresql://…&sslrootcert=/build/app/certs/prod-ca-2021.crt>" \
+    -e CI=true \
+    node:22-alpine sh -c 'cp -r /src /build/app && cd /build/app && \
+      npm install -g pnpm && pnpm install --frozen-lockfile && \
+      pnpm exec prisma db push'
+  ```
+  Konteyner çıktısında "fark yok" (exit 0) ya da "fark var" (exit 2) görebilirsiniz; "P1011" yok olmalı. İlk defa bu yol koşulursa takvim saat kısıtı yoktur (Network indirmesi ~40 sn). Bu adım çalıştıktan sonra runner-up 3. adımdan §3.1 2a (c) adımını bir kez daha koşmalı (claim taşıma penceresi kontrolü).
 - [ ] 2. `pnpm db:rls-role` — `fabrika_app` rolü (sonraki adımların `GRANT … TO fabrika_app` satırları bunu arar).
 - [ ] 2a. **Eski worker'ı durdur. ZORUNLU, atlanamaz.** Yeni sürümün `legacyClaims` koruması bu adımın yerini tutmaz; yalnız bir sırayı kapatır (gerekçe ve ölçüm aşağıda, **Claim taşıma penceresi**). Yeni worker §3.3'te kalkana kadar bu DB'de hiçbir worker koşmaz.
   - **İlk canlı kurulumda** eski worker yoktur. 2a o zaman yalnız "bu DB'ye bağlı koşan bir worker yok" kontrolüdür: aşağıdaki (b) ve (c) adımları.
