@@ -114,6 +114,9 @@ export function TtoAcceleratorClient({
       setMatchedTopics(res.matchedTopics || []);
     } catch (err) {
       console.error('Error matching TTO item:', err);
+      // A refused match has no result: an open modal would read "no matching
+      // call found" and cover the band that says why (TASK-MUUS5HE3OW0CT).
+      setSelectedMatchItem(null);
       setActionError(errorText(err, null));
     } finally {
       setIsMatching(false);
