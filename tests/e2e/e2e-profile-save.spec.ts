@@ -6,23 +6,12 @@
  * After: Form gerçek sunucu isteği gönderiyor, başarı mesajı ancak sunucu başarılı dönünce gösterilir.
  */
 import { test, expect } from '@playwright/test';
-import path from 'path';
 import crypto from 'crypto';
+import { expectHydrated } from './fixtures/hydration';
 
 const suffix = crypto.randomBytes(3).toString('hex');
 
 test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
-  let tenantId: string;
-  let userId: string;
-  let authToken: string;
-
-  test.beforeAll(async () => {
-    // Setup: Create test tenant and user with auth token
-    // This would normally be done via an API setup call
-    // For now, we skip this and assume the test environment is pre-configured
-    tenantId = `test-tenant-${suffix}`;
-    userId = `test-user-${suffix}`;
-  });
 
   test('should send profile update to server and persist after reload', async ({ browser }) => {
     const context = await browser.newContext();
@@ -36,7 +25,8 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     const profileUrl = `${baseUrl}/tr/default/settings/profile`;
 
     // Go to profile page
-    await page.goto(profileUrl, { waitUntil: 'networkidle' });
+    await page.goto(profileUrl);
+    await expectHydrated(page.locator('body'));
 
     // Wait for page to load
     await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
@@ -44,10 +34,6 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     // Get the current values
     const capabilitiesInput = page.locator('textarea[placeholder*="teknik"]');
     const keywordsInput = page.locator('input[placeholder*="e.g. AI"]');
-
-    // Read current values
-    const originalCapabilities = await capabilitiesInput.inputValue();
-    const originalKeywords = await keywordsInput.inputValue();
 
     // Create new test data
     const newCapabilities = `Test profile ${suffix}: AI, ML, Robotics expertise, TRL 5-8`;
@@ -75,7 +61,8 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     await expect(successMessage).toBeVisible();
 
     // Reload the page
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload();
+    await expectHydrated(page.locator('body'));
 
     // Wait for form to load
     await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
@@ -98,7 +85,8 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
     const profileUrl = `${baseUrl}/tr/default/settings/profile`;
 
-    await page.goto(profileUrl, { waitUntil: 'networkidle' });
+    await page.goto(profileUrl);
+    await expectHydrated(page.locator('body'));
 
     // Wait for form
     await page.waitForSelector('textarea[placeholder*="teknik"]', { timeout: 5000 });
