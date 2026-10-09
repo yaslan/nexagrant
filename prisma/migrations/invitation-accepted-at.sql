@@ -1,0 +1,27 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- invitation-accepted-at.sql — TASK-MUN2793A57Z9I (davet kabul sayfası)
+--
+-- Purpose: an invitation link is single use. `/[locale]/accept-invite` marks
+-- the row accepted instead of deleting it, so a second click on the same link
+-- can say "already used" rather than "unknown link", and so the accept is one
+-- conditional UPDATE (… WHERE "acceptedAt" IS NULL) that two concurrent
+-- accepts cannot both win.
+--
+-- After this file:
+--   * "acceptedAt" (TIMESTAMP(3), NULL) — NULL: pending; set: accepted.
+--   * The seat limit counts only pending rows (src/lib/billing/seat-limit.ts);
+--     an accepted invitation's seat is the member it became.
+--   * A re-invite of the same address (POST /api/invitations upsert) sets it
+--     back to NULL together with the new token.
+--   * No existing row is changed: every row today is pending.
+--
+-- RLS: untouched. "Invitation" stays in prisma/rls.sql's tenant-isolated list;
+-- the policies key on "tenantId", which this file does not touch.
+--
+-- Idempotent: ADD COLUMN IF NOT EXISTS, so a database built by `prisma db push`
+-- first, or a second run, is a no-op.
+--
+-- Rollback: prisma/migrations/invitation-accepted-at.down.sql
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE "Invitation" ADD COLUMN IF NOT EXISTS "acceptedAt" TIMESTAMP(3);
