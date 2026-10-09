@@ -332,4 +332,27 @@ test.describe('public lead form — /tr/fon-hazirlik result screen', () => {
     expect(rows[0]).toMatchObject({ locale: 'en', province: null, source: 'fon-hazirlik', organisation: 'Ankara Metropolitan' });
     await context.close();
   });
+
+  test('JS disabled: noscript message appears on /tr/fon-hazirlik and /en/funding-readiness', async ({ browser }) => {
+    // JavaScript off = the server-rendered form, and noscript is visible.
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+
+    // TR version: noscript message should be visible.
+    await page.goto(TR_RESULT);
+    const noscriptTr = page.locator('noscript');
+    await expect(noscriptTr).toBeVisible();
+    // Message mentions JavaScript requirement.
+    const noscriptTextTr = await noscriptTr.textContent();
+    expect(noscriptTextTr).toMatch(/JavaScript|javascript/);
+
+    // EN version: noscript message should be visible.
+    await page.goto(EN_RESULT);
+    const noscriptEn = page.locator('noscript');
+    await expect(noscriptEn).toBeVisible();
+    const noscriptTextEn = await noscriptEn.textContent();
+    expect(noscriptTextEn).toMatch(/JavaScript|javascript/);
+
+    await context.close();
+  });
 });
