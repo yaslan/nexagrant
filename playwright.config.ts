@@ -43,6 +43,7 @@ const E2E_WEB_SERVER = process.env.E2E_WEB_SERVER === 'start' ? 'start' : 'dev';
 
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5433/fabrika',
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
   ...(E2E_WEB_SERVER === 'dev' ? { DEMO_LOGIN_ENABLED: 'true' } : {}),
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
