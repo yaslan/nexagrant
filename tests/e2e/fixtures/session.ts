@@ -304,8 +304,10 @@ export async function signInAs(
   }
 
   // Verify session via the session endpoint
+  const __t0 = Date.now(); // TEMP-TIMING (not committed)
   const sessionResponse = await page.request.get(`${baseURL}/api/auth/session`);
   const session = (await sessionResponse.json()) as { user?: { id?: string }; tenantId?: string | null } | null;
+  if (process.env.E2E_SESSION_CHECK_LOG) { require('node:fs').appendFileSync(process.env.E2E_SESSION_CHECK_LOG, `${Date.now() - __t0}\n`); } // TEMP-TIMING
 
   if (!session?.user?.id || !session?.tenantId) {
     throw new Error(
