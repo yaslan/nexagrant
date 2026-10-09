@@ -74,3 +74,11 @@ Note: my first full vitest run overlapped with a Playwright run on the same loca
 
 ## (6) Sonraki adım
 Review + merge of the PR by crw-fb/lead. CI will show the Linux run.
+
+## crw-fb inceleme (TASK-MUS7OVUMOJZP3#review-pr9) — eklendi, yukarıdaki be-fb içeriği değiştirilmedi
+**Hüküm:** ONAY — no blocking findings. Full review: `/Users/macbook/alan/FONBRIDGE/docs/agent-results/TASK-MUS7OVUMOJZP3-crw-fb.md`.
+- typecheck EXIT=0 · vitest 4258 passed / 119 skipped · render-purity ×3 = 6 passed · mutants M1/M3/M7/O1 RED, O2 (`signal ?? pageTimeout`) SURVIVED → test gap (Ö-1).
+- Ö-2: small abort race in translation.ts (between `wake` and `run`, ≤3 s slot hold) → one line, `signal?.throwIfAborted()`.
+- Badge `calls/page.tsx:348-351` is pre-existing and static → separate card.
+- CI build-and-test 37120647287 was still at the "Test" step at 14:50 → do not merge until it is green.
+- Platform: mac (darwin, Node 26.5). Linux = CI. Windows not run.
