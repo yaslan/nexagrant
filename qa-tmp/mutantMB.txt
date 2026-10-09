@@ -1,0 +1,25 @@
+  ✘  1 [chromium] › tests/e2e/render-purity-refactor.spec.ts:146:7 › render-purity refactor — the three formerly suppressed components › the calls list loads, and changing a filter puts it back into loading (12.0s)
+  ✘  2 [chromium] › tests/e2e/render-purity-refactor.spec.ts:146:7 › render-purity refactor — the three formerly suppressed components › the calls list loads, and changing a filter puts it back into loading (11.1s)
+  ✘  3 [chromium] › tests/e2e/render-purity-refactor.spec.ts:146:7 › render-purity refactor — the three formerly suppressed components › the calls list loads, and changing a filter puts it back into loading (11.1s)
+    Error: expect(locator).toBeVisible() failed
+    Error: element(s) not found
+      166 |     await expect.poll(() => calls.requests.length).toBeGreaterThan(0);
+    > 168 |     await expect(loadingLabel).toBeVisible();
+      169 |     await expect(energy).toBeHidden();
+      171 |     await expect(loadingLabel).toBeHidden({ timeout: 30_000 });
+    test-results/render-purity-refactor-ren-10bbb-r-puts-it-back-into-loading-chromium/test-failed-1.png
+    Error: expect(locator).toBeVisible() failed
+    Error: element(s) not found
+      166 |     await expect.poll(() => calls.requests.length).toBeGreaterThan(0);
+    > 168 |     await expect(loadingLabel).toBeVisible();
+      169 |     await expect(energy).toBeHidden();
+      171 |     await expect(loadingLabel).toBeHidden({ timeout: 30_000 });
+    test-results/render-purity-refactor-ren-10bbb-r-puts-it-back-into-loading-chromium-repeat1/test-failed-1.png
+    Error: expect(locator).toBeVisible() failed
+    Error: element(s) not found
+      166 |     await expect.poll(() => calls.requests.length).toBeGreaterThan(0);
+    > 168 |     await expect(loadingLabel).toBeVisible();
+      169 |     await expect(energy).toBeHidden();
+      171 |     await expect(loadingLabel).toBeHidden({ timeout: 30_000 });
+    test-results/render-purity-refactor-ren-10bbb-r-puts-it-back-into-loading-chromium-repeat2/test-failed-1.png
+  3 failed

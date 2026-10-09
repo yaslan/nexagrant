@@ -1,0 +1,20 @@
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+  ✓  10 [chromium] › tests/e2e/render-purity-refactor.spec.ts:146:7 › render-purity refactor — the three formerly suppressed components › the calls list loads, and changing a filter puts it back into loading (1.2s)
+
+  10 passed (19.4s)
