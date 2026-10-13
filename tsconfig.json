@@ -43,5 +43,5 @@
   // `.ts` import specifiers that `tsc` rejects, TS5097). Leaving them in scope
   // made `pnpm typecheck` — and therefore the whole `pnpm gate` — red at HEAD
   // for every agent, from one committed probe file (TASK-MTSYH8LDGV5YU).
-  "exclude": ["node_modules", "docs/agent-results", "_workspace"]
+  "exclude": ["node_modules", "docs/agent-results", "_workspace", ".claude/worktrees"]
 }
