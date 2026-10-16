@@ -17,7 +17,7 @@ pnpm db:rls              # prisma/rls.sql uygula (psql gerektirmez)
 pnpm test                # vitest
 pnpm test:e2e            # playwright
 pnpm lint && pnpm typecheck
-pnpm gate                # lint + typecheck + test + e2e + rls:check + rls:verify + alerts:check (kapinin tamami)
+pnpm gate                # db:generate + lint + typecheck + test + i18n:check + rls:check + rls:bypass-check + rls:verify --require-db + e2e + alerts:check (kapinin tamami)
 pnpm rls:verify          # DB gercekten kiraci izolasyonu uyguluyor mu (canli olcum)
 pnpm alerts:check        # acik SystemAlert satirlari silinmis kiracilari mi gosteriyor (oksuz alarm kapisi)
 pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)
