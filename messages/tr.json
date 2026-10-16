@@ -2891,6 +2891,27 @@
       "openM4Relationship": "M4 İlişkisi Aç"
     }
   },
+  "PartnersLeaders": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbPartners": "Ortaklar",
+    "breadcrumbLeaders": "Lider Koordinatörler",
+    "backToPartners": "← Ortaklar Listesine Dön",
+    "title": "Kilit Ekosistem Liderleri (Merkeziyet Analizi)",
+    "titleByTopic": "{prefix} konusunun koordinatörleri",
+    "intro": "Bu kurumlar Horizon Europe ve H2020 projelerinde en fazla katılım sağlayan ve koordine eden kurumlar arasındadır (CORDIS verisi).",
+    "introByTopic": "Bu konu kodu önekindeki projelerde en çok koordinatörlük yapan kurumlar (CORDIS verisi). HORIZON-CL5- gibi bir önek girin.",
+    "topicLabel": "Konu kodu öneki",
+    "topicPlaceholder": "ör. HORIZON-CL5-",
+    "topicSubmit": "Listele",
+    "topicClear": "Temizle",
+    "topicInvalid": "Önek en az 3 karakter olmalı ve yalnızca harf, rakam ve tire içermelidir.",
+    "noTopicResults": "Bu önekte koordinatör bulunamadı.",
+    "loadFailed": "Koordinatör listesi şu an yüklenemedi. Lütfen biraz sonra yeniden deneyin.",
+    "picLabel": "PIC:",
+    "coordinatedLabel": "Koordine Edilen Proje:",
+    "totalLabel": "Toplam Katılım:",
+    "ecContributionLabel": "Koordine Edilen AB Katkısı:"
+  },
   "PartnersPage": {
     "crossLinks": {
       "label": "İlgili sayfalar",
