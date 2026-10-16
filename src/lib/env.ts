@@ -66,6 +66,13 @@ const envSchema = z.object({
   SMTP_USER: blankToUndefined(z.string().optional()),
   SMTP_PASS: blankToUndefined(z.string().optional()),
   SMTP_FROM: blankToUndefined(z.string().optional()),
+  /**
+   * Key for the IP hash of the public expert pre-registration (TASK-MVBIXPP33UK1B,
+   * src/lib/expert-prereg/server/). The per-IP limit stores HMAC(IP) under this
+   * key, never the address. Unset = no IP is stored and the per-IP limit does not
+   * apply; the route logs that once. Set it to a random string of 32+ characters.
+   */
+  EXPERT_PREREG_IP_SALT: blankToUndefined(z.string().min(32).optional()),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */

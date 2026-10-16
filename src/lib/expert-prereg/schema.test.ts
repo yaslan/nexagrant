@@ -62,6 +62,12 @@ describe('expertPreRegInputSchema', () => {
     expect(codeOf({ ...valid, email: 'not-an-email' }, 'email')).toBe('invalid_email');
   });
 
+  it('reports a missing choice as required, and a wrong one as its own code', () => {
+    expect(codeOf({ ...valid, province: undefined }, 'province')).toBe('required');
+    expect(codeOf({ ...valid, isFreelancer: undefined }, 'isFreelancer')).toBe('required');
+    expect(codeOf({ ...valid, isFreelancer: 'yes' }, 'isFreelancer')).toBe('invalid');
+  });
+
   it('refuses a slug that is not in the closed list', () => {
     expect(codeOf({ ...valid, province: '99' }, 'province')).toBe('unknown_slug');
     expect(codeOf({ ...valid, expertiseAreas: ['astrology'] }, 'expertiseAreas')).toBe('unknown_slug');

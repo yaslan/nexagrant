@@ -22,6 +22,11 @@ import {
 
 const PROVINCE_CODES = PROVINCES.map((p) => p.value) as [string, ...string[]];
 
+/** A missing value is `required`; a present but wrong one gets `code`. */
+const orRequired = (code: string) => ({
+  error: (issue: { input?: unknown }) => (issue.input === undefined ? 'required' : code),
+});
+
 /** Optional free text: blank = absent, stored as null. */
 const optionalText = (max: number) =>
   z
@@ -70,9 +75,9 @@ export const expertPreRegInputSchema = z.object({
     .toLowerCase()
     .max(254, { error: 'too_long' })
     .pipe(z.email({ error: 'invalid_email' })),
-  province: z.enum(PROVINCE_CODES, { error: 'unknown_slug' }),
+  province: z.enum(PROVINCE_CODES, orRequired('unknown_slug')),
   title: optionalText(120),
-  isFreelancer: z.boolean({ error: 'invalid' }),
+  isFreelancer: z.boolean(orRequired('invalid')),
   expertiseAreas: slugList(EXPERTISE_AREAS, 8),
   roles: slugList(ROLES, 5),
   programmes: slugList(PROGRAMMES, 6),
@@ -100,6 +105,8 @@ export const expertPreRegInputSchema = z.object({
   /** Must be literally true: the expert is listed in the public count only with this. */
   visibilityConsent: z.literal(true, { error: 'consent_required' }),
   marketingConsent: z.boolean({ error: 'invalid' }).optional().default(false),
+  /** The UI language the form was shown in: the verification mail and the redirect follow it. */
+  locale: z.enum(['tr', 'en'], orRequired('unknown_slug')).default('tr'),
 });
 
 export type ExpertPreRegInput = z.input<typeof expertPreRegInputSchema>;

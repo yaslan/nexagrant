@@ -2918,5 +2918,13 @@
       "leaders": "Key ecosystem leaders",
       "personDays": "Person-days report"
     }
+  },
+  "ExpertPreregEmail": {
+    "subject": "Confirm your expert pre-registration · {product}",
+    "greeting": "Hello {name},",
+    "intro": "We received your expert pre-registration for {product}. Click the link below to confirm it.",
+    "cta": "Confirm my registration",
+    "expires": "The link is valid until {date}.",
+    "ignore": "If you did not register, you can ignore this email."
   }
 }
