@@ -171,7 +171,10 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl }: Expert
     const body = payload();
     const parsed = expertPreRegInputSchema.safeParse(body);
     if (!parsed.success) {
-      showErrors(toFieldErrors(parsed.error.issues.map((i) => [i.path[0], i.message])));
+      const found = toFieldErrors(parsed.error.issues.map((i) => [i.path[0], i.message]));
+      // The schema says too_short for an empty name; to the person it is simply missing.
+      if (found.fullName === 'too_short' && fullName.trim() === '') found.fullName = 'required';
+      showErrors(found);
       return;
     }
     setErrors({});

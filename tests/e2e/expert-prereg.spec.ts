@@ -106,7 +106,7 @@ test.describe('expert pre-registration (FO-20)', () => {
     const fullName = page.getByLabel(/Ad Soyad/);
     await expect(fullName).toBeFocused();
     await expect(fullName).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('#ep-fullName-error')).toHaveText('Çok kısa.');
+    await expect(page.locator('#ep-fullName-error')).toHaveText('Bu alan zorunludur.');
     await expect(page.locator('#ep-email-error')).toHaveText('Geçerli bir e-posta adresi yazın.');
     await expect(page.locator('#expertiseAreas-error')).toHaveText('Bu alan zorunludur.');
     await expect(page.locator('#ep-kvkkAccepted-error')).toHaveText('Devam etmek için bu onay gereklidir.');

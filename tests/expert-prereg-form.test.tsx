@@ -76,7 +76,7 @@ describe('ExpertPreregForm', () => {
     await waitFor(() => expect(document.activeElement).toBe(name));
     expect(name.getAttribute('aria-invalid')).toBe('true');
     const err = document.getElementById('ep-fullName-error');
-    expect(err?.textContent).toBe(tr.errors.too_short);
+    expect(err?.textContent).toBe(tr.errors.required);
     expect(name.getAttribute('aria-describedby')).toContain('ep-fullName-error');
     expect(document.getElementById('ep-email-error')?.textContent).toBe(tr.errors.invalid_email);
     expect(document.getElementById('ep-province-error')?.textContent).toBe(tr.errors.unknown_slug);
