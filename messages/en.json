@@ -2879,5 +2879,25 @@
       "noMatch": "No matching EU call was found for this technology.",
       "openM4Relationship": "Open M4 relationship"
     }
+  },
+  "PartnersLeaders": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbPartners": "Partners",
+    "breadcrumbLeaders": "Top Leaders",
+    "backToPartners": "← Back to Partners",
+    "title": "Key Ecosystem Leaders",
+    "titleByTopic": "Coordinators for {prefix}",
+    "intro": "These organisations are among the most active participants and coordinators in Horizon Europe and H2020 projects (CORDIS data).",
+    "introByTopic": "Organisations that coordinate the most projects under this topic-code prefix (CORDIS data). Pick a prefix such as HORIZON-CL5-.",
+    "topicLabel": "Topic code prefix",
+    "topicPlaceholder": "e.g. HORIZON-CL5-",
+    "topicSubmit": "Show",
+    "topicClear": "Clear",
+    "topicInvalid": "The prefix must be at least 3 characters and use only letters, digits and hyphens.",
+    "noTopicResults": "No coordinators found for this prefix.",
+    "picLabel": "PIC:",
+    "coordinatedLabel": "Projects Coordinated:",
+    "totalLabel": "Total Projects:",
+    "ecContributionLabel": "EU Contribution Coordinated:"
   }
 }
