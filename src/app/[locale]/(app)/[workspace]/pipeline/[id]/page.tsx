@@ -145,6 +145,8 @@ export default async function OpportunityDetailPage({
       efforts={loaded.efforts}
       canArchive={canArchive}
       backHref={`/${locale}/${workspace}/pipeline`}
+      locale={locale}
+      workspace={workspace}
     />
   );
 }

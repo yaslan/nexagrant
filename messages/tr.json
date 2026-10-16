@@ -241,7 +241,18 @@
           "WITHDRAWN": "Geri çekilmiş bir fırsat için beyan yapılamaz.",
           "DECLARE_FAILED": "Beyan kaydedilemedi. Tekrar deneyin."
         }
-      }
+      },
+      "modules": {
+        "label": "Modüller",
+        "conceptNote": "Konsept Notu",
+        "evaluations": "İç Ön Değerlendirme",
+        "matching": "Konsorsiyum Rol Matrisi",
+        "consortium": "Konsorsiyum Kurucu",
+        "briefs": "Görüşme Brifingi",
+        "documents": "Takip Belgeleri",
+        "application": "Başvuru (Part A & B)"
+      },
+      "personDaysReport": "Adam-gün raporu"
     }
   },
   "pipeline": {
@@ -2878,6 +2889,13 @@
       "matchResultTitle": "AB Çağrı Eşleştirme Sonucu ({count})",
       "noMatch": "Bu teknoloji için eşleşen AB çağrısı bulunamamıştır.",
       "openM4Relationship": "M4 İlişkisi Aç"
+    }
+  },
+  "PartnersPage": {
+    "crossLinks": {
+      "label": "İlgili sayfalar",
+      "leaders": "Kilit ekosistem liderleri",
+      "personDays": "Adam-gün raporu"
     }
   }
 }

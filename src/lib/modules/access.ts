@@ -3,7 +3,8 @@ import { getEntitlements } from '@/lib/billing';
 import { planNamesGrantingModule } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import { tenantScopeOf } from '@/lib/tenant';
-import { canAccessStatus, type ModuleDenyReason } from '@/lib/modules/state-machine';
+import { canAccessStatus, type ModuleDenyReason, type ModuleViewer } from '@/lib/modules/state-machine';
+import { getAllManifests } from '@/lib/modules/registry';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
 
@@ -99,9 +100,26 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
     ),
   ]);
 
-  const status = (state?.status ?? 'OFF') as ModuleStatus;
+  return decideModuleAccess(
+    moduleId,
+    (state?.status ?? 'OFF') as ModuleStatus,
+    entitlements.allowedModules,
+    { role: scope.role, isPlatformAdmin: scope.isPlatformAdmin },
+  );
+}
 
-  if (!entitlements.allowedModules.includes(moduleId)) {
+/**
+ * The two-fact decision itself, shared by `checkModuleAccess` (one module, for a
+ * gate) and `listAccessibleModules` (every module, for navigation), so the entry
+ * points a user sees and the door they then knock on can never disagree.
+ */
+function decideModuleAccess(
+  moduleId: ModuleId,
+  status: ModuleStatus,
+  allowedModules: readonly string[],
+  viewer: ModuleViewer,
+): ModuleAccessResult {
+  if (!allowedModules.includes(moduleId)) {
     return {
       allowed: false,
       status,
@@ -111,13 +129,50 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
   }
 
   const decision = canAccessStatus(status, {
-    role: scope.role,
-    isPlatformAdmin: scope.isPlatformAdmin,
+    role: viewer.role,
+    isPlatformAdmin: viewer.isPlatformAdmin,
   });
 
   return decision.allowed
     ? { allowed: true, status }
     : { allowed: false, status, reason: decision.reason ?? 'MODULE_OFF' };
+}
+
+/**
+ * Every module the session's viewer may open, for the app shell's `ModuleProvider`
+ * (sidebar entries, opportunity tabs, cross-links). Same answer as calling
+ * `checkModuleAccess` once per module, in two reads instead of twenty-two.
+ *
+ * Navigation only: a hidden link is not a closed door, so every page behind these
+ * entries still runs `moduleGate` and every action `assertModuleAccess`.
+ */
+export async function listAccessibleModules(): Promise<ModuleId[]> {
+  const scope = tenantScopeOf(await auth());
+  if (!scope) return [];
+
+  const [states, entitlements] = await Promise.all([
+    withTenant(scope.tenantId, (tx) =>
+      tx.moduleState.findMany({
+        where: { tenantId: scope.tenantId },
+        select: { moduleId: true, status: true },
+      })
+    ),
+    withTenant(scope.tenantId, (tx) =>
+      getEntitlements(scope.tenantId, tx)
+    ),
+  ]);
+
+  const statusById = new Map<string, ModuleStatus>(
+    states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
+  );
+
+  return getAllManifests().map((m) => m.id).filter(
+    (id) =>
+      decideModuleAccess(id, statusById.get(id) ?? 'OFF', entitlements.allowedModules, {
+        role: scope.role,
+        isPlatformAdmin: scope.isPlatformAdmin,
+      }).allowed,
+  );
 }
 
 /**
