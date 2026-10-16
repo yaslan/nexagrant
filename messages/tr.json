@@ -2918,5 +2918,13 @@
       "leaders": "Kilit ekosistem liderleri",
       "personDays": "Adam-gün raporu"
     }
+  },
+  "ExpertPreregEmail": {
+    "subject": "Uzman ön kaydınızı doğrulayın · {product}",
+    "greeting": "Merhaba {name},",
+    "intro": "{product} uzman ön kaydınızı aldık. Kaydı tamamlamak için aşağıdaki bağlantıya tıklayın.",
+    "cta": "Kaydımı doğrula",
+    "expires": "Bağlantı {date} tarihine kadar geçerlidir.",
+    "ignore": "Bu kaydı siz yapmadıysanız bu e-postayı yok sayabilirsiniz."
   }
 }

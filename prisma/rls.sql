@@ -112,7 +112,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
-    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','Programme','PublicLead',
+    'CordisProjectSciVoc','CordisProjectTopic','ExpertPreRegistration','ModuleCatalog','Programme','PublicLead',
     'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN

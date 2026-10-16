@@ -55,6 +55,7 @@ hash-bearer-tokens.sql
 credit-ledger-grant-period.sql
 invitation-accepted-at.sql
 add-public-lead.sql
+add-expert-pre-registration.sql
 relationship-stale-reminded-at.sql
 k1-embedding-hash.sql
 m4-stale-reminder-idempotency.sql
