@@ -35,6 +35,7 @@ const valid = (address: string) => ({
   email: address,
   province: '06',
   title: 'Araştırmacı',
+  organization: 'Test Üniversitesi',
   isFreelancer: false,
   expertiseAreas: ['digital-ict'],
   roles: ['researcher'],

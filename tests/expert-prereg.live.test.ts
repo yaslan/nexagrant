@@ -38,6 +38,8 @@ beforeAll(async () => {
       fullName: `Live Expert ${i}`,
       email: `${PREFIX}${i}-${now.getTime()}@example.org`,
       province: '06',
+      title: 'Araştırmacı',
+      organization: 'Test Üniversitesi',
       isFreelancer: false,
       expertiseAreas: ['digital-ict'],
       roles: ['researcher'],
