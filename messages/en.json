@@ -241,7 +241,18 @@
           "WITHDRAWN": "A withdrawn opportunity cannot take a declaration.",
           "DECLARE_FAILED": "The declaration could not be saved. Try again."
         }
-      }
+      },
+      "modules": {
+        "label": "Modules",
+        "conceptNote": "Concept note",
+        "evaluations": "Internal pre-assessment",
+        "matching": "Consortium role matrix",
+        "consortium": "Consortium builder",
+        "briefs": "Meeting briefing",
+        "documents": "Follow-up documents",
+        "application": "Application (Part A & B)"
+      },
+      "personDaysReport": "Person-days report"
     }
   },
   "pipeline": {
@@ -2900,5 +2911,12 @@
     "coordinatedLabel": "Projects Coordinated:",
     "totalLabel": "Total Projects:",
     "ecContributionLabel": "EU Contribution Coordinated:"
+  },
+  "PartnersPage": {
+    "crossLinks": {
+      "label": "Related pages",
+      "leaders": "Key ecosystem leaders",
+      "personDays": "Person-days report"
+    }
   }
 }

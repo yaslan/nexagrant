@@ -23,6 +23,15 @@ export type WorkspaceRouteKey =
   | 'pipeline'
   | 'partners'
   | 'partnerDetail'
+  | 'partnerLeaders'
+  | 'reportsPersonDays'
+  | 'opportunityConceptNote'
+  | 'opportunityEvaluations'
+  | 'opportunityMatching'
+  | 'opportunityConsortium'
+  | 'opportunityBriefs'
+  | 'opportunityDocuments'
+  | 'opportunityApplication'
   | 'relationships'
   | 'evidence'
   | 'conceptNotes'
@@ -95,6 +104,27 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/ortaklar` : `/${locale}/${workspace}/partners`;
     case 'partnerDetail':
       return isTr ? `/${locale}/${workspace}/ortaklar/${param}` : `/${locale}/${workspace}/partners/${param}`;
+    // The pages below have no Turkish re-export under [workspace] (route-catalog.ts
+    // WORKSPACE_ROUTE_ALIASES), so both locales use the one canonical path. `param` is
+    // the opportunity id for the `opportunity*` keys.
+    case 'partnerLeaders':
+      return `/${locale}/${workspace}/partners/leaders`;
+    case 'reportsPersonDays':
+      return `/${locale}/${workspace}/reports/person-days`;
+    case 'opportunityConceptNote':
+      return `/${locale}/${workspace}/opportunities/${param}/m2`;
+    case 'opportunityEvaluations':
+      return `/${locale}/${workspace}/opportunities/${param}/evaluations`;
+    case 'opportunityMatching':
+      return `/${locale}/${workspace}/opportunities/${param}/matching`;
+    case 'opportunityConsortium':
+      return `/${locale}/${workspace}/pipeline/${param}/consortium`;
+    case 'opportunityBriefs':
+      return `/${locale}/${workspace}/opportunities/${param}/briefs`;
+    case 'opportunityDocuments':
+      return `/${locale}/${workspace}/opportunities/${param}/documents`;
+    case 'opportunityApplication':
+      return `/${locale}/${workspace}/opportunities/${param}/application`;
     case 'relationships':
       return isTr ? `/${locale}/${workspace}/iliskiler` : `/${locale}/${workspace}/relationships`;
     case 'evidence':

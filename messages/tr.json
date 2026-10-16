@@ -241,7 +241,18 @@
           "WITHDRAWN": "Geri çekilmiş bir fırsat için beyan yapılamaz.",
           "DECLARE_FAILED": "Beyan kaydedilemedi. Tekrar deneyin."
         }
-      }
+      },
+      "modules": {
+        "label": "Modüller",
+        "conceptNote": "Konsept Notu",
+        "evaluations": "İç Ön Değerlendirme",
+        "matching": "Konsorsiyum Rol Matrisi",
+        "consortium": "Konsorsiyum Kurucu",
+        "briefs": "Görüşme Brifingi",
+        "documents": "Takip Belgeleri",
+        "application": "Başvuru (Part A & B)"
+      },
+      "personDaysReport": "Adam-gün raporu"
     }
   },
   "pipeline": {
@@ -2900,5 +2911,12 @@
     "coordinatedLabel": "Koordine Edilen Proje:",
     "totalLabel": "Toplam Katılım:",
     "ecContributionLabel": "Koordine Edilen AB Katkısı:"
+  },
+  "PartnersPage": {
+    "crossLinks": {
+      "label": "İlgili sayfalar",
+      "leaders": "Kilit ekosistem liderleri",
+      "personDays": "Adam-gün raporu"
+    }
   }
 }
