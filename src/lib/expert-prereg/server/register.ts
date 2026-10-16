@@ -41,10 +41,16 @@ export interface RegisterOptions {
   baseUrl?: string | null;
 }
 
-export interface RegisterResult {
-  status: 201 | 400 | 409 | 429 | 500 | 503;
-  body: { ok: true } | { errors: Record<string, string> } | { error: string };
-}
+/**
+ * What the route answers. `unavailable` is every 5xx: the route turns it into
+ * internalError() with a fixed code, so no server text reaches the body.
+ */
+export type RegisterResult =
+  | { kind: 'created' }
+  | { kind: 'invalid'; errors: Record<string, string> }
+  | { kind: 'duplicate' }
+  | { kind: 'rate_limited' }
+  | { kind: 'unavailable'; error: 'mail_unavailable' | 'mail_failed' | 'server' };
 
 /** HMAC of the IP's bucket under the salt, so the per-IP limit works without storing the address. */
 export function hashExpertIp(ip: string | null, salt: string | null | undefined): string | null {
@@ -73,11 +79,11 @@ export async function registerExpertPreRegistration(
   // Honeypot first: a bot gets the same answer as a person and nothing is stored.
   if (typeof input.website === 'string' && input.website.trim() !== '') {
     logger.info('expert pre-registration dropped by honeypot');
-    return { status: 201, body: { ok: true } };
+    return { kind: 'created' };
   }
 
   const parsed = expertPreRegInputSchema.safeParse(input);
-  if (!parsed.success) return { status: 400, body: { errors: fieldErrors(parsed.error) } };
+  if (!parsed.success) return { kind: 'invalid', errors: fieldErrors(parsed.error) };
   const data = parsed.data;
 
   const now = options.now ?? new Date();
@@ -94,7 +100,7 @@ export async function registerExpertPreRegistration(
   const baseUrl = options.baseUrl === undefined ? invitationMailBaseUrl() : options.baseUrl;
   if (!mailer || !baseUrl) {
     await reportMailNotConfigured('expert-prereg');
-    return { status: 503, body: { error: 'mail_unavailable' } };
+    return { kind: 'unavailable', error: 'mail_unavailable' };
   }
 
   const { raw: token, hash: tokenHash } = issueSecretToken();
@@ -149,13 +155,13 @@ export async function registerExpertPreRegistration(
       return { status: 201 as const, id: row.id };
     });
 
-    if (written.status === 429) return { status: 429, body: { error: 'rate_limited' } };
-    if (written.status === 409) return { status: 409, body: { errors: { email: 'already_registered' } } };
+    if (written.status === 429) return { kind: 'rate_limited' };
+    if (written.status === 409) return { kind: 'duplicate' };
     id = written.id;
   } catch (error) {
     // The error's name only: a Prisma message can quote the values it failed on.
     logger.error('expert pre-registration write failed', { error: error instanceof Error ? error.name : 'unknown' });
-    return { status: 500, body: { error: 'server' } };
+    return { kind: 'unavailable', error: 'server' };
   }
 
   const link = `${baseUrl}/api/expert-preregistration/verify?token=${token}`;
@@ -168,8 +174,8 @@ export async function registerExpertPreRegistration(
       logger.error('expert pre-registration rollback failed after a mail error');
     });
     logger.error('expert pre-registration mail failed', { code: mailFailureCode(error) ?? 'unknown' });
-    return { status: 503, body: { error: 'mail_failed' } };
+    return { kind: 'unavailable', error: 'mail_failed' };
   }
 
-  return { status: 201, body: { ok: true } };
+  return { kind: 'created' };
 }

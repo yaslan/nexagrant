@@ -90,7 +90,7 @@ describe('registerExpertPreRegistration', () => {
       ip: IP,
       salt: SALT,
     });
-    expect(result).toEqual({ status: 201, body: { ok: true } });
+    expect(result).toEqual({ kind: 'created' });
     expect(rows).toHaveLength(0);
     expect(sent).toHaveLength(0);
   });
@@ -104,8 +104,7 @@ describe('registerExpertPreRegistration', () => {
       baseUrl: BASE,
       now: NOW,
     });
-    expect(result.status).toBe(400);
-    expect(result.body).toEqual({ errors: { email: 'invalid_email', kvkkAccepted: 'consent_required' } });
+    expect(result).toEqual({ kind: 'invalid', errors: { email: 'invalid_email', kvkkAccepted: 'consent_required' } });
     expect(rows).toHaveLength(0);
     expect(mailer).not.toHaveBeenCalled();
   });
@@ -113,7 +112,7 @@ describe('registerExpertPreRegistration', () => {
   it('answers 503 and writes nothing when no mail can go out', async () => {
     const { db, rows } = fakeDb();
     const result = await registerExpertPreRegistration(valid, { db, mailer: null, baseUrl: BASE, now: NOW });
-    expect(result).toEqual({ status: 503, body: { error: 'mail_unavailable' } });
+    expect(result).toEqual({ kind: 'unavailable', error: 'mail_unavailable' });
     expect(rows).toHaveLength(0);
   });
 
@@ -122,7 +121,7 @@ describe('registerExpertPreRegistration', () => {
     const { mailer, sent } = recordingMailer();
     const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
 
-    expect(result).toEqual({ status: 201, body: { ok: true } });
+    expect(result).toEqual({ kind: 'created' });
     expect(rows).toHaveLength(1);
     const row = rows[0]!;
     expect(row.email).toBe('ayse@example.org');
@@ -151,7 +150,7 @@ describe('registerExpertPreRegistration', () => {
       { ...valid, email: 'AYSE@example.org' },
       { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null }
     );
-    expect(second).toEqual({ status: 409, body: { errors: { email: 'already_registered' } } });
+    expect(second).toEqual({ kind: 'duplicate' });
     expect(rows).toHaveLength(1);
     expect(sent).toHaveLength(1);
   });
@@ -166,7 +165,7 @@ describe('registerExpertPreRegistration', () => {
     const { db, rows } = fakeDb(seeded);
     const { mailer } = recordingMailer();
     const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
-    expect(result).toEqual({ status: 429, body: { error: 'rate_limited' } });
+    expect(result).toEqual({ kind: 'rate_limited' });
     expect(rows).toHaveLength(REGISTRATION_IP_LIMIT);
   });
 
@@ -180,7 +179,7 @@ describe('registerExpertPreRegistration', () => {
     const { db } = fakeDb(seeded);
     const { mailer } = recordingMailer();
     const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
-    expect(result.status).toBe(201);
+    expect(result).toEqual({ kind: 'created' });
   });
 
   it('removes the row again when the mail cannot be sent, so the expert can register again', async () => {
@@ -189,7 +188,7 @@ describe('registerExpertPreRegistration', () => {
       throw new MailSendError('ECONNECTION', null);
     });
     const result = await registerExpertPreRegistration(valid, { db, mailer: failing, baseUrl: BASE, now: NOW });
-    expect(result).toEqual({ status: 503, body: { error: 'mail_failed' } });
+    expect(result).toEqual({ kind: 'unavailable', error: 'mail_failed' });
     expect(rows).toHaveLength(0);
   });
 });
