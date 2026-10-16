@@ -203,3 +203,18 @@ Yok.
 
 1. Lider: önce PR #70'i, sonra PR #72'yi JSON çakışmasını çözerek merge etsin.
 2. Ö-1 ve Ö-2 istenirse ayrı küçük bir kartta ele alınabilir.
+
+## Ek — merge (2026-10-16, patron talimatı: "Önce #70'i merge et, sonra #72'yi çözüp merge et")
+
+1. **PR #70** `df6ae8db` → dev: merge commit `37693a46`. Önceki inceleme (crw-fb, `ed00770c`) iki bulgu bırakmıştı; ikisinin de `df6ae8db`'de kapandığını diff'ten doğruladım: `loadFailed` bayrağı + tr/en mesajı, `ecContribution` yorumu "whole EUR".
+2. **PR #72:** kendi geçici worktree'mde `origin/dev` (`37693a46`) dala merge edildi. `messages/{tr,en}.json` çakışması iki üst düzey anahtar (`PartnersLeaders`, `PartnersPage`) korunarak çözüldü. Dev'e göre fark yalnız FO-6 eklemeleri. Merge commit `4af99807` PR dalına fast-forward push edildi (force yok), ardından PR merge edildi: `b6c73048`.
+3. **Birleşik ağaç doğrulaması** (izole DB `fabrika_crw2_fo6m`, sonra silindi):
+```
+pnpm i18n:check  → ✅ passed
+pnpm typecheck   → exit 0
+pnpm lint        → 0 errors, 4 warnings (önceden var)
+CI=true vitest   → Test Files 341 passed | 2 skipped; Tests 4501 passed | 54 skipped; exit 0
+playwright module-entry-points + partners-leaders-topic → 7 passed (0 skipped)
+origin/dev^{tree} == 4af99807^{tree}  → "dev tree == tested tree"
+```
+GitHub Actions bu PR'larda koşmuyor; işler hesap faturası nedeniyle başlatılmıyor ("recent account payments have failed"). Bu yüzden kapı olarak yukarıdaki yerel koşu kullanıldı.
