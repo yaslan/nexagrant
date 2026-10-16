@@ -2895,6 +2895,7 @@
     "topicClear": "Temizle",
     "topicInvalid": "Önek en az 3 karakter olmalı ve yalnızca harf, rakam ve tire içermelidir.",
     "noTopicResults": "Bu önekte koordinatör bulunamadı.",
+    "loadFailed": "Koordinatör listesi şu an yüklenemedi. Lütfen biraz sonra yeniden deneyin.",
     "picLabel": "PIC:",
     "coordinatedLabel": "Koordine Edilen Proje:",
     "totalLabel": "Toplam Katılım:",

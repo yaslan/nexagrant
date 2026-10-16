@@ -2895,6 +2895,7 @@
     "topicClear": "Clear",
     "topicInvalid": "The prefix must be at least 3 characters and use only letters, digits and hyphens.",
     "noTopicResults": "No coordinators found for this prefix.",
+    "loadFailed": "The coordinator list could not be loaded right now. Please try again shortly.",
     "picLabel": "PIC:",
     "coordinatedLabel": "Projects Coordinated:",
     "totalLabel": "Total Projects:",

@@ -25,7 +25,7 @@ export interface CoordinatorLeaderRow {
   country: string | null;
   /** Projects under the prefix that this organisation coordinates. */
   coordinatedProjects: number;
-  /** Sum of `ecContribution` (EUR, minor unit = cent) over those projects. */
+  /** Sum of `ecContribution` over those projects, in whole EUR as CORDIS stores it (`parseBigIntEur`), not cents. */
   totalEcContribution: bigint;
 }
 

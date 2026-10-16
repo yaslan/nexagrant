@@ -37,6 +37,8 @@ export default async function LeadersPage({
 
   let leaders: GlobalLeader[] = [];
   let byTopic: CoordinatorLeaderRow[] = [];
+  // A failed query must not read as "no coordinators for this prefix".
+  let loadFailed = false;
   try {
     if (topicPrefix) {
       byTopic = await coordinatorLeaders({ topicPrefix, limit: 20 });
@@ -55,6 +57,7 @@ export default async function LeadersPage({
       });
     }
   } catch (e) {
+    loadFailed = true;
     console.warn(`[LeadersPage] Failed to fetch leaders: ${errorMessage(e)}`);
   }
 
@@ -112,6 +115,11 @@ export default async function LeadersPage({
       </form>
 
       {topicInvalid ? <p className="mb-6 text-xs text-red-700">{t('topicInvalid')}</p> : null}
+      {loadFailed ? (
+        <p role="alert" className="mb-6 text-xs text-red-700">
+          {t('loadFailed')}
+        </p>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {topicPrefix
@@ -167,7 +175,7 @@ export default async function LeadersPage({
             ))}
       </div>
 
-      {topicPrefix && byTopic.length === 0 ? <p className="text-xs text-muted">{t('noTopicResults')}</p> : null}
+      {topicPrefix && !loadFailed && byTopic.length === 0 ? <p className="text-xs text-muted">{t('noTopicResults')}</p> : null}
     </div>
   );
 }
