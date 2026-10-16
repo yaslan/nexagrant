@@ -104,3 +104,16 @@ $ git show origin/dev:package.json | grep -n '"next"'
 
 ## Sonraki adım
 Dalga 1 için patron onayı (aşağıdaki karar). Onay gelince üç kart açılır ve tek çağrıda paralel delege edilir.
+
+## Ek (sürüm 1.1) — bağımsız denetim sonrası düzeltmeler
+Kaynak: `docs/agent-results/TASK-MVBB458UIILWZ-crw2-fb.md` (crw2-fb, origin/dev @ ffb9c79f üzerinde iddia denetimi).
+
+- **Kart hükümleri:** FO-2 ONAY. FO-1, FO-3, FO-4 "DÜZELTME GEREKLİ" — düzeltmeler rapor düzeyinde (sayılar, satır atıfları, ölçülen ağaç); hiçbir P0'ın yönünü değiştirmiyor. Kaynak raporlar yeniden yazdırılmadı; doğru değerler crw2-fb raporunda ve bu ekte.
+- **Ölçülen ağaç:** be-fb ve se-fb yerel HEAD'i (origin/dev'den ayrışmış) ölçtü. origin/dev'de 50 tenantId modeli (nullable 4: Document, Chunk, ConceptTemplate, AuditEvent), strict 47.
+- **DATA_MODEL eksiği 15 tablo** (14 değil; Session da yok).
+- **P0-8 OpenAI anahtarı** yalnız 29.09 RELEASE_CHECKLIST kaynaklı; güncel durum ölçülmedi.
+- **"Olumlu" bölümündeki CORDIS 272 sn** 29.09 ölçümüdür, bu turda yeniden ölçülmedi. (FO-5'te ayrı DB'de yeni içe aktarma 246,7 sn, 23.954 proje — `TASK-MVBBPXU1ZW0F5-be-fb.md`.)
+- **next.config izinli görsel hostları** iki değil: ayrıca `R2_PUBLIC_HOST` kalıbı ve `dangerouslyAllowLocalIP` var (B2 yine geçerli).
+- **B4 daha geniş:** `ci.yml:143` de `rls:verify`'ı `--require-db` olmadan koşuyor (FO-7 kapsamına giriyor).
+- **PostHog stub değil** (anahtar yokken no-op); T-6 için statik UI var, kalıcı model yok; M7/M9/M10 ekranları `src/app` altında var.
+- **YENİ YÜKSEK — gizlilik metni yanlış güvence veriyor:** `messages/tr.json:836` / `en.json:836` `securityBody`: "Verileriniz … PostgreSQL Row-Level Security (RLS) ile diğer kiracılardan yalıtılmış". Canlıda RLS uygulanmıyor (Açık karar #16 = HAYIR) ve ROADMAP:159 bu iddianın yazılmamasını söylüyor. Kullanıcıya dönük, hukuki bağlayıcılığı olan metin. Çözümü K-489304 kararına bağlı: B seçilirse geçiş sonrası doğru olur; A seçilirse metin düzeltilmeli.
