@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@/lib/db';
 import { hashSecretToken } from '@/lib/secret-token';
 import { exportExpertPreRegistrationsCsv } from '@/lib/expert-prereg/server/admin';
+import { FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
 
 /**
@@ -60,15 +61,17 @@ afterAll(async () => {
 });
 
 describe('founder number race (live Postgres)', () => {
-  it.skipIf(!reachable)('gives 20 concurrent verifications distinct, gap-free numbers after the highest one given', async () => {
+  it.skipIf(!reachable)('gives 20 concurrent verifications distinct, gap-free numbers up to the limit, and none past it', async () => {
     const results = await Promise.all(tokens.map((token) => verifyExpertPreRegistration(token)));
 
     expect(results.every((r) => r.ok)).toBe(true);
-    const numbers = results.map((r) => (r.ok ? r.founderNumber : null));
-    expect(numbers.every((n) => typeof n === 'number')).toBe(true);
-    const sorted = [...(numbers as number[])].sort((a, b) => a - b);
-    expect(new Set(sorted).size).toBe(COUNT);
-    expect(sorted).toEqual(Array.from({ length: COUNT }, (_, i) => before + 1 + i));
+    // Numbers run on from the highest one already given, up to FOUNDER_SEAT_LIMIT. The
+    // rest of the 20 are verified without one: the expectation follows the room left.
+    const room = Math.max(0, FOUNDER_SEAT_LIMIT - before);
+    const expectedGranted = Math.min(COUNT, room);
+    const granted = results.flatMap((r) => (r.ok && r.founderNumber !== null ? [r.founderNumber] : [])).sort((a, b) => a - b);
+    expect(new Set(granted).size).toBe(granted.length);
+    expect(granted).toEqual(Array.from({ length: expectedGranted }, (_, i) => before + 1 + i));
   });
 
   it.skipIf(!reachable)('answers a second click on each link the same and moves no number', async () => {

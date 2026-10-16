@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { internalError } from '@/lib/api-error';
-import { env } from '@/lib/env';
 import { clientIpFrom } from '@/lib/leads/public-lead';
 import { logger } from '@/lib/logger';
 import { registerExpertPreRegistration } from '@/lib/expert-prereg/server/register';
@@ -14,10 +13,8 @@ import { registerExpertPreRegistration } from '@/lib/expert-prereg/server/regist
 export async function POST(req: NextRequest) {
   const body: unknown = await req.json().catch(() => null);
   try {
-    const result = await registerExpertPreRegistration(body, {
-      ip: clientIpFrom(req.headers),
-      salt: env.EXPERT_PREREG_IP_SALT ?? null,
-    });
+    // No salt here: register.ts resolves it (EXPERT_PREREG_IP_SALT, else the AUTH_SECRET-derived key).
+    const result = await registerExpertPreRegistration(body, { ip: clientIpFrom(req.headers) });
     if (result.kind === 'created') return NextResponse.json({ ok: true }, { status: 201 });
     if (result.kind === 'invalid') return NextResponse.json({ errors: result.errors }, { status: 400 });
     if (result.kind === 'duplicate') {

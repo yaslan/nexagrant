@@ -17,6 +17,12 @@ export const FOUNDER_SEAT_LIMIT = 100;
 /** A verification link works this long after the registration (24 hours). */
 export const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * A pending expert who registers again gets a new link, but not sooner than this
+ * after the last one: without it one e-mail address could be sent mail forever.
+ */
+export const RESEND_COOLDOWN_MS = 5 * 60 * 1000;
+
 /** At most this many registrations per client IP in {@link IP_WINDOW_MS}. */
 export const REGISTRATION_IP_LIMIT = 5;
 export const IP_WINDOW_MS = 60 * 60 * 1000;

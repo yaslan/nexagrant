@@ -14,6 +14,7 @@ import {
   EXPERT_PREREG_LOCK_KEY,
   IP_WINDOW_MS,
   REGISTRATION_IP_LIMIT,
+  RESEND_COOLDOWN_MS,
   VERIFY_TOKEN_TTL_MS,
 } from './constants';
 import { renderExpertVerificationEmail } from './email';
@@ -30,7 +31,7 @@ import { renderExpertVerificationEmail } from './email';
 export interface RegisterOptions {
   /** Client address as the nearest trusted proxy saw it (clientIpFrom). Null = no IP is stored. */
   ip?: string | null;
-  /** Key for the IP hash. Defaults to EXPERT_PREREG_IP_SALT. */
+  /** Key for the IP hash. Defaults to {@link expertPreRegIpSalt}. */
   salt?: string | null;
   now?: Date;
   /** Test seam: the database client. */
@@ -56,6 +57,24 @@ export type RegisterResult =
 export function hashExpertIp(ip: string | null, salt: string | null | undefined): string | null {
   if (!ip || !salt) return null;
   return createHmac('sha256', salt).update(ipBucket(ip)).digest('hex');
+}
+
+/** What a re-issued registration replaced, so a mail that cannot go out puts the old link back. */
+interface ReissueState {
+  verifyTokenHash: string | null;
+  verifyTokenExpiresAt: Date | null;
+}
+
+/**
+ * The key of the IP hash: EXPERT_PREREG_IP_SALT when set, else a key derived from
+ * AUTH_SECRET, so the per-IP limit does not switch off where only the secret is set.
+ * Null only when neither is set. Hashes made under the derived key do not match
+ * the configured one; the window is one hour, so the change is transient.
+ */
+export function expertPreRegIpSalt(configured: string | undefined, secret: string | undefined): string | null {
+  if (configured) return configured;
+  if (!secret) return null;
+  return createHmac('sha256', secret).update('expert-prereg-ip').digest('hex');
 }
 
 let warnedNoSalt = false;
@@ -88,10 +107,11 @@ export async function registerExpertPreRegistration(
 
   const now = options.now ?? new Date();
   const db = options.db ?? prisma;
-  const salt = options.salt === undefined ? env.EXPERT_PREREG_IP_SALT : options.salt;
+  const salt =
+    options.salt === undefined ? expertPreRegIpSalt(env.EXPERT_PREREG_IP_SALT, process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET) : options.salt;
   if (!salt && !warnedNoSalt) {
     warnedNoSalt = true;
-    logger.warn('EXPERT_PREREG_IP_SALT is unset: no IP is stored and the per-IP limit is off');
+    logger.warn('EXPERT_PREREG_IP_SALT and AUTH_SECRET are unset: no IP is stored and the per-IP limit is off');
   }
   const ipHash = hashExpertIp(options.ip ?? null, salt);
 
@@ -107,6 +127,7 @@ export async function registerExpertPreRegistration(
   const expires = new Date(now.getTime() + VERIFY_TOKEN_TTL_MS);
 
   let id: string;
+  let previous: ReissueState | null = null;
   try {
     const written = await db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EXPERT_PREREG_LOCK_KEY})`;
@@ -118,46 +139,67 @@ export async function registerExpertPreRegistration(
         if (recent >= REGISTRATION_IP_LIMIT) return { status: 429 as const };
       }
 
-      const existing = await tx.expertPreRegistration.findUnique({ where: { email: data.email }, select: { id: true } });
-      if (existing) return { status: 409 as const };
-
-      const row = await tx.expertPreRegistration.create({
-        data: {
-          fullName: data.fullName,
-          email: data.email,
-          province: data.province,
-          title: data.title,
-          isFreelancer: data.isFreelancer,
-          expertiseAreas: data.expertiseAreas,
-          roles: data.roles,
-          programmes: data.programmes,
-          projectCodes: data.projectCodes,
-          orcid: data.orcid,
-          linkedinUrl: data.linkedinUrl,
-          languages: data.languages,
-          referredBy: data.referredBy,
-          utmSource: data.utmSource,
-          utmMedium: data.utmMedium,
-          utmCampaign: data.utmCampaign,
-          kvkkAcceptedAt: now,
-          visibilityConsentAt: now,
-          marketingConsentAt: data.marketingConsent ? now : null,
-          consentTextVersion: EXPERT_PREREG_CONSENT_VERSION,
-          locale: data.locale,
-          verifyTokenHash: tokenHash,
-          verifyTokenExpiresAt: expires,
-          ipHash,
-          status: 'pending',
-          createdAt: now,
-        },
-        select: { id: true },
+      const existing = await tx.expertPreRegistration.findUnique({
+        where: { email: data.email },
+        select: { id: true, status: true, verifyTokenHash: true, verifyTokenExpiresAt: true },
       });
-      return { status: 201 as const, id: row.id };
+      // Verified (or disabled by an admin) is refused. Pending gets a fresh link, but not inside the cooldown.
+      if (existing && existing.status !== 'pending') return { status: 409 as const };
+      if (existing) {
+        // The link was issued VERIFY_TOKEN_TTL_MS before it expires.
+        const issuedAt = existing.verifyTokenExpiresAt ? existing.verifyTokenExpiresAt.getTime() - VERIFY_TOKEN_TTL_MS : 0;
+        if (now.getTime() - issuedAt < RESEND_COOLDOWN_MS) return { status: 429 as const };
+      }
+
+      const fields = {
+        fullName: data.fullName,
+        email: data.email,
+        province: data.province,
+        title: data.title,
+        isFreelancer: data.isFreelancer,
+        expertiseAreas: data.expertiseAreas,
+        roles: data.roles,
+        programmes: data.programmes,
+        projectCodes: data.projectCodes,
+        orcid: data.orcid,
+        linkedinUrl: data.linkedinUrl,
+        languages: data.languages,
+        referredBy: data.referredBy,
+        utmSource: data.utmSource,
+        utmMedium: data.utmMedium,
+        utmCampaign: data.utmCampaign,
+        kvkkAcceptedAt: now,
+        visibilityConsentAt: now,
+        marketingConsentAt: data.marketingConsent ? now : null,
+        consentTextVersion: EXPERT_PREREG_CONSENT_VERSION,
+        locale: data.locale,
+        verifyTokenHash: tokenHash,
+        verifyTokenExpiresAt: expires,
+        ipHash,
+        status: 'pending',
+        createdAt: now,
+      };
+
+      if (existing) {
+        // Read the old link before the update replaces it, so a failed mail can put it back.
+        const replaced: ReissueState = {
+          verifyTokenHash: existing.verifyTokenHash,
+          verifyTokenExpiresAt: existing.verifyTokenExpiresAt,
+        };
+        // The new link replaces the old one (its hash is gone, so the old link answers invalid).
+        // createdAt moves to this attempt so the per-IP window counts it.
+        await tx.expertPreRegistration.update({ where: { id: existing.id }, data: fields });
+        return { status: 201 as const, id: existing.id, previous: replaced };
+      }
+
+      const row = await tx.expertPreRegistration.create({ data: fields, select: { id: true } });
+      return { status: 201 as const, id: row.id, previous: null };
     });
 
     if (written.status === 429) return { kind: 'rate_limited' };
     if (written.status === 409) return { kind: 'duplicate' };
     id = written.id;
+    previous = written.previous;
   } catch (error) {
     // The error's name only: a Prisma message can quote the values it failed on.
     logger.error('expert pre-registration write failed', { error: error instanceof Error ? error.name : 'unknown' });
@@ -168,11 +210,18 @@ export async function registerExpertPreRegistration(
   try {
     await mailer(renderExpertVerificationEmail({ to: data.email, fullName: data.fullName, link, locale: data.locale, expires }));
   } catch (error) {
-    // The row must not outlive a mail nobody got: the expert could not verify and
-    // could not register again. Removed here; a failure to remove is logged.
-    await db.expertPreRegistration.delete({ where: { id } }).catch(() => {
-      logger.error('expert pre-registration rollback failed after a mail error');
-    });
+    // A new row must not outlive a mail nobody got: the expert could not verify and
+    // could not register again, so it is removed. A re-issued row goes back to the
+    // link the expert already has. A failure to undo is logged.
+    if (previous) {
+      await db.expertPreRegistration.update({ where: { id }, data: previous }).catch(() => {
+        logger.error('expert pre-registration link restore failed after a mail error');
+      });
+    } else {
+      await db.expertPreRegistration.delete({ where: { id } }).catch(() => {
+        logger.error('expert pre-registration rollback failed after a mail error');
+      });
+    }
     logger.error('expert pre-registration mail failed', { code: mailFailureCode(error) ?? 'unknown' });
     return { kind: 'unavailable', error: 'mail_failed' };
   }
