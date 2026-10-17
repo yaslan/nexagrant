@@ -46,8 +46,11 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 dump="$BACKUP_DIR/fonbridge-$stamp.dump"
 tmp="$dump.partial"
 
-# A half-written file must never be mistaken for a backup. EXIT covers signals
-# too (measured: TERM, HUP and INT all leave no .partial behind).
+# A half-written file must never be mistaken for a backup. The EXIT trap removes
+# .partial on normal exit and on TERM and HUP (measured with a .partial present:
+# both left none behind). INT was not measured. If the script is killed and
+# pg_dump keeps running, pg_dump can write the .partial after the trap has run;
+# retention below removes such leftovers.
 cleanup() { rm -f "$tmp"; }
 trap cleanup EXIT
 
@@ -95,5 +98,5 @@ fi
 log "ok: $(basename "$final") $(du -h "$final" | cut -f1) toc_entries=$toc_entries"
 
 # Retention: delete only files this script names, so unrelated files stay.
-find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'fonbridge-*.dump' -o -name 'fonbridge-*.dump.age' -o -name 'fonbridge-*.sha256' \) \
+find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'fonbridge-*.dump' -o -name 'fonbridge-*.dump.age' -o -name 'fonbridge-*.dump.partial' -o -name 'fonbridge-*.sha256' \) \
   -mtime +"$BACKUP_KEEP_DAYS" -print -delete | sed 's/^/[pg-backup] pruned /' || true

@@ -31,7 +31,7 @@ pg_url_decode() {
 
 pg_url_split() {
   local name="$1" url="${!1}" re
-  re='^postgres(ql)?://([^:/?#@]*)(:([^@/?#]*))?@([^/?#]*)/([^?#]*)(\?([^#]*))?$'
+  re='^postgres(ql)?://([^:/?#@]*)(:([^@/?#]*))?@([^@/?#]*)/([^?#]*)(\?([^#]*))?$'
   [[ "$url" =~ $re ]] || { echo "$name is not a postgresql:// URL with user@host/db" >&2; return 1; }
   local raw_user="${BASH_REMATCH[2]}" raw_pass="${BASH_REMATCH[4]}" hostport="${BASH_REMATCH[5]}"
   local raw_db="${BASH_REMATCH[6]}" query="${BASH_REMATCH[8]}"

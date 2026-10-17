@@ -89,14 +89,19 @@ SQL
 }
 
 # counts_of CONN PASS LABEL
+# psql's exit code is checked on its own: a failed count query must fail the
+# drill, never leave an empty list that compares equal to an empty list.
 counts_of() {
-  local conn="$1" pass="$2" label="$3" union
-  union="$(PGPASSWORD="$pass" psql "$conn" -X -At -c "$(count_sql)")"
+  local conn="$1" pass="$2" label="$3" union out
+  union="$(PGPASSWORD="$pass" psql "$conn" -X -At -c "$(count_sql)")" || fail "could not list tables on $label"
   [ -n "$union" ] || fail "no tables found on $label"
-  PGPASSWORD="$pass" psql "$conn" -X -At -v ON_ERROR_STOP=1 \
+  out="$(PGPASSWORD="$pass" psql "$conn" -X -At -v ON_ERROR_STOP=1 \
     -c 'begin isolation level repeatable read' \
     -c "select tbl || '=' || n from ($union) q order by tbl" \
-    -c 'commit' | grep '=' || true
+    -c 'commit')" || fail "row count query failed on $label"
+  out="$(printf '%s\n' "$out" | grep '=' || true)"
+  [ -n "$out" ] || fail "row count query returned no rows on $label"
+  printf '%s\n' "$out"
 }
 
 # The restored database: same server and credentials as the admin URL, new db name.
@@ -117,6 +122,7 @@ log "comparing row counts (source vs $RESTORE_DB)"
 src_counts="$(counts_of "$src_conn" "$src_pass" source)"
 dst_counts="$(counts_of "$restored_conn" "$admin_pass" restored)"
 tables=$(printf '%s\n' "$src_counts" | grep -c '=' || true)
+[ "$tables" -gt 0 ] || fail "no tables counted on source"
 
 diff_out="$(diff <(printf '%s\n' "$src_counts") <(printf '%s\n' "$dst_counts") || true)"
 if [ -n "$diff_out" ]; then
