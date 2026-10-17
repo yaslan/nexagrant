@@ -96,6 +96,10 @@ describe('SidebarNav — feature entries locked while their module is off', () =
       trMessages.Navigation.featureLocked.replace('{module}', `M5 ${trMessages.modules.workflows.name}`)
     );
     expect(approvals.textContent).toContain('Onay Merkezi (4-Eyes)');
+    // The reason is announced as the entry's description, not inside its name.
+    const reason = document.getElementById(approvals.getAttribute('aria-describedby') ?? '');
+    expect(reason?.textContent).toBe(approvals.getAttribute('title'));
+    expect(approvals.contains(reason)).toBe(false);
 
     const apiKeys = screen.getByTestId('sidebar-nav-apiKeys');
     expect(apiKeys.getAttribute('title')).toContain(`M1 ${trMessages.modules['partner-intel'].name}`);

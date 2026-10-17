@@ -83,20 +83,23 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
         const featureManifest = featureModule && !activeModules.includes(featureModule) ? getManifest(featureModule) : null;
         if (featureManifest) {
           const tooltip = t('featureLocked', { module: `${featureManifest.id} ${tModules(`${featureManifest.key}.name`)}` });
+          const reasonId = `sidebar-nav-${item.key}-locked`;
           return (
-            <span
-              key={item.key}
-              data-testid={`sidebar-nav-${item.key}`}
-              data-locked="true"
-              aria-disabled="true"
-              tabIndex={0}
-              title={tooltip}
-              className="px-3 py-2 rounded-lg font-medium flex items-center justify-between text-muted cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <span>{item.label}</span>
-              <span aria-hidden="true">🔒</span>
-              <span className="sr-only">{tooltip}</span>
-            </span>
+            <React.Fragment key={item.key}>
+              <span
+                data-testid={`sidebar-nav-${item.key}`}
+                data-locked="true"
+                aria-disabled="true"
+                aria-describedby={reasonId}
+                tabIndex={0}
+                title={tooltip}
+                className="px-3 py-2 rounded-lg font-medium flex items-center justify-between text-muted cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span>{item.label}</span>
+                <span aria-hidden="true">🔒</span>
+              </span>
+              <span id={reasonId} className="sr-only">{tooltip}</span>
+            </React.Fragment>
           );
         }
         return (
