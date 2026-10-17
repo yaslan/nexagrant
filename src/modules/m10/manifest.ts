@@ -24,4 +24,9 @@ export const m10Manifest: ModuleManifest = {
   ],
   tables: ['FollowupDoc'],
   isActive: true,
+  category: 'tools',
+  stages: ['G2', 'G4'], // Patron onayı K-563625 (2026-10-17)
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

@@ -15,9 +15,11 @@ pnpm db:migrate          # prisma migrate dev
 pnpm db:seed             # prisma/seed.ts (planlar, modül kataloğu, demo kiracı)
 pnpm db:rls              # prisma/rls.sql uygula (psql gerektirmez)
 pnpm test                # vitest
-pnpm test:e2e            # playwright
+pnpm test:e2e            # playwright (baska port/host: E2E_PORT=3100 veya E2E_BASE_URL; spec'ler cerezi `baseURL` fixture'ina yazar, sabit localhost:3000 yazma)
 pnpm lint && pnpm typecheck
 pnpm gate                # db:generate + lint + typecheck + test + i18n:check + rls:check + rls:bypass-check + rls:verify --require-db + db:rls-role + e2e + alerts:check (kapinin tamami)
+                         # Aynı veritabanına iki gate: migration-owner-chain.live advisory lock ile sıra bekler (~30 sn);
+                         # e2e için ikinci worktree'de E2E_PORT farklı olmalı.
 pnpm rls:verify          # DB gercekten kiraci izolasyonu uyguluyor mu (canli olcum)
 pnpm alerts:check        # acik SystemAlert satirlari silinmis kiracilari mi gosteriyor (oksuz alarm kapisi)
 pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)

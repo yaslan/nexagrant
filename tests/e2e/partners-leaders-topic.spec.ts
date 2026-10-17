@@ -30,6 +30,8 @@ const PREFIX = 'FO5E2E-CL5-';
 const TOPIC = 'FO5E2E-CL5-2024-01';
 const COORD_NAME = 'FO5 Coordinator Institute';
 const PART_NAME = 'FO5 Participant Institute';
+// The coordinator's 150000 EUR fixture contribution, in each locale's money format (FO-15).
+const EC_TOTAL = { tr: '\u20ac150.000', en: '\u20ac150,000' } as const;
 
 async function rollback() {
   await prisma.cordisParticipation.deleteMany({ where: { organisationId: { in: presentIds([COORDINATOR, PARTICIPANT]) } } });
@@ -86,6 +88,7 @@ test.describe('Partners leaders — topic filter (FO-5)', () => {
       await expect(card).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText(PART_NAME, { exact: true })).toHaveCount(0);
       await expect(page.getByRole('heading', { level: 1 })).toContainText(PREFIX);
+      await expect(page.getByText(EC_TOTAL[locale], { exact: true })).toBeVisible();
       await page.screenshot({ path: `${SHOTS}/01-topic-${locale}.png`, fullPage: true });
     });
   }

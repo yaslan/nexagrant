@@ -67,6 +67,22 @@ const slugList = (values: readonly string[], max: number) =>
     .min(1, { error: 'required' })
     .max(max, { error: 'too_many' });
 
+/** Optional list: absent or empty is fine (`[]`); a present value must be in the closed list. */
+const optionalSlugList = (values: readonly string[], max: number) =>
+  z
+    .array(z.enum(values as [string, ...string[]], { error: 'unknown_slug' }), { error: 'invalid' })
+    .max(max, { error: 'too_many' })
+    .default([]);
+
+/** Required free text: missing or blank is `required`, one character is `too_short`. */
+const requiredText = (max: number) =>
+  z
+    .string({ error: 'required' })
+    .trim()
+    .min(1, { error: 'required' })
+    .min(2, { error: 'too_short' })
+    .max(max, { error: 'too_long' });
+
 export const expertPreRegInputSchema = z.object({
   fullName: z.string({ error: 'required' }).trim().min(2, { error: 'too_short' }).max(120, { error: 'too_long' }),
   email: z
@@ -76,7 +92,9 @@ export const expertPreRegInputSchema = z.object({
     .max(254, { error: 'too_long' })
     .pipe(z.email({ error: 'invalid_email' })),
   province: z.enum(PROVINCE_CODES, orRequired('unknown_slug')),
-  title: optionalText(120),
+  /** FO-25 (K-516717): Unvan and Kurum are required; Diller is optional. */
+  title: requiredText(120),
+  organization: requiredText(200),
   isFreelancer: z.boolean(orRequired('invalid')),
   expertiseAreas: slugList(EXPERTISE_AREAS, 8),
   roles: slugList(ROLES, 5),
@@ -95,7 +113,7 @@ export const expertPreRegInputSchema = z.object({
     .optional()
     .transform((value) => (value ? value : null))
     .refine((value) => value === null || isLinkedInUrl(value), { error: 'invalid_url' }),
-  languages: slugList(LANGUAGES, 7),
+  languages: optionalSlugList(LANGUAGES, 7),
   referredBy: optionalText(120),
   utmSource: optionalText(100),
   utmMedium: optionalText(100),

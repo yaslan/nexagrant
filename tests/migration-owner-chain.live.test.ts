@@ -7,6 +7,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { envValue } from './helpers/dotenv';
 import { skipOrFailInCi } from './helpers/live-db-role';
+import { MIGRATION_OWNER_CHAIN_LOCK } from './helpers/test-db-lock';
 
 /**
  * TASK-MUOEGWSV8I7H0 (İNCELEME-106 I-1) — scripts/apply-migrations.sh run by the
@@ -136,6 +137,9 @@ beforeAll(async () => {
     skipOrFailInCi(SUITE, skipReason);
     return;
   }
+  // Another run of this file (a second worktree's gate on the same Postgres)
+  // waits here until this one's admin session ends in afterAll (FO-27).
+  await admin.query('SELECT pg_advisory_lock(hashtext($1))', [`test:${MIGRATION_OWNER_CHAIN_LOCK}`]);
 
   await admin.query(
     `CREATE ROLE ${OWNER} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB PASSWORD '${OWNER_PW}'`
@@ -155,7 +159,7 @@ beforeAll(async () => {
   await admin.query(`CREATE DATABASE ${DB_ACL} TEMPLATE ${DB} OWNER ${OWNER}`);
   created.dbs.push(DB_ACL);
   ready = true;
-}, LONG);
+}, 2 * LONG);
 
 beforeEach((ctx) => {
   if (!ready) ctx.skip(skipReason);

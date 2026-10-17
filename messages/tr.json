@@ -2998,7 +2998,7 @@
   "ExpertPrereg": {
     "meta": {
       "title": "AB Proje Uzmanları Rehberi — Ön Kayıt | FonBridge",
-      "description": "Türkiye'nin doğrulanmış AB proje uzmanları rehberine ücretsiz ön kayıt. İlk 100 kayıt Kurucu Uzman rozeti ve ömür boyu Pro üyelik kazanır.",
+      "description": "Türkiye'nin doğrulanmış AB proje uzmanları rehberine ücretsiz ön kayıt. İlk {limit} kayıt Kurucu Uzman rozeti ve ömür boyu Pro üyelik kazanır.",
       "verified_title": "E-posta doğrulama | FonBridge Uzman Rehberi"
     },
     "nav_label": "Uzman Havuzu",
@@ -3006,9 +3006,9 @@
       "eyebrow": "Uzman Rehberi · Ön kayıt",
       "title": "AB proje deneyiminiz görünür olsun",
       "subtitle": "Türkiye'nin doğrulanmış AB proje uzmanları rehberine katılın. Kayıt 3 dakika.",
-      "founder_open": "İlk 100 kayıt Kurucu Uzman: kalıcı rozet + ömür boyu Pro üyelik — kalan koltuk: {count}",
+      "founder_open": "İlk {limit} kayıt Kurucu Uzman: kalıcı rozet + ömür boyu Pro üyelik — kalan koltuk: {count}",
       "founder_full": "Kurucu kadro tamamlandı, kayıtlar açık",
-      "founder_unknown": "İlk 100 kayıt Kurucu Uzman: kalıcı rozet + ömür boyu Pro üyelik",
+      "founder_unknown": "İlk {limit} kayıt Kurucu Uzman: kalıcı rozet + ömür boyu Pro üyelik",
       "cta": "Ön kayda başla"
     },
     "values": {
@@ -3032,8 +3032,10 @@
       "province_placeholder": "İl seçin",
       "province_no_match": "Eşleşen il yok",
       "province_results": "{count} il listeleniyor",
-      "title_label": "Unvan / Kurum",
-      "title_placeholder": "örn. Proje Koordinatörü, Ankara Üniversitesi",
+      "title_label": "Unvan",
+      "title_placeholder": "örn. Proje Koordinatörü",
+      "organization_label": "Kurum",
+      "organization_placeholder": "örn. Ankara Üniversitesi",
       "freelancer_label": "Serbest çalışıyorum",
       "areas_legend": "Uzmanlık alanları",
       "areas_hint": "En fazla 8 alan seçin.",
@@ -3084,7 +3086,7 @@
     },
     "success": {
       "title": "Teşekkürler, ön kaydınız alındı",
-      "verify": "E-postanızı doğrulayın: {email} adresine gönderdiğimiz bağlantıya 24 saat içinde tıklayın. Doğrulanmayan kayıt rehbere alınmaz.",
+      "verify": "E-postanızı doğrulayın: {email} adresine gönderdiğimiz bağlantıya {hours} saat içinde tıklayın. Doğrulanmayan kayıt rehbere alınmaz.",
       "share": "LinkedIn'de paylaş",
       "share_new_tab": "(yeni sekmede açılır)",
       "share_text": "FonBridge AB Proje Uzmanları Rehberi'ne ön kayıt yaptım. AB projelerinde deneyimliysen sen de katıl: {url}"
@@ -3105,7 +3107,7 @@
       "founder": "Kurucu Uzman numaranız: #{number}",
       "no_founder": "Kurucu kadro tamamlanmıştı; kaydınız rehbere alındı. Lansmanda haber vereceğiz.",
       "heading_expired": "Bağlantının süresi dolmuş",
-      "text_expired": "Doğrulama bağlantısı 24 saat geçerlidir. info@fonbridge.com adresine yazın, yeni bağlantı gönderelim.",
+      "text_expired": "Doğrulama bağlantısı {hours} saat geçerlidir. info@fonbridge.com adresine yazın, yeni bağlantı gönderelim.",
       "heading_invalid": "Bağlantı geçersiz",
       "text_invalid": "Bağlantı eksik kopyalanmış ya da daha önce kullanılmış olabilir. E-postadaki düğmeyi yeniden deneyin.",
       "back": "Uzman Rehberi sayfasına dön"
@@ -3211,6 +3213,7 @@
     "load_error": "Kayıtlar yüklenemedi. Sayfayı yenileyin; sorun sürerse sistem uyarılarına bakın.",
     "table_caption": "Uzman ön kayıtları, en yenisi başta",
     "col_name": "Ad",
+    "col_organization": "Kurum",
     "col_province": "İl",
     "col_areas": "Alanlar",
     "col_roles": "Roller",
@@ -3223,5 +3226,51 @@
       "disabled": "Devre dışı"
     },
     "none": "—"
+  },
+  "modules": {
+    "partner-intel": {
+      "name": "Ortak İstihbarat Veritabanı",
+      "tagline": "Her kuruluş için tek ortak kartı, konu liderleri ve iş birliği ağı."
+    },
+    "concept-note": {
+      "name": "Konsept Notu Oluşturucu",
+      "tagline": "Programa özel kısa teklif şablonları ve YZ destekli ilk taslak."
+    },
+    "evidence": {
+      "name": "Kanıt Paketi",
+      "tagline": "Kaynak ve geçerlilik disipliniyle yeniden kullanılabilir kanıt kütüphanesi."
+    },
+    "focal-point": {
+      "name": "Konsorsiyum CRM",
+      "tagline": "Her ilişki için bir iç sorumlu, bir dış muhatap ve temas ritmi."
+    },
+    "workflows": {
+      "name": "Teklif Üretim İş Akışı",
+      "tagline": "Fırsattan başvuruya kapı tabanlı süreç ve adam-gün raporu."
+    },
+    "evaluator": {
+      "name": "Hakem Gözü",
+      "tagline": "Çağrı kriterlerine göre iç ön değerlendirme — resmî puan değildir."
+    },
+    "tto": {
+      "name": "TTO Hızlandırıcı",
+      "tagline": "Teknoloji transferi portföyü: varlık başına hazırlık, sahiplik ve ticarileşme yolu."
+    },
+    "consortium-matching": {
+      "name": "Konsorsiyum Eşleştirme",
+      "tagline": "Teklif başına koltuk planı ve her açık koltuk için sıralı ortak adayları."
+    },
+    "briefs": {
+      "name": "Toplantı Brifingi",
+      "tagline": "Ortak görüşmesinden önce ortak kartı ve konudan derlenen tek sayfalık brifing."
+    },
+    "followups": {
+      "name": "Takip Dokümanları",
+      "tagline": "Fırsattan üretilen, imza başına sürümlenen NDA, LOI ve hibe paketleri."
+    },
+    "application": {
+      "name": "Tam Başvuru Üretimi",
+      "tagline": "Konsept notu, kanıt ve konsorsiyum üzerine bölüm bölüm başvuru taslağı."
+    }
   }
 }

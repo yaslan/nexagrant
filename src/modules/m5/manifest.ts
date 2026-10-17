@@ -28,4 +28,9 @@ export const m5Manifest: ModuleManifest = {
   ],
   tables: ['Opportunity', 'GateDecision', 'Proposal', 'Effort', 'ProposalUsage'],
   isActive: true,
+  category: 'core',
+  stages: ['G3', 'G4'], // Patron onayı K-563625 (2026-10-17)
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };
