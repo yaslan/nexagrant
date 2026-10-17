@@ -38,6 +38,8 @@ beforeAll(async () => {
       fullName: `Live Expert ${i}`,
       email: `${PREFIX}${i}-${now.getTime()}@example.org`,
       province: '06',
+      title: 'Araştırmacı',
+      organization: 'Test Üniversitesi',
       isFreelancer: false,
       expertiseAreas: ['digital-ict'],
       roles: ['researcher'],
@@ -83,7 +85,7 @@ describe('founder number race (live Postgres)', () => {
   it.skipIf(!reachable)('exports the test rows as CSV with the header first and one line per row', async () => {
     const csv = await exportExpertPreRegistrationsCsv({ q: PREFIX });
     const lines = csv.replace(/^\uFEFF/, '').split('\r\n').filter(Boolean);
-    expect(lines[0]).toBe('ad,e-posta,il,alanlar,roller,programlar,durum,founderNumber,createdAt');
+    expect(lines[0]).toBe('ad,e-posta,kurum,il,alanlar,roller,programlar,durum,founderNumber,createdAt');
     expect(lines).toHaveLength(COUNT + 1);
     expect(lines[1]).toContain('Ankara');
     expect(lines.slice(1).every((line) => line.includes(',verified,'))).toBe(true);
