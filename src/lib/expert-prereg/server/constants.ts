@@ -30,9 +30,8 @@ export const IP_WINDOW_MS = 60 * 60 * 1000;
 /** Serialises registrations and founder numbering so concurrent requests cannot pass a limit or share a number. */
 export const EXPERT_PREREG_LOCK_KEY = 7_302_026_019_001n;
 
-/** Where a verified expert lands, by UI language (the page itself is the frontend card's). */
-export function verifiedRedirectPath(locale: string, outcome: { founderNumber: number | null } | { error: 'expired' | 'invalid' }): string {
-  const base = locale === 'en' ? '/en/experts/verified' : '/tr/uzman/dogrulandi';
-  if ('error' in outcome) return `${base}?error=${outcome.error}`;
-  return `${base}?n=${outcome.founderNumber ?? 'yok'}`;
-}
+/**
+ * The signed result on the verify redirect (`?r=`, verified-outcome.ts) is good
+ * this long. It is read once, right after the redirect; an hour is plenty.
+ */
+export const VERIFIED_OUTCOME_TTL_SECONDS = 60 * 60;
