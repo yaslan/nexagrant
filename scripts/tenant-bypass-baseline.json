@@ -327,7 +327,7 @@
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "purgeOldExpertPreRegistrations(), run nightly by the expert-prereg-cleanup cron (FO-50, TASK-MVC91K7JYOWQC): deletes ExpertPreRegistration rows (platform data with personal data, no tenantId, SYSTEM_WIDE) older than EXPERT_PREREG_RETENTION_DAYS by one createdAt < cutoff filter, spares only the row holding the highest founderNumber, and writes one expert_prereg.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope, so delete and audit share this one transaction. No tenant row is read or written."
+      "reason": "purgeOldExpertPreRegistrations(), run nightly by the expert-prereg-cleanup cron (FO-50, TASK-MVC91K7JYOWQC): deletes ExpertPreRegistration rows (platform data with personal data, no tenantId, SYSTEM_WIDE) older than EXPERT_PREREG_RETENTION_DAYS by one createdAt < cutoff filter with no exception (K-568932 = A), first raising the one-row ExpertFounderCounter (SYSTEM_WIDE, no personal data) to the highest founderNumber so no number is freed, and writes one expert_prereg.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope, so delete and audit share this one transaction. No tenant row is read or written."
     }
   ]
 }

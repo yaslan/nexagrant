@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { RESEND_COOLDOWN_MS, REGISTRATION_IP_LIMIT, VERIFY_TOKEN_TTL_MS } from '@/lib/expert-prereg/server/constants';
 import { hashExpertIp, registerExpertPreRegistration } from '@/lib/expert-prereg/server/register';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
-import { acquireExpertPreRegLiveLock } from './helpers/expert-prereg-live-lock';
+import { acquireExpertPreRegLiveLock, holdFounderCounter } from './helpers/expert-prereg-live-lock';
 import type { Mailer, MailMessage } from '@/lib/email/mailer';
 
 /**
@@ -75,16 +75,19 @@ async function cleanup() {
 
 // FO-45: serialised with the founder-number race file (see helpers/expert-prereg-live-lock.ts).
 let releaseLock: (() => Promise<void>) | null = null;
+let restoreCounter: (() => Promise<void>) | null = null;
 
 beforeAll(async () => {
   if (!reachable) return;
   releaseLock = await acquireExpertPreRegLiveLock();
+  restoreCounter = await holdFounderCounter(prisma);
   await cleanup();
 });
 
 afterAll(async () => {
   if (!reachable) return;
   await cleanup();
+  await restoreCounter?.();
   await prisma.$disconnect();
   await releaseLock?.();
 });
