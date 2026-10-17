@@ -242,7 +242,7 @@ describe('no hard-coded call data on the public surfaces', () => {
     // `Call.country`, `Call.isOpen` and `Call.deadline` do not exist; the query
     // that named them threw on every render and the page showed an empty list.
     const source = readFileSync(
-      resolve(REPO, 'src/app/[locale]/calls/turkey/page.tsx'),
+      resolve(REPO, 'src/app/[locale]/(public)/calls/turkey/page.tsx'),
       'utf8'
     );
     expect(source).not.toMatch(/country:\s*'TR'/);

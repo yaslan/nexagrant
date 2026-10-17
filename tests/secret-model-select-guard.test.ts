@@ -97,7 +97,7 @@ const ROW_OPS = [
  * addBudgetLineByToken returns only `{ success }`.
  */
 const SECRET_SELECT_ALLOWLIST: Record<string, string> = {
-  'src/app/[locale]/portal/partner/[token]/page.tsx::applicationPart.magicTokenHash':
+  'src/app/[locale]/(public)/portal/partner/[token]/page.tsx::applicationPart.magicTokenHash':
     'timing-safe comparison in generateMetadata and the page; no client component on the page',
   'src/modules/m11/server/actions.ts::applicationPart.magicTokenHash':
     'addBudgetLineByToken compares the hash and returns { success } only',

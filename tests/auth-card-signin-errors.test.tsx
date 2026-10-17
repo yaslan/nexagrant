@@ -6,7 +6,7 @@ import { NextIntlClientProvider } from 'next-intl';
 
 import trMessages from '../messages/tr.json';
 import enMessages from '../messages/en.json';
-import AuthCard from '@/app/[locale]/login/AuthCard';
+import AuthCard from '@/app/[locale]/(public)/login/AuthCard';
 
 /**
  * İNCELEME-14 K-3 (TASK-MUMAC1VT7DT5Q) — Auth.js sends its own sign-in errors

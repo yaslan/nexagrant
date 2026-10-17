@@ -61,7 +61,7 @@
     },
     {
       "check": "D",
-      "file": "src/app/[locale]/portal/partner/[token]/page.tsx",
+      "file": "src/app/[locale]/(public)/portal/partner/[token]/page.tsx",
       "subject": "system-scope:tenant-discovery",
       "count": 2,
       "kind": "system-scope",
