@@ -105,13 +105,19 @@ psql_bin=${PSQL:-psql}
 #
 # Session-level on purpose: `SET LOCAL` would end at the first COMMIT inside a
 # file. It dies with the psql process, one per file.
+#
+# Stored defaults that reach a session in THIS database: database-wide here,
+# any role's here, and role-wide (setdatabase 0, every database). A default on
+# another database never applies here; pg_db_role_setting is cluster-wide, so
+# without the filter another database's default refused this run (FO-34).
 system_scope_defaults() {
   "$psql_bin" "$url" -X -Atq -v ON_ERROR_STOP=1 -c "
     SELECT coalesce(string_agg(coalesce(d.datname, '*') || '/' || coalesce(r.rolname, '*'), ', '), '')
       FROM pg_db_role_setting s
       LEFT JOIN pg_database d ON d.oid = s.setdatabase
       LEFT JOIN pg_roles r ON r.oid = s.setrole
-     WHERE EXISTS (SELECT 1 FROM unnest(s.setconfig) c WHERE c LIKE 'app.system\_scope=%')"
+     WHERE s.setdatabase IN (0, (SELECT oid FROM pg_database WHERE datname = current_database()))
+       AND EXISTS (SELECT 1 FROM unnest(s.setconfig) c WHERE c LIKE 'app.system\_scope=%')"
 }
 
 preflight=$("$psql_bin" "$url" -X -Atq -F '|' -v ON_ERROR_STOP=1 -c "
