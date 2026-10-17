@@ -69,12 +69,44 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
 
   it('adds TTO once M7 is open, at its manifest position', () => {
     shell(['M5', 'M7'], <SidebarNav locale="en" />, 'en');
-    expect(sidebarLabels()).toEqual(['Dashboard', 'Calls', 'Pipeline', expect.stringContaining('TTO'), 'Approvals (4-Eyes)', 'Partner REST API', 'Settings']);
+    // M1 is off, so Partner REST API (an M1 feature) is locked rather than linked.
+    expect(sidebarLabels()).toEqual(['Dashboard', 'Calls', 'Pipeline', expect.stringContaining('TTO'), 'Approvals (4-Eyes)', 'Settings']);
+    expect(screen.getByTestId('sidebar-nav-apiKeys').getAttribute('data-locked')).toBe('true');
   });
 
   it('shows only the core items when no module is open', () => {
     shell([], <SidebarNav locale="tr" />);
-    expect(sidebarLabels()).toEqual(['Panel', 'Çağrılar', 'Onay Merkezi (4-Eyes)', 'Partner REST API', 'Ayarlar']);
+    expect(sidebarLabels()).toEqual(['Panel', 'Çağrılar', 'Ayarlar']);
+  });
+});
+
+/**
+ * FO-39 (TASK-MVC4JEKT5KX5C) — Onay Merkezi is an M5 feature and Partner REST API
+ * an M1 one (`navFeatureModule`): with the module off the entry stays in the menu,
+ * locked, with a tooltip naming the module, and is no link.
+ */
+describe('SidebarNav — feature entries locked while their module is off', () => {
+  it('locks Onay Merkezi without M5 and Partner REST API without M1', () => {
+    shell([], <SidebarNav locale="tr" />);
+
+    const approvals = screen.getByTestId('sidebar-nav-approvals');
+    expect(approvals.tagName).toBe('SPAN');
+    expect(approvals.getAttribute('aria-disabled')).toBe('true');
+    expect(approvals.getAttribute('title')).toBe(
+      trMessages.Navigation.featureLocked.replace('{module}', `M5 ${trMessages.modules.workflows.name}`)
+    );
+    expect(approvals.textContent).toContain('Onay Merkezi (4-Eyes)');
+
+    const apiKeys = screen.getByTestId('sidebar-nav-apiKeys');
+    expect(apiKeys.getAttribute('title')).toContain(`M1 ${trMessages.modules['partner-intel'].name}`);
+    expect(screen.queryByRole('link', { name: /Onay Merkezi|Partner REST API/ })).toBeNull();
+  });
+
+  it('links both once M5 and M1 are on', () => {
+    shell(['M1', 'M5'], <SidebarNav locale="tr" />);
+    expect(screen.getByRole('link', { name: 'Onay Merkezi (4-Eyes)' }).getAttribute('href')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Partner REST API' })).toBeTruthy();
+    expect(screen.queryByTitle(/modülü kapalı/)).toBeNull();
   });
 });
 
