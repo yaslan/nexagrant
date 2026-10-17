@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { PROVINCES } from '@/lib/expert-prereg/options';
 import { focusRing, inputClass } from './styles';
@@ -28,7 +28,8 @@ export default function ProvinceCombobox({ id, value, onChange, invalid, describ
   const selected = PROVINCES.find((p) => p.value === value);
   const [query, setQuery] = useState(selected?.name ?? '');
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  // -1 = no active option: Enter is left to the form until an arrow key moves.
+  const [active, setActive] = useState(-1);
   const listRef = useRef<HTMLUListElement>(null);
 
   const matches = useMemo(() => {
@@ -39,18 +40,29 @@ export default function ProvinceCombobox({ id, value, onChange, invalid, describ
     return [...starts, ...PROVINCES.filter((p) => !starts.includes(p) && fold(p.name).includes(q))];
   }, [query, selected]);
 
+  // Keep the active option in view, also when the list opens on a saved province.
+  useEffect(() => {
+    if (open && active >= 0) listRef.current?.children[active]?.scrollIntoView?.({ block: 'nearest' });
+  }, [open, active]);
+
   function choose(code: string) {
     const p = PROVINCES.find((x) => x.value === code);
     if (!p) return;
     onChange(p.value);
     setQuery(p.name);
     setOpen(false);
+    setActive(-1);
+  }
+
+  /** Opening shows the saved province as active, or nothing (ARIA APG). */
+  function openList() {
+    if (open) return;
+    setOpen(true);
+    setActive(matches.findIndex((p) => p.value === value));
   }
 
   function move(next: number) {
-    const bounded = Math.max(0, Math.min(matches.length - 1, next));
-    setActive(bounded);
-    listRef.current?.children[bounded]?.scrollIntoView?.({ block: 'nearest' });
+    setActive(Math.max(0, Math.min(matches.length - 1, next)));
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -80,7 +92,7 @@ export default function ProvinceCombobox({ id, value, onChange, invalid, describ
         break;
       case 'Enter': {
         const pick = matches[active];
-        if (open && pick) {
+        if (open && active >= 0 && pick) {
           e.preventDefault();
           choose(pick.value);
         }
@@ -95,7 +107,7 @@ export default function ProvinceCombobox({ id, value, onChange, invalid, describ
     }
   }
 
-  const activeOption = open ? matches[active] : undefined;
+  const activeOption = open && active >= 0 ? matches[active] : undefined;
 
   return (
     <div className="relative">
@@ -115,11 +127,12 @@ export default function ProvinceCombobox({ id, value, onChange, invalid, describ
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
-          setActive(0);
+          // A typed query makes its first match active, so "izmir" + Enter picks İzmir.
+          setActive(e.target.value.trim() ? 0 : -1);
           if (value) onChange('');
         }}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
+        onFocus={openList}
+        onClick={openList}
         onBlur={() => {
           setOpen(false);
           // An exact name typed out counts as a choice; anything else is not one.
@@ -150,7 +163,7 @@ export default function ProvinceCombobox({ id, value, onChange, invalid, describ
               key={p.value}
               id={`${listId}-${p.value}`}
               role="option"
-              aria-selected={p.value === value}
+              aria-selected={i === active}
               // mousedown, not click: the input's blur would close the list first.
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -159,7 +172,7 @@ export default function ProvinceCombobox({ id, value, onChange, invalid, describ
               onMouseEnter={() => setActive(i)}
               className={`flex min-h-11 cursor-pointer items-center justify-between px-3 text-sm text-ink ${
                 i === active ? 'bg-accent-light' : ''
-              } ${focusRing}`}
+              } ${p.value === value ? 'font-semibold' : ''} ${focusRing}`}
             >
               <span>{p.name}</span>
               <span className="font-mono text-xs text-ink-2">{p.value}</span>

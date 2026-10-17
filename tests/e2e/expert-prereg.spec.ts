@@ -70,6 +70,11 @@ async function fillRequired(page: Page, email: string) {
   await province.pressSequentially('izm');
   await page.keyboard.press('Enter');
   await expect(province).toHaveValue('İzmir');
+  // FO-28: leaving and re-entering the field, then Enter, keeps İzmir (not Adana).
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await expect(province).toHaveValue('İzmir');
   await page.getByLabel('Enerji', { exact: true }).check();
   await page.getByLabel('Koordinatör', { exact: true }).check();
   await page.getByLabel('Erasmus+', { exact: true }).check();

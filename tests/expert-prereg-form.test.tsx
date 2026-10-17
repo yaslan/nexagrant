@@ -169,6 +169,46 @@ describe('ExpertPreregForm', () => {
     expect(box.getAttribute('aria-expanded')).toBe('false');
   });
 
+  // FO-28 (TASK-MVC30JGOJTXJW): nothing is active until an arrow key moves, so
+  // Enter on a fresh focus neither picks a province nor swallows the submit.
+  test('province combobox: focus + Enter on an empty field picks nothing', () => {
+    renderForm();
+    const box = screen.getByRole('combobox');
+    fireEvent.focus(box);
+    expect(box.getAttribute('aria-expanded')).toBe('true');
+    expect(box.hasAttribute('aria-activedescendant')).toBe(false);
+    expect(screen.queryAllByRole('option', { selected: true })).toHaveLength(0);
+    const enter = fireEvent.keyDown(box, { key: 'Enter' });
+    expect(enter).toBe(true); // not preventDefault-ed: the form keeps its Enter
+    expect((box as HTMLInputElement).value).toBe('');
+  });
+
+  test('province combobox: refocus + Enter keeps the chosen province', () => {
+    renderForm();
+    const box = screen.getByRole('combobox');
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: 'izmir' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect((box as HTMLInputElement).value).toBe('İzmir');
+    fireEvent.blur(box);
+    fireEvent.focus(box);
+    // The saved value is the active option on reopen, so Enter re-picks İzmir.
+    expect(box.getAttribute('aria-activedescendant')).toMatch(/-35$/);
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect((box as HTMLInputElement).value).toBe('İzmir');
+  });
+
+  test('province combobox: focus + ArrowDown + Enter picks the first option', () => {
+    renderForm();
+    const box = screen.getByRole('combobox');
+    fireEvent.focus(box);
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    const [first] = screen.getAllByRole('option', { selected: true });
+    expect(box.getAttribute('aria-activedescendant')).toBe(first?.id);
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect((box as HTMLInputElement).value).toBe('Adana');
+  });
+
   test('the honeypot is out of the tab order and hidden from assistive tech', () => {
     renderForm();
     const hp = document.getElementById('ep-website') as HTMLInputElement;
