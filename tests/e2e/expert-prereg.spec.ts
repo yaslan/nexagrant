@@ -61,7 +61,7 @@ async function signIn(page: Page, baseURL: string, admin: boolean) {
   await page.context().addCookies([{ name: COOKIE_NAME, value, url: baseURL }]);
 }
 
-/** Fills every required field by keyboard and clicks, the way a person does. */
+/** Fills every required field (FO-25: Diller is optional and stays empty) by keyboard and clicks, the way a person does. */
 async function fillRequired(page: Page, email: string) {
   await page.getByLabel(/Ad Soyad/).fill('Ayşe Deneme');
   await page.getByLabel(/^E-posta/).fill(email);
@@ -75,10 +75,11 @@ async function fillRequired(page: Page, email: string) {
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(province).toHaveValue('İzmir');
+  await page.getByLabel(/^Unvan/).fill('Proje Koordinatörü');
+  await page.getByLabel(/^Kurum/).fill('Ege Deneme Üniversitesi');
   await page.getByLabel('Enerji', { exact: true }).check();
   await page.getByLabel('Koordinatör', { exact: true }).check();
   await page.getByLabel('Erasmus+', { exact: true }).check();
-  await page.getByLabel('İngilizce', { exact: true }).check();
   await page.getByLabel(/KVKK Aydınlatma Metni/).check();
   await page.getByLabel(/Profilimin uzman rehberinde/).check();
 }
@@ -117,6 +118,25 @@ test.describe('expert pre-registration (FO-20)', () => {
     await expect(page.locator('#ep-kvkkAccepted-error')).toHaveText('Devam etmek için bu onay gereklidir.');
     expect(posts).toBe(0);
     await page.screenshot({ path: `${SHOTS}/e2e-01-empty-submit.png`, fullPage: true });
+  });
+
+  // FO-25 (K-516717): Kurum is required on its own; leaving it blank keeps the form here.
+  test('no organisation: field error on Kurum, focus there, nothing is posted', async ({ page }) => {
+    let posts = 0;
+    page.on('request', (r) => {
+      if (r.url().endsWith('/api/expert-preregistration') && r.method() === 'POST') posts += 1;
+    });
+    await page.goto('/tr/uzman');
+    await fillRequired(page, runEmail('noorg'));
+    await page.getByLabel(/^Kurum/).fill('');
+    await page.getByRole('button', { name: 'Ön kaydı gönder' }).click();
+    const org = page.getByLabel(/^Kurum/);
+    await expect(org).toBeFocused();
+    await expect(org).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#ep-organization-error')).toHaveText('Bu alan zorunludur.');
+    await expect(page.locator('#languages-error')).toHaveCount(0);
+    expect(posts).toBe(0);
+    await page.screenshot({ path: `${SHOTS}/e2e-05-no-organisation.png`, fullPage: true });
   });
 
   test('the KVKK notice opens in a modal and closes with Escape', async ({ page }) => {
@@ -188,6 +208,7 @@ test.describe('expert pre-registration (FO-20)', () => {
     const row = page.getByTestId('ep-admin-row').filter({ hasText: email });
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('İzmir');
+    await expect(row).toContainText('Ege Deneme Üniversitesi');
     await expect(row).toContainText('Doğrulandı');
     if (n && n !== 'yok') await expect(row).toContainText(n);
     await page.screenshot({ path: `${SHOTS}/e2e-04-admin.png`, fullPage: true });
@@ -195,6 +216,7 @@ test.describe('expert pre-registration (FO-20)', () => {
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
     const csv = await (await download.createReadStream()).toArray();
     expect(Buffer.concat(csv).toString('utf8')).toContain(email);
+    expect(Buffer.concat(csv).toString('utf8')).toContain('Ege Deneme Üniversitesi');
   });
 
   test('a non-admin does not see the admin table', async ({ page, baseURL }) => {

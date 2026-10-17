@@ -66,3 +66,4 @@ revoke-api-role-function-execute.sql
 add-blog-post.sql
 add-notification.sql
 drop-evidence-reminder.sql
+add-expert-pre-registration-organization.sql
