@@ -8,6 +8,7 @@ const valid = {
   email: 'Ayse@Example.org',
   province: '34',
   title: 'Proje Yöneticisi',
+  organization: 'Ankara Kalkınma Ajansı',
   isFreelancer: true,
   expertiseAreas: ['digital-ict'],
   roles: ['project-manager'],
@@ -40,12 +41,30 @@ describe('expertPreRegInputSchema', () => {
   });
 
   it('defaults marketing consent to false and allows the optional fields to be absent', () => {
-    const minimal = { ...valid, marketingConsent: undefined, title: undefined, orcid: undefined, linkedinUrl: undefined };
+    const minimal = { ...valid, marketingConsent: undefined, orcid: undefined, linkedinUrl: undefined };
     const result = expertPreRegInputSchema.parse(minimal);
     expect(result.marketingConsent).toBe(false);
-    expect(result.title).toBeNull();
     expect(result.orcid).toBeNull();
     expect(result.linkedinUrl).toBeNull();
+  });
+
+  it('accepts a submission without languages (FO-25: Diller is optional, stored as [])', () => {
+    expect(expertPreRegInputSchema.parse({ ...valid, languages: undefined }).languages).toEqual([]);
+    expect(expertPreRegInputSchema.parse({ ...valid, languages: [] }).languages).toEqual([]);
+  });
+
+  it('refuses a missing or blank title or organisation as required (FO-25)', () => {
+    expect(codeOf({ ...valid, title: undefined }, 'title')).toBe('required');
+    expect(codeOf({ ...valid, title: '   ' }, 'title')).toBe('required');
+    expect(codeOf({ ...valid, organization: undefined }, 'organization')).toBe('required');
+    expect(codeOf({ ...valid, organization: '' }, 'organization')).toBe('required');
+  });
+
+  it('refuses a one-character or over-long title or organisation (FO-25)', () => {
+    expect(codeOf({ ...valid, title: 'A' }, 'title')).toBe('too_short');
+    expect(codeOf({ ...valid, title: 'x'.repeat(121) }, 'title')).toBe('too_long');
+    expect(codeOf({ ...valid, organization: 'K' }, 'organization')).toBe('too_short');
+    expect(codeOf({ ...valid, organization: 'x'.repeat(201) }, 'organization')).toBe('too_long');
   });
 
   it('refuses a missing required field with the code required', () => {

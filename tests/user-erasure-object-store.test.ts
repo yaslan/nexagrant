@@ -87,6 +87,7 @@ vi.mock("@/lib/db", () => {
     effort: { deleteMany: ok },
     calendarConnection: { deleteMany: ok },
     savedSearch: { deleteMany: ok },
+    notification: { deleteMany: ok },
     auditEvent: { updateMany: ok, create: async () => ({}) },
     opportunity: { updateMany: ok },
     feedback: { updateMany: ok },

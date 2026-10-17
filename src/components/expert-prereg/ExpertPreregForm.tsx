@@ -27,25 +27,32 @@ interface ExpertPreregFormProps {
 type Field = Exclude<keyof ExpertPreRegInput, 'utmSource' | 'utmMedium' | 'utmCampaign' | 'locale'>;
 type FieldErrors = Partial<Record<Field, ExpertPreRegErrorCode>>;
 
-/** Top-to-bottom order of the form: the first error in this order gets focus. */
-const FIELD_ORDER: readonly Field[] = [
-  'fullName',
-  'email',
-  'province',
-  'title',
-  'isFreelancer',
-  'expertiseAreas',
-  'roles',
-  'programmes',
-  'languages',
-  'projectCodes',
-  'orcid',
-  'linkedinUrl',
-  'referredBy',
-  'kvkkAccepted',
-  'visibilityConsent',
-  'marketingConsent',
-];
+/**
+ * Every schema field, top-to-bottom as the form shows them (key order): the first
+ * error in this order gets focus. Keyed by Field, so a field added to the schema
+ * without a place here fails tsc instead of being dropped by toFieldErrors (FO-25).
+ */
+const FIELDS = {
+  fullName: true,
+  email: true,
+  province: true,
+  title: true,
+  organization: true,
+  isFreelancer: true,
+  expertiseAreas: true,
+  roles: true,
+  programmes: true,
+  languages: true,
+  projectCodes: true,
+  orcid: true,
+  linkedinUrl: true,
+  referredBy: true,
+  kvkkAccepted: true,
+  visibilityConsent: true,
+  marketingConsent: true,
+} satisfies Record<Field, true>;
+
+const FIELD_ORDER = Object.keys(FIELDS) as Field[];
 
 const UTM_KEYS = { utm_source: 'utmSource', utm_medium: 'utmMedium', utm_campaign: 'utmCampaign' } as const;
 const noSubscribe = () => () => {};
@@ -86,6 +93,7 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
   const [email, setEmail] = useState('');
   const [province, setProvince] = useState('');
   const [title, setTitle] = useState('');
+  const [organization, setOrganization] = useState('');
   const [isFreelancer, setIsFreelancer] = useState(false);
   const [areas, setAreas] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -149,6 +157,7 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
       email,
       province,
       title,
+      organization,
       isFreelancer,
       expertiseAreas: areas,
       roles,
@@ -256,7 +265,7 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
   const hintClass = 'text-xs text-ink-2';
 
   const textField = (
-    field: 'fullName' | 'email' | 'title' | 'projectCodes' | 'linkedinUrl' | 'referredBy',
+    field: 'fullName' | 'email' | 'title' | 'organization' | 'projectCodes' | 'linkedinUrl' | 'referredBy',
     value: string,
     set: (v: string) => void,
     opts: {
@@ -386,9 +395,16 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
 
         <div className="space-y-2">
           {textField('title', title, setTitle, {
+            required: true,
             autoComplete: 'organization-title',
             placeholder: t('form.title_placeholder'),
             maxLength: 120,
+          })}
+          {textField('organization', organization, setOrganization, {
+            required: true,
+            autoComplete: 'organization',
+            placeholder: t('form.organization_placeholder'),
+            maxLength: 200,
           })}
           <label htmlFor="ep-isFreelancer" className="inline-flex min-h-11 items-center gap-3 text-sm text-ink">
             <input
@@ -444,22 +460,19 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
           error={err('programmes')}
         />
 
-        {/* Required by the FO-19 schema (min 1), although the card lists it as optional. */}
-        <ChoiceGroup
-          name="languages"
-          legend={t('form.languages_legend')}
-          required
-          options={opts('languages', LANGUAGES)}
-          selected={languages}
-          onChange={(v) => {
-            setLanguages(v);
-            clear('languages');
-          }}
-          error={err('languages')}
-        />
-
         <div className="space-y-5 border-t border-border pt-5">
           <h3 className="text-base font-semibold text-ink">{t('form.optional_heading')}</h3>
+          <ChoiceGroup
+            name="languages"
+            legend={t('form.languages_legend')}
+            options={opts('languages', LANGUAGES)}
+            selected={languages}
+            onChange={(v) => {
+              setLanguages(v);
+              clear('languages');
+            }}
+            error={err('languages')}
+          />
           {textField('projectCodes', projectCodes, setProjectCodes, {
             placeholder: t('form.projectCodes_placeholder'),
             hint: t('form.projectCodes_hint'),

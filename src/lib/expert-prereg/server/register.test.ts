@@ -24,6 +24,7 @@ const valid = {
   email: 'Ayse@Example.org',
   province: '34',
   title: 'Proje Yöneticisi',
+  organization: 'Ankara Kalkınma Ajansı',
   isFreelancer: true,
   expertiseAreas: ['digital-ict'],
   roles: ['project-manager'],

@@ -195,6 +195,7 @@ export async function registerExpertPreRegistration(
         email: data.email,
         province: data.province,
         title: data.title,
+        organization: data.organization,
         isFreelancer: data.isFreelancer,
         expertiseAreas: data.expertiseAreas,
         roles: data.roles,

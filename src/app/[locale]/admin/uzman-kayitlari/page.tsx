@@ -184,6 +184,7 @@ export default async function AdminExpertPreregPage({
               <thead className="bg-surface-hover text-xs font-semibold uppercase tracking-wide text-ink-2">
                 <tr>
                   <th scope="col" className="px-3 py-2">{t('col_name')}</th>
+                  <th scope="col" className="px-3 py-2">{t('col_organization')}</th>
                   <th scope="col" className="px-3 py-2">{t('col_province')}</th>
                   <th scope="col" className="px-3 py-2">{t('col_areas')}</th>
                   <th scope="col" className="px-3 py-2">{t('col_roles')}</th>
@@ -201,6 +202,7 @@ export default async function AdminExpertPreregPage({
                         {r.email}
                       </a>
                     </td>
+                    <td className="px-3 py-2 min-w-40">{r.organization ?? t('none')}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{PROVINCE_NAME.get(r.province) ?? r.province}</td>
                     <td className="px-3 py-2 min-w-48">{list('areas', r.expertiseAreas)}</td>
                     <td className="px-3 py-2 min-w-40">{list('roles', r.roles)}</td>

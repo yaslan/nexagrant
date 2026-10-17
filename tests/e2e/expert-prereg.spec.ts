@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { withSystemScope } from '../../src/lib/system-scope';
+import { encodeVerifiedOutcome } from '../../src/lib/expert-prereg/server/verified-outcome';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -61,7 +62,7 @@ async function signIn(page: Page, baseURL: string, admin: boolean) {
   await page.context().addCookies([{ name: COOKIE_NAME, value, url: baseURL }]);
 }
 
-/** Fills every required field by keyboard and clicks, the way a person does. */
+/** Fills every required field (FO-25: Diller is optional and stays empty) by keyboard and clicks, the way a person does. */
 async function fillRequired(page: Page, email: string) {
   await page.getByLabel(/Ad Soyad/).fill('Ayşe Deneme');
   await page.getByLabel(/^E-posta/).fill(email);
@@ -75,10 +76,11 @@ async function fillRequired(page: Page, email: string) {
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   await expect(province).toHaveValue('İzmir');
+  await page.getByLabel(/^Unvan/).fill('Proje Koordinatörü');
+  await page.getByLabel(/^Kurum/).fill('Ege Deneme Üniversitesi');
   await page.getByLabel('Enerji', { exact: true }).check();
   await page.getByLabel('Koordinatör', { exact: true }).check();
   await page.getByLabel('Erasmus+', { exact: true }).check();
-  await page.getByLabel('İngilizce', { exact: true }).check();
   await page.getByLabel(/KVKK Aydınlatma Metni/).check();
   await page.getByLabel(/Profilimin uzman rehberinde/).check();
 }
@@ -117,6 +119,25 @@ test.describe('expert pre-registration (FO-20)', () => {
     await expect(page.locator('#ep-kvkkAccepted-error')).toHaveText('Devam etmek için bu onay gereklidir.');
     expect(posts).toBe(0);
     await page.screenshot({ path: `${SHOTS}/e2e-01-empty-submit.png`, fullPage: true });
+  });
+
+  // FO-25 (K-516717): Kurum is required on its own; leaving it blank keeps the form here.
+  test('no organisation: field error on Kurum, focus there, nothing is posted', async ({ page }) => {
+    let posts = 0;
+    page.on('request', (r) => {
+      if (r.url().endsWith('/api/expert-preregistration') && r.method() === 'POST') posts += 1;
+    });
+    await page.goto('/tr/uzman');
+    await fillRequired(page, runEmail('noorg'));
+    await page.getByLabel(/^Kurum/).fill('');
+    await page.getByRole('button', { name: 'Ön kaydı gönder' }).click();
+    const org = page.getByLabel(/^Kurum/);
+    await expect(org).toBeFocused();
+    await expect(org).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#ep-organization-error')).toHaveText('Bu alan zorunludur.');
+    await expect(page.locator('#languages-error')).toHaveCount(0);
+    expect(posts).toBe(0);
+    await page.screenshot({ path: `${SHOTS}/e2e-05-no-organisation.png`, fullPage: true });
   });
 
   test('the KVKK notice opens in a modal and closes with Escape', async ({ page }) => {
@@ -169,10 +190,13 @@ test.describe('expert pre-registration (FO-20)', () => {
     const target = new URL(verify.headers()['location'] ?? '');
     expect(target.pathname).toBe('/tr/uzman/dogrulandi');
     await page.goto(`${target.pathname}${target.search}`);
-    await expect(page).toHaveURL(/\/tr\/uzman\/dogrulandi\?n=/);
+    // FO-29: the result travels only as a signed r; no readable n/error in the URL.
+    expect([...target.searchParams.keys()]).toEqual(['r']);
+    await expect(page).toHaveURL(/\/tr\/uzman\/dogrulandi\?r=/);
     await expect(page.getByRole('heading', { name: 'E-postanız doğrulandı' })).toBeVisible();
-    const n = new URL(page.url()).searchParams.get('n');
-    if (n && n !== 'yok') await expect(page.getByTestId('ep-founder-number')).toHaveText(`Kurucu Uzman numaranız: #${n}`);
+    const founder = page.getByTestId('ep-founder-number');
+    const n = (await founder.count()) ? ((await founder.textContent())?.match(/#(\d+)/)?.[1] ?? null) : null;
+    if (n) await expect(founder).toHaveText(`Kurucu Uzman numaranız: #${n}`);
     await page.screenshot({ path: `${SHOTS}/e2e-03-verified.png`, fullPage: true });
 
     // The same address a second time: 409 → message on the e-mail field, focus there.
@@ -188,13 +212,15 @@ test.describe('expert pre-registration (FO-20)', () => {
     const row = page.getByTestId('ep-admin-row').filter({ hasText: email });
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('İzmir');
+    await expect(row).toContainText('Ege Deneme Üniversitesi');
     await expect(row).toContainText('Doğrulandı');
-    if (n && n !== 'yok') await expect(row).toContainText(n);
+    if (n) await expect(row).toContainText(n);
     await page.screenshot({ path: `${SHOTS}/e2e-04-admin.png`, fullPage: true });
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('ep-admin-csv').click()]);
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
     const csv = await (await download.createReadStream()).toArray();
     expect(Buffer.concat(csv).toString('utf8')).toContain(email);
+    expect(Buffer.concat(csv).toString('utf8')).toContain('Ege Deneme Üniversitesi');
   });
 
   test('a non-admin does not see the admin table', async ({ page, baseURL }) => {
@@ -214,12 +240,25 @@ test.describe('expert pre-registration (FO-20)', () => {
     await page.screenshot({ path: `${SHOTS}/e2e-05-en-375.png`, fullPage: true });
     await page.goto('/tr/uzman');
     await noHorizontalScroll(page);
-    await page.goto('/en/experts/verified?error=expired');
+    const expired = encodeVerifiedOutcome({ outcome: 'expired', founderNumber: null }, { secret: e2eAuthSecret() });
+    await page.goto(`/en/experts/verified?r=${expired}`);
     await expect(page.getByRole('heading', { name: 'This link has expired' })).toBeVisible();
     const robots = await page.locator('meta[name="robots"]').getAttribute('content');
     expect(robots).toContain('noindex');
     await noHorizontalScroll(page);
     await page.goto('/tr/uzman/dogrulandi?error=invalid');
     await expect(page.getByRole('heading', { name: 'Bağlantı geçersiz' })).toBeVisible();
+  });
+
+  test('FO-29: a hand-typed ?n=1 or a tampered r is an invalid link, not "verified"', async ({ page }) => {
+    await page.goto('/tr/uzman/dogrulandi?n=1');
+    await expect(page.getByRole('heading', { name: 'Bağlantı geçersiz' })).toBeVisible();
+    await expect(page.getByTestId('ep-founder-number')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/fo29-01-bare-n.png`, fullPage: true });
+    const r = encodeVerifiedOutcome({ outcome: 'ok', founderNumber: 1 }, { secret: `${e2eAuthSecret()}-wrong` });
+    await page.goto(`/tr/uzman/dogrulandi?r=${r}`);
+    await expect(page.getByRole('heading', { name: 'Bağlantı geçersiz' })).toBeVisible();
+    await expect(page.getByTestId('ep-founder-number')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/fo29-02-tampered-r.png`, fullPage: true });
   });
 });

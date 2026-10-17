@@ -80,6 +80,13 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
   AUTH_URL: z.string().optional(),
+  /**
+   * The session-signing key (NextAuth; NEXTAUTH_SECRET is the older name). Startup
+   * refuses to run without a strong one (src/lib/auth-secret.ts); read it here
+   * with {@link authSecret}.
+   */
+  AUTH_SECRET: blankToUndefined(z.string().optional()),
+  NEXTAUTH_SECRET: blankToUndefined(z.string().optional()),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
@@ -257,6 +264,15 @@ if (!_env.success) {
 }
 
 export const env = _env.data;
+
+/**
+ * The key NextAuth signs sessions with, for code that derives a labelled key of
+ * its own from it (FO-29, src/lib/expert-prereg/server/verified-outcome.ts).
+ * `null` only in a process that skipped the startup check.
+ */
+export function authSecret(): string | null {
+  return env.AUTH_SECRET ?? env.NEXTAUTH_SECRET ?? null;
+}
 
 /**
  * The numeric view of `ALERTS_SWEEP_FAILURE_THRESHOLD`, converted once here so

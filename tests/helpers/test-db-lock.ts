@@ -43,3 +43,12 @@ export const AGENCY_INVITE_CODE_DDL_LOCK = 'AgencyInviteCode:ddl';
  * 6 rows where 3 belong. Hold this around the seed and any read of those rows.
  */
 export const PUBLIC_SECTOR_PLANS_LOCK = 'PlanFeature:public-sector';
+
+/**
+ * scripts/apply-migrations.sh refuses to run while ANY database in the cluster
+ * has a stored default for app.system_scope (pg_db_role_setting is
+ * cluster-wide). migration-owner-chain.live stores one on its own database for
+ * a few seconds, so two gates sharing one Postgres (two worktrees) broke each
+ * other's chain runs (FO-27). Held for that whole file, on the admin session.
+ */
+export const MIGRATION_OWNER_CHAIN_LOCK = 'cluster:app.system_scope-defaults';

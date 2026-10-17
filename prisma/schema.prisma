@@ -687,6 +687,9 @@ model ExpertPreRegistration {
   /// Plate code "01".."81" (src/lib/expert-prereg/options.ts).
   province             String
   title                String?
+  /// FO-25 (TASK-MVBLMIJW293GW): "Kurum". Required by the API from FO-25 on; nullable in the
+  /// column so rows written before it stay valid (no backfill, additive migration).
+  organization         String?
   isFreelancer         Boolean
   expertiseAreas       String[]
   roles                String[]

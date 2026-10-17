@@ -26,6 +26,7 @@ export interface ExpertPreRegRow {
   id: string;
   fullName: string;
   email: string;
+  organization: string | null;
   province: string;
   expertiseAreas: string[];
   roles: string[];
@@ -53,6 +54,7 @@ const ROW_SELECT = {
   id: true,
   fullName: true,
   email: true,
+  organization: true,
   province: true,
   expertiseAreas: true,
   roles: true,
@@ -84,6 +86,7 @@ const PROVINCE_NAME = new Map<string, string>(PROVINCES.map((p) => [p.value, p.n
 export const EXPERT_PREREG_CSV_HEADER = [
   'ad',
   'e-posta',
+  'kurum',
   'il',
   'alanlar',
   'roller',
@@ -104,6 +107,7 @@ export async function exportExpertPreRegistrationsCsv(
     rows.map((row) => [
       row.fullName,
       row.email,
+      row.organization,
       PROVINCE_NAME.get(row.province) ?? row.province,
       row.expertiseAreas.join(';'),
       row.roles.join(';'),
