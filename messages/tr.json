@@ -3310,6 +3310,30 @@
     "none": "—"
   },
   "modules": {
+    "call-fit": {
+      "name": "Çağrı Uyum Analizi",
+      "tagline": "Açık çağrıları kuruluş profiline göre puanlar; karar desteğidir, seçilme garantisi değildir."
+    },
+    "expert-pool": {
+      "name": "Uzman Havuzu",
+      "tagline": "Değerlendirici ve hakem eşleştirmesi için ön kayıtlı uzmanlar."
+    },
+    "budget-wp": {
+      "name": "Bütçe ve İş Paketleri",
+      "tagline": "Ortaklık ve teklif verisi üzerine bütçe ve iş paketi planlaması."
+    },
+    "compliance": {
+      "name": "Uygunluk Kontrolü",
+      "tagline": "Başvuru bölümlerinin program kurallarına göre YZ destekli incelemesi."
+    },
+    "post-award": {
+      "name": "Sözleşme Sonrası Yönetim",
+      "tagline": "Hibe imzalandıktan sonra raporlama, efor takibi ve teslimatlar."
+    },
+    "tr-layer": {
+      "name": "Türkiye Ulusal Katmanı",
+      "tagline": "AB hattının yanında TÜBİTAK, KOSGEB gibi ulusal programlar."
+    },
     "partner-intel": {
       "name": "Ortak İstihbarat Veritabanı",
       "tagline": "Her kuruluş için tek ortak kartı, konu liderleri ve iş birliği ağı."

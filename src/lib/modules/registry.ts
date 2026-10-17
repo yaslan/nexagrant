@@ -1,5 +1,6 @@
 import { ModuleId, ModuleManifest } from './types';
 import { isKnownWorkspaceRoute } from './route-catalog';
+import { m0Manifest } from '../../modules/m0/manifest';
 import { m1Manifest } from '../../modules/m1/manifest';
 import { m2Manifest } from '../../modules/m2/manifest';
 import { m3Manifest } from '../../modules/m3/manifest';
@@ -11,8 +12,14 @@ import { m8Manifest } from '../../modules/m8/manifest';
 import { m9Manifest } from '../../modules/m9/manifest';
 import { m10Manifest } from '../../modules/m10/manifest';
 import { m11Manifest } from '../../modules/m11/manifest';
+import { m12Manifest } from '../../modules/m12/manifest';
+import { m13Manifest } from '../../modules/m13/manifest';
+import { m14Manifest } from '../../modules/m14/manifest';
+import { m15Manifest } from '../../modules/m15/manifest';
+import { m16Manifest } from '../../modules/m16/manifest';
 
 export const moduleRegistry: Record<ModuleId, ModuleManifest> = {
+  M0: m0Manifest,
   M1: m1Manifest,
   M2: m2Manifest,
   M3: m3Manifest,
@@ -24,6 +31,11 @@ export const moduleRegistry: Record<ModuleId, ModuleManifest> = {
   M9: m9Manifest,
   M10: m10Manifest,
   M11: m11Manifest,
+  M12: m12Manifest,
+  M13: m13Manifest,
+  M14: m14Manifest,
+  M15: m15Manifest,
+  M16: m16Manifest,
 };
 
 export const getManifest = (id: ModuleId): ModuleManifest => moduleRegistry[id];
