@@ -1,4 +1,5 @@
 'use strict';
+/* eslint-disable @typescript-eslint/no-require-imports -- Passenger loads this plain CommonJS file as is: no bundler, no ESM. */
 /**
  * Startup file for cPanel "Setup Node.js App" (CloudLinux Node.js Selector +
  * Passenger). Application root /home/fonbridge/fonbridge-app, Startup file
