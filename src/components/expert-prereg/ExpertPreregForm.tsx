@@ -20,6 +20,8 @@ interface ExpertPreregFormProps {
   kvkkBlocks: KvkkBlock[];
   /** Absolute URL of this page, for the LinkedIn share text. */
   pageUrl: string;
+  /** Lifetime of the verification link, from the server's VERIFY_TOKEN_TTL_MS. */
+  verifyHours: number;
 }
 
 type Field = Exclude<keyof ExpertPreRegInput, 'utmSource' | 'utmMedium' | 'utmCampaign' | 'locale'>;
@@ -78,7 +80,7 @@ export function maskOrcid(raw: string): string {
  * schema from FO-19 (src/lib/expert-prereg/schema.ts); the server repeats it and
  * answers with the same error codes, which this form translates (kural 8).
  */
-export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl }: ExpertPreregFormProps) {
+export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHours }: ExpertPreregFormProps) {
   const t = useTranslations('ExpertPrereg');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -216,7 +218,7 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl }: Expert
           {t('success.title')}
         </h2>
         <p role="status" className="mt-2 rounded-lg border border-amber bg-surface px-3 py-2 text-sm font-medium text-ink">
-          {t('success.verify', { email: sentTo })}
+          {t('success.verify', { email: sentTo, hours: verifyHours })}
         </p>
         <a
           href={shareHref}

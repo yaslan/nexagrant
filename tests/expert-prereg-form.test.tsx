@@ -2,7 +2,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { NextIntlClientProvider } from 'next-intl';
+import { NextIntlClientProvider, createTranslator } from 'next-intl';
 
 import trMessages from '../messages/tr.json';
 import enMessages from '../messages/en.json';
@@ -21,13 +21,14 @@ import { parseFounderNumber } from '@/components/expert-prereg/paths';
 const messages = { tr: trMessages, en: enMessages };
 const tr = trMessages.ExpertPrereg;
 
-function renderForm(locale: 'tr' | 'en' = 'tr') {
+function renderForm(locale: 'tr' | 'en' = 'tr', verifyHours = 24) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <ExpertPreregForm
         locale={locale}
         kvkkBlocks={[{ kind: 'title', text: 'Aydınlatma' }, { kind: 'paragraph', text: 'Metin' }]}
         pageUrl="https://example.test/tr/uzman"
+        verifyHours={verifyHours}
       />
     </NextIntlClientProvider>,
   );
@@ -137,6 +138,18 @@ describe('ExpertPreregForm', () => {
     expect(document.getElementById('ep-linkedinUrl-error')?.textContent).toBe(tr.errors.invalid);
   });
 
+  // FO-31 (TASK-MVC35ULM2X2D0): the link lifetime comes from the server, not the copy.
+  test('the success screen states the verify window it was given', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 201 }));
+    renderForm('tr', 48);
+    fillRequired();
+    fireEvent.submit(screen.getByTestId('ep-form'));
+    await screen.findByText(tr.success.title);
+    const text = screen.getByText(/ayse@example\.org/).textContent ?? '';
+    expect(text).toContain('48 saat');
+    expect(text).not.toContain('24');
+  });
+
   test('429 shows the rate-limit message', async () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 429 }));
     renderForm();
@@ -224,6 +237,22 @@ describe('helpers', () => {
     expect(maskOrcid('12ab34')).toBe('1234');
     expect(maskOrcid('X123')).toBe('123');
     expect(maskOrcid('00000002182500971234')).toBe('0000-0002-1825-0097');
+  });
+
+  // FO-31: seat limit and link lifetime are ICU parameters in both catalogs, so a
+  // change in constants.ts reaches every sentence that states them.
+  test.each(['tr', 'en'] as const)('founder and verify copy takes limit/hours as parameters (%s)', (locale) => {
+    const t = createTranslator({ locale, messages: messages[locale], namespace: 'ExpertPrereg' });
+    const lines = [
+      t('meta.description', { limit: 150 }),
+      t('hero.founder_open', { limit: 150, count: 7 }),
+      t('hero.founder_unknown', { limit: 150 }),
+      t('success.verify', { email: 'a@b.test', hours: 48 }),
+      t('verified.text_expired', { hours: 48 }),
+    ];
+    for (const line of lines.slice(0, 3)) expect(line).toContain('150');
+    for (const line of lines.slice(3)) expect(line).toContain('48');
+    for (const line of lines) expect(line).not.toMatch(/\b(100|24)\b/);
   });
 
   test('parseFounderNumber', () => {

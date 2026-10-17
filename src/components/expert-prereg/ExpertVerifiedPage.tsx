@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { CircleAlert, CircleCheck } from 'lucide-react';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
+import { VERIFY_TOKEN_TTL_MS } from '@/lib/expert-prereg/server/constants';
 import { expertPreregPath, parseFounderNumber } from './paths';
 
 type PageProps = {
@@ -50,7 +51,7 @@ export default async function ExpertVerifiedPage({ params, searchParams }: PageP
             {error ? t(`heading_${error}`) : t('heading_ok')}
           </h1>
           {error ? (
-            <p className="mt-2 text-sm text-ink-2">{t(`text_${error}`)}</p>
+            <p className="mt-2 text-sm text-ink-2">{t(`text_${error}`, { hours: VERIFY_TOKEN_TTL_MS / 3_600_000 })}</p>
           ) : founder !== null ? (
             <p data-testid="ep-founder-number" className="mt-3 text-xl font-semibold text-accent-ink">
               {t('founder', { number: founder })}
