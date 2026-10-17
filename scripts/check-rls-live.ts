@@ -556,6 +556,66 @@ async function probeIsolation(
   return { failures, checks };
 }
 
+/**
+ * FO-45 (TASK-MVC6CTSCLO6LI): ExpertPreRegistration is personal data with no tenant,
+ * so the tenant probe above does not reach it. Its contract is the one policy
+ * `system_scope`: outside that scope the measured role reads 0 rows and cannot
+ * insert; inside `public-intake` every row is visible. Rolled back, nothing is kept.
+ */
+const EXPERT_TABLE = 'ExpertPreRegistration';
+
+async function probeSystemScopeTable(
+  m: pg.Client,
+  rlsOn: boolean,
+  expectedRows: number
+): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  if (!rlsOn) {
+    failures.push(`${EXPERT_TABLE}: RLS kapalı — kişisel veri korumasız (prisma/migrations/expert-prereg-rls-mail-quota.sql).`);
+    return { failures, checks };
+  }
+  const count = async (): Promise<number> =>
+    Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? -1);
+
+  const outside = await count();
+  if (outside !== 0) {
+    failures.push(`${EXPERT_TABLE}: sistem kapsamı DIŞINDA ${outside} satır okunuyor — izolasyon uygulanmıyor.`);
+  } else {
+    checks.push(`${EXPERT_TABLE}: sistem kapsamı dışında okuma 0 satır (tabloda ${expectedRows})`);
+  }
+
+  const id = `rls-verify-${randomBytes(6).toString('hex')}`;
+  await m.query('begin');
+  try {
+    await m.query(
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+       values ($1, 'probe', $2, '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+      [id, `${id}@rls-verify.invalid`]
+    );
+    failures.push(`${EXPERT_TABLE}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
+  } catch (e) {
+    if (isRlsViolation(e)) checks.push(`${EXPERT_TABLE}: sistem kapsamı dışında INSERT reddedildi`);
+    else failures.push(`${EXPERT_TABLE}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+  } finally {
+    await m.query('rollback');
+  }
+
+  await m.query('begin');
+  try {
+    await m.query(`select enter_system_scope('public-intake')`);
+    const inside = await count();
+    if (inside !== expectedRows) {
+      failures.push(`${EXPERT_TABLE}: sistem kapsamı İÇİNDE ${inside}/${expectedRows} satır görüldü — politika yanlış.`);
+    } else {
+      checks.push(`${EXPERT_TABLE}: sistem kapsamı içinde ${inside}/${expectedRows} satır görüldü`);
+    }
+  } finally {
+    await m.query('rollback');
+  }
+  return { failures, checks };
+}
+
 async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
@@ -737,6 +797,12 @@ async function main() {
       populated,
       existing.has('AiUsageLog')
     );
+    if (existing.has(EXPERT_TABLE)) {
+      const expertRows = Number((await client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? 0);
+      const expert = await probeSystemScopeTable(measurer.client, rlsOn.has(EXPERT_TABLE), expertRows);
+      failures.push(...expert.failures);
+      checks.push(...expert.checks);
+    }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);
     for (const c of checks) console.log(`   ✓ ${c}`);

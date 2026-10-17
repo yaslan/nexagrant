@@ -5,7 +5,9 @@ import type { Mailer, MailMessage } from '@/lib/email/mailer';
 import { MailSendError } from '@/lib/email/mailer';
 import {
   EXPERT_PREREG_CONSENT_VERSION,
+  EXPERT_PREREG_DAILY_MAIL_LIMIT,
   IP_WINDOW_MS,
+  MAIL_DAY_MS,
   REGISTRATION_IP_LIMIT,
   RESEND_COOLDOWN_MS,
   VERIFY_TOKEN_TTL_MS,
@@ -208,7 +210,8 @@ describe('registerExpertPreRegistration', () => {
     expect(again).toEqual({ kind: 'created' });
     expect(rows).toHaveLength(1);
     const row = rows[0]!;
-    expect(row).toMatchObject({ status: 'pending', title: 'Yeni Unvan', createdAt: later });
+    // F6: the profile is the one first entered; only the link and the timestamp move.
+    expect(row).toMatchObject({ status: 'pending', title: valid.title, createdAt: later });
     expect(row.verifyTokenExpiresAt).toEqual(new Date(later.getTime() + VERIFY_TOKEN_TTL_MS));
     const secondToken = tokenFromMail(sent[1]!);
     expect(secondToken).not.toBe(firstToken);
@@ -224,6 +227,10 @@ describe('registerExpertPreRegistration', () => {
       createdAt: new Date(NOW.getTime() - IP_WINDOW_MS - 1_000),
       status: 'pending',
       emailVerifiedAt: null,
+      fullName: valid.fullName,
+      locale: 'tr',
+      verifyMailCount: 1,
+      verifyMailWindowStart: null,
       verifyTokenHash: sha256('old'),
       verifyTokenExpiresAt: new Date(NOW.getTime() - IP_WINDOW_MS - 1_000 + VERIFY_TOKEN_TTL_MS),
     } as Row;
@@ -310,6 +317,87 @@ describe('registerExpertPreRegistration', () => {
     const result = await registerExpertPreRegistration(valid, { db, mailer: failing, baseUrl: BASE, now: NOW });
     expect(result).toEqual({ kind: 'unavailable', error: 'mail_failed' });
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('FO-45 · pending re-issue, daily mail quota, AUTH_SECRET key', () => {
+  it('keeps the profile and the consents of a pending row when it registers again (F6 / crw2 MINOR-A)', async () => {
+    const { db, rows } = fakeDb();
+    const { mailer, sent } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    const later = new Date(NOW.getTime() + RESEND_COOLDOWN_MS + 1_000);
+
+    const again = await registerExpertPreRegistration(
+      { ...valid, fullName: 'Başka İsim', title: 'Yeni Unvan', marketingConsent: true, locale: 'en' },
+      { db, mailer, baseUrl: BASE, now: later, ip: null, salt: null }
+    );
+
+    expect(again).toEqual({ kind: 'created' });
+    expect(rows[0]).toMatchObject({
+      fullName: valid.fullName,
+      title: valid.title,
+      locale: 'tr',
+      kvkkAcceptedAt: NOW,
+      visibilityConsentAt: NOW,
+      marketingConsentAt: null,
+    });
+    // The new link works: the mail went out and carries the stored name and language.
+    expect(sent).toHaveLength(2);
+    expect(sent[1]!.subject).toBe(sent[0]!.subject);
+    expect(sha256(tokenFromMail(sent[1]!))).toBe(rows[0]!.verifyTokenHash);
+  });
+
+  it('answers 429 to the fourth mail to one address in a day, and opens a new window the next day (F5)', async () => {
+    const { db, rows } = fakeDb();
+    const { mailer, sent } = recordingMailer();
+    const gap = RESEND_COOLDOWN_MS + 1_000;
+    const attempt = (offset: number) =>
+      registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: new Date(NOW.getTime() + offset), ip: null, salt: null });
+
+    expect(await attempt(0)).toEqual({ kind: 'created' });
+    expect(await attempt(gap)).toEqual({ kind: 'created' });
+    expect(await attempt(2 * gap)).toEqual({ kind: 'created' });
+    expect(await attempt(3 * gap)).toEqual({ kind: 'rate_limited' });
+    expect(sent).toHaveLength(3);
+    expect(rows[0]).toMatchObject({ verifyMailCount: EXPERT_PREREG_DAILY_MAIL_LIMIT });
+
+    expect(await attempt(MAIL_DAY_MS + 60_000)).toEqual({ kind: 'created' });
+    expect(rows[0]).toMatchObject({ verifyMailCount: 1, verifyMailWindowStart: new Date(NOW.getTime() + MAIL_DAY_MS + 60_000) });
+    expect(sent).toHaveLength(4);
+  });
+
+  it('gives back the day quota of a re-issue whose mail cannot be sent', async () => {
+    const { db, rows } = fakeDb();
+    const { mailer } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    const before = { ...rows[0]! };
+    const failing: Mailer = vi.fn(async () => {
+      throw new MailSendError('smtp-down', 421);
+    });
+    const later = new Date(NOW.getTime() + RESEND_COOLDOWN_MS + 1_000);
+
+    const result = await registerExpertPreRegistration(valid, { db, mailer: failing, baseUrl: BASE, now: later, ip: null, salt: null });
+
+    expect(result).toEqual({ kind: 'unavailable', error: 'mail_failed' });
+    expect(rows[0]).toMatchObject({ verifyMailCount: before.verifyMailCount, verifyMailWindowStart: before.verifyMailWindowStart });
+  });
+
+  it('keys the IP hash with AUTH_SECRET when neither the salt option nor EXPERT_PREREG_IP_SALT is given (crw2 MINOR-B)', async () => {
+    const previous = process.env.AUTH_SECRET;
+    process.env.AUTH_SECRET = 'test-auth-secret-for-fo45-0123456789';
+    try {
+      const { db, rows } = fakeDb();
+      const { mailer } = recordingMailer();
+      const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP });
+      expect(result).toEqual({ kind: 'created' });
+      const configured = process.env.EXPERT_PREREG_IP_SALT;
+      const key = expertPreRegIpSalt(configured, process.env.AUTH_SECRET);
+      expect(key).not.toBeNull();
+      expect(rows[0]!.ipHash).toBe(hashExpertIp(IP, key));
+    } finally {
+      if (previous === undefined) delete process.env.AUTH_SECRET;
+      else process.env.AUTH_SECRET = previous;
+    }
   });
 });
 

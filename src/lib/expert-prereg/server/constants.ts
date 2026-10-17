@@ -23,6 +23,13 @@ export const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
  */
 export const RESEND_COOLDOWN_MS = 5 * 60 * 1000;
 
+/**
+ * At most this many verification mails to one address in {@link MAIL_DAY_MS} (FO-45 F5).
+ * The cooldown spaces them out; this caps the day. The first registration counts as one.
+ */
+export const EXPERT_PREREG_DAILY_MAIL_LIMIT = 3;
+export const MAIL_DAY_MS = 24 * 60 * 60 * 1000;
+
 /** At most this many registrations per client IP in {@link IP_WINDOW_MS}. */
 export const REGISTRATION_IP_LIMIT = 5;
 export const IP_WINDOW_MS = 60 * 60 * 1000;
