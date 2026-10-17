@@ -44,7 +44,12 @@ function shell(active: ModuleId[], node: React.ReactNode, locale: 'tr' | 'en' = 
   );
 }
 
-const sidebarLabels = () => screen.getAllByRole('link').map((a) => a.textContent?.trim());
+// Entries a user can follow; a locked feature entry is a disabled link and is asserted separately.
+const sidebarLabels = () =>
+  screen
+    .getAllByRole('link')
+    .filter((a) => a.getAttribute('aria-disabled') !== 'true')
+    .map((a) => a.textContent?.trim());
 
 describe('SidebarNav — module entries from manifest nav[]', () => {
   it('shows M2 Konsept Notlar and hides a closed M7, keeping core items in place', () => {
@@ -89,21 +94,36 @@ describe('SidebarNav — feature entries locked while their module is off', () =
   it('locks Onay Merkezi without M5 and Partner REST API without M1', () => {
     shell([], <SidebarNav locale="tr" />);
 
-    const approvals = screen.getByTestId('sidebar-nav-approvals');
-    expect(approvals.tagName).toBe('SPAN');
-    expect(approvals.getAttribute('aria-disabled')).toBe('true');
-    expect(approvals.getAttribute('title')).toBe(
-      trMessages.Navigation.featureLocked.replace('{module}', `M5 ${trMessages.modules.workflows.name}`)
-    );
-    expect(approvals.textContent).toContain('Onay Merkezi (4-Eyes)');
-    // The reason is announced as the entry's description, not inside its name.
+    const locked = (module: string) => trMessages.Navigation.featureLocked.replace('{module}', module);
+    // Name is the label, the lock reason is the description: what a screen reader announces.
+    const approvals = screen.getByRole('link', {
+      name: 'Onay Merkezi (4-Eyes)',
+      description: locked(`M5 ${trMessages.modules.workflows.name}`),
+    });
+    const apiKeys = screen.getByRole('link', {
+      name: 'Partner REST API',
+      description: locked(`M1 ${trMessages.modules['partner-intel'].name}`),
+    });
+    for (const entry of [approvals, apiKeys]) {
+      expect(entry.tagName).toBe('SPAN');
+      expect(entry.hasAttribute('href')).toBe(false);
+      expect(entry.getAttribute('aria-disabled')).toBe('true');
+      expect(entry.getAttribute('data-locked')).toBe('true');
+      expect(entry.tabIndex).toBe(0);
+    }
+    expect(approvals.getAttribute('title')).toBe(locked(`M5 ${trMessages.modules.workflows.name}`));
+    // The reason is only reachable as a description; browse mode does not read it again.
     const reason = document.getElementById(approvals.getAttribute('aria-describedby') ?? '');
-    expect(reason?.textContent).toBe(approvals.getAttribute('title'));
+    expect(reason?.hidden).toBe(true);
     expect(approvals.contains(reason)).toBe(false);
+  });
 
-    const apiKeys = screen.getByTestId('sidebar-nav-apiKeys');
-    expect(apiKeys.getAttribute('title')).toContain(`M1 ${trMessages.modules['partner-intel'].name}`);
-    expect(screen.queryByRole('link', { name: /Onay Merkezi|Partner REST API/ })).toBeNull();
+  it('keeps reason ids unique when the desktop aside and mobile drawer both render', () => {
+    shell([], <><SidebarNav locale="tr" /><SidebarNav locale="tr" /></>);
+    const ids = screen.getAllByRole('link', { name: /Onay Merkezi|Partner REST API/ }).map((a) => a.getAttribute('aria-describedby'));
+    expect(ids).toHaveLength(4);
+    expect(new Set(ids).size).toBe(4);
+    for (const id of ids) expect(document.getElementById(id ?? '')).not.toBeNull();
   });
 
   it('links both once M5 and M1 are on', () => {

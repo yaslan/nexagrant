@@ -20,6 +20,9 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
   const t = useTranslations('Navigation');
   const tModules = useTranslations('modules');
   const pathname = usePathname();
+  // The nav renders twice at once (desktop aside + mobile drawer), so a key-only id
+  // would repeat in the document.
+  const idBase = React.useId();
 
   // Extract current workspace from URL if present (e.g. /tr/demo-sme/calls -> demo-sme)
   const segments = pathname ? pathname.split('/').filter(Boolean) : [];
@@ -83,10 +86,14 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
         const featureManifest = featureModule && !activeModules.includes(featureModule) ? getManifest(featureModule) : null;
         if (featureManifest) {
           const tooltip = t('featureLocked', { module: `${featureManifest.id} ${tModules(`${featureManifest.key}.name`)}` });
-          const reasonId = `sidebar-nav-${item.key}-locked`;
+          const reasonId = `${idBase}-${item.key}-locked`;
+          // A disabled link: the name comes from the label, the lock reason is its
+          // description. The reason node is `hidden` so browse mode does not read it
+          // a second time; `aria-describedby` still resolves hidden nodes.
           return (
             <React.Fragment key={item.key}>
               <span
+                role="link"
                 data-testid={`sidebar-nav-${item.key}`}
                 data-locked="true"
                 aria-disabled="true"
@@ -98,7 +105,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
                 <span>{item.label}</span>
                 <span aria-hidden="true">🔒</span>
               </span>
-              <span id={reasonId} className="sr-only">{tooltip}</span>
+              <span id={reasonId} hidden>{tooltip}</span>
             </React.Fragment>
           );
         }
