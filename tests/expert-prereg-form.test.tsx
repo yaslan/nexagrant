@@ -39,10 +39,11 @@ function fillRequired() {
   const province = screen.getByRole('combobox');
   fireEvent.change(province, { target: { value: 'izmir' } });
   fireEvent.keyDown(province, { key: 'Enter' });
+  fireEvent.change(screen.getByLabelText(/^Unvan/), { target: { value: 'Proje Koordinatörü' } });
+  fireEvent.change(screen.getByLabelText(/^Kurum/), { target: { value: 'Ankara Üniversitesi' } });
   fireEvent.click(screen.getByLabelText(tr.options.areas.energy));
   fireEvent.click(screen.getByLabelText(tr.options.roles.coordinator));
   fireEvent.click(screen.getByLabelText(tr.options.programmes['erasmus-plus']));
-  fireEvent.click(screen.getByLabelText(tr.options.languages.en));
   fireEvent.click(screen.getByLabelText(/Profilimin uzman rehberinde/));
   fireEvent.click(document.getElementById('ep-kvkkAccepted') as HTMLInputElement);
 }
@@ -81,6 +82,9 @@ describe('ExpertPreregForm', () => {
     expect(document.getElementById('ep-email-error')?.textContent).toBe(tr.errors.invalid_email);
     expect(document.getElementById('ep-province-error')?.textContent).toBe(tr.errors.unknown_slug);
     expect(document.getElementById('expertiseAreas-error')?.textContent).toBe(tr.errors.required);
+    expect(document.getElementById('ep-title-error')?.textContent).toBe(tr.errors.required);
+    expect(document.getElementById('ep-organization-error')?.textContent).toBe(tr.errors.required);
+    expect(document.getElementById('languages-error')).toBeNull();
     expect(document.getElementById('ep-kvkkAccepted-error')?.textContent).toBe(tr.errors.consent_required);
     expect(document.getElementById('ep-visibilityConsent-error')?.textContent).toBe(tr.errors.consent_required);
     expect(document.getElementById('ep-marketingConsent-error')).toBeNull();
@@ -101,10 +105,12 @@ describe('ExpertPreregForm', () => {
       fullName: 'Ayşe Yılmaz',
       email: 'ayse@example.org',
       province: '35',
+      title: 'Proje Koordinatörü',
+      organization: 'Ankara Üniversitesi',
       expertiseAreas: ['energy'],
       roles: ['coordinator'],
       programmes: ['erasmus-plus'],
-      languages: ['en'],
+      languages: [],
       kvkkAccepted: true,
       visibilityConsent: true,
       marketingConsent: false,
@@ -114,6 +120,34 @@ describe('ExpertPreregForm', () => {
     const share = screen.getByTestId('ep-share-linkedin');
     expect(share.getAttribute('href')).toContain('linkedin.com');
     expect(decodeURIComponent(share.getAttribute('href') ?? '')).toContain('https://example.test/tr/uzman');
+  });
+
+  // FO-25 (K-516717): Unvan and Kurum are required, Diller is optional.
+  test('no organisation: the error lands on Kurum with focus, nothing is sent', async () => {
+    renderForm();
+    fillRequired();
+    const org = screen.getByLabelText(/^Kurum/);
+    fireEvent.change(org, { target: { value: '' } });
+    fireEvent.submit(screen.getByTestId('ep-form'));
+    await waitFor(() => expect(document.activeElement).toBe(org));
+    expect(document.getElementById('ep-organization-error')?.textContent).toBe(tr.errors.required);
+    expect(org.getAttribute('aria-invalid')).toBe('true');
+    expect(org.getAttribute('aria-required')).toBe('true');
+    expect(screen.getByLabelText(/^Unvan/).getAttribute('aria-required')).toBe('true');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('a picked language is sent; the languages group carries no required mark', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 201 }));
+    renderForm();
+    fillRequired();
+    const legend = screen.getByText(tr.form.languages_legend);
+    expect(legend.closest('legend')?.textContent).not.toContain('*');
+    fireEvent.click(screen.getByLabelText(tr.options.languages.en));
+    fireEvent.submit(screen.getByTestId('ep-form'));
+    await screen.findByText(tr.success.title);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).languages).toEqual(['en']);
   });
 
   test('409 already_registered lands on the e-mail field', async () => {
