@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDbClient, prisma } from '@/lib/db';
 import type { Mailer, MailMessage } from '@/lib/email/mailer';
 import { exportExpertPreRegistrationsCsv, listExpertPreRegistrations } from '@/lib/expert-prereg/server/admin';
+import { FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
 import { registerExpertPreRegistration } from '@/lib/expert-prereg/server/register';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
@@ -39,6 +40,7 @@ const ready = reachable;
 let releaseLock: (() => Promise<void>) | null = null;
 
 const address = `${PREFIX}${RUN}@example.org`;
+const failedAddress = `${PREFIX}${RUN}-mailfail@example.org`;
 
 const valid = {
   fullName: 'App Role Expert',
@@ -108,6 +110,7 @@ describe('expert pre-registration as fabrika_app (live Postgres, RLS on)', () =>
 
     const verified = await verifyExpertPreRegistration(tokenFromMail(sent[0]!), { db: rls, now });
     expect(verified).toMatchObject({ ok: true, locale: 'en' });
+    if (!verified.ok) throw new Error('verification failed');
 
     const rows = await listExpertPreRegistrations({ q: PREFIX }, { db: rls });
     expect(rows).toHaveLength(1);
@@ -118,8 +121,28 @@ describe('expert pre-registration as fabrika_app (live Postgres, RLS on)', () =>
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain(address);
 
+    // Without the scope the aggregate sees no row and the strip shows every seat free.
+    // Other runs can only take more numbers, so this bound holds when they run alongside.
     const seats = await getRemainingFounderSeats(rls);
-    expect(Number.isInteger(seats)).toBe(true);
+    expect(seats).toBeLessThanOrEqual(Math.max(0, FOUNDER_SEAT_LIMIT - (verified.founderNumber ?? FOUNDER_SEAT_LIMIT)));
+  });
+
+  it.skipIf(!ready)('removes the new row when the mail fails, through the RLS role', async () => {
+    if (!rls) throw new Error('setup did not run');
+    const mailer: Mailer = vi.fn(async () => {
+      throw new Error('smtp down');
+    });
+
+    const result = await registerExpertPreRegistration(
+      { ...valid, email: failedAddress },
+      { db: rls, mailer, baseUrl: BASE, now: new Date(), ip: null, salt: null }
+    );
+    expect(result).toEqual({ kind: 'unavailable', error: 'mail_failed' });
+    expect(mailer).toHaveBeenCalledTimes(1);
+
+    // Counted as the owner: without the rollback's scope the app role cannot see the row to delete it.
+    const left = await prisma.expertPreRegistration.count({ where: { email: failedAddress } });
+    expect(left).toBe(0);
   });
 
   it.skipIf(!ready)('sees no row of the table without a scope, while the owner sees the row', async () => {
