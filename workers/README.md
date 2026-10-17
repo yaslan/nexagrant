@@ -67,8 +67,20 @@ Dağıtım: Fly.io (1 shared-cpu-2x, 2 GB). Aylık iş < 30 dk hedefi.
 
 ## Yerel çalıştırma
 
+Sanal ortamı her checkout'ta yerelde oluştur; `.venv/` git'e girmez (`.gitignore`).
+İçindeki ikililer işletim sistemine ve Python sürümüne bağlıdır, paylaşılamaz.
+
 ```bash
-pip install -r workers/cordis/requirements.txt
+python3.12 -m venv .venv                     # depo kökünde, bir kez
+source .venv/bin/activate                    # Windows: .venv\Scripts\activate
+pip install -r workers/cordis/requirements-dev.txt   # uygulama + pytest
+python -m pytest workers/cordis              # isteğe bağlı: testler
+```
+
+Bağımlılık değişince yalnız `pip install -r ...` adımını tekrarla; ortam bozulursa
+`.venv/` klasörünü silip baştan kur.
+
+```bash
 cd workers/cordis
 DATABASE_URL=postgresql://... WORKER_TOKEN=... CORDIS_WORKER_ALLOW_MOCK=1 \
   python -m uvicorn main:app --reload --port 8000
