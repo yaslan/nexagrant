@@ -24,8 +24,9 @@
 #                         removed. The private key stays out of this repo.
 #
 # The connection string and password are never printed, and the password never
-# reaches a command line (ps shows argv to every local user). It goes to a 0600
-# PGPASSFILE that is removed on exit. Logs carry the file name and sizes only.
+# reaches a command line (ps shows argv to every local user): it travels in the
+# PGPASSWORD environment variable of each pg_dump call. No password file is
+# written. Logs carry the file name and sizes only. URL parsing: pg-url.sh.
 
 set -euo pipefail
 
@@ -45,53 +46,16 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 dump="$BACKUP_DIR/fonbridge-$stamp.dump"
 tmp="$dump.partial"
 
-# A half-written file must never be mistaken for a backup. The PGPASSFILE holds
-# the password, so it must not outlive the run either.
-pgpass=""
-cleanup() {
-  rm -f "$tmp"
-  if [ -n "$pgpass" ]; then rm -f "$pgpass"; fi
-}
+# A half-written file must never be mistaken for a backup. EXIT covers signals
+# too (measured: TERM, HUP and INT all leave no .partial behind).
+cleanup() { rm -f "$tmp"; }
 trap cleanup EXIT
 
-# Split BACKUP_DATABASE_URL: the password goes to a PGPASSFILE, the rest stays in
-# the URL that pg_dump receives. Error messages name the variable, never its value.
-url_re='^postgres(ql)?://([^:/?#@]*)(:([^@/?#]*))?@([^/?#]*)/([^?#]*)(\?([^#]*))?$'
-[[ "$BACKUP_DATABASE_URL" =~ $url_re ]] || fail "BACKUP_DATABASE_URL is not a postgresql:// URL with user@host/db"
-url_user="${BASH_REMATCH[2]}"
-url_pass="${BASH_REMATCH[4]}"
-hostport="${BASH_REMATCH[5]}"
-url_db="${BASH_REMATCH[6]}"
-url_query="${BASH_REMATCH[8]}"
-[[ "$hostport" != \[* ]] || fail "IPv6 host in BACKUP_DATABASE_URL is not supported"
-[[ "$url_query" != *password=* ]] || fail "password= in the BACKUP_DATABASE_URL query is not supported; put it in the userinfo"
-
-# Percent-decoding for libpq. Only the passfile gets the decoded values.
-url_decode() { local s="${1//%/\\x}"; printf '%b' "$s"; }
-# A passfile line escapes backslash and colon in each of its five fields.
-pgpass_field() { local s="${1//\\/\\\\}"; printf '%s' "${s//:/\\:}"; }
-
-user="$(url_decode "$url_user")"
-pass="$(url_decode "$url_pass")"
-db="$(url_decode "$url_db")"
-if [[ "$hostport" == *:* ]]; then
-  host="${hostport%:*}"
-  port="${hostport##*:}"
-else
-  host="$hostport"
-  port="*"
-fi
-conn="postgresql://${url_user}@${hostport}/${url_db}${url_query:+?$url_query}"
-
-if [ -n "$pass" ]; then
-  # mktemp creates the file 0600, so the password is never readable by others.
-  pgpass="$(mktemp "${TMPDIR:-/tmp}/fonbridge-pgpass.XXXXXX")"
-  printf '%s:%s:%s:%s:%s\n' \
-    "$(pgpass_field "${host:-*}")" "$(pgpass_field "$port")" \
-    "$(pgpass_field "${db:-*}")" "$(pgpass_field "${user:-*}")" \
-    "$(pgpass_field "$pass")" > "$pgpass"
-  export PGPASSFILE="$pgpass"
-fi
+# Split BACKUP_DATABASE_URL (pg-url.sh). The password goes to PGPASSWORD per
+# call; the URL pg_dump receives has none. Errors name the variable, not its value.
+# shellcheck source=pg-url.sh
+source "$(dirname "$0")/pg-url.sh"
+pg_url_split BACKUP_DATABASE_URL || fail "BACKUP_DATABASE_URL could not be parsed (see above)"
 
 log "dumping to $(basename "$dump")"
 # --no-owner: ownership is not restored, so the dump loads under any owner role.
@@ -99,12 +63,9 @@ log "dumping to $(basename "$dump")"
 # of what the restored database must enforce. Restore needs the roles the dump
 # grants to (fabrika_app) to exist on the target cluster (see pg-restore-drill.sh).
 # graphile_worker and pgvector objects are included (checklist §4.1).
-pg_dump --dbname="$conn" \
+PGPASSWORD="$PG_PASS" pg_dump --dbname="$PG_CONN" \
   --format=custom --no-owner \
   --file="$tmp"
-
-# The password has been used; remove the passfile before the TOC read.
-if [ -n "$pgpass" ]; then rm -f "$pgpass"; pgpass=""; fi
 
 [ -s "$tmp" ] || fail "dump is empty"
 
