@@ -3223,5 +3223,51 @@
       "disabled": "Disabled"
     },
     "none": "—"
+  },
+  "modules": {
+    "partner-intel": {
+      "name": "Partner Intelligence Database",
+      "tagline": "One partner card per organisation, topic leaders and the collaboration graph."
+    },
+    "concept-note": {
+      "name": "Concept Note Builder",
+      "tagline": "Programme-specific short proposal templates with an AI first draft."
+    },
+    "evidence": {
+      "name": "Evidence Pack",
+      "tagline": "Reusable evidence library with source and validity discipline."
+    },
+    "focal-point": {
+      "name": "Focal Point",
+      "tagline": "One internal owner and one external contact per relationship, plus contact cadence."
+    },
+    "workflows": {
+      "name": "Proposal Production Workflows",
+      "tagline": "Gate-driven pipeline from opportunity to submission, with person-day reporting."
+    },
+    "evaluator": {
+      "name": "Evaluator Lens",
+      "tagline": "Internal pre-assessment against the call criteria — never an official score."
+    },
+    "tto": {
+      "name": "TTO Accelerator",
+      "tagline": "Technology transfer portfolio: readiness, ownership and commercialisation route per asset."
+    },
+    "consortium-matching": {
+      "name": "Consortium Matching",
+      "tagline": "Seat plan per proposal and ranked partner candidates for each open seat."
+    },
+    "briefs": {
+      "name": "Meeting Briefs",
+      "tagline": "One-page brief before a partner meeting, assembled from the partner card and the topic."
+    },
+    "followups": {
+      "name": "Follow-up Documents",
+      "tagline": "NDA, LOI and award packs generated from an opportunity and versioned per signature."
+    },
+    "application": {
+      "name": "Full Application Production",
+      "tagline": "Part-by-part application drafting on top of the concept note, evidence and consortium."
+    }
   }
 }
