@@ -1,0 +1,42 @@
+$ curl -I http://127.0.0.1:9100/fonbridge-public/blog/2026/c0mvchvc6allivdstmik21eq2.jpg
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Cache-Control: public, max-age=31536000, immutable
+Content-Length: 264857
+Content-Type: image/jpeg
+ETag: "58c86b26a14aa27c90bd3e0e7c304ac9"
+Last-Modified: Sat, 17 Oct 2026 14:31:12 GMT
+Server: MinIO
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Vary: Origin
+Vary: Accept-Encoding
+X-Amz-Id-2: 40fd399614142fea3be9690e18526c1881df2b9fc838b215f9c270b056695f9e
+X-Amz-Request-Id: 18DF5796BE02A8D8
+X-Content-Type-Options: nosniff
+X-Ratelimit-Limit: 4692
+X-Ratelimit-Remaining: 4692
+X-Xss-Protection: 1; mode=block
+Date: Sat, 17 Oct 2026 14:31:21 GMT
+
+$ curl -sI 'http://localhost:3100/_next/image?url=<encoded>&w=1920&q=75'
+HTTP/1.1 200 OK
+Accept-CH: Sec-CH-Prefers-Color-Scheme
+Critical-CH: Sec-CH-Prefers-Color-Scheme
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()
+Vary: Accept
+Cache-Control: public, max-age=31536000, must-revalidate
+ETag: smyod4wDxEjGspvRdHGemzQt0IUBZlIJIyQe76-PqiU
+Content-Type: image/jpeg
+Content-Disposition: attachment; filename="c0mvchvc6allivdstmik21eq2.jpeg"
+Content-Security-Policy: script-src 'none'; frame-src 'none'; sandbox;
+X-Nextjs-Cache: MISS
+Content-Length: 74849
+Date: Sat, 17 Oct 2026 14:31:21 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+$ cmp bytes
+identical to uploaded kapak.jpg
