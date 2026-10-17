@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import { config as loadDotenv } from 'dotenv';
+
+// The runner reads the same .env that `next dev` reads. Without it, the runner's
+// own DB clients fall back to src/lib/db.ts's CI default (port 5432), which is not
+// the local database. A value already in the environment wins, so CI, which sets
+// DATABASE_URL itself and has no .env, is unchanged.
+loadDotenv({ quiet: true });
 
 /**
  * Playwright configuration.
@@ -46,8 +53,17 @@ if (process.env.E2E_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
 }
 
+// Mail for the e2e web server, the same mailpit service CI runs (ci.yml, e2e step).
+// Without SMTP the invite cooldown answers (`recently_sent`, `role_change_blocked`)
+// never happen. This belongs to the e2e run only: the vitest step in the gate runs
+// without SMTP, and a live test there asserts the no-SMTP invite response.
+// Local: `docker compose` provides fabrika-mailpit on 1025/8025.
+const E2E_SMTP = { SMTP_HOST: 'localhost', SMTP_PORT: '1025' };
+process.env.E2E_MAILPIT_URL ??= 'http://localhost:8025';
+
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
+  ...E2E_SMTP,
   // E2E database URL — defaults to .env DATABASE_URL if not overridden via E2E_DATABASE_URL.
   DATABASE_URL: process.env.DATABASE_URL,
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).

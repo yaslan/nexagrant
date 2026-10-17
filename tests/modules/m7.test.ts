@@ -13,6 +13,11 @@ import { generateText } from '../../src/lib/llm';
 const h = vi.hoisted(() => ({
   ttoCreate: vi.fn(),
   ttoFindFirst: vi.fn(),
+  locale: 'tr' as 'tr' | 'en',
+}));
+
+vi.mock('../../src/lib/ai/prompts/locale', () => ({
+  promptLocale: async () => h.locale,
 }));
 
 vi.mock('../../src/lib/tenant', async () => {
@@ -41,6 +46,7 @@ describe('M7 TTO Accelerator Module', () => {
     resetScope();
     resetModuleAccess();
     vi.clearAllMocks();
+    h.locale = 'tr';
     h.ttoCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'tto-123',
       tenantId: data.tenantId,
@@ -138,5 +144,31 @@ describe('M7 TTO Accelerator Module', () => {
     await expect(
       generateIpChecklist({ title: 'Solid State Battery Sensor', trl: 5, patentStatus: 'granted' })
     ).rejects.toBe(outcome);
+  });
+
+  // The canned list is UI copy: an English user used to get it in Turkish.
+  test.each([
+    ['tr', 'TTO IP & Lisanslama Kontrol Listesi', "TRL 5'den TRL 7 seviyesine"],
+    ['en', 'TTO IP & licensing checklist', 'from TRL 5 to TRL 7'],
+  ] as const)('generateIpChecklist fallback is written in the user locale (%s)', async (locale, heading, roadmap) => {
+    h.locale = locale;
+    vi.mocked(generateText).mockRejectedValueOnce(new Error('provider down'));
+
+    const res = await generateIpChecklist({ title: 'Solid State Battery Sensor', trl: 5, patentStatus: 'granted' });
+
+    expect(res.checklistContent).toContain(heading);
+    expect(res.checklistContent).toContain('(GRANTED)');
+    expect(res.checklistContent).toContain(roadmap);
+    // Every ICU argument was filled; none leaks to the screen as `{trl}`.
+    expect(res.checklistContent).not.toMatch(/[{}]/);
+  });
+
+  test('generateIpChecklist fallback caps the target TRL at 9', async () => {
+    h.locale = 'en';
+    vi.mocked(generateText).mockRejectedValueOnce(new Error('provider down'));
+
+    const res = await generateIpChecklist({ title: 'Mature', trl: 8, patentStatus: 'licensed' });
+
+    expect(res.checklistContent).toContain('from TRL 8 to TRL 9');
   });
 });

@@ -3,8 +3,14 @@ import type { PrismaClient } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
 import type { Mailer, MailMessage } from '@/lib/email/mailer';
 import { MailSendError } from '@/lib/email/mailer';
-import { EXPERT_PREREG_CONSENT_VERSION, IP_WINDOW_MS, REGISTRATION_IP_LIMIT } from './constants';
-import { hashExpertIp, registerExpertPreRegistration } from './register';
+import {
+  EXPERT_PREREG_CONSENT_VERSION,
+  IP_WINDOW_MS,
+  REGISTRATION_IP_LIMIT,
+  RESEND_COOLDOWN_MS,
+  VERIFY_TOKEN_TTL_MS,
+} from './constants';
+import { expertPreRegIpSalt, hashExpertIp, registerExpertPreRegistration } from './register';
 
 const NOW = new Date('2026-10-17T10:00:00.000Z');
 const SALT = 'unit-test-salt-0123456789abcdef0123';
@@ -40,10 +46,20 @@ function fakeDb(seed: Row[] = []) {
           (where.createdAt === undefined || r.createdAt >= where.createdAt.gte)
       ).length
     ),
-    findUnique: vi.fn(async ({ where }: { where: { email: string } }) => rows.find((r) => r.email === where.email) ?? null),
+    // A copy, as Prisma returns: the caller must not see later writes through it.
+    findUnique: vi.fn(async ({ where }: { where: { email: string } }) => {
+      const row = rows.find((r) => r.email === where.email);
+      return row ? { ...row } : null;
+    }),
     create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
       const row = { id: `row-${nextId++}`, ...data } as Row;
       rows.push(row);
+      return { id: row.id };
+    }),
+    update: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+      const row = rows.find((r) => r.id === where.id);
+      if (!row) throw new Error('not found');
+      Object.assign(row, data);
       return { id: row.id };
     }),
     delete: vi.fn(async ({ where }: { where: { id: string } }) => {
@@ -142,17 +158,120 @@ describe('registerExpertPreRegistration', () => {
     expect(JSON.stringify(row)).not.toContain(IP);
   });
 
-  it('refuses a second registration of the same e-mail with 409 and sends no second mail', async () => {
+  it('refuses a registration of a verified e-mail with 409 and sends no mail', async () => {
+    const verified = {
+      id: 'done',
+      email: 'ayse@example.org',
+      ipHash: null,
+      createdAt: NOW,
+      status: 'verified',
+      emailVerifiedAt: NOW,
+      founderNumber: 1,
+      verifyTokenHash: null,
+      verifyTokenExpiresAt: null,
+    } as Row;
+    const { db, rows } = fakeDb([verified]);
+    const { mailer, sent } = recordingMailer();
+    const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    expect(result).toEqual({ kind: 'duplicate' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'verified', founderNumber: 1 });
+    expect(sent).toHaveLength(0);
+  });
+
+  it('answers 429 to a second registration of a pending e-mail inside the cooldown, and sends no mail', async () => {
     const { db, rows } = fakeDb();
     const { mailer, sent } = recordingMailer();
     await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
-    const second = await registerExpertPreRegistration(
+    const again = await registerExpertPreRegistration(
       { ...valid, email: 'AYSE@example.org' },
-      { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null }
+      { db, mailer, baseUrl: BASE, now: new Date(NOW.getTime() + RESEND_COOLDOWN_MS - 1_000), ip: null, salt: null }
     );
-    expect(second).toEqual({ kind: 'duplicate' });
+    expect(again).toEqual({ kind: 'rate_limited' });
     expect(rows).toHaveLength(1);
     expect(sent).toHaveLength(1);
+  });
+
+  it('re-issues the link for a pending e-mail after the cooldown: 201, one row, the old link stops working', async () => {
+    const { db, rows } = fakeDb();
+    const { mailer, sent } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    const firstToken = tokenFromMail(sent[0]!);
+    const later = new Date(NOW.getTime() + RESEND_COOLDOWN_MS + 1_000);
+
+    const again = await registerExpertPreRegistration(
+      { ...valid, email: 'AYSE@example.org', title: 'Yeni Unvan' },
+      { db, mailer, baseUrl: BASE, now: later, ip: null, salt: null }
+    );
+
+    expect(again).toEqual({ kind: 'created' });
+    expect(rows).toHaveLength(1);
+    const row = rows[0]!;
+    expect(row).toMatchObject({ status: 'pending', title: 'Yeni Unvan', createdAt: later });
+    expect(row.verifyTokenExpiresAt).toEqual(new Date(later.getTime() + VERIFY_TOKEN_TTL_MS));
+    const secondToken = tokenFromMail(sent[1]!);
+    expect(secondToken).not.toBe(firstToken);
+    expect(row.verifyTokenHash).toBe(sha256(secondToken));
+    expect(row.verifyTokenHash).not.toBe(sha256(firstToken));
+  });
+
+  it('counts a re-issued registration toward the IP window of the new attempt', async () => {
+    const stale = {
+      id: 'pending-1',
+      email: 'ayse@example.org',
+      ipHash: hashExpertIp('198.51.100.9', SALT),
+      createdAt: new Date(NOW.getTime() - IP_WINDOW_MS - 1_000),
+      status: 'pending',
+      emailVerifiedAt: null,
+      verifyTokenHash: sha256('old'),
+      verifyTokenExpiresAt: new Date(NOW.getTime() - IP_WINDOW_MS - 1_000 + VERIFY_TOKEN_TTL_MS),
+    } as Row;
+    const { db, rows } = fakeDb([stale]);
+    const { mailer } = recordingMailer();
+    const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
+    expect(result).toEqual({ kind: 'created' });
+    expect(rows[0]).toMatchObject({ createdAt: NOW, ipHash: hashExpertIp(IP, SALT) });
+    expect(await db.expertPreRegistration.count({ where: { ipHash: hashExpertIp(IP, SALT), createdAt: { gte: new Date(NOW.getTime() - IP_WINDOW_MS) } } })).toBe(1);
+  });
+
+  it('puts the previous link back when the re-issued mail cannot be sent', async () => {
+    const oldHash = sha256('old-token');
+    // Issued just outside the cooldown, so the re-issue is allowed and then fails at the mail.
+    const issuedAt = NOW.getTime() - RESEND_COOLDOWN_MS - 1_000;
+    const oldExpires = new Date(issuedAt + VERIFY_TOKEN_TTL_MS);
+    const pendingRow = {
+      id: 'pending-2',
+      email: 'ayse@example.org',
+      ipHash: null,
+      createdAt: new Date(issuedAt),
+      status: 'pending',
+      emailVerifiedAt: null,
+      verifyTokenHash: oldHash,
+      verifyTokenExpiresAt: oldExpires,
+    } as Row;
+    const { db, rows } = fakeDb([pendingRow]);
+    const failing: Mailer = vi.fn(async () => {
+      throw new MailSendError('ECONNECTION', null);
+    });
+    const result = await registerExpertPreRegistration(valid, { db, mailer: failing, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    expect(result).toEqual({ kind: 'unavailable', error: 'mail_failed' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ verifyTokenHash: oldHash, verifyTokenExpiresAt: oldExpires });
+  });
+
+  it('keeps the first registration row when a re-issue mail fails: the expert keeps the old link', async () => {
+    const { db, rows } = fakeDb();
+    const { mailer, sent } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    const firstToken = tokenFromMail(sent[0]!);
+    const failing: Mailer = vi.fn(async () => {
+      throw new MailSendError('ECONNECTION', null);
+    });
+    const later = new Date(NOW.getTime() + RESEND_COOLDOWN_MS + 1_000);
+    const result = await registerExpertPreRegistration(valid, { db, mailer: failing, baseUrl: BASE, now: later, ip: null, salt: null });
+    expect(result).toEqual({ kind: 'unavailable', error: 'mail_failed' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.verifyTokenHash).toBe(sha256(firstToken));
   });
 
   it('answers 429 from the sixth registration of one IP inside the window', async () => {
@@ -190,6 +309,25 @@ describe('registerExpertPreRegistration', () => {
     const result = await registerExpertPreRegistration(valid, { db, mailer: failing, baseUrl: BASE, now: NOW });
     expect(result).toEqual({ kind: 'unavailable', error: 'mail_failed' });
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe('expertPreRegIpSalt', () => {
+  it('uses EXPERT_PREREG_IP_SALT when it is set', () => {
+    expect(expertPreRegIpSalt(SALT, 'auth-secret-value-0123456789abcdef')).toBe(SALT);
+  });
+
+  it('derives a key from AUTH_SECRET when the salt is unset, so the per-IP limit never switches off', () => {
+    const derived = expertPreRegIpSalt(undefined, 'auth-secret-value-0123456789abcdef');
+    expect(derived).toMatch(/^[0-9a-f]{64}$/);
+    expect(derived).toBe(expertPreRegIpSalt(undefined, 'auth-secret-value-0123456789abcdef'));
+    expect(derived).not.toBe(expertPreRegIpSalt(undefined, 'another-secret-value-0123456789abcdef'));
+    expect(derived).not.toBe(sha256('auth-secret-value-0123456789abcdef'));
+  });
+
+  it('is null only when neither the salt nor AUTH_SECRET is set', () => {
+    expect(expertPreRegIpSalt(undefined, undefined)).toBeNull();
+    expect(expertPreRegIpSalt('', '')).toBeNull();
   });
 });
 

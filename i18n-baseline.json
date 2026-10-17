@@ -13,7 +13,6 @@
   "src/app/[locale]/(app)/[workspace]/settings/api-keys/client.tsx": 18,
   "src/app/[locale]/(app)/[workspace]/settings/modules/client.tsx": 24,
   "src/app/[locale]/(app)/[workspace]/settings/modules/page.tsx": 2,
-  "src/app/[locale]/(app)/[workspace]/tto/client.tsx": 27,
   "src/app/[locale]/admin/audit/page.tsx": 4,
   "src/app/[locale]/admin/blog/client.tsx": 22,
   "src/app/[locale]/admin/cordis/client.tsx": 37,

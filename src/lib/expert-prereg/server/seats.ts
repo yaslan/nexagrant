@@ -3,11 +3,12 @@ import { prisma } from '@/lib/db';
 import { FOUNDER_SEAT_LIMIT } from './constants';
 
 /**
- * How many founder numbers are still free: the limit minus the verified experts
- * who already hold one, never below zero. FO-19 (TASK-MVBIXPP33UK1B); the
- * landing page's seat strip reads it.
+ * How many founder numbers are still free: the limit minus the highest number
+ * given, never below zero. The same source as the verification's next number
+ * (verify.ts), so the strip and the numbering cannot disagree. FO-19
+ * (TASK-MVBIXPP33UK1B); the landing page's seat strip reads it.
  */
 export async function getRemainingFounderSeats(db: PrismaClient = prisma): Promise<number> {
-  const taken = await db.expertPreRegistration.count({ where: { founderNumber: { not: null } } });
-  return Math.max(0, FOUNDER_SEAT_LIMIT - taken);
+  const top = await db.expertPreRegistration.aggregate({ _max: { founderNumber: true } });
+  return Math.max(0, FOUNDER_SEAT_LIMIT - (top._max.founderNumber ?? 0));
 }

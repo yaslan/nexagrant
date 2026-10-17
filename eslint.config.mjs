@@ -18,6 +18,10 @@ const eslintConfig = defineConfig([
     ".claude/worktrees/**",
     "docs/agent-results/**",
     "_workspace/**",
+    // Output of `pnpm test:e2e` (gitignored): bundled trace viewer JS and
+    // screenshots. Lint must not read it; a local run with CI=true writes it.
+    "playwright-report/**",
+    "test-results/**",
   ]),
   {
     files: ["**/*.ts", "**/*.tsx"],
