@@ -70,17 +70,15 @@ Dağıtım: Fly.io (1 shared-cpu-2x, 2 GB). Aylık iş < 30 dk hedefi.
 Sanal ortamı her checkout'ta yerelde oluştur; `.venv/` git'e girmez (`.gitignore`).
 İçindeki ikililer işletim sistemine ve Python sürümüne bağlıdır, paylaşılamaz.
 
-```bash
+```sh
 python3.12 -m venv .venv                     # depo kökünde, bir kez
 source .venv/bin/activate                    # Windows: .venv\Scripts\activate
-pip install -r workers/cordis/requirements-dev.txt   # uygulama + pytest
-python -m pytest workers/cordis              # isteğe bağlı: testler
 ```
 
-Bağımlılık değişince yalnız `pip install -r ...` adımını tekrarla; ortam bozulursa
-`.venv/` klasörünü silip baştan kur.
+Kurulum yalnız hash'li kilitten yapılır, sonra worker çalıştırılır:
 
 ```bash
+pip install --require-hashes -r workers/cordis/requirements.lock
 cd workers/cordis
 DATABASE_URL=postgresql://... WORKER_TOKEN=... CORDIS_WORKER_ALLOW_MOCK=1 \
   python -m uvicorn main:app --reload --port 8000
@@ -88,6 +86,19 @@ DATABASE_URL=postgresql://... WORKER_TOKEN=... CORDIS_WORKER_ALLOW_MOCK=1 \
 curl -X POST -H "Authorization: Bearer $WORKER_TOKEN" \
   'http://127.0.0.1:8000/jobs/cordis?month=2026-09'
 ```
+
+Testler için dev paketlerini kilitten **sonra** ekle (depo kökünde):
+
+```sh
+pip install -r workers/cordis/requirements-dev.txt   # yalnız pytest/httpx2 ekler
+python -m pytest workers/cordis
+```
+
+`pytest` ve `httpx2` kilitte yok; bu iki dev paketi hash'siz kurulur. Dosyadaki
+`-r requirements.txt` satırı, kilitten kurulmuş sürümlerle zaten karşılanır.
+
+Bağımlılık değişince kilit adımını tekrarla; ortam bozulursa `.venv/` klasörünü silip
+baştan kur.
 
 ## Henüz yapılmadı
 
