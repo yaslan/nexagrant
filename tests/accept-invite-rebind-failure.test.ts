@@ -35,7 +35,7 @@ vi.mock('@/lib/legal/registration-ack-cookie', () => ({
 vi.mock('@/lib/registration-province-cookie', () => ({ setRegistrationProvinceCookie: vi.fn() }));
 vi.mock('@/lib/registration-readiness-cookie', () => ({ setRegistrationReadinessCookie: vi.fn() }));
 
-import { acceptInvitationAction } from '@/app/[locale]/accept-invite/continue/actions';
+import { acceptInvitationAction } from '@/app/[locale]/(public)/accept-invite/continue/actions';
 
 async function outcome(p: Promise<unknown>): Promise<string> {
   try {

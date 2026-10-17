@@ -56,7 +56,7 @@ const REMOVED_LITERALS = [
 ] as const;
 
 describe('landing page — the CORDIS scale and budget figures are gone', () => {
-  const source = readCode('src/app/[locale]/page.tsx');
+  const source = readCode('src/app/[locale]/(public)/page.tsx');
 
   test.each(REMOVED_LITERALS)('does not print %s', (literal) => {
     expect(source).not.toContain(literal);
@@ -80,7 +80,7 @@ describe('landing page — the CORDIS scale and budget figures are gone', () => 
 });
 
 describe('landing page — the M1 mock quotes no real institution and no uplift', () => {
-  const source = readCode('src/app/[locale]/page.tsx');
+  const source = readCode('src/app/[locale]/(public)/page.tsx');
 
   test.each([
     'Fraunhofer',

@@ -51,7 +51,7 @@ let lib: {
   token: typeof import('../src/lib/secret-token');
   opportunities: typeof import('../src/app/api/v1/opportunities/route');
   m11: typeof import('../src/modules/m11/server/actions');
-  portal: typeof import('../src/app/[locale]/portal/partner/[token]/page');
+  portal: typeof import('../src/app/[locale]/(public)/portal/partner/[token]/page');
   credits: typeof import('../src/lib/jobs/tasks/credits-monthly-grant');
   alerts: typeof import('../src/lib/jobs/tasks/alerts-daily');
   m4: typeof import('../src/lib/jobs/tasks/m4-weekly-summary');
@@ -67,7 +67,7 @@ beforeAll(async () => {
     token: await import('../src/lib/secret-token'),
     opportunities: await import('../src/app/api/v1/opportunities/route'),
     m11: await import('../src/modules/m11/server/actions'),
-    portal: await import('../src/app/[locale]/portal/partner/[token]/page'),
+    portal: await import('../src/app/[locale]/(public)/portal/partner/[token]/page'),
     credits: await import('../src/lib/jobs/tasks/credits-monthly-grant'),
     alerts: await import('../src/lib/jobs/tasks/alerts-daily'),
     m4: await import('../src/lib/jobs/tasks/m4-weekly-summary'),

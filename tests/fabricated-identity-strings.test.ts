@@ -269,7 +269,7 @@ describe('blog — a byline names a real author or there is none', () => {
 });
 
 describe('login page — the demo buttons name a role, not a person', () => {
-  test.each(['src/app/[locale]/login/AuthCard.tsx'])(
+  test.each(['src/app/[locale]/(public)/login/AuthCard.tsx'])(
     '%s headlines the seat and the address',
     (file) => {
       const source = readCode(file);
@@ -285,7 +285,7 @@ describe('login page — the demo buttons name a role, not a person', () => {
   // its demo buttons never reached a user and the two copies could drift apart unnoticed. It
   // was deleted (TASK-MTS6LZOD715WM); this keeps a copy from coming back.
   test('the unreachable duplicate login form stays deleted', () => {
-    expect(existsSync(resolve(REPO, 'src/app/[locale]/login/LoginForm.tsx'))).toBe(false);
+    expect(existsSync(resolve(REPO, 'src/app/[locale]/(public)/login/LoginForm.tsx'))).toBe(false);
   });
 
   test('the role labels exist in both locales', () => {
