@@ -285,6 +285,9 @@ export async function registerExpertPreRegistration(
           logger.error('expert pre-registration rollback failed after a mail error');
         });
       }
+    }).catch(() => {
+      // The scope itself failed (the connection dropped). The answer stays mail_failed, not a 500.
+      logger.error('expert pre-registration rollback failed after a mail error');
     });
     logger.error('expert pre-registration mail failed', { code: mailFailureCode(error) ?? 'unknown' });
     return { kind: 'unavailable', error: 'mail_failed' };
