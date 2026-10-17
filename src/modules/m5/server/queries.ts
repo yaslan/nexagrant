@@ -1,4 +1,4 @@
-import { withTenant } from '@/lib/db';
+import { withTenant, type TenantTx } from '@/lib/db';
 
 import {
   averageG0ToG2Days,
@@ -210,66 +210,84 @@ export async function getKpiTrend(
   to: Date,
   intervalDays: number = 7
 ): Promise<{ date: string; metric: string; value: number }[]> {
-  return withTenant(tenantId, async (tx) => {
-    const data: { date: string; metric: string; value: number }[] = [];
+  return withTenant(tenantId, (tx) => getKpiTrendIn(tx, tenantId, from, to, intervalDays));
+}
 
-    // Generate date intervals
-    const current = new Date(from);
-    while (current <= to) {
-      const intervalEnd = new Date(
-        current.getTime() + intervalDays * 24 * 60 * 60 * 1000
-      );
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-      // Count opportunities created in this interval
-      const offerCount = await tx.opportunity.count({
-        where: {
-          tenantId,
-          deletedAt: null,
-          createdAt: { gte: current, lte: intervalEnd },
-        },
-      });
+/** A UTC instant as the `timestamp` literal Prisma's `DateTime` columns hold. */
+function pgTimestamp(d: Date): string {
+  return d.toISOString().replace('T', ' ').replace('Z', '');
+}
 
-      const submittedCount = await tx.proposal.count({
-        where: {
-          tenantId,
-          submittedAt: { not: null },
-          opportunity: {
-            deletedAt: null,
-            createdAt: { gte: current, lte: intervalEnd },
-          },
-        },
-      });
+/**
+ * The trend inside a transaction the caller has already bound to `tenantId`.
+ *
+ * One query for the whole range, whatever its length. It used to be three
+ * `count`s per bucket, one after another: a five-year range was ~780 round trips
+ * and a long custom range ran past the 5 s interactive-transaction timeout,
+ * taking the whole dashboard down with it (TASK-MVCU7MP8JK1V5).
+ *
+ * Buckets start at `from` and step `intervalDays`; the last one starts on or
+ * before `to` and spans a full interval. Each bucket is half-open, so an
+ * opportunity created exactly on a boundary counts once, in the later bucket.
+ * The filters are the ones {@link getKpiMetrics} uses for the same figures, and
+ * `tenantId` is in the WHERE as well as in RLS: locally the app connects as a
+ * BYPASSRLS role, and there the WHERE is the only fence.
+ */
+export async function getKpiTrendIn(
+  tx: TenantTx,
+  tenantId: string,
+  from: Date,
+  to: Date,
+  intervalDays: number = 7
+): Promise<{ date: string; metric: string; value: number }[]> {
+  const intervalMs = intervalDays * DAY_MS;
+  const buckets = to < from ? 0 : Math.floor((to.getTime() - from.getTime()) / intervalMs) + 1;
+  if (buckets === 0) return [];
+  const end = new Date(from.getTime() + buckets * intervalMs);
 
-      const g0ScoredCount = await tx.opportunity.count({
-        where: {
-          tenantId,
-          deletedAt: null,
-          g0Score: { not: null },
-          createdAt: { gte: current, lte: intervalEnd },
-        },
-      });
+  // Proposal.opportunityId is unique, so the join cannot multiply opportunities.
+  const rows = await tx.$queryRaw<Array<{ bucket: number; offers: number; submitted: number; g0Scored: number }>>`
+    SELECT floor(extract(epoch FROM (o."createdAt" - ${pgTimestamp(from)}::timestamp)) / ${intervalMs / 1000})::int AS bucket,
+           count(*)::int AS offers,
+           count(p."id") FILTER (WHERE p."submittedAt" IS NOT NULL)::int AS submitted,
+           count(*) FILTER (WHERE o."g0Score" IS NOT NULL)::int AS "g0Scored"
+    FROM "Opportunity" o
+    LEFT JOIN "Proposal" p ON p."opportunityId" = o."id" AND p."tenantId" = ${tenantId}
+    WHERE o."tenantId" = ${tenantId}
+      AND o."deletedAt" IS NULL
+      AND o."createdAt" >= ${pgTimestamp(from)}::timestamp
+      AND o."createdAt" < ${pgTimestamp(end)}::timestamp
+    GROUP BY 1
+  `;
+  const byBucket = new Map(rows.map((r) => [Number(r.bucket), r]));
 
-      const successRate =
-        g0ScoredCount > 0 ? (submittedCount / g0ScoredCount) * 100 : 0;
+  const data: { date: string; metric: string; value: number }[] = [];
+  for (let k = 0; k < buckets; k++) {
+    const row = byBucket.get(k);
+    const offerCount = Number(row?.offers ?? 0);
+    const submittedCount = Number(row?.submitted ?? 0);
+    const g0ScoredCount = Number(row?.g0Scored ?? 0);
 
-      // `slice` rather than `split('T')[0]`: identical output for an ISO string,
-      // and it is typed `string`. Same idiom as src/lib/fx/tcmb.ts.
-      const dateStr = current.toISOString().slice(0, 10);
+    const successRate =
+      g0ScoredCount > 0 ? (submittedCount / g0ScoredCount) * 100 : 0;
 
-      data.push({
-        date: dateStr,
-        metric: 'offers',
-        value: offerCount,
-      });
-      data.push({
-        date: dateStr,
-        metric: 'success_rate',
-        value: Math.round(successRate * 100) / 100,
-      });
+    // `slice` rather than `split('T')[0]`: identical output for an ISO string,
+    // and it is typed `string`. Same idiom as src/lib/fx/tcmb.ts.
+    const dateStr = new Date(from.getTime() + k * intervalMs).toISOString().slice(0, 10);
 
-      current.setDate(current.getDate() + intervalDays);
-    }
+    data.push({
+      date: dateStr,
+      metric: 'offers',
+      value: offerCount,
+    });
+    data.push({
+      date: dateStr,
+      metric: 'success_rate',
+      value: Math.round(successRate * 100) / 100,
+    });
+  }
 
-    return data;
-  });
+  return data;
 }
