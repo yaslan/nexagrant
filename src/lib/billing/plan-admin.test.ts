@@ -395,6 +395,10 @@ describe('plan admin write layer', () => {
       await deletePlan(emptyPlanId, 'admin-1');
       expect(await prisma.plan.findUnique({ where: { id: emptyPlanId } })).toBeNull();
     } finally {
+      // The version must go first: PlanVersion.planId is ON DELETE RESTRICT, so a
+      // plan delete alone fails here and leaves both rows behind. Those rows then
+      // make every later `pnpm db:seed` fail on its retired-plan cleanup.
+      await prisma.planVersion.deleteMany({ where: { planId: emptyPlanId } });
       await prisma.plan.deleteMany({ where: { id: emptyPlanId } });
     }
   });
