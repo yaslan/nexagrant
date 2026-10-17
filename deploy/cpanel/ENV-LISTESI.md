@@ -58,7 +58,7 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `BETA_SUPPORT_EMAIL`, `BETA_FEEDBACK_EMAIL` | ✓ | boş (varsayılan `info@fonbridge.com`) | |
 | `BETA_MEETING_URL` | ✓ | `https://meet.google.com/<...>` | Beta davetindeki toplantı bağlantısı. |
 | `CALENDAR_ENCRYPTION_KEY` | ✓ | `openssl rand -base64 32` | Takvim bağlantısı özelliği. **Boş değer YAZMAYIN.** Kullanılmayacaksa değişkeni hiç eklemeyin. Değiştirilirse kullanıcılar takvimi yeniden bağlar. |
-| `TRUSTED_PROXY_HOPS` | | boş (= `1`) | Önünüzdeki ters vekil sayısı (LiteSpeed = 1). Ziyaretçi formunun IP sınırı buna göre çalışır. Sunucuda **ölçülmedi**. Tek LiteSpeed ise boş bırakın. |
+| `TRUSTED_PROXY_HOPS` | | `1` | Önünüzdeki ters vekil sayısı. Ölçüm (17.10.2026, `curl -sI https://fonbridge.com`): `77.92.144.187` önünde tek LiteSpeed, CDN başlığı yok → **`1`**. Ziyaretçi formunun IP sınırı buna göre çalışır. Bir fazla ya da eksik olursa sınır sahte başlıkla aşılır. |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | | boş | Analitik kapalı (zararsız). **Not:** tarayıcı tarafı bu anahtarı **derleme anında** okur. Bu paket anahtarsız derlendi. cPanel'e girmek analitiği açmaz; açmak için yeniden derleme gerekir. |
 | `CSP_MODE` | | boş | Boş = içerik güvenlik politikası uygulanır. `report-only` yalnız sorun ararken kullanılır. |
 | `K1_EMBEDDING_MAX_USD_PER_RUN` | W | `0.05` | Gece embedding işinin koşu başına dolar tavanı. |
