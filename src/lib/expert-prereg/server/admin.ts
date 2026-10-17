@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
+import { withSystemScopeOn } from '@/lib/system-scope';
 import { EXPERTISE_AREAS, PROVINCES } from '../options';
 import { toCsv } from './csv';
 
@@ -67,12 +68,15 @@ export async function listExpertPreRegistrations(
   options: { take?: number; db?: PrismaClient } = {}
 ): Promise<ExpertPreRegRow[]> {
   const db = options.db ?? prisma;
-  return db.expertPreRegistration.findMany({
-    where: whereFrom(filters),
-    orderBy: { createdAt: 'desc' },
-    ...(options.take ? { take: options.take } : {}),
-    select: ROW_SELECT,
-  });
+  // FO-45: personal data, RLS-on. Read only inside the platform-admin scope; the route has checked requirePlatformAdminApi().
+  return withSystemScopeOn(db, 'platform-admin', 'expert-prereg.admin-list', (tx) =>
+    tx.expertPreRegistration.findMany({
+      where: whereFrom(filters),
+      orderBy: { createdAt: 'desc' },
+      ...(options.take ? { take: options.take } : {}),
+      select: ROW_SELECT,
+    })
+  );
 }
 
 const PROVINCE_NAME = new Map<string, string>(PROVINCES.map((p) => [p.value, p.name]));

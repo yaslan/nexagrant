@@ -105,6 +105,8 @@ export const SYSTEM_SCOPE_PURPOSES = [
   'platform-aggregate',
   /** A cron fan-out whose tenant set is the query's output. */
   'cross-tenant-job',
+  /** An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45). */
+  'public-intake',
 ] as const;
 
 export type SystemScopePurpose = (typeof SYSTEM_SCOPE_PURPOSES)[number];

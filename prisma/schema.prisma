@@ -716,6 +716,10 @@ model ExpertPreRegistration {
   status               String    @default("pending")
   /// HMAC-SHA256 of the client IP under EXPERT_PREREG_IP_SALT: the per-IP limit only.
   ipHash               String?
+  /// Verification mails sent to this address in the current day window (FO-45 F5, EXPERT_PREREG_DAILY_MAIL_LIMIT).
+  verifyMailCount      Int       @default(0)
+  /// Start of the day window `verifyMailCount` counts from. NULL = no mail yet.
+  verifyMailWindowStart DateTime?
   createdAt            DateTime  @default(now())
   @@index([createdAt])
   @@index([ipHash, createdAt])

@@ -7,12 +7,15 @@ import { prisma } from '@/lib/db';
 import { env } from '@/lib/env';
 import { ipBucket } from '@/lib/leads/public-lead';
 import { logger } from '@/lib/logger';
+import { withSystemScopeOn } from '@/lib/system-scope';
 import { issueSecretToken } from '@/lib/secret-token';
 import { expertPreRegInputSchema } from '../schema';
 import {
   EXPERT_PREREG_CONSENT_VERSION,
+  EXPERT_PREREG_DAILY_MAIL_LIMIT,
   EXPERT_PREREG_LOCK_KEY,
   IP_WINDOW_MS,
+  MAIL_DAY_MS,
   REGISTRATION_IP_LIMIT,
   RESEND_COOLDOWN_MS,
   VERIFY_TOKEN_TTL_MS,
@@ -59,10 +62,24 @@ export function hashExpertIp(ip: string | null, salt: string | null | undefined)
   return createHmac('sha256', salt).update(ipBucket(ip)).digest('hex');
 }
 
-/** What a re-issued registration replaced, so a mail that cannot go out puts the old link back. */
+/**
+ * What a re-issue changes on a pending row (F6): the link, the IP and the mail
+ * counters. Everything the expert typed and consented to stays as it was. This
+ * is the state the row had before, so a mail that cannot go out restores all of it.
+ */
 interface ReissueState {
   verifyTokenHash: string | null;
   verifyTokenExpiresAt: Date | null;
+  ipHash: string | null;
+  createdAt: Date;
+  verifyMailCount: number;
+  verifyMailWindowStart: Date | null;
+}
+
+/** Name and language of the row the mail is written for: the stored ones on a re-issue, the form's otherwise. */
+interface MailTarget {
+  fullName: string;
+  locale: string;
 }
 
 /**
@@ -128,8 +145,10 @@ export async function registerExpertPreRegistration(
 
   let id: string;
   let previous: ReissueState | null = null;
+  let target: MailTarget = { fullName: data.fullName, locale: data.locale };
   try {
-    const written = await db.$transaction(async (tx) => {
+    // FO-45: the table is RLS-on with the system_scope policy only, so every read and write here runs in the 'public-intake' scope.
+    const written = await withSystemScopeOn(db, 'public-intake', 'expert-prereg.register', async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EXPERT_PREREG_LOCK_KEY})`;
 
       if (ipHash) {
@@ -141,15 +160,35 @@ export async function registerExpertPreRegistration(
 
       const existing = await tx.expertPreRegistration.findUnique({
         where: { email: data.email },
-        select: { id: true, status: true, verifyTokenHash: true, verifyTokenExpiresAt: true },
+        select: {
+          id: true,
+          status: true,
+          fullName: true,
+          locale: true,
+          verifyTokenHash: true,
+          verifyTokenExpiresAt: true,
+          ipHash: true,
+          createdAt: true,
+          verifyMailCount: true,
+          verifyMailWindowStart: true,
+        },
       });
       // Verified (or disabled by an admin) is refused. Pending gets a fresh link, but not inside the cooldown.
       if (existing && existing.status !== 'pending') return { status: 409 as const };
+
+      // F5: at most EXPERT_PREREG_DAILY_MAIL_LIMIT mails to one address per day window.
+      const dayOpen = existing?.verifyMailWindowStart != null && now.getTime() - existing.verifyMailWindowStart.getTime() < MAIL_DAY_MS;
+      const mailsToday = dayOpen ? (existing?.verifyMailCount ?? 0) : 0;
       if (existing) {
         // The link was issued VERIFY_TOKEN_TTL_MS before it expires.
         const issuedAt = existing.verifyTokenExpiresAt ? existing.verifyTokenExpiresAt.getTime() - VERIFY_TOKEN_TTL_MS : 0;
         if (now.getTime() - issuedAt < RESEND_COOLDOWN_MS) return { status: 429 as const };
+        if (mailsToday >= EXPERT_PREREG_DAILY_MAIL_LIMIT) return { status: 429 as const };
       }
+      const mailCounters = {
+        verifyMailCount: mailsToday + 1,
+        verifyMailWindowStart: dayOpen ? (existing?.verifyMailWindowStart ?? now) : now,
+      };
 
       const fields = {
         fullName: data.fullName,
@@ -178,28 +217,49 @@ export async function registerExpertPreRegistration(
         ipHash,
         status: 'pending',
         createdAt: now,
+        ...mailCounters,
       };
 
       if (existing) {
-        // Read the old link before the update replaces it, so a failed mail can put it back.
+        // F6: a pending row keeps the profile the expert first entered and the consent they first gave.
+        // Only the link, the IP and the mail counters move. The mail goes to the stored name and language.
         const replaced: ReissueState = {
           verifyTokenHash: existing.verifyTokenHash,
           verifyTokenExpiresAt: existing.verifyTokenExpiresAt,
+          ipHash: existing.ipHash,
+          createdAt: existing.createdAt,
+          verifyMailCount: existing.verifyMailCount,
+          verifyMailWindowStart: existing.verifyMailWindowStart,
         };
         // The new link replaces the old one (its hash is gone, so the old link answers invalid).
         // createdAt moves to this attempt so the per-IP window counts it.
-        await tx.expertPreRegistration.update({ where: { id: existing.id }, data: fields });
-        return { status: 201 as const, id: existing.id, previous: replaced };
+        await tx.expertPreRegistration.update({
+          where: { id: existing.id },
+          data: {
+            verifyTokenHash: tokenHash,
+            verifyTokenExpiresAt: expires,
+            ipHash,
+            createdAt: now,
+            ...mailCounters,
+          },
+        });
+        return {
+          status: 201 as const,
+          id: existing.id,
+          previous: replaced,
+          target: { fullName: existing.fullName, locale: existing.locale },
+        };
       }
 
       const row = await tx.expertPreRegistration.create({ data: fields, select: { id: true } });
-      return { status: 201 as const, id: row.id, previous: null };
+      return { status: 201 as const, id: row.id, previous: null, target };
     });
 
     if (written.status === 429) return { kind: 'rate_limited' };
     if (written.status === 409) return { kind: 'duplicate' };
     id = written.id;
     previous = written.previous;
+    target = written.target ?? target;
   } catch (error) {
     // The error's name only: a Prisma message can quote the values it failed on.
     logger.error('expert pre-registration write failed', { error: error instanceof Error ? error.name : 'unknown' });
@@ -208,20 +268,23 @@ export async function registerExpertPreRegistration(
 
   const link = `${baseUrl}/api/expert-preregistration/verify?token=${token}`;
   try {
-    await mailer(renderExpertVerificationEmail({ to: data.email, fullName: data.fullName, link, locale: data.locale, expires }));
+    await mailer(renderExpertVerificationEmail({ to: data.email, fullName: target.fullName, link, locale: target.locale, expires }));
   } catch (error) {
     // A new row must not outlive a mail nobody got: the expert could not verify and
     // could not register again, so it is removed. A re-issued row goes back to the
-    // link the expert already has. A failure to undo is logged.
-    if (previous) {
-      await db.expertPreRegistration.update({ where: { id }, data: previous }).catch(() => {
-        logger.error('expert pre-registration link restore failed after a mail error');
-      });
-    } else {
-      await db.expertPreRegistration.delete({ where: { id } }).catch(() => {
-        logger.error('expert pre-registration rollback failed after a mail error');
-      });
-    }
+    // link the expert already has, and its mail counters go back too, so a failed
+    // mail does not use up the day's quota. A failure to undo is logged.
+    await withSystemScopeOn(db, 'public-intake', 'expert-prereg.rollback', async (tx) => {
+      if (previous) {
+        await tx.expertPreRegistration.update({ where: { id }, data: previous }).catch(() => {
+          logger.error('expert pre-registration link restore failed after a mail error');
+        });
+      } else {
+        await tx.expertPreRegistration.delete({ where: { id } }).catch(() => {
+          logger.error('expert pre-registration rollback failed after a mail error');
+        });
+      }
+    });
     logger.error('expert pre-registration mail failed', { code: mailFailureCode(error) ?? 'unknown' });
     return { kind: 'unavailable', error: 'mail_failed' };
   }
