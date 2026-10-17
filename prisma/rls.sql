@@ -412,6 +412,10 @@ BEGIN
     CREATE POLICY system_scope ON public."ExpertFounderCounter"
       USING ((SELECT public.system_scope_open('"ExpertFounderCounter"'::regclass)))
       WITH CHECK ((SELECT public.system_scope_open('"ExpertFounderCounter"'::regclass)));
+    -- Never emptied by the app role (crw-fb Ö-1); db:rls-role grants DELETE on every table.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+      REVOKE DELETE, TRUNCATE ON public."ExpertFounderCounter" FROM fabrika_app;
+    END IF;
   END IF;
 END $$;
 

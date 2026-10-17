@@ -19,11 +19,17 @@ export async function lastFounderNumberGiven(tx: Prisma.TransactionClient): Prom
   return Math.max(counter?.lastNumber ?? 0, top._max.founderNumber ?? 0);
 }
 
-/** Stores `lastNumber` as the counter. Call under EXPERT_PREREG_LOCK_KEY with a value from {@link lastFounderNumberGiven} or above it. */
+/**
+ * Raises the counter to `lastNumber`. Never lowers it and writes nothing when the
+ * value is not higher (so `updatedAt` stays the moment a number was last given);
+ * the database refuses a lowering UPDATE anyway (add-expert-founder-counter.sql).
+ * Call under EXPERT_PREREG_LOCK_KEY.
+ */
 export async function recordFounderNumberGiven(tx: Prisma.TransactionClient, lastNumber: number): Promise<void> {
-  await tx.expertFounderCounter.upsert({
-    where: { id: 1 },
-    create: { id: 1, lastNumber },
-    update: { lastNumber },
-  });
+  await tx.$executeRaw`
+    INSERT INTO "ExpertFounderCounter" ("id", "lastNumber", "updatedAt")
+    VALUES (1, ${lastNumber}, CURRENT_TIMESTAMP)
+    ON CONFLICT ("id") DO UPDATE
+      SET "lastNumber" = EXCLUDED."lastNumber", "updatedAt" = EXCLUDED."updatedAt"
+      WHERE EXCLUDED."lastNumber" > "ExpertFounderCounter"."lastNumber"`;
 }

@@ -22,15 +22,19 @@ type Row = {
 /** In-memory stand-in for the calls verify and seats make. `counter` is ExpertFounderCounter's lastNumber (undefined = no row). */
 function fakeDb(seed: Row[] = [], counter?: number) {
   const rows: Row[] = [...seed];
-  const state = { counter };
+  const state = { counter, counterWrites: 0 };
   const tx = {
-    $executeRaw: vi.fn(async () => 0),
+    // The advisory lock, and recordFounderNumberGiven's raise-only upsert of the counter.
+    $executeRaw: vi.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
+      if (!sql.join('?').includes('"ExpertFounderCounter"')) return 0;
+      const n = values[0] as number;
+      if (state.counter !== undefined && n <= state.counter) return 0;
+      state.counter = n;
+      state.counterWrites += 1;
+      return 1;
+    }),
     expertFounderCounter: {
       findUnique: vi.fn(async () => (state.counter === undefined ? null : { lastNumber: state.counter })),
-      upsert: vi.fn(async ({ update }: { update: { lastNumber: number } }) => {
-        state.counter = update.lastNumber;
-        return { id: 1, lastNumber: state.counter };
-      }),
     },
     expertPreRegistration: {
       findUnique: vi.fn(async ({ where }: { where: { verifyTokenHash: string } }) => {

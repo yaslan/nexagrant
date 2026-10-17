@@ -18,7 +18,11 @@
 -- runs this file before rls.sql gets a NOTICE here, and rls.sql (same block)
 -- creates the policy on `pnpm db:rls`.
 --
--- Idempotent: IF NOT EXISTS, ON CONFLICT, DROP POLICY IF EXISTS before CREATE.
+-- The database refuses to lower the counter (BEFORE UPDATE trigger) and the app
+-- role cannot DELETE or TRUNCATE it (crw-fb Ö-1).
+--
+-- Idempotent: IF NOT EXISTS, ON CONFLICT, CREATE OR REPLACE FUNCTION, DROP
+-- POLICY / TRIGGER IF EXISTS before CREATE.
 --
 -- Rollback: prisma/migrations/add-expert-founder-counter.down.sql
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -39,6 +43,26 @@ BEGIN
     ALTER TABLE "ExpertFounderCounter" ADD CONSTRAINT "ExpertFounderCounter_lastNumber_nonneg" CHECK ("lastNumber" >= 0);
   END IF;
 END $$;
+
+-- "Only goes up", held by the database and not only by the code (crw-fb Ö-1):
+-- an UPDATE that lowers lastNumber is refused for every role. The owner restores
+-- a test value with DELETE + INSERT (no UPDATE), which the app role cannot do:
+-- it has no DELETE or TRUNCATE here (below).
+CREATE OR REPLACE FUNCTION public.expert_founder_counter_no_decrease() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog
+AS $$
+BEGIN
+  RAISE EXCEPTION 'ExpertFounderCounter.lastNumber only goes up (% -> %)', OLD."lastNumber", NEW."lastNumber"
+    USING ERRCODE = 'check_violation';
+END;
+$$;
+REVOKE ALL ON FUNCTION public.expert_founder_counter_no_decrease() FROM PUBLIC;
+DROP TRIGGER IF EXISTS "ExpertFounderCounter_no_decrease" ON "ExpertFounderCounter";
+CREATE TRIGGER "ExpertFounderCounter_no_decrease"
+  BEFORE UPDATE ON "ExpertFounderCounter"
+  FOR EACH ROW WHEN (NEW."lastNumber" < OLD."lastNumber")
+  EXECUTE FUNCTION public.expert_founder_counter_no_decrease();
 
 INSERT INTO "ExpertFounderCounter" ("id", "lastNumber", "updatedAt")
 SELECT 1, COALESCE(MAX("founderNumber"), 0), CURRENT_TIMESTAMP FROM "ExpertPreRegistration"
@@ -66,5 +90,9 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
     GRANT SELECT, INSERT, UPDATE ON "ExpertFounderCounter" TO fabrika_app;
+    -- Default privileges hand it DELETE at CREATE TABLE; a deleted row would let the
+    -- next verification fall back to the rows' max and reuse a purged number.
+    -- Also revoked in prisma/rls.sql and prisma/rls-app-role.sql (db:rls-role re-grants DELETE on all tables).
+    REVOKE DELETE, TRUNCATE ON "ExpertFounderCounter" FROM fabrika_app;
   END IF;
 END $$;

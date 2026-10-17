@@ -54,6 +54,7 @@ export async function purgeOldExpertPreRegistrations(options: { now?: Date } = {
   return withSystemScope('cross-tenant-job', 'expert-prereg-retention.purge', async (tx) => {
     // Under the verification's lock, and the counter first: a number that lives
     // only on a row about to go (counter behind the rows) is recorded before the row is.
+    // A no-op write when the counter is already there (crw-fb Ö-2).
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EXPERT_PREREG_LOCK_KEY})`;
     await recordFounderNumberGiven(tx, await lastFounderNumberGiven(tx));
     const { count } = await tx.expertPreRegistration.deleteMany({
