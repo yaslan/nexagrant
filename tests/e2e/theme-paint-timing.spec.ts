@@ -14,7 +14,8 @@ import { test, expect } from '@playwright/test';
  * both tests go red, because ThemeProvider's effect cannot run while chunks are held.
  */
 
-const BASE_URL = 'http://localhost:3000';
+// The same origin playwright.config.ts serves the app on (E2E_BASE_URL / E2E_PORT).
+const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_PORT ?? 3000}`;
 
 async function setThemeCookie(
   context: import('@playwright/test').BrowserContext,
