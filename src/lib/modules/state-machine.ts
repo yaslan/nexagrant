@@ -19,6 +19,9 @@ export function canEnable(
   if (!manifest) {
     return { allowed: false, reason: 'Module not found.' };
   }
+  if (manifest.statusBadge === 'soon') {
+    return { allowed: false, reason: 'Module is coming soon.' };
+  }
 
   // Check plan constraint
   if (!manifest.planTiers.includes(plan)) {
@@ -57,6 +60,11 @@ export function canEnableEntitled(
   const manifest = getManifest(moduleId);
   if (!manifest) {
     return { allowed: false, reason: 'Module not found.' };
+  }
+  // A "Yakında" module has no gate that opens it: the plan list and the switch
+  // are not enough, so it is refused before either is read (FO-40).
+  if (manifest.statusBadge === 'soon') {
+    return { allowed: false, reason: 'Module is coming soon.' };
   }
 
   if (!entitledModules.includes(moduleId)) {

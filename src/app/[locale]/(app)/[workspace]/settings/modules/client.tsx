@@ -424,8 +424,9 @@ export function ModulesClient({
                 mod.quota.recordLimit !== null ? t('quotaRecords', { count: mod.quota.recordLimit }) : null,
               ].filter((part): part is string => part !== null)
             : [];
+          // A "Yakında" module is not sold yet, so a locked card offers no upgrade (FO-40).
           const upgradeOffer =
-            status === 'LOCKED' || status === 'ORPHANED' ? (
+            mod.statusBadge !== 'soon' && (status === 'LOCKED' || status === 'ORPHANED') ? (
               plan?.pilot ? (
                 // A pilot cannot change plan (billing says so), so no upgrade offer here.
                 <span className="text-xs font-medium text-muted text-right">{t('pilotLocked')}</span>
