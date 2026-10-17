@@ -1,3 +1,4 @@
+import type { PrismaClient } from '@prisma/client';
 import pg from 'pg';
 
 /**
@@ -20,5 +21,26 @@ export async function acquireExpertPreRegLiveLock(): Promise<() => Promise<void>
   return async () => {
     await client.query('select pg_advisory_unlock($1::bigint)', [SERIAL_LOCK_KEY]).catch(() => {});
     await client.end();
+  };
+}
+
+/**
+ * FO-50 (K-568932 = A): verifications raise the founder counter, and it never comes
+ * down by itself, so a live file that numbers experts would use up the 100 seats of
+ * the test database a few runs later. Call this with an owner client while holding
+ * the lock above; the returned function puts the counter back as it was (no row → no row).
+ */
+export async function holdFounderCounter(db: PrismaClient): Promise<() => Promise<void>> {
+  const saved = await db.expertFounderCounter.findUnique({ where: { id: 1 } });
+  return async () => {
+    if (saved) {
+      await db.expertFounderCounter.upsert({
+        where: { id: 1 },
+        create: { id: 1, lastNumber: saved.lastNumber },
+        update: { lastNumber: saved.lastNumber },
+      });
+    } else {
+      await db.expertFounderCounter.deleteMany({ where: { id: 1 } });
+    }
   };
 }

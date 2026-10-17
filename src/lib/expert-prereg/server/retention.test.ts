@@ -17,23 +17,15 @@ describe('expert pre-registration retention (FO-50)', () => {
     expect(() => expertPreRegPurgeCutoff(new Date('nope'))).toThrow(RangeError);
   });
 
-  it('filters by createdAt only when no founder number is held yet', () => {
+  it('filters by createdAt alone: the holder of the highest founder number is not spared (K-568932 = A)', () => {
     const cutoff = expertPreRegPurgeCutoff(NOW);
-    expect(purgeableExpertPreRegWhere(cutoff, null)).toEqual({
+    expect(purgeableExpertPreRegWhere(cutoff)).toEqual({
       createdAt: { lt: cutoff },
-    });
-  });
-
-  it('spares the holder of the highest founder number and any row above it, never a NULL-number row', () => {
-    const cutoff = expertPreRegPurgeCutoff(NOW);
-    expect(purgeableExpertPreRegWhere(cutoff, 7)).toEqual({
-      createdAt: { lt: cutoff },
-      OR: [{ founderNumber: null }, { founderNumber: { lt: 7 } }],
     });
   });
 
   it('refuses a filterless delete when the cutoff is not a valid date', () => {
-    expect(() => purgeableExpertPreRegWhere(undefined as unknown as Date, null)).toThrow(RangeError);
-    expect(() => purgeableExpertPreRegWhere(new Date('nope'), 3)).toThrow(RangeError);
+    expect(() => purgeableExpertPreRegWhere(undefined as unknown as Date)).toThrow(RangeError);
+    expect(() => purgeableExpertPreRegWhere(new Date('nope'))).toThrow(RangeError);
   });
 });

@@ -399,6 +399,22 @@ BEGIN
   END IF;
 END $$;
 
+-- ExpertFounderCounter (FO-50, K-568932 = A): the one-row founder-number counter of
+-- the table above, so a purged row never frees its number. No personal data; the
+-- same policy and purposes ('public-intake' verify, 'platform-aggregate' seats,
+-- 'cross-tenant-job' purge). See prisma/migrations/add-expert-founder-counter.sql.
+-- Guarded: a database built before that migration has no table yet.
+DO $$
+BEGIN
+  IF to_regclass('public."ExpertFounderCounter"') IS NOT NULL THEN
+    ALTER TABLE public."ExpertFounderCounter" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."ExpertFounderCounter";
+    CREATE POLICY system_scope ON public."ExpertFounderCounter"
+      USING ((SELECT public.system_scope_open('"ExpertFounderCounter"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"ExpertFounderCounter"'::regclass)));
+  END IF;
+END $$;
+
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call
 -- system_scope_open/system_scope_sealed as the querying role, and the pricing

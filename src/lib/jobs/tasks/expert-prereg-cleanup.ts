@@ -8,8 +8,8 @@ import { purgeOldExpertPreRegistrations } from '@/lib/expert-prereg/server/reten
  * Expert pre-registration cleanup — nightly, 3:55 AM UTC (FO-50, TASK-MVC91K7JYOWQC).
  *
  * Deletes pre-registrations left more than EXPERT_PREREG_RETENTION_DAYS ago, verified
- * or not, except the row that holds the highest founder number (see
- * src/lib/expert-prereg/server/retention.ts). A purge that deleted anything writes one
+ * or not, with no exception; founder numbers stay taken in the founder counter (see
+ * src/lib/expert-prereg/server/retention.ts, K-568932 = A). A purge that deleted anything writes one
  * `expert_prereg.purged` AuditEvent with the count; no name or address is written
  * anywhere. The window is not taken from the payload.
  *
