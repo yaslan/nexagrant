@@ -568,7 +568,13 @@ async function probeIsolation(
  * FO-50 (K-568932 = A): ExpertFounderCounter, its founder-number counter, has the
  * same contract and is measured the same way.
  */
-const SYSTEM_SCOPE_TABLES: ReadonlyArray<{ table: string; migration: string; insert: (id: string) => [string, unknown[]] }> = [
+const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
+  table: string;
+  migration: string;
+  insert: (id: string) => [string, unknown[]];
+  /** The measured role must hold no DELETE/TRUNCATE (crw-fb Ö-1: the counter only goes up). */
+  noDelete?: boolean;
+}> = [
   {
     table: 'ExpertPreRegistration',
     migration: 'expert-prereg-rls-mail-quota.sql',
@@ -582,6 +588,7 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{ table: string; migration: string; ins
     table: 'ExpertFounderCounter',
     migration: 'add-expert-founder-counter.sql',
     insert: () => [`insert into ${quoteIdent('ExpertFounderCounter')} (id, "lastNumber", "updatedAt") values (1, 0, now())`, []],
+    noDelete: true,
   },
 ];
 
@@ -618,6 +625,16 @@ async function probeSystemScopeTable(
     else failures.push(`${table}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
   } finally {
     await m.query('rollback');
+  }
+
+  if (spec.noDelete) {
+    const priv = await m.query<{ d: boolean; t: boolean }>(
+      `select has_table_privilege(current_user, $1, 'DELETE') as d, has_table_privilege(current_user, $1, 'TRUNCATE') as t`,
+      [quoteIdent(table)]
+    );
+    const { d, t } = priv.rows[0] ?? { d: true, t: true };
+    if (d || t) failures.push(`${table}: ölçüm rolünde DELETE/TRUNCATE yetkisi var — sayaç silinebilir (prisma/migrations/${spec.migration}).`);
+    else checks.push(`${table}: ölçüm rolünde DELETE ve TRUNCATE yetkisi yok`);
   }
 
   await m.query('begin');

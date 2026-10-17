@@ -59,6 +59,11 @@ BEGIN
   --    app role has no business reshaping or emptying tables.
   EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO %I', app_role);
   EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO %I', app_role);
+  --    Except DELETE on the founder-number counter: it only goes up, and a deleted
+  --    row would let a purged founder number be handed out again (FO-50, crw-fb Ö-1).
+  IF to_regclass('public."ExpertFounderCounter"') IS NOT NULL THEN
+    EXECUTE format('REVOKE DELETE, TRUNCATE ON public."ExpertFounderCounter" FROM %I', app_role);
+  END IF;
 
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as fabrika (or fabrika_migrate); default privileges are recorded per

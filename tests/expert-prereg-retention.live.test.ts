@@ -42,7 +42,8 @@ import { randomBytes } from 'node:crypto';
 import { createDbClient, prisma } from '@/lib/db';
 import { hashSecretToken } from '@/lib/secret-token';
 import { EXPERT_PREREG_RETENTION_DAYS, FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
-import { lastFounderNumberGiven } from '@/lib/expert-prereg/server/founder-counter';
+import { lastFounderNumberGiven, recordFounderNumberGiven } from '@/lib/expert-prereg/server/founder-counter';
+import { withSystemScope } from '@/lib/system-scope';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
 import { EXPERT_PREREG_PURGED, purgeOldExpertPreRegistrations } from '@/lib/expert-prereg/server/retention';
@@ -124,6 +125,10 @@ async function seed(
 
 async function counterValue(): Promise<number | undefined> {
   return (await admin.expertFounderCounter.findUnique({ where: { id: 1 } }))?.lastNumber;
+}
+
+async function counterRow() {
+  return admin.expertFounderCounter.findUnique({ where: { id: 1 } });
 }
 
 async function labelsLeft(): Promise<string[]> {
@@ -233,6 +238,41 @@ describe.skipIf(!HAS_DB)('expert pre-registration retention (live database, fabr
     expect(await getRemainingFounderSeats()).toBe(Math.max(0, FOUNDER_SEAT_LIMIT - (base + 5)));
   });
 
+  test('a purge that changes nothing leaves the counter row untouched (updatedAt too)', async () => {
+    await seed('founder-top', ago(10), base + 2);
+    const before = await counterRow();
+    expect(before?.lastNumber).toBe(base + 2);
+
+    await purgeOldExpertPreRegistrations({ now: NOW });
+    await purgeOldExpertPreRegistrations({ now: NOW });
+
+    expect(await counterRow()).toEqual(before);
+  });
+
+  test('the database refuses to lower the counter; the app role cannot delete it (crw-fb Ö-1)', async () => {
+    await seed('founder-top', ago(10), base + 3);
+
+    // App role, inside the system scope the real writers use: a lowering UPDATE is refused.
+    await expect(
+      withSystemScope('cross-tenant-job', 'test.counter-lower', (tx) =>
+        tx.expertFounderCounter.update({ where: { id: 1 }, data: { lastNumber: base + 1 } })
+      )
+    ).rejects.toThrow(/only goes up/);
+    // ... and so is a DELETE (no privilege), which would free the numbers of purged rows.
+    await expect(
+      withSystemScope('cross-tenant-job', 'test.counter-delete', (tx) => tx.expertFounderCounter.deleteMany({ where: { id: 1 } }))
+    ).rejects.toThrow(/permission denied/);
+    // The code path itself never lowers: a smaller value is a no-op.
+    await withSystemScope('cross-tenant-job', 'test.counter-record', (tx) => recordFounderNumberGiven(tx, base + 1));
+    // The owner is refused the lowering UPDATE too (the trigger is for every role).
+    await expect(admin.expertFounderCounter.update({ where: { id: 1 }, data: { lastNumber: 0 } })).rejects.toThrow(
+      /only goes up/
+    );
+
+    expect(await counterValue()).toBe(base + 3);
+    expect(await getRemainingFounderSeats()).toBe(Math.max(0, FOUNDER_SEAT_LIMIT - (base + 3)));
+  });
+
   test('writes one expert_prereg.purged audit with the count and no person; a second run changes nothing', async () => {
     await seed('a1', ago(500));
     await seed('a2', ago(370));
@@ -250,10 +290,11 @@ describe.skipIf(!HAS_DB)('expert pre-registration retention (live database, fabr
     });
     expect(JSON.stringify(audits)).not.toContain('@example.test');
 
-    const counterAfterFirst = await counterValue();
+    const counterAfterFirst = await counterRow();
     const second = await purgeOldExpertPreRegistrations({ now: NOW });
     expect(second.deletedCount).toBe(0);
-    expect(await counterValue()).toBe(counterAfterFirst);
+    // crw-fb Ö-2: the second run writes nothing to the counter, not even updatedAt.
+    expect(await counterRow()).toEqual(counterAfterFirst);
     expect(await purgeAudits()).toHaveLength(1);
     expect(await labelsLeft()).toEqual(['keep']);
   });
