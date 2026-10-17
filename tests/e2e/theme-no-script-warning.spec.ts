@@ -20,7 +20,7 @@ for (const locale of ['tr', 'en']) {
     page.on('console', (msg) => logs.push(`[${msg.type()}] ${msg.text()}`));
     page.on('pageerror', (error) => logs.push(`[pageerror] ${error.message}`));
 
-    await page.goto(`http://localhost:3000/${locale}`);
+    await page.goto(`/${locale}`);
     // The warning is emitted during hydration, so wait for hydration itself: <body>
     // carrying React's props key (fixtures/hydration.ts). Then give React the room
     // to finish the rest of the tree.

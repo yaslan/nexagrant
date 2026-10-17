@@ -171,7 +171,11 @@ test.describe('Settings → Members: team management UI', () => {
     expect(await invitationsOf()).toHaveLength(0);
   });
 
+  // The cooldown answers exist only once a mail has really gone out, so this test
+  // needs the mailpit SMTP the mailpit test above needs. Without it the first invite
+  // stops at "created, mail not sent" and there is no cooldown to test.
   test('re-invite within the cooldown: same role is "recently sent", another role is role_change_blocked', async ({ page }) => {
+    test.skip(!MAILPIT, 'opt-in: needs SMTP that really sends (E2E_MAILPIT_URL, SMTP_HOST=localhost SMTP_PORT=1025)');
     const email = inviteEmail('cooldown');
     await openMembers(page);
 
