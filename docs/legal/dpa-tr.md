@@ -58,7 +58,7 @@ Düzeltme ve itiraz talepleri Veri Sorumlusu'nun kiracı yöneticisi üzerinden 
 
 ## 5. Güvenlik Önlemleri
 
-- Kiracı verileri uygulama katmanında ayrılır: kiracı verisine erişen sorgular kiracı kimliğiyle sınırlanır; yetkili platform yönetimi işlemleri kiracılar arası çalışabilir; plan yönetimindeki değişiklikler denetim kaydına (AuditEvent) yazılır. PostgreSQL Row Level Security politikaları veritabanında tanımlıdır; ancak uygulamanın veritabanı bağlantısında etkin değildir.
+- Kiracı verileri uygulama katmanında ayrılır: kiracı verisine erişen sorgular kiracı kimliğiyle sınırlanır; yetkili platform yönetimi işlemleri kiracılar arası çalışabilir; plan yayımlama, arşivleme, görünürlük, silme ve kiracıya plan atama işlemleri denetim kaydına (AuditEvent) yazılır. PostgreSQL Row Level Security politikaları veritabanında tanımlıdır; ancak uygulamanın veritabanı bağlantısında etkin değildir.
 - Dosya ekleri şifreli nesne depolamada (S3 uyumlu) saklanır.
 - Erişim rol tabanlıdır; hassas işlemler çift onay gerektirir.
 - Denetim olayları `AuditEvent` tablosunda tutulur.
