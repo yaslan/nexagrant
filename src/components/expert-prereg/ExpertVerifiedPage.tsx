@@ -5,7 +5,9 @@ import { getTranslations } from 'next-intl/server';
 import { CircleAlert, CircleCheck } from 'lucide-react';
 import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
-import { expertPreregPath, parseFounderNumber } from './paths';
+import { authSecret } from '@/lib/env';
+import { decodeVerifiedOutcome } from '@/lib/expert-prereg/server/verified-outcome';
+import { expertPreregPath } from './paths';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -19,9 +21,10 @@ export async function expertVerifiedMetadata({ params }: Pick<PageProps, 'params
 }
 
 /**
- * FO-20 — where GET /api/expert-preregistration/verify redirects (FO-19):
- * `?n=<founderNumber|yok>` on success, `?error=expired|invalid` otherwise.
- * Only reads the query; it never claims a verification the redirect did not make.
+ * FO-20 — where GET /api/expert-preregistration/verify redirects (FO-19). The
+ * result arrives as one signed `?r=` (FO-29, verified-outcome.ts) and is checked
+ * here, on the server: a missing, tampered or expired `r`, or a hand-typed
+ * `?n=`, shows "invalid link". Only a value the verify route signed says verified.
  */
 export default async function ExpertVerifiedPage({ params, searchParams }: PageProps) {
   const { locale: raw } = await params;
@@ -29,8 +32,10 @@ export default async function ExpertVerifiedPage({ params, searchParams }: PageP
   const query = await searchParams;
   const t = await getTranslations({ locale, namespace: 'ExpertPrereg.verified' });
 
-  const error = query.error === 'expired' ? 'expired' : query.error !== undefined || query.n === undefined ? 'invalid' : null;
-  const founder = parseFounderNumber(query.n);
+  const secret = authSecret();
+  const result = secret ? decodeVerifiedOutcome(query.r, { secret }) : null;
+  const error = result === null ? 'invalid' : result.outcome === 'ok' ? null : result.outcome;
+  const founder = result?.founderNumber ?? null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-ink">

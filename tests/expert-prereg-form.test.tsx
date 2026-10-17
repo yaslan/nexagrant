@@ -8,7 +8,6 @@ import trMessages from '../messages/tr.json';
 import enMessages from '../messages/en.json';
 import ExpertPreregForm, { maskOrcid } from '@/components/expert-prereg/ExpertPreregForm';
 import { parseKvkkMarkdown } from '@/components/expert-prereg/kvkk-text';
-import { parseFounderNumber } from '@/components/expert-prereg/paths';
 
 /**
  * FO-20 (TASK-MVBIYE9O6JCQ7) — the public expert pre-registration form. The
@@ -224,15 +223,6 @@ describe('helpers', () => {
     expect(maskOrcid('12ab34')).toBe('1234');
     expect(maskOrcid('X123')).toBe('123');
     expect(maskOrcid('00000002182500971234')).toBe('0000-0002-1825-0097');
-  });
-
-  test('parseFounderNumber', () => {
-    expect(parseFounderNumber('1')).toBe(1);
-    expect(parseFounderNumber('100')).toBe(100);
-    expect(parseFounderNumber('0')).toBeNull();
-    expect(parseFounderNumber('101')).toBeNull();
-    expect(parseFounderNumber('yok')).toBeNull();
-    expect(parseFounderNumber(['3'])).toBeNull();
   });
 
   test('parseKvkkMarkdown reads the shipped notice', async () => {

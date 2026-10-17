@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { withSystemScope } from '../../src/lib/system-scope';
+import { encodeVerifiedOutcome } from '../../src/lib/expert-prereg/server/verified-outcome';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -169,10 +170,13 @@ test.describe('expert pre-registration (FO-20)', () => {
     const target = new URL(verify.headers()['location'] ?? '');
     expect(target.pathname).toBe('/tr/uzman/dogrulandi');
     await page.goto(`${target.pathname}${target.search}`);
-    await expect(page).toHaveURL(/\/tr\/uzman\/dogrulandi\?n=/);
+    // FO-29: the result travels only as a signed r; no readable n/error in the URL.
+    expect([...target.searchParams.keys()]).toEqual(['r']);
+    await expect(page).toHaveURL(/\/tr\/uzman\/dogrulandi\?r=/);
     await expect(page.getByRole('heading', { name: 'E-postanız doğrulandı' })).toBeVisible();
-    const n = new URL(page.url()).searchParams.get('n');
-    if (n && n !== 'yok') await expect(page.getByTestId('ep-founder-number')).toHaveText(`Kurucu Uzman numaranız: #${n}`);
+    const founder = page.getByTestId('ep-founder-number');
+    const n = (await founder.count()) ? ((await founder.textContent())?.match(/#(\d+)/)?.[1] ?? null) : null;
+    if (n) await expect(founder).toHaveText(`Kurucu Uzman numaranız: #${n}`);
     await page.screenshot({ path: `${SHOTS}/e2e-03-verified.png`, fullPage: true });
 
     // The same address a second time: 409 → message on the e-mail field, focus there.
@@ -189,7 +193,7 @@ test.describe('expert pre-registration (FO-20)', () => {
     await expect(row).toHaveCount(1);
     await expect(row).toContainText('İzmir');
     await expect(row).toContainText('Doğrulandı');
-    if (n && n !== 'yok') await expect(row).toContainText(n);
+    if (n) await expect(row).toContainText(n);
     await page.screenshot({ path: `${SHOTS}/e2e-04-admin.png`, fullPage: true });
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('ep-admin-csv').click()]);
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
@@ -214,12 +218,25 @@ test.describe('expert pre-registration (FO-20)', () => {
     await page.screenshot({ path: `${SHOTS}/e2e-05-en-375.png`, fullPage: true });
     await page.goto('/tr/uzman');
     await noHorizontalScroll(page);
-    await page.goto('/en/experts/verified?error=expired');
+    const expired = encodeVerifiedOutcome({ outcome: 'expired', founderNumber: null }, { secret: e2eAuthSecret() });
+    await page.goto(`/en/experts/verified?r=${expired}`);
     await expect(page.getByRole('heading', { name: 'This link has expired' })).toBeVisible();
     const robots = await page.locator('meta[name="robots"]').getAttribute('content');
     expect(robots).toContain('noindex');
     await noHorizontalScroll(page);
     await page.goto('/tr/uzman/dogrulandi?error=invalid');
     await expect(page.getByRole('heading', { name: 'Bağlantı geçersiz' })).toBeVisible();
+  });
+
+  test('FO-29: a hand-typed ?n=1 or a tampered r is an invalid link, not "verified"', async ({ page }) => {
+    await page.goto('/tr/uzman/dogrulandi?n=1');
+    await expect(page.getByRole('heading', { name: 'Bağlantı geçersiz' })).toBeVisible();
+    await expect(page.getByTestId('ep-founder-number')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/fo29-01-bare-n.png`, fullPage: true });
+    const r = encodeVerifiedOutcome({ outcome: 'ok', founderNumber: 1 }, { secret: `${e2eAuthSecret()}-wrong` });
+    await page.goto(`/tr/uzman/dogrulandi?r=${r}`);
+    await expect(page.getByRole('heading', { name: 'Bağlantı geçersiz' })).toBeVisible();
+    await expect(page.getByTestId('ep-founder-number')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/fo29-02-tampered-r.png`, fullPage: true });
   });
 });
