@@ -1,9 +1,15 @@
 /**
- * Creates (or re-asserts) the RLS-subject application role `fabrika_app` on the
- * local database, then proves the role is not exempt from row level security.
+ * Creates the RLS-subject application role `fabrika_app` on the local database,
+ * then proves the role is not exempt from row level security.
  *
- *   pnpm db:rls-role              # create / update
+ *   pnpm db:rls-role              # create if missing, otherwise verify only
  *   pnpm db:rls-role:rollback     # remove the role again
+ *
+ * The role is cluster-wide but DATABASE_URL_RLS_TEST lives in one checkout's
+ * .env. Re-setting the password from here would silently break every other
+ * checkout that shares the database, so an existing role is never altered: its
+ * password must already match this .env, or the script fails. Rotating means
+ * rollback + create (see the error message for the exact steps).
  *
  * The role's password is never written into a .sql file. It comes from
  * DATABASE_URL_RLS_TEST in .env; if that variable is absent, a random password
@@ -67,9 +73,26 @@ async function main() {
       return;
     }
 
+    const { rows: existing } = await admin.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [ROLE]);
+    const configuredUrl = process.env[ENV_KEY] ?? dotenv[ENV_KEY];
+
+    if (existing.length > 0) {
+      if (!configuredUrl) {
+        throw new Error(
+          `${ROLE} already exists but ${ENV_KEY} is not set in this .env, so its password is unknown. ` +
+            `Copy ${ENV_KEY} from the checkout that created the role. To rotate it instead, run ` +
+            `pnpm db:rls-role:rollback and then pnpm db:rls-role; every other checkout must then copy the new value.`
+        );
+      }
+      await assertRoleAttributes(admin);
+      const user = await proveLogin(configuredUrl);
+      console.log(`✅ ${ROLE} already exists; ${ENV_KEY} logs in as ${user}. Password left unchanged.`);
+      return;
+    }
+
     // Password: reuse the one already in .env so re-runs stay idempotent,
     // otherwise mint one and persist the connection string.
-    let appUrl = process.env[ENV_KEY] ?? dotenv[ENV_KEY];
+    let appUrl = configuredUrl;
     let password: string;
     if (appUrl) {
       password = decodeURIComponent(new URL(appUrl).password);
@@ -89,27 +112,50 @@ async function main() {
     await admin.query('SELECT set_config($1, $2, false)', ['fabrika.app_password', password]);
     await admin.query(loadSql('prisma/rls-app-role.sql'));
 
-    const { rows } = await admin.query(
-      'SELECT rolname, rolsuper, rolbypassrls, rolcanlogin, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = $1',
-      [ROLE]
-    );
-    if (rows.length === 0) throw new Error(`${ROLE} was not created.`);
-    console.table(rows);
-
-    const role = rows[0];
-    if (role.rolsuper || role.rolbypassrls) {
-      throw new Error(`${ROLE} is superuser/bypassrls — it would not be subject to RLS. Aborting.`);
-    }
-
-    // Prove the credential actually logs in before anyone wires it into a test.
-    const appClient = new pg.Client({ connectionString: appUrl });
-    await appClient.connect();
-    const who = await appClient.query('SELECT current_user, current_setting($1, true) AS tenant', ['app.tenant_id']);
-    await appClient.end();
-    console.log(`✅ ${ROLE} connects as ${who.rows[0].current_user}, app.tenant_id unset by default.`);
+    await assertRoleAttributes(admin);
+    const user = await proveLogin(appUrl);
+    console.log(`✅ ${ROLE} connects as ${user}, app.tenant_id unset by default.`);
     console.log(`   ${ENV_KEY}=${redact(appUrl)}`);
   } finally {
     await admin.end();
+  }
+}
+
+/** Prints the role row and refuses a role that would be exempt from RLS. */
+async function assertRoleAttributes(admin: pg.Client) {
+  const { rows } = await admin.query(
+    'SELECT rolname, rolsuper, rolbypassrls, rolcanlogin, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = $1',
+    [ROLE]
+  );
+  if (rows.length === 0) throw new Error(`${ROLE} was not created.`);
+  console.table(rows);
+
+  const role = rows[0];
+  if (role.rolsuper || role.rolbypassrls) {
+    throw new Error(`${ROLE} is superuser/bypassrls — it would not be subject to RLS. Aborting.`);
+  }
+}
+
+/** Proves the credential logs in before anyone wires it into a test; returns the login user. */
+async function proveLogin(appUrl: string): Promise<string> {
+  const appClient = new pg.Client({ connectionString: appUrl });
+  try {
+    await appClient.connect();
+  } catch (error) {
+    if ((error as { code?: string }).code === '28P01') {
+      throw new Error(
+        `${ENV_KEY} password does not match the ${ROLE} role on this database. Another checkout likely ` +
+          `set it last. Copy ${ENV_KEY} from that checkout's .env, or rotate with pnpm db:rls-role:rollback ` +
+          `and then pnpm db:rls-role (other checkouts must then copy the new value).`
+      );
+    }
+    throw error;
+  }
+  try {
+    const who = await appClient.query('SELECT current_user, current_setting($1, true) AS tenant', ['app.tenant_id']);
+    return who.rows[0].current_user;
+  } finally {
+    await appClient.end();
   }
 }
 
