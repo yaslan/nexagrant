@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 
 import { createDbClient, withTenantOn } from '@/lib/db';
-import { getKpiTrendIn } from '@/modules/m5/server/queries';
+import { getKpiMetricsIn, getKpiTrendIn } from '@/modules/m5/server/queries';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { requireId } from './helpers/teardown-guard';
@@ -21,8 +21,12 @@ import { requireId } from './helpers/teardown-guard';
  *   bucket 2021-01-04: two live opportunities, both G0-scored, one with a
  *                      submitted proposal                        → offers 2, 50 %
  *                      one archived opportunity                  → not counted
+ *   bucket 2021-01-11: one opportunity created at exactly 00:00 Z, the
+ *                      boundary with the first bucket            → offers 1, here only
  *   bucket 2023-06-12: one opportunity, not scored               → offers 1, 0 %
  *   before the range:  one opportunity                           → not counted
+ *   after the range:   one opportunity on 2026-01-02, past `to` but inside the
+ *                      last bucket's seven days                  → not counted
  * Tenant B has one opportunity in the first bucket; it must not reach A.
  */
 
@@ -71,8 +75,10 @@ beforeAll(async () => {
     });
     await opp('scored', '2021-01-06T10:00:00Z', { g0Score: 60 });
     await opp('archived', '2021-01-07T10:00:00Z', { g0Score: 80, deletedAt: new Date('2021-01-08T00:00:00Z') });
+    await opp('boundary', '2021-01-11T00:00:00Z');
     await opp('mid-range', '2023-06-15T10:00:00Z');
     await opp('before-range', '2020-12-31T10:00:00Z', { g0Score: 50 });
+    await opp('after-range', '2026-01-02T10:00:00Z');
   });
 
   await withTenantOn(admin, ids.tenantB, async (tx) => {
@@ -137,7 +143,27 @@ describe('getKpiTrend against a live database', () => {
     expect(offers.map((r) => r.date)).toEqual(
       Array.from({ length: BUCKETS }, (_, k) => new Date(FROM.getTime() + k * 7 * 86_400_000).toISOString().slice(0, 10))
     );
-    expect(offers.reduce((sum, r) => sum + r.value, 0)).toBe(3);
+    expect(offers.reduce((sum, r) => sum + r.value, 0)).toBe(4);
+  });
+
+  test('an opportunity created exactly on a bucket boundary counts once, in the later bucket', async (ctx) => {
+    if (!ready) ctx.skip();
+    const out = await withTenantOn(rls!, ids.tenantA, (tx) => getKpiTrendIn(tx, ids.tenantA, FROM, TO));
+    const offers = (date: string) => out.find((r) => r.date === date && r.metric === 'offers')?.value;
+    expect(offers('2021-01-04')).toBe(2);
+    expect(offers('2021-01-11')).toBe(1);
+  });
+
+  test('the last bucket stops at `to`: the trend sums to the "total offers" card', async (ctx) => {
+    if (!ready) ctx.skip();
+    const [trend, metrics] = await withTenantOn(rls!, ids.tenantA, async (tx) => [
+      await getKpiTrendIn(tx, ids.tenantA, FROM, TO),
+      await getKpiMetricsIn(tx, ids.tenantA, FROM, TO),
+    ] as const);
+    const offers = trend.filter((r) => r.metric === 'offers');
+    expect(offers.at(-1)).toEqual({ date: '2025-12-29', metric: 'offers', value: 0 });
+    expect(offers.reduce((sum, r) => sum + r.value, 0)).toBe(metrics.totalOffers);
+    expect(metrics.totalOffers).toBe(4);
   });
 
   test('a 26-year range completes inside the default 5 s transaction timeout', async (ctx) => {
@@ -145,7 +171,7 @@ describe('getKpiTrend against a live database', () => {
     const out = await withTenantOn(rls!, ids.tenantA, (tx) =>
       getKpiTrendIn(tx, ids.tenantA, new Date('2000-01-03T00:00:00Z'), TO)
     );
-    expect(out.filter((r) => r.metric === 'offers').reduce((sum, r) => sum + r.value, 0)).toBe(4);
+    expect(out.filter((r) => r.metric === 'offers').reduce((sum, r) => sum + r.value, 0)).toBe(5);
   });
 
   test("bound to tenant B, a read for tenant A's id returns only zeros: RLS, not only the WHERE", async (ctx) => {
