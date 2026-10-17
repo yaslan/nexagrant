@@ -11,7 +11,8 @@
 -- (SELECT "lastNumber" FROM "ExpertFounderCounter") and roll the application code
 -- back in the same deploy (to before FO-50 K-568932), whose purge keeps the top row.
 --
--- Idempotent: DROP TABLE IF EXISTS (its policy goes with it).
+-- Idempotent: DROP TABLE / FUNCTION IF EXISTS (policy and trigger go with the table).
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS "ExpertFounderCounter";
+DROP FUNCTION IF EXISTS public.expert_founder_counter_no_decrease();
