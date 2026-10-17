@@ -48,7 +48,8 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `R2_ACCESS_KEY_ID` | ✓ | `<...>` | R2_ACCOUNT_ID ile birlikte. |
 | `R2_SECRET_ACCESS_KEY` | ✓ | `<...>` | R2_ACCOUNT_ID ile birlikte. |
 | `R2_BUCKET` | ✓ | `fonbridge-evidence` | Boşsa kod `fonbridge-evidence` kullanır. `.env.example`'daki `fabrika` eskidir, kullanmayın. |
-| `R2_PUBLIC_HOST` | ✓ | `files.fonbridge.com` (varsa) | |
+| `R2_PUBLIC_BUCKET` | | `fonbridge-public` | **Blog kapak görseli yüklenemez** (form "dosya deposu yapılandırılmamış" der, 503). Herkese açık okunan **ayrı** bir bucket olmalı; `R2_BUCKET` ile aynı ad verilirse kod onu reddeder (kanıt bucket'ı gizli kalır). TASK-MVCH99A54WALG. |
+| `R2_PUBLIC_HOST` | | `https://files.fonbridge.com` ya da `https://pub-<id>.r2.dev` | `R2_PUBLIC_BUCKET`'ın herkese açık adresi, `https://` ile, sonda `/` yok. Boşsa blog görseli yüklenemez. **Paket bu değerle DERLENİR** (`R2_PUBLIC_HOST=… deploy/cpanel/build-package.sh …`): cPanel'deki değer derlemedekinden farklıysa yükleme çalışır ama görsel sitede **görünmez** (`/_next/image` 400). Değişirse paket yeniden derlenir. Hangi değerle derlendiği `BUILD-INFO.txt` → `images.remotePatterns` satırında. |
 | `R2_ENDPOINT` | ✓ | boş | Yalnız R2 dışında S3 uyumlu bir depo kullanılırsa doldurulur. Boşsa R2 adresi otomatik kurulur. |
 | `JOBS_CRON_ENABLED` | **yalnız W** | `false`, sonra `true` | **Yalnız worker dosyasına yazılır, web ekranına değil.** Boşsa üretim worker'ı başlamaz. Açılış sırası KURULUM.md §7'de. |
 | `JOBS_DATABASE_URL` | yalnız W | boş = `DATABASE_URL` | Worker ilk açılışta `graphile_worker` şemasını kurar. Bu yüzden bu rolün DB'de şema oluşturma yetkisi olmalı. `fabrika_app`'te bu yetki yoksa ayrı bir rol gerekir (ADR-0008 §6.6; canlı DB'de **ölçülmedi**). |

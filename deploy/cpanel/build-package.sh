@@ -10,7 +10,19 @@
 #   app.js  package.json  worker.sh  BUILD-INFO.txt  certs/  app/ (Next standalone)
 # FB_BUILD_DIR=<dir with build-out.tar + build.log> re-packages without building.
 # Idempotent: re-running overwrites the zip and SHA256SUMS. TASK-MUST2PP2NHP6L.
+#
+# R2_PUBLIC_HOST (the public bucket's base URL, a public value, not a secret) is
+# read by next.config.ts at `next build` time and frozen into the standalone
+# server's images.remotePatterns: a zip built without it answers 400 for every
+# uploaded blog cover, whatever cPanel says at runtime (TASK-MVCH99A54WALG).
+# Give the exact value cPanel will carry, or FB_NO_PUBLIC_ASSETS=1 to build
+# without uploaded images on purpose.
 set -euo pipefail
+
+if [ -z "${FB_BUILD_DIR:-}" ] && [ -z "${R2_PUBLIC_HOST:-}" ] && [ "${FB_NO_PUBLIC_ASSETS:-}" != 1 ]; then
+  echo "R2_PUBLIC_HOST is unset: uploaded blog images would not display (see header). Set it, or FB_NO_PUBLIC_ASSETS=1." >&2
+  exit 1
+fi
 
 COMMIT="${1:?usage: build-package.sh <commit> <out-dir>}"
 OUT="${2:?usage: build-package.sh <commit> <out-dir>}"
@@ -28,7 +40,7 @@ if [ -n "${FB_BUILD_DIR:-}" ]; then
 else
   git -C "$REPO" archive --format=tar "$COMMIT" > "$WORK/src.tar"
   cp "$HERE/container-build.sh" "$WORK/build.sh"
-  docker run --rm --platform linux/amd64 -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
+  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
 fi
 grep -q 'TAR_OK' "$WORK/build.log"
 
@@ -59,6 +71,8 @@ if [ -n "$OTHER" ]; then echo "symlinks outside app/.next/node_modules:"; echo "
   echo "built: $(date -u +%FT%TZ)"
   echo "platform: linux/amd64 (node:22-bookworm-slim, glibc 2.36), node $(grep -m1 -oE '^v22[.0-9]+' "$WORK/build.log" || echo 22)"
   echo "packaging: deploy/cpanel @ $(git -C "$REPO" rev-parse --short=8 HEAD)"
+  # What the standalone server really froze, read back from the build output.
+  echo "images.remotePatterns: $(node -e 'process.stdout.write(JSON.stringify(require(process.argv[1]).config.images.remotePatterns.map((p) => p.protocol + "://" + p.hostname + (p.port ? ":" + p.port : "") + (p.pathname || ""))))' "$S/app/.next/required-server-files.json")"
 } > "$S/BUILD-INFO.txt"
 
 ZIP="fonbridge-app-$SHORT.zip"
