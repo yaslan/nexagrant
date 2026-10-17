@@ -34,7 +34,7 @@ Dört bölüm; metnin tamamı `messages/{tr,en}.json` → `legal.privacy` altın
 | 1   | Veri Sorumlusu                              | Tek cümle: "{brand} SaaS Platformu olarak … azami özen göstermekteyiz." Kimlik bilgisi (unvan, adres, VKN, iletişim) **yok**. |
 | 2   | İşlenen Veriler ve Toplama Amaçları         | Beş amaç ve dört veri kategorisi tek cümlede sayılıyor.                                                                       |
 | 3   | Veri Sahibi Hakları (Dışa Aktarma ve Silme) | md.11'e **atıf** var; anlatılan hak **iki tane**: JSON dışa aktarma ve hesap silme (30 gün).                                  |
-| 4   | Güvenlik ve Depolama                        | Kiracı ayrımı uygulama katmanında; RLS politikaları tanımlı ama uygulama bağlantısında etkin değil (ölçüm 2026-10-17). Şifreli nesne depolama (R2/S3). |
+| 4   | Güvenlik ve Depolama                        | Kiracı ayrımı uygulama katmanında; RLS politikaları tanımlı ama uygulama bağlantısında etkin değil (dayanak: Açık karar #16; yerel ölçüm 2026-10-17). Şifreli nesne depolama (R2/S3). |
 
 ### 1.2 `/[locale]/[workspace]/settings/privacy` — "Gizlilik ve Verilerim"
 
