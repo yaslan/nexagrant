@@ -8,8 +8,13 @@ import { renderPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
+import { createTranslator } from 'next-intl';
 import { errorMessage } from '@/lib/errors';
 import type { TtoPortfolioItemRow } from '@/types/db-rows';
+import trMessages from '../../../../messages/tr.json';
+import enMessages from '../../../../messages/en.json';
+
+const TTO_MESSAGES = { tr: trMessages, en: enMessages };
 
 /**
  * M7 TTO portfolio.
@@ -109,22 +114,15 @@ export async function generateIpChecklist({
     // papered over with the canned list below (TASK-MUN4PSBP19RKK).
     if (isLlmUnusableOutcome(e)) throw e;
     console.warn('[generateIpChecklist] LLM fallback:', errorMessage(e));
-    content = `### 📋 TTO IP & Lisanslama Kontrol Listesi
-
-1. **Arka Plan Fikri Mülkiyet (Background IP) Beyanı:**
-   - [x] Tescilli patent belgesi (${patentStatus.toUpperCase()}) ve hak sahipliği sözleşmesi hazırlandı.
-   - [ ] Üniversite araştırmacılarının buluş bildirimi (Invention Disclosure Form) dosyalandı.
-
-2. **Ön Plan Fikri Mülkiyet (Foreground IP) ve Lisanslama:**
-   - [ ] Proje çıktılarının (Foreground IP) lisans hakları için ön anlaşma metni taslağı.
-   - [ ] Özel sektör ortakları için ticarileştirme opsiyon hakkı (Option Agreement).
-
-3. **Spin-off & Pazar Açılımı:**
-   - [ ] TRL ${trl}'den TRL ${Math.min(9, trl + 2)} seviyesine ticarileştirme yol haritası.
-   - [ ] Şirketleşme (Spin-off) hisse paylaşım modeli.
-
-4. **AB Konsorsiyum Anlaşması Maddeleri:**
-   - [ ] Konsorsiyum anlaşmasında arka plan IP kullanımı kısıtlamaları duyuruldu.`;
+    // The canned list is shown to the user, so it is UI copy in the user's
+    // locale, not a prompt. createTranslator rather than getTranslations: it
+    // needs no next-intl request config, so the unit tests reach it too.
+    const t = createTranslator({ locale, messages: TTO_MESSAGES[locale], namespace: 'm7.tto' });
+    content = t('ipChecklistFallback', {
+      patentStatus: patentStatus.toUpperCase(),
+      trl,
+      nextTrl: Math.min(9, trl + 2),
+    });
   }
 
   return { success: true, checklistContent: content };

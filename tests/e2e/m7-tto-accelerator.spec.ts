@@ -94,8 +94,19 @@ async function moduleRefusal(page: Page) {
   const text = (lang.startsWith('tr') ? trMessages : enMessages).Common.moduleUnavailable;
   return page.getByRole('alert').filter({ hasText: text });
 }
+
+/** The page's copy, read from the catalog the page renders, not retyped here. */
+const TR = trMessages.m7.tto;
+const EN = enMessages.m7.tto;
+function fill(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in values ? String(values[k]) : m));
+}
+/** `matchResultTitle` without its `({count})` tail: "any result modal is open". */
+const TR_MATCH_RESULT_PREFIX = TR.matchResultTitle.replace(/\s*\(\{count\}\)$/, '');
+const TURKISH_LETTERS = /[ÇĞİÖŞÜçğıöşü]/;
 const MATCH_ITEM_TITLE = 'E2E M7 match item';
 const GATED_MATCH_ITEM_TITLE = 'E2E M7 gated match item';
+const I18N_ITEM_TITLE = 'E2E M7 English page item';
 
 const SPEC_TENANTS = [TENANT, ISOLATION_TENANT];
 
@@ -595,8 +606,8 @@ test.describe('M7 TTO Accelerator', () => {
     await page.goto(TTO_BASE_URL);
     await expectHydrated(page.locator('body'));
 
-    const titleInput = page.getByPlaceholder('Örn: Katı Hal Batarya Mikrosensör Dizesi');
-    const submitBtn = page.getByRole('button', { name: 'TTO Portföyüne Kaydet' });
+    const titleInput = page.getByPlaceholder(TR.form.titlePlaceholder);
+    const submitBtn = page.getByRole('button', { name: TR.form.submit });
     await expect(titleInput).toBeVisible();
     await titleInput.fill(GATED_ITEM_TITLE);
 
@@ -642,11 +653,11 @@ test.describe('M7 TTO Accelerator', () => {
     await page.goto(`/tr/${ISOLATION_WORKSPACE.slug}/tto`);
     await expectHydrated(page.locator('body'));
 
-    await expect(page.getByText('Portföyde henüz teknoloji kaydı bulunmamaktadır.')).toBeVisible();
+    await expect(page.getByText(TR.emptyPortfolio)).toBeVisible();
     // Header figures come from the (zero) real rows.
-    await expect(page.getByText('TTO Portföy Kartları (0)')).toBeVisible();
-    await expect(page.getByText('Portföy Teknolojileri (0)')).toBeVisible();
-    await expect(page.getByText('TRL 0.0')).toBeVisible();
+    await expect(page.getByText(fill(TR.tabs.portfolio, { count: 0 }))).toBeVisible();
+    await expect(page.getByText(fill(TR.portfolio.heading, { count: 0 }))).toBeVisible();
+    await expect(page.getByText(fill(TR.trlValue, { value: '0.0' }))).toBeVisible();
     for (const fabricated of FABRICATED_ITEM_TITLES) {
       await expect(page.getByText(fabricated)).toHaveCount(0);
     }
@@ -671,10 +682,10 @@ test.describe('M7 TTO Accelerator', () => {
 
       const card = page.locator('div.rounded-2xl', { has: page.locator('h4', { hasText: MATCH_ITEM_TITLE }) });
       await expect(card).toHaveCount(1);
-      await card.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).click();
+      await card.getByRole('button', { name: TR.matchCalls }).click();
 
-      await expect(page.getByText('AB Çağrı Eşleştirme Sonucu (0)')).toBeVisible();
-      await expect(page.getByText('Bu teknoloji için eşleşen AB çağrısı bulunamamıştır.')).toBeVisible();
+      await expect(page.getByText(fill(TR.matchResultTitle, { count: 0 }))).toBeVisible();
+      await expect(page.getByText(TR.noMatch)).toBeVisible();
       for (const fabricated of FABRICATED_TOPIC_TITLES) {
         await expect(page.getByText(fabricated)).toHaveCount(0);
       }
@@ -709,11 +720,11 @@ test.describe('M7 TTO Accelerator', () => {
       });
       try {
         const posted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('/tto'));
-        await card.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).click();
+        await card.getByRole('button', { name: TR.matchCalls }).click();
         await posted;
         await expect(await moduleRefusal(page)).toBeVisible();
         // No result modal over it: a refusal is not "no matching call found".
-        await expect(page.getByText(/AB Çağrı Eşleştirme Sonucu/)).toHaveCount(0);
+        await expect(page.getByText(TR_MATCH_RESULT_PREFIX)).toHaveCount(0);
         await page.screenshot({ path: `${SHOTS}/14-gated-match-message.png`, fullPage: true });
       } finally {
         await prisma.moduleState.update({
@@ -723,9 +734,77 @@ test.describe('M7 TTO Accelerator', () => {
       }
 
       // Control: module back on, the same button answers with the honest empty result.
-      await card.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).click();
-      await expect(page.getByText('AB Çağrı Eşleştirme Sonucu (0)')).toBeVisible();
+      await card.getByRole('button', { name: TR.matchCalls }).click();
+      await expect(page.getByText(fill(TR.matchResultTitle, { count: 0 }))).toBeVisible();
       await expect(await moduleRefusal(page)).toHaveCount(0);
+    } finally {
+      await prisma.ttoPortfolioItem.delete({ where: { id: item.id } });
+    }
+  });
+
+  // The page used to render its own copy in Turkish whatever the locale; only the
+  // menu and the refusal band followed /en (TASK-MV15DTYYB81VS).
+  test('15 — /en renders the whole TTO page in English, IP checklist fallback included', async ({ page }) => {
+    const item = await prisma.ttoPortfolioItem.create({
+      data: {
+        tenantId: TENANT,
+        title: I18N_ITEM_TITLE,
+        trl: 5,
+        patentStatus: 'granted',
+        summary: 'Item the English page renders',
+        keywords: ['e2e'],
+      },
+    });
+    const main = page.locator('main');
+    try {
+      await signInAs(page, sessionToken(M7_MEMBER));
+      await page.goto(`/en/${WORKSPACE}/tto`);
+      await expectHydrated(page.locator('body'));
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+      // Portfolio tab: header, figures, form, cards. Every row in this tenant has
+      // an ASCII title, so a Turkish letter can only come from the page's own copy.
+      await expect(page.getByRole('heading', { name: EN.header.title })).toBeVisible();
+      await expect(page.getByPlaceholder(EN.form.titlePlaceholder)).toBeVisible();
+      await expect(page.getByRole('button', { name: EN.form.submit })).toBeVisible();
+      expect(await main.innerText()).not.toMatch(TURKISH_LETTERS);
+      await page.screenshot({ path: `${SHOTS}/15-en-portfolio.png`, fullPage: true });
+
+      const card = page.locator('div.rounded-2xl', { has: page.locator('h4', { hasText: I18N_ITEM_TITLE }) });
+      await expect(card.getByText(EN.patentStatus.granted, { exact: true })).toBeVisible();
+
+      // Match modal.
+      await card.getByRole('button', { name: EN.matchCalls }).click();
+      await expect(page.getByText(fill(EN.matchResultTitle, { count: 0 }))).toBeVisible();
+      expect(await main.innerText()).not.toMatch(TURKISH_LETTERS);
+      await page.screenshot({ path: `${SHOTS}/15-en-match-modal.png`, fullPage: true });
+      await page.getByRole('button', { name: EN.matcher.close }).click();
+
+      // IP checklist: the LLM keys are blank in e2e (playwright.config.ts), so the
+      // canned fallback list is what the user gets — and it must be English too.
+      const generated = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('/tto'));
+      await card.getByRole('button', { name: EN.portfolio.generateChecklist }).click();
+      await generated;
+      await page.getByRole('button', { name: EN.tabs.checklist }).click();
+      await expect(page.getByText('TTO IP & licensing checklist')).toBeVisible();
+      await expect(page.getByText(/from TRL 5 to TRL 7/)).toBeVisible();
+      expect(await main.innerText()).not.toMatch(TURKISH_LETTERS);
+      await page.screenshot({ path: `${SHOTS}/15-en-ip-checklist.png`, fullPage: true });
+
+      // Roadmap tab.
+      await page.getByRole('button', { name: EN.tabs.roadmap }).click();
+      await expect(page.getByText(EN.roadmap.title)).toBeVisible();
+      expect(await main.innerText()).not.toMatch(TURKISH_LETTERS);
+      await page.screenshot({ path: `${SHOTS}/15-en-roadmap.png`, fullPage: true });
+
+      // Control: the same keys read Turkish under /tr, so the check above is not
+      // passing on a page that lost its copy altogether.
+      await page.goto(TTO_BASE_URL);
+      await expectHydrated(page.locator('body'));
+      await expect(page.getByRole('heading', { name: TR.header.title })).toBeVisible();
+      await expect(page.getByRole('button', { name: TR.form.submit })).toBeVisible();
+      expect(await main.innerText()).toMatch(TURKISH_LETTERS);
+      await page.screenshot({ path: `${SHOTS}/15-tr-portfolio.png`, fullPage: true });
     } finally {
       await prisma.ttoPortfolioItem.delete({ where: { id: item.id } });
     }
