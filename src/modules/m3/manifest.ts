@@ -24,4 +24,9 @@ export const m3Manifest: ModuleManifest = {
   ],
   tables: ['Evidence', 'Claim', 'ClaimEvidenceLink'],
   isActive: true,
+  category: 'core',
+  stages: ['G3', 'G4'], // Patron onayı K-563625 (2026-10-17)
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

@@ -138,7 +138,7 @@ async function rollbackFixture() {
   await prisma.tenant.deleteMany({ where: { id: M11_E2E.tenantId } });
 }
 
-async function signInAndOpenPartB(page: Page, locale: string) {
+async function signInAndOpenPartB(page: Page, baseURL: string, locale: string) {
   const url = APPLICATION_URL(locale);
   const value = await encode({
     token: {
@@ -154,7 +154,7 @@ async function signInAndOpenPartB(page: Page, locale: string) {
     maxAge: 60 * 60,
   });
   await page.context().addCookies([
-    { name: COOKIE_NAME, value, url: 'http://localhost:3000' },
+    { name: COOKIE_NAME, value, url: baseURL },
   ]);
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -184,8 +184,9 @@ test.describe('Part B editor — an unwritten section is shown as unwritten', ()
   ] as const) {
     test(`${locale}: no invented author, organisation or prose reaches the screen`, async ({
       page,
+      baseURL,
     }) => {
-      const app = await signInAndOpenPartB(page, locale);
+      const app = await signInAndOpenPartB(page, baseURL!, locale);
 
       const unassigned = app.getByText(messages.PartBEditor.leadUnassigned);
       await expect(unassigned.first()).toBeVisible();

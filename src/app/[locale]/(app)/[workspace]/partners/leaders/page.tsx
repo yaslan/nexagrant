@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
+import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { cordisTopicPrefixSchema } from '@/lib/k2-cordis/api-query';
 import { coordinatorLeaders, type CoordinatorLeaderRow } from '@/lib/k2-cordis/coordinator-leaders';
@@ -143,7 +144,7 @@ export default async function LeadersPage({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted">{t('ecContributionLabel')}</span>
-                      <span className="font-semibold text-ink">{numberFormat.format(Number(org.totalEcContribution))} €</span>
+                      <span className="font-semibold text-ink">{formatWholeMoney(org.totalEcContribution, 'EUR', locale)}</span>
                     </div>
                   </div>
                 </div>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { NextIntlClientProvider } from 'next-intl';
+import { NextIntlClientProvider, createTranslator } from 'next-intl';
 
 import trMessages from '../messages/tr.json';
 import enMessages from '../messages/en.json';
@@ -20,13 +20,14 @@ import { parseKvkkMarkdown } from '@/components/expert-prereg/kvkk-text';
 const messages = { tr: trMessages, en: enMessages };
 const tr = trMessages.ExpertPrereg;
 
-function renderForm(locale: 'tr' | 'en' = 'tr') {
+function renderForm(locale: 'tr' | 'en' = 'tr', verifyHours = 24) {
   return render(
     <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <ExpertPreregForm
         locale={locale}
         kvkkBlocks={[{ kind: 'title', text: 'Aydınlatma' }, { kind: 'paragraph', text: 'Metin' }]}
         pageUrl="https://example.test/tr/uzman"
+        verifyHours={verifyHours}
       />
     </NextIntlClientProvider>,
   );
@@ -38,10 +39,11 @@ function fillRequired() {
   const province = screen.getByRole('combobox');
   fireEvent.change(province, { target: { value: 'izmir' } });
   fireEvent.keyDown(province, { key: 'Enter' });
+  fireEvent.change(screen.getByLabelText(/^Unvan/), { target: { value: 'Proje Koordinatörü' } });
+  fireEvent.change(screen.getByLabelText(/^Kurum/), { target: { value: 'Ankara Üniversitesi' } });
   fireEvent.click(screen.getByLabelText(tr.options.areas.energy));
   fireEvent.click(screen.getByLabelText(tr.options.roles.coordinator));
   fireEvent.click(screen.getByLabelText(tr.options.programmes['erasmus-plus']));
-  fireEvent.click(screen.getByLabelText(tr.options.languages.en));
   fireEvent.click(screen.getByLabelText(/Profilimin uzman rehberinde/));
   fireEvent.click(document.getElementById('ep-kvkkAccepted') as HTMLInputElement);
 }
@@ -80,6 +82,9 @@ describe('ExpertPreregForm', () => {
     expect(document.getElementById('ep-email-error')?.textContent).toBe(tr.errors.invalid_email);
     expect(document.getElementById('ep-province-error')?.textContent).toBe(tr.errors.unknown_slug);
     expect(document.getElementById('expertiseAreas-error')?.textContent).toBe(tr.errors.required);
+    expect(document.getElementById('ep-title-error')?.textContent).toBe(tr.errors.required);
+    expect(document.getElementById('ep-organization-error')?.textContent).toBe(tr.errors.required);
+    expect(document.getElementById('languages-error')).toBeNull();
     expect(document.getElementById('ep-kvkkAccepted-error')?.textContent).toBe(tr.errors.consent_required);
     expect(document.getElementById('ep-visibilityConsent-error')?.textContent).toBe(tr.errors.consent_required);
     expect(document.getElementById('ep-marketingConsent-error')).toBeNull();
@@ -100,10 +105,12 @@ describe('ExpertPreregForm', () => {
       fullName: 'Ayşe Yılmaz',
       email: 'ayse@example.org',
       province: '35',
+      title: 'Proje Koordinatörü',
+      organization: 'Ankara Üniversitesi',
       expertiseAreas: ['energy'],
       roles: ['coordinator'],
       programmes: ['erasmus-plus'],
-      languages: ['en'],
+      languages: [],
       kvkkAccepted: true,
       visibilityConsent: true,
       marketingConsent: false,
@@ -113,6 +120,34 @@ describe('ExpertPreregForm', () => {
     const share = screen.getByTestId('ep-share-linkedin');
     expect(share.getAttribute('href')).toContain('linkedin.com');
     expect(decodeURIComponent(share.getAttribute('href') ?? '')).toContain('https://example.test/tr/uzman');
+  });
+
+  // FO-25 (K-516717): Unvan and Kurum are required, Diller is optional.
+  test('no organisation: the error lands on Kurum with focus, nothing is sent', async () => {
+    renderForm();
+    fillRequired();
+    const org = screen.getByLabelText(/^Kurum/);
+    fireEvent.change(org, { target: { value: '' } });
+    fireEvent.submit(screen.getByTestId('ep-form'));
+    await waitFor(() => expect(document.activeElement).toBe(org));
+    expect(document.getElementById('ep-organization-error')?.textContent).toBe(tr.errors.required);
+    expect(org.getAttribute('aria-invalid')).toBe('true');
+    expect(org.getAttribute('aria-required')).toBe('true');
+    expect(screen.getByLabelText(/^Unvan/).getAttribute('aria-required')).toBe('true');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('a picked language is sent; the languages group carries no required mark', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 201 }));
+    renderForm();
+    fillRequired();
+    const legend = screen.getByText(tr.form.languages_legend);
+    expect(legend.closest('legend')?.textContent).not.toContain('*');
+    fireEvent.click(screen.getByLabelText(tr.options.languages.en));
+    fireEvent.submit(screen.getByTestId('ep-form'));
+    await screen.findByText(tr.success.title);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).languages).toEqual(['en']);
   });
 
   test('409 already_registered lands on the e-mail field', async () => {
@@ -134,6 +169,18 @@ describe('ExpertPreregForm', () => {
     fireEvent.submit(screen.getByTestId('ep-form'));
     await waitFor(() => expect(document.getElementById('ep-orcid-error')?.textContent).toBe(tr.errors.invalid_orcid));
     expect(document.getElementById('ep-linkedinUrl-error')?.textContent).toBe(tr.errors.invalid);
+  });
+
+  // FO-31 (TASK-MVC35ULM2X2D0): the link lifetime comes from the server, not the copy.
+  test('the success screen states the verify window it was given', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 201 }));
+    renderForm('tr', 48);
+    fillRequired();
+    fireEvent.submit(screen.getByTestId('ep-form'));
+    await screen.findByText(tr.success.title);
+    const text = screen.getByText(/ayse@example\.org/).textContent ?? '';
+    expect(text).toContain('48 saat');
+    expect(text).not.toContain('24');
   });
 
   test('429 shows the rate-limit message', async () => {
@@ -223,6 +270,22 @@ describe('helpers', () => {
     expect(maskOrcid('12ab34')).toBe('1234');
     expect(maskOrcid('X123')).toBe('123');
     expect(maskOrcid('00000002182500971234')).toBe('0000-0002-1825-0097');
+  });
+
+  // FO-31: seat limit and link lifetime are ICU parameters in both catalogs, so a
+  // change in constants.ts reaches every sentence that states them.
+  test.each(['tr', 'en'] as const)('founder and verify copy takes limit/hours as parameters (%s)', (locale) => {
+    const t = createTranslator({ locale, messages: messages[locale], namespace: 'ExpertPrereg' });
+    const lines = [
+      t('meta.description', { limit: 150 }),
+      t('hero.founder_open', { limit: 150, count: 7 }),
+      t('hero.founder_unknown', { limit: 150 }),
+      t('success.verify', { email: 'a@b.test', hours: 48 }),
+      t('verified.text_expired', { hours: 48 }),
+    ];
+    for (const line of lines.slice(0, 3)) expect(line).toContain('150');
+    for (const line of lines.slice(3)) expect(line).toContain('48');
+    for (const line of lines) expect(line).not.toMatch(/\b(100|24)\b/);
   });
 
   test('parseKvkkMarkdown reads the shipped notice', async () => {

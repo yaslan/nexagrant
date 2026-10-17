@@ -19,6 +19,10 @@ import { VERIFIED_OUTCOME_TTL_SECONDS } from './constants';
 /** Separates this value's key from every other use of AUTH_SECRET. */
 const KEY_LABEL = 'fonbridge:expert-prereg-verified:v1';
 
+/** base64url alphabet only; an HMAC-SHA256 digest is 32 bytes = 43 characters unpadded. */
+const BASE64URL = /^[A-Za-z0-9_-]+$/;
+const SIG_LENGTH = 43;
+
 export type VerifiedOutcome =
   | { outcome: 'ok'; founderNumber: number | null }
   | { outcome: 'expired' | 'invalid'; founderNumber: null };
@@ -60,7 +64,11 @@ export function decodeVerifiedOutcome(raw: unknown, { secret, now = Date.now() }
   const dot = raw.indexOf('.');
   if (dot <= 0) return null;
   const body = raw.slice(0, dot);
-  const given = Buffer.from(raw.slice(dot + 1), 'base64url');
+  const sig = raw.slice(dot + 1);
+  // Strict shape first: Node's base64url decoder skips stray characters, so a
+  // signature with extra bytes must not reach the comparison.
+  if (!BASE64URL.test(body) || sig.length !== SIG_LENGTH || !BASE64URL.test(sig)) return null;
+  const given = Buffer.from(sig, 'base64url');
   const expected = mac(body, secret);
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   let p: unknown;

@@ -7,6 +7,7 @@ import PublicNavbar from '@/components/PublicNavbar';
 import PublicFooter from '@/components/PublicFooter';
 import { appUrl } from '@/lib/app-url';
 import { errorMessage } from '@/lib/errors';
+import { FOUNDER_SEAT_LIMIT, VERIFY_TOKEN_TTL_MS } from '@/lib/expert-prereg/server/constants';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
 import ExpertPreregForm from './ExpertPreregForm';
 import { loadKvkkNotice } from './kvkk-text.server';
@@ -20,7 +21,7 @@ export async function expertPreregMetadata({ params }: PageProps): Promise<Metad
   const base = appUrl();
   const url = `${base}${expertPreregPath(locale)}`;
   const title = t('title');
-  const description = t('description');
+  const description = t('description', { limit: FOUNDER_SEAT_LIMIT });
   return {
     title,
     description,
@@ -78,9 +79,9 @@ export default async function ExpertPreregPage({ params }: PageProps) {
             className="rounded-lg border border-accent-strong bg-accent-light px-4 py-3 text-sm font-semibold text-ink"
           >
             {seats === null
-              ? t('hero.founder_unknown')
+              ? t('hero.founder_unknown', { limit: FOUNDER_SEAT_LIMIT })
               : seats > 0
-                ? t('hero.founder_open', { count: seats })
+                ? t('hero.founder_open', { limit: FOUNDER_SEAT_LIMIT, count: seats })
                 : t('hero.founder_full')}
           </p>
           <a
@@ -110,6 +111,7 @@ export default async function ExpertPreregPage({ params }: PageProps) {
           locale={locale}
           kvkkBlocks={kvkkBlocks}
           pageUrl={`${appUrl()}${expertPreregPath(locale)}`}
+          verifyHours={VERIFY_TOKEN_TTL_MS / 3_600_000}
         />
 
         <section aria-labelledby="ep-faq" className="space-y-3">

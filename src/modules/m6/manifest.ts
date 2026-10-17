@@ -28,4 +28,9 @@ export const m6Manifest: ModuleManifest = {
   ],
   tables: ['Evaluation', 'Reviewer', 'Criterion', 'Score'],
   isActive: true,
+  category: 'ai',
+  stages: ['G3'], // Patron onayı K-563625 (2026-10-17)
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

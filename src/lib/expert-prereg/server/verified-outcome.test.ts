@@ -54,6 +54,13 @@ describe('verified outcome signature', () => {
     expect(decodeVerifiedOutcome([valid], opts)).toBeNull();
   });
 
+  it('a signature with extra or non-base64url characters is refused', () => {
+    const value = encodeVerifiedOutcome({ outcome: 'ok', founderNumber: 4 }, opts);
+    for (const extra of ['!', '=', '\n']) {
+      expect(decodeVerifiedOutcome(value + extra, opts)).toBeNull();
+    }
+  });
+
   it('the body carries only outcome, number and expiry', () => {
     const value = encodeVerifiedOutcome({ outcome: 'ok', founderNumber: 3 }, opts);
     const body = JSON.parse(Buffer.from(value.split('.')[0]!, 'base64url').toString('utf8'));

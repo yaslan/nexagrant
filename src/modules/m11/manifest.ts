@@ -24,4 +24,9 @@ export const m11Manifest: ModuleManifest = {
   ],
   tables: ['ApplicationPart'],
   isActive: true,
+  category: 'tools',
+  stages: ['G3', 'G4'], // Patron onayı K-563625 (2026-10-17)
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

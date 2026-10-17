@@ -2998,7 +2998,7 @@
   "ExpertPrereg": {
     "meta": {
       "title": "EU Project Experts Directory — Pre-registration | FonBridge",
-      "description": "Free pre-registration for Türkiye's directory of verified EU project experts. The first 100 sign-ups become Founding Experts with a permanent badge and lifetime Pro membership.",
+      "description": "Free pre-registration for Türkiye's directory of verified EU project experts. The first {limit} sign-ups become Founding Experts with a permanent badge and lifetime Pro membership.",
       "verified_title": "E-mail verification | FonBridge Expert Directory"
     },
     "nav_label": "Expert Pool",
@@ -3006,9 +3006,9 @@
       "eyebrow": "Expert Directory · Pre-registration",
       "title": "Make your EU project experience visible",
       "subtitle": "Join Türkiye's directory of verified EU project experts. Sign-up takes 3 minutes.",
-      "founder_open": "The first 100 sign-ups become Founding Experts: permanent badge + lifetime Pro membership — seats left: {count}",
+      "founder_open": "The first {limit} sign-ups become Founding Experts: permanent badge + lifetime Pro membership — seats left: {count}",
       "founder_full": "The founding cohort is complete — registration is still open",
-      "founder_unknown": "The first 100 sign-ups become Founding Experts: permanent badge + lifetime Pro membership",
+      "founder_unknown": "The first {limit} sign-ups become Founding Experts: permanent badge + lifetime Pro membership",
       "cta": "Start pre-registration"
     },
     "values": {
@@ -3032,8 +3032,10 @@
       "province_placeholder": "Choose a province",
       "province_no_match": "No matching province",
       "province_results": "{count} provinces listed",
-      "title_label": "Title / Organisation",
-      "title_placeholder": "e.g. Project Coordinator, Ankara University",
+      "title_label": "Title",
+      "title_placeholder": "e.g. Project Coordinator",
+      "organization_label": "Organisation",
+      "organization_placeholder": "e.g. Ankara University",
       "freelancer_label": "I work freelance",
       "areas_legend": "Areas of expertise",
       "areas_hint": "Choose up to 8 areas.",
@@ -3084,7 +3086,7 @@
     },
     "success": {
       "title": "Thank you — your pre-registration is in",
-      "verify": "Verify your e-mail: click the link we sent to {email} within 24 hours. Unverified registrations are not added to the directory.",
+      "verify": "Verify your e-mail: click the link we sent to {email} within {hours} hours. Unverified registrations are not added to the directory.",
       "share": "Share on LinkedIn",
       "share_new_tab": "(opens in a new tab)",
       "share_text": "I pre-registered for the FonBridge EU Project Experts Directory. If you have EU project experience, join too: {url}"
@@ -3105,7 +3107,7 @@
       "founder": "Your Founding Expert number: #{number}",
       "no_founder": "The founding cohort was already complete; your registration is in the directory. We will let you know at launch.",
       "heading_expired": "This link has expired",
-      "text_expired": "Verification links are valid for 24 hours. Write to info@fonbridge.com and we will send you a new one.",
+      "text_expired": "Verification links are valid for {hours} hours. Write to info@fonbridge.com and we will send you a new one.",
       "heading_invalid": "This link is not valid",
       "text_invalid": "The link may be incomplete or already used. Try the button in the e-mail again.",
       "back": "Back to the Expert Directory page"
@@ -3211,6 +3213,7 @@
     "load_error": "Records could not be loaded. Refresh the page; if it persists, check the system alerts.",
     "table_caption": "Expert pre-registrations, newest first",
     "col_name": "Name",
+    "col_organization": "Organisation",
     "col_province": "Province",
     "col_areas": "Areas",
     "col_roles": "Roles",
@@ -3223,5 +3226,51 @@
       "disabled": "Disabled"
     },
     "none": "—"
+  },
+  "modules": {
+    "partner-intel": {
+      "name": "Partner Intelligence Database",
+      "tagline": "One partner card per organisation, topic leaders and the collaboration graph."
+    },
+    "concept-note": {
+      "name": "Concept Note Builder",
+      "tagline": "Programme-specific short proposal templates with an AI first draft."
+    },
+    "evidence": {
+      "name": "Evidence Pack",
+      "tagline": "Reusable evidence library with source and validity discipline."
+    },
+    "focal-point": {
+      "name": "Focal Point",
+      "tagline": "One internal owner and one external contact per relationship, plus contact cadence."
+    },
+    "workflows": {
+      "name": "Proposal Production Workflows",
+      "tagline": "Gate-driven pipeline from opportunity to submission, with person-day reporting."
+    },
+    "evaluator": {
+      "name": "Evaluator Lens",
+      "tagline": "Internal pre-assessment against the call criteria — never an official score."
+    },
+    "tto": {
+      "name": "TTO Accelerator",
+      "tagline": "Technology transfer portfolio: readiness, ownership and commercialisation route per asset."
+    },
+    "consortium-matching": {
+      "name": "Consortium Matching",
+      "tagline": "Seat plan per proposal and ranked partner candidates for each open seat."
+    },
+    "briefs": {
+      "name": "Meeting Briefs",
+      "tagline": "One-page brief before a partner meeting, assembled from the partner card and the topic."
+    },
+    "followups": {
+      "name": "Follow-up Documents",
+      "tagline": "NDA, LOI and award packs generated from an opportunity and versioned per signature."
+    },
+    "application": {
+      "name": "Full Application Production",
+      "tagline": "Part-by-part application drafting on top of the concept note, evidence and consortium."
+    }
   }
 }
