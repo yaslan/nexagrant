@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyPercentDiscount, currencyExponent, formatMoney, lineNetMinor, sameAmount, toDecimalString, toMinorUnits } from './money';
+import { applyPercentDiscount, currencyExponent, formatMoney, formatWholeMoney, lineNetMinor, sameAmount, toDecimalString, toMinorUnits } from './money';
 
 describe('toMinorUnits', () => {
   it('parses provider decimal strings', () => {
@@ -94,6 +94,32 @@ describe('formatMoney', () => {
 
   it('refuses a non-integer amount rather than rendering a rounded one', () => {
     expect(() => formatMoney(26.105, 'USD', 'en')).toThrow();
+  });
+});
+
+describe('formatWholeMoney', () => {
+  // TASK-MVBF53ACTGRT1 (FO-15): CORDIS EU contributions are whole EUR.
+  it('renders whole euros in each locale\u2019s own format, without a fraction', () => {
+    // CLDR puts the symbol first in both tr and en; only the separators move.
+    expect(formatWholeMoney(1_234_567n, 'EUR', 'tr')).toBe('\u20ac1.234.567');
+    expect(formatWholeMoney(1_234_567n, 'EUR', 'en')).toBe('\u20ac1,234,567');
+    expect(formatWholeMoney(150_000, 'eur', 'en')).toBe('\u20ac150,000');
+  });
+
+  it('renders zero as an amount, not an empty string', () => {
+    expect(formatWholeMoney(0n, 'EUR', 'tr')).toBe('\u20ac0');
+    expect(formatWholeMoney(0, 'EUR', 'en')).toBe('\u20ac0');
+  });
+
+  it('keeps every digit of a bigint past Number.MAX_SAFE_INTEGER', () => {
+    // Number(9007199254740993n) is 9007199254740992: a float round-trip would drop the 3.
+    expect(formatWholeMoney(9_007_199_254_740_993n, 'EUR', 'en')).toBe('\u20ac9,007,199,254,740,993');
+    expect(formatWholeMoney(12_345_678_901_234_567_890n, 'EUR', 'tr')).toBe('\u20ac12.345.678.901.234.567.890');
+  });
+
+  it('refuses a number that is not a safe integer rather than rounding it', () => {
+    expect(() => formatWholeMoney(1.5, 'EUR', 'en')).toThrow();
+    expect(() => formatWholeMoney(2 ** 53, 'EUR', 'en')).toThrow();
   });
 });
 

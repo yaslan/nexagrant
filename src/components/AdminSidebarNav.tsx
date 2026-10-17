@@ -15,7 +15,8 @@ import {
   ShieldAlert,
   Percent,
   FileText,
-  Inbox
+  Inbox,
+  UserCheck
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -25,6 +26,7 @@ interface AdminSidebarNavProps {
 export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
   const pathname = usePathname();
   const tLeads = useTranslations('adminLeads');
+  const tExperts = useTranslations('AdminExpertPrereg');
 
   const adminNavItems = [
     {
@@ -90,6 +92,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: tLeads('nav_desc'),
       icon: Inbox,
       badge: 'Lead',
+    },
+    {
+      key: 'uzman-kayitlari',
+      href: `/${locale}/admin/uzman-kayitlari`,
+      label: tExperts('nav_label'),
+      desc: tExperts('nav_desc'),
+      icon: UserCheck,
+      badge: 'FO-20',
     },
     {
       key: 'audit',
