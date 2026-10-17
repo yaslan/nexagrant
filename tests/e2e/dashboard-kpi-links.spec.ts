@@ -33,10 +33,7 @@ const MANAGER = {
   tenantId: TENANT,
 };
 
-/**
- * A year back, so the seeded opportunities fill the KPI grid. Not wider: the trend query runs
- * three counts per week inside one 5 s transaction, and a range of decades times it out.
- */
+/** A year back, so the seeded opportunities fill the KPI grid. Wide ranges: dashboard-wide-range.spec.ts. */
 const day = (offset: number) => new Date(Date.now() + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const RANGE = `from=${day(-365)}&to=${day(0)}`;
 
