@@ -124,18 +124,29 @@ describe('verifyExpertPreRegistration', () => {
 });
 
 describe('getRemainingFounderSeats', () => {
-  it('counts the free seats: the limit minus the numbers already given, never below zero', async () => {
-    const seeded = [1, 2, 3].map((n) => ({ id: `v${n}`, founderNumber: n }));
-    const db = {
-      expertPreRegistration: {
-        count: vi.fn(async () => seeded.length),
-      },
-    } as unknown as PrismaClient;
-    expect(await getRemainingFounderSeats(db)).toBe(FOUNDER_SEAT_LIMIT - 3);
+  /** A db whose only call is the aggregate over founder numbers, answering with the given highest number. */
+  function seatsDb(highest: number | null) {
+    const aggregate = vi.fn(async () => ({ _max: { founderNumber: highest } }));
+    const db = { expertPreRegistration: { aggregate } } as unknown as PrismaClient;
+    return { db, aggregate };
+  }
 
-    const full = {
-      expertPreRegistration: { count: vi.fn(async () => FOUNDER_SEAT_LIMIT + 5) },
-    } as unknown as PrismaClient;
-    expect(await getRemainingFounderSeats(full)).toBe(0);
+  it('counts the free seats from the highest number given, the same source the verification numbers from', async () => {
+    const { db, aggregate } = seatsDb(3);
+    expect(await getRemainingFounderSeats(db)).toBe(FOUNDER_SEAT_LIMIT - 3);
+    expect(aggregate).toHaveBeenCalledWith({ _max: { founderNumber: true } });
+  });
+
+  it('does not count a gap as a free seat: the highest number decides, not how many hold one', async () => {
+    const { db } = seatsDb(5);
+    expect(await getRemainingFounderSeats(db)).toBe(FOUNDER_SEAT_LIMIT - 5);
+  });
+
+  it('is zero, never negative, once the limit is passed', async () => {
+    expect(await getRemainingFounderSeats(seatsDb(FOUNDER_SEAT_LIMIT + 5).db)).toBe(0);
+  });
+
+  it('is the full limit before anyone is verified', async () => {
+    expect(await getRemainingFounderSeats(seatsDb(null).db)).toBe(FOUNDER_SEAT_LIMIT);
   });
 });
