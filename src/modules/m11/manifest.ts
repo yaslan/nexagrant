@@ -24,4 +24,9 @@ export const m11Manifest: ModuleManifest = {
   ],
   tables: ['ApplicationPart'],
   isActive: true,
+  category: 'tools',
+  stages: ['G3', 'G4'],
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

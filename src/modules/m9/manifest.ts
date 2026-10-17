@@ -24,4 +24,9 @@ export const m9Manifest: ModuleManifest = {
   ],
   tables: ['MeetingBrief'],
   isActive: true,
+  category: 'tools',
+  stages: ['G2'],
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

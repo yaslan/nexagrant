@@ -28,4 +28,9 @@ export const m5Manifest: ModuleManifest = {
   ],
   tables: ['Opportunity', 'GateDecision', 'Proposal', 'Effort', 'ProposalUsage'],
   isActive: true,
+  category: 'core',
+  stages: ['G0', 'G1', 'G2', 'G3', 'G4'],
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

@@ -3223,5 +3223,51 @@
       "disabled": "Devre dışı"
     },
     "none": "—"
+  },
+  "modules": {
+    "partner-intel": {
+      "name": "Ortak İstihbarat Veritabanı",
+      "tagline": "Her kuruluş için tek ortak kartı, konu liderleri ve iş birliği ağı."
+    },
+    "concept-note": {
+      "name": "Konsept Notu Oluşturucu",
+      "tagline": "Programa özel kısa teklif şablonları ve YZ destekli ilk taslak."
+    },
+    "evidence": {
+      "name": "Kanıt Paketi",
+      "tagline": "Kaynak ve geçerlilik disipliniyle yeniden kullanılabilir kanıt kütüphanesi."
+    },
+    "focal-point": {
+      "name": "Konsorsiyum CRM",
+      "tagline": "Her ilişki için bir iç sorumlu, bir dış muhatap ve temas ritmi."
+    },
+    "workflows": {
+      "name": "Teklif Üretim İş Akışı",
+      "tagline": "Fırsattan başvuruya kapı tabanlı süreç ve adam-gün raporu."
+    },
+    "evaluator": {
+      "name": "Hakem Gözü",
+      "tagline": "Çağrı kriterlerine göre iç ön değerlendirme — resmî puan değildir."
+    },
+    "tto": {
+      "name": "TTO Hızlandırıcı",
+      "tagline": "Teknoloji transferi portföyü: varlık başına hazırlık, sahiplik ve ticarileşme yolu."
+    },
+    "consortium-matching": {
+      "name": "Konsorsiyum Eşleştirme",
+      "tagline": "Teklif başına koltuk planı ve her açık koltuk için sıralı ortak adayları."
+    },
+    "briefs": {
+      "name": "Toplantı Brifingi",
+      "tagline": "Ortak görüşmesinden önce ortak kartı ve konudan derlenen tek sayfalık brifing."
+    },
+    "followups": {
+      "name": "Takip Dokümanları",
+      "tagline": "Fırsattan üretilen, imza başına sürümlenen NDA, LOI ve hibe paketleri."
+    },
+    "application": {
+      "name": "Tam Başvuru Üretimi",
+      "tagline": "Konsept notu, kanıt ve konsorsiyum üzerine bölüm bölüm başvuru taslağı."
+    }
   }
 }

@@ -24,4 +24,9 @@ export const m7Manifest: ModuleManifest = {
   ],
   tables: ['TtoPortfolioItem'],
   isActive: true,
+  category: 'tools',
+  stages: ['G0'],
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

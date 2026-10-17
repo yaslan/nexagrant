@@ -36,4 +36,9 @@ export const m1Manifest: ModuleManifest = {
     'PartnerOrg',
   ],
   isActive: true,
+  category: 'core',
+  stages: ['G0', 'G2'],
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

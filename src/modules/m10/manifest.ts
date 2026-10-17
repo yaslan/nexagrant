@@ -24,4 +24,9 @@ export const m10Manifest: ModuleManifest = {
   ],
   tables: ['FollowupDoc'],
   isActive: true,
+  category: 'tools',
+  stages: ['G2', 'G4'],
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };

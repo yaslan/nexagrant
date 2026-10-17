@@ -28,4 +28,9 @@ export const m8Manifest: ModuleManifest = {
   ],
   tables: ['ConsortiumSeat', 'SeatCandidate', 'TopicMatch'],
   isActive: true,
+  category: 'ai',
+  stages: ['G2'],
+  statusBadge: 'ga',
+  docsUrl: null,
+  quota: null,
 };
