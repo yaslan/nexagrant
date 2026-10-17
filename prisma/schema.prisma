@@ -751,6 +751,17 @@ model ExpertPreRegAttempt {
   @@index([ipHash, createdAt])
 }
 
+/// The founder numbers handed out so far (FO-50, K-568932 = A). One row, `id` 1.
+/// `lastNumber` only goes up: the next number is `lastNumber + 1`, so a pre-registration
+/// purged after one year never frees its number, and the seat count is `100 − lastNumber`.
+/// Tenant-less, no personal data; RLS on with the `system_scope` policy only, like
+/// ExpertPreRegistration. Migration: prisma/migrations/add-expert-founder-counter.sql.
+model ExpertFounderCounter {
+  id         Int      @id @default(1)
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
 // ───────────────────────── K1 tenant-scoped ─────────────────────────
 
 /// Two kinds of row live here, told apart by `opportunityId`:

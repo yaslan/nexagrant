@@ -9,9 +9,12 @@ import { describe, test, expect, beforeAll, afterAll, afterEach, vi } from 'vite
  * rows. This file refuses to run there outside CI; point DATABASE_URL_RLS_TEST at a
  * throwaway database, as tests/public-lead.live.test.ts does.
  *
- * Founder numbers are seeded above the current maximum, so the file never collides with
+ * Founder numbers are seeded above the last one given, so the file never collides with
  * the founder-number races that run on the same table (serialised by
- * acquireExpertPreRegLiveLock).
+ * acquireExpertPreRegLiveLock). The founder counter is put back after every test.
+ *
+ * K-568932 = A: the purge deletes the holder of the highest founder number too; the
+ * number stays taken in ExpertFounderCounter, so the next verification gets the one after.
  */
 const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   const { readFileSync, existsSync } = await import('node:fs');
@@ -35,12 +38,16 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
+import { randomBytes } from 'node:crypto';
 import { createDbClient, prisma } from '@/lib/db';
-import { EXPERT_PREREG_RETENTION_DAYS } from '@/lib/expert-prereg/server/constants';
+import { hashSecretToken } from '@/lib/secret-token';
+import { EXPERT_PREREG_RETENTION_DAYS, FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
+import { lastFounderNumberGiven } from '@/lib/expert-prereg/server/founder-counter';
+import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
 import { EXPERT_PREREG_PURGED, purgeOldExpertPreRegistrations } from '@/lib/expert-prereg/server/retention';
 import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { acquireExpertPreRegLiveLock } from './helpers/expert-prereg-live-lock';
+import { acquireExpertPreRegLiveLock, holdFounderCounter } from './helpers/expert-prereg-live-lock';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const SUITE = 'expert pre-registration retention test';
@@ -71,11 +78,21 @@ const ago = (days: number) => new Date(NOW.getTime() - days * DAY);
 const mail = (label: string) => `${label}-${RUN}@example.test`;
 
 let releaseLock: (() => Promise<void>) | undefined;
+let restoreCounter: (() => Promise<void>) | undefined;
 
-/** Highest founder number before this file seeds anything; the file's numbers sit above it. */
+/** Last founder number given before this file seeds anything; the file's numbers sit above it. */
 let base = 0;
 
-async function seed(label: string, createdAt: Date, founderNumber: number | null = null): Promise<void> {
+/**
+ * A row as the form leaves it; a founder number also raises the counter, as the
+ * verification does (`counter: false` leaves it behind, like a row written by hand).
+ */
+async function seed(
+  label: string,
+  createdAt: Date,
+  founderNumber: number | null = null,
+  opts: { counter?: boolean; tokenHash?: string } = {}
+): Promise<void> {
   await admin.expertPreRegistration.create({
     data: {
       fullName: 'Seed Uzman',
@@ -91,9 +108,22 @@ async function seed(label: string, createdAt: Date, founderNumber: number | null
       locale: 'tr',
       status: founderNumber === null ? 'pending' : 'verified',
       founderNumber,
+      verifyTokenHash: opts.tokenHash ?? null,
+      verifyTokenExpiresAt: opts.tokenHash ? new Date(Date.now() + DAY) : null,
       createdAt,
     },
   });
+  if (founderNumber !== null && opts.counter !== false) {
+    await admin.expertFounderCounter.upsert({
+      where: { id: 1 },
+      create: { id: 1, lastNumber: founderNumber },
+      update: { lastNumber: founderNumber },
+    });
+  }
+}
+
+async function counterValue(): Promise<number | undefined> {
+  return (await admin.expertFounderCounter.findUnique({ where: { id: 1 } }))?.lastNumber;
 }
 
 async function labelsLeft(): Promise<string[]> {
@@ -122,20 +152,20 @@ async function cleanRows(): Promise<void> {
 beforeAll(async () => {
   if (!HAS_DB) return;
   releaseLock = await acquireExpertPreRegLiveLock();
+  restoreCounter = await holdFounderCounter(admin);
   await cleanRows();
-  const top = await admin.expertPreRegistration.aggregate({
-    _max: { founderNumber: true },
-  });
-  base = top._max.founderNumber ?? 0;
+  base = await lastFounderNumberGiven(admin);
 });
 
 afterEach(async () => {
   if (!HAS_DB) return;
   await cleanRows();
+  await restoreCounter?.();
 });
 
 afterAll(async () => {
   if (!HAS_DB) return;
+  await restoreCounter?.();
   await releaseLock?.();
   await admin.$disconnect();
 });
@@ -163,30 +193,44 @@ describe.skipIf(!HAS_DB)('expert pre-registration retention (live database, fabr
     expect(await labelsLeft()).toEqual(['verified-new']);
   });
 
-  test('keeps the row holding the highest founder number, so the number is never handed out again', async () => {
+  test('deletes the row holding the highest founder number too; the number stays taken and the seats do not move', async () => {
     await seed('founder-1', ago(400), base + 1);
     await seed('founder-2', ago(400), base + 2);
     await seed('founder-top', ago(400), base + 3);
+    const seatsBefore = await getRemainingFounderSeats();
 
-    await purgeOldExpertPreRegistrations({ now: NOW });
+    const result = await purgeOldExpertPreRegistrations({ now: NOW });
 
-    expect(await labelsLeft()).toEqual(['founder-top']);
-    const top = await admin.expertPreRegistration.aggregate({
-      _max: { founderNumber: true },
-    });
-    expect(top._max.founderNumber).toBe(base + 3);
+    expect(result.deletedCount).toBe(3);
+    expect(await labelsLeft()).toEqual([]);
+    expect(await counterValue()).toBe(base + 3);
+    expect(await getRemainingFounderSeats()).toBe(seatsBefore);
+    expect(seatsBefore).toBe(Math.max(0, FOUNDER_SEAT_LIMIT - (base + 3)));
   });
 
-  test('seat count is unchanged by the purge, and the next founder number is the one after the kept maximum', async () => {
-    await seed('founder-1', ago(400), base + 1);
-    await seed('founder-2', ago(400), base + 2);
-    await seed('founder-top', ago(400), base + 3);
-    const before = await getRemainingFounderSeats();
+  test('after the top founder row is purged, a new verification gets the next number, not the freed one', async () => {
+    await seed('founder-top', ago(400), base + 1);
+    await purgeOldExpertPreRegistrations({ now: NOW });
+    expect(await labelsLeft()).toEqual([]);
+
+    const token = randomBytes(32).toString('hex');
+    await seed('newcomer', ago(0), null, { tokenHash: hashSecretToken(token) });
+    const verified = await verifyExpertPreRegistration(token);
+
+    const expected = base + 2 <= FOUNDER_SEAT_LIMIT ? base + 2 : null;
+    expect(verified).toMatchObject({ ok: true, founderNumber: expected });
+    if (expected !== null) expect(await counterValue()).toBe(expected);
+  });
+
+  test('a founder number the counter missed (row written by hand) is recorded before its row goes', async () => {
+    await seed('stray-top', ago(400), base + 5, { counter: false });
+    expect(await counterValue()).not.toBe(base + 5);
 
     await purgeOldExpertPreRegistrations({ now: NOW });
 
-    expect(await getRemainingFounderSeats()).toBe(before);
-    expect(before).toBe(Math.max(0, 100 - (base + 3)));
+    expect(await labelsLeft()).toEqual([]);
+    expect(await counterValue()).toBe(base + 5);
+    expect(await getRemainingFounderSeats()).toBe(Math.max(0, FOUNDER_SEAT_LIMIT - (base + 5)));
   });
 
   test('writes one expert_prereg.purged audit with the count and no person; a second run changes nothing', async () => {
@@ -206,8 +250,10 @@ describe.skipIf(!HAS_DB)('expert pre-registration retention (live database, fabr
     });
     expect(JSON.stringify(audits)).not.toContain('@example.test');
 
+    const counterAfterFirst = await counterValue();
     const second = await purgeOldExpertPreRegistrations({ now: NOW });
     expect(second.deletedCount).toBe(0);
+    expect(await counterValue()).toBe(counterAfterFirst);
     expect(await purgeAudits()).toHaveLength(1);
     expect(await labelsLeft()).toEqual(['keep']);
   });
