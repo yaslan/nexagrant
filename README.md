@@ -27,7 +27,7 @@ docker compose config -q       # rc=0 olmalı; AUTH_SECRET boşsa burada düşer
 docker compose up -d --wait    # postgres+pgvector (:5433), redis (:6379), mailpit (smtp :1025, arayüz :8025)
 pnpm install && pnpm db:generate
 pnpm exec prisma db push       # boş DB'de temel tablolar (migration'lar bunları kurmaz)
-pnpm db:rls-role               # fabrika_app rolü; parolayı üretip DATABASE_URL_RLS_TEST'i .env'e ekler
+pnpm db:rls-role               # fabrika_app rolü; yoksa parolayı üretip DATABASE_URL_RLS_TEST'i .env'e ekler, varsa yalnız doğrular (parola değiştirmez)
 DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' .env)" scripts/apply-migrations.sh   # host'ta psql ister
 pnpm db:rls && pnpm db:seed
 pnpm dev                       # Next.js :3000
