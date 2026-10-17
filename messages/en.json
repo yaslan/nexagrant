@@ -2998,7 +2998,7 @@
   "ExpertPrereg": {
     "meta": {
       "title": "EU Project Experts Directory — Pre-registration | FonBridge",
-      "description": "Free pre-registration for Türkiye's directory of verified EU project experts. The first 100 sign-ups become Founding Experts with a permanent badge and lifetime Pro membership.",
+      "description": "Free pre-registration for Türkiye's directory of verified EU project experts. The first {limit} sign-ups become Founding Experts with a permanent badge and lifetime Pro membership.",
       "verified_title": "E-mail verification | FonBridge Expert Directory"
     },
     "nav_label": "Expert Pool",
@@ -3006,9 +3006,9 @@
       "eyebrow": "Expert Directory · Pre-registration",
       "title": "Make your EU project experience visible",
       "subtitle": "Join Türkiye's directory of verified EU project experts. Sign-up takes 3 minutes.",
-      "founder_open": "The first 100 sign-ups become Founding Experts: permanent badge + lifetime Pro membership — seats left: {count}",
+      "founder_open": "The first {limit} sign-ups become Founding Experts: permanent badge + lifetime Pro membership — seats left: {count}",
       "founder_full": "The founding cohort is complete — registration is still open",
-      "founder_unknown": "The first 100 sign-ups become Founding Experts: permanent badge + lifetime Pro membership",
+      "founder_unknown": "The first {limit} sign-ups become Founding Experts: permanent badge + lifetime Pro membership",
       "cta": "Start pre-registration"
     },
     "values": {
@@ -3084,7 +3084,7 @@
     },
     "success": {
       "title": "Thank you — your pre-registration is in",
-      "verify": "Verify your e-mail: click the link we sent to {email} within 24 hours. Unverified registrations are not added to the directory.",
+      "verify": "Verify your e-mail: click the link we sent to {email} within {hours} hours. Unverified registrations are not added to the directory.",
       "share": "Share on LinkedIn",
       "share_new_tab": "(opens in a new tab)",
       "share_text": "I pre-registered for the FonBridge EU Project Experts Directory. If you have EU project experience, join too: {url}"
@@ -3105,7 +3105,7 @@
       "founder": "Your Founding Expert number: #{number}",
       "no_founder": "The founding cohort was already complete; your registration is in the directory. We will let you know at launch.",
       "heading_expired": "This link has expired",
-      "text_expired": "Verification links are valid for 24 hours. Write to info@fonbridge.com and we will send you a new one.",
+      "text_expired": "Verification links are valid for {hours} hours. Write to info@fonbridge.com and we will send you a new one.",
       "heading_invalid": "This link is not valid",
       "text_invalid": "The link may be incomplete or already used. Try the button in the e-mail again.",
       "back": "Back to the Expert Directory page"
