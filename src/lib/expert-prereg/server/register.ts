@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger';
 import { issueSecretToken } from '@/lib/secret-token';
 import { expertPreRegInputSchema } from '../schema';
 import {
+  ATTEMPT_RETENTION_MS,
   EXPERT_PREREG_CONSENT_VERSION,
   EXPERT_PREREG_LOCK_KEY,
   IP_WINDOW_MS,
@@ -63,6 +64,7 @@ export function hashExpertIp(ip: string | null, salt: string | null | undefined)
 interface ReissueState {
   verifyTokenHash: string | null;
   verifyTokenExpiresAt: Date | null;
+  lastSubmittedAt: Date | null;
 }
 
 /**
@@ -133,22 +135,38 @@ export async function registerExpertPreRegistration(
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EXPERT_PREREG_LOCK_KEY})`;
 
       if (ipHash) {
-        const recent = await tx.expertPreRegistration.count({
-          where: { ipHash, createdAt: { gte: new Date(now.getTime() - IP_WINDOW_MS) } },
+        // Old attempts go first, so the table never holds more than the retention window.
+        await tx.expertPreRegAttempt.deleteMany({
+          where: { createdAt: { lt: new Date(now.getTime() - ATTEMPT_RETENTION_MS) } },
         });
+        const windowStart = new Date(now.getTime() - IP_WINDOW_MS);
+        const recent =
+          (await tx.expertPreRegistration.count({ where: { ipHash, createdAt: { gte: windowStart } } })) +
+          (await tx.expertPreRegAttempt.count({ where: { ipHash, createdAt: { gte: windowStart } } }));
         if (recent >= REGISTRATION_IP_LIMIT) return { status: 429 as const };
       }
 
       const existing = await tx.expertPreRegistration.findUnique({
         where: { email: data.email },
-        select: { id: true, status: true, verifyTokenHash: true, verifyTokenExpiresAt: true },
+        select: {
+          id: true,
+          status: true,
+          verifyTokenHash: true,
+          verifyTokenExpiresAt: true,
+          lastSubmittedAt: true,
+        },
       });
-      // Verified (or disabled by an admin) is refused. Pending gets a fresh link, but not inside the cooldown.
-      if (existing && existing.status !== 'pending') return { status: 409 as const };
+      // Verified (or disabled by an admin) is refused. The attempt still counts toward the IP window.
+      if (existing && existing.status !== 'pending') {
+        if (ipHash) await tx.expertPreRegAttempt.create({ data: { ipHash } });
+        return { status: 409 as const };
+      }
       if (existing) {
-        // The link was issued VERIFY_TOKEN_TTL_MS before it expires.
-        const issuedAt = existing.verifyTokenExpiresAt ? existing.verifyTokenExpiresAt.getTime() - VERIFY_TOKEN_TTL_MS : 0;
-        if (now.getTime() - issuedAt < RESEND_COOLDOWN_MS) return { status: 429 as const };
+        // Before lastSubmittedAt existed, the last issue time was VERIFY_TOKEN_TTL_MS before the link expires.
+        const lastIssued =
+          existing.lastSubmittedAt?.getTime() ??
+          (existing.verifyTokenExpiresAt ? existing.verifyTokenExpiresAt.getTime() - VERIFY_TOKEN_TTL_MS : 0);
+        if (now.getTime() - lastIssued < RESEND_COOLDOWN_MS) return { status: 429 as const };
       }
 
       const fields = {
@@ -178,7 +196,7 @@ export async function registerExpertPreRegistration(
         verifyTokenExpiresAt: expires,
         ipHash,
         status: 'pending',
-        createdAt: now,
+        lastSubmittedAt: now,
       };
 
       if (existing) {
@@ -186,14 +204,19 @@ export async function registerExpertPreRegistration(
         const replaced: ReissueState = {
           verifyTokenHash: existing.verifyTokenHash,
           verifyTokenExpiresAt: existing.verifyTokenExpiresAt,
+          lastSubmittedAt: existing.lastSubmittedAt,
         };
         // The new link replaces the old one (its hash is gone, so the old link answers invalid).
-        // createdAt moves to this attempt so the per-IP window counts it.
+        // createdAt stays: it is the first registration. This attempt is counted in ExpertPreRegAttempt.
+        if (ipHash) await tx.expertPreRegAttempt.create({ data: { ipHash } });
         await tx.expertPreRegistration.update({ where: { id: existing.id }, data: fields });
         return { status: 201 as const, id: existing.id, previous: replaced };
       }
 
-      const row = await tx.expertPreRegistration.create({ data: fields, select: { id: true } });
+      const row = await tx.expertPreRegistration.create({
+        data: { ...fields, createdAt: now },
+        select: { id: true },
+      });
       return { status: 201 as const, id: row.id, previous: null };
     });
 

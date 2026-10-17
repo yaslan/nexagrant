@@ -37,6 +37,8 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // tenant; read and written by the expert-prereg server code and the
   // platform-admin export only. See prisma/migrations/add-expert-pre-registration.sql.
   'ExpertPreRegistration',
+  // TASK-MVBLYRLP9ID93 (FO-26): the submission counter of the same pre-registration; no tenant.
+  'ExpertPreRegAttempt',
   // AKTAR-MURBCJ0A-1: a post on the public blog. Platform content shown to
   // anonymous visitors, owned by no tenant; written only by /admin/blog behind
   // requirePlatformAdmin(). See prisma/migrations/add-blog-post.sql.

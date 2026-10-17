@@ -27,6 +27,13 @@ export const RESEND_COOLDOWN_MS = 5 * 60 * 1000;
 export const REGISTRATION_IP_LIMIT = 5;
 export const IP_WINDOW_MS = 60 * 60 * 1000;
 
+/**
+ * A submission counted against the IP window (ExpertPreRegAttempt) is kept this long.
+ * Longer than IP_WINDOW_MS so the table stays small, and rows past it are deleted on
+ * every submission (register.ts).
+ */
+export const ATTEMPT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
 /** Serialises registrations and founder numbering so concurrent requests cannot pass a limit or share a number. */
 export const EXPERT_PREREG_LOCK_KEY = 7_302_026_019_001n;
 

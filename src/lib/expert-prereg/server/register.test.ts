@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Mailer, MailMessage } from '@/lib/email/mailer';
 import { MailSendError } from '@/lib/email/mailer';
 import {
+  ATTEMPT_RETENTION_MS,
   EXPERT_PREREG_CONSENT_VERSION,
   IP_WINDOW_MS,
   REGISTRATION_IP_LIMIT,
@@ -34,11 +35,32 @@ const valid = {
 };
 
 type Row = Record<string, unknown> & { id: string; email: string; ipHash: string | null; createdAt: Date };
+type Attempt = { id: string; ipHash: string | null; createdAt: Date };
 
-/** An in-memory stand-in for the three calls the register path makes, inside a transaction. */
-function fakeDb(seed: Row[] = []) {
+/** An in-memory stand-in for the calls the register path makes, inside a transaction. */
+function fakeDb(seed: Row[] = [], attemptSeed: Attempt[] = []) {
   const rows: Row[] = [...seed];
+  const attempts: Attempt[] = [...attemptSeed];
   let nextId = 1;
+  const attemptDelegate = {
+    count: vi.fn(async ({ where }: { where: { ipHash?: string; createdAt?: { gte?: Date; lt?: Date } } }) =>
+      attempts.filter(
+        (a) =>
+          (where.ipHash === undefined || a.ipHash === where.ipHash) &&
+          (where.createdAt?.gte === undefined || a.createdAt >= where.createdAt.gte)
+      ).length
+    ),
+    create: vi.fn(async ({ data }: { data: { ipHash: string; createdAt?: Date } }) => {
+      attempts.push({ id: `attempt-${attempts.length + 1}`, ipHash: data.ipHash, createdAt: data.createdAt ?? NOW });
+      return {};
+    }),
+    deleteMany: vi.fn(async ({ where }: { where: { createdAt: { lt: Date } } }) => {
+      const kept = attempts.filter((a) => a.createdAt >= where.createdAt.lt);
+      const count = attempts.length - kept.length;
+      attempts.splice(0, attempts.length, ...kept);
+      return { count };
+    }),
+  };
   const delegate = {
     count: vi.fn(async ({ where }: { where: { ipHash?: string; createdAt?: { gte: Date } } }) =>
       rows.filter(
@@ -70,12 +92,18 @@ function fakeDb(seed: Row[] = []) {
       return {};
     }),
   };
-  const tx = { $executeRaw: vi.fn(async () => 0), expertPreRegistration: delegate };
+  const tx = { $executeRaw: vi.fn(async () => 0), expertPreRegistration: delegate, expertPreRegAttempt: attemptDelegate };
   const db = {
     $transaction: async <T>(fn: (t: typeof tx) => Promise<T>) => fn(tx),
     expertPreRegistration: delegate,
+    expertPreRegAttempt: attemptDelegate,
   } as unknown as PrismaClient;
-  return { db, rows, delegate };
+  return { db, rows, delegate, attempts, attemptDelegate };
+}
+
+/** The attempt rows held for one IP, as the window counts them. */
+async function attemptCount(db: PrismaClient, ip: string): Promise<number> {
+  return db.expertPreRegAttempt.count({ where: { ipHash: hashExpertIp(ip, SALT) ?? '', createdAt: { gte: new Date(NOW.getTime() - IP_WINDOW_MS) } } });
 }
 
 function recordingMailer() {
@@ -208,7 +236,8 @@ describe('registerExpertPreRegistration', () => {
     expect(again).toEqual({ kind: 'created' });
     expect(rows).toHaveLength(1);
     const row = rows[0]!;
-    expect(row).toMatchObject({ status: 'pending', title: 'Yeni Unvan', createdAt: later });
+    // The first registration time stays; the last submission is what the cooldown reads.
+    expect(row).toMatchObject({ status: 'pending', title: 'Yeni Unvan', createdAt: NOW, lastSubmittedAt: later });
     expect(row.verifyTokenExpiresAt).toEqual(new Date(later.getTime() + VERIFY_TOKEN_TTL_MS));
     const secondToken = tokenFromMail(sent[1]!);
     expect(secondToken).not.toBe(firstToken);
@@ -216,7 +245,7 @@ describe('registerExpertPreRegistration', () => {
     expect(row.verifyTokenHash).not.toBe(sha256(firstToken));
   });
 
-  it('counts a re-issued registration toward the IP window of the new attempt', async () => {
+  it('counts a re-issued registration toward the IP window through its attempt row, not createdAt', async () => {
     const stale = {
       id: 'pending-1',
       email: 'ayse@example.org',
@@ -231,8 +260,82 @@ describe('registerExpertPreRegistration', () => {
     const { mailer } = recordingMailer();
     const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
     expect(result).toEqual({ kind: 'created' });
-    expect(rows[0]).toMatchObject({ createdAt: NOW, ipHash: hashExpertIp(IP, SALT) });
-    expect(await db.expertPreRegistration.count({ where: { ipHash: hashExpertIp(IP, SALT), createdAt: { gte: new Date(NOW.getTime() - IP_WINDOW_MS) } } })).toBe(1);
+    expect(rows[0]).toMatchObject({ createdAt: new Date(NOW.getTime() - IP_WINDOW_MS - 1_000), ipHash: hashExpertIp(IP, SALT), lastSubmittedAt: NOW });
+    expect(await attemptCount(db, IP)).toBe(1);
+  });
+
+  it('writes the first registration with createdAt and lastSubmittedAt both at this attempt', async () => {
+    const { db, rows } = fakeDb();
+    const { mailer } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
+    expect(rows[0]).toMatchObject({ createdAt: NOW, lastSubmittedAt: NOW });
+    // The row itself is the count for this submission: no attempt row is written for a new registration.
+    expect(await attemptCount(db, IP)).toBe(0);
+  });
+
+  it('writes an attempt row for a 409 on a verified address and sends no mail', async () => {
+    const verified = {
+      id: 'done',
+      email: 'ayse@example.org',
+      ipHash: null,
+      createdAt: NOW,
+      status: 'verified',
+      founderNumber: 1,
+      verifyTokenHash: null,
+      verifyTokenExpiresAt: null,
+      lastSubmittedAt: null,
+    } as Row;
+    const { db, attempts } = fakeDb([verified]);
+    const { mailer, sent } = recordingMailer();
+    const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
+    expect(result).toEqual({ kind: 'duplicate' });
+    expect(sent).toHaveLength(0);
+    expect(attempts).toEqual([expect.objectContaining({ ipHash: hashExpertIp(IP, SALT), createdAt: NOW })]);
+  });
+
+  it('answers 429 from the sixth submission of one IP to a verified address, though none of them creates a row', async () => {
+    const verified = {
+      id: 'done',
+      email: 'ayse@example.org',
+      ipHash: null,
+      createdAt: NOW,
+      status: 'verified',
+      founderNumber: 1,
+      verifyTokenHash: null,
+      verifyTokenExpiresAt: null,
+      lastSubmittedAt: null,
+    } as Row;
+    const { db, attempts } = fakeDb([verified]);
+    const { mailer } = recordingMailer();
+    const attempt = () => registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
+    for (let i = 0; i < REGISTRATION_IP_LIMIT; i++) expect(await attempt()).toEqual({ kind: 'duplicate' });
+    expect(attempts).toHaveLength(REGISTRATION_IP_LIMIT);
+    expect(await attempt()).toEqual({ kind: 'rate_limited' });
+    expect(attempts).toHaveLength(REGISTRATION_IP_LIMIT);
+  });
+
+  it('keeps no attempt row older than 24 hours: each submission deletes the expired ones', async () => {
+    const old = { id: 'attempt-old', ipHash: hashExpertIp('198.51.100.9', SALT), createdAt: new Date(NOW.getTime() - ATTEMPT_RETENTION_MS - 1_000) };
+    const recentAt = new Date(NOW.getTime() - 60_000);
+    const recent = { id: 'attempt-recent', ipHash: hashExpertIp('198.51.100.9', SALT), createdAt: recentAt };
+    const { db, attempts } = fakeDb([], [old, recent]);
+    const { mailer } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
+    expect(attempts.map((a) => a.id)).toEqual(['attempt-recent']);
+  });
+
+  it('lets the cooldown read lastSubmittedAt, so a re-issue long after createdAt is still gated by the last one', async () => {
+    const { db, rows } = fakeDb();
+    const { mailer } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    const later = new Date(NOW.getTime() + RESEND_COOLDOWN_MS + 1_000);
+    await registerExpertPreRegistration({ ...valid, email: 'AYSE@example.org' }, { db, mailer, baseUrl: BASE, now: later, ip: null, salt: null });
+    const tooSoon = await registerExpertPreRegistration(
+      { ...valid, email: 'AYSE@example.org' },
+      { db, mailer, baseUrl: BASE, now: new Date(later.getTime() + RESEND_COOLDOWN_MS - 1_000), ip: null, salt: null }
+    );
+    expect(tooSoon).toEqual({ kind: 'rate_limited' });
+    expect(rows[0]).toMatchObject({ createdAt: NOW, lastSubmittedAt: later });
   });
 
   it('puts the previous link back when the re-issued mail cannot be sent', async () => {
