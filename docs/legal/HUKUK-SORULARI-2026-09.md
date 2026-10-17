@@ -246,7 +246,7 @@ Bu sorular ajans eki taslağında (`agency-channel-notice-addendum.md` §7) zate
 
 ### 4.1 HUKUK-1 — Veri sorumlusunun kimliği ve başvuru kanalı
 
-**Bugün.** Ölçülen aday unvan `FonBridge Ltd. Şti.` (`docs/EFATURA_SETUP.md:38`). MERSİS numarası, merkez adresi, KEP adresi ve kanonik başvuru e-postası repoda yok. Dört ayrı alan adı kullanılıyor (`privacy-notice-gap-analysis.md` §4.2). **Sürüm 1.11:** ürün sahibi canlı uygulama alan adını `fonbridge.com`, e-posta göndericisini `info@fonbridge.com` olarak belirledi (29.09.2026). Başvuru e-postasının hangisi olacağı hâlâ bu sorunun parçasıdır.
+**Bugün.** Ölçülen aday unvan `Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.` (`docs/EFATURA_SETUP.md:38`). MERSİS numarası, merkez adresi, KEP adresi ve kanonik başvuru e-postası repoda yok. Dört ayrı alan adı kullanılıyor (`privacy-notice-gap-analysis.md` §4.2). **Sürüm 1.11:** ürün sahibi canlı uygulama alan adını `fonbridge.com`, e-posta göndericisini `info@fonbridge.com` olarak belirledi (29.09.2026). Başvuru e-postasının hangisi olacağı hâlâ bu sorunun parçasıdır.
 
 > **Soru.** Aydınlatma metinlerine yazılacak tam unvan, MERSİS, adres, KEP ve başvuru e-postası nedir? VERBİS kaydı gerekiyor mu?
 
