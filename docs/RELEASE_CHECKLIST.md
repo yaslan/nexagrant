@@ -263,9 +263,9 @@ Aynı UTC gününün sonunda `psql -Atq "$DATABASE_URL" -f m4-claims.sql | comm 
 
 ---
 
-## 4. Yedekleme ve felaket kurtarma — EKSİK
+## 4. Yedekleme ve felaket kurtarma — betik var, canlı sunucu kararı bekliyor
 
-Repoda Postgres yedekleme/geri yükleme betiği, zamanlayıcısı ya da belgesi **yok** (`grep -rE 'pg_dump|pg_restore|pgbackrest|wal-g'` repoda sonuç vermiyor; `scripts/compare-production-backup.ts` bir dosya ağacı karşılaştırıcısı, DB yedeği değil). Uygulama sunucusu belli olmadan (madde 1.2) kurulamaz; plan aşağıda.
+Yerel yedek ve geri yükleme provası repoda: `pnpm backup:db` (`scripts/backup/pg-backup.sh`, `pg_dump --format=custom`, dökümü `pg_restore --list` ile okuyup SHA-256 yazar) ve `pnpm backup:restore-drill` (`scripts/backup/pg-restore-drill.sh`, ayrı bir DB'ye geri yükler, tablo başına satır sayısını iki tarafta karşılaştırır). Zamanlayıcı, dış kopya ve saklama katmanları (4 haftalık / 12 aylık) **henüz yok**; sunucu belli olunca kurulur. Uygulama sunucusu belli olmadan (madde 1.2) bu bölümün 4.1 zamanlayıcısı kurulamaz; plan aşağıda.
 
 ### 4.1 Günlük yedek (öneri — sunucu belli olunca EKSİK kartı)
 

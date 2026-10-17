@@ -139,8 +139,21 @@ jobs:
     # in the database (mutants N4/N5) kept every vitest suite green; only this
     # live check, which reads pg_policies and measures isolation as fabrika_app,
     # went red. It used to run only in the local `pnpm gate`.
+    # `--require-db`: this job always has its database. An unreachable one must
+    # fail here, not pass as a skipped measurement (scripts/check-rls-live.ts, R-S7).
     - name: Verify RLS policies (live, as fabrika_app)
-      run: pnpm rls:verify
+      run: pnpm rls:verify --require-db
+
+    # Static half of the tenant-isolation pair (scripts/check-tenant-bypass.ts):
+    # a tenant-scoped Prisma call outside withTenant fails here. It reads files
+    # only, so it needs no database, but it sits next to the live check it pairs with.
+    - name: Tenant bypass gate
+      run: pnpm rls:bypass-check
+
+    # Open SystemAlert rows that name deleted tenants (scripts/check-orphan-alerts.ts).
+    # Runs against the service container prepared above.
+    - name: Orphan alert gate
+      run: pnpm alerts:check
 
     - name: Lint
       run: pnpm lint
