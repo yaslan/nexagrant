@@ -9,7 +9,7 @@
  * agreement to a text nobody saw: bump this together with the copy in
  * messages/*.json when the consent wording changes.
  */
-export const EXPERT_PREREG_CONSENT_VERSION = 'kvkk-v1';
+export const EXPERT_PREREG_CONSENT_VERSION = 'kvkk-v2';
 
 /** The first this many verified experts get a founder number ("Kurucu Uzman"). */
 export const FOUNDER_SEAT_LIMIT = 100;

@@ -19,7 +19,7 @@ This agreement is made between the two parties whose details are set out in the 
 | Detail                     | Controller (customer organisation) | Processor                       |
 | -------------------------- | ---------------------------------- | ------------------------------- |
 | Name                       | ...............................    | FonBridge                       |
-| Registered legal name      | ...............................    | Fonbridge Ltd. Şti.             |
+| Registered legal name      | ...............................    | Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.             |
 | Address                    | ...............................    | Karasamsun Quarter, İlkadım, SAMSUN [to be completed] |
 | Tax office / tax number    | ...............................    | 29120352230                     |
 | Trade registry (MERSİS) no | ...............................    | ............................... |
