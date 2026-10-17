@@ -192,10 +192,18 @@ describe("pipelineCoverage / categorySummary", () => {
       covered: ["G0", "G1", "G2"],
       total: 5,
     });
+    // Patron onayı K-563625: M5 covers only the late gates, so it alone is 2/5.
     expect(pipelineCoverage(["M5"])).toEqual({
-      covered: ["G0", "G1", "G2", "G3", "G4"],
+      covered: ["G3", "G4"],
       total: 5,
     });
+  });
+
+  it("M5 declares exactly G3 and G4 as its stages", () => {
+    expect(getAllManifests().find((m) => m.id === "M5")?.stages).toEqual([
+      "G3",
+      "G4",
+    ]);
   });
 
   it("gives active/total per category", () => {

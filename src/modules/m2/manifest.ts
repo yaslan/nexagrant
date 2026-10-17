@@ -29,7 +29,7 @@ export const m2Manifest: ModuleManifest = {
   tables: ['ConceptTemplate', 'ConceptNote'],
   isActive: true,
   category: 'core',
-  stages: ['G0', 'G1'],
+  stages: ['G0', 'G1'], // Patron onayı K-563625 (2026-10-17)
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,

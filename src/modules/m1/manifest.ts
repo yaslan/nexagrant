@@ -37,7 +37,7 @@ export const m1Manifest: ModuleManifest = {
   ],
   isActive: true,
   category: 'core',
-  stages: ['G0', 'G2'],
+  stages: ['G0', 'G2'], // Patron onayı K-563625 (2026-10-17)
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,

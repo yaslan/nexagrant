@@ -25,7 +25,7 @@ export const m9Manifest: ModuleManifest = {
   tables: ['MeetingBrief'],
   isActive: true,
   category: 'tools',
-  stages: ['G2'],
+  stages: ['G2'], // Patron onayı K-563625 (2026-10-17)
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,

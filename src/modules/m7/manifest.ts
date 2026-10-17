@@ -25,7 +25,7 @@ export const m7Manifest: ModuleManifest = {
   tables: ['TtoPortfolioItem'],
   isActive: true,
   category: 'tools',
-  stages: ['G0'],
+  stages: ['G0'], // Patron onayı K-563625 (2026-10-17)
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,

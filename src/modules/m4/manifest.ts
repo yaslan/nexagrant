@@ -28,7 +28,7 @@ export const m4Manifest: ModuleManifest = {
   tables: ['Relationship', 'Interaction'],
   isActive: true,
   category: 'core',
-  stages: ['G2'],
+  stages: ['G2'], // Patron onayı K-563625 (2026-10-17)
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,

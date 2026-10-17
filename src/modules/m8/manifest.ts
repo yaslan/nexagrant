@@ -29,7 +29,7 @@ export const m8Manifest: ModuleManifest = {
   tables: ['ConsortiumSeat', 'SeatCandidate', 'TopicMatch'],
   isActive: true,
   category: 'ai',
-  stages: ['G2'],
+  stages: ['G2'], // Patron onayı K-563625 (2026-10-17)
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
