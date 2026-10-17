@@ -134,7 +134,8 @@
     "readinessImportedAt": "scorecard result added on {date}",
     "readinessMoreGaps": "{count} more gaps; see the full result for all of them.",
     "readinessViewResult": "View the full result",
-    "readinessRetake": "Retake the scorecard"
+    "readinessRetake": "Retake the scorecard",
+    "cardLinkAria": "{title} — go to details"
   },
   "Pipeline": {
     "title": "Opportunity Pipeline",

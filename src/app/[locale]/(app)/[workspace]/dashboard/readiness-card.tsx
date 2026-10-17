@@ -43,13 +43,23 @@ export async function ReadinessCard({ tenantId, locale }: { tenantId: string; lo
   const shown = result.gaps.slice(0, GAPS_SHOWN);
   const query = buildShareQuery(stored.orgType, stored.answers, province);
   const importedAt = stored.importedAt ? new Date(stored.importedAt) : null;
+  const resultHref = query ? `${readinessPath(locale)}?${query}` : readinessPath(locale);
 
   return (
     <section
       aria-labelledby="readiness-card-title"
       data-testid="readiness-card"
-      className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+      className="relative rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md hover:ring-1 hover:ring-blue-400 dark:border-gray-700 dark:bg-gray-800 dark:hover:ring-blue-500"
     >
+      {/* FO-69: the whole card opens the full result. A link stretched over the card rather
+          than a link around it, so the two buttons below stay links of their own (no link
+          inside a link); they sit above it with `relative`. */}
+      <a
+        href={resultHref}
+        aria-label={tCard('cardLinkAria', { title: tCard('readinessTitle') })}
+        data-testid="readiness-card-link"
+        className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+      />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 id="readiness-card-title" className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -105,8 +115,8 @@ export async function ReadinessCard({ tenantId, locale }: { tenantId: string; lo
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         {query && (
           <a
-            href={`${readinessPath(locale)}?${query}`}
-            className={`${link} border border-gray-300 text-gray-900 hover:bg-gray-50 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700`}
+            href={resultHref}
+            className={`${link} relative border border-gray-300 text-gray-900 hover:bg-gray-50 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700`}
           >
             {tCard('readinessViewResult')}
           </a>
@@ -114,7 +124,7 @@ export async function ReadinessCard({ tenantId, locale }: { tenantId: string; lo
         <a
           href={readinessPath(locale)}
           data-testid="readiness-card-retake"
-          className={`${link} bg-blue-600 text-white hover:bg-blue-700`}
+          className={`${link} relative bg-blue-600 text-white hover:bg-blue-700`}
         >
           {tCard('readinessRetake')}
         </a>

@@ -134,7 +134,8 @@
     "readinessImportedAt": "karne sonucu {date} tarihinde eklendi",
     "readinessMoreGaps": "{count} eksik adım daha var; tamamı ayrıntılı sonuçta.",
     "readinessViewResult": "Ayrıntılı sonucu gör",
-    "readinessRetake": "Karneyi yeniden yap"
+    "readinessRetake": "Karneyi yeniden yap",
+    "cardLinkAria": "{title} — ayrıntıya git"
   },
   "Pipeline": {
     "title": "Fırsat Pipeline",
