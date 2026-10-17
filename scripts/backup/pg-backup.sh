@@ -8,10 +8,11 @@
 # not a silent one. Exit code is non-zero on any failure; the caller (cron, CI)
 # is responsible for turning that into an alert (checklist §5.3).
 #
-# Required: BACKUP_DATABASE_URL. Use a role that BYPASSRLS (or is superuser):
-# a NOBYPASSRLS role such as fabrika_app sees zero tenant rows and produces an
-# empty-looking backup that still exits 0. This script refuses to run without
-# the variable; it never falls back to DATABASE_URL.
+# Required: BACKUP_DATABASE_URL. Use a role that BYPASSRLS (or is superuser).
+# A NOBYPASSRLS role such as fabrika_app makes pg_dump fail loudly (permission
+# denied on the private schema, measured: exit 1, no file written). The script
+# does not check the role's BYPASSRLS flag itself. This script refuses to run
+# without the variable; it never falls back to DATABASE_URL.
 #
 # Optional:
 #   BACKUP_DIR            output directory          (default: ./backups)

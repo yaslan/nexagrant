@@ -47,9 +47,14 @@ src_db="$(psql "$BACKUP_DATABASE_URL" -X -At -c 'select current_database()')"
 
 dump="${1:-}"
 if [ -z "$dump" ]; then
-  dump="$(ls -1t "$BACKUP_DIR"/fonbridge-*.dump 2>/dev/null | head -n 1 || true)"
+  dump="$(ls -1t "$BACKUP_DIR"/fonbridge-*.dump "$BACKUP_DIR"/fonbridge-*.dump.age 2>/dev/null | head -n 1 || true)"
   [ -n "$dump" ] || fail "no dump given and none found in $BACKUP_DIR"
 fi
+# An encrypted backup is not drilled: this script does not decrypt. Fail loudly
+# instead of letting an undecryptable file pass as a restore proof.
+case "$dump" in
+  *.age) fail "encrypted backup ($(basename "$dump")) cannot be drilled here; decrypt it with 'age -d' to a .dump first" ;;
+esac
 [ -s "$dump" ] || fail "dump not found or empty: $(basename "$dump")"
 
 # Checksum, when the backup wrote one.
