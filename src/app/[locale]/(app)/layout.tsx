@@ -17,6 +17,8 @@ import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-sto
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
 import { can, asRole } from '@/lib/rbac';
+import { listAccessibleModules } from '@/lib/modules/access';
+import { ModuleProvider } from '@/lib/modules/hooks';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
 import FeedbackWidget from '@/components/FeedbackWidget';
@@ -92,8 +94,12 @@ export default async function AppLayout({
 
   const canManageModules = can(asRole(roleName), 'manage_modules');
   const canManageUsers = can(asRole(roleName), 'manage_users');
+  // What the sidebar, the opportunity tabs and the cross-links may offer. Same decision
+  // as each page's `moduleGate`, read once here; the pages still gate themselves.
+  const activeModules = await listAccessibleModules();
 
   return (
+    <ModuleProvider activeModules={activeModules}>
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-background">
       <LocaleUpdater />
       {/* Mobile Top Header */}
@@ -161,6 +167,7 @@ export default async function AppLayout({
       {/* E11.2 — beta feedback entry point, present on every workspace page */}
       <FeedbackWidget locale={locale} workspace={workspace} />
     </div>
+    </ModuleProvider>
   );
 }
 

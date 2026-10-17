@@ -241,7 +241,18 @@
           "WITHDRAWN": "A withdrawn opportunity cannot take a declaration.",
           "DECLARE_FAILED": "The declaration could not be saved. Try again."
         }
-      }
+      },
+      "modules": {
+        "label": "Modules",
+        "conceptNote": "Concept note",
+        "evaluations": "Internal pre-assessment",
+        "matching": "Consortium role matrix",
+        "consortium": "Consortium builder",
+        "briefs": "Meeting briefing",
+        "documents": "Follow-up documents",
+        "application": "Application (Part A & B)"
+      },
+      "personDaysReport": "Person-days report"
     }
   },
   "pipeline": {
@@ -2879,5 +2890,41 @@
       "noMatch": "No matching EU call was found for this technology.",
       "openM4Relationship": "Open M4 relationship"
     }
+  },
+  "PartnersLeaders": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbPartners": "Partners",
+    "breadcrumbLeaders": "Top Leaders",
+    "backToPartners": "← Back to Partners",
+    "title": "Key Ecosystem Leaders",
+    "titleByTopic": "Coordinators for {prefix}",
+    "intro": "These organisations are among the most active participants and coordinators in Horizon Europe and H2020 projects (CORDIS data).",
+    "introByTopic": "Organisations that coordinate the most projects under this topic-code prefix (CORDIS data). Pick a prefix such as HORIZON-CL5-.",
+    "topicLabel": "Topic code prefix",
+    "topicPlaceholder": "e.g. HORIZON-CL5-",
+    "topicSubmit": "Show",
+    "topicClear": "Clear",
+    "topicInvalid": "The prefix must be at least 3 characters and use only letters, digits and hyphens.",
+    "noTopicResults": "No coordinators found for this prefix.",
+    "loadFailed": "The coordinator list could not be loaded right now. Please try again shortly.",
+    "picLabel": "PIC:",
+    "coordinatedLabel": "Projects Coordinated:",
+    "totalLabel": "Total Projects:",
+    "ecContributionLabel": "EU Contribution Coordinated:"
+  },
+  "PartnersPage": {
+    "crossLinks": {
+      "label": "Related pages",
+      "leaders": "Key ecosystem leaders",
+      "personDays": "Person-days report"
+    }
+  },
+  "ExpertPreregEmail": {
+    "subject": "Confirm your expert pre-registration · {product}",
+    "greeting": "Hello {name},",
+    "intro": "We received your expert pre-registration for {product}. Click the link below to confirm it.",
+    "cta": "Confirm my registration",
+    "expires": "The link is valid until {date}.",
+    "ignore": "If you did not register, you can ignore this email."
   }
 }

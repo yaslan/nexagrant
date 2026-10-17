@@ -672,6 +672,56 @@ model PublicLead {
   @@index([ipHash, createdAt])
 }
 
+/// FO-19 (TASK-MVBIXPP33UK1B): the public expert pre-registration. An expert
+/// with no account leaves a profile; the e-mail link verifies it, and the first
+/// 100 verified rows get a `founderNumber` (src/lib/expert-prereg/server/).
+/// No tenant: platform data with personal data in it (KVKK), so the table is
+/// SYSTEM_WIDE in scripts/rls-models.ts with RLS off, the same as PublicLead.
+/// Raw tokens and raw IPs are never stored: only `verifyTokenHash` and `ipHash`.
+model ExpertPreRegistration {
+  id                   String    @id @default(cuid())
+  fullName             String
+  /// Trimmed and lower-cased (the form and the API both normalise it).
+  email                String    @unique
+  emailVerifiedAt      DateTime?
+  /// Plate code "01".."81" (src/lib/expert-prereg/options.ts).
+  province             String
+  title                String?
+  isFreelancer         Boolean
+  expertiseAreas       String[]
+  roles                String[]
+  programmes           String[]
+  projectCodes         String?
+  /// ORCID iD, upper-cased, checksum-validated (src/lib/expert-prereg/schema.ts).
+  orcid                String?
+  linkedinUrl          String?
+  languages            String[]
+  referredBy           String?
+  utmSource            String?
+  utmMedium            String?
+  utmCampaign          String?
+  kvkkAcceptedAt       DateTime
+  visibilityConsentAt  DateTime
+  marketingConsentAt   DateTime?
+  /// Version of the consent text the expert ticked; a server constant, never a client field.
+  consentTextVersion   String    @default("kvkk-v1")
+  /// `tr` or `en`: the language of the verification mail and of the redirect after it.
+  locale               String
+  /// SHA-256 of the one-time verification token. The raw token exists only in the mail.
+  verifyTokenHash      String?   @unique
+  verifyTokenExpiresAt DateTime?
+  /// Set once, on verification, for the first 100 verified experts (Kurucu Uzman). Unique: no duplicate number.
+  founderNumber        Int?      @unique
+  /// `pending` | `verified` | `disabled`.
+  status               String    @default("pending")
+  /// HMAC-SHA256 of the client IP under EXPERT_PREREG_IP_SALT: the per-IP limit only.
+  ipHash               String?
+  createdAt            DateTime  @default(now())
+  @@index([createdAt])
+  @@index([ipHash, createdAt])
+  @@index([status, createdAt])
+}
+
 // ───────────────────────── K1 tenant-scoped ─────────────────────────
 
 /// Two kinds of row live here, told apart by `opportunityId`:

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getWorkspaceRoute } from '@/lib/routes';
+import { getAllManifests } from '@/lib/modules/registry';
+import { useActiveModules } from '@/lib/modules/hooks';
 
 interface SidebarNavProps {
   locale: string;
@@ -26,14 +28,24 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
     ? secondSegment
     : 'default';
 
+  // Module entries come from each manifest's `nav[]`, shown only for modules the server
+  // said this session may open (plan + ModuleState + role, `listAccessibleModules`).
+  // The visibility decision is not re-made here; this only reads its answer.
+  const activeModules = useActiveModules();
+  const moduleItems = getAllManifests()
+    .filter((m) => activeModules.includes(m.id))
+    .flatMap((m) => m.nav)
+    .sort((a, b) => a.order - b.order)
+    .map((item) => ({
+      key: item.labelKey,
+      href: getWorkspaceRoute(item.routeKey, locale, workspaceSlug),
+      label: t(item.labelKey),
+    }));
+
   const navItems = [
     { key: 'dashboard', href: getWorkspaceRoute('dashboard', locale, workspaceSlug), label: t('dashboard') },
     { key: 'calls', href: getWorkspaceRoute('calls', locale, workspaceSlug), label: t('calls') },
-    { key: 'pipeline', href: getWorkspaceRoute('pipeline', locale, workspaceSlug), label: t('pipeline') },
-    { key: 'partners', href: getWorkspaceRoute('partners', locale, workspaceSlug), label: t('partners') },
-    { key: 'relationships', href: getWorkspaceRoute('relationships', locale, workspaceSlug), label: t('relationships') },
-    { key: 'evidence', href: getWorkspaceRoute('evidence', locale, workspaceSlug), label: t('evidence') },
-    { key: 'tto', href: getWorkspaceRoute('tto', locale, workspaceSlug), label: t('tto') },
+    ...moduleItems,
     { key: 'approvals', href: getWorkspaceRoute('approvals', locale, workspaceSlug), label: t('approvals') },
     { key: 'apiKeys', href: getWorkspaceRoute('settingsApiKeys', locale, workspaceSlug), label: t('apiKeys') },
     ...(canManageUsers
@@ -66,6 +78,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
           <Link
             key={item.key}
             href={item.href}
+            data-testid={`sidebar-nav-${item.key}`}
             className={`px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-between ${
               isActive
                 ? 'bg-accent/10 text-accent-ink font-semibold'
