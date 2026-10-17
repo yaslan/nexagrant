@@ -196,8 +196,9 @@ Every ratio on the dashboard is backed by a record; with no source, the metric s
 
 ## 7. Data, privacy and compliance
 
-- **Tenant isolation:** every record belongs to a tenant, enforced with row-level security (RLS) in the
-  database. One partner's data is not visible to another.
+- **Tenant isolation:** every record belongs to a tenant, and the application restricts every query to
+  that tenant. One partner's data is not visible to another. Row-level security (RLS) policies are
+  defined in the database but are not yet in effect on the application's database connection.
 - **AI usage:** LLM calls are logged (module, purpose, model, tokens, credits). **Your data is not used
   to train models.**
 - **Your rights:** data export and deletion requests directly in the product: `Settings → Privacy`.
