@@ -5,6 +5,7 @@ import { hashSecretToken } from '@/lib/secret-token';
 import { exportExpertPreRegistrationsCsv } from '@/lib/expert-prereg/server/admin';
 import { FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
+import { acquireExpertPreRegLiveLock } from './helpers/expert-prereg-live-lock';
 
 /**
  * FO-19 (TASK-MVBIXPP33UK1B) — live founder-number race on real Postgres.
@@ -26,8 +27,12 @@ const reachable = await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => 
 const tokens = Array.from({ length: COUNT }, () => randomBytes(32).toString('hex'));
 let before = 0;
 
+// FO-45: the re-issue file also assigns founder numbers on this table; run the two one after the other.
+let releaseLock: (() => Promise<void>) | null = null;
+
 beforeAll(async () => {
   if (!reachable) return;
+  releaseLock = await acquireExpertPreRegLiveLock();
   await prisma.expertPreRegistration.deleteMany({ where: { email: { startsWith: PREFIX } } });
   const top = await prisma.expertPreRegistration.aggregate({ _max: { founderNumber: true } });
   before = top._max.founderNumber ?? 0;
@@ -58,6 +63,7 @@ afterAll(async () => {
   if (!reachable) return;
   await prisma.expertPreRegistration.deleteMany({ where: { email: { startsWith: PREFIX } } });
   await prisma.$disconnect();
+  await releaseLock?.();
 });
 
 describe('founder number race (live Postgres)', () => {
