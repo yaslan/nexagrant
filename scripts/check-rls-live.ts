@@ -178,6 +178,10 @@ async function createProbeRole(admin: pg.Client, adminUrl: string): Promise<Meas
         IF to_regprocedure('public.system_scope_open(regclass)') IS NOT NULL THEN
           EXECUTE 'GRANT EXECUTE ON FUNCTION public.system_scope_open(regclass), public.system_scope_sealed() TO ${PROBE_ROLE}';
         END IF;
+        -- The system-scope probes enter a purpose the way fabrika_app does.
+        IF to_regprocedure('public.enter_system_scope(text)') IS NOT NULL THEN
+          EXECUTE 'GRANT EXECUTE ON FUNCTION public.enter_system_scope(text) TO ${PROBE_ROLE}';
+        END IF;
       END $$;`);
   } catch (e) {
     console.log(`   geçici ölçüm rolü kurulamadı: ${e instanceof Error ? e.message : String(e)}`);
@@ -616,6 +620,121 @@ async function probeSystemScopeTable(
   return { failures, checks };
 }
 
+/**
+ * FO-52 (K-569554 = C): the purpose 'public-intake' (the anonymous expert form)
+ * opens only PUBLIC_INTAKE_TABLES; every other system_scope table must look
+ * exactly as it does outside the scope, and a write there must be refused.
+ * The other purposes must still open everything. One snapshot for both
+ * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
+ * Everything is rolled back.
+ */
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter']);
+
+async function probePurposeTables(
+  m: pg.Client,
+  admin: pg.Client | null
+): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const tables = (
+    await m.query<{ t: string }>(
+      `select tablename as t from pg_policies where schemaname = 'public' and policyname = 'system_scope' order by 1`
+    )
+  ).rows.map((r) => r.t);
+  if (!tables.includes('AuditEvent')) {
+    failures.push('system_scope: AuditEvent politikası yok — amaç ölçümü koşamadı.');
+    return { failures, checks };
+  }
+  const countAll = async (c: pg.Client): Promise<Map<string, number>> => {
+    const out = new Map<string, number>();
+    for (const t of tables) {
+      out.set(t, Number((await c.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(t)}`)).rows[0]?.n ?? -1));
+    }
+    return out;
+  };
+  const tryInsert = async (sql: string, params: unknown[]): Promise<'ok' | 'rls' | string> => {
+    await m.query('savepoint probe_purpose');
+    try {
+      await m.query(sql, params);
+      return 'ok';
+    } catch (e) {
+      return isRlsViolation(e) ? 'rls' : e instanceof Error ? e.message.split('\n')[0]! : String(e);
+    } finally {
+      await m.query('rollback to savepoint probe_purpose');
+    }
+  };
+  const auditInsert = (tenantId: string | null) =>
+    tryInsert(`insert into "AuditEvent" (id, "tenantId", type) values ($1, $2, 'rls-verify.probe')`, [
+      `rls-verify-${randomBytes(6).toString('hex')}`,
+      tenantId,
+    ]);
+
+  let truth: Map<string, number> | null = null;
+  if (admin) {
+    await admin.query('begin isolation level repeatable read');
+    const snap = (await admin.query<{ s: string }>('select pg_export_snapshot() as s')).rows[0]!.s;
+    await m.query('begin isolation level repeatable read');
+    await m.query(`set transaction snapshot '${snap.replace(/'/g, "''")}'`);
+    truth = await countAll(admin);
+  } else {
+    await m.query('begin isolation level repeatable read');
+  }
+  try {
+    const outside = await countAll(m);
+    const tenantId = (await m.query<{ id: string }>('select id from "Tenant" order by id limit 1')).rows[0]?.id ?? null;
+    const opened = (inside: Map<string, number>) =>
+      tables.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
+
+    await m.query(`select enter_system_scope('public-intake')`);
+    const intake = await countAll(m);
+    const leaked = opened(intake).filter((t) => !PUBLIC_INTAKE_TABLES.has(t));
+    if (leaked.length > 0) {
+      failures.push(
+        `public-intake: ${leaked.length} tablo kapsam dışından fazlasını gösteriyor (yalnız ${[...PUBLIC_INTAKE_TABLES].join(', ')} açılmalı): ${leaked
+          .map((t) => `${t}=${intake.get(t)}>${outside.get(t)}`)
+          .join(', ')}`
+      );
+    } else {
+      checks.push(`public-intake: ${tables.length - PUBLIC_INTAKE_TABLES.size} system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ${[...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t)).join(', ')} açık)`);
+    }
+    if (truth) {
+      const short = [...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t) && intake.get(t) !== truth!.get(t));
+      if (short.length > 0) failures.push(`public-intake: kendi tablosunu tam göremiyor: ${short.map((t) => `${t}=${intake.get(t)}/${truth!.get(t)}`).join(', ')}`);
+    }
+    const auditIntake = await auditInsert(tenantId);
+    if (auditIntake === 'rls') checks.push('public-intake: AuditEvent INSERT reddedildi');
+    else failures.push(`public-intake: AuditEvent INSERT ${auditIntake === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${auditIntake}`}`);
+    const expertIntake = await tryInsert(
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+      [`rls-verify-${randomBytes(6).toString('hex')}`]
+    );
+    if (expertIntake === 'ok') checks.push(`public-intake: ${EXPERT_TABLE} INSERT kabul edildi (pozitif kontrol, geri alındı)`);
+    else failures.push(`public-intake: ${EXPERT_TABLE} INSERT reddedildi — form yazamaz: ${expertIntake}`);
+
+    // The other purposes are not narrowed: each still opens every row.
+    for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
+      await m.query('select enter_system_scope($1)', [purpose]);
+      const inside = await countAll(m);
+      const short = truth
+        ? tables.filter((t) => inside.get(t) !== truth!.get(t))
+        : tables.filter((t) => (inside.get(t) ?? 0) < (outside.get(t) ?? 0));
+      if (short.length > 0) {
+        failures.push(`${purpose}: daraldı, tüm satırları görmüyor: ${short.map((t) => `${t}=${inside.get(t)}`).join(', ')}`);
+      } else {
+        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? ', her system_scope tablosunda tüm satırlar' : ''}`);
+      }
+    }
+    const auditAdmin = await auditInsert(tenantId);
+    if (auditAdmin === 'ok') checks.push('cross-tenant-job: AuditEvent INSERT kabul edildi (pozitif kontrol, geri alındı)');
+    else failures.push(`cross-tenant-job: AuditEvent INSERT reddedildi — ${auditAdmin === 'rls' ? 'RLS' : auditAdmin}`);
+  } finally {
+    await m.query('rollback');
+    if (admin) await admin.query('rollback');
+  }
+  return { failures, checks };
+}
+
 async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
@@ -802,6 +921,9 @@ async function main() {
       const expert = await probeSystemScopeTable(measurer.client, rlsOn.has(EXPERT_TABLE), expertRows);
       failures.push(...expert.failures);
       checks.push(...expert.checks);
+      const purposes = await probePurposeTables(measurer.client, measurer.client === client ? null : client);
+      failures.push(...purposes.failures);
+      checks.push(...purposes.checks);
     }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);

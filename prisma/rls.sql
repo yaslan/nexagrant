@@ -180,6 +180,18 @@ END $$;
 -- docs/agent-results/TASK-MTVTPVTEBCF5Z-de-fb.md §6 (1-3-1) and
 -- docs/adr/ADR-0009-signed-system-scope.md.
 --
+-- One purpose is narrowed by table (FO-52, K-569554 = C): 'public-intake' is
+-- the anonymous expert form, so a sealed scope with that purpose opens only
+-- ExpertPreRegistration and ExpertFounderCounter (the founder-number counter
+-- the same verification writes). Every other system_scope table stays shut to
+-- it, reads and writes alike. The other five purposes are not narrowed. The
+-- purpose is read from app.system_scope_purpose, which is USERSET like the
+-- flag; the seal is not tied to it. So this guards against a public-intake
+-- call site that reaches for the wrong table, not against code that can call
+-- enter_system_scope('<another purpose>') — that code could open everything
+-- anyway. A new table the form needs goes into the list in system_scope_open()
+-- on purpose; until then a write there is an RLS error and a read is 0 rows.
+--
 -- Deploy order: this is applied by `pnpm db:rls`. Code that calls
 -- withSystemScope() reads zero rows until it has run, exactly like every other
 -- policy change in this file. The role that runs it must be allowed to create
@@ -301,11 +313,19 @@ AS $fn$
      AND (pg_has_role(current_user,
                       (SELECT c.relowner FROM pg_class c WHERE c.oid = tbl),
                       'USAGE')
-          OR public.system_scope_sealed())
+          OR (public.system_scope_sealed()
+              -- FO-52: public-intake opens the expert form's tables only.
+              -- to_regclass, not '…'::regclass: a table missing on this
+              -- database (ExpertFounderCounter before its migration) is NULL
+              -- here and simply not on the list, instead of an error in every
+              -- system_scope policy. IS TRUE turns that NULL into false.
+              AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'public-intake'
+                   OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
+                               to_regclass('public."ExpertFounderCounter"'))) IS TRUE)))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration and ExpertFounderCounter (FO-52). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
