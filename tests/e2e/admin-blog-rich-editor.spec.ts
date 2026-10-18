@@ -88,8 +88,8 @@ test.describe.serial('admin blog — rich text editor, stored as markdown', () =
     await expect(editor).toHaveText(ORIGINAL);
     // Only what the site renders is offered.
     const toolbar = page.getByRole('toolbar', { name: 'Biçimlendirme' });
-    await expect(toolbar.getByRole('button')).toHaveCount(8);
-    for (const name of ['Başlık 1', 'Başlık 2', 'Başlık 3', 'Kalın', 'Madde listesi', 'Numaralı liste', 'Geri al', 'Yinele']) {
+    await expect(toolbar.getByRole('button')).toHaveCount(10);
+    for (const name of ['Başlık 1', 'Başlık 2', 'Başlık 3', 'Kalın', 'Madde listesi', 'Numaralı liste', 'Bağlantı', 'Görsel', 'Geri al', 'Yinele']) {
       await expect(toolbar.getByRole('button', { name, exact: true })).toBeVisible();
     }
 
@@ -160,10 +160,13 @@ test.describe.serial('admin blog — rich text editor, stored as markdown', () =
     await editor.click();
     await page.keyboard.press('ControlOrMeta+A');
     await pasteInto(editor, { html: WORD_HTML, text: 'Word başlığı' });
-    // Dropped in the editor already: no italic, strike, code, link, quote, rule, table cell, image.
+    // Dropped in the editor already: no italic, strike, code, quote, rule, table cell, image.
+    // An https link is kept (TASK-MVDPHZQCTVJ2R); a pasted image never is.
     await expect(editor.locator('h1')).toHaveText('Word başlığı');
     await expect(editor.locator('strong')).toHaveText('kalın');
-    await expect(editor.locator('em, i, s, code, u, a, blockquote, hr, table, img, h4, li ul, li ol')).toHaveCount(0);
+    // The browser's clipboard writes the address normalised, with its trailing slash.
+    await expect(editor.locator('a')).toHaveAttribute('href', 'https://example.test/');
+    await expect(editor.locator('em, i, s, code, u, blockquote, hr, table, img, h4, li ul, li ol')).toHaveCount(0);
     // Numbered from 1, as the page will number it.
     await expect(editor.locator('ol')).not.toHaveAttribute('start', /.*/);
     await page.screenshot({ path: `${SHOTS}/04-editor-word-paste.png` });
@@ -172,7 +175,8 @@ test.describe.serial('admin blog — rich text editor, stored as markdown', () =
     const content = (await prisma.blogPost.findUnique({ where: { slug: PASTE_SLUG } }))?.content ?? '';
     expect(content).toContain('# Word başlığı');
     expect(content).toContain('**kalın**');
-    expect(content).not.toMatch(/[_~`<>[\]]|^[ \t]+[*\d]|^-{3}/m);
+    expect(content).toContain('[bağlantı](https://example.test/)');
+    expect(content.replace('[bağlantı](https://example.test/)', '')).not.toMatch(/[_~`<>[\]]|^[ \t]+[*\d]|^-{3}/m);
 
     await page.goto(`/tr/blog/${PASTE_SLUG}`);
     const article = page.locator('article .prose');

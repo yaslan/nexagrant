@@ -3,8 +3,12 @@
  * stays plain markdown: the public post page renders it with
  * `renderBlogContent` (src/app/[locale]/(public)/blog/[slug]/page.tsx), and
  * that renderer knows exactly this subset — paragraph, `#`/`##`/`###`
- * heading, `**bold**`, `* ` bullet list, `1. ` numbered list. Nothing else
- * exists on the site, so nothing else exists here.
+ * heading, `**bold**`, `* ` bullet list, `1. ` numbered list, and since
+ * TASK-MVDPHZQCTVJ2R an inline link `[text](href)` and a block image
+ * `![alt](src)` on a line of its own — both only as far as
+ * src/lib/blog-content-policy.ts allows them. Nothing else exists on the site,
+ * so nothing else exists here. A link or image the policy refuses is plain
+ * text here, as it is on the page.
  *
  * `markdownToDoc` reads content the way the renderer does (line by line,
  * trimmed, the same patterns in the same order, consecutive paragraph lines
@@ -18,10 +22,20 @@
  * Pure functions over Tiptap/ProseMirror JSON; no editor import, no HTML.
  */
 
+import {
+  BLOG_LINK_SPLIT,
+  blogImage,
+  blogLink,
+  cleanBracketText,
+  encodeContentUrl,
+  isAllowedLinkHref,
+} from '@/lib/blog-content-policy';
+
+export type BlogDocMark = { type: 'bold' } | { type: 'link'; attrs: { href: string } };
 export interface BlogDocText {
   type: 'text';
   text: string;
-  marks?: { type: 'bold' }[];
+  marks?: BlogDocMark[];
 }
 export interface BlogDocParagraph {
   type: 'paragraph';
@@ -36,7 +50,11 @@ export interface BlogDocList {
   type: 'bulletList' | 'orderedList';
   content: { type: 'listItem'; content: BlogDocParagraph[] }[];
 }
-export type BlogDocBlock = BlogDocParagraph | BlogDocHeading | BlogDocList;
+export interface BlogDocImage {
+  type: 'image';
+  attrs: { src: string; alt: string };
+}
+export type BlogDocBlock = BlogDocParagraph | BlogDocHeading | BlogDocList | BlogDocImage;
 export interface BlogDoc {
   type: 'doc';
   content: BlogDocBlock[];
@@ -44,6 +62,18 @@ export interface BlogDoc {
 
 /** The renderer's `renderInline` split: `**…**` with no `*` inside is bold. */
 const BOLD_SPLIT = /(\*\*[^*]+\*\*)/g;
+
+/** renderInline's second split, inside each bold or plain part: allowed links. */
+function linkNodes(text: string, marks: BlogDocMark[]): BlogDocText[] {
+  const nodes: BlogDocText[] = [];
+  for (const token of text.split(BLOG_LINK_SPLIT)) {
+    if (token.length === 0) continue;
+    const link = blogLink(token);
+    const all: BlogDocMark[] = link ? [...marks, { type: 'link', attrs: { href: link.href } }] : marks;
+    nodes.push(all.length > 0 ? { type: 'text', text: link ? link.text : token, marks: all } : { type: 'text', text: token });
+  }
+  return nodes;
+}
 
 function inlineToNodes(text: string): BlogDocText[] {
   const nodes: BlogDocText[] = [];
@@ -53,9 +83,9 @@ function inlineToNodes(text: string): BlogDocText[] {
     // `**` is bold, so a whole line `**a*b**` is bold "a*b" and `***` is nothing.
     if (part.startsWith('**') && part.endsWith('**')) {
       const bold = part.slice(2, -2);
-      if (bold.length > 0) nodes.push({ type: 'text', text: bold, marks: [{ type: 'bold' }] });
+      if (bold.length > 0) nodes.push(...linkNodes(bold, [{ type: 'bold' }]));
     } else {
-      nodes.push({ type: 'text', text: part });
+      nodes.push(...linkNodes(part, []));
     }
   }
   return nodes;
@@ -66,7 +96,12 @@ function withContent<T extends BlogDocParagraph | BlogDocHeading>(block: T, text
   return content.length > 0 ? { ...block, content } : block;
 }
 
-export function markdownToDoc(markdown: string): BlogDoc {
+/**
+ * `imageBase` is the public bucket's base URL (`publicAssetStore().baseUrl`):
+ * an image line is an image only when its src is an upload under it — the
+ * renderer is handed the same base.
+ */
+export function markdownToDoc(markdown: string, imageBase?: string): BlogDoc {
   const blocks: BlogDocBlock[] = [];
   let paragraphLines: string[] = [];
   let list: BlogDocList | null = null;
@@ -101,6 +136,7 @@ export function markdownToDoc(markdown: string): BlogDoc {
     const ulItem = line.match(/^\*\s+(.*)$/);
     const olItem = line.match(/^\d+\.\s+(.*)$/);
     const heading = h3 ? { level: 3 as const, m: h3 } : h2 ? { level: 2 as const, m: h2 } : h1 ? { level: 1 as const, m: h1 } : null;
+    const image = blogImage(line, imageBase);
 
     if (heading) {
       flushParagraph();
@@ -110,6 +146,10 @@ export function markdownToDoc(markdown: string): BlogDoc {
       pushItem('bulletList', ulItem[1] ?? '');
     } else if (olItem) {
       pushItem('orderedList', olItem[1] ?? '');
+    } else if (image) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: 'image', attrs: image });
     } else {
       flushList();
       paragraphLines.push(line);
@@ -125,7 +165,7 @@ export interface EditorJson {
   type?: string;
   text?: string;
   attrs?: Record<string, unknown>;
-  marks?: { type: string }[];
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
   content?: EditorJson[];
 }
 
@@ -135,21 +175,47 @@ export interface EditorJson {
  * without its markers — inside a line `**a*b**` reaches the page as raw
  * asterisks — so the page shows that text plain rather than broken; only a
  * run that is the whole line keeps them, since the renderer bolds that one.
+ *
+ * A link is written `[text](href)` with its address percent-encoded where
+ * the patterns would stop, and brackets in its text turned into parentheses.
+ * A link the page could not show as one — an address the policy refuses, a
+ * `*` in its text (the bold split reads it first), only whitespace — is
+ * written as its plain text.
  */
 function inlineToMarkdown(nodes: EditorJson[] | undefined): string {
-  const runs: { text: string; bold: boolean }[] = [];
+  const runs: { text: string; bold: boolean; href: string | null }[] = [];
   for (const node of nodes ?? []) {
     if (node.type !== 'text' || !node.text) continue;
-    const bold = (node.marks ?? []).some((m) => m.type === 'bold');
+    const marks = node.marks ?? [];
+    const bold = marks.some((m) => m.type === 'bold');
+    const rawHref = marks.find((m) => m.type === 'link')?.attrs?.href;
+    const href = typeof rawHref === 'string' && rawHref ? rawHref : null;
     const last = runs[runs.length - 1];
-    if (last && last.bold === bold) last.text += node.text;
-    else runs.push({ text: node.text, bold });
+    if (last && last.bold === bold && last.href === href) last.text += node.text;
+    else runs.push({ text: node.text, bold, href });
   }
-  return runs
-    .map(({ text, bold }) => {
-      const flat = text.replace(/\s*\n\s*/g, ' ');
-      const markable = flat.trim().length > 0 && (!flat.includes('*') || runs.length === 1);
-      return bold && markable ? `**${flat}**` : flat;
+  // Consecutive runs of the same weight share one pair of `**`.
+  const groups: { bold: boolean; runs: typeof runs }[] = [];
+  for (const run of runs) {
+    const last = groups[groups.length - 1];
+    if (last && last.bold === run.bold) last.runs.push(run);
+    else groups.push({ bold: run.bold, runs: [run] });
+  }
+  return groups
+    .map(({ bold, runs: groupRuns }) => {
+      const flat = groupRuns.map((r) => r.text).join('').replace(/\s*\n\s*/g, ' ');
+      const md = groupRuns
+        .map(({ text, href }) => {
+          const plain = text.replace(/\s*\n\s*/g, ' ');
+          const label = cleanBracketText(plain);
+          const encoded = href ? encodeContentUrl(href) : '';
+          return href && label.trim().length > 0 && !label.includes('*') && isAllowedLinkHref(encoded)
+            ? `[${label}](${encoded})`
+            : plain;
+        })
+        .join('');
+      const markable = flat.trim().length > 0 && (!flat.includes('*') || groups.length === 1);
+      return bold && markable ? `**${md}**` : md;
     })
     .join('')
     .trim();
@@ -199,6 +265,12 @@ function blockToMarkdown(block: EditorJson): string | null {
       if (items.length === 0) return null;
       // The page numbers every list from 1, whatever the source said.
       return items.map((text, i) => (block.type === 'bulletList' ? `* ${text}` : `${i + 1}. ${text}`)).join('\n');
+    }
+    case 'image': {
+      // Its own block; an empty alt is written as is, and the save refuses it.
+      const alt = cleanBracketText(String(block.attrs?.alt ?? '')).trim();
+      const src = encodeContentUrl(String(block.attrs?.src ?? ''));
+      return src ? `![${alt}](${src})` : null;
     }
     default:
       return null;

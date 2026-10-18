@@ -2757,6 +2757,8 @@
       "invalid_slug": "Kısa ad (slug) yalnız küçük harf, rakam ve tire içerebilir (3–120 karakter).",
       "invalid_excerpt": "Özet 10–500 karakter olmalı.",
       "invalid_content": "İçerik 20–50.000 karakter olmalı.",
+      "invalid_content_link": "İçerikte izin verilmeyen bir bağlantı var. Bağlantılar https://, http://, mailto: ya da / ile başlayan site içi bir yol olmalı.",
+      "invalid_content_image": "İçerikte kullanılamayan bir görsel var. Görseller yalnız yükleme ile eklenir ve alternatif metinleri dolu olmalı.",
       "invalid_category": "Kategori 1–60 karakter olmalı.",
       "invalid_read_time": "Okuma süresi 1–30 karakter olmalı.",
       "invalid_image": "Görsel adresi https ile başlamalı ve izin verilen bir sunucudan (images.unsplash.com) gelmeli.",
@@ -2784,7 +2786,7 @@
     },
     "content": {
       "label": "Makale İçeriği",
-      "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste. İçerik Markdown olarak kaydedilir.",
+      "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste, bağlantı ve yüklenen görsel. İçerik Markdown olarak kaydedilir.",
       "missing": "Makale içeriği boş olamaz."
     },
     "readTime": {
@@ -3377,6 +3379,31 @@
     "bulletList": "Madde listesi",
     "orderedList": "Numaralı liste",
     "undo": "Geri al",
-    "redo": "Yinele"
+    "redo": "Yinele",
+    "link": "Bağlantı",
+    "image": "Görsel",
+    "cancel": "Vazgeç",
+    "apply": "Uygula",
+    "linkDialog": {
+      "title": "Bağlantı ekle",
+      "editTitle": "Bağlantıyı düzenle",
+      "text": "Görünen metin",
+      "textRequired": "Bağlantıda görünecek metni yazın.",
+      "url": "Adres",
+      "urlHint": "https:// , http:// ya da mailto: ile başlayan bir adres, veya / ile başlayan bir site içi yol.",
+      "invalidUrl": "Bu adres kullanılamaz. https:// , http:// , mailto: ile başlayan bir adres ya da / ile başlayan bir site içi yol girin.",
+      "remove": "Bağlantıyı kaldır"
+    },
+    "imageDialog": {
+      "title": "Görsel ekle",
+      "editTitle": "Görseli düzenle",
+      "choose": "Görsel seç",
+      "change": "Başka görsel seç",
+      "preview": "Yüklenen görselin önizlemesi",
+      "fileRequired": "Önce bir görsel yükleyin. Yazıya yalnız yüklenen görseller eklenebilir.",
+      "alt": "Alternatif metin",
+      "altHint": "Görseli göremeyenler için görselin ne gösterdiğini kısaca yazın.",
+      "altRequired": "Alternatif metin zorunlu."
+    }
   }
 }

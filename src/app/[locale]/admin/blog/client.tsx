@@ -29,6 +29,12 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
+import {
+  BLOG_IMAGE_UPLOAD_MAX_MB as IMAGE_MAX_MB,
+  BLOG_IMAGE_UPLOAD_TYPES as IMAGE_TYPES,
+  uploadBlogImage,
+  type BlogImageUploadError as ImageError,
+} from '@/lib/blog-image-upload';
 
 interface AdminBlogClientProps {
   initialPosts: BlogPost[];
@@ -41,28 +47,22 @@ interface AdminBlogClientProps {
   sessionUserName?: string;
   /** The server could not read the posts; shown instead of an empty table. */
   loadError?: boolean;
+  /** The public bucket's base URL: images in the post body are uploads under it. */
+  publicImageBase?: string;
 }
 
 /** One line of feedback above the table. `error` is only ever a translated message. */
 type Notice = { kind: 'ok' | 'error'; text: string } | null;
 
-/**
- * The cover image upload, `POST /api/admin/blog/image` (TASK-MUU20NSV2TETW):
- * multipart `file` → 200 `{ url }` · 400 `{ error: 'type' | 'size' }` ·
- * 401/403 `{ error: 'forbidden' }` · 503 `{ error: 'object_store_unconfigured' }`.
- * The route checks the bytes; the type and size are checked here first only so
- * an obviously wrong file is refused before it is sent.
- */
-const IMAGE_MAX_MB = 5;
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const IMAGE_ERRORS = ['type', 'size', 'forbidden', 'object_store_unconfigured', 'upload_failed'] as const;
-type ImageError = (typeof IMAGE_ERRORS)[number];
+// The cover image upload, `POST /api/admin/blog/image` — shared with the
+// images inside the post body (src/lib/blog-image-upload.ts).
 
 export default function AdminBlogClient({
   initialPosts,
   locale,
   sessionUserName = '',
   loadError = false,
+  publicImageBase,
 }: AdminBlogClientProps) {
   const t = useTranslations('adminBlog');
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
@@ -173,25 +173,12 @@ export default function AdminBlogClient({
     setImageError(null);
     // The same file can be picked again after an error.
     if (imageInput.current) imageInput.current.value = '';
-    if (!IMAGE_TYPES.includes(file.type)) return setImageError('type');
-    if (file.size > IMAGE_MAX_MB * 1024 * 1024) return setImageError('size');
 
     setIsUploading(true);
     try {
-      const body = new FormData();
-      body.set('file', file);
-      const res = await fetch('/api/admin/blog/image', { method: 'POST', body });
-      const data: { url?: unknown; error?: unknown } = await res.json().catch(() => ({}));
-      if (res.ok && typeof data.url === 'string' && data.url) {
-        const url = data.url;
-        setFormData((prev) => ({ ...prev, image: url }));
-        return;
-      }
-      const code = IMAGE_ERRORS.find((c) => c === data.error);
-      setImageError(code ?? (res.status === 401 || res.status === 403 ? 'forbidden' : 'upload_failed'));
-    } catch (err) {
-      console.error(err);
-      setImageError('upload_failed');
+      const result = await uploadBlogImage(file);
+      if (result.ok) setFormData((prev) => ({ ...prev, image: result.url }));
+      else setImageError(result.error);
     } finally {
       setIsUploading(false);
     }
@@ -586,6 +573,7 @@ export default function AdminBlogClient({
                 <span id="blog-content-label" className="block text-xs font-bold text-ink mb-1">{t('content.label')} *</span>
                 <RichTextEditor
                   format="markdown"
+                  imageBase={publicImageBase}
                   labelledBy="blog-content-label"
                   required
                   invalid={contentMissing}
