@@ -41,7 +41,7 @@ test.describe.serial('blog reader — list → post → back, TR and EN, 404 on 
   test.beforeAll(async () => {
     await withSystemScope('platform-admin', 'e2e.blog-reader.seed', async (tx) => {
       for (const post of [NEWER, OLDER]) {
-        await tx.blogPost.create({ data: { ...post, readTime: '2 dk', image: IMAGE } });
+        await tx.blogPost.create({ data: { ...post, readMinutes: 2, image: IMAGE } });
       }
     });
   });
@@ -76,6 +76,8 @@ test.describe.serial('blog reader — list → post → back, TR and EN, 404 on 
     const card = page.locator('article').filter({ hasText: NEWER.title });
     await expect(card.getByText(NEWER.excerpt)).toBeVisible();
     await expect(card.getByText(NEWER.category, { exact: true })).toBeVisible();
+    // Stored as minutes, written in the reader's language (TASK-MVDSY96TB1EPM).
+    await expect(card.getByText('2 dk okuma', { exact: true })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/10-tr-blog-list.png` });
 
     await card.getByRole('link', { name: 'Devamını Oku' }).click();
@@ -86,6 +88,7 @@ test.describe.serial('blog reader — list → post → back, TR and EN, 404 on 
     await expect(page.getByRole('heading', { name: 'Okur bölümü' })).toBeVisible();
     await expect(page.locator('strong', { hasText: 'kalın' })).toBeVisible();
     await expect(page.getByRole('listitem').filter({ hasText: 'ikinci madde' })).toBeVisible();
+    await expect(page.getByText('• 2 dk okuma', { exact: true })).toBeVisible();
     // The other seeded post is offered as related reading.
     await expect(page.getByRole('link', { name: new RegExp(OLDER.title) })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/11-tr-blog-post.png`, fullPage: true });
@@ -114,11 +117,13 @@ test.describe.serial('blog reader — list → post → back, TR and EN, 404 on 
     await expect(page.getByRole('heading', { level: 1, name: 'EU Grant Management & Insights Blog' })).toBeVisible();
 
     const card = page.locator('article').filter({ hasText: NEWER.title });
+    await expect(card.getByText('2 min read', { exact: true })).toBeVisible();
     await card.getByRole('link', { name: 'Read Article' }).click();
 
     await expect(page).toHaveURL((url) => url.pathname === `/en/blog/${NEWER.slug}`);
     await expect(page.getByRole('heading', { level: 1, name: NEWER.title })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Related Articles' })).toBeVisible();
+    await expect(page.getByText('• 2 min read', { exact: true })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/12-en-blog-post.png`, fullPage: true });
 
     await page.getByRole('link', { name: /Back to Blog/ }).click();
@@ -138,7 +143,7 @@ test.describe.serial('blog reader — list → post → back, TR and EN, 404 on 
     const gone = `${PREFIX}-silinen`;
     await withSystemScope('platform-admin', 'e2e.blog-reader.seed-gone', (tx) =>
       tx.blogPost.create({
-        data: { ...OLDER, slug: gone, title: `E2E silinecek ${RUN}`, readTime: '1 dk', image: IMAGE },
+        data: { ...OLDER, slug: gone, title: `E2E silinecek ${RUN}`, readMinutes: 1, image: IMAGE },
       })
     );
     await page.goto('/tr/blog');

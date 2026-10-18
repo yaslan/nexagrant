@@ -2760,7 +2760,7 @@
       "invalid_content_link": "İçerikte izin verilmeyen bir bağlantı var. Bağlantılar https://, http://, mailto: ya da / ile başlayan site içi bir yol olmalı.",
       "invalid_content_image": "İçerikte kullanılamayan bir görsel var. Görseller yalnız yükleme ile eklenir ve alternatif metinleri dolu olmalı.",
       "invalid_category": "Kategori 1–60 karakter olmalı.",
-      "invalid_read_time": "Okuma süresi 1–30 karakter olmalı.",
+      "invalid_read_time": "Okuma süresi 1–120 dakika arasında bir tam sayı olmalı.",
       "invalid_image": "Görsel adresi https ile başlamalı ve izin verilen bir sunucudan (images.unsplash.com) gelmeli.",
       "invalid_author": "Yazar adı ve unvanı en fazla 120 karakter olabilir; unvan ya da portre yalnız yazar adıyla birlikte girilebilir.",
       "slug_taken": "Bu kısa adla (slug) bir yazı zaten var. Başlığı ya da kısa adı değiştirin.",
@@ -2790,10 +2790,9 @@
       "missing": "Makale içeriği boş olamaz."
     },
     "readTime": {
-      "label": "Okuma süresi",
-      "placeholder": "örn: 5 dk",
-      "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz.",
-      "auto": "{min} dk",
+      "label": "Okuma süresi (dakika)",
+      "placeholder": "örn: 5",
+      "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz. Sitede okuyucunun dilinde gösterilir.",
       "missing": "Okuma süresi boş olamaz. İçerikte okunacak metin yoksa süreyi elle yazın."
     }
   },
@@ -2940,7 +2939,8 @@
   },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
-    "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri."
+    "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.",
+    "readMinutes": "{min} dk okuma"
   },
   "blog_detail": {
     "meta_description": "Blog yazısı"

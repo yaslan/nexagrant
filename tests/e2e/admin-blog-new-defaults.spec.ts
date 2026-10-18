@@ -49,7 +49,7 @@ test.describe.serial('admin blog — a new post has no invented defaults', () =>
         excerpt: 'Kayıtlı okuma süresi korunur.',
         content: 'Kısa bir mevcut yazı.',
         category: 'E2E',
-        readTime: '9 dk okuma',
+        readMinutes: 9,
         authorName: 'Kayıtlı Yazar',
         publishedAt: new Date(),
         image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
@@ -80,17 +80,18 @@ test.describe.serial('admin blog — a new post has no invented defaults', () =>
     // The byline is the signed-in admin's own name, nothing appended to it.
     await expect(page.locator('label:has-text("Yazar Adı") + input')).toHaveValue(ADMIN.name);
     await expect(readTime(page)).toHaveValue('');
-    await expect(page.getByLabel('Okuma süresi')).toHaveAccessibleDescription(
-      'İçerikten otomatik hesaplanır; elle değiştirebilirsiniz.'
+    await expect(page.getByLabel('Okuma süresi (dakika)')).toHaveAccessibleDescription(
+      'İçerikten otomatik hesaplanır; elle değiştirebilirsiniz. Sitede okuyucunun dilinde gösterilir.'
     );
+    await expect(readTime(page)).toHaveAttribute('type', 'number');
 
     await page.locator('#blog-title').fill(NEW_TITLE);
     await page.locator('#blog-excerpt').fill('Görselsiz kayıt reddedilir.');
     await typeContent(page, 'Kısa giriş.');
-    await expect(readTime(page)).toHaveValue('1 dk');
+    await expect(readTime(page)).toHaveValue('1');
     await page.keyboard.press('Enter');
     await page.keyboard.insertText(LONG);
-    await expect(readTime(page)).toHaveValue('2 dk');
+    await expect(readTime(page)).toHaveValue('2');
     await page.screenshot({ path: `${SHOTS}/01-new-post-auto-read-time.png` });
 
     await page.getByTestId('blog-submit').click();
@@ -115,35 +116,49 @@ test.describe.serial('admin blog — a new post has no invented defaults', () =>
     await page.screenshot({ path: `${SHOTS}/03-read-time-missing.png` });
     expect(await prisma.blogPost.count({ where: { title: NEW_TITLE } })).toBe(0);
 
-    await readTime(page).fill('1 dk');
+    await readTime(page).fill('1');
     await expect(readTime(page)).not.toHaveAttribute('aria-invalid');
   });
 
   test('a read time typed by the admin is not overwritten by the estimate', async ({ page }) => {
     await openNew(page, 'tr');
-    await readTime(page).fill('7 dk okuma');
+    await readTime(page).fill('7');
     await typeContent(page, LONG);
     await expect(blogContentEditor(page)).toContainText('kelime8');
-    await expect(readTime(page)).toHaveValue('7 dk okuma');
+    await expect(readTime(page)).toHaveValue('7');
   });
 
-  test('the estimate follows the admin’s language', async ({ page }) => {
+  test('the estimate is a number of minutes in either admin language (TASK-MVDSY96TB1EPM)', async ({ page }) => {
     await openNew(page, 'en');
     await expect(readTime(page)).toHaveValue('');
     await typeContent(page, LONG);
-    await expect(readTime(page)).toHaveValue('2 min read');
+    await expect(readTime(page)).toHaveValue('2');
+  });
+
+  test('a read time outside 1–120 is refused by the field and nothing is saved', async ({ page }) => {
+    await openNew(page, 'tr');
+    await page.locator('#blog-title').fill(NEW_TITLE);
+    await page.locator('#blog-excerpt').fill('Aralık dışı okuma süresi.');
+    await typeContent(page, LONG);
+    await readTime(page).fill('121');
+    await page.getByTestId('blog-submit').click();
+    expect(await readTime(page).evaluate((el: HTMLInputElement) => el.validity.rangeOverflow)).toBe(true);
+    await readTime(page).fill('0');
+    await page.getByTestId('blog-submit').click();
+    expect(await readTime(page).evaluate((el: HTMLInputElement) => el.validity.rangeUnderflow)).toBe(true);
+    expect(await prisma.blogPost.count({ where: { title: NEW_TITLE } })).toBe(0);
   });
 
   test('editing a post keeps its saved read time, cover and author', async ({ page }) => {
     await page.goto('/tr/admin/blog');
     await page.getByRole('row').filter({ hasText: EXISTING_SLUG }).getByRole('button', { name: 'Düzenle' }).click();
     await expect(blogContentEditor(page)).toHaveText('Kısa bir mevcut yazı.');
-    await expect(readTime(page)).toHaveValue('9 dk okuma');
+    await expect(readTime(page)).toHaveValue('9');
     await expect(page.locator('label:has-text("Yazar Adı") + input')).toHaveValue('Kayıtlı Yazar');
     await expect(page.getByTestId('blog-image-preview')).toHaveAttribute('src', /photo-1522071820081/);
     await typeContent(page, ` ${LONG}`);
     await expect(blogContentEditor(page)).toContainText('kelime8');
-    await expect(readTime(page)).toHaveValue('9 dk okuma');
+    await expect(readTime(page)).toHaveValue('9');
     await page.screenshot({ path: `${SHOTS}/02-edit-keeps-read-time.png` });
   });
 });

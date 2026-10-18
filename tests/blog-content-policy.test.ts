@@ -128,7 +128,7 @@ describe('content refusals (the save path)', () => {
     excerpt: 'Konsorsiyum kurarken dikkat edilecekler.',
     content: '# Başlık\n\nBu içerik yirmi karakterden uzundur.',
     category: 'Horizon Europe',
-    readTime: '5 dk okuma',
+    readMinutes: 5,
     image: `${BASE}/blog/cover.png`,
   };
 

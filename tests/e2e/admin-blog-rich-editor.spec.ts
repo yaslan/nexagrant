@@ -61,7 +61,7 @@ test.describe.serial('admin blog — rich text editor, stored as markdown', () =
           excerpt: 'Zengin metin editörü uçtan uca testi.',
           content: ORIGINAL,
           category: 'E2E',
-          readTime: '1 dk',
+          readMinutes: 1,
           publishedAt: new Date(),
           image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
         },

@@ -76,7 +76,7 @@ test.describe.serial('admin blog — links and images in a post', () => {
           excerpt: 'Blog yazısına bağlantı ve görsel ekleme testi.',
           content: ORIGINAL,
           category: 'E2E',
-          readTime: '1 dk',
+          readMinutes: 1,
           publishedAt: new Date(),
           image: COVER,
         },

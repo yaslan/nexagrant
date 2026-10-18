@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -23,6 +24,7 @@ export default async function BlogSection({ locale }: BlogSectionProps) {
     return null;
   }
   if (posts.length === 0) return null;
+  const t = await getTranslations({ locale, namespace: 'blog' });
   const isTr = locale === 'tr';
 
   return (
@@ -83,7 +85,7 @@ export default async function BlogSection({ locale }: BlogSectionProps) {
                   <div className="flex items-center gap-2 text-[11px] text-muted font-medium">
                     <time dateTime={post.publishedAt.toISOString()}>{formatBlogDate(post.publishedAt, locale)}</time>
                     <span>•</span>
-                    <span>{post.readTime}</span>
+                    <span>{t('readMinutes', { min: post.readMinutes })}</span>
                   </div>
 
                   <h3 className="font-bold text-lg text-ink font-heading group-hover:text-accent transition-colors leading-snug">

@@ -254,7 +254,7 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
         excerpt: 'Elle girilmiş unsplash adresli eski bir yazı.',
         content: 'Bu yazının kapağı yükleme özelliğinden önce adresle girildi.',
         category: 'E2E',
-        readTime: '1 dk',
+        readMinutes: 1,
         publishedAt: new Date(),
         image: LEGACY_IMAGE,
       },

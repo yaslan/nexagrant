@@ -4,6 +4,13 @@
  * Pure and client-safe: it only looks at the Markdown text.
  */
 
+/**
+ * Read time bounds, in whole minutes (TASK-MVDSY96TB1EPM): the admin form's
+ * number field, the server validation and the CHECK in
+ * prisma/migrations/blog-read-minutes.sql.
+ */
+export const BLOG_READ_MINUTES = { min: 1, max: 120 } as const;
+
 /** Words an average reader gets through in a minute. */
 export const WORDS_PER_MINUTE = 200;
 
@@ -21,8 +28,12 @@ export function countReadableWords(markdown: string): number {
   return text.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length;
 }
 
-/** Minutes to read `markdown`: 0 when there is nothing to read, otherwise at least 1. */
+/**
+ * Minutes to read `markdown`: 0 when there is nothing to read, otherwise within
+ * {@link BLOG_READ_MINUTES}.
+ */
 export function estimateReadMinutes(markdown: string): number {
   const words = countReadableWords(markdown);
-  return words === 0 ? 0 : Math.max(1, Math.round(words / WORDS_PER_MINUTE));
+  if (words === 0) return 0;
+  return Math.min(BLOG_READ_MINUTES.max, Math.max(BLOG_READ_MINUTES.min, Math.round(words / WORDS_PER_MINUTE)));
 }

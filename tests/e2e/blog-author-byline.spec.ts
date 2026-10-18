@@ -50,7 +50,7 @@ test.describe.serial('blog author byline — ünvan before name, one line', () =
           excerpt: 'FO-76 byline testinin kısa özeti.',
           content: 'Byline testinin içeriği.',
           category: 'E2E',
-          readTime: '1 dk okuma',
+          readMinutes: 1,
           publishedAt: new Date(),
           authorName: post.name,
           authorRole: post.role || null,

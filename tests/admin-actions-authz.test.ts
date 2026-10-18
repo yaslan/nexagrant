@@ -85,7 +85,7 @@ const OTHER_TENANT_ADMIN = {
   isPlatformAdmin: false,
 };
 
-const POST = { title: 't', excerpt: 'e', content: 'c', category: 'x', readTime: '1', authorName: '', authorRole: '', image: '' };
+const POST = { title: 't', excerpt: 'e', content: 'c', category: 'x', readMinutes: 1, authorName: '', authorRole: '', image: '' };
 
 /** Each action, called with plausible arguments, and the spies it must not reach when refused. */
 const ACTIONS: { name: string; call: () => Promise<unknown>; effects: () => ReturnType<typeof vi.fn>[] }[] = [
