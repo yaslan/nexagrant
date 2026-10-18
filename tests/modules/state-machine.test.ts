@@ -107,6 +107,17 @@ describe('Module State Machine', () => {
         reason: 'PILOT_MANAGERS_ONLY',
       });
     });
+
+    // A tenant's API key is a machine audience (TASK-MVDPYNG1JI0S1): PILOT opens to it
+    // like to the managers, DEV does not, because it is not staff.
+    it('PILOT admits a machine audience (the tenant API key), DEV does not', () => {
+      const apiKey = { role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
+      expect(canAccessStatus('PILOT', apiKey).allowed).toBe(true);
+      expect(canAccessStatus('DEV', apiKey)).toEqual({
+        allowed: false,
+        reason: 'DEV_INTERNAL_ONLY',
+      });
+    });
   });
 
 });

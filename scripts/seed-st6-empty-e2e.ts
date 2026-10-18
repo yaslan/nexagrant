@@ -68,7 +68,9 @@ export const ST6 = {
   },
 } as const;
 
-const MODULES = ['M5', 'M11'] as const;
+// M1 for the Partner REST API: /api/v1/* is gated by it (TASK-MVDPYNG1JI0S1), and
+// point 1 below calls that API with the bare tenant's key.
+const MODULES = ['M1', 'M5', 'M11'] as const;
 
 interface CordisBackup {
   cordisCoParticipations: CordisCoParticipation[];

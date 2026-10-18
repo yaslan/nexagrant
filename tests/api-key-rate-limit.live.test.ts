@@ -22,6 +22,10 @@ describe('API key rate limit (live DB)', () => {
       data: { name: 'Rate Limit Test', slug: `rate-limit-${suffix()}`, country: 'TR' },
     });
     tenantId = tenant.id;
+    // The key is only served while M1 is on and the plan includes it (FO-80); the
+    // counter is what this suite measures, so the tenant is entitled to M1.
+    await prisma.subscription.create({ data: { tenantId, planId: 'pro', status: 'ACTIVE' } });
+    await prisma.moduleState.create({ data: { tenantId, moduleId: 'M1', status: 'ON' } });
     key = `fp_live_rl_${crypto.randomBytes(12).toString('hex')}`;
     const row = await prisma.apiKey.create({
       data: {
@@ -36,6 +40,7 @@ describe('API key rate limit (live DB)', () => {
 
   afterEach(async () => {
     await prisma.apiKey.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    await prisma.subscription.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
     await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   });
 
