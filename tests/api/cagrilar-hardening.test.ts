@@ -73,7 +73,28 @@ describe('/api/cagrilar hardening', () => {
     const res = await get('?limit=1000&lang=tr');
     expect(res.status).toBe(200);
     expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
-    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 50, maxPages: 5 });
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 50, startPage: 1, maxPages: 1 });
+  });
+
+  // FO-42: the UI sends ?page and the route used to read page 1 five times over.
+  // Each request now asks SEDIA for exactly the page it was given.
+  test('?page=2 asks SEDIA for page 2 only and returns that page', async () => {
+    const res = await get('?page=2&limit=20&lang=en');
+    expect(res.status).toBe(200);
+    expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ startPage: 2, pageSize: 20, maxPages: 1 });
+  });
+
+  test('without ?page the first page is read', async () => {
+    await get('?lang=en');
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ startPage: 1, maxPages: 1 });
+  });
+
+  test.each(['0', '-3', '1.5', 'abc', '', '1001'])('page=%s is a 400 before any outbound call', async (page) => {
+    const res = await get(`?page=${page}&lang=en`);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ success: false, error: 'invalid_page' });
+    expect(mocks.searchSedia).not.toHaveBeenCalled();
   });
 
   // İNCELEME-70 D-1 (TASK-MUNVVMJDEO932): the lower bound had no test, so a
@@ -82,7 +103,7 @@ describe('/api/cagrilar hardening', () => {
     const res = await get(`?limit=${limit}&lang=en`);
     expect(res.status).toBe(200);
     expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
-    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 1, maxPages: 5 });
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ pageSize: 1, maxPages: 1 });
   });
 
   test('a non-numeric limit is a 400 before any outbound call', async () => {
