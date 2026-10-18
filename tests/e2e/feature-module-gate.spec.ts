@@ -108,10 +108,10 @@ test.describe('feature pages behind M5 / M1 — the URL is a door, not just the 
     await setModule('M1', 'OFF');
     await signIn(page);
 
-    // There is no Turkish slug for this page (src/lib/modules/route-catalog.ts has
-    // no `ayarlar/api-anahtarlari`), so both locales use `settings/api-keys`.
+    // The Turkish slug is a rewrite onto settings/api-keys (next.config.ts), so
+    // it reaches the same page and the same gate.
     for (const [url, messages, locale] of [
-      [`/tr/${WS}/settings/api-keys`, trMessages, 'tr'],
+      [`/tr/${WS}/ayarlar/api-anahtarlari`, trMessages, 'tr'],
       [`/en/${WS}/settings/api-keys`, enMessages, 'en'],
     ] as const) {
       await page.goto(url);
@@ -124,7 +124,7 @@ test.describe('feature pages behind M5 / M1 — the URL is a door, not just the 
     }
 
     await setModule('M1', 'ON');
-    await page.goto(`/tr/${WS}/settings/api-keys`);
+    await page.goto(`/tr/${WS}/ayarlar/api-anahtarlari`);
     await expect(page.locator('body')).toContainText('Yeni API Anahtarı Oluştur');
     await expect(gate(page)).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/m1-on-tr.png`, fullPage: true });
