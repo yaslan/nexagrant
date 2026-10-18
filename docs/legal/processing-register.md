@@ -189,7 +189,7 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 | **Amaç**                       | Güvenlik/uyum denetimi, olay soruşturması                                                                                                                                                                                       |
 | **Hukuki sebep**               | KVKK md.5/2-ç (hukuki yükümlülük) / GDPR art.6(1)(c)                                                                                                                                                                            |
 | **Alıcı ve yurt dışı aktarım** | Yok                                                                                                                                                                                                                             |
-| **Saklama süresi**             | Kalıcı — kimliksizleştirme adımı `AuditEvent.actorId` için kod düzeyinde yok (`AiUsageLog` gibi NULL'lanmıyor) — **açık**, `docs/legal/dpa-en.md` §6'daki "denetim kayıtları kimliksizleştirilmiş tutulur" iddiasıyla çelişiyor |
+| **Saklama süresi**             | Kalıcı. Hesap silindiğinde (`purgeDueUsers`, `src/lib/jobs/tasks/users-scheduled-deletion.ts`): `actorId` NULL'lanır. `target` kullanıcı kimliği taşımaz: `member.removed` kaydı Membership id'sini yazar (`src/app/api/team/members/[id]/route.ts:47`); kişiyle bağ, `Membership.user` `onDelete: Cascade` (`prisma/schema.prisma`) ile silme sırasında kopar, bu yüzden `target` yeniden yazılmaz. Silme kaydı `user.erased` silinen kişinin kimliğinin tek yönlü özetini (sha256) taşır. Serbest `data` JSON alanı değiştirilmez ve kişisel veri içerebilir (`docs/legal/dpa-en.md` §6.3 istisnası). Bu, gizlilik metnindeki "kimlik bağlantısı kaldırılır ya da özetle değiştirilir" ifadesiyle uyumludur. |
 | **Teknik-idari tedbir**        | kiracı filtresi (`withTenant`); RLS politikası tanımlı, uygulama bağlantısında etkin değil                                                                                                                                                                                                                             |
 | **Kaynak dosya yolu**          | `prisma/schema.prisma` (`AuditEvent`)                                                                                                                                                                                           |
 
@@ -431,7 +431,7 @@ Hiçbiri için repo içinde imzalı bir Standart Sözleşme Hükümleri (SCC) ek
 
 1. VKN/TCKN saklama süresi tanımlı değil (§5).
 2. `Document`/`Chunk` için silme/anonimleştirme akışı yok (§7).
-3. `AuditEvent.actorId` kimliksizleştirilmiyor; DPA'nın "denetim kaydı kimliksizleştirilir" iddiasıyla çelişiyor (§13).
+3. ~~`AuditEvent.actorId` kimliksizleştirilmiyor~~ — **kapandı (FO-82):** silmede `actorId` NULL'lanıyor; `target` kişi kimliği taşımıyor (membership id), kişiyle bağ Membership cascade ile kopuyor; silme kaydı tek yönlü özet taşıyor (§13). Kalan: `AuditEvent.data` serbest metni silme sonrasında değiştirilmiyor; DPA §6.3 bunu istisna olarak yazıyor, kişisel veri içerebilir (§13).
 4. `CalendarConnection` token'ları plaintext (§11) — henüz veri yazılmadığı için bugün risk gerçekleşmiyor ama OAuth akışı açılmadan önce şifreleme şart.
 5. Muhatap (üçüncü kişi) için ayrı silme talebi formu iddia ediliyor (`docs/SECURITY_COMPLIANCE.md` satır 101) ama kod tabanında bulunamadı (§10).
 6. Hiçbir yurt dışı aktarım için imzalı SCC/ek sözleşme repoda yok (§21).

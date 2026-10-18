@@ -258,6 +258,10 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
     await expect(off).toBeVisible();
     // M1 is outside Basic, so its feature entry in the sidebar is locked.
     await expect(page.locator('[data-testid="sidebar-nav-apiKeys"][data-locked="true"]').first()).toBeAttached();
+    // What a screen reader announces: the label as the name, the lock reason as the description.
+    const apiKeysLocked = page.getByTestId('sidebar-nav-apiKeys').filter({ visible: true }).first();
+    await expect(apiKeysLocked).toHaveAccessibleName('Partner REST API');
+    await expect(apiKeysLocked).toHaveAccessibleDescription(/^M1 .+ modülü kapalı/);
     await captureState(page, '03-downgrade-orphaned');
 
     await expectHydrated(off);
