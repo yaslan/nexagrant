@@ -2781,6 +2781,11 @@
         "object_store_unconfigured": "Dosya deposu yapılandırılmamış; görsel şu an yüklenemiyor. Sistem yöneticisine bildirin.",
         "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
       }
+    },
+    "content": {
+      "label": "Makale İçeriği",
+      "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste. İçerik Markdown olarak kaydedilir.",
+      "missing": "Makale içeriği boş olamaz."
     }
   },
   "adminDocuments": {
@@ -3356,5 +3361,16 @@
       "name": "Tam Başvuru Üretimi",
       "tagline": "Konsept notu, kanıt ve konsorsiyum üzerine bölüm bölüm başvuru taslağı."
     }
+  },
+  "richTextEditor": {
+    "toolbar": "Biçimlendirme",
+    "heading1": "Başlık 1",
+    "heading2": "Başlık 2",
+    "heading3": "Başlık 3",
+    "bold": "Kalın",
+    "bulletList": "Madde listesi",
+    "orderedList": "Numaralı liste",
+    "undo": "Geri al",
+    "redo": "Yinele"
   }
 }

@@ -12,7 +12,7 @@
   "src/app/[locale]/(app)/[workspace]/pipeline/board.tsx": 29,
   "src/app/[locale]/(app)/[workspace]/settings/api-keys/client.tsx": 18,
   "src/app/[locale]/admin/audit/page.tsx": 4,
-  "src/app/[locale]/admin/blog/client.tsx": 22,
+  "src/app/[locale]/admin/blog/client.tsx": 21,
   "src/app/[locale]/admin/cordis/client.tsx": 37,
   "src/app/[locale]/admin/layout.tsx": 3,
   "src/app/[locale]/admin/modules/client.tsx": 3,

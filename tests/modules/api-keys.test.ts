@@ -8,6 +8,8 @@ import {
   resetScope,
   setScope,
   FakeTenantScopeError,
+  resetModuleAccess,
+  setModuleOpen,
 } from '../helpers/tenant-scope-mock';
 
 const h = vi.hoisted(() => ({
@@ -18,6 +20,13 @@ const h = vi.hoisted(() => ({
 vi.mock('../../src/lib/tenant', async () => {
   const m = await import('../helpers/tenant-scope-mock');
   return m.tenantModuleStub();
+});
+
+// Partner API keys are an M1 feature (TASK-MVC9MCXKVMDN7). Open by default; the
+// M1 cases below close it.
+vi.mock('../../src/lib/modules/access', async () => {
+  const m = await import('../helpers/tenant-scope-mock');
+  return m.moduleAccessStub();
 });
 
 vi.mock('../../src/lib/db', async () => {
@@ -32,6 +41,7 @@ vi.mock('../../src/lib/db', async () => {
 describe('Partner API keys', () => {
   beforeEach(() => {
     resetScope();
+    resetModuleAccess();
     vi.clearAllMocks();
     h.apiKeyCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'key-123',
@@ -172,6 +182,23 @@ describe('Partner API keys', () => {
       expect(h.apiKeyCreate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ name: 'SAP ERP' }) })
       );
+    });
+  });
+
+  describe('module gate (M1)', () => {
+    test('M1 closed: generateApiKey is refused and no key is written', async () => {
+      setModuleOpen(false);
+      await expect(generateApiKey({ name: 'ERP Integration Key' })).rejects.toMatchObject({
+        name: 'ModuleAccessError',
+        moduleId: 'M1',
+      });
+      expect(h.apiKeyCreate).not.toHaveBeenCalled();
+    });
+
+    test('M1 closed: revokeApiKey still revokes — withdrawing a key must never be gated', async () => {
+      setModuleOpen(false);
+      expect(await revokeApiKey('key-123')).toEqual({ success: true });
+      expect(h.apiKeyDeleteMany).toHaveBeenCalledWith({ where: { id: 'key-123', tenantId: 'tenant-1' } });
     });
   });
 });

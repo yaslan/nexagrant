@@ -1,6 +1,7 @@
 'use server';
 
 import { requireTenantAction } from '@/lib/tenant';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
 import {
   createApprovalRequest,
@@ -24,6 +25,12 @@ import { Role } from '@prisma/client';
  * refuses still throws `ForbiddenRoleError` from `requireTenantAction` before
  * anything is read; the rules that need the stored row (four eyes, required
  * role, PENDING only, expiry, requester-only cancel) answer as values.
+ *
+ * TASK-MVC9MCXKVMDN7: the Approval Centre belongs to M5. Every action calls
+ * `assertModuleAccess('M5')` after the role check and before the first write, so
+ * a tenant with M5 closed cannot use it by posting to the action directly. The
+ * refusal throws `ModuleAccessError`, which the client turns into the ModuleGate
+ * sentence through `useActionErrorText`.
  */
 
 const revalidateApprovals = () => revalidatePath('/[locale]/(app)/[workspace]/approvals', 'page');
@@ -38,6 +45,7 @@ export async function submitApprovalRequestAction(data: {
   expiresInHours?: number;
 }): Promise<ApprovalResult> {
   const { tenantId, userId } = await requireTenantAction({ can: 'request_dual_approval' });
+  await assertModuleAccess('M5');
 
   const result = await createApprovalRequest({
     tenantId,
@@ -57,6 +65,7 @@ export async function submitApprovalRequestAction(data: {
 
 export async function approveRequestAction(requestId: string): Promise<ApprovalResult> {
   const { tenantId, userId, role } = await requireTenantAction({ can: 'approve_dual_approval' });
+  await assertModuleAccess('M5');
 
   const result = await approveApprovalRequest({ requestId, approverId: userId, approverRole: role, tenantId });
 
@@ -67,6 +76,7 @@ export async function approveRequestAction(requestId: string): Promise<ApprovalR
 export async function rejectRequestAction(requestId: string, reason: string): Promise<ApprovalResult> {
   // Same permission as approving (see approveRequestAction).
   const { tenantId, userId, role } = await requireTenantAction({ can: 'approve_dual_approval' });
+  await assertModuleAccess('M5');
 
   const result = await rejectApprovalRequest({ requestId, approverId: userId, approverRole: role, tenantId, reason });
 
@@ -76,6 +86,7 @@ export async function rejectRequestAction(requestId: string, reason: string): Pr
 
 export async function cancelRequestAction(requestId: string): Promise<ApprovalResult> {
   const { tenantId, userId } = await requireTenantAction({ can: 'request_dual_approval' });
+  await assertModuleAccess('M5');
 
   const result = await cancelApprovalRequest({ requestId, requesterId: userId, tenantId });
 

@@ -68,6 +68,9 @@ export const PLAN_E2E = {
     opportunityId: 'plan-e2e-ultra-opp',
     planId: 'ultra',
     role: 'PIPELINE_MANAGER',
+    // M5 for approvals-persistence: the Approval Centre is gated on M5
+    // (TASK-MVC9MCXKVMDN7).
+    modules: ['M10', 'M5'],
   },
   flip: {
     tenantId: 'plan-e2e-flip-tenant',

@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import ApprovalsClient, { type ApprovalRequestItem } from './client';
 import { Role } from '@prisma/client';
 import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
 import { getTranslations } from 'next-intl/server';
 
 export default async function ApprovalsPage({
@@ -12,6 +13,11 @@ export default async function ApprovalsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  // The Approval Centre is an M5 feature (docs/MODULES.md). The sidebar lock is
+  // navigation only; this is the door, and `onay-merkezi` re-exports this page.
+  const locked = await moduleGate('M5', locale);
+  if (locked) return locked;
+
   const t = await getTranslations('Approvals');
   const session = await auth();
   const tenantId = session?.tenantId;

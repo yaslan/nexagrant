@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
+import { blogContentEditor, pasteInto } from './fixtures/rich-editor';
 
 /**
  * AKTAR-MURBCJ0A-1 — an admin's blog post survives the server that wrote it.
@@ -60,7 +61,8 @@ async function fillNewPost(page: Page): Promise<void> {
   await page.getByLabel('Makale Başlığı *').fill(TITLE);
   await page.getByLabel('Kategori *').fill('E2E');
   await page.getByLabel('Özet (Excerpt) *').fill('Uçtan uca kalıcılık testinin kısa özeti.');
-  await page.getByLabel('Makale İçeriği (Markdown) *').fill(CONTENT);
+  // The content field is a rich text editor (TASK-MVDKHOXGRQQS5); pasted plain text is read as post markdown.
+  await pasteInto(blogContentEditor(page), { text: CONTENT });
   await page.getByTestId('blog-submit').click();
 }
 
