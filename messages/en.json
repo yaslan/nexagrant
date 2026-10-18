@@ -2786,6 +2786,12 @@
       "label": "Article content",
       "hint": "Formats the site shows: headings (H1–H3), bold, bulleted and numbered lists. Content is saved as Markdown.",
       "missing": "Article content cannot be empty."
+    },
+    "readTime": {
+      "label": "Read time",
+      "placeholder": "e.g. 5 min read",
+      "hint": "Estimated from the content; you can change it.",
+      "auto": "{min} min read"
     }
   },
   "adminDocuments": {
