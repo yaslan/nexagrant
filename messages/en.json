@@ -2791,7 +2791,8 @@
       "label": "Read time",
       "placeholder": "e.g. 5 min read",
       "hint": "Estimated from the content; you can change it.",
-      "auto": "{min} min read"
+      "auto": "{min} min read",
+      "missing": "The read time cannot be empty. If the content has no text to read, type the read time yourself."
     }
   },
   "adminDocuments": {

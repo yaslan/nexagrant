@@ -98,6 +98,27 @@ test.describe.serial('admin blog — a new post has no invented defaults', () =>
     expect(await prisma.blogPost.count({ where: { title: NEW_TITLE } })).toBe(0);
   });
 
+  test('content with no readable words: the empty read time is caught before saving', async ({ page }) => {
+    await openNew(page, 'tr');
+    await page.locator('#blog-title').fill(NEW_TITLE);
+    await page.locator('#blog-excerpt').fill('Okunacak kelime yok.');
+    // Rules and stars only: the editor is not empty, but there is nothing to read.
+    await typeContent(page, '--- *** ---');
+    await expect(blogContentEditor(page)).toContainText('***');
+    await expect(readTime(page)).toHaveValue('');
+
+    await page.getByTestId('blog-submit').click();
+    await expect(page.getByTestId('blog-form-error')).toHaveText(
+      'Okuma süresi boş olamaz. İçerikte okunacak metin yoksa süreyi elle yazın.'
+    );
+    await expect(readTime(page)).toHaveAttribute('aria-invalid', 'true');
+    await page.screenshot({ path: `${SHOTS}/03-read-time-missing.png` });
+    expect(await prisma.blogPost.count({ where: { title: NEW_TITLE } })).toBe(0);
+
+    await readTime(page).fill('1 dk');
+    await expect(readTime(page)).not.toHaveAttribute('aria-invalid');
+  });
+
   test('a read time typed by the admin is not overwritten by the estimate', async ({ page }) => {
     await openNew(page, 'tr');
     await readTime(page).fill('7 dk okuma');
@@ -118,6 +139,7 @@ test.describe.serial('admin blog — a new post has no invented defaults', () =>
     await page.getByRole('row').filter({ hasText: EXISTING_SLUG }).getByRole('button', { name: 'Düzenle' }).click();
     await expect(blogContentEditor(page)).toHaveText('Kısa bir mevcut yazı.');
     await expect(readTime(page)).toHaveValue('9 dk okuma');
+    await expect(page.locator('label:has-text("Yazar Adı") + input')).toHaveValue('Kayıtlı Yazar');
     await expect(page.getByTestId('blog-image-preview')).toHaveAttribute('src', /photo-1522071820081/);
     await typeContent(page, ` ${LONG}`);
     await expect(blogContentEditor(page)).toContainText('kelime8');

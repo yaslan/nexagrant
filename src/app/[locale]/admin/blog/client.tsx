@@ -77,6 +77,7 @@ export default function AdminBlogClient({
   const [isUploading, setIsUploading] = useState(false);
   const [imageError, setImageError] = useState<ImageError | null>(null);
   const [contentMissing, setContentMissing] = useState(false);
+  const [readTimeMissing, setReadTimeMissing] = useState(false);
   const imageInput = useRef<HTMLInputElement>(null);
 
   // Form State
@@ -128,6 +129,7 @@ export default function AdminBlogClient({
     setFormError(null);
     setImageError(null);
     setContentMissing(false);
+    setReadTimeMissing(false);
     setFormData({
       title: '',
       slug: '',
@@ -150,6 +152,7 @@ export default function AdminBlogClient({
     setFormError(null);
     setImageError(null);
     setContentMissing(false);
+    setReadTimeMissing(false);
     setFormData({
       title: post.title,
       slug: post.slug,
@@ -204,6 +207,13 @@ export default function AdminBlogClient({
     if (!formData.content.trim()) {
       setContentMissing(true);
       setFormError(t('content.missing'));
+      return;
+    }
+    // Content with no readable words (only images, rules, line breaks) gives no
+    // estimate; the server would refuse the empty field, so say so here first.
+    if (!formData.readTime.trim()) {
+      setReadTimeMissing(true);
+      setFormError(t('readTime.missing'));
       return;
     }
     // BlogPost.image is required; the server refuses a post without one too.
@@ -556,12 +566,16 @@ export default function AdminBlogClient({
                     value={formData.readTime}
                     onChange={(e) => {
                       readTimeAuto.current = false;
+                      setReadTimeMissing(false);
                       setFormData({ ...formData, readTime: e.target.value });
                     }}
                     placeholder={t('readTime.placeholder')}
                     aria-describedby="blog-read-time-hint"
+                    aria-invalid={readTimeMissing || undefined}
                     data-testid="blog-read-time"
-                    className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
+                    className={`w-full px-3 py-2 bg-ground border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent ${
+                      readTimeMissing ? 'border-bad' : 'border-border'
+                    }`}
                   />
                   <p id="blog-read-time-hint" className="mt-1 text-[11px] text-muted">{t('readTime.hint')}</p>
                 </div>
@@ -592,6 +606,7 @@ export default function AdminBlogClient({
                   content={formData.content}
                   onChange={(md) => {
                     setContentMissing(false);
+                    if (readTimeAuto.current && autoReadTime(md)) setReadTimeMissing(false);
                     setFormData((prev) => ({
                       ...prev,
                       content: md,
