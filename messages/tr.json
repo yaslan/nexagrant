@@ -2793,7 +2793,8 @@
       "label": "Okuma süresi",
       "placeholder": "örn: 5 dk",
       "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz.",
-      "auto": "{min} dk"
+      "auto": "{min} dk",
+      "missing": "Okuma süresi boş olamaz. İçerikte okunacak metin yoksa süreyi elle yazın."
     }
   },
   "adminDocuments": {
