@@ -2786,7 +2786,7 @@
     },
     "content": {
       "label": "Article content",
-      "hint": "Formats the site shows: headings (H1–H3), bold, bulleted and numbered lists. Content is saved as Markdown.",
+      "hint": "Formats the site shows: headings (H1–H3), bold, bulleted and numbered lists, links and uploaded images. Content is saved as Markdown.",
       "missing": "Article content cannot be empty."
     },
     "readTime": {

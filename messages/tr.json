@@ -2786,7 +2786,7 @@
     },
     "content": {
       "label": "Makale İçeriği",
-      "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste. İçerik Markdown olarak kaydedilir.",
+      "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste, bağlantı ve yüklenen görsel. İçerik Markdown olarak kaydedilir.",
       "missing": "Makale içeriği boş olamaz."
     },
     "readTime": {
