@@ -4,6 +4,7 @@ import { requireTenantPage } from '@/lib/tenant';
 import { ApiKeysClient, type ApiKeyRecord } from './client';
 import { errorMessage } from '@/lib/errors';
 import { appUrl } from '@/lib/app-url';
+import { moduleGate } from '@/lib/modules/guard';
 
 /**
  * Placeholder rows for the empty state — the timestamps are relative to the
@@ -34,6 +35,11 @@ export default async function ApiKeysSettingsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale } = await params;
+  // Partner API keys are an M1 feature (docs/MODULES.md): the sidebar lock alone
+  // left the page open to anyone who typed the URL.
+  const locked = await moduleGate('M1', locale);
+  if (locked) return locked;
+
   const { tenantId } = await requireTenantPage(locale);
 
   let apiKeys: ApiKeyRecord[] = [];
