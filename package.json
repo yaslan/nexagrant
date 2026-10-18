@@ -11,6 +11,8 @@
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "efatura:preflight": "tsx scripts/efatura-preflight.ts",
+    "storage:up": "docker compose --profile storage up -d minio && tsx scripts/minio-local-setup.ts",
+    "storage:setup": "tsx scripts/minio-local-setup.ts",
     "db:migrate": "prisma migrate dev",
     "db:setup": "bash scripts/db-setup.sh",
     "db:generate": "prisma generate",

@@ -31,6 +31,11 @@ pnpm dev                       # Next.js :3000
 pnpm test                      # .env'i vitest.config.mts kendisi yükler; `source .env` gerekmez
 ```
 
+- **Yerel görsel yükleme (blog kapağı):** `pnpm storage:up` MinIO'yu `storage` profilinde kaldırır (API :9000, konsol :9001) ve
+  iki bucket'ı kurar: `fabrika` (özel) ve `fabrika-public` (anonim okuma). Tekrar çalıştırmak güvenlidir. Uygulamanın görmesi için
+  `.env.local`'a `R2_ENDPOINT=http://localhost:9000`, `R2_REGION=us-east-1`, `R2_ACCESS_KEY_ID=minioadmin`,
+  `R2_SECRET_ACCESS_KEY=minioadmin`, `R2_BUCKET=fabrika`, `R2_PUBLIC_BUCKET=fabrika-public`,
+  `R2_PUBLIC_HOST=http://localhost:9000/fabrika-public` ekleyin, sonra `pnpm dev`'i yeniden başlatın. Yalnız geliştirme için; canlıda R2 ya da Supabase Storage kullanılır.
 - **Kurulum sırası CI ile aynı**: CI "Prepare database" de `pnpm db:setup` çağırır. `pnpm db:migrate`
   (`prisma migrate dev`) ve `prisma migrate deploy` bu depoda kullanılmaz; `prisma.config.ts` onları hiçbir şey uygulamadan durdurur. Neden: `prisma/migrations` temel tabloları kurmaz,
   `db push` üstüne yazılmış ek dosyalardır (`add-m10-dual-approval-persistence` → `relation
