@@ -4,6 +4,7 @@ import { errorMessage } from '@/lib/errors';
 import { auth } from '@/lib/auth';
 import { getTranslations } from 'next-intl/server';
 import { displayUserName } from '@/lib/user-display';
+import { publicAssetStore } from '@/lib/storage';
 import AdminBlogClient from './client';
 
 export default async function AdminBlogPage({
@@ -41,6 +42,7 @@ export default async function AdminBlogPage({
       locale={locale}
       sessionUserName={sessionUserName}
       loadError={loadError}
+      publicImageBase={publicAssetStore()?.baseUrl}
     />
   );
 }
