@@ -3406,5 +3406,27 @@
       "altHint": "Görseli göremeyenler için görselin ne gösterdiğini kısaca yazın.",
       "altRequired": "Alternatif metin zorunlu."
     }
+  },
+  "ApiKeysSettings": {
+    "createTitle": "Yeni API Anahtarı Oluştur",
+    "revoke": {
+      "title": "Mevcut API anahtarları",
+      "description": "Modül kapalıyken de mevcut anahtarlarınızı buradan iptal edebilirsiniz. İptal edilen anahtar hemen geçersiz olur. Anahtar değerleri gösterilmez.",
+      "createdAt": "Oluşturulma:",
+      "lastUsed": "Son kullanım:",
+      "neverUsed": "Henüz kullanılmadı",
+      "revokeOneLabel": "\"{name}\" anahtarını iptal et",
+      "revokeAll": "Tüm anahtarları iptal et",
+      "confirmOneTitle": "\"{name}\" anahtarı iptal edilsin mi?",
+      "confirmAllTitle": "Tüm anahtarlar iptal edilsin mi?",
+      "confirmBody": "Bu işlem geri alınamaz. Bu anahtarları kullanan entegrasyonlar erişimini hemen kaybeder.",
+      "confirm": "İptal et",
+      "cancel": "Vazgeç",
+      "revoking": "İptal ediliyor…",
+      "error": {
+        "forbidden": "API anahtarlarını yalnızca kurum sahibi veya yöneticisi iptal edebilir.",
+        "failed": "Anahtar iptal edilemedi. Lütfen tekrar deneyin."
+      }
+    }
   }
 }

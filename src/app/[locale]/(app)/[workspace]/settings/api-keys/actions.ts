@@ -79,10 +79,14 @@ export async function generateApiKey({
   return { apiKeyRecord, rawKey };
 }
 
+/**
+ * Withdraws one key. The settings page calls it once per key for "revoke all"
+ * (FO-81), so there is one revoke path, not a second bulk query beside it.
+ */
 export async function revokeApiKey(
   keyId: string
 ): Promise<{ success: boolean } | { success: false; error: 'forbidden' }> {
-  const { tenantId, role } = await requireTenantAction();
+  const { tenantId, userId, role } = await requireTenantAction();
   if (!can(asRole(role), 'manage_users')) return { success: false, error: 'forbidden' };
   // Deliberately NOT behind `assertModuleAccess('M1')` (TASK-MVC9MCXKVMDN7).
   // Revoking only ever reduces access: a tenant whose M1 was turned off, or whose
@@ -94,9 +98,18 @@ export async function revokeApiKey(
 
   // `deleteMany` so the tenant is part of the WHERE clause; `delete` takes only
   // a unique selector and would revoke another tenant's key.
-  const deleted = await withTenant(tenantId, (tx) =>
-    tx.apiKey.deleteMany({ where: { id: keyId, tenantId } })
-  );
+  // The audit row is written in the same transaction and only when a key was
+  // actually removed, so a repeated click on an already revoked key leaves no
+  // second "revoked" entry behind.
+  const deleted = await withTenant(tenantId, async (tx) => {
+    const result = await tx.apiKey.deleteMany({ where: { id: keyId, tenantId } });
+    if (result.count > 0) {
+      await tx.auditEvent.create({
+        data: { tenantId, actorId: userId, type: 'apiKey.revoked', target: keyId },
+      });
+    }
+    return result;
+  });
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/settings/api-keys', 'page');

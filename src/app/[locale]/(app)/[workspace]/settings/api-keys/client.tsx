@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Lock,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
 import { generateApiKey, revokeApiKey, type ApiKeyActionError } from './actions';
@@ -46,6 +47,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClien
   const [actionError, setActionError] = useState<string | null>(null);
   const [activeCodeTab, setActiveCodeTab] = useState<'curl' | 'javascript' | 'python'>('curl');
   const errorText = useActionErrorText();
+  const t = useTranslations('ApiKeysSettings');
 
   const handleGenerateKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,7 +169,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClien
           <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex items-center gap-2 border-b pb-3">
               <Plus className="w-4 h-4 text-purple-600" />
-              <h3 className="font-bold text-sm text-ink">Yeni API Anahtarı Oluştur</h3>
+              <h3 className="font-bold text-sm text-ink">{t('createTitle')}</h3>
             </div>
 
             <form onSubmit={handleGenerateKey} className="space-y-3.5 text-xs">
