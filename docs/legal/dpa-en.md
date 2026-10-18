@@ -58,7 +58,7 @@ Rectification and objection requests are handled through the Controller's tenant
 
 ## 5. Security Measures
 
-- Tenant data is separated at the application layer: queries that access tenant data are restricted to the tenant identifier; authorized platform administration operations may operate across tenants; plan publication, archiving, visibility changes, deletion and tenant plan assignments are written to an audit record (AuditEvent). PostgreSQL Row Level Security policies are defined in the database but are not in effect on the application's database connection.
+- Tenant data is separated at the application layer: queries that access tenant data are restricted to the tenant identifier; a defined, limited set of system operations (platform administration, data-subject requests, scheduled jobs) may operate across tenants. PostgreSQL Row Level Security policies are defined in the database but are not in effect on the application's database connection.
 - File attachments are stored in encrypted, S3-compatible object storage.
 - Access is role-based; sensitive operations require dual approval.
 - Audit events are recorded in the `AuditEvent` table.

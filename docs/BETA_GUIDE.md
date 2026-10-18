@@ -221,7 +221,7 @@ Panelde gösterilen her oran bir kayda dayanır; kaynak yoksa metrik "veri yok" 
 
 ## 7. Veri, gizlilik ve uyum
 
-- **Kiracı izolasyonu:** Her kayıt bir kiracıya bağlıdır ve uygulama, kiracı verisine erişen sorguları kiracı kimliğiyle sınırlar; yetkili platform yönetimi işlemleri kiracılar arası çalışabilir; plan yayımlama, arşivleme, görünürlük, silme ve kiracıya plan atama işlemleri denetim kaydına (AuditEvent) yazılır.
+- **Kiracı izolasyonu:** Her kayıt bir kiracıya bağlıdır ve uygulama, kiracı verisine erişen sorguları kiracı kimliğiyle sınırlar; tanımlı ve sınırlı sistem işlemleri (platform yönetimi, veri sahibi talepleri, zamanlanmış işler) kiracılar arası çalışabilir.
   Bir ortağın verisi başka bir ortağa görünmez. Veritabanı seviyesindeki satır bazlı güvenlik (RLS)
   politikaları tanımlıdır, ancak uygulamanın veritabanı bağlantısında etkin değildir.
 - **YZ kullanımı:** LLM çağrıları kayıt altına alınır (modül, amaç, model, token, kredi). **Verileriniz
