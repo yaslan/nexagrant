@@ -319,7 +319,23 @@
     "wordCount": "Kelime Sayısı",
     "overLimit": "Limit Aşıldı",
     "aiUsage": "YZ Kullanım Beyanı",
-    "creditsUsed": "Kullanılan Kredi"
+    "creditsUsed": "Kullanılan Kredi",
+    "editor": {
+      "title": "Konsept Notu Editörü",
+      "generate": "YZ ile Taslak Üret",
+      "generating": "Üretiliyor...",
+      "save": "Taslağı Kaydet",
+      "saving": "Kaydediliyor...",
+      "export": "DOCX Olarak Dışa Aktar",
+      "exporting": "Dışa aktarılıyor...",
+      "generated": "Taslak oluşturuldu. Üretilen metni görmek için sayfayı yenileyin.",
+      "saved": "Taslak kaydedildi.",
+      "failed": "İşlem başarısız: {message}",
+      "sectionLabel": "{label} (en fazla {max} kelime)",
+      "placeholder": "{label} bölümünü yazın...",
+      "words": "Kelime: {count} / {max}",
+      "noTemplate": "Sistemde konsept notu şablonu bulunamadı. Seed verisini yükleyin."
+    }
   },
   "Relationships": {
     "title": "İlişki Yönetimi",
@@ -355,7 +371,15 @@
     "kindMeeting": "Toplantı",
     "kindEmail": "E-posta",
     "kindCall": "Telefon",
-    "kindEvent": "Etkinlik"
+    "kindEvent": "Etkinlik",
+    "page": {
+      "title": "Odak Noktası CRM (M4)",
+      "subtitle": "Ortak ilişkilerini yönet ve etkileşimleri takip et.",
+      "newFromPartner": "+ Ortak Kartından Ekle",
+      "staleDays": "{days} gündür bayat",
+      "daysAgo": "{days} gün önce",
+      "empty": "Henüz ilişki yok. Bir Ortak Kartından açın."
+    }
   },
   "Consortium": {
     "title": "Konsorsiyum Oluşturucu",
@@ -1307,7 +1331,98 @@
     "meta_description": "{region} bölgesine uygun AB hibe çağrıları"
   },
   "applicationPartA": {
-    "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin."
+    "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin.",
+    "eyebrow": "Modül 11 — Tam Başvuru Üretimi",
+    "title": "Part A & Part B Başvuru Üretim Paneli",
+    "proposal": "Teklif: <strong>{title}</strong>",
+    "downloadPartB": "Part B (.docx) Şablonu İndir",
+    "partsActive": "Part A & B Aktif",
+    "summary": {
+      "effort": "Toplam Konsorsiyum Eforu",
+      "personMonths": "Kişi-Ay (PM)",
+      "budget": "Toplam Bütçe (Lump Sum)",
+      "wpCount": "İş Paketi Sayısı",
+      "wpUnit": "İş Paketi (WP)",
+      "pageLimit": "Sayfa Limiti Kontrolü",
+      "pageLimitValue": "RIA/IA Limit: 45 Sayfa"
+    },
+    "tabs": {
+      "partBEditor": "Part B (Çoklu Yazar İşbirlikçi Metin Editörü)",
+      "partA": "Part A (İdari & Lump-Sum Bütçe)",
+      "gantt": "Part B (Gantt Şeması & İş Paketleri)",
+      "checklist": "Gönderim Kontrol Listesi"
+    },
+    "portal": {
+      "title": "Ortak Katkı Portalı (Magic Link)",
+      "intro": "Dış konsorsiyum ortakları şifre gerekmeksizin aşağıdaki güvenli bağlantıyla kendi kurum ve bütçe verilerini girebilir:",
+      "copied": "Kopyalandı",
+      "copy": "Kopyala",
+      "shownOnce": "Bu bağlantı yalnız şimdi gösterilir; güvenlik için saklanmaz. Şimdi kopyalayıp ortağınıza iletin.",
+      "issuedBefore": "Bir bağlantı daha önce oluşturuldu ve güvenlik için yeniden gösterilemez. Yeni bağlantı oluşturursanız eskisi çalışmaz.",
+      "none": "Henüz bağlantı oluşturulmadı.",
+      "reissue": "Yeni bağlantı oluştur",
+      "issue": "Bağlantı oluştur"
+    },
+    "budget": {
+      "addTitle": "Lump-Sum Bütçe Kalemi Ekle",
+      "partnerName": "Ortak Kurum Adı",
+      "partnerNamePlaceholder": "Örn: METU TTO, Fraunhofer Institute",
+      "effort": "Efor (Kişi-Ay)",
+      "countryCoef": "Ülke Katsayısı",
+      "coefStandard": "1.00 (Standart AB)",
+      "coefSee": "0.85 (Türkiye / Güneydoğu Avrupa)",
+      "coefNorth": "1.20 (Yüksek Maliyetli Kuzey)",
+      "travel": "Seyahat (€)",
+      "subcontracting": "Alt Yüklenici (€)",
+      "calculating": "Hesaplanıyor...",
+      "save": "Bütçe Kalemini Kaydet",
+      "tableTitle": "Konsorsiyum Lump-Sum Bütçe Tablosu",
+      "overhead": "Standart %25 Genel Gider Dahil",
+      "colPartner": "Ortak Kurum",
+      "colCoef": "Ülke Kat.",
+      "colRequested": "Talep Edilen (€)",
+      "empty": "Henüz bütçe satırı eklenmedi. Aşağıdaki formdan ortak ekleyin.",
+      "total": "TOPLAM KONSORSİYUM"
+    },
+    "gantt": {
+      "title": "Proje Gantt Şeması & İş Paketi Zaman Çizelgesi (M1 - M36)",
+      "subtitle": "Horizon Europe Part B Bölüm 3.1 İş Paketi (WP) başlangıç ve bitiş ayları.",
+      "empty": "Henüz iş paketi tanımlanmadı. Aşağıdaki formdan WP ekleyin.",
+      "lead": "Lider: <strong>{lead}</strong> (Ay M{start} - M{end})",
+      "addTitle": "Yeni İş Paketi (WP) Ekle",
+      "code": "WP Kodu",
+      "wpTitle": "WP Başlığı",
+      "leadOrg": "Lider Kurum",
+      "start": "Başlangıç (Ay)",
+      "end": "Bitiş (Ay)",
+      "add": "İş Paketini Gantt Şemasına Ekle"
+    },
+    "checklist": {
+      "title": "Resmî Gönderim Öncesi Kontrol Listesi",
+      "subtitle": "European Funding & Tenders portalına yükleme yapmadan önce zorunlu kriterleri doğrulayın.",
+      "items": {
+        "partA": {
+          "title": "Part A İdari Kurum Formları",
+          "desc": "Tüm konsorsiyum ortaklarının PIC numaraları ve finansal temsilcileri doğrulandı."
+        },
+        "pageLimit": {
+          "title": "Part B Sayfa Limiti Uyum Kontrolü",
+          "desc": "RIA/IA projeleri için azami 45 sayfa sınırı aşılmadı (Mevcut: ~38 Sayfa)."
+        },
+        "gep": {
+          "title": "Cinsiyet Eşitliği Planı (Gender Equality Plan - GEP)",
+          "desc": "Kamu ve üniversite ortaklarının onaylı GEP belgeleri yüklendi."
+        },
+        "fair": {
+          "title": "Açık Bilim ve Veri Yönetimi Planı (FAIR Data)",
+          "desc": "Part B 1.2 bölümünde açık erişim yayıncılık taahhüt edildi."
+        },
+        "ip": {
+          "title": "Fikri Mülkiyet (IP) & Arka Plan Hakları",
+          "desc": "Tüm ortakların arka plan patent ve yazılım hakları tanımlandı."
+        }
+      }
+    }
   },
   "partner_portal": {
     "badge": "Consortium Partner Portal",

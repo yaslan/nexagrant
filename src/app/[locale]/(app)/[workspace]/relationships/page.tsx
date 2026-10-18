@@ -1,5 +1,6 @@
 import { withTenant } from '@/lib/db';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import type { RelationshipRow } from '@/types/db-rows';
@@ -65,20 +66,20 @@ export default async function RelationshipsPage({
     active: 'bg-ok/15 text-ok border border-ok/20',
   };
 
-  const isTr = locale === 'tr';
+  const t = await getTranslations({ locale, namespace: 'Relationships.page' });
 
   return (
     <div className="max-w-6xl mx-auto py-8 sm:px-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold font-heading text-ink">{isTr ? 'Odak Noktası CRM (M3)' : 'Focal Point CRM'}</h1>
-          <p className="text-muted text-xs md:text-sm mt-1">{isTr ? 'Ortak ilişkilerini yönet ve etkileşimleri takip et.' : 'Manage partner relationships and track interactions.'}</p>
+          <h1 className="text-3xl font-bold font-heading text-ink">{t('title')}</h1>
+          <p className="text-muted text-xs md:text-sm mt-1">{t('subtitle')}</p>
         </div>
         <Link
           href={getWorkspaceRoute('partners', locale, workspace)}
           className="bg-accent text-white px-4 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition shadow-2xs"
         >
-          {isTr ? '+ Ortak Kartından Ekle' : '+ New from Partner Card'}
+          {t('newFromPartner')}
         </Link>
       </div>
 
@@ -114,7 +115,7 @@ export default async function RelationshipsPage({
                 <div className="flex items-center gap-3">
                   {stale && (
                     <span className="text-[10px] bg-bad/15 text-bad border border-bad/30 px-2 py-0.5 rounded font-bold">
-                      ⚠ {days}d stale
+                      ⚠ {t('staleDays', { days: days ?? 0 })}
                     </span>
                   )}
                   <span
@@ -123,7 +124,7 @@ export default async function RelationshipsPage({
                     {rel.warmth}
                   </span>
                   {days !== null && !stale && (
-                    <span className="text-[11px] text-muted font-mono">{days}d ago</span>
+                    <span className="text-[11px] text-muted font-mono">{t('daysAgo', { days })}</span>
                   )}
                 </div>
               </div>
@@ -133,7 +134,7 @@ export default async function RelationshipsPage({
 
         {relationships.length === 0 && (
           <div className="text-center text-muted py-12 border-2 border-dashed border-border rounded-xl bg-surface/40 text-xs">
-            No relationships yet. Open one from a Partner Card.
+            {t('empty')}
           </div>
         )}
       </div>

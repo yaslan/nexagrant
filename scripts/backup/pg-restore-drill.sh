@@ -27,7 +27,7 @@
 set -euo pipefail
 
 log() { printf '%s [restore-drill] %s\n' "$(date -u +%FT%TZ)" "$*"; }
-fail() { log "FAIL: $*"; exit 1; }
+fail() { log "FAIL: $*" >&2; exit 1; }
 
 for bin in pg_restore psql; do
   command -v "$bin" >/dev/null 2>&1 || fail "$bin not found on PATH"
@@ -39,8 +39,21 @@ done
 RESTORE_DB="${RESTORE_DB:-fabrika_restore_drill}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 
+# Split both URLs (pg-url.sh). Passwords travel in PGPASSWORD per call, never in
+# argv; the connection strings handed to psql/pg_restore carry no password.
+# shellcheck source=pg-url.sh
+source "$(dirname "$0")/pg-url.sh"
+pg_url_split BACKUP_DATABASE_URL || fail "BACKUP_DATABASE_URL could not be parsed (see above)"
+src_conn="$PG_CONN"
+src_pass="$PG_PASS"
+pg_url_split RESTORE_ADMIN_URL || fail "RESTORE_ADMIN_URL could not be parsed (see above)"
+admin_conn="$PG_CONN"
+admin_prefix="$PG_CONN_BASE"
+admin_query="$PG_QUERY"
+admin_pass="$PG_PASS"
+
 # Name guards: the scratch database must be a different database from the source.
-src_db="$(psql "$BACKUP_DATABASE_URL" -X -At -c 'select current_database()')"
+src_db="$(PGPASSWORD="$src_pass" psql "$src_conn" -X -At -c 'select current_database()')"
 [ "$RESTORE_DB" != "$src_db" ] || fail "RESTORE_DB ($RESTORE_DB) equals the source database; refusing"
 [ "$RESTORE_DB" != "fabrika" ] || fail "RESTORE_DB must not be 'fabrika'"
 [[ "$RESTORE_DB" =~ ^[a-z0-9_]+$ ]] || fail "RESTORE_DB must match ^[a-z0-9_]+$"
@@ -75,38 +88,41 @@ where table_type = 'BASE TABLE' and table_schema in ('public', 'graphile_worker'
 SQL
 }
 
+# counts_of CONN PASS LABEL
+# psql's exit code is checked on its own: a failed count query must fail the
+# drill, never leave an empty list that compares equal to an empty list.
 counts_of() {
-  local url="$1" union
-  union="$(psql "$url" -X -At -c "$(count_sql)")"
-  [ -n "$union" ] || fail "no tables found on $2"
-  psql "$url" -X -At -v ON_ERROR_STOP=1 \
+  local conn="$1" pass="$2" label="$3" union out
+  union="$(PGPASSWORD="$pass" psql "$conn" -X -At -c "$(count_sql)")" || fail "could not list tables on $label"
+  [ -n "$union" ] || fail "no tables found on $label"
+  out="$(PGPASSWORD="$pass" psql "$conn" -X -At -v ON_ERROR_STOP=1 \
     -c 'begin isolation level repeatable read' \
     -c "select tbl || '=' || n from ($union) q order by tbl" \
-    -c 'commit' | grep '=' || true
+    -c 'commit')" || fail "row count query failed on $label"
+  out="$(printf '%s\n' "$out" | grep '=' || true)"
+  [ -n "$out" ] || fail "row count query returned no rows on $label"
+  printf '%s\n' "$out"
 }
 
-# The restored database URL: same server and credentials as the admin URL, new db name.
-restored_url="$(RESTORE_ADMIN_URL="$RESTORE_ADMIN_URL" RESTORE_DB="$RESTORE_DB" node -e '
-  const u = new URL(process.env.RESTORE_ADMIN_URL);
-  u.pathname = "/" + process.env.RESTORE_DB;
-  process.stdout.write(u.toString());
-')"
+# The restored database: same server and credentials as the admin URL, new db name.
+restored_conn="$admin_prefix/$RESTORE_DB${admin_query:+?$admin_query}"
 
 started=$(date +%s)
 log "recreating scratch database $RESTORE_DB"
-psql "$RESTORE_ADMIN_URL" -X -q -v ON_ERROR_STOP=1 \
+PGPASSWORD="$admin_pass" psql "$admin_conn" -X -q -v ON_ERROR_STOP=1 \
   -c "drop database if exists \"$RESTORE_DB\" with (force)" \
   -c "create database \"$RESTORE_DB\""
 
 log "restoring $(basename "$dump")"
-pg_restore --dbname="$restored_url" --no-owner --exit-on-error "$dump" \
+PGPASSWORD="$admin_pass" pg_restore --dbname="$restored_conn" --no-owner --exit-on-error "$dump" \
   || fail "pg_restore failed (see its messages above)"
 restored_s=$(date +%s)
 
 log "comparing row counts (source vs $RESTORE_DB)"
-src_counts="$(counts_of "$BACKUP_DATABASE_URL" source)"
-dst_counts="$(counts_of "$restored_url" restored)"
+src_counts="$(counts_of "$src_conn" "$src_pass" source)"
+dst_counts="$(counts_of "$restored_conn" "$admin_pass" restored)"
 tables=$(printf '%s\n' "$src_counts" | grep -c '=' || true)
+[ "$tables" -gt 0 ] || fail "no tables counted on source"
 
 diff_out="$(diff <(printf '%s\n' "$src_counts") <(printf '%s\n' "$dst_counts") || true)"
 if [ -n "$diff_out" ]; then
@@ -119,6 +135,6 @@ printf '%s\n' "$dst_counts" | sed 's/^/    /'
 log "ok: $tables tables, restore $(( restored_s - started ))s, total $(( $(date +%s) - started ))s"
 
 if [ "${RESTORE_KEEP:-0}" != "1" ]; then
-  psql "$RESTORE_ADMIN_URL" -X -q -c "drop database if exists \"$RESTORE_DB\" with (force)"
+  PGPASSWORD="$admin_pass" psql "$admin_conn" -X -q -c "drop database if exists \"$RESTORE_DB\" with (force)"
   log "scratch database dropped (set RESTORE_KEEP=1 to keep it)"
 fi
