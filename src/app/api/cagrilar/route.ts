@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { internalError } from '@/lib/api-error';
 import { SediaAdapter } from '@/lib/adapters/sedia';
 import { translateTopicsBatch } from '@/lib/translation';
@@ -7,12 +8,20 @@ import { logger } from '@/lib/logger';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 
 /**
- * The largest page this route asks SEDIA for. The route fetches up to
- * {@link MAX_PAGES} pages and translates every title, so an uncapped `limit`
- * multiplied into thousands of outbound calls per request (TASK-MUN66T2HM4A4E O-1).
+ * The largest page this route asks SEDIA for. Every title on the page is
+ * translated, so an uncapped `limit` multiplied into thousands of outbound
+ * calls per request (TASK-MUN66T2HM4A4E O-1).
  */
 const CAGRILAR_MAX_PAGE_SIZE = 50;
-const MAX_PAGES = 5;
+
+/**
+ * The highest page number a caller may ask for (FO-42). One request reads one
+ * SEDIA page, so this only bounds how deep a loop can walk, not how much work
+ * a single request does.
+ */
+const CAGRILAR_MAX_PAGE_NUMBER = 1000;
+
+const PageParamSchema = z.coerce.number().int().min(1).max(CAGRILAR_MAX_PAGE_NUMBER);
 
 /**
  * Total time one search may take, SEDIA and translation together
@@ -55,9 +64,13 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const text = searchParams.get('q') || searchParams.get('text') || '***';
-    // NOTE: ?page/?pageNumber is not honoured. `SediaAdapter.searchSedia` paginates
-    // internally from page 1 up to maxPages and reports pageNumber 1, so there is no
-    // page argument to forward. Parsing one here only implied otherwise.
+    const rawPage = searchParams.get('page');
+    const pageParsed = rawPage === null ? { success: true as const, data: 1 } : PageParamSchema.safeParse(rawPage);
+    if (!pageParsed.success) {
+      return NextResponse.json({ success: false, error: 'invalid_page' }, { status: 400 });
+    }
+    const page = pageParsed.data;
+
     const rawPageSize = Number.parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '20', 10);
     if (!Number.isFinite(rawPageSize)) {
       return NextResponse.json({ success: false, error: 'invalid_limit' }, { status: 400 });
@@ -95,7 +108,8 @@ export async function GET(request: NextRequest) {
     const result = await adapter.searchSedia({
       text,
       pageSize,
-      maxPages: MAX_PAGES, // Limit API calls for web endpoint
+      startPage: page,
+      maxPages: 1, // One SEDIA call per request: the page the caller asked for
       statuses,
       frameworkProgrammes,
       types,
