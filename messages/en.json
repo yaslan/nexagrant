@@ -3406,5 +3406,27 @@
       "altHint": "Briefly describe what the image shows, for readers who cannot see it.",
       "altRequired": "Alt text is required."
     }
+  },
+  "ApiKeysSettings": {
+    "createTitle": "Create new API key",
+    "revoke": {
+      "title": "Active API keys",
+      "description": "You can revoke your existing keys here while the module is off. A revoked key stops working immediately. Key values are never shown.",
+      "createdAt": "Created:",
+      "lastUsed": "Last used:",
+      "neverUsed": "Not used yet",
+      "revokeOneLabel": "Revoke key \"{name}\"",
+      "revokeAll": "Revoke all keys",
+      "confirmOneTitle": "Revoke key \"{name}\"?",
+      "confirmAllTitle": "Revoke all keys?",
+      "confirmBody": "This cannot be undone. Integrations using these keys lose access immediately.",
+      "confirm": "Revoke",
+      "cancel": "Cancel",
+      "revoking": "Revoking…",
+      "error": {
+        "forbidden": "Only the workspace owner or an admin can revoke API keys.",
+        "failed": "The key could not be revoked. Please try again."
+      }
+    }
   }
 }

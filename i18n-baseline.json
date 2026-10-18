@@ -10,7 +10,7 @@
   "src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager.tsx": 5,
   "src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx": 1,
   "src/app/[locale]/(app)/[workspace]/pipeline/board.tsx": 29,
-  "src/app/[locale]/(app)/[workspace]/settings/api-keys/client.tsx": 18,
+  "src/app/[locale]/(app)/[workspace]/settings/api-keys/client.tsx": 17,
   "src/app/[locale]/admin/audit/page.tsx": 4,
   "src/app/[locale]/admin/blog/client.tsx": 21,
   "src/app/[locale]/admin/cordis/client.tsx": 37,

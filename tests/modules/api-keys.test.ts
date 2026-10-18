@@ -15,6 +15,7 @@ import {
 const h = vi.hoisted(() => ({
   apiKeyCreate: vi.fn(),
   apiKeyDeleteMany: vi.fn(),
+  auditEventCreate: vi.fn(),
 }));
 
 vi.mock('../../src/lib/tenant', async () => {
@@ -33,6 +34,7 @@ vi.mock('../../src/lib/db', async () => {
   const m = await import('../helpers/tenant-scope-mock');
   return m.dbModuleStub({
     apiKey: { create: h.apiKeyCreate, deleteMany: h.apiKeyDeleteMany },
+    auditEvent: { create: h.auditEventCreate },
   });
 });
 
@@ -51,6 +53,7 @@ describe('Partner API keys', () => {
       keyHash: data.keyHash,
     }));
     h.apiKeyDeleteMany.mockResolvedValue({ count: 1 });
+    h.auditEventCreate.mockResolvedValue({});
   });
 
   test('generateApiKey generates API key with prefix', async () => {
@@ -92,6 +95,41 @@ describe('Partner API keys', () => {
 
     const res = await revokeApiKey('key-from-other-tenant');
     expect(res.success).toBe(false);
+  });
+
+  // FO-81: every revoke is audited, and the audit row is written only for a key
+  // that was actually removed (a repeated click leaves no second entry).
+  describe('revoke audit (FO-81)', () => {
+    test('a removed key writes one AuditEvent for the session tenant and actor', async () => {
+      await revokeApiKey('key-123');
+
+      expect(h.auditEventCreate).toHaveBeenCalledTimes(1);
+      expect(h.auditEventCreate).toHaveBeenCalledWith({
+        data: {
+          tenantId: 'tenant-1',
+          actorId: 'user-1',
+          type: 'apiKey.revoked',
+          target: 'key-123',
+        },
+      });
+    });
+
+    test('a key that was already gone writes no AuditEvent', async () => {
+      h.apiKeyDeleteMany.mockResolvedValue({ count: 0 });
+
+      await revokeApiKey('key-123');
+
+      expect(h.auditEventCreate).not.toHaveBeenCalled();
+    });
+
+    test('a refused role neither deletes nor audits', async () => {
+      setScope({ ...DEFAULT_SCOPE, role: 'MEMBER' });
+
+      await revokeApiKey('key-123');
+
+      expect(h.apiKeyDeleteMany).not.toHaveBeenCalled();
+      expect(h.auditEventCreate).not.toHaveBeenCalled();
+    });
   });
 
   // TASK-MULU88PPI3HY3 (review K-12): a key reads the whole tenant through the
