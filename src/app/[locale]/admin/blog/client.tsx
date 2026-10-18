@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 // blog-shared, not blog: this is a client component and @/lib/blog reaches Prisma.
 import { formatBlogDate, type BlogPost } from '@/lib/blog-shared';
+import { estimateReadMinutes } from '@/lib/blog-read-time';
 import { 
   createBlogPostAction, 
   updateBlogPostAction, 
@@ -85,14 +86,24 @@ export default function AdminBlogClient({
     category: 'Horizon Europe',
     excerpt: '',
     content: '',
-    readTime: '5 min read',
+    // Filled from the content as it is written (see `readTimeAuto`).
+    readTime: '',
     // The signed-in admin, or nothing. No stand-in author, no stock portrait.
     authorName: sessionUserName,
     authorRole: '',
     authorAvatar: '',
-    image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+    // No stock cover: the admin uploads one, and saving without it is refused.
+    image: '',
     featured: true,
   });
+  // A new post's read time follows its content until the admin edits the field;
+  // an existing post keeps the value it was saved with. A ref, not state: the
+  // editor's update callback may be the one from an earlier render.
+  const readTimeAuto = useRef(true);
+  const autoReadTime = (markdown: string) => {
+    const minutes = estimateReadMinutes(markdown);
+    return minutes ? t('readTime.auto', { min: minutes }) : '';
+  };
 
   const categories = Array.from(new Set(posts.map((p) => p.category)));
 
@@ -123,13 +134,14 @@ export default function AdminBlogClient({
       category: 'Horizon Europe',
       excerpt: '',
       content: '',
-      readTime: '5 min read',
+      readTime: '',
       authorName: sessionUserName,
       authorRole: '',
       authorAvatar: '',
-      image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      image: '',
       featured: true,
     });
+    readTimeAuto.current = true;
     setIsModalOpen(true);
   };
 
@@ -152,6 +164,7 @@ export default function AdminBlogClient({
       image: post.image,
       featured: !!post.featured,
     });
+    readTimeAuto.current = false;
     setIsModalOpen(true);
   };
 
@@ -537,14 +550,21 @@ export default function AdminBlogClient({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1">Okuma Süresi</label>
+                  <label htmlFor="blog-read-time" className="block text-xs font-bold text-ink mb-1">{t('readTime.label')}</label>
                   <input
+                    id="blog-read-time"
                     type="text"
                     value={formData.readTime}
-                    onChange={(e) => setFormData({ ...formData, readTime: e.target.value })}
-                    placeholder="örn: 5 dk okuma"
+                    onChange={(e) => {
+                      readTimeAuto.current = false;
+                      setFormData({ ...formData, readTime: e.target.value });
+                    }}
+                    placeholder={t('readTime.placeholder')}
+                    aria-describedby="blog-read-time-hint"
+                    data-testid="blog-read-time"
                     className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
                   />
+                  <p id="blog-read-time-hint" className="mt-1 text-[11px] text-muted">{t('readTime.hint')}</p>
                 </div>
               </div>
 
@@ -573,7 +593,11 @@ export default function AdminBlogClient({
                   content={formData.content}
                   onChange={(md) => {
                     setContentMissing(false);
-                    setFormData((prev) => ({ ...prev, content: md }));
+                    setFormData((prev) => ({
+                      ...prev,
+                      content: md,
+                      readTime: readTimeAuto.current ? autoReadTime(md) : prev.readTime,
+                    }));
                   }}
                 />
                 <p className="mt-1 text-[11px] text-muted">{t('content.hint')}</p>

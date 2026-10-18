@@ -2785,6 +2785,12 @@
       "label": "Makale İçeriği",
       "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste. İçerik Markdown olarak kaydedilir.",
       "missing": "Makale içeriği boş olamaz."
+    },
+    "readTime": {
+      "label": "Okuma süresi",
+      "placeholder": "örn: 5 dk",
+      "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz.",
+      "auto": "{min} dk"
     }
   },
   "adminDocuments": {
