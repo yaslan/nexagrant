@@ -5,6 +5,8 @@ import { NextResponse } from 'next/server';
 import { internalError } from '@/lib/api-error';
 import { errorMessage } from '@/lib/errors';
 import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
+import { checkModuleAccessForTenant } from '@/lib/modules/tenant-access';
+import type { ModuleId } from '@/lib/modules/types';
 
 export interface AuthenticatedApiRequest {
   tenantId: string;
@@ -13,6 +15,28 @@ export interface AuthenticatedApiRequest {
 }
 
 const API_KEY_RATE_WINDOW_MS = 60_000;
+
+/**
+ * Every `/api/v1/*` route is the Partner REST API, which is the M1 module. The
+ * gate sits here, not in each route, so a route added later is closed by default.
+ */
+const PARTNER_API_MODULE: ModuleId = 'M1';
+
+/**
+ * An API key is not a member, so it acts under a role no membership holds: the
+ * `PILOT` and `DEV` audiences stay closed to it.
+ */
+const API_KEY_VIEWER = { role: 'API_KEY', isPlatformAdmin: false };
+
+function moduleDenied(): { authenticated: false; errorResponse: NextResponse } {
+  return {
+    authenticated: false,
+    errorResponse: NextResponse.json(
+      { error: 'MODULE_ACCESS_DENIED', module: PARTNER_API_MODULE },
+      { status: 403 }
+    ),
+  };
+}
 
 function invalidKey(): { authenticated: false; errorResponse: NextResponse } {
   return {
@@ -143,6 +167,14 @@ export async function authenticateApiKey(req: Request): Promise<
           }
         ),
       };
+    }
+
+    // Module and plan gate, after the key and its count: a key whose tenant has
+    // switched M1 off, or whose plan no longer includes it, is refused here even
+    // though it still authenticates. Revoking a key is not gated (its own route).
+    const access = await checkModuleAccessForTenant(keyRecord.tenantId, PARTNER_API_MODULE, API_KEY_VIEWER);
+    if (!access.allowed) {
+      return moduleDenied();
     }
 
     return {

@@ -61,6 +61,10 @@ const TOPIC_ROW = {
  */
 const dbBox = vi.hoisted(() => ({ client: undefined as unknown }));
 
+// The module gate has its own suite (v1-module-gate.test.ts); these suites test the route.
+vi.mock('../../src/lib/modules/tenant-access', () => ({
+  checkModuleAccessForTenant: vi.fn(async () => ({ allowed: true, status: 'ON' })),
+}));
 vi.mock('../../src/lib/db', () => {
   const client = {
     // authenticateApiKey's per-key rate-limit UPDATE ... RETURNING (TASK-MUN80XIW5NPV1): first request of a window.
