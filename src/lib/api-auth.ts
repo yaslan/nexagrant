@@ -18,15 +18,19 @@ const API_KEY_RATE_WINDOW_MS = 60_000;
 
 /**
  * Every `/api/v1/*` route is the Partner REST API, which is the M1 module. The
- * gate sits here, not in each route, so a route added later is closed by default.
+ * gate sits here, in `authenticateApiKey`, not in each route: a route that calls
+ * `authenticateApiKey` is gated, and the route scan in tests/api/v1-module-gate.test.ts
+ * fails a route that does not call it or calls it after reading data. A new route
+ * that skips the call is not refused by anything at runtime.
  */
 const PARTNER_API_MODULE: ModuleId = 'M1';
 
 /**
- * An API key is not a member, so it acts under a role no membership holds: the
- * `PILOT` and `DEV` audiences stay closed to it.
+ * An API key is not a member, so it acts under a role no membership holds. It is a
+ * machine audience: open where a pilot's managers are (`PILOT`), closed to `DEV`,
+ * which is staff only.
  */
-const API_KEY_VIEWER = { role: 'API_KEY', isPlatformAdmin: false };
+const API_KEY_VIEWER = { role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
 
 function moduleDenied(): { authenticated: false; errorResponse: NextResponse } {
   return {

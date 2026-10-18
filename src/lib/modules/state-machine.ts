@@ -118,6 +118,13 @@ export interface ModuleViewer {
   role: string;
   /** FonBridge staff — the only people a `DEV` module is for. */
   isPlatformAdmin: boolean;
+  /**
+   * A machine audience: an API key acting for a tenant, not a member. It is open
+   * wherever the tenant's managers are (`PILOT`), because a pilot tenant's Partner
+   * API integration must keep working while the pilot runs; it is not staff, so
+   * `DEV` stays closed to it. Only the API-key path sets this — a session never does.
+   */
+  isMachine?: boolean;
 }
 
 /**
@@ -154,7 +161,7 @@ const PILOT_ROLES = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER'];
  *   DEV   → FonBridge staff only. Work in progress; the tenant's own owner is *not*
  *           an insider, which is exactly the case the previous `role === 'TENANT_OWNER'`
  *           test got wrong: every tenant has an owner, so DEV let everyone in.
- *   PILOT → the tenant's managers, plus staff.
+ *   PILOT → the tenant's managers, plus staff, plus the tenant's API keys (machine).
  *   ON    → every member of the tenant.
  *
  * Role-level permissions (`evaluator:write`) and plan entitlement are separate gates
@@ -168,7 +175,7 @@ export function canAccessStatus(
     case 'ON':
       return { allowed: true };
     case 'PILOT':
-      return viewer.isPlatformAdmin || PILOT_ROLES.includes(viewer.role)
+      return viewer.isPlatformAdmin || viewer.isMachine === true || PILOT_ROLES.includes(viewer.role)
         ? { allowed: true }
         : { allowed: false, reason: 'PILOT_MANAGERS_ONLY' };
     case 'DEV':

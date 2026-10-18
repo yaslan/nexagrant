@@ -98,10 +98,7 @@ export function decideModuleAccess(
     };
   }
 
-  const decision = canAccessStatus(status, {
-    role: viewer.role,
-    isPlatformAdmin: viewer.isPlatformAdmin,
-  });
+  const decision = canAccessStatus(status, viewer);
 
   return decision.allowed
     ? { allowed: true, status }

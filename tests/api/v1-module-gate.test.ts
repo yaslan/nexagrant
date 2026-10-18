@@ -99,12 +99,10 @@ describe('/api/v1 is gated by M1 (module status and plan)', () => {
     expect(await res.errorResponse.json()).toEqual(DENIED_BODY);
   });
 
-  test('PILOT is for pilot managers, and a key is not one: 403', async () => {
+  test('PILOT stays open to the tenant key as a machine audience: 200', async () => {
     db.moduleStatus = 'PILOT';
     const res = await call();
-    expect(res.authenticated).toBe(false);
-    if (res.authenticated) return;
-    expect(res.errorResponse.status).toBe(403);
+    expect(res.authenticated).toBe(true);
   });
 
   test('DEV is for FonBridge staff, and a key is not staff: 403', async () => {
@@ -158,8 +156,22 @@ describe('every /api/v1 route goes through authenticateApiKey', () => {
     expect(files.length).toBeGreaterThanOrEqual(5);
   });
 
+  // Comments are dropped first, so a `prisma.` mentioned in a doc comment does not
+  // count as a read. The first real data access must come after the auth call.
+  const DATA_ACCESS = /\b(withTenant|withSystemScope|prisma)\s*[.(]/;
+  const AUTH_CALL = /await authenticateApiKey\(req\)/;
+
+  function codeOf(file: string): string {
+    return readFileSync(file, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+  }
+
   test.each(files.map((f) => [relative(root, f), f]))('%s authenticates before it reads data', (_name, file) => {
-    const src = readFileSync(file, 'utf8');
-    expect(src).toMatch(/await authenticateApiKey\(req\)/);
+    const src = codeOf(file);
+    const authAt = src.search(AUTH_CALL);
+    expect(authAt).toBeGreaterThanOrEqual(0);
+    const dataAt = src.search(DATA_ACCESS);
+    if (dataAt !== -1) expect(authAt).toBeLessThan(dataAt);
   });
 });

@@ -44,7 +44,7 @@ describe('/api/v1 module gate (live DB)', () => {
   const call = () =>
     authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': key } }));
 
-  const setM1 = (status: 'ON' | 'OFF') =>
+  const setM1 = (status: 'ON' | 'OFF' | 'PILOT' | 'DEV') =>
     prisma.moduleState.update({
       where: { tenantId_moduleId: { tenantId: requireId(tenantId, 'tenantId'), moduleId: 'M1' } },
       data: { status },
@@ -67,6 +67,17 @@ describe('/api/v1 module gate (live DB)', () => {
 
     await setM1('ON');
     expect((await call()).authenticated).toBe(true);
+  });
+
+  it('M1 in pilot: the tenant key keeps working (machine audience), while DEV stays staff-only: 200 then 403', async () => {
+    await setM1('PILOT');
+    expect((await call()).authenticated).toBe(true);
+
+    await setM1('DEV');
+    const dev = await call();
+    expect(dev.authenticated).toBe(false);
+    if (dev.authenticated) return;
+    expect(dev.errorResponse.status).toBe(403);
   });
 
   it('switched on but the plan does not include M1 (basic): 403', async () => {
