@@ -1,0 +1,18 @@
+signin status 200
+[tr] landed http://localhost:3016/tr/main/panel
+[tr] M4 url http://localhost:3016/tr/main/iliskiler | h1: Odak Noktası CRM (M4)
+[tr] M2 url http://localhost:3016/tr/main/opportunities/demo-opp-1/m2 | h2: Konsept Notu Editörü
+[tr] M2 label: Executive Summary (en fazla 500 kelime) | placeholder: Executive Summary bölümünü yazın... | counter: Kelime: 0 / 500
+[tr] M2 generate band role=alert: İşlem başarısız: Insufficient AI credits. Please purchase more credits or upgrade your plan.
+[tr] M2 save band role=status: Taslak kaydedildi. | counter: Kelime: 1 / 500
+[tr] M11 url http://localhost:3016/tr/main/opportunities/demo-opp-1/application | h1: Part A & Part B Başvuru Üretim Paneli
+[tr] M11 tabs: Part B (Çoklu Yazar İşbirlikçi Metin Editörü) | Part A (İdari & Lump-Sum Bütçe) | Part B (Gantt Şeması & İş Paketleri) | Gönderim Kontrol Listesi
+[en] landed http://localhost:3016/en/main/panel
+[en] M4 url http://localhost:3016/en/main/relationships | h1: Focal Point CRM (M4)
+[en] M2 url http://localhost:3016/en/main/opportunities/demo-opp-1/m2 | h2: Concept Note Editor
+[en] M2 label: Executive Summary (max 500 words) | placeholder: Write the Executive Summary section... | counter: Words: 0 / 500
+[en] M2 generate band role=alert: Action failed: Insufficient AI credits. Please purchase more credits or upgrade your plan.
+[en] M2 save band role=status: Draft saved. | counter: Words: 1 / 500
+[en] M11 url http://localhost:3016/en/main/opportunities/demo-opp-1/application | h1: Part A & Part B Application Production Panel
+[en] M11 tabs: Part B (Multi-Author Collaborative Editor) | Part A (Administrative & Lump-Sum Budget) | Part B (Gantt Chart & Work Packages) | Submission Checklist
+dialogs opened: 0
