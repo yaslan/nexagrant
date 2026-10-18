@@ -30,26 +30,27 @@ const panel = (page: Page) => page.locator('section[aria-labelledby="revoke-api-
 const gate = (page: Page) => page.locator('section[role="alert"]');
 const confirmDialog = (page: Page) => page.getByRole('alertdialog');
 
-async function setM1(status: 'ON' | 'OFF') {
+async function setM1(status: 'ON' | 'OFF', tenantId = TENANT) {
   await prisma.moduleState.upsert({
-    where: { tenantId_moduleId: { tenantId: TENANT, moduleId: 'M1' } },
-    create: { tenantId: TENANT, moduleId: 'M1', status, changedBy: 'fo81 e2e' },
+    where: { tenantId_moduleId: { tenantId, moduleId: 'M1' } },
+    create: { tenantId, moduleId: 'M1', status, changedBy: 'fo81 e2e' },
     update: { status },
   });
 }
 
 /** A key row written straight to the table; only the verifier and the prefix matter. */
-async function seedKey(name: string) {
+async function seedKey(name: string, tenantId = TENANT) {
   const rawKey = `fp_live_${randomBytes(24).toString('hex')}`;
-  return prisma.apiKey.create({
+  const row = await prisma.apiKey.create({
     data: {
-      tenantId: TENANT,
+      tenantId,
       name,
       keyHash: createHash('sha256').update(rawKey).digest('hex'),
       prefix: rawKey.slice(0, 12),
     },
     select: { id: true },
   });
+  return { ...row, rawKey };
 }
 
 test.describe('API keys with M1 closed — withdrawal stays open (FO-81)', () => {
@@ -173,5 +174,103 @@ test.describe('API keys with M1 closed — withdrawal stays open (FO-81)', () =>
     await expect(panel(page)).toContainText(trMessages.ApiKeysSettings.revoke.error.forbidden);
     await expect(panel(page).getByRole('button')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/m1-off-member-tr.png`, fullPage: true });
+  });
+});
+
+/**
+ * FO-89 — the revoke action is the one place a key is withdrawn, so it must not be
+ * able to withdraw another tenant's key. The owner of TENANT, on the real page, revokes
+ * one of their own keys; the request that click sends is captured, and the same action
+ * is then replayed with another tenant's key id in its body, one at a time and as the
+ * bulk loop does it. Tenant B's keys must survive, still authenticate on /api/v1, and
+ * leave no AuditEvent for tenant A.
+ */
+const OTHER = 'fo89-e2e-other-tenant';
+
+test.describe('API keys — one tenant cannot withdraw another tenant\'s keys (FO-89)', () => {
+  test.beforeAll(async () => {
+    await prisma.tenant.upsert({
+      where: { id: TENANT },
+      create: { id: TENANT, name: 'FO-81 e2e (internal)', slug: TENANT, country: 'TR', orgType: 'SME' },
+      update: {},
+    });
+    await prisma.subscription.upsert({
+      where: { tenantId: TENANT },
+      create: { tenantId: TENANT, planId: 'pro', status: 'ACTIVE' },
+      update: { planId: 'pro', status: 'ACTIVE', planVersionId: null },
+    });
+    await prisma.tenant.upsert({
+      where: { id: OTHER },
+      create: { id: OTHER, name: 'FO-89 e2e other tenant', slug: OTHER, country: 'TR', orgType: 'SME' },
+      update: {},
+    });
+    await prisma.subscription.upsert({
+      where: { tenantId: OTHER },
+      create: { tenantId: OTHER, planId: 'pro', status: 'ACTIVE' },
+      update: { planId: 'pro', status: 'ACTIVE', planVersionId: null },
+    });
+    await seedIdentity(
+      { userId: OWNER.id, email: OWNER.email, role: 'TENANT_OWNER', tenantId: TENANT },
+      WORKSPACE,
+    );
+  });
+
+  test.beforeEach(async () => {
+    await prisma.apiKey.deleteMany({ where: { tenantId: { in: [TENANT, OTHER] } } });
+  });
+
+  test.afterAll(async () => {
+    await prisma.apiKey.deleteMany({ where: { tenantId: { in: [TENANT, OTHER] } } });
+    await cleanupIdentity([OWNER.id]);
+  });
+
+  test('the owner of A revokes B\'s keys one by one and in bulk: B keeps them, B\'s keys still work, no audit for A', async ({ page }) => {
+    await setM1('OFF');
+    await setM1('ON', OTHER);
+    const own = await seedKey('FO-89 own key');
+    const b1 = await seedKey('FO-89 other key 1', OTHER);
+    const b2 = await seedKey('FO-89 other key 2', OTHER);
+    await signInAs(page, { id: OWNER.id, email: OWNER.email, tenantId: TENANT, role: 'TENANT_OWNER' });
+
+    await page.goto(TR_PAGE);
+    await expect(panel(page)).toContainText('FO-89 own key');
+    // Lock screen lists A's keys only: B's rows never reach the page.
+    await expect(panel(page)).not.toContainText('FO-89 other key');
+    await expect(page.locator('body')).not.toContainText(b1.id);
+
+    // A real click on A's own key: this is the request the page sends, kept as the probe.
+    const sent = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.headers()['next-action'] !== undefined && (req.postData() ?? '').includes(own.id),
+    );
+    await panel(page).getByRole('button', { name: '"FO-89 own key" anahtarını iptal et' }).click();
+    await confirmDialog(page).getByRole('button', { name: 'İptal et', exact: true }).click();
+    const req = await sent;
+    const body = req.postData() ?? '';
+    const headers = {
+      'next-action': req.headers()['next-action'] ?? '',
+      'content-type': req.headers()['content-type'] ?? 'text/plain;charset=UTF-8',
+    };
+
+    // The same action, same session, B's id in place of A's: one key at a time...
+    const single = await page.request.post(req.url(), { headers, data: body.replace(own.id, b1.id) });
+    expect(single.status()).toBe(200);
+    // ...then as the bulk loop sends it, every id in turn.
+    for (const id of [b1.id, b2.id]) {
+      const res = await page.request.post(req.url(), { headers, data: body.replace(own.id, id) });
+      expect(res.status()).toBe(200);
+    }
+
+    expect(await prisma.apiKey.count({ where: { id: { in: [b1.id, b2.id] } } })).toBe(2);
+    expect(
+      await prisma.auditEvent.count({ where: { tenantId: TENANT, type: 'apiKey.revoked', target: { in: [b1.id, b2.id] } } }),
+    ).toBe(0);
+    // Control: the probe did reach the real revoke, so A's own key is audited.
+    expect(
+      await prisma.auditEvent.count({ where: { tenantId: TENANT, type: 'apiKey.revoked', target: own.id } }),
+    ).toBe(1);
+
+    // B's keys still authenticate with M1 open for B.
+    const api = await page.request.get('/api/v1/partners?limit=1', { headers: { 'x-api-key': b1.rawKey } });
+    expect(api.status()).toBe(200);
   });
 });
