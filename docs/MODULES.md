@@ -15,6 +15,7 @@ Ortak kurallar: tüm ekranlar `/[workspace]/<module-route>`; her liste sayfası 
 **Kurallar:** paylaşımlı veri salt okunur; kiracı notları ayrı; "CORDIS'te yok" kurumlar `PartnerOrg` olarak eklenir ve daha sonra PIC ile birleştirilebilir.
 **YZ:** Kurum profili özeti (CORDIS `objective` metinlerinden, 1 kredi, önbellekli).
 **Kabul:** liderler sorgusu < 2 s; graf 30 komşu < 1 s; not ekleme RLS testli.
+**Bağlı özellik:** Partner REST API anahtarları (`/settings/api-keys`, TR `/ayarlar/api-anahtarlari`). Sayfa `moduleGate('M1')`, `generateApiKey` `assertModuleAccess('M1')` ile kapılı; `revokeApiKey` bilerek kapısız (M1 kapansa da sızan anahtar iptal edilebilmeli). `/api/v1/*` uçları henüz M1'e bakmıyor (TASK-MVC9MCXKVMDN7 raporu).
 
 ## M2 · Concept Note Architectures (`concept-note`) — MVP · Başlangıç (3/ay), Ekip
 
@@ -46,6 +47,7 @@ Ortak kurallar: tüm ekranlar `/[workspace]/<module-route>`; her liste sayfası 
 **Ekranlar:** `/pipeline` (kanban: G0..G4 + sonuç sütunları), `/pipeline/[id]` (kapı paneli: kural girdileri, geç/geçme, gerekçe; görevler; takvim T-6→T0; çaba kaydı), `/pipeline/calendar` (tüm son tarihler), yönetici: `/settings/gates` (kural eşikleri ve G0 ağırlıkları).
 **Kurallar:** Kapı geçişi yalnızca `evaluateGate(gate, inputs, rules)` sonucuyla; manuel geçersiz kılma `pipeline_manager` + gerekçe; T-6 plan şablonu: T-24h gönderim, T-2h son kontrol, T-2w dış okuma, T-6w Part A, T-3m taslak, T-4m iş planı, T-5m ortak/bütçe kilidi, T-6m başlangıç.
 **Kabul:** kapı kuralları birim testli (`src/lib/scoring/gates.test.ts`); kişi-gün raporu CSV; kanban sürükle-bırak kapı kuralını atlayamaz.
+**Bağlı özellik:** Onay Merkezi / 4-Eyes (`/approvals`, TR `/onay-merkezi`). Sayfa `moduleGate('M5')`; `submitApprovalRequestAction`, `approveRequestAction`, `rejectRequestAction`, `cancelRequestAction` `assertModuleAccess('M5')` ile kapılı. M10 belge imzasının çift onayı (`src/lib/dual-approval.ts`) ayrı mekanizmadır, bu kapıya bağlı değildir.
 
 ## M6 · Evaluator Lens (`evaluator`) — v1.1 · İşletme / eklenti €99
 
