@@ -100,7 +100,7 @@ export default async function BlogSection({ locale }: BlogSectionProps) {
                 {/* Author Badge & Read More Button */}
                 <div className="pt-4 border-t border-border/80 flex items-center justify-between">
                   {/* Byline only when the post records one — see src/lib/blog.ts. */}
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     {post.author ? (
                       <>
                         {post.author.avatar && (
@@ -121,7 +121,7 @@ export default async function BlogSection({ locale }: BlogSectionProps) {
 
                   <Link
                     href={getPublicRoute('blogDetail', locale, post.slug)}
-                    className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                    className="shrink-0 text-xs font-bold text-accent hover:underline flex items-center gap-1"
                   >
                     <span>{isTr ? 'Oku' : 'Read'}</span>
                     <span>→</span>

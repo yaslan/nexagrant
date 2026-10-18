@@ -116,7 +116,7 @@ export default async function BlogIndexPage({
                   {/* Author Badge & Button */}
                   <div className="pt-4 border-t border-border/80 flex items-center justify-between">
                     {/* Byline only when the post records one — see src/lib/blog.ts. */}
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       {post.author ? (
                         <>
                           {post.author.avatar && (
@@ -137,7 +137,7 @@ export default async function BlogIndexPage({
 
                     <Link
                       href={getPublicRoute('blogDetail', locale, post.slug)}
-                      className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                      className="shrink-0 text-xs font-bold text-accent hover:underline flex items-center gap-1"
                     >
                       <span>{isTr ? 'Devamını Oku' : 'Read Article'}</span>
                       <span>→</span>

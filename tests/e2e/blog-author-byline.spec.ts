@@ -9,7 +9,7 @@ import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
  * the name always was: on the post page, the blog listing, the landing
  * BlogSection and the admin list. A post with no ünvan shows the bare name.
  *
- * Two posts are written under a per-run slug and removed in `afterAll`, so the
+ * Three posts are written under a per-run slug and removed in `afterAll`, so the
  * spec is safe to repeat on a shared database.
  */
 
@@ -18,6 +18,13 @@ const RUN = Math.random().toString(36).slice(2, 8);
 const IMAGE = BLOG_SEED_POSTS[0]!.image;
 const WITH_ROLE = { slug: `e2e-byline-role-${RUN}`, title: `E2E byline ünvanlı ${RUN}`, role: 'Dr.', name: 'Mehmet Yılmaz' };
 const NO_ROLE = { slug: `e2e-byline-plain-${RUN}`, title: `E2E byline ünvansız ${RUN}`, role: '', name: 'Ayşe Demir' };
+// A byline far wider than a phone card; it must truncate, not push the CTA out.
+const LONG = {
+  slug: `e2e-byline-long-${RUN}`,
+  title: `E2E byline uzun ${RUN}`,
+  role: 'Prof. Dr. Ayşe Nurhan Kırkpınar Özdemir Sürdürülebilirlik Danışmanı',
+  name: 'Mehmet Alparslan Yılmazoğlu-Kırkpınar',
+};
 const WITH_ROLE_BYLINE = 'Dr. Mehmet Yılmaz';
 const NO_ROLE_BYLINE = 'Ayşe Demir';
 
@@ -35,7 +42,7 @@ async function signInAsPlatformAdmin(page: Page, baseURL: string): Promise<void>
 test.describe.serial('blog author byline — ünvan before name, one line', () => {
   test.beforeAll(async () => {
     await seedIdentity({ ...ADMIN, workspaceIds: [], isPlatformAdmin: true });
-    for (const post of [WITH_ROLE, NO_ROLE]) {
+    for (const post of [WITH_ROLE, NO_ROLE, LONG]) {
       await prisma.blogPost.create({
         data: {
           slug: post.slug,
@@ -102,6 +109,27 @@ test.describe.serial('blog author byline — ünvan before name, one line', () =
       }
       await page.goto('/tr/blog');
       await page.screenshot({ path: `${SHOTS}/blog-listing-375.png`, fullPage: false });
+    });
+
+    // The card clips its overflow, so a byline that will not shrink hides the
+    // read-more link without any page-level overflow (FO-76 review B1).
+    test('a long ünvan and name keep the read-more link inside the viewport', async ({ page }) => {
+      // Keep the cookie banner off the evidence screenshot (same key signInAs sets).
+      await page.addInitScript(() => {
+        window.localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false }));
+      });
+      for (const [path, label] of [['/tr/blog', /^Devamını Oku/], ['/tr', /^Oku/]] as const) {
+        await page.goto(path);
+        const card = page.locator('article').filter({ hasText: LONG.title });
+        await expect(card.getByText(`${LONG.role} ${LONG.name}`, { exact: true })).toBeVisible();
+        const link = card.getByRole('link', { name: label });
+        await expect(link).toBeVisible();
+        const box = await link.boundingBox();
+        expect(box, `read-more link box on ${path}`).not.toBeNull();
+        expect(box!.x + box!.width, `read-more link right edge on ${path}`).toBeLessThanOrEqual(375);
+      }
+      await page.goto('/tr/blog');
+      await page.locator('article').filter({ hasText: LONG.title }).screenshot({ path: `${SHOTS}/blog-listing-long-byline-375.png` });
     });
   });
 });
