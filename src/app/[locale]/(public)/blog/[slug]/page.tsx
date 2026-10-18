@@ -6,6 +6,8 @@ import { notFound } from 'next/navigation';
 import { authorByline, formatBlogDate, getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
 import { appUrl } from '@/lib/app-url';
+import { BLOG_LINK_SPLIT, blogImage, blogLink } from '@/lib/blog-content-policy';
+import { publicAssetStore } from '@/lib/storage';
 
 export async function generateMetadata({
   params,
@@ -47,16 +49,47 @@ export async function generateMetadata({
 }
 
 /**
- * Renders `**bold**` spans inside a line of already-escaped React text.
- * No HTML is produced — only <strong> elements — so admin-authored post
- * content can never inject markup via this path.
+ * `[text](href)` links inside a bold or plain part. Only an address that
+ * src/lib/blog-content-policy.ts allows becomes a link — anything else
+ * (`javascript:`, `//host`, …) stays the literal token, as text. A path on
+ * this site opens in place; another site opens in a new tab and is given no
+ * referrer, no opener and no endorsement.
+ */
+function renderLinks(text: string): React.ReactNode {
+  return text.split(BLOG_LINK_SPLIT).map((token, i) => {
+    const link = blogLink(token);
+    if (!link) return token;
+    if (link.kind === 'internal') {
+      return (
+        <Link key={i} href={link.href} className="text-accent underline underline-offset-2 hover:no-underline">
+          {link.text}
+        </Link>
+      );
+    }
+    return (
+      <a
+        key={i}
+        href={link.href}
+        className="text-accent underline underline-offset-2 hover:no-underline"
+        {...(link.kind === 'external' ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {})}
+      >
+        {link.text}
+      </a>
+    );
+  });
+}
+
+/**
+ * Renders `**bold**` spans and links inside a line of already-escaped React
+ * text. No HTML is produced — only <strong>, <a> and next/link elements — so
+ * admin-authored post content can never inject markup via this path.
  */
 function renderInline(text: string): React.ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
     part.startsWith('**') && part.endsWith('**') ? (
-      <strong key={i}>{part.slice(2, -2)}</strong>
+      <strong key={i}>{renderLinks(part.slice(2, -2))}</strong>
     ) : (
-      part
+      <React.Fragment key={i}>{renderLinks(part)}</React.Fragment>
     )
   );
 }
@@ -68,7 +101,12 @@ function renderInline(text: string): React.ReactNode {
  * '\n\n' — a block split let a `### heading` swallow the rest of its
  * paragraph, literal `**`/`*` included, into the heading text.
  */
-function renderBlogContent(content: string): React.ReactNode[] {
+/**
+ * A line that is only `![alt](src)` is an image block when src is an upload
+ * in the public bucket's blog folder (`imageBase`) and alt is not empty;
+ * otherwise it is an ordinary paragraph line. No inline images.
+ */
+function renderBlogContent(content: string, imageBase: string | undefined): React.ReactNode[] {
   const blocks: React.ReactNode[] = [];
   let paragraphLines: string[] = [];
   let listItems: string[] = [];
@@ -123,6 +161,7 @@ function renderBlogContent(content: string): React.ReactNode[] {
     const h1 = line.match(/^#\s+(.*)$/);
     const ulItem = line.match(/^\*\s+(.*)$/);
     const olItem = line.match(/^\d+\.\s+(.*)$/);
+    const image = blogImage(line, imageBase);
 
     if (h3) {
       flushParagraph();
@@ -158,6 +197,20 @@ function renderBlogContent(content: string): React.ReactNode[] {
       if (listType !== 'ol') flushList();
       listType = 'ol';
       listItems.push(olItem[1] ?? '');
+    } else if (image) {
+      flushParagraph();
+      flushList();
+      blocks.push(
+        <Image
+          key={blocks.length}
+          src={image.src}
+          alt={image.alt}
+          width={1200}
+          height={675}
+          sizes="(min-width: 896px) 832px, 100vw"
+          className="w-full h-auto rounded-xl border border-border"
+        />
+      );
     } else {
       flushList();
       paragraphLines.push(line);
@@ -245,7 +298,7 @@ export default async function BlogDetailPage({
 
           {/* Article Content */}
           <div className="prose prose-slate dark:prose-invert max-w-none bg-surface border border-border rounded-2xl p-6 sm:p-10 shadow-xs text-sm sm:text-base leading-relaxed space-y-4">
-            {renderBlogContent(post.content)}
+            {renderBlogContent(post.content, publicAssetStore()?.baseUrl)}
           </div>
 
           {/* Related Articles */}

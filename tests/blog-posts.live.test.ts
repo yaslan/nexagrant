@@ -206,6 +206,34 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     expect(await rowsFor('bad')).toHaveLength(0);
   });
 
+  // TASK-MVDPHZQCTVJ2R — the body's links and images are checked by the save
+  // itself (src/lib/blog-content-policy.ts), not only by the editor: raw
+  // markdown posted to the action with a forbidden one stores nothing.
+  test('a body link or image outside the content policy is refused on create and on update', async () => {
+    const body = (extra: string) => `${CONTENT}\n\n${extra}`;
+    const refused: [string, string][] = [
+      ['[tıkla](javascript:alert(1))', 'invalid_content_link'],
+      ['[tıkla](JaVaScRiPt:alert(1))', 'invalid_content_link'],
+      ['[tıkla](//evil.example/x)', 'invalid_content_link'],
+      ['[tıkla](data:text/html,x)', 'invalid_content_link'],
+      ['![grafik](https://evil.example/blog/x.png)', 'invalid_content_image'],
+      ['![](https://evil.example/blog/x.png)', 'invalid_content_image'],
+    ];
+    for (const [extra, error] of refused) {
+      expect(await createBlogPostAction(form('policy', { content: body(extra) })), extra).toEqual({ ok: false, error });
+    }
+    expect(await rowsFor('policy')).toHaveLength(0);
+
+    const allowed = body('Ayrıntı [rehberde](https://ec.europa.eu/info) ve [fiyatlarda](/tr/fiyatlar).');
+    expect(await createBlogPostAction(form('policy', { content: allowed }))).toMatchObject({ ok: true });
+    expect(
+      await updateBlogPostAction(slugOf('policy'), { content: body('[tıkla](javascript:alert(1))') })
+    ).toEqual({ ok: false, error: 'invalid_content_link' });
+    const rows = await rowsFor('policy');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.content).toBe(allowed);
+  });
+
   test.each([
     ['anonymous', null],
     ['the admin of another tenant', OTHER_TENANT_ADMIN],

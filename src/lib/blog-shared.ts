@@ -1,3 +1,5 @@
+import { blogContentRefusal, isAllowedBlogImageSrc } from '@/lib/blog-content-policy';
+
 /**
  * The database-free half of src/lib/blog.ts (AKTAR-MURBCJ0A-1): types, the
  * refusal codes, validation, slug and date helpers. Split out so the admin
@@ -52,6 +54,8 @@ export const BLOG_WRITE_ERRORS = [
   'invalid_slug',
   'invalid_excerpt',
   'invalid_content',
+  'invalid_content_link',
+  'invalid_content_image',
   'invalid_category',
   'invalid_read_time',
   'invalid_image',
@@ -117,45 +121,15 @@ export function formatBlogDate(date: Date, locale: string): string {
   }).format(date);
 }
 
-/**
- * Whether `url` is an uploaded blog image: an object under `<publicBase>/blog/`
- * — the public bucket's base URL (R2_PUBLIC_HOST, TASK-MUU20NSV2TETW), the same
- * host, port and path prefix next.config's `publicAssetImagePattern` admits.
- * No credentials, query or fragment; no `..` segment.
- */
-function isUploadedImageUrl(url: URL, publicBase: string | undefined): boolean {
-  if (!publicBase) return false;
-  let base: URL;
-  try {
-    base = new URL(publicBase);
-  } catch {
-    return false;
-  }
-  const prefix = `${base.pathname.replace(/\/+$/, '')}/blog/`;
-  return (
-    (url.protocol === 'https:' || url.protocol === 'http:') &&
-    url.protocol === base.protocol &&
-    url.hostname === base.hostname &&
-    url.port === base.port &&
-    url.username === '' &&
-    url.password === '' &&
-    url.search === '' &&
-    url.hash === '' &&
-    url.pathname.startsWith(prefix) &&
-    url.pathname.length > prefix.length &&
-    !url.pathname.split('/').includes('..')
-  );
-}
-
 function isAllowedImageUrl(value: string, publicImageBase?: string): boolean {
   if (value.length > BLOG_LIMITS.url) return false;
+  if (isAllowedBlogImageSrc(value, publicImageBase)) return true;
   let url: URL;
   try {
     url = new URL(value);
   } catch {
     return false;
   }
-  if (isUploadedImageUrl(url, publicImageBase)) return true;
   return (
     url.protocol === 'https:' &&
     url.port === '' &&
@@ -212,6 +186,9 @@ export function validateBlogInput(
   if (!lengthWithin(excerpt, 10, BLOG_LIMITS.excerpt)) return { ok: false, error: 'invalid_excerpt' };
   const content = trimmedText(input.content);
   if (!lengthWithin(content, 20, BLOG_LIMITS.content)) return { ok: false, error: 'invalid_content' };
+  // Links and images in the body: the rules of src/lib/blog-content-policy.ts (TASK-MVDPHZQCTVJ2R).
+  const contentRefusal = blogContentRefusal(content, publicImageBase);
+  if (contentRefusal) return { ok: false, error: contentRefusal };
   const category = trimmedText(input.category);
   if (!lengthWithin(category, 1, BLOG_LIMITS.category)) return { ok: false, error: 'invalid_category' };
   const readTime = trimmedText(input.readTime);

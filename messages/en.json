@@ -2757,6 +2757,8 @@
       "invalid_slug": "The slug may contain only lower-case letters, digits and hyphens (3–120 characters).",
       "invalid_excerpt": "The excerpt must be 10–500 characters.",
       "invalid_content": "The content must be 20–50,000 characters.",
+      "invalid_content_link": "The content has a link that is not allowed. Links must start with https://, http:// or mailto:, or be a path on this site starting with /.",
+      "invalid_content_image": "The content has an image that cannot be used. Images are added by upload only and need alt text.",
       "invalid_category": "The category must be 1–60 characters.",
       "invalid_read_time": "The read time must be 1–30 characters.",
       "invalid_image": "The image URL must start with https and come from an allowed host (images.unsplash.com).",
@@ -2784,7 +2786,7 @@
     },
     "content": {
       "label": "Article content",
-      "hint": "Formats the site shows: headings (H1–H3), bold, bulleted and numbered lists. Content is saved as Markdown.",
+      "hint": "Formats the site shows: headings (H1–H3), bold, bulleted and numbered lists, links and uploaded images. Content is saved as Markdown.",
       "missing": "Article content cannot be empty."
     },
     "readTime": {
@@ -3378,6 +3380,31 @@
     "bulletList": "Bulleted list",
     "orderedList": "Numbered list",
     "undo": "Undo",
-    "redo": "Redo"
+    "redo": "Redo",
+    "link": "Link",
+    "image": "Image",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "linkDialog": {
+      "title": "Add link",
+      "editTitle": "Edit link",
+      "text": "Text to show",
+      "textRequired": "Enter the text the link shows.",
+      "url": "Address",
+      "urlHint": "An address starting with https://, http:// or mailto:, or a path on this site starting with /.",
+      "invalidUrl": "This address cannot be used. Enter an address starting with https://, http:// or mailto:, or a path on this site starting with /.",
+      "remove": "Remove link"
+    },
+    "imageDialog": {
+      "title": "Add image",
+      "editTitle": "Edit image",
+      "choose": "Choose image",
+      "change": "Choose another image",
+      "preview": "Preview of the uploaded image",
+      "fileRequired": "Upload an image first. Only uploaded images can be added to a post.",
+      "alt": "Alt text",
+      "altHint": "Briefly describe what the image shows, for readers who cannot see it.",
+      "altRequired": "Alt text is required."
+    }
   }
 }
