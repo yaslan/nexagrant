@@ -319,7 +319,23 @@
     "wordCount": "Word Count",
     "overLimit": "Over Limit",
     "aiUsage": "AI Usage Disclosure",
-    "creditsUsed": "Credits Used"
+    "creditsUsed": "Credits Used",
+    "editor": {
+      "title": "Concept Note Editor",
+      "generate": "AI Generate Draft",
+      "generating": "Generating...",
+      "save": "Save Draft",
+      "saving": "Saving...",
+      "export": "Export DOCX",
+      "exporting": "Exporting...",
+      "generated": "Draft generated. Refresh the page to see the generated text.",
+      "saved": "Draft saved.",
+      "failed": "Action failed: {message}",
+      "sectionLabel": "{label} (max {max} words)",
+      "placeholder": "Write the {label} section...",
+      "words": "Words: {count} / {max}",
+      "noTemplate": "No concept note template found in the system. Run the seed."
+    }
   },
   "Relationships": {
     "title": "Relationship Manager",
@@ -355,7 +371,15 @@
     "kindMeeting": "Meeting",
     "kindEmail": "Email",
     "kindCall": "Call",
-    "kindEvent": "Event"
+    "kindEvent": "Event",
+    "page": {
+      "title": "Focal Point CRM (M4)",
+      "subtitle": "Manage partner relationships and track interactions.",
+      "newFromPartner": "+ New from Partner Card",
+      "staleDays": "{days}d stale",
+      "daysAgo": "{days}d ago",
+      "empty": "No relationships yet. Open one from a Partner Card."
+    }
   },
   "Consortium": {
     "title": "Consortium Builder",
@@ -1307,7 +1331,98 @@
     "meta_description": "EU funding calls open to {region}"
   },
   "applicationPartA": {
-    "portalLinkFailed": "The link could not be created. Refresh the page and try again."
+    "portalLinkFailed": "The link could not be created. Refresh the page and try again.",
+    "eyebrow": "Module 11 — Full Application Production",
+    "title": "Part A & Part B Application Production Panel",
+    "proposal": "Proposal: <strong>{title}</strong>",
+    "downloadPartB": "Download Part B (.docx) Template",
+    "partsActive": "Part A & B Active",
+    "summary": {
+      "effort": "Total Consortium Effort",
+      "personMonths": "Person-Months (PM)",
+      "budget": "Total Budget (Lump Sum)",
+      "wpCount": "Work Packages",
+      "wpUnit": "Work Packages (WP)",
+      "pageLimit": "Page Limit Check",
+      "pageLimitValue": "RIA/IA Limit: 45 Pages"
+    },
+    "tabs": {
+      "partBEditor": "Part B (Multi-Author Collaborative Editor)",
+      "partA": "Part A (Administrative & Lump-Sum Budget)",
+      "gantt": "Part B (Gantt Chart & Work Packages)",
+      "checklist": "Submission Checklist"
+    },
+    "portal": {
+      "title": "Partner Contribution Portal (Magic Link)",
+      "intro": "External consortium partners can enter their own organisation and budget data through the secure link below, with no password:",
+      "copied": "Copied",
+      "copy": "Copy",
+      "shownOnce": "This link is shown only now and is not stored, for security. Copy it now and send it to your partner.",
+      "issuedBefore": "A link was issued earlier and cannot be shown again, for security. Issuing a new link stops the old one from working.",
+      "none": "No link has been issued yet.",
+      "reissue": "Issue a new link",
+      "issue": "Issue link"
+    },
+    "budget": {
+      "addTitle": "Add Lump-Sum Budget Line",
+      "partnerName": "Partner Organisation Name",
+      "partnerNamePlaceholder": "e.g. METU TTO, Fraunhofer Institute",
+      "effort": "Effort (Person-Months)",
+      "countryCoef": "Country Coefficient",
+      "coefStandard": "1.00 (Standard EU)",
+      "coefSee": "0.85 (Türkiye / SEE)",
+      "coefNorth": "1.20 (High-Cost North)",
+      "travel": "Travel (€)",
+      "subcontracting": "Subcontracting (€)",
+      "calculating": "Calculating...",
+      "save": "Save Budget Line",
+      "tableTitle": "Consortium Lump-Sum Budget Table",
+      "overhead": "Standard 25% Overhead Included",
+      "colPartner": "Partner",
+      "colCoef": "Country Coef.",
+      "colRequested": "Requested (€)",
+      "empty": "No budget lines yet. Add a partner with the form below.",
+      "total": "CONSORTIUM TOTAL"
+    },
+    "gantt": {
+      "title": "Project Gantt Chart & Work Package Timeline (M1 - M36)",
+      "subtitle": "Horizon Europe Part B Section 3.1 work package (WP) start and end months.",
+      "empty": "No work packages yet. Add a WP with the form below.",
+      "lead": "Lead: <strong>{lead}</strong> (Month M{start} - M{end})",
+      "addTitle": "Add Work Package (WP)",
+      "code": "WP Code",
+      "wpTitle": "WP Title",
+      "leadOrg": "Lead Organisation",
+      "start": "Start (Month)",
+      "end": "End (Month)",
+      "add": "Add Work Package to Gantt Chart"
+    },
+    "checklist": {
+      "title": "Pre-Submission Checklist (Submission Readiness)",
+      "subtitle": "Check the mandatory criteria before uploading to the EU Funding & Tenders portal.",
+      "items": {
+        "partA": {
+          "title": "Part A Administrative Forms",
+          "desc": "PIC numbers and financial representatives of all consortium partners verified."
+        },
+        "pageLimit": {
+          "title": "Part B Page Limit Compliance",
+          "desc": "The 45-page maximum for RIA/IA projects is not exceeded (Current: ~38 pages)."
+        },
+        "gep": {
+          "title": "Gender Equality Plan (GEP)",
+          "desc": "Approved GEP documents of public and university partners uploaded."
+        },
+        "fair": {
+          "title": "Open Science & Data Management Plan (FAIR Data)",
+          "desc": "Open-access publishing committed in Part B section 1.2."
+        },
+        "ip": {
+          "title": "Intellectual Property (IP) & Background Rights",
+          "desc": "Background patent and software rights of all partners defined."
+        }
+      }
+    }
   },
   "partner_portal": {
     "badge": "Consortium Partner Portal",
