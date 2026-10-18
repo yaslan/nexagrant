@@ -27,6 +27,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { RichTextEditor } from '@/components/editor/RichTextEditor';
 
 interface AdminBlogClientProps {
   initialPosts: BlogPost[];
@@ -74,6 +75,7 @@ export default function AdminBlogClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [imageError, setImageError] = useState<ImageError | null>(null);
+  const [contentMissing, setContentMissing] = useState(false);
   const imageInput = useRef<HTMLInputElement>(null);
 
   // Form State
@@ -114,6 +116,7 @@ export default function AdminBlogClient({
     setEditingSlug(null);
     setFormError(null);
     setImageError(null);
+    setContentMissing(false);
     setFormData({
       title: '',
       slug: '',
@@ -134,6 +137,7 @@ export default function AdminBlogClient({
     setEditingSlug(post.slug);
     setFormError(null);
     setImageError(null);
+    setContentMissing(false);
     setFormData({
       title: post.title,
       slug: post.slug,
@@ -183,6 +187,12 @@ export default function AdminBlogClient({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isUploading) return;
+    // The editor is no native `required` field, so an empty post is refused here.
+    if (!formData.content.trim()) {
+      setContentMissing(true);
+      setFormError(t('content.missing'));
+      return;
+    }
     // BlogPost.image is required; the server refuses a post without one too.
     if (!formData.image) {
       setFormError(t('image.missing'));
@@ -551,17 +561,22 @@ export default function AdminBlogClient({
                 />
               </div>
 
-              <div>
-                <label htmlFor="blog-content" className="block text-xs font-bold text-ink mb-1">Makale İçeriği (Markdown) *</label>
-                <textarea
-                  id="blog-content"
-                  rows={6}
+              <div data-testid="blog-content-field">
+                {/* The editor is a contenteditable, not a form control: it is named by
+                    aria-labelledby, and its required check is done in handleSubmit. */}
+                <span id="blog-content-label" className="block text-xs font-bold text-ink mb-1">{t('content.label')} *</span>
+                <RichTextEditor
+                  format="markdown"
+                  labelledBy="blog-content-label"
                   required
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="# Başlık&#10;&#10;Paragraf metni..."
-                  className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs font-mono text-ink focus:outline-hidden focus:border-accent"
+                  invalid={contentMissing}
+                  content={formData.content}
+                  onChange={(md) => {
+                    setContentMissing(false);
+                    setFormData((prev) => ({ ...prev, content: md }));
+                  }}
                 />
+                <p className="mt-1 text-[11px] text-muted">{t('content.hint')}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

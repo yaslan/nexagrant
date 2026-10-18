@@ -2780,6 +2780,11 @@
         "object_store_unconfigured": "The file store is not configured, so the image cannot be uploaded right now. Tell your system administrator.",
         "upload_failed": "The image could not be uploaded. Please try again."
       }
+    },
+    "content": {
+      "label": "Article content",
+      "hint": "Formats the site shows: headings (H1–H3), bold, bulleted and numbered lists. Content is saved as Markdown.",
+      "missing": "Article content cannot be empty."
     }
   },
   "adminDocuments": {
@@ -3355,5 +3360,16 @@
       "name": "Full Application Production",
       "tagline": "Part-by-part application drafting on top of the concept note, evidence and consortium."
     }
+  },
+  "richTextEditor": {
+    "toolbar": "Formatting",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "bold": "Bold",
+    "bulletList": "Bulleted list",
+    "orderedList": "Numbered list",
+    "undo": "Undo",
+    "redo": "Redo"
   }
 }
