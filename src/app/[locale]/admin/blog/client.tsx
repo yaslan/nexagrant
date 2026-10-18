@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 // blog-shared, not blog: this is a client component and @/lib/blog reaches Prisma.
-import { formatBlogDate, type BlogPost } from '@/lib/blog-shared';
+import { authorByline, formatBlogDate, type BlogPost } from '@/lib/blog-shared';
 import { estimateReadMinutes } from '@/lib/blog-read-time';
 import { 
   createBlogPostAction, 
@@ -423,8 +423,7 @@ export default function AdminBlogClient({
                     {/* A post with no recorded author is listed without one. */}
                     {post.author ? (
                       <>
-                        <div className="font-semibold text-ink">{post.author.name}</div>
-                        <div className="text-[10px] text-muted">{post.author.role}</div>
+                        <div className="font-semibold text-ink">{authorByline(post.author)}</div>
                       </>
                     ) : (
                       <div className="text-muted" aria-hidden="true">—</div>
@@ -619,6 +618,7 @@ export default function AdminBlogClient({
                   <input
                     type="text"
                     value={formData.authorRole}
+                    placeholder={t('authorRolePlaceholder')}
                     onChange={(e) => setFormData({ ...formData, authorRole: e.target.value })}
                     className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
                   />

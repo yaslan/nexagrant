@@ -2747,6 +2747,7 @@
     "none": "—"
   },
   "adminBlog": {
+    "authorRolePlaceholder": "Dr., Prof. Dr., Uzman",
     "saved": "Blog yazısı kaydedildi.",
     "deleted": "Blog yazısı silindi.",
     "featureToggled": "Öne çıkan durumu güncellendi.",
