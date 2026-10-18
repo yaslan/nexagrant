@@ -1,6 +1,9 @@
 import { describe, test, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { createTranslator } from 'next-intl';
 
-import { countReadableWords, estimateReadMinutes, WORDS_PER_MINUTE } from '@/lib/blog-read-time';
+import { BLOG_READ_MINUTES, countReadableWords, estimateReadMinutes, WORDS_PER_MINUTE } from '@/lib/blog-read-time';
 
 /** TASK-MVDPA19QP3M9A — the read time a new post starts with comes from its content. */
 const words = (n: number) => Array.from({ length: n }, (_, i) => `kelime${i}`).join(' ');
@@ -55,5 +58,29 @@ describe('countReadableWords — Markdown syntax is not counted', () => {
 
   test('numbers in the text are still words', () => {
     expect(countReadableWords('Bütçe 2027 yılında 3 milyon')).toBe(5);
+  });
+});
+
+/** TASK-MVDSY96TB1EPM — minutes are stored as a number and formatted per reader locale. */
+describe('read minutes', () => {
+  test('the estimate never leaves the stored range (CHECK BlogPost_readMinutes_range)', () => {
+    expect(estimateReadMinutes(words(WORDS_PER_MINUTE * 200))).toBe(BLOG_READ_MINUTES.max);
+    expect(estimateReadMinutes('bir')).toBe(BLOG_READ_MINUTES.min);
+  });
+
+  test('the migration CHECK and the form share the bounds', () => {
+    const sql = readFileSync(resolve(__dirname, '../prisma/migrations/blog-read-minutes.sql'), 'utf8');
+    expect(sql).toContain(`CHECK ("readMinutes" BETWEEN ${BLOG_READ_MINUTES.min} AND ${BLOG_READ_MINUTES.max})`);
+  });
+
+  test.each([
+    ['tr', 5, '5 dk okuma'],
+    ['en', 5, '5 min read'],
+    ['en', 1, '1 min read'],
+    ['tr', 120, '120 dk okuma'],
+  ] as const)('%s blog.readMinutes(%i) = %s', (locale, min, expected) => {
+    const messages = JSON.parse(readFileSync(resolve(__dirname, `../messages/${locale}.json`), 'utf8'));
+    const t = createTranslator({ locale, messages, namespace: 'blog' });
+    expect(t('readMinutes', { min })).toBe(expected);
   });
 });

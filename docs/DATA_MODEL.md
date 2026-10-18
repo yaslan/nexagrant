@@ -988,3 +988,13 @@ Herkese açık uzman ön kayıt formunun (`POST /api/expert-preregistration`) ka
 - **İndeksler.** `createdAt`, `(ipHash, createdAt)` (hız sınırı), `(status, createdAt)` (admin filtresi); `email`, `verifyTokenHash`, `founderNumber` benzersiz.
 - **Saklama: açık karar.** Bu tabloda henüz bir saklama/silme işi yok. Süre (ör. PublicLead gibi 12 ay mı, doğrulanmamış kayıtlar için daha kısa mı) lider/patron kararıdır; karar verilene dek satırlar kalır.
 - **Admin.** `listExpertPreRegistrations(filters)` ve `GET /api/admin/expert-preregistrations/export.csv` (filtreler: `province`, `area`, `status`, `q`). Yalnız platform admin; yetkisizde satır okunmaz (401/403). CSV: `ad, e-posta, il, alanlar, roller, programlar, durum, founderNumber, createdAt`, UTF-8 BOM, CRLF, formül kaçışlı (`= + - @`).
+
+## 23. `BlogPost` — herkese açık blog yazıları (AKTAR-MURBCJ0A-1 · okuma süresi TASK-MVDSY96TB1EPM · FO-84)
+
+`/[locale]/blog`, `/[locale]/blog/<slug>` ve ana sayfadaki blog bölümünün yazıları; tek yazıcı `/admin/blog` (`requirePlatformAdmin`).
+
+- **Kiracısız platform verisi.** `tenantId` yok; `scripts/rls-models.ts` `SYSTEM_WIDE` listesinde, RLS kapalı (politikasız, `add-blog-post.sql` açıkça `DISABLE` eder). Yazma `src/lib/blog.ts` üzerinden, her yazma bir `AuditEvent` ile aynı transaction'da.
+- **Okuma süresi = `readMinutes Int?` (dakika, 1–120).** Sınır DB'de `CHECK BlogPost_readMinutes_range`, kodda `BLOG_READ_MINUTES` (`src/lib/blog-read-time.ts`), sunucu doğrulamasında zod (`validateBlogInput` → `invalid_read_time`). Sayfalar metni **okuyucunun** dilinde `t('blog.readMinutes', { min })` ile yazar (tr `"{min} dk okuma"`, en `"{min} min read"`). Admin formu `type="number"`; yeni yazıda içerikten `estimateReadMinutes` ile dolar, admin elle değiştirince tahmin durur.
+- **NULL ne demek.** Yalnız dağıtım penceresinde, migration'dan sonra eski kodun yazdığı satır. Okurken içerikten tahmin edilir (`readMinutesOf`); migration'ı yeniden koşmak satırı doldurur (idempotent backfill).
+- **`readTime String?` — eski alan, artık yazılmaz ve okunmaz.** Yazıyı giren admin'in dilinde serbest metindi ("5 dk", "5 min read"); geri dönüş güvenliği için kaldı, NOT NULL'ı düşürüldü. Kaldırılması ayrı bir takip işi.
+- **Migration:** `prisma/migrations/blog-read-minutes.sql` (kolon + CHECK + backfill: `readTime`'taki ilk tamsayı 1–120 ise o, değilse içerikten `estimateReadMinutes` ile aynı sayım, en az 1). Geri alma: `blog-read-minutes.down.sql` (`readTime`'ı dakikadan Türkçe "N dk okuma" olarak yeniden yazar, NOT NULL'ı geri koyar, kolonu düşürür).

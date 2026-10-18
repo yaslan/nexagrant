@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 // blog-shared, not blog: this is a client component and @/lib/blog reaches Prisma.
 import { authorByline, formatBlogDate, type BlogPost } from '@/lib/blog-shared';
-import { estimateReadMinutes } from '@/lib/blog-read-time';
+import { BLOG_READ_MINUTES, estimateReadMinutes } from '@/lib/blog-read-time';
 import { 
   createBlogPostAction, 
   updateBlogPostAction, 
@@ -87,8 +87,9 @@ export default function AdminBlogClient({
     category: 'Horizon Europe',
     excerpt: '',
     content: '',
-    // Filled from the content as it is written (see `readTimeAuto`).
-    readTime: '',
+    // Minutes, as the number field's text. Filled from the content as it is
+    // written (see `readTimeAuto`).
+    readMinutes: '',
     // The signed-in admin, or nothing. No stand-in author, no stock portrait.
     authorName: sessionUserName,
     authorRole: '',
@@ -103,7 +104,7 @@ export default function AdminBlogClient({
   const readTimeAuto = useRef(true);
   const autoReadTime = (markdown: string) => {
     const minutes = estimateReadMinutes(markdown);
-    return minutes ? t('readTime.auto', { min: minutes }) : '';
+    return minutes ? String(minutes) : '';
   };
 
   const categories = Array.from(new Set(posts.map((p) => p.category)));
@@ -136,7 +137,7 @@ export default function AdminBlogClient({
       category: 'Horizon Europe',
       excerpt: '',
       content: '',
-      readTime: '',
+      readMinutes: '',
       authorName: sessionUserName,
       authorRole: '',
       authorAvatar: '',
@@ -159,7 +160,7 @@ export default function AdminBlogClient({
       category: post.category,
       excerpt: post.excerpt,
       content: post.content,
-      readTime: post.readTime,
+      readMinutes: String(post.readMinutes),
       // A post with no recorded author opens with empty byline fields.
       authorName: post.author?.name ?? '',
       authorRole: post.author?.role ?? '',
@@ -198,7 +199,7 @@ export default function AdminBlogClient({
     }
     // Content with no readable words (only images, rules, line breaks) gives no
     // estimate; the server would refuse the empty field, so say so here first.
-    if (!formData.readTime.trim()) {
+    if (!formData.readMinutes.trim()) {
       setReadTimeMissing(true);
       setFormError(t('readTime.missing'));
       return;
@@ -215,9 +216,12 @@ export default function AdminBlogClient({
     // database. A refusal keeps the modal open with the reason; nothing in the
     // list changes (AKTAR-MURBCJ0A-1 — this used to close on any answer).
     try {
+      // The field is type="number" with min/max, so the browser has already
+      // refused anything but a whole number in range; the server checks again.
+      const input = { ...formData, readMinutes: Number(formData.readMinutes) };
       const res = editingSlug
-        ? await updateBlogPostAction(editingSlug, formData)
-        : await createBlogPostAction(formData);
+        ? await updateBlogPostAction(editingSlug, input)
+        : await createBlogPostAction(input);
       if (!res.ok) {
         setFormError(t(`errors.${res.error}`));
         return;
@@ -549,12 +553,16 @@ export default function AdminBlogClient({
                   <label htmlFor="blog-read-time" className="block text-xs font-bold text-ink mb-1">{t('readTime.label')}</label>
                   <input
                     id="blog-read-time"
-                    type="text"
-                    value={formData.readTime}
+                    type="number"
+                    inputMode="numeric"
+                    min={BLOG_READ_MINUTES.min}
+                    max={BLOG_READ_MINUTES.max}
+                    step={1}
+                    value={formData.readMinutes}
                     onChange={(e) => {
                       readTimeAuto.current = false;
                       setReadTimeMissing(false);
-                      setFormData({ ...formData, readTime: e.target.value });
+                      setFormData({ ...formData, readMinutes: e.target.value });
                     }}
                     placeholder={t('readTime.placeholder')}
                     aria-describedby="blog-read-time-hint"
@@ -598,7 +606,7 @@ export default function AdminBlogClient({
                     setFormData((prev) => ({
                       ...prev,
                       content: md,
-                      readTime: readTimeAuto.current ? autoReadTime(md) : prev.readTime,
+                      readMinutes: readTimeAuto.current ? autoReadTime(md) : prev.readMinutes,
                     }));
                   }}
                 />

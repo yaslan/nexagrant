@@ -6,6 +6,11 @@ import { blogContentRefusal, isAllowedBlogImageSrc } from '@/lib/blog-content-po
  * editor (a client component) can import them without pulling Prisma into the
  * browser bundle. src/lib/blog.ts re-exports all of it.
  */
+import { z } from 'zod';
+import { BLOG_READ_MINUTES } from './blog-read-time';
+
+export { BLOG_READ_MINUTES };
+
 export interface BlogAuthor {
   name: string;
   role: string;
@@ -19,7 +24,8 @@ export interface BlogPost {
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  /** Minutes to read; the pages format it per reader locale (blog.readMinutes). */
+  readMinutes: number;
   publishedAt: Date;
   /** Absent when the post has no recorded author. Never a placeholder. */
   author?: BlogAuthor;
@@ -35,7 +41,8 @@ export interface BlogPostInput {
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  /** Whole minutes, {@link BLOG_READ_MINUTES}. */
+  readMinutes: number;
   /** Empty: the post has no byline. */
   authorName?: string;
   authorRole?: string;
@@ -76,7 +83,6 @@ export const BLOG_LIMITS = {
   excerpt: 500,
   content: 50_000,
   category: 60,
-  readTime: 30,
   authorName: 120,
   authorRole: 120,
   url: 2_000,
@@ -154,13 +160,15 @@ export function authorByline(author: Pick<BlogAuthor, 'name' | 'role'> | undefin
     .join(' ');
 }
 
+const readMinutesSchema = z.number().int().min(BLOG_READ_MINUTES.min).max(BLOG_READ_MINUTES.max);
+
 /** The columns a validated input writes. Author columns are null when cleared. */
 type BlogColumns = {
   title: string;
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  readMinutes: number;
   image: string;
   featured: boolean;
   authorName: string | null;
@@ -191,8 +199,8 @@ export function validateBlogInput(
   if (contentRefusal) return { ok: false, error: contentRefusal };
   const category = trimmedText(input.category);
   if (!lengthWithin(category, 1, BLOG_LIMITS.category)) return { ok: false, error: 'invalid_category' };
-  const readTime = trimmedText(input.readTime);
-  if (!lengthWithin(readTime, 1, BLOG_LIMITS.readTime)) return { ok: false, error: 'invalid_read_time' };
+  const readMinutes = readMinutesSchema.safeParse(input.readMinutes);
+  if (!readMinutes.success) return { ok: false, error: 'invalid_read_time' };
   const image = trimmedText(input.image);
   if (!isAllowedImageUrl(image, publicImageBase)) return { ok: false, error: 'invalid_image' };
 
@@ -213,7 +221,7 @@ export function validateBlogInput(
       excerpt,
       content,
       category,
-      readTime,
+      readMinutes: readMinutes.data,
       image,
       featured: input.featured === true,
       authorName: authorName || null,

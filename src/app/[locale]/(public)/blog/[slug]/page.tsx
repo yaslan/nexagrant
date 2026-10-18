@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -235,6 +236,7 @@ export default async function BlogDetailPage({
     notFound();
   }
 
+  const t = await getTranslations({ locale, namespace: 'blog' });
   const isTr = locale === 'tr';
   const relatedPosts = (await getBlogPosts()).filter((p) => p.slug !== slug).slice(0, 2);
 
@@ -262,7 +264,7 @@ export default async function BlogDetailPage({
               <time dateTime={post.publishedAt.toISOString()} className="text-xs text-muted font-medium">
                 {formatBlogDate(post.publishedAt, locale)}
               </time>
-              <span className="text-xs text-muted font-medium">• {post.readTime}</span>
+              <span className="text-xs text-muted font-medium">• {t('readMinutes', { min: post.readMinutes })}</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-heading text-ink leading-tight">

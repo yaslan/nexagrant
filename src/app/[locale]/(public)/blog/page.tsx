@@ -48,6 +48,7 @@ export default async function BlogIndexPage({
 }) {
   const { locale } = await params;
   const posts = await getBlogPosts();
+  const t = await getTranslations({ locale, namespace: 'blog' });
   const isTr = locale === 'tr';
 
   return (
@@ -99,7 +100,7 @@ export default async function BlogIndexPage({
                     <div className="flex items-center gap-2 text-[11px] text-muted font-medium">
                       <time dateTime={post.publishedAt.toISOString()}>{formatBlogDate(post.publishedAt, locale)}</time>
                       <span>•</span>
-                      <span>{post.readTime}</span>
+                      <span>{t('readMinutes', { min: post.readMinutes })}</span>
                     </div>
 
                     <h2 className="font-bold text-lg text-ink font-heading group-hover:text-accent transition-colors leading-snug">

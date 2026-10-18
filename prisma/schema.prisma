@@ -625,7 +625,13 @@ model BlogPost {
   /// Markdown subset rendered as React text nodes (no HTML) — see blog/[slug]/page.tsx.
   content      String
   category     String
-  readTime     String
+  /// Minutes, 1–120 (CHECK BlogPost_readMinutes_range); formatted per reader locale
+  /// with messages blog.readMinutes. NULL only for a row written by pre-FO-84 code
+  /// during the deploy window. prisma/migrations/blog-read-minutes.sql.
+  readMinutes  Int?
+  /// Legacy free-text read time in the writer's language. No longer written or read;
+  /// kept for rollback until a follow-up drops it (TASK-MVDSY96TB1EPM).
+  readTime     String?
   publishedAt  DateTime
   authorName   String?
   authorRole   String?

@@ -221,7 +221,7 @@ describe('blog — a byline names a real author or there is none', () => {
     excerpt: 'Özet',
     content: 'İçerik',
     category: 'Test',
-    readTime: '1 dk',
+    readMinutes: 1,
     authorName: '',
     authorRole: '',
     authorAvatar: '',

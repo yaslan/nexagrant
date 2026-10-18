@@ -23,7 +23,7 @@ vi.mock('@/lib/blog', () => ({
     excerpt: 'E',
     content: currentContent,
     category: 'C',
-    readTime: '1',
+    readMinutes: 1,
     publishedAt: new Date('2026-10-01T00:00:00Z'),
     image: 'https://images.unsplash.com/x',
     featured: false,
@@ -39,6 +39,7 @@ vi.mock('@/lib/storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/storage')>()),
   publicAssetStore: () => ({ bucket: 'pub', baseUrl: BASE }),
 }));
+vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }));
 
 const BlogDetailPage = (await import('@/app/[locale]/(public)/blog/[slug]/page')).default;
 const realBlog = await vi.importActual<typeof import('@/lib/blog')>('@/lib/blog');
