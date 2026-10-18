@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { PRODUCT_NAME } from '@/lib/brand';
 import React from 'react';
 import PricingClient from './PricingClient';
+import { sortForDisplay } from './plan-display-order';
 import { auth } from '@/lib/auth';
 import { getActiveTier } from '@/lib/billing/active-tier';
 import { DISCOUNT_TIERS, NO_DISCOUNT_TIER } from '@/lib/billing/catalog';
@@ -76,13 +77,23 @@ export default async function PricingPage({
     DISCOUNT_TIERS
   );
 
+  // Card order is a display rule (`PLAN_DISPLAY_ORDER`), not whatever order the
+  // database returned the rows in. The schedule table's columns are headed by
+  // the cards, so its cells get the same order or a price would sit under
+  // another plan's name.
+  const cards = sortForDisplay(storefront.cards, (card) => card.plan.planId);
+  const schedule = storefront.schedule.map((row) => ({
+    ...row,
+    cells: sortForDisplay(row.cells, (cell) => cell.planId),
+  }));
+
   return (
     <PricingClient
       locale={locale}
       activeTier={activeTier}
       lifetimeScarcity={scarcity}
-      plans={storefront.cards}
-      tierSchedule={storefront.schedule}
+      plans={cards}
+      tierSchedule={schedule}
       plansMeasured={storefront.measured}
     />
   );
