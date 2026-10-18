@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { withSystemScopeOn } from '@/lib/system-scope';
 import { hashSecretToken } from '@/lib/secret-token';
 import { EXPERT_PREREG_LOCK_KEY, FOUNDER_SEAT_LIMIT } from './constants';
 
@@ -30,7 +31,8 @@ export async function verifyExpertPreRegistration(
   const db = options.db ?? prisma;
   const tokenHash = hashSecretToken(rawToken);
 
-  return db.$transaction(async (tx): Promise<VerifyResult> => {
+  // FO-45: the table is RLS-on with the system_scope policy only, so the lookup and the write run in the 'public-intake' scope.
+  return withSystemScopeOn(db, 'public-intake', 'expert-prereg.verify', async (tx): Promise<VerifyResult> => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EXPERT_PREREG_LOCK_KEY})`;
 
     const row = await tx.expertPreRegistration.findUnique({

@@ -1,12 +1,14 @@
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
-import { planNamesGrantingModule } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import { tenantScopeOf } from '@/lib/tenant';
-import { canAccessStatus, type ModuleDenyReason, type ModuleViewer } from '@/lib/modules/state-machine';
+import type { ModuleDenyReason } from '@/lib/modules/state-machine';
 import { getAllManifests } from '@/lib/modules/registry';
+import { checkModuleAccessForTenant, decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
+
+export type { ModuleAccessResult } from '@/lib/modules/tenant-access';
 
 /**
  * The module gate — the one place that turns a `ModuleState` row into an answer.
@@ -27,18 +29,6 @@ import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
  * upgrade. The plan half of the decision is now checked here, in the same call, so
  * no caller can hold one gate and miss the other.
  */
-
-export interface ModuleAccessResult {
-  allowed: boolean;
-  status: ModuleStatus;
-  /** Stable code, translated by the caller. Never a server-authored sentence. */
-  reason?: ModuleDenyReason;
-  /**
-   * Plans that *do* include this module, by display name, for a
-   * `PLAN_UPGRADE_REQUIRED` refusal. Read from `PLAN_GRANTS`, never re-typed.
-   */
-  requiredPlans?: string[];
-}
 
 /** Thrown by `assertModuleAccess`, so a caller can tell a gate refusal from a crash. */
 export class ModuleAccessError extends Error {
@@ -87,55 +77,10 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
     return { allowed: false, status: 'OFF', reason: 'NO_TENANT' };
   }
 
-  // Both facts are independent reads; neither gates the other's query.
-  const [state, entitlements] = await Promise.all([
-    withTenant(scope.tenantId, (tx) =>
-      tx.moduleState.findUnique({
-        where: { tenantId_moduleId: { tenantId: scope.tenantId, moduleId } },
-        select: { status: true },
-      })
-    ),
-    withTenant(scope.tenantId, (tx) =>
-      getEntitlements(scope.tenantId, tx)
-    ),
-  ]);
-
-  return decideModuleAccess(
-    moduleId,
-    (state?.status ?? 'OFF') as ModuleStatus,
-    entitlements.allowedModules,
-    { role: scope.role, isPlatformAdmin: scope.isPlatformAdmin },
-  );
-}
-
-/**
- * The two-fact decision itself, shared by `checkModuleAccess` (one module, for a
- * gate) and `listAccessibleModules` (every module, for navigation), so the entry
- * points a user sees and the door they then knock on can never disagree.
- */
-function decideModuleAccess(
-  moduleId: ModuleId,
-  status: ModuleStatus,
-  allowedModules: readonly string[],
-  viewer: ModuleViewer,
-): ModuleAccessResult {
-  if (!allowedModules.includes(moduleId)) {
-    return {
-      allowed: false,
-      status,
-      reason: 'PLAN_UPGRADE_REQUIRED',
-      requiredPlans: planNamesGrantingModule(moduleId),
-    };
-  }
-
-  const decision = canAccessStatus(status, {
-    role: viewer.role,
-    isPlatformAdmin: viewer.isPlatformAdmin,
+  return checkModuleAccessForTenant(scope.tenantId, moduleId, {
+    role: scope.role,
+    isPlatformAdmin: scope.isPlatformAdmin,
   });
-
-  return decision.allowed
-    ? { allowed: true, status }
-    : { allowed: false, status, reason: decision.reason ?? 'MODULE_OFF' };
 }
 
 /**

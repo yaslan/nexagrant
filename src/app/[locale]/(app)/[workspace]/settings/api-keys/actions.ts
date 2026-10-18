@@ -4,6 +4,7 @@ import type { ApiKey } from '@prisma/client';
 import { withTenant } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { isPresentId } from '@/lib/required-id';
 import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
@@ -43,6 +44,9 @@ export async function generateApiKey({
 }): Promise<{ apiKeyRecord: ApiKeyView; rawKey: string } | { error: ApiKeyActionError }> {
   const { tenantId, role } = await requireTenantAction();
   if (!can(asRole(role), 'manage_users')) return { error: 'forbidden' };
+  // Minting is an M1 feature; a closed module throws `ModuleAccessError` before
+  // the key is written (TASK-MVC9MCXKVMDN7).
+  await assertModuleAccess('M1');
 
   // The action is a public POST endpoint: `name` is whatever the caller sent.
   const trimmed = typeof name === 'string' ? name.trim() : '';
@@ -75,20 +79,37 @@ export async function generateApiKey({
   return { apiKeyRecord, rawKey };
 }
 
+/**
+ * Withdraws one key. The settings page calls it once per key for "revoke all"
+ * (FO-81), so there is one revoke path, not a second bulk query beside it.
+ */
 export async function revokeApiKey(
   keyId: string
 ): Promise<{ success: boolean } | { success: false; error: 'forbidden' }> {
-  const { tenantId, role } = await requireTenantAction();
+  const { tenantId, userId, role } = await requireTenantAction();
   if (!can(asRole(role), 'manage_users')) return { success: false, error: 'forbidden' };
+  // Deliberately NOT behind `assertModuleAccess('M1')` (TASK-MVC9MCXKVMDN7).
+  // Revoking only ever reduces access: a tenant whose M1 was turned off, or whose
+  // plan was downgraded, must still be able to kill a key that leaked. Gating it
+  // would leave live credentials the owner can no longer withdraw.
   // Client-supplied: an `undefined` id would drop out of the `where` below and
   // revoke every key of the tenant (TASK-MUMSUA77J1C6Q).
   if (!isPresentId(keyId)) return { success: false };
 
   // `deleteMany` so the tenant is part of the WHERE clause; `delete` takes only
   // a unique selector and would revoke another tenant's key.
-  const deleted = await withTenant(tenantId, (tx) =>
-    tx.apiKey.deleteMany({ where: { id: keyId, tenantId } })
-  );
+  // The audit row is written in the same transaction and only when a key was
+  // actually removed, so a repeated click on an already revoked key leaves no
+  // second "revoked" entry behind.
+  const deleted = await withTenant(tenantId, async (tx) => {
+    const result = await tx.apiKey.deleteMany({ where: { id: keyId, tenantId } });
+    if (result.count > 0) {
+      await tx.auditEvent.create({
+        data: { tenantId, actorId: userId, type: 'apiKey.revoked', target: keyId },
+      });
+    }
+    return result;
+  });
 
   try {
     revalidatePath('/[locale]/(app)/[workspace]/settings/api-keys', 'page');

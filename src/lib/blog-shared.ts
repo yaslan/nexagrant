@@ -1,9 +1,16 @@
+import { blogContentRefusal, isAllowedBlogImageSrc } from '@/lib/blog-content-policy';
+
 /**
  * The database-free half of src/lib/blog.ts (AKTAR-MURBCJ0A-1): types, the
  * refusal codes, validation, slug and date helpers. Split out so the admin
  * editor (a client component) can import them without pulling Prisma into the
  * browser bundle. src/lib/blog.ts re-exports all of it.
  */
+import { z } from 'zod';
+import { BLOG_READ_MINUTES } from './blog-read-time';
+
+export { BLOG_READ_MINUTES };
+
 export interface BlogAuthor {
   name: string;
   role: string;
@@ -17,7 +24,8 @@ export interface BlogPost {
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  /** Minutes to read; the pages format it per reader locale (blog.readMinutes). */
+  readMinutes: number;
   publishedAt: Date;
   /** Absent when the post has no recorded author. Never a placeholder. */
   author?: BlogAuthor;
@@ -33,7 +41,8 @@ export interface BlogPostInput {
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  /** Whole minutes, {@link BLOG_READ_MINUTES}. */
+  readMinutes: number;
   /** Empty: the post has no byline. */
   authorName?: string;
   authorRole?: string;
@@ -52,6 +61,8 @@ export const BLOG_WRITE_ERRORS = [
   'invalid_slug',
   'invalid_excerpt',
   'invalid_content',
+  'invalid_content_link',
+  'invalid_content_image',
   'invalid_category',
   'invalid_read_time',
   'invalid_image',
@@ -72,7 +83,6 @@ export const BLOG_LIMITS = {
   excerpt: 500,
   content: 50_000,
   category: 60,
-  readTime: 30,
   authorName: 120,
   authorRole: 120,
   url: 2_000,
@@ -117,45 +127,15 @@ export function formatBlogDate(date: Date, locale: string): string {
   }).format(date);
 }
 
-/**
- * Whether `url` is an uploaded blog image: an object under `<publicBase>/blog/`
- * — the public bucket's base URL (R2_PUBLIC_HOST, TASK-MUU20NSV2TETW), the same
- * host, port and path prefix next.config's `publicAssetImagePattern` admits.
- * No credentials, query or fragment; no `..` segment.
- */
-function isUploadedImageUrl(url: URL, publicBase: string | undefined): boolean {
-  if (!publicBase) return false;
-  let base: URL;
-  try {
-    base = new URL(publicBase);
-  } catch {
-    return false;
-  }
-  const prefix = `${base.pathname.replace(/\/+$/, '')}/blog/`;
-  return (
-    (url.protocol === 'https:' || url.protocol === 'http:') &&
-    url.protocol === base.protocol &&
-    url.hostname === base.hostname &&
-    url.port === base.port &&
-    url.username === '' &&
-    url.password === '' &&
-    url.search === '' &&
-    url.hash === '' &&
-    url.pathname.startsWith(prefix) &&
-    url.pathname.length > prefix.length &&
-    !url.pathname.split('/').includes('..')
-  );
-}
-
 function isAllowedImageUrl(value: string, publicImageBase?: string): boolean {
   if (value.length > BLOG_LIMITS.url) return false;
+  if (isAllowedBlogImageSrc(value, publicImageBase)) return true;
   let url: URL;
   try {
     url = new URL(value);
   } catch {
     return false;
   }
-  if (isUploadedImageUrl(url, publicImageBase)) return true;
   return (
     url.protocol === 'https:' &&
     url.port === '' &&
@@ -168,13 +148,27 @@ function isAllowedImageUrl(value: string, publicImageBase?: string): boolean {
 export const trimmedText = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 export const lengthWithin = (v: string, min: number, max: number) => v.length >= min && v.length <= max;
 
+/**
+ * The one-line byline shown wherever a post's author appears: "<Ünvan> <İsim>",
+ * or just the name when there is no ünvan. Blank parts drop out, so no stray
+ * space leads or trails the result.
+ */
+export function authorByline(author: Pick<BlogAuthor, 'name' | 'role'> | undefined): string {
+  return [author?.role, author?.name]
+    .map((part) => trimmedText(part).replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .join(' ');
+}
+
+const readMinutesSchema = z.number().int().min(BLOG_READ_MINUTES.min).max(BLOG_READ_MINUTES.max);
+
 /** The columns a validated input writes. Author columns are null when cleared. */
 type BlogColumns = {
   title: string;
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  readMinutes: number;
   image: string;
   featured: boolean;
   authorName: string | null;
@@ -200,10 +194,13 @@ export function validateBlogInput(
   if (!lengthWithin(excerpt, 10, BLOG_LIMITS.excerpt)) return { ok: false, error: 'invalid_excerpt' };
   const content = trimmedText(input.content);
   if (!lengthWithin(content, 20, BLOG_LIMITS.content)) return { ok: false, error: 'invalid_content' };
+  // Links and images in the body: the rules of src/lib/blog-content-policy.ts (TASK-MVDPHZQCTVJ2R).
+  const contentRefusal = blogContentRefusal(content, publicImageBase);
+  if (contentRefusal) return { ok: false, error: contentRefusal };
   const category = trimmedText(input.category);
   if (!lengthWithin(category, 1, BLOG_LIMITS.category)) return { ok: false, error: 'invalid_category' };
-  const readTime = trimmedText(input.readTime);
-  if (!lengthWithin(readTime, 1, BLOG_LIMITS.readTime)) return { ok: false, error: 'invalid_read_time' };
+  const readMinutes = readMinutesSchema.safeParse(input.readMinutes);
+  if (!readMinutes.success) return { ok: false, error: 'invalid_read_time' };
   const image = trimmedText(input.image);
   if (!isAllowedImageUrl(image, publicImageBase)) return { ok: false, error: 'invalid_image' };
 
@@ -224,7 +221,7 @@ export function validateBlogInput(
       excerpt,
       content,
       category,
-      readTime,
+      readMinutes: readMinutes.data,
       image,
       featured: input.featured === true,
       authorName: authorName || null,

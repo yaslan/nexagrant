@@ -58,7 +58,15 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
 export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersion', 'PlanFeature']);
 
 /**
- * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY.
+ * SYSTEM_WIDE tables whose RLS is ON with one policy: `system_scope` alone, no
+ * tenant policy and no platform_read. Personal data with no tenant (FO-45,
+ * K-562266 = A). Reachable only through withSystemScope(). tests/rls-coverage.test.ts
+ * pins this set to the block in prisma/rls.sql.
+ */
+export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertPreRegistration']);
+
+/**
+ * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.
  *
  * TASK-MUWDA86A7U4LK: the live Supabase project has an `ensure_rls` event
  * trigger (ddl_command_end → public.rls_auto_enable(), owned by the platform,
@@ -71,7 +79,7 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersio
  * list tests/rls-coverage.test.ts pins to this function.
  */
 export function policylessSystemWide(): string[] {
-  return [...SYSTEM_WIDE].filter((t) => !PLATFORM_POLICY.has(t)).sort();
+  return [...SYSTEM_WIDE].filter((t) => !PLATFORM_POLICY.has(t) && !SYSTEM_SCOPE_POLICY.has(t)).sort();
 }
 
 /**

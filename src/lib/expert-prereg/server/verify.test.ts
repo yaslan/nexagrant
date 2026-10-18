@@ -127,7 +127,12 @@ describe('getRemainingFounderSeats', () => {
   /** A db whose only call is the aggregate over founder numbers, answering with the given highest number. */
   function seatsDb(highest: number | null) {
     const aggregate = vi.fn(async () => ({ _max: { founderNumber: highest } }));
-    const db = { expertPreRegistration: { aggregate } } as unknown as PrismaClient;
+    const tx = { $executeRaw: vi.fn(async () => 0), expertPreRegistration: { aggregate } };
+    // FO-45: the read runs inside withSystemScopeOn, so the fake answers $transaction too.
+    const db = {
+      $transaction: async <T>(fn: (t: typeof tx) => Promise<T>) => fn(tx),
+      expertPreRegistration: { aggregate },
+    } as unknown as PrismaClient;
     return { db, aggregate };
   }
 

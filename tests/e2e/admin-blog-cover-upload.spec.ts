@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
+import { blogContentEditor } from './fixtures/rich-editor';
 
 /**
  * TASK-MUU20XFIXZKTE — the admin blog form uploads its cover image.
@@ -122,12 +123,15 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
     await page.getByLabel('Makale Başlığı *').fill(TITLE);
     await page.getByLabel('Kategori *').fill('E2E');
     await page.getByLabel('Özet (Excerpt) *').fill('Kapak görseli yükleme testinin kısa özeti.');
-    await page.getByLabel('Makale İçeriği (Markdown) *').fill('# Kapak\n\nBu yazının kapağı uçtan uca testte yüklendi.');
+    await blogContentEditor(page).click();
+    await page.keyboard.insertText('Bu yazının kapağı uçtan uca testte yüklendi.');
 
     const uploaded = page.waitForResponse(
       (r) => r.url().endsWith('/api/admin/blog/image') && r.request().method() === 'POST'
     );
-    await page.getByLabel('Görseli değiştir').setInputFiles({ name: 'kapak.png', mimeType: 'image/png', buffer: PNG });
+    // A new post starts with no cover (TASK-MVDPA19QP3M9A): the picker says "choose".
+    await expect(page.getByTestId('blog-image-preview')).toHaveCount(0);
+    await page.getByLabel('Görsel seç').setInputFiles({ name: 'kapak.png', mimeType: 'image/png', buffer: PNG });
     const res = await uploaded;
     expect(res.status()).toBe(200);
     const { url } = (await res.json()) as { url: string };
@@ -166,12 +170,14 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
     expect(storeConfigured, 'CI must run this against the MinIO public bucket').toBe(true);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    // The new-post form starts on an unsplash cover; answer for the CDN so CI needs no internet.
-    await page.route('https://images.unsplash.com/**', (route) =>
-      route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
-    );
     await openNewPost(page, baseURL as string);
-    const before = await page.getByTestId('blog-image-preview').getAttribute('src');
+    // The new-post form starts with no cover; upload one so there is a cover to keep.
+    const first = page.waitForResponse((r) => r.url().endsWith('/api/admin/blog/image'));
+    await page.getByLabel('Görsel seç').setInputFiles({ name: 'kapak.png', mimeType: 'image/png', buffer: PNG });
+    expect((await first).status()).toBe(200);
+    const preview = page.getByTestId('blog-image-preview');
+    await expect(preview).toHaveAttribute('src', /\/blog\/.+\.png$/);
+    const before = await preview.getAttribute('src');
     const input = page.getByLabel('Görseli değiştir');
 
     // Declared as text: refused before anything is sent.
@@ -209,9 +215,6 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
     await page.route('**/api/admin/blog/image', (route) =>
       route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'object_store_unconfigured' }) })
     );
-    await page.route('https://images.unsplash.com/**', (route) =>
-      route.fulfill({ status: 200, contentType: 'image/png', body: PNG })
-    );
     await openNewPost(page, baseURL as string);
     // The picker is in the tab order (the input is visually hidden, not removed).
     await page.locator('#featured').focus();
@@ -228,13 +231,14 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
         clip: { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 },
       });
     }
-    await page.getByLabel('Görseli değiştir').setInputFiles({ name: 'kapak.png', mimeType: 'image/png', buffer: PNG });
+    await page.getByLabel('Görsel seç').setInputFiles({ name: 'kapak.png', mimeType: 'image/png', buffer: PNG });
     await expect(page.getByTestId('blog-image-error')).toHaveText(MSG_UNCONFIGURED);
     await expect(page.getByTestId('blog-image-uploading')).toHaveCount(0);
     await expect(page.getByTestId('blog-submit')).toBeEnabled();
     expect(dialogs).toBe(0);
-    // The cover the form had is kept and still shown.
-    await expectImageDecoded(page, page.getByTestId('blog-image-preview'));
+    // A new post had no cover, and a failed upload does not invent one.
+    await expect(page.getByTestId('blog-image-preview')).toHaveCount(0);
+    await expect(page.getByLabel('Görsel seç')).toBeAttached();
     await page.screenshot({ path: `${SHOTS}/04-unconfigured.png`, fullPage: true });
   });
 
@@ -250,7 +254,7 @@ test.describe.serial('admin blog — cover image is uploaded, not typed', () => 
         excerpt: 'Elle girilmiş unsplash adresli eski bir yazı.',
         content: 'Bu yazının kapağı yükleme özelliğinden önce adresle girildi.',
         category: 'E2E',
-        readTime: '1 dk',
+        readMinutes: 1,
         publishedAt: new Date(),
         image: LEGACY_IMAGE,
       },

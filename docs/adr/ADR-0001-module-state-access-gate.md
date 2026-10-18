@@ -32,7 +32,7 @@
 |---|---|---|
 | `OFF` | **hiç kimse** (platform admin dahil) | "Bu kiracıda bu modül yok." Bir platform yöneticisinin bakması gerekiyorsa doğru hamle durumu `DEV`'e almaktır — bu denetlenir (`AuditEvent`), sessiz bir arka kapı denetlenmez. |
 | `DEV` | **yalnız Fabrika ekibi** (`session.isPlatformAdmin`) | "Geliştirme aşamasında." Kiracının kendi sahibi bir iç kullanıcı DEĞİLDİR; eski `TENANT_OWNER` testi tam olarak bunu yanlış yapıyordu. |
-| `PILOT` | kiracının yöneticileri (`TENANT_OWNER`, `TENANT_ADMIN`, `PIPELINE_MANAGER`) + Fabrika ekibi | Pilot, kiracının içinde dar bir kitleyle denenen özelliktir; kararı kiracının pipeline'ını yöneten kişi verir. |
+| `PILOT` | kiracının yöneticileri (`TENANT_OWNER`, `TENANT_ADMIN`, `PIPELINE_MANAGER`) + Fabrika ekibi + kiracının API anahtarları (makine kitlesi, `isMachine`; TASK-MVDPYNG1JI0S1) | Pilot, kiracının içinde dar bir kitleyle denenen özelliktir; kararı kiracının pipeline'ını yöneten kişi verir. |
 | `ON` | kiracının bütün üyeleri | Normal üretim durumu. |
 
 Bu tablo **tek yerde** yaşar. `access.ts` durumu DB'den okur, kararı bu fonksiyona

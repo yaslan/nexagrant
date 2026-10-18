@@ -112,7 +112,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
-    'CordisProjectSciVoc','CordisProjectTopic','ExpertPreRegAttempt','ExpertPreRegistration','ModuleCatalog','Programme','PublicLead',
+    'CordisProjectSciVoc','CordisProjectTopic','ExpertPreRegAttempt','ModuleCatalog','Programme','PublicLead',
     'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
@@ -238,7 +238,8 @@ BEGIN
     'subject-scoped',
     'platform-admin',
     'platform-aggregate',
-    'cross-tenant-job'
+    'cross-tenant-job',
+    'public-intake'
   ) THEN
     RAISE EXCEPTION 'enter_system_scope: unknown purpose %', coalesce(purpose, '<null>')
       USING ERRCODE = 'invalid_parameter_value';
@@ -325,6 +326,18 @@ BEGIN
       t, quote_ident(t), quote_ident(t));
   END LOOP;
 END $$;
+
+-- ExpertPreRegistration (FO-45, K-562266 = A): personal data of experts, with no
+-- tenant. RLS is ON and the one policy is system_scope, so fabrika_app reads and
+-- writes it only inside withSystemScope(). Outside that scope it sees 0 rows and
+-- refuses every write. Its purposes: 'public-intake' (registration, verification),
+-- 'platform-aggregate' (seat count), 'platform-admin' (list and CSV). Same policy
+-- body as the loop above. See prisma/migrations/expert-prereg-rls-mail-quota.sql.
+ALTER TABLE public."ExpertPreRegistration" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
+CREATE POLICY system_scope ON public."ExpertPreRegistration"
+  USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
+  WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
 
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call

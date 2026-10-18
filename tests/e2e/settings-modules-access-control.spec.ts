@@ -248,9 +248,11 @@ test.describe('Settings → Modules access control (RBAC)', () => {
     await signInAsUser(page, baseURL as string, 'test-owner-user-1', 'TENANT_OWNER');
     await page.goto('/tr/default/panel');
 
-    // Sidebar Settings link should navigate to modules
-    const settingsLink = page.locator('a[href*="ayarlar/moduller"], a[href*="settings/modules"]');
+    // Sidebar Settings link should navigate to modules. Picked by its test id: the panel's
+    // active-modules KPI card links to the same page for an owner (FO-69).
+    const settingsLink = page.getByTestId('sidebar-nav-settings');
     await expect(settingsLink).toBeVisible();
+    await expect(settingsLink).toHaveAttribute('href', /(ayarlar\/moduller|settings\/modules)$/);
 
     // Open user menu and verify "Modül Ayarları" link exists
     const userButton = page.getByRole('button', { name: /Tenant Owner User/ }).filter({ visible: true });

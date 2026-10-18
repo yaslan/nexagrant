@@ -221,7 +221,7 @@ describe('blog — a byline names a real author or there is none', () => {
     excerpt: 'Özet',
     content: 'İçerik',
     category: 'Test',
-    readTime: '1 dk',
+    readMinutes: 1,
     authorName: '',
     authorRole: '',
     authorAvatar: '',
@@ -266,10 +266,29 @@ describe('blog — a byline names a real author or there is none', () => {
     // Same rule the app frame uses: real name -> e-mail local part -> label.
     expect(displayUserName(null, 'editor@fabrika.app', 'İsimsiz kullanıcı')).toBe('editor');
   });
+
+  // TASK-MVDPA19QP3M9A: the byline is seeded from User.name, so a role written
+  // into the admin's name ("Yasin Aslan (Süperadmin)") was published with every
+  // post. The role is `isPlatformAdmin`, not part of the name.
+  test.each(['prisma/seed-tenant-workspace.ts', 'scripts/create-superadmin.ts'])(
+    '%s names the platform admin without a role label',
+    (file) => {
+      const source = readCode(file);
+      expect(source).not.toContain('(Süperadmin)');
+      expect(source).toContain("'Yasin Aslan'");
+      expect(source).toContain('isPlatformAdmin: true');
+    }
+  );
+
+  test('a new post starts with no stock cover and no fixed read time', () => {
+    const client = readCode('src/app/[locale]/admin/blog/client.tsx');
+    expect(client).not.toMatch(/images\.unsplash\.com/);
+    expect(client).not.toContain('5 min read');
+  });
 });
 
 describe('login page — the demo buttons name a role, not a person', () => {
-  test.each(['src/app/[locale]/login/AuthCard.tsx'])(
+  test.each(['src/app/[locale]/(public)/login/AuthCard.tsx'])(
     '%s headlines the seat and the address',
     (file) => {
       const source = readCode(file);
@@ -285,7 +304,7 @@ describe('login page — the demo buttons name a role, not a person', () => {
   // its demo buttons never reached a user and the two copies could drift apart unnoticed. It
   // was deleted (TASK-MTS6LZOD715WM); this keeps a copy from coming back.
   test('the unreachable duplicate login form stays deleted', () => {
-    expect(existsSync(resolve(REPO, 'src/app/[locale]/login/LoginForm.tsx'))).toBe(false);
+    expect(existsSync(resolve(REPO, 'src/app/[locale]/(public)/login/LoginForm.tsx'))).toBe(false);
   });
 
   test('the role labels exist in both locales', () => {

@@ -117,3 +117,9 @@ service-account*.json
 
 # FB KAMU B4 — local stand-in for R2 in development (src/lib/storage.ts)
 /.dev-objects/
+
+# Python virtualenvs — created locally per checkout (workers/README.md
+# "Yerel çalıştırma"). A darwin/py3.9 .venv was committed in c915bc43 and
+# carried 5659 third-party files until TASK-MVC68297ZVEMN untracked it.
+.venv/
+venv/

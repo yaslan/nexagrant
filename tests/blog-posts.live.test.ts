@@ -47,7 +47,9 @@ import {
   toggleFeaturedBlogPostAction,
   updateBlogPostAction,
 } from '@/app/[locale]/admin/blog/actions';
+import { estimateReadMinutes } from '@/lib/blog-read-time';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { sqlStatements } from './helpers/sql-statements';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const SUITE = 'blog posts test';
@@ -98,7 +100,7 @@ function form(label: string, overrides: Record<string, unknown> = {}) {
     excerpt: 'Canlı veritabanı testinde kullanılan kısa özet metni.',
     content: CONTENT,
     category: 'Test',
-    readTime: '3 dk okuma',
+    readMinutes: 3,
     authorName: '',
     authorRole: '',
     image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
@@ -206,6 +208,34 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     expect(await rowsFor('bad')).toHaveLength(0);
   });
 
+  // TASK-MVDPHZQCTVJ2R — the body's links and images are checked by the save
+  // itself (src/lib/blog-content-policy.ts), not only by the editor: raw
+  // markdown posted to the action with a forbidden one stores nothing.
+  test('a body link or image outside the content policy is refused on create and on update', async () => {
+    const body = (extra: string) => `${CONTENT}\n\n${extra}`;
+    const refused: [string, string][] = [
+      ['[tıkla](javascript:alert(1))', 'invalid_content_link'],
+      ['[tıkla](JaVaScRiPt:alert(1))', 'invalid_content_link'],
+      ['[tıkla](//evil.example/x)', 'invalid_content_link'],
+      ['[tıkla](data:text/html,x)', 'invalid_content_link'],
+      ['![grafik](https://evil.example/blog/x.png)', 'invalid_content_image'],
+      ['![](https://evil.example/blog/x.png)', 'invalid_content_image'],
+    ];
+    for (const [extra, error] of refused) {
+      expect(await createBlogPostAction(form('policy', { content: body(extra) })), extra).toEqual({ ok: false, error });
+    }
+    expect(await rowsFor('policy')).toHaveLength(0);
+
+    const allowed = body('Ayrıntı [rehberde](https://ec.europa.eu/info) ve [fiyatlarda](/tr/fiyatlar).');
+    expect(await createBlogPostAction(form('policy', { content: allowed }))).toMatchObject({ ok: true });
+    expect(
+      await updateBlogPostAction(slugOf('policy'), { content: body('[tıkla](javascript:alert(1))') })
+    ).toEqual({ ok: false, error: 'invalid_content_link' });
+    const rows = await rowsFor('policy');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.content).toBe(allowed);
+  });
+
   test.each([
     ['anonymous', null],
     ['the admin of another tenant', OTHER_TENANT_ADMIN],
@@ -301,5 +331,65 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     expect(await admin.blogPost.count({ where: { slug: expected } })).toBe(1);
     await admin.blogPost.deleteMany({ where: { slug: expected } });
     await admin.auditEvent.deleteMany({ where: { type: 'blog.post.created', target: expected } });
+  });
+
+  test('blog-read-minutes.sql backfills the minutes from the old text, else from the content (TASK-MVDSY96TB1EPM)', async () => {
+    const words = (n: number) => Array.from({ length: n }, (_, i) => `kelime${i}`).join(' ');
+    // Links, images, tags and list numbers are not words — the SQL must count like estimateReadMinutes.
+    const marked = `# Başlık\n\n1. [bağlantı metni](https://example.test/a) <b>kalın</b>\n2. ![görsel](https://x.test/i.png)\n\n${words(1100)}`;
+    const cases: Array<[label: string, readTime: string, content: string, expected: number]> = [
+      ['tr', '5 dk', CONTENT, 5],
+      ['en', '5 min read', CONTENT, 5],
+      ['old', '3 dk okuma', CONTENT, 3],
+      ['minutes', '12 minutes', CONTENT, 12],
+      ['bare', '7', CONTENT, 7],
+      ['nonum', 'kısa', words(650), 3],
+      ['zero', '0 dk', words(10), 1],
+      ['over', '999 dk', marked, estimateReadMinutes(marked)],
+      ['huge', '99999999999 dk', words(450), 2],
+      ['empty', 'dk', '', 1],
+    ];
+    expect(estimateReadMinutes(marked)).toBe(6);
+    for (const [label, readTime, content] of cases) {
+      await admin.$executeRaw`
+        INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
+        VALUES (${`bf-${label}-${RUN}`}, ${slugOf(`bf-${label}`)}, 't', 'e', ${content}, 'c', ${readTime}, NULL, now(), 'https://images.unsplash.com/x', now())`;
+    }
+    // A row that already has minutes (written by the new code) is not touched.
+    await admin.$executeRaw`
+      INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
+      VALUES (${`bf-kept-${RUN}`}, ${slugOf('bf-kept')}, 't', 'e', ${CONTENT}, 'c', '40 dk', 9, now(), 'https://images.unsplash.com/x', now())`;
+
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const { default: pg } = await import('pg');
+    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/blog-read-minutes.sql'), 'utf8');
+    const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
+    await client.connect();
+    try {
+      for (const statement of sqlStatements(sql)) await client.query(statement);
+      for (const statement of sqlStatements(sql)) await client.query(statement); // idempotent
+    } finally {
+      await client.end();
+    }
+
+    const minutesOf = async (label: string) =>
+      (await admin.blogPost.findUnique({ where: { slug: slugOf(label) }, select: { readMinutes: true } }))?.readMinutes;
+    for (const [label, , , expected] of cases) expect([label, await minutesOf(`bf-${label}`)]).toEqual([label, expected]);
+    expect(await minutesOf('bf-kept')).toBe(9);
+
+    // The CHECK holds the range for every writer, not only the admin form.
+    await expect(
+      admin.$executeRaw`UPDATE "BlogPost" SET "readMinutes" = 121 WHERE "slug" = ${slugOf('bf-kept')}`
+    ).rejects.toThrow(/BlogPost_readMinutes_range/);
+  });
+
+  test('a saved post stores minutes only and reads back as a number (TASK-MVDSY96TB1EPM)', async () => {
+    expect(await createBlogPostAction(form('mins', { readMinutes: 8 }))).toMatchObject({ ok: true });
+    const [row] = await rowsFor('mins');
+    expect(row).toMatchObject({ readMinutes: 8, readTime: null });
+    expect((await getBlogPostBySlug(slugOf('mins')))?.readMinutes).toBe(8);
+    expect(await createBlogPostAction(form('mins121', { readMinutes: 121 }))).toEqual({ ok: false, error: 'invalid_read_time' });
+    expect(await rowsFor('mins121')).toHaveLength(0);
   });
 });

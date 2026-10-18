@@ -68,3 +68,5 @@ add-blog-post.sql
 add-notification.sql
 drop-evidence-reminder.sql
 add-expert-pre-registration-organization.sql
+expert-prereg-rls-mail-quota.sql
+blog-read-minutes.sql

@@ -625,7 +625,13 @@ model BlogPost {
   /// Markdown subset rendered as React text nodes (no HTML) — see blog/[slug]/page.tsx.
   content      String
   category     String
-  readTime     String
+  /// Minutes, 1–120 (CHECK BlogPost_readMinutes_range); formatted per reader locale
+  /// with messages blog.readMinutes. NULL only for a row written by pre-FO-84 code
+  /// during the deploy window. prisma/migrations/blog-read-minutes.sql.
+  readMinutes  Int?
+  /// Legacy free-text read time in the writer's language. No longer written or read;
+  /// kept for rollback until a follow-up drops it (TASK-MVDSY96TB1EPM).
+  readTime     String?
   publishedAt  DateTime
   authorName   String?
   authorRole   String?
@@ -719,6 +725,10 @@ model ExpertPreRegistration {
   status               String    @default("pending")
   /// HMAC-SHA256 of the client IP under EXPERT_PREREG_IP_SALT: the per-IP limit only.
   ipHash               String?
+  /// Verification mails sent to this address in the current day window (FO-45 F5, EXPERT_PREREG_DAILY_MAIL_LIMIT).
+  verifyMailCount      Int       @default(0)
+  /// Start of the day window `verifyMailCount` counts from. NULL = no mail yet.
+  verifyMailWindowStart DateTime?
   /// When the row was first created. A re-issued link does not move it (FO-26).
   createdAt            DateTime  @default(now())
   /// Last time a registration reached the write (new row or re-issued link). Drives the resend cooldown (FO-26).

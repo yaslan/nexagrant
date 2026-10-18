@@ -60,6 +60,10 @@ const mockDb = vi.hoisted(() => ({
  * moved its query into a tenant scope (TASK-MTVR9T834EPUC). The API-key lookup
  * stays on `prisma`: it is the auth boundary, before any tenant is known.
  */
+// The module gate has its own suite (v1-module-gate.test.ts); these suites test the route.
+vi.mock('../../src/lib/modules/tenant-access', () => ({
+  checkModuleAccessForTenant: vi.fn(async () => ({ allowed: true, status: 'ON' })),
+}));
 vi.mock('../../src/lib/db', () => ({
   prisma: mockDb,
   withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>

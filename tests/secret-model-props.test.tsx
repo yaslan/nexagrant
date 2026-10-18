@@ -125,6 +125,7 @@ vi.mock('next-intl/server', () => ({
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: vi.fn(async () => null) }));
+vi.mock('@/lib/modules/access', () => ({ assertModuleAccess: vi.fn(async () => undefined) }));
 
 // The client components are replaced by named stubs: the test reads the props
 // the page gives them, which is exactly what the RSC payload would carry.

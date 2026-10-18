@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
+import { blogContentEditor, pasteInto } from './fixtures/rich-editor';
 
 /**
  * AKTAR-MURBCJ0A-1 — an admin's blog post survives the server that wrote it.
@@ -23,6 +24,7 @@ const TITLE = `E2E kalıcılık testi ${RUN}`;
 const SLUG = `e2e-kalicilik-testi-${RUN}`;
 // Markup an editor might paste. The post page renders content as React text
 // nodes; none of this may become an element.
+const COVER = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80';
 const HOSTILE = '<script>window.__blogXss = 1</script>';
 const HOSTILE_IMG = '<img src=x onerror="window.__blogXss = 2">';
 const CONTENT = [
@@ -60,7 +62,17 @@ async function fillNewPost(page: Page): Promise<void> {
   await page.getByLabel('Makale Başlığı *').fill(TITLE);
   await page.getByLabel('Kategori *').fill('E2E');
   await page.getByLabel('Özet (Excerpt) *').fill('Uçtan uca kalıcılık testinin kısa özeti.');
-  await page.getByLabel('Makale İçeriği (Markdown) *').fill(CONTENT);
+  // The content field is a rich text editor (TASK-MVDKHOXGRQQS5); pasted plain text is read as post markdown.
+  await pasteInto(blogContentEditor(page), { text: CONTENT });
+  // A new post starts with no cover (TASK-MVDPA19QP3M9A) and is refused without
+  // one. The upload is not this spec's subject (admin-blog-cover-upload is), so
+  // the route answers with a cover on an allowed host, and the CDN is answered too.
+  await page.route('**/api/admin/blog/image', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: COVER }) })
+  );
+  await page.route('https://images.unsplash.com/**', (route) => route.fulfill({ status: 204 }));
+  await page.getByLabel('Görsel seç').setInputFiles({ name: 'kapak.png', mimeType: 'image/png', buffer: Buffer.from('png') });
+  await expect(page.getByTestId('blog-image-preview')).toHaveAttribute('src', COVER);
   await page.getByTestId('blog-submit').click();
 }
 

@@ -6,6 +6,7 @@ import { sendSavedSearchAlerts } from '@/lib/jobs/tasks/alerts-daily';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 import { shotsDir } from './fixtures/shots';
 import { requireId } from '../helpers/teardown-guard';
+import { switchLocalePath } from '@/lib/routes';
 
 /**
  * TASK-MUU7678DFI9QF — notification center (bell in the app shell + the
@@ -273,7 +274,16 @@ test.describe('Notification center — live surface', () => {
       await expect(page.getByText(`notif-a-${RUN}`)).toHaveCount(0);
       await expect(page.getByText(A.email)).toHaveCount(0);
       await expect(page.getByText(A.ws.name, { exact: true })).toHaveCount(0);
-      await expect(page.locator(`a[href*="/${A.ws.slug}"]`)).toHaveCount(0);
+      // The 404 carries the public header (FO-68), whose TR | EN switch links the
+      // path B typed in the other language — B's own input, not A's data. Those
+      // two are pinned exactly; any other link to A's slug is a leak.
+      const navbar = page.getByTestId('public-navbar');
+      const ownPaths = [path, switchLocalePath(path, 'tr'), switchLocalePath(path, 'en')];
+      await expect(navbar.locator(`a[href*="/${A.ws.slug}"]`)).toHaveCount(2);
+      for (const href of await navbar.locator(`a[href*="/${A.ws.slug}"]`).evaluateAll((as) => as.map((a) => a.getAttribute('href')))) {
+        expect(ownPaths).toContain(href);
+      }
+      await expect(page.locator(`a[href*="/${A.ws.slug}"]:not([data-testid="public-navbar"] a)`)).toHaveCount(0);
       await expect(page.getByRole('heading', { level: 1, name: /^(Notifications|Bildirimler)$/ })).toHaveCount(0);
       await expect(page.getByText(/You have no notifications yet\.|Henüz bildiriminiz yok\./)).toHaveCount(0);
       await expect(page.locator('body')).not.toContainText(FABRICATED);

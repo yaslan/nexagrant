@@ -134,7 +134,8 @@
     "readinessImportedAt": "karne sonucu {date} tarihinde eklendi",
     "readinessMoreGaps": "{count} eksik adım daha var; tamamı ayrıntılı sonuçta.",
     "readinessViewResult": "Ayrıntılı sonucu gör",
-    "readinessRetake": "Karneyi yeniden yap"
+    "readinessRetake": "Karneyi yeniden yap",
+    "cardLinkAria": "{title} — ayrıntıya git"
   },
   "Pipeline": {
     "title": "Fırsat Pipeline",
@@ -926,7 +927,7 @@
       "rightsBody": "KVKK 11. maddesi ve GDPR uyarınca aşağıdaki dokuz hakkınız vardır: (a) Kişisel verilerinizin işlenip işlenmediğini öğrenme; (b) İşlenmiş verilerinize ilişkin bilgi talep etme — 'Ayarlar → Gizlilik ve Verilerim' ekranından JSON biçiminde dışa aktarabilirsiniz; (c) İşleme amacını ve amaca uygunluğunu öğrenme; (ç) Verilerinizin yurt içinde ve yurt dışında aktarıldığı üçüncü kişileri bilme; (d) Eksik veya yanlış verilerinizin düzeltilmesini isteme; (e) Verilerinizin silinmesini veya yok edilmesini isteme — 'Ayarlar → Gizlilik ve Verilerim' ekranından hesabınızın silinmesini talep edebilirsiniz (hesabınız derhal kapatılır, 30 gün sonra kalıcı silinir, bu süre içinde iptal edebilirsiniz); (f) Düzeltme veya silme işleminin üçüncü kişilere bildirilmesini isteme; (g) Münhasıran otomatik sistem analizi sonucu aleyhe sonuca itiraz etme (ürün puanlaması bu kapsamdadır); (ğ) Zarara uğrama hâlinde tazminat talep etme. Güvenlik gereği, kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dışa aktarıma dahil edilmez.",
       "rightsLink": "Gizlilik ve Verilerim ekranına git",
       "securityHeading": "7. Güvenlik ve Depolama",
-      "securityBody": "Verileriniz çok kiracılı veritabanında PostgreSQL Row-Level Security (RLS) ile diğer kiracılardan yalıtılmış olup, dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır.",
+      "securityBody": "Kiracıya ait verileriniz uygulama katmanında diğer kiracılardan ayrılır: kiracı verisine erişen sorgular kiracı kimliğinizle sınırlanır; tanımlı ve sınırlı sistem işlemleri (platform yönetimi, veri sahibi talepleri, zamanlanmış işler) kiracılar arası çalışabilir. PostgreSQL Row-Level Security (RLS) politikaları veritabanında tanımlıdır; ancak bu politikalar uygulamanın veritabanı bağlantısında etkin değildir. Dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır.",
       "recipientsHeading": "3. Veri Alıcıları ve Yurt Dışı Aktarım",
       "recipientsBody": "Verileriniz aşağıdaki alıcılara aktarılabilir: (1) Anthropic PBC (ABD) — yapay zeka destekli metin üretimi ve ön değerlendirme için gönderdiğiniz metinler (kapasite açıklaması, teklif taslağı, değerlendirilen belge içeriği); (2) Google LLC (ABD) — oturum açma sırasında gönderilen ad ve e-posta; (3) Stripe, Inc. (ABD) — abonelik ve ödeme yönetimi için müşteri tanımlayıcısı ve faturalama durumu; (4) OpenAI, L.L.C. (ABD) — yüklenen belgelerin embedding'i için metin; (5) Cloudflare, Inc. (bölge ayara bağlı) — yüklenen dosya ve ekran görüntüleri; (6) PostHog Inc. (Avrupa Birliği bölgesi, varsayılan) — olay adları ve puanlandırma duruşu (çerez onayıyla); (7) Vulut (Türkiye) — veritabanı, uygulama sunucusu ve e-posta barındırması. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
       "legalBasisHeading": "5. Hukuki Sebebi Tablosu",
@@ -953,7 +954,7 @@
       "trialHeading": "6. Pilot Periyodu",
       "trialBody": "Çalışma alanının açılması sırasında, belirli bir süre boyunca pilot (deneme) erişimi sağlanır. Pilot süresi dolduğunda yeni hesaplamalar ve değişiklikler askıya alınır. Uzatmak için çalışma alanı yöneticiniz tarafından abonelik kurulması gerekir.",
       "terminationHeading": "7. Hesap Fesih ve Veri Silme",
-      "terminationBody": "Abonelik istenildiğinde portal üzerinden iptal edilebilir. Hesap silme talebinde, hesap derhal erişime kapatılır ve 30 gün sonra kişisel hesap bilgileriniz silinir. Çalışma alanına ait belgeler ve projeler çalışma alanı silinene kadar kurumda kalır. Faturalama ve denetim kayıtları anonimleştirilerek saklanır. Silme süresi içinde talebinizi geri çekebilirsiniz. Ayrıntı için bkz. Gizlilik Politikası §3.",
+      "terminationBody": "Abonelik istenildiğinde portal üzerinden iptal edilebilir. Hesap silme talebinde, hesap derhal erişime kapatılır ve 30 gün sonra kişisel hesap bilgileriniz silinir. Çalışma alanına ait belgeler ve projeler çalışma alanı silinene kadar kurumda kalır. Faturalama ve denetim kayıtları saklanır; bu kayıtlardaki kullanıcı kimliği bağlantısı kaldırılır ya da tek yönlü bir özetle değiştirilir. Denetim kayıtlarının serbest metin alanları kişisel veri içerebilir. Silme süresi içinde talebinizi geri çekebilirsiniz. Ayrıntı için bkz. Gizlilik Politikası §3.",
       "agencyHeading": "8. Ajans Kanalı ve Davet Kodu",
       "agencyBody": "Teklif hazırlama destek sağlayıcıları (ajanslar), danışmanlık müşterilerine davet kodu ile ulaşabilir. Davet koduyla kayıt yapan kullanıcı, çalışma alanı ajansa bağlanır. Bu bağ ajansa çalışma alanının verilerine erişim sağlamaz; ilişki yalnız kayıt sırasında kurulur.",
       "partnerHeading": "9. Ortak Portalı",
@@ -2746,6 +2747,7 @@
     "none": "—"
   },
   "adminBlog": {
+    "authorRolePlaceholder": "Dr., Prof. Dr., Uzman",
     "saved": "Blog yazısı kaydedildi.",
     "deleted": "Blog yazısı silindi.",
     "featureToggled": "Öne çıkan durumu güncellendi.",
@@ -2755,8 +2757,10 @@
       "invalid_slug": "Kısa ad (slug) yalnız küçük harf, rakam ve tire içerebilir (3–120 karakter).",
       "invalid_excerpt": "Özet 10–500 karakter olmalı.",
       "invalid_content": "İçerik 20–50.000 karakter olmalı.",
+      "invalid_content_link": "İçerikte izin verilmeyen bir bağlantı var. Bağlantılar https://, http://, mailto: ya da / ile başlayan site içi bir yol olmalı.",
+      "invalid_content_image": "İçerikte kullanılamayan bir görsel var. Görseller yalnız yükleme ile eklenir ve alternatif metinleri dolu olmalı.",
       "invalid_category": "Kategori 1–60 karakter olmalı.",
-      "invalid_read_time": "Okuma süresi 1–30 karakter olmalı.",
+      "invalid_read_time": "Okuma süresi 1–120 dakika arasında bir tam sayı olmalı.",
       "invalid_image": "Görsel adresi https ile başlamalı ve izin verilen bir sunucudan (images.unsplash.com) gelmeli.",
       "invalid_author": "Yazar adı ve unvanı en fazla 120 karakter olabilir; unvan ya da portre yalnız yazar adıyla birlikte girilebilir.",
       "slug_taken": "Bu kısa adla (slug) bir yazı zaten var. Başlığı ya da kısa adı değiştirin.",
@@ -2779,6 +2783,17 @@
         "object_store_unconfigured": "Dosya deposu yapılandırılmamış; görsel şu an yüklenemiyor. Sistem yöneticisine bildirin.",
         "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
       }
+    },
+    "content": {
+      "label": "Makale İçeriği",
+      "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste, bağlantı ve yüklenen görsel. İçerik Markdown olarak kaydedilir.",
+      "missing": "Makale içeriği boş olamaz."
+    },
+    "readTime": {
+      "label": "Okuma süresi (dakika)",
+      "placeholder": "örn: 5",
+      "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz. Sitede okuyucunun dilinde gösterilir.",
+      "missing": "Okuma süresi boş olamaz. İçerikte okunacak metin yoksa süreyi elle yazın."
     }
   },
   "adminDocuments": {
@@ -2924,7 +2939,8 @@
   },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
-    "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri."
+    "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.",
+    "readMinutes": "{min} dk okuma"
   },
   "blog_detail": {
     "meta_description": "Blog yazısı"
@@ -3353,6 +3369,64 @@
     "application": {
       "name": "Tam Başvuru Üretimi",
       "tagline": "Konsept notu, kanıt ve konsorsiyum üzerine bölüm bölüm başvuru taslağı."
+    }
+  },
+  "richTextEditor": {
+    "toolbar": "Biçimlendirme",
+    "heading1": "Başlık 1",
+    "heading2": "Başlık 2",
+    "heading3": "Başlık 3",
+    "bold": "Kalın",
+    "bulletList": "Madde listesi",
+    "orderedList": "Numaralı liste",
+    "undo": "Geri al",
+    "redo": "Yinele",
+    "link": "Bağlantı",
+    "image": "Görsel",
+    "cancel": "Vazgeç",
+    "apply": "Uygula",
+    "linkDialog": {
+      "title": "Bağlantı ekle",
+      "editTitle": "Bağlantıyı düzenle",
+      "text": "Görünen metin",
+      "textRequired": "Bağlantıda görünecek metni yazın.",
+      "url": "Adres",
+      "urlHint": "https:// , http:// ya da mailto: ile başlayan bir adres, veya / ile başlayan bir site içi yol.",
+      "invalidUrl": "Bu adres kullanılamaz. https:// , http:// , mailto: ile başlayan bir adres ya da / ile başlayan bir site içi yol girin.",
+      "remove": "Bağlantıyı kaldır"
+    },
+    "imageDialog": {
+      "title": "Görsel ekle",
+      "editTitle": "Görseli düzenle",
+      "choose": "Görsel seç",
+      "change": "Başka görsel seç",
+      "preview": "Yüklenen görselin önizlemesi",
+      "fileRequired": "Önce bir görsel yükleyin. Yazıya yalnız yüklenen görseller eklenebilir.",
+      "alt": "Alternatif metin",
+      "altHint": "Görseli göremeyenler için görselin ne gösterdiğini kısaca yazın.",
+      "altRequired": "Alternatif metin zorunlu."
+    }
+  },
+  "ApiKeysSettings": {
+    "createTitle": "Yeni API Anahtarı Oluştur",
+    "revoke": {
+      "title": "Mevcut API anahtarları",
+      "description": "Modül kapalıyken de mevcut anahtarlarınızı buradan iptal edebilirsiniz. İptal edilen anahtar hemen geçersiz olur. Anahtar değerleri gösterilmez.",
+      "createdAt": "Oluşturulma:",
+      "lastUsed": "Son kullanım:",
+      "neverUsed": "Henüz kullanılmadı",
+      "revokeOneLabel": "\"{name}\" anahtarını iptal et",
+      "revokeAll": "Tüm anahtarları iptal et",
+      "confirmOneTitle": "\"{name}\" anahtarı iptal edilsin mi?",
+      "confirmAllTitle": "Tüm anahtarlar iptal edilsin mi?",
+      "confirmBody": "Bu işlem geri alınamaz. Bu anahtarları kullanan entegrasyonlar erişimini hemen kaybeder.",
+      "confirm": "İptal et",
+      "cancel": "Vazgeç",
+      "revoking": "İptal ediliyor…",
+      "error": {
+        "forbidden": "API anahtarlarını yalnızca kurum sahibi veya yöneticisi iptal edebilir.",
+        "failed": "Anahtar iptal edilemedi. Lütfen tekrar deneyin."
+      }
     }
   }
 }
