@@ -105,7 +105,11 @@ export const SYSTEM_SCOPE_PURPOSES = [
   'platform-aggregate',
   /** A cron fan-out whose tenant set is the query's output. */
   'cross-tenant-job',
-  /** An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45). */
+  /**
+   * An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45).
+   * The database opens only ExpertPreRegistration and ExpertFounderCounter for it (FO-52,
+   * prisma/rls.sql system_scope_open); any other table reads 0 rows and refuses writes.
+   */
   'public-intake',
 ] as const;
 
