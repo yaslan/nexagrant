@@ -23,7 +23,10 @@
 #                         dump is encrypted to <file>.age and the plain file is
 #                         removed. The private key stays out of this repo.
 #
-# The connection string is never printed. Logs carry the file name and sizes only.
+# The connection string and password are never printed, and the password never
+# reaches a command line (ps shows argv to every local user): it travels in the
+# PGPASSWORD environment variable of each pg_dump call. No password file is
+# written. Logs carry the file name and sizes only. URL parsing: pg-url.sh.
 
 set -euo pipefail
 
@@ -43,9 +46,19 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 dump="$BACKUP_DIR/fonbridge-$stamp.dump"
 tmp="$dump.partial"
 
-# A half-written file must never be mistaken for a backup.
+# A half-written file must never be mistaken for a backup. The EXIT trap removes
+# .partial on normal exit and on TERM and HUP (measured with a .partial present:
+# both left none behind). INT was not measured. If the script is killed and
+# pg_dump keeps running, pg_dump can write the .partial after the trap has run;
+# retention below removes such leftovers.
 cleanup() { rm -f "$tmp"; }
 trap cleanup EXIT
+
+# Split BACKUP_DATABASE_URL (pg-url.sh). The password goes to PGPASSWORD per
+# call; the URL pg_dump receives has none. Errors name the variable, not its value.
+# shellcheck source=pg-url.sh
+source "$(dirname "$0")/pg-url.sh"
+pg_url_split BACKUP_DATABASE_URL || fail "BACKUP_DATABASE_URL could not be parsed (see above)"
 
 log "dumping to $(basename "$dump")"
 # --no-owner: ownership is not restored, so the dump loads under any owner role.
@@ -53,7 +66,7 @@ log "dumping to $(basename "$dump")"
 # of what the restored database must enforce. Restore needs the roles the dump
 # grants to (fabrika_app) to exist on the target cluster (see pg-restore-drill.sh).
 # graphile_worker and pgvector objects are included (checklist §4.1).
-pg_dump --dbname="$BACKUP_DATABASE_URL" \
+PGPASSWORD="$PG_PASS" pg_dump --dbname="$PG_CONN" \
   --format=custom --no-owner \
   --file="$tmp"
 
@@ -85,5 +98,5 @@ fi
 log "ok: $(basename "$final") $(du -h "$final" | cut -f1) toc_entries=$toc_entries"
 
 # Retention: delete only files this script names, so unrelated files stay.
-find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'fonbridge-*.dump' -o -name 'fonbridge-*.dump.age' -o -name 'fonbridge-*.sha256' \) \
+find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'fonbridge-*.dump' -o -name 'fonbridge-*.dump.age' -o -name 'fonbridge-*.dump.partial' -o -name 'fonbridge-*.sha256' \) \
   -mtime +"$BACKUP_KEEP_DAYS" -print -delete | sed 's/^/[pg-backup] pruned /' || true
