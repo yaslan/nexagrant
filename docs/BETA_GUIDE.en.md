@@ -197,7 +197,7 @@ Every ratio on the dashboard is backed by a record; with no source, the metric s
 ## 7. Data, privacy and compliance
 
 - **Tenant isolation:** every record belongs to a tenant, and the application restricts queries that access tenant data to
-  that tenant. Authorized platform administration operations may operate across tenants; plan publication, archiving, visibility changes, deletion and tenant plan assignments are written to an audit record (AuditEvent). One partner's data is not visible to another. Row-level security (RLS) policies are
+  that tenant. A defined, limited set of system operations (platform administration, data-subject requests, scheduled jobs) may operate across tenants. One partner's data is not visible to another. Row-level security (RLS) policies are
   defined in the database but are not in effect on the application's database connection.
 - **AI usage:** LLM calls are logged (module, purpose, model, tokens, credits). **Your data is not used
   to train models.**
