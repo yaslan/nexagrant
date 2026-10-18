@@ -2747,6 +2747,7 @@
     "none": "—"
   },
   "adminBlog": {
+    "authorRolePlaceholder": "Dr., Prof. Dr., Expert",
     "saved": "Blog post saved.",
     "deleted": "Blog post deleted.",
     "featureToggled": "Featured status updated.",

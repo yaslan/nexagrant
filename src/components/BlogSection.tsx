@@ -1,7 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatBlogDate, getFeaturedBlogPosts, type BlogPost } from '@/lib/blog';
+import { authorByline, formatBlogDate, getFeaturedBlogPosts, type BlogPost } from '@/lib/blog';
 import { errorMessage } from '@/lib/errors';
 import { getPublicRoute } from '@/lib/routes';
 
@@ -106,15 +106,14 @@ export default async function BlogSection({ locale }: BlogSectionProps) {
                         {post.author.avatar && (
                           <Image
                             src={post.author.avatar}
-                            alt={post.author.name}
+                            alt={authorByline(post.author)}
                             width={28}
                             height={28}
                             className="rounded-full object-cover border border-border"
                           />
                         )}
-                        <div>
-                          <div className="text-xs font-semibold text-ink leading-none">{post.author.name}</div>
-                          <div className="text-[10px] text-muted mt-0.5">{post.author.role}</div>
+                        <div className="min-w-0 text-xs font-semibold text-ink leading-none truncate">
+                          {authorByline(post.author)}
                         </div>
                       </>
                     ) : null}

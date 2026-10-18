@@ -168,6 +168,18 @@ function isAllowedImageUrl(value: string, publicImageBase?: string): boolean {
 export const trimmedText = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 export const lengthWithin = (v: string, min: number, max: number) => v.length >= min && v.length <= max;
 
+/**
+ * The one-line byline shown wherever a post's author appears: "<Ünvan> <İsim>",
+ * or just the name when there is no ünvan. Blank parts drop out, so no stray
+ * space leads or trails the result.
+ */
+export function authorByline(author: Pick<BlogAuthor, 'name' | 'role'> | undefined): string {
+  return [author?.role, author?.name]
+    .map((part) => trimmedText(part).replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .join(' ');
+}
+
 /** The columns a validated input writes. Author columns are null when cleared. */
 type BlogColumns = {
   title: string;
