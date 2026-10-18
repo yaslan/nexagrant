@@ -3,7 +3,7 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { formatBlogDate, getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
+import { authorByline, formatBlogDate, getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
 import { appUrl } from '@/lib/app-url';
 
@@ -222,16 +222,13 @@ export default async function BlogDetailPage({
                 {post.author.avatar && (
                   <Image
                     src={post.author.avatar}
-                    alt={post.author.name}
+                    alt={authorByline(post.author)}
                     width={40}
                     height={40}
                     className="rounded-full object-cover border border-border"
                   />
                 )}
-                <div>
-                  <div className="text-sm font-bold text-ink">{post.author.name}</div>
-                  <div className="text-xs text-muted">{post.author.role}</div>
-                </div>
+                <div className="text-sm font-bold text-ink">{authorByline(post.author)}</div>
               </div>
             )}
           </div>

@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatBlogDate, getBlogPosts } from '@/lib/blog';
+import { authorByline, formatBlogDate, getBlogPosts } from '@/lib/blog';
 import { getPublicRoute } from '@/lib/routes';
 import { appUrl } from '@/lib/app-url';
 
@@ -116,21 +116,20 @@ export default async function BlogIndexPage({
                   {/* Author Badge & Button */}
                   <div className="pt-4 border-t border-border/80 flex items-center justify-between">
                     {/* Byline only when the post records one — see src/lib/blog.ts. */}
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       {post.author ? (
                         <>
                           {post.author.avatar && (
                             <Image
                               src={post.author.avatar}
-                              alt={post.author.name}
+                              alt={authorByline(post.author)}
                               width={28}
                               height={28}
                               className="rounded-full object-cover border border-border"
                             />
                           )}
-                          <div>
-                            <div className="text-xs font-semibold text-ink leading-none">{post.author.name}</div>
-                            <div className="text-[10px] text-muted mt-0.5">{post.author.role}</div>
+                          <div className="min-w-0 text-xs font-semibold text-ink leading-none truncate">
+                            {authorByline(post.author)}
                           </div>
                         </>
                       ) : null}
@@ -138,7 +137,7 @@ export default async function BlogIndexPage({
 
                     <Link
                       href={getPublicRoute('blogDetail', locale, post.slug)}
-                      className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                      className="shrink-0 text-xs font-bold text-accent hover:underline flex items-center gap-1"
                     >
                       <span>{isTr ? 'Devamını Oku' : 'Read Article'}</span>
                       <span>→</span>
