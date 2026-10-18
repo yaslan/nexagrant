@@ -179,12 +179,6 @@ describe('purgeDueUsers — grace period', () => {
     expect(savedSearchDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
     expect(notificationDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
     expect(auditUpdateMany).toHaveBeenCalledWith({ where: { actorId: 'due' }, data: { actorId: null } });
-    // The subject's own id in `target` is replaced by the same hash the erasure
-    // record uses, scoped to the subject, so other people's events are untouched.
-    expect(auditUpdateMany).toHaveBeenCalledWith({
-      where: { target: 'due' },
-      data: { target: createHash('sha256').update('due').digest('hex') },
-    });
     expect(opportunityUpdateMany).toHaveBeenCalledWith({ where: { ownerId: 'due' }, data: { ownerId: null } });
     expect(feedbackUpdateMany).toHaveBeenCalledWith({ where: { userId: 'due' }, data: { userId: null } });
     expect(proposalUsageUpdateMany).toHaveBeenCalledWith({

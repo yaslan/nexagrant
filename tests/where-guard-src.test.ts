@@ -34,7 +34,6 @@ const KNOWN: Record<string, string> = {
     '`const userId = user.id` over `user.findMany` rows (primary key); cron input, no client',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts actorId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerId: userId': 'same `user.id` as above',
-  'src/lib/jobs/tasks/users-scheduled-deletion.ts target: userId': 'same `user.id` as above (FO-82: rewrites the subject\'s own id in AuditEvent.target)',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts usedByUserId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerUserId: userId': 'same `user.id` as above',
   'src/lib/k3-topic-stats/importer.ts topicPrefix: p.topicPrefix':

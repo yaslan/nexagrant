@@ -152,12 +152,9 @@ export async function purgeDueUsers(
         //     the same choice already made for `AiUsageLog` above and for the
         //     hashed subject reference in the erasure audit below.
         await tx.auditEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
-        //     `target` holds the subject's own id on events about them (e.g.
-        //     `member.removed`). That id is the link the DPA promises to remove,
-        //     so it takes the same one-way hash as the erasure record. Only rows
-        //     naming this subject match, so no other person's trail changes, and a
-        //     second run finds nothing left to rewrite.
-        await tx.auditEvent.updateMany({ where: { target: userId }, data: { target: subjectRefOf(userId) } });
+        //     `member.removed` names the Membership id in `target`, never the user
+        //     id. The person link there is cut by the `Membership.user` cascade
+        //     below, so `target` needs no rewrite here.
         await tx.opportunity.updateMany({ where: { ownerId: userId }, data: { ownerId: null } });
         await tx.feedback.updateMany({ where: { userId }, data: { userId: null } });
         await tx.proposalUsage.updateMany({ where: { usedByUserId: userId }, data: { usedByUserId: null } });
