@@ -38,8 +38,13 @@ test.beforeAll(async () => {
 test('the alert console under a 250-row pile', async ({ page }) => {
   test.skip(skipReason !== '', skipReason);
 
+  // The open rows that exist before the probe runs are the ones it must leave alone. Other specs
+  // share this database and keep writing alerts while it runs, so the check is per row, not a count.
+  const preOpenIds = (await prisma.systemAlert.findMany({ where: { resolvedAt: null }, select: { id: true } })).map(
+    (alert) => alert.id,
+  );
   const dbTotal = await prisma.systemAlert.count();
-  const dbOpen = await prisma.systemAlert.count({ where: { resolvedAt: null } });
+  const dbOpen = preOpenIds.length;
   console.log(`[probe] DB truth: total=${dbTotal} open=${dbOpen}`);
 
   await page.addInitScript(() => {
@@ -152,11 +157,15 @@ test('the alert console under a 250-row pile', async ({ page }) => {
   // The page must at least be the console we think it is.
   await expect(page.getByRole('heading', { name: 'Sistem Uyarıları' })).toBeVisible();
 
-  // Nothing was written: prove it.
+  // Nothing the probe saw was resolved or deleted: check those exact rows. A deleted row drops out
+  // of this count, and a resolved one does too. Counting the whole table would also count the
+  // alerts other specs write while this one runs.
+  const stillOpen = await prisma.systemAlert.count({ where: { id: { in: preOpenIds }, resolvedAt: null } });
   const afterTotal = await prisma.systemAlert.count();
-  const afterOpen = await prisma.systemAlert.count({ where: { resolvedAt: null } });
-  console.log(`[probe] DB after the probe: total=${afterTotal} open=${afterOpen} (was ${dbTotal}/${dbOpen})`);
-  expect(afterOpen, 'the probe must not resolve or delete anything').toBe(dbOpen);
+  console.log(
+    `[probe] DB after the probe: total=${afterTotal} (was ${dbTotal}); pre-existing open rows still open=${stillOpen}/${dbOpen}`,
+  );
+  expect(stillOpen, 'the probe must not resolve or delete any open alert it saw').toBe(dbOpen);
 });
 
 test.afterAll(async () => {
