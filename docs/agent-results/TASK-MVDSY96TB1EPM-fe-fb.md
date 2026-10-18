@@ -149,9 +149,12 @@ Ekran görüntüleri: `docs/agent-results/TASK-MVDSY96TB1EPM-screenshots/` (PR'd
 
 ## Canlıya uygulama (YAPILMADI — patron onaylı ayrı adım)
 Sıra:
+0. **Canlıdan önce locale kontrolü (salt okunur; crw-fb bulgu 2):**
+   `psql "$DATABASE_URL" -X -c "SELECT datctype FROM pg_database WHERE datname = current_database();"`
+   Sonuç UTF-8 bir locale ise (ör. `en_US.UTF-8`, `C.UTF-8`) devam et. `C` ya da `POSIX` çıkarsa backfill'i çalıştırma, önce karar al. Sebep: backfill SQL'indeki `[[:alnum:]]` C locale'de `ş`, `ğ`, `ı`, `İ` gibi harfleri harf saymıyor. Sayısı olmayan `readTime` satırlarında dakika düşük çıkıyor; crw-fb'nin ölçümünde 21 yerine 17 dk.
 1. **Önce migration, sonra kod.** Migration eski kodla uyumlu: eski kod `readTime` yazmaya devam eder, yeni kolon NULL kalır.
    Komut: `DATABASE_URL=<canlı> scripts/apply-migrations.sh`. Sırada en sonda `blog-read-minutes.sql` var. Tek dosya için: `psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f prisma/migrations/blog-read-minutes.sql`. Tablo RLS'siz, system_scope gerekmez.
-2. Uygulama kodunu dağıt (PR #107 içeren `dev` → main).
+2. Uygulama kodunu dağıt (PR #107 içeren `dev` → main). **Tek adımda dağıt** (crw-fb bulgu 1): eski ve yeni instance aynı anda çalışmasın. Yeni kod `readTime` yazmıyor, bu yüzden yeni kodun kaydettiği satırda `readTime` NULL kalıyor. Eski kod bu satırı açınca formu boş `readTime` ile geri gönderiyor ve kayıt `invalid_read_time` ile reddediliyor. Eski okuyucu da o satırda okuma süresini boş gösteriyor. Rolling deploy kaçınılmazsa eski instance'lar tamamen kapanana kadar admin blog düzenlemesi yapılmasın. Aynı kısıt kod geri alınıp `.down.sql` henüz koşmadığı aralık için de geçerli. Geri alırken kodu ve down'u arka arkaya uygula.
 3. **Dağıtımdan sonra migration'ı bir kez daha koştur.** Aradaki pencerede eski kodun yazdığı NULL satırlar dolar. İdempotent; ikinci koşu `UPDATE 0` ya da yalnız o satırlar.
 4. Kontrol: `SELECT count(*) FILTER (WHERE "readMinutes" IS NULL) FROM "BlogPost";` → 0.
 
