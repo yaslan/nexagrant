@@ -27,7 +27,7 @@
 set -euo pipefail
 
 log() { printf '%s [restore-drill] %s\n' "$(date -u +%FT%TZ)" "$*"; }
-fail() { log "FAIL: $*"; exit 1; }
+fail() { log "FAIL: $*" >&2; exit 1; }
 
 for bin in pg_restore psql; do
   command -v "$bin" >/dev/null 2>&1 || fail "$bin not found on PATH"
