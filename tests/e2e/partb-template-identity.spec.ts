@@ -204,8 +204,9 @@ test.describe('Part B editor — an unwritten section is shown as unwritten', ()
       // All eight sections in the list are unowned, and the active section says so too.
       expect(await unassigned.count()).toBeGreaterThanOrEqual(9);
 
-      // An empty section reports zero words, not the invented proposal's page count.
-      expect(body).toMatch(/\(0 (Kelime|words)\)/);
+      // An empty section reports zero words, not the invented proposal's page count, in the
+      // viewer's language: the English screen used to say "(0 Kelime)" (FO-93).
+      expect(body).toContain(locale === 'tr' ? '(0 Kelime)' : '(0 Words)');
     });
   }
 });
