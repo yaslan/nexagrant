@@ -15,8 +15,19 @@ import { describe, expect, test } from 'vitest';
 
 const ROOT = resolve(import.meta.dirname, '..');
 
-/** Deliberate major jumps; each needs its reason next to the line in the yaml. */
-const CROSS_MAJOR = new Set(['deepmerge-ts']);
+/**
+ * Deliberate major jumps, by exact key: the advisory leaves the older line
+ * without a patch of its own, so the only fix is the next major. Each row must
+ * stay in the yaml with its pin and its GHSA in the comment above it; dropping
+ * one would quietly leave that older line open.
+ */
+const CROSS_MAJOR = new Map([
+  ['deepmerge-ts@<8.0.0', { pinned: '8.0.0', ghsa: 'GHSA-ggr8-5vv4-36mx' }],
+  ['sharp@>=0.34.0 <0.35.0', { pinned: '0.35.5', ghsa: 'GHSA-f88m-g3jw-g9cj' }],
+  ['hono@>=3.0.0 <4.0.0', { pinned: '4.13.7', ghsa: 'GHSA-m732-5p4w-x69g' }],
+  ['proxy-addr@>=1.1.0 <2.0.0', { pinned: '2.0.8', ghsa: 'GHSA-jqcg-44mw-7w3h' }],
+  ['brace-expansion@>=4.0.0 <5.0.0', { pinned: '5.0.12', ghsa: 'GHSA-q2hr-2g5m-vwhr' }],
+]);
 
 function unquote(value: string): string {
   return value.trim().replace(/^'(.*)'$/, '$1');
@@ -47,8 +58,7 @@ function openSelectors(yaml: string): string[] {
   for (const [key, pinned] of overridesOf(yaml)) {
     const at = key.lastIndexOf('@');
     if (at <= 0) continue;
-    const pkg = key.slice(0, at);
-    if (pkg.includes('>') || CROSS_MAJOR.has(pkg)) continue;
+    if (key.slice(0, at).includes('>') || CROSS_MAJOR.has(key)) continue;
     const lower = key.slice(at + 1).match(/>=\s*(\d+\.\d+\.\d+)/)?.[1];
     if (!lower || line(lower) !== line(pinned)) bad.push(key);
   }
@@ -62,6 +72,15 @@ describe('pnpm overrides stay in their own major', () => {
     expect(openSelectors(yaml)).toEqual([]);
   });
 
+  test('every cross-major exception is still in the yaml, pinned, with its GHSA', () => {
+    const yaml = readFileSync(resolve(ROOT, 'pnpm-workspace.yaml'), 'utf8');
+    const pins = new Map(overridesOf(yaml));
+    for (const [key, { pinned, ghsa }] of CROSS_MAJOR) {
+      expect(pins.get(key), key).toBe(pinned);
+      expect(yaml, `${key}: ${ghsa}`).toContain(ghsa);
+    }
+  });
+
   test('flags an open lower bound, a wrong major and a 0.x minor jump', () => {
     const yaml = [
       'overrides:',
@@ -71,9 +90,16 @@ describe('pnpm overrides stay in their own major', () => {
       "  'sharp@>=0.34.0 <0.35.5': '0.35.5'",
       "  'hono@>=4.0.0 <4.13.7': '4.13.7'",
       "  'deepmerge-ts@<8.0.0': '8.0.0'",
+      "  'proxy-addr@>=1.1.0 <2.0.0': '2.0.8'",
+      "  'proxy-addr@<2.0.0': '2.0.8'",
       'importers:',
       "  'undici@<1.0.0': '1.0.0'",
     ].join('\n');
-    expect(openSelectors(yaml)).toEqual(['undici@<7.29.1', 'fast-uri@>=2.0.0 <3.1.8', 'sharp@>=0.34.0 <0.35.5']);
+    expect(openSelectors(yaml)).toEqual([
+      'undici@<7.29.1',
+      'fast-uri@>=2.0.0 <3.1.8',
+      'sharp@>=0.34.0 <0.35.5',
+      'proxy-addr@<2.0.0',
+    ]);
   });
 });
