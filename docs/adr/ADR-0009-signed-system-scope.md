@@ -44,3 +44,9 @@ Kısıtlar:
 - `drop-marketplace.down.sql` geri yüklediği iki tabloya eski metinli `system_scope` kuruyor. Down'dan sonra `pnpm db:rls` koşulmalı (zaten gerekli), o zaman düzelir.
 - `rls.sql`'i koşan rol `CREATE SCHEMA` yetkisine sahip olmalı. DB sahibi olan migration rolünde bu yetki var.
 - Sır yenileme: `TRUNCATE fabrika_private.system_scope_key; pnpm db:rls`. O sırada açık olan kapsam işlemleri, işlem bitene kadar 0 satır görür.
+
+## 5. Ek: `public-intake` tabloya göre daraltıldı (FO-52, K-569554 = C, 18.10.2026)
+
+- `system_scope_open` mühürlü dalda amaca bakar: amaç `public-intake` ise yalnız `ExpertPreRegistration` ve `ExpertFounderCounter` açılır. Kontrol `to_regclass` ile yapılır, çünkü bu veritabanında henüz olmayan bir tablo hata vermez, listede yokmuş gibi davranır. Öteki 5 amaç değişmedi. Sahip dalı (`pg_has_role`) amaca bakmaz.
+- Ölçüm (yerel, `fabrika_app` ile): önce 53 system_scope tablosunun 30'u açıktı (18.313 satır) ve AuditEvent INSERT kabul ediliyordu. Sonra yalnız bu 2 tablo açık (paylaşımlı satırlarla 105) ve INSERT reddediliyor. Öteki amaçlar yine 30 tabloyu açıyor. `pnpm rls:verify` bunu her koşuda ölçer.
+- Sınır: amaç GUC'si de USERSET ve mühür ona bağlı değil. Yani bu daraltma yanlış tabloya uzanan bir public-intake çağrısına karşı koruyor. `enter_system_scope('<başka amaç>')` çağırabilen koda karşı korumuyor; o (c)'nin konusu. Formun ihtiyaç duyduğu yeni bir tablo listeye bilerek eklenir. Eklenmezse form o tabloya yazarken RLS hatası alır, okurken 0 satır görür; testler bu ikincisini yakalamalı.

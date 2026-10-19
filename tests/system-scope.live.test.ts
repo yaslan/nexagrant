@@ -188,27 +188,27 @@ describe('the purpose list', () => {
  * (PGOPTIONS, `options=` in the URL) and a Prisma pool would carry a session
  * SET into the next test.
  */
-describe('a forged system scope opens nothing', () => {
-  const fixtureCount = async (c: pg.Client): Promise<number> =>
-    Number(
-      (
-        await c.query<{ n: number }>(
-          `SELECT count(*)::int AS n FROM "Membership" WHERE "tenantId" = ANY($1)`,
-          [FIXTURE_TENANTS]
-        )
-      ).rows[0]?.n ?? -1
-    );
+const fixtureCount = async (c: pg.Client): Promise<number> =>
+  Number(
+    (
+      await c.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM "Membership" WHERE "tenantId" = ANY($1)`,
+        [FIXTURE_TENANTS]
+      )
+    ).rows[0]?.n ?? -1
+  );
 
-  async function asApp<T>(fn: (c: pg.Client) => Promise<T>, options?: string): Promise<T> {
-    const c = new pg.Client({ connectionString: RLS_URL, ...(options ? { options } : {}) });
-    await c.connect();
-    try {
-      return await fn(c);
-    } finally {
-      await c.end();
-    }
+async function asApp<T>(fn: (c: pg.Client) => Promise<T>, options?: string): Promise<T> {
+  const c = new pg.Client({ connectionString: RLS_URL, ...(options ? { options } : {}) });
+  await c.connect();
+  try {
+    return await fn(c);
+  } finally {
+    await c.end();
   }
+}
 
+describe('a forged system scope opens nothing', () => {
   test('control: enter_system_scope sees both tenants on the same connection shape', async (ctx) => {
     if (!ready) return ctx.skip(skipReason);
     const n = await asApp(async (c) => {
@@ -319,5 +319,64 @@ describe('a forged system scope opens nothing', () => {
       await expect(c.query('SELECT secret FROM fabrika_private.system_scope_key')).rejects.toThrow(/permission denied/i);
       await expect(c.query('SELECT fabrika_private.system_scope_seal()')).rejects.toThrow(/permission denied/i);
     });
+  });
+});
+
+/**
+ * FO-52 (TASK-MVC9FW2U15VM6, K-569554 = C) — 'public-intake' is the anonymous
+ * expert form, and the database opens only the form's tables for it
+ * (prisma/rls.sql system_scope_open). Every other purpose still opens all rows.
+ * Raw `pg` as fabrika_app, one transaction per arm, always rolled back.
+ */
+describe('public-intake opens only the expert form tables', () => {
+  async function inScope<T>(purpose: string, fn: (c: pg.Client) => Promise<T>): Promise<T> {
+    return asApp(async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query('SELECT enter_system_scope($1)', [purpose]);
+        return await fn(c);
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+  }
+  const apiKeyCount = async (c: pg.Client): Promise<number> =>
+    Number((await c.query<{ n: number }>(`SELECT count(*)::int AS n FROM "ApiKey"`)).rows[0]?.n ?? -1);
+
+  test('another tenant\'s Membership and ApiKey rows stay at 0, while platform-admin still sees them', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const intake = await inScope('public-intake', async (c) => [await fixtureCount(c), await apiKeyCount(c)]);
+    // The regression arm: the narrowing is public-intake's alone. The fixture's
+    // memberships carry the weight; ApiKey is counted whole-table, and other
+    // live files write it concurrently, so only public-intake's 0 is exact.
+    const platform = await inScope('platform-admin', fixtureCount);
+    expect(intake).toEqual([0, 0]);
+    expect(platform).toBe(FIXTURE_TENANTS.length);
+  });
+
+  test('a write outside the form tables is refused', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await inScope('public-intake', async (c) => {
+      await expect(
+        c.query(`INSERT INTO "AuditEvent"(id, "tenantId", type) VALUES ($1, $2, 'fo52.probe')`, [
+          `ae-intake-${RUN}`,
+          FIXTURE_TENANTS[0],
+        ])
+      ).rejects.toThrow(/row-level security/i);
+    });
+  });
+
+  test('the form still reads and writes ExpertPreRegistration', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const id = `epr-intake-${RUN}`;
+    const seen = await inScope('public-intake', async (c) => {
+      await c.query(
+        `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+         VALUES ($1, 'probe', $1 || '@system-scope.test', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+        [id]
+      );
+      return (await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = $1`, [id])).rows;
+    });
+    expect(seen).toEqual([{ id }]);
   });
 });
