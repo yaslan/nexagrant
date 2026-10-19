@@ -65,7 +65,7 @@ describe('public-sector package assignment', () => {
     }));
 
   it('assigning public-team puts the tenant on it: pro modules, 6 seats, contract provider', async () => {
-    const before = await getEntitlements(tenantId);
+    const before = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
     expect(before.allowedModules).not.toContain('M1');
 
     await assignPlanToTenant('public-team', tenantId, 'admin-1', 'İlkadım pilot sözleşmesi');
@@ -79,7 +79,7 @@ describe('public-sector package assignment', () => {
       planVersionId: 'pv_public-team_1',
     });
 
-    const after = await getEntitlements(tenantId);
+    const after = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
     expect(after.source).toBe('plan-version');
     expect(after.seats).toBe(6);
     expect([...after.allowedModules].sort()).toEqual([...grantsFor('pro')!.moduleIds].sort());
@@ -112,7 +112,7 @@ describe('public-sector package assignment', () => {
     await unassignPlanFromTenant('public-team', tenantId, 'admin-1');
     const sub = await prisma.subscription.findUnique({ where: { tenantId } });
     expect(sub?.status).toBe('CANCELED');
-    const ent = await getEntitlements(tenantId);
+    const ent = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
     expect(ent.seats).toBe(grantsFor('free')!.seats);
   });
 

@@ -196,6 +196,15 @@
     },
     {
       "check": "D",
+      "file": "src/app/[locale]/admin/tenants/page.tsx",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "The platform tenant list with per-tenant member and workspace counts (admin-tenants.list). Tenant has no RLS, but the two _count subqueries read Membership and Workspace, both tenant_isolation-scoped and FORCEd: measured under fabrika_app, 128 tenants with 0 members / 0 workspaces unwrapped vs 36 / 14 inside the scope (FA-49). Read-only, gated by the admin layout's isPlatformAdminSession()."
+    },
+    {
+      "check": "D",
       "file": "src/lib/billing/plan-repository.ts",
       "subject": "system-scope:platform-aggregate",
       "count": 3,
