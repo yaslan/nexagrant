@@ -30,9 +30,9 @@ overrides:
   # gets an explicit, bounded cross-major row with its GHSA next to it;
   # leaving it out would drop the protection the open selector used to give.
   # Older lines dropped by FO-18 got their rows back in TASK-MVF543TDDDMX1
-  # (FO-96, decision K-569955). Still NOT covered: brace-expansion 1.x (and
-  # 0.0.0); eslint's minimatch@3 holds 1.1.18 (dev only, not in the prod
-  # audit) and a 1.1.21 row would change the lockfile, which that card ruled out.
+  # (FO-96, decision K-569955); brace-expansion 1.x got its row in
+  # TASK-MVFSE4XXFWC85 (FO-108, decision K-570177). Still NOT covered:
+  # brace-expansion 0.0.0 (no 0.x line in the lockfile).
   # Paths: sharp via next (optional dep ^0.35.4); undici via shadcn / openai;
   # hono, @hono/node-server, @modelcontextprotocol/sdk, proxy-addr via shadcn's
   # MCP SDK + express; mysql2, deepmerge-ts, fast-uri via prisma.
@@ -106,3 +106,7 @@ overrides:
   # GHSA-qhr7-859c-m2p7 and GHSA-6j4f-fj2g-mc7p, high, earlier on both lines).
   'brace-expansion@>=2.0.0 <2.1.7': '2.1.7'
   'brace-expansion@>=3.0.0 <3.0.9': '3.0.9'
+  # 1.x carries its own patch (GHSA-q2hr-2g5m-vwhr <1.1.21; GHSA-qhr7-859c-m2p7
+  # <1.1.20 and GHSA-6j4f-fj2g-mc7p <1.1.19, high). Dev only: eslint's
+  # minimatch@3 (via @eslint/config-array and @eslint/eslintrc) held 1.1.18.
+  'brace-expansion@>=1.0.0 <1.1.21': '1.1.21'
