@@ -78,6 +78,11 @@
  *      on the comment-blanked copy; a line window would cut a wrapped callback
  *      in half and judge the wrong half. The callback's parameter name is read
  *      from the block (`(tx) =>`, `async (client) =>`), `tx` when unreadable.
+ *      The receiver is the same set E2 uses: `prisma`, or a variable the file
+ *      assigns as `<x> ?? prisma` — `db.$transaction(…)` on
+ *      `const db = client ?? prisma` is a bare transaction whenever the caller
+ *      omitted the client, and nothing at the call site says which it was
+ *      (PR #121 review, crw3-gnd finding 3).
  *
  *      Exemption, by boss decision K-570148 = A: a block that calls
  *      `bindTransactionToTenant(tx, …)` (src/lib/legal/registration-consent.ts)
@@ -89,6 +94,17 @@
  *      call are exempt and reported as an information line, never a finding
  *      and never a baseline entry; an access BEFORE it is still a finding,
  *      because at that point the transaction is as bare as the singleton.
+ *
+ *      The bind only counts when it binds THIS transaction, unconditionally
+ *      (PR #121 review, crw3-gnd finding 2): its first argument must be the
+ *      callback's own parameter — `bindTransactionToTenant(prisma, id)` inside
+ *      the block binds some other connection — and the call must be a
+ *      statement at the top level of the callback body, so a bind parked in
+ *      an `if` branch, a nested block or a nested function does not exempt the
+ *      accesses that run whether or not that branch did. The check is
+ *      lexical (brace depth one inside the block, preceded by `{`, `;` or
+ *      `}`), not a flow analysis; a bind the rule cannot see is simply not an
+ *      exemption, and the block is judged as bare — the safe direction.
  *
  *   E2 a tenant-scoped relation reached THROUGH a model that is not itself
  *      tenant-scoped: `prisma.tenant.findMany({ include: { _count: { select:
@@ -464,10 +480,29 @@ const KNOWN_PURPOSES: ReadonlySet<string> = new Set([
 /** Where the path is defined; its own internal delegation is not a call site. */
 const SYSTEM_SCOPE_HOME = 'src/lib/system-scope.ts';
 
-/** CHECK E1: a transaction opened on the singleton, hence outside every scope. */
-const BARE_TRANSACTION = /\bprisma\.\$transaction\s*\(/g;
-/** The K-570148 = A exemption: the block binds itself the way withTenantOn does. */
-const BIND_CALL = /\bbindTransactionToTenant\s*\(/;
+/**
+ * CHECK E1: a transaction opened on the singleton — or on a variable that falls
+ * back to it — hence outside every scope. Built per file from the same receiver
+ * list E2 uses (see SINGLETON_FALLBACK).
+ */
+function bareTransaction(receivers: readonly string[]): RegExp {
+  return new RegExp(`(?<![\\w$])(?:${receivers.map(escapeRegExp).join('|')})\\.\\$transaction\\s*\\(`, 'g');
+}
+/**
+ * The K-570148 = A exemption: the block binds itself the way withTenantOn does.
+ * Matched with the callback's parameter as the first argument, so a bind of
+ * some other connection inside the block is not one.
+ */
+function bindCall(cb: string): RegExp {
+  return new RegExp(`\\bbindTransactionToTenant\\s*\\(\\s*${escapeRegExp(cb)}\\s*,`, 'g');
+}
+/**
+ * An identifier may contain `$`, which is a regex metacharacter — and `\\b` does
+ * not see a boundary before it, so the receiver regexes use a lookbehind.
+ */
+function escapeRegExp(s: string): string {
+  return s.replace(/[$\\^.*+?()[\]{}|]/g, '\\$&');
+}
 /**
  * The callback's parameter, read from the start of the block: `(tx) =>`,
  * `async (client) =>`, `tx =>`, `async function (tx)`. `tx` when unreadable —
@@ -516,6 +551,33 @@ export function closingParen(code: string, open: number): number {
 
 function lineOf(code: string, offset: number): number {
   return code.slice(0, offset).split('\n').length;
+}
+
+/**
+ * Offset, inside a bare `$transaction(` block, of the first
+ * `bindTransactionToTenant(<cb>, …)` that is a top-level statement of the
+ * callback body; -1 when there is none. Top level means brace depth exactly
+ * one (the body's own braces, nothing nested) and, once trailing whitespace
+ * and an `await` are stripped, the previous character is `{`, `;` or `}` — a
+ * statement boundary. `if (x) await bind(tx, …)` fails on the boundary,
+ * `if (x) { await bind(tx, …) }` fails on the depth, and so does a bind inside
+ * a nested arrow function. Exported for the fixture tests.
+ */
+export function qualifyingBindAt(block: string, cb: string): number {
+  for (const m of block.matchAll(bindCall(cb))) {
+    const at = m.index ?? 0;
+    const head = block.slice(0, at);
+    let depth = 0;
+    for (const c of head) {
+      if (c === '{') depth += 1;
+      else if (c === '}') depth -= 1;
+    }
+    if (depth !== 1) continue;
+    const boundary = head.replace(/\s+$/, '').replace(/\bawait$/, '').replace(/\s+$/, '').slice(-1);
+    if (boundary === '' || !'{;}'.includes(boundary)) continue;
+    return at;
+  }
+  return -1;
 }
 
 /**
@@ -642,14 +704,18 @@ export function scan(cwd = process.cwd()): ScanResult {
       if (named.length > 0) push('E2', at, `${accessor}.${op}->${named.join(',')}`);
     };
 
+    // The bare receivers: the singleton and anything that falls back to it.
+    const receivers = ['prisma'];
+    for (const f of blanked.matchAll(SINGLETON_FALLBACK)) receivers.push(f[1] as string);
+
     // E1 — and E2 on the bare callback's non-scoped reads.
-    for (const m of blanked.matchAll(BARE_TRANSACTION)) {
+    for (const m of blanked.matchAll(bareTransaction(receivers))) {
       const open = (m.index ?? 0) + m[0].length - 1;
       const close = closingParen(blanked, open);
       if (close < 0) continue;
       const block = blanked.slice(open + 1, close);
       const cb = CALLBACK_PARAM.exec(block)?.[1] ?? 'tx';
-      const bindAt = block.search(BIND_CALL);
+      const bindAt = qualifyingBindAt(block, cb);
       let exempted = 0;
       const access = new RegExp(`\\b${cb}\\.([A-Za-z0-9_]+)\\.([A-Za-z0-9_]+)\\s*\\(`, 'g');
       for (const a of block.matchAll(access)) {
@@ -677,11 +743,9 @@ export function scan(cwd = process.cwd()): ScanResult {
       }
     }
 
-    // E2 — on the singleton and on anything that falls back to it.
-    const receivers = ['prisma'];
-    for (const f of blanked.matchAll(SINGLETON_FALLBACK)) receivers.push(f[1] as string);
+    // E2 — on the same receivers.
     const read = new RegExp(
-      `\\b(?:${receivers.join('|')})\\.([A-Za-z0-9_]+)\\.([A-Za-z0-9_]+)\\s*\\(`,
+      `(?<![\\w$])(?:${receivers.map(escapeRegExp).join('|')})\\.([A-Za-z0-9_]+)\\.([A-Za-z0-9_]+)\\s*\\(`,
       'g'
     );
     for (const r of blanked.matchAll(read)) {

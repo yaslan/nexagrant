@@ -101,7 +101,7 @@ const CHECK_TITLES: Record<CheckId, string> = {
   B2: '`tenantId: x ?? …` / `x || …` — an invented tenant instead of a refusal',
   C: '`as unknown as TenantTx` — the brand minted outside withTenantOn',
   D: '`withSystemScope(…)` — a sanctioned cross-tenant escape, counted so it stays sanctioned',
-  E1: '`prisma.$transaction((tx) => tx.<model>…)` — a tenant-scoped model on a transaction nothing bound',
+  E1: '`prisma.$transaction((tx) => tx.<model>…)` — a tenant-scoped model on a transaction nothing bound (`prisma`, or a `client ?? prisma` fallback)',
   E2: 'a tenant-scoped relation joined through a model that is not tenant-scoped (include/select/_count/where)',
 };
 
@@ -138,7 +138,10 @@ const HOW_TO_FIX: Record<CheckId, string> = {
     '  (the tenant is CREATED inside the transaction) calls\n' +
     '  `bindTransactionToTenant(tx, tenant.id)` first (src/lib/legal/registration-consent.ts)\n' +
     '  and is exempt from that line on — boss decision K-570148 = A, printed below\n' +
-    '  as an exemption, never recorded here.',
+    '  as an exemption, never recorded here. The bind counts only as a top-level\n' +
+    '  statement of the callback body whose first argument is the callback\'s own\n' +
+    '  `tx`: a bind of another client, or one inside an `if`/nested block, does\n' +
+    '  not exempt anything.',
   E2:
     'The root row is readable without a scope, the joined rows are not, so the\n' +
     '  relation comes back EMPTY under fabrika_app — "0 members", "no subscription",\n' +
@@ -346,7 +349,8 @@ function main(): void {
     console.log(
       '  Same set_config as withTenantOn, applied at the first moment a tenant id\n' +
         '  exists (src/lib/legal/registration-consent.ts). Accesses BEFORE the bind are\n' +
-        '  still judged.'
+        '  still judged; only a top-level `bindTransactionToTenant(<tx>, …)` statement\n' +
+        '  of the callback body counts as the bind.'
     );
   }
 

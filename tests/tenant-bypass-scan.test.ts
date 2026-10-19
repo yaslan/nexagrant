@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import {
   closingParen,
   kindMatchesCheck,
+  qualifyingBindAt,
   scan,
   tenantScopedRelations,
   type Finding,
@@ -236,6 +237,139 @@ export async function register(email: string) {
     expect(r.findings).toEqual([]);
     expect(r.testFindings).toEqual([]);
     expect(r.exemptions).toEqual([]);
+  });
+
+  // PR #121 review (crw3-gnd, finding 2): the probes below exempted the block
+  // although the bind did not bind THIS transaction, or did not run for sure.
+  const BIND_LINE = '    await bindTransactionToTenant(tx, tenant.id);\n';
+  const BOTH = ['tx.membership.create', 'tx.workspace.create'];
+
+  test('probe P1: the bind is on another client (`bindTransactionToTenant(prisma, id)`) → not exempt', () => {
+    const r = scanOne(BOUND.replace(BIND_LINE, '    await bindTransactionToTenant(prisma, tenant.id);\n'));
+    expect(ofCheck(r, 'E1').map((f) => f.subject).sort()).toEqual(BOTH);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  test('probe P2a: the bind sits behind a braceless `if` → not exempt', () => {
+    const r = scanOne(
+      BOUND.replace(BIND_LINE, '    if (process.env.NEVER_SET) await bindTransactionToTenant(tx, tenant.id);\n')
+    );
+    expect(ofCheck(r, 'E1').map((f) => f.subject).sort()).toEqual(BOTH);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  test('probe P2b: the bind sits inside an `if { … }` block → not exempt', () => {
+    const r = scanOne(
+      BOUND.replace(BIND_LINE, '    if (process.env.NEVER_SET) {\n      await bindTransactionToTenant(tx, tenant.id);\n    }\n')
+    );
+    expect(ofCheck(r, 'E1').map((f) => f.subject).sort()).toEqual(BOTH);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  test('probe P2c: a braceless `if` with the bind on the NEXT line → not exempt', () => {
+    const r = scanOne(
+      BOUND.replace(BIND_LINE, '    if (process.env.NEVER_SET)\n      await bindTransactionToTenant(tx, tenant.id);\n')
+    );
+    expect(ofCheck(r, 'E1').map((f) => f.subject).sort()).toEqual(BOTH);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  test('probe P2d: the bind lives in a nested function that nothing is shown to call → not exempt', () => {
+    const r = scanOne(
+      BOUND.replace(BIND_LINE, '    const later = async () => { await bindTransactionToTenant(tx, tenant.id); };\n    void later;\n')
+    );
+    expect(ofCheck(r, 'E1').map((f) => f.subject).sort()).toEqual(BOTH);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  test('a bind written as an expression statement without `await` still counts (it is the same set_config)', () => {
+    const r = scanOne(BOUND.replace(BIND_LINE, '    bindTransactionToTenant(tx, tenant.id);\n'));
+    expect(r.findings).toEqual([]);
+    expect(r.exemptions).toHaveLength(1);
+  });
+
+  test('a `try { … }` around the bind is a nested block too: judged bare (stated limit, safe direction)', () => {
+    const r = scanOne(BOUND.replace(BIND_LINE, '    try { await bindTransactionToTenant(tx, tenant.id); } catch { throw new Error(); }\n'));
+    expect(ofCheck(r, 'E1')).toHaveLength(2);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  test('the src/lib/auth.ts:836 shape — the block only delegates to a helper — is neither a finding nor an exemption', () => {
+    const src = `${HEAD}
+import { bootstrapOAuthTenant } from '@/lib/auth/oauth-registration';
+export async function oauth(userId: string) {
+  await prisma.$transaction((tx) =>
+    bootstrapOAuthTenant(tx, { userId, agencyId: null })
+  );
+}
+`;
+    const r = scanOne(src);
+    expect(r.findings).toEqual([]);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  describe('qualifyingBindAt', () => {
+    const body = (stmt: string) => `async (tx) => {\n  const t = await tx.tenant.create({ data: { a: { b: 1 } } });\n  ${stmt}\n  await tx.workspace.create({});\n}`;
+    test('a top-level statement after `;` qualifies, with or without await', () => {
+      expect(qualifyingBindAt(body('await bindTransactionToTenant(tx, t.id);'), 'tx')).toBeGreaterThan(0);
+      expect(qualifyingBindAt(body('bindTransactionToTenant(tx, t.id);'), 'tx')).toBeGreaterThan(0);
+    });
+    test('first statement of the body (after `{`) and a statement after `}` qualify', () => {
+      expect(qualifyingBindAt('async (tx) => {\n  await bindTransactionToTenant(tx, id);\n}', 'tx')).toBeGreaterThan(0);
+      expect(qualifyingBindAt('async (tx) => {\n  if (x) { y(); }\n  await bindTransactionToTenant(tx, id);\n}', 'tx')).toBeGreaterThan(0);
+    });
+    test('wrong receiver, wrong callback name, conditional, nested or returned → -1', () => {
+      expect(qualifyingBindAt(body('await bindTransactionToTenant(prisma, t.id);'), 'tx')).toBe(-1);
+      expect(qualifyingBindAt(body('await bindTransactionToTenant(tx, t.id);'), 'client')).toBe(-1);
+      expect(qualifyingBindAt(body('if (x) await bindTransactionToTenant(tx, t.id);'), 'tx')).toBe(-1);
+      expect(qualifyingBindAt(body('x && (await bindTransactionToTenant(tx, t.id));'), 'tx')).toBe(-1);
+      expect(qualifyingBindAt(body('if (x) { await bindTransactionToTenant(tx, t.id); }'), 'tx')).toBe(-1);
+      expect(qualifyingBindAt(body('return bindTransactionToTenant(tx, t.id);'), 'tx')).toBe(-1);
+    });
+    test('the first QUALIFYING bind wins, not the first bind', () => {
+      const at = qualifyingBindAt(body('if (x) await bindTransactionToTenant(tx, t.id);\n  await bindTransactionToTenant(tx, t.id);'), 'tx');
+      expect(at).toBeGreaterThan(0);
+      expect(qualifyingBindAt(body('if (x) await bindTransactionToTenant(tx, t.id);'), 'tx')).toBe(-1);
+    });
+  });
+});
+
+describe('CHECK E1 on a receiver that falls back to the singleton (PR #121 review, crw3-gnd finding 3)', () => {
+  const FALLBACK = `${HEAD}
+import type { TenantTx } from '@/lib/db';
+export async function bootstrap(tenantId: string, client?: TenantTx) {
+  const db = client ?? prisma;
+  return db.$transaction(async (tx) => {
+    return tx.workspace.create({ data: { tenantId, name: 'x', slug: 'x' } });
+  });
+}
+`;
+
+  test('broken: `db.$transaction` on `const db = client ?? prisma` → E1, judged as the singleton it falls back to', () => {
+    const r = scanOne(FALLBACK);
+    expect(ofCheck(r, 'E1').map((f) => f.subject)).toEqual(['tx.workspace.create']);
+    expect(ofCheck(r, 'E1')[0]?.line).toBe(9);
+    expect(r.exemptions).toEqual([]);
+  });
+
+  test('fixed: the client is required (no `?? prisma`), so `db` is a scoped client → nothing', () => {
+    const r = scanOne(FALLBACK.replace('client?: TenantTx', 'client: TenantTx').replace('const db = client ?? prisma;', 'const db = client;'));
+    expect(r.findings).toEqual([]);
+  });
+
+  test('a bound block on the fallback receiver is exempt under the same rule', () => {
+    const bound = FALLBACK.replace(
+      '    return tx.workspace.create(',
+      '    await bindTransactionToTenant(tx, tenantId);\n    return tx.workspace.create('
+    );
+    const r = scanOne(bound);
+    expect(r.findings).toEqual([]);
+    expect(r.exemptions).toEqual([{ check: 'E1', file: 'src/fixture.ts', line: 8, boundAt: 9, accesses: 1 }]);
+  });
+
+  test('a receiver whose name contains `$` is matched literally, not as a regex anchor', () => {
+    const dollar = FALLBACK.replaceAll('db', '$db');
+    expect(ofCheck(scanOne(dollar), 'E1').map((f) => f.subject)).toEqual(['tx.workspace.create']);
   });
 });
 
