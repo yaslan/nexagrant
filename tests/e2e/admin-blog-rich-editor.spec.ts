@@ -162,7 +162,9 @@ test.describe.serial('admin blog — rich text editor, stored as markdown', () =
     await pasteInto(editor, { html: WORD_HTML, text: 'Word başlığı' });
     // Dropped in the editor already: no italic, strike, code, quote, rule, table cell, image.
     // An https link is kept (TASK-MVDPHZQCTVJ2R); a pasted image never is.
+    // Ctrl+A then paste replaces the whole post; the heading is not glued to the old paragraph.
     await expect(editor.locator('h1')).toHaveText('Word başlığı');
+    await expect(editor).not.toContainText(ORIGINAL);
     await expect(editor.locator('strong')).toHaveText('kalın');
     // The browser's clipboard writes the address normalised, with its trailing slash.
     await expect(editor.locator('a')).toHaveAttribute('href', 'https://example.test/');

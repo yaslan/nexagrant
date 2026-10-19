@@ -83,7 +83,7 @@ export default function ConceptNoteEditor({
       link.download = `ConceptNote_${opportunityId}.docx`;
       link.click();
     } catch (err) {
-      setNotice({ kind: 'error', text: t('failed', { message: errorMessage(err) }) });
+      setNotice({ kind: 'error', text: errorText(err, () => t('failed', { message: errorMessage(err) })) });
     } finally {
       setIsExporting(false);
     }
@@ -158,7 +158,7 @@ export default function ConceptNoteEditor({
             />
             <div className="text-xs text-muted text-right">
               {t('words', {
-                count: (content[section.key] || '').split(/\\s+/).filter(Boolean).length,
+                count: (content[section.key] || '').split(/\s+/).filter(Boolean).length,
                 max: section.maxWords,
               })}
             </div>

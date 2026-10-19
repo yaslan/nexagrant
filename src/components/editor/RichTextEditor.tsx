@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { ListItem, OrderedList } from '@tiptap/extension-list';
 import Image from '@tiptap/extension-image';
 import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Undo2, Redo2, Link2, ImagePlus } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import { docToMarkdown, markdownToDoc } from '@/lib/blog-markdown';
@@ -111,11 +111,14 @@ export function RichTextEditor({
   imageBase,
 }: RichTextEditorProps) {
   const isMarkdown = format === 'markdown';
-  // markdown: the values this editor reported that the parent may still hand
-  // back. While typing, a render can carry an older one of them (state updates
-  // are batched); that is an echo, not a change. Any other `content` comes from
-  // outside (another post loaded) and replaces the document.
-  const emitted = useRef<string[]>([content]);
+  // markdown: the last value this editor reported (or was handed). A `content`
+  // equal to it is the parent rendering that report back; any other value comes
+  // from outside (another post loaded, a reset) and replaces the document — even
+  // one the author typed on the way, since it is not what the editor shows now
+  // (TASK-MVDP07GF2EVIU). The check runs as a layout effect, at commit: a
+  // passive effect could run after the next keystroke and see the render before
+  // it as an outside value, rewinding the text (TASK-MVDKHOXGRQQS5).
+  const emitted = useRef(content);
   const editor = useEditor({
     extensions: isMarkdown ? MARKDOWN_EXTENSIONS : [StarterKit],
     content: isMarkdown ? markdownToDoc(content, imageBase) : content,
@@ -123,7 +126,7 @@ export function RichTextEditor({
     onUpdate: ({ editor }) => {
       if (isMarkdown) {
         const md = docToMarkdown(editor.getJSON());
-        emitted.current = [...emitted.current.slice(-49), md];
+        emitted.current = md;
         onChange(md);
         return;
       }
@@ -162,14 +165,11 @@ export function RichTextEditor({
   }, [editor, editorRef]);
 
   // Sync external content changes if editor is empty or on initial load
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!editor) return;
     if (isMarkdown) {
-      const echo = emitted.current.lastIndexOf(content);
-      if (echo >= 0) {
-        emitted.current = emitted.current.slice(echo);
-      } else {
-        emitted.current = [content];
+      if (content !== emitted.current) {
+        emitted.current = content;
         editor.commands.setContent(markdownToDoc(content, imageBase), { emitUpdate: false });
       }
       return;
