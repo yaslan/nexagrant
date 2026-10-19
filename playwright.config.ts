@@ -68,6 +68,12 @@ const testEnv = {
   DATABASE_URL: process.env.DATABASE_URL,
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
   ...(E2E_WEB_SERVER === 'dev' ? { DEMO_LOGIN_ENABLED: 'true' } : {}),
+  // The Google button renders only with a client id (src/lib/auth.ts), and
+  // tests/e2e/auth.spec.ts clicks it. CI's e2e step sets these same placeholders;
+  // a worktree built from .env.example has them blank (TASK-MVBFDSUSE5QCY). A
+  // real pair in .env still wins.
+  AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || 'ci-placeholder-id.apps.googleusercontent.com',
+  AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || 'ci-placeholder-google-secret',
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
   INVOICE_SUPPLIER_VKN: '1000000000',
   INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD',
