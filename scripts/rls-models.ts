@@ -37,6 +37,9 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // tenant; read and written by the expert-prereg server code and the
   // platform-admin export only. See prisma/migrations/add-expert-pre-registration.sql.
   'ExpertPreRegistration',
+  // TASK-MVBLYRLP9ID93 (FO-26): the submission counter of the same pre-registration; no
+  // tenant. RLS on with system_scope only, like ExpertPreRegistration (SYSTEM_SCOPE_POLICY).
+  'ExpertPreRegAttempt',
   // AKTAR-MURBCJ0A-1: a post on the public blog. Platform content shown to
   // anonymous visitors, owned by no tenant; written only by /admin/blog behind
   // requirePlatformAdmin(). See prisma/migrations/add-blog-post.sql.
@@ -61,7 +64,7 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersio
  * K-562266 = A). Reachable only through withSystemScope(). tests/rls-coverage.test.ts
  * pins this set to the block in prisma/rls.sql.
  */
-export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertPreRegistration']);
+export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertPreRegistration', 'ExpertPreRegAttempt']);
 
 /**
  * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.

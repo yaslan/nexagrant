@@ -11,6 +11,7 @@ import { withSystemScopeOn } from '@/lib/system-scope';
 import { issueSecretToken } from '@/lib/secret-token';
 import { expertPreRegInputSchema } from '../schema';
 import {
+  ATTEMPT_RETENTION_MS,
   EXPERT_PREREG_CONSENT_VERSION,
   EXPERT_PREREG_DAILY_MAIL_LIMIT,
   EXPERT_PREREG_LOCK_KEY,
@@ -63,15 +64,16 @@ export function hashExpertIp(ip: string | null, salt: string | null | undefined)
 }
 
 /**
- * What a re-issue changes on a pending row (F6): the link, the IP and the mail
- * counters. Everything the expert typed and consented to stays as it was. This
- * is the state the row had before, so a mail that cannot go out restores all of it.
+ * What a re-issue changes on a pending row (F6): the link, the IP, the resend
+ * timestamp and the mail counters. Everything the expert typed and consented to
+ * stays as it was, and so does createdAt (FO-26). This is the state the row had
+ * before, so a mail that cannot go out restores all of it.
  */
 interface ReissueState {
   verifyTokenHash: string | null;
   verifyTokenExpiresAt: Date | null;
   ipHash: string | null;
-  createdAt: Date;
+  lastSubmittedAt: Date | null;
   verifyMailCount: number;
   verifyMailWindowStart: Date | null;
 }
@@ -152,9 +154,14 @@ export async function registerExpertPreRegistration(
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EXPERT_PREREG_LOCK_KEY})`;
 
       if (ipHash) {
-        const recent = await tx.expertPreRegistration.count({
-          where: { ipHash, createdAt: { gte: new Date(now.getTime() - IP_WINDOW_MS) } },
+        // Old attempts go first, so the table never holds more than the retention window.
+        await tx.expertPreRegAttempt.deleteMany({
+          where: { createdAt: { lt: new Date(now.getTime() - ATTEMPT_RETENTION_MS) } },
         });
+        const windowStart = new Date(now.getTime() - IP_WINDOW_MS);
+        const recent =
+          (await tx.expertPreRegistration.count({ where: { ipHash, createdAt: { gte: windowStart } } })) +
+          (await tx.expertPreRegAttempt.count({ where: { ipHash, createdAt: { gte: windowStart } } }));
         if (recent >= REGISTRATION_IP_LIMIT) return { status: 429 as const };
       }
 
@@ -168,21 +175,26 @@ export async function registerExpertPreRegistration(
           verifyTokenHash: true,
           verifyTokenExpiresAt: true,
           ipHash: true,
-          createdAt: true,
+          lastSubmittedAt: true,
           verifyMailCount: true,
           verifyMailWindowStart: true,
         },
       });
-      // Verified (or disabled by an admin) is refused. Pending gets a fresh link, but not inside the cooldown.
-      if (existing && existing.status !== 'pending') return { status: 409 as const };
+      // Verified (or disabled by an admin) is refused. The attempt still counts toward the IP window.
+      if (existing && existing.status !== 'pending') {
+        if (ipHash) await tx.expertPreRegAttempt.create({ data: { ipHash } });
+        return { status: 409 as const };
+      }
 
       // F5: at most EXPERT_PREREG_DAILY_MAIL_LIMIT mails to one address per day window.
       const dayOpen = existing?.verifyMailWindowStart != null && now.getTime() - existing.verifyMailWindowStart.getTime() < MAIL_DAY_MS;
       const mailsToday = dayOpen ? (existing?.verifyMailCount ?? 0) : 0;
       if (existing) {
-        // The link was issued VERIFY_TOKEN_TTL_MS before it expires.
-        const issuedAt = existing.verifyTokenExpiresAt ? existing.verifyTokenExpiresAt.getTime() - VERIFY_TOKEN_TTL_MS : 0;
-        if (now.getTime() - issuedAt < RESEND_COOLDOWN_MS) return { status: 429 as const };
+        // Before lastSubmittedAt existed, the last issue time was VERIFY_TOKEN_TTL_MS before the link expires.
+        const lastIssued =
+          existing.lastSubmittedAt?.getTime() ??
+          (existing.verifyTokenExpiresAt ? existing.verifyTokenExpiresAt.getTime() - VERIFY_TOKEN_TTL_MS : 0);
+        if (now.getTime() - lastIssued < RESEND_COOLDOWN_MS) return { status: 429 as const };
         if (mailsToday >= EXPERT_PREREG_DAILY_MAIL_LIMIT) return { status: 429 as const };
       }
       const mailCounters = {
@@ -217,30 +229,31 @@ export async function registerExpertPreRegistration(
         verifyTokenExpiresAt: expires,
         ipHash,
         status: 'pending',
-        createdAt: now,
+        lastSubmittedAt: now,
         ...mailCounters,
       };
 
       if (existing) {
         // F6: a pending row keeps the profile the expert first entered and the consent they first gave.
-        // Only the link, the IP and the mail counters move. The mail goes to the stored name and language.
+        // Only the link, the IP, the resend timestamp and the mail counters move. The mail goes to the stored name and language.
         const replaced: ReissueState = {
           verifyTokenHash: existing.verifyTokenHash,
           verifyTokenExpiresAt: existing.verifyTokenExpiresAt,
           ipHash: existing.ipHash,
-          createdAt: existing.createdAt,
+          lastSubmittedAt: existing.lastSubmittedAt,
           verifyMailCount: existing.verifyMailCount,
           verifyMailWindowStart: existing.verifyMailWindowStart,
         };
         // The new link replaces the old one (its hash is gone, so the old link answers invalid).
-        // createdAt moves to this attempt so the per-IP window counts it.
+        // createdAt stays: it is the first registration. This attempt is counted in ExpertPreRegAttempt.
+        if (ipHash) await tx.expertPreRegAttempt.create({ data: { ipHash } });
         await tx.expertPreRegistration.update({
           where: { id: existing.id },
           data: {
             verifyTokenHash: tokenHash,
             verifyTokenExpiresAt: expires,
             ipHash,
-            createdAt: now,
+            lastSubmittedAt: now,
             ...mailCounters,
           },
         });
@@ -252,7 +265,10 @@ export async function registerExpertPreRegistration(
         };
       }
 
-      const row = await tx.expertPreRegistration.create({ data: fields, select: { id: true } });
+      const row = await tx.expertPreRegistration.create({
+        data: { ...fields, createdAt: now },
+        select: { id: true },
+      });
       return { status: 201 as const, id: row.id, previous: null, target };
     });
 

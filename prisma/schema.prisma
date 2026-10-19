@@ -729,10 +729,26 @@ model ExpertPreRegistration {
   verifyMailCount      Int       @default(0)
   /// Start of the day window `verifyMailCount` counts from. NULL = no mail yet.
   verifyMailWindowStart DateTime?
+  /// When the row was first created. A re-issued link does not move it (FO-26).
   createdAt            DateTime  @default(now())
+  /// Last time a registration reached the write (new row or re-issued link). Drives the resend cooldown (FO-26).
+  lastSubmittedAt      DateTime?
   @@index([createdAt])
   @@index([ipHash, createdAt])
   @@index([status, createdAt])
+}
+
+/// FO-26 (TASK-MVBLYRLP9ID93): one submission that reached the expert pre-registration
+/// write without creating a row: a 409 for a verified address, or a re-issued link. The
+/// per-IP window counts these with ExpertPreRegistration.createdAt, so a repeated
+/// submission counts once. Only the HMAC of the IP is stored (as on the row). Rows older
+/// than 24 hours are deleted on every submission (register.ts). SYSTEM_WIDE, RLS off.
+model ExpertPreRegAttempt {
+  id        String   @id @default(cuid())
+  ipHash    String
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+  @@index([ipHash, createdAt])
 }
 
 // ───────────────────────── K1 tenant-scoped ─────────────────────────

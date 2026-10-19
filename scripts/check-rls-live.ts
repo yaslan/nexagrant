@@ -628,7 +628,7 @@ async function probeSystemScopeTable(
  * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
  * Everything is rolled back.
  */
-const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter']);
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt']);
 
 async function probePurposeTables(
   m: pg.Client,

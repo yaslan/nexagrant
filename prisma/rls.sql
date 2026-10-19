@@ -182,8 +182,9 @@ END $$;
 --
 -- One purpose is narrowed by table (FO-52, K-569554 = C): 'public-intake' is
 -- the anonymous expert form, so a sealed scope with that purpose opens only
--- ExpertPreRegistration and ExpertFounderCounter (the founder-number counter
--- the same verification writes). Every other system_scope table stays shut to
+-- ExpertPreRegistration, ExpertFounderCounter (the founder-number counter
+-- the same verification writes) and ExpertPreRegAttempt (the per-IP submission
+-- counter the same registration writes, FO-26). Every other system_scope table stays shut to
 -- it, reads and writes alike. The other five purposes are not narrowed. The
 -- purpose is read from app.system_scope_purpose, which is USERSET like the
 -- flag; the seal is not tied to it. So this guards against a public-intake
@@ -314,18 +315,20 @@ AS $fn$
                       (SELECT c.relowner FROM pg_class c WHERE c.oid = tbl),
                       'USAGE')
           OR (public.system_scope_sealed()
-              -- FO-52: public-intake opens the expert form's tables only.
+              -- FO-52: public-intake opens the expert form's tables only
+              -- (ExpertPreRegAttempt: FO-26).
               -- to_regclass, not '…'::regclass: a table missing on this
               -- database (ExpertFounderCounter before its migration) is NULL
               -- here and simply not on the list, instead of an error in every
               -- system_scope policy. IS TRUE turns that NULL into false.
               AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'public-intake'
                    OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
-                               to_regclass('public."ExpertFounderCounter"'))) IS TRUE)))
+                               to_regclass('public."ExpertFounderCounter"'),
+                               to_regclass('public."ExpertPreRegAttempt"'))) IS TRUE)))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration and ExpertFounderCounter (FO-52). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -358,6 +361,23 @@ DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
 CREATE POLICY system_scope ON public."ExpertPreRegistration"
   USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
   WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
+
+-- ExpertPreRegAttempt (FO-26, TASK-MVBLYRLP9ID93): the per-IP submission counter of the
+-- same pre-registration (HMAC of an IP, pseudonymous personal data). Same standing and
+-- same policy as ExpertPreRegistration: written and counted only inside
+-- withSystemScope('public-intake'), which system_scope_open() opens for it. Skipped
+-- on a database whose chain has not created the table yet; the migration has the
+-- same block. See prisma/migrations/add-expert-pre-reg-attempt.sql.
+DO $$
+BEGIN
+  IF to_regclass('public."ExpertPreRegAttempt"') IS NOT NULL THEN
+    ALTER TABLE public."ExpertPreRegAttempt" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegAttempt";
+    CREATE POLICY system_scope ON public."ExpertPreRegAttempt"
+      USING ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)));
+  END IF;
+END $$;
 
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call
