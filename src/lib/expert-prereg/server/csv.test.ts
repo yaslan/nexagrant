@@ -16,6 +16,11 @@ describe('csvCell', () => {
     expect(csvCell('a\nb')).toBe('"a\nb"');
   });
 
+  it('quotes a cell with a semicolon, so a Turkish-locale spreadsheet keeps it in one cell', () => {
+    expect(csvCell('Ali;=1+1;')).toBe('"Ali;=1+1;"');
+    expect(csvCell("Kurum;=cmd|' /C calc'!A0;")).toBe(`"Kurum;=cmd|' /C calc'!A0;"`);
+  });
+
   it('writes numbers as they are and null as an empty cell', () => {
     expect(csvCell(7)).toBe('7');
     expect(csvCell(null)).toBe('');
