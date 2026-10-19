@@ -2,14 +2,14 @@
 sözleşme: 3
 görev: TASK-MVBIYRGLU5EMX
 kod: TASK-MVBIYRGLU5EMX
-ajan: se-fb
+ajan: crw-fb
 motor: claude
 tip: ölçüm
 okur: ekip
 hüküm: Bitti: YAYIN ENGELİ — teknik güvenlik büyük ölçüde sağlam (RLS, yetki, token, founderNumber yarışı, XSS, başlık enjeksiyonu canlı ölçümle temiz), ama dev'deki KVKK metninde unvan yer tutucusu ve saklama işi yok (#94/#92 açık, çakışmalı); ayrıca Türkçe Excel'de CSV formül enjeksiyonu açık.
 platform: mac yerel: ayrık worktree (origin/dev 80271979) + izole Postgres pgvector:pg16 (:55421) + Mailpit + `next dev :3121`, uygulama DATABASE_URL = fabrika_app (NOBYPASSRLS). Prod ortamı koşulmadı; Caddy/XFF davranışı prod'da ölçülmedi.
 sürüm: 1
-tarih: 2026-10-19T18:38:42.876Z
+tarih: 2026-10-19T19:00:09.465Z
 ---
 
 # FO-21 · Uzman ön kayıt güvenlik + KVKK incelemesi (dev 80271979)
@@ -72,14 +72,7 @@ Mevcut `= + - @ \t \r` öneki ve virgül ayrıştırma doğru çalışıyor (`ek
 
 ### O2 — Aydınlatma metni eksikleri (v1 ve v2)
 - **Toplama yöntemi ve hukuki sebep birlikte** (m.10/1-d): "web formu aracılığıyla elektronik ortamda, otomatik yollarla" cümlesi yok.
-- **m.11 hak listesi eksik.** Şunlar yazılmamış:
-  - (ç) amacına uygun kullanılıp kullanılmadığını öğrenme,
-  - aktarıldığı üçüncü kişileri bilme,
-  - (e)/(f) düzeltme ve silmenin aktarılan üçüncü kişilere bildirilmesi,
-  - (g) münhasıran otomatik analiz sonucu aleyhe çıkan sonuca itiraz,
-  - (ğ) zararın giderilmesini talep.
-  
-  Metin yalnız genel bir "itiraz etme" ifadesi içeriyor.
+- **m.11 hak listesi eksik.** Şunlar yazılmamış: (ç) amacına uygun kullanılıp kullanılmadığını öğrenme; aktarıldığı üçüncü kişileri bilme; (e)/(f) düzeltme ve silmenin aktarılan üçüncü kişilere bildirilmesi; (g) münhasıran otomatik analiz sonucu aleyhe çıkan sonuca itiraz; (ğ) zararın giderilmesini talep. Metin yalnız genel bir "itiraz etme" ifadesi içeriyor.
 - **Veri sorumlusunun adresi** (ve varsa MERSİS) ve Başvuru Usul Tebliği'ne uygun kanallar (yazılı, KEP, sistemde kayıtlı e-posta) yok. Yalnız info@ adresi var.
 - **Aktarım:** v2 "yurt içi hizmet sağlayıcı" diyor. SMTP ve barındırma sağlayıcısının gerçekten yurt içinde olduğu doğrulanmadı (açık soru).
 
@@ -141,6 +134,7 @@ N=110 clicks=220 (her token 2×, karışık) workers=64 → http 307×220
 verified 110 · numbered 100 · distinct 100 · min/max 1|100 · 1..100 boşluk 0 · numarasız verified 10
 UNIQUE INDEX "ExpertPreRegistration_founderNumber_key"
 ```
+
 **4. Girdi:** Sunucuda zod uygulanıyor. Bilinmeyen il, alan, rol, dil ve locale → `400 unknown_slug`. Fazla uzun ad, kurum, projectCodes ve e-posta → `too_long`. CRLF içeren e-posta → `invalid_email`. `javascript:` ve `linkedin.com.evil.test` → `invalid_url`. `kvkkAccepted:"true"` (string) → `consent_required`. 9 alan → `too_many`. Fazladan gönderilen `status:verified, founderNumber:1` alanları yok sayıldı (satır `pending|null`). Admin sayfasında ham `<script>`/`<svg onload` yok, `&lt;script&gt;` var (kaçışlı). `mailto:` yalnız doğrulanmış e-postayla oluşuyor.
 
 **5. Spam:** Honeypot → 201, satır 0, mail 0. IP sınırı → yukarıdaki D1 tablosu.
