@@ -14,6 +14,9 @@
 # package only shows uploaded blog images from the host it was built with. The
 # same value goes into the cPanel environment (ENV-LISTESI.md). It reaches the
 # container as `-e R2_PUBLIC_HOST`, never on a command line.
+# FB_PNPM_STORE=<dir> keeps the container's pnpm store between runs (a slow
+# registry then resumes instead of starting over); the packages are the
+# lockfile's either way.
 # Idempotent: re-running overwrites the zip and SHA256SUMS. TASK-MUST2PP2NHP6L.
 set -euo pipefail
 
@@ -39,7 +42,9 @@ else
            if (v && p!=="http:" && p!=="https:") { console.error("R2_PUBLIC_HOST is not an http(s) URL"); process.exit(1); }'
   git -C "$REPO" archive --format=tar "$COMMIT" > "$WORK/src.tar"
   cp "$HERE/container-build.sh" "$WORK/build.sh"
-  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
+  STORE=()
+  if [ -n "${FB_PNPM_STORE:-}" ]; then mkdir -p "$FB_PNPM_STORE"; STORE=(-v "$(cd "$FB_PNPM_STORE" && pwd):/root/.local/share/pnpm/store"); fi
+  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST ${STORE[@]+"${STORE[@]}"} -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
 fi
 grep -q 'TAR_OK' "$WORK/build.log"
 

@@ -194,4 +194,4 @@ Kaçan bir saat felaket değildir: worker açılınca kaçan işleri 6 saat (ayl
 | "Run NPM Install" hata verdi | Basılması gerekmiyordu. Bir şey bozulmaz. |
 | Worker log'u boş | Cron satırı yok ya da yanlış. `worker.sh` izni 755 değil. `.fonbridge-worker.env` yok. Log'da `no node binary` → Cron'a `FB_NODE=/home/fonbridge/nodevenv/fonbridge-app/22/bin/node /bin/bash …` yazın. |
 
-Teknik ayrıntı: paket nasıl üretilir, yeniden üretmek için `deploy/cpanel/build-package.sh <commit> <klasör>` (Docker, linux/amd64).
+Teknik ayrıntı: paket nasıl üretilir, yeniden üretmek için `R2_PUBLIC_HOST=<açık bucket adresi ya da boş> deploy/cpanel/build-package.sh <commit> <klasör>` (Docker, linux/amd64). `R2_PUBLIC_HOST` derleme anında okunur; cPanel'deki değer `BUILD-INFO.txt` içindekiyle aynı olmalı (ENV-LISTESI.md §2). Ağ yavaşsa `FB_PNPM_STORE=<klasör>` indirilen paketleri koşular arasında saklar.
