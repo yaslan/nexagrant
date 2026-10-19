@@ -141,7 +141,8 @@ sütunları düşürmek her abonenin katılım oranını siler ve geri hesaplana
 
 ## 7. Silme ve saklama
 
-- Kiracı silme: `Tenant` cascade; paylaşımlı veriye dokunmaz; `AuditEvent` 12 ay anonimleştirilmiş saklanır (KVKK/GDPR).
+- Kiracı silme: `Tenant` cascade; paylaşımlı veriye dokunmaz. O kiracının `AuditEvent` satırları da cascade ile silinir (`AuditEvent.tenant` `onDelete: Cascade`); `tenantId` boş satırlar kalır.
+- `AuditEvent` saklaması: süre sınırı ve budama işi **yok**, satırlar kalıcıdır. Hesap silindiğinde `docs/legal/processing-register.md` §13'teki mekanizma uygulanır: `purgeDueUsers` `actorId`'yi NULL'lar, `user.erased` satırı kimlik yerine tek yönlü özet (`subjectRefOf`, `src/lib/legal/subject-ref.ts`) taşır; serbest `data` JSON'u değiştirilmez. Süreli saklama/budama istenirse ayrı karar ve iş gerekir.
 - `RawFetch` 90 gün; `AiUsageLog` 24 ay (şeffaflık beyanı için).
 - `RawFetch` yalnızca **içerik değiştiğinde** yazılır (`hash` karşılaştırması). Aynı yükü her gece yeniden saklamak tabloyu günde ~1200 satır büyütür, denetim değeri katmaz.
 - `Topic.eligibility` (Json) şekli: `{ restricted: "EU_EEA_CH_ONLY" | "TR" | null, eligibleCountries: string[], countriesExcluded: string[], notes?: string }`. `eligibleCountries` boş dizi = tespit edilmiş kısıt yok.
@@ -955,9 +956,9 @@ ve okunur; sorguda ayrıca `tenantId = ajans` koşulu vardır. Başka bir ajans�
 indeks değil, uygulama kontrolü sağlar (şema kilidi). Inngest işlevi `concurrency: 1` ile
 çalışır.
 
-**Saklama.** §3'teki "AuditEvent 12 ay anonimleştirilmiş" kuralı için bugün bir budama kodu yok.
-Böyle bir iş yazılırsa `agency.report.generated` satırlarını ya dışarıda bırakmalı ya da
-rapor geçmişinin 12 ayla sınırlı olduğunu ajansa söylemelidir.
+**Saklama.** `AuditEvent` için süre sınırı ve budama kodu yok (§7); satırlar kalıcıdır.
+İleride bir budama işi yazılırsa `agency.report.generated` satırlarını ya dışarıda bırakmalı ya da
+rapor geçmişinin o süreyle sınırlı olduğunu ajansa söylemelidir.
 
 **İleride (C seçeneği, ayrı onay):** gerçek PDF (yeni bağımlılık), R2'de saklanan dosya ve
 ayrı bir `AgencyReport` tablosu (tekil `(agencyId, period)`).
