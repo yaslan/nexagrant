@@ -1,0 +1,16 @@
+== /tr/uzman dialog chars=4357
+OK   Toplama yöntemi ve hukuki sebepler
+OK   zararın giderilmesini talep etme
+OK   Başvuru yöntemi
+OK   KEP adresi: [KEP ADRESİ — patron]
+OK   Adres: [ADRES — patron]
+OK   KVKK m.14
+OK   Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.
+rights list items=9
+== /en/experts dialog chars=4496
+OK   Collection method and legal bases
+OK   claim compensation
+OK   How to apply
+OK   Address: [ADDRESS — owner]
+OK   KVKK Art. 14
+rights list items=9

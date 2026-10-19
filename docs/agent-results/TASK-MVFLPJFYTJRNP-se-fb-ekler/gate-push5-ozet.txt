@@ -1,0 +1,8 @@
+     × no server action returns what it caught (beyond the known list) 46295ms
+     × a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast 7799ms
+     × a valid form posts the schema body plus honeypot and locale 43134ms
+     × no organisation: the error lands on Kurum with focus, nothing is sent 44076ms
+     × a picked language is sent; the languages group carries no required mark 38352ms
+ Test Files  3 failed | 360 passed | 7 skipped (370)
+      Tests  5 failed | 4793 passed | 120 skipped (4918)
+error: failed to push some refs to 'https://github.com/yaslan/fonbridge.git'
