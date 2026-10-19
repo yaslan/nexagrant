@@ -250,7 +250,7 @@ export function ApplicationClient({
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
             <span className="text-muted block text-[11px]">{t('summary.budget')}</span>
             <span className="text-xl font-bold text-emerald-400 font-mono mt-0.5 block">
-              €{totalRequestedBudget.toLocaleString()}
+              €{totalRequestedBudget.toLocaleString(locale)}
             </span>
           </div>
 
@@ -493,10 +493,10 @@ export function ApplicationClient({
                   {budgetLines.map((b, idx) => (
                     <tr key={idx} className="hover:bg-ground/80 transition-colors">
                       <td className="p-3.5 font-bold text-ink">{b.partnerName}</td>
-                      <td className="p-3.5 font-mono text-ink-2">{b.personMonths} PM</td>
+                      <td className="p-3.5 font-mono text-ink-2">{b.personMonths} {t('summary.pmUnit')}</td>
                       <td className="p-3.5 font-mono text-muted">{b.countryCoefficient || 1.0}</td>
                       <td className="p-3.5 text-right font-mono font-bold text-ink">
-                        €{Number(b.requestedTotal).toLocaleString()}
+                        €{Number(b.requestedTotal).toLocaleString(locale)}
                       </td>
                     </tr>
                   ))}
@@ -511,10 +511,10 @@ export function ApplicationClient({
 
                   <tr className="bg-slate-900 text-white font-bold">
                     <td className="p-3.5">{t('budget.total')}</td>
-                    <td className="p-3.5 font-mono">{totalPersonMonths} PM</td>
+                    <td className="p-3.5 font-mono">{totalPersonMonths} {t('summary.pmUnit')}</td>
                     <td className="p-3.5">-</td>
                     <td className="p-3.5 text-right font-mono text-emerald-400 text-sm">
-                      €{totalRequestedBudget.toLocaleString()}
+                      €{totalRequestedBudget.toLocaleString(locale)}
                     </td>
                   </tr>
                 </tbody>
