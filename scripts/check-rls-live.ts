@@ -565,6 +565,14 @@ async function probeIsolation(
  * so the tenant probe above does not reach it. Its contract is the one policy
  * `system_scope`: outside that scope the measured role reads 0 rows and cannot
  * insert; inside `public-intake` every row is visible. Rolled back, nothing is kept.
+ */
+const EXPERT_TABLE = 'ExpertPreRegistration';
+
+/**
+ * FO-45 (TASK-MVC6CTSCLO6LI): ExpertPreRegistration is personal data with no tenant,
+ * so the tenant probe above does not reach it. Its contract is the one policy
+ * `system_scope`: outside that scope the measured role reads 0 rows and cannot
+ * insert; inside `public-intake` every row is visible. Rolled back, nothing is kept.
  * FO-50 (K-568932 = A): ExpertFounderCounter, its founder-number counter, has the
  * same contract and is measured the same way.
  */
