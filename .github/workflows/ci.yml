@@ -280,3 +280,37 @@ jobs:
           playwright-report/
         if-no-files-found: ignore
         retention-days: 14
+
+  # CORDIS worker (Python). Its own job: it needs no Postgres or Node, and a
+  # failure here should not hide the app's result. The interpreter comes from
+  # workers/cordis/.python-version so CI cannot drift from the README.
+  cordis-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: workers/cordis
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version-file: workers/cordis/.python-version
+
+    # Hash-checked install from the lock: only the pinned, 3.12-resolved set.
+    - name: Install locked dependencies
+      run: pip install --require-hashes -r requirements.lock
+
+    # Same file the README uses; its `-r requirements.txt` is already met by the lock.
+    - name: Install test-only pins
+      run: pip install -r requirements-dev.txt
+
+    - name: Test
+      run: python -m pytest -q
+
+    # pip-audit runs on the locked set with the same interpreter that installed
+    # it. It is installed here, not added to the repo's requirements.
+    - name: Audit locked dependencies
+      run: |
+        pip install pip-audit==2.10.1
+        pip-audit -r requirements.lock
