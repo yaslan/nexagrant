@@ -624,7 +624,8 @@ async function probeSystemScopeTable(
  * FO-52 (K-569554 = C): the purpose 'public-intake' (the anonymous expert form)
  * opens only PUBLIC_INTAKE_TABLES; every other system_scope table must look
  * exactly as it does outside the scope, and a write there must be refused.
- * The other purposes must still open everything. One snapshot for both
+ * The other purposes must still open everything but the expert data they do
+ * not handle (FO-92, EXPERT_DATA_PURPOSES). One snapshot for both
  * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
  * Everything is rolled back.
  */
@@ -663,6 +664,14 @@ const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, param
     ],
   ],
 ]);
+
+/**
+ * FO-92 (FO-21 O4): the reverse direction. The expert's personal data opens only
+ * for the purposes that handle it; the others read exactly what they read outside
+ * the scope (0) and cannot insert there.
+ */
+const EXPERT_DATA_TABLES = new Set([EXPERT_TABLE, 'ExpertPreRegAttempt']);
+const EXPERT_DATA_PURPOSES = new Set(['public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']);
 
 async function probePurposeTables(
   m: pg.Client,
@@ -757,17 +766,36 @@ async function probePurposeTables(
       else failures.push(`public-intake: ${t} INSERT reddedildi — form yazamaz: ${r === 'rls' ? 'RLS' : r}`);
     }
 
-    // The other purposes are not narrowed: each still opens every row.
+    // The other purposes are not narrowed by public-intake's list: each still
+    // opens every row, except the expert data the purpose does not handle (FO-92).
     for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
       await m.query('select enter_system_scope($1)', [purpose]);
       const inside = await countAll(m);
-      const short = truth
-        ? tables.filter((t) => inside.get(t) !== truth!.get(t))
-        : tables.filter((t) => (inside.get(t) ?? 0) < (outside.get(t) ?? 0));
+      const shut = EXPERT_DATA_PURPOSES.has(purpose) ? [] : tables.filter((t) => EXPERT_DATA_TABLES.has(t));
+      if (shut.length > 0) {
+        const seen = shut.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
+        if (seen.length > 0) {
+          failures.push(`${purpose}: uzman kişisel verisini görüyor (kapalı olmalı): ${seen.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
+        } else {
+          checks.push(`${purpose}: ${shut.map((t) => `${t}=${inside.get(t)}${truth ? `/${truth.get(t)}` : ''}`).join(', ')} — uzman verisi kapalı`);
+        }
+        const expertWrite = await tryInsert(
+          `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+           values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+          [`rls-verify-${randomBytes(6).toString('hex')}`]
+        );
+        if (expertWrite === 'rls') checks.push(`${purpose}: ${EXPERT_TABLE} INSERT reddedildi`);
+        else failures.push(`${purpose}: ${EXPERT_TABLE} INSERT ${expertWrite === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${expertWrite}`}`);
+      }
+      const short = (
+        truth
+          ? tables.filter((t) => inside.get(t) !== truth!.get(t))
+          : tables.filter((t) => (inside.get(t) ?? 0) < (outside.get(t) ?? 0))
+      ).filter((t) => !shut.includes(t));
       if (short.length > 0) {
         failures.push(`${purpose}: daraldı, tüm satırları görmüyor: ${short.map((t) => `${t}=${inside.get(t)}`).join(', ')}`);
       } else {
-        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? ', her system_scope tablosunda tüm satırlar' : ''}`);
+        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? `, ${shut.length > 0 ? 'uzman verisi dışında ' : ''}her system_scope tablosunda tüm satırlar` : ''}`);
       }
     }
     const auditAdmin = await auditInsert(tenantId);

@@ -193,6 +193,16 @@ END $$;
 -- anyway. A new table the form needs goes into the list in system_scope_open()
 -- on purpose; until then a write there is an RLS error and a read is 0 rows.
 --
+-- The reverse direction (FO-92, FO-21 O4): the expert's personal data
+-- (ExpertPreRegistration, ExpertPreRegAttempt) opens in a sealed scope only for
+-- the purposes that handle it: 'public-intake' (the form), 'platform-admin' (the
+-- list and CSV), 'platform-aggregate' (the seat count) and 'cross-tenant-job'
+-- (the retention purge, FO-50). 'tenant-discovery' and 'subject-scoped' read 0
+-- rows there and cannot write. The same USERSET limit applies: this guards
+-- against a call site that reaches for the wrong table, not against code that
+-- names a purpose on the list. A new purpose that must see an expert goes into
+-- the list in system_scope_open() on purpose.
+--
 -- Deploy order: this is applied by `pnpm db:rls`. Code that calls
 -- withSystemScope() reads zero rows until it has run, exactly like every other
 -- policy change in this file. The role that runs it must be allowed to create
@@ -324,11 +334,18 @@ AS $fn$
               AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'public-intake'
                    OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
                                to_regclass('public."ExpertFounderCounter"'),
-                               to_regclass('public."ExpertPreRegAttempt"'))) IS TRUE)))
+                               to_regclass('public."ExpertPreRegAttempt"'))) IS TRUE)
+              -- FO-92: the expert's personal data opens only for the purposes
+              -- that handle it. IS NOT TRUE: a missing table (NULL) is simply
+              -- not on the list, like above.
+              AND ((tbl IN (to_regclass('public."ExpertPreRegistration"'),
+                            to_regclass('public."ExpertPreRegAttempt"'))) IS NOT TRUE
+                   OR coalesce(current_setting('app.system_scope_purpose', true), '')
+                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -354,8 +371,9 @@ END $$;
 -- tenant. RLS is ON and the one policy is system_scope, so fabrika_app reads and
 -- writes it only inside withSystemScope(). Outside that scope it sees 0 rows and
 -- refuses every write. Its purposes: 'public-intake' (registration, verification),
--- 'platform-aggregate' (seat count), 'platform-admin' (list and CSV). Same policy
--- body as the loop above. See prisma/migrations/expert-prereg-rls-mail-quota.sql.
+-- 'platform-aggregate' (seat count), 'platform-admin' (list and CSV),
+-- 'cross-tenant-job' (retention purge, FO-50); system_scope_open() shuts it to the
+-- other purposes (FO-92). Same policy body as the loop above. See prisma/migrations/expert-prereg-rls-mail-quota.sql.
 ALTER TABLE public."ExpertPreRegistration" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
 CREATE POLICY system_scope ON public."ExpertPreRegistration"
