@@ -29,6 +29,16 @@ const CROSS_MAJOR = new Map([
   ['hono@>=3.0.0 <4.0.0', { pinned: '4.13.7', ghsa: 'GHSA-m732-5p4w-x69g' }],
   ['proxy-addr@>=1.1.0 <2.0.0', { pinned: '2.0.8', ghsa: 'GHSA-jqcg-44mw-7w3h' }],
   ['brace-expansion@>=4.0.0 <5.0.0', { pinned: '5.0.12', ghsa: 'GHSA-q2hr-2g5m-vwhr' }],
+  // TASK-MVF543TDDDMX1 (FO-96): older lines FO-18 left without a row.
+  ['sharp@<0.34.0', { pinned: '0.35.5', ghsa: 'GHSA-f88m-g3jw-g9cj' }],
+  ['undici@<6.0.0', { pinned: '6.28.1', ghsa: 'GHSA-vxpw-j846-p89q' }],
+  ['hono@<3.0.0', { pinned: '4.13.7', ghsa: 'GHSA-m732-5p4w-x69g' }],
+  ['@hono/node-server@<1.0.0', { pinned: '1.19.15', ghsa: 'GHSA-wc8c-qw6v-h7f6' }],
+  ['@modelcontextprotocol/sdk@<1.0.0', { pinned: '1.31.0', ghsa: 'GHSA-w48q-cv73-mx4w' }],
+  ['mysql2@<3.0.0', { pinned: '3.23.1', ghsa: 'GHSA-3f6p-5ww8-9rcr' }],
+  ['fast-uri@<2.0.0', { pinned: '2.4.7', ghsa: 'GHSA-hrr3-gc8f-f4qj' }],
+  ['ip-address@<10.0.0', { pinned: '10.7.1', ghsa: 'GHSA-h3mg-xc3c-68pw' }],
+  ['postcss-selector-parser@<7.0.0', { pinned: '7.1.6', ghsa: 'GHSA-rj75-hqrm-r3gf' }],
 ]);
 
 function unquote(value: string): string {
@@ -55,6 +65,32 @@ function line(version: string): string {
   return major === '0' ? `0.${minor}` : (major ?? '');
 }
 
+function compare(a: string, b: string): number {
+  const [x, y] = [a.split('.').map(Number), b.split('.').map(Number)];
+  for (let i = 0; i < 3; i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * Keys whose `<` upper bound is missing or above the pinned version. Such a
+ * row would also catch a release newer than the pin (a patched 6.29 under
+ * `'undici@>=6.0.0 <6.30.0': '6.28.1'`) and move it back down. Applies to
+ * cross-major rows too, which `openSelectors` skips.
+ */
+function upperAbovePin(yaml: string): string[] {
+  const bad: string[] = [];
+  for (const [key, pinned] of overridesOf(yaml)) {
+    const at = key.lastIndexOf('@');
+    if (at <= 0 || key.slice(0, at).includes('>')) continue;
+    const upper = key.slice(at + 1).match(/<\s*(\d+\.\d+\.\d+)/)?.[1];
+    if (!upper || compare(upper, pinned) > 0) bad.push(key);
+  }
+  return bad;
+}
+
 function openSelectors(yaml: string): string[] {
   const bad: string[] = [];
   for (const [key, pinned] of overridesOf(yaml)) {
@@ -74,6 +110,11 @@ describe('pnpm overrides stay in their own major', () => {
     const yaml = readFileSync(resolve(ROOT, 'pnpm-workspace.yaml'), 'utf8');
     expect(overridesOf(yaml).length).toBeGreaterThan(10);
     expect(openSelectors(yaml)).toEqual([]);
+  });
+
+  test('no row reaches above its own pin', () => {
+    const yaml = readFileSync(resolve(ROOT, 'pnpm-workspace.yaml'), 'utf8');
+    expect(upperAbovePin(yaml)).toEqual([]);
   });
 
   test('every cross-major exception is still in the yaml, pinned, with its GHSA', () => {
@@ -114,5 +155,15 @@ describe('pnpm overrides stay in their own major', () => {
     const mutant = yaml.replace("'hono@>=4.0.0 <4.13.7'", "'hono@>=4.0.0'");
     expect(mutant).not.toBe(yaml);
     expect(openSelectors(mutant)).toEqual(['hono@>=4.0.0']);
+  });
+
+  test('mutant M2: an upper bound above the pin is caught, cross-major rows included', () => {
+    const yaml = readFileSync(resolve(ROOT, 'pnpm-workspace.yaml'), 'utf8');
+    const mutant = yaml
+      .replace("'undici@>=6.0.0 <6.28.1'", "'undici@>=6.0.0 <6.30.0'")
+      .replace("'undici@<6.0.0'", "'undici@<7.0.0'")
+      .replace("'mysql2@<3.0.0'", "'mysql2@>=1.0.0'");
+    expect(mutant).not.toBe(yaml);
+    expect(upperAbovePin(mutant)).toEqual(['undici@>=6.0.0 <6.30.0', 'undici@<7.0.0', 'mysql2@>=1.0.0']);
   });
 });
