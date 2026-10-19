@@ -36,6 +36,14 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // The cPanel startup file is CommonJS on purpose: Passenger loads `app.js`
+    // with plain `require`, and its package.json declares no "type" (PR #28).
+    files: ["deploy/cpanel/app.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
     // TASK-MUM033NPP7UFI — E2E runs against `next dev`, whose HMR websocket keeps
     // the page from ever going network-idle, so a `networkidle` wait is a race that
     // ends in a 60 s timeout on whichever spec loses it. Wait for what the test

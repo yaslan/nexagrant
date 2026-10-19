@@ -16,6 +16,7 @@ Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (aja
 | Alan adı | `https://fonbridge.com` kanonik; `www` → kök **301** (tek sıçrama) | patron 29.09, `docs/SMTP-SUNUCU.md` §10 |
 | Barındırma | Vulut; cPanel sunucusu `srv.iyisunucu.com.tr` = `77.92.144.187`; DNS `ns1/ns2.iyisunucu.com.tr` | `docs/SMTP-SUNUCU.md` §1.1 |
 | E-posta | Seçenek A: Vulut cPanel/Exim, `mail.fonbridge.com`, gönderici `info@fonbridge.com` | `docs/SMTP-SUNUCU.md` |
+| Uygulama sunucusu | Aynı cPanel hesabında **Setup Node.js App** (CloudLinux Node.js Selector + Passenger, önünde tek LiteSpeed); uygulama kökü `/home/fonbridge/fonbridge-app`; veritabanı Supabase (session pooler). Docker/Caddy **yok**: paket `deploy/cpanel/build-package.sh` ile linux/amd64 konteynerinde üretilen zip, kurulum `deploy/cpanel/KURULUM.md`, env listesi `deploy/cpanel/ENV-LISTESI.md` | patron 03.10, CE-627 `TASK-MUST2PP2NHP6L`, CE-629 `TASK-MUTP1R1C13GE3`, PR #28; FO-44 `TASK-MVC69IDQ5H9IC` |
 | İş kuyruğu | graphile-worker (Postgres); web ve worker **ayrı imaj/süreç**; `JOBS_CRON_ENABLED` üretimde zorunlu | `docs/adr/ADR-0008-own-job-queue-graphile-worker.md` §9 |
 | Kaldırılanlar | Sentry, Resend, Inngest, Microsoft Entra, Outlook, SAML SSO | patron 29.09 |
 | LLM | Anthropic `claude-sonnet-5` (varsayılan) + OpenAI embedding `text-embedding-3-large` | `src/lib/llm.ts:43`, `:613` |
@@ -28,8 +29,8 @@ Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (aja
 | # | Madde | Durum | Kanıt (kısa) |
 |---|---|---|---|
 | 1.1 | DNS bölgesi `fonbridge.com` | **PATRON** | `dig +norec SOA fonbridge.com @ns1/ns2.iyisunucu.com.tr` → `REFUSED` (29.09 21:43 UTC); aynı NS'de `usfinbridge.com` → `NOERROR`; `@8.8.8.8` A/AAAA/MX/TXT → `SERVFAIL` |
-| 1.2 | Uygulama sunucusu (web + worker + Postgres 16/pgvector) nerede koşacak | **PATRON** | `77.92.144.187` paylaşımlı cPanel/Exim sunucusu; Docker, uzun yaşayan worker süreci ve pgvector'ün orada olup olmadığı **ölçülmedi**. `<APP_IP>` hâlâ yok (`docs/SMTP-SUNUCU.md` §8 madde 2) |
-| 1.3 | Ters vekil + TLS + `www`→kök 301 | **EKSİK** (1.2'ye bağlı) | Caddyfile hazır (`docs/SMTP-SUNUCU.md` §10.1), kurulmadı |
+| 1.2 | Uygulama sunucusu (web + worker + Postgres 16/pgvector) nerede koşacak | **KARAR VERİLDİ** (§0) | Web: cPanel Setup Node.js App (Passenger) `77.92.144.187`, paket `deploy/cpanel/`; DB: Supabase. Worker: cPanel Cron + `worker.sh` (K-1, `deploy/cpanel/KURULUM.md` §8). Bu satırın eski hâli (Docker/`<APP_IP>` ölçülmedi) 03.10 kararıyla geçersiz |
+| 1.3 | Ters vekil + TLS + `www`→kök 301 | **PATRON** (cPanel tarafı) | Vekil cPanel'in LiteSpeed'i (`TRUSTED_PROXY_HOPS=1` ölçüldü, 17.10), TLS cPanel AutoSSL. Caddyfile (`docs/SMTP-SUNUCU.md` §10.1) bu barındırmada **kullanılmaz**; HSTS ve `www`→kök 301 cPanel/`.htaccess` tarafında ayarlanır (§5.4 Caddy adımları bu kurulumda aynı başlıkların `.htaccess` karşılığıdır) |
 | 1.4 | SMTP (`mail.fonbridge.com`) | **PATRON** | 1.1'e bağlı; kutular, DKIM, AutoSSL `docs/SMTP-SUNUCU.md` §8 |
 | 2 | Üretim ortam değişkenleri | **EKSİK** (liste hazır, değerler PATRON) | §2 |
 | 3 | Migration sırası + geri dönüş | **HAZIR** (2 not) | §3 |
@@ -378,7 +379,7 @@ origin  https://github.com/yaslan/fonbridge.git
 
 Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabilenler aynı numarada harfle).
 
-1. **Uygulama sunucusu kararı:** web + worker + Postgres 16 (pgvector) nerede koşacak? `77.92.144.187` paylaşımlı cPanel sunucusu; orada Docker/uzun yaşayan süreç/pgvector olup olmadığını Vulut'a sor. Olmuyorsa Vulut VPS (öneri: 2 vCPU / 4 GB / 60 GB SSD) — **`<APP_IP>`**'yi bize ilet.
+1. ~~**Uygulama sunucusu kararı**~~ — verildi (03.10): cPanel Setup Node.js App + Supabase (§0). Kurulum adımları `deploy/cpanel/KURULUM.md`; paket `deploy/cpanel/build-package.sh <commit> <klasör>` (Docker, linux/amd64; `R2_PUBLIC_HOST` derleme anında da gerekli, `deploy/cpanel/ENV-LISTESI.md` §2).
 2. **fonbridge.com'u `srv.iyisunucu.com.tr` cPanel'ine ekle** (bugün NS'ler `REFUSED`). NS değişmez.
 3. Zone Editor: kök `A` → `<APP_IP>`, `www` → kök, `mail A 77.92.144.187`, MX, SPF, DMARC, DKIM (2048 bit) — tam liste `docs/SMTP-SUNUCU.md` §3.0/§8 madde 3. TTL 300.
 4. Posta kutuları `info@` + `dmarc@`; **S-1 kararı** (uygulama `info@` ile mi, ayrı `bildirim@` ile mi göndersin — öneri ayrı kutu). AutoSSL çalıştır.
@@ -390,7 +391,7 @@ Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabil
 10. **Alarm alıcı adresi** (`SystemAlert` özeti için) ve **uptime izleyici hesabı** (§5.2).
 11. **RPO/RTO hedefini onayla** (öneri RPO ≤ 24 sa, RTO ≤ 4 sa) ve yedeğin sunucu dışı konumunu seç (§4.1).
 12. **1 Ekim: GitHub push** (`git push origin dev`) — öncesinde push yapılacak makinede `git config core.hooksPath githooks` (§6). CI yeşilini gör.
-13. 1–11 bitince haber ver → biz (onayla): sunucuya Caddy + Docker kurulumu, §3.1 şema sırası, §3.3 web→worker sırası, §4.2 geri yükleme testi, `docs/SMTP-SUNUCU.md` §7 posta ölçümleri, `docs/SMTP-SUNUCU.md` §10.3 yönlendirme ölçümleri.
+13. 1–11 bitince haber ver → biz (onayla): paketin üretimi ve `deploy/cpanel/KURULUM.md` adımları (yüklemeyi patron yapar), §3.1 şema sırası, §3.3 web→worker sırası, §4.2 geri yükleme testi, `docs/SMTP-SUNUCU.md` §7 posta ölçümleri, `docs/SMTP-SUNUCU.md` §10.3 yönlendirme ölçümleri.
 14. **Canlıya geçiş onayı** (açık, yazılı). Onaysız hiçbir adım canlıya yazılmaz.
 
 ## 9. Dev entegrasyon prosedürü (TASK-MUOFCOKBQBUSQ)

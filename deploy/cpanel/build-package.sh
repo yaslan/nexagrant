@@ -9,6 +9,11 @@
 # The zip unpacks straight into the application root (/home/fonbridge/fonbridge-app):
 #   app.js  package.json  worker.sh  BUILD-INFO.txt  certs/  app/ (Next standalone)
 # FB_BUILD_DIR=<dir with build-out.tar + build.log> re-packages without building.
+# R2_PUBLIC_HOST must be set in the caller's environment (empty = no public
+# bucket): next.config reads it at `next build` for images.remotePatterns, so the
+# package only shows uploaded blog images from the host it was built with. The
+# same value goes into the cPanel environment (ENV-LISTESI.md). It reaches the
+# container as `-e R2_PUBLIC_HOST`, never on a command line.
 # Idempotent: re-running overwrites the zip and SHA256SUMS. TASK-MUST2PP2NHP6L.
 set -euo pipefail
 
@@ -26,9 +31,15 @@ if [ -n "${FB_BUILD_DIR:-}" ]; then
   # Re-package an earlier container build (its build-out.tar + build.log) without rebuilding.
   cp "$FB_BUILD_DIR/build-out.tar" "$FB_BUILD_DIR/build.log" "$WORK/"
 else
+  : "${R2_PUBLIC_HOST?set R2_PUBLIC_HOST to the public bucket URL, or to empty for none (ENV-LISTESI.md)}"
+  export R2_PUBLIC_HOST
+  # Same rule as src/lib/env.ts (blank = unset, otherwise a URL) and
+  # publicAssetImagePattern (http/https only, or no pattern is built).
+  node -e 'const v=process.env.R2_PUBLIC_HOST.trim(); let p=""; try { p=new URL(v).protocol } catch {}
+           if (v && p!=="http:" && p!=="https:") { console.error("R2_PUBLIC_HOST is not an http(s) URL"); process.exit(1); }'
   git -C "$REPO" archive --format=tar "$COMMIT" > "$WORK/src.tar"
   cp "$HERE/container-build.sh" "$WORK/build.sh"
-  docker run --rm --platform linux/amd64 -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
+  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
 fi
 grep -q 'TAR_OK' "$WORK/build.log"
 
@@ -59,6 +70,8 @@ if [ -n "$OTHER" ]; then echo "symlinks outside app/.next/node_modules:"; echo "
   echo "built: $(date -u +%FT%TZ)"
   echo "platform: linux/amd64 (node:22-bookworm-slim, glibc 2.36), node $(grep -m1 -oE '^v22[.0-9]+' "$WORK/build.log" || echo 22)"
   echo "packaging: deploy/cpanel @ $(git -C "$REPO" rev-parse --short=8 HEAD)"
+  # Not a secret (it is in every response's CSP img-src); cPanel must carry the same value.
+  echo "R2_PUBLIC_HOST at build: $(grep -m1 -oE '^R2_PUBLIC_HOST_AT_BUILD=.*' "$WORK/build.log" | cut -d= -f2- || true)"
 } > "$S/BUILD-INFO.txt"
 
 ZIP="fonbridge-app-$SHORT.zip"
