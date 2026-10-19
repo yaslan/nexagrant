@@ -13,10 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     // Not our source: nested git worktrees checked out by agents, and the
-    // evidence scripts attached to task reports. Mirrors the exclusions in
-    // vitest.config.mts.
+    // evidence scripts attached to task reports, and the untracked _workspace/
+    // artefact folder. Mirrors the exclusions in vitest.config.mts.
     ".claude/worktrees/**",
     "docs/agent-results/**",
+    "_workspace/**",
+    // Output of `pnpm test:e2e` (gitignored): bundled trace viewer JS and
+    // screenshots. Lint must not read it; a local run with CI=true writes it.
+    "playwright-report/**",
+    "test-results/**",
   ]),
   {
     files: ["**/*.ts", "**/*.tsx"],

@@ -66,11 +66,27 @@ const envSchema = z.object({
   SMTP_USER: blankToUndefined(z.string().optional()),
   SMTP_PASS: blankToUndefined(z.string().optional()),
   SMTP_FROM: blankToUndefined(z.string().optional()),
+  /**
+   * Key for the IP hash of the public expert pre-registration (TASK-MVBIXPP33UK1B,
+   * src/lib/expert-prereg/server/). The per-IP limit stores HMAC(IP) under this
+   * key, never the address. Unset = no IP is stored and the per-IP limit does not
+   * apply; the route logs that once. Set it to a random string of 32+ characters.
+   */
+  EXPERT_PREREG_IP_SALT: blankToUndefined(z.string().min(32).optional()),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
   FEEDBACK_DIGEST_TO: z.string().email().optional(),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
+  /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
+  AUTH_URL: z.string().optional(),
+  /**
+   * The session-signing key (NextAuth; NEXTAUTH_SECRET is the older name). Startup
+   * refuses to run without a strong one (src/lib/auth-secret.ts); read it here
+   * with {@link authSecret}.
+   */
+  AUTH_SECRET: blankToUndefined(z.string().optional()),
+  NEXTAUTH_SECRET: blankToUndefined(z.string().optional()),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
@@ -179,12 +195,15 @@ const envSchema = z.object({
    * credentials stay on `process.env` inside src/lib/storage.ts because moving
    * a credential is a different change from moving a brand string.
    *
-   * R2_PUBLIC_HOST is the public origin of the bucket, if one exists. Evidence
-   * is no longer linked from it (B-2, TASK-MUNODY0DVDWC5): anyone holding such
-   * a URL read the file, CONFIDENTIAL ones included, and it went into the CSV
-   * export. Evidence is read through the authenticated download route, which
-   * redirects to a short-lived presigned GET. Only the CSP still reads this
-   * (src/lib/security-headers.ts); the bucket itself should not be public.
+   * R2_PUBLIC_HOST is the public base URL of R2_PUBLIC_BUCKET, a separate
+   * bucket the store serves to anyone (blog images, TASK-MUU20NSV2TETW); it may
+   * carry a path (MinIO `http://host:9000/<bucket>`, Supabase Storage
+   * `https://<ref>.supabase.co/storage/v1/object/public/<bucket>`). The CSP
+   * img-src and next.config `images.remotePatterns` read it too. Evidence is
+   * never linked from it (B-2, TASK-MUNODY0DVDWC5): anyone holding such a URL
+   * read the file, CONFIDENTIAL ones included. Evidence stays in the private
+   * R2_BUCKET and is read through the authenticated download route, which
+   * redirects to a short-lived presigned GET.
    *
    * R2_BUCKET keeps the historical bucket default that storage.ts applies: 50
    * Evidence rows already carry it, and a bucket name is an infrastructure
@@ -192,6 +211,7 @@ const envSchema = z.object({
    * stored object.
    */
   R2_PUBLIC_HOST: optionalUrl,
+  R2_PUBLIC_BUCKET: blankToUndefined(z.string().optional()),
   R2_BUCKET: z.string().optional(),
   /**
    * How many *consecutive* failed runs of the daily orphan-alert sweep
@@ -244,6 +264,15 @@ if (!_env.success) {
 }
 
 export const env = _env.data;
+
+/**
+ * The key NextAuth signs sessions with, for code that derives a labelled key of
+ * its own from it (FO-29, src/lib/expert-prereg/server/verified-outcome.ts).
+ * `null` only in a process that skipped the startup check.
+ */
+export function authSecret(): string | null {
+  return env.AUTH_SECRET ?? env.NEXTAUTH_SECRET ?? null;
+}
 
 /**
  * The numeric view of `ALERTS_SWEEP_FAILURE_THRESHOLD`, converted once here so

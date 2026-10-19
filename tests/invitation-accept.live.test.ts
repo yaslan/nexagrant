@@ -59,7 +59,7 @@ let lib: {
   ack: typeof import('../src/lib/legal/registration-ack-cookie');
   consent: typeof import('../src/lib/legal/consent-documents');
   seats: typeof import('../src/lib/billing/seat-limit');
-  route: typeof import('../src/app/[locale]/accept-invite/route');
+  route: typeof import('../src/app/[locale]/(public)/accept-invite/route');
 };
 
 let ready = false;
@@ -191,7 +191,7 @@ beforeAll(async () => {
     ack: await import('../src/lib/legal/registration-ack-cookie'),
     consent: await import('../src/lib/legal/consent-documents'),
     seats: await import('../src/lib/billing/seat-limit'),
-    route: await import('../src/app/[locale]/accept-invite/route'),
+    route: await import('../src/app/[locale]/(public)/accept-invite/route'),
   };
   admin = lib.db.createDbClient(env.admin);
   try {

@@ -187,6 +187,50 @@ function originOf(value: string | null | undefined): string | null {
   }
 }
 
+/**
+ * The `images.remotePatterns` entry next.config adds for R2_PUBLIC_HOST, the
+ * public bucket's base URL (blog images, TASK-MUU20NSV2TETW): that host, that
+ * port only, and only the `blog/` objects under its path. Null when the value
+ * is unset or not an http(s) URL. next.config reads it when the config loads —
+ * for the standalone build that is `next build`, so the variable must be set
+ * at build time as well.
+ */
+export function publicAssetImagePattern(
+  value: string | null | undefined
+): { protocol: 'http' | 'https'; hostname: string; port: string; pathname: string } | null {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return {
+      protocol: url.protocol === 'https:' ? 'https' : 'http',
+      hostname: url.hostname,
+      port: url.port,
+      pathname: `${url.pathname.replace(/\/+$/, '')}/blog/**`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when R2_PUBLIC_HOST points at this machine (the MinIO of a local or CI
+ * e2e run). next.config then sets `images.dangerouslyAllowLocalIP`: Next 16's
+ * optimizer refuses an upstream that resolves to a private address, so the
+ * uploaded blog covers rendered through `next/image` showed broken
+ * (TASK-MUU20XFIXZKTE). A deployment's public bucket is never on loopback, so
+ * there the guard stays on.
+ */
+export function publicAssetHostIsLoopback(value: string | null | undefined): boolean {
+  if (!value?.trim()) return false;
+  try {
+    const host = new URL(value.trim()).hostname;
+    return host === 'localhost' || host === '[::1]' || /^127(?:\.\d{1,3}){3}$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
 /** R2 account ids are 32 hex chars; anything else must not reach a header. */
 function r2UploadOrigin(accountId: string | null | undefined): string | null {
   const id = accountId?.trim();

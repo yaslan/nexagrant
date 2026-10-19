@@ -240,23 +240,27 @@ export const ALLOWED: Record<string, string> = {
   'lib/actions/auth.ts#loginWithCredentialsAction': 'sign-in; no session yet',
   'lib/actions/auth.ts#loginWithSocialAction': 'sign-in; no session yet',
   'lib/actions/auth.ts#logoutAction': 'signs the caller out of their own session',
-  'app/[locale]/fon-hazirlik/actions.ts#submitReadinessLead': 'public lead form, no session by design',
-  'app/[locale]/accept-invite/continue/actions.ts#startInvitationSignInAction':
+  'app/[locale]/(public)/fon-hazirlik/actions.ts#submitReadinessLead': 'public lead form, no session by design',
+  'app/[locale]/(public)/accept-invite/continue/actions.ts#startInvitationSignInAction':
     'invitation sign-in; the invitation token is the credential',
-  'app/[locale]/accept-invite/continue/actions.ts#acceptInvitationAction':
+  'app/[locale]/(public)/accept-invite/continue/actions.ts#acceptInvitationAction':
     'joins a tenant by invitation; the role comes from the invitation, the caller has none yet',
-  'app/[locale]/accept-invite/continue/actions.ts#signOutForInvitationAction': 'signs the caller out',
+  'app/[locale]/(public)/accept-invite/continue/actions.ts#signOutForInvitationAction': 'signs the caller out',
   // Personal data of the caller themself (KVKK/GDPR), not tenant business data.
   'actions/user/export-data.ts#exportUserData': "the caller's own data export (KVKK right of access)",
   'actions/user/request-deletion.ts#requestAccountDeletion': "the caller's own account (KVKK erasure)",
   'actions/user/request-deletion.ts#cancelAccountDeletion': "the caller's own account (KVKK erasure)",
   'actions/user/request-deletion.ts#getDeletionStatus': "reads the caller's own deletion request",
+  // ADR-0011 (TASK-MUVR24EHWI2RA): the caller's own read state. Every query is
+  // `where { tenantId, userId }` of the session; every role has a bell, and an
+  // expired pilot must still be able to clear it, so neither `can` nor the pilot gate.
+  'actions/user/notifications.ts#markNotificationsRead': "marks the caller's own notifications read (userId = session user)",
   // Token-authenticated partner portal: no session, no tenant role. Narrow by
   // construction (Part A budget lines only) and pilot-gated on the token's tenant.
   'modules/m11/server/actions.ts#addBudgetLineByToken': 'partner portal; the magic token is the credential',
   // The portal form's inline action only hands the form to addBudgetLineByToken
   // above; an inline action that writes itself is refused regardless of this entry.
-  'app/[locale]/portal/partner/[token]/page.tsx#inline:PartnerPortalPage:1':
+  'app/[locale]/(public)/portal/partner/[token]/page.tsx#inline:PartnerPortalPage:1':
     'partner portal form; delegates to addBudgetLineByToken, the token is the credential',
   // Reads that resolve the tenant through pipeline/actions.ts `sessionScope()`
   // rather than `requireTenantAction({ readOnly: true })`.
@@ -2028,7 +2032,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
     });
 
     it('G10: an inline `use server` action that writes', () => {
-      const portal = 'app/[locale]/portal/partner/[token]/page.tsx';
+      const portal = 'app/[locale]/(public)/portal/partner/[token]/page.tsx';
       const portalSource = fs.readFileSync(path.join(SRC, portal), 'utf8');
       const anchor = "            'use server';";
       expect(portalSource.split(anchor)).toHaveLength(2);

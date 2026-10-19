@@ -142,6 +142,9 @@ export async function purgeDueUsers(
         //     platform has just promised to forget.
         await tx.calendarConnection.deleteMany({ where: { userId } });
         await tx.savedSearch.deleteMany({ where: { userId } });
+        //     ADR-0011: notifications are addressed to the subject and nobody
+        //     else, so they go outright, in every tenant.
+        await tx.notification.deleteMany({ where: { userId } });
 
         //     The rest are the tenant's records, not the subject's. Erasure must
         //     not delete the tenant's opportunities, bug reports or audit trail,
@@ -149,6 +152,9 @@ export async function purgeDueUsers(
         //     the same choice already made for `AiUsageLog` above and for the
         //     hashed subject reference in the erasure audit below.
         await tx.auditEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
+        //     `member.removed` names the Membership id in `target`, never the user
+        //     id. The person link there is cut by the `Membership.user` cascade
+        //     below, so `target` needs no rewrite here.
         await tx.opportunity.updateMany({ where: { ownerId: userId }, data: { ownerId: null } });
         await tx.feedback.updateMany({ where: { userId }, data: { userId: null } });
         await tx.proposalUsage.updateMany({ where: { usedByUserId: userId }, data: { usedByUserId: null } });
@@ -237,9 +243,17 @@ interface PurgedUser {
   memberships: Array<{ tenantId: string }>;
 }
 
+/**
+ * The one-way reference to an erased subject that replaces their id in the
+ * audit trail. Deterministic, so anyone holding the original id can recompute it.
+ */
+function subjectRefOf(userId: string): string {
+  return createHash('sha256').update(userId).digest('hex');
+}
+
 /** Writes one `user.erased` AuditEvent per tenant the subject belonged to. */
 async function writeErasureAudit(user: PurgedUser): Promise<void> {
-  const subjectRef = createHash('sha256').update(user.id).digest('hex');
+  const subjectRef = subjectRefOf(user.id);
   const data = {
     subjectRef,
     // Values crossing a step.run boundary are JSON, so this can arrive as a

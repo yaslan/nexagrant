@@ -25,12 +25,12 @@ export async function GET(req: NextRequest) {
       "kayit",
       OAUTH_SIGNIN_ERROR.inviteInvalid,
     );
-    return NextResponse.redirect(new URL(to, publicUrl()), 302);
+    return NextResponse.redirect(new URL(to, publicUrl(req)), 302);
   }
   const raw = req.nextUrl.searchParams.get("error") ?? "";
   const code = /^[A-Za-z]{1,64}$/.test(raw) ? raw : "Configuration";
   return NextResponse.redirect(
-    new URL(`/tr/giris?error=${code}`, publicUrl()),
+    new URL(`/tr/giris?error=${code}`, publicUrl(req)),
     302,
   );
 }

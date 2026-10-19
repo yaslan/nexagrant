@@ -64,7 +64,7 @@ export const BETA_SEATS: BetaSeat[] = [
 export const DEMO_ADMIN_SEAT = {
   id: 'demo-user-superadmin',
   email: 'admin@yasinaslan.com.tr',
-  name: 'Yasin Aslan (Süperadmin)',
+  name: 'Yasin Aslan',
   role: 'TENANT_OWNER' as SeatRole,
 };
 

@@ -23,8 +23,8 @@ vi.mock('@/lib/workspaces', () => ({
   }),
 }));
 
-import { GET } from '@/app/[locale]/calls/topic/[id]/route';
-import { callTopicTarget } from '@/app/[locale]/calls/topic/[id]/target';
+import { GET } from '@/app/[locale]/(public)/calls/topic/[id]/route';
+import { callTopicTarget } from '@/app/[locale]/(public)/calls/topic/[id]/target';
 
 const call = async (locale: string, id: string) => {
   const res = await GET(new NextRequest(`http://localhost:3000/${locale}/calls/topic/${encodeURIComponent(id)}`), {

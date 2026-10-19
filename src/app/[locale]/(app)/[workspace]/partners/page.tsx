@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { getWorkspaceRoute } from '@/lib/routes';
+import { ModuleLink } from '@/components/ModuleLink';
 import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
@@ -68,6 +70,7 @@ export default async function PartnersPage({
 
   const sParams = await searchParams;
   const isTr = locale === 'tr';
+  const tLinks = await getTranslations({ locale, namespace: 'PartnersPage.crossLinks' });
 
   const q = sParams.q?.trim() || '';
   const country = sParams.country?.trim().toUpperCase() || '';
@@ -211,6 +214,32 @@ export default async function PartnersPage({
           </span>
         </div>
       </div>
+
+      {/* Pages that used to be reachable only by typing their address (TASK-MVBB4FCX2Q24T K-1). */}
+      <nav
+        aria-labelledby="partners-cross-links-label"
+        data-testid="partners-cross-links"
+        className="flex flex-wrap items-center gap-2 text-sm"
+      >
+        <span id="partners-cross-links-label" className="text-xs font-semibold text-ink-2 uppercase tracking-wider mr-1">
+          {tLinks('label')}
+        </span>
+        <Link
+          href={getWorkspaceRoute('partnerLeaders', locale, workspace)}
+          data-testid="partners-link-leaders"
+          className="inline-flex items-center min-h-9 px-3 py-1.5 rounded-lg border border-border bg-surface font-medium text-ink-2 hover:text-ink hover:border-accent/40 transition-colors"
+        >
+          {tLinks('leaders')}
+        </Link>
+        <ModuleLink
+          module="M5"
+          href={getWorkspaceRoute('reportsPersonDays', locale, workspace)}
+          data-testid="partners-link-person-days"
+          className="inline-flex items-center min-h-9 px-3 py-1.5 rounded-lg border border-border bg-surface font-medium text-ink-2 hover:text-ink hover:border-accent/40 transition-colors"
+        >
+          {tLinks('personDays')}
+        </ModuleLink>
+      </nav>
 
       {/* Client Filter Bar Component */}
       <PartnerFilters

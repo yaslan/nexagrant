@@ -133,6 +133,30 @@ export function formatMoney(amountMinor: number, currency: string, locale: strin
 }
 
 /**
+ * Renders a *whole-unit* amount (whole euros, not cents) for a person to read,
+ * in their locale, with no fraction digits.
+ *
+ * For figures that arrive in major units and are never priced or summed into
+ * an invoice — CORDIS stores `ecContribution` as whole EUR (`parseBigIntEur`).
+ * Converting those to cents just to call `formatMoney` would print a ",00" the
+ * source never had.
+ *
+ * A `bigint` goes to `Intl` as is, so totals past `Number.MAX_SAFE_INTEGER`
+ * keep every digit; a `number` must already be a safe integer.
+ */
+export function formatWholeMoney(amountWhole: bigint | number, currency: string, locale: string): string {
+  if (typeof amountWhole === 'number' && !Number.isSafeInteger(amountWhole)) {
+    throw new Error(`Whole-unit amounts must be safe integers, got ${amountWhole}`);
+  }
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amountWhole);
+}
+
+/**
  * Converts an integer minor-unit amount to an integer minor-unit amount
  * in target currency using a record-provided exchange rate.
  * Integer arithmetic with half-up rounding (0.5 rounds up).

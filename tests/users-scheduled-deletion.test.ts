@@ -19,6 +19,7 @@ const auditCreate = vi.fn().mockResolvedValue({});
 // the job has to clear each one by hand and each one needs a mock here.
 const calendarDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const savedSearchDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const notificationDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const auditUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const opportunityUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const feedbackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
@@ -54,6 +55,7 @@ vi.mock('../src/lib/db', () => {
     },
     calendarConnection: { deleteMany: (...args: unknown[]) => calendarDeleteMany(...args) },
     savedSearch: { deleteMany: (...args: unknown[]) => savedSearchDeleteMany(...args) },
+    notification: { deleteMany: (...args: unknown[]) => notificationDeleteMany(...args) },
     opportunity: { updateMany: (...args: unknown[]) => opportunityUpdateMany(...args) },
     feedback: { updateMany: (...args: unknown[]) => feedbackUpdateMany(...args) },
     proposalUsage: { updateMany: (...args: unknown[]) => proposalUsageUpdateMany(...args) },
@@ -160,6 +162,7 @@ describe('purgeDueUsers — grace period', () => {
     expect(auditCreate).not.toHaveBeenCalled();
     expect(calendarDeleteMany).not.toHaveBeenCalled();
     expect(savedSearchDeleteMany).not.toHaveBeenCalled();
+    expect(notificationDeleteMany).not.toHaveBeenCalled();
     expect(relationshipUpdateMany).not.toHaveBeenCalled();
   });
 
@@ -174,6 +177,7 @@ describe('purgeDueUsers — grace period', () => {
 
     expect(calendarDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
     expect(savedSearchDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
+    expect(notificationDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
     expect(auditUpdateMany).toHaveBeenCalledWith({ where: { actorId: 'due' }, data: { actorId: null } });
     expect(opportunityUpdateMany).toHaveBeenCalledWith({ where: { ownerId: 'due' }, data: { ownerId: null } });
     expect(feedbackUpdateMany).toHaveBeenCalledWith({ where: { userId: 'due' }, data: { userId: null } });

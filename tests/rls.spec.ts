@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
 import { envValue } from './helpers/dotenv';
 import { requireId } from './helpers/teardown-guard';
+import { skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * Tenant isolation is only observable through a role that is actually subject
@@ -28,7 +29,7 @@ describe('Row Level Security (RLS)', () => {
     if (!RLS_URL) {
       skipReason =
         'DATABASE_URL_RLS_TEST is not set. Run `pnpm db:rls-role` to create the NOBYPASSRLS role.';
-      console.warn(`RLS test skipped: ${skipReason}`);
+      skipOrFailInCi('RLS test', skipReason);
       return;
     }
 
@@ -56,8 +57,9 @@ describe('Row Level Security (RLS)', () => {
       ready = true;
     } catch (e) {
       skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
-      console.warn(`RLS test skipped: ${skipReason}`);
       ready = false;
+      // In CI this throws: a failed fixture there is a broken setup, not a skip.
+      skipOrFailInCi('RLS test', skipReason);
     }
   });
 

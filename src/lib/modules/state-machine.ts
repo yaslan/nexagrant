@@ -1,5 +1,5 @@
 import { ModuleId, ModuleStatus, PlanTier } from './types';
-import { getManifest } from './registry';
+import { getAllManifests, getManifest } from './registry';
 
 export interface CanEnableResult {
   allowed: boolean;
@@ -118,6 +118,13 @@ export interface ModuleViewer {
   role: string;
   /** FonBridge staff — the only people a `DEV` module is for. */
   isPlatformAdmin: boolean;
+  /**
+   * A machine audience: an API key acting for a tenant, not a member. It is open
+   * wherever the tenant's managers are (`PILOT`), because a pilot tenant's Partner
+   * API integration must keep working while the pilot runs; it is not staff, so
+   * `DEV` stays closed to it. Only the API-key path sets this — a session never does.
+   */
+  isMachine?: boolean;
 }
 
 /**
@@ -154,7 +161,7 @@ const PILOT_ROLES = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER'];
  *   DEV   → FonBridge staff only. Work in progress; the tenant's own owner is *not*
  *           an insider, which is exactly the case the previous `role === 'TENANT_OWNER'`
  *           test got wrong: every tenant has an owner, so DEV let everyone in.
- *   PILOT → the tenant's managers, plus staff.
+ *   PILOT → the tenant's managers, plus staff, plus the tenant's API keys (machine).
  *   ON    → every member of the tenant.
  *
  * Role-level permissions (`evaluator:write`) and plan entitlement are separate gates
@@ -168,7 +175,7 @@ export function canAccessStatus(
     case 'ON':
       return { allowed: true };
     case 'PILOT':
-      return viewer.isPlatformAdmin || PILOT_ROLES.includes(viewer.role)
+      return viewer.isPlatformAdmin || viewer.isMachine === true || PILOT_ROLES.includes(viewer.role)
         ? { allowed: true }
         : { allowed: false, reason: 'PILOT_MANAGERS_ONLY' };
     case 'DEV':
@@ -179,4 +186,119 @@ export function canAccessStatus(
     default:
       return { allowed: false, reason: 'MODULE_OFF' };
   }
+}
+
+// ───────────────────────────── Plan × switch → card status ─────────────────────────────
+
+/**
+ * Where a module stands for a tenant, from the two facts the module gate checks:
+ * does the plan (plus add-ons) entitle it, and has `ModuleState` switched it on.
+ *
+ *   ACTIVE    → entitled and switched on: usable.
+ *   AVAILABLE → entitled, switched off: the tenant can open it in settings.
+ *   LOCKED    → not entitled, never switched on: answered at checkout.
+ *   ORPHANED  → switched on but no longer entitled (left behind by a downgrade).
+ */
+export type ModuleCardStatus = 'ACTIVE' | 'AVAILABLE' | 'LOCKED' | 'ORPHANED';
+
+/**
+ * The slice of the settings page's plan view `moduleStatus` reads. Shaped like
+ * `ModulesPlanView`, so the page passes its view as it is: `activeModules` and
+ * `switchedOnOutsidePlan` together are every module `ModuleState` switched on.
+ */
+export interface ModuleStatusView {
+  entitledModules: readonly ModuleId[];
+  activeModules: readonly ModuleId[];
+  switchedOnOutsidePlan: readonly ModuleId[];
+}
+
+export function moduleStatus(moduleId: ModuleId, view: ModuleStatusView): ModuleCardStatus {
+  const switchedOn =
+    view.activeModules.includes(moduleId) || view.switchedOnOutsidePlan.includes(moduleId);
+  if (view.entitledModules.includes(moduleId)) return switchedOn ? 'ACTIVE' : 'AVAILABLE';
+  return switchedOn ? 'ORPHANED' : 'LOCKED';
+}
+
+// ───────────────────────────── Transitive requirements ─────────────────────────────
+
+/** Module → its hard dependencies (`requires[]`), as declared in the manifests. */
+export type RequirementGraph = Readonly<Record<string, readonly string[]>>;
+
+export function requirementGraph(): Record<ModuleId, ModuleId[]> {
+  return Object.fromEntries(getAllManifests().map((m) => [m.id, m.requires])) as Record<
+    ModuleId,
+    ModuleId[]
+  >;
+}
+
+/** `M2` < `M10`: module ids sort by their number, not as strings. */
+function byModuleNumber(a: string, b: string): number {
+  return Number(a.slice(1)) - Number(b.slice(1)) || a.localeCompare(b);
+}
+
+/**
+ * The first dependency cycle in `graph`, as a closed path (`['M1', 'M4', 'M1']`),
+ * or `null` when the graph is acyclic. `requirementChain` and `getDisableCascade`
+ * both assume there is none.
+ */
+export function findDependencyCycle(graph: RequirementGraph = requirementGraph()): string[] | null {
+  const done = new Set<string>();
+  const path: string[] = [];
+
+  const visit = (id: string): string[] | null => {
+    const onPath = path.indexOf(id);
+    if (onPath !== -1) return [...path.slice(onPath), id];
+    if (done.has(id)) return null;
+    path.push(id);
+    for (const dep of graph[id] ?? []) {
+      const cycle = visit(dep);
+      if (cycle) return cycle;
+    }
+    path.pop();
+    done.add(id);
+    return null;
+  };
+
+  for (const id of Object.keys(graph).sort(byModuleNumber)) {
+    const cycle = visit(id);
+    if (cycle) return cycle;
+  }
+  return null;
+}
+
+/**
+ * Every module `moduleId` needs switched on first, directly or through another
+ * dependency — each once, dependencies before the modules that need them, ties
+ * in module-number order. For M11: `['M1', 'M2', 'M3', 'M5', 'M8']`.
+ *
+ * Throws on a cycle rather than returning a partial chain.
+ */
+export function requirementChain(moduleId: ModuleId): ModuleId[];
+export function requirementChain(moduleId: string, graph: RequirementGraph): string[];
+export function requirementChain(
+  moduleId: string,
+  graph: RequirementGraph = requirementGraph()
+): string[] {
+  const cycle = findDependencyCycle(graph);
+  if (cycle) throw new Error(`Module dependency cycle: ${cycle.join(' → ')}`);
+
+  const needed = new Set<string>();
+  const stack = [...(graph[moduleId] ?? [])];
+  while (stack.length > 0) {
+    const id = stack.pop() as string;
+    if (needed.has(id)) continue;
+    needed.add(id);
+    stack.push(...(graph[id] ?? []));
+  }
+
+  // Layered topological order: place whatever has all of its requirements placed.
+  const chain: string[] = [];
+  while (chain.length < needed.size) {
+    const ready = [...needed]
+      .filter((id) => !chain.includes(id))
+      .filter((id) => (graph[id] ?? []).every((dep) => chain.includes(dep)))
+      .sort(byModuleNumber);
+    chain.push(...ready);
+  }
+  return chain;
 }

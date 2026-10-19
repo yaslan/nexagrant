@@ -5,15 +5,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getWorkspaceRoute } from '@/lib/routes';
+import { getAllManifests, getManifest } from '@/lib/modules/registry';
+import { useActiveModules } from '@/lib/modules/hooks';
+import { navFeatureModule } from '@/lib/modules/catalog';
 
 interface SidebarNavProps {
   locale: string;
   isPlatformAdmin?: boolean;
+  canManageModules?: boolean;
+  canManageUsers?: boolean;
 }
 
-export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarNavProps) {
+export default function SidebarNav({ locale, isPlatformAdmin = false, canManageModules = false, canManageUsers = false }: SidebarNavProps) {
   const t = useTranslations('Navigation');
+  const tModules = useTranslations('modules');
   const pathname = usePathname();
+  // The nav renders twice at once (desktop aside + mobile drawer), so a key-only id
+  // would repeat in the document.
+  const idBase = React.useId();
 
   // Extract current workspace from URL if present (e.g. /tr/demo-sme/calls -> demo-sme)
   const segments = pathname ? pathname.split('/').filter(Boolean) : [];
@@ -24,17 +33,36 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
     ? secondSegment
     : 'default';
 
+  // Module entries come from each manifest's `nav[]`, shown only for modules the server
+  // said this session may open (plan + ModuleState + role, `listAccessibleModules`).
+  // The visibility decision is not re-made here; this only reads its answer.
+  const activeModules = useActiveModules();
+  const moduleItems = getAllManifests()
+    .filter((m) => activeModules.includes(m.id))
+    .flatMap((m) => m.nav)
+    .sort((a, b) => a.order - b.order)
+    .map((item) => ({
+      key: item.labelKey,
+      href: getWorkspaceRoute(item.routeKey, locale, workspaceSlug),
+      label: t(item.labelKey),
+    }));
+
   const navItems = [
     { key: 'dashboard', href: getWorkspaceRoute('dashboard', locale, workspaceSlug), label: t('dashboard') },
     { key: 'calls', href: getWorkspaceRoute('calls', locale, workspaceSlug), label: t('calls') },
-    { key: 'pipeline', href: getWorkspaceRoute('pipeline', locale, workspaceSlug), label: t('pipeline') },
-    { key: 'partners', href: getWorkspaceRoute('partners', locale, workspaceSlug), label: t('partners') },
-    { key: 'relationships', href: getWorkspaceRoute('relationships', locale, workspaceSlug), label: t('relationships') },
-    { key: 'evidence', href: getWorkspaceRoute('evidence', locale, workspaceSlug), label: t('evidence') },
-    { key: 'tto', href: getWorkspaceRoute('tto', locale, workspaceSlug), label: t('tto') },
+    ...moduleItems,
     { key: 'approvals', href: getWorkspaceRoute('approvals', locale, workspaceSlug), label: t('approvals') },
     { key: 'apiKeys', href: getWorkspaceRoute('settingsApiKeys', locale, workspaceSlug), label: t('apiKeys') },
-    { key: 'settings', href: getWorkspaceRoute('settingsModules', locale, workspaceSlug), label: t('settings') },
+    ...(canManageUsers
+      ? [{ key: 'members', href: getWorkspaceRoute('settingsMembers', locale, workspaceSlug), label: t('members') }]
+      : []),
+    {
+      key: 'settings',
+      href: canManageModules
+        ? getWorkspaceRoute('settingsModules', locale, workspaceSlug)
+        : getWorkspaceRoute('settingsProfile', locale, workspaceSlug),
+      label: t('settings')
+    },
   ];
 
   const adminItem = {
@@ -51,10 +79,41 @@ export default function SidebarNav({ locale, isPlatformAdmin = false }: SidebarN
       
       {navItems.map((item) => {
         const isActive = pathname?.startsWith(item.href) || pathname?.includes(`/${item.key}`);
+        // A feature of a module that is off (approvals → M5, API keys → M1) stays in
+        // the menu but locked. `activeModules` is the same answer `useModuleEnabled`
+        // reads; the hook itself cannot be called inside this loop.
+        const featureModule = navFeatureModule(item.key);
+        const featureManifest = featureModule && !activeModules.includes(featureModule) ? getManifest(featureModule) : null;
+        if (featureManifest) {
+          const tooltip = t('featureLocked', { module: `${featureManifest.id} ${tModules(`${featureManifest.key}.name`)}` });
+          const reasonId = `${idBase}-${item.key}-locked`;
+          // A disabled link: the name comes from the label, the lock reason is its
+          // description. The reason node is `hidden` so browse mode does not read it
+          // a second time; `aria-describedby` still resolves hidden nodes.
+          return (
+            <React.Fragment key={item.key}>
+              <span
+                role="link"
+                data-testid={`sidebar-nav-${item.key}`}
+                data-locked="true"
+                aria-disabled="true"
+                aria-describedby={reasonId}
+                tabIndex={0}
+                title={tooltip}
+                className="px-3 py-2 rounded-lg font-medium flex items-center justify-between text-muted cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <span>{item.label}</span>
+                <span aria-hidden="true">🔒</span>
+              </span>
+              <span id={reasonId} hidden>{tooltip}</span>
+            </React.Fragment>
+          );
+        }
         return (
           <Link
             key={item.key}
             href={item.href}
+            data-testid={`sidebar-nav-${item.key}`}
             className={`px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-between ${
               isActive
                 ? 'bg-accent/10 text-accent-ink font-semibold'

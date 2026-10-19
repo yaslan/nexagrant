@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { getPublicRoute, getWorkspaceRoute } from '@/lib/routes';
 import { PRODUCT_NAME } from '@/lib/brand';
+import { expertPreregPath } from '@/components/expert-prereg/paths';
 
 interface PublicFooterProps {
   locale: string;
@@ -13,9 +14,10 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
   const isTr = locale === 'tr';
   const tCommon = useTranslations('Common');
   const tFooter = useTranslations('landing.footer');
+  const tExpert = useTranslations('ExpertPrereg');
 
   return (
-    <footer className="bg-ground border-t border-border text-muted text-xs transition-colors">
+    <footer data-testid="public-footer" className="bg-ground border-t border-border text-muted text-xs transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-10">
           {/* Col 1: Brand */}
@@ -44,6 +46,11 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
               {isTr ? 'Yetenekler' : 'Platform'}
             </h3>
             <ul className="space-y-2">
+              <li>
+                <Link href={expertPreregPath(locale)} className="hover:text-ink transition">
+                  {tExpert('nav_label')}
+                </Link>
+              </li>
               <li>
                 <Link href={getWorkspaceRoute('pipeline', locale, 'default')} className="hover:text-ink transition">
                   {isTr ? 'G0-G4 Kapı Modeli' : 'G0-G4 Stage-Gate'}

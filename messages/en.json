@@ -10,10 +10,12 @@
     "tto": "TTO Accelerator (M7)",
     "approvals": "Approvals (4-Eyes)",
     "apiKeys": "Partner REST API",
+    "members": "Members",
     "settings": "Settings",
     "adminModules": "Platform Admin",
     "workspaceLabel": "Workspace",
-    "administrationLabel": "Administration"
+    "administrationLabel": "Administration",
+    "featureLocked": "The {module} module is off — this feature is unavailable"
   },
   "Common": {
     "loading": "Loading...",
@@ -37,10 +39,34 @@
     "pilotExpired": "The pilot has ended, so editing is off. Ask your administrator to extend it.",
     "forbiddenRole": "Your role does not allow this action, so nothing was saved. Ask your workspace administrator for access.",
     "serviceBusy": "The system is very busy right now, so nothing was saved. Try again in a few seconds.",
+    "moduleUnavailable": "This module is not available in your workspace right now (switched off or outside your plan), so nothing was saved. Ask your workspace administrator for access.",
     "aiTruncated": "The AI text was cut off at the length limit, so nothing was saved and no credit was charged. Try again, or ask for a shorter document.",
     "aiRefused": "The AI model declined this request. Nothing was saved and no credit was charged.",
     "logoAlt": "{brand} logo",
     "copyright": "© {year} {brand} ({brand} SaaS). All rights reserved."
+  },
+  "Notifications": {
+    "title": "Notifications",
+    "description": "System alerts, match findings, and workspace updates.",
+    "noNotifications": "You have no notifications yet.",
+    "noNotificationsDesc": "Match findings, evidence alerts and credit activity will appear here.",
+    "allRead": "All Notifications Read",
+    "unreadBadge": "{count, plural, one {1 Unread Notification} other {# Unread Notifications}}",
+    "markAllRead": "Mark All as Read",
+    "savedSearchTitle": "New match found",
+    "savedSearchDesc": "{matchCount, plural, one {1 call} other {# calls}} matched \"{searchName}\"",
+    "creditGrantedTitle": "Credits added",
+    "creditGrantedDesc": "{amount} AI credits added ({source})",
+    "sourceMonthly": "Monthly grant",
+    "sourceStripe": "Stripe",
+    "sourceIyzico": "iyzico",
+    "creditExhaustedTitle": "Credits exhausted",
+    "creditExhaustedDesc": "No AI credits left for {module}",
+    "evidenceExpiringTitle": "Document expiring soon",
+    "evidenceExpiringDesc": "Valid until {validUntil}",
+    "sourceOther": "another source",
+    "genericTitle": "Notification",
+    "genericDesc": "You have a new notification."
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -108,7 +134,8 @@
     "readinessImportedAt": "scorecard result added on {date}",
     "readinessMoreGaps": "{count} more gaps; see the full result for all of them.",
     "readinessViewResult": "View the full result",
-    "readinessRetake": "Retake the scorecard"
+    "readinessRetake": "Retake the scorecard",
+    "cardLinkAria": "{title} — go to details"
   },
   "Pipeline": {
     "title": "Opportunity Pipeline",
@@ -216,7 +243,18 @@
           "WITHDRAWN": "A withdrawn opportunity cannot take a declaration.",
           "DECLARE_FAILED": "The declaration could not be saved. Try again."
         }
-      }
+      },
+      "modules": {
+        "label": "Modules",
+        "conceptNote": "Concept note",
+        "evaluations": "Internal pre-assessment",
+        "matching": "Consortium role matrix",
+        "consortium": "Consortium builder",
+        "briefs": "Meeting briefing",
+        "documents": "Follow-up documents",
+        "application": "Application (Part A & B)"
+      },
+      "personDaysReport": "Person-days report"
     }
   },
   "pipeline": {
@@ -281,7 +319,23 @@
     "wordCount": "Word Count",
     "overLimit": "Over Limit",
     "aiUsage": "AI Usage Disclosure",
-    "creditsUsed": "Credits Used"
+    "creditsUsed": "Credits Used",
+    "editor": {
+      "title": "Concept Note Editor",
+      "generate": "AI Generate Draft",
+      "generating": "Generating...",
+      "save": "Save Draft",
+      "saving": "Saving...",
+      "export": "Export DOCX",
+      "exporting": "Exporting...",
+      "generated": "Draft generated. Refresh the page to see the generated text.",
+      "saved": "Draft saved.",
+      "failed": "Action failed: {message}",
+      "sectionLabel": "{label} (max {max} words)",
+      "placeholder": "Write the {label} section...",
+      "words": "Words: {count} / {max}",
+      "noTemplate": "No concept note template found in the system. Run the seed."
+    }
   },
   "Relationships": {
     "title": "Relationship Manager",
@@ -317,7 +371,15 @@
     "kindMeeting": "Meeting",
     "kindEmail": "Email",
     "kindCall": "Call",
-    "kindEvent": "Event"
+    "kindEvent": "Event",
+    "page": {
+      "title": "Focal Point CRM (M4)",
+      "subtitle": "Manage partner relationships and track interactions.",
+      "newFromPartner": "+ New from Partner Card",
+      "staleDays": "{days}d stale",
+      "daysAgo": "{days}d ago",
+      "empty": "No relationships yet. Open one from a Partner Card."
+    }
   },
   "Consortium": {
     "title": "Consortium Builder",
@@ -694,7 +756,88 @@
     "modules": {
       "noSubscription": "No subscription · free plan",
       "pilotLocked": "Off during the pilot · available with an institution plan",
-      "upgradeCta": "Upgrade Plan"
+      "upgradeCta": "Upgrade Plan",
+      "forbiddenTitle": "Access Denied",
+      "forbiddenBody": "You are not allowed to manage modules. Only users with the <strong>Tenant Owner</strong> role can open this area.",
+      "breadcrumbDashboard": "Dashboard",
+      "breadcrumbSettings": "Settings",
+      "breadcrumbCurrent": "Module Management",
+      "title": "Module and Feature Management",
+      "subtitle": "Manage the EU R&D and funding modules active in your workspace ({tenant}), check their dependencies and switch on new capabilities.",
+      "currentPlan": "Current Subscription Plan",
+      "planUnread": "Unavailable",
+      "pilotBadge": "Pilot",
+      "pilotEndedBadge": "Pilot ended",
+      "pilotLastDay": "Last day: {date} · not renewed",
+      "changePlan": "Change Plan →",
+      "pilotExpiredNotice": "The free pilot ended on {date}. The workspace is read-only; modules cannot be changed.",
+      "planUnreadNotice": "The plan and module state could not be read right now. No module is shown as on; reload the page and try again.",
+      "activeModules": "Active Modules",
+      "pipelineCoverage": "Pipeline coverage",
+      "pipelineCoverageValue": "{covered}/{total} stages",
+      "pipelineCoverageStages": "G0–G4 · covered: {stages}",
+      "pipelineCoverageNone": "G0–G4 · no stage covered",
+      "categoryCount": "{active}/{total} active",
+      "category": {
+        "core": "Core Workflow",
+        "ai": "AI & Scoring",
+        "tools": "Tools & TTO"
+      },
+      "tabAll": "All Modules ({count})",
+      "tabCategory": "{label} ({count})",
+      "tabActive": "Switched On Only ({count})",
+      "categoryTabsLabel": "Module category",
+      "searchPlaceholder": "Search modules (e.g. M6, Partner, AI)...",
+      "searchLabel": "Search modules",
+      "clearSearch": "Clear search",
+      "status": {
+        "ACTIVE": "Ready to use",
+        "AVAILABLE": "Included in your plan, can be switched on",
+        "LOCKED": "Not included in your plan",
+        "ORPHANED": "Left outside your plan — unavailable",
+        "UNKNOWN": "Status unavailable"
+      },
+      "statusBadge": {
+        "ga": "GA",
+        "beta": "Beta",
+        "soon": "Coming soon"
+      },
+      "keyLabel": "Key: {key}",
+      "versionLabel": "v{version}",
+      "docsLink": "Documentation ↗",
+      "quotaLabel": "Quota:",
+      "quotaAiCalls": "{count} AI calls per month",
+      "quotaRecords": "{count} records",
+      "chainLabel": "Full requirement chain:",
+      "chainNone": "Standalone (no requirements)",
+      "chainActive": "{id} active",
+      "chainMissing": "{id} missing — switch this module on first",
+      "recommendsLabel": "Recommended:",
+      "plansLabel": "Plans:",
+      "plansNone": "Not in any plan",
+      "addOnSku": "SKU: {sku}",
+      "missingDependencies": "Missing dependency: {ids}",
+      "enable": "Switch on",
+      "disable": "Switch off",
+      "toastDisabled": "Module {id} switched off.",
+      "toastEnabled": "Module {id} switched on.",
+      "toastDisableFailed": "The module could not be switched off.",
+      "toastEnableFailed": "The module could not be switched on.",
+      "toastEnableBlockedDeps": "{id} could not be switched on: required modules missing: {ids}",
+      "toastEnableBlocked": "{id} could not be switched on: the enable rule was not met.",
+      "toastOrphanDisabled": "{id} had been left on outside the plan; switched off.",
+      "toastCascadeDisabled": "{id} and {count} dependent modules switched off.",
+      "toastCascadeFailed": "The modules could not be switched off.",
+      "emptyTitle": "No module matches your search",
+      "emptyBody": "Try clearing the filters or your search.",
+      "emptyReset": "Reset Filters",
+      "cascadeTitle": "Dependent Modules Will Be Switched Off",
+      "cascadeSubtitle": "Other modules that depend on this one are affected.",
+      "cascadeBody": "Switching off <strong>{name} ({id})</strong> also switches off the following <strong>{count}</strong> modules that depend on it:",
+      "cascadeCancel": "Cancel",
+      "cascadeConfirm": "Switch All Off",
+      "footerTitle": "Module Architecture and Dependency Hierarchy",
+      "footerBody": "{product} modules work together. Before a module can be switched on, every module in its card’s “Full requirement chain” must be on; switching a module off also switches off the modules that depend on it."
     },
     "privacy": {
       "title": "Privacy & My Data",
@@ -808,7 +951,7 @@
       "rightsBody": "Under GDPR and applicable data protection law, you have the following nine rights: (a) To know whether your personal data is being processed; (b) To request information about your processed data — you can export it as JSON at any time from 'Settings → Privacy & My Data'; (c) To learn the purpose of processing and whether it aligns with that purpose; (d) To know which third parties within and outside your country your data is transferred to; (e) To request correction of incomplete or incorrect data; (f) To request deletion or destruction of your data — you can request account deletion from 'Settings → Privacy & My Data' (account is closed immediately and permanently deleted after 30 days; you may cancel within that window); (g) To request that deletion or correction be communicated to third parties; (h) To object to decisions based solely on automated processing (product scoring falls under this right); (i) To seek compensation for harm. For security, authentication secrets (OAuth and session tokens) are excluded from exports.",
       "rightsLink": "Go to Privacy & My Data",
       "securityHeading": "7. Security and Storage",
-      "securityBody": "Your data is partitioned via PostgreSQL Row-Level Security (RLS) in a multi-tenant environment, and uploaded files are protected in encrypted cloud object storage (R2/S3).",
+      "securityBody": "Tenant data is separated at the application layer: queries that access tenant data are restricted to your tenant identifier; a defined, limited set of system operations (platform administration, data-subject requests, scheduled jobs) may operate across tenants. PostgreSQL Row-Level Security (RLS) policies are defined in the database, but they are not in effect on the application's database connection. Uploaded files are stored in encrypted cloud object storage (R2/S3).",
       "recipientsHeading": "3. Data Recipients & International Transfers",
       "recipientsBody": "Your data may be transferred to: (1) Anthropic PBC (USA) — text content you submit for AI-assisted text generation and pre-assessment (capacity descriptions, proposal drafts, documents under evaluation); (2) Google LLC (USA) — name and email sent during sign-in; (3) Stripe, Inc. (USA) — customer identifier and billing status for subscription and payment management; (4) OpenAI, L.L.C. (USA) — document text for embedding; (5) Cloudflare, Inc. (region depends on account settings) — uploaded files and screenshots; (6) PostHog Inc. (EU region, default) — event names and scoring status (requires cookie consent); (7) Vulut (Turkey) — database, application server, and email hosting. For questions about international transfers, please contact us at info@fonbridge.com.",
       "legalBasisHeading": "5. Legal Basis Table",
@@ -835,7 +978,7 @@
       "trialHeading": "6. Pilot Period",
       "trialBody": "When a workspace is created, pilot (trial) access is granted for a limited time. After the pilot expires, new calculations and changes are paused. To continue, your workspace administrator must set up a subscription.",
       "terminationHeading": "7. Account Termination and Data Deletion",
-      "terminationBody": "Subscriptions may be cancelled anytime via the portal. When you request account deletion, the account is immediately closed and your personal account information is permanently deleted after 30 days. Workspace content, projects and documents remain in the system until the workspace itself is deleted. Billing and audit records are retained in anonymized form. You may withdraw your deletion request during this 30-day period. For details, see the Privacy Policy §3.",
+      "terminationBody": "Subscriptions may be cancelled anytime via the portal. When you request account deletion, the account is immediately closed and your personal account information is permanently deleted after 30 days. Workspace content, projects and documents remain in the system until the workspace itself is deleted. Billing and audit records are retained; the link to your user identifier in them is removed or replaced with a one-way hash. Free-text fields in audit records may still contain personal data. You may withdraw your deletion request during this 30-day period. For details, see the Privacy Policy §3.",
       "agencyHeading": "8. Agency Channel and Invite Code",
       "agencyBody": "Proposal-writing consultants (agencies) may reach their clients via an invitation code. Users who sign up with an invite code link their workspace to the agency. This linkage does not grant the agency access to the workspace's data; the relationship is established only at registration.",
       "partnerHeading": "9. Partner Portal",
@@ -1188,7 +1331,98 @@
     "meta_description": "EU funding calls open to {region}"
   },
   "applicationPartA": {
-    "portalLinkFailed": "The link could not be created. Refresh the page and try again."
+    "portalLinkFailed": "The link could not be created. Refresh the page and try again.",
+    "eyebrow": "Module 11 — Full Application Production",
+    "title": "Part A & Part B Application Production Panel",
+    "proposal": "Proposal: <strong>{title}</strong>",
+    "downloadPartB": "Download Part B (.docx) Template",
+    "partsActive": "Part A & B Active",
+    "summary": {
+      "effort": "Total Consortium Effort",
+      "personMonths": "Person-Months (PM)",
+      "budget": "Total Budget (Lump Sum)",
+      "wpCount": "Work Packages",
+      "wpUnit": "Work Packages (WP)",
+      "pageLimit": "Page Limit Check",
+      "pageLimitValue": "RIA/IA Limit: 45 Pages"
+    },
+    "tabs": {
+      "partBEditor": "Part B (Multi-Author Collaborative Editor)",
+      "partA": "Part A (Administrative & Lump-Sum Budget)",
+      "gantt": "Part B (Gantt Chart & Work Packages)",
+      "checklist": "Submission Checklist"
+    },
+    "portal": {
+      "title": "Partner Contribution Portal (Magic Link)",
+      "intro": "External consortium partners can enter their own organisation and budget data through the secure link below, with no password:",
+      "copied": "Copied",
+      "copy": "Copy",
+      "shownOnce": "This link is shown only now and is not stored, for security. Copy it now and send it to your partner.",
+      "issuedBefore": "A link was issued earlier and cannot be shown again, for security. Issuing a new link stops the old one from working.",
+      "none": "No link has been issued yet.",
+      "reissue": "Issue a new link",
+      "issue": "Issue link"
+    },
+    "budget": {
+      "addTitle": "Add Lump-Sum Budget Line",
+      "partnerName": "Partner Organisation Name",
+      "partnerNamePlaceholder": "e.g. METU TTO, Fraunhofer Institute",
+      "effort": "Effort (Person-Months)",
+      "countryCoef": "Country Coefficient",
+      "coefStandard": "1.00 (Standard EU)",
+      "coefSee": "0.85 (Türkiye / SEE)",
+      "coefNorth": "1.20 (High-Cost North)",
+      "travel": "Travel (€)",
+      "subcontracting": "Subcontracting (€)",
+      "calculating": "Calculating...",
+      "save": "Save Budget Line",
+      "tableTitle": "Consortium Lump-Sum Budget Table",
+      "overhead": "Standard 25% Overhead Included",
+      "colPartner": "Partner",
+      "colCoef": "Country Coef.",
+      "colRequested": "Requested (€)",
+      "empty": "No budget lines yet. Add a partner with the form below.",
+      "total": "CONSORTIUM TOTAL"
+    },
+    "gantt": {
+      "title": "Project Gantt Chart & Work Package Timeline (M1 - M36)",
+      "subtitle": "Horizon Europe Part B Section 3.1 work package (WP) start and end months.",
+      "empty": "No work packages yet. Add a WP with the form below.",
+      "lead": "Lead: <strong>{lead}</strong> (Month M{start} - M{end})",
+      "addTitle": "Add Work Package (WP)",
+      "code": "WP Code",
+      "wpTitle": "WP Title",
+      "leadOrg": "Lead Organisation",
+      "start": "Start (Month)",
+      "end": "End (Month)",
+      "add": "Add Work Package to Gantt Chart"
+    },
+    "checklist": {
+      "title": "Pre-Submission Checklist (Submission Readiness)",
+      "subtitle": "Check the mandatory criteria before uploading to the EU Funding & Tenders portal.",
+      "items": {
+        "partA": {
+          "title": "Part A Administrative Forms",
+          "desc": "PIC numbers and financial representatives of all consortium partners verified."
+        },
+        "pageLimit": {
+          "title": "Part B Page Limit Compliance",
+          "desc": "The 45-page maximum for RIA/IA projects is not exceeded (Current: ~38 pages)."
+        },
+        "gep": {
+          "title": "Gender Equality Plan (GEP)",
+          "desc": "Approved GEP documents of public and university partners uploaded."
+        },
+        "fair": {
+          "title": "Open Science & Data Management Plan (FAIR Data)",
+          "desc": "Open-access publishing committed in Part B section 1.2."
+        },
+        "ip": {
+          "title": "Intellectual Property (IP) & Background Rights",
+          "desc": "Background patent and software rights of all partners defined."
+        }
+      }
+    }
   },
   "partner_portal": {
     "badge": "Consortium Partner Portal",
@@ -2239,7 +2473,8 @@
       "error_consent": "Tick the explicit consent box to send the form.",
       "error_outdated": "The form has been updated. Reload the page and try again.",
       "error_rate": "Too many requests in a short time. Please try again later.",
-      "error_server": "Your request could not be saved right now. Please try again in a moment."
+      "error_server": "Your request could not be saved right now. Please try again in a moment.",
+      "noscript_message": "JavaScript is required to submit this form. Please enable JavaScript in your browser."
     },
     "turkey": {
       "partial": "Türkiye takes part in part of it",
@@ -2627,6 +2862,7 @@
     "none": "—"
   },
   "adminBlog": {
+    "authorRolePlaceholder": "Dr., Prof. Dr., Expert",
     "saved": "Blog post saved.",
     "deleted": "Blog post deleted.",
     "featureToggled": "Featured status updated.",
@@ -2636,13 +2872,43 @@
       "invalid_slug": "The slug may contain only lower-case letters, digits and hyphens (3–120 characters).",
       "invalid_excerpt": "The excerpt must be 10–500 characters.",
       "invalid_content": "The content must be 20–50,000 characters.",
+      "invalid_content_link": "The content has a link that is not allowed. Links must start with https://, http:// or mailto:, or be a path on this site starting with /.",
+      "invalid_content_image": "The content has an image that cannot be used. Images are added by upload only and need alt text.",
       "invalid_category": "The category must be 1–60 characters.",
-      "invalid_read_time": "The read time must be 1–30 characters.",
+      "invalid_read_time": "The read time must be a whole number of minutes from 1 to 120.",
       "invalid_image": "The image URL must start with https and come from an allowed host (images.unsplash.com).",
       "invalid_author": "Author name and title may be at most 120 characters; a title or portrait needs an author name.",
       "slug_taken": "A post with this slug already exists. Change the title or the slug.",
       "not_found": "Post not found; another admin may have deleted it. Reload the page.",
       "save_failed": "The post could not be saved. Please try again."
+    },
+    "image": {
+      "label": "Cover image",
+      "choose": "Choose image",
+      "change": "Change image",
+      "hint": "JPG, PNG or WebP, up to {maxMb} MB.",
+      "uploading": "Uploading image…",
+      "uploaded": "Image uploaded.",
+      "previewAlt": "Cover image preview",
+      "missing": "Upload a cover image before saving.",
+      "errors": {
+        "type": "This file type is not supported. Choose a JPG, PNG or WebP image.",
+        "size": "The image is larger than {maxMb} MB. Choose a smaller file.",
+        "forbidden": "You are not allowed to upload images. Sign in as a platform admin.",
+        "object_store_unconfigured": "The file store is not configured, so the image cannot be uploaded right now. Tell your system administrator.",
+        "upload_failed": "The image could not be uploaded. Please try again."
+      }
+    },
+    "content": {
+      "label": "Article content",
+      "hint": "Formats the site shows: headings (H1–H3), bold, bulleted and numbered lists, links and uploaded images. Content is saved as Markdown.",
+      "missing": "Article content cannot be empty."
+    },
+    "readTime": {
+      "label": "Read time (minutes)",
+      "placeholder": "e.g. 5",
+      "hint": "Estimated from the content; you can change it. Shown on the site in the reader's language.",
+      "missing": "The read time cannot be empty. If the content has no text to read, type the read time yourself."
     }
   },
   "adminDocuments": {
@@ -2788,7 +3054,8 @@
   },
   "blog": {
     "meta_title": "EU Grant Management & Insights Blog",
-    "meta_description": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips."
+    "meta_description": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.",
+    "readMinutes": "{min} min read"
   },
   "blog_detail": {
     "meta_description": "Blog post"
@@ -2824,5 +3091,457 @@
     "errorGeneric": "An error occurred",
     "savingButton": "Generating AI Embeddings...",
     "saveButton": "Save Profile"
+  },
+  "m7": {
+    "tto": {
+      "matchingStatLabel": "Call matching",
+      "matchingStatValue": "Library loading",
+      "emptyPortfolio": "No technologies in the portfolio yet.",
+      "emptyPortfolioHint": "Start by adding a new technology with the form above.",
+      "matchCalls": "Match EU calls",
+      "matchResultTitle": "EU call matching result ({count})",
+      "noMatch": "No matching EU call was found for this technology.",
+      "openM4Relationship": "Open M4 relationship",
+      "header": {
+        "kicker": "Module 7 — TTO Accelerator",
+        "title": "University TTO Portfolio & EU Call Matcher",
+        "subtitle": "Connect university R&D patent portfolios with Horizon Europe calls and private-sector needs.",
+        "engineBadge": "Patent & TRL Engine"
+      },
+      "stats": {
+        "totalAssetsLabel": "Total TTO IP assets",
+        "technologiesUnit": "Technologies",
+        "avgTrlLabel": "Average TRL",
+        "grantedLabel": "Granted patents",
+        "patentsUnit": "Patents"
+      },
+      "trlValue": "TRL {value}",
+      "tabs": {
+        "portfolio": "TTO portfolio cards ({count})",
+        "roadmap": "TRL level map (TRL 1-9)",
+        "checklist": "IP & licensing checklist"
+      },
+      "form": {
+        "heading": "Add a new patent / IP portfolio item",
+        "titleLabel": "Technology / patent title",
+        "titlePlaceholder": "e.g. Solid-state battery micro-sensor array",
+        "trlLabel": "TRL (1 - 9)",
+        "patentStatusLabel": "Patent status",
+        "keywordsLabel": "Keywords (comma separated)",
+        "keywordsPlaceholder": "e.g. battery, thermal, sensor, solid state",
+        "summaryLabel": "Technology summary & advantages",
+        "summaryPlaceholder": "The technical strengths and commercial qualities this technology brings to EU projects...",
+        "submit": "Save to TTO portfolio",
+        "submitting": "Saving..."
+      },
+      "patentStatus": {
+        "granted": "Granted",
+        "pending": "Pending",
+        "licensed": "Licensed"
+      },
+      "portfolio": {
+        "heading": "Portfolio technologies ({count})",
+        "hint": "Click a card to match it to EU calls",
+        "generateChecklist": "Generate IP checklist",
+        "generatingChecklist": "Generating..."
+      },
+      "roadmap": {
+        "title": "Technology Readiness Level (TRL 1 - 9) matrix",
+        "subtitle": "The commercialisation maturity steps of university inventions in Horizon Europe projects.",
+        "researchBadge": "TRL 1 - 3 (Basic research)",
+        "researchTitle": "Laboratory & proof of concept",
+        "researchBody": "Basic principles observed; technology concept and application formulated.",
+        "prototypeBadge": "TRL 4 - 6 (Prototype & validation)",
+        "prototypeTitle": "Validation in the lab & relevant environment",
+        "prototypeBody": "Components validated in the laboratory and in a relevant industrial environment (the Horizon Europe R&D focus).",
+        "marketBadge": "TRL 7 - 9 (Commercialisation & market)",
+        "marketTitle": "Demonstration & operational roll-out",
+        "marketBody": "System demonstrated in a real operational environment, registered and licensed to the market."
+      },
+      "checklist": {
+        "title": "Intellectual property (IP) & licensing checklist guide",
+        "empty": "Click \"{button}\" on any technology in the Portfolio tab."
+      },
+      "matcher": {
+        "kicker": "EU Horizon Europe call matcher",
+        "close": "Close",
+        "analyzing": "AI is analysing EU calls...",
+        "fitScore": "Fit score: {score}%",
+        "targetTrl": "Target TRL: <strong>{range}</strong>"
+      },
+      "ipChecklistFallback": "### 📋 TTO IP & licensing checklist\n\n1. **Background IP declaration:**\n   - [x] Registered patent document ({patentStatus}) and ownership agreement prepared.\n   - [ ] Invention Disclosure Forms of the university researchers filed.\n\n2. **Foreground IP and licensing:**\n   - [ ] Draft pre-agreement on licence rights to the project results (Foreground IP).\n   - [ ] Commercialisation option right for private-sector partners (Option Agreement).\n\n3. **Spin-off & market entry:**\n   - [ ] Commercialisation roadmap from TRL {trl} to TRL {nextTrl}.\n   - [ ] Spin-off equity sharing model.\n\n4. **EU consortium agreement clauses:**\n   - [ ] Restrictions on the use of background IP declared in the consortium agreement."
+    }
+  },
+  "PartnersLeaders": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbPartners": "Partners",
+    "breadcrumbLeaders": "Top Leaders",
+    "backToPartners": "← Back to Partners",
+    "title": "Key Ecosystem Leaders",
+    "titleByTopic": "Coordinators for {prefix}",
+    "intro": "These organisations are among the most active participants and coordinators in Horizon Europe and H2020 projects (CORDIS data).",
+    "introByTopic": "Organisations that coordinate the most projects under this topic-code prefix (CORDIS data). Pick a prefix such as HORIZON-CL5-.",
+    "topicLabel": "Topic code prefix",
+    "topicPlaceholder": "e.g. HORIZON-CL5-",
+    "topicSubmit": "Show",
+    "topicClear": "Clear",
+    "topicInvalid": "The prefix must be at least 3 characters and use only letters, digits and hyphens.",
+    "noTopicResults": "No coordinators found for this prefix.",
+    "loadFailed": "The coordinator list could not be loaded right now. Please try again shortly.",
+    "picLabel": "PIC:",
+    "coordinatedLabel": "Projects Coordinated:",
+    "totalLabel": "Total Projects:",
+    "ecContributionLabel": "EU Contribution Coordinated:"
+  },
+  "PartnersPage": {
+    "crossLinks": {
+      "label": "Related pages",
+      "leaders": "Key ecosystem leaders",
+      "personDays": "Person-days report"
+    }
+  },
+  "ExpertPreregEmail": {
+    "subject": "Confirm your expert pre-registration · {product}",
+    "greeting": "Hello {name},",
+    "intro": "We received your expert pre-registration for {product}. Click the link below to confirm it.",
+    "cta": "Confirm my registration",
+    "expires": "The link is valid until {date}.",
+    "ignore": "If you did not register, you can ignore this email."
+  },
+  "ExpertPrereg": {
+    "meta": {
+      "title": "EU Project Experts Directory — Pre-registration | FonBridge",
+      "description": "Free pre-registration for Türkiye's directory of verified EU project experts. The first {limit} sign-ups become Founding Experts with a permanent badge and lifetime Pro membership.",
+      "verified_title": "E-mail verification | FonBridge Expert Directory"
+    },
+    "nav_label": "Expert Pool",
+    "hero": {
+      "eyebrow": "Expert Directory · Pre-registration",
+      "title": "Make your EU project experience visible",
+      "subtitle": "Join Türkiye's directory of verified EU project experts. Sign-up takes 3 minutes.",
+      "founder_open": "The first {limit} sign-ups become Founding Experts: permanent badge + lifetime Pro membership — seats left: {count}",
+      "founder_full": "The founding cohort is complete — registration is still open",
+      "founder_unknown": "The first {limit} sign-ups become Founding Experts: permanent badge + lifetime Pro membership",
+      "cta": "Start pre-registration"
+    },
+    "values": {
+      "heading": "Why join?",
+      "verified_title": "Verified profile",
+      "verified_text": "Your project experience is checked at source, so your profile earns trust.",
+      "found_title": "Organisations find you",
+      "found_text": "Organisations building consortia reach you by your area of expertise.",
+      "free_title": "Free",
+      "free_text": "Joining the directory and keeping a profile is free; no card details."
+    },
+    "form": {
+      "heading": "Pre-registration form",
+      "intro": "Fields marked * are required.",
+      "noscript": "JavaScript is required to send this form.",
+      "fullName_label": "Full name",
+      "email_label": "E-mail",
+      "email_hint": "We will send the verification link to this address.",
+      "province_label": "Province",
+      "province_hint": "Type to search; pick with the arrow keys and press Enter.",
+      "province_placeholder": "Choose a province",
+      "province_no_match": "No matching province",
+      "province_results": "{count} provinces listed",
+      "title_label": "Title",
+      "title_placeholder": "e.g. Project Coordinator",
+      "organization_label": "Organisation",
+      "organization_placeholder": "e.g. Ankara University",
+      "freelancer_label": "I work freelance",
+      "areas_legend": "Areas of expertise",
+      "areas_hint": "Choose up to 8 areas.",
+      "areas_filter": "Search areas",
+      "roles_legend": "Roles",
+      "roles_hint": "Roles you have held in projects (up to 5).",
+      "programmes_legend": "Programme experience",
+      "programmes_hint": "Funding programmes you have worked in (up to 6).",
+      "selected_count": "{count} selected",
+      "optional_heading": "Optional details",
+      "projectCodes_label": "Project codes",
+      "projectCodes_placeholder": "e.g. 101034567, 2021-1-TR01-KA220-ADU-…",
+      "projectCodes_hint": "Speeds up verification. Separate with commas.",
+      "orcid_label": "ORCID",
+      "orcid_hint": "16 digits: 0000-0000-0000-0000",
+      "linkedinUrl_label": "LinkedIn profile URL",
+      "linkedinUrl_placeholder": "https://www.linkedin.com/in/…",
+      "languages_legend": "Working languages",
+      "referredBy_label": "Who referred you?",
+      "consents_legend": "Consents",
+      "kvkk_label": "I have read the <link>KVKK Privacy Notice</link>.",
+      "visibility_label": "I consent to my profile being published in the expert directory (at launch).",
+      "marketing_label": "I would like to receive FonBridge announcements by e-mail.",
+      "required_mark_sr": "(required)",
+      "honeypot_label": "Leave this field empty",
+      "submit": "Send pre-registration",
+      "sending": "Sending…",
+      "error_summary": "The form has {count} errors. Focus moved to the first one.",
+      "error_rate": "Too many attempts. Please try again in an hour.",
+      "error_server": "We could not save your registration right now. Please try again shortly."
+    },
+    "kvkk": {
+      "close": "Close",
+      "dialog_label": "KVKK Privacy Notice"
+    },
+    "errors": {
+      "required": "This field is required.",
+      "invalid": "Invalid value.",
+      "too_short": "Too short.",
+      "too_long": "Too long.",
+      "too_many": "Too many selected.",
+      "invalid_email": "Enter a valid e-mail address.",
+      "unknown_slug": "Choose an option from the list.",
+      "invalid_orcid": "ORCID must look like 0000-0000-0000-000X and be valid.",
+      "invalid_url": "Enter an address starting with https://linkedin.com.",
+      "consent_required": "This consent is required to continue.",
+      "already_registered": "This e-mail address is already pre-registered."
+    },
+    "success": {
+      "title": "Thank you — your pre-registration is in",
+      "verify": "Verify your e-mail: click the link we sent to {email} within {hours} hours. Unverified registrations are not added to the directory.",
+      "share": "Share on LinkedIn",
+      "share_new_tab": "(opens in a new tab)",
+      "share_text": "I pre-registered for the FonBridge EU Project Experts Directory. If you have EU project experience, join too: {url}"
+    },
+    "faq": {
+      "heading": "Frequently asked questions",
+      "paid_q": "Is it paid?",
+      "paid_a": "No. Pre-registration and a directory profile are free.",
+      "visible_q": "Who can see my details?",
+      "visible_a": "Nobody until launch. After launch, if you gave publication consent, your profile is visible to organisations using the directory; your e-mail address is never shown publicly.",
+      "verify_q": "How does verification work?",
+      "verify_a": "Level 0: e-mail verified. Level 1: project codes or ORCID matched against public sources. Level 2: your project role confirmed with a document. Level 3: endorsed by a reference organisation.",
+      "delete_q": "Can I delete my data?",
+      "delete_a": "Yes. Just write to info@fonbridge.com."
+    },
+    "verified": {
+      "heading_ok": "Your e-mail is verified",
+      "founder": "Your Founding Expert number: #{number}",
+      "no_founder": "The founding cohort was already complete; your registration is in the directory. We will let you know at launch.",
+      "heading_expired": "This link has expired",
+      "text_expired": "Verification links are valid for {hours} hours. Write to info@fonbridge.com and we will send you a new one.",
+      "heading_invalid": "This link is not valid",
+      "text_invalid": "The link may be incomplete or already used. Try the button in the e-mail again.",
+      "back": "Back to the Expert Directory page"
+    },
+    "options": {
+      "areas": {
+        "climate-environment": "Climate and environment",
+        "circular-economy": "Circular economy",
+        "water-management": "Water management",
+        "biodiversity": "Biodiversity",
+        "energy": "Energy",
+        "digital-ict": "Digital / ICT",
+        "artificial-intelligence": "Artificial intelligence",
+        "cybersecurity": "Cybersecurity",
+        "data-science": "Data science",
+        "health": "Health",
+        "public-health": "Public health",
+        "education": "Education",
+        "vocational-training": "Vocational training",
+        "higher-education": "Higher education",
+        "youth": "Youth",
+        "culture": "Culture",
+        "cultural-heritage": "Cultural heritage",
+        "media-journalism": "Media and journalism",
+        "sport": "Sport",
+        "agriculture": "Agriculture",
+        "food-systems": "Food systems",
+        "fisheries": "Fisheries",
+        "rural-development": "Rural development",
+        "urban-planning": "Urban planning",
+        "construction": "Construction",
+        "mobility-transport": "Mobility and transport",
+        "maritime": "Maritime",
+        "tourism": "Tourism",
+        "migration": "Migration",
+        "social-inclusion": "Social inclusion",
+        "gender-equality": "Gender equality",
+        "disability": "Disability",
+        "civil-society": "Civil society",
+        "public-administration": "Public administration",
+        "anti-corruption-governance": "Anti-corruption and governance",
+        "human-rights": "Human rights",
+        "justice": "Justice",
+        "employment": "Employment",
+        "entrepreneurship-sme": "Entrepreneurship and SMEs",
+        "research-innovation": "Research and innovation",
+        "financial-services": "Financial services",
+        "security": "Security",
+        "disaster-risk": "Disaster risk"
+      },
+      "roles": {
+        "coordinator": "Coordinator",
+        "project-manager": "Project manager",
+        "financial-manager": "Financial manager",
+        "wp-leader": "Work package leader",
+        "evaluator": "Independent evaluator",
+        "proposal-writer": "Proposal writer",
+        "dissemination": "Dissemination",
+        "trainer": "Trainer",
+        "researcher": "Researcher",
+        "other": "Other"
+      },
+      "programmes": {
+        "horizon-europe-h2020": "Horizon Europe / H2020",
+        "erasmus-plus": "Erasmus+",
+        "ipa": "IPA",
+        "interreg": "Interreg",
+        "life": "LIFE",
+        "cerv": "CERV",
+        "digital-europe": "Digital Europe",
+        "eu4health": "EU4Health",
+        "creative-europe": "Creative Europe",
+        "national-tubitak": "National / TÜBİTAK",
+        "other": "Other"
+      },
+      "languages": {
+        "tr": "Turkish",
+        "en": "English",
+        "de": "German",
+        "fr": "French",
+        "ar": "Arabic",
+        "ru": "Russian",
+        "other": "Other"
+      }
+    }
+  },
+  "AdminExpertPrereg": {
+    "title": "Expert pre-registrations",
+    "subtitle": "Sign-ups from the public expert directory pre-registration form. Contains personal data: platform admins only.",
+    "nav_label": "Expert Sign-ups",
+    "nav_desc": "Expert directory pre-registration",
+    "filters_legend": "Filters",
+    "search_label": "Search (name, e-mail)",
+    "province_label": "Province",
+    "area_label": "Area",
+    "status_label": "Status",
+    "any": "All",
+    "apply": "Apply",
+    "reset": "Reset",
+    "export_csv": "Download CSV",
+    "count": "{count} records",
+    "empty": "No records match these filters.",
+    "load_error": "Records could not be loaded. Refresh the page; if it persists, check the system alerts.",
+    "table_caption": "Expert pre-registrations, newest first",
+    "col_name": "Name",
+    "col_organization": "Organisation",
+    "col_province": "Province",
+    "col_areas": "Areas",
+    "col_roles": "Roles",
+    "col_status": "Verification",
+    "col_founder": "Founder no.",
+    "col_created": "Date",
+    "status": {
+      "pending": "Pending",
+      "verified": "Verified",
+      "disabled": "Disabled"
+    },
+    "none": "—"
+  },
+  "modules": {
+    "partner-intel": {
+      "name": "Partner Intelligence Database",
+      "tagline": "One partner card per organisation, topic leaders and the collaboration graph."
+    },
+    "concept-note": {
+      "name": "Concept Note Builder",
+      "tagline": "Programme-specific short proposal templates with an AI first draft."
+    },
+    "evidence": {
+      "name": "Evidence Pack",
+      "tagline": "Reusable evidence library with source and validity discipline."
+    },
+    "focal-point": {
+      "name": "Focal Point",
+      "tagline": "One internal owner and one external contact per relationship, plus contact cadence."
+    },
+    "workflows": {
+      "name": "Proposal Production Workflows",
+      "tagline": "Gate-driven pipeline from opportunity to submission, with person-day reporting."
+    },
+    "evaluator": {
+      "name": "Evaluator Lens",
+      "tagline": "Internal pre-assessment against the call criteria — never an official score."
+    },
+    "tto": {
+      "name": "TTO Accelerator",
+      "tagline": "Technology transfer portfolio: readiness, ownership and commercialisation route per asset."
+    },
+    "consortium-matching": {
+      "name": "Consortium Matching",
+      "tagline": "Seat plan per proposal and ranked partner candidates for each open seat."
+    },
+    "briefs": {
+      "name": "Meeting Briefs",
+      "tagline": "One-page brief before a partner meeting, assembled from the partner card and the topic."
+    },
+    "followups": {
+      "name": "Follow-up Documents",
+      "tagline": "NDA, LOI and award packs generated from an opportunity and versioned per signature."
+    },
+    "application": {
+      "name": "Full Application Production",
+      "tagline": "Part-by-part application drafting on top of the concept note, evidence and consortium."
+    }
+  },
+  "richTextEditor": {
+    "toolbar": "Formatting",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "bold": "Bold",
+    "bulletList": "Bulleted list",
+    "orderedList": "Numbered list",
+    "undo": "Undo",
+    "redo": "Redo",
+    "link": "Link",
+    "image": "Image",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "linkDialog": {
+      "title": "Add link",
+      "editTitle": "Edit link",
+      "text": "Text to show",
+      "textRequired": "Enter the text the link shows.",
+      "url": "Address",
+      "urlHint": "An address starting with https://, http:// or mailto:, or a path on this site starting with /.",
+      "invalidUrl": "This address cannot be used. Enter an address starting with https://, http:// or mailto:, or a path on this site starting with /.",
+      "remove": "Remove link"
+    },
+    "imageDialog": {
+      "title": "Add image",
+      "editTitle": "Edit image",
+      "choose": "Choose image",
+      "change": "Choose another image",
+      "preview": "Preview of the uploaded image",
+      "fileRequired": "Upload an image first. Only uploaded images can be added to a post.",
+      "alt": "Alt text",
+      "altHint": "Briefly describe what the image shows, for readers who cannot see it.",
+      "altRequired": "Alt text is required."
+    }
+  },
+  "ApiKeysSettings": {
+    "createTitle": "Create new API key",
+    "revoke": {
+      "title": "Active API keys",
+      "description": "You can revoke your existing keys here while the module is off. A revoked key stops working immediately. Key values are never shown.",
+      "createdAt": "Created:",
+      "lastUsed": "Last used:",
+      "neverUsed": "Not used yet",
+      "revokeOneLabel": "Revoke key \"{name}\"",
+      "revokeAll": "Revoke all keys",
+      "confirmOneTitle": "Revoke key \"{name}\"?",
+      "confirmAllTitle": "Revoke all keys?",
+      "confirmBody": "This cannot be undone. Integrations using these keys lose access immediately.",
+      "confirm": "Revoke",
+      "cancel": "Cancel",
+      "revoking": "Revoking…",
+      "error": {
+        "forbidden": "Only the workspace owner or an admin can revoke API keys.",
+        "failed": "The key could not be revoked. Please try again."
+      }
+    }
   }
 }

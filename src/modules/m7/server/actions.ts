@@ -8,8 +8,13 @@ import { renderPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
+import { createTranslator } from 'next-intl';
 import { errorMessage } from '@/lib/errors';
 import type { TtoPortfolioItemRow } from '@/types/db-rows';
+import trMessages from '../../../../messages/tr.json';
+import enMessages from '../../../../messages/en.json';
+
+const TTO_MESSAGES = { tr: trMessages, en: enMessages };
 
 /**
  * M7 TTO portfolio.
@@ -33,6 +38,7 @@ export async function createTtoItem({
   summary: string;
   keywords: string[];
 }) {
+  await assertModuleAccess('M7');
   const { tenantId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const item = await withTenant<TtoPortfolioItemRow>(tenantId, (tx) =>
@@ -56,6 +62,9 @@ export async function createTtoItem({
 }
 
 export async function matchTtoItemToCalls(itemId: string) {
+  // The page gate is not enough: an action is a public POST endpoint, callable
+  // with M7 off or outside the plan (TASK-MUUS5HE3OW0CT).
+  await assertModuleAccess('M7');
   // Reads only (TASK-MUN80UOUPB2A4): nothing here is written, so an expired
   // pilot may still see it and no edit permission is needed.
   const { tenantId } = await requireTenantAction({ readOnly: true });
@@ -70,36 +79,7 @@ export async function matchTtoItemToCalls(itemId: string) {
 
   if (!item) return { matchedTopics: [] };
 
-  const itemTrl = item.trl;
-
-  return {
-    matchedTopics: [
-      {
-        topicId: 'HORIZON-CL5-2026-D3-01',
-        title: 'Zero-Emission Transport Systems & Battery Safety',
-        fitScore: 92,
-        targetTrlRange: 'TRL 5 -> TRL 7',
-        matchReason: `Mevcut TRL ${itemTrl} olgunluğu ve batarya termal izleme patent odağı tam uyumlu.`,
-        recommendedRole: 'Key Technology Provider / Work Package Leader',
-      },
-      {
-        topicId: 'HORIZON-CL4-2026-TWIN-01',
-        title: 'Advanced Materials & Sensors for Clean Energy',
-        fitScore: 84,
-        targetTrlRange: `TRL ${itemTrl} -> TRL ${Math.min(9, itemTrl + 2)}`,
-        matchReason: 'Tescilli patent (granted) ve sensör dizesi mimarisi çağrı gereksinimleriyle örtüşüyor.',
-        recommendedRole: 'Co-applicant / Pilot Testbed Host',
-      },
-      {
-        topicId: 'EIC-ACC-2026-STEP',
-        title: 'EIC Accelerator Deep-Tech Scale-up',
-        fitScore: 78,
-        targetTrlRange: 'TRL 5 -> TRL 8/9',
-        matchReason: 'Yüksek lisanslama potansiyeli ve üniversite spin-off ticarileştirme kriterine uygun.',
-        recommendedRole: 'Grant & Blended Finance Applicant',
-      },
-    ],
-  };
+  return { matchedTopics: [] };
 }
 
 export async function generateIpChecklist({
@@ -134,22 +114,15 @@ export async function generateIpChecklist({
     // papered over with the canned list below (TASK-MUN4PSBP19RKK).
     if (isLlmUnusableOutcome(e)) throw e;
     console.warn('[generateIpChecklist] LLM fallback:', errorMessage(e));
-    content = `### 📋 TTO IP & Lisanslama Kontrol Listesi
-
-1. **Arka Plan Fikri Mülkiyet (Background IP) Beyanı:**
-   - [x] Tescilli patent belgesi (${patentStatus.toUpperCase()}) ve hak sahipliği sözleşmesi hazırlandı.
-   - [ ] Üniversite araştırmacılarının buluş bildirimi (Invention Disclosure Form) dosyalandı.
-
-2. **Ön Plan Fikri Mülkiyet (Foreground IP) ve Lisanslama:**
-   - [ ] Proje çıktılarının (Foreground IP) lisans hakları için ön anlaşma metni taslağı.
-   - [ ] Özel sektör ortakları için ticarileştirme opsiyon hakkı (Option Agreement).
-
-3. **Spin-off & Pazar Açılımı:**
-   - [ ] TRL ${trl}'den TRL ${Math.min(9, trl + 2)} seviyesine ticarileştirme yol haritası.
-   - [ ] Şirketleşme (Spin-off) hisse paylaşım modeli.
-
-4. **AB Konsorsiyum Anlaşması Maddeleri:**
-   - [ ] Konsorsiyum anlaşmasında arka plan IP kullanımı kısıtlamaları duyuruldu.`;
+    // The canned list is shown to the user, so it is UI copy in the user's
+    // locale, not a prompt. createTranslator rather than getTranslations: it
+    // needs no next-intl request config, so the unit tests reach it too.
+    const t = createTranslator({ locale, messages: TTO_MESSAGES[locale], namespace: 'm7.tto' });
+    content = t('ipChecklistFallback', {
+      patentStatus: patentStatus.toUpperCase(),
+      trl,
+      nextTrl: Math.min(9, trl + 2),
+    });
   }
 
   return { success: true, checklistContent: content };

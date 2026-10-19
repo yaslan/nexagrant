@@ -1,10 +1,14 @@
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
-import { planNamesGrantingModule } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import { tenantScopeOf } from '@/lib/tenant';
-import { canAccessStatus, type ModuleDenyReason } from '@/lib/modules/state-machine';
+import type { ModuleDenyReason } from '@/lib/modules/state-machine';
+import { getAllManifests } from '@/lib/modules/registry';
+import { checkModuleAccessForTenant, decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
+import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
+
+export type { ModuleAccessResult } from '@/lib/modules/tenant-access';
 
 /**
  * The module gate — the one place that turns a `ModuleState` row into an answer.
@@ -26,21 +30,11 @@ import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
  * no caller can hold one gate and miss the other.
  */
 
-export interface ModuleAccessResult {
-  allowed: boolean;
-  status: ModuleStatus;
-  /** Stable code, translated by the caller. Never a server-authored sentence. */
-  reason?: ModuleDenyReason;
-  /**
-   * Plans that *do* include this module, by display name, for a
-   * `PLAN_UPGRADE_REQUIRED` refusal. Read from `PLAN_GRANTS`, never re-typed.
-   */
-  requiredPlans?: string[];
-}
-
 /** Thrown by `assertModuleAccess`, so a caller can tell a gate refusal from a crash. */
 export class ModuleAccessError extends Error {
-  readonly code = 'MODULE_ACCESS_DENIED';
+  readonly code = MODULE_UNAVAILABLE_DIGEST;
+  /** Kept by Next.js across the action boundary: src/lib/module-unavailable.ts. */
+  readonly digest = MODULE_UNAVAILABLE_DIGEST;
 
   constructor(
     readonly moduleId: ModuleId,
@@ -83,12 +77,29 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
     return { allowed: false, status: 'OFF', reason: 'NO_TENANT' };
   }
 
-  // Both facts are independent reads; neither gates the other's query.
-  const [state, entitlements] = await Promise.all([
+  return checkModuleAccessForTenant(scope.tenantId, moduleId, {
+    role: scope.role,
+    isPlatformAdmin: scope.isPlatformAdmin,
+  });
+}
+
+/**
+ * Every module the session's viewer may open, for the app shell's `ModuleProvider`
+ * (sidebar entries, opportunity tabs, cross-links). Same answer as calling
+ * `checkModuleAccess` once per module, in two reads instead of twenty-two.
+ *
+ * Navigation only: a hidden link is not a closed door, so every page behind these
+ * entries still runs `moduleGate` and every action `assertModuleAccess`.
+ */
+export async function listAccessibleModules(): Promise<ModuleId[]> {
+  const scope = tenantScopeOf(await auth());
+  if (!scope) return [];
+
+  const [states, entitlements] = await Promise.all([
     withTenant(scope.tenantId, (tx) =>
-      tx.moduleState.findUnique({
-        where: { tenantId_moduleId: { tenantId: scope.tenantId, moduleId } },
-        select: { status: true },
+      tx.moduleState.findMany({
+        where: { tenantId: scope.tenantId },
+        select: { moduleId: true, status: true },
       })
     ),
     withTenant(scope.tenantId, (tx) =>
@@ -96,25 +107,17 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
     ),
   ]);
 
-  const status = (state?.status ?? 'OFF') as ModuleStatus;
+  const statusById = new Map<string, ModuleStatus>(
+    states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
+  );
 
-  if (!entitlements.allowedModules.includes(moduleId)) {
-    return {
-      allowed: false,
-      status,
-      reason: 'PLAN_UPGRADE_REQUIRED',
-      requiredPlans: planNamesGrantingModule(moduleId),
-    };
-  }
-
-  const decision = canAccessStatus(status, {
-    role: scope.role,
-    isPlatformAdmin: scope.isPlatformAdmin,
-  });
-
-  return decision.allowed
-    ? { allowed: true, status }
-    : { allowed: false, status, reason: decision.reason ?? 'MODULE_OFF' };
+  return getAllManifests().map((m) => m.id).filter(
+    (id) =>
+      decideModuleAccess(id, statusById.get(id) ?? 'OFF', entitlements.allowedModules, {
+        role: scope.role,
+        isPlatformAdmin: scope.isPlatformAdmin,
+      }).allowed,
+  );
 }
 
 /**

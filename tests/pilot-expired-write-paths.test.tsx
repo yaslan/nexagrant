@@ -92,7 +92,7 @@ import { ApplicationClient } from '@/app/[locale]/(app)/[workspace]/opportunitie
 import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEditor';
 import MembersSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/members/page';
 import CallsPage from '@/app/[locale]/(app)/[workspace]/calls/page';
-import PartnerPortalPage from '@/app/[locale]/portal/partner/[token]/page';
+import PartnerPortalPage from '@/app/[locale]/(public)/portal/partner/[token]/page';
 import { computeSeatCandidatesForm, inviteCandidateToSeat } from '@/modules/m8/server/actions';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
 import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';

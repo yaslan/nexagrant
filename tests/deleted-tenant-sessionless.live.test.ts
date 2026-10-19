@@ -51,7 +51,7 @@ let lib: {
   token: typeof import('../src/lib/secret-token');
   opportunities: typeof import('../src/app/api/v1/opportunities/route');
   m11: typeof import('../src/modules/m11/server/actions');
-  portal: typeof import('../src/app/[locale]/portal/partner/[token]/page');
+  portal: typeof import('../src/app/[locale]/(public)/portal/partner/[token]/page');
   credits: typeof import('../src/lib/jobs/tasks/credits-monthly-grant');
   alerts: typeof import('../src/lib/jobs/tasks/alerts-daily');
   m4: typeof import('../src/lib/jobs/tasks/m4-weekly-summary');
@@ -67,7 +67,7 @@ beforeAll(async () => {
     token: await import('../src/lib/secret-token'),
     opportunities: await import('../src/app/api/v1/opportunities/route'),
     m11: await import('../src/modules/m11/server/actions'),
-    portal: await import('../src/app/[locale]/portal/partner/[token]/page'),
+    portal: await import('../src/app/[locale]/(public)/portal/partner/[token]/page'),
     credits: await import('../src/lib/jobs/tasks/credits-monthly-grant'),
     alerts: await import('../src/lib/jobs/tasks/alerts-daily'),
     m4: await import('../src/lib/jobs/tasks/m4-weekly-summary'),
@@ -84,6 +84,8 @@ afterAll(async () => {
   await admin.savedSearch.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
   await admin.relationship.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
   await admin.apiKey.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
+  await admin.moduleState.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
+  await admin.subscription.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
   await admin.applicationPart.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
   await admin.opportunity.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
   await admin.tenant.deleteMany({ where: { id: { in: presentIds(tenantIds) } } });
@@ -115,6 +117,9 @@ const softDelete = (id: string, at: Date | null) => admin.tenant.update({ where:
 describe('Partner REST API key (authenticateApiKey)', () => {
   test('a soft-deleted tenant’s key is 401 and leaves no trace; restoring the tenant restores the key', async () => {
     const tenantId = await makeTenant('api');
+    // The key is served only while M1 is on and the plan includes it (FO-80).
+    await admin.subscription.create({ data: { tenantId, planId: 'pro', status: 'ACTIVE' } });
+    await admin.moduleState.create({ data: { tenantId, moduleId: 'M1', status: 'ON' } });
     await makeOpportunity(tenantId, `${RUN} secret opp`);
     const raw = `fp_live_${RUN}_${crypto.randomBytes(8).toString('hex')}`;
     const key = await admin.apiKey.create({

@@ -1,11 +1,23 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { createTtoItem, matchTtoItemToCalls, generateIpChecklist } from '../../src/modules/m7/server/actions';
-import { resetScope, setScope, FakeTenantScopeError } from '../helpers/tenant-scope-mock';
+import {
+  resetScope,
+  setScope,
+  FakeTenantScopeError,
+  FakeModuleAccessError,
+  setModuleOpen,
+  resetModuleAccess,
+} from '../helpers/tenant-scope-mock';
 import { generateText } from '../../src/lib/llm';
 
 const h = vi.hoisted(() => ({
   ttoCreate: vi.fn(),
   ttoFindFirst: vi.fn(),
+  locale: 'tr' as 'tr' | 'en',
+}));
+
+vi.mock('../../src/lib/ai/prompts/locale', () => ({
+  promptLocale: async () => h.locale,
 }));
 
 vi.mock('../../src/lib/tenant', async () => {
@@ -32,7 +44,9 @@ vi.mock('../../src/lib/llm', () => ({
 describe('M7 TTO Accelerator Module', () => {
   beforeEach(() => {
     resetScope();
+    resetModuleAccess();
     vi.clearAllMocks();
+    h.locale = 'tr';
     h.ttoCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: 'tto-123',
       tenantId: data.tenantId,
@@ -76,11 +90,9 @@ describe('M7 TTO Accelerator Module', () => {
     expect(h.ttoCreate).not.toHaveBeenCalled();
   });
 
-  test('matchTtoItemToCalls returns matched topics with fitScore and targetTrlRange', async () => {
+  test('matchTtoItemToCalls returns no matches (matching not yet implemented)', async () => {
     const res = await matchTtoItemToCalls('tto-123');
-    expect(res.matchedTopics.length).toBeGreaterThan(0);
-    expect(res.matchedTopics[0]?.fitScore).toBeGreaterThan(50);
-    expect(res.matchedTopics[0]?.targetTrlRange).toBeDefined();
+    expect(res.matchedTopics).toEqual([]);
     expect(h.ttoFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'tto-123', tenantId: 'tenant-1' } })
     );
@@ -91,6 +103,24 @@ describe('M7 TTO Accelerator Module', () => {
 
     const res = await matchTtoItemToCalls('tto-from-other-tenant');
     expect(res.matchedTopics).toEqual([]);
+  });
+
+  // TASK-MUUS5HE3OW0CT — both actions are public POST endpoints; the page gate
+  // does not cover a direct call with M7 off or outside the plan.
+  test('createTtoItem refuses before writing when M7 is closed', async () => {
+    setModuleOpen(false);
+
+    await expect(
+      createTtoItem({ title: 'Gated', trl: 5, patentStatus: 'granted', summary: '', keywords: [] })
+    ).rejects.toBeInstanceOf(FakeModuleAccessError);
+    expect(h.ttoCreate).not.toHaveBeenCalled();
+  });
+
+  test('matchTtoItemToCalls refuses before reading when M7 is closed', async () => {
+    setModuleOpen(false);
+
+    await expect(matchTtoItemToCalls('tto-123')).rejects.toBeInstanceOf(FakeModuleAccessError);
+    expect(h.ttoFindFirst).not.toHaveBeenCalled();
   });
 
   test('generateIpChecklist generates tailored TTO IP protection checklist', async () => {
@@ -114,5 +144,31 @@ describe('M7 TTO Accelerator Module', () => {
     await expect(
       generateIpChecklist({ title: 'Solid State Battery Sensor', trl: 5, patentStatus: 'granted' })
     ).rejects.toBe(outcome);
+  });
+
+  // The canned list is UI copy: an English user used to get it in Turkish.
+  test.each([
+    ['tr', 'TTO IP & Lisanslama Kontrol Listesi', "TRL 5'den TRL 7 seviyesine"],
+    ['en', 'TTO IP & licensing checklist', 'from TRL 5 to TRL 7'],
+  ] as const)('generateIpChecklist fallback is written in the user locale (%s)', async (locale, heading, roadmap) => {
+    h.locale = locale;
+    vi.mocked(generateText).mockRejectedValueOnce(new Error('provider down'));
+
+    const res = await generateIpChecklist({ title: 'Solid State Battery Sensor', trl: 5, patentStatus: 'granted' });
+
+    expect(res.checklistContent).toContain(heading);
+    expect(res.checklistContent).toContain('(GRANTED)');
+    expect(res.checklistContent).toContain(roadmap);
+    // Every ICU argument was filled; none leaks to the screen as `{trl}`.
+    expect(res.checklistContent).not.toMatch(/[{}]/);
+  });
+
+  test('generateIpChecklist fallback caps the target TRL at 9', async () => {
+    h.locale = 'en';
+    vi.mocked(generateText).mockRejectedValueOnce(new Error('provider down'));
+
+    const res = await generateIpChecklist({ title: 'Mature', trl: 8, patentStatus: 'licensed' });
+
+    expect(res.checklistContent).toContain('from TRL 8 to TRL 9');
   });
 });

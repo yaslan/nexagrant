@@ -27,9 +27,18 @@ export const ModuleProvider = ({
   );
 };
 
+/**
+ * Every module the session may open, as decided on the server by
+ * `listAccessibleModules` (plan + `ModuleState` + role) and handed to the app shell's
+ * `ModuleProvider`. For lists — the sidebar — where calling `useModuleEnabled` per item
+ * would mean a hook in a loop.
+ */
+export function useActiveModules(): readonly ModuleId[] {
+  return useContext(ModuleContext).activeModules;
+}
+
 export function useModuleEnabled(moduleId: ModuleId): boolean {
-  const context = useContext(ModuleContext);
-  return context.activeModules.includes(moduleId);
+  return useActiveModules().includes(moduleId);
 }
 
 /**

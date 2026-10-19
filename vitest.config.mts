@@ -47,7 +47,7 @@ export default defineConfig({
     // budget still sets it; a test that hangs still fails.
     testTimeout: 30_000,
     hookTimeout: 60_000,
-    exclude: ['**/node_modules/**', '**/dist/**', '**/tests/e2e/**', '**/.next/**', '**/docs/**', '**/.claude/worktrees/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/tests/e2e/**', '**/.next/**', '**/docs/**', '**/.claude/worktrees/**', '**/_workspace/**'],
     alias: {
       '@': path.resolve(root, './src'),
     },

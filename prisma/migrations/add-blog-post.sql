@@ -17,6 +17,11 @@
 -- database whose table `prisma db push` built first. Slug format and length
 -- limits are enforced in src/lib/blog.ts (validateBlogInput).
 --
+-- RLS is DISABLEd explicitly right after CREATE TABLE (TASK-MUWDA86A7U4LK):
+-- Supabase's `ensure_rls` event trigger ENABLEs it on every new table in
+-- public, and RLS on with no policy is deny-all for fabrika_app. A no-op where
+-- it is already off. scripts/rls-migrations.ts CHECK 4c enforces the line.
+--
 -- Idempotent: IF NOT EXISTS throughout, so a database built by `prisma db push`
 -- first, or a second run, is a no-op. Index names are Prisma's own, so a pushed
 -- database does not end up with a second copy of each index.
@@ -46,6 +51,7 @@ CREATE TABLE IF NOT EXISTS "BlogPost" (
     "updatedAt"    TIMESTAMP(3) NOT NULL,
     CONSTRAINT "BlogPost_pkey" PRIMARY KEY ("id")
 );
+ALTER TABLE "BlogPost" DISABLE ROW LEVEL SECURITY;  -- Supabase ensure_rls turns it on; this table is policy-less by design (rls-models.ts SYSTEM_WIDE)
 
 CREATE UNIQUE INDEX IF NOT EXISTS "BlogPost_slug_key" ON "BlogPost"("slug");
 CREATE INDEX IF NOT EXISTS "BlogPost_publishedAt_idx" ON "BlogPost"("publishedAt");

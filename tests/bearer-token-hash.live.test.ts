@@ -14,6 +14,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 
+// The invite route mails the link when SMTP is configured and hands it back in
+// the response only when no mail can go out (src/app/api/invitations/route.ts).
+// The assertions below read `inviteLink` from the response, so this file pins
+// the no-mail branch itself. The runner's .env and CI's mailpit service must not
+// decide it. Blank counts as unset (src/lib/env.ts).
+vi.hoisted(() => {
+  process.env.SMTP_HOST = '';
+});
+
 vi.mock('@/lib/auth', () => ({ auth: vi.fn(async () => session.current) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 

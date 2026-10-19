@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
 import { envValue } from './helpers/dotenv';
+import { skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MTRJ32BZBY2AI — a private plan must reach the tenant it was assigned to,
@@ -34,7 +35,7 @@ describe('private plan visibility under the role that enforces RLS', () => {
 
   beforeAll(async () => {
     if (!RLS_URL) {
-      console.warn('private plan RLS test skipped: DATABASE_URL_RLS_TEST is not set.');
+      skipOrFailInCi('private plan RLS test', 'DATABASE_URL_RLS_TEST is not set');
       return;
     }
     try {
@@ -86,10 +87,9 @@ describe('private plan visibility under the role that enforces RLS', () => {
       ({ plansVisibleToTenant } = await import('@/lib/billing/plan-repository'));
       ready = true;
     } catch (e) {
-      console.warn(
-        `private plan RLS test skipped: ${e instanceof Error ? e.message : String(e)}`
-      );
       ready = false;
+      // In CI this throws: a failed fixture there is a broken setup, not a skip.
+      skipOrFailInCi('private plan RLS test', e instanceof Error ? e.message : String(e));
     }
   });
 

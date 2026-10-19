@@ -5,6 +5,7 @@ import { createPortalSession } from '@/lib/billing/create-portal-session';
 import { Role } from '@prisma/client';
 import { can } from '@/lib/rbac';
 import { requireTenantApi } from '@/lib/tenant';
+import { publicUrl } from '@/lib/public-url';
 
 /**
  * The roles that may manage the tenant's subscription, read from rbac.ts
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const tenantId = membership.tenantId;
-    const returnUrl = new URL('/settings/billing', request.nextUrl.origin).toString();
+    const returnUrl = new URL('/settings/billing', publicUrl(request)).toString();
 
     const portalUrl = await createPortalSession(tenantId, returnUrl);
     return NextResponse.json({ url: portalUrl });

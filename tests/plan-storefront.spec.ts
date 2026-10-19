@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
 import { NO_DISCOUNT_TIER, findTierByCode, type DiscountTier, type PricedLine } from '../src/lib/billing/catalog';
 import { envValue } from './helpers/dotenv';
+import { skipOrFailInCi } from './helpers/live-db-role';
 
 /**
  * TASK-MTSHVKTSGC8A4 — a plan published in the studio must be buyable, and a
@@ -56,7 +57,7 @@ describe('the storefront a tenant sees is the storefront it may buy from', () =>
 
   beforeAll(async () => {
     if (!RLS_URL) {
-      console.warn('storefront test skipped: DATABASE_URL_RLS_TEST is not set.');
+      skipOrFailInCi('storefront test', 'DATABASE_URL_RLS_TEST is not set');
       return;
     }
     try {
@@ -126,8 +127,9 @@ describe('the storefront a tenant sees is the storefront it may buy from', () =>
       storefront = (await import('@/lib/billing/storefront')) as unknown as Storefront;
       ready = true;
     } catch (e) {
-      console.warn(`storefront test skipped: ${e instanceof Error ? e.message : String(e)}`);
       ready = false;
+      // In CI this throws: a failed fixture there is a broken setup, not a skip.
+      skipOrFailInCi('storefront test', e instanceof Error ? e.message : String(e));
     }
   });
 

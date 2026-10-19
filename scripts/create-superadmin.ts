@@ -5,7 +5,7 @@ import { errorMessage } from '../src/lib/errors';
 
 async function main() {
   const email = 'admin@yasinaslan.com.tr';
-  const name = 'Yasin Aslan (Süperadmin)';
+  const name = 'Yasin Aslan';
 
   console.log(`[Superadmin Seed] Creating/updating superadmin account: ${email}...`);
 

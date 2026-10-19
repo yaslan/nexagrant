@@ -26,6 +26,11 @@ export interface DashboardProps {
   to: string;
   /** Rendered under the page header, above the tabs (the B6 readiness card). */
   aside?: ReactNode;
+  /**
+   * The reader may open Settings › Modules (`can(role, 'manage_modules')`, decided on the
+   * server). Without it the active-modules card is not a link: that page refuses them.
+   */
+  canManageModules?: boolean;
 }
 
 type Tab = 'overview' | 'trends' | 'export';
@@ -38,7 +43,14 @@ function toParam(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProps) {
+export function Dashboard({
+  metrics,
+  trendData,
+  from,
+  to,
+  aside,
+  canManageModules = false,
+}: DashboardProps) {
   const t = useTranslations('Dashboard');
   const locale = useLocale();
   const router = useRouter();
@@ -91,6 +103,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
     description: string;
     emptyDescription: string;
     variant?: 'default' | 'success' | 'warning';
+    href: string;
   }) =>
     opts.metric.measured ? (
       <KpiCard
@@ -99,6 +112,8 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
         unit={opts.unit}
         description={opts.description}
         variant={opts.variant ?? 'default'}
+        href={opts.href}
+        ariaLabel={cardAria(opts.title)}
       />
     ) : (
       <KpiCard
@@ -107,12 +122,23 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
         description={opts.emptyDescription}
         variant="default"
         unmeasured
+        href={opts.href}
+        ariaLabel={cardAria(opts.title)}
       />
     );
 
   // The workspace slug sits between the locale and the page segment: /tr/<workspace>/panel.
   const workspace = pathname.split('/')[2] ?? 'default';
   const pipelineHref = getWorkspaceRoute('pipeline', locale, workspace);
+  // Where each card's figure is worked on (FO-69). None of these pages reads a date range,
+  // so the panel's `from`/`to` is not carried: a query the target ignores would only
+  // suggest a filter that is not there. The pipeline board is the stage-gate view, so it
+  // is also where scores, gate outcomes and G0→G2 progress are worked on.
+  const personDaysHref = getWorkspaceRoute('reportsPersonDays', locale, workspace);
+  const modulesHref = canManageModules
+    ? getWorkspaceRoute('settingsModules', locale, workspace)
+    : undefined;
+  const cardAria = (title: string) => t('cardLinkAria', { title });
 
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'overview', label: t('tabOverview') },
@@ -200,6 +226,8 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
                 unit={t('unitProjects')}
                 description={t('descTotalProposals')}
                 variant="default"
+                href={pipelineHref}
+                ariaLabel={cardAria(t('totalProposals'))}
               />
               {metricCard({
                 title: t('hitRate'),
@@ -207,6 +235,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
                 unit: '%',
                 description: t('descHitRate'),
                 emptyDescription: t('emptyHitRate'),
+                href: pipelineHref,
                 variant: 'success',
               })}
               {metricCard({
@@ -215,6 +244,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
                 unit: '%',
                 description: t('descThresholdRate'),
                 emptyDescription: t('emptyThresholdRate'),
+                href: pipelineHref,
               })}
               {metricCard({
                 title: t('averageScore'),
@@ -222,6 +252,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
                 unit: t('unitScore'),
                 description: t('descAverageScore'),
                 emptyDescription: t('emptyAverageScore'),
+                href: pipelineHref,
               })}
               {metricCard({
                 title: t('personDays'),
@@ -229,6 +260,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
                 unit: t('unitDays'),
                 description: t('descPersonDays'),
                 emptyDescription: t('emptyPersonDays'),
+                href: personDaysHref,
               })}
               {metricCard({
                 title: t('avgDaysG2'),
@@ -236,6 +268,7 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
                 unit: t('unitDays'),
                 description: t('descAvgDaysG2'),
                 emptyDescription: t('emptyAvgDaysG2'),
+                href: pipelineHref,
                 variant: 'warning',
               })}
               <KpiCard
@@ -244,6 +277,8 @@ export function Dashboard({ metrics, trendData, from, to, aside }: DashboardProp
                 unit={t('unitModules')}
                 description={t('descActiveModules')}
                 variant="success"
+                href={modulesHref}
+                ariaLabel={modulesHref ? cardAria(t('activeModules')) : undefined}
               />
             </div>
           )}

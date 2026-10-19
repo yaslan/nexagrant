@@ -8,6 +8,8 @@ import { errorMessage } from '@/lib/errors';
 import { recordAlert, type RecordAlertInput } from '@/lib/observability/system-alert';
 import { AlertsDailyOutputSchema, type AlertsDailyOutput } from '../events';
 import { parseSavedSearchFilters } from '@/lib/saved-search-filters';
+import { recordNotification, savedSearchDedupeKey } from '@/lib/notifications/store';
+import { escapeHtml } from '@/lib/feedback/digest';
 
 /**
  * Why a search's alert did not go out, when the reason is the mail provider
@@ -28,7 +30,7 @@ export const NO_MAIL_PROVIDER = 'no_mail_provider';
  */
 export const SAVED_SEARCH_ALERT_QUERY = {
   where: { notify: true },
-  select: { id: true, tenantId: true, name: true, filters: true, lastRunAt: true, createdAt: true },
+  select: { id: true, tenantId: true, userId: true, name: true, filters: true, lastRunAt: true, createdAt: true },
 } as const;
 
 /**
@@ -84,15 +86,49 @@ export function matchCountQuery(filters: unknown, since: Date): { where: TopicMa
 }
 
 /**
- * The owner lookup, keyed by the scalar `tenantId` — the same "separate query
- * by scalar id" shape M2 uses where no relation exists. Only the address is
- * selected; the job has no use for the rest of the user row.
+ * The recipient lookup: the search's own owner (`SavedSearch.userId`), and only
+ * while they are still a member of the search's tenant — the same "separate
+ * query by scalar id" shape M2 uses where no relation exists. Only the address
+ * is selected; the job has no use for the rest of the user row.
+ *
+ * TASK-MUVRYPO9GTU7D: this used to be the tenant's first TENANT_OWNER, so a
+ * MEMBER's search — whose name is free text they chose — was mailed to the
+ * owner under FonBridge's name. ADR-0011 K-6 a: the recipient is the searcher.
  */
-export function ownerEmailQuery(tenantId: string) {
+export function recipientEmailQuery(tenantId: string, userId: string) {
   return {
-    where: { tenantId, role: 'TENANT_OWNER' },
+    where: { tenantId, userId },
     select: { user: { select: { email: true } } },
   } as const;
+}
+
+/** C0/C1 controls plus the Unicode line and paragraph separators. */
+const HEADER_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+
+/**
+ * The alert mail for one search. `name` is the searcher's free text (up to 200
+ * characters, src/app/api/saved-searches/route.ts), so it is escaped before it
+ * reaches the HTML and stripped of line breaks and other controls before it
+ * reaches the Subject header. Pure, so the escaping is testable without SMTP.
+ */
+export function renderSavedSearchAlert(params: {
+  name: string;
+  matchCount: number;
+  searchId: string;
+  appUrl: string;
+}): { subject: string; html: string } {
+  const subjectName = params.name.replace(HEADER_UNSAFE, ' ').trim();
+  const href = escapeHtml(`${params.appUrl}/calls?search=${encodeURIComponent(params.searchId)}`);
+  return {
+    subject: `New Call Opportunities: ${subjectName} (${params.matchCount} new)`,
+    html: `
+            <h2>FonBridge Saved Search Alert</h2>
+            <p>Hi there,</p>
+            <p>We checked for new opportunities matching your saved search <strong>${escapeHtml(params.name)}</strong>.</p>
+            <p>Found <strong>${params.matchCount} new opportunities</strong>. <a href="${href}">View them now</a></p>
+            <p>Happy hunting!<br/>FonBridge Team</p>
+          `,
+  };
 }
 
 /**
@@ -117,6 +153,8 @@ export type TenantRunner = <T>(
 export interface SavedSearchAlertRow {
   id: string;
   tenantId: string;
+  /** The search's owner: the in-app notification's recipient (ADR-0011 K-6 a). */
+  userId: string;
   name: string;
   filters: unknown;
   lastRunAt: Date | string | null;
@@ -163,19 +201,25 @@ export async function sendSavedSearchAlerts(
     // fix — it is a guard against the edit that would break it: reaching for a
     // tenant id that outlived the iteration does not crash here, it writes one
     // tenant's row under another tenant's scope.
-    const { id: searchId, tenantId, name } = search;
+    const { id: searchId, tenantId, userId, name } = search;
 
     try {
-      const ownerEmail = await runTenant(tenantId, async (tx) => {
-        const owners = await tx.membership.findMany(ownerEmailQuery(tenantId));
-        return owners[0]?.user?.email;
+      // Undefined when the searcher is no longer a member of this tenant:
+      // removing a member leaves their saved searches in place, so that is an
+      // ordinary state, not a failure — see the skip below. Which is why the
+      // search itself must be visible in the same scope first: under a wrong
+      // tenant scope every membership is invisible too, and that must fail the
+      // search, not pass for "the searcher left". The explicit `tenantId` makes
+      // the guard hold on a role that bypasses RLS too (the local `fabrika`),
+      // where the scope hides nothing and only the filter can catch a row whose
+      // tenant is not the one it was handed with (TASK-MUVSIO5F4TLHK, N-1).
+      const recipientEmail = await runTenant(tenantId, async (tx) => {
+        if ((await tx.savedSearch.count({ where: { id: searchId, tenantId } })) === 0) {
+          throw new Error('saved search not visible under its own tenant scope');
+        }
+        const membership = await tx.membership.findFirst(recipientEmailQuery(tenantId, userId));
+        return membership?.user.email;
       });
-
-      if (!ownerEmail) {
-        emailsFailed++;
-        errors.push({ searchId, reason: 'no_owner_email' });
-        continue;
-      }
 
       const since = new Date(search.lastRunAt ?? search.createdAt);
 
@@ -197,15 +241,33 @@ export async function sendSavedSearchAlerts(
         continue;
       }
 
-      const subject = `New Call Opportunities: ${name} (${matchCount} new)`;
-      const appUrl = resolveAppUrl();
-      const html = `
-            <h2>FonBridge Saved Search Alert</h2>
-            <p>Hi there,</p>
-            <p>We checked for new opportunities matching your saved search <strong>${name}</strong>.</p>
-            <p>Found <strong>${matchCount} new opportunities</strong>. <a href="${appUrl}/calls?search=${searchId}">View them now</a></p>
-            <p>Happy hunting!<br/>FonBridge Team</p>
-          `;
+      // ADR-0011 (TASK-MUVR24EHWI2RA): the in-app notification, for the
+      // search's OWNER, the same person the e-mail goes to. Written before
+      // the mail and before the provider check, so it reaches the user with no
+      // SMTP at all. The key is this window's start: when the mail fails,
+      // `lastRunAt` stays put, the next run counts the same window with the
+      // same `since`, and this write is skipped instead of repeated. A failed
+      // write throws into the catch below like any other step: no mail goes
+      // out and `lastRunAt` stays, so the next run retries both.
+      await runTenant(tenantId, (tx) =>
+        recordNotification(tx, {
+          tenantId,
+          userId,
+          type: 'SAVED_SEARCH_MATCH',
+          payload: { searchId, searchName: name, matchCount, since: since.toISOString() },
+          dedupeKey: savedSearchDedupeKey(searchId, since),
+        })
+      );
+
+      // The searcher has left the tenant: no mail to anyone. Not a failure, so
+      // no alert every morning; `lastRunAt` advances as for a zero-match check.
+      if (!recipientEmail) {
+        await runTenant(tenantId, (tx) => touchLastRun(tx, searchId));
+        emailsSkipped++;
+        continue;
+      }
+
+      const { subject, html } = renderSavedSearchAlert({ name, matchCount, searchId, appUrl: resolveAppUrl() });
 
       // TASK-MUMH6NZ128QZ1: with no mail provider the send used to be skipped
       // silently while `lastRunAt` still advanced and `emailsSent` still
@@ -223,7 +285,7 @@ export async function sendSavedSearchAlerts(
       // the SMTP server would pin a connection for the length of the send. A
       // rejected send throws (see smtpMailer) and lands in the catch below before
       // `lastRunAt` moves.
-      await mailer({ to: ownerEmail, subject, html });
+      await mailer({ to: recipientEmail, subject, html });
 
       await runTenant(tenantId, (tx) => touchLastRun(tx, searchId));
 

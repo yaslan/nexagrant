@@ -5,8 +5,16 @@ import React, { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { getAllManifests, getManifest } from '@/lib/modules/registry';
-import { canEnableEntitled, getDisableCascade } from '@/lib/modules/state-machine';
-import { ModuleId, PlanTier } from '@/lib/modules/types';
+import {
+  canEnableEntitled,
+  getDisableCascade,
+  moduleStatus,
+  requirementChain,
+  type ModuleCardStatus,
+} from '@/lib/modules/state-machine';
+import { MODULE_CATEGORIES, categorySummary, pipelineCoverage } from '@/lib/modules/catalog';
+import { displayPlansForModule, grantsFor } from '@/lib/billing/catalog';
+import type { ModuleCategory, ModuleId, PlanTier } from '@/lib/modules/types';
 import type { ModulesPlanView } from './plan-view';
 import { toggleModuleState } from './actions';
 import { errorMessage } from '@/lib/errors';
@@ -15,6 +23,8 @@ import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 interface ModulesClientProps {
   /** `null` when the plan could not be read — nothing is shown as active or offered. */
   plan: ModulesPlanView | null;
+  /** Module id → English name, shown under the Turkish name on a Turkish page. */
+  englishNames?: Partial<Record<ModuleId, string>>;
   tenantName?: string;
   workspace?: string;
   locale?: string;
@@ -26,69 +36,25 @@ interface ToastMessage {
   text: string;
 }
 
-// Module descriptive Turkish explanations and categories
-const MODULE_METADATA: Record<ModuleId, { descriptionTr: string; category: 'core' | 'ai' | 'tools'; icon: string }> = {
-  M1: {
-    descriptionTr: 'CORDIS veritabanı entegrasyonu, geçmiş AB projeleri, organizasyon profilleri ve ağ merkezilik analitiği.',
-    category: 'core',
-    icon: '🌐',
-  },
-  M2: {
-    descriptionTr: 'Horizon Europe, Eurostars ve ikili işbirlikleri için şablonlu ve yapay zeka destekli konsept notu oluşturucu.',
-    category: 'core',
-    icon: '📝',
-  },
-  M3: {
-    descriptionTr: 'Teklif gerekçelendirmeleri için AB politika hedefleri, etki göstergeleri ve istatistiki kanıt deposu.',
-    category: 'core',
-    icon: '📊',
-  },
-  M4: {
-    descriptionTr: 'Konsorsiyum ortakları ve irtibat kişileri için kurumsal ilişki yönetimi (CRM) ve iletişim geçmişi.',
-    category: 'core',
-    icon: '👥',
-  },
-  M5: {
-    descriptionTr: 'G0-G4 aşama-kapı teklif üretim döngüsü, görev dağılımı, zaman çizelgesi ve onay mekanizmaları.',
-    category: 'core',
-    icon: '🚦',
-  },
-  M6: {
-    descriptionTr: 'AB hakem perspektifiyle Mükemmeliyet, Etki ve Uygulama bölümlerini denetleyen derin yapay zeka puanlama simülasyonu.',
-    category: 'ai',
-    icon: '🔬',
-  },
-  M7: {
-    descriptionTr: 'Üniversite ve araştırma merkezleri için patent/teknoloji portföyünden AB çağrılarına otomatik eşleştirme motoru.',
-    category: 'tools',
-    icon: '🚀',
-  },
-  M8: {
-    descriptionTr: 'Çağrı gereksinimlerine göre en yüksek kazanma olasılığına sahip ortak ve koordinatörleri öneren akıllı eşleştirici.',
-    category: 'ai',
-    icon: '🎯',
-  },
-  M9: {
-    descriptionTr: 'Konsorsiyum hazırlık toplantıları için çağrı özeti, partner analizleri ve tartışma gündemi üreten brifing modülü.',
-    category: 'tools',
-    icon: '📋',
-  },
-  M10: {
-    descriptionTr: 'Toplantı notlarından otomatik aksiyon planları, mutabakat zabıtları (MoM) ve görev takip belgeleri üretir.',
-    category: 'tools',
-    icon: '📄',
-  },
-  M11: {
-    descriptionTr: 'Part A ve Part B başvuru formlarını resmi AB standartlarına uygun formatta tam taslak olarak üreten üst düzey üretim motoru.',
-    category: 'ai',
-    icon: '⚡',
-  },
+const PLAN_BADGES: Record<PlanTier, string> = {
+  basic: 'bg-accent/15 text-accent-ink border border-accent/20',
+  pro: 'bg-ok/15 text-ok border border-ok/20',
+  ultra: 'bg-amber/15 text-amber border border-amber/20',
 };
 
-const PLAN_BADGES: Record<PlanTier, { label: string; bg: string; text: string }> = {
-  basic: { label: 'Basic', bg: 'bg-accent/15 text-accent-ink border border-accent/20', text: 'text-accent-ink' },
-  pro: { label: 'Pro', bg: 'bg-ok/15 text-ok border border-ok/20', text: 'text-ok' },
-  ultra: { label: 'Ultra', bg: 'bg-amber/15 text-amber border border-amber/20', text: 'text-amber' },
+/** Badge colour per card status — one distinct colour each. */
+const STATUS_STYLES: Record<ModuleCardStatus | 'UNKNOWN', { badge: string; icon: string }> = {
+  ACTIVE: { badge: 'bg-ok/15 text-ok border border-ok/30', icon: '●' },
+  AVAILABLE: { badge: 'bg-accent/15 text-accent-ink border border-accent/30', icon: '○' },
+  LOCKED: { badge: 'bg-ground text-muted border border-border', icon: '🔒' },
+  ORPHANED: { badge: 'bg-bad/15 text-bad border border-bad/30', icon: '⚠' },
+  UNKNOWN: { badge: 'bg-ground text-muted border border-border', icon: '?' },
+};
+
+const MODULE_BADGE_STYLES: Record<string, string> = {
+  ga: 'bg-ok/10 text-ok border-ok/20',
+  beta: 'bg-amber/10 text-amber border-amber/20',
+  soon: 'bg-ground text-muted border-border',
 };
 
 /**
@@ -101,6 +67,7 @@ const nextToastId = () => (toastSequence += 1);
 
 export function ModulesClient({
   plan,
+  englishNames = {},
   tenantName,
   workspace = 'default',
   locale = 'tr',
@@ -109,7 +76,7 @@ export function ModulesClient({
 
   const [activeModules, setActiveModules] = useState<ModuleId[]>(plan?.activeModules ?? []);
   // Switched on in ModuleState but outside the plan (left by a downgrade): the
-  // gate refuses them, so the only offer is to switch them off.
+  // gate refuses them, so the only offers are to upgrade or switch them off.
   const [outsidePlanOn, setOutsidePlanOn] = useState<ModuleId[]>(plan?.switchedOnOutsidePlan ?? []);
   const entitledModules = plan?.entitledModules ?? [];
   const badgeTier = plan?.badgeTier ?? null;
@@ -120,10 +87,16 @@ export function ModulesClient({
   const [isPending, startTransition] = useTransition();
   const errorText = useActionErrorText();
   const t = useTranslations('settings.modules');
+  const tModules = useTranslations('modules');
+
+  const moduleName = (id: ModuleId) => {
+    const key = getManifest(id)?.key;
+    return key ? tModules(`${key}.name`) : id;
+  };
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'core' | 'ai' | 'tools' | 'active'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | ModuleCategory | 'active'>('all');
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -136,33 +109,27 @@ export function ModulesClient({
     }, 4000);
   };
 
+  const statusView = { entitledModules, activeModules, switchedOnOutsidePlan: outsidePlanOn };
+  const summary = categorySummary(activeModules);
+  const coverage = pipelineCoverage(activeModules);
+
   // Filtered Manifests
   const filteredManifests = useMemo(() => {
+    const query = searchQuery.toLowerCase();
     return manifests.filter((mod) => {
-      const meta = MODULE_METADATA[mod.id];
-      const isActive = activeModules.includes(mod.id);
-
-      // Search matching
-      const matchesSearch =
-        mod.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        mod.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (meta && meta.descriptionTr.toLowerCase().includes(searchQuery.toLowerCase()));
-
+      const matchesSearch = [mod.id, mod.name, tModules(`${mod.key}.name`), tModules(`${mod.key}.tagline`)].some(
+        (text) => text.toLowerCase().includes(query)
+      );
       if (!matchesSearch) return false;
 
-      // Category matching
-      if (selectedCategory === 'active') return isActive;
-      if (selectedCategory === 'core') return meta?.category === 'core';
-      if (selectedCategory === 'ai') return meta?.category === 'ai';
-      if (selectedCategory === 'tools') return meta?.category === 'tools';
-
-      return true;
+      if (selectedCategory === 'active') return activeModules.includes(mod.id);
+      if (selectedCategory === 'all') return true;
+      return mod.category === selectedCategory;
     });
-  }, [manifests, searchQuery, selectedCategory, activeModules]);
+  }, [manifests, searchQuery, selectedCategory, activeModules, tModules]);
 
   const activeCount = activeModules.length;
   const totalCount = manifests.length;
-  const activePercentage = Math.round((activeCount / totalCount) * 100);
 
   const handleToggle = (id: ModuleId) => {
     const isActive = activeModules.includes(id);
@@ -177,9 +144,9 @@ export function ModulesClient({
           setActiveModules((prev) => prev.filter((m) => m !== id));
           try {
             await toggleModuleState(id, 'OFF');
-            showToast(`${id} modülü başarıyla devre dışı bırakıldı.`, 'info');
+            showToast(t('toastDisabled', { id }), 'info');
           } catch (e) {
-            showToast(errorText(e, () => errorMessage(e, 'Modül kapatılırken hata oluştu.')), 'error');
+            showToast(errorText(e, () => errorMessage(e, t('toastDisableFailed'))), 'error');
             setActiveModules((prev) => [...prev, id]); // rollback
           }
         });
@@ -192,17 +159,19 @@ export function ModulesClient({
           setActiveModules((prev) => [...prev, id]);
           try {
             await toggleModuleState(id, 'ON');
-            showToast(`${id} modülü başarıyla aktifleştirildi!`, 'success');
+            showToast(t('toastEnabled', { id }), 'success');
           } catch (e) {
-            showToast(errorText(e, () => errorMessage(e, 'Modül etkinleştirilirken hata oluştu.')), 'error');
+            showToast(errorText(e, () => errorMessage(e, t('toastEnableFailed'))), 'error');
             setActiveModules((prev) => prev.filter((m) => m !== id)); // rollback
           }
         });
       } else {
-        const missing = check.missingDependencies?.length
-          ? `Gerekli modüller eksik: ${check.missingDependencies.join(', ')}`
-          : check.reason || 'Etkinleştirme kuralı karşılanmadı.';
-        showToast(`${id} açılamadı: ${missing}`, 'error');
+        showToast(
+          check.missingDependencies?.length
+            ? t('toastEnableBlockedDeps', { id, ids: check.missingDependencies.join(', ') })
+            : check.reason || t('toastEnableBlocked', { id }),
+          'error'
+        );
       }
     }
   };
@@ -212,9 +181,9 @@ export function ModulesClient({
       setOutsidePlanOn((prev) => prev.filter((m) => m !== id));
       try {
         await toggleModuleState(id, 'OFF');
-        showToast(`${id} plan dışında açık kalmıştı; kapatıldı.`, 'info');
+        showToast(t('toastOrphanDisabled', { id }), 'info');
       } catch (e) {
-        showToast(errorText(e, () => errorMessage(e, 'Modül kapatılırken hata oluştu.')), 'error');
+        showToast(errorText(e, () => errorMessage(e, t('toastDisableFailed'))), 'error');
         setOutsidePlanOn((prev) => [...prev, id]); // rollback
       }
     });
@@ -232,19 +201,31 @@ export function ModulesClient({
 
       try {
         await toggleModuleState(target, 'OFF');
-        showToast(`${target} ve bağlı ${count - 1} alt modül kapatıldı.`, 'info');
+        showToast(t('toastCascadeDisabled', { id: target, count: count - 1 }), 'info');
       } catch (e) {
-        showToast(errorText(e, () => errorMessage(e, 'Modüller kapatılırken hata oluştu.')), 'error');
+        showToast(errorText(e, () => errorMessage(e, t('toastCascadeFailed'))), 'error');
         // Rollback
         setActiveModules((prev) => Array.from(new Set([...prev, ...toDisable])));
       }
     });
   };
 
+  const tabClass = (selected: boolean) =>
+    `px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
+      selected ? 'bg-surface text-ink shadow-xs border border-border/80' : 'text-muted hover:text-ink'
+    }`;
+
+  const disableButtonClass = (disabled: boolean) =>
+    `text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-2xs ${
+      disabled
+        ? 'bg-ground text-muted border border-border cursor-not-allowed'
+        : 'bg-bad/15 text-bad hover:bg-bad/25 border border-bad/30'
+    }`;
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-16">
       {/* Toast Overlay */}
-      <div className="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" aria-live="polite">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -256,41 +237,39 @@ export function ModulesClient({
                 : 'bg-surface text-ink border-border shadow-xl'
             }`}
           >
-            <span>{toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'}</span>
+            <span aria-hidden="true">{toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'}</span>
             <span>{toast.text}</span>
           </div>
         ))}
       </div>
 
       {/* Header & Breadcrumb */}
-      <div className="bg-surface border border-border rounded-2xl p-6 md:p-8 shadow-xs">
+      <div className="bg-surface border border-border rounded-2xl p-4 sm:p-6 md:p-8 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 text-xs font-medium text-muted mb-2">
               <Link href={`/${locale}/${workspace}/dashboard`} className="hover:text-ink transition-colors">
-                Dashboard
+                {t('breadcrumbDashboard')}
               </Link>
-              <span>/</span>
-              <span className="text-ink-2">Ayarlar</span>
-              <span>/</span>
-              <span className="text-accent-ink font-semibold">Modül Yönetimi</span>
+              <span aria-hidden="true">/</span>
+              <span className="text-ink-2">{t('breadcrumbSettings')}</span>
+              <span aria-hidden="true">/</span>
+              <span className="text-accent-ink font-semibold">{t('breadcrumbCurrent')}</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink">Modül ve Özellik Yönetimi</h1>
-            <p className="text-xs md:text-sm text-muted mt-1 max-w-2xl">
-              Çalışma alanınızda ({tenantName}) aktif olan AB Ar-Ge ve fonlama modüllerini yönetin, bağımlılıkları kontrol edin ve yeni yetenekleri devreye alın.
-            </p>
+            <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink">{t('title')}</h1>
+            <p className="text-xs md:text-sm text-muted mt-1 max-w-2xl">{t('subtitle', { tenant: tenantName ?? '' })}</p>
           </div>
 
-          <div className="flex items-center gap-4 bg-ground border border-border p-4 rounded-xl">
+          <div className="flex flex-wrap items-center gap-4 bg-ground border border-border p-4 rounded-xl">
             <div>
-              <div className="text-xs text-muted font-medium">Mevcut Abonelik Paketi</div>
+              <div className="text-xs text-muted font-medium">{t('currentPlan')}</div>
               <div className="flex flex-wrap items-center gap-2 mt-1">
                 <span
                   className={`text-xs font-bold tracking-wide whitespace-nowrap px-2.5 py-1 rounded-md ${
-                    (badgeTier && PLAN_BADGES[badgeTier]?.bg) || 'bg-surface text-ink border border-border'
+                    (badgeTier && PLAN_BADGES[badgeTier]) || 'bg-surface text-ink border border-border'
                   }`}
                 >
-                  {plan ? plan.planName : 'Okunamadı'}
+                  {plan ? plan.planName : t('planUnread')}
                 </span>
                 {plan?.pilot && (
                   <span
@@ -298,14 +277,12 @@ export function ModulesClient({
                       plan.pilot.expired ? 'bg-bad/15 text-bad border-bad/30' : 'bg-amber/15 text-amber border-amber/20'
                     }`}
                   >
-                    {plan.pilot.expired ? 'Pilot bitti' : 'Pilot'}
+                    {plan.pilot.expired ? t('pilotEndedBadge') : t('pilotBadge')}
                   </span>
                 )}
               </div>
               {plan?.pilot && (
-                <div className="text-[11px] text-muted mt-1">
-                  Son gün: {plan.pilot.lastDay} · yenilenmez
-                </div>
+                <div className="text-[11px] text-muted mt-1">{t('pilotLastDay', { date: plan.pilot.lastDay })}</div>
               )}
               {plan && !plan.pilot && plan.planId === 'free' && (
                 <div className="text-[11px] text-muted mt-1">{t('noSubscription')}</div>
@@ -315,100 +292,112 @@ export function ModulesClient({
               href={`/${locale}/${workspace}/settings/billing`}
               className="text-xs font-bold text-accent hover:underline bg-surface border border-border px-3 py-2 rounded-lg shadow-2xs hover:bg-surface-hover transition"
             >
-              Planı Değiştir →
+              {t('changePlan')}
             </Link>
           </div>
         </div>
 
         {readOnly && (
           <div role="status" className="mt-6 rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-xs text-ink">
-            {plan
-              ? `Ücretsiz pilot ${plan.pilot?.lastDay} tarihinde sona erdi. Çalışma alanı salt okunur; modüller değiştirilemez.`
-              : 'Plan ve modül durumu şu anda okunamadı. Hiçbir modül açık gösterilmiyor; sayfayı yenileyip tekrar deneyin.'}
+            {plan ? t('pilotExpiredNotice', { date: plan.pilot?.lastDay ?? '' }) : t('planUnreadNotice')}
           </div>
         )}
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
+        {/* Stats Row: active total, pipeline coverage, one card per category */}
+        <div
+          className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mt-6 pt-6 border-t border-border"
+          data-testid="modules-summary"
+        >
           <div className="p-3 bg-ground rounded-xl border border-border">
-            <div className="text-xs text-muted font-medium">Aktif Modüller</div>
+            <div className="text-xs text-muted font-medium">{t('activeModules')}</div>
             <div className="text-2xl font-bold text-ink mt-0.5">
               {activeCount} <span className="text-sm font-normal text-muted">/ {totalCount}</span>
             </div>
           </div>
-          <div className="p-3 bg-ground rounded-xl border border-border">
-            <div className="text-xs text-muted font-medium">Kapsam Oranı</div>
-            <div className="text-2xl font-bold text-ok mt-0.5">%{activePercentage}</div>
+          <div className="p-3 bg-ground rounded-xl border border-border" data-testid="pipeline-coverage">
+            <div className="text-xs text-muted font-medium">{t('pipelineCoverage')}</div>
+            <div className="text-2xl font-bold text-ok mt-0.5">
+              {t('pipelineCoverageValue', { covered: coverage.covered.length, total: coverage.total })}
+            </div>
+            <div className="text-[11px] text-muted mt-0.5">
+              {coverage.covered.length > 0
+                ? t('pipelineCoverageStages', { stages: coverage.covered.join(', ') })
+                : t('pipelineCoverageNone')}
+            </div>
           </div>
-          <div className="p-3 bg-ground rounded-xl border border-border">
-            <div className="text-xs text-muted font-medium">Çekirdek Pipeline</div>
-            <div className="text-2xl font-bold text-ink mt-0.5">M1 - M5</div>
-          </div>
-          <div className="p-3 bg-ground rounded-xl border border-border">
-            <div className="text-xs text-muted font-medium">Gelişmiş AI & Eklentiler</div>
-            <div className="text-2xl font-bold text-accent mt-0.5">M6, M8, M11</div>
-          </div>
+          {MODULE_CATEGORIES.map((category) => (
+            <div
+              key={category}
+              className="p-3 bg-ground rounded-xl border border-border"
+              data-testid={`category-summary-${category}`}
+            >
+              <div className="text-xs text-muted font-medium">{t(`category.${category}`)}</div>
+              <div className="text-2xl font-bold text-ink mt-0.5">
+                {summary[category].active}{' '}
+                <span className="text-sm font-normal text-muted">/ {summary[category].total}</span>
+              </div>
+              <div className="sr-only">
+                {t('categoryCount', { active: summary[category].active, total: summary[category].total })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Control Bar: Search & Category Tabs */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         {/* Tabs */}
-        <div className="flex items-center gap-1.5 bg-ground p-1 rounded-xl border border-border text-xs font-semibold overflow-x-auto">
+        <div
+          role="group"
+          aria-label={t('categoryTabsLabel')}
+          className="flex items-center gap-1.5 bg-ground p-1 rounded-xl border border-border text-xs font-semibold overflow-x-auto"
+        >
           <button
+            type="button"
+            aria-pressed={selectedCategory === 'all'}
             onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
-              selectedCategory === 'all' ? 'bg-surface text-ink shadow-xs border border-border/80' : 'text-muted hover:text-ink'
-            }`}
+            className={tabClass(selectedCategory === 'all')}
           >
-            Tüm Modüller ({totalCount})
+            {t('tabAll', { count: totalCount })}
           </button>
+          {MODULE_CATEGORIES.map((category) => (
+            <button
+              key={category}
+              type="button"
+              aria-pressed={selectedCategory === category}
+              onClick={() => setSelectedCategory(category)}
+              className={tabClass(selectedCategory === category)}
+            >
+              {t('tabCategory', { label: t(`category.${category}`), count: summary[category].total })}
+            </button>
+          ))}
           <button
-            onClick={() => setSelectedCategory('core')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
-              selectedCategory === 'core' ? 'bg-surface text-ink shadow-xs border border-border/80' : 'text-muted hover:text-ink'
-            }`}
-          >
-            Çekirdek İş Akışı (M1-M5)
-          </button>
-          <button
-            onClick={() => setSelectedCategory('ai')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
-              selectedCategory === 'ai' ? 'bg-surface text-ink shadow-xs border border-border/80' : 'text-muted hover:text-ink'
-            }`}
-          >
-            Yapay Zeka & Puanlama
-          </button>
-          <button
-            onClick={() => setSelectedCategory('tools')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
-              selectedCategory === 'tools' ? 'bg-surface text-ink shadow-xs border border-border/80' : 'text-muted hover:text-ink'
-            }`}
-          >
-            Araçlar & TTO
-          </button>
-          <button
+            type="button"
+            aria-pressed={selectedCategory === 'active'}
             onClick={() => setSelectedCategory('active')}
-            className={`px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
-              selectedCategory === 'active' ? 'bg-surface text-ink shadow-xs border border-border/80' : 'text-muted hover:text-ink'
-            }`}
+            className={tabClass(selectedCategory === 'active')}
           >
-            Sadece Açık Olanlar ({activeCount})
+            {t('tabActive', { count: activeCount })}
           </button>
         </div>
 
         {/* Search */}
-        <div className="relative w-full sm:w-72">
+        <div className="relative w-full sm:w-72 shrink-0">
           <input
-            type="text"
-            placeholder="Modül ara (örn: M6, Ortak, AI)..."
+            type="search"
+            aria-label={t('searchLabel')}
+            placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full text-xs bg-surface border border-border rounded-xl px-3 py-2 pl-8 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
           />
-          <span className="absolute left-2.5 top-2.5 text-muted text-xs">🔍</span>
+          <span className="absolute left-2.5 top-2.5 text-muted text-xs" aria-hidden="true">
+            🔍
+          </span>
           {searchQuery && (
             <button
+              type="button"
+              aria-label={t('clearSearch')}
               onClick={() => setSearchQuery('')}
               className="absolute right-2.5 top-2 text-muted hover:text-ink text-xs font-bold"
             >
@@ -422,89 +411,124 @@ export function ModulesClient({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {filteredManifests.map((mod) => {
           const isActive = activeModules.includes(mod.id);
-          const meta = MODULE_METADATA[mod.id];
+          const status = plan ? moduleStatus(mod.id, statusView) : null;
+          const statusStyle = STATUS_STYLES[status ?? 'UNKNOWN'];
           const check = canEnableEntitled(mod.id, activeModules, entitledModules);
-          const isPlanLocked = plan !== null && !entitledModules.includes(mod.id);
-          const isOutsidePlanOn = isPlanLocked && outsidePlanOn.includes(mod.id);
+          const chain = requirementChain(mod.id);
+          const plans = displayPlansForModule(mod.id);
+          const currentPlanId = badgeTier ?? plan?.planId ?? null;
+          const englishName = englishNames[mod.id];
+          const quotaParts = mod.quota
+            ? [
+                mod.quota.aiCallsMonthly !== null ? t('quotaAiCalls', { count: mod.quota.aiCallsMonthly }) : null,
+                mod.quota.recordLimit !== null ? t('quotaRecords', { count: mod.quota.recordLimit }) : null,
+              ].filter((part): part is string => part !== null)
+            : [];
+          const upgradeOffer =
+            status === 'LOCKED' || status === 'ORPHANED' ? (
+              plan?.pilot ? (
+                // A pilot cannot change plan (billing says so), so no upgrade offer here.
+                <span className="text-xs font-medium text-muted text-right">{t('pilotLocked')}</span>
+              ) : (
+                <Link
+                  href={`/${locale}/${workspace}/settings/billing`}
+                  className="text-xs font-bold bg-amber hover:opacity-90 text-white px-3 py-2 rounded-lg transition shadow-2xs"
+                >
+                  {t('upgradeCta')}
+                </Link>
+              )
+            ) : null;
 
           return (
             <div
               key={mod.id}
-              className={`bg-surface border rounded-2xl p-6 shadow-xs flex flex-col justify-between transition-all hover:shadow-md ${
-                isActive ? 'border-accent/40 ring-1 ring-accent/20' : 'border-border'
+              data-testid={`module-card-${mod.id}`}
+              data-status={status ?? 'UNKNOWN'}
+              className={`min-w-0 bg-surface border rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between transition-all hover:shadow-md ${
+                status === 'ACTIVE'
+                  ? 'border-accent/40 ring-1 ring-accent/20'
+                  : status === 'ORPHANED'
+                  ? 'border-bad/40'
+                  : 'border-border'
               } ${isPending ? 'opacity-70' : ''}`}
             >
               <div className="space-y-4">
-                {/* Card Top: ID Badge, Status Tag, Toggle */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl p-2 bg-ground border border-border rounded-xl">{meta?.icon || '📦'}</span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-xs bg-ground text-ink-2 px-2 py-0.5 rounded border border-border">
-                          {mod.id}
-                        </span>
-                        <h2 className="text-base font-bold text-ink">{mod.name}</h2>
+                {/* Card Top: id, names, status */}
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 basis-48">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono font-bold text-xs bg-ground text-ink-2 px-2 py-0.5 rounded border border-border">
+                        {mod.id}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                          MODULE_BADGE_STYLES[mod.statusBadge] ?? MODULE_BADGE_STYLES.soon
+                        }`}
+                      >
+                        {t(`statusBadge.${mod.statusBadge}`)}
+                      </span>
+                    </div>
+                    <h2 className="text-base font-bold text-ink mt-1.5">{tModules(`${mod.key}.name`)}</h2>
+                    {locale !== 'en' && englishName && (
+                      <div className="text-[11px] text-muted" lang="en">
+                        {englishName}
                       </div>
-                      <div className="text-[11px] text-muted font-mono mt-0.5">
-                        Key: {mod.key} {mod.version ? `• v${mod.version}` : ''}
-                      </div>
+                    )}
+                    <div className="text-[11px] text-muted font-mono mt-0.5">
+                      {t('keyLabel', { key: mod.key })}
+                      {mod.version ? ` • ${t('versionLabel', { version: mod.version })}` : ''}
                     </div>
                   </div>
 
-                  {/* Status & Switch */}
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        isActive
-                          ? 'bg-ok/15 text-ok border border-ok/20'
-                          : isPlanLocked
-                          ? 'bg-amber/15 text-amber border border-amber/20'
-                          : 'bg-ground text-muted border border-border'
-                      }`}
-                    >
-                      {isActive ? '● Aktif' : isPlanLocked ? '🔒 Kilitli' : '○ Pasif'}
-                    </span>
-                  </div>
+                  <span
+                    data-testid="module-status"
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-right ${statusStyle.badge}`}
+                  >
+                    <span aria-hidden="true">{statusStyle.icon} </span>
+                    {t(`status.${status ?? 'UNKNOWN'}`)}
+                  </span>
                 </div>
 
-                {/* Description */}
-                <p className="text-xs text-ink-2 leading-relaxed">
-                  {meta?.descriptionTr || 'Modül fonksiyonu ve otomasyon araçları.'}
-                </p>
+                {/* Tagline */}
+                <p className="text-xs text-ink-2 leading-relaxed">{tModules(`${mod.key}.tagline`)}</p>
 
-                {/* Dependencies & Plan Requirements */}
+                {/* Requirement chain, recommendations, plans */}
                 <div className="space-y-2 pt-2 border-t border-border text-xs">
-                  {/* Requires */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-muted font-medium">Gereksinim:</span>
-                    {mod.requires.length > 0 ? (
-                      mod.requires.map((reqId) => {
+                  <div className="flex items-center gap-2 flex-wrap" data-testid="requirement-chain">
+                    <span className="text-muted font-medium">{t('chainLabel')}</span>
+                    {chain.length > 0 ? (
+                      chain.map((reqId, index) => {
                         const isReqActive = activeModules.includes(reqId);
                         return (
-                          <span
-                            key={reqId}
-                            className={`font-mono text-[11px] px-2 py-0.5 rounded border font-semibold flex items-center gap-1 ${
-                              isReqActive
-                                ? 'bg-ok/15 border-ok/30 text-ok'
-                                : 'bg-bad/15 border-bad/30 text-bad'
-                            }`}
-                            title={isReqActive ? `${reqId} Aktif` : `${reqId} Eksik! Önce bu modül açılmalı.`}
-                          >
-                            <span>{isReqActive ? '✓' : '✕'}</span>
-                            <span>{reqId}</span>
-                          </span>
+                          <React.Fragment key={reqId}>
+                            {index > 0 && (
+                              <span className="text-muted" aria-hidden="true">
+                                →
+                              </span>
+                            )}
+                            <span
+                              className={`font-mono text-[11px] px-2 py-0.5 rounded border font-semibold flex items-center gap-1 ${
+                                isReqActive ? 'bg-ok/15 border-ok/30 text-ok' : 'bg-bad/15 border-bad/30 text-bad'
+                              }`}
+                              title={isReqActive ? t('chainActive', { id: reqId }) : t('chainMissing', { id: reqId })}
+                            >
+                              <span aria-hidden="true">{isReqActive ? '✓' : '✕'}</span>
+                              <span>{reqId}</span>
+                              <span className="sr-only">
+                                {isReqActive ? t('chainActive', { id: reqId }) : t('chainMissing', { id: reqId })}
+                              </span>
+                            </span>
+                          </React.Fragment>
                         );
                       })
                     ) : (
-                      <span className="text-muted text-[11px]">Bağımsız (Gereksinim Yok)</span>
+                      <span className="text-muted text-[11px]">{t('chainNone')}</span>
                     )}
                   </div>
 
-                  {/* Recommends */}
                   {mod.recommends.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-muted font-medium">Önerilen:</span>
+                      <span className="text-muted font-medium">{t('recommendsLabel')}</span>
                       {mod.recommends.map((recId) => (
                         <span
                           key={recId}
@@ -516,97 +540,96 @@ export function ModulesClient({
                     </div>
                   )}
 
-                  {/* Plans & Addons */}
-                  <div className="flex items-center gap-2 flex-wrap pt-1">
-                    <span className="text-muted font-medium">Planlar:</span>
-                    <div className="flex items-center gap-1">
-                      {mod.planTiers.map((tier) => (
-                        <span
-                          key={tier}
-                          className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border border-border ${
-                            badgeTier === tier
-                              ? 'bg-accent/15 text-accent-ink font-bold border-accent/30'
-                              : 'bg-ground text-muted'
-                          }`}
-                        >
-                          {tier}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="flex items-center gap-2 flex-wrap pt-1" data-testid="module-plans">
+                    <span className="text-muted font-medium">{t('plansLabel')}</span>
+                    {plans.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {plans.map((planId) => (
+                          <span
+                            key={planId}
+                            className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border border-border ${
+                              currentPlanId === planId
+                                ? 'bg-accent/15 text-accent-ink font-bold border-accent/30'
+                                : 'bg-ground text-muted'
+                            }`}
+                          >
+                            {grantsFor(planId)?.name ?? planId}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted text-[11px]">{t('plansNone')}</span>
+                    )}
                     {mod.addOnSku && (
-                      <span className="text-[10px] bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-mono font-semibold">
-                        SKU: {mod.addOnSku}
+                      <span className="text-[10px] bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-mono font-semibold break-all">
+                        {t('addOnSku', { sku: mod.addOnSku })}
                       </span>
                     )}
                   </div>
+
+                  {quotaParts.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap" data-testid="module-quota">
+                      <span className="text-muted font-medium">{t('quotaLabel')}</span>
+                      <span className="text-ink-2">{quotaParts.join(' · ')}</span>
+                    </div>
+                  )}
+
+                  {mod.docsUrl && (
+                    <a
+                      href={mod.docsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block text-accent font-semibold hover:underline"
+                    >
+                      {t('docsLink')}
+                    </a>
+                  )}
                 </div>
               </div>
 
               {/* Card Footer: Action Buttons */}
-              <div className="mt-5 pt-4 border-t border-border flex items-center justify-between gap-3">
-                <div className="text-xs">
-                  {!isActive && !check.allowed && (
+              <div className="mt-5 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs min-w-0">
+                  {status === 'AVAILABLE' && !check.allowed && (
                     <span className="text-bad font-medium">
-                      {isOutsidePlanOn
-                        ? 'Plan dışında açık kalmış — kullanılamaz'
-                        : isPlanLocked
-                        ? 'Plan yükseltmesi gerektirir'
-                        : `Eksik bağımlılık: ${check.missingDependencies?.join(', ')}`}
+                      {t('missingDependencies', { ids: check.missingDependencies?.join(', ') ?? '' })}
                     </span>
                   )}
-                  {isActive && <span className="text-ok font-medium">Kullanıma hazır</span>}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {isOutsidePlanOn && (
-                    <button
-                      onClick={() => disableOutsidePlan(mod.id)}
-                      disabled={readOnly || isPending}
-                      className={`text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-2xs ${
-                        readOnly
-                          ? 'bg-ground text-muted border border-border cursor-not-allowed'
-                          : 'bg-bad/15 text-bad hover:bg-bad/25 border border-bad/30'
-                      }`}
-                    >
-                      Kapat
-                    </button>
-                  )}
-                  {isPlanLocked && !isActive && plan?.pilot ? (
-                    // A pilot cannot change plan (billing says so), so no upgrade offer here.
-                    <span className="text-xs font-medium text-muted text-right">{t('pilotLocked')}</span>
-                  ) : isPlanLocked && !isActive ? (
-                    <Link
-                      href={`/${locale}/${workspace}/settings/billing`}
-                      className="text-xs font-bold bg-amber hover:opacity-90 text-white px-3 py-1.5 rounded-lg transition shadow-2xs"
-                    >
-                      {t('upgradeCta')}
-                    </Link>
-                  ) : (
-                    <button
-                      onClick={() => handleToggle(mod.id)}
-                      disabled={readOnly || (!isActive && !check.allowed)}
-                      className={`text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-2xs flex items-center gap-1.5 ${
-                        readOnly
-                          ? 'bg-ground text-muted border border-border cursor-not-allowed'
-                          : isActive
-                          ? 'bg-bad/15 text-bad hover:bg-bad/25 border border-bad/30'
-                          : check.allowed
-                          ? 'bg-accent hover:opacity-90 text-white'
-                          : 'bg-ground text-muted border border-border cursor-not-allowed'
-                      }`}
-                    >
-                      {isActive ? (
-                        <>
-                          <span>Kapat</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Etkinleştir</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
+                {plan && (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {status === 'ORPHANED' && (
+                      <button
+                        type="button"
+                        onClick={() => disableOutsidePlan(mod.id)}
+                        disabled={readOnly || isPending}
+                        className={disableButtonClass(readOnly)}
+                      >
+                        {t('disable')}
+                      </button>
+                    )}
+                    {upgradeOffer}
+                    {(status === 'ACTIVE' || status === 'AVAILABLE') && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(mod.id)}
+                        disabled={readOnly || (!isActive && !check.allowed)}
+                        className={
+                          isActive
+                            ? disableButtonClass(readOnly)
+                            : `text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-2xs ${
+                                !readOnly && check.allowed
+                                  ? 'bg-accent hover:opacity-90 text-white'
+                                  : 'bg-ground text-muted border border-border cursor-not-allowed'
+                              }`
+                        }
+                      >
+                        {isActive ? t('disable') : t('enable')}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -615,17 +638,20 @@ export function ModulesClient({
 
       {filteredManifests.length === 0 && (
         <div className="bg-surface border border-border rounded-2xl p-12 text-center text-muted">
-          <div className="text-3xl mb-2">🔍</div>
-          <h3 className="text-base font-bold text-ink">Aramanızla eşleşen modül bulunamadı</h3>
-          <p className="text-xs text-muted mt-1">Filtreleri veya arama kriterinizi temizlemeyi deneyin.</p>
+          <div className="text-3xl mb-2" aria-hidden="true">
+            🔍
+          </div>
+          <h3 className="text-base font-bold text-ink">{t('emptyTitle')}</h3>
+          <p className="text-xs text-muted mt-1">{t('emptyBody')}</p>
           <button
+            type="button"
             onClick={() => {
               setSearchQuery('');
               setSelectedCategory('all');
             }}
             className="mt-4 text-xs font-semibold text-accent hover:underline"
           >
-            Filtreleri Sıfırla
+            {t('emptyReset')}
           </button>
         </div>
       )}
@@ -633,26 +659,34 @@ export function ModulesClient({
       {/* Cascade Disable Confirmation Modal */}
       {cascadeWarning && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-surface rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-border">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cascade-title"
+            className="bg-surface rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-border"
+          >
             <div className="flex items-center gap-3 text-bad">
-              <div className="w-10 h-10 rounded-full bg-bad/15 flex items-center justify-center text-xl font-bold">
+              <div
+                className="w-10 h-10 shrink-0 rounded-full bg-bad/15 flex items-center justify-center text-xl font-bold"
+                aria-hidden="true"
+              >
                 ⚠️
               </div>
               <div>
-                <h2 className="text-lg font-bold text-ink font-heading">
-                  Bağlantılı Modül Kapatma Uyarısı
+                <h2 id="cascade-title" className="text-lg font-bold text-ink font-heading">
+                  {t('cascadeTitle')}
                 </h2>
-                <div className="text-xs text-muted">Bu modüle bağlı çalışan diğer modüller etkilenecektir.</div>
+                <div className="text-xs text-muted">{t('cascadeSubtitle')}</div>
               </div>
             </div>
 
             <p className="text-xs text-ink-2 leading-relaxed">
-              <strong className="text-ink">
-                {getManifest(cascadeWarning.target)?.name} ({cascadeWarning.target})
-              </strong>{' '}
-              modülünü kapattığınızda, bu modüle bağımlı çalışan aşağıdaki{' '}
-              <strong>{cascadeWarning.cascading.length}</strong> modül de otomatik olarak <strong>devre dışı</strong>{' '}
-              bırakılacaktır:
+              {t.rich('cascadeBody', {
+                name: moduleName(cascadeWarning.target),
+                id: cascadeWarning.target,
+                count: cascadeWarning.cascading.length,
+                strong: (chunks) => <strong className="text-ink">{chunks}</strong>,
+              })}
             </p>
 
             <div className="bg-amber/10 border border-amber/20 rounded-xl p-3 space-y-1.5 max-h-48 overflow-y-auto">
@@ -662,23 +696,25 @@ export function ModulesClient({
                   <span className="font-mono bg-surface px-1.5 py-0.5 rounded border border-border text-[10px]">
                     {id}
                   </span>
-                  <span>{getManifest(id)?.name}</span>
+                  <span>{moduleName(id)}</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
               <button
+                type="button"
                 onClick={() => setCascadeWarning(null)}
                 className="px-4 py-2 text-xs font-semibold border border-border rounded-xl hover:bg-surface-hover text-ink-2 transition"
               >
-                Vazgeç
+                {t('cascadeCancel')}
               </button>
               <button
+                type="button"
                 onClick={confirmDisable}
                 className="px-4 py-2 text-xs font-bold bg-bad text-white rounded-xl shadow-xs hover:opacity-90 transition"
               >
-                Tümünü Kapatmayı Onayla
+                {t('cascadeConfirm')}
               </button>
             </div>
           </div>
@@ -688,15 +724,10 @@ export function ModulesClient({
       {/* Informative Footer Box */}
       <div className="bg-surface border border-border rounded-2xl p-6 text-xs text-ink-2 space-y-3">
         <h4 className="font-bold text-ink text-sm flex items-center gap-2">
-          <span>💡</span>
-          <span>Modül Mimarisi ve Bağımlılık Hiyerarşisi</span>
+          <span aria-hidden="true">💡</span>
+          <span>{t('footerTitle')}</span>
         </h4>
-        <p className="leading-relaxed">
-          {PRODUCT_NAME} SaaS modülleri birbirleriyle entegre çalışır. Örneğin <strong>M4 (Focal Point CRM)</strong> modülü{' '}
-          <strong>M1 (Partner Intelligence)</strong> veritabanını kullanır; <strong>M11 (Full Application Production)</strong>{' '}
-          modülü ise Konsept Notu (M2), Kanıt Paketi (M3), Teklif İş Akışı (M5) ve Konsorsiyum Eşleştirme (M8)
-          modüllerinin aktif olmasını gerektirir.
-        </p>
+        <p className="leading-relaxed">{t('footerBody', { product: PRODUCT_NAME })}</p>
       </div>
     </div>
   );

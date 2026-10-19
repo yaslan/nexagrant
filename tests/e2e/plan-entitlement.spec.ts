@@ -33,6 +33,7 @@ const SHOTS = shotsDir('TASK-MTR6QIE05ZKNH-screenshots');
 const LENS = PLAN_E2E.lens;
 const TENANT_ID = LENS.tenantId;
 const MODULES_URL = `/tr/${LENS.workspaceSlug}/settings/modules`;
+const STATE_SHOTS = shotsDir('TASK-MVC4JEKT5KX5C-screenshots');
 
 /**
  * `planVersionId` is cleared along with the plan, so entitlement is answered by the
@@ -57,6 +58,66 @@ async function setM6(status: ModuleStatus) {
     create: { tenantId: TENANT_ID, moduleId: 'M6', status },
   });
 }
+
+const ALL_MODULES = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11'] as const;
+
+/** Every module ON in `on`, every other one OFF — one upsert each, no filtered bulk write. */
+async function setModules(on: readonly string[]) {
+  for (const moduleId of ALL_MODULES) {
+    const status: ModuleStatus = on.includes(moduleId) ? 'ON' : 'OFF';
+    await prisma.moduleState.upsert({
+      where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId } },
+      update: { status },
+      create: { tenantId: TENANT_ID, moduleId, status },
+    });
+  }
+}
+
+/** The tenant as one that never bought anything: no subscription row at all. */
+async function dropSubscription() {
+  await prisma.subscription.delete({ where: { tenantId: TENANT_ID } }).catch(() => undefined);
+}
+
+async function upsertPlan(planId: string) {
+  await prisma.subscription.upsert({
+    where: { tenantId: TENANT_ID },
+    update: { planId, status: 'ACTIVE', planVersionId: null },
+    create: { tenantId: TENANT_ID, planId, status: 'ACTIVE' },
+  });
+}
+
+/**
+ * The app shell scrolls inside `<main>`, not the document, so a full-page frame
+ * stops at the viewport. Grow the viewport to the content instead, then measure
+ * horizontal overflow on both the document and `<main>`.
+ */
+async function frameAt(page: Page, width: number, path: string) {
+  await page.setViewportSize({ width, height: 900 });
+  await expect(page.getByTestId('modules-summary')).toBeVisible();
+  const overflow = await page.evaluate(() => {
+    const main = document.querySelector('main');
+    return Math.max(
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      main ? main.scrollWidth - main.clientWidth : 0
+    );
+  });
+  expect(overflow, `horizontal scroll at ${width}px`).toBeLessThanOrEqual(0);
+  const height = await page.evaluate(() => {
+    const main = document.querySelector('main');
+    return main ? Math.ceil(main.getBoundingClientRect().top + main.scrollHeight) : 900;
+  });
+  await page.setViewportSize({ width, height: Math.min(height, 12_000) });
+  await page.screenshot({ path });
+}
+
+async function captureState(page: Page, name: string) {
+  await frameAt(page, 1280, `${STATE_SHOTS}/${name}-1280.png`);
+  await frameAt(page, 375, `${STATE_SHOTS}/${name}-375.png`);
+  await page.setViewportSize({ width: 1280, height: 900 });
+}
+
+const statusOf = (page: Page, moduleId: string) =>
+  page.getByTestId(`module-card-${moduleId}`).getAttribute('data-status');
 
 async function signIn(page: Page) {
   // Managing modules is Tenant Owner only, and the fixture seats its user as one.
@@ -104,20 +165,21 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
     await expect(page.getByRole('main')).toContainText('Basic');
 
     const m6Basic = moduleCard(page, 'M6');
+    await expect(m6Basic).toContainText('Hakem Gözü');
     await expect(m6Basic).toContainText('Evaluator Lens');
-    await expect(m6Basic).toContainText('Kilitli');
-    await expect(m6Basic).toContainText('Plan yükseltmesi gerektirir');
+    await expect(m6Basic).toContainText('Planınıza dahil değil');
     // The card lists the plans that do open it, straight from the catalogue.
-    await expect(m6Basic).toContainText('ultra');
-    // No way in: the enable button is replaced by an upgrade link.
-    await expect(m6Basic.getByRole('button', { name: 'Etkinleştir' })).toHaveCount(0);
+    await expect(m6Basic).toContainText('Ultra');
+    // No way in: neither switch is offered, only an upgrade link (LOCKED, FO-39).
+    await expect(m6Basic.getByRole('button', { name: 'Aç' })).toHaveCount(0);
+    await expect(m6Basic.getByRole('button', { name: 'Kapat' })).toHaveCount(0);
     await expect(m6Basic.getByRole('link', { name: 'Planı Yükselt' })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/01-basic-page.png`, fullPage: true });
     await m6Basic.scrollIntoViewIfNeeded();
     await m6Basic.screenshot({ path: `${SHOTS}/01-basic-m6-locked.png` });
 
     // M3 is on Basic, so the lock is about the plan and not about the page.
-    await expect(moduleCard(page, 'M3')).not.toContainText('Kilitli');
+    await expect(moduleCard(page, 'M3')).not.toContainText('Planınıza dahil değil');
 
     // ── Ultra: the same card, the same session, and it actually turns on.
     await setPlan('ultra');
@@ -126,8 +188,8 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
     await expect(page.getByRole('main')).toContainText('Ultra');
 
     const m6Ultra = moduleCard(page, 'M6');
-    await expect(m6Ultra).not.toContainText('Kilitli');
-    const enable = m6Ultra.getByRole('button', { name: 'Etkinleştir' });
+    await expect(m6Ultra).toContainText('Planınıza dahil, açılabilir');
+    const enable = m6Ultra.getByRole('button', { name: 'Aç' });
     await expectHydrated(enable);
     await enable.click();
     await expect(m6Ultra).toContainText('Kullanıma hazır', { timeout: 20_000 });
@@ -140,5 +202,76 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
       where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M6' } },
     });
     expect(saved?.status).not.toBe('OFF');
+  });
+  // FO-39 (TASK-MVC4JEKT5KX5C): the four card states on real subscription rows.
+  test('Discover without a subscription: no ORPHANED card, Discover listed on its modules', async ({ page }) => {
+    await dropSubscription();
+    await setModules(['M3']);
+    await signIn(page);
+
+    await expect(page.getByRole('main')).toContainText('Discover');
+    await expect(page.getByRole('main')).toContainText('Aboneliğiniz yok');
+    for (const id of ALL_MODULES) expect(await statusOf(page, id)).not.toBe('ORPHANED');
+    expect(await statusOf(page, 'M3')).toBe('ACTIVE');
+    expect(await statusOf(page, 'M5')).toBe('AVAILABLE');
+    expect(await statusOf(page, 'M6')).toBe('LOCKED');
+    await expect(page.getByTestId('module-card-M5').getByTestId('module-plans')).toContainText('Discover');
+    // LOCKED: an upgrade link and no switch.
+    const m6 = page.getByTestId('module-card-M6');
+    await expect(m6.getByRole('button')).toHaveCount(0);
+    await expect(m6.getByRole('link', { name: 'Planı Yükselt' })).toBeVisible();
+    await expect(page.getByTestId('pipeline-coverage')).toContainText('/5 aşama');
+    await captureState(page, '01-discover');
+  });
+
+  test('Pro: ACTIVE cards offer Kapat, AVAILABLE cards Aç; sidebar unlocks Onay Merkezi with M5', async ({ page }) => {
+    await upsertPlan('pro');
+    await setModules(['M1', 'M2', 'M3', 'M5']);
+    await signIn(page);
+
+    await expect(page.getByRole('main')).toContainText('Pro');
+    expect(await statusOf(page, 'M1')).toBe('ACTIVE');
+    expect(await statusOf(page, 'M4')).toBe('AVAILABLE');
+    expect(await statusOf(page, 'M7')).toBe('LOCKED');
+    await expect(page.getByTestId('module-card-M1').getByRole('button', { name: 'Kapat' })).toBeVisible();
+    await expect(page.getByTestId('module-card-M4').getByRole('button', { name: 'Aç' })).toBeVisible();
+    await expect(page.getByTestId('category-summary-core')).toContainText('4');
+    await expect(page.getByTestId('sidebar-nav-approvals').filter({ visible: true }).first()).not.toHaveAttribute(
+      'data-locked',
+      'true'
+    );
+    await captureState(page, '02-pro');
+  });
+
+  test('downgrade Pro → Basic: M1 and M6 are ORPHANED with both offers, and Kapat switches M6 off', async ({ page }) => {
+    await upsertPlan('basic');
+    await setModules(['M1', 'M2', 'M3', 'M5', 'M6']);
+    await signIn(page);
+
+    await expect(page.getByRole('main')).toContainText('Basic');
+    expect(await statusOf(page, 'M1')).toBe('ORPHANED');
+    expect(await statusOf(page, 'M6')).toBe('ORPHANED');
+    const m6 = page.getByTestId('module-card-M6');
+    await expect(m6).toContainText('Plan dışında kaldı — kullanılamaz');
+    await expect(m6.getByRole('link', { name: 'Planı Yükselt' })).toBeVisible();
+    const off = m6.getByRole('button', { name: 'Kapat' });
+    await expect(off).toBeVisible();
+    // M1 is outside Basic, so its feature entry in the sidebar is locked.
+    await expect(page.locator('[data-testid="sidebar-nav-apiKeys"][data-locked="true"]').first()).toBeAttached();
+    // What a screen reader announces: the label as the name, the lock reason as the description.
+    const apiKeysLocked = page.getByTestId('sidebar-nav-apiKeys').filter({ visible: true }).first();
+    await expect(apiKeysLocked).toHaveAccessibleName('Partner REST API');
+    await expect(apiKeysLocked).toHaveAccessibleDescription(/^M1 .+ modülü kapalı/);
+    await captureState(page, '03-downgrade-orphaned');
+
+    await expectHydrated(off);
+    await off.click();
+    await expect(m6).toHaveAttribute('data-status', 'LOCKED', { timeout: 20_000 });
+    const saved = await prisma.moduleState.findUnique({
+      where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M6' } },
+    });
+    expect(saved?.status).toBe('OFF');
+    await page.reload();
+    expect(await statusOf(page, 'M6')).toBe('LOCKED');
   });
 });

@@ -178,6 +178,10 @@ async function createProbeRole(admin: pg.Client, adminUrl: string): Promise<Meas
         IF to_regprocedure('public.system_scope_open(regclass)') IS NOT NULL THEN
           EXECUTE 'GRANT EXECUTE ON FUNCTION public.system_scope_open(regclass), public.system_scope_sealed() TO ${PROBE_ROLE}';
         END IF;
+        -- The system-scope probes enter a purpose the way fabrika_app does.
+        IF to_regprocedure('public.enter_system_scope(text)') IS NOT NULL THEN
+          EXECUTE 'GRANT EXECUTE ON FUNCTION public.enter_system_scope(text) TO ${PROBE_ROLE}';
+        END IF;
       END $$;`);
   } catch (e) {
     console.log(`   geçici ölçüm rolü kurulamadı: ${e instanceof Error ? e.message : String(e)}`);
@@ -556,6 +560,181 @@ async function probeIsolation(
   return { failures, checks };
 }
 
+/**
+ * FO-45 (TASK-MVC6CTSCLO6LI): ExpertPreRegistration is personal data with no tenant,
+ * so the tenant probe above does not reach it. Its contract is the one policy
+ * `system_scope`: outside that scope the measured role reads 0 rows and cannot
+ * insert; inside `public-intake` every row is visible. Rolled back, nothing is kept.
+ */
+const EXPERT_TABLE = 'ExpertPreRegistration';
+
+async function probeSystemScopeTable(
+  m: pg.Client,
+  rlsOn: boolean,
+  expectedRows: number
+): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  if (!rlsOn) {
+    failures.push(`${EXPERT_TABLE}: RLS kapalı — kişisel veri korumasız (prisma/migrations/expert-prereg-rls-mail-quota.sql).`);
+    return { failures, checks };
+  }
+  const count = async (): Promise<number> =>
+    Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? -1);
+
+  const outside = await count();
+  if (outside !== 0) {
+    failures.push(`${EXPERT_TABLE}: sistem kapsamı DIŞINDA ${outside} satır okunuyor — izolasyon uygulanmıyor.`);
+  } else {
+    checks.push(`${EXPERT_TABLE}: sistem kapsamı dışında okuma 0 satır (tabloda ${expectedRows})`);
+  }
+
+  const id = `rls-verify-${randomBytes(6).toString('hex')}`;
+  await m.query('begin');
+  try {
+    await m.query(
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+       values ($1, 'probe', $2, '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+      [id, `${id}@rls-verify.invalid`]
+    );
+    failures.push(`${EXPERT_TABLE}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
+  } catch (e) {
+    if (isRlsViolation(e)) checks.push(`${EXPERT_TABLE}: sistem kapsamı dışında INSERT reddedildi`);
+    else failures.push(`${EXPERT_TABLE}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+  } finally {
+    await m.query('rollback');
+  }
+
+  await m.query('begin');
+  try {
+    await m.query(`select enter_system_scope('public-intake')`);
+    const inside = await count();
+    if (inside !== expectedRows) {
+      failures.push(`${EXPERT_TABLE}: sistem kapsamı İÇİNDE ${inside}/${expectedRows} satır görüldü — politika yanlış.`);
+    } else {
+      checks.push(`${EXPERT_TABLE}: sistem kapsamı içinde ${inside}/${expectedRows} satır görüldü`);
+    }
+  } finally {
+    await m.query('rollback');
+  }
+  return { failures, checks };
+}
+
+/**
+ * FO-52 (K-569554 = C): the purpose 'public-intake' (the anonymous expert form)
+ * opens only PUBLIC_INTAKE_TABLES; every other system_scope table must look
+ * exactly as it does outside the scope, and a write there must be refused.
+ * The other purposes must still open everything. One snapshot for both
+ * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
+ * Everything is rolled back.
+ */
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter']);
+
+async function probePurposeTables(
+  m: pg.Client,
+  admin: pg.Client | null
+): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const tables = (
+    await m.query<{ t: string }>(
+      `select tablename as t from pg_policies where schemaname = 'public' and policyname = 'system_scope' order by 1`
+    )
+  ).rows.map((r) => r.t);
+  if (!tables.includes('AuditEvent')) {
+    failures.push('system_scope: AuditEvent politikası yok — amaç ölçümü koşamadı.');
+    return { failures, checks };
+  }
+  const countAll = async (c: pg.Client): Promise<Map<string, number>> => {
+    const out = new Map<string, number>();
+    for (const t of tables) {
+      out.set(t, Number((await c.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(t)}`)).rows[0]?.n ?? -1));
+    }
+    return out;
+  };
+  const tryInsert = async (sql: string, params: unknown[]): Promise<'ok' | 'rls' | string> => {
+    await m.query('savepoint probe_purpose');
+    try {
+      await m.query(sql, params);
+      return 'ok';
+    } catch (e) {
+      return isRlsViolation(e) ? 'rls' : e instanceof Error ? e.message.split('\n')[0]! : String(e);
+    } finally {
+      await m.query('rollback to savepoint probe_purpose');
+    }
+  };
+  const auditInsert = (tenantId: string | null) =>
+    tryInsert(`insert into "AuditEvent" (id, "tenantId", type) values ($1, $2, 'rls-verify.probe')`, [
+      `rls-verify-${randomBytes(6).toString('hex')}`,
+      tenantId,
+    ]);
+
+  let truth: Map<string, number> | null = null;
+  if (admin) {
+    await admin.query('begin isolation level repeatable read');
+    const snap = (await admin.query<{ s: string }>('select pg_export_snapshot() as s')).rows[0]!.s;
+    await m.query('begin isolation level repeatable read');
+    await m.query(`set transaction snapshot '${snap.replace(/'/g, "''")}'`);
+    truth = await countAll(admin);
+  } else {
+    await m.query('begin isolation level repeatable read');
+  }
+  try {
+    const outside = await countAll(m);
+    const tenantId = (await m.query<{ id: string }>('select id from "Tenant" order by id limit 1')).rows[0]?.id ?? null;
+    const opened = (inside: Map<string, number>) =>
+      tables.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
+
+    await m.query(`select enter_system_scope('public-intake')`);
+    const intake = await countAll(m);
+    const leaked = opened(intake).filter((t) => !PUBLIC_INTAKE_TABLES.has(t));
+    if (leaked.length > 0) {
+      failures.push(
+        `public-intake: ${leaked.length} tablo kapsam dışından fazlasını gösteriyor (yalnız ${[...PUBLIC_INTAKE_TABLES].join(', ')} açılmalı): ${leaked
+          .map((t) => `${t}=${intake.get(t)}>${outside.get(t)}`)
+          .join(', ')}`
+      );
+    } else {
+      checks.push(`public-intake: ${tables.length - PUBLIC_INTAKE_TABLES.size} system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ${[...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t)).join(', ')} açık)`);
+    }
+    if (truth) {
+      const short = [...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t) && intake.get(t) !== truth!.get(t));
+      if (short.length > 0) failures.push(`public-intake: kendi tablosunu tam göremiyor: ${short.map((t) => `${t}=${intake.get(t)}/${truth!.get(t)}`).join(', ')}`);
+    }
+    const auditIntake = await auditInsert(tenantId);
+    if (auditIntake === 'rls') checks.push('public-intake: AuditEvent INSERT reddedildi');
+    else failures.push(`public-intake: AuditEvent INSERT ${auditIntake === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${auditIntake}`}`);
+    const expertIntake = await tryInsert(
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+      [`rls-verify-${randomBytes(6).toString('hex')}`]
+    );
+    if (expertIntake === 'ok') checks.push(`public-intake: ${EXPERT_TABLE} INSERT kabul edildi (pozitif kontrol, geri alındı)`);
+    else failures.push(`public-intake: ${EXPERT_TABLE} INSERT reddedildi — form yazamaz: ${expertIntake}`);
+
+    // The other purposes are not narrowed: each still opens every row.
+    for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
+      await m.query('select enter_system_scope($1)', [purpose]);
+      const inside = await countAll(m);
+      const short = truth
+        ? tables.filter((t) => inside.get(t) !== truth!.get(t))
+        : tables.filter((t) => (inside.get(t) ?? 0) < (outside.get(t) ?? 0));
+      if (short.length > 0) {
+        failures.push(`${purpose}: daraldı, tüm satırları görmüyor: ${short.map((t) => `${t}=${inside.get(t)}`).join(', ')}`);
+      } else {
+        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? ', her system_scope tablosunda tüm satırlar' : ''}`);
+      }
+    }
+    const auditAdmin = await auditInsert(tenantId);
+    if (auditAdmin === 'ok') checks.push('cross-tenant-job: AuditEvent INSERT kabul edildi (pozitif kontrol, geri alındı)');
+    else failures.push(`cross-tenant-job: AuditEvent INSERT reddedildi — ${auditAdmin === 'rls' ? 'RLS' : auditAdmin}`);
+  } finally {
+    await m.query('rollback');
+    if (admin) await admin.query('rollback');
+  }
+  return { failures, checks };
+}
+
 async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
@@ -640,7 +819,48 @@ async function main() {
     );
     const apiExposed = apiCallable.rows.map((r) => `${r.fn} → ${r.role}`);
 
+    // RLS on with ZERO policies is deny-all for every non-owner role, fabrika_app
+    // included: it reads 0 rows and every INSERT fails "new row violates
+    // row-level security policy" (TASK-MUWDA86A7U4LK). Supabase's ensure_rls
+    // event trigger produces exactly that on every new table in public, and
+    // BlogPost sat in it on live (TASK-MUTP1R1C13GE3). No exception: no table is
+    // meant to be unreachable. The behavioural probe below cannot see it — it
+    // reads only populated tenant tables — so it is asked of the catalogue.
+    const denyAll = await client.query<{ relname: string; tenant: boolean }>(
+      `select c.relname,
+              exists (select 1 from pg_attribute a
+                       where a.attrelid = c.oid and a.attname = 'tenantId'
+                         and a.attnum > 0 and not a.attisdropped) as tenant
+         from pg_class c
+        where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+          and c.relrowsecurity
+          and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+        order by 1`
+    );
+    const denyAllFixes = denyAll.rows.map((r) =>
+      r.tenant
+        ? `${r.relname} (kiracı tablosu → pnpm db:rls)`
+        : `${r.relname} (politikasız SYSTEM_WIDE → ALTER TABLE "${r.relname}" DISABLE ROW LEVEL SECURITY; migration'a ve prisma/rls.sql DISABLE döngüsüne ekle)`
+    );
+
+    // The other side of that DISABLE: a table with RLS off is guarded only by
+    // GRANTs. Supabase's Data API roles must hold none on it, or /rest/v1 serves
+    // it anonymously — the very thing ensure_rls exists to prevent. On live they
+    // hold none today (TASK-MUWDA86A7U4LK Phase 3); the roles exist only on
+    // Supabase, elsewhere this returns nothing.
+    const apiTables = await client.query<{ relname: string; role: string }>(
+      `select c.relname, r.rolname as role
+         from pg_class c
+         cross join (select rolname from pg_roles where rolname in ('anon', 'authenticated')) r
+        where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+          and not c.relrowsecurity
+          and has_table_privilege(r.rolname, c.oid, 'SELECT, INSERT, UPDATE, DELETE')
+        order by 1, 2`
+    );
+    const apiOpenTables = apiTables.rows.map((r) => `${r.relname} → ${r.role}`);
+
     console.log(`Kiracıya özel model: ${models.length} · RLS açık tablo: ${rlsOn.size} · tenant_isolation politikası: ${hasPolicy.size}`);
+    console.log(`RLS açık + 0 politika (deny-all): ${denyAll.rows.length} · RLS kapalı + anon/authenticated erişimi: ${apiOpenTables.length}`);
 
     if (missingTable.length > 0) {
       console.log(`\nℹ  Şemada olup veritabanında olmayan tablo (migration bekliyor): ${missingTable.join(', ')}`);
@@ -660,6 +880,19 @@ async function main() {
         console.error(`   Supabase API rolleri şema sahibinin fonksiyonlarını çağırabiliyor (/rest/v1/rpc): ${apiExposed.join(', ')}`);
       }
       console.error('\n   Onarım: pnpm db:rls   (gerekirse önce pnpm db:rls-role)');
+      process.exit(1);
+    }
+
+    if (denyAll.rows.length > 0 || apiOpenTables.length > 0) {
+      console.error('\n❌ ERİŞİLEMEZ YA DA AÇIK TABLO — bu bir ortam gürültüsü değil.');
+      if (denyAll.rows.length > 0) {
+        console.error(
+          `   RLS açık ama hiç politika yok (fabrika_app 0 satır görür, her INSERT reddedilir; Supabase ensure_rls): ${denyAllFixes.join(', ')}`
+        );
+      }
+      if (apiOpenTables.length > 0) {
+        console.error(`   RLS kapalı ve Supabase API rolleri tabloya erişebiliyor (/rest/v1): ${apiOpenTables.join(', ')} → REVOKE ALL ON "<T>" FROM anon, authenticated`);
+      }
       process.exit(1);
     }
 
@@ -683,6 +916,15 @@ async function main() {
       populated,
       existing.has('AiUsageLog')
     );
+    if (existing.has(EXPERT_TABLE)) {
+      const expertRows = Number((await client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? 0);
+      const expert = await probeSystemScopeTable(measurer.client, rlsOn.has(EXPERT_TABLE), expertRows);
+      failures.push(...expert.failures);
+      checks.push(...expert.checks);
+      const purposes = await probePurposeTables(measurer.client, measurer.client === client ? null : client);
+      failures.push(...purposes.failures);
+      checks.push(...purposes.checks);
+    }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);
     for (const c of checks) console.log(`   ✓ ${c}`);

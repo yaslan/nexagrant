@@ -32,7 +32,7 @@ async function acceptCookies(page: Page): Promise<void> {
   if (await accept.isVisible().catch(() => false)) await accept.click();
 }
 
-async function signInAs(page: Page, token: Record<string, unknown>): Promise<void> {
+async function signInAs(page: Page, baseURL: string, token: Record<string, unknown>): Promise<void> {
   const value = await encode({
     token: { sub: token.id as string, ...token },
     secret: SECRET,
@@ -40,7 +40,7 @@ async function signInAs(page: Page, token: Record<string, unknown>): Promise<voi
     maxAge: 60 * 60,
   });
   await page.context().addCookies([
-    { name: COOKIE_NAME, value, url: 'http://localhost:3000' },
+    { name: COOKIE_NAME, value, url: baseURL },
   ]);
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -124,8 +124,8 @@ test.afterAll(async () => {
 });
 
 test.describe('identity strings', () => {
-  test('the workspace switcher offers no organisation the session is not in', async ({ page }) => {
-    await signInAs(page, {
+  test('the workspace switcher offers no organisation the session is not in', async ({ page, baseURL }) => {
+    await signInAs(page, baseURL!, {
       id: 'e2e-identity-user',
       email: 'zeynep@e2e.fabrika.test',
       name: 'Zeynep Aydın',
@@ -133,7 +133,9 @@ test.describe('identity strings', () => {
       role: 'PIPELINE_MANAGER',
     });
 
-    await page.goto('/tr/fabrika-beta/panel');
+    // The workspace the membership above covers. `fabrika-beta` is the demo tenant's
+    // slug, not a workspace's, and the [workspace] guard answers it 404 (TASK-MUUS62C4SC7H5).
+    await page.goto('/tr/default/panel');
 
     // Real click: the switcher is rendered only while the menu is open.
     const header = page.locator('header:visible').first();
@@ -189,8 +191,8 @@ test.describe('identity strings', () => {
     await page.screenshot({ path: `${SHOTS}/03-login-demo-roles-en.png`, fullPage: false });
   });
 
-  test('the admin editor opens a new post signed by the admin who is signed in', async ({ page }) => {
-    await signInAs(page, {
+  test('the admin editor opens a new post signed by the admin who is signed in', async ({ page, baseURL }) => {
+    await signInAs(page, baseURL!, {
       ...ADMIN,
       tenantId: 'demo-tenant',
       role: 'TENANT_OWNER',

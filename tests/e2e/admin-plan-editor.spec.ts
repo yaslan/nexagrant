@@ -171,6 +171,12 @@ test.describe('admin plan editor', () => {
   test('a private plan shows the tenant assignment panel; a public one does not', async ({ page }) => {
     await page.goto(URL);
     await page.getByTestId('plan-row-free').click();
+    // This test restores `free` to public at its end, which a failed run never
+    // reaches; the shared dev DB then starts the next run private. Start from
+    // public explicitly so the first assertion measures the test, not the leftover.
+    if ((await page.getByTestId('visibility-select').inputValue()) !== 'public') {
+      await page.getByTestId('visibility-select').selectOption('public');
+    }
     await expect(page.getByTestId('assignment-panel')).toHaveCount(0);
 
     await page.getByTestId('visibility-select').selectOption('private');

@@ -26,7 +26,7 @@ const VALID: BlogPostInput = {
   excerpt: 'Konsorsiyum kurarken dikkat edilecekler.',
   content: '# Başlık\n\nBu içerik yirmi karakterden uzundur.',
   category: 'Horizon Europe',
-  readTime: '5 dk okuma',
+  readMinutes: 5,
   authorName: '',
   authorRole: '',
   image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800',
@@ -78,7 +78,7 @@ describe('validateBlogInput', () => {
         excerpt: VALID.excerpt,
         content: VALID.content,
         category: VALID.category,
-        readTime: VALID.readTime,
+        readMinutes: 5,
         image: VALID.image,
         featured: true,
         authorName: null,
@@ -88,6 +88,11 @@ describe('validateBlogInput', () => {
     });
   });
 
+  test.each([1, 120])('a whole number of minutes within 1–120 is accepted (%i)', (readMinutes) => {
+    const res = validateBlogInput({ ...VALID, readMinutes });
+    expect(res.ok && res.data.readMinutes).toBe(readMinutes);
+  });
+
   test.each([
     ['title too short', { title: 'ab' }, 'invalid_title'],
     ['title too long', { title: 'x'.repeat(201) }, 'invalid_title'],
@@ -95,7 +100,11 @@ describe('validateBlogInput', () => {
     ['content too short', { content: 'kısa' }, 'invalid_content'],
     ['content too long', { content: 'x'.repeat(50_001) }, 'invalid_content'],
     ['category empty', { category: '' }, 'invalid_category'],
-    ['read time too long', { readTime: 'x'.repeat(31) }, 'invalid_read_time'],
+    ['read time zero', { readMinutes: 0 }, 'invalid_read_time'],
+    ['read time over 120', { readMinutes: 121 }, 'invalid_read_time'],
+    ['read time not whole', { readMinutes: 2.5 }, 'invalid_read_time'],
+    ['read time NaN (empty field)', { readMinutes: Number.NaN }, 'invalid_read_time'],
+    ['read time as text', { readMinutes: '5 dk' as unknown as number }, 'invalid_read_time'],
     ['image on a foreign host', { image: 'https://evil.example/a.png' }, 'invalid_image'],
     ['image over http', { image: 'http://images.unsplash.com/a.png' }, 'invalid_image'],
     ['image with a port', { image: 'https://images.unsplash.com:8443/a.png' }, 'invalid_image'],
@@ -112,6 +121,37 @@ describe('validateBlogInput', () => {
   test('featured is true only for a literal true', () => {
     const r = validateBlogInput({ ...VALID, featured: 'on' as unknown as boolean });
     expect(r.ok && r.data.featured).toBe(false);
+  });
+});
+
+describe('uploaded images (TASK-MUU20XFIXZKTE): <public base>/blog/… only', () => {
+  const MINIO = 'http://localhost:9000/test-public';
+  const SUPABASE = 'https://ref.supabase.co/storage/v1/object/public/blog-images';
+
+  test.each([
+    ['MinIO path-style', MINIO, `${MINIO}/blog/2026/abc.png`],
+    ['Supabase Storage', SUPABASE, `${SUPABASE}/blog/2026/abc.webp`],
+    ['base with a trailing slash', `${MINIO}/`, `${MINIO}/blog/2026/abc.jpg`],
+  ])('accepted: %s', (_name, base, image) => {
+    expect(validateBlogInput({ ...VALID, image }, base)).toMatchObject({ ok: true, data: { image } });
+  });
+
+  test.each([
+    ['no public base configured', undefined, `${MINIO}/blog/2026/abc.png`],
+    ['outside blog/', MINIO, `${MINIO}/evidence/abc.png`],
+    ['the blog/ prefix alone', MINIO, `${MINIO}/blog/`],
+    ['another bucket on the same host', MINIO, 'http://localhost:9000/test-evidence/blog/abc.png'],
+    ['another port', MINIO, 'http://localhost:9001/test-public/blog/abc.png'],
+    ['https for an http base', MINIO, 'https://localhost:9000/test-public/blog/abc.png'],
+    ['a query string', MINIO, `${MINIO}/blog/abc.png?x=1`],
+    ['credentials', MINIO, 'http://u:p@localhost:9000/test-public/blog/abc.png'],
+    ['a dot-dot escape', SUPABASE, `${SUPABASE}/blog/%2e%2e/../x.png`],
+  ])('refused: %s', (_name, base, image) => {
+    expect(validateBlogInput({ ...VALID, image }, base)).toEqual({ ok: false, error: 'invalid_image' });
+  });
+
+  test('the unsplash covers saved before uploads keep validating with a base set', () => {
+    expect(validateBlogInput(VALID, MINIO)).toMatchObject({ ok: true });
   });
 });
 

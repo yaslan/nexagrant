@@ -16,8 +16,10 @@ import { env } from '@/lib/env';
 // SDK default puts the CRC32 of the *empty* body into a presigned PUT URL
 // (`x-amz-checksum-crc32=AAAAAA==`), which a store that checks it refuses for
 // any real file.
+// R2_REGION: R2 ignores the region ('auto'); another S3-compatible store
+// (Supabase Storage) signs with its project's region and refuses any other.
 const s3 = process.env.R2_ACCOUNT_ID ? new S3Client({
-  region: 'auto',
+  region: process.env.R2_REGION?.trim() || 'auto',
   endpoint: process.env.R2_ENDPOINT || `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   forcePathStyle: Boolean(process.env.R2_ENDPOINT),
   requestChecksumCalculation: 'WHEN_REQUIRED',
@@ -596,4 +598,56 @@ export async function deleteObjectBytes(objectKey: string): Promise<boolean> {
   if (!path) return false;
   const { rm } = await import('node:fs/promises');
   return rm(path, { force: true }).then(() => true, () => false);
+}
+
+/**
+ * Public assets (blog images, TASK-MUU20NSV2TETW). The evidence bucket stays
+ * private (B-2, TASK-MUNODY0DVDWC5); what the public site shows lives in a
+ * bucket of its own that the store serves to anyone, `R2_PUBLIC_BUCKET`, read
+ * back under `R2_PUBLIC_HOST`. The host may carry a path: a MinIO bucket is
+ * `http://host:9000/<bucket>`, a Supabase Storage public bucket
+ * `https://<ref>.supabase.co/storage/v1/object/public/<bucket>`.
+ *
+ * Null unless the client, the bucket and the host are all set: an object
+ * written with no way to read it back is not an upload.
+ */
+export function publicAssetStore(
+  source: { R2_PUBLIC_BUCKET?: string; R2_PUBLIC_HOST?: string } = env,
+  objectStore: boolean = hasObjectStore
+): { bucket: string; baseUrl: string } | null {
+  const bucket = source.R2_PUBLIC_BUCKET?.trim();
+  const host = source.R2_PUBLIC_HOST?.trim();
+  if (!objectStore || !bucket || !host) return null;
+  if (bucket === EVIDENCE_BUCKET) return null;
+  try {
+    const url = new URL(host);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return { bucket, baseUrl: `${url.origin}${url.pathname.replace(/\/+$/, '')}` };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes `bytes` to the public bucket under `objectKey` and returns the URL
+ * anyone can read it from; null when the store refused the write. The caller
+ * has checked `publicAssetStore()` and the bytes themselves. Keys are never
+ * reused (they carry a fresh id), so the object may be cached for a year.
+ */
+export async function putPublicAsset(objectKey: string, bytes: Buffer, contentType: string): Promise<string | null> {
+  const store = publicAssetStore();
+  if (!s3 || !store) throw new ObjectStoreUnconfiguredError();
+  try {
+    await s3.send(new PutObjectCommand({
+      Bucket: store.bucket,
+      Key: objectKey,
+      Body: bytes,
+      ContentType: contentType,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }));
+    return `${store.baseUrl}/${objectKey}`;
+  } catch (err) {
+    console.error(`[R2 Storage] Public put error for ${objectKey}: ${errorMessage(err)}`);
+    return null;
+  }
 }

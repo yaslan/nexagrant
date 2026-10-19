@@ -5,7 +5,7 @@
 ```
 ┌──────────────┐   ┌────────────────────────────────────────────┐   ┌─────────────────┐
 │  Tarayıcı    │──▶│ Next.js 15 (Vercel)                         │──▶│ Postgres 16      │
-│  tr / en     │   │  (marketing) (auth) (app)/[ws] (admin)      │   │ + pgvector + RLS │
+│  tr / en     │   │  (public) (app)/[ws] admin                  │   │ + pgvector + RLS │
 └──────────────┘   │  Server Actions · Route Handlers (/api)     │   └─────────────────┘
                    │  src/core/k1..k6 · src/modules/m1..m11      │          ▲
                    └───────┬───────────────┬─────────────────────┘          │
@@ -18,7 +18,7 @@
 
 ## 2. Uygulama katmanları
 
-- **Rota grupları:** `(marketing)` herkese açık; `(auth)` giriş/kayıt; `(app)/[workspaceSlug]/...` kiracı uygulaması; `(admin)` platform yönetimi (`platform_admin`).
+- **Rota grupları:** `[locale]/(public)` herkese açık sayfaların hepsi (ana sayfa, yasal metinler, fiyatlandırma, çağrılar, blog, giriş/kayıt, davet, partner portalı); ortak `PublicNavbar` + `PublicFooter` yalnız bu grubun `layout.tsx`'inde, sayfalar kendileri eklemez (FO-68). 404 (`src/app/not-found.tsx`) aynı çifti kendisi çizer. `(app)/[workspaceSlug]/...` kiracı uygulaması; `admin` platform yönetimi (`platform_admin`) — ikisinin kendi kabuğu var.
 - **Sunucu tarafı:** Server Components veri okur; yazma Server Actions (zod ile doğrulanmış) ya da `/api/v1/*` Route Handlers (harici API lisansı için de aynı katman).
 - **Alan katmanı:** `src/core/*` (K1–K6) ve `src/modules/*` (M1–M11) saf TypeScript; Prisma istemcisi `withTenant()` ile sarılı.
 - **Olay veri yolu:** `src/core/events` — tipli olaylar (`opportunity.created`, `gate.passed`, `module.state.changed`, `ai.used`, `esr.uploaded`). Modüller birbirini import etmez; olay dinler. Inngest bu olayları dayanıklı işlere de bağlar.

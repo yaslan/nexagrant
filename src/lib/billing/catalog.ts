@@ -597,6 +597,23 @@ export function plansGrantingModule(moduleId: string): PlanId[] {
   ).map((grant) => grant.planId as PlanId);
 }
 
+/** The plans a module card lists: the free tier plus the three self-serve plans. */
+export type DisplayPlanId = PlanId | typeof FALLBACK_PLAN_ID;
+
+/**
+ * Which plans to *show* on a module card as including it — read-only, for
+ * display. Unlike `plansGrantingModule` this keeps `free` (Discover), because a
+ * customer comparing plans should see that Discover already includes M3 and M5;
+ * gating keeps using `plansGrantingModule`, so nothing here changes who can
+ * switch a module on. Contract-only public-sector packages are left out: they
+ * are not on the shopfront the card points at.
+ */
+export function displayPlansForModule(moduleId: string): DisplayPlanId[] {
+  return SELF_SERVE_GRANTS.filter((grant) => grant.moduleIds.includes(moduleId)).map(
+    (grant) => grant.planId as DisplayPlanId
+  );
+}
+
 /**
  * The same grant, as the names a customer recognises ("Pro", "Ultra") rather
  * than the ids the code speaks in. Read-only helper for the module gate's

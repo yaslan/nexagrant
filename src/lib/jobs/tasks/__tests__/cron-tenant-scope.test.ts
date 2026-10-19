@@ -14,6 +14,7 @@ import { MailSendError, type Mailer, type MailMessage } from '@/lib/email/mailer
 import { grantCreditsToTenants } from '../credits-monthly-grant';
 import { requireId } from '../../../../../tests/helpers/teardown-guard';
 import { skipUnlessSeeded } from '../../../../../tests/helpers/seed';
+import { skipOrFailInCi } from '../../../../../tests/helpers/live-db-role';
 
 /**
  * TASK-MTVR8KK92G0GA — do the two cron jobs write under the tenant they are
@@ -46,7 +47,9 @@ const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
  * Postgres to measure against — the way tests/rls.spec.ts and
  * tests/m9-calendar-tenant-scope.live.test.ts already do. A missing database is
  * an absent measurement, not a failing one, and reddening `pnpm gate` on every
- * machine without `docker compose up` would be the wrong alarm.
+ * machine without `docker compose up` would be the wrong alarm. In CI it is the
+ * opposite: a skipped file there is a green that measured nothing, so
+ * `skipOrFailInCi` throws at module scope and the file goes red.
  *
  * Note what does NOT skip: when the database IS reachable, the first test
  * asserts the probe role is genuinely NOBYPASSRLS and fails hard if it is not.
@@ -58,9 +61,9 @@ const dbReachable =
   (await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 
 if (!dbReachable) {
-  console.warn(
-    'cron tenant-scope test skipped: needs Postgres and DATABASE_URL_RLS_TEST ' +
-      '(`docker compose up -d` then `pnpm db:rls-role`).'
+  skipOrFailInCi(
+    'cron tenant-scope test',
+    'needs Postgres and DATABASE_URL_RLS_TEST (`docker compose up -d` then `pnpm db:rls-role`)'
   );
 }
 
@@ -72,6 +75,7 @@ const LONG_AGO = new Date('2000-01-01T00:00:00Z');
 
 interface Fixture {
   tenantId: string;
+  userId: string;
   searchId: string;
   email: string;
 }
@@ -82,6 +86,8 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
   let b: Fixture;
   let ready = false;
   let skipReason = '';
+  /** Users made by single tests, removed with the rest in afterAll. */
+  const extraEmails: string[] = [];
 
   /**
    * `withTenant`'s contract over the role the policies actually apply to, plus
@@ -124,7 +130,7 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
         lastRunAt: LONG_AGO,
       },
     });
-    return { tenantId: tenant.id, searchId: search.id, email };
+    return { tenantId: tenant.id, userId: user.id, searchId: search.id, email };
   }
 
   /** The row shape `fetch-saved-searches` hands the loop. */
@@ -132,6 +138,7 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     return {
       id: f.searchId,
       tenantId: f.tenantId,
+      userId: f.userId,
       name: `Search ${label} ${RUN}`,
       filters: {},
       lastRunAt: LONG_AGO,
@@ -201,9 +208,13 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       if (!f) continue;
       await prisma.savedSearch.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
       await prisma.creditLedger.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
+      await prisma.notification.deleteMany({ where: { tenantId: requireId(f.tenantId, 'f.tenantId') } });
       // Membership cascades from both sides; the tenant delete takes it.
       await prisma.tenant.deleteMany({ where: { id: requireId(f.tenantId, 'f.tenantId') } });
       await prisma.user.deleteMany({ where: { email: requireId(f.email, 'f.email') } });
+    }
+    for (const email of extraEmails) {
+      await prisma.user.deleteMany({ where: { email: requireId(email, 'email') } });
     }
     await rls?.$disconnect();
     await prisma.$disconnect();
@@ -478,10 +489,20 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     expect(result.errors).toEqual([]);
     expect(result.emailsFailed).toBe(0);
 
-    // Two scopes per search — the owner lookup and the `lastRunAt` write — and
-    // every one of them the tenant of the search being processed. A run that
-    // reached for a stale id, or skipped the wrapper, cannot produce this.
-    expect(runner.scopes).toEqual([a.tenantId, a.tenantId, b.tenantId, b.tenantId]);
+    // Three scopes per search — the owner lookup, the notification write
+    // (ADR-0011) and the `lastRunAt` write — and every one of them the tenant
+    // of the search being processed. A run that reached for a stale id, or
+    // skipped the wrapper, cannot produce this.
+    expect(runner.scopes).toEqual([a.tenantId, a.tenantId, a.tenantId, b.tenantId, b.tenantId, b.tenantId]);
+    // Each search's owner got one SAVED_SEARCH_MATCH, readable through RLS
+    // under that tenant only.
+    for (const [f, other] of [[a, b], [b, a]] as const) {
+      const mine = await withTenantOn(rls, f.tenantId, (tx) =>
+        tx.notification.findMany({ where: { userId: { in: [a.userId, b.userId] } }, select: { userId: true, type: true } })
+      );
+      expect(mine).toEqual([{ userId: f.userId, type: 'SAVED_SEARCH_MATCH' }]);
+      expect(mine.some((n) => n.userId === other.userId)).toBe(false);
+    }
     // Each owner was mailed once, and only after the mailer accepted it was
     // the search counted as sent.
     expect(mail.sent.map((m) => m.to)).toEqual([a.email, b.email]);
@@ -513,13 +534,94 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
     const result = await sendSavedSearchAlerts([rowFor(a, 'a'), rowFor(b, 'b')], stale, mail.send);
     expect(mail.sent.map((m) => m.to)).toEqual([a.email]);
 
-    // Search B is looked up under tenant A's scope, so its owner membership is
-    // invisible and the search fails before it can mail or write anything.
+    // Search B is looked up under tenant A's scope: the search row itself is
+    // invisible there, so it fails before it can mail or write anything —
+    // rather than reading its owner's invisible membership as "left the
+    // tenant" and quietly skipping.
     expect(result.emailsFailed).toBe(1);
-    expect(result.errors).toEqual([{ searchId: b.searchId, reason: 'no_owner_email' }]);
+    expect(result.emailsSkipped).toBe(0);
+    expect(result.errors).toEqual([
+      { searchId: b.searchId, reason: 'saved search not visible under its own tenant scope' },
+    ]);
 
     expect((await lastRunOf(a.searchId))!.getTime()).toBeGreaterThan(LONG_AGO.getTime());
     expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
+  });
+
+  // TASK-MUVSIO5F4TLHK (N-1): the test above proves the guard under RLS, where
+  // the scope does the hiding. On a BYPASSRLS role the scope hides nothing, so
+  // a row handed in with the wrong tenant would pass a guard keyed by id alone,
+  // its owner's membership would not be found under that tenant, and the
+  // search would be skipped as "the searcher left" instead of failing.
+  it('alerts-daily: on a BYPASSRLS role, a row carrying the wrong tenant still fails the search', async (ctx) => {
+    expect(ready, skipReason).toBe(true);
+    await assertMatchesExist(ctx);
+    await resetLastRun();
+
+    const [role] = await prisma.$queryRawUnsafe<Array<{ rolbypassrls: boolean; rolsuper: boolean }>>(
+      'select rolbypassrls, rolsuper from pg_roles where rolname = current_user'
+    );
+    if (!role?.rolbypassrls && !role?.rolsuper) {
+      const reason = 'the privileged client does not bypass RLS here, so there is nothing for this case to measure';
+      skipOrFailInCi(
+        'alerts-daily: on a BYPASSRLS role, a row carrying the wrong tenant still fails the search',
+        reason,
+        'The CI database user must be SUPERUSER or BYPASSRLS to run this test.'
+      );
+      ctx.skip(reason);
+    }
+
+    // Honest runner (scope = the tenant it was given) over the bypassing role;
+    // the mismatch is in the row: search B, handed in as tenant A's.
+    const bypass: TenantRunner = (tenantId, callback) => withTenantOn(prisma, tenantId, callback);
+    const mail = recordingMailer();
+    const result = await sendSavedSearchAlerts([{ ...rowFor(b, 'b'), tenantId: a.tenantId }], bypass, mail.send);
+
+    expect(mail.sent).toEqual([]);
+    expect(result.emailsSkipped).toBe(0);
+    expect(result.emailsFailed).toBe(1);
+    expect(result.errors).toEqual([
+      { searchId: b.searchId, reason: 'saved search not visible under its own tenant scope' },
+    ]);
+    expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
+  });
+
+  // TASK-MUVRYPO9GTU7D: the mail used to go to the tenant's first owner
+  // whoever's search it was, carrying the searcher's free-text name.
+  it("alerts-daily: mails the search's own owner, and no one once they have left the tenant", async (ctx) => {
+    expect(ready, skipReason).toBe(true);
+    await assertMatchesExist(ctx);
+
+    const member = await prisma.user.create({ data: { email: `${RUN}-member@example.invalid`, name: 'Member' } });
+    const leaver = await prisma.user.create({ data: { email: `${RUN}-leaver@example.invalid`, name: 'Leaver' } });
+    extraEmails.push(member.email, leaver.email);
+    await prisma.membership.create({ data: { tenantId: a.tenantId, userId: member.id, role: 'MEMBER' } });
+    // `leaver` has no membership: removing a member leaves their searches behind.
+    const searchOf = (userId: string, label: string) =>
+      prisma.savedSearch.create({
+        data: { tenantId: a.tenantId, userId, name: `${label} ${RUN}`, filters: {}, notify: true, lastRunAt: LONG_AGO },
+      });
+    const mine = await searchOf(member.id, 'member');
+    const orphan = await searchOf(leaver.id, 'leaver');
+    const row = (s: { id: string; userId: string; name: string }): SavedSearchAlertRow => ({
+      id: s.id,
+      tenantId: a.tenantId,
+      userId: s.userId,
+      name: s.name,
+      filters: {},
+      lastRunAt: LONG_AGO,
+      createdAt: LONG_AGO,
+    });
+
+    const mail = recordingMailer();
+    const result = await sendSavedSearchAlerts([row(mine), row(orphan)], recordingRunner().run, mail.send);
+
+    expect(result.errors).toEqual([]);
+    expect(mail.sent.map((m) => m.to)).toEqual([member.email]);
+    expect(mail.sent.map((m) => m.to)).not.toContain(a.email);
+    expect(result).toMatchObject({ emailsSent: 1, emailsSkipped: 1, emailsFailed: 0 });
+    // Checked, not failed: the orphan does not come back every morning.
+    expect((await lastRunOf(orphan.id))!.getTime()).toBeGreaterThan(LONG_AGO.getTime());
   });
 
   it('alerts-daily: the lastRunAt write itself is refused under a foreign scope', async () => {
@@ -550,8 +652,9 @@ describe.skipIf(!dbReachable)('cron jobs write under the tenant they are iterati
       { searchId: a.searchId, reason: NO_MAIL_PROVIDER },
       { searchId: b.searchId, reason: NO_MAIL_PROVIDER },
     ]);
-    // Owner lookups only — no `lastRunAt` write was attempted for either.
-    expect(runner.scopes).toEqual([a.tenantId, b.tenantId]);
+    // Owner lookup and notification write (ADR-0011: the notification does
+    // not need a mail provider) — no `lastRunAt` write was attempted for either.
+    expect(runner.scopes).toEqual([a.tenantId, a.tenantId, b.tenantId, b.tenantId]);
     expect(await lastRunOf(a.searchId)).toEqual(LONG_AGO);
     expect(await lastRunOf(b.searchId)).toEqual(LONG_AGO);
   });

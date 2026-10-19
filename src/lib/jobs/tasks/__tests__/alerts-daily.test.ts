@@ -5,7 +5,8 @@ import {
   SAVED_SEARCH_ALERT_QUERY,
   alertsRunReport,
   matchCountQuery,
-  ownerEmailQuery,
+  recipientEmailQuery,
+  renderSavedSearchAlert,
 } from '../alerts-daily';
 
 /**
@@ -52,16 +53,18 @@ describe('alerts-daily query contract', () => {
     expect(kind).toBe('PrismaClientValidationError');
   });
 
-  it('accepts the owner lookup keyed by the scalar tenantId', async () => {
-    const kind = await rejectionKind(() => db.membership.findMany(ownerEmailQuery('tenant:1')));
+  it('accepts the recipient lookup keyed by the scalar tenantId and userId', async () => {
+    const kind = await rejectionKind(() => db.membership.findFirst(recipientEmailQuery('tenant:1', 'user:1')));
 
     expect(kind).not.toBe('PrismaClientValidationError');
   });
 
-  it('selects what the match-count query needs, and no relation', () => {
+  it('selects what the match-count query and the notification need, and no relation', () => {
     expect(SAVED_SEARCH_ALERT_QUERY.select).toEqual({
       id: true,
       tenantId: true,
+      // ADR-0011 K-6 a: the notification's recipient is the search's owner.
+      userId: true,
       name: true,
       filters: true,
       lastRunAt: true,
@@ -70,9 +73,11 @@ describe('alerts-daily query contract', () => {
     expect(SAVED_SEARCH_ALERT_QUERY).not.toHaveProperty('include');
   });
 
-  it('reads only the owner address, not the whole user row', () => {
-    expect(ownerEmailQuery('tenant:1')).toEqual({
-      where: { tenantId: 'tenant:1', role: 'TENANT_OWNER' },
+  // TASK-MUVRYPO9GTU7D: the search's own owner, and only through a membership
+  // of this tenant — never the tenant's first TENANT_OWNER.
+  it("mails the search's owner while a member of this tenant, reading only the address", () => {
+    expect(recipientEmailQuery('tenant:1', 'user:1')).toEqual({
+      where: { tenantId: 'tenant:1', userId: 'user:1' },
       select: { user: { select: { email: true } } },
     });
   });
@@ -149,11 +154,73 @@ describe('alerts-daily run report (TASK-MUMH6NZ128QZ1)', () => {
 
   it('any other per-search failure still fails the run, at warn level', () => {
     const { output, alert } = alertsRunReport(
-      { emailsSent: 1, emailsFailed: 1, emailsSkipped: 0, errors: [{ searchId: 'ss_2', reason: 'no_owner_email' }] },
+      { emailsSent: 1, emailsFailed: 1, emailsSkipped: 0, errors: [{ searchId: 'ss_2', reason: 'smtp:EENVELOPE:550' }] },
       2
     );
     expect(output.success).toBe(false);
     expect(output.reason).toBe('send_failed');
     expect(alert?.level).toBe('warn');
+  });
+});
+
+// TASK-MUVRYPO9GTU7D: the search name is the searcher's free text.
+describe('alerts-daily mail rendering', () => {
+  const base = { matchCount: 3, searchId: 'ss_1', appUrl: 'https://app.example.invalid' };
+
+  it('escapes a link and an onerror image in the name instead of rendering them', () => {
+    const name = '<a href="https://evil.example/verify">Hesabınızı doğrulayın</a><img src=x onerror="alert(1)">';
+    const { html } = renderSavedSearchAlert({ ...base, name });
+
+    expect(html).not.toContain('<a href="https://evil.example');
+    expect(html).not.toContain('<img');
+    expect(html).toContain(
+      '<strong>&lt;a href=&quot;https://evil.example/verify&quot;&gt;Hesabınızı doğrulayın&lt;/a&gt;' +
+        '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;</strong>'
+    );
+    // The one real link is still the app's own.
+    expect(html.match(/<a /g)).toHaveLength(1);
+    expect(html).toContain('<a href="https://app.example.invalid/calls?search=ss_1">');
+  });
+
+  it('keeps the name on one Subject line: no CR, LF or other control characters', () => {
+    const name = 'Quantum\r\nBcc: victim@example.invalid\u0000\u0085\u2028x\ty';
+    const { subject } = renderSavedSearchAlert({ ...base, name });
+
+    expect(subject).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/);
+    expect(subject).toBe('New Call Opportunities: Quantum Bcc: victim@example.invalid x y (3 new)');
+  });
+
+  // TASK-MUVSIO5F4TLHK (N-2): each separator alone, so the regex losing either
+  // one leaves it in the Subject instead of hiding behind a neighbour.
+  it.each([
+    ['U+2028 line separator', '\u2028'],
+    ['U+2029 paragraph separator', '\u2029'],
+  ])('replaces a %s in the name with a space', (_label, separator) => {
+    const { subject } = renderSavedSearchAlert({ ...base, name: `Quantum${separator}Bcc: x@example.invalid` });
+
+    expect(subject).not.toContain(separator);
+    expect(subject).toBe('New Call Opportunities: Quantum Bcc: x@example.invalid (3 new)');
+  });
+
+  // TASK-MUVSIO5F4TLHK (se-fb N-2): `appUrl` comes from env and `searchId` is
+  // encoded, so this is defence in depth — but without it nothing failed when
+  // the href escape was removed.
+  it('escapes the app URL inside the href attribute', () => {
+    const { html } = renderSavedSearchAlert({
+      ...base,
+      name: 'x',
+      appUrl: 'https://app.example.invalid/" onmouseover="alert(1)',
+    });
+
+    expect(html).not.toContain('" onmouseover="');
+    expect(html).toContain(
+      '<a href="https://app.example.invalid/&quot; onmouseover=&quot;alert(1)/calls?search=ss_1">'
+    );
+  });
+
+  it('leaves an ordinary Turkish name as it is', () => {
+    const { subject, html } = renderSavedSearchAlert({ ...base, name: 'Yeşil dönüşüm & iklim' });
+    expect(subject).toBe('New Call Opportunities: Yeşil dönüşüm & iklim (3 new)');
+    expect(html).toContain('<strong>Yeşil dönüşüm &amp; iklim</strong>');
   });
 });

@@ -1,9 +1,16 @@
+import { blogContentRefusal, isAllowedBlogImageSrc } from '@/lib/blog-content-policy';
+
 /**
  * The database-free half of src/lib/blog.ts (AKTAR-MURBCJ0A-1): types, the
  * refusal codes, validation, slug and date helpers. Split out so the admin
  * editor (a client component) can import them without pulling Prisma into the
  * browser bundle. src/lib/blog.ts re-exports all of it.
  */
+import { z } from 'zod';
+import { BLOG_READ_MINUTES } from './blog-read-time';
+
+export { BLOG_READ_MINUTES };
+
 export interface BlogAuthor {
   name: string;
   role: string;
@@ -17,7 +24,8 @@ export interface BlogPost {
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  /** Minutes to read; the pages format it per reader locale (blog.readMinutes). */
+  readMinutes: number;
   publishedAt: Date;
   /** Absent when the post has no recorded author. Never a placeholder. */
   author?: BlogAuthor;
@@ -33,7 +41,8 @@ export interface BlogPostInput {
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  /** Whole minutes, {@link BLOG_READ_MINUTES}. */
+  readMinutes: number;
   /** Empty: the post has no byline. */
   authorName?: string;
   authorRole?: string;
@@ -52,6 +61,8 @@ export const BLOG_WRITE_ERRORS = [
   'invalid_slug',
   'invalid_excerpt',
   'invalid_content',
+  'invalid_content_link',
+  'invalid_content_image',
   'invalid_category',
   'invalid_read_time',
   'invalid_image',
@@ -72,7 +83,6 @@ export const BLOG_LIMITS = {
   excerpt: 500,
   content: 50_000,
   category: 60,
-  readTime: 30,
   authorName: 120,
   authorRole: 120,
   url: 2_000,
@@ -117,8 +127,9 @@ export function formatBlogDate(date: Date, locale: string): string {
   }).format(date);
 }
 
-function isAllowedImageUrl(value: string): boolean {
+function isAllowedImageUrl(value: string, publicImageBase?: string): boolean {
   if (value.length > BLOG_LIMITS.url) return false;
+  if (isAllowedBlogImageSrc(value, publicImageBase)) return true;
   let url: URL;
   try {
     url = new URL(value);
@@ -137,13 +148,27 @@ function isAllowedImageUrl(value: string): boolean {
 export const trimmedText = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 export const lengthWithin = (v: string, min: number, max: number) => v.length >= min && v.length <= max;
 
+/**
+ * The one-line byline shown wherever a post's author appears: "<Ünvan> <İsim>",
+ * or just the name when there is no ünvan. Blank parts drop out, so no stray
+ * space leads or trails the result.
+ */
+export function authorByline(author: Pick<BlogAuthor, 'name' | 'role'> | undefined): string {
+  return [author?.role, author?.name]
+    .map((part) => trimmedText(part).replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .join(' ');
+}
+
+const readMinutesSchema = z.number().int().min(BLOG_READ_MINUTES.min).max(BLOG_READ_MINUTES.max);
+
 /** The columns a validated input writes. Author columns are null when cleared. */
 type BlogColumns = {
   title: string;
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  readMinutes: number;
   image: string;
   featured: boolean;
   authorName: string | null;
@@ -154,9 +179,14 @@ type BlogColumns = {
 /**
  * Server-side validation of a complete editor submission. Pure: no database.
  * Returns the trimmed column values, or the first refusal.
+ *
+ * `publicImageBase` is the public bucket's base URL when one is configured;
+ * images uploaded there (`<base>/blog/…`) are accepted besides BLOG_IMAGE_HOSTS.
+ * The caller passes it, so this file stays free of server-only env.
  */
 export function validateBlogInput(
-  input: BlogPostInput
+  input: BlogPostInput,
+  publicImageBase?: string
 ): { ok: true; data: BlogColumns } | { ok: false; error: BlogWriteError } {
   const title = trimmedText(input.title);
   if (!lengthWithin(title, 3, BLOG_LIMITS.title)) return { ok: false, error: 'invalid_title' };
@@ -164,12 +194,15 @@ export function validateBlogInput(
   if (!lengthWithin(excerpt, 10, BLOG_LIMITS.excerpt)) return { ok: false, error: 'invalid_excerpt' };
   const content = trimmedText(input.content);
   if (!lengthWithin(content, 20, BLOG_LIMITS.content)) return { ok: false, error: 'invalid_content' };
+  // Links and images in the body: the rules of src/lib/blog-content-policy.ts (TASK-MVDPHZQCTVJ2R).
+  const contentRefusal = blogContentRefusal(content, publicImageBase);
+  if (contentRefusal) return { ok: false, error: contentRefusal };
   const category = trimmedText(input.category);
   if (!lengthWithin(category, 1, BLOG_LIMITS.category)) return { ok: false, error: 'invalid_category' };
-  const readTime = trimmedText(input.readTime);
-  if (!lengthWithin(readTime, 1, BLOG_LIMITS.readTime)) return { ok: false, error: 'invalid_read_time' };
+  const readMinutes = readMinutesSchema.safeParse(input.readMinutes);
+  if (!readMinutes.success) return { ok: false, error: 'invalid_read_time' };
   const image = trimmedText(input.image);
-  if (!isAllowedImageUrl(image)) return { ok: false, error: 'invalid_image' };
+  if (!isAllowedImageUrl(image, publicImageBase)) return { ok: false, error: 'invalid_image' };
 
   const authorName = trimmedText(input.authorName);
   const authorRole = trimmedText(input.authorRole);
@@ -179,7 +212,7 @@ export function validateBlogInput(
   }
   // A role or portrait without a name would be a byline for nobody.
   if (!authorName && (authorRole || authorAvatar)) return { ok: false, error: 'invalid_author' };
-  if (authorAvatar && !isAllowedImageUrl(authorAvatar)) return { ok: false, error: 'invalid_image' };
+  if (authorAvatar && !isAllowedImageUrl(authorAvatar, publicImageBase)) return { ok: false, error: 'invalid_image' };
 
   return {
     ok: true,
@@ -188,7 +221,7 @@ export function validateBlogInput(
       excerpt,
       content,
       category,
-      readTime,
+      readMinutes: readMinutes.data,
       image,
       featured: input.featured === true,
       authorName: authorName || null,

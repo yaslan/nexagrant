@@ -123,7 +123,7 @@ fabrika/
   README.md
   docs/                 ← BUSINESS_MODEL, ARCHITECTURE, DATA_MODEL, MODULES, API, BILLING, SECURITY_COMPLIANCE, ROADMAP, UI_GUIDE
   prisma/schema.prisma, prisma/rls.sql, prisma/seed.ts
-  src/app/              ← Next.js rotaları: (marketing) (auth) (app)/[workspace]/... (admin)
+  src/app/              ← Next.js rotaları: [locale]/(public) (app)/[workspace]/... admin
   src/modules/<m1..m11>/manifest.ts, server/, ui/
   src/core/             ← k1-calls, k2-cordis, k3-stats, k4-outreach, k5-pipeline, k6-ai
   src/lib/              ← auth, billing, scoring, i18n, rls, events

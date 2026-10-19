@@ -43,6 +43,17 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      # Mail catcher for the e2e step (TASK-MUVFUDZDKSMWO). The invite cooldown
+      # answers (`recently_sent`, `role_change_blocked`) only exist once a mail
+      # has really been sent; with no SMTP the server stops at "created, mail
+      # not sent" and tests/e2e/team-members-ui.spec.ts cannot reach them.
+      # Accepts anything on :1025, nothing leaves the runner; :8025 is its API.
+      # axllent/mailpit v1.31.3, pinned by digest like MinIO below.
+      mailpit:
+        image: axllent/mailpit@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+        ports:
+          - 1025:1025
+          - 8025:8025
     steps:
     - uses: actions/checkout@v4
     
@@ -99,11 +110,25 @@ jobs:
     # is how production applies them (docs/RELEASE_CHECKLIST.md §1) and the
     # second pass is the idempotency check; either pass failing fails the job.
     # psql comes preinstalled on ubuntu-latest.
+    #
+    # Supabase's `ensure_rls` event trigger goes in first (TASK-MUWDA86A7U4LK).
+    # Live ENABLEs RLS on every new table in public; on a policy-less
+    # SYSTEM_WIDE table that is deny-all for fabrika_app, and BlogPost broke on
+    # live while every CI suite stayed green (TASK-MUTP1R1C13GE3). With it, every
+    # table `db push` builds starts locked, as on a fresh Supabase project. So
+    # `db:rls` also runs BEFORE the migrations: its DISABLE loop unlocks the
+    # policy-less base tables (Tenant, User, …) that no migration creates, and
+    # the apply-migrations postflight fails on any table without a tenantId
+    # left RLS on with no policy. It is also the live order of things: there
+    # the policies exist when the migrations run. The trailing `db:rls` stays,
+    # for what the migrations change.
     - name: Prepare database
       run: |
+        psql --version
+        psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -f .github/ci/supabase-ensure-rls.sql
         pnpm exec prisma db push
         pnpm db:rls-role
-        psql --version
+        pnpm db:rls
         scripts/apply-migrations.sh
         scripts/apply-migrations.sh
         pnpm db:rls
@@ -114,8 +139,21 @@ jobs:
     # in the database (mutants N4/N5) kept every vitest suite green; only this
     # live check, which reads pg_policies and measures isolation as fabrika_app,
     # went red. It used to run only in the local `pnpm gate`.
+    # `--require-db`: this job always has its database. An unreachable one must
+    # fail here, not pass as a skipped measurement (scripts/check-rls-live.ts, R-S7).
     - name: Verify RLS policies (live, as fabrika_app)
-      run: pnpm rls:verify
+      run: pnpm rls:verify --require-db
+
+    # Static half of the tenant-isolation pair (scripts/check-tenant-bypass.ts):
+    # a tenant-scoped Prisma call outside withTenant fails here. It reads files
+    # only, so it needs no database, but it sits next to the live check it pairs with.
+    - name: Tenant bypass gate
+      run: pnpm rls:bypass-check
+
+    # Open SystemAlert rows that name deleted tenants (scripts/check-orphan-alerts.ts).
+    # Runs against the service container prepared above.
+    - name: Orphan alert gate
+      run: pnpm alerts:check
 
     - name: Lint
       run: pnpm lint
@@ -176,6 +214,14 @@ jobs:
           || aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-evidence
         aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-evidence
         echo "bucket test-evidence ready"
+        # Blog images (TASK-MUU20NSV2TETW): a second bucket anyone may read,
+        # like the public bucket a deployment serves blog covers from. The
+        # evidence bucket above stays private.
+        aws --endpoint-url http://localhost:9000 s3api head-bucket --bucket test-public 2>/dev/null \
+          || aws --endpoint-url http://localhost:9000 s3api create-bucket --bucket test-public
+        aws --endpoint-url http://localhost:9000 s3api put-bucket-policy --bucket test-public --policy \
+          '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::test-public/*"]}]}'
+        echo "bucket test-public ready (anonymous read)"
       env:
         AWS_ACCESS_KEY_ID: minioadmin
         AWS_SECRET_ACCESS_KEY: minioadmin
@@ -196,12 +242,23 @@ jobs:
         R2_ACCESS_KEY_ID: 'minioadmin'
         R2_SECRET_ACCESS_KEY: 'minioadmin'
         R2_BUCKET: 'test-evidence'
+        R2_PUBLIC_BUCKET: 'test-public'
+        R2_PUBLIC_HOST: 'http://localhost:9000/test-public'
         # OAuth placeholder env for E2E auth tests (tests render button only, no real Google interaction)
         AUTH_GOOGLE_ID: 'ci-placeholder-id.apps.googleusercontent.com'
         AUTH_GOOGLE_SECRET: 'ci-placeholder-google-secret'
         AUTH_SECRET: 'ci-placeholder-secret-for-nextauth-at-least-32-chars-1234'
+        AUTH_URL: 'http://localhost:3000'
         NEXTAUTH_URL: 'http://localhost:3000'
         AUTH_TRUST_HOST: 'true'
+        # The mailpit service above; E2E_MAILPIT_URL turns on the inbox check.
+        # An invitation mail needs a base URL for its link and is not sent
+        # without one. The dev server falls back to this same origin anyway,
+        # so it changes nothing else (a `start` run refuses loopback here).
+        SMTP_HOST: 'localhost'
+        SMTP_PORT: '1025'
+        E2E_MAILPIT_URL: 'http://localhost:8025'
+        NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
         # Invoice test data
         INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.'
         INVOICE_SUPPLIER_VKN: '1000000000'

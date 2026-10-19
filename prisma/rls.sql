@@ -11,8 +11,8 @@ BEGIN
     'Evidence','ConceptNote','Relationship','Interaction','SeatCandidate','AiUsageLog',
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
-    'PlanAssignment','ClaimEvidenceLink','EvidenceReminder','Consent',
-    'StripeEventLog','AgencyInviteCode','AuditEvent'
+    'PlanAssignment','ClaimEvidenceLink','Consent',
+    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -97,6 +97,30 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Policy-less platform tables (TASK-MUWDA86A7U4LK): no tenantId, no policy, RLS
+-- off, on purpose — policylessSystemWide() in scripts/rls-models.ts, which
+-- tests/rls-coverage.test.ts pins this list to. Supabase's `ensure_rls` event
+-- trigger (platform-owned; we do not touch it) ENABLEs RLS on every new table
+-- in public, and with no policy that is deny-all for fabrika_app: BlogPost read
+-- 0 rows and refused every INSERT on live (06.10.2026, TASK-MUTP1R1C13GE3).
+-- Only a table whose RLS is actually on is altered, so on a healthy database
+-- this takes no lock and needs no ownership. The ALTER is schema-qualified like the
+-- guard, so a search_path without public cannot aim it at another table.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
+    'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
+    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','Programme','PublicLead',
+    'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
+  ] LOOP
+    IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
+      EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', t);
+    END IF;
+  END LOOP;
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- Sanctioned cross-tenant scope (TASK-MTVTPVTEBCF5Z, slice 6; signed in
 -- TASK-MUOGMQK3JAH4Y).
@@ -156,6 +180,18 @@ END $$;
 -- docs/agent-results/TASK-MTVTPVTEBCF5Z-de-fb.md §6 (1-3-1) and
 -- docs/adr/ADR-0009-signed-system-scope.md.
 --
+-- One purpose is narrowed by table (FO-52, K-569554 = C): 'public-intake' is
+-- the anonymous expert form, so a sealed scope with that purpose opens only
+-- ExpertPreRegistration and ExpertFounderCounter (the founder-number counter
+-- the same verification writes). Every other system_scope table stays shut to
+-- it, reads and writes alike. The other five purposes are not narrowed. The
+-- purpose is read from app.system_scope_purpose, which is USERSET like the
+-- flag; the seal is not tied to it. So this guards against a public-intake
+-- call site that reaches for the wrong table, not against code that can call
+-- enter_system_scope('<another purpose>') — that code could open everything
+-- anyway. A new table the form needs goes into the list in system_scope_open()
+-- on purpose; until then a write there is an RLS error and a read is 0 rows.
+--
 -- Deploy order: this is applied by `pnpm db:rls`. Code that calls
 -- withSystemScope() reads zero rows until it has run, exactly like every other
 -- policy change in this file. The role that runs it must be allowed to create
@@ -214,7 +250,8 @@ BEGIN
     'subject-scoped',
     'platform-admin',
     'platform-aggregate',
-    'cross-tenant-job'
+    'cross-tenant-job',
+    'public-intake'
   ) THEN
     RAISE EXCEPTION 'enter_system_scope: unknown purpose %', coalesce(purpose, '<null>')
       USING ERRCODE = 'invalid_parameter_value';
@@ -276,11 +313,19 @@ AS $fn$
      AND (pg_has_role(current_user,
                       (SELECT c.relowner FROM pg_class c WHERE c.oid = tbl),
                       'USAGE')
-          OR public.system_scope_sealed())
+          OR (public.system_scope_sealed()
+              -- FO-52: public-intake opens the expert form's tables only.
+              -- to_regclass, not '…'::regclass: a table missing on this
+              -- database (ExpertFounderCounter before its migration) is NULL
+              -- here and simply not on the list, instead of an error in every
+              -- system_scope policy. IS TRUE turns that NULL into false.
+              AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'public-intake'
+                   OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
+                               to_regclass('public."ExpertFounderCounter"'))) IS TRUE)))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration and ExpertFounderCounter (FO-52). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -301,6 +346,18 @@ BEGIN
       t, quote_ident(t), quote_ident(t));
   END LOOP;
 END $$;
+
+-- ExpertPreRegistration (FO-45, K-562266 = A): personal data of experts, with no
+-- tenant. RLS is ON and the one policy is system_scope, so fabrika_app reads and
+-- writes it only inside withSystemScope(). Outside that scope it sees 0 rows and
+-- refuses every write. Its purposes: 'public-intake' (registration, verification),
+-- 'platform-aggregate' (seat count), 'platform-admin' (list and CSV). Same policy
+-- body as the loop above. See prisma/migrations/expert-prereg-rls-mail-quota.sql.
+ALTER TABLE public."ExpertPreRegistration" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
+CREATE POLICY system_scope ON public."ExpertPreRegistration"
+  USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
+  WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
 
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call

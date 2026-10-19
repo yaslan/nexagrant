@@ -44,9 +44,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # `next start` refuses to boot without a session-signing key
+      # (src/lib/auth-secret.ts), so without one the gate measured nothing.
+      # The audited pages are public; the key only has to exist. It is made
+      # fresh for this run and given to this process alone: no repository
+      # value, no secret store entry, never the key of any deployment.
       - name: Start server
         run: |
-          pnpm start -p 3100 > /tmp/next-start.log 2>&1 &
+          AUTH_SECRET="$(openssl rand -base64 32)" pnpm start -p 3100 > /tmp/next-start.log 2>&1 &
           echo "server started"
 
       # The script waits for the port itself and exits non-zero below the

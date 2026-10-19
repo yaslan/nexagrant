@@ -114,11 +114,14 @@ describe('notifications page — the invented feed is gone', () => {
     ]) {
       expect(source).not.toContain(invented);
     }
-    expect(source).toContain('initialNotifications={[]}');
+    // TASK-MUVR2C9H3KTHQ: the feed now comes from the notification store
+    // (ADR-0011), and only from it — an empty store is an empty feed.
+    expect(source).toContain('await listNotifications()');
+    expect(source).toContain('result.ok ? result.notifications : []');
   });
 
   test('the client has an empty state, so an empty feed reads as empty', () => {
-    expect(client).toContain('notifications.length === 0');
+    expect(client).toContain('renderedNotifications.length === 0');
   });
 });
 

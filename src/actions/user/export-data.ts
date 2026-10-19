@@ -60,6 +60,7 @@ export async function exportUserData(): Promise<ExportResult> {
       aiUsage,
       approvals,
       opportunities,
+      notifications,
     ] = await withSystemScope('subject-scoped', 'gdpr-export.subjectRows', (tx) =>
       Promise.all([
         tx.user.findUnique({
@@ -136,6 +137,21 @@ export async function exportUserData(): Promise<ExportResult> {
             },
           },
         }),
+        // ADR-0011: the subject's notifications in every tenant. `payload`
+        // holds ids and counts only; no other person is named in it.
+        tx.notification.findMany({
+          where: { userId },
+          select: {
+            id: true,
+            tenantId: true,
+            workspaceId: true,
+            type: true,
+            payload: true,
+            createdAt: true,
+            readAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        }),
       ])
     );
 
@@ -173,6 +189,7 @@ export async function exportUserData(): Promise<ExportResult> {
       Effort: efforts,
       AiUsageLog: aiUsage,
       ApprovalRequest: approvals,
+      Notification: notifications,
     };
 
     await recordAccessAudit(userId, tenantId, tables);

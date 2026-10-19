@@ -3,7 +3,7 @@
  * across the Google round trip (TASK-MUN2793A57Z9I).
  *
  * The e-mail link is `/<locale>/accept-invite?token=<raw>`. The GET handler at
- * that path (src/app/[locale]/accept-invite/route.ts) moves the token into this
+ * that path (src/app/[locale]/(public)/accept-invite/route.ts) moves the token into this
  * cookie and redirects to a URL without it, so the token does not stay in the
  * address bar, the history, a Referer header or a screenshot (İNCELEME-28,
  * se-fb (d)). Everything after that — the accept screen, the signIn callback,

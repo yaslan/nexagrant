@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
 import { getBlogPosts } from '@/lib/blog';
 
-// Hardcoded regions matching src/app/[locale]/calls/[region]/regions.ts
+// Hardcoded regions matching src/app/[locale]/(public)/calls/[region]/regions.ts
 const REGIONS: Record<string, { name: string; code: string }> = {
   turkey: { name: 'Türkiye', code: 'TR' },
   germany: { name: 'Almanya', code: 'DE' },
@@ -29,6 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { path: '/kullanim-kosullari', priority: 0.5 },
       { path: '/veri-isleme-sozlesmesi', priority: 0.5 },
       { path: '/turkiyeye-acik-cagrilar', priority: 0.7 },
+      { path: '/uzman', priority: 0.7 },
       { path: '/blog', priority: 0.6 },
     ],
     en: [
@@ -38,6 +39,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { path: '/terms', priority: 0.5 },
       { path: '/dpa', priority: 0.5 },
       { path: '/open-calls', priority: 0.7 },
+      { path: '/experts', priority: 0.7 },
       { path: '/blog', priority: 0.6 },
     ],
   };

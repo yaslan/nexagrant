@@ -19,7 +19,9 @@ import type { BlogPost as BlogPostRow, Prisma } from '@prisma/client';
 import { prisma } from './db';
 import { errorCode } from './errors';
 import { logger } from './logger';
+import { publicAssetStore } from './storage';
 import { withSystemScope, type SystemTx } from './system-scope';
+import { BLOG_READ_MINUTES, estimateReadMinutes } from './blog-read-time';
 import {
   BLOG_LIMITS,
   BLOG_WRITE_ERRORS,
@@ -38,6 +40,15 @@ import {
 
 export * from './blog-shared';
 
+/**
+ * The stored minutes. NULL only on a row written by pre-FO-84 code during the
+ * deploy window (prisma/migrations/blog-read-minutes.sql); such a row is shown
+ * with the estimate from its content until the migration's backfill runs again.
+ */
+function readMinutesOf(row: BlogPostRow): number {
+  return row.readMinutes ?? Math.max(BLOG_READ_MINUTES.min, estimateReadMinutes(row.content));
+}
+
 function toBlogPost(row: BlogPostRow): BlogPost {
   return {
     slug: row.slug,
@@ -45,7 +56,7 @@ function toBlogPost(row: BlogPostRow): BlogPost {
     excerpt: row.excerpt,
     content: row.content,
     category: row.category,
-    readTime: row.readTime,
+    readMinutes: readMinutesOf(row),
     publishedAt: row.publishedAt,
     ...(row.authorName
       ? {
@@ -68,7 +79,7 @@ function toInput(row: BlogPostRow): BlogPostInput {
     excerpt: row.excerpt,
     content: row.content,
     category: row.category,
-    readTime: row.readTime,
+    readMinutes: readMinutesOf(row),
     authorName: row.authorName ?? '',
     authorRole: row.authorRole ?? '',
     authorAvatar: row.authorAvatar ?? '',
@@ -134,7 +145,7 @@ function failure(context: string, slug: string, error: unknown): { ok: false; er
 }
 
 export async function createBlogPost(input: BlogPostInput, actorId: string): Promise<BlogWriteResult> {
-  const valid = validateBlogInput(input);
+  const valid = validateBlogInput(input, publicAssetStore()?.baseUrl);
   if (!valid.ok) return valid;
   const slug = trimmedText(input.slug) || slugifyTitle(valid.data.title);
   if (!BLOG_SLUG_PATTERN.test(slug) || !lengthWithin(slug, 3, BLOG_LIMITS.slug)) {
@@ -166,7 +177,7 @@ export async function updateBlogPost(
     const row = await adminWrite('update', async (tx) => {
       const current = await tx.blogPost.findUnique({ where: { slug } });
       if (!current) throw new BlogRefusal('not_found');
-      const valid = validateBlogInput(mergeBlogPatch(toInput(current), patch));
+      const valid = validateBlogInput(mergeBlogPatch(toInput(current), patch), publicAssetStore()?.baseUrl);
       if (!valid.ok) throw new BlogRefusal(valid.error);
       const updated = await tx.blogPost.update({ where: { slug }, data: valid.data });
       await tx.auditEvent.create({

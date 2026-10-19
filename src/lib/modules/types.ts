@@ -66,6 +66,30 @@ export interface ModuleNavItem {
   order: number;
 }
 
+/**
+ * Filter tab / summary card a module sits under on the modules page. The
+ * grouping is a property of the module, so the page counts it rather than
+ * hard-coding which ids belong where.
+ */
+export type ModuleCategory = 'core' | 'ai' | 'tools';
+
+/** The five proposal gates, in pipeline order (docs/BETA_GUIDE.md "Kapı modeli"). */
+export const PIPELINE_STAGES = ['G0', 'G1', 'G2', 'G3', 'G4'] as const;
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+
+/** Release maturity shown on the module card: GA / Beta / Yakında. */
+export type ModuleStatusBadge = 'ga' | 'beta' | 'soon';
+
+/**
+ * Usage limits a module advertises. `null` on a field means no limit has been
+ * decided — the card must not invent one (CLAUDE.md §7: a figure shown to a
+ * user comes from a record, not from the code path).
+ */
+export interface ModuleQuota {
+  aiCallsMonthly: number | null;
+  recordLimit: number | null;
+}
+
 export interface ModuleManifest {
   id: ModuleId;
   key: string;
@@ -89,4 +113,12 @@ export interface ModuleManifest {
   /** Prisma models this module reads or writes; validated against schema.prisma. */
   tables: string[];
   isActive: boolean;
+  category: ModuleCategory;
+  /** Pipeline gates this module does work in; drives `pipelineCoverage`. */
+  stages: PipelineStage[];
+  statusBadge: ModuleStatusBadge;
+  /** Public documentation page; `null` until one is published. */
+  docsUrl: string | null;
+  /** `null` when the module advertises no quota at all. */
+  quota: ModuleQuota | null;
 }

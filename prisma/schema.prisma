@@ -49,6 +49,7 @@ model Tenant {
   billingIdentity TenantBillingIdentity?
   planAssignments PlanAssignment[]
   stripeEvents  StripeEventLog[]
+  notifications Notification[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -624,7 +625,13 @@ model BlogPost {
   /// Markdown subset rendered as React text nodes (no HTML) — see blog/[slug]/page.tsx.
   content      String
   category     String
-  readTime     String
+  /// Minutes, 1–120 (CHECK BlogPost_readMinutes_range); formatted per reader locale
+  /// with messages blog.readMinutes. NULL only for a row written by pre-FO-84 code
+  /// during the deploy window. prisma/migrations/blog-read-minutes.sql.
+  readMinutes  Int?
+  /// Legacy free-text read time in the writer's language. No longer written or read;
+  /// kept for rollback until a follow-up drops it (TASK-MVDSY96TB1EPM).
+  readTime     String?
   publishedAt  DateTime
   authorName   String?
   authorRole   String?
@@ -669,6 +676,63 @@ model PublicLead {
   @@index([createdAt])
   @@index([email, createdAt])
   @@index([ipHash, createdAt])
+}
+
+/// FO-19 (TASK-MVBIXPP33UK1B): the public expert pre-registration. An expert
+/// with no account leaves a profile; the e-mail link verifies it, and the first
+/// 100 verified rows get a `founderNumber` (src/lib/expert-prereg/server/).
+/// No tenant: platform data with personal data in it (KVKK), so the table is
+/// SYSTEM_WIDE in scripts/rls-models.ts with RLS off, the same as PublicLead.
+/// Raw tokens and raw IPs are never stored: only `verifyTokenHash` and `ipHash`.
+model ExpertPreRegistration {
+  id                   String    @id @default(cuid())
+  fullName             String
+  /// Trimmed and lower-cased (the form and the API both normalise it).
+  email                String    @unique
+  emailVerifiedAt      DateTime?
+  /// Plate code "01".."81" (src/lib/expert-prereg/options.ts).
+  province             String
+  title                String?
+  /// FO-25 (TASK-MVBLMIJW293GW): "Kurum". Required by the API from FO-25 on; nullable in the
+  /// column so rows written before it stay valid (no backfill, additive migration).
+  organization         String?
+  isFreelancer         Boolean
+  expertiseAreas       String[]
+  roles                String[]
+  programmes           String[]
+  projectCodes         String?
+  /// ORCID iD, upper-cased, checksum-validated (src/lib/expert-prereg/schema.ts).
+  orcid                String?
+  linkedinUrl          String?
+  languages            String[]
+  referredBy           String?
+  utmSource            String?
+  utmMedium            String?
+  utmCampaign          String?
+  kvkkAcceptedAt       DateTime
+  visibilityConsentAt  DateTime
+  marketingConsentAt   DateTime?
+  /// Version of the consent text the expert ticked; a server constant, never a client field.
+  consentTextVersion   String    @default("kvkk-v1")
+  /// `tr` or `en`: the language of the verification mail and of the redirect after it.
+  locale               String
+  /// SHA-256 of the one-time verification token. The raw token exists only in the mail.
+  verifyTokenHash      String?   @unique
+  verifyTokenExpiresAt DateTime?
+  /// Set once, on verification, for the first 100 verified experts (Kurucu Uzman). Unique: no duplicate number.
+  founderNumber        Int?      @unique
+  /// `pending` | `verified` | `disabled`.
+  status               String    @default("pending")
+  /// HMAC-SHA256 of the client IP under EXPERT_PREREG_IP_SALT: the per-IP limit only.
+  ipHash               String?
+  /// Verification mails sent to this address in the current day window (FO-45 F5, EXPERT_PREREG_DAILY_MAIL_LIMIT).
+  verifyMailCount      Int       @default(0)
+  /// Start of the day window `verifyMailCount` counts from. NULL = no mail yet.
+  verifyMailWindowStart DateTime?
+  createdAt            DateTime  @default(now())
+  @@index([createdAt])
+  @@index([ipHash, createdAt])
+  @@index([status, createdAt])
 }
 
 // ───────────────────────── K1 tenant-scoped ─────────────────────────
@@ -1048,7 +1112,6 @@ model Evidence {
 
   claimLinks         ClaimEvidenceLink[]
   proposalUsages     ProposalUsage[]
-  reminders          EvidenceReminder[]
 
   // One row per stored object (D-3, TASK-MUNTTZ94LJWBC): confirming the same
   // key twice made two rows, and deleting either removed the other's file.
@@ -1106,23 +1169,6 @@ model ProposalUsage {
   evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, opportunityId])
-}
-
-// `recipientEmails` is personal data, so a row here is tenant data twice over:
-// it hangs off one tenant's Evidence and it names that tenant's people. Carried
-// on the row so RLS can see it (TASK-MTU6HUB8FUHMG B-1).
-model EvidenceReminder {
-  id                 String               @id @default(cuid())
-  tenantId           String
-  evidenceId         String
-  notifyAt           DateTime
-  sent               Boolean              @default(false)
-  recipientEmails    String[]
-
-  evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@index([sent, notifyAt])
 }
 
 // ───────────────────────── M2 Concept Note ─────────────────────────
@@ -1306,6 +1352,39 @@ model StripeEventLog {
   processedAt   DateTime @default(now())
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@index([tenantId, processedAt])
+}
+
+// ADR-0011 (TASK-MUVR24EHWI2RA). One row per recipient: `readAt` is that
+// user's read state, so there is no per-workspace or browser-side copy of it
+// (K-1 a, K-2 a). Tenant isolation is RLS (`tenant_isolation`, prisma/rls.sql);
+// user isolation is the `userId` filter every read and write in
+// src/lib/notifications/store.ts carries (K-5 a). `payload` holds ids and
+// counts only; the text is rendered from `type` + `payload` with next-intl.
+// Deleted after NOTIFICATION_RETENTION_DAYS (90, K-3 a) by
+// `notifications-retention`, with the user (users-scheduled-deletion) and with
+// the tenant (cascade). Migration: add-notification.sql.
+model Notification {
+  id          String           @id @default(cuid())
+  tenantId    String
+  userId      String           // recipient; User.id, no FK (SavedSearch.userId pattern)
+  workspaceId String?          // NULL = tenant-wide (both MVP producers)
+  type        NotificationType
+  payload     Json             @default("{}")
+  dedupeKey   String?          // same event twice -> one row (@@unique below)
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?        // NULL = unread
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, dedupeKey])
+  @@index([tenantId, userId, readAt, createdAt])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  SAVED_SEARCH_MATCH   // payload: { searchId, searchName, matchCount, since }
+  CREDIT_GRANTED       // payload: { amount, period?, source } (no producer yet)
+  CREDIT_EXHAUSTED     // payload: { module } (no producer yet)
+  EVIDENCE_EXPIRING    // payload: { evidenceId, validUntil } (evidence-expiring job)
 }
 
 // ───────────────────────── v1.1+ (M6, M9, M10, M11, M7) ─────────────────────────

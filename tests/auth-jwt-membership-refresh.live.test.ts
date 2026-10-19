@@ -49,7 +49,7 @@ let lib:
   | {
       auth: typeof import('../src/lib/auth');
       evidence: typeof import('../src/app/[locale]/(app)/[workspace]/evidence/actions');
-      acceptActions: typeof import('../src/app/[locale]/accept-invite/continue/actions');
+      acceptActions: typeof import('../src/app/[locale]/(public)/accept-invite/continue/actions');
       acceptCookie: typeof import('../src/lib/invitations/accept-cookie');
       token: typeof import('../src/lib/secret-token');
       encode: typeof import('next-auth/jwt').encode;
@@ -100,7 +100,7 @@ beforeAll(async () => {
   lib = {
     auth: await import('../src/lib/auth'),
     evidence: await import('../src/app/[locale]/(app)/[workspace]/evidence/actions'),
-    acceptActions: await import('../src/app/[locale]/accept-invite/continue/actions'),
+    acceptActions: await import('../src/app/[locale]/(public)/accept-invite/continue/actions'),
     acceptCookie: await import('../src/lib/invitations/accept-cookie'),
     token: await import('../src/lib/secret-token'),
     encode: (await import('next-auth/jwt')).encode,

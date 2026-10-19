@@ -12,6 +12,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { createTtoItem, matchTtoItemToCalls, generateIpChecklist } from '@/modules/m7/server/actions';
+import { useTranslations } from 'next-intl';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 export interface TtoItem {
@@ -41,6 +42,7 @@ interface MatchedTopic {
 export function TtoAcceleratorClient({
   items: initialItems,
 }: TtoAcceleratorClientProps) {
+  const t = useTranslations('m7.tto');
   const [items, setItems] = useState<TtoItem[]>(initialItems);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'roadmap' | 'checklist'>('portfolio');
 
@@ -112,6 +114,9 @@ export function TtoAcceleratorClient({
       setMatchedTopics(res.matchedTopics || []);
     } catch (err) {
       console.error('Error matching TTO item:', err);
+      // A refused match has no result: an open modal would read "no matching
+      // call found" and cover the band that says why (TASK-MUUS5HE3OW0CT).
+      setSelectedMatchItem(null);
       setActionError(errorText(err, null));
     } finally {
       setIsMatching(false);
@@ -146,11 +151,11 @@ export function TtoAcceleratorClient({
   const getPatentBadge = (status: string) => {
     switch (status) {
       case 'granted':
-        return <span className="bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">Tescilli (Granted)</span>;
+        return <span className="bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.granted')}</span>;
       case 'pending':
-        return <span className="bg-amber-500/15 text-amber-500 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">Başvuru Aşamasında (Pending)</span>;
+        return <span className="bg-amber-500/15 text-amber-500 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.pending')}</span>;
       case 'licensed':
-        return <span className="bg-accent/15 text-accent-ink border border-accent/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">Lisanslandı (Licensed)</span>;
+        return <span className="bg-accent/15 text-accent-ink border border-accent/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.licensed')}</span>;
       default:
         return <span className="bg-surface-hover text-ink border border-border px-2.5 py-0.5 rounded-full font-bold text-[11px]">{status}</span>;
     }
@@ -169,19 +174,19 @@ export function TtoAcceleratorClient({
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-accent font-semibold tracking-wider uppercase mb-1">
               <Lightbulb className="w-4 h-4 text-accent" />
-              <span>Modül 7 — TTO Accelerator</span>
+              <span>{t('header.kicker')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-ink">
-              Üniversite TTO Portföy & AB Çağrı Eşleştirici
+              {t('header.title')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              Üniversite Ar-Ge patent portföylerini Ufuk Avrupa çağrılarıyla ve özel sektör ihtiyaçlarıyla buluşturun.
+              {t('header.subtitle')}
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs bg-accent/10 border border-accent/20 text-accent-ink px-3.5 py-1.5 rounded-full font-mono font-bold">
-              Patent & TRL Engine
+              {t('header.engineBadge')}
             </span>
           </div>
         </div>
@@ -189,31 +194,31 @@ export function TtoAcceleratorClient({
         {/* Metric Cards Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-border text-xs">
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Toplam TTO IP Varlığı</span>
+            <span className="text-muted block text-[11px]">{t('stats.totalAssetsLabel')}</span>
             <span className="text-xl font-bold text-ink font-mono mt-0.5 block">
-              {items.length} <span className="text-xs text-muted">Teknoloji</span>
+              {items.length} <span className="text-xs text-muted">{t('stats.technologiesUnit')}</span>
             </span>
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Ortalama TRL Seviyesi</span>
+            <span className="text-muted block text-[11px]">{t('stats.avgTrlLabel')}</span>
             <span className="text-xl font-bold text-accent font-mono mt-0.5 block">
-              TRL {avgTrl}
+              {t('trlValue', { value: avgTrl })}
             </span>
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Tescilli Patent (Granted)</span>
+            <span className="text-muted block text-[11px]">{t('stats.grantedLabel')}</span>
             <span className="text-xl font-bold text-emerald-500 font-mono mt-0.5 block">
-              {grantedCount} <span className="text-xs text-muted">Patent</span>
+              {grantedCount} <span className="text-xs text-muted">{t('stats.patentsUnit')}</span>
             </span>
           </div>
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Yapay Zeka Çağrı Eşleşmesi</span>
-            <span className="text-xs font-bold text-purple-400 mt-1 block flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              Horizon Europe Uyumlu
+            <span className="text-muted block text-[11px]">{t('matchingStatLabel')}</span>
+            <span className="text-xs font-bold text-muted mt-1 block flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-muted" />
+              {t('matchingStatValue')}
             </span>
           </div>
         </div>
@@ -230,7 +235,7 @@ export function TtoAcceleratorClient({
           }`}
         >
           <Lightbulb className="w-4 h-4" />
-          <span>TTO Portföy Kartları ({items.length})</span>
+          <span>{t('tabs.portfolio', { count: items.length })}</span>
         </button>
 
         <button
@@ -242,7 +247,7 @@ export function TtoAcceleratorClient({
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>TRL Seviye Haritası (TRL 1-9)</span>
+          <span>{t('tabs.roadmap')}</span>
         </button>
 
         <button
@@ -254,7 +259,7 @@ export function TtoAcceleratorClient({
           }`}
         >
           <FileCheck className="w-4 h-4" />
-          <span>IP & Lisanslama Kontrol Listesi</span>
+          <span>{t('tabs.checklist')}</span>
         </button>
       </div>
 
@@ -266,17 +271,17 @@ export function TtoAcceleratorClient({
             <div className="bg-surface rounded-2xl p-5 border border-border shadow-xs space-y-4">
               <div className="flex items-center gap-2 border-b border-border pb-3">
                 <Plus className="w-4 h-4 text-accent" />
-                <h3 className="font-bold text-sm text-ink">Yeni Patent / IP Portföy Öğesi Ekle</h3>
+                <h3 className="font-bold text-sm text-ink">{t('form.heading')}</h3>
               </div>
 
               <form onSubmit={handleCreateItem} className="space-y-3.5 text-xs">
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Teknoloji / Patent Başlığı</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('form.titleLabel')}</label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Örn: Katı Hal Batarya Mikrosensör Dizesi"
+                    placeholder={t('form.titlePlaceholder')}
                     required
                     className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground text-ink"
                   />
@@ -285,8 +290,8 @@ export function TtoAcceleratorClient({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="font-semibold text-ink-2">TRL (1 - 9)</label>
-                      <span className="font-mono font-bold text-accent">TRL {trl}</span>
+                      <label className="font-semibold text-ink-2">{t('form.trlLabel')}</label>
+                      <span className="font-mono font-bold text-accent">{t('trlValue', { value: trl })}</span>
                     </div>
                     <input
                       type="range"
@@ -299,37 +304,37 @@ export function TtoAcceleratorClient({
                   </div>
 
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Patent Durumu</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('form.patentStatusLabel')}</label>
                     <select
                       value={patentStatus}
                       onChange={(e) => setPatentStatus(e.target.value)}
                       className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground text-ink"
                     >
-                      <option value="granted">Tescilli (Granted)</option>
-                      <option value="pending">Başvuru Aşamasında (Pending)</option>
-                      <option value="licensed">Lisanslandı (Licensed)</option>
+                      <option value="granted">{t('patentStatus.granted')}</option>
+                      <option value="pending">{t('patentStatus.pending')}</option>
+                      <option value="licensed">{t('patentStatus.licensed')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Anahtar Kelimeler (Virgülle ayırın)</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('form.keywordsLabel')}</label>
                   <input
                     type="text"
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
-                    placeholder="Örn: batarya, termal, sensör, katı hal"
+                    placeholder={t('form.keywordsPlaceholder')}
                     className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground text-ink"
                   />
                 </div>
 
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Teknoloji Özeti & Avantajları</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('form.summaryLabel')}</label>
                   <textarea
                     rows={3}
                     value={summary}
                     onChange={(e) => setSummary(e.target.value)}
-                    placeholder="Teknolojinin AB projelerine sunacağı teknik üstünlükler ve ticarileştirme nitelikleri..."
+                    placeholder={t('form.summaryPlaceholder')}
                     className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground text-ink"
                   />
                 </div>
@@ -340,7 +345,7 @@ export function TtoAcceleratorClient({
                   className="w-full bg-accent hover:opacity-90 text-white font-semibold py-2.5 rounded-xl transition shadow-2xs flex items-center justify-center gap-2 text-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{isSubmitting ? 'Ekleniyor...' : 'TTO Portföyüne Kaydet'}</span>
+                  <span>{isSubmitting ? t('form.submitting') : t('form.submit')}</span>
                 </button>
               </form>
             </div>
@@ -349,63 +354,70 @@ export function TtoAcceleratorClient({
           {/* Right Column: IP Cards & AI Match Launcher (7 cols) */}
           <div className="lg:col-span-7 space-y-4">
             <h3 className="font-bold text-sm text-ink flex items-center justify-between">
-              <span>Portföy Teknolojileri ({items.length})</span>
+              <span>{t('portfolio.heading', { count: items.length })}</span>
               <span className="text-xs font-normal text-muted">
-                AB Çağrı Eşleşmesi İçin Karta Tıklayın
+                {t('portfolio.hint')}
               </span>
             </h3>
 
             <div className="space-y-4">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3.5 hover:border-accent/40 transition"
-                >
-                  <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
-                    <div>
-                      <h4 className="font-bold text-sm text-ink">{item.title}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        {getPatentBadge(item.patentStatus)}
-                        <span className="bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono font-bold px-2 py-0.5 rounded text-[11px]">
-                          TRL {item.trl}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleRunMatcher(item)}
-                      className="px-3 py-1.5 bg-accent hover:opacity-90 text-white font-semibold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5 shrink-0"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>AB Çağrıları Eşleştir</span>
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-ink-2 leading-relaxed">{item.summary}</p>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
-                    <div className="flex flex-wrap gap-1.5">
-                      {item.keywords?.map((k, idx) => (
-                        <span key={idx} className="text-[10px] bg-ground border border-border text-ink-2 px-2 py-0.5 rounded font-mono">
-                          #{k}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* `isGeneratingChecklist` was set on both sides of the call and never
-                        read, so the button stayed idle-looking during an AI request and
-                        could be clicked again — each click debits credits (CLAUDE.md §5). */}
-                    <button
-                      onClick={() => handleGenerateIpChecklist(item)}
-                      disabled={isGeneratingChecklist}
-                      className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
-                    >
-                      <FileCheck className="w-3.5 h-3.5 text-accent" />
-                      <span>{isGeneratingChecklist ? 'Üretiliyor...' : 'IP Kontrol Listesi Üret'}</span>
-                    </button>
-                  </div>
+              {items.length === 0 ? (
+                <div className="bg-surface border border-border rounded-2xl p-8 text-center shadow-xs">
+                  <p className="text-muted text-sm">{t('emptyPortfolio')}</p>
+                  <p className="text-ink-2 text-xs mt-2">{t('emptyPortfolioHint')}</p>
                 </div>
-              ))}
+              ) : (
+                items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3.5 hover:border-accent/40 transition"
+                  >
+                    <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
+                      <div>
+                        <h4 className="font-bold text-sm text-ink">{item.title}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          {getPatentBadge(item.patentStatus)}
+                          <span className="bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono font-bold px-2 py-0.5 rounded text-[11px]">
+                            {t('trlValue', { value: item.trl })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleRunMatcher(item)}
+                        className="px-3 py-1.5 bg-accent hover:opacity-90 text-white font-semibold rounded-xl text-xs transition shadow-2xs flex items-center gap-1.5 shrink-0"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{t('matchCalls')}</span>
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-ink-2 leading-relaxed">{item.summary}</p>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border">
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.keywords?.map((k, idx) => (
+                          <span key={idx} className="text-[10px] bg-ground border border-border text-ink-2 px-2 py-0.5 rounded font-mono">
+                            #{k}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* `isGeneratingChecklist` was set on both sides of the call and never
+                          read, so the button stayed idle-looking during an AI request and
+                          could be clicked again — each click debits credits (CLAUDE.md §5). */}
+                      <button
+                        onClick={() => handleGenerateIpChecklist(item)}
+                        disabled={isGeneratingChecklist}
+                        className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                      >
+                        <FileCheck className="w-3.5 h-3.5 text-accent" />
+                        <span>{isGeneratingChecklist ? t('portfolio.generatingChecklist') : t('portfolio.generateChecklist')}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -417,41 +429,41 @@ export function TtoAcceleratorClient({
           <div>
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               <Sliders className="w-5 h-5 text-accent" />
-              <span>Teknoloji Hazırlık Seviyesi (TRL 1 - 9) Matrisi</span>
+              <span>{t('roadmap.title')}</span>
             </h2>
             <p className="text-muted text-xs mt-1">
-              Horizon Europe projelerinde üniversite buluşlarının ticarileşme olgunlaşma basamakları.
+              {t('roadmap.subtitle')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div className="bg-ground border border-border rounded-2xl p-4 space-y-2">
               <span className="text-xs font-bold font-mono text-ink-2 bg-surface border border-border px-2 py-0.5 rounded">
-                TRL 1 - 3 (Temel Araştırma)
+                {t('roadmap.researchBadge')}
               </span>
-              <h4 className="font-bold text-ink">Laboratuvar & Konsept Kanıtı</h4>
+              <h4 className="font-bold text-ink">{t('roadmap.researchTitle')}</h4>
               <p className="text-ink-2 text-[11px] leading-relaxed">
-                Temel ilkelerin gözlemlenmesi, teknoloji konseptinin ve uygulamanın formule edilmesi.
+                {t('roadmap.researchBody')}
               </p>
             </div>
 
             <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 space-y-2">
               <span className="text-xs font-bold font-mono text-accent-ink bg-accent/20 px-2 py-0.5 rounded">
-                TRL 4 - 6 (Prototip & Doğrulama)
+                {t('roadmap.prototypeBadge')}
               </span>
-              <h4 className="font-bold text-ink">Laboratuvar & İlgili Ortam Doğrulaması</h4>
+              <h4 className="font-bold text-ink">{t('roadmap.prototypeTitle')}</h4>
               <p className="text-ink-2 text-[11px] leading-relaxed">
-                Bileşenlerin laboratuvarda ve ilgili sanayi ortamında doğrulanması. (Ufuk Avrupa Ar-Ge odağı).
+                {t('roadmap.prototypeBody')}
               </p>
             </div>
 
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-2">
               <span className="text-xs font-bold font-mono text-emerald-500 bg-emerald-500/20 px-2 py-0.5 rounded">
-                TRL 7 - 9 (Ticarileşme & Pazar)
+                {t('roadmap.marketBadge')}
               </span>
-              <h4 className="font-bold text-ink">Demonstrasyon & Operasyonel Yaygınlaşma</h4>
+              <h4 className="font-bold text-ink">{t('roadmap.marketTitle')}</h4>
               <p className="text-ink-2 text-[11px] leading-relaxed">
-                Sistemin gerçek operasyonel ortamda gösterimi, tescili ve pazar lisanslaması.
+                {t('roadmap.marketBody')}
               </p>
             </div>
           </div>
@@ -463,7 +475,7 @@ export function TtoAcceleratorClient({
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-xs space-y-4">
           <h2 className="text-base font-bold text-ink flex items-center gap-2">
             <FileCheck className="w-5 h-5 text-accent" />
-            <span>Fikri Mülkiyet (IP) & Lisanslama Kontrol Rehberi</span>
+            <span>{t('checklist.title')}</span>
           </h2>
 
           {checklistContent ? (
@@ -472,7 +484,7 @@ export function TtoAcceleratorClient({
             </div>
           ) : (
             <div className="p-8 text-center text-muted text-xs border border-dashed border-border rounded-xl space-y-2">
-              <p>Lütfen Portföy sekmesindeki herhangi bir teknoloji için &quot;IP Kontrol Listesi Üret&quot; butonuna tıklayın.</p>
+              <p>{t('checklist.empty', { button: t('portfolio.generateChecklist') })}</p>
             </div>
           )}
         </div>
@@ -485,12 +497,13 @@ export function TtoAcceleratorClient({
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <span className="text-xs font-mono font-bold text-accent uppercase">
-                  AB Horizon Europe Çağrı Eşleştirici
+                  {t('matcher.kicker')}
                 </span>
                 <h3 className="font-bold text-base text-ink">{selectedMatchItem.title}</h3>
               </div>
               <button
                 onClick={() => setSelectedMatchItem(null)}
+                aria-label={t('matcher.close')}
                 className="p-1 rounded-lg hover:bg-surface-hover text-muted"
               >
                 <X className="w-5 h-5" />
@@ -500,43 +513,52 @@ export function TtoAcceleratorClient({
             {isMatching ? (
               <div className="p-12 text-center text-muted space-y-2">
                 <Zap className="w-8 h-8 text-accent animate-spin mx-auto" />
-                <p className="font-semibold text-sm">Yapay Zeka AB Çağrılarını Analiz Ediyor...</p>
+                <p className="font-semibold text-sm">{t('matcher.analyzing')}</p>
               </div>
             ) : (
               <div className="space-y-3">
                 <h4 className="font-bold text-xs text-ink-2 uppercase tracking-wider">
-                  Tespit Edilen En Yüksek Uyumlu AB Çağrıları ({matchedTopics.length})
+                  {t('matchResultTitle', { count: matchedTopics.length })}
                 </h4>
 
-                {matchedTopics.map((topic, idx) => (
-                  <div key={idx} className="bg-ground border border-border rounded-xl p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-xs text-accent bg-accent/15 border border-accent/20 px-2 py-0.5 rounded">
-                        {topic.topicId}
-                      </span>
-                      <span className="font-mono font-bold text-xs text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
-                        Uyum Skoru: %{topic.fitScore}
-                      </span>
-                    </div>
-
-                    <h5 className="font-bold text-sm text-ink">{topic.title}</h5>
-                    <p className="text-xs text-ink-2">{topic.matchReason}</p>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
-                      <span className="text-[11px] font-mono text-muted">
-                        Hedef TRL: <strong>{topic.targetTrlRange}</strong>
-                      </span>
-
-                      <button
-                        onClick={() => setSelectedMatchItem(null)}
-                        className="px-3 py-1 bg-accent hover:opacity-90 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
-                      >
-                        <span>M4 İlişkisi Aç</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                {matchedTopics.length === 0 ? (
+                  <div className="bg-ground border border-border rounded-xl p-4 text-center">
+                    <p className="text-xs text-muted">{t('noMatch')}</p>
                   </div>
-                ))}
+                ) : (
+                  matchedTopics.map((topic, idx) => (
+                    <div key={idx} className="bg-ground border border-border rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-xs text-accent bg-accent/15 border border-accent/20 px-2 py-0.5 rounded">
+                          {topic.topicId}
+                        </span>
+                        <span className="font-mono font-bold text-xs text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                          {t('matcher.fitScore', { score: topic.fitScore })}
+                        </span>
+                      </div>
+
+                      <h5 className="font-bold text-sm text-ink">{topic.title}</h5>
+                      <p className="text-xs text-ink-2">{topic.matchReason}</p>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
+                        <span className="text-[11px] font-mono text-muted">
+                          {t.rich('matcher.targetTrl', {
+                            range: topic.targetTrlRange,
+                            strong: (chunks) => <strong>{chunks}</strong>,
+                          })}
+                        </span>
+
+                        <button
+                          onClick={() => setSelectedMatchItem(null)}
+                          className="px-3 py-1 bg-accent hover:opacity-90 text-white rounded-lg transition font-semibold text-xs flex items-center gap-1"
+                        >
+                          <span>{t('openM4Relationship')}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

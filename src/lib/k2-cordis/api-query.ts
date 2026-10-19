@@ -46,3 +46,26 @@ export function pickQuery<K extends string>(searchParams: URLSearchParams, keys:
   }
   return out;
 }
+
+/**
+ * A CORDIS topic-code prefix such as `HORIZON-CL5-`. Upper-cased before the
+ * check, so `horizon-cl5-` is accepted. Three characters minimum keeps a bare
+ * `H` from matching the whole programme. The character set has no `%` or `_`,
+ * so the prefix can go straight into a LIKE pattern.
+ */
+export const cordisTopicPrefixSchema = z
+  .string()
+  .max(40)
+  .transform((s) => s.trim().toUpperCase())
+  .pipe(z.string().regex(/^[A-Z0-9-]{3,40}$/));
+
+/** GET /api/v1/partners/leaders — `topicPrefix` required, `limit` clamped to 1–50. */
+export const coordinatorLeadersQuerySchema = z.object({
+  topicPrefix: cordisTopicPrefixSchema,
+  limit: digits.optional().transform((n) => Math.min(50, Math.max(1, n ?? 20))),
+  country: z
+    .string()
+    .regex(/^[A-Za-z]{2}$/)
+    .transform((s) => s.toUpperCase())
+    .optional(),
+});

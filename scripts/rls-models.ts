@@ -12,11 +12,11 @@ import { resolve } from 'node:path';
  * System-wide tables: no tenantId, no policy expected.
  *
  * Membership here is an exemption from both gates, so it is only ever correct
- * for a table that holds no tenant data at all. `ClaimEvidenceLink` and
- * `EvidenceReminder` sat in this set until TASK-MTU6HUB8FUHMG B-1 while joining
- * one tenant's Claim to that tenant's Evidence — and, in the reminder's case,
- * carrying its people's e-mail addresses. They had no RLS at all, and both
- * gates were programmed to look away, so the gate could never go red for them.
+ * for a table that holds no tenant data at all. `ClaimEvidenceLink` sat in this
+ * set until TASK-MTU6HUB8FUHMG B-1 while joining one tenant's Claim to that
+ * tenant's Evidence. It had no RLS at all, and both gates were programmed to
+ * look away, so the gate could never go red for it. (`EvidenceReminder` was in
+ * the same position and was dropped outright by TASK-MUXVOWBNIIQKD.)
  *
  * A table belongs here because it has no tenant, never because adding it makes
  * the gate quiet. `rls-coverage.test.ts` asserts no member carries a tenantId.
@@ -33,11 +33,52 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // readiness scorecard. No account, hence no tenant; read by platform admins
   // only (/admin/leads), same standing as User. See prisma/migrations/add-public-lead.sql.
   'PublicLead',
+  // TASK-MVBIXPP33UK1B: a public expert pre-registration. No account, hence no
+  // tenant; read and written by the expert-prereg server code and the
+  // platform-admin export only. See prisma/migrations/add-expert-pre-registration.sql.
+  'ExpertPreRegistration',
   // AKTAR-MURBCJ0A-1: a post on the public blog. Platform content shown to
   // anonymous visitors, owned by no tenant; written only by /admin/blog behind
   // requirePlatformAdmin(). See prisma/migrations/add-blog-post.sql.
   'BlogPost',
+  // TASK-MUWDA86A7U4LK: the programme catalogue (HE, DEP, EUREKA, …) behind
+  // Call. No tenantId, never was; it simply was never listed. Listed now so the
+  // policy-less set below — and the DISABLE loop in prisma/rls.sql derived from
+  // it — covers every table Supabase's ensure_rls trigger would lock.
+  'Programme',
 ]);
+
+/**
+ * SYSTEM_WIDE (or tenant-less) tables that DO carry policies: the read-only
+ * platform block in prisma/rls.sql (platform_read + platform_no_*). Their RLS is
+ * on on purpose. tests/rls-coverage.test.ts pins this set to that block.
+ */
+export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersion', 'PlanFeature']);
+
+/**
+ * SYSTEM_WIDE tables whose RLS is ON with one policy: `system_scope` alone, no
+ * tenant policy and no platform_read. Personal data with no tenant (FO-45,
+ * K-562266 = A). Reachable only through withSystemScope(). tests/rls-coverage.test.ts
+ * pins this set to the block in prisma/rls.sql.
+ */
+export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertPreRegistration']);
+
+/**
+ * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.
+ *
+ * TASK-MUWDA86A7U4LK: the live Supabase project has an `ensure_rls` event
+ * trigger (ddl_command_end → public.rls_auto_enable(), owned by the platform,
+ * not by us) that runs ENABLE ROW LEVEL SECURITY on every table created in
+ * `public`. On one of these tables that means RLS on with zero policies — deny
+ * all for fabrika_app: 0 rows read, every INSERT refused. BlogPost was in that
+ * state on live (06.10.2026, TASK-MUTP1R1C13GE3). So each of them is DISABLEd
+ * explicitly: in the migration that creates it (CHECK 4c,
+ * scripts/rls-migrations.ts) and again by the loop in prisma/rls.sql, whose
+ * list tests/rls-coverage.test.ts pins to this function.
+ */
+export function policylessSystemWide(): string[] {
+  return [...SYSTEM_WIDE].filter((t) => !PLATFORM_POLICY.has(t) && !SYSTEM_SCOPE_POLICY.has(t)).sort();
+}
 
 /**
  * Nullable tenantId where NULL means "shared with every tenant": covered by the
