@@ -6,7 +6,11 @@ This notice is given under Article 10 of the Turkish Personal Data Protection La
 
 ## 1. Data controller
 
-Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. ("FonBridge"). Contact: info@fonbridge.com
+Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. ("FonBridge").
+
+- Address: [ADDRESS — owner]
+- Registered e-mail (KEP) address: [KEP ADDRESS — owner]
+- E-mail: info@fonbridge.com
 
 ## 2. Personal data processed
 
@@ -22,7 +26,9 @@ Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. ("FonBridge"). Contact: in
 - To prevent abuse and automated (bot) registrations.
 - If you opted in, to send you FonBridge announcements by e-mail.
 
-## 4. Legal bases
+## 4. Collection method and legal bases
+
+Your personal data is collected from you electronically through the pre-registration form on the FonBridge website, partly by automated means (form submission, the e-mail verification link, the IP address digest). It is processed on the following legal bases:
 
 - Necessary for entering into or performing a contract (KVKK Art. 5/2-c): pre-registration and verification.
 - Legitimate interest of the controller (KVKK Art. 5/2-f): abuse prevention.
@@ -38,4 +44,26 @@ Your pre-registration data is kept for 1 (one) year from the date you first subm
 
 ## 7. Your rights
 
-Under KVKK Art. 11 you may learn whether your data is processed, request information, ask for correction or deletion, withdraw consent and object. You can withdraw your consent to announcement e-mails and to directory publication by writing to info@fonbridge.com. Send any other requests to the same address.
+Under KVKK Art. 11 you may apply to the data controller to:
+
+- learn whether your personal data is processed,
+- request information about the processing if it is,
+- learn the purpose of the processing and whether the data is used in line with that purpose,
+- know the third parties in Turkey or abroad to whom your data is transferred,
+- ask for incomplete or inaccurate data to be corrected,
+- ask for your data to be deleted or destroyed under the conditions of KVKK Art. 7,
+- ask for any correction, deletion or destruction to be notified to the third parties your data was transferred to,
+- object to a result against you that arises solely from the analysis of your data by automated systems,
+- claim compensation if you suffer damage because your data was processed unlawfully.
+
+You may withdraw your consent to processing based on explicit consent at any time; withdrawal does not affect processing carried out before it. You can withdraw your consent to announcement e-mails and to directory publication by writing to info@fonbridge.com.
+
+## 8. How to apply
+
+Under the Communiqué on the Procedures and Principles of Application to the Data Controller, you may send your request in Turkish and in writing:
+
+- with a wet-signed letter to the address above, in person or through a notary,
+- to our registered e-mail (KEP) address, signed with a secure electronic signature or mobile signature,
+- to info@fonbridge.com from the e-mail address you gave us earlier and that is registered in our system.
+
+Your request must include your full name, signature, residential or business address for notification, an e-mail address or telephone number for notification if you have one, and the subject of your request. It is answered free of charge within 30 days at the latest; if the request involves an additional cost, the fee set by the Personal Data Protection Board may apply. If your request is rejected, the answer is insufficient or no answer is given in time, you may lodge a complaint with the Personal Data Protection Board (KVKK Art. 14).
