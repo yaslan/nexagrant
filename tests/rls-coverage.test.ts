@@ -387,7 +387,7 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
     const { tables, findings } = scanPolicylessMigrations();
     expect(findings.map((f) => `${f.file}:${f.line} ${f.problem}`)).toEqual([]);
     // A green check that inspects nothing is not a green check.
-    expect(tables.map((t) => t.table).sort()).toEqual(['BlogPost', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'PublicLead']);
+    expect(tables.map((t) => t.table).sort()).toEqual(['BlogPost', 'ExpertPreRegistration', 'PublicLead']);
   });
 
   test('CHECK 4c mutation probe — missing DISABLE and ENABLE-without-policy are caught', () => {

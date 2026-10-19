@@ -330,18 +330,33 @@ describe('registerExpertPreRegistration', () => {
     expect(attempts.map((a) => a.id)).toEqual(['attempt-recent']);
   });
 
-  it('lets the cooldown read lastSubmittedAt, so a re-issue long after createdAt is still gated by the last one', async () => {
-    const { db, rows } = fakeDb();
-    const { mailer } = recordingMailer();
-    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
-    const later = new Date(NOW.getTime() + RESEND_COOLDOWN_MS + 1_000);
-    await registerExpertPreRegistration({ ...valid, email: 'AYSE@example.org' }, { db, mailer, baseUrl: BASE, now: later, ip: null, salt: null });
-    const tooSoon = await registerExpertPreRegistration(
-      { ...valid, email: 'AYSE@example.org' },
-      { db, mailer, baseUrl: BASE, now: new Date(later.getTime() + RESEND_COOLDOWN_MS - 1_000), ip: null, salt: null }
-    );
+  it('lets the cooldown read lastSubmittedAt, not the link issue time, when the two differ', async () => {
+    // The link was issued 2 hours ago (verifyTokenExpiresAt − TTL is far outside the
+    // cooldown), but the last submission was 1 minute ago. Only lastSubmittedAt gates.
+    const linkIssuedAt = NOW.getTime() - 2 * 60 * 60_000;
+    const lastSubmittedAt = new Date(NOW.getTime() - 60_000);
+    const pendingRow = {
+      id: 'pending-cooldown',
+      email: 'ayse@example.org',
+      ipHash: null,
+      createdAt: new Date(NOW.getTime() - 3 * 24 * 60 * 60_000),
+      lastSubmittedAt,
+      status: 'pending',
+      emailVerifiedAt: null,
+      fullName: valid.fullName,
+      locale: 'tr',
+      verifyTokenHash: sha256('old-token'),
+      verifyTokenExpiresAt: new Date(linkIssuedAt + VERIFY_TOKEN_TTL_MS),
+      verifyMailCount: 1,
+      verifyMailWindowStart: new Date(linkIssuedAt),
+    } as Row;
+    expect(NOW.getTime() - linkIssuedAt).toBeGreaterThan(RESEND_COOLDOWN_MS);
+    const { db, rows } = fakeDb([pendingRow]);
+    const { mailer, sent } = recordingMailer();
+    const tooSoon = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
     expect(tooSoon).toEqual({ kind: 'rate_limited' });
-    expect(rows[0]).toMatchObject({ createdAt: NOW, lastSubmittedAt: later });
+    expect(sent).toHaveLength(0);
+    expect(rows[0]).toMatchObject({ lastSubmittedAt, verifyTokenHash: sha256('old-token') });
   });
 
   it('puts the previous link back when the re-issued mail cannot be sent', async () => {

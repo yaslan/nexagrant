@@ -112,7 +112,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
-    'CordisProjectSciVoc','CordisProjectTopic','ExpertPreRegAttempt','ModuleCatalog','Programme','PublicLead',
+    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','Programme','PublicLead',
     'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
@@ -338,6 +338,16 @@ DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
 CREATE POLICY system_scope ON public."ExpertPreRegistration"
   USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
   WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
+
+-- ExpertPreRegAttempt (FO-26, TASK-MVBLYRLP9ID93): the per-IP submission counter of the
+-- same pre-registration (HMAC of an IP, pseudonymous personal data). Same standing and
+-- same policy as ExpertPreRegistration: written and counted only inside
+-- withSystemScope('public-intake'). See prisma/migrations/add-expert-pre-reg-attempt.sql.
+ALTER TABLE public."ExpertPreRegAttempt" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegAttempt";
+CREATE POLICY system_scope ON public."ExpertPreRegAttempt"
+  USING ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)))
+  WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)));
 
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call
