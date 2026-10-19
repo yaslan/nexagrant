@@ -103,7 +103,7 @@ Kaldırılan servislerin (Sentry, Resend, Inngest, Entra, Outlook, SAML) hiçbir
 
 ### 3.1 Uygulama sırası — HAZIR
 
-`prisma migrate deploy` düz `.sql` dosyalarını görmez; tek yol `scripts/apply-migrations.sh` (sıra: `prisma/migrations/apply-order.txt`, `psql -v ON_ERROR_STOP=1`). Liste ile disk uyuşmazsa betik koşmaz.
+`prisma migrate deploy` düz `.sql` dosyalarını görmez; tek yol `scripts/apply-migrations.sh` (sıra: `prisma/migrations/apply-order.txt`, `psql -v ON_ERROR_STOP=1`). Liste ile disk uyuşmazsa betik koşmaz. `prisma migrate deploy|dev|reset` artık `prisma.config.ts` tarafından hiçbir şey uygulanmadan reddedilir (TASK-MVBFDSUSE5QCY; klasörlü 6 migration'ı görür, boş DB'de `add-m10` `FollowupDoc` yüzünden yarıda kalırdı). `pnpm db:setup` (`scripts/db-setup.sh`) aynı zincirin yerel/CI kopyasıdır ve localhost dışındaki bir hedefi reddeder; canlıda aşağıdaki adımlar tek tek koşulur.
 
 ```
 $ bash scripts/apply-migrations.sh --list | wc -l

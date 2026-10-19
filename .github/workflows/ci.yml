@@ -86,8 +86,12 @@ jobs:
     - name: Generate Prisma client
       run: pnpm db:generate
 
-    # The README setup (`db:migrate && db:rls && db:seed`) for a throwaway CI
-    # database: `db push` builds the schema from schema.prisma without the
+    # `pnpm db:setup` (scripts/db-setup.sh, TASK-MVBFDSUSE5QCY) is the one
+    # command that builds a database from empty, here and on a laptop or
+    # worktree; the order below lives in that script. Twice: the second run is
+    # the idempotency check of the whole chain; either run failing fails the job.
+    #
+    # The order: `db push` builds the schema from schema.prisma without the
     # interactive `migrate dev`, `db:rls` installs the tenant policies and the
     # system-scope functions, and the seed adds the demo tenant and the module
     # catalogue that the database-backed tests read.
@@ -106,9 +110,9 @@ jobs:
     # and without them tests/agency-invite.live.test.ts had nothing to measure.
     # It runs after `db push`, not instead of it: the migrations never create
     # the base tables (Tenant, User, …). After `db:rls-role`, so their
-    # `GRANT … TO fabrika_app` guards find the role. Twice, because re-running
-    # is how production applies them (docs/RELEASE_CHECKLIST.md §1) and the
-    # second pass is the idempotency check; either pass failing fails the job.
+    # `GRANT … TO fabrika_app` guards find the role. Re-running is how
+    # production applies them (docs/RELEASE_CHECKLIST.md §3.1), so the second
+    # db:setup also re-applies every migration file.
     # psql comes preinstalled on ubuntu-latest.
     #
     # Supabase's `ensure_rls` event trigger goes in first (TASK-MUWDA86A7U4LK).
@@ -125,14 +129,8 @@ jobs:
     - name: Prepare database
       run: |
         psql --version
-        psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 -f .github/ci/supabase-ensure-rls.sql
-        pnpm exec prisma db push
-        pnpm db:rls-role
-        pnpm db:rls
-        scripts/apply-migrations.sh
-        scripts/apply-migrations.sh
-        pnpm db:rls
-        pnpm db:seed
+        pnpm db:setup
+        pnpm db:setup
 
     # Catalog-level policy drift (TASK-MUPCYOCLINGC7, crw2-fb Y-1). A system_scope
     # policy turned back into the bare, forgeable `app.system_scope = 'on'` test

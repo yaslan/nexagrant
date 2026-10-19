@@ -431,10 +431,15 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
 
   test('CI installs the live trigger before db push and runs db:rls before the migrations', () => {
     const ci = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
-    const step = ci.slice(ci.indexOf('- name: Prepare database'), ci.indexOf('- name: Verify RLS policies'));
+    const ciStep = ci.slice(ci.indexOf('- name: Prepare database'), ci.indexOf('- name: Verify RLS policies'));
+    // TASK-MVBFDSUSE5QCY: the step calls `pnpm db:setup`; the order lives in
+    // scripts/db-setup.sh (its commands, not its header comment).
+    expect(ciStep).toContain('pnpm db:setup\n');
+    const sh = readFileSync(resolve(process.cwd(), 'scripts/db-setup.sh'), 'utf8');
+    const step = sh.slice(sh.indexOf('set -euo pipefail'));
     const at = (needle: string) => {
       const i = step.indexOf(needle);
-      expect(i, `"${needle}" is missing from the Prepare database step`).toBeGreaterThan(-1);
+      expect(i, `"${needle}" is missing from scripts/db-setup.sh`).toBeGreaterThan(-1);
       return i;
     };
     expect(at('.github/ci/supabase-ensure-rls.sql')).toBeLessThan(at('prisma db push'));

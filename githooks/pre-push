@@ -1,5 +1,16 @@
 #!/bin/sh
 # Push, kodun bu makineden ÇIKTIĞI andır: burada tam kapı koşar, kısaltma yok.
 set -e
+# Kapının veritabanı bu checkout'un .env'inden gelir (vitest, playwright ve
+# tsx betikleri cwd'deki .env'i okur). .env yoksa testler varsayılan
+# localhost:5432'ye düşer ve onlarca test ortam yüzünden kırmızı olur
+# (TASK-MVBFDSUSE5QCY). Worktree tarifi: CLAUDE.md "Worktree'de gate".
+if [ -z "${DATABASE_URL:-}" ] && [ ! -f .env ]; then
+  echo "pre-push: bu checkout'ta .env yok ve DATABASE_URL tanımlı değil; kapı hangi veritabanına karşı koşacağını bilmiyor." >&2
+  echo "  Worktree'de izole DB kur: CLAUDE.md \"Worktree'de gate\" (docker run … + .env + pnpm db:setup)." >&2
+  exit 1
+fi
+db=${DATABASE_URL:-$(sed -n 's/^DATABASE_URL=//p' .env | tail -1)}
+echo "→ veritabanı: $(printf '%s' "$db" | sed -E 's#^[a-z]+://([^@]*@)?([^/?]*)/?([^?]*).*#\2/\3#')"
 echo "→ pnpm gate (lint + typecheck + test, proje geneli)"
 pnpm gate
