@@ -29,7 +29,11 @@ overrides:
   # Exception: an older line the advisory leaves without a patch of its own
   # gets an explicit, bounded cross-major row with its GHSA next to it;
   # leaving it out would drop the protection the open selector used to give.
-  # An older line that has its own patch gets its own same-line row instead.
+  # NOT covered by any row here (open on dev too, or dropped by this change):
+  # undici 5.x and 6.x, mysql2 2.x, hono 1.x/2.x, sharp 0.33 and older,
+  # ip-address 9.x, postcss-selector-parser 6.x, @modelcontextprotocol/sdk 0.x,
+  # fast-uri 1.x, @hono/node-server 2.x, brace-expansion 1.x/2.x/3.x. A separate
+  # card adds their rows with the GHSA next to each one (decision K-569955).
   # Paths: sharp via next (optional dep ^0.35.4); undici via shadcn / openai;
   # hono, @hono/node-server, @modelcontextprotocol/sdk, proxy-addr via shadcn's
   # MCP SDK + express; mysql2, deepmerge-ts, fast-uri via prisma.

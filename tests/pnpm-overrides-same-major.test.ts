@@ -9,8 +9,10 @@ import { describe, expect, test } from 'vitest';
  * to 7.x without a word from `pnpm install`; the break would show at run time.
  *
  * Rule for every `<pkg>@<range>` key: the range has a `>=` lower bound in the
- * same major as the pinned version (same minor for 0.x, where a minor breaks).
- * Parent selectors (`a>b`) are not version selectors and are skipped.
+ * same major as the pinned version (same minor for 0.x, where a minor breaks),
+ * and a `<` upper bound. Without the upper bound, `hono@>=4.0.0` would also
+ * pull a later `hono@5` down to 4.x. Parent selectors (`a>b`) are not version
+ * selectors and are skipped.
  */
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -59,8 +61,10 @@ function openSelectors(yaml: string): string[] {
     const at = key.lastIndexOf('@');
     if (at <= 0) continue;
     if (key.slice(0, at).includes('>') || CROSS_MAJOR.has(key)) continue;
-    const lower = key.slice(at + 1).match(/>=\s*(\d+\.\d+\.\d+)/)?.[1];
-    if (!lower || line(lower) !== line(pinned)) bad.push(key);
+    const range = key.slice(at + 1);
+    const lower = range.match(/>=\s*(\d+\.\d+\.\d+)/)?.[1];
+    const upper = /<\s*\d+\.\d+\.\d+/.test(range);
+    if (!lower || !upper || line(lower) !== line(pinned)) bad.push(key);
   }
   return bad;
 }
@@ -89,6 +93,7 @@ describe('pnpm overrides stay in their own major', () => {
       "  'fast-uri@>=2.0.0 <3.1.8': '3.1.8'",
       "  'sharp@>=0.34.0 <0.35.5': '0.35.5'",
       "  'hono@>=4.0.0 <4.13.7': '4.13.7'",
+      "  'hono@>=4.0.0': '4.13.7'",
       "  'deepmerge-ts@<8.0.0': '8.0.0'",
       "  'proxy-addr@>=1.1.0 <2.0.0': '2.0.8'",
       "  'proxy-addr@<2.0.0': '2.0.8'",
@@ -99,7 +104,15 @@ describe('pnpm overrides stay in their own major', () => {
       'undici@<7.29.1',
       'fast-uri@>=2.0.0 <3.1.8',
       'sharp@>=0.34.0 <0.35.5',
+      'hono@>=4.0.0',
       'proxy-addr@<2.0.0',
     ]);
+  });
+
+  test('mutant M1: dropping the upper bound of hono 4.x is caught', () => {
+    const yaml = readFileSync(resolve(ROOT, 'pnpm-workspace.yaml'), 'utf8');
+    const mutant = yaml.replace("'hono@>=4.0.0 <4.13.7'", "'hono@>=4.0.0'");
+    expect(mutant).not.toBe(yaml);
+    expect(openSelectors(mutant)).toEqual(['hono@>=4.0.0']);
   });
 });
