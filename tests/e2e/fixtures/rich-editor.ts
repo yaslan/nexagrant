@@ -16,6 +16,12 @@ export function blogContentEditor(page: Page): Locator {
  * with the keyboard shortcut into the focused editor. With `html` the editor
  * gets what a copy from Word or a web page carries; with `text` alone it gets
  * plain text, which the blog editor reads as post markdown.
+ *
+ * The paste goes where the caller left the selection. An editor that already
+ * holds focus is not clicked: a click collapses a Ctrl+A selection to a caret
+ * mid-editor, and ProseMirror takes that up on a later `selectionchange`, so
+ * whether Ctrl+V replaced the document or landed inside its paragraph was a
+ * race (TASK-MVDP07GF2EVIU, `admin-blog-rich-editor` "paste from Word" 3/5).
  */
 export async function pasteInto(editor: Locator, payload: { text: string; html?: string }): Promise<void> {
   const page = editor.page();
@@ -25,6 +31,6 @@ export async function pasteInto(editor: Locator, payload: { text: string; html?:
     if (html) parts['text/html'] = new Blob([html], { type: 'text/html' });
     await navigator.clipboard.write([new ClipboardItem(parts)]);
   }, payload);
-  await editor.click();
+  if (!(await editor.evaluate((el) => el.contains(document.activeElement)))) await editor.click();
   await page.keyboard.press('ControlOrMeta+V');
 }
