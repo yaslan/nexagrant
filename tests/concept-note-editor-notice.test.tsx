@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from 'next-intl';
 
 import trMessages from '../messages/tr.json';
 import enMessages from '../messages/en.json';
+import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
 
 const actions = vi.hoisted(() => ({
   generateConceptNoteDraft: vi.fn(),
@@ -87,5 +88,52 @@ describe('ConceptNoteEditor — result band instead of alert()', () => {
     expect(band.textContent).toBe(enMessages.ConceptNote.editor.saved);
     expect(actions.saveConceptNoteDraft).toHaveBeenCalledWith('note-1', {});
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  test('an export refused for an ended pilot says so, like generate and save', async () => {
+    actions.exportToDocx.mockRejectedValue(Object.assign(new Error('x'), { digest: PILOT_EXPIRED_DIGEST }));
+    renderEditor('tr', 'note-1');
+    fireEvent.click(screen.getByRole('button', { name: trMessages.ConceptNote.editor.export }));
+
+    const band = await screen.findByRole('alert');
+    expect(band.textContent).toBe(trMessages.Common.pilotExpired);
+  });
+
+  test('any other export failure keeps the "action failed" text', async () => {
+    actions.exportToDocx.mockRejectedValue(new Error('docx broke'));
+    renderEditor('en', 'note-1');
+    fireEvent.click(screen.getByRole('button', { name: enMessages.ConceptNote.editor.export }));
+
+    const band = await screen.findByRole('alert');
+    expect(band.textContent).toBe('Action failed: docx broke');
+  });
+});
+
+/**
+ * TASK-MVE19AQ06FF6J (FO-93) — the counter split on a literal "\s" instead of
+ * whitespace, so four words read as "1".
+ */
+describe('ConceptNoteEditor — word counter', () => {
+  const typeInto = (value: string) =>
+    fireEvent.change(screen.getByRole('textbox'), { target: { value } });
+
+  test('counts whitespace-separated words', () => {
+    renderEditor('tr');
+    typeInto('dört kelimelik bir metin');
+    expect(screen.getByText('Kelime: 4 / 500')).toBeTruthy();
+  });
+
+  test('tabs, newlines and repeated spaces separate words too', () => {
+    renderEditor('en');
+    typeInto('  one\ttwo\n\nthree    four five  ');
+    expect(screen.getByText('Words: 5 / 500')).toBeTruthy();
+  });
+
+  test('empty or blank text counts 0', () => {
+    renderEditor('en');
+    typeInto('   \n ');
+    expect(screen.getByText('Words: 0 / 500')).toBeTruthy();
+    typeInto('');
+    expect(screen.getByText('Words: 0 / 500')).toBeTruthy();
   });
 });

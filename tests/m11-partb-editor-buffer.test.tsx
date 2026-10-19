@@ -87,7 +87,7 @@ describe('PartBCollaborativeEditor edit buffer', () => {
     renderEditor();
 
     expect(editor().value).toBe('Objectives body');
-    expect(screen.getByText('Senkronize')).toBeTruthy();
+    expect(screen.getByText(messages.PartBEditor.synced)).toBeTruthy();
   });
 
   it('flags an edited buffer as unsaved without an effect writing the flag', () => {
@@ -95,8 +95,8 @@ describe('PartBCollaborativeEditor edit buffer', () => {
 
     fireEvent.change(editor(), { target: { value: 'Objectives body — revised' } });
 
-    expect(screen.getByText('Değişiklik var...')).toBeTruthy();
-    expect(screen.queryByText('Senkronize')).toBeNull();
+    expect(screen.getByText(messages.PartBEditor.unsaved)).toBeTruthy();
+    expect(screen.queryByText(messages.PartBEditor.synced)).toBeNull();
   });
 
   it('swaps to the newly selected section instead of carrying the old text over', () => {
@@ -107,7 +107,7 @@ describe('PartBCollaborativeEditor edit buffer', () => {
 
     expect(editor().value).toBe('Methodology body');
     // The other section's unsaved text must not make this one look dirty.
-    expect(screen.getByText('Senkronize')).toBeTruthy();
+    expect(screen.getByText(messages.PartBEditor.synced)).toBeTruthy();
   });
 
   it('keeps the unsaved buffer when the user comes back to that section', () => {
@@ -118,6 +118,33 @@ describe('PartBCollaborativeEditor edit buffer', () => {
     selectSection('1.1 Objectives and Ambition');
 
     expect(editor().value).toBe('Objectives body — revised');
-    expect(screen.getByText('Değişiklik var...')).toBeTruthy();
+    expect(screen.getByText(messages.PartBEditor.unsaved)).toBeTruthy();
+  });
+});
+
+/**
+ * TASK-MVE19AQ06FF6J (FO-93) — the editor chrome was fixed Turkish, so an English viewer read
+ * "Bölümü Kilitle", "Senkronize", "Sürüm Geçmişi". Every drawer is opened here and the rendered
+ * text is checked for Turkish-only letters; section titles and bodies are English test data.
+ */
+describe('PartBCollaborativeEditor in English', () => {
+  afterEach(() => cleanup());
+
+  it('renders no Turkish text in the editor or any drawer', () => {
+    const { container } = renderEditor();
+    const t = messages.PartBEditor;
+    const turkish = /[çğıöşüÇĞİÖŞÜ]/;
+    expect(container.textContent).not.toMatch(turkish);
+    expect(screen.getByRole('button', { name: t.acquireLock })).toBeTruthy();
+    expect(screen.getByText(t.sectionCount.replace(/.*other \{# (\w+)\}.*/, `${SECTIONS.length} $1`))).toBeTruthy();
+
+    for (const drawer of [t.reviewComments.replace('{count}', '0'), t.history, t.aiAssistant]) {
+      fireEvent.click(screen.getByRole('button', { name: drawer }));
+      expect(container.textContent, drawer).not.toMatch(turkish);
+      for (const el of container.querySelectorAll('[placeholder]')) {
+        expect(el.getAttribute('placeholder')).not.toMatch(turkish);
+      }
+    }
+    expect(screen.getAllByRole('button', { name: t.close }).length).toBe(1);
   });
 });
