@@ -207,10 +207,10 @@
       "check": "D",
       "file": "src/lib/billing/plan-repository.ts",
       "subject": "system-scope:platform-admin",
-      "count": 4,
+      "count": 5,
       "kind": "system-scope",
       "class": "platform-admin",
-      "reason": "Four platform-admin plan writes — publishVersion, archivePlan, deletePlan, setPlanVisibility — each one transaction that also writes an AuditEvent with no tenantId (plan.version.published / plan.archived / plan.deleted / plan.visibility.changed). AuditEvent is strict since TASK-MULUJ8O4JH1PF, so that tenant-less row is writable only in system scope; before it, every tenant could read all of them (331 rows measured). publishVersion's subscription.updateMany is estate-wide by design (every live tenant on the plan moves to the new version) and needs the same scope. Callers sit behind requirePlatformAdmin() in the admin plan console."
+      "reason": "Four platform-admin plan writes — publishVersion, archivePlan, deletePlan, setPlanVisibility — each one transaction that also writes an AuditEvent with no tenantId (plan.version.published / plan.archived / plan.deleted / plan.visibility.changed). AuditEvent is strict since TASK-MULUJ8O4JH1PF, so that tenant-less row is writable only in system scope; before it, every tenant could read all of them (331 rows measured). publishVersion's subscription.updateMany is estate-wide by design (every live tenant on the plan moves to the new version) and needs the same scope. Callers sit behind requirePlatformAdmin() in the admin plan console. Fifth: listPlansForAdmin (plan-admin.listPlans), the admin plan list. The Plan rows themselves are readable under fabrika_app (Plan has a platform_read SELECT policy), but its `assignments` include reads PlanAssignment, which is tenant_isolation-scoped: measured under fabrika_app, 0 assignments unwrapped vs 1 inside the scope, so the per-plan tenant list read back empty. Read-only, behind requirePlatformAdmin() on the admin plan console."
     },
     {
       "check": "D",
