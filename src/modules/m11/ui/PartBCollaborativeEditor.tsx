@@ -253,7 +253,7 @@ export function PartBCollaborativeEditor({
         currentUserId,
         currentUserName,
         currentUserOrg,
-        isManual ? 'Elle anlık kaydedildi' : 'Otomatik arka plan kaydı'
+        isManual ? tEditor('summaryManual') : tEditor('summaryAutoBackground')
       );
 
       setSections((prev) =>
@@ -276,7 +276,7 @@ export function PartBCollaborativeEditor({
         authorOrg: currentUserOrg,
         timestamp: new Date().toISOString(),
         wordCount: currentSectionWords,
-        summary: isManual ? 'Elle anlık kaydedildi' : 'Otomatik senkronizasyon kaydı',
+        summary: isManual ? tEditor('summaryManual') : tEditor('summaryAutoSync'),
         content: editorText,
       };
       setRevisions((prev) => [newRev, ...prev.slice(0, 20)]);
@@ -286,7 +286,7 @@ export function PartBCollaborativeEditor({
     } finally {
       setIsSaving(false);
     }
-  }, [partId, activeSectionKey, editorText, currentUserId, currentUserName, currentUserOrg, currentSectionWords, errorText]);
+  }, [partId, activeSectionKey, editorText, currentUserId, currentUserName, currentUserOrg, currentSectionWords, errorText, tEditor]);
 
   // Autosave only. The dirty indicator is derived above, so this effect no longer sets state
   // in its body — it just arms the 2.5s timer and disarms it on the next keystroke.
@@ -352,7 +352,7 @@ export function PartBCollaborativeEditor({
         )
       );
     } else {
-      alert(res.message || 'Bölüm şu anda başka bir ortak tarafından kilitli.');
+      alert(res.message || tEditor('lockTaken'));
     }
   };
 
@@ -413,7 +413,14 @@ export function PartBCollaborativeEditor({
   };
 
   const handleRestoreRevision = async (rev: SectionRevisionItem) => {
-    if (confirm(`${rev.authorName} tarafından oluşturulan (${new Date(rev.timestamp).toLocaleTimeString()}) sürüme geri dönmek istediğinizden emin misiniz?`)) {
+    if (
+      confirm(
+        tEditor('restoreConfirm', {
+          author: rev.authorName,
+          time: new Date(rev.timestamp).toLocaleTimeString(locale),
+        })
+      )
+    ) {
       setActionError(null);
       setEditorText(rev.content);
       try {
@@ -439,7 +446,7 @@ export function PartBCollaborativeEditor({
       setEditorText(draft);
       setActiveDrawer(null);
     } catch (e) {
-      alert('YZ taslak üretilirken hata oluştu: ' + errorMessage(e));
+      alert(tEditor('aiFailed', { message: errorMessage(e) }));
     } finally {
       setIsAiGenerating(false);
     }
@@ -457,10 +464,10 @@ export function PartBCollaborativeEditor({
           <div>
             <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-slate-300 flex items-center gap-2">
               <Users className="w-3.5 h-3.5 text-blue-400" />
-              <span>Canlı Konsorsiyum Eşzamanlı Yazarları ({presenceList.length} Aktif)</span>
+              <span>{tEditor('presenceTitle', { count: presenceList.length })}</span>
             </h3>
             <p className="text-[11px] text-muted mt-0.5">
-              Tüm değişiklikler ve kilitler diğer konsorsiyum ortaklarıyla anlık senkronize edilir.
+              {tEditor('presenceHint')}
             </p>
           </div>
         </div>
@@ -496,7 +503,7 @@ export function PartBCollaborativeEditor({
           <div className="flex items-center justify-between sm:justify-start gap-3 text-xs font-semibold">
             <span className="text-ink-2 flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-indigo-600" />
-              <span>Part B Toplam Sayfa Bütçesi:</span>
+              <span>{tEditor('pageBudget')}</span>
             </span>
             <span
               className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
@@ -507,7 +514,11 @@ export function PartBCollaborativeEditor({
                   : 'bg-emerald-100 text-emerald-700 border border-emerald-300'
               }`}
             >
-              {totalEstimatedPages} / {MAX_PAGE_LIMIT} Sayfa ({totalWords.toLocaleString()} Kelime)
+              {tEditor('pageBudgetValue', {
+                pages: totalEstimatedPages,
+                max: MAX_PAGE_LIMIT,
+                words: totalWords.toLocaleString(locale),
+              })}
             </span>
           </div>
 
@@ -529,7 +540,7 @@ export function PartBCollaborativeEditor({
           {totalEstimatedPages > MAX_PAGE_LIMIT && (
             <span className="text-red-600 flex items-center gap-1 font-semibold text-[11px] bg-red-50 px-2.5 py-1 rounded-lg border border-red-200">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              <span>Sayfa Limiti Aşıldı! (~{(totalEstimatedPages - MAX_PAGE_LIMIT).toFixed(1)} sayfa kırpılmalı)</span>
+              <span>{tEditor('pageLimitExceeded', { over: (totalEstimatedPages - MAX_PAGE_LIMIT).toFixed(1) })}</span>
             </span>
           )}
 
@@ -540,7 +551,7 @@ export function PartBCollaborativeEditor({
             className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 shadow-xs text-xs"
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Resmî DOCX İndir</span>
+            <span>{tEditor('downloadDocx')}</span>
           </a>
         </div>
       </div>
@@ -551,16 +562,16 @@ export function PartBCollaborativeEditor({
         <div className="lg:col-span-4 space-y-3">
           <div className="bg-surface border border-border rounded-2xl p-4 shadow-2xs space-y-3">
             <h4 className="font-bold text-xs uppercase tracking-wider text-muted font-mono flex items-center justify-between">
-              <span>Part B Bölüm Ağacı</span>
-              <span className="text-muted font-normal">8 Bölüm</span>
+              <span>{tEditor('sectionTree')}</span>
+              <span className="text-muted font-normal">{tEditor('sectionCount', { count: sections.length })}</span>
             </h4>
 
             <div className="space-y-2">
               {/* Group 1: Excellence */}
               <div>
                 <div className="text-[11px] font-bold text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg mb-1 flex items-center justify-between">
-                  <span>1. EXCELLENCE (Mükemmeliyet)</span>
-                  <span className="font-mono text-[10px] text-blue-700">~18 Sayfa</span>
+                  <span>{tEditor('groupExcellence')}</span>
+                  <span className="font-mono text-[10px] text-blue-700">{tEditor('groupPages', { count: 18 })}</span>
                 </div>
                 <div className="space-y-1 pl-1">
                   {sections
@@ -602,7 +613,7 @@ export function PartBCollaborativeEditor({
                                   : 'bg-slate-200 text-ink-2'
                               }`}
                             >
-                              {estPages}/{s.targetPages} s.
+                              {tEditor('sectionPagesShort', { pages: estPages, target: s.targetPages })}
                             </span>
 
                             {secComments.length > 0 && (
@@ -627,8 +638,8 @@ export function PartBCollaborativeEditor({
               {/* Group 2: Impact */}
               <div className="pt-1">
                 <div className="text-[11px] font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-lg mb-1 flex items-center justify-between">
-                  <span>2. IMPACT (Etki & Yayma)</span>
-                  <span className="font-mono text-[10px] text-emerald-700">~14 Sayfa</span>
+                  <span>{tEditor('groupImpact')}</span>
+                  <span className="font-mono text-[10px] text-emerald-700">{tEditor('groupPages', { count: 14 })}</span>
                 </div>
                 <div className="space-y-1 pl-1">
                   {sections
@@ -668,7 +679,7 @@ export function PartBCollaborativeEditor({
                                   : 'bg-slate-200 text-ink-2'
                               }`}
                             >
-                              {estPages}/{s.targetPages} s.
+                              {tEditor('sectionPagesShort', { pages: estPages, target: s.targetPages })}
                             </span>
 
                             {secComments.length > 0 && (
@@ -693,8 +704,8 @@ export function PartBCollaborativeEditor({
               {/* Group 3: Implementation */}
               <div className="pt-1">
                 <div className="text-[11px] font-bold text-purple-900 bg-purple-50 px-2.5 py-1 rounded-lg mb-1 flex items-center justify-between">
-                  <span>3. IMPLEMENTATION (Uygulama)</span>
-                  <span className="font-mono text-[10px] text-purple-700">~13 Sayfa</span>
+                  <span>{tEditor('groupImplementation')}</span>
+                  <span className="font-mono text-[10px] text-purple-700">{tEditor('groupPages', { count: 13 })}</span>
                 </div>
                 <div className="space-y-1 pl-1">
                   {sections
@@ -734,7 +745,7 @@ export function PartBCollaborativeEditor({
                                   : 'bg-slate-200 text-ink-2'
                               }`}
                             >
-                              {estPages}/{s.targetPages} s.
+                              {tEditor('sectionPagesShort', { pages: estPages, target: s.targetPages })}
                             </span>
 
                             {secComments.length > 0 && (
@@ -781,10 +792,10 @@ export function PartBCollaborativeEditor({
                       : ''}
                   </span>
                   <span>•</span>
-                  <span>Hedef: {activeSection.targetPages} Sayfa</span>
+                  <span>{tEditor('targetPages', { count: activeSection.targetPages })}</span>
                   <span>•</span>
                   <span className="text-blue-600 font-semibold">
-                    Şu an: ~{currentSectionEstimatedPages} Sayfa ({currentSectionWords} Kelime)
+                    {tEditor('currentPages', { pages: currentSectionEstimatedPages, words: currentSectionWords })}
                   </span>
                 </div>
               </div>
@@ -793,18 +804,18 @@ export function PartBCollaborativeEditor({
                 {saveStatus === 'SAVING' && (
                   <span className="text-[11px] font-mono text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-1">
                     <Clock className="w-3 h-3 animate-spin" />
-                    <span>Kaydediliyor...</span>
+                    <span>{tEditor('saving')}</span>
                   </span>
                 )}
                 {saveStatus === 'SAVED' && (
                   <span className="text-[11px] font-mono text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    <span>Senkronize</span>
+                    <span>{tEditor('synced')}</span>
                   </span>
                 )}
                 {saveStatus === 'UNSAVED' && (
                   <span className="text-[11px] font-mono text-muted bg-surface-hover px-2 py-1 rounded">
-                    Değişiklik var...
+                    {tEditor('unsaved')}
                   </span>
                 )}
 
@@ -814,12 +825,12 @@ export function PartBCollaborativeEditor({
                     className="bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
                   >
                     <Unlock className="w-3.5 h-3.5" />
-                    <span>Kilidi Bırak</span>
+                    <span>{tEditor('releaseLock')}</span>
                   </button>
                 ) : isLockedByOther ? (
                   <div className="bg-red-50 border border-red-300 text-red-700 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5" />
-                    <span>{activeSection.lockedByName?.split(' ')[0]} Düzenliyor</span>
+                    <span>{tEditor('lockedBy', { name: activeSection.lockedByName?.split(' ')[0] ?? '' })}</span>
                   </div>
                 ) : (
                   <button
@@ -827,7 +838,7 @@ export function PartBCollaborativeEditor({
                     className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
                   >
                     <Lock className="w-3.5 h-3.5" />
-                    <span>Bölümü Kilitle</span>
+                    <span>{tEditor('acquireLock')}</span>
                   </button>
                 )}
               </div>
@@ -844,7 +855,7 @@ export function PartBCollaborativeEditor({
                   }`}
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                  <span>Düzenle (Markdown)</span>
+                  <span>{tEditor('editMarkdown')}</span>
                 </button>
                 <button
                   onClick={() => setViewMode('PREVIEW')}
@@ -855,17 +866,17 @@ export function PartBCollaborativeEditor({
                   }`}
                 >
                   <Eye className="w-3.5 h-3.5" />
-                  <span>Önizleme</span>
+                  <span>{tEditor('preview')}</span>
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setActiveDrawer('AI')}
                   className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>YZ Eş-Yazar Asistanı</span>
+                  <span>{tEditor('aiAssistant')}</span>
                 </button>
 
                 <button
@@ -877,7 +888,7 @@ export function PartBCollaborativeEditor({
                   }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
-                  <span>İnceleme Yorumları ({activeSectionComments.length})</span>
+                  <span>{tEditor('reviewComments', { count: activeSectionComments.length })}</span>
                 </button>
 
                 <button
@@ -889,7 +900,7 @@ export function PartBCollaborativeEditor({
                   }`}
                 >
                   <History className="w-3.5 h-3.5 text-ink-2" />
-                  <span>Sürüm Geçmişi</span>
+                  <span>{tEditor('history')}</span>
                 </button>
 
                 <button
@@ -898,7 +909,7 @@ export function PartBCollaborativeEditor({
                   className="bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>Kaydet</span>
+                  <span>{tEditor('save')}</span>
                 </button>
               </div>
             </div>
@@ -914,7 +925,7 @@ export function PartBCollaborativeEditor({
                     className="w-full rounded-xl border border-border p-4 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground/50 leading-relaxed"
                   />
                   <div className="absolute bottom-3 right-3 text-[10px] font-mono bg-surface/90 border border-border px-2 py-0.5 rounded text-muted shadow-2xs">
-                    {currentSectionWords} kelime | ~{currentSectionEstimatedPages} sayfa
+                    {tEditor('editorStats', { words: currentSectionWords, pages: currentSectionEstimatedPages })}
                   </div>
                 </div>
               ) : (
@@ -936,11 +947,12 @@ export function PartBCollaborativeEditor({
             <div className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-blue-600" />
               <h4 className="font-bold text-sm text-ink">
-                {activeSection.title} — İnceleme ve Ortak Yorumları
+                {tEditor('commentsTitle', { section: activeSection.title })}
               </h4>
             </div>
             <button
               onClick={() => setActiveDrawer(null)}
+              aria-label={tEditor('close')}
               className="p-1 text-muted hover:text-ink-2 rounded-lg"
             >
               <X className="w-4 h-4" />
@@ -952,7 +964,7 @@ export function PartBCollaborativeEditor({
               type="text"
               value={newCommentText}
               onChange={(e) => setNewCommentText(e.target.value)}
-              placeholder="Bu bölüme bir revizyon notu veya soru ekleyin..."
+              placeholder={tEditor('commentPlaceholder')}
               className="flex-1 border border-border rounded-xl p-2.5 text-xs bg-ground focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
             <button
@@ -960,14 +972,14 @@ export function PartBCollaborativeEditor({
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Gönder</span>
+              <span>{tEditor('send')}</span>
             </button>
           </form>
 
           <div className="space-y-3 pt-2">
             {activeSectionComments.length === 0 ? (
               <p className="text-xs text-muted py-4 text-center">
-                Bu bölüm için henüz bir inceleme yorumu bulunmuyor.
+                {tEditor('noComments')}
               </p>
             ) : (
               activeSectionComments.map((cmt) => (
@@ -1005,7 +1017,7 @@ export function PartBCollaborativeEditor({
                       }`}
                     >
                       <Check className="w-3 h-3" />
-                      <span>{cmt.resolved ? 'Yeniden Aç' : 'Çözüldü Olarak İşaretle'}</span>
+                      <span>{cmt.resolved ? tEditor('reopen') : tEditor('markResolved')}</span>
                     </button>
                   </div>
                 </div>
@@ -1022,11 +1034,12 @@ export function PartBCollaborativeEditor({
             <div className="flex items-center gap-2">
               <History className="w-4 h-4 text-purple-600" />
               <h4 className="font-bold text-sm text-ink">
-                {activeSection.title} — Zaman Damgalı Sürüm Geçmişi
+                {tEditor('historyTitle', { section: activeSection.title })}
               </h4>
             </div>
             <button
               onClick={() => setActiveDrawer(null)}
+              aria-label={tEditor('close')}
               className="p-1 text-muted hover:text-ink-2 rounded-lg"
             >
               <X className="w-4 h-4" />
@@ -1051,12 +1064,12 @@ export function PartBCollaborativeEditor({
                       </span>
                     ) : null}
                     <span className="bg-purple-100 text-purple-800 text-[10px] font-mono px-1.5 py-0.5 rounded">
-                      {rev.wordCount} Kelime
+                      {tEditor('revisionWords', { count: rev.wordCount })}
                     </span>
                   </div>
                   <p className="text-[11px] text-ink-2">{rev.summary}</p>
                   <span className="text-[10px] text-muted font-mono block">
-                    {new Date(rev.timestamp).toLocaleString('tr-TR')}
+                    {new Date(rev.timestamp).toLocaleString(locale)}
                   </span>
                 </div>
 
@@ -1065,7 +1078,7 @@ export function PartBCollaborativeEditor({
                   className="bg-surface border border-border hover:bg-surface-hover text-ink px-3 py-1.5 rounded-lg font-semibold text-[11px] transition flex items-center gap-1 shrink-0 shadow-2xs"
                 >
                   <RotateCcw className="w-3 h-3 text-purple-600" />
-                  <span>Bu Sürüme Dön</span>
+                  <span>{tEditor('restoreRevision')}</span>
                 </button>
               </div>
             ))}
@@ -1081,15 +1094,16 @@ export function PartBCollaborativeEditor({
               <Sparkles className="w-5 h-5 text-amber-400" />
               <div>
                 <h4 className="font-bold text-base text-white">
-                  YZ Eş-Yazar Asistanı (Horizon Europe Evaluator Lens)
+                  {tEditor('aiTitle')}
                 </h4>
                 <p className="text-xs text-indigo-300 mt-0.5">
-                  Seçili Bölüm: <strong>{activeSection.title}</strong>
+                  {tEditor('aiSelectedSection')} <strong>{activeSection.title}</strong>
                 </p>
               </div>
             </div>
             <button
               onClick={() => setActiveDrawer(null)}
+              aria-label={tEditor('close')}
               className="p-1 text-muted hover:text-white rounded-lg"
             >
               <X className="w-5 h-5" />
@@ -1098,7 +1112,7 @@ export function PartBCollaborativeEditor({
 
           <div className="space-y-3 text-xs">
             <label className="font-semibold text-slate-200 block">
-              Özel Odak Noktaları veya Konsorsiyum Notları (Opsiyonel):
+              {tEditor('aiNotesLabel')}
             </label>
             <textarea
               rows={3}
@@ -1111,36 +1125,24 @@ export function PartBCollaborativeEditor({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
               <button
                 type="button"
-                onClick={() =>
-                  setAiPromptNotes(
-                    'SMART hedefler, TRL 4-7 ilerlemesi ve state-of-the-art karşılaştırması ekle'
-                  )
-                }
+                onClick={() => setAiPromptNotes(tEditor('aiPresetSmartNotes'))}
                 className="bg-indigo-950/80 border border-indigo-800 hover:border-indigo-600 text-indigo-200 p-2 rounded-lg text-left text-[11px] transition"
               >
-                🎯 SMART & SOTA Odaklı
+                {tEditor('aiPresetSmart')}
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  setAiPromptNotes(
-                    'Açık bilim (FAIR), Zenodo açık veri deposu ve cinsiyet boyutu entegrasyonu'
-                  )
-                }
+                onClick={() => setAiPromptNotes(tEditor('aiPresetOpenScienceNotes'))}
                 className="bg-indigo-950/80 border border-indigo-800 hover:border-indigo-600 text-indigo-200 p-2 rounded-lg text-left text-[11px] transition"
               >
-                🔬 Açık Bilim & FAIR
+                {tEditor('aiPresetOpenScience')}
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  setAiPromptNotes(
-                    'Ticari sömürü, Fikri Mülkiyet (IP) konsorsiyum protokolü ve pazar ölçeği'
-                  )
-                }
+                onClick={() => setAiPromptNotes(tEditor('aiPresetImpactNotes'))}
                 className="bg-indigo-950/80 border border-indigo-800 hover:border-indigo-600 text-indigo-200 p-2 rounded-lg text-left text-[11px] transition"
               >
-                📈 Etki, DEC & IP Planı
+                {tEditor('aiPresetImpact')}
               </button>
             </div>
 
@@ -1150,7 +1152,7 @@ export function PartBCollaborativeEditor({
                 onClick={() => setActiveDrawer(null)}
                 className="px-4 py-2 rounded-xl text-muted hover:text-white transition text-xs font-semibold"
               >
-                Vazgeç
+                {tEditor('cancel')}
               </button>
               <button
                 type="button"
@@ -1159,7 +1161,7 @@ export function PartBCollaborativeEditor({
                 className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl transition text-xs shadow-lg flex items-center gap-2 disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>{isAiGenerating ? 'Taslak Üretiliyor (2 Kredi)...' : 'Bölüm Taslağını Üret & Editöre Aktar'}</span>
+                <span>{isAiGenerating ? tEditor('aiGenerating') : tEditor('aiGenerate')}</span>
               </button>
             </div>
           </div>

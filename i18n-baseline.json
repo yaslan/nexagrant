@@ -25,6 +25,5 @@
   "src/app/[locale]/(public)/page.tsx": 4,
   "src/app/[locale]/(public)/register/page.tsx": 1,
   "src/app/[locale]/(public)/turkiyeye-acik-cagrilar/page.tsx": 1,
-  "src/app/global-error.tsx": 1,
-  "src/modules/m11/ui/PartBCollaborativeEditor.tsx": 16
+  "src/app/global-error.tsx": 1
 }
