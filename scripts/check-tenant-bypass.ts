@@ -68,14 +68,20 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { scan, type CheckId, type Finding } from './tenant-bypass-scan';
+import {
+  kindMatchesCheck,
+  scan,
+  type BaselineKind,
+  type CheckId,
+  type Finding,
+} from './tenant-bypass-scan';
 
 interface BaselineEntry {
   check: CheckId;
   file: string;
   subject: string;
   count: number;
-  kind: 'allowed' | 'debt' | 'system-scope';
+  kind: BaselineKind;
   class: string;
   reason: string;
   card?: string;
@@ -95,6 +101,8 @@ const CHECK_TITLES: Record<CheckId, string> = {
   B2: '`tenantId: x ?? …` / `x || …` — an invented tenant instead of a refusal',
   C: '`as unknown as TenantTx` — the brand minted outside withTenantOn',
   D: '`withSystemScope(…)` — a sanctioned cross-tenant escape, counted so it stays sanctioned',
+  E1: '`prisma.$transaction((tx) => tx.<model>…)` — a tenant-scoped model on a transaction nothing bound',
+  E2: 'a tenant-scoped relation joined through a model that is not tenant-scoped (include/select/_count/where)',
 };
 
 const HOW_TO_FIX: Record<CheckId, string> = {
@@ -123,6 +131,21 @@ const HOW_TO_FIX: Record<CheckId, string> = {
     '  as "unreadable-purpose", pass one of the five literals from\n' +
     '  SYSTEM_SCOPE_PURPOSES directly at the call site instead of a variable: a\n' +
     '  purpose the gate cannot read is a purpose nobody reviews.',
+  E1:
+    'Open the transaction through the scope instead: `withTenant(tenantId, (tx) => …)`\n' +
+    '  or `withSystemScope(purpose, context, (tx) => …)` — both run set_config on the\n' +
+    '  `tx` they hand you; `prisma.$transaction` does not. The one flow that cannot\n' +
+    '  (the tenant is CREATED inside the transaction) calls\n' +
+    '  `bindTransactionToTenant(tx, tenant.id)` first (src/lib/legal/registration-consent.ts)\n' +
+    '  and is exempt from that line on — boss decision K-570148 = A, printed below\n' +
+    '  as an exemption, never recorded here.',
+  E2:
+    'The root row is readable without a scope, the joined rows are not, so the\n' +
+    '  relation comes back EMPTY under fabrika_app — "0 members", "no subscription",\n' +
+    '  "assigned to nobody". Wrap the read: `withTenant(tenantId, (tx) => tx.<model>…)`\n' +
+    '  for one tenant, `withSystemScope(purpose, context, (tx) => …)` for a platform\n' +
+    '  screen. A helper that takes an optional client and does `client ?? prisma`\n' +
+    '  is judged as the singleton it falls back to: make the client required.',
 };
 
 function keyOf(f: { check: string; file: string; subject: string }): string {
@@ -165,9 +188,7 @@ function main(): void {
    * "system-scope" and it would slide into the quiet list without ever going
    * through withSystemScope. Structural, so nobody has to remember it.
    */
-  const mislabelled = baseline.entries.filter((e) =>
-    e.check === 'D' ? e.kind !== 'system-scope' : e.kind === 'system-scope'
-  );
+  const mislabelled = baseline.entries.filter((e) => !kindMatchesCheck(e.check, e.kind));
 
   for (const [key, found] of actual) {
     const entry = expected.get(key);
@@ -236,9 +257,10 @@ function main(): void {
     }
     console.error(
       '  CHECK D is the sanctioned cross-tenant path and is recorded as kind\n' +
-        '  "system-scope"; every other check records a bypass and must not be. A\n' +
-        '  bypass relabelled into the sanctioned list is the mute button this gate\n' +
-        '  exists to prevent.'
+        '  "system-scope"; every other check — A, B, C and the E family (a bare\n' +
+        '  transaction, a relation joined without a scope) — records a bypass and\n' +
+        '  must not be. A bypass relabelled into the sanctioned list is the mute\n' +
+        '  button this gate exists to prevent.'
     );
   }
 
@@ -304,6 +326,28 @@ function main(): void {
       console.log(`  ${c.model} — ${c.callSites} call site(s) in src/**`);
       console.log(`      ${c.reason}`);
     }
+  }
+
+  // CHECK E1 exemptions (K-570148 = A). An information line, not a finding and
+  // not a baseline entry: the block bound itself the way withTenantOn does.
+  // Printed on every run so the exemption stays visible — the day a second
+  // registration-style flow appears here is the day somebody should ask why.
+  if (result.exemptions.length > 0) {
+    console.log(
+      `\nℹ CHECK E1 exemptions (K-570148 = A): ${result.exemptions.length} bare transaction ` +
+        'block(s) bound by bindTransactionToTenant, not judged after the bind:'
+    );
+    for (const x of result.exemptions) {
+      console.log(
+        `  ${x.file}:${x.line} — bound at :${x.boundAt}, ${x.accesses} tenant-scoped ` +
+          `access(es) after it exempt`
+      );
+    }
+    console.log(
+      '  Same set_config as withTenantOn, applied at the first moment a tenant id\n' +
+        '  exists (src/lib/legal/registration-consent.ts). Accesses BEFORE the bind are\n' +
+        '  still judged.'
+    );
   }
 
   // The sanctioned escapes, measured. Printed on every run for the same reason

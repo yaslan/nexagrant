@@ -67,6 +67,57 @@
  *   would otherwise be a call site. The call POSITION still comes from the
  *   blanked copy, so a `withSystemScope(` quoted in prose is not a finding.
  *
+ * CHECK E — the two shapes CHECK A cannot see, because the accessor is right
+ * and the SCOPE is missing (TASK-MTWOVYEKUDNZY, FA-47 / FA-50).
+ *
+ *   E1 `prisma.$transaction((tx) => … tx.<tenant model>.<op>( … )`. The accessor
+ *      is `tx.`, so CHECK A is silent — but this `tx` came from the bare
+ *      singleton, not from withTenant/withSystemScope, so no set_config ran on
+ *      it and it is outside every tenant scope exactly as `prisma.` is. The
+ *      block is the balanced-parenthesis span of the `$transaction(` call, read
+ *      on the comment-blanked copy; a line window would cut a wrapped callback
+ *      in half and judge the wrong half. The callback's parameter name is read
+ *      from the block (`(tx) =>`, `async (client) =>`), `tx` when unreadable.
+ *
+ *      Exemption, by boss decision K-570148 = A: a block that calls
+ *      `bindTransactionToTenant(tx, …)` (src/lib/legal/registration-consent.ts)
+ *      is bound by the same `set_config('app.tenant_id', …, true)` that
+ *      withTenantOn runs, applied at the first moment a tenant id exists — the
+ *      registration flow, where the tenant is CREATED inside the transaction
+ *      that then writes its Membership and Workspace, and withTenant cannot
+ *      open because there is nothing to scope to yet. Accesses AFTER the bind
+ *      call are exempt and reported as an information line, never a finding
+ *      and never a baseline entry; an access BEFORE it is still a finding,
+ *      because at that point the transaction is as bare as the singleton.
+ *
+ *   E2 a tenant-scoped relation reached THROUGH a model that is not itself
+ *      tenant-scoped: `prisma.tenant.findMany({ include: { _count: { select:
+ *      { users } } } })`, `prisma.plan.findMany({ include: { assignments } })`,
+ *      `prisma.tenant.findUnique({ include: { subscription } })`. The root
+ *      table has no tenant_isolation policy, so the read returns its row; the
+ *      joined table does, so under fabrika_app the relation comes back EMPTY —
+ *      every tenant "has 0 members", every private plan "is assigned to
+ *      nobody", a paying tenant "has no subscription" (all three measured,
+ *      TASK-MTWOVYEKUDNZY-crw2-gnd.md). Convincing, wrong, and silent.
+ *
+ *      The relation names come from the generated client's DMMF
+ *      (`Prisma.dmmf.datamodel.models`, `kind === 'object'` fields whose type
+ *      is in tenantScopedModels()), never from a guessed list: a renamed or
+ *      added relation is covered the moment `pnpm db:generate` runs. The
+ *      receiver is `prisma` (the singleton, never in a scope), a variable the
+ *      file assigns as `<x> ?? prisma` (an optional client that FALLS BACK to
+ *      the singleton — src/lib/billing.ts's `const db = client ?? prisma` is
+ *      the live instance, and every caller that omits the client lands on the
+ *      bare path), or the callback parameter of a bare E1 block. Reads inside a
+ *      withTenant / withSystemScope callback use that callback's `tx` and are
+ *      never a finding. The argument body is searched for the relation as a
+ *      property key, so `include`, `select`, `_count.select` and a `where`
+ *      relation filter all count — each of them joins the policed table.
+ *
+ *   Both record under kind "allowed" or "debt" like A/B/C. The gate refuses
+ *   an E entry recorded as "system-scope": leaving a scope through the
+ *   sanctioned path is CHECK D, and a bare transaction is not that path.
+ *
  * ---------------------------------------------------------------------------
  * Two deliberate limits, stated rather than hidden
  * ---------------------------------------------------------------------------
@@ -81,13 +132,36 @@
  *    scripts/ are operator tools that run as `fabrika` deliberately. Those
  *    counts are reported, not judged — see the gate's closing summary, so the
  *    exclusion is visible instead of silent.
+ *
+ * 3. CHECK E judges the call site it can see, not the helper it calls. A bare
+ *    `$transaction` that hands `tx` to a function in another file
+ *    (`createInvoiceForPayment(tx, …)`, `bootstrapOAuthTenant(tx, …)`) is not
+ *    followed; what that helper does with `tx` is that helper's own call
+ *    sites, and only a `tx.<model>` written in the block is judged here.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { Prisma } from '@prisma/client';
 import { NULLABLE_TENANT, SYSTEM_WIDE, tenantScopedModels } from './rls-models';
 
-export type CheckId = 'A' | 'B1' | 'B2' | 'C' | 'D';
+export type CheckId = 'A' | 'B1' | 'B2' | 'C' | 'D' | 'E1' | 'E2';
+
+/**
+ * Which checks record under kind "system-scope". Exactly one: CHECK D is the
+ * sanctioned path, and only a call ON that path may be listed as being on it.
+ * Every other check — A/B/C and the E family alike — records a bypass under
+ * "allowed" or "debt". The gate derives its kind↔check rule from this set so
+ * a new check cannot be added without being placed on one side of the line.
+ */
+export const SYSTEM_SCOPE_CHECKS: ReadonlySet<CheckId> = new Set<CheckId>(['D']);
+
+export type BaselineKind = 'allowed' | 'debt' | 'system-scope';
+
+/** True when a baseline entry's kind is legal for its check. */
+export function kindMatchesCheck(check: CheckId, kind: BaselineKind): boolean {
+  return SYSTEM_SCOPE_CHECKS.has(check) ? kind === 'system-scope' : kind !== 'system-scope';
+}
 
 export interface Finding {
   check: CheckId;
@@ -264,13 +338,71 @@ const CATALOGUE_REASONS: Record<string, string> = {
   Chunk: 'tenantId is String?; in NULLABLE_TENANT.',
 };
 
+/**
+ * A CHECK E1 block that is NOT a finding because of K-570148 = A, reported so
+ * the exemption is visible on every run rather than silent. Never a baseline
+ * entry: the baseline is for bypasses, and a bound transaction is not one.
+ */
+export interface Exemption {
+  check: 'E1';
+  file: string;
+  /** Line of the `prisma.$transaction(` call. */
+  line: number;
+  /** Line of the `bindTransactionToTenant(` call inside it. */
+  boundAt: number;
+  /** How many `tx.<tenant model>` accesses after the bind were exempted. */
+  accesses: number;
+}
+
 export interface ScanResult {
   findings: Finding[];
   /** Findings that live in fixtures: counted, never judged. */
   testFindings: Finding[];
+  /** CHECK E1 blocks exempted by a bind call (K-570148 = A), src/** only. */
+  exemptions: Exemption[];
   filesScanned: number;
   models: string[];
   catalogue: CatalogueNote[];
+}
+
+/** A model that is NOT tenant-scoped, with its relations that ARE. */
+export interface RelationNote {
+  model: string;
+  /** relation field name -> tenant-scoped model it points at */
+  relations: Map<string, string>;
+}
+
+/**
+ * CHECK E2's map, read from the generated client's DMMF: for every model
+ * outside tenantScopedModels(), the `kind === 'object'` fields whose type is
+ * inside it. Keyed by Prisma accessor (`tenant`, `plan`, `user`). Models with
+ * no such relation are left out, so a hit on this map is a hit on a policed
+ * join. Throws, rather than returning an empty map, when the DMMF does not
+ * know a model the schema regex found: that is a stale client, and a gate
+ * that silently finds nothing on a stale client is the quiet failure this
+ * file exists to prevent — run `pnpm db:generate`.
+ */
+export function tenantScopedRelations(scoped: ReadonlySet<string> = new Set(tenantScopedModels())): Map<string, RelationNote> {
+  const models = Prisma.dmmf.datamodel.models;
+  const known = new Set(models.map((m) => m.name));
+  for (const name of scoped) {
+    if (!known.has(name)) {
+      throw new Error(
+        `tenant-bypass-scan: model ${name} is in prisma/schema.prisma but not in the generated ` +
+          'client\'s DMMF — run `pnpm db:generate` before `pnpm rls:bypass-check`.'
+      );
+    }
+  }
+  const out = new Map<string, RelationNote>();
+  for (const m of models) {
+    if (scoped.has(m.name)) continue;
+    const relations = new Map<string, string>();
+    for (const f of m.fields) {
+      if (f.kind === 'object' && scoped.has(f.type)) relations.set(f.name, f.type);
+    }
+    if (relations.size > 0) out.set(accessorFor(m.name), { model: m.name, relations });
+  }
+  return out;
 }
 
 function gitTrackedSources(cwd: string): string[] {
@@ -332,14 +464,83 @@ const KNOWN_PURPOSES: ReadonlySet<string> = new Set([
 /** Where the path is defined; its own internal delegation is not a call site. */
 const SYSTEM_SCOPE_HOME = 'src/lib/system-scope.ts';
 
+/** CHECK E1: a transaction opened on the singleton, hence outside every scope. */
+const BARE_TRANSACTION = /\bprisma\.\$transaction\s*\(/g;
+/** The K-570148 = A exemption: the block binds itself the way withTenantOn does. */
+const BIND_CALL = /\bbindTransactionToTenant\s*\(/;
+/**
+ * The callback's parameter, read from the start of the block: `(tx) =>`,
+ * `async (client) =>`, `tx =>`, `async function (tx)`. `tx` when unreadable —
+ * the array form `$transaction([prisma.x.op()])` has no parameter and its
+ * `prisma.` accessors are CHECK A's already.
+ */
+const CALLBACK_PARAM = /^\s*(?:async\s*)?(?:function\s*)?\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*(?:=>|\{)/;
+/** Reads whose argument body can name a relation. Writes carry data, not joins. */
+const READ_OPS: ReadonlySet<string> = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'count',
+  'aggregate',
+  'groupBy',
+]);
+/**
+ * A variable that falls back to the singleton: `const db = client ?? prisma`.
+ * Every read through it is on the bare path whenever the caller omitted the
+ * client, and nothing at the read site says which it was — so the read is
+ * judged as if it were `prisma.`, because sometimes it is.
+ */
+const SINGLETON_FALLBACK = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[^;\n]*?\?\?\s*prisma\b/g;
+
+/**
+ * Index of the `)` that closes the `(` at `open`, counting parentheses only —
+ * strings and comments are already blanked, and braces inside a call are
+ * balanced on their own. -1 when the file ends first (a regex literal holding
+ * a lone parenthesis is the one way that happens); the block is then not
+ * judged rather than guessed at.
+ */
+export function closingParen(code: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < code.length; i += 1) {
+    const c = code[i];
+    if (c === '(') depth += 1;
+    else if (c === ')') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function lineOf(code: string, offset: number): number {
+  return code.slice(0, offset).split('\n').length;
+}
+
+/**
+ * The tenant-scoped relations a read's argument body names, as property keys
+ * (`users: true`, `subscription: {`, `assignments: {`). Sorted, so the baseline
+ * subject is stable under reordering.
+ */
+function relationsNamed(args: string, note: RelationNote): string[] {
+  const hit: string[] = [];
+  for (const field of note.relations.keys()) {
+    if (new RegExp(`(?:^|[^\\w$.])${field}\\s*:`).test(args)) hit.push(field);
+  }
+  return hit.sort();
+}
+
 export function scan(cwd = process.cwd()): ScanResult {
   const models = tenantScopedModels();
   const accessors = new Map<string, string>();
   for (const m of models) accessors.set(accessorFor(m), m);
+  const relations = tenantScopedRelations(new Set(models));
 
   const files = gitTrackedSources(cwd);
   const findings: Finding[] = [];
   const testFindings: Finding[] = [];
+  const exemptions: Exemption[] = [];
   /**
    * Seeded at zero for every model that has a written reason, because the note
    * is documentation of an absence and a counter that only grows when a call
@@ -422,6 +623,71 @@ export function scan(cwd = process.cwd()): ScanResult {
         });
       }
     }
+
+    // CHECK E — whole-file, because a transaction block and a wrapped include
+    // both span lines. Works on the blanked copy throughout; offsets map 1:1
+    // onto the raw text, so the quoted line is the real one.
+    const blanked = codeLines.join('\n');
+    const push = (check: 'E1' | 'E2', at: number, subject: string) => {
+      const line = lineOf(blanked, at);
+      sink.push({ check, file, line, subject, text: (rawLines[line - 1] ?? '').trim() });
+    };
+    /** E2 on one read: the relations its argument body names, or nothing. */
+    const judgeRead = (accessor: string, op: string, openParen: number, at: number) => {
+      const note = relations.get(accessor);
+      if (!note || !READ_OPS.has(op)) return;
+      const close = closingParen(blanked, openParen);
+      if (close < 0) return;
+      const named = relationsNamed(blanked.slice(openParen + 1, close), note);
+      if (named.length > 0) push('E2', at, `${accessor}.${op}->${named.join(',')}`);
+    };
+
+    // E1 — and E2 on the bare callback's non-scoped reads.
+    for (const m of blanked.matchAll(BARE_TRANSACTION)) {
+      const open = (m.index ?? 0) + m[0].length - 1;
+      const close = closingParen(blanked, open);
+      if (close < 0) continue;
+      const block = blanked.slice(open + 1, close);
+      const cb = CALLBACK_PARAM.exec(block)?.[1] ?? 'tx';
+      const bindAt = block.search(BIND_CALL);
+      let exempted = 0;
+      const access = new RegExp(`\\b${cb}\\.([A-Za-z0-9_]+)\\.([A-Za-z0-9_]+)\\s*\\(`, 'g');
+      for (const a of block.matchAll(access)) {
+        const rel = a.index ?? 0;
+        const at = open + 1 + rel;
+        const accessor = a[1] as string;
+        const op = a[2] as string;
+        if (accessors.has(accessor)) {
+          // After the bind the transaction carries app.tenant_id (K-570148 = A).
+          if (bindAt >= 0 && rel > bindAt) exempted += 1;
+          else push('E1', at, `${cb}.${accessor}.${op}`);
+          continue;
+        }
+        if (bindAt >= 0 && rel > bindAt) continue;
+        judgeRead(accessor, op, at + a[0].length - 1, at);
+      }
+      if (bindAt >= 0 && exempted > 0 && sink === findings) {
+        exemptions.push({
+          check: 'E1',
+          file,
+          line: lineOf(blanked, m.index ?? 0),
+          boundAt: lineOf(blanked, open + 1 + bindAt),
+          accesses: exempted,
+        });
+      }
+    }
+
+    // E2 — on the singleton and on anything that falls back to it.
+    const receivers = ['prisma'];
+    for (const f of blanked.matchAll(SINGLETON_FALLBACK)) receivers.push(f[1] as string);
+    const read = new RegExp(
+      `\\b(?:${receivers.join('|')})\\.([A-Za-z0-9_]+)\\.([A-Za-z0-9_]+)\\s*\\(`,
+      'g'
+    );
+    for (const r of blanked.matchAll(read)) {
+      const at = r.index ?? 0;
+      judgeRead(r[1] as string, r[2] as string, at + r[0].length - 1, at);
+    }
   }
 
   const catalogue: CatalogueNote[] = [...catalogueCounts.entries()]
@@ -436,5 +702,5 @@ export function scan(cwd = process.cwd()): ScanResult {
     }))
     .sort((a, b) => b.callSites - a.callSites);
 
-  return { findings, testFindings, filesScanned: files.length, models, catalogue };
+  return { findings, testFindings, exemptions, filesScanned: files.length, models, catalogue };
 }
