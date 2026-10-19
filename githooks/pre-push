@@ -10,7 +10,9 @@ if [ -z "${DATABASE_URL:-}" ] && [ ! -f .env ]; then
   echo "  Worktree'de izole DB kur: CLAUDE.md \"Worktree'de gate\" (docker run … + .env + pnpm db:setup)." >&2
   exit 1
 fi
-db=${DATABASE_URL:-$(sed -n 's/^DATABASE_URL=//p' .env | tail -1)}
-echo "→ veritabanı: $(printf '%s' "$db" | sed -E 's#^[a-z]+://([^@]*@)?([^/?]*)/?([^?]*).*#\2/\3#')"
+# Yalnız host:port/db yazılır; parola ve girdinin kendisi hiçbir zaman basılmaz (scripts/db-target.sh).
+. scripts/db-target.sh
+db=${DATABASE_URL:-$(db_env_value .env)}
+echo "→ veritabanı: $(db_target "$db")"
 echo "→ pnpm gate (lint + typecheck + test, proje geneli)"
 pnpm gate

@@ -36,7 +36,7 @@ Pre-push kancası tam `pnpm gate` koşar; gate'in DB'si checkout'un kendi `.env`
 P=55xx                                          # boş bir port seç (lsof -nP -iTCP:$P -sTCP:LISTEN boş dönmeli)
 docker run -d --name <is>-pg -e POSTGRES_DB=fabrika -e POSTGRES_USER=fabrika -e POSTGRES_PASSWORD=fabrika \
   -p 127.0.0.1:$P:5432 pgvector/pgvector:pg16
-cp .env.example .env && sed -i '' "s#@localhost:5433/#@localhost:$P/#g" .env
+cp .env.example .env && perl -pi -e "s#\@localhost:5433/#\@localhost:$P/#g" .env   # perl: mac ve Linux'ta aynı (sed -i '' yalnız BSD)
 perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env
 pnpm install --frozen-lockfile && pnpm db:setup  # db:rls-role, DATABASE_URL_RLS_TEST'i bu .env'e ekler
 E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: localhost:$P/fabrika" yazar

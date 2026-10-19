@@ -435,6 +435,8 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
     // TASK-MVBFDSUSE5QCY: the step calls `pnpm db:setup`; the order lives in
     // scripts/db-setup.sh (its commands, not its header comment).
     expect(ciStep).toContain('pnpm db:setup\n');
+    // The second run is the idempotency check; a single call would pass the line above.
+    expect(ciStep).toMatch(/pnpm db:setup\n\s*pnpm db:setup\n/);
     const sh = readFileSync(resolve(process.cwd(), 'scripts/db-setup.sh'), 'utf8');
     const step = sh.slice(sh.indexOf('set -euo pipefail'));
     const at = (needle: string) => {
@@ -442,7 +444,8 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
       expect(i, `"${needle}" is missing from scripts/db-setup.sh`).toBeGreaterThan(-1);
       return i;
     };
-    expect(at('.github/ci/supabase-ensure-rls.sql')).toBeLessThan(at('prisma db push'));
+    // The command, not the header comment: a `prisma db push` mention in a comment must not satisfy this.
+    expect(at('.github/ci/supabase-ensure-rls.sql')).toBeLessThan(at('pnpm exec prisma db push\n'));
     expect(at('pnpm db:rls\n')).toBeLessThan(at('scripts/apply-migrations.sh'));
     const trig = readFileSync(resolve(process.cwd(), '.github/ci/supabase-ensure-rls.sql'), 'utf8');
     expect(trig).toContain("EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);");

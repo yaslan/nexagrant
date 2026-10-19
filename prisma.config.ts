@@ -9,10 +9,14 @@ dotenv.config();
 // with `relation "FollowupDoc" does not exist` after add-calendar-connections
 // has already been applied. Stop before anything runs and point at the real
 // path. `migrate diff` and `migrate status` only read, so they stay.
-const [cmd, sub] = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-if (cmd === 'migrate' && (sub === 'deploy' || sub === 'dev' || sub === 'reset')) {
+// Every token after `migrate` counts, flags and their values included, so
+// `--config prisma.config.ts migrate deploy` is refused too (crw2-fb O-2).
+const args = process.argv.slice(2);
+const at = args.indexOf('migrate');
+const blocked = at >= 0 ? args.slice(at + 1).find((a) => a === 'deploy' || a === 'dev' || a === 'reset') : undefined;
+if (blocked) {
   console.error(
-    `prisma migrate ${sub} is not how this repository builds a database: prisma/migrations ` +
+    `prisma migrate ${blocked} is not how this repository builds a database: prisma/migrations ` +
       'is applied by scripts/apply-migrations.sh on top of `prisma db push`.\n' +
       '  Local / CI / worktree database: pnpm db:setup (scripts/db-setup.sh)\n' +
       '  Production: docs/RELEASE_CHECKLIST.md §3.1\n' +

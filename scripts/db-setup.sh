@@ -32,21 +32,21 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+# shellcheck source=scripts/db-target.sh
+. scripts/db-target.sh
 
 if [ -z "${DATABASE_URL:-}" ] && [ -f .env ]; then
-  DATABASE_URL=$(sed -n 's/^DATABASE_URL=//p' .env | tail -1 | sed -E 's/^"(.*)"$/\1/')
+  DATABASE_URL=$(db_env_value .env)
 fi
 : "${DATABASE_URL:?DATABASE_URL is not set and ./.env has none}"
 export DATABASE_URL
 
-# host:port/db, never the password.
-target=$(printf '%s' "$DATABASE_URL" | sed -E 's#^[a-z]+://([^@]*@)?([^/?]*)/?([^?]*).*#\2/\3#')
-case "${target%%/*}" in
-  localhost|localhost:*|127.0.0.1|127.0.0.1:*|\[::1\]|\[::1\]:*) ;;
-  *)
-    echo "db-setup: refusing $target: only a local or CI database (localhost). Production: docs/RELEASE_CHECKLIST.md §3.1." >&2
-    exit 1 ;;
-esac
+# host:port/db, never the password (scripts/db-target.sh).
+target=$(db_target "$DATABASE_URL")
+if ! db_is_local "$DATABASE_URL" "${target%%/*}"; then
+  echo "db-setup: refusing $target: only a local or CI database (localhost, no host= / hostaddr= / service= in the URL). Production: docs/RELEASE_CHECKLIST.md §3.1." >&2
+  exit 1
+fi
 
 # psql rejects Prisma's `?schema=` parameter (same as apply-migrations.sh).
 psql_url=$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*&?/\1/; s/[?&]$//')
