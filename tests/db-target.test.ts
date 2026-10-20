@@ -43,4 +43,17 @@ describe('scripts/db-target.sh', () => {
     expect(local).toBe(false);
     expect(target).not.toContain('pw');
   });
+
+  // A password with # ? or / used to leak into the printed target
+  // (user:pa#ss@localhost:5479/fabrika printed "user:pa#ss/@localhost:5479/fabrika").
+  it.each([
+    'postgresql://u:pa#ss@localhost:5479/fabrika',
+    'postgresql://u:pa?ss@localhost:5479/fabrika',
+    'postgresql://u:pa/ss@localhost:5479/fabrika',
+    'postgresql://u:p%23ss@localhost:5479/fabrika?password=x@y',
+  ])('prints the placeholder, never a password fragment: %s', (url) => {
+    const { local, target } = probe(url);
+    expect(local).toBe(false);
+    expect(target).toBe('<ayrıştırılamadı>');
+  });
 });

@@ -9,11 +9,31 @@ db_env_value() {
   sed -n 's/^DATABASE_URL=//p' "$1" | tail -1 | sed -E 's/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'
 }
 
-# host:port/db. -n with p: a URL that does not match prints nothing, so the
-# input is never echoed back (fail closed).
+# host:port/db or the placeholder. Fail closed in two places: a / ? or # before
+# the last @ means the password has a character that splits the URL differently
+# (user:pa#ss@host would print "user:pa#ss"), and whatever is left must match a
+# strict host[:port]/db shape before it is printed.
 db_target() {
-  _t=$(printf '%s' "$1" | sed -nE 's#^[A-Za-z][A-Za-z0-9+.-]*://([^/?#]*@)?([^/?@]*)/?([^?]*).*#\2/\3#p')
-  printf '%s\n' "${_t:-<ayrıştırılamadı>}"
+  _rest=$(printf '%s' "$1" | sed -nE 's#^[A-Za-z][A-Za-z0-9+.-]*://(.*)$#\1#p')
+  case "$_rest" in
+    *@*)
+      _ui=${_rest%@*}
+      case "$_ui" in
+        *[/?#]*) _rest= ;;
+        *) _rest=${_rest##*@} ;;
+      esac ;;
+  esac
+  _hp=${_rest%%[/?#]*}
+  _db=${_rest#"$_hp"}
+  _db=${_db#/}
+  _db=${_db%%[?#]*}
+  if [ -n "$_hp" ] \
+    && printf '%s' "$_hp" | grep -Eq '^(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._-]+)(:[0-9]+)?$' \
+    && printf '%s' "$_db" | grep -Eq '^[A-Za-z0-9._-]*$'; then
+    printf '%s/%s\n' "$_hp" "$_db"
+  else
+    printf '%s\n' "<ayrıştırılamadı>"
+  fi
 }
 
 # Exit 0 only for a single localhost host with no host-overriding query parameter.
