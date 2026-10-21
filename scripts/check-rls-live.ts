@@ -630,6 +630,40 @@ async function probeSystemScopeTable(
  */
 const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt']);
 
+/**
+ * FO-98: one write per PUBLIC_INTAKE_TABLES table, the smallest the form itself
+ * makes. A row count cannot tell an open empty table from a closed one (0 = 0):
+ * with ExpertPreRegAttempt dropped from system_scope_open the counts still
+ * matched and rls:verify passed. So each table is written once outside any scope
+ * (must be an RLS error) and once inside public-intake (must be accepted), each
+ * inside tryInsert's savepoint. A table on the list without a probe here fails.
+ */
+const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, params: unknown[]]>([
+  [
+    EXPERT_TABLE,
+    (id) => [
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+      [id],
+    ],
+  ],
+  ['ExpertPreRegAttempt', (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]]],
+  // One-row counter (CHECK id = 1), written by the app with this same upsert
+  // (src/lib/expert-prereg/server/founder-counter.ts). Empty table: the INSERT
+  // path meets WITH CHECK. Seeded row: the UPDATE path meets USING, and RLS
+  // refuses a hidden conflicting row with an error instead of a silent 0-row
+  // UPDATE. No WHERE, so the UPDATE path always runs; lastNumber is not touched,
+  // so the "only goes up" trigger stays out of it.
+  [
+    'ExpertFounderCounter',
+    () => [
+      `insert into "ExpertFounderCounter" (id, "lastNumber", "updatedAt") values (1, 0, now())
+       on conflict (id) do update set "updatedAt" = excluded."updatedAt"`,
+      [],
+    ],
+  ],
+]);
+
 async function probePurposeTables(
   m: pg.Client,
   admin: pg.Client | null
@@ -685,6 +719,19 @@ async function probePurposeTables(
     const opened = (inside: Map<string, number>) =>
       tables.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
 
+    const intakeProbes: [string, (id: string) => [string, unknown[]]][] = [];
+    for (const t of PUBLIC_INTAKE_TABLES) {
+      const probe = PUBLIC_INTAKE_PROBES.get(t);
+      if (!probe) failures.push(`public-intake: ${t} için yazma prob'u yok (PUBLIC_INTAKE_PROBES) — boş tabloda kapsam ölçülemez`);
+      else if (!tables.includes(t)) checks.push(`public-intake: ${t} bu veritabanında yok (system_scope politikası yok), yazma ölçülmedi`);
+      else intakeProbes.push([t, probe]);
+    }
+    for (const [t, probe] of intakeProbes) {
+      const r = await tryInsert(...probe(`rls-verify-${randomBytes(6).toString('hex')}`));
+      if (r === 'rls') checks.push(`public-intake: ${t} kapsam dışında INSERT reddedildi`);
+      else failures.push(`public-intake: ${t} kapsam dışında INSERT ${r === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${r}`}`);
+    }
+
     await m.query(`select enter_system_scope('public-intake')`);
     const intake = await countAll(m);
     const leaked = opened(intake).filter((t) => !PUBLIC_INTAKE_TABLES.has(t));
@@ -695,7 +742,7 @@ async function probePurposeTables(
           .join(', ')}`
       );
     } else {
-      checks.push(`public-intake: ${tables.length - PUBLIC_INTAKE_TABLES.size} system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ${[...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t)).join(', ')} açık)`);
+      checks.push(`public-intake: ${tables.filter((t) => !PUBLIC_INTAKE_TABLES.has(t)).length} system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ${[...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t)).join(', ')} açık)`);
     }
     if (truth) {
       const short = [...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t) && intake.get(t) !== truth!.get(t));
@@ -704,13 +751,11 @@ async function probePurposeTables(
     const auditIntake = await auditInsert(tenantId);
     if (auditIntake === 'rls') checks.push('public-intake: AuditEvent INSERT reddedildi');
     else failures.push(`public-intake: AuditEvent INSERT ${auditIntake === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${auditIntake}`}`);
-    const expertIntake = await tryInsert(
-      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
-       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
-      [`rls-verify-${randomBytes(6).toString('hex')}`]
-    );
-    if (expertIntake === 'ok') checks.push(`public-intake: ${EXPERT_TABLE} INSERT kabul edildi (pozitif kontrol, geri alındı)`);
-    else failures.push(`public-intake: ${EXPERT_TABLE} INSERT reddedildi — form yazamaz: ${expertIntake}`);
+    for (const [t, probe] of intakeProbes) {
+      const r = await tryInsert(...probe(`rls-verify-${randomBytes(6).toString('hex')}`));
+      if (r === 'ok') checks.push(`public-intake: ${t} INSERT kabul edildi (pozitif kontrol, geri alındı)`);
+      else failures.push(`public-intake: ${t} INSERT reddedildi — form yazamaz: ${r === 'rls' ? 'RLS' : r}`);
+    }
 
     // The other purposes are not narrowed: each still opens every row.
     for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
