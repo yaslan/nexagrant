@@ -318,36 +318,48 @@ export default async function PartnersPage({
             where: orgWhere,
             take: 50,
             orderBy: { updatedAt: 'desc' },
-            include: {
-              profile: true,
-              participations: {
-                include: {
-                  project: {
-                    select: {
-                      id: true,
-                      acronym: true,
-                      title: true,
-                      framework: true,
-                      masterCall: true,
-                      topics: { select: { topicCode: true, topicTitle: true } },
-                    },
-                  },
-                },
-              },
-            },
+            include: { profile: true },
           }),
         ]);
 
         if (cOrgs.length > 0) {
+          // Totals come from the database for this page's rows, not from a
+          // participation list, so an organisation with many projects is counted
+          // in full and nothing unbounded is read.
+          const pageOrgIds = cOrgs.map((o) => o.organisationId);
+          const [totalRows, interregRows] = await Promise.all([
+            prisma.cordisParticipation.groupBy({
+              by: ['organisationId', 'role'],
+              where: { organisationId: { in: pageOrgIds } },
+              _count: { _all: true },
+              _sum: { ecContribution: true },
+            }),
+            prisma.cordisParticipation.findMany({
+              where: { organisationId: { in: pageOrgIds }, project: { framework: 'INTERREG' } },
+              distinct: ['organisationId'],
+              select: { organisationId: true },
+            }),
+          ]);
+          const interregIds = new Set(interregRows.map((r) => r.organisationId));
+          const totalsById = new Map<string, { projects: number; coordinators: number; ec: bigint }>();
+          for (const r of totalRows) {
+            const t = totalsById.get(r.organisationId) ?? { projects: 0, coordinators: 0, ec: 0n };
+            t.projects += r._count._all;
+            if (r.role === 'coordinator') t.coordinators += r._count._all;
+            t.ec += r._sum.ecContribution ?? 0n;
+            totalsById.set(r.organisationId, t);
+          }
+
           dataSource = 'cordis_organization';
           totalCount = cCount;
           profiles = cOrgs.map((o) => {
-            const parts = o.participations || [];
-            const hasInterreg = parts.some((p) => p.project?.framework === 'INTERREG');
-            const coordCount = parts.filter((p) => p.role === 'coordinator').length;
-            const totalEc = parts.reduce((sum, p) => sum + (p.ecContribution ?? 0n), 0n);
+            const totals = totalsById.get(o.organisationId);
+            const parts = totals?.projects ?? 0;
+            const hasInterreg = interregIds.has(o.organisationId);
+            const coordCount = totals?.coordinators ?? 0;
+            const totalEc = totals?.ec ?? 0n;
 
-            if (parts.length === 0) {
+            if (parts === 0) {
               return {
                 organisationId: o.organisationId,
                 name: o.name,
@@ -371,7 +383,7 @@ export default async function PartnersPage({
               sme: o.sme,
               isTurkish: o.isTurkish,
               isInterreg: hasInterreg,
-              totalProjects: parts.length,
+              totalProjects: parts,
               coordinatorProjects: coordCount,
               totalEcContribution: totalEc > 0n ? totalEc : null,
               topTopics: [],

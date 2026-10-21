@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Globe,
   RefreshCw,
@@ -35,6 +35,7 @@ interface KeepEuAdminClientProps {
 
 export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
   const t = useTranslations('adminInterreg');
+  const locale = useLocale();
   const [metrics, setMetrics] = useState<KeepEuMetrics>(initialMetrics);
   const [activeTab, setActiveTab] = useState<'programmes' | 'countries' | 'rag'>('programmes');
 
@@ -82,7 +83,7 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
   };
 
   const formatEur = (amount: number): string => {
-    return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount);
   };
 
   return (

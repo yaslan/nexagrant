@@ -34,6 +34,42 @@ function createMockDb() {
         }));
       }),
     },
+    cordisParticipation: {
+      // Only the two shapes the partner routes use: `distinct` on organisationId
+      // for the Interreg flag, and `groupBy(organisationId, role)` for totals.
+      findMany: vi.fn().mockImplementation(async ({ where, distinct }: { where?: Row; distinct?: string[] }) => {
+        const ids = (where?.organisationId as { in?: string[] } | undefined)?.in ?? [];
+        const framework = (where?.project as { framework?: string } | undefined)?.framework;
+        const rows = participations.filter((part) => {
+          if (!ids.includes(part.organisationId as string)) return false;
+          const proj = projects.find((pr) => pr.id === part.projectId);
+          return framework === undefined || proj?.framework === framework;
+        });
+        if (!distinct) return rows;
+        const seen = new Set<string>();
+        return rows.filter((r) => {
+          const organisationId = r.organisationId as string;
+          if (seen.has(organisationId)) return false;
+          seen.add(organisationId);
+          return true;
+        });
+      }),
+      groupBy: vi.fn().mockImplementation(async ({ where }: { where?: Row }) => {
+        const ids = (where?.organisationId as { in?: string[] } | undefined)?.in ?? [];
+        const groups = new Map<string, { organisationId: string; role: string; _count: { _all: number }; _sum: { ecContribution: bigint } }>();
+        for (const part of participations) {
+          const organisationId = part.organisationId as string;
+          if (!ids.includes(organisationId)) continue;
+          const role = part.role as string;
+          const key = `${organisationId}|${role}`;
+          const g = groups.get(key) ?? { organisationId, role, _count: { _all: 0 }, _sum: { ecContribution: 0n } };
+          g._count._all += 1;
+          g._sum.ecContribution += (part.ecContribution as bigint | null) ?? 0n;
+          groups.set(key, g);
+        }
+        return [...groups.values()];
+      }),
+    },
     cordisOrganization: {
       count: vi.fn().mockImplementation(async ({ where }: { where?: Row }) => {
         return filterOrgs(where).length;
