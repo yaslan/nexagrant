@@ -1,11 +1,13 @@
 # FO-51 · TASK-MVC91SAU3V72H — Canlı `TRUSTED_PROXY_HOPS` ölçümü ve belgeleme
 
-**Ajan:** devop-fb · **Sprint:** FB-UZMAN · **Dal:** `devop-fb/fo51-trusted-proxy-hops` (taban: `origin/dev` @ edda63cc) · **PR:** dev'e, merge yok
+**Ajan:** devop-fb · **Sprint:** FB-UZMAN · **Tip:** runtime (güvenlik konfigürasyonu) · **Dal:** `devop-fb/fo51-trusted-proxy-hops` (taban: `origin/dev` @ edda63cc) · **PR:** YOK — dal push edilemedi (aşağıda), PR açılmadı
 
 ## Hüküm
 
 Canlı topoloji **tek ters vekil**: `fonbridge.com` → `77.92.144.187` (LiteSpeed) → Passenger → Node. CDN yok.
 Doğru değer **`TRUSTED_PROXY_HOPS=1`**. Kod varsayılanı da 1 (`src/lib/leads/public-lead.ts` `trustedProxyHops`), yani env girilmese de canlı 1 ile çalışır. Değeri açıkça girmek sabitleme içindir.
+
+Durum: **kod ve testler yeşil, ama dal henüz `origin`'de değil.** Pre-push gate'in son adımı (`pnpm test:e2e`) port 3000 meşgul olduğu için koşamadı (aşağıda). Push ve PR bu yüzden yapılmadı.
 
 ## Ne yapıldı
 
@@ -13,6 +15,7 @@ Doğru değer **`TRUSTED_PROXY_HOPS=1`**. Kod varsayılanı da 1 (`src/lib/leads
 2. **Değer:** 1 (aşağıdaki kanıta göre).
 3. **Belge ve test:** `.env.example`, `docs/RELEASE_CHECKLIST.md` satırı, `clientIpFrom` için sahte-XFF birim testi. Bu üçü dalda zaten vardı (commit `b2e6d8ed`, 17.10.2026, aynı değer). Bu oturumda doğrulandı ve kanıtlandı.
 4. **Canlı sunucu env'i değiştirilmedi, deploy yapılmadı.** Erişimim yok, yetkim de yok.
+5. **Push denemesi (normal push, `--no-verify` yok):** iki deneme yapıldı, ikisi de pre-push gate'te durdu. Ayrıntı aşağıda.
 
 ## Kanıt (ham çıktı)
 
@@ -51,15 +54,27 @@ Yanıtta `cf-ray`, `x-cache`, `via`, CDN başlığı ve `server` başlığı yok
 
 ## Test
 
-Komut: `perl -e 'alarm 600; exec @ARGV' npx vitest run src/lib/leads/public-lead.test.ts`
+**Birim (FO-51 dosyası):** `perl -e 'alarm 600; exec @ARGV' npx vitest run src/lib/leads/public-lead.test.ts`
 - **17/17 geçti** (`Duration 421ms`).
 
-Mutasyon (sadece bu oturumda, sonra geri alındı): `return chain[Math.max(0, chain.length - hops)] ?? null;` → `return chain[0] ?? null;` (ilk değeri al, eski güvensiz davranış).
+**Mutasyon** (sadece bu oturumda, sonra geri alındı): `return chain[Math.max(0, chain.length - hops)] ?? null;` → `return chain[0] ?? null;` (ilk değeri al, eski güvensiz davranış).
 - **2 test kırıldı:** "takes the hop our proxy appended, never the one the client wrote" ve FO-51 testi "with the live value (one proxy) ignores a forged X-Forwarded-For prefix". Yani test sahte önekli XFF'i gerçekten yakalıyor.
-- Geri alındı, `git status` temiz.
+- Geri alındı, dal temiz.
 
-Lint: `npx eslint src/lib/leads/public-lead.test.ts` → hata yok.
-Tip denetimi (`tsc`) bu oturumda **çalıştırılmadı**. Değişiklik yalnız test ve belge dosyaları.
+**Tip denetimi:** `pnpm typecheck` (`tsc --noEmit`) çalıştırıldı, **çıkış kodu 0**, hata yok. Ham çıktı: `$ tsc --noEmit` (tek satır, hata satırı yok).
+
+**Lint:** `npx eslint src/lib/leads/public-lead.test.ts` → hata yok.
+
+**Pre-push gate (`git push`, `.env` aynı kabukta):**
+- Deneme 1 — `.env` yüklenmeden: 14 test dosyası kırmızı, `ECONNREFUSED 127.0.0.1:5432`. Sebep: worktree'de `.env` yok, testler varsayılan 5432 portuna gitti. Postgres (docker) `5433`'te dinliyor. Kod kaynaklı değil.
+- Deneme 2 — `.env` (ana checkout'taki) aynı kabukta yüklü:
+  - `pnpm lint`: 0 hata, 4 uyarı (`no-unused-vars`, test dosyaları; bu dalın değişiklikleri değil).
+  - `pnpm typecheck`: geçti.
+  - `pnpm test`: **Test Files 350 passed | 7 skipped (357); Tests 4569 passed | 120 skipped (4689)**.
+  - `i18n:check`, `rls:check`, `rls:bypass-check`, `rls:verify --require-db`, `db:rls-role`: geçti (zincir `&&` ile ilerledi).
+  - **`pnpm test:e2e`: KIRMIZI, kod hatası değil.** `Error: http://localhost:3000 is already used, make sure that nothing is running on the port/url`. Port 3000'i PID 25179 `next-server` tutuyor (başlangıç 22:25, cwd `/Users/macbook/alan/FONBRIDGE`, ana checkout). Bu süreç bana ait değil; öldürmedim. Playwright `reuseExistingServer` kapalı, e2e 3000'de yeni sunucu başlatamıyor.
+  - Son adım `pnpm alerts:check` e2e yüzünden koşmadı.
+  - `git push` → `failed to push some refs` (gate çıkış kodu 1).
 
 ## Değişen dosyalar
 
@@ -85,18 +100,23 @@ Değer zaten varsayılan 1 olduğundan bu adım zorunlu değil. Yine de açık y
 - **Hop sayısı yanlış olursa** (ör. ileride CDN eklenirse 2 olmalı): sahte XFF ile ön kayıt IP sınırı (5/saat) aşılır, ya da az ayarlanırsa tüm istemciler proxy IP'sini paylaşır ve form kilitlenir. Bu yüzden CDN eklenirse değer ve `docker-compose.yml` birlikte güncellenmeli.
 - **Canlı env'in gerçek değeri bilinmiyor.** Erişim olmadığı için cPanel'deki değişkeni görmedim. Kod varsayılanı 1 olduğundan, boşsa da 1 kullanılır.
 - **Ölçüm UA filtresi:** Varsayılan curl User-Agent ile sunucu 403 veriyor. Ölçüm belgesine not düşüldü.
+- **Dal origin/dev'in 125 commit gerisinde** (`ahead 2, behind 125`). PR açılırsa birleşme çakışması olabilir; gate bu dalda koştu, rebase edilmiş dalda değil.
 
 ## Açık sorular
 
-1. `deploy/cpanel/` ne zaman dev'e pushlanacak? (yukarıda)
-2. Canlıda XFF tek kez ekleniyor mu? Kesin kanıt için yayın sonrası izleme: `PublicLead` tablosunda saatlik `count(DISTINCT "ipHash") / count(*)` oranına bak. Oran 1'e yakınsa her istek ayrı IP'den geliyor (değer az). Bir IP sürekli 10'da takılıyorsa değer fazla ya da tüm trafik proxy IP'sine düşüyor.
+1. **Port 3000'i tutan `next-server` (PID 25179) kime ait?** Kapatılırsa e2e koşar ve push tamamlanır. Ben dokunmadım.
+2. `deploy/cpanel/` ne zaman dev'e pushlanacak?
+3. Canlıda XFF tek kez ekleniyor mu? Kesin kanıt için yayın sonrası izleme: `PublicLead` tablosunda saatlik `count(DISTINCT "ipHash") / count(*)` oranına bak. Oran 1'e yakınsa her istek ayrı IP'den geliyor (değer az). Bir IP sürekli 10'da takılıyorsa değer fazla ya da tüm trafik proxy IP'sine düşüyor.
 
 ## Platform beyanı
 
-- **Koşuldu:** macOS (darwin). Vitest, eslint, DNS ve `curl` burada.
+- **Koşuldu:** macOS (darwin). Vitest, eslint, tsc, Playwright (kuruldu, port çakışmasında durdu), DNS ve `curl` burada.
 - **Canlı hedef:** Linux (cPanel/Passenger). Değiştirilen kod yolu (`clientIpFrom`) platforma bağlı değil: yalnız HTTP başlıklarını okuyor. İşletim sistemi dallanması yok.
 - **Windows / Linux:** koşulmadı. Gerekçe: değişiklik yalnız belge ve test; platforma bağlı kod yolu içermiyor.
 
 ## Sonraki adım
 
-PR dev'e açıldı (merge yok). Patron cPanel'e `TRUSTED_PROXY_HOPS=1` satırını girer. Yayın sonrası `ipHash` oranı izlenir.
+1. Port 3000'deki süreç kapanınca (sahibi onaylarsa) `.env` yüklü kabukta `git push -u origin devop-fb/fo51-trusted-proxy-hops` yeniden çalıştırılır; gate tamamen yeşilse `dev` tabanına PR açılır (merge yok).
+2. Patron cPanel'e `TRUSTED_PROXY_HOPS=1` satırını girer (zorunlu değil).
+3. Yayın sonrası `ipHash` oranı izlenir.
+4. Kart `review`'a yalnız PR açıldıktan sonra alınır.
