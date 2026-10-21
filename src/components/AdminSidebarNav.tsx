@@ -16,7 +16,8 @@ import {
   Percent,
   FileText,
   Inbox,
-  UserCheck
+  UserCheck,
+  Globe
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -92,6 +93,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: tLeads('nav_desc'),
       icon: Inbox,
       badge: 'Lead',
+    },
+    {
+      key: 'interreg',
+      href: `/${locale}/admin/interreg`,
+      label: 'Interreg & keep.eu',
+      desc: locale === 'tr' ? 'Sınır ötesi fonlar & ortaklar' : 'Cross-border funds & partners',
+      icon: Globe,
+      badge: 'Interreg',
     },
     {
       key: 'uzman-kayitlari',

@@ -20,6 +20,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "jobs:k1": "tsx scripts/run-k1-daily.ts",
     "jobs:k2": "tsx scripts/run-k2-monthly.ts",
+    "jobs:keep-eu": "tsx scripts/run-keep-eu-sync.ts",
     "jobs:worker": "tsx scripts/jobs-worker.ts",
     "jobs:enqueue": "tsx scripts/jobs-enqueue.ts",
     "rls:check": "tsx scripts/check-rls.ts",
