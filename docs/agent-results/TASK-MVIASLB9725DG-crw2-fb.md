@@ -6,10 +6,10 @@ ajan: crw2-fb
 motor: claude
 tip: hata
 okur: ekip
-hüküm: Kısmen bitti: koruma, testler ve belge 674d6f91'de commit'lendi ve doğrulandı; ancak pre-push tam gate'i yük altında (load ~24) dört denemede de zaman aşımına duyarlı 1-4 ilgisiz testle kırmızı döndüğü için dal push edilemedi ve PR açılmadı.
+hüküm: Bitti, incelemeye hazır: koruma, testler ve belge 674d6f91'de; dal tam pre-push gate'i yeşil geçerek push edildi (6. deneme, --no-verify yok) ve dev'e PR #145 açıldı (merge edilmedi): https://github.com/yaslan/fonbridge/pull/145
 platform: mac (Darwin 27, git 2.54.0) üzerinde doğrulandı. Kanca ve yardımcı betik POSIX sh; Linux'ta aynı çalışır (CI ubuntu). Windows: Git-for-Windows sh'si ile çalışır; `tests/core-bare-guard.test.ts` `sh` ve chmod'lu stub kullanır, Git-bash PATH'te değilse ENOENT verir (FO-111 testindeki Ö3 ile aynı sınır) — Windows'ta koşulamadı, makine yok.
-sürüm: 1
-tarih: 2026-10-21T19:43:01.994Z
+sürüm: 2
+tarih: 2026-10-21T20:45:00.000Z
 ---
 
 # FO-114 · core.bare=true koruması (kancalar + regresyon testi + belge)
@@ -73,6 +73,14 @@ $ git status -sb
 
 Load average 23–25. Kırmızı dosyaların yedisi birlikte tek başına koşunca **120 passed (120)**. Diff `src/`'ye ve bu testlere dokunmuyor. Bu koşularda ana checkout `core.bare` her seferinde `false` kaldı; yeni gate sonrası kontrol tetiklenmedi.
 
+### Push sonucu (ikinci tur, 21.10 23:09–23:43)
+- **Deneme 5** (load başta ~7, koşu sırasında 31'e çıktı): 3 kırmızı. `expert-prereg-form.test.tsx` ×2 (30 sn timeout) ve `rag-pdf-worker-isolation.test.ts` "128 MB-inflating stream … fast" (`expected 3602 to be less than 3000`). İkisi tek başına koşunca: **44 passed (44)**. Yük kaynaklı, test gevşetilmedi.
+- 1-dk load 8'in altına inene kadar beklendi (23:29, load 6.92).
+- **Deneme 6:** tam gate yeşil. `Test Files 368 passed | 7 skipped (375)`, `Tests 4872 passed | 120 skipped (4992)`; e2e `380 passed (12.4m)`; `alerts:check` "Öksüz alarm yok"; gate sonrası `core_bare_guard` geçti. Push çıktısı: `* [new branch] crw2-fb/fo114-core-bare-guard -> crw2-fb/fo114-core-bare-guard`.
+- **PR:** https://github.com/yaslan/fonbridge/pull/145 (base `dev`, merge edilmedi). Dal, dev'in iki yeni docs merge'ünün (#141, #142) gerisinde; dosya çakışması yok, rebase yapılmadı.
+- Ana checkout `git config --get core.bare` → `false` (push sonrası).
+- İzole DB `crw2-fo114-pg` kaldırıldı (`docker rm -f`).
+
 ## Değişen dosyalar
 `githooks/pre-commit`, `githooks/pre-push`, `scripts/git-core-bare.sh` (yeni), `tests/core-bare-guard.test.ts` (yeni), `tests/tenant-bypass-scan.test.ts`, `eslint.config.mjs`, `vitest.config.mts`, `docs/RELEASE_CHECKLIST.md`, `CLAUDE.md`.
 
@@ -87,4 +95,4 @@ Load average 23–25. Kırmızı dosyaların yedisi birlikte tek başına koşun
 - GitHub Actions dev'de "failure" görünüyor, ama nedeni testler değil: job "recent account payments have failed or your spending limit needs to be increased" yüzünden hiç başlamıyor (run 39659796275). Bu, patronun faturalama ayarı.
 
 ## Sonraki adım
-Yük düşünce aynı worktree'den `E2E_PORT=3214 git push -u origin crw2-fb/fo114-core-bare-guard`, ardından PR'ı dev'e aç (merge etme) → CRW-FB incelemesi. İş bitince `docker rm -f crw2-fo114-pg`.
+PR #145'i CRW-FB incelesin, sonra lider merge etsin. Merge'den sonra ana checkout ve açık dallar dev'i alınca koruma yayılır. Worktree `.claude/worktrees/fo114-core-bare-guard`, merge'den sonra silinebilir.
