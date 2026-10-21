@@ -36,7 +36,7 @@ const h = vi.hoisted(() => {
       allowedModules: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10'],
     },
     auth: vi.fn(),
-    moduleStateFindUnique: vi.fn(),
+    moduleStateFindMany: vi.fn(),
     getEntitlements: vi.fn(),
     // The two rows a generation writes — the subject of the refusal assertions.
     aiUsageLogCreate: vi.fn(),
@@ -98,7 +98,7 @@ vi.mock('@/lib/db', async (importOriginal) => {
   assertTenantScope: actual.assertTenantScope,
   MissingTenantScopeError: actual.MissingTenantScopeError,
   prisma: {
-    moduleState: { findUnique: h.moduleStateFindUnique },
+    moduleState: { findMany: h.moduleStateFindMany },
     // `findFirst`: the template lookup carries a tenant arm (TASK-MTVTU103F11XJ).
     conceptTemplate: { findFirst: h.conceptTemplateFindFirst },
     topic: { findUnique: h.topicFindUnique },
@@ -107,10 +107,11 @@ vi.mock('@/lib/db', async (importOriginal) => {
   // TenantTx without widening either side to `any`.
   withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
     cb({
-      // `checkModuleAccess` reads its ModuleState row inside a tenant scope as
-      // of TASK-MTVR9T834EPUC — same spy as the `prisma` entry above, so a test
-      // that stubs one sees it whichever way the gate reaches the row.
-      moduleState: { findUnique: h.moduleStateFindUnique },
+      // `checkModuleAccess` reads the tenant's ModuleState rows inside a tenant
+      // scope as of TASK-MTVR9T834EPUC (all rows since TASK-MVBEM10PJYU0E) —
+      // same spy as the `prisma` entry above, so a test that stubs one sees it
+      // whichever way the gate reaches the rows.
+      moduleState: { findMany: h.moduleStateFindMany },
       aiUsageLog: { create: h.aiUsageLogCreate },
       creditLedger: { create: h.creditLedgerCreate, aggregate: h.creditLedgerAggregate },
       opportunity: { findFirst: h.opportunityFindFirst },
@@ -197,8 +198,14 @@ beforeEach(() => {
   h.state.allowedModules = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10'];
 
   h.auth.mockImplementation(async () => h.session);
-  h.moduleStateFindUnique.mockImplementation(async () =>
-    h.state.moduleStatus === null ? null : { status: h.state.moduleStatus }
+  // Every module at the test's status; `null` is a tenant with no rows.
+  h.moduleStateFindMany.mockImplementation(async () =>
+    h.state.moduleStatus === null
+      ? []
+      : ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11'].map((moduleId) => ({
+          moduleId,
+          status: h.state.moduleStatus,
+        }))
   );
   h.getEntitlements.mockImplementation(async () => ({
     allowedModules: h.state.allowedModules,
