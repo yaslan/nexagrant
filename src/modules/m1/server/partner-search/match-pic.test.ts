@@ -164,6 +164,17 @@ describe('helpers', () => {
     );
   });
 
+  it('gives no key to an organisation with neither a PIC nor a name', () => {
+    expect(matchKeyFor({ name: '', country: 'DE' })).toBeNull();
+    expect(matchKeyFor({ name: '   ', country: 'DE' })).toBeNull();
+    expect(matchKeyFor({ pic: '999 888 777', name: '', country: 'DE' })).toBe('pic:999888777');
+    expect(matchPic({ name: '   ', country: 'DE' }, [{ organisationId: '61', name: 'TU BERLIN', country: 'DE' }])).toEqual({
+      kind: 'unmatched',
+      matchKey: null,
+      bestScore: 0,
+    });
+  });
+
   it('nameSimilarity bounds', () => {
     expect(nameSimilarity('ABC', 'ABC')).toBe(1);
     expect(nameSimilarity('', 'ABC')).toBe(0);

@@ -2,15 +2,18 @@
  * PIC matching for partner-search announcements (FO-58 / TASK-MVCH1YZXDOED).
  *
  * An announcing organisation is linked to a CordisOrganization in three steps:
- *   1. exact PIC (`organisationId` is the PIC),
+ *   1. exact PIC (`organisationId` is the PIC), against every candidate whatever its country,
  *   2. name + country fuzzy match: accepted at `threshold` (default 0.9), only
  *      when the runner-up is at least `DEFAULT_PIC_MATCH_MARGIN` behind, and
  *      only when the differing words are single-letter typos of each other.
  *      A PIC the portal sent but CORDIS does not have never falls back to step 2,
- *   3. otherwise unmatched → an UnmatchedOrganization row keyed by `matchKeyFor`.
+ *   3. otherwise unmatched → an UnmatchedOrganization row keyed by `matchKeyFor`
+ *      (no row when the key is null: no PIC and no name).
  *
- * Pure: the caller loads the candidate organisations (same country is enough
- * for step 2) and writes the result. No DB, no I/O.
+ * Pure: the caller loads the candidate organisations and writes the result.
+ * Step 1 needs the organisation looked up by PIC across all countries (CORDIS
+ * may register it elsewhere); step 2 only reads same-country candidates.
+ * No DB, no I/O.
  */
 import { normalizeOrgName } from '@/lib/k2-cordis/cordisSchema';
 
@@ -32,7 +35,7 @@ export interface CandidateOrganization {
 export type PicMatch =
   | { kind: 'exact'; pic: string; score: 1 }
   | { kind: 'fuzzy'; pic: string; score: number }
-  | { kind: 'unmatched'; matchKey: string; bestScore: number };
+  | { kind: 'unmatched'; matchKey: string | null; bestScore: number };
 
 /** PICs are 9 digits; the portal sometimes sends them with spaces or as numbers. */
 export function normalizePic(pic: string | null | undefined): string | null {
@@ -96,12 +99,18 @@ function wordsCompatible(a: string, b: string): boolean {
   return onlyA.every((w, i) => isSingleTypo(w, onlyB[i] ?? ''));
 }
 
-/** Stable UnmatchedOrganization.matchKey: the PIC when there is one, else country + name. */
-export function matchKeyFor(org: AnnouncingOrganization): string {
+/**
+ * Stable UnmatchedOrganization.matchKey: the PIC when there is one, else country + name.
+ * Null when there is neither a PIC nor a name ("" or only spaces): nothing tells two such
+ * organisations apart, so a shared `name:<COUNTRY>:` key would merge them. The caller writes
+ * no UnmatchedOrganization row for a null key.
+ */
+export function matchKeyFor(org: AnnouncingOrganization): string | null {
   const pic = normalizePic(org.pic);
   if (pic) return `pic:${pic}`;
-  // A name that normalizes to nothing ("GmbH") keeps its raw text, so it cannot share a key with the empty name.
+  // A name that normalizes to nothing ("GmbH") keeps its raw text, so it cannot share a key with another name.
   const name = matchableName(org.name) || org.name.trim().toUpperCase();
+  if (!name) return null;
   return `name:${normalizeCountry(org.country) ?? '--'}:${name}`;
 }
 
@@ -112,6 +121,7 @@ export function matchPic(
 ): PicMatch {
   const pic = normalizePic(org.pic);
   if (pic) {
+    // Every candidate, not only the same country: the PIC is the identity wherever CORDIS registered it.
     const exact = candidates.find((c) => normalizePic(c.organisationId) === pic);
     if (exact) return { kind: 'exact', pic: exact.organisationId, score: 1 };
   }
