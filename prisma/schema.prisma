@@ -50,6 +50,7 @@ model Tenant {
   planAssignments PlanAssignment[]
   stripeEvents  StripeEventLog[]
   notifications Notification[]
+  partnerSearchQuota PartnerSearchQuotaUsage[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -554,6 +555,8 @@ model Topic {
   call           Call     @relation(fields: [callId], references: [id])
   matches        TopicMatch[]
   stats          TopicStat[]
+  partnerAnnouncements PartnerSearchAnnouncement[]
+  partnerSearchStat    PartnerSearchTopicStat?
   @@index([nextDeadlineAt])
   @@index([status])
 }
@@ -862,6 +865,10 @@ model CordisOrganization {
   isTurkish          Boolean    @default(false)
   rawJson            Json?
   updatedAt          DateTime   @updatedAt
+  // FO-58 Partner Search (additive; written by the partner-search ingestor only)
+  hasActiveAnnouncements Boolean   @default(false)
+  lastAnnouncementAt     DateTime?
+  portalProfileFetchedAt DateTime?
 
   participations     CordisParticipation[]
   profile            CordisPartnerProfile?
@@ -964,6 +971,143 @@ model CordisCoParticipation {
   @@id([orgA, orgB])
   @@index([orgA])
   @@index([orgB])
+}
+
+// ───────────────────── Partner Search (FO-58, global + one tenant counter) ─────────────────────
+// Funding & Tenders Portal partner-search announcements (docs/agent-results/TASK-MVCGPI6V3RM1F-*).
+// Global reference data like CORDIS: no tenantId, SYSTEM_WIDE in scripts/rls-models.ts.
+// Person announcements are NEVER stored as rows; only PartnerSearchTopicStat counts them.
+// Migration: prisma/migrations/add-partner-search.sql
+
+enum PartnerSearchAnnouncementType {
+  EXPERTISE_REQUEST
+  EXPERTISE_OFFER
+}
+
+enum PartnerSearchOrgType {
+  HES
+  REC
+  PRC
+  PUB
+  OTH
+}
+
+enum PartnerSearchSource {
+  PORTAL_API
+  TOPIC_HTML
+}
+
+enum PartnerSearchRunTrigger {
+  FULL
+  INCREMENTAL
+  MANUAL
+}
+
+enum PartnerSearchRunStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+model PartnerSearchAnnouncement {
+  id               String                        @id @default(cuid())
+  externalId       String                        @unique // portal announcement key
+  topicIdentifier  String                        // Topic.identifier
+  callIdentifier   String?
+  type             PartnerSearchAnnouncementType
+  description      String?                       @db.VarChar(500)
+  publishedAt      DateTime?
+  lastSeenAt       DateTime
+  withdrawnAt      DateTime?
+  organizationPic  String?                       // CordisOrganization.organisationId when matched
+  organizationName String
+  organizationType PartnerSearchOrgType          @default(OTH)
+  isSme            Boolean                       @default(false)
+  country          String?                       // ISO-3166-1 alpha-2
+  city             String?
+  keywords         Json                          @default("[]") // string[]
+  programmeCodes   Json                          @default("[]") // string[]
+  source           PartnerSearchSource
+  raw              Json?                         // allowlisted fields only; ecasId NEVER
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+  topic            Topic                         @relation(fields: [topicIdentifier], references: [identifier], onDelete: Cascade)
+
+  @@index([topicIdentifier])
+  @@index([organizationPic])
+  @@index([country])
+  @@index([type])
+  @@index([lastSeenAt])
+}
+
+// Latest portal organisation profile per PIC (overwritten on each fetch).
+model PartnerProfileSnapshot {
+  pic               String   @id
+  name              String
+  type              PartnerSearchOrgType @default(OTH)
+  country           String?
+  city              String?
+  description       String?  @db.Text
+  keywords          Json     @default("[]") // string[]
+  projectCount      Int      @default(0)
+  announcementCount Int      @default(0)
+  programmes        Json     @default("[]") // [{ code, role }]
+  topCollaborators  Json     @default("[]") // [{ pic, name, sharedProjects }]
+  fetchedAt         DateTime @default(now())
+
+  @@index([country])
+}
+
+model PartnerSearchIngestionRun {
+  id                      String                  @id @default(cuid())
+  startedAt               DateTime                @default(now())
+  finishedAt              DateTime?
+  trigger                 PartnerSearchRunTrigger
+  topicsScanned           Int                     @default(0)
+  created                 Int                     @default(0)
+  updated                 Int                     @default(0)
+  withdrawn               Int                     @default(0)
+  personAnnouncementCount Int                     @default(0)
+  status                  PartnerSearchRunStatus  @default(RUNNING)
+  error                   String?                 @db.Text
+
+  @@index([startedAt])
+}
+
+// Announcing organisations with no CordisOrganization yet (match-pic.ts said 'unmatched').
+model UnmatchedOrganization {
+  id          String    @id @default(cuid())
+  matchKey    String    @unique // matchKeyFor(): "pic:<pic>" or "name:<COUNTRY>:<normalized name>"
+  pic         String?
+  name        String
+  country     String?
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime
+  resolvedPic String?   // set once an admin or a later CORDIS import links it
+
+  @@index([pic])
+  @@index([resolvedPic])
+}
+
+// Anonymous person-announcement count per topic; no person row exists anywhere.
+model PartnerSearchTopicStat {
+  topicIdentifier         String   @id // Topic.identifier
+  personAnnouncementCount Int      @default(0)
+  updatedAt               DateTime @updatedAt
+  topic                   Topic    @relation(fields: [topicIdentifier], references: [identifier], onDelete: Cascade)
+}
+
+// Tenant-scoped: Discover queries per tenant per month. RLS tenant_isolation, written inside withTenant.
+model PartnerSearchQuotaUsage {
+  id        String   @id @default(cuid())
+  tenantId  String
+  month     String   // 'YYYY-MM' (UTC)
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, month])
 }
 
 // ───────────────────────── K5 Pipeline (tenant-scoped) ─────────────────────────

@@ -71,3 +71,4 @@ add-expert-pre-registration-organization.sql
 expert-prereg-rls-mail-quota.sql
 blog-read-minutes.sql
 add-expert-founder-counter.sql
+add-partner-search.sql
