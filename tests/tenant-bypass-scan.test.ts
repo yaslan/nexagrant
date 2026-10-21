@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   closingParen,
+  gitEnvFor,
+  HOOK_GIT_VARS,
   kindMatchesCheck,
   qualifyingBindAt,
   scan,
@@ -36,12 +38,15 @@ const repos: string[] = [];
 function fixtureRepo(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'tenant-bypass-e-'));
   repos.push(dir);
-  execFileSync('git', ['init', '-q'], { cwd: dir });
+  // gitEnvFor: under a git hook GIT_DIR is set, and without this the fixture's
+  // `git add` would land in the hook's repository index instead (FO-111).
+  const env = gitEnvFor(process.env);
+  execFileSync('git', ['init', '-q'], { cwd: dir, env });
   for (const [path, content] of Object.entries(files)) {
     mkdirSync(join(dir, path, '..'), { recursive: true });
     writeFileSync(join(dir, path), content);
   }
-  execFileSync('git', ['add', '--', ...Object.keys(files)], { cwd: dir });
+  execFileSync('git', ['add', '--', ...Object.keys(files)], { cwd: dir, env });
   return dir;
 }
 
@@ -517,5 +522,36 @@ describe('closingParen', () => {
     const code = 'f(a, g(b, (c)), d)';
     expect(closingParen(code, 1)).toBe(code.length - 1);
     expect(closingParen('f(a, g(b', 1)).toBe(-1);
+  });
+});
+
+describe('scan(cwd) reads cwd even when a git hook exported GIT_DIR (FO-111)', () => {
+  // `git push` runs pre-push with GIT_DIR set and `pnpm gate` inherits it. Git
+  // then ignores cwd: scan(fixture) listed the hook repository's index and read
+  // its paths under the fixture dir (ENOENT), and the fixture's `git add`
+  // wrote into that index. A decoy repository stands in for the hook's.
+  test('the fixture is scanned and the decoy index is left alone', () => {
+    const decoy = fixtureRepo({ 'src/decoy-only.ts': 'export const d = 1;\n' });
+    const saved = Object.fromEntries(HOOK_GIT_VARS.map((k) => [k, process.env[k]]));
+    process.env.GIT_DIR = join(decoy, '.git');
+    process.env.GIT_INDEX_FILE = join(decoy, '.git', 'index');
+    try {
+      const r = scanOne(`${HEAD}
+export const t = prisma.tenant.findMany({ include: { users: true } });
+`);
+      expect(r.filesScanned).toBe(1);
+      expect(ofFamilyE(r).map((f) => f.file)).toEqual(['src/fixture.ts']);
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+    const decoyIndex = execFileSync('git', ['ls-files'], {
+      cwd: decoy,
+      env: gitEnvFor(process.env),
+      encoding: 'utf8',
+    });
+    expect(decoyIndex.trim().split('\n')).toEqual(['src/decoy-only.ts']);
   });
 });
