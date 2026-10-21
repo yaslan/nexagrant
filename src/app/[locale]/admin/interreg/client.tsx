@@ -412,9 +412,9 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
                   onChange={(e) => setTopK(Number(e.target.value))}
                   className="px-3 py-2 rounded-xl text-sm bg-ground border border-border text-ink"
                 >
-                  <option value={3}>Top 3</option>
-                  <option value={5}>Top 5</option>
-                  <option value={10}>Top 10</option>
+                  <option value={3}>{t('topKOption', { count: 3 })}</option>
+                  <option value={5}>{t('topKOption', { count: 5 })}</option>
+                  <option value={10}>{t('topKOption', { count: 10 })}</option>
                 </select>
                 <button
                   onClick={handleTriggerRagSearch}

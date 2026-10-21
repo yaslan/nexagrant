@@ -3150,7 +3150,8 @@
     "emptyStateDesc": "Click the Sync button above to fetch projects and consortium partners from the keep.eu API.",
     "interregAndNext": "Interreg & NEXT",
     "m8PartnerPool": "M8 Partner Pool",
-    "turkishBeneficiariesDesc": "Local authorities & universities"
+    "turkishBeneficiariesDesc": "Local authorities & universities",
+    "topKOption": "Top {count}"
   },
   "blog": {
     "meta_title": "EU Grant Management & Insights Blog",

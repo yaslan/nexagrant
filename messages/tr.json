@@ -3150,7 +3150,8 @@
     "emptyStateDesc": "keep.eu API'sinden projeleri ve konsorsiyum ortaklarını çekmek için yukarıdaki Senkronize Et butonuna tıklayın.",
     "interregAndNext": "Interreg & NEXT",
     "m8PartnerPool": "M8 Partner Havuzu",
-    "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler"
+    "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler",
+    "topKOption": "İlk {count}"
   },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
