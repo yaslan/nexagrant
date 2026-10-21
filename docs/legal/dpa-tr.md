@@ -19,7 +19,7 @@ Bu sözleşme, aşağıdaki tabloda bilgileri yazılı iki taraf arasında yapı
 | Bilgi                      | Veri Sorumlusu (müşteri kurum) | Veri İşleyen                    |
 | -------------------------- | ------------------------------ | ------------------------------- |
 | Ad                         | ............................... | FonBridge                       |
-| Ticari unvan               | ............................... | Fonbridge Ltd. Şti.             |
+| Ticari unvan               | ............................... | Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.             |
 | Adres                      | ............................... | Karasamsun Mahallesi, İlkadım, SAMSUN [tamamlanacak] |
 | Vergi dairesi / VKN        | ............................... | 29120352230                     |
 | MERSİS no                  | ............................... | ............................... |

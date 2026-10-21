@@ -18,7 +18,7 @@ Kartlar: `TASK-MTT1WUUS7MN7R` (KDV) · `TASK-MTRJSOWFH6B45` (go-live)
 
 Merhaba,
 
-FonBridge Ltd. Şti. olarak, Avrupa fonlarına yönelik abonelik tabanlı bir yazılım
+Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. olarak, Avrupa fonlarına yönelik abonelik tabanlı bir yazılım
 hizmeti (SaaS) sunuyoruz. Faturalama altyapımızı canlıya almadan önce aşağıdaki
 konularda yazılı görüşünüze ihtiyacımız var. Her başlığın altında bugünkü
 uygulamamızı da yazdım; yanlışsa lütfen düzeltin.
@@ -115,7 +115,7 @@ Cevaplarınızı yazılı olarak iletmeniz yeterli; ardından kısa bir görüş
 edebiliriz.
 
 İyi çalışmalar,
-Dr. Yasin ASLAN · FonBridge Ltd. Şti.
+Dr. Yasin ASLAN · Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.
 bilgi@fonbridge.com · 0533 461 55 95
 
 ---

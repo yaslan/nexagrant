@@ -290,12 +290,16 @@ describe('helpers', () => {
 
   test('parseKvkkMarkdown reads the shipped notice', async () => {
     const { readFile } = await import('node:fs/promises');
-    for (const f of ['content/kvkk-uzman-v1.md', 'content/kvkk-uzman-v1.en.md']) {
+    for (const f of ['content/kvkk-uzman-v2.md', 'content/kvkk-uzman-v2.en.md']) {
       const blocks = parseKvkkMarkdown(await readFile(f, 'utf8'));
       expect(blocks[0]?.kind).toBe('title');
-      expect(blocks.filter((b) => b.kind === 'heading')).toHaveLength(7);
+      expect(blocks.filter((b) => b.kind === 'heading')).toHaveLength(8);
       expect(blocks.some((b) => b.kind === 'list')).toBe(true);
-      expect(JSON.stringify(blocks)).toContain('[FonBridge tüzel kişi unvanı]');
+      expect(JSON.stringify(blocks)).toContain('Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.');
+      // KVKK m.11 lists nine rights; the notice must carry all of them, plus the Art. 14 complaint route.
+      const rights = blocks.filter((b) => b.kind === 'list').at(-2);
+      expect(rights?.kind === 'list' && rights.items).toHaveLength(9);
+      expect(JSON.stringify(blocks)).toMatch(/(m|Art)\. ?14\b/);
     }
     expect(parseKvkkMarkdown('# T\n\na\nb\n- x\n- y\nc')).toEqual([
       { kind: 'title', text: 'T' },

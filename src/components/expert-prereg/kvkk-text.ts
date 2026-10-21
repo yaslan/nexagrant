@@ -1,6 +1,6 @@
 /**
  * FO-20 — the KVKK notice of the expert pre-registration form lives in
- * content/kvkk-uzman-v1*.md so a lawyer can edit prose without touching code.
+ * content/kvkk-uzman-v2*.md so a lawyer can edit prose without touching code.
  * The repo has no Markdown dependency and the notice needs only headings,
  * paragraphs and bullet lists, so this reads that subset and nothing more.
  * Pure: the file is read by kvkk-text.server.ts.
