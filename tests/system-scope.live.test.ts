@@ -325,7 +325,8 @@ describe('a forged system scope opens nothing', () => {
 /**
  * FO-52 (TASK-MVC9FW2U15VM6, K-569554 = C) — 'public-intake' is the anonymous
  * expert form, and the database opens only the form's tables for it
- * (prisma/rls.sql system_scope_open). Every other purpose still opens all rows.
+ * (prisma/rls.sql system_scope_open). Every other purpose still opens all rows
+ * but the expert data it does not handle (FO-92, below).
  * Raw `pg` as fabrika_app, one transaction per arm, always rolled back.
  */
 describe('public-intake opens only the expert form tables', () => {
@@ -378,5 +379,67 @@ describe('public-intake opens only the expert form tables', () => {
       return (await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = $1`, [id])).rows;
     });
     expect(seen).toEqual([{ id }]);
+  });
+});
+
+/**
+ * FO-92 (FO-21 O4) — the reverse direction: the expert's personal data opens
+ * only for the purposes that handle it (prisma/rls.sql system_scope_open). The
+ * fixture row is written by public-intake and counted under each purpose in the
+ * same transaction, so concurrent writers cannot skew the count; rolled back.
+ */
+describe('expert pre-registrations open only for the purposes that handle them', () => {
+  const EXPECTED: Record<string, number> = {
+    'tenant-discovery': 0,
+    'subject-scoped': 0,
+    'platform-admin': 1,
+    'platform-aggregate': 1,
+    'cross-tenant-job': 1,
+    'public-intake': 1,
+  };
+
+  test('tenant-discovery and subject-scoped read 0, the handling purposes read the row', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const id = `epr-reverse-${RUN}`;
+    const seen = await asApp(async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(`SELECT enter_system_scope('public-intake')`);
+        await c.query(
+          `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+           VALUES ($1, 'probe', $1 || '@system-scope.test', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+          [id]
+        );
+        const out: Record<string, number> = {};
+        for (const purpose of SYSTEM_SCOPE_PURPOSES) {
+          await c.query('SELECT enter_system_scope($1)', [purpose]);
+          const sql = `SELECT count(*)::int AS n FROM "ExpertPreRegistration" WHERE id = $1`;
+          out[purpose] = Number((await c.query<{ n: number }>(sql, [id])).rows[0]?.n ?? -1);
+        }
+        return out;
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+    expect(seen).toEqual(EXPECTED);
+  });
+
+  test('tenant-discovery cannot write an expert row', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await asApp(async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(`SELECT enter_system_scope('tenant-discovery')`);
+        await expect(
+          c.query(
+            `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+             VALUES ($1, 'probe', $1 || '@system-scope.test', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+            [`epr-discovery-${RUN}`]
+          )
+        ).rejects.toThrow(/row-level security/i);
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
   });
 });
