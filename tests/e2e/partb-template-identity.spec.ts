@@ -205,8 +205,15 @@ test.describe('Part B editor — an unwritten section is shown as unwritten', ()
       expect(await unassigned.count()).toBeGreaterThanOrEqual(9);
 
       // An empty section reports zero words, not the invented proposal's page count, in the
-      // viewer's language: the English screen used to say "(0 Kelime)" (FO-93).
-      expect(body).toContain(locale === 'tr' ? '(0 Kelime)' : '(0 Words)');
+      // viewer's language: the English screen used to say "(0 Kelime)" (FO-93). The page-budget
+      // bar prints "(0 Words)" as well, so the whole active-section line is matched — a Turkish
+      // leak there would otherwise hide behind the bar (FO-95).
+      const activeSectionLine = new RegExp(
+        `^${messages.PartBEditor.currentPages.replace(/[.*+?^$()|[\]\\]/g, '\\$&')}$`
+          .replace('{pages}', '[\\d.,]+')
+          .replace('{words}', '0'),
+      );
+      await expect(app.getByText(activeSectionLine)).toBeVisible();
     });
   }
 });

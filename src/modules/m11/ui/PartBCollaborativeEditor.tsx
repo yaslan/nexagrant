@@ -1001,7 +1001,7 @@ export function PartBCollaborativeEditor({
                       ) : null}
                     </div>
                     <span className="text-[10px] text-muted font-mono">
-                      {new Date(cmt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(cmt.timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
