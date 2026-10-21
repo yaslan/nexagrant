@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto';
 import { defineJob } from '../define';
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
 import { errorCode } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { subjectRefOf } from '@/lib/legal/subject-ref';
 import {
   UsersScheduledDeletionEventSchema,
   UsersScheduledDeletionOutputSchema,
@@ -241,14 +241,6 @@ interface PurgedUser {
   deletionRequestedAt: Date | string | null;
   deletionReason: string | null;
   memberships: Array<{ tenantId: string }>;
-}
-
-/**
- * The one-way reference to an erased subject that replaces their id in the
- * audit trail. Deterministic, so anyone holding the original id can recompute it.
- */
-function subjectRefOf(userId: string): string {
-  return createHash('sha256').update(userId).digest('hex');
 }
 
 /** Writes one `user.erased` AuditEvent per tenant the subject belonged to. */
