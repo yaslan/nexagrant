@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "efatura:preflight": "tsx scripts/efatura-preflight.ts",
     "db:migrate": "prisma migrate dev",
+    "db:setup": "bash scripts/db-setup.sh",
     "db:generate": "prisma generate",
     "db:rls": "tsx scripts/apply-rls.ts",
     "db:rls-role": "tsx scripts/setup-rls-role.ts",
