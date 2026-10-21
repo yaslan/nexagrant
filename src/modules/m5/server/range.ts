@@ -51,3 +51,24 @@ export function resolveDashboardRange(
 
   return { from: fromDate, to: toDate, rangeEnd: new Date(toDate.getTime() + DAY_MS - 1) };
 }
+
+/**
+ * Most points the trend chart draws per metric. A hand-edited `?from=1000-01-01`
+ * is a valid date, and at a week per bucket it was ~53,000 buckets: the query
+ * stays fast, but ~106,000 points went into the page payload and the chart
+ * (TASK-MVCW3ANV1JU6Y).
+ */
+export const MAX_TREND_BUCKETS = 120;
+
+/**
+ * The bucket width for a trend over `from`…`to`: `minDays` (a week by default)
+ * while that fits in {@link MAX_TREND_BUCKETS}, otherwise the smallest multiple
+ * of it that does — a five-year range comes out at three weeks, so bucket starts
+ * stay on the same weekday whatever the length.
+ */
+export function trendIntervalDays(from: Date, to: Date, minDays: number = 7): number {
+  const span = to.getTime() - from.getTime();
+  if (span <= 0) return minDays;
+  // floor(span / step) + 1 buckets; that is <= MAX exactly when step > span / MAX.
+  return (Math.floor(span / (MAX_TREND_BUCKETS * minDays * DAY_MS)) + 1) * minDays;
+}
