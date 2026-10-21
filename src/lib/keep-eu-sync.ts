@@ -99,10 +99,18 @@ export interface KeepEuProjectRecord {
   rawJson?: Record<string, unknown>;
 }
 
+/**
+ * Why keep.eu could not be read. A fixed code, never the upstream or exception text:
+ * the detail goes to SystemAlert, and the admin UI maps the code to a translated message.
+ */
+export type KeepEuFetchErrorCode = 'missing_api_key' | 'forbidden' | 'upstream_error' | 'timeout' | 'network_error';
+
 export interface KeepEuSyncResult {
   success: boolean;
   /** False when keep.eu could not be read; `source:'database'` figures are then stale re-indexes. */
   upstreamOk: boolean;
+  /** Set exactly when `upstreamOk` is false. */
+  upstreamError?: KeepEuFetchErrorCode;
   source: 'api' | 'input' | 'database';
   syncedProjectsCount: number;
   syncedPartnersCount: number;
@@ -465,20 +473,19 @@ export async function fetchKeepEuOpenData(options?: {
   userAgent?: string;
   /** False for dry runs: no RawFetch row and no SystemAlert is written. */
   persist?: boolean;
-}): Promise<{ ok: boolean; data: unknown; error?: string }> {
+}): Promise<{ ok: boolean; data: unknown; error?: KeepEuFetchErrorCode }> {
   const persist = options?.persist !== false;
   const apiKey = options?.apiKey ?? env.KEEP_EU_API_KEY;
   if (!apiKey) {
-    const error = 'KEEP_EU_API_KEY is not configured in environment';
     if (persist) {
       await recordAlert({
         level: 'error',
         source: KEEP_EU_SYNC_ALERT_SOURCE,
-        message: `keep.eu fetch skipped: ${error}`,
+        message: 'keep.eu fetch skipped: KEEP_EU_API_KEY is not configured in environment',
         dedupeKey: 'keep-eu-sync:missing-api-key',
       });
     }
-    return { ok: false, data: null, error };
+    return { ok: false, data: null, error: 'missing_api_key' };
   }
 
   const idsParam = options?.programmeIds
@@ -517,7 +524,7 @@ export async function fetchKeepEuOpenData(options?: {
               : `keep-eu-sync:http-error-${response.status}`,
         });
       }
-      return { ok: false, data: null, error: statusText };
+      return { ok: false, data: null, error: response.status === 403 ? 'forbidden' : 'upstream_error' };
     }
 
     const json = await response.json();
@@ -556,7 +563,7 @@ export async function fetchKeepEuOpenData(options?: {
         dedupeKey: timedOut ? 'keep-eu-sync:timeout' : 'keep-eu-sync:network-error',
       });
     }
-    return { ok: false, data: null, error: message };
+    return { ok: false, data: null, error: timedOut ? 'timeout' : 'network_error' };
   }
 }
 
@@ -813,6 +820,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
   let dataset: KeepEuProjectRecord[] = [];
   let programmesCount = 1;
   let upstreamOk = true;
+  let upstreamError: KeepEuFetchErrorCode | undefined;
 
   if (options?.records) {
     source = 'input';
@@ -827,6 +835,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
       // The upstream failed, so nothing new was read. Re-indexing old rows is an explicit opt-in
       // and is reported as a failure: it must never look like a successful sync.
       upstreamOk = false;
+      upstreamError = fetchRes.error ?? 'upstream_error';
       if (options?.allowDatabaseFallback) {
         dataset = await loadInterregProjectsFromDatabase(DEFAULT_DATABASE_BATCH);
         source = 'database';
@@ -929,6 +938,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
   return {
     success: upstreamOk && skippedCount === 0,
     upstreamOk,
+    upstreamError,
     source,
     syncedProjectsCount,
     syncedPartnersCount,

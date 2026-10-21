@@ -16,7 +16,7 @@ import {
   TrendingUp,
   FileText,
 } from 'lucide-react';
-import type { KeepEuMetrics, KeepEuSyncResult } from '@/lib/keep-eu-sync';
+import type { KeepEuFetchErrorCode, KeepEuMetrics, KeepEuSyncResult } from '@/lib/keep-eu-sync';
 import {
   handleRunKeepEuSyncAction,
   handleGetKeepEuMetricsAction,
@@ -28,6 +28,15 @@ interface RetrievedChunk {
   text: string;
   score: number;
 }
+
+/** Translation key for each fixed keep.eu failure code; the service never sends upstream text. */
+const UPSTREAM_ERROR_KEYS = {
+  missing_api_key: 'upstreamMissingApiKey',
+  forbidden: 'upstreamForbidden',
+  upstream_error: 'upstreamErrorResponse',
+  timeout: 'upstreamTimeout',
+  network_error: 'upstreamNetworkError',
+} as const satisfies Record<KeepEuFetchErrorCode, string>;
 
 interface KeepEuAdminClientProps {
   initialMetrics: KeepEuMetrics;
@@ -58,7 +67,11 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
 
     try {
       const res = await handleRunKeepEuSyncAction(customProgrammeIds || undefined);
-      setSyncResult(res);
+      if (res.upstreamError) {
+        setSyncError(t(UPSTREAM_ERROR_KEYS[res.upstreamError]));
+      } else {
+        setSyncResult(res);
+      }
       const updatedMetrics = await handleGetKeepEuMetricsAction();
       setMetrics(updatedMetrics);
     } catch (err) {

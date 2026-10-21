@@ -506,6 +506,18 @@ describe('syncKeepEuData', () => {
     expect(doc?.title).toContain('ENPORT STRANDJA');
   });
 
+  test('a failed keep.eu read reports the fixed code and no sync counts', async () => {
+    // Without KEEP_EU_API_KEY the fetch is skipped; with it, the 403 is the failure. Either way: a code.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 403, statusText: 'Forbidden' })));
+    const res = await syncKeepEuData({ programmeIds: [305] });
+    vi.unstubAllGlobals();
+
+    expect(res.success).toBe(false);
+    expect(res.upstreamOk).toBe(false);
+    expect(['missing_api_key', 'forbidden']).toContain(res.upstreamError);
+    expect(res.syncedProjectsCount).toBe(0);
+  });
+
   test('mirrors existing database records when sourceFromDatabaseOnly is true', async () => {
     await persistKeepEuRecord(sampleKeepEuProject());
     db.clear('document');
@@ -573,11 +585,16 @@ describe('fetchKeepEuOpenData', () => {
   test('returns error and records alert when API key is missing', async () => {
     const res = await fetchKeepEuOpenData({ apiKey: '' });
     expect(res.ok).toBe(false);
-    expect(res.error).toContain('KEEP_EU_API_KEY is not configured');
+    expect(res.error).toBe('missing_api_key');
 
     const alerts = db.rows('systemAlert');
     expect(
-      alerts.some((a) => a.source === KEEP_EU_SYNC_ALERT_SOURCE && String(a.message).includes('skipped'))
+      alerts.some(
+        (a) =>
+          a.source === KEEP_EU_SYNC_ALERT_SOURCE &&
+          String(a.message).includes('skipped') &&
+          String(a.message).includes('KEEP_EU_API_KEY is not configured')
+      )
     ).toBe(true);
   });
 });
@@ -595,7 +612,7 @@ describe('fetchKeepEuOpenData failure handling (B2, Y3)', () => {
     const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305] });
 
     expect(res.ok).toBe(false);
-    expect(res.error).toContain('403');
+    expect(res.error).toBe('forbidden');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('refused access'));
     expect(alerts).toHaveLength(1);
@@ -609,7 +626,28 @@ describe('fetchKeepEuOpenData failure handling (B2, Y3)', () => {
     const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305] });
 
     expect(res.ok).toBe(false);
+    expect(res.error).toBe('timeout');
     const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('did not answer within 30s'));
+    expect(alerts).toHaveLength(1);
+  });
+
+  test('a non-403 HTTP error returns a fixed code, the status only in the alert', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500, statusText: 'Internal Server Error' })));
+
+    const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305] });
+
+    expect(res).toEqual({ ok: false, data: null, error: 'upstream_error' });
+    const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('HTTP 500'));
+    expect(alerts).toHaveLength(1);
+  });
+
+  test('a network error returns a fixed code and never the thrown text', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error('getaddrinfo ENOTFOUND keep.eu.internal'))));
+
+    const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305] });
+
+    expect(res).toEqual({ ok: false, data: null, error: 'network_error' });
+    const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('ENOTFOUND'));
     expect(alerts).toHaveLength(1);
   });
 
