@@ -81,3 +81,19 @@ describe.each(ACTIONS)('$name', ({ call, effects }) => {
     expect(effects()[0]).toHaveBeenCalled();
   });
 });
+
+describe('input validation (FO-112 Ö5)', () => {
+  beforeEach(() => {
+    m.auth.mockResolvedValue(PLATFORM_ADMIN);
+  });
+
+  test('rejects an unbounded topK before any embedding is paid for', async () => {
+    await expect(interreg.handleTestInterregRagQuery('test', 500)).rejects.toThrow();
+    expect(m.retrieveChunks).not.toHaveBeenCalled();
+  });
+
+  test('rejects programme ids that are not numbers', async () => {
+    await expect(interreg.handleRunKeepEuSyncAction('305; DROP TABLE')).rejects.toThrow();
+    expect(m.syncKeepEuData).not.toHaveBeenCalled();
+  });
+});
