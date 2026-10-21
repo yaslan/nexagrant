@@ -251,6 +251,10 @@ async function main() {
   console.log(`  - INTERREG Document Records:       ${ragDocCount}`);
   console.log(`  - Embedded Vector Chunks (1536d):  ${ragChunkCount}`);
 
+  if (!syncResult.upstreamOk) {
+    console.error('\n❌ keep.eu was not reachable: the database rows were re-indexed, no new upstream data was synced.');
+    process.exit(1);
+  }
   if (syncResult.skippedCount > 0) {
     console.warn(`\n⚠️ Finished with ${syncResult.skippedCount} skipped projects.`);
     process.exit(1);

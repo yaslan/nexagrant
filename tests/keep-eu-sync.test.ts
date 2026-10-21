@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { fakeEmbedding } from './helpers/fake-embedding';
 
@@ -39,6 +40,16 @@ function createKeepEuStub() {
   const asString = (val: unknown): string => String(val ?? '');
 
   const delegate = (name: TableName, keyOf: (where: Row) => string) => ({
+    findUnique: async (args: { where: Row }): Promise<Row | null> => table(name).get(keyOf(args.where)) ?? null,
+    create: async (args: { data: Row }): Promise<Row> => upsertInto(name, keyOf(args.data), args.data, {}),
+    update: async (args: { where: Row; data: Row }): Promise<Row> => {
+      const key = keyOf(args.where);
+      const existing = table(name).get(key);
+      if (!existing) throw new Error(`${name} row not found: ${key}`);
+      const row = { ...existing, ...args.data };
+      table(name).set(key, row);
+      return row;
+    },
     upsert: async (args: { where: Row; create?: Row; update?: Row }): Promise<Row> =>
       upsertInto(name, keyOf(args.where), args.create ?? {}, args.update ?? {}),
     count: async (args?: { where?: Row }): Promise<number> => {
@@ -190,6 +201,16 @@ function createKeepEuStub() {
 
     $queryRaw: async (query: TemplateStringsArray): Promise<unknown[]> => {
       const sql = query.join('');
+      if (sql.includes('AS "count"')) {
+        // Distinct partner organisations across all INTERREG projects
+        const projectIds = new Set(rows('cordisProject').filter((r) => r.framework === 'INTERREG').map((r) => r.id));
+        const orgs = new Set(
+          rows('cordisParticipation')
+            .filter((p) => projectIds.has(p.projectId))
+            .map((p) => asString(p.organisationId))
+        );
+        return [{ count: BigInt(orgs.size) }];
+      }
       if (sql.includes('masterCall')) {
         // Group by masterCall
         const map = new Map<string, { count: bigint; grant: bigint }>();
@@ -558,3 +579,112 @@ describe('fetchKeepEuOpenData', () => {
   });
 });
 
+
+describe('persistKeepEuRecord — data protection (FO-112)', () => {
+  type Seedable = { create(args: { data: Record<string, unknown> }): Promise<unknown> };
+  const seed = (name: 'cordisOrganization' | 'cordisProject', data: Record<string, unknown>) =>
+    (db.prisma[name] as unknown as Seedable).create({ data });
+
+  test('never overwrites an existing CORDIS organisation; only fills empty fields', async () => {
+    await seed('cordisOrganization', {
+      organisationId: '999616914',
+      name: 'TRAKYA UNIVERSITESI',
+      nameNormalized: 'TRAKYA UNIVERSITESI',
+      country: 'TR',
+      city: null,
+      isTurkish: true,
+    });
+
+    const proj = sampleKeepEuProject();
+    proj.partners = [
+      {
+        partnerName: 'Trakya University, Edirne',
+        country: 'TR',
+        role: 'partner',
+        pic: '999616914',
+        town: 'Edirne',
+        isTurkish: true,
+      },
+    ];
+    await persistKeepEuRecord(proj);
+
+    const org = db.rows('cordisOrganization').find((o) => o.organisationId === '999616914');
+    expect(org?.name).toBe('TRAKYA UNIVERSITESI');
+    expect(org?.nameNormalized).toBe('TRAKYA UNIVERSITESI');
+    expect(org?.city).toBe('Edirne');
+  });
+
+  test('a blank beneficiary id does not create a shared KEU: organisation', async () => {
+    const proj = sampleKeepEuProject();
+    proj.partners = [
+      {
+        partnerName: 'Unkeyed Partner',
+        country: 'BG',
+        role: 'partner',
+        pic: null,
+        beneficiaryId: '|abc',
+        isTurkish: false,
+      },
+    ];
+    await persistKeepEuRecord(proj);
+
+    expect(db.rows('cordisOrganization').some((o) => o.organisationId === 'KEU:')).toBe(false);
+    expect(db.rows('cordisOrganization')).toHaveLength(0);
+  });
+
+  test('refuses to overwrite a non-Interreg project that shares the id', async () => {
+    await seed('cordisProject', {
+      id: 'BGTR0200037',
+      title: 'Horizon project title',
+      framework: 'HORIZON',
+    });
+
+    const ok = await persistKeepEuRecord(sampleKeepEuProject());
+    expect(ok).toBe(false);
+    expect(db.rows('cordisProject').find((p) => p.id === 'BGTR0200037')?.title).toBe('Horizon project title');
+    expect(
+      db.rows('systemAlert').some((a) => String(a.message).includes('non-Interreg'))
+    ).toBe(true);
+  });
+});
+
+describe('syncKeepEuData — upstream failure (FO-112)', () => {
+  test('a run that could not reach keep.eu is not reported as successful', async () => {
+    // fetch is stubbed so the test never reaches the network, whether or not a key is configured
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('unreachable');
+    }));
+    try {
+      const result = await syncKeepEuData({ programmeIds: '305' });
+      expect(result.source).toBe('database');
+      expect(result.upstreamOk).toBe(false);
+      expect(result.success).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('a database-only run is not an upstream failure', async () => {
+    const result = await syncKeepEuData({ sourceFromDatabaseOnly: true });
+    expect(result.upstreamOk).toBe(true);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('fetchKeepEuOpenData — raw answer (FO-112)', () => {
+  test('records the response body in RawFetch and hashes the body bytes', async () => {
+    const body = JSON.stringify({ 'exported date': '2026-10-01', programmes: [] });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200 })));
+    try {
+      const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: '305' });
+      expect(res.ok).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    const raw = db.rows('rawFetch')[0];
+    expect(raw?.source).toBe('keep_eu_open_data');
+    expect(raw?.hash).toBe(crypto.createHash('sha256').update(body).digest('hex'));
+    expect((raw?.payload as { body?: unknown }).body).toEqual({ 'exported date': '2026-10-01', programmes: [] });
+  });
+});
