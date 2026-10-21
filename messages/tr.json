@@ -2974,6 +2974,63 @@
       "placeholder": "örn: 5",
       "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz. Sitede okuyucunun dilinde gösterilir.",
       "missing": "Okuma süresi boş olamaz. İçerikte okunacak metin yoksa süreyi elle yazın."
+    },
+    "editor": {
+      "label": "Makale İçeriği (Markdown)",
+      "placeholder": "# Başlık\n\nParagraf metni…",
+      "hint": "Desteklenenler: # / ## / ### başlık, **kalın**, *italik*, [link](url), ![görsel](url), * madde, 1. numaralı liste, > alıntı. Kalın için Ctrl/Cmd+B, italik için Ctrl/Cmd+I, link için Ctrl/Cmd+K.",
+      "previewEmpty": "Önizlenecek içerik yok.",
+      "toolbar": {
+        "label": "Biçimlendirme araçları",
+        "h1": "Başlık 1",
+        "h2": "Başlık 2",
+        "h3": "Başlık 3",
+        "bold": "Kalın",
+        "italic": "İtalik",
+        "quote": "Alıntı",
+        "bulletList": "Madde işaretli liste",
+        "numberedList": "Numaralı liste",
+        "link": "Bağlantı ekle",
+        "image": "Görsel ekle"
+      },
+      "tabs": {
+        "label": "İçerik görünümü",
+        "write": "Yaz",
+        "preview": "Önizle"
+      },
+      "stats": {
+        "words": "{count} kelime",
+        "chars": "{count} karakter"
+      },
+      "linkModal": {
+        "title": "Bağlantı Ekle",
+        "textLabel": "Bağlantı Metni",
+        "textPlaceholder": "Bağlantı verilecek metin…",
+        "urlLabel": "Bağlantı Adresi (URL)",
+        "urlPlaceholder": "https://example.com",
+        "cancel": "İptal",
+        "submit": "Bağlantıyı Ekle"
+      },
+      "imageModal": {
+        "title": "Görsel Ekle",
+        "tabUpload": "Dosya Yükle",
+        "tabUrl": "Görsel URL",
+        "uploadLabel": "Görsel seçin veya sürükleyin",
+        "uploadHint": "JPG, PNG veya WebP, en fazla {maxMb} MB",
+        "uploading": "Görsel yükleniyor…",
+        "urlLabel": "Görsel URL Adresi",
+        "urlPlaceholder": "https://images.unsplash.com/...",
+        "altLabel": "Açıklama / Alt Metin (İsteğe bağlı)",
+        "altPlaceholder": "Görsel açıklaması…",
+        "cancel": "İptal",
+        "submit": "Görseli Ekle",
+        "errors": {
+          "type": "Bu dosya türü desteklenmiyor. JPG, PNG veya WebP bir görsel seçin.",
+          "size": "Görsel {maxMb} MB'tan büyük. Daha küçük bir dosya seçin.",
+          "forbidden": "Görsel yükleme yetkiniz yok.",
+          "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
+        }
+      }
     }
   },
   "adminDocuments": {
@@ -3116,6 +3173,49 @@
       "SKIP_LIMIT_EXCEEDED": "İçe aktarım hatası: CORDIS dökümünde okunamayan kayıt sayısı sınırı aştı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında.",
       "IMPORT_FAILED": "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında."
     }
+  },
+  "adminInterreg": {
+    "title": "Interreg & keep.eu Veri Merkezi",
+    "subtitle": "Avrupa Birliği sınır ötesi (CBC), Interreg ve NEXT işbirliği programları veri senkronizasyonu ve analitiği.",
+    "badge": "Interreg / keep.eu",
+    "syncNow": "keep.eu ile Senkronize Et",
+    "syncing": "Senkronize Ediliyor...",
+    "lastSync": "Son Senkronizasyon",
+    "neverSynced": "Henüz senkronize edilmedi",
+    "totalProjects": "Toplam Interreg Projesi",
+    "totalFunding": "Toplam AB / IPA Hibesi",
+    "totalBudget": "Toplam Bütçe",
+    "totalPartners": "Toplam Kurum & Ortak",
+    "turkishPartners": "Türk Yararlanıcı (TR)",
+    "tabProgrammes": "Programlar & Senkronizasyon",
+    "tabCountries": "Ülke Dağılımı",
+    "tabRag": "RAG Arama Workbench",
+    "syncSuccess": "Senkronizasyon Başarılı",
+    "syncError": "Senkronizasyon Hatası",
+    "syncedProjectsCount": "{count} proje başarıyla senkronize edildi",
+    "syncedPartnersCount": "{count} konsorsiyum ortağı kaydedildi",
+    "skippedCount": "{count} kayıt atlandı",
+    "totalEuFundingEUR": "Toplam Hibe: €{amount}",
+    "selectProgrammes": "Senkronize Edilecek Programlar",
+    "defaultProgrammesHelp": "Varsayılan: Türkiye'nin uygun olduğu 4 sınır ötesi işbirliği programı (Bulgaristan-Türkiye, Karadeniz Havzası, NEXT MED, CBC 2014-2020).",
+    "customIdsPlaceholder": "Özel Program ID'leri (virgülle ayırın, örn. 305, 387)",
+    "programmeTitle": "Program Adı",
+    "projectCount": "Proje Sayısı",
+    "grantAmount": "Toplam Hibe",
+    "country": "Ülke",
+    "partnerCount": "Ortak Sayısı",
+    "ragTitle": "Interreg Semantik Arama Testi",
+    "ragSubtitle": "RAG vektör veritabanına aktarılan Interreg projeleri üzerinde doğal dil sorgulaması yapın.",
+    "searchPlaceholder": "Örn: Sürdürülebilir turizm, Karadeniz çevre koruma, KOBİ dijitalleşme...",
+    "searchButton": "Semantik Ara",
+    "searching": "Aranıyor...",
+    "noResults": "Eşleşen sonuç bulunamadı.",
+    "similarityScore": "Benzerlik Skoru",
+    "emptyStateTitle": "Henüz Interreg Projesi Senkronize Edilmedi",
+    "emptyStateDesc": "keep.eu API'sinden projeleri ve konsorsiyum ortaklarını çekmek için yukarıdaki Senkronize Et butonuna tıklayın.",
+    "interregAndNext": "Interreg & NEXT",
+    "m8PartnerPool": "M8 Partner Havuzu",
+    "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler"
   },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
