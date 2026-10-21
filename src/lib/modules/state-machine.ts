@@ -128,6 +128,15 @@ export interface ModuleViewer {
 }
 
 /**
+ * A viewer built from a signed-in session (`tenantScopeOf`). `isMachine` is
+ * `never`, so the session paths in ./access.ts cannot open `PILOT` to every
+ * member by setting it — `{ ...viewer, isMachine: true }` does not compile.
+ * The API-key viewer in src/lib/api-auth.ts is the one place that sets it
+ * (TASK-MVDV63H2OCK0; tests/modules/session-viewer.test.ts).
+ */
+export type SessionViewer = Omit<ModuleViewer, 'isMachine'> & { isMachine?: never };
+
+/**
  * Why access was refused. A stable code rather than a sentence, so the UI can
  * translate it (CLAUDE.md §8) instead of printing an English string from the server.
  */

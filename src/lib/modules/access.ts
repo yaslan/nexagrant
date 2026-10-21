@@ -1,8 +1,8 @@
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
 import { withTenant } from '@/lib/db';
-import { tenantScopeOf } from '@/lib/tenant';
-import type { ModuleDenyReason } from '@/lib/modules/state-machine';
+import { tenantScopeOf, type TenantScope } from '@/lib/tenant';
+import type { ModuleDenyReason, SessionViewer } from '@/lib/modules/state-machine';
 import { getAllManifests } from '@/lib/modules/registry';
 import { checkModuleAccessForTenant, decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
@@ -46,6 +46,11 @@ export class ModuleAccessError extends Error {
   }
 }
 
+/** The session's viewer: role and staff flag only, never the API-key `isMachine`. */
+function sessionViewerOf(scope: TenantScope): SessionViewer {
+  return { role: scope.role, isPlatformAdmin: scope.isPlatformAdmin };
+}
+
 /**
  * Decide whether the session's viewer may use `moduleId`, on two facts:
  *
@@ -77,10 +82,7 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
     return { allowed: false, status: 'OFF', reason: 'NO_TENANT' };
   }
 
-  return checkModuleAccessForTenant(scope.tenantId, moduleId, {
-    role: scope.role,
-    isPlatformAdmin: scope.isPlatformAdmin,
-  });
+  return checkModuleAccessForTenant(scope.tenantId, moduleId, sessionViewerOf(scope));
 }
 
 /**
@@ -95,6 +97,7 @@ export async function listAccessibleModules(): Promise<ModuleId[]> {
   const scope = tenantScopeOf(await auth());
   if (!scope) return [];
 
+  const viewer = sessionViewerOf(scope);
   const [states, entitlements] = await Promise.all([
     withTenant(scope.tenantId, (tx) =>
       tx.moduleState.findMany({
@@ -113,10 +116,7 @@ export async function listAccessibleModules(): Promise<ModuleId[]> {
 
   return getAllManifests().map((m) => m.id).filter(
     (id) =>
-      decideModuleAccess(id, statusById.get(id) ?? 'OFF', entitlements.allowedModules, {
-        role: scope.role,
-        isPlatformAdmin: scope.isPlatformAdmin,
-      }).allowed,
+      decideModuleAccess(id, statusById.get(id) ?? 'OFF', entitlements.allowedModules, viewer).allowed,
   );
 }
 
