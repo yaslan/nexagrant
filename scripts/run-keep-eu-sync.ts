@@ -40,6 +40,16 @@ interface CliOptions {
   help: boolean;
 }
 
+/** Exits with code 2 on a value that is not a positive integer, instead of running with NaN. */
+function parseLimit(raw: string | undefined): number {
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    console.error(`--limit expects a positive whole number, got "${raw ?? ''}"`);
+    process.exit(2);
+  }
+  return value;
+}
+
 function parseCliArgs(): CliOptions {
   const args = process.argv.slice(2);
   const options: CliOptions = {
@@ -61,9 +71,9 @@ function parseCliArgs(): CliOptions {
     } else if (arg === '--source-db-only') {
       options.sourceDbOnly = true;
     } else if (arg.startsWith('--limit=')) {
-      options.limit = parseInt(arg.split('=')[1]!, 10);
+      options.limit = parseLimit(arg.split('=')[1]);
     } else if (arg === '--limit' && i + 1 < args.length) {
-      options.limit = parseInt(args[++i]!, 10);
+      options.limit = parseLimit(args[++i]);
     } else if (arg.startsWith('--programmes=') || arg.startsWith('--ids=')) {
       const raw = arg.split('=')[1]!;
       options.programmes = raw
@@ -114,7 +124,7 @@ async function main() {
 
   if (options.help) {
     printHelp();
-    process.exit(0);
+    return;
   }
 
   const programmeIds = options.programmes ?? [...DEFAULT_TURKEY_PROGRAMME_IDS];
@@ -135,17 +145,19 @@ async function main() {
   if (options.dryRun) {
     console.log('Fetching live upstream data from keep.eu Open Data API...');
     const started = Date.now();
-    const fetchRes = await fetchKeepEuOpenData({ programmeIds });
+    // persist: false keeps the dry run read-only (no RawFetch row, no SystemAlert).
+    const fetchRes = await fetchKeepEuOpenData({ programmeIds, persist: false });
 
     if (!fetchRes.ok || !fetchRes.data) {
       console.error(`❌ keep.eu fetch failed: ${fetchRes.error}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     const duration = Date.now() - started;
     console.log(`✅ Upstream API responded in ${duration}ms`);
 
-    const parsed = await parseKeepEuResponse(fetchRes.data);
+    const parsed = await parseKeepEuResponse(fetchRes.data, { persist: false });
     console.log(`\nProgrammes returned: ${parsed.programmesCount}`);
     console.log(`Total projects parsed: ${parsed.projects.length}`);
 
@@ -179,7 +191,7 @@ async function main() {
     }
 
     console.log('\n✅ [Dry Run Finished] No database or vector changes were made.');
-    process.exit(0);
+    return;
   }
 
   // Live synchronization
@@ -212,6 +224,7 @@ async function main() {
 
   console.log('\n───────────────────────────────────────────────────────────────────────────────');
   console.log(`Sync Completed in ${durationSec}s`);
+  console.log(`Upstream OK:             ${syncResult.upstreamOk ? 'YES' : 'NO (keep.eu was not read)'}`);
   console.log(`Success:                 ${syncResult.success ? 'YES' : 'PARTIAL / COMPLETED WITH SKIPS'}`);
   console.log(`Synced Projects:         ${syncResult.syncedProjectsCount}`);
   console.log(`Synced Partners:         ${syncResult.syncedPartnersCount}`);
@@ -251,19 +264,22 @@ async function main() {
   console.log(`  - INTERREG Document Records:       ${ragDocCount}`);
   console.log(`  - Embedded Vector Chunks (1536d):  ${ragChunkCount}`);
 
-  if (syncResult.skippedCount > 0) {
+  if (!syncResult.upstreamOk) {
+    console.error('\n❌ keep.eu could not be read; nothing new was synced. See SystemAlert for the cause.');
+    process.exitCode = 1;
+  } else if (syncResult.skippedCount > 0) {
     console.warn(`\n⚠️ Finished with ${syncResult.skippedCount} skipped projects.`);
-    process.exit(1);
+    process.exitCode = 1;
   } else {
     console.log('\n🎉 Live synchronization completed successfully with 0 errors.');
-    process.exit(0);
   }
 }
 
+// Exit code is set, not forced: `process.exit` here would skip the `finally` that closes the DB pool.
 main()
   .catch((err) => {
     console.error('Fatal CLI Error:', err);
-    process.exit(1);
+    process.exitCode = 1;
   })
   .finally(async () => {
     await prisma.$disconnect();

@@ -65,7 +65,7 @@ interface CordisOrgWithProfile {
 
 function toApiRow(org: CordisOrgWithProfile): PartnerApiRow {
   const parts = org.participations || [];
-  const coordCount = parts.filter((p) => p.role === 'coordinator' || p.role === 'lead').length;
+  const coordCount = parts.filter((p) => p.role === 'coordinator').length;
   const totalEc = parts.reduce((sum, p) => sum + (p.ecContribution ?? 0n), 0n);
   const isInterreg = parts.some((p) => p.project?.framework === 'INTERREG');
 

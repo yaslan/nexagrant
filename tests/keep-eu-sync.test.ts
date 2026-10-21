@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fakeEmbedding } from './helpers/fake-embedding';
 
 type Row = Record<string, unknown>;
@@ -119,7 +119,22 @@ function createKeepEuStub() {
       },
     },
 
-    cordisOrganization: delegate('cordisOrganization', (w) => asString(w.organisationId)),
+    cordisOrganization: {
+      ...delegate('cordisOrganization', (w) => asString(w.organisationId)),
+      findUnique: async (args: { where: Row }): Promise<Row | null> =>
+        table('cordisOrganization').get(asString(args.where.organisationId)) ?? null,
+      create: async (args: { data: Row }): Promise<Row> => {
+        const key = asString(args.data.organisationId);
+        table('cordisOrganization').set(key, { ...args.data });
+        return args.data;
+      },
+      update: async (args: { where: Row; data: Row }): Promise<Row> => {
+        const key = asString(args.where.organisationId);
+        const row = { ...(table('cordisOrganization').get(key) ?? {}), ...args.data };
+        table('cordisOrganization').set(key, row);
+        return row;
+      },
+    },
 
     cordisParticipation: {
       ...delegate('cordisParticipation', (w) => {
@@ -190,6 +205,15 @@ function createKeepEuStub() {
 
     $queryRaw: async (query: TemplateStringsArray): Promise<unknown[]> => {
       const sql = query.join('');
+      if (sql.includes('AS "count"')) {
+        // Distinct organisations with at least one Interreg participation.
+        const orgIds = new Set(
+          rows('cordisParticipation')
+            .filter((part) => rows('cordisProject').some((p) => p.id === part.projectId && p.framework === 'INTERREG'))
+            .map((part) => asString(part.organisationId)),
+        );
+        return [{ count: BigInt(orgIds.size) }];
+      }
       if (sql.includes('masterCall')) {
         // Group by masterCall
         const map = new Map<string, { count: bigint; grant: bigint }>();
@@ -558,3 +582,70 @@ describe('fetchKeepEuOpenData', () => {
   });
 });
 
+
+describe('fetchKeepEuOpenData failure handling (B2, Y3)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test('403 is not retried and raises one keep_eu_forbidden alert', async () => {
+    const fetchMock = vi.fn(async () => new Response('', { status: 403, statusText: 'Forbidden' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305] });
+
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('403');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('refused access'));
+    expect(alerts).toHaveLength(1);
+    expect(String(alerts[0]?.message)).toContain('Interact');
+  });
+
+  test('timeout is reported as a timeout alert, not a generic network error', async () => {
+    const timeout = Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(timeout)));
+
+    const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305] });
+
+    expect(res.ok).toBe(false);
+    const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('did not answer within 30s'));
+    expect(alerts).toHaveLength(1);
+  });
+
+  test('dry run (persist: false) writes no alert on 403', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 403, statusText: 'Forbidden' })));
+
+    const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305], persist: false });
+
+    expect(res.ok).toBe(false);
+    expect(db.rows('systemAlert')).toHaveLength(0);
+  });
+});
+
+describe('aggregateKeepEuMetrics partner count (Y4)', () => {
+  test('counts distinct partner organisations across more than 10 countries', async () => {
+    const countries = ['BG', 'TR', 'RO', 'GR', 'IT', 'HU', 'AT', 'DE', 'FR', 'ES', 'PL', 'CY'];
+    const base = sampleKeepEuProject();
+    await persistKeepEuRecord({
+      ...base,
+      leadPartner: undefined,
+      partners: countries.map((country, i) => ({
+        partnerName: `Partner ${country}`,
+        country,
+        role: 'partner',
+        pic: `9000000${String(i).padStart(2, '0')}`,
+        town: 'Town',
+        isTurkish: country === 'TR',
+        totalBudgetEUR: 1000,
+        euFundingEUR: 800,
+      })),
+    });
+
+    const metrics = await aggregateKeepEuMetrics();
+
+    // Previously this summed the top-10 country rows, which undercounts once
+    // there are more than ten countries and double-counts orgs in several.
+    expect(metrics.totalPartnersCount).toBe(countries.length);
+  });
+});

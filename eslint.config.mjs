@@ -25,6 +25,8 @@ const eslintConfig = defineConfig([
     // screenshots. Lint must not read it; a local run with CI=true writes it.
     "playwright-report/**",
     "test-results/**",
+    // Per-task scratch checkouts (FO-49 review copies); not part of the app.
+    ".claude-fo49/**",
   ]),
   {
     files: ["**/*.ts", "**/*.tsx"],

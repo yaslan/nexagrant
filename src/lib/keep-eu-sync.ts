@@ -14,6 +14,7 @@
  *   #52 All environment variable reads go through `env` in `src/lib/env.ts`.
  */
 
+import { createHash } from 'node:crypto';
 import { prisma } from './db';
 import { ingestDocument } from './rag';
 import { env } from '@/lib/env';
@@ -34,11 +35,28 @@ export const KEEP_EU_SYNC_ALERT_SOURCE = 'keep-eu-sync';
  */
 export const DEFAULT_TURKEY_PROGRAMME_IDS: readonly number[] = [305, 387, 385, 66];
 
-/** Browser user-agent needed because keep.eu's Gunicorn/nginx rejects bot UAs with HTTP 403. */
-export const KEEP_EU_HTTP_USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+/**
+ * Honest client identification. We do not impersonate a browser: keep.eu may refuse
+ * bot traffic with HTTP 403, and in that case we alert and stop instead of retrying
+ * under a different identity. Access must be agreed with Interact (keep.support@interact.eu).
+ */
+export const KEEP_EU_HTTP_USER_AGENT = 'FonBridge/1.0 (+https://fonbridge.com/contact)';
+
+/** Upper bound for one keep.eu request; a hung upstream must not block a job or admin action. */
+export const KEEP_EU_FETCH_TIMEOUT_MS = 30_000;
 
 export const KEEP_EU_API_BASE_URL = 'https://keep.eu/api/open-data';
+
+/** Namespace prefix for keep.eu-only project and organisation ids (never a CORDIS id). */
+const KEEP_EU_KEY_PREFIX = 'KEU:';
+
+/** Maps a stored id back to keep.eu terms: keep.eu-only keys become beneficiary ids, CORDIS PICs stay PICs. */
+function splitKeepEuKey(storedId: string): { pic: string | null; beneficiaryId: string | null } {
+  if (storedId.startsWith(KEEP_EU_KEY_PREFIX)) {
+    return { pic: null, beneficiaryId: storedId.slice(KEEP_EU_KEY_PREFIX.length) };
+  }
+  return { pic: storedId, beneficiaryId: null };
+}
 
 /** How many already-imported projects a no-argument sync mirrors into RAG. */
 const DEFAULT_DATABASE_BATCH = 200;
@@ -83,6 +101,8 @@ export interface KeepEuProjectRecord {
 
 export interface KeepEuSyncResult {
   success: boolean;
+  /** False when keep.eu could not be read; `source:'database'` figures are then stale re-indexes. */
+  upstreamOk: boolean;
   source: 'api' | 'input' | 'database';
   syncedProjectsCount: number;
   syncedPartnersCount: number;
@@ -299,17 +319,24 @@ export function normalizeKeepEuPartner(rawPart: Record<string, unknown>): KeepEu
 /**
  * Parses raw JSON returned by keep.eu Open Data API into normalized KeepEuProjectRecord array.
  */
-export async function parseKeepEuResponse(data: unknown): Promise<{
+export async function parseKeepEuResponse(
+  data: unknown,
+  options?: { persist?: boolean }
+): Promise<{
   programmesCount: number;
   projects: KeepEuProjectRecord[];
 }> {
+  const persist = options?.persist !== false;
+
   if (typeof data !== 'object' || data === null || !('programmes' in data)) {
-    await recordAlert({
-      level: 'error',
-      source: KEEP_EU_SYNC_ALERT_SOURCE,
-      message: 'keep.eu API response malformed: missing "programmes" array',
-      dedupeKey: 'keep-eu-sync:malformed-response',
-    });
+    if (persist) {
+      await recordAlert({
+        level: 'error',
+        source: KEEP_EU_SYNC_ALERT_SOURCE,
+        message: 'keep.eu API response malformed: missing "programmes" array',
+        dedupeKey: 'keep-eu-sync:malformed-response',
+      });
+    }
     return { programmesCount: 0, projects: [] };
   }
 
@@ -380,7 +407,7 @@ export async function parseKeepEuResponse(data: unknown): Promise<{
 
       // Drift detection (CLAUDE.md #6)
       const drift = detectProjectDrift(p);
-      if (Object.keys(drift).length > 0) {
+      if (persist && Object.keys(drift).length > 0) {
         await recordAlert({
           level: 'warn',
           source: KEEP_EU_SYNC_ALERT_SOURCE,
@@ -436,16 +463,21 @@ export async function fetchKeepEuOpenData(options?: {
   programmeIds?: number[] | string;
   apiKey?: string;
   userAgent?: string;
+  /** False for dry runs: no RawFetch row and no SystemAlert is written. */
+  persist?: boolean;
 }): Promise<{ ok: boolean; data: unknown; error?: string }> {
+  const persist = options?.persist !== false;
   const apiKey = options?.apiKey ?? env.KEEP_EU_API_KEY;
   if (!apiKey) {
     const error = 'KEEP_EU_API_KEY is not configured in environment';
-    await recordAlert({
-      level: 'error',
-      source: KEEP_EU_SYNC_ALERT_SOURCE,
-      message: `keep.eu fetch skipped: ${error}`,
-      dedupeKey: 'keep-eu-sync:missing-api-key',
-    });
+    if (persist) {
+      await recordAlert({
+        level: 'error',
+        source: KEEP_EU_SYNC_ALERT_SOURCE,
+        message: `keep.eu fetch skipped: ${error}`,
+        dedupeKey: 'keep-eu-sync:missing-api-key',
+      });
+    }
     return { ok: false, data: null, error };
   }
 
@@ -465,45 +497,65 @@ export async function fetchKeepEuOpenData(options?: {
         'User-Agent': userAgent,
         Accept: 'application/json',
       },
+      signal: AbortSignal.timeout(KEEP_EU_FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
       const statusText = `HTTP ${response.status} ${response.statusText}`;
-      await recordAlert({
-        level: 'error',
-        source: KEEP_EU_SYNC_ALERT_SOURCE,
-        message: `keep.eu API returned error: ${statusText}`,
-        meta: { status: response.status, programmeIds: idsParam },
-        dedupeKey: `keep-eu-sync:http-error-${response.status}`,
-      });
+      if (persist) {
+        await recordAlert({
+          level: 'error',
+          source: KEEP_EU_SYNC_ALERT_SOURCE,
+          message:
+            response.status === 403
+              ? `keep.eu refused access (${statusText}); access must be agreed with Interact`
+              : `keep.eu API returned error: ${statusText}`,
+          meta: { status: response.status, programmeIds: idsParam },
+          dedupeKey:
+            response.status === 403
+              ? 'keep_eu_forbidden'
+              : `keep-eu-sync:http-error-${response.status}`,
+        });
+      }
       return { ok: false, data: null, error: statusText };
     }
 
     const json = await response.json();
 
-    // CLAUDE.md #6: Raw fetch recorded into RawFetch table
-    await recordRawFetch({
-      source: 'keep_eu_open_data',
-      key: `programmes_${idsParam}`,
-      payload: {
-        url: KEEP_EU_API_BASE_URL,
-        programmeIds: idsParam,
-        status: response.status,
-        fetchedAt: new Date().toISOString(),
-        exportedDate: (json as { 'exported date'?: string })['exported date'] ?? null,
-      },
-    });
+    // CLAUDE.md #6: the full upstream body is stored. The hash covers only the body, so an
+    // unchanged response short-circuits even though `fetchedAt` differs between runs.
+    const body = json as Record<string, unknown>;
+    if (persist) {
+      await recordRawFetch({
+        source: 'keep_eu_open_data',
+        key: `programmes_${idsParam}`,
+        hash: createHash('sha256').update(JSON.stringify(json)).digest('hex'),
+        payload: {
+          url: KEEP_EU_API_BASE_URL,
+          programmeIds: idsParam,
+          status: response.status,
+          fetchedAt: new Date().toISOString(),
+          exportedDate: (body['exported date'] as string | undefined) ?? null,
+          body,
+        },
+      });
+    }
 
     return { ok: true, data: json };
   } catch (err) {
     const message = errorMessage(err);
-    await recordAlert({
-      level: 'error',
-      source: KEEP_EU_SYNC_ALERT_SOURCE,
-      message: `keep.eu fetch network error: ${message}`,
-      meta: { programmeIds: idsParam },
-      dedupeKey: 'keep-eu-sync:network-error',
-    });
+    const timedOut = err instanceof Error && err.name === 'TimeoutError';
+    if (persist) {
+      await recordAlert({
+        level: 'error',
+        source: KEEP_EU_SYNC_ALERT_SOURCE,
+        message: timedOut
+          ? `keep.eu did not answer within ${KEEP_EU_FETCH_TIMEOUT_MS / 1000}s`
+          : `keep.eu fetch network error: ${message}`,
+        meta: { programmeIds: idsParam },
+        dedupeKey: timedOut ? 'keep-eu-sync:timeout' : 'keep-eu-sync:network-error',
+      });
+    }
     return { ok: false, data: null, error: message };
   }
 }
@@ -515,19 +567,23 @@ export async function fetchKeepEuOpenData(options?: {
  * Idempotent by design: uses `upsert` on natural keys.
  */
 export async function persistKeepEuRecord(record: KeepEuProjectRecord): Promise<boolean> {
-  const projectId = trimmed(record.projectId);
+  const rawProjectId = trimmed(record.projectId);
   const title = trimmed(record.title);
 
-  if (!projectId || !title) {
+  if (!rawProjectId || !title) {
     await recordAlert({
       level: 'warn',
       source: KEEP_EU_SYNC_ALERT_SOURCE,
       message: 'keep.eu record skipped: missing project id or title',
-      meta: { projectId: projectId ?? null, hasTitle: Boolean(title) },
+      meta: { projectId: rawProjectId ?? null, hasTitle: Boolean(title) },
       dedupeKey: 'keep-eu-sync:record-missing-id-or-title',
     });
     return false;
   }
+
+  // keep.eu ids live in their own namespace so they can never overwrite a CORDIS project
+  // that happens to share the same numeric id.
+  const projectId = `${KEEP_EU_KEY_PREFIX}${rawProjectId}`;
 
   const ecMaxContribution = toEurBigInt(record.euFundingEUR);
   const totalCost = toEurBigInt(record.totalBudgetEUR);
@@ -575,33 +631,42 @@ export async function persistKeepEuRecord(record: KeepEuProjectRecord): Promise<
     // Determine organisation key:
     // If partner has PIC, use PIC.
     // If no PIC, use beneficiary ID or clean slug with KEU prefix.
+    const beneficiaryKey = trimmed(partner.beneficiaryId?.split('|')[0]);
     const orgId =
-      trimmed(partner.pic) ??
-      (partner.beneficiaryId
-        ? `KEU:${partner.beneficiaryId.split('|')[0]?.trim()}`
-        : null);
+      trimmed(partner.pic) ?? (beneficiaryKey ? `${KEEP_EU_KEY_PREFIX}${beneficiaryKey}` : null);
 
     if (orgId) {
       const country = trimmed(partner.country) ?? null;
-      await prisma.cordisOrganization.upsert({
+      const city = trimmed(partner.town) ?? null;
+      const isTurkish = country === 'TR' || partner.isTurkish;
+
+      // CORDIS rows are authoritative (FO-58: "mevcut CORDIS verisine dokunulmaz"). keep.eu
+      // only creates a missing organisation or fills fields that are still empty.
+      const existing = await prisma.cordisOrganization.findUnique({
         where: { organisationId: orgId },
-        create: {
-          organisationId: orgId,
-          name: partnerName,
-          nameNormalized: partnerName.toLocaleUpperCase('en-US'),
-          country,
-          city: trimmed(partner.town) ?? null,
-          isTurkish: country === 'TR' || partner.isTurkish,
-          rawJson: (partner.nuts ?? {}) as unknown as Prisma.InputJsonObject,
-        },
-        update: {
-          name: partnerName,
-          nameNormalized: partnerName.toLocaleUpperCase('en-US'),
-          country,
-          city: trimmed(partner.town) ?? null,
-          isTurkish: country === 'TR' || partner.isTurkish,
-        },
+        select: { name: true, nameNormalized: true, country: true, city: true },
       });
+      if (!existing) {
+        await prisma.cordisOrganization.create({
+          data: {
+            organisationId: orgId,
+            name: partnerName,
+            nameNormalized: partnerName.toLocaleUpperCase('en-US'),
+            country,
+            city,
+            isTurkish,
+            rawJson: (partner.nuts ?? {}) as unknown as Prisma.InputJsonObject,
+          },
+        });
+      } else {
+        const fill: Prisma.CordisOrganizationUpdateInput = {};
+        if (!existing.nameNormalized) fill.nameNormalized = partnerName.toLocaleUpperCase('en-US');
+        if (!existing.country && country) fill.country = country;
+        if (!existing.city && city) fill.city = city;
+        if (Object.keys(fill).length > 0) {
+          await prisma.cordisOrganization.update({ where: { organisationId: orgId }, data: fill });
+        }
+      }
 
       const role = partner.role === 'lead' ? 'coordinator' : 'participant';
       const ecContribution = toEurBigInt(partner.euFundingEUR);
@@ -684,8 +749,7 @@ async function loadInterregProjectsFromDatabase(take: number): Promise<KeepEuPro
     const partners: KeepEuPartnerRecord[] = row.participations.map((p) => ({
       partnerName: p.organization.name,
       country: p.organization.country,
-      pic: p.organisationId.startsWith('KEU:') ? null : p.organisationId,
-      beneficiaryId: p.organisationId.startsWith('KEU:') ? p.organisationId.slice(4) : null,
+      ...splitKeepEuKey(p.organisationId),
       role: p.role === 'coordinator' ? 'lead' : 'partner',
       isTurkish: p.organization.isTurkish,
       totalBudgetEUR: p.totalCost ? Number(p.totalCost) : null,
@@ -694,7 +758,7 @@ async function loadInterregProjectsFromDatabase(take: number): Promise<KeepEuPro
     }));
 
     return {
-      projectId: row.id,
+      projectId: splitKeepEuKey(row.id).beneficiaryId ?? row.id,
       acronym: row.acronym,
       title: row.title,
       description: row.objective,
@@ -711,7 +775,7 @@ async function loadInterregProjectsFromDatabase(take: number): Promise<KeepEuPro
         ? {
             partnerName: leadParticipation.organization.name,
             country: leadParticipation.organization.country,
-            pic: leadParticipation.organisationId,
+            ...splitKeepEuKey(leadParticipation.organisationId),
             role: 'lead',
             isTurkish: leadParticipation.organization.isTurkish,
           }
@@ -725,6 +789,8 @@ export interface KeepEuSyncOptions {
   records?: KeepEuProjectRecord[];
   programmeIds?: number[] | string;
   sourceFromDatabaseOnly?: boolean;
+  /** When the keep.eu request fails, re-index existing DB rows instead of stopping. Reported as `success:false`. */
+  allowDatabaseFallback?: boolean;
   skipRag?: boolean;
   limit?: number;
   onProgress?: (info: {
@@ -746,6 +812,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
   let source: 'api' | 'input' | 'database' = 'input';
   let dataset: KeepEuProjectRecord[] = [];
   let programmesCount = 1;
+  let upstreamOk = true;
 
   if (options?.records) {
     source = 'input';
@@ -757,9 +824,13 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     source = 'api';
     const fetchRes = await fetchKeepEuOpenData({ programmeIds: options?.programmeIds });
     if (!fetchRes.ok || !fetchRes.data) {
-      // Fallback: re-index existing rows if available
-      dataset = await loadInterregProjectsFromDatabase(DEFAULT_DATABASE_BATCH);
-      source = 'database';
+      // The upstream failed, so nothing new was read. Re-indexing old rows is an explicit opt-in
+      // and is reported as a failure: it must never look like a successful sync.
+      upstreamOk = false;
+      if (options?.allowDatabaseFallback) {
+        dataset = await loadInterregProjectsFromDatabase(DEFAULT_DATABASE_BATCH);
+        source = 'database';
+      }
     } else {
       const parsed = await parseKeepEuResponse(fetchRes.data);
       dataset = parsed.projects;
@@ -799,15 +870,13 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
 
       if (!options?.skipRag) {
         const docTitle = `INTERREG Project: ${record.acronym ?? record.projectId} - ${record.title}`;
-        if (typeof prisma.document?.deleteMany === 'function') {
-          await prisma.document.deleteMany({
-            where: {
-              tenantId: null,
-              kind: 'INTERREG_PROJECT',
-              title: docTitle,
-            },
-          });
-        }
+        await prisma.document.deleteMany({
+          where: {
+            tenantId: null,
+            kind: 'INTERREG_PROJECT',
+            title: docTitle,
+          },
+        });
 
         // Shared public RAG corpus (tenantId is undefined)
         await ingestDocument(
@@ -858,7 +927,8 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
   }
 
   return {
-    success: skippedCount === 0,
+    success: upstreamOk && skippedCount === 0,
+    upstreamOk,
     source,
     syncedProjectsCount,
     syncedPartnersCount,
@@ -886,7 +956,7 @@ interface ProgrammeAggregateRow {
  * Aggregates measured Interreg / keep.eu metrics from the database (CLAUDE.md #7).
  */
 export async function aggregateKeepEuMetrics(): Promise<KeepEuMetrics> {
-  const [totalProjectsCount, totalEuFundingAgg, totalBudgetAgg, countryRows, programmeRows, turkishPartnersCount, newestProject] =
+  const [totalProjectsCount, totalEuFundingAgg, totalBudgetAgg, countryRows, programmeRows, turkishPartnersCount, distinctPartnersRows, newestProject] =
     await Promise.all([
       prisma.cordisProject.count({ where: { framework: 'INTERREG' } }),
       prisma.cordisProject.aggregate({
@@ -925,6 +995,12 @@ export async function aggregateKeepEuMetrics(): Promise<KeepEuMetrics> {
           organization: { isTurkish: true },
         },
       }),
+      prisma.$queryRaw<{ count: bigint | number }[]>`
+        SELECT COUNT(DISTINCT p."organisationId") AS "count"
+        FROM "CordisParticipation" p
+        JOIN "CordisProject" pr ON pr."id" = p."projectId"
+        WHERE pr."framework" = 'INTERREG'
+      `,
       prisma.cordisProject.findFirst({
         where: { framework: 'INTERREG' },
         orderBy: { importedAt: 'desc' },
@@ -952,7 +1028,7 @@ export async function aggregateKeepEuMetrics(): Promise<KeepEuMetrics> {
       totalGrantEUR: Number(row.totalGrantEUR ?? 0),
     }));
 
-  const totalPartnersCount = topCountriesBreakdown.reduce((sum, c) => sum + c.partnerCount, 0);
+  const totalPartnersCount = Number((distinctPartnersRows as { count: bigint | number }[])[0]?.count ?? 0);
 
   return {
     totalProjectsCount,

@@ -151,10 +151,11 @@ export function insertLink(
   start: number,
   end: number,
   url: string,
-  text?: string
+  text?: string,
+  fallbackText = 'Bağlantı'
 ): TextEdit {
   const selected = value.slice(start, end);
-  const linkText = text?.trim() || selected.trim() || 'Bağlantı';
+  const linkText = text?.trim() || selected.trim() || fallbackText;
   const cleanUrl = url.trim();
   const md = `[${linkText}](${cleanUrl})`;
   const nextValue = value.slice(0, start) + md + value.slice(end);

@@ -48,16 +48,6 @@ interface PartnerRow {
   topTopics: Array<{ code: string; title?: string; count?: number } | string>;
 }
 
-/** The CordisOrganization columns the second fallback reads. */
-interface CordisOrganizationRow {
-  organisationId: string;
-  name: string;
-  country: string | null;
-  activityType: string | null;
-  sme: boolean;
-  isTurkish: boolean;
-}
-
 export default async function PartnersPage({
   params,
   searchParams,
@@ -122,6 +112,20 @@ export default async function PartnersPage({
       if (activityType) orgWhere.activityType = activityType;
       if (isTurkishOnly) orgWhere.isTurkish = true;
 
+      // min_projects counts Interreg projects only. Filtering after `take: 50`
+      // gave a wrong total and dropped matches, so the threshold is applied in
+      // SQL against the whole table and then paginated.
+      if (minProjects > 0) {
+        const eligible = await prisma.$queryRaw<Array<{ organisationId: string }>>`
+          SELECT p."organisationId"
+          FROM "CordisParticipation" p
+          JOIN "CordisProject" pr ON pr.id = p."projectId"
+          WHERE pr.framework = 'INTERREG'
+          GROUP BY p."organisationId"
+          HAVING COUNT(*) >= ${minProjects}`;
+        orgWhere.organisationId = { in: eligible.map((r) => r.organisationId) };
+      }
+
       const [cCount, cOrgs] = await Promise.all([
         prisma.cordisOrganization.count({ where: orgWhere }),
         prisma.cordisOrganization.findMany({
@@ -130,12 +134,15 @@ export default async function PartnersPage({
           orderBy: { updatedAt: 'desc' },
           include: {
             profile: true,
+            // Nested take caps the rows read per organisation. Counts and EC sums
+            // come from the aggregate below, so the cap does not change them.
             participations: {
               where: {
                 project: {
                   framework: 'INTERREG',
                 },
               },
+              take: 200,
               include: {
                 project: {
                   select: {
@@ -153,12 +160,31 @@ export default async function PartnersPage({
         }),
       ]);
 
+      // Exact per-organisation totals for the page's 50 rows, computed in the
+      // database rather than summed from a participation list.
+      const pageOrgIds = cOrgs.map((o) => o.organisationId);
+      const interregTotals = pageOrgIds.length === 0 ? [] : await prisma.cordisParticipation.groupBy({
+        by: ['organisationId'],
+        where: { organisationId: { in: pageOrgIds }, project: { framework: 'INTERREG' } },
+        _count: { _all: true },
+        _sum: { ecContribution: true },
+      });
+      const interregCoordinators = pageOrgIds.length === 0 ? [] : await prisma.cordisParticipation.groupBy({
+        by: ['organisationId'],
+        where: { organisationId: { in: pageOrgIds }, role: 'coordinator', project: { framework: 'INTERREG' } },
+        _count: { _all: true },
+      });
+      const totalsById = new Map(interregTotals.map((t) => [t.organisationId, t]));
+      const coordinatorsById = new Map(interregCoordinators.map((c) => [c.organisationId, c._count._all]));
+
       dataSource = 'cordis_organization_interreg';
       totalCount = cCount;
       profiles = cOrgs.map((o) => {
         const parts = o.participations || [];
-        const coordCount = parts.filter((p) => p.role === 'coordinator' || p.role === 'lead').length;
-        const totalEc = parts.reduce((sum, p) => sum + (p.ecContribution ?? 0n), 0n);
+        const totals = totalsById.get(o.organisationId);
+        const projectCount = totals?._count._all ?? 0;
+        const coordCount = coordinatorsById.get(o.organisationId) ?? 0;
+        const totalEc = totals?._sum.ecContribution ?? 0n;
 
         const topicsMap = new Map<string, { code: string; title: string; count: number }>();
         for (const part of parts) {
@@ -187,16 +213,13 @@ export default async function PartnersPage({
           sme: o.sme,
           isTurkish: o.isTurkish,
           isInterreg: true,
-          totalProjects: parts.length > 0 ? parts.length : (o.profile?.totalProjects ?? null),
-          coordinatorProjects: parts.length > 0 ? coordCount : (o.profile?.coordinatorProjects ?? null),
+          totalProjects: projectCount > 0 ? projectCount : (o.profile?.totalProjects ?? null),
+          coordinatorProjects: projectCount > 0 ? coordCount : (o.profile?.coordinatorProjects ?? null),
           totalEcContribution: totalEc > 0n ? totalEc : (o.profile?.totalEcContribution ?? null),
           topTopics: topTopics.length > 0 ? topTopics : ((o.profile?.topTopics as Array<{ code: string; title?: string; count?: number } | string>) || []),
         };
       });
 
-      if (minProjects > 0) {
-        profiles = profiles.filter((p) => (p.totalProjects ?? 0) >= minProjects);
-      }
     } catch (e) {
       queryFailed = true;
       console.warn(`[PartnersPage] CordisOrganization Interreg DB unavailable: ${errorMessage(e)}`);
@@ -204,7 +227,7 @@ export default async function PartnersPage({
         level: 'warn',
         source: 'partners_interreg_query_failed',
         message: `CordisOrganization Interreg lookup failed: ${errorMessage(e)}`,
-        meta: { module: 'M8', table: 'CordisOrganization' },
+        meta: { module: 'M1', table: 'CordisOrganization' },
         dedupeKey: 'partners-page:interreg-query-failed',
       });
     }
@@ -321,7 +344,7 @@ export default async function PartnersPage({
           profiles = cOrgs.map((o) => {
             const parts = o.participations || [];
             const hasInterreg = parts.some((p) => p.project?.framework === 'INTERREG');
-            const coordCount = parts.filter((p) => p.role === 'coordinator' || p.role === 'lead').length;
+            const coordCount = parts.filter((p) => p.role === 'coordinator').length;
             const totalEc = parts.reduce((sum, p) => sum + (p.ecContribution ?? 0n), 0n);
 
             if (parts.length === 0) {
@@ -427,6 +450,11 @@ export default async function PartnersPage({
           {tLinks('personDays')}
         </ModuleLink>
       </nav>
+      <p className="text-[11px] text-muted">
+        {isTr
+          ? 'Veri kaynağı: CORDIS, Avrupa Komisyonu (CC BY 4.0); keep.eu, Interact (Interreg). Yalnızca iç arama ve ön değerlendirme amaçlıdır.'
+          : 'Data source: CORDIS, European Commission (CC BY 4.0); keep.eu, Interact (Interreg). For internal search and pre-assessment only.'}
+      </p>
 
       {/* Client Filter Bar Component */}
       <PartnerFilters
@@ -449,8 +477,8 @@ export default async function PartnersPage({
           {country && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Ülke: {country}</span>}
           {activityType && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Tip: {activityType}</span>}
           {isTurkishOnly && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">🇹🇷 Türk Kuruluşlar</span>}
-          {isInterregOnly && <span className="bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono px-2 py-0.5 rounded font-bold">🇪🇺 Interreg Ortakları</span>}
-          {minProjects > 0 && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Min. {minProjects} Proje</span>}
+          {isInterregOnly && <span className="bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono px-2 py-0.5 rounded font-bold">🇪🇺 {isTr ? 'Interreg Ortakları' : 'Interreg Partners'}</span>}
+          {minProjects > 0 && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{isTr ? `Min. ${minProjects} Proje` : `Min. ${minProjects} Projects`}</span>}
         </div>
       )}
 

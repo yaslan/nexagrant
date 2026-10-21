@@ -5,14 +5,22 @@ import { render } from '@testing-library/react';
 import { isSafeUrl, renderBlogContent, renderInline } from '@/components/blog/blog-content';
 
 describe('isSafeUrl', () => {
-  test('accepts https and http protocols', () => {
+  test('accepts https, mailto, local paths and fragments; rejects http', () => {
     expect(isSafeUrl('https://fonbridge.com/test')).toBe(true);
-    expect(isSafeUrl('http://images.unsplash.com/photo-1')).toBe(true);
+    expect(isSafeUrl('mailto:info@fonbridge.com')).toBe(true);
+    expect(isSafeUrl('/tr/partners')).toBe(true);
+    expect(isSafeUrl('#section')).toBe(true);
+    expect(isSafeUrl('http://images.unsplash.com/photo-1')).toBe(false);
   });
 
   test('accepts relative paths', () => {
     expect(isSafeUrl('/tr/blog/ornek-yazi')).toBe(true);
     expect(isSafeUrl('#bolum-1')).toBe(true);
+  });
+
+  test('refuses protocol-relative URLs that leave the site', () => {
+    expect(isSafeUrl('//evil.example.com/x')).toBe(false);
+    expect(isSafeUrl('/\\evil.example.com/x')).toBe(false);
   });
 
   test('refuses dangerous protocols', () => {

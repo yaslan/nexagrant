@@ -126,15 +126,14 @@ export default async function seedTenantWorkspace() {
     create: { tenantId: TENANT_ID, userId: adminUser.id, role: DEMO_ADMIN_SEAT.role },
   });
 
-  // 5. Subscription — preserves Ultra if LifetimeLicence exists, otherwise Pro, ACTIVE.
-  const existingLifetime = await prisma.lifetimeLicence.findFirst({
-    where: { tenantId: TENANT_ID },
-  });
-  const targetPlanId = existingLifetime ? 'ultra' : DEMO_PLAN_ID;
-
+  // 5. Subscription — Pro, ACTIVE.
+  //
+  // The plan id is taken from the billing catalogue, not typed: this used to
+  // say 'team', and when the EUR ladder was retired (TASK-MTR6QIE05ZKNH) a
+  // re-seed put the demo tenant back on a plan that no longer has a row.
   const demoPublishedVersion = await prisma.planVersion
     .findFirst({
-      where: { planId: targetPlanId, status: 'published' },
+      where: { planId: DEMO_PLAN_ID, status: 'published' },
       orderBy: { version: 'desc' },
       select: { id: true },
     })
@@ -143,28 +142,16 @@ export default async function seedTenantWorkspace() {
   await prisma.subscription.upsert({
     where: { tenantId: TENANT_ID },
     update: {
-      planId: targetPlanId,
+      planId: DEMO_PLAN_ID,
       status: 'ACTIVE',
       ...(demoPublishedVersion ? { planVersionId: demoPublishedVersion.id } : {}),
-      ...(existingLifetime ? {
-        lockedTierCode: 'OMURBOYU20',
-        lockedPercentOff: 50,
-        lockedAmountMinor: 128800,
-        lockedCurrency: 'USD',
-      } : {}),
     },
     create: {
       tenantId: TENANT_ID,
-      planId: targetPlanId,
+      planId: DEMO_PLAN_ID,
       status: 'ACTIVE',
-      billingInterval: existingLifetime ? 'year' : 'month',
+      billingInterval: 'month',
       ...(demoPublishedVersion ? { planVersionId: demoPublishedVersion.id } : {}),
-      ...(existingLifetime ? {
-        lockedTierCode: 'OMURBOYU20',
-        lockedPercentOff: 50,
-        lockedAmountMinor: 128800,
-        lockedCurrency: 'USD',
-      } : {}),
     },
   });
 

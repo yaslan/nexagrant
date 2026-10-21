@@ -146,7 +146,7 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
               onChange={(e) => setIsInterreg(e.target.checked)}
               className="rounded border-border text-indigo-600 focus:ring-indigo-500"
             />
-            <span>🇪🇺 {isTr ? 'Sadece Interreg Ortakları (Trakya Üni., Belediyeler, Ajanslar)' : 'Show Interreg Partners Only (Universities, Municipalities, Agencies)'}</span>
+            <span>🇪🇺 {isTr ? 'Sadece Interreg Ortakları (Üniversiteler, Belediyeler, Ajanslar)' : 'Show Interreg Partners Only (Universities, Municipalities, Agencies)'}</span>
           </label>
         </div>
 

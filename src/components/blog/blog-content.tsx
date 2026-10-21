@@ -4,12 +4,18 @@ import React from 'react';
  * Validates that a URL uses an approved protocol (http, https) or a relative path.
  * Disallows javascript:, data:, vbscript: to prevent XSS.
  */
+/**
+ * Allows same-site paths, fragments, https and mailto. `//host` and `/\host`
+ * are protocol-relative and leave the site, so they are rejected; `http:` is
+ * rejected too, so user-written links cannot be downgraded.
+ */
 export function isSafeUrl(urlStr: string): boolean {
   const trimmed = urlStr.trim();
+  if (trimmed.startsWith('//') || trimmed.startsWith('/\\')) return false;
   if (trimmed.startsWith('/') || trimmed.startsWith('#')) return true;
   try {
     const parsed = new URL(trimmed);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    return parsed.protocol === 'https:' || parsed.protocol === 'mailto:';
   } catch {
     return false;
   }
