@@ -421,9 +421,23 @@ export function tenantScopedRelations(scoped: ReadonlySet<string> = new Set(tena
   return out;
 }
 
+/**
+ * Git hooks export GIT_DIR (and GIT_INDEX_FILE in a worktree); with those set,
+ * git ignores `cwd` and answers from the hook's repository instead. Dropping
+ * them makes `cwd` the repository again, which is what scan(cwd) promises.
+ */
+export const HOOK_GIT_VARS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_PREFIX'] as const;
+
+export function gitEnvFor(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env };
+  for (const name of HOOK_GIT_VARS) delete out[name];
+  return out;
+}
+
 function gitTrackedSources(cwd: string): string[] {
   const out = execFileSync('git', ['ls-files', '-z', '--', 'src/*.ts', 'src/*.tsx'], {
     cwd,
+    env: gitEnvFor(process.env),
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
   });

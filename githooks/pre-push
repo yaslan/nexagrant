@@ -1,6 +1,11 @@
 #!/bin/sh
 # Push, kodun bu makineden ÇIKTIĞI andır: burada tam kapı koşar, kısaltma yok.
 set -e
+# Git kancayı GIT_DIR (worktree'de ayrıca GIT_INDEX_FILE) set ederek çalıştırır.
+# Gate bunları devralırsa başka cwd'de git çağıran her şey (ör. geçici fixture
+# repo kuran testler) BU reponun indeksini okur ve ona `git add` yazar (FO-111).
+# Kancanın cwd'si checkout kökü; git repoyu buradan kendisi bulur.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX
 # Kapının veritabanı bu checkout'un .env'inden gelir (vitest, playwright ve
 # tsx betikleri cwd'deki .env'i okur). .env yoksa testler varsayılan
 # localhost:5432'ye düşer ve onlarca test ortam yüzünden kırmızı olur
