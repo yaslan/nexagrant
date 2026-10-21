@@ -402,3 +402,13 @@ Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabil
 5. Ham çıktılar `docs/agent-results/<TASK>-devop-fb-ekler/` altına yazılır. Bir kapı 0'dan farklı biterse sonraki dala geçilmez.
 6. Her adımdan önce ve sonra `git reflog -3 dev` kontrol edilir. Entegratörün yapmadığı bir `dev` hareketi görülürse raporda "eşzamanlı yazıcı" olarak kaydedilir. Kapılar o hareketi de kapsayacak biçimde yeniden koşulur.
 7. Commit'ler `git commit -- <yollar>` ile atılır; geniş `git add -A` kullanılmaz. İş bitince `git merge-base --is-ancestor <sha> dev` ile her dalın dev'de olduğu kanıtlanır. Push yalnız ayrı ve açık onayla yapılır.
+
+### 9.1 Paylaşımlı ağaç: `core.bare=true` (FO-114)
+
+`core.bare` bütün worktree'lerin ortak kullandığı `.git/config`'te durur.
+
+- **Belirti:** Ana checkout'ta `git status`, `git commit` ya da `git check-ignore` komutu `fatal: this operation must be run in a work tree` hatası verir ve `git worktree list` ana satırda `(bare)` yazar. Linked worktree'lerde commit geçmeye devam eder; bu yüzden sorun genelde geç fark edilir. pre-commit ve pre-push kancaları bu durumda `core.bare=true` mesajıyla durur, ayarı kendileri düzeltmez.
+- **Kontrol:** `git -C /Users/macbook/alan/FONBRIDGE config --get core.bare` → `false` olmalı.
+- **Düzeltme:** `git -C /Users/macbook/alan/FONBRIDGE config core.bare false`. Ardından yazanı bul: ayarın yeniden dönmesi bir yazıcının hâlâ çalıştığını gösterir.
+- **Kural:** `GIT_DIR`, `GIT_WORK_TREE` ya da `GIT_INDEX_FILE` set iken başka bir dizinde `git init` ya da `git config` koşma. Bu kural kancanın içinden çağrılan her şey için de geçerlidir (gate, testler, betikler). Linked worktree'nin `GIT_DIR`'i (`.git/worktrees/<ad>`) ile çalışan bir `git init`, depo tipini "bare" tahmin eder ve paylaşılan config'e `core.bare=true` yazar. Kanca, gate'ten önce bu değişkenleri temizler (FO-111). Test ya da betik başka bir cwd'de git çağırıyorsa `gitEnvFor` (`scripts/tenant-bypass-scan.ts`) kullanılır. Gate bir şekilde yine de ayarı çevirirse pre-push, gate yeşil olsa bile push'u durdurur.
+- **Not:** FO-111 düzeltmesini içermeyen bir daldan push etmek, ayarı bugün de çevirebilir. Push'tan önce dalı `origin/dev` üzerine al: `git merge-base --is-ancestor a7ce5d4c HEAD` sonucu doğru dönmeli.
