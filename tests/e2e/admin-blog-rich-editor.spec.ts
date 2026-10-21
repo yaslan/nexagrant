@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
-import { blogContentEditor, pasteInto } from './fixtures/rich-editor';
+import { blogContentEditor, pasteInto, selectAll } from './fixtures/rich-editor';
 
 /**
  * TASK-MVDKHOXGRQQS5 — the admin blog content field is a rich text editor that
@@ -158,7 +158,7 @@ test.describe.serial('admin blog — rich text editor, stored as markdown', () =
     await openEdit(page, PASTE_SLUG);
     const editor = blogContentEditor(page);
     await editor.click();
-    await page.keyboard.press('ControlOrMeta+A');
+    await selectAll(editor);
     await pasteInto(editor, { html: WORD_HTML, text: 'Word başlığı' });
     // Dropped in the editor already: no italic, strike, code, quote, rule, table cell, image.
     // An https link is kept (TASK-MVDPHZQCTVJ2R); a pasted image never is.
@@ -216,7 +216,7 @@ test.describe.serial('admin blog — rich text editor, stored as markdown', () =
     await openEdit(page, PASTE_SLUG);
     const editor = blogContentEditor(page);
     await editor.click();
-    await page.keyboard.press('ControlOrMeta+A');
+    await selectAll(editor);
     await page.keyboard.press('Backspace');
     await page.getByTestId('blog-submit').click();
     await expect(page.getByTestId('blog-form-error')).toHaveText('Makale içeriği boş olamaz.');
