@@ -29,11 +29,10 @@ overrides:
   # Exception: an older line the advisory leaves without a patch of its own
   # gets an explicit, bounded cross-major row with its GHSA next to it;
   # leaving it out would drop the protection the open selector used to give.
-  # NOT covered by any row here (open on dev too, or dropped by this change):
-  # undici 5.x and 6.x, mysql2 2.x, hono 1.x/2.x, sharp 0.33 and older,
-  # ip-address 9.x, postcss-selector-parser 6.x, @modelcontextprotocol/sdk 0.x,
-  # fast-uri 1.x, @hono/node-server 2.x, brace-expansion 1.x/2.x/3.x. A separate
-  # card adds their rows with the GHSA next to each one (decision K-569955).
+  # Older lines dropped by FO-18 got their rows back in TASK-MVF543TDDDMX1
+  # (FO-96, decision K-569955). Still NOT covered: brace-expansion 1.x (and
+  # 0.0.0); eslint's minimatch@3 holds 1.1.18 (dev only, not in the prod
+  # audit) and a 1.1.21 row would change the lockfile, which that card ruled out.
   # Paths: sharp via next (optional dep ^0.35.4); undici via shadcn / openai;
   # hono, @hono/node-server, @modelcontextprotocol/sdk, proxy-addr via shadcn's
   # MCP SDK + express; mysql2, deepmerge-ts, fast-uri via prisma.
@@ -41,19 +40,42 @@ overrides:
   # Cross-line: 0.34.x has no patch of its own (GHSA-f88m-g3jw-g9cj <0.35.0,
   # GHSA-rgj7-g3m4-5g8c <0.35.4, GHSA-wq5f-xc86-pv6w <0.35.5).
   'sharp@>=0.34.0 <0.35.0': '0.35.5'
+  # Cross-line: 0.33 and older have no patch of their own either
+  # (GHSA-f88m-g3jw-g9cj <0.35.0 also covers GHSA-54xq <0.32.6, GHSA-gp95 <0.30.5).
+  'sharp@<0.34.0': '0.35.5'
   'undici@>=7.0.0 <7.29.1': '7.29.1'
   'undici@>=8.0.0 <8.10.2': '8.10.2'
+  # 6.x carries its own patch (GHSA-rfgv-xxqx-mfg5, GHSA-3wwx-pv8p-q78v,
+  # GHSA-r53p-7pc4-xj5r: 6.28.1).
+  'undici@>=6.0.0 <6.28.1': '6.28.1'
+  # Cross-major: 5.x and older stop at 5.29.0, which still carries
+  # GHSA-vxpw-j846-p89q (high, <6.27.0) and GHSA-vrm6-8vpv-qv8q (high, <6.24.0);
+  # fixed only in 6.x, so 5.29.0 is not a patch for this line.
+  'undici@<6.0.0': '6.28.1'
   'hono@>=4.0.0 <4.13.7': '4.13.7'
   # Cross-major: 3.x has no patch of its own (GHSA-m732-5p4w-x69g >=1.1.0
   # <4.10.2, high; GHSA-88fw-hqm2-52qc <4.12.25, high; fixed only in 4.x).
   'hono@>=3.0.0 <4.0.0': '4.13.7'
+  # Cross-major: 0.x/1.x/2.x likewise (GHSA-m732-5p4w-x69g >=1.1.0 <4.10.2,
+  # high; GHSA-88fw-hqm2-52qc <4.12.25, high).
+  'hono@<3.0.0': '4.13.7'
   '@hono/node-server@>=1.0.0 <1.19.15': '1.19.15'
+  # 2.x carries its own patch (GHSA-9mqv-5hh9-4cgg <=2.0.9, GHSA-frvp-7c67-39w9).
+  '@hono/node-server@>=2.0.0 <2.0.10': '2.0.10'
+  # Cross-major: 0.x has no patch of its own (GHSA-wc8c-qw6v-h7f6 <1.19.10,
+  # high; GHSA-frvp-7c67-39w9 <1.19.15).
+  '@hono/node-server@<1.0.0': '1.19.15'
   '@modelcontextprotocol/sdk@>=1.0.0 <1.31.0': '1.31.0'
+  # Cross-major: 0.x has no patch of its own (GHSA-w48q-cv73-mx4w <1.24.0, high).
+  '@modelcontextprotocol/sdk@<1.0.0': '1.31.0'
   'proxy-addr@>=2.0.0 <2.0.8': '2.0.8'
   # Cross-major: 1.x has no patch of its own (GHSA-jqcg-44mw-7w3h, critical,
   # >=1.1.0 <2.0.8; fixed only in 2.0.8). Lower bound follows the advisory.
   'proxy-addr@>=1.1.0 <2.0.0': '2.0.8'
   'mysql2@>=3.0.0 <3.23.1': '3.23.1'
+  # Cross-major: 1.x/2.x have no patch of their own (GHSA-3f6p-5ww8-9rcr <3.22.0,
+  # high; GHSA-4rch-2fh8-94vw <3.9.7, critical; GHSA-fpw7-j2hg-69v5 <3.9.4).
+  'mysql2@<3.0.0': '3.23.1'
   # Deliberate major jump (GHSA-ggr8-5vv4-36mx): @prisma/config 7.1.5 pins
   # deepmerge-ts 7.x exactly and no patched 7.x exists. The one override that
   # crosses a major; first line to revisit on a Prisma upgrade.
@@ -62,12 +84,25 @@ overrides:
   # 2.x and 4.x carry their own patches (GHSA-hrr3-gc8f-f4qj: 2.4.7, 4.1.5).
   'fast-uri@>=2.0.0 <2.4.7': '2.4.7'
   'fast-uri@>=4.0.0 <4.1.5': '4.1.5'
+  # Cross-major: 0.x/1.x have no patch of their own (GHSA-hrr3-gc8f-f4qj <2.4.7,
+  # GHSA-qw65-cvwx-89v3 <2.4.6, high).
+  'fast-uri@<2.0.0': '2.4.7'
   'ip-address@>=10.0.0 <10.7.1': '10.7.1'
+  # Cross-major: 9.x and older have no patch of their own (GHSA-h3mg-xc3c-68pw
+  # and GHSA-j6r3-76f7-8jcv <=10.7.0; GHSA-mwp4-54f8-5fhr <=10.3.0, high).
+  'ip-address@<10.0.0': '10.7.1'
   'source-map-js@>=1.0.0 <1.2.2': '1.2.2'
   'postcss-selector-parser@>=7.0.0 <7.1.6': '7.1.6'
+  # Cross-major: 6.x and older have no patch of their own (GHSA-rj75-hqrm-r3gf
+  # <7.1.6; 6.1.3 fixes only GHSA-w9m9-85wc-3x92).
+  'postcss-selector-parser@<7.0.0': '7.1.6'
   # brace-expansion 5.0.x under shadcn > ts-morph > minimatch; same major (5.x),
   # so only the patch line moves. Range selector keeps minimatch@3's 1.x copy.
   'brace-expansion@>=5.0.0 <5.0.12': '5.0.12'
   # Cross-major: 4.x has no patch of its own (GHSA-q2hr-2g5m-vwhr,
   # GHSA-qhr7-859c-m2p7 high, GHSA-6j4f-fj2g-mc7p high: '>=4.0.0 <5.0.x').
   'brace-expansion@>=4.0.0 <5.0.0': '5.0.12'
+  # 2.x and 3.x carry their own patches (GHSA-q2hr-2g5m-vwhr: 2.1.7, 3.0.9;
+  # GHSA-qhr7-859c-m2p7 and GHSA-6j4f-fj2g-mc7p, high, earlier on both lines).
+  'brace-expansion@>=2.0.0 <2.1.7': '2.1.7'
+  'brace-expansion@>=3.0.0 <3.0.9': '3.0.9'
