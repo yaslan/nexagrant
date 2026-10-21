@@ -12,7 +12,8 @@ import {
 } from '@/lib/billing/price-lock';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
-import { isPilotSubscription, lockPilotRow, PILOT_PLAN_ID } from '@/lib/billing/pilot';
+import { lockPilotRow } from '@/lib/billing/pilot';
+import { stripeSyncBlocker, type StripeSyncBlock } from '@/lib/billing/subscription-owner';
 import { invoiceLinePeriodFallback } from '@/lib/efatura';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
@@ -275,13 +276,22 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-/** Thrown inside a cancellation's transaction to roll it back over a free pilot row. */
-class PilotSubscriptionProtected extends Error {
-  constructor() {
-    super('Subscription row is a free pilot; Stripe does not own it.');
-    this.name = 'PilotSubscriptionProtected';
+/**
+ * Thrown inside a sync's transaction to roll it back over a row Stripe does not
+ * own — a free pilot or an internal plan (`stripeSyncBlocker`).
+ */
+class SubscriptionProtected extends Error {
+  constructor(readonly block: StripeSyncBlock, readonly planId: string) {
+    super(`Subscription row is not Stripe's to write (${block}).`);
+    this.name = 'SubscriptionProtected';
   }
 }
+
+/** The log line for a skipped event, per owner, so an operator knows whose row it was. */
+const PROTECTED_LOG: Record<StripeSyncBlock, string> = {
+  PILOT_PROTECTED: 'Stripe subscription names a tenant on the free pilot; not synced',
+  INTERNAL_PLAN_PROTECTED: 'Stripe subscription names a tenant on an internal plan; not synced',
+};
 
 /**
  * Thrown inside a `withTenant` callback to roll the transaction back when the
@@ -376,9 +386,11 @@ export async function syncStripeSubscription(
   // sale that got past that gate or a forged `metadata.tenantId`; both need a
   // person, not an upsert that would turn 90 free days into whatever Stripe
   // says. The event is not claimed, so it can be replayed once the pilot has
-  // been ended by the platform admin.
-  if (isPilotSubscription(existingSubscription)) {
-    logger.error('Stripe subscription names a tenant on the free pilot; not synced', {
+  // been ended by the platform admin. An internal plan (TASK-MVCH26OXNVLKR) is
+  // protected the same way, until the admin takes it back.
+  const fastBlock = stripeSyncBlocker(existingSubscription);
+  if (fastBlock) {
+    logger.error(PROTECTED_LOG[fastBlock], {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
@@ -390,7 +402,7 @@ export async function syncStripeSubscription(
       addedAddOns: [],
       removedAddOns: [],
       creditsGranted: 0,
-      error: 'PILOT_PROTECTED',
+      error: fastBlock,
     };
   }
 
@@ -491,9 +503,10 @@ export async function syncStripeSubscription(
     await lockPilotRow(tx, tenantId);
     const current = await tx.subscription.findUnique({
       where: { tenantId },
-      select: { status: true, provider: true, trialEndsAt: true },
+      select: { planId: true, status: true, provider: true, trialEndsAt: true },
     });
-    if (isPilotSubscription(current)) throw new PilotSubscriptionProtected();
+    const block = stripeSyncBlocker(current);
+    if (block) throw new SubscriptionProtected(block, current!.planId);
 
     await tx.subscription.upsert({
       where: { tenantId },
@@ -655,24 +668,24 @@ export async function syncStripeSubscription(
     return { addedAddOns: added, removedAddOns: removed, creditsGranted: granted };
   }).catch((error: unknown) => {
     if (error instanceof StripeEventAlreadyClaimed) return null;
-    if (error instanceof PilotSubscriptionProtected) return 'pilot' as const;
+    if (error instanceof SubscriptionProtected) return { block: error.block, planId: error.planId };
     throw error;
   });
 
-  if (outcome === 'pilot') {
-    logger.error('Stripe subscription names a tenant on the free pilot; not synced', {
+  if (outcome !== null && typeof outcome === 'object' && 'block' in outcome) {
+    logger.error(PROTECTED_LOG[outcome.block], {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
     });
     return {
       tenantId,
-      planId: PILOT_PLAN_ID,
+      planId: outcome.planId,
       status: 'skipped',
       addedAddOns: [],
       removedAddOns: [],
       creditsGranted: 0,
-      error: 'PILOT_PROTECTED',
+      error: outcome.block,
     };
   }
 
@@ -768,9 +781,10 @@ export async function handleSubscriptionCancellation(
     await lockPilotRow(tx, tenantId);
     const current = await tx.subscription.findUnique({
       where: { tenantId },
-      select: { status: true, provider: true, trialEndsAt: true },
+      select: { planId: true, status: true, provider: true, trialEndsAt: true },
     });
-    if (isPilotSubscription(current)) throw new PilotSubscriptionProtected();
+    const block = stripeSyncBlocker(current);
+    if (block) throw new SubscriptionProtected(block, current!.planId);
 
     // Update subscription status, and drop the price lock with it: the locked
     // rate belongs to the subscription that just ended, not to the tenant. Coming
@@ -812,24 +826,24 @@ export async function handleSubscriptionCancellation(
     return true;
   }).catch((error: unknown) => {
     if (error instanceof StripeEventAlreadyClaimed) return false;
-    if (error instanceof PilotSubscriptionProtected) return 'pilot' as const;
+    if (error instanceof SubscriptionProtected) return { block: error.block, planId: error.planId };
     throw error;
   });
 
-  if (claimed === 'pilot') {
-    logger.error('Stripe cancellation names a tenant on the free pilot; not applied', {
+  if (claimed !== null && typeof claimed === 'object' && 'block' in claimed) {
+    logger.error(PROTECTED_LOG[claimed.block], {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
     });
     return {
       tenantId,
-      planId: PILOT_PLAN_ID,
+      planId: claimed.planId,
       status: 'skipped',
       addedAddOns: [],
       removedAddOns: [],
       creditsGranted: 0,
-      error: 'PILOT_PROTECTED',
+      error: claimed.block,
     };
   }
 

@@ -223,6 +223,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/billing/internal-plan.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "listInternalPlans reads active internal plan subscriptions across all tenants to display the internal plan badge in the admin tenants list, behind requirePlatformAdmin()."
+    },
+    {
+      "check": "D",
       "file": "src/lib/billing/lifetime-licence.ts",
       "subject": "system-scope:platform-aggregate",
       "count": 1,

@@ -1,0 +1,5 @@
+          type          |   actorId    |   tenantId    | target |                                                                      data                                                                      |        createdAt        
+------------------------+--------------+---------------+--------+------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------
+ plan.internal.assigned | ip-e2e-admin | ip-e2e-tenant | pro    | {"note": "M1 kilit testi (e2e)", "after": "pro", "before": "free", "internal": true, "tenantId": "ip-e2e-tenant", "planVersionId": "pv_pro_1"} | 2026-10-21 15:59:35.577
+ plan.internal.revoked  | ip-e2e-admin | ip-e2e-tenant | free   | {"note": "test bitti (e2e)", "after": "free", "before": "pro", "internal": true, "tenantId": "ip-e2e-tenant"}                                  | 2026-10-21 15:59:39.773
+(2 rows)
