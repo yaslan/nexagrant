@@ -17,7 +17,6 @@
   "src/app/[locale]/admin/modules/page.tsx": 1,
   "src/app/[locale]/admin/settings/page.tsx": 7,
   "src/app/[locale]/admin/settings/smtp-form.tsx": 6,
-  "src/app/[locale]/admin/tenants/page.tsx": 4,
   "src/app/[locale]/(public)/calls/turkey/page.tsx": 1,
   "src/app/[locale]/(public)/i18n-check/page.tsx": 7,
   "src/app/[locale]/(public)/login/AuthCard.tsx": 4,
