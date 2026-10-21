@@ -14,6 +14,13 @@ export const EXPERT_PREREG_CONSENT_VERSION = 'kvkk-v1';
 /** The first this many verified experts get a founder number ("Kurucu Uzman"). */
 export const FOUNDER_SEAT_LIMIT = 100;
 
+/**
+ * How long an expert pre-registration row (name, e-mail, province, ORCID, ...) is kept
+ * from when it was left, verified or not. Patron decision, 2026-10-17 (FO-50): one year.
+ * The nightly `expert-prereg-cleanup` job deletes what is older; see ./retention.ts.
+ */
+export const EXPERT_PREREG_RETENTION_DAYS = 365;
+
 /** A verification link works this long after the registration (24 hours). */
 export const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 

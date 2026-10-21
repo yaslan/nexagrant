@@ -12,6 +12,7 @@ import {
 import {
   NULLABLE_TENANT,
   PLATFORM_POLICY,
+  SYSTEM_SCOPE_POLICY,
   SYSTEM_WIDE,
   policylessSystemWide,
   tenantScopedModels,
@@ -305,6 +306,19 @@ describe('4b — every migration protects the tenant table it creates', () => {
     expect(scanMigrations(root).findings).toEqual([]);
 
     rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe('SYSTEM_SCOPE_POLICY — tenant-less tables reachable only inside withSystemScope (FO-45, FO-50)', () => {
+  test('each one is SYSTEM_WIDE and gets the system_scope policy, gated by system_scope_open, in prisma/rls.sql', () => {
+    expect([...SYSTEM_SCOPE_POLICY].sort()).toEqual(['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration']);
+    for (const t of SYSTEM_SCOPE_POLICY) {
+      expect(SYSTEM_WIDE.has(t)).toBe(true);
+      expect(rlsSql).toContain(`ALTER TABLE public."${t}" ENABLE ROW LEVEL SECURITY;`);
+      expect(rlsSql).toContain(`CREATE POLICY system_scope ON public."${t}"`);
+      expect(rlsSql).toContain(`USING ((SELECT public.system_scope_open('"${t}"'::regclass)))`);
+      expect(rlsSql).toContain(`WITH CHECK ((SELECT public.system_scope_open('"${t}"'::regclass)))`);
+    }
   });
 });
 
