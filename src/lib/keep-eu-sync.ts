@@ -34,9 +34,12 @@ export const KEEP_EU_SYNC_ALERT_SOURCE = 'keep-eu-sync';
  */
 export const DEFAULT_TURKEY_PROGRAMME_IDS: readonly number[] = [305, 387, 385, 66];
 
-/** Browser user-agent needed because keep.eu's Gunicorn/nginx rejects bot UAs with HTTP 403. */
-export const KEEP_EU_HTTP_USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+/**
+ * Identifies FonBridge to keep.eu honestly. A browser user-agent used to be sent to get past
+ * the HTTP 403 that keep.eu returns to bots; that impersonation is removed. If keep.eu answers
+ * 403 now, the sync records a SystemAlert and the job keeps running on the stored data.
+ */
+export const KEEP_EU_HTTP_USER_AGENT = 'FonBridge/1.0 (+https://fonbridge.com; info@fonbridge.com)';
 
 export const KEEP_EU_API_BASE_URL = 'https://keep.eu/api/open-data';
 
