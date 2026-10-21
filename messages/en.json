@@ -3498,6 +3498,30 @@
     "none": "—"
   },
   "modules": {
+    "call-fit": {
+      "name": "Call Fit",
+      "tagline": "Scores open calls against the organisation profile; a decision aid, not a guarantee of selection."
+    },
+    "expert-pool": {
+      "name": "Expert Pool",
+      "tagline": "Pre-registered experts for evaluator and reviewer matching."
+    },
+    "budget-wp": {
+      "name": "Budget & Work Packages",
+      "tagline": "Budget and work-package planning on top of partner and proposal data."
+    },
+    "compliance": {
+      "name": "Compliance Check",
+      "tagline": "AI-assisted review of application parts against programme rules."
+    },
+    "post-award": {
+      "name": "Post-Award Management",
+      "tagline": "Reporting, effort tracking and deliverables after a grant is signed."
+    },
+    "tr-layer": {
+      "name": "Turkish National Layer",
+      "tagline": "Turkish national programmes such as TÜBİTAK and KOSGEB, alongside the EU pipeline."
+    },
     "partner-intel": {
       "name": "Partner Intelligence Database",
       "tagline": "One partner card per organisation, topic leaders and the collaboration graph."

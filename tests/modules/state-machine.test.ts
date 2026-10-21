@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { canAccessStatus, canEnable, getDisableCascade } from '../../src/lib/modules/state-machine';
+import {
+  canAccessStatus,
+  canEnable,
+  canEnableEntitled,
+  getDisableCascade,
+} from '../../src/lib/modules/state-machine';
 import { ModuleId } from '../../src/lib/modules/types';
 
 describe('Module State Machine', () => {
@@ -120,4 +125,30 @@ describe('Module State Machine', () => {
     });
   });
 
+});
+
+describe('Yakında (statusBadge: soon) modules cannot be opened', () => {
+  const everything = ['M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12', 'M13', 'M14', 'M15', 'M16'] as ModuleId[];
+  const soon: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'];
+
+  it('refuses every soon module on the top plan, even with its dependencies on', () => {
+    for (const id of soon) {
+      expect(canEnable(id, everything, 'ultra'), id).toMatchObject({ allowed: false, reason: 'Module is coming soon.' });
+      expect(canEnableEntitled(id, everything, everything), id).toMatchObject({
+        allowed: false,
+        reason: 'Module is coming soon.',
+      });
+    }
+  });
+
+  it('a GA module is still allowed through the same path (the refusal is for soon only)', () => {
+    expect(canEnableEntitled('M1', [], ['M1']).allowed).toBe(true);
+    expect(canEnableEntitled('M11', ['M1', 'M2', 'M3', 'M5', 'M8'], ['M11']).allowed).toBe(true);
+  });
+
+  it('cascades through the new dependency edges when a GA parent is switched off', () => {
+    expect(getDisableCascade('M5', ['M5', 'M13', 'M15'])).toEqual(['M13', 'M15']);
+    expect(getDisableCascade('M11', ['M1', 'M2', 'M3', 'M5', 'M8', 'M11', 'M14'])).toEqual(['M14']);
+    expect(getDisableCascade('M14', ['M11', 'M14'])).toEqual([]);
+  });
 });

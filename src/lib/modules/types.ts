@@ -3,6 +3,7 @@ import type { WorkspaceRouteKey } from '@/lib/routes';
 import type { PlanId } from '@/lib/billing/catalog';
 
 export type ModuleId =
+  | 'M0'
   | 'M1'
   | 'M2'
   | 'M3'
@@ -13,7 +14,12 @@ export type ModuleId =
   | 'M8'
   | 'M9'
   | 'M10'
-  | 'M11';
+  | 'M11'
+  | 'M12'
+  | 'M13'
+  | 'M14'
+  | 'M15'
+  | 'M16';
 
 export type ModuleStatus = 'OFF' | 'DEV' | 'PILOT' | 'ON';
 
@@ -121,4 +127,9 @@ export interface ModuleManifest {
   docsUrl: string | null;
   /** `null` when the module advertises no quota at all. */
   quota: ModuleQuota | null;
+  /**
+   * Programme templates this module ships with (data only; the template bodies
+   * live with the module). Empty when the module has none.
+   */
+  programTemplates?: readonly string[];
 }
