@@ -9,7 +9,7 @@
   "src/app/[locale]/(app)/[workspace]/partners/PartnerFilters.tsx": 10,
   "src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager.tsx": 6,
   "src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx": 3,
-  "src/app/[locale]/(app)/[workspace]/pipeline/board.tsx": 46,
+  "src/app/[locale]/(app)/[workspace]/pipeline/board.tsx": 40,
   "src/app/[locale]/(app)/[workspace]/settings/api-keys/client.tsx": 28,
   "src/app/[locale]/(public)/calls/page.tsx": 3,
   "src/app/[locale]/(public)/i18n-check/page.tsx": 7,
