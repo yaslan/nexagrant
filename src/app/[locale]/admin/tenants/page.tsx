@@ -1,5 +1,5 @@
 import React from 'react';
-import { prisma } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
 import { Building2 } from 'lucide-react';
 import { errorMessage } from '@/lib/errors';
 
@@ -22,14 +22,20 @@ export default async function AdminTenantsPage() {
   let tenants: TenantRow[] = [];
   let loadError: string | null = null;
   try {
-    tenants = await prisma.tenant.findMany({
-      include: {
-        _count: {
-          select: { users: true, workspaces: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    // Tenant itself has no RLS, but both _count subqueries read RLS-scoped
+    // tables (Membership, Workspace): unscoped under fabrika_app every count
+    // reads back 0. The console lists every tenant, so it is a platform-admin
+    // read, behind the admin layout's isPlatformAdminSession check.
+    tenants = await withSystemScope('platform-admin', 'admin-tenants.list', (tx) =>
+      tx.tenant.findMany({
+        include: {
+          _count: {
+            select: { users: true, workspaces: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+    );
   } catch (e) {
     console.error(`[AdminTenantsPage] DB query failed: ${errorMessage(e)}`);
     loadError = 'Kiracı listesi okunamadı (veritabanına ulaşılamıyor).';
