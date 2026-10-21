@@ -11,6 +11,7 @@ interface PartnerFiltersProps {
     activityType: string;
     isTurkish: boolean;
     minProjects: number;
+    isInterreg?: boolean;
   };
 }
 
@@ -24,6 +25,7 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
   const [activityType, setActivityType] = useState(initialFilters.activityType);
   const [isTurkish, setIsTurkish] = useState(initialFilters.isTurkish);
   const [minProjects, setMinProjects] = useState(initialFilters.minProjects.toString());
+  const [isInterreg, setIsInterreg] = useState(Boolean(initialFilters.isInterreg));
 
   const handleApplyFilters = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +43,9 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
     if (isTurkish) params.set('is_turkish', 'true');
     else params.delete('is_turkish');
 
+    if (isInterreg) params.set('is_interreg', 'true');
+    else params.delete('is_interreg');
+
     if (parseInt(minProjects, 10) > 0) params.set('min_projects', minProjects);
     else params.delete('min_projects');
 
@@ -54,6 +59,7 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
     setCountry('');
     setActivityType('');
     setIsTurkish(false);
+    setIsInterreg(false);
     setMinProjects('0');
     router.push(pathname);
   };
@@ -121,19 +127,31 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-border flex-wrap gap-2">
-        <label className="flex items-center gap-2 text-xs font-semibold text-ink cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={isTurkish}
-            onChange={(e) => setIsTurkish(e.target.checked)}
-            className="rounded border-border text-blue-600 focus:ring-blue-500"
-          />
-          <span>🇹🇷 {isTr ? 'Sadece Türk Kuruluşları Göster (isTurkish = true)' : 'Show Turkish Organizations Only'}</span>
-        </label>
+      <div className="flex items-center justify-between pt-2 border-t border-border flex-wrap gap-3">
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="flex items-center gap-2 text-xs font-semibold text-ink cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isTurkish}
+              onChange={(e) => setIsTurkish(e.target.checked)}
+              className="rounded border-border text-blue-600 focus:ring-blue-500"
+            />
+            <span>🇹🇷 {isTr ? 'Sadece Türk Kuruluşları Göster' : 'Show Turkish Organizations Only'}</span>
+          </label>
+
+          <label className="flex items-center gap-2 text-xs font-semibold text-ink cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isInterreg}
+              onChange={(e) => setIsInterreg(e.target.checked)}
+              className="rounded border-border text-indigo-600 focus:ring-indigo-500"
+            />
+            <span>🇪🇺 {isTr ? 'Sadece Interreg Ortakları (Trakya Üni., Belediyeler, Ajanslar)' : 'Show Interreg Partners Only (Universities, Municipalities, Agencies)'}</span>
+          </label>
+        </div>
 
         <div className="flex items-center gap-2">
-          {(q || country || activityType || isTurkish || minProjects !== '0') && (
+          {(q || country || activityType || isTurkish || isInterreg || minProjects !== '0') && (
             <button
               type="button"
               onClick={handleReset}
