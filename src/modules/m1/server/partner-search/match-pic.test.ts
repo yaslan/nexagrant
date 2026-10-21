@@ -38,9 +38,9 @@ describe('matchPic — exact PIC', () => {
     expect(matchPic({ pic: '999 979 500', name: 'x' }, ORGS)).toMatchObject({ kind: 'exact', pic: '999979500' });
   });
 
-  it('falls back to fuzzy when the PIC is unknown', () => {
+  it('does not fuzzy-match when the PIC is unknown to CORDIS', () => {
     const r = matchPic({ pic: '123456789', name: 'Orta Doğu Teknik Üniversitesi', country: 'tr' }, ORGS);
-    expect(r).toMatchObject({ kind: 'fuzzy', pic: '999987648' });
+    expect(r).toEqual({ kind: 'unmatched', matchKey: 'pic:123456789', bestScore: 1 });
   });
 });
 
@@ -84,6 +84,52 @@ describe('matchPic — name + country fuzzy', () => {
     ];
     expect(matchPic({ name: 'Nova Labs', country: 'PT' }, twins).kind).toBe('unmatched');
   });
+
+  it('refuses city names that differ by more than a typo, even as the only candidate', () => {
+    const padova: CandidateOrganization[] = [
+      { organisationId: '10', name: 'UNIVERSITA DEGLI STUDI DI PADOVA', country: 'IT' },
+    ];
+    expect(matchPic({ name: 'Università degli Studi di Pavia', country: 'IT' }, padova).kind).toBe('unmatched');
+    expect(matchPic({ name: 'Università degli Studi di Parma', country: 'IT' }, [
+      { organisationId: '11', name: 'UNIVERSITA DEGLI STUDI DI PAVIA', country: 'IT' },
+    ]).kind).toBe('unmatched');
+  });
+
+  it('refuses different words even when the names are otherwise close', () => {
+    const uk: CandidateOrganization[] = [{ organisationId: '20', name: 'UNIVERSITY OF SUSSEX', country: 'GB' }];
+    expect(matchPic({ name: 'University of Surrey', country: 'GB' }, uk).kind).toBe('unmatched');
+  });
+
+  it('needs a clear winner: a runner-up within the margin blocks the match', () => {
+    const base = 'UNIVERSIDAD POLITECNICA DE MADRID';
+    const near: CandidateOrganization[] = [
+      { organisationId: '30', name: 'UNIVERSIDAD POLITECNICA DE MADRIX', country: 'ES' },
+      { organisationId: '31', name: 'UNIVERSIDAD POLITECNICX DE MADRIX', country: 'ES' },
+    ];
+    expect(matchPic({ name: base, country: 'ES' }, near).kind).toBe('unmatched');
+  });
+
+  it('accepts a winner that is clearly ahead of the runner-up', () => {
+    const cands: CandidateOrganization[] = [
+      { organisationId: '40', name: 'UNIVERSIDAD POLITECNICA DE MADRIX', country: 'ES' },
+      { organisationId: '41', name: 'Instituto Nacional de Estadistica', country: 'ES' },
+    ];
+    expect(matchPic({ name: 'UNIVERSIDAD POLITECNICA DE MADRID', country: 'ES' }, cands)).toMatchObject({
+      kind: 'fuzzy',
+      pic: '40',
+    });
+  });
+
+  it('does not count the same organisation twice as a rival', () => {
+    const dupes: CandidateOrganization[] = [
+      { organisationId: '50', name: 'UNIVERSIDAD POLITECNICA DE MADRID', country: 'ES' },
+      { organisationId: '50', name: 'UNIVERSIDAD POLITECNICA DE MADRID', country: 'ES' },
+    ];
+    expect(matchPic({ name: 'UNIVERSIDAD POLITECNICA DE MADRID', country: 'ES' }, dupes)).toMatchObject({
+      kind: 'fuzzy',
+      pic: '50',
+    });
+  });
 });
 
 describe('matchPic — unmatched', () => {
@@ -108,6 +154,14 @@ describe('helpers', () => {
       matchKeyFor({ name: 'ORTA DOGU TEKNIK UNIVERSITESI', country: 'TR' })
     );
     expect(matchKeyFor({ name: 'x', country: null })).toBe('name:--:X');
+  });
+
+  it('keeps a name that normalizes to nothing from sharing a key with other empty names', () => {
+    expect(matchKeyFor({ name: 'GmbH', country: 'DE' })).toBe('name:DE:GMBH');
+    expect(matchKeyFor({ name: 'Ltd.', country: 'DE' })).not.toBe(matchKeyFor({ name: 'GmbH', country: 'DE' }));
+    expect(matchPic({ name: 'GmbH', country: 'DE' }, [{ organisationId: '60', name: 'GMBH', country: 'DE' }]).kind).toBe(
+      'unmatched'
+    );
   });
 
   it('nameSimilarity bounds', () => {
