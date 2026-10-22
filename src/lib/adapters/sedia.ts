@@ -43,6 +43,16 @@ export const SEDIA_SOURCE = 'sedia';
  */
 export const SEDIA_TIMEOUT_MS = 10_000;
 
+/**
+ * Sort sent with every search. Without one SEDIA answers the same query in a
+ * different order from one request to the next, so page 2 of one request and
+ * page 3 of the next could repeat or skip topics (FO-42). `identifier` is a
+ * field SEDIA honours (checked live: ASC gave the same 1012 rows in the same
+ * order on two full walks; `reference` and unsorted did not). It is not unique:
+ * one topic can appear twice, so a tie of two rows is still possible.
+ */
+export const SEDIA_STABLE_SORT = { field: 'identifier', order: 'ASC' } as const;
+
 export interface SediaSearchOptions {
   text?: string;
   pageSize?: number;
@@ -317,6 +327,11 @@ export class SediaAdapter {
           'query',
           new Blob([JSON.stringify(queryObj)], { type: 'application/json' }),
           'query.json'
+        );
+        formData.append(
+          'sort',
+          new Blob([JSON.stringify(SEDIA_STABLE_SORT)], { type: 'application/json' }),
+          'sort.json'
         );
         formData.append(
           'languages',

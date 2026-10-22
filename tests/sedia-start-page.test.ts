@@ -4,7 +4,7 @@
  * report the page it actually read.
  */
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { SediaAdapter } from '@/lib/adapters/sedia';
+import { SEDIA_STABLE_SORT, SediaAdapter } from '@/lib/adapters/sedia';
 
 const page = (n: number) => ({
   totalResults: 300,
@@ -57,5 +57,19 @@ describe('SEDIA search startPage', () => {
 
     expect(result.topics.map((t) => t.identifier)).toEqual(['HORIZON-T-1']);
     expect(result.pageNumber).toBe(1);
+  });
+
+  // FO-42 QA: without a sort SEDIA reordered the same query between requests.
+  test('every search sends the stable sort', async () => {
+    const fetchMock = vi.fn((_url: string, _init: RequestInit) => Promise.resolve(Response.json(page(1))));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new SediaAdapter().searchSedia({ startPage: 2, maxPages: 1, pageSize: 1 });
+
+    const body = fetchMock.mock.calls[0]![1].body as FormData;
+    const sort = body.get('sort');
+    expect(sort).toBeInstanceOf(Blob);
+    expect(JSON.parse(await (sort as Blob).text())).toEqual(SEDIA_STABLE_SORT);
+    expect(SEDIA_STABLE_SORT).toEqual({ field: 'identifier', order: 'ASC' });
   });
 });

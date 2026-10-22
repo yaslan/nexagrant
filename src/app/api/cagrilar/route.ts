@@ -21,7 +21,24 @@ const CAGRILAR_MAX_PAGE_SIZE = 50;
  */
 const CAGRILAR_MAX_PAGE_NUMBER = 1000;
 
-const PageParamSchema = z.coerce.number().int().min(1).max(CAGRILAR_MAX_PAGE_NUMBER);
+/**
+ * SEDIA reads only the first 10 000 hits of a query: measured live, page 100 at
+ * size 100 and page 200 at size 50 answer, the next page of each comes back
+ * empty with `totalResults: 0`. A page past that window is a 400, not a 200
+ * that the calls page would show as "0 results".
+ */
+const CAGRILAR_SEDIA_WINDOW = 10_000;
+
+/**
+ * Plain digits only, no leading zero. `z.coerce.number()` would also take
+ * " 2 ", "2.0", "1e1" and "0x2", so the same page could be asked for under
+ * several spellings.
+ */
+const PageParamSchema = z
+  .string()
+  .regex(/^[1-9]\d{0,3}$/)
+  .transform(Number)
+  .pipe(z.number().max(CAGRILAR_MAX_PAGE_NUMBER));
 
 /**
  * Total time one search may take, SEDIA and translation together
@@ -76,6 +93,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'invalid_limit' }, { status: 400 });
     }
     const pageSize = Math.min(CAGRILAR_MAX_PAGE_SIZE, Math.max(1, rawPageSize));
+    if (page * pageSize > CAGRILAR_SEDIA_WINDOW) {
+      return NextResponse.json({ success: false, error: 'page_out_of_window' }, { status: 400 });
+    }
     const lang = (searchParams.get('lang') || searchParams.get('locale') || 'tr').toLowerCase();
     
     // Status filter: 'OPEN', 'FORTHCOMING', 'CLOSED' or numeric codes ('31094501', '31094502', '31094503')

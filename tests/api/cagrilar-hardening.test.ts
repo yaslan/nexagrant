@@ -90,11 +90,57 @@ describe('/api/cagrilar hardening', () => {
     expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ startPage: 1, maxPages: 1 });
   });
 
-  test.each(['0', '-3', '1.5', 'abc', '', '1001'])('page=%s is a 400 before any outbound call', async (page) => {
-    const res = await get(`?page=${page}&lang=en`);
+  // Spellings of a number that z.coerce.number() used to take: one page, many URLs.
+  test.each(['0', '-3', '1.5', 'abc', '', '1001', ' 2 ', '2.0', '1e1', '0x2', '02', '+2'])(
+    'page=%j is a 400 before any outbound call',
+    async (page) => {
+      const res = await get(`?page=${encodeURIComponent(page)}&lang=en`);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ success: false, error: 'invalid_page' });
+      expect(mocks.searchSedia).not.toHaveBeenCalled();
+    }
+  );
+
+  // FO-42 QA: the top of the range was only tested from the outside (1001).
+  test('page=1000 is the last accepted page number', async () => {
+    const res = await get('?page=1000&limit=10&lang=en');
+    expect(res.status).toBe(200);
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ startPage: 1000, pageSize: 10 });
+  });
+
+  // SEDIA answers 200 with totalResults 0 past its 10 000-hit window; the page
+  // would show "0 results". Measured live: 200x50 answers, 201x50 is empty.
+  test.each([
+    ['1000', '50'],
+    ['201', '50'],
+    ['1000', '11'],
+  ])('page=%s limit=%s is past the SEDIA window: 400, no outbound call', async (page, limit) => {
+    const res = await get(`?page=${page}&limit=${limit}&lang=en`);
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ success: false, error: 'invalid_page' });
+    expect(await res.json()).toEqual({ success: false, error: 'page_out_of_window' });
     expect(mocks.searchSedia).not.toHaveBeenCalled();
+  });
+
+  test('page=200 limit=50 (the last offset inside the window) is read', async () => {
+    const res = await get('?page=200&limit=50&lang=en');
+    expect(res.status).toBe(200);
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ startPage: 200, pageSize: 50 });
+  });
+
+  // Past the last page SEDIA answers an empty list with the true total. That is
+  // "no more calls", not an error: 200, empty topics, total kept.
+  test('a page beyond the last one is 200 with an empty list and the real total', async () => {
+    mocks.searchSedia.mockResolvedValue({
+      totalResults: 1012,
+      pageNumber: 52,
+      pageSize: 20,
+      topics: [],
+      schemaDrift: [],
+      errors: [],
+    });
+    const res = await get('?page=52&limit=20&lang=en');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, totalResults: 1012, topics: [], pageNumber: 52 });
   });
 
   // İNCELEME-70 D-1 (TASK-MUNVVMJDEO932): the lower bound had no test, so a
