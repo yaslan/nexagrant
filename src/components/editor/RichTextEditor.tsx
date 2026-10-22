@@ -42,9 +42,6 @@ interface RichTextEditorProps {
   imageBase?: string;
 }
 
-/** A scheme at the start of an address: `https:`, `mailto:`, `javascript:` … */
-const URL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
-
 /**
  * What the public post page can render, and nothing more: anything else would
  * show in the editor and reach the site as raw `*`/`_` markers. Disabled marks
@@ -69,10 +66,10 @@ const MARKDOWN_EXTENSIONS = [
       autolink: true,
       linkOnPaste: true,
       defaultProtocol: 'https',
-      // A typed or pasted address with no scheme (`example.com`, `a@b.org`)
-      // is completed by the link extension and checked again as an href
-      // before it is rendered; every other address is the policy's to judge.
-      isAllowedUri: (url, ctx) => isAllowedLinkHref(url) || (!URL_SCHEME.test(url) && !url.startsWith('/') && ctx.defaultValidate(url)),
+      // The post policy alone (TASK-MVDTW6KVN5BSA): an address it refuses is
+      // never a link here either, so a typed `example.com` stays text — type
+      // `https://example.com` or use the Link tool.
+      isAllowedUri: (url) => isAllowedLinkHref(url),
     },
     strike: false,
     underline: false,
