@@ -1,8 +1,8 @@
 'use server';
 
-import { createHash } from 'node:crypto';
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
+import { subjectRefOf } from '@/lib/legal/subject-ref';
 import { auth } from '@/lib/auth';
 
 /**
@@ -237,7 +237,7 @@ async function recordAccessAudit(
   tables: Record<string, unknown[]>
 ): Promise<void> {
   try {
-    const subjectRef = createHash('sha256').update(userId).digest('hex');
+    const subjectRef = subjectRefOf(userId);
     // Row counts only — the audit trail records that the export happened, never
     // a second copy of the personal data it contained.
     const rowCounts = Object.fromEntries(

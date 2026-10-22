@@ -1,8 +1,8 @@
 'use server';
 
-import { createHash } from 'node:crypto';
 import { prisma, withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
+import { subjectRefOf } from '@/lib/legal/subject-ref';
 import { auth } from '@/lib/auth';
 import { reportMailNotConfigured, smtpMailer } from '@/lib/email/mailer';
 
@@ -255,7 +255,7 @@ async function recordErasureAudit(
   extra: Record<string, string>
 ): Promise<void> {
   try {
-    const subjectRef = createHash('sha256').update(userId).digest('hex');
+    const subjectRef = subjectRefOf(userId);
     const data = { subjectRef, ...extra };
     const unique = [...new Set(tenantIds)];
 
