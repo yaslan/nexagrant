@@ -7,6 +7,27 @@ export interface CanEnableResult {
   missingDependencies?: ModuleId[];
 }
 
+const COMING_SOON_REASON = 'Module is coming soon.';
+
+/**
+ * A "Yakında" (`statusBadge: 'soon'`) module has no gate that opens it. Every
+ * path that switches one on is refused here (FO-40): the enable checks below and
+ * the admin write in `updateTenantModuleStatus`.
+ */
+export function isComingSoon(moduleId: ModuleId): boolean {
+  return getManifest(moduleId)?.statusBadge === 'soon';
+}
+
+/**
+ * The refusal for an admin write of `targetStatus` to a module, or `null` when
+ * the write may go ahead. `OFF` closes a module, so it is always allowed; `ON`,
+ * `PILOT` and `DEV` open one, so a `soon` module is refused.
+ */
+export function adminStatusRefusal(moduleId: ModuleId, targetStatus: ModuleStatus): string | null {
+  if (targetStatus !== 'OFF' && isComingSoon(moduleId)) return COMING_SOON_REASON;
+  return null;
+}
+
 /**
  * Checks if a module can be enabled based on its dependencies and the current plan tier.
  */
@@ -19,8 +40,8 @@ export function canEnable(
   if (!manifest) {
     return { allowed: false, reason: 'Module not found.' };
   }
-  if (manifest.statusBadge === 'soon') {
-    return { allowed: false, reason: 'Module is coming soon.' };
+  if (isComingSoon(moduleId)) {
+    return { allowed: false, reason: COMING_SOON_REASON };
   }
 
   // Check plan constraint
@@ -63,8 +84,8 @@ export function canEnableEntitled(
   }
   // A "Yakında" module has no gate that opens it: the plan list and the switch
   // are not enough, so it is refused before either is read (FO-40).
-  if (manifest.statusBadge === 'soon') {
-    return { allowed: false, reason: 'Module is coming soon.' };
+  if (isComingSoon(moduleId)) {
+    return { allowed: false, reason: COMING_SOON_REASON };
   }
 
   if (!entitledModules.includes(moduleId)) {

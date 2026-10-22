@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  adminStatusRefusal,
   canAccessStatus,
   canEnable,
   canEnableEntitled,
   getDisableCascade,
+  isComingSoon,
 } from '../../src/lib/modules/state-machine';
 import { ModuleId } from '../../src/lib/modules/types';
 
@@ -138,6 +140,23 @@ describe('Yakında (statusBadge: soon) modules cannot be opened', () => {
         allowed: false,
         reason: 'Module is coming soon.',
       });
+    }
+  });
+
+  it('the admin write refuses ON, PILOT and DEV for a soon module, and still allows OFF', () => {
+    for (const id of soon) {
+      expect(isComingSoon(id), id).toBe(true);
+      for (const status of ['ON', 'PILOT', 'DEV'] as const) {
+        expect(adminStatusRefusal(id, status), `${id} ${status}`).toBe('Module is coming soon.');
+      }
+      expect(adminStatusRefusal(id, 'OFF'), id).toBeNull();
+    }
+  });
+
+  it('the admin write lets a GA module through every status', () => {
+    expect(isComingSoon('M1')).toBe(false);
+    for (const status of ['ON', 'PILOT', 'DEV', 'OFF'] as const) {
+      expect(adminStatusRefusal('M1', status), status).toBeNull();
     }
   });
 

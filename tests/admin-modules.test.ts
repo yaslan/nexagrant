@@ -84,6 +84,22 @@ describe('Admin Module Actions', () => {
     ).rejects.toThrow('Missing required dependency');
   });
 
+  test('An admin cannot open a Yakında (soon) module, but can still close it', async () => {
+    const { prisma } = await import('../src/lib/db');
+    const upsert = vi.mocked(prisma.moduleState.upsert);
+
+    for (const status of ['ON', 'PILOT', 'DEV'] as const) {
+      upsert.mockClear();
+      await expect(
+        updateTenantModuleStatus('tenant-1', 'M0', status)
+      ).rejects.toThrow('Module is coming soon.');
+      expect(upsert, status).not.toHaveBeenCalled();
+    }
+
+    const off = await updateTenantModuleStatus('tenant-1', 'M0', 'OFF');
+    expect(off.success).toBe(true);
+  });
+
   test('A signed-in user who is not a platform admin is rejected', async () => {
     auth.mockResolvedValueOnce({ user: { id: 'member-1', email: 'member@tenant.app' } });
 

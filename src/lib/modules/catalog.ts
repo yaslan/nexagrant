@@ -1,4 +1,5 @@
 import { getAllManifests, getManifest } from "./registry";
+import { isComingSoon } from "./state-machine";
 import {
   PIPELINE_STAGES,
   type ModuleCategory,
@@ -86,7 +87,6 @@ export function navFeatureLock(
   activeIds: readonly ModuleId[],
 ): ModuleManifest | null {
   const id = navFeatureModule(navKey);
-  if (!id || activeIds.includes(id)) return null;
-  const manifest = getManifest(id);
-  return manifest.statusBadge === "soon" ? null : manifest;
+  if (!id || activeIds.includes(id) || isComingSoon(id)) return null;
+  return getManifest(id);
 }
