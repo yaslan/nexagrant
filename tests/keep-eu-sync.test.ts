@@ -507,14 +507,14 @@ describe('syncKeepEuData', () => {
   });
 
   test('a failed keep.eu read reports the fixed code and no sync counts', async () => {
-    // Without KEEP_EU_API_KEY the fetch is skipped; with it, the 403 is the failure. Either way: a code.
+    // An explicit apiKey keeps the test independent of KEEP_EU_API_KEY in the environment.
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 403, statusText: 'Forbidden' })));
-    const res = await syncKeepEuData({ programmeIds: [305] });
+    const res = await syncKeepEuData({ programmeIds: [305], apiKey: 'test-key' });
     vi.unstubAllGlobals();
 
     expect(res.success).toBe(false);
     expect(res.upstreamOk).toBe(false);
-    expect(['missing_api_key', 'forbidden']).toContain(res.upstreamError);
+    expect(res.upstreamError).toBe('forbidden');
     expect(res.syncedProjectsCount).toBe(0);
   });
 
@@ -631,12 +631,12 @@ describe('fetchKeepEuOpenData failure handling (B2, Y3)', () => {
     expect(alerts).toHaveLength(1);
   });
 
-  test('a non-403 HTTP error returns a fixed code, the status only in the alert', async () => {
+  test('a non-403 HTTP error returns a fixed code and the numeric status, never the status text', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500, statusText: 'Internal Server Error' })));
 
     const res = await fetchKeepEuOpenData({ apiKey: 'test-key', programmeIds: [305] });
 
-    expect(res).toEqual({ ok: false, data: null, error: 'upstream_error' });
+    expect(res).toEqual({ ok: false, data: null, error: 'upstream_error', status: 500 });
     const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('HTTP 500'));
     expect(alerts).toHaveLength(1);
   });

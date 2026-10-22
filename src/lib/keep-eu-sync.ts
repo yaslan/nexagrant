@@ -473,7 +473,7 @@ export async function fetchKeepEuOpenData(options?: {
   userAgent?: string;
   /** False for dry runs: no RawFetch row and no SystemAlert is written. */
   persist?: boolean;
-}): Promise<{ ok: boolean; data: unknown; error?: KeepEuFetchErrorCode }> {
+}): Promise<{ ok: boolean; data: unknown; error?: KeepEuFetchErrorCode; status?: number }> {
   const persist = options?.persist !== false;
   const apiKey = options?.apiKey ?? env.KEEP_EU_API_KEY;
   if (!apiKey) {
@@ -524,7 +524,13 @@ export async function fetchKeepEuOpenData(options?: {
               : `keep-eu-sync:http-error-${response.status}`,
         });
       }
-      return { ok: false, data: null, error: response.status === 403 ? 'forbidden' : 'upstream_error' };
+      // The status is for server-side callers (the CLI dry run). It never reaches the admin action.
+      return {
+        ok: false,
+        data: null,
+        error: response.status === 403 ? 'forbidden' : 'upstream_error',
+        status: response.status,
+      };
     }
 
     const json = await response.json();
@@ -795,6 +801,8 @@ async function loadInterregProjectsFromDatabase(take: number): Promise<KeepEuPro
 export interface KeepEuSyncOptions {
   records?: KeepEuProjectRecord[];
   programmeIds?: number[] | string;
+  /** Defaults to KEEP_EU_API_KEY from the environment. */
+  apiKey?: string;
   sourceFromDatabaseOnly?: boolean;
   /** When the keep.eu request fails, re-index existing DB rows instead of stopping. Reported as `success:false`. */
   allowDatabaseFallback?: boolean;
@@ -830,7 +838,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     dataset = await loadInterregProjectsFromDatabase(DEFAULT_DATABASE_BATCH);
   } else {
     source = 'api';
-    const fetchRes = await fetchKeepEuOpenData({ programmeIds: options?.programmeIds });
+    const fetchRes = await fetchKeepEuOpenData({ programmeIds: options?.programmeIds, apiKey: options?.apiKey });
     if (!fetchRes.ok || !fetchRes.data) {
       // The upstream failed, so nothing new was read. Re-indexing old rows is an explicit opt-in
       // and is reported as a failure: it must never look like a successful sync.

@@ -149,7 +149,8 @@ async function main() {
     const fetchRes = await fetchKeepEuOpenData({ programmeIds, persist: false });
 
     if (!fetchRes.ok || !fetchRes.data) {
-      console.error(`❌ keep.eu fetch failed: ${fetchRes.error}`);
+      const httpStatus = fetchRes.status === undefined ? '' : ` (HTTP ${fetchRes.status})`;
+      console.error(`❌ keep.eu fetch failed: ${fetchRes.error}${httpStatus}`);
       process.exitCode = 1;
       return;
     }
