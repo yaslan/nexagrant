@@ -4,9 +4,14 @@
 # core.bare lives in the SHARED .git/config. When it flips to true the main
 # checkout stops working ("fatal: this operation must be run in a work tree")
 # while linked worktrees keep committing, so nobody notices until an agent's
-# commit or report step dies there. Known writer: a `git init` that inherits a
-# linked worktree's GIT_DIR (FO-111). The guard only reports: flipping the
+# commit or report step dies there. One way to write it, reproduced in a
+# throwaway repo: a `git init` that inherits a linked worktree's GIT_DIR
+# (FO-111). Whether that wrote it in the main checkout is a hypothesis
+# (docs/RELEASE_CHECKLIST.md §9.1). The guard only reports: flipping the
 # setting back silently would hide whatever wrote it.
+#
+# --path-format needs Git >= 2.31; on older git only the path in the message
+# breaks (it prints "/config"), the check itself still works.
 
 # Exit status 1 and a fix-it message on stderr when core.bare=true. $1 names
 # the caller in the message.
