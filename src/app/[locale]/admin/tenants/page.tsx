@@ -34,22 +34,25 @@ export default async function AdminTenantsPage({ params }: { params: Promise<{ l
     // tables (Membership, Workspace): unscoped under fabrika_app every count
     // reads back 0. The console lists every tenant, so it is a platform-admin
     // read, behind the admin layout's isPlatformAdminSession check.
-    [tenants, internalPlans] = await Promise.all([
-      withSystemScope('platform-admin', 'admin-tenants.list', (tx) =>
-        tx.tenant.findMany({
-          include: {
-            _count: {
-              select: { users: true, workspaces: true }
-            }
-          },
-          orderBy: { createdAt: 'desc' }
-        })
-      ),
-      listInternalPlans()
-    ]);
+    tenants = await withSystemScope('platform-admin', 'admin-tenants.list', (tx) =>
+      tx.tenant.findMany({
+        include: {
+          _count: {
+            select: { users: true, workspaces: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+    );
   } catch (e) {
     console.error(`[AdminTenantsPage] DB query failed: ${errorMessage(e)}`);
     loadError = t('loadError');
+  }
+  // Only the badge reads this: a failure costs the badge, never the list.
+  try {
+    internalPlans = await listInternalPlans();
+  } catch (e) {
+    console.error(`[AdminTenantsPage] internal plan badge query failed: ${errorMessage(e)}`);
   }
 
   return (

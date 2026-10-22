@@ -12,8 +12,9 @@
  *
  * The rule for which source wins is stated here and nowhere else:
  * subscription-sync.ts asks {@link stripeSyncBlocker} before every write, and a
- * row it names is left alone — the event is not claimed, so it can be replayed
- * once the admin has ended the pilot or taken the internal plan back. A
+ * row it names is left alone. Nothing replays the skipped event, so checkout is
+ * closed for both owners (`PILOT_CHECKOUT_CLOSED`, `INTERNAL_PLAN_CHECKOUT_CLOSED`)
+ * and a skip is logged — for an internal plan also raised as a `SystemAlert`. A
  * contract is not listed: assigning one is refused while a live Stripe
  * subscription exists, so Stripe never names a contract tenant.
  *

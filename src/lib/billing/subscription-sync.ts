@@ -14,6 +14,7 @@ import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
 import { lockPilotRow } from '@/lib/billing/pilot';
 import { stripeSyncBlocker, type StripeSyncBlock } from '@/lib/billing/subscription-owner';
+import { recordAlert } from '@/lib/observability/system-alert';
 import { invoiceLinePeriodFallback } from '@/lib/efatura';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
@@ -294,6 +295,33 @@ const PROTECTED_LOG: Record<StripeSyncBlock, string> = {
 };
 
 /**
+ * Says a Stripe event was skipped over a row Stripe does not own. Nothing
+ * replays it: the event is not claimed, but the webhook answers 200, so Stripe
+ * does not retry, and a re-delivery is only ever a manual "resend" from the
+ * Stripe Dashboard. The defence is upstream — checkout refuses a pilot and an
+ * internal-plan tenant — and this is the trace when something got past it.
+ *
+ * An internal plan also raises a `SystemAlert`: unlike the pilot, it is an
+ * ordinary admin action, so a payment arriving over it is the one case an
+ * operator must see without reading logs. The alert carries Stripe ids only —
+ * `SystemAlert` is outside tenant isolation (system-alert.ts), and the Stripe
+ * subscription leads back to the tenant.
+ */
+async function reportProtected(
+  block: StripeSyncBlock,
+  context: { tenantId: string; eventId: string; stripeSubscriptionId: string }
+): Promise<void> {
+  logger.error(PROTECTED_LOG[block], context);
+  if (block !== 'INTERNAL_PLAN_PROTECTED') return;
+  await recordAlert({
+    level: 'error',
+    source: 'stripe-webhook',
+    message: PROTECTED_LOG[block],
+    meta: { code: block, eventId: context.eventId, stripeSubscriptionId: context.stripeSubscriptionId },
+  });
+}
+
+/**
  * Thrown inside a `withTenant` callback to roll the transaction back when the
  * claim above lost the race. Not an error the caller reports: the outcome is
  * "already processed", which is a successful no-op.
@@ -385,12 +413,11 @@ export async function syncStripeSubscription(
   // closed for a pilot tenant, so a Stripe subscription naming one is either a
   // sale that got past that gate or a forged `metadata.tenantId`; both need a
   // person, not an upsert that would turn 90 free days into whatever Stripe
-  // says. The event is not claimed, so it can be replayed once the pilot has
-  // been ended by the platform admin. An internal plan (TASK-MVCH26OXNVLKR) is
-  // protected the same way, until the admin takes it back.
+  // says. An internal plan (TASK-MVCH26OXNVLKR) is protected the same way, and
+  // checkout is closed for it too. There is no replay: see `reportProtected`.
   const fastBlock = stripeSyncBlocker(existingSubscription);
   if (fastBlock) {
-    logger.error(PROTECTED_LOG[fastBlock], {
+    await reportProtected(fastBlock, {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
@@ -673,7 +700,7 @@ export async function syncStripeSubscription(
   });
 
   if (outcome !== null && typeof outcome === 'object' && 'block' in outcome) {
-    logger.error(PROTECTED_LOG[outcome.block], {
+    await reportProtected(outcome.block, {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
@@ -776,8 +803,8 @@ export async function handleSubscriptionCancellation(
     // The same guard as in `syncStripeSubscription`: a Stripe cancellation must
     // not cancel a free pilot it never sold. Read in this transaction under the
     // pilot lock, so no grant can land between the check and the update;
-    // throwing rolls the claim back too, so the event can be replayed once the
-    // pilot is ended.
+    // throwing rolls the claim back too, so nothing is recorded as processed
+    // (there is still no replay — see `reportProtected`).
     await lockPilotRow(tx, tenantId);
     const current = await tx.subscription.findUnique({
       where: { tenantId },
@@ -831,7 +858,7 @@ export async function handleSubscriptionCancellation(
   });
 
   if (claimed !== null && typeof claimed === 'object' && 'block' in claimed) {
-    logger.error(PROTECTED_LOG[claimed.block], {
+    await reportProtected(claimed.block, {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,

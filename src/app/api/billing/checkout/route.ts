@@ -15,6 +15,7 @@ import { requireTenantApi } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
 import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
 import { getPilotState } from '@/lib/billing/pilot';
+import { hasActiveInternalPlan } from '@/lib/billing/internal-plan';
 import { appUrl as resolveAppUrl } from '@/lib/app-url';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -122,6 +123,21 @@ export async function POST(req: Request) {
           error: 'Checkout closed during the pilot',
           message: 'Pilot süresince ödeme ve plan yükseltme kapalıdır; pilot sonrasında açılır.',
           code: 'PILOT_CHECKOUT_CLOSED',
+        },
+        { status: 403 }
+      );
+    }
+
+    // A tenant on an internal plan (TASK-MVCH26OXNVLKR) buys nothing either: the
+    // plan is the platform admin's, and the Stripe sync leaves such a row alone
+    // (`stripeSyncBlocker`), so a payment taken here would land nowhere. The
+    // admin takes the internal plan back first; then checkout opens again.
+    if (await hasActiveInternalPlan(tenantId)) {
+      return NextResponse.json(
+        {
+          error: 'Checkout closed while an internal plan is assigned',
+          message: 'Planınız yönetici tarafından atandı; değişiklik için bizimle iletişime geçin.',
+          code: 'INTERNAL_PLAN_CHECKOUT_CLOSED',
         },
         { status: 403 }
       );

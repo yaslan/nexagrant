@@ -67,6 +67,25 @@ export default async function AdminTenantDetailPage({
     loadError = true;
   }
 
+  // Who made each change, by name or e-mail. User is a platform table (no RLS)
+  // and the actor is a platform admin, usually of another tenant. Unresolved —
+  // a deleted user, a failed read — falls back to a shortened id.
+  const actorIds = [...new Set(history.map((h) => h.actorId).filter((id): id is string => Boolean(id)))];
+  const actorNames = new Map<string, string>();
+  if (actorIds.length > 0) {
+    try {
+      const users = (await prisma.user.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, name: true, email: true },
+      })) as Array<{ id: string; name: string | null; email: string }>;
+      for (const u of users) actorNames.set(u.id, u.name ? `${u.name} (${u.email})` : u.email);
+    } catch (e) {
+      console.error(`[AdminTenantDetailPage] actor lookup failed: ${errorMessage(e)}`);
+    }
+  }
+  const actorLabel = (id: string | null) =>
+    !id ? '-' : actorNames.get(id) ?? (id.length > 10 ? `${id.slice(0, 8)}…` : id);
+
   const planName = (id: string) => grantsFor(id)?.name ?? id;
   const internal = isInternalPlanSubscription(subscription);
   const entitledFrom =
@@ -131,7 +150,7 @@ export default async function AdminTenantDetailPage({
                 <span className="text-xs text-muted">{dateFmt.format(new Date(h.createdAt))}</span>
               </div>
               <p className="text-xs text-ink-2 break-words">{h.data?.note}</p>
-              <p className="text-[11px] text-muted font-mono">{t('internalPlan.by', { actor: h.actorId ?? '-' })}</p>
+              <p className="text-[11px] text-muted break-words">{t('internalPlan.by', { actor: actorLabel(h.actorId) })}</p>
             </li>
           ))}
         </ul>

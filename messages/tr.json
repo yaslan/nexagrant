@@ -1697,6 +1697,7 @@
       "refundNote": "14 gün iade garantisi",
       "checkoutFailed": "Ödeme oturumu başlatılamadı.",
       "checkoutUnreachable": "Ödeme servisine bağlanılamadı.",
+      "internalPlanCheckoutClosed": "Planınız yönetici tarafından atandı; ödeme ve plan değişikliği buradan yapılamaz. Değişiklik için bizimle iletişime geçin.",
       "demoBadge": "STRIPE CHECKOUT DEMO MODU",
       "demoTitle": "Stripe ödeme simülasyonu",
       "demoBody": "Stripe anahtarları tanımlandığında doğrudan Stripe Checkout sayfasına yönlendirilirsiniz. Aşağıdaki tutarlar sunucunun hesapladığı tutarlardır.",

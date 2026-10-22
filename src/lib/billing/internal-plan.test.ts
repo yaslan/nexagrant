@@ -8,7 +8,7 @@ import type Stripe from 'stripe';
 import { prisma, withTenant } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { LiveProviderSubscriptionError } from './plan-repository';
-import { assignInternalPlan, InternalPlanNoteRequiredError, listInternalPlans } from './internal-plan';
+import { assignInternalPlan, hasActiveInternalPlan, InternalPlanNoteRequiredError, listInternalPlans } from './internal-plan';
 import { INTERNAL_PROVIDER, isInternalPlanSubscription, stripeSyncBlocker } from './subscription-owner';
 import { PILOT_PROVIDER } from './pilot';
 import { handleSubscriptionCancellation, syncStripeSubscription } from './subscription-sync';
@@ -113,8 +113,12 @@ describe('assignInternalPlan (live DB)', () => {
     expect(await prisma.auditEvent.count({ where: { tenantId, type: { startsWith: 'plan.internal.' } } })).toBe(0);
   });
 
-  it('the Stripe sync and cancellation leave an internal plan alone', async () => {
+  it('the Stripe sync and cancellation leave an internal plan alone, and raise an operator alert', async () => {
+    expect(await hasActiveInternalPlan(tenantId)).toBe(false);
     await assignInternalPlan(tenantId, 'ultra', 'admin-1', 'stripe guard');
+    expect(await hasActiveInternalPlan(tenantId)).toBe(true);
+    const syncEvent = `evt_internal_sync_${suffix()}`;
+    const cancelEvent = `evt_internal_cancel_${suffix()}`;
 
     const fake = {
       id: 'sub_over_internal',
@@ -124,12 +128,12 @@ describe('assignInternalPlan (live DB)', () => {
       items: { data: [] },
     } as unknown as Stripe.Subscription;
 
-    expect(await syncStripeSubscription(fake, `evt_internal_sync_${suffix()}`)).toMatchObject({
+    expect(await syncStripeSubscription(fake, syncEvent)).toMatchObject({
       status: 'skipped',
       planId: 'ultra',
       error: 'INTERNAL_PLAN_PROTECTED',
     });
-    expect(await handleSubscriptionCancellation(fake, `evt_internal_cancel_${suffix()}`)).toMatchObject({
+    expect(await handleSubscriptionCancellation(fake, cancelEvent)).toMatchObject({
       status: 'skipped',
       planId: 'ultra',
       error: 'INTERNAL_PLAN_PROTECTED',
@@ -141,7 +145,27 @@ describe('assignInternalPlan (live DB)', () => {
       provider: INTERNAL_PROVIDER,
       providerSubId: null,
     });
-    // Not claimed, so either event can be replayed once the internal plan is taken back.
+    // Not claimed — but nothing replays it either: the webhook answers 200, so
+    // Stripe does not retry. Checkout is closed for an internal plan, and a skip
+    // that still happens is an operator alert, one per event, carrying Stripe
+    // ids and no tenant id (SystemAlert has no RLS).
     expect(await prisma.stripeEventLog.count({ where: { tenantId } })).toBe(0);
+    const alerts = await prisma.systemAlert.findMany({
+      where: {
+        source: 'stripe-webhook',
+        OR: [syncEvent, cancelEvent].map((id) => ({ meta: { path: ['eventId'], equals: id } })),
+      },
+      select: { id: true, level: true, meta: true },
+    });
+    try {
+      expect(alerts).toHaveLength(2);
+      for (const alert of alerts) {
+        expect(alert.level).toBe('error');
+        expect(alert.meta).toMatchObject({ code: 'INTERNAL_PLAN_PROTECTED', stripeSubscriptionId: 'sub_over_internal' });
+        expect(JSON.stringify(alert.meta)).not.toContain(tenantId);
+      }
+    } finally {
+      await prisma.systemAlert.deleteMany({ where: { id: { in: alerts.map((a) => a.id) } } });
+    }
   });
 });

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
+import { expectHydrated } from './fixtures/hydration';
 import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 
 /**
@@ -12,7 +13,9 @@ import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
  * Discover does not grant M1, Pro does. The operator assigns Pro from
  * Admin > Tenants with a note, the tenant's partners page opens; the operator
  * picks Discover, the page locks again with the plan refusal. Both changes
- * must leave an audit row with old → new and the note.
+ * must leave an audit row with old → new and the note. While the internal plan
+ * is on, the owner cannot start a payment from the pricing page: checkout
+ * answers INTERNAL_PLAN_CHECKOUT_CLOSED and the cart says why.
  */
 
 const SHOTS = shotsDir('TASK-MVCH26OXNVLKR-screenshots');
@@ -108,6 +111,8 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
     await expect(page.getByTestId('internal-plan-notice')).toHaveText('İç plan atandı.');
     await expect(page.getByTestId('tenant-current-plan')).toContainText('Pro');
     await expect(page.getByTestId('internal-plan-history')).toContainText('M1 kilit testi (e2e)');
+    // Who did it reads as a person, not a user id.
+    await expect(page.getByTestId('internal-plan-history')).toContainText(`${ADMIN.name} (${ADMIN.email})`);
     await page.screenshot({ path: `${SHOTS}/02-admin-assigned-pro.png`, fullPage: true });
 
     // Phone width: the form and history must fit without a horizontal scroll.
@@ -128,6 +133,37 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('M1');
     await expect(planLock(page)).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/04-m1-open-pro.png`, fullPage: true });
+  });
+
+  test('on the internal Pro plan, the owner cannot start a checkout from pricing', async ({ page }) => {
+    await signInOwner(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'fabrika_cookie_consent',
+        JSON.stringify({ necessary: true, analytics: true, marketing: true })
+      );
+    });
+    await page.goto('/tr/pricing');
+    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
+    await expectHydrated(monthly);
+    await monthly.click();
+    await page.getByTestId('plan-card-ultra').getByRole('button', { name: /sepete ekle/i }).click();
+    await expect(page.getByTestId('cart-total')).toBeVisible();
+
+    const answer = page.waitForResponse(
+      (r) => r.url().endsWith('/api/billing/checkout') && r.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: /Stripe ile ödemeye geç/ }).click();
+    const response = await answer;
+    expect(response.status()).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'INTERNAL_PLAN_CHECKOUT_CLOSED' });
+    // No demo quote either: the refusal comes before anything is priced.
+    await expect(page.getByTestId('checkout-total')).toHaveCount(0);
+    await expect(page.getByTestId('cart-checkout-error')).toHaveText(
+      'Planınız yönetici tarafından atandı; ödeme ve plan değişikliği buradan yapılamaz. Değişiklik için bizimle iletişime geçin.'
+    );
+    await page.screenshot({ path: `${SHOTS}/04b-checkout-closed-internal-plan.png` });
   });
 
   test('back to Discover: M1 locks again and both changes are audited', async ({ page }) => {

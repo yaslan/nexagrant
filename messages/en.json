@@ -1697,6 +1697,7 @@
       "refundNote": "14-day refund guarantee",
       "checkoutFailed": "Could not start the checkout session.",
       "checkoutUnreachable": "Could not reach the payment service.",
+      "internalPlanCheckoutClosed": "Your plan was assigned by an administrator, so payments and plan changes are not available here. Please contact us to change it.",
       "demoBadge": "STRIPE CHECKOUT DEMO MODE",
       "demoTitle": "Stripe checkout simulation",
       "demoBody": "With Stripe keys configured you go straight to the Stripe Checkout page. The amounts below are the ones the server computed.",
