@@ -135,36 +135,59 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
     await page.screenshot({ path: `${SHOTS}/04-m1-open-pro.png`, fullPage: true });
   });
 
-  test('on the internal Pro plan, the owner cannot start a checkout from pricing', async ({ page }) => {
-    await signInOwner(page);
-    await page.addInitScript(() => {
-      window.localStorage.setItem(
-        'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: true, marketing: true })
-      );
-    });
-    await page.goto('/tr/pricing');
-    // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
-    const monthly = page.getByRole('button', { name: 'Aylık', exact: true });
-    await expectHydrated(monthly);
-    await monthly.click();
-    await page.getByTestId('plan-card-ultra').getByRole('button', { name: /sepete ekle/i }).click();
-    await expect(page.getByTestId('cart-total')).toBeVisible();
+  // The refusal is said in the visitor's language (messages/*.json
+  // `billingPanels.cart.internalPlanCheckoutClosed`), not as the server's code.
+  const CHECKOUT_CLOSED = [
+    {
+      locale: 'tr',
+      monthly: 'Aylık',
+      addToCart: /sepete ekle/i,
+      proceed: /Stripe ile ödemeye geç/,
+      refusal:
+        'Planınız yönetici tarafından atandı; ödeme ve plan değişikliği buradan yapılamaz. Değişiklik için bizimle iletişime geçin.',
+      shot: '04b-checkout-closed-internal-plan.png',
+    },
+    {
+      locale: 'en',
+      monthly: 'Monthly',
+      addToCart: /add ultra to cart/i,
+      proceed: /Proceed to Stripe checkout/,
+      refusal:
+        'Your plan was assigned by an administrator, so payments and plan changes are not available here. Please contact us to change it.',
+      shot: '04c-checkout-closed-internal-plan-en.png',
+    },
+  ] as const;
 
-    const answer = page.waitForResponse(
-      (r) => r.url().endsWith('/api/billing/checkout') && r.request().method() === 'POST'
-    );
-    await page.getByRole('button', { name: /Stripe ile ödemeye geç/ }).click();
-    const response = await answer;
-    expect(response.status()).toBe(403);
-    expect(await response.json()).toMatchObject({ code: 'INTERNAL_PLAN_CHECKOUT_CLOSED' });
-    // No demo quote either: the refusal comes before anything is priced.
-    await expect(page.getByTestId('checkout-total')).toHaveCount(0);
-    await expect(page.getByTestId('cart-checkout-error')).toHaveText(
-      'Planınız yönetici tarafından atandı; ödeme ve plan değişikliği buradan yapılamaz. Değişiklik için bizimle iletişime geçin.'
-    );
-    await page.screenshot({ path: `${SHOTS}/04b-checkout-closed-internal-plan.png` });
-  });
+  for (const c of CHECKOUT_CLOSED) {
+    test(`on the internal Pro plan, the owner cannot start a checkout from pricing (${c.locale})`, async ({ page }) => {
+      await signInOwner(page);
+      await page.addInitScript(() => {
+        window.localStorage.setItem(
+          'fabrika_cookie_consent',
+          JSON.stringify({ necessary: true, analytics: true, marketing: true })
+        );
+      });
+      await page.goto(`/${c.locale}/pricing`);
+      // The toggle is client state: a click before hydration is lost (docs/E2E_TESTING.md §3.4).
+      const monthly = page.getByRole('button', { name: c.monthly, exact: true });
+      await expectHydrated(monthly);
+      await monthly.click();
+      await page.getByTestId('plan-card-ultra').getByRole('button', { name: c.addToCart }).click();
+      await expect(page.getByTestId('cart-total')).toBeVisible();
+
+      const answer = page.waitForResponse(
+        (r) => r.url().endsWith('/api/billing/checkout') && r.request().method() === 'POST'
+      );
+      await page.getByRole('button', { name: c.proceed }).click();
+      const response = await answer;
+      expect(response.status()).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'INTERNAL_PLAN_CHECKOUT_CLOSED' });
+      // No demo quote either: the refusal comes before anything is priced.
+      await expect(page.getByTestId('checkout-total')).toHaveCount(0);
+      await expect(page.getByTestId('cart-checkout-error')).toHaveText(c.refusal);
+      await page.screenshot({ path: `${SHOTS}/${c.shot}` });
+    });
+  }
 
   test('back to Discover: M1 locks again and both changes are audited', async ({ page }) => {
     await assign(page, 'free', 'test bitti (e2e)');

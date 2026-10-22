@@ -8,8 +8,8 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
  * come before Stripe is called; a pilot and an ordinary tenant behave as before.
  *
  * Stripe is a spy behind a key that looks live; the tenant's `Subscription` row
- * is the only thing each case changes, read through the real `getPilotState`
- * and `hasActiveInternalPlan`.
+ * is the only thing each case changes, judged by the real `checkoutBlocker`
+ * (subscription-owner.ts).
  */
 
 const m = vi.hoisted(() => {

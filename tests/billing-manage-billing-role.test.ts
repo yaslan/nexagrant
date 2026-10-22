@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server';
  * There is no Stripe key in CI, so Stripe itself is replaced: the route is
  * loaded with a key that looks live and a `stripe` module whose calls are
  * spies. A refused role must get its 403 before any of them — and before the
- * pilot read and the pricing — while the owner reaches Stripe, so a green run
+ * subscription read and the pricing — while the owner reaches Stripe, so a green run
  * cannot mean the route now refuses everybody. The expected answer per role is
  * read from `can()`, not restated.
  */
@@ -21,7 +21,6 @@ const m = vi.hoisted(() => {
     auth: vi.fn(),
     checkoutCreate: vi.fn(),
     portalCreate: vi.fn(),
-    getPilotState: vi.fn(),
     tierForTenant: vi.fn(),
     priceLineForTenant: vi.fn(),
     taxLineForTenant: vi.fn(),
@@ -37,10 +36,6 @@ vi.mock('stripe', () => ({
   },
 }));
 vi.mock('@/lib/auth', () => ({ auth: m.auth }));
-vi.mock('@/lib/billing/pilot', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/billing/pilot')>()),
-  getPilotState: m.getPilotState,
-}));
 vi.mock('@/lib/billing/tenant-tier', () => ({ tierForTenant: m.tierForTenant }));
 vi.mock('@/lib/billing/checkout-tax', () => ({ taxLineForTenant: m.taxLineForTenant }));
 vi.mock('@/lib/billing/storefront', async (importOriginal) => ({
@@ -76,7 +71,6 @@ const portalRequest = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  m.getPilotState.mockResolvedValue({ kind: 'none' });
   m.tierForTenant.mockResolvedValue({
     shopfront: { code: 'NONE', percentOff: 0 },
     effective: { code: 'NONE', percentOff: 0 },
@@ -107,7 +101,7 @@ beforeEach(() => {
 describe('POST /api/billing/checkout needs manage_billing', () => {
   for (const role of ROLES) {
     const allowed = can(role, 'manage_billing');
-    test(`${role}: ${allowed ? 'reaches Stripe' : '403 before the pilot read, the pricing and Stripe'}`, async () => {
+    test(`${role}: ${allowed ? 'reaches Stripe' : '403 before the subscription read, the pricing and Stripe'}`, async () => {
       m.auth.mockResolvedValue(sessionFor(role));
 
       const res = await checkout.POST(checkoutRequest());
@@ -119,7 +113,7 @@ describe('POST /api/billing/checkout needs manage_billing', () => {
       }
       expect(res.status).toBe(403);
       await expect(res.json()).resolves.toMatchObject({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' });
-      expect(m.getPilotState).not.toHaveBeenCalled();
+      expect(m.withTenant).not.toHaveBeenCalled();
       expect(m.tierForTenant).not.toHaveBeenCalled();
       expect(m.priceLineForTenant).not.toHaveBeenCalled();
       expect(m.taxLineForTenant).not.toHaveBeenCalled();

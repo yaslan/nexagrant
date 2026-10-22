@@ -151,18 +151,6 @@ export async function assignInternalPlan(
   });
 }
 
-/**
- * Is the tenant on an internal plan right now? Checkout asks this before it
- * opens a Stripe session: a sale over an internal plan would be a payment the
- * Stripe sync then refuses to record (`INTERNAL_PLAN_PROTECTED`).
- */
-export async function hasActiveInternalPlan(tenantId: string): Promise<boolean> {
-  const sub = await withTenant(tenantId, (tx) =>
-    tx.subscription.findUnique({ where: { tenantId }, select: { status: true, provider: true } })
-  );
-  return isInternalPlanSubscription(sub);
-}
-
 /** Tenants on an internal plan right now, by id — the "internal" badge on the tenant list. */
 export async function listInternalPlans(): Promise<Map<string, string>> {
   const rows = (await withSystemScope('platform-admin', 'internal-plan.listInternalPlans', (tx) =>

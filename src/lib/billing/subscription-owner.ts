@@ -12,9 +12,10 @@
  *
  * The rule for which source wins is stated here and nowhere else:
  * subscription-sync.ts asks {@link stripeSyncBlocker} before every write, and a
- * row it names is left alone. Nothing replays the skipped event, so checkout is
- * closed for both owners (`PILOT_CHECKOUT_CLOSED`, `INTERNAL_PLAN_CHECKOUT_CLOSED`)
- * and a skip is logged — for an internal plan also raised as a `SystemAlert`. A
+ * row it names is left alone. Nothing replays the skipped event, so checkout
+ * asks {@link checkoutBlocker} — the same rule — and refuses to sell over such a
+ * row; a skip that still happens is logged, and for an internal plan also
+ * raised as a `SystemAlert` (subscription-sync.ts `reportProtected`). A
  * contract is not listed: assigning one is refused while a live Stripe
  * subscription exists, so Stripe never names a contract tenant.
  *
@@ -38,4 +39,22 @@ export function stripeSyncBlocker(sub: PilotSubscriptionRow | null | undefined):
   if (isPilotSubscription(sub)) return 'PILOT_PROTECTED';
   if (isInternalPlanSubscription(sub)) return 'INTERNAL_PLAN_PROTECTED';
   return null;
+}
+
+/** Why checkout refuses to open a Stripe session, as the route's `code` carries. */
+export type CheckoutBlock = 'PILOT_CHECKOUT_CLOSED' | 'INTERNAL_PLAN_CHECKOUT_CLOSED';
+
+const CHECKOUT_BLOCK: Record<StripeSyncBlock, CheckoutBlock> = {
+  PILOT_PROTECTED: 'PILOT_CHECKOUT_CLOSED',
+  INTERNAL_PLAN_PROTECTED: 'INTERNAL_PLAN_CHECKOUT_CLOSED',
+};
+
+/**
+ * `null` when checkout may sell; otherwise why not. A row Stripe may not write
+ * is a row nobody may buy over: the payment would be taken and then skipped by
+ * the sync, so the two answers come from the one rule above.
+ */
+export function checkoutBlocker(sub: PilotSubscriptionRow | null | undefined): CheckoutBlock | null {
+  const block = stripeSyncBlocker(sub);
+  return block ? CHECKOUT_BLOCK[block] : null;
 }

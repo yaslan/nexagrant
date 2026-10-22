@@ -8,8 +8,8 @@ import type Stripe from 'stripe';
 import { prisma, withTenant } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { LiveProviderSubscriptionError } from './plan-repository';
-import { assignInternalPlan, hasActiveInternalPlan, InternalPlanNoteRequiredError, listInternalPlans } from './internal-plan';
-import { INTERNAL_PROVIDER, isInternalPlanSubscription, stripeSyncBlocker } from './subscription-owner';
+import { assignInternalPlan, InternalPlanNoteRequiredError, listInternalPlans } from './internal-plan';
+import { checkoutBlocker, INTERNAL_PROVIDER, isInternalPlanSubscription, stripeSyncBlocker } from './subscription-owner';
 import { PILOT_PROVIDER } from './pilot';
 import { handleSubscriptionCancellation, syncStripeSubscription } from './subscription-sync';
 import { requireId } from '../../../tests/helpers/teardown-guard';
@@ -33,6 +33,24 @@ describe('stripeSyncBlocker — which source owns the row', () => {
       'PILOT_PROTECTED'
     );
     expect(isInternalPlanSubscription({ status: 'ACTIVE', provider: INTERNAL_PROVIDER })).toBe(true);
+  });
+
+  it('checkout is closed exactly where Stripe may not write', () => {
+    const rows = [
+      null,
+      { status: 'ACTIVE', provider: 'stripe', trialEndsAt: null },
+      { status: 'CANCELED', provider: INTERNAL_PROVIDER, trialEndsAt: null },
+      { status: 'ACTIVE', provider: INTERNAL_PROVIDER, trialEndsAt: null },
+      { status: 'TRIALING', provider: PILOT_PROVIDER, trialEndsAt: new Date(Date.now() - 86_400_000) },
+    ];
+    expect(rows.map(checkoutBlocker)).toEqual([
+      null,
+      null,
+      null,
+      'INTERNAL_PLAN_CHECKOUT_CLOSED',
+      'PILOT_CHECKOUT_CLOSED',
+    ]);
+    for (const row of rows) expect(checkoutBlocker(row) === null).toBe(stripeSyncBlocker(row) === null);
   });
 });
 
@@ -114,9 +132,10 @@ describe('assignInternalPlan (live DB)', () => {
   });
 
   it('the Stripe sync and cancellation leave an internal plan alone, and raise an operator alert', async () => {
-    expect(await hasActiveInternalPlan(tenantId)).toBe(false);
+    const readRow = () => prisma.subscription.findUnique({ where: { tenantId } });
+    expect(checkoutBlocker(await readRow())).toBeNull();
     await assignInternalPlan(tenantId, 'ultra', 'admin-1', 'stripe guard');
-    expect(await hasActiveInternalPlan(tenantId)).toBe(true);
+    expect(checkoutBlocker(await readRow())).toBe('INTERNAL_PLAN_CHECKOUT_CLOSED');
     const syncEvent = `evt_internal_sync_${suffix()}`;
     const cancelEvent = `evt_internal_cancel_${suffix()}`;
 
