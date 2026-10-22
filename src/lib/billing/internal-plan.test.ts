@@ -12,7 +12,7 @@ import { assignInternalPlan, InternalPlanNoteRequiredError, listInternalPlans } 
 import { checkoutBlocker, INTERNAL_PROVIDER, isInternalPlanSubscription, stripeSyncBlocker } from './subscription-owner';
 import { PILOT_PROVIDER } from './pilot';
 import { handleSubscriptionCancellation, syncStripeSubscription } from './subscription-sync';
-import { requireId } from '../../../tests/helpers/teardown-guard';
+import { presentIds, requireId } from '../../../tests/helpers/teardown-guard';
 
 const entitlements = (tenantId: string) => withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -184,7 +184,7 @@ describe('assignInternalPlan (live DB)', () => {
         expect(JSON.stringify(alert.meta)).not.toContain(tenantId);
       }
     } finally {
-      await prisma.systemAlert.deleteMany({ where: { id: { in: alerts.map((a) => a.id) } } });
+      await prisma.systemAlert.deleteMany({ where: { id: { in: presentIds(alerts.map((a) => a.id)) } } });
     }
   });
 });
