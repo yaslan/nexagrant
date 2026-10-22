@@ -1,4 +1,4 @@
-# Python 3.12 (workers/README.md). Do not install on 3.9: pip silently falls
+# Python 3.12 (.python-version, workers/README.md). Do not install on 3.9: pip silently falls
 # back to starlette 0.49.3 / anyio 4.12.1, which carry 7 pip-audit findings
 # (FO-14). These pins have no 3.9 wheels, so such an install now fails loudly.
 #
