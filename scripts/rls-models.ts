@@ -49,6 +49,12 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // policy-less set below — and the DISABLE loop in prisma/rls.sql derived from
   // it — covers every table Supabase's ensure_rls trigger would lock.
   'Programme',
+  // FO-58 (TASK-MVCH1YZXDOED): Funding & Tenders Portal partner-search data,
+  // global reference data like CORDIS. No person rows, no tenant. The tenant's
+  // own Discover counter (PartnerSearchQuotaUsage) is tenant-scoped, not here.
+  // See prisma/migrations/add-partner-search.sql.
+  'PartnerSearchAnnouncement', 'PartnerProfileSnapshot', 'PartnerSearchIngestionRun',
+  'UnmatchedOrganization', 'PartnerSearchTopicStat',
 ]);
 
 /**

@@ -12,7 +12,7 @@ BEGIN
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','Consent',
-    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification'
+    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -112,8 +112,10 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
-    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','Programme','PublicLead',
-    'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
+    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','PartnerProfileSnapshot',
+    'PartnerSearchAnnouncement','PartnerSearchIngestionRun','PartnerSearchTopicStat','Programme',
+    'PublicLead','RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat',
+    'UnmatchedOrganization','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
       EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', t);
