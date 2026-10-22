@@ -69,6 +69,8 @@ describe('image sources: uploads under <public base>/blog/ only', () => {
   test('an upload in the blog folder is allowed', () => {
     expect(isAllowedBlogImageSrc(`${BASE}/blog/2026/cabc.png`, BASE)).toBe(true);
     expect(isAllowedBlogImageSrc('http://127.0.0.1:9000/fabrika-public/blog/2026/x.webp', 'http://127.0.0.1:9000/fabrika-public')).toBe(true);
+    expect(isAllowedBlogImageSrc(`${BASE}/blog/2026/cabc.jpg`, BASE)).toBe(true);
+    expect(isAllowedBlogImageSrc(`${BASE}/blog/2026/cabc.jpeg`, BASE)).toBe(true);
   });
 
   test.each([
@@ -87,6 +89,16 @@ describe('image sources: uploads under <public base>/blog/ only', () => {
     ['a data URI', 'data:image/png;base64,iVBORw0KGgo='],
     ['javascript', 'javascript:alert(1)'],
     ['a relative path', '/blog/x.png'],
+    // TASK-MVDTW6KVN5BSA: the upload route only writes png/jpg/webp names.
+    ['no extension', `${BASE}/blog/2026/cabc`],
+    ['an SVG', `${BASE}/blog/2026/cabc.svg`],
+    ['an HTML file', `${BASE}/blog/2026/cabc.html`],
+    ['a GIF', `${BASE}/blog/2026/cabc.gif`],
+    ['an extension only', `${BASE}/blog/2026/.png`],
+    ['an image extension mid-name', `${BASE}/blog/2026/cabc.png.html`],
+    ['a folder named like an image', `${BASE}/blog/x.png/`],
+    ['an encoded dot', `${BASE}/blog/2026/cabc%2Epng`],
+    ['an uppercase extension', `${BASE}/blog/2026/cabc.PNG`],
   ])('%s is refused', (_name, src) => {
     expect(isAllowedBlogImageSrc(src, BASE)).toBe(false);
   });

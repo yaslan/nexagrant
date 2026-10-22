@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { encodeVerifiedOutcome } from '../../src/lib/expert-prereg/server/verified-outcome';
+import { FOUNDER_SEAT_LIMIT, VERIFY_TOKEN_TTL_MS } from '../../src/lib/expert-prereg/server/constants';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -24,6 +25,19 @@ const MAILPIT = process.env.E2E_MAILPIT_URL;
 const COOKIE_NAME = 'authjs.session-token';
 const EMAIL_PREFIX = 'fo20-e2e-';
 const runEmail = (tag: string) => `${EMAIL_PREFIX}${tag}-${Date.now().toString(36)}@e2e.fabrika.test`;
+
+// FO-47: the numbers on the page come from constants.ts, so the expected ones do too.
+// next-intl does not type message arguments: a dropped {limit}/{hours} still compiles
+// and only shows up here, as missing copy or a raw `ExpertPrereg.` key.
+const verifyHours = VERIFY_TOKEN_TTL_MS / 3_600_000;
+const FOUNDER_COPY = {
+  tr: { strip: `İlk ${FOUNDER_SEAT_LIMIT} kayıt`, full: 'Kurucu kadro tamamlandı, kayıtlar açık', meta: `İlk ${FOUNDER_SEAT_LIMIT}` },
+  en: {
+    strip: `The first ${FOUNDER_SEAT_LIMIT} sign-ups`,
+    full: 'The founding cohort is complete — registration is still open',
+    meta: `first ${FOUNDER_SEAT_LIMIT}`,
+  },
+};
 
 async function acceptCookies(page: Page) {
   await page.addInitScript(() => {
@@ -85,6 +99,30 @@ async function fillRequired(page: Page, email: string) {
   await page.getByLabel(/Profilimin uzman rehberinde/).check();
 }
 
+/** No message key reaches the page untranslated (a missing ICU argument renders the key). */
+async function noRawMessageKeys(page: Page) {
+  await expect(page.getByText(/ExpertPrereg\./)).toHaveCount(0);
+}
+
+/**
+ * The founder strip and the meta description name the seat limit. The seats left
+ * depend on the database, so they are not checked. Once the cohort is full the strip
+ * no longer names the limit: its own copy is accepted then, and the meta description
+ * still carries the limit.
+ */
+async function expectFounderLimit(page: Page, locale: 'tr' | 'en') {
+  const copy = FOUNDER_COPY[locale];
+  const strip = page.getByTestId('ep-founder-strip');
+  await expect(strip).toBeVisible();
+  if ((await strip.textContent())?.trim() === copy.full) {
+    test.info().annotations.push({ type: 'founder_full', description: `${locale}: strip shows the full-cohort copy` });
+  } else {
+    await expect(strip).toContainText(copy.strip);
+  }
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', new RegExp(copy.meta));
+  await noRawMessageKeys(page);
+}
+
 async function noHorizontalScroll(page: Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
@@ -106,6 +144,7 @@ test.describe('expert pre-registration (FO-20)', () => {
     });
     await page.goto('/tr/uzman');
     await expect(page).toHaveTitle('AB Proje Uzmanları Rehberi — Ön Kayıt | FonBridge');
+    await expectFounderLimit(page, 'tr');
     for (const name of [/KVKK Aydınlatma Metni/, /Profilimin uzman rehberinde/, /FonBridge duyurularını/]) {
       await expect(page.getByLabel(name)).not.toBeChecked();
     }
@@ -163,6 +202,8 @@ test.describe('expert pre-registration (FO-20)', () => {
     await page.getByRole('button', { name: 'Ön kaydı gönder' }).click();
     await expect(page.getByRole('heading', { name: 'Teşekkürler, ön kaydınız alındı' })).toBeFocused();
     await expect(page.getByRole('status')).toContainText(email);
+    await expect(page.getByRole('status')).toContainText(`${verifyHours} saat`);
+    await noRawMessageKeys(page);
     await expect(page.getByTestId('ep-share-linkedin')).toHaveAttribute('href', /linkedin\.com/);
     await page.screenshot({ path: `${SHOTS}/e2e-02-success.png`, fullPage: true });
 
@@ -236,6 +277,7 @@ test.describe('expert pre-registration (FO-20)', () => {
     await page.goto('/en/experts');
     await expect(page).toHaveTitle('EU Project Experts Directory — Pre-registration | FonBridge');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your EU project experience visible');
+    await expectFounderLimit(page, 'en');
     await noHorizontalScroll(page);
     await page.screenshot({ path: `${SHOTS}/e2e-05-en-375.png`, fullPage: true });
     await page.goto('/tr/uzman');
@@ -243,6 +285,8 @@ test.describe('expert pre-registration (FO-20)', () => {
     const expired = encodeVerifiedOutcome({ outcome: 'expired', founderNumber: null }, { secret: e2eAuthSecret() });
     await page.goto(`/en/experts/verified?r=${expired}`);
     await expect(page.getByRole('heading', { name: 'This link has expired' })).toBeVisible();
+    await expect(page.locator('body')).toContainText(`valid for ${verifyHours} hours`);
+    await noRawMessageKeys(page);
     const robots = await page.locator('meta[name="robots"]').getAttribute('content');
     expect(robots).toContain('noindex');
     await noHorizontalScroll(page);

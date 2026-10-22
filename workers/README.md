@@ -59,7 +59,10 @@ ay tekrar koşulduğunda satır sayısı değişmez (kural 6: çekiciler idempot
 
 ## Yığın ve dağıtım
 
-Python 3.12, FastAPI, DuckDB, pandas, psycopg2 (`workers/cordis/requirements.txt`).
+Python 3.12 (`workers/cordis/.python-version`), FastAPI, DuckDB, pandas, psycopg2.
+Üst düzey bağımlılıklar `workers/cordis/requirements.txt`'te; kurulan sürümler ve hash'ler
+`workers/cordis/requirements.lock`'ta sabit. Kurulum yalnız lock'tan yapılır. 3.9 gibi
+başka bir yorumlayıcıda kurulum hata verir (lock yalnız 3.12 wheel'lerini içerir).
 DuckDB, upsert'ten önce her kümeyi hedef tablonun birincil anahtarında tekilleştirir —
 tek partide yinelenen anahtar `ON CONFLICT ... DO UPDATE`'i hata verdirir.
 

@@ -141,7 +141,8 @@ sütunları düşürmek her abonenin katılım oranını siler ve geri hesaplana
 
 ## 7. Silme ve saklama
 
-- Kiracı silme: `Tenant` cascade; paylaşımlı veriye dokunmaz; `AuditEvent` 12 ay anonimleştirilmiş saklanır (KVKK/GDPR).
+- Kiracı silme: `Tenant` cascade; paylaşımlı veriye dokunmaz. O kiracının `AuditEvent` satırları da cascade ile silinir (`AuditEvent.tenant` `onDelete: Cascade`); `tenantId` boş satırlar kalır.
+- `AuditEvent` saklaması: süre sınırı ve budama işi **yok**, satırlar kalıcıdır. Hesap silindiğinde `docs/legal/processing-register.md` §13'teki mekanizma uygulanır: `purgeDueUsers` `actorId`'yi NULL'lar, `user.erased` satırı kimlik yerine tek yönlü özet (`subjectRefOf`, `src/lib/legal/subject-ref.ts`) taşır; serbest `data` JSON'u değiştirilmez. Süreli saklama/budama istenirse ayrı karar ve iş gerekir.
 - `RawFetch` 90 gün; `AiUsageLog` 24 ay (şeffaflık beyanı için).
 - `RawFetch` yalnızca **içerik değiştiğinde** yazılır (`hash` karşılaştırması). Aynı yükü her gece yeniden saklamak tabloyu günde ~1200 satır büyütür, denetim değeri katmaz.
 - `Topic.eligibility` (Json) şekli: `{ restricted: "EU_EEA_CH_ONLY" | "TR" | null, eligibleCountries: string[], countriesExcluded: string[], notes?: string }`. `eligibleCountries` boş dizi = tespit edilmiş kısıt yok.
@@ -955,9 +956,9 @@ ve okunur; sorguda ayrıca `tenantId = ajans` koşulu vardır. Başka bir ajans�
 indeks değil, uygulama kontrolü sağlar (şema kilidi). Inngest işlevi `concurrency: 1` ile
 çalışır.
 
-**Saklama.** §3'teki "AuditEvent 12 ay anonimleştirilmiş" kuralı için bugün bir budama kodu yok.
-Böyle bir iş yazılırsa `agency.report.generated` satırlarını ya dışarıda bırakmalı ya da
-rapor geçmişinin 12 ayla sınırlı olduğunu ajansa söylemelidir.
+**Saklama.** `AuditEvent` için süre sınırı ve budama kodu yok (§7); satırlar kalıcıdır.
+İleride bir budama işi yazılırsa `agency.report.generated` satırlarını ya dışarıda bırakmalı ya da
+rapor geçmişinin o süreyle sınırlı olduğunu ajansa söylemelidir.
 
 **İleride (C seçeneği, ayrı onay):** gerçek PDF (yeni bağımlılık), R2'de saklanan dosya ve
 ayrı bir `AgencyReport` tablosu (tekil `(agencyId, period)`).
@@ -999,3 +1000,18 @@ Herkese açık uzman ön kayıt formunun (`POST /api/expert-preregistration`) ka
 - **NULL ne demek.** Yalnız dağıtım penceresinde, migration'dan sonra eski kodun yazdığı satır. Okurken içerikten tahmin edilir (`readMinutesOf`); migration'ı yeniden koşmak satırı doldurur (idempotent backfill).
 - **`readTime String?` — eski alan, artık yazılmaz ve okunmaz.** Yazıyı giren admin'in dilinde serbest metindi ("5 dk", "5 min read"); geri dönüş güvenliği için kaldı, NOT NULL'ı düşürüldü. Kaldırılması ayrı bir takip işi.
 - **Migration:** `prisma/migrations/blog-read-minutes.sql` (kolon + CHECK + backfill: `readTime`'taki ilk tamsayı 1–120 ise o, değilse içerikten `estimateReadMinutes` ile aynı sayım, en az 1). Geri alma: `blog-read-minutes.down.sql` (`readTime`'ı dakikadan Türkçe "N dk okuma" olarak yeniden yazar, NOT NULL'ı geri koyar, kolonu düşürür).
+
+## 24. Partner Search ilanları (FO-58 · TASK-MVCH1YZXDOED · PS-K1)
+
+Funding & Tenders Portal "Partner search" ilanları (keşif: `docs/agent-results/TASK-MVCGPI6V3RM1F-be-fb.md`, plan: `…-leed-fb.md`). Bu kart yalnız şemayı ekler; yazıcı K2 ingestor'dur. Migration: `prisma/migrations/add-partner-search.sql` (geri alma: `add-partner-search.down.sql`, `scripts/apply-migrations.sh --down` ile).
+
+- **Kiracısız referans veri (CORDIS gibi).** `PartnerSearchAnnouncement`, `PartnerProfileSnapshot`, `PartnerSearchIngestionRun`, `UnmatchedOrganization`, `PartnerSearchTopicStat` → `tenantId` yok, politika yok, `scripts/rls-models.ts` `SYSTEM_WIDE`'da; migration RLS'i açıkça `DISABLE` eder (Supabase `ensure_rls`, CHECK 4c).
+- **Kişi verisi yok (GDPR).** Person Profile ilanları satır olarak hiçbir tabloda tutulmaz; `PartnerSearchTopicStat(topicIdentifier → personAnnouncementCount)` yalnız anonim sayıdır. `raw` alanına allowlist'teki alanlar yazılır, `ecasId` asla.
+- **`PartnerSearchAnnouncement`:** `externalId` (portal anahtarı, unique), `topicIdentifier` → `Topic.identifier` (FK, `ON DELETE CASCADE`), `callIdentifier?`, `type` (`EXPERTISE_REQUEST|EXPERTISE_OFFER`), `description VARCHAR(500)`, `publishedAt?`, `lastSeenAt`, `withdrawnAt?`, `organizationPic?` (eşleşince `CordisOrganization.organisationId`), `organizationName`, `organizationType` (`HES|REC|PRC|PUB|OTH`, varsayılan `OTH`) + `isSme`, `country` (ISO2), `city?`, `keywords`/`programmeCodes` (JSON dizi), `source` (`PORTAL_API|TOPIC_HTML`). İndeksler: `topicIdentifier`, `organizationPic`, `country`, `type`, `lastSeenAt`.
+- **`PartnerProfileSnapshot`:** PIC başına son portal profili (her çekimde üzerine yazılır): ad, tip, ülke/şehir, açıklama, anahtar kelimeler, `projectCount`, `announcementCount`, `programmes`, `topCollaborators`, `fetchedAt`. FK yok: profil CORDIS'te olmayan bir kuruma ait olabilir.
+- **`PartnerSearchIngestionRun`:** koşu kaydı — `trigger` (`FULL|INCREMENTAL|MANUAL`), `status` (`RUNNING|SUCCESS|PARTIAL|FAILED`), `topicsScanned`, `created`, `updated`, `withdrawn`, `personAnnouncementCount`, `error`.
+- **`UnmatchedOrganization`:** CORDIS'te karşılığı bulunamayan ilan sahibi kurumlar. Tekil anahtar `matchKey` = `pic:<PIC>` ya da `name:<ÜLKE>:<normalize ad>` (`matchKeyFor`; PIC ve ad ikisi de boşsa anahtar yok, satır yazılmaz); `resolvedPic` eşleşme sonradan bulununca doldurulur.
+- **PIC eşleme:** `src/modules/m1/server/partner-search/match-pic.ts` `matchPic` (saf): 1) tam PIC, 2) aynı ülkede ad benzerliği (`normalizeOrgName` + aksan temizliği, Levenshtein oranı, eşik varsayılan `0.9`), 3) aksi halde `unmatched`. Ülkesiz kayıt bulanık eşleşmez. Bulanık eşleşme için üç ek koşul (FO-58 D1 / FO-116): **PIC önceliği**: ilanın PIC'i gelmişse ve CORDIS'te yoksa bulanık eşlemeye düşülmez, `unmatched` + `pic:<PIC>` anahtarı döner (PIC tüzel kişinin kimliğidir); **fark payı** `DEFAULT_PIC_MATCH_MARGIN = 0.05`: birinci ile ikinci en iyi aday (aynı `organisationId` rakip sayılmaz) arasındaki fark bunun altındaysa `unmatched` (eşit iki aday dahil); **token koruması**: ortak olmayan kelimeler birebir eşleşen tek-harf yazım hatası çiftleri olmalı (4+ harf; `MADIRD`/`MADRID` kabul, `PAVIA`/`PADOVA` ve `SURREY`/`SUSSEX` red). Ad normalize olunca boş kalırsa (ör. yalnız `GmbH`) `matchKeyFor` ham adı büyük harfle kullanır. Ham ad da boşsa (`''`, yalnız boşluk) ve PIC yoksa `matchKeyFor` `null` döner (`PicMatch.unmatched.matchKey: string | null`): iki adsız kurumu ayıracak bir şey yoktur, ortak `name:<ÜLKE>:` anahtarı onları birleştirirdi; K2 bu durumda `UnmatchedOrganization` satırı yazmaz. Adım 1 (tam PIC) ülkeden bağımsız tüm kurumlara karşı yapılır (K2 PIC ile ülke filtresi olmadan arar); adım 2 (bulanık) yalnız aynı ülkedeki adayları okur.
+- **`CordisOrganization` additive alanlar:** `hasActiveAnnouncements` (varsayılan `false`), `lastAnnouncementAt?`, `portalProfileFetchedAt?`. Sabit varsayılanlı `ADD COLUMN` PG 11+'da yalnız metadata'dır; hiçbir CORDIS değeri değişmez (dev klonunda satır md5'i öncesi/sonrası aynı ölçüldü).
+- **Kiracıya özel tek tablo: `PartnerSearchQuotaUsage`** (`tenantId`, `month` `'YYYY-MM'` UTC, `count`; tekil `(tenantId, month)`; FK `Tenant` `ON DELETE CASCADE`). Discover sorgu sayacı; strict `tenant_isolation` hem migration'da hem `prisma/rls.sql`'de, yazımlar `withTenant` içinde.
+- **Seed yok:** tablolar portaldan gelen veriyle dolar; sahte ilan yazmak kanıt disiplinine (CLAUDE.md §7) aykırı olurdu.
