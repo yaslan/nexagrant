@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 // scripts/gate-lock.mjs'i gerçek süreç olarak koşar; kilit dizini geçici bir yola yönlendirilir.
 const script = path.join(import.meta.dirname, '..', 'scripts', 'gate-lock.mjs');
+// Bu test bir gate'in içinde koşabilir; miras gelen HELD=1 kilidi atlatır ve testi boşa çıkarır.
+const baseEnv = { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '' };
 
 describe('gate-lock (FO-55)', () => {
   let root: string;
@@ -22,7 +24,7 @@ describe('gate-lock (FO-55)', () => {
     const lockDir = path.join(root, 'yok-ebeveyn', 'lock');
 
     const out = execFileSync(process.execPath, [script, process.execPath, '-e', 'console.log("calisti")'], {
-      env: { ...process.env, FONBRIDGE_GATE_LOCK_DIR: lockDir },
+      env: { ...baseEnv, FONBRIDGE_GATE_LOCK_DIR: lockDir },
       encoding: 'utf8',
     });
 
@@ -33,12 +35,16 @@ describe('gate-lock (FO-55)', () => {
   it('alt komut başarısız olursa çıkış kodunu aynen iletir', () => {
     const lockDir = path.join(root, 'yok-ebeveyn', 'lock');
 
-    expect(() =>
+    let status: number | undefined;
+    try {
       execFileSync(process.execPath, [script, process.execPath, '-e', 'process.exit(3)'], {
-        env: { ...process.env, FONBRIDGE_GATE_LOCK_DIR: lockDir },
+        env: { ...baseEnv, FONBRIDGE_GATE_LOCK_DIR: lockDir },
         stdio: 'ignore',
-      }),
-    ).toThrow();
+      });
+    } catch (err) {
+      status = (err as { status?: number }).status;
+    }
+    expect(status).toBe(3);
     expect(existsSync(lockDir)).toBe(false);
   });
 });
