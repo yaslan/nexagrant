@@ -72,4 +72,39 @@ describe('SEDIA search startPage', () => {
     expect(JSON.parse(await (sort as Blob).text())).toEqual(SEDIA_STABLE_SORT);
     expect(SEDIA_STABLE_SORT).toEqual({ field: 'identifier', order: 'ASC' });
   });
+
+  // Mock SEDIA that, like the live one, reorders the hits on every request
+  // unless a sort is sent. Two separate requests for page 1 and page 2 must
+  // then never share a topic.
+  test('page 1 and page 2 of separate requests do not overlap', async () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `HORIZON-T-${String(i).padStart(2, '0')}`);
+    let call = 0;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      const params = new URL(url).searchParams;
+      const size = Number(params.get('pageSize'));
+      const n = Number(params.get('pageNumber'));
+      const sort = (init.body as FormData).get('sort');
+      call++;
+      const order = sort instanceof Blob ? [...ids].sort() : [...ids.slice(call % 12), ...ids.slice(0, call % 12)];
+      return Response.json({
+        totalResults: ids.length,
+        results: order.slice((n - 1) * size, n * size).map((id) => ({
+          metadata: { identifier: [id], title: [id], status: ['31094502'] },
+        })),
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = new SediaAdapter();
+    const p1 = await adapter.searchSedia({ startPage: 1, maxPages: 1, pageSize: 5 });
+    const p2 = await adapter.searchSedia({ startPage: 2, maxPages: 1, pageSize: 5 });
+    const p2Again = await adapter.searchSedia({ startPage: 2, maxPages: 1, pageSize: 5 });
+
+    const first = p1.topics.map((t) => t.identifier);
+    const second = p2.topics.map((t) => t.identifier);
+    expect(first).toHaveLength(5);
+    expect(second).toHaveLength(5);
+    expect(first.filter((id) => second.includes(id))).toEqual([]);
+    expect(p2Again.topics.map((t) => t.identifier)).toEqual(second);
+  });
 });
