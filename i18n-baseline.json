@@ -26,6 +26,5 @@
   "src/app/[locale]/admin/modules/page.tsx": 1,
   "src/app/[locale]/admin/settings/page.tsx": 7,
   "src/app/[locale]/admin/settings/smtp-form.tsx": 9,
-  "src/app/[locale]/admin/tenants/page.tsx": 9,
   "src/app/global-error.tsx": 3
 }

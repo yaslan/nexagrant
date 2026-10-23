@@ -113,6 +113,14 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
         return;
       }
 
+      // An internal plan is the admin's to change (TASK-MVCH26OXNVLKR): say so in
+      // the visitor's language rather than print the server's English word.
+      if (data?.code === 'INTERNAL_PLAN_CHECKOUT_CLOSED') {
+        setErrorMessage(t('internalPlanCheckoutClosed'));
+        setIsSubmitting(false);
+        return;
+      }
+
       setErrorMessage(typeof data?.error === 'string' ? data.error : t('checkoutFailed'));
       setIsSubmitting(false);
     } catch (err) {
@@ -257,7 +265,7 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                 )}
 
                 {errorMessage && (
-                  <div role="alert" className="p-3 bg-bad/15 border border-bad/40 text-bad text-xs rounded-xl">
+                  <div role="alert" data-testid="cart-checkout-error" className="p-3 bg-bad/15 border border-bad/40 text-bad text-xs rounded-xl">
                     {errorMessage}
                   </div>
                 )}

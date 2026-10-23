@@ -40,6 +40,9 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   return { rlsUrl, ownerUrl };
 });
 
+// The tenant list is translated (FO-59); the row markup is what is measured, not its labels.
+vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }));
+
 import { createDbClient, prisma, withTenant, withTenantOn } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { FALLBACK_PLAN_ID, grantsFor } from '@/lib/billing/catalog';
@@ -103,7 +106,7 @@ describe.skipIf(!HAS_DB)('FA-49 call sites under fabrika_app', () => {
     });
     expect(unscoped?._count).toEqual({ users: 0, workspaces: 0 });
 
-    const html = renderToStaticMarkup(await AdminTenantsPage());
+    const html = renderToStaticMarkup(await AdminTenantsPage({ params: Promise.resolve({ locale: 'tr' }) }));
     const row = html.split('<tr').find((r) => r.includes(`>${TENANT}<`));
     expect(row).toBeDefined();
     const counts = [...row!.matchAll(/text-center font-bold">(\d+)</g)].map((m) => Number(m[1]));

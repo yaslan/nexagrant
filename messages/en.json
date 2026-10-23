@@ -1697,6 +1697,7 @@
       "refundNote": "14-day refund guarantee",
       "checkoutFailed": "Could not start the checkout session.",
       "checkoutUnreachable": "Could not reach the payment service.",
+      "internalPlanCheckoutClosed": "Your plan was assigned by an administrator, so payments and plan changes are not available here. Please contact us to change it.",
       "demoBadge": "STRIPE CHECKOUT DEMO MODE",
       "demoTitle": "Stripe checkout simulation",
       "demoBody": "With Stripe keys configured you go straight to the Stripe Checkout page. The amounts below are the ones the server computed.",
@@ -3599,6 +3600,52 @@
         "forbidden": "Only the workspace owner or an admin can revoke API keys.",
         "failed": "The key could not be revoked. Please try again."
       }
+    }
+  },
+  "adminTenants": {
+    "title": "Tenant accounts",
+    "subtitle": "Every organisation registered on the platform, with its member capacity.",
+    "count": "{count} registered tenants",
+    "empty": "No tenants registered.",
+    "loadError": "Tenant data could not be read (database unreachable).",
+    "internalBadge": "internal",
+    "columns": {
+      "name": "Tenant",
+      "slug": "Slug",
+      "country": "Country",
+      "orgType": "Org type",
+      "pic": "PIC",
+      "users": "Users",
+      "workspaces": "Workspaces"
+    },
+    "detail": {
+      "back": "Back to tenants",
+      "currentPlan": "Current plan: {plan}",
+      "provider": "Subscription source: {provider}"
+    },
+    "internalPlan": {
+      "title": "Internal plan assignment",
+      "hint": "Grants a plan without payment (internal testing only). Stripe sync does not overwrite it. Choosing Discover takes the internal plan back. A note is required and goes to the audit log.",
+      "plan": "Plan",
+      "note": "Note (required)",
+      "notePlaceholder": "Why? e.g. testing the M1 Pro lock",
+      "submit": "Assign",
+      "history": "Assignment history",
+      "historyEmpty": "No internal plan has been assigned to this tenant yet.",
+      "change": "{before} → {after}",
+      "by": "By: {actor}",
+      "outcome": {
+        "assigned": "Internal plan assigned.",
+        "revoked": "Internal plan taken back; the tenant is on Discover again.",
+        "unchanged": "Nothing changed: the tenant is already on this plan."
+      }
+    },
+    "errors": {
+      "LIVE_PROVIDER_SUBSCRIPTION": "The tenant has a live paid subscription, pilot or contract; end it first.",
+      "NOTE_REQUIRED": "A note is required.",
+      "PLATFORM_ADMIN_REQUIRED": "You need to be a platform admin to do this.",
+      "INVALID_INPUT": "Invalid selection.",
+      "UNKNOWN": "The action could not be completed. Please try again."
     }
   }
 }

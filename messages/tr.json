@@ -1697,6 +1697,7 @@
       "refundNote": "14 gün iade garantisi",
       "checkoutFailed": "Ödeme oturumu başlatılamadı.",
       "checkoutUnreachable": "Ödeme servisine bağlanılamadı.",
+      "internalPlanCheckoutClosed": "Planınız yönetici tarafından atandı; ödeme ve plan değişikliği buradan yapılamaz. Değişiklik için bizimle iletişime geçin.",
       "demoBadge": "STRIPE CHECKOUT DEMO MODU",
       "demoTitle": "Stripe ödeme simülasyonu",
       "demoBody": "Stripe anahtarları tanımlandığında doğrudan Stripe Checkout sayfasına yönlendirilirsiniz. Aşağıdaki tutarlar sunucunun hesapladığı tutarlardır.",
@@ -3599,6 +3600,52 @@
         "forbidden": "API anahtarlarını yalnızca kurum sahibi veya yöneticisi iptal edebilir.",
         "failed": "Anahtar iptal edilemedi. Lütfen tekrar deneyin."
       }
+    }
+  },
+  "adminTenants": {
+    "title": "Kiracı Hesapları",
+    "subtitle": "Platformda kayıtlı tüm organizasyonlar ve üye kapasiteleri.",
+    "count": "{count} kayıtlı kiracı",
+    "empty": "Kayıtlı kiracı yok.",
+    "loadError": "Kiracı verisi okunamadı (veritabanına ulaşılamıyor).",
+    "internalBadge": "internal",
+    "columns": {
+      "name": "Kiracı",
+      "slug": "Slug",
+      "country": "Ülke",
+      "orgType": "Kurum tipi",
+      "pic": "PIC",
+      "users": "Kullanıcı",
+      "workspaces": "Çalışma alanı"
+    },
+    "detail": {
+      "back": "Kiracı listesine dön",
+      "currentPlan": "Geçerli plan: {plan}",
+      "provider": "Abonelik kaynağı: {provider}"
+    },
+    "internalPlan": {
+      "title": "İç plan ataması",
+      "hint": "Ödeme olmadan plan verir (yalnız iç test için). Stripe senkronu bu atamayı ezmez. Discover seçmek iç planı geri alır. Not zorunludur ve denetim kaydına yazılır.",
+      "plan": "Plan",
+      "note": "Not (zorunlu)",
+      "notePlaceholder": "Neden? ör. M1 Pro kilidi testi",
+      "submit": "Ata",
+      "history": "Atama geçmişi",
+      "historyEmpty": "Bu kiracıya henüz iç plan atanmadı.",
+      "change": "{before} → {after}",
+      "by": "Yapan: {actor}",
+      "outcome": {
+        "assigned": "İç plan atandı.",
+        "revoked": "İç plan geri alındı; kiracı Discover'a döndü.",
+        "unchanged": "Değişiklik yok: kiracı zaten bu planda."
+      }
+    },
+    "errors": {
+      "LIVE_PROVIDER_SUBSCRIPTION": "Kiracının canlı bir ücretli aboneliği, pilotu ya da sözleşmesi var; önce onu sonlandırın.",
+      "NOTE_REQUIRED": "Not zorunlu.",
+      "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekiyor.",
+      "INVALID_INPUT": "Geçersiz seçim.",
+      "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin."
     }
   }
 }

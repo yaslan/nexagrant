@@ -205,6 +205,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/billing/internal-plan.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "The tenants on an internal plan right now (internal-plan.listInternalPlans), for the 'internal' badge on the platform tenant list (FO-59). Subscription is tenant_isolation-scoped and the set of tenants is the query's output, not its input, so there is no tenant to scope to. Read-only (tenantId + planId of ACTIVE provider='internal' rows); its one caller is admin/tenants/page.tsx, gated by the admin layout's isPlatformAdminSession()."
+    },
+    {
+      "check": "D",
       "file": "src/lib/billing/plan-repository.ts",
       "subject": "system-scope:platform-aggregate",
       "count": 3,
