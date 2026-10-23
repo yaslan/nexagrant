@@ -6,6 +6,7 @@ import {
 } from '@/modules/m1/server/partner-search/ingestor';
 
 const NOW = new Date('2026-10-22T03:00:00.000Z');
+const YESTERDAY = new Date('2026-10-21T03:00:00.000Z');
 
 describe('orgTypeFor', () => {
   it.each([
@@ -30,8 +31,8 @@ describe('planTopicWrite', () => {
       now: NOW,
     });
     expect(writes).toEqual([
-      { externalId: 'a', kind: 'create', missedScans: 0, withdrawnAt: null },
-      { externalId: 'b', kind: 'create', missedScans: 0, withdrawnAt: null },
+      { externalId: 'a', kind: 'create', missedScans: 0, withdrawnAt: null, missedScanAt: null },
+      { externalId: 'b', kind: 'create', missedScans: 0, withdrawnAt: null, missedScanAt: null },
     ]);
     expect(withdrawn).toEqual([]);
   });
@@ -50,6 +51,7 @@ describe('planTopicWrite', () => {
       kind: 'update',
       missedScans: 1,
       withdrawnAt: null,
+      missedScanAt: NOW,
     });
     expect(withdrawn).toEqual([]);
   });
@@ -58,11 +60,11 @@ describe('planTopicWrite', () => {
     expect(WITHDRAW_AFTER_MISSED_SCANS).toBe(2);
     const { writes, withdrawn } = planTopicWrite({
       seenExternalIds: [],
-      stored: [{ externalId: 'gone', withdrawnAt: null, missedScans: 1 }],
+      stored: [{ externalId: 'gone', withdrawnAt: null, missedScans: 1, missedScanAt: YESTERDAY }],
       now: NOW,
     });
     expect(withdrawn).toEqual(['gone']);
-    expect(writes).toEqual([{ externalId: 'gone', kind: 'update', missedScans: 2, withdrawnAt: NOW }]);
+    expect(writes).toEqual([{ externalId: 'gone', kind: 'update', missedScans: 2, withdrawnAt: NOW, missedScanAt: NOW }]);
   });
 
   it('a row seen again resets its miss counter and is un-withdrawn', () => {
@@ -72,7 +74,7 @@ describe('planTopicWrite', () => {
       now: NOW,
     });
     expect(withdrawn).toEqual([]);
-    expect(writes).toEqual([{ externalId: 'back', kind: 'update', missedScans: 0, withdrawnAt: null }]);
+    expect(writes).toEqual([{ externalId: 'back', kind: 'update', missedScans: 0, withdrawnAt: null, missedScanAt: null }]);
   });
 
   it('an already-withdrawn row is not counted again', () => {
@@ -84,5 +86,40 @@ describe('planTopicWrite', () => {
     });
     expect(writes).toEqual([]);
     expect(withdrawn).toEqual([]);
+  });
+});
+
+describe('planTopicWrite: one counted miss per UTC day (FO-60 review 2)', () => {
+  it('a second run on the same day does not count the same gap again', () => {
+    const { writes, withdrawn } = planTopicWrite({
+      seenExternalIds: [],
+      stored: [{ externalId: 'gone', withdrawnAt: null, missedScans: 1, missedScanAt: new Date('2026-10-22T02:00:00.000Z') }],
+      now: NOW,
+    });
+    expect(withdrawn).toEqual([]);
+    expect(writes).toEqual([
+      { externalId: 'gone', kind: 'update', missedScans: 1, withdrawnAt: null, missedScanAt: new Date('2026-10-22T02:00:00.000Z') },
+    ]);
+  });
+
+  it('the second miss on a later day withdraws the row', () => {
+    const { withdrawn } = planTopicWrite({
+      seenExternalIds: [],
+      stored: [{ externalId: 'gone', withdrawnAt: null, missedScans: 1, missedScanAt: YESTERDAY }],
+      now: NOW,
+    });
+    expect(withdrawn).toEqual(['gone']);
+  });
+});
+
+describe('planTopicWrite: rows the portal moved between topics', () => {
+  it('an externalId that exists under another topic is an update, not a create', () => {
+    const { writes } = planTopicWrite({
+      seenExternalIds: ['moved'],
+      stored: [],
+      elsewhereExternalIds: ['moved'],
+      now: NOW,
+    });
+    expect(writes).toEqual([{ externalId: 'moved', kind: 'update', missedScans: 0, withdrawnAt: null, missedScanAt: null }]);
   });
 });

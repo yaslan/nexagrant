@@ -31,14 +31,20 @@ import {
  * Rules (from the card):
  *  - scope: Topic rows with status OPEN or FORTHCOMING only;
  *  - PERSON announcements: never written; counted into PartnerSearchTopicStat;
- *  - withdrawn: absent from two consecutive scans of the topic (the portal's
- *    withdraw list carries counts only, so ids cannot be matched to it);
+ *  - withdrawn: absent from the topic's scans on two different UTC days (the
+ *    portal's withdraw list carries counts only, so ids cannot be matched to it);
  *  - schema drift → alert and stop, last good data kept; 403/429 → stop and alert;
+ *  - one topic that fails to write does not stop the others (run is PARTIAL);
  *  - the whole run is a no-op while `partner_search_ingestion_enabled` is off.
  */
 
 export const WITHDRAW_AFTER_MISSED_SCANS = 2;
 const DESCRIPTION_MAX = 500;
+
+/** Same UTC calendar day. Two runs on one day (nightly + K1 incremental) count one miss. */
+export function sameUtcDay(a: Date, b: Date): boolean {
+  return a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10);
+}
 
 export type PartnerSearchOrgTypeCode = 'HES' | 'REC' | 'PRC' | 'PUB' | 'OTH';
 
@@ -58,6 +64,7 @@ export interface ExistingAnnouncement {
   externalId: string;
   withdrawnAt: Date | null;
   missedScans: number;
+  missedScanAt?: Date | null;
 }
 
 export interface AnnouncementWrite {
@@ -65,21 +72,27 @@ export interface AnnouncementWrite {
   kind: 'create' | 'update';
   missedScans: number;
   withdrawnAt: Date | null;
+  missedScanAt: Date | null;
 }
 
 /**
  * Decide, for one successful topic scan, what each stored row becomes.
  * Rows in the scan are seen again (counter reset, un-withdrawn). Rows stored for
- * the topic but absent from the scan count one more miss; the second consecutive
- * miss sets `withdrawnAt`. Rows already withdrawn stay withdrawn.
+ * the topic but absent from the scan count one miss, at most one per UTC day; the
+ * second miss on a later day sets `withdrawnAt`. Rows already withdrawn stay withdrawn.
+ *
+ * `elsewhereExternalIds`: rows the portal moved here from another topic. They exist
+ * already, so they are updated; a create would hit the unique `externalId` and fail.
  */
 export function planTopicWrite(input: {
   seenExternalIds: readonly string[];
   stored: readonly ExistingAnnouncement[];
+  elsewhereExternalIds?: readonly string[];
   now: Date;
 }): { writes: AnnouncementWrite[]; withdrawn: string[] } {
   const seen = new Set(input.seenExternalIds);
   const storedById = new Map(input.stored.map((s) => [s.externalId, s]));
+  const elsewhere = new Set(input.elsewhereExternalIds ?? []);
   const writes: AnnouncementWrite[] = [];
   const withdrawn: string[] = [];
 
@@ -87,16 +100,20 @@ export function planTopicWrite(input: {
     const prev = storedById.get(id);
     writes.push({
       externalId: id,
-      kind: prev ? 'update' : 'create',
+      kind: prev || elsewhere.has(id) ? 'update' : 'create',
       missedScans: 0,
       withdrawnAt: null,
+      missedScanAt: null,
     });
   }
 
   for (const s of input.stored) {
     if (seen.has(s.externalId)) continue;
     if (s.withdrawnAt) continue;
-    const missedScans = s.missedScans + 1;
+    const lastMiss = s.missedScanAt ?? null;
+    const countedToday = lastMiss !== null && sameUtcDay(lastMiss, input.now);
+    const missedScans = countedToday ? s.missedScans : s.missedScans + 1;
+    const missedScanAt = countedToday && lastMiss ? lastMiss : input.now;
     const gone = missedScans >= WITHDRAW_AFTER_MISSED_SCANS;
     if (gone) withdrawn.push(s.externalId);
     writes.push({
@@ -104,6 +121,7 @@ export function planTopicWrite(input: {
       kind: 'update',
       missedScans,
       withdrawnAt: gone ? input.now : null,
+      missedScanAt,
     });
   }
   return { writes, withdrawn };
@@ -142,8 +160,9 @@ function rowsHash(rows: readonly PartnerSearchAllowlistedRow[]): string {
   return crypto.createHash('sha256').update(JSON.stringify(ordered)).digest('hex');
 }
 
+/** Code points, not UTF-16 units: a slice must not split an emoji or a surrogate pair. */
 function clip(text: string | null): string | null {
-  return text == null ? null : text.slice(0, DESCRIPTION_MAX);
+  return text == null ? null : Array.from(text).slice(0, DESCRIPTION_MAX).join('');
 }
 
 /** IO shell: runs one ingestion. Always writes a PartnerSearchIngestionRun row unless the flag is off. */
@@ -203,7 +222,14 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
         await reportSchemaDrift(PARTNER_SEARCH_SOURCE, result.schemaDrift);
         break;
       }
-      const topicTouched = await writeTopic(result.topicIdentifier, result.rows, now(), summary, touchedPics);
+      let topicTouched: boolean;
+      try {
+        topicTouched = await writeTopic(result.topicIdentifier, result.rows, now(), summary, touchedPics);
+      } catch (error) {
+        // One topic's write failing (a unique clash, a lost connection) must not stop the rest.
+        errors.push(`${topic.identifier}: write failed: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
       summary.personAnnouncementCount += result.personCount;
       await prisma.partnerSearchTopicStat.upsert({
         where: { topicIdentifier: topic.identifier },
@@ -270,7 +296,12 @@ async function writeTopic(
 ): Promise<boolean> {
   const stored = await prisma.partnerSearchAnnouncement.findMany({
     where: { topicIdentifier },
-    select: { externalId: true, withdrawnAt: true, missedScans: true, organizationPic: true },
+    select: { externalId: true, withdrawnAt: true, missedScans: true, missedScanAt: true, organizationPic: true },
+  });
+  // A row the portal moved from another topic: same externalId, so an update, not a create.
+  const elsewhere = await prisma.partnerSearchAnnouncement.findMany({
+    where: { externalId: { in: rows.map((r) => r.id) }, topicIdentifier: { not: topicIdentifier } },
+    select: { externalId: true },
   });
 
   // PIC match (PS-K1 match-pic). Candidates: CORDIS organisations whose id is one of
@@ -313,6 +344,7 @@ async function writeTopic(
   const { writes } = planTopicWrite({
     seenExternalIds: rows.map((r) => r.id),
     stored,
+    elsewhereExternalIds: elsewhere.map((e) => e.externalId),
     now,
   });
 
@@ -325,7 +357,7 @@ async function writeTopic(
       if (prev?.organizationPic) touchedPics.add(prev.organizationPic);
       await prisma.partnerSearchAnnouncement.update({
         where: { externalId: w.externalId },
-        data: { missedScans: w.missedScans, withdrawnAt: w.withdrawnAt },
+        data: { missedScans: w.missedScans, missedScanAt: w.missedScanAt, withdrawnAt: w.withdrawnAt },
       });
       if (w.withdrawnAt) summary.withdrawn++;
       changed = true;
@@ -339,6 +371,7 @@ async function writeTopic(
       lastSeenAt: now,
       withdrawnAt: null,
       missedScans: 0,
+      missedScanAt: null,
       organizationPic: picByExternal.get(row.id) ?? null,
       organizationName: row.organisationName,
       organizationType: orgTypeFor(row.organisationType),
@@ -383,7 +416,7 @@ async function writeTopic(
  * Recompute `CordisOrganization.hasActiveAnnouncements` / `lastAnnouncementAt` for
  * every PIC this run touched. Active = not withdrawn.
  */
-async function refreshOrganisationFlags(pics: ReadonlySet<string>): Promise<void> {
+export async function refreshOrganisationFlags(pics: ReadonlySet<string>): Promise<void> {
   for (const pic of pics) {
     // An undefined PIC would drop out of the `where` and rewrite every organisation row.
     if (!isPresentId(pic)) continue;

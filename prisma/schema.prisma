@@ -1029,6 +1029,7 @@ model PartnerSearchAnnouncement {
   lastSeenAt       DateTime
   withdrawnAt      DateTime?
   missedScans      Int                           @default(0) // consecutive scans without this row; 2 → withdrawn
+  missedScanAt     DateTime?                     // UTC day of the last counted miss: one miss per day (FO-60 review 2)
   organizationPic  String?                       // CordisOrganization.organisationId when matched
   organizationName String
   organizationType PartnerSearchOrgType          @default(OTH)
