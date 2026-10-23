@@ -37,7 +37,7 @@ import {
   NoPublishedVersionError,
   publishedVersionIdFor,
 } from '@/lib/billing/plan-repository';
-import { pilotGrantBlocker, SubscriptionOwnedError } from '@/lib/billing/subscription-owner';
+import { pilotGrantBlocker, subscriptionOwnedError } from '@/lib/billing/subscription-owner';
 
 /** `Subscription.provider` of a free pilot. Not a payment provider. */
 export const PILOT_PROVIDER = 'pilot';
@@ -226,7 +226,7 @@ export async function grantPilot(
       throw new ContractSubscriptionError(tenantId);
     }
     const block = pilotGrantBlocker(existing);
-    if (block) throw new SubscriptionOwnedError(block, tenantId);
+    if (block) throw subscriptionOwnedError(block, tenantId);
 
     const state = pilotStateOf(existing, now);
     if (state.kind === 'active' && !opts.extend) {

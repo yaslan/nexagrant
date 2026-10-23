@@ -92,6 +92,21 @@ export class SubscriptionOwnedError extends Error {
   }
 }
 
+/**
+ * The error for a refused admin grant. The code reaches the admin screen, so it
+ * is thrown as a literal per case rather than passed through from `block`
+ * (tests/api/api-error-body-guard.test.ts follows a non-literal code back as a
+ * caught value handed to the client).
+ */
+export function subscriptionOwnedError(block: AdminGrantBlock, tenantId: string): SubscriptionOwnedError {
+  switch (block) {
+    case 'INTERNAL_PLAN_PROTECTED':
+      return new SubscriptionOwnedError('INTERNAL_PLAN_PROTECTED', tenantId);
+    case 'TRIAL_PROTECTED':
+      return new SubscriptionOwnedError('TRIAL_PROTECTED', tenantId);
+  }
+}
+
 /** The row an admin grant reads before it writes. */
 type AdminGrantRow = Pick<PilotSubscriptionRow, 'status' | 'provider'> & { providerSubId: string | null };
 

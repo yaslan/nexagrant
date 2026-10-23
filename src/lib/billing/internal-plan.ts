@@ -31,7 +31,7 @@ import {
   INTERNAL_PROVIDER,
   internalPlanBlocker,
   isInternalPlanSubscription,
-  SubscriptionOwnedError,
+  subscriptionOwnedError,
 } from '@/lib/billing/subscription-owner';
 
 /** The plans an admin may assign internally, Discover first (= take it back). */
@@ -108,7 +108,7 @@ export async function assignInternalPlan(
       if (owned) throw new LiveProviderSubscriptionError(tenantId, existing.provider);
     }
     const block = internalPlanBlocker(existing);
-    if (block) throw new SubscriptionOwnedError(block, tenantId);
+    if (block) throw subscriptionOwnedError(block, tenantId);
 
     if (planId === FALLBACK_PLAN_ID) {
       if (!internal) return { outcome: 'unchanged' as const, before, after: before };
