@@ -14,7 +14,7 @@ export const m15Manifest: ModuleManifest = {
   recommends: [],
   planTiers: plansGrantingModule('M15'),
   addOnSku: null,
-  routes: [],
+  routes: [{ path: 'modules/post-award' }],
   nav: [],
   permissions: [],
   tables: ['Effort'],

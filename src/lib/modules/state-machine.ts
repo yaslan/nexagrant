@@ -172,7 +172,13 @@ export type ModuleDenyReason =
    * `MODULE_OFF`, which says an administrator closed something the tenant owns
    * and can reopen; this one is answered at checkout, not in settings.
    */
-  | 'PLAN_UPGRADE_REQUIRED';
+  | 'PLAN_UPGRADE_REQUIRED'
+  /**
+   * A "Yakında" (`statusBadge: 'soon'`) module: not sold and not built yet, so
+   * neither a plan nor a switch opens it (FO-40). Checked before entitlement,
+   * because "upgrade your plan" would be untrue — no plan includes it.
+   */
+  | 'COMING_SOON';
 
 export interface ModuleAccessDecision {
   allowed: boolean;
@@ -227,8 +233,10 @@ export function canAccessStatus(
  *   AVAILABLE → entitled, switched off: the tenant can open it in settings.
  *   LOCKED    → not entitled, never switched on: answered at checkout.
  *   ORPHANED  → switched on but no longer entitled (left behind by a downgrade).
+ *   SOON      → a "Yakında" module: nothing to enable or buy yet (FO-40). One that
+ *               a row still switches on stays ORPHANED, so it can be closed.
  */
-export type ModuleCardStatus = 'ACTIVE' | 'AVAILABLE' | 'LOCKED' | 'ORPHANED';
+export type ModuleCardStatus = 'ACTIVE' | 'AVAILABLE' | 'LOCKED' | 'ORPHANED' | 'SOON';
 
 /**
  * The slice of the settings page's plan view `moduleStatus` reads. Shaped like
@@ -244,6 +252,7 @@ export interface ModuleStatusView {
 export function moduleStatus(moduleId: ModuleId, view: ModuleStatusView): ModuleCardStatus {
   const switchedOn =
     view.activeModules.includes(moduleId) || view.switchedOnOutsidePlan.includes(moduleId);
+  if (isComingSoon(moduleId)) return switchedOn ? 'ORPHANED' : 'SOON';
   if (view.entitledModules.includes(moduleId)) return switchedOn ? 'ACTIVE' : 'AVAILABLE';
   return switchedOn ? 'ORPHANED' : 'LOCKED';
 }

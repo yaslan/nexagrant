@@ -58,6 +58,11 @@ describe("moduleStatus — four card states", () => {
   it("switched on but outside the plan (downgrade) is ORPHANED", () => {
     expect(moduleStatus("M7", view)).toBe("ORPHANED");
   });
+  it("a Yakında module is SOON, or ORPHANED while a row still switches it on (FO-40)", () => {
+    expect(moduleStatus("M0", viewOf(["M0"], []))).toBe("SOON");
+    expect(moduleStatus("M13", view)).toBe("SOON");
+    expect(moduleStatus("M0", viewOf([], ["M0"]))).toBe("ORPHANED");
+  });
 
   it("a Discover tenant that never subscribed has no ORPHANED module", () => {
     const discover = [

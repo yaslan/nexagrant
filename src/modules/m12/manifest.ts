@@ -14,7 +14,7 @@ export const m12Manifest: ModuleManifest = {
   recommends: [],
   planTiers: plansGrantingModule('M12'),
   addOnSku: null,
-  routes: [],
+  routes: [{ path: 'modules/expert-pool' }],
   nav: [],
   permissions: [],
   tables: ['ExpertPreRegistration'],

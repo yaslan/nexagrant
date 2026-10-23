@@ -1,7 +1,7 @@
 import { getEntitlements } from '@/lib/billing';
 import { planNamesGrantingModule } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
-import { canAccessStatus, type ModuleDenyReason, type ModuleViewer } from '@/lib/modules/state-machine';
+import { canAccessStatus, isComingSoon, type ModuleDenyReason, type ModuleViewer } from '@/lib/modules/state-machine';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
 
 /**
@@ -89,6 +89,10 @@ export function decideModuleAccess(
   allowedModules: readonly string[],
   viewer: ModuleViewer,
 ): ModuleAccessResult {
+  if (isComingSoon(moduleId)) {
+    return { allowed: false, status, reason: 'COMING_SOON' };
+  }
+
   if (!allowedModules.includes(moduleId)) {
     return {
       allowed: false,

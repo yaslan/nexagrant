@@ -795,7 +795,8 @@
         "AVAILABLE": "Planınıza dahil, açılabilir",
         "LOCKED": "Planınıza dahil değil",
         "ORPHANED": "Plan dışında kaldı — kullanılamaz",
-        "UNKNOWN": "Durum okunamadı"
+        "UNKNOWN": "Durum okunamadı",
+        "SOON": "Henüz açılamaz"
       },
       "statusBadge": {
         "ga": "GA",
@@ -817,6 +818,8 @@
       "plansNone": "Hiçbir planda yok",
       "addOnSku": "SKU: {sku}",
       "missingDependencies": "Eksik bağımlılık: {ids}",
+      "soonNotice": "Bu modül hazırlanıyor; kullanıma açıldığında buradan etkinleştirebilirsiniz.",
+      "soonLink": "Ne getirecek? →",
       "enable": "Aç",
       "disable": "Kapat",
       "toastDisabled": "{id} modülü devre dışı bırakıldı.",
@@ -1480,13 +1483,15 @@
   "ModuleGate": {
     "title": "Bu modül şu anda kullanılamıyor",
     "askAdmin": "Erişim gerekiyorsa çalışma alanı yöneticinizle ya da {brand} ekibiyle görüşün.",
+    "comingSoon": "{brand} bu modülü hazırlıyor. Kullanıma açıldığında Modül Yönetimi sayfasından etkinleştirebilirsiniz.",
     "reason": {
       "MODULE_OFF": "{module} modülü kiracınızda kapalı.",
       "PLAN_UPGRADE_REQUIRED": "{module} modülü aboneliğinizin kapsamı dışında. Şu planlarda yer alıyor: {plans}.",
       "DEV_INTERNAL_ONLY": "{module} modülü geliştirme aşamasında ve şu an yalnızca {brand} ekibine açık.",
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
-      "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor."
+      "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
+      "COMING_SOON": "{module} modülü yakında kullanıma açılacak."
     }
   },
   "UserIdentity": {

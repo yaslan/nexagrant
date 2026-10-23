@@ -14,7 +14,7 @@ export const m14Manifest: ModuleManifest = {
   recommends: [],
   planTiers: plansGrantingModule('M14'),
   addOnSku: null,
-  routes: [],
+  routes: [{ path: 'modules/compliance' }],
   nav: [],
   permissions: [],
   tables: ['ApplicationPart'],

@@ -795,7 +795,8 @@
         "AVAILABLE": "Included in your plan, can be switched on",
         "LOCKED": "Not included in your plan",
         "ORPHANED": "Left outside your plan — unavailable",
-        "UNKNOWN": "Status unavailable"
+        "UNKNOWN": "Status unavailable",
+        "SOON": "Not available yet"
       },
       "statusBadge": {
         "ga": "GA",
@@ -817,6 +818,8 @@
       "plansNone": "Not in any plan",
       "addOnSku": "SKU: {sku}",
       "missingDependencies": "Missing dependency: {ids}",
+      "soonNotice": "This module is in preparation; once it is released you can enable it here.",
+      "soonLink": "What will it do? →",
       "enable": "Switch on",
       "disable": "Switch off",
       "toastDisabled": "Module {id} switched off.",
@@ -1480,13 +1483,15 @@
   "ModuleGate": {
     "title": "This module is not available",
     "askAdmin": "If you need access, talk to your workspace administrator or the {brand} team.",
+    "comingSoon": "{brand} is preparing this module. Once it is released you can enable it from Module Management.",
     "reason": {
       "MODULE_OFF": "The {module} module is turned off for your workspace.",
       "PLAN_UPGRADE_REQUIRED": "The {module} module is outside your subscription. It is included in: {plans}.",
       "DEV_INTERNAL_ONLY": "The {module} module is in development and is open to the {brand} team only.",
       "PILOT_MANAGERS_ONLY": "The {module} module is in pilot and is limited to workspace managers.",
       "NO_TENANT": "Your session is not linked to a workspace.",
-      "NOT_AUTHENTICATED": "You need to sign in to see this page."
+      "NOT_AUTHENTICATED": "You need to sign in to see this page.",
+      "COMING_SOON": "The {module} module is coming soon."
     }
   },
   "UserIdentity": {

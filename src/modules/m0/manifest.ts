@@ -15,7 +15,7 @@ export const m0Manifest: ModuleManifest = {
   recommends: [],
   planTiers: plansGrantingModule('M0'),
   addOnSku: null,
-  routes: [],
+  routes: [{ path: 'modules/call-fit' }],
   nav: [],
   permissions: [],
   tables: ['Call'],

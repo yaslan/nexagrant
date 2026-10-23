@@ -14,7 +14,7 @@ export const m13Manifest: ModuleManifest = {
   recommends: ['M11'],
   planTiers: plansGrantingModule('M13'),
   addOnSku: null,
-  routes: [],
+  routes: [{ path: 'modules/budget-wp' }],
   nav: [],
   permissions: [],
   tables: ['Proposal'],

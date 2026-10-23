@@ -87,16 +87,33 @@ describe('modules page — four card states', () => {
 
     const locked = screen.getAllByTestId(/^module-card-/).filter((c) => c.getAttribute('data-status') === 'LOCKED');
     expect(locked.length).toBeGreaterThan(0);
-    // A Yakında card is not sold yet, so it offers no upgrade (FO-40).
-    const soon = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'];
     for (const c of locked) {
       expect(within(c).getByText(M.status.LOCKED)).toBeTruthy();
       expect(within(c).queryByRole('button', { name: M.disable })).toBeNull();
-      if (soon.includes(c.dataset.testid!.replace('module-card-', ''))) {
-        expect(within(c).queryByRole('link', { name: M.upgradeCta })).toBeNull();
-        continue;
-      }
       expect(within(c).getByRole('link', { name: M.upgradeCta }).getAttribute('href')).toBe('/tr/default/settings/billing');
+    }
+  });
+
+  test('Yakında cards: no switch, no upgrade, only the notice and the placeholder page (FO-40)', () => {
+    for (const plan of [discover, pro]) {
+      renderModules(plan);
+      for (const [id, key] of [
+        ['M0', 'call-fit'],
+        ['M12', 'expert-pool'],
+        ['M13', 'budget-wp'],
+        ['M14', 'compliance'],
+        ['M15', 'post-award'],
+        ['M16', 'tr-layer'],
+      ] as const) {
+        expect(card(id).getAttribute('data-status')).toBe('SOON');
+        expect(within(card(id)).getByText(M.statusBadge.soon)).toBeTruthy();
+        expect(within(card(id)).getByText(M.status.SOON)).toBeTruthy();
+        expect(within(card(id)).getByTestId('module-soon-notice').textContent).toBe(M.soonNotice);
+        expect(buttons(id)).toEqual([]);
+        expect(links(id)).toEqual([M.soonLink]);
+        expect(within(card(id)).getByRole('link').getAttribute('href')).toBe(`/tr/default/modules/${key}`);
+      }
+      cleanup();
     }
   });
 

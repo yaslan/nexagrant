@@ -14,7 +14,7 @@ export const m16Manifest: ModuleManifest = {
   recommends: [],
   planTiers: plansGrantingModule('M16'),
   addOnSku: null,
-  routes: [],
+  routes: [{ path: 'modules/tr-layer' }],
   nav: [],
   permissions: [],
   tables: ['Programme'],

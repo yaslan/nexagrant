@@ -48,6 +48,7 @@ const STATUS_STYLES: Record<ModuleCardStatus | 'UNKNOWN', { badge: string; icon:
   AVAILABLE: { badge: 'bg-accent/15 text-accent-ink border border-accent/30', icon: '○' },
   LOCKED: { badge: 'bg-ground text-muted border border-border', icon: '🔒' },
   ORPHANED: { badge: 'bg-bad/15 text-bad border border-bad/30', icon: '⚠' },
+  SOON: { badge: 'bg-ground text-muted border border-border', icon: '⏳' },
   UNKNOWN: { badge: 'bg-ground text-muted border border-border', icon: '?' },
 };
 
@@ -596,7 +597,22 @@ export function ModulesClient({
                       {t('missingDependencies', { ids: check.missingDependencies?.join(', ') ?? '' })}
                     </span>
                   )}
+                  {status === 'SOON' && (
+                    <span className="text-muted" data-testid="module-soon-notice">
+                      {t('soonNotice')}
+                    </span>
+                  )}
                 </div>
+
+                {/* A "Yakında" card has no switch, only its placeholder page (FO-40). */}
+                {status === 'SOON' && mod.routes[0] && (
+                  <Link
+                    href={`/${locale}/${workspace}/${mod.routes[0].path}`}
+                    className="text-xs font-semibold text-accent hover:underline"
+                  >
+                    {t('soonLink')}
+                  </Link>
+                )}
 
                 {plan && (
                   <div className="flex flex-wrap items-center justify-end gap-2">
