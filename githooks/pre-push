@@ -24,6 +24,7 @@ db=${DATABASE_URL:-$(db_env_value .env)}
 echo "→ veritabanı: $(db_target "$db")"
 echo "→ pnpm gate (lint + typecheck + test, proje geneli)"
 pnpm gate
-# FO-114'te ayarı gate'in kendisi çevirdi (GIT_DIR sızıntısı + fixture'da git init).
+# FO-114: core.bare'i kimin yazdığı kanıtlanmadı; gate (GIT_DIR sızıntısı + git init) muhtemel
+# yazıcı, doğrulanmadı (docs/RELEASE_CHECKLIST.md §9.1).
 # Gate yeşil olsa bile ana checkout'u bozduysa push etme.
 core_bare_guard "pre-push (gate sonrası)" || exit 1
