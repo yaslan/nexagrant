@@ -22,7 +22,11 @@ export const CLOSED_RETENTION_DAYS = 90;
 export const WITHDRAWN_RETENTION_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Throws on an invalid `now`: an Invalid Date cutoff would leave the deletes without a bound. */
 export function retentionCutoffs(now: Date): { closedBefore: Date; withdrawnBefore: Date } {
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
+    throw new RangeError('partner-search retention: now is not a valid date; refusing an unbounded delete');
+  }
   return {
     closedBefore: new Date(now.getTime() - CLOSED_RETENTION_DAYS * DAY_MS),
     withdrawnBefore: new Date(now.getTime() - WITHDRAWN_RETENTION_DAYS * DAY_MS),
@@ -47,14 +51,14 @@ export async function runPartnerSearchRetention(now: Date = new Date()): Promise
 
   const { closedBefore, withdrawnBefore } = retentionCutoffs(now);
   const closed = await prisma.topic.findMany({ where: { status: 'CLOSED' }, select: { identifier: true } });
-  const closedIds = closed.map((t) => t.identifier);
+  const closedIds = closed.map((t) => t.identifier).filter(isPresentId);
 
   const stale = await prisma.partnerSearchAnnouncement.findMany({
     where: { topicIdentifier: { in: closedIds }, lastSeenAt: { lt: closedBefore } },
     select: { externalId: true, organizationPic: true },
   });
   const closedDeleted = await prisma.partnerSearchAnnouncement.deleteMany({
-    where: { externalId: { in: stale.map((s) => s.externalId) } },
+    where: { externalId: { in: stale.map((s) => s.externalId).filter(isPresentId) } },
   });
   const pics = new Set(stale.map((s) => s.organizationPic).filter(isPresentId));
   await refreshOrganisationFlags(pics);

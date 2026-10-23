@@ -52,6 +52,16 @@ const KNOWN: Record<string, string> = {
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
   'src/lib/notifications/store.ts in: ids':
     '`ids` is parseMarkReadTarget(target) one line above, which throws unless every element passes isPresentId; an empty list returns before the update; tenantId and userId beside it go through requireActionId (TASK-MUVR24EHWI2RA)',
+  'src/modules/m1/server/partner-search/retention.ts in: stale.map((s) => s.externalId).filter(isPresentId)':
+    '`externalId` (non-null PK) of rows read one statement above, filtered by isPresentId; an empty list deletes nothing; cron input, no client (FO-65 F4)',
+  'src/modules/m1/server/partner-search/retention.ts lt: withdrawnBefore':
+    '`withdrawnBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
+  'src/modules/m1/server/partner-search/retention.ts source: PARTNER_SEARCH_SOURCE':
+    'module constant `partner_search` imported from the adapter, never undefined (FO-65 F4)',
+  'src/modules/m1/server/partner-search/retention.ts in: closedIds':
+    '`Topic.identifier` (non-null, unique) of CLOSED rows read above, filtered by isPresentId; an empty list deletes nothing (FO-65 F4)',
+  'src/modules/m1/server/partner-search/retention.ts lt: closedBefore':
+    '`closedBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts version: existing.version':

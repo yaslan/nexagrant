@@ -4,6 +4,7 @@ import {
   orgTypeFor,
   planTopicWrite,
 } from '@/modules/m1/server/partner-search/ingestor';
+import { retentionCutoffs } from '@/modules/m1/server/partner-search/retention';
 
 const NOW = new Date('2026-10-22T03:00:00.000Z');
 const YESTERDAY = new Date('2026-10-21T03:00:00.000Z');
@@ -121,5 +122,18 @@ describe('planTopicWrite: rows the portal moved between topics', () => {
       now: NOW,
     });
     expect(writes).toEqual([{ externalId: 'moved', kind: 'update', missedScans: 0, withdrawnAt: null, missedScanAt: null }]);
+  });
+});
+
+describe('retentionCutoffs (FO-65 F4)', () => {
+  it('closed topics keep 90 days, withdrawn rows 30', () => {
+    expect(retentionCutoffs(NOW)).toEqual({
+      closedBefore: new Date('2026-07-24T03:00:00.000Z'),
+      withdrawnBefore: new Date('2026-09-22T03:00:00.000Z'),
+    });
+  });
+
+  it('refuses an invalid date instead of deleting without a bound', () => {
+    expect(() => retentionCutoffs(new Date('nope'))).toThrow(RangeError);
   });
 });
