@@ -43,6 +43,7 @@ E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: loca
 docker rm -f <is>-pg                            # iş bitince
 ```
 Ana checkout "must be run in a work tree" veriyorsa `core.bare=true` olmuştur. Belirti, kontrol ve düzeltme için bkz. `docs/RELEASE_CHECKLIST.md` §9.1. `GIT_DIR` set iken başka dizinde `git init` ya da `git config` koşma.
+E2E postası: `playwright.config.ts` e2e sunucusuna `SMTP_HOST=localhost`, `SMTP_PORT=1025` verir (`E2E_SMTP`, `.env`'i ezer) ve posta kutusunu `http://localhost:8025`'ten okur. Bu portlarda bir mailpit gerekir: `docker compose up -d mailpit` (konteyner `fabrika-mailpit`; zaten ayaktaysa dokunma). Yoksa davet ve cooldown e2e'leri "SMTP is not configured" ile düşer. `.env`'de `SMTP_*` boş kalır (`.env.example` gibi): vitest `.env`'i okur, orada SMTP açmak no-SMTP canlı testini değiştirir. Mailpit paylaşımlıdır: iki e2e koşusu aynı anda çalışırsa postalar karışır.
 
 ## Mimari kurallar (ihlal etme)
 1. **Çok kiracılılık:** Her iş tablosunda `tenantId` zorunlu; sorgular `withTenant(prisma, tenantId)` sarmalayıcısından geçer; RLS politikası olmayan tablo PR'ı geçmez.
