@@ -52,6 +52,8 @@ function pidAlive(pid) {
 
 function tryAcquire() {
   try {
+    // Üst dizin (ör. ~/.cache) yoksa önce oluştur; kilit dizininin kendisi atomiklik için recursive değil.
+    fs.mkdirSync(path.dirname(LOCK_DIR), { recursive: true })
     fs.mkdirSync(LOCK_DIR)
   } catch (err) {
     if (err.code === 'EEXIST') return false
@@ -69,8 +71,15 @@ function clearIfStale() {
   if (owner) {
     stale = !pidAlive(owner.pid)
   } else {
-    const ageMs = Date.now() - fs.statSync(LOCK_DIR).mtimeMs
-    stale = ageMs > NO_OWNER_STALE_MS
+    let mtimeMs
+    try {
+      mtimeMs = fs.statSync(LOCK_DIR).mtimeMs
+    } catch (err) {
+      // Sahip kilidi o an bırakıyor: dizin zaten yok, yeniden denemek yeterli.
+      if (err.code === 'ENOENT') return true
+      throw err
+    }
+    stale = Date.now() - mtimeMs > NO_OWNER_STALE_MS
   }
   if (!stale) return false
   const graveyard = `${LOCK_DIR}.stale-${process.pid}-${Date.now()}`

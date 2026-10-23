@@ -1,0 +1,44 @@
+import { execFileSync } from 'child_process';
+import { existsSync, mkdtempSync, rmSync } from 'fs';
+import os from 'os';
+import path from 'path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+// scripts/gate-lock.mjs'i gerçek süreç olarak koşar; kilit dizini geçici bir yola yönlendirilir.
+const script = path.join(import.meta.dirname, '..', 'scripts', 'gate-lock.mjs');
+
+describe('gate-lock (FO-55)', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(path.join(os.tmpdir(), 'gate-lock-'));
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('ebeveyn dizini yokken kilidi oluşturur, komutu koşar ve kilidi bırakır', () => {
+    const lockDir = path.join(root, 'yok-ebeveyn', 'lock');
+
+    const out = execFileSync(process.execPath, [script, process.execPath, '-e', 'console.log("calisti")'], {
+      env: { ...process.env, FONBRIDGE_GATE_LOCK_DIR: lockDir },
+      encoding: 'utf8',
+    });
+
+    expect(out).toContain('calisti');
+    expect(existsSync(lockDir)).toBe(false);
+  });
+
+  it('alt komut başarısız olursa çıkış kodunu aynen iletir', () => {
+    const lockDir = path.join(root, 'yok-ebeveyn', 'lock');
+
+    expect(() =>
+      execFileSync(process.execPath, [script, process.execPath, '-e', 'process.exit(3)'], {
+        env: { ...process.env, FONBRIDGE_GATE_LOCK_DIR: lockDir },
+        stdio: 'ignore',
+      }),
+    ).toThrow();
+    expect(existsSync(lockDir)).toBe(false);
+  });
+});
