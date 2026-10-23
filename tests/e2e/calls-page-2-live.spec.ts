@@ -53,8 +53,10 @@ test.describe('calls page — page 2 (live SEDIA)', () => {
     await expect(async () => {
       expect(await rowTitles(page)).not.toEqual(titles1);
     }).toPass({ timeout: 30_000 });
+    // Both buttons are disabled while the list loads; the shot shows the settled page.
+    await expect(page.getByRole('button', { name: 'Next →', exact: true })).toBeEnabled({ timeout: 240_000 });
     const titles2 = await rowTitles(page);
-    await page.screenshot({ path: `${SHOTS}/calls-page-2.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/calls-page-2.png`, fullPage: true, animations: 'disabled' });
 
     const ids1 = body1.topics.map((t) => t.identifier);
     const ids2 = body2.topics.map((t) => t.identifier);
