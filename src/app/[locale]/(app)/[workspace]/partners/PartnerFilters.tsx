@@ -120,10 +120,10 @@ export function PartnerFilters({ initialFilters }: PartnerFiltersProps) {
             className="w-full border border-border rounded-xl px-3 py-2 text-xs bg-ground text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="0">{t('filterMinAny')}</option>
-            <option value="1">≥ 1 Proje</option>
-            <option value="5">≥ 5 Proje</option>
-            <option value="10">≥ 10 Proje</option>
-            <option value="25">≥ 25 Proje</option>
+            <option value="1">{t('minProjectsOption', { count: 1 })}</option>
+            <option value="5">{t('minProjectsOption', { count: 5 })}</option>
+            <option value="10">{t('minProjectsOption', { count: 10 })}</option>
+            <option value="25">{t('minProjectsOption', { count: 25 })}</option>
           </select>
         </div>
       </div>

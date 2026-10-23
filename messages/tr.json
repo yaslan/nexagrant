@@ -3823,6 +3823,7 @@
     "clearFilters": "Filtreleri Temizle",
     "filterSubmit": "Filtrele & Ara",
     "minProjectsTag": "Min. {count} Proje",
+    "minProjectsOption": "≥ {count} Proje",
     "foundInterreg": "Toplam {count} Interreg Ortak Profili Bulundu",
     "foundAll": "Toplam {count} Ortak Profili Bulundu",
     "turkishOnlyTag": "Türk Kuruluşlar"

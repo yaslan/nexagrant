@@ -3823,6 +3823,7 @@
     "clearFilters": "Clear Filters",
     "filterSubmit": "Filter & Search",
     "minProjectsTag": "Min. {count} Projects",
+    "minProjectsOption": "≥ {count} Projects",
     "foundInterreg": "Found {count} Interreg Partner Profiles",
     "foundAll": "Found {count} Partner Profiles",
     "turkishOnlyTag": "Turkish Organisations"
