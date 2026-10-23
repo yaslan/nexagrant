@@ -391,6 +391,12 @@ export interface PlanGrant {
   aiCreditsMonthly: number;
   /** Modules switched on by the plan itself, before any add-on. */
   moduleIds: readonly string[];
+  /**
+   * Modules a card lists this plan as including, but which do not grant access
+   * yet (`statusBadge: 'soon'`). Read only by `displayPlansForModule`; never by
+   * `plansGrantingModule`, `PLAN_GRANTS` access or the module gate.
+   */
+  previewModuleIds?: readonly string[];
 }
 
 const ALL_MODULE_IDS = [
@@ -416,6 +422,7 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     workspaces: 1,
     aiCreditsMonthly: 10,
     moduleIds: ['M3', 'M5'],
+    previewModuleIds: ['M0', 'M12', 'M16'],
   },
   {
     planId: 'basic',
@@ -425,6 +432,7 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     workspaces: 1,
     aiCreditsMonthly: 100,
     moduleIds: ['M2', 'M3', 'M5'],
+    previewModuleIds: ['M0', 'M12', 'M16'],
   },
   {
     planId: 'pro',
@@ -434,6 +442,7 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     workspaces: 1,
     aiCreditsMonthly: 500,
     moduleIds: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8'],
+    previewModuleIds: ['M0', 'M12', 'M13', 'M16'],
   },
   {
     planId: 'ultra',
@@ -443,6 +452,7 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     workspaces: 5,
     aiCreditsMonthly: 2_000,
     moduleIds: ALL_MODULE_IDS,
+    previewModuleIds: ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'],
   },
 ];
 
@@ -609,9 +619,10 @@ export type DisplayPlanId = PlanId | typeof FALLBACK_PLAN_ID;
  * are not on the shopfront the card points at.
  */
 export function displayPlansForModule(moduleId: string): DisplayPlanId[] {
-  return SELF_SERVE_GRANTS.filter((grant) => grant.moduleIds.includes(moduleId)).map(
-    (grant) => grant.planId as DisplayPlanId
-  );
+  return SELF_SERVE_GRANTS.filter(
+    (grant) =>
+      grant.moduleIds.includes(moduleId) || (grant.previewModuleIds ?? []).includes(moduleId)
+  ).map((grant) => grant.planId as DisplayPlanId);
 }
 
 /**

@@ -7,6 +7,27 @@ export interface CanEnableResult {
   missingDependencies?: ModuleId[];
 }
 
+const COMING_SOON_REASON = 'Module is coming soon.';
+
+/**
+ * A "Yakında" (`statusBadge: 'soon'`) module has no gate that opens it. Every
+ * path that switches one on is refused here (FO-40): the enable checks below and
+ * the admin write in `updateTenantModuleStatus`.
+ */
+export function isComingSoon(moduleId: ModuleId): boolean {
+  return getManifest(moduleId)?.statusBadge === 'soon';
+}
+
+/**
+ * The refusal for an admin write of `targetStatus` to a module, or `null` when
+ * the write may go ahead. `OFF` closes a module, so it is always allowed; `ON`,
+ * `PILOT` and `DEV` open one, so a `soon` module is refused.
+ */
+export function adminStatusRefusal(moduleId: ModuleId, targetStatus: ModuleStatus): string | null {
+  if (targetStatus !== 'OFF' && isComingSoon(moduleId)) return COMING_SOON_REASON;
+  return null;
+}
+
 /**
  * Checks if a module can be enabled based on its dependencies and the current plan tier.
  */
@@ -18,6 +39,9 @@ export function canEnable(
   const manifest = getManifest(moduleId);
   if (!manifest) {
     return { allowed: false, reason: 'Module not found.' };
+  }
+  if (isComingSoon(moduleId)) {
+    return { allowed: false, reason: COMING_SOON_REASON };
   }
 
   // Check plan constraint
@@ -57,6 +81,11 @@ export function canEnableEntitled(
   const manifest = getManifest(moduleId);
   if (!manifest) {
     return { allowed: false, reason: 'Module not found.' };
+  }
+  // A "Yakında" module has no gate that opens it: the plan list and the switch
+  // are not enough, so it is refused before either is read (FO-40).
+  if (isComingSoon(moduleId)) {
+    return { allowed: false, reason: COMING_SOON_REASON };
   }
 
   if (!entitledModules.includes(moduleId)) {
@@ -143,7 +172,13 @@ export type ModuleDenyReason =
    * `MODULE_OFF`, which says an administrator closed something the tenant owns
    * and can reopen; this one is answered at checkout, not in settings.
    */
-  | 'PLAN_UPGRADE_REQUIRED';
+  | 'PLAN_UPGRADE_REQUIRED'
+  /**
+   * A "Yakında" (`statusBadge: 'soon'`) module: not sold and not built yet, so
+   * neither a plan nor a switch opens it (FO-40). Checked before entitlement,
+   * because "upgrade your plan" would be untrue — no plan includes it.
+   */
+  | 'COMING_SOON';
 
 export interface ModuleAccessDecision {
   allowed: boolean;
@@ -198,8 +233,10 @@ export function canAccessStatus(
  *   AVAILABLE → entitled, switched off: the tenant can open it in settings.
  *   LOCKED    → not entitled, never switched on: answered at checkout.
  *   ORPHANED  → switched on but no longer entitled (left behind by a downgrade).
+ *   SOON      → a "Yakında" module: nothing to enable or buy yet (FO-40). One that
+ *               a row still switches on stays ORPHANED, so it can be closed.
  */
-export type ModuleCardStatus = 'ACTIVE' | 'AVAILABLE' | 'LOCKED' | 'ORPHANED';
+export type ModuleCardStatus = 'ACTIVE' | 'AVAILABLE' | 'LOCKED' | 'ORPHANED' | 'SOON';
 
 /**
  * The slice of the settings page's plan view `moduleStatus` reads. Shaped like
@@ -215,6 +252,7 @@ export interface ModuleStatusView {
 export function moduleStatus(moduleId: ModuleId, view: ModuleStatusView): ModuleCardStatus {
   const switchedOn =
     view.activeModules.includes(moduleId) || view.switchedOnOutsidePlan.includes(moduleId);
+  if (isComingSoon(moduleId)) return switchedOn ? 'ORPHANED' : 'SOON';
   if (view.entitledModules.includes(moduleId)) return switchedOn ? 'ACTIVE' : 'AVAILABLE';
   return switchedOn ? 'ORPHANED' : 'LOCKED';
 }

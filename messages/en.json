@@ -795,7 +795,8 @@
         "AVAILABLE": "Included in your plan, can be switched on",
         "LOCKED": "Not included in your plan",
         "ORPHANED": "Left outside your plan — unavailable",
-        "UNKNOWN": "Status unavailable"
+        "UNKNOWN": "Status unavailable",
+        "SOON": "Not available yet"
       },
       "statusBadge": {
         "ga": "GA",
@@ -817,6 +818,8 @@
       "plansNone": "Not in any plan",
       "addOnSku": "SKU: {sku}",
       "missingDependencies": "Missing dependency: {ids}",
+      "soonNotice": "This module is in preparation; once it is released you can enable it here.",
+      "soonLink": "What will it do? →",
       "enable": "Switch on",
       "disable": "Switch off",
       "toastDisabled": "Module {id} switched off.",
@@ -1480,13 +1483,15 @@
   "ModuleGate": {
     "title": "This module is not available",
     "askAdmin": "If you need access, talk to your workspace administrator or the {brand} team.",
+    "comingSoon": "{brand} is preparing this module. Once it is released you can enable it from Module Management.",
     "reason": {
       "MODULE_OFF": "The {module} module is turned off for your workspace.",
       "PLAN_UPGRADE_REQUIRED": "The {module} module is outside your subscription. It is included in: {plans}.",
       "DEV_INTERNAL_ONLY": "The {module} module is in development and is open to the {brand} team only.",
       "PILOT_MANAGERS_ONLY": "The {module} module is in pilot and is limited to workspace managers.",
       "NO_TENANT": "Your session is not linked to a workspace.",
-      "NOT_AUTHENTICATED": "You need to sign in to see this page."
+      "NOT_AUTHENTICATED": "You need to sign in to see this page.",
+      "COMING_SOON": "The {module} module is coming soon."
     }
   },
   "UserIdentity": {
@@ -3499,6 +3504,30 @@
     "none": "—"
   },
   "modules": {
+    "call-fit": {
+      "name": "Call Fit",
+      "tagline": "Scores open calls against the organisation profile; a decision aid, not a guarantee of selection."
+    },
+    "expert-pool": {
+      "name": "Expert Pool",
+      "tagline": "Pre-registered experts for evaluator and reviewer matching."
+    },
+    "budget-wp": {
+      "name": "Budget & Work Packages",
+      "tagline": "Budget and work-package planning on top of partner and proposal data."
+    },
+    "compliance": {
+      "name": "Compliance Check",
+      "tagline": "AI-assisted review of application parts against programme rules."
+    },
+    "post-award": {
+      "name": "Post-Award Management",
+      "tagline": "Reporting, effort tracking and deliverables after a grant is signed."
+    },
+    "tr-layer": {
+      "name": "Turkish National Layer",
+      "tagline": "Turkish national programmes such as TÜBİTAK and KOSGEB, alongside the EU pipeline."
+    },
     "partner-intel": {
       "name": "Partner Intelligence Database",
       "tagline": "One partner card per organisation, topic leaders and the collaboration graph."

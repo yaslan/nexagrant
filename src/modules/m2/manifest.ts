@@ -33,4 +33,5 @@ export const m2Manifest: ModuleManifest = {
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
+  programTemplates: ['horizon-europe', 'eurostars', 'digital-europe', 'eic-accelerator'],
 };

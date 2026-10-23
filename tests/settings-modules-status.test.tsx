@@ -94,6 +94,29 @@ describe('modules page — four card states', () => {
     }
   });
 
+  test('Yakında cards: no switch, no upgrade, only the notice and the placeholder page (FO-40)', () => {
+    for (const plan of [discover, pro]) {
+      renderModules(plan);
+      for (const [id, key] of [
+        ['M0', 'call-fit'],
+        ['M12', 'expert-pool'],
+        ['M13', 'budget-wp'],
+        ['M14', 'compliance'],
+        ['M15', 'post-award'],
+        ['M16', 'tr-layer'],
+      ] as const) {
+        expect(card(id).getAttribute('data-status')).toBe('SOON');
+        expect(within(card(id)).getByText(M.statusBadge.soon)).toBeTruthy();
+        expect(within(card(id)).getByText(M.status.SOON)).toBeTruthy();
+        expect(within(card(id)).getByTestId('module-soon-notice').textContent).toBe(M.soonNotice);
+        expect(buttons(id)).toEqual([]);
+        expect(links(id)).toEqual([M.soonLink]);
+        expect(within(card(id)).getByRole('link').getAttribute('href')).toBe(`/tr/default/modules/${key}`);
+      }
+      cleanup();
+    }
+  });
+
   test('Pro: ACTIVE offers Kapat, AVAILABLE offers Aç', () => {
     renderModules(pro);
 
@@ -127,7 +150,7 @@ describe('modules page — four card states', () => {
 
   test('unread plan: no status is claimed and nothing is offered', () => {
     renderModules(null);
-    expect(screen.getAllByText(M.status.UNKNOWN)).toHaveLength(11);
+    expect(screen.getAllByText(M.status.UNKNOWN)).toHaveLength(screen.getAllByTestId(/^module-card-/).length);
     expect(screen.queryByRole('link', { name: M.upgradeCta })).toBeNull();
     expect(screen.queryByRole('button', { name: M.enable })).toBeNull();
   });
@@ -156,8 +179,8 @@ describe('modules page — catalogue-driven card details', () => {
   test('category cards and pipeline coverage count active modules', () => {
     renderModules(pro);
     expect(screen.getByTestId('category-summary-core').textContent).toContain(M.category.core);
-    expect(screen.getByTestId('category-summary-core').textContent).toMatch(/2\s*\/ 5/);
-    expect(screen.getByTestId('category-summary-ai').textContent).toMatch(/0\s*\/ 2/);
+    expect(screen.getByTestId('category-summary-core').textContent).toMatch(/2\s*\/ 8/);
+    expect(screen.getByTestId('category-summary-ai').textContent).toMatch(/0\s*\/ 3/);
     expect(screen.getByTestId('pipeline-coverage').textContent).toMatch(/\d\/5 aşama/);
     expect(screen.queryByText(/Kapsam Oranı/)).toBeNull();
   });
@@ -179,6 +202,7 @@ describe('modules page — catalogue-driven card details', () => {
     expect(screen.getAllByTestId(/^module-card-/).map((c) => c.dataset.testid)).toEqual([
       'module-card-M6',
       'module-card-M8',
+      'module-card-M14',
     ]);
   });
 });
