@@ -18,7 +18,8 @@
  *
  * Refused over a subscription somebody else owns: a live Stripe/iyzico
  * subscription (cancel it first, or the tenant would be charged for a plan it
- * is no longer on), a running pilot or a contract.
+ * is no longer on), a running pilot or a contract — and over a trial with no
+ * Stripe subscription behind it (`internalPlanBlocker`).
  */
 import { withTenant } from '@/lib/db';
 import { withSystemScope } from '@/lib/system-scope';
@@ -26,7 +27,12 @@ import { FALLBACK_PLAN_ID, grantsFor, type PlanId } from '@/lib/billing/catalog'
 import { clearedPriceLock } from '@/lib/billing/price-lock';
 import { CONTRACT_PROVIDER, LiveProviderSubscriptionError, publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { lockPilotRow, PILOT_PROVIDER } from '@/lib/billing/pilot';
-import { INTERNAL_PROVIDER, isInternalPlanSubscription } from '@/lib/billing/subscription-owner';
+import {
+  INTERNAL_PROVIDER,
+  internalPlanBlocker,
+  isInternalPlanSubscription,
+  subscriptionOwnedError,
+} from '@/lib/billing/subscription-owner';
 
 /** The plans an admin may assign internally, Discover first (= take it back). */
 export const INTERNAL_PLAN_CHOICES = [FALLBACK_PLAN_ID, 'basic', 'pro', 'ultra'] as const satisfies readonly (
@@ -101,6 +107,8 @@ export async function assignInternalPlan(
         existing.provider === PILOT_PROVIDER || existing.provider === CONTRACT_PROVIDER || Boolean(existing.providerSubId);
       if (owned) throw new LiveProviderSubscriptionError(tenantId, existing.provider);
     }
+    const block = internalPlanBlocker(existing);
+    if (block) throw subscriptionOwnedError(block, tenantId);
 
     if (planId === FALLBACK_PLAN_ID) {
       if (!internal) return { outcome: 'unchanged' as const, before, after: before };
