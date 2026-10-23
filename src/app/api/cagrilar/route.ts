@@ -6,6 +6,7 @@ import { translateTopicsBatch } from '@/lib/translation';
 import { requireTenantApi } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
+import { SEDIA_RESULT_WINDOW } from '@/lib/calls-paging';
 
 /**
  * The largest page this route asks SEDIA for. Every title on the page is
@@ -20,14 +21,6 @@ const CAGRILAR_MAX_PAGE_SIZE = 50;
  * a single request does.
  */
 const CAGRILAR_MAX_PAGE_NUMBER = 1000;
-
-/**
- * SEDIA reads only the first 10 000 hits of a query: measured live, page 100 at
- * size 100 and page 200 at size 50 answer, the next page of each comes back
- * empty with `totalResults: 0`. A page past that window is a 400, not a 200
- * that the calls page would show as "0 results".
- */
-const CAGRILAR_SEDIA_WINDOW = 10_000;
 
 /**
  * Plain digits only, no leading zero. `z.coerce.number()` would also take
@@ -93,7 +86,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'invalid_limit' }, { status: 400 });
     }
     const pageSize = Math.min(CAGRILAR_MAX_PAGE_SIZE, Math.max(1, rawPageSize));
-    if (page * pageSize > CAGRILAR_SEDIA_WINDOW) {
+    // A page past SEDIA's window is a 400, not a 200 the calls page would show as "0 results".
+    if (page * pageSize > SEDIA_RESULT_WINDOW) {
       return NextResponse.json({ success: false, error: 'page_out_of_window' }, { status: 400 });
     }
     const lang = (searchParams.get('lang') || searchParams.get('locale') || 'tr').toLowerCase();

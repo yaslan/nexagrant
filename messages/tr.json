@@ -1647,6 +1647,7 @@
     "closed": "Kapanmış",
     "loadingData": "Canlı veriler yükleniyor...",
     "resultsCount": "Toplam {count} çağrı bulundu ({page}. sayfa)",
+    "windowNote": "İlk {count, number} sonuç gösteriliyor, aramayı daraltın.",
     "colStatus": "Durum",
     "colTopic": "Çağrı Başlığı & Kodu",
     "colActionType": "Eylem Tipi",
@@ -1665,7 +1666,8 @@
       "rateLimited": "Kısa sürede çok fazla arama yaptınız. Lütfen {seconds} saniye bekleyip tekrar deneyin.",
       "badRequest": "Arama isteği kabul edilmedi: filtrelerden biri geçersiz bir değer içeriyor. Filtreleri değiştirip tekrar deneyin.",
       "network": "Sunucuya ulaşılamadı ya da yanıt zaman aşımına uğradı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
-      "unexpected": "Çağrı listesi beklenmeyen bir hata nedeniyle alınamadı. Lütfen tekrar deneyin; sorun sürerse yöneticinize bildirin."
+      "unexpected": "Çağrı listesi beklenmeyen bir hata nedeniyle alınamadı. Lütfen tekrar deneyin; sorun sürerse yöneticinize bildirin.",
+      "pageOutOfWindow": "Bu sayfa gösterilemiyor: AB fon portalı bir aramada yalnızca ilk {count, number} sonucu verir. Filtrelerde bir sorun yok; önceki sayfalara dönün ya da aramayı daraltın."
     },
     "loadFailedShort": "Çağrılar alınamadı",
     "perPage": "Sayfa Başı Gösterim:",

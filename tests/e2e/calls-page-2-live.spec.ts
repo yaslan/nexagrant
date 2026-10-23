@@ -72,4 +72,25 @@ test.describe('calls page — page 2 (live SEDIA)', () => {
     const back = await answerFor(page, 1, () => page.getByRole('button', { name: '← Previous', exact: true }).click());
     expect(back.topics.map((t) => t.identifier)).toEqual(ids1);
   });
+  test('closed grants: the real total is shown, the pager ends at the 10 000-hit window', async ({ page }) => {
+    await signInAs(page, SEAT);
+    await page.goto(CALLS_URL);
+    await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 240_000 });
+
+    // Only "Closed": tick it first, then untick the two defaults, as a person would.
+    await page.getByLabel('Closed', { exact: true }).check();
+    await page.getByLabel('Open Calls', { exact: true }).uncheck();
+    const closed = await answerFor(page, 1, () => page.getByLabel('Forthcoming', { exact: true }).uncheck());
+    console.log(`[FO-42 window] closed totalResults=${closed.totalResults}`);
+    expect(closed.totalResults).toBeGreaterThan(10_000);
+
+    await expect(page.getByText('1 / 500', { exact: true })).toBeVisible({ timeout: 240_000 });
+    await expect(page.getByTestId('calls-window-note')).toHaveText('Showing the first 10,000 results; narrow your search.');
+    await page.screenshot({ path: `${SHOTS}/calls-closed-window-live.png`, fullPage: true, animations: 'disabled' });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId('calls-window-note')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: `${SHOTS}/calls-closed-window-live-390.png`, animations: 'disabled' });
+  });
 });
