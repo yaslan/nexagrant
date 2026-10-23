@@ -75,3 +75,4 @@ add-expert-founder-counter.sql
 add-platform-setting.sql
 add-partner-search-missed-scans.sql
 add-partner-search-missed-scan-day.sql
+platform-setting-write-guard.sql

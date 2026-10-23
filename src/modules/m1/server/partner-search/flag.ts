@@ -24,3 +24,12 @@ export async function isPartnerSearchIngestionEnabled(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * The only write path for the flag (FO-65 F2). The app role cannot UPDATE
+ * PlatformSetting; `set_platform_setting` (platform-setting-write-guard.sql) writes
+ * the row and an AuditEvent in one call. `actorId` is the admin who flipped it.
+ */
+export async function setPartnerSearchIngestionFlag(enabled: boolean, actorId: string): Promise<void> {
+  await prisma.$executeRaw`SELECT public.set_platform_setting(${PARTNER_SEARCH_FLAG_KEY}, ${JSON.stringify(enabled)}::jsonb, ${actorId})`;
+}

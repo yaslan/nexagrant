@@ -64,6 +64,11 @@ BEGIN
   IF to_regclass('public."ExpertFounderCounter"') IS NOT NULL THEN
     EXECUTE format('REVOKE DELETE, TRUNCATE ON public."ExpertFounderCounter" FROM %I', app_role);
   END IF;
+  -- 3b. PlatformSetting is written only by set_platform_setting() (platform-setting-
+  --     write-guard.sql, FO-65 F2). Step 3 above would grant DML again on a re-run.
+  IF to_regclass('public."PlatformSetting"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE ON "PlatformSetting" FROM %I', app_role);
+  END IF;
 
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as fabrika (or fabrika_migrate); default privileges are recorded per
