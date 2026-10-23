@@ -37,6 +37,7 @@ import {
   NoPublishedVersionError,
   publishedVersionIdFor,
 } from '@/lib/billing/plan-repository';
+import { pilotGrantBlocker, SubscriptionOwnedError } from '@/lib/billing/subscription-owner';
 
 /** `Subscription.provider` of a free pilot. Not a payment provider. */
 export const PILOT_PROVIDER = 'pilot';
@@ -192,7 +193,7 @@ export interface GrantPilotResult {
  *
  * Refused over a live Stripe/iyzico subscription (the tenant is paying) and
  * over a live contract package (the tenant has bought one) — the pilot is for
- * a tenant that has neither. The caller is the platform-admin action; this
+ * a tenant that has neither — and over an internal plan (`pilotGrantBlocker`). The caller is the platform-admin action; this
  * enforces the data rules only, like the rest of plan-repository.ts.
  */
 export async function grantPilot(
@@ -223,6 +224,8 @@ export async function grantPilot(
     if (live && existing!.provider === CONTRACT_PROVIDER) {
       throw new ContractSubscriptionError(tenantId);
     }
+    const block = pilotGrantBlocker(existing);
+    if (block) throw new SubscriptionOwnedError(block, tenantId);
 
     const state = pilotStateOf(existing, now);
     if (state.kind === 'active' && !opts.extend) {

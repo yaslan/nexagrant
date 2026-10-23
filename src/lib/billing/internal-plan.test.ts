@@ -2,15 +2,27 @@
  * TASK-MVCH26OXNVLKR — internal plan assignment, against the real database
  * (as pilot.test.ts: a mocked delegate cannot prove that the row
  * `getEntitlements` reads was written, or that Stripe left it alone).
+ * TASK-MVIB6KITO9U5I: a pilot grant and an unbacked trial cannot replace it.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import type Stripe from 'stripe';
 import { prisma, withTenant } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { LiveProviderSubscriptionError } from './plan-repository';
 import { assignInternalPlan, InternalPlanNoteRequiredError, listInternalPlans } from './internal-plan';
-import { checkoutBlocker, INTERNAL_PROVIDER, isInternalPlanSubscription, stripeSyncBlocker } from './subscription-owner';
-import { PILOT_PROVIDER } from './pilot';
+import {
+  checkoutBlocker,
+  INTERNAL_PROVIDER,
+  internalPlanBlocker,
+  isInternalPlanSubscription,
+  isUnbackedTrial,
+  pilotGrantBlocker,
+  stripeSyncBlocker,
+  SubscriptionOwnedError,
+} from './subscription-owner';
+import { grantPilot, PILOT_PROVIDER } from './pilot';
+import { upsertPublicSectorPlans } from './public-sector-plans';
+import { PUBLIC_SECTOR_PLANS_LOCK, withTestDbLock } from '../../../tests/helpers/test-db-lock';
 import { handleSubscriptionCancellation, syncStripeSubscription } from './subscription-sync';
 import { presentIds, requireId } from '../../../tests/helpers/teardown-guard';
 
@@ -54,8 +66,32 @@ describe('stripeSyncBlocker — which source owns the row', () => {
   });
 });
 
+describe('admin grants — which rows they may not replace', () => {
+  it('a pilot may not replace an active internal plan; a cancelled one is free', () => {
+    expect(pilotGrantBlocker({ status: 'ACTIVE', provider: INTERNAL_PROVIDER, trialEndsAt: null })).toBe(
+      'INTERNAL_PLAN_PROTECTED'
+    );
+    expect(pilotGrantBlocker({ status: 'CANCELED', provider: INTERNAL_PROVIDER, trialEndsAt: null })).toBeNull();
+    expect(pilotGrantBlocker(null)).toBeNull();
+  });
+
+  it('an internal plan may not replace a trial with no Stripe subscription behind it', () => {
+    const beta = { status: 'TRIALING', provider: 'stripe', providerSubId: null };
+    expect(isUnbackedTrial(beta)).toBe(true);
+    expect(internalPlanBlocker(beta)).toBe('TRIAL_PROTECTED');
+    expect(internalPlanBlocker({ ...beta, status: 'CANCELED' })).toBeNull();
+    expect(internalPlanBlocker({ ...beta, providerSubId: 'sub_1' })).toBeNull();
+    expect(internalPlanBlocker({ ...beta, provider: PILOT_PROVIDER })).toBeNull();
+    expect(internalPlanBlocker(null)).toBeNull();
+  });
+});
+
 describe('assignInternalPlan (live DB)', () => {
   let tenantId: string;
+
+  beforeAll(async () => {
+    await withTestDbLock(process.env.DATABASE_URL!, PUBLIC_SECTOR_PLANS_LOCK, () => upsertPublicSectorPlans(prisma));
+  });
 
   beforeEach(async () => {
     const tenant = await prisma.tenant.create({
@@ -129,6 +165,57 @@ describe('assignInternalPlan (live DB)', () => {
       LiveProviderSubscriptionError
     );
     expect(await prisma.auditEvent.count({ where: { tenantId, type: { startsWith: 'plan.internal.' } } })).toBe(0);
+  });
+
+  it('a pilot grant leaves an internal plan alone', async () => {
+    await assignInternalPlan(tenantId, 'ultra', 'admin-1', 'pilot guard');
+
+    const refused = await grantPilot(tenantId, 'admin-1').catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(SubscriptionOwnedError);
+    expect(refused).toMatchObject({ code: 'INTERNAL_PLAN_PROTECTED' });
+    await expect(grantPilot(tenantId, 'admin-1', { extend: true })).rejects.toBeInstanceOf(SubscriptionOwnedError);
+
+    expect(await prisma.subscription.findUnique({ where: { tenantId } })).toMatchObject({
+      planId: 'ultra',
+      status: 'ACTIVE',
+      provider: INTERNAL_PROVIDER,
+      trialEndsAt: null,
+    });
+    expect(await prisma.auditEvent.count({ where: { tenantId, type: { startsWith: 'billing.pilot.' } } })).toBe(0);
+
+    // Taken back, the tenant is free for a pilot again.
+    await assignInternalPlan(tenantId, 'free', 'admin-1', 'pilot next');
+    expect(await grantPilot(tenantId, 'admin-1')).toMatchObject({ outcome: 'granted' });
+  });
+
+  it('an internal plan is refused over a trial with no Stripe subscription, and the trial is kept', async () => {
+    // As scripts/beta-onboarding.ts writes it: BETA_PLAN_ID (ultra), provider left at the column default, no subscription id.
+    const trialEndsAt = new Date(Date.now() + 30 * 86_400_000);
+    await prisma.subscription.create({
+      data: { tenantId, planId: 'ultra', status: 'TRIALING', provider: 'stripe', providerSubId: null, trialEndsAt },
+    });
+    const before = await entitlements(tenantId);
+
+    const refused = await assignInternalPlan(tenantId, 'pro', 'admin-1', 'over beta').catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(SubscriptionOwnedError);
+    expect(refused).toMatchObject({ code: 'TRIAL_PROTECTED' });
+    // Discover is refused too, as over a live Stripe subscription: the trial is not the admin's to end.
+    await expect(assignInternalPlan(tenantId, 'free', 'admin-1', 'x')).rejects.toMatchObject({ code: 'TRIAL_PROTECTED' });
+
+    expect(await prisma.subscription.findUnique({ where: { tenantId } })).toMatchObject({
+      planId: 'ultra',
+      status: 'TRIALING',
+      provider: 'stripe',
+      providerSubId: null,
+      trialEndsAt,
+    });
+    expect((await entitlements(tenantId)).allowedModules).toEqual(before.allowedModules);
+    expect(await prisma.planAssignment.count({ where: { tenantId } })).toBe(0);
+    expect(await prisma.auditEvent.count({ where: { tenantId, type: { startsWith: 'plan.internal.' } } })).toBe(0);
+
+    // Once the trial has ended the row is nobody's, and the assignment goes through.
+    await prisma.subscription.update({ where: { tenantId }, data: { status: 'CANCELED' } });
+    expect(await assignInternalPlan(tenantId, 'pro', 'admin-1', 'after beta')).toMatchObject({ outcome: 'assigned' });
   });
 
   it('the Stripe sync and cancellation leave an internal plan alone, and raise an operator alert', async () => {

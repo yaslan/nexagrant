@@ -11,6 +11,8 @@ export const TENANT_FAILURE_CODES = [
   'LIVE_PROVIDER_SUBSCRIPTION',
   // src/lib/billing/internal-plan.ts
   'NOTE_REQUIRED',
+  // src/lib/billing/subscription-owner.ts internalPlanBlocker, thrown by internal-plan.ts
+  'TRIAL_PROTECTED',
   // src/lib/tenant.ts requirePlatformAdmin()
   'PLATFORM_ADMIN_REQUIRED',
   // actions.ts: arguments that fail the zod schema

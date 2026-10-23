@@ -2118,7 +2118,8 @@
       "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekir.",
       "INVALID_VISIBILITY": "Geçersiz görünürlük değeri. Sayfayı yenileyip tekrar deneyin.",
       "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin; sürerse ayrıntı sunucu günlüğündedir.",
-      "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz."
+      "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz.",
+      "INTERNAL_PLAN_PROTECTED": "Kiracı bir iç planda; pilot atanamaz. Önce iç planı kiracı sayfasından geri alın."
     },
     "pilot": {
       "title": "Ücretsiz pilot (90 gün, Belediye Ekip)",
@@ -3643,6 +3644,7 @@
     "errors": {
       "LIVE_PROVIDER_SUBSCRIPTION": "Kiracının canlı bir ücretli aboneliği, pilotu ya da sözleşmesi var; önce onu sonlandırın.",
       "NOTE_REQUIRED": "Not zorunlu.",
+      "TRIAL_PROTECTED": "Kiracı Stripe aboneliği olmayan bir deneme süresinde (ör. beta); iç plan atanamaz. Önce denemeyi sonlandırın.",
       "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekiyor.",
       "INVALID_INPUT": "Geçersiz seçim.",
       "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin."
