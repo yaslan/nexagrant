@@ -193,7 +193,8 @@ export interface GrantPilotResult {
  *
  * Refused over a live Stripe/iyzico subscription (the tenant is paying) and
  * over a live contract package (the tenant has bought one) — the pilot is for
- * a tenant that has neither — and over an internal plan (`pilotGrantBlocker`). The caller is the platform-admin action; this
+ * a tenant that has neither — and over an internal plan or a trial with no
+ * Stripe subscription behind it, such as beta (`pilotGrantBlocker`). The caller is the platform-admin action; this
  * enforces the data rules only, like the rest of plan-repository.ts.
  */
 export async function grantPilot(

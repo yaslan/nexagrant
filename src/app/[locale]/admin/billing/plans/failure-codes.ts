@@ -25,6 +25,7 @@ export const PLAN_FAILURE_CODES = [
   'PILOT_OVER_CONTRACT',
   // src/lib/billing/subscription-owner.ts pilotGrantBlocker, thrown by pilot.ts
   'INTERNAL_PLAN_PROTECTED',
+  'TRIAL_PROTECTED',
   // src/lib/tenant.ts requirePlatformAdmin()
   'PLATFORM_ADMIN_REQUIRED',
   // actions.ts setVisibilityAction: a value outside PlanVisibility (İNCELEME-94 G-1)

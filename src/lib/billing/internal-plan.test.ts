@@ -68,11 +68,18 @@ describe('stripeSyncBlocker — which source owns the row', () => {
 
 describe('admin grants — which rows they may not replace', () => {
   it('a pilot may not replace an active internal plan; a cancelled one is free', () => {
-    expect(pilotGrantBlocker({ status: 'ACTIVE', provider: INTERNAL_PROVIDER, trialEndsAt: null })).toBe(
+    expect(pilotGrantBlocker({ status: 'ACTIVE', provider: INTERNAL_PROVIDER, providerSubId: null })).toBe(
       'INTERNAL_PLAN_PROTECTED'
     );
-    expect(pilotGrantBlocker({ status: 'CANCELED', provider: INTERNAL_PROVIDER, trialEndsAt: null })).toBeNull();
+    expect(pilotGrantBlocker({ status: 'CANCELED', provider: INTERNAL_PROVIDER, providerSubId: null })).toBeNull();
     expect(pilotGrantBlocker(null)).toBeNull();
+  });
+
+  it('a pilot may not replace a trial with no Stripe subscription behind it either', () => {
+    const beta = { status: 'TRIALING', provider: 'stripe', providerSubId: null };
+    expect(pilotGrantBlocker(beta)).toBe('TRIAL_PROTECTED');
+    expect(pilotGrantBlocker({ ...beta, status: 'CANCELED' })).toBeNull();
+    expect(pilotGrantBlocker({ ...beta, provider: PILOT_PROVIDER })).toBeNull();
   });
 
   it('an internal plan may not replace a trial with no Stripe subscription behind it', () => {
@@ -185,6 +192,34 @@ describe('assignInternalPlan (live DB)', () => {
 
     // Taken back, the tenant is free for a pilot again.
     await assignInternalPlan(tenantId, 'free', 'admin-1', 'pilot next');
+    expect(await grantPilot(tenantId, 'admin-1')).toMatchObject({ outcome: 'granted' });
+  });
+
+  it('a pilot grant is refused over a trial with no Stripe subscription, and the trial is kept', async () => {
+    // As scripts/beta-onboarding.ts writes it: BETA_PLAN_ID (ultra), provider left at the column default, no subscription id.
+    const trialEndsAt = new Date(Date.now() + 30 * 86_400_000);
+    await prisma.subscription.create({
+      data: { tenantId, planId: 'ultra', status: 'TRIALING', provider: 'stripe', providerSubId: null, trialEndsAt },
+    });
+    const before = await entitlements(tenantId);
+
+    const refused = await grantPilot(tenantId, 'admin-1').catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(SubscriptionOwnedError);
+    expect(refused).toMatchObject({ code: 'TRIAL_PROTECTED' });
+    await expect(grantPilot(tenantId, 'admin-1', { extend: true })).rejects.toMatchObject({ code: 'TRIAL_PROTECTED' });
+
+    expect(await prisma.subscription.findUnique({ where: { tenantId } })).toMatchObject({
+      planId: 'ultra',
+      status: 'TRIALING',
+      provider: 'stripe',
+      providerSubId: null,
+      trialEndsAt,
+    });
+    expect((await entitlements(tenantId)).allowedModules).toEqual(before.allowedModules);
+    expect(await prisma.auditEvent.count({ where: { tenantId, type: { startsWith: 'billing.pilot.' } } })).toBe(0);
+
+    // Once the trial has ended, the tenant is free for a pilot.
+    await prisma.subscription.update({ where: { tenantId }, data: { status: 'CANCELED' } });
     expect(await grantPilot(tenantId, 'admin-1')).toMatchObject({ outcome: 'granted' });
   });
 

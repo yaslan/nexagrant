@@ -92,13 +92,20 @@ export class SubscriptionOwnedError extends Error {
   }
 }
 
+/** The row an admin grant reads before it writes. */
+type AdminGrantRow = Pick<PilotSubscriptionRow, 'status' | 'provider'> & { providerSubId: string | null };
+
 /**
- * `null` when a pilot may be granted over the row. An internal plan carries no
- * provider id, so the paying-subscription check in `grantPilot` lets it through;
- * this one does not — the pilot would take the plan an admin assigned.
+ * `null` when a pilot may be granted over the row. An internal plan and an
+ * unbacked trial carry no provider id, so the paying-subscription check in
+ * `grantPilot` lets them through; this one does not — the pilot would take the
+ * plan an admin assigned, or drop the trial's plan as an internal plan would
+ * ({@link internalPlanBlocker}).
  */
-export function pilotGrantBlocker(sub: PilotSubscriptionRow | null | undefined): AdminGrantBlock | null {
-  return isInternalPlanSubscription(sub) ? 'INTERNAL_PLAN_PROTECTED' : null;
+export function pilotGrantBlocker(sub: AdminGrantRow | null | undefined): AdminGrantBlock | null {
+  if (isInternalPlanSubscription(sub)) return 'INTERNAL_PLAN_PROTECTED';
+  if (isUnbackedTrial(sub)) return 'TRIAL_PROTECTED';
+  return null;
 }
 
 /**
@@ -107,8 +114,6 @@ export function pilotGrantBlocker(sub: PilotSubscriptionRow | null | undefined):
  * the trial's plan, and taking the internal plan back (Discover) would not
  * bring it back.
  */
-export function internalPlanBlocker(
-  sub: (Pick<PilotSubscriptionRow, 'status' | 'provider'> & { providerSubId: string | null }) | null | undefined
-): AdminGrantBlock | null {
+export function internalPlanBlocker(sub: AdminGrantRow | null | undefined): AdminGrantBlock | null {
   return isUnbackedTrial(sub) ? 'TRIAL_PROTECTED' : null;
 }
