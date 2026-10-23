@@ -37,6 +37,7 @@ export const JOB_IDS = [
   'notifications-retention',
   'evidence-expiring',
   'partner-search',
+  'partner-search-retention',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];
@@ -114,6 +115,15 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   {
     id: 'partner-search',
     cron: '0 3 * * *',
+    maxAttempts: 5,
+    fill: '6h',
+    queue: 'partner-search',
+    missedTickAlert: true,
+  },
+  // FO-65 F4: 15 minutes after the ingestion. Same queue, so the two never overlap.
+  {
+    id: 'partner-search-retention',
+    cron: '15 3 * * *',
     maxAttempts: 5,
     fill: '6h',
     queue: 'partner-search',
