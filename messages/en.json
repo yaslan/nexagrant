@@ -3823,10 +3823,19 @@
     "filterInterregOnly": "Show Interreg Partners Only (Universities, Municipalities, Agencies)",
     "clearFilters": "Clear Filters",
     "filterSubmit": "Filter & Search",
-    "minProjectsTag": "Min. {count} Projects",
-    "minProjectsOption": "≥ {count} Projects",
-    "foundInterreg": "Found {count} Interreg Partner Profiles",
-    "foundAll": "Found {count} Partner Profiles",
-    "turkishOnlyTag": "Turkish Organisations"
+    "minProjectsTag": "Min. {count, plural, one {# Project} other {# Projects}}",
+    "minProjectsOption": "≥ {count, plural, one {# Project} other {# Projects}}",
+    "foundInterreg": "Found {count, plural, one {# Interreg Partner Profile} other {# Interreg Partner Profiles}}",
+    "foundAll": "Found {count, plural, one {# Partner Profile} other {# Partner Profiles}}",
+    "turkishOnlyTag": "Turkish Organisations",
+    "filterCountryPlaceholder": "E.g. TR, DE, FR, ES...",
+    "activityTypeHES": "HES (Higher Education)",
+    "activityTypeREC": "REC (Research)",
+    "activityTypePRC": "PRC (Private Company)",
+    "activityTypePUB": "PUB (Public Body)",
+    "activityTypeOTH": "OTH (Other)",
+    "chipSearch": "Search: \"{query}\"",
+    "chipCountry": "Country: {country}",
+    "chipType": "Type: {type}"
   }
 }

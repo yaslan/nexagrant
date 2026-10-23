@@ -5,8 +5,6 @@
   "src/app/[locale]/(app)/[workspace]/concept-notes/page.tsx": 7,
   "src/app/[locale]/(app)/[workspace]/evidence/evidence-client.tsx": 4,
   "src/app/[locale]/(app)/[workspace]/evidence/EvidenceForm.tsx": 18,
-  "src/app/[locale]/(app)/[workspace]/partners/page.tsx": 6,
-  "src/app/[locale]/(app)/[workspace]/partners/PartnerFilters.tsx": 10,
   "src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager.tsx": 6,
   "src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx": 3,
   "src/app/[locale]/(app)/[workspace]/pipeline/board.tsx": 46,

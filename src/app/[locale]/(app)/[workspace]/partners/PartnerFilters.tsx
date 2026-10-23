@@ -89,7 +89,7 @@ export function PartnerFilters({ initialFilters }: PartnerFiltersProps) {
             type="text"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
-            placeholder="Örn: TR, DE, FR, ES..."
+            placeholder={t('filterCountryPlaceholder')}
             className="w-full border border-border rounded-xl px-3 py-2 text-xs bg-ground text-ink font-mono font-semibold uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -103,11 +103,11 @@ export function PartnerFilters({ initialFilters }: PartnerFiltersProps) {
             className="w-full border border-border rounded-xl px-3 py-2 text-xs bg-ground text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">{t('filterTypeAll')}</option>
-            <option value="HES">HES (Higher Education / Üniversite)</option>
-            <option value="REC">REC (Research / Araştırma)</option>
-            <option value="PRC">PRC (Private Company / Özel Şirket)</option>
-            <option value="PUB">PUB (Public Body / Kamu Kurumu)</option>
-            <option value="OTH">OTH (Other / Diğer)</option>
+            <option value="HES">{t('activityTypeHES')}</option>
+            <option value="REC">{t('activityTypeREC')}</option>
+            <option value="PRC">{t('activityTypePRC')}</option>
+            <option value="PUB">{t('activityTypePUB')}</option>
+            <option value="OTH">{t('activityTypeOTH')}</option>
           </select>
         </div>
 

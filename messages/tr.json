@@ -3827,6 +3827,15 @@
     "minProjectsOption": "≥ {count} Proje",
     "foundInterreg": "Toplam {count} Interreg Ortak Profili Bulundu",
     "foundAll": "Toplam {count} Ortak Profili Bulundu",
-    "turkishOnlyTag": "Türk Kuruluşlar"
+    "turkishOnlyTag": "Türk Kuruluşlar",
+    "filterCountryPlaceholder": "Örn: TR, DE, FR, ES...",
+    "activityTypeHES": "HES (Yükseköğretim / Üniversite)",
+    "activityTypeREC": "REC (Araştırma)",
+    "activityTypePRC": "PRC (Özel Şirket)",
+    "activityTypePUB": "PUB (Kamu Kurumu)",
+    "activityTypeOTH": "OTH (Diğer)",
+    "chipSearch": "Arama: \"{query}\"",
+    "chipCountry": "Ülke: {country}",
+    "chipType": "Tip: {type}"
   }
 }

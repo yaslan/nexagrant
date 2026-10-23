@@ -480,9 +480,9 @@ export default async function PartnersPage({
       {(q || country || activityType || isTurkishOnly || isInterregOnly || minProjects > 0) && (
         <div className="flex items-center gap-2 flex-wrap text-xs bg-blue-50/50 border border-blue-100 p-3 rounded-xl">
           <span className="font-bold text-blue-900">{t('activeFilters')}</span>
-          {q && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Arama: &quot;{q}&quot;</span>}
-          {country && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Ülke: {country}</span>}
-          {activityType && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Tip: {activityType}</span>}
+          {q && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{t('chipSearch', { query: q })}</span>}
+          {country && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{t('chipCountry', { country })}</span>}
+          {activityType && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{t('chipType', { type: activityType })}</span>}
           {isTurkishOnly && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">🇹🇷 {t('turkishOnlyTag')}</span>}
           {isInterregOnly && <span className="bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono px-2 py-0.5 rounded font-bold">🇪🇺 {t('interregPartnersTag')}</span>}
           {minProjects > 0 && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{t('minProjectsTag', { count: minProjects })}</span>}
@@ -510,8 +510,8 @@ export default async function PartnersPage({
         <div className="px-5 py-3 border-b border-border bg-ground/50 flex justify-between items-center text-xs">
           <span className="font-bold text-ink">
             {isInterregOnly
-              ? t('foundInterreg', { count: totalCount.toLocaleString() })
-              : t('foundAll', { count: totalCount.toLocaleString() })}
+              ? t('foundInterreg', { count: totalCount })
+              : t('foundAll', { count: totalCount })}
           </span>
           <span className="text-muted text-[11px] font-mono">
             {t('pageShowing')} ({dataSource})
