@@ -12,6 +12,7 @@ import {
 } from '@/lib/adapters/partner-search';
 import { isPresentId } from '@/lib/required-id';
 import { isPartnerSearchIngestionEnabled } from './flag';
+import { maskContact } from './mask';
 import {
   matchKeyFor,
   matchPic,
@@ -165,6 +166,11 @@ function clip(text: string | null): string | null {
   return text == null ? null : Array.from(text).slice(0, DESCRIPTION_MAX).join('');
 }
 
+/** Contact details out of the free text before anything is stored (FO-65 F3). */
+function maskRow(row: PartnerSearchAllowlistedRow): PartnerSearchAllowlistedRow {
+  return { ...row, summary: maskContact(row.summary) };
+}
+
 /** IO shell: runs one ingestion. Always writes a PartnerSearchIngestionRun row unless the flag is off. */
 export async function runPartnerSearchIngestion(options: RunOptions): Promise<PartnerSearchRunOutcome> {
   if (!(await isPartnerSearchIngestionEnabled())) {
@@ -224,7 +230,7 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
       }
       let topicTouched: boolean;
       try {
-        topicTouched = await writeTopic(result.topicIdentifier, result.rows, now(), summary, touchedPics);
+        topicTouched = await writeTopic(result.topicIdentifier, result.rows.map(maskRow), now(), summary, touchedPics);
       } catch (error) {
         // One topic's write failing (a unique clash, a lost connection) must not stop the rest.
         errors.push(`${topic.identifier}: write failed: ${error instanceof Error ? error.message : String(error)}`);
