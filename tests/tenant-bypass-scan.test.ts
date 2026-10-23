@@ -554,4 +554,39 @@ export const t = prisma.tenant.findMany({ include: { users: true } });
     });
     expect(decoyIndex.trim().split('\n')).toEqual(['src/decoy-only.ts']);
   });
+
+  // FO-114: pushed from a LINKED worktree, the hook's GIT_DIR is
+  // <repo>/.git/worktrees/<name>. A `git init` that inherits it guesses "bare"
+  // from that path and writes core.bare=true into the SHARED .git/config, which
+  // breaks the main checkout ("must be run in a work tree"). The decoy above is
+  // main-checkout shaped, where git guesses non-bare, so it cannot catch this.
+  test('a worktree GIT_DIR does not turn the decoy into a bare repository', () => {
+    const decoy = fixtureRepo({ 'src/decoy-only.ts': 'export const d = 1;\n' });
+    const clean = gitEnvFor(process.env);
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'decoy'], {
+      cwd: decoy,
+      env: clean,
+    });
+    const wt = join(mkdtempSync(join(tmpdir(), 'tenant-bypass-wt-')), 'wt');
+    repos.push(join(wt, '..'));
+    execFileSync('git', ['worktree', 'add', '-q', '-b', 'wt', wt], { cwd: decoy, env: clean });
+
+    const saved = Object.fromEntries(HOOK_GIT_VARS.map((k) => [k, process.env[k]]));
+    process.env.GIT_DIR = join(decoy, '.git', 'worktrees', 'wt');
+    process.env.GIT_INDEX_FILE = join(decoy, '.git', 'worktrees', 'wt', 'index');
+    try {
+      fixtureRepo({ 'src/fixture.ts': 'export const x = 1;\n' });
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+    const bare = execFileSync('git', ['config', '--get', 'core.bare'], {
+      cwd: decoy,
+      env: clean,
+      encoding: 'utf8',
+    });
+    expect(bare.trim()).toBe('false');
+  });
 });

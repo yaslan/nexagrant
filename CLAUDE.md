@@ -42,6 +42,7 @@ pnpm install --frozen-lockfile && pnpm db:setup  # db:rls-role, DATABASE_URL_RLS
 E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: localhost:$P/fabrika" yazar
 docker rm -f <is>-pg                            # iş bitince
 ```
+Ana checkout "must be run in a work tree" veriyorsa `core.bare=true` olmuştur. Belirti, kontrol ve düzeltme için bkz. `docs/RELEASE_CHECKLIST.md` §9.1. `GIT_DIR` set iken başka dizinde `git init` ya da `git config` koşma.
 
 ## Mimari kurallar (ihlal etme)
 1. **Çok kiracılılık:** Her iş tablosunda `tenantId` zorunlu; sorgular `withTenant(prisma, tenantId)` sarmalayıcısından geçer; RLS politikası olmayan tablo PR'ı geçmez.

@@ -6,6 +6,9 @@ set -e
 # repo kuran testler) BU reponun indeksini okur ve ona `git add` yazar (FO-111).
 # Kancanın cwd'si checkout kökü; git repoyu buradan kendisi bulur.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX
+# Paylaşılan .git/config'te core.bare=true ise dur; ayarı kendimiz düzeltmeyiz (FO-114).
+. scripts/git-core-bare.sh
+core_bare_guard pre-push || exit 1
 # Kapının veritabanı bu checkout'un .env'inden gelir (vitest, playwright ve
 # tsx betikleri cwd'deki .env'i okur). .env yoksa testler varsayılan
 # localhost:5432'ye düşer ve onlarca test ortam yüzünden kırmızı olur
@@ -21,3 +24,7 @@ db=${DATABASE_URL:-$(db_env_value .env)}
 echo "→ veritabanı: $(db_target "$db")"
 echo "→ pnpm gate (lint + typecheck + test, proje geneli)"
 pnpm gate
+# FO-114: core.bare'i kimin yazdığı kanıtlanmadı; gate (GIT_DIR sızıntısı + git init) muhtemel
+# yazıcı, doğrulanmadı (docs/RELEASE_CHECKLIST.md §9.1).
+# Gate yeşil olsa bile ana checkout'u bozduysa push etme.
+core_bare_guard "pre-push (gate sonrası)" || exit 1
