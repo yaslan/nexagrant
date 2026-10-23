@@ -3223,7 +3223,8 @@
     "m8PartnerPool": "M8 Partner Havuzu",
     "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler",
     "navDesc": "Sınır ötesi fonlar & ortaklar",
-    "defaultRagQuery": "Sürdürülebilir turizm ve kültürel miras"
+    "defaultRagQuery": "Sürdürülebilir turizm ve kültürel miras",
+    "topK": "İlk {count}"
   },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",

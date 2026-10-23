@@ -1,7 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { ModuleLink } from '@/components/ModuleLink';
 import { PartnerFilters } from './PartnerFilters';
@@ -69,7 +68,6 @@ export default async function PartnersPage({
   if (locked) return locked;
 
   const sParams = await searchParams;
-  const isTr = locale === 'tr';
   const tLinks = await getTranslations({ locale, namespace: 'PartnersPage.crossLinks' });
   const t = await getTranslations('partnersPage');
 

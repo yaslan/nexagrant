@@ -3223,7 +3223,8 @@
     "m8PartnerPool": "M8 Partner Pool",
     "turkishBeneficiariesDesc": "Local authorities & universities",
     "navDesc": "Cross-border funds & partners",
-    "defaultRagQuery": "Sustainable tourism and cultural heritage"
+    "defaultRagQuery": "Sustainable tourism and cultural heritage",
+    "topK": "Top {count}"
   },
   "blog": {
     "meta_title": "EU Grant Management & Insights Blog",
