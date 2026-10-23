@@ -151,8 +151,8 @@ export function insertLink(
   start: number,
   end: number,
   url: string,
-  text?: string,
-  fallbackText = 'Bağlantı'
+  text: string | undefined,
+  fallbackText: string
 ): TextEdit {
   const selected = value.slice(start, end);
   const linkText = text?.trim() || selected.trim() || fallbackText;

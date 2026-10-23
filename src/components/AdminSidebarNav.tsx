@@ -28,6 +28,7 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
   const pathname = usePathname();
   const tLeads = useTranslations('adminLeads');
   const tExperts = useTranslations('AdminExpertPrereg');
+  const tInterreg = useTranslations('adminInterreg');
 
   const adminNavItems = [
     {
@@ -90,7 +91,7 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       key: 'interreg',
       href: `/${locale}/admin/interreg`,
       label: 'Interreg & keep.eu',
-      desc: locale === 'tr' ? 'Sınır ötesi fonlar & ortaklar' : 'Cross-border funds & partners',
+      desc: tInterreg('navDesc'),
       icon: Globe,
       badge: 'Interreg',
     },

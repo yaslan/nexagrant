@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 interface PartnerFiltersProps {
-  isTr: boolean;
   initialFilters: {
     q: string;
     country: string;
@@ -15,7 +15,8 @@ interface PartnerFiltersProps {
   };
 }
 
-export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
+export function PartnerFilters({ initialFilters }: PartnerFiltersProps) {
+  const t = useTranslations('partnersPage');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -70,20 +71,20 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
         {/* Search Query */}
         <div className="md:col-span-2">
           <label className="font-semibold text-ink-2 block mb-1">
-            {isTr ? 'Kurum Adı veya Anahtar Kelime' : 'Organization Name or Keyword'}
+            {t('filterNameLabel')}
           </label>
           <input
             type="text"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={isTr ? 'Örn: METU, Fraunhofer, Lomartov, TUBITAK...' : 'E.g. METU, Fraunhofer, Lomartov...'}
+            placeholder={t('filterNamePlaceholder')}
             className="w-full border border-border rounded-xl px-3 py-2 text-xs bg-ground text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         {/* Country */}
         <div>
-          <label className="font-semibold text-ink-2 block mb-1">{isTr ? 'Ülke Kodu' : 'Country Code'}</label>
+          <label className="font-semibold text-ink-2 block mb-1">{t('filterCountryLabel')}</label>
           <input
             type="text"
             value={country}
@@ -95,13 +96,13 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
 
         {/* Activity Type */}
         <div>
-          <label className="font-semibold text-ink-2 block mb-1">{isTr ? 'Kurum Tipi' : 'Activity Type'}</label>
+          <label className="font-semibold text-ink-2 block mb-1">{t('filterTypeLabel')}</label>
           <select
             value={activityType}
             onChange={(e) => setActivityType(e.target.value)}
             className="w-full border border-border rounded-xl px-3 py-2 text-xs bg-ground text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">{isTr ? 'Tüm Tipler' : 'All Types'}</option>
+            <option value="">{t('filterTypeAll')}</option>
             <option value="HES">HES (Higher Education / Üniversite)</option>
             <option value="REC">REC (Research / Araştırma)</option>
             <option value="PRC">PRC (Private Company / Özel Şirket)</option>
@@ -112,13 +113,13 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
 
         {/* Min Projects */}
         <div>
-          <label className="font-semibold text-ink-2 block mb-1">{isTr ? 'Min. Proje Sayısı' : 'Min. Projects'}</label>
+          <label className="font-semibold text-ink-2 block mb-1">{t('filterMinLabel')}</label>
           <select
             value={minProjects}
             onChange={(e) => setMinProjects(e.target.value)}
             className="w-full border border-border rounded-xl px-3 py-2 text-xs bg-ground text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="0">{isTr ? 'Tümü' : 'Any'}</option>
+            <option value="0">{t('filterMinAny')}</option>
             <option value="1">≥ 1 Proje</option>
             <option value="5">≥ 5 Proje</option>
             <option value="10">≥ 10 Proje</option>
@@ -136,7 +137,7 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
               onChange={(e) => setIsTurkish(e.target.checked)}
               className="rounded border-border text-blue-600 focus:ring-blue-500"
             />
-            <span>🇹🇷 {isTr ? 'Sadece Türk Kuruluşları Göster' : 'Show Turkish Organizations Only'}</span>
+            <span>🇹🇷 {t('filterTurkishOnly')}</span>
           </label>
 
           <label className="flex items-center gap-2 text-xs font-semibold text-ink cursor-pointer select-none">
@@ -146,7 +147,7 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
               onChange={(e) => setIsInterreg(e.target.checked)}
               className="rounded border-border text-indigo-600 focus:ring-indigo-500"
             />
-            <span>🇪🇺 {isTr ? 'Sadece Interreg Ortakları (Üniversiteler, Belediyeler, Ajanslar)' : 'Show Interreg Partners Only (Universities, Municipalities, Agencies)'}</span>
+            <span>🇪🇺 {t('filterInterregOnly')}</span>
           </label>
         </div>
 
@@ -157,7 +158,7 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
               onClick={handleReset}
               className="text-xs text-muted hover:text-ink font-semibold px-3 py-2 rounded-xl transition hover:bg-ground"
             >
-              {isTr ? 'Filtreleri Temizle' : 'Clear Filters'}
+              {t('clearFilters')}
             </button>
           )}
 
@@ -165,7 +166,7 @@ export function PartnerFilters({ isTr, initialFilters }: PartnerFiltersProps) {
             type="submit"
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl transition text-xs shadow-xs"
           >
-            {isTr ? 'Filtrele & Ara' : 'Filter & Search'}
+            {t('filterSubmit')}
           </button>
         </div>
       </div>

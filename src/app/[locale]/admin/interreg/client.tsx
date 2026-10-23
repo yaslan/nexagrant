@@ -55,7 +55,7 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // RAG workbench state
-  const [searchQuery, setSearchQuery] = useState<string>('Sürdürülebilir turizm ve kültürel miras');
+  const [searchQuery, setSearchQuery] = useState<string>(t('defaultRagQuery'));
   const [topK, setTopK] = useState<number>(3);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [retrievedChunks, setRetrievedChunks] = useState<RetrievedChunk[]>([]);

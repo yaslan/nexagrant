@@ -40,10 +40,10 @@ export async function handleGetKeepEuMetricsAction(): Promise<KeepEuMetrics> {
 }
 
 export async function handleTestInterregRagQuery(query: string, topK: number = 3) {
-  await requirePlatformAdmin();
+  const { userId } = await requirePlatformAdmin();
   const input = ragQuerySchema.parse({ query, topK });
   // Platform scope: searches shared public corpus (Chunk.tenantId IS NULL)
-  const chunks = await retrieveChunks(input.query, input.topK);
+  const chunks = await retrieveChunks(input.query, input.topK, undefined, { userId });
   const ragPrompt = formatRagPrompt(input.query, chunks);
   return { chunks, ragPrompt };
 }

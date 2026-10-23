@@ -174,6 +174,8 @@ function createMockDb() {
 
 const db = createMockDb();
 
+// The page reads its copy through next-intl's server API; the assertions here are about rows, not text.
+vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock('../src/lib/db', () => ({
   prisma: db.prisma,
   withTenant: async (_tenantId: string, fn: (tx: typeof db.prisma) => Promise<unknown>) => fn(db.prisma),

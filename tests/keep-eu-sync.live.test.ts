@@ -113,6 +113,7 @@ describe.skipIf(!LIVE)(SUITE, () => {
     expect(org.country).toBe('TR');
     expect(org.city).toBe('Izmir');
     expect(org.nameNormalized).toBe('KEEP.EU FILL LTD');
+    expect(org.isTurkish).toBe(true);
   });
 
   test('keep.eu creates a missing organisation and links it under the KEU: project id', async () => {

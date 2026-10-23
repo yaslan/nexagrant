@@ -3030,7 +3030,8 @@
           "forbidden": "You are not authorized to upload images.",
           "upload_failed": "The image could not be uploaded. Please try again."
         }
-      }
+      },
+      "linkFallback": "Link"
     }
   },
   "adminDocuments": {
@@ -3220,7 +3221,9 @@
     "emptyStateDesc": "Click the Sync button above to fetch projects and consortium partners from the keep.eu API.",
     "interregAndNext": "Interreg & NEXT",
     "m8PartnerPool": "M8 Partner Pool",
-    "turkishBeneficiariesDesc": "Local authorities & universities"
+    "turkishBeneficiariesDesc": "Local authorities & universities",
+    "navDesc": "Cross-border funds & partners",
+    "defaultRagQuery": "Sustainable tourism and cultural heritage"
   },
   "blog": {
     "meta_title": "EU Grant Management & Insights Blog",
@@ -3784,5 +3787,44 @@
       "INVALID_INPUT": "Invalid selection.",
       "UNKNOWN": "The action could not be completed. Please try again."
     }
+  },
+  "partnersPage": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbCurrent": "Partners & CORDIS / Interreg (M1/M8)",
+    "title": "M8 / M1 Partner Search & CORDIS / Interreg Database",
+    "subtitle": "Past EU project participations, coordinator achievements, EC funding, and partnership networks of European and Turkish organizations derived from official CORDIS and keep.eu Interreg data.",
+    "sourceBadge": "Source: CORDIS & keep.eu, European Commission",
+    "attribution": "Data sources: CORDIS, European Commission (CC BY 4.0); keep.eu, Interact (Interreg). For internal search and pre-assessment only.",
+    "activeFilters": "Active Filters:",
+    "interregPartnersTag": "Interreg Partners",
+    "dbUnavailableTitle": "The partner database could not be read.",
+    "dbUnavailableBody": "The list below may be incomplete. The failure has been recorded; please try again shortly.",
+    "pageShowing": "Page 1 / Showing",
+    "colPic": "PIC",
+    "colName": "Organization Name",
+    "colCountry": "Country",
+    "colType": "Type",
+    "colProjects": "Total Projects",
+    "colCoordinations": "Coordinations",
+    "colGrant": "EC Grant (€)",
+    "interregParticipantTitle": "Interreg / Cross-border Cooperation Programme Participant",
+    "emptyInterreg": "No Interreg partners found matching your search criteria.",
+    "emptyCordis": "No CORDIS partners found matching your search criteria.",
+    "emptyHint": "Reset your search filters or try different keywords.",
+    "filterNameLabel": "Organization Name or Keyword",
+    "filterNamePlaceholder": "E.g. METU, Fraunhofer, Lomartov...",
+    "filterCountryLabel": "Country Code",
+    "filterTypeLabel": "Activity Type",
+    "filterTypeAll": "All Types",
+    "filterMinLabel": "Min. Projects",
+    "filterMinAny": "Any",
+    "filterTurkishOnly": "Show Turkish Organizations Only",
+    "filterInterregOnly": "Show Interreg Partners Only (Universities, Municipalities, Agencies)",
+    "clearFilters": "Clear Filters",
+    "filterSubmit": "Filter & Search",
+    "minProjectsTag": "Min. {count} Projects",
+    "foundInterreg": "Found {count} Interreg Partner Profiles",
+    "foundAll": "Found {count} Partner Profiles",
+    "turkishOnlyTag": "Turkish Organisations"
   }
 }

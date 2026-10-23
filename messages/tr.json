@@ -3030,7 +3030,8 @@
           "forbidden": "Görsel yükleme yetkiniz yok.",
           "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
         }
-      }
+      },
+      "linkFallback": "Bağlantı"
     }
   },
   "adminDocuments": {
@@ -3220,7 +3221,9 @@
     "emptyStateDesc": "keep.eu API'sinden projeleri ve konsorsiyum ortaklarını çekmek için yukarıdaki Senkronize Et butonuna tıklayın.",
     "interregAndNext": "Interreg & NEXT",
     "m8PartnerPool": "M8 Partner Havuzu",
-    "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler"
+    "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler",
+    "navDesc": "Sınır ötesi fonlar & ortaklar",
+    "defaultRagQuery": "Sürdürülebilir turizm ve kültürel miras"
   },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
@@ -3784,5 +3787,44 @@
       "INVALID_INPUT": "Geçersiz seçim.",
       "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin."
     }
+  },
+  "partnersPage": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbCurrent": "Ortak Arama & CORDIS / Interreg (M1/M8)",
+    "title": "M8 / M1 Partner Arama & CORDIS / Interreg Ortak Veritabanı",
+    "subtitle": "Avrupa Komisyonu CORDIS (Horizon Europe & H2020) ve keep.eu Interreg (IPA Sınır Ötesi) fonlanmış verilerinden türetilen Avrupalı ve Türk kurumların geçmiş proje deneyimleri, koordinatörlük başarıları, AB katkıları ve ortaklık ağı.",
+    "sourceBadge": "Kaynak: CORDIS & keep.eu, Avrupa Komisyonu",
+    "attribution": "Veri kaynakları: CORDIS, Avrupa Komisyonu (CC BY 4.0); keep.eu, Interact (Interreg). Yalnızca iç arama ve ön değerlendirme amaçlıdır.",
+    "activeFilters": "Aktif Filtreler:",
+    "interregPartnersTag": "Interreg Ortakları",
+    "dbUnavailableTitle": "Ortak veritabanı şu anda okunamadı.",
+    "dbUnavailableBody": "Aşağıdaki liste eksik olabilir. Sorun kaydedildi; lütfen birazdan tekrar deneyin.",
+    "pageShowing": "Sayfa 1 / Gösteriliyor",
+    "colPic": "PIC Kodu",
+    "colName": "Kurum Adı",
+    "colCountry": "Ülke",
+    "colType": "Kurum Türü",
+    "colProjects": "Toplam Proje",
+    "colCoordinations": "Koordinatörlük",
+    "colGrant": "AB Desteği (€)",
+    "interregParticipantTitle": "Interreg / Sınır Ötesi İşbirliği Programı Katılımcısı",
+    "emptyInterreg": "Aradığınız kriterlere uygun Interreg ortağı bulunamadı.",
+    "emptyCordis": "Aradığınız kriterlere uygun CORDIS ortağı bulunamadı.",
+    "emptyHint": "Arama kriterlerinizi değiştirebilir veya filtreleri temizleyebilirsiniz.",
+    "filterNameLabel": "Kurum Adı veya Anahtar Kelime",
+    "filterNamePlaceholder": "Örn: METU, Fraunhofer, Lomartov, TUBITAK...",
+    "filterCountryLabel": "Ülke Kodu",
+    "filterTypeLabel": "Kurum Tipi",
+    "filterTypeAll": "Tüm Tipler",
+    "filterMinLabel": "Min. Proje Sayısı",
+    "filterMinAny": "Tümü",
+    "filterTurkishOnly": "Sadece Türk Kuruluşları Göster",
+    "filterInterregOnly": "Sadece Interreg Ortakları (Üniversiteler, Belediyeler, Ajanslar)",
+    "clearFilters": "Filtreleri Temizle",
+    "filterSubmit": "Filtrele & Ara",
+    "minProjectsTag": "Min. {count} Proje",
+    "foundInterreg": "Toplam {count} Interreg Ortak Profili Bulundu",
+    "foundAll": "Toplam {count} Ortak Profili Bulundu",
+    "turkishOnlyTag": "Türk Kuruluşlar"
   }
 }

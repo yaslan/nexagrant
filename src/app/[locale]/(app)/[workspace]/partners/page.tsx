@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
@@ -70,6 +71,7 @@ export default async function PartnersPage({
   const sParams = await searchParams;
   const isTr = locale === 'tr';
   const tLinks = await getTranslations({ locale, namespace: 'PartnersPage.crossLinks' });
+  const t = await getTranslations('partnersPage');
 
   const q = sParams.q?.trim() || '';
   const country = sParams.country?.trim().toUpperCase() || '';
@@ -411,28 +413,26 @@ export default async function PartnersPage({
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-medium text-muted">
         <Link href={getWorkspaceRoute('dashboard', locale, workspace)} className="hover:text-ink transition-colors">
-          {isTr ? 'Panel' : 'Dashboard'}
+          {t('breadcrumbDashboard')}
         </Link>
         <span>/</span>
-        <span className="text-accent font-semibold">{isTr ? 'Ortak Arama & CORDIS / Interreg (M1/M8)' : 'Partners & CORDIS / Interreg (M1/M8)'}</span>
+        <span className="text-accent font-semibold">{t('breadcrumbCurrent')}</span>
       </div>
 
       {/* Header */}
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink">
-            {isTr ? 'M8 / M1 Partner Arama & CORDIS / Interreg Ortak Veritabanı' : 'M8 / M1 Partner Search & CORDIS / Interreg Database'}
+            {t('title')}
           </h1>
           <p className="text-xs text-muted mt-1 max-w-3xl">
-            {isTr
-              ? 'Avrupa Komisyonu CORDIS (Horizon Europe & H2020) ve keep.eu Interreg (IPA Sınır Ötesi) fonlanmış verilerinden türetilen Avrupalı ve Türk kurumların geçmiş proje deneyimleri, koordinatörlük başarıları, AB katkıları ve ortaklık ağı.'
-              : 'Past EU project participations, coordinator achievements, EC funding, and partnership networks of European and Turkish organizations derived from official CORDIS and keep.eu Interreg data.'}
+            {t('subtitle')}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-full">
-            {isTr ? 'Kaynak: CORDIS & keep.eu, Avrupa Komisyonu' : 'Source: CORDIS & keep.eu, European Commission'}
+            {t('sourceBadge')}
           </span>
         </div>
       </div>
@@ -463,14 +463,11 @@ export default async function PartnersPage({
         </ModuleLink>
       </nav>
       <p className="text-[11px] text-muted">
-        {isTr
-          ? 'Veri kaynağı: CORDIS, Avrupa Komisyonu (CC BY 4.0); keep.eu, Interact (Interreg). Yalnızca iç arama ve ön değerlendirme amaçlıdır.'
-          : 'Data source: CORDIS, European Commission (CC BY 4.0); keep.eu, Interact (Interreg). For internal search and pre-assessment only.'}
+        {t('attribution')}
       </p>
 
       {/* Client Filter Bar Component */}
       <PartnerFilters
-        isTr={isTr}
         initialFilters={{
           q,
           country,
@@ -484,13 +481,13 @@ export default async function PartnersPage({
       {/* Active Filter Indicators */}
       {(q || country || activityType || isTurkishOnly || isInterregOnly || minProjects > 0) && (
         <div className="flex items-center gap-2 flex-wrap text-xs bg-blue-50/50 border border-blue-100 p-3 rounded-xl">
-          <span className="font-bold text-blue-900">{isTr ? 'Aktif Filtreler:' : 'Active Filters:'}</span>
+          <span className="font-bold text-blue-900">{t('activeFilters')}</span>
           {q && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Arama: &quot;{q}&quot;</span>}
           {country && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Ülke: {country}</span>}
           {activityType && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">Tip: {activityType}</span>}
-          {isTurkishOnly && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">🇹🇷 Türk Kuruluşlar</span>}
-          {isInterregOnly && <span className="bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono px-2 py-0.5 rounded font-bold">🇪🇺 {isTr ? 'Interreg Ortakları' : 'Interreg Partners'}</span>}
-          {minProjects > 0 && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{isTr ? `Min. ${minProjects} Proje` : `Min. ${minProjects} Projects`}</span>}
+          {isTurkishOnly && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">🇹🇷 {t('turkishOnlyTag')}</span>}
+          {isInterregOnly && <span className="bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono px-2 py-0.5 rounded font-bold">🇪🇺 {t('interregPartnersTag')}</span>}
+          {minProjects > 0 && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{t('minProjectsTag', { count: minProjects })}</span>}
         </div>
       )}
 
@@ -502,12 +499,10 @@ export default async function PartnersPage({
           className="border border-amber-200 bg-amber-50 text-amber-900 text-xs rounded-xl p-4"
         >
           <p className="font-bold">
-            {isTr ? 'Ortak veritabanı şu anda okunamadı.' : 'The partner database could not be read.'}
+            {t('dbUnavailableTitle')}
           </p>
           <p className="mt-1">
-            {isTr
-              ? 'Aşağıdaki liste eksik olabilir. Sorun kaydedildi; lütfen birazdan tekrar deneyin.'
-              : 'The list below may be incomplete. The failure has been recorded; please try again shortly.'}
+            {t('dbUnavailableBody')}
           </p>
         </div>
       )}
@@ -516,12 +511,12 @@ export default async function PartnersPage({
       <div className="bg-surface border border-border rounded-2xl shadow-xs overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-ground/50 flex justify-between items-center text-xs">
           <span className="font-bold text-ink">
-            {isTr
-              ? `Toplam ${totalCount.toLocaleString()} ${isInterregOnly ? 'Interreg Ortak Profili' : 'Ortak Profili'} Bulundu`
-              : `Found ${totalCount.toLocaleString()} ${isInterregOnly ? 'Interreg Partner Profiles' : 'Partner Profiles'}`}
+            {isInterregOnly
+              ? t('foundInterreg', { count: totalCount.toLocaleString() })
+              : t('foundAll', { count: totalCount.toLocaleString() })}
           </span>
           <span className="text-muted text-[11px] font-mono">
-            {isTr ? 'Sayfa 1 / Gösteriliyor' : 'Page 1 / Showing'} ({dataSource})
+            {t('pageShowing')} ({dataSource})
           </span>
         </div>
 
@@ -529,13 +524,13 @@ export default async function PartnersPage({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-ground/60 border-b border-border text-ink-2 font-bold uppercase tracking-wider text-[11px]">
-                <th className="p-4">{isTr ? 'PIC Kodu' : 'PIC'}</th>
-                <th className="p-4">{isTr ? 'Kurum Adı' : 'Organization Name'}</th>
-                <th className="p-4">{isTr ? 'Ülke' : 'Country'}</th>
-                <th className="p-4">{isTr ? 'Kurum Türü' : 'Type'}</th>
-                <th className="p-4 text-center">{isTr ? 'Toplam Proje' : 'Total Projects'}</th>
-                <th className="p-4 text-center">{isTr ? 'Koordinatörlük' : 'Coordinations'}</th>
-                <th className="p-4 text-right">{isTr ? 'AB Desteği (€)' : 'EC Grant (€)'}</th>
+                <th className="p-4">{t('colPic')}</th>
+                <th className="p-4">{t('colName')}</th>
+                <th className="p-4">{t('colCountry')}</th>
+                <th className="p-4">{t('colType')}</th>
+                <th className="p-4 text-center">{t('colProjects')}</th>
+                <th className="p-4 text-center">{t('colCoordinations')}</th>
+                <th className="p-4 text-right">{t('colGrant')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -560,7 +555,7 @@ export default async function PartnersPage({
                       {p.isInterreg && (
                         <span
                           className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold font-mono px-1.5 py-0.2 rounded"
-                          title={isTr ? 'Interreg / Sınır Ötesi İşbirliği Programı Katılımcısı' : 'Interreg / Cross-border Cooperation Programme Participant'}
+                          title={t('interregParticipantTitle')}
                         >
                           INTERREG
                         </span>
@@ -606,14 +601,10 @@ export default async function PartnersPage({
         {profiles.length === 0 && (
           <div className="p-12 text-center text-muted text-xs space-y-2">
             <p className="font-bold text-ink">
-              {isTr
-                ? (isInterregOnly ? 'Aradığınız kriterlere uygun Interreg ortağı bulunamadı.' : 'Aradığınız kriterlere uygun CORDIS ortağı bulunamadı.')
-                : (isInterregOnly ? 'No Interreg partners found matching your search criteria.' : 'No CORDIS partners found matching your search criteria.')}
+              {isInterregOnly ? t('emptyInterreg') : t('emptyCordis')}
             </p>
             <p>
-              {isTr
-                ? 'Arama kriterlerinizi değiştirebilir veya filtreleri temizleyebilirsiniz.'
-                : 'Reset your search filters or try different keywords.'}
+              {t('emptyHint')}
             </p>
           </div>
         )}

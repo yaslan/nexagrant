@@ -81,3 +81,10 @@ describe.each(ACTIONS)('$name', ({ call, effects }) => {
     expect(effects()[0]).toHaveBeenCalled();
   });
 });
+
+// FO-113 K4: the RAG query carries the admin's userId, so its AiUsageLog row is attributed.
+test('handleTestInterregRagQuery passes the platform admin as the embedding actor', async () => {
+  m.auth.mockResolvedValue(PLATFORM_ADMIN);
+  await interreg.handleTestInterregRagQuery('tourism', 3);
+  expect(m.retrieveChunks).toHaveBeenCalledWith('tourism', 3, undefined, { userId: 'user-admin' });
+});

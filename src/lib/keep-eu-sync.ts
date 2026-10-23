@@ -674,7 +674,10 @@ export async function persistKeepEuRecord(record: KeepEuProjectRecord): Promise<
       } else {
         const fill: Prisma.CordisOrganizationUpdateInput = {};
         if (!existing.nameNormalized) fill.nameNormalized = partnerName.toLocaleUpperCase('en-US');
-        if (!existing.country && country) fill.country = country;
+        if (!existing.country && country) {
+          fill.country = country;
+          fill.isTurkish = country === 'TR';
+        }
         if (!existing.city && city) fill.city = city;
         if (Object.keys(fill).length > 0) {
           await prisma.cordisOrganization.update({ where: { organisationId: orgId }, data: fill });

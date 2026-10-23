@@ -97,7 +97,7 @@ export function BlogMarkdownEditor({
     }
 
     const { start, end } = linkSelection;
-    const next = insertLink(value, start, end, finalUrl, linkText);
+    const next = insertLink(value, start, end, finalUrl, linkText, t('linkFallback'));
     onChange(next.value);
     setIsLinkModalOpen(false);
 
