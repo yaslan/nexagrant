@@ -5,16 +5,7 @@ import { auth } from '@/lib/auth';
 import { can } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { resolveDashboardRange } from '@/modules/m5/server/range';
-import { csvCell } from '@/lib/csv-cell';
-
-interface ExportRow {
-  id: string;
-  title: string | null;
-  stage: string | null;
-  status: string | null;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-}
+import { opportunityCsv, type OpportunityCsvRow } from '@/lib/dashboard/opportunity-csv';
 
 export async function exportDashboardCSV(params: {
   from?: string;
@@ -39,7 +30,7 @@ export async function exportDashboardCSV(params: {
     const { from: fromDate, rangeEnd } = resolveDashboardRange(params.from, params.to);
 
     // Tenant scope goes through withTenant so RLS backs up the explicit filter.
-    const opportunities = await withTenant<ExportRow[]>(tenantId, async (tx) =>
+    const opportunities = await withTenant<OpportunityCsvRow[]>(tenantId, async (tx) =>
       tx.opportunity.findMany({
         // `deletedAt: null`: an archived opportunity is off the dashboard, so it must be off
         // the export the dashboard links to — otherwise the CSV contradicts the screen.
@@ -56,22 +47,9 @@ export async function exportDashboardCSV(params: {
       })
     );
 
-    // Build CSV
-    const headers = ['ID', 'Title', 'Stage', 'Status', 'Created', 'Updated'];
-    const rows = opportunities.map((opp) => [
-      csvCell(opp.id),
-      csvCell(opp.title || ''),
-      csvCell(opp.stage || 'G0'),
-      csvCell(opp.status || 'N/A'),
-      csvCell(opp.createdAt?.toISOString() || ''),
-      csvCell(opp.updatedAt?.toISOString() || ''),
-    ]);
-
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
-
     return {
       success: true,
-      data: csv,
+      data: opportunityCsv(opportunities),
     };
   } catch (error) {
     // Keep database detail server-side; the caller gets a stable, generic reason.
