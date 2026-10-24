@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PartnerSearchBlockedError, type PartnerSearchClient } from '@/lib/adapters/partner-search';
+import {
+  PartnerSearchBlockedError,
+  PartnerSearchClient,
+  type PartnerSearchAllowlistedRow,
+  type PartnerSearchTopicResult,
+} from '@/lib/adapters/partner-search';
 
 const db = vi.hoisted(() => ({
   platformSetting: { findUnique: vi.fn() },
   partnerSearchIngestionRun: { create: vi.fn(), update: vi.fn() },
   partnerSearchTopicStat: { upsert: vi.fn() },
+  partnerSearchAnnouncement: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+  cordisOrganization: { findMany: vi.fn(), updateMany: vi.fn() },
+  unmatchedOrganization: { upsert: vi.fn() },
+  rawFetch: { findFirst: vi.fn(), create: vi.fn() },
   topic: { findMany: vi.fn() },
 }));
 const alerts = vi.hoisted(() => ({
@@ -130,5 +139,147 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     );
     expect(alerts.createAdapterAlert).not.toHaveBeenCalled();
     expect(db.partnerSearchTopicStat.upsert).not.toHaveBeenCalled();
+  });
+});
+
+/** A stored announcement with every field a scan compares; the defaults match an unmatched organisation row. */
+function storedRow(overrides: Record<string, unknown> = {}) {
+  return {
+    externalId: 'a',
+    topicIdentifier: 'HORIZON-TEST-1',
+    type: 'EXPERTISE_OFFER',
+    description: null,
+    publishedAt: null,
+    organizationName: 'Org A',
+    organizationType: 'OTH',
+    country: 'BE',
+    organizationPic: null,
+    withdrawnAt: null,
+    missedScans: 0,
+    missedScanAt: null,
+    ...overrides,
+  };
+}
+
+function orgRow(overrides: Partial<PartnerSearchAllowlistedRow> = {}): PartnerSearchAllowlistedRow {
+  return {
+    id: 'a',
+    organisationName: 'Org A',
+    organisationType: null,
+    country: 'BE',
+    pic: null,
+    summary: null,
+    expertise: 'Expertise_offer',
+    interestStatus: null,
+    requestDate: null,
+    topicIdentifier: 'HORIZON-TEST-1',
+    ...overrides,
+  };
+}
+
+function okResult(rows: PartnerSearchAllowlistedRow[]): PartnerSearchTopicResult {
+  return { status: 'ok', topicIdentifier: 'HORIZON-TEST-1', rows, personCount: 0, withdrawnCount: 0, schemaDrift: [] };
+}
+
+/** A real client over a routed fetch: the SEDIA listing and the topic endpoint. The adapter's own checks run. */
+function portalClient(topicBody: unknown) {
+  const fetchImpl = vi.fn(async (url: string) => {
+    const body = String(url).includes('api.tech.ec.europa.eu')
+      ? { totalResults: 1, results: [{ metadata: { identifier: ['HORIZON-TEST-1'], ccm2Id: ['123'] } }] }
+      : topicBody;
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }) as unknown as typeof fetch;
+  return new PartnerSearchClient({ fetchImpl, sleep: async () => {}, minIntervalMs: 0 });
+}
+
+/** The topic's stored rows; the portal-move lookup and the active-PIC refresh find nothing. */
+function storedOnly(rows: Array<ReturnType<typeof storedRow>>) {
+  db.partnerSearchAnnouncement.findMany.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+    where.externalId || where.organizationPic ? [] : rows
+  );
+}
+
+describe('runPartnerSearchIngestion — FO-60 review 2: an invalid requestDate is drift', () => {
+  it('raises one drift alert, writes no topic rows, and the run stops', async () => {
+    enableFlag(true);
+    const body = {
+      topicOrganizations: [
+        {
+          id: 'a',
+          organisationName: 'Org A',
+          type: 'ORGANISATION',
+          expertise: 'Expertise_offer',
+          topicIdentifier: 'HORIZON-TEST-1',
+          requestDate: '19/10/2026',
+          pic: '100',
+        },
+      ],
+    };
+
+    const outcome = await runPartnerSearchIngestion({ trigger: 'FULL', client: portalClient(body) });
+
+    expect(outcome.kind === 'done' && outcome.status).toBe('FAILED');
+    expect(alerts.reportSchemaDrift).toHaveBeenCalledTimes(1);
+    expect(db.partnerSearchAnnouncement.create).not.toHaveBeenCalled();
+    expect(db.partnerSearchAnnouncement.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('runPartnerSearchIngestion — FO-60 review 4: an empty scan is not a withdrawal', () => {
+  it('a 0-row scan of a topic with stored announcements withdraws nothing and raises one alert', async () => {
+    enableFlag(true);
+    // Two misses on earlier days would withdraw this row on the empty scan.
+    storedOnly([storedRow({ missedScans: 1, missedScanAt: new Date('2026-10-22T03:00:00.000Z') })]);
+    db.partnerSearchAnnouncement.update.mockResolvedValue({});
+    const client = fakeClient({ fetchTopic: vi.fn(async () => okResult([])) });
+
+    await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(db.partnerSearchAnnouncement.update).not.toHaveBeenCalled();
+    expect(alerts.createAdapterAlert).toHaveBeenCalledTimes(1);
+    expect(alerts.createAdapterAlert).toHaveBeenCalledWith(
+      expect.any(String),
+      'warn',
+      expect.stringContaining('empty'),
+      expect.any(Object),
+      'partner_search:empty_scan:HORIZON-TEST-1'
+    );
+  });
+});
+
+describe('runPartnerSearchIngestion — FO-60 review 5 and 6: PIC refresh and updated count', () => {
+  it("a row seen again refreshes the PIC it had before, so that organisation's flag is recomputed", async () => {
+    enableFlag(true);
+    storedOnly([storedRow({ organizationPic: 'OLDPIC' })]);
+    db.cordisOrganization.findMany.mockResolvedValue([]);
+    db.unmatchedOrganization.upsert.mockResolvedValue({});
+    db.partnerSearchAnnouncement.update.mockResolvedValue({});
+    db.rawFetch.findFirst.mockResolvedValue(null);
+    db.rawFetch.create.mockResolvedValue({});
+    db.cordisOrganization.updateMany.mockResolvedValue({ count: 1 });
+    const client = fakeClient({ fetchTopic: vi.fn(async () => okResult([orgRow()])) });
+
+    await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(db.cordisOrganization.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organisationId: 'OLDPIC' } })
+    );
+  });
+
+  it('a scan that changes no field counts zero updated rows', async () => {
+    enableFlag(true);
+    storedOnly([storedRow()]);
+    db.cordisOrganization.findMany.mockResolvedValue([]);
+    db.unmatchedOrganization.upsert.mockResolvedValue({});
+    db.partnerSearchAnnouncement.update.mockResolvedValue({});
+    db.rawFetch.findFirst.mockResolvedValue(null);
+    db.rawFetch.create.mockResolvedValue({});
+    const client = fakeClient({ fetchTopic: vi.fn(async () => okResult([orgRow()])) });
+
+    await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ updated: 0, created: 0 }) })
+    );
   });
 });

@@ -94,7 +94,7 @@ export type PartnerSearchTopicResult =
       rows: PartnerSearchAllowlistedRow[];
       /** Person announcements in this response: counted, never stored. */
       personCount: number;
-      /** Count from `topicOrganisationsWithdraw`; the ids are not in the capture. */
+      /** Count from `topicOrganisationsWithdraw`. Its ids are not used: absence across scans decides withdrawal. */
       withdrawnCount: number;
       schemaDrift: string[];
     }
@@ -205,9 +205,16 @@ export class PartnerSearchClient {
     const rows: PartnerSearchAllowlistedRow[] = [];
     let personCount = 0;
     envelope.data.topicOrganizations.forEach((raw, index) => {
-      // A person row is counted and dropped before any field is read from it.
-      if (typeof raw === 'object' && raw !== null && (raw as { type?: unknown }).type === 'PERSON') {
+      // Allowlist on `type` (FO-60 review 1). PERSON is counted and dropped before any field is
+      // read. Only an explicit ORGANISATION is stored: a missing, empty or unknown type is drift,
+      // so a row that is not known to be an organisation never reaches the database.
+      const type = typeof raw === 'object' && raw !== null ? (raw as { type?: unknown }).type : undefined;
+      if (type === 'PERSON') {
         personCount++;
+        return;
+      }
+      if (type !== 'ORGANISATION') {
+        schemaDrift.push(`topicOrganizations[${index}]: unknown type`);
         return;
       }
       const parsed = PartnerSearchOrgRowSchema.safeParse(raw);

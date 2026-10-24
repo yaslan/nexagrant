@@ -91,6 +91,45 @@ describe('PartnerSearchClient.fetchTopic', () => {
     expect(result.schemaDrift[0]).toMatch(/topicOrganizations\[0\]/);
   });
 
+  // FO-60 review 1 (gizlilik): only an explicit ORGANISATION is stored. Anything else is either
+  // counted (PERSON) or dropped as drift; a row that is not typed is never taken for an organisation.
+  it('a row without a type is drift, not an organisation', async () => {
+    const untyped = structuredClone(fixture);
+    delete untyped.topicOrganizations[0].type;
+    const { client } = clientWith([jsonResponse(untyped)]);
+    const result = await client.fetchTopic('HORIZON-CL4-2027-01-MAT-PROD-22', '50127991');
+    expect(result.status).toBe('drift');
+    expect(result.schemaDrift[0]).toMatch(/topicOrganizations\[0\]: unknown type/);
+  });
+
+  it.each(['Person', ''])('a row typed %j is drift, not an organisation', async (type) => {
+    const odd = structuredClone(fixture);
+    odd.topicOrganizations[0].type = type;
+    const { client } = clientWith([jsonResponse(odd)]);
+    const result = await client.fetchTopic('HORIZON-CL4-2027-01-MAT-PROD-22', '50127991');
+    expect(result.status).toBe('drift');
+    expect(result.schemaDrift[0]).toMatch(/topicOrganizations\[0\]: unknown type/);
+  });
+
+  it('a row typed PERSON is counted and dropped, not reported as drift', async () => {
+    const { client } = clientWith([jsonResponse(fixture)]);
+    const result = await client.fetchTopic('HORIZON-CL4-2027-01-MAT-PROD-22', '50127991');
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') return;
+    expect(result.personCount).toBe(1);
+    expect(result.rows.map((r) => r.organisationName)).not.toContain('<masked-person>');
+  });
+
+  // FO-60 review 2 (alarm): an unparseable requestDate must raise drift, not fail later at the DB write.
+  it('a requestDate that is not a date is drift, not a silent write failure', async () => {
+    const bad = structuredClone(fixture);
+    bad.topicOrganizations[0].requestDate = '19/10/2026';
+    const { client } = clientWith([jsonResponse(bad)]);
+    const result = await client.fetchTopic('HORIZON-CL4-2027-01-MAT-PROD-22', '50127991');
+    expect(result.status).toBe('drift');
+    expect(result.schemaDrift[0]).toMatch(/topicOrganizations\[0\]: requestDate/);
+  });
+
   it('a broken envelope is drift', async () => {
     const { client } = clientWith([jsonResponse({ somethingElse: [] })]);
     const result = await client.fetchTopic('HORIZON-CL4-2027-01-MAT-PROD-22', '50127991');

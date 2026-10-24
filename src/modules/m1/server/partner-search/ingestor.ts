@@ -32,8 +32,10 @@ import {
  * Rules (from the card):
  *  - scope: Topic rows with status OPEN or FORTHCOMING only;
  *  - PERSON announcements: never written; counted into PartnerSearchTopicStat;
- *  - withdrawn: absent from the topic's scans on two different UTC days (the
- *    portal's withdraw list carries counts only, so ids cannot be matched to it);
+ *  - withdrawn: absent from the topic's scans on two different UTC days. The adapter
+ *    reads only the count of `topicOrganisationsWithdraw`; its ids are not matched, so
+ *    absence across scans is the only withdrawal signal;
+ *  - an empty scan of a topic with live stored rows is not a withdrawal: alert, write nothing;
  *  - schema drift → alert and stop, last good data kept; 403/429 → stop and alert;
  *  - one topic that fails to write does not stop the others (run is PARTIAL);
  *  - the whole run is a no-op while `partner_search_ingestion_enabled` is off.
@@ -74,6 +76,43 @@ export interface AnnouncementWrite {
   missedScans: number;
   withdrawnAt: Date | null;
   missedScanAt: Date | null;
+}
+
+/** The fields a scan can change. `updated` counts a seen row only when one of these moved. */
+export interface AnnouncementFields {
+  type: string;
+  description: string | null;
+  publishedAt: Date | null;
+  organizationName: string;
+  organizationType: string;
+  country: string | null;
+  organizationPic: string | null;
+  topicIdentifier: string;
+  withdrawnAt: Date | null;
+}
+
+/** Dates compare by instant, so two Date objects for the same moment are equal (FO-60 review 6). */
+export function announcementChanged(prev: AnnouncementFields, next: AnnouncementFields): boolean {
+  const sameDate = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
+  return (
+    prev.type !== next.type ||
+    prev.description !== next.description ||
+    !sameDate(prev.publishedAt, next.publishedAt) ||
+    prev.organizationName !== next.organizationName ||
+    prev.organizationType !== next.organizationType ||
+    prev.country !== next.country ||
+    prev.organizationPic !== next.organizationPic ||
+    prev.topicIdentifier !== next.topicIdentifier ||
+    !sameDate(prev.withdrawnAt, next.withdrawnAt)
+  );
+}
+
+/**
+ * A scan that returns no rows while the topic still has live stored rows is more likely a
+ * portal fault than a clear-out. The caller alerts and writes nothing (FO-60 review 4).
+ */
+export function suspectEmptyScan(seenCount: number, stored: ReadonlyArray<{ withdrawnAt: Date | null }>): boolean {
+  return seenCount === 0 && stored.some((s) => s.withdrawnAt === null);
 }
 
 /**
@@ -228,9 +267,9 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
         await reportSchemaDrift(PARTNER_SEARCH_SOURCE, result.schemaDrift);
         break;
       }
-      let topicTouched: boolean;
+      let outcome: TopicWriteOutcome;
       try {
-        topicTouched = await writeTopic(result.topicIdentifier, result.rows.map(maskRow), now(), summary, touchedPics);
+        outcome = await writeTopic(result.topicIdentifier, result.rows.map(maskRow), now(), summary, touchedPics);
       } catch (error) {
         // One topic's write failing (a unique clash, a lost connection) must not stop the rest.
         errors.push(`${topic.identifier}: write failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -244,7 +283,8 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
       });
       summary.topicsScanned++;
       okTopics++;
-      if (!topicTouched) logger.info(`[partner-search] ${topic.identifier}: no change`);
+      if (outcome === 'suspect-empty') logger.warn(`[partner-search] ${topic.identifier}: empty scan, nothing written`);
+      else if (outcome === 'unchanged') logger.info(`[partner-search] ${topic.identifier}: no change`);
     }
     await refreshOrganisationFlags(touchedPics);
   } catch (error) {
@@ -292,18 +332,45 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
   return { kind: 'done', runId: run.id, status, summary };
 }
 
-/** Write one topic's scan. Returns true when any row changed. */
+type TopicWriteOutcome = 'changed' | 'unchanged' | 'suspect-empty';
+
+/** Write one topic's scan. Nothing is written when the scan is suspect-empty. */
 async function writeTopic(
   topicIdentifier: string,
   rows: readonly PartnerSearchAllowlistedRow[],
   now: Date,
   summary: RunSummary,
   touchedPics: Set<string>
-): Promise<boolean> {
+): Promise<TopicWriteOutcome> {
   const stored = await prisma.partnerSearchAnnouncement.findMany({
     where: { topicIdentifier },
-    select: { externalId: true, withdrawnAt: true, missedScans: true, missedScanAt: true, organizationPic: true },
+    select: {
+      externalId: true,
+      topicIdentifier: true,
+      type: true,
+      description: true,
+      publishedAt: true,
+      organizationName: true,
+      organizationType: true,
+      country: true,
+      organizationPic: true,
+      withdrawnAt: true,
+      missedScans: true,
+      missedScanAt: true,
+    },
   });
+  if (suspectEmptyScan(rows.length, stored)) {
+    const live = stored.filter((s) => s.withdrawnAt === null).length;
+    await createAdapterAlert(
+      PARTNER_SEARCH_SOURCE,
+      'warn',
+      `Partner Search scan of ${topicIdentifier} is empty while ${live} announcement(s) are stored. Nothing was withdrawn; check the portal.`,
+      { topicIdentifier, stored: live },
+      `partner_search:empty_scan:${topicIdentifier}`
+    );
+    return 'suspect-empty';
+  }
+  const storedById = new Map(stored.map((s) => [s.externalId, s]));
   // A row the portal moved from another topic: same externalId, so an update, not a create.
   const elsewhere = await prisma.partnerSearchAnnouncement.findMany({
     where: { externalId: { in: rows.map((r) => r.id) }, topicIdentifier: { not: topicIdentifier } },
@@ -357,9 +424,9 @@ async function writeTopic(
   let changed = false;
   for (const w of writes) {
     const row = rows.find((r) => r.id === w.externalId);
+    const prev = storedById.get(w.externalId);
     if (!row) {
       // Absent from this scan: only the miss counter and withdrawal move.
-      const prev = stored.find((s) => s.externalId === w.externalId);
       if (prev?.organizationPic) touchedPics.add(prev.organizationPic);
       await prisma.partnerSearchAnnouncement.update({
         where: { externalId: w.externalId },
@@ -369,19 +436,22 @@ async function writeTopic(
       changed = true;
       continue;
     }
-    const data = {
+    const fields = {
       topicIdentifier,
-      type: row.expertise === 'Expertise_request' ? 'EXPERTISE_REQUEST' as const : 'EXPERTISE_OFFER' as const,
+      type: row.expertise === 'Expertise_request' ? ('EXPERTISE_REQUEST' as const) : ('EXPERTISE_OFFER' as const),
       description: clip(row.summary),
       publishedAt: row.requestDate ? new Date(row.requestDate) : null,
-      lastSeenAt: now,
-      withdrawnAt: null,
-      missedScans: 0,
-      missedScanAt: null,
       organizationPic: picByExternal.get(row.id) ?? null,
       organizationName: row.organisationName,
       organizationType: orgTypeFor(row.organisationType),
       country: row.country,
+      withdrawnAt: null,
+    };
+    const data = {
+      ...fields,
+      lastSeenAt: now,
+      missedScans: 0,
+      missedScanAt: null,
       keywords: [],
       programmeCodes: [],
       source: 'PORTAL_API' as const,
@@ -396,11 +466,18 @@ async function writeTopic(
     if (w.kind === 'create') {
       await prisma.partnerSearchAnnouncement.create({ data: { externalId: row.id, ...data } });
       summary.created++;
-    } else {
-      await prisma.partnerSearchAnnouncement.update({ where: { externalId: row.id }, data });
-      summary.updated++;
+      changed = true;
+      continue;
     }
-    changed = true;
+    // The PIC the row had before this scan: its organisation's flag must be recomputed too,
+    // even when the row now matches a different PIC or none (FO-60 review 5).
+    if (prev?.organizationPic) touchedPics.add(prev.organizationPic);
+    // Written every time so `lastSeenAt` moves; counted only when a field actually changed.
+    await prisma.partnerSearchAnnouncement.update({ where: { externalId: row.id }, data });
+    if (!prev || announcementChanged(prev, fields)) {
+      summary.updated++;
+      changed = true;
+    }
   }
 
   // Raw payload: only when the allowlisted rows changed (same rule as K1 RawFetch).
@@ -415,7 +492,7 @@ async function writeTopic(
       data: { source: PARTNER_SEARCH_SOURCE, key: topicIdentifier, hash, payload: rows as unknown as object },
     });
   }
-  return changed;
+  return changed ? 'changed' : 'unchanged';
 }
 
 /**

@@ -125,6 +125,9 @@ describe.skipIf(!RUN)('partner-search ingestion (live database)', () => {
     expect(rows).toHaveLength(3);
     expect(JSON.stringify(rows)).not.toMatch(/ecas/i);
 
+    // FO-60 review 1: the person's name never reaches a row, not only the ecasId.
+    expect(await prisma.partnerSearchAnnouncement.count({ where: { organizationName: '<masked-person>' } })).toBe(0);
+
     const stat = await prisma.partnerSearchTopicStat.findUnique({ where: { topicIdentifier: TOPIC } });
     expect(stat?.personAnnouncementCount).toBe(1);
 
@@ -135,6 +138,28 @@ describe.skipIf(!RUN)('partner-search ingestion (live database)', () => {
     const raw = await prisma.rawFetch.findMany({ where: { source: 'partner_search', key: TOPIC } });
     expect(raw.length).toBe(1);
     expect(JSON.stringify(raw)).not.toMatch(/ecas/i);
+  });
+
+  it('an invalid requestDate raises a SystemAlert, stops the run, and writes no rows (FO-60 review 2)', async () => {
+    await setFlag(true);
+    const broken = structuredClone(FIXTURE);
+    broken.topicOrganizations[0].requestDate = '19/10/2026';
+    // A repeat of the same drift folds into one open alert (recordAlert dedupes), so the
+    // test counts open drift alerts, not new rows: the spec is exactly one.
+    const driftAlerts = () =>
+      prisma.systemAlert.count({
+        where: { source: 'partner_search_adapter', resolvedAt: null, message: { contains: 'API schema change detected' } },
+      });
+    await prisma.systemAlert.deleteMany({ where: { source: 'partner_search_adapter' } });
+    const rowsBefore = await prisma.partnerSearchAnnouncement.count({ where: { topicIdentifier: TOPIC } });
+    const outcome = await runPartnerSearchIngestion({
+      trigger: 'MANUAL',
+      topicIdentifiers: [TOPIC],
+      client: client(portal(() => broken)),
+    });
+    expect(outcome.kind === 'done' && outcome.status).toBe('FAILED');
+    expect(await driftAlerts()).toBe(1);
+    expect(await prisma.partnerSearchAnnouncement.count({ where: { topicIdentifier: TOPIC } })).toBe(rowsBefore);
   });
 
   it('an unchanged second scan stores no new RawFetch row', async () => {

@@ -12,7 +12,13 @@ import { z } from 'zod';
  * into a typed value here and never reaches a database row (GDPR, discovery §3).
  */
 
-/** One announcement row. Organisation rows only; person rows never reach this schema. */
+/** A calendar date or an ISO date-time. `19/10/2026` is not one (FO-60 review 2). */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/;
+export function isIsoDate(value: string): boolean {
+  return ISO_DATE.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+/** One announcement row. Organisation rows only; the adapter rejects every other `type` before this schema runs. */
 export const PartnerSearchOrgRowSchema = z.looseObject({
   id: z.union([z.string().min(1), z.number()]),
   organisationName: z.string(),
@@ -22,9 +28,12 @@ export const PartnerSearchOrgRowSchema = z.looseObject({
   summary: z.string().nullish(),
   expertise: z.enum(['Expertise_offer', 'Expertise_request']),
   interestStatus: z.string().nullish(),
-  requestDate: z.string().nullish(),
+  requestDate: z
+    .string()
+    .nullish()
+    .refine((value) => value == null || isIsoDate(value), 'requestDate: not a date'),
   topicIdentifier: z.string().min(1),
-  type: z.string().nullish(),
+  type: z.literal('ORGANISATION'),
 });
 
 export type PartnerSearchOrgRow = z.infer<typeof PartnerSearchOrgRowSchema>;

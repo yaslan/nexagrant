@@ -14,8 +14,9 @@ import { refreshOrganisationFlags } from './ingestor';
  *  - withdrawn announcements are deleted 30 days after `withdrawnAt`;
  *  - RawFetch rows of a CLOSED topic are deleted 90 days after they were fetched.
  *
- * Deleting closed-topic rows is also the "90 days archive" of the card: one rule,
- * one implementation. PIC flags are recomputed for the PICs that lost rows.
+ * Lead decision (FO-60): closed-topic rows are DELETED after 90 days, not moved to an
+ * archive table. The card's "arşivlenir" wording is superseded by that decision.
+ * PIC flags are recomputed for the PICs that lost rows.
  */
 
 export const CLOSED_RETENTION_DAYS = 90;

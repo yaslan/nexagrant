@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   WITHDRAW_AFTER_MISSED_SCANS,
+  announcementChanged,
   orgTypeFor,
   planTopicWrite,
+  suspectEmptyScan,
 } from '@/modules/m1/server/partner-search/ingestor';
 import { retentionCutoffs } from '@/modules/m1/server/partner-search/retention';
 
@@ -122,6 +124,49 @@ describe('planTopicWrite: rows the portal moved between topics', () => {
       now: NOW,
     });
     expect(writes).toEqual([{ externalId: 'moved', kind: 'update', missedScans: 0, withdrawnAt: null, missedScanAt: null }]);
+  });
+});
+
+describe('announcementChanged (FO-60 review 6: updated counts real changes only)', () => {
+  const stored = {
+    type: 'EXPERTISE_OFFER' as const,
+    description: 'Looking for a partner',
+    publishedAt: YESTERDAY,
+    organizationName: 'Org',
+    organizationType: 'OTH' as const,
+    country: 'BE',
+    organizationPic: '100000000',
+    topicIdentifier: 'T',
+    withdrawnAt: null,
+  };
+
+  it('the same fields, even as a different Date instance, are not a change', () => {
+    expect(announcementChanged(stored, { ...stored, publishedAt: new Date(YESTERDAY) })).toBe(false);
+  });
+
+  it.each([
+    ['description', { description: 'Changed' }],
+    ['organisation name', { organizationName: 'Org renamed' }],
+    ['publication date', { publishedAt: NOW }],
+    ['PIC match', { organizationPic: null }],
+    ['withdrawal lifted', { withdrawnAt: NOW }],
+  ])('a changed %s is a change', (_label, patch) => {
+    expect(announcementChanged(stored, { ...stored, ...patch })).toBe(true);
+  });
+});
+
+describe('suspectEmptyScan (FO-60 review 4: an empty scan is not a withdrawal)', () => {
+  it('no rows while live announcements are stored is suspect', () => {
+    expect(suspectEmptyScan(0, [{ withdrawnAt: null }, { withdrawnAt: null }])).toBe(true);
+  });
+
+  it('no rows and nothing live stored is an ordinary empty topic', () => {
+    expect(suspectEmptyScan(0, [])).toBe(false);
+    expect(suspectEmptyScan(0, [{ withdrawnAt: YESTERDAY }])).toBe(false);
+  });
+
+  it('any row seen is never suspect', () => {
+    expect(suspectEmptyScan(1, [{ withdrawnAt: null }])).toBe(false);
   });
 });
 
