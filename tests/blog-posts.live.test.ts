@@ -405,11 +405,17 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     const tags = `${Array.from({ length: 400 }, () => '<br>').join(' ')} ${words(200)}`;
     const list = Array.from({ length: 200 }, (_, i) => `${i + 1}. kelime${i}`).join('\n');
     expect([estimateReadMinutes(images), estimateReadMinutes(tags), estimateReadMinutes(list)]).toEqual([1, 1, 1]);
+    // A bare marker has no letter or digit, so it is not a word; a link keeps its text as words.
+    const marks = `${Array.from({ length: 400 }, () => '*').join(' ')} ${words(200)}`;
+    const linktext = Array.from({ length: 200 }, (_, i) => `[kelime${i} söz${i}](https://x.test/${i})`).join(' ');
+    expect([estimateReadMinutes(marks), estimateReadMinutes(linktext)]).toEqual([1, 2]);
     const cases: Array<[label: string, readTime: string, content: string, expected: number]> = [
       ['max', '120 dk', CONTENT, 120],
       ['images', 'yok', images, 1],
       ['tags', 'yok', tags, 1],
       ['list', 'yok', list, 1],
+      ['marks', 'yok', marks, estimateReadMinutes(marks)],
+      ['linktext', 'yok', linktext, estimateReadMinutes(linktext)],
       ['long', 'yok', words(25_000), 120],
       ['tr', '5 dk', CONTENT, 5],
       ['en', '5 min read', CONTENT, 5],
