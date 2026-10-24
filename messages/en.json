@@ -3346,6 +3346,20 @@
       "ipChecklistFallback": "### 📋 TTO IP & licensing checklist\n\n1. **Background IP declaration:**\n   - [x] Registered patent document ({patentStatus}) and ownership agreement prepared.\n   - [ ] Invention Disclosure Forms of the university researchers filed.\n\n2. **Foreground IP and licensing:**\n   - [ ] Draft pre-agreement on licence rights to the project results (Foreground IP).\n   - [ ] Commercialisation option right for private-sector partners (Option Agreement).\n\n3. **Spin-off & market entry:**\n   - [ ] Commercialisation roadmap from TRL {trl} to TRL {nextTrl}.\n   - [ ] Spin-off equity sharing model.\n\n4. **EU consortium agreement clauses:**\n   - [ ] Restrictions on the use of background IP declared in the consortium agreement."
     }
   },
+  "PartnerDetail": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbPartners": "Partners",
+    "backToPartners": "← Back to Partners",
+    "countryLabel": "Country: {value}",
+    "typeLabel": "Type: {value}",
+    "smeBadge": "SME",
+    "totalParticipations": "Total Participations",
+    "coordinatorRoles": "Coordinator Roles",
+    "totalEcFunding": "Total EC Funding",
+    "graphTitle": "Collaboration Graph",
+    "graphPlaceholder": "[Interactive Collaboration Graph] — This organization's network within Horizon Europe and H2020 projects.",
+    "pastProjects": "Past Projects"
+  },
   "PartnersLeaders": {
     "breadcrumbDashboard": "Dashboard",
     "breadcrumbPartners": "Partners",
@@ -3798,6 +3812,7 @@
     "attribution": "Data sources: CORDIS, European Commission (CC BY 4.0); keep.eu, Interact (Interreg). For internal search and pre-assessment only.",
     "activeFilters": "Active Filters:",
     "interregPartnersTag": "Interreg Partners",
+    "smeBadge": "SME",
     "dbUnavailableTitle": "The partner database could not be read.",
     "dbUnavailableBody": "The list below may be incomplete. The failure has been recorded; please try again shortly.",
     "pageShowing": "Page 1 / Showing",

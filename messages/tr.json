@@ -3346,6 +3346,20 @@
       "ipChecklistFallback": "### 📋 TTO IP & Lisanslama Kontrol Listesi\n\n1. **Arka Plan Fikri Mülkiyet (Background IP) Beyanı:**\n   - [x] Tescilli patent belgesi ({patentStatus}) ve hak sahipliği sözleşmesi hazırlandı.\n   - [ ] Üniversite araştırmacılarının buluş bildirimi (Invention Disclosure Form) dosyalandı.\n\n2. **Ön Plan Fikri Mülkiyet (Foreground IP) ve Lisanslama:**\n   - [ ] Proje çıktılarının (Foreground IP) lisans hakları için ön anlaşma metni taslağı.\n   - [ ] Özel sektör ortakları için ticarileştirme opsiyon hakkı (Option Agreement).\n\n3. **Spin-off & Pazar Açılımı:**\n   - [ ] TRL {trl}'den TRL {nextTrl} seviyesine ticarileştirme yol haritası.\n   - [ ] Şirketleşme (Spin-off) hisse paylaşım modeli.\n\n4. **AB Konsorsiyum Anlaşması Maddeleri:**\n   - [ ] Konsorsiyum anlaşmasında arka plan IP kullanımı kısıtlamaları duyuruldu."
     }
   },
+  "PartnerDetail": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbPartners": "Ortaklar",
+    "backToPartners": "← Ortaklar Listesine Dön",
+    "countryLabel": "Ülke: {value}",
+    "typeLabel": "Tür: {value}",
+    "smeBadge": "KOBİ",
+    "totalParticipations": "Toplam Katılım",
+    "coordinatorRoles": "Koordinatörlük",
+    "totalEcFunding": "Toplam AB Fonu",
+    "graphTitle": "İşbirliği ve Ortaklık Grafiği",
+    "graphPlaceholder": "[CORDIS Etkileşim Grafiği] — Kurumun Horizon Europe ve H2020 projeleriyle ortaklık ağı.",
+    "pastProjects": "Geçmiş AB Projeleri"
+  },
   "PartnersLeaders": {
     "breadcrumbDashboard": "Panel",
     "breadcrumbPartners": "Ortaklar",
@@ -3798,6 +3812,7 @@
     "attribution": "Veri kaynakları: CORDIS, Avrupa Komisyonu (CC BY 4.0); keep.eu, Interact (Interreg). Yalnızca iç arama ve ön değerlendirme amaçlıdır.",
     "activeFilters": "Aktif Filtreler:",
     "interregPartnersTag": "Interreg Ortakları",
+    "smeBadge": "KOBİ",
     "dbUnavailableTitle": "Ortak veritabanı şu anda okunamadı.",
     "dbUnavailableBody": "Aşağıdaki liste eksik olabilir. Sorun kaydedildi; lütfen birazdan tekrar deneyin.",
     "pageShowing": "Sayfa 1 / Gösteriliyor",
