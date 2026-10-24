@@ -47,7 +47,6 @@ import {
   toggleFeaturedBlogPostAction,
   updateBlogPostAction,
 } from '@/app/[locale]/admin/blog/actions';
-import { estimateReadMinutes } from '@/lib/blog-read-time';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { sqlStatements } from './helpers/sql-statements';
 
@@ -333,61 +332,68 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     await admin.auditEvent.deleteMany({ where: { type: 'blog.post.created', target: expected } });
   });
 
-  test('blog-read-minutes.sql backfills the minutes from the old text, else from the content (TASK-MVDSY96TB1EPM)', async () => {
-    const words = (n: number) => Array.from({ length: n }, (_, i) => `kelime${i}`).join(' ');
-    // Links, images, tags and list numbers are not words — the SQL must count like estimateReadMinutes.
-    const marked = `# Başlık\n\n1. [bağlantı metni](https://example.test/a) <b>kalın</b>\n2. ![görsel](https://x.test/i.png)\n\n${words(1100)}`;
-    const cases: Array<[label: string, readTime: string, content: string, expected: number]> = [
-      ['tr', '5 dk', CONTENT, 5],
-      ['en', '5 min read', CONTENT, 5],
-      ['old', '3 dk okuma', CONTENT, 3],
-      ['minutes', '12 minutes', CONTENT, 12],
-      ['bare', '7', CONTENT, 7],
-      ['nonum', 'kısa', words(650), 3],
-      ['zero', '0 dk', words(10), 1],
-      ['over', '999 dk', marked, estimateReadMinutes(marked)],
-      ['huge', '99999999999 dk', words(450), 2],
-      ['empty', 'dk', '', 1],
-    ];
-    expect(estimateReadMinutes(marked)).toBe(6);
-    for (const [label, readTime, content] of cases) {
-      await admin.$executeRaw`
-        INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
-        VALUES (${`bf-${label}-${RUN}`}, ${slugOf(`bf-${label}`)}, 't', 'e', ${content}, 'c', ${readTime}, NULL, now(), 'https://images.unsplash.com/x', now())`;
-    }
-    // A row that already has minutes (written by the new code) is not touched.
-    await admin.$executeRaw`
-      INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
-      VALUES (${`bf-kept-${RUN}`}, ${slugOf('bf-kept')}, 't', 'e', ${CONTENT}, 'c', '40 dk', 9, now(), 'https://images.unsplash.com/x', now())`;
-
+  test('drop-blog-read-time.sql leaves readMinutes NOT NULL and no readTime; both blog files re-run cleanly (TASK-MVDVCQW3GI94J)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const { default: pg } = await import('pg');
-    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/blog-read-minutes.sql'), 'utf8');
+    const fileOf = (name: string) => sqlStatements(readFileSync(resolve(process.cwd(), 'prisma/migrations', name), 'utf8'));
+    const drop = fileOf('drop-blog-read-time.sql');
     const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
     await client.connect();
     try {
-      for (const statement of sqlStatements(sql)) await client.query(statement);
-      for (const statement of sqlStatements(sql)) await client.query(statement); // idempotent
+      // apply-migrations.sh re-runs every file: FO-84's must not trip over the dropped column.
+      for (const name of ['blog-read-minutes.sql', 'drop-blog-read-time.sql', 'blog-read-minutes.sql', 'drop-blog-read-time.sql']) {
+        for (const statement of fileOf(name)) await client.query(statement);
+      }
+
+      const columns = await client.query<{ column_name: string; is_nullable: string }>(
+        `SELECT column_name, is_nullable FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name IN ('readTime', 'readMinutes')`
+      );
+      expect(columns.rows).toEqual([{ column_name: 'readMinutes', is_nullable: 'NO' }]);
+
+      // A NULL left by some writer stops the file instead of being half-applied; rolled back here.
+      await client.query('BEGIN');
+      try {
+        await client.query('ALTER TABLE "BlogPost" ALTER COLUMN "readMinutes" DROP NOT NULL');
+        await client.query(
+          `INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readMinutes", "publishedAt", "image", "updatedAt")
+           VALUES ($1, $2, 't', 'e', 'c', 'c', NULL, now(), 'https://images.unsplash.com/x', now())`,
+          [`nul-${RUN}`, slugOf('nul')]
+        );
+        let raised: unknown;
+        try {
+          for (const statement of drop) await client.query(statement);
+        } catch (e) {
+          raised = e;
+        }
+        expect(String(raised)).toMatch(/1 row\(s\) without "readMinutes"/);
+      } finally {
+        await client.query('ROLLBACK');
+      }
     } finally {
       await client.end();
     }
 
-    const minutesOf = async (label: string) =>
-      (await admin.blogPost.findUnique({ where: { slug: slugOf(label) }, select: { readMinutes: true } }))?.readMinutes;
-    for (const [label, , , expected] of cases) expect([label, await minutesOf(`bf-${label}`)]).toEqual([label, expected]);
-    expect(await minutesOf('bf-kept')).toBe(9);
-
-    // The CHECK holds the range for every writer, not only the admin form.
     await expect(
-      admin.$executeRaw`UPDATE "BlogPost" SET "readMinutes" = 121 WHERE "slug" = ${slugOf('bf-kept')}`
+      admin.$executeRaw`
+        INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readMinutes", "publishedAt", "image", "updatedAt")
+        VALUES (${`nn-${RUN}`}, ${slugOf('nn')}, 't', 'e', 'c', 'c', NULL, now(), 'https://images.unsplash.com/x', now())`
+    ).rejects.toThrow(/readMinutes|23502|null value/i);
+    // The CHECK holds the range for every writer, not only the admin form.
+    await admin.$executeRaw`
+      INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readMinutes", "publishedAt", "image", "updatedAt")
+      VALUES (${`ck-${RUN}`}, ${slugOf('ck')}, 't', 'e', 'c', 'c', 9, now(), 'https://images.unsplash.com/x', now())`;
+    await expect(
+      admin.$executeRaw`UPDATE "BlogPost" SET "readMinutes" = 121 WHERE "slug" = ${slugOf('ck')}`
     ).rejects.toThrow(/BlogPost_readMinutes_range/);
   });
 
   test('a saved post stores minutes only and reads back as a number (TASK-MVDSY96TB1EPM)', async () => {
     expect(await createBlogPostAction(form('mins', { readMinutes: 8 }))).toMatchObject({ ok: true });
     const [row] = await rowsFor('mins');
-    expect(row).toMatchObject({ readMinutes: 8, readTime: null });
+    expect(row).toMatchObject({ readMinutes: 8 });
+    expect(row).not.toHaveProperty('readTime');
     expect((await getBlogPostBySlug(slugOf('mins')))?.readMinutes).toBe(8);
     expect(await createBlogPostAction(form('mins121', { readMinutes: 121 }))).toEqual({ ok: false, error: 'invalid_read_time' });
     expect(await rowsFor('mins121')).toHaveLength(0);
