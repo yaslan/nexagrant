@@ -1,0 +1,67 @@
+
+=== 4. Girdi ===
+unknown province                              -> 400 {"errors":{"province":"unknown_slug"}}
+unknown area slug                             -> 400 {"errors":{"expertiseAreas":"unknown_slug"}}
+unknown role slug                             -> 400 {"errors":{"roles":"unknown_slug"}}
+unknown language                              -> 400 {"errors":{"languages":"unknown_slug"}}
+locale de                                     -> 400 {"errors":{"locale":"unknown_slug"}}
+fullName 121                                  -> 400 {"errors":{"fullName":"too_long"}}
+org 201                                       -> 400 {"errors":{"organization":"too_long"}}
+projectCodes 10k                              -> 400 {"errors":{"projectCodes":"too_long"}}
+email 300                                     -> 400 {"errors":{"email":"too_long"}}
+email CRLF                                    -> 400 {"errors":{"email":"invalid_email"}}
+linkedin javascript:                          -> 400 {"errors":{"linkedinUrl":"invalid_url"}}
+linkedin evil host                            -> 400 {"errors":{"linkedinUrl":"invalid_url"}}
+kvkk false                                    -> 400 {"errors":{"kvkkAccepted":"consent_required"}}
+kvkk "true" string                            -> 400 {"errors":{"kvkkAccepted":"consent_required"}}
+visibility missing                            -> 400 {"errors":{"visibilityConsent":"consent_required"}}
+areas 9 items                                 -> 400 {"errors":{"expertiseAreas":"too_many"}}
+extra field status=verified,founderNumber=1   -> 201 {"ok":true}
+i15 stored status/founder: pending|null
+not json                                      -> 400 {"errors":{"fullName":"required","email":"required","province":"required","title":"required","organization":"required","
+json array                                    -> 400 {"errors":{"form":"Invalid input: expected object, received array"}}
+json null                                     -> 400 {"errors":{"fullName":"required","email":"required","province":"required","title":"required","organization":"required","
+8 MiB body (unknown key pad) -> 201 {"ok":true} in 0.04s
+
+=== 4b. XSS + CSV injection (kayit -> admin tablo/CSV) ===
+register x1@fo21.test -> 201 {"ok":true}
+register x2@fo21.test -> 201 {"ok":true}
+register x3@fo21.test -> 201 {"ok":true}
+register x4@fo21.test -> 201 {"ok":true}
+register x5@fo21.test -> 201 {"ok":true}
+register x6@fo21.test -> 201 {"ok":true}
+stored (fullName | organization):
+    'x1@fo21.test|<script>alert(1)</script><img src=x onerror=alert(2)>|"><svg onload=alert(3)>'
+    'x2@fo21.test|=HYPERLINK("http://evil.test","tikla")|+cmd|\' /C calc\'!A0'
+    "x3@fo21.test|-2+3|@SUM(1+1)*cmd|'/C calc'!A0"
+    'x4@fo21.test|Ali Veli;=HYPERLINK("http://evil.test";"x")|Kurum;=1+1'
+    'x5@fo21.test|=1+1|=1+1'
+    'x6@fo21.test|Ayse "=1+1"|Kurum,=1+1'
+admin page 200 | raw <script>alert(1) present: False | escaped &lt;script&gt; present: True | raw <svg onload present: False
+CSV 200
+   csv line: '"Ayse ""=1+1""",x6@fo21.test,"Kurum,=1+1",Ankara,climate-environment,coordinator,horizon-europe-h2020,pending,,2026-10-19T18:35:26.575Z,2026'
+   csv line: "'=1+1,x5@fo21.test,'=1+1,Ankara,climate-environment,coordinator,horizon-europe-h2020,pending,,2026-10-19T18:35:26.559Z,2026-10-19T18:35:26.5"
+   csv line: '"Ali Veli;=HYPERLINK(""http://evil.test"";""x"")",x4@fo21.test,Kurum;=1+1,Ankara,climate-environment,coordinator,horizon-europe-h2020,pendin'
+   csv line: "'-2+3,x3@fo21.test,'@SUM(1+1)*cmd|'/C calc'!A0,Ankara,climate-environment,coordinator,horizon-europe-h2020,pending,,2026-10-19T18:35:26.526Z"
+   csv line: '"\'=HYPERLINK(""http://evil.test"",""tikla"")",x2@fo21.test,\'+cmd|\' /C calc\'!A0,Ankara,climate-environment,coordinator,horizon-europe-h2020,p'
+   csv line: '<script>alert(1)</script><img src=x onerror=alert(2)>,x1@fo21.test,"""><svg onload=alert(3)>",Ankara,climate-environment,coordinator,horizon'
+Comma-delimited reader (Excel en-US / LibreOffice default) cells starting with = + - @:
+Semicolon-delimited reader (Excel tr-TR liste ayirici ";") cells starting with = + - @:
+    !! ['=1+1,Ankara,climate-environment,coordinator,horizon-europe-h2020,pending,,2026-10-19T18:35:26.541Z,2026-10-19T18:35:26.541Z']
+
+=== 5. Spam / kotuye kullanim ===
+honeypot -> 201 {"ok":true} | row stored: 0 | mail sent: False
+same proxy-seen IP 192.0.2.50, forged left entries rotate -> [201, 201, 201, 201, 201, 429, 429]
+rightmost entry rotates (only possible when app is reachable WITHOUT our proxy) -> [201, 201, 201, 201, 201, 201, 201]
+no X-Forwarded-For header at all -> [201, 201, 201, 201, 201, 429, 429] | ipHash null rows: 0
+IPv6 same /64 rotating host part -> [201, 201, 201, 201, 201, 429, 429]
+rightmost entry not an IP (junk-N) -> [201, 201, 201, 201, 201, 201, 201]
+
+=== 6. KVKK kolonlari ===
+columns: id,fullName,email,emailVerifiedAt,province,title,organization,isFreelancer,expertiseAreas,roles,programmes,projectCodes,orcid,linkedinUrl,languages,referredBy,utmSource,utmMedium,utmCampaign,kvkkAcceptedAt,visibilityConsentAt,marketingConsentAt,consentTextVersion,locale,verifyTokenHash,verifyTokenExpiresAt,founderNumber,status,ipHash,verifyMailCount,verifyMailWindowStart,createdAt,lastSubmittedAt
+any column named like ip (besides ipHash): []
+raw IP text in any row: 0
+ipHash sample length: 64
+k1 (marketing=true): t|t|t|kvkk-v1
+k2 (marketing absent): t|t|f|kvkk-v1
+/tr/uzman 200 checkboxes in SSR html: 75 | any checked: []

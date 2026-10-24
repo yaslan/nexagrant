@@ -1,0 +1,174 @@
+
+
+
+
+[e2e-gate] Dev server info: PID=33372
+[e2e-gate] Test data: INVOICE_SUPPLIER_NAME loaded
+
+Running 5 tests using 1 worker
+
+[1/5] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[2/5] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[3/5] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[4/5] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[5/5] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+  5 passed (30.7s)
+exit=0

@@ -1,0 +1,25 @@
+Kiracıya özel model: 47 · RLS açık tablo: 55 · tenant_isolation politikası: 47
+RLS açık + 0 politika (deny-all): 0 · RLS kapalı + anon/authenticated erişimi: 0
+
+⚠  DATABASE_URL rolü fabrika (rolsuper=true, rolbypassrls=true) — RLS bu bağlantıda hiç uygulanmıyor.
+   Bu rolle yapılan bir izolasyon ölçümü GEÇERSİZDİR; RLS'e tabi bir rol aranıyor:
+
+Ölçüm rolü: fabrika_app (rolsuper=false, rolbypassrls=false) — kaynak: DATABASE_URL_RLS_TEST
+   ✓ yazma (negatif): app.tenant_id yokken INSERT reddedildi
+   ✓ yazma (pozitif): kendi kiracısına INSERT kabul edildi (geri alındı)
+   ✓ yazma (çapraz): başka kiracıya INSERT reddedildi
+   ✓ ExpertPreRegistration: sistem kapsamı dışında okuma 0 satır (tabloda 0)
+   ✓ ExpertPreRegistration: sistem kapsamı dışında INSERT reddedildi
+   ✓ ExpertPreRegistration: sistem kapsamı içinde 0/0 satır görüldü
+   ✓ public-intake: 49 system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ExpertPreRegistration, ExpertPreRegAttempt açık)
+   ✓ public-intake: AuditEvent INSERT reddedildi
+   ✓ public-intake: ExpertPreRegistration INSERT kabul edildi (pozitif kontrol, geri alındı)
+   ✓ tenant-discovery: 0 tablo kapsamla açıldı, her system_scope tablosunda tüm satırlar
+   ✓ subject-scoped: 0 tablo kapsamla açıldı, her system_scope tablosunda tüm satırlar
+   ✓ platform-admin: 0 tablo kapsamla açıldı, her system_scope tablosunda tüm satırlar
+   ✓ platform-aggregate: 0 tablo kapsamla açıldı, her system_scope tablosunda tüm satırlar
+   ✓ cross-tenant-job: 0 tablo kapsamla açıldı, her system_scope tablosunda tüm satırlar
+   ✓ cross-tenant-job: AuditEvent INSERT kabul edildi (pozitif kontrol, geri alındı)
+   ℹ dolu kiracıya özel tablo yok — okuma sondası koşulmadı.
+
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.

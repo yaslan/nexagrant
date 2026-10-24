@@ -1,0 +1,6 @@
+     × 409 already_registered lands on the e-mail field 34651ms
+     × 400 from the server maps each code; an unknown code falls back to "invalid" 33311ms
+     × the success screen states the verify window it was given 36011ms
+ Test Files  1 failed | 362 passed | 7 skipped (370)
+      Tests  3 failed | 4795 passed | 120 skipped (4918)
+error: failed to push some refs to 'https://github.com/yaslan/fonbridge.git'

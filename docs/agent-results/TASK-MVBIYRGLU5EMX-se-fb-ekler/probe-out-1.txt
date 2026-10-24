@@ -1,0 +1,40 @@
+
+=== 1. RLS / erisim ===
+app role select (scope disi): 0
+app role insert (scope disi): ERROR:  column "updatedAt" of relation "ExpertPreRegistration" does not exist
+LINE 1: ...tedAt","visibilityConsentAt","consentTextVersion","updatedAt...
+       
+CSV  anon            -> 401 application/json '{"error":"Unauthorized","message":"Bu işlem için giriş yapmanız gereki'
+PAGE anon            -> 404 loc=None has-table=False
+CSV  u-plain         -> 403 application/json '{"error":"Forbidden","message":"Bu işlem yalnızca platform yöneticiler'
+PAGE u-plain         -> 404 loc=None has-table=False
+CSV  u-plain-forged  -> 403 application/json '{"error":"Forbidden","message":"Bu işlem yalnızca platform yöneticiler'
+PAGE u-plain-forged  -> 404 loc=None has-table=False
+CSV  u-admin         -> 200 text/csv; charset=utf-8 '\ufeffad,e-posta,kurum,il,alanlar,roller,programlar,durum,founderNumber,cre'
+PAGE u-admin         -> 200 loc=None has-table=True
+
+=== 2+7. Token / e-posta ===
+register a1 (Host+XFH evil, CRLF in name) -> 201 {"ok":true}
+mail a1 token found: True
+link origins in mail: ['http://localhost:3121/api/expert-preregistration/verify?token=']
+mail headers containing Bcc/X-Inj/evil: []
+Subject line: ['Subject: =?UTF-8?Q?Uzman_=C3=B6n_kayd=C4=B1n=C4=B1z=C4=B1_d?=']
+recipients To/Cc/Bcc: ['a1@fo21.test'] None None
+db row (hash, ttl, ipHash set): 5c83dc86cedf1a93dde3f3afcff5e53b5e9c3b3a63591336a033970a50f3abed|1 day|t
+sha256(raw)==stored: True
+raw token anywhere in row text: 0
+verify random 64hex       -> 307 {'v': 1, 'o': 'invalid', 'n': None, 'exp': 1792438431}
+verify malformed          -> 307 {'v': 1, 'o': 'invalid', 'n': None, 'exp': 1792438431}
+verify empty              -> 307 {'v': 1, 'o': 'invalid', 'n': None, 'exp': 1792438431}
+verify uppercase of real  -> 307 {'v': 1, 'o': 'invalid', 'n': None, 'exp': 1792438431}
+verify real minus 1 char  -> 307 {'v': 1, 'o': 'invalid', 'n': None, 'exp': 1792438431}
+verify real (Host evil) -> 307 location host: http://localhost:3121/tr/uzman/dogrulandi {'v': 1, 'o': 'ok', 'n': 1, 'exp': 1792438431}
+verify replay -> 307 {'v': 1, 'o': 'ok', 'n': 1, 'exp': 1792438431} | db verified count: verified|1
+verify b1 with its token -> {'v': 1, 'o': 'ok', 'n': 2, 'exp': 1792438431} a1@fo21.test|verified|1
+b1@fo21.test|verified|2
+verify expired c1 -> {'v': 1, 'o': 'expired', 'n': None, 'exp': 1792438432} pending
+re-register d1 inside cooldown -> 429 {"error":"rate_limited"}
+re-register d1 after cooldown -> 201 {"ok":true} | fullName kept: Deneme Uzman
+verify OLD d1 link after reissue -> {'v': 1, 'o': 'invalid', 'n': None, 'exp': 1792438432}
+register verified a1 again (enumeration) -> 409 {"errors":{"email":"already_registered"}}
+register new address -> 201 {"ok":true}

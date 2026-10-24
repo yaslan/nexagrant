@@ -178,6 +178,9 @@ jobs:
         pnpm exec tsx scripts/check-live-skips.ts vitest-report.json
       env:
         AUTH_SECRET: 'ci-vitest-auth-secret-fixture-not-for-any-deployment'
+        # Opt-in for keep-eu-sync.live.test.ts (TASK-MVIAOEGRE2JJT, FO-113 Y1).
+        # CI's DATABASE_URL is the throwaway service container prepared above.
+        KEEP_EU_LIVE: '1'
 
     # Same reason: the browsers must match the pinned @playwright/test.
     - name: Install Playwright browsers
