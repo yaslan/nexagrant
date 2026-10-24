@@ -1647,6 +1647,7 @@
     "closed": "Closed",
     "loadingData": "Fetching live data...",
     "resultsCount": "Found {count} calls (Page {page})",
+    "windowNote": "Showing the first {count, number} results; narrow your search.",
     "colStatus": "Status",
     "colTopic": "Topic & Code",
     "colActionType": "Type of Action",
@@ -1665,7 +1666,8 @@
       "rateLimited": "You have searched too often in a short time. Please wait {seconds} seconds and try again.",
       "badRequest": "The search request was rejected: one of the filters has an invalid value. Change the filters and try again.",
       "network": "The server could not be reached, or it did not answer in time. Check your internet connection and try again.",
-      "unexpected": "The list of calls could not be loaded because of an unexpected error. Please try again; if it keeps happening, tell your administrator."
+      "unexpected": "The list of calls could not be loaded because of an unexpected error. Please try again; if it keeps happening, tell your administrator.",
+      "pageOutOfWindow": "This page cannot be shown: the EU funding portal returns only the first {count, number} results of a search. The filters are fine; go back to an earlier page or narrow your search."
     },
     "loadFailedShort": "Could not load calls",
     "perPage": "Per page:",
