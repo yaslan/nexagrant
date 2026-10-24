@@ -3,8 +3,8 @@ import { cache } from 'react';
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
 import { withTenant } from '@/lib/db';
-import { tenantScopeOf } from '@/lib/tenant';
-import type { ModuleDenyReason } from '@/lib/modules/state-machine';
+import { tenantScopeOf, type TenantScope } from '@/lib/tenant';
+import type { ModuleDenyReason, SessionViewer } from '@/lib/modules/state-machine';
 import { getAllManifests } from '@/lib/modules/registry';
 import { decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
@@ -46,6 +46,11 @@ export class ModuleAccessError extends Error {
     super(`Module ${moduleId} is not available (${status}/${reason}).`);
     this.name = 'ModuleAccessError';
   }
+}
+
+/** The session's viewer: role and staff flag only, never the API-key `isMachine`. */
+function sessionViewerOf(scope: TenantScope): SessionViewer {
+  return { role: scope.role, isPlatformAdmin: scope.isPlatformAdmin };
 }
 
 /**
@@ -120,10 +125,7 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
   }
 
   const facts = await tenantModuleFacts(scope.tenantId);
-  return decideModuleAccess(moduleId, facts.statusById.get(moduleId) ?? 'OFF', facts.allowedModules, {
-    role: scope.role,
-    isPlatformAdmin: scope.isPlatformAdmin,
-  });
+  return decideModuleAccess(moduleId, facts.statusById.get(moduleId) ?? 'OFF', facts.allowedModules, sessionViewerOf(scope));
 }
 
 /**
@@ -139,13 +141,11 @@ export async function listAccessibleModules(): Promise<ModuleId[]> {
   if (!scope) return [];
 
   const facts = await tenantModuleFacts(scope.tenantId);
+  const viewer = sessionViewerOf(scope);
 
   return getAllManifests().map((m) => m.id).filter(
     (id) =>
-      decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, {
-        role: scope.role,
-        isPlatformAdmin: scope.isPlatformAdmin,
-      }).allowed,
+      decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, viewer).allowed,
   );
 }
 

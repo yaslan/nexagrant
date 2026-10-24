@@ -6,6 +6,7 @@ import {
   canEnableEntitled,
   getDisableCascade,
   isComingSoon,
+  type MachineViewer,
 } from '../../src/lib/modules/state-machine';
 import { ModuleId } from '../../src/lib/modules/types';
 
@@ -118,7 +119,7 @@ describe('Module State Machine', () => {
     // A tenant's API key is a machine audience (TASK-MVDPYNG1JI0S1): PILOT opens to it
     // like to the managers, DEV does not, because it is not staff.
     it('PILOT admits a machine audience (the tenant API key), DEV does not', () => {
-      const apiKey = { role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
+      const apiKey: MachineViewer = { kind: 'machine', role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
       expect(canAccessStatus('PILOT', apiKey).allowed).toBe(true);
       expect(canAccessStatus('DEV', apiKey)).toEqual({
         allowed: false,
