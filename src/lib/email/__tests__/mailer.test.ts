@@ -176,8 +176,35 @@ describe('reportMailNotConfigured', () => {
       level: 'error',
       source: MAIL_ALERT_SOURCE,
       message: expect.stringContaining('invitations'),
-      meta: { caller: 'invitations' },
+      meta: { caller: 'invitations', reason: 'smtp' },
       dedupeKey: 'smtp-not-configured:invitations',
+    });
+  });
+
+  // FO-131: a missing NEXT_PUBLIC_APP_URL was logged as "SMTP_HOST unset".
+  it('names the missing setting: SMTP and the app URL give two different lines', async () => {
+    // The production test above leaves its spy in place; start from no calls.
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    error.mockClear();
+    await reportMailNotConfigured('expert-prereg', 'smtp');
+    await reportMailNotConfigured('expert-prereg', 'app_url');
+    const [smtpLine, appUrlLine] = error.mock.calls.map(([line]) => String(line));
+    expect(smtpLine).toBe('[mail] expert-prereg: SMTP is not configured (SMTP_HOST unset) — mail not sent');
+    expect(appUrlLine).toContain('[mail] expert-prereg: NEXT_PUBLIC_APP_URL is not usable');
+    expect(appUrlLine).not.toContain('SMTP');
+    error.mockRestore();
+  });
+
+  it('keeps an app-URL alert apart from an SMTP alert in production', async () => {
+    env.NODE_ENV = 'production';
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await reportMailNotConfigured('expert-prereg', 'app_url');
+    expect(recordAlert).toHaveBeenCalledWith({
+      level: 'error',
+      source: MAIL_ALERT_SOURCE,
+      message: expect.stringContaining('NEXT_PUBLIC_APP_URL'),
+      meta: { caller: 'expert-prereg', reason: 'app_url' },
+      dedupeKey: 'app-url-not-configured:expert-prereg',
     });
   });
 });

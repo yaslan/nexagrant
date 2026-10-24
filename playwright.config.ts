@@ -64,6 +64,11 @@ process.env.E2E_MAILPIT_URL ??= 'http://localhost:8025';
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
   ...E2E_SMTP,
+  // Mail links are built from this (src/lib/app-url.ts); without it the invite and
+  // expert-prereg mails are not sent. CI sets it in ci.yml, but a worktree with no
+  // .env had none, so the mail specs failed there (FO-131). Under `start` a
+  // production server refuses loopback here by design, as ci.yml notes.
+  NEXT_PUBLIC_APP_URL: BASE_URL,
   // E2E database URL — defaults to .env DATABASE_URL if not overridden via E2E_DATABASE_URL.
   DATABASE_URL: process.env.DATABASE_URL,
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).

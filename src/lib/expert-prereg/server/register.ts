@@ -138,7 +138,7 @@ export async function registerExpertPreRegistration(
   const mailer = options.mailer === undefined ? smtpMailer() : options.mailer;
   const baseUrl = options.baseUrl === undefined ? invitationMailBaseUrl() : options.baseUrl;
   if (!mailer || !baseUrl) {
-    await reportMailNotConfigured('expert-prereg');
+    await reportMailNotConfigured('expert-prereg', mailer ? 'app_url' : 'smtp');
     return { kind: 'unavailable', error: 'mail_unavailable' };
   }
 
