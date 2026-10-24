@@ -182,6 +182,10 @@ function authOrderProblems(source: string): string[] {
   const exported = [...src.matchAll(/export\s+(?:const|let|var|async\s+function|function)\s+(\w+)/g)]
     .filter((m) => HTTP_METHODS.includes(m[1]!));
   if (exported.length === 0) problems.push('no exported HTTP handler');
+  // `export { list as POST }` names a method the declaration scan above cannot see (FO-86 review §1).
+  for (const m of src.matchAll(/export\s*\{[^}]*\b(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)\b[^}]*\}/g)) {
+    problems.push(`${m[1]}: exported through an export list, the scan cannot read it`);
+  }
 
   for (const m of exported) {
     const method = m[1]!;
@@ -316,6 +320,17 @@ describe('the route scan itself refuses the wrong orders', () => {
       'not an exported async function, the scan cannot read it',
     ],
     ['no handler at all', `export const dynamic = 'force-dynamic';`, 'no exported HTTP handler'],
+    [
+      'a handler exported through an export list (`as POST`)',
+      `export async function GET(req: Request) {
+        const authRes = await authenticateApiKey(req);
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json([]);
+      }
+      async function list(req: Request) { return GET(req); }
+      export { list as POST };`,
+      'POST: exported through an export list, the scan cannot read it',
+    ],
   ])('%s', (_name, src, problem) => {
     expect(authOrderProblems(src).join('\n')).toContain(problem);
   });
