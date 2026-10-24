@@ -5,13 +5,15 @@ import { hashSecretToken } from '@/lib/secret-token';
 import { exportExpertPreRegistrationsCsv } from '@/lib/expert-prereg/server/admin';
 import { FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
-import { acquireExpertPreRegLiveLock } from './helpers/expert-prereg-live-lock';
+import { lastFounderNumberGiven } from '@/lib/expert-prereg/server/founder-counter';
+import { acquireExpertPreRegLiveLock, holdFounderCounter } from './helpers/expert-prereg-live-lock';
 
 /**
  * FO-19 (TASK-MVBIXPP33UK1B) — live founder-number race on real Postgres.
  *
  * Twenty experts verify at the same moment. Each must get a distinct number, and
- * the numbers must run on without a gap from the highest one already given. A
+ * the numbers must run on without a gap from the last one given (the founder
+ * counter, FO-50; put back afterwards so runs do not use up the seats). A
  * second click on each link must answer the same and move nothing. The rows the
  * test makes carry the `expertprereg-live-` prefix and are removed afterwards;
  * no other row is read for writing.
@@ -29,13 +31,14 @@ let before = 0;
 
 // FO-45: the re-issue file also assigns founder numbers on this table; run the two one after the other.
 let releaseLock: (() => Promise<void>) | null = null;
+let restoreCounter: (() => Promise<void>) | null = null;
 
 beforeAll(async () => {
   if (!reachable) return;
   releaseLock = await acquireExpertPreRegLiveLock();
+  restoreCounter = await holdFounderCounter(prisma);
   await prisma.expertPreRegistration.deleteMany({ where: { email: { startsWith: PREFIX } } });
-  const top = await prisma.expertPreRegistration.aggregate({ _max: { founderNumber: true } });
-  before = top._max.founderNumber ?? 0;
+  before = await lastFounderNumberGiven(prisma);
 
   const now = new Date();
   await prisma.expertPreRegistration.createMany({
@@ -64,6 +67,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!reachable) return;
   await prisma.expertPreRegistration.deleteMany({ where: { email: { startsWith: PREFIX } } });
+  await restoreCounter?.();
   await prisma.$disconnect();
   await releaseLock?.();
 });
