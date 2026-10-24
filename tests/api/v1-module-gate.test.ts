@@ -141,6 +141,77 @@ describe('/api/v1 is gated by M1 (module status and plan)', () => {
   });
 });
 
+/**
+ * A route scan, not a runtime refusal: a new route that skips the call is caught
+ * here or nowhere (src/lib/api-auth.ts). Matching on `withTenant|prisma` alone
+ * missed routes that read through a helper (`partners/leaders` →
+ * `coordinatorLeaders`) and never looked at whether the result was checked, so the
+ * rule is now about the handler itself (TASK-MVDV63H2OCK0, FO-80 review §1-2):
+ *
+ *   1. every exported HTTP method is an `async function` whose body we can read;
+ *   2. its first statement is `const x = await authenticateApiKey(req);`, so no
+ *      call of any kind (a helper, a floating promise) runs before the key check;
+ *   3. the very next statement is `if (!x.authenticated) … return`.
+ *
+ * Rule 2 is what catches a read through a helper with no `await`: the data-access
+ * text check on `withTenant|withSystemScope|prisma` alone cannot see those.
+ */
+const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
+const DATA_ACCESS = /\b(withTenant|withSystemScope|prisma)\s*[.(]/;
+const AUTH_GUARD = /const (\w+) = await authenticateApiKey\(req\);\s*if \(!\1\.authenticated\)\s*\{?\s*return\b/;
+
+/** Comments are dropped, so a `prisma.` or an `await` in a doc comment does not count. */
+function codeOf(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
+/** Index just past the bracket that closes the one at `open`. */
+function closeOf(src: string, open: number, l: string, r: string): number {
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === l) depth++;
+    else if (src[i] === r && --depth === 0) return i + 1;
+  }
+  return -1;
+}
+
+/** What is wrong with each exported handler of a route file; empty when it is gated. */
+function authOrderProblems(source: string): string[] {
+  const src = codeOf(source);
+  const problems: string[] = [];
+  const exported = [...src.matchAll(/export\s+(?:const|let|var|async\s+function|function)\s+(\w+)/g)]
+    .filter((m) => HTTP_METHODS.includes(m[1]!));
+  if (exported.length === 0) problems.push('no exported HTTP handler');
+
+  for (const m of exported) {
+    const method = m[1]!;
+    const fn = new RegExp(`export\\s+async\\s+function\\s+${method}\\s*\\(`).exec(src);
+    if (!fn) {
+      problems.push(`${method}: not an exported async function, the scan cannot read it`);
+      continue;
+    }
+    const paramsEnd = closeOf(src, fn.index + fn[0].length - 1, '(', ')');
+    const bodyOpen = src.indexOf('{', paramsEnd);
+    const body = src.slice(bodyOpen + 1, closeOf(src, bodyOpen, '{', '}') - 1);
+
+    const guard = AUTH_GUARD.exec(body);
+    if (!guard) {
+      problems.push(`${method}: no \`const x = await authenticateApiKey(req); if (!x.authenticated) return\``);
+      continue;
+    }
+    const leadingWhitespace = body.length - body.trimStart().length;
+    if (guard.index !== leadingWhitespace) {
+      problems.push(`${method}: authenticateApiKey is not the first statement`);
+    }
+    if (body.search(/\bawait\b/) !== guard.index + guard[0].indexOf('await')) {
+      problems.push(`${method}: something is awaited before authenticateApiKey`);
+    }
+    const dataAt = body.search(DATA_ACCESS);
+    if (dataAt !== -1 && dataAt < guard.index) problems.push(`${method}: data is read before authenticateApiKey`);
+  }
+  return problems;
+}
+
 describe('every /api/v1 route goes through authenticateApiKey', () => {
   function routeFiles(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
@@ -156,22 +227,110 @@ describe('every /api/v1 route goes through authenticateApiKey', () => {
     expect(files.length).toBeGreaterThanOrEqual(5);
   });
 
-  // Comments are dropped first, so a `prisma.` mentioned in a doc comment does not
-  // count as a read. The first real data access must come after the auth call.
-  const DATA_ACCESS = /\b(withTenant|withSystemScope|prisma)\s*[.(]/;
-  const AUTH_CALL = /await authenticateApiKey\(req\)/;
+  test.each(files.map((f) => [relative(root, f), f]))(
+    '%s authenticates first and checks the result before anything else',
+    (_name, file) => {
+      expect(authOrderProblems(readFileSync(file, 'utf8'))).toEqual([]);
+    },
+  );
+});
 
-  function codeOf(file: string): string {
-    return readFileSync(file, 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/^\s*\/\/.*$/gm, '');
-  }
+describe('the route scan itself refuses the wrong orders', () => {
+  const GOOD = `
+    export async function GET(req: Request, { params }: { params: Promise<{ pic: string }> }) {
+      // await something() in a comment is not code
+      const authRes = await authenticateApiKey(req);
+      if (!authRes.authenticated) {
+        return authRes.errorResponse;
+      }
+      const rows = await coordinatorLeaders({});
+      return NextResponse.json(rows);
+    }`;
 
-  test.each(files.map((f) => [relative(root, f), f]))('%s authenticates before it reads data', (_name, file) => {
-    const src = codeOf(file);
-    const authAt = src.search(AUTH_CALL);
-    expect(authAt).toBeGreaterThanOrEqual(0);
-    const dataAt = src.search(DATA_ACCESS);
-    if (dataAt !== -1) expect(authAt).toBeLessThan(dataAt);
+  test('the shape every route uses passes', () => {
+    expect(authOrderProblems(GOOD)).toEqual([]);
+  });
+
+  test.each([
+    [
+      'a helper read before the auth call (no prisma/withTenant text)',
+      `export async function GET(req: Request) {
+        const rows = await coordinatorLeaders({});
+        const authRes = await authenticateApiKey(req);
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json(rows);
+      }`,
+      'something is awaited before authenticateApiKey',
+    ],
+    [
+      'the auth result is never checked',
+      `export async function GET(req: Request) {
+        const authRes = await authenticateApiKey(req);
+        const rows = await coordinatorLeaders({ tenant: authRes });
+        return NextResponse.json(rows);
+      }`,
+      'no `const x = await authenticateApiKey(req); if (!x.authenticated) return`',
+    ],
+    [
+      'the check comes after another statement',
+      `export async function GET(req: Request) {
+        const authRes = await authenticateApiKey(req);
+        const rows = await coordinatorLeaders({});
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json(rows);
+      }`,
+      'no `const x = await authenticateApiKey(req); if (!x.authenticated) return`',
+    ],
+    [
+      'the check tests a different variable',
+      `export async function GET(req: Request) {
+        const authRes = await authenticateApiKey(req);
+        if (!other.authenticated) return other.errorResponse;
+        return NextResponse.json([]);
+      }`,
+      'no `const x = await authenticateApiKey(req); if (!x.authenticated) return`',
+    ],
+    [
+      'a helper call without await before the auth call (no prisma/withTenant text)',
+      `export async function GET(req: Request) {
+        const pending = coordinatorLeaders({});
+        const authRes = await authenticateApiKey(req);
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json(await pending);
+      }`,
+      'authenticateApiKey is not the first statement',
+    ],
+    [
+      'a floating prisma read started before the auth call',
+      `export async function GET(req: Request) {
+        const pending = prisma.topic.findMany();
+        const authRes = await authenticateApiKey(req);
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json(await pending);
+      }`,
+      'data is read before authenticateApiKey',
+    ],
+    [
+      'a handler the scan cannot read',
+      `export const GET = withSomething(async (req: Request) => NextResponse.json([]));`,
+      'not an exported async function, the scan cannot read it',
+    ],
+    ['no handler at all', `export const dynamic = 'force-dynamic';`, 'no exported HTTP handler'],
+  ])('%s', (_name, src, problem) => {
+    expect(authOrderProblems(src).join('\n')).toContain(problem);
+  });
+
+  test('every handler in a file is checked, not just the first', () => {
+    const bad = `${GOOD}
+      export async function POST(req: Request) {
+        const body = await req.json();
+        const authRes = await authenticateApiKey(req);
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json(body);
+      }`;
+    expect(authOrderProblems(bad)).toEqual([
+      'POST: authenticateApiKey is not the first statement',
+      'POST: something is awaited before authenticateApiKey',
+    ]);
   });
 });

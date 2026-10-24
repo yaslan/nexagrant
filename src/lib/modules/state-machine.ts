@@ -139,22 +139,36 @@ export function getDisableCascade(
 // ─────────────────────────── Status → access decision ────────────────────────────
 
 /**
- * Who is asking. Both fields come from the session (`tenantScopeOf`), never from
- * a client argument — a server action is a public POST endpoint.
+ * A viewer built from a signed-in session (`tenantScopeOf`). Both fields come from
+ * the session, never from a client argument — a server action is a public POST
+ * endpoint. `isMachine` is `never`, so no session value can carry the machine flag:
+ * `{ ...session, isMachine: true }` is refused wherever a `ModuleViewer` is taken.
  */
-export interface ModuleViewer {
+export interface SessionViewer {
   /** Tenant role, as stored on `Membership.role`. */
   role: string;
   /** FonBridge staff — the only people a `DEV` module is for. */
   isPlatformAdmin: boolean;
-  /**
-   * A machine audience: an API key acting for a tenant, not a member. It is open
-   * wherever the tenant's managers are (`PILOT`), because a pilot tenant's Partner
-   * API integration must keep working while the pilot runs; it is not staff, so
-   * `DEV` stays closed to it. Only the API-key path sets this — a session never does.
-   */
-  isMachine?: boolean;
+  isMachine?: never;
 }
+
+/**
+ * A machine audience: an API key acting for a tenant, not a member. It is open
+ * wherever the tenant's managers are (`PILOT`), because a pilot tenant's Partner
+ * API integration must keep working while the pilot runs; it is not staff, so
+ * `DEV` stays closed to it. Only the API-key viewer in src/lib/api-auth.ts builds
+ * one. `kind` is what a session value lacks, so spreading a session with
+ * `isMachine: true` does not make a machine viewer (tests/modules/session-viewer.test.ts).
+ */
+export interface MachineViewer {
+  kind: 'machine';
+  role: string;
+  isPlatformAdmin: boolean;
+  isMachine: true;
+}
+
+/** Who is asking: a session member or an API key. The gate's parameter type. */
+export type ModuleViewer = SessionViewer | MachineViewer;
 
 /**
  * Why access was refused. A stable code rather than a sentence, so the UI can

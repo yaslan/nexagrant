@@ -6,6 +6,7 @@ import { internalError } from '@/lib/api-error';
 import { errorMessage } from '@/lib/errors';
 import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
 import { checkModuleAccessForTenant } from '@/lib/modules/tenant-access';
+import type { MachineViewer } from '@/lib/modules/state-machine';
 import type { ModuleId } from '@/lib/modules/types';
 
 export interface AuthenticatedApiRequest {
@@ -30,7 +31,7 @@ const PARTNER_API_MODULE: ModuleId = 'M1';
  * machine audience: open where a pilot's managers are (`PILOT`), closed to `DEV`,
  * which is staff only.
  */
-const API_KEY_VIEWER = { role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
+const API_KEY_VIEWER: MachineViewer = { kind: 'machine', role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
 
 function moduleDenied(): { authenticated: false; errorResponse: NextResponse } {
   return {
