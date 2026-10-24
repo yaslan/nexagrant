@@ -409,6 +409,8 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
       'PartnerSearchAnnouncement',
       'PartnerSearchIngestionRun',
       'PartnerSearchTopicStat',
+      // FO-60: prisma/migrations/add-platform-setting.sql (RLS DISABLEd in the same file)
+      'PlatformSetting',
       'PublicLead',
       'UnmatchedOrganization',
     ]);

@@ -509,6 +509,14 @@ model CreditLedger {
 
 // ───────────────────────── K1 Calls (shared, not tenant-scoped) ─────────────────────────
 
+// FO-60 (TASK-MVCH2J271U5VY): platform-wide switches, one row per key. Global,
+// like Programme; no tenantId. See prisma/migrations/add-platform-setting.sql.
+model PlatformSetting {
+  key       String   @id // e.g. "partner_search_ingestion_enabled"
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
 model Programme {
   id        String @id          // "HE", "DEP", "EUROSTARS", "CETP", "DUT", "ERASMUS", "EIT", "EUREKA", "TUBITAK"
   name      String
@@ -1020,6 +1028,7 @@ model PartnerSearchAnnouncement {
   publishedAt      DateTime?
   lastSeenAt       DateTime
   withdrawnAt      DateTime?
+  missedScans      Int                           @default(0) // consecutive scans without this row; 2 → withdrawn
   organizationPic  String?                       // CordisOrganization.organisationId when matched
   organizationName String
   organizationType PartnerSearchOrgType          @default(OTH)

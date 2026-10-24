@@ -43,6 +43,7 @@
     "a11y:check": "tsx scripts/a11y-check.ts",
     "jobs:g0-rescore": "tsx scripts/rescore-g0.ts",
     "jobs:alerts-sweep": "tsx scripts/run-alerts-sweep.ts",
+    "jobs:partner-search": "tsx scripts/run-partner-search.ts",
     "db:backfill-plan-version": "tsx scripts/backfill-subscription-plan-version.ts",
     "db:seed-public-sector-plans": "tsx scripts/seed-public-sector-plans.ts",
     "db:seed-blog": "tsx scripts/seed-blog-posts.ts",

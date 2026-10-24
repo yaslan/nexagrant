@@ -7,11 +7,27 @@ import { EurostarsAdapter } from '@/lib/adapters/eurostars';
 import { TubitakAdapter } from '@/lib/adapters/tubitak';
 import type { AdapterResult, BaseTopic } from '@/lib/adapters/schemas/common';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { enqueueJob } from '../enqueue';
 import {
   K1DailyCallsOutputSchema,
   type K1DailyCallsOutput,
   type K1SourceResult,
 } from '../events';
+
+/**
+ * Event emission for the partner-search incremental run (FO-60). Only the enqueue
+ * is new; k1-daily-calls behaviour is unchanged. A failure here is logged and
+ * never fails K1: the nightly partner-search full scan (03:00) covers the topics too.
+ * Deduped by enqueueJob's `partner-search:manual` key, so a run already queued wins.
+ */
+async function queuePartnerSearchIncremental(topicIdentifiers: string[]): Promise<void> {
+  if (topicIdentifiers.length === 0) return;
+  try {
+    await enqueueJob('partner-search', { trigger: 'INCREMENTAL', topicIdentifiers });
+  } catch (error) {
+    logger.warn(`[k1-daily-calls] could not queue partner-search incremental run: ${String(error)}`);
+  }
+}
 
 /** Map a topic to the Programme row it belongs to. */
 function getProgrammeIdFromTopic(callId?: string, source?: string): string {
@@ -153,6 +169,8 @@ export async function syncK1Topics(
   }
   let insertedCount = 0;
   let updatedCount = 0;
+  // FO-60: the topics this run created, handed to the partner-search incremental run.
+  const insertedIdentifiers: string[] = [];
 
   // A source that came back `error` is an operational alert, not a data error.
   for (const s of sources.filter((s) => s.status === 'error')) {
@@ -256,6 +274,7 @@ export async function syncK1Topics(
       } else {
         await prisma.topic.create({ data: { identifier: t.identifier, ...topicData } });
         insertedCount++;
+        insertedIdentifiers.push(t.identifier);
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -263,6 +282,8 @@ export async function syncK1Topics(
       errors.push({ identifier: t.identifier, message: msg });
     }
   }
+
+  await queuePartnerSearchIncremental(insertedIdentifiers);
 
   const drift = sources.flatMap((s) => s.schemaDrift);
   if (drift.length > 0) {
