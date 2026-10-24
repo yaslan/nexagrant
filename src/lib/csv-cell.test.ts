@@ -22,6 +22,9 @@ describe('csvCell', () => {
     expect(csvCell('a; "=1')).toBe(`"a;' ""=1"`);
     expect(csvCell('a\r\n+1')).toBe(`"a\r\n'+1"`);
     expect(csvCell('Ali; Veli')).toBe('"Ali; Veli"');
+    expect(csvCell('a;=1;=2')).toBe(`"a;'=1;'=2"`);
+    expect(csvCell('a\r=1')).toBe(`"a\r'=1"`);
+    expect(csvCell('a;-1')).toBe(`"a;'-1"`);
   });
 
   it('writes numbers as they are and null as an empty cell', () => {

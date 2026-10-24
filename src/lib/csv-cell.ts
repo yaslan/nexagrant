@@ -1,6 +1,7 @@
 /**
  * One CSV cell, for every CSV the app writes (FO-101 expert pre-registration
- * export, FO-124 agency report). RFC 4180: quotes around any cell that holds a
+ * export, FO-124 agency report, FO-126 dashboard and evidence exports). Every
+ * writer routes each cell through here, never a copy of the rule. RFC 4180: quotes around any cell that holds a
  * comma, semicolon, quote or line break. The semicolon is quoted too: a
  * Turkish-locale spreadsheet splits on it, which would let a formula cell
  * escape its quotes.

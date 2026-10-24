@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth';
 import { can } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { resolveDashboardRange } from '@/modules/m5/server/range';
+import { csvCell } from '@/lib/csv-cell';
 
 interface ExportRow {
   id: string;
@@ -58,12 +59,12 @@ export async function exportDashboardCSV(params: {
     // Build CSV
     const headers = ['ID', 'Title', 'Stage', 'Status', 'Created', 'Updated'];
     const rows = opportunities.map((opp) => [
-      opp.id,
-      `"${(opp.title || '').replace(/"/g, '""')}"`,
-      opp.stage || 'G0',
-      opp.status || 'N/A',
-      opp.createdAt?.toISOString() || '',
-      opp.updatedAt?.toISOString() || '',
+      csvCell(opp.id),
+      csvCell(opp.title || ''),
+      csvCell(opp.stage || 'G0'),
+      csvCell(opp.status || 'N/A'),
+      csvCell(opp.createdAt?.toISOString() || ''),
+      csvCell(opp.updatedAt?.toISOString() || ''),
     ]);
 
     const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');

@@ -10,6 +10,7 @@ import {
 } from './actions';
 import { calculateEvidenceHealthScore, HealthScoreResult } from '@/lib/evidence-health';
 import { evidenceBadge } from '@/lib/evidence-status';
+import { csvCell } from '@/lib/csv-cell';
 import {
   ShieldCheck,
   Upload,
@@ -277,8 +278,16 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     // link in it used to open the file for anyone. The name identifies it; the
     // file itself is downloaded in the app.
     const header = "ID,Title,Category,IssuingAuthority,ValidUntil,Status,FileName\n";
-    const rows = filteredItems.map(i => 
-      `${i.id},"${i.title.replace(/"/g, '""')}",${i.category || i.kind || ''},"${i.issuingAuthority || ''}",${i.validUntil || ''},${i.status || 'UNVERIFIED'},"${(i.fileName || '').replace(/"/g, '""')}"`
+    const rows = filteredItems.map(i =>
+      [
+        csvCell(i.id),
+        csvCell(i.title),
+        csvCell(i.category || i.kind || ''),
+        csvCell(i.issuingAuthority || ''),
+        csvCell(String(i.validUntil || '')),
+        csvCell(i.status || 'UNVERIFIED'),
+        csvCell(i.fileName || ''),
+      ].join(',')
     ).join('\n');
     
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
