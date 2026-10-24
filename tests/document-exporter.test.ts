@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import unzipper from 'unzipper';
-import { generateDocxBuffer, generatePdfHtml } from '../src/lib/document-exporter';
+import { generateDocxBuffer, generatePdfHtml, toCsv } from '../src/lib/document-exporter';
+import { formulaCells, readLikeASpreadsheet } from './helpers/spreadsheet-csv';
 import { withBrand } from '../src/lib/brand';
 
 /** The name the platform used to ship under; see `tests/retired-brand-name.test.ts`. */
@@ -247,5 +248,31 @@ describe('signature block attribution', () => {
 
     expect(xml).toContain('Kuruluş belirtilmedi');
     expect(xml).not.toContain('FonBridge Teknoloji A.Ş.');
+  });
+});
+
+describe('toCsv (agency report CSV, FO-124)', () => {
+  const text = toCsv([
+    ['Dönem', 'Tablo', 'Grup', 'Adım', 'Değer'],
+    ['2026-09', "Kurum;=cmd|' /C calc'!A0;", 'Ali; "=1+1', 'a\r\n@b', 30],
+    ['=SUM(A1)', '-2', 'Samsun', '<5', 5],
+  ]);
+
+  test('leaves no formula cell when read with a comma or with a semicolon', () => {
+    expect(readLikeASpreadsheet(text, ',')[1]).toEqual([
+      '2026-09',
+      "Kurum;'=cmd|' /C calc'!A0;",
+      `Ali;' "=1+1`,
+      "a\r\n'@b",
+      '30',
+    ]);
+    expect(readLikeASpreadsheet(text, ';').flat().length).toBeGreaterThan(5);
+    expect(formulaCells(text)).toEqual({ ',': [], ';': [] });
+  });
+
+  test('quotes a semicolon cell, keeps numbers and the BOM + CRLF frame', () => {
+    expect(text.charCodeAt(0)).toBe(0xfeff);
+    expect(text.endsWith('\r\n')).toBe(true);
+    expect(toCsv([['Ali; Veli', 7]])).toBe('\ufeff"Ali; Veli",7\r\n');
   });
 });
