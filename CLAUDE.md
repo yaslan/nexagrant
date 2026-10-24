@@ -22,6 +22,10 @@ pnpm lint && pnpm typecheck
 pnpm gate                # db:generate + lint + typecheck + test + i18n:check + rls:check + rls:bypass-check + rls:verify --require-db + db:rls-role + e2e + alerts:check (kapinin tamami)
                          # Aynı veritabanına iki gate: migration-owner-chain.live advisory lock ile sıra bekler (~30 sn);
                          # e2e için ikinci worktree'de E2E_PORT farklı olmalı.
+                         # Makine çapı kilit (FO-55): `pnpm gate` scripts/gate-lock.mjs ile sarılı; kilit dizini ~/.cache/fonbridge-gate.lock (FONBRIDGE_GATE_LOCK_DIR ile değişir).
+                         # İkinci gate "Gate kilidi meşgul — bekliyor" yazar ve birincinin bitişini bekler; sahibin pid'i ölmüşse kilit bayat sayılıp kendiliğinden temizlenir.
+                         # Canlı bir sahip takılı kalırsa `kill <pid>` ile durdur (kilit dizinini elle silme: çakışan iki gate aynı DB'yi kullanır).
+                         # FONBRIDGE_GATE_LOCK_HELD=1 kilidi atlar (gate içinden gate); elle set etme.
 pnpm rls:verify          # DB gercekten kiraci izolasyonu uyguluyor mu (canli olcum)
 pnpm alerts:check        # acik SystemAlert satirlari silinmis kiracilari mi gosteriyor (oksuz alarm kapisi)
 pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)
