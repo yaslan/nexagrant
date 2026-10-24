@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, test, expect } from 'vitest';
 
 import { opportunityCsv } from '../src/lib/dashboard/opportunity-csv';
@@ -5,6 +7,25 @@ import { evidenceCsv } from '../src/lib/evidence/evidence-csv';
 import { formulaCells, readLikeASpreadsheet } from './helpers/spreadsheet-csv';
 
 const PAYLOAD = "=cmd|' /C calc'!A0";
+const ROOT = resolve(__dirname, '..');
+const source = (path: string) => readFileSync(resolve(ROOT, path), 'utf8');
+
+// FO-133 Ö-1: the sinks above are only the guard if the call sites use them. A unit test of
+// the sink alone stays green when a call site goes back to joining cells by hand.
+describe('CSV call sites use the sinks (FO-133 Ö-1)', () => {
+  test('the dashboard export writes its rows through opportunityCsv', () => {
+    const file = source('src/app/[locale]/(app)/[workspace]/dashboard/export-csv.ts');
+
+    expect(file).toContain('opportunityCsv(opportunities)');
+    expect(file).not.toMatch(/\.join\(\s*','\s*\)/);
+  });
+
+  test('the evidence pack download is built by evidenceCsv', () => {
+    const file = source('src/app/[locale]/(app)/[workspace]/evidence/evidence-client.tsx');
+
+    expect(file).toContain('new Blob([evidenceCsv(filteredItems)]');
+  });
+});
 
 describe('dashboard export (FO-126)', () => {
   const at = new Date('2026-10-01T09:00:00.000Z');
@@ -71,6 +92,18 @@ describe('evidence pack export (FO-126)', () => {
 
     expect(rows[0]).toEqual(['ID', 'Title', 'Category', 'IssuingAuthority', 'ValidUntil', 'Status', 'FileName']);
     expect(rows[1]).toEqual(['ev2', 'Belge', 'corporate', '', '', 'UNVERIFIED', '']);
+  });
+
+  // FO-133 M2: String(Date) printed the local, long form ("Sat Oct 24 2026 00:00:00 GMT+0300 …").
+  // ValidUntil is a day, so it prints as the UTC day, the same for a Date and for its ISO string.
+  test('ValidUntil prints as a UTC day, the same for a Date and for its ISO string', () => {
+    const asDate = evidenceCsv([{ id: 'ev4', title: 'Belge', validUntil: new Date('2026-10-24T00:00:00.000Z') }]);
+    const asString = evidenceCsv([{ id: 'ev4', title: 'Belge', validUntil: '2026-10-24T00:00:00.000Z' }]);
+    const asDay = evidenceCsv([{ id: 'ev4', title: 'Belge', validUntil: '2026-10-24' }]);
+
+    expect(readLikeASpreadsheet(asDate, ',')[1]?.[4]).toBe('2026-10-24');
+    expect(asString).toBe(asDate);
+    expect(asDay).toBe(asDate);
   });
 
   test('an empty pack is the header line with its line break', () => {
