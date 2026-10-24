@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
+import { toRangeParam } from '../../src/modules/m5/server/range';
 import { READINESS_ORG_TYPES } from '../../src/lib/readiness/score';
 import { READINESS_QUESTIONS, type ReadinessAnswers } from '../../src/lib/readiness/questions';
 import { encodeReadinessCode } from '../../src/lib/readiness/share';
@@ -33,8 +34,12 @@ const MANAGER = {
   tenantId: TENANT,
 };
 
-/** A year back, so the seeded opportunities fill the KPI grid. Wide ranges: dashboard-wide-range.spec.ts. */
-const day = (offset: number) => new Date(Date.now() + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+/**
+ * A year back, so the seeded opportunities fill the KPI grid. The range is local-date based like
+ * the server reads it; a UTC date (toISOString) puts the window off by a day between local midnight
+ * and the UTC offset, which dropped the seeded rows out of the window.
+ */
+const day = (offset: number) => toRangeParam(new Date(Date.now() + offset * 24 * 60 * 60 * 1000));
 const RANGE = `from=${day(-365)}&to=${day(0)}`;
 
 const LOCALES = {
