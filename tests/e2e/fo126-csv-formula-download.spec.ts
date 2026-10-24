@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { withSystemScope } from '../../src/lib/system-scope';
 import { formulaCells } from '../helpers/spreadsheet-csv';
+import { requireId } from '../helpers/teardown-guard';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
@@ -56,8 +57,8 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await withSystemScope('platform-admin', 'fo126.csv.cleanup', async (tx) => {
-    if (evidenceId) await tx.evidence.deleteMany({ where: { id: evidenceId } });
-    if (opportunityId) await tx.opportunity.deleteMany({ where: { id: opportunityId } });
+    if (evidenceId) await tx.evidence.deleteMany({ where: { id: requireId(evidenceId, 'evidenceId') } });
+    if (opportunityId) await tx.opportunity.deleteMany({ where: { id: requireId(opportunityId, 'opportunityId') } });
   });
   await cleanupIdentity([OWNER.userId]);
 });
