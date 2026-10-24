@@ -13,7 +13,10 @@ import {
 } from '@/lib/billing/catalog';
 import type { StorefrontPlanCards, TierScheduleRow } from '@/lib/billing/storefront';
 import { formatMoney } from '@/lib/money';
+import { planCardCopy } from '@/lib/billing/plan-copy';
 import type { LifetimeScarcity } from '@/lib/billing/lifetime-licence';
+
+const PRICING_BULLETS = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6'] as const;
 
 interface PricingClientProps {
   locale: string;
@@ -269,6 +272,7 @@ export default function PricingClient({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-16 items-stretch">
           {cards.map(({ plan: entry, charged, list, yearlyVsMonthly }) => {
             const recommended = entry.planId === 'pro';
+            const copy = planCardCopy(entry, t, locale, { summary: 'subtitle', bullets: PRICING_BULLETS });
             return (
               <div
                 key={entry.planId}
@@ -287,7 +291,7 @@ export default function PricingClient({
 
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-1 font-heading">{entry.name}</h3>
-                  <p className="text-slate-400 text-xs mb-6 min-h-[32px]">{t(`plans.${entry.planId}.subtitle`)}</p>
+                  <p className="text-slate-400 text-xs mb-6 min-h-[32px]">{copy.summary}</p>
 
                   {/* Price Header */}
                   <div className="mb-4">
@@ -359,7 +363,7 @@ export default function PricingClient({
                           sku: entry.sku,
                           type: 'plan',
                           name: `${entry.name} · ${cycleLabel}`,
-                          subtitle: t(`plans.${entry.planId}.subtitle`),
+                          subtitle: copy.summary ?? undefined,
                           billingCycle,
                           quantity: 1,
                         })
@@ -378,10 +382,10 @@ export default function PricingClient({
 
                   {/* Feature Checklist */}
                   <div className="space-y-3 pt-4 border-t border-slate-800/80">
-                    {['f1', 'f2', 'f3', 'f4', 'f5', 'f6'].map((key) => (
+                    {copy.bullets.map(({ key, text }) => (
                       <div key={key} className="flex items-start gap-2.5 text-xs text-slate-300 leading-snug">
                         <Check className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                        <span>{t(`plans.${entry.planId}.${key}`)}</span>
+                        <span>{text}</span>
                       </div>
                     ))}
                   </div>

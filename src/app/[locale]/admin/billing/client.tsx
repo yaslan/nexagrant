@@ -15,6 +15,9 @@ import {
 } from '@/lib/billing/catalog';
 import type { StorefrontPlanCards } from '@/lib/billing/storefront';
 import { formatMoney } from '@/lib/money';
+import { planCardCopy } from '@/lib/billing/plan-copy';
+
+const ADMIN_BULLETS = ['f1', 'f2', 'f3', 'f4'] as const;
 
 interface BillingClientProps {
   locale: string;
@@ -176,6 +179,7 @@ export function BillingClient({
           {cards.map(({ entry, charged, list, yearlyVsMonthly }) => {
             const isCurrent = currentPlanId.toLowerCase() === entry.planId;
             const recommended = entry.planId === 'pro';
+            const copy = planCardCopy(entry, t, locale, { summary: 'desc', bullets: ADMIN_BULLETS });
 
             return (
               <div
@@ -216,12 +220,12 @@ export function BillingClient({
                         })
                       : t('monthlyBillingNote')}
                   </p>
-                  <p className="text-xs text-muted">{t(`plans.${entry.planId}.desc`)}</p>
+                  {copy.summary && <p className="text-xs text-muted">{copy.summary}</p>}
                   <ul className="text-xs space-y-2 pt-2 border-t border-line text-ink-2">
-                    {['f1', 'f2', 'f3', 'f4'].map((key) => (
+                    {copy.bullets.map(({ key, text }) => (
                       <li key={key} className="flex items-center gap-2">
                         <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
-                        <span>{t(`plans.${entry.planId}.${key}`)}</span>
+                        <span>{text}</span>
                       </li>
                     ))}
                   </ul>
@@ -233,7 +237,7 @@ export function BillingClient({
                       sku: entry.sku,
                       type: 'plan',
                       name: `${entry.name} · ${cycleLabel}`,
-                      subtitle: t(`plans.${entry.planId}.desc`),
+                      subtitle: copy.summary ?? undefined,
                       billingCycle,
                       quantity: 1,
                     })

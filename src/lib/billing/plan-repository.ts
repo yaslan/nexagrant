@@ -35,7 +35,28 @@ export interface PublishedPlanVersion {
     name: string;
     visibility: string;
   };
+  /**
+   * The version's card bullets, in display order. Only the storefront reads
+   * (`listPublicPlans`, `plansVisibleToTenant`) select them; a plan made in the
+   * studio has no catalogue keys, so these rows are the only copy it has.
+   */
+  features?: PublishedPlanFeature[];
 }
+
+/** One `PlanFeature` row as a storefront card needs it. */
+export interface PublishedPlanFeature {
+  order: number;
+  kind: string;
+  moduleId: string | null;
+  limitKey: string | null;
+  textTr: string | null;
+  textEn: string | null;
+}
+
+const STOREFRONT_FEATURE_SELECT = {
+  orderBy: { order: 'asc' },
+  select: { order: true, kind: true, moduleId: true, limitKey: true, textTr: true, textEn: true },
+} as const;
 
 /**
  * Fetch the published version of a plan.
@@ -98,6 +119,7 @@ export async function listPublicPlans(): Promise<
               visibility: true,
             },
           },
+          features: STOREFRONT_FEATURE_SELECT,
         },
       },
     },
@@ -176,6 +198,7 @@ export async function plansVisibleToTenant(tenantId: string): Promise<
               visibility: true,
             },
           },
+          features: STOREFRONT_FEATURE_SELECT,
         },
       },
     },
