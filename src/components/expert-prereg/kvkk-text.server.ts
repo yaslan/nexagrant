@@ -10,7 +10,7 @@ import { parseKvkkMarkdown, type KvkkBlock } from './kvkk-text';
 export async function loadKvkkNotice(locale: string): Promise<KvkkBlock[]> {
   const file =
     locale === 'en'
-      ? path.join(process.cwd(), 'content/kvkk-uzman-v1.en.md')
-      : path.join(process.cwd(), 'content/kvkk-uzman-v1.md');
+      ? path.join(process.cwd(), 'content/kvkk-uzman-v2.en.md')
+      : path.join(process.cwd(), 'content/kvkk-uzman-v2.md');
   return parseKvkkMarkdown(await readFile(file, 'utf8'));
 }

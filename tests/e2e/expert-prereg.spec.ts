@@ -184,7 +184,7 @@ test.describe('expert pre-registration (FO-20)', () => {
     await page.getByRole('button', { name: 'KVKK Aydınlatma Metni' }).click();
     const dialog = page.getByRole('dialog', { name: 'Uzman Ön Kayıt Aydınlatma Metni' });
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText('[FonBridge tüzel kişi unvanı]');
+    await expect(dialog).toContainText('Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.');
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(page.getByLabel(/KVKK Aydınlatma Metni/)).not.toBeChecked();
