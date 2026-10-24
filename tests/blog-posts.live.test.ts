@@ -41,6 +41,7 @@ vi.mock('next/cache', () => ({ revalidatePath: m.revalidatePath }));
 
 import { createDbClient, prisma } from '@/lib/db';
 import { getBlogPostBySlug, getBlogPosts, getFeaturedBlogPosts } from '@/lib/blog';
+import { estimateReadMinutes } from '@/lib/blog-read-time';
 import {
   createBlogPostAction,
   deleteBlogPostAction,
@@ -387,6 +388,79 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     await expect(
       admin.$executeRaw`UPDATE "BlogPost" SET "readMinutes" = 121 WHERE "slug" = ${slugOf('ck')}`
     ).rejects.toThrow(/BlogPost_readMinutes_range/);
+  });
+
+  test('blog-read-minutes.sql backfills the minutes from the old text, else from the content, on the FO-84 schema (TASK-MVMFCB7SVEEG1)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const { default: pg } = await import('pg');
+    const statements = sqlStatements(readFileSync(resolve(process.cwd(), 'prisma/migrations/blog-read-minutes.sql'), 'utf8'));
+    const words = (n: number) => Array.from({ length: n }, (_, i) => `kelime${i}`).join(' ');
+    // Links, images, tags and list numbers are not words — the SQL must count like estimateReadMinutes.
+    const marked = `# Başlık\n\n1. [bağlantı metni](https://example.test/a) <b>kalın</b>\n2. ![görsel](https://x.test/i.png)\n\n${words(1100)}`;
+    expect(estimateReadMinutes(marked)).toBe(6);
+    // Each is a token of its own until the SQL strips it (an image with no alt text, a bare tag, a list
+    // number): 200 words read as 1 minute, with the markers counted as 2–3. One case per strip.
+    const images = `${Array.from({ length: 400 }, () => '![](https://x.test/i.png)').join(' ')} ${words(200)}`;
+    const tags = `${Array.from({ length: 400 }, () => '<br>').join(' ')} ${words(200)}`;
+    const list = Array.from({ length: 200 }, (_, i) => `${i + 1}. kelime${i}`).join('\n');
+    expect([estimateReadMinutes(images), estimateReadMinutes(tags), estimateReadMinutes(list)]).toEqual([1, 1, 1]);
+    const cases: Array<[label: string, readTime: string, content: string, expected: number]> = [
+      ['max', '120 dk', CONTENT, 120],
+      ['images', 'yok', images, 1],
+      ['tags', 'yok', tags, 1],
+      ['list', 'yok', list, 1],
+      ['long', 'yok', words(25_000), 120],
+      ['tr', '5 dk', CONTENT, 5],
+      ['en', '5 min read', CONTENT, 5],
+      ['old', '3 dk okuma', CONTENT, 3],
+      ['minutes', '12 minutes', CONTENT, 12],
+      ['bare', '7', CONTENT, 7],
+      ['nonum', 'kısa', words(650), 3],
+      ['zero', '0 dk', words(10), 1],
+      ['over', '999 dk', marked, estimateReadMinutes(marked)],
+      ['huge', '99999999999 dk', words(450), 2],
+      ['empty', 'dk', '', 1],
+    ];
+    const insert = `INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
+      VALUES ($1, $2, 't', 'e', $3, 'c', $4, $5, now(), 'https://images.unsplash.com/x', now())`;
+    const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
+    await client.connect();
+    try {
+      // Back to the FO-84 schema (readTime text, readMinutes nullable) inside a transaction that is rolled back:
+      // this is the branch the live database takes the first time the file runs there.
+      await client.query('BEGIN');
+      try {
+        await client.query('ALTER TABLE "BlogPost" ADD COLUMN "readTime" TEXT');
+        await client.query('ALTER TABLE "BlogPost" ALTER COLUMN "readMinutes" DROP NOT NULL');
+        for (const [label, readTime, content] of cases) {
+          await client.query(insert, [`bf-${label}-${RUN}`, slugOf(`bf-${label}`), content, readTime, null]);
+        }
+        // A row that already has minutes (written by the new code) is not touched.
+        await client.query(insert, [`bf-kept-${RUN}`, slugOf('bf-kept'), CONTENT, '40 dk', 9]);
+
+        for (const statement of statements) await client.query(statement);
+        for (const statement of statements) await client.query(statement); // idempotent
+
+        const { rows } = await client.query<{ slug: string; readMinutes: number | null }>(
+          'SELECT "slug", "readMinutes" FROM "BlogPost" WHERE "slug" = ANY($1::text[])',
+          [[...cases.map(([label]) => slugOf(`bf-${label}`)), slugOf('bf-kept')]]
+        );
+        const minutesOf = (label: string) => rows.find((r) => r.slug === slugOf(label))?.readMinutes;
+        for (const [label, , , expected] of cases) expect([label, minutesOf(`bf-${label}`)]).toEqual([label, expected]);
+        expect(minutesOf('bf-kept')).toBe(9);
+      } finally {
+        await client.query('ROLLBACK');
+      }
+
+      const columns = await client.query<{ column_name: string; is_nullable: string }>(
+        `SELECT column_name, is_nullable FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name IN ('readTime', 'readMinutes')`
+      );
+      expect(columns.rows).toEqual([{ column_name: 'readMinutes', is_nullable: 'NO' }]);
+    } finally {
+      await client.end();
+    }
   });
 
   test('a saved post stores minutes only and reads back as a number (TASK-MVDSY96TB1EPM)', async () => {
