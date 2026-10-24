@@ -25,6 +25,7 @@ describe('csvCell', () => {
     expect(csvCell('a;=1;=2')).toBe(`"a;'=1;'=2"`);
     expect(csvCell('a\r=1')).toBe(`"a\r'=1"`);
     expect(csvCell('a;-1')).toBe(`"a;'-1"`);
+    expect(csvCell('\rcmd')).toBe('"\'\rcmd"');
   });
 
   it('writes numbers as they are and null as an empty cell', () => {
