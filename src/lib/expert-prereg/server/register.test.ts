@@ -163,6 +163,24 @@ describe('registerExpertPreRegistration', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('says which setting is missing: SMTP, or the app URL the mail link needs (FO-131)', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db, rows } = fakeDb();
+    const { mailer } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer: null, baseUrl: BASE, now: NOW });
+    const result = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: null, now: NOW });
+
+    expect(result).toEqual({ kind: 'unavailable', error: 'mail_unavailable' });
+    expect(rows).toHaveLength(0);
+    const lines = error.mock.calls.map(([line]) => String(line));
+    expect(lines).toEqual([
+      expect.stringContaining('SMTP is not configured'),
+      expect.stringContaining('NEXT_PUBLIC_APP_URL is not usable'),
+    ]);
+    expect(mailer).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it('writes one pending row with a hashed token, a hashed IP and server-stamped consent', async () => {
     const { db, rows } = fakeDb();
     const { mailer, sent } = recordingMailer();

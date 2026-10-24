@@ -38,16 +38,17 @@ pnpm jobs:k2 -- --month 2026-09
 Pre-push kancası tam `pnpm gate` koşar; gate'in DB'si checkout'un kendi `.env`'inden gelir. Worktree'de ortak `fabrika` DB'sine (5433) ve 3000 portuna bağlanma; `--no-verify` yok.
 ```bash
 P=55xx                                          # boş bir port seç (lsof -nP -iTCP:$P -sTCP:LISTEN boş dönmeli)
-docker run -d --name <is>-pg -e POSTGRES_DB=fabrika -e POSTGRES_USER=fabrika -e POSTGRES_PASSWORD=fabrika \
+DB=<is>                                         # `fabrika` OLMASIN: tests/expert-prereg-retention.live.test.ts `fabrika` adlı DB'de kendini atlar (paylaşılan DB sanar)
+docker run -d --name <is>-pg -e POSTGRES_DB=$DB -e POSTGRES_USER=fabrika -e POSTGRES_PASSWORD=fabrika \
   -p 127.0.0.1:$P:5432 pgvector/pgvector:pg16
-cp .env.example .env && perl -pi -e "s#\@localhost:5433/#\@localhost:$P/#g" .env   # perl: mac ve Linux'ta aynı (sed -i '' yalnız BSD)
+cp .env.example .env && perl -pi -e "s#\@localhost:5433/fabrika#\@localhost:$P/$DB#g" .env   # perl: mac ve Linux'ta aynı (sed -i '' yalnız BSD)
 perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env
 pnpm install --frozen-lockfile && pnpm db:setup  # db:rls-role, DATABASE_URL_RLS_TEST'i bu .env'e ekler
-E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: localhost:$P/fabrika" yazar
+E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: localhost:$P/$DB" yazar
 docker rm -f <is>-pg                            # iş bitince
 ```
 Ana checkout "must be run in a work tree" veriyorsa `core.bare=true` olmuştur. Belirti, kontrol ve düzeltme için bkz. `docs/RELEASE_CHECKLIST.md` §9.1. `GIT_DIR` set iken başka dizinde `git init` ya da `git config` koşma.
-E2E postası: `playwright.config.ts` e2e sunucusuna `SMTP_HOST=localhost`, `SMTP_PORT=1025` verir (`E2E_SMTP`, `.env`'i ezer) ve posta kutusunu `http://localhost:8025`'ten okur. Bu portlarda bir mailpit gerekir: `docker compose up -d mailpit` (konteyner `fabrika-mailpit`; zaten ayaktaysa dokunma). Yoksa davet ve cooldown e2e'leri "SMTP is not configured" ile düşer. `.env`'de `SMTP_*` boş kalır (`.env.example` gibi): vitest `.env`'i okur, orada SMTP açmak no-SMTP canlı testini değiştirir. Mailpit paylaşımlıdır: iki e2e koşusu aynı anda çalışırsa postalar karışır.
+E2E postası: `playwright.config.ts` e2e sunucusuna `SMTP_HOST=localhost`, `SMTP_PORT=1025` verir (`E2E_SMTP`, `.env`'i ezer) ve posta kutusunu `http://localhost:8025`'ten okur. Bu portlarda bir mailpit gerekir: `docker compose up -d mailpit` (konteyner `fabrika-mailpit`; zaten ayaktaysa dokunma). Yoksa davet ve cooldown e2e'leri düşer. Posta linki `NEXT_PUBLIC_APP_URL`'den kurulur; config bunu e2e sunucusuna `BASE_URL` olarak verir (`.env`'siz worktree'de de). Log hangi ayarın eksik olduğunu söyler: `SMTP is not configured` ya da `NEXT_PUBLIC_APP_URL is not usable` (FO-131/FO-132). `.env`'de `SMTP_*` boş kalır (`.env.example` gibi): vitest `.env`'i okur, orada SMTP açmak no-SMTP canlı testini değiştirir. Mailpit paylaşımlıdır: iki e2e koşusu aynı anda çalışırsa postalar karışır.
 
 ## Mimari kurallar (ihlal etme)
 1. **Çok kiracılılık:** Her iş tablosunda `tenantId` zorunlu; sorgular `withTenant(prisma, tenantId)` sarmalayıcısından geçer; RLS politikası olmayan tablo PR'ı geçmez.
