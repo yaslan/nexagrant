@@ -192,7 +192,7 @@ export async function reportMailNotConfigured(caller: string, reason: MailNotCon
     level: 'error',
     source: MAIL_ALERT_SOURCE,
     message: `${what}: ${caller} mail is not being sent`,
-    meta: { caller, reason },
+    meta: { caller },
     dedupeKey: `${dedupe}:${caller}`,
   });
 }

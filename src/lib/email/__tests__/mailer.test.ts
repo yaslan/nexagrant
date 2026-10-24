@@ -176,7 +176,7 @@ describe('reportMailNotConfigured', () => {
       level: 'error',
       source: MAIL_ALERT_SOURCE,
       message: expect.stringContaining('invitations'),
-      meta: { caller: 'invitations', reason: 'smtp' },
+      meta: { caller: 'invitations' },
       dedupeKey: 'smtp-not-configured:invitations',
     });
   });
@@ -203,7 +203,7 @@ describe('reportMailNotConfigured', () => {
       level: 'error',
       source: MAIL_ALERT_SOURCE,
       message: expect.stringContaining('NEXT_PUBLIC_APP_URL'),
-      meta: { caller: 'expert-prereg', reason: 'app_url' },
+      meta: { caller: 'expert-prereg' },
       dedupeKey: 'app-url-not-configured:expert-prereg',
     });
   });
