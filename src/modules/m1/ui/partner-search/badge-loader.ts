@@ -3,28 +3,22 @@
  *
  * The FO-61 contract has no "count by PIC list" read, only
  * GET /api/organizations/:pic/announcements, one organisation per call, and on a
- * metered plan every call spends a list query of the month. So the loader asks
- * for ONE organisation first; when that answer carries a quota (metered plan) it
- * stops and every badge stays hidden — fifty badges must not eat a ten-query
- * month. Unmetered plans get the rest with a small concurrency cap.
+ * metered plan every call spends a list query of the month. Whether the plan is
+ * metered is decided on the server (`partners/page.tsx`, `partnerSearchGrant`):
+ * a metered plan renders no badge and so asks for nothing. This loader only
+ * runs on an unmetered plan: each PIC once, with a small concurrency cap.
  */
 
-export interface BadgeProbe {
-  total: number;
-  /** The response carried `meta.quota`: the plan meters list queries. */
-  metered: boolean;
-}
-
-export type FetchBadge = (pic: string) => Promise<BadgeProbe | null>;
+/** Live announcement count of one PIC, or null when the answer was not a count. */
+export type FetchBadge = (pic: string) => Promise<number | null>;
 
 export interface BadgeLoader {
-  /** Live announcement count of `pic`, or null when unknown or not to be shown. */
+  /** Live announcement count of `pic`, or null when unknown. */
   load(pic: string): Promise<number | null>;
 }
 
 export function createBadgeLoader(fetchBadge: FetchBadge, concurrency = 4): BadgeLoader {
   const cache = new Map<string, Promise<number | null>>();
-  let probe: Promise<boolean> | null = null; // resolves to "metered"
   let running = 0;
   const waiting: Array<() => void> = [];
 
@@ -42,21 +36,24 @@ export function createBadgeLoader(fetchBadge: FetchBadge, concurrency = 4): Badg
   function load(pic: string): Promise<number | null> {
     const cached = cache.get(pic);
     if (cached) return cached;
-
-    let result: Promise<number | null>;
-    if (probe === null) {
-      const first = fetchBadge(pic).catch(() => null);
-      probe = first.then((r) => r?.metered ?? false);
-      result = first.then((r) => (r && !r.metered ? r.total : null));
-    } else {
-      const gate = probe;
-      result = gate.then((metered) =>
-        metered ? null : slot(() => fetchBadge(pic).catch(() => null)).then((r) => r?.total ?? null)
-      );
-    }
+    const result = slot(() => fetchBadge(pic)).catch(() => null);
     cache.set(pic, result);
     return result;
   }
 
   return { load };
+}
+
+/**
+ * One loader per workspace, shared by every badge of a table. Client-side
+ * navigation keeps module state, and the workspace switcher is a plain link, so
+ * a loader kept without its scope would carry one workspace's counts into the
+ * next. A new scope replaces the old loader.
+ */
+export function scopedLoader(make: () => BadgeLoader): (scope: string) => BadgeLoader {
+  let current: { scope: string; loader: BadgeLoader } | null = null;
+  return (scope) => {
+    if (current?.scope !== scope) current = { scope, loader: make() };
+    return current.loader;
+  };
 }

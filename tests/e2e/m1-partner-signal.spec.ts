@@ -4,6 +4,7 @@ import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { presentIds } from '../helpers/teardown-guard';
 import { signInAs } from './fixtures/session';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * FO-62 (TASK-MVCH2YSRRM28N) — the Partner Search UI over the FO-61 endpoints,
@@ -13,6 +14,9 @@ import { signInAs } from './fixtures/session';
  *   pro       M1 + M4 on, unlimited: the call's Partner Signal box, its list and
  *             filters, the M1 "active announcement" badge, the live tab, the
  *             profile section.
+ *   basic+M1  Basic with an M1 add-on: M1 open but metered (10 a month). Opening
+ *             and reloading the M1 table must not spend a query (review B1):
+ *             the badges are not rendered, so nothing is asked.
  *   discover  the free plan (metered, 10 list queries a month), this month already
  *             spent: the box still counts (the signal is never metered), the list
  *             answers "10/10 used — upgrade", and the M1 pages stay locked.
@@ -43,6 +47,16 @@ const DISCOVER = {
   userId: 'fo62-e2e-discover-user',
   email: 'fo62-discover@e2e.fonbridge.test',
 };
+
+const BASIC = {
+  tenantId: 'fo62-e2e-basic',
+  workspaceId: 'fo62-e2e-basic-ws',
+  workspace: 'fo62-basic',
+  userId: 'fo62-e2e-basic-user',
+  email: 'fo62-basic@e2e.fonbridge.test',
+};
+/** A fixture add-on granting M1, as a contract add-on on Basic would. */
+const M1_ADDON = 'fo62-e2e-addon-m1';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -82,8 +96,8 @@ function announcements(now: number) {
   }));
 }
 
-const TENANTS = [PRO.tenantId, DISCOVER.tenantId];
-const USERS = [PRO.userId, DISCOVER.userId];
+const TENANTS = [PRO.tenantId, DISCOVER.tenantId, BASIC.tenantId];
+const USERS = [PRO.userId, DISCOVER.userId, BASIC.userId];
 
 async function rollback() {
   await prisma.partnerSearchAnnouncement.deleteMany({ where: { topicIdentifier: 'FO62-E2E-TOPIC-01' } });
@@ -94,11 +108,13 @@ async function rollback() {
   await prisma.partnerSearchQuotaUsage.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await prisma.relationship.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await prisma.membership.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
+  await prisma.addOn.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await prisma.moduleState.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await prisma.subscription.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await prisma.workspace.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
   await prisma.user.deleteMany({ where: { id: { in: presentIds(USERS) } } });
   await prisma.tenant.deleteMany({ where: { id: { in: presentIds(TENANTS) } } });
+  await prisma.addOnCatalog.deleteMany({ where: { sku: 'fo62-e2e-addon-m1' } });
 }
 
 async function seedTenant(t: typeof PRO, planId: string, modules: Record<string, 'ON'>) {
@@ -144,6 +160,14 @@ async function seed() {
 
   await seedTenant(PRO, 'pro', { M1: 'ON', M4: 'ON' });
   await seedTenant(DISCOVER, 'free', {});
+  await prisma.addOnCatalog.create({
+    data: { sku: M1_ADDON, name: 'FO-62 e2e M1 add-on', monthlyCents: 0, currency: 'EUR', grantsModule: 'M1' },
+  });
+  await seedTenant(BASIC, 'basic', { M1: 'ON' });
+  await prisma.addOn.create({ data: { tenantId: BASIC.tenantId, sku: M1_ADDON } });
+  await prisma.partnerSearchQuotaUsage.create({
+    data: { tenantId: BASIC.tenantId, month: new Date(now).toISOString().slice(0, 7), count: 3 },
+  });
   // This month's ten list queries are already spent.
   await prisma.partnerSearchQuotaUsage.create({
     data: { tenantId: DISCOVER.tenantId, month: new Date(now).toISOString().slice(0, 7), count: 10 },
@@ -289,6 +313,35 @@ test.describe('FO-62 Partner Search UI', () => {
       await expect(page.getByTestId('partners-live')).toHaveCount(0);
     });
   }
+
+  test('basic+M1 (tr): opening and reloading the M1 table spends no query, shows no badge', async ({ page }) => {
+    const asked: string[] = [];
+    page.on('request', (r) => {
+      if (r.url().includes('/announcements')) asked.push(r.url());
+    });
+    const before = await prisma.partnerSearchQuotaUsage.findMany({ where: { tenantId: BASIC.tenantId } });
+    expect(before.map((u) => u.count)).toEqual([3]);
+
+    const path = `/tr/${BASIC.workspace}/ortaklar?q=${encodeURIComponent(ORG_NAME)}`;
+    await signIn(page, BASIC, path);
+    const row = page.locator('tr', { hasText: ORG_NAME });
+    // The same organisation carries "Aktif ilanı var (1)" on Pro (test above).
+    // Hydrated = the page's client effects (where a badge would fetch) have had their turn.
+    const tab = page.getByTestId('partners-tab-live');
+    await expect(row).toBeVisible();
+    await expectHydrated(tab);
+    for (let i = 0; i < 3; i++) {
+      await page.reload();
+      await expect(row).toBeVisible();
+      await expectHydrated(tab);
+    }
+    await expect(page.getByTestId('ps-active-badge')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/07-basic-m1-no-badge-tr.png`, fullPage: true });
+
+    expect(asked).toEqual([]);
+    const after = await prisma.partnerSearchQuotaUsage.findMany({ where: { tenantId: BASIC.tenantId } });
+    expect(after.map((u) => u.count)).toEqual([3]);
+  });
 
   test('pro (tr) at 390px: the box and its filters fit the screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });

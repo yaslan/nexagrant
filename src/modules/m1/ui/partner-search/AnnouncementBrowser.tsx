@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { PartnerSearchAnnouncementDto, PartnerSearchQuotaState } from '@/core/contracts/partner-search';
 
 import { AnnouncementCard, actionClass, type AnnouncementLinks } from './AnnouncementCard';
+import { PartnerSearchBoundary } from './PartnerSearchBoundary';
 import {
   ANNOUNCEMENT_TYPES,
   CC_BY_4_URL,
@@ -35,7 +36,15 @@ type Status = 'loading' | 'ready' | 'error' | 'quota' | 'denied';
  * Filters apply on submit, not per keystroke: on a metered plan every request
  * is one of the month's queries.
  */
-export function AnnouncementBrowser({
+export function AnnouncementBrowser(props: { topic?: string; links: AnnouncementLinks; upgradeHref: string }) {
+  return (
+    <PartnerSearchBoundary>
+      <Browser {...props} />
+    </PartnerSearchBoundary>
+  );
+}
+
+function Browser({
   topic,
   links,
   upgradeHref,
@@ -131,7 +140,8 @@ export function AnnouncementBrowser({
   const now = new Date();
   const visible = applied.thisWeekOnly ? rows.filter((r) => withinWeek(r.publishedAt, now)) : rows;
   const more = status === 'ready' && !quotaSpent(quota) && canLoadMore(rows, total, applied.thisWeekOnly, now);
-  const resetsAt = quota
+  // `readQuota` leaves an unreadable reset instant as '': no line rather than "Invalid Date".
+  const resetsAt = quota?.resetsAt
     ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(quota.resetsAt))
     : '';
   const upsell = (
@@ -263,7 +273,7 @@ export function AnnouncementBrowser({
           {quotaSpent(quota) ? (
             <>
               {t('list.quotaSpent', { used: quota.used, limit: quota.limit })} — {upsell}
-              <span className="mt-1 block text-[11px]">{t('list.quotaResets', { date: resetsAt })}</span>
+              {resetsAt && <span className="mt-1 block text-[11px]">{t('list.quotaResets', { date: resetsAt })}</span>}
             </>
           ) : (
             t('list.quotaUsage', { used: quota.used, limit: quota.limit })

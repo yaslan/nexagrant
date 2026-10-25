@@ -3903,14 +3903,16 @@
       "REC": "Araştırma kuruluşu",
       "PRC": "Özel şirket",
       "PUB": "Kamu kurumu",
-      "OTH": "Diğer"
+      "OTH": "Diğer",
+      "unknown": "Belirtilmemiş"
     },
     "orgTypesShort": {
       "HES": "Üniversite",
       "REC": "Araştırma",
       "PRC": "Şirket",
       "PUB": "Kamu",
-      "OTH": "Diğer"
+      "OTH": "Diğer",
+      "unknown": "Belirsiz"
     },
     "card": {
       "typeRequest": "Partner arıyor",

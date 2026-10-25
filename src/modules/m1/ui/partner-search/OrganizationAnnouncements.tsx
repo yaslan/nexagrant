@@ -8,6 +8,7 @@ import type { PartnerSearchAnnouncementDto } from '@/core/contracts/partner-sear
 import { Attribution } from './AnnouncementBrowser';
 import { AnnouncementCard, type AnnouncementLinks } from './AnnouncementCard';
 import { isPic, keywordSnapshot, readListResponse } from './model';
+import { PartnerSearchBoundary } from './PartnerSearchBoundary';
 
 type State =
   | { kind: 'loading' }
@@ -20,7 +21,15 @@ type State =
  * with the keywords the organisation used in them. First page only (20 rows):
  * the busiest organisation on the portal has far fewer live announcements.
  */
-export function OrganizationAnnouncements({ pic, links }: { pic: string; links: AnnouncementLinks }) {
+export function OrganizationAnnouncements(props: { pic: string; links: AnnouncementLinks }) {
+  return (
+    <PartnerSearchBoundary>
+      <Announcements {...props} />
+    </PartnerSearchBoundary>
+  );
+}
+
+function Announcements({ pic, links }: { pic: string; links: AnnouncementLinks }) {
   const t = useTranslations('PartnerSignal');
   const titleId = useId();
   const [state, setState] = useState<State>({ kind: 'loading' });

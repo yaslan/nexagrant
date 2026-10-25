@@ -3903,14 +3903,16 @@
       "REC": "Research organisation",
       "PRC": "Private company",
       "PUB": "Public body",
-      "OTH": "Other"
+      "OTH": "Other",
+      "unknown": "Not specified"
     },
     "orgTypesShort": {
       "HES": "University",
       "REC": "Research",
       "PRC": "Company",
       "PUB": "Public",
-      "OTH": "Other"
+      "OTH": "Other",
+      "unknown": "Unknown"
     },
     "card": {
       "typeRequest": "Looking for partners",

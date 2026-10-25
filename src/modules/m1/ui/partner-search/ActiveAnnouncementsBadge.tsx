@@ -3,32 +3,39 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
-import { createBadgeLoader, type BadgeLoader } from './badge-loader';
+import { createBadgeLoader, scopedLoader } from './badge-loader';
+import { PartnerSearchBoundary } from './PartnerSearchBoundary';
 import { isPic, readListResponse } from './model';
 
-/** One loader per page load, shared by every badge in the table. */
-let loader: BadgeLoader | null = null;
-
-function sharedLoader(): BadgeLoader {
-  loader ??= createBadgeLoader(async (pic) => {
+const loaderFor = scopedLoader(() =>
+  createBadgeLoader(async (pic) => {
     const res = await fetch(`/api/organizations/${pic}/announcements?page=1`, { headers: { accept: 'application/json' } });
     const result = readListResponse(res.status, await res.json().catch(() => null));
-    if (result.kind === 'quota') return { total: 0, metered: true };
-    if (result.kind !== 'ok') return null;
-    return { total: result.page.meta.total, metered: result.page.meta.quota !== undefined };
-  });
-  return loader;
+    return result.kind === 'ok' ? result.page.meta.total : null;
+  })
+);
+
+/**
+ * "Has an active announcement (N)" next to an organisation in the M1 table
+ * (FO-62, card item 3). The page renders it on unmetered plans only: on a
+ * metered plan each badge would spend one of the month's list queries.
+ */
+export function ActiveAnnouncementsBadge(props: { pic: string; scope: string }) {
+  return (
+    <PartnerSearchBoundary fallback={null}>
+      <Badge {...props} />
+    </PartnerSearchBoundary>
+  );
 }
 
-/** "Has an active announcement (N)" next to an organisation in the M1 table (FO-62, card item 3). */
-export function ActiveAnnouncementsBadge({ pic }: { pic: string }) {
+function Badge({ pic, scope }: { pic: string; scope: string }) {
   const t = useTranslations('PartnerSignal');
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isPic(pic)) return;
     let live = true;
-    void sharedLoader()
+    void loaderFor(scope)
       .load(pic)
       .then((n) => {
         if (live) setCount(n);
@@ -36,7 +43,7 @@ export function ActiveAnnouncementsBadge({ pic }: { pic: string }) {
     return () => {
       live = false;
     };
-  }, [pic]);
+  }, [pic, scope]);
 
   if (!count) return null;
   return (

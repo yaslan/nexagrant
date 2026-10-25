@@ -13,6 +13,7 @@ import type {
   PartnerSearchDenyReason,
   PartnerSearchOrgType,
   PartnerSearchQuotaState,
+  PartnerSignal,
 } from '@/core/contracts/partner-search';
 
 export const ORG_TYPES = ['HES', 'REC', 'PRC', 'PUB', 'OTH'] as const satisfies readonly PartnerSearchOrgType[];
@@ -108,23 +109,128 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 
-function isQuota(v: unknown): v is PartnerSearchQuotaState {
-  return isRecord(v) && typeof v.limit === 'number' && typeof v.used === 'number';
+function isCount(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0;
+}
+
+function textOrNull(v: unknown): string | null {
+  return typeof v === 'string' ? v : null;
+}
+
+/** An ISO instant the browser can format, or null: `Intl` throws on an Invalid Date. */
+function instantOrNull(v: unknown): string | null {
+  return typeof v === 'string' && Number.isFinite(Date.parse(v)) ? v : null;
+}
+
+function strings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : [];
+}
+
+/**
+ * A quota as the UI can show it, or undefined. `limit` and `used` are the
+ * figures on screen and must be there; `remaining` falls back to their
+ * difference, and an unreadable `resetsAt` becomes '' (the reset line is left
+ * out) rather than "Invalid Date".
+ */
+export function readQuota(v: unknown): PartnerSearchQuotaState | undefined {
+  if (!isRecord(v) || !isCount(v.limit) || !isCount(v.used)) return undefined;
+  return {
+    limit: v.limit,
+    used: v.used,
+    remaining: typeof v.remaining === 'number' && Number.isFinite(v.remaining) ? v.remaining : Math.max(0, v.limit - v.used),
+    month: typeof v.month === 'string' ? v.month : '',
+    resetsAt: instantOrNull(v.resetsAt) ?? '',
+  };
+}
+
+/** Organisation type as a message key: a type FO-61 adds later reads as `unknown`. */
+export function orgTypeKey(type: string): PartnerSearchOrgType | 'unknown' {
+  return (ORG_TYPES as readonly string[]).includes(type) ? (type as PartnerSearchOrgType) : 'unknown';
+}
+
+/**
+ * One row of a list answer, or null when it lacks what a card renders (id,
+ * topic, a known announcement type, an organisation with a name). Optional
+ * fields that come back in another shape are emptied instead, so one odd row
+ * neither breaks the card nor the list.
+ */
+export function readAnnouncement(v: unknown): PartnerSearchAnnouncementDto | null {
+  if (!isRecord(v) || typeof v.id !== 'string' || typeof v.topicIdentifier !== 'string') return null;
+  if (!(ANNOUNCEMENT_TYPES as readonly unknown[]).includes(v.type)) return null;
+  const org = v.organization;
+  if (!isRecord(org) || typeof org.name !== 'string') return null;
+  return {
+    id: v.id,
+    topicIdentifier: v.topicIdentifier,
+    callIdentifier: textOrNull(v.callIdentifier),
+    type: v.type as PartnerSearchAnnouncementType,
+    description: textOrNull(v.description),
+    publishedAt: instantOrNull(v.publishedAt),
+    lastSeenAt: typeof v.lastSeenAt === 'string' ? v.lastSeenAt : '',
+    organization: {
+      pic: textOrNull(org.pic),
+      name: org.name,
+      // Kept as sent; the card shows an unknown one through `orgTypeKey`.
+      type: (typeof org.type === 'string' ? org.type : '') as PartnerSearchOrgType,
+      isSme: org.isSme === true,
+      country: textOrNull(org.country),
+      city: textOrNull(org.city),
+    },
+    keywords: strings(v.keywords),
+    programmeCodes: strings(v.programmeCodes),
+  };
 }
 
 /** Reads a list response (status + parsed JSON body, or null when it was not JSON). */
 export function readListResponse(status: number, body: unknown): ListResult {
   if (status === 200 && isRecord(body) && body.success === true && Array.isArray(body.data) && isRecord(body.meta)) {
-    return { kind: 'ok', page: body as unknown as PartnerSearchAnnouncementPage };
+    const { meta } = body;
+    if (!isCount(meta.total)) return { kind: 'error' };
+    const data = body.data.map(readAnnouncement).filter((a): a is PartnerSearchAnnouncementDto => a !== null);
+    const quota = readQuota(meta.quota);
+    return {
+      kind: 'ok',
+      page: {
+        success: true,
+        meta: {
+          page: isCount(meta.page) && meta.page >= 1 ? meta.page : 1,
+          pageSize: isCount(meta.pageSize) ? meta.pageSize : data.length,
+          total: meta.total,
+          ...(quota ? { quota } : {}),
+        },
+        data,
+      },
+    };
   }
-  if (status === 429 && isRecord(body) && isQuota(body.quota)) return { kind: 'quota', quota: body.quota };
+  if (status === 429 && isRecord(body)) {
+    const quota = readQuota(body.quota);
+    if (quota) return { kind: 'quota', quota };
+  }
   if (status === 403 && isRecord(body) && typeof body.reason === 'string') {
-    const plans = Array.isArray(body.requiredPlans)
-      ? body.requiredPlans.filter((p): p is string => typeof p === 'string')
-      : [];
-    return { kind: 'denied', reason: body.reason as PartnerSearchDenyReason, requiredPlans: plans };
+    return { kind: 'denied', reason: body.reason as PartnerSearchDenyReason, requiredPlans: strings(body.requiredPlans) };
   }
   return { kind: 'error' };
+}
+
+/**
+ * The partner-signal answer (`{ data: PartnerSignal }`), or null when the counts
+ * the box prints are not numbers. Per-country counts that are not numbers are
+ * left out of the country line.
+ */
+export function readSignal(body: unknown): PartnerSignal | null {
+  if (!isRecord(body) || !isRecord(body.data)) return null;
+  const d = body.data;
+  if (!isCount(d.total) || !isCount(d.requests) || !isCount(d.offers) || !isCount(d.trCount)) return null;
+  const counts = (v: unknown): Record<string, number> =>
+    isRecord(v) ? Object.fromEntries(Object.entries(v).filter((e): e is [string, number] => isCount(e[1]))) : {};
+  return {
+    total: d.total,
+    requests: d.requests,
+    offers: d.offers,
+    trCount: d.trCount,
+    byCountry: counts(d.byCountry),
+    byOrgType: counts(d.byOrgType) as PartnerSignal['byOrgType'],
+  };
 }
 
 /** The month is spent: after a 429, or when the last allowed query just ran. */

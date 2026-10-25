@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { ModuleLink } from '@/components/ModuleLink';
@@ -8,6 +8,9 @@ import { errorMessage } from '@/lib/errors';
 import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { getEntitlements } from '@/lib/billing';
+import { partnerSearchGrant } from '@/lib/billing/catalog';
+import { requireTenantPage } from '@/lib/tenant';
 import { AnnouncementBrowser } from '@/modules/m1/ui/partner-search/AnnouncementBrowser';
 import { ActiveAnnouncementsBadge } from '@/modules/m1/ui/partner-search/ActiveAnnouncementsBadge';
 import { createRelationship } from '../relationships/actions';
@@ -80,6 +83,23 @@ export default async function PartnersPage({
   // CORDIS table below is not queried while it is open.
   const liveTab = sParams.tab === 'live';
   const partnersHref = getWorkspaceRoute('partners', locale, workspace);
+
+  // FO-62 review B1: every "active announcement" badge is one
+  // /api/organizations/:pic/announcements read, and on a metered plan (Basic
+  // with the M1 add-on) each read spends one of the month's queries. So the
+  // badges render only where the plan's grant is unmetered; when the plan cannot
+  // be read they stay off, nothing is spent on a guess.
+  let showAnnouncementBadges = false;
+  if (!liveTab) {
+    const { tenantId } = await requireTenantPage(locale);
+    try {
+      const entitlements = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
+      showAnnouncementBadges =
+        partnerSearchGrant(entitlements.planId, entitlements.allowedModules.includes('M1')).queriesMonthly === null;
+    } catch {
+      showAnnouncementBadges = false;
+    }
+  }
 
   const q = sParams.q?.trim() || '';
   const country = sParams.country?.trim().toUpperCase() || '';
@@ -594,7 +614,7 @@ export default async function PartnersPage({
                           {t('smeBadge')}
                         </span>
                       )}
-                      <ActiveAnnouncementsBadge pic={p.organisationId} />
+                      {showAnnouncementBadges && <ActiveAnnouncementsBadge pic={p.organisationId} scope={workspace} />}
                       {p.isInterreg && (
                         <span
                           className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold font-mono px-1.5 py-0.2 rounded"

@@ -2,13 +2,14 @@
 
 import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
-import type { PartnerSignal, PartnerSignalResponse } from '@/core/contracts/partner-search';
+import type { PartnerSignal } from '@/core/contracts/partner-search';
 
 import { AnnouncementBrowser, Attribution } from './AnnouncementBrowser';
 import { useRegionName, type AnnouncementLinks } from './AnnouncementCard';
-import { topCountries } from './model';
+import { readSignal, topCountries } from './model';
+import { PartnerSearchBoundary } from './PartnerSearchBoundary';
 
 type State =
   | { kind: 'loading' }
@@ -24,7 +25,15 @@ type State =
  * page; the announcement list (a metered read on Discover/Basic) loads only
  * when the user opens it.
  */
-export function PartnerSignalBox({
+export function PartnerSignalBox(props: { topicIdentifier: string; links: AnnouncementLinks; upgradeHref: string }) {
+  return (
+    <PartnerSearchBoundary>
+      <SignalBox {...props} />
+    </PartnerSearchBoundary>
+  );
+}
+
+function SignalBox({
   topicIdentifier,
   links,
   upgradeHref,
@@ -47,12 +56,12 @@ export function PartnerSignalBox({
           signal: controller.signal,
           headers: { accept: 'application/json' },
         });
-        const body = (await res.json().catch(() => null)) as
-          | (PartnerSignalResponse & { reason?: string })
-          | { reason?: string }
-          | null;
-        if (res.ok && body && 'data' in body) setState({ kind: 'ready', signal: body.data });
-        else if (res.status === 403 && body?.reason === 'PLAN_UPGRADE_REQUIRED') setState({ kind: 'upgrade' });
+        const body: unknown = await res.json().catch(() => null);
+        const reason = body && typeof body === 'object' && 'reason' in body ? body.reason : undefined;
+        const signal = res.ok ? readSignal(body) : null;
+        if (signal) setState({ kind: 'ready', signal });
+        else if (res.ok) setState({ kind: 'error' });
+        else if (res.status === 403 && reason === 'PLAN_UPGRADE_REQUIRED') setState({ kind: 'upgrade' });
         // Switched off, role without access, or a topic id the API refuses: nothing to say here.
         else if (res.status === 403 || res.status === 401 || res.status === 400) setState({ kind: 'hidden' });
         else setState({ kind: 'error' });
@@ -120,6 +129,7 @@ export function PartnerSignalBox({
 
 function SignalSummary({ signal, regionName }: { signal: PartnerSignal; regionName: (c: string | null) => string }) {
   const t = useTranslations('PartnerSignal');
+  const locale = useLocale();
   if (signal.total === 0) {
     return (
       <p className="text-xs text-ink-2" data-testid="partner-signal-empty">
@@ -128,6 +138,10 @@ function SignalSummary({ signal, regionName }: { signal: PartnerSignal; regionNa
     );
   }
   const countries = topCountries(signal.byCountry);
+  const list = countryList(
+    countries.map((c) => `${regionName(c.country)} (${new Intl.NumberFormat(locale).format(c.count)})`),
+    locale
+  );
   return (
     <div className="space-y-1">
       <p className="text-sm text-ink" data-testid="partner-signal-summary">
@@ -136,11 +150,18 @@ function SignalSummary({ signal, regionName }: { signal: PartnerSignal; regionNa
       </p>
       {countries.length > 0 && (
         <p className="text-xs text-ink-2">
-          {t('box.topCountries', {
-            list: countries.map((c) => `${regionName(c.country)} (${c.count})`).join(', '),
-          })}
+          {t('box.topCountries', { list })}
         </p>
       )}
     </div>
   );
+}
+
+/** "Germany (5), Belgium (3) and Türkiye (3)", in the UI language. */
+function countryList(items: string[], locale: string): string {
+  try {
+    return new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(items);
+  } catch {
+    return items.join(', ');
+  }
 }

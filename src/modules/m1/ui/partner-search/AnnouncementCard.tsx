@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { PartnerSearchAnnouncementDto } from '@/core/contracts/partner-search';
 import { useModuleEnabled } from '@/lib/modules/hooks';
 
-import { isPic, topicPortalUrl } from './model';
+import { isPic, orgTypeKey, topicPortalUrl } from './model';
 
 /**
  * Adds the announcing organisation to M4 relationships. Handed in by the page
@@ -71,6 +71,7 @@ export function AnnouncementCard({
     ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(a.publishedAt))
     : null;
   const isRequest = a.type === 'EXPERTISE_REQUEST';
+  const orgType = orgTypeKey(org.type);
 
   async function addToM4() {
     if (!links.addToRelationships) return;
@@ -119,8 +120,8 @@ export function AnnouncementCard({
           >
             {isRequest ? t('card.typeRequest') : t('card.typeOffer')}
           </span>
-          <span className={`${chipClass} border-border bg-ground text-ink-2`} title={t(`orgTypes.${org.type}`)}>
-            {t(`orgTypesShort.${org.type}`)}
+          <span className={`${chipClass} border-border bg-ground text-ink-2`} title={t(`orgTypes.${orgType}`)}>
+            {t(`orgTypesShort.${orgType}`)}
           </span>
           {org.isSme && <span className={`${chipClass} border-border bg-ground text-ink-2`}>{t('card.sme')}</span>}
         </div>
