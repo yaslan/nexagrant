@@ -14,7 +14,7 @@ import { isPic, orgTypeKey, topicPortalUrl } from './model';
  * (a server action of the relationships route), so M1 never imports M4.
  */
 export type AddToRelationships = (input: {
-  kind: string;
+  kind: 'partner';
   organizationId?: string;
   counterpartName?: string;
   notes?: string;
