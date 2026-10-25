@@ -7,10 +7,8 @@ import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
 import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
-import { checkModuleAccess, requestSession } from '@/lib/modules/access';
-import { tenantScopeOf } from '@/lib/tenant';
 import { planNamesGrantingModuleInFull } from '@/lib/billing/catalog';
-import { consumePartnerSearch, type PartnerSearchQuota } from '@/modules/m1/server/partner-search/monthly-quota';
+import { meterPartnerSearch } from '@/modules/m1/server/partner-search/monthly-quota';
 import { recordAlert } from '@/lib/observability/system-alert';
 
 
@@ -85,15 +83,9 @@ export default async function PartnersPage({
 
   // FO-41: a limited M1 (Discover, Basic, TTO Edition) counts each search with
   // a criterion against the month; browsing the default list is not a search.
-  // Same per-request read as `moduleGate` above (React `cache()`), so no extra
-  // query. A used-up month runs no lookup at all.
+  // A used-up month runs no lookup at all.
   const hasCriteria = Boolean(q || country || activityType || isTurkishOnly || isInterregOnly || minProjects > 0);
-  let searchQuota: PartnerSearchQuota | null = null;
-  const searchLimit = (await checkModuleAccess('M1')).limits?.partnerSearchPerMonth;
-  if (searchLimit !== undefined && hasCriteria) {
-    const scope = tenantScopeOf(await requestSession());
-    if (scope) searchQuota = await consumePartnerSearch(scope.tenantId, searchLimit);
-  }
+  const searchQuota = hasCriteria ? await meterPartnerSearch() : null;
   const quotaExhausted = searchQuota?.allowed === false;
 
   let profiles: PartnerRow[] = [];

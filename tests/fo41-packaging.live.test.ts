@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { presentIds } from './helpers/teardown-guard';
 
 /**
  * TASK-MVC4JRKUKYPLU (FO-41) — module packaging, against the real database.
@@ -92,12 +93,11 @@ describe.skipIf(!reachable)('FO-41 packaging (live)', () => {
 
   afterAll(async () => {
     const db = admin!;
-    const ids = Object.values(T);
-    await db.partnerSearchQuotaUsage.deleteMany({ where: { tenantId: { in: ids } } });
-    await db.moduleState.deleteMany({ where: { tenantId: { in: ids } } });
-    await db.addOn.deleteMany({ where: { tenantId: { in: ids } } });
-    await db.subscription.deleteMany({ where: { tenantId: { in: ids } } });
-    await db.tenant.deleteMany({ where: { id: { in: ids } } });
+    await db.partnerSearchQuotaUsage.deleteMany({ where: { tenantId: { in: presentIds(Object.values(T)) } } });
+    await db.moduleState.deleteMany({ where: { tenantId: { in: presentIds(Object.values(T)) } } });
+    await db.addOn.deleteMany({ where: { tenantId: { in: presentIds(Object.values(T)) } } });
+    await db.subscription.deleteMany({ where: { tenantId: { in: presentIds(Object.values(T)) } } });
+    await db.tenant.deleteMany({ where: { id: { in: presentIds(Object.values(T)) } } });
     await db.addOnCatalog.deleteMany({ where: { sku: ADDON_SKU } });
     await Promise.all([admin?.$disconnect(), rls?.$disconnect()]);
   });

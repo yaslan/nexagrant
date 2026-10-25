@@ -184,6 +184,8 @@ vi.mock('../src/lib/db', () => ({
 vi.mock('../src/lib/modules/guard', () => ({
   moduleGate: vi.fn().mockResolvedValue(null),
 }));
+// M1 in full: no monthly search count (FO-41).
+vi.mock('../src/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch: async () => null }));
 
 vi.mock('../src/lib/observability/system-alert', () => ({
   recordAlert: vi.fn().mockResolvedValue(undefined),

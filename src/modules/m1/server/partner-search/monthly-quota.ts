@@ -1,4 +1,6 @@
 import { withTenant, type TenantTx } from '@/lib/db';
+import { checkModuleAccess, requestSession } from '@/lib/modules/access';
+import { tenantScopeOf } from '@/lib/tenant';
 
 /**
  * FO-41 — the monthly partner-search allowance of a limited M1 (Discover,
@@ -48,6 +50,19 @@ export async function consumePartnerSearch(
     if (counted) return { allowed: true, used: Number(counted.count), limit };
     return { allowed: false, used: await usedThisMonth(tx, tenantId, month), limit };
   });
+}
+
+/**
+ * For the partner search page: counts one search of the session's tenant when
+ * its M1 is metered, and returns `null` when it is not (M1 in full, or no
+ * session). Reads the same per-request gate answer as `moduleGate` (React
+ * `cache()`), so the plan is not looked up twice.
+ */
+export async function meterPartnerSearch(): Promise<PartnerSearchQuota | null> {
+  const limit = (await checkModuleAccess('M1')).limits?.partnerSearchPerMonth;
+  if (limit === undefined) return null;
+  const scope = tenantScopeOf(await requestSession());
+  return scope ? consumePartnerSearch(scope.tenantId, limit) : null;
 }
 
 async function usedThisMonth(
