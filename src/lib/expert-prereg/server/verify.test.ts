@@ -90,11 +90,13 @@ describe('verifyExpertPreRegistration', () => {
     expect(second).toMatchObject({ ok: true, founderNumber: 2 });
   });
 
-  it('answers the same on a second click and does not move the number', async () => {
+  it('is single use: the second click is invalid, the token is cleared and the number does not move (FO-141 F7)', async () => {
     const { db, rows } = fakeDb([pending('a', TOKEN)]);
     const first = await verifyExpertPreRegistration(TOKEN, { db, now: NOW });
+    expect(first).toMatchObject({ ok: true, founderNumber: 1 });
+    expect(rows[0]).toMatchObject({ verifyTokenHash: null, verifyTokenExpiresAt: null });
     const again = await verifyExpertPreRegistration(TOKEN, { db, now: LATER });
-    expect(again).toEqual(first);
+    expect(again).toMatchObject({ ok: false, error: 'invalid' });
     expect(rows[0]!.founderNumber).toBe(1);
   });
 

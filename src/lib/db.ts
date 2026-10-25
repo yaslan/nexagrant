@@ -2,8 +2,35 @@ import { PrismaClient, type Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { assertEnvelopedOrNull } from '@/lib/calendar/token-envelope';
+import { env } from '@/lib/env';
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
+/**
+ * FO-141: no built-in fallback URL. A process without DATABASE_URL used to
+ * connect to whatever Postgres answered on localhost:5432 with a well-known
+ * password. Now the first use fails with a message that names the variable;
+ * importing this module (a build step, a test that mocks the client) does not.
+ */
+export class MissingDatabaseUrlError extends Error {
+  constructor() {
+    super('DATABASE_URL is not set; refusing to connect to a default database.');
+    this.name = 'MissingDatabaseUrlError';
+  }
+}
+
+function requireDatabaseUrl(): string {
+  if (!env.DATABASE_URL) throw new MissingDatabaseUrlError();
+  return env.DATABASE_URL;
+}
+
+function missingUrlClient(): PrismaClient {
+  return new Proxy({} as PrismaClient, {
+    get(_target, prop) {
+      // `await prisma` and string conversion probe these; they are not a query.
+      if (prop === 'then' || typeof prop === 'symbol') return undefined;
+      throw new MissingDatabaseUrlError();
+    },
+  });
+}
 
 function guardCalendarTokenWrite(data: unknown): void {
   if (!data || typeof data !== 'object') return;
@@ -80,9 +107,10 @@ const globalForPrisma = globalThis as unknown as {
   lockPool: PrismaClient | undefined;
 };
 
-export const prisma: PrismaClient = globalForPrisma.prisma ?? createDbClient(connectionString);
+export const prisma: PrismaClient =
+  globalForPrisma.prisma ?? (env.DATABASE_URL ? createDbClient(env.DATABASE_URL) : missingUrlClient());
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== 'production' && env.DATABASE_URL) globalForPrisma.prisma = prisma;
 
 /**
  * B-1 (TASK-MUO9IFMMVRUDJ, İNCELEME-92): the pool of {@link withTenantLockPool}.
@@ -105,7 +133,7 @@ export const LOCK_POOL_OPTIONS: DbPoolOptions = {
 };
 
 function lockPoolClient(): PrismaClient {
-  globalForPrisma.lockPool ??= createDbClient(connectionString, LOCK_POOL_OPTIONS);
+  globalForPrisma.lockPool ??= createDbClient(requireDatabaseUrl(), LOCK_POOL_OPTIONS);
   return globalForPrisma.lockPool;
 }
 

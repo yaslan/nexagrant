@@ -14,8 +14,8 @@ import { lastFounderNumberGiven, recordFounderNumberGiven } from './founder-coun
  * column is unique, so two verifications cannot share a number. It comes from the
  * founder counter (./founder-counter.ts, FO-50), not from the rows, so a number
  * whose row the one-year purge deleted is never given again. A second click on
- * a link that already verified the expert changes nothing and answers the same
- * way: the number does not move.
+ * a link that already verified the expert is dead: the verification clears the
+ * token (FO-141 F7), so the click is `invalid` and the number does not move.
  */
 
 export type VerifyResult =
@@ -64,7 +64,8 @@ export async function verifyExpertPreRegistration(
 
     await tx.expertPreRegistration.update({
       where: { id: row.id },
-      data: { emailVerifiedAt: now, status: 'verified', founderNumber },
+      // F7 (FO-141): single use. The link stops matching once it has verified.
+      data: { emailVerifiedAt: now, status: 'verified', founderNumber, verifyTokenHash: null, verifyTokenExpiresAt: null },
     });
     return { ok: true, founderNumber, locale: row.locale };
   });
