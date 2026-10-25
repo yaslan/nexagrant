@@ -72,3 +72,7 @@ expert-prereg-rls-mail-quota.sql
 blog-read-minutes.sql
 add-partner-search.sql
 add-expert-founder-counter.sql
+add-platform-setting.sql
+add-partner-search-missed-scans.sql
+add-partner-search-missed-scan-day.sql
+platform-setting-write-guard.sql

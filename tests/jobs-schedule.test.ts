@@ -48,6 +48,8 @@ describe('schedule (ADR-0008 §2)', () => {
       'alerts-sweep': '15 4 * * *',
       'stripe-event-cleanup': '0 2 * * *',
       'agency-monthly-report': '0 6 1 * *',
+      'partner-search': '0 3 * * *',
+      'partner-search-retention': '15 3 * * *',
       'invitation-cleanup': '30 3 * * *',
       'public-lead-cleanup': '45 3 * * *',
       'expert-prereg-cleanup': '55 3 * * *',

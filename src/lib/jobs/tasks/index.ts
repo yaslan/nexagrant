@@ -19,6 +19,8 @@ import { m4StaleRelationshipsTask } from './m4-stale-relationships';
 import { jobQueueHealthTask } from './job-queue-health';
 import { notificationsRetentionTask } from './notifications-retention';
 import { evidenceExpiringTask } from './evidence-expiring';
+import { partnerSearchTask } from './partner-search';
+import { partnerSearchRetentionTask } from './partner-search-retention';
 
 /**
  * Every job the worker serves, keyed by the id used in the crontab
@@ -45,4 +47,6 @@ export const taskList: Record<JobId, Task> = {
   'job-queue-health': jobQueueHealthTask,
   'notifications-retention': notificationsRetentionTask,
   'evidence-expiring': evidenceExpiringTask,
+  'partner-search': partnerSearchTask,
+  'partner-search-retention': partnerSearchRetentionTask,
 };

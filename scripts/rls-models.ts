@@ -59,6 +59,8 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // See prisma/migrations/add-partner-search.sql.
   'PartnerSearchAnnouncement', 'PartnerProfileSnapshot', 'PartnerSearchIngestionRun',
   'UnmatchedOrganization', 'PartnerSearchTopicStat',
+  // FO-60 (TASK-MVCH2J271U5VY): the partner-search ingestion flag. See add-platform-setting.sql.
+  'PlatformSetting',
 ]);
 
 /**

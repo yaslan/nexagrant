@@ -52,6 +52,10 @@ const KNOWN: Record<string, string> = {
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
   'src/lib/notifications/store.ts in: ids':
     '`ids` is parseMarkReadTarget(target) one line above, which throws unless every element passes isPresentId; an empty list returns before the update; tenantId and userId beside it go through requireActionId (TASK-MUVR24EHWI2RA)',
+  'src/modules/m1/server/partner-search/retention.ts lt: withdrawnBefore':
+    '`withdrawnBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
+  'src/modules/m1/server/partner-search/retention.ts lt: closedBefore':
+    '`closedBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts version: existing.version':
