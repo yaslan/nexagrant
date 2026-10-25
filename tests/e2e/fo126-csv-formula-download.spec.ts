@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { prisma } from '../../src/lib/db';
+import { toRangeParam } from '../../src/modules/m5/server/range';
 import { formulaCells } from "../helpers/spreadsheet-csv";
 import { requireId } from '../helpers/teardown-guard';
 import { evidenceTenant } from './fixtures/evidence-tenant';
@@ -23,7 +24,7 @@ const PAYLOAD = "=cmd|' /C calc'!A0";
 const EVIDENCE_DIR = process.env.FO126_EVIDENCE_DIR;
 
 const tenant = evidenceTenant('fo126');
-const day = (offset: number) => new Date(Date.now() + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const day = (offset: number) => toRangeParam(new Date(Date.now() + offset * 24 * 60 * 60 * 1000));
 const RANGE = `from=${day(-365)}&to=${day(0)}`;
 
 test.beforeAll(async () => {
