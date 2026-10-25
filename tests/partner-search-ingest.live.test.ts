@@ -306,10 +306,16 @@ describe.skipIf(!RUN)('partner-search ingestion (live database)', () => {
  * file, not its own: both suites flip the one global flag row, and vitest runs
  * files in parallel, so two files would switch it under each other.
  * `DATABASE_URL_RLS_TEST` is the app role `fabrika_app`: the write-guard checks run
- * under it, because the superuser connection would pass them anyway.
+ * under it, because the superuser connection would pass them anyway. `prisma` here
+ * is the owner connection, the only one allowed to call the writer (PR #163, crw-fb B1).
  */
 const RET_TOPIC = 'FO65-RET-CLOSED-01';
+const RET_OPEN_TOPIC = 'FO65-RET-OPEN-01';
+const RET_SOLO_KEY = 'FO65-RET-OPEN-SOLO';
 const RET_CALL = 'FO65-RET-CALL';
+const RET_PIC = '999065001';
+const ADMIN_ID = 'fo65-test-admin';
+const NON_ADMIN_ID = 'fo65-test-member';
 const APP_URL = process.env.DATABASE_URL_RLS_TEST;
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date();
@@ -331,15 +337,36 @@ function retentionRow(externalId: string, extra: Record<string, unknown>) {
 }
 
 async function retentionCleanup() {
-  await prisma.partnerSearchAnnouncement.deleteMany({ where: { topicIdentifier: RET_TOPIC } });
-  await prisma.rawFetch.deleteMany({ where: { source: 'partner_search', key: RET_TOPIC } });
-  await prisma.topic.deleteMany({ where: { identifier: RET_TOPIC } });
+  await prisma.partnerSearchAnnouncement.deleteMany({ where: { topicIdentifier: { in: [RET_TOPIC, RET_OPEN_TOPIC] } } });
+  await prisma.rawFetch.deleteMany({
+    where: { source: 'partner_search', key: { in: [RET_TOPIC, RET_OPEN_TOPIC, RET_SOLO_KEY] } },
+  });
+  await prisma.topic.deleteMany({ where: { identifier: { in: [RET_TOPIC, RET_OPEN_TOPIC] } } });
   await prisma.call.deleteMany({ where: { callIdentifier: RET_CALL } });
+  await prisma.cordisOrganization.deleteMany({ where: { organisationId: RET_PIC } });
+  await prisma.auditEvent.deleteMany({ where: { type: 'platform.setting.changed', actorId: ADMIN_ID } });
+  await prisma.user.deleteMany({ where: { id: { in: [ADMIN_ID, NON_ADMIN_ID] } } });
+}
+
+async function withApp<T>(fn: (app: pg.Client) => Promise<T>): Promise<T> {
+  const app = new pg.Client({ connectionString: APP_URL });
+  await app.connect();
+  try {
+    return await fn(app);
+  } finally {
+    await app.end();
+  }
 }
 
 describe.skipIf(!RUN)('partner-search retention and flag write path (live database)', () => {
   beforeAll(async () => {
     await retentionCleanup();
+    await prisma.user.createMany({
+      data: [
+        { id: ADMIN_ID, email: 'fo65-admin@example.test', isPlatformAdmin: true },
+        { id: NON_ADMIN_ID, email: 'fo65-member@example.test', isPlatformAdmin: false },
+      ],
+    });
     await prisma.programme.upsert({
       where: { id: 'HE' },
       update: {},
@@ -348,64 +375,64 @@ describe.skipIf(!RUN)('partner-search retention and flag write path (live databa
     const call = await prisma.call.create({
       data: { callIdentifier: RET_CALL, title: 'FO65 retention call', programmeId: 'HE' },
     });
-    await prisma.topic.create({
-      data: {
-        identifier: RET_TOPIC,
-        callId: call.id,
-        title: 'FO65 closed topic',
-        status: 'CLOSED',
-        deadlines: [],
-        eligibility: {},
-        keywords: [],
-      },
-    });
+    for (const [identifier, status] of [
+      [RET_TOPIC, 'CLOSED'],
+      [RET_OPEN_TOPIC, 'OPEN'],
+    ] as const) {
+      await prisma.topic.create({
+        data: { identifier, callId: call.id, title: `FO65 ${status} topic`, status, deadlines: [], eligibility: {}, keywords: [] },
+      });
+    }
   });
 
   afterAll(async () => {
-    await setPartnerSearchIngestionFlag(false, 'fo65-test');
+    await setPartnerSearchIngestionFlag(prisma, false, ADMIN_ID);
     await retentionCleanup();
   });
 
-  it('app role cannot UPDATE PlatformSetting; the writer does, and leaves an AuditEvent', async () => {
+  it('app role can neither write PlatformSetting nor call the writer (42501)', async () => {
     expect(APP_URL).toBeTruthy();
-    const app = new pg.Client({ connectionString: APP_URL });
-    await app.connect();
-    try {
+    await withApp(async (app) => {
       await expect(
         app.query(`UPDATE "PlatformSetting" SET value = 'true'::jsonb WHERE key = $1`, [PARTNER_SEARCH_FLAG_KEY])
       ).rejects.toMatchObject({ code: '42501' });
       await expect(
         app.query(`INSERT INTO "PlatformSetting" (key, value, "updatedAt") VALUES ('x', 'true'::jsonb, now())`)
       ).rejects.toMatchObject({ code: '42501' });
-
-      await app.query(`SELECT public.set_platform_setting($1, 'true'::jsonb, 'fo65-admin')`, [PARTNER_SEARCH_FLAG_KEY]);
-      const audit = await prisma.auditEvent.findFirst({
-        where: { type: 'platform.setting.changed', target: PARTNER_SEARCH_FLAG_KEY, actorId: 'fo65-admin' },
-      });
-      expect(audit?.data).toEqual({ value: true });
-    } finally {
-      await app.end();
-    }
-    expect((await prisma.platformSetting.findUnique({ where: { key: PARTNER_SEARCH_FLAG_KEY } }))?.value).toBe(true);
+      await expect(
+        app.query(`SELECT public.set_platform_setting($1, 'true'::jsonb, $2)`, [PARTNER_SEARCH_FLAG_KEY, ADMIN_ID])
+      ).rejects.toMatchObject({ code: '42501' });
+    });
   });
 
-  it('the writer refuses an unknown key and a non-boolean value', async () => {
-    const app = new pg.Client({ connectionString: APP_URL });
-    await app.connect();
-    try {
-      await expect(app.query(`SELECT public.set_platform_setting('other_key', 'true'::jsonb, 'x')`)).rejects.toThrow(
-        /unknown key/
-      );
-      await expect(
-        app.query(`SELECT public.set_platform_setting($1, '"yes"'::jsonb, 'x')`, [PARTNER_SEARCH_FLAG_KEY])
-      ).rejects.toThrow(/takes a boolean/);
-    } finally {
-      await app.end();
-    }
+  it('owner path: the writer sets the flag and leaves an AuditEvent naming the admin', async () => {
+    await setPartnerSearchIngestionFlag(prisma, true, ADMIN_ID);
+    expect((await prisma.platformSetting.findUnique({ where: { key: PARTNER_SEARCH_FLAG_KEY } }))?.value).toBe(true);
+    const audit = await prisma.auditEvent.findFirst({
+      where: { type: 'platform.setting.changed', target: PARTNER_SEARCH_FLAG_KEY, actorId: ADMIN_ID },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(audit?.data).toEqual({ value: true });
+    expect(audit?.tenantId).toBeNull();
+  });
+
+  it('the writer refuses a blank, unknown or non-admin actor, an unknown key and a non-boolean value', async () => {
+    const call = (key: string, value: string, actor: string | null) =>
+      prisma.$executeRawUnsafe(`SELECT public.set_platform_setting($1, $2::jsonb, $3)`, key, value, actor);
+    await expect(call(PARTNER_SEARCH_FLAG_KEY, 'true', null)).rejects.toThrow(/actor is required/);
+    await expect(call(PARTNER_SEARCH_FLAG_KEY, 'true', '  ')).rejects.toThrow(/actor is required/);
+    await expect(call(PARTNER_SEARCH_FLAG_KEY, 'true', 'anyone-at-all')).rejects.toThrow(/not a platform admin/);
+    await expect(call(PARTNER_SEARCH_FLAG_KEY, 'true', NON_ADMIN_ID)).rejects.toThrow(/not a platform admin/);
+    await expect(call('other_key', 'true', ADMIN_ID)).rejects.toThrow(/unknown key/);
+    await expect(call(PARTNER_SEARCH_FLAG_KEY, '"yes"', ADMIN_ID)).rejects.toThrow(/takes a boolean/);
+    await expect(setPartnerSearchIngestionFlag(prisma, true, ' ')).rejects.toThrow(/actorId is required/);
+    expect(
+      await prisma.auditEvent.count({ where: { type: 'platform.setting.changed', actorId: { in: ['anyone-at-all', NON_ADMIN_ID] } } })
+    ).toBe(0);
   });
 
   it('flag OFF: retention is a no-op and deletes nothing', async () => {
-    await setPartnerSearchIngestionFlag(false, 'fo65-test');
+    await setPartnerSearchIngestionFlag(prisma, false, ADMIN_ID);
     await prisma.partnerSearchAnnouncement.create({ data: retentionRow('off-91', { lastSeenAt: ago(91) }) });
     const outcome = await runPartnerSearchRetention(NOW);
     expect(outcome).toEqual({ kind: 'skipped', reason: 'flag-off' });
@@ -413,43 +440,63 @@ describe.skipIf(!RUN)('partner-search retention and flag write path (live databa
     await prisma.partnerSearchAnnouncement.delete({ where: { externalId: 'off-91' } });
   });
 
-  it('flag ON: closed-topic rows at 91 days go, at 89 days stay; withdrawn at 31 go, at 29 stay', async () => {
-    await setPartnerSearchIngestionFlag(true, 'fo65-test');
+  it('flag ON: 90-day closed rule, 30-day withdrawn rule, RawFetch rules, PIC flag refresh; a second run deletes nothing', async () => {
+    await setPartnerSearchIngestionFlag(prisma, true, ADMIN_ID);
+    await prisma.cordisOrganization.create({
+      data: { organisationId: RET_PIC, name: 'Retention PIC Org', hasActiveAnnouncements: true, lastAnnouncementAt: ago(91) },
+    });
     await prisma.partnerSearchAnnouncement.createMany({
       data: [
-        retentionRow('closed-91', { lastSeenAt: ago(91), organizationPic: null }),
+        // CLOSED topic: 91 days goes (its PIC loses its only active row), 89 stays.
+        retentionRow('closed-91', { lastSeenAt: ago(91), organizationPic: RET_PIC }),
         retentionRow('closed-89', { lastSeenAt: ago(89) }),
-        retentionRow('withdrawn-31', { lastSeenAt: ago(60), withdrawnAt: ago(31) }),
-        retentionRow('withdrawn-29', { lastSeenAt: ago(60), withdrawnAt: ago(29) }),
+        // Withdrawn rows only appear on topics still being scanned: an OPEN one.
+        retentionRow('withdrawn-31', { topicIdentifier: RET_OPEN_TOPIC, lastSeenAt: ago(60), withdrawnAt: ago(31) }),
+        retentionRow('withdrawn-29', { topicIdentifier: RET_OPEN_TOPIC, lastSeenAt: ago(60), withdrawnAt: ago(29) }),
+        // OPEN topic, not withdrawn: kept however old.
+        retentionRow('open-200', { topicIdentifier: RET_OPEN_TOPIC, lastSeenAt: ago(200) }),
       ],
     });
     await prisma.rawFetch.createMany({
       data: [
-        { source: 'partner_search', key: RET_TOPIC, hash: 'old', fetchedAt: ago(91) },
-        { source: 'partner_search', key: RET_TOPIC, hash: 'recent', fetchedAt: ago(89) },
+        // CLOSED topic: 90-day rule.
+        { source: 'partner_search', key: RET_TOPIC, hash: 'closed-91', fetchedAt: ago(91) },
+        { source: 'partner_search', key: RET_TOPIC, hash: 'closed-89', fetchedAt: ago(89) },
+        // OPEN topic: older than 30 days and not the newest goes; the newest stays.
+        { source: 'partner_search', key: RET_OPEN_TOPIC, hash: 'open-200', fetchedAt: ago(200) },
+        { source: 'partner_search', key: RET_OPEN_TOPIC, hash: 'open-31', fetchedAt: ago(31) },
+        { source: 'partner_search', key: RET_OPEN_TOPIC, hash: 'open-29', fetchedAt: ago(29) },
+        { source: 'partner_search', key: RET_OPEN_TOPIC, hash: 'open-5', fetchedAt: ago(5) },
+        // An only snapshot stays at any age while its topic is not closed.
+        { source: 'partner_search', key: RET_SOLO_KEY, hash: 'solo-200', fetchedAt: ago(200) },
       ],
     });
 
     const outcome = await runPartnerSearchRetention(NOW);
-    expect(outcome.kind).toBe('done');
-    if (outcome.kind !== 'done') return;
-    expect(outcome.summary).toEqual({ closedDeleted: 1, withdrawnDeleted: 1, rawFetchDeleted: 1 });
+    expect(outcome).toEqual({ kind: 'done', summary: { closedDeleted: 1, withdrawnDeleted: 1, rawFetchDeleted: 3 } });
 
     const left = await prisma.partnerSearchAnnouncement.findMany({
-      where: { externalId: { in: ['closed-91', 'closed-89', 'withdrawn-31', 'withdrawn-29'] } },
+      where: { topicIdentifier: { in: [RET_TOPIC, RET_OPEN_TOPIC] } },
       select: { externalId: true },
     });
-    expect(left.map((r) => r.externalId).sort()).toEqual(['closed-89', 'withdrawn-29']);
-    const raw = await prisma.rawFetch.findMany({ where: { source: 'partner_search', key: RET_TOPIC }, select: { hash: true } });
-    expect(raw.map((r) => r.hash)).toEqual(['recent']);
-  });
+    expect(left.map((r) => r.externalId).sort()).toEqual(['closed-89', 'open-200', 'withdrawn-29']);
 
-  it('flag ON: an OPEN topic keeps its old rows', async () => {
-    await prisma.topic.update({ where: { identifier: RET_TOPIC }, data: { status: 'OPEN' } });
-    await prisma.partnerSearchAnnouncement.create({ data: retentionRow('open-200', { lastSeenAt: ago(200) }) });
-    await runPartnerSearchRetention(NOW);
-    expect(await prisma.partnerSearchAnnouncement.count({ where: { externalId: 'open-200' } })).toBe(1);
-    await prisma.topic.update({ where: { identifier: RET_TOPIC }, data: { status: 'CLOSED' } });
+    const raw = await prisma.rawFetch.findMany({
+      where: { source: 'partner_search', key: { in: [RET_TOPIC, RET_OPEN_TOPIC, RET_SOLO_KEY] } },
+      select: { hash: true },
+    });
+    expect(raw.map((r) => r.hash).sort()).toEqual(['closed-89', 'open-29', 'open-5', 'solo-200']);
+
+    const org = await prisma.cordisOrganization.findUnique({
+      where: { organisationId: RET_PIC },
+      select: { hasActiveAnnouncements: true, lastAnnouncementAt: true },
+    });
+    expect(org).toEqual({ hasActiveAnnouncements: false, lastAnnouncementAt: null });
+
+    expect(await runPartnerSearchRetention(NOW)).toEqual({
+      kind: 'done',
+      summary: { closedDeleted: 0, withdrawnDeleted: 0, rawFetchDeleted: 0 },
+    });
   });
 });
 

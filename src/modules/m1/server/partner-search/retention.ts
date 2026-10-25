@@ -8,11 +8,16 @@ import { refreshOrganisationFlags } from './ingestor';
 /**
  * Partner Search retention (FO-65 F4 / TASK-MVL3LMW9R7S5E; also FO-60 card step 5).
  *
- * Three rules, one nightly job, no-op while the global flag is off:
+ * Four rules, one nightly job, no-op while the global flag is off:
  *  - announcements of a CLOSED topic are deleted 90 days after their last scan
  *    (closed topics are no longer scanned, so `lastSeenAt` is the closing date);
- *  - withdrawn announcements are deleted 30 days after `withdrawnAt`;
- *  - RawFetch rows of a CLOSED topic are deleted 90 days after they were fetched.
+ *  - withdrawn announcements are deleted 30 days after `withdrawnAt`, on any topic;
+ *  - RawFetch rows of a CLOSED topic are deleted 90 days after they were fetched;
+ *  - every other `partner_search` RawFetch row older than 30 days is deleted unless it
+ *    is the newest snapshot of its key (PR #163 review Ö2, lead decision). An old
+ *    snapshot still carries the summary of an announcement withdrawn since, so the
+ *    30-day rule would not hold without it; the newest one is the ingestor's
+ *    change baseline and stays.
  *
  * Lead decision (FO-60): closed-topic rows are DELETED after 90 days, not moved to an
  * archive table. The card's "arşivlenir" wording is superseded by that decision.
@@ -51,16 +56,14 @@ export async function runPartnerSearchRetention(now: Date = new Date()): Promise
   }
 
   const { closedBefore, withdrawnBefore } = retentionCutoffs(now);
-  const closed = await prisma.topic.findMany({ where: { status: 'CLOSED' }, select: { identifier: true } });
-  const closedIds = closed.map((t) => t.identifier).filter(isPresentId);
-
+  // Relation filters, not `in: [...]` lists: the closed-topic set only grows (crw2-fb).
+  const closedWhere = { topic: { status: 'CLOSED' as const }, lastSeenAt: { lt: closedBefore } };
   const stale = await prisma.partnerSearchAnnouncement.findMany({
-    where: { topicIdentifier: { in: closedIds }, lastSeenAt: { lt: closedBefore } },
-    select: { externalId: true, organizationPic: true },
+    where: closedWhere,
+    select: { organizationPic: true },
+    distinct: ['organizationPic'],
   });
-  const closedDeleted = await prisma.partnerSearchAnnouncement.deleteMany({
-    where: { externalId: { in: stale.map((s) => s.externalId).filter(isPresentId) } },
-  });
+  const closedDeleted = await prisma.partnerSearchAnnouncement.deleteMany({ where: closedWhere });
   const pics = new Set(stale.map((s) => s.organizationPic).filter(isPresentId));
   await refreshOrganisationFlags(pics);
 
@@ -68,14 +71,24 @@ export async function runPartnerSearchRetention(now: Date = new Date()): Promise
     where: { withdrawnAt: { lt: withdrawnBefore } },
   });
 
-  const raw = await prisma.rawFetch.deleteMany({
-    where: { source: PARTNER_SEARCH_SOURCE, key: { in: closedIds }, fetchedAt: { lt: closedBefore } },
-  });
+  const rawClosed = await prisma.$executeRaw`
+    DELETE FROM "RawFetch" r
+     WHERE r."source" = ${PARTNER_SEARCH_SOURCE}
+       AND r."fetchedAt" < ${closedBefore}
+       AND EXISTS (SELECT 1 FROM "Topic" t WHERE t."identifier" = r."key" AND t."status" = 'CLOSED')`;
+  const rawSuperseded = await prisma.$executeRaw`
+    DELETE FROM "RawFetch" r
+     WHERE r."source" = ${PARTNER_SEARCH_SOURCE}
+       AND r."fetchedAt" < ${withdrawnBefore}
+       AND EXISTS (
+         SELECT 1 FROM "RawFetch" n
+          WHERE n."source" = r."source" AND n."key" = r."key"
+            AND (n."fetchedAt", n."id") > (r."fetchedAt", r."id"))`;
 
   const summary = {
     closedDeleted: closedDeleted.count,
     withdrawnDeleted: withdrawn.count,
-    rawFetchDeleted: raw.count,
+    rawFetchDeleted: rawClosed + rawSuperseded,
   };
   logger.info('[partner-search] retention done', summary);
   return { kind: 'done', summary };

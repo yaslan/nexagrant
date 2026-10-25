@@ -3,9 +3,12 @@
 --
 -- Purpose: the app role fabrika_app could UPDATE PlatformSetting, so any code
 -- path with the app connection could switch the partner-search ingestor on.
--- Now the app role reads the table and nothing else. The one write path is
--- set_platform_setting(), which runs as the owner, writes the row and an
--- AuditEvent in the same statement's transaction.
+-- Now the app role reads the table and nothing else, and cannot call the
+-- writer either (PR #163 review, crw-fb B1): set_platform_setting() is EXECUTE
+-- for its owner only, so a flag flip needs the owner connection, not the app's.
+-- The writer takes the acting admin's User id, refuses a NULL/blank one or one
+-- that is not a live platform admin, and writes the row and an AuditEvent in the
+-- same statement's transaction.
 --
 -- RLS: PlatformSetting is policy-less on purpose (SYSTEM_WIDE in
 -- scripts/rls-models.ts). AuditEvent is FORCE RLS and its NULL-tenant rows open
@@ -13,8 +16,9 @@
 -- body (owner path of system_scope_open(), like agency_funnel_counts) and puts
 -- the old value back. No enter_system_scope seal is needed.
 --
--- Re-run caveat: prisma/rls-app-role.sql grants DML on ALL TABLES to fabrika_app.
--- It carries the same REVOKE at its end, so re-running it does not undo this.
+-- Re-run caveat: prisma/rls-app-role.sql grants DML on ALL TABLES to fabrika_app
+-- (its step 3). Its step 3b repeats the PlatformSetting REVOKE right after, so
+-- re-running it does not undo this. It grants no EXECUTE on functions.
 --
 -- Idempotent: REVOKE / GRANT / CREATE OR REPLACE. Rollback: platform-setting-write-guard.down.sql.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -37,6 +41,15 @@ BEGIN
   IF jsonb_typeof(p_value) IS DISTINCT FROM 'boolean' THEN
     RAISE EXCEPTION 'set_platform_setting: % takes a boolean', p_key USING ERRCODE = '22023';
   END IF;
+  -- The audit row names a real admin, never free text (crw-fb B1).
+  IF p_actor IS NULL OR btrim(p_actor) = '' THEN
+    RAISE EXCEPTION 'set_platform_setting: actor is required' USING ERRCODE = '22004';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM "User" WHERE "id" = p_actor AND "isPlatformAdmin" AND "deletedAt" IS NULL
+  ) THEN
+    RAISE EXCEPTION 'set_platform_setting: actor % is not a platform admin', p_actor USING ERRCODE = '42501';
+  END IF;
 
   PERFORM set_config('app.system_scope', 'on', true);
   INSERT INTO "PlatformSetting" ("key", "value", "updatedAt")
@@ -57,14 +70,17 @@ BEGIN
 END
 $fn$;
 
+-- Owner only: no EXECUTE for PUBLIC, and none for the app role (an earlier
+-- version of this file granted it; the REVOKE below takes it back on re-run).
 REVOKE ALL ON FUNCTION public.set_platform_setting(text, jsonb, text) FROM PUBLIC;
 
--- The app role may call the writer, and cannot write the table directly.
-REVOKE INSERT, UPDATE, DELETE ON "PlatformSetting" FROM fabrika_app;
+-- The app role reads the table, and can neither write it nor call the writer.
+-- Inside the role check: a database without fabrika_app must still migrate.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+    EXECUTE 'REVOKE INSERT, UPDATE, DELETE ON "PlatformSetting" FROM fabrika_app';
     EXECUTE 'GRANT SELECT ON "PlatformSetting" TO fabrika_app';
-    EXECUTE 'GRANT EXECUTE ON FUNCTION public.set_platform_setting(text, jsonb, text) TO fabrika_app';
+    EXECUTE 'REVOKE EXECUTE ON FUNCTION public.set_platform_setting(text, jsonb, text) FROM fabrika_app';
   END IF;
 END $$;
