@@ -8,6 +8,11 @@
  * receive the raw text. The rule itself stays in mask.ts (`maskContact`): this file
  * adds no pattern of its own.
  *
+ * tests/partner-search-read.test.ts holds every file that reaches stored announcements
+ * (the delegate, the `Topic.partnerAnnouncements` relation, raw SQL) to this: it must
+ * CALL `maskContact` / `toPublicSummary` and must not let the raw `description` out
+ * beside it. That is a per-file scan of the code, not a type guarantee.
+ *
  * Masking an already masked text is a no-op (`[email]` / `[phone]` match nothing),
  * so calling it on every read costs nothing and never double-masks.
  */
