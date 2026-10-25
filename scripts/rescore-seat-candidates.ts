@@ -6,10 +6,12 @@
  * Each row is re-derived from its own stored breakdown through the scorer that wrote it
  * (src/lib/scoring/seat-rescore.ts), and the seat's ranks follow. A second run writes nothing.
  *
- *   pnpm jobs:seat-rescore                       # dry run, prints the diff, writes nothing
- *   pnpm jobs:seat-rescore -- --apply            # writes the scores and ranks
+ *   pnpm jobs:seat-rescore -- --all-tenants      # dry run over every tenant, writes nothing
  *   pnpm jobs:seat-rescore -- --tenant demo-tenant --apply
+ *   pnpm jobs:seat-rescore -- --all-tenants --apply
+ *   pnpm jobs:seat-rescore -- --all-tenants --apply --confirm-remote-db   # non-local DATABASE_URL
  *
+ * A run must name its scope (`--tenant <id>` or `--all-tenants`); a bare run is refused.
  * Every tenant is read and written inside its own `withTenant`, so the tenant_isolation policy
  * holds for the job as it does for a request. Not to be run against production without a
  * separate approval (FO-147).
@@ -19,35 +21,14 @@ import 'dotenv/config';
 
 import { prisma, withTenant } from '../src/lib/db';
 import { consortiumWeights } from '../src/lib/scoring/consortium';
+import { parseSeatRescoreArgs } from '../src/lib/scoring/seat-rescore-args';
 import { planSeatRescore, type StoredSeatCandidate } from '../src/lib/scoring/seat-rescore';
-
-interface Options {
-  apply: boolean;
-  tenantId: string | null;
-  verbose: boolean;
-}
-
-function parseArgs(argv: string[]): Options {
-  const opts: Options = { apply: false, tenantId: null, verbose: false };
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    // `pnpm jobs:seat-rescore -- --apply` forwards the bare separator; skip it rather than reject it.
-    if (arg === '--') continue;
-    if (arg === '--apply') opts.apply = true;
-    else if (arg === '--dry-run') opts.apply = false;
-    else if (arg === '--verbose') opts.verbose = true;
-    else if (arg === '--tenant') opts.tenantId = argv[++i] ?? null;
-    else if (arg.startsWith('--tenant=')) opts.tenantId = arg.slice('--tenant='.length);
-    else if (arg.startsWith('--')) throw new Error(`Unknown flag: ${arg}`);
-  }
-  return opts;
-}
 
 /** Example rows printed per tenant without --verbose. */
 const SAMPLE_ROWS = 5;
 
 async function main(): Promise<void> {
-  const opts = parseArgs(process.argv.slice(2));
+  const opts = parseSeatRescoreArgs(process.argv.slice(2), process.env.DATABASE_URL);
   const weights = consortiumWeights();
 
   const tenants: { id: string }[] = await prisma.tenant.findMany({

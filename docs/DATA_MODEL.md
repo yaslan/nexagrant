@@ -1066,7 +1066,7 @@ Rakip cezası skoru 0'ın altına düşüremez; sıra ham toplamdan kurulur, kı
 okunur ve yeniden hesaplama bu yüzden kendiliğinden idempotenttir. Eşleştiricinin `breakdown`'ı ham
 puan olarak kalır (UI dökümü bunları gösterir); Aday Bul satırlarında `breakdown.total` = `score`.
 
-Eski satırlar: `pnpm jobs:seat-rescore` (kuru koşu) / `-- --apply` (`scripts/rescore-seat-candidates.ts`).
+Eski satırlar: `pnpm jobs:seat-rescore -- --all-tenants` (kuru koşu) / `-- --all-tenants --apply` (`scripts/rescore-seat-candidates.ts`). Kapsam bayrağı zorunlu: `--tenant <id>` ya da `--all-tenants`; değersiz `--tenant` hata verir. Yerel olmayan `DATABASE_URL` üzerinde `--apply` ayrıca `--confirm-remote-db` ister (`src/lib/scoring/seat-rescore-args.ts`).
 Kiracı başına `withTenant` içinde okur/yazar, koltuğun sıralarını yeni skora göre yeniden kurar,
 `breakdown`'ı iki puanlayıcıdan hiçbirine uymayan koltuğu dokunmadan "SKIPPED" diye raporlar. İkinci
 koşu 0 satır yazar. Canlı ortamda ayrı onayla koşulur.
