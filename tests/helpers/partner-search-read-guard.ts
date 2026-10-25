@@ -6,7 +6,7 @@ import ts from 'typescript';
  * It looks at one production file and says (a) whether the file reaches stored
  * `PartnerSearchAnnouncement` rows at all, (b) whether it CALLS the masking
  * function, (c) where it lets the raw `description` out of a masking call.
- * It reads the code, not the comments: a `// TODO: toPublicSummary` proves nothing.
+ * It reads the AST, not the comments: a `// TODO: toPublicSummary` proves nothing.
  *
  * What it cannot do: follow a value across functions or files. A reader that
  * calls `toPublicSummary` and never touches `description` outside it passes; a
@@ -15,36 +15,104 @@ import ts from 'typescript';
 
 const MASK_CALLS = new Set(['maskContact', 'toPublicSummary']);
 
-/** The file's code with every comment removed (JSDoc included); strings and templates stay. */
-export function codeOnly(source: string, fileName = 'file.ts'): string {
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const parts: string[] = [];
-  const walk = (node: ts.Node) => {
-    if (node.kind === ts.SyntaxKind.JSDoc) return;
-    const kids = node.getChildren(sf);
-    if (kids.length === 0) {
-      if (node.kind !== ts.SyntaxKind.EndOfFileToken) parts.push(node.getText(sf));
-      return;
+const DELEGATE = 'partnerSearchAnnouncement';
+const RELATION = 'partnerAnnouncements';
+const TABLE = /\\?"PartnerSearchAnnouncement\\?"/;
+/** Delegate methods that hand back no row: a count of changed rows cannot carry the text. */
+const NO_ROW_METHODS = new Set(['updateMany', 'deleteMany', 'createMany', 'count']);
+
+/** Does the object literal name `description` / the relation anywhere (or hide keys behind a spread / computed key)? */
+function selectCanReachText(select: ts.ObjectLiteralExpression): boolean {
+  let reaches = false;
+  const visit = (n: ts.Node) => {
+    if (ts.isSpreadAssignment(n) || ts.isComputedPropertyName(n)) reaches = true;
+    if (
+      (ts.isPropertyAssignment(n) || ts.isShorthandPropertyAssignment(n)) &&
+      (ts.isIdentifier(n.name) || ts.isStringLiteral(n.name)) &&
+      (n.name.text === 'description' || n.name.text === RELATION)
+    ) {
+      reaches = true;
     }
-    kids.forEach(walk);
+    if (!reaches) ts.forEachChild(n, visit);
   };
-  walk(sf);
-  return parts.join(' ');
+  visit(select);
+  return reaches;
 }
 
 /**
- * Does the file read stored announcements? Three ways in:
- *  - the Prisma delegate: `partnerSearchAnnouncement.findMany(…)` and its siblings;
- *  - the relation: `include/select: { partnerAnnouncements: … }` off `Topic`;
- *  - raw SQL: the quoted table name `"PartnerSearchAnnouncement"`.
+ * Can this delegate call hand the text back? Only a `select` object literal that never names
+ * `description` (or the relation) rules it out; no `select` (a whole row), `include`, a
+ * `select` held in a variable, or a spread all keep it a reader.
+ */
+function delegateCallReachesText(call: ts.CallExpression, method: string): boolean {
+  if (NO_ROW_METHODS.has(method)) return false;
+  const arg = call.arguments[0];
+  if (!arg || !ts.isObjectLiteralExpression(arg)) return true;
+  const select = arg.properties.find(
+    (p): p is ts.PropertyAssignment =>
+      ts.isPropertyAssignment(p) && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) && p.name.text === 'select'
+  );
+  if (!select || !ts.isObjectLiteralExpression(select.initializer)) return true;
+  return selectCanReachText(select.initializer);
+}
+
+/** The raw SQL around a quoted table name: climb out of `+` / parentheses to the query call or template. */
+function rawQueryText(literal: ts.Node, sf: ts.SourceFile): string {
+  let n: ts.Node = literal;
+  while (n.parent && (ts.isBinaryExpression(n.parent) || ts.isParenthesizedExpression(n.parent) || ts.isTemplateSpan(n.parent) || ts.isTemplateExpression(n.parent))) {
+    n = n.parent;
+  }
+  if (n.parent && (ts.isTaggedTemplateExpression(n.parent) || ts.isCallExpression(n.parent))) n = n.parent;
+  return n.getText(sf);
+}
+
+/**
+ * Does the file read the TEXT of stored announcements? Three ways in:
+ *  - the Prisma delegate, any method (`find*`, `groupBy`, `update`, `create`, `delete`, `['x']`,
+ *    a delegate held in a variable) unless it provably cannot return the text: a `select`
+ *    literal without `description`, or a method that returns no row (`updateMany`, `count`);
+ *  - the relation: `partnerAnnouncements` as an include/select key off `Topic`;
+ *  - raw SQL: the quoted table name `"PartnerSearchAnnouncement"` in a query that mentions
+ *    `description` or `*`.
+ * A file that only touches ids and counts is not a reader and owes the mask nothing.
  */
 export function readsAnnouncements(source: string, fileName = 'file.ts'): boolean {
-  const code = codeOnly(source, fileName);
-  return (
-    /\bpartnerSearchAnnouncement\s*\.\s*(findMany|findFirst|findUnique|findFirstOrThrow|findUniqueOrThrow)\b/.test(code) ||
-    /\bpartnerAnnouncements\b/.test(code) ||
-    /\\?"PartnerSearchAnnouncement\\?"/.test(code)
-  );
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let found = false;
+  const visit = (node: ts.Node) => {
+    if (found) return;
+    let use: ts.Node | undefined;
+    if (ts.isIdentifier(node) && node.text === DELEGATE) {
+      const p = node.parent;
+      if (p && ts.isPropertyAccessExpression(p) && p.name === node) use = p;
+      else if (p && ts.isPropertyAccessExpression(p) && p.expression === node) use = node;
+      else if (p && (ts.isBindingElement(p) || ts.isShorthandPropertyAssignment(p))) found = true;
+    } else if (ts.isStringLiteralLike(node) && node.text === DELEGATE && node.parent && ts.isElementAccessExpression(node.parent)) {
+      use = node.parent;
+    } else if (ts.isIdentifier(node) && node.text === RELATION) {
+      found = true;
+    } else if (ts.isStringLiteralLike(node) && node.text === RELATION) {
+      found = true;
+    } else if (
+      (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) &&
+      TABLE.test(node.getText(sf))
+    ) {
+      const sql = rawQueryText(node, sf);
+      if (/description/i.test(sql) || sql.includes('*')) found = true;
+    }
+    if (use && !found) {
+      const access = use.parent;
+      const call = access && ts.isPropertyAccessExpression(access) && access.expression === use ? access.parent : undefined;
+      if (access && call && ts.isCallExpression(call) && call.expression === access && ts.isPropertyAccessExpression(access)) {
+        if (delegateCallReachesText(call, access.name.text)) found = true;
+      } else {
+        found = true;
+      }
+    }
+    if (!found) ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
 }
 
 function calleeName(call: ts.CallExpression): string {

@@ -42,18 +42,24 @@ describe('toPublicSummary (FO-137)', () => {
 /**
  * What this guard proves, and what it does not (FO-137, widened in FO-151).
  *
- * Every production file that reaches stored announcements must (1) CALL `maskContact`
- * or `toPublicSummary`, and (2) not let the raw `description` out beside that call.
- * "Reaches" means the Prisma delegate (`partnerSearchAnnouncement.find*`), the `Topic`
- * relation (`partnerAnnouncements`) or raw SQL (`"PartnerSearchAnnouncement"`). Comments
- * do not count: the scan reads code only. Two files are exempt because no row they read
- * is sent to a client:
+ * Every production file that can read the TEXT of stored announcements must (1) CALL
+ * `maskContact` or `toPublicSummary`, and (2) not let the raw `description` out beside that
+ * call. A file "reads the text" through the Prisma delegate (any method: `find*`, `groupBy`,
+ * `update`, `create`, `['x']`...), the `Topic` relation (`partnerAnnouncements`) or raw SQL
+ * (`"PartnerSearchAnnouncement"` in a query that mentions `description` or `*`). A delegate
+ * call that provably cannot return the text is not a read: `select` is an object literal
+ * that never names `description`, or the method returns no row (`updateMany`, `count`).
+ * Comments do not count: the scan reads code only. Two files are exempt because no row they
+ * read is sent to a client:
  *  - ingestor.ts reads `description` only to compare it with the scan it is about to write;
  *  - retention.ts deletes rows and selects ids.
- * It is a per-file scan. It does not follow a value from one file into another, and it
- * does not make a reader return a masked type; a reader that wraps the raw text in a
- * helper with another name still needs a human. A new reader that fails here should call
- * `toPublicSummary` (read.ts), not extend the exempt list.
+ * It is a per-file scan. (1) is one call per file: it does not tie the call to each reader in
+ * that file, so a second reader that returns its rows as they are, or carries a row under
+ * another key (`{ summary: toPublicSummary(x), row: x }`), passes. It does not follow a value
+ * from one file into another, trusts a parameter typed `...Dto` as already mapped, and does not
+ * make a reader return a masked type; a reader that wraps the raw text in a helper with another
+ * name still needs a human. A new reader that fails here should call `toPublicSummary`
+ * (read.ts), not extend the exempt list.
  */
 describe('announcement readers mask on the server (FO-137)', () => {
   const NEVER_LEAVES_THE_SERVER = new Set([
@@ -120,6 +126,51 @@ describe('the guard recognises the leaks it polices (FO-151)', () => {
   it('M5: raw SQL against the table counts as a reader', () => {
     expect(readsAnnouncements('p.$queryRaw`SELECT description FROM "PartnerSearchAnnouncement"`')).toBe(true);
     expect(readsAnnouncements(`p.$queryRawUnsafe('SELECT description FROM \\"PartnerSearchAnnouncement\\"')`)).toBe(true);
+  });
+
+  it('FO-151 B1: a delegate call whose select never names description is not a text read', () => {
+    // consortium.ts (#173/#174) and the Partner Search admin console (FO-64) read ids / PIC / country only.
+    const pic = `p.partnerSearchAnnouncement.findMany({ where: { topicId }, select: { organizationPic: true, publishedAt: true } })`;
+    expect(readsAnnouncements(pic)).toBe(false);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany({ select: { id: true, organizationName: true, country: true } })`)).toBe(false);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.updateMany({ where: { id }, data: { status: 'x' } })`)).toBe(false);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.count({ where: { country } })`)).toBe(false);
+    expect(readsAnnouncements(`rows.map((c) => ({ ...c, rank: i }))`)).toBe(false);
+  });
+
+  it('FO-151 B1: any way the select can reach the text keeps the file a reader', () => {
+    const f = (sel: string) => `p.partnerSearchAnnouncement.findMany({ select: ${sel} })`;
+    expect(readsAnnouncements(f('{ id: true, description: true }'))).toBe(true);
+    expect(readsAnnouncements(f(`{ id: true, 'description': true }`))).toBe(true);
+    expect(readsAnnouncements(f('{ id: true, description }'))).toBe(true);
+    expect(readsAnnouncements(f('{ ...base, id: true }'))).toBe(true);
+    expect(readsAnnouncements(f('{ [key]: true }'))).toBe(true);
+    expect(readsAnnouncements(f('{ topic: { select: { partnerAnnouncements: true } } }'))).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany({ select })`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany({ include: { topic: true } })`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany({ where: { id } })`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany(args)`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany()`)).toBe(true);
+  });
+
+  it('FO-151 Ö2: every delegate method, bracket access and a held delegate count (X3-X5)', () => {
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.groupBy({ by: ['description'], _count: true })`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.update({ where: { id }, data: { status: 'x' } })`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.create({ data })`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.delete({ where: { id } })`)).toBe(true);
+    expect(readsAnnouncements(`p['partnerSearchAnnouncement'].findMany()`)).toBe(true);
+    expect(readsAnnouncements(`const d = p.partnerSearchAnnouncement; d.findMany();`)).toBe(true);
+    expect(readsAnnouncements(`const { partnerSearchAnnouncement } = p; partnerSearchAnnouncement.findMany();`)).toBe(true);
+    expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany.call(p, {})`)).toBe(true);
+  });
+
+  it('FO-151 B1: raw SQL is a reader when it can select the text, not when it counts ids', () => {
+    expect(readsAnnouncements('p.$queryRaw`SELECT id FROM "PartnerSearchAnnouncement" WHERE country = ${c}`')).toBe(false);
+    expect(readsAnnouncements('p.$queryRaw`SELECT * FROM "PartnerSearchAnnouncement"`')).toBe(true);
+    expect(readsAnnouncements('p.$queryRaw`SELECT a.* FROM "PartnerSearchAnnouncement" a`')).toBe(true);
+    expect(readsAnnouncements('p.$queryRaw`SELECT "Description" FROM "PartnerSearchAnnouncement" WHERE id = ${id}`')).toBe(true);
+    expect(readsAnnouncements('p.$queryRaw`SELECT id FROM "PartnerSearchAnnouncement" WHERE id = ${id} AND description LIKE ${q}`')).toBe(true);
+    expect(readsAnnouncements(`p.$queryRawUnsafe('SELECT ' + cols + ' FROM \\"PartnerSearchAnnouncement\\" WHERE description IS NOT NULL')`)).toBe(true);
   });
 
   it('a comment that merely names the model or the relation is not a reader', () => {
