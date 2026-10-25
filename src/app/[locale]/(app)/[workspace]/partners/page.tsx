@@ -5,6 +5,7 @@ import { getWorkspaceRoute } from '@/lib/routes';
 import { ModuleLink } from '@/components/ModuleLink';
 import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
+import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { recordAlert } from '@/lib/observability/system-alert';
 
@@ -547,7 +548,7 @@ export default async function PartnersPage({
                       )}
                       {p.sme && (
                         <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold font-mono px-1.5 py-0.2 rounded">
-                          SME
+                          {t('smeBadge')}
                         </span>
                       )}
                       {p.isInterreg && (
@@ -588,7 +589,7 @@ export default async function PartnersPage({
                   <td className="p-4 text-right font-mono font-bold text-emerald-700">
                     {p.totalEcContribution === null
                       ? '—'
-                      : `€ ${Number(p.totalEcContribution).toLocaleString()}`}
+                      : formatWholeMoney(p.totalEcContribution, 'EUR', locale)}
                   </td>
                 </tr>
               ))}
