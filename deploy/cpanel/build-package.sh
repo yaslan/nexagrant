@@ -17,6 +17,9 @@
 # uploaded blog cover, whatever cPanel says at runtime (TASK-MVCH99A54WALG).
 # Give the exact value cPanel will carry, or FB_NO_PUBLIC_ASSETS=1 to build
 # without uploaded images on purpose.
+# FB_PNPM_STORE=<dir> keeps the container's pnpm store between runs (a slow
+# registry then resumes instead of starting over); the packages are the
+# lockfile's either way.
 set -euo pipefail
 
 if [ -z "${FB_BUILD_DIR:-}" ] && [ -z "${R2_PUBLIC_HOST:-}" ] && [ "${FB_NO_PUBLIC_ASSETS:-}" != 1 ]; then
@@ -38,9 +41,17 @@ if [ -n "${FB_BUILD_DIR:-}" ]; then
   # Re-package an earlier container build (its build-out.tar + build.log) without rebuilding.
   cp "$FB_BUILD_DIR/build-out.tar" "$FB_BUILD_DIR/build.log" "$WORK/"
 else
+  # Same rule as src/lib/env.ts (blank = unset) and publicAssetImagePattern (http/https
+  # only, or no pattern is built): a value with stray spaces or another scheme stops here.
+  R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" FB_NO_PUBLIC_ASSETS="${FB_NO_PUBLIC_ASSETS:-}" node -e '
+    const v = process.env.R2_PUBLIC_HOST; let p = ""; try { p = new URL(v).protocol } catch {}
+    if (v === "" && process.env.FB_NO_PUBLIC_ASSETS === "1") process.exit(0);
+    if (v !== v.trim() || (p !== "http:" && p !== "https:")) { console.error("R2_PUBLIC_HOST must be an http(s) URL without spaces"); process.exit(1) }'
   git -C "$REPO" archive --format=tar "$COMMIT" > "$WORK/src.tar"
   cp "$HERE/container-build.sh" "$WORK/build.sh"
-  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
+  STORE=()
+  if [ -n "${FB_PNPM_STORE:-}" ]; then mkdir -p "$FB_PNPM_STORE"; STORE=(-v "$(cd "$FB_PNPM_STORE" && pwd):/root/.local/share/pnpm/store"); fi
+  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" ${STORE[@]+"${STORE[@]}"} -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
 fi
 grep -q 'TAR_OK' "$WORK/build.log"
 
@@ -54,8 +65,9 @@ cp "$WORK/b/worker-out/jobs-worker.cjs" "$S/app/jobs-worker.cjs"
 mkdir "$S/certs" && cp "$WORK/b/certs/"*.crt "$WORK/b/certs/README.md" "$S/certs/"
 cp "$HERE/app.js" "$HERE/package.json" "$HERE/worker.sh" "$S/"
 chmod 755 "$S/worker.sh"
-# Nothing the build may have left that is not for the server.
-find "$S" \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '.DS_Store' \) -print -delete
+# Nothing the build may have left that is not for the server. Source maps go too
+# (FO-141 5): the standalone server never serves them, only stack-trace tools read them.
+find "$S" \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '.DS_Store' -o -name '*.map' \) -print -delete
 # The only links allowed: Turbopack's aliases for serverExternalPackages under
 # app/.next/node_modules (relative, inside the package). app.js restores them
 # from this manifest if the extractor loses them.

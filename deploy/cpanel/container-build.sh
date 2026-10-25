@@ -13,6 +13,11 @@ node_modules/.bin/prisma generate
 # R2_PUBLIC_HOST comes from build-package.sh (docker -e); next.config freezes it.
 NODE_ENV=production DEMO_LOGIN_ENABLED=false NEXT_PUBLIC_APP_URL=https://fonbridge.com R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" pnpm build
 echo BUILD_OK
+# The blog-image pattern must be in the config the standalone server starts with.
+node -e 'const c=require("/app/.next/required-server-files.json").config.images.remotePatterns, v=(process.env.R2_PUBLIC_HOST||"").trim();
+  const h=v?new URL(v).hostname:null, hit=c.filter(p=>p.hostname===h);
+  console.log("remotePatterns:", JSON.stringify(c.map(p=>p.hostname+(p.pathname||""))));
+  if (h && hit.length!==1) { console.error("R2_PUBLIC_HOST pattern missing from the build"); process.exit(1); }'
 # Scheduled-job worker as one CJS file; @prisma/client resolves from the standalone node_modules.
 node_modules/esbuild/bin/esbuild scripts/jobs-worker.ts --bundle --platform=node --target=node22 --format=cjs \
   --outfile=/app/worker-out/jobs-worker.cjs --tsconfig=tsconfig.json \
