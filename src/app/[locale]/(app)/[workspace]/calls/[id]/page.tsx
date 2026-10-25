@@ -8,6 +8,8 @@ import { requireTenantPage } from '@/lib/tenant';
 import { normalizeWorkspaceSlug, resolveScopedWorkspace } from '@/lib/workspaces';
 import { getWorkspaceRoute, publicCallDetailHref } from '@/lib/routes';
 import AddToPipelineButton from './add-button';
+import { PartnerSignalBox } from '@/modules/m1/ui/partner-search/PartnerSignalBox';
+import { createRelationship } from '../../relationships/actions';
 
 export default async function CallDetailsPage({
   params,
@@ -191,6 +193,15 @@ export default async function CallDetailsPage({
             ))}
           </div>
         </div>
+
+        <PartnerSignalBox
+          topicIdentifier={call.id}
+          upgradeHref={getWorkspaceRoute('settingsBilling', locale, workspace)}
+          links={{
+            partnerHref: getWorkspaceRoute('partnerDetail', locale, workspace, ':pic'),
+            addToRelationships: createRelationship,
+          }}
+        />
       </div>
     </div>
   );
