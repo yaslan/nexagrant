@@ -19,10 +19,11 @@ import { skipOrFailInCi } from './helpers/live-db-role';
  * the same server and checks the grants, the unchanged password, and the
  * second run.
  *
- * It creates `fabrika_app` itself, so it only runs where the role is absent
- * (CI, or an isolated local cluster). On a shared cluster where another
- * checkout already owns the role, it skips with a warning locally and fails in
- * CI, because dropping that role would break every checkout that uses it.
+ * The role is the shared one CI creates in `Prepare database` (db:setup runs
+ * before vitest), so the test works on the role as it already exists. It takes
+ * the password from DATABASE_URL_RLS_TEST and never creates or drops the role:
+ * dropping a shared role would break every checkout that uses it. Only the two
+ * databases this file creates are dropped.
  *
  * The script appends to `.env` in its working directory, so it runs from a
  * temporary directory that only links `prisma/`. The repo `.env` is never
@@ -33,8 +34,10 @@ const SUITE = 'db:rls-role second-database live test';
 const ROLE = 'fabrika_app';
 const REPO = resolve(import.meta.dirname, '..');
 const SCRIPT = join(REPO, 'scripts/setup-rls-role.ts');
+const SQL = join(REPO, 'prisma/rls-app-role.sql');
 const TSX = join(REPO, 'node_modules/.bin/tsx');
 const ADMIN_URL = envValue('DATABASE_URL');
+const APP_URL = envValue('DATABASE_URL_RLS_TEST') ?? '';
 const RUN = `${Date.now()}_${randomUUID().slice(0, 8)}`.replace(/-/g, '');
 const DB_A = `fo139rls_${RUN}_a`;
 const DB_B = `fo139rls_${RUN}_b`;
@@ -70,12 +73,12 @@ function scratchDir(): string {
   return dir;
 }
 
-function readAppUrl(dir: string): string {
-  const line = readFileSync(join(dir, '.env'), 'utf8')
+/** The SQL file as the script sees it: psql meta-commands stripped, as in scripts/setup-rls-role.ts. */
+function sqlWithoutMetaCommands(): string {
+  return readFileSync(SQL, 'utf8')
     .split('\n')
-    .find((l) => l.startsWith('DATABASE_URL_RLS_TEST='));
-  if (!line) throw new Error('the create run did not write DATABASE_URL_RLS_TEST');
-  return line.slice('DATABASE_URL_RLS_TEST='.length);
+    .filter((line) => !line.startsWith('\\'))
+    .join('\n');
 }
 
 const admin = ADMIN_URL ? new pg.Client({ connectionString: serverUrl('postgres', ADMIN_URL) }) : undefined;
@@ -86,21 +89,17 @@ if (admin) {
     () => undefined
   );
 }
-if (!reachable) {
+const missing = !reachable ? (ADMIN_URL ? 'database unavailable' : 'DATABASE_URL is not set') : !APP_URL ? 'DATABASE_URL_RLS_TEST is not set' : undefined;
+if (missing) {
   await admin?.end().catch(() => undefined);
-  skipOrFailInCi(SUITE, ADMIN_URL ? 'database unavailable' : 'DATABASE_URL is not set');
+  skipOrFailInCi(SUITE, missing);
 }
-const roleExists = reachable && (await admin!.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [ROLE])).rowCount! > 0;
-if (roleExists) {
-  await admin!.end();
-  skipOrFailInCi(SUITE, `role ${ROLE} already exists on this cluster and belongs to another checkout`, 'Run it on a fresh cluster.');
-}
-const ready = reachable && !roleExists;
+const ready = reachable && APP_URL !== '';
 
 describe.skipIf(!ready)(SUITE, () => {
-  // Filled in beforeAll; each `it` reads what the three script runs produced.
-  let appUrlA = '';
+  // Filled in beforeAll; each `it` reads what the script runs produced.
   let scratch = '';
+  let runA: { status: number | null; output: string } | undefined;
   let runB: { status: number | null; output: string } | undefined;
   let runReuse: { status: number | null; output: string } | undefined;
   let runWrongPassword: { status: number | null; output: string } | undefined;
@@ -133,26 +132,17 @@ describe.skipIf(!ready)(SUITE, () => {
       await onDb(db, 'CREATE TABLE "Tenant" (id text PRIMARY KEY)');
     }
 
-    // First database: role absent, the script creates it and mints the password.
+    // The role already exists here (CI's Prepare database step), so every run takes the keep path:
+    // grants for this database, the password checked against DATABASE_URL_RLS_TEST, never rewritten.
     scratch = scratchDir();
-    const created = runScript(scratch, { DATABASE_URL: serverUrl(DB_A, ADMIN_URL as string), DATABASE_URL_RLS_TEST: undefined });
-    expect(created.status, created.output).toBe(0);
-    appUrlA = readAppUrl(scratch);
-
-    // Second database: role present, this .env's URL carries the password.
-    runB = runScript(scratch, {
-      DATABASE_URL: serverUrl(DB_B, ADMIN_URL as string),
-      DATABASE_URL_RLS_TEST: appUrlA,
-    });
+    runA = runScript(scratch, { DATABASE_URL: serverUrl(DB_A, ADMIN_URL as string), DATABASE_URL_RLS_TEST: APP_URL });
+    runB = runScript(scratch, { DATABASE_URL: serverUrl(DB_B, ADMIN_URL as string), DATABASE_URL_RLS_TEST: APP_URL });
     // Second run on B: idempotent.
-    runReuse = runScript(scratch, {
-      DATABASE_URL: serverUrl(DB_B, ADMIN_URL as string),
-      DATABASE_URL_RLS_TEST: appUrlA,
-    });
+    runReuse = runScript(scratch, { DATABASE_URL: serverUrl(DB_B, ADMIN_URL as string), DATABASE_URL_RLS_TEST: APP_URL });
     // A wrong password must fail and must not rewrite the role.
     runWrongPassword = runScript(scratch, {
       DATABASE_URL: serverUrl(DB_B, ADMIN_URL as string),
-      DATABASE_URL_RLS_TEST: withPassword(appUrlA, `${passwordOf(appUrlA)}-wrong`),
+      DATABASE_URL_RLS_TEST: withPassword(APP_URL, `${passwordOf(APP_URL)}-wrong`),
     });
   }, 300_000);
 
@@ -161,8 +151,6 @@ describe.skipIf(!ready)(SUITE, () => {
       for (const db of [DB_A, DB_B]) {
         await admin.query(`DROP DATABASE IF EXISTS "${db}" WITH (FORCE)`).catch(() => undefined);
       }
-      // Only this file ever creates the role on a cluster where it was absent.
-      await admin.query(`DROP ROLE IF EXISTS ${ROLE}`).catch(() => undefined);
       await admin.end().catch(() => undefined);
     }
     if (scratch) rmSync(scratch, { recursive: true, force: true });
@@ -175,7 +163,7 @@ describe.skipIf(!ready)(SUITE, () => {
   }, 120_000);
 
   it('the second database accepts the shared credential and reads the tenant table through it', async () => {
-    const appUrlB = serverUrl(DB_B, appUrlA);
+    const appUrlB = serverUrl(DB_B, APP_URL);
     const rows = await canLogIn(appUrlB, 'SELECT current_user AS who, count(*)::int AS n FROM "Tenant"');
     expect(rows[0]).toEqual({ who: ROLE, n: 0 });
   });
@@ -189,14 +177,25 @@ describe.skipIf(!ready)(SUITE, () => {
     expect(runWrongPassword?.status).not.toBe(0);
     expect(runWrongPassword?.output).toContain('password does not match');
     // The original credential still logs in, on the first database and on the second.
-    const rowsA = await canLogIn(appUrlA, 'SELECT count(*)::int AS n FROM "Tenant"');
+    const rowsA = await canLogIn(serverUrl(DB_A, APP_URL), 'SELECT count(*)::int AS n FROM "Tenant"');
     expect(rowsA).toEqual([{ n: 0 }]);
-    const rowsB = await canLogIn(serverUrl(DB_B, appUrlA), 'SELECT count(*)::int AS n FROM "Tenant"');
+    const rowsB = await canLogIn(serverUrl(DB_B, APP_URL), 'SELECT count(*)::int AS n FROM "Tenant"');
     expect(rowsB).toEqual([{ n: 0 }]);
   });
 
-  it('the first database keeps its own GRANTs', async () => {
+  it('the first database runs and keeps its own GRANTs', async () => {
+    expect(runA?.status, runA?.output).toBe(0);
     const rows = await onDb(DB_A, `SELECT has_table_privilege('${ROLE}', '"Tenant"', 'SELECT') AS ok`);
     expect(rows[0]).toEqual({ ok: true });
+  });
+
+  it('the SQL refuses to run without the password GUC and keeps the shared password', async () => {
+    // The admin connection never sets fabrika.app_password, so the SQL reaches its guard with no password.
+    const before = await admin!.query('SELECT rolpassword FROM pg_authid WHERE rolname = $1', [ROLE]);
+    await expect(admin!.query(sqlWithoutMetaCommands())).rejects.toThrow('fabrika.app_password is not set');
+    const after = await admin!.query('SELECT rolpassword FROM pg_authid WHERE rolname = $1', [ROLE]);
+    expect(after.rows).toEqual(before.rows);
+    const rows = await canLogIn(serverUrl(DB_A, APP_URL), 'SELECT current_user AS who');
+    expect(rows[0]).toEqual({ who: ROLE });
   });
 });

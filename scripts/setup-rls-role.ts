@@ -145,10 +145,16 @@ async function assertRoleAttributes(admin: pg.Client) {
   }
 }
 
-/** Same credential and options, pointed at another database on the same server. */
+/**
+ * Same credential and options, pointed at the server and database of the admin
+ * URL. The grants were applied there, so the login proof must go there too
+ * (TASK-MVNMZ521MJ3AD Ö1); the host and port of the .env URL are not used.
+ */
 function onDatabase(url: string, databaseUrl: string): string {
+  const target = new URL(databaseUrl);
   const next = new URL(url);
-  next.pathname = new URL(databaseUrl).pathname;
+  next.host = target.host;
+  next.pathname = target.pathname;
   return next.toString();
 }
 

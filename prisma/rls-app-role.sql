@@ -51,6 +51,12 @@ BEGIN
     );
     RAISE NOTICE 'role % already existed; password kept, grants re-applied', app_role;
   ELSE
+    -- Without the GUC this branch would send PASSWORD NULL and silently remove
+    -- the shared password (TASK-MVNMZ521MJ3AD B2). Refuse instead.
+    IF app_pw IS NULL OR app_pw = '' THEN
+      RAISE EXCEPTION
+        'fabrika.app_password is not set. Role % already exists; set the password or run with the keep flag (pnpm db:rls-role). Password left unchanged.', app_role;
+    END IF;
     -- Re-assert the attributes and rotate the password. Never widens privileges.
     EXECUTE format(
       'ALTER ROLE %I LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD %L',
