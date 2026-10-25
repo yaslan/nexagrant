@@ -406,7 +406,9 @@ export default function PartnerSearchConsoleClient({
             {t('runsEmpty')}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-surface shadow-2xs">
+          <div className="relative overflow-x-auto rounded-xl border bg-surface shadow-2xs">
+            {/* relative: the sr-only caption and labels are absolute; without a positioned box they
+                escape this scroll box and widen the page on a phone. */}
             <table className="w-full min-w-[820px] border-collapse text-left text-sm" data-testid="ps-runs-table">
               <caption className="sr-only">{t('runsTitle')}</caption>
               <thead>
@@ -497,7 +499,7 @@ export default function PartnerSearchConsoleClient({
             {t('unmatchedEmpty')}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-surface shadow-2xs">
+          <div className="relative overflow-x-auto rounded-xl border bg-surface shadow-2xs">
             <table className="w-full min-w-[820px] border-collapse text-left text-sm" data-testid="ps-unmatched-table">
               <caption className="sr-only">{t('unmatchedTitle', { count: unmatchedCount })}</caption>
               <thead>

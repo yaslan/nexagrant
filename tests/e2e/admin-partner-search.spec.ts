@@ -167,12 +167,25 @@ test.describe.serial('admin partner search — ingestion console', () => {
   });
 
   test('en locale and a 390px phone: no horizontal page scroll', async ({ page, baseURL }) => {
-    await signInAsPlatformAdmin(page, baseURL as string);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/en/admin/partner-search');
-    await expect(page.getByRole('heading', { level: 1, name: 'Partner Search ingestion' })).toBeVisible();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: `${SHOTS}/05-en-mobile-390.png`, fullPage: true });
+    // Both tables must render: an empty console shows only the empty states and hides the overflow.
+    const run = await prisma.partnerSearchIngestionRun.create({
+      data: { trigger: 'MANUAL', status: 'FAILED', finishedAt: new Date(), error: `E2E FO-64 ${RUN} ${'x'.repeat(200)}` },
+    });
+    await prisma.unmatchedOrganization.create({
+      data: { matchKey: `name:${COUNTRY}:E2E MOBILE ${RUN}`, name: `${ORG_NAME} mobile`, country: COUNTRY, lastSeenAt: new Date() },
+    });
+    try {
+      await signInAsPlatformAdmin(page, baseURL as string);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto('/en/admin/partner-search');
+      await expect(page.getByRole('heading', { level: 1, name: 'Partner Search ingestion' })).toBeVisible();
+      await expect(page.getByTestId('ps-runs-table')).toBeVisible();
+      await expect(page.getByTestId('ps-unmatched-table')).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      await page.screenshot({ path: `${SHOTS}/05-en-mobile-390.png`, fullPage: true });
+    } finally {
+      await prisma.partnerSearchIngestionRun.delete({ where: { id: run.id } });
+    }
   });
 });
