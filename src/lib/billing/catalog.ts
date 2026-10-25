@@ -397,6 +397,36 @@ export interface PlanGrant {
    * `plansGrantingModule`, `PLAN_GRANTS` access or the module gate.
    */
   previewModuleIds?: readonly string[];
+  /**
+   * Metered capabilities, keyed by the `limitKey` a plan card's
+   * `PlanFeature` row names (see {@link PLAN_LIMIT_KEYS}). A missing key means
+   * the plan states no limit for it: read through the helper of that limit,
+   * never directly, because "missing" means different things per limit.
+   */
+  limits?: PlanLimits;
+}
+
+/**
+ * The `limitKey` values this catalogue defines. `PlanFeature.limitKey` (kind
+ * `limit`) points at one of these, so a card bullet and the gate read the
+ * same key.
+ */
+export const PLAN_LIMIT_KEYS = {
+  /** Partner Search list queries per tenant per UTC month (FO-61). */
+  partnerSearchQueriesMonthly: 'partner_search_queries_monthly',
+  /** Partner Search JSON/CSV export (FO-61). */
+  partnerSearchExport: 'partner_search_export',
+} as const;
+
+export interface PlanLimits {
+  /**
+   * On a plan **with** M1 a missing value means unlimited; a number meters it.
+   * On a plan **without** M1 a positive number opens Partner Search announcements
+   * (and only those, not the rest of M1) up to that many list queries a month.
+   */
+  readonly partner_search_queries_monthly?: number;
+  /** True opens the export; missing means no export. Requires M1. */
+  readonly partner_search_export?: boolean;
 }
 
 const ALL_MODULE_IDS = [
@@ -423,6 +453,7 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     aiCreditsMonthly: 10,
     moduleIds: ['M3', 'M5'],
     previewModuleIds: ['M0', 'M12', 'M16'],
+    limits: { partner_search_queries_monthly: 10 },
   },
   {
     planId: 'basic',
@@ -433,6 +464,7 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     aiCreditsMonthly: 100,
     moduleIds: ['M2', 'M3', 'M5'],
     previewModuleIds: ['M0', 'M12', 'M16'],
+    limits: { partner_search_queries_monthly: 10 },
   },
   {
     planId: 'pro',
@@ -453,6 +485,7 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     aiCreditsMonthly: 2_000,
     moduleIds: ALL_MODULE_IDS,
     previewModuleIds: ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'],
+    limits: { partner_search_export: true },
   },
 ];
 
@@ -605,6 +638,35 @@ export function plansGrantingModule(moduleId: string): PlanId[] {
   return PLAN_GRANTS.filter(
     (grant) => grant.purchasable && grant.moduleIds.includes(moduleId)
   ).map((grant) => grant.planId as PlanId);
+}
+
+/** What a plan grants of Partner Search beyond the M1 switch (FO-61). */
+export interface PartnerSearchGrant {
+  /** Monthly list-query allowance; null = unlimited (only ever with M1). */
+  queriesMonthly: number | null;
+  export: boolean;
+}
+
+/**
+ * Partner Search terms of `planId`, from {@link PlanLimits}. `hasM1` is the
+ * tenant's M1 entitlement (plan plus add-ons, from `getEntitlements`), because
+ * an M1 add-on on a metered plan turns "no key" into "unlimited". The figure
+ * itself is never typed anywhere else.
+ */
+export function partnerSearchGrant(planId: string, hasM1: boolean): PartnerSearchGrant {
+  const limits = grantsFor(planId)?.limits ?? {};
+  const metered = limits.partner_search_queries_monthly;
+  return {
+    queriesMonthly: typeof metered === 'number' ? metered : hasM1 ? null : 0,
+    export: hasM1 && limits.partner_search_export === true,
+  };
+}
+
+/** Plan names whose card would open the Partner Search export, for an upgrade prompt. */
+export function planNamesGrantingPartnerSearchExport(): string[] {
+  return SELF_SERVE_GRANTS.filter((grant) => grant.purchasable && grant.limits?.partner_search_export === true).map(
+    (grant) => grant.name
+  );
 }
 
 /** The plans a module card lists: the free tier plus the three self-serve plans. */

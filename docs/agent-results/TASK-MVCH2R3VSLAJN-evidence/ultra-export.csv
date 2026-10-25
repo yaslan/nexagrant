@@ -1,0 +1,6 @@
+"# Source: EU Funding & Tenders Portal, fetched 2026-10-22T06:00:00.000Z (https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/how-to-participate/partner-search)"
+# License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). © European Union. Contact details in summaries are masked.
+id,topicIdentifier,callIdentifier,type,organizationName,organizationPic,organizationType,isSme,country,city,publishedAt,lastSeenAt,keywords,programmeCodes,description
+fo61-a4,HORIZON-CL6-2026-D3-01,HORIZON-CL6-2026,EXPERTISE_OFFER,Acme Batarya,999000001,PRC,true,TR,Ankara,2026-09-10T10:00:00.000Z,2026-10-20T06:00:00.000Z,water,HE,"'=HYPERLINK(""http://x"") municipality offering test site."
+fo61-a2,HORIZON-CL5-2026-D4-01,HORIZON-CL5-2026,EXPERTISE_REQUEST,TU Example,999000002,HES,false,DE,Berlin,2026-09-05T10:00:00.000Z,2026-10-21T06:00:00.000Z,pilot line,HE,University lab seeking industrial partner for pilot line.
+fo61-a1,HORIZON-CL5-2026-D4-01,HORIZON-CL5-2026,EXPERTISE_OFFER,Acme Batarya,999000001,PRC,true,TR,Ankara,2026-09-01T10:00:00.000Z,2026-10-22T06:00:00.000Z,"batteries; recycling",HE,Battery recycling SME. Contact [email] or [phone].
