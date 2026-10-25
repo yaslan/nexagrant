@@ -7,9 +7,10 @@
 /**
  * Version of the consent text the expert ticks. A stored row never claims
  * agreement to a text nobody saw: bump this together with the copy in
- * messages/*.json when the consent wording changes.
+ * messages/*.json when the consent wording changes. kvkk-v3 (FO-149): the notice no
+ * longer lists announcement e-mails, which FO-144 took off the form.
  */
-export const EXPERT_PREREG_CONSENT_VERSION = 'kvkk-v2';
+export const EXPERT_PREREG_CONSENT_VERSION = 'kvkk-v3';
 
 /** The first this many verified experts get a founder number ("Kurucu Uzman"). */
 export const FOUNDER_SEAT_LIMIT = 100;
