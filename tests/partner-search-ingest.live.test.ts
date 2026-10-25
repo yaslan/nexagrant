@@ -31,6 +31,11 @@ const CALL = 'FO60-TEST-CALL';
 const CCM2 = '900777';
 const OTHER_TOPIC = 'FO60-TEST-OTHER-TOPIC';
 const MOVED_ID = '900099';
+// FO-64 review B1: the fixture's first row (PIC 100000000) is not in CORDIS, so it is queued
+// under this key; an admin links it to a CORDIS organisation with another PIC.
+const LINKED_ID = '900000';
+const LINKED_KEY = 'pic:100000000';
+const LINKED_PIC = '999064001';
 
 /** Routes the two portal endpoints: the SEDIA listing (ccm2 map) and topicOrganisations. */
 function portal(topicBody: () => unknown, status = 200) {
@@ -66,6 +71,8 @@ async function cleanup() {
   await prisma.rawFetch.deleteMany({ where: { source: 'partner_search', key: TOPIC } });
   await prisma.topic.deleteMany({ where: { identifier: { in: [TOPIC, OTHER_TOPIC] } } });
   await prisma.call.deleteMany({ where: { callIdentifier: CALL } });
+  await prisma.unmatchedOrganization.deleteMany({ where: { matchKey: LINKED_KEY } });
+  await prisma.cordisOrganization.deleteMany({ where: { organisationId: LINKED_PIC } });
 }
 
 describe.skipIf(!RUN)('partner-search ingestion (live database)', () => {
@@ -298,6 +305,29 @@ describe.skipIf(!RUN)('partner-search ingestion (live database)', () => {
       orderBy: { createdAt: 'desc' },
     });
     expect(alert?.level).toBe('error');
+  });
+
+  it('a manual PIC link survives the next scan (FO-64 review B1)', async () => {
+    await setFlag(true);
+    const scan = () =>
+      runPartnerSearchIngestion({ trigger: 'MANUAL', topicIdentifiers: [TOPIC], client: client(portal(() => FIXTURE)) });
+    await scan();
+    const queued = await prisma.unmatchedOrganization.findUnique({ where: { matchKey: LINKED_KEY } });
+    expect(queued?.resolvedPic).toBeNull();
+
+    // What resolveUnmatchedOrganization writes (admin action, audited there).
+    await prisma.cordisOrganization.create({ data: { organisationId: LINKED_PIC, name: 'FO64 linked org' } });
+    await prisma.unmatchedOrganization.update({ where: { matchKey: LINKED_KEY }, data: { resolvedPic: LINKED_PIC } });
+    await prisma.partnerSearchAnnouncement.update({ where: { externalId: LINKED_ID }, data: { organizationPic: LINKED_PIC } });
+
+    const outcome = await scan();
+    expect(outcome.kind === 'done' && outcome.status).toBe('SUCCESS');
+    const row = await prisma.partnerSearchAnnouncement.findUnique({ where: { externalId: LINKED_ID } });
+    expect(row?.organizationPic).toBe(LINKED_PIC);
+    const org = await prisma.cordisOrganization.findUnique({ where: { organisationId: LINKED_PIC } });
+    expect(org?.hasActiveAnnouncements).toBe(true);
+    const after = await prisma.unmatchedOrganization.findUnique({ where: { matchKey: LINKED_KEY } });
+    expect(after?.resolvedPic).toBe(LINKED_PIC);
   });
 });
 
