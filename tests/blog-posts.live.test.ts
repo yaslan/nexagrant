@@ -48,10 +48,11 @@ import {
   toggleFeaturedBlogPostAction,
   updateBlogPostAction,
 } from '@/app/[locale]/admin/blog/actions';
-import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isLocalDbUrl, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { sqlStatements } from './helpers/sql-statements';
 
-const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
+const OWNER = OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
+const admin = createDbClient(OWNER);
 const SUITE = 'blog posts test';
 
 const REACHABLE =
@@ -70,6 +71,22 @@ if (REACHABLE && !HAS_TABLE) {
 const HAS_DB = REACHABLE && HAS_TABLE;
 
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
+
+// The two migration tests run DDL as the owner (rolled back, but under an ACCESS
+// EXCLUSIVE lock on "BlogPost"): only on a database db:setup itself would accept.
+const DDL_LOCAL = HAS_DB && isLocalDbUrl(OWNER);
+if (HAS_DB && !DDL_LOCAL) {
+  skipOrFailInCi(`${SUITE} (migration tests)`, 'DATABASE_URL is not a local database (scripts/db-target.sh db_is_local) and they run DDL');
+}
+// "readTime" still there = the FO-84 schema: drop-blog-read-time.sql has not run. The FO-87 test
+// would run it for real (it commits), so it waits for the file instead.
+const HAS_READ_TIME =
+  DDL_LOCAL &&
+  (await admin.$queryRaw<Array<{ n: bigint }>>`SELECT count(*) AS n FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name = 'readTime'`)[0]?.n === 1n;
+if (HAS_READ_TIME) {
+  skipOrFailInCi(`${SUITE} (FO-87 migration test)`, '"BlogPost"."readTime" still exists — apply prisma/migrations/drop-blog-read-time.sql (scripts/apply-migrations.sh)');
+}
 
 const RUN = Math.random().toString(36).slice(2, 10);
 const STARTED = new Date(Date.now() - 1000);
@@ -333,13 +350,13 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     await admin.auditEvent.deleteMany({ where: { type: 'blog.post.created', target: expected } });
   });
 
-  test('drop-blog-read-time.sql leaves readMinutes NOT NULL and no readTime; both blog files re-run cleanly (TASK-MVDVCQW3GI94J)', async () => {
+  test.skipIf(!DDL_LOCAL || HAS_READ_TIME)('drop-blog-read-time.sql leaves readMinutes NOT NULL and no readTime; both blog files re-run cleanly (TASK-MVDVCQW3GI94J)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const { default: pg } = await import('pg');
     const fileOf = (name: string) => sqlStatements(readFileSync(resolve(process.cwd(), 'prisma/migrations', name), 'utf8'));
     const drop = fileOf('drop-blog-read-time.sql');
-    const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
+    const client = new pg.Client({ connectionString: OWNER });
     await client.connect();
     try {
       // apply-migrations.sh re-runs every file: FO-84's must not trip over the dropped column.
@@ -390,7 +407,7 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     ).rejects.toThrow(/BlogPost_readMinutes_range/);
   });
 
-  test('blog-read-minutes.sql backfills the minutes from the old text, else from the content, on the FO-84 schema (TASK-MVMFCB7SVEEG1)', async () => {
+  test.skipIf(!DDL_LOCAL)('blog-read-minutes.sql backfills the minutes from the old text, else from the content, on the FO-84 schema (TASK-MVMFCB7SVEEG1)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const { default: pg } = await import('pg');
@@ -430,14 +447,22 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     ];
     const insert = `INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
       VALUES ($1, $2, 't', 'e', $3, 'c', $4, $5, now(), 'https://images.unsplash.com/x', now())`;
-    const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
+    const client = new pg.Client({ connectionString: OWNER });
     await client.connect();
     try {
-      // Back to the FO-84 schema (readTime text, readMinutes nullable) inside a transaction that is rolled back:
-      // this is the branch the live database takes the first time the file runs there.
+      const columnsNow = () =>
+        client.query<{ column_name: string; is_nullable: string }>(
+          `SELECT column_name, is_nullable FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name IN ('readTime', 'readMinutes')
+            ORDER BY column_name`
+        );
+      const before = (await columnsNow()).rows;
+      // The FO-84 schema (readTime text, readMinutes nullable), inside a transaction that is rolled back.
+      // A database FO-87 has reached gets it here; one still on it (the live one until
+      // drop-blog-read-time.sql runs there) already has it, so both statements are no-ops.
       await client.query('BEGIN');
       try {
-        await client.query('ALTER TABLE "BlogPost" ADD COLUMN "readTime" TEXT');
+        await client.query('ALTER TABLE "BlogPost" ADD COLUMN IF NOT EXISTS "readTime" TEXT');
         await client.query('ALTER TABLE "BlogPost" ALTER COLUMN "readMinutes" DROP NOT NULL');
         for (const [label, readTime, content] of cases) {
           await client.query(insert, [`bf-${label}-${RUN}`, slugOf(`bf-${label}`), content, readTime, null]);
@@ -459,11 +484,8 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
         await client.query('ROLLBACK');
       }
 
-      const columns = await client.query<{ column_name: string; is_nullable: string }>(
-        `SELECT column_name, is_nullable FROM information_schema.columns
-          WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name IN ('readTime', 'readMinutes')`
-      );
-      expect(columns.rows).toEqual([{ column_name: 'readMinutes', is_nullable: 'NO' }]);
+      // The rollback left the schema as it found it.
+      expect((await columnsNow()).rows).toEqual(before);
     } finally {
       await client.end();
     }
