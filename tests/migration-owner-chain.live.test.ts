@@ -137,8 +137,9 @@ beforeAll(async () => {
     skipOrFailInCi(SUITE, skipReason);
     return;
   }
-  // Another run of this file (a second worktree's gate on the same Postgres)
-  // waits here until this one's admin session ends in afterAll (FO-27).
+  // Another run of this file (a second worktree's gate on the same database)
+  // waits here until this one's admin session ends in afterAll: the role-wide
+  // default below reaches every database (FO-27, FO-34).
   await admin.query('SELECT pg_advisory_lock(hashtext($1))', [`test:${MIGRATION_OWNER_CHAIN_LOCK}`]);
 
   await admin.query(
@@ -523,6 +524,46 @@ describe('apply-migrations.sh as the schema owner (not superuser, not BYPASSRLS)
       expect(r.out).not.toContain('==> [1/');
     } finally {
       await withDb(adminUrl(), (c) => c.query(`ALTER DATABASE ${DB} RESET app.system_scope`));
+    }
+  }, LONG);
+
+  // FO-34: the role's defaults reach this database too, wherever they are stored.
+  test.each([
+    ['role-wide', `ALTER ROLE ${OWNER} SET app.system_scope = 'on'`, `ALTER ROLE ${OWNER} RESET app.system_scope`],
+    [
+      'role in this database',
+      `ALTER ROLE ${OWNER} IN DATABASE ${DB} SET app.system_scope = 'on'`,
+      `ALTER ROLE ${OWNER} IN DATABASE ${DB} RESET app.system_scope`,
+    ],
+  ])('a %s default for app.system_scope stops the run before any file', async (_, set, reset) => {
+    await admin!.query(set);
+    try {
+      const r = chain(ownerUrl());
+      expect(r.status).toBe(1);
+      expect(r.out).toContain('app.system_scope has a stored default');
+      expect(r.out).not.toContain('==> [1/');
+    } finally {
+      await admin!.query(reset);
+    }
+  }, LONG);
+
+  // FO-34: pg_db_role_setting is cluster-wide, but another database's default
+  // never reaches a session here. It used to refuse this run (FO-27: two gates
+  // on one Postgres broke each other's chain runs).
+  test('a default stored on another database does not stop the run', async () => {
+    const other = `${DB}_other`;
+    await admin!.query(`CREATE DATABASE ${other}`);
+    created.dbs.push(other);
+    await admin!.query(`ALTER DATABASE ${other} SET app.system_scope = 'on'`);
+    await admin!.query(`ALTER ROLE ${OWNER} IN DATABASE ${other} SET app.system_scope = 'on'`);
+    try {
+      const r = chain(ownerUrl());
+      expect(r.status, r.out.slice(-2000)).toBe(0);
+      expect(r.out).not.toContain('stored default');
+      expect(r.out).toContain('files applied as');
+    } finally {
+      await admin!.query(`ALTER ROLE ${OWNER} IN DATABASE ${other} RESET app.system_scope`);
+      await admin!.query(`DROP DATABASE IF EXISTS ${other} WITH (FORCE)`);
     }
   }, LONG);
   // İNCELEME-115 Ö-3 (mutant M6): the check AFTER the files, measured on its own.

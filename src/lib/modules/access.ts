@@ -1,10 +1,12 @@
+import { cache } from 'react';
+
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
 import { withTenant } from '@/lib/db';
-import { tenantScopeOf } from '@/lib/tenant';
-import type { ModuleDenyReason } from '@/lib/modules/state-machine';
+import { tenantScopeOf, type TenantScope } from '@/lib/tenant';
+import type { ModuleDenyReason, SessionViewer } from '@/lib/modules/state-machine';
 import { getAllManifests } from '@/lib/modules/registry';
-import { checkModuleAccessForTenant, decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
+import { decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
 
@@ -46,6 +48,51 @@ export class ModuleAccessError extends Error {
   }
 }
 
+/** The session's viewer: role and staff flag only, never the API-key `isMachine`. */
+function sessionViewerOf(scope: TenantScope): SessionViewer {
+  return { role: scope.role, isPlatformAdmin: scope.isPlatformAdmin };
+}
+
+/**
+ * TASK-MVBEM10PJYU0E (FO-12, Ö-2) — what one request reads, read once.
+ *
+ * A module page used to pay for its gate twice: the app shell's
+ * `listAccessibleModules` read `ModuleState` and the entitlement, then the page's
+ * `moduleGate` read both again, and each of the three `auth()` calls re-ran the jwt
+ * callback's membership lookup. React `cache()` keeps one answer per request:
+ * the store lives in the render that asked and is dropped with it, so nothing
+ * here outlives the request or reaches another session. Outside a server render
+ * (a test, a script) `cache()` memoises nothing and every call reads afresh.
+ *
+ * Only the *facts* are cached, keyed by tenant id; the decision is still made per
+ * call by `decideModuleAccess`, with the viewer from the session.
+ */
+export const requestSession = cache(() => auth());
+
+interface TenantModuleFacts {
+  statusById: ReadonlyMap<string, ModuleStatus>;
+  allowedModules: readonly string[];
+}
+
+const tenantModuleFacts = cache(
+  (tenantId: string): Promise<TenantModuleFacts> =>
+    withTenant(tenantId, async (tx) => {
+      const [states, entitlements] = await Promise.all([
+        tx.moduleState.findMany({
+          where: { tenantId },
+          select: { moduleId: true, status: true },
+        }),
+        getEntitlements(tenantId, tx),
+      ]);
+      return {
+        statusById: new Map<string, ModuleStatus>(
+          states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
+        ),
+        allowedModules: entitlements.allowedModules,
+      };
+    }),
+);
+
 /**
  * Decide whether the session's viewer may use `moduleId`, on two facts:
  *
@@ -71,52 +118,34 @@ export class ModuleAccessError extends Error {
  * it — an `AddOn` row, which `getEntitlements` already honours — not by a session.
  */
 export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAccessResult> {
-  const scope = tenantScopeOf(await auth());
+  const scope = tenantScopeOf(await requestSession());
 
   if (!scope) {
     return { allowed: false, status: 'OFF', reason: 'NO_TENANT' };
   }
 
-  return checkModuleAccessForTenant(scope.tenantId, moduleId, {
-    role: scope.role,
-    isPlatformAdmin: scope.isPlatformAdmin,
-  });
+  const facts = await tenantModuleFacts(scope.tenantId);
+  return decideModuleAccess(moduleId, facts.statusById.get(moduleId) ?? 'OFF', facts.allowedModules, sessionViewerOf(scope));
 }
 
 /**
  * Every module the session's viewer may open, for the app shell's `ModuleProvider`
  * (sidebar entries, opportunity tabs, cross-links). Same answer as calling
- * `checkModuleAccess` once per module, in two reads instead of twenty-two.
+ * `checkModuleAccess` once per module, from the same per-request read.
  *
  * Navigation only: a hidden link is not a closed door, so every page behind these
  * entries still runs `moduleGate` and every action `assertModuleAccess`.
  */
 export async function listAccessibleModules(): Promise<ModuleId[]> {
-  const scope = tenantScopeOf(await auth());
+  const scope = tenantScopeOf(await requestSession());
   if (!scope) return [];
 
-  const [states, entitlements] = await Promise.all([
-    withTenant(scope.tenantId, (tx) =>
-      tx.moduleState.findMany({
-        where: { tenantId: scope.tenantId },
-        select: { moduleId: true, status: true },
-      })
-    ),
-    withTenant(scope.tenantId, (tx) =>
-      getEntitlements(scope.tenantId, tx)
-    ),
-  ]);
-
-  const statusById = new Map<string, ModuleStatus>(
-    states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
-  );
+  const facts = await tenantModuleFacts(scope.tenantId);
+  const viewer = sessionViewerOf(scope);
 
   return getAllManifests().map((m) => m.id).filter(
     (id) =>
-      decideModuleAccess(id, statusById.get(id) ?? 'OFF', entitlements.allowedModules, {
-        role: scope.role,
-        isPlatformAdmin: scope.isPlatformAdmin,
-      }).allowed,
+      decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, viewer).allowed,
   );
 }
 

@@ -12,7 +12,7 @@ BEGIN
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','Consent',
-    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification'
+    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -112,8 +112,10 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
-    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','Programme','PublicLead',
-    'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat','User','VerificationToken'
+    'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','PartnerProfileSnapshot',
+    'PartnerSearchAnnouncement','PartnerSearchIngestionRun','PartnerSearchTopicStat','Programme',
+    'PublicLead','RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat',
+    'UnmatchedOrganization','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
       EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', t);
@@ -182,8 +184,9 @@ END $$;
 --
 -- One purpose is narrowed by table (FO-52, K-569554 = C): 'public-intake' is
 -- the anonymous expert form, so a sealed scope with that purpose opens only
--- ExpertPreRegistration and ExpertFounderCounter (the founder-number counter
--- the same verification writes). Every other system_scope table stays shut to
+-- ExpertPreRegistration, ExpertFounderCounter (the founder-number counter
+-- the same verification writes) and ExpertPreRegAttempt (the per-IP submission
+-- counter the same registration writes, FO-26). Every other system_scope table stays shut to
 -- it, reads and writes alike. The other five purposes are not narrowed. The
 -- purpose is read from app.system_scope_purpose, which is USERSET like the
 -- flag; the seal is not tied to it. So this guards against a public-intake
@@ -191,6 +194,16 @@ END $$;
 -- enter_system_scope('<another purpose>') — that code could open everything
 -- anyway. A new table the form needs goes into the list in system_scope_open()
 -- on purpose; until then a write there is an RLS error and a read is 0 rows.
+--
+-- The reverse direction (FO-92, FO-21 O4): the expert's personal data
+-- (ExpertPreRegistration, ExpertPreRegAttempt) opens in a sealed scope only for
+-- the purposes that handle it: 'public-intake' (the form), 'platform-admin' (the
+-- list and CSV), 'platform-aggregate' (the seat count) and 'cross-tenant-job'
+-- (the retention purge, FO-50). 'tenant-discovery' and 'subject-scoped' read 0
+-- rows there and cannot write. The same USERSET limit applies: this guards
+-- against a call site that reaches for the wrong table, not against code that
+-- names a purpose on the list. A new purpose that must see an expert goes into
+-- the list in system_scope_open() on purpose.
 --
 -- Deploy order: this is applied by `pnpm db:rls`. Code that calls
 -- withSystemScope() reads zero rows until it has run, exactly like every other
@@ -314,18 +327,27 @@ AS $fn$
                       (SELECT c.relowner FROM pg_class c WHERE c.oid = tbl),
                       'USAGE')
           OR (public.system_scope_sealed()
-              -- FO-52: public-intake opens the expert form's tables only.
+              -- FO-52: public-intake opens the expert form's tables only
+              -- (ExpertPreRegAttempt: FO-26).
               -- to_regclass, not '…'::regclass: a table missing on this
               -- database (ExpertFounderCounter before its migration) is NULL
               -- here and simply not on the list, instead of an error in every
               -- system_scope policy. IS TRUE turns that NULL into false.
               AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'public-intake'
                    OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
-                               to_regclass('public."ExpertFounderCounter"'))) IS TRUE)))
+                               to_regclass('public."ExpertFounderCounter"'),
+                               to_regclass('public."ExpertPreRegAttempt"'))) IS TRUE)
+              -- FO-92: the expert's personal data opens only for the purposes
+              -- that handle it. IS NOT TRUE: a missing table (NULL) is simply
+              -- not on the list, like above.
+              AND ((tbl IN (to_regclass('public."ExpertPreRegistration"'),
+                            to_regclass('public."ExpertPreRegAttempt"'))) IS NOT TRUE
+                   OR coalesce(current_setting('app.system_scope_purpose', true), '')
+                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration and ExpertFounderCounter (FO-52). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -351,13 +373,51 @@ END $$;
 -- tenant. RLS is ON and the one policy is system_scope, so fabrika_app reads and
 -- writes it only inside withSystemScope(). Outside that scope it sees 0 rows and
 -- refuses every write. Its purposes: 'public-intake' (registration, verification),
--- 'platform-aggregate' (seat count), 'platform-admin' (list and CSV). Same policy
--- body as the loop above. See prisma/migrations/expert-prereg-rls-mail-quota.sql.
+-- 'platform-aggregate' (seat count), 'platform-admin' (list and CSV),
+-- 'cross-tenant-job' (retention purge, FO-50); system_scope_open() shuts it to the
+-- other purposes (FO-92). Same policy body as the loop above. See prisma/migrations/expert-prereg-rls-mail-quota.sql.
 ALTER TABLE public."ExpertPreRegistration" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
 CREATE POLICY system_scope ON public."ExpertPreRegistration"
   USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
   WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
+
+-- ExpertPreRegAttempt (FO-26, TASK-MVBLYRLP9ID93): the per-IP submission counter of the
+-- same pre-registration (HMAC of an IP, pseudonymous personal data). Same standing and
+-- same policy as ExpertPreRegistration: written and counted only inside
+-- withSystemScope('public-intake'), which system_scope_open() opens for it. Skipped
+-- on a database whose chain has not created the table yet; the migration has the
+-- same block. See prisma/migrations/add-expert-pre-reg-attempt.sql.
+DO $$
+BEGIN
+  IF to_regclass('public."ExpertPreRegAttempt"') IS NOT NULL THEN
+    ALTER TABLE public."ExpertPreRegAttempt" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegAttempt";
+    CREATE POLICY system_scope ON public."ExpertPreRegAttempt"
+      USING ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)));
+  END IF;
+END $$;
+
+-- ExpertFounderCounter (FO-50, K-568932 = A): the one-row founder-number counter of
+-- the table above, so a purged row never frees its number. No personal data; the
+-- same policy and purposes ('public-intake' verify, 'platform-aggregate' seats,
+-- 'cross-tenant-job' purge). See prisma/migrations/add-expert-founder-counter.sql.
+-- Guarded: a database built before that migration has no table yet.
+DO $$
+BEGIN
+  IF to_regclass('public."ExpertFounderCounter"') IS NOT NULL THEN
+    ALTER TABLE public."ExpertFounderCounter" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."ExpertFounderCounter";
+    CREATE POLICY system_scope ON public."ExpertFounderCounter"
+      USING ((SELECT public.system_scope_open('"ExpertFounderCounter"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"ExpertFounderCounter"'::regclass)));
+    -- Never emptied by the app role (crw-fb Ö-1); db:rls-role grants DELETE on every table.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+      REVOKE DELETE, TRUNCATE ON public."ExpertFounderCounter" FROM fabrika_app;
+    END IF;
+  END IF;
+END $$;
 
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call

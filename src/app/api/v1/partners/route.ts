@@ -29,6 +29,7 @@ interface PartnerApiRow {
   orgType: string | null;
   isSme: boolean;
   city: string | null;
+  isInterreg?: boolean;
   stats: {
     /** From CordisPartnerProfile; null when the profile has not been derived. */
     projectCount: number | null;
@@ -55,7 +56,36 @@ interface CordisOrgWithProfile {
   } | null;
 }
 
-function toApiRow(org: CordisOrgWithProfile): PartnerApiRow {
+/** Per-organisation participation totals, read from the database by `totalsByOrg`. */
+interface OrgTotals {
+  projects: number;
+  coordinators: number;
+  ec: bigint;
+}
+
+/**
+ * Folds `groupBy(organisationId, role)` rows into one total per organisation.
+ * The counts and EC sums come from the database, so no participation list is
+ * read into memory for the 20-50 rows of a page.
+ */
+function totalsByOrg(
+  rows: Array<{ organisationId: string; role: string; _count: { _all: number }; _sum: { ecContribution: bigint | null } }>,
+): Map<string, OrgTotals> {
+  const totals = new Map<string, OrgTotals>();
+  for (const r of rows) {
+    const t = totals.get(r.organisationId) ?? { projects: 0, coordinators: 0, ec: 0n };
+    t.projects += r._count._all;
+    if (r.role === 'coordinator') t.coordinators += r._count._all;
+    t.ec += r._sum.ecContribution ?? 0n;
+    totals.set(r.organisationId, t);
+  }
+  return totals;
+}
+
+function toApiRow(org: CordisOrgWithProfile, isInterreg: boolean, totals: OrgTotals | undefined): PartnerApiRow {
+  const t = totals ?? { projects: 0, coordinators: 0, ec: 0n };
+  const hasParticipations = t.projects > 0;
+
   return {
     id: org.organisationId,
     pic: org.organisationId,
@@ -67,10 +97,11 @@ function toApiRow(org: CordisOrgWithProfile): PartnerApiRow {
     orgType: org.activityType,
     isSme: org.sme,
     city: org.city,
+    isInterreg: isInterreg ? true : undefined,
     stats: {
-      projectCount: org.profile ? org.profile.totalProjects : null,
-      coordinatorCount: org.profile ? org.profile.coordinatorProjects : null,
-      totalEuContributionEur: org.profile ? Number(org.profile.totalEcContribution) : null,
+      projectCount: org.profile ? org.profile.totalProjects : (hasParticipations ? t.projects : null),
+      coordinatorCount: org.profile ? org.profile.coordinatorProjects : (hasParticipations ? t.coordinators : null),
+      totalEuContributionEur: org.profile ? Number(org.profile.totalEcContribution) : (hasParticipations ? Number(t.ec) : null),
       networkCentralityScore: null,
     },
   };
@@ -86,11 +117,21 @@ export async function GET(req: Request) {
   const country = searchParams.get('country');
   const orgType = searchParams.get('orgType');
   const q = searchParams.get('q')?.trim();
+  const isInterreg = searchParams.get('isInterreg') === 'true' || searchParams.get('framework')?.toUpperCase() === 'INTERREG';
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
 
   const where: Record<string, unknown> = {};
   if (country) where.country = country.toUpperCase();
   if (orgType) where.activityType = orgType.toUpperCase();
+  if (isInterreg) {
+    where.participations = {
+      some: {
+        project: {
+          framework: 'INTERREG',
+        },
+      },
+    };
+  }
   if (q) {
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
@@ -100,6 +141,8 @@ export async function GET(req: Request) {
   }
 
   let orgs: CordisOrgWithProfile[];
+  let interregIds = new Set<string>();
+  let orgTotals = new Map<string, OrgTotals>();
   try {
     // The CORDIS tables are shared reference data, not tenant data: they carry
     // no tenantId and scripts/rls-models.ts lists all eight of them as
@@ -128,6 +171,28 @@ export async function GET(req: Request) {
         },
       },
     });
+
+    // No nested participation list: one `distinct` read answers "is this an
+    // Interreg partner" per organisation, and one `groupBy` gives the totals.
+    // The page's organisations are the only ones read, so the work is bounded.
+    const ids = orgs.map((o) => o.organisationId);
+    if (ids.length > 0) {
+      const [interregRows, totalRows] = await Promise.all([
+        prisma.cordisParticipation.findMany({
+          where: { organisationId: { in: ids }, project: { framework: 'INTERREG' } },
+          distinct: ['organisationId'],
+          select: { organisationId: true },
+        }),
+        prisma.cordisParticipation.groupBy({
+          by: ['organisationId', 'role'],
+          where: { organisationId: { in: ids } },
+          _count: { _all: true },
+          _sum: { ecContribution: true },
+        }),
+      ]);
+      interregIds = new Set(interregRows.map((r) => r.organisationId));
+      orgTotals = totalsByOrg(totalRows);
+    }
   } catch (e) {
     // A query failure is reported, not replaced with invented rows. The old
     // catch fell through to a demo array, which is how a broken query shipped
@@ -140,7 +205,7 @@ export async function GET(req: Request) {
     });
   }
 
-  const partners = orgs.map(toApiRow);
+  const partners = orgs.map((org) => toApiRow(org, interregIds.has(org.organisationId), orgTotals.get(org.organisationId)));
 
   return NextResponse.json({
     success: true,

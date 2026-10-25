@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getWorkspaceRoute } from '@/lib/routes';
-import { getAllManifests, getManifest } from '@/lib/modules/registry';
+import { getAllManifests } from '@/lib/modules/registry';
 import { useActiveModules } from '@/lib/modules/hooks';
-import { navFeatureModule } from '@/lib/modules/catalog';
+import { navFeatureLock } from '@/lib/modules/catalog';
 
 interface SidebarNavProps {
   locale: string;
@@ -82,8 +82,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
         // A feature of a module that is off (approvals → M5, API keys → M1) stays in
         // the menu but locked. `activeModules` is the same answer `useModuleEnabled`
         // reads; the hook itself cannot be called inside this loop.
-        const featureModule = navFeatureModule(item.key);
-        const featureManifest = featureModule && !activeModules.includes(featureModule) ? getManifest(featureModule) : null;
+        const featureManifest = navFeatureLock(item.key, activeModules);
         if (featureManifest) {
           const tooltip = t('featureLocked', { module: `${featureManifest.id} ${tModules(`${featureManifest.key}.name`)}` });
           const reasonId = `${idBase}-${item.key}-locked`;

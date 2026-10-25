@@ -174,6 +174,8 @@ const envSchema = z.object({
     .regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/, 'K1_EMBEDDING_MAX_USD_PER_RUN must be a non-negative number of USD')
     .default('0.05'),
   ANTHROPIC_API_KEY: z.string().optional(),
+  /** keep.eu Open Data API authentication key for Interreg project data. */
+  KEEP_EU_API_KEY: z.string().optional(),
   /**
    * 256-bit AES-GCM encryption key for sensitive tokens in CalendarConnection.
    * If unset, token encryption/decryption will fail with 503 (CalendarEncryptionNotConfiguredError).

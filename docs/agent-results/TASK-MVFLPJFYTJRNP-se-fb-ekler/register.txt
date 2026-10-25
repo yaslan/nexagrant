@@ -1,0 +1,10 @@
+$ POST /api/expert-preregistration (tr)
+{"ok":true} HTTP 201
+$ POST (en)
+{"ok":true} HTTP 201
+$ psql: SELECT email, locale, consentTextVersion, kvkkAcceptedAt IS NOT NULL, visibilityConsentAt IS NOT NULL, status
+fo102-en@example.test|en|kvkk-v2|t|t|pending
+fo102-tr@example.test|tr|kvkk-v2|t|t|pending
+$ mailpit messages
+fo102-en@example.test | Confirm your expert pre-registration · FonBridge
+fo102-tr@example.test | Uzman ön kaydınızı doğrulayın · FonBridge

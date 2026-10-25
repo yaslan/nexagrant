@@ -34,6 +34,7 @@ export interface ExpertPreRegRow {
   status: string;
   founderNumber: number | null;
   createdAt: Date;
+  lastSubmittedAt: Date | null;
 }
 
 function whereFrom(filters: ExpertPreRegFilters): Prisma.ExpertPreRegistrationWhereInput {
@@ -62,6 +63,7 @@ const ROW_SELECT = {
   status: true,
   founderNumber: true,
   createdAt: true,
+  lastSubmittedAt: true,
 } as const;
 
 /** Newest first. `take` caps the page; the CSV export asks for every match. */
@@ -94,6 +96,7 @@ export const EXPERT_PREREG_CSV_HEADER = [
   'durum',
   'founderNumber',
   'createdAt',
+  'lastSubmittedAt',
 ] as const;
 
 /** The export: the matching rows as CSV. Lists are joined with ";" inside one cell. */
@@ -115,6 +118,7 @@ export async function exportExpertPreRegistrationsCsv(
       row.status,
       row.founderNumber,
       row.createdAt.toISOString(),
+      row.lastSubmittedAt?.toISOString() ?? null,
     ])
   );
 }

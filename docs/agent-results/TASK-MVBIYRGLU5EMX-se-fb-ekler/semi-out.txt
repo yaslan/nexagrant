@@ -1,0 +1,5 @@
+register 201 {"ok":true}
+CSV 200
+raw line: "Ali;=1+1;,semi@fo21.test,Kurum;=cmd|' /C calc'!A0;,Ankara,climate-environment,coordinator,horizon-europe-h2020,pending,,2026-10-19T18:36:02.146Z,2026-10-19T18:36:02.146Z"
+comma parse   : ['Ali;=1+1;', 'semi@fo21.test', "Kurum;=cmd|' /C calc'!A0;", 'Ankara', 'climate-environment', 'coordinator', 'horizon-europe-h2020', 'pending', '', '2026-10-19T18:36:02.146Z', '2026-10-19T18:36:02.146Z']
+semicolon parse: ['Ali', '=1+1', ',semi@fo21.test,Kurum', "=cmd|' /C calc'!A0", ',Ankara,climate-environment,coordinator,horizon-europe-h2020,pending,,2026-10-19T18:36:02.146Z,2026-10-19T18:36:02.146Z']

@@ -1,5 +1,30 @@
 #!/bin/sh
 # Push, kodun bu makineden ÇIKTIĞI andır: burada tam kapı koşar, kısaltma yok.
 set -e
+# Git kancayı GIT_DIR (worktree'de ayrıca GIT_INDEX_FILE) set ederek çalıştırır.
+# Gate bunları devralırsa başka cwd'de git çağıran her şey (ör. geçici fixture
+# repo kuran testler) BU reponun indeksini okur ve ona `git add` yazar (FO-111).
+# Kancanın cwd'si checkout kökü; git repoyu buradan kendisi bulur.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX
+# Paylaşılan .git/config'te core.bare=true ise dur; ayarı kendimiz düzeltmeyiz (FO-114).
+. scripts/git-core-bare.sh
+core_bare_guard pre-push || exit 1
+# Kapının veritabanı bu checkout'un .env'inden gelir (vitest, playwright ve
+# tsx betikleri cwd'deki .env'i okur). .env yoksa testler varsayılan
+# localhost:5432'ye düşer ve onlarca test ortam yüzünden kırmızı olur
+# (TASK-MVBFDSUSE5QCY). Worktree tarifi: CLAUDE.md "Worktree'de gate".
+if [ -z "${DATABASE_URL:-}" ] && [ ! -f .env ]; then
+  echo "pre-push: bu checkout'ta .env yok ve DATABASE_URL tanımlı değil; kapı hangi veritabanına karşı koşacağını bilmiyor." >&2
+  echo "  Worktree'de izole DB kur: CLAUDE.md \"Worktree'de gate\" (docker run … + .env + pnpm db:setup)." >&2
+  exit 1
+fi
+# Yalnız host:port/db yazılır; parola ve girdinin kendisi hiçbir zaman basılmaz (scripts/db-target.sh).
+. scripts/db-target.sh
+db=${DATABASE_URL:-$(db_env_value .env)}
+echo "→ veritabanı: $(db_target "$db")"
 echo "→ pnpm gate (lint + typecheck + test, proje geneli)"
 pnpm gate
+# FO-114: core.bare'i kimin yazdığı kanıtlanmadı; gate (GIT_DIR sızıntısı + git init) muhtemel
+# yazıcı, doğrulanmadı (docs/RELEASE_CHECKLIST.md §9.1).
+# Gate yeşil olsa bile ana checkout'u bozduysa push etme.
+core_bare_guard "pre-push (gate sonrası)" || exit 1

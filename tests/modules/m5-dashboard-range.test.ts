@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_RANGE_DAYS,
+  MAX_TREND_BUCKETS,
   parseRangeParam,
   resolveDashboardRange,
   toRangeParam,
+  trendIntervalDays,
 } from '../../src/modules/m5/server/range';
 
 const NOW = new Date(2026, 8, 6, 19, 30); // 2026-09-06 19:30 local
@@ -65,5 +67,53 @@ describe('resolveDashboardRange', () => {
       const range = resolveDashboardRange(from, to, NOW);
       expect(range.from.getTime()).toBeLessThanOrEqual(range.to.getTime());
     }
+  });
+});
+
+describe('trendIntervalDays (TASK-MVCW3ANV1JU6Y)', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  // The bucket count the trend query draws for a width: floor(span / step) + 1.
+  const buckets = (from: Date, to: Date, days: number) =>
+    Math.floor((to.getTime() - from.getTime()) / (days * DAY)) + 1;
+  const range = (from: string, to: string) => {
+    const r = resolveDashboardRange(from, to, NOW);
+    return [r.from, r.rangeEnd] as const;
+  };
+
+  it('stays weekly while the range fits in the cap', () => {
+    expect(trendIntervalDays(...range('2026-01-01', '2026-01-31'))).toBe(7);
+    expect(trendIntervalDays(...range('2024-01-01', '2025-12-31'))).toBe(7);
+  });
+
+  it('widens a five-year range to a multiple of a week', () => {
+    const [from, to] = range('2021-01-04', '2025-12-31');
+    const days = trendIntervalDays(from, to);
+    expect(days).toBe(21);
+    expect(buckets(from, to, days)).toBe(87);
+  });
+
+  it('caps the year-1000 range from the review at the bucket limit', () => {
+    const [from, to] = range('1000-01-01', '2026-09-06');
+    expect(buckets(from, to, 7)).toBeGreaterThan(50_000);
+    const days = trendIntervalDays(from, to);
+    expect(days % 7).toBe(0);
+    expect(buckets(from, to, days)).toBeLessThanOrEqual(MAX_TREND_BUCKETS);
+  });
+
+  it('never exceeds the cap and never widens more than one step past it, at any length', () => {
+    const to = new Date(2026, 8, 6);
+    for (let spanDays = 0; spanDays <= 400_000; spanDays += 97) {
+      const from = new Date(to.getTime() - spanDays * DAY);
+      const days = trendIntervalDays(from, to);
+      expect(buckets(from, to, days)).toBeLessThanOrEqual(MAX_TREND_BUCKETS);
+      if (days > 7) expect(buckets(from, to, days - 7)).toBeGreaterThan(MAX_TREND_BUCKETS);
+    }
+  });
+
+  it('honours a wider minimum and an empty or inverted range', () => {
+    const [from, to] = range('2026-01-01', '2026-01-31');
+    expect(trendIntervalDays(from, to, 30)).toBe(30);
+    expect(trendIntervalDays(to, from)).toBe(7);
+    expect(trendIntervalDays(from, from)).toBe(7);
   });
 });

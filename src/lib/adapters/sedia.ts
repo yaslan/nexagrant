@@ -43,10 +43,22 @@ export const SEDIA_SOURCE = 'sedia';
  */
 export const SEDIA_TIMEOUT_MS = 10_000;
 
+/**
+ * Sort sent with every search. Without one SEDIA answers the same query in a
+ * different order from one request to the next, so page 2 of one request and
+ * page 3 of the next could repeat or skip topics (FO-42). `identifier` is a
+ * field SEDIA honours (checked live: ASC gave the same 1012 rows in the same
+ * order on two full walks; `reference` and unsorted did not). It is not unique:
+ * one topic can appear twice, so a tie of two rows is still possible.
+ */
+export const SEDIA_STABLE_SORT = { field: 'identifier', order: 'ASC' } as const;
+
 export interface SediaSearchOptions {
   text?: string;
   pageSize?: number;
   maxPages?: number;
+  /** First SEDIA page to read; the pages run from here for `maxPages`. Defaults to 1. */
+  startPage?: number;
   statuses?: string[];
   frameworkProgrammes?: string[];
   types?: string[];
@@ -268,6 +280,7 @@ export class SediaAdapter {
       text = '***',
       pageSize = 100,
       maxPages = 10,
+      startPage = 1,
       statuses = [SEDIA_STATUS_CODES.FORTHCOMING, SEDIA_STATUS_CODES.OPEN],
       frameworkProgrammes = [],
       types = ['1'],
@@ -294,10 +307,10 @@ export class SediaAdapter {
     const errors: string[] = [];
     const now = new Date();
     let totalResults = 0;
-    let pageNumber = 1;
+    let pageNumber = startPage;
     let detailFetches = 0;
 
-    while (pageNumber <= maxPages) {
+    while (pageNumber < startPage + maxPages) {
       if (signal?.aborted) {
         errors.push(`Page ${pageNumber} not fetched: ${errorMessage(signal.reason)}`);
         break;
@@ -314,6 +327,11 @@ export class SediaAdapter {
           'query',
           new Blob([JSON.stringify(queryObj)], { type: 'application/json' }),
           'query.json'
+        );
+        formData.append(
+          'sort',
+          new Blob([JSON.stringify(SEDIA_STABLE_SORT)], { type: 'application/json' }),
+          'sort.json'
         );
         formData.append(
           'languages',
@@ -352,7 +370,9 @@ export class SediaAdapter {
             ? ((data as { results: unknown[] }).results)
             : [];
 
-        if (pageNumber === 1 && envelope.success) {
+        // The total is the same on every page, so the first page read supplies it.
+        // With a startPage above 1 that is not page 1 (FO-42).
+        if (pageNumber === startPage && envelope.success) {
           totalResults = envelope.data.totalResults;
         }
 
@@ -411,10 +431,10 @@ export class SediaAdapter {
     }
 
     logger.info(
-      `[SediaAdapter] Total fetched: ${topics.length} topics across ${pageNumber - 1} pages`
+      `[SediaAdapter] Total fetched: ${topics.length} topics across ${pageNumber - startPage} pages`
     );
 
-    return { totalResults, pageNumber: 1, pageSize, topics, schemaDrift, errors };
+    return { totalResults, pageNumber: startPage, pageSize, topics, schemaDrift, errors };
   }
 
   /** Back-compatible plain list. Never throws; an empty array means "nothing usable". */

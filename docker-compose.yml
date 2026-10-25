@@ -115,6 +115,28 @@ services:
       - "${FABRIKA_SMTP_PORT:-1025}:1025"
       - "${FABRIKA_MAILPIT_PORT:-8025}:8025"
 
+  # Local S3-compatible object store for uploads (blog cover images, evidence).
+  # Behind the `storage` profile, so a plain `docker compose up -d` does not
+  # start it. Start with `docker compose --profile storage up -d`, then run
+  # `pnpm storage:setup` once to create the buckets (scripts/minio-local-setup.ts).
+  # The image is the same Chainguard build, pinned by digest, that CI uses
+  # (.github/workflows/ci.yml). minioadmin is a throwaway local credential.
+  # Development only: production stores objects in R2 or Supabase Storage.
+  minio:
+    profiles: ["storage"]
+    image: cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034
+    command: ["server", "/data", "--console-address", ":9001"]
+    container_name: fabrika-minio
+    restart: unless-stopped
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "127.0.0.1:${FABRIKA_MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${FABRIKA_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - miniodata:/data
+
 volumes:
   # Fixed name so compose reuses the volume the hand-made fabrika-postgres
   # container already writes to, instead of creating an empty one.
@@ -122,3 +144,5 @@ volumes:
     name: fabrika_pgdata
   redisdata:
     name: fabrika_redisdata
+  miniodata:
+    name: fabrika_miniodata

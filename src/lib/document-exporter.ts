@@ -12,6 +12,7 @@
 
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { withBrand } from './brand';
+import { csvCell } from './csv-cell';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 
@@ -511,14 +512,10 @@ export function generateTableReportHtml(data: TableReportData): string {
 
 /**
  * RFC 4180 CSV with a UTF-8 BOM, so Excel opens Turkish letters as Turkish
- * letters. A text cell that starts with `= + - @` (or a tab / CR) is prefixed
- * with `'`, so a spreadsheet does not run it as a formula (CSV injection).
+ * letters. Each cell is written by {@link csvCell}: quoted for a comma or a
+ * semicolon reader, and a formula at the cell start or after a `;` / line break
+ * gets a leading `'` (CSV injection, FO-124).
  */
 export function toCsv(rows: readonly (readonly (string | number)[])[]): string {
-  const cell = (v: string | number): string => {
-    if (typeof v === 'number') return String(v);
-    const s = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
-    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+  return '\ufeff' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }

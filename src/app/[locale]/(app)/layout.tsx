@@ -5,7 +5,6 @@ import SidebarNav from '@/components/SidebarNav';
 import UserMenu from '@/components/UserMenu';
 import ThemeToggle from '@/components/ThemeToggle';
 import { LocaleUpdater } from '@/components/LocaleUpdater';
-import { auth } from '@/lib/auth';
 import { isPlatformAdminDemoEmail } from '@/lib/demo-login';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -17,7 +16,8 @@ import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-sto
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
 import { can, asRole } from '@/lib/rbac';
-import { listAccessibleModules } from '@/lib/modules/access';
+import { listAccessibleModules, requestSession } from '@/lib/modules/access';
+import { logger } from '@/lib/logger';
 import { ModuleProvider } from '@/lib/modules/hooks';
 
 import MobileAppHeader from '@/components/MobileAppHeader';
@@ -54,7 +54,8 @@ export default async function AppLayout({
   params: Promise<{ locale: string; workspace?: string }>;
 }) {
   const { locale, workspace = 'default' } = await params;
-  const session = await auth();
+  // The same per-request session `moduleGate` and `listAccessibleModules` read.
+  const session = await requestSession();
 
   if (!session?.user) {
     redirect(`/${locale}/${locale === 'tr' ? 'giris' : 'login'}`);
@@ -96,7 +97,18 @@ export default async function AppLayout({
   const canManageUsers = can(asRole(roleName), 'manage_users');
   // What the sidebar, the opportunity tabs and the cross-links may offer. Same decision
   // as each page's `moduleGate`, read once here; the pages still gate themselves.
-  const activeModules = await listAccessibleModules();
+  //
+  // TASK-MVBEM10PJYU0E (FO-12, Ö-1): a failed read empties the menu instead of
+  // failing the shell. Otherwise the pages that are no module's — the dashboard,
+  // Settings → Modules, Members — went down with it, and the admin could not reach
+  // the screen that fixes the cause. Module pages stay closed: each runs its own
+  // `moduleGate`. The error goes to the server log only, never to the page.
+  let activeModules: Awaited<ReturnType<typeof listAccessibleModules>> = [];
+  try {
+    activeModules = await listAccessibleModules();
+  } catch (error) {
+    logger.error('App shell could not read the accessible modules; menu shows none', error, { tenantId });
+  }
 
   return (
     <ModuleProvider activeModules={activeModules}>

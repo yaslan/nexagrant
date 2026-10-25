@@ -1,0 +1,19 @@
+6MB: Görsel 5 MB'tan büyük. Daha küçük bir dosya seçin.
+upload: HTTP 200 {"url":"http://127.0.0.1:9100/fonbridge-public/blog/2026/c0mvchvc6allivdstmik21eq2.jpg"}
+preview src: http://127.0.0.1:9100/fonbridge-public/blog/2026/c0mvchvc6allivdstmik21eq2.jpg
+save: Blog yazısı kaydedildi.
+public link: /tr/blog/fo-67-staging-kapak-gorseli-denemesi
+public cover imgs: [{"src":"http://localhost:3100/_next/image?url=http%3A%2F%2F127.0.0.1%3A9100%2Ffonbridge-public%2Fblog%2F2026%2Fc0mvchvc6allivdstmik21eq2.jpg&w=1920&q=75","ok":true}]
+image responses:
+  200 http://localhost:3100/_next/image?url=%2Flogo.png&w=48&q=75
+  200 http://localhost:3100/_next/image?url=https%3A%2F%2Fimages.unsplash.com%2Fphoto-1454165804606-c3d57bc86b40%3Fauto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80&w=64&q=75
+  200 http://localhost:3100/_next/image?url=https%3A%2F%2Fimages.unsplash.com%2Fphoto-1522071820081-009f0129c71c%3Fauto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80&w=64&q=75
+  200 http://localhost:3100/_next/image?url=https%3A%2F%2Fimages.unsplash.com%2Fphoto-1618005182384-a83a8bd57fbe%3Fauto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80&w=64&q=75
+  200 http://localhost:3100/_next/image?url=https%3A%2F%2Fimages.unsplash.com%2Fphoto-1531482615713-2afd69097998%3Fauto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80&w=64&q=75
+  200 http://127.0.0.1:9100/fonbridge-public/blog/2026/c0mvchvc6allivdstmik21eq2.jpg
+  200 http://localhost:3100/_next/image?url=http%3A%2F%2F127.0.0.1%3A9100%2Ffonbridge-public%2Fblog%2F2026%2Fc0mvchvc6allivdstmik21eq2.jpg&w=64&q=75
+  anon 200 http://localhost:3100/_next/image?url=%2Flogo.png&w=64&q=75
+  anon 200 http://localhost:3100/_next/image?url=%2Flogo.png&w=96&q=75
+  anon 200 http://localhost:3100/_next/image?url=%2Flogo.png&w=64&q=75
+  anon 200 http://localhost:3100/_next/image?url=http%3A%2F%2F127.0.0.1%3A9100%2Ffonbridge-public%2Fblog%2F2026%2Fc0mvchvc6allivdstmik21eq2.jpg&w=1920&q=75
+  anon 200 http://localhost:3100/_next/image?url=%2Flogo.png&w=96&q=75

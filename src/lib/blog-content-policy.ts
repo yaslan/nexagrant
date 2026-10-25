@@ -37,6 +37,11 @@ const LINK_TOKEN = /^\[([^[\]]+)\]\(([^\s()]+)\)$/;
  * content is refused, not stored.
  */
 const LINK_ATTEMPT = /\[[^[\]]+\]\(([^\s)]*)/g;
+/**
+ * The file name the upload route gives an image (src/lib/blog-image.ts):
+ * something, then a lowercase `.png`, `.jpg`, `.jpeg` or `.webp`.
+ */
+const IMAGE_FILE = /\/[^/]+\.(?:png|jpe?g|webp)$/;
 /** A line that is an image and nothing else; alt and src may be empty so a save can say which is wrong. */
 const IMAGE_LINE = /^!\[([^[\]]*)\]\(([^\s()]*)\)$/;
 
@@ -74,7 +79,8 @@ export function isAllowedLinkHref(href: string): boolean {
 /**
  * Whether `src` is an image uploaded to the public bucket's blog folder:
  * `<publicBase>/blog/…` on the same scheme, host and port, with no
- * credentials, query, fragment or `..` segment. A host that merely starts
+ * credentials, query, fragment or `..` segment, and a `.png`, `.jpg`,
+ * `.jpeg` or `.webp` name (TASK-MVDTW6KVN5BSA). A host that merely starts
  * with the bucket's host (`bucket.host.evil.com`) is another host.
  * Also the rule for cover images and author portraits.
  */
@@ -100,6 +106,7 @@ export function isAllowedBlogImageSrc(src: string, publicBase: string | undefine
     url.hash === '' &&
     url.pathname.startsWith(prefix) &&
     url.pathname.length > prefix.length &&
+    IMAGE_FILE.test(url.pathname) &&
     !url.pathname.split('/').includes('..')
   );
 }

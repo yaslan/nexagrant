@@ -50,6 +50,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'agency-monthly-report': '0 6 1 * *',
       'invitation-cleanup': '30 3 * * *',
       'public-lead-cleanup': '45 3 * * *',
+      'expert-prereg-cleanup': '55 3 * * *',
       'k1-topic-match': '30 2 * * *',
       'k1-embeddings': '15 2 * * *',
       'm4-stale-relationships': '0 7 * * *',
@@ -72,6 +73,7 @@ describe('schedule (ADR-0008 §2)', () => {
     expect(lines).toContain('5 * * * * job-queue-health ?id=job-queue-health&max=3');
     expect(lines).toContain('30 3 * * * invitation-cleanup ?id=invitation-cleanup&max=5&fill=6h');
     expect(lines).toContain('45 3 * * * public-lead-cleanup ?id=public-lead-cleanup&max=5&fill=6h');
+    expect(lines).toContain('55 3 * * * expert-prereg-cleanup ?id=expert-prereg-cleanup&max=5&fill=6h');
     expect(lines).toContain('50 3 * * * notifications-retention ?id=notifications-retention&max=5&fill=6h');
     expect(lines).toContain('30 2 * * * k1-topic-match ?id=k1-topic-match&max=5&fill=6h&queue=k1-topic-match');
     expect(lines).toContain('15 2 * * * k1-embeddings ?id=k1-embeddings&max=5&fill=6h&queue=k1-embeddings');

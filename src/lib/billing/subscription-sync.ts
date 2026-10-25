@@ -12,7 +12,9 @@ import {
 } from '@/lib/billing/price-lock';
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
-import { isPilotSubscription, lockPilotRow, PILOT_PLAN_ID } from '@/lib/billing/pilot';
+import { lockPilotRow } from '@/lib/billing/pilot';
+import { stripeSyncBlocker, type StripeSyncBlock } from '@/lib/billing/subscription-owner';
+import { recordAlert } from '@/lib/observability/system-alert';
 import { invoiceLinePeriodFallback } from '@/lib/efatura';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock');
@@ -275,12 +277,48 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-/** Thrown inside a cancellation's transaction to roll it back over a free pilot row. */
-class PilotSubscriptionProtected extends Error {
-  constructor() {
-    super('Subscription row is a free pilot; Stripe does not own it.');
-    this.name = 'PilotSubscriptionProtected';
+/**
+ * Thrown inside a sync's transaction to roll it back over a row Stripe does not
+ * own — a free pilot or an internal plan (`stripeSyncBlocker`).
+ */
+class SubscriptionProtected extends Error {
+  constructor(readonly block: StripeSyncBlock, readonly planId: string) {
+    super(`Subscription row is not Stripe's to write (${block}).`);
+    this.name = 'SubscriptionProtected';
   }
+}
+
+/** The log line for a skipped event, per owner, so an operator knows whose row it was. */
+const PROTECTED_LOG: Record<StripeSyncBlock, string> = {
+  PILOT_PROTECTED: 'Stripe subscription names a tenant on the free pilot; not synced',
+  INTERNAL_PLAN_PROTECTED: 'Stripe subscription names a tenant on an internal plan; not synced',
+};
+
+/**
+ * Says a Stripe event was skipped over a row Stripe does not own. Nothing
+ * replays it: the event is not claimed, but the webhook answers 200, so Stripe
+ * does not retry, and a re-delivery is only ever a manual "resend" from the
+ * Stripe Dashboard. The defence is upstream — checkout refuses a pilot and an
+ * internal-plan tenant — and this is the trace when something got past it.
+ *
+ * An internal plan also raises a `SystemAlert`: unlike the pilot, it is an
+ * ordinary admin action, so a payment arriving over it is the one case an
+ * operator must see without reading logs. The alert carries Stripe ids only —
+ * `SystemAlert` is outside tenant isolation (system-alert.ts), and the Stripe
+ * subscription leads back to the tenant.
+ */
+async function reportProtected(
+  block: StripeSyncBlock,
+  context: { tenantId: string; eventId: string; stripeSubscriptionId: string }
+): Promise<void> {
+  logger.error(PROTECTED_LOG[block], context);
+  if (block !== 'INTERNAL_PLAN_PROTECTED') return;
+  await recordAlert({
+    level: 'error',
+    source: 'stripe-webhook',
+    message: PROTECTED_LOG[block],
+    meta: { code: block, eventId: context.eventId, stripeSubscriptionId: context.stripeSubscriptionId },
+  });
 }
 
 /**
@@ -375,10 +413,11 @@ export async function syncStripeSubscription(
   // closed for a pilot tenant, so a Stripe subscription naming one is either a
   // sale that got past that gate or a forged `metadata.tenantId`; both need a
   // person, not an upsert that would turn 90 free days into whatever Stripe
-  // says. The event is not claimed, so it can be replayed once the pilot has
-  // been ended by the platform admin.
-  if (isPilotSubscription(existingSubscription)) {
-    logger.error('Stripe subscription names a tenant on the free pilot; not synced', {
+  // says. An internal plan (TASK-MVCH26OXNVLKR) is protected the same way, and
+  // checkout is closed for it too. There is no replay: see `reportProtected`.
+  const fastBlock = stripeSyncBlocker(existingSubscription);
+  if (fastBlock) {
+    await reportProtected(fastBlock, {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
@@ -390,7 +429,7 @@ export async function syncStripeSubscription(
       addedAddOns: [],
       removedAddOns: [],
       creditsGranted: 0,
-      error: 'PILOT_PROTECTED',
+      error: fastBlock,
     };
   }
 
@@ -491,9 +530,10 @@ export async function syncStripeSubscription(
     await lockPilotRow(tx, tenantId);
     const current = await tx.subscription.findUnique({
       where: { tenantId },
-      select: { status: true, provider: true, trialEndsAt: true },
+      select: { planId: true, status: true, provider: true, trialEndsAt: true },
     });
-    if (isPilotSubscription(current)) throw new PilotSubscriptionProtected();
+    const block = stripeSyncBlocker(current);
+    if (block) throw new SubscriptionProtected(block, current!.planId);
 
     await tx.subscription.upsert({
       where: { tenantId },
@@ -655,24 +695,24 @@ export async function syncStripeSubscription(
     return { addedAddOns: added, removedAddOns: removed, creditsGranted: granted };
   }).catch((error: unknown) => {
     if (error instanceof StripeEventAlreadyClaimed) return null;
-    if (error instanceof PilotSubscriptionProtected) return 'pilot' as const;
+    if (error instanceof SubscriptionProtected) return { block: error.block, planId: error.planId };
     throw error;
   });
 
-  if (outcome === 'pilot') {
-    logger.error('Stripe subscription names a tenant on the free pilot; not synced', {
+  if (outcome !== null && typeof outcome === 'object' && 'block' in outcome) {
+    await reportProtected(outcome.block, {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
     });
     return {
       tenantId,
-      planId: PILOT_PLAN_ID,
+      planId: outcome.planId,
       status: 'skipped',
       addedAddOns: [],
       removedAddOns: [],
       creditsGranted: 0,
-      error: 'PILOT_PROTECTED',
+      error: outcome.block,
     };
   }
 
@@ -763,14 +803,15 @@ export async function handleSubscriptionCancellation(
     // The same guard as in `syncStripeSubscription`: a Stripe cancellation must
     // not cancel a free pilot it never sold. Read in this transaction under the
     // pilot lock, so no grant can land between the check and the update;
-    // throwing rolls the claim back too, so the event can be replayed once the
-    // pilot is ended.
+    // throwing rolls the claim back too, so nothing is recorded as processed
+    // (there is still no replay — see `reportProtected`).
     await lockPilotRow(tx, tenantId);
     const current = await tx.subscription.findUnique({
       where: { tenantId },
-      select: { status: true, provider: true, trialEndsAt: true },
+      select: { planId: true, status: true, provider: true, trialEndsAt: true },
     });
-    if (isPilotSubscription(current)) throw new PilotSubscriptionProtected();
+    const block = stripeSyncBlocker(current);
+    if (block) throw new SubscriptionProtected(block, current!.planId);
 
     // Update subscription status, and drop the price lock with it: the locked
     // rate belongs to the subscription that just ended, not to the tenant. Coming
@@ -812,24 +853,24 @@ export async function handleSubscriptionCancellation(
     return true;
   }).catch((error: unknown) => {
     if (error instanceof StripeEventAlreadyClaimed) return false;
-    if (error instanceof PilotSubscriptionProtected) return 'pilot' as const;
+    if (error instanceof SubscriptionProtected) return { block: error.block, planId: error.planId };
     throw error;
   });
 
-  if (claimed === 'pilot') {
-    logger.error('Stripe cancellation names a tenant on the free pilot; not applied', {
+  if (claimed !== null && typeof claimed === 'object' && 'block' in claimed) {
+    await reportProtected(claimed.block, {
       tenantId,
       eventId,
       stripeSubscriptionId: subscription.id,
     });
     return {
       tenantId,
-      planId: PILOT_PLAN_ID,
+      planId: claimed.planId,
       status: 'skipped',
       addedAddOns: [],
       removedAddOns: [],
       creditsGranted: 0,
-      error: 'PILOT_PROTECTED',
+      error: claimed.block,
     };
   }
 

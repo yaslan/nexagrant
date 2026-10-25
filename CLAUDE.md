@@ -11,7 +11,9 @@ Sen bu depoda çalışan Claude Code'sun. Önce `PROJECT.md`'yi oku; sonra göre
 ```bash
 pnpm install
 pnpm dev                 # Next.js :3000
-pnpm db:migrate          # prisma migrate dev
+pnpm db:setup           # boş DB'yi kurar (CI ile aynı sıra, scripts/db-setup.sh): generate → ensure_rls → db push → db:rls-role → db:rls → apply-migrations → db:rls → seed; tekrar koşulabilir
+                         # `pnpm db:migrate` / `prisma migrate deploy|dev|reset` KULLANMA: prisma/migrations bir Migrate geçmişi değil,
+                         # prisma.config.ts bunları hiçbir şey uygulamadan durdurur. Canlı: docs/RELEASE_CHECKLIST.md §3.1
 pnpm db:seed             # prisma/seed.ts (planlar, modül kataloğu, demo kiracı)
 pnpm db:rls              # prisma/rls.sql uygula (psql gerektirmez)
 pnpm test                # vitest
@@ -20,6 +22,10 @@ pnpm lint && pnpm typecheck
 pnpm gate                # db:generate + lint + typecheck + test + i18n:check + rls:check + rls:bypass-check + rls:verify --require-db + db:rls-role + e2e + alerts:check (kapinin tamami)
                          # Aynı veritabanına iki gate: migration-owner-chain.live advisory lock ile sıra bekler (~30 sn);
                          # e2e için ikinci worktree'de E2E_PORT farklı olmalı.
+                         # Makine çapı kilit (FO-55): `pnpm gate` scripts/gate-lock.mjs ile sarılı; kilit dizini ~/.cache/fonbridge-gate.lock (FONBRIDGE_GATE_LOCK_DIR ile değişir).
+                         # İkinci gate "Gate kilidi meşgul — bekliyor" yazar ve birincinin bitişini bekler; sahibin pid'i ölmüşse kilit bayat sayılıp kendiliğinden temizlenir.
+                         # Canlı bir sahip takılı kalırsa `kill <pid>` ile durdur (kilit dizinini elle silme: çakışan iki gate aynı DB'yi kullanır).
+                         # FONBRIDGE_GATE_LOCK_HELD=1 kilidi atlar (gate içinden gate); elle set etme.
 pnpm rls:verify          # DB gercekten kiraci izolasyonu uyguluyor mu (canli olcum)
 pnpm alerts:check        # acik SystemAlert satirlari silinmis kiracilari mi gosteriyor (oksuz alarm kapisi)
 pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)
@@ -27,6 +33,22 @@ pnpm worker:dev          # workers/ (python -m uvicorn app:app --reload)
 pnpm jobs:k1             # K1 çağrı toplama işini elle tetikle
 pnpm jobs:k2 -- --month 2026-09
 ```
+
+### Worktree'de gate (izole DB)
+Pre-push kancası tam `pnpm gate` koşar; gate'in DB'si checkout'un kendi `.env`'inden gelir. Worktree'de ortak `fabrika` DB'sine (5433) ve 3000 portuna bağlanma; `--no-verify` yok.
+```bash
+P=55xx                                          # boş bir port seç (lsof -nP -iTCP:$P -sTCP:LISTEN boş dönmeli)
+DB=<is>                                         # `fabrika` OLMASIN: tests/expert-prereg-retention.live.test.ts `fabrika` adlı DB'de kendini atlar (paylaşılan DB sanar)
+docker run -d --name <is>-pg -e POSTGRES_DB=$DB -e POSTGRES_USER=fabrika -e POSTGRES_PASSWORD=fabrika \
+  -p 127.0.0.1:$P:5432 pgvector/pgvector:pg16
+cp .env.example .env && perl -pi -e "s#\@localhost:5433/fabrika#\@localhost:$P/$DB#g" .env   # perl: mac ve Linux'ta aynı (sed -i '' yalnız BSD)
+perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env
+pnpm install --frozen-lockfile && pnpm db:setup  # db:rls-role, DATABASE_URL_RLS_TEST'i bu .env'e ekler
+E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: localhost:$P/$DB" yazar
+docker rm -f <is>-pg                            # iş bitince
+```
+Ana checkout "must be run in a work tree" veriyorsa `core.bare=true` olmuştur. Belirti, kontrol ve düzeltme için bkz. `docs/RELEASE_CHECKLIST.md` §9.1. `GIT_DIR` set iken başka dizinde `git init` ya da `git config` koşma.
+E2E postası: `playwright.config.ts` e2e sunucusuna `SMTP_HOST=localhost`, `SMTP_PORT=1025` verir (`E2E_SMTP`, `.env`'i ezer) ve posta kutusunu `http://localhost:8025`'ten okur. Bu portlarda bir mailpit gerekir: `docker compose up -d mailpit` (konteyner `fabrika-mailpit`; zaten ayaktaysa dokunma). Yoksa davet ve cooldown e2e'leri düşer. Posta linki `NEXT_PUBLIC_APP_URL`'den kurulur; config bunu e2e sunucusuna `BASE_URL` olarak verir (`.env`'siz worktree'de de). Log hangi ayarın eksik olduğunu söyler: `SMTP is not configured` ya da `NEXT_PUBLIC_APP_URL is not usable` (FO-131/FO-132). `.env`'de `SMTP_*` boş kalır (`.env.example` gibi): vitest `.env`'i okur, orada SMTP açmak no-SMTP canlı testini değiştirir. Mailpit paylaşımlıdır: iki e2e koşusu aynı anda çalışırsa postalar karışır.
 
 ## Mimari kurallar (ihlal etme)
 1. **Çok kiracılılık:** Her iş tablosunda `tenantId` zorunlu; sorgular `withTenant(prisma, tenantId)` sarmalayıcısından geçer; RLS politikası olmayan tablo PR'ı geçmez.

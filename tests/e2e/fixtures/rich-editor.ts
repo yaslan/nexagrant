@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * TASK-MVDKHOXGRQQS5 — the admin blog content field is a Tiptap editor, not a
@@ -9,6 +9,27 @@ import type { Locator, Page } from '@playwright/test';
 /** The blog post content editor, found by its visible label. */
 export function blogContentEditor(page: Page): Locator {
   return page.getByRole('textbox', { name: 'Makale İçeriği *' });
+}
+
+/** The text the page's selection covers inside the editor, or null if it is a caret or elsewhere. */
+function selectedText(editor: Locator): Promise<string | null> {
+  return editor.evaluate((el) => {
+    const s = getSelection();
+    if (!s || s.isCollapsed || !el.contains(s.anchorNode) || !el.contains(s.focusNode)) return null;
+    return s.toString().replace(/\s+/g, '');
+  });
+}
+
+/**
+ * Ctrl+A in the focused editor, as a person selects the whole post, and wait
+ * until the selection really covers all of it. A paste or Backspace sent
+ * before that lands at the caret instead (TASK-MVF3IS4CIHXFO).
+ */
+export async function selectAll(editor: Locator): Promise<void> {
+  await expect(editor).toBeFocused();
+  await editor.page().keyboard.press('ControlOrMeta+A');
+  const all = (await editor.textContent())?.replace(/\s+/g, '') ?? '';
+  await expect.poll(() => selectedText(editor), { message: 'Ctrl+A selects the whole post' }).toBe(all);
 }
 
 /**
@@ -25,6 +46,8 @@ export function blogContentEditor(page: Page): Locator {
  */
 export async function pasteInto(editor: Locator, payload: { text: string; html?: string }): Promise<void> {
   const page = editor.page();
+  // A range the caller selected must still be the one Ctrl+V replaces.
+  const selected = await selectedText(editor);
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.evaluate(async ({ text, html }) => {
     const parts: Record<string, Blob> = { 'text/plain': new Blob([text], { type: 'text/plain' }) };
@@ -32,5 +55,6 @@ export async function pasteInto(editor: Locator, payload: { text: string; html?:
     await navigator.clipboard.write([new ClipboardItem(parts)]);
   }, payload);
   if (!(await editor.evaluate((el) => el.contains(document.activeElement)))) await editor.click();
+  if (selected) expect(await selectedText(editor), 'the selection survives until Ctrl+V').toBe(selected);
   await page.keyboard.press('ControlOrMeta+V');
 }

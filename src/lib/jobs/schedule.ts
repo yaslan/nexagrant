@@ -29,6 +29,7 @@ export const JOB_IDS = [
   'agency-monthly-report',
   'invitation-cleanup',
   'public-lead-cleanup',
+  'expert-prereg-cleanup',
   'k1-topic-match',
   'k1-embeddings',
   'm4-stale-relationships',
@@ -70,6 +71,8 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   },
   { id: 'invitation-cleanup', cron: '30 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   { id: 'public-lead-cleanup', cron: '45 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
+  // FO-50: pre-registrations older than EXPERT_PREREG_RETENTION_DAYS (365).
+  { id: 'expert-prereg-cleanup', cron: '55 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // ADR-0011 §3.4: notifications older than 90 days.
   { id: 'notifications-retention', cron: '50 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // ADR-0011 §2.2: 08:20 Istanbul, verified documents within the badge's EXPIRING_SOON window.

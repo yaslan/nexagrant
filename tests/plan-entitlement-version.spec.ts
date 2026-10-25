@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
-import { createDbClient, prisma } from '../src/lib/db';
+import { createDbClient, prisma, withTenant } from '../src/lib/db';
 import { getEntitlements } from '../src/lib/billing';
 import { grantsFor } from '../src/lib/billing/catalog';
 import {
@@ -116,7 +116,7 @@ describe('entitlements come from the plan version the subscription is on', () =>
     // call threw; the figures below exist only in the database.
     expect(grantsFor(PLAN_ID)).toBeNull();
 
-    const ent = await getEntitlements(liveTenantId);
+    const ent = await withTenant(liveTenantId, (tx) => getEntitlements(liveTenantId, tx));
     expect(ent.source).toBe('plan-version');
     expect(ent.planVersionId).toBe(`pv_${PLAN_ID}_1`);
     expect(ent.seats).toBe(V1.seats);
@@ -143,7 +143,7 @@ describe('entitlements come from the plan version the subscription is on', () =>
     const impact = await computePublishImpact(draft.id);
     await publishVersion(draft.id, 'entitlement-version-spec', impact.loweredTenantCount);
 
-    const ent = await getEntitlements(liveTenantId);
+    const ent = await withTenant(liveTenantId, (tx) => getEntitlements(liveTenantId, tx));
     expect(ent.planVersionId).toBe(draft.id);
     expect(ent.seats).toBe(V2.seats);
     expect(ent.workspaces).toBe(V2.workspaces);
@@ -160,14 +160,14 @@ describe('entitlements come from the plan version the subscription is on', () =>
     });
     expect(row?.planVersionId).toBe(`pv_${PLAN_ID}_1`);
 
-    const ent = await getEntitlements(cancelledTenantId);
+    const ent = await withTenant(cancelledTenantId, (tx) => getEntitlements(cancelledTenantId, tx));
     expect(ent.source).toBe('catalogue');
     expect(ent.seats).toBe(grantsFor('free')!.seats);
   });
 
   test('seatsExtra still adds on top of the version', async () => {
     await prisma.subscription.update({ where: { tenantId: liveTenantId }, data: { seatsExtra: 3 } });
-    const ent = await getEntitlements(liveTenantId);
+    const ent = await withTenant(liveTenantId, (tx) => getEntitlements(liveTenantId, tx));
     expect(ent.seats).toBe(V2.seats + 3);
     await prisma.subscription.update({ where: { tenantId: liveTenantId }, data: { seatsExtra: 0 } });
   });
@@ -175,7 +175,7 @@ describe('entitlements come from the plan version the subscription is on', () =>
   test('a subscription with no version keeps exactly the behaviour it had', async () => {
     // The row the backfill has not reached. It must read the catalogue, not a
     // version nobody pointed it at.
-    const ent = await getEntitlements(proTenantId);
+    const ent = await withTenant(proTenantId, (tx) => getEntitlements(proTenantId, tx));
     expect(ent.source).toBe('catalogue');
     expect(ent.planVersionId).toBeNull();
     expect(ent.seats).toBe(grantsFor('pro')!.seats);
@@ -191,7 +191,7 @@ describe('entitlements come from the plan version the subscription is on', () =>
       where: { tenantId: proTenantId },
       data: { planVersionId: published!.id },
     });
-    const ent = await getEntitlements(proTenantId);
+    const ent = await withTenant(proTenantId, (tx) => getEntitlements(proTenantId, tx));
     expect(ent.source).toBe('catalogue');
     expect(ent.seats).toBe(grantsFor('pro')!.seats);
     await prisma.subscription.update({
@@ -210,7 +210,7 @@ describe('entitlements come from the plan version the subscription is on', () =>
       where: { tenantId: liveTenantId },
       data: { planVersionId: draft.id },
     });
-    await expect(getEntitlements(liveTenantId)).rejects.toThrow(
+    await expect(withTenant(liveTenantId, (tx) => getEntitlements(liveTenantId, tx))).rejects.toThrow(
       `Plan not found in catalogue: ${PLAN_ID}`
     );
 
@@ -225,7 +225,7 @@ describe('entitlements come from the plan version the subscription is on', () =>
       where: { tenantId: liveTenantId },
       data: { planVersionId: published!.id },
     });
-    const ent = await getEntitlements(liveTenantId);
+    const ent = await withTenant(liveTenantId, (tx) => getEntitlements(liveTenantId, tx));
     expect(ent.source).toBe('plan-version');
     expect(ent.seats).toBe(V2.seats);
   });

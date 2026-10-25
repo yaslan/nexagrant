@@ -1,4 +1,4 @@
-import { prisma, type TenantTx } from './db';
+import type { TenantTx } from './db';
 import { logger } from './logger';
 import {
   CATALOG_CURRENCY,
@@ -76,9 +76,13 @@ export interface Entitlements {
  * A retired EUR plan id still sitting on a subscription resolves to its
  * replacement (`team` → `pro`) instead of throwing, so a row the migration did
  * not reach is served rather than locked out.
+ *
+ * `client` is required (FA-49): Subscription is tenant-scoped, so a call on the
+ * bare singleton reads no subscription under fabrika_app and silently entitles
+ * a paying tenant from the free fallback. Callers open `withTenant`.
  */
-export async function getEntitlements(tenantId: string, client?: TenantTx): Promise<Entitlements> {
-  const db = client ?? prisma;
+export async function getEntitlements(tenantId: string, client: TenantTx): Promise<Entitlements> {
+  const db = client;
   const tenant = await db.tenant.findUnique({
     where: { id: tenantId },
     include: {

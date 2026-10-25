@@ -388,16 +388,18 @@ export interface AdminPlanRow {
  * plans, the tenants it is assigned to.
  */
 export async function listPlansForAdmin(): Promise<AdminPlanRow[]> {
-  const plans = await prisma.plan.findMany({
-    orderBy: { monthlyCents: 'asc' },
-    include: {
-      versions: {
-        orderBy: { version: 'desc' },
-        include: { features: { orderBy: { order: 'asc' } } },
+  const plans = await withSystemScope('platform-admin', 'plan-admin.listPlans', (tx) =>
+    tx.plan.findMany({
+      orderBy: { monthlyCents: 'asc' },
+      include: {
+        versions: {
+          orderBy: { version: 'desc' },
+          include: { features: { orderBy: { order: 'asc' } } },
+        },
+        assignments: { include: { tenant: { select: { name: true } } } },
       },
-      assignments: { include: { tenant: { select: { name: true } } } },
-    },
-  });
+    })
+  );
 
   // "How many live subscriptions does each plan have" is a cross-tenant count by
   // definition — the answer is a number per plan, never one tenant's rows.

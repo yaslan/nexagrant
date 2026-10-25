@@ -1,8 +1,10 @@
-import { getAllManifests } from "./registry";
+import { getAllManifests, getManifest } from "./registry";
+import { isComingSoon } from "./state-machine";
 import {
   PIPELINE_STAGES,
   type ModuleCategory,
   type ModuleId,
+  type ModuleManifest,
   type PipelineStage,
 } from "./types";
 
@@ -61,13 +63,30 @@ export function categorySummary(
 /**
  * Sidebar entries that are not a module's own `nav[]` item but are a feature of
  * one: shown locked while that module is off. Keyed by the `SidebarNav` item key.
- * `calls` (and Fırsatlar) are unmapped until the M0 module exists (phase 2).
+ * `calls` maps to M0 (Call Fit) as data only: M0 is "Yakında", so `navFeatureLock`
+ * does not lock it. Fırsatlar (`pipeline`) is M5's own nav item, not a feature,
+ * so it is not mapped here.
  */
 export const NAV_FEATURE_MODULE: Readonly<Record<string, ModuleId>> = {
   approvals: "M5",
   apiKeys: "M1",
+  calls: "M0",
 };
 
 export function navFeatureModule(navKey: string): ModuleId | null {
   return NAV_FEATURE_MODULE[navKey] ?? null;
+}
+
+/**
+ * The module whose absence locks a sidebar feature, or `null` when the entry
+ * stays open. A feature of a `soon` module is never locked: nothing a tenant can
+ * use today is taken away by a module that has not shipped (FO-40).
+ */
+export function navFeatureLock(
+  navKey: string,
+  activeIds: readonly ModuleId[],
+): ModuleManifest | null {
+  const id = navFeatureModule(navKey);
+  if (!id || activeIds.includes(id) || isComingSoon(id)) return null;
+  return getManifest(id);
 }

@@ -8,6 +8,7 @@ import {
 } from "../../src/lib/billing/catalog";
 import {
   categorySummary,
+  navFeatureLock,
   navFeatureModule,
   pipelineCoverage,
 } from "../../src/lib/modules/catalog";
@@ -25,6 +26,10 @@ import en from "../../messages/en.json";
 import tr from "../../messages/tr.json";
 
 const ALL_IDS = getAllManifests().map((m) => m.id);
+const SOON_IDS = getAllManifests()
+  .filter((m) => m.statusBadge === "soon")
+  .map((m) => m.id);
+const isSoon = (id: ModuleId) => SOON_IDS.includes(id);
 
 /** The view `readModulesPlanView` builds, from entitlements and switched-on rows. */
 function viewOf(
@@ -52,6 +57,11 @@ describe("moduleStatus — four card states", () => {
   });
   it("switched on but outside the plan (downgrade) is ORPHANED", () => {
     expect(moduleStatus("M7", view)).toBe("ORPHANED");
+  });
+  it("a Yakında module is SOON, or ORPHANED while a row still switches it on (FO-40)", () => {
+    expect(moduleStatus("M0", viewOf(["M0"], []))).toBe("SOON");
+    expect(moduleStatus("M13", view)).toBe("SOON");
+    expect(moduleStatus("M0", viewOf([], ["M0"]))).toBe("ORPHANED");
   });
 
   it("a Discover tenant that never subscribed has no ORPHANED module", () => {
@@ -103,10 +113,25 @@ describe("displayPlansForModule — card plan list", () => {
   it("leaves gating alone: plansGrantingModule still never names free", () => {
     for (const id of ALL_IDS) {
       expect(plansGrantingModule(id)).not.toContain("free");
+    }
+    for (const id of ALL_IDS.filter((id) => !isSoon(id))) {
       expect(displayPlansForModule(id).filter((p) => p !== "free")).toEqual(
         plansGrantingModule(id),
       );
     }
+  });
+
+  it("a Yakında module is shown on the cards of its plans, but no plan grants it", () => {
+    for (const id of SOON_IDS) {
+      expect(plansGrantingModule(id), id).toEqual([]);
+      expect(displayPlansForModule(id), id).not.toEqual([]);
+    }
+    expect(displayPlansForModule("M0")).toEqual(["free", "basic", "pro", "ultra"]);
+    expect(displayPlansForModule("M12")).toEqual(["free", "basic", "pro", "ultra"]);
+    expect(displayPlansForModule("M13")).toEqual(["pro", "ultra"]);
+    expect(displayPlansForModule("M14")).toEqual(["ultra"]);
+    expect(displayPlansForModule("M15")).toEqual(["ultra"]);
+    expect(displayPlansForModule("M16")).toEqual(["free", "basic", "pro", "ultra"]);
   });
 });
 
@@ -159,9 +184,9 @@ describe("manifest catalogue fields", () => {
       getAllManifests()
         .filter((m) => m.category === c)
         .map((m) => m.id);
-    expect(byCat("core")).toEqual(["M1", "M2", "M3", "M4", "M5"]);
-    expect(byCat("ai")).toEqual(["M6", "M8"]);
-    expect(byCat("tools")).toEqual(["M7", "M9", "M10", "M11"]);
+    expect(byCat("core")).toEqual(["M0", "M1", "M2", "M3", "M4", "M5", "M13", "M16"]);
+    expect(byCat("ai")).toEqual(["M6", "M8", "M14"]);
+    expect(byCat("tools")).toEqual(["M7", "M9", "M10", "M11", "M12", "M15"]);
   });
 
   it("every module names at least one gate and a name + tagline in both locales", () => {
@@ -208,9 +233,9 @@ describe("pipelineCoverage / categorySummary", () => {
 
   it("gives active/total per category", () => {
     expect(categorySummary(["M1", "M6", "M11"])).toEqual({
-      core: { active: 1, total: 5 },
-      ai: { active: 1, total: 2 },
-      tools: { active: 1, total: 4 },
+      core: { active: 1, total: 8 },
+      ai: { active: 1, total: 3 },
+      tools: { active: 1, total: 6 },
     });
   });
 });
@@ -219,6 +244,45 @@ describe("navFeatureModule", () => {
   it("maps the approvals centre to M5 and the partner REST API to M1", () => {
     expect(navFeatureModule("approvals")).toBe("M5");
     expect(navFeatureModule("apiKeys")).toBe("M1");
-    expect(navFeatureModule("calls")).toBeNull();
+    expect(navFeatureModule("calls")).toBe("M0");
+  });
+
+  it("does not lock a feature of a Yakında module, and locks one whose module is off", () => {
+    expect(navFeatureLock("calls", [])).toBeNull();
+    expect(navFeatureLock("calls", ["M0"])).toBeNull();
+    expect(navFeatureLock("approvals", ["M5"])).toBeNull();
+    expect(navFeatureLock("approvals", [])?.id).toBe("M5");
+    expect(navFeatureLock("apiKeys", [])?.id).toBe("M1");
+    expect(navFeatureLock("dashboard", [])).toBeNull();
+  });
+});
+
+describe("Yakında modules and programme templates", () => {
+  it("declares the six new manifests with the agreed categories, dependencies and badge", () => {
+    const byId = Object.fromEntries(getAllManifests().map((m) => [m.id, m]));
+    expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16"]);
+    expect(byId.M13?.requires).toEqual(["M5"]);
+    expect(byId.M13?.recommends).toEqual(["M11"]);
+    expect(byId.M14?.requires).toEqual(["M11"]);
+    expect(byId.M15?.requires).toEqual(["M5"]);
+    expect(byId.M0?.requires).toEqual([]);
+    expect(byId.M12?.requires).toEqual([]);
+    expect(byId.M16?.requires).toEqual([]);
+  });
+
+  it("M11 recommends M13 and the application/concept modules ship the programme templates", () => {
+    const byId = Object.fromEntries(getAllManifests().map((m) => [m.id, m]));
+    expect(byId.M11?.recommends).toEqual(["M13"]);
+    const templates = ["horizon-europe", "eurostars", "digital-europe", "eic-accelerator"];
+    expect(byId.M2?.programTemplates).toEqual(templates);
+    expect(byId.M11?.programTemplates).toEqual(templates);
+  });
+
+  it("the new chains resolve in dependency order with no cycle", () => {
+    expect(findDependencyCycle()).toBeNull();
+    expect(requirementChain("M13")).toEqual(["M5"]);
+    expect(requirementChain("M15")).toEqual(["M5"]);
+    expect(requirementChain("M14")).toEqual(["M1", "M2", "M3", "M5", "M8", "M11"]);
+    expect(requirementChain("M12")).toEqual([]);
   });
 });

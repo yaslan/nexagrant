@@ -153,18 +153,36 @@ export function smtpMailer(): Mailer | null {
   };
 }
 
-/** SystemAlert source for every "SMTP is not configured" alert. */
+/** SystemAlert source for every "mail cannot go out" alert. */
 export const MAIL_ALERT_SOURCE = 'mail';
 
 /**
- * Makes "no SMTP configured" loud instead of a silently skipped send: an
+ * What is missing when mail cannot go out: `smtp` (no SMTP_HOST) or `app_url`
+ * (no usable NEXT_PUBLIC_APP_URL, so the link the mail carries cannot be built;
+ * see `appBaseUrl()`). One log line used to name SMTP for both, which sent the
+ * FO-131 investigation after SMTP while the app URL was the gap.
+ */
+export type MailNotConfiguredReason = 'smtp' | 'app_url';
+
+const MAIL_NOT_CONFIGURED: Record<MailNotConfiguredReason, { what: string; dedupe: string }> = {
+  smtp: { what: 'SMTP is not configured (SMTP_HOST unset)', dedupe: 'smtp-not-configured' },
+  app_url: {
+    what: 'NEXT_PUBLIC_APP_URL is not usable (unset, or in production loopback, http:// or more than an origin)',
+    dedupe: 'app-url-not-configured',
+  },
+};
+
+/**
+ * Makes "mail cannot go out" loud instead of a silently skipped send: an
  * error on the console everywhere, and in production an error-level
- * `SystemAlert` (one open row per caller, deduplicated). Never throws.
+ * `SystemAlert` (one open row per caller and reason, deduplicated). Never throws.
  *
  * `caller` is a fixed identifier such as `invitations`; never an address.
+ * `reason` says which setting is missing; SMTP unless the caller says otherwise.
  */
-export async function reportMailNotConfigured(caller: string): Promise<void> {
-  console.error(`[mail] ${caller}: SMTP is not configured (SMTP_HOST unset) — mail not sent`);
+export async function reportMailNotConfigured(caller: string, reason: MailNotConfiguredReason = 'smtp'): Promise<void> {
+  const { what, dedupe } = MAIL_NOT_CONFIGURED[reason];
+  console.error(`[mail] ${caller}: ${what} — mail not sent`);
   if (env.NODE_ENV !== 'production') return;
   // Imported here, not at the top: system-alert pulls in the database client,
   // and this module is imported by code that must stay light (see
@@ -173,8 +191,8 @@ export async function reportMailNotConfigured(caller: string): Promise<void> {
   await recordAlert({
     level: 'error',
     source: MAIL_ALERT_SOURCE,
-    message: `SMTP is not configured (SMTP_HOST unset): ${caller} mail is not being sent`,
+    message: `${what}: ${caller} mail is not being sent`,
     meta: { caller },
-    dedupeKey: `smtp-not-configured:${caller}`,
+    dedupeKey: `${dedupe}:${caller}`,
   });
 }

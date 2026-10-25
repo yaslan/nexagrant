@@ -5,12 +5,13 @@ import { createDbClient, prisma } from '@/lib/db';
 import type { Mailer, MailMessage } from '@/lib/email/mailer';
 import { exportExpertPreRegistrationsCsv, listExpertPreRegistrations } from '@/lib/expert-prereg/server/admin';
 import { FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
-import { registerExpertPreRegistration } from '@/lib/expert-prereg/server/register';
+import { hashExpertIp, registerExpertPreRegistration } from '@/lib/expert-prereg/server/register';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
 import { acquireExpertPreRegLiveLock } from './helpers/expert-prereg-live-lock';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { requireId } from './helpers/teardown-guard';
 
 /**
  * FO-45 (TASK-MVC6CTSCLO6LI, Ö-1) — the expert flow as the app role, under RLS.
@@ -41,6 +42,10 @@ let releaseLock: (() => Promise<void>) | null = null;
 
 const address = `${PREFIX}${RUN}@example.org`;
 const failedAddress = `${PREFIX}${RUN}-mailfail@example.org`;
+// FO-26: an IP of this run only (TEST-NET-2), so its attempt rows are this file's alone.
+const SALT = 'app-role-live-salt-0123456789abcdef';
+const IP = `198.51.100.${1 + (Number.parseInt(RUN.slice(-2), 16) % 254)}`;
+const ipHash = hashExpertIp(IP, SALT) ?? '';
 
 const valid = {
   fullName: 'App Role Expert',
@@ -74,6 +79,7 @@ function tokenFromMail(message: MailMessage): string {
 
 async function cleanup() {
   await prisma.expertPreRegistration.deleteMany({ where: { email: { startsWith: PREFIX } } });
+  await prisma.expertPreRegAttempt.deleteMany({ where: { ipHash: requireId(ipHash, 'ipHash') } });
 }
 
 beforeAll(async () => {
@@ -125,6 +131,25 @@ describe('expert pre-registration as fabrika_app (live Postgres, RLS on)', () =>
     // Other runs can only take more numbers, so this bound holds when they run alongside.
     const seats = await getRemainingFounderSeats(rls);
     expect(seats).toBeLessThanOrEqual(Math.max(0, FOUNDER_SEAT_LIMIT - (verified.founderNumber ?? FOUNDER_SEAT_LIMIT)));
+  });
+
+  it.skipIf(!ready)('writes the 409 attempt row through the RLS role, and the row is invisible without a scope', async () => {
+    if (!rls) throw new Error('setup did not run');
+    const { sent, mailer } = recorder();
+    // The address was verified by the test above: a second registration is a 409.
+    const again = await registerExpertPreRegistration(valid, { db: rls, mailer, baseUrl: BASE, now: new Date(), ip: IP, salt: SALT });
+    expect(again).toEqual({ kind: 'duplicate' });
+    expect(sent).toHaveLength(0);
+
+    // FO-26 M1: ExpertPreRegAttempt is RLS on with system_scope only, like ExpertPreRegistration.
+    const sql = `SELECT count(*)::int AS n FROM "ExpertPreRegAttempt" WHERE "ipHash" = $1`;
+    const asApp = await rls.$queryRawUnsafe<{ n: number }[]>(sql, ipHash);
+    const asOwner = await prisma.$queryRawUnsafe<{ n: number }[]>(sql, ipHash);
+    expect(asApp[0]?.n).toBe(0);
+    expect(asOwner[0]?.n).toBe(1);
+    // Without the scope the app role cannot empty the counter either.
+    const removed = await rls.$executeRawUnsafe(`DELETE FROM "ExpertPreRegAttempt" WHERE "ipHash" = $1`, ipHash);
+    expect(removed).toBe(0);
   });
 
   it.skipIf(!ready)('removes the new row when the mail fails, through the RLS role', async () => {

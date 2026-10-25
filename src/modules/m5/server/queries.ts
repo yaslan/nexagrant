@@ -8,6 +8,7 @@ import {
   thresholdRate,
   type MetricValue,
 } from './metrics';
+import { trendIntervalDays } from './range';
 
 export type { MetricValue } from './metrics';
 
@@ -236,7 +237,9 @@ function pgTimestamp(d: Date): string {
  * and a long custom range ran past the 5 s interactive-transaction timeout,
  * taking the whole dashboard down with it (TASK-MVCU7MP8JK1V5).
  *
- * Buckets start at `from` and step `intervalDays`; the last one starts on or
+ * Buckets start at `from` and step `intervalDays`, widened by
+ * {@link trendIntervalDays} so a long range never draws more than
+ * `MAX_TREND_BUCKETS` points; the last one starts on or
  * before `to` and is cut off at `to`, the same `createdAt <= to` the "total
  * offers" card uses, so the trend never sums to more than that card. Each bucket
  * is half-open, so an opportunity created exactly on a boundary counts once, in
@@ -252,7 +255,7 @@ export async function getKpiTrendIn(
   to: Date,
   intervalDays: number = 7
 ): Promise<{ date: string; metric: string; value: number }[]> {
-  const intervalMs = intervalDays * DAY_MS;
+  const intervalMs = trendIntervalDays(from, to, intervalDays) * DAY_MS;
   const buckets = to < from ? 0 : Math.floor((to.getTime() - from.getTime()) / intervalMs) + 1;
   if (buckets === 0) return [];
 

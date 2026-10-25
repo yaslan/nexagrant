@@ -56,6 +56,7 @@ credit-ledger-grant-period.sql
 invitation-accepted-at.sql
 add-public-lead.sql
 add-expert-pre-registration.sql
+add-expert-pre-reg-attempt.sql
 relationship-stale-reminded-at.sql
 k1-embedding-hash.sql
 m4-stale-reminder-idempotency.sql
@@ -69,3 +70,5 @@ drop-evidence-reminder.sql
 add-expert-pre-registration-organization.sql
 expert-prereg-rls-mail-quota.sql
 blog-read-minutes.sql
+add-partner-search.sql
+add-expert-founder-counter.sql

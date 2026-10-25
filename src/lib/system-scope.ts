@@ -107,8 +107,10 @@ export const SYSTEM_SCOPE_PURPOSES = [
   'cross-tenant-job',
   /**
    * An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45).
-   * The database opens only ExpertPreRegistration and ExpertFounderCounter for it (FO-52,
+   * The database opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt for it (FO-52,
    * prisma/rls.sql system_scope_open); any other table reads 0 rows and refuses writes.
+   * In reverse, ExpertPreRegistration and ExpertPreRegAttempt open only for this purpose,
+   * 'platform-admin', 'platform-aggregate' and 'cross-tenant-job' (FO-92).
    */
   'public-intake',
 ] as const;

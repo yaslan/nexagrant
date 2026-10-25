@@ -17,16 +17,18 @@ import { requireId } from './helpers/teardown-guard';
  * shape of the read — a bounded number of queries whatever the range — plus the
  * numbers it must still produce.
  *
- * Fixture (tenant A), weekly buckets from Mon 2021-01-04:
- *   bucket 2021-01-04: two live opportunities, both G0-scored, one with a
+ * Fixture (tenant A), from Mon 2021-01-04. Five years of weeks is past the
+ * 120-bucket cap (TASK-MVCW3ANV1JU6Y), so that range is read in three-week
+ * buckets; the boundary claim is pinned on a short, weekly range instead.
+ *   week 2021-01-04:   two live opportunities, both G0-scored, one with a
  *                      submitted proposal                        → offers 2, 50 %
  *                      one archived opportunity                  → not counted
- *   bucket 2021-01-11: one opportunity created at exactly 00:00 Z, the
- *                      boundary with the first bucket            → offers 1, here only
- *   bucket 2023-06-12: one opportunity, not scored               → offers 1, 0 %
+ *   week 2021-01-11:   one opportunity created at exactly 00:00 Z, the
+ *                      boundary with the first week              → offers 1, here only
+ *   2023-06-15:        one opportunity, not scored               → offers 1, 0 %
  *   before the range:  one opportunity                           → not counted
  *   after the range:   one opportunity on 2026-01-02, past `to` but inside the
- *                      last bucket's seven days                  → not counted
+ *                      last bucket's 21 days                     → not counted
  * Tenant B has one opportunity in the first bucket; it must not reach A.
  */
 
@@ -36,9 +38,12 @@ const ADMIN_URL = envValue('DATABASE_URL');
 const RUN = `kpitrend-${Date.now().toString(36)}`;
 
 const FROM = new Date('2021-01-04T00:00:00Z');
-// Five years of weekly buckets: 2021-01-04 … 2025-12-29 is 261 bucket starts.
+// Five years is 261 weeks, past the cap: three-week buckets, 2021-01-04 … 2025-12-15.
 const TO = new Date('2025-12-31T23:59:59.999Z');
-const BUCKETS = 261;
+const STEP_DAYS = 21;
+const BUCKETS = 87;
+// Nine weeks: under the cap, so still a week per bucket.
+const WEEKLY_TO = new Date('2021-03-07T23:59:59.999Z');
 
 let rls: PrismaClient | undefined;
 let admin: PrismaClient | undefined;
@@ -117,7 +122,7 @@ function countingClient(client: PrismaClient): { client: PrismaClient; count: ()
 }
 
 describe('getKpiTrend against a live database', () => {
-  test('a five-year range is read in a bounded number of queries, not one batch per week', async (ctx) => {
+  test('a five-year range is read in a bounded number of queries, not one batch per bucket', async (ctx) => {
     if (!ready) ctx.skip();
     const counter = countingClient(rls!);
     const out = await withTenantOn(counter.client, ids.tenantA, async (tx) => {
@@ -128,27 +133,31 @@ describe('getKpiTrend against a live database', () => {
     expect(counter.count()).toBeLessThanOrEqual(2);
   });
 
-  test('the five-year numbers: per-week offers and hit rate, archived and out-of-range rows left out', async (ctx) => {
+  test('the five-year numbers: per-bucket offers and hit rate, archived and out-of-range rows left out', async (ctx) => {
     if (!ready) ctx.skip();
     const out = await withTenantOn(rls!, ids.tenantA, (tx) => getKpiTrendIn(tx, ids.tenantA, FROM, TO));
 
     const at = (date: string, metric: string) => out.find((r) => r.date === date && r.metric === metric)?.value;
-    expect(out[0]).toEqual({ date: '2021-01-04', metric: 'offers', value: 2 });
+    // The first three weeks share a bucket: two scored (one submitted) plus the unscored boundary one.
+    expect(out[0]).toEqual({ date: '2021-01-04', metric: 'offers', value: 3 });
     expect(out[1]).toEqual({ date: '2021-01-04', metric: 'success_rate', value: 50 });
-    expect(at('2023-06-12', 'offers')).toBe(1);
-    expect(at('2023-06-12', 'success_rate')).toBe(0);
-    expect(out.at(-1)?.date).toBe('2025-12-29');
+    expect(at('2023-06-05', 'offers')).toBe(1);
+    expect(at('2023-06-05', 'success_rate')).toBe(0);
+    expect(out.at(-1)?.date).toBe('2025-12-15');
 
     const offers = out.filter((r) => r.metric === 'offers');
     expect(offers.map((r) => r.date)).toEqual(
-      Array.from({ length: BUCKETS }, (_, k) => new Date(FROM.getTime() + k * 7 * 86_400_000).toISOString().slice(0, 10))
+      Array.from({ length: BUCKETS }, (_, k) =>
+        new Date(FROM.getTime() + k * STEP_DAYS * 86_400_000).toISOString().slice(0, 10)
+      )
     );
     expect(offers.reduce((sum, r) => sum + r.value, 0)).toBe(4);
   });
 
   test('an opportunity created exactly on a bucket boundary counts once, in the later bucket', async (ctx) => {
     if (!ready) ctx.skip();
-    const out = await withTenantOn(rls!, ids.tenantA, (tx) => getKpiTrendIn(tx, ids.tenantA, FROM, TO));
+    const out = await withTenantOn(rls!, ids.tenantA, (tx) => getKpiTrendIn(tx, ids.tenantA, FROM, WEEKLY_TO));
+    expect(out.filter((r) => r.metric === 'offers')).toHaveLength(9);
     const offers = (date: string) => out.find((r) => r.date === date && r.metric === 'offers')?.value;
     expect(offers('2021-01-04')).toBe(2);
     expect(offers('2021-01-11')).toBe(1);
@@ -161,7 +170,7 @@ describe('getKpiTrend against a live database', () => {
       await getKpiMetricsIn(tx, ids.tenantA, FROM, TO),
     ] as const);
     const offers = trend.filter((r) => r.metric === 'offers');
-    expect(offers.at(-1)).toEqual({ date: '2025-12-29', metric: 'offers', value: 0 });
+    expect(offers.at(-1)).toEqual({ date: '2025-12-15', metric: 'offers', value: 0 });
     expect(offers.reduce((sum, r) => sum + r.value, 0)).toBe(metrics.totalOffers);
     expect(metrics.totalOffers).toBe(4);
   });
@@ -172,6 +181,16 @@ describe('getKpiTrend against a live database', () => {
       getKpiTrendIn(tx, ids.tenantA, new Date('2000-01-03T00:00:00Z'), TO)
     );
     expect(out.filter((r) => r.metric === 'offers').reduce((sum, r) => sum + r.value, 0)).toBe(5);
+  });
+
+  test('a year-1000 `from` is capped at 120 buckets and still counts every row in range', async (ctx) => {
+    if (!ready) ctx.skip();
+    const out = await withTenantOn(rls!, ids.tenantA, (tx) =>
+      getKpiTrendIn(tx, ids.tenantA, new Date('1000-01-01T00:00:00Z'), TO)
+    );
+    const offers = out.filter((r) => r.metric === 'offers');
+    expect(offers.length).toBeLessThanOrEqual(120);
+    expect(offers.reduce((sum, r) => sum + r.value, 0)).toBe(5);
   });
 
   test("bound to tenant B, a read for tenant A's id returns only zeros: RLS, not only the WHERE", async (ctx) => {

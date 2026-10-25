@@ -100,6 +100,16 @@ describe('client IP', () => {
     expect(clientIpFrom(headers({ 'x-forwarded-for': '198.51.100.77' }), 2)).toBe('198.51.100.77');
   });
 
+  // FO-51: the live host is one LiteSpeed in front of Passenger (no CDN), so the value
+  // that goes into the deploy template must read the entry that one proxy appended.
+  it('with the live value (one proxy) ignores a forged X-Forwarded-For prefix', () => {
+    const live = trustedProxyHops('1');
+    expect(clientIpFrom(headers({ 'x-forwarded-for': '203.0.113.9, 198.51.100.77' }), live)).toBe('198.51.100.77');
+    expect(clientIpFrom(headers({ 'x-forwarded-for': '203.0.113.9, 203.0.113.10, 198.51.100.77' }), live)).toBe('198.51.100.77');
+    expect(clientIpFrom(headers({ 'x-forwarded-for': '198.51.100.77' }), live)).toBe('198.51.100.77');
+    expect(readFileSync(resolve(process.cwd(), '.env.example'), 'utf8')).toMatch(/^TRUSTED_PROXY_HOPS=1$/m);
+  });
+
   it('never reads X-Real-IP, and trusts nothing with no proxy of ours or no header', () => {
     expect(clientIpFrom(headers({ 'x-real-ip': '198.51.100.2' }), 1)).toBeNull();
     expect(clientIpFrom(headers({ 'x-forwarded-for': '198.51.100.77', 'x-real-ip': '10.0.0.1' }), 1)).toBe('198.51.100.77');

@@ -568,41 +568,81 @@ async function probeIsolation(
  */
 const EXPERT_TABLE = 'ExpertPreRegistration';
 
+/**
+ * FO-45 (TASK-MVC6CTSCLO6LI): ExpertPreRegistration is personal data with no tenant,
+ * so the tenant probe above does not reach it. Its contract is the one policy
+ * `system_scope`: outside that scope the measured role reads 0 rows and cannot
+ * insert; inside `public-intake` every row is visible. Rolled back, nothing is kept.
+ * FO-50 (K-568932 = A): ExpertFounderCounter, its founder-number counter, has the
+ * same contract and is measured the same way.
+ */
+const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
+  table: string;
+  migration: string;
+  insert: (id: string) => [string, unknown[]];
+  /** The measured role must hold no DELETE/TRUNCATE (crw-fb Ö-1: the counter only goes up). */
+  noDelete?: boolean;
+}> = [
+  {
+    table: 'ExpertPreRegistration',
+    migration: 'expert-prereg-rls-mail-quota.sql',
+    insert: (id) => [
+      `insert into ${quoteIdent('ExpertPreRegistration')} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+       values ($1, 'probe', $2, '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+      [id, `${id}@rls-verify.invalid`],
+    ],
+  },
+  {
+    table: 'ExpertFounderCounter',
+    migration: 'add-expert-founder-counter.sql',
+    insert: () => [`insert into ${quoteIdent('ExpertFounderCounter')} (id, "lastNumber", "updatedAt") values (1, 0, now())`, []],
+    noDelete: true,
+  },
+];
+
 async function probeSystemScopeTable(
   m: pg.Client,
+  spec: (typeof SYSTEM_SCOPE_TABLES)[number],
   rlsOn: boolean,
   expectedRows: number
 ): Promise<{ failures: string[]; checks: string[] }> {
   const failures: string[] = [];
   const checks: string[] = [];
+  const table = spec.table;
   if (!rlsOn) {
-    failures.push(`${EXPERT_TABLE}: RLS kapalı — kişisel veri korumasız (prisma/migrations/expert-prereg-rls-mail-quota.sql).`);
+    failures.push(`${table}: RLS kapalı — sistem kapsamı korumasız (prisma/migrations/${spec.migration}).`);
     return { failures, checks };
   }
   const count = async (): Promise<number> =>
-    Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? -1);
+    Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(table)}`)).rows[0]?.n ?? -1);
 
   const outside = await count();
   if (outside !== 0) {
-    failures.push(`${EXPERT_TABLE}: sistem kapsamı DIŞINDA ${outside} satır okunuyor — izolasyon uygulanmıyor.`);
+    failures.push(`${table}: sistem kapsamı DIŞINDA ${outside} satır okunuyor — izolasyon uygulanmıyor.`);
   } else {
-    checks.push(`${EXPERT_TABLE}: sistem kapsamı dışında okuma 0 satır (tabloda ${expectedRows})`);
+    checks.push(`${table}: sistem kapsamı dışında okuma 0 satır (tabloda ${expectedRows})`);
   }
 
   const id = `rls-verify-${randomBytes(6).toString('hex')}`;
   await m.query('begin');
   try {
-    await m.query(
-      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
-       values ($1, 'probe', $2, '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
-      [id, `${id}@rls-verify.invalid`]
-    );
-    failures.push(`${EXPERT_TABLE}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
+    await m.query(...spec.insert(id));
+    failures.push(`${table}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
   } catch (e) {
-    if (isRlsViolation(e)) checks.push(`${EXPERT_TABLE}: sistem kapsamı dışında INSERT reddedildi`);
-    else failures.push(`${EXPERT_TABLE}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+    if (isRlsViolation(e)) checks.push(`${table}: sistem kapsamı dışında INSERT reddedildi`);
+    else failures.push(`${table}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
   } finally {
     await m.query('rollback');
+  }
+
+  if (spec.noDelete) {
+    const priv = await m.query<{ d: boolean; t: boolean }>(
+      `select has_table_privilege(current_user, $1, 'DELETE') as d, has_table_privilege(current_user, $1, 'TRUNCATE') as t`,
+      [quoteIdent(table)]
+    );
+    const { d, t } = priv.rows[0] ?? { d: true, t: true };
+    if (d || t) failures.push(`${table}: ölçüm rolünde DELETE/TRUNCATE yetkisi var — sayaç silinebilir (prisma/migrations/${spec.migration}).`);
+    else checks.push(`${table}: ölçüm rolünde DELETE ve TRUNCATE yetkisi yok`);
   }
 
   await m.query('begin');
@@ -610,9 +650,9 @@ async function probeSystemScopeTable(
     await m.query(`select enter_system_scope('public-intake')`);
     const inside = await count();
     if (inside !== expectedRows) {
-      failures.push(`${EXPERT_TABLE}: sistem kapsamı İÇİNDE ${inside}/${expectedRows} satır görüldü — politika yanlış.`);
+      failures.push(`${table}: sistem kapsamı İÇİNDE ${inside}/${expectedRows} satır görüldü — politika yanlış.`);
     } else {
-      checks.push(`${EXPERT_TABLE}: sistem kapsamı içinde ${inside}/${expectedRows} satır görüldü`);
+      checks.push(`${table}: sistem kapsamı içinde ${inside}/${expectedRows} satır görüldü`);
     }
   } finally {
     await m.query('rollback');
@@ -624,11 +664,54 @@ async function probeSystemScopeTable(
  * FO-52 (K-569554 = C): the purpose 'public-intake' (the anonymous expert form)
  * opens only PUBLIC_INTAKE_TABLES; every other system_scope table must look
  * exactly as it does outside the scope, and a write there must be refused.
- * The other purposes must still open everything. One snapshot for both
+ * The other purposes must still open everything but the expert data they do
+ * not handle (FO-92, EXPERT_DATA_PURPOSES). One snapshot for both
  * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
  * Everything is rolled back.
  */
-const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter']);
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt']);
+
+/**
+ * FO-98: one write per PUBLIC_INTAKE_TABLES table, the smallest the form itself
+ * makes. A row count cannot tell an open empty table from a closed one (0 = 0):
+ * with ExpertPreRegAttempt dropped from system_scope_open the counts still
+ * matched and rls:verify passed. So each table is written once outside any scope
+ * (must be an RLS error) and once inside public-intake (must be accepted), each
+ * inside tryInsert's savepoint. A table on the list without a probe here fails.
+ */
+const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, params: unknown[]]>([
+  [
+    EXPERT_TABLE,
+    (id) => [
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+      [id],
+    ],
+  ],
+  ['ExpertPreRegAttempt', (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]]],
+  // One-row counter (CHECK id = 1), written by the app with this same upsert
+  // (src/lib/expert-prereg/server/founder-counter.ts). Empty table: the INSERT
+  // path meets WITH CHECK. Seeded row: the UPDATE path meets USING, and RLS
+  // refuses a hidden conflicting row with an error instead of a silent 0-row
+  // UPDATE. No WHERE, so the UPDATE path always runs; lastNumber is not touched,
+  // so the "only goes up" trigger stays out of it.
+  [
+    'ExpertFounderCounter',
+    () => [
+      `insert into "ExpertFounderCounter" (id, "lastNumber", "updatedAt") values (1, 0, now())
+       on conflict (id) do update set "updatedAt" = excluded."updatedAt"`,
+      [],
+    ],
+  ],
+]);
+
+/**
+ * FO-92 (FO-21 O4): the reverse direction. The expert's personal data opens only
+ * for the purposes that handle it; the others read exactly what they read outside
+ * the scope (0) and cannot insert there.
+ */
+const EXPERT_DATA_TABLES = new Set([EXPERT_TABLE, 'ExpertPreRegAttempt']);
+const EXPERT_DATA_PURPOSES = new Set(['public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']);
 
 async function probePurposeTables(
   m: pg.Client,
@@ -685,6 +768,19 @@ async function probePurposeTables(
     const opened = (inside: Map<string, number>) =>
       tables.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
 
+    const intakeProbes: [string, (id: string) => [string, unknown[]]][] = [];
+    for (const t of PUBLIC_INTAKE_TABLES) {
+      const probe = PUBLIC_INTAKE_PROBES.get(t);
+      if (!probe) failures.push(`public-intake: ${t} için yazma prob'u yok (PUBLIC_INTAKE_PROBES) — boş tabloda kapsam ölçülemez`);
+      else if (!tables.includes(t)) checks.push(`public-intake: ${t} bu veritabanında yok (system_scope politikası yok), yazma ölçülmedi`);
+      else intakeProbes.push([t, probe]);
+    }
+    for (const [t, probe] of intakeProbes) {
+      const r = await tryInsert(...probe(`rls-verify-${randomBytes(6).toString('hex')}`));
+      if (r === 'rls') checks.push(`public-intake: ${t} kapsam dışında INSERT reddedildi`);
+      else failures.push(`public-intake: ${t} kapsam dışında INSERT ${r === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${r}`}`);
+    }
+
     await m.query(`select enter_system_scope('public-intake')`);
     const intake = await countAll(m);
     const leaked = opened(intake).filter((t) => !PUBLIC_INTAKE_TABLES.has(t));
@@ -695,7 +791,7 @@ async function probePurposeTables(
           .join(', ')}`
       );
     } else {
-      checks.push(`public-intake: ${tables.length - PUBLIC_INTAKE_TABLES.size} system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ${[...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t)).join(', ')} açık)`);
+      checks.push(`public-intake: ${tables.filter((t) => !PUBLIC_INTAKE_TABLES.has(t)).length} system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ${[...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t)).join(', ')} açık)`);
     }
     if (truth) {
       const short = [...PUBLIC_INTAKE_TABLES].filter((t) => tables.includes(t) && intake.get(t) !== truth!.get(t));
@@ -704,25 +800,42 @@ async function probePurposeTables(
     const auditIntake = await auditInsert(tenantId);
     if (auditIntake === 'rls') checks.push('public-intake: AuditEvent INSERT reddedildi');
     else failures.push(`public-intake: AuditEvent INSERT ${auditIntake === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${auditIntake}`}`);
-    const expertIntake = await tryInsert(
-      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
-       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
-      [`rls-verify-${randomBytes(6).toString('hex')}`]
-    );
-    if (expertIntake === 'ok') checks.push(`public-intake: ${EXPERT_TABLE} INSERT kabul edildi (pozitif kontrol, geri alındı)`);
-    else failures.push(`public-intake: ${EXPERT_TABLE} INSERT reddedildi — form yazamaz: ${expertIntake}`);
+    for (const [t, probe] of intakeProbes) {
+      const r = await tryInsert(...probe(`rls-verify-${randomBytes(6).toString('hex')}`));
+      if (r === 'ok') checks.push(`public-intake: ${t} INSERT kabul edildi (pozitif kontrol, geri alındı)`);
+      else failures.push(`public-intake: ${t} INSERT reddedildi — form yazamaz: ${r === 'rls' ? 'RLS' : r}`);
+    }
 
-    // The other purposes are not narrowed: each still opens every row.
+    // The other purposes are not narrowed by public-intake's list: each still
+    // opens every row, except the expert data the purpose does not handle (FO-92).
     for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
       await m.query('select enter_system_scope($1)', [purpose]);
       const inside = await countAll(m);
-      const short = truth
-        ? tables.filter((t) => inside.get(t) !== truth!.get(t))
-        : tables.filter((t) => (inside.get(t) ?? 0) < (outside.get(t) ?? 0));
+      const shut = EXPERT_DATA_PURPOSES.has(purpose) ? [] : tables.filter((t) => EXPERT_DATA_TABLES.has(t));
+      if (shut.length > 0) {
+        const seen = shut.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
+        if (seen.length > 0) {
+          failures.push(`${purpose}: uzman kişisel verisini görüyor (kapalı olmalı): ${seen.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
+        } else {
+          checks.push(`${purpose}: ${shut.map((t) => `${t}=${inside.get(t)}${truth ? `/${truth.get(t)}` : ''}`).join(', ')} — uzman verisi kapalı`);
+        }
+        const expertWrite = await tryInsert(
+          `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+           values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+          [`rls-verify-${randomBytes(6).toString('hex')}`]
+        );
+        if (expertWrite === 'rls') checks.push(`${purpose}: ${EXPERT_TABLE} INSERT reddedildi`);
+        else failures.push(`${purpose}: ${EXPERT_TABLE} INSERT ${expertWrite === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${expertWrite}`}`);
+      }
+      const short = (
+        truth
+          ? tables.filter((t) => inside.get(t) !== truth!.get(t))
+          : tables.filter((t) => (inside.get(t) ?? 0) < (outside.get(t) ?? 0))
+      ).filter((t) => !shut.includes(t));
       if (short.length > 0) {
         failures.push(`${purpose}: daraldı, tüm satırları görmüyor: ${short.map((t) => `${t}=${inside.get(t)}`).join(', ')}`);
       } else {
-        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? ', her system_scope tablosunda tüm satırlar' : ''}`);
+        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? `, ${shut.length > 0 ? 'uzman verisi dışında ' : ''}her system_scope tablosunda tüm satırlar` : ''}`);
       }
     }
     const auditAdmin = await auditInsert(tenantId);
@@ -916,11 +1029,14 @@ async function main() {
       populated,
       existing.has('AiUsageLog')
     );
+    for (const spec of SYSTEM_SCOPE_TABLES) {
+      if (!existing.has(spec.table)) continue;
+      const rows = Number((await client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(spec.table)}`)).rows[0]?.n ?? 0);
+      const probe = await probeSystemScopeTable(measurer.client, spec, rlsOn.has(spec.table), rows);
+      failures.push(...probe.failures);
+      checks.push(...probe.checks);
+    }
     if (existing.has(EXPERT_TABLE)) {
-      const expertRows = Number((await client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? 0);
-      const expert = await probeSystemScopeTable(measurer.client, rlsOn.has(EXPERT_TABLE), expertRows);
-      failures.push(...expert.failures);
-      checks.push(...expert.checks);
       const purposes = await probePurposeTables(measurer.client, measurer.client === client ? null : client);
       failures.push(...purposes.failures);
       checks.push(...purposes.checks);

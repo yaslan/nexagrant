@@ -12,6 +12,11 @@
 
 set -e
 
+# Paylaşılan .git/config'te core.bare=true ise ana checkout bozuktur; linked
+# worktree'de commit yine geçtiği için burada durup söylüyoruz (FO-114).
+. scripts/git-core-bare.sh
+core_bare_guard pre-commit || exit 1
+
 # --- docs/agent-results/ kanıt koruması ---------------------------------
 # docs/agent-results/ ajanların kanıt yazdığı ortak, sahipsiz bir alan: kimse
 # başka bir görevin dosyasını ezmemesi gerektiğini "bilerek" tutmuyor, ve bu

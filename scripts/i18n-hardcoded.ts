@@ -16,9 +16,15 @@
  *   - a JSX text node            <span>Aktif Hibe Çağrısı</span>
  *   - a text-carrying prop       title= / label= / placeholder= / aria-label=
  * and that is either Turkish (carries ç ğ ı İ ö ş ü) or two or more words. A single
- * ASCII word ("Save") is deliberately NOT a violation: at one word the signal is too weak
- * to separate prose from an identifier, and a gate that cries wolf gets disabled. This
- * detector is a floor, not a census.
+ * ASCII word in a prop (title="Save") is deliberately NOT a violation: at one word the
+ * signal is too weak to separate prose from an identifier, and a gate that cries wolf
+ * gets disabled. JSX text is the exception: there a capitalised word ("Kaydet", "Vazgec")
+ * is a button label, not an identifier, so it counts. This detector is a floor, not a
+ * census.
+ *
+ * JSX text is read from the TypeScript AST, not a line regex. The regex refused a newline
+ * inside the match, so a label on its own line — the normal Prettier shape — was never
+ * counted: dev's Part B editor scored 16 while carrying ~55 literals (FO-95).
  *
  * ── What is excluded ──────────────────────────────────────────────────────────────────
  * Technical strings are not prose: Tailwind class lists, routes and file paths, URLs,
@@ -28,6 +34,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import ts from 'typescript';
 
 export interface Violation {
   /** Repo-relative, POSIX separators — the key shape used in i18n-baseline.json. */
@@ -128,18 +135,42 @@ export function isUserFacing(text: string): boolean {
   return t.split(/\s+/).filter(w => /[A-Za-zÇĞİÖŞÜçğıöşü]/.test(w)).length >= 2;
 }
 
-/** JSX text node between two tags: `>Aktif Hibe Çağrısı<`. */
-const JSX_TEXT = /> *([^<>{}\n][^<>{}\n]{1,199}?) *</g;
+const SINGLE_LABEL = /^[A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,}$/;
+
+/** JSX text adds one shape to isUserFacing: a lone capitalised word, i.e. a label. */
+export function isJsxProse(text: string): boolean {
+  if (isUserFacing(text)) return true;
+  const words = text.trim().split(/\s+/).filter(w => /[A-Za-zÇĞİÖŞÜçğıöşü]/.test(w));
+  if (words.length !== 1) return false;
+  // "Sayfa (" and "Kelime)" sit next to an expression; the brackets are not the word.
+  const word = words[0]!.replace(/^[^A-Za-zÇĞİÖŞÜçğıöşü]+|[^A-Za-zÇĞİÖŞÜçğıöşü]+$/g, '');
+  return SINGLE_LABEL.test(word);
+}
+
+/** Every JSX text node, whitespace collapsed the way React renders it. */
+function jsxTextNodes(raw: string): { line: number; text: string }[] {
+  const sf = ts.createSourceFile('scan.tsx', raw, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const out: { line: number; text: string }[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxText(node) && !node.containsOnlyTriviaWhiteSpaces) {
+      // getStart already skips the leading newline and indentation of a JSX text node.
+      const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+      out.push({ line, text: node.text.replace(/\s+/g, ' ').trim() });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
 
 export function scanSource(relPath: string, raw: string): Violation[] {
   const src = stripComments(raw);
   const lineOf = (index: number) => src.slice(0, index).split('\n').length;
   const found: Violation[] = [];
 
-  for (const m of src.matchAll(JSX_TEXT)) {
-    const text = m[1];
-    if (text === undefined || !isUserFacing(text)) continue;
-    found.push({ file: relPath, line: lineOf(m.index), kind: 'jsx-text', text: text.trim() });
+  for (const { line, text } of jsxTextNodes(raw)) {
+    if (!isJsxProse(text)) continue;
+    found.push({ file: relPath, line, kind: 'jsx-text', text });
   }
 
   for (const prop of TEXT_PROPS) {

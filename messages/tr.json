@@ -795,7 +795,8 @@
         "AVAILABLE": "Planınıza dahil, açılabilir",
         "LOCKED": "Planınıza dahil değil",
         "ORPHANED": "Plan dışında kaldı — kullanılamaz",
-        "UNKNOWN": "Durum okunamadı"
+        "UNKNOWN": "Durum okunamadı",
+        "SOON": "Henüz açılamaz"
       },
       "statusBadge": {
         "ga": "GA",
@@ -817,6 +818,8 @@
       "plansNone": "Hiçbir planda yok",
       "addOnSku": "SKU: {sku}",
       "missingDependencies": "Eksik bağımlılık: {ids}",
+      "soonNotice": "Bu modül hazırlanıyor; kullanıma açıldığında buradan etkinleştirebilirsiniz.",
+      "soonLink": "Ne getirecek? →",
       "enable": "Aç",
       "disable": "Kapat",
       "toastDisabled": "{id} modülü devre dışı bırakıldı.",
@@ -1480,13 +1483,15 @@
   "ModuleGate": {
     "title": "Bu modül şu anda kullanılamıyor",
     "askAdmin": "Erişim gerekiyorsa çalışma alanı yöneticinizle ya da {brand} ekibiyle görüşün.",
+    "comingSoon": "{brand} bu modülü hazırlıyor. Kullanıma açıldığında Modül Yönetimi sayfasından etkinleştirebilirsiniz.",
     "reason": {
       "MODULE_OFF": "{module} modülü kiracınızda kapalı.",
       "PLAN_UPGRADE_REQUIRED": "{module} modülü aboneliğinizin kapsamı dışında. Şu planlarda yer alıyor: {plans}.",
       "DEV_INTERNAL_ONLY": "{module} modülü geliştirme aşamasında ve şu an yalnızca {brand} ekibine açık.",
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
-      "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor."
+      "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
+      "COMING_SOON": "{module} modülü yakında kullanıma açılacak."
     }
   },
   "UserIdentity": {
@@ -1642,6 +1647,7 @@
     "closed": "Kapanmış",
     "loadingData": "Canlı veriler yükleniyor...",
     "resultsCount": "Toplam {count} çağrı bulundu ({page}. sayfa)",
+    "windowNote": "İlk {count, number} sonuç gösteriliyor, aramayı daraltın.",
     "colStatus": "Durum",
     "colTopic": "Çağrı Başlığı & Kodu",
     "colActionType": "Eylem Tipi",
@@ -1660,7 +1666,8 @@
       "rateLimited": "Kısa sürede çok fazla arama yaptınız. Lütfen {seconds} saniye bekleyip tekrar deneyin.",
       "badRequest": "Arama isteği kabul edilmedi: filtrelerden biri geçersiz bir değer içeriyor. Filtreleri değiştirip tekrar deneyin.",
       "network": "Sunucuya ulaşılamadı ya da yanıt zaman aşımına uğradı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
-      "unexpected": "Çağrı listesi beklenmeyen bir hata nedeniyle alınamadı. Lütfen tekrar deneyin; sorun sürerse yöneticinize bildirin."
+      "unexpected": "Çağrı listesi beklenmeyen bir hata nedeniyle alınamadı. Lütfen tekrar deneyin; sorun sürerse yöneticinize bildirin.",
+      "pageOutOfWindow": "Bu sayfa gösterilemiyor: AB fon portalı bir aramada yalnızca ilk {count, number} sonucu verir. Filtrelerde bir sorun yok; önceki sayfalara dönün ya da aramayı daraltın."
     },
     "loadFailedShort": "Çağrılar alınamadı",
     "perPage": "Sayfa Başı Gösterim:",
@@ -1697,6 +1704,7 @@
       "refundNote": "14 gün iade garantisi",
       "checkoutFailed": "Ödeme oturumu başlatılamadı.",
       "checkoutUnreachable": "Ödeme servisine bağlanılamadı.",
+      "internalPlanCheckoutClosed": "Planınız yönetici tarafından atandı; ödeme ve plan değişikliği buradan yapılamaz. Değişiklik için bizimle iletişime geçin.",
       "demoBadge": "STRIPE CHECKOUT DEMO MODU",
       "demoTitle": "Stripe ödeme simülasyonu",
       "demoBody": "Stripe anahtarları tanımlandığında doğrudan Stripe Checkout sayfasına yönlendirilirsiniz. Aşağıdaki tutarlar sunucunun hesapladığı tutarlardır.",
@@ -2117,7 +2125,9 @@
       "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekir.",
       "INVALID_VISIBILITY": "Geçersiz görünürlük değeri. Sayfayı yenileyip tekrar deneyin.",
       "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin; sürerse ayrıntı sunucu günlüğündedir.",
-      "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz."
+      "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz.",
+      "INTERNAL_PLAN_PROTECTED": "Kiracı bir iç planda; pilot atanamaz. Önce iç planı kiracı sayfasından geri alın.",
+      "TRIAL_PROTECTED": "Kiracı Stripe aboneliği olmayan bir deneme süresinde (ör. beta); pilot atanamaz. Önce denemeyi sonlandırın."
     },
     "pilot": {
       "title": "Ücretsiz pilot (90 gün, Belediye Ekip)",
@@ -2966,6 +2976,64 @@
       "placeholder": "örn: 5",
       "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz. Sitede okuyucunun dilinde gösterilir.",
       "missing": "Okuma süresi boş olamaz. İçerikte okunacak metin yoksa süreyi elle yazın."
+    },
+    "editor": {
+      "label": "Makale İçeriği (Markdown)",
+      "placeholder": "# Başlık\n\nParagraf metni…",
+      "hint": "Desteklenenler: # / ## / ### başlık, **kalın**, *italik*, [link](url), ![görsel](url), * madde, 1. numaralı liste, > alıntı. Kalın için Ctrl/Cmd+B, italik için Ctrl/Cmd+I, link için Ctrl/Cmd+K.",
+      "previewEmpty": "Önizlenecek içerik yok.",
+      "toolbar": {
+        "label": "Biçimlendirme araçları",
+        "h1": "Başlık 1",
+        "h2": "Başlık 2",
+        "h3": "Başlık 3",
+        "bold": "Kalın",
+        "italic": "İtalik",
+        "quote": "Alıntı",
+        "bulletList": "Madde işaretli liste",
+        "numberedList": "Numaralı liste",
+        "link": "Bağlantı ekle",
+        "image": "Görsel ekle"
+      },
+      "tabs": {
+        "label": "İçerik görünümü",
+        "write": "Yaz",
+        "preview": "Önizle"
+      },
+      "stats": {
+        "words": "{count} kelime",
+        "chars": "{count} karakter"
+      },
+      "linkModal": {
+        "title": "Bağlantı Ekle",
+        "textLabel": "Bağlantı Metni",
+        "textPlaceholder": "Bağlantı verilecek metin…",
+        "urlLabel": "Bağlantı Adresi (URL)",
+        "urlPlaceholder": "https://example.com",
+        "cancel": "İptal",
+        "submit": "Bağlantıyı Ekle"
+      },
+      "imageModal": {
+        "title": "Görsel Ekle",
+        "tabUpload": "Dosya Yükle",
+        "tabUrl": "Görsel URL",
+        "uploadLabel": "Görsel seçin veya sürükleyin",
+        "uploadHint": "JPG, PNG veya WebP, en fazla {maxMb} MB",
+        "uploading": "Görsel yükleniyor…",
+        "urlLabel": "Görsel URL Adresi",
+        "urlPlaceholder": "https://images.unsplash.com/...",
+        "altLabel": "Açıklama / Alt Metin (İsteğe bağlı)",
+        "altPlaceholder": "Görsel açıklaması…",
+        "cancel": "İptal",
+        "submit": "Görseli Ekle",
+        "errors": {
+          "type": "Bu dosya türü desteklenmiyor. JPG, PNG veya WebP bir görsel seçin.",
+          "size": "Görsel {maxMb} MB'tan büyük. Daha küçük bir dosya seçin.",
+          "forbidden": "Görsel yükleme yetkiniz yok.",
+          "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
+        }
+      },
+      "linkFallback": "Bağlantı"
     }
   },
   "adminDocuments": {
@@ -3108,6 +3176,57 @@
       "SKIP_LIMIT_EXCEEDED": "İçe aktarım hatası: CORDIS dökümünde okunamayan kayıt sayısı sınırı aştı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında.",
       "IMPORT_FAILED": "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında."
     }
+  },
+  "adminInterreg": {
+    "title": "Interreg & keep.eu Veri Merkezi",
+    "subtitle": "Avrupa Birliği sınır ötesi (CBC), Interreg ve NEXT işbirliği programları veri senkronizasyonu ve analitiği.",
+    "badge": "Interreg / keep.eu",
+    "syncNow": "keep.eu ile Senkronize Et",
+    "syncing": "Senkronize Ediliyor...",
+    "lastSync": "Son Senkronizasyon",
+    "neverSynced": "Henüz senkronize edilmedi",
+    "totalProjects": "Toplam Interreg Projesi",
+    "totalFunding": "Toplam AB / IPA Hibesi",
+    "totalBudget": "Toplam Bütçe",
+    "totalPartners": "Toplam Kurum & Ortak",
+    "turkishPartners": "Türk Yararlanıcı (TR)",
+    "tabProgrammes": "Programlar & Senkronizasyon",
+    "tabCountries": "Ülke Dağılımı",
+    "tabRag": "RAG Arama Workbench",
+    "syncSuccess": "Senkronizasyon Başarılı",
+    "syncError": "Senkronizasyon Hatası",
+    "upstreamMissingApiKey": "keep.eu API anahtarı tanımlı değil. Bir sistem yöneticisi KEEP_EU_API_KEY ayarını yapmalı.",
+    "upstreamForbidden": "keep.eu erişimi reddetti. Erişim Interact ile anlaşılmalı.",
+    "upstreamErrorResponse": "keep.eu bir hata döndürdü. Ayrıntılar sistem uyarılarında.",
+    "upstreamTimeout": "keep.eu zamanında yanıt vermedi.",
+    "upstreamNetworkError": "keep.eu'ya bağlanılamadı.",
+    "syncedProjectsCount": "{count} proje başarıyla senkronize edildi",
+    "syncedPartnersCount": "{count} konsorsiyum ortağı kaydedildi",
+    "skippedCount": "{count} kayıt atlandı",
+    "totalEuFundingEUR": "Toplam Hibe: €{amount}",
+    "selectProgrammes": "Senkronize Edilecek Programlar",
+    "defaultProgrammesHelp": "Varsayılan: Türkiye'nin uygun olduğu 4 sınır ötesi işbirliği programı (Bulgaristan-Türkiye, Karadeniz Havzası, NEXT MED, CBC 2014-2020).",
+    "customIdsPlaceholder": "Özel Program ID'leri (virgülle ayırın, örn. 305, 387)",
+    "programmeTitle": "Program Adı",
+    "projectCount": "Proje Sayısı",
+    "grantAmount": "Toplam Hibe",
+    "country": "Ülke",
+    "partnerCount": "Ortak Sayısı",
+    "ragTitle": "Interreg Semantik Arama Testi",
+    "ragSubtitle": "RAG vektör veritabanına aktarılan Interreg projeleri üzerinde doğal dil sorgulaması yapın.",
+    "searchPlaceholder": "Örn: Sürdürülebilir turizm, Karadeniz çevre koruma, KOBİ dijitalleşme...",
+    "searchButton": "Semantik Ara",
+    "searching": "Aranıyor...",
+    "noResults": "Eşleşen sonuç bulunamadı.",
+    "similarityScore": "Benzerlik Skoru",
+    "emptyStateTitle": "Henüz Interreg Projesi Senkronize Edilmedi",
+    "emptyStateDesc": "keep.eu API'sinden projeleri ve konsorsiyum ortaklarını çekmek için yukarıdaki Senkronize Et butonuna tıklayın.",
+    "interregAndNext": "Interreg & NEXT",
+    "m8PartnerPool": "M8 Partner Havuzu",
+    "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler",
+    "navDesc": "Sınır ötesi fonlar & ortaklar",
+    "defaultRagQuery": "Sürdürülebilir turizm ve kültürel miras",
+    "topK": "İlk {count}"
   },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
@@ -3498,6 +3617,30 @@
     "none": "—"
   },
   "modules": {
+    "call-fit": {
+      "name": "Çağrı Uyum Analizi",
+      "tagline": "Açık çağrıları kuruluş profiline göre puanlar; karar desteğidir, seçilme garantisi değildir."
+    },
+    "expert-pool": {
+      "name": "Uzman Havuzu",
+      "tagline": "Değerlendirici ve hakem eşleştirmesi için ön kayıtlı uzmanlar."
+    },
+    "budget-wp": {
+      "name": "Bütçe ve İş Paketleri",
+      "tagline": "Ortaklık ve teklif verisi üzerine bütçe ve iş paketi planlaması."
+    },
+    "compliance": {
+      "name": "Uygunluk Kontrolü",
+      "tagline": "Başvuru bölümlerinin program kurallarına göre YZ destekli incelemesi."
+    },
+    "post-award": {
+      "name": "Sözleşme Sonrası Yönetim",
+      "tagline": "Hibe imzalandıktan sonra raporlama, efor takibi ve teslimatlar."
+    },
+    "tr-layer": {
+      "name": "Türkiye Ulusal Katmanı",
+      "tagline": "AB hattının yanında TÜBİTAK, KOSGEB gibi ulusal programlar."
+    },
     "partner-intel": {
       "name": "Ortak İstihbarat Veritabanı",
       "tagline": "Her kuruluş için tek ortak kartı, konu liderleri ve iş birliği ağı."
@@ -3600,5 +3743,101 @@
         "failed": "Anahtar iptal edilemedi. Lütfen tekrar deneyin."
       }
     }
+  },
+  "adminTenants": {
+    "title": "Kiracı Hesapları",
+    "subtitle": "Platformda kayıtlı tüm organizasyonlar ve üye kapasiteleri.",
+    "count": "{count} kayıtlı kiracı",
+    "empty": "Kayıtlı kiracı yok.",
+    "loadError": "Kiracı verisi okunamadı (veritabanına ulaşılamıyor).",
+    "internalBadge": "internal",
+    "columns": {
+      "name": "Kiracı",
+      "slug": "Slug",
+      "country": "Ülke",
+      "orgType": "Kurum tipi",
+      "pic": "PIC",
+      "users": "Kullanıcı",
+      "workspaces": "Çalışma alanı"
+    },
+    "detail": {
+      "back": "Kiracı listesine dön",
+      "currentPlan": "Geçerli plan: {plan}",
+      "provider": "Abonelik kaynağı: {provider}"
+    },
+    "internalPlan": {
+      "title": "İç plan ataması",
+      "hint": "Ödeme olmadan plan verir (yalnız iç test için). Stripe senkronu bu atamayı ezmez. Discover seçmek iç planı geri alır. Not zorunludur ve denetim kaydına yazılır.",
+      "plan": "Plan",
+      "note": "Not (zorunlu)",
+      "notePlaceholder": "Neden? ör. M1 Pro kilidi testi",
+      "submit": "Ata",
+      "history": "Atama geçmişi",
+      "historyEmpty": "Bu kiracıya henüz iç plan atanmadı.",
+      "change": "{before} → {after}",
+      "by": "Yapan: {actor}",
+      "outcome": {
+        "assigned": "İç plan atandı.",
+        "revoked": "İç plan geri alındı; kiracı Discover'a döndü.",
+        "unchanged": "Değişiklik yok: kiracı zaten bu planda."
+      }
+    },
+    "errors": {
+      "LIVE_PROVIDER_SUBSCRIPTION": "Kiracının canlı bir ücretli aboneliği, pilotu ya da sözleşmesi var; önce onu sonlandırın.",
+      "NOTE_REQUIRED": "Not zorunlu.",
+      "TRIAL_PROTECTED": "Kiracı Stripe aboneliği olmayan bir deneme süresinde (ör. beta); iç plan atanamaz. Önce denemeyi sonlandırın.",
+      "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekiyor.",
+      "INVALID_INPUT": "Geçersiz seçim.",
+      "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin."
+    }
+  },
+  "partnersPage": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbCurrent": "Ortak Arama & CORDIS / Interreg (M1/M8)",
+    "title": "M1 Partner Intelligence Database & CORDIS Ortak Arama",
+    "subtitle": "Avrupa Komisyonu CORDIS (Horizon Europe & H2020) ve keep.eu Interreg (IPA Sınır Ötesi) fonlanmış verilerinden türetilen Avrupalı ve Türk kurumların geçmiş proje deneyimleri, koordinatörlük başarıları, AB katkıları ve ortaklık ağı.",
+    "sourceBadge": "Kaynak: CORDIS & keep.eu, Avrupa Komisyonu",
+    "attribution": "Veri kaynakları: CORDIS, Avrupa Komisyonu (CC BY 4.0); keep.eu, Interact (Interreg). Yalnızca iç arama ve ön değerlendirme amaçlıdır.",
+    "activeFilters": "Aktif Filtreler:",
+    "interregPartnersTag": "Interreg Ortakları",
+    "dbUnavailableTitle": "Ortak veritabanı şu anda okunamadı.",
+    "dbUnavailableBody": "Aşağıdaki liste eksik olabilir. Sorun kaydedildi; lütfen birazdan tekrar deneyin.",
+    "pageShowing": "Sayfa 1 / Gösteriliyor",
+    "colPic": "PIC Kodu",
+    "colName": "Kurum Adı",
+    "colCountry": "Ülke",
+    "colType": "Kurum Türü",
+    "colProjects": "Toplam Proje",
+    "colCoordinations": "Koordinatörlük",
+    "colGrant": "AB Desteği (€)",
+    "interregParticipantTitle": "Interreg / Sınır Ötesi İşbirliği Programı Katılımcısı",
+    "emptyInterreg": "Aradığınız kriterlere uygun Interreg ortağı bulunamadı.",
+    "emptyCordis": "Aradığınız kriterlere uygun CORDIS ortağı bulunamadı.",
+    "emptyHint": "Arama kriterlerinizi değiştirebilir veya filtreleri temizleyebilirsiniz.",
+    "filterNameLabel": "Kurum Adı veya Anahtar Kelime",
+    "filterNamePlaceholder": "Örn: METU, Fraunhofer, Lomartov, TUBITAK...",
+    "filterCountryLabel": "Ülke Kodu",
+    "filterTypeLabel": "Kurum Tipi",
+    "filterTypeAll": "Tüm Tipler",
+    "filterMinLabel": "Min. Proje Sayısı",
+    "filterMinAny": "Tümü",
+    "filterTurkishOnly": "Sadece Türk Kuruluşları Göster",
+    "filterInterregOnly": "Sadece Interreg Ortakları (Üniversiteler, Belediyeler, Ajanslar)",
+    "clearFilters": "Filtreleri Temizle",
+    "filterSubmit": "Filtrele & Ara",
+    "minProjectsTag": "Min. {count} Proje",
+    "minProjectsOption": "≥ {count} Proje",
+    "foundInterreg": "Toplam {count} Interreg Ortak Profili Bulundu",
+    "foundAll": "Toplam {count} Ortak Profili Bulundu",
+    "turkishOnlyTag": "Türk Kuruluşlar",
+    "filterCountryPlaceholder": "Örn: TR, DE, FR, ES...",
+    "activityTypeHES": "HES (Yükseköğretim / Üniversite)",
+    "activityTypeREC": "REC (Araştırma)",
+    "activityTypePRC": "PRC (Özel Şirket)",
+    "activityTypePUB": "PUB (Kamu Kurumu)",
+    "activityTypeOTH": "OTH (Diğer)",
+    "chipSearch": "Arama: \"{query}\"",
+    "chipCountry": "Ülke: {country}",
+    "chipType": "Tip: {type}"
   }
 }

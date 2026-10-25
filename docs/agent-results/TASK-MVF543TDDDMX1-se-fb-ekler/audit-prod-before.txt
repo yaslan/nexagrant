@@ -1,0 +1,19 @@
+┌─────────────────────┬────────────────────────────────────────────────────────┐
+│ high                │ braces vulnerable to stack-exhaustion denial of        │
+│                     │ service through deeply nested patterns                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Package             │ braces                                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Vulnerable versions │ <=3.0.3                                                │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Patched versions    │ None                                                   │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ Paths               │ .>shadcn>fast-glob>micromatch>braces                   │
+│                     │                                                        │
+│                     │ .>shadcn>ts-morph>@ts-morph/common>fast-               │
+│                     │ glob>micromatch>braces                                 │
+├─────────────────────┼────────────────────────────────────────────────────────┤
+│ More info           │ https://github.com/advisories/GHSA-vfj7-8cjw-p6xm      │
+└─────────────────────┴────────────────────────────────────────────────────────┘
+1 vulnerabilities found
+Severity: 1 high

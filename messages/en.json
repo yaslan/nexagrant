@@ -795,7 +795,8 @@
         "AVAILABLE": "Included in your plan, can be switched on",
         "LOCKED": "Not included in your plan",
         "ORPHANED": "Left outside your plan — unavailable",
-        "UNKNOWN": "Status unavailable"
+        "UNKNOWN": "Status unavailable",
+        "SOON": "Not available yet"
       },
       "statusBadge": {
         "ga": "GA",
@@ -817,6 +818,8 @@
       "plansNone": "Not in any plan",
       "addOnSku": "SKU: {sku}",
       "missingDependencies": "Missing dependency: {ids}",
+      "soonNotice": "This module is in preparation; once it is released you can enable it here.",
+      "soonLink": "What will it do? →",
       "enable": "Switch on",
       "disable": "Switch off",
       "toastDisabled": "Module {id} switched off.",
@@ -1480,13 +1483,15 @@
   "ModuleGate": {
     "title": "This module is not available",
     "askAdmin": "If you need access, talk to your workspace administrator or the {brand} team.",
+    "comingSoon": "{brand} is preparing this module. Once it is released you can enable it from Module Management.",
     "reason": {
       "MODULE_OFF": "The {module} module is turned off for your workspace.",
       "PLAN_UPGRADE_REQUIRED": "The {module} module is outside your subscription. It is included in: {plans}.",
       "DEV_INTERNAL_ONLY": "The {module} module is in development and is open to the {brand} team only.",
       "PILOT_MANAGERS_ONLY": "The {module} module is in pilot and is limited to workspace managers.",
       "NO_TENANT": "Your session is not linked to a workspace.",
-      "NOT_AUTHENTICATED": "You need to sign in to see this page."
+      "NOT_AUTHENTICATED": "You need to sign in to see this page.",
+      "COMING_SOON": "The {module} module is coming soon."
     }
   },
   "UserIdentity": {
@@ -1642,6 +1647,7 @@
     "closed": "Closed",
     "loadingData": "Fetching live data...",
     "resultsCount": "Found {count} calls (Page {page})",
+    "windowNote": "Showing the first {count, number} results; narrow your search.",
     "colStatus": "Status",
     "colTopic": "Topic & Code",
     "colActionType": "Type of Action",
@@ -1660,7 +1666,8 @@
       "rateLimited": "You have searched too often in a short time. Please wait {seconds} seconds and try again.",
       "badRequest": "The search request was rejected: one of the filters has an invalid value. Change the filters and try again.",
       "network": "The server could not be reached, or it did not answer in time. Check your internet connection and try again.",
-      "unexpected": "The list of calls could not be loaded because of an unexpected error. Please try again; if it keeps happening, tell your administrator."
+      "unexpected": "The list of calls could not be loaded because of an unexpected error. Please try again; if it keeps happening, tell your administrator.",
+      "pageOutOfWindow": "This page cannot be shown: the EU funding portal returns only the first {count, number} results of a search. The filters are fine; go back to an earlier page or narrow your search."
     },
     "loadFailedShort": "Could not load calls",
     "perPage": "Per page:",
@@ -1697,6 +1704,7 @@
       "refundNote": "14-day refund guarantee",
       "checkoutFailed": "Could not start the checkout session.",
       "checkoutUnreachable": "Could not reach the payment service.",
+      "internalPlanCheckoutClosed": "Your plan was assigned by an administrator, so payments and plan changes are not available here. Please contact us to change it.",
       "demoBadge": "STRIPE CHECKOUT DEMO MODE",
       "demoTitle": "Stripe checkout simulation",
       "demoBody": "With Stripe keys configured you go straight to the Stripe Checkout page. The amounts below are the ones the server computed.",
@@ -2117,7 +2125,9 @@
       "PLATFORM_ADMIN_REQUIRED": "This action requires a platform administrator.",
       "INVALID_VISIBILITY": "That visibility value is not valid. Refresh the page and try again.",
       "UNKNOWN": "The action could not be completed. Try again; if it persists, the details are in the server log.",
-      "PILOT_OVER_CONTRACT": "The tenant is already on a contracted public-sector package; a pilot cannot be granted."
+      "PILOT_OVER_CONTRACT": "The tenant is already on a contracted public-sector package; a pilot cannot be granted.",
+      "INTERNAL_PLAN_PROTECTED": "The tenant is on an internal plan; a pilot cannot be granted. Take the internal plan back on the tenant page first.",
+      "TRIAL_PROTECTED": "The tenant is on a trial with no Stripe subscription behind it (e.g. beta); a pilot cannot be granted. End the trial first."
     },
     "pilot": {
       "title": "Free pilot (90 days, Municipal Team)",
@@ -2966,6 +2976,64 @@
       "placeholder": "e.g. 5",
       "hint": "Estimated from the content; you can change it. Shown on the site in the reader's language.",
       "missing": "The read time cannot be empty. If the content has no text to read, type the read time yourself."
+    },
+    "editor": {
+      "label": "Article content (Markdown)",
+      "placeholder": "# Heading\n\nParagraph text…",
+      "hint": "Supported: # / ## / ### headings, **bold**, *italic*, [link](url), ![image](url), * bullets, 1. numbered lists, > quotes. Ctrl/Cmd+B for bold, Ctrl/Cmd+I for italic, Ctrl/Cmd+K for link.",
+      "previewEmpty": "Nothing to preview yet.",
+      "toolbar": {
+        "label": "Formatting tools",
+        "h1": "Heading 1",
+        "h2": "Heading 2",
+        "h3": "Heading 3",
+        "bold": "Bold",
+        "italic": "Italic",
+        "quote": "Quote",
+        "bulletList": "Bulleted list",
+        "numberedList": "Numbered list",
+        "link": "Add link",
+        "image": "Add image"
+      },
+      "tabs": {
+        "label": "Content view",
+        "write": "Write",
+        "preview": "Preview"
+      },
+      "stats": {
+        "words": "{count} words",
+        "chars": "{count} characters"
+      },
+      "linkModal": {
+        "title": "Add Link",
+        "textLabel": "Link Text",
+        "textPlaceholder": "Text to display…",
+        "urlLabel": "Link URL",
+        "urlPlaceholder": "https://example.com",
+        "cancel": "Cancel",
+        "submit": "Add Link"
+      },
+      "imageModal": {
+        "title": "Add Image",
+        "tabUpload": "Upload File",
+        "tabUrl": "Image URL",
+        "uploadLabel": "Choose or drag image",
+        "uploadHint": "JPG, PNG or WebP, up to {maxMb} MB",
+        "uploading": "Uploading image…",
+        "urlLabel": "Image URL",
+        "urlPlaceholder": "https://images.unsplash.com/...",
+        "altLabel": "Description / Alt Text (Optional)",
+        "altPlaceholder": "Image description…",
+        "cancel": "Cancel",
+        "submit": "Add Image",
+        "errors": {
+          "type": "This file type is not supported. Choose a JPG, PNG or WebP image.",
+          "size": "Image is larger than {maxMb} MB. Choose a smaller file.",
+          "forbidden": "You are not authorized to upload images.",
+          "upload_failed": "The image could not be uploaded. Please try again."
+        }
+      },
+      "linkFallback": "Link"
     }
   },
   "adminDocuments": {
@@ -3108,6 +3176,57 @@
       "SKIP_LIMIT_EXCEEDED": "Import failed: the CORDIS dump has more unreadable records than the limit allows. Details are in the run record and in system alerts.",
       "IMPORT_FAILED": "Import failed: the import could not finish. Details are in the run record and in system alerts."
     }
+  },
+  "adminInterreg": {
+    "title": "Interreg & keep.eu Data Hub",
+    "subtitle": "Data synchronization and analytics for EU Cross-Border Cooperation (CBC), Interreg, and NEXT programmes.",
+    "badge": "Interreg / keep.eu",
+    "syncNow": "Sync with keep.eu",
+    "syncing": "Synchronizing...",
+    "lastSync": "Last Sync",
+    "neverSynced": "Not synced yet",
+    "totalProjects": "Total Interreg Projects",
+    "totalFunding": "Total EU / IPA Grant",
+    "totalBudget": "Total Budget",
+    "totalPartners": "Total Organizations",
+    "turkishPartners": "Turkish Beneficiaries (TR)",
+    "tabProgrammes": "Programmes & Sync",
+    "tabCountries": "Country Breakdown",
+    "tabRag": "RAG Search Workbench",
+    "syncSuccess": "Sync Successful",
+    "syncError": "Sync Error",
+    "upstreamMissingApiKey": "keep.eu API key is not configured. A system administrator must set KEEP_EU_API_KEY.",
+    "upstreamForbidden": "keep.eu refused access. Access must be agreed with Interact.",
+    "upstreamErrorResponse": "keep.eu returned an error. Details are in the system alerts.",
+    "upstreamTimeout": "keep.eu did not respond in time.",
+    "upstreamNetworkError": "Could not connect to keep.eu.",
+    "syncedProjectsCount": "{count} projects successfully synchronized",
+    "syncedPartnersCount": "{count} consortium partners recorded",
+    "skippedCount": "{count} records skipped",
+    "totalEuFundingEUR": "Total Grant: €{amount}",
+    "selectProgrammes": "Programmes to Synchronize",
+    "defaultProgrammesHelp": "Default: 4 cross-border programmes eligible for Türkiye (Bulgaria-Türkiye, Black Sea Basin, NEXT MED, CBC 2014-2020).",
+    "customIdsPlaceholder": "Custom Programme IDs (comma-separated, e.g. 305, 387)",
+    "programmeTitle": "Programme Title",
+    "projectCount": "Project Count",
+    "grantAmount": "Total Grant",
+    "country": "Country",
+    "partnerCount": "Partner Count",
+    "ragTitle": "Interreg Semantic Search Test",
+    "ragSubtitle": "Run natural language queries over Interreg projects indexed in the RAG vector store.",
+    "searchPlaceholder": "E.g. Sustainable tourism, Black Sea environmental protection, SME digitalization...",
+    "searchButton": "Semantic Search",
+    "searching": "Searching...",
+    "noResults": "No matching projects found.",
+    "similarityScore": "Similarity Score",
+    "emptyStateTitle": "No Interreg Projects Synchronized Yet",
+    "emptyStateDesc": "Click the Sync button above to fetch projects and consortium partners from the keep.eu API.",
+    "interregAndNext": "Interreg & NEXT",
+    "m8PartnerPool": "M8 Partner Pool",
+    "turkishBeneficiariesDesc": "Local authorities & universities",
+    "navDesc": "Cross-border funds & partners",
+    "defaultRagQuery": "Sustainable tourism and cultural heritage",
+    "topK": "Top {count}"
   },
   "blog": {
     "meta_title": "EU Grant Management & Insights Blog",
@@ -3498,6 +3617,30 @@
     "none": "—"
   },
   "modules": {
+    "call-fit": {
+      "name": "Call Fit",
+      "tagline": "Scores open calls against the organisation profile; a decision aid, not a guarantee of selection."
+    },
+    "expert-pool": {
+      "name": "Expert Pool",
+      "tagline": "Pre-registered experts for evaluator and reviewer matching."
+    },
+    "budget-wp": {
+      "name": "Budget & Work Packages",
+      "tagline": "Budget and work-package planning on top of partner and proposal data."
+    },
+    "compliance": {
+      "name": "Compliance Check",
+      "tagline": "AI-assisted review of application parts against programme rules."
+    },
+    "post-award": {
+      "name": "Post-Award Management",
+      "tagline": "Reporting, effort tracking and deliverables after a grant is signed."
+    },
+    "tr-layer": {
+      "name": "Turkish National Layer",
+      "tagline": "Turkish national programmes such as TÜBİTAK and KOSGEB, alongside the EU pipeline."
+    },
     "partner-intel": {
       "name": "Partner Intelligence Database",
       "tagline": "One partner card per organisation, topic leaders and the collaboration graph."
@@ -3600,5 +3743,101 @@
         "failed": "The key could not be revoked. Please try again."
       }
     }
+  },
+  "adminTenants": {
+    "title": "Tenant accounts",
+    "subtitle": "Every organisation registered on the platform, with its member capacity.",
+    "count": "{count} registered tenants",
+    "empty": "No tenants registered.",
+    "loadError": "Tenant data could not be read (database unreachable).",
+    "internalBadge": "internal",
+    "columns": {
+      "name": "Tenant",
+      "slug": "Slug",
+      "country": "Country",
+      "orgType": "Org type",
+      "pic": "PIC",
+      "users": "Users",
+      "workspaces": "Workspaces"
+    },
+    "detail": {
+      "back": "Back to tenants",
+      "currentPlan": "Current plan: {plan}",
+      "provider": "Subscription source: {provider}"
+    },
+    "internalPlan": {
+      "title": "Internal plan assignment",
+      "hint": "Grants a plan without payment (internal testing only). Stripe sync does not overwrite it. Choosing Discover takes the internal plan back. A note is required and goes to the audit log.",
+      "plan": "Plan",
+      "note": "Note (required)",
+      "notePlaceholder": "Why? e.g. testing the M1 Pro lock",
+      "submit": "Assign",
+      "history": "Assignment history",
+      "historyEmpty": "No internal plan has been assigned to this tenant yet.",
+      "change": "{before} → {after}",
+      "by": "By: {actor}",
+      "outcome": {
+        "assigned": "Internal plan assigned.",
+        "revoked": "Internal plan taken back; the tenant is on Discover again.",
+        "unchanged": "Nothing changed: the tenant is already on this plan."
+      }
+    },
+    "errors": {
+      "LIVE_PROVIDER_SUBSCRIPTION": "The tenant has a live paid subscription, pilot or contract; end it first.",
+      "NOTE_REQUIRED": "A note is required.",
+      "TRIAL_PROTECTED": "The tenant is on a trial with no Stripe subscription behind it (e.g. beta); an internal plan cannot be assigned. End the trial first.",
+      "PLATFORM_ADMIN_REQUIRED": "You need to be a platform admin to do this.",
+      "INVALID_INPUT": "Invalid selection.",
+      "UNKNOWN": "The action could not be completed. Please try again."
+    }
+  },
+  "partnersPage": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbCurrent": "Partners & CORDIS / Interreg (M1/M8)",
+    "title": "M1 Partner Intelligence Database & CORDIS Search",
+    "subtitle": "Past EU project participations, coordinator achievements, EC funding, and partnership networks of European and Turkish organizations derived from official CORDIS and keep.eu Interreg data.",
+    "sourceBadge": "Source: CORDIS & keep.eu, European Commission",
+    "attribution": "Data sources: CORDIS, European Commission (CC BY 4.0); keep.eu, Interact (Interreg). For internal search and pre-assessment only.",
+    "activeFilters": "Active Filters:",
+    "interregPartnersTag": "Interreg Partners",
+    "dbUnavailableTitle": "The partner database could not be read.",
+    "dbUnavailableBody": "The list below may be incomplete. The failure has been recorded; please try again shortly.",
+    "pageShowing": "Page 1 / Showing",
+    "colPic": "PIC",
+    "colName": "Organization Name",
+    "colCountry": "Country",
+    "colType": "Type",
+    "colProjects": "Total Projects",
+    "colCoordinations": "Coordinations",
+    "colGrant": "EC Grant (€)",
+    "interregParticipantTitle": "Interreg / Cross-border Cooperation Programme Participant",
+    "emptyInterreg": "No Interreg partners found matching your search criteria.",
+    "emptyCordis": "No CORDIS partners found matching your search criteria.",
+    "emptyHint": "Reset your search filters or try different keywords.",
+    "filterNameLabel": "Organization Name or Keyword",
+    "filterNamePlaceholder": "E.g. METU, Fraunhofer, Lomartov...",
+    "filterCountryLabel": "Country Code",
+    "filterTypeLabel": "Activity Type",
+    "filterTypeAll": "All Types",
+    "filterMinLabel": "Min. Projects",
+    "filterMinAny": "Any",
+    "filterTurkishOnly": "Show Turkish Organizations Only",
+    "filterInterregOnly": "Show Interreg Partners Only (Universities, Municipalities, Agencies)",
+    "clearFilters": "Clear Filters",
+    "filterSubmit": "Filter & Search",
+    "minProjectsTag": "Min. {count, plural, one {# Project} other {# Projects}}",
+    "minProjectsOption": "≥ {count, plural, one {# Project} other {# Projects}}",
+    "foundInterreg": "Found {count, plural, one {# Interreg Partner Profile} other {# Interreg Partner Profiles}}",
+    "foundAll": "Found {count, plural, one {# Partner Profile} other {# Partner Profiles}}",
+    "turkishOnlyTag": "Turkish Organisations",
+    "filterCountryPlaceholder": "E.g. TR, DE, FR, ES...",
+    "activityTypeHES": "HES (Higher Education)",
+    "activityTypeREC": "REC (Research)",
+    "activityTypePRC": "PRC (Private Company)",
+    "activityTypePUB": "PUB (Public Body)",
+    "activityTypeOTH": "OTH (Other)",
+    "chipSearch": "Search: \"{query}\"",
+    "chipCountry": "Country: {country}",
+    "chipType": "Type: {type}"
   }
 }
