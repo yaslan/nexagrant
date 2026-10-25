@@ -21,7 +21,6 @@ const valid = {
   utmSource: 'newsletter',
   kvkkAccepted: true,
   visibilityConsent: true,
-  marketingConsent: false,
 };
 
 function codeOf(input: unknown, field: string): string | undefined {
@@ -40,10 +39,17 @@ describe('expertPreRegInputSchema', () => {
     expect(result.orcid).toBe('0000-0002-1825-0097');
   });
 
-  it('defaults marketing consent to false and allows the optional fields to be absent', () => {
-    const minimal = { ...valid, marketingConsent: undefined, orcid: undefined, linkedinUrl: undefined };
+  it('FO-144: an older client that still sends marketingConsent is accepted, and the key is dropped', () => {
+    for (const marketingConsent of [true, false, 'yes']) {
+      const result = expertPreRegInputSchema.safeParse({ ...valid, marketingConsent });
+      expect(result.success).toBe(true);
+      expect(result.data).not.toHaveProperty('marketingConsent');
+    }
+  });
+
+  it('allows the optional fields to be absent', () => {
+    const minimal = { ...valid, orcid: undefined, linkedinUrl: undefined };
     const result = expertPreRegInputSchema.parse(minimal);
-    expect(result.marketingConsent).toBe(false);
     expect(result.orcid).toBeNull();
     expect(result.linkedinUrl).toBeNull();
   });
