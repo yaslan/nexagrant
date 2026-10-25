@@ -198,6 +198,21 @@ async function runScoring(
         ).map((r) => ({ organizationPic: r.organizationPic, publishedAt: r.publishedAt })),
       }
     : null;
+  // 4c. Ö1: organisations that published a request on this topic join the pool even
+  // when their track record puts them outside the top CANDIDATE_POOL, so a small
+  // partner with live demand is not dropped before scoring. Bounded by the request
+  // ceiling (LIVE_DEMAND_REQUEST_LIMIT), so the pool is at most CANDIDATE_POOL + 500.
+  const pooled = new Set(candidates.map((c) => c.organisationId));
+  const demandPicIds = [
+    ...new Set((liveDemand?.requests ?? []).map((r) => r.organizationPic).filter((id): id is string => Boolean(id))),
+  ].filter((id) => !pooled.has(id) && !existingOrgIds.includes(id));
+  if (demandPicIds.length) {
+    const demandProfiles: PartnerProfileRow[] = await tx.cordisPartnerProfile.findMany({
+      where: { organisationId: { in: demandPicIds } },
+      select: { organisationId: true, country: true, sme: true, totalProjects: true },
+    });
+    candidates.push(...demandProfiles);
+  }
   const now = new Date();
 
   // 5. Score each candidate. Every component is scaled to 0–1 and the weights
