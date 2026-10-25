@@ -9,7 +9,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, test, expect } from 'vitest';
 
-const MACHINE_LITERAL = /\bkind:\s*'machine'\s*[,}]/;
+/** Quoted or unquoted key, either quote style, an optional `as const`; the `;` of the type declaration never matches. */
+const MACHINE_LITERAL = /\bkind['"]?\s*:\s*(['"`])machine\1\s*(?:as\s+const\s*)?[,}]/;
 
 /** Comments are dropped, so a doc comment that quotes the literal does not count. */
 function codeOf(src: string): string {
@@ -49,6 +50,18 @@ describe('a MachineViewer is built only by the API-key viewer', () => {
         'src/app/x/page.tsx',
         "const forged = { kind: 'machine', role: 'TENANT_MEMBER', isPlatformAdmin: false, isMachine: true };",
       ],
+    ]);
+    expect(sites).toEqual(['src/lib/api-auth.ts', 'src/app/x/page.tsx']);
+  });
+
+  test.each([
+    ['`as const`', "const forged = { kind: 'machine' as const, role: 'TENANT_MEMBER', isPlatformAdmin: false, isMachine: true };"],
+    ['a double-quoted value', 'const forged = { kind: "machine", role: "TENANT_MEMBER", isPlatformAdmin: false, isMachine: true };'],
+    ['a quoted key', "const forged = { 'kind': 'machine', role: 'TENANT_MEMBER', isPlatformAdmin: false, isMachine: true };"],
+  ])('a second literal written with %s is caught (red fixture)', (_name, literal) => {
+    const sites = machineLiteralSites([
+      ['src/lib/api-auth.ts', "const V = { kind: 'machine', role: 'API_KEY', isPlatformAdmin: false, isMachine: true };"],
+      ['src/app/x/page.tsx', literal],
     ]);
     expect(sites).toEqual(['src/lib/api-auth.ts', 'src/app/x/page.tsx']);
   });

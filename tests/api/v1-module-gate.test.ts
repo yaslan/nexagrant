@@ -186,6 +186,9 @@ function authOrderProblems(source: string): string[] {
   for (const m of src.matchAll(/export\s*\{[^}]*\b(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)\b[^}]*\}/g)) {
     problems.push(`${m[1]}: exported through an export list, the scan cannot read it`);
   }
+  // `export const { POST } = handlers` and `export * from` hide a method from both scans above (FO-127 review).
+  if (/export\s+(?:const|let|var)\s*[{[]/.test(src)) problems.push('a destructured export, the scan cannot read it');
+  if (/export\s*\*/.test(src)) problems.push('`export *`, the scan cannot read it');
 
   for (const m of exported) {
     const method = m[1]!;
@@ -330,6 +333,26 @@ describe('the route scan itself refuses the wrong orders', () => {
       async function list(req: Request) { return GET(req); }
       export { list as POST };`,
       'POST: exported through an export list, the scan cannot read it',
+    ],
+    [
+      'a handler exported by destructuring (NextAuth `export const { GET, POST } = handlers`)',
+      `export async function GET(req: Request) {
+        const authRes = await authenticateApiKey(req);
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json([]);
+      }
+      export const { POST } = handlers;`,
+      'a destructured export, the scan cannot read it',
+    ],
+    [
+      'a handler re-exported from another module (`export * from`)',
+      `export async function GET(req: Request) {
+        const authRes = await authenticateApiKey(req);
+        if (!authRes.authenticated) return authRes.errorResponse;
+        return NextResponse.json([]);
+      }
+      export * from './impl';`,
+      '`export *`, the scan cannot read it',
     ],
   ])('%s', (_name, src, problem) => {
     expect(authOrderProblems(src).join('\n')).toContain(problem);
