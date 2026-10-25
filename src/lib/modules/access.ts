@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
 import { withTenant } from '@/lib/db';
-import { tenantScopeOf, type TenantScope } from '@/lib/tenant';
+import { tenantScopeOf, TenantScopeError, type TenantScope } from '@/lib/tenant';
 import type { ModuleDenyReason, SessionViewer } from '@/lib/modules/state-machine';
 import { getAllManifests } from '@/lib/modules/registry';
 import { decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
@@ -156,9 +156,14 @@ export async function listAccessibleModules(): Promise<ModuleId[]> {
  * in the client is not a gate, and `generateText()` writes an `AiUsageLog` row and
  * debits `CreditLedger` (src/lib/llm.ts) the moment it is reached, so a closed
  * module that was checked afterwards would still have cost the tenant credits.
+ *
+ * No session is not a module refusal (TASK-MV15MNI79MSWO): it leaves as the same
+ * `TenantScopeError` that `requireTenantAction` would have thrown a line later,
+ * so the browser says "sign in again" rather than "the module is switched off".
  */
 export async function assertModuleAccess(moduleId: ModuleId): Promise<void> {
   const access = await checkModuleAccess(moduleId);
+  if (access.reason === 'NO_TENANT') throw new TenantScopeError();
   if (!access.allowed) {
     throw new ModuleAccessError(moduleId, access.status, access.reason ?? 'MODULE_OFF');
   }
