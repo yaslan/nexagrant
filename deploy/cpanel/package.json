@@ -1,0 +1,12 @@
+{
+  "name": "fonbridge-app",
+  "private": true,
+  "description": "FonBridge web (Next standalone) for cPanel Setup Node.js App. No dependencies: the server's modules are in app/node_modules.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}
