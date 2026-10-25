@@ -191,8 +191,19 @@ describe.skipIf(!ready)(SUITE, () => {
 
   it('the SQL refuses to run without the password GUC and keeps the shared password', async () => {
     // The admin connection never sets fabrika.app_password, so the SQL reaches its guard with no password.
+    // It runs inside a transaction that is always rolled back: if the guard is broken, the ALTER ROLE would
+    // otherwise commit PASSWORD NULL and erase the shared password (TASK-MVNMZ521MJ3AD Ö4).
     const before = await admin!.query('SELECT rolpassword FROM pg_authid WHERE rolname = $1', [ROLE]);
-    await expect(admin!.query(sqlWithoutMetaCommands())).rejects.toThrow('fabrika.app_password is not set');
+    let refusal: unknown;
+    await admin!.query('BEGIN');
+    try {
+      await admin!.query(sqlWithoutMetaCommands());
+    } catch (error) {
+      refusal = error;
+    } finally {
+      await admin!.query('ROLLBACK');
+    }
+    expect(String(refusal)).toContain('fabrika.app_password is not set');
     const after = await admin!.query('SELECT rolpassword FROM pg_authid WHERE rolname = $1', [ROLE]);
     expect(after.rows).toEqual(before.rows);
     const rows = await canLogIn(serverUrl(DB_A, APP_URL), 'SELECT current_user AS who');
