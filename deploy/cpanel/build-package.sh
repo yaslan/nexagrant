@@ -54,8 +54,11 @@ cp "$WORK/b/worker-out/jobs-worker.cjs" "$S/app/jobs-worker.cjs"
 mkdir "$S/certs" && cp "$WORK/b/certs/"*.crt "$WORK/b/certs/README.md" "$S/certs/"
 cp "$HERE/app.js" "$HERE/package.json" "$HERE/worker.sh" "$S/"
 chmod 755 "$S/worker.sh"
-# Nothing the build may have left that is not for the server.
-find "$S" \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '.DS_Store' \) -print -delete
+# Nothing the build may have left that is not for the server. Source maps (*.map)
+# would hand the original TypeScript to anyone who can read the zip or the app
+# directory (FO-141, FO-140 finding); a bundle's sourceMappingURL comment then
+# points at a file that is not there, which browsers ignore.
+find "$S" \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '.DS_Store' -o -name '*.map' \) -print -delete
 # The only links allowed: Turbopack's aliases for serverExternalPackages under
 # app/.next/node_modules (relative, inside the package). app.js restores them
 # from this manifest if the extractor loses them.
