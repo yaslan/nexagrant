@@ -437,8 +437,16 @@
       "collabHistory": "Collaboration history",
       "relationshipWarmth": "Relationship warmth",
       "centrality": "Network centrality",
-      "rivalRisk": "Rival risk"
-    }
+      "rivalRisk": "Rival risk",
+      "networkCentrality": "Network centrality",
+      "countryDiversity": "Country diversity",
+      "smeBonus": "SME bonus",
+      "warmthBonus": "Relationship warmth",
+      "liveDemandSignal": "Live partner demand"
+    },
+    "dimensionOutOf": "{score} / {max}",
+    "dimensionRange": "{score} (range {min}…{max})",
+    "breakdownNote": "Dimensions are raw points, each on its own range; the total is out of 100."
   },
   "Auth": {
     "signIn": "Sign In",

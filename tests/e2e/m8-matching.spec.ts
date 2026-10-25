@@ -287,6 +287,9 @@ test.describe('M8 consortium matching', () => {
     const details = rows.nth(0).locator('details');
     await details.locator('summary').click();
     await expect(details).toContainText('Konu deneyimi');
+    // Each dimension against its own range, not a bare number next to "/ 100" (FO-155).
+    await expect(details.getByTestId('m8-dimension-topicExperience')).toHaveText(/^\d+\.\d \/ 35$/);
+    await expect(details.getByTestId('m8-dimension-rivalRisk')).toHaveText(/^-?\d+\.\d \(aralık -10…0\)$/);
     await page.screenshot({ path: `${SHOTS}/04-breakdown-expanded.png`, fullPage: true });
 
     // The same ranked seat in English carries the same scale label.
@@ -294,6 +297,11 @@ test.describe('M8 consortium matching', () => {
     await expect(page.getByTestId('m8-seat-research').locator('tbody tr').first()).toContainText('/ 100', {
       timeout: 30_000,
     });
+    const detailsEn = page.getByTestId('m8-seat-research').locator('tbody tr').first().locator('details');
+    await detailsEn.locator('summary').click();
+    await expect(detailsEn.getByTestId('m8-dimension-geographicBalance')).toHaveText(/^\d+\.\d \/ 15$/);
+    await expect(detailsEn.getByTestId('m8-dimension-rivalRisk')).toHaveText(/^-?\d+\.\d \(range -10…0\)$/);
+    await page.screenshot({ path: `${SHOTS}/04c-breakdown-expanded-en.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/04b-candidates-en.png`, fullPage: true });
 
     // 5. What was actually written, asserted here rather than in a later test:
@@ -365,6 +373,11 @@ test.describe('M8 consortium matching', () => {
     await expect(page.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
     await expectNoRuntimeError(page);
     await expect(builderSeat).toContainText('/ 100');
+    const builderDetails = builderSeat.locator('details').first();
+    await builderDetails.locator('summary').click();
+    await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+\.\d \/ 3$/);
+    await expect(builderDetails.getByTestId('m8-builder-dimension-liveDemandSignal')).toHaveText(/^\d+\.\d \/ 1$/);
+    await page.screenshot({ path: `${SHOTS}/05c-builder-breakdown.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05-consortium-builder.png`, fullPage: true });
 
     // This surface's own scorer ran: its breakdown keys are not the matching
@@ -404,6 +417,11 @@ test.describe('M8 consortium matching', () => {
     await expectHydrated(findCandidatesEn);
     await findCandidatesEn.click();
     await expect(builderSeatEn).toContainText('/ 100', { timeout: 30_000 });
+    const builderDetailsEn = builderSeatEn.locator('details').first();
+    await builderDetailsEn.locator('summary').click();
+    await expect(builderDetailsEn).toContainText('Country diversity');
+    await expect(builderDetailsEn.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+\.\d \/ 1\.5$/);
+    await page.screenshot({ path: `${SHOTS}/05d-builder-breakdown-en.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05b-consortium-builder-en.png`, fullPage: true });
 
     expect(serverErrors, `server errors:\n${serverErrors.join('\n')}`).toEqual([]);

@@ -437,8 +437,16 @@
       "collabHistory": "Ortak proje geçmişi",
       "relationshipWarmth": "İlişki sıcaklığı",
       "centrality": "Ağ merkeziliği",
-      "rivalRisk": "Rakip riski"
-    }
+      "rivalRisk": "Rakip riski",
+      "networkCentrality": "Ağ merkeziliği",
+      "countryDiversity": "Ülke çeşitliliği",
+      "smeBonus": "KOBİ bonusu",
+      "warmthBonus": "İlişki sıcaklığı",
+      "liveDemandSignal": "Canlı ortak talebi"
+    },
+    "dimensionOutOf": "{score} / {max}",
+    "dimensionRange": "{score} (aralık {min}…{max})",
+    "breakdownNote": "Boyutlar ham puandır, her biri kendi aralığında; toplam 100 üzerinden."
   },
   "Auth": {
     "signIn": "Giriş Yap",
