@@ -28,6 +28,7 @@
 
 import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
+import { consortiumLiveDemandWeight } from '@/lib/env';
 import { topicPrefix } from '@/modules/m8/server/matching';
 import type { LiveDemandInput } from '@/core/contracts/live-demand';
 import {
@@ -54,7 +55,7 @@ export interface ScoringBreakdown {
 export interface SeatScoringOptions {
   /** M8 is on for the viewer: the reason line is returned. The signal is always computed. */
   liveDemandVisible?: boolean;
-  /** Config weight of the live-demand dimension; defaults to 15 %. */
+  /** Weight of the live-demand dimension; unset = CONSORTIUM_LIVE_DEMAND_WEIGHT, then 15 %. */
   liveDemandWeight?: number;
 }
 
@@ -109,7 +110,9 @@ async function runScoring(
 ) {
   const { tenantId, seatId, opportunityId, topicId, limit, options } = params;
   const liveDemandVisible = options.liveDemandVisible === true;
-  const weights = normalizedWeights(options.liveDemandWeight ?? DEFAULT_LIVE_DEMAND_WEIGHT);
+  const weights = normalizedWeights(
+    options.liveDemandWeight ?? consortiumLiveDemandWeight ?? DEFAULT_LIVE_DEMAND_WEIGHT
+  );
   // The persist step is `deleteMany({ tenantId, seatId })`: a missing seat id would
   // wipe the candidates of every seat of the tenant (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId) || !isPresentId(tenantId)) throw new Error('Seat not found in this workspace.');

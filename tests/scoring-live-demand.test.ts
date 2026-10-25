@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_LIVE_DEMAND_WEIGHT,
   freshnessOf,
@@ -112,5 +112,31 @@ describe('liveDemandReason', () => {
 
   it('has nothing to say without an own request', () => {
     expect(liveDemandReason(null, true)).toBeNull();
+  });
+});
+
+describe('CONSORTIUM_LIVE_DEMAND_WEIGHT', () => {
+  const load = async (value: string | undefined) => {
+    vi.resetModules();
+    vi.stubEnv('CONSORTIUM_LIVE_DEMAND_WEIGHT', value as string);
+    try {
+      return await import('@/lib/env');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  };
+
+  it('is undefined when unset or blank, so the scorer uses the 15 % default', async () => {
+    expect((await load('')).consortiumLiveDemandWeight).toBeUndefined();
+  });
+
+  it('reads a decimal weight from config', async () => {
+    const { consortiumLiveDemandWeight } = await load('0.25');
+    expect(consortiumLiveDemandWeight).toBe(0.25);
+    expect(normalizedWeights(consortiumLiveDemandWeight ?? DEFAULT_LIVE_DEMAND_WEIGHT).liveDemand).toBe(0.25);
+  });
+
+  it('rejects a weight outside 0–1 at boot', async () => {
+    await expect(load('1.5')).rejects.toThrow(/CONSORTIUM_LIVE_DEMAND_WEIGHT/);
   });
 });
