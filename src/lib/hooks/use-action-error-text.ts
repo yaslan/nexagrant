@@ -6,6 +6,7 @@ import { isPilotExpired } from '@/lib/pilot-expired';
 import { isForbiddenRole } from '@/lib/forbidden-role';
 import { isServiceBusy } from '@/lib/service-busy';
 import { isModuleUnavailable } from '@/lib/module-unavailable';
+import { isSessionRequired } from '@/lib/session-required';
 import { isLlmRefused, isLlmTruncated } from '@/lib/llm-outcome';
 
 /**
@@ -22,9 +23,11 @@ import { isLlmRefused, isLlmTruncated } from '@/lib/llm-outcome';
  * (src/lib/forbidden-role.ts, TASK-MUN80UOUPB2A4), and a write refused because
  * the database had no connection to give (src/lib/service-busy.ts,
  * TASK-MUOF85BU7BV3X), and an action the module gate refused
- * (src/lib/module-unavailable.ts, TASK-MUUS5HE3OW0CT). Pass a function when the fallback
- * is looked up from the code itself (`() => t(`errors.${code}`)`), so the
- * lookup never runs for `'pilotExpired'`, which that namespace does not have.
+ * (src/lib/module-unavailable.ts, TASK-MUUS5HE3OW0CT), and an action called
+ * without a signed-in session (src/lib/session-required.ts,
+ * TASK-MV15MNI79MSWO). Pass a function when the fallback is looked up from
+ * the code itself (`() => t(`errors.${code}`)`), so the lookup never runs for
+ * `'pilotExpired'`, which that namespace does not have.
  * A site that showed nothing for a thrown error passes `null`: it still shows
  * nothing for other errors, and the pilot sentence for this one.
  */
@@ -35,6 +38,7 @@ export function useActionErrorText(): <F extends string | null>(error: unknown, 
       if (isPilotExpired(error)) return t('pilotExpired');
       if (isForbiddenRole(error)) return t('forbiddenRole');
       if (isServiceBusy(error)) return t('serviceBusy');
+      if (isSessionRequired(error)) return t('sessionExpired');
       if (isModuleUnavailable(error)) return t('moduleUnavailable');
       if (isLlmTruncated(error)) return t('aiTruncated');
       if (isLlmRefused(error)) return t('aiRefused');

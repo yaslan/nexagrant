@@ -6,6 +6,7 @@ import { assertTenantWritable, PilotExpiredError } from '@/lib/billing/pilot';
 import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
 import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
 import { SERVICE_BUSY_DIGEST } from '@/lib/service-busy';
+import { SESSION_REQUIRED_DIGEST } from '@/lib/session-required';
 import { isDatabaseUnavailable } from '@/lib/db-unavailable';
 import { asRole, can, type Action } from '@/lib/rbac';
 import { errorMessage } from '@/lib/errors';
@@ -46,7 +47,9 @@ export interface TenantScope {
 }
 
 export class TenantScopeError extends Error {
-  readonly code = 'TENANT_SCOPE_REQUIRED';
+  readonly code = SESSION_REQUIRED_DIGEST;
+  /** Kept by Next.js across the action boundary: src/lib/session-required.ts. */
+  readonly digest = SESSION_REQUIRED_DIGEST;
 
   constructor(message = 'Request has no tenant scope; refusing to query tenant data.') {
     super(message);
