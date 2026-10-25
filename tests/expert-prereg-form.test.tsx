@@ -145,14 +145,15 @@ describe('ExpertPreregForm', () => {
   // FO-25 (K-516717): Unvan and Kurum are required, Diller is optional.
   test('no organisation: the error lands on Kurum with focus, nothing is sent', async () => {
     renderForm();
-    const { organization: org, title } = fillRequired();
+    const { organization: org } = fillRequired();
     fireEvent.change(org, { target: { value: '' } });
     fireEvent.submit(screen.getByTestId('ep-form'));
     await waitFor(() => expect(document.activeElement).toBe(org));
     expect(document.getElementById('ep-organization-error')?.textContent).toBe(tr.errors.required);
     expect(org.getAttribute('aria-invalid')).toBe('true');
     expect(org.getAttribute('aria-required')).toBe('true');
-    expect(title.getAttribute('aria-required')).toBe('true');
+    // Fresh lookup: the node captured before the fill would miss a remount.
+    expect(screen.getByLabelText(/^Unvan/).getAttribute('aria-required')).toBe('true');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
