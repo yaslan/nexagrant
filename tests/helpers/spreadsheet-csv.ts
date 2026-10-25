@@ -22,6 +22,7 @@ export function readLikeASpreadsheet(text: string, delimiter: ',' | ';'): string
     row.push(cell);
     if (text[i] === delimiter) {
       i++;
+      if (i === text.length) row.push('');
       continue;
     }
     if (text[i] === '\r') i++;
@@ -29,6 +30,8 @@ export function readLikeASpreadsheet(text: string, delimiter: ',' | ';'): string
     rows.push(row);
     row = [];
   }
+  // A line that ends on a delimiter at the very end (`a,b,`) still has its last, empty cell.
+  if (row.length > 0) rows.push(row);
   return rows;
 }
 

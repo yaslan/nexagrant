@@ -8,6 +8,7 @@ import {
   normalizeProposalOutcome,
 } from '../src/lib/proposal-outcome';
 import { countOutcomes, generateCSV } from '../src/lib/dashboard/fetch-metrics';
+import { formulaCells } from './helpers/spreadsheet-csv';
 import { ESR_OUTCOMES } from '../src/lib/beta/esr-samples';
 
 /**
@@ -153,5 +154,21 @@ describe('dashboard KPI — mixed-case outcome rows', () => {
       stageBreakdown: [],
     });
     expect(csv).toContain('Başarı Oranı,0.0,%');
+  });
+
+  test('a stage label that starts with a formula sign is neutralised (FO-126)', () => {
+    // Same CSV rule as every other export (csvCell): a stage name a spreadsheet would run
+    // as a formula must not reach the cell as it is, with either delimiter.
+    const csv = generateCSV({
+      totalOpps: 1,
+      aboveThresholdOpps: 0,
+      avgIsabet: 60,
+      totalEffortDays: '1.0',
+      avgG2Days: 2,
+      activeModules: 6,
+      stageBreakdown: [{ stage: '=HYPERLINK("http://x")', count: 1 }],
+    });
+    expect(csv).toContain(`'=HYPERLINK`);
+    expect(formulaCells(csv)).toEqual({ ',': [], ';': [] });
   });
 });
