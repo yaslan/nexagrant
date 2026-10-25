@@ -67,7 +67,7 @@ cp "$HERE/app.js" "$HERE/package.json" "$HERE/worker.sh" "$S/"
 chmod 755 "$S/worker.sh"
 # Nothing the build may have left that is not for the server. Source maps go too
 # (FO-141 5): the standalone server never serves them, only stack-trace tools read them.
-find "$S" \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '.DS_Store' -o -name '*.map' \) -print -delete
+find "$S" \( -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name '*.key' -o -name '.DS_Store' -o \( -type f -name '*.map' \) \) -print -delete
 # The only links allowed: Turbopack's aliases for serverExternalPackages under
 # app/.next/node_modules (relative, inside the package). app.js restores them
 # from this manifest if the extractor loses them.

@@ -1,6 +1,6 @@
 # FonBridge cPanel kurulum rehberi (Setup Node.js App)
 
-**Paket:** `fonbridge-app-86a1a1d0.zip` · **Kod:** `dev` @ `86a1a1d0` (PR #120 merge) · **Hedef:** Linux x86_64, cPanel hesabı `/home/fonbridge`, LiteSpeed + Passenger
+**Paket:** `fonbridge-app-<kısa-sha>.zip` (`<kısa-sha>`: onay talebindeki commit'in ilk 8 karakteri) · **Kod:** onay talebindeki commit · **Hedef:** Linux x86_64, cPanel hesabı `/home/fonbridge`, LiteSpeed + Passenger
 **Uygulama kökü:** `/home/fonbridge/fonbridge-app` (patron kararı 03.10.2026)
 **Hazırlayan:** devop-fb, TASK-MUST2PP2NHP6L. Paketi hazırlayan taraf sunucuya hiçbir şey yüklemedi, canlı veritabanına dokunmadı, DNS ya da cPanel ayarı değiştirmedi. Yükleme ve onay patrondadır.
 
@@ -28,7 +28,7 @@ fonbridge-app/
 - **"Run NPM Install" GEREKMEZ, basmayın.** Sunucunun bütün modülleri `app/node_modules` içinde, Linux x86_64 için derlenmiş olarak gelir. Kök `package.json`'da bağımlılık yoktur. Yanlışlıkla basılırsa bir şey bozulmaz, ama gereksizdir.
 - Kökte bilerek `node_modules` klasörü **yoktur**. cPanel'in Node.js seçicisi bu adı kendi sanal ortamına bağlantı için kullanır. Klasör zaten varsa uygulamayı reddeder.
 - Pakette `.env`, şifre ya da özel anahtar **yoktur** (taranıp kanıtlandı). Bütün değerleri siz cPanel ekranına girersiniz (`ENV-LISTESI.md`).
-- İndirdiğiniz dosyanın bozulmadığını `SHA256SUMS` ile kontrol edin. Mac'te: `shasum -a 256 fonbridge-app-3d63de7b.zip`. Çıktı `SHA256SUMS` dosyasındaki satırla aynı olmalı.
+- İndirdiğiniz dosyanın bozulmadığını `SHA256SUMS` ile kontrol edin. Mac'te: `shasum -a 256 fonbridge-app-<kısa-sha>.zip`. Çıktı `SHA256SUMS` dosyasındaki satırla aynı olmalı.
 
 ## 1. Başlamadan önce: kararlar
 
@@ -52,11 +52,19 @@ Sıra `docs/RELEASE_CHECKLIST.md` §3.1'dedir. Kısaca, **sahip rolüyle** (`fab
 1. **Yedek.** Supabase panelinden yedek alın ya da `pg_dump` koşulsun. Geri dönüşün tek güvenli yolu budur. (§4: repoda yedek betiği yok. 🟥 nasıl yedek alınacağı da bir karardır.)
 2. **R-1 ön kontrolü** (TASK-MUOG51GJ3PUOG): `psql "$URL" -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql`. Son satır `R1_SONUC | TEMIZ` ya da `DB_PUSH_ONCESI` ise devam edilir. `DUR_MUKERRER` ise durulur ve karar sizindir.
    - **`drop-evidence-reminder.sql` paketteyse, adım 3'ten ÖNCE `EvidenceReminder` satır sayısına bakın.** Şemada bu tablo artık yok; `prisma db push` tablo doluysa `There might be data loss … Use the --accept-data-loss flag` diyerek durur (exit 1, hiçbir şey değişmez), boşsa tabloyu kendisi siler. Yani dolu tabloda migration'daki koruma hiç devreye girmez; karar burada verilir. Kontrol (tablo `FORCE ROW LEVEL SECURITY` olduğu için sahip rol bile politikasız 0 görür; FORCE yalnız bu işlem içinde kapatılır ve geri alınır):
-     `printf '%s\n' 'BEGIN;' 'ALTER TABLE "EvidenceReminder" NO FORCE ROW LEVEL SECURITY;' 'SELECT count(*) FROM "EvidenceReminder";' 'ROLLBACK;' | psql "$URL" -v ON_ERROR_STOP=1 -At`
+     `printf '%s\n' 'BEGIN;' 'ALTER TABLE "EvidenceReminder" NO FORCE ROW LEVEL SECURITY;' 'SELECT count(*) FROM "EvidenceReminder";' 'ROLLBACK;' | psql "$URL" -v ON_ERROR_STOP=1 -qAt`
      (Tek `-c` satırı psql 15 öncesinde sayıyı yazmaz; bu biçim her sürümde sayıyı yazar.)
      Sonuç 0 ise ya da tablo yoksa adım 3'e geçilir. 0'dan büyükse durulur: satırlar kalıcı silinir (`.down.sql` yalnız boş tabloyu geri kurar). Silmeye onay verilirse, adım 3'ten önce yalnız bu dosya o oturum için koşulur: `PGOPTIONS='-c app.allow_evidence_reminder_drop=on' psql "$URL" -v ON_ERROR_STOP=1 -f prisma/migrations/drop-evidence-reminder.sql`. Dosya idempotenttir; adım 5 onu yeniden koşunca `already absent` der. 🟧 PATRON ONAYI
 3. `pnpm exec prisma db push` (**`--accept-data-loss` verilmez**)
-4. `pnpm db:rls-role` → `fabrika_app` rolü. Önce aynı kabukta `DATABASE_URL_RLS_TEST` = adım 7'deki `fabrika_app` URL'i olmalı; yoksa komut rc=1 verir ve yeni tablolara grant vermez (rol zaten varsa da).
+4. **`fabrika_app` rolü (canlı).** `pnpm db:rls-role` yalnız yerel veritabanı içindir: betik adres `localhost` ya da `127.0.0.1` değilse bağlanmadan `Refusing to run against a non-local database` ile rc=1 verir. Canlıda rolü adım 2'deki **sahip rolüyle** elle kurun. Parolayı belgeye yazmayın; kabukta gizli girin (betiğin ürettiği biçim: harf, rakam, `-`, `_`):
+   ```
+   read -rs -p 'fabrika_app parolası: ' APP_PW; echo
+   psql "$URL" -v ON_ERROR_STOP=1 \
+     -c "select set_config('fabrika.app_password', '$APP_PW', false)" \
+     -f prisma/rls-app-role.sql
+   unset APP_PW
+   ```
+   `$URL` sahip rol URL'idir. Betik idempotenttir: rol yoksa oluşturur, varsa öznitelikleri ve parolayı yeniler, yetki genişletmez. Kontrol: `psql "<fabrika_app URL'i>" -Atc 'select current_user'` → `fabrika_app`. `fabrika_app URL'i` = aynı host, kullanıcı `fabrika_app`, parola yukarıdaki. Adım 7'de kullanılır, belgeye yazılmaz. (Rol varken `pnpm db:rls-role` yalnız doğrulama yapar ve grant vermez; bu boşluk ayrı kartta, FO-139.)
 5. `scripts/apply-migrations.sh` → son satır **`apply-migrations: N files applied as <sahip rol>`** olmalı. N sabit değildir: paketin commit'indeki `prisma/migrations/apply-order.txt` dosyasının yorum dışı satır sayısıdır (`grep -v '^\s*#' apply-order.txt | grep -c .`). Beklenen N, onay talebinde ve paketin notunda yazılır. Betik idempotenttir; ikinci koşu aynı N'yi verir. Bir dosya hata verirse betik orada durur; ondan önceki dosyalar uygulanmış kalır (hepsi idempotent, yeniden koşmak güvenlidir).
 6. `pnpm db:rls`
 7. `pnpm rls:verify --require-db`, `fabrika_app` URL'iyle → exit 0
@@ -94,9 +102,9 @@ LiteSpeed, `public_html` içinde gerçekten var olan bir dosyayı (ör. `index.h
 
 1. File Manager → `/home/fonbridge/fonbridge-app` klasörüne girin.
 2. cPanel'in koyduğu örnek dosyaları silin: `app.js`, varsa `package.json`, `public/`, `tmp/`. (`node_modules` adlı bir **bağlantı** varsa ona dokunmayın. O cPanel'indir.)
-3. **Upload** → `fonbridge-app-3d63de7b.zip` (~**41 MB**; açılınca ~135 MB, 4.095 dosya). Yükleme bitince geri dönün.
+3. **Upload** → `fonbridge-app-<kısa-sha>.zip` (~**41 MB**; açılınca ~135 MB; dosya sayısı derleme raporundaki sayıyla aynı olmalı). Yükleme bitince geri dönün.
 4. Zip'e sağ tık → **Extract** → hedef `/home/fonbridge/fonbridge-app` → **Extract File(s)**.
-5. Klasörde artık `app.js`, `package.json`, `worker.sh`, `BUILD-INFO.txt`, `certs/`, `app/` görünmeli. `BUILD-INFO.txt`'yi açın: ilk satır `commit: 3d63de7b…` olmalı.
+5. Klasörde artık `app.js`, `package.json`, `worker.sh`, `BUILD-INFO.txt`, `certs/`, `app/` görünmeli. `BUILD-INFO.txt`'yi açın: `commit:` satırı onay talebindeki sha ile aynı olmalı.
 6. Zip'i silmeyin. `/home/fonbridge/surumler/` adında bir klasör açıp oraya taşıyın. **Geri alma için gerekir** (§9).
 7. `worker.sh`'e sağ tık → **Change Permissions** → `755`.
 
@@ -198,4 +206,4 @@ Kaçan bir saat felaket değildir: worker açılınca kaçan işleri 6 saat (ayl
 | "Run NPM Install" hata verdi | Basılması gerekmiyordu. Bir şey bozulmaz. |
 | Worker log'u boş | Cron satırı yok ya da yanlış. `worker.sh` izni 755 değil. `.fonbridge-worker.env` yok. Log'da `no node binary` → Cron'a `FB_NODE=/home/fonbridge/nodevenv/fonbridge-app/22/bin/node /bin/bash …` yazın. |
 
-Teknik ayrıntı: paket nasıl üretilir, yeniden üretmek için `deploy/cpanel/build-package.sh <commit> <klasör>` (Docker, linux/amd64).
+Teknik ayrıntı: paket nasıl üretilir, yeniden üretmek için `R2_PUBLIC_HOST=<ENV-LISTESI.md'deki değer> deploy/cpanel/build-package.sh <commit> <klasör>` (Docker, linux/amd64).
