@@ -201,7 +201,7 @@ export default async function MatchingPage({
                               </div>
                             </td>
                             <td className="py-2 px-4">
-                              <div className="font-bold">{c.score.toFixed(1)}</div>
+                              <div className="font-bold tabular-nums">{t('scoreOutOf', { score: c.score.toFixed(1) })}</div>
                               {/* Was a `title` attribute — invisible to keyboard and
                                   touch users, who could not see why a partner ranked. */}
                               <details className="text-xs text-muted mt-1">

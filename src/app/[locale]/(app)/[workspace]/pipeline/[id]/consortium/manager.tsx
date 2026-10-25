@@ -256,7 +256,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                                 </>
                               )}
                             </div>
-                            <span className="font-bold text-ok text-xs font-mono">{(typeof c.score === 'number' ? c.score : c.score?.total || 0).toFixed(1)}</span>
+                            <span className="font-bold text-ok text-xs font-mono">{t('scoreOutOf', { score: (typeof c.score === 'number' ? c.score : c.score?.total || 0).toFixed(1) })}</span>
                             <button
                               onClick={() => handleAssign(seat.id, c.organizationId)}
                               disabled={isPending}

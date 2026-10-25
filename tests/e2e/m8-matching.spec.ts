@@ -275,6 +275,8 @@ test.describe('M8 consortium matching', () => {
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText('M8E2E Institute of Grids');
     await expect(rows.nth(0)).toContainText('#1');
+    // One 0–100 scale for both surfaces (FO-147), and the label says so.
+    await expect(rows.nth(0)).toContainText('/ 100');
 
     // The seated partner is already on the consortium and is not offered again.
     await expect(table).not.toContainText('M8E2E Nordwerk GmbH');
@@ -286,6 +288,13 @@ test.describe('M8 consortium matching', () => {
     await details.locator('summary').click();
     await expect(details).toContainText('Konu deneyimi');
     await page.screenshot({ path: `${SHOTS}/04-breakdown-expanded.png`, fullPage: true });
+
+    // The same ranked seat in English carries the same scale label.
+    await page.goto(URL.replace('/tr/', '/en/'));
+    await expect(page.getByTestId('m8-seat-research').locator('tbody tr').first()).toContainText('/ 100', {
+      timeout: 30_000,
+    });
+    await page.screenshot({ path: `${SHOTS}/04b-candidates-en.png`, fullPage: true });
 
     // 5. What was actually written, asserted here rather than in a later test:
     // the consortium builder writes the *same* seat's candidates with its own
@@ -308,6 +317,10 @@ test.describe('M8 consortium matching', () => {
       'rivalRisk',
       'topicExperience',
     ]);
+    for (const row of written) {
+      expect(row.score).toBeGreaterThanOrEqual(0);
+      expect(row.score).toBeLessThanOrEqual(100);
+    }
 
     expect(serverErrors, `server errors during the run:\n${serverErrors.join('\n')}`).toEqual([]);
   });
@@ -319,10 +332,9 @@ test.describe('M8 consortium matching', () => {
    * silent demo fallback rather than an error screen.
    *
    * It is pointed at a seat of its own on purpose. Both surfaces write the same
-   * `SeatCandidate` rows for a seat, on different scales (0-100 here, 0-10
-   * there), so sharing a seat would mean this test asserted on whichever button
-   * was pressed last. That collision is a real product defect, recorded in the
-   * result report — this test simply refuses to depend on it.
+   * `SeatCandidate` rows for a seat (one 0–100 scale since FO-147, but each with
+   * its own breakdown), so sharing a seat would mean this test asserted on
+   * whichever button was pressed last.
    */
   test('the pipeline consortium builder finds candidates too', async ({ page }) => {
     const consortiumUrl = `/tr/${WORKSPACE}/pipeline/${OPP}/consortium`;
@@ -352,6 +364,7 @@ test.describe('M8 consortium matching', () => {
 
     await expect(page.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
     await expectNoRuntimeError(page);
+    await expect(builderSeat).toContainText('/ 100');
     await page.screenshot({ path: `${SHOTS}/05-consortium-builder.png`, fullPage: true });
 
     // This surface's own scorer ran: its breakdown keys are not the matching
@@ -365,9 +378,14 @@ test.describe('M8 consortium matching', () => {
     const written = await prisma.seatCandidate.findMany({
       where: { seatId: BUILDER_SEAT },
       orderBy: { rank: 'asc' },
-      select: { tenantId: true, breakdown: true },
+      select: { tenantId: true, score: true, breakdown: true },
     });
-    for (const row of written) expect(row.tenantId).toBe(TENANT);
+    for (const row of written) {
+      expect(row.tenantId).toBe(TENANT);
+      expect(row.score).toBeGreaterThanOrEqual(0);
+      expect(row.score).toBeLessThanOrEqual(100);
+      expect((row.breakdown as { total?: number }).total).toBe(row.score);
+    }
     expect(Object.keys(written[0]?.breakdown as object).sort()).toEqual([
       'countryDiversity',
       'liveDemandReason',
@@ -378,6 +396,15 @@ test.describe('M8 consortium matching', () => {
       'total',
       'warmthBonus',
     ]);
+
+    // The builder lists candidates after its button is pressed, so press it in English too.
+    await page.goto(consortiumUrl.replace('/tr/', '/en/'));
+    const builderSeatEn = page.getByTestId('m8-builder-seat-widening');
+    const findCandidatesEn = builderSeatEn.getByRole('button', { name: /Find Candidates/ });
+    await expectHydrated(findCandidatesEn);
+    await findCandidatesEn.click();
+    await expect(builderSeatEn).toContainText('/ 100', { timeout: 30_000 });
+    await page.screenshot({ path: `${SHOTS}/05b-consortium-builder-en.png`, fullPage: true });
 
     expect(serverErrors, `server errors:\n${serverErrors.join('\n')}`).toEqual([]);
   });

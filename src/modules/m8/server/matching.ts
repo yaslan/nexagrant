@@ -1,5 +1,6 @@
 import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
+import { normalizeSeatScore } from '@/lib/scoring/seat-score';
 import { SeatNotFoundError } from './errors';
 
 /**
@@ -33,8 +34,9 @@ import { SeatNotFoundError } from './errors';
  */
 
 /**
- * Why a candidate scored what it did: one entry per scoring dimension, summing
- * to `MatchCandidate.score`. Persisted to `SeatCandidate.breakdown` (Json), so
+ * Why a candidate scored what it did: one entry per scoring dimension, in raw
+ * points (their sum is {@link totalScore}; `MatchCandidate.score` is that sum on
+ * the 0–100 seat scale, {@link matchSeatScore}). Persisted to `SeatCandidate.breakdown` (Json), so
  * the UI can show the reasoning rather than a bare number.
  */
 /** Written verbatim into `SeatCandidate.breakdown`, a JSON column — a type alias, not an interface, so it stays assignable to a JSON value. */
@@ -103,6 +105,18 @@ export function scoreCandidate(signals: CandidateSignals): MatchBreakdown {
 
 export function totalScore(breakdown: MatchBreakdown): number {
   return Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+}
+
+/** Highest raw total {@link scoreCandidate} can give: 35 + 15 + 15 + 15 + 10 with no rival penalty. */
+export const MATCH_MAX_TOTAL = 90;
+
+/**
+ * The matcher's raw total on the 0–100 `SeatCandidate.score` scale shared with
+ * the consortium builder (src/lib/scoring/seat-score.ts). Linear, so the order of
+ * candidates is kept; a rival whose penalty takes the raw total below 0 scores 0.
+ */
+export function matchSeatScore(breakdown: MatchBreakdown): number {
+  return normalizeSeatScore(totalScore(breakdown) / MATCH_MAX_TOTAL);
 }
 
 /**
@@ -304,10 +318,14 @@ export async function runSeatMatch(
       degree: degreeOf.get(organizationId) ?? 0,
       isRival: rivals.has(organizationId),
     });
-    return { organizationId, score: totalScore(breakdown), breakdown };
+    return { organizationId, score: matchSeatScore(breakdown), breakdown };
   });
 
-  const sorted = scored.sort((a, b) => b.score - a.score).slice(0, limit);
+  // Ranked on the raw total: the 0–100 clamp ties candidates whose rival penalty
+  // takes them below 0, and their order should not depend on the clamp.
+  const sorted = scored
+    .sort((a, b) => totalScore(b.breakdown) - totalScore(a.breakdown))
+    .slice(0, limit);
 
   // The caller already holds a transaction (`withTenant`), so the clear and the
   // rewrite are atomic without opening a second one.
