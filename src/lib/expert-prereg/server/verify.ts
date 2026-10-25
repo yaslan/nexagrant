@@ -14,13 +14,14 @@ import { lastFounderNumberGiven, recordFounderNumberGiven } from './founder-coun
  * column is unique, so two verifications cannot share a number. It comes from the
  * founder counter (./founder-counter.ts, FO-50), not from the rows, so a number
  * whose row the one-year purge deleted is never given again. A second click on
- * a link that already verified the expert is dead: the verification clears the
- * token (FO-141 F7), so the click is `invalid` and the number does not move.
+ * a link that already verified the expert is single use in effect (FO-141 F7):
+ * it answers `already`, shows no number and writes nothing. The token hash stays
+ * on the row so the click can be told apart from an unknown link.
  */
 
 export type VerifyResult =
   | { ok: true; founderNumber: number | null; locale: string }
-  | { ok: false; error: 'expired' | 'invalid'; locale: string };
+  | { ok: false; error: 'expired' | 'invalid' | 'already'; locale: string };
 
 const SHAPE = /^[0-9a-f]{64}$/;
 
@@ -51,8 +52,8 @@ export async function verifyExpertPreRegistration(
     });
     if (!row || row.status === 'disabled') return { ok: false, error: 'invalid', locale: 'tr' };
 
-    // Already verified: answer as the first click did, change nothing.
-    if (row.emailVerifiedAt) return { ok: true, founderNumber: row.founderNumber, locale: row.locale };
+    // Already verified (this link, or a row verified before FO-141): no number, no write.
+    if (row.emailVerifiedAt) return { ok: false, error: 'already', locale: row.locale };
 
     if (!row.verifyTokenExpiresAt || row.verifyTokenExpiresAt <= now) {
       return { ok: false, error: 'expired', locale: row.locale };
@@ -64,8 +65,7 @@ export async function verifyExpertPreRegistration(
 
     await tx.expertPreRegistration.update({
       where: { id: row.id },
-      // F7 (FO-141): single use. The link stops matching once it has verified.
-      data: { emailVerifiedAt: now, status: 'verified', founderNumber, verifyTokenHash: null, verifyTokenExpiresAt: null },
+      data: { emailVerifiedAt: now, status: 'verified', founderNumber },
     });
     return { ok: true, founderNumber, locale: row.locale };
   });

@@ -22,7 +22,7 @@ const FORMULA_START = /^\s*[=+\-@]|^[\t\r]/;
  * other cell a `;`, or a line break, starts a new field of its own. That piece
  * gets the apostrophe too, so `Kurum;=cmd|…` cannot open a formula there.
  */
-const FORMULA_AFTER_BREAK = /([;\r\n])(?=[" \t]*[=+\-@\t\r])/g;
+const FORMULA_AFTER_BREAK = /([;\r\n])(?=(?:[^\S\r\n]|")*[=+\-@\t\r])/g;
 
 export function csvCell(value: string | number | null): string {
   if (value === null) return '';

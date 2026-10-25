@@ -57,6 +57,7 @@ describe('ExpertVerifiedPage', () => {
   test('signed expired / no-seat outcomes pick their own copy', async () => {
     const sign = (o: Parameters<typeof encodeVerifiedOutcome>[0]) => encodeVerifiedOutcome(o, { secret: SECRET });
     expect(await html({ r: sign({ outcome: 'expired', founderNumber: null }) })).toContain(t.heading_expired);
+    expect(await html({ r: sign({ outcome: 'already', founderNumber: null }) })).toContain(t.heading_already);
     const full = await html({ r: sign({ outcome: 'ok', founderNumber: null }) });
     expect(full).toContain(t.heading_ok);
     expect(full).toContain(t.no_founder);
