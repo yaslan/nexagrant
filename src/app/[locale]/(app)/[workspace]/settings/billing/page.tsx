@@ -139,7 +139,7 @@ export default async function BillingSettingsPage({
   };
 
   try {
-    const dbEntitlements = await getEntitlements(tenantId);
+    const dbEntitlements = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
 
     // Count active members and workspaces from the database
     const usageData = await withTenant<{

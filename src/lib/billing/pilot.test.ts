@@ -95,7 +95,7 @@ describe('grantPilot (live DB)', () => {
     });
     expect(sub?.trialEndsAt?.toISOString()).toBe('2026-12-29T21:00:00.000Z');
 
-    const ent = await getEntitlements(tenantId);
+    const ent = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
     expect(ent.seats).toBe(6);
     expect(ent.source).toBe('plan-version');
     expect([...ent.allowedModules].sort()).toEqual([...grantsFor('pro')!.moduleIds].sort());
@@ -114,7 +114,7 @@ describe('grantPilot (live DB)', () => {
     await grantPilot(tenantId, 'admin-1');
     const usage = await withTenant(tenantId, (tx) => readSeatUsage(tx, tenantId, 'new@example.test'));
     expect(usage).toEqual({ limit: 6, members: 0, pendingInvitations: 0 });
-    const ent = await getEntitlements(tenantId);
+    const ent = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
     for (const m of ['M1', 'M2', 'M3', 'M4', 'M5', 'M8']) expect(ent.allowedModules).toContain(m);
   });
 
@@ -184,7 +184,7 @@ describe('grantPilot (live DB)', () => {
     await assertTenantWritable(tenantId, undefined, new Date(endsAt.getTime() - 1));
     await expect(assertTenantWritable(tenantId, undefined, endsAt)).rejects.toBeInstanceOf(PilotExpiredError);
     // Read-only keeps the data and the plan: entitlements are unchanged, nothing was deleted.
-    expect((await getEntitlements(tenantId)).seats).toBe(6);
+    expect((await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx))).seats).toBe(6);
   });
 
   it('the Stripe sync and cancellation leave a pilot row alone', async () => {

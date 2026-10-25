@@ -809,4 +809,35 @@ test.describe('M7 TTO Accelerator', () => {
       await prisma.ttoPortfolioItem.delete({ where: { id: item.id } });
     }
   });
+
+  // TASK-MV15MNI79MSWO (CE-693): a session that ended while the page was open
+  // was refused by the module gate first and read "module switched off or
+  // outside your plan". The cookie is dropped after the page loaded with M7 on,
+  // so only the action stands between the click and the answer.
+  for (const locale of ['tr', 'en'] as const) {
+    test(`16 — ${locale}: a dropped session says "sign in again", not "module off"`, async ({ page, context }) => {
+      const copy = locale === 'tr' ? trMessages : enMessages;
+      const title = `E2E M7 signed-out create ${locale}`;
+      await signInAs(page, sessionToken(M7_MEMBER));
+      await page.goto(`/${locale}/${WORKSPACE}/tto`);
+      await expectHydrated(page.locator('body'));
+
+      const submitBtn = page.getByRole('button', { name: copy.m7.tto.form.submit });
+      await page.getByPlaceholder(copy.m7.tto.form.titlePlaceholder).fill(title);
+
+      await context.clearCookies();
+      const posted = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes('/tto'));
+      await submitBtn.click();
+      await posted;
+      await expect(submitBtn).toBeEnabled();
+
+      const band = page.getByRole('alert').filter({ hasText: copy.Common.sessionExpired });
+      await expect(band).toBeVisible();
+      await expect(await moduleRefusal(page)).toHaveCount(0);
+      expect(await prisma.ttoPortfolioItem.count({ where: { tenantId: TENANT, title } })).toBe(0);
+      // The page scrolls inside its own container, so a full-page shot alone left the band out.
+      await band.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${SHOTS}/16-${locale}-session-expired.png`, fullPage: true });
+    });
+  }
 });

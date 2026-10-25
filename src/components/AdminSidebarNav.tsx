@@ -16,7 +16,8 @@ import {
   Percent,
   FileText,
   Inbox,
-  UserCheck
+  UserCheck,
+  Globe
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -27,6 +28,7 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
   const pathname = usePathname();
   const tLeads = useTranslations('adminLeads');
   const tExperts = useTranslations('AdminExpertPrereg');
+  const tInterreg = useTranslations('adminInterreg');
 
   const adminNavItems = [
     {
@@ -84,6 +86,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: locale === 'tr' ? 'Çalışma programı PDF → paylaşılan RAG' : 'Work programme PDF → shared RAG',
       icon: FileText,
       badge: 'K6',
+    },
+    {
+      key: 'interreg',
+      href: `/${locale}/admin/interreg`,
+      label: 'Interreg & keep.eu',
+      desc: tInterreg('navDesc'),
+      icon: Globe,
+      badge: 'Interreg',
     },
     {
       key: 'leads',

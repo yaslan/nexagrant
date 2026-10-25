@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
+import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { getTranslations } from 'next-intl/server';
 import { PartnerOutreach, type PartnerOutreachProps } from '@/modules/m1/ui/PartnerOutreach';
@@ -37,7 +38,7 @@ export default async function PartnerDetailPage({
   const { pic, workspace, locale } = await params;
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
-  const isTr = locale === 'tr';
+  const t = await getTranslations('PartnerDetail');
 
   let org: OrgDetail | null = null;
   let topics: PartnerOutreachProps['topics'] = [];
@@ -104,11 +105,11 @@ export default async function PartnerDetailPage({
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-medium text-muted mb-4">
         <Link href={getWorkspaceRoute('dashboard', locale, workspace)} className="hover:text-ink transition-colors">
-          {isTr ? 'Panel' : 'Dashboard'}
+          {t('breadcrumbDashboard')}
         </Link>
         <span>/</span>
         <Link href={getWorkspaceRoute('partners', locale, workspace)} className="hover:text-ink transition-colors">
-          {isTr ? 'Ortaklar' : 'Partners'}
+          {t('breadcrumbPartners')}
         </Link>
         <span>/</span>
         <span className="text-accent font-semibold">{org.name}</span>
@@ -119,7 +120,7 @@ export default async function PartnerDetailPage({
           href={getWorkspaceRoute('partners', locale, workspace)} 
           className="text-accent hover:underline text-xs font-semibold flex items-center gap-1"
         >
-          {isTr ? '← Ortaklar Listesine Dön' : '← Back to Partners'}
+          {t('backToPartners')}
         </Link>
       </div>
 
@@ -129,35 +130,33 @@ export default async function PartnerDetailPage({
             <h1 className="text-2xl md:text-3xl font-bold font-heading text-ink mb-2">{org.name}</h1>
             <div className="flex flex-wrap gap-2 text-xs text-muted mb-6">
               <span className="bg-ground border border-border px-2.5 py-1 rounded-md font-mono">PIC: {org.id}</span>
-              <span className="bg-ground border border-border px-2.5 py-1 rounded-md">{isTr ? 'Ülke:' : 'Country:'} {org.country || '-'}</span>
-              <span className="bg-ground border border-border px-2.5 py-1 rounded-md">{isTr ? 'Tür:' : 'Type:'} {org.activityType || '-'}</span>
-              {org.sme && <span className="bg-accent/15 text-accent-ink border border-accent/20 px-2.5 py-1 rounded-md font-bold">{isTr ? 'KOBİ' : 'SME'}</span>}
+              <span className="bg-ground border border-border px-2.5 py-1 rounded-md">{t('countryLabel', { value: org.country || '-' })}</span>
+              <span className="bg-ground border border-border px-2.5 py-1 rounded-md">{t('typeLabel', { value: org.activityType || '-' })}</span>
+              {org.sme && <span className="bg-accent/15 text-accent-ink border border-accent/20 px-2.5 py-1 rounded-md font-bold">{t('smeBadge')}</span>}
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
           <div className="p-4 bg-ground border border-border rounded-xl">
-            <div className="text-xs text-muted font-medium">{isTr ? 'Toplam Katılım' : 'Total Participations'}</div>
+            <div className="text-xs text-muted font-medium">{t('totalParticipations')}</div>
             <div className="text-2xl font-bold text-ink mt-1">{org.participationCount}</div>
           </div>
           <div className="p-4 bg-ground border border-border rounded-xl">
-            <div className="text-xs text-muted font-medium">{isTr ? 'Koordinatörlük' : 'Coordinator Roles'}</div>
+            <div className="text-xs text-muted font-medium">{t('coordinatorRoles')}</div>
             <div className="text-2xl font-bold text-ink mt-1">{org.coordinatorCount}</div>
           </div>
           <div className="p-4 bg-ground border border-border rounded-xl">
-            <div className="text-xs text-muted font-medium">{isTr ? 'Toplam AB Fonu' : 'Total EC Funding'}</div>
-            <div className="text-xl md:text-2xl font-bold text-ink font-mono mt-1">€ {Number(org.ecContributionSum || 0).toLocaleString()}</div>
+            <div className="text-xs text-muted font-medium">{t('totalEcFunding')}</div>
+            <div className="text-xl md:text-2xl font-bold text-ink font-mono mt-1">{formatWholeMoney(org.ecContributionSum, 'EUR', locale)}</div>
           </div>
         </div>
 
         {/* Network Graph Placeholder */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold font-heading text-ink mb-4">{isTr ? 'İşbirliği ve Ortaklık Grafiği' : 'Collaboration Graph'}</h2>
+          <h2 className="text-lg font-bold font-heading text-ink mb-4">{t('graphTitle')}</h2>
           <div className="h-48 bg-ground rounded-xl border-2 border-dashed border-border flex items-center justify-center text-muted text-xs text-center p-4">
-            {isTr
-              ? `[CORDIS Etkileşim Grafiği] — Kurumun Horizon Europe ve H2020 projeleriyle ortaklık ağı.`
-              : `[Interactive Collaboration Graph] — This organization's network within Horizon Europe and H2020 projects.`}
+            {t('graphPlaceholder')}
           </div>
         </div>
 
@@ -172,7 +171,7 @@ export default async function PartnerDetailPage({
         </div>
 
         <div>
-          <h2 className="text-lg font-bold font-heading text-ink mb-4">{isTr ? 'Geçmiş AB Projeleri' : 'Past Projects'}</h2>
+          <h2 className="text-lg font-bold font-heading text-ink mb-4">{t('pastProjects')}</h2>
           <div className="space-y-3">
             {org.participations.map((p) => (
               <div key={`${p.projectId}-${p.organisationId}`} className="p-4 border border-border rounded-xl bg-surface hover:bg-surface-hover transition-colors flex justify-between items-center gap-4">
@@ -182,7 +181,7 @@ export default async function PartnerDetailPage({
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-[10px] uppercase font-bold text-muted">{p.role}</div>
-                  <div className="font-mono text-xs font-semibold text-ink">€ {Number(p.ecContribution || 0).toLocaleString()}</div>
+                  <div className="font-mono text-xs font-semibold text-ink">{formatWholeMoney(p.ecContribution ?? 0n, 'EUR', locale)}</div>
                 </div>
               </div>
             ))}

@@ -1,0 +1,2 @@
+GET /_next/image?url=http://127.0.0.1:9100/fonbridge-public/blog/2026/c0mvchvc6allivdstmik21eq2.jpg → HTTP 200 image/jpeg 20711B
+GET /_next/image?url=http://localhost:9100/fonbridge-public/blog/2026/c0mvchvc6allivdstmik21eq2.jpg → HTTP 400  30B body: "url" parameter is not allowed

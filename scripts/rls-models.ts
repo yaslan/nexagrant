@@ -37,6 +37,13 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // tenant; read and written by the expert-prereg server code and the
   // platform-admin export only. See prisma/migrations/add-expert-pre-registration.sql.
   'ExpertPreRegistration',
+  // TASK-MVBLYRLP9ID93 (FO-26): the submission counter of the same pre-registration; no
+  // tenant. RLS on with system_scope only, like ExpertPreRegistration (SYSTEM_SCOPE_POLICY).
+  'ExpertPreRegAttempt',
+  // FO-50 (K-568932 = A): the founder-number counter of the expert pre-registration,
+  // one row, no personal data. Same standing and policy as ExpertPreRegistration.
+  // See prisma/migrations/add-expert-founder-counter.sql.
+  'ExpertFounderCounter',
   // AKTAR-MURBCJ0A-1: a post on the public blog. Platform content shown to
   // anonymous visitors, owned by no tenant; written only by /admin/blog behind
   // requirePlatformAdmin(). See prisma/migrations/add-blog-post.sql.
@@ -46,6 +53,12 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // policy-less set below — and the DISABLE loop in prisma/rls.sql derived from
   // it — covers every table Supabase's ensure_rls trigger would lock.
   'Programme',
+  // FO-58 (TASK-MVCH1YZXDOED): Funding & Tenders Portal partner-search data,
+  // global reference data like CORDIS. No person rows, no tenant. The tenant's
+  // own Discover counter (PartnerSearchQuotaUsage) is tenant-scoped, not here.
+  // See prisma/migrations/add-partner-search.sql.
+  'PartnerSearchAnnouncement', 'PartnerProfileSnapshot', 'PartnerSearchIngestionRun',
+  'UnmatchedOrganization', 'PartnerSearchTopicStat',
 ]);
 
 /**
@@ -56,7 +69,15 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
 export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersion', 'PlanFeature']);
 
 /**
- * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY.
+ * SYSTEM_WIDE tables whose RLS is ON with one policy: `system_scope` alone, no
+ * tenant policy and no platform_read. Personal data with no tenant (FO-45,
+ * K-562266 = A). Reachable only through withSystemScope(). tests/rls-coverage.test.ts
+ * pins this set to the block in prisma/rls.sql.
+ */
+export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt']);
+
+/**
+ * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.
  *
  * TASK-MUWDA86A7U4LK: the live Supabase project has an `ensure_rls` event
  * trigger (ddl_command_end → public.rls_auto_enable(), owned by the platform,
@@ -69,7 +90,7 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersio
  * list tests/rls-coverage.test.ts pins to this function.
  */
 export function policylessSystemWide(): string[] {
-  return [...SYSTEM_WIDE].filter((t) => !PLATFORM_POLICY.has(t)).sort();
+  return [...SYSTEM_WIDE].filter((t) => !PLATFORM_POLICY.has(t) && !SYSTEM_SCOPE_POLICY.has(t)).sort();
 }
 
 /**

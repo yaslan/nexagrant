@@ -1,6 +1,7 @@
 import { withTenant } from '@/lib/db';
 import { isAboveThreshold, isFunded } from '@/lib/proposal-outcome';
 import type { Opportunity } from '@prisma/client';
+import { csvCell } from '@/lib/csv-cell';
 
 export interface MetricsFilters {
   tenantId: string;
@@ -134,17 +135,18 @@ const orBlank = (value: number | string, denominator: number) => (denominator > 
 export function generateCSV(metrics: DashboardMetricsCsvInput, from?: Date, to?: Date): string {
   const headers = ['KPI', 'Değer', 'Birim', 'Dönem'];
   const period = `${from?.toLocaleDateString('tr-TR') ?? 'Başlangıç'} - ${to?.toLocaleDateString('tr-TR') ?? 'Günümüz'}`;
+  const line = (cells: (string | number)[]) => cells.map((cell) => csvCell(cell)).join(',');
   const rows = [
-    headers.join(','),
-    `Toplam Teklif,${metrics.totalOpps},adet,"${period}"`,
-    `Başarı Oranı,${ratio(metrics.aboveThresholdOpps, metrics.totalOpps)},%`,
-    `İsabet Oranı,${orBlank(metrics.avgIsabet, metrics.totalOpps)},skor`,
-    `Kişi-Gün,${metrics.totalEffortDays},gün`,
-    `G0→G2 Süresi,${orBlank(metrics.avgG2Days, metrics.totalOpps)},gün`,
-    `Açık Modüller,${metrics.activeModules},modül`,
+    line(headers),
+    line(['Toplam Teklif', metrics.totalOpps, 'adet', period]),
+    line(['Başarı Oranı', ratio(metrics.aboveThresholdOpps, metrics.totalOpps), '%']),
+    line(['İsabet Oranı', orBlank(metrics.avgIsabet, metrics.totalOpps), 'skor']),
+    line(['Kişi-Gün', metrics.totalEffortDays, 'gün']),
+    line(['G0→G2 Süresi', orBlank(metrics.avgG2Days, metrics.totalOpps), 'gün']),
+    line(['Açık Modüller', metrics.activeModules, 'modül']),
     '',
-    'Stage,Sayı',
-    ...metrics.stageBreakdown.map((s) => `${s.stage},${s.count}`),
+    line(['Stage', 'Sayı']),
+    ...metrics.stageBreakdown.map((s) => line([s.stage, s.count])),
   ];
 
   return rows.join('\n');

@@ -50,7 +50,7 @@ export interface BlogSeedPost {
   excerpt: string;
   content: string;
   category: string;
-  readTime: string;
+  readMinutes: number;
   publishedAt: Date;
   image: string;
   featured: boolean;
@@ -62,7 +62,7 @@ export const BLOG_SEED_POSTS: readonly BlogSeedPost[] = [
     title: 'Horizon Europe Çalışma Programlarında Başarılı Konsorsiyum Kurma Rehberi',
     excerpt: 'CORDIS ağ verisinde bir kurumun merkezilik puanı, geçmişte ne kadar aktif koordinasyon yaptığını gösterir. Konsorsiyum kurarken bu sinyali nasıl okuyacağınızı anlatıyoruz.',
     category: 'Horizon Europe',
-    readTime: '5 dk okuma',
+    readMinutes: 5,
     publishedAt: new Date('2026-08-28T00:00:00.000Z'),
     image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
     featured: true,
@@ -88,7 +88,7 @@ ${PRODUCT_NAME} M8 modülü, CORDIS canlı delta API entegrasyonu sayesinde arad
     title: 'TÜBİTAK Eşik Üstü Ödülü ve AB Hakem Değerlendirme Kriterleri (15 Puan)',
     excerpt: 'Mükemmeliyet (Excellence), Etki (Impact) ve Uygulama (Implementation) kriterlerinde AB bağımsız hakemlerinin dikkat ettiği 10 kritik detay.',
     category: 'TÜBİTAK & Hibe',
-    readTime: '7 dk okuma',
+    readMinutes: 7,
     publishedAt: new Date('2026-08-15T00:00:00.000Z'),
     image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80',
     featured: true,
@@ -111,7 +111,7 @@ ${PRODUCT_NAME} M6 modülü, resmi AB hakemi bakış açısıyla metninizin zay�
     title: 'Ar-Ge Projelerinde Yapay Zeka Desteği: Part B Yazımında Etik Standartlar',
     excerpt: 'Yapay zeka araçlarıyla Konsept Notu ve Part B taslağı oluştururken AB komisyonu etik rehberi ve CORDIS RAG mimarisinin kullanımı.',
     category: 'Yapay Zeka',
-    readTime: '4 dk okuma',
+    readMinutes: 4,
     publishedAt: new Date('2026-08-02T00:00:00.000Z'),
     image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
     featured: true,
@@ -134,7 +134,7 @@ Genel yapay zeka modelleri (hallucination) uydurma kaynak üretebilir. ${PRODUCT
     title: 'TTO ve Danışmanlar İçin Multi-Tenant Proje Yönetimi: Adam-Gün Eforu',
     excerpt: 'G0-G4 Stage-Gate boru hattı ile üniversite ve danışmanlık firmaları çok sayıda teklifi eşzamanlı ve birbirinden yalıtılmış yürütür.',
     category: 'TTO & Danışmanlık',
-    readTime: '6 dk okuma',
+    readMinutes: 6,
     publishedAt: new Date('2026-07-20T00:00:00.000Z'),
     image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
     featured: false,

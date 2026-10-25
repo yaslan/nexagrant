@@ -97,7 +97,7 @@ test.describe('module entry points — reached by clicking', () => {
       ['Ortaklar', /\/ortaklar$/, /Partner Intelligence/],
       ['Konsept Notlar', /\/konsept-notlar$/, /Konsept|Concept/],
       ['Kanıtlar', /\/kanitlar$/, /Kanıt|Evidence/],
-      ['İlişkiler', /\/iliskiler$/, /Odak Noktası/],
+      ['İlişkiler', /\/iliskiler$/, /Odak Noktası CRM \(M4\)/],
     ];
     for (const [label, url, heading] of entries) {
       await sidebar(page).getByRole('link', { name: label }).click();
@@ -111,13 +111,13 @@ test.describe('module entry points — reached by clicking', () => {
     await page.screenshot({ path: `${SHOTS}/e2e-02-opportunity-tabs-ultra.png` });
 
     const tabs: [string, RegExp, RegExp][] = [
-      ['conceptNote', /\/opportunities\/[^/]+\/m2$/, /Concept Note/],
+      ['conceptNote', /\/opportunities\/[^/]+\/m2$/, /Konsept Notu Editörü/],
       ['evaluations', /\/opportunities\/[^/]+\/evaluations$/, /İç Ön Değerlendirme/],
       ['matching', /\/opportunities\/[^/]+\/matching$/, /Konsorsiyum Rol Matrisi/],
       ['consortium', /\/pipeline\/[^/]+\/consortium$/, /Consortium Builder/],
       ['briefs', /\/opportunities\/[^/]+\/briefs$/, /Görüşme Brifingi/],
       ['documents', /\/opportunities\/[^/]+\/documents$/, /Takip Belgeleri/],
-      ['application', /\/opportunities\/[^/]+\/application$/, /Başvuru/],
+      ['application', /\/opportunities\/[^/]+\/application$/, /Part A & Part B Başvuru Üretim Paneli/],
     ];
     for (const [tab, url, heading] of tabs) {
       await page.getByTestId(`opportunity-module-tab-${tab}`).click();

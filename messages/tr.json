@@ -40,6 +40,7 @@
     "forbiddenRole": "Rolünüz bu işlem için yetkili değil; hiçbir şey kaydedilmedi. Yetki için çalışma alanı yöneticinize başvurun.",
     "serviceBusy": "Sistem şu an çok yoğun; hiçbir şey kaydedilmedi. Birkaç saniye sonra tekrar deneyin.",
     "moduleUnavailable": "Bu modül çalışma alanınızda şu an kullanılamıyor (kapalı ya da planınızın dışında); hiçbir şey kaydedilmedi. Erişim için çalışma alanı yöneticinize başvurun.",
+    "sessionExpired": "Oturumunuz sona erdi; hiçbir şey kaydedilmedi. Devam etmek için yeniden giriş yapın.",
     "aiTruncated": "Yapay zekâ metni uzunluk sınırında kesildi; hiçbir şey kaydedilmedi, kredi düşülmedi. Yeniden deneyin ya da daha kısa bir belge isteyin.",
     "aiRefused": "Yapay zekâ modeli bu isteği yanıtlamayı reddetti. Hiçbir şey kaydedilmedi, kredi düşülmedi.",
     "logoAlt": "{brand} logosu",
@@ -134,7 +135,8 @@
     "readinessImportedAt": "karne sonucu {date} tarihinde eklendi",
     "readinessMoreGaps": "{count} eksik adım daha var; tamamı ayrıntılı sonuçta.",
     "readinessViewResult": "Ayrıntılı sonucu gör",
-    "readinessRetake": "Karneyi yeniden yap"
+    "readinessRetake": "Karneyi yeniden yap",
+    "cardLinkAria": "{title} — ayrıntıya git"
   },
   "Pipeline": {
     "title": "Fırsat Pipeline",
@@ -318,7 +320,23 @@
     "wordCount": "Kelime Sayısı",
     "overLimit": "Limit Aşıldı",
     "aiUsage": "YZ Kullanım Beyanı",
-    "creditsUsed": "Kullanılan Kredi"
+    "creditsUsed": "Kullanılan Kredi",
+    "editor": {
+      "title": "Konsept Notu Editörü",
+      "generate": "YZ ile Taslak Üret",
+      "generating": "Üretiliyor...",
+      "save": "Taslağı Kaydet",
+      "saving": "Kaydediliyor...",
+      "export": "DOCX Olarak Dışa Aktar",
+      "exporting": "Dışa aktarılıyor...",
+      "generated": "Taslak oluşturuldu. Üretilen metni görmek için sayfayı yenileyin.",
+      "saved": "Taslak kaydedildi.",
+      "failed": "İşlem başarısız: {message}",
+      "sectionLabel": "{label} (en fazla {max} kelime)",
+      "placeholder": "{label} bölümünü yazın...",
+      "words": "Kelime: {count} / {max}",
+      "noTemplate": "Sistemde konsept notu şablonu bulunamadı. Seed verisini yükleyin."
+    }
   },
   "Relationships": {
     "title": "İlişki Yönetimi",
@@ -354,7 +372,15 @@
     "kindMeeting": "Toplantı",
     "kindEmail": "E-posta",
     "kindCall": "Telefon",
-    "kindEvent": "Etkinlik"
+    "kindEvent": "Etkinlik",
+    "page": {
+      "title": "Odak Noktası CRM (M4)",
+      "subtitle": "Ortak ilişkilerini yönet ve etkileşimleri takip et.",
+      "newFromPartner": "+ Ortak Kartından Ekle",
+      "staleDays": "{days} gündür bayat",
+      "daysAgo": "{days} gün önce",
+      "empty": "Henüz ilişki yok. Bir Ortak Kartından açın."
+    }
   },
   "Consortium": {
     "title": "Konsorsiyum Oluşturucu",
@@ -770,7 +796,8 @@
         "AVAILABLE": "Planınıza dahil, açılabilir",
         "LOCKED": "Planınıza dahil değil",
         "ORPHANED": "Plan dışında kaldı — kullanılamaz",
-        "UNKNOWN": "Durum okunamadı"
+        "UNKNOWN": "Durum okunamadı",
+        "SOON": "Henüz açılamaz"
       },
       "statusBadge": {
         "ga": "GA",
@@ -792,6 +819,8 @@
       "plansNone": "Hiçbir planda yok",
       "addOnSku": "SKU: {sku}",
       "missingDependencies": "Eksik bağımlılık: {ids}",
+      "soonNotice": "Bu modül hazırlanıyor; kullanıma açıldığında buradan etkinleştirebilirsiniz.",
+      "soonLink": "Ne getirecek? →",
       "enable": "Aç",
       "disable": "Kapat",
       "toastDisabled": "{id} modülü devre dışı bırakıldı.",
@@ -926,7 +955,7 @@
       "rightsBody": "KVKK 11. maddesi ve GDPR uyarınca aşağıdaki dokuz hakkınız vardır: (a) Kişisel verilerinizin işlenip işlenmediğini öğrenme; (b) İşlenmiş verilerinize ilişkin bilgi talep etme — 'Ayarlar → Gizlilik ve Verilerim' ekranından JSON biçiminde dışa aktarabilirsiniz; (c) İşleme amacını ve amaca uygunluğunu öğrenme; (ç) Verilerinizin yurt içinde ve yurt dışında aktarıldığı üçüncü kişileri bilme; (d) Eksik veya yanlış verilerinizin düzeltilmesini isteme; (e) Verilerinizin silinmesini veya yok edilmesini isteme — 'Ayarlar → Gizlilik ve Verilerim' ekranından hesabınızın silinmesini talep edebilirsiniz (hesabınız derhal kapatılır, 30 gün sonra kalıcı silinir, bu süre içinde iptal edebilirsiniz); (f) Düzeltme veya silme işleminin üçüncü kişilere bildirilmesini isteme; (g) Münhasıran otomatik sistem analizi sonucu aleyhe sonuca itiraz etme (ürün puanlaması bu kapsamdadır); (ğ) Zarara uğrama hâlinde tazminat talep etme. Güvenlik gereği, kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dışa aktarıma dahil edilmez.",
       "rightsLink": "Gizlilik ve Verilerim ekranına git",
       "securityHeading": "7. Güvenlik ve Depolama",
-      "securityBody": "Verileriniz çok kiracılı veritabanında PostgreSQL Row-Level Security (RLS) ile diğer kiracılardan yalıtılmış olup, dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır.",
+      "securityBody": "Kiracıya ait verileriniz uygulama katmanında diğer kiracılardan ayrılır: kiracı verisine erişen sorgular kiracı kimliğinizle sınırlanır; tanımlı ve sınırlı sistem işlemleri (platform yönetimi, veri sahibi talepleri, zamanlanmış işler) kiracılar arası çalışabilir. PostgreSQL Row-Level Security (RLS) politikaları veritabanında tanımlıdır; ancak bu politikalar uygulamanın veritabanı bağlantısında etkin değildir. Dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır.",
       "recipientsHeading": "3. Veri Alıcıları ve Yurt Dışı Aktarım",
       "recipientsBody": "Verileriniz aşağıdaki alıcılara aktarılabilir: (1) Anthropic PBC (ABD) — yapay zeka destekli metin üretimi ve ön değerlendirme için gönderdiğiniz metinler (kapasite açıklaması, teklif taslağı, değerlendirilen belge içeriği); (2) Google LLC (ABD) — oturum açma sırasında gönderilen ad ve e-posta; (3) Stripe, Inc. (ABD) — abonelik ve ödeme yönetimi için müşteri tanımlayıcısı ve faturalama durumu; (4) OpenAI, L.L.C. (ABD) — yüklenen belgelerin embedding'i için metin; (5) Cloudflare, Inc. (bölge ayara bağlı) — yüklenen dosya ve ekran görüntüleri; (6) PostHog Inc. (Avrupa Birliği bölgesi, varsayılan) — olay adları ve puanlandırma duruşu (çerez onayıyla); (7) Vulut (Türkiye) — veritabanı, uygulama sunucusu ve e-posta barındırması. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
       "legalBasisHeading": "5. Hukuki Sebebi Tablosu",
@@ -953,7 +982,7 @@
       "trialHeading": "6. Pilot Periyodu",
       "trialBody": "Çalışma alanının açılması sırasında, belirli bir süre boyunca pilot (deneme) erişimi sağlanır. Pilot süresi dolduğunda yeni hesaplamalar ve değişiklikler askıya alınır. Uzatmak için çalışma alanı yöneticiniz tarafından abonelik kurulması gerekir.",
       "terminationHeading": "7. Hesap Fesih ve Veri Silme",
-      "terminationBody": "Abonelik istenildiğinde portal üzerinden iptal edilebilir. Hesap silme talebinde, hesap derhal erişime kapatılır ve 30 gün sonra kişisel hesap bilgileriniz silinir. Çalışma alanına ait belgeler ve projeler çalışma alanı silinene kadar kurumda kalır. Faturalama ve denetim kayıtları anonimleştirilerek saklanır. Silme süresi içinde talebinizi geri çekebilirsiniz. Ayrıntı için bkz. Gizlilik Politikası §3.",
+      "terminationBody": "Abonelik istenildiğinde portal üzerinden iptal edilebilir. Hesap silme talebinde, hesap derhal erişime kapatılır ve 30 gün sonra kişisel hesap bilgileriniz silinir. Çalışma alanına ait belgeler ve projeler çalışma alanı silinene kadar kurumda kalır. Faturalama ve denetim kayıtları saklanır; bu kayıtlardaki kullanıcı kimliği bağlantısı kaldırılır ya da tek yönlü bir özetle değiştirilir. Denetim kayıtlarının serbest metin alanları kişisel veri içerebilir. Silme süresi içinde talebinizi geri çekebilirsiniz. Ayrıntı için bkz. Gizlilik Politikası §3.",
       "agencyHeading": "8. Ajans Kanalı ve Davet Kodu",
       "agencyBody": "Teklif hazırlama destek sağlayıcıları (ajanslar), danışmanlık müşterilerine davet kodu ile ulaşabilir. Davet koduyla kayıt yapan kullanıcı, çalışma alanı ajansa bağlanır. Bu bağ ajansa çalışma alanının verilerine erişim sağlamaz; ilişki yalnız kayıt sırasında kurulur.",
       "partnerHeading": "9. Ortak Portalı",
@@ -1306,7 +1335,99 @@
     "meta_description": "{region} bölgesine uygun AB hibe çağrıları"
   },
   "applicationPartA": {
-    "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin."
+    "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin.",
+    "eyebrow": "Modül 11 — Tam Başvuru Üretimi",
+    "title": "Part A & Part B Başvuru Üretim Paneli",
+    "proposal": "Teklif: <strong>{title}</strong>",
+    "downloadPartB": "Part B (.docx) Şablonu İndir",
+    "partsActive": "Part A & B Aktif",
+    "summary": {
+      "effort": "Toplam Konsorsiyum Eforu",
+      "personMonths": "Kişi-Ay (PM)",
+      "budget": "Toplam Bütçe (Lump Sum)",
+      "wpCount": "İş Paketi Sayısı",
+      "wpUnit": "İş Paketi (WP)",
+      "pageLimit": "Sayfa Limiti Kontrolü",
+      "pageLimitValue": "RIA/IA Limit: 45 Sayfa",
+      "pmUnit": "PM"
+    },
+    "tabs": {
+      "partBEditor": "Part B (Çoklu Yazar İşbirlikçi Metin Editörü)",
+      "partA": "Part A (İdari & Lump-Sum Bütçe)",
+      "gantt": "Part B (Gantt Şeması & İş Paketleri)",
+      "checklist": "Gönderim Kontrol Listesi"
+    },
+    "portal": {
+      "title": "Ortak Katkı Portalı (Magic Link)",
+      "intro": "Dış konsorsiyum ortakları şifre gerekmeksizin aşağıdaki güvenli bağlantıyla kendi kurum ve bütçe verilerini girebilir:",
+      "copied": "Kopyalandı",
+      "copy": "Kopyala",
+      "shownOnce": "Bu bağlantı yalnız şimdi gösterilir; güvenlik için saklanmaz. Şimdi kopyalayıp ortağınıza iletin.",
+      "issuedBefore": "Bir bağlantı daha önce oluşturuldu ve güvenlik için yeniden gösterilemez. Yeni bağlantı oluşturursanız eskisi çalışmaz.",
+      "none": "Henüz bağlantı oluşturulmadı.",
+      "reissue": "Yeni bağlantı oluştur",
+      "issue": "Bağlantı oluştur"
+    },
+    "budget": {
+      "addTitle": "Lump-Sum Bütçe Kalemi Ekle",
+      "partnerName": "Ortak Kurum Adı",
+      "partnerNamePlaceholder": "Örn: METU TTO, Fraunhofer Institute",
+      "effort": "Efor (Kişi-Ay)",
+      "countryCoef": "Ülke Katsayısı",
+      "coefStandard": "1.00 (Standart AB)",
+      "coefSee": "0.85 (Türkiye / Güneydoğu Avrupa)",
+      "coefNorth": "1.20 (Yüksek Maliyetli Kuzey)",
+      "travel": "Seyahat (€)",
+      "subcontracting": "Alt Yüklenici (€)",
+      "calculating": "Hesaplanıyor...",
+      "save": "Bütçe Kalemini Kaydet",
+      "tableTitle": "Konsorsiyum Lump-Sum Bütçe Tablosu",
+      "overhead": "Standart %25 Genel Gider Dahil",
+      "colPartner": "Ortak Kurum",
+      "colCoef": "Ülke Kat.",
+      "colRequested": "Talep Edilen (€)",
+      "empty": "Henüz bütçe satırı eklenmedi. Aşağıdaki formdan ortak ekleyin.",
+      "total": "TOPLAM KONSORSİYUM"
+    },
+    "gantt": {
+      "title": "Proje Gantt Şeması & İş Paketi Zaman Çizelgesi (M1 - M36)",
+      "subtitle": "Horizon Europe Part B Bölüm 3.1 İş Paketi (WP) başlangıç ve bitiş ayları.",
+      "empty": "Henüz iş paketi tanımlanmadı. Aşağıdaki formdan WP ekleyin.",
+      "lead": "Lider: <strong>{lead}</strong> (Ay M{start} - M{end})",
+      "addTitle": "Yeni İş Paketi (WP) Ekle",
+      "code": "WP Kodu",
+      "wpTitle": "WP Başlığı",
+      "leadOrg": "Lider Kurum",
+      "start": "Başlangıç (Ay)",
+      "end": "Bitiş (Ay)",
+      "add": "İş Paketini Gantt Şemasına Ekle"
+    },
+    "checklist": {
+      "title": "Resmî Gönderim Öncesi Kontrol Listesi",
+      "subtitle": "European Funding & Tenders portalına yükleme yapmadan önce zorunlu kriterleri doğrulayın.",
+      "items": {
+        "partA": {
+          "title": "Part A İdari Kurum Formları",
+          "desc": "Tüm konsorsiyum ortaklarının PIC numaraları ve finansal temsilcileri doğrulandı."
+        },
+        "pageLimit": {
+          "title": "Part B Sayfa Limiti Uyum Kontrolü",
+          "desc": "RIA/IA projeleri için azami 45 sayfa sınırı aşılmadı (Mevcut: ~38 Sayfa)."
+        },
+        "gep": {
+          "title": "Cinsiyet Eşitliği Planı (Gender Equality Plan - GEP)",
+          "desc": "Kamu ve üniversite ortaklarının onaylı GEP belgeleri yüklendi."
+        },
+        "fair": {
+          "title": "Açık Bilim ve Veri Yönetimi Planı (FAIR Data)",
+          "desc": "Part B 1.2 bölümünde açık erişim yayıncılık taahhüt edildi."
+        },
+        "ip": {
+          "title": "Fikri Mülkiyet (IP) & Arka Plan Hakları",
+          "desc": "Tüm ortakların arka plan patent ve yazılım hakları tanımlandı."
+        }
+      }
+    }
   },
   "partner_portal": {
     "badge": "Consortium Partner Portal",
@@ -1363,13 +1484,15 @@
   "ModuleGate": {
     "title": "Bu modül şu anda kullanılamıyor",
     "askAdmin": "Erişim gerekiyorsa çalışma alanı yöneticinizle ya da {brand} ekibiyle görüşün.",
+    "comingSoon": "{brand} bu modülü hazırlıyor. Kullanıma açıldığında Modül Yönetimi sayfasından etkinleştirebilirsiniz.",
     "reason": {
       "MODULE_OFF": "{module} modülü kiracınızda kapalı.",
       "PLAN_UPGRADE_REQUIRED": "{module} modülü aboneliğinizin kapsamı dışında. Şu planlarda yer alıyor: {plans}.",
       "DEV_INTERNAL_ONLY": "{module} modülü geliştirme aşamasında ve şu an yalnızca {brand} ekibine açık.",
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
-      "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor."
+      "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
+      "COMING_SOON": "{module} modülü yakında kullanıma açılacak."
     }
   },
   "UserIdentity": {
@@ -1417,7 +1540,63 @@
     "leadAuthorLabel": "Sorumlu",
     "leadUnassigned": "Atanmadı",
     "contentPlaceholder": "Bölüm içeriğini buraya yazın veya YZ Eş-Yazar Asistanı ile taslak üretin...",
-    "aiPromptPlaceholder": "Örn: bu bölümde vurgulanmasını istediğiniz yöntem, sonuç veya saha bilgisini yazın..."
+    "aiPromptPlaceholder": "Örn: bu bölümde vurgulanmasını istediğiniz yöntem, sonuç veya saha bilgisini yazın...",
+    "presenceTitle": "Canlı Konsorsiyum Eşzamanlı Yazarları ({count} Aktif)",
+    "presenceHint": "Tüm değişiklikler ve kilitler diğer konsorsiyum ortaklarıyla anlık senkronize edilir.",
+    "pageBudget": "Part B Toplam Sayfa Bütçesi:",
+    "pageBudgetValue": "{pages} / {max} Sayfa ({words} Kelime)",
+    "pageLimitExceeded": "Sayfa Limiti Aşıldı! (~{over} sayfa kırpılmalı)",
+    "downloadDocx": "Resmî DOCX İndir",
+    "sectionTree": "Part B Bölüm Ağacı",
+    "sectionCount": "{count} Bölüm",
+    "groupExcellence": "1. EXCELLENCE (Mükemmeliyet)",
+    "groupImpact": "2. IMPACT (Etki & Yayma)",
+    "groupImplementation": "3. IMPLEMENTATION (Uygulama)",
+    "groupPages": "~{count} Sayfa",
+    "sectionPagesShort": "{pages}/{target} s.",
+    "targetPages": "Hedef: {count} Sayfa",
+    "currentPages": "Şu an: ~{pages} Sayfa ({words} Kelime)",
+    "saving": "Kaydediliyor...",
+    "synced": "Senkronize",
+    "unsaved": "Değişiklik var...",
+    "releaseLock": "Kilidi Bırak",
+    "lockedBy": "{name} Düzenliyor",
+    "acquireLock": "Bölümü Kilitle",
+    "lockTaken": "Bölüm şu anda başka bir ortak tarafından kilitli.",
+    "editMarkdown": "Düzenle (Markdown)",
+    "preview": "Önizleme",
+    "aiAssistant": "YZ Eş-Yazar Asistanı",
+    "reviewComments": "İnceleme Yorumları ({count})",
+    "history": "Sürüm Geçmişi",
+    "save": "Kaydet",
+    "editorStats": "{words} kelime | ~{pages} sayfa",
+    "close": "Kapat",
+    "commentsTitle": "{section} — İnceleme ve Ortak Yorumları",
+    "commentPlaceholder": "Bu bölüme bir revizyon notu veya soru ekleyin...",
+    "send": "Gönder",
+    "noComments": "Bu bölüm için henüz bir inceleme yorumu bulunmuyor.",
+    "reopen": "Yeniden Aç",
+    "markResolved": "Çözüldü Olarak İşaretle",
+    "historyTitle": "{section} — Zaman Damgalı Sürüm Geçmişi",
+    "revisionWords": "{count} Kelime",
+    "restoreRevision": "Bu Sürüme Dön",
+    "restoreConfirm": "{author} tarafından oluşturulan ({time}) sürüme geri dönmek istediğinizden emin misiniz?",
+    "summaryManual": "Elle anlık kaydedildi",
+    "summaryAutoBackground": "Otomatik arka plan kaydı",
+    "summaryAutoSync": "Otomatik senkronizasyon kaydı",
+    "aiTitle": "YZ Eş-Yazar Asistanı (Horizon Europe Evaluator Lens)",
+    "aiSelectedSection": "Seçili Bölüm:",
+    "aiNotesLabel": "Özel Odak Noktaları veya Konsorsiyum Notları (Opsiyonel):",
+    "aiPresetSmart": "🎯 SMART & SOTA Odaklı",
+    "aiPresetSmartNotes": "SMART hedefler, TRL 4-7 ilerlemesi ve state-of-the-art karşılaştırması ekle",
+    "aiPresetOpenScience": "🔬 Açık Bilim & FAIR",
+    "aiPresetOpenScienceNotes": "Açık bilim (FAIR), Zenodo açık veri deposu ve cinsiyet boyutu entegrasyonu",
+    "aiPresetImpact": "📈 Etki, DEC & IP Planı",
+    "aiPresetImpactNotes": "Ticari sömürü, Fikri Mülkiyet (IP) konsorsiyum protokolü ve pazar ölçeği",
+    "cancel": "Vazgeç",
+    "aiGenerating": "Taslak Üretiliyor (2 Kredi)...",
+    "aiGenerate": "Bölüm Taslağını Üret & Editöre Aktar",
+    "aiFailed": "YZ taslak üretilirken hata oluştu: {message}"
   },
   "callDetails": {
     "backToCalls": "Çağrılara Geri Dön",
@@ -1469,6 +1648,7 @@
     "closed": "Kapanmış",
     "loadingData": "Canlı veriler yükleniyor...",
     "resultsCount": "Toplam {count} çağrı bulundu ({page}. sayfa)",
+    "windowNote": "İlk {count, number} sonuç gösteriliyor, aramayı daraltın.",
     "colStatus": "Durum",
     "colTopic": "Çağrı Başlığı & Kodu",
     "colActionType": "Eylem Tipi",
@@ -1487,7 +1667,8 @@
       "rateLimited": "Kısa sürede çok fazla arama yaptınız. Lütfen {seconds} saniye bekleyip tekrar deneyin.",
       "badRequest": "Arama isteği kabul edilmedi: filtrelerden biri geçersiz bir değer içeriyor. Filtreleri değiştirip tekrar deneyin.",
       "network": "Sunucuya ulaşılamadı ya da yanıt zaman aşımına uğradı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
-      "unexpected": "Çağrı listesi beklenmeyen bir hata nedeniyle alınamadı. Lütfen tekrar deneyin; sorun sürerse yöneticinize bildirin."
+      "unexpected": "Çağrı listesi beklenmeyen bir hata nedeniyle alınamadı. Lütfen tekrar deneyin; sorun sürerse yöneticinize bildirin.",
+      "pageOutOfWindow": "Bu sayfa gösterilemiyor: AB fon portalı bir aramada yalnızca ilk {count, number} sonucu verir. Filtrelerde bir sorun yok; önceki sayfalara dönün ya da aramayı daraltın."
     },
     "loadFailedShort": "Çağrılar alınamadı",
     "perPage": "Sayfa Başı Gösterim:",
@@ -1524,6 +1705,7 @@
       "refundNote": "14 gün iade garantisi",
       "checkoutFailed": "Ödeme oturumu başlatılamadı.",
       "checkoutUnreachable": "Ödeme servisine bağlanılamadı.",
+      "internalPlanCheckoutClosed": "Planınız yönetici tarafından atandı; ödeme ve plan değişikliği buradan yapılamaz. Değişiklik için bizimle iletişime geçin.",
       "demoBadge": "STRIPE CHECKOUT DEMO MODU",
       "demoTitle": "Stripe ödeme simülasyonu",
       "demoBody": "Stripe anahtarları tanımlandığında doğrudan Stripe Checkout sayfasına yönlendirilirsiniz. Aşağıdaki tutarlar sunucunun hesapladığı tutarlardır.",
@@ -1944,7 +2126,9 @@
       "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekir.",
       "INVALID_VISIBILITY": "Geçersiz görünürlük değeri. Sayfayı yenileyip tekrar deneyin.",
       "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin; sürerse ayrıntı sunucu günlüğündedir.",
-      "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz."
+      "PILOT_OVER_CONTRACT": "Kiracı zaten sözleşmeli bir kamu paketinde; pilot atanamaz.",
+      "INTERNAL_PLAN_PROTECTED": "Kiracı bir iç planda; pilot atanamaz. Önce iç planı kiracı sayfasından geri alın.",
+      "TRIAL_PROTECTED": "Kiracı Stripe aboneliği olmayan bir deneme süresinde (ör. beta); pilot atanamaz. Önce denemeyi sonlandırın."
     },
     "pilot": {
       "title": "Ücretsiz pilot (90 gün, Belediye Ekip)",
@@ -2746,6 +2930,7 @@
     "none": "—"
   },
   "adminBlog": {
+    "authorRolePlaceholder": "Dr., Prof. Dr., Uzman",
     "saved": "Blog yazısı kaydedildi.",
     "deleted": "Blog yazısı silindi.",
     "featureToggled": "Öne çıkan durumu güncellendi.",
@@ -2755,8 +2940,10 @@
       "invalid_slug": "Kısa ad (slug) yalnız küçük harf, rakam ve tire içerebilir (3–120 karakter).",
       "invalid_excerpt": "Özet 10–500 karakter olmalı.",
       "invalid_content": "İçerik 20–50.000 karakter olmalı.",
+      "invalid_content_link": "İçerikte izin verilmeyen bir bağlantı var. Bağlantılar https://, http://, mailto: ya da / ile başlayan site içi bir yol olmalı.",
+      "invalid_content_image": "İçerikte kullanılamayan bir görsel var. Görseller yalnız yükleme ile eklenir ve alternatif metinleri dolu olmalı.",
       "invalid_category": "Kategori 1–60 karakter olmalı.",
-      "invalid_read_time": "Okuma süresi 1–30 karakter olmalı.",
+      "invalid_read_time": "Okuma süresi 1–120 dakika arasında bir tam sayı olmalı.",
       "invalid_image": "Görsel adresi https ile başlamalı ve izin verilen bir sunucudan (images.unsplash.com) gelmeli.",
       "invalid_author": "Yazar adı ve unvanı en fazla 120 karakter olabilir; unvan ya da portre yalnız yazar adıyla birlikte girilebilir.",
       "slug_taken": "Bu kısa adla (slug) bir yazı zaten var. Başlığı ya da kısa adı değiştirin.",
@@ -2779,6 +2966,75 @@
         "object_store_unconfigured": "Dosya deposu yapılandırılmamış; görsel şu an yüklenemiyor. Sistem yöneticisine bildirin.",
         "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
       }
+    },
+    "content": {
+      "label": "Makale İçeriği",
+      "hint": "Sitede görünen biçimler: başlık (H1–H3), kalın, madde ve numaralı liste, bağlantı ve yüklenen görsel. İçerik Markdown olarak kaydedilir.",
+      "missing": "Makale içeriği boş olamaz."
+    },
+    "readTime": {
+      "label": "Okuma süresi (dakika)",
+      "placeholder": "örn: 5",
+      "hint": "İçerikten otomatik hesaplanır; elle değiştirebilirsiniz. Sitede okuyucunun dilinde gösterilir.",
+      "missing": "Okuma süresi boş olamaz. İçerikte okunacak metin yoksa süreyi elle yazın."
+    },
+    "editor": {
+      "label": "Makale İçeriği (Markdown)",
+      "placeholder": "# Başlık\n\nParagraf metni…",
+      "hint": "Desteklenenler: # / ## / ### başlık, **kalın**, *italik*, [link](url), ![görsel](url), * madde, 1. numaralı liste, > alıntı. Kalın için Ctrl/Cmd+B, italik için Ctrl/Cmd+I, link için Ctrl/Cmd+K.",
+      "previewEmpty": "Önizlenecek içerik yok.",
+      "toolbar": {
+        "label": "Biçimlendirme araçları",
+        "h1": "Başlık 1",
+        "h2": "Başlık 2",
+        "h3": "Başlık 3",
+        "bold": "Kalın",
+        "italic": "İtalik",
+        "quote": "Alıntı",
+        "bulletList": "Madde işaretli liste",
+        "numberedList": "Numaralı liste",
+        "link": "Bağlantı ekle",
+        "image": "Görsel ekle"
+      },
+      "tabs": {
+        "label": "İçerik görünümü",
+        "write": "Yaz",
+        "preview": "Önizle"
+      },
+      "stats": {
+        "words": "{count} kelime",
+        "chars": "{count} karakter"
+      },
+      "linkModal": {
+        "title": "Bağlantı Ekle",
+        "textLabel": "Bağlantı Metni",
+        "textPlaceholder": "Bağlantı verilecek metin…",
+        "urlLabel": "Bağlantı Adresi (URL)",
+        "urlPlaceholder": "https://example.com",
+        "cancel": "İptal",
+        "submit": "Bağlantıyı Ekle"
+      },
+      "imageModal": {
+        "title": "Görsel Ekle",
+        "tabUpload": "Dosya Yükle",
+        "tabUrl": "Görsel URL",
+        "uploadLabel": "Görsel seçin veya sürükleyin",
+        "uploadHint": "JPG, PNG veya WebP, en fazla {maxMb} MB",
+        "uploading": "Görsel yükleniyor…",
+        "urlLabel": "Görsel URL Adresi",
+        "urlPlaceholder": "https://images.unsplash.com/...",
+        "altLabel": "Açıklama / Alt Metin (İsteğe bağlı)",
+        "altPlaceholder": "Görsel açıklaması…",
+        "cancel": "İptal",
+        "submit": "Görseli Ekle",
+        "errors": {
+          "type": "Bu dosya türü desteklenmiyor. JPG, PNG veya WebP bir görsel seçin.",
+          "size": "Görsel {maxMb} MB'tan büyük. Daha küçük bir dosya seçin.",
+          "forbidden": "Görsel yükleme yetkiniz yok.",
+          "upload_failed": "Görsel yüklenemedi. Lütfen tekrar deneyin."
+        }
+      },
+      "linkFallback": "Bağlantı"
     }
   },
   "adminDocuments": {
@@ -2922,9 +3178,61 @@
       "IMPORT_FAILED": "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında."
     }
   },
+  "adminInterreg": {
+    "title": "Interreg & keep.eu Veri Merkezi",
+    "subtitle": "Avrupa Birliği sınır ötesi (CBC), Interreg ve NEXT işbirliği programları veri senkronizasyonu ve analitiği.",
+    "badge": "Interreg / keep.eu",
+    "syncNow": "keep.eu ile Senkronize Et",
+    "syncing": "Senkronize Ediliyor...",
+    "lastSync": "Son Senkronizasyon",
+    "neverSynced": "Henüz senkronize edilmedi",
+    "totalProjects": "Toplam Interreg Projesi",
+    "totalFunding": "Toplam AB / IPA Hibesi",
+    "totalBudget": "Toplam Bütçe",
+    "totalPartners": "Toplam Kurum & Ortak",
+    "turkishPartners": "Türk Yararlanıcı (TR)",
+    "tabProgrammes": "Programlar & Senkronizasyon",
+    "tabCountries": "Ülke Dağılımı",
+    "tabRag": "RAG Arama Workbench",
+    "syncSuccess": "Senkronizasyon Başarılı",
+    "syncError": "Senkronizasyon Hatası",
+    "upstreamMissingApiKey": "keep.eu API anahtarı tanımlı değil. Bir sistem yöneticisi KEEP_EU_API_KEY ayarını yapmalı.",
+    "upstreamForbidden": "keep.eu erişimi reddetti. Erişim Interact ile anlaşılmalı.",
+    "upstreamErrorResponse": "keep.eu bir hata döndürdü. Ayrıntılar sistem uyarılarında.",
+    "upstreamTimeout": "keep.eu zamanında yanıt vermedi.",
+    "upstreamNetworkError": "keep.eu'ya bağlanılamadı.",
+    "syncedProjectsCount": "{count} proje başarıyla senkronize edildi",
+    "syncedPartnersCount": "{count} konsorsiyum ortağı kaydedildi",
+    "skippedCount": "{count} kayıt atlandı",
+    "totalEuFundingEUR": "Toplam Hibe: €{amount}",
+    "selectProgrammes": "Senkronize Edilecek Programlar",
+    "defaultProgrammesHelp": "Varsayılan: Türkiye'nin uygun olduğu 4 sınır ötesi işbirliği programı (Bulgaristan-Türkiye, Karadeniz Havzası, NEXT MED, CBC 2014-2020).",
+    "customIdsPlaceholder": "Özel Program ID'leri (virgülle ayırın, örn. 305, 387)",
+    "programmeTitle": "Program Adı",
+    "projectCount": "Proje Sayısı",
+    "grantAmount": "Toplam Hibe",
+    "country": "Ülke",
+    "partnerCount": "Ortak Sayısı",
+    "ragTitle": "Interreg Semantik Arama Testi",
+    "ragSubtitle": "RAG vektör veritabanına aktarılan Interreg projeleri üzerinde doğal dil sorgulaması yapın.",
+    "searchPlaceholder": "Örn: Sürdürülebilir turizm, Karadeniz çevre koruma, KOBİ dijitalleşme...",
+    "searchButton": "Semantik Ara",
+    "searching": "Aranıyor...",
+    "noResults": "Eşleşen sonuç bulunamadı.",
+    "similarityScore": "Benzerlik Skoru",
+    "emptyStateTitle": "Henüz Interreg Projesi Senkronize Edilmedi",
+    "emptyStateDesc": "keep.eu API'sinden projeleri ve konsorsiyum ortaklarını çekmek için yukarıdaki Senkronize Et butonuna tıklayın.",
+    "interregAndNext": "Interreg & NEXT",
+    "m8PartnerPool": "M8 Partner Havuzu",
+    "turkishBeneficiariesDesc": "Yerel kurumlar & üniversiteler",
+    "navDesc": "Sınır ötesi fonlar & ortaklar",
+    "defaultRagQuery": "Sürdürülebilir turizm ve kültürel miras",
+    "topK": "İlk {count}"
+  },
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
-    "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri."
+    "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.",
+    "readMinutes": "{min} dk okuma"
   },
   "blog_detail": {
     "meta_description": "Blog yazısı"
@@ -3040,6 +3348,20 @@
       },
       "ipChecklistFallback": "### 📋 TTO IP & Lisanslama Kontrol Listesi\n\n1. **Arka Plan Fikri Mülkiyet (Background IP) Beyanı:**\n   - [x] Tescilli patent belgesi ({patentStatus}) ve hak sahipliği sözleşmesi hazırlandı.\n   - [ ] Üniversite araştırmacılarının buluş bildirimi (Invention Disclosure Form) dosyalandı.\n\n2. **Ön Plan Fikri Mülkiyet (Foreground IP) ve Lisanslama:**\n   - [ ] Proje çıktılarının (Foreground IP) lisans hakları için ön anlaşma metni taslağı.\n   - [ ] Özel sektör ortakları için ticarileştirme opsiyon hakkı (Option Agreement).\n\n3. **Spin-off & Pazar Açılımı:**\n   - [ ] TRL {trl}'den TRL {nextTrl} seviyesine ticarileştirme yol haritası.\n   - [ ] Şirketleşme (Spin-off) hisse paylaşım modeli.\n\n4. **AB Konsorsiyum Anlaşması Maddeleri:**\n   - [ ] Konsorsiyum anlaşmasında arka plan IP kullanımı kısıtlamaları duyuruldu."
     }
+  },
+  "PartnerDetail": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbPartners": "Ortaklar",
+    "backToPartners": "← Ortaklar Listesine Dön",
+    "countryLabel": "Ülke: {value}",
+    "typeLabel": "Tür: {value}",
+    "smeBadge": "KOBİ",
+    "totalParticipations": "Toplam Katılım",
+    "coordinatorRoles": "Koordinatörlük",
+    "totalEcFunding": "Toplam AB Fonu",
+    "graphTitle": "İşbirliği ve Ortaklık Grafiği",
+    "graphPlaceholder": "[CORDIS Etkileşim Grafiği] — Kurumun Horizon Europe ve H2020 projeleriyle ortaklık ağı.",
+    "pastProjects": "Geçmiş AB Projeleri"
   },
   "PartnersLeaders": {
     "breadcrumbDashboard": "Panel",
@@ -3310,6 +3632,30 @@
     "none": "—"
   },
   "modules": {
+    "call-fit": {
+      "name": "Çağrı Uyum Analizi",
+      "tagline": "Açık çağrıları kuruluş profiline göre puanlar; karar desteğidir, seçilme garantisi değildir."
+    },
+    "expert-pool": {
+      "name": "Uzman Havuzu",
+      "tagline": "Değerlendirici ve hakem eşleştirmesi için ön kayıtlı uzmanlar."
+    },
+    "budget-wp": {
+      "name": "Bütçe ve İş Paketleri",
+      "tagline": "Ortaklık ve teklif verisi üzerine bütçe ve iş paketi planlaması."
+    },
+    "compliance": {
+      "name": "Uygunluk Kontrolü",
+      "tagline": "Başvuru bölümlerinin program kurallarına göre YZ destekli incelemesi."
+    },
+    "post-award": {
+      "name": "Sözleşme Sonrası Yönetim",
+      "tagline": "Hibe imzalandıktan sonra raporlama, efor takibi ve teslimatlar."
+    },
+    "tr-layer": {
+      "name": "Türkiye Ulusal Katmanı",
+      "tagline": "AB hattının yanında TÜBİTAK, KOSGEB gibi ulusal programlar."
+    },
     "partner-intel": {
       "name": "Ortak İstihbarat Veritabanı",
       "tagline": "Her kuruluş için tek ortak kartı, konu liderleri ve iş birliği ağı."
@@ -3354,5 +3700,160 @@
       "name": "Tam Başvuru Üretimi",
       "tagline": "Konsept notu, kanıt ve konsorsiyum üzerine bölüm bölüm başvuru taslağı."
     }
+  },
+  "richTextEditor": {
+    "toolbar": "Biçimlendirme",
+    "heading1": "Başlık 1",
+    "heading2": "Başlık 2",
+    "heading3": "Başlık 3",
+    "bold": "Kalın",
+    "bulletList": "Madde listesi",
+    "orderedList": "Numaralı liste",
+    "undo": "Geri al",
+    "redo": "Yinele",
+    "link": "Bağlantı",
+    "image": "Görsel",
+    "cancel": "Vazgeç",
+    "apply": "Uygula",
+    "linkDialog": {
+      "title": "Bağlantı ekle",
+      "editTitle": "Bağlantıyı düzenle",
+      "text": "Görünen metin",
+      "textRequired": "Bağlantıda görünecek metni yazın.",
+      "url": "Adres",
+      "urlHint": "https:// , http:// ya da mailto: ile başlayan bir adres, veya / ile başlayan bir site içi yol.",
+      "invalidUrl": "Bu adres kullanılamaz. https:// , http:// , mailto: ile başlayan bir adres ya da / ile başlayan bir site içi yol girin.",
+      "remove": "Bağlantıyı kaldır"
+    },
+    "imageDialog": {
+      "title": "Görsel ekle",
+      "editTitle": "Görseli düzenle",
+      "choose": "Görsel seç",
+      "change": "Başka görsel seç",
+      "preview": "Yüklenen görselin önizlemesi",
+      "fileRequired": "Önce bir görsel yükleyin. Yazıya yalnız yüklenen görseller eklenebilir.",
+      "alt": "Alternatif metin",
+      "altHint": "Görseli göremeyenler için görselin ne gösterdiğini kısaca yazın.",
+      "altRequired": "Alternatif metin zorunlu."
+    }
+  },
+  "ApiKeysSettings": {
+    "createTitle": "Yeni API Anahtarı Oluştur",
+    "revoke": {
+      "title": "Mevcut API anahtarları",
+      "description": "Modül kapalıyken de mevcut anahtarlarınızı buradan iptal edebilirsiniz. İptal edilen anahtar hemen geçersiz olur. Anahtar değerleri gösterilmez.",
+      "createdAt": "Oluşturulma:",
+      "lastUsed": "Son kullanım:",
+      "neverUsed": "Henüz kullanılmadı",
+      "revokeOneLabel": "\"{name}\" anahtarını iptal et",
+      "revokeAll": "Tüm anahtarları iptal et",
+      "confirmOneTitle": "\"{name}\" anahtarı iptal edilsin mi?",
+      "confirmAllTitle": "Tüm anahtarlar iptal edilsin mi?",
+      "confirmBody": "Bu işlem geri alınamaz. Bu anahtarları kullanan entegrasyonlar erişimini hemen kaybeder.",
+      "confirm": "İptal et",
+      "cancel": "Vazgeç",
+      "revoking": "İptal ediliyor…",
+      "error": {
+        "forbidden": "API anahtarlarını yalnızca kurum sahibi veya yöneticisi iptal edebilir.",
+        "failed": "Anahtar iptal edilemedi. Lütfen tekrar deneyin."
+      }
+    }
+  },
+  "adminTenants": {
+    "title": "Kiracı Hesapları",
+    "subtitle": "Platformda kayıtlı tüm organizasyonlar ve üye kapasiteleri.",
+    "count": "{count} kayıtlı kiracı",
+    "empty": "Kayıtlı kiracı yok.",
+    "loadError": "Kiracı verisi okunamadı (veritabanına ulaşılamıyor).",
+    "internalBadge": "internal",
+    "columns": {
+      "name": "Kiracı",
+      "slug": "Slug",
+      "country": "Ülke",
+      "orgType": "Kurum tipi",
+      "pic": "PIC",
+      "users": "Kullanıcı",
+      "workspaces": "Çalışma alanı"
+    },
+    "detail": {
+      "back": "Kiracı listesine dön",
+      "currentPlan": "Geçerli plan: {plan}",
+      "provider": "Abonelik kaynağı: {provider}"
+    },
+    "internalPlan": {
+      "title": "İç plan ataması",
+      "hint": "Ödeme olmadan plan verir (yalnız iç test için). Stripe senkronu bu atamayı ezmez. Discover seçmek iç planı geri alır. Not zorunludur ve denetim kaydına yazılır.",
+      "plan": "Plan",
+      "note": "Not (zorunlu)",
+      "notePlaceholder": "Neden? ör. M1 Pro kilidi testi",
+      "submit": "Ata",
+      "history": "Atama geçmişi",
+      "historyEmpty": "Bu kiracıya henüz iç plan atanmadı.",
+      "change": "{before} → {after}",
+      "by": "Yapan: {actor}",
+      "outcome": {
+        "assigned": "İç plan atandı.",
+        "revoked": "İç plan geri alındı; kiracı Discover'a döndü.",
+        "unchanged": "Değişiklik yok: kiracı zaten bu planda."
+      }
+    },
+    "errors": {
+      "LIVE_PROVIDER_SUBSCRIPTION": "Kiracının canlı bir ücretli aboneliği, pilotu ya da sözleşmesi var; önce onu sonlandırın.",
+      "NOTE_REQUIRED": "Not zorunlu.",
+      "TRIAL_PROTECTED": "Kiracı Stripe aboneliği olmayan bir deneme süresinde (ör. beta); iç plan atanamaz. Önce denemeyi sonlandırın.",
+      "PLATFORM_ADMIN_REQUIRED": "Bu işlem için platform yöneticisi olmanız gerekiyor.",
+      "INVALID_INPUT": "Geçersiz seçim.",
+      "UNKNOWN": "İşlem tamamlanamadı. Tekrar deneyin."
+    }
+  },
+  "partnersPage": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbCurrent": "Ortak Arama & CORDIS / Interreg (M1/M8)",
+    "title": "M1 Partner Intelligence Database & CORDIS Ortak Arama",
+    "subtitle": "Avrupa Komisyonu CORDIS (Horizon Europe & H2020) ve keep.eu Interreg (IPA Sınır Ötesi) fonlanmış verilerinden türetilen Avrupalı ve Türk kurumların geçmiş proje deneyimleri, koordinatörlük başarıları, AB katkıları ve ortaklık ağı.",
+    "sourceBadge": "Kaynak: CORDIS & keep.eu, Avrupa Komisyonu",
+    "attribution": "Veri kaynakları: CORDIS, Avrupa Komisyonu (CC BY 4.0); keep.eu, Interact (Interreg). Yalnızca iç arama ve ön değerlendirme amaçlıdır.",
+    "activeFilters": "Aktif Filtreler:",
+    "interregPartnersTag": "Interreg Ortakları",
+    "smeBadge": "KOBİ",
+    "dbUnavailableTitle": "Ortak veritabanı şu anda okunamadı.",
+    "dbUnavailableBody": "Aşağıdaki liste eksik olabilir. Sorun kaydedildi; lütfen birazdan tekrar deneyin.",
+    "pageShowing": "Sayfa 1 / Gösteriliyor",
+    "colPic": "PIC Kodu",
+    "colName": "Kurum Adı",
+    "colCountry": "Ülke",
+    "colType": "Kurum Türü",
+    "colProjects": "Toplam Proje",
+    "colCoordinations": "Koordinatörlük",
+    "colGrant": "AB Desteği (€)",
+    "interregParticipantTitle": "Interreg / Sınır Ötesi İşbirliği Programı Katılımcısı",
+    "emptyInterreg": "Aradığınız kriterlere uygun Interreg ortağı bulunamadı.",
+    "emptyCordis": "Aradığınız kriterlere uygun CORDIS ortağı bulunamadı.",
+    "emptyHint": "Arama kriterlerinizi değiştirebilir veya filtreleri temizleyebilirsiniz.",
+    "filterNameLabel": "Kurum Adı veya Anahtar Kelime",
+    "filterNamePlaceholder": "Örn: METU, Fraunhofer, Lomartov, TUBITAK...",
+    "filterCountryLabel": "Ülke Kodu",
+    "filterTypeLabel": "Kurum Tipi",
+    "filterTypeAll": "Tüm Tipler",
+    "filterMinLabel": "Min. Proje Sayısı",
+    "filterMinAny": "Tümü",
+    "filterTurkishOnly": "Sadece Türk Kuruluşları Göster",
+    "filterInterregOnly": "Sadece Interreg Ortakları (Üniversiteler, Belediyeler, Ajanslar)",
+    "clearFilters": "Filtreleri Temizle",
+    "filterSubmit": "Filtrele & Ara",
+    "minProjectsTag": "Min. {count} Proje",
+    "minProjectsOption": "≥ {count} Proje",
+    "foundInterreg": "Toplam {count} Interreg Ortak Profili Bulundu",
+    "foundAll": "Toplam {count} Ortak Profili Bulundu",
+    "turkishOnlyTag": "Türk Kuruluşlar",
+    "filterCountryPlaceholder": "Örn: TR, DE, FR, ES...",
+    "activityTypeHES": "HES (Yükseköğretim / Üniversite)",
+    "activityTypeREC": "REC (Araştırma)",
+    "activityTypePRC": "PRC (Özel Şirket)",
+    "activityTypePUB": "PUB (Kamu Kurumu)",
+    "activityTypeOTH": "OTH (Diğer)",
+    "chipSearch": "Arama: \"{query}\"",
+    "chipCountry": "Ülke: {country}",
+    "chipType": "Tip: {type}"
   }
 }

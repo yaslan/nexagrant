@@ -19,6 +19,10 @@ import { presentIds, requireId } from './helpers/teardown-guard';
  * bodies are real. Runs as the app's own BYPASSRLS role (`assertAppOwnerRole`):
  * the guard under test is the action's own `tenantId` filter; the RLS policy
  * behind it is measured by `pnpm rls:verify`.
+ *
+ * The module gate is real too (TASK-MVC9MCXKVMDN7): both tenants sit on `basic`,
+ * which sells M5, with M5 switched `ON`. The last case turns M5 `OFF` and reads
+ * the table to prove nothing was written.
  */
 
 const s = vi.hoisted(() => ({ session: null as Record<string, unknown> | null }));
@@ -85,6 +89,11 @@ describe.skipIf(!dbReachable)('approvals: four-eyes rules against the database',
     const b = await prisma.tenant.create({ data: { name: `${TAG} b`, slug: `${TAG}-b`, country: 'TR' } });
     fx.tenantId = a.id;
     fx.otherTenantId = b.id;
+    // The Approval Centre is M5: sold by `basic`, switched on here.
+    for (const tenantId of [a.id, b.id]) {
+      await prisma.subscription.create({ data: { tenantId, planId: 'basic', status: 'ACTIVE' } });
+      await prisma.moduleState.create({ data: { tenantId, moduleId: 'M5', status: 'ON', changedBy: TAG } });
+    }
     for (const who of Object.keys(ROLE_OF) as Who[]) {
       const u = await prisma.user.create({ data: { email: `${who}@${TAG}.test`, name: `${TAG} ${who}` } });
       fx.users[who] = u.id;
@@ -288,5 +297,39 @@ describe.skipIf(!dbReachable)('approvals: four-eyes rules against the database',
     as('requester'); // WRITER: may request, may not approve
     await expect(approvals.approveRequestAction(id)).rejects.toMatchObject({ digest: 'FORBIDDEN_ROLE' });
     expect((await row(id))?.status).toBe('PENDING');
+  });
+
+  test('M5 OFF: every action is refused by the module gate and nothing is written', async () => {
+    const tenantId = requireId(fx.tenantId, 'tenantId');
+    const mine = await open('requester');
+    const theirs = await open('owner1');
+    const setM5 = (status: 'ON' | 'OFF') =>
+      prisma.moduleState.update({ where: { tenantId_moduleId: { tenantId, moduleId: 'M5' } }, data: { status } });
+
+    await setM5('OFF');
+    try {
+      const before = await tenantRowCount();
+      const refused = { digest: 'MODULE_ACCESS_DENIED' };
+
+      as('requester');
+      await expect(
+        approvals.submitApprovalRequestAction({ actionType: 'BUDGET_ALLOCATION', title: `${TAG} off`, payload: {} })
+      ).rejects.toMatchObject(refused);
+      await expect(approvals.cancelRequestAction(mine)).rejects.toMatchObject(refused);
+      as('admin');
+      await expect(approvals.approveRequestAction(mine)).rejects.toMatchObject(refused);
+      await expect(approvals.rejectRequestAction(theirs, 'kapalı modül')).rejects.toMatchObject(refused);
+
+      expect(await tenantRowCount()).toBe(before);
+      expect(await row(mine)).toMatchObject({ status: 'PENDING', approverId: null });
+      expect(await row(theirs)).toMatchObject({ status: 'PENDING', approverId: null, rejectionReason: null });
+      expect((await auditOf(mine)).map((e) => e.type)).toEqual(['approval.requested']);
+    } finally {
+      await setM5('ON');
+    }
+
+    // Switched back on, the same request goes through: the refusal was the gate.
+    as('admin');
+    expect((await approvals.approveRequestAction(mine)).ok).toBe(true);
   });
 });

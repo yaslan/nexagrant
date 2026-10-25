@@ -125,6 +125,8 @@ export const SANITISERS: Readonly<Record<string, string>> = {
   mailFailureCode: 'src/lib/email/mailer',
   // src/app/[locale]/admin/billing/plans/actions.test.ts: a PLAN_FAILURE_CODES entry.
   planFailureCode: 'src/app/[locale]/admin/billing/plans/failure-codes',
+  // src/app/[locale]/admin/tenants/actions.test.ts: a TENANT_FAILURE_CODES entry.
+  tenantFailureCode: 'src/app/[locale]/admin/tenants/failure-codes',
 };
 
 /** Reads a repo-relative file, or `undefined` when there is none. */

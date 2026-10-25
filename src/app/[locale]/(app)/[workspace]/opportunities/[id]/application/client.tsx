@@ -211,13 +211,13 @@ export function ApplicationClient({
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-blue-400 font-semibold tracking-wider uppercase mb-1">
               <FileCheck className="w-4 h-4 text-blue-400" />
-              <span>Modül 11 — Full Application Production</span>
+              <span>{t('eyebrow')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              Part A & Part B Başvuru Üretim Paneli
+              {t('title')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              Teklif: <strong className="text-slate-200">{opportunityTitle}</strong>
+              {t.rich('proposal', { title: opportunityTitle, strong: (chunks) => <strong className="text-slate-200">{chunks}</strong> })}
             </p>
           </div>
 
@@ -228,12 +228,12 @@ export function ApplicationClient({
               rel="noreferrer"
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 py-1.5 rounded-xl transition text-xs shadow-md flex items-center gap-1.5"
             >
-              <span>Part B (.docx) Şablonu İndir</span>
+              <span>{t('downloadPartB')}</span>
             </a>
 
             <span className="text-xs bg-slate-800 border border-slate-700 text-emerald-400 px-3 py-1.5 rounded-full font-mono font-bold flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Part A & B Aktif</span>
+              <span>{t('partsActive')}</span>
             </span>
           </div>
         </div>
@@ -241,31 +241,31 @@ export function ApplicationClient({
         {/* Top Summary Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs">
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Toplam Konsorsiyum Eforu</span>
+            <span className="text-muted block text-[11px]">{t('summary.effort')}</span>
             <span className="text-xl font-bold text-white font-mono mt-0.5 block">
-              {totalPersonMonths} <span className="text-xs text-muted">Kişi-Ay (PM)</span>
+              {totalPersonMonths} <span className="text-xs text-muted">{t('summary.personMonths')}</span>
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Toplam Bütçe (Lump Sum)</span>
+            <span className="text-muted block text-[11px]">{t('summary.budget')}</span>
             <span className="text-xl font-bold text-emerald-400 font-mono mt-0.5 block">
-              €{totalRequestedBudget.toLocaleString()}
+              €{totalRequestedBudget.toLocaleString(locale)}
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">İş Paketi Sayısı</span>
+            <span className="text-muted block text-[11px]">{t('summary.wpCount')}</span>
             <span className="text-xl font-bold text-white font-mono mt-0.5 block">
-              {workPackages.length} <span className="text-xs text-muted">İş Paketi (WP)</span>
+              {workPackages.length} <span className="text-xs text-muted">{t('summary.wpUnit')}</span>
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Sayfa Limiti Kontrolü</span>
+            <span className="text-muted block text-[11px]">{t('summary.pageLimit')}</span>
             <span className="text-xs font-bold font-mono mt-1 flex items-center gap-1.5 text-blue-300">
               <FileText className="w-3.5 h-3.5 text-blue-400" />
-              RIA/IA Limit: 45 Sayfa
+              {t('summary.pageLimitValue')}
             </span>
           </div>
         </div>
@@ -282,7 +282,7 @@ export function ApplicationClient({
           }`}
         >
           <Sparkles className="w-4 h-4 text-blue-600" />
-          <span>Part B (Çoklu Yazar İşbirlikçi Metin Editörü)</span>
+          <span>{t('tabs.partBEditor')}</span>
         </button>
 
         <button
@@ -294,7 +294,7 @@ export function ApplicationClient({
           }`}
         >
           <Euro className="w-4 h-4" />
-          <span>Part A (İdari & Lump-Sum Bütçe)</span>
+          <span>{t('tabs.partA')}</span>
         </button>
 
         <button
@@ -306,7 +306,7 @@ export function ApplicationClient({
           }`}
         >
           <BarChart3 className="w-4 h-4" />
-          <span>Part B (Gantt Şeması & İş Paketleri)</span>
+          <span>{t('tabs.gantt')}</span>
         </button>
 
         <button
@@ -318,7 +318,7 @@ export function ApplicationClient({
           }`}
         >
           <FileCheck className="w-4 h-4" />
-          <span>Gönderim Kontrol Listesi</span>
+          <span>{t('tabs.checklist')}</span>
         </button>
       </div>
 
@@ -344,10 +344,10 @@ export function ApplicationClient({
               <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white rounded-2xl p-5 shadow-sm border border-indigo-800 space-y-3">
                 <div className="flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-indigo-400" />
-                  <h3 className="font-bold text-sm text-white">Ortak Katkı Portalı (Magic Link)</h3>
+                  <h3 className="font-bold text-sm text-white">{t('portal.title')}</h3>
                 </div>
                 <p className="text-[11px] text-slate-300">
-                  Dış konsorsiyum ortakları şifre gerekmeksizin aşağıdaki güvenli bağlantıyla kendi kurum ve bütçe verilerini girebilir:
+                  {t('portal.intro')}
                 </p>
 
                 {portalLink ? (
@@ -359,18 +359,18 @@ export function ApplicationClient({
                         className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-[11px] font-semibold shrink-0 flex items-center gap-1"
                       >
                         {copiedToken ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedToken ? 'Kopyalandı' : 'Kopyala'}</span>
+                        <span>{copiedToken ? t('portal.copied') : t('portal.copy')}</span>
                       </button>
                     </div>
                     <p className="text-[11px] text-amber-200">
-                      Bu bağlantı yalnız şimdi gösterilir; güvenlik için saklanmaz. Şimdi kopyalayıp ortağınıza iletin.
+                      {t('portal.shownOnce')}
                     </p>
                   </>
                 ) : (
                   <p className="text-[11px] text-slate-300">
                     {hasPortalLink
-                      ? 'Bir bağlantı daha önce oluşturuldu ve güvenlik için yeniden gösterilemez. Yeni bağlantı oluşturursanız eskisi çalışmaz.'
-                      : 'Henüz bağlantı oluşturulmadı.'}
+                      ? t('portal.issuedBefore')
+                      : t('portal.none')}
                   </p>
                 )}
                 <button
@@ -379,7 +379,7 @@ export function ApplicationClient({
                   className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg transition text-[11px] font-semibold flex items-center gap-1"
                 >
                   <LinkIcon className="w-3.5 h-3.5" />
-                  <span>{hasPortalLink ? 'Yeni bağlantı oluştur' : 'Bağlantı oluştur'}</span>
+                  <span>{hasPortalLink ? t('portal.reissue') : t('portal.issue')}</span>
                 </button>
                 {linkError && (
                   <p className="text-[11px] text-red-300" role="alert">{linkError}</p>
@@ -391,17 +391,17 @@ export function ApplicationClient({
             <div className="bg-surface rounded-2xl p-5 border border-border shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b pb-3">
                 <Euro className="w-4 h-4 text-blue-600" />
-                <h3 className="font-bold text-sm text-ink">Lump-Sum Bütçe Kalemi Ekle</h3>
+                <h3 className="font-bold text-sm text-ink">{t('budget.addTitle')}</h3>
               </div>
 
               <form onSubmit={handleAddBudget} className="space-y-3 text-xs">
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Ortak Kurum Adı</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('budget.partnerName')}</label>
                   <input
                     type="text"
                     value={partnerName}
                     onChange={(e) => setPartnerName(e.target.value)}
-                    placeholder="Örn: METU TTO, Fraunhofer Institute"
+                    placeholder={t('budget.partnerNamePlaceholder')}
                     required
                     className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground"
                   />
@@ -409,7 +409,7 @@ export function ApplicationClient({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Efor (Person-Months)</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('budget.effort')}</label>
                     <input
                       type="number"
                       min="1"
@@ -420,22 +420,22 @@ export function ApplicationClient({
                   </div>
 
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Ülke Katsayısı</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('budget.countryCoef')}</label>
                     <select
                       value={countryCoef}
                       onChange={(e) => setCountryCoef(e.target.value)}
                       className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground font-mono"
                     >
-                      <option value="1.0">1.00 (Standard EU)</option>
-                      <option value="0.85">0.85 (Türkiye / SEE)</option>
-                      <option value="1.2">1.20 (High-Cost North)</option>
+                      <option value="1.0">{t('budget.coefStandard')}</option>
+                      <option value="0.85">{t('budget.coefSee')}</option>
+                      <option value="1.2">{t('budget.coefNorth')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Seyahat (€)</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('budget.travel')}</label>
                     <input
                       type="number"
                       value={travel}
@@ -445,7 +445,7 @@ export function ApplicationClient({
                   </div>
 
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">Alt Yüklenici (€)</label>
+                    <label className="font-semibold text-ink-2 block mb-1">{t('budget.subcontracting')}</label>
                     <input
                       type="number"
                       value={subcontracting}
@@ -461,7 +461,7 @@ export function ApplicationClient({
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 text-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{isAddingBudget ? 'Hesaplanıyor...' : 'Bütçe Kalemini Kaydet'}</span>
+                  <span>{isAddingBudget ? t('budget.calculating') : t('budget.save')}</span>
                 </button>
                 {budgetError && (
                   <p role="alert" className="text-xs font-semibold text-bad">{budgetError}</p>
@@ -473,9 +473,9 @@ export function ApplicationClient({
           {/* Right Column: Partner Lump-Sum Budget Breakdown Table (7 cols) */}
           <div className="lg:col-span-7 space-y-4">
             <h3 className="font-bold text-sm text-ink flex items-center justify-between">
-              <span>Konsorsiyum Lump-Sum Bütçe Tablosu</span>
+              <span>{t('budget.tableTitle')}</span>
               <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                Standart %25 Genel Gider Dahil
+                {t('budget.overhead')}
               </span>
             </h3>
 
@@ -483,20 +483,20 @@ export function ApplicationClient({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-ground border-b border-border text-ink-2 font-bold uppercase tracking-wider text-[11px]">
-                    <th className="p-3.5">Ortak Kurum</th>
-                    <th className="p-3.5">Kişi-Ay (PM)</th>
-                    <th className="p-3.5">Ülke Kat.</th>
-                    <th className="p-3.5 text-right">Talep Edilen (€)</th>
+                    <th className="p-3.5">{t('budget.colPartner')}</th>
+                    <th className="p-3.5">{t('summary.personMonths')}</th>
+                    <th className="p-3.5">{t('budget.colCoef')}</th>
+                    <th className="p-3.5 text-right">{t('budget.colRequested')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {budgetLines.map((b, idx) => (
                     <tr key={idx} className="hover:bg-ground/80 transition-colors">
                       <td className="p-3.5 font-bold text-ink">{b.partnerName}</td>
-                      <td className="p-3.5 font-mono text-ink-2">{b.personMonths} PM</td>
+                      <td className="p-3.5 font-mono text-ink-2">{b.personMonths} {t('summary.pmUnit')}</td>
                       <td className="p-3.5 font-mono text-muted">{b.countryCoefficient || 1.0}</td>
                       <td className="p-3.5 text-right font-mono font-bold text-ink">
-                        €{Number(b.requestedTotal).toLocaleString()}
+                        €{Number(b.requestedTotal).toLocaleString(locale)}
                       </td>
                     </tr>
                   ))}
@@ -504,17 +504,17 @@ export function ApplicationClient({
                   {budgetLines.length === 0 && (
                     <tr>
                       <td colSpan={4} className="p-8 text-center text-muted">
-                        Henüz bütçe satırı eklenmedi. Aşağıdaki formdan ortak ekleyin.
+                        {t('budget.empty')}
                       </td>
                     </tr>
                   )}
 
                   <tr className="bg-slate-900 text-white font-bold">
-                    <td className="p-3.5">TOPLAM KONSORSİYUM</td>
-                    <td className="p-3.5 font-mono">{totalPersonMonths} PM</td>
+                    <td className="p-3.5">{t('budget.total')}</td>
+                    <td className="p-3.5 font-mono">{totalPersonMonths} {t('summary.pmUnit')}</td>
                     <td className="p-3.5">-</td>
                     <td className="p-3.5 text-right font-mono text-emerald-400 text-sm">
-                      €{totalRequestedBudget.toLocaleString()}
+                      €{totalRequestedBudget.toLocaleString(locale)}
                     </td>
                   </tr>
                 </tbody>
@@ -533,10 +533,10 @@ export function ApplicationClient({
               <div>
                 <h3 className="font-bold text-base text-ink flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <span>Proje Gantt Şeması & İş Paketi Zaman Çizelgesi (M1 - M36)</span>
+                  <span>{t('gantt.title')}</span>
                 </h3>
                 <p className="text-muted text-xs mt-1">
-                  Horizon Europe Part B Section 3.1 İş Paketi (WP) başlangıç ve bitiş ayları.
+                  {t('gantt.subtitle')}
                 </p>
               </div>
             </div>
@@ -561,7 +561,7 @@ export function ApplicationClient({
 
               {workPackages.length === 0 && (
                 <div className="p-8 text-center text-xs text-muted">
-                  Henüz iş paketi tanımlanmadı. Aşağıdaki formdan WP ekleyin.
+                  {t('gantt.empty')}
                 </div>
               )}
 
@@ -581,7 +581,7 @@ export function ApplicationClient({
                         <span>{wp.title}</span>
                       </div>
                       <span className="text-muted text-[11px] font-mono">
-                        Lider: <strong>{wp.leadPartner}</strong> (Ay M{wp.startMonth} - M{wp.endMonth})
+                        {t.rich('gantt.lead', { lead: wp.leadPartner, start: wp.startMonth, end: wp.endMonth, strong: (chunks) => <strong>{chunks}</strong> })}
                       </span>
                     </div>
 
@@ -604,13 +604,13 @@ export function ApplicationClient({
           <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-4 max-w-xl">
             <h3 className="font-bold text-sm text-ink flex items-center gap-2 border-b pb-3">
               <Plus className="w-4 h-4 text-blue-600" />
-              <span>Yeni İş Paketi (WP) Ekle</span>
+              <span>{t('gantt.addTitle')}</span>
             </h3>
 
             <form onSubmit={handleAddWp} className="space-y-3 text-xs">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">WP Kodu</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('gantt.code')}</label>
                   <input
                     type="text"
                     value={wpCode}
@@ -620,7 +620,7 @@ export function ApplicationClient({
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="font-semibold text-ink-2 block mb-1">WP Başlığı</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('gantt.wpTitle')}</label>
                   <input
                     type="text"
                     value={wpTitle}
@@ -633,7 +633,7 @@ export function ApplicationClient({
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Lider Kurum</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('gantt.leadOrg')}</label>
                   <input
                     type="text"
                     value={wpLead}
@@ -644,7 +644,7 @@ export function ApplicationClient({
                 </div>
 
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Başlangıç (Ay)</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('gantt.start')}</label>
                   <input
                     type="number"
                     min="1"
@@ -656,7 +656,7 @@ export function ApplicationClient({
                 </div>
 
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Bitiş (Ay)</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('gantt.end')}</label>
                   <input
                     type="number"
                     min="1"
@@ -674,7 +674,7 @@ export function ApplicationClient({
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-2 text-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>İş Paketini Gantt Şemasına Ekle</span>
+                <span>{t('gantt.add')}</span>
               </button>
               {wpError && (
                 <p role="alert" className="text-xs font-semibold text-bad">{wpError}</p>
@@ -690,20 +690,20 @@ export function ApplicationClient({
           <div>
             <h2 className="text-base font-bold text-ink flex items-center gap-2">
               <FileCheck className="w-5 h-5 text-blue-600" />
-              <span>Resmî Gönderim Öncesi Kontrol Listesi (Submission Readiness)</span>
+              <span>{t('checklist.title')}</span>
             </h2>
             <p className="text-muted text-xs mt-1">
-              European Funding & Tenders portalına yükleme yapmadan önce zorunlu kriterleri doğrulayın.
+              {t('checklist.subtitle')}
             </p>
           </div>
 
           <div className="space-y-3 text-xs">
             {[
-              { title: 'Part A İdari Kurum Formları', desc: 'Tüm konsorsiyum ortaklarının PIC numaraları ve finansal temsilcileri doğrulandı.', status: true },
-              { title: 'Part B Sayfa Limiti Uyum Kontrolü', desc: 'RIA/IA projeleri için azami 45 sayfa sınırı aşılmadı (Mevcut: ~38 Sayfa).', status: true },
-              { title: 'Cinsiyet Eşitliği Planı (Gender Equality Plan - GEP)', desc: 'Kamu ve üniversite ortaklarının onaylı GEP belgeleri yüklendi.', status: true },
-              { title: 'Açık Bilim ve Veri Yönetimi Planı (FAIR Data)', desc: 'Part B 1.2 bölümünde açık erişim yayıncılık taahhüt edildi.', status: true },
-              { title: 'Fikri Mülkiyet (IP) & Arka Plan Hakları', desc: 'Tüm ortakların arka plan patent ve yazılım hakları tanımlandı.', status: true },
+              { title: t('checklist.items.partA.title'), desc: t('checklist.items.partA.desc'), status: true },
+              { title: t('checklist.items.pageLimit.title'), desc: t('checklist.items.pageLimit.desc'), status: true },
+              { title: t('checklist.items.gep.title'), desc: t('checklist.items.gep.desc'), status: true },
+              { title: t('checklist.items.fair.title'), desc: t('checklist.items.fair.desc'), status: true },
+              { title: t('checklist.items.ip.title'), desc: t('checklist.items.ip.desc'), status: true },
             ].map((chk, idx) => (
               <div key={idx} className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 flex items-start gap-3 text-emerald-950">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />

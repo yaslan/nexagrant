@@ -21,7 +21,7 @@ Bağlam: `docs/EFATURA_SETUP.md` · Kart: `TASK-MTRJSOWFH6B45`
 
 Merhaba,
 
-FonBridge Ltd. Şti. olarak abonelik tabanlı bir yazılım hizmeti sunuyoruz ve
+Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. olarak abonelik tabanlı bir yazılım hizmeti sunuyoruz ve
 e-Fatura gönderimi için özel entegratör hizmeti almayı değerlendiriyoruz.
 
 Kısa bağlam:
@@ -72,7 +72,7 @@ Cevaplarınızı yazılı olarak iletmeniz bizim için yeterli; ardından teknik
 kısa bir görüşme talep edebilir.
 
 İyi çalışmalar,
-Dr. Yasin ASLAN · FonBridge Ltd. Şti.
+Dr. Yasin ASLAN · Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.
 bilgi@fonbridge.com · 0533 461 55 95
 
 ---

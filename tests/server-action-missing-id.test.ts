@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   evidenceFindFirst: vi.fn(),
   evidenceDeleteMany: vi.fn(),
   apiKeyDeleteMany: vi.fn(),
+  auditEventCreate: vi.fn(),
   seatFindFirst: vi.fn(),
   generateSeatCandidates: vi.fn(),
 }));
@@ -27,6 +28,7 @@ vi.mock('@/lib/db', async () => {
   return m.dbModuleStub({
     evidence: { findFirst: h.evidenceFindFirst, deleteMany: h.evidenceDeleteMany },
     apiKey: { deleteMany: h.apiKeyDeleteMany },
+    auditEvent: { create: h.auditEventCreate },
     consortiumSeat: { findFirst: h.seatFindFirst },
   });
 });

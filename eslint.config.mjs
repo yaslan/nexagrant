@@ -16,12 +16,17 @@ const eslintConfig = defineConfig([
     // evidence scripts attached to task reports, and the untracked _workspace/
     // artefact folder. Mirrors the exclusions in vitest.config.mts.
     ".claude/worktrees/**",
+    // A dev worktree nested at the repo root (the main checkout's .claude-fo49);
+    // unignored it added 43 lint errors from someone else's tree.
+    ".claude-fo49/**",
     "docs/agent-results/**",
     "_workspace/**",
     // Output of `pnpm test:e2e` (gitignored): bundled trace viewer JS and
     // screenshots. Lint must not read it; a local run with CI=true writes it.
     "playwright-report/**",
     "test-results/**",
+    // Per-task scratch checkouts (FO-49 review copies); not part of the app.
+    ".claude-fo49/**",
   ]),
   {
     files: ["**/*.ts", "**/*.tsx"],

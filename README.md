@@ -25,17 +25,19 @@ cp .env.example .env           # prisma, vitest ve docker compose .env'i okur (.
 perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env   # boş AUTH_SECRET'i doldurur
 docker compose config -q       # rc=0 olmalı; AUTH_SECRET boşsa burada düşer
 docker compose up -d --wait    # postgres+pgvector (:5433), redis (:6379), mailpit (smtp :1025, arayüz :8025)
-pnpm install && pnpm db:generate
-pnpm exec prisma db push       # boş DB'de temel tablolar (migration'lar bunları kurmaz)
-pnpm db:rls-role               # fabrika_app rolü; yoksa parolayı üretip DATABASE_URL_RLS_TEST'i .env'e ekler, varsa yalnız doğrular (parola değiştirmez)
-DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' .env)" scripts/apply-migrations.sh   # host'ta psql ister
-pnpm db:rls && pnpm db:seed
+pnpm install
+pnpm db:setup                  # boş DB'yi CI sırasıyla kurar (scripts/db-setup.sh); host'ta psql ister, tekrar koşulabilir
 pnpm dev                       # Next.js :3000
 pnpm test                      # .env'i vitest.config.mts kendisi yükler; `source .env` gerekmez
 ```
 
-- **Kurulum sırası CI ile aynı** (`.github/workflows/ci.yml` "Prepare database"). `pnpm db:migrate`
-  (`prisma migrate dev`) boş DB'de **çalışmaz**: `prisma/migrations` temel tabloları kurmaz,
+- **Yerel görsel yükleme (blog kapağı):** `pnpm storage:up` MinIO'yu `storage` profilinde kaldırır (API :9000, konsol :9001) ve
+  iki bucket'ı kurar: `fabrika` (özel) ve `fabrika-public` (anonim okuma). Tekrar çalıştırmak güvenlidir. Uygulamanın görmesi için
+  `.env.local`'a `R2_ENDPOINT=http://localhost:9000`, `R2_REGION=us-east-1`, `R2_ACCESS_KEY_ID=minioadmin`,
+  `R2_SECRET_ACCESS_KEY=minioadmin`, `R2_BUCKET=fabrika`, `R2_PUBLIC_BUCKET=fabrika-public`,
+  `R2_PUBLIC_HOST=http://localhost:9000/fabrika-public` ekleyin, sonra `pnpm dev`'i yeniden başlatın. Yalnız geliştirme için; canlıda R2 ya da Supabase Storage kullanılır.
+- **Kurulum sırası CI ile aynı**: CI "Prepare database" de `pnpm db:setup` çağırır. `pnpm db:migrate`
+  (`prisma migrate dev`) ve `prisma migrate deploy` bu depoda kullanılmaz; `prisma.config.ts` onları hiçbir şey uygulamadan durdurur. Neden: `prisma/migrations` temel tabloları kurmaz,
   `db push` üstüne yazılmış ek dosyalardır (`add-m10-dual-approval-persistence` → `relation
   "FollowupDoc" does not exist`). `db:rls-role` `db:rls`'ten önce gelmeli. `apply-migrations.sh`
   host'ta `psql` ister (macOS: `brew install libpq`); `PSQL=` ile başka ikili verilebilir.

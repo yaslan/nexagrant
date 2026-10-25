@@ -16,24 +16,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
   auth: vi.fn(),
-  moduleStateFindUnique: vi.fn(),
+  moduleStateFindMany: vi.fn(),
   getEntitlements: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ auth: h.auth }));
 
 vi.mock('@/lib/db', () => ({
-  prisma: { moduleState: { findUnique: h.moduleStateFindUnique } },
-  // The gate reads its ModuleState row inside a tenant scope as of
-  // TASK-MTVR9T834EPUC. `as never` hands the fake client to a callback typed
+  prisma: { moduleState: { findMany: h.moduleStateFindMany } },
+  // The gate reads the tenant's ModuleState rows inside a tenant scope as of
+  // TASK-MTVR9T834EPUC, all of them since TASK-MVBEM10PJYU0E (one read per
+  // request, shared with the app shell's menu). `as never` hands the fake client to a callback typed
   // against the real TenantTx without widening either side to `any`.
   withTenant: async <T,>(_tenantId: string, cb: (tx: never) => Promise<T> | T) =>
-    cb({ moduleState: { findUnique: h.moduleStateFindUnique } } as never),
+    cb({ moduleState: { findMany: h.moduleStateFindMany } } as never),
 }));
 
 vi.mock('@/lib/billing', () => ({ getEntitlements: h.getEntitlements }));
 
 import { checkModuleAccess, assertModuleAccess, ModuleAccessError } from '@/lib/modules/access';
+import { getAllManifests } from '@/lib/modules/registry';
 
 /** A plain tenant member — no platform-admin or manager bypass in play. */
 const SESSION = {
@@ -47,11 +49,14 @@ const SESSION = {
 /** Everything a `pro` tenant is entitled to, per PLAN_GRANTS. M10 is not in it. */
 const PRO_MODULES = ['M1', 'M2', 'M3', 'M4', 'M5', 'M8'];
 
+/** Every module at `status`; `null` is a tenant with no ModuleState rows at all. */
+function rowsAt(status: string | null) {
+  return status === null ? [] : getAllManifests().map((m) => ({ moduleId: m.id, status }));
+}
+
 function arrange(opts: { status: string | null; allowedModules: string[] }) {
   h.auth.mockResolvedValue(SESSION);
-  h.moduleStateFindUnique.mockResolvedValue(
-    opts.status === null ? null : { status: opts.status },
-  );
+  h.moduleStateFindMany.mockResolvedValue(rowsAt(opts.status));
   h.getEntitlements.mockResolvedValue({
     allowedModules: opts.allowedModules,
     seats: 6,
@@ -116,7 +121,7 @@ describe('checkModuleAccess — plan entitlement and module status together', ()
 
   it('binds a platform admin too: entitlement is not a status bypass', async () => {
     h.auth.mockResolvedValue({ ...SESSION, isPlatformAdmin: true, role: 'TENANT_OWNER' });
-    h.moduleStateFindUnique.mockResolvedValue({ status: 'ON' });
+    h.moduleStateFindMany.mockResolvedValue(rowsAt('ON'));
     h.getEntitlements.mockResolvedValue({
       allowedModules: PRO_MODULES,
       seats: 6,
@@ -136,9 +141,9 @@ describe('checkModuleAccess — plan entitlement and module status together', ()
     await checkModuleAccess('M8');
 
     expect(h.getEntitlements).toHaveBeenCalledWith('tenant-1', expect.any(Object));
-    expect(h.moduleStateFindUnique).toHaveBeenCalledWith({
-      where: { tenantId_moduleId: { tenantId: 'tenant-1', moduleId: 'M8' } },
-      select: { status: true },
+    expect(h.moduleStateFindMany).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1' },
+      select: { moduleId: true, status: true },
     });
   });
 });

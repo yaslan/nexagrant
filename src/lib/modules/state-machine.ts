@@ -7,6 +7,27 @@ export interface CanEnableResult {
   missingDependencies?: ModuleId[];
 }
 
+const COMING_SOON_REASON = 'Module is coming soon.';
+
+/**
+ * A "Yakında" (`statusBadge: 'soon'`) module has no gate that opens it. Every
+ * path that switches one on is refused here (FO-40): the enable checks below and
+ * the admin write in `updateTenantModuleStatus`.
+ */
+export function isComingSoon(moduleId: ModuleId): boolean {
+  return getManifest(moduleId)?.statusBadge === 'soon';
+}
+
+/**
+ * The refusal for an admin write of `targetStatus` to a module, or `null` when
+ * the write may go ahead. `OFF` closes a module, so it is always allowed; `ON`,
+ * `PILOT` and `DEV` open one, so a `soon` module is refused.
+ */
+export function adminStatusRefusal(moduleId: ModuleId, targetStatus: ModuleStatus): string | null {
+  if (targetStatus !== 'OFF' && isComingSoon(moduleId)) return COMING_SOON_REASON;
+  return null;
+}
+
 /**
  * Checks if a module can be enabled based on its dependencies and the current plan tier.
  */
@@ -18,6 +39,9 @@ export function canEnable(
   const manifest = getManifest(moduleId);
   if (!manifest) {
     return { allowed: false, reason: 'Module not found.' };
+  }
+  if (isComingSoon(moduleId)) {
+    return { allowed: false, reason: COMING_SOON_REASON };
   }
 
   // Check plan constraint
@@ -57,6 +81,11 @@ export function canEnableEntitled(
   const manifest = getManifest(moduleId);
   if (!manifest) {
     return { allowed: false, reason: 'Module not found.' };
+  }
+  // A "Yakında" module has no gate that opens it: the plan list and the switch
+  // are not enough, so it is refused before either is read (FO-40).
+  if (isComingSoon(moduleId)) {
+    return { allowed: false, reason: COMING_SOON_REASON };
   }
 
   if (!entitledModules.includes(moduleId)) {
@@ -110,15 +139,36 @@ export function getDisableCascade(
 // ─────────────────────────── Status → access decision ────────────────────────────
 
 /**
- * Who is asking. Both fields come from the session (`tenantScopeOf`), never from
- * a client argument — a server action is a public POST endpoint.
+ * A viewer built from a signed-in session (`tenantScopeOf`). Both fields come from
+ * the session, never from a client argument — a server action is a public POST
+ * endpoint. `isMachine` is `never`, so no session value can carry the machine flag:
+ * `{ ...session, isMachine: true }` is refused wherever a `ModuleViewer` is taken.
  */
-export interface ModuleViewer {
+export interface SessionViewer {
   /** Tenant role, as stored on `Membership.role`. */
   role: string;
   /** FonBridge staff — the only people a `DEV` module is for. */
   isPlatformAdmin: boolean;
+  isMachine?: never;
 }
+
+/**
+ * A machine audience: an API key acting for a tenant, not a member. It is open
+ * wherever the tenant's managers are (`PILOT`), because a pilot tenant's Partner
+ * API integration must keep working while the pilot runs; it is not staff, so
+ * `DEV` stays closed to it. Only the API-key viewer in src/lib/api-auth.ts builds
+ * one. `kind` is what a session value lacks, so spreading a session with
+ * `isMachine: true` does not make a machine viewer (tests/modules/session-viewer.test.ts).
+ */
+export interface MachineViewer {
+  kind: 'machine';
+  role: string;
+  isPlatformAdmin: boolean;
+  isMachine: true;
+}
+
+/** Who is asking: a session member or an API key. The gate's parameter type. */
+export type ModuleViewer = SessionViewer | MachineViewer;
 
 /**
  * Why access was refused. A stable code rather than a sentence, so the UI can
@@ -136,7 +186,13 @@ export type ModuleDenyReason =
    * `MODULE_OFF`, which says an administrator closed something the tenant owns
    * and can reopen; this one is answered at checkout, not in settings.
    */
-  | 'PLAN_UPGRADE_REQUIRED';
+  | 'PLAN_UPGRADE_REQUIRED'
+  /**
+   * A "Yakında" (`statusBadge: 'soon'`) module: not sold and not built yet, so
+   * neither a plan nor a switch opens it (FO-40). Checked before entitlement,
+   * because "upgrade your plan" would be untrue — no plan includes it.
+   */
+  | 'COMING_SOON';
 
 export interface ModuleAccessDecision {
   allowed: boolean;
@@ -154,7 +210,7 @@ const PILOT_ROLES = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER'];
  *   DEV   → FonBridge staff only. Work in progress; the tenant's own owner is *not*
  *           an insider, which is exactly the case the previous `role === 'TENANT_OWNER'`
  *           test got wrong: every tenant has an owner, so DEV let everyone in.
- *   PILOT → the tenant's managers, plus staff.
+ *   PILOT → the tenant's managers, plus staff, plus the tenant's API keys (machine).
  *   ON    → every member of the tenant.
  *
  * Role-level permissions (`evaluator:write`) and plan entitlement are separate gates
@@ -168,7 +224,7 @@ export function canAccessStatus(
     case 'ON':
       return { allowed: true };
     case 'PILOT':
-      return viewer.isPlatformAdmin || PILOT_ROLES.includes(viewer.role)
+      return viewer.isPlatformAdmin || viewer.isMachine === true || PILOT_ROLES.includes(viewer.role)
         ? { allowed: true }
         : { allowed: false, reason: 'PILOT_MANAGERS_ONLY' };
     case 'DEV':
@@ -191,8 +247,10 @@ export function canAccessStatus(
  *   AVAILABLE → entitled, switched off: the tenant can open it in settings.
  *   LOCKED    → not entitled, never switched on: answered at checkout.
  *   ORPHANED  → switched on but no longer entitled (left behind by a downgrade).
+ *   SOON      → a "Yakında" module: nothing to enable or buy yet (FO-40). One that
+ *               a row still switches on stays ORPHANED, so it can be closed.
  */
-export type ModuleCardStatus = 'ACTIVE' | 'AVAILABLE' | 'LOCKED' | 'ORPHANED';
+export type ModuleCardStatus = 'ACTIVE' | 'AVAILABLE' | 'LOCKED' | 'ORPHANED' | 'SOON';
 
 /**
  * The slice of the settings page's plan view `moduleStatus` reads. Shaped like
@@ -208,6 +266,7 @@ export interface ModuleStatusView {
 export function moduleStatus(moduleId: ModuleId, view: ModuleStatusView): ModuleCardStatus {
   const switchedOn =
     view.activeModules.includes(moduleId) || view.switchedOnOutsidePlan.includes(moduleId);
+  if (isComingSoon(moduleId)) return switchedOn ? 'ORPHANED' : 'SOON';
   if (view.entitledModules.includes(moduleId)) return switchedOn ? 'ACTIVE' : 'AVAILABLE';
   return switchedOn ? 'ORPHANED' : 'LOCKED';
 }

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { SEDIA_RESULT_WINDOW, lastReachablePage } from '@/lib/calls-paging';
 
 interface SediaTopic {
   identifier: string;
@@ -55,6 +56,7 @@ type LoadFailure =
   | { kind: 'sediaUnavailable' } // 503: SEDIA did not answer within the route's budget
   | { kind: 'rateLimited'; seconds: number } // 429: the per-user search limit, with Retry-After
   | { kind: 'badRequest' } // 400: the route rejected a parameter (invalid_limit)
+  | { kind: 'pageOutOfWindow' } // 400 page_out_of_window: the page is past SEDIA's first 10 000 hits
   | { kind: 'network' } // fetch threw: offline, or no answer within CALLS_CLIENT_TIMEOUT_MS
   | { kind: 'unexpected' }; // any other status, or a 200 that is not a list
 
@@ -64,14 +66,15 @@ function retryAfterSeconds(header: string | null): number {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 60;
 }
 
-function failureFromResponse(res: Response): LoadFailure {
+function failureFromResponse(res: Response, error: unknown): LoadFailure {
   switch (res.status) {
     case 503:
       return { kind: 'sediaUnavailable' };
     case 429:
       return { kind: 'rateLimited', seconds: retryAfterSeconds(res.headers.get('Retry-After')) };
     case 400:
-      return { kind: 'badRequest' };
+      // Not a bad filter: the filters are fine, only the page is too deep to read.
+      return error === 'page_out_of_window' ? { kind: 'pageOutOfWindow' } : { kind: 'badRequest' };
     default:
       return { kind: 'unexpected' };
   }
@@ -217,7 +220,8 @@ export default function CallsPage({
       try {
         const res = await fetch(`/api/cagrilar?${query}`, { signal: controller.signal });
         // The status decides the failure, not the body: a proxy's HTML 502 has no JSON to read.
-        const data = res.ok ? await res.json().catch(() => null) : null;
+        // A 400 is ours, and its error code tells a bad filter from a page past the window.
+        const data = res.ok || res.status === 400 ? await res.json().catch(() => null) : null;
         if (cancelled) return;
 
         if (res.ok && data?.success) {
@@ -227,7 +231,7 @@ export default function CallsPage({
         } else {
           setTopics([]);
           setTotalResults(0);
-          setLoadFailure(res.ok ? { kind: 'unexpected' } : failureFromResponse(res));
+          setLoadFailure(res.ok ? { kind: 'unexpected' } : failureFromResponse(res, data?.error));
         }
       } catch (err) {
         if (cancelled) return;
@@ -348,7 +352,10 @@ export default function CallsPage({
     }
   };
 
-  const totalPages = Math.ceil(totalResults / limit) || 1;
+  // SEDIA counts every hit but serves only the first SEDIA_RESULT_WINDOW, so the pager ends
+  // where the route would start answering 400 page_out_of_window.
+  const totalPages = lastReachablePage(totalResults, limit);
+  const pastWindow = totalResults > SEDIA_RESULT_WINDOW;
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return t('notSpecified');
@@ -592,7 +599,14 @@ export default function CallsPage({
             ) : loadFailed ? (
               <span>{t('loadFailedShort')}</span>
             ) : (
-              <span>{t('resultsCount', { count: totalResults, page })}</span>
+              <span>
+                {t('resultsCount', { count: totalResults, page })}
+                {pastWindow && (
+                  <span data-testid="calls-window-note" className="block">
+                    {t('windowNote', { count: SEDIA_RESULT_WINDOW })}
+                  </span>
+                )}
+              </span>
             )}
           </div>
         </div>
@@ -773,7 +787,9 @@ export default function CallsPage({
                   >
                     {loadFailure?.kind === 'rateLimited'
                       ? t('loadErrors.rateLimited', { seconds: loadFailure.seconds })
-                      : t(`loadErrors.${loadFailure?.kind ?? 'unexpected'}`)}
+                      : loadFailure?.kind === 'pageOutOfWindow'
+                        ? t('loadErrors.pageOutOfWindow', { count: SEDIA_RESULT_WINDOW })
+                        : t(`loadErrors.${loadFailure?.kind ?? 'unexpected'}`)}
                   </td>
                 </tr>
               ) : (

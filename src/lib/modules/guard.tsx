@@ -36,6 +36,27 @@ export async function moduleGate(
   const t = await getTranslations({ locale, namespace: 'ModuleGate' });
   const manifest = getManifest(moduleId);
 
+  // A "Yakında" module is not closed, it does not exist yet (FO-40): no lock, no
+  // "ask your administrator" — nobody can open it. Its name is the translated one.
+  if (access.reason === 'COMING_SOON' && manifest) {
+    const tModules = await getTranslations({ locale, namespace: 'modules' });
+    return (
+      <section
+        role="status"
+        data-testid="module-coming-soon"
+        className="max-w-2xl mx-auto sm:px-4 py-16 text-center"
+      >
+        <p className="text-5xl mb-6" aria-hidden="true">
+          ⏳
+        </p>
+        <p className="font-mono text-xs text-muted">{moduleId}</p>
+        <h1 className="mt-1 text-2xl font-semibold text-ink">{tModules(`${manifest.key}.name`)}</h1>
+        <p className="mt-3 text-ink-2">{tModules(`${manifest.key}.tagline`)}</p>
+        <p className="mt-6 text-sm text-muted">{t('comingSoon', { brand: PRODUCT_NAME })}</p>
+      </section>
+    );
+  }
+
   return (
     // A <section>, not a <main>: the workspace layout already renders one, and a
     // nested <main> is invalid HTML and gives screen readers two landmarks.

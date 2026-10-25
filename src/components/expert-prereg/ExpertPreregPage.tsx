@@ -3,8 +3,6 @@ import type { Metadata } from 'next';
 import { connection } from 'next/server';
 import { getTranslations } from 'next-intl/server';
 import { BadgeCheck, Building2, Gift } from 'lucide-react';
-import PublicNavbar from '@/components/PublicNavbar';
-import PublicFooter from '@/components/PublicFooter';
 import { appUrl } from '@/lib/app-url';
 import { errorMessage } from '@/lib/errors';
 import { FOUNDER_SEAT_LIMIT, VERIFY_TOKEN_TTL_MS } from '@/lib/expert-prereg/server/constants';
@@ -64,9 +62,7 @@ export default async function ExpertPreregPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-ink">
-      <PublicNavbar locale={locale} />
-
+    <div className="flex-1 flex flex-col bg-background text-ink">
       <main id="main" className="flex-1 w-full max-w-3xl mx-auto px-edge sm:px-4 py-8 sm:py-12 space-y-10">
         <section aria-labelledby="ep-hero" className="space-y-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-accent-ink">{t('hero.eyebrow')}</p>
@@ -128,8 +124,6 @@ export default async function ExpertPreregPage({ params }: PageProps) {
           ))}
         </section>
       </main>
-
-      <PublicFooter locale={locale} />
     </div>
   );
 }

@@ -61,6 +61,10 @@ const TOPIC_ROW = {
  */
 const dbBox = vi.hoisted(() => ({ client: undefined as unknown }));
 
+// The module gate has its own suite (v1-module-gate.test.ts); these suites test the route.
+vi.mock('../../src/lib/modules/tenant-access', () => ({
+  checkModuleAccessForTenant: vi.fn(async () => ({ allowed: true, status: 'ON' })),
+}));
 vi.mock('../../src/lib/db', () => {
   const client = {
     // authenticateApiKey's per-key rate-limit UPDATE ... RETURNING (TASK-MUN80XIW5NPV1): first request of a window.
@@ -242,7 +246,7 @@ describe('no hard-coded call data on the public surfaces', () => {
     // `Call.country`, `Call.isOpen` and `Call.deadline` do not exist; the query
     // that named them threw on every render and the page showed an empty list.
     const source = readFileSync(
-      resolve(REPO, 'src/app/[locale]/calls/turkey/page.tsx'),
+      resolve(REPO, 'src/app/[locale]/(public)/calls/turkey/page.tsx'),
       'utf8'
     );
     expect(source).not.toMatch(/country:\s*'TR'/);

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 
-import { regionOf } from '@/app/[locale]/calls/[region]/regions';
+import { regionOf } from '@/app/[locale]/(public)/calls/[region]/regions';
 import { publicCallDetailHref } from '@/lib/routes';
 
 /**
@@ -42,7 +42,7 @@ describe('publicCallDetailHref (B-2, İNCELEME-76 Y-1)', () => {
 });
 
 describe('the public call lists use publicCallDetailHref (B-2)', () => {
-  const pages = ['src/app/[locale]/calls/page.tsx', 'src/app/[locale]/calls/[region]/page.tsx'];
+  const pages = ['src/app/[locale]/(public)/calls/page.tsx', 'src/app/[locale]/(public)/calls/[region]/page.tsx'];
 
   it.each(pages)('%s links every card through it and reads no session', (file) => {
     const src = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');

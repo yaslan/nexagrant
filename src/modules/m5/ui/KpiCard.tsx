@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+import Link from 'next/link';
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 
 export interface KpiCardProps {
@@ -17,6 +19,14 @@ export interface KpiCardProps {
    * Callers pass no `unit`: there is no "0.0 %" left to qualify.
    */
   unmeasured?: boolean;
+  /**
+   * Where the metric is worked on. Given, the whole card is one link (and the only focus
+   * stop in it); left out — for a reader whose role cannot open the target — the card
+   * stays a plain, unclickable block.
+   */
+  href?: string;
+  /** Accessible name of the link; the figure and description are read as its description. */
+  ariaLabel?: string;
 }
 
 export function KpiCard({
@@ -28,7 +38,11 @@ export function KpiCard({
   chartData,
   variant = 'default',
   unmeasured = false,
+  href,
+  ariaLabel,
 }: KpiCardProps) {
+  const bodyId = useId();
+
   const variantClasses = {
     default: 'border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950',
     success: 'border-l-4 border-green-500 bg-green-50 dark:bg-green-950',
@@ -41,10 +55,10 @@ export function KpiCard({
     neutral: 'text-gray-600 dark:text-gray-400',
   };
 
-  return (
-    <div
-      className={`rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 ${variantClasses[variant]}`}
-    >
+  const frameClasses = `rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 ${variantClasses[variant]}`;
+
+  const body = (
+    <>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
@@ -62,7 +76,7 @@ export function KpiCard({
       </div>
 
       {/* Metric */}
-      <div className="mb-4">
+      <div id={href ? bodyId : undefined} className="mb-4">
         <div className="flex items-baseline gap-2">
           <span
             className={
@@ -108,10 +122,23 @@ export function KpiCard({
 
       {/* Description */}
       {description && (
-        <p className="text-xs text-gray-600 dark:text-gray-400">
+        <p id={href ? `${bodyId}-desc` : undefined} className="text-xs text-gray-600 dark:text-gray-400">
           {description}
         </p>
       )}
-    </div>
+    </>
+  );
+
+  if (!href) return <div className={frameClasses}>{body}</div>;
+
+  return (
+    <Link
+      href={href}
+      aria-label={ariaLabel}
+      aria-describedby={description ? `${bodyId} ${bodyId}-desc` : bodyId}
+      className={`block ${frameClasses} transition-shadow hover:shadow-md hover:ring-1 hover:ring-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:hover:ring-blue-500`}
+    >
+      {body}
+    </Link>
   );
 }

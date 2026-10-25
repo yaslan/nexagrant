@@ -59,6 +59,48 @@ describe('hard-coded text detector — what counts', () => {
   });
 });
 
+describe('hard-coded text detector — multi-line JSX text (FO-95)', () => {
+  // The old line regex refused a newline inside the match, so a label written on its own
+  // line — the normal Prettier shape for a button — was never counted. Dev's Part B editor
+  // scored 16 while carrying "Kaydet", "Senkronize" and "Vazgeç" in exactly that shape.
+  it('reports a Turkish label that sits on its own line', () => {
+    const src = ['<button', '  onClick={close}', '>', '  Vazgeç', '</button>'].join('\n');
+    const found = scanSource('a.tsx', src);
+    expect(found.map(v => [v.kind, v.text, v.line])).toEqual([['jsx-text', 'Vazgeç', 4]]);
+  });
+
+  it('points at the label line even under deep indentation', () => {
+    const indent = ' '.repeat(16);
+    const src = ['<div>', `${indent}<button>`, `${indent}  Vazgeç`, `${indent}</button>`, '</div>'].join('\n');
+    expect(scanSource('a.tsx', src).map(v => v.line)).toEqual([3]);
+  });
+
+  it('reports an ASCII-spelled label on its own line — "Vazgec" has no Turkish letter to give it away', () => {
+    const src = ['<button type="button">', '  Vazgec', '</button>'].join('\n');
+    expect(scanSource('a.tsx', src).map(v => v.text)).toEqual(['Vazgec']);
+  });
+
+  it('reports a sentence wrapped over several lines once, with its whitespace collapsed', () => {
+    const src = ['<p className="text-sm">', '  Bu metin iki', '  satıra bölünmüş', '</p>'].join('\n');
+    const found = scanSource('a.tsx', src);
+    expect(found.map(v => [v.text, v.line])).toEqual([['Bu metin iki satıra bölünmüş', 2]]);
+  });
+
+  it('reports text that shares its node with an expression', () => {
+    const src = '<span>~{pages} Sayfa ({words} Kelime)</span>';
+    expect(scanSource('a.tsx', src).map(v => v.text)).toEqual(['Sayfa (', 'Kelime)']);
+  });
+
+  it('reports a single capitalised word in JSX text', () => {
+    expect(scanSource('a.tsx', '<button>Save</button>').map(v => v.text)).toEqual(['Save']);
+  });
+
+  it('does not read TypeScript comparisons as JSX text', () => {
+    const src = 'function f(cents: bigint, limit: bigint) {\n  if (cents > limit || cents < -limit) return null;\n  return <b>{String(cents)}</b>;\n}';
+    expect(scanSource('a.tsx', src)).toHaveLength(0);
+  });
+});
+
 describe('hard-coded text detector — what does not count', () => {
   it.each([
     'flex items-center',
@@ -80,9 +122,13 @@ describe('hard-coded text detector — what does not count', () => {
     expect(isUserFacing(text)).toBe(false);
   });
 
-  it('does not report a single ASCII word — too weak a signal to block on', () => {
+  it('does not report a single ASCII word in a prop — too weak a signal to block on', () => {
     expect(isUserFacing('Save')).toBe(false);
-    expect(scanSource('a.tsx', '<button>Save</button>')).toHaveLength(0);
+    expect(scanSource('a.tsx', '<button title="Save" />')).toHaveLength(0);
+  });
+
+  it('does not report a lowercase single word in JSX text — units and code samples', () => {
+    expect(scanSource('a.tsx', '<span>px</span><code>pnpm</code><span>{n} kB</span>')).toHaveLength(0);
   });
 
   it('still reports a single Turkish word', () => {

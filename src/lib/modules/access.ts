@@ -1,12 +1,16 @@
+import { cache } from 'react';
+
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
-import { planNamesGrantingModule } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
-import { tenantScopeOf } from '@/lib/tenant';
-import { canAccessStatus, type ModuleDenyReason, type ModuleViewer } from '@/lib/modules/state-machine';
+import { tenantScopeOf, TenantScopeError, type TenantScope } from '@/lib/tenant';
+import type { ModuleDenyReason, SessionViewer } from '@/lib/modules/state-machine';
 import { getAllManifests } from '@/lib/modules/registry';
+import { decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
+
+export type { ModuleAccessResult } from '@/lib/modules/tenant-access';
 
 /**
  * The module gate — the one place that turns a `ModuleState` row into an answer.
@@ -28,18 +32,6 @@ import { MODULE_UNAVAILABLE_DIGEST } from '@/lib/module-unavailable';
  * no caller can hold one gate and miss the other.
  */
 
-export interface ModuleAccessResult {
-  allowed: boolean;
-  status: ModuleStatus;
-  /** Stable code, translated by the caller. Never a server-authored sentence. */
-  reason?: ModuleDenyReason;
-  /**
-   * Plans that *do* include this module, by display name, for a
-   * `PLAN_UPGRADE_REQUIRED` refusal. Read from `PLAN_GRANTS`, never re-typed.
-   */
-  requiredPlans?: string[];
-}
-
 /** Thrown by `assertModuleAccess`, so a caller can tell a gate refusal from a crash. */
 export class ModuleAccessError extends Error {
   readonly code = MODULE_UNAVAILABLE_DIGEST;
@@ -55,6 +47,51 @@ export class ModuleAccessError extends Error {
     this.name = 'ModuleAccessError';
   }
 }
+
+/** The session's viewer: role and staff flag only, never the API-key `isMachine`. */
+function sessionViewerOf(scope: TenantScope): SessionViewer {
+  return { role: scope.role, isPlatformAdmin: scope.isPlatformAdmin };
+}
+
+/**
+ * TASK-MVBEM10PJYU0E (FO-12, Ö-2) — what one request reads, read once.
+ *
+ * A module page used to pay for its gate twice: the app shell's
+ * `listAccessibleModules` read `ModuleState` and the entitlement, then the page's
+ * `moduleGate` read both again, and each of the three `auth()` calls re-ran the jwt
+ * callback's membership lookup. React `cache()` keeps one answer per request:
+ * the store lives in the render that asked and is dropped with it, so nothing
+ * here outlives the request or reaches another session. Outside a server render
+ * (a test, a script) `cache()` memoises nothing and every call reads afresh.
+ *
+ * Only the *facts* are cached, keyed by tenant id; the decision is still made per
+ * call by `decideModuleAccess`, with the viewer from the session.
+ */
+export const requestSession = cache(() => auth());
+
+interface TenantModuleFacts {
+  statusById: ReadonlyMap<string, ModuleStatus>;
+  allowedModules: readonly string[];
+}
+
+const tenantModuleFacts = cache(
+  (tenantId: string): Promise<TenantModuleFacts> =>
+    withTenant(tenantId, async (tx) => {
+      const [states, entitlements] = await Promise.all([
+        tx.moduleState.findMany({
+          where: { tenantId },
+          select: { moduleId: true, status: true },
+        }),
+        getEntitlements(tenantId, tx),
+      ]);
+      return {
+        statusById: new Map<string, ModuleStatus>(
+          states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
+        ),
+        allowedModules: entitlements.allowedModules,
+      };
+    }),
+);
 
 /**
  * Decide whether the session's viewer may use `moduleId`, on two facts:
@@ -81,97 +118,34 @@ export class ModuleAccessError extends Error {
  * it — an `AddOn` row, which `getEntitlements` already honours — not by a session.
  */
 export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAccessResult> {
-  const scope = tenantScopeOf(await auth());
+  const scope = tenantScopeOf(await requestSession());
 
   if (!scope) {
     return { allowed: false, status: 'OFF', reason: 'NO_TENANT' };
   }
 
-  // Both facts are independent reads; neither gates the other's query.
-  const [state, entitlements] = await Promise.all([
-    withTenant(scope.tenantId, (tx) =>
-      tx.moduleState.findUnique({
-        where: { tenantId_moduleId: { tenantId: scope.tenantId, moduleId } },
-        select: { status: true },
-      })
-    ),
-    withTenant(scope.tenantId, (tx) =>
-      getEntitlements(scope.tenantId, tx)
-    ),
-  ]);
-
-  return decideModuleAccess(
-    moduleId,
-    (state?.status ?? 'OFF') as ModuleStatus,
-    entitlements.allowedModules,
-    { role: scope.role, isPlatformAdmin: scope.isPlatformAdmin },
-  );
-}
-
-/**
- * The two-fact decision itself, shared by `checkModuleAccess` (one module, for a
- * gate) and `listAccessibleModules` (every module, for navigation), so the entry
- * points a user sees and the door they then knock on can never disagree.
- */
-function decideModuleAccess(
-  moduleId: ModuleId,
-  status: ModuleStatus,
-  allowedModules: readonly string[],
-  viewer: ModuleViewer,
-): ModuleAccessResult {
-  if (!allowedModules.includes(moduleId)) {
-    return {
-      allowed: false,
-      status,
-      reason: 'PLAN_UPGRADE_REQUIRED',
-      requiredPlans: planNamesGrantingModule(moduleId),
-    };
-  }
-
-  const decision = canAccessStatus(status, {
-    role: viewer.role,
-    isPlatformAdmin: viewer.isPlatformAdmin,
-  });
-
-  return decision.allowed
-    ? { allowed: true, status }
-    : { allowed: false, status, reason: decision.reason ?? 'MODULE_OFF' };
+  const facts = await tenantModuleFacts(scope.tenantId);
+  return decideModuleAccess(moduleId, facts.statusById.get(moduleId) ?? 'OFF', facts.allowedModules, sessionViewerOf(scope));
 }
 
 /**
  * Every module the session's viewer may open, for the app shell's `ModuleProvider`
  * (sidebar entries, opportunity tabs, cross-links). Same answer as calling
- * `checkModuleAccess` once per module, in two reads instead of twenty-two.
+ * `checkModuleAccess` once per module, from the same per-request read.
  *
  * Navigation only: a hidden link is not a closed door, so every page behind these
  * entries still runs `moduleGate` and every action `assertModuleAccess`.
  */
 export async function listAccessibleModules(): Promise<ModuleId[]> {
-  const scope = tenantScopeOf(await auth());
+  const scope = tenantScopeOf(await requestSession());
   if (!scope) return [];
 
-  const [states, entitlements] = await Promise.all([
-    withTenant(scope.tenantId, (tx) =>
-      tx.moduleState.findMany({
-        where: { tenantId: scope.tenantId },
-        select: { moduleId: true, status: true },
-      })
-    ),
-    withTenant(scope.tenantId, (tx) =>
-      getEntitlements(scope.tenantId, tx)
-    ),
-  ]);
-
-  const statusById = new Map<string, ModuleStatus>(
-    states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
-  );
+  const facts = await tenantModuleFacts(scope.tenantId);
+  const viewer = sessionViewerOf(scope);
 
   return getAllManifests().map((m) => m.id).filter(
     (id) =>
-      decideModuleAccess(id, statusById.get(id) ?? 'OFF', entitlements.allowedModules, {
-        role: scope.role,
-        isPlatformAdmin: scope.isPlatformAdmin,
-      }).allowed,
+      decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, viewer).allowed,
   );
 }
 
@@ -182,9 +156,14 @@ export async function listAccessibleModules(): Promise<ModuleId[]> {
  * in the client is not a gate, and `generateText()` writes an `AiUsageLog` row and
  * debits `CreditLedger` (src/lib/llm.ts) the moment it is reached, so a closed
  * module that was checked afterwards would still have cost the tenant credits.
+ *
+ * No session is not a module refusal (TASK-MV15MNI79MSWO): it leaves as the same
+ * `TenantScopeError` that `requireTenantAction` would have thrown a line later,
+ * so the browser says "sign in again" rather than "the module is switched off".
  */
 export async function assertModuleAccess(moduleId: ModuleId): Promise<void> {
   const access = await checkModuleAccess(moduleId);
+  if (access.reason === 'NO_TENANT') throw new TenantScopeError();
   if (!access.allowed) {
     throw new ModuleAccessError(moduleId, access.status, access.reason ?? 'MODULE_OFF');
   }

@@ -10,6 +10,7 @@ import {
 } from './actions';
 import { calculateEvidenceHealthScore, HealthScoreResult } from '@/lib/evidence-health';
 import { evidenceBadge } from '@/lib/evidence-status';
+import { evidenceCsv } from '@/lib/evidence/evidence-csv';
 import {
   ShieldCheck,
   Upload,
@@ -276,12 +277,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     // No file link in the export (B-2, TASK-MUNODY0DVDWC5): a CSV travels, and a
     // link in it used to open the file for anyone. The name identifies it; the
     // file itself is downloaded in the app.
-    const header = "ID,Title,Category,IssuingAuthority,ValidUntil,Status,FileName\n";
-    const rows = filteredItems.map(i => 
-      `${i.id},"${i.title.replace(/"/g, '""')}",${i.category || i.kind || ''},"${i.issuingAuthority || ''}",${i.validUntil || ''},${i.status || 'UNVERIFIED'},"${(i.fileName || '').replace(/"/g, '""')}"`
-    ).join('\n');
-    
-    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([evidenceCsv(filteredItems)], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

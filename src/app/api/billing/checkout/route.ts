@@ -14,7 +14,8 @@ import { taxLineForTenant } from '@/lib/billing/checkout-tax';
 import { requireTenantApi } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
 import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
-import { getPilotState } from '@/lib/billing/pilot';
+import { withTenant } from '@/lib/db';
+import { checkoutBlocker, type CheckoutBlock } from '@/lib/billing/subscription-owner';
 import { appUrl as resolveAppUrl } from '@/lib/app-url';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -82,6 +83,17 @@ function collectClientPriceFields(body: unknown): string[] {
   return [...found];
 }
 
+const CHECKOUT_CLOSED: Record<CheckoutBlock, { error: string; message: string }> = {
+  PILOT_CHECKOUT_CLOSED: {
+    error: 'Checkout closed during the pilot',
+    message: 'Pilot süresince ödeme ve plan yükseltme kapalıdır; pilot sonrasında açılır.',
+  },
+  INTERNAL_PLAN_CHECKOUT_CLOSED: {
+    error: 'Checkout closed while an internal plan is assigned',
+    message: 'Planınız yönetici tarafından atandı; değişiklik için bizimle iletişime geçin.',
+  },
+};
+
 export async function POST(req: Request) {
   try {
     // The gate comes first, before the body is read and before anything is
@@ -100,7 +112,7 @@ export async function POST(req: Request) {
     // Buying on the tenant's behalf is `manage_billing`, which only the owner
     // carries (src/lib/rbac.ts). Any member — the outside partner included —
     // used to be able to open a subscription session here (İNCELEME-59 Y-3,
-    // TASK-MUNQAXELV83HO). Refused before the pilot read, the pricing and Stripe.
+    // TASK-MUNQAXELV83HO). Refused before the subscription read, the pricing and Stripe.
     if (!can(asRole(scope.scope.role), 'manage_billing')) {
       return NextResponse.json(
         {
@@ -112,19 +124,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // A tenant on the free pilot buys nothing until the pilot is over: no
-    // e-Fatura yet, so no sale may start (TASK-MUMABL78X5JLX). Running or run
-    // out, the answer is the same — the conversion is a contract package the
-    // platform admin assigns, not a card payment.
-    if ((await getPilotState(tenantId)).kind !== 'none') {
-      return NextResponse.json(
-        {
-          error: 'Checkout closed during the pilot',
-          message: 'Pilot süresince ödeme ve plan yükseltme kapalıdır; pilot sonrasında açılır.',
-          code: 'PILOT_CHECKOUT_CLOSED',
-        },
-        { status: 403 }
-      );
+    // A tenant whose plan Stripe does not own buys nothing (subscription-owner.ts
+    // `checkoutBlocker`): the Stripe sync would skip the subscription, so the
+    // payment would land nowhere. The free pilot has no e-Fatura yet, running or
+    // run out (TASK-MUMABL78X5JLX); an internal plan is the platform admin's
+    // until it is taken back (TASK-MVCH26OXNVLKR).
+    const owned = await withTenant(tenantId, (tx) =>
+      tx.subscription.findUnique({
+        where: { tenantId },
+        select: { status: true, provider: true, trialEndsAt: true },
+      })
+    );
+    const closed = checkoutBlocker(owned);
+    if (closed) {
+      return NextResponse.json({ ...CHECKOUT_CLOSED[closed], code: closed }, { status: 403 });
     }
 
     const rawBody: unknown = await req.json();

@@ -4,7 +4,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 // blog-shared, not blog: this is a client component and @/lib/blog reaches Prisma.
-import { formatBlogDate, type BlogPost } from '@/lib/blog-shared';
+import { authorByline, formatBlogDate, type BlogPost } from '@/lib/blog-shared';
+import { BLOG_READ_MINUTES, estimateReadMinutes } from '@/lib/blog-read-time';
 import { 
   createBlogPostAction, 
   updateBlogPostAction, 
@@ -27,6 +28,13 @@ import {
   Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { RichTextEditor } from '@/components/editor/RichTextEditor';
+import {
+  BLOG_IMAGE_UPLOAD_MAX_MB as IMAGE_MAX_MB,
+  BLOG_IMAGE_UPLOAD_TYPES as IMAGE_TYPES,
+  uploadBlogImage,
+  type BlogImageUploadError as ImageError,
+} from '@/lib/blog-image-upload';
 
 interface AdminBlogClientProps {
   initialPosts: BlogPost[];
@@ -39,28 +47,22 @@ interface AdminBlogClientProps {
   sessionUserName?: string;
   /** The server could not read the posts; shown instead of an empty table. */
   loadError?: boolean;
+  /** The public bucket's base URL: images in the post body are uploads under it. */
+  publicImageBase?: string;
 }
 
 /** One line of feedback above the table. `error` is only ever a translated message. */
 type Notice = { kind: 'ok' | 'error'; text: string } | null;
 
-/**
- * The cover image upload, `POST /api/admin/blog/image` (TASK-MUU20NSV2TETW):
- * multipart `file` → 200 `{ url }` · 400 `{ error: 'type' | 'size' }` ·
- * 401/403 `{ error: 'forbidden' }` · 503 `{ error: 'object_store_unconfigured' }`.
- * The route checks the bytes; the type and size are checked here first only so
- * an obviously wrong file is refused before it is sent.
- */
-const IMAGE_MAX_MB = 5;
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const IMAGE_ERRORS = ['type', 'size', 'forbidden', 'object_store_unconfigured', 'upload_failed'] as const;
-type ImageError = (typeof IMAGE_ERRORS)[number];
+// The cover image upload, `POST /api/admin/blog/image` — shared with the
+// images inside the post body (src/lib/blog-image-upload.ts).
 
 export default function AdminBlogClient({
   initialPosts,
   locale,
   sessionUserName = '',
   loadError = false,
+  publicImageBase,
 }: AdminBlogClientProps) {
   const t = useTranslations('adminBlog');
   const [posts, setPosts] = useState<BlogPost[]>(initialPosts);
@@ -74,6 +76,8 @@ export default function AdminBlogClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [imageError, setImageError] = useState<ImageError | null>(null);
+  const [contentMissing, setContentMissing] = useState(false);
+  const [readTimeMissing, setReadTimeMissing] = useState(false);
   const imageInput = useRef<HTMLInputElement>(null);
 
   // Form State
@@ -83,14 +87,25 @@ export default function AdminBlogClient({
     category: 'Horizon Europe',
     excerpt: '',
     content: '',
-    readTime: '5 min read',
+    // Minutes, as the number field's text. Filled from the content as it is
+    // written (see `readTimeAuto`).
+    readMinutes: '',
     // The signed-in admin, or nothing. No stand-in author, no stock portrait.
     authorName: sessionUserName,
     authorRole: '',
     authorAvatar: '',
-    image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+    // No stock cover: the admin uploads one, and saving without it is refused.
+    image: '',
     featured: true,
   });
+  // A new post's read time follows its content until the admin edits the field;
+  // an existing post keeps the value it was saved with. A ref, not state: the
+  // editor's update callback may be the one from an earlier render.
+  const readTimeAuto = useRef(true);
+  const autoReadTime = (markdown: string) => {
+    const minutes = estimateReadMinutes(markdown);
+    return minutes ? String(minutes) : '';
+  };
 
   const categories = Array.from(new Set(posts.map((p) => p.category)));
 
@@ -114,19 +129,22 @@ export default function AdminBlogClient({
     setEditingSlug(null);
     setFormError(null);
     setImageError(null);
+    setContentMissing(false);
+    setReadTimeMissing(false);
     setFormData({
       title: '',
       slug: '',
       category: 'Horizon Europe',
       excerpt: '',
       content: '',
-      readTime: '5 min read',
+      readMinutes: '',
       authorName: sessionUserName,
       authorRole: '',
       authorAvatar: '',
-      image: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      image: '',
       featured: true,
     });
+    readTimeAuto.current = true;
     setIsModalOpen(true);
   };
 
@@ -134,13 +152,15 @@ export default function AdminBlogClient({
     setEditingSlug(post.slug);
     setFormError(null);
     setImageError(null);
+    setContentMissing(false);
+    setReadTimeMissing(false);
     setFormData({
       title: post.title,
       slug: post.slug,
       category: post.category,
       excerpt: post.excerpt,
       content: post.content,
-      readTime: post.readTime,
+      readMinutes: String(post.readMinutes),
       // A post with no recorded author opens with empty byline fields.
       authorName: post.author?.name ?? '',
       authorRole: post.author?.role ?? '',
@@ -148,6 +168,7 @@ export default function AdminBlogClient({
       image: post.image,
       featured: !!post.featured,
     });
+    readTimeAuto.current = false;
     setIsModalOpen(true);
   };
 
@@ -156,25 +177,12 @@ export default function AdminBlogClient({
     setImageError(null);
     // The same file can be picked again after an error.
     if (imageInput.current) imageInput.current.value = '';
-    if (!IMAGE_TYPES.includes(file.type)) return setImageError('type');
-    if (file.size > IMAGE_MAX_MB * 1024 * 1024) return setImageError('size');
 
     setIsUploading(true);
     try {
-      const body = new FormData();
-      body.set('file', file);
-      const res = await fetch('/api/admin/blog/image', { method: 'POST', body });
-      const data: { url?: unknown; error?: unknown } = await res.json().catch(() => ({}));
-      if (res.ok && typeof data.url === 'string' && data.url) {
-        const url = data.url;
-        setFormData((prev) => ({ ...prev, image: url }));
-        return;
-      }
-      const code = IMAGE_ERRORS.find((c) => c === data.error);
-      setImageError(code ?? (res.status === 401 || res.status === 403 ? 'forbidden' : 'upload_failed'));
-    } catch (err) {
-      console.error(err);
-      setImageError('upload_failed');
+      const result = await uploadBlogImage(file);
+      if (result.ok) setFormData((prev) => ({ ...prev, image: result.url }));
+      else setImageError(result.error);
     } finally {
       setIsUploading(false);
     }
@@ -183,6 +191,19 @@ export default function AdminBlogClient({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isUploading) return;
+    // The editor is no native `required` field, so an empty post is refused here.
+    if (!formData.content.trim()) {
+      setContentMissing(true);
+      setFormError(t('content.missing'));
+      return;
+    }
+    // Content with no readable words (only images, rules, line breaks) gives no
+    // estimate; the server would refuse the empty field, so say so here first.
+    if (!formData.readMinutes.trim()) {
+      setReadTimeMissing(true);
+      setFormError(t('readTime.missing'));
+      return;
+    }
     // BlogPost.image is required; the server refuses a post without one too.
     if (!formData.image) {
       setFormError(t('image.missing'));
@@ -195,9 +216,12 @@ export default function AdminBlogClient({
     // database. A refusal keeps the modal open with the reason; nothing in the
     // list changes (AKTAR-MURBCJ0A-1 — this used to close on any answer).
     try {
+      // The field is type="number" with min/max, so the browser has already
+      // refused anything but a whole number in range; the server checks again.
+      const input = { ...formData, readMinutes: Number(formData.readMinutes) };
       const res = editingSlug
-        ? await updateBlogPostAction(editingSlug, formData)
-        : await createBlogPostAction(formData);
+        ? await updateBlogPostAction(editingSlug, input)
+        : await createBlogPostAction(input);
       if (!res.ok) {
         setFormError(t(`errors.${res.error}`));
         return;
@@ -400,8 +424,7 @@ export default function AdminBlogClient({
                     {/* A post with no recorded author is listed without one. */}
                     {post.author ? (
                       <>
-                        <div className="font-semibold text-ink">{post.author.name}</div>
-                        <div className="text-[10px] text-muted">{post.author.role}</div>
+                        <div className="font-semibold text-ink">{authorByline(post.author)}</div>
                       </>
                     ) : (
                       <div className="text-muted" aria-hidden="true">—</div>
@@ -527,14 +550,29 @@ export default function AdminBlogClient({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1">Okuma Süresi</label>
+                  <label htmlFor="blog-read-time" className="block text-xs font-bold text-ink mb-1">{t('readTime.label')}</label>
                   <input
-                    type="text"
-                    value={formData.readTime}
-                    onChange={(e) => setFormData({ ...formData, readTime: e.target.value })}
-                    placeholder="örn: 5 dk okuma"
-                    className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
+                    id="blog-read-time"
+                    type="number"
+                    inputMode="numeric"
+                    min={BLOG_READ_MINUTES.min}
+                    max={BLOG_READ_MINUTES.max}
+                    step={1}
+                    value={formData.readMinutes}
+                    onChange={(e) => {
+                      readTimeAuto.current = false;
+                      setReadTimeMissing(false);
+                      setFormData({ ...formData, readMinutes: e.target.value });
+                    }}
+                    placeholder={t('readTime.placeholder')}
+                    aria-describedby="blog-read-time-hint"
+                    aria-invalid={readTimeMissing || undefined}
+                    data-testid="blog-read-time"
+                    className={`w-full px-3 py-2 bg-ground border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent ${
+                      readTimeMissing ? 'border-bad' : 'border-border'
+                    }`}
                   />
+                  <p id="blog-read-time-hint" className="mt-1 text-[11px] text-muted">{t('readTime.hint')}</p>
                 </div>
               </div>
 
@@ -551,17 +589,28 @@ export default function AdminBlogClient({
                 />
               </div>
 
-              <div>
-                <label htmlFor="blog-content" className="block text-xs font-bold text-ink mb-1">Makale İçeriği (Markdown) *</label>
-                <textarea
-                  id="blog-content"
-                  rows={6}
+              <div data-testid="blog-content-field">
+                {/* The editor is a contenteditable, not a form control: it is named by
+                    aria-labelledby, and its required check is done in handleSubmit. */}
+                <span id="blog-content-label" className="block text-xs font-bold text-ink mb-1">{t('content.label')} *</span>
+                <RichTextEditor
+                  format="markdown"
+                  imageBase={publicImageBase}
+                  labelledBy="blog-content-label"
                   required
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  placeholder="# Başlık&#10;&#10;Paragraf metni..."
-                  className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs font-mono text-ink focus:outline-hidden focus:border-accent"
+                  invalid={contentMissing}
+                  content={formData.content}
+                  onChange={(md) => {
+                    setContentMissing(false);
+                    if (readTimeAuto.current && autoReadTime(md)) setReadTimeMissing(false);
+                    setFormData((prev) => ({
+                      ...prev,
+                      content: md,
+                      readMinutes: readTimeAuto.current ? autoReadTime(md) : prev.readMinutes,
+                    }));
+                  }}
                 />
+                <p className="mt-1 text-[11px] text-muted">{t('content.hint')}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -580,6 +629,7 @@ export default function AdminBlogClient({
                   <input
                     type="text"
                     value={formData.authorRole}
+                    placeholder={t('authorRolePlaceholder')}
                     onChange={(e) => setFormData({ ...formData, authorRole: e.target.value })}
                     className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
                   />

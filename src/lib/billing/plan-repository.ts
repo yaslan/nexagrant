@@ -35,7 +35,28 @@ export interface PublishedPlanVersion {
     name: string;
     visibility: string;
   };
+  /**
+   * The version's card bullets, in display order. Only the storefront reads
+   * (`listPublicPlans`, `plansVisibleToTenant`) select them; a plan made in the
+   * studio has no catalogue keys, so these rows are the only copy it has.
+   */
+  features?: PublishedPlanFeature[];
 }
+
+/** One `PlanFeature` row as a storefront card needs it. */
+export interface PublishedPlanFeature {
+  order: number;
+  kind: string;
+  moduleId: string | null;
+  limitKey: string | null;
+  textTr: string | null;
+  textEn: string | null;
+}
+
+const STOREFRONT_FEATURE_SELECT = {
+  orderBy: { order: 'asc' },
+  select: { order: true, kind: true, moduleId: true, limitKey: true, textTr: true, textEn: true },
+} as const;
 
 /**
  * Fetch the published version of a plan.
@@ -98,6 +119,7 @@ export async function listPublicPlans(): Promise<
               visibility: true,
             },
           },
+          features: STOREFRONT_FEATURE_SELECT,
         },
       },
     },
@@ -176,6 +198,7 @@ export async function plansVisibleToTenant(tenantId: string): Promise<
               visibility: true,
             },
           },
+          features: STOREFRONT_FEATURE_SELECT,
         },
       },
     },
@@ -388,16 +411,18 @@ export interface AdminPlanRow {
  * plans, the tenants it is assigned to.
  */
 export async function listPlansForAdmin(): Promise<AdminPlanRow[]> {
-  const plans = await prisma.plan.findMany({
-    orderBy: { monthlyCents: 'asc' },
-    include: {
-      versions: {
-        orderBy: { version: 'desc' },
-        include: { features: { orderBy: { order: 'asc' } } },
+  const plans = await withSystemScope('platform-admin', 'plan-admin.listPlans', (tx) =>
+    tx.plan.findMany({
+      orderBy: { monthlyCents: 'asc' },
+      include: {
+        versions: {
+          orderBy: { version: 'desc' },
+          include: { features: { orderBy: { order: 'asc' } } },
+        },
+        assignments: { include: { tenant: { select: { name: true } } } },
       },
-      assignments: { include: { tenant: { select: { name: true } } } },
-    },
-  });
+    })
+  );
 
   // "How many live subscriptions does each plan have" is a cross-tenant count by
   // definition — the answer is a number per plan, never one tenant's rows.

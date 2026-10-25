@@ -13,6 +13,10 @@ const HASH = crypto.createHash('sha256').update(KEY).digest('hex');
 
 const db = vi.hoisted(() => ({ queryRaw: vi.fn(), down: false }));
 
+// The module gate has its own suite (v1-module-gate.test.ts); these suites test the route.
+vi.mock('../../src/lib/modules/tenant-access', () => ({
+  checkModuleAccessForTenant: vi.fn(async () => ({ allowed: true, status: 'ON' })),
+}));
 vi.mock('@/lib/system-scope', () => ({
   withSystemScope: async <T,>(_p: string, _c: string, cb: (tx: unknown) => Promise<T>) =>
     cb({ apiKey: { findUnique: async ({ where }: { where: { keyHash: string } }) => (where.keyHash === HASH ? { id: 'k1', tenantId: 't1', name: 'unit' } : null) } }),

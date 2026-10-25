@@ -44,3 +44,15 @@ Kısıtlar:
 - `drop-marketplace.down.sql` geri yüklediği iki tabloya eski metinli `system_scope` kuruyor. Down'dan sonra `pnpm db:rls` koşulmalı (zaten gerekli), o zaman düzelir.
 - `rls.sql`'i koşan rol `CREATE SCHEMA` yetkisine sahip olmalı. DB sahibi olan migration rolünde bu yetki var.
 - Sır yenileme: `TRUNCATE fabrika_private.system_scope_key; pnpm db:rls`. O sırada açık olan kapsam işlemleri, işlem bitene kadar 0 satır görür.
+
+## 5. Ek: `public-intake` tabloya göre daraltıldı (FO-52, K-569554 = C, 18.10.2026)
+
+- `system_scope_open` mühürlü dalda amaca bakar: amaç `public-intake` ise yalnız `ExpertPreRegistration`, `ExpertFounderCounter` ve `ExpertPreRegAttempt` (FO-26: IP başına gönderim sayacı, aynı kayıt işleminde yazılır) açılır. Kontrol `to_regclass` ile yapılır, çünkü bu veritabanında henüz olmayan bir tablo hata vermez, listede yokmuş gibi davranır. Bu listenin kopyaları: `prisma/rls.sql` `system_scope_open`, `scripts/check-rls-live.ts` `PUBLIC_INTAKE_TABLES`, `src/lib/system-scope.ts` (`public-intake` yorumu). Öteki 5 amaç değişmedi. Sahip dalı (`pg_has_role`) amaca bakmaz.
+- Ölçüm (yerel, `fabrika_app` ile): önce 53 system_scope tablosunun 30'u açıktı (18.313 satır) ve AuditEvent INSERT kabul ediliyordu. Sonra yalnız bu 2 tablo açık (paylaşımlı satırlarla 105) ve INSERT reddediliyor. Öteki amaçlar yine 30 tabloyu açıyor. `pnpm rls:verify` bunu her koşuda ölçer.
+- Sınır: amaç GUC'si de USERSET ve mühür ona bağlı değil. Yani bu daraltma yanlış tabloya uzanan bir public-intake çağrısına karşı koruyor. `enter_system_scope('<başka amaç>')` çağırabilen koda karşı korumuyor; o (c)'nin konusu. Formun ihtiyaç duyduğu yeni bir tablo listeye bilerek eklenir. Eklenmezse form o tabloya yazarken RLS hatası alır, okurken 0 satır görür; testler bu ikincisini yakalamalı.
+
+## 6. Ek: ters yön — uzman verisi yalnız işleyen amaçlara açık (FO-92, FO-21 O4, 19.10.2026)
+
+- `system_scope_open` mühürlü dalda ikinci bir koşul daha uygular: `ExpertPreRegistration` ve `ExpertPreRegAttempt` yalnız `public-intake` (form), `platform-admin` (liste ve CSV), `platform-aggregate` (koltuk sayısı) ve `cross-tenant-job` (saklama temizliği, FO-50) amaçlarında açılır. `tenant-discovery` ve `subject-scoped` bu tablolarda 0 satır görür, yazamaz. `ExpertFounderCounter` kişisel veri taşımadığı için listede yok. Sahip dalı yine amaca bakmaz.
+- Ölçüm (yerel, `fabrika_app` ile): önce `tenant-discovery` 5/5 `ExpertPreRegistration` satırı görüyordu. Sonra 0/5. `pnpm rls:verify` her koşuda iki kapalı amacı ölçer ve INSERT reddini dener.
+- Sınır §5 ile aynı: amaç GUC'si USERSET. Bu koşul yanlış tabloya uzanan bir çağrıya karşıdır, listedeki bir amacı adlandırabilen koda karşı değil. Uzmanı görmesi gereken yeni bir amaç `system_scope_open` listesine bilerek eklenir.

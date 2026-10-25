@@ -35,7 +35,6 @@ const SHELL_LAYOUTS = ['src/app/[locale]/(app)/layout.tsx', 'src/app/[locale]/ad
 const BARS: Array<[file: string, classFragment: string]> = [
   ['src/components/PublicNavbar.tsx', 'h-18 flex items-center justify-between'],
   ['src/components/PublicFooter.tsx', 'py-16'],
-  ['src/app/[locale]/calls/page.tsx', 'py-4 flex justify-between items-center'],
 ];
 
 const HORIZONTAL = /^(p|px|pl|pr|ps|pe)-(?!0$)\S+$/;

@@ -14,18 +14,18 @@ import { test, expect, type Page } from '@playwright/test';
  * descendant selector from the variant and this goes red.
  */
 
-// Public, no session or database needed. Its wrapper is `bg-gray-50 dark:bg-slate-900`
+// Public, no session or database needed. Its <main> is `bg-gray-50 dark:bg-slate-900`
 // and the back link `text-indigo-600 dark:text-indigo-400`.
 const PATH = '/tr/calls/germany';
 
 async function colours(page: Page, baseURL: string, theme: 'light' | 'dark') {
   await page.context().addCookies([{ name: 'fabrika-theme', value: theme, url: baseURL }]);
   await page.goto(PATH);
-  const wrapper = page.locator('div.bg-gray-50').first();
+  const wrapper = page.locator('main.bg-gray-50').first();
   await expect(wrapper).toBeVisible();
   return page.evaluate(() => {
     const html = document.documentElement;
-    const wrapper = document.querySelector('div.bg-gray-50') as HTMLElement;
+    const wrapper = document.querySelector('main.bg-gray-50') as HTMLElement;
     const link = wrapper.querySelector('a.text-indigo-600') as HTMLElement;
     return {
       htmlDark: html.classList.contains('dark'),

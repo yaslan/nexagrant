@@ -258,7 +258,7 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
  * TASK-MUO12A7NHANOT (İNCELEME-76 Y-1): that detail sits under a workspace the
  * public page does not know, and the fixed `default` segment put pipeline
  * writes in the wrong workspace. The card now links a workspace-free route that
- * the server resolves per session (src/app/[locale]/calls/topic/[id]/route.ts),
+ * the server resolves per session (src/app/[locale]/(public)/calls/topic/[id]/route.ts),
  * so the link is the same for every visitor and the page needs no session.
  */
 export function publicCallDetailHref(locale: string, identifier: string): string {

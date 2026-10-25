@@ -96,6 +96,7 @@ export default async function DashboardPage({
         trendData={trendData}
         from={toRangeParam(fromDate)}
         to={toRangeParam(toDate)}
+        canManageModules={can(userRole, 'manage_modules')}
         aside={<ReadinessCard tenantId={tenantId} locale={locale} />}
       />
     </div>

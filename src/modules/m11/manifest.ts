@@ -12,7 +12,7 @@ export const m11Manifest: ModuleManifest = {
   description: 'Part-by-part application drafting on top of the concept note, evidence and consortium.',
   version: '1.0',
   requires: ['M2', 'M3', 'M5', 'M8'],
-  recommends: [],
+  recommends: ['M13'],
   // Which plans open this module is declared once, in the billing catalogue.
   planTiers: plansGrantingModule('M11'),
   addOnSku: null,
@@ -29,4 +29,5 @@ export const m11Manifest: ModuleManifest = {
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
+  programTemplates: ['horizon-europe', 'eurostars', 'digital-europe', 'eic-accelerator'],
 };

@@ -173,7 +173,7 @@ describe('server action error returns', () => {
     expect(hasUseServerDirective("import x from 'y';\n'use server';")).toBe(false);
     expect(hasUseServerDirective("const note = 'use server';")).toBe(false);
     // The inline action of the partner portal page is now scanned too (İNCELEME-93 D-1).
-    expect(serverActionFiles().map(rel)).toContain('src/app/[locale]/portal/partner/[token]/page.tsx');
+    expect(serverActionFiles().map(rel)).toContain('src/app/[locale]/(public)/portal/partner/[token]/page.tsx');
   });
 
   /** An action body wrapped the way the files are: the directive, imports, then the action. */

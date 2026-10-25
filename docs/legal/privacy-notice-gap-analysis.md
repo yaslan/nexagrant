@@ -34,7 +34,7 @@ Dört bölüm; metnin tamamı `messages/{tr,en}.json` → `legal.privacy` altın
 | 1   | Veri Sorumlusu                              | Tek cümle: "{brand} SaaS Platformu olarak … azami özen göstermekteyiz." Kimlik bilgisi (unvan, adres, VKN, iletişim) **yok**. |
 | 2   | İşlenen Veriler ve Toplama Amaçları         | Beş amaç ve dört veri kategorisi tek cümlede sayılıyor.                                                                       |
 | 3   | Veri Sahibi Hakları (Dışa Aktarma ve Silme) | md.11'e **atıf** var; anlatılan hak **iki tane**: JSON dışa aktarma ve hesap silme (30 gün).                                  |
-| 4   | Güvenlik ve Depolama                        | RLS + şifreli nesne depolama (R2/S3).                                                                                         |
+| 4   | Güvenlik ve Depolama                        | Kiracı ayrımı uygulama katmanında; RLS politikaları tanımlı ama uygulama bağlantısında etkin değil (dayanak: Açık karar #16; yerel ölçüm 2026-10-17). Şifreli nesne depolama (R2/S3). |
 
 ### 1.2 `/[locale]/[workspace]/settings/privacy` — "Gizlilik ve Verilerim"
 
@@ -230,7 +230,7 @@ Bu ikisi **eksiklik değil, fazla/yanlış beyan**dır ve düzeltmeleri hukuk gi
 | Kimlik unsuru          | Bugün nerede geçiyor                  | Değer                                                                                                           | Aydınlatma metninde                                                                                                                                                                              |
 | ---------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Ürün adı**           | `src/lib/brand.ts:19`                 | `PRODUCT_NAME = 'FonBridge'` (2026-09-10'da patron direktifiyle geri alındı)                                    | `{brand}` yer tutucusu olarak — **basılmıyor** (§1.3)                                                                                                                                            |
-| **Tüzel kişi unvanı**  | `docs/EFATURA_SETUP.md:38`            | **`FonBridge Ltd. Şti.`** (patron kararı, 2026-09-08)                                                           | **YOK**                                                                                                                                                                                          |
+| **Tüzel kişi unvanı**  | `docs/EFATURA_SETUP.md:38`            | **`Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.`** (patron kararı, 2026-09-08)                                                           | **YOK**                                                                                                                                                                                          |
 | **VKN**                | `docs/EFATURA_SETUP.md:39`            | Yalnızca **örnek** `1234567890`; gerçek değer yalnızca `INVOICE_SUPPLIER_VKN` ortam değişkeninde, repoda değil  | **YOK**                                                                                                                                                                                          |
 | **Vergi dairesi**      | `docs/EFATURA_SETUP.md:40`            | Örnek `Doğanbey V.D.`                                                                                           | **YOK**                                                                                                                                                                                          |
 | **Merkez adresi**      | `docs/EFATURA_SETUP.md:41-42`         | Örnek `Kızılırmak Mah. 1450. Cad. No:3` / `Ankara`                                                              | **YOK**                                                                                                                                                                                          |
@@ -301,7 +301,7 @@ yanındaki cümle **hukukçudan tam olarak ne istendiğini** söyler.
 
 ### Bölüm 1 — Veri sorumlusunun kimliği _(md.10/1-a)_
 
-- `<<HUKUK: TÜZEL KİŞİ UNVANI>>` — _Ticaret sicilindeki tam unvan. Ölçülen aday: `FonBridge Ltd. Şti.` (`docs/EFATURA_SETUP.md:38`, patron 2026-09-08); teyit ve nihai yazım hukukçudan._
+- `<<HUKUK: TÜZEL KİŞİ UNVANI>>` — _Ticaret sicilindeki tam unvan. Ölçülen aday: `Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.` (`docs/EFATURA_SETUP.md:38`, patron 2026-09-08); teyit ve nihai yazım hukukçudan._
 - `<<HUKUK: MERSİS NO>>` — _Repoda hiç geçmiyor; sicil kaydından._
 - `<<HUKUK: VKN VE VERGİ DAİRESİ>>` — _Aydınlatma metninde gösterilip gösterilmeyeceği de dahil karar hukukçunun; fatura tarafındaki `INVOICE_SUPPLIER_VKN` ile tutarlı olmalı._
 - `<<HUKUK: MERKEZ ADRESİ>>` — _Tebligata elverişli adres._

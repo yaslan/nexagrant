@@ -38,6 +38,7 @@ export function storefrontPlanFixture(planId: keyof typeof SEEDED_LIST_MINOR): S
     workspaces: grant.workspaces,
     aiCreditsMonthly: grant.aiCreditsMonthly,
     modules: [...grant.moduleIds],
+    features: [],
   };
 }
 

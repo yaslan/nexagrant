@@ -1,29 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { csvCell, toCsv } from './csv';
-
-describe('csvCell', () => {
-  it('neutralises a formula at the start of a text cell', () => {
-    expect(csvCell('=HYPERLINK("http://x")')).toBe(`"'=HYPERLINK(""http://x"")"`);
-    expect(csvCell('+1')).toBe(`'+1`);
-    expect(csvCell('-2')).toBe(`'-2`);
-    expect(csvCell('@SUM(A1)')).toBe(`'@SUM(A1)`);
-    expect(csvCell('\tcmd')).toBe(`'\tcmd`);
-  });
-
-  it('quotes a cell with a comma, a quote or a line break, and doubles its quotes', () => {
-    expect(csvCell('Ayşe, Yılmaz')).toBe('"Ayşe, Yılmaz"');
-    expect(csvCell('say "hi"')).toBe('"say ""hi"""');
-    expect(csvCell('a\nb')).toBe('"a\nb"');
-  });
-
-  it('writes numbers as they are and null as an empty cell', () => {
-    expect(csvCell(7)).toBe('7');
-    expect(csvCell(null)).toBe('');
-    expect(csvCell('Ankara')).toBe('Ankara');
-  });
-});
+import { toCsv } from './csv';
+import { formulaCells, readLikeASpreadsheet } from '../../../../tests/helpers/spreadsheet-csv';
 
 describe('toCsv', () => {
+  it('leaves no formula cell when read with a comma or with a semicolon (FO-101)', () => {
+    const text = toCsv(
+      ['ad', 'e-posta', 'kurum', 'il'],
+      [
+        ['Ali;=1+1;', 'ali@example.invalid', "Kurum;=cmd|' /C calc'!A0;", 'İstanbul'],
+        ['=SUM(A1)', 'x@example.invalid', 'a\r\n@b', 'Ankara'],
+      ],
+    );
+    const byComma = readLikeASpreadsheet(text, ',');
+    expect(byComma[1]).toEqual(["Ali;'=1+1;", 'ali@example.invalid', "Kurum;'=cmd|' /C calc'!A0;", 'İstanbul']);
+    expect(readLikeASpreadsheet(text, ';').flat().length).toBeGreaterThan(4);
+    expect(formulaCells(text)).toEqual({ ',': [], ';': [] });
+  });
+
   it('starts with a byte-order mark and uses CRLF line ends', () => {
     const text = toCsv(['ad', 'il'], [['Ayşe', 'Ankara']]);
     expect(text.charCodeAt(0)).toBe(0xfeff);

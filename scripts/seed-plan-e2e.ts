@@ -13,8 +13,9 @@
  *
  * So the entitlement each spec needs is seeded as its own tenant:
  *
- *   ultra  permanently `ultra` — nothing flips it. For specs that only need the module
- *          to be reachable (m10-audit-identity).
+ *   ultra  permanently `ultra` — nothing flips it. For specs that only need their module
+ *          to be reachable: m10-audit-identity (M10) and approvals-persistence (M5, the
+ *          Approval Centre).
  *   flip   the tenant whose plan IS the subject. `module-plan-gate` moves it between
  *          `pro` and `ultra` on purpose; owning the tenant is what makes that safe.
  *   lens   the settings-page counterpart, for `plan-entitlement`. That spec was the
@@ -51,9 +52,10 @@ interface PlanFixture {
   role: Role;
   /**
    * Modules switched `ON` for this fixture. Defaults to M10 — what the two M10 specs
-   * point a browser at. `lens` overrides it with none: its subject is a module the
-   * plan does *not* sell, and seeding an `ON` row for a module outside the plan would
-   * put a contradiction on the settings page it reads.
+   * point a browser at. `ultra` adds M5 for the Approval Centre spec, and `lens`
+   * overrides it with none: its subject is a module the plan does *not* sell, and
+   * seeding an `ON` row for a module outside the plan would put a contradiction on the
+   * settings page it reads.
    */
   modules?: readonly string[];
 }
@@ -68,6 +70,9 @@ export const PLAN_E2E = {
     opportunityId: 'plan-e2e-ultra-opp',
     planId: 'ultra',
     role: 'PIPELINE_MANAGER',
+    // M5 for approvals-persistence: the Approval Centre is gated on M5
+    // (TASK-MVC9MCXKVMDN7).
+    modules: ['M10', 'M5'],
   },
   flip: {
     tenantId: 'plan-e2e-flip-tenant',
@@ -95,11 +100,12 @@ export const PLAN_E2E = {
 const FIXTURES: readonly PlanFixture[] = [PLAN_E2E.ultra, PLAN_E2E.flip, PLAN_E2E.lens];
 
 /**
- * M10 (Follow-up Documents) is what the two M10 specs point a browser at, and the only
- * module either of them needs switched on. Entitlement is two facts — this row plus the
- * plan — which is exactly the pair those specs are about. A fixture whose subject is a
- * module outside its plan (`lens`) sets `modules: []` and leaves the row absent, which
- * `checkModuleAccess` already reads as `OFF`.
+ * M10 (Follow-up Documents) is what the two M10 specs point a browser at, so it is the
+ * default for a fixture that names no modules. M5 (Approval Centre) is not a default:
+ * only `ultra` switches it on, for its approvals spec. Entitlement is two facts — this
+ * row plus the plan — which is exactly the pair those specs are about. A fixture whose
+ * subject is a module outside its plan (`lens`) sets `modules: []` and leaves the row
+ * absent, which `checkModuleAccess` already reads as `OFF`.
  */
 const DEFAULT_MODULES = ['M10'] as const;
 

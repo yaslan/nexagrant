@@ -33,19 +33,39 @@ function renderForm(locale: 'tr' | 'en' = 'tr', verifyHours = 24) {
   );
 }
 
+/**
+ * FO-135 (TASK-MVMTRWH5L37F8) — every control is looked up before the first
+ * event fires. jsdom recomputes `element.labels` for the whole form on the
+ * first label query after a DOM change (~280 ms idle here, 510 elements), so
+ * querying between events cost ~2.4 s per fill and pushed the file past the
+ * 30 s budget under load. Tests reuse the returned controls for the same reason.
+ */
 function fillRequired() {
-  fireEvent.change(screen.getByLabelText(/Ad Soyad/), { target: { value: 'Ayşe Yılmaz' } });
-  fireEvent.change(screen.getByLabelText(/^E-posta/), { target: { value: 'ayse@example.org' } });
-  const province = screen.getByRole('combobox');
-  fireEvent.change(province, { target: { value: 'izmir' } });
-  fireEvent.keyDown(province, { key: 'Enter' });
-  fireEvent.change(screen.getByLabelText(/^Unvan/), { target: { value: 'Proje Koordinatörü' } });
-  fireEvent.change(screen.getByLabelText(/^Kurum/), { target: { value: 'Ankara Üniversitesi' } });
-  fireEvent.click(screen.getByLabelText(tr.options.areas.energy));
-  fireEvent.click(screen.getByLabelText(tr.options.roles.coordinator));
-  fireEvent.click(screen.getByLabelText(tr.options.programmes['erasmus-plus']));
-  fireEvent.click(screen.getByLabelText(/Profilimin uzman rehberinde/));
-  fireEvent.click(document.getElementById('ep-kvkkAccepted') as HTMLInputElement);
+  const c = {
+    fullName: screen.getByLabelText(/Ad Soyad/),
+    email: screen.getByLabelText(/^E-posta/),
+    province: screen.getByRole('combobox'),
+    title: screen.getByLabelText(/^Unvan/),
+    organization: screen.getByLabelText(/^Kurum/),
+    energy: screen.getByLabelText(tr.options.areas.energy),
+    coordinator: screen.getByLabelText(tr.options.roles.coordinator),
+    erasmus: screen.getByLabelText(tr.options.programmes['erasmus-plus']),
+    visibility: screen.getByLabelText(/Profilimin uzman rehberinde/),
+    kvkk: document.getElementById('ep-kvkkAccepted') as HTMLInputElement,
+    english: screen.getByLabelText(tr.options.languages.en),
+  };
+  fireEvent.change(c.fullName, { target: { value: 'Ayşe Yılmaz' } });
+  fireEvent.change(c.email, { target: { value: 'ayse@example.org' } });
+  fireEvent.change(c.province, { target: { value: 'izmir' } });
+  fireEvent.keyDown(c.province, { key: 'Enter' });
+  fireEvent.change(c.title, { target: { value: 'Proje Koordinatörü' } });
+  fireEvent.change(c.organization, { target: { value: 'Ankara Üniversitesi' } });
+  fireEvent.click(c.energy);
+  fireEvent.click(c.coordinator);
+  fireEvent.click(c.erasmus);
+  fireEvent.click(c.visibility);
+  fireEvent.click(c.kvkk);
+  return c;
 }
 
 const fetchMock = vi.fn();
@@ -125,14 +145,14 @@ describe('ExpertPreregForm', () => {
   // FO-25 (K-516717): Unvan and Kurum are required, Diller is optional.
   test('no organisation: the error lands on Kurum with focus, nothing is sent', async () => {
     renderForm();
-    fillRequired();
-    const org = screen.getByLabelText(/^Kurum/);
+    const { organization: org } = fillRequired();
     fireEvent.change(org, { target: { value: '' } });
     fireEvent.submit(screen.getByTestId('ep-form'));
     await waitFor(() => expect(document.activeElement).toBe(org));
     expect(document.getElementById('ep-organization-error')?.textContent).toBe(tr.errors.required);
     expect(org.getAttribute('aria-invalid')).toBe('true');
     expect(org.getAttribute('aria-required')).toBe('true');
+    // Fresh lookup: the node captured before the fill would miss a remount.
     expect(screen.getByLabelText(/^Unvan/).getAttribute('aria-required')).toBe('true');
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -140,10 +160,10 @@ describe('ExpertPreregForm', () => {
   test('a picked language is sent; the languages group carries no required mark', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 201 }));
     renderForm();
-    fillRequired();
+    const { english } = fillRequired();
     const legend = screen.getByText(tr.form.languages_legend);
     expect(legend.closest('legend')?.textContent).not.toContain('*');
-    fireEvent.click(screen.getByLabelText(tr.options.languages.en));
+    fireEvent.click(english);
     fireEvent.submit(screen.getByTestId('ep-form'));
     await screen.findByText(tr.success.title);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -153,9 +173,8 @@ describe('ExpertPreregForm', () => {
   test('409 already_registered lands on the e-mail field', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ errors: { email: 'already_registered' } }), { status: 409 }));
     renderForm();
-    fillRequired();
+    const { email } = fillRequired();
     fireEvent.submit(screen.getByTestId('ep-form'));
-    const email = screen.getByLabelText(/^E-posta/);
     await waitFor(() => expect(document.getElementById('ep-email-error')?.textContent).toBe(tr.errors.already_registered));
     expect(document.activeElement).toBe(email);
   });
@@ -290,12 +309,16 @@ describe('helpers', () => {
 
   test('parseKvkkMarkdown reads the shipped notice', async () => {
     const { readFile } = await import('node:fs/promises');
-    for (const f of ['content/kvkk-uzman-v1.md', 'content/kvkk-uzman-v1.en.md']) {
+    for (const f of ['content/kvkk-uzman-v2.md', 'content/kvkk-uzman-v2.en.md']) {
       const blocks = parseKvkkMarkdown(await readFile(f, 'utf8'));
       expect(blocks[0]?.kind).toBe('title');
-      expect(blocks.filter((b) => b.kind === 'heading')).toHaveLength(7);
+      expect(blocks.filter((b) => b.kind === 'heading')).toHaveLength(8);
       expect(blocks.some((b) => b.kind === 'list')).toBe(true);
-      expect(JSON.stringify(blocks)).toContain('[FonBridge tüzel kişi unvanı]');
+      expect(JSON.stringify(blocks)).toContain('Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.');
+      // KVKK m.11 lists nine rights; the notice must carry all of them, plus the Art. 14 complaint route.
+      const rights = blocks.filter((b) => b.kind === 'list').at(-2);
+      expect(rights?.kind === 'list' && rights.items).toHaveLength(9);
+      expect(JSON.stringify(blocks)).toMatch(/(m|Art)\. ?14\b/);
     }
     expect(parseKvkkMarkdown('# T\n\na\nb\n- x\n- y\nc')).toEqual([
       { kind: 'title', text: 'T' },

@@ -59,7 +59,10 @@ ay tekrar koşulduğunda satır sayısı değişmez (kural 6: çekiciler idempot
 
 ## Yığın ve dağıtım
 
-Python 3.12, FastAPI, DuckDB, pandas, psycopg2 (`workers/cordis/requirements.txt`).
+Python 3.12 (`workers/cordis/.python-version`), FastAPI, DuckDB, pandas, psycopg2.
+Üst düzey bağımlılıklar `workers/cordis/requirements.txt`'te; kurulan sürümler ve hash'ler
+`workers/cordis/requirements.lock`'ta sabit. Kurulum yalnız lock'tan yapılır. 3.9 gibi
+başka bir yorumlayıcıda kurulum hata verir (lock yalnız 3.12 wheel'lerini içerir).
 DuckDB, upsert'ten önce her kümeyi hedef tablonun birincil anahtarında tekilleştirir —
 tek partide yinelenen anahtar `ON CONFLICT ... DO UPDATE`'i hata verdirir.
 
@@ -67,8 +70,18 @@ Dağıtım: Fly.io (1 shared-cpu-2x, 2 GB). Aylık iş < 30 dk hedefi.
 
 ## Yerel çalıştırma
 
+Sanal ortamı her checkout'ta yerelde oluştur; `.venv/` git'e girmez (`.gitignore`).
+İçindeki ikililer işletim sistemine ve Python sürümüne bağlıdır, paylaşılamaz.
+
+```sh
+python3.12 -m venv .venv                     # depo kökünde, bir kez
+source .venv/bin/activate                    # Windows: .venv\Scripts\activate
+```
+
+Kurulum yalnız hash'li kilitten yapılır, sonra worker çalıştırılır:
+
 ```bash
-pip install -r workers/cordis/requirements.txt
+pip install --require-hashes -r workers/cordis/requirements.lock
 cd workers/cordis
 DATABASE_URL=postgresql://... WORKER_TOKEN=... CORDIS_WORKER_ALLOW_MOCK=1 \
   python -m uvicorn main:app --reload --port 8000
@@ -76,6 +89,19 @@ DATABASE_URL=postgresql://... WORKER_TOKEN=... CORDIS_WORKER_ALLOW_MOCK=1 \
 curl -X POST -H "Authorization: Bearer $WORKER_TOKEN" \
   'http://127.0.0.1:8000/jobs/cordis?month=2026-09'
 ```
+
+Testler için dev paketlerini kilitten **sonra** ekle (depo kökünde):
+
+```sh
+pip install -r workers/cordis/requirements-dev.txt   # yalnız pytest/httpx2 ekler
+python -m pytest workers/cordis
+```
+
+`pytest` ve `httpx2` kilitte yok; bu iki dev paketi hash'siz kurulur. Dosyadaki
+`-r requirements.txt` satırı, kilitten kurulmuş sürümlerle zaten karşılanır.
+
+Bağımlılık değişince kilit adımını tekrarla; ortam bozulursa `.venv/` klasörünü silip
+baştan kur.
 
 ## Henüz yapılmadı
 

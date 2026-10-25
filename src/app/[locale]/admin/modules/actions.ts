@@ -5,7 +5,7 @@ import { requirePlatformAdmin } from '@/lib/tenant';
 import { getManifest } from '@/lib/modules/registry';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { revalidatePath } from 'next/cache';
-import { getDisableCascade } from '@/lib/modules/state-machine';
+import { adminStatusRefusal, getDisableCascade } from '@/lib/modules/state-machine';
 import { errorMessage } from '@/lib/errors';
 import type { ModuleStateRow } from '@/types/db-rows';
 
@@ -29,6 +29,13 @@ export async function updateTenantModuleStatus(
   const manifest = getManifest(moduleId);
   if (!manifest) {
     throw new Error(`Module ${moduleId} not found in catalog.`);
+  }
+
+  // A "Yakında" module cannot be opened from here either (FO-40); the rule lives
+  // in state-machine.ts, the same one the tenant-side enable path uses.
+  const refusal = adminStatusRefusal(moduleId, targetStatus);
+  if (refusal) {
+    throw new Error(`Cannot set ${manifest.name} to ${targetStatus}: ${refusal}`);
   }
 
   // Fetch current active module states for this tenant. The tenant is named in

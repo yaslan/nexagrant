@@ -1,0 +1,493 @@
+
+
+
+
+[e2e-gate] Dev server info: PID=34806
+[e2e-gate] Test data: INVOICE_SUPPLIER_NAME loaded
+
+Running 10 tests using 1 worker
+
+[1/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+  1) [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+    Expected: "Word başlığı"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" with timeout 10000ms
+      - waiting for getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+
+
+      164 |     // An https link is kept (TASK-MVDPHZQCTVJ2R); a pasted image never is.
+      165 |     // Ctrl+A then paste replaces the whole post; the heading is not glued to the old paragraph.
+    > 166 |     await expect(editor.locator('h1')).toHaveText('Word başlığı');
+          |                                        ^
+      167 |     await expect(editor).not.toContainText(ORIGINAL);
+      168 |     await expect(editor.locator('strong')).toHaveText('kalın');
+      169 |     // The browser's clipboard writes the address normalised, with its trailing slash.
+        at /Users/macbook/alan/FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:166:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium/error-context.md
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[2/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+
+
+[3/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+  2) [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+    Expected: "Word başlığı"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" with timeout 10000ms
+      - waiting for getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+
+
+      164 |     // An https link is kept (TASK-MVDPHZQCTVJ2R); a pasted image never is.
+      165 |     // Ctrl+A then paste replaces the whole post; the heading is not glued to the old paragraph.
+    > 166 |     await expect(editor.locator('h1')).toHaveText('Word başlığı');
+          |                                        ^
+      167 |     await expect(editor).not.toContainText(ORIGINAL);
+      168 |     await expect(editor.locator('strong')).toHaveText('kalın');
+      169 |     // The browser's clipboard writes the address normalised, with its trailing slash.
+        at /Users/macbook/alan/FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:166:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat2/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat2/error-context.md
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat2/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat2/trace.zip
+    Usage:
+
+        npx playwright show-trace ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat2/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[4/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[5/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[6/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+  3) [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+    Expected: "Word başlığı"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" with timeout 10000ms
+      - waiting for getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+
+
+      164 |     // An https link is kept (TASK-MVDPHZQCTVJ2R); a pasted image never is.
+      165 |     // Ctrl+A then paste replaces the whole post; the heading is not glued to the old paragraph.
+    > 166 |     await expect(editor.locator('h1')).toHaveText('Word başlığı');
+          |                                        ^
+      167 |     await expect(editor).not.toContainText(ORIGINAL);
+      168 |     await expect(editor.locator('strong')).toHaveText('kalın');
+      169 |     // The browser's clipboard writes the address normalised, with its trailing slash.
+        at /Users/macbook/alan/FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:166:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat5/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat5/error-context.md
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat5/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat5/trace.zip
+    Usage:
+
+        npx playwright show-trace ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat5/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[7/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+  4) [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+    Expected: "Word başlığı"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" with timeout 10000ms
+      - waiting for getByRole('textbox', { name: 'Makale İçeriği *' }).locator('h1')
+
+
+      164 |     // An https link is kept (TASK-MVDPHZQCTVJ2R); a pasted image never is.
+      165 |     // Ctrl+A then paste replaces the whole post; the heading is not glued to the old paragraph.
+    > 166 |     await expect(editor.locator('h1')).toHaveText('Word başlığı');
+          |                                        ^
+      167 |     await expect(editor).not.toContainText(ORIGINAL);
+      168 |     await expect(editor.locator('strong')).toHaveText('kalın');
+      169 |     // The browser's clipboard writes the address normalised, with its trailing slash.
+        at /Users/macbook/alan/FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:166:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat6/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat6/error-context.md
+
+    Error Context: ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat6/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat6/trace.zip
+    Usage:
+
+        npx playwright show-trace ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/test-results/admin-blog-rich-editor-adm-494df--raw-markers-reach-the-page-chromium-repeat6/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[8/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+
+
+[9/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[10/10] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+  4 failed
+    [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+    [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+    [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+    [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/admin-blog-rich-editor.spec.ts:157:7 › admin blog — rich text editor, stored as markdown › a paste from Word keeps only what the site shows; no raw markers reach the page 
+  6 passed (1.7m)
+exit=1

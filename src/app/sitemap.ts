@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
 import { getBlogPosts } from '@/lib/blog';
 
-// Hardcoded regions matching src/app/[locale]/calls/[region]/regions.ts
+// Hardcoded regions matching src/app/[locale]/(public)/calls/[region]/regions.ts
 const REGIONS: Record<string, { name: string; code: string }> = {
   turkey: { name: 'Türkiye', code: 'TR' },
   germany: { name: 'Almanya', code: 'DE' },

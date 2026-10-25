@@ -12,6 +12,7 @@ import {
 import {
   NULLABLE_TENANT,
   PLATFORM_POLICY,
+  SYSTEM_SCOPE_POLICY,
   SYSTEM_WIDE,
   policylessSystemWide,
   tenantScopedModels,
@@ -308,6 +309,19 @@ describe('4b — every migration protects the tenant table it creates', () => {
   });
 });
 
+describe('SYSTEM_SCOPE_POLICY — tenant-less tables reachable only inside withSystemScope (FO-45, FO-50)', () => {
+  test('each one is SYSTEM_WIDE and gets the system_scope policy, gated by system_scope_open, in prisma/rls.sql', () => {
+    expect([...SYSTEM_SCOPE_POLICY].sort()).toEqual(['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration']);
+    for (const t of SYSTEM_SCOPE_POLICY) {
+      expect(SYSTEM_WIDE.has(t)).toBe(true);
+      expect(rlsSql).toContain(`ALTER TABLE public."${t}" ENABLE ROW LEVEL SECURITY;`);
+      expect(rlsSql).toContain(`CREATE POLICY system_scope ON public."${t}"`);
+      expect(rlsSql).toContain(`USING ((SELECT public.system_scope_open('"${t}"'::regclass)))`);
+      expect(rlsSql).toContain(`WITH CHECK ((SELECT public.system_scope_open('"${t}"'::regclass)))`);
+    }
+  });
+});
+
 describe('BlogPost — platform content, classified as SYSTEM_WIDE on purpose (AKTAR-MURBCJ0A-1)', () => {
   // A blog post is shown to anonymous visitors and written only by platform
   // admins (/admin/blog, requirePlatformAdmin). It belongs to no tenant, so the
@@ -387,7 +401,17 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
     const { tables, findings } = scanPolicylessMigrations();
     expect(findings.map((f) => `${f.file}:${f.line} ${f.problem}`)).toEqual([]);
     // A green check that inspects nothing is not a green check.
-    expect(tables.map((t) => t.table).sort()).toEqual(['BlogPost', 'ExpertPreRegistration', 'PublicLead']);
+    expect(tables.map((t) => t.table).sort()).toEqual([
+      'BlogPost',
+      'ExpertPreRegistration',
+      // FO-58: prisma/migrations/add-partner-search.sql
+      'PartnerProfileSnapshot',
+      'PartnerSearchAnnouncement',
+      'PartnerSearchIngestionRun',
+      'PartnerSearchTopicStat',
+      'PublicLead',
+      'UnmatchedOrganization',
+    ]);
   });
 
   test('CHECK 4c mutation probe — missing DISABLE and ENABLE-without-policy are caught', () => {
@@ -431,13 +455,21 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
 
   test('CI installs the live trigger before db push and runs db:rls before the migrations', () => {
     const ci = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
-    const step = ci.slice(ci.indexOf('- name: Prepare database'), ci.indexOf('- name: Verify RLS policies'));
+    const ciStep = ci.slice(ci.indexOf('- name: Prepare database'), ci.indexOf('- name: Verify RLS policies'));
+    // TASK-MVBFDSUSE5QCY: the step calls `pnpm db:setup`; the order lives in
+    // scripts/db-setup.sh (its commands, not its header comment).
+    expect(ciStep).toContain('pnpm db:setup\n');
+    // The second run is the idempotency check; a single call would pass the line above.
+    expect(ciStep).toMatch(/pnpm db:setup\n\s*pnpm db:setup\n/);
+    const sh = readFileSync(resolve(process.cwd(), 'scripts/db-setup.sh'), 'utf8');
+    const step = sh.slice(sh.indexOf('set -euo pipefail'));
     const at = (needle: string) => {
       const i = step.indexOf(needle);
-      expect(i, `"${needle}" is missing from the Prepare database step`).toBeGreaterThan(-1);
+      expect(i, `"${needle}" is missing from scripts/db-setup.sh`).toBeGreaterThan(-1);
       return i;
     };
-    expect(at('.github/ci/supabase-ensure-rls.sql')).toBeLessThan(at('prisma db push'));
+    // The command, not the header comment: a `prisma db push` mention in a comment must not satisfy this.
+    expect(at('.github/ci/supabase-ensure-rls.sql')).toBeLessThan(at('pnpm exec prisma db push\n'));
     expect(at('pnpm db:rls\n')).toBeLessThan(at('scripts/apply-migrations.sh'));
     const trig = readFileSync(resolve(process.cwd(), '.github/ci/supabase-ensure-rls.sql'), 'utf8');
     expect(trig).toContain("EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);");

@@ -1,0 +1,14 @@
+== tests/expert-prereg-form.test.tsx  38.87 50.60 42.36
+     × no organisation: the error lands on Kurum with focus, nothing is sent 32295ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  1 failed | 18 passed (19)
+   Duration  132.57s (transform 415ms, setup 0ms, import 747ms, tests 130.52s, environment 1.08s)
+== tests/zz-dev-form.test.tsx  35.27 47.09 42.29
+     × no organisation: the error lands on Kurum with focus, nothing is sent 35959ms
+     × a picked language is sent; the languages group carries no required mark 32928ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  2 failed | 17 passed (19)
+   Duration  165.88s (transform 403ms, setup 0ms, import 1.10s, tests 162.03s, environment 2.36s)
+== tests/expert-prereg-form.test.tsx  33.65 42.47 41.28
+      Tests  19 passed (19)
+   Duration  60.73s (transform 408ms, setup 0ms, import 811ms, tests 57.83s, environment 1.88s)

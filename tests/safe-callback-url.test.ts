@@ -47,7 +47,7 @@ describe('safeCallbackUrl', () => {
 });
 
 describe('AuthCard reads callbackUrl only through safeCallbackUrl', () => {
-  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/app/[locale]/login/AuthCard.tsx'), 'utf8');
+  const src = fs.readFileSync(path.resolve(__dirname, '..', 'src/app/[locale]/(public)/login/AuthCard.tsx'), 'utf8');
 
   it('has exactly one read of the query value, and it is filtered', () => {
     expect(src.match(/searchParams\.get\('callbackUrl'\)/g)).toHaveLength(1);

@@ -45,10 +45,13 @@ export const AGENCY_INVITE_CODE_DDL_LOCK = 'AgencyInviteCode:ddl';
 export const PUBLIC_SECTOR_PLANS_LOCK = 'PlanFeature:public-sector';
 
 /**
- * scripts/apply-migrations.sh refuses to run while ANY database in the cluster
- * has a stored default for app.system_scope (pg_db_role_setting is
- * cluster-wide). migration-owner-chain.live stores one on its own database for
- * a few seconds, so two gates sharing one Postgres (two worktrees) broke each
- * other's chain runs (FO-27). Held for that whole file, on the admin session.
+ * scripts/apply-migrations.sh refuses to run while a stored default for
+ * app.system_scope reaches its database: one on that database, or a role-wide
+ * one (pg_db_role_setting.setdatabase = 0), which reaches every database.
+ * migration-owner-chain.live stores a role-wide one on its own owner role for a
+ * few seconds, so two gates on one Postgres would still break each other's
+ * chain runs (FO-27; FO-34 only stopped other databases' defaults counting).
+ * Held for that whole file, on the admin session. The advisory lock lives in
+ * one database, so gates pointed at different databases are not serialised.
  */
 export const MIGRATION_OWNER_CHAIN_LOCK = 'cluster:app.system_scope-defaults';

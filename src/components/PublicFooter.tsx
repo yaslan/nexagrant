@@ -17,7 +17,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
   const tExpert = useTranslations('ExpertPrereg');
 
   return (
-    <footer className="bg-ground border-t border-border text-muted text-xs transition-colors">
+    <footer data-testid="public-footer" className="bg-ground border-t border-border text-muted text-xs transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-10">
           {/* Col 1: Brand */}

@@ -3,8 +3,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { CircleAlert, CircleCheck } from 'lucide-react';
-import PublicNavbar from '@/components/PublicNavbar';
-import PublicFooter from '@/components/PublicFooter';
 import { authSecret } from '@/lib/env';
 import { decodeVerifiedOutcome } from '@/lib/expert-prereg/server/verified-outcome';
 import { VERIFY_TOKEN_TTL_MS } from '@/lib/expert-prereg/server/constants';
@@ -39,8 +37,7 @@ export default async function ExpertVerifiedPage({ params, searchParams }: PageP
   const founder = result?.founderNumber ?? null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-ink">
-      <PublicNavbar locale={locale} />
+    <div className="flex-1 flex flex-col bg-background text-ink">
       <main id="main" className="flex-1 w-full max-w-2xl mx-auto px-edge sm:px-4 py-12 sm:py-16">
         <section
           aria-labelledby="ep-verified-heading"
@@ -72,7 +69,6 @@ export default async function ExpertVerifiedPage({ params, searchParams }: PageP
           </Link>
         </section>
       </main>
-      <PublicFooter locale={locale} />
     </div>
   );
 }
