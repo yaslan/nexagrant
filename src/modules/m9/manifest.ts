@@ -29,4 +29,6 @@ export const m9Manifest: ModuleManifest = {
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
+  addonPurchasable: false,
+  trialDays: 7,
 };

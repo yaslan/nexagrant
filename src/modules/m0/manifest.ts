@@ -25,4 +25,6 @@ export const m0Manifest: ModuleManifest = {
   statusBadge: 'soon',
   docsUrl: null,
   quota: null,
+  addonPurchasable: false,
+  trialDays: null,
 };

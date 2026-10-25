@@ -374,7 +374,32 @@ export const FALLBACK_PLAN_ID = 'free';
 /** FB KAMU B11 — the three public-sector packages, sold by contract only. */
 export type PublicSectorPlanId = 'public-starter' | 'public-team' | 'public-institution';
 
-export type EntitlementPlanId = PlanId | typeof FALLBACK_PLAN_ID | PublicSectorPlanId;
+/**
+ * FO-41 (F3) — the TTO Edition: a package a technology transfer office is
+ * offered by agreement. Like the public-sector packages it is never on the
+ * shopfront (`purchasable: false`, no `CATALOG` price); unlike them it is not a
+ * copy of a self-serve plan, so it is a grant of its own.
+ */
+export const TTO_EDITION_PLAN_ID = 'tto-edition';
+
+export type EntitlementPlanId =
+  | PlanId
+  | typeof FALLBACK_PLAN_ID
+  | typeof TTO_EDITION_PLAN_ID
+  | PublicSectorPlanId;
+
+/**
+ * How a plan narrows a module it grants (FO-41). Absent means the module is
+ * granted in full. Read through `moduleLimitsFor`; the gate turns `readOnly`
+ * into a `READ_ONLY_PLAN` refusal on writes (`assertModuleWrite`) and the M1
+ * search page meters `partnerSearchPerMonth` in `PartnerSearchQuotaUsage`.
+ */
+export interface ModuleLimits {
+  /** Partner searches (a search with at least one criterion) per UTC month. */
+  partnerSearchPerMonth?: number;
+  /** Nothing may be created or changed in the module; reading is allowed. */
+  readOnly?: boolean;
+}
 
 export interface PlanGrant {
   planId: EntitlementPlanId;
@@ -397,7 +422,19 @@ export interface PlanGrant {
    * `plansGrantingModule`, `PLAN_GRANTS` access or the module gate.
    */
   previewModuleIds?: readonly string[];
+  /**
+   * Modules in `moduleIds` that this plan grants only in a limited form. A
+   * module listed here is still granted (it is in `allowedModules`); the limit
+   * is what the module does with it.
+   */
+  moduleLimits?: Readonly<Record<string, ModuleLimits>>;
 }
+
+/**
+ * The limited Partner Intelligence (M1) of FO-41: ten searches a month, read
+ * only. One constant, so Discover, Basic and the TTO Edition cannot drift.
+ */
+const M1_LIMITED: ModuleLimits = { partnerSearchPerMonth: 10, readOnly: true };
 
 const ALL_MODULE_IDS = [
   'M1',
@@ -421,8 +458,12 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     seats: 1,
     workspaces: 1,
     aiCreditsMonthly: 10,
-    moduleIds: ['M3', 'M5'],
+    // FO-41 (F3): M3 moved to Basic; Discover opens a limited M1 instead. M0
+    // stays a preview while it is `statusBadge: 'soon'`. Tenants that already
+    // run M3 here keep it through `ModuleState.grandfathered`.
+    moduleIds: ['M1', 'M5'],
     previewModuleIds: ['M0', 'M12', 'M16'],
+    moduleLimits: { M1: M1_LIMITED },
   },
   {
     planId: 'basic',
@@ -431,8 +472,10 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     seats: 2,
     workspaces: 1,
     aiCreditsMonthly: 100,
-    moduleIds: ['M2', 'M3', 'M5'],
+    // Limited M1 as on Discover: upgrading must not take a module away.
+    moduleIds: ['M1', 'M2', 'M3', 'M5'],
     previewModuleIds: ['M0', 'M12', 'M16'],
+    moduleLimits: { M1: M1_LIMITED },
   },
   {
     planId: 'pro',
@@ -547,8 +590,12 @@ export function isContractPlan(planId: string): boolean {
 function publicSectorGrant(plan: PublicSectorPlan): PlanGrant {
   const base = SELF_SERVE_GRANTS.find((grant) => grant.planId === plan.basePlanId);
   if (!base) throw new Error(`Public-sector plan ${plan.planId} names unknown base ${plan.basePlanId}`);
+  // The contract terms (ILKADIM-PILOT.md §6.2) predate FO-41 and name modules in
+  // full only: a module the base grants limited (Basic's M1) is not part of them.
+  const { moduleLimits: baseLimits = {}, ...rest } = base;
   return {
-    ...base,
+    ...rest,
+    moduleIds: base.moduleIds.filter((id) => !(id in baseLimits)),
     planId: plan.planId,
     name: plan.name,
     purchasable: false,
@@ -556,10 +603,32 @@ function publicSectorGrant(plan: PublicSectorPlan): PlanGrant {
   };
 }
 
+/**
+ * FO-41: limited M1, M4 and M7. No price anywhere (`CATALOG` has no entry), so
+ * neither checkout nor `getAllPlans` can offer it; seats and credits follow
+ * Basic until an agreement states otherwise.
+ */
+const TTO_EDITION_GRANT: PlanGrant = {
+  planId: TTO_EDITION_PLAN_ID,
+  name: 'TTO Edition',
+  purchasable: false,
+  seats: 2,
+  workspaces: 1,
+  aiCreditsMonthly: 100,
+  moduleIds: ['M1', 'M4', 'M7'],
+  moduleLimits: { M1: M1_LIMITED },
+};
+
 export const PLAN_GRANTS: readonly PlanGrant[] = [
   ...SELF_SERVE_GRANTS,
+  TTO_EDITION_GRANT,
   ...PUBLIC_SECTOR_PLANS.map(publicSectorGrant),
 ];
+
+/** The limits a plan puts on one module it grants; `null` when granted in full. */
+export function moduleLimitsFor(planId: string, moduleId: string): ModuleLimits | null {
+  return grantsFor(planId)?.moduleLimits?.[moduleId] ?? null;
+}
 
 /**
  * Retired EUR plan id → the USD plan that replaces it.
@@ -634,6 +703,17 @@ export function displayPlansForModule(moduleId: string): DisplayPlanId[] {
  */
 export function planNamesGrantingModule(moduleId: string): string[] {
   return plansGrantingModule(moduleId).map((planId) => grantsFor(planId)?.name ?? planId);
+}
+
+/**
+ * The purchasable plans that open a module with no limit — what a
+ * `READ_ONLY_PLAN` refusal tells the tenant to buy (Basic's limited M1 is not
+ * an answer to "I need to write").
+ */
+export function planNamesGrantingModuleInFull(moduleId: string): string[] {
+  return plansGrantingModule(moduleId)
+    .filter((planId) => moduleLimitsFor(planId, moduleId) === null)
+    .map((planId) => grantsFor(planId)?.name ?? planId);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

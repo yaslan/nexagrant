@@ -29,5 +29,7 @@ export const m11Manifest: ModuleManifest = {
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
+  addonPurchasable: false,
+  trialDays: 7,
   programTemplates: ['horizon-europe', 'eurostars', 'digital-europe', 'eic-accelerator'],
 };

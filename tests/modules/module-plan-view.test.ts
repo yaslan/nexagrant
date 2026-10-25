@@ -11,6 +11,8 @@ import { readModulesPlanView } from "../../src/app/[locale]/(app)/[workspace]/se
 function fakeTx(opts: {
   subscription: Record<string, unknown> | null;
   moduleStates?: Array<{ moduleId: string }>;
+  /** Module ids whose ModuleState row is `grandfathered` (FO-41). */
+  grandfathered?: string[];
 }): TenantTx {
   return {
     subscription: {
@@ -20,6 +22,7 @@ function fakeTx(opts: {
       findUnique: async () => ({
         id: "t1",
         subscription: opts.subscription,
+        moduleStates: (opts.grandfathered ?? []).map((moduleId) => ({ moduleId })),
       }),
     },
     moduleState: {
@@ -51,13 +54,13 @@ describe("readModulesPlanView — tenant without a live subscription", () => {
       "t1",
       fakeTx({
         subscription: null,
-        moduleStates: [{ moduleId: "M3" }, { moduleId: "M5" }],
+        moduleStates: [{ moduleId: "M1" }, { moduleId: "M5" }],
       }),
       "tr",
       NOW,
     );
 
-    expect(view.activeModules).toEqual(["M3", "M5"]);
+    expect(view.activeModules).toEqual(["M1", "M5"]);
     expect(view.switchedOnOutsidePlan).toEqual([]);
   });
 
@@ -66,14 +69,32 @@ describe("readModulesPlanView — tenant without a live subscription", () => {
       "t1",
       fakeTx({
         subscription: null,
-        moduleStates: [{ moduleId: "M1" }],
+        moduleStates: [{ moduleId: "M3" }],
       }),
       "tr",
       NOW,
     );
 
     expect(view.activeModules).toEqual([]);
-    expect(view.switchedOnOutsidePlan).toEqual(["M1"]);
+    expect(view.switchedOnOutsidePlan).toEqual(["M3"]);
+  });
+
+  it("FO-41: a grandfathered M3 on Discover is active, not ORPHANED", async () => {
+    const view = await readModulesPlanView(
+      "t1",
+      fakeTx({
+        subscription: null,
+        moduleStates: [{ moduleId: "M3" }],
+        grandfathered: ["M3"],
+      }),
+      "tr",
+      NOW,
+    );
+
+    expect(view.planId).toBe("free");
+    expect(view.entitledModules).toContain("M3");
+    expect(view.activeModules).toEqual(["M3"]);
+    expect(view.switchedOnOutsidePlan).toEqual([]);
   });
 });
 

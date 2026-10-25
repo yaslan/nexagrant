@@ -7,6 +7,10 @@ import { PartnerFilters } from './PartnerFilters';
 import { errorMessage } from '@/lib/errors';
 import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
+import { checkModuleAccess, requestSession } from '@/lib/modules/access';
+import { tenantScopeOf } from '@/lib/tenant';
+import { planNamesGrantingModuleInFull } from '@/lib/billing/catalog';
+import { consumePartnerSearch, type PartnerSearchQuota } from '@/modules/m1/server/partner-search/monthly-quota';
 import { recordAlert } from '@/lib/observability/system-alert';
 
 
@@ -79,6 +83,19 @@ export default async function PartnersPage({
   const minProjects = sParams.min_projects ? parseInt(sParams.min_projects, 10) : 0;
   const isInterregOnly = sParams.is_interreg === 'true' || sParams.framework?.toUpperCase() === 'INTERREG';
 
+  // FO-41: a limited M1 (Discover, Basic, TTO Edition) counts each search with
+  // a criterion against the month; browsing the default list is not a search.
+  // Same per-request read as `moduleGate` above (React `cache()`), so no extra
+  // query. A used-up month runs no lookup at all.
+  const hasCriteria = Boolean(q || country || activityType || isTurkishOnly || isInterregOnly || minProjects > 0);
+  let searchQuota: PartnerSearchQuota | null = null;
+  const searchLimit = (await checkModuleAccess('M1')).limits?.partnerSearchPerMonth;
+  if (searchLimit !== undefined && hasCriteria) {
+    const scope = tenantScopeOf(await requestSession());
+    if (scope) searchQuota = await consumePartnerSearch(scope.tenantId, searchLimit);
+  }
+  const quotaExhausted = searchQuota?.allowed === false;
+
   let profiles: PartnerRow[] = [];
   let totalCount = 0;
   let dataSource = 'cordis_partner_profile';
@@ -86,7 +103,10 @@ export default async function PartnersPage({
   // the same to the user.
   let queryFailed = false;
 
-  if (isInterregOnly) {
+  if (quotaExhausted) {
+    // Nothing is looked up: the table below shows the empty state and the
+    // notice above it says why.
+  } else if (isInterregOnly) {
     // Interreg partners (e.g. Trakya Üniversitesi, belediyeler, ajanslar) are recorded
     // in CordisOrganization and linked to CordisProject with framework 'INTERREG'.
     // Querying CordisOrganization directly with framework filter ensures all Interreg
@@ -487,6 +507,22 @@ export default async function PartnersPage({
           {isTurkishOnly && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">🇹🇷 {t('turkishOnlyTag')}</span>}
           {isInterregOnly && <span className="bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono px-2 py-0.5 rounded font-bold">🇪🇺 {t('interregPartnersTag')}</span>}
           {minProjects > 0 && <span className="bg-white border border-blue-200 text-blue-800 font-mono px-2 py-0.5 rounded">{t('minProjectsTag', { count: minProjects })}</span>}
+        </div>
+      )}
+
+      {searchQuota && (
+        <div
+          role={quotaExhausted ? 'alert' : 'status'}
+          data-testid="partner-search-quota"
+          className={
+            quotaExhausted
+              ? 'border border-amber-200 bg-amber-50 text-amber-900 text-xs rounded-xl p-4'
+              : 'text-xs text-muted'
+          }
+        >
+          {quotaExhausted
+            ? t('searchQuotaExhausted', { limit: searchQuota.limit, plans: planNamesGrantingModuleInFull('M1').join(', ') })
+            : t('searchQuotaUsed', { used: searchQuota.used, limit: searchQuota.limit })}
         </div>
       )}
 
