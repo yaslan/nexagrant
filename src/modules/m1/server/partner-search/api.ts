@@ -28,6 +28,7 @@ import { csvCell } from '@/lib/csv-cell';
 import type { TenantTx } from '@/lib/db';
 import { asRole, can, type Action } from '@/lib/rbac';
 import type { ModuleAccessResult } from '@/lib/modules/tenant-access';
+import { canAccessStatus, type ModuleViewer } from '@/lib/modules/state-machine';
 
 import { maskContact } from './mask';
 
@@ -45,7 +46,25 @@ export const PARTNER_SEARCH_ACTION: Action = 'view_partner_search';
 const ORG_TYPES = ['HES', 'REC', 'PRC', 'PUB', 'OTH'] as const satisfies readonly PartnerSearchOrgType[];
 
 const blankToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
-const optionalText = (max: number) => z.preprocess(blankToUndefined, z.string().trim().min(1).max(max).optional());
+/** A NUL byte is not text Postgres stores: refused here (400), not left to fail the query (500). */
+const optionalText = (max: number) =>
+  z.preprocess(
+    blankToUndefined,
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(max)
+      .refine((s) => !s.includes('\u0000'))
+      .optional()
+  );
+
+/**
+ * `ILIKE` wildcards and the escape character itself, escaped for Prisma's
+ * `contains` (Postgres `LIKE` escapes with `\` by default). Without it "100%"
+ * matches every row and `_` matches any character.
+ */
+export const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
 
 export const partnerSearchQuerySchema = z.object({
   topic: optionalText(200),
@@ -102,8 +121,8 @@ export function announcementWhere(filter: AnnouncementFilter): Record<string, un
   if (filter.pic !== undefined) where.organizationPic = filter.pic;
   if (filter.q !== undefined) {
     where.OR = [
-      { organizationName: { contains: filter.q, mode: 'insensitive' } },
-      { description: { contains: filter.q, mode: 'insensitive' } },
+      { organizationName: { contains: escapeLike(filter.q), mode: 'insensitive' } },
+      { description: { contains: escapeLike(filter.q), mode: 'insensitive' } },
     ];
   }
   return where;
@@ -371,15 +390,19 @@ export type PartnerSearchAccess =
  *
  *  - M1 open → allowed; `quota` is the plan's monthly figure or null (unlimited).
  *  - M1 refused only because the plan lacks it, and the plan meters Partner
- *    Search (Discover, Basic) → allowed with that quota. `ModuleState` cannot
- *    say anything here: a tenant cannot switch on a module it does not own.
+ *    Search (Discover, Basic) → allowed with that quota, unless the rollout
+ *    holds the module back: `DEV` (staff only) or `PILOT` (managers only)
+ *    answers as `canAccessStatus` does for a plan that has the module. `OFF`
+ *    stays open here, because a tenant with no `ModuleState` row is the metered
+ *    default. The plan decides entitlement, the switch decides rollout.
  *  - Any other M1 refusal (switched off, DEV, PILOT audience, coming soon) is
  *    the module gate's answer and stands.
  */
 export function decidePartnerSearchAccess(
   actor: PartnerSearchActor,
   m1: ModuleAccessResult,
-  grant: PartnerSearchGrant
+  grant: PartnerSearchGrant,
+  viewer: ModuleViewer
 ): PartnerSearchAccess {
   if (actor.kind === 'member' && !can(asRole(actor.role), PARTNER_SEARCH_ACTION)) {
     return { allowed: false, reason: 'ROLE_FORBIDDEN' };
@@ -388,6 +411,8 @@ export function decidePartnerSearchAccess(
     return { allowed: true, quota: grant.queriesMonthly, export: grant.export };
   }
   if (m1.reason === 'PLAN_UPGRADE_REQUIRED' && grant.queriesMonthly !== null && grant.queriesMonthly > 0) {
+    const rollout = m1.status === 'OFF' ? null : canAccessStatus(m1.status, viewer);
+    if (rollout && !rollout.allowed) return { allowed: false, reason: rollout.reason ?? 'MODULE_OFF' };
     return { allowed: true, quota: grant.queriesMonthly, export: false };
   }
   return {

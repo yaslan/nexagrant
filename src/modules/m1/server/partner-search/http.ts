@@ -63,7 +63,7 @@ async function accessOf(tx: TenantTx, caller: PartnerSearchCaller): Promise<Part
   ]);
   const m1 = decideModuleAccess(M1, (state?.status ?? 'OFF') as ModuleStatus, entitlements.allowedModules, caller.viewer);
   const grant = partnerSearchGrant(entitlements.planId, entitlements.allowedModules.includes(M1));
-  return decidePartnerSearchAccess(caller.actor, m1, grant);
+  return decidePartnerSearchAccess(caller.actor, m1, grant, caller.viewer);
 }
 
 function denied(access: Extract<PartnerSearchAccess, { allowed: false }>): NextResponse {

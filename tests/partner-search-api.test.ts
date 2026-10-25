@@ -9,12 +9,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { grantsFor, partnerSearchGrant, PLAN_LIMIT_KEYS, planNamesGrantingPartnerSearchExport } from '@/lib/billing/catalog';
 import type { TenantTx } from '@/lib/db';
-import type { ModuleAccessResult } from '@/lib/modules/tenant-access';
+import { decideModuleAccess, type ModuleAccessResult } from '@/lib/modules/tenant-access';
+import type { ModuleStatus } from '@/lib/modules/types';
 import {
   announcementWhere,
   computePartnerSignal,
   consumePartnerSearchQuery,
   decidePartnerSearchAccess,
+  escapeLike,
   parsePartnerSearchQuery,
   quotaMonth,
   quotaResetsAt,
@@ -35,6 +37,9 @@ const m1NotInPlan: ModuleAccessResult = {
 };
 const m1SwitchedOff: ModuleAccessResult = { allowed: false, status: 'OFF', reason: 'MODULE_OFF' };
 const member = (role: string) => ({ kind: 'member' as const, role });
+const sessionViewer = (role: string, isPlatformAdmin = false) => ({ role, isPlatformAdmin });
+/** M1 as the route gets it for a tenant whose plan lacks M1 (Discover, Basic): built by the same call, not typed. */
+const m1OutOfPlan = (status: ModuleStatus, role: string) => decideModuleAccess('M1', status, [], sessionViewer(role));
 
 describe('computePartnerSignal', () => {
   it('counts requests, offers, countries, organisation types and Türkiye', () => {
@@ -99,8 +104,10 @@ describe('catalogue: Partner Search terms per plan', () => {
 });
 
 describe('decidePartnerSearchAccess', () => {
+  const discover = { queriesMonthly: 10, export: false };
+
   it('Pro (M1 on) is allowed and unlimited', () => {
-    expect(decidePartnerSearchAccess(member('MEMBER'), m1Open, { queriesMonthly: null, export: false })).toEqual({
+    expect(decidePartnerSearchAccess(member('MEMBER'), m1Open, { queriesMonthly: null, export: false }, sessionViewer('MEMBER'))).toEqual({
       allowed: true,
       quota: null,
       export: false,
@@ -108,7 +115,7 @@ describe('decidePartnerSearchAccess', () => {
   });
 
   it('Discover (no M1, metered) is allowed with its quota and without the export', () => {
-    expect(decidePartnerSearchAccess(member('TENANT_OWNER'), m1NotInPlan, { queriesMonthly: 10, export: false })).toEqual({
+    expect(decidePartnerSearchAccess(member('TENANT_OWNER'), m1NotInPlan, discover, sessionViewer('TENANT_OWNER'))).toEqual({
       allowed: true,
       quota: 10,
       export: false,
@@ -116,7 +123,9 @@ describe('decidePartnerSearchAccess', () => {
   });
 
   it('a plan with neither M1 nor a quota gets the module gate refusal and the plans to upgrade to', () => {
-    expect(decidePartnerSearchAccess(member('TENANT_OWNER'), m1NotInPlan, { queriesMonthly: 0, export: false })).toEqual({
+    expect(
+      decidePartnerSearchAccess(member('TENANT_OWNER'), m1NotInPlan, { queriesMonthly: 0, export: false }, sessionViewer('TENANT_OWNER'))
+    ).toEqual({
       allowed: false,
       reason: 'PLAN_UPGRADE_REQUIRED',
       requiredPlans: ['Pro', 'Ultra'],
@@ -124,22 +133,67 @@ describe('decidePartnerSearchAccess', () => {
   });
 
   it('Pro with M1 switched off is refused: the switch is not bypassed by the quota path', () => {
-    expect(decidePartnerSearchAccess(member('TENANT_OWNER'), m1SwitchedOff, { queriesMonthly: null, export: false })).toEqual({
+    expect(
+      decidePartnerSearchAccess(member('TENANT_OWNER'), m1SwitchedOff, { queriesMonthly: null, export: false }, sessionViewer('TENANT_OWNER'))
+    ).toEqual({
       allowed: false,
       reason: 'MODULE_OFF',
     });
     // Same for a metered plan whose refusal is not the plan.
     expect(
-      decidePartnerSearchAccess(member('TENANT_OWNER'), { allowed: false, status: 'DEV', reason: 'DEV_INTERNAL_ONLY' }, {
-        queriesMonthly: 10,
-        export: false,
-      })
+      decidePartnerSearchAccess(
+        member('TENANT_OWNER'),
+        { allowed: false, status: 'DEV', reason: 'DEV_INTERNAL_ONLY' },
+        discover,
+        sessionViewer('TENANT_OWNER')
+      )
     ).toEqual({ allowed: false, reason: 'DEV_INTERNAL_ONLY' });
+  });
+
+  // se-fb S1 (PR #165, round 3): on a metered plan the rollout of M1 must still hold.
+  // Before the fix Discover MEMBER got 200 with M1 in DEV or PILOT, Pro MEMBER got 403.
+  it('a metered plan honours M1 DEV (staff only): a tenant MEMBER is refused as on Pro', () => {
+    expect(decidePartnerSearchAccess(member('MEMBER'), m1OutOfPlan('DEV', 'MEMBER'), discover, sessionViewer('MEMBER'))).toEqual({
+      allowed: false,
+      reason: 'DEV_INTERNAL_ONLY',
+    });
+    expect(
+      decidePartnerSearchAccess(member('TENANT_OWNER'), m1OutOfPlan('DEV', 'TENANT_OWNER'), discover, sessionViewer('TENANT_OWNER'))
+    ).toEqual({ allowed: false, reason: 'DEV_INTERNAL_ONLY' });
+  });
+
+  it('a metered plan honours M1 PILOT (managers only): a MEMBER is refused, a manager gets the quota', () => {
+    expect(decidePartnerSearchAccess(member('MEMBER'), m1OutOfPlan('PILOT', 'MEMBER'), discover, sessionViewer('MEMBER'))).toEqual({
+      allowed: false,
+      reason: 'PILOT_MANAGERS_ONLY',
+    });
+    expect(
+      decidePartnerSearchAccess(member('TENANT_OWNER'), m1OutOfPlan('PILOT', 'TENANT_OWNER'), discover, sessionViewer('TENANT_OWNER'))
+    ).toEqual({ allowed: true, quota: 10, export: false });
+  });
+
+  it('platform staff pass M1 DEV on a metered plan, and an API key passes M1 PILOT', () => {
+    expect(
+      decidePartnerSearchAccess(member('MEMBER'), m1OutOfPlan('DEV', 'MEMBER'), discover, sessionViewer('MEMBER', true))
+    ).toEqual({ allowed: true, quota: 10, export: false });
+    expect(decidePartnerSearchAccess({ kind: 'apiKey' }, m1OutOfPlan('PILOT', 'MEMBER'), discover, { kind: 'machine', role: 'API_KEY', isPlatformAdmin: false, isMachine: true })).toEqual({
+      allowed: true,
+      quota: 10,
+      export: false,
+    });
+  });
+
+  it('an OFF switch stays open on a metered plan: no ModuleState row is the metered default', () => {
+    expect(decidePartnerSearchAccess(member('MEMBER'), m1OutOfPlan('OFF', 'MEMBER'), discover, sessionViewer('MEMBER'))).toEqual({
+      allowed: true,
+      quota: 10,
+      export: false,
+    });
   });
 
   it('refuses a guest partner and an unknown role before anything else', () => {
     for (const role of ['GUEST_PARTNER', 'NOT_A_ROLE']) {
-      expect(decidePartnerSearchAccess(member(role), m1Open, { queriesMonthly: null, export: true })).toEqual({
+      expect(decidePartnerSearchAccess(member(role), m1Open, { queriesMonthly: null, export: true }, sessionViewer(role))).toEqual({
         allowed: false,
         reason: 'ROLE_FORBIDDEN',
       });
@@ -147,11 +201,31 @@ describe('decidePartnerSearchAccess', () => {
   });
 
   it('lets an API key through on the M1 decision alone (it holds no membership role)', () => {
-    expect(decidePartnerSearchAccess({ kind: 'apiKey' }, m1Open, { queriesMonthly: null, export: true })).toEqual({
+    expect(
+      decidePartnerSearchAccess({ kind: 'apiKey' }, m1Open, { queriesMonthly: null, export: true }, { kind: 'machine', role: 'API_KEY', isPlatformAdmin: false, isMachine: true })
+    ).toEqual({
       allowed: true,
       quota: null,
       export: true,
     });
+  });
+});
+
+describe('query hardening (se-fb S2, S3)', () => {
+  it('escapes the LIKE wildcards and the escape character itself', () => {
+    expect(escapeLike('100%_\\')).toBe('100\\%\\_\\\\');
+    expect(escapeLike('plain words')).toBe('plain words');
+  });
+
+  it('a search for "100%" is a substring match on that text, not a match-all pattern', () => {
+    const where = announcementWhere({ q: '100%' }) as { OR: Array<Record<string, { contains: string }>> };
+    expect(where.OR[0]?.organizationName?.contains).toBe('100\\%');
+    expect(where.OR[1]?.description?.contains).toBe('100\\%');
+  });
+
+  it('refuses a NUL byte in q with a 400-class parse failure, not a query error', () => {
+    expect(parsePartnerSearchQuery(new URLSearchParams('q=a%00b')).success).toBe(false);
+    expect(parsePartnerSearchQuery(new URLSearchParams('q=ab')).success).toBe(true);
   });
 });
 
