@@ -38,6 +38,9 @@ const UPSTREAM_ERROR_KEYS = {
   network_error: 'upstreamNetworkError',
 } as const satisfies Record<KeepEuFetchErrorCode, string>;
 
+/** The admin team's zone; the label printed next to the time names it. */
+const SYNC_TIME_ZONE = 'Europe/Istanbul';
+
 interface KeepEuAdminClientProps {
   initialMetrics: KeepEuMetrics;
 }
@@ -99,6 +102,22 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
     return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount);
   };
 
+  const formatCount = (count: number): string => new Intl.NumberFormat(locale).format(count);
+
+  // Locale and zone are pinned: a bare `toLocaleString()` rendered the server's
+  // en-US/process zone on the server and the browser's on the client, and the
+  // mismatch failed hydration (CE-699…CE-702).
+  const formatSyncTime = (iso: string): string =>
+    new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: SYNC_TIME_ZONE,
+      timeZoneName: 'short',
+    }).format(new Date(iso));
+
   return (
     <div className="space-y-6">
       {/* ───────────────────────── HEADER ───────────────────────── */}
@@ -118,7 +137,7 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
             <div className="text-xs text-muted mt-2 font-mono flex items-center gap-1.5">
               <span>{t('lastSync')}:</span>
               <span className="font-semibold text-ink">
-                {metrics.lastSyncTimestamp ? new Date(metrics.lastSyncTimestamp).toLocaleString() : t('neverSynced')}
+                {metrics.lastSyncTimestamp ? formatSyncTime(metrics.lastSyncTimestamp) : t('neverSynced')}
               </span>
             </div>
           </div>
@@ -143,7 +162,7 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
             <Layers className="w-4 h-4 text-blue-500" />
           </div>
           <div className="text-2xl font-bold text-ink mt-2">
-            {metrics.totalProjectsCount.toLocaleString()}
+            {formatCount(metrics.totalProjectsCount)}
           </div>
           <div className="text-xs text-muted mt-1 flex items-center gap-1">
             <span className="font-medium text-emerald-600">{t('interregAndNext')}</span>
@@ -171,7 +190,7 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
             <Building2 className="w-4 h-4 text-purple-500" />
           </div>
           <div className="text-2xl font-bold text-ink mt-2">
-            {metrics.totalPartnersCount.toLocaleString()}
+            {formatCount(metrics.totalPartnersCount)}
           </div>
           <div className="text-xs text-muted mt-1 flex items-center gap-1">
             <span className="text-purple-600 font-medium">{t('m8PartnerPool')}</span>
@@ -185,7 +204,7 @@ export function KeepEuAdminClient({ initialMetrics }: KeepEuAdminClientProps) {
             <MapPin className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-2">
-            {metrics.turkishPartnersCount.toLocaleString()}
+            {formatCount(metrics.turkishPartnersCount)}
           </div>
           <div className="text-xs text-muted mt-1">
             <span className="font-semibold text-rose-600">TR</span> {t('turkishBeneficiariesDesc')}
