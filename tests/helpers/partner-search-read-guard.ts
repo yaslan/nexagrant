@@ -42,12 +42,14 @@ function selectCanReachText(select: ts.ObjectLiteralExpression): boolean {
 /**
  * Can this delegate call hand the text back? Only a `select` object literal that never names
  * `description` (or the relation) rules it out; no `select` (a whole row), `include`, a
- * `select` held in a variable, or a spread all keep it a reader.
+ * `select` held in a variable, or a spread (inside `select` or beside it) all keep it a reader.
  */
 function delegateCallReachesText(call: ts.CallExpression, method: string): boolean {
   if (NO_ROW_METHODS.has(method)) return false;
   const arg = call.arguments[0];
   if (!arg || !ts.isObjectLiteralExpression(arg)) return true;
+  // `{ select: { id: true }, ...args }`: a spread on either side of `select` can replace it.
+  if (arg.properties.some(ts.isSpreadAssignment)) return true;
   const select = arg.properties.find(
     (p): p is ts.PropertyAssignment =>
       ts.isPropertyAssignment(p) && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) && p.name.text === 'select'
@@ -56,25 +58,18 @@ function delegateCallReachesText(call: ts.CallExpression, method: string): boole
   return selectCanReachText(select.initializer);
 }
 
-/** The raw SQL around a quoted table name: climb out of `+` / parentheses to the query call or template. */
-function rawQueryText(literal: ts.Node, sf: ts.SourceFile): string {
-  let n: ts.Node = literal;
-  while (n.parent && (ts.isBinaryExpression(n.parent) || ts.isParenthesizedExpression(n.parent) || ts.isTemplateSpan(n.parent) || ts.isTemplateExpression(n.parent))) {
-    n = n.parent;
-  }
-  if (n.parent && (ts.isTaggedTemplateExpression(n.parent) || ts.isCallExpression(n.parent))) n = n.parent;
-  return n.getText(sf);
-}
-
 /**
  * Does the file read the TEXT of stored announcements? Three ways in:
  *  - the Prisma delegate, any method (`find*`, `groupBy`, `update`, `create`, `delete`, `['x']`,
  *    a delegate held in a variable) unless it provably cannot return the text: a `select`
  *    literal without `description`, or a method that returns no row (`updateMany`, `count`);
  *  - the relation: `partnerAnnouncements` as an include/select key off `Topic`;
- *  - raw SQL: the quoted table name `"PartnerSearchAnnouncement"` in a query that mentions
- *    `description` or `*`.
- * A file that only touches ids and counts is not a reader and owes the mask nothing.
+ *  - raw SQL: the quoted table name `"PartnerSearchAnnouncement"` in any string or template,
+ *    whatever the query selects. The text of the query is not read: `${cols}`, a `Prisma.sql`
+ *    fragment, `to_jsonb(a)` or `Prisma.raw(...)` all hide the column, and no file has a reason
+ *    to write raw SQL against this table (use the delegate with a `select`).
+ * A file that only touches ids and counts through the delegate is not a reader and owes the
+ * mask nothing.
  */
 export function readsAnnouncements(source: string, fileName = 'file.ts'): boolean {
   const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -97,8 +92,7 @@ export function readsAnnouncements(source: string, fileName = 'file.ts'): boolea
       (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) &&
       TABLE.test(node.getText(sf))
     ) {
-      const sql = rawQueryText(node, sf);
-      if (/description/i.test(sql) || sql.includes('*')) found = true;
+      found = true;
     }
     if (use && !found) {
       const access = use.parent;

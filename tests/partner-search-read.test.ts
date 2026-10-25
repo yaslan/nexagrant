@@ -46,9 +46,11 @@ describe('toPublicSummary (FO-137)', () => {
  * `maskContact` or `toPublicSummary`, and (2) not let the raw `description` out beside that
  * call. A file "reads the text" through the Prisma delegate (any method: `find*`, `groupBy`,
  * `update`, `create`, `['x']`...), the `Topic` relation (`partnerAnnouncements`) or raw SQL
- * (`"PartnerSearchAnnouncement"` in a query that mentions `description` or `*`). A delegate
- * call that provably cannot return the text is not a read: `select` is an object literal
- * that never names `description`, or the method returns no row (`updateMany`, `count`).
+ * (the quoted `"PartnerSearchAnnouncement"` in any string or template; the query text is not
+ * read, so `${cols}`, `Prisma.sql`, `to_jsonb(a)` and `Prisma.raw(...)` change nothing). A
+ * delegate call that provably cannot return the text is not a read: `select` is an object
+ * literal that never names `description` and has no spread beside it, or the method returns
+ * no row (`updateMany`, `count`).
  * Comments do not count: the scan reads code only. Two files are exempt because no row they
  * read is sent to a client:
  *  - ingestor.ts reads `description` only to compare it with the scan it is about to write;
@@ -164,13 +166,43 @@ describe('the guard recognises the leaks it polices (FO-151)', () => {
     expect(readsAnnouncements(`p.partnerSearchAnnouncement.findMany.call(p, {})`)).toBe(true);
   });
 
-  it('FO-151 B1: raw SQL is a reader when it can select the text, not when it counts ids', () => {
-    expect(readsAnnouncements('p.$queryRaw`SELECT id FROM "PartnerSearchAnnouncement" WHERE country = ${c}`')).toBe(false);
+  // crw2-fb Y1-Y3b: a rule that reads the query text for `description` / `*` is an allowlist, and
+  // `${cols}`, a `Prisma.sql` fragment, `to_jsonb(a)` or `Prisma.raw(...)` walk around it. No legitimate
+  // file writes raw SQL against this table, so naming the quoted table is enough to be a reader.
+  it('FO-151 Y1: the column list arrives by interpolation', () => {
+    expect(readsAnnouncements('p.$queryRaw`SELECT ${cols} FROM "PartnerSearchAnnouncement"`')).toBe(true);
+    expect(readsAnnouncements(`p.$queryRawUnsafe(\`SELECT \${cols} FROM \\"PartnerSearchAnnouncement\\"\`)`)).toBe(true);
+  });
+
+  it('FO-151 Y2: the whole row as one value', () => {
+    expect(readsAnnouncements('p.$queryRaw`SELECT to_jsonb(a) AS row FROM "PartnerSearchAnnouncement" a`')).toBe(true);
+    expect(readsAnnouncements('p.$queryRaw`SELECT row_to_json(a) FROM "PartnerSearchAnnouncement" a`')).toBe(true);
+  });
+
+  it('FO-151 Y3: `description` sits in a Prisma.sql fragment that is spliced in', () => {
+    expect(readsAnnouncements('const cols = Prisma.sql`id, description`; p.$queryRaw`SELECT ${cols} FROM "PartnerSearchAnnouncement"`')).toBe(true);
+  });
+
+  it('FO-151 Y3b: the table name itself is inside Prisma.raw(...)', () => {
+    expect(readsAnnouncements('p.$queryRaw`SELECT ${Prisma.raw(cols)} FROM ${Prisma.raw(\'"PartnerSearchAnnouncement"\')}`')).toBe(true);
+    expect(readsAnnouncements(`p.$queryRaw(Prisma.sql\`SELECT \${cols} FROM \${Prisma.raw('"PartnerSearchAnnouncement"')}\`)`)).toBe(true);
+  });
+
+  it('FO-151 B1: raw SQL that names the table is a reader even when it asks for ids only', () => {
+    expect(readsAnnouncements('p.$queryRaw`SELECT id FROM "PartnerSearchAnnouncement" WHERE country = ${c}`')).toBe(true);
     expect(readsAnnouncements('p.$queryRaw`SELECT * FROM "PartnerSearchAnnouncement"`')).toBe(true);
     expect(readsAnnouncements('p.$queryRaw`SELECT a.* FROM "PartnerSearchAnnouncement" a`')).toBe(true);
     expect(readsAnnouncements('p.$queryRaw`SELECT "Description" FROM "PartnerSearchAnnouncement" WHERE id = ${id}`')).toBe(true);
-    expect(readsAnnouncements('p.$queryRaw`SELECT id FROM "PartnerSearchAnnouncement" WHERE id = ${id} AND description LIKE ${q}`')).toBe(true);
     expect(readsAnnouncements(`p.$queryRawUnsafe('SELECT ' + cols + ' FROM \\"PartnerSearchAnnouncement\\" WHERE description IS NOT NULL')`)).toBe(true);
+  });
+
+  // crw2-fb Y4: a later spread can overwrite `select`, so the literal proves nothing.
+  it('FO-151 Y4: a spread beside `select` keeps the file a reader', () => {
+    const call = (args: string) => `p.partnerSearchAnnouncement.findMany({ ${args} })`;
+    expect(readsAnnouncements(call('select: { id: true }, ...args'))).toBe(true);
+    expect(readsAnnouncements(call('...args, select: { id: true }'))).toBe(true);
+    expect(readsAnnouncements(call('select: { id: true }, ...(cond ? { take: 1 } : {})'))).toBe(true);
+    expect(readsAnnouncements(call('select: { id: true }, take: 1'))).toBe(false);
   });
 
   it('a comment that merely names the model or the relation is not a reader', () => {
