@@ -43,6 +43,7 @@ import {
   type PricablePlan,
   type PricedLine,
 } from '@/lib/billing/catalog';
+import type { PlanCardFeature } from '@/lib/billing/plan-copy';
 import { listPublicPlans, plansVisibleToTenant, type PublishedPlanVersion } from '@/lib/billing/plan-repository';
 
 /**
@@ -66,6 +67,8 @@ export interface StorefrontPlan {
   workspaces: number;
   aiCreditsMonthly: number;
   modules: string[];
+  /** The version's card bullets — the only copy a studio-made plan has (plan-copy.ts). */
+  features: PlanCardFeature[];
 }
 
 /**
@@ -109,6 +112,12 @@ function toStorefrontPlan(row: {
     workspaces: row.version.workspaces,
     aiCreditsMonthly: row.version.aiCreditsMonthly,
     modules: row.version.modules,
+    features: (row.version.features ?? []).map(({ kind, moduleId, textTr, textEn }) => ({
+      kind,
+      moduleId,
+      textTr,
+      textEn,
+    })),
   };
 }
 

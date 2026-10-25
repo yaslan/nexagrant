@@ -14,8 +14,11 @@ import {
 } from '@/lib/billing/catalog';
 import type { StorefrontPlanCards } from '@/lib/billing/storefront';
 import { formatMoney } from '@/lib/money';
+import { planCardCopy } from '@/lib/billing/plan-copy';
 import type { LifetimeScarcity } from '@/lib/billing/lifetime-licence';
 import type { InvoiceBuyerIdentity, InvoiceListRow } from '@/lib/billing/invoice-list';
+
+const SETTINGS_BULLETS = ['seats', 'credits', 'modules'] as const;
 
 interface BillingClientProps {
   workspace: string;
@@ -478,6 +481,7 @@ export function BillingClient({
           {cards.map(({ entry, charged, list, yearlyVsMonthly }) => {
             const isCurrent = activePlan === entry.planId;
             const recommended = entry.planId === 'pro';
+            const copy = planCardCopy(entry, t, locale, { summary: 'desc', bullets: SETTINGS_BULLETS });
 
             return (
               <div
@@ -496,7 +500,7 @@ export function BillingClient({
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-base font-bold text-ink">{entry.name}</h3>
-                    <p className="text-[11px] text-muted mt-0.5">{t(`plans.${entry.planId}.desc`)}</p>
+                    {copy.summary && <p className="text-[11px] text-muted mt-0.5">{copy.summary}</p>}
                   </div>
 
                   <div>
@@ -530,17 +534,21 @@ export function BillingClient({
                   </div>
 
                   <ul className="space-y-2 text-xs text-ink-2 pt-2 border-t border-border">
-                    <li className="flex items-center gap-1.5">
-                      <span className="text-emerald-600 font-bold">✓</span>
-                      {t(`plans.${entry.planId}.seats`)}
-                    </li>
-                    <li className="flex items-center gap-1.5 font-semibold text-ink">
-                      <span className="text-emerald-600 font-bold">✓</span>
-                      {t(`plans.${entry.planId}.credits`)}
-                    </li>
-                    <li className="flex items-center gap-1.5 text-muted text-[11px]">
-                      <span>📦 {t(`plans.${entry.planId}.modules`)}</span>
-                    </li>
+                    {copy.bullets.map(({ key, text }) =>
+                      key === 'modules' ? (
+                        <li key={key} className="flex items-center gap-1.5 text-muted text-[11px]">
+                          <span>📦 {text}</span>
+                        </li>
+                      ) : (
+                        <li
+                          key={key}
+                          className={`flex items-center gap-1.5${key === 'credits' ? ' font-semibold text-ink' : ''}`}
+                        >
+                          <span className="text-emerald-600 font-bold">✓</span>
+                          {text}
+                        </li>
+                      )
+                    )}
                   </ul>
                 </div>
 
@@ -551,7 +559,7 @@ export function BillingClient({
                         sku: entry.sku,
                         type: 'plan',
                         name: `${entry.name} · ${cycleLabel}`,
-                        subtitle: t(`plans.${entry.planId}.desc`),
+                        subtitle: copy.summary ?? undefined,
                         billingCycle,
                         quantity: 1,
                       })

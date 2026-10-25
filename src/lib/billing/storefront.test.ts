@@ -116,6 +116,7 @@ describe('pricing a storefront plan', () => {
         workspaces: 1,
         aiCreditsMonthly: 500,
         modules: [],
+        features: [],
       },
       tier,
       NO_DISCOUNT_TIER
@@ -144,6 +145,7 @@ describe('pricing a storefront plan', () => {
         workspaces: 1,
         aiCreditsMonthly: 1,
         modules: [],
+        features: [],
       },
       NO_DISCOUNT_TIER,
       NO_DISCOUNT_TIER
@@ -167,6 +169,7 @@ describe('pricing a storefront plan', () => {
         workspaces: 1,
         aiCreditsMonthly: 1,
         modules: [],
+        features: [],
       },
     ];
     const schedule = priceTierSchedule(plans, DISCOUNT_TIERS);
