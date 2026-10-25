@@ -194,7 +194,7 @@ export async function exportAnnouncements(caller: PartnerSearchCaller, req: Requ
   const now = new Date();
 
   try {
-    const rows = await withTenant(caller.tenantId, async (tx) => {
+    const { rows, truncated } = await withTenant(caller.tenantId, async (tx) => {
       const access = await accessOf(tx, caller);
       if (!access.allowed) throw new Refusal(denied(access));
       if (!access.export) {
@@ -202,16 +202,17 @@ export async function exportAnnouncements(caller: PartnerSearchCaller, req: Requ
           denied({ allowed: false, reason: 'EXPORT_NOT_IN_PLAN', requiredPlans: planNamesGrantingPartnerSearchExport() })
         );
       }
-      return (await readAnnouncementsForExport(tx, filter)).map(toAnnouncementDto);
+      const found = await readAnnouncementsForExport(tx, filter);
+      return { rows: found.rows.map(toAnnouncementDto), truncated: found.truncated };
     });
 
     const stamp = now.toISOString().slice(0, 10);
     if (format === 'json') {
-      return NextResponse.json(toExportJson(rows, now), {
+      return NextResponse.json(toExportJson(rows, now, truncated), {
         headers: { 'Content-Disposition': `attachment; filename="partner-search-${stamp}.json"` },
       });
     }
-    return new NextResponse(toExportCsv(rows), {
+    return new NextResponse(toExportCsv(rows, truncated), {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="partner-search-${stamp}.csv"`,

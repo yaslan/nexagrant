@@ -19,7 +19,7 @@ Tüm rotalar `/api/v1/*`; JSON; zod doğrulama; hata biçimi `{ error: { code, m
 | GET | `/partner-search/announcements?topic&country&type&orgType&q&page` | Partner Search ilanları (geri çekilenler hariç; Discover/Basic ayda 10 sorgu, sonra 429) | M1 (FO-61) |
 | GET | `/organizations/:pic/announcements?…aynı filtreler` | Bir kurumun ilanları (aynı sayaç) | M1 (FO-61) |
 | GET | `/topics/:identifier/partner-signal` | `{ total, requests, offers, byCountry, byOrgType, trCount }` — sayaçtan düşmez | M1 (FO-61) |
-| GET | `/partner-search/announcements/export?format=csv\|json&…filtreler` | Ultra dışa aktarma; kaynak + CC BY 4.0 notu dosyada; yalnız oturum | M1 (FO-61) |
+| GET | `/partner-search/announcements/export?format=csv\|json&…filtreler` | Ultra dışa aktarma; kaynak + CC BY 4.0 notu dosyada; en çok 10.000 satır, kesilirse JSON `truncated: true` ve CSV'de `# Truncated` satırı; yalnız oturum | M1 (FO-61) |
 | GET/POST/PATCH | `/relationships`, `/relationships/:id/interactions` | Odak kişi | M4 |
 | GET/POST/PATCH/DELETE | `/evidence` | Kanıt | M3 |
 | GET/POST | `/concepts`, `/concepts/:id/generate` (SSE akış), `/concepts/:id/export?format=docx` | Concept note | M2 |

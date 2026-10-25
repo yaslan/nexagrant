@@ -80,7 +80,7 @@ describe('catalogue: Partner Search terms per plan', () => {
     expect(PLAN_LIMIT_KEYS.partnerSearchQueriesMonthly).toBe('partner_search_queries_monthly');
   });
 
-  it('opens an M1 add-on on a metered plan without a monthly cap, and still no export', () => {
+  it('keeps the monthly cap of a metered plan when M1 comes as an add-on, and still no export', () => {
     // An add-on M1 on Basic: the plan states 10, which still meters it.
     expect(partnerSearchGrant('basic', true)).toEqual({ queriesMonthly: 10, export: false });
     // An unknown plan id grants nothing without M1.
@@ -258,7 +258,16 @@ describe('export attribution', () => {
     });
     expect(json.source.notice).toMatch(/^Source: EU Funding & Tenders Portal, fetched 2026-10-22T06:00:00\.000Z\..*CC BY 4\.0/);
     expect(json.count).toBe(2);
+    expect(json.truncated).toBe(false);
     expect(json.exportedAt).toBe('2026-10-25T00:00:00.000Z');
+  });
+
+  it('a cut export says so: `truncated` in JSON, a third `#` line in CSV', () => {
+    expect(toExportJson(dtos, new Date(), true)).toMatchObject({ count: 2, truncated: true });
+    const lines = toExportCsv(dtos, true).split('\r\n');
+    expect(lines[2]).toBe('# Truncated: only the first 2 matching rows. Narrow the filters to export the rest.');
+    expect(lines[3]?.startsWith('id,topicIdentifier,')).toBe(true);
+    expect(lines).toHaveLength(7);
   });
 
   it('an empty export still carries the attribution', () => {

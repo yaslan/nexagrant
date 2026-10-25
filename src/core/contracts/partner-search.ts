@@ -141,6 +141,9 @@ export interface PartnerSearchExportSource {
 export interface PartnerSearchExportJson {
   source: PartnerSearchExportSource;
   exportedAt: string;
+  /** Rows in `data`. */
   count: number;
+  /** True when more rows matched than one export holds; `data` is the first `count` of them. */
+  truncated: boolean;
   data: PartnerSearchAnnouncementDto[];
 }

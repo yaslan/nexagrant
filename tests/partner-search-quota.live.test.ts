@@ -14,7 +14,9 @@ import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpe
  *    25 at once give exactly 10 passes, and the counter stops at 10;
  *  - a new UTC month starts a new row at 1;
  *  - the row is the tenant's own: another tenant's scope neither sees it nor
- *    can count against it (strict tenant_isolation).
+ *    can count against it (strict tenant_isolation);
+ *  - a read that fails after the count, in the same transaction, gives the
+ *    unit back (review B1c; the route side: tests/partner-search-http.test.ts).
  *
  * The statement's text and the plan figures: tests/partner-search-api.test.ts.
  */
@@ -102,6 +104,22 @@ describe('Partner Search quota (live DB, fabrika_app)', () => {
       { month: '2026-10', count: LIMIT },
       { month: '2026-11', count: 1 },
     ]);
+  });
+
+  test('a read that fails after the count rolls the unit back with the transaction', async (ctx) => {
+    if (skipReason) ctx.skip(skipReason);
+    const tenantId = tenants[1]!;
+    const now = new Date('2026-10-15T12:00:00Z');
+    await expect(consume(tenantId, now)).resolves.toEqual({ ok: true, used: 1 });
+
+    await expect(
+      withTenantOn(rls!, tenantId, async (tx) => {
+        await expect(consumePartnerSearchQuery(tx, tenantId, LIMIT, now)).resolves.toEqual({ ok: true, used: 2 });
+        throw new Error('page read failed');
+      })
+    ).rejects.toThrow('page read failed');
+
+    expect((await admin!.partnerSearchQuotaUsage.findFirstOrThrow({ where: { tenantId, month: '2026-10' } })).count).toBe(1);
   });
 
   test("another tenant's scope neither reads the row nor counts against it", async (ctx) => {

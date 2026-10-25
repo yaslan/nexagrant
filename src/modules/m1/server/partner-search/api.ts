@@ -264,8 +264,12 @@ export function exportSource(rows: readonly PartnerSearchAnnouncementDto[]): Par
   };
 }
 
-export function toExportJson(rows: readonly PartnerSearchAnnouncementDto[], now: Date): PartnerSearchExportJson {
-  return { source: exportSource(rows), exportedAt: now.toISOString(), count: rows.length, data: [...rows] };
+export function toExportJson(
+  rows: readonly PartnerSearchAnnouncementDto[],
+  now: Date,
+  truncated = false
+): PartnerSearchExportJson {
+  return { source: exportSource(rows), exportedAt: now.toISOString(), count: rows.length, truncated, data: [...rows] };
 }
 
 const CSV_COLUMNS = [
@@ -288,16 +292,20 @@ const CSV_COLUMNS = [
 
 /**
  * CSV with the attribution on its first two lines (`#` comment rows, which
- * spreadsheets show as text), then a header row. Every text cell goes through
- * the shared `csvCell`, so a summary cannot open a formula.
+ * spreadsheets show as text), a third `#` line when the export stopped at
+ * {@link PARTNER_SEARCH_EXPORT_MAX_ROWS}, then a header row. Every text cell
+ * goes through the shared `csvCell`, so a summary cannot open a formula.
  */
-export function toExportCsv(rows: readonly PartnerSearchAnnouncementDto[]): string {
+export function toExportCsv(rows: readonly PartnerSearchAnnouncementDto[], truncated = false): string {
   const source = exportSource(rows);
   const lines = [
     csvCell(`# Source: EU Funding & Tenders Portal, fetched ${source.fetchedAt ?? 'n/a'} (${source.url})`),
     csvCell(`# License: CC BY 4.0 (${source.licenseUrl}). © European Union. Contact details in summaries are masked.`),
-    CSV_COLUMNS.join(','),
   ];
+  if (truncated) {
+    lines.push(csvCell(`# Truncated: only the first ${rows.length} matching rows. Narrow the filters to export the rest.`));
+  }
+  lines.push(CSV_COLUMNS.join(','));
   for (const r of rows) {
     lines.push(
       [
@@ -324,14 +332,23 @@ export function toExportCsv(rows: readonly PartnerSearchAnnouncementDto[]): stri
   return `${lines.join('\r\n')}\r\n`;
 }
 
-export async function readAnnouncementsForExport(tx: TenantTx, filter: AnnouncementFilter): Promise<AnnouncementRow[]> {
-  const rows = await tx.partnerSearchAnnouncement.findMany({
+/**
+ * The rows of an export, at most {@link PARTNER_SEARCH_EXPORT_MAX_ROWS}. One row
+ * more is read to tell a file that holds every match from one that was cut, so
+ * the file can say so (`truncated`).
+ */
+export async function readAnnouncementsForExport(
+  tx: TenantTx,
+  filter: AnnouncementFilter
+): Promise<{ rows: AnnouncementRow[]; truncated: boolean }> {
+  const rows = (await tx.partnerSearchAnnouncement.findMany({
     where: announcementWhere(filter),
     orderBy: [...ANNOUNCEMENT_ORDER],
-    take: PARTNER_SEARCH_EXPORT_MAX_ROWS,
+    take: PARTNER_SEARCH_EXPORT_MAX_ROWS + 1,
     select: ANNOUNCEMENT_SELECT,
-  });
-  return rows as AnnouncementRow[];
+  })) as AnnouncementRow[];
+  const truncated = rows.length > PARTNER_SEARCH_EXPORT_MAX_ROWS;
+  return { rows: truncated ? rows.slice(0, PARTNER_SEARCH_EXPORT_MAX_ROWS) : rows, truncated };
 }
 
 // ───────────────────────────── Access and quota ─────────────────────────────

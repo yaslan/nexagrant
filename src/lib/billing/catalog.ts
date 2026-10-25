@@ -649,8 +649,10 @@ export interface PartnerSearchGrant {
 
 /**
  * Partner Search terms of `planId`, from {@link PlanLimits}. `hasM1` is the
- * tenant's M1 entitlement (plan plus add-ons, from `getEntitlements`), because
- * an M1 add-on on a metered plan turns "no key" into "unlimited". The figure
+ * tenant's M1 entitlement (plan plus add-ons, from `getEntitlements`); it
+ * decides what a plan that states **no** figure means: unlimited with M1,
+ * nothing without it. A plan that states a figure is metered either way, so an
+ * M1 add-on on Basic keeps Basic's monthly cap (docs/BILLING.md). The figure
  * itself is never typed anywhere else.
  */
 export function partnerSearchGrant(planId: string, hasM1: boolean): PartnerSearchGrant {
