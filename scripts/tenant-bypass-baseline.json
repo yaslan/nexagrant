@@ -142,6 +142,15 @@
     },
     {
       "check": "D",
+      "file": "src/app/[locale]/admin/partner-search/actions.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 2,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "FO-64 / PS-K6: the Partner Search ingestion console, reached only from /admin/partner-search behind the admin layout and requirePlatformAdmin() in every action. The partner-search tables (UnmatchedOrganization, PartnerSearchAnnouncement) are SYSTEM_WIDE with no RLS; the scope is for the tenant-less AuditEvent (tenantId NULL) written for run-now, topic re-fetch and the manual PIC link, which the strict tenant_isolation policy refuses outside system_scope. (1) the audit() helper, (2) the manual-link transaction that writes resolvedPic, the announcement links and its AuditEvent together."
+    },
+    {
+      "check": "D",
       "file": "src/lib/blog.ts",
       "subject": "system-scope:platform-admin",
       "count": 1,
