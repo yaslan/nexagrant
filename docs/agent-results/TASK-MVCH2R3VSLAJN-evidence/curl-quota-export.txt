@@ -1,0 +1,26 @@
+### 8) Discover — signal does not spend quota
+{"success":true,"topicIdentifier":"HORIZON-CL5-2026-D4-01","data":{"total":2,"requests":1,"offers":1,"byCountry":{"TR":1,"DE":1},"byOrgType":{"HES":1,"REC":0,"PRC":1,"PUB":0,"OTH":0},"trCount":1}}
+<HTTP 200>
+### 9) Discover — queries 1..11 (status + meta.quota)
+q1  {"limit": 10, "used": 1, "remaining": 9, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q2  {"limit": 10, "used": 2, "remaining": 8, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q3  {"limit": 10, "used": 3, "remaining": 7, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q4  {"limit": 10, "used": 4, "remaining": 6, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q5  {"limit": 10, "used": 5, "remaining": 5, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q6  {"limit": 10, "used": 6, "remaining": 4, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q7  {"limit": 10, "used": 7, "remaining": 3, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q8  {"limit": 10, "used": 8, "remaining": 2, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q9  {"limit": 10, "used": 9, "remaining": 1, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q10 {"limit": 10, "used": 10, "remaining": 0, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"} <HTTP 200>
+q11 {"error": "PARTNER_SEARCH_QUOTA_EXCEEDED", "quota": {"limit": 10, "used": 10, "remaining": 0, "month": "2026-10", "resetsAt": "2026-11-01T00:00:00.000Z"}} <HTTP 429>
+### 10) Discover — 11th response in full (headers + body)
+HTTP/1.1 429 Too Many Requests
+retry-after: 577183
+{"error":"PARTNER_SEARCH_QUOTA_EXCEEDED","quota":{"limit":10,"used":10,"remaining":0,"month":"2026-10","resetsAt":"2026-11-01T00:00:00.000Z"}}
+### 11) DB counter
+fo61-discover|2026-10|10
+### 12) Export: Discover / Pro (no export) / Ultra
+{"error":"MODULE_ACCESS_DENIED","module":"M1","reason":"EXPORT_NOT_IN_PLAN","requiredPlans":["Ultra"]}
+<HTTP 403>
+{"error":"MODULE_ACCESS_DENIED","module":"M1","reason":"EXPORT_NOT_IN_PLAN","requiredPlans":["Ultra"]}
+<HTTP 403>
