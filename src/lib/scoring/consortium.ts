@@ -29,6 +29,13 @@
 import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
 import { topicPrefix } from '@/modules/m8/server/matching';
+import type { LiveDemandInput } from '@/core/contracts/live-demand';
+import {
+  liveDemandReason,
+  liveDemandSignalFor,
+  normalizedWeights,
+  DEFAULT_LIVE_DEMAND_WEIGHT,
+} from '@/lib/scoring/live-demand';
 
 export interface ScoringBreakdown {
   topicExperience: number;
@@ -36,8 +43,32 @@ export interface ScoringBreakdown {
   countryDiversity: number;
   smeBonus: number;
   warmthBonus: number;
+  /** 0–1, live partner demand on the topic (src/lib/scoring/live-demand.ts). */
+  liveDemandSignal: number;
+  /** Shown only when M8 is on for the viewer; null otherwise or without an own request. */
+  liveDemandReason: { days: number } | null;
+  /** Weighted, normalised total on a 0–100 scale. */
   total: number;
 }
+
+export interface SeatScoringOptions {
+  /** M8 is on for the viewer: the reason line is returned. The signal is always computed. */
+  liveDemandVisible?: boolean;
+  /** Config weight of the live-demand dimension; defaults to 15 %. */
+  liveDemandWeight?: number;
+}
+
+/** Ceiling of the live-demand request set read per topic. */
+const LIVE_DEMAND_REQUEST_LIMIT = 500;
+
+/** Each raw dimension's maximum, so every component can be scaled to 0–1. */
+const DIMENSION_MAX = {
+  topicExperience: 3.0,
+  networkCentrality: 3.0,
+  countryDiversity: 1.5,
+  smeBonus: 1.0,
+  warmthBonus: 1.5,
+} as const;
 
 /** Bounds on the search space, mirroring src/modules/m8/server/matching.ts. */
 const TOPIC_PROJECT_LIMIT = 2_000;
@@ -57,10 +88,11 @@ export async function scoreCandidatesForSeat(
   seatId: string,
   opportunityId: string,
   topicId: string | null,
-  limit: number = 5
+  limit: number = 5,
+  options: SeatScoringOptions = {}
 ): Promise<{ organizationId: string; score: ScoringBreakdown; rank: number }[]> {
   return withTenant(tenantId, (tx) =>
-    runScoring(tx, { tenantId, seatId, opportunityId, topicId, limit })
+    runScoring(tx, { tenantId, seatId, opportunityId, topicId, limit, options })
   );
 }
 
@@ -72,9 +104,12 @@ async function runScoring(
     opportunityId: string;
     topicId: string | null;
     limit: number;
+    options: SeatScoringOptions;
   }
 ) {
-  const { tenantId, seatId, opportunityId, topicId, limit } = params;
+  const { tenantId, seatId, opportunityId, topicId, limit, options } = params;
+  const liveDemandVisible = options.liveDemandVisible === true;
+  const weights = normalizedWeights(options.liveDemandWeight ?? DEFAULT_LIVE_DEMAND_WEIGHT);
   // The persist step is `deleteMany({ tenantId, seatId })`: a missing seat id would
   // wipe the candidates of every seat of the tenant (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId) || !isPresentId(tenantId)) throw new Error('Seat not found in this workspace.');
@@ -146,18 +181,56 @@ async function runScoring(
     }
   }
 
-  // 5. Score each candidate.
+  // 4b. Active partner-search requests on this topic (M1 ingestion; read as plain
+  // rows and mapped to the contract shape, M8 never imports the M1 module).
+  const liveDemand: LiveDemandInput | null = topic
+    ? {
+        topicIdentifier: topic.identifier,
+        requests: (
+          await tx.partnerSearchAnnouncement.findMany({
+            where: { topicIdentifier: topic.identifier, type: 'EXPERTISE_REQUEST', withdrawnAt: null },
+            select: { organizationPic: true, publishedAt: true },
+            take: LIVE_DEMAND_REQUEST_LIMIT,
+          })
+        ).map((r) => ({ organizationPic: r.organizationPic, publishedAt: r.publishedAt })),
+      }
+    : null;
+  const now = new Date();
+
+  // 5. Score each candidate. Every component is scaled to 0–1 and the weights
+  // sum to 1, so the total is a 0–100 value whatever the config weight is.
   const scored = candidates.map((org) => {
-    const topicExperience = topicOrgIds.has(org.organisationId) ? 3.0 : 0;
-    const networkCentrality = Math.min(org.totalProjects / 10, 3.0); // normalise to 0-3
-    const countryDiversity = org.country && !existingCountries.has(org.country) ? 1.5 : 0;
-    const smeBonus = org.sme ? 1.0 : 0;
-    const warmthBonus = warmOrgIds.has(org.organisationId) ? 1.5 : 0;
-    const total = topicExperience + networkCentrality + countryDiversity + smeBonus + warmthBonus;
+    const topicExperience = topicOrgIds.has(org.organisationId) ? DIMENSION_MAX.topicExperience : 0;
+    const networkCentrality = Math.min(org.totalProjects / 10, DIMENSION_MAX.networkCentrality); // normalise to 0-3
+    const countryDiversity =
+      org.country && !existingCountries.has(org.country) ? DIMENSION_MAX.countryDiversity : 0;
+    const smeBonus = org.sme ? DIMENSION_MAX.smeBonus : 0;
+    const warmthBonus = warmOrgIds.has(org.organisationId) ? DIMENSION_MAX.warmthBonus : 0;
+    const demand = liveDemand
+      ? liveDemandSignalFor(liveDemand, org.organisationId, now)
+      : { signal: 0, ownRequestAgeDays: null };
+
+    const weighted =
+      weights.topicExperience * (topicExperience / DIMENSION_MAX.topicExperience) +
+      weights.networkCentrality * (networkCentrality / DIMENSION_MAX.networkCentrality) +
+      weights.countryDiversity * (countryDiversity / DIMENSION_MAX.countryDiversity) +
+      weights.smeBonus * (smeBonus / DIMENSION_MAX.smeBonus) +
+      weights.warmthBonus * (warmthBonus / DIMENSION_MAX.warmthBonus) +
+      weights.liveDemand * demand.signal;
+    const total = Math.round(weighted * 100 * 100) / 100;
 
     return {
       organizationId: org.organisationId,
-      score: { topicExperience, networkCentrality, countryDiversity, smeBonus, warmthBonus, total },
+      score: {
+        topicExperience,
+        networkCentrality,
+        countryDiversity,
+        smeBonus,
+        warmthBonus,
+        liveDemandSignal: demand.signal,
+        liveDemandReason: liveDemandReason(demand.ownRequestAgeDays, liveDemandVisible),
+        total,
+      },
     };
   });
 
