@@ -1,6 +1,6 @@
 # TASK-MVPOEXQ1LVQNN (FO-166) — next ≥16.4.1 + transitif yükseltmeler, audit yeniden koşusu — se-fb
 
-**Hüküm:** Bitti: `pnpm audit --prod` 21 bulgudan (2 kritik, 6 yüksek) 0'a indi, pip-audit temiz, build/lint/typecheck/unit yeşil; e2e'de yalnız MinIO/R2 ister 5 blog testi bu makinede koşamadı. Draft PR açıldı.
+**Hüküm:** Bitti: `pnpm audit --prod` 21 bulgudan (2 kritik, 6 yüksek) 0'a indi, pip-audit temiz, build/lint/typecheck/unit yeşil ve pre-push tam `pnpm gate` (MinIO'lu, izole DB) yeşil geçti; draft PR #188 açık.
 
 ## Ne yapıldı
 - Kart `next 16.3.4` varsayıyordu; `origin/dev` zaten 16.3.8 + FO-8 override'larındaydı. Ama audit artık `next` için **≥16.4.1** istiyor (2 kritik RCE, 1 yüksek DoS; >=16.0.0 <=16.4.0). `next` ve `eslint-config-next` → **16.4.3** (minor atlama 16.3→16.4; kırıcı uyum gerekmedi, kod değişikliği yok).
@@ -25,7 +25,8 @@ Gerçek `/_next/image` (prod build, `next start`, R2_PUBLIC_HOST boş):
 `pnpm build` → exit 0, `▲ Next.js 16.4.3`, i18n gate geçti (instrumentation.ts'te Edge `process.exit` uyarısı derleme çıktısında var, build'i kırmıyor; dev ile karşılaştırmadım).
 `pnpm typecheck` 0; `pnpm lint` 0 hata / 4 uyarı (kullanılmayan import, bu değişiklikten bağımsız).
 `pnpm test` (yerel pgvector DB, `pnpm db:setup`): son durum `1 failed | 411 passed` → o 1 (pnpm-overrides mutant testi) düzeltildi, dosya tek başına 6/6 geçti. Tam suite'in düzeltme sonrası yeniden koşusu yapılmadı. DB'siz ilk koşuda 58 fail DB bağlantısıydı.
-`pnpm test:e2e` (dev server, CI=1, MinIO yok): **399 passed, 5 failed, 4 skipped, 8 did not run** (416). 5 fail hepsi blog görsel yükleme (`admin-blog-cover-upload`, `admin-blog-image-upload` ×3, `admin-blog-links-images`): "R2_ACCOUNT_ID, R2_PUBLIC_BUCKET and R2_PUBLIC_HOST must be set / CI must run this against the MinIO public bucket" — ortam eksiği, yükseltmeyle ilgisi yok (baseline'da koşturmadım). `module-plan-gate` 2 test tam koşuda değil, ilk denemede fail olmuş, tek başına 2/2 geçti. `pnpm gate` koşulmadı (MinIO + tam DB kurulumu gerekir).
+`pnpm test:e2e` (dev server, CI=1, MinIO yok): **399 passed, 5 failed, 4 skipped, 8 did not run** (416). 5 fail hepsi blog görsel yükleme (`admin-blog-cover-upload`, `admin-blog-image-upload` ×3, `admin-blog-links-images`): "R2_ACCOUNT_ID, R2_PUBLIC_BUCKET and R2_PUBLIC_HOST must be set / CI must run this against the MinIO public bucket" — ortam eksiği, yükseltmeyle ilgisi yok (baseline'da koşturmadım). `module-plan-gate` 2 test tam koşuda değil, ilk denemede fail olmuş, tek başına 2/2 geçti. 
+**Pre-push tam `pnpm gate` (izole pgvector DB + yerel MinIO R2_* ile, `--no-verify` yok): yeşil, push başarılı.** Önceki turlar env yüzünden kırmızıydı, kod değil: (1) `.env` yokken canlı testler `fabrika` DB'sine düştü (41 dosya); (2) kalıcı kümede `DATABASE_URL_RLS_TEST` eski DB adını taşıdı → kümeyi sıfırlayınca vitest 5542 geçti/57 skipped; (3) dirty DB'de ikinci koşuda `cordis-partner-profile.live` 42≠41 tek kırmızı verdi, temiz DB'de aynı gate yeşil (bağımlılıklarla ilgisi kanıtlanmadı, veri-durumu bağımlı görünüyor). Tam gate vitest/e2e sayıları push logunun sonunda kesildi, kaydedilmedi.
 
 ## Değişen dosyalar
 package.json, pnpm-lock.yaml, pnpm-workspace.yaml, tests/pnpm-overrides-same-major.test.ts
@@ -40,6 +41,6 @@ package.json, pnpm-lock.yaml, pnpm-workspace.yaml, tests/pnpm-overrides-same-maj
 Yok.
 
 ## Sonraki adım
-Draft PR CI'sını izle (MinIO'lu e2e); onay/merge başkasında.
+Draft PR #188 CI'sını izle; onay/merge başkasında.
 
 **Platform beyanı:** mac (Darwin) üzerinde doğrulandı — web/sunucu (build, next start, /_next/image, e2e Chromium) ve Python worker yalnız pip-audit (3.9 yerel; worker testi/çalıştırma koşulmadı). Kod yolları platformdan bağımsız (bağımlılık sürümleri + `next.config.ts` host kalıpları); Windows/Linux koşulamadı — CI Linux koşar.
