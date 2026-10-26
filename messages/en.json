@@ -15,7 +15,12 @@
     "adminModules": "Platform Admin",
     "workspaceLabel": "Workspace",
     "administrationLabel": "Administration",
-    "featureLocked": "The {module} module is off — this feature is unavailable"
+    "featureLocked": "The {module} module is off — this feature is unavailable",
+    "planLocked": "{module} is not in your plan — open it to see which plans include it",
+    "preview": {
+      "PILOT": "Pilot",
+      "DEV": "Dev"
+    }
   },
   "Common": {
     "loading": "Loading...",
