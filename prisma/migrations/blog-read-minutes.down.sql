@@ -15,8 +15,23 @@
 -- Roll the application code back in the same deploy (to before
 -- TASK-MVDSY96TB1EPM): code that knows "readMinutes" fails without it.
 --
+-- Order: if drop-blog-read-time.sql (FO-87) has run, roll it back first with
+-- drop-blog-read-time.down.sql — it brings "readTime" back. Without "readTime"
+-- this file stops (RAISE below) before changing anything.
+--
 -- Idempotent: every step checks for the column / constraint first.
 -- ─────────────────────────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name = 'readTime'
+  ) THEN
+    RAISE EXCEPTION 'BlogPost has no "readTime" column; drop-blog-read-time.sql (FO-87) has run'
+      USING HINT = 'Run scripts/apply-migrations.sh --down drop-blog-read-time.down.sql first, then this file.';
+  END IF;
+END $$;
 
 DO $$
 BEGIN

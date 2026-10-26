@@ -637,12 +637,9 @@ model BlogPost {
   content      String
   category     String
   /// Minutes, 1–120 (CHECK BlogPost_readMinutes_range); formatted per reader locale
-  /// with messages blog.readMinutes. NULL only for a row written by pre-FO-84 code
-  /// during the deploy window. prisma/migrations/blog-read-minutes.sql.
-  readMinutes  Int?
-  /// Legacy free-text read time in the writer's language. No longer written or read;
-  /// kept for rollback until a follow-up drops it (TASK-MVDSY96TB1EPM).
-  readTime     String?
+  /// with messages blog.readMinutes. prisma/migrations/blog-read-minutes.sql,
+  /// drop-blog-read-time.sql.
+  readMinutes  Int
   publishedAt  DateTime
   authorName   String?
   authorRole   String?
