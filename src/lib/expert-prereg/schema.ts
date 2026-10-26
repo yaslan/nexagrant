@@ -122,7 +122,8 @@ export const expertPreRegInputSchema = z.object({
   kvkkAccepted: z.literal(true, { error: 'consent_required' }),
   /** Must be literally true: the expert is listed in the public count only with this. */
   visibilityConsent: z.literal(true, { error: 'consent_required' }),
-  marketingConsent: z.boolean({ error: 'invalid' }).optional().default(false),
+  // FO-144 (K-572235): no marketing box. An older client may still send `marketingConsent`;
+  // z.object strips unknown keys, so the request passes and the value is not stored.
   /** The UI language the form was shown in: the verification mail and the redirect follow it. */
   locale: z.enum(['tr', 'en'], orRequired('unknown_slug')).default('tr'),
 });

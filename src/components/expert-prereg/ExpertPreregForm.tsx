@@ -49,7 +49,6 @@ const FIELDS = {
   referredBy: true,
   kvkkAccepted: true,
   visibilityConsent: true,
-  marketingConsent: true,
 } satisfies Record<Field, true>;
 
 const FIELD_ORDER = Object.keys(FIELDS) as Field[];
@@ -105,7 +104,6 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
   const [referredBy, setReferredBy] = useState('');
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [visibilityConsent, setVisibilityConsent] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -170,7 +168,6 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
       ...utmRef.current,
       kvkkAccepted,
       visibilityConsent,
-      marketingConsent,
       locale,
     };
   }
@@ -311,7 +308,7 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
   );
 
   const consentBox = (
-    field: 'kvkkAccepted' | 'visibilityConsent' | 'marketingConsent',
+    field: 'kvkkAccepted' | 'visibilityConsent',
     checked: boolean,
     set: (v: boolean) => void,
     label: React.ReactNode,
@@ -541,7 +538,6 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
             true,
           )}
           {consentBox('visibilityConsent', visibilityConsent, setVisibilityConsent, t('form.visibility_label'), true)}
-          {consentBox('marketingConsent', marketingConsent, setMarketingConsent, t('form.marketing_label'), false)}
         </fieldset>
 
         <p
