@@ -8,8 +8,8 @@ This notice is given under Article 10 of the Turkish Personal Data Protection La
 
 Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. ("FonBridge").
 
-- Address: [ADDRESS — owner]
-- Registered e-mail (KEP) address: [KEP ADDRESS — owner]
+- Address: Kadıköy Mahallesi No:55, İlkadım / SAMSUN, Türkiye
+- Registered e-mail (KEP) address: fonbridge@hs01.kep.tr
 - E-mail: info@fonbridge.com
 
 ## 2. Personal data processed

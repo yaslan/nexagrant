@@ -8,8 +8,8 @@ Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu'nun ("KVKK") 10. ma
 
 Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. ("FonBridge").
 
-- Adres: [ADRES — patron]
-- KEP adresi: [KEP ADRESİ — patron]
+- Adres: Kadıköy Mahallesi No:55, İlkadım / SAMSUN
+- KEP adresi: fonbridge@hs01.kep.tr
 - E-posta: info@fonbridge.com
 
 ## 2. İşlenen kişisel veriler
