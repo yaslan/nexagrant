@@ -128,6 +128,8 @@ vi.mock('@/lib/modules/guard', () => ({ moduleGate: vi.fn(async () => null) }));
 vi.mock('@/lib/modules/access', () => ({
   assertModuleAccess: vi.fn(async () => undefined),
   assertModuleWrite: vi.fn(async () => undefined),
+  // The api-keys page reads M1's read-only flag (FO-157); full access here.
+  checkModuleAccess: vi.fn(async () => ({ allowed: true, status: 'ON' })),
 }));
 
 // The client components are replaced by named stubs: the test reads the props
