@@ -54,6 +54,8 @@ const KNOWN: Record<string, string> = {
     '`ids` is parseMarkReadTarget(target) one line above, which throws unless every element passes isPresentId; an empty list returns before the update; tenantId and userId beside it go through requireActionId (TASK-MUVR24EHWI2RA)',
   'src/app/[locale]/admin/partner-search/actions.ts in: ids':
     '`ids` are the primary keys of PartnerSearchAnnouncement rows read by `findMany` in the same transaction a few lines above; an empty list skips the update; the queue row id beside it is found first or the action refuses (FO-64)',
+  'src/app/[locale]/admin/partner-search/actions.ts id: unmatched.id':
+    '`unmatched` is the UnmatchedOrganization row `findUnique` read in the same transaction just above (the action refuses with not_found when it is null); `id` is its primary key, not client input (FO-148)',
   'src/modules/m1/server/partner-search/retention.ts lt: withdrawnBefore':
     '`withdrawnBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
   'src/modules/m1/server/partner-search/retention.ts lt: closedBefore':
