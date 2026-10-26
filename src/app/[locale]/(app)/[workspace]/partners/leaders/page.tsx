@@ -5,6 +5,7 @@ import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
+import { authenticateCordisSession } from '@/lib/cordis-api-auth';
 import { cordisTopicPrefixSchema } from '@/lib/k2-cordis/api-query';
 import { coordinatorLeaders, type CoordinatorLeaderRow } from '@/lib/k2-cordis/coordinator-leaders';
 
@@ -29,6 +30,18 @@ export default async function LeadersPage({
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
   const t = await getTranslations('PartnersLeaders');
+  // Same door as /api/cordis/*: M1 open in full (a limited plan is refused) and
+  // the shared per-user window. No monthly quota is counted here.
+  const access = await authenticateCordisSession();
+  if (!access.authenticated) {
+    const status = access.errorResponse.status;
+    const reason = status === 429 ? 'rateLimited' : status === 401 ? 'signInRequired' : status === 403 ? 'limitedPlan' : 'loadFailed';
+    return (
+      <section role="alert" className="max-w-2xl mx-auto sm:px-4 py-16 text-center">
+        <p className="text-sm text-ink-2">{t(reason)}</p>
+      </section>
+    );
+  }
 
   // `?topic=` filters by CORDIS topic-code prefix. Empty means the global list.
   const topicRaw = topic?.trim() ?? '';
