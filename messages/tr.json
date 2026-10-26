@@ -695,7 +695,16 @@
     "metaDescription": "{brand}: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
     "ecosystemSubtitle": "İster bağımsız bir danışman olun, ister büyük bir üniversite; {brand} iş akışınızı hızlandırır.",
     "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin.",
-    "heroCompliance": "GDPR / KVKK Uyumlu Güvenli Bulut"
+    "heroCompliance": "GDPR / KVKK Uyumlu Güvenli Bulut",
+    "cordisProjects": {
+      "eyebrow": "CORDIS canlı veri",
+      "title": "Türkiye'nin yer aldığı güncel Horizon Europe projeleri",
+      "subtitle": "Avrupa Komisyonu CORDIS veritabanından canlı olarak güncellenir: Türkiye'den katılımcısı olan, en son güncellenen 6 proje.",
+      "loading": "Projeler CORDIS'ten yükleniyor…",
+      "fallback": "Proje listesi şu an yüklenemedi. Aynı aramayı doğrudan CORDIS'te görebilirsiniz.",
+      "fallbackLink": "Türkiye katılımcılı Horizon Europe projelerini CORDIS'te aç",
+      "source": "Kaynak: CORDIS – EU research results, Avrupa Birliği Yayın Ofisi"
+    }
   },
   "pricing": {
     "title": "{brand} Fiyatlandırması",

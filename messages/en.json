@@ -695,7 +695,16 @@
     "metaDescription": "{brand}: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding.",
     "ecosystemSubtitle": "From high-growth SMEs to university TTOs and international research consortia.",
     "closingSubtitle": "Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft.",
-    "heroCompliance": "GDPR / KVKK-Compliant Secure Cloud"
+    "heroCompliance": "GDPR / KVKK-Compliant Secure Cloud",
+    "cordisProjects": {
+      "eyebrow": "Live CORDIS data",
+      "title": "Current Horizon Europe projects with participants from Türkiye",
+      "subtitle": "Updated live from the European Commission's CORDIS database: the 6 most recently updated projects with a participant from Türkiye.",
+      "loading": "Loading projects from CORDIS…",
+      "fallback": "The project list could not be loaded right now. You can see the same search directly on CORDIS.",
+      "fallbackLink": "Open Horizon Europe projects with participants from Türkiye on CORDIS",
+      "source": "Source: CORDIS – EU research results, Publications Office of the European Union"
+    }
   },
   "pricing": {
     "title": "{brand} Pricing",
