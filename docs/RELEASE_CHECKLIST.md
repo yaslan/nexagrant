@@ -33,7 +33,7 @@ Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (aja
 | 1.4 | SMTP (`mail.fonbridge.com`) | **PATRON** | 1.1'e bağlı; kutular, DKIM, AutoSSL `docs/SMTP-SUNUCU.md` §8 |
 | 2 | Üretim ortam değişkenleri | **EKSİK** (liste hazır, değerler PATRON) | §2 |
 | 3 | Migration sırası + geri dönüş | **HAZIR** (2 not) | §3 |
-| 4 | Yedekleme / felaket kurtarma | **EKSİK** | repoda `pg_dump`/geri yükleme betiği ya da belgesi yok (§4) |
+| 4 | Yedekleme / felaket kurtarma | **EKSİK** (betikler HAZIR, zamanlayıcı/dış kopya sunucuya bağlı) | `pnpm backup:db`, `backup:restore-drill`, `backup:restore` repoda; izole DB provası FO-165'te yeşil. Zamanlayıcı, sunucu dışı kopya, saklama katmanları yok (§4) |
 | 5 | İzleme / alarm | **EKSİK** (kısmi) | `SystemAlert` yalnız `/[locale]/admin/alerts` ekranında; e-posta/push yok; dış kalp atışı yok (§5) |
 | 6 | GitHub push + CI | **PATRON** (push) / **EKSİK** (yerel kanca) | `dev` origin'den **223 commit** ileride; `core.hooksPath` var olmayan dizini gösteriyor (§6) |
 | 7 | Anahtar yenileme (OpenAI) | **PATRON** | anahtar sohbette açığa çıktı → yenile + harcama limiti (§2.3) |
@@ -266,7 +266,7 @@ Aynı UTC gününün sonunda `psql -Atq "$DATABASE_URL" -f m4-claims.sql | comm 
 
 ## 4. Yedekleme ve felaket kurtarma — betik var, canlı sunucu kararı bekliyor
 
-Yerel yedek ve geri yükleme provası repoda: `pnpm backup:db` (`scripts/backup/pg-backup.sh`, `pg_dump --format=custom`, dökümü `pg_restore --list` ile okuyup SHA-256 yazar) ve `pnpm backup:restore-drill` (`scripts/backup/pg-restore-drill.sh`, ayrı bir DB'ye geri yükler, tablo başına satır sayısını iki tarafta karşılaştırır). Zamanlayıcı, dış kopya ve saklama katmanları (4 haftalık / 12 aylık) **henüz yok**; sunucu belli olunca kurulur. Uygulama sunucusu belli olmadan (madde 1.2) bu bölümün 4.1 zamanlayıcısı kurulamaz; plan aşağıda.
+Yerel yedek ve geri yükleme provası repoda: `pnpm backup:db` (`scripts/backup/pg-backup.sh`, `pg_dump --format=custom`, dökümü `pg_restore --list` ile okuyup SHA-256 yazar) ve `pnpm backup:restore-drill` (`scripts/backup/pg-restore-drill.sh`, ayrı bir DB'ye geri yükler, tablo başına satır sayısını iki tarafta karşılaştırır) ve `pnpm backup:restore` (`scripts/backup/pg-restore.sh`, gerçek geri yükleme: önceden oluşturulmuş **boş** bir DB'ye yükler, dolu hedefi reddeder; §4.4). Zamanlayıcı, dış kopya ve saklama katmanları (4 haftalık / 12 aylık) **henüz yok**; sunucu belli olunca kurulur. Uygulama sunucusu belli olmadan (madde 1.2) bu bölümün 4.1 zamanlayıcısı kurulamaz; plan aşağıda.
 
 ### 4.1 Günlük yedek (öneri — sunucu belli olunca EKSİK kartı)
 
@@ -282,11 +282,39 @@ Yerel yedek ve geri yükleme provası repoda: `pnpm backup:db` (`scripts/backup/
 ### 4.2 Geri yükleme testi planı (canlıdan önce bir kez, sonra ayda bir)
 
 1. Boş bir Postgres 16 + pgvector (yerelde `docker compose up -d postgres-vector` ayrı bir veri hacmiyle ya da geçici VM).
-2. `pg_restore --no-owner --dbname=<test> fonbridge-<tarih>.dump`
-3. `pnpm db:rls-role && pnpm db:rls && pnpm rls:verify` → exit 0.
+2. `pnpm backup:restore-drill <dump>` (aynı sunucuda `fabrika_restore_drill`'i silip yeniden kurar, satır sayılarını karşılaştırır) ya da gerçek hedefe `pnpm backup:restore <dump>` (§4.4).
+3. `pnpm db:rls-role && pnpm db:rls && pnpm rls:verify --require-db` → exit 0.
 4. Satır sayıları karşılaştır: `Tenant`, `User`, `CreditLedger`, `AuditEvent` (kaynak ile ± o günün yazımları).
 5. Uygulamayı bu DB'ye bağla, giriş + bir kiracı sayfası açılıyor.
 6. Süreyi yaz (RTO ölçümü). Hedef öneri: **RPO ≤ 24 saat, RTO ≤ 4 saat** (pilot için; patron onaylar).
+
+### 4.4 Runbook — yedek al, geri yükle (FO-165)
+
+Sırlar yalnız ortam değişkeninde; betikler parolayı ne argv'ye ne log'a yazar (`PGPASSWORD`, `scripts/backup/pg-url.sh`). Hepsi bash; Linux sunucuda `pg_dump`/`pg_restore`/`psql` **sunucu sürümüyle aynı ya da yeni** olmalı (pg16), `shasum` yoksa `perl` paketinden gelir.
+
+```bash
+# 1) Yedek (BYPASSRLS ya da süper kullanıcı rolü; fabrika_app ile boş/eksik çıkar)
+BACKUP_DATABASE_URL=postgresql://<yedek-rolü>@<host>:5432/fabrika \
+BACKUP_DIR=/var/backups/fonbridge pnpm backup:db
+#   → fonbridge-<UTC damga>.dump + .sha256; pg_restore --list ile okunur; 7 gün saklama
+
+# 2) Prova (ayda bir; kaynak sessizken)
+RESTORE_ADMIN_URL=postgresql://<süper>@<host>:5432/postgres \
+BACKUP_DATABASE_URL=postgresql://<yedek-rolü>@<host>:5432/fabrika \
+BACKUP_DIR=/var/backups/fonbridge pnpm backup:restore-drill
+#   → tablo başına satır sayısı iki tarafta eşit değilse exit 1
+
+# 3) Gerçek geri yükleme (felaket): önce BOŞ hedef DB, sonra yükle
+createdb -O <sahip-rol> fabrika_restored            # fabrika_app rolü kümede olmalı
+RESTORE_DATABASE_URL=postgresql://<sahip-rol>@<host>:5432/fabrika_restored \
+pnpm backup:restore /var/backups/fonbridge/fonbridge-<damga>.dump
+DATABASE_URL=<aynı hedef> pnpm db:rls && DATABASE_URL=<aynı hedef> pnpm rls:verify --require-db
+#   → uygulamanın DATABASE_URL'ini yeni DB'ye çevir; eski DB'yi hemen silme
+```
+
+Geri alma: `backup:restore` yalnız boş bir DB'ye yazar; başarısız ya da yanlış yüklemede hedef DB silinip adım 3 baştan koşulur. Mevcut (dolu) DB'ye asla yazmaz — `public`/`graphile_worker`'da tek bir tablo bile varsa reddeder.
+
+Kanıt (FO-165, izole pgvector:pg16 konteyner, `pnpm db:setup` tohumlu): yedek 815 TOC girdisi → drill 86 tablo eşit → `backup:restore` boş DB'ye 86 tablo / 200 satır birebir → geri yüklenen DB'de `rls:verify --require-db` 48 tabloda yeşil, `alerts:check` 0. Ret senaryoları (dolu hedef, kaynak DB, yol yok, bozuk checksum) exit 1. Ayrıntı: `docs/agent-results/TASK-MVPOENZ2BX26O-devop-fb.md`.
 
 ### 4.3 Felaket kurtarma (sunucu kaybı)
 
