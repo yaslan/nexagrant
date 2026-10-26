@@ -3521,6 +3521,8 @@
       "no_founder": "Kurucu kadro tamamlanmıştı; kaydınız rehbere alındı. Lansmanda haber vereceğiz.",
       "heading_expired": "Bağlantının süresi dolmuş",
       "text_expired": "Doğrulama bağlantısı {hours} saat geçerlidir. info@fonbridge.com adresine yazın, yeni bağlantı gönderelim.",
+      "heading_already": "E-postanız zaten doğrulanmış",
+      "text_already": "Bu bağlantı daha önce kullanılmış; yapmanız gereken başka bir şey yok. Kaydınız Uzman Dizini'nde.",
       "heading_invalid": "Bağlantı geçersiz",
       "text_invalid": "Bağlantı eksik kopyalanmış ya da daha önce kullanılmış olabilir. E-postadaki düğmeyi yeniden deneyin.",
       "back": "Uzman Rehberi sayfasına dön"

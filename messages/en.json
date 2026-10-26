@@ -3521,6 +3521,8 @@
       "no_founder": "The founding cohort was already complete; your registration is in the directory. We will let you know at launch.",
       "heading_expired": "This link has expired",
       "text_expired": "Verification links are valid for {hours} hours. Write to info@fonbridge.com and we will send you a new one.",
+      "heading_already": "Your e-mail is already verified",
+      "text_already": "This link has been used before; there is nothing more to do. Your registration is in the Expert Directory.",
       "heading_invalid": "This link is not valid",
       "text_invalid": "The link may be incomplete or already used. Try the button in the e-mail again.",
       "back": "Back to the Expert Directory page"
