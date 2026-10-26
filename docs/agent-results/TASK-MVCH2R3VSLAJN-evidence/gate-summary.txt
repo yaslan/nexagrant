@@ -1,0 +1,13 @@
+ Test Files  404 passed | 3 skipped (407)
+      Tests  5345 passed | 57 skipped (5402)
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+✅ SUCCESS: All 48 tenant-scoped models have RLS policies registered.
+✅ SUCCESS: every one of them carries ENABLE + FORCE + tenant_isolation in its own migration.
+✅ SUCCESS: every one of them DISABLEs row level security in its own migration.
+✅ SUCCESS: no new tenant bypass. 0 call site(s) allowed with a recorded reason, 48 on the sanctioned cross-tenant path, 0 still owed.
+✅ 48 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+✅ fabrika_app already exists; DATABASE_URL_RLS_TEST logs in as fabrika_app. Password left unchanged.
+  11 skipped
+  395 passed (8.3m)
+✅ Öksüz alarm yok: her açık alarm ya bir tenant adı taşımıyor ya da yaşayan bir tenant’ı gösteriyor.
+GATE_EXIT=0

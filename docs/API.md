@@ -16,6 +16,10 @@ Tüm rotalar `/api/v1/*`; JSON; zod doğrulama; hata biçimi `{ error: { code, m
 | GET | `/partners?q&country&type&sme&prefix&sort` | Ortak arama | M1 |
 | GET | `/partners/leaders?prefix&limit=20` | Konu liderleri | M1 |
 | GET | `/partners/:pic` · `/partners/:pic/graph?depth=1&limit=30` | Kart ve graf | M1 |
+| GET | `/partner-search/announcements?topic&country&type&orgType&q&page` | Partner Search ilanları (geri çekilenler hariç; Discover/Basic ayda 10 sorgu, sonra 429) | M1 (FO-61) |
+| GET | `/organizations/:pic/announcements?…aynı filtreler` | Bir kurumun ilanları (aynı sayaç) | M1 (FO-61) |
+| GET | `/topics/:identifier/partner-signal` | `{ total, requests, offers, byCountry, byOrgType, trCount }` — sayaçtan düşmez | M1 (FO-61) |
+| GET | `/partner-search/announcements/export?format=csv\|json&…filtreler` | Ultra dışa aktarma; kaynak + CC BY 4.0 notu dosyada; en çok 10.000 satır, kesilirse JSON `truncated: true` ve CSV'de `# Truncated` satırı; yalnız oturum | M1 (FO-61) |
 | GET/POST/PATCH | `/relationships`, `/relationships/:id/interactions` | Odak kişi | M4 |
 | GET/POST/PATCH/DELETE | `/evidence` | Kanıt | M3 |
 | GET/POST | `/concepts`, `/concepts/:id/generate` (SSE akış), `/concepts/:id/export?format=docx` | Concept note | M2 |
@@ -39,6 +43,8 @@ Akış (SSE) yalnızca `generate` uç noktalarında; diğerleri senkron.
 | GET | `/public/v1/partners/:pic` | Kart (kiracı notları hariç) |
 | GET | `/public/v1/partners/:pic/collaborators` | Collab |
 | GET | `/public/v1/calls?eligibleCountry=TR&status=open` | Normalize konu listesi |
+
+Partner Search (FO-61) aynı yollarla `/api/v1/` altında da var (`partner-search/announcements`, `organizations/:pic/announcements`, `topics/:identifier/partner-signal`); anahtar M1 kapısından (`authenticateApiKey`) geçer, gövde oturum yoluyla aynıdır. Sözleşme tipleri: `src/core/contracts/partner-search.ts`. Hatalar: `400 invalid_query`, `403 { error: 'MODULE_ACCESS_DENIED', module: 'M1', reason, requiredPlans? }`, `429 PARTNER_SEARCH_QUOTA_EXCEEDED`. Özetler sunucuda `maskContact`'tan bir kez daha geçer.
 
 Rate limit: `429` + `Retry-After`; kullanım `ApiUsage` tablosuna; lisans metni türev veri/AB açık veri ayrımını belirtir.
 

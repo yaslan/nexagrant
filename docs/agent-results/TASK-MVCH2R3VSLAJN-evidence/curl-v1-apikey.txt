@@ -1,0 +1,13 @@
+### 15) v1 (API key) — Pro key: list / org / signal
+{"success":true,"meta":{"page":1,"pageSize":20,"total":1},"data":[{"id":"fo61-a2","topicIdentifier":"HORIZON-CL5-2026-D4-01","callIdentifier":"HORIZON-CL5-2026","type":"EXPERTISE_REQUEST","description":"University lab seeking industrial partner for pilot line.","publishedAt":"2026-09-05T10:00:00.000Z","lastSeenAt":"2026-10-21T06:00:00.000Z","organization":{"pic":"999000002","name":"TU Example","type":"HES","isSme":false,"country":"DE","city":"Berlin"},"keywords":["pilot line"],"programmeCodes":["HE"]}]}
+<HTTP 200>
+{"success":true,"meta":{"page":1,"pageSize":20,"total":1},"data":[{"id":"fo61-a2","topicIdentifier":"HORIZON-CL5-2026-D4-01","callIdentifier":"HORIZON-CL5-2026","type":"EXPERTISE_REQUEST","description":"University lab seeking industrial partner for pilot line.","publishedAt":"2026-09-05T10:00:00.000Z","lastSeenAt":"2026-10-21T06:00:00.000Z","organization":{"pic":"999000002","name":"TU Example","type":"HES","isSme":false,"country":"DE","city":"Berlin"},"keywords":["pilot line"],"programmeCodes":["HE"]}]}
+<HTTP 200>
+{"success":true,"topicIdentifier":"HORIZON-CL6-2026-D3-01","data":{"total":1,"requests":0,"offers":1,"byCountry":{"TR":1},"byOrgType":{"HES":0,"REC":0,"PRC":1,"PUB":0,"OTH":0},"trCount":1}}
+<HTTP 200>
+### 16) v1 — Discover key (no M1 in plan)
+{"error":"MODULE_ACCESS_DENIED","module":"M1"}
+<HTTP 403>
+### 17) v1 — no key
+{"error":"Unauthorized","message":"Missing API key. Provide `x-api-key` or `Authorization: Bearer <key>` header.","code":"AUTH_MISSING_API_KEY"}
+<HTTP 401>
