@@ -941,6 +941,15 @@
         "budgetRoleEconomy": "Budget / role economy",
         "lumpSumTwoStage": "Lump-sum / two-stage"
       }
+    },
+    "members": {
+      "teamList": {
+        "errors": {
+          "sessionOrMembership": "You are no longer a member of this organisation, or your session has ended. Please sign in again.",
+          "forbiddenRole": "Only an owner or admin can see the team list.",
+          "loadFailed": "The team list could not be loaded."
+        }
+      }
     }
   },
   "legal": {

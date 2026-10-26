@@ -941,6 +941,15 @@
         "budgetRoleEconomy": "Bütçe / rol ekonomisi",
         "lumpSumTwoStage": "Götürü bedel / iki aşamalı"
       }
+    },
+    "members": {
+      "teamList": {
+        "errors": {
+          "sessionOrMembership": "Bu kurumda artık üyeliğiniz yok ya da oturumunuz sona erdi. Lütfen yeniden giriş yapın.",
+          "forbiddenRole": "Ekip listesini yalnızca kurum sahibi veya yöneticisi görebilir.",
+          "loadFailed": "Ekip listesi yüklenemedi."
+        }
+      }
     }
   },
   "legal": {
