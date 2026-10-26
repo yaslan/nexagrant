@@ -20,6 +20,7 @@ describe('verified outcome signature', () => {
       { outcome: 'ok', founderNumber: null },
       { outcome: 'expired', founderNumber: null },
       { outcome: 'invalid', founderNumber: null },
+      { outcome: 'already', founderNumber: null },
     ] as const) {
       expect(decodeVerifiedOutcome(encodeVerifiedOutcome(result, opts), opts)).toEqual(result);
     }

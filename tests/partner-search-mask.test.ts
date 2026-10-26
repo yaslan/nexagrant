@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMAIL_MASK, PHONE_MASK, maskContact } from '@/modules/m1/server/partner-search/mask';
+import { EMAIL_MASK, LINKEDIN_MASK, PHONE_MASK, maskContact } from '@/modules/m1/server/partner-search/mask';
 
 describe('maskContact (FO-65 F3)', () => {
   it.each([
@@ -46,6 +46,17 @@ describe('maskContact (FO-65 F3)', () => {
     ['EUR 2.500.000,00', 'EUR 2.500.000,00'],
     ['TRL 4-6, 24-36 months', 'TRL 4-6, 24-36 months'],
   ])('review probe: %j', (input, expected) => {
+    expect(maskContact(input)).toBe(expected);
+  });
+
+  // se-fb S4 (PR #165, round 3): the forms that reached an export unmasked.
+  it.each([
+    ['reach me: john.doe (at) uni.example dot org', `reach me: ${EMAIL_MASK}`],
+    ['john [at] uni dot org', EMAIL_MASK],
+    ['see https://linkedin.com/in/johndoe for me', `see ${LINKEDIN_MASK} for me`],
+    ['www.linkedin.com/in/jane-doe_1/', LINKEDIN_MASK],
+    ['company page linkedin.com/company/uni-x stays', 'company page linkedin.com/company/uni-x stays'],
+  ])('masks the obfuscated and profile-URL forms (S4): %j', (input, expected) => {
     expect(maskContact(input)).toBe(expected);
   });
 

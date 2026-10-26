@@ -13,8 +13,8 @@
  * Probe set: tests/partner-search-mask.test.ts (PR #163 review, crw2-fb B1 + Ö1).
  */
 
-/** "." or an obfuscated "(dot)" / "[dot]". */
-const DOT = String.raw`(?:\.|\s?[[(]\s?dot\s?[\])]\s?)`;
+/** "." or an obfuscated "(dot)" / "[dot]", or a bare " dot " between two words. */
+const DOT = String.raw`(?:\.|\s?(?:[[(]\s?dot\s?[\])]|\bdot\b)\s?)`;
 /** "@", an obfuscated "(at)" / "[at]", or a bare " at " between two words. */
 const AT = String.raw`(?:\s?@\s?|\s?[[(]\s?at\s?[\])]\s?|\s+at\s+)`;
 /** Local part: Unicode letters too (müller@…), hence the `u` flag. */
@@ -49,18 +49,25 @@ const PHONE_MIN_DIGITS = 8;
 /** "125 000 000" / "2.500.000": thousands groups with one separator and no leading 0 or "+". */
 const AMOUNT = /^[1-9]\d{0,2}([ .,])\d{3}(?:\1\d{3})*$/;
 
+/** A personal LinkedIn profile URL (`linkedin.com/in/…`), with or without the scheme. */
+const LINKEDIN_PROFILE = /(?:https?:\/\/)?(?:[\p{L}-]+\.)*linkedin\.com\/in\/[\p{L}\p{N}_%.-]+\/?/giu;
+
 export const EMAIL_MASK = '[email]';
 export const PHONE_MASK = '[phone]';
+export const LINKEDIN_MASK = '[linkedin]';
 
 export function maskContact(text: string): string;
 export function maskContact(text: null): null;
 export function maskContact(text: string | null): string | null;
 export function maskContact(text: string | null): string | null {
   if (text == null) return null;
-  return text.replace(EMAIL, EMAIL_MASK).replace(NUMBER_RUN, (match, notAPhone: string | undefined) => {
-    if (notAPhone !== undefined) return match;
-    if (AMOUNT.test(match)) return match;
-    const digits = match.replace(/\D/g, '').length;
-    return digits >= PHONE_MIN_DIGITS ? PHONE_MASK : match;
-  });
+  return text
+    .replace(EMAIL, EMAIL_MASK)
+    .replace(LINKEDIN_PROFILE, LINKEDIN_MASK)
+    .replace(NUMBER_RUN, (match, notAPhone: string | undefined) => {
+      if (notAPhone !== undefined) return match;
+      if (AMOUNT.test(match)) return match;
+      const digits = match.replace(/\D/g, '').length;
+      return digits >= PHONE_MIN_DIGITS ? PHONE_MASK : match;
+    });
 }

@@ -145,9 +145,11 @@ test.describe('expert pre-registration (FO-20)', () => {
     await page.goto('/tr/uzman');
     await expect(page).toHaveTitle('AB Proje Uzmanları Rehberi — Ön Kayıt | FonBridge');
     await expectFounderLimit(page, 'tr');
-    for (const name of [/KVKK Aydınlatma Metni/, /Profilimin uzman rehberinde/, /FonBridge duyurularını/]) {
+    for (const name of [/KVKK Aydınlatma Metni/, /Profilimin uzman rehberinde/]) {
       await expect(page.getByLabel(name)).not.toBeChecked();
     }
+    // FO-144 (K-572235): the marketing box is gone.
+    await expect(page.locator('#ep-marketingConsent')).toHaveCount(0);
     await page.getByRole('button', { name: 'Ön kaydı gönder' }).click();
     const fullName = page.getByLabel(/Ad Soyad/);
     await expect(fullName).toBeFocused();

@@ -252,6 +252,18 @@ const envSchema = z.object({
       .regex(/^[1-9][0-9]*$/, 'must be a positive integer (1 = alert on the first failure)')
       .default('3')
   ),
+  /**
+   * Share of the M8 seat-candidate score carried by live partner demand
+   * (src/lib/scoring/live-demand.ts, FO-63). A decimal in [0, 1]; unset or
+   * blank = the 15 % default. Kept as a string like the threshold above, with
+   * the numeric view exported below.
+   */
+  CONSORTIUM_LIVE_DEMAND_WEIGHT: blankToUndefined(
+    z
+      .string()
+      .regex(/^(0(\.[0-9]+)?|1(\.0+)?)$/, 'must be a decimal between 0 and 1 (e.g. 0.15)')
+      .optional()
+  ),
 });
 
 const _env = envSchema.safeParse(process.env);
@@ -306,3 +318,10 @@ export function jobsCronEnabled(
   if (source.NODE_ENV === 'production') throw new JobsCronUnsetInProductionError();
   return true;
 }
+
+/**
+ * The numeric view of `CONSORTIUM_LIVE_DEMAND_WEIGHT`; `undefined` when unset,
+ * so the scorer falls back to its own default.
+ */
+export const consortiumLiveDemandWeight: number | undefined =
+  env.CONSORTIUM_LIVE_DEMAND_WEIGHT === undefined ? undefined : Number(env.CONSORTIUM_LIVE_DEMAND_WEIGHT);

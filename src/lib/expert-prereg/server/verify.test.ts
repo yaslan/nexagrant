@@ -90,12 +90,21 @@ describe('verifyExpertPreRegistration', () => {
     expect(second).toMatchObject({ ok: true, founderNumber: 2 });
   });
 
-  it('answers the same on a second click and does not move the number', async () => {
+  it('is single use in effect: the second click is `already`, with no number, and the row does not move (FO-141 F7)', async () => {
     const { db, rows } = fakeDb([pending('a', TOKEN)]);
     const first = await verifyExpertPreRegistration(TOKEN, { db, now: NOW });
+    expect(first).toMatchObject({ ok: true, founderNumber: 1 });
+    const before = { ...rows[0]! };
     const again = await verifyExpertPreRegistration(TOKEN, { db, now: LATER });
-    expect(again).toEqual(first);
-    expect(rows[0]!.founderNumber).toBe(1);
+    expect(again).toEqual({ ok: false, error: 'already', locale: 'tr' });
+    expect(rows[0]).toEqual(before);
+  });
+
+  it('a row verified before FO-141 (token hash kept, TTL long past) answers `already`, not `ok` (FO-141 F7)', async () => {
+    const { db, rows } = fakeDb([pending('a', TOKEN, { status: 'verified', emailVerifiedAt: NOW, founderNumber: 97 })]);
+    const result = await verifyExpertPreRegistration(TOKEN, { db, now: new Date(NOW.getTime() + 40 * 86_400_000) });
+    expect(result).toEqual({ ok: false, error: 'already', locale: 'tr' });
+    expect(rows[0]!.founderNumber).toBe(97);
   });
 
   it('refuses an expired link and leaves the expert unverified', async () => {

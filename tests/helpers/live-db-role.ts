@@ -24,6 +24,8 @@
  * whole file goes red rather than one test among many.
  */
 
+import { execFileSync } from "node:child_process";
+
 /** Anything with Prisma's `$queryRawUnsafe` — the singleton or a `createDbClient` handle. */
 export interface RawQueryable {
   $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>;
@@ -88,6 +90,22 @@ export function requireTestEnv(name: string, suite: string): string | undefined 
     `Set a test-only ${name} in the Test step of .github/workflows/ci.yml.`,
   );
   return undefined;
+}
+
+/**
+ * True only for a URL `scripts/db-target.sh` `db_is_local` accepts — the guard
+ * db:setup and the pre-push hook use. Run, not ported, so the two cannot drift;
+ * fail closed: no `sh` (or any error) reads as "not local". For a live test
+ * that runs DDL, which must never reach a shared or production database.
+ */
+export function isLocalDbUrl(url: string): boolean {
+  const script = '. scripts/db-target.sh\ntarget=$(db_target "$1")\ndb_is_local "$1" "${target%%/*}"';
+  try {
+    execFileSync("sh", ["-c", script, "probe", url], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function readRole(client: RawQueryable): Promise<RoleFacts> {

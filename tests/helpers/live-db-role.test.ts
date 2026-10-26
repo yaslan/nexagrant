@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isCi, requireRlsTestUrl, requireTestEnv, skipOrFailInCi } from './live-db-role';
+import { isCi, isLocalDbUrl, requireRlsTestUrl, requireTestEnv, skipOrFailInCi } from './live-db-role';
 
 /**
  * İNCELEME-62 O-1 — these four decide whether a live suite in CI throws or
@@ -85,5 +85,23 @@ describe('requireTestEnv (the AUTH_SECRET guard of İNCELEME-54 Y-1)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(requireTestEnv(NAME, 's')).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(`s skipped: ${NAME} is not set`);
+  });
+});
+
+// TASK-MVDVCQW3GI94J — blog-posts.live.test.ts runs DDL only where this says local.
+describe('isLocalDbUrl', () => {
+  it.each([
+    ['postgresql://u:pw@localhost:5587/fabrika'],
+    ['postgresql://u:pw@127.0.0.1:5587/fabrika?schema=public'],
+  ])('%s is local', (url) => {
+    expect(isLocalDbUrl(url)).toBe(true);
+  });
+  it.each([
+    ['postgresql://u:pw@db.example.invalid:5432/postgres'],
+    ['postgresql://u:pw@localhost:5587/fabrika?host=db.example.invalid'],
+    ['postgresql://u:pw@localhost:5587,db.example.invalid:5432/fabrika'],
+    ['not a url'],
+  ])('%s is not', (url) => {
+    expect(isLocalDbUrl(url)).toBe(false);
   });
 });

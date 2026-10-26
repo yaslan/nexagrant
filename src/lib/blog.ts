@@ -21,7 +21,6 @@ import { errorCode } from './errors';
 import { logger } from './logger';
 import { publicAssetStore } from './storage';
 import { withSystemScope, type SystemTx } from './system-scope';
-import { BLOG_READ_MINUTES, estimateReadMinutes } from './blog-read-time';
 import {
   BLOG_LIMITS,
   BLOG_WRITE_ERRORS,
@@ -40,15 +39,6 @@ import {
 
 export * from './blog-shared';
 
-/**
- * The stored minutes. NULL only on a row written by pre-FO-84 code during the
- * deploy window (prisma/migrations/blog-read-minutes.sql); such a row is shown
- * with the estimate from its content until the migration's backfill runs again.
- */
-function readMinutesOf(row: BlogPostRow): number {
-  return row.readMinutes ?? Math.max(BLOG_READ_MINUTES.min, estimateReadMinutes(row.content));
-}
-
 function toBlogPost(row: BlogPostRow): BlogPost {
   return {
     slug: row.slug,
@@ -56,7 +46,7 @@ function toBlogPost(row: BlogPostRow): BlogPost {
     excerpt: row.excerpt,
     content: row.content,
     category: row.category,
-    readMinutes: readMinutesOf(row),
+    readMinutes: row.readMinutes,
     publishedAt: row.publishedAt,
     ...(row.authorName
       ? {
@@ -79,7 +69,7 @@ function toInput(row: BlogPostRow): BlogPostInput {
     excerpt: row.excerpt,
     content: row.content,
     category: row.category,
-    readMinutes: readMinutesOf(row),
+    readMinutes: row.readMinutes,
     authorName: row.authorName ?? '',
     authorRole: row.authorRole ?? '',
     authorAvatar: row.authorAvatar ?? '',

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 /**
@@ -55,6 +56,7 @@ const ERROR_TEXT: Record<string, [string, string]> = {
 
 export default function TeamList({ isTr, refreshKey }: { isTr: boolean; refreshKey: number }) {
   const errorText = useActionErrorText();
+  const t = useTranslations('settings.members.teamList');
   const [team, setTeam] = useState<Team | null>(null);
   const [loadError, setLoadError] = useState('');
   const [target, setTarget] = useState<Target | null>(null);
@@ -89,19 +91,13 @@ export default function TeamList({ isTr, refreshKey }: { isTr: boolean; refreshK
             team: null,
             error:
               res.status === 401
-                ? isTr
-                  ? 'Bu kurumda artık üyeliğiniz yok ya da oturumunuz sona erdi. Lütfen yeniden giriş yapın.'
-                  : 'You are no longer a member of this organisation, or your session has ended. Please sign in again.'
+                ? t('errors.sessionOrMembership')
                 : data?.code === 'FORBIDDEN_ROLE'
-                ? isTr
-                  ? 'Ekip listesini yalnızca kurum sahibi veya yöneticisi görebilir.'
-                  : 'Only an owner or admin can see the team list.'
-                : isTr
-                  ? 'Ekip listesi yüklenemedi.'
-                  : 'The team list could not be loaded.',
+                  ? t('errors.forbiddenRole')
+                  : t('errors.loadFailed'),
           };
       } catch {
-        next = { team: null, error: isTr ? 'Ekip listesi yüklenemedi.' : 'The team list could not be loaded.' };
+        next = { team: null, error: t('errors.loadFailed') };
       }
       if (!live) return;
       setTeam(next.team);
@@ -110,7 +106,7 @@ export default function TeamList({ isTr, refreshKey }: { isTr: boolean; refreshK
     return () => {
       live = false;
     };
-  }, [isTr, refreshKey, reloads]);
+  }, [t, refreshKey, reloads]);
 
   const closeDialog = useCallback(() => {
     setTarget(null);

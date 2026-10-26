@@ -370,6 +370,8 @@ test.describe('M8 consortium matching', () => {
     for (const row of written) expect(row.tenantId).toBe(TENANT);
     expect(Object.keys(written[0]?.breakdown as object).sort()).toEqual([
       'countryDiversity',
+      'liveDemandReason',
+      'liveDemandSignal',
       'networkCentrality',
       'smeBonus',
       'topicExperience',

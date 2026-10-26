@@ -27,22 +27,36 @@ DO $$
 DECLARE
   app_role   text := 'fabrika_app';
   app_pw     text := current_setting('fabrika.app_password', true);
+  keep_pw    boolean := coalesce(current_setting('fabrika.app_password_keep', true), '') = 'on';
   owner_role text;
   fn         regprocedure;
 BEGIN
-  IF app_pw IS NULL OR app_pw = '' THEN
-    RAISE EXCEPTION
-      'fabrika.app_password is not set. Run: select set_config(''fabrika.app_password'', ''<pw>'', false); before this script.';
-  END IF;
-
   -- 1. Role, idempotently. NOSUPERUSER + NOBYPASSRLS is the whole point.
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = app_role) THEN
+    IF app_pw IS NULL OR app_pw = '' THEN
+      RAISE EXCEPTION
+        'fabrika.app_password is not set. Run: select set_config(''fabrika.app_password'', ''<pw>'', false); before this script.';
+    END IF;
     EXECUTE format(
       'CREATE ROLE %I LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD %L',
       app_role, app_pw
     );
     RAISE NOTICE 'created role %', app_role;
+  ELSIF keep_pw THEN
+    -- Keep mode (scripts/setup-rls-role.ts): attributes only, the password is
+    -- owned by the .env that created the role and must not be rewritten here.
+    EXECUTE format(
+      'ALTER ROLE %I LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE',
+      app_role
+    );
+    RAISE NOTICE 'role % already existed; password kept, grants re-applied', app_role;
   ELSE
+    -- Without the GUC this branch would send PASSWORD NULL and silently remove
+    -- the shared password (TASK-MVNMZ521MJ3AD B2). Refuse instead.
+    IF app_pw IS NULL OR app_pw = '' THEN
+      RAISE EXCEPTION
+        'fabrika.app_password is not set. Role % already exists; set the password or run with the keep flag (pnpm db:rls-role). Password left unchanged.', app_role;
+    END IF;
     -- Re-assert the attributes and rotate the password. Never widens privileges.
     EXECUTE format(
       'ALTER ROLE %I LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD %L',
