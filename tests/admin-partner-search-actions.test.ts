@@ -10,7 +10,7 @@ const m = vi.hoisted(() => ({
   topicFindFirst: vi.fn(),
   cordisFindUnique: vi.fn(),
   tx: {
-    unmatchedOrganization: { findUnique: vi.fn(), update: vi.fn() },
+    unmatchedOrganization: { findUnique: vi.fn(), updateMany: vi.fn() },
     partnerSearchAnnouncement: { findMany: vi.fn(), updateMany: vi.fn() },
     auditEvent: { create: vi.fn() },
   },
@@ -75,7 +75,7 @@ const ACTIONS = [
   {
     name: 'resolveUnmatchedOrganization',
     call: () => ps.resolveUnmatchedOrganization({ id: 'um-1', pic: '999999999' }),
-    effects: () => [m.tx.unmatchedOrganization.update, m.tx.auditEvent.create],
+    effects: () => [m.tx.unmatchedOrganization.updateMany, m.tx.auditEvent.create],
   },
 ];
 
@@ -93,6 +93,7 @@ beforeEach(() => {
   });
   m.cordisFindUnique.mockResolvedValue({ organisationId: '999999999', name: 'ACME RESEARCH GMBH' });
   m.tx.unmatchedOrganization.findUnique.mockResolvedValue(UNMATCHED);
+  m.tx.unmatchedOrganization.updateMany.mockResolvedValue({ count: 1 });
   m.tx.partnerSearchAnnouncement.findMany.mockResolvedValue([
     { id: 'a-1', organizationName: 'ACME Research GmbH', country: 'DE' },
     { id: 'a-2', organizationName: 'Other Org', country: 'DE' },
@@ -180,8 +181,8 @@ describe('as platform admin', () => {
       pic: '999999999',
       linkedAnnouncements: 1,
     });
-    expect(m.tx.unmatchedOrganization.update).toHaveBeenCalledWith({
-      where: { id: 'um-1' },
+    expect(m.tx.unmatchedOrganization.updateMany).toHaveBeenCalledWith({
+      where: { id: 'um-1', resolvedPic: null },
       data: { resolvedPic: '999999999' },
     });
     expect(m.tx.partnerSearchAnnouncement.updateMany).toHaveBeenCalledWith({
@@ -213,7 +214,7 @@ describe('as platform admin', () => {
       ok: false,
       error: 'organization_not_found',
     });
-    expect(m.tx.unmatchedOrganization.update).not.toHaveBeenCalled();
+    expect(m.tx.unmatchedOrganization.updateMany).not.toHaveBeenCalled();
     expect(m.tx.auditEvent.create).not.toHaveBeenCalled();
   });
 
@@ -223,7 +224,18 @@ describe('as platform admin', () => {
       ok: false,
       error: 'already_resolved',
     });
-    expect(m.tx.unmatchedOrganization.update).not.toHaveBeenCalled();
+    expect(m.tx.unmatchedOrganization.updateMany).not.toHaveBeenCalled();
+    expect(m.refreshFlags).not.toHaveBeenCalled();
+  });
+
+  test('manual link loses the race when another admin resolved the row first', async () => {
+    m.tx.unmatchedOrganization.updateMany.mockResolvedValue({ count: 0 });
+    await expect(ps.resolveUnmatchedOrganization({ id: 'um-1', pic: '999999999' })).resolves.toEqual({
+      ok: false,
+      error: 'already_resolved',
+    });
+    expect(m.tx.partnerSearchAnnouncement.updateMany).not.toHaveBeenCalled();
+    expect(m.tx.auditEvent.create).not.toHaveBeenCalled();
     expect(m.refreshFlags).not.toHaveBeenCalled();
   });
 });

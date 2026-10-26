@@ -172,7 +172,12 @@ export async function resolveUnmatchedOrganization(input: unknown): Promise<Reso
       });
       const ids = announcementsOfUnmatched(unmatched, candidates).map((a) => a.id);
 
-      await tx.unmatchedOrganization.update({ where: { id: unmatched.id }, data: { resolvedPic: pic } });
+      // Conditional claim: two admins linking the same row at once must not both win.
+      const claimed = await tx.unmatchedOrganization.updateMany({
+        where: { id: unmatched.id, resolvedPic: null },
+        data: { resolvedPic: pic },
+      });
+      if (claimed.count === 0) throw new ResolveRefusal('already_resolved');
       if (ids.length > 0) {
         await tx.partnerSearchAnnouncement.updateMany({
           where: { id: { in: ids }, organizationPic: null },
