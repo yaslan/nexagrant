@@ -241,6 +241,9 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                             <span className="font-semibold text-ink text-xs">{cOrg?.shortName || cOrg?.name || c.organizationId}</span>
                             <span className="text-muted text-xs ml-2">{cOrg?.country}</span>
                             {cOrg?.isSme && <span className="ml-2 text-[10px] bg-accent/15 text-accent-ink px-1.5 py-0.5 rounded font-bold">SME</span>}
+                            {bd?.liveDemandReason && (
+                              <p className="mt-1 text-xs text-muted">{t('liveDemandReason', { days: bd.liveDemandReason.days })}</p>
+                            )}
                           </div>
                           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
                             <div className="text-xs text-muted space-x-2">

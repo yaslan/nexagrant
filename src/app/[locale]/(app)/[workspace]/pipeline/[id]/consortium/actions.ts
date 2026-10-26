@@ -4,6 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
+import { checkModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import { inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
@@ -79,12 +80,16 @@ export async function findCandidates(seatId: string) {
 
   // `Opportunity.topicId` is a `Topic` cuid; the scorer resolves it to the topic
   // identifier itself, so it is passed through as an id rather than a code.
+  // The live-demand reason line is shown only while M8 is on for the viewer; the
+  // signal itself is always computed and stored with the candidate.
+  const m8 = await checkModuleAccess('M8');
   const candidates = await scoreCandidatesForSeat(
     tenantId,
     seatId,
     seat.opportunityId,
     opp?.topicId || null,
-    5
+    5,
+    { liveDemandVisible: m8.allowed }
   );
 
   revalidatePath(PIPELINE_PATH, 'page');

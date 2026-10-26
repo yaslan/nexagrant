@@ -389,6 +389,7 @@
     "conflict": "Conflict Warning",
     "addRoleToConsortium": "ADD ROLE TO CONSORTIUM",
     "topCandidates": "TOP CANDIDATES",
+    "liveDemandReason": "This organisation published a partner-search request for this topic {days} days ago.",
     "required": "Required",
     "status": {
       "OPEN": "OPEN",

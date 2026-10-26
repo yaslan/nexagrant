@@ -389,6 +389,7 @@
     "conflict": "Çakışma Uyarısı",
     "addRoleToConsortium": "KONSORSİYUMA ROL EKLE",
     "topCandidates": "EN İYİ ADAYLAR",
+    "liveDemandReason": "Bu kurum bu topic için {days} gün önce partner arıyor ilanı yayınladı.",
     "required": "Zorunlu",
     "status": {
       "OPEN": "AÇIK",
