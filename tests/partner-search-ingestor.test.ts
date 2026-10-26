@@ -283,3 +283,73 @@ describe('runPartnerSearchIngestion — FO-60 review 5 and 6: PIC refresh and up
     );
   });
 });
+
+describe('runPartnerSearchIngestion — FO-64 review B1: a manual PIC link survives the next scan', () => {
+  const LINKED = '998877665';
+
+  /** CORDIS knows the PIC under another name, so matchPic stays unmatched; the admin has resolved the queue row. */
+  function adminLinked(stored: Array<ReturnType<typeof storedRow>>) {
+    enableFlag(true);
+    db.partnerSearchAnnouncement.findMany.mockImplementation(
+      async ({ where }: { where: Record<string, unknown> }) => {
+        if (where.externalId) return [];
+        if (where.organizationPic) return where.organizationPic === LINKED ? [{ lastSeenAt: new Date() }] : [];
+        return stored;
+      }
+    );
+    db.cordisOrganization.findMany.mockResolvedValue([]);
+    db.unmatchedOrganization.upsert.mockResolvedValue({ resolvedPic: LINKED });
+    db.partnerSearchAnnouncement.update.mockResolvedValue({});
+    db.partnerSearchAnnouncement.create.mockResolvedValue({});
+    db.rawFetch.findFirst.mockResolvedValue(null);
+    db.rawFetch.create.mockResolvedValue({});
+    db.cordisOrganization.updateMany.mockResolvedValue({ count: 1 });
+  }
+
+  it('keeps the linked PIC on an announcement seen again and leaves its organisation flagged active', async () => {
+    adminLinked([storedRow({ organizationName: 'Live Demo Labs', organizationPic: LINKED })]);
+    const client = fakeClient({
+      fetchTopic: vi.fn(async () => okResult([orgRow({ organisationName: 'Live Demo Labs' })])),
+    });
+
+    await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(db.partnerSearchAnnouncement.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { externalId: 'a' }, data: expect.objectContaining({ organizationPic: LINKED }) })
+    );
+    expect(db.cordisOrganization.updateMany).toHaveBeenCalledWith({
+      where: { organisationId: LINKED },
+      data: expect.objectContaining({ hasActiveAnnouncements: true }),
+    });
+    expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ updated: 0 }) })
+    );
+  });
+
+  it("links the same organisation's new announcement to the resolved PIC", async () => {
+    adminLinked([]);
+    const client = fakeClient({
+      fetchTopic: vi.fn(async () => okResult([orgRow({ id: 'b', organisationName: 'Live Demo Labs' })])),
+    });
+
+    await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(db.partnerSearchAnnouncement.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ externalId: 'b', organizationPic: LINKED }),
+    });
+  });
+
+  it('an unresolved queue row still writes no PIC', async () => {
+    adminLinked([storedRow({ organizationName: 'Live Demo Labs' })]);
+    db.unmatchedOrganization.upsert.mockResolvedValue({ resolvedPic: null });
+    const client = fakeClient({
+      fetchTopic: vi.fn(async () => okResult([orgRow({ organisationName: 'Live Demo Labs' })])),
+    });
+
+    await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(db.partnerSearchAnnouncement.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ organizationPic: null }) })
+    );
+  });
+});

@@ -17,7 +17,8 @@ import {
   FileText,
   Inbox,
   UserCheck,
-  Globe
+  Globe,
+  Network
 } from 'lucide-react';
 
 interface AdminSidebarNavProps {
@@ -29,6 +30,7 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
   const tLeads = useTranslations('adminLeads');
   const tExperts = useTranslations('AdminExpertPrereg');
   const tInterreg = useTranslations('adminInterreg');
+  const tPartnerSearch = useTranslations('adminPartnerSearch');
 
   const adminNavItems = [
     {
@@ -94,6 +96,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: tInterreg('navDesc'),
       icon: Globe,
       badge: 'Interreg',
+    },
+    {
+      key: 'partner-search',
+      href: `/${locale}/admin/partner-search`,
+      label: tPartnerSearch('navLabel'),
+      desc: tPartnerSearch('navDesc'),
+      icon: Network,
+      badge: 'PS',
     },
     {
       key: 'leads',
