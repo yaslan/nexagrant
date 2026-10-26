@@ -7,8 +7,11 @@ import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { getWorkspaceMembers, type WorkspaceMember } from '@/lib/k5-pipeline/pipelineStore';
+import {
+  createRelationship as createFocalPoint,
+  type RelationshipCreateInput,
+} from '@/modules/m4/server/actions';
 import { revalidatePath } from 'next/cache';
-import type { RelationshipRow } from '@/types/db-rows';
 
 /**
  * `tenantId` was read as `session.tenantId` with no null check, and
@@ -19,34 +22,15 @@ import type { RelationshipRow } from '@/types/db-rows';
 
 // ─── Relationship CRUD ───
 
-export async function createRelationship(data: {
-  organizationId?: string;
-  partnerOrgId?: string;
-  kind: string;
-  counterpartName?: string;
-  counterpartEmail?: string;
-  notes?: string;
-}) {
-  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
-
-  const rel = await withTenant<RelationshipRow>(tenantId, (tx) =>
-    tx.relationship.create({
-    data: {
-      tenantId,
-      ownerUserId: userId,
-      kind: data.kind,
-      organizationId: data.organizationId,
-      partnerOrgId: data.partnerOrgId,
-      counterpartName: data.counterpartName,
-      counterpartEmail: data.counterpartEmail,
-      notes: data.notes,
-      warmth: 'cold',
-    },
-    })
-  );
-
-  revalidatePath('/[locale]/(app)/[workspace]/relationships', 'page');
-  return rel;
+/**
+ * The partner screens' "add to M4" action, kept at this path because the
+ * screens import it from here. The rule is in the M4 module (module gate,
+ * input schema, one row per PIC); this entry point adds only the role check,
+ * which the RBAC guard requires to see in the file that exports the action.
+ */
+export async function createRelationship(data: RelationshipCreateInput) {
+  await requireTenantAction({ can: 'edit_proposal' });
+  return createFocalPoint(data);
 }
 
 /**
