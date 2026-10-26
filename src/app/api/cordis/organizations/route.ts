@@ -4,8 +4,12 @@ import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { cordisOrganizationsQuerySchema, pickQuery } from '@/lib/k2-cordis/api-query';
 import type { CordisPartnerProfileRow } from '@/lib/k2-cordis/rows';
+import { authenticateCordisRequest } from '@/lib/cordis-api-auth';
 
 export async function GET(req: NextRequest) {
+  const authRes = await authenticateCordisRequest(req);
+  if (!authRes.authenticated) return authRes.errorResponse;
+
   try {
     const { searchParams } = new URL(req.url);
 
