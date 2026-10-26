@@ -24,6 +24,10 @@ vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
 vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch }));
 vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: vi.fn() }));
 vi.mock('@/lib/db', () => ({ prisma: { cordisPartnerProfile: { count, findMany } } }));
+vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 'tenant-1' }) }));
+vi.mock('@/lib/billing', () => ({
+  getEntitlements: async () => ({ planId: 'free', allowedModules: ['M1', 'M5'] }),
+}));
 
 async function render(searchParams: Record<string, string>): Promise<string> {
   const { default: PartnersPage } = await import('@/app/[locale]/(app)/[workspace]/partners/page');

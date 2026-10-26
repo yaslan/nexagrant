@@ -31,7 +31,7 @@ const PARTNER_API_MODULE: ModuleId = 'M1';
  * machine audience: open where a pilot's managers are (`PILOT`), closed to `DEV`,
  * which is staff only.
  */
-const API_KEY_VIEWER: MachineViewer = { kind: 'machine', role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
+export const API_KEY_VIEWER: MachineViewer = { kind: 'machine', role: 'API_KEY', isPlatformAdmin: false, isMachine: true };
 
 function moduleDenied(): { authenticated: false; errorResponse: NextResponse } {
   return {

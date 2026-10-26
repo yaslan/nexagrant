@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server';
-import { prisma } from '@/lib/db';
+import { prisma, withTenant } from '@/lib/db';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { ModuleLink } from '@/components/ModuleLink';
@@ -10,6 +10,12 @@ import { moduleGate } from '@/lib/modules/guard';
 import { planNamesGrantingModuleInFull } from '@/lib/billing/catalog';
 import { meterPartnerSearch } from '@/modules/m1/server/partner-search/monthly-quota';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { getEntitlements } from '@/lib/billing';
+import { partnerSearchGrant } from '@/lib/billing/catalog';
+import { requireTenantPage } from '@/lib/tenant';
+import { AnnouncementBrowser } from '@/modules/m1/ui/partner-search/AnnouncementBrowser';
+import { ActiveAnnouncementsBadge } from '@/modules/m1/ui/partner-search/ActiveAnnouncementsBadge';
+import { createRelationship } from '../relationships/actions';
 
 
 /**
@@ -64,6 +70,7 @@ export default async function PartnersPage({
     min_projects?: string;
     is_interreg?: string;
     framework?: string;
+    tab?: string;
   }>;
 }) {
   const { workspace, locale } = await params;
@@ -73,6 +80,28 @@ export default async function PartnersPage({
   const sParams = await searchParams;
   const tLinks = await getTranslations({ locale, namespace: 'PartnersPage.crossLinks' });
   const t = await getTranslations('partnersPage');
+  const tSignal = await getTranslations({ locale, namespace: 'PartnerSignal' });
+  // FO-62: the live Partner Search announcements are their own tab; the
+  // CORDIS table below is not queried while it is open.
+  const liveTab = sParams.tab === 'live';
+  const partnersHref = getWorkspaceRoute('partners', locale, workspace);
+
+  // FO-62 review B1: every "active announcement" badge is one
+  // /api/organizations/:pic/announcements read, and on a metered plan (Basic
+  // with the M1 add-on) each read spends one of the month's queries. So the
+  // badges render only where the plan's grant is unmetered; when the plan cannot
+  // be read they stay off, nothing is spent on a guess.
+  let showAnnouncementBadges = false;
+  if (!liveTab) {
+    const { tenantId } = await requireTenantPage(locale);
+    try {
+      const entitlements = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
+      showAnnouncementBadges =
+        partnerSearchGrant(entitlements.planId, entitlements.allowedModules.includes('M1')).queriesMonthly === null;
+    } catch {
+      showAnnouncementBadges = false;
+    }
+  }
 
   const q = sParams.q?.trim() || '';
   const country = sParams.country?.trim().toUpperCase() || '';
@@ -83,9 +112,10 @@ export default async function PartnersPage({
 
   // FO-41: a limited M1 (Discover, Basic, TTO Edition) counts each search with
   // a criterion against the month; browsing the default list is not a search.
-  // A used-up month runs no lookup at all.
+  // A used-up month runs no lookup at all. The live tab is metered by its own
+  // FO-61 endpoint call, so it is not counted here as well.
   const hasCriteria = Boolean(q || country || activityType || isTurkishOnly || isInterregOnly || minProjects > 0);
-  const searchQuota = hasCriteria ? await meterPartnerSearch() : null;
+  const searchQuota = hasCriteria && !liveTab ? await meterPartnerSearch() : null;
   const quotaExhausted = searchQuota?.allowed === false;
 
   let profiles: PartnerRow[] = [];
@@ -98,6 +128,8 @@ export default async function PartnersPage({
   if (quotaExhausted) {
     // Nothing is looked up: the table below shows the empty state and the
     // notice above it says why.
+  } else if (liveTab) {
+    // The announcement list loads in the browser, from the FO-61 endpoint.
   } else if (isInterregOnly) {
     // Interreg partners (e.g. Trakya Üniversitesi, belediyeler, ajanslar) are recorded
     // in CordisOrganization and linked to CordisProject with framework 'INTERREG'.
@@ -473,6 +505,38 @@ export default async function PartnersPage({
           {tLinks('personDays')}
         </ModuleLink>
       </nav>
+      <nav aria-label={tSignal('tabs.label')} className="flex gap-1 border-b border-border" data-testid="partners-tabs">
+        <Link
+          href={partnersHref}
+          aria-current={liveTab ? undefined : 'page'}
+          className={`-mb-px inline-flex min-h-10 items-center border-b-2 px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-accent ${liveTab ? 'border-transparent text-ink-2 hover:text-ink' : 'border-accent text-accent'}`}
+          data-testid="partners-tab-cordis"
+        >
+          {tSignal('tabs.cordis')}
+        </Link>
+        <Link
+          href={`${partnersHref}?tab=live`}
+          aria-current={liveTab ? 'page' : undefined}
+          className={`-mb-px inline-flex min-h-10 items-center border-b-2 px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-accent ${liveTab ? 'border-accent text-accent' : 'border-transparent text-ink-2 hover:text-ink'}`}
+          data-testid="partners-tab-live"
+        >
+          {tSignal('tabs.live')}
+        </Link>
+      </nav>
+
+      {liveTab ? (
+        <section aria-label={tSignal('tabs.live')} data-testid="partners-live">
+          <p className="mb-4 max-w-3xl text-xs text-ink-2">{tSignal('tabs.liveIntro')}</p>
+          <AnnouncementBrowser
+            upgradeHref={getWorkspaceRoute('settingsBilling', locale, workspace)}
+            links={{
+              partnerHref: getWorkspaceRoute('partnerDetail', locale, workspace, ':pic'),
+              addToRelationships: createRelationship,
+            }}
+          />
+        </section>
+      ) : (
+      <>
       <p className="text-[11px] text-muted">
         {t('attribution')}
       </p>
@@ -579,6 +643,7 @@ export default async function PartnersPage({
                           {t('smeBadge')}
                         </span>
                       )}
+                      {showAnnouncementBadges && <ActiveAnnouncementsBadge pic={p.organisationId} scope={workspace} />}
                       {p.isInterreg && (
                         <span
                           className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold font-mono px-1.5 py-0.2 rounded"
@@ -636,6 +701,8 @@ export default async function PartnersPage({
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

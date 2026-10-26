@@ -40,6 +40,12 @@ interface AddOnCatalogRow {
 }
 
 export interface Entitlements {
+  /**
+   * The plan the figures belong to, after `resolvePlanId` (a retired id is
+   * already its replacement); `free` when no live subscription. For limits that
+   * are read from the catalogue by plan, such as `partnerSearchGrant`.
+   */
+  planId: string;
   allowedModules: string[];
   /**
    * FO-41: modules in `allowedModules` the plan grants only in a limited form
@@ -218,6 +224,7 @@ export async function getEntitlements(tenantId: string, client: TenantTx): Promi
   }
 
   return {
+    planId,
     allowedModules: Array.from(allowedModules),
     moduleLimits,
     grandfatheredModules,

@@ -2,14 +2,19 @@
  * Creates the RLS-subject application role `fabrika_app` on the local database,
  * then proves the role is not exempt from row level security.
  *
- *   pnpm db:rls-role              # create if missing, otherwise verify only
+ *   pnpm db:rls-role              # create if missing; otherwise re-apply grants here
  *   pnpm db:rls-role:rollback     # remove the role again
  *
  * The role is cluster-wide but DATABASE_URL_RLS_TEST lives in one checkout's
  * .env. Re-setting the password from here would silently break every other
- * checkout that shares the database, so an existing role is never altered: its
- * password must already match this .env, or the script fails. Rotating means
+ * checkout that shares the database, so an existing role's password is never
+ * altered: it must already match this .env, or the script fails. Rotating means
  * rollback + create (see the error message for the exact steps).
+ *
+ * Grants are per database, the role is per cluster. An existing role therefore
+ * still gets the grant half of prisma/rls-app-role.sql applied to THIS database
+ * (TASK-MVNMZ521MJ3AD), and the login proof runs against THIS database, not the
+ * one the .env URL happens to name.
  *
  * The role's password is never written into a .sql file. It comes from
  * DATABASE_URL_RLS_TEST in .env; if that variable is absent, a random password
@@ -85,8 +90,12 @@ async function main() {
         );
       }
       await assertRoleAttributes(admin);
-      const user = await proveLogin(configuredUrl);
-      console.log(`✅ ${ROLE} already exists; ${ENV_KEY} logs in as ${user}. Password left unchanged.`);
+      // Keep mode: the SQL re-asserts attributes and grants but never touches the
+      // password, so the shared credential stays exactly as this .env knows it.
+      await admin.query("SELECT set_config('fabrika.app_password_keep', 'on', false)");
+      await admin.query(loadSql('prisma/rls-app-role.sql'));
+      const user = await proveLogin(onDatabase(configuredUrl, adminUrl));
+      console.log(`✅ ${ROLE} already exists; grants applied to this database. ${ENV_KEY} logs in as ${user}. Password left unchanged.`);
       return;
     }
 
@@ -136,7 +145,24 @@ async function assertRoleAttributes(admin: pg.Client) {
   }
 }
 
-/** Proves the credential logs in before anyone wires it into a test; returns the login user. */
+/**
+ * Same credential and options, pointed at the server and database of the admin
+ * URL. The grants were applied there, so the login proof must go there too
+ * (TASK-MVNMZ521MJ3AD Ö1); the host and port of the .env URL are not used.
+ */
+function onDatabase(url: string, databaseUrl: string): string {
+  const target = new URL(databaseUrl);
+  const next = new URL(url);
+  next.host = target.host;
+  next.pathname = target.pathname;
+  return next.toString();
+}
+
+/**
+ * Proves the credential logs in AND can read a tenant table on this database;
+ * returns the login user. A login alone proves nothing: a role can connect to a
+ * database it has no table grants on (TASK-MVNMZ521MJ3AD).
+ */
 async function proveLogin(appUrl: string): Promise<string> {
   const appClient = new pg.Client({ connectionString: appUrl });
   try {
@@ -153,6 +179,17 @@ async function proveLogin(appUrl: string): Promise<string> {
   }
   try {
     const who = await appClient.query('SELECT current_user, current_setting($1, true) AS tenant', ['app.tenant_id']);
+    try {
+      await appClient.query('SELECT 1 FROM "Tenant" LIMIT 1');
+    } catch (error) {
+      if ((error as { code?: string }).code === '42501') {
+        throw new Error(
+          `${ROLE} logs in on this database but has no SELECT on "Tenant": the GRANTs in prisma/rls-app-role.sql ` +
+            `did not reach this database. Run pnpm db:rls-role again and check the output above.`
+        );
+      }
+      throw error;
+    }
     return who.rows[0].current_user;
   } finally {
     await appClient.end();

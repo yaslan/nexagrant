@@ -28,6 +28,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({ notFound: () => null }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
 vi.mock('@/modules/m1/ui/PartnerOutreach', () => ({ PartnerOutreach: () => null }));
+vi.mock('@/modules/m1/ui/partner-search/OrganizationAnnouncements', () => ({ OrganizationAnnouncements: () => null }));
 vi.mock('@/lib/db', () => ({
   prisma: {
     cordisOrganization: { findUnique },

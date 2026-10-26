@@ -21,7 +21,19 @@ vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
 // M1 in full: no monthly search count (FO-41).
 vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch: async () => null }));
 vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: vi.fn() }));
-vi.mock('@/lib/db', () => ({ prisma: { cordisPartnerProfile: { count, findMany } } }));
+vi.mock('@/lib/db', () => {
+  const prisma = { cordisPartnerProfile: { count, findMany } };
+  return { prisma, withTenant: async (_tenantId: string, fn: (tx: typeof prisma) => unknown) => fn(prisma) };
+});
+// FO-62: the page reads the tenant's plan to decide the announcement badges.
+vi.mock('@/lib/tenant', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/tenant')>()),
+  requireTenantPage: vi.fn().mockResolvedValue({ tenantId: 'demo-tenant' }),
+}));
+vi.mock('@/lib/billing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/billing')>()),
+  getEntitlements: vi.fn().mockResolvedValue({ planId: 'basic', allowedModules: [] }),
+}));
 
 function profile(organisationId: string, totalEcContribution: bigint | null) {
   return {

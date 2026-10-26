@@ -187,6 +187,18 @@ vi.mock('../src/lib/modules/guard', () => ({
 // M1 in full: no monthly search count (FO-41).
 vi.mock('../src/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch: async () => null }));
 
+// FO-62 B1: the page reads the tenant's plan to decide whether the (metered)
+// announcement badges render. Rendered outside a request, so the session and
+// the plan are stubbed; Basic without M1 → no badges, as before.
+vi.mock('../src/lib/tenant', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/lib/tenant')>()),
+  requireTenantPage: vi.fn().mockResolvedValue({ tenantId: 'demo-tenant' }),
+}));
+vi.mock('../src/lib/billing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/lib/billing')>()),
+  getEntitlements: vi.fn().mockResolvedValue({ planId: 'basic', allowedModules: [] }),
+}));
+
 vi.mock('../src/lib/observability/system-alert', () => ({
   recordAlert: vi.fn().mockResolvedValue(undefined),
 }));

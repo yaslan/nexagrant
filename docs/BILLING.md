@@ -27,6 +27,28 @@ Para birimi **USD**, tutarlar cent (CLAUDE.md kural 9). Aşağıdaki fiyatlar
 |---|---|---|---|---|---|
 | `lifetime-ultra` | Ultra Lifetime | $2.576,00 | %50 (sabit) | $1.288,00 | `OMURBOYU20` |
 
+### 1.0 Sayaçlı yetenekler (`PlanGrant.limits`, FO-61)
+
+Plan kartındaki `PlanFeature` (`kind: 'limit'`) satırının `limitKey`'i bu
+anahtarlardan birini adlandırır (`PLAN_LIMIT_KEYS`, `src/lib/billing/catalog.ts`).
+Rakam yalnız katalogdadır; okuma `partnerSearchGrant(planId, hasM1)` ile.
+
+| `limitKey` | `free` (Discover) | `basic` | `pro` | `ultra` |
+|---|---|---|---|---|
+| `partner_search_queries_monthly` | 10 / ay | 10 / ay | sınırsız (anahtar yok) | sınırsız (anahtar yok) |
+| `partner_search_export` | — | — | — | JSON/CSV dışa aktarma |
+
+- M1'i olmayan bir planda pozitif `partner_search_queries_monthly`, **yalnız
+  Partner Search ilan listelerini** (`/api/partner-search/announcements`,
+  `/api/organizations/:pic/announcements`) o kadar sorguyla açar; M1'in geri
+  kalanı (ortak arama, graf, v1 API) plan yükseltmesi ister. Konu sinyali
+  (`/api/topics/:id/partner-signal`, yalnız sayılar) sayaçtan düşmez.
+- Ay UTC takvim ayıdır; sayaç `PartnerSearchQuotaUsage` (kiracı × ay), 11. sorgu
+  `429 PARTNER_SEARCH_QUOTA_EXCEEDED` + `Retry-After`.
+- M1'li planda anahtar yoksa sınırsızdır; M1 eklentisi alan bir Basic kiracı
+  Basic'in 10'unu korur (açık soru: `docs/agent-results/TASK-MVCH2R3VSLAJN-be-fb.md`).
+- Kamu paketleri (`public-*`) taban planlarının limitlerini devralır.
+
 **`free` satılık bir plan değildir.** Aboneliği olmayan kiracının düştüğü
 durumdur: `CATALOG`'da yer almaz (dolayısıyla hiçbir fiyat panelinde
 görünmez), ama `Plan` tablosunda satırı vardır çünkü `getEntitlements()`

@@ -138,11 +138,11 @@ const ACTIONS: [string, Action, () => Promise<unknown>][] = [
   ['approvals.approveRequestAction', 'approve_dual_approval', () => approvals.approveRequestAction('req-1')],
   ['approvals.rejectRequestAction', 'approve_dual_approval', () => approvals.rejectRequestAction('req-1', 'no')],
   // relationships (app) + m4
-  ['relationships.createRelationship', 'edit_proposal', () => relationships.createRelationship({ kind: 'partner' })],
   // İNCELEME-59 B-1 (TASK-MUNQAXELV83HO): every internal member, never the outside partner. The final bar is KARAR 7.
   ['relationships.updateRelationship', 'view_proposal', () => relationships.updateRelationship('rel-1', { notes: 'x' })],
   ['relationships.addInteraction', 'edit_proposal', () => relationships.addInteraction('rel-1', { kind: 'call', at: '2026-09-30', summary: 's' })],
-  ['m4.createRelationship', 'edit_proposal', () => m4.createRelationship({ organizationId: 'org-1', kind: 'partner' })],
+  ['relationships.createRelationship', 'edit_proposal', () => relationships.createRelationship({ kind: 'partner' })],
+  ['m4.createRelationship', 'edit_proposal', () => m4.createRelationship({ organizationId: '123456789', kind: 'partner' })],
   ['m4.addInteraction', 'edit_proposal', () => m4.addInteraction({ relationshipId: 'rel-1', kind: 'call' })],
   ['m4.updateNextStep', 'edit_proposal', () => m4.updateNextStep('rel-1', 'next', null)],
   // m2

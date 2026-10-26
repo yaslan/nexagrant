@@ -11,7 +11,9 @@ export type Action =
   | "contribute_assigned"
   | "request_dual_approval"
   | "manage_approvals"
-  | "approve_dual_approval";
+  | "approve_dual_approval"
+  /** M1 Partner Search announcements: read and export (FO-61). Not for guest partners. */
+  | "view_partner_search";
 
 const rolePermissions: Record<Role, Action[]> = {
   TENANT_OWNER: [
@@ -26,6 +28,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "request_dual_approval",
     "manage_approvals",
     "approve_dual_approval",
+    "view_partner_search",
   ],
   TENANT_ADMIN: [
     "manage_users",
@@ -37,6 +40,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "request_dual_approval",
     "manage_approvals",
     "approve_dual_approval",
+    "view_partner_search",
   ],
   PIPELINE_MANAGER: [
     "manage_workspaces",
@@ -46,17 +50,20 @@ const rolePermissions: Record<Role, Action[]> = {
     "contribute_assigned",
     "request_dual_approval",
     "manage_approvals",
+    "view_partner_search",
   ],
   WRITER: [
     "edit_proposal",
     "view_proposal",
     "contribute_assigned",
     "request_dual_approval",
+    "view_partner_search",
   ],
   MEMBER: [
     "view_proposal",
     "contribute_assigned",
     "request_dual_approval",
+    "view_partner_search",
   ],
   GUEST_PARTNER: [
     "contribute_assigned",

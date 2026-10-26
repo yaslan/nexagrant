@@ -6,7 +6,8 @@
 #   0. pnpm db:generate                    Prisma client for the tsx steps (a fresh worktree has none)
 #   1. .github/ci/supabase-ensure-rls.sql  live's ensure_rls event trigger: every new table starts RLS on
 #   2. prisma db push                      base tables from schema.prisma (no migration creates them)
-#   3. pnpm db:rls-role                    fabrika_app; needs the tables, must exist before db:rls grants to it
+#   3. pnpm db:rls-role                    fabrika_app; needs the tables, must exist before db:rls grants to it.
+#                                          Role already there? Its GRANTs are still re-applied to THIS database.
 #   4. pnpm db:rls                         policies + DISABLE loop, so the migrations' postflight passes
 #   5. scripts/apply-migrations.sh         prisma/migrations in apply-order.txt order
 #   6. pnpm db:rls                         again, for the tables and columns the migrations added

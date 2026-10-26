@@ -1,10 +1,13 @@
 'use server';
 
+import { z } from 'zod';
+
 import { withTenant } from '@/lib/db';
+import { assertModuleAccess } from '@/lib/modules/access';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { revalidatePath } from 'next/cache';
-import type { InteractionRow, RelationshipRow } from '@/types/db-rows';
+import type { InteractionRow } from '@/types/db-rows';
 
 /**
  * M4 relationships.
@@ -16,47 +19,88 @@ import type { InteractionRow, RelationshipRow } from '@/types/db-rows';
  * every write is matched on `(id, tenantId)`.
  */
 
-export async function createRelationship(data: {
-  organizationId?: string;
-  partnerOrgId?: string;
-  kind: string; // partner | ncp | city | cluster | consultant | tto
-  counterpartName?: string;
-  counterpartEmail?: string;
-}) {
-  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
+/**
+ * CORDIS PIC: the participant identifier the funding portal uses. Digits only,
+ * 6 to 12 of them.
+ */
+const CORDIS_PIC = /^\d{6,12}$/;
 
-  if (!data.organizationId && !data.partnerOrgId) {
-    throw new Error('Must provide either organizationId or partnerOrgId');
-  }
+/**
+ * Relationship kinds, as the schema comment lists them. Only `partner` is
+ * written by the screens today; the rest are kept so a later screen can
+ * record them without a schema change.
+ */
+const RELATIONSHIP_KINDS = ['partner', 'ncp', 'city', 'cluster', 'consultant', 'tto'] as const;
 
-  const rel = await withTenant<RelationshipRow>(tenantId, async (tx) => {
-    // Rule: One Relationship per organization per tenant
-    if (data.organizationId) {
-      const existing = await tx.relationship.findFirst({
-        where: { tenantId, organizationId: data.organizationId }
-      });
-      if (existing) {
-        throw new Error('Relationship already exists for this organization in your tenant.');
-      }
-    }
-
-    return tx.relationship.create({
-      data: {
-        tenantId,
-        organizationId: data.organizationId,
-        partnerOrgId: data.partnerOrgId,
-        kind: data.kind,
-        ownerUserId: userId,
-        counterpartName: data.counterpartName,
-        counterpartEmail: data.counterpartEmail,
-        warmth: 'active', // starts active if we just reached out/created
-        lastContactAt: new Date()
-      }
-    });
+const RelationshipCreateInput = z
+  .object({
+    organizationId: z.string().regex(CORDIS_PIC, 'organizationId must be a CORDIS PIC (6 to 12 digits)').optional(),
+    partnerOrgId: z.string().min(1).max(64).optional(),
+    kind: z.enum(RELATIONSHIP_KINDS),
+    counterpartName: z.string().trim().min(1).max(300).optional(),
+    counterpartEmail: z.string().trim().email().max(320).optional(),
+    notes: z.string().max(5000).optional(),
+  })
+  // A relationship with no PIC and no partner id still needs a name to show
+  // on the screen; an empty request is refused before it reaches the table.
+  .refine((d) => d.organizationId || d.partnerOrgId || d.counterpartName, {
+    message: 'Provide organizationId, partnerOrgId or counterpartName',
   });
 
-  revalidatePath('/[workspace]/relationships', 'page');
-  return rel.id;
+export type RelationshipCreateInput = z.input<typeof RelationshipCreateInput>;
+
+/**
+ * The one definition of "add to M4". The partner announcement screens reach it
+ * through `src/app/.../relationships/actions.ts`, which delegates here.
+ *
+ * Refused before any write when the module is off for the tenant, and
+ * refused on input the schema does not accept. A second request for a PIC the
+ * tenant already has returns the existing relationship's id instead of
+ * writing a second row. The advisory lock makes that check and the insert one
+ * step for concurrent requests, which a plain `findFirst` would not.
+ */
+export async function createRelationship(data: RelationshipCreateInput): Promise<string> {
+  await assertModuleAccess('M4');
+  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
+
+  const parsed = RelationshipCreateInput.safeParse(data);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    throw new Error(first ? `${first.path.join('.') || 'input'}: ${first.message}` : 'Invalid relationship input');
+  }
+  const input = parsed.data;
+
+  const id = await withTenant<string>(tenantId, async (tx) => {
+    if (input.organizationId) {
+      // Transaction-scoped: released at commit, so a second request for the same
+      // PIC waits here and then sees the first request's row.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${tenantId}:${input.organizationId}`}, 0))::text`;
+      const existing = await tx.relationship.findFirst({
+        where: { tenantId, organizationId: input.organizationId },
+        select: { id: true },
+      });
+      if (existing) return existing.id;
+    }
+
+    const rel = await tx.relationship.create({
+      data: {
+        tenantId,
+        organizationId: input.organizationId,
+        partnerOrgId: input.partnerOrgId,
+        kind: input.kind,
+        ownerUserId: userId,
+        counterpartName: input.counterpartName,
+        counterpartEmail: input.counterpartEmail,
+        notes: input.notes,
+        warmth: 'cold',
+      },
+      select: { id: true },
+    });
+    return rel.id;
+  });
+
+  revalidatePath('/[locale]/(app)/[workspace]/relationships', 'page');
+  return id;
 }
 
 export async function addInteraction(data: {
