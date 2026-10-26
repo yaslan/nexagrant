@@ -6,6 +6,9 @@ import { RevokeApiKeysPanel } from './revoke-panel';
 import { errorMessage } from '@/lib/errors';
 import { appUrl } from '@/lib/app-url';
 import { moduleGate } from '@/lib/modules/guard';
+import { checkModuleAccess } from '@/lib/modules/access';
+import { getManifest } from '@/lib/modules/registry';
+import { planNamesGrantingModuleInFull } from '@/lib/billing/catalog';
 import { asRole, can } from '@/lib/rbac';
 
 /**
@@ -56,7 +59,7 @@ export default async function ApiKeysSettingsPage({
 }: {
   params: Promise<{ locale: string; workspace: string }>;
 }) {
-  const { locale } = await params;
+  const { locale, workspace } = await params;
   // Partner API keys are an M1 feature (docs/MODULES.md): the sidebar lock alone
   // left the page open to anyone who typed the URL.
   const locked = await moduleGate('M1', locale);
@@ -80,6 +83,18 @@ export default async function ApiKeysSettingsPage({
 
   const { tenantId } = await requireTenantPage(locale);
 
+  // FO-157: a plan that grants M1 read only (FO-41) may look at its keys but not
+  // mint one; `generateApiKey` refuses with READ_ONLY_PLAN. The flag is the
+  // entitlement's, read through the same gate, never a plan-name comparison.
+  const access = await checkModuleAccess('M1');
+  const readOnly = access.limits?.readOnly
+    ? {
+        moduleName: getManifest('M1')?.name ?? 'M1',
+        plans: planNamesGrantingModuleInFull('M1'),
+        upgradeHref: `/${locale}/${workspace}/settings/billing`,
+      }
+    : null;
+
   let apiKeys = (await loadApiKeys(tenantId)) ?? [];
   if (apiKeys.length === 0) {
     apiKeys = demoApiKeys();
@@ -87,7 +102,7 @@ export default async function ApiKeysSettingsPage({
 
   return (
     <div className="max-w-6xl mx-auto py-6 sm:px-6 space-y-6">
-      <ApiKeysClient apiKeys={apiKeys} apiBaseUrl={appUrl()} />
+      <ApiKeysClient apiKeys={apiKeys} apiBaseUrl={appUrl()} readOnly={readOnly} />
     </div>
   );
 }

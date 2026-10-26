@@ -3740,6 +3740,10 @@
   },
   "ApiKeysSettings": {
     "createTitle": "Yeni API Anahtarı Oluştur",
+    "readOnly": {
+      "title": "Planınızda API anahtarı oluşturulamaz",
+      "upgrade": "Planı yükselt"
+    },
     "revoke": {
       "title": "Mevcut API anahtarları",
       "description": "Modül kapalıyken de mevcut anahtarlarınızı buradan iptal edebilirsiniz. İptal edilen anahtar hemen geçersiz olur. Anahtar değerleri gösterilmez.",

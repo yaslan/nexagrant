@@ -11,7 +11,10 @@ import {
   ShieldCheck,
   Lock,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { isModuleUnavailable } from '@/lib/module-unavailable';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
 import { generateApiKey, revokeApiKey, type ApiKeyActionError } from './actions';
@@ -29,16 +32,28 @@ const ACTION_ERROR_TEXT: Record<ApiKeyActionError, string> = {
   invalidName: 'Anahtar adı 1 ile 100 karakter arasında olmalı.',
 };
 
+/**
+ * FO-157: set when the plan grants M1 read only (FO-41). The page reads it from
+ * the module gate's `limits`; this component only renders it.
+ */
+export interface ApiKeysReadOnly {
+  moduleName: string;
+  /** Plans that open M1 in full, by display name. */
+  plans: string[];
+  upgradeHref: string;
+}
+
 interface ApiKeysClientProps {
   apiKeys: ApiKeyRecord[];
   /** The app's own origin for the code samples (NEXT_PUBLIC_APP_URL, TASK-MUN3OAFIVW9NA). */
   apiBaseUrl: string;
+  readOnly?: ApiKeysReadOnly | null;
 }
 
 // The tenant and user are not props: `generateApiKey` resolves both from the session,
 // and a client component that carries a tenant id is one prop away from naming someone
 // else's workspace. Both were passed in and never read.
-export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClientProps) {
+export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = null }: ApiKeysClientProps) {
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>(initialKeys);
   const [keyName, setKeyName] = useState('');
   const [newRawKey, setNewRawKey] = useState<string | null>(null);
@@ -48,10 +63,12 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClien
   const [activeCodeTab, setActiveCodeTab] = useState<'curl' | 'javascript' | 'python'>('curl');
   const errorText = useActionErrorText();
   const t = useTranslations('ApiKeysSettings');
+  const tGate = useTranslations('ModuleGate');
+  const router = useRouter();
 
   const handleGenerateKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!keyName.trim()) return;
+    if (readOnly || !keyName.trim()) return;
 
     setIsGenerating(true);
     setActionError(null);
@@ -79,6 +96,9 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClien
     } catch (err) {
       console.error('Error generating API key:', err);
       setActionError(errorText(err, null));
+      // The plan changed under an open page (FO-157): re-render it so the
+      // read-only notice, or the module gate, says why instead of a bare refusal.
+      if (isModuleUnavailable(err)) router.refresh();
     } finally {
       setIsGenerating(false);
     }
@@ -172,7 +192,34 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClien
               <h3 className="font-bold text-sm text-ink">{t('createTitle')}</h3>
             </div>
 
+            {readOnly && (
+              <div
+                role="status"
+                data-testid="api-keys-read-only"
+                className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-xs text-ink space-y-2"
+              >
+                <p className="font-bold flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>{t('readOnly.title')}</span>
+                </p>
+                <p className="text-ink-2">
+                  {tGate('reason.READ_ONLY_PLAN', {
+                    module: readOnly.moduleName,
+                    plans: readOnly.plans.length ? readOnly.plans.join(', ') : '—',
+                  })}
+                </p>
+                <Link
+                  href={readOnly.upgradeHref}
+                  className="inline-flex items-center min-h-[44px] sm:min-h-0 font-bold text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent rounded"
+                >
+                  {t('readOnly.upgrade')}
+                </Link>
+              </div>
+            )}
+
             <form onSubmit={handleGenerateKey} className="space-y-3.5 text-xs">
+              {/* A disabled fieldset disables every control in it: one switch, nothing left typeable. */}
+              <fieldset disabled={readOnly !== null} className="space-y-3.5 disabled:opacity-60">
               <div>
                 <label className="font-semibold text-ink-2 block mb-1">Anahtar Adı / Servis Tanımı</label>
                 <input
@@ -203,11 +250,12 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl }: ApiKeysClien
               <button
                 type="submit"
                 disabled={isGenerating}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl transition shadow-xs text-xs flex items-center justify-center gap-2"
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:hover:bg-purple-600 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl transition shadow-xs text-xs flex items-center justify-center gap-2"
               >
                 <Key className="w-3.5 h-3.5" />
                 <span>{isGenerating ? 'Üretiliyor...' : 'API Key Oluştur (fp_live_...)'}</span>
               </button>
+              </fieldset>
             </form>
 
             {/* Newly Created Key Alert Box */}
