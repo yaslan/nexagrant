@@ -26,18 +26,18 @@ const ROOT = resolve(import.meta.dirname, '..');
 const CROSS_MAJOR = new Map([
   ['deepmerge-ts@<8.0.0', { pinned: '8.0.0', ghsa: 'GHSA-ggr8-5vv4-36mx' }],
   ['sharp@>=0.34.0 <0.35.0', { pinned: '0.35.5', ghsa: 'GHSA-f88m-g3jw-g9cj' }],
-  ['hono@>=3.0.0 <4.0.0', { pinned: '4.13.7', ghsa: 'GHSA-m732-5p4w-x69g' }],
+  ['hono@>=3.0.0 <4.0.0', { pinned: '4.13.11', ghsa: 'GHSA-m732-5p4w-x69g' }],
   ['proxy-addr@>=1.1.0 <2.0.0', { pinned: '2.0.8', ghsa: 'GHSA-jqcg-44mw-7w3h' }],
   ['brace-expansion@>=4.0.0 <5.0.0', { pinned: '5.0.12', ghsa: 'GHSA-q2hr-2g5m-vwhr' }],
   // TASK-MVF543TDDDMX1 (FO-96): older lines FO-18 left without a row.
   ['sharp@<0.34.0', { pinned: '0.35.5', ghsa: 'GHSA-f88m-g3jw-g9cj' }],
   ['undici@<6.0.0', { pinned: '6.28.1', ghsa: 'GHSA-vxpw-j846-p89q' }],
-  ['hono@<3.0.0', { pinned: '4.13.7', ghsa: 'GHSA-m732-5p4w-x69g' }],
+  ['hono@<3.0.0', { pinned: '4.13.11', ghsa: 'GHSA-m732-5p4w-x69g' }],
   ['@hono/node-server@<1.0.0', { pinned: '1.19.15', ghsa: 'GHSA-wc8c-qw6v-h7f6' }],
-  ['@modelcontextprotocol/sdk@<1.0.0', { pinned: '1.31.0', ghsa: 'GHSA-w48q-cv73-mx4w' }],
+  ['@modelcontextprotocol/sdk@<1.0.0', { pinned: '1.32.0', ghsa: 'GHSA-w48q-cv73-mx4w' }],
   ['mysql2@<3.0.0', { pinned: '3.23.1', ghsa: 'GHSA-3f6p-5ww8-9rcr' }],
   ['fast-uri@<2.0.0', { pinned: '2.4.7', ghsa: 'GHSA-hrr3-gc8f-f4qj' }],
-  ['ip-address@<10.0.0', { pinned: '10.7.1', ghsa: 'GHSA-h3mg-xc3c-68pw' }],
+  ['ip-address@<10.0.0', { pinned: '10.7.4', ghsa: 'GHSA-h3mg-xc3c-68pw' }],
   ['postcss-selector-parser@<7.0.0', { pinned: '7.1.6', ghsa: 'GHSA-rj75-hqrm-r3gf' }],
 ]);
 
@@ -152,7 +152,7 @@ describe('pnpm overrides stay in their own major', () => {
 
   test('mutant M1: dropping the upper bound of hono 4.x is caught', () => {
     const yaml = readFileSync(resolve(ROOT, 'pnpm-workspace.yaml'), 'utf8');
-    const mutant = yaml.replace("'hono@>=4.0.0 <4.13.7'", "'hono@>=4.0.0'");
+    const mutant = yaml.replace("'hono@>=4.0.0 <4.13.11'", "'hono@>=4.0.0'");
     expect(mutant).not.toBe(yaml);
     expect(openSelectors(mutant)).toEqual(['hono@>=4.0.0']);
   });
