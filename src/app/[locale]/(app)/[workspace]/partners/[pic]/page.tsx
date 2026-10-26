@@ -7,6 +7,8 @@ import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { getTranslations } from 'next-intl/server';
 import { PartnerOutreach, type PartnerOutreachProps } from '@/modules/m1/ui/PartnerOutreach';
+import { OrganizationAnnouncements } from '@/modules/m1/ui/partner-search/OrganizationAnnouncements';
+import { createRelationship } from '../../relationships/actions';
 
 interface OrgDetail {
   id: string;
@@ -169,6 +171,14 @@ export default async function PartnerDetailPage({
             locale={locale}
           />
         </div>
+
+        <OrganizationAnnouncements
+          pic={pic}
+          links={{
+            partnerHref: getWorkspaceRoute('partnerDetail', locale, workspace, ':pic'),
+            addToRelationships: createRelationship,
+          }}
+        />
 
         <div>
           <h2 className="text-lg font-bold font-heading text-ink mb-4">{t('pastProjects')}</h2>

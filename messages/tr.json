@@ -3855,5 +3855,95 @@
     "chipSearch": "Arama: \"{query}\"",
     "chipCountry": "Ülke: {country}",
     "chipType": "Tip: {type}"
+  },
+  "PartnerSignal": {
+    "box": {
+      "title": "Partner Sinyali",
+      "loading": "Partner ilanları sayılıyor…",
+      "error": "Partner sinyali şu an yüklenemedi.",
+      "locked": "Bu topic'e partner arayan kurumları görmek için planınızı yükseltin.",
+      "empty": "Bu topic için Funding & Tenders Portalı'nda yayında partner ilanı yok.",
+      "summary": "Bu topic için {total, plural, other {# ilan}}: {requests, number} partner arıyor, {offers, number} uzmanlık sunuyor",
+      "fromTurkey": "{count, number} tanesi Türkiye'den",
+      "topCountries": "En çok ilan: {list}",
+      "show": "İlanları göster",
+      "hide": "İlanları gizle"
+    },
+    "list": {
+      "filtersLabel": "İlan filtreleri",
+      "type": "İlan türü",
+      "any": "Tümü",
+      "orgType": "Kurum türü",
+      "country": "Ülke",
+      "countryPlaceholder": "ör. DE",
+      "search": "Ara",
+      "searchPlaceholder": "Kurum, anahtar kelime…",
+      "trOnly": "Sadece TR kurumları",
+      "thisWeekOnly": "Sadece bu hafta yayınlananlar",
+      "reset": "Sıfırla",
+      "apply": "Uygula",
+      "results": "{count, plural, =0 {İlan yok} other {# ilan}}",
+      "resultsThisWeek": "Bu hafta yayınlanan: {count, plural, =0 {ilan yok} other {# ilan}}",
+      "empty": "Bu filtrelere uyan ilan yok. Filtreleri genişletmeyi deneyin.",
+      "loading": "Yükleniyor…",
+      "loadMore": "Daha fazla göster",
+      "error": "İlanlar yüklenemedi. Biraz sonra tekrar deneyin.",
+      "denied": "Planınız canlı partner ilanlarını kapsamıyor.",
+      "quotaUsage": "Bu ay {used, number}/{limit, number} sorgu kullanıldı.",
+      "quotaSpent": "Bu ay {used, number}/{limit, number} sorgu kullanıldı",
+      "quotaResets": "Hak {date} tarihinde yenilenir.",
+      "upgradeCta": "Pro'ya geç"
+    },
+    "types": {
+      "EXPERTISE_REQUEST": "Partner arıyor",
+      "EXPERTISE_OFFER": "Uzmanlık sunuyor"
+    },
+    "orgTypes": {
+      "HES": "Yükseköğretim kurumu",
+      "REC": "Araştırma kuruluşu",
+      "PRC": "Özel şirket",
+      "PUB": "Kamu kurumu",
+      "OTH": "Diğer",
+      "unknown": "Belirtilmemiş"
+    },
+    "orgTypesShort": {
+      "HES": "Üniversite",
+      "REC": "Araştırma",
+      "PRC": "Şirket",
+      "PUB": "Kamu",
+      "OTH": "Diğer",
+      "unknown": "Belirsiz"
+    },
+    "card": {
+      "typeRequest": "Partner arıyor",
+      "typeOffer": "Uzmanlık sunuyor",
+      "sme": "KOBİ",
+      "noDescription": "Bu ilanda açıklama yok.",
+      "published": "Yayın: {date}",
+      "undated": "Yayın tarihi yok",
+      "openPortal": "Portalda aç",
+      "openPortalAria": "{org} ilanını Funding & Tenders Portalı'nda aç (yeni sekme)",
+      "addM4": "M4'e ekle",
+      "addingM4": "Ekleniyor…",
+      "addedM4": "M4'e eklendi",
+      "addM4Error": "Eklenemedi, tekrar deneyin.",
+      "m4Note": "Partner Search ilanından eklendi — topic {topic}"
+    },
+    "badge": {
+      "label": "Aktif ilanı var ({count, number})",
+      "title": "Bu kurumun Funding & Tenders Portalı'nda yayında partner ilanı var"
+    },
+    "profile": {
+      "title": "Yayınlanan ilanlar",
+      "empty": "Bu kurumun yayında partner ilanı yok.",
+      "keywords": "İlanlardaki anahtar kelimeler"
+    },
+    "tabs": {
+      "label": "Ortak kaynakları",
+      "cordis": "CORDIS ortakları",
+      "live": "Canlı Partner İlanları",
+      "liveIntro": "Funding & Tenders Portalı'ndaki Partner Search ilanları: partner arayan ve uzmanlık sunan kurumlar. İletişim portal üzerinden kurulur."
+    },
+    "attribution": "Kaynak: <portal>Avrupa Komisyonu, Funding & Tenders Portalı — Partner Search</portal>. Veriler <license>CC BY 4.0</license> lisansıyla yeniden kullanılır; özetler kısaltılmış ve kişisel veriler maskelenmiştir."
   }
 }

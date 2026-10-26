@@ -3855,5 +3855,95 @@
     "chipSearch": "Search: \"{query}\"",
     "chipCountry": "Country: {country}",
     "chipType": "Type: {type}"
+  },
+  "PartnerSignal": {
+    "box": {
+      "title": "Partner signal",
+      "loading": "Counting partner announcements…",
+      "error": "The partner signal could not be loaded right now.",
+      "locked": "Upgrade your plan to see who is looking for partners on this topic.",
+      "empty": "No live partner announcements on the Funding & Tenders Portal for this topic.",
+      "summary": "{total, plural, one {# announcement} other {# announcements}} for this topic: {requests, number} looking for partners, {offers, number} offering expertise",
+      "fromTurkey": "{count, number} from Türkiye",
+      "topCountries": "Most announcements: {list}",
+      "show": "Show announcements",
+      "hide": "Hide announcements"
+    },
+    "list": {
+      "filtersLabel": "Announcement filters",
+      "type": "Announcement type",
+      "any": "All",
+      "orgType": "Organisation type",
+      "country": "Country",
+      "countryPlaceholder": "e.g. DE",
+      "search": "Search",
+      "searchPlaceholder": "Organisation, keyword…",
+      "trOnly": "Turkish organisations only",
+      "thisWeekOnly": "Published this week only",
+      "reset": "Reset",
+      "apply": "Apply",
+      "results": "{count, plural, =0 {No announcements} one {# announcement} other {# announcements}}",
+      "resultsThisWeek": "Published this week: {count, plural, =0 {none} one {# announcement} other {# announcements}}",
+      "empty": "No announcements match these filters. Try widening them.",
+      "loading": "Loading…",
+      "loadMore": "Show more",
+      "error": "Announcements could not be loaded. Please try again shortly.",
+      "denied": "Your plan does not include live partner announcements.",
+      "quotaUsage": "{used, number}/{limit, number} queries used this month.",
+      "quotaSpent": "{used, number}/{limit, number} queries used this month",
+      "quotaResets": "Your allowance renews on {date}.",
+      "upgradeCta": "Upgrade to Pro"
+    },
+    "types": {
+      "EXPERTISE_REQUEST": "Expertise request",
+      "EXPERTISE_OFFER": "Expertise offer"
+    },
+    "orgTypes": {
+      "HES": "Higher education institution",
+      "REC": "Research organisation",
+      "PRC": "Private company",
+      "PUB": "Public body",
+      "OTH": "Other",
+      "unknown": "Not specified"
+    },
+    "orgTypesShort": {
+      "HES": "University",
+      "REC": "Research",
+      "PRC": "Company",
+      "PUB": "Public",
+      "OTH": "Other",
+      "unknown": "Unknown"
+    },
+    "card": {
+      "typeRequest": "Looking for partners",
+      "typeOffer": "Offering expertise",
+      "sme": "SME",
+      "noDescription": "This announcement has no description.",
+      "published": "Published {date}",
+      "undated": "No publication date",
+      "openPortal": "Open on the portal",
+      "openPortalAria": "Open the announcement of {org} on the Funding & Tenders Portal (new tab)",
+      "addM4": "Add to M4",
+      "addingM4": "Adding…",
+      "addedM4": "Added to M4",
+      "addM4Error": "Could not add, please try again.",
+      "m4Note": "Added from a Partner Search announcement — topic {topic}"
+    },
+    "badge": {
+      "label": "Active announcement ({count, number})",
+      "title": "This organisation has a live partner announcement on the Funding & Tenders Portal"
+    },
+    "profile": {
+      "title": "Published announcements",
+      "empty": "This organisation has no live partner announcements.",
+      "keywords": "Keywords in its announcements"
+    },
+    "tabs": {
+      "label": "Partner sources",
+      "cordis": "CORDIS partners",
+      "live": "Live partner announcements",
+      "liveIntro": "Partner Search announcements from the Funding & Tenders Portal: organisations looking for partners and offering expertise. Contact happens on the portal."
+    },
+    "attribution": "Source: <portal>European Commission, Funding & Tenders Portal — Partner Search</portal>. Reused under <license>CC BY 4.0</license>; summaries are shortened and personal data is masked."
   }
 }
