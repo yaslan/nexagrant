@@ -1200,7 +1200,7 @@
             "data": "Uzman ön kayıt bilgileri",
             "period": "Formun ilk gönderildiği tarihten itibaren {months} ay (doğrulanmamış kayıtlar dahil)"
           },
-          "invitations": {
+          "teamInvites": {
             "data": "Ekip davetleri",
             "period": "Kabulden ya da davet bağlantısının süresinin dolmasından itibaren {days} gün"
           },

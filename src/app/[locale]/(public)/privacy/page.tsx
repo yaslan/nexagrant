@@ -46,7 +46,7 @@ type Translate = Awaited<ReturnType<typeof getTranslations>>;
 const RETENTION_VALUES = {
   leads: { months: publicLeadRetentionMonths() },
   expertPrereg: { months: publicLeadRetentionMonths(EXPERT_PREREG_RETENTION_DAYS) },
-  invitations: { days: INVITATION_RETENTION_DAYS },
+  teamInvites: { days: INVITATION_RETENTION_DAYS },
   notifications: { days: NOTIFICATION_RETENTION_DAYS },
 } as const;
 

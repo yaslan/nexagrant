@@ -1200,7 +1200,7 @@
             "data": "Expert pre-registration details",
             "period": "{months} months from the day the form was first submitted (unverified registrations included)"
           },
-          "invitations": {
+          "teamInvites": {
             "data": "Team invitations",
             "period": "{days} days after acceptance or after the invitation link expires"
           },

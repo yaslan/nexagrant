@@ -19,7 +19,7 @@ export const PRIVACY_TABLES = {
     rows: ['account', 'matching', 'aiProcessing', 'assessment', 'expertPool', 'support', 'billing', 'trafficLogs', 'security', 'legalClaims', 'improvement', 'analytics', 'leadRequest', 'expertDirectory'],
   },
   s5: { columns: ['colRecipient', 'colLocation', 'colData'], cells: ['recipient', 'location', 'data'], rows: ['anthropic', 'google', 'stripe', 'openai', 'cloudflare', 'posthog'] },
-  s6: { columns: ['colData', 'colPeriod'], cells: ['data', 'period'], rows: ['account', 'invoices', 'trafficLogs', 'leads', 'expertPrereg', 'invitations', 'notifications', 'records', 'browser'] },
+  s6: { columns: ['colData', 'colPeriod'], cells: ['data', 'period'], rows: ['account', 'invoices', 'trafficLogs', 'leads', 'expertPrereg', 'teamInvites', 'notifications', 'records', 'browser'] },
   s7: { columns: ['colType', 'colPurpose', 'colConsent'], cells: ['type', 'purpose', 'consent'], rows: ['essential', 'analytics'] },
 } as const;
 
