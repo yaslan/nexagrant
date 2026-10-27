@@ -8,6 +8,7 @@ import { publicLeadRetentionMonths } from '@/lib/leads/public-lead-policy';
 import { EXPERT_PREREG_RETENTION_DAYS } from '@/lib/expert-prereg/server/constants';
 import { INVITATION_RETENTION_DAYS } from '@/lib/invitations/retention';
 import { NOTIFICATION_RETENTION_DAYS } from '@/lib/notifications/retention';
+import CookiePreferencesButton from '@/components/CookiePreferencesButton';
 import { PRIVACY_LISTS, PRIVACY_TABLES, type PrivacyTableSection } from './structure';
 
 /**
@@ -177,6 +178,9 @@ export default async function PrivacyPage({
             <p>{t('s7.body')}</p>
             <PrivacyTable t={t} section="s7" />
             <p>{t('s7.withdraw')}</p>
+            <p className="mt-2">
+              <CookiePreferencesButton className="text-accent underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded" />
+            </p>
           </Section>
 
           <Section heading={t('s8.heading')}>
