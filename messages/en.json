@@ -1326,7 +1326,10 @@
       "description": "We use cookies and browser storage the site needs to work: your session, your language and theme preference, and your cart. If you click 'Accept All', we also use analytics cookies (PostHog) to improve the product. We do not use third-party tracking cookies. For details, see our ",
       "privacyLink": "Privacy Policy",
       "acceptAll": "Accept All",
-      "essentialOnly": "Essential Only"
+      "essentialOnly": "Essential Only",
+      "preferencesLink": "Cookie preferences",
+      "currentAll": "Your current choice: all cookies accepted. Choosing \"Essential Only\" withdraws your analytics consent and removes analytics data from this browser.",
+      "currentEssential": "Your current choice: essential cookies only."
     }
   },
   "feedback": {

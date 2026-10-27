@@ -70,14 +70,23 @@ const HARD_CODED = {
    */
   count: /\b\d+\s+(?:[\p{L}&-]+\s+){0,2}(?:modül\p{L}*|modules?|engines?)\b/giu,
   /**
-   * The same count spelled out: "on bir modül", "eleven modules". Turkish
-   * words before "modül", English before the plural only ("the two facts the
-   * module checks" counts facts); "bir"/"one" alone mean "a".
+   * The same count spelled out, ten and up: "on bir modül", "eleven modules".
+   * Smaller numbers are ordinary wording ("Yalnız iki modül seçildi", "two
+   * modules"), and the product has more than ten modules, so a stale count
+   * of the catalogue is never spelled below ten. "bir"/"one" alone mean "a".
    */
-  spelledTr:
-    /(?<!\p{L})(?:(?:on|yirmi)(?:\s*(?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz))?|iki|üç|dört|beş|altı|yedi|sekiz|dokuz)\s+(?:[\p{L}&-]+\s+){0,2}modül\p{L}*/giu,
+  spelledTr: /(?<!\p{L})(?:on|yirmi)(?:\s*(?:bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz))?\s+(?:[\p{L}&-]+\s+){0,2}modül\p{L}*/giu,
   spelledEn:
-    /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:[\p{L}&-]+\s+){0,2}(?:modules|engines)\b/giu,
+    /\b(?:ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:[\p{L}&-]+\s+){0,2}(?:modules|engines)\b/giu,
+  /**
+   * The badge without the word "module": "11 aktif + 6 yakında", "11 live +
+   * 6 soon". A live count only where it ends the phrase or meets "+", so
+   * "0 aktif çağrı" (calls) and Tailwind's "bg-blue-700 active:" stay out.
+   */
+  live: /\b\d+\s+(?:aktif|live|active)(?=\s*(?:\+|$|[)"'.,;·|]))/giu,
+  soon: /(?<![\p{L}\d-])\d+\s+(?:yakında|coming\s+soon|soon)(?!\p{L})/giu,
+  /** A count after the word: "Modüller (11)", "Modules: 17". */
+  after: /(?:modül\p{L}*|modules?|engines?)\s*[(:]\s*\d+/giu,
   /** A module id range, "M1-M11" or "M1–M11": it states the first and last module. */
   range: /\bM\d+\s*[-–]\s*M\d+\b/gu,
 } as const;
@@ -149,13 +158,33 @@ describe('hard-coded module counts', () => {
       'onbir Ar-Ge modülü',
       'eleven modules',
       'Seventeen integrated engines',
+      '11 aktif + 6 yakında',
+      '11 live + 6 soon',
+      '17 aktif',
+      '6 coming soon',
+      'Modüller (11)',
+      'Modules (17)',
+      'Modüller: 17',
     ]) {
       expect(matchesAny(text), text).toBe(true);
     }
   });
 
   it('leaves ordinary module wording alone', () => {
-    for (const text of ['bir modül seçin', 'one module per plan', 'Modüller: {modules}', 'M8 modülü', 'Bu modül yakında']) {
+    for (const text of [
+      'bir modül seçin',
+      'one module per plan',
+      'Modüller: {modules}',
+      'Modüller ({count})',
+      'M8 modülü',
+      'Bu modül yakında',
+      '{active} aktif + {soon} yakında',
+      'Yalnız iki modül seçildi',
+      'the two modules it reads',
+      'the two facts the module checks',
+      '0 aktif çağrı',
+      'bg-blue-700 active:bg-blue-800',
+    ]) {
       expect(matchesAny(text), text).toBe(false);
     }
   });

@@ -20,7 +20,7 @@
 
 - **Rota grupları:** `[locale]/(public)` herkese açık sayfaların hepsi (ana sayfa, yasal metinler, fiyatlandırma, çağrılar, blog, giriş/kayıt, davet, partner portalı); ortak `PublicNavbar` + `PublicFooter` yalnız bu grubun `layout.tsx`'inde, sayfalar kendileri eklemez (FO-68). 404 (`src/app/not-found.tsx`) aynı çifti kendisi çizer. `(app)/[workspaceSlug]/...` kiracı uygulaması; `admin` platform yönetimi (`platform_admin`) — ikisinin kendi kabuğu var.
 - **Sunucu tarafı:** Server Components veri okur; yazma Server Actions (zod ile doğrulanmış) ya da `/api/v1/*` Route Handlers (harici API lisansı için de aynı katman).
-- **Alan katmanı:** `src/core/*` (K1–K6) ve `src/modules/*` (M1–M11) saf TypeScript; Prisma istemcisi `withTenant()` ile sarılı.
+- **Alan katmanı:** `src/core/*` (K1–K6) ve `src/modules/*` (kayıtlı modüller: `src/lib/modules/registry.ts`) saf TypeScript; Prisma istemcisi `withTenant()` ile sarılı.
 - **Olay veri yolu:** `src/core/events` — tipli olaylar (`opportunity.created`, `gate.passed`, `module.state.changed`, `ai.used`, `esr.uploaded`). Modüller birbirini import etmez; olay dinler. Inngest bu olayları dayanıklı işlere de bağlar.
 
 ## 3. Modül sistemi

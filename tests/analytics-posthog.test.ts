@@ -5,7 +5,15 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { analytics, buildCaptureBody, sanitizeProperties } from '@/lib/analytics';
-import { CONSENT_STORAGE_KEY, hasAnalyticsConsent } from '@/lib/cookie-consent';
+import {
+  ANALYTICS_ANON_ID_STORAGE_KEY,
+  CONSENT_STORAGE_KEY,
+  OPEN_COOKIE_PREFERENCES_EVENT,
+  clearAnalyticsStorage,
+  hasAnalyticsConsent,
+  openCookiePreferences,
+  storedConsentLevel,
+} from '@/lib/cookie-consent';
 
 const fetchMock = vi.fn(async () => new Response('{}'));
 
@@ -107,5 +115,34 @@ describe('sanitizeProperties', () => {
     const body = buildCaptureBody('k', 'e', 'id', { a: 1 });
     expect(Object.keys(body).sort()).toEqual(['api_key', 'distinct_id', 'event', 'properties', 'timestamp']);
     expect(Object.keys(body.properties).sort()).toEqual(['$geoip_disable', '$lib', '$process_person_profile', 'a']);
+  });
+});
+
+/** FO-180 — the "Cookie preferences" links reopen the banner; withdrawing removes what analytics stored. */
+describe('cookie preferences', () => {
+  it('opens the banner through one window event', () => {
+    const listener = vi.fn();
+    window.addEventListener(OPEN_COOKIE_PREFERENCES_EVENT, listener);
+    openCookiePreferences();
+    window.removeEventListener(OPEN_COOKIE_PREFERENCES_EVENT, listener);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the stored answer, and nothing as "not answered"', () => {
+    expect(storedConsentLevel()).toBeNull();
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all' }));
+    expect(storedConsentLevel()).toBe('all');
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: false, level: 'essential' }));
+    expect(storedConsentLevel()).toBe('essential');
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, '{nope');
+    expect(storedConsentLevel()).toBeNull();
+  });
+
+  it('withdrawing removes the analytics id and leaves the rest of storage alone', () => {
+    window.localStorage.setItem(ANALYTICS_ANON_ID_STORAGE_KEY, 'anon');
+    window.localStorage.setItem('fabrika_cart', '[]');
+    clearAnalyticsStorage();
+    expect(window.localStorage.getItem(ANALYTICS_ANON_ID_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem('fabrika_cart')).toBe('[]');
   });
 });

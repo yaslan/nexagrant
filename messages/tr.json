@@ -1326,7 +1326,10 @@
       "description": "Sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. \"Tümünü Kabul Et\" seçerseniz, ürün iyileştirmesi için analitik çerezleri (PostHog) de kullanırız. Üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
       "privacyLink": "Gizlilik Bildirimi",
       "acceptAll": "Tümünü Kabul Et",
-      "essentialOnly": "Gerekli Çerezler"
+      "essentialOnly": "Gerekli Çerezler",
+      "preferencesLink": "Çerez tercihleri",
+      "currentAll": "Şu anki seçiminiz: tüm çerezler kabul edildi. \"Gerekli Çerezler\" seçerseniz analitik onayınız geri alınır ve analitik verileri bu tarayıcıdan silinir.",
+      "currentEssential": "Şu anki seçiminiz: yalnızca gerekli çerezler."
     }
   },
   "feedback": {

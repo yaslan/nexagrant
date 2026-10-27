@@ -22,11 +22,10 @@
  * capture endpoint is a documented HTTP contract; one keepalive fetch covers it.
  */
 
-import { hasAnalyticsConsent } from '@/lib/cookie-consent';
+import { ANALYTICS_ANON_ID_STORAGE_KEY, hasAnalyticsConsent } from '@/lib/cookie-consent';
 
 /** EU cloud by default: analytics data should stay in the EU region. */
 const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
-const ANON_ID_STORAGE_KEY = 'fabrika_analytics_anon_id';
 
 const MAX_PROPERTIES = 20;
 const MAX_STRING_LENGTH = 64;
@@ -87,10 +86,10 @@ function posthogConfig(): { key: string; host: string } | null {
 /** Random, per browser, created only once consent exists. Not derived from anything. */
 function anonymousId(): string | null {
   try {
-    const existing = window.localStorage.getItem(ANON_ID_STORAGE_KEY);
+    const existing = window.localStorage.getItem(ANALYTICS_ANON_ID_STORAGE_KEY);
     if (existing) return existing;
     const id = crypto.randomUUID();
-    window.localStorage.setItem(ANON_ID_STORAGE_KEY, id);
+    window.localStorage.setItem(ANALYTICS_ANON_ID_STORAGE_KEY, id);
     return id;
   } catch {
     return null;
