@@ -1,6 +1,6 @@
 # seed.ts — üretilecek içerik (Claude Code E2/E3'te yazar)
 
-1. `ModuleCatalog`: 11 modül, PROJECT.md §4 tablosundan (requires/recommends/planTiers/addOnSku).
+1. `ModuleCatalog`: `prisma/seed.ts`'deki `modules` dizisindeki her modül için bir satır, PROJECT.md §4 tablosundan (requires/recommends/planTiers/addOnSku). Modül sayısı burada yazılmaz; ürünün tanıdığı modüllerin tek kaynağı `src/lib/modules/registry.ts`'tir ve seed dizisi onun alt kümesi olabilir.
 2. `Plan`: free/starter/team/business/enterprise — docs/BILLING.md §1.
 3. `AddOnCatalog`: addon_m6, addon_m11, addon_m7, addon_m8_pro, addon_workspace, addon_seat_*, addon_credits_250.
 4. `Programme`: HE, DEP, EUROSTARS, EUREKA, CETP, DUT, ERASMUS, EIT, NEB, TUBITAK.
