@@ -96,6 +96,9 @@ describe('catalogue: Partner Search terms per plan', () => {
     expect(partnerSearchGrant('public-starter', false)).toEqual({ queriesMonthly: 10, export: false });
     expect(partnerSearchGrant('public-team', true)).toEqual({ queriesMonthly: null, export: false });
     expect(partnerSearchGrant('public-institution', true)).toEqual({ queriesMonthly: null, export: true });
+    // TTO Edition has no `limits` of its own; the live-tab quota falls back to the
+    // M1 module limit. Without this line, deleting the fallback gives it unlimited search.
+    expect(partnerSearchGrant('tto-edition', true)).toEqual({ queriesMonthly: 10, export: false });
   });
 
   it('names the purchasable plans that carry the export for an upgrade prompt', () => {

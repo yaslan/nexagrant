@@ -19,6 +19,9 @@ vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: unknown }) => <a href={href}>{children as never}</a>,
 }));
 vi.mock('@/components/ModuleLink', () => ({ ModuleLink: () => null }));
+// The live tab renders a client-side browser; only the server-side meter matters here.
+vi.mock('@/modules/m1/ui/partner-search/AnnouncementBrowser', () => ({ AnnouncementBrowser: () => null }));
+vi.mock('@/modules/m1/ui/partner-search/ActiveAnnouncementsBadge', () => ({ ActiveAnnouncementsBadge: () => null }));
 vi.mock('@/app/[locale]/(app)/[workspace]/partners/PartnerFilters', () => ({ PartnerFilters: () => null }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
 vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch }));
@@ -66,6 +69,13 @@ describe('/partners monthly search quota (FO-41)', () => {
     expect(html).toContain('data-testid="partner-search-quota"');
     expect(html).toContain('role="alert"');
     expect(html).toContain('searchQuotaExhausted');
+  });
+
+  it('does not count the live tab twice when a criterion is in the URL', async () => {
+    // The live tab is metered by its own FO-61 call; a hand-typed ?tab=live&q=x
+    // must not also spend a month slot here.
+    await render({ tab: 'live', q: 'x' });
+    expect(meterPartnerSearch).not.toHaveBeenCalled();
   });
 
   it('shows the usage notice while the month still has searches left', async () => {
