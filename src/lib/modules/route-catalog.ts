@@ -40,6 +40,7 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'partners',
   'partners/[pic]',
   'partners/leaders',
+  'partners/resources',
   'pipeline',
   'pipeline/[id]',
   'pipeline/[id]/consortium',

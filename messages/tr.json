@@ -12,6 +12,7 @@
     "apiKeys": "Partner REST API",
     "members": "Üyeler",
     "settings": "Ayarlar",
+    "partnerResources": "Ortak Arama Kaynakları",
     "adminModules": "Yönetici Konsolu",
     "workspaceLabel": "Çalışma Alanı",
     "administrationLabel": "Yönetim",
@@ -3398,6 +3399,56 @@
     "coordinatedLabel": "Koordine Edilen Proje:",
     "totalLabel": "Toplam Katılım:",
     "ecContributionLabel": "Koordine Edilen AB Katkısı:"
+  },
+  "PartnerResources": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbPartners": "Ortaklar",
+    "breadcrumbResources": "AB Portalları & Kaynaklar",
+    "title": "AB Portalları & Ortak Arama Kaynakları",
+    "intro": "Ortak ararken en çok kullanılan resmî AB portalları ve ağları. Her bağlantı yeni sekmede, ilgili kurumun kendi sitesinde açılır.",
+    "opensInNewTab": "(yeni sekmede açılır)",
+    "items": {
+      "fundingTenders": {
+        "name": "Funding & Tenders Portal",
+        "description": "Açık çağrılar, Partner Search ilanları ve başvuru gönderimi için AB Komisyonu'nun resmî portalı."
+      },
+      "horizonTr": {
+        "name": "Ufuk Avrupa Portalı",
+        "description": "TÜBİTAK'ın Ufuk Avrupa ulusal irtibat noktası: duyurular, etkinlikler ve Türkiye'ye özel destekler."
+      },
+      "erasmusResults": {
+        "name": "Erasmus+ Project Results",
+        "description": "Tamamlanmış ve süren Erasmus+ projelerinde deneyimli kurumları bulmak için proje sonuçları veritabanı."
+      },
+      "cordis": {
+        "name": "CORDIS",
+        "description": "AB destekli araştırma projeleri ve katılımcıları; konu bazında deneyimli koordinatörleri keşfedin."
+      },
+      "cost": {
+        "name": "COST",
+        "description": "Araştırmacı ağları (COST Actions): mevcut bir aksiyona katılarak Avrupa çapında ortak edinin."
+      },
+      "een": {
+        "name": "Enterprise Europe Network (EEN)",
+        "description": "İş birliği ve ortaklık profilleri; teknoloji ve araştırma ortağı arayan KOBİ'ler için."
+      },
+      "tubitakNetworks": {
+        "name": "TÜBİTAK Ağlara Üyelik Desteği",
+        "description": "Avrupa ağlarına ve platformlarına üyelik ücretleri için TÜBİTAK desteği."
+      },
+      "b2match": {
+        "name": "B2Match",
+        "description": "Brokerage etkinlikleri ve ikili görüşmeler: AB bilgi günlerinde ortaklarla randevu ayarlayın."
+      },
+      "linkedin": {
+        "name": "LinkedIn",
+        "description": "Kurum ve uzman profilleri; çağrı temalı gruplarda potansiyel ortaklara doğrudan ulaşın."
+      },
+      "participantRegister": {
+        "name": "PIC / Kurum Kaydı",
+        "description": "Kurumunuz için PIC (Katılımcı Kimlik Kodu) almak ya da mevcut kaydı aramak için Katılımcı Kaydı."
+      }
+    }
   },
   "PartnersPage": {
     "crossLinks": {

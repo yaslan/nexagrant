@@ -66,6 +66,7 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
       'Çağrılar',
       'Fırsatlar',
       'Ortaklar',
+      'Ortak Arama Kaynakları',
       'Konsept Notlar',
       'Kanıtlar',
       'İlişkiler',
@@ -83,6 +84,20 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
     // M1 is off, so Partner REST API (an M1 feature) is locked rather than linked.
     expect(sidebarLabels()).toEqual(['Dashboard', 'Calls', 'Pipeline', expect.stringContaining('TTO'), 'Approvals (4-Eyes)', 'Settings']);
     expect(screen.getByTestId('sidebar-nav-apiKeys').getAttribute('data-locked')).toBe('true');
+  });
+
+  // FO-176: the resources page sits under Partners; while it is open only it is highlighted.
+  it('highlights the open Partners sub-entry, not Partners itself', () => {
+    nav.pathname = '/en/main/partners/resources';
+    try {
+      shell(['M1'], <SidebarNav locale="en" />, 'en');
+      const sub = screen.getByTestId('sidebar-nav-partnerResources');
+      expect(sub.getAttribute('href')).toBe('/en/main/partners/resources');
+      expect(sub.className).toContain('bg-accent/10');
+      expect(screen.getByTestId('sidebar-nav-partners').className).not.toContain('bg-accent/10');
+    } finally {
+      nav.pathname = '/tr/main/panel';
+    }
   });
 
   it('shows only the core items when no module is open', () => {
@@ -120,6 +135,7 @@ describe('SidebarNav — preview badge and plan lock', () => {
       'Çağrılar',
       'Fırsatlar',
       'Ortaklar',
+      'Ortak Arama Kaynakları',
       expect.stringContaining('TTO'),
       'Onay Merkezi (4-Eyes)',
       'Partner REST API',

@@ -24,6 +24,7 @@ export type WorkspaceRouteKey =
   | 'partners'
   | 'partnerDetail'
   | 'partnerLeaders'
+  | 'partnerResources'
   | 'reportsPersonDays'
   | 'opportunityConceptNote'
   | 'opportunityEvaluations'
@@ -109,6 +110,8 @@ export function getWorkspaceRoute(
     // the opportunity id for the `opportunity*` keys.
     case 'partnerLeaders':
       return `/${locale}/${workspace}/partners/leaders`;
+    case 'partnerResources':
+      return `/${locale}/${workspace}/partners/resources`;
     case 'reportsPersonDays':
       return `/${locale}/${workspace}/reports/person-days`;
     case 'opportunityConceptNote':

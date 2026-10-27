@@ -12,6 +12,7 @@
     "apiKeys": "Partner REST API",
     "members": "Members",
     "settings": "Settings",
+    "partnerResources": "Partner Search Resources",
     "adminModules": "Platform Admin",
     "workspaceLabel": "Workspace",
     "administrationLabel": "Administration",
@@ -3398,6 +3399,56 @@
     "coordinatedLabel": "Projects Coordinated:",
     "totalLabel": "Total Projects:",
     "ecContributionLabel": "EU Contribution Coordinated:"
+  },
+  "PartnerResources": {
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbPartners": "Partners",
+    "breadcrumbResources": "EU Portals & Resources",
+    "title": "EU Portals & Partner Search Resources",
+    "intro": "The official EU portals and networks most used when looking for partners. Each link opens the organisation's own site in a new tab.",
+    "opensInNewTab": "(opens in a new tab)",
+    "items": {
+      "fundingTenders": {
+        "name": "Funding & Tenders Portal",
+        "description": "The European Commission's official portal for open calls, Partner Search announcements and proposal submission."
+      },
+      "horizonTr": {
+        "name": "Horizon Europe Portal (Türkiye)",
+        "description": "TÜBİTAK's Horizon Europe national contact point: news, events and support specific to Türkiye."
+      },
+      "erasmusResults": {
+        "name": "Erasmus+ Project Results",
+        "description": "Database of finished and ongoing Erasmus+ projects, for finding organisations with relevant experience."
+      },
+      "cordis": {
+        "name": "CORDIS",
+        "description": "EU-funded research projects and their participants; find experienced coordinators by topic."
+      },
+      "cost": {
+        "name": "COST",
+        "description": "Researcher networks (COST Actions): join an existing Action to build partners across Europe."
+      },
+      "een": {
+        "name": "Enterprise Europe Network (EEN)",
+        "description": "Cooperation and partnering profiles for SMEs looking for technology and research partners."
+      },
+      "tubitakNetworks": {
+        "name": "TÜBİTAK Network Membership Support",
+        "description": "TÜBİTAK support for membership fees of European networks and platforms."
+      },
+      "b2match": {
+        "name": "B2Match",
+        "description": "Brokerage events and one-to-one meetings: book meetings with partners at EU info days."
+      },
+      "linkedin": {
+        "name": "LinkedIn",
+        "description": "Organisation and expert profiles; reach potential partners directly in call-themed groups."
+      },
+      "participantRegister": {
+        "name": "PIC / Organisation Registration",
+        "description": "The Participant Register, to get a PIC (Participant Identification Code) for your organisation or look up an existing one."
+      }
+    }
   },
   "PartnersPage": {
     "crossLinks": {
