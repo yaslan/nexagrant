@@ -689,13 +689,15 @@
       "compliance": "Compliance",
       "contact": "Contact",
       "residencyBadge": "● GDPR Compliant",
-      "dataResidency": "🇹🇷 Database hosted in Türkiye"
+      "dataResidency": "🇹🇷 Database hosted in Türkiye",
+      "moduleCatalog": "Module Catalog"
     },
     "metaTitle": "{brand} — AI-Powered EU Funding Platform for Horizon Europe & Eurostars",
     "metaDescription": "{brand}: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding.",
     "ecosystemSubtitle": "From high-growth SMEs to university TTOs and international research consortia.",
     "closingSubtitle": "Shorten your proposal timeline with CORDIS network analytics and an evaluator’s reading of your draft.",
-    "heroCompliance": "GDPR / KVKK-Compliant Secure Cloud"
+    "heroCompliance": "GDPR / KVKK-Compliant Secure Cloud",
+    "modulesTitle": "{active, plural, one {# Live Module} other {# Live Modules}} for EU Proposal Production{soon, plural, =0 {} other { + # Coming Soon}}"
   },
   "pricing": {
     "title": "{brand} Pricing",
@@ -1894,7 +1896,7 @@
       "metricWorkspaceSlug": "Slug: {slug}",
       "modulesTitle": "Modules your plan entitles you to",
       "modulesBody": "The EU project modules available under your current subscription.",
-      "modulesLink": "Manage modules (M1-M11) →",
+      "modulesLink": "Manage modules →",
       "moduleChip": "Module {module}",
       "plansTitle": "Subscription plans and upgrades",
       "plansBody": "Pick the plan that fits your R&D operation and team size.",
@@ -4040,5 +4042,9 @@
       "liveIntro": "Partner Search announcements from the Funding & Tenders Portal: organisations looking for partners and offering expertise. Contact happens on the portal."
     },
     "attribution": "Source: <portal>European Commission, Funding & Tenders Portal — Partner Search</portal>. Reused under <license>CC BY 4.0</license>; summaries are shortened and personal data is masked."
+  },
+  "moduleCount": {
+    "summary": "{active, plural, one {# live module} other {# live modules}}{soon, plural, =0 {} other { + # coming soon}}",
+    "badge": "{active} live{soon, plural, =0 {} other { + # soon}}"
   }
 }

@@ -5,6 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import BlogSection from '@/components/BlogSection';
 import { getPublicRoute, getWorkspaceRoute } from '@/lib/routes';
+import { getModuleCounts } from '@/lib/modules/registry';
 
 export async function generateMetadata({
   params,
@@ -46,6 +47,8 @@ export default async function HomePage({
   const isTr = locale === 'tr';
   const t = await getTranslations({ locale, namespace: 'landing.heroMock' });
   const tLanding = await getTranslations({ locale, namespace: 'landing' });
+  const tModuleCount = await getTranslations({ locale, namespace: 'moduleCount' });
+  const moduleCounts = getModuleCounts();
 
   return (
     <div className="flex-1 flex flex-col bg-background text-ink selection:bg-accent selection:text-white">
@@ -121,7 +124,7 @@ export default async function HomePage({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
-                  <span>{isTr ? '11 Özel Ar-Ge Modülü (M1-M11)' : '11 Integrated R&D Modules'}</span>
+                  <span>{tModuleCount('summary', moduleCounts)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
@@ -323,7 +326,7 @@ export default async function HomePage({
           </div>
         </section>
 
-        {/* ─── MODÜLLER VE YETENEKLER (M1-M11) ─── */}
+        {/* ─── MODÜLLER VE YETENEKLER ─── */}
         <section id="moduller" className="py-20 lg:py-28 bg-ground/50 border-b border-border">
           <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
@@ -331,9 +334,7 @@ export default async function HomePage({
                 {isTr ? 'Entegre Modül Mimarisi' : 'Modular Powerhouse'}
               </span>
               <h2 className="text-3xl sm:text-4xl font-extrabold font-heading text-ink">
-                {isTr
-                  ? 'AB Proje Yönetiminin 11 Güçlü Modülü'
-                  : '11 Integrated Engines for EU Proposal Production'}
+                {tLanding('modulesTitle', moduleCounts)}
               </h2>
               <p className="text-xs sm:text-sm text-muted">
                 {isTr

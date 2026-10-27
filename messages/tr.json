@@ -689,13 +689,15 @@
       "compliance": "Uyum",
       "contact": "İletişim",
       "residencyBadge": "● GDPR Uyumlu",
-      "dataResidency": "🇹🇷 Veritabanı Türkiye'de barındırılır"
+      "dataResidency": "🇹🇷 Veritabanı Türkiye'de barındırılır",
+      "moduleCatalog": "Modül Kataloğu"
     },
     "metaTitle": "{brand} — AB Finansman Platformu (Horizon Europe, Eurostars)",
     "metaDescription": "{brand}: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
     "ecosystemSubtitle": "İster bağımsız bir danışman olun, ister büyük bir üniversite; {brand} iş akışınızı hızlandırır.",
     "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin.",
-    "heroCompliance": "GDPR / KVKK Uyumlu Güvenli Bulut"
+    "heroCompliance": "GDPR / KVKK Uyumlu Güvenli Bulut",
+    "modulesTitle": "AB Proje Yönetimi İçin {active} Aktif Modül{soon, plural, =0 {} other { + # Yakında}}"
   },
   "pricing": {
     "title": "{brand} Fiyatlandırması",
@@ -1894,7 +1896,7 @@
       "metricWorkspaceSlug": "Slug: {slug}",
       "modulesTitle": "Planınız kapsamındaki yetkili modüller",
       "modulesBody": "Mevcut aboneliğiniz dahilinde kullanabileceğiniz AB proje modülleri.",
-      "modulesLink": "Modülleri yönet (M1-M11) →",
+      "modulesLink": "Modülleri yönet →",
       "moduleChip": "Modül {module}",
       "plansTitle": "Abonelik planları ve yükseltme",
       "plansBody": "Ar-Ge operasyonlarınıza ve ekip büyüklüğünüze en uygun planı seçin.",
@@ -4040,5 +4042,9 @@
       "liveIntro": "Funding & Tenders Portalı'ndaki Partner Search ilanları: partner arayan ve uzmanlık sunan kurumlar. İletişim portal üzerinden kurulur."
     },
     "attribution": "Kaynak: <portal>Avrupa Komisyonu, Funding & Tenders Portalı — Partner Search</portal>. Veriler <license>CC BY 4.0</license> lisansıyla yeniden kullanılır; özetler kısaltılmış ve kişisel veriler maskelenmiştir."
+  },
+  "moduleCount": {
+    "summary": "{active} aktif modül{soon, plural, =0 {} other { + # yakında}}",
+    "badge": "{active} aktif{soon, plural, =0 {} other { + # yakında}}"
   }
 }

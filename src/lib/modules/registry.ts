@@ -41,6 +41,30 @@ export const moduleRegistry: Record<ModuleId, ModuleManifest> = {
 export const getManifest = (id: ModuleId): ModuleManifest => moduleRegistry[id];
 export const getAllManifests = (): ModuleManifest[] => Object.values(moduleRegistry);
 
+// A type alias rather than an interface so it passes straight to `t(key, counts)`,
+// whose values parameter wants an index signature.
+export type ModuleCounts = {
+  /** Every registered module. */
+  total: number;
+  /** Modules a tenant can use today: every badge except `soon` (GA and beta). */
+  active: number;
+  /** "Yakında" modules (`statusBadge: 'soon'`), the same test as `isComingSoon`. */
+  soon: number;
+};
+
+/**
+ * The module counts every user-facing text shows ("{active} aktif modül + {soon} yakında",
+ * FO-171 / K-572973). Copy never carries the numbers: it takes these as ICU
+ * arguments, so a module that moves from `soon` to `ga`, or a new manifest,
+ * changes the text by itself. `tests/modules/module-count-copy.test.ts` keeps
+ * hard-coded counts out of `src/` and `messages/`.
+ */
+export function getModuleCounts(): ModuleCounts {
+  const manifests = getAllManifests();
+  const soon = manifests.filter((m) => m.statusBadge === 'soon').length;
+  return { total: manifests.length, active: manifests.length - soon, soon };
+}
+
 export interface RouteOwnerInfo {
   moduleId: ModuleId;
   permission?: string;

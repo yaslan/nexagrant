@@ -73,7 +73,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
               </li>
               <li>
                 <Link href={getPublicRoute('modules', locale)} className="hover:text-ink transition">
-                  {isTr ? 'Modül Kataloğu (M1-M11)' : 'Module Catalog'}
+                  {tFooter('moduleCatalog')}
                 </Link>
               </li>
             </ul>
