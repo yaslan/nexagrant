@@ -9,6 +9,12 @@ export NEXT_TELEMETRY_DISABLED=1 CI=1
 printf '\nnodeLinker: hoisted\n' >> pnpm-workspace.yaml
 pnpm install --frozen-lockfile
 test ! -L node_modules/next || { echo "node_modules is not flat (node-linker)"; exit 1; }
+# Privacy publish gate (FO-180): the commit being packaged must carry no
+# placeholder or demo value in /privacy. Run on the archived sources, before the
+# build, so a red check costs one install, not a build. Never part of `pnpm gate`.
+pnpm privacy:publish-check
+node_modules/.bin/vitest run tests/privacy-notice.test.ts
+echo PRIVACY_OK
 node_modules/.bin/prisma generate
 # R2_PUBLIC_HOST comes from build-package.sh (docker -e); next.config freezes it.
 NODE_ENV=production DEMO_LOGIN_ENABLED=false NEXT_PUBLIC_APP_URL=https://fonbridge.com R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" pnpm build

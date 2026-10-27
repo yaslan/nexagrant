@@ -17,6 +17,11 @@
 # uploaded blog cover, whatever cPanel says at runtime (TASK-MVCH99A54WALG).
 # Give the exact value cPanel will carry, or FB_NO_PUBLIC_ASSETS=1 to build
 # without uploaded images on purpose.
+#
+# The production package is the dev→prod promotion, so it refuses a commit whose
+# /privacy still carries placeholders: container-build.sh runs
+# `pnpm privacy:publish-check` + tests/privacy-notice.test.ts and the build log
+# must say PRIVACY_OK (also on FB_BUILD_DIR re-packages). No bypass (FO-180).
 set -euo pipefail
 
 if [ -z "${FB_BUILD_DIR:-}" ] && [ -z "${R2_PUBLIC_HOST:-}" ] && [ "${FB_NO_PUBLIC_ASSETS:-}" != 1 ]; then
@@ -42,6 +47,7 @@ else
   cp "$HERE/container-build.sh" "$WORK/build.sh"
   docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
 fi
+grep -q 'PRIVACY_OK' "$WORK/build.log" || { echo "privacy publish gate is red or did not run: no package (see build log above)" >&2; exit 1; }
 grep -q 'TAR_OK' "$WORK/build.log"
 
 mkdir "$WORK/b" "$WORK/stage"
