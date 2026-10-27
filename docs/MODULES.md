@@ -1,4 +1,6 @@
-# MODULES.md — Modül spesifikasyonları (M1–M11)
+# MODULES.md — Modül spesifikasyonları
+
+Kayıtlı modüllerin listesi ve sayısı tek yerde tutulur: `src/lib/modules/registry.ts` (`moduleRegistry`, `getModuleCounts()`). Bu belge her modülü ayrı başlıkta anlatır; kayıtlı her modülün burada bölümü olmayabilir.
 
 Her modül için: amaç · kullanıcı hikâyeleri · ekranlar · veri · iş kuralları · YZ kullanımı · kabul kriterleri · plan. Durum makinesi ve manifest biçimi `ARCHITECTURE.md §3`.
 
