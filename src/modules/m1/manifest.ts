@@ -19,9 +19,14 @@ export const m1Manifest: ModuleManifest = {
   routes: [
     { path: 'partners', permission: 'partner-intel:read' },
     { path: 'partners/leaders', permission: 'partner-intel:read' },
+    { path: 'partners/resources', permission: 'partner-intel:read' },
     { path: 'partners/[pic]', permission: 'partner-intel:read' },
   ],
-  nav: [{ labelKey: 'partners', routeKey: 'partners', order: 30 }],
+  nav: [
+    { labelKey: 'partners', routeKey: 'partners', order: 30 },
+    // A top-level entry right after Partners; Partners stays unlit on its page (SidebarNav OUTRANKS).
+    { labelKey: 'partnerResources', routeKey: 'partnerResources', order: 31 },
+  ],
   permissions: [
     { id: 'partner-intel:read', minRole: Role.MEMBER },
     { id: 'partner-intel:write', minRole: Role.WRITER },
