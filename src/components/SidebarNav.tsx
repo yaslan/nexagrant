@@ -19,12 +19,13 @@ interface NavItem {
   preview?: ModulePreviewStatus;
   /** The plan does not include the module: the entry leads to its page's upgrade notice. */
   upgrade?: boolean;
-  /** Rendered indented under this entry, which stays inactive while the sub-entry is open. */
-  parentKey?: string;
 }
 
-/** Module nav entries shown as a sub-entry of another one: child key → parent key. */
-const SUB_ITEMS: Record<string, string> = { partnerResources: 'partners' };
+/**
+ * Top-level entries whose page sits under another entry's path: open key → the key
+ * that must not light up with it (`/partners/resources` also matches Partners).
+ */
+const OUTRANKS: Record<string, string> = { partnerResources: 'partners' };
 
 interface SidebarNavProps {
   locale: string;
@@ -64,7 +65,6 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
     moduleId: item.moduleId,
     preview: previewStatus[item.moduleId],
     upgrade: upgradeModules.includes(item.moduleId),
-    parentKey: SUB_ITEMS[item.labelKey],
   }));
 
   const navItems: NavItem[] = [
@@ -99,9 +99,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
       
       {navItems.map((item) => {
         const matches = (i: NavItem) => Boolean(pathname?.startsWith(i.href) || pathname?.includes(`/${i.key}`));
-        // `/partners/resources` also starts with the Partners href: the open sub-entry wins.
-        const isActive = matches(item) && !navItems.some((child) => child.parentKey === item.key && matches(child));
-        const indent = item.parentKey ? 'ml-4 text-xs' : '';
+        const isActive = matches(item) && !navItems.some((other) => OUTRANKS[other.key] === item.key && matches(other));
         // A feature of a module that is off (approvals → M5, API keys → M1) stays in
         // the menu but locked. `activeModules` is the same answer `useModuleEnabled`
         // reads; the hook itself cannot be called inside this loop.
@@ -122,7 +120,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
                 aria-describedby={reasonId}
                 tabIndex={0}
                 title={tooltip}
-                className={`px-3 py-2 rounded-lg font-medium flex items-center justify-between text-muted cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${indent}`}
+                className="px-3 py-2 rounded-lg font-medium flex items-center justify-between text-muted cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <span>{item.label}</span>
                 <span aria-hidden="true">🔒</span>
@@ -145,7 +143,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
                 data-locked="upgrade"
                 aria-describedby={reasonId}
                 title={tooltip}
-                className={`px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-between text-ink-2 hover:bg-surface-hover hover:text-ink ${indent}`}
+                className="px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-between text-ink-2 hover:bg-surface-hover hover:text-ink"
               >
                 <span>{item.label}</span>
                 <span aria-hidden="true">🔒</span>
@@ -159,7 +157,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
             key={item.key}
             href={item.href}
             data-testid={`sidebar-nav-${item.key}`}
-            className={`px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-between ${indent} ${
+            className={`px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-between ${
               isActive
                 ? 'bg-accent/10 text-accent-ink font-semibold'
                 : 'text-ink-2 hover:bg-surface-hover hover:text-ink'

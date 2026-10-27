@@ -86,15 +86,21 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
     expect(screen.getByTestId('sidebar-nav-apiKeys').getAttribute('data-locked')).toBe('true');
   });
 
-  // FO-176: the resources page sits under Partners; while it is open only it is highlighted.
-  it('highlights the open Partners sub-entry, not Partners itself', () => {
+  // FO-176: a top-level entry right after Partners (not a sub-entry); its path sits
+  // under /partners, yet only it is highlighted while it is open.
+  it('lists Partner Search Resources as a top-level entry and highlights it alone', () => {
     nav.pathname = '/en/main/partners/resources';
     try {
       shell(['M1'], <SidebarNav locale="en" />, 'en');
-      const sub = screen.getByTestId('sidebar-nav-partnerResources');
-      expect(sub.getAttribute('href')).toBe('/en/main/partners/resources');
-      expect(sub.className).toContain('bg-accent/10');
-      expect(screen.getByTestId('sidebar-nav-partners').className).not.toContain('bg-accent/10');
+      const labels = sidebarLabels();
+      expect(labels[labels.indexOf('Partners') + 1]).toBe('Partner Search Resources');
+      const entry = screen.getByTestId('sidebar-nav-partnerResources');
+      const partners = screen.getByTestId('sidebar-nav-partners');
+      expect(entry.getAttribute('href')).toBe('/en/main/partners/resources');
+      expect(entry.parentElement).toBe(partners.parentElement);
+      expect(entry.className).not.toMatch(/\bml-|\btext-xs\b/);
+      expect(entry.className).toContain('bg-accent/10');
+      expect(partners.className).not.toContain('bg-accent/10');
     } finally {
       nav.pathname = '/tr/main/panel';
     }

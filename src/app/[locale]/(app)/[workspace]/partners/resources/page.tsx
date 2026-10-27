@@ -22,10 +22,6 @@ export default async function PartnerResourcesPage({
           {t('breadcrumbDashboard')}
         </Link>
         <span>/</span>
-        <Link href={getWorkspaceRoute('partners', locale, workspace)} className="hover:text-ink transition-colors">
-          {t('breadcrumbPartners')}
-        </Link>
-        <span>/</span>
         <span className="text-accent font-semibold">{t('breadcrumbResources')}</span>
       </div>
 

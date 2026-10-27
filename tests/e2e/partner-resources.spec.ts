@@ -8,8 +8,8 @@ import { shotsDir } from './fixtures/shots';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
- * /partners/resources (TASK-MVQEAR9MCJLAT, FO-176) — the EU portal shortcut page
- * under Partners. Reached the way a user reaches it: by clicking the sidebar entry
+ * /partners/resources (TASK-MVQEAR9MCJLAT, FO-176) — the EU portal shortcut page,
+ * a top-level main-menu entry of its own (not a sub-entry of Partners). Reached the way a user reaches it: by clicking the sidebar entry
  * (desktop) or the drawer entry (390px). A card click must open a new tab on the
  * portal's own host; the portal itself is answered by a stub so the run does not
  * depend on an outside site being up.
@@ -30,10 +30,33 @@ async function signIn(page: Page, locale: 'tr' | 'en') {
   await page.goto(`/${locale}/${WORKSPACE}/dashboard`);
 }
 
+/** Top-level: same parent and same left edge / font size as Partners, and only it is lit. */
+async function expectTopLevelEntry(page: Page) {
+  const entry = page.getByTestId('sidebar-nav-partnerResources').filter({ visible: true });
+  const partners = page.getByTestId('sidebar-nav-partners').filter({ visible: true });
+  const [e, p] = await Promise.all(
+    [entry, partners].map((l) =>
+      l.evaluate((el) => ({
+        left: el.getBoundingClientRect().left,
+        fontSize: getComputedStyle(el).fontSize,
+        sameParent: el.parentElement?.querySelector(':scope > [data-testid="sidebar-nav-partners"]') !== null,
+      })),
+    ),
+  );
+  expect(e!.sameParent, 'a sibling of Partners, not nested under it').toBe(true);
+  expect(e!.left, 'not indented').toBe(p!.left);
+  expect(e!.fontSize, 'no sub-entry type size').toBe(p!.fontSize);
+  await expect(entry).toHaveClass(/bg-accent\/10/);
+  await expect(partners).not.toHaveClass(/bg-accent\/10/);
+}
+
 async function expectTenCards(page: Page, locale: 'tr' | 'en') {
   const m = MESSAGES[locale].PartnerResources;
   await expect(page).toHaveURL(new RegExp(`/${locale}/${WORKSPACE}/partners/resources$`));
   await expect(page.getByRole('heading', { level: 1, name: m.title })).toBeVisible({ timeout: 30_000 });
+  // Breadcrumb: Dashboard / EU Portals & Resources — no Partners step.
+  const crumbs = page.locator('main').getByText(m.breadcrumbDashboard, { exact: true }).locator('..');
+  await expect(crumbs).toHaveText(`${m.breadcrumbDashboard}/${m.breadcrumbResources}`);
   const cards = page.getByTestId('partner-resources-grid').getByRole('link');
   await expect(cards).toHaveCount(10);
   for (const r of PARTNER_RESOURCES) {
@@ -58,7 +81,7 @@ test.describe('Partner search resources (FO-176)', () => {
   });
 
   for (const locale of ['tr', 'en'] as const) {
-    test(`desktop: sidebar entry under Partners opens the page, a card opens the portal in a new tab (${locale})`, async ({ page, context }) => {
+    test(`desktop: top-level sidebar entry opens the page, a card opens the portal in a new tab (${locale})`, async ({ page, context }) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       // The portal is stubbed: the test proves where the click goes, not that cordis.europa.eu is up.
       await context.route('https://cordis.europa.eu/**', (route) =>
@@ -69,7 +92,7 @@ test.describe('Partner search resources (FO-176)', () => {
       const nav = MESSAGES[locale].Navigation;
       const entry = page.getByTestId('sidebar-nav-partnerResources').filter({ visible: true });
       await expect(entry).toHaveText(nav.partnerResources, { timeout: 30_000 });
-      // Directly below Partners in the sidebar.
+      // Right after Partners in the main menu.
       const keys = await page
         .locator('aside [data-testid^="sidebar-nav-"]')
         .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
@@ -77,9 +100,7 @@ test.describe('Partner search resources (FO-176)', () => {
 
       await entry.click();
       await expectTenCards(page, locale);
-      // The open sub-entry is the highlighted one, not its parent.
-      await expect(entry).toHaveClass(/bg-accent\/10/);
-      await expect(page.getByTestId('sidebar-nav-partners').filter({ visible: true })).not.toHaveClass(/bg-accent\/10/);
+      await expectTopLevelEntry(page);
       await page.screenshot({ path: `${SHOTS}/01-desktop-${locale}.png`, fullPage: true });
 
       // Keyboard: the card takes focus with a visible ring and Enter opens it.
@@ -107,6 +128,10 @@ test.describe('Partner search resources (FO-176)', () => {
 
       await entry.click();
       await expectTenCards(page, locale);
+      await page.getByRole('button', { name: 'Open Mobile Menu' }).click();
+      await expectTopLevelEntry(page);
+      await page.screenshot({ path: `${SHOTS}/02b-mobile-drawer-active-${locale}.png` });
+      await page.getByRole('button', { name: 'Close Mobile Menu' }).click();
       const overflow = await page.evaluate(() => {
         const main = document.querySelector('main');
         return main ? main.scrollWidth - main.clientWidth : 0;

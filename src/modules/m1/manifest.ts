@@ -24,7 +24,7 @@ export const m1Manifest: ModuleManifest = {
   ],
   nav: [
     { labelKey: 'partners', routeKey: 'partners', order: 30 },
-    // Sits under "Partners" in the sidebar (SidebarNav SUB_ITEMS).
+    // A top-level entry right after Partners; Partners stays unlit on its page (SidebarNav OUTRANKS).
     { labelKey: 'partnerResources', routeKey: 'partnerResources', order: 31 },
   ],
   permissions: [
