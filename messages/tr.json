@@ -1153,12 +1153,12 @@
           "google": {
             "recipient": "Google LLC",
             "location": "ABD",
-            "data": "Oturum açma sırasında gönderilen ad ve e-posta"
+            "data": "Google ile oturum açarken Google hesabınıza yönlendirilirsiniz; Google, Platform'a giriş yaptığınızı ve bağlantı bilgilerinizi işler. Ad ve e-posta Google'dan Platform'a gelir (bölüm 4)"
           },
           "stripe": {
             "recipient": "Stripe, Inc.",
             "location": "ABD",
-            "data": "Abonelik ve ödeme yönetimi için müşteri tanımlayıcısı ve faturalama durumu"
+            "data": "Abonelik ve ödeme yönetimi için müşteri tanımlayıcısı ve faturalama durumu; ödeme sayfasında doğrudan Stripe'a girdiğiniz e-posta, kart ve fatura bilgileri (Stripe'ın kendi aydınlatmasına tabidir)"
           },
           "openai": {
             "recipient": "OpenAI, L.L.C.",
@@ -1173,10 +1173,10 @@
           "posthog": {
             "recipient": "PostHog Inc.",
             "location": "Avrupa Birliği bölgesi (varsayılan)",
-            "data": "Olay adları ve anonim tarayıcı kimliği (yalnız çerez onayıyla)"
+            "data": "Olay adları ve anonim tarayıcı kimliği (yalnız çerez onayıyla); bağlantı gereği IP adresiniz PostHog'a ulaşır, konum çözümleme kapalıdır"
           }
         },
-        "safeguards": "Bu aktarımlar; Kurul'un yeterlilik kararı bulunan ülkelere, yoksa Kurul'un yayımladığı standart sözleşme gibi uygun güvencelere dayanılarak yapılır. Standart sözleşme imzalanan aktarımlar, imzadan itibaren 5 iş günü içinde Kurul'a bildirilir. Bunların hiçbiri mümkün değilse, arızi aktarımlar için açık rızanız istenir. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
+        "safeguards": "Bu aktarımlar KVKK m.9 hükümlerine tabidir. Her alıcı için dayanılan güvence: [YURT DIŞI AKTARIM MEKANİZMASI — HUKUK TEYİDİ]. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
         "ownTransfer": "AB proje başvurularında, başvuru sahibi olarak sizin talimatınızla Avrupa Komisyonu portalına (Funding & Tenders) veya proje ortaklarınıza iletilen bilgiler, sizin tarafınızdan yapılan aktarım niteliğindedir. {brand} portala sizin adınıza başvuru göndermez."
       },
       "s6": {
@@ -1195,7 +1195,7 @@
           },
           "trafficLogs": {
             "data": "Trafik / log kayıtları",
-            "period": "2 yıl (5651 sayılı Kanun)"
+            "period": "[LOG SAKLAMA SÜRESİ — barındırma sağlayıcısı teyidi]"
           },
           "leads": {
             "data": "Fon hazırlık karnesi iletişim formu talepleri",
@@ -1219,7 +1219,7 @@
           },
           "browser": {
             "data": "Çerezler ve tarayıcı depolaması",
-            "period": "Oturum çerezi oturum süresince; dil, tema ve çerez tercihiniz ile anonim analiz kimliği, tarayıcınızdan silinene kadar"
+            "period": "Oturum açma çerezi 30 gün (kullandıkça yenilenir); dil tercihi çerezi tarayıcı oturumu süresince; tema çerezi 1 yıl; davet ve kayıt adımlarındaki geçici çerezler 15–30 dakika; çerez tercihiniz, sepet içeriği ve anonim analiz kimliği (tarayıcı depolaması) tarayıcınızdan silinene kadar"
           }
         },
         "disposal": "Süresi dolan kayıtlar her gece çalışan otomatik silme işleriyle silinir. Hesabınızı silmeniz hâlinde, yasal saklama yükümlülüğü bulunmayan veriler 30 günlük bekleme süresinin sonunda silinir.",
@@ -1235,7 +1235,7 @@
         "rows": {
           "essential": {
             "type": "Zorunlu",
-            "purpose": "Oturum, güvenlik, dil tercihi (TR/EN), tema seçimi, çerez tercihinizin kaydı",
+            "purpose": "Oturum, güvenlik, dil tercihi (TR/EN), tema seçimi (1 yıl), sepet içeriği (tarayıcı depolaması), çerez tercihinizin kaydı, davet ve kayıt adımlarında 15–30 dakikalık geçici çerezler",
             "consent": "Gerekmez"
           },
           "analytics": {
@@ -1282,7 +1282,7 @@
           "expert": "Uzman profilinin rehberde yayımlanması: uzman ön kaydındaki onayla"
         },
         "withdraw": "Açık rızanızı dilediğiniz an info@fonbridge.com adresine yazarak, analiz çerezi için ayrıca 7. bölümde anlatılan yolla geri alabilirsiniz. Geri alma, önceki işlemlerin hukuka uygunluğunu etkilemez.",
-        "effective": "Bu metin [YÜRÜRLÜK TARİHİ] tarihinden itibaren geçerlidir. Değişiklikler sitede yayımlandığı tarihte yürürlüğe girer; esaslı değişiklikler kayıtlı üyelere e-posta ile bildirilir."
+        "effective": "Bu metin [YÜRÜRLÜK TARİHİ] tarihinden itibaren geçerlidir. Değişiklikler sitede yayımlandığı tarihte yürürlüğe girer; esaslı değişikliklerde bu sayfadaki yürürlük tarihi güncellenir."
       }
     },
     "terms": {

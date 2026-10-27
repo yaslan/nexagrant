@@ -79,7 +79,7 @@ function PrivacyTable({ t, section }: { t: Translate; section: PrivacyTableSecti
               {cells.map((cell, index) => {
                 const text = t(`${section}.rows.${row}.${cell}`, cellValues(section, row));
                 return index === 0 ? (
-                  <th key={cell} scope="row" className="px-3 py-2 align-top text-left font-medium text-ink [overflow-wrap:anywhere]">
+                  <th key={cell} scope="row" className="px-3 py-2 align-top text-left font-medium text-ink [overflow-wrap:break-word]">
                     {text}
                   </th>
                 ) : (

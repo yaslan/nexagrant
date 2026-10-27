@@ -1153,12 +1153,12 @@
           "google": {
             "recipient": "Google LLC",
             "location": "USA",
-            "data": "Name and email sent during sign-in"
+            "data": "When you sign in with Google you are redirected to your Google account; Google processes the fact that you sign in to the Platform and your connection data. Name and email come from Google to the Platform (section 4)"
           },
           "stripe": {
             "recipient": "Stripe, Inc.",
             "location": "USA",
-            "data": "Customer identifier and billing status for subscription and payment management"
+            "data": "Customer identifier and billing status for subscription and payment management; the email, card and billing details you enter directly with Stripe on its payment page (subject to Stripe's own privacy notice)"
           },
           "openai": {
             "recipient": "OpenAI, L.L.C.",
@@ -1173,10 +1173,10 @@
           "posthog": {
             "recipient": "PostHog Inc.",
             "location": "EU region (default)",
-            "data": "Event names and an anonymous browser identifier (only with cookie consent)"
+            "data": "Event names and an anonymous browser identifier (only with cookie consent); your IP address reaches PostHog as part of the connection, location lookup is turned off"
           }
         },
-        "safeguards": "These transfers are made to countries covered by an adequacy decision of the Personal Data Protection Board (the \"Board\") or, failing that, on appropriate safeguards such as the standard contracts published by the Board. Transfers under a standard contract are notified to the Board within 5 business days of signature. Where none of these is possible, your explicit consent is sought for incidental transfers. Please send any questions about transfers abroad to info@fonbridge.com.",
+        "safeguards": "These transfers are subject to KVKK article 9. The safeguard relied on for each recipient: [CROSS-BORDER TRANSFER MECHANISM — LEGAL CONFIRMATION]. Please send any questions about transfers abroad to info@fonbridge.com.",
         "ownTransfer": "In EU project applications, information passed on your instructions, as the applicant, to the European Commission portal (Funding & Tenders) or to your project partners is a transfer made by you. {brand} does not submit applications to the portal on your behalf."
       },
       "s6": {
@@ -1195,7 +1195,7 @@
           },
           "trafficLogs": {
             "data": "Traffic / log records",
-            "period": "2 years (Law No. 5651)"
+            "period": "[LOG RETENTION PERIOD — hosting provider confirmation]"
           },
           "leads": {
             "data": "Funding readiness scorecard contact requests",
@@ -1219,7 +1219,7 @@
           },
           "browser": {
             "data": "Cookies and browser storage",
-            "period": "Session cookie for the session; language, theme and cookie choice and the anonymous analytics identifier until they are cleared from your browser"
+            "period": "Sign-in cookie 30 days (renewed as you use the site); language preference cookie for the browser session; theme cookie 1 year; temporary cookies during invitation and sign-up steps 15–30 minutes; your cookie choice, cart contents and the anonymous analytics identifier (browser storage) until they are cleared from your browser"
           }
         },
         "disposal": "Expired records are deleted by automated jobs that run every night. If you delete your account, data that is not subject to a statutory retention duty is deleted at the end of the 30-day waiting period.",
@@ -1235,7 +1235,7 @@
         "rows": {
           "essential": {
             "type": "Essential",
-            "purpose": "Session, security, language preference (TR/EN), theme choice, recording your cookie choice",
+            "purpose": "Session, security, language preference (TR/EN), theme choice (1 year), cart contents (browser storage), recording your cookie choice, 15–30 minute temporary cookies during invitation and sign-up steps",
             "consent": "Not required"
           },
           "analytics": {
@@ -1282,7 +1282,7 @@
           "expert": "Publishing an expert profile in the directory: by the consent in the expert pre-registration"
         },
         "withdraw": "You can withdraw your explicit consent at any time by writing to info@fonbridge.com and, for analytics storage, also as described in section 7. Withdrawal does not affect the lawfulness of processing before it.",
-        "effective": "This notice is effective from [EFFECTIVE DATE]. Changes take effect when published on the site; material changes are notified to registered members by email."
+        "effective": "This notice is effective from [EFFECTIVE DATE]. Changes take effect when published on the site; for material changes the effective date on this page is updated."
       }
     },
     "terms": {

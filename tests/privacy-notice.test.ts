@@ -7,6 +7,7 @@ import {
   PRIVACY_LISTS,
   PRIVACY_PLACEHOLDERS,
   PRIVACY_TABLES,
+  privacyPublishBlockers,
 } from '../src/app/[locale]/(public)/privacy/structure';
 
 /**
@@ -71,10 +72,22 @@ describe('privacy notice copy (FO-170)', () => {
     }
   });
 
-  test('tax office, MERSIS, VERBIS and effective date are still placeholders', () => {
+  test('tax office, MERSIS, VERBIS, effective date, transfer mechanism and log retention are still placeholders', () => {
     expect(PRIVACY_PLACEHOLDERS.map((p) => p.key).sort()).toEqual(
-      ['s1.rows.mersis.value', 's1.rows.taxId.value', 's1.rows.verbis.value', 's9.effective'].sort(),
+      [
+        's1.rows.mersis.value',
+        's1.rows.taxId.value',
+        's1.rows.verbis.value',
+        's5.safeguards',
+        's6.rows.trafficLogs.period',
+        's9.effective',
+      ].sort(),
     );
+  });
+
+  test('the publish check blocks on every placeholder and demo value', () => {
+    // scripts/privacy-publish-check.ts exits 1 while this is non-empty.
+    expect(privacyPublishBlockers()).toHaveLength(PRIVACY_PLACEHOLDERS.length + PRIVACY_DEMO_VALUES.length);
   });
 
   test('controller identity matches the expert notice (FO-149 v3)', () => {
@@ -96,6 +109,12 @@ describe('privacy notice copy (FO-170)', () => {
     ['commercial electronic messages', /ticari elektronik ileti|commercial electronic message|6563/i],
     ['newsletter', /bülten|newsletter/i],
     ['the template\'s internal lawyer note', /genel bir şablondur|avukat/i],
+    // No signed standard contract or Board notification exists (se-fb review B-1).
+    ['standard contracts / Board notification', /standart sözleşme|standard contract|kurul'a bildiril|notified to the board/i],
+    ['explicit consent for incidental transfers', /arızi|incidental/i],
+    // Nothing emails members when the notice changes (se-fb review B-2).
+    ['email notice of changes', /e-posta ile bildirilir|notified to registered members by email/i],
+    ['a retention period for traffic logs nobody confirmed', /2 yıl \(5651|2 years \(law/i],
   ])('no claim the code does not back: %s', (_label, pattern) => {
     for (const lang of ['tr', 'en'] as const) {
       const hits = Object.entries(FLAT[lang]).filter(([, value]) => pattern.test(value));

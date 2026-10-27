@@ -36,14 +36,25 @@ export const PRIVACY_LISTS = {
 /**
  * Values the notice cannot state yet and must not invent. Each still reads as
  * the bracketed text below, in both languages, until the owner supplies it.
- * The publish gate (FO-140) must find this list empty; the test in
- * tests/privacy-notice.test.ts keeps it honest in both directions — every entry
- * is still in the copy, and no other bracketed placeholder is.
+ * The publish gate (`pnpm privacy:publish-check`, FO-140) must find this list
+ * empty; the test in tests/privacy-notice.test.ts keeps it honest in both
+ * directions — every entry is still in the copy, and no other bracketed
+ * placeholder is.
  */
 export const PRIVACY_PLACEHOLDERS: readonly { key: string; tr: string; en: string }[] = [
   { key: 's1.rows.taxId.value', tr: '[VERGİ DAİRESİ / NO]', en: '[TAX OFFICE / NO]' },
   { key: 's1.rows.mersis.value', tr: '[MERSİS NO]', en: '[MERSIS NO]' },
   { key: 's1.rows.verbis.value', tr: '[Kayıtlı / Muaf]', en: '[Registered / Exempt]' },
+  {
+    key: 's5.safeguards',
+    tr: '[YURT DIŞI AKTARIM MEKANİZMASI — HUKUK TEYİDİ]',
+    en: '[CROSS-BORDER TRANSFER MECHANISM — LEGAL CONFIRMATION]',
+  },
+  {
+    key: 's6.rows.trafficLogs.period',
+    tr: '[LOG SAKLAMA SÜRESİ — barındırma sağlayıcısı teyidi]',
+    en: '[LOG RETENTION PERIOD — hosting provider confirmation]',
+  },
   { key: 's9.effective', tr: '[YÜRÜRLÜK TARİHİ]', en: '[EFFECTIVE DATE]' },
 ];
 
@@ -54,3 +65,15 @@ export const PRIVACY_PLACEHOLDERS: readonly { key: string; tr: string; en: strin
 export const PRIVACY_DEMO_VALUES: readonly { key: string; value: string }[] = [
   { key: 's1.rows.kep.value', value: 'fonbridge@hs01.kep.tr' },
 ];
+
+/**
+ * What still stops /privacy from going live: every placeholder and every demo
+ * value, by message key. Empty means the notice states only real values.
+ * Read by scripts/privacy-publish-check.ts.
+ */
+export function privacyPublishBlockers(): string[] {
+  return [
+    ...PRIVACY_PLACEHOLDERS.map((p) => `placeholder ${p.key}: ${p.tr}`),
+    ...PRIVACY_DEMO_VALUES.map((d) => `demo value ${d.key}: ${d.value}`),
+  ];
+}
