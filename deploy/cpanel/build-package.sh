@@ -19,9 +19,10 @@
 # without uploaded images on purpose.
 #
 # The production package is the dev→prod promotion, so it refuses a commit whose
-# /privacy still carries placeholders: container-build.sh runs
-# `pnpm privacy:publish-check` + tests/privacy-notice.test.ts and the build log
-# must say PRIVACY_OK (also on FB_BUILD_DIR re-packages). No bypass (FO-180).
+# /privacy still carries placeholders (FO-180). The gate is `pnpm privacy:publish-check`
+# + tests/privacy-notice.test.ts, run HERE on COMMIT's own archive, for fresh builds
+# and FB_BUILD_DIR re-packages alike. build.log is plain text, so it is never the
+# evidence for the gate; the container runs the same gate first (red = no build).
 set -euo pipefail
 
 if [ -z "${FB_BUILD_DIR:-}" ] && [ -z "${R2_PUBLIC_HOST:-}" ] && [ "${FB_NO_PUBLIC_ASSETS:-}" != 1 ]; then
@@ -33,9 +34,21 @@ COMMIT="${1:?usage: build-package.sh <commit> <out-dir>}"
 OUT="${2:?usage: build-package.sh <commit> <out-dir>}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+FULL="$(git -C "$REPO" rev-parse "$COMMIT")"
 SHORT="$(git -C "$REPO" rev-parse --short=8 "$COMMIT")"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+
+# The gate, run on the host against COMMIT's own archive. The repo's node_modules is
+# linked into that scratch copy only (never into the zip): no second `pnpm install`.
+privacy_gate() {
+  local gate="$WORK/gate"
+  mkdir "$gate"
+  git -C "$REPO" archive --format=tar "$FULL" | tar -x -C "$gate"
+  ln -s "$REPO/node_modules" "$gate/node_modules"
+  (cd "$gate" && node_modules/.bin/tsx scripts/privacy-publish-check.ts && node_modules/.bin/vitest run tests/privacy-notice.test.ts) \
+    || { echo "privacy publish gate is red for $FULL: no package (see output above)" >&2; exit 1; }
+}
 
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
@@ -43,11 +56,16 @@ if [ -n "${FB_BUILD_DIR:-}" ]; then
   # Re-package an earlier container build (its build-out.tar + build.log) without rebuilding.
   cp "$FB_BUILD_DIR/build-out.tar" "$FB_BUILD_DIR/build.log" "$WORK/"
 else
-  git -C "$REPO" archive --format=tar "$COMMIT" > "$WORK/src.tar"
+  git -C "$REPO" archive --format=tar "$FULL" > "$WORK/src.tar"
   cp "$HERE/container-build.sh" "$WORK/build.sh"
-  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
+  docker run --rm --platform linux/amd64 -e R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" -e SRC_COMMIT="$FULL" -v "$WORK:/out" node:22-bookworm-slim /out/build.sh 2>&1 | tee "$WORK/build.log"
 fi
-grep -q 'PRIVACY_OK' "$WORK/build.log" || { echo "privacy publish gate is red or did not run: no package (see build log above)" >&2; exit 1; }
+privacy_gate
+# Provenance, so a tar built from another commit cannot be labelled with COMMIT:
+# the log must name COMMIT as its source and the sha256 of the tar it describes.
+grep -qx "SRC_COMMIT $FULL" "$WORK/build.log" || { echo "build.log does not name $FULL as its source: no package" >&2; exit 1; }
+[ "$(grep '^TAR_SHA256 ' "$WORK/build.log" | tail -1 | cut -d' ' -f2)" = "$(shasum -a 256 "$WORK/build-out.tar" | cut -d' ' -f1)" ] \
+  || { echo "build-out.tar does not match the TAR_SHA256 in build.log: no package" >&2; exit 1; }
 grep -q 'TAR_OK' "$WORK/build.log"
 
 mkdir "$WORK/b" "$WORK/stage"
