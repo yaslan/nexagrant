@@ -1,0 +1,114 @@
+source_path,main_status,class,dev_note,rescue_target,bytes,sha256
+docs/BILLING.md, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/docs/BILLING.md,21989,d9f51dc87ab89e88ec8a9fce7944af62800f15aa0c4d897dc10160f7ddb9474d
+messages/en.json, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/messages/en.json,162873,cec4d5fcb21bf814de94bacc3b73d6973364c13368ca4258d381899ac4862747
+messages/tr.json, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/messages/tr.json,170312,f97f137499a0426074b53aebe834709bce91fca7436f6d66501fd0ce814a6a41
+prisma/seed.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/prisma/seed.ts,28125,927b63464ccab7e04bc8715bb762d886274bfc19c9e150e47a79c111c6368f49
+src/app/[locale]/(app)/[workspace]/calls/[id]/page.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/(app)/[workspace]/calls/[id]/page.tsx,8869,98a74cf1aa881ca34780c34f5ff5c75085d23898adbdc1cc6f006c7bef0204e7
+src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx,21545,5c6b42ececc3d93a299549b516232becf6d6ccb765eff93e2f74a6d259e5d292
+src/app/[locale]/(app)/[workspace]/pipeline/[id]/page.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/(app)/[workspace]/pipeline/[id]/page.tsx,5795,d651b5281f17673011ea402da1647df88a2d864eb57db6adadc0857bfe27f800
+src/app/[locale]/(app)/[workspace]/pipeline/board.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/(app)/[workspace]/pipeline/board.tsx,74387,bbca7d2b79350b3a3a79507d9ba9876d36074b0192bd1dc79868d3f6ff2be34d
+src/app/[locale]/(app)/[workspace]/settings/modules/client.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/(app)/[workspace]/settings/modules/client.tsx,91911,d99f0aad1c5dc6e9caedc950054fc75b83123a92705943bdfd7e083156545340
+src/app/[locale]/(app)/[workspace]/settings/modules/plan-view.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/(app)/[workspace]/settings/modules/plan-view.ts,4806,982cb99c01541a1bd77161714777be63589bd64fa0c2963f9fb36abea0210fc3
+src/app/[locale]/(marketing)/blog/page.tsx, M,C,dev'de yok,src/app/[locale]/(marketing)/blog/page.tsx,6543,50b9dbb6f6f9c21cfc35e3eb8d022f3530d6c916c649c89bed3097874903db9f
+src/app/[locale]/admin/blog/client.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/admin/blog/client.tsx,30870,a3c17eee6213eb8d42324683ac7115031db94724aa4148daacd5280ec6023a0f
+src/app/[locale]/admin/modules/client.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/app/[locale]/admin/modules/client.tsx,20591,96adb1fc1694242d55b19fd6bc5527470c5ed07f6873f05b70aaf40d5df4768b
+src/app/[locale]/page.tsx, M,C,dev'de yok,src/app/[locale]/page.tsx,38914,cbd1e55611f62c2cdf1c0e27d78c09b32fd73348fdf2d4cbba04f5f972e9923d
+src/components/AdminSidebarNav.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/components/AdminSidebarNav.tsx,5115,ad253f23c4188969d0ce23071a90545cd951171f12c92e7aedd42ba62126df12
+src/components/PublicFooter.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/components/PublicFooter.tsx,7045,0c48747fd4a119b0ce3243fc1e00d8cfbda1ce36d0de7fba1d291e31a4374247
+src/components/SidebarNav.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/components/SidebarNav.tsx,4786,90f13470525c2093fb6efad8a56c8596e905f05cddaf34f0e6966413e061cc57
+src/lib/beta/constants.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/beta/constants.ts,3433,a38502781c836c21cf84c1ea7e63b7fb5c2369064de20b2c16e71bae094298be
+src/lib/billing.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/billing.ts,8371,c3bfaef9974db93533430910a3d0ea4cad6bb9a1d884591bd13fdf791a3226bb
+src/lib/billing/catalog.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/billing/catalog.ts,27118,b6936c67f13e53137ba22e09fdf26d4679839148aed46d7d2eaa9d8f059a3f14
+src/lib/billing/plan-repository.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/billing/plan-repository.ts,36419,1b6baaebeac98b5d6ea8c86d10dad1909db1e5f0529479d17099a9a15f3cad9c
+src/lib/billing/subscription-sync.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/billing/subscription-sync.ts,36939,45199f52e56b0ae0f0e652989fd947df1bfeb7a82ec5d8b0cd916adca4959e70
+src/lib/blog.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/blog.ts,8554,679010069d57289c4aaabf76d29f0ef2f74d121ab1c716f324f2acdad806cc7d
+src/lib/modules/access.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/modules/access.ts,5941,7f75eea4e97d356d48612ead6ee2f254246720bce1b96c6878deb5b6b29103fb
+src/lib/modules/registry.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/modules/registry.ts,4285,885b297708e4745e690ce0979586f26eb705a5d317f5861f7f91bf041c5a5447
+src/lib/modules/route-catalog.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/modules/route-catalog.ts,2863,ed1afba3b894b6d413b753684b3c436d494a4e3cb83605fb9aff3256c51ffcca
+src/lib/modules/types.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/modules/types.ts,16962,5e4c23a92daa22214d67560e8341aafafa9d55de4a8b926c7d1877475c1d042c
+src/lib/routes.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/lib/routes.ts,11494,155bea92588d41a44d8470ef3cce4213fced4773aba163084bc36e9b53cfaaec
+tests/modules-pilot-upgrade-cta.test.tsx, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/tests/modules-pilot-upgrade-cta.test.tsx,4315,d16cb99a0cc3b2b27f9b211c21ee014e31c6857cb37a1d71f4b46b7eeb67c08e
+tests/modules/module-plan-gate.test.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/tests/modules/module-plan-gate.test.ts,7162,9c0b1242fd1d25ba231664a7aa773055714d2f04b77c77c3d00501cf902bd5ca
+tests/modules/settings-modules-plan.test.ts, M,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/tests/modules/settings-modules-plan.test.ts,7039,28c3dad275350db8331591218cfcb80d30036a78093a86f3b9f6f11880d5113d
+docs/legal-input/kvkk-aydinlatma-sablon-2026-10-27.md,??,C,dev'de yok,docs/legal-input/kvkk-aydinlatma-sablon-2026-10-27.md,10391,5cf56844e89a9166620ef381b2a028dc14097325537a8d6c0d984853255d37c1
+git show 9d1aafb5:docs/agent-results/FO-17-evidence/orphan-2026-10-21T21-23-59-975Z.patch,??,F,F-kaza klasor (yanlis komut): kurtarmaya girmez,,,
+git show origin/be-fb/fo61-partner-search-api:docs/agent-results/FO-61-evidence/orphan-2026-10-25T09-41-28-393Z.patch,??,F,F-kaza klasor (yanlis komut): kurtarmaya girmez,,,
+modules/ExpertOutreach/MODUL_ENTEGRASYONU.md,??,C,dev'de yok,modules/ExpertOutreach/MODUL_ENTEGRASYONU.md,5229,ee78f9761efb79be25e3682a58e2a5f3a7f8f71c6bea5a1475ee48b5c30c1382
+modules/ExpertOutreach/README.md,??,C,dev'de yok,modules/ExpertOutreach/README.md,4778,ed65b9974078988aaef1c60910680f94d1c6e02ff4f7f416a0834495463576e3
+modules/ExpertOutreach/__pycache__/config.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/__pycache__/fonbridge_module.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/app.py,??,C,dev'de yok,modules/ExpertOutreach/app.py,55868,aac2456c1ae0fddb150310865ef1410df9b6eafd482dcfa1676bfec321273fa7
+modules/ExpertOutreach/config.py,??,C,dev'de yok,modules/ExpertOutreach/config.py,984,70b72de9dc4c27615172af40a91fc3da8db40dea7a531267b0d8db77c48ffa30
+modules/ExpertOutreach/data/fonbridge.db,??,F,"F/hassas (veritabani, log, derleme ciktisi): kurtarmaya girmez",,,
+modules/ExpertOutreach/data/streamlit.log,??,F,"F/hassas (veritabani, log, derleme ciktisi): kurtarmaya girmez",,,
+modules/ExpertOutreach/fonbridge_module.py,??,C,dev'de yok,modules/ExpertOutreach/fonbridge_module.py,3456,0c5439bb36bcfed715e2c4b405cbda7a9f335c591fa9234bda0392937a628a04
+modules/ExpertOutreach/output/hata_raporu.csv,??,C,dev'de yok,modules/ExpertOutreach/output/hata_raporu.csv,466,0f3493dbeccb1fd3263eb5da32aff1178225c913c46bb2ec287e0a85a79dd944
+modules/ExpertOutreach/pyproject.toml,??,C,dev'de yok,modules/ExpertOutreach/pyproject.toml,523,0e34e865ad852bf56e0f22340ae0d43016e9e9262f571d6cef3180f5681e65af
+modules/ExpertOutreach/pytest.ini,??,C,dev'de yok,modules/ExpertOutreach/pytest.ini,24,07e12af78809b103a9e003b9bf24f9718928fa263046b37bf3ebc9ebbf802ceb
+modules/ExpertOutreach/requirements.txt,??,C,dev'de yok,modules/ExpertOutreach/requirements.txt,76,f2b1ce5b94c16965eb503de4a0a59135852b976ba4a124fea04def14127b802d
+modules/ExpertOutreach/run.sh,??,C,dev'de yok,modules/ExpertOutreach/run.sh,421,1118330688fe4efd1a07c7d57cc7cdfb2784ff52309b6db899fe7c5ff96ced0a
+modules/ExpertOutreach/setup.py,??,C,dev'de yok,modules/ExpertOutreach/setup.py,623,81e4d82c98b9ea778cddf58179d78e0c09a9769c4a46ae96161a0f5d5773d807
+modules/ExpertOutreach/src/__init__.py,??,C,dev'de yok,modules/ExpertOutreach/src/__init__.py,14,b95dc82ca1648e9c54677c391d2f62e5dc672fe80620c141cd3f7a9523844d73
+modules/ExpertOutreach/src/__pycache__/__init__.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/auth.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/cleaner.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/db.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/exporter.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/importer.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/language.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/module_manager.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/templates.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/__pycache__/tracker.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/src/auth.py,??,C,dev'de yok,modules/ExpertOutreach/src/auth.py,2913,60c82c2f868f25b565535c51eeeedda979fdcaeff8a8f1ca3f480ce08487b40e
+modules/ExpertOutreach/src/cleaner.py,??,C,dev'de yok,modules/ExpertOutreach/src/cleaner.py,6282,f0e87544d66c0e18de4548d9b19d60d402caf5825ab9e5d1209ad6f2e8670fa6
+modules/ExpertOutreach/src/db.py,??,C,dev'de yok,modules/ExpertOutreach/src/db.py,21409,618883d745420327a3466ef8f62b6861e6bddf041dfd0eec3db33ad71b5b3c33
+modules/ExpertOutreach/src/exporter.py,??,C,dev'de yok,modules/ExpertOutreach/src/exporter.py,4007,ec22d6b5c5ca2541feb5ee5e4e3116d684411ed5b473d051df1feea3859911bd
+modules/ExpertOutreach/src/importer.py,??,C,dev'de yok,modules/ExpertOutreach/src/importer.py,6001,a1b29d0a8646b56c6c0ea9e1baf883154e8b77e3f3f516dce249cb05ee158e51
+modules/ExpertOutreach/src/language.py,??,C,dev'de yok,modules/ExpertOutreach/src/language.py,30043,b0257102e29c98efc79b0d692aeca14af7b382877b8fad4087ac5542c6f7d558
+modules/ExpertOutreach/src/module_manager.py,??,C,dev'de yok,modules/ExpertOutreach/src/module_manager.py,8814,6bb54f516abdedd1c4ec4c38d7f9d967e0c08ffd7491e80a13aa5cfb03afb050
+modules/ExpertOutreach/src/templates.py,??,C,dev'de yok,modules/ExpertOutreach/src/templates.py,4044,a58c57d7ff7038fa845c9deb54a333b35e483de7d5ea7ee18080b5ae036113d3
+modules/ExpertOutreach/src/tracker.py,??,C,dev'de yok,modules/ExpertOutreach/src/tracker.py,13478,953c2d967fa2a884f5c7bba17989e23c4f76205b5735aa3a23a33254137fbaac
+modules/ExpertOutreach/tests/__init__.py,??,C,dev'de yok,modules/ExpertOutreach/tests/__init__.py,16,735469839c842bc3fbc34792d87ecca2fb190d80bc5c631024bb850a07b5bbfb
+modules/ExpertOutreach/tests/__pycache__/__init__.cpython-314.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_auth.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_cleaner.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_exporter.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_importer.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_language.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_module_manager.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_templates.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/__pycache__/test_tracker.cpython-314-pytest-9.1.1.pyc,??,F,F-uretilmis (pycache),,,
+modules/ExpertOutreach/tests/fixtures/ornek_uzmanlar.xlsx,??,C,dev'de yok,modules/ExpertOutreach/tests/fixtures/ornek_uzmanlar.xlsx,5124,5b4f5f859e53bfb23034354022ce63cc2142c6c8487c319a644e0bfe04980e39
+modules/ExpertOutreach/tests/test_auth.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_auth.py,1209,e8247625d5b410a18907fdc9a10dce3a3d105036e5077385eed419bc854a4af1
+modules/ExpertOutreach/tests/test_cleaner.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_cleaner.py,1679,4cf9fc6224214e5857b32129a670284ca58d91dc73316d69184b6f59e30f5a46
+modules/ExpertOutreach/tests/test_exporter.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_exporter.py,1267,11ebda711004e6b73b80cf9529a6f6ba2f4c66c4bf2b31fe59780cbd295079fd
+modules/ExpertOutreach/tests/test_importer.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_importer.py,4185,df2e30e622ff799038cf8977fafca5fe9c111e5304fb9f9428993982698666f6
+modules/ExpertOutreach/tests/test_language.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_language.py,3287,1acde8cfb1b74dd61846c222223185e69e2b709c5c82eee68dde4135e235c3df
+modules/ExpertOutreach/tests/test_module_manager.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_module_manager.py,4244,f993ccd733aa3d69a28653893e9c3bd063515826bccfd827d870173d3c257962
+modules/ExpertOutreach/tests/test_templates.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_templates.py,2436,5a459ba3f1b958af02370a9d021a5f7be54181f4874f6d35e7d7ccebb95bd9a2
+modules/ExpertOutreach/tests/test_tracker.py,??,C,dev'de yok,modules/ExpertOutreach/tests/test_tracker.py,8240,827ce47345915e4846be28372df7d5a436173c9cfa74663a6a6bdcdc49ae9640
+modules/ProjecSum/README.md,??,C,dev'de yok,modules/ProjecSum/README.md,2516,01b874baada8d0bb45256e29921231ea9a2d0d310cf49f5246a2d523d4efd0df
+modules/ProjecSum/cagri_ozet.py,??,C,dev'de yok,modules/ProjecSum/cagri_ozet.py,1673,ba3eb70b72a0ee3cd7d30d568c0786710c6dd340dfed792689cb0603c9b36d83
+modules/ProjecSum/cagri_ozet_modulu/__init__.py,??,C,dev'de yok,modules/ProjecSum/cagri_ozet_modulu/__init__.py,6334,b01ac81376d550a38c8eba5ebf923ab328c17db31d817d7adde6062d7df92748
+modules/ProjecSum/cagri_ozet_modulu/cekirdek.py,??,C,dev'de yok,modules/ProjecSum/cagri_ozet_modulu/cekirdek.py,6640,b9b44971cf0bb32fbbdcb318ba468701e03e3c53f1b17dedcc73bf787c53f2d6
+modules/ProjecSum/ornek_site.py,??,C,dev'de yok,modules/ProjecSum/ornek_site.py,1805,abfe0989462a3142076aeb62370a53dd006954800e1462dce359c0055e1d0ffa
+modules/ProjecSum/ozet_smoke.md,??,C,dev'de yok,modules/ProjecSum/ozet_smoke.md,1710,6945232de6f329354bc41caf261ef8c4b58bafc27a7e1d324032c84b55f64a97
+modules/ProjecSum/requirements.txt,??,C,dev'de yok,modules/ProjecSum/requirements.txt,80,06df454260ced515c8e327f9c13452b52af063e96d91cb2470cce7de76014667
+modules/ProjecSum/test_girdi.docx,??,C,dev'de yok,modules/ProjecSum/test_girdi.docx,36824,953e951dea477734739a11f614429699a6690f3ec91060561ba02a04d8950fce
+src/app/[locale]/(app)/[workspace]/cagri-ozeti/page.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/cagri-ozeti/page.tsx,84,34d47f70c76dab6d5fe614fa22278644e96d104b3fe81bebe60967fc3058718e
+src/app/[locale]/(app)/[workspace]/call-summary/actions.ts,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/call-summary/actions.ts,18040,5d44f9192b72b9fc52b8c6732a6ee0a494c0b2fcc3c5dd7471993997026e189f
+src/app/[locale]/(app)/[workspace]/call-summary/client.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/call-summary/client.tsx,35660,127a8162c87a4649831224b904a4a6b1618983008c487a0415afa3d4c8c9b855
+src/app/[locale]/(app)/[workspace]/call-summary/page.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/call-summary/page.tsx,1051,7d357206624744fdc3bb9ba57df63cf11580b25f5e53ccc341f8544399a874f5
+src/app/[locale]/(app)/[workspace]/egitim/page.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/egitim/page.tsx,74,ddbb380472c3463045b7893a3d9ace559cbbebd63e43752dedf053524ba29756
+src/app/[locale]/(app)/[workspace]/outreach/client.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/outreach/client.tsx,22892,7743c1508060c27d813cef06ca578d2e8114b49a71f9b42da513cdf44493c25e
+src/app/[locale]/(app)/[workspace]/outreach/page.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/outreach/page.tsx,610,4738bcf4fdd4aad2ed400e2838a0810cfd33c0afe467172df51cefd9aae92888
+src/app/[locale]/(app)/[workspace]/training/client.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/training/client.tsx,56205,4d418ee7198155aed7ddd135469e98751a651fa4c7620844633e65855f551d5e
+src/app/[locale]/(app)/[workspace]/training/page.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/training/page.tsx,610,8aec7534f7080f0d8f9a7137b7128468fc6f6983fcff733d466bb881d3186a94
+src/app/[locale]/(app)/[workspace]/uzman-ulasim/page.tsx,??,C,dev'de yok,src/app/[locale]/(app)/[workspace]/uzman-ulasim/page.tsx,74,7f9131a910b5a70abb8fe30e047956a10e7cf8aa154c40b85251aa729631bc41
+src/lib/modules/pluggable.ts,??,C,dev'de yok,src/lib/modules/pluggable.ts,10800,0d723ad9160c27a0f18822f42e1eb436b9dd9d2497d3f9418cb55faedece17e3
+src/modules/m12/manifest.ts,??,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/modules/m12/manifest.ts,988,f6da48dc12418003833ee02d380a5a3ad782e844d7f900a8936979b88052003b
+src/modules/m13/manifest.ts,??,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/modules/m13/manifest.ts,999,d6c06e5196e4c74f2e65826d96bfee6b367b6e72067e17fbc6ddb25d80d2b6fd
+src/modules/m14/content.ts,??,C,dev'de yok,src/modules/m14/content.ts,46062,63a01b51b23ada60bf92e6d39d59fb84677c24550f33257e201d9fec50f9a9a9
+src/modules/m14/manifest.ts,??,C,dev'de ayni yolda var (farkli icerik) -> rescue/ altina,rescue/src/modules/m14/manifest.ts,834,48a932b6de4c081e2ca1f84b3739c1dd10d602e2a849c75cdc7773b20263c7de
+src/modules/m14/types.ts,??,C,dev'de yok,src/modules/m14/types.ts,1286,ddd089637e3a7b1802c8df89073077e4b773e4fa2462179e98c7996d88940915
+tests/modules/m14.test.ts,??,C,dev'de yok,tests/modules/m14.test.ts,3244,a8f392c3eb0f40cf7774cb655dcd9343840540de063b6ad52a3712714f570700

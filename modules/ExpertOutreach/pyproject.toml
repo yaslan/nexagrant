@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fonbridge-outreach"
+version = "1.0.0"
+description = "FonBridge Uzman Ulaşım ve Akıllı İletişim Modülü (24 AB Dili + TR, Yarı Otomatik LinkedIn Outreach)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+    "streamlit>=1.30.0",
+    "bcrypt>=4.0.0",
+]
+
+[project.entry-points."fonbridge.modules"]
+outreach = "fonbridge_module:FonBridgeOutreachModule"

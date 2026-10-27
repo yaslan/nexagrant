@@ -1,0 +1,7 @@
+﻿Satır No,Ad,Soyad,Uzmanlık,Hata Nedeni
+2,Ahmet,Yılmaz,Finans // Hukuk,Tekrar kaydı (Veritabanında zaten mevcut)
+3,John,Doe,Technology,Tekrar kaydı (Veritabanında zaten mevcut)
+4,Hans,Schmidt,Energy // Horizon Europe,Tekrar kaydı (Veritabanında zaten mevcut)
+6,Ahmet,Yılmaz,Finans // Hukuk,Tekrar kaydı (Veritabanında zaten mevcut)
+7,Eksik,,Hukuk,Eksik zorunlu alan: Last Name (Soyad)
+8,Zeynep,Kaya,Sağlık,Tekrar kaydı (Veritabanında zaten mevcut)
