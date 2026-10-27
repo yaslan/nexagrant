@@ -315,7 +315,7 @@ describe('helpers', () => {
 
   test('parseKvkkMarkdown reads the shipped notice', async () => {
     const { readFile } = await import('node:fs/promises');
-    for (const f of ['content/kvkk-uzman-v2.md', 'content/kvkk-uzman-v2.en.md']) {
+    for (const f of ['content/kvkk-uzman-v3.md', 'content/kvkk-uzman-v3.en.md']) {
       const blocks = parseKvkkMarkdown(await readFile(f, 'utf8'));
       expect(blocks[0]?.kind).toBe('title');
       expect(blocks.filter((b) => b.kind === 'heading')).toHaveLength(8);
