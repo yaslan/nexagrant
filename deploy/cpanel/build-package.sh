@@ -43,6 +43,7 @@ trap 'rm -rf "$WORK"' EXIT
 # linked into that scratch copy only (never into the zip): no second `pnpm install`.
 privacy_gate() {
   local gate="$WORK/gate"
+  [ -d "$REPO/node_modules" ] || { echo "node_modules missing in $REPO (pnpm install): privacy gate cannot run, no package" >&2; exit 1; }
   mkdir "$gate"
   git -C "$REPO" archive --format=tar "$FULL" | tar -x -C "$gate"
   ln -s "$REPO/node_modules" "$gate/node_modules"
