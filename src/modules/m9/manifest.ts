@@ -18,6 +18,7 @@ export const m9Manifest: ModuleManifest = {
   addOnSku: null,
   routes: [{ path: 'opportunities/[id]/briefs', permission: 'briefs:read' }],
   nav: [],
+  opportunityTabs: [{ labelKey: 'briefs', routeKey: 'opportunityBriefs', order: 50 }],
   permissions: [
     { id: 'briefs:read', minRole: Role.MEMBER },
     { id: 'briefs:write', minRole: Role.WRITER },

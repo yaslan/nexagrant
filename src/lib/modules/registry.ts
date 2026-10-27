@@ -1,5 +1,6 @@
-import { ModuleId, ModuleManifest } from './types';
-import { isKnownWorkspaceRoute } from './route-catalog';
+import { ModuleId, ModuleManifest, ModuleNavItem } from './types';
+import { canonicalWorkspaceRoute, isKnownWorkspaceRoute } from './route-catalog';
+import { getWorkspaceRoute, type WorkspaceRouteKey } from '../routes';
 import { m0Manifest } from '../../modules/m0/manifest';
 import { m1Manifest } from '../../modules/m1/manifest';
 import { m2Manifest } from '../../modules/m2/manifest';
@@ -40,6 +41,41 @@ export const moduleRegistry: Record<ModuleId, ModuleManifest> = {
 
 export const getManifest = (id: ModuleId): ModuleManifest => moduleRegistry[id];
 export const getAllManifests = (): ModuleManifest[] => Object.values(moduleRegistry);
+
+/** A manifest nav/tab item with the module that contributes it. */
+export interface ModuleEntry extends ModuleNavItem {
+  moduleId: ModuleId;
+}
+
+function entriesOf(
+  pick: (m: ModuleManifest) => readonly ModuleNavItem[] | undefined,
+  moduleIds: readonly ModuleId[],
+): ModuleEntry[] {
+  return getAllManifests()
+    .filter((m) => moduleIds.includes(m.id))
+    .flatMap((m) => (pick(m) ?? []).map((item) => ({ ...item, moduleId: m.id })))
+    .sort((a, b) => a.order - b.order);
+}
+
+/** Sidebar entries (`nav[]`) of the given modules, in sidebar order. */
+export function getSidebarEntries(moduleIds: readonly ModuleId[]): ModuleEntry[] {
+  return entriesOf((m) => m.nav, moduleIds);
+}
+
+/** Opportunity detail tabs (`opportunityTabs[]`) of the given modules, in tab order. */
+export function getOpportunityTabs(moduleIds: readonly ModuleId[]): ModuleEntry[] {
+  return entriesOf((m) => m.opportunityTabs, moduleIds);
+}
+
+/**
+ * The catalog page a route key opens, e.g. `opportunityMatching` →
+ * `opportunities/[id]/matching`. Read off `getWorkspaceRoute` itself, so the URL
+ * builder stays the one place that spells paths.
+ */
+export function workspaceRoutePath(key: WorkspaceRouteKey): string {
+  const prefix = '/en/__ws__/';
+  return canonicalWorkspaceRoute(getWorkspaceRoute(key, 'en', '__ws__', '[id]').slice(prefix.length));
+}
 
 export interface RouteOwnerInfo {
   moduleId: ModuleId;
@@ -114,6 +150,21 @@ export function validateRegistry(): string[] {
         problems.push(
           `${m.id}: route "${route.path}" requires "${route.permission}", which the module does not declare`
         );
+      }
+    }
+
+    // A nav entry or tab that opens another module's page would show the link
+    // under one module's switch and gate it behind another's.
+    const ownPaths = new Set(m.routes.map((r) => r.path));
+    for (const item of [...m.nav, ...(m.opportunityTabs ?? [])]) {
+      const target = workspaceRoutePath(item.routeKey);
+      if (!ownPaths.has(target)) {
+        problems.push(`${m.id}: entry "${item.labelKey}" opens "${target}", which is not one of its routes`);
+      }
+    }
+    for (const tab of m.opportunityTabs ?? []) {
+      if (!workspaceRoutePath(tab.routeKey).includes('[id]')) {
+        problems.push(`${m.id}: opportunity tab "${tab.labelKey}" opens a page that is not opportunity-scoped`);
       }
     }
 

@@ -4,7 +4,7 @@ import type React from 'react';
 /**
  * TASK-MVBEM10PJYU0E (FO-12, Ö-1) — the app shell survives a failed module read.
  *
- * `listAccessibleModules` feeds the sidebar. When its read failed the whole
+ * `listModuleNav` feeds the sidebar. When its read failed the whole
  * `(app)` layout threw, so the pages that belong to no module — the dashboard,
  * Settings → Modules, Members — went down with it, and an admin could not reach
  * the screen that fixes the cause. The shell now renders with an empty menu and
@@ -15,7 +15,7 @@ import type React from 'react';
  */
 
 const h = vi.hoisted(() => ({
-  listAccessibleModules: vi.fn(),
+  listModuleNav: vi.fn(),
   requestSession: vi.fn(),
   loggerError: vi.fn(),
   redirect: vi.fn(),
@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/modules/access', () => ({
-  listAccessibleModules: h.listAccessibleModules,
+  listModuleNav: h.listModuleNav,
   requestSession: h.requestSession,
 }));
 vi.mock('@/lib/logger', () => ({ logger: { error: h.loggerError, warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
@@ -59,7 +59,12 @@ const SESSION = {
   isPlatformAdmin: false,
 };
 
-type El = React.ReactElement<{ activeModules?: string[]; children?: React.ReactNode }>;
+type El = React.ReactElement<{
+  activeModules?: string[];
+  previewStatus?: Record<string, string>;
+  upgradeModules?: string[];
+  children?: React.ReactNode;
+}>;
 
 async function renderShell(): Promise<El> {
   return (await AppLayout({
@@ -85,19 +90,20 @@ describe('app shell — module list read failure (Ö-1)', () => {
 
   it('renders the page with an empty module menu when the read throws', async () => {
     const dbError = new Error('permission denied for table ModuleState');
-    h.listAccessibleModules.mockRejectedValue(dbError);
+    h.listModuleNav.mockRejectedValue(dbError);
 
     const shell = await renderShell();
 
     expect(shell.type).toBe(ModuleProvider);
     expect(shell.props.activeModules).toEqual([]);
+    expect(shell.props.upgradeModules).toEqual([]);
     expect(containsPage(shell)).toBe(true);
     expect(h.loggerError).toHaveBeenCalledTimes(1);
     expect(h.loggerError).toHaveBeenCalledWith(expect.any(String), dbError, { tenantId: 'tenant-1' });
   });
 
   it('the raw error text reaches the log only, not the rendered tree', async () => {
-    h.listAccessibleModules.mockRejectedValue(new Error('relation "ModuleState" does not exist'));
+    h.listModuleNav.mockRejectedValue(new Error('relation "ModuleState" does not exist'));
 
     const shell = await renderShell();
 
@@ -114,11 +120,13 @@ describe('app shell — module list read failure (Ö-1)', () => {
   });
 
   it('a healthy read still feeds the menu, and nothing is logged', async () => {
-    h.listAccessibleModules.mockResolvedValue(['M1', 'M5']);
+    h.listModuleNav.mockResolvedValue({ activeModules: ['M1', 'M5'], previewStatus: { M5: 'PILOT' }, upgradeModules: ['M7'] });
 
     const shell = await renderShell();
 
     expect(shell.props.activeModules).toEqual(['M1', 'M5']);
+    expect(shell.props.previewStatus).toEqual({ M5: 'PILOT' });
+    expect(shell.props.upgradeModules).toEqual(['M7']);
     expect(h.loggerError).not.toHaveBeenCalled();
   });
 });

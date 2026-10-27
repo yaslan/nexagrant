@@ -18,6 +18,7 @@ export const m10Manifest: ModuleManifest = {
   addOnSku: null,
   routes: [{ path: 'opportunities/[id]/documents', permission: 'followups:read' }],
   nav: [],
+  opportunityTabs: [{ labelKey: 'documents', routeKey: 'opportunityDocuments', order: 60 }],
   permissions: [
     { id: 'followups:read', minRole: Role.MEMBER },
     { id: 'followups:write', minRole: Role.WRITER },

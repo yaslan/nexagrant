@@ -18,6 +18,7 @@ export const m11Manifest: ModuleManifest = {
   addOnSku: null,
   routes: [{ path: 'opportunities/[id]/application', permission: 'application:read' }],
   nav: [],
+  opportunityTabs: [{ labelKey: 'application', routeKey: 'opportunityApplication', order: 70 }],
   permissions: [
     { id: 'application:read', minRole: Role.MEMBER },
     { id: 'application:write', minRole: Role.WRITER },

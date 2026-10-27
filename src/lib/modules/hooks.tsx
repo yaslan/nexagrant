@@ -5,23 +5,39 @@ import { useTranslations } from 'next-intl';
 import { ModuleId } from './types';
 import { getManifest } from './registry';
 
+/** A module open as a preview rather than finished (`ModuleStatus` minus ON/OFF). */
+export type ModulePreviewStatus = 'PILOT' | 'DEV';
+
 interface ModuleContextType {
   activeModules: ModuleId[];
+  previewStatus: Partial<Record<ModuleId, ModulePreviewStatus>>;
+  upgradeModules: ModuleId[];
 }
 
 const ModuleContext = createContext<ModuleContextType>({
   activeModules: [], // Default empty
+  previewStatus: {},
+  upgradeModules: [],
 });
 
+/**
+ * Fed by the app shell from `listModuleNav` (@/lib/modules/access): which modules
+ * are open, which of those are a PILOT/DEV preview, and which are closed only by
+ * the plan. All three are the server's answer; nothing here re-decides them.
+ */
 export const ModuleProvider = ({
   activeModules,
+  previewStatus = {},
+  upgradeModules = [],
   children,
 }: {
   activeModules: ModuleId[];
+  previewStatus?: Partial<Record<ModuleId, ModulePreviewStatus>>;
+  upgradeModules?: ModuleId[];
   children: ReactNode;
 }) => {
   return (
-    <ModuleContext.Provider value={{ activeModules }}>
+    <ModuleContext.Provider value={{ activeModules, previewStatus, upgradeModules }}>
       {children}
     </ModuleContext.Provider>
   );
@@ -35,6 +51,16 @@ export const ModuleProvider = ({
  */
 export function useActiveModules(): readonly ModuleId[] {
   return useContext(ModuleContext).activeModules;
+}
+
+/** PILOT/DEV for an open module that is still a preview; absent when it is ON. */
+export function useModulePreviewStatus(): Partial<Record<ModuleId, ModulePreviewStatus>> {
+  return useContext(ModuleContext).previewStatus;
+}
+
+/** Modules the plan does not include; the sidebar shows their entries locked. */
+export function useUpgradeModules(): readonly ModuleId[] {
+  return useContext(ModuleContext).upgradeModules;
 }
 
 export function useModuleEnabled(moduleId: ModuleId): boolean {
