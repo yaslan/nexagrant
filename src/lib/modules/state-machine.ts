@@ -192,7 +192,12 @@ export type ModuleDenyReason =
    * neither a plan nor a switch opens it (FO-40). Checked before entitlement,
    * because "upgrade your plan" would be untrue — no plan includes it.
    */
-  | 'COMING_SOON';
+  | 'COMING_SOON'
+  /**
+   * The plan grants the module read only (FO-41: Discover's M1). Reading is
+   * allowed; a write (`assertModuleWrite`) and the unmetered API are refused.
+   */
+  | 'READ_ONLY_PLAN';
 
 export interface ModuleAccessDecision {
   allowed: boolean;

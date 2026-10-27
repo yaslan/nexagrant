@@ -159,7 +159,8 @@ async function seed() {
   await prisma.partnerSearchAnnouncement.createMany({ data: announcements(now) });
 
   await seedTenant(PRO, 'pro', { M1: 'ON', M4: 'ON' });
-  await seedTenant(DISCOVER, 'free', {});
+  // Discover grants M1 in its limited form (FO-41): the module is on, metered.
+  await seedTenant(DISCOVER, 'free', { M1: 'ON' });
   await prisma.addOnCatalog.create({
     data: { sku: M1_ADDON, name: 'FO-62 e2e M1 add-on', monthlyCents: 0, currency: 'EUR', grantsModule: 'M1' },
   });
@@ -284,7 +285,7 @@ test.describe('FO-62 Partner Search UI', () => {
   });
 
   for (const locale of ['tr', 'en'] as const) {
-    test(`discover (${locale}): signal is free, list says the month is spent, M1 stays locked`, async ({ page }) => {
+    test(`discover (${locale}): signal is free, list says the month is spent, M1 is limited not locked`, async ({ page }) => {
       const callPath = locale === 'tr' ? 'cagrilar' : 'calls';
       await signIn(page, DISCOVER, `/${locale}/${DISCOVER.workspace}/${callPath}/${TOPIC}`);
 
@@ -308,9 +309,9 @@ test.describe('FO-62 Partner Search UI', () => {
       expect(usage?.count).toBe(10);
 
       await page.goto(`/${locale}/${DISCOVER.workspace}/${locale === 'tr' ? 'ortaklar' : 'partners'}?tab=live`);
-      // M1 is not on this plan: the existing lock page, not the live tab.
-      await expect(page.locator('section[role="alert"]').getByRole('heading', { level: 1 })).toBeVisible();
-      await expect(page.getByTestId('partners-live')).toHaveCount(0);
+      // Discover's M1 is the limited form: the live tab opens, no lock page.
+      await expect(page.getByTestId('partners-live')).toBeVisible();
+      await expect(page.locator('section[role="alert"]')).toHaveCount(0);
     });
   }
 

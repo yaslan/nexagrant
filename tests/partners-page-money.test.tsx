@@ -18,6 +18,8 @@ vi.mock('next/link', () => ({
 vi.mock('@/components/ModuleLink', () => ({ ModuleLink: () => null }));
 vi.mock('@/app/[locale]/(app)/[workspace]/partners/PartnerFilters', () => ({ PartnerFilters: () => null }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
+// M1 in full: no monthly search count (FO-41).
+vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch: async () => null }));
 vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: vi.fn() }));
 vi.mock('@/lib/db', () => {
   const prisma = { cordisPartnerProfile: { count, findMany } };

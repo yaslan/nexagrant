@@ -66,7 +66,7 @@ describe('public-sector package assignment', () => {
 
   it('assigning public-team puts the tenant on it: pro modules, 6 seats, contract provider', async () => {
     const before = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
-    expect(before.allowedModules).not.toContain('M1');
+    expect(before.allowedModules).not.toContain('M4');
 
     await assignPlanToTenant('public-team', tenantId, 'admin-1', 'İlkadım pilot sözleşmesi');
 

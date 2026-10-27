@@ -8,10 +8,11 @@ import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 /**
  * TASK-MVCH26OXNVLKR — an internal plan, assigned and taken back with clicks.
  *
- * The tenant is its own (no subscription = Discover, M1 switched ON in
- * `ModuleState`), so the only thing that can open or close M1 here is the plan:
- * Discover does not grant M1, Pro does. The operator assigns Pro from
- * Admin > Tenants with a note, the tenant's partners page opens; the operator
+ * The tenant is its own (no subscription = Discover, M2 switched ON in
+ * `ModuleState`), so the only thing that can open or close M2 here is the plan:
+ * Discover does not grant M2, Pro does. (It was M1 until FO-41 put a limited M1
+ * into Discover.) The operator assigns Pro from Admin > Tenants with a note, the
+ * tenant's concept-notes page opens; the operator
  * picks Discover, the page locks again with the plan refusal. Both changes
  * must leave an audit row with old → new and the note. While the internal plan
  * is on, the owner cannot start a payment from the pricing page: checkout
@@ -31,7 +32,7 @@ const ADMIN = {
   workspaceIds: [] as string[],
   isPlatformAdmin: true,
 };
-const PARTNERS_URL = `/tr/${WORKSPACE.slug}/partners`;
+const CONCEPT_NOTES_URL = `/tr/${WORKSPACE.slug}/concept-notes`;
 const DETAIL_URL = `/tr/admin/tenants/${TENANT}`;
 
 // Tenant tables sit behind RLS, so the fixture reads and writes them in the system scope.
@@ -87,7 +88,7 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
         data: { id: TENANT, name: 'Internal Plan E2E', slug: TENANT, country: 'TR', orgType: 'SME' },
       });
       await tx.moduleState.create({
-        data: { tenantId: TENANT, moduleId: 'M1', status: 'ON', changedBy: 'internal-plan e2e fixture' },
+        data: { tenantId: TENANT, moduleId: 'M2', status: 'ON', changedBy: 'internal-plan e2e fixture' },
       });
     });
     await seedIdentity({ ...OWNER, tenantId: TENANT }, WORKSPACE);
@@ -99,11 +100,11 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
     await prisma.$disconnect();
   });
 
-  test('on Discover, M1 is locked behind the plan', async ({ page }) => {
+  test('on Discover, M2 is locked behind the plan', async ({ page }) => {
     await signInOwner(page);
-    await page.goto(PARTNERS_URL);
+    await page.goto(CONCEPT_NOTES_URL);
     await expect(planLock(page)).toBeVisible();
-    await page.screenshot({ path: `${SHOTS}/01-m1-locked-discover.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/01-m2-locked-discover.png`, fullPage: true });
   });
 
   test('the operator assigns Pro with a note; the list shows the internal badge', async ({ page }) => {
@@ -126,13 +127,13 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
     await page.screenshot({ path: `${SHOTS}/03-tenant-list-internal-badge.png`, fullPage: true });
   });
 
-  test('on the internal Pro plan, M1 opens', async ({ page }) => {
+  test('on the internal Pro plan, M2 opens', async ({ page }) => {
     await signInOwner(page);
-    await page.goto(PARTNERS_URL);
+    await page.goto(CONCEPT_NOTES_URL);
     // The page itself rendered, not just an absent lock (an error page has no lock either).
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('M1');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Concept Notes');
     await expect(planLock(page)).toHaveCount(0);
-    await page.screenshot({ path: `${SHOTS}/04-m1-open-pro.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/04-m2-open-pro.png`, fullPage: true });
   });
 
   // The refusal is said in the visitor's language (messages/*.json
@@ -189,15 +190,15 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
     });
   }
 
-  test('back to Discover: M1 locks again and both changes are audited', async ({ page }) => {
+  test('back to Discover: M2 locks again and both changes are audited', async ({ page }) => {
     await assign(page, 'free', 'test bitti (e2e)');
     await expect(page.getByTestId('internal-plan-notice')).toHaveText("İç plan geri alındı; kiracı Discover'a döndü.");
     await page.screenshot({ path: `${SHOTS}/05-admin-revoked.png`, fullPage: true });
 
     await signInOwner(page);
-    await page.goto(PARTNERS_URL);
+    await page.goto(CONCEPT_NOTES_URL);
     await expect(planLock(page)).toBeVisible();
-    await page.screenshot({ path: `${SHOTS}/06-m1-locked-again.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/06-m2-locked-again.png`, fullPage: true });
 
     const audit = await withSystemScope('platform-admin', 'e2e.internal-plan.audit', (tx) =>
       tx.auditEvent.findMany({

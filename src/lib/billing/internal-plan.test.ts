@@ -115,21 +115,21 @@ describe('assignInternalPlan (live DB)', () => {
     await prisma.tenant.deleteMany({ where: { id: requireId(tenantId, 'tenantId') } });
   });
 
-  it('Pro opens M1; Discover takes it back; both are audited with old → new and the note', async () => {
-    expect((await entitlements(tenantId)).allowedModules).not.toContain('M1');
+  it('Pro opens M4; Discover takes it back; both are audited with old → new and the note', async () => {
+    expect((await entitlements(tenantId)).allowedModules).not.toContain('M4');
 
     const assigned = await assignInternalPlan(tenantId, 'pro', 'admin-1', '  M1 lock test  ');
     expect(assigned).toEqual({ outcome: 'assigned', before: 'free', after: 'pro' });
     const sub = await prisma.subscription.findUnique({ where: { tenantId } });
     expect(sub).toMatchObject({ planId: 'pro', status: 'ACTIVE', provider: INTERNAL_PROVIDER, providerSubId: null });
-    expect((await entitlements(tenantId)).allowedModules).toContain('M1');
+    expect((await entitlements(tenantId)).allowedModules).toContain('M4');
     expect(await prisma.planAssignment.findMany({ where: { tenantId }, select: { planId: true, note: true, assignedBy: true } }))
       .toEqual([{ planId: 'pro', note: 'M1 lock test', assignedBy: 'admin-1' }]);
     expect((await listInternalPlans()).get(tenantId)).toBe('pro');
 
     const revoked = await assignInternalPlan(tenantId, 'free', 'admin-1', 'done testing');
     expect(revoked).toEqual({ outcome: 'revoked', before: 'pro', after: 'free' });
-    expect((await entitlements(tenantId)).allowedModules).not.toContain('M1');
+    expect((await entitlements(tenantId)).allowedModules).not.toContain('M4');
     expect(await prisma.planAssignment.count({ where: { tenantId } })).toBe(0);
     expect((await listInternalPlans()).has(tenantId)).toBe(false);
 
