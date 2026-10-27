@@ -1509,6 +1509,7 @@
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
       "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
+      "READ_ONLY_PLAN": "{module} modülü planınızda salt okunur. Kayıt oluşturmak ve değiştirmek şu planlarda var: {plans}.",
       "COMING_SOON": "{module} modülü yakında kullanıma açılacak."
     }
   },
@@ -1977,6 +1978,7 @@
       "invoiceExportGenericError": "Fatura indirilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.",
       "notMeasured": "ölçülmedi",
       "notMeasuredHint": "Bu değer okunamadı; yerine bir rakam gösterilmiyor.",
+      "moduleLimited": "{id} (sınırlı)",
       "plans": {
         "basic": {
           "desc": "Solo başlangıç — ilk adım.",
@@ -3825,6 +3827,8 @@
     }
   },
   "partnersPage": {
+    "searchQuotaExhausted": "Bu ay {limit} ortak aramasının tamamını kullandınız. Planınızda ortak arama sınırlı; sınırsız arama şu planlarda var: {plans}.",
+    "searchQuotaUsed": "Bu ay {limit} ortak aramasından {used} tanesini kullandınız.",
     "breadcrumbDashboard": "Panel",
     "breadcrumbCurrent": "Ortak Arama & CORDIS / Interreg (M1/M8)",
     "title": "M1 Partner Intelligence Database & CORDIS Ortak Arama",

@@ -7,7 +7,7 @@ import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 import { getModuleCounts, moduleRegistry } from '@/lib/modules/registry';
 import { isComingSoon } from '@/lib/modules/state-machine';
-import { formatModuleIds } from '@/lib/billing/plan-copy';
+import { formatModuleIds, planCardCopy } from '@/lib/billing/plan-copy';
 import type { ModuleId } from '@/lib/modules/types';
 
 /**
@@ -94,6 +94,8 @@ const ALLOWED: readonly string[] = [
   'src/app/[locale]/(app)/[workspace]/opportunities/[id]/application/client.tsx:  // Prototyping & Pilot Testing / Fraunhofer Institute / M7-M24',
   // A comment recording which modules an old bug showed as active; not shown to anyone.
   'src/app/[locale]/(app)/[workspace]/settings/modules/plan-view.ts: * additionally showed M1–M5 and M8',
+  // "FO-41" is a ticket id ("predate FO-41 and name modules in full"), not a module count.
+  'src/lib/billing/catalog.ts:  // The contract terms (ILKADIM-PILOT.md §6.2) predate FO-41 and name modules in',
 ];
 
 function* sourceFiles(dir: string): Generator<string> {
@@ -176,6 +178,27 @@ describe('plan card module list', () => {
     expect(formatModuleIds(['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8'])).toBe(`M1${'-'}M6, M8`);
     expect(formatModuleIds(['M10', 'M9', 'M11', 'M1'])).toBe(`M1, M9${'-'}M11`);
     expect(formatModuleIds([])).toBe('');
+  });
+
+  it('names a limited grant on its own and never folds it into a range (FO-41)', () => {
+    const limited = { ids: ['M1'], label: (id: string) => `${id} (limited)` };
+    expect(formatModuleIds(['M1', 'M2', 'M3', 'M5'], limited)).toBe('M1 (limited), M2, M3, M5');
+    expect(formatModuleIds(['M1', 'M2', 'M3', 'M4'], limited)).toBe(`M1 (limited), M2${'-'}M4`);
+    expect(formatModuleIds(['M1', 'M4', 'M7'], limited)).toBe('M1 (limited), M4, M7');
+  });
+
+  it('renders the basic line with its limited M1 as the plan grants it (tr + en)', () => {
+    for (const [locale, messages, word] of [
+      ['tr', trMessages, 'sınırlı'],
+      ['en', enMessages, 'limited'],
+    ] as const) {
+      const t = createTranslator({ locale, messages, namespace: 'billingPanels.settings' });
+      const line = planCardCopy({ planId: 'basic' }, t as unknown as Parameters<typeof planCardCopy>[1], locale, {
+        summary: 'desc',
+        bullets: ['modules'],
+      }).bullets[0]?.text;
+      expect(line).toBe(`${locale === 'tr' ? 'Modüller' : 'Modules'}: M1 (${word}), M2, M3, M5`);
+    }
   });
 
   it('renders the ultra line from the plan grant, not from the message', () => {

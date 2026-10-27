@@ -135,6 +135,19 @@ export interface ModuleManifest {
   /** `null` when the module advertises no quota at all. */
   quota: ModuleQuota | null;
   /**
+   * FO-41: whether a tenant may buy this module on its own, outside its plan.
+   * True only together with an `addOnSku` that `AddOnCatalog` sells; no module
+   * is sold that way yet, so every manifest says `false`.
+   */
+  addonPurchasable: boolean;
+  /**
+   * FO-41: length of the "try it" period a tenant whose plan lacks the module
+   * may start, in days; `null` when the module offers none (every "Yakında"
+   * module). Read by the module card; the trial entitlement itself is not
+   * built yet.
+   */
+  trialDays: number | null;
+  /**
    * Programme templates this module ships with (data only; the template bodies
    * live with the module). Empty when the module has none.
    */

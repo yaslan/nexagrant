@@ -135,6 +135,14 @@ export function moduleAccessStub() {
       if (!moduleAccessState.open) {
         throw new FakeModuleAccessError(moduleId, 'OFF', 'MODULE_OFF');
       }
+      return { allowed: true, status: 'ON' };
+    }),
+    // FO-41: the write gate refuses exactly what the read gate refuses here; the
+    // stub has no read-only plan.
+    assertModuleWrite: vi.fn(async (moduleId: string) => {
+      if (!moduleAccessState.open) {
+        throw new FakeModuleAccessError(moduleId, 'OFF', 'MODULE_OFF');
+      }
     }),
   };
 }

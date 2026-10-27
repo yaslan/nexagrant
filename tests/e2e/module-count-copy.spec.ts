@@ -36,6 +36,7 @@ const COPY = {
     catalog: 'Modül Kataloğu',
     adminLink: /Modül Yönetimi/,
     modulesLabel: 'Modüller',
+    limited: 'sınırlı',
   },
   en: {
     summary: `${active} live modules + ${soon} coming soon`,
@@ -44,6 +45,7 @@ const COPY = {
     catalog: 'Module Catalog',
     adminLink: /Module State Manager/,
     modulesLabel: 'Modules',
+    limited: 'limited',
   },
 } as const;
 
@@ -121,7 +123,11 @@ for (const locale of ['tr', 'en'] as const) {
 
     for (const planId of ['basic', 'pro', 'ultra'] as const) {
       const card = page.getByTestId(`settings-plan-card-${planId}`);
-      const modules = formatModuleIds(grantsFor(planId)?.moduleIds ?? []);
+      const grant = grantsFor(planId);
+      const modules = formatModuleIds(grant?.moduleIds ?? [], {
+        ids: Object.keys(grant?.moduleLimits ?? {}),
+        label: (id) => `${id} (${copy.limited})`,
+      });
       await expect(card.getByText(`📦 ${copy.modulesLabel}: ${modules}`, { exact: true })).toBeVisible();
     }
     const ultra = page.getByTestId('settings-plan-card-ultra');

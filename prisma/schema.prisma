@@ -260,6 +260,10 @@ model ModuleState {
   settings  Json         @default("{}")
   changedBy String?
   changedAt DateTime     @default(now())
+  // FO-41: keeps the module entitled whatever the plan (M3 for pre-FO-41
+  // Discover tenants). Set by migrations only; a trigger refuses fabrika_app.
+  // Migration: module-state-grandfathered.sql.
+  grandfathered Boolean  @default(false)
   tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@unique([tenantId, moduleId])
 }

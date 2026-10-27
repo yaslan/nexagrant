@@ -80,8 +80,18 @@ describe('/api/v1 module gate (live DB)', () => {
     expect(dev.errorResponse.status).toBe(403);
   });
 
-  it('switched on but the plan does not include M1 (basic): 403', async () => {
-    await setPlan('basic');
+  it('switched on but the plan does not include M1 (public-starter): 403', async () => {
+    await setPlan('public-starter');
+    const res = await call();
+    expect(res.authenticated).toBe(false);
+    if (res.authenticated) return;
+    expect(res.errorResponse.status).toBe(403);
+  });
+
+  // FO-41: Discover and Basic grant M1 limited (metered searches, read only);
+  // the API meters nothing, so a limited M1 does not open it.
+  it.each(['basic', 'free'])('M1 only limited on %s: 403', async (planId) => {
+    await setPlan(planId);
     const res = await call();
     expect(res.authenticated).toBe(false);
     if (res.authenticated) return;

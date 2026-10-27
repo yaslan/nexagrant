@@ -68,7 +68,7 @@ describe("moduleStatus — four card states", () => {
     const discover = [
       ...(grantsFor(FALLBACK_PLAN_ID)?.moduleIds ?? []),
     ] as ModuleId[];
-    expect(discover).toEqual(["M3", "M5"]);
+    expect(discover).toEqual(["M1", "M5"]); // FO-41: M3 moved to Basic, M1 limited
 
     // No ModuleState rows yet.
     const fresh = viewOf(discover, []);
@@ -86,15 +86,14 @@ describe("moduleStatus — four card states", () => {
     expect(
       ALL_IDS.filter((id) => moduleStatus(id, tried) === "ORPHANED"),
     ).toEqual([]);
-    expect(moduleStatus("M3", tried)).toBe("ACTIVE");
-    expect(moduleStatus("M1", tried)).toBe("LOCKED");
+    expect(moduleStatus("M1", tried)).toBe("ACTIVE");
+    expect(moduleStatus("M3", tried)).toBe("LOCKED");
   });
 });
 
 describe("displayPlansForModule — card plan list", () => {
   it("lists Discover for the modules the free tier grants", () => {
     expect(displayPlansForModule("M3")).toEqual([
-      "free",
       "basic",
       "pro",
       "ultra",
@@ -105,7 +104,7 @@ describe("displayPlansForModule — card plan list", () => {
       "pro",
       "ultra",
     ]);
-    expect(displayPlansForModule("M1")).toEqual(["pro", "ultra"]);
+    expect(displayPlansForModule("M1")).toEqual(["free", "basic", "pro", "ultra"]);
     expect(displayPlansForModule("M7")).toEqual(["ultra"]);
     expect(grantsFor("free")?.name).toBe("Discover");
   });

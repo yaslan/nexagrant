@@ -111,6 +111,7 @@ export type PartnerSearchDenyReason =
   | 'PILOT_MANAGERS_ONLY'
   | 'PLAN_UPGRADE_REQUIRED'
   | 'COMING_SOON'
+  | 'READ_ONLY_PLAN'
   | 'ROLE_FORBIDDEN'
   | 'EXPORT_NOT_IN_PLAN';
 

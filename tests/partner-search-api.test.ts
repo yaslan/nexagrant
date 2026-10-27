@@ -96,6 +96,9 @@ describe('catalogue: Partner Search terms per plan', () => {
     expect(partnerSearchGrant('public-starter', false)).toEqual({ queriesMonthly: 10, export: false });
     expect(partnerSearchGrant('public-team', true)).toEqual({ queriesMonthly: null, export: false });
     expect(partnerSearchGrant('public-institution', true)).toEqual({ queriesMonthly: null, export: true });
+    // TTO Edition has no `limits` of its own; the live-tab quota falls back to the
+    // M1 module limit. Without this line, deleting the fallback gives it unlimited search.
+    expect(partnerSearchGrant('tto-edition', true)).toEqual({ queriesMonthly: 10, export: false });
   });
 
   it('names the purchasable plans that carry the export for an upgrade prompt', () => {
@@ -116,6 +119,17 @@ describe('decidePartnerSearchAccess', () => {
 
   it('Discover (no M1, metered) is allowed with its quota and without the export', () => {
     expect(decidePartnerSearchAccess(member('TENANT_OWNER'), m1NotInPlan, discover, sessionViewer('TENANT_OWNER'))).toEqual({
+      allowed: true,
+      quota: 10,
+      export: false,
+    });
+  });
+
+  // FO-41: Discover's M1 is in the plan (limited), so the switch-off refusal is
+  // what a metered plan meets first. The free signal and the quota'd list must
+  // still open with the switch off, as they did before M1 moved into the plan.
+  it('Discover (limited M1 in the plan, switch off) is allowed with its quota', () => {
+    expect(decidePartnerSearchAccess(member('TENANT_OWNER'), m1SwitchedOff, discover, sessionViewer('TENANT_OWNER'))).toEqual({
       allowed: true,
       quota: 10,
       export: false,

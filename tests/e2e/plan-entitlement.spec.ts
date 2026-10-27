@@ -206,12 +206,21 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
   // FO-39 (TASK-MVC4JEKT5KX5C): the four card states on real subscription rows.
   test('Discover without a subscription: no ORPHANED card, Discover listed on its modules', async ({ page }) => {
     await dropSubscription();
-    await setModules(['M3']);
+    // FO-41: Discover is M1 (limited) + M5; M3 moved to Basic. A tenant that had
+    // M3 on before the move carries `grandfathered` (the migration's backfill;
+    // set here over the owner connection, the only role the trigger allows) and
+    // keeps it ACTIVE rather than ORPHANED.
+    await setModules(['M1', 'M3']);
+    await prisma.moduleState.update({
+      where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M3' } },
+      data: { grandfathered: true },
+    });
     await signIn(page);
 
     await expect(page.getByRole('main')).toContainText('Discover');
     await expect(page.getByRole('main')).toContainText('Aboneliğiniz yok');
     for (const id of ALL_MODULES) expect(await statusOf(page, id)).not.toBe('ORPHANED');
+    expect(await statusOf(page, 'M1')).toBe('ACTIVE');
     expect(await statusOf(page, 'M3')).toBe('ACTIVE');
     expect(await statusOf(page, 'M5')).toBe('AVAILABLE');
     expect(await statusOf(page, 'M6')).toBe('LOCKED');
@@ -243,25 +252,21 @@ test.describe('plan entitlement — the catalogue decides what a plan opens', ()
     await captureState(page, '02-pro');
   });
 
-  test('downgrade Pro → Basic: M1 and M6 are ORPHANED with both offers, and Kapat switches M6 off', async ({ page }) => {
+  test('downgrade Pro → Basic: M4 and M6 are ORPHANED with both offers, and Kapat switches M6 off', async ({ page }) => {
     await upsertPlan('basic');
-    await setModules(['M1', 'M2', 'M3', 'M5', 'M6']);
+    await setModules(['M1', 'M2', 'M3', 'M4', 'M5', 'M6']);
     await signIn(page);
 
     await expect(page.getByRole('main')).toContainText('Basic');
-    expect(await statusOf(page, 'M1')).toBe('ORPHANED');
+    // FO-41: Basic keeps M1 in its limited form, so it stays ACTIVE.
+    expect(await statusOf(page, 'M1')).toBe('ACTIVE');
+    expect(await statusOf(page, 'M4')).toBe('ORPHANED');
     expect(await statusOf(page, 'M6')).toBe('ORPHANED');
     const m6 = page.getByTestId('module-card-M6');
     await expect(m6).toContainText('Plan dışında kaldı — kullanılamaz');
     await expect(m6.getByRole('link', { name: 'Planı Yükselt' })).toBeVisible();
     const off = m6.getByRole('button', { name: 'Kapat' });
     await expect(off).toBeVisible();
-    // M1 is outside Basic, so its feature entry in the sidebar is locked.
-    await expect(page.locator('[data-testid="sidebar-nav-apiKeys"][data-locked="true"]').first()).toBeAttached();
-    // What a screen reader announces: the label as the name, the lock reason as the description.
-    const apiKeysLocked = page.getByTestId('sidebar-nav-apiKeys').filter({ visible: true }).first();
-    await expect(apiKeysLocked).toHaveAccessibleName('Partner REST API');
-    await expect(apiKeysLocked).toHaveAccessibleDescription(/^M1 .+ modülü kapalı/);
     await captureState(page, '03-downgrade-orphaned');
 
     await expectHydrated(off);

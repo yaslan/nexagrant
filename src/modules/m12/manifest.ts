@@ -24,4 +24,6 @@ export const m12Manifest: ModuleManifest = {
   statusBadge: 'soon',
   docsUrl: null,
   quota: null,
+  addonPurchasable: false,
+  trialDays: null,
 };

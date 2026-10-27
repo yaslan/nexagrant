@@ -17,8 +17,8 @@ describe('Module State Machine', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('rejects M1 on the basic plan (plan tier restriction)', () => {
-      const result = canEnable('M1', [], 'basic');
+    it('rejects M4 on the basic plan (plan tier restriction)', () => {
+      const result = canEnable('M4', [], 'basic');
       expect(result.allowed).toBe(false);
       expect(result.reason).toBe('Plan upgrade required.');
     });
