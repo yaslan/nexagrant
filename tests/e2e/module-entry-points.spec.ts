@@ -82,6 +82,7 @@ test.describe('module entry points — reached by clicking', () => {
       'Çağrılar',
       'Fırsatlar',
       'Ortaklar',
+      'Ortak Arama Kaynakları',
       'Konsept Notlar',
       'Kanıtlar',
       'İlişkiler',
@@ -95,6 +96,7 @@ test.describe('module entry points — reached by clicking', () => {
     const entries: [string, RegExp, RegExp][] = [
       ['Fırsatlar', /\/firsatlar$/, /Fırsat/],
       ['Ortaklar', /\/ortaklar$/, /Partner Intelligence/],
+      ['Ortak Arama Kaynakları', /\/partners\/resources$/, /AB Portalları/],
       ['Konsept Notlar', /\/konsept-notlar$/, /Konsept|Concept/],
       ['Kanıtlar', /\/kanitlar$/, /Kanıt|Evidence/],
       ['İlişkiler', /\/iliskiler$/, /Odak Noktası CRM \(M4\)/],
