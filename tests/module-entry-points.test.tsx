@@ -106,6 +106,21 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
     }
   });
 
+  // FO-176: in Turkish the entry links the Turkish slug and is still the only one lit.
+  it('links the Turkish slug for Partner Search Resources and highlights it alone', () => {
+    nav.pathname = '/tr/main/ortaklar/kaynaklar';
+    try {
+      shell(['M1'], <SidebarNav locale="tr" />);
+      const entry = screen.getByTestId('sidebar-nav-partnerResources');
+      const partners = screen.getByTestId('sidebar-nav-partners');
+      expect(entry.getAttribute('href')).toBe('/tr/main/ortaklar/kaynaklar');
+      expect(entry.className).toContain('bg-accent/10');
+      expect(partners.className).not.toContain('bg-accent/10');
+    } finally {
+      nav.pathname = '/tr/main/panel';
+    }
+  });
+
   it('shows only the core items when no module is open', () => {
     shell([], <SidebarNav locale="tr" />);
     expect(sidebarLabels()).toEqual(['Panel', 'Çağrılar', 'Ayarlar']);

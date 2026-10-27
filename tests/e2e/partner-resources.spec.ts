@@ -24,6 +24,10 @@ const MEMBER = {
   tenantId: 'demo-tenant',
 };
 const MESSAGES = { tr: trMessages, en: enMessages } as const;
+/** The page's own address per locale: Turkish slug in TR, canonical path in EN. */
+const PAGE_PATH = { tr: 'ortaklar/kaynaklar', en: 'partners/resources' } as const;
+/** Used only when the database holds no CORDIS organisation to open. */
+const FALLBACK_ORG = { organisationId: '917600001', name: 'FO176 E2E Fallback Organisation' };
 
 async function signIn(page: Page, locale: 'tr' | 'en') {
   await signInAs(page, { id: MEMBER.userId, email: MEMBER.email, tenantId: MEMBER.tenantId, role: MEMBER.role });
@@ -52,7 +56,7 @@ async function expectTopLevelEntry(page: Page) {
 
 async function expectTenCards(page: Page, locale: 'tr' | 'en') {
   const m = MESSAGES[locale].PartnerResources;
-  await expect(page).toHaveURL(new RegExp(`/${locale}/${WORKSPACE}/partners/resources$`));
+  await expect(page).toHaveURL(new RegExp(`/${locale}/${WORKSPACE}/${PAGE_PATH[locale]}$`));
   await expect(page.getByRole('heading', { level: 1, name: m.title })).toBeVisible({ timeout: 30_000 });
   // Breadcrumb: Dashboard / EU Portals & Resources — no Partners step.
   const crumbs = page.locator('main').getByText(m.breadcrumbDashboard, { exact: true }).locator('..');
@@ -77,10 +81,23 @@ test.describe('Partner search resources (FO-176)', () => {
   });
   test.afterAll(async () => {
     await cleanupIdentity([MEMBER.userId]);
+    await prisma.cordisOrganization.deleteMany({ where: { organisationId: '917600001' } });
     await prisma.$disconnect();
   });
 
   for (const locale of ['tr', 'en'] as const) {
+    test(`typing the address opens the page directly (${locale})`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await signIn(page, locale);
+      await page.goto(`/${locale}/${WORKSPACE}/${PAGE_PATH[locale]}`);
+      await expectTenCards(page, locale);
+      await expectTopLevelEntry(page);
+      await expect(page.getByTestId('sidebar-nav-partnerResources').filter({ visible: true })).toHaveAttribute(
+        'href',
+        `/${locale}/${WORKSPACE}/${PAGE_PATH[locale]}`,
+      );
+    });
+
     test(`desktop: top-level sidebar entry opens the page, a card opens the portal in a new tab (${locale})`, async ({ page, context }) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       // The portal is stubbed: the test proves where the click goes, not that cordis.europa.eu is up.
@@ -142,4 +159,26 @@ test.describe('Partner search resources (FO-176)', () => {
       await page.screenshot({ path: `${SHOTS}/04-mobile-bottom-${locale}.png` });
     });
   }
+
+  // `ortaklar/kaynaklar` is rewritten ahead of `ortaklar/:pic`; the list and a real
+  // PIC under `ortaklar/` must still reach their own pages.
+  test('TR: /ortaklar list and /ortaklar/<PIC> detail are unchanged', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    let org = await prisma.cordisOrganization.findFirst({
+      select: { organisationId: true, name: true },
+      orderBy: { organisationId: 'asc' },
+    });
+    if (!org) org = await prisma.cordisOrganization.create({ data: FALLBACK_ORG, select: { organisationId: true, name: true } });
+    await signIn(page, 'tr');
+
+    await page.goto(`/tr/${WORKSPACE}/ortaklar`);
+    await expect(page.getByTestId('partner-resources-grid')).toHaveCount(0);
+    await expect(page.getByTestId('sidebar-nav-partners').filter({ visible: true })).toHaveClass(/bg-accent\/10/, { timeout: 30_000 });
+    await expect(page.getByTestId('sidebar-nav-partnerResources').filter({ visible: true })).not.toHaveClass(/bg-accent\/10/);
+
+    await page.goto(`/tr/${WORKSPACE}/ortaklar/${org.organisationId}`);
+    await expect(page.getByRole('heading', { level: 1, name: org.name })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('partner-resources-grid')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/05-tr-partner-detail-regression.png` });
+  });
 });

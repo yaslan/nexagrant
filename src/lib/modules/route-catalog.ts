@@ -78,6 +78,7 @@ export const WORKSPACE_ROUTE_ALIASES: Record<string, WorkspaceRoutePath> = {
   'konsept-notlar': 'concept-notes',
   'onay-merkezi': 'approvals',
   ortaklar: 'partners',
+  'ortaklar/kaynaklar': 'partners/resources',
   panel: 'dashboard',
   'tto-hizlandirici': 'tto',
 };

@@ -105,13 +105,13 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/ortaklar` : `/${locale}/${workspace}/partners`;
     case 'partnerDetail':
       return isTr ? `/${locale}/${workspace}/ortaklar/${param}` : `/${locale}/${workspace}/partners/${param}`;
+    case 'partnerResources':
+      return isTr ? `/${locale}/${workspace}/ortaklar/kaynaklar` : `/${locale}/${workspace}/partners/resources`;
     // The pages below have no Turkish re-export under [workspace] (route-catalog.ts
     // WORKSPACE_ROUTE_ALIASES), so both locales use the one canonical path. `param` is
     // the opportunity id for the `opportunity*` keys.
     case 'partnerLeaders':
       return `/${locale}/${workspace}/partners/leaders`;
-    case 'partnerResources':
-      return `/${locale}/${workspace}/partners/resources`;
     case 'reportsPersonDays':
       return `/${locale}/${workspace}/reports/person-days`;
     case 'opportunityConceptNote':
@@ -233,6 +233,11 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
       };
       const detailRouteKey = detailedRoutes[subRoute];
       if (detailRouteKey) return getWorkspaceRoute(detailRouteKey, targetLocale, workspace);
+    }
+
+    // A fixed page under Partners, not a PIC: `ortaklar/kaynaklar` ↔ `partners/resources`.
+    if (routeKey === 'partners' && (segments[3] === 'kaynaklar' || segments[3] === 'resources')) {
+      return getWorkspaceRoute('partnerResources', targetLocale, workspace);
     }
 
     if (segments.length > 3 && ['cagrilar', 'calls', 'ortaklar', 'partners', 'konsept-notlar', 'concept-notes'].includes(baseRoute)) {
