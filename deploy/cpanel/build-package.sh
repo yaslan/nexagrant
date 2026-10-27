@@ -62,7 +62,11 @@ else
 fi
 privacy_gate
 # Provenance, so a tar built from another commit cannot be labelled with COMMIT:
-# the log must name COMMIT as its source and the sha256 of the tar it describes.
+# the tar itself carries BUILD-SRC (the commit the container built), and the log
+# must name COMMIT as its source and the sha256 of the tar it describes. This
+# catches mix-ups, not a hand-made tar: that needs signing.
+[ "$(tar -xOf "$WORK/build-out.tar" BUILD-SRC 2>/dev/null)" = "$FULL" ] \
+  || { echo "build-out.tar was not built from $FULL (BUILD-SRC): no package" >&2; exit 1; }
 grep -qx "SRC_COMMIT $FULL" "$WORK/build.log" || { echo "build.log does not name $FULL as its source: no package" >&2; exit 1; }
 [ "$(grep '^TAR_SHA256 ' "$WORK/build.log" | tail -1 | cut -d' ' -f2)" = "$(shasum -a 256 "$WORK/build-out.tar" | cut -d' ' -f1)" ] \
   || { echo "build-out.tar does not match the TAR_SHA256 in build.log: no package" >&2; exit 1; }

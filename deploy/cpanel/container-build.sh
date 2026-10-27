@@ -25,6 +25,7 @@ node_modules/esbuild/bin/esbuild scripts/jobs-worker.ts --bundle --platform=node
   --external:@prisma/client --external:.prisma/client --external:pg-native --external:sharp --log-level=warning
 echo WORKER_OK
 LINKS=$(find .next/standalone -type l | wc -l); echo "symlinks: $LINKS"
-tar -C /app -cf /out/build-out.tar .next/standalone .next/static public certs worker-out
+echo "$SRC_COMMIT" > /app/BUILD-SRC
+tar -C /app -cf /out/build-out.tar .next/standalone .next/static public certs worker-out BUILD-SRC
 echo "TAR_SHA256 $(sha256sum /out/build-out.tar | cut -d' ' -f1)"
 echo TAR_OK
