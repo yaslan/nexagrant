@@ -30,16 +30,22 @@ vi.mock('@/app/[locale]/(app)/[workspace]/pipeline/actions', () => ({
 
 import SidebarNav from '@/components/SidebarNav';
 import { ModuleLink } from '@/components/ModuleLink';
-import { ModuleProvider } from '@/lib/modules/hooks';
+import { ModuleProvider, type ModulePreviewStatus } from '@/lib/modules/hooks';
+import { getAllManifests } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
 import { OpportunityDetailClient } from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/client';
 
 afterEach(cleanup);
 
-function shell(active: ModuleId[], node: React.ReactNode, locale: 'tr' | 'en' = 'tr') {
+function shell(
+  active: ModuleId[],
+  node: React.ReactNode,
+  locale: 'tr' | 'en' = 'tr',
+  nav: { previewStatus?: Partial<Record<ModuleId, ModulePreviewStatus>>; upgradeModules?: ModuleId[] } = {},
+) {
   return render(
     <NextIntlClientProvider locale={locale} messages={locale === 'tr' ? trMessages : enMessages} timeZone="Europe/Istanbul">
-      <ModuleProvider activeModules={active}>{node}</ModuleProvider>
+      <ModuleProvider activeModules={active} {...nav}>{node}</ModuleProvider>
     </NextIntlClientProvider>,
   );
 }
@@ -82,6 +88,43 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
   it('shows only the core items when no module is open', () => {
     shell([], <SidebarNav locale="tr" />);
     expect(sidebarLabels()).toEqual(['Panel', 'Çağrılar', 'Ayarlar']);
+  });
+});
+
+/**
+ * FO-164 (Y-1) — a preview module is badged, a module only the plan keeps closed is
+ * listed locked and leads to its page, whose gate names the plans that include it.
+ */
+describe('SidebarNav — preview badge and plan lock', () => {
+  it('badges a PILOT module and leaves an ON one unbadged', () => {
+    shell(['M2', 'M5'], <SidebarNav locale="tr" />, 'tr', { previewStatus: { M2: 'PILOT' } });
+    expect(screen.getByTestId('sidebar-nav-conceptNotes-preview').textContent).toBe('Pilot');
+    expect(screen.queryByTestId('sidebar-nav-pipeline-preview')).toBeNull();
+  });
+
+  it('labels a DEV preview in English', () => {
+    shell(['M7'], <SidebarNav locale="en" />, 'en', { previewStatus: { M7: 'DEV' } });
+    expect(screen.getByTestId('sidebar-nav-tto-preview').textContent).toBe('Dev');
+  });
+
+  it('lists a plan-locked module as a locked link to its own page, reason as description', () => {
+    shell(['M1', 'M5'], <SidebarNav locale="tr" />, 'tr', { upgradeModules: ['M7', 'M9'] });
+    const reason = trMessages.Navigation.planLocked.replace('{module}', `M7 ${trMessages.modules.tto.name}`);
+    const tto = screen.getByRole('link', { name: /TTO/, description: reason });
+    expect(tto.getAttribute('href')).toBe('/tr/main/tto-hizlandirici');
+    expect(tto.getAttribute('data-locked')).toBe('upgrade');
+    expect(tto.getAttribute('aria-disabled')).toBeNull();
+    // M9 has no sidebar entry of its own; nothing is invented for it.
+    expect(sidebarLabels()).toEqual([
+      'Panel',
+      'Çağrılar',
+      'Fırsatlar',
+      'Ortaklar',
+      expect.stringContaining('TTO'),
+      'Onay Merkezi (4-Eyes)',
+      'Partner REST API',
+      'Ayarlar',
+    ]);
   });
 });
 
@@ -186,6 +229,19 @@ describe('opportunity detail — module tabs', () => {
       'opportunity-module-tab-consortium',
     ]);
     expect(screen.queryByTestId('opportunity-module-tab-briefs')).toBeNull();
+  });
+
+  it('takes its tabs from the manifests: every opportunityTabs[] entry, nothing else', () => {
+    const all = getAllManifests();
+    detail(all.map((m) => m.id));
+    const shown = within(screen.getByTestId('opportunity-module-tabs'))
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('data-testid'));
+    const declared = all
+      .flatMap((m) => m.opportunityTabs ?? [])
+      .sort((a, b) => a.order - b.order)
+      .map((tab) => `opportunity-module-tab-${tab.labelKey}`);
+    expect(shown).toEqual(declared);
   });
 
   it('renders no module row at all when none of them is open', () => {

@@ -7,9 +7,9 @@ import { useTranslations } from 'next-intl';
 import { AlertTriangle, Archive, CheckCircle2 } from 'lucide-react';
 import type { Gate } from '@prisma/client';
 
-import { getWorkspaceRoute, type WorkspaceRouteKey } from '@/lib/routes';
+import { getWorkspaceRoute } from '@/lib/routes';
 import { useActiveModules } from '@/lib/modules/hooks';
-import type { ModuleId } from '@/lib/modules/types';
+import { getOpportunityTabs } from '@/lib/modules/registry';
 
 import { archiveOpportunity, declareApplication, evaluateOpportunityGate } from '../actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
@@ -49,22 +49,6 @@ type GateOutcome = { passed: boolean; reasons: string[] };
 
 const TASK_TEMPLATE = ['T-6', 'T-5', 'T-4'] as const;
 
-/**
- * The per-opportunity pages other modules own. Until these links existed they were
- * reachable only by typing the address (TASK-MVBB4FCX2Q24T K-1). Each one is shown
- * only when the server-side module decision (`listAccessibleModules`, via
- * `ModuleProvider`) opens its module; the page behind it still runs `moduleGate`.
- */
-const MODULE_TABS: readonly { module: ModuleId; route: WorkspaceRouteKey; label: string }[] = [
-  { module: 'M2', route: 'opportunityConceptNote', label: 'conceptNote' },
-  { module: 'M6', route: 'opportunityEvaluations', label: 'evaluations' },
-  { module: 'M8', route: 'opportunityMatching', label: 'matching' },
-  { module: 'M8', route: 'opportunityConsortium', label: 'consortium' },
-  { module: 'M9', route: 'opportunityBriefs', label: 'briefs' },
-  { module: 'M10', route: 'opportunityDocuments', label: 'documents' },
-  { module: 'M11', route: 'opportunityApplication', label: 'application' },
-];
-
 export function OpportunityDetailClient({
   opportunity,
   g0,
@@ -86,7 +70,12 @@ export function OpportunityDetailClient({
 }) {
   const t = useTranslations('Pipeline');
   const activeModules = useActiveModules();
-  const moduleTabs = MODULE_TABS.filter((tab) => activeModules.includes(tab.module));
+  // The per-opportunity pages other modules own, from each manifest's
+  // `opportunityTabs[]`. Until these links existed they were reachable only by typing
+  // the address (TASK-MVBB4FCX2Q24T K-1). A tab shows only when the server-side module
+  // decision (`listModuleNav`, via `ModuleProvider`) opens its module; the page behind
+  // it still runs `moduleGate`.
+  const moduleTabs = getOpportunityTabs(activeModules);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'effort'>('overview');
   const [outcome, setOutcome] = useState<GateOutcome | null>(null);
@@ -349,14 +338,14 @@ export function OpportunityDetailClient({
             </span>
             {moduleTabs.map((tab) => (
               <Link
-                key={tab.route}
-                href={getWorkspaceRoute(tab.route, locale, workspace, opportunity.id)}
-                data-testid={`opportunity-module-tab-${tab.label}`}
+                key={tab.routeKey}
+                href={getWorkspaceRoute(tab.routeKey, locale, workspace, opportunity.id)}
+                data-testid={`opportunity-module-tab-${tab.labelKey}`}
                 className="inline-flex items-center gap-1.5 min-h-9 px-3 py-1.5 rounded-lg border border-border bg-ground text-sm font-medium text-ink-2 hover:text-ink hover:border-accent/40 transition-colors"
               >
-                {t(`detail.modules.${tab.label}`)}
+                {t(`detail.modules.${tab.labelKey}`)}
                 {/* text-ink-2, not text-muted: muted on bg-ground is 4.39:1, under AA. */}
-                <span className="font-mono text-[10px] text-ink-2">{tab.module}</span>
+                <span className="font-mono text-[10px] text-ink-2">{tab.moduleId}</span>
               </Link>
             ))}
           </nav>

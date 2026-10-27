@@ -34,6 +34,15 @@
  *   file straight to the R2 presigned URL (`<account>.r2.cloudflarestorage.com`).
  *   Anthropic/OpenAI/SEDIA/CORDIS are called from the server only and are
  *   deliberately absent.
+ * - CORDIS widget (FO-168): the home page (`/tr`, `/en` — `isCordisWidgetPath`) embeds
+ *   CORDIS's official project-list widget, so only its policy grows by the one path
+ *   `https://cordis.europa.eu/datalab/visualisations/` in style-src, img-src and
+ *   font-src. Measured with Playwright (CSP off, then enforced): the nonced
+ *   widgetLoader.js injects jQuery, three helper scripts, three stylesheets and the
+ *   spinner, then fetches its data as JSONP (`<script src=…/widget/api/*.php>`), not
+ *   XHR. Scripts need no host entry — 'strict-dynamic' trusts what the nonced loader
+ *   injects (the loader tag must carry the request nonce); connect-src and frame-src
+ *   stay as they are. Every other route keeps the policy above, byte for byte.
  * - form-action: Auth.js signs in with a form POST to /api/auth/signin/google that
  *   redirects to accounts.google.com; Chrome applies form-action to that redirect.
  * - frame-ancestors 'none' (with X-Frame-Options DENY for old browsers),
@@ -171,9 +180,23 @@ export type CspOptions = {
   r2PublicHost?: string | null;
   /** R2_ENDPOINT — S3-compatible endpoint (MinIO, etc.). Origin only, safe HTTP for loopback. */
   r2Endpoint?: string | null;
+  /** The page embeds the CORDIS widget (`isCordisWidgetPath`): allow its path for styles, images, fonts. */
+  cordisWidget?: boolean;
 };
 
 const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
+
+/** Everything the CORDIS widget loads lives under this one path (CSS, fonts, flags, spinner; its scripts ride on strict-dynamic). */
+export const CORDIS_WIDGET_SOURCE = 'https://cordis.europa.eu/datalab/visualisations/';
+
+/**
+ * The only pages that embed the CORDIS widget: the home page, `/tr` and `/en`
+ * (localePrefix is 'always'; `/` redirects to one of them). Lower case only — anything
+ * else (`/TR`, `/tr/login`, `/tr/x`) gets the default policy.
+ */
+export function isCordisWidgetPath(pathname: string): boolean {
+  return /^\/(?:tr|en)\/?$/.test(pathname);
+}
 
 /** `https://host[:port]` of a URL, or null when it is blank or unparsable. */
 function originOf(value: string | null | undefined): string | null {
@@ -263,15 +286,17 @@ export function buildContentSecurityPolicy(opts: CspOptions): string {
   const r2Ep = r2EndpointOrigin(opts.r2Endpoint);
   const extra = (...values: Array<string | null>) => values.filter((v): v is string => !!v);
 
+  const cordis = opts.cordisWidget ? [CORDIS_WIDGET_SOURCE] : [];
+
   const directives: Array<[string, string[]]> = [
     ['default-src', ["'self'"]],
     [
       'script-src',
       ["'self'", `'nonce-${opts.nonce}'`, "'strict-dynamic'", ...(opts.isDev ? ["'unsafe-eval'"] : [])],
     ],
-    ['style-src', ["'self'", "'unsafe-inline'"]],
-    ['img-src', ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', ...extra(r2Public)]],
-    ['font-src', ["'self'", 'data:']],
+    ['style-src', ["'self'", "'unsafe-inline'", ...cordis]],
+    ['img-src', ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', ...extra(r2Public), ...cordis]],
+    ['font-src', ["'self'", 'data:', ...cordis]],
     // `next dev` HMR runs over a websocket to this origin; ws: is not covered by 'self' everywhere.
     ['connect-src', ["'self'", ...extra(posthog, r2Upload, r2Ep), ...(opts.isDev ? ['ws:', 'wss:'] : [])]],
     ['media-src', ["'self'", 'blob:']],
