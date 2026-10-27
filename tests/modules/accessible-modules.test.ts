@@ -27,7 +27,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/billing', () => ({ getEntitlements: h.getEntitlements }));
 
-import { checkModuleAccess, listAccessibleModules } from '@/lib/modules/access';
+import { checkModuleAccess, listAccessibleModules, listModuleNav } from '@/lib/modules/access';
 import { getAllManifests } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
 
@@ -113,5 +113,57 @@ describe('listAccessibleModules', () => {
     h.auth.mockResolvedValue(null);
     expect(await listAccessibleModules()).toEqual([]);
     expect(h.findMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * FO-164 (Y-1) — the sidebar badges a preview and shows a plan-locked module, both
+ * read off the same per-module decision as the gate: the badge goes on exactly the
+ * open PILOT/DEV modules, the lock on exactly the `PLAN_UPGRADE_REQUIRED` refusals.
+ */
+describe('listModuleNav', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function upgradeOneByOne(): Promise<ModuleId[]> {
+    const out: ModuleId[] = [];
+    for (const id of ALL) if ((await checkModuleAccess(id)).reason === 'PLAN_UPGRADE_REQUIRED') out.push(id);
+    return out;
+  }
+
+  it('pro: M7 and M9–M11 are plan-locked, never the "Yakında" modules or an OFF switch', async () => {
+    arrange({
+      rows: { M1: 'ON', M2: 'PILOT', M3: 'OFF', M5: 'ON', M7: 'OFF', M8: 'ON', M9: 'ON', M10: 'ON', M11: 'ON' },
+      allowedModules: PRO,
+      role: 'TENANT_OWNER',
+    });
+
+    const nav = await listModuleNav();
+
+    expect(nav.activeModules).toEqual(['M1', 'M2', 'M5', 'M8']);
+    expect(nav.activeModules).toEqual(await listAccessibleModules());
+    expect(nav.previewStatus).toEqual({ M2: 'PILOT' });
+    expect(nav.upgradeModules).toEqual(['M7', 'M9', 'M10', 'M11']);
+    expect(nav.upgradeModules).toEqual(await upgradeOneByOne());
+    expect(nav.upgradeModules).not.toContain('M3');
+  });
+
+  it('badges DEV only for the staff who can open it; a member sees neither link nor badge', async () => {
+    const rows = { M2: 'DEV', M8: 'ON' } as const;
+
+    arrange({ rows, allowedModules: ALL, role: 'MEMBER' });
+    const member = await listModuleNav();
+    expect(member.activeModules).toEqual(['M8']);
+    expect(member.previewStatus).toEqual({});
+    expect(member.upgradeModules).toEqual([]);
+
+    arrange({ rows, allowedModules: ALL, role: 'MEMBER', isPlatformAdmin: true });
+    const staff = await listModuleNav();
+    expect(staff.activeModules).toEqual(['M2', 'M8']);
+    expect(staff.previewStatus).toEqual({ M2: 'DEV' });
+  });
+
+  it('returns an empty nav for a session without a tenant', async () => {
+    h.auth.mockResolvedValue(null);
+    expect(await listModuleNav()).toEqual({ activeModules: [], previewStatus: {}, upgradeModules: [] });
   });
 });

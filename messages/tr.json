@@ -15,7 +15,12 @@
     "adminModules": "Yönetici Konsolu",
     "workspaceLabel": "Çalışma Alanı",
     "administrationLabel": "Yönetim",
-    "featureLocked": "{module} modülü kapalı — bu özellik kullanılamaz"
+    "featureLocked": "{module} modülü kapalı — bu özellik kullanılamaz",
+    "planLocked": "{module} planınıza dahil değil — hangi planlarda olduğunu görmek için açın",
+    "preview": {
+      "PILOT": "Pilot",
+      "DEV": "Geliştirme"
+    }
   },
   "Common": {
     "loading": "Yükleniyor...",

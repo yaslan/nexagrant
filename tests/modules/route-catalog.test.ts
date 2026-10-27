@@ -6,6 +6,7 @@ import {
   WORKSPACE_ROUTE_ALIASES,
 } from '../../src/lib/modules/route-catalog';
 import { getAllManifests, validateRegistry } from '../../src/lib/modules/registry';
+import { isComingSoon } from '../../src/lib/modules/state-machine';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 
@@ -91,5 +92,35 @@ describe('module registry', () => {
   it('gives every nav entry a distinct sort order', () => {
     const orders = getAllManifests().flatMap((m) => m.nav.map((n) => n.order));
     expect(new Set(orders).size, `duplicate nav orders in ${JSON.stringify(orders)}`).toBe(orders.length);
+  });
+
+  it('only declares opportunity tab labels that exist in both tr and en', () => {
+    type Modules = Record<string, unknown>;
+    const tr = (trMessages.Pipeline.detail.modules ?? {}) as Modules;
+    const en = (enMessages.Pipeline.detail.modules ?? {}) as Modules;
+    const missing: string[] = [];
+
+    for (const m of getAllManifests()) {
+      for (const tab of m.opportunityTabs ?? []) {
+        if (!(tab.labelKey in tr)) missing.push(`${m.id}: Pipeline.detail.modules.${tab.labelKey} missing in tr.json`);
+        if (!(tab.labelKey in en)) missing.push(`${m.id}: Pipeline.detail.modules.${tab.labelKey} missing in en.json`);
+      }
+    }
+
+    expect(missing).toEqual([]);
+  });
+
+  it('gives every opportunity tab a distinct sort order', () => {
+    const orders = getAllManifests().flatMap((m) => (m.opportunityTabs ?? []).map((n) => n.order));
+    expect(new Set(orders).size, `duplicate tab orders in ${JSON.stringify(orders)}`).toBe(orders.length);
+  });
+
+  // FO-164 (P0-4): a module a tenant can buy but cannot click into is an orphan page.
+  it('gives every module that is not "Yakında" a sidebar entry or an opportunity tab', () => {
+    const orphans = getAllManifests()
+      .filter((m) => !isComingSoon(m.id))
+      .filter((m) => m.nav.length === 0 && (m.opportunityTabs ?? []).length === 0)
+      .map((m) => m.id);
+    expect(orphans).toEqual([]);
   });
 });

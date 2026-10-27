@@ -5,9 +5,21 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { getWorkspaceRoute } from '@/lib/routes';
-import { getAllManifests } from '@/lib/modules/registry';
-import { useActiveModules } from '@/lib/modules/hooks';
+import { getManifest, getSidebarEntries } from '@/lib/modules/registry';
+import { useActiveModules, useModulePreviewStatus, useUpgradeModules, type ModulePreviewStatus } from '@/lib/modules/hooks';
+import type { ModuleId } from '@/lib/modules/types';
 import { navFeatureLock } from '@/lib/modules/catalog';
+
+interface NavItem {
+  key: string;
+  href: string;
+  label: string;
+  moduleId?: ModuleId;
+  /** The module is open as a PILOT/DEV preview: badge it so it does not pass as finished. */
+  preview?: ModulePreviewStatus;
+  /** The plan does not include the module: the entry leads to its page's upgrade notice. */
+  upgrade?: boolean;
+}
 
 interface SidebarNavProps {
   locale: string;
@@ -33,21 +45,23 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
     ? secondSegment
     : 'default';
 
-  // Module entries come from each manifest's `nav[]`, shown only for modules the server
-  // said this session may open (plan + ModuleState + role, `listAccessibleModules`).
-  // The visibility decision is not re-made here; this only reads its answer.
+  // Module entries come from each manifest's `nav[]`, shown for modules the server
+  // said this session may open (plan + ModuleState + role, `listModuleNav`) and, locked,
+  // for modules only the plan keeps closed. No visibility decision is re-made here;
+  // this only reads the answer the app shell handed to `ModuleProvider`.
   const activeModules = useActiveModules();
-  const moduleItems = getAllManifests()
-    .filter((m) => activeModules.includes(m.id))
-    .flatMap((m) => m.nav)
-    .sort((a, b) => a.order - b.order)
-    .map((item) => ({
-      key: item.labelKey,
-      href: getWorkspaceRoute(item.routeKey, locale, workspaceSlug),
-      label: t(item.labelKey),
-    }));
+  const previewStatus = useModulePreviewStatus();
+  const upgradeModules = useUpgradeModules();
+  const moduleItems: NavItem[] = getSidebarEntries([...activeModules, ...upgradeModules]).map((item) => ({
+    key: item.labelKey,
+    href: getWorkspaceRoute(item.routeKey, locale, workspaceSlug),
+    label: t(item.labelKey),
+    moduleId: item.moduleId,
+    preview: previewStatus[item.moduleId],
+    upgrade: upgradeModules.includes(item.moduleId),
+  }));
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { key: 'dashboard', href: getWorkspaceRoute('dashboard', locale, workspaceSlug), label: t('dashboard') },
     { key: 'calls', href: getWorkspaceRoute('calls', locale, workspaceSlug), label: t('calls') },
     ...moduleItems,
@@ -108,6 +122,29 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
             </React.Fragment>
           );
         }
+        // Outside the plan: still a link — the module's page names the plans that
+        // include it (`moduleGate`, PLAN_UPGRADE_REQUIRED) — marked locked, with the
+        // reason as its description, like the feature lock above.
+        if (item.upgrade && item.moduleId) {
+          const tooltip = t('planLocked', { module: `${item.moduleId} ${tModules(`${getManifest(item.moduleId).key}.name`)}` });
+          const reasonId = `${idBase}-${item.key}-upgrade`;
+          return (
+            <React.Fragment key={item.key}>
+              <Link
+                href={item.href}
+                data-testid={`sidebar-nav-${item.key}`}
+                data-locked="upgrade"
+                aria-describedby={reasonId}
+                title={tooltip}
+                className="px-3 py-2 rounded-lg font-medium transition-colors flex items-center justify-between text-ink-2 hover:bg-surface-hover hover:text-ink"
+              >
+                <span>{item.label}</span>
+                <span aria-hidden="true">🔒</span>
+              </Link>
+              <span id={reasonId} hidden>{tooltip}</span>
+            </React.Fragment>
+          );
+        }
         return (
           <Link
             key={item.key}
@@ -120,6 +157,14 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
             }`}
           >
             <span>{item.label}</span>
+            {item.preview ? (
+              <span
+                data-testid={`sidebar-nav-${item.key}-preview`}
+                className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border border-amber/30 bg-amber/10 text-ink-2"
+              >
+                {t(`preview.${item.preview}`)}
+              </span>
+            ) : null}
           </Link>
         );
       })}
