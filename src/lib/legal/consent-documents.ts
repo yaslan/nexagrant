@@ -55,7 +55,7 @@ export interface ConsentDocument {
  */
 export const PRIVACY_NOTICE: ConsentDocument = {
   id: 'privacy-notice',
-  version: '2026-10-18.2',
+  version: '2026-10-27.1',
   messageKey: 'legal.privacy.heading',
   href: (locale) => `/${locale}/privacy`,
   kind: 'DISCLOSURE_ACK',
