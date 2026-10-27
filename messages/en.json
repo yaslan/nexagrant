@@ -1982,19 +1982,19 @@
           "desc": "Solo start — the first step.",
           "seats": "2 users / 1 workspace",
           "credits": "100 AI credits / month",
-          "modules": "Modules: M2, M3, M5"
+          "modules": "Modules: {modules}"
         },
         "pro": {
           "desc": "For serious daily use and projects.",
           "seats": "6 users / 1 workspace",
           "credits": "500 AI credits / month",
-          "modules": "Modules: M1-M6, M8"
+          "modules": "Modules: {modules}"
         },
         "ultra": {
           "desc": "The whole ecosystem and enterprise consortia.",
           "seats": "15 users / 5 workspaces",
           "credits": "2,000 AI credits / month",
-          "modules": "Modules: M1-M11"
+          "modules": "Modules: {modules}"
         }
       },
       "plansUnavailable": "The plan list cannot be read right now. Rather than show a price that may be wrong we are showing none; please try again shortly.",

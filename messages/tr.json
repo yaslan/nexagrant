@@ -1982,19 +1982,19 @@
           "desc": "Solo başlangıç — ilk adım.",
           "seats": "2 kullanıcı / 1 çalışma alanı",
           "credits": "100 YZ kredisi / ay",
-          "modules": "Modüller: M2, M3, M5"
+          "modules": "Modüller: {modules}"
         },
         "pro": {
           "desc": "Ciddi günlük kullanım ve projeler.",
           "seats": "6 kullanıcı / 1 çalışma alanı",
           "credits": "500 YZ kredisi / ay",
-          "modules": "Modüller: M1-M6, M8"
+          "modules": "Modüller: {modules}"
         },
         "ultra": {
           "desc": "Tüm ekosistem ve kurumsal konsorsiyumlar.",
           "seats": "15 kullanıcı / 5 çalışma alanı",
           "credits": "2.000 YZ kredisi / ay",
-          "modules": "Modüller: M1-M11"
+          "modules": "Modüller: {modules}"
         }
       },
       "plansUnavailable": "Paket listesi şu anda okunamıyor. Yanlış bir fiyat göstermemek için burada rakam vermiyoruz; birazdan tekrar deneyin.",

@@ -14,7 +14,7 @@
  * with `t.has` first, so a screen that asks for a bullet one plan lacks gets
  * a shorter list instead of an error.
  */
-import { findEntry } from '@/lib/billing/catalog';
+import { findEntry, grantsFor } from '@/lib/billing/catalog';
 
 /** The `PlanFeature` fields a card reads. */
 export interface PlanCardFeature {
@@ -31,7 +31,7 @@ export interface PlanCopySource {
 
 /** The two methods of a next-intl translator this needs, already namespaced. */
 export interface PlanCopyTranslator {
-  (key: string): string;
+  (key: string, values?: Record<string, string>): string;
   has(key: string): boolean;
 }
 
@@ -58,6 +58,28 @@ export function featureText(feature: PlanCardFeature, locale: string): string | 
   return feature.kind === 'module' && feature.moduleId ? feature.moduleId : null;
 }
 
+/**
+ * A plan's module ids as the card lists them: a run of three or more
+ * consecutive ids collapses to a first-last range, the rest stay listed. The `modules` bullet
+ * takes this as `{modules}`, so the list follows the plan's grant in
+ * catalog.ts instead of being typed into messages/*.json (FO-171).
+ */
+export function formatModuleIds(ids: readonly string[]): string {
+  const numbers = ids.map((id) => Number(id.slice(1))).sort((a, b) => a - b);
+  const parts: string[] = [];
+  for (let i = 0; i < numbers.length; ) {
+    let end = i;
+    while (end + 1 < numbers.length && numbers[end + 1] === (numbers[end] ?? 0) + 1) end += 1;
+    if (end - i >= 2) {
+      parts.push(`M${numbers[i]}-M${numbers[end]}`);
+    } else {
+      for (let j = i; j <= end; j += 1) parts.push(`M${numbers[j]}`);
+    }
+    i = end + 1;
+  }
+  return parts.join(', ');
+}
+
 export function planCardCopy(
   plan: PlanCopySource,
   t: PlanCopyTranslator,
@@ -65,9 +87,10 @@ export function planCardCopy(
   keys: { summary: string; bullets: readonly string[] }
 ): PlanCardCopy {
   if (findEntry(plan.planId)?.kind === 'plan') {
+    const values = { modules: formatModuleIds(grantsFor(plan.planId)?.moduleIds ?? []) };
     const message = (key: string) => {
       const id = `plans.${plan.planId}.${key}`;
-      return t.has(id) ? t(id) : null;
+      return t.has(id) ? t(id, values) : null;
     };
     return {
       summary: message(keys.summary),

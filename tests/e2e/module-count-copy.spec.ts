@@ -3,6 +3,9 @@ import { encode } from 'next-auth/jwt';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 import { getModuleCounts } from '../../src/lib/modules/registry';
+import { grantsFor } from '../../src/lib/billing/catalog';
+import { formatModuleIds } from '../../src/lib/billing/plan-copy';
+import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 
 /**
  * FO-171 (TASK-MVQ6Y9J8Q3NSW, K-572973) — the module count the landing page and
@@ -32,6 +35,7 @@ const COPY = {
     badge: `${active} aktif + ${soon} yakında`,
     catalog: 'Modül Kataloğu',
     adminLink: /Modül Yönetimi/,
+    modulesLabel: 'Modüller',
   },
   en: {
     summary: `${active} live modules + ${soon} coming soon`,
@@ -39,8 +43,25 @@ const COPY = {
     badge: `${active} live + ${soon} soon`,
     catalog: 'Module Catalog',
     adminLink: /Module State Manager/,
+    modulesLabel: 'Modules',
   },
 } as const;
+
+/** A TENANT_OWNER seat of this spec's own on the demo tenant, removed afterwards. */
+const OWNER = {
+  userId: 'e2e-module-count-owner',
+  email: 'module-count-owner@e2e.fabrika.test',
+  role: 'TENANT_OWNER' as const,
+  tenantId: 'demo-tenant',
+};
+
+test.beforeAll(async () => {
+  await seedIdentity({ ...OWNER, workspaceIds: [] });
+});
+
+test.afterAll(async () => {
+  await cleanupIdentity([OWNER.userId]);
+});
 
 async function acceptCookies(page: Page) {
   await page.addInitScript(() => {
@@ -91,5 +112,20 @@ for (const locale of ['tr', 'en'] as const) {
     await page.getByRole('button', { name: 'Open Admin Menu' }).click();
     await expect(page.getByText(copy.badge, { exact: true }).filter({ visible: true })).toHaveCount(1);
     await page.screenshot({ path: `${SHOTS}/${locale}-admin-mobile-390.png` });
+  });
+
+  test(`settings/billing plan cards list each plan's granted modules (${locale})`, async ({ page }) => {
+    // signInAs also records the cookie consent the banner would otherwise ask for.
+    await signInAs(page, { id: OWNER.userId, email: OWNER.email, tenantId: OWNER.tenantId, role: OWNER.role });
+    await page.goto(`/${locale}/main/settings/billing`);
+
+    for (const planId of ['basic', 'pro', 'ultra'] as const) {
+      const card = page.getByTestId(`settings-plan-card-${planId}`);
+      const modules = formatModuleIds(grantsFor(planId)?.moduleIds ?? []);
+      await expect(card.getByText(`📦 ${copy.modulesLabel}: ${modules}`, { exact: true })).toBeVisible();
+    }
+    const ultra = page.getByTestId('settings-plan-card-ultra');
+    await ultra.scrollIntoViewIfNeeded();
+    await ultra.screenshot({ path: `${SHOTS}/${locale}-settings-billing-ultra-modules.png` });
   });
 }
