@@ -148,16 +148,45 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
  * entries still runs `moduleGate` and every action `assertModuleAccess`.
  */
 export async function listAccessibleModules(): Promise<ModuleId[]> {
+  return (await listModuleNav()).activeModules;
+}
+
+/**
+ * What the app shell's navigation shows, read off the same per-module decision
+ * as `checkModuleAccess`:
+ *
+ *   - `activeModules` — open for this viewer (the `listAccessibleModules` answer);
+ *   - `previewStatus` — the open ones that are not `ON` yet (`PILOT`, `DEV`), so
+ *     the sidebar can say the module is a preview rather than finished;
+ *   - `upgradeModules` — refused only because the plan does not include them
+ *     (`PLAN_UPGRADE_REQUIRED`), shown locked so a paid module can be found
+ *     before it is bought. A module switched off, out of the viewer's audience or
+ *     "Yakında" is not listed: nothing the viewer can do opens it.
+ */
+export interface ModuleNavState {
+  activeModules: ModuleId[];
+  previewStatus: Partial<Record<ModuleId, 'PILOT' | 'DEV'>>;
+  upgradeModules: ModuleId[];
+}
+
+export async function listModuleNav(): Promise<ModuleNavState> {
+  const nav: ModuleNavState = { activeModules: [], previewStatus: {}, upgradeModules: [] };
   const scope = tenantScopeOf(await requestSession());
-  if (!scope) return [];
+  if (!scope) return nav;
 
   const facts = await tenantModuleFacts(scope.tenantId);
   const viewer = sessionViewerOf(scope);
 
-  return getAllManifests().map((m) => m.id).filter(
-    (id) =>
-      decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, viewer).allowed,
-  );
+  for (const { id } of getAllManifests()) {
+    const access = decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, viewer);
+    if (access.allowed) {
+      nav.activeModules.push(id);
+      if (access.status === 'PILOT' || access.status === 'DEV') nav.previewStatus[id] = access.status;
+    } else if (access.reason === 'PLAN_UPGRADE_REQUIRED') {
+      nav.upgradeModules.push(id);
+    }
+  }
+  return nav;
 }
 
 /**

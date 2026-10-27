@@ -22,6 +22,7 @@ export const m6Manifest: ModuleManifest = {
     { path: 'opportunities/[id]/evaluations/panel', permission: 'evaluator:read' },
   ],
   nav: [],
+  opportunityTabs: [{ labelKey: 'evaluations', routeKey: 'opportunityEvaluations', order: 20 }],
   permissions: [
     { id: 'evaluator:read', minRole: Role.MEMBER },
     { id: 'evaluator:write', minRole: Role.WRITER },

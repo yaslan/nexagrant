@@ -16,12 +16,17 @@ export const m8Manifest: ModuleManifest = {
   // Which plans open this module is declared once, in the billing catalogue.
   planTiers: plansGrantingModule('M8'),
   addOnSku: null,
-  // Both pages hang off a specific opportunity, so there is no sidebar entry.
+  // Both pages hang off a specific opportunity, so there is no sidebar entry:
+  // they are reached as tabs on the opportunity detail page.
   routes: [
     { path: 'opportunities/[id]/matching', permission: 'consortium-matching:read' },
     { path: 'pipeline/[id]/consortium', permission: 'consortium-matching:read' },
   ],
   nav: [],
+  opportunityTabs: [
+    { labelKey: 'matching', routeKey: 'opportunityMatching', order: 30 },
+    { labelKey: 'consortium', routeKey: 'opportunityConsortium', order: 40 },
+  ],
   permissions: [
     { id: 'consortium-matching:read', minRole: Role.MEMBER },
     { id: 'consortium-matching:write', minRole: Role.WRITER },

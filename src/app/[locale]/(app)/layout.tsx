@@ -16,7 +16,7 @@ import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-sto
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
 import { can, asRole } from '@/lib/rbac';
-import { listAccessibleModules, requestSession } from '@/lib/modules/access';
+import { listModuleNav, requestSession, type ModuleNavState } from '@/lib/modules/access';
 import { logger } from '@/lib/logger';
 import { ModuleProvider } from '@/lib/modules/hooks';
 
@@ -54,7 +54,7 @@ export default async function AppLayout({
   params: Promise<{ locale: string; workspace?: string }>;
 }) {
   const { locale, workspace = 'default' } = await params;
-  // The same per-request session `moduleGate` and `listAccessibleModules` read.
+  // The same per-request session `moduleGate` and `listModuleNav` read.
   const session = await requestSession();
 
   if (!session?.user) {
@@ -103,15 +103,19 @@ export default async function AppLayout({
   // Settings → Modules, Members — went down with it, and the admin could not reach
   // the screen that fixes the cause. Module pages stay closed: each runs its own
   // `moduleGate`. The error goes to the server log only, never to the page.
-  let activeModules: Awaited<ReturnType<typeof listAccessibleModules>> = [];
+  let moduleNav: ModuleNavState = { activeModules: [], previewStatus: {}, upgradeModules: [] };
   try {
-    activeModules = await listAccessibleModules();
+    moduleNav = await listModuleNav();
   } catch (error) {
     logger.error('App shell could not read the accessible modules; menu shows none', error, { tenantId });
   }
 
   return (
-    <ModuleProvider activeModules={activeModules}>
+    <ModuleProvider
+      activeModules={moduleNav.activeModules}
+      previewStatus={moduleNav.previewStatus}
+      upgradeModules={moduleNav.upgradeModules}
+    >
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-background">
       <LocaleUpdater />
       {/* Mobile Top Header */}

@@ -114,6 +114,13 @@ export interface ModuleManifest {
   routes: ModuleRoute[];
   /** Sidebar entries this module contributes when it is visible. */
   nav: ModuleNavItem[];
+  /**
+   * Tabs this module contributes to the opportunity detail page when it is
+   * visible. `labelKey` lives in the `Pipeline.detail.modules` i18n namespace;
+   * `routeKey` is an opportunity-scoped route, resolved with the opportunity id.
+   * Omitted when the module has no per-opportunity page.
+   */
+  opportunityTabs?: ModuleNavItem[];
   /** Capabilities this module defines; referenced by its own routes. */
   permissions: ModulePermission[];
   /** Prisma models this module reads or writes; validated against schema.prisma. */
