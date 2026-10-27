@@ -66,6 +66,7 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
       'Çağrılar',
       'Fırsatlar',
       'Ortaklar',
+      'Ortak Arama Kaynakları',
       'Konsept Notlar',
       'Kanıtlar',
       'İlişkiler',
@@ -83,6 +84,41 @@ describe('SidebarNav — module entries from manifest nav[]', () => {
     // M1 is off, so Partner REST API (an M1 feature) is locked rather than linked.
     expect(sidebarLabels()).toEqual(['Dashboard', 'Calls', 'Pipeline', expect.stringContaining('TTO'), 'Approvals (4-Eyes)', 'Settings']);
     expect(screen.getByTestId('sidebar-nav-apiKeys').getAttribute('data-locked')).toBe('true');
+  });
+
+  // FO-176: a top-level entry right after Partners (not a sub-entry); its path sits
+  // under /partners, yet only it is highlighted while it is open.
+  it('lists Partner Search Resources as a top-level entry and highlights it alone', () => {
+    nav.pathname = '/en/main/partners/resources';
+    try {
+      shell(['M1'], <SidebarNav locale="en" />, 'en');
+      const labels = sidebarLabels();
+      expect(labels[labels.indexOf('Partners') + 1]).toBe('Partner Search Resources');
+      const entry = screen.getByTestId('sidebar-nav-partnerResources');
+      const partners = screen.getByTestId('sidebar-nav-partners');
+      expect(entry.getAttribute('href')).toBe('/en/main/partners/resources');
+      expect(entry.parentElement).toBe(partners.parentElement);
+      expect(entry.className).not.toMatch(/\bml-|\btext-xs\b/);
+      expect(entry.className).toContain('bg-accent/10');
+      expect(partners.className).not.toContain('bg-accent/10');
+    } finally {
+      nav.pathname = '/tr/main/panel';
+    }
+  });
+
+  // FO-176: in Turkish the entry links the Turkish slug and is still the only one lit.
+  it('links the Turkish slug for Partner Search Resources and highlights it alone', () => {
+    nav.pathname = '/tr/main/ortaklar/kaynaklar';
+    try {
+      shell(['M1'], <SidebarNav locale="tr" />);
+      const entry = screen.getByTestId('sidebar-nav-partnerResources');
+      const partners = screen.getByTestId('sidebar-nav-partners');
+      expect(entry.getAttribute('href')).toBe('/tr/main/ortaklar/kaynaklar');
+      expect(entry.className).toContain('bg-accent/10');
+      expect(partners.className).not.toContain('bg-accent/10');
+    } finally {
+      nav.pathname = '/tr/main/panel';
+    }
   });
 
   it('shows only the core items when no module is open', () => {
@@ -120,6 +156,7 @@ describe('SidebarNav — preview badge and plan lock', () => {
       'Çağrılar',
       'Fırsatlar',
       'Ortaklar',
+      'Ortak Arama Kaynakları',
       expect.stringContaining('TTO'),
       'Onay Merkezi (4-Eyes)',
       'Partner REST API',

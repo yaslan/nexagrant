@@ -15,6 +15,13 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/en/ws/notifications', 'tr')).toBe('/tr/ws/bildirimler');
   });
 
+  // FO-176: `kaynaklar` is a fixed page under Partners, not a PIC detail.
+  test('partner resources page maps to its counterpart, not to a PIC', () => {
+    expect(switchLocalePath('/tr/ws/ortaklar/kaynaklar', 'en')).toBe('/en/ws/partners/resources');
+    expect(switchLocalePath('/en/ws/partners/resources', 'tr')).toBe('/tr/ws/ortaklar/kaynaklar');
+    expect(switchLocalePath('/tr/ws/ortaklar/999999999', 'en')).toBe('/en/ws/partners/999999999');
+  });
+
   test('public pages land on their counterpart, not on the home page', () => {
     expect(switchLocalePath('/tr/blog', 'en')).toBe('/en/blog');
     expect(switchLocalePath('/en/pricing', 'tr')).toBe('/tr/fiyatlandirma');

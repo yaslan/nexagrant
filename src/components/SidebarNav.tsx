@@ -21,6 +21,12 @@ interface NavItem {
   upgrade?: boolean;
 }
 
+/**
+ * Top-level entries whose page sits under another entry's path: open key → the key
+ * that must not light up with it (`/partners/resources` also matches Partners).
+ */
+const OUTRANKS: Record<string, string> = { partnerResources: 'partners' };
+
 interface SidebarNavProps {
   locale: string;
   isPlatformAdmin?: boolean;
@@ -92,7 +98,8 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
       </div>
       
       {navItems.map((item) => {
-        const isActive = pathname?.startsWith(item.href) || pathname?.includes(`/${item.key}`);
+        const matches = (i: NavItem) => Boolean(pathname?.startsWith(i.href) || pathname?.includes(`/${i.key}`));
+        const isActive = matches(item) && !navItems.some((other) => OUTRANKS[other.key] === item.key && matches(other));
         // A feature of a module that is off (approvals → M5, API keys → M1) stays in
         // the menu but locked. `activeModules` is the same answer `useModuleEnabled`
         // reads; the hook itself cannot be called inside this loop.

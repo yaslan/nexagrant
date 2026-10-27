@@ -36,6 +36,8 @@ describe('SEO-Friendly Localized Multilingual Routing System (TR & EN)', () => {
       expect(getWorkspaceRoute('callDetail', 'tr', ws, 'call-123')).toBe('/tr/itu-tto/cagrilar/call-123');
       expect(getWorkspaceRoute('pipeline', 'tr', ws)).toBe('/tr/itu-tto/firsatlar');
       expect(getWorkspaceRoute('partners', 'tr', ws)).toBe('/tr/itu-tto/ortaklar');
+      expect(getWorkspaceRoute('partnerResources', 'tr', ws)).toBe('/tr/itu-tto/ortaklar/kaynaklar');
+      expect(getWorkspaceRoute('partnerResources', 'en', ws)).toBe('/en/itu-tto/partners/resources');
       expect(getWorkspaceRoute('evidence', 'tr', ws)).toBe('/tr/itu-tto/kanitlar');
       expect(getWorkspaceRoute('conceptNotes', 'tr', ws)).toBe('/tr/itu-tto/konsept-notlar');
       expect(getWorkspaceRoute('approvals', 'tr', ws)).toBe('/tr/itu-tto/onay-merkezi');
