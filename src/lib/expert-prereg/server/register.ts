@@ -222,7 +222,7 @@ export async function registerExpertPreRegistration(
         utmCampaign: data.utmCampaign,
         kvkkAcceptedAt: now,
         visibilityConsentAt: now,
-        marketingConsentAt: data.marketingConsent ? now : null,
+        // FO-144: marketingConsentAt is not written (the column stays for rows that already carry it).
         consentTextVersion: EXPERT_PREREG_CONSENT_VERSION,
         locale: data.locale,
         verifyTokenHash: tokenHash,

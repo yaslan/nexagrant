@@ -76,4 +76,5 @@ add-platform-setting.sql
 add-partner-search-missed-scans.sql
 add-partner-search-missed-scan-day.sql
 platform-setting-write-guard.sql
+drop-blog-read-time.sql
 module-state-grandfathered.sql

@@ -26,7 +26,9 @@
 --
 -- Idempotent: ADD COLUMN IF NOT EXISTS, the CHECK added only when missing, the
 -- backfill only touches rows whose "readMinutes" is NULL, DROP NOT NULL is a
--- no-op the second time.
+-- no-op the second time. Once drop-blog-read-time.sql (FO-87) has removed
+-- "readTime" — or `prisma db push` built the table without it — the DROP NOT
+-- NULL and the backfill are skipped: "readMinutes" is NOT NULL by then.
 --
 -- Rollback: prisma/migrations/blog-read-minutes.down.sql
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -44,33 +46,41 @@ BEGIN
   END IF;
 END $$;
 
-ALTER TABLE "BlogPost" ALTER COLUMN "readTime" DROP NOT NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name = 'readTime'
+  ) THEN
+    ALTER TABLE "BlogPost" ALTER COLUMN "readTime" DROP NOT NULL;
 
-WITH parsed AS (
-  SELECT
-    "id",
-    substring("readTime" FROM '[0-9]+') AS digits,
-    (
-      SELECT count(*)
-      FROM regexp_split_to_table(
-        regexp_replace(
-          regexp_replace(
-            regexp_replace("content", '!?\[([^\]]*)\]\([^)]*\)', '\1', 'g'),
-            '<[^>]+>', ' ', 'g'),
-          '^\s*[0-9]+[.)]\s+', ' ', 'gn'),
-        '\s+') AS token
-      WHERE token ~ '[[:alnum:]]'
-    ) AS words
-  FROM "BlogPost"
-  WHERE "readMinutes" IS NULL
-)
-UPDATE "BlogPost" AS b
-SET "readMinutes" = CASE
-  -- Nested so the cast never sees more than three digits (no integer overflow).
-  WHEN p.digits IS NOT NULL AND length(p.digits) <= 3 THEN
-    CASE WHEN p.digits::int BETWEEN 1 AND 120 THEN p.digits::int
-         ELSE LEAST(120, GREATEST(1, round(p.words / 200.0)::int)) END
-  ELSE LEAST(120, GREATEST(1, round(p.words / 200.0)::int))
-END
-FROM parsed AS p
-WHERE b."id" = p."id";
+    WITH parsed AS (
+      SELECT
+        "id",
+        substring("readTime" FROM '[0-9]+') AS digits,
+        (
+          SELECT count(*)
+          FROM regexp_split_to_table(
+            regexp_replace(
+              regexp_replace(
+                regexp_replace("content", '!?\[([^\]]*)\]\([^)]*\)', '\1', 'g'),
+                '<[^>]+>', ' ', 'g'),
+              '^\s*[0-9]+[.)]\s+', ' ', 'gn'),
+            '\s+') AS token
+          WHERE token ~ '[[:alnum:]]'
+        ) AS words
+      FROM "BlogPost"
+      WHERE "readMinutes" IS NULL
+    )
+    UPDATE "BlogPost" AS b
+    SET "readMinutes" = CASE
+      -- Nested so the cast never sees more than three digits (no integer overflow).
+      WHEN p.digits IS NOT NULL AND length(p.digits) <= 3 THEN
+        CASE WHEN p.digits::int BETWEEN 1 AND 120 THEN p.digits::int
+             ELSE LEAST(120, GREATEST(1, round(p.words / 200.0)::int)) END
+      ELSE LEAST(120, GREATEST(1, round(p.words / 200.0)::int))
+    END
+    FROM parsed AS p
+    WHERE b."id" = p."id";
+  END IF;
+END $$;

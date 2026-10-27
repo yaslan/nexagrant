@@ -41,17 +41,18 @@ vi.mock('next/cache', () => ({ revalidatePath: m.revalidatePath }));
 
 import { createDbClient, prisma } from '@/lib/db';
 import { getBlogPostBySlug, getBlogPosts, getFeaturedBlogPosts } from '@/lib/blog';
+import { estimateReadMinutes } from '@/lib/blog-read-time';
 import {
   createBlogPostAction,
   deleteBlogPostAction,
   toggleFeaturedBlogPostAction,
   updateBlogPostAction,
 } from '@/app/[locale]/admin/blog/actions';
-import { estimateReadMinutes } from '@/lib/blog-read-time';
-import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isLocalDbUrl, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { sqlStatements } from './helpers/sql-statements';
 
-const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
+const OWNER = OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
+const admin = createDbClient(OWNER);
 const SUITE = 'blog posts test';
 
 const REACHABLE =
@@ -70,6 +71,22 @@ if (REACHABLE && !HAS_TABLE) {
 const HAS_DB = REACHABLE && HAS_TABLE;
 
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
+
+// The two migration tests run DDL as the owner (rolled back, but under an ACCESS
+// EXCLUSIVE lock on "BlogPost"): only on a database db:setup itself would accept.
+const DDL_LOCAL = HAS_DB && isLocalDbUrl(OWNER);
+if (HAS_DB && !DDL_LOCAL) {
+  skipOrFailInCi(`${SUITE} (migration tests)`, 'DATABASE_URL is not a local database (scripts/db-target.sh db_is_local) and they run DDL');
+}
+// "readTime" still there = the FO-84 schema: drop-blog-read-time.sql has not run. The FO-87 test
+// would run it for real (it commits), so it waits for the file instead.
+const HAS_READ_TIME =
+  DDL_LOCAL &&
+  (await admin.$queryRaw<Array<{ n: bigint }>>`SELECT count(*) AS n FROM information_schema.columns
+     WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name = 'readTime'`)[0]?.n === 1n;
+if (HAS_READ_TIME) {
+  skipOrFailInCi(`${SUITE} (FO-87 migration test)`, '"BlogPost"."readTime" still exists — apply prisma/migrations/drop-blog-read-time.sql (scripts/apply-migrations.sh)');
+}
 
 const RUN = Math.random().toString(36).slice(2, 10);
 const STARTED = new Date(Date.now() - 1000);
@@ -333,11 +350,90 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
     await admin.auditEvent.deleteMany({ where: { type: 'blog.post.created', target: expected } });
   });
 
-  test('blog-read-minutes.sql backfills the minutes from the old text, else from the content (TASK-MVDSY96TB1EPM)', async () => {
+  test.skipIf(!DDL_LOCAL || HAS_READ_TIME)('drop-blog-read-time.sql leaves readMinutes NOT NULL and no readTime; both blog files re-run cleanly (TASK-MVDVCQW3GI94J)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const { default: pg } = await import('pg');
+    const fileOf = (name: string) => sqlStatements(readFileSync(resolve(process.cwd(), 'prisma/migrations', name), 'utf8'));
+    const drop = fileOf('drop-blog-read-time.sql');
+    const client = new pg.Client({ connectionString: OWNER });
+    await client.connect();
+    try {
+      // apply-migrations.sh re-runs every file: FO-84's must not trip over the dropped column.
+      for (const name of ['blog-read-minutes.sql', 'drop-blog-read-time.sql', 'blog-read-minutes.sql', 'drop-blog-read-time.sql']) {
+        for (const statement of fileOf(name)) await client.query(statement);
+      }
+
+      const columns = await client.query<{ column_name: string; is_nullable: string }>(
+        `SELECT column_name, is_nullable FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name IN ('readTime', 'readMinutes')`
+      );
+      expect(columns.rows).toEqual([{ column_name: 'readMinutes', is_nullable: 'NO' }]);
+
+      // A NULL left by some writer stops the file instead of being half-applied; rolled back here.
+      await client.query('BEGIN');
+      try {
+        await client.query('ALTER TABLE "BlogPost" ALTER COLUMN "readMinutes" DROP NOT NULL');
+        await client.query(
+          `INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readMinutes", "publishedAt", "image", "updatedAt")
+           VALUES ($1, $2, 't', 'e', 'c', 'c', NULL, now(), 'https://images.unsplash.com/x', now())`,
+          [`nul-${RUN}`, slugOf('nul')]
+        );
+        let raised: unknown;
+        try {
+          for (const statement of drop) await client.query(statement);
+        } catch (e) {
+          raised = e;
+        }
+        expect(String(raised)).toMatch(/1 row\(s\) without "readMinutes"/);
+      } finally {
+        await client.query('ROLLBACK');
+      }
+    } finally {
+      await client.end();
+    }
+
+    await expect(
+      admin.$executeRaw`
+        INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readMinutes", "publishedAt", "image", "updatedAt")
+        VALUES (${`nn-${RUN}`}, ${slugOf('nn')}, 't', 'e', 'c', 'c', NULL, now(), 'https://images.unsplash.com/x', now())`
+    ).rejects.toThrow(/readMinutes|23502|null value/i);
+    // The CHECK holds the range for every writer, not only the admin form.
+    await admin.$executeRaw`
+      INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readMinutes", "publishedAt", "image", "updatedAt")
+      VALUES (${`ck-${RUN}`}, ${slugOf('ck')}, 't', 'e', 'c', 'c', 9, now(), 'https://images.unsplash.com/x', now())`;
+    await expect(
+      admin.$executeRaw`UPDATE "BlogPost" SET "readMinutes" = 121 WHERE "slug" = ${slugOf('ck')}`
+    ).rejects.toThrow(/BlogPost_readMinutes_range/);
+  });
+
+  test.skipIf(!DDL_LOCAL)('blog-read-minutes.sql backfills the minutes from the old text, else from the content, on the FO-84 schema (TASK-MVMFCB7SVEEG1)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const { default: pg } = await import('pg');
+    const statements = sqlStatements(readFileSync(resolve(process.cwd(), 'prisma/migrations/blog-read-minutes.sql'), 'utf8'));
     const words = (n: number) => Array.from({ length: n }, (_, i) => `kelime${i}`).join(' ');
     // Links, images, tags and list numbers are not words — the SQL must count like estimateReadMinutes.
     const marked = `# Başlık\n\n1. [bağlantı metni](https://example.test/a) <b>kalın</b>\n2. ![görsel](https://x.test/i.png)\n\n${words(1100)}`;
+    expect(estimateReadMinutes(marked)).toBe(6);
+    // Each is a token of its own until the SQL strips it (an image with no alt text, a bare tag, a list
+    // number): 200 words read as 1 minute, with the markers counted as 2–3. One case per strip.
+    const images = `${Array.from({ length: 400 }, () => '![](https://x.test/i.png)').join(' ')} ${words(200)}`;
+    const tags = `${Array.from({ length: 400 }, () => '<br>').join(' ')} ${words(200)}`;
+    const list = Array.from({ length: 200 }, (_, i) => `${i + 1}. kelime${i}`).join('\n');
+    expect([estimateReadMinutes(images), estimateReadMinutes(tags), estimateReadMinutes(list)]).toEqual([1, 1, 1]);
+    // A bare marker has no letter or digit, so it is not a word; a link keeps its text as words.
+    const marks = `${Array.from({ length: 400 }, () => '*').join(' ')} ${words(200)}`;
+    const linktext = Array.from({ length: 200 }, (_, i) => `[kelime${i} söz${i}](https://x.test/${i})`).join(' ');
+    expect([estimateReadMinutes(marks), estimateReadMinutes(linktext)]).toEqual([1, 2]);
     const cases: Array<[label: string, readTime: string, content: string, expected: number]> = [
+      ['max', '120 dk', CONTENT, 120],
+      ['images', 'yok', images, 1],
+      ['tags', 'yok', tags, 1],
+      ['list', 'yok', list, 1],
+      ['marks', 'yok', marks, estimateReadMinutes(marks)],
+      ['linktext', 'yok', linktext, estimateReadMinutes(linktext)],
+      ['long', 'yok', words(25_000), 120],
       ['tr', '5 dk', CONTENT, 5],
       ['en', '5 min read', CONTENT, 5],
       ['old', '3 dk okuma', CONTENT, 3],
@@ -349,45 +445,57 @@ describe.skipIf(!HAS_DB)('blog posts (live database, fabrika_app)', () => {
       ['huge', '99999999999 dk', words(450), 2],
       ['empty', 'dk', '', 1],
     ];
-    expect(estimateReadMinutes(marked)).toBe(6);
-    for (const [label, readTime, content] of cases) {
-      await admin.$executeRaw`
-        INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
-        VALUES (${`bf-${label}-${RUN}`}, ${slugOf(`bf-${label}`)}, 't', 'e', ${content}, 'c', ${readTime}, NULL, now(), 'https://images.unsplash.com/x', now())`;
-    }
-    // A row that already has minutes (written by the new code) is not touched.
-    await admin.$executeRaw`
-      INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
-      VALUES (${`bf-kept-${RUN}`}, ${slugOf('bf-kept')}, 't', 'e', ${CONTENT}, 'c', '40 dk', 9, now(), 'https://images.unsplash.com/x', now())`;
-
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const { default: pg } = await import('pg');
-    const sql = readFileSync(resolve(process.cwd(), 'prisma/migrations/blog-read-minutes.sql'), 'utf8');
-    const client = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika' });
+    const insert = `INSERT INTO "BlogPost" ("id", "slug", "title", "excerpt", "content", "category", "readTime", "readMinutes", "publishedAt", "image", "updatedAt")
+      VALUES ($1, $2, 't', 'e', $3, 'c', $4, $5, now(), 'https://images.unsplash.com/x', now())`;
+    const client = new pg.Client({ connectionString: OWNER });
     await client.connect();
     try {
-      for (const statement of sqlStatements(sql)) await client.query(statement);
-      for (const statement of sqlStatements(sql)) await client.query(statement); // idempotent
+      const columnsNow = () =>
+        client.query<{ column_name: string; is_nullable: string }>(
+          `SELECT column_name, is_nullable FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name IN ('readTime', 'readMinutes')
+            ORDER BY column_name`
+        );
+      const before = (await columnsNow()).rows;
+      // The FO-84 schema (readTime text, readMinutes nullable), inside a transaction that is rolled back.
+      // A database FO-87 has reached gets it here; one still on it (the live one until
+      // drop-blog-read-time.sql runs there) already has it, so both statements are no-ops.
+      await client.query('BEGIN');
+      try {
+        await client.query('ALTER TABLE "BlogPost" ADD COLUMN IF NOT EXISTS "readTime" TEXT');
+        await client.query('ALTER TABLE "BlogPost" ALTER COLUMN "readMinutes" DROP NOT NULL');
+        for (const [label, readTime, content] of cases) {
+          await client.query(insert, [`bf-${label}-${RUN}`, slugOf(`bf-${label}`), content, readTime, null]);
+        }
+        // A row that already has minutes (written by the new code) is not touched.
+        await client.query(insert, [`bf-kept-${RUN}`, slugOf('bf-kept'), CONTENT, '40 dk', 9]);
+
+        for (const statement of statements) await client.query(statement);
+        for (const statement of statements) await client.query(statement); // idempotent
+
+        const { rows } = await client.query<{ slug: string; readMinutes: number | null }>(
+          'SELECT "slug", "readMinutes" FROM "BlogPost" WHERE "slug" = ANY($1::text[])',
+          [[...cases.map(([label]) => slugOf(`bf-${label}`)), slugOf('bf-kept')]]
+        );
+        const minutesOf = (label: string) => rows.find((r) => r.slug === slugOf(label))?.readMinutes;
+        for (const [label, , , expected] of cases) expect([label, minutesOf(`bf-${label}`)]).toEqual([label, expected]);
+        expect(minutesOf('bf-kept')).toBe(9);
+      } finally {
+        await client.query('ROLLBACK');
+      }
+
+      // The rollback left the schema as it found it.
+      expect((await columnsNow()).rows).toEqual(before);
     } finally {
       await client.end();
     }
-
-    const minutesOf = async (label: string) =>
-      (await admin.blogPost.findUnique({ where: { slug: slugOf(label) }, select: { readMinutes: true } }))?.readMinutes;
-    for (const [label, , , expected] of cases) expect([label, await minutesOf(`bf-${label}`)]).toEqual([label, expected]);
-    expect(await minutesOf('bf-kept')).toBe(9);
-
-    // The CHECK holds the range for every writer, not only the admin form.
-    await expect(
-      admin.$executeRaw`UPDATE "BlogPost" SET "readMinutes" = 121 WHERE "slug" = ${slugOf('bf-kept')}`
-    ).rejects.toThrow(/BlogPost_readMinutes_range/);
   });
 
   test('a saved post stores minutes only and reads back as a number (TASK-MVDSY96TB1EPM)', async () => {
     expect(await createBlogPostAction(form('mins', { readMinutes: 8 }))).toMatchObject({ ok: true });
     const [row] = await rowsFor('mins');
-    expect(row).toMatchObject({ readMinutes: 8, readTime: null });
+    expect(row).toMatchObject({ readMinutes: 8 });
+    expect(row).not.toHaveProperty('readTime');
     expect((await getBlogPostBySlug(slugOf('mins')))?.readMinutes).toBe(8);
     expect(await createBlogPostAction(form('mins121', { readMinutes: 121 }))).toEqual({ ok: false, error: 'invalid_read_time' });
     expect(await rowsFor('mins121')).toHaveLength(0);
