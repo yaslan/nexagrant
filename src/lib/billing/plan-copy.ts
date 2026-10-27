@@ -14,7 +14,7 @@
  * with `t.has` first, so a screen that asks for a bullet one plan lacks gets
  * a shorter list instead of an error.
  */
-import { findEntry } from '@/lib/billing/catalog';
+import { findEntry, grantsFor } from '@/lib/billing/catalog';
 
 /** The `PlanFeature` fields a card reads. */
 export interface PlanCardFeature {
@@ -31,7 +31,7 @@ export interface PlanCopySource {
 
 /** The two methods of a next-intl translator this needs, already namespaced. */
 export interface PlanCopyTranslator {
-  (key: string): string;
+  (key: string, values?: Record<string, string>): string;
   has(key: string): boolean;
 }
 
@@ -58,6 +58,48 @@ export function featureText(feature: PlanCardFeature, locale: string): string | 
   return feature.kind === 'module' && feature.moduleId ? feature.moduleId : null;
 }
 
+/**
+ * A plan's module ids as the card lists them: a run of three or more
+ * consecutive ids collapses to a first-last range, the rest stay listed. The `modules` bullet
+ * takes this as `{modules}`, so the list follows the plan's grant in
+ * catalog.ts instead of being typed into messages/*.json (FO-171).
+ *
+ * A module the plan grants only in a limited form (`moduleLimits`, FO-41) is
+ * named on its own through `limited(id)` — "M1 (limited)" — and never folded
+ * into a range, so a card cannot pass a limited grant off as a full one.
+ */
+export function formatModuleIds(
+  ids: readonly string[],
+  limited: { ids: readonly string[]; label: (id: string) => string } = { ids: [], label: (id) => id }
+): string {
+  const entries = ids
+    .map((id) => ({ id, n: Number(id.slice(1)), limited: limited.ids.includes(id) }))
+    .sort((a, b) => a.n - b.n);
+  const parts: string[] = [];
+  for (let i = 0; i < entries.length; ) {
+    const first = entries[i];
+    if (!first) break;
+    if (first.limited) {
+      parts.push(limited.label(first.id));
+      i += 1;
+      continue;
+    }
+    let end = i;
+    for (;;) {
+      const next = entries[end + 1];
+      if (!next || next.limited || next.n !== (entries[end]?.n ?? 0) + 1) break;
+      end += 1;
+    }
+    if (end - i >= 2) {
+      parts.push(`M${first.n}-M${entries[end]?.n}`);
+    } else {
+      for (let j = i; j <= end; j += 1) parts.push(`M${entries[j]?.n}`);
+    }
+    i = end + 1;
+  }
+  return parts.join(', ');
+}
+
 export function planCardCopy(
   plan: PlanCopySource,
   t: PlanCopyTranslator,
@@ -65,9 +107,16 @@ export function planCardCopy(
   keys: { summary: string; bullets: readonly string[] }
 ): PlanCardCopy {
   if (findEntry(plan.planId)?.kind === 'plan') {
+    const grant = grantsFor(plan.planId);
+    const values = {
+      modules: formatModuleIds(grant?.moduleIds ?? [], {
+        ids: Object.keys(grant?.moduleLimits ?? {}),
+        label: (id) => (t.has('moduleLimited') ? t('moduleLimited', { id }) : id),
+      }),
+    };
     const message = (key: string) => {
       const id = `plans.${plan.planId}.${key}`;
-      return t.has(id) ? t(id) : null;
+      return t.has(id) ? t(id, values) : null;
     };
     return {
       summary: message(keys.summary),

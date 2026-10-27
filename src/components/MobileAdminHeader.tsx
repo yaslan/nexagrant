@@ -8,6 +8,7 @@ import UserMenu, { type UserMenuWorkspace } from './UserMenu';
 import { Menu, X, ShieldCheck } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { PRODUCT_NAME } from '@/lib/brand';
+import type { ModuleCounts } from '@/lib/modules/registry';
 
 interface MobileAdminHeaderProps {
   locale: string;
@@ -17,6 +18,8 @@ interface MobileAdminHeaderProps {
   roleName?: string;
   /** Real workspaces of the session, resolved server-side. See UserMenu. */
   workspaces?: UserMenuWorkspace[];
+  /** From `getModuleCounts()` on the server; feeds the sidebar's module badge. */
+  moduleCounts: ModuleCounts;
 }
 
 export default function MobileAdminHeader({
@@ -26,6 +29,7 @@ export default function MobileAdminHeader({
   userImage,
   roleName,
   workspaces = [],
+  moduleCounts,
 }: MobileAdminHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const tCommon = useTranslations('Common');
@@ -89,7 +93,7 @@ export default function MobileAdminHeader({
                   Yönetim Menüsü
                 </span>
               </div>
-              <AdminSidebarNav locale={locale} />
+              <AdminSidebarNav locale={locale} moduleCounts={moduleCounts} />
             </div>
           </div>
         </div>

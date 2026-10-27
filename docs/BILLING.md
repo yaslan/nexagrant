@@ -391,7 +391,7 @@ satış tarafı kazanır.
 | `starter` (€59) | `basic` ($45) | Giriş seviyesi ücretli plan → giriş seviyesi ücretli plan. Modül kümesi birebir aynı (M2, M3, M5). |
 | `team` (€249) | `pro` ($87) | Orta plan → orta plan. Modül kümesi birebir aynı (M1–M5, M8). |
 | `business` (€599) | `ultra` ($147) | `ultra`, `business`'ın üst kümesidir (üstüne M7 açar). Kayıp yok, kazanç var. |
-| `enterprise` (≥€1.500) | `ultra` ($147) | 11 modülün tamamını açan tek plan `ultra`. Koltuk/çalışma alanı farkı aşağıda korunur. |
+| `enterprise` (≥€1.500) | `ultra` ($147) | Yayındaki modüllerin tamamını (`ALL_MODULE_IDS`, `src/lib/billing/catalog.ts`) açan tek plan `ultra`. Koltuk/çalışma alanı farkı aşağıda korunur. |
 
 Eşleme **fiyat eşliğine göre değil, yetenek eşliğine göre** yapıldı: USD
 merdiveni bütünüyle eski `team` fiyatının altında, dolayısıyla fiyat eşleştirmek

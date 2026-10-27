@@ -169,7 +169,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 
 ### E3 · Modül çekirdeği + yönetici konsolu (S3)
 
-- [x] `ModuleManifest` tipi, registry, derleme zamanı doğrulama; 11 manifest (`src/modules/m1`–`m11`, boş UI ile).
+- [x] `ModuleManifest` tipi, registry, derleme zamanı doğrulama; modül manifestleri (`src/modules/m*`; ilk teslimde M1–M11, boş UI ile — güncel sayı `getModuleCounts()`).
 - [x] `state-machine.ts` (`canEnable/enable/disable/cascade`) + birim testleri (`tests/modules/state-machine.test.ts`, `tests/admin-modules.test.ts`).
 - [x] `requireModule`, `useModuleEnabled` (`src/lib/modules/access.ts`, `hooks.tsx`), nav filtreleme; `/settings/modules`, `/admin/modules`.
 - Kabul: PROJECT.md §8 modül maddeleri.

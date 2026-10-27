@@ -4,7 +4,7 @@
 
 ## 0. Özet
 
-**Fabrika**, KOBİ'lerin, danışmanlık firmalarının ve üniversite proje ofislerinin Avrupa fonlarına (Ufuk Avrupa, EIC, Eurostars/Eureka, CETPartnership, DUT, Erasmus+, Digital Europe, EIT, NEB, Missions) sürekli ve sistematik başvurmasını sağlayan çok kiracılı (multi-tenant) bir web SaaS'ıdır. Çekirdek altı veri katmanı (K1–K6) ve on bir iş modülü (M1–M11) içerir; modüller kiracı yöneticisi tarafından plana/eklentiye göre açılıp kapatılır. Gelir modeli: abonelik + modül eklentileri + hizmet paketleri + veri/API lisansı (`docs/BUSINESS_MODEL.md`; pazar yeri kaldırıldı — ADR-0005).
+**Fabrika**, KOBİ'lerin, danışmanlık firmalarının ve üniversite proje ofislerinin Avrupa fonlarına (Ufuk Avrupa, EIC, Eurostars/Eureka, CETPartnership, DUT, Erasmus+, Digital Europe, EIT, NEB, Missions) sürekli ve sistematik başvurmasını sağlayan çok kiracılı (multi-tenant) bir web SaaS'ıdır. Çekirdek altı veri katmanı (K1–K6) ve iş modüllerini içerir (güncel liste ve sayı: `src/lib/modules/registry.ts`, `getModuleCounts()`; henüz yayında olmayanlar `statusBadge: 'soon'`); modüller kiracı yöneticisi tarafından plana/eklentiye göre açılıp kapatılır. Gelir modeli: abonelik + modül eklentileri + hizmet paketleri + veri/API lisansı (`docs/BUSINESS_MODEL.md`; pazar yeri kaldırıldı — ADR-0005).
 
 Dil: arayüz **Türkçe (varsayılan) ve İngilizce**; kod, tablo/alan adları ve commit mesajları **İngilizce**.
 
@@ -48,7 +48,7 @@ Dil: arayüz **Türkçe (varsayılan) ve İngilizce**; kod, tablo/alan adları v
 | **K5 Pipeline/CRM** | `Opportunity`, `Proposal`, `ConsortiumSeat`, `PartnerOrg`, `Gate`, `Effort` | |
 | **K6 YZ** | Sağlayıcıdan bağımsız LLM adaptörü (Anthropic varsayılan), embedding + pgvector, RAG (çalışma programı PDF + topic JSON + CORDIS özet), **kredi sayacı**, **YZ kullanım günlüğü** (şeffaflık beyanı için) | `docs/ARCHITECTURE.md §6` |
 
-## 4. Modüller (M1–M11) ve durum makinesi
+## 4. Modüller ve durum makinesi
 
 Durumlar: `off → dev → pilot → on`. Yalnızca `on` kullanıcı menüsünde; `pilot` yalnızca `pipeline_manager` ve üstüne görünür. Bağımlılık kuralı: zorunlu bağımlılıkların hepsi `on|pilot` olmadan modül açılamaz; bir modül `off` yapılınca ona bağımlı `on|pilot` modüller kademeli `off` olur ve yöneticiye listelenir. Plan kuralı: plan/eklenti kapsamı dışındaki modül `on` yapılamaz; konsolda "Eklentiyi satın al" akışı açılır.
 

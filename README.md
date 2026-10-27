@@ -1,6 +1,6 @@
 # Fabrika — Avrupa Proje Fabrikası SaaS
 
-KOBİ, danışmanlık ve üniversite proje ofisleri için Avrupa fonlarına sürekli başvuru pipeline'ı. Çok kiracılı, modüler (M1–M11), yönetici tarafından açılıp kapatılabilen modüller; abonelik + eklenti + hizmet + veri/API gelir modeli (pazar yeri kaldırıldı, ADR-0005).
+KOBİ, danışmanlık ve üniversite proje ofisleri için Avrupa fonlarına sürekli başvuru pipeline'ı. Çok kiracılı, modüler (güncel modül listesi ve sayısı `src/lib/modules/registry.ts` → `getModuleCounts()`), yönetici tarafından açılıp kapatılabilen modüller; abonelik + eklenti + hizmet + veri/API gelir modeli (pazar yeri kaldırıldı, ADR-0005).
 
 ## Belgeler (önce bunları oku)
 1. `PROJECT.md` — tek doğruluk kaynağı (hedefler, roller, katmanlar, modüller, kapılar, stack, kabul kriterleri)

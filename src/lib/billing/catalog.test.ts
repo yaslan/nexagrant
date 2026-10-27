@@ -30,6 +30,8 @@ import {
   type DiscountTier,
 } from './catalog';
 import { DEFAULT_ACTIVE_TIER, resolveConfiguredTier } from './active-tier';
+import { createTranslator } from 'next-intl';
+import { planCardCopy } from './plan-copy';
 
 function tier(code: string): DiscountTier {
   const found = findTierByCode(code);
@@ -309,11 +311,11 @@ describe('plan entitlements', () => {
 });
 
 /**
- * Sentinel — TASK-MTRIXGYXLLQR1. `billingPanels.settings.plans.<id>.modules` is
- * marketing/settings copy typed by hand in two JSON files; nothing regenerates
- * it from `PLAN_GRANTS`. It had drifted before this task started: the Pro card
- * said "M1-M5, M8" a version behind the catalogue, which already granted M6.
- * This guards the two from silently diverging again, in either direction —
+ * Sentinel — TASK-MTRIXGYXLLQR1. `billingPanels.settings.plans.<id>.modules` was
+ * typed by hand in two JSON files and had drifted: the Pro card listed M5 as
+ * its last consecutive module a version after the catalogue granted M6. Since
+ * FO-171 the list is `{modules}`, filled by `planCardCopy` from `PLAN_GRANTS`;
+ * this reads the rendered line back and guards the two from diverging —
  * a card cannot promise a module the plan does not grant, and cannot grant one
  * the card does not mention, so the seats/credits/module figures a tenant
  * reads on the settings page are always exactly what `grantsFor()` computes.
@@ -321,7 +323,7 @@ describe('plan entitlements', () => {
 describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
   const PLAN_IDS = ['basic', 'pro', 'ultra'] as const;
 
-  /** "M1-M6, M8" / "M2, M3, M5" → ['M1','M2','M3','M4','M5','M6','M8'] */
+  /** "Modules: <first>-<last>, M8" → every id in the range plus M8. */
   function parseModuleIds(label: string): string[] {
     const list = label.split(':')[1];
     if (!list) throw new Error(`No "label: list" split point in "${label}"`);
@@ -389,12 +391,20 @@ describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
       const maybeCard = cards[planId];
 
       it(`${locale}/${planId}: modules line names exactly grantsFor('${planId}').moduleIds`, () => {
-        const card = requireCard(maybeCard, `${locale}/${planId}`);
-        const named = parseModuleIds(card.modules);
+        requireCard(maybeCard, `${locale}/${planId}`);
+        const t = createTranslator({
+          locale,
+          messages,
+          namespace: 'billingPanels.settings',
+        }) as unknown as Parameters<typeof planCardCopy>[1];
+        const rendered = planCardCopy({ planId }, t, locale, { summary: 'desc', bullets: ['modules'] })
+          .bullets[0]?.text;
+        if (!rendered) throw new Error(`${locale}/${planId}: no modules bullet rendered`);
+        const named = parseModuleIds(rendered);
         const grantedSet = [...grant.moduleIds].sort();
         expect(
           [...named].sort(),
-          `${locale}/${planId} modules line "${card.modules}" vs grant [${grantedSet.join(', ')}]`
+          `${locale}/${planId} modules line "${rendered}" vs grant [${grantedSet.join(', ')}]`
         ).toEqual(grantedSet);
       });
 
