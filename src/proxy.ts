@@ -6,6 +6,7 @@ import {
   cspHeaderName,
   cspOptionsFromEnv,
   generateNonce,
+  isCordisWidgetPath,
 } from './lib/security-headers';
 
 const handleIntl = createMiddleware(routing);
@@ -34,7 +35,10 @@ function isPolicyOnlyPath(pathname: string): boolean {
  */
 export function proxy(request: NextRequest) {
   const nonce = generateNonce();
-  const csp = buildContentSecurityPolicy(cspOptionsFromEnv(nonce));
+  const csp = buildContentSecurityPolicy({
+    ...cspOptionsFromEnv(nonce),
+    cordisWidget: isCordisWidgetPath(request.nextUrl.pathname),
+  });
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
