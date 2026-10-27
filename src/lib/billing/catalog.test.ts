@@ -23,7 +23,10 @@ import {
   AI_ACTION_CREDITS,
   aiCreditEntry,
   plansGrantingModule,
+  planNamesGrantingModuleInFull,
+  moduleLimitsFor,
   resolvePlanId,
+  TTO_EDITION_PLAN_ID,
   type DiscountTier,
 } from './catalog';
 import { DEFAULT_ACTIVE_TIER, resolveConfiguredTier } from './active-tier';
@@ -331,6 +334,12 @@ describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
         for (let n = from; n <= to; n += 1) ids.push(`M${n}`);
         continue;
       }
+      // FO-41: "M1 (sınırlı)" / "M1 (limited)" names a limited grant of M1.
+      const limited = token.match(/^(M\d+) \(.+\)$/);
+      if (limited?.[1]) {
+        ids.push(limited[1]);
+        continue;
+      }
       if (!/^M\d+$/.test(token)) {
         throw new Error(`Unrecognised module token "${token}" in "${label}"`);
       }
@@ -492,5 +501,36 @@ describe('AI credit catalogue — docs/BILLING.md and the code say one number', 
       expect(aiCreditEntry('M4', 'whatever')).toBeNull();
       expect(aiCreditEntry('', '')).toBeNull();
     });
+  });
+});
+
+describe('FO-41 packaging (F3, owner approval 2026-10-25)', () => {
+  const LIMITED = { partnerSearchPerMonth: 10, readOnly: true };
+
+  it('Discover: M1 limited and M5, M3 gone; Yakında M0 only previewed', () => {
+    const free = grantsFor('free')!;
+    expect([...free.moduleIds].sort()).toEqual(['M1', 'M5']);
+    expect(free.moduleLimits).toEqual({ M1: LIMITED });
+    expect(free.previewModuleIds).toContain('M0');
+  });
+
+  it('Basic: M3 there, M1 limited', () => {
+    const basic = grantsFor('basic')!;
+    expect([...basic.moduleIds].sort()).toEqual(['M1', 'M2', 'M3', 'M5']);
+    expect(moduleLimitsFor('basic', 'M1')).toEqual(LIMITED);
+    expect(moduleLimitsFor('basic', 'M3')).toBeNull();
+    expect(moduleLimitsFor('pro', 'M1')).toBeNull();
+  });
+
+  it('TTO Edition: limited M1 + M4 + M7, not purchasable, no price anywhere', () => {
+    const tto = grantsFor(TTO_EDITION_PLAN_ID)!;
+    expect([...tto.moduleIds].sort()).toEqual(['M1', 'M4', 'M7']);
+    expect(tto.purchasable).toBe(false);
+    expect(moduleLimitsFor(TTO_EDITION_PLAN_ID, 'M1')).toEqual(LIMITED);
+    expect(findEntry(TTO_EDITION_PLAN_ID)).toBeNull();
+  });
+
+  it('names only plans with M1 in full as the way out of the read-only mode', () => {
+    expect(planNamesGrantingModuleInFull('M1')).toEqual(['Pro', 'Ultra']);
   });
 });

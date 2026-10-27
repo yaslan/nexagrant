@@ -18,8 +18,8 @@ Para birimi **USD**, tutarlar cent (CLAUDE.md kural 9). Aşağıdaki fiyatlar
 
 | Plan id | Ad | Aylık liste | Yıllık liste | Aylık eşdeğeri (gösterim) | Koltuk | Çalışma alanı | YZ kredi/ay | Açtığı modüller |
 |---|---|---|---|---|---|---|---|---|
-| `free` | Discover | — | — | — | 1 | 1 | 10 | M3, M5 |
-| `basic` | Basic | $45,00 | $387,00 | $32,25 | 2 | 1 | 100 | M2, M3, M5 |
+| `free` | Discover | — | — | — | 1 | 1 | 10 | M1 (sınırlı), M5 |
+| `basic` | Basic | $45,00 | $387,00 | $32,25 | 2 | 1 | 100 | M1 (sınırlı), M2, M3, M5 |
 | `pro` | Pro | $87,00 | $747,00 | $62,25 | 6 | 1 | 500 | M1-M6, M8 |
 | `ultra` | Ultra | $147,00 | $1.197,00 | $99,75 | 15 | 5 | 2.000 | M1-M11 |
 
@@ -53,6 +53,21 @@ Rakam yalnız katalogdadır; okuma `partnerSearchGrant(planId, hasM1)` ile.
 durumdur: `CATALOG`'da yer almaz (dolayısıyla hiçbir fiyat panelinde
 görünmez), ama `Plan` tablosunda satırı vardır çünkü `getEntitlements()`
 abonesiz her kiracı için ona düşer.
+
+**FO-41 (F3) paketleme, patron onayı 2026-10-25.** M3 Discover'dan çıktı (Basic
+ve üstünde). Discover ve Basic M1'i **sınırlı** açar: ayda 10 ortak araması
+(`partnerSearchPerMonth`, sayaç `PartnerSearchQuotaUsage`), salt okunur
+(`readOnly`: API anahtarı üretilemez, `/api/v1` kapalı). Sınır tek yerde:
+`PlanGrant.moduleLimits` (`src/lib/billing/catalog.ts`, `M1_LIMITED`); bir
+eklenti ya da `ModuleState.grandfathered` modülü tam açar. M0 "Yakında"
+olduğu sürece Discover/Basic kartında önizleme olarak kalır (erişim vermez).
+Discover'da M3'ü açık olan kiracılar `ModuleState.grandfathered` ile M3'ü
+korur (migration `module-state-grandfathered.sql`) — ORPHANED'a düşmez.
+
+**TTO Edition (`tto-edition`) satılık değildir** (`purchasable: false`,
+`CATALOG`'da fiyat yok, `getAllPlans()` göstermez): M1 (sınırlı) + M4 + M7,
+2 koltuk, 1 çalışma alanı, 100 kredi/ay (Basic ile aynı; sözleşme başka
+derse orada değişir). Atama yolu ve fiyatı ayrı karar.
 
 **Yıllık fiyat nasıl türetilir:** indirim yıllık toplama **bir kez** uygulanır
 ve bir kez yuvarlanır (`YEARLY_DERIVATION`). Aylık eşdeğeri yalnızca gösterim

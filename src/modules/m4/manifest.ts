@@ -32,4 +32,6 @@ export const m4Manifest: ModuleManifest = {
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
+  addonPurchasable: false,
+  trialDays: 7,
 };

@@ -410,7 +410,11 @@ export function decidePartnerSearchAccess(
   if (m1.allowed) {
     return { allowed: true, quota: grant.queriesMonthly, export: grant.export };
   }
-  if (m1.reason === 'PLAN_UPGRADE_REQUIRED' && grant.queriesMonthly !== null && grant.queriesMonthly > 0) {
+  // A metered plan opens its quota'd read whether M1 is outside the plan or in it
+  // only as a limited M1 that the tenant has not switched on (FO-41: Discover's
+  // M1 is in the plan; the free signal must not vanish with the switch off).
+  const planLimited = m1.reason === 'PLAN_UPGRADE_REQUIRED' || (m1.reason === 'MODULE_OFF' && m1.status === 'OFF');
+  if (planLimited && grant.queriesMonthly !== null && grant.queriesMonthly > 0) {
     const rollout = m1.status === 'OFF' ? null : canAccessStatus(m1.status, viewer);
     if (rollout && !rollout.allowed) return { allowed: false, reason: rollout.reason ?? 'MODULE_OFF' };
     return { allowed: true, quota: grant.queriesMonthly, export: false };

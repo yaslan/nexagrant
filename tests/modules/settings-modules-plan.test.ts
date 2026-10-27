@@ -67,24 +67,24 @@ describe('modules settings — plan and state from entitlements', () => {
   it('no subscription: Discover, nothing active, Pro module refused and not written', async () => {
     const v = await view(tenantId);
     expect(v).toMatchObject({ planId: 'free', planName: 'Discover', badgeTier: null, pilot: null, activeModules: [] });
-    expect([...v.entitledModules].sort()).toEqual(['M3', 'M5']);
+    expect([...v.entitledModules].sort()).toEqual(['M1', 'M5']);
 
-    await expect(toggleModuleState('M1', 'ON')).rejects.toThrow(/Plan upgrade required/);
-    expect(await moduleRow(tenantId, 'M1')).toBeNull();
+    await expect(toggleModuleState('M3', 'ON')).rejects.toThrow(/Plan upgrade required/);
+    expect(await moduleRow(tenantId, 'M3')).toBeNull();
 
-    await expect(toggleModuleState('M3', 'ON')).resolves.toEqual({ success: true });
-    expect((await view(tenantId)).activeModules).toEqual(['M3']);
+    await expect(toggleModuleState('M1', 'ON')).resolves.toEqual({ success: true });
+    expect((await view(tenantId)).activeModules).toEqual(['M1']);
   });
 
   it('a row switched on outside the plan is not shown active and does not satisfy a dependency', async () => {
-    await prisma.moduleState.create({ data: { tenantId, moduleId: 'M1', status: 'ON' } });
+    await prisma.moduleState.create({ data: { tenantId, moduleId: 'M3', status: 'ON' } });
     const v = await view(tenantId);
     expect(v.activeModules).toEqual([]);
-    expect(v.switchedOnOutsidePlan).toEqual(['M1']);
+    expect(v.switchedOnOutsidePlan).toEqual(['M3']);
 
     // The page offers "Kapat" for it; the action switches it off.
-    await expect(toggleModuleState('M1', 'OFF')).resolves.toEqual({ success: true });
-    expect((await moduleRow(tenantId, 'M1'))?.status).toBe('OFF');
+    await expect(toggleModuleState('M3', 'OFF')).resolves.toEqual({ success: true });
+    expect((await moduleRow(tenantId, 'M3'))?.status).toBe('OFF');
     expect((await view(tenantId)).switchedOnOutsidePlan).toEqual([]);
   });
 

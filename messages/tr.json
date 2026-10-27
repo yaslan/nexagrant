@@ -1507,6 +1507,7 @@
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
       "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
+      "READ_ONLY_PLAN": "{module} modülü planınızda salt okunur. Kayıt oluşturmak ve değiştirmek şu planlarda var: {plans}.",
       "COMING_SOON": "{module} modülü yakında kullanıma açılacak."
     }
   },
@@ -1980,7 +1981,7 @@
           "desc": "Solo başlangıç — ilk adım.",
           "seats": "2 kullanıcı / 1 çalışma alanı",
           "credits": "100 YZ kredisi / ay",
-          "modules": "Modüller: M2, M3, M5"
+          "modules": "Modüller: M1 (sınırlı), M2, M3, M5"
         },
         "pro": {
           "desc": "Ciddi günlük kullanım ve projeler.",
@@ -3823,6 +3824,8 @@
     }
   },
   "partnersPage": {
+    "searchQuotaExhausted": "Bu ay {limit} ortak aramasının tamamını kullandınız. Planınızda ortak arama sınırlı; sınırsız arama şu planlarda var: {plans}.",
+    "searchQuotaUsed": "Bu ay {limit} ortak aramasından {used} tanesini kullandınız.",
     "breadcrumbDashboard": "Panel",
     "breadcrumbCurrent": "Ortak Arama & CORDIS / Interreg (M1/M8)",
     "title": "M1 Partner Intelligence Database & CORDIS Ortak Arama",

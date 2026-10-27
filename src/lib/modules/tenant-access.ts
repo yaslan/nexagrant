@@ -1,5 +1,5 @@
 import { getEntitlements } from '@/lib/billing';
-import { planNamesGrantingModule } from '@/lib/billing/catalog';
+import { planNamesGrantingModule, type ModuleLimits } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import { canAccessStatus, isComingSoon, type ModuleDenyReason, type ModuleViewer } from '@/lib/modules/state-machine';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
@@ -24,6 +24,11 @@ export interface ModuleAccessResult {
    * `PLAN_UPGRADE_REQUIRED` refusal. Read from `PLAN_GRANTS`, never re-typed.
    */
   requiredPlans?: string[];
+  /**
+   * FO-41: set on an allowed answer when the plan grants the module only in a
+   * limited form (read only, metered searches). Absent means in full.
+   */
+  limits?: ModuleLimits;
 }
 
 /**
@@ -73,6 +78,7 @@ export async function checkModuleAccessForTenant(
     (state?.status ?? 'OFF') as ModuleStatus,
     entitlements.allowedModules,
     viewer,
+    entitlements.moduleLimits?.[moduleId],
   );
 }
 
@@ -88,6 +94,7 @@ export function decideModuleAccess(
   status: ModuleStatus,
   allowedModules: readonly string[],
   viewer: ModuleViewer,
+  limits?: ModuleLimits,
 ): ModuleAccessResult {
   if (isComingSoon(moduleId)) {
     return { allowed: false, status, reason: 'COMING_SOON' };
@@ -104,7 +111,8 @@ export function decideModuleAccess(
 
   const decision = canAccessStatus(status, viewer);
 
-  return decision.allowed
-    ? { allowed: true, status }
-    : { allowed: false, status, reason: decision.reason ?? 'MODULE_OFF' };
+  if (!decision.allowed) {
+    return { allowed: false, status, reason: decision.reason ?? 'MODULE_OFF' };
+  }
+  return limits ? { allowed: true, status, limits } : { allowed: true, status };
 }

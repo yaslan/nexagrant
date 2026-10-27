@@ -1507,6 +1507,7 @@
       "PILOT_MANAGERS_ONLY": "The {module} module is in pilot and is limited to workspace managers.",
       "NO_TENANT": "Your session is not linked to a workspace.",
       "NOT_AUTHENTICATED": "You need to sign in to see this page.",
+      "READ_ONLY_PLAN": "Your plan includes the {module} module read only. Creating and changing records is included in: {plans}.",
       "COMING_SOON": "The {module} module is coming soon."
     }
   },
@@ -1980,7 +1981,7 @@
           "desc": "Solo start — the first step.",
           "seats": "2 users / 1 workspace",
           "credits": "100 AI credits / month",
-          "modules": "Modules: M2, M3, M5"
+          "modules": "Modules: M1 (limited), M2, M3, M5"
         },
         "pro": {
           "desc": "For serious daily use and projects.",
@@ -3823,6 +3824,8 @@
     }
   },
   "partnersPage": {
+    "searchQuotaExhausted": "You have used all {limit} partner searches for this month. Your plan includes a limited partner search; unlimited searches are included in: {plans}.",
+    "searchQuotaUsed": "You have used {used} of your {limit} partner searches this month.",
     "breadcrumbDashboard": "Dashboard",
     "breadcrumbCurrent": "Partners & CORDIS / Interreg (M1/M8)",
     "title": "M1 Partner Intelligence Database & CORDIS Search",

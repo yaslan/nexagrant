@@ -2,6 +2,7 @@ import { cache } from 'react';
 
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
+import { planNamesGrantingModuleInFull, type ModuleLimits } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import { tenantScopeOf, TenantScopeError, type TenantScope } from '@/lib/tenant';
 import type { ModuleDenyReason, SessionViewer } from '@/lib/modules/state-machine';
@@ -42,6 +43,8 @@ export class ModuleAccessError extends Error {
     readonly moduleId: ModuleId,
     readonly status: ModuleStatus,
     readonly reason: ModuleDenyReason,
+    /** Plans that would lift the refusal, by display name (FO-41). */
+    readonly requiredPlans: string[] = [],
   ) {
     super(`Module ${moduleId} is not available (${status}/${reason}).`);
     this.name = 'ModuleAccessError';
@@ -72,6 +75,7 @@ export const requestSession = cache(() => auth());
 interface TenantModuleFacts {
   statusById: ReadonlyMap<string, ModuleStatus>;
   allowedModules: readonly string[];
+  moduleLimits: Readonly<Record<string, ModuleLimits>>;
 }
 
 const tenantModuleFacts = cache(
@@ -89,6 +93,7 @@ const tenantModuleFacts = cache(
           states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
         ),
         allowedModules: entitlements.allowedModules,
+        moduleLimits: entitlements.moduleLimits ?? {},
       };
     }),
 );
@@ -125,7 +130,13 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
   }
 
   const facts = await tenantModuleFacts(scope.tenantId);
-  return decideModuleAccess(moduleId, facts.statusById.get(moduleId) ?? 'OFF', facts.allowedModules, sessionViewerOf(scope));
+  return decideModuleAccess(
+    moduleId,
+    facts.statusById.get(moduleId) ?? 'OFF',
+    facts.allowedModules,
+    sessionViewerOf(scope),
+    facts.moduleLimits[moduleId],
+  );
 }
 
 /**
@@ -190,10 +201,25 @@ export async function listModuleNav(): Promise<ModuleNavState> {
  * `TenantScopeError` that `requireTenantAction` would have thrown a line later,
  * so the browser says "sign in again" rather than "the module is switched off".
  */
-export async function assertModuleAccess(moduleId: ModuleId): Promise<void> {
+export async function assertModuleAccess(moduleId: ModuleId): Promise<ModuleAccessResult> {
   const access = await checkModuleAccess(moduleId);
   if (access.reason === 'NO_TENANT') throw new TenantScopeError();
   if (!access.allowed) {
     throw new ModuleAccessError(moduleId, access.status, access.reason ?? 'MODULE_OFF');
+  }
+  return access;
+}
+
+/**
+ * FO-41 — for server actions that create or change something in the module.
+ * Everything `assertModuleAccess` refuses, plus a plan that grants the module
+ * read only (Discover's M1): such a tenant may look, not write. Reads keep
+ * calling `assertModuleAccess`; an action that only *reduces* access (revoking
+ * an API key) calls neither.
+ */
+export async function assertModuleWrite(moduleId: ModuleId): Promise<void> {
+  const access = await assertModuleAccess(moduleId);
+  if (access.limits?.readOnly) {
+    throw new ModuleAccessError(moduleId, access.status, 'READ_ONLY_PLAN', planNamesGrantingModuleInFull(moduleId));
   }
 }
