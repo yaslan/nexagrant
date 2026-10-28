@@ -4478,6 +4478,7 @@
       "downloadName": "interreg-pre-assessment",
       "reset": "Reset",
       "resetConfirm": "The text of both uploaded files and this report will be deleted. Continue?",
+      "resetConfirmFiles": "The text of the uploaded files will be deleted. Continue?",
       "resetDone": "Files and report deleted; you can start again.",
       "reportTitle": "Pre-assessment report",
       "rubric": "Assessment grid: {label}",
@@ -4489,7 +4490,8 @@
       "knockouts": "{count, plural, =0 {No criterion carries an elimination risk} one {# criterion carries an elimination risk} other {# criteria carry an elimination risk}}",
       "loading": "Loading…",
       "retry": "Try again",
-      "genericError": "Something went wrong. Please try again."
+      "genericError": "Something went wrong. Please try again.",
+      "stillRunning": "The analysis still seems to be running. Refresh the page in a few minutes to look again."
     }
   }
 }

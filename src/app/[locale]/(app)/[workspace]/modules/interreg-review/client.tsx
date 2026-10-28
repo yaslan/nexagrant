@@ -30,6 +30,8 @@ const API = '/api/interreg-review/analyses';
 const ACCEPT = '.pdf,.docx,.md,.markdown,.txt';
 /** How often an analysis left running (another tab, a refresh mid-run) is looked at again. */
 const POLL_MS = 5_000;
+/** After this many looks (10 minutes) the page stops asking and says so; a refresh starts over. */
+const MAX_POLLS = 120;
 
 type Slot = { busy: boolean; error: string | null };
 const IDLE: Slot = { busy: false, error: null };
@@ -111,16 +113,29 @@ export function InterregReviewClient() {
   useEffect(() => {
     if (!runningElsewhere || !analysis) return;
     const id = analysis.id;
+    let polls = 0;
     const timer = setInterval(async () => {
-      const res = await fetch(`${API}/${id}`);
-      if (!res.ok) return;
-      const next = ((await res.json()) as { analysis: InterregAnalysisView }).analysis;
-      if (next.status === 'ANALYZING') return;
-      setAnalysis(next);
-      if (next.status === 'DONE') setResult(await fetchResult(id));
+      polls += 1;
+      if (polls > MAX_POLLS) {
+        clearInterval(timer);
+        setActionError(t('ui.stillRunning'));
+        return;
+      }
+      // A failed look (offline, a deploy) is not the run's end: the next tick tries again.
+      try {
+        const res = await fetch(`${API}/${id}`);
+        if (!res.ok) return;
+        const next = ((await res.json()) as { analysis: InterregAnalysisView }).analysis;
+        if (next.status === 'ANALYZING') return;
+        clearInterval(timer);
+        setAnalysis(next);
+        if (next.status === 'DONE') setResult(await fetchResult(id));
+      } catch {
+        // Counted above; nothing else to do until the next tick.
+      }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [runningElsewhere, analysis, fetchResult]);
+  }, [runningElsewhere, analysis, fetchResult, t]);
 
   const setSlot = (kind: InterregDocKind, slot: Slot) => setSlots((s) => ({ ...s, [kind]: slot }));
 
@@ -206,7 +221,10 @@ export function InterregReviewClient() {
 
   async function reset() {
     if (!analysis) return;
-    if (result && !window.confirm(t('ui.resetConfirm'))) return;
+    // Uploaded files are the user's own data: deleting them is asked first, with or
+    // without a report.
+    const confirmKey = result ? 'ui.resetConfirm' : analysis.call || analysis.project ? 'ui.resetConfirmFiles' : null;
+    if (confirmKey && !window.confirm(t(confirmKey))) return;
     setActionError(null);
     const res = await fetch(`${API}/${analysis.id}`, { method: 'DELETE' });
     if (!res.ok && res.status !== 404) {

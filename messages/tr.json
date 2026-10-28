@@ -4478,6 +4478,7 @@
       "downloadName": "interreg-on-degerlendirme",
       "reset": "Sıfırla",
       "resetConfirm": "Yüklenen iki dosyanın metni ve bu rapor silinecek. Devam edilsin mi?",
+      "resetConfirmFiles": "Yüklenen dosyaların metni silinecek. Devam edilsin mi?",
       "resetDone": "Dosyalar ve rapor silindi; baştan başlayabilirsiniz.",
       "reportTitle": "Ön değerlendirme raporu",
       "rubric": "Değerlendirme tablosu: {label}",
@@ -4489,7 +4490,8 @@
       "knockouts": "{count, plural, =0 {Eleme riski taşıyan kriter yok} one {# kriter eleme riski taşıyor} other {# kriter eleme riski taşıyor}}",
       "loading": "Yükleniyor…",
       "retry": "Yeniden dene",
-      "genericError": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin."
+      "genericError": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
+      "stillRunning": "Analiz hâlâ sürüyor görünüyor. Birkaç dakika sonra sayfayı yenileyip tekrar bakın."
     }
   }
 }
