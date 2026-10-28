@@ -4,6 +4,7 @@
  * no 0, reject < 37, knockout 1.1 / 1.2 / 5.1 < 3. The FO-185 draft
  * (7 criteria, 20-20-15-15-15-10-5 of 100) is gone.
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { INTERREG_RUBRICS } from '../prisma/seed-data/interreg-rubrics';
@@ -49,6 +50,56 @@ describe('seeded rubric — Interreg NEXT BSB 2nd call Regular (Annex 7)', () =>
   it('labels itself an internal pre-assessment and does not claim the assessor guidelines', () => {
     expect(bsb.label).toMatch(/iç ön değerlendirme \(resmî puan değildir\)/);
     expect(bsb.source.assessorGuidelines).toMatch(/doğrulanmadı/);
+  });
+});
+
+/**
+ * The §5.2 JSON of the FO-187 report (TASK-MVRIVI9Y62503-crw2-fb.md, outside this
+ * repo), extracted verbatim into a fixture (crw2 Ö2). A change to the seed data
+ * that drifts from the programme's grid as FO-187 recorded it fails here; a
+ * deliberate revision updates both, and is a new rubric id (prisma/seed-interreg-rubrics.ts).
+ */
+describe('seeded rubric = FO-187 §5.2, field by field', () => {
+  interface Fo187 {
+    rubricId: string;
+    label: string;
+    source: Record<string, string>;
+    scale: { allowedMarks: number[]; maxPerCriterion: number };
+    totals: { maxRaw: number; passRaw: number; pass100: number };
+    knockouts: ({ criterionKey: string; minMark: number } | { rule: string })[];
+    tieBreak: string[];
+    criteria: {
+      criterionKey: string; officialRef: string; section: string; group: string; name: string; maxMark: number;
+      subQuestions: string[]; afSections: string[]; evidenceExpectation: string;
+    }[];
+    programChecks: { key: string; rule: string; source: string }[];
+  }
+  const fo187 = JSON.parse(readFileSync(new URL('./fixtures/m17/fo187-bsb-call2-regular.json', import.meta.url), 'utf8')) as Fo187;
+
+  it('has the same id, label, source, scale and totals', () => {
+    expect(bsb.id).toBe(fo187.rubricId);
+    expect(bsb.label).toBe(fo187.label);
+    expect(bsb.source).toEqual(fo187.source);
+    expect(bsb.allowedMarks).toEqual(fo187.scale.allowedMarks);
+    expect(Math.max(...bsb.criteria.map((c) => c.maxMark))).toBe(fo187.scale.maxPerCriterion);
+    expect([bsb.maxRaw, bsb.passRaw, to100(bsb, bsb.passRaw!)]).toEqual([fo187.totals.maxRaw, fo187.totals.passRaw, fo187.totals.pass100]);
+  });
+
+  it('has the same knockouts and tie-break order', () => {
+    const floors = fo187.knockouts.flatMap((k) => ('criterionKey' in k ? [[k.criterionKey, k.minMark]] : []));
+    expect(bsb.criteria.filter((c) => c.knockoutBelow !== null).map((c) => [c.criterionKey, c.knockoutBelow])).toEqual(floors);
+    expect(fo187.knockouts).toContainEqual({ rule: `raw >= ${bsb.passRaw}` });
+    expect(bsb.tieBreak).toEqual(fo187.tieBreak);
+  });
+
+  it('has the same 14 criteria, in order, with every text', () => {
+    const fields = ['criterionKey', 'officialRef', 'section', 'group', 'name', 'maxMark', 'subQuestions', 'afSections', 'evidenceExpectation'] as const;
+    const pick = (c: Record<(typeof fields)[number], unknown>) => Object.fromEntries(fields.map((f) => [f, c[f]]));
+    expect(bsb.criteria.map(pick)).toEqual(fo187.criteria.map(pick));
+  });
+
+  it('has the same programme checks', () => {
+    expect(bsb.programChecks).toEqual(fo187.programChecks);
   });
 });
 
@@ -119,6 +170,43 @@ describe('the arithmetic is programme-independent', () => {
     expect(scoreMarks(noTotal, { excellence: 3, impact: 0, implementation: 0 })).toMatchObject({
       belowPass: false, pass100: null, passesThresholds: true,
     });
+  });
+
+  it('refuses an allowed mark above its own criterion maximum (mark_not_allowed)', () => {
+    const capped: RubricDef = { ...other, maxRaw: 13, criteria: [{ ...other.criteria[0]!, maxMark: 3, knockoutBelow: null }, ...other.criteria.slice(1)] };
+    expect(rubricProblems(capped)).toEqual([]);
+    expect(scoreMarks(capped, { excellence: 3, impact: 0, implementation: 0 }).raw).toBe(3);
+    expect(() => scoreMarks(capped, { excellence: 4, impact: 0, implementation: 0 })).toThrow(/mark_not_allowed: excellence/);
+  });
+
+  it('a mark equal to the knockout floor is not a knockout; one step below is', () => {
+    expect(scoreMarks(other, { excellence: 3, impact: 5, implementation: 5 }).knockouts).toEqual([]);
+    expect(scoreMarks(other, { excellence: 2, impact: 5, implementation: 5 }).knockouts).toEqual(['excellence']);
+  });
+
+  it('rubricProblems: the boundaries are inclusive where the rule says so', () => {
+    // knockoutBelow == maxMark is valid (only the maximum passes); above it can never be met.
+    const ko = (knockoutBelow: number) => ({ ...other, criteria: [{ ...other.criteria[0]!, knockoutBelow }, ...other.criteria.slice(1)] });
+    expect(rubricProblems(ko(5))).toEqual([]);
+    expect(rubricProblems(ko(6))).toEqual(['excellence: knockoutBelow 6 can never or always trigger']);
+    // One step above the lowest allowed mark (0 here) can trigger; the lowest itself
+    // never can (the 'dead knockout' case below).
+    expect(rubricProblems(ko(1))).toEqual([]);
+    // passRaw == maxRaw is valid; 0 is not.
+    expect(rubricProblems({ ...other, passRaw: 15 })).toEqual([]);
+    expect(rubricProblems({ ...other, passRaw: 0 })).toEqual(['passRaw 0 outside (0, 15]']);
+  });
+
+  it('rubricProblems: no criteria, no allowed marks, a maximum that is not an allowed mark', () => {
+    expect(rubricProblems({ ...other, criteria: [], maxRaw: 0, passRaw: null })).toEqual(['no criteria']);
+    const noMarks = rubricProblems({ ...other, allowedMarks: [] });
+    expect(noMarks[0]).toBe('no allowedMarks');
+    expect(noMarks).toContain('impact: maxMark 5 not an allowed mark');
+    expect(rubricProblems({ ...other, allowedMarks: [0, 1, 2, 3, 4] })).toEqual([
+      'excellence: maxMark 5 not an allowed mark',
+      'impact: maxMark 5 not an allowed mark',
+      'implementation: maxMark 5 not an allowed mark',
+    ]);
   });
 
   it('rubricProblems catches a mistyped total, a duplicate key and a dead knockout', () => {
