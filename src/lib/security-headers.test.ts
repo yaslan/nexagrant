@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { getMiddlewareRouteMatcher } from 'next/dist/shared/lib/router/utils/middleware-route-matcher';
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match';
 import { config as proxyConfig, proxy } from '../proxy';
+import { CORDIS_IFRAME_SANDBOX } from './cordis-widget';
 
 // The compiler `next build` runs over `config.matcher`. Exported at runtime but not
 // in next's .d.ts, hence the require and the hand-written type.
@@ -22,6 +23,7 @@ import {
   STATIC_FILE_EXTENSIONS,
   STATIC_SECURITY_HEADERS,
   buildContentSecurityPolicy,
+  cordisSandboxPolicy,
   cspHeaderName,
   cspOptionsFromEnv,
   CORDIS_WIDGET_SOURCE,
@@ -355,12 +357,17 @@ describe('CORDIS widget CSP (FO-168, sandboxed iframe since FO-169 / K-573263) â
   it('embed policy: style/img/font-src get the CORDIS path, frame-ancestors is self, nothing else changes', () => {
     const plain = parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false }));
     const e = embed();
-    expect([...e.keys()]).toEqual([...plain.keys()]);
+    expect([...e.keys()].filter((name) => name !== 'sandbox')).toEqual([...plain.keys()]);
     for (const [name, values] of plain) {
       if (WIDENED.includes(name)) expect(e.get(name), name).toEqual([...values, CORDIS_PATH]);
       else if (name === 'frame-ancestors') expect(e.get(name), name).toEqual(["'self'"]);
       else expect(e.get(name), name).toEqual(values);
     }
+    // the embed document is sandboxed by its own policy too (K-573263), with the iframe's tokens
+    expect(e.get('sandbox')).toEqual(CORDIS_IFRAME_SANDBOX.split(' '));
+    expect(e.get('sandbox')).not.toContain('allow-same-origin');
+    expect(plain.has('sandbox')).toBe(false);
+    expect(parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false, cordisWidgetHost: true })).has('sandbox')).toBe(false);
     // the widget fetches its data as JSONP scripts: no connect-src opening, and it frames nothing
     expect(e.get('connect-src')).toEqual(["'self'"]);
     expect(e.get('frame-src')).toEqual(["'none'"]);
@@ -427,6 +434,37 @@ describe('CORDIS widget CSP (FO-168, sandboxed iframe since FO-169 / K-573263) â
 
   it('CSP_MODE=report-only still applies to the embed policy (rollback switch)', () => {
     expect(cspHeaderName(env({ CSP_MODE: 'report-only' }))).toBe('Content-Security-Policy-Report-Only');
+  });
+
+  it('the enforced sandbox-only header carries the iframe tokens and nothing else', () => {
+    expect(cordisSandboxPolicy()).toBe(`sandbox ${CORDIS_IFRAME_SANDBOX}`);
+    expect(cordisSandboxPolicy()).not.toContain('allow-same-origin');
+  });
+
+  it('report-only: the embed also gets an enforced sandbox header; other pages do not', () => {
+    const prev = process.env.CSP_MODE;
+    process.env.CSP_MODE = 'report-only';
+    try {
+      const embedRes = proxy(new NextRequest('http://localhost/tr/embed/cordis'));
+      expect(embedRes.headers.get('content-security-policy-report-only')).toMatch(/sandbox /);
+      expect(embedRes.headers.get('content-security-policy')).toBe(cordisSandboxPolicy());
+      const homeRes = proxy(new NextRequest('http://localhost/tr'));
+      expect(homeRes.headers.get('content-security-policy')).toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.CSP_MODE;
+      else process.env.CSP_MODE = prev;
+    }
+  });
+
+  it('enforce mode: the sandbox is in the one enforced policy, no extra header', () => {
+    const prev = process.env.CSP_MODE;
+    delete process.env.CSP_MODE;
+    try {
+      const res = proxy(new NextRequest('http://localhost/tr/embed/cordis'));
+      expect(res.headers.get('content-security-policy')).toMatch(/(^|; )sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox(;|$)/);
+    } finally {
+      if (prev !== undefined) process.env.CSP_MODE = prev;
+    }
   });
 
   it('API and static-file policies never mention cordis', () => {

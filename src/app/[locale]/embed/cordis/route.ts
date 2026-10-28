@@ -24,6 +24,11 @@ import {
  * src/proxy.ts via `isCordisWidgetPath`.
  *
  * No key: 404 — the home page does not frame this route then, it shows the link.
+ *
+ * Opened on its own (a top-level visit, `Sec-Fetch-Dest: document`): 404. The
+ * sandbox header already keeps that document from reaching our origin; the 404 keeps
+ * the CORDIS loader from running at all outside the frame. A request without the
+ * header (old browsers, server-side fetches) is not refused by this check.
  */
 
 const TARGET_ID = 'WidgetPlaceHolder';
@@ -79,7 +84,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ loca
   const { locale: requested } = await params;
   const locale = requested === 'en' ? 'en' : 'tr';
   const apiKey = env.NEXT_PUBLIC_CORDIS_WIDGET_KEY?.trim();
-  if (!apiKey) return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  // Browsers set Sec-Fetch-Dest and scripts cannot change it; only the frame is ours.
+  const dest = req.headers.get('sec-fetch-dest');
+  if (!apiKey || (dest !== null && dest !== 'iframe')) {
+    return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
 
   const nonce = attr(req.headers.get('x-nonce') ?? '');
   const data: Record<string, string> = {

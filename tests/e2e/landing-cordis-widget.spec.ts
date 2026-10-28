@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { CORDIS_IFRAME_SANDBOX } from '../../src/lib/cordis-widget';
 
 /**
  * FO-169 — the landing page's CORDIS block: "Horizon Europe projects with
@@ -65,6 +66,15 @@ test.describe('landing page CORDIS projects block (FO-169)', () => {
     });
   }
 
+  test('embed opened on its own: 404, and the document is sandboxed (no origin of ours)', async ({ page }) => {
+    // Sec-Fetch-Dest: document — the route refuses; without a key it would be a 404 too,
+    // so the sandbox header is what this test is for: it must be on the 404 as well.
+    const res = await page.goto('/en/embed/cordis');
+    expect(res!.status()).toBe(404);
+    expect(res!.headers()['content-security-policy'] ?? '').toContain(`sandbox ${CORDIS_IFRAME_SANDBOX}`);
+    expect(await page.evaluate(() => window.origin)).toBe('null');
+  });
+
   test('no key: no frame at all, and the embed route is a 404', async ({ page, request }) => {
     test.skip(HAS_KEY, 'the server has a widget key');
     await page.goto('/en');
@@ -88,7 +98,9 @@ test.describe('landing page CORDIS projects block (FO-169)', () => {
     const homeCsp = home.headers()['content-security-policy'] ?? '';
     expect(homeCsp).not.toMatch(/cordis/i);
     expect(homeCsp).toMatch(/frame-src 'self'/);
-    const embed = await request.get('/en/embed/cordis');
+    // a top-level visit (Sec-Fetch-Dest: document) gets no widget page; the frame's own request gets it
+    expect((await request.get('/en/embed/cordis', { headers: { 'Sec-Fetch-Dest': 'document' } })).status()).toBe(404);
+    const embed = await request.get('/en/embed/cordis', { headers: { 'Sec-Fetch-Dest': 'iframe' } });
     expect(embed.status()).toBe(200);
     expect(embed.headers()['content-security-policy']).toMatch(/frame-ancestors 'self'/);
     expect(embed.headers()['content-security-policy']).toContain('https://cordis.europa.eu/datalab/visualisations/');

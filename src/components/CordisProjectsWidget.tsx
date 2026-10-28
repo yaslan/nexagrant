@@ -2,14 +2,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useIsHydrated } from '@/lib/hooks/use-is-hydrated';
-import { CORDIS_SEARCH_URL, CORDIS_WIDGET_MESSAGE_TYPE, CORDIS_WIDGET_TIMEOUT_MS } from '@/lib/cordis-widget';
-
-/**
- * No `allow-same-origin` — ever (K-573263). The framed document gets an opaque
- * origin: CORDIS's scripts cannot reach this page, our storage or our API with the
- * visitor's cookies. Popups so a project link opens CORDIS in a normal tab.
- */
-export const CORDIS_IFRAME_SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox';
+import {
+  CORDIS_IFRAME_SANDBOX,
+  CORDIS_SEARCH_URL,
+  CORDIS_WIDGET_MESSAGE_TYPE,
+  CORDIS_WIDGET_TIMEOUT_MS,
+} from '@/lib/cordis-widget';
 
 /** The embed reports its height; keep the frame between the box's min-height and this. */
 const MAX_FRAME_HEIGHT = 4000;

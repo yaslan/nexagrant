@@ -5,13 +5,15 @@ const mockEnv = vi.hoisted(() => ({ NEXT_PUBLIC_CORDIS_WIDGET_KEY: undefined as 
 vi.mock('@/lib/env', () => ({ env: mockEnv }));
 
 import { GET } from './route';
-import { CORDIS_IFRAME_SANDBOX } from '@/components/CordisProjectsWidget';
-import { CORDIS_PROJECT_QUERY, CORDIS_WIDGET_LOADER_URL } from '@/lib/cordis-widget';
+import { CORDIS_IFRAME_SANDBOX, CORDIS_PROJECT_QUERY, CORDIS_WIDGET_LOADER_URL } from '@/lib/cordis-widget';
 
-const call = (locale: string, nonce = 'abc123') =>
-  GET(new NextRequest(`http://localhost/${locale}/embed/cordis`, { headers: { 'x-nonce': nonce } }), {
-    params: Promise.resolve({ locale }),
-  });
+const call = (locale: string, nonce = 'abc123', dest?: string) =>
+  GET(
+    new NextRequest(`http://localhost/${locale}/embed/cordis`, {
+      headers: { 'x-nonce': nonce, ...(dest ? { 'sec-fetch-dest': dest } : {}) },
+    }),
+    { params: Promise.resolve({ locale }) }
+  );
 
 describe('CORDIS embed route (FO-169, K-573263)', () => {
   beforeEach(() => {
@@ -51,6 +53,17 @@ describe('CORDIS embed route (FO-169, K-573263)', () => {
   it('a nonce cannot inject markup', async () => {
     const html = await (await call('tr', '"><script>alert(1)</script>')).text();
     expect(html).not.toContain('<script>alert(1)</script>');
+  });
+
+  it('opened on its own (Sec-Fetch-Dest: document): 404, no widget page', async () => {
+    const res = await call('en', 'abc123', 'document');
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe('');
+  });
+
+  it('framed by the home page (Sec-Fetch-Dest: iframe): the page; without the header (old browsers): the page too', async () => {
+    expect((await call('en', 'abc123', 'iframe')).status).toBe(200);
+    expect((await call('en')).status).toBe(200);
   });
 });
 

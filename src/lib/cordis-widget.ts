@@ -34,6 +34,14 @@ export const CORDIS_WIDGET_EMBED_PATH = '/embed/cordis';
 /** `type` of the postMessage the embed sends its parent: `{ type, status: 'ready' | 'error', height }`. */
 export const CORDIS_WIDGET_MESSAGE_TYPE = 'fonbridge:cordis-widget';
 
+/**
+ * The frame's sandbox (K-573263). No `allow-same-origin`, ever: the framed document
+ * gets an opaque origin. The home page puts it on the `<iframe>`, and the embed's
+ * own CSP carries the same tokens (src/lib/security-headers.ts), so the embed is
+ * sandboxed when it is opened directly too.
+ */
+export const CORDIS_IFRAME_SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox';
+
 /** How long the table may take before the fallback link replaces it. */
 export const CORDIS_WIDGET_TIMEOUT_MS = 8_000;
 

@@ -72,6 +72,8 @@
  * env change + restart instead of a rebuild.
  */
 
+import { CORDIS_IFRAME_SANDBOX } from './cordis-widget';
+
 export type HeaderEntry = { key: string; value: string };
 
 export const PERMISSIONS_POLICY_VALUE =
@@ -294,6 +296,17 @@ function r2EndpointOrigin(endpoint: string | null | undefined): string | null {
   }
 }
 
+/**
+ * An enforced header that carries only the sandbox, for the embed's own document.
+ * Its tokens are the iframe's (`CORDIS_IFRAME_SANDBOX`, one source), so opening the
+ * embed directly gives the same opaque origin the home page's frame has. In
+ * `CSP_MODE=report-only` the full policy is only reported, and a report-only
+ * `sandbox` is not enforced, so src/proxy.ts sends this header as well.
+ */
+export function cordisSandboxPolicy(): string {
+  return `sandbox ${CORDIS_IFRAME_SANDBOX}`;
+}
+
 export function buildContentSecurityPolicy(opts: CspOptions): string {
   const posthog = originOf(opts.posthogHost);
   const r2Upload = r2UploadOrigin(opts.r2AccountId);
@@ -322,6 +335,7 @@ export function buildContentSecurityPolicy(opts: CspOptions): string {
     ['base-uri', ["'self'"]],
     ['form-action', ["'self'", 'https://accounts.google.com']],
     ['frame-ancestors', [opts.cordisWidget ? "'self'" : "'none'"]],
+    ...(opts.cordisWidget ? [['sandbox', CORDIS_IFRAME_SANDBOX.split(' ')] as [string, string[]]] : []),
     ['report-uri', [CSP_REPORT_PATH]],
   ];
   return directives.map(([name, values]) => `${name} ${values.join(' ')}`).join('; ');
