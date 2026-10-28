@@ -41,6 +41,7 @@ vi.mock('@/lib/db', async (importOriginal) => {
 
 const { createDbClient, withTenantOn } = await import('@/lib/db');
 const { createAnalysis, saveDocument } = await import('@/modules/m17/server/analyses');
+const { loadScorableRubric } = await import('@/modules/m17/server/rubrics');
 type Owner = { tenantId: string; userId: string };
 
 let admin: PrismaClient | undefined;
@@ -212,6 +213,38 @@ describe('saveDocument — the status rule (crw2 Ö1)', () => {
     expect([row.status, row.callText, row.projectText]).toEqual(['CALL_READY', 'alice call', null]);
   });
 
+  test('the call guide first, then the project, ends READY', async () => {
+    const id = await newAnalysis(alice);
+    expect(await saveDocument(alice, id, 'call', 'guide.txt', doc('call'))).toMatchObject({ ok: true, analysis: { status: 'CALL_READY' } });
+    expect(await saveDocument(alice, id, 'project', 'draft.txt', doc('project'))).toMatchObject({ ok: true, analysis: { status: 'READY' } });
+    expect(await statusOf(id)).toBe('READY');
+  });
+
+  test('a new call guide on a READY analysis keeps it READY and drops the marks and the result', async () => {
+    const id = await newAnalysis(alice);
+    await saveDocument(alice, id, 'call', 'guide.txt', doc('call'));
+    await saveDocument(alice, id, 'project', 'draft.txt', doc('project'));
+    await withTenantOn(state.rls!, alice.tenantId, async (tx) => {
+      await tx.interregCriterionMark.create({
+        data: { tenantId: alice.tenantId, analysisId: id, rubricId: SEEDED_RUBRIC, criterionId: seededCriterion, mark: 3 },
+      });
+      await tx.interregAnalysisResult.create({
+        data: { tenantId: alice.tenantId, analysisId: id, rawScore: 40, score100: 71.4, passesThresholds: true, reportMarkdown: 'r', model: 'm', promptHash: 'h' },
+      });
+    });
+
+    expect(await saveDocument(alice, id, 'call', 'guide-v2.txt', doc('call v2'))).toMatchObject({ ok: true, analysis: { status: 'READY' } });
+    expect(await admin!.interregCriterionMark.count({ where: { analysisId: id } })).toBe(0);
+    expect(await admin!.interregAnalysisResult.count({ where: { analysisId: id } })).toBe(0);
+  });
+
+  test('another tenant sees no row of the analysis, not even the texts', async () => {
+    const id = await newAnalysis(alice);
+    await saveDocument(alice, id, 'call', 'guide.txt', doc('alice call'));
+    const seen = await withTenantOn(state.rls!, carol.tenantId, (tx) => tx.interregAnalysis.count({ where: { id } }));
+    expect(seen).toBe(0);
+  });
+
   test('ANALYZING refuses the upload as analysis_busy and keeps the texts', async () => {
     const id = await newAnalysis(alice);
     await saveDocument(alice, id, 'call', 'guide.txt', doc('call'));
@@ -219,6 +252,31 @@ describe('saveDocument — the status rule (crw2 Ö1)', () => {
     expect(await saveDocument(alice, id, 'call', 'new.txt', doc('new'))).toEqual({ ok: false, error: 'analysis_busy' });
     const row = await admin!.interregAnalysis.findUniqueOrThrow({ where: { id } });
     expect([row.status, row.callText, row.callFileName]).toEqual(['ANALYZING', 'call', 'guide.txt']);
+  });
+});
+
+describe('loadScorableRubric on the database (FO-196 B1)', () => {
+  test('returns the seeded grid: 14 criteria, 56, pass at 37', async () => {
+    const def = await loadScorableRubric(alice.tenantId, SEEDED_RUBRIC);
+    expect(def.criteria).toHaveLength(14);
+    expect([def.maxRaw, def.passRaw]).toEqual([56, 37]);
+  });
+
+  test('refuses a stored grid whose total no longer matches its criteria', async () => {
+    await admin!.interregRubric.update({ where: { id: OTHER_RUBRIC }, data: { maxRaw: 9 } });
+    try {
+      await expect(loadScorableRubric(alice.tenantId, OTHER_RUBRIC)).rejects.toMatchObject({
+        code: 'rubric_inconsistent',
+        problems: ['maxRaw 9 ≠ Σ maxMark 4'],
+      });
+    } finally {
+      await admin!.interregRubric.update({ where: { id: OTHER_RUBRIC }, data: { maxRaw: 4 } });
+    }
+    await expect(loadScorableRubric(alice.tenantId, OTHER_RUBRIC)).resolves.toMatchObject({ maxRaw: 4 });
+  });
+
+  test('an id that does not exist is rubric_not_found', async () => {
+    await expect(loadScorableRubric(alice.tenantId, `${RUN}-missing`)).rejects.toMatchObject({ code: 'rubric_not_found' });
   });
 });
 
