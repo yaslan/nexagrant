@@ -32,7 +32,8 @@ export const rubricCriterionSchema = z
 
 export const rubricProfileSchema = z
   .object({
-    id: z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/),
+    // Lower-case slug segments joined by "." or "-" (interreg-next-bsb.call2.regular).
+    id: z.string().regex(/^[a-z0-9]+([.-][a-z0-9]+)*$/),
     programme: nonEmpty,
     label: nonEmpty,
     isDefault: z.boolean(),
