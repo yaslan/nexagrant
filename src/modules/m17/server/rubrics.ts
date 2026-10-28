@@ -7,7 +7,7 @@ import type { Prisma } from '@prisma/client';
 
 import { withTenant } from '@/lib/db';
 
-import { to100, type RubricDef } from '../rubric';
+import { rubricProblems, to100, type RubricDef } from '../rubric';
 
 export const RUBRIC_SELECT = {
   id: true,
@@ -113,4 +113,37 @@ export async function listRubrics(tenantId: string): Promise<InterregRubricView[
 export async function getRubric(tenantId: string, id: string): Promise<InterregRubricView | null> {
   const row = await withTenant(tenantId, (tx) => tx.interregRubric.findUnique({ where: { id }, select: RUBRIC_SELECT }));
   return row ? toRubricView(row) : null;
+}
+
+export type ScorableRubricErrorCode = 'rubric_not_found' | 'rubric_inconsistent';
+
+export class ScorableRubricError extends Error {
+  constructor(
+    readonly code: ScorableRubricErrorCode,
+    readonly rubricId: string,
+    readonly problems: readonly string[] = [],
+  ) {
+    super(`${code}: ${rubricId}${problems.length ? ` (${problems.join('; ')})` : ''}`);
+    this.name = 'ScorableRubricError';
+  }
+}
+
+/**
+ * The scoring definition of a rubric view, or a throw if the stored grid cannot
+ * be scored. Every score is computed from what the database holds right now;
+ * this is the check between that and `scoreMarks` (FO-196 B1), so a criterion
+ * left behind or a total edited by hand stops the run instead of skewing a score.
+ */
+export function scorableDef(view: InterregRubricView): RubricDef {
+  const def = rubricDef(view);
+  const problems = rubricProblems(def);
+  if (problems.length) throw new ScorableRubricError('rubric_inconsistent', view.id, problems);
+  return def;
+}
+
+/** Reads the rubric and returns its definition only if it is consistent. The F2 score writer calls this, not `getRubric`. */
+export async function loadScorableRubric(tenantId: string, id: string): Promise<RubricDef> {
+  const view = await getRubric(tenantId, id);
+  if (!view) throw new ScorableRubricError('rubric_not_found', id);
+  return scorableDef(view);
 }
