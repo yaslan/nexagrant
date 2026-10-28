@@ -9,7 +9,7 @@ import { withTenant } from '@/lib/db';
 
 import { to100, type RubricDef } from '../rubric';
 
-const RUBRIC_SELECT = {
+export const RUBRIC_SELECT = {
   id: true,
   programme: true,
   label: true,
