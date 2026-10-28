@@ -304,12 +304,20 @@ BACKUP_DATABASE_URL=postgresql://<yedek-rolü>@<host>:5432/fabrika \
 BACKUP_DIR=/var/backups/fonbridge pnpm backup:restore-drill
 #   → tablo başına satır sayısı iki tarafta eşit değilse exit 1
 
-# 3) Gerçek geri yükleme (felaket): önce BOŞ hedef DB, sonra yükle
+# 3) Gerçek geri yükleme (felaket): geri yüklemenin yapıldığı sunucuda, localhost üzerinden
+#    (ssh ile sunucuya gir; uzak host'a karşı çalışmaz — db:rls ve db:rls-role yalnız localhost|127.0.0.1 kabul eder)
+#    önce BOŞ hedef DB, sonra yükle
 createdb -O <sahip-rol> fabrika_restored            # fabrika_app rolü kümede olmalı
-RESTORE_DATABASE_URL=postgresql://<sahip-rol>@<host>:5432/fabrika_restored \
+RESTORE_DATABASE_URL=postgresql://<sahip-rol>@localhost:5432/fabrika_restored \
 pnpm backup:restore /var/backups/fonbridge/fonbridge-<damga>.dump
-DATABASE_URL=<aynı hedef> pnpm db:rls && DATABASE_URL=<aynı hedef> pnpm rls:verify --require-db
+DATABASE_URL=postgresql://<sahip-rol>@localhost:5432/fabrika_restored pnpm db:rls && \
+DATABASE_URL=postgresql://<sahip-rol>@localhost:5432/fabrika_restored pnpm rls:verify --require-db
 #   → uygulamanın DATABASE_URL'ini yeni DB'ye çevir; eski DB'yi hemen silme
+#   → db:rls, prisma/rls.sql'i uygular (aşağıdaki DISABLE döngüsü dahil).
+#   → rls:verify --require-db (scripts/check-rls-live.ts): localhost kısıtı YOK; DATABASE_URL erişilemezse exit 1.
+#     Tam salt-okur DEĞİL: DATABASE_URL rolü SUPERUSER/CREATEROLE ise geçici NOBYPASSRLS rol açıp siler (yan etki);
+#     DATABASE_URL_RLS_TEST tanımlıysa yalnız bağlanır (ölçüm yazması geri alınır). Uzak host'tan koşulacaksa bu farkı göz önüne al.
+#   → prisma/rls.sql:121 DISABLE ROW LEVEL SECURITY döngüsü (23 tablo: Account, User, Session, Tenant, SystemAlert, RawFetch, … ) — geri yüklenmiş DB'de bu döngünün RLS durumunu kaynakla aynı bıraktığı ölçülmedi.
 ```
 
 Geri alma: `backup:restore` yalnız boş bir DB'ye yazar; başarısız ya da yanlış yüklemede hedef DB silinip adım 3 baştan koşulur. Mevcut (dolu) DB'ye asla yazmaz — `public`/`graphile_worker`'da tek bir tablo bile varsa reddeder.
