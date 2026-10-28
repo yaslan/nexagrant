@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 
 import { prisma } from '../src/lib/db';
 import { round1, rubricProblems, type RubricDef } from '../src/modules/m17/rubric';
+import { rubricProfileSchema } from '../src/modules/m17/rubric-schema';
 import { RUBRIC_SELECT, rubricDef, toRubricView } from '../src/modules/m17/server/rubrics';
 import { INTERREG_RUBRICS, type InterregRubricSeed } from './seed-data/interreg-rubrics';
 
@@ -53,8 +54,12 @@ export class RubricSeedError extends Error {
 }
 
 export async function seedRubric(db: PrismaClient, r: InterregRubricSeed): Promise<void> {
-  const problems = rubricProblems(defOfSeed(r));
-  if (problems.length) throw new RubricSeedError(`Rubric ${r.id} is inconsistent: ${problems.join('; ')}`);
+  // The zod profile (FO-188) includes rubricProblems: field shapes and the totals in one check.
+  const parsed = rubricProfileSchema.safeParse(r);
+  if (!parsed.success) {
+    const problems = parsed.error.issues.map((i) => `${i.path.join('.') || '(rubric)'}: ${i.message}`);
+    throw new RubricSeedError(`Rubric ${r.id} is inconsistent: ${problems.join('; ')}`);
+  }
 
   await db.$transaction(async (tx) => {
     const existing = await tx.interregRubric.findUnique({ where: { id: r.id }, select: RUBRIC_SELECT });

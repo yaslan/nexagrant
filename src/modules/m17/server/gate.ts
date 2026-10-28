@@ -20,7 +20,7 @@ export type GateResult = { ok: true; scope: TenantScope } | { ok: false; respons
 // from a status it can read, and every refusal here is a 4xx.
 export function refuse(
   error: InterregApiError,
-  status: 400 | 401 | 403 | 404 | 409 | 413 | 415 | 422,
+  status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 415 | 422,
   extra: Record<string, string | number> = {},
 ) {
   return NextResponse.json({ error, ...extra }, { status });

@@ -167,3 +167,19 @@ describe('prompt text is byte-identical to the pre-move inline literals', () => 
     expect(formatRagPrompt('Bare question', [])).toBe('Bare question');
   });
 });
+
+/**
+ * FO-188 — M17 was written with its prompts in place (no inline literal to match),
+ * in both locales. These snapshots pin the text the model sees; a change to them
+ * is a behaviour change and is updated on purpose (`vitest -u`), never in passing.
+ */
+describe('M17 Interreg pre-assessment prompts (tr + en)', () => {
+  test.each(['en', 'tr'] as const)('call context, evaluate and retry — %s', async (locale) => {
+    const { renderPrompt } = await import('@/lib/ai/prompts');
+    expect({
+      callContext: renderPrompt('m17/call-context', { call_context: 'CALL GUIDE TEXT' }, locale),
+      evaluate: renderPrompt('m17/evaluate', { rubric: '{"id":"rubric"}', project_context: 'PROJECT TEXT' }, locale),
+      retry: renderPrompt('m17/evaluate-retry', { problems: '- criterionMarks: missing' }, locale),
+    }).toMatchSnapshot();
+  });
+});

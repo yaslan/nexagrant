@@ -120,3 +120,25 @@ export function scoreMarks(def: RubricDef, marks: Readonly<Record<string, number
     passesThresholds: !belowPass && knockouts.length === 0,
   };
 }
+
+/** One reason the programme would reject the application whatever else it scores. */
+export type KnockoutFlag =
+  | { kind: 'criterion'; criterionKey: string; mark: number; floor: number }
+  | { kind: 'total'; raw: number; passRaw: number };
+
+/**
+ * The elimination risks of a set of marks (FO-188): every knockout criterion
+ * below its floor (1.1, 1.2, 5.1 < 3 on the BSB grids), then the total below
+ * `passRaw`. Empty when the marks clear every threshold. Validates the marks
+ * the way `scoreMarks` does — it is computed from it, not alongside it.
+ */
+export function knockoutFlags(def: RubricDef, marks: Readonly<Record<string, number>>): KnockoutFlag[] {
+  const score = scoreMarks(def, marks);
+  const flags: KnockoutFlag[] = [];
+  for (const key of score.knockouts) {
+    const c = def.criteria.find((x) => x.criterionKey === key)!;
+    flags.push({ kind: 'criterion', criterionKey: key, mark: marks[key]!, floor: c.knockoutBelow! });
+  }
+  if (score.belowPass) flags.push({ kind: 'total', raw: score.raw, passRaw: score.passRaw! });
+  return flags;
+}

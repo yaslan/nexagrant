@@ -2182,6 +2182,8 @@ model InterregAnalysisResult {
   redFlags         Json     @default("[]")
   improvements     Json     @default("[]")
   rewriteSample    Json     @default("{}")
+  /// Programme rules outside the grid: [{ key, status: met|missing|unclear, note }] (FO-188).
+  programChecks    Json     @default("[]")
   model            String
   promptHash       String
   createdAt        DateTime @default(now())
@@ -2207,6 +2209,8 @@ model InterregCriterionMark {
   weaknesses      Json     @default("[]")
   evidenceQuote   String?  @db.Text
   evidenceLocator String?
+  /// Every [{ quote, location }] behind the mark; evidenceQuote/Locator keep the first (FO-188).
+  evidence        Json     @default("[]")
   createdAt       DateTime @default(now())
 
   /// Same tenant and same rubric as the analysis; the criterion must belong to that rubric.

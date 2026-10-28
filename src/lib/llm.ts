@@ -61,6 +61,9 @@ const DEFAULT_MAX_TOKENS = 4096;
 const MAX_TOKENS_OVERRIDES: Readonly<Record<string, number>> = {
   M7: 8192,
   M10: 8192,
+  // M17 pre-assessment (FO-188): one JSON object with strengths, weaknesses and
+  // quoted evidence for each of 12–14 criteria plus a rewrite.
+  M17: 12288,
 };
 
 /** Output ceiling for one call: explicit > per-action table > default. */
@@ -430,7 +433,7 @@ export function resolveCredits(module: string, purpose: string): AiCreditQuote {
  * rows. Only the hash is ever stored; the prompt text itself never reaches the
  * database.
  */
-function hashMessages(messages: LlmMessage[]): string {
+export function hashMessages(messages: LlmMessage[]): string {
   return crypto
     .createHash('sha256')
     .update(messages.map(m => `${m.role}:${m.content}`).join('\n'))

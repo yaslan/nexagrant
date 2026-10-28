@@ -4469,7 +4469,10 @@
       "analysis_busy": "Analiz şu anda çalışıyor; bitince yeniden yükleyebilirsiniz.",
       "bad_rubric": "Bu değerlendirme tablosu bulunamadı.",
       "rubric_unavailable": "Henüz tanımlı bir değerlendirme tablosu yok; lütfen destekle iletişime geçin.",
-      "upload_failed": "Yükleme sırasında beklenmeyen bir hata oluştu. Lütfen tekrar deneyin."
+      "upload_failed": "Yükleme sırasında beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
+      "not_ready": "Önce çağrı kılavuzunu ve proje dosyasını yükleyin.",
+      "insufficient_credits": "Ön değerlendirme için yeterli YZ krediniz yok.",
+      "evaluation_failed": "Kontrol tamamlanamadı. Belgeleriniz duruyor; lütfen yeniden deneyin."
     },
     "ui": {
       "title": "Interreg Ön Değerlendirme",
@@ -4514,6 +4517,89 @@
       "retry": "Yeniden dene",
       "genericError": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
       "stillRunning": "Analiz hâlâ sürüyor görünüyor. Birkaç dakika sonra sayfayı yenileyip tekrar bakın."
+    },
+    "criteria": {
+      "relevance_so_fit": "Program özel hedefi ve beklenen sonuçlarla ilgililik",
+      "relevance_transnational_value": "Ulusötesi iş birliğinin katma değeri",
+      "coherence_intervention_logic": "Tutarlı ve açık tanımlı müdahale mantığı",
+      "coherence_indicators": "Göstergelerin doğru belirlenmesi ve nicelendirilmesi",
+      "results_durability": "Çıktıların proje süresinden sonra etkisi",
+      "results_synergies_cma": "Sinerjiler, yatay ilkeler ve birikimden yararlanma",
+      "results_impact_synergies": "Etki, sinerjiler, yatay ilkeler ve birikimden yararlanma",
+      "partnership_relevance": "Ortak soruna uygun ortaklar",
+      "partnership_capacity": "Ortakların yetkinliği ve mali kapasitesi",
+      "partnership_lead_capacity": "Lider ortağın yetkinliği ve mali kapasitesi",
+      "workplan_coherent": "Tutarlı iş planı",
+      "workplan_realistic": "Gerçekçi iş planı",
+      "management_risk": "Proje yönetimi, koordinasyon ve risk azaltma",
+      "communication": "Hedef gruplara ve paydaşlara ulaşan iletişim",
+      "budget_value_for_money": "Bütçenin harcanan paraya değmesi",
+      "budget_eligibility": "Uygun ve makul maliyetler"
+    },
+    "programChecks": {
+      "rco87_present": "Zorunlu çıktı göstergesi RCO87",
+      "rco07_if_research_so1": "SO1'de araştırma kuruluşu varsa RCO07",
+      "cma_contribution": "Ortak Denizcilik Gündemi'ne (CMA) katkı",
+      "partnership_composition": "Ortaklık yapısı",
+      "budget_range": "Interreg bütçe aralığı",
+      "duration": "Proje süresi",
+      "so_open_in_call": "Özel hedefin bu çağrıda açık olması"
+    },
+    "report": {
+      "sections": {
+        "summary": "📊 Interreg BSB uyumluluk özeti ve tahmini skor",
+        "critical": "🔴 Kritik sınır ötesi eksikler (eleme riskleri)",
+        "improve": "🟡 Geliştirilmesi gereken alanlar (puan artıracak noktalar)",
+        "rewrite": "✍️ Interreg jargonuyla yeniden yazım önerisi"
+      },
+      "eliminationRisk": "Eleme riski — program, toplam ne olursa olsun bunlardan biri için başvuruyu reddeder:",
+      "scoreLine": "**Tahmini: {score100}/100** (Annex 7 ölçeğinde ≈{raw}/{maxRaw}) — iç ön değerlendirme, resmî puan değildir",
+      "threshold": "Tablonun geçme eşiği: {passRaw}/{maxRaw} ({pass100}/100).",
+      "table": {
+        "ref": "No.",
+        "criterion": "Kriter",
+        "mark": "Not"
+      },
+      "checksHeading": "Program kuralları",
+      "checkStatus": {
+        "met": "✅ Karşılanıyor",
+        "missing": "❌ Eksik",
+        "unclear": "❔ Belirsiz"
+      },
+      "callGridNote": "Çağrı kılavuzunun kendi tablosu:",
+      "contextTrimmed": "Çağrı kılavuzu tamamı okunamayacak kadar uzundu: son {chars} karakteri dışarıda kaldı.",
+      "noRedFlags": "Eleme riski bulunmadı.",
+      "noImprovements": "Geliştirme alanı bulunmadı.",
+      "finding": "Bulgu",
+      "why": "Neden sorun?",
+      "fix": "Çözüm önerisi",
+      "weakness": "Zayıf yön",
+      "strength": "Güçlü yön",
+      "evidence": "Kanıt",
+      "suggestion": "Öneri",
+      "original": "Özgün metin",
+      "revised": "Yeniden yazım (EN)",
+      "flagCriterion": {
+        "finding": "{ref} {name}: not {mark}, {floor} altında",
+        "why": "Bu kriterde {floor} altı not, toplamdan bağımsız olarak başvurunun reddi demektir.",
+        "fix": "{ref} kriterinin her alt sorusunu proje dosyasında kanıtla açıkça yanıtlayın; aşağıda {ref} altındaki önerilere bakın."
+      },
+      "flagTotal": {
+        "finding": "Toplam {raw}/{maxRaw}, geçme eşiği {passRaw} altında",
+        "why": "{passRaw}/{maxRaw} altındaki başvuru reddedilir.",
+        "fix": "Aşağıda en düşük not alan kriterlerden başlayın; her yarım puan önemlidir."
+      },
+      "flagCheck": {
+        "finding": "{check}: karşılanmıyor — {note}",
+        "why": "Bu bir çağrı kuralıdır; karşılamayan başvuru kalite değerlendirmesinden önce elenebilir.",
+        "fix": "{check} kuralının nasıl karşılandığını proje dosyasında açıkça yazın."
+      }
+    },
+    "evaluate": {
+      "start": "Projeyi kontrol et",
+      "running": "Proje kontrol ediliyor…",
+      "done": "Ön değerlendirme hazır",
+      "failed": "Kontrol tamamlanamadı. Belgeleriniz duruyor; lütfen yeniden deneyin."
     }
   }
 }

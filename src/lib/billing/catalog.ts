@@ -853,6 +853,22 @@ export const AI_ACTION_CREDITS: Readonly<Record<string, AiCreditEntry>> = {
       'TTO/IP checklist. Proposed 1 by parity: M9 (brifing) and M10 (belge) are 1, ' +
       'and M7 is the same shape — one click, one generated document.',
   },
+  'M17:evaluate': {
+    credits: 3,
+    approval: 'pending-owner-approval',
+    note:
+      'Interreg pre-assessment (FO-188). Proposed 3 = the M6 evaluation class: the FO-185 ' +
+      'plan the owner approved says "kredi fiyatı M6 değerlendirmesiyle aynı sınıfta başlar", ' +
+      'and it is the same shape — a whole application read against an official grid.',
+  },
+  'M17:evaluate-retry': {
+    credits: 0,
+    approval: 'pending-owner-approval',
+    note:
+      'The one re-ask after an answer that failed the output schema (FO-188). Proposed 0: ' +
+      'the user pressed one button and already paid M17:evaluate; a malformed answer is ' +
+      'our defect, not a second purchase. The call is still logged in AiUsageLog.',
+  },
   'M6:esr-parser': {
     credits: 0,
     approval: 'pending-owner-approval',

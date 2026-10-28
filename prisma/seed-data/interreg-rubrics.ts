@@ -7,9 +7,12 @@
  * The assessors' own "Guidelines for Assessment and Selection" are not public
  * and nothing here assumes their content.
  *
- * Only the profile whose full criterion texts FO-187 extracted is listed. The
- * 2nd-call small-scale grid (12 × 4 = 48, reject < 32, §1.5) is named there
- * but its sub-questions are not; it is added as a new entry once they are.
+ * The 2nd-call Regular grid is the FO-187 §5.2 JSON. The 2nd-call small-scale
+ * grid (12 × 4 = 48, reject < 32, §1.5) was added in FO-188 from the same
+ * evidence folder (call2ssp/…/Annex 7 Quality Assessment Grid SSP.docx, read
+ * cell by cell); its programme rules are FO-187 §2.3 (SSP Part II). The SSP
+ * Part IV was not read, so it carries no tie-break order. The 1st call is
+ * historical (FO-187 §1.4) and not offered.
  *
  * A published grid is not edited in place once analyses point at it: a revised
  * grid is a new `id`. prisma/seed-interreg-rubrics.ts checks the totals.
@@ -301,6 +304,234 @@ export const INTERREG_RUBRICS: readonly InterregRubricSeed[] = [
         subQuestions: ['Costs eligible under programme rules', 'Costs reasonable', 'No duplication of costs'],
         afSections: ['D', 'C.4'],
         evidenceExpectation: 'Uygun olmayan kalem şüphesi, mükerrer kalem, piyasa fiyatına göre makullük gerekçesi',
+      },
+    ],
+  },
+  {
+    id: 'interreg-next-bsb.call2.ssp',
+    programme: 'interreg-next-bsb',
+    label: 'Interreg NEXT BSB — 2. çağrı Small-scale — iç ön değerlendirme (resmî puan değildir)',
+    isDefault: false,
+    allowedMarks: [1, 1.5, 2, 2.5, 3, 3.5, 4],
+    maxRaw: 48,
+    passRaw: 32,
+    // Interreg funds per project, EUR 250,000 – 500,000 (SSP Part II, 2nd call, p.20), in cent.
+    budgetMinMinor: 25_000_000,
+    budgetMaxMinor: 50_000_000,
+    currency: 'EUR',
+    maxDurationMonths: 18,
+    source: {
+      grid: 'Annex 7 Quality Assessment Grid – Second call – Small scale projects',
+      procedure: 'Part IV (SSP) okunmadı; eşik ve eleme kuralları Annex 7 SSP s.1–5',
+      url: 'https://blacksea-cbc.net/images/APPLICATION_PACK_SMALL_SCALE_PROJECTS_REVISED.zip',
+      assessorGuidelines:
+        'Guidelines for Assessment and Selection (MC kararı 30/18.06.2024, 44/07.11.2024) — kamuya açık değil, içeriği doğrulanmadı',
+    },
+    // The SSP Part IV (where the Regular tie-break is written) was not read: no order is assumed.
+    tieBreak: [],
+    programChecks: [
+      { key: 'rco87_present', rule: 'Zorunlu çıktı RCO87 tanımlı ve doğru nicelendirilmiş', source: 'Annex 7 SSP (2. çağrı) s.1' },
+      { key: 'cma_contribution', rule: 'CMA hedeflerine katkı açıkça yazılı', source: 'SSP Part II (2. çağrı) s.6' },
+      {
+        key: 'partnership_composition',
+        rule: 'SSP: 3–4 kuruluş, 3 farklı ülke, ülke başına ≤2',
+        source: 'SSP Part II (2. çağrı) s.14',
+      },
+      { key: 'budget_range', rule: 'Interreg 250.000–500.000 € (SSP)', source: 'SSP Part II (2. çağrı) s.20' },
+      { key: 'duration', rule: '≤18 ay (SSP)', source: 'SSP Part II (2. çağrı) s.20' },
+      { key: 'so_open_in_call', rule: 'Seçilen SO çağrıda açık (2. çağrı SSP: SO4, SO7, ISO1/SO3)', source: 'Bilgi günü (2. çağrı) s.4' },
+    ],
+    criteria: [
+      {
+        criterionKey: 'relevance_so_fit',
+        officialRef: '1.1',
+        section: 'relevance',
+        group: 'strategic',
+        name: 'Relevance to the targeted programme specific objective and expected results',
+        maxMark: 4,
+        knockoutBelow: 3,
+        subQuestions: [
+          'Project overall objective clearly in line with one programme SO and field of action',
+          'Main outputs and results linked to and contributing to the selected SO and its indicator(s)',
+        ],
+        afSections: ['A', 'C.1', 'C.4', 'C.5'],
+        evidenceExpectation:
+          'Seçilen SO kodu (SO4/SO7/ISO1-SO3) + faaliyet alanı adı, proje genel hedefinden alıntı, çıktı→gösterge bağlantısı',
+      },
+      {
+        criterionKey: 'relevance_transnational_value',
+        officialRef: '1.2',
+        section: 'relevance',
+        group: 'strategic',
+        name: 'Added value of transnational cooperation clearly demonstrated',
+        maxMark: 4,
+        knockoutBelow: 3,
+        subQuestions: [
+          'Common problems and needs of the targeted regions identified and described',
+          'Planned activities suitable for tackling them at transnational level',
+          'Objectives and results demonstrate transnational added value',
+        ],
+        afSections: ['C.2.1', 'C.2.2', 'C.2.3', 'C.4', 'C.5', 'C.7.5'],
+        evidenceExpectation:
+          'Ortak sorun tanımı (≥2 ülke verisi), tek ülkenin tek başına çözemeyeceği gerekçesi, ortak üretilen çıktı',
+      },
+      {
+        criterionKey: 'coherence_intervention_logic',
+        officialRef: '2.1',
+        section: 'coherence',
+        group: 'strategic',
+        name: 'Intervention logic consistent and clearly defined',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Project specific objective, activities, outputs and expected results clearly defined',
+          'Planned outputs and results achievable by implementing the proposed activities',
+        ],
+        afSections: ['C.4', 'C.5'],
+        evidenceExpectation: 'Hedef→faaliyet→çıktı→sonuç zinciri; her çıktının üreten faaliyeti',
+      },
+      {
+        criterionKey: 'coherence_indicators',
+        officialRef: '2.2',
+        section: 'coherence',
+        group: 'strategic',
+        name: 'Indicators correctly identified and quantified',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Result and output indicators correctly identified',
+          'Outputs/results contribute to indicators as defined in the Programme Performance Framework Methodology',
+          'Quantification realistic',
+        ],
+        afSections: ['C.4', 'C.5'],
+        evidenceExpectation:
+          'RCO87 var mı ve doğru nicelendirilmiş mi; RCR doğru RCO ile eşli mi; hedef değerler gerekçeli mi (çok gösterge ≠ yüksek puan)',
+      },
+      {
+        criterionKey: 'results_impact_synergies',
+        officialRef: '3.1',
+        section: 'results',
+        group: 'strategic',
+        name: 'Perspectives for impact, synergies, horizontal principles and capitalization',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Contributes to Common Maritime Agenda goals and priorities',
+          'Contributes to another macro-regional strategy (EUSDR, EUSAIR) and/or other Black Sea strategy (e.g. SRIA)',
+          'Creates synergies or builds on BSB or other projects/programmes/initiatives',
+          'Describes contribution to horizontal principles (equal opportunities and non-discrimination, gender equality, environment and sustainable development)',
+          'Main outputs durable (institutional and financial support after project end), applicable and replicable outside the partnership',
+        ],
+        afSections: ['C.2.5', 'C.2.6', 'C.2.7', 'C.7.6', 'C.8'],
+        evidenceExpectation:
+          'CMA hedefinin adıyla (Goal 1/2/3) eşleşme, önceki proje adı/kodu, yatay ilkeler paragrafı, proje sonrası sahiplik ve aktarım planı',
+      },
+      {
+        criterionKey: 'partnership_relevance',
+        officialRef: '4.1',
+        section: 'partnership',
+        group: 'operational',
+        name: 'Relevant partners involved to address the common challenge and achieve the SO',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Partners competent in the thematic field',
+          'Partners actively involved in joint implementation',
+          "Partners' roles in activities and results described",
+        ],
+        afSections: ['C.3', 'C.4'],
+        evidenceExpectation: 'Ortak tablosu: ülke, tür, tematik yetkinlik, faaliyet bazında rol',
+      },
+      {
+        criterionKey: 'partnership_lead_capacity',
+        officialRef: '4.2',
+        section: 'partnership',
+        group: 'operational',
+        name: 'The Lead partner has competence and financial capacity to manage a cooperation project',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Lead partner experienced in managing a cooperation project',
+          'Lead partner capacity to manage implementation and achieve results',
+          'Lead partner financial capacity for cash-flow (Annex 5 self-assessment)',
+        ],
+        afSections: ['C.3'],
+        evidenceExpectation: "Lider ortağın önceki projeleri, Annex 5 sonucu (metinde yoksa 'belge yüklenmedi' bulgusu)",
+      },
+      {
+        criterionKey: 'workplan_coherent',
+        officialRef: '5.1',
+        section: 'workplan',
+        group: 'operational',
+        name: 'The workplan is coherent',
+        maxMark: 4,
+        knockoutBelow: 3,
+        subQuestions: [
+          'Activities clearly described (what, how, when, where, by whom)',
+          'Activities appropriate to achieve outputs and results',
+          'Activities address relevant target group(s)',
+          'Activities outside programme area described and compliant',
+        ],
+        afSections: ['C.4', 'C.6', 'C.2.4'],
+        evidenceExpectation: 'Faaliyet listesi 5N1K; hedef grup; program alanı dışı faaliyet gerekçesi',
+      },
+      {
+        criterionKey: 'workplan_realistic',
+        officialRef: '5.2',
+        section: 'workplan',
+        group: 'operational',
+        name: 'The work-plan is realistic',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: ['Sequence of activities logical', 'Time-schedule feasible within the timeframe'],
+        afSections: ['C.4', 'C.6'],
+        evidenceExpectation: 'Takvim/Gantt; süre ≤18 ay (SSP)',
+      },
+      {
+        criterionKey: 'management_risk',
+        officialRef: '5.3',
+        section: 'workplan',
+        group: 'operational',
+        name: 'Sound project management, coordination and risk mitigation',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Management, coordination and risk mitigation measures described',
+          'Joint development, joint implementation and joint financing demonstrated',
+        ],
+        afSections: ['C.7.1', 'C.7.2', 'C.7.4', 'C.7.5'],
+        evidenceExpectation: "Yönetim yapısı, risk tablosu, 'joint development / implementation / financing' kanıtı",
+      },
+      {
+        criterionKey: 'communication',
+        officialRef: '6.1',
+        section: 'communication',
+        group: 'operational',
+        name: 'Communication activities appropriate to reach target groups and stakeholders',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Communication objectives relevant and contribute to project specific objective',
+          'Activities appropriate to reach target groups and stakeholders',
+        ],
+        afSections: ['C.4', 'C.7.3'],
+        evidenceExpectation: 'İletişim hedefi ↔ proje hedefi bağı, kanal ↔ hedef grup eşlemesi',
+      },
+      {
+        criterionKey: 'budget_value_for_money',
+        officialRef: '7.1',
+        section: 'budget',
+        group: 'operational',
+        name: 'The project budget demonstrates value for money',
+        maxMark: 4,
+        knockoutBelow: null,
+        subQuestions: [
+          'Budget justified and necessary for activities, outputs, results',
+          "Each partner's budget reflects its involvement",
+          'Proposed costs reasonable',
+        ],
+        afSections: ['D', 'C.4'],
+        evidenceExpectation: 'Bütçe–faaliyet eşleşmesi, ortak payı ↔ rol; Interreg tutarı 250.000–500.000 € (SSP)',
       },
     ],
   },
