@@ -6,6 +6,7 @@ import {
   cspHeaderName,
   cspOptionsFromEnv,
   generateNonce,
+  isCordisWidgetHostPath,
   isCordisWidgetPath,
 } from './lib/security-headers';
 
@@ -38,6 +39,7 @@ export function proxy(request: NextRequest) {
   const csp = buildContentSecurityPolicy({
     ...cspOptionsFromEnv(nonce),
     cordisWidget: isCordisWidgetPath(request.nextUrl.pathname),
+    cordisWidgetHost: isCordisWidgetHostPath(request.nextUrl.pathname),
   });
 
   const requestHeaders = new Headers(request.headers);

@@ -708,6 +708,7 @@
       "eyebrow": "Live CORDIS data",
       "title": "Current Horizon Europe projects with participants from Türkiye",
       "subtitle": "Updated live from the European Commission's CORDIS database: the 6 most recently updated projects with a participant from Türkiye.",
+      "frameTitle": "CORDIS – list of Horizon Europe projects with participants from Türkiye",
       "loading": "Loading projects from CORDIS…",
       "fallback": "The project list could not be loaded right now. You can see the same search directly on CORDIS.",
       "fallbackLink": "Open Horizon Europe projects with participants from Türkiye on CORDIS",

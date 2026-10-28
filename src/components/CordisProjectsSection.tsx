@@ -1,8 +1,7 @@
 import { getTranslations } from 'next-intl/server';
-import { headers } from 'next/headers';
 import React from 'react';
 import { env } from '@/lib/env';
-import { cordisWidgetLang } from '@/lib/cordis-widget';
+import { CORDIS_WIDGET_EMBED_PATH } from '@/lib/cordis-widget';
 import CordisProjectsWidget from './CordisProjectsWidget';
 
 interface CordisProjectsSectionProps {
@@ -14,14 +13,17 @@ interface CordisProjectsSectionProps {
  * recently updated Horizon Europe projects with a participant from Türkiye, read
  * live from CORDIS — nothing here is counted or stored by us.
  *
+ * The widget itself runs in a sandboxed iframe on its own route
+ * (src/app/[locale]/embed/cordis/route.ts, K-573263): nothing from CORDIS runs in
+ * this page. The heading, text, source line and fallback link stay here.
+ *
  * The widget key comes from NEXT_PUBLIC_CORDIS_WIDGET_KEY only. Without one, the
  * block still renders, with a link to the same search on CORDIS in place of the
- * table. The nonce is the one src/proxy.ts put on this request's CSP.
+ * table, and the frame is not added at all.
  */
 export default async function CordisProjectsSection({ locale }: CordisProjectsSectionProps) {
   const t = await getTranslations({ locale, namespace: 'landing.cordisProjects' });
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-  const apiKey = env.NEXT_PUBLIC_CORDIS_WIDGET_KEY?.trim() || null;
+  const hasKey = Boolean(env.NEXT_PUBLIC_CORDIS_WIDGET_KEY?.trim());
 
   return (
     <section
@@ -41,10 +43,13 @@ export default async function CordisProjectsSection({ locale }: CordisProjectsSe
         </div>
 
         <CordisProjectsWidget
-          apiKey={apiKey}
-          lang={cordisWidgetLang(locale)}
-          nonce={nonce}
-          labels={{ loading: t('loading'), fallback: t('fallback'), fallbackLink: t('fallbackLink') }}
+          src={hasKey ? `/${locale}${CORDIS_WIDGET_EMBED_PATH}` : null}
+          labels={{
+            frameTitle: t('frameTitle'),
+            loading: t('loading'),
+            fallback: t('fallback'),
+            fallbackLink: t('fallbackLink'),
+          }}
         />
 
         <p className="mt-4 text-[11px] text-muted">{t('source')}</p>

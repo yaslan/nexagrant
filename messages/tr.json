@@ -708,6 +708,7 @@
       "eyebrow": "CORDIS canlı veri",
       "title": "Türkiye'nin yer aldığı güncel Horizon Europe projeleri",
       "subtitle": "Avrupa Komisyonu CORDIS veritabanından canlı olarak güncellenir: Türkiye'den katılımcısı olan, en son güncellenen 6 proje.",
+      "frameTitle": "CORDIS – Türkiye katılımcılı Horizon Europe projeleri listesi",
       "loading": "Projeler CORDIS'ten yükleniyor…",
       "fallback": "Proje listesi şu an yüklenemedi. Aynı aramayı doğrudan CORDIS'te görebilirsiniz.",
       "fallbackLink": "Türkiye katılımcılı Horizon Europe projelerini CORDIS'te aç",

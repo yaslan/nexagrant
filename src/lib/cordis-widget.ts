@@ -25,6 +25,15 @@ export const CORDIS_SEARCH_URL = `https://cordis.europa.eu/search?${new URLSearc
   srt: CORDIS_PROJECT_SORT,
 }).toString()}`;
 
+/**
+ * The widget's own page, framed sandboxed by the home page (K-573263):
+ * `/<locale>/embed/cordis` (src/app/[locale]/embed/cordis/route.ts).
+ */
+export const CORDIS_WIDGET_EMBED_PATH = '/embed/cordis';
+
+/** `type` of the postMessage the embed sends its parent: `{ type, status: 'ready' | 'error', height }`. */
+export const CORDIS_WIDGET_MESSAGE_TYPE = 'fonbridge:cordis-widget';
+
 /** How long the table may take before the fallback link replaces it. */
 export const CORDIS_WIDGET_TIMEOUT_MS = 8_000;
 
