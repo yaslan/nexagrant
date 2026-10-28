@@ -220,6 +220,65 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     expect((await load(justAfter)).callText).toBe(text);
   });
 
+  test('pages: more due rows than one batch are ALL emptied, each page committing on its own (FO-195 B1)', async () => {
+    const t = await makeTenant('pages');
+    const text = 'p'.repeat(300);
+    const ids: string[] = [];
+    for (let i = 0; i < 7; i++) ids.push(await analysis(t, 'READY', { text, expiresInDays: -1 - i }, { text, expiresInDays: 9 }));
+    const young = await analysis(t, 'READY', { text, expiresInDays: 5 }, { text, expiresInDays: 6 });
+
+    // batchSize 3 over 7 due rows (+ whatever the other tests of this file left due): several pages.
+    const result = await purgeExpiredInterregText(NOW, { batchSize: 3 });
+    expect(result.more).toBe(false);
+    expect(result.callSlots).toBeGreaterThanOrEqual(7);
+    for (const id of ids) {
+      expect(await load(id)).toMatchObject({ status: 'UPLOADING', callText: null, callTextExpiresAt: null });
+      expect(await derived(id)).toEqual([0, 0]);
+    }
+    expect(await load(young)).toMatchObject({ status: 'READY', callText: text });
+  });
+
+  test('a run cut short keeps what it finished, and the next run carries on to the end', async () => {
+    const t = await makeTenant('resume');
+    const text = 'q'.repeat(300);
+    const ids: string[] = [];
+    for (let i = 0; i < 8; i++) ids.push(await analysis(t, 'CALL_READY', { text, expiresInDays: -2 }, null, false));
+    const dueNow = async () =>
+      Number(
+        (
+          await admin.$queryRaw<Array<{ n: bigint }>>`
+            SELECT count(*)::bigint AS n FROM "InterregAnalysis" WHERE "tenantId" = ANY(${tenantIds}) AND "callText" IS NOT NULL AND "callTextExpiresAt" <= ${NOW}`
+        )[0]?.n,
+      );
+    const before = await dueNow();
+    expect(before).toBeGreaterThanOrEqual(8);
+
+    // Two pages of 2, then stop: the 4 rows of those pages are gone (committed), the rest stay.
+    const first = await purgeExpiredInterregText(NOW, { batchSize: 2, maxBatches: 2 });
+    expect(first.more).toBe(true);
+    expect(first.callSlots).toBe(4);
+    expect(await dueNow()).toBe(before - 4);
+
+    // The next run is the same call: it finishes the backlog and the one after finds nothing.
+    const second = await purgeExpiredInterregText(NOW, { batchSize: 2 });
+    expect(second.more).toBe(false);
+    expect(second.callSlots).toBe(before - 4);
+    expect(await dueNow()).toBe(0);
+    const third = await purgeExpiredInterregText(NOW, { batchSize: 2 });
+    expect(third).toEqual({ callSlots: 0, projectSlots: 0, analyses: 0, more: false });
+    for (const id of ids) expect((await load(id)).callText).toBeNull();
+  });
+
+  test('a time budget that is already spent stops after one page and reports more', async () => {
+    const t = await makeTenant('budget');
+    const text = 'b'.repeat(300);
+    for (let i = 0; i < 4; i++) await analysis(t, 'CALL_READY', { text, expiresInDays: -2 }, null, false);
+    const r = await purgeExpiredInterregText(NOW, { batchSize: 2, budgetMs: 1e-9 });
+    expect(r.more).toBe(true);
+    expect(r.callSlots).toBe(2);
+    await purgeExpiredInterregText(NOW); // leave the database clean for the other tests
+  });
+
   test('an invalid `now` is refused instead of silently matching nothing', async () => {
     await expect(purgeExpiredInterregText(new Date('nope'))).rejects.toThrow(/valid Date/);
   });
