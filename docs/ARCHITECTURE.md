@@ -20,7 +20,7 @@
 
 - **Rota grupları:** `[locale]/(public)` herkese açık sayfaların hepsi (ana sayfa, yasal metinler, fiyatlandırma, çağrılar, blog, giriş/kayıt, davet, partner portalı); ortak `PublicNavbar` + `PublicFooter` yalnız bu grubun `layout.tsx`'inde, sayfalar kendileri eklemez (FO-68). 404 (`src/app/not-found.tsx`) aynı çifti kendisi çizer. `(app)/[workspaceSlug]/...` kiracı uygulaması; `admin` platform yönetimi (`platform_admin`) — ikisinin kendi kabuğu var.
 - **Sunucu tarafı:** Server Components veri okur; yazma Server Actions (zod ile doğrulanmış) ya da `/api/v1/*` Route Handlers (harici API lisansı için de aynı katman).
-- **Alan katmanı:** `src/core/*` (K1–K6) ve `src/modules/*` (M1–M11) saf TypeScript; Prisma istemcisi `withTenant()` ile sarılı.
+- **Alan katmanı:** `src/core/*` (K1–K6) ve `src/modules/*` (kayıtlı modüller: `src/lib/modules/registry.ts`) saf TypeScript; Prisma istemcisi `withTenant()` ile sarılı.
 - **Olay veri yolu:** `src/core/events` — tipli olaylar (`opportunity.created`, `gate.passed`, `module.state.changed`, `ai.used`, `esr.uploaded`). Modüller birbirini import etmez; olay dinler. Inngest bu olayları dayanıklı işlere de bağlar.
 
 ## 3. Modül sistemi
@@ -46,6 +46,7 @@ export const manifest: ModuleManifest = {
   - `disable(tenant, moduleId, actor) → cascadedOff: ModuleId[]` (bağımlıları özyinelemeli kapatır)
   - Her geçiş `AuditEvent` yazar (`module.state.changed`).
 - **Koruma:** `requireModule('M8')` (server) ve `useModuleEnabled('M8')` (client). `pilot` durumunda yalnızca `pipeline_manager+` geçer.
+- **Giriş noktaları (FO-164):** kenar menüsü manifest `nav[]`'dan, fırsat detayı sekmeleri manifest `opportunityTabs[]`'dan türetilir (`getSidebarEntries` / `getOpportunityTabs`, `src/lib/modules/registry.ts`); elle liste yok. Görünürlük uygulama kabuğunda `listModuleNav()` (`src/lib/modules/access.ts`) ile, kapıyla aynı `decideModuleAccess` kararından okunur: açık modül → bağlantı (PILOT/DEV ise rozetli), yalnız plan dışı → kilitli bağlantı (modül sayfasındaki kapı hangi planlarda olduğunu söyler), kapalı/yakında → gizli. `validateRegistry()` her girişin kendi modülünün rotasını açtığını, `tests/modules/route-catalog.test.ts` "Yakında" olmayan her modülün en az bir girişi olduğunu denetler.
 - **Yeni modül ekleme:** `/new-module` komutu iskeleti üretir: manifest, `server/`, `ui/`, i18n anahtarları, test dosyası, `docs/MODULES.md` bölümü.
 
 ## 4. K1 — Çağrı toplama

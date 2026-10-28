@@ -24,8 +24,10 @@ import {
   buildContentSecurityPolicy,
   cspHeaderName,
   cspOptionsFromEnv,
+  CORDIS_WIDGET_SOURCE,
   CSP_REPORT_PATH,
   generateNonce,
+  isCordisWidgetPath,
   staticFileNotFoundSource,
 } from './security-headers';
 
@@ -311,6 +313,83 @@ describe('cspOptionsFromEnv / cspHeaderName', () => {
     expect(cspHeaderName(env({}))).toBe('Content-Security-Policy');
     expect(cspHeaderName(env({ CSP_MODE: 'enforce' }))).toBe('Content-Security-Policy');
     expect(cspHeaderName(env({ CSP_MODE: ' Report-Only ' }))).toBe('Content-Security-Policy-Report-Only');
+  });
+});
+
+describe('CORDIS widget CSP (FO-168) — home page only', () => {
+  const CORDIS_PATH = 'https://cordis.europa.eu/datalab/visualisations/';
+  const WIDENED = ['style-src', 'img-src', 'font-src'];
+
+  it('the source is one https path on cordis.europa.eu — no wildcard, no bare host', () => {
+    expect(CORDIS_WIDGET_SOURCE).toBe(CORDIS_PATH);
+    expect(CORDIS_WIDGET_SOURCE).not.toContain('*');
+  });
+
+  it('isCordisWidgetPath: /tr and /en (optional trailing slash) only', () => {
+    for (const p of ['/tr', '/en', '/tr/', '/en/']) expect(isCordisWidgetPath(p), p).toBe(true);
+    for (const p of [
+      '/', '/TR', '/En', '/tr/login', '/en/pricing', '/tr/blog', '/tr/x', '/tr//', '/trx', '/tr.png',
+      '/api/health', '/api/csp-report', '/de', '/tr/en', '',
+    ]) {
+      expect(isCordisWidgetPath(p), p).toBe(false);
+    }
+  });
+
+  it('with the flag: exactly style/img/font-src get the CORDIS path, every other directive is unchanged', () => {
+    const plain = parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false }));
+    const home = parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false, cordisWidget: true }));
+    expect([...home.keys()]).toEqual([...plain.keys()]);
+    for (const [name, values] of plain) {
+      if (WIDENED.includes(name)) expect(home.get(name), name).toEqual([...values, CORDIS_PATH]);
+      else expect(home.get(name), name).toEqual(values);
+    }
+    // the widget fetches its data as JSONP scripts: no connect-src / frame-src opening
+    expect(home.get('connect-src')).toEqual(["'self'"]);
+    expect(home.get('frame-src')).toEqual(["'none'"]);
+  });
+
+  it('without the flag (default) nothing mentions cordis', () => {
+    expect(buildContentSecurityPolicy({ nonce: 'n', isDev: false })).not.toMatch(/cordis/i);
+    expect(buildContentSecurityPolicy({ nonce: 'n', isDev: false, cordisWidget: false })).not.toMatch(/cordis/i);
+  });
+
+  it('production home policy has no unsafe-eval, no unsafe-inline in script-src, no wildcard host', () => {
+    const home = parseCsp(buildContentSecurityPolicy({ nonce: 'n', isDev: false, cordisWidget: true }));
+    expect(home.get('script-src')).toEqual(["'self'", "'nonce-n'", "'strict-dynamic'"]);
+    for (const [name, values] of home) {
+      expect(values.join(' '), name).not.toContain('unsafe-eval');
+      expect(values.join(' '), name).not.toMatch(/(^|\s)\*/);
+      expect(values.join(' '), name).not.toMatch(/https:\/\/\*|\s(https?:)(\s|$)/);
+      if (name !== 'style-src') expect(values, name).not.toContain("'unsafe-inline'");
+    }
+  });
+
+  it('the proxy sends the CORDIS path on /tr and /en and on no other route', () => {
+    const csp = (p: string) => proxy(new NextRequest(`http://localhost${p}`)).headers.get('content-security-policy') ?? '';
+    for (const p of ['/tr', '/en', '/tr/', '/en?utm=x']) expect(csp(p), p).toContain(CORDIS_PATH);
+    for (const p of ['/tr/login', '/en/login', '/tr/pricing', '/tr/blog', '/tr/some-workspace/pipeline', '/TR', '/tr/en', '/foo.bar', '/robots.txt']) {
+      expect(csp(p), p).not.toMatch(/cordis/i);
+    }
+    // `/` only redirects to a locale: the redirect carries the default policy
+    expect(csp('/')).not.toMatch(/cordis/i);
+  });
+
+  it('the home policy is the same policy on request and response (Next reads the nonce from the request)', () => {
+    const res = proxy(new NextRequest('http://localhost/tr'));
+    const csp = res.headers.get('content-security-policy') ?? '';
+    const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+    expect(nonce).toBeTruthy();
+    expect(res.headers.get('x-middleware-request-x-nonce')).toBe(nonce);
+    expect(res.headers.get('x-middleware-request-content-security-policy')).toBe(csp);
+  });
+
+  it('CSP_MODE=report-only still applies to the home policy (rollback switch)', () => {
+    expect(cspHeaderName(env({ CSP_MODE: 'report-only' }))).toBe('Content-Security-Policy-Report-Only');
+  });
+
+  it('API and static-file policies never mention cordis', () => {
+    expect(API_CONTENT_SECURITY_POLICY).not.toMatch(/cordis/i);
+    expect(STATIC_FILE_CONTENT_SECURITY_POLICY).not.toMatch(/cordis/i);
   });
 });
 

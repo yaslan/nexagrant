@@ -6,7 +6,9 @@ import {
   PLAN_GRANTS,
   findEntry,
   grantsFor,
+  moduleLimitsFor,
   resolvePlanId,
+  type ModuleLimits,
 } from './billing/catalog';
 import {
   grantFromPlanVersion,
@@ -45,6 +47,17 @@ export interface Entitlements {
    */
   planId: string;
   allowedModules: string[];
+  /**
+   * FO-41: modules in `allowedModules` the plan grants only in a limited form
+   * (Discover's M1). A module missing here is granted in full.
+   */
+  moduleLimits: Record<string, ModuleLimits>;
+  /**
+   * Modules kept by `ModuleState.grandfathered` rather than by the plan — M3
+   * for the Discover tenants that ran it before FO-41 moved it to Basic.
+   * Already included in `allowedModules`; reported so a screen can say why.
+   */
+  grandfatheredModules: string[];
   seats: number;
   workspaces: number;
   aiCreditsMonthly: number;
@@ -101,6 +114,12 @@ export async function getEntitlements(tenantId: string, client: TenantTx): Promi
           planVersion: true,
         },
       },
+      // FO-41: modules this tenant keeps from before a repackaging. Joined for
+      // the same reason as the version: every module gate reads it.
+      moduleStates: {
+        where: { grandfathered: true },
+        select: { moduleId: true },
+      },
     },
   });
 
@@ -142,6 +161,13 @@ export async function getEntitlements(tenantId: string, client: TenantTx): Promi
   }
 
   const allowedModules = new Set<string>(plan.moduleIds);
+  // Limits are a catalogue fact about the plan id, so they apply whichever row
+  // (version or catalogue) granted the module.
+  const moduleLimits: Record<string, ModuleLimits> = {};
+  for (const moduleId of allowedModules) {
+    const limits = moduleLimitsFor(planId, moduleId);
+    if (limits) moduleLimits[moduleId] = limits;
+  }
   let seats = plan.seats + (tenant.subscription?.seatsExtra || 0);
   let workspaces = plan.workspaces + (tenant.subscription?.workspacesExtra || 0);
   let aiCreditsMonthly = plan.aiCreditsMonthly;
@@ -163,6 +189,8 @@ export async function getEntitlements(tenantId: string, client: TenantTx): Promi
         if (details) {
           if (details.grantsModule) {
             allowedModules.add(details.grantsModule);
+            // A bought add-on is the module in full, whatever the plan limits.
+            delete moduleLimits[details.grantsModule];
           }
           if (details.grantsSeats) {
             seats += (details.grantsSeats * addon.quantity);
@@ -184,9 +212,22 @@ export async function getEntitlements(tenantId: string, client: TenantTx): Promi
     }
   }
 
+  // Grandfathered last: the tenant keeps exactly what it had, in full. The
+  // flag is written by the migration only (a trigger refuses fabrika_app), so
+  // a session cannot grant itself a module through it.
+  const grandfatheredModules: string[] = (tenant.moduleStates ?? []).map(
+    (row: { moduleId: string }) => row.moduleId
+  );
+  for (const moduleId of grandfatheredModules) {
+    allowedModules.add(moduleId);
+    delete moduleLimits[moduleId];
+  }
+
   return {
     planId,
     allowedModules: Array.from(allowedModules),
+    moduleLimits,
+    grandfatheredModules,
     seats,
     workspaces,
     aiCreditsMonthly,

@@ -17,18 +17,24 @@ import {
   FileText,
   Inbox,
   UserCheck,
-  Globe
+  Globe,
+  Network
 } from 'lucide-react';
+import type { ModuleCounts } from '@/lib/modules/registry';
 
 interface AdminSidebarNavProps {
   locale: string;
+  /** From `getModuleCounts()` on the server, so the registry stays out of the client bundle. */
+  moduleCounts: ModuleCounts;
 }
 
-export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
+export default function AdminSidebarNav({ locale, moduleCounts }: AdminSidebarNavProps) {
   const pathname = usePathname();
   const tLeads = useTranslations('adminLeads');
   const tExperts = useTranslations('AdminExpertPrereg');
   const tInterreg = useTranslations('adminInterreg');
+  const tPartnerSearch = useTranslations('adminPartnerSearch');
+  const tModuleCount = useTranslations('moduleCount');
 
   const adminNavItems = [
     {
@@ -37,7 +43,7 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       label: locale === 'tr' ? 'Modül Yönetimi' : 'Module State Manager',
       desc: 'OFF, DEV, PILOT, ON geçişleri',
       icon: Puzzle,
-      badge: '11 Modül',
+      badge: tModuleCount('badge', moduleCounts),
     },
     {
       key: 'tenants',
@@ -94,6 +100,14 @@ export default function AdminSidebarNav({ locale }: AdminSidebarNavProps) {
       desc: tInterreg('navDesc'),
       icon: Globe,
       badge: 'Interreg',
+    },
+    {
+      key: 'partner-search',
+      href: `/${locale}/admin/partner-search`,
+      label: tPartnerSearch('navLabel'),
+      desc: tPartnerSearch('navDesc'),
+      icon: Network,
+      badge: 'PS',
     },
     {
       key: 'leads',

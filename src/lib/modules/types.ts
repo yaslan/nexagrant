@@ -114,6 +114,13 @@ export interface ModuleManifest {
   routes: ModuleRoute[];
   /** Sidebar entries this module contributes when it is visible. */
   nav: ModuleNavItem[];
+  /**
+   * Tabs this module contributes to the opportunity detail page when it is
+   * visible. `labelKey` lives in the `Pipeline.detail.modules` i18n namespace;
+   * `routeKey` is an opportunity-scoped route, resolved with the opportunity id.
+   * Omitted when the module has no per-opportunity page.
+   */
+  opportunityTabs?: ModuleNavItem[];
   /** Capabilities this module defines; referenced by its own routes. */
   permissions: ModulePermission[];
   /** Prisma models this module reads or writes; validated against schema.prisma. */
@@ -127,6 +134,19 @@ export interface ModuleManifest {
   docsUrl: string | null;
   /** `null` when the module advertises no quota at all. */
   quota: ModuleQuota | null;
+  /**
+   * FO-41: whether a tenant may buy this module on its own, outside its plan.
+   * True only together with an `addOnSku` that `AddOnCatalog` sells; no module
+   * is sold that way yet, so every manifest says `false`.
+   */
+  addonPurchasable: boolean;
+  /**
+   * FO-41: length of the "try it" period a tenant whose plan lacks the module
+   * may start, in days; `null` when the module offers none (every "Yakında"
+   * module). Read by the module card; the trial entitlement itself is not
+   * built yet.
+   */
+  trialDays: number | null;
   /**
    * Programme templates this module ships with (data only; the template bodies
    * live with the module). Empty when the module has none.

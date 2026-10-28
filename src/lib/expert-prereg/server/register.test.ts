@@ -194,7 +194,7 @@ describe('registerExpertPreRegistration', () => {
     expect(row.consentTextVersion).toBe(EXPERT_PREREG_CONSENT_VERSION);
     expect(row.kvkkAcceptedAt).toEqual(NOW);
     expect(row.visibilityConsentAt).toEqual(NOW);
-    expect(row.marketingConsentAt).toBeNull();
+    expect(row).not.toHaveProperty('marketingConsentAt');
     expect(row.locale).toBe('tr');
 
     // The raw token is in the mail; the database holds only its hash.
@@ -455,6 +455,35 @@ describe('registerExpertPreRegistration', () => {
   });
 });
 
+describe('FO-144 · no marketing consent (K-572235)', () => {
+  it('accepts an old payload with marketingConsent: true and stores no marketing consent', async () => {
+    const { db, rows, delegate } = fakeDb();
+    const { mailer } = recordingMailer();
+    const result = await registerExpertPreRegistration({ ...valid, marketingConsent: true }, { db, mailer, baseUrl: BASE, now: NOW, ip: IP, salt: SALT });
+
+    expect(result).toEqual({ kind: 'created' });
+    const data = (delegate.create.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
+    expect(data).not.toHaveProperty('marketingConsentAt');
+    expect(rows[0]).not.toHaveProperty('marketingConsentAt');
+  });
+
+  it('leaves the marketingConsentAt of a row registered before FO-144 untouched on a re-issue', async () => {
+    const earlier = new Date(NOW.getTime() - 60_000);
+    const { db, rows, delegate } = fakeDb();
+    const { mailer } = recordingMailer();
+    await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: NOW, ip: null, salt: null });
+    rows[0]!.marketingConsentAt = earlier;
+
+    const later = new Date(NOW.getTime() + RESEND_COOLDOWN_MS + 1_000);
+    const again = await registerExpertPreRegistration(valid, { db, mailer, baseUrl: BASE, now: later, ip: null, salt: null });
+
+    expect(again).toEqual({ kind: 'created' });
+    const data = (delegate.update.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
+    expect(data).not.toHaveProperty('marketingConsentAt');
+    expect(rows[0]!.marketingConsentAt).toEqual(earlier);
+  });
+});
+
 describe('FO-45 · pending re-issue, daily mail quota, AUTH_SECRET key', () => {
   it('keeps the profile and the consents of a pending row when it registers again (F6 / crw2 MINOR-A)', async () => {
     const { db, rows } = fakeDb();
@@ -474,8 +503,8 @@ describe('FO-45 · pending re-issue, daily mail quota, AUTH_SECRET key', () => {
       locale: 'tr',
       kvkkAcceptedAt: NOW,
       visibilityConsentAt: NOW,
-      marketingConsentAt: null,
     });
+    expect(rows[0]).not.toHaveProperty('marketingConsentAt');
     // The new link works: the mail went out and carries the stored name and language.
     expect(sent).toHaveLength(2);
     expect(sent[1]!.subject).toBe(sent[0]!.subject);

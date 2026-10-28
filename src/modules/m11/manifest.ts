@@ -18,6 +18,7 @@ export const m11Manifest: ModuleManifest = {
   addOnSku: null,
   routes: [{ path: 'opportunities/[id]/application', permission: 'application:read' }],
   nav: [],
+  opportunityTabs: [{ labelKey: 'application', routeKey: 'opportunityApplication', order: 70 }],
   permissions: [
     { id: 'application:read', minRole: Role.MEMBER },
     { id: 'application:write', minRole: Role.WRITER },
@@ -29,5 +30,7 @@ export const m11Manifest: ModuleManifest = {
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
+  addonPurchasable: false,
+  trialDays: 7,
   programTemplates: ['horizon-europe', 'eurostars', 'digital-europe', 'eic-accelerator'],
 };

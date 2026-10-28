@@ -18,14 +18,24 @@ Para birimi **USD**, tutarlar cent (CLAUDE.md kural 9). Aşağıdaki fiyatlar
 
 | Plan id | Ad | Aylık liste | Yıllık liste | Aylık eşdeğeri (gösterim) | Koltuk | Çalışma alanı | YZ kredi/ay | Açtığı modüller |
 |---|---|---|---|---|---|---|---|---|
-| `free` | Discover | — | — | — | 1 | 1 | 10 | M3, M5 |
-| `basic` | Basic | $45,00 | $387,00 | $32,25 | 2 | 1 | 100 | M2, M3, M5 |
+| `free` | Discover | — | — | — | 1 | 1 | 10 | M1 (sınırlı), M5 |
+| `basic` | Basic | $45,00 | $387,00 | $32,25 | 2 | 1 | 100 | M1 (sınırlı), M2, M3, M5 |
 | `pro` | Pro | $87,00 | $747,00 | $62,25 | 6 | 1 | 500 | M1-M6, M8 |
-| `ultra` | Ultra | $147,00 | $1.197,00 | $99,75 | 15 | 5 | 2.000 | M1-M11 |
+| `ultra` | Ultra | $147,00 | $1.197,00 | $99,75 | 15 | 5 | 2.000 | `ALL_MODULE_IDS` (aşağıdaki nota bakın) |
 
 | Tek seferlik sku | Ad | Liste | İndirim | Ödenen | Kampanya kodu |
 |---|---|---|---|---|---|
 | `lifetime-ultra` | Ultra Lifetime | $2.576,00 | %50 (sabit) | $1.288,00 | `OMURBOYU20` |
+
+> **Ultra elle yönetilen bir pakettir (K-573060 = A).** `ultra`'nın açtığı
+> modüller `src/lib/billing/catalog.ts` içindeki `ALL_MODULE_IDS` sabitidir; bu
+> liste modül kayıt defterinden (`src/lib/modules/registry.ts`) **türetilmez**,
+> elle tutulur. Registry'de bir modül canlıya alındığında ultra kapsamına
+> kendiliğinden girmez: o modülün `ALL_MODULE_IDS`'e eklenip eklenmeyeceği
+> bilinçli bir plan kapsamı kararıdır. Bu yüzden ürünün gösterdiği modül sayısı
+> (`getModuleCounts()`, "N aktif + M yakında") ile ultra kartındaki modül
+> listesi (plan grant'ından, `formatModuleIds`) farklı olabilir; bu bir çelişki
+> değildir.
 
 ### 1.0 Sayaçlı yetenekler (`PlanGrant.limits`, FO-61)
 
@@ -53,6 +63,21 @@ Rakam yalnız katalogdadır; okuma `partnerSearchGrant(planId, hasM1)` ile.
 durumdur: `CATALOG`'da yer almaz (dolayısıyla hiçbir fiyat panelinde
 görünmez), ama `Plan` tablosunda satırı vardır çünkü `getEntitlements()`
 abonesiz her kiracı için ona düşer.
+
+**FO-41 (F3) paketleme, patron onayı 2026-10-25.** M3 Discover'dan çıktı (Basic
+ve üstünde). Discover ve Basic M1'i **sınırlı** açar: ayda 10 ortak araması
+(`partnerSearchPerMonth`, sayaç `PartnerSearchQuotaUsage`), salt okunur
+(`readOnly`: API anahtarı üretilemez, `/api/v1` kapalı). Sınır tek yerde:
+`PlanGrant.moduleLimits` (`src/lib/billing/catalog.ts`, `M1_LIMITED`); bir
+eklenti ya da `ModuleState.grandfathered` modülü tam açar. M0 "Yakında"
+olduğu sürece Discover/Basic kartında önizleme olarak kalır (erişim vermez).
+Discover'da M3'ü açık olan kiracılar `ModuleState.grandfathered` ile M3'ü
+korur (migration `module-state-grandfathered.sql`) — ORPHANED'a düşmez.
+
+**TTO Edition (`tto-edition`) satılık değildir** (`purchasable: false`,
+`CATALOG`'da fiyat yok, `getAllPlans()` göstermez): M1 (sınırlı) + M4 + M7,
+2 koltuk, 1 çalışma alanı, 100 kredi/ay (Basic ile aynı; sözleşme başka
+derse orada değişir). Atama yolu ve fiyatı ayrı karar.
 
 **Yıllık fiyat nasıl türetilir:** indirim yıllık toplama **bir kez** uygulanır
 ve bir kez yuvarlanır (`YEARLY_DERIVATION`). Aylık eşdeğeri yalnızca gösterim
@@ -376,7 +401,7 @@ satış tarafı kazanır.
 | `starter` (€59) | `basic` ($45) | Giriş seviyesi ücretli plan → giriş seviyesi ücretli plan. Modül kümesi birebir aynı (M2, M3, M5). |
 | `team` (€249) | `pro` ($87) | Orta plan → orta plan. Modül kümesi birebir aynı (M1–M5, M8). |
 | `business` (€599) | `ultra` ($147) | `ultra`, `business`'ın üst kümesidir (üstüne M7 açar). Kayıp yok, kazanç var. |
-| `enterprise` (≥€1.500) | `ultra` ($147) | 11 modülün tamamını açan tek plan `ultra`. Koltuk/çalışma alanı farkı aşağıda korunur. |
+| `enterprise` (≥€1.500) | `ultra` ($147) | `ALL_MODULE_IDS` (`src/lib/billing/catalog.ts`) listesinin tamamını açan tek plan `ultra`. Bu liste elle tutulur, registry'deki canlı modüllerden türetilmez (§1 notu, K-573060); yeni canlı modül ultra'ya ancak bilinçli bir kararla eklenir. Koltuk/çalışma alanı farkı aşağıda korunur. |
 
 Eşleme **fiyat eşliğine göre değil, yetenek eşliğine göre** yapıldı: USD
 merdiveni bütünüyle eski `team` fiyatının altında, dolayısıyla fiyat eşleştirmek

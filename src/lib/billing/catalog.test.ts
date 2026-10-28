@@ -23,10 +23,15 @@ import {
   AI_ACTION_CREDITS,
   aiCreditEntry,
   plansGrantingModule,
+  planNamesGrantingModuleInFull,
+  moduleLimitsFor,
   resolvePlanId,
+  TTO_EDITION_PLAN_ID,
   type DiscountTier,
 } from './catalog';
 import { DEFAULT_ACTIVE_TIER, resolveConfiguredTier } from './active-tier';
+import { createTranslator } from 'next-intl';
+import { planCardCopy } from './plan-copy';
 
 function tier(code: string): DiscountTier {
   const found = findTierByCode(code);
@@ -306,11 +311,11 @@ describe('plan entitlements', () => {
 });
 
 /**
- * Sentinel — TASK-MTRIXGYXLLQR1. `billingPanels.settings.plans.<id>.modules` is
- * marketing/settings copy typed by hand in two JSON files; nothing regenerates
- * it from `PLAN_GRANTS`. It had drifted before this task started: the Pro card
- * said "M1-M5, M8" a version behind the catalogue, which already granted M6.
- * This guards the two from silently diverging again, in either direction —
+ * Sentinel — TASK-MTRIXGYXLLQR1. `billingPanels.settings.plans.<id>.modules` was
+ * typed by hand in two JSON files and had drifted: the Pro card listed M5 as
+ * its last consecutive module a version after the catalogue granted M6. Since
+ * FO-171 the list is `{modules}`, filled by `planCardCopy` from `PLAN_GRANTS`;
+ * this reads the rendered line back and guards the two from diverging —
  * a card cannot promise a module the plan does not grant, and cannot grant one
  * the card does not mention, so the seats/credits/module figures a tenant
  * reads on the settings page are always exactly what `grantsFor()` computes.
@@ -318,7 +323,7 @@ describe('plan entitlements', () => {
 describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
   const PLAN_IDS = ['basic', 'pro', 'ultra'] as const;
 
-  /** "M1-M6, M8" / "M2, M3, M5" → ['M1','M2','M3','M4','M5','M6','M8'] */
+  /** "Modules: <first>-<last>, M8" → every id in the range plus M8. */
   function parseModuleIds(label: string): string[] {
     const list = label.split(':')[1];
     if (!list) throw new Error(`No "label: list" split point in "${label}"`);
@@ -329,6 +334,12 @@ describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
         const from = Number(range[1]);
         const to = Number(range[2]);
         for (let n = from; n <= to; n += 1) ids.push(`M${n}`);
+        continue;
+      }
+      // FO-41: "M1 (sınırlı)" / "M1 (limited)" names a limited grant of M1.
+      const limited = token.match(/^(M\d+) \(.+\)$/);
+      if (limited?.[1]) {
+        ids.push(limited[1]);
         continue;
       }
       if (!/^M\d+$/.test(token)) {
@@ -380,12 +391,20 @@ describe('plan card copy matches grantsFor() exactly (tr + en)', () => {
       const maybeCard = cards[planId];
 
       it(`${locale}/${planId}: modules line names exactly grantsFor('${planId}').moduleIds`, () => {
-        const card = requireCard(maybeCard, `${locale}/${planId}`);
-        const named = parseModuleIds(card.modules);
+        requireCard(maybeCard, `${locale}/${planId}`);
+        const t = createTranslator({
+          locale,
+          messages,
+          namespace: 'billingPanels.settings',
+        }) as unknown as Parameters<typeof planCardCopy>[1];
+        const rendered = planCardCopy({ planId }, t, locale, { summary: 'desc', bullets: ['modules'] })
+          .bullets[0]?.text;
+        if (!rendered) throw new Error(`${locale}/${planId}: no modules bullet rendered`);
+        const named = parseModuleIds(rendered);
         const grantedSet = [...grant.moduleIds].sort();
         expect(
           [...named].sort(),
-          `${locale}/${planId} modules line "${card.modules}" vs grant [${grantedSet.join(', ')}]`
+          `${locale}/${planId} modules line "${rendered}" vs grant [${grantedSet.join(', ')}]`
         ).toEqual(grantedSet);
       });
 
@@ -492,5 +511,36 @@ describe('AI credit catalogue — docs/BILLING.md and the code say one number', 
       expect(aiCreditEntry('M4', 'whatever')).toBeNull();
       expect(aiCreditEntry('', '')).toBeNull();
     });
+  });
+});
+
+describe('FO-41 packaging (F3, owner approval 2026-10-25)', () => {
+  const LIMITED = { partnerSearchPerMonth: 10, readOnly: true };
+
+  it('Discover: M1 limited and M5, M3 gone; Yakında M0 only previewed', () => {
+    const free = grantsFor('free')!;
+    expect([...free.moduleIds].sort()).toEqual(['M1', 'M5']);
+    expect(free.moduleLimits).toEqual({ M1: LIMITED });
+    expect(free.previewModuleIds).toContain('M0');
+  });
+
+  it('Basic: M3 there, M1 limited', () => {
+    const basic = grantsFor('basic')!;
+    expect([...basic.moduleIds].sort()).toEqual(['M1', 'M2', 'M3', 'M5']);
+    expect(moduleLimitsFor('basic', 'M1')).toEqual(LIMITED);
+    expect(moduleLimitsFor('basic', 'M3')).toBeNull();
+    expect(moduleLimitsFor('pro', 'M1')).toBeNull();
+  });
+
+  it('TTO Edition: limited M1 + M4 + M7, not purchasable, no price anywhere', () => {
+    const tto = grantsFor(TTO_EDITION_PLAN_ID)!;
+    expect([...tto.moduleIds].sort()).toEqual(['M1', 'M4', 'M7']);
+    expect(tto.purchasable).toBe(false);
+    expect(moduleLimitsFor(TTO_EDITION_PLAN_ID, 'M1')).toEqual(LIMITED);
+    expect(findEntry(TTO_EDITION_PLAN_ID)).toBeNull();
+  });
+
+  it('names only plans with M1 in full as the way out of the read-only mode', () => {
+    expect(planNamesGrantingModuleInFull('M1')).toEqual(['Pro', 'Ultra']);
   });
 });

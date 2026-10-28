@@ -1,9 +1,14 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useIsHydrated } from '@/lib/hooks/use-is-hydrated';
-import { CONSENT_STORAGE_KEY } from '@/lib/cookie-consent';
+import {
+  CONSENT_STORAGE_KEY,
+  OPEN_COOKIE_PREFERENCES_EVENT,
+  clearAnalyticsStorage,
+  storedConsentLevel,
+} from '@/lib/cookie-consent';
 
 /** Whether this browser has already answered. Client-only: the server cannot see storage. */
 function hasStoredConsent(): boolean {
@@ -25,9 +30,94 @@ export default function CookieConsent() {
   const isHydrated = useIsHydrated();
   const answered = useMemo(() => (isHydrated ? hasStoredConsent() : false), [isHydrated]);
   const [dismissed, setDismissed] = useState(false);
-  const visible = isHydrated && !answered && !dismissed;
+  /**
+   * FO-180: a "Cookie preferences" link (footer, /privacy) reopens the banner so
+   * an answer can be changed as easily as it was given. `current` is the answer
+   * shown while reopened; `trigger` gets focus back when the banner closes.
+   */
+  const [reopened, setReopened] = useState<{ current: 'all' | 'essential' | null } | null>(null);
+  const trigger = useRef<HTMLElement | null>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+  const firstButton = useRef<HTMLButtonElement>(null);
+  const visible = isHydrated && (reopened !== null || (!answered && !dismissed));
   const locale = useLocale();
   const t = useTranslations('legal.cookieConsent');
+
+  useEffect(() => {
+    const open = () => {
+      trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setReopened({ current: storedConsentLevel() });
+    };
+    window.addEventListener(OPEN_COOKIE_PREFERENCES_EVENT, open);
+    return () => window.removeEventListener(OPEN_COOKIE_PREFERENCES_EVENT, open);
+  }, []);
+
+  /**
+   * FO-183: focus lands on the least-committing answer when the banner opens. On a first
+   * visit it does so only if nothing else holds focus yet (an autofocused field keeps it);
+   * the Tab trap below still brings the keyboard into the banner from there.
+   */
+  useEffect(() => {
+    if (!visible) return;
+    if (reopened || document.activeElement === null || document.activeElement === document.body) {
+      firstButton.current?.focus();
+    }
+  }, [visible, reopened]);
+
+  /**
+   * FO-183: the banner is `aria-modal`, so Tab and Shift+Tab cycle through its own
+   * controls and never reach the page behind the overlay.
+   */
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog.current) return;
+      const focusable = Array.from(
+        dialog.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      const inside = active instanceof Node && dialog.current.contains(active);
+      if (!inside) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [visible]);
+
+  const close = () => {
+    setDismissed(true);
+    if (reopened) {
+      setReopened(null);
+      trigger.current?.focus();
+    }
+  };
+
+  /**
+   * Escape closes the banner only when an answer is already stored: it then keeps that
+   * answer. Without one (first visit, even if opened from the link) the banner stays and
+   * waits for a choice, so Escape is ignored rather than half-closing it.
+   */
+  useEffect(() => {
+    if (!reopened) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !hasStoredConsent()) return;
+      setReopened(null);
+      trigger.current?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [reopened]);
 
   const handleAccept = () => {
     localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({
@@ -35,7 +125,7 @@ export default function CookieConsent() {
       time: new Date().toISOString(),
       level: 'all',
     }));
-    setDismissed(true);
+    close();
   };
 
   const handleReject = () => {
@@ -44,13 +134,16 @@ export default function CookieConsent() {
       time: new Date().toISOString(),
       level: 'essential',
     }));
-    setDismissed(true);
+    // Withdrawal leaves nothing behind (KVKK / ePrivacy).
+    clearAnalyticsStorage();
+    close();
   };
 
   if (!visible) return null;
 
   return (
     <div
+      ref={dialog}
       className="fixed inset-0 z-50 bg-black/50"
       role="alertdialog"
       aria-modal="true"
@@ -73,9 +166,15 @@ export default function CookieConsent() {
                 {t('privacyLink')}
               </a>
             </p>
+            {reopened?.current && (
+              <p data-testid="cookie-current-choice" className="text-xs text-muted mt-2">
+                {t(reopened.current === 'all' ? 'currentAll' : 'currentEssential')}
+              </p>
+            )}
           </div>
           <div className="flex gap-3 flex-col sm:flex-row">
             <button
+              ref={firstButton}
               onClick={handleReject}
               aria-label={t('essentialOnly')}
               className="text-xs font-semibold border border-border px-4 py-2 rounded-lg text-ink-2 hover:bg-surface-hover hover:text-ink focus:ring-2 focus:ring-offset-2 focus:ring-accent focus:outline-none transition-colors"

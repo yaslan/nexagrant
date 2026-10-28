@@ -394,8 +394,11 @@ async function writeTopic(
     );
     if (match.kind === 'unmatched') {
       const key = matchKeyFor({ pic: row.pic, name: row.organisationName, country: row.country });
+      // A queue row an admin resolved (FO-64, audited) keeps its PIC; otherwise every scan
+      // would write the link back to null (FO-64 review B1).
+      let resolvedPic: string | null = null;
       if (key) {
-        await prisma.unmatchedOrganization.upsert({
+        const queued = await prisma.unmatchedOrganization.upsert({
           where: { matchKey: key },
           update: { lastSeenAt: now, name: row.organisationName, country: row.country },
           create: {
@@ -405,9 +408,12 @@ async function writeTopic(
             country: row.country,
             lastSeenAt: now,
           },
+          select: { resolvedPic: true },
         });
+        resolvedPic = normalizePic(queued.resolvedPic);
       }
-      picByExternal.set(row.id, null);
+      picByExternal.set(row.id, resolvedPic);
+      if (resolvedPic) touchedPics.add(resolvedPic);
     } else {
       picByExternal.set(row.id, match.pic);
       touchedPics.add(match.pic);

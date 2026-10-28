@@ -206,6 +206,8 @@ const nextConfig: NextConfig = {
       { source: '/tr/:workspace/firsatlar', destination: '/tr/:workspace/pipeline' },
       { source: '/tr/:workspace/ortaklar', destination: '/tr/:workspace/partners' },
       { source: '/tr/:workspace/ortaklar/liderler', destination: '/tr/:workspace/partners/leaders' },
+      // Before `ortaklar/:pic`, which would otherwise take `kaynaklar` as a PIC (FO-176).
+      { source: '/tr/:workspace/ortaklar/kaynaklar', destination: '/tr/:workspace/partners/resources' },
       { source: '/tr/:workspace/ortaklar/:pic', destination: '/tr/:workspace/partners/:pic' },
       { source: '/tr/:workspace/iliskiler', destination: '/tr/:workspace/relationships' },
       { source: '/tr/:workspace/kanitlar', destination: '/tr/:workspace/evidence' },

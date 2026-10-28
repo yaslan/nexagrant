@@ -12,10 +12,16 @@
     "apiKeys": "Partner REST API",
     "members": "Üyeler",
     "settings": "Ayarlar",
+    "partnerResources": "Ortak Arama Kaynakları",
     "adminModules": "Yönetici Konsolu",
     "workspaceLabel": "Çalışma Alanı",
     "administrationLabel": "Yönetim",
-    "featureLocked": "{module} modülü kapalı — bu özellik kullanılamaz"
+    "featureLocked": "{module} modülü kapalı — bu özellik kullanılamaz",
+    "planLocked": "{module} planınıza dahil değil — hangi planlarda olduğunu görmek için açın",
+    "preview": {
+      "PILOT": "Pilot",
+      "DEV": "Geliştirme"
+    }
   },
   "Common": {
     "loading": "Yükleniyor...",
@@ -389,7 +395,7 @@
     "conflict": "Çakışma Uyarısı",
     "addRoleToConsortium": "KONSORSİYUMA ROL EKLE",
     "topCandidates": "EN İYİ ADAYLAR",
-    "liveDemandReason": "Bu kurum bu topic için {days} gün önce partner arıyor ilanı yayınladı.",
+    "liveDemandReason": "Bu kurum bu topic için {days, plural, =0 {bugün} other {# gün önce}} partner arıyor ilanı yayınladı.",
     "required": "Zorunlu",
     "status": {
       "OPEN": "AÇIK",
@@ -689,13 +695,15 @@
       "compliance": "Uyum",
       "contact": "İletişim",
       "residencyBadge": "● GDPR Uyumlu",
-      "dataResidency": "🇹🇷 Veritabanı Türkiye'de barındırılır"
+      "dataResidency": "🇹🇷 Veritabanı Türkiye'de barındırılır",
+      "moduleCatalog": "Modül Kataloğu"
     },
     "metaTitle": "{brand} — AB Finansman Platformu (Horizon Europe, Eurostars)",
     "metaDescription": "{brand}: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
     "ecosystemSubtitle": "İster bağımsız bir danışman olun, ister büyük bir üniversite; {brand} iş akışınızı hızlandırır.",
     "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin.",
     "heroCompliance": "GDPR / KVKK Uyumlu Güvenli Bulut",
+    "modulesTitle": "AB Proje Yönetimi İçin {active} Aktif Modül{soon, plural, =0 {} other { + # Yakında}}",
     "cordisProjects": {
       "eyebrow": "CORDIS canlı veri",
       "title": "Türkiye'nin yer aldığı güncel Horizon Europe projeleri",
@@ -950,30 +958,344 @@
         "budgetRoleEconomy": "Bütçe / rol ekonomisi",
         "lumpSumTwoStage": "Götürü bedel / iki aşamalı"
       }
+    },
+    "members": {
+      "teamList": {
+        "errors": {
+          "sessionOrMembership": "Bu kurumda artık üyeliğiniz yok ya da oturumunuz sona erdi. Lütfen yeniden giriş yapın.",
+          "forbiddenRole": "Ekip listesini yalnızca kurum sahibi veya yöneticisi görebilir.",
+          "loadFailed": "Ekip listesi yüklenemedi."
+        }
+      }
     }
   },
   "legal": {
     "privacy": {
       "metaTitle": "Gizlilik Politikası ve KVKK Aydınlatma Metni — {brand}",
-      "metaDescription": "{brand}'nın KVKK ve GDPR uyumlu gizlilik politikası: işlenen veriler, işleme amaçları, saklama süreleri ve veri sahibi hakları.",
+      "metaDescription": "{brand} KVKK aydınlatma metni: veri sorumlusu, işlenen veriler, amaçlar ve hukuki sebepler, aktarım, saklama süreleri, çerezler ve başvuru yolları.",
       "heading": "Gizlilik Politikası ve KVKK Aydınlatma Metni",
-      "controllerHeading": "1. Veri Sorumlusu",
-      "controllerBody": "{brand} SaaS Platformu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) ve AB Genel Veri Koruma Tüzüğü (“GDPR”) uyarınca kişisel verilerinizin güvenliğine azami özen göstermekteyiz.",
-      "dataHeading": "2. İşlenen Veriler, Toplama Amaçları ve Hukuki Sebebi",
-      "dataBody": "Kullanıcı hesabı açma, oturum doğrulama, AB hibe çağrılarıyla eşleştirme, yapay zeka destekli teklif taslağı oluşturma, ürün analitikleri ve abonelik faturalandırması süreçlerinde ad, e-posta, şirket/kurum bilgileri, ödeme kayıtları ve tarayıcı etkinlikleri işlenmektedir. Veriler hesap oluşturma ve sözleşmenin ifası (KVKK md.5/2-c), yasal yükümlülükler (md.5/2-ç), meşru menfaatler (md.5/2-f) ve açık rıza (md.5/1 — analitik çerezleri ve ürün iyileştirme) kapsamında işlenmektedir.",
-      "rightsHeading": "4. Veri Sahibi Hakları",
-      "rightsBody": "KVKK 11. maddesi ve GDPR uyarınca aşağıdaki dokuz hakkınız vardır: (a) Kişisel verilerinizin işlenip işlenmediğini öğrenme; (b) İşlenmiş verilerinize ilişkin bilgi talep etme — 'Ayarlar → Gizlilik ve Verilerim' ekranından JSON biçiminde dışa aktarabilirsiniz; (c) İşleme amacını ve amaca uygunluğunu öğrenme; (ç) Verilerinizin yurt içinde ve yurt dışında aktarıldığı üçüncü kişileri bilme; (d) Eksik veya yanlış verilerinizin düzeltilmesini isteme; (e) Verilerinizin silinmesini veya yok edilmesini isteme — 'Ayarlar → Gizlilik ve Verilerim' ekranından hesabınızın silinmesini talep edebilirsiniz (hesabınız derhal kapatılır, 30 gün sonra kalıcı silinir, bu süre içinde iptal edebilirsiniz); (f) Düzeltme veya silme işleminin üçüncü kişilere bildirilmesini isteme; (g) Münhasıran otomatik sistem analizi sonucu aleyhe sonuca itiraz etme (ürün puanlaması bu kapsamdadır); (ğ) Zarara uğrama hâlinde tazminat talep etme. Güvenlik gereği, kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dışa aktarıma dahil edilmez.",
-      "rightsLink": "Gizlilik ve Verilerim ekranına git",
-      "securityHeading": "7. Güvenlik ve Depolama",
-      "securityBody": "Kiracıya ait verileriniz uygulama katmanında diğer kiracılardan ayrılır: kiracı verisine erişen sorgular kiracı kimliğinizle sınırlanır; tanımlı ve sınırlı sistem işlemleri (platform yönetimi, veri sahibi talepleri, zamanlanmış işler) kiracılar arası çalışabilir. PostgreSQL Row-Level Security (RLS) politikaları veritabanında tanımlıdır; ancak bu politikalar uygulamanın veritabanı bağlantısında etkin değildir. Dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır.",
-      "recipientsHeading": "3. Veri Alıcıları ve Yurt Dışı Aktarım",
-      "recipientsBody": "Verileriniz aşağıdaki alıcılara aktarılabilir: (1) Anthropic PBC (ABD) — yapay zeka destekli metin üretimi ve ön değerlendirme için gönderdiğiniz metinler (kapasite açıklaması, teklif taslağı, değerlendirilen belge içeriği); (2) Google LLC (ABD) — oturum açma sırasında gönderilen ad ve e-posta; (3) Stripe, Inc. (ABD) — abonelik ve ödeme yönetimi için müşteri tanımlayıcısı ve faturalama durumu; (4) OpenAI, L.L.C. (ABD) — yüklenen belgelerin embedding'i için metin; (5) Cloudflare, Inc. (bölge ayara bağlı) — yüklenen dosya ve ekran görüntüleri; (6) PostHog Inc. (Avrupa Birliği bölgesi, varsayılan) — olay adları ve puanlandırma duruşu (çerez onayıyla); (7) Vulut (Türkiye) — veritabanı, uygulama sunucusu ve e-posta barındırması. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
-      "legalBasisHeading": "5. Hukuki Sebebi Tablosu",
-      "legalBasisBody": "İşleme faaliyetleri başına hukuki sebebi: Hesap oluşturma (md.5/2-c — sözleşmenin kurulması/ifası); Davetler ve ekip yönetimi (md.5/2-c); Faturalama ve ödeme (md.5/2-c ve md.5/2-ç — yasal saklama yükümlülüğü); VKN/TCKN (md.5/2-ç); Yapay zeka metin üretimi (md.5/2-f — meşru menfaat); Yapay zeka embedding ve RAG (md.5/2-f); Kullanım günlüğü (md.5/2-f); İç ön değerlendirme (md.5/2-f); Denetim kaydı (md.5/2-ç); Geri bildirim (md.5/2-f); Ürün analitiği (md.5/1 — açık rıza, çerez onayı gerekli); Aydınlatma ve rıza kaydı (md.5/2-ç); Ajans kanalı davetleri (md.5/2-f); Karne sonucu ve ajans kanalı sayıları (md.5/2-f); Muhatap ve ilişki kayıtları (md.5/2-f); Dosya ve kanıt depolama (md.5/2-c); Kayıtlı arama uyarı e-postaları (md.5/2-f); Onay iş akışı kayıtları (md.5/2-f; hesap silinse de saklama için md.5/2-e — hakkın tesisi); Ziyaretçi iletişim talebi (md.5/1 — açık rıza; kötüye kullanım önleme için IP özeti md.5/2-f).",
-      "collectionMethodHeading": "6. Veri Toplama Yöntemi",
-      "collectionMethodBody": "Veriler aşağıdaki yollardan toplanır: (1) Kullanıcı tarafından (form — kayıt, oturum açma, profil bilgileri, fon hazırlık karnesi); (2) Google OAuth — oturum açma sırasında ad ve e-posta; (3) Çerezler ve tarayıcı depolaması — oturum, dil tercihi, tema seçimi; (4) Analitik çerezleri (çerez onayıyla) — PostHog üzerinden ürün etkinlikleri; (5) Otomatik — yapay zeka puanlaması sistemi tarafından.",
-      "contactHeading": "8. Başvuru Kanalı ve İletişim",
-      "contactBody": "Yukarıdaki haklarınızı kullanmak için info@fonbridge.com adresine başvurabilirsiniz. Başvurunuz Başvuru Usul ve Esasları Tebliği uyarınca yazılı, KEP, güvenli elektronik imza veya mobil imza ile yapılabilir; sistemde kayıtlı e-posta adresiniz de kabul edilir. Başvurunuz en geç 30 gün içinde ücretsiz sonuçlandırılır; işlemin ayrıca bir maliyet gerektirmesi hâlinde Kurulca belirlenen tarifedeki ücret alınabilir. Başvuru yaptığınız tarihte hesap olmasa da bu hakları kullanabilirsiniz."
+      "s1": {
+        "heading": "1. Veri Sorumlusu",
+        "body": "Bu aydınlatma metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") m.10 ve Aydınlatma Yükümlülüğünün Yerine Getirilmesinde Uyulacak Usul ve Esaslar Hakkında Tebliğ uyarınca, fonbridge.com internet sitesi ve {brand} platformu (\"Platform\") üzerinden işlenen kişisel veriler hakkında sizi bilgilendirmek amacıyla hazırlanmıştır. AB Genel Veri Koruma Tüzüğü (\"GDPR\") kapsamındaki kullanıcılarımız için de aynı esaslar uygulanır.",
+        "colItem": "Bilgi",
+        "colValue": "Değer",
+        "rows": {
+          "controller": {
+            "label": "Veri sorumlusu",
+            "value": "Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. (\"{brand}\")"
+          },
+          "address": {
+            "label": "Adres",
+            "value": "Kadıköy Mahallesi No:55, İlkadım / SAMSUN"
+          },
+          "taxId": {
+            "label": "Vergi dairesi / no",
+            "value": "[VERGİ DAİRESİ / NO]"
+          },
+          "mersis": {
+            "label": "MERSİS no",
+            "value": "[MERSİS NO]"
+          },
+          "email": {
+            "label": "E-posta",
+            "value": "info@fonbridge.com"
+          },
+          "kep": {
+            "label": "KEP adresi",
+            "value": "fonbridge@hs01.kep.tr"
+          },
+          "verbis": {
+            "label": "VERBİS kayıt durumu",
+            "value": "[Kayıtlı / Muaf]"
+          }
+        }
+      },
+      "s2": {
+        "heading": "2. İşlenen Kişisel Veriler",
+        "body": "Platformu kullanım şeklinize göre aşağıdaki veri kategorileri işlenebilir.",
+        "colGroup": "İlgili kişi grubu",
+        "colCategory": "Veri kategorisi",
+        "colExamples": "Örnek veriler",
+        "rows": {
+          "visitorSecurity": {
+            "group": "Tüm ziyaretçiler",
+            "category": "İşlem güvenliği",
+            "examples": "IP adresi, tarayıcı ve cihaz bilgisi, sunucu log kayıtları, ziyaret tarihi/saati"
+          },
+          "visitorAnalytics": {
+            "group": "Tüm ziyaretçiler",
+            "category": "Analiz",
+            "examples": "Tarayıcıya özgü rastgele anonim kimlik ve ürün içi olay adları (yalnız çerez onayınızla; ad, e-posta, sayfa adresi gönderilmez)"
+          },
+          "memberIdentity": {
+            "group": "Üyeler (kurum yetkilisi, uzman)",
+            "category": "Kimlik",
+            "examples": "Ad, soyad, unvan"
+          },
+          "memberContact": {
+            "group": "Üyeler",
+            "category": "İletişim",
+            "examples": "E-posta adresi, kurum adı ve ili"
+          },
+          "memberProfessional": {
+            "group": "Üyeler",
+            "category": "Mesleki deneyim",
+            "examples": "Kurum, görev, uzmanlık alanları, AB proje deneyimi ve program bilgileri, kurum kapasite açıklamaları"
+          },
+          "memberTransaction": {
+            "group": "Üyeler",
+            "category": "Müşteri işlem",
+            "examples": "Proje fikirleri, başvuru taslakları, çağrı tercihleri ve kayıtlı aramalar, yüklediğiniz belgeler, yapay zekâ ile üretilen metinler, geri bildirimler, talepler"
+          },
+          "paidFinance": {
+            "group": "Ücretli üyeler",
+            "category": "Finans",
+            "examples": "Fatura bilgileri (VKN/TCKN dahil), ödeme kayıtları (kart bilgileri {brand} tarafından saklanmaz; ödeme kuruluşunca işlenir)"
+          },
+          "leadForm": {
+            "group": "Fon hazırlık karnesi iletişim formu",
+            "category": "Kimlik, iletişim",
+            "examples": "Ad, soyad, e-posta, kurum, il ve ilçe, karne sonucu; kötüye kullanımı önlemek için IP adresinin geri döndürülemez özeti"
+          },
+          "expertPrereg": {
+            "group": "Uzman ön kaydı",
+            "category": "Kimlik, iletişim, mesleki deneyim",
+            "examples": "Ad, soyad, e-posta, il, unvan/kurum, uzmanlık alanları, proje rolleri, deneyim programları, ORCID, LinkedIn profil adresi, çalışma dilleri; IP adresinin geri döndürülemez özeti"
+          }
+        },
+        "note": "Platform, özel nitelikli kişisel verileri (sağlık, din, etnik köken, biyometrik veri vb.) talep etmez. Lütfen yüklediğiniz belgelerde bu tür verilere yer vermeyiniz."
+      },
+      "s3": {
+        "heading": "3. İşleme Amaçları ve Hukuki Sebepler",
+        "body": "Kişisel verileriniz yalnızca aşağıdaki amaçlarla ve KVKK m.5'teki hukuki sebeplere dayanılarak işlenir. Açık rıza yalnızca son üç satırdaki işlemler için aranır.",
+        "colPurpose": "Amaç",
+        "colBasis": "Hukuki sebep (KVKK m.5)",
+        "rows": {
+          "account": {
+            "purpose": "Üyelik hesabının açılması ve yönetimi, davetler ve ekip yönetimi",
+            "basis": "m.5/2-c — Sözleşmenin kurulması ve ifası"
+          },
+          "matching": {
+            "purpose": "AB fon çağrılarının eşleştirilmesi, proje hazırlık modüllerinin sunulması, dosya ve kanıt depolama",
+            "basis": "m.5/2-c — Sözleşmenin ifası"
+          },
+          "aiProcessing": {
+            "purpose": "Yapay zekâ destekli metin üretimi, belge embedding ve arama, kullanım günlüğü",
+            "basis": "m.5/2-f — Meşru menfaat"
+          },
+          "assessment": {
+            "purpose": "İç ön değerlendirme ve otomatik puanlama",
+            "basis": "m.5/2-f — Meşru menfaat"
+          },
+          "expertPool": {
+            "purpose": "Uzman ön kaydının alınması ve e-posta adresinin doğrulanması",
+            "basis": "m.5/2-c — Sözleşmenin kurulması"
+          },
+          "support": {
+            "purpose": "Talep, şikâyet, geri bildirim ve destek süreçlerinin yürütülmesi",
+            "basis": "m.5/2-f — Meşru menfaat"
+          },
+          "billing": {
+            "purpose": "Faturalama, muhasebe ve yasal saklama (VKN/TCKN dahil)",
+            "basis": "m.5/2-ç — Hukuki yükümlülük; m.5/2-a — Kanunlarda açıkça öngörülme"
+          },
+          "trafficLogs": {
+            "purpose": "5651 sayılı Kanun kapsamında trafik/log kayıtlarının tutulması; denetim kaydı",
+            "basis": "m.5/2-ç — Hukuki yükümlülük"
+          },
+          "security": {
+            "purpose": "Bilgi güvenliği, kötüye kullanımın önlenmesi",
+            "basis": "m.5/2-f — Meşru menfaat"
+          },
+          "legalClaims": {
+            "purpose": "Hukuki uyuşmazlıklarda hakların tesisi, kullanılması, korunması (onay iş akışı kayıtları hesap silinse de bu amaçla saklanır)",
+            "basis": "m.5/2-e — Bir hakkın tesisi, kullanılması veya korunması"
+          },
+          "improvement": {
+            "purpose": "Platform kullanımının anonim istatistiklerle iyileştirilmesi",
+            "basis": "m.5/2-f — Meşru menfaat"
+          },
+          "analytics": {
+            "purpose": "Analiz çerezi ile ürün kullanımının ölçülmesi",
+            "basis": "m.5/1 — Açık rıza (çerez panelindeki onay)"
+          },
+          "leadRequest": {
+            "purpose": "Fon hazırlık karnesi iletişim formu üzerinden sizinle iletişime geçilmesi",
+            "basis": "m.5/1 — Açık rıza (formdaki onay kutusu); IP özeti için m.5/2-f"
+          },
+          "expertDirectory": {
+            "purpose": "Uzman profilinin, rehber yayına girdiğinde kurumlara gösterilmesi",
+            "basis": "m.5/1 — Açık rıza"
+          }
+        }
+      },
+      "s4": {
+        "heading": "4. Toplama Yöntemi",
+        "body": "Kişisel verileriniz tamamen veya kısmen otomatik yollarla toplanır:",
+        "items": {
+          "forms": "Üyelik, profil, proje, fon hazırlık karnesi ve uzman ön kayıt formlarına girdiğiniz bilgiler",
+          "uploads": "Yüklediğiniz proje dokümanları ve belgeler",
+          "contact": "İletişim formu veya e-posta üzerinden ilettiğiniz bilgiler",
+          "cookies": "Çerezler, tarayıcı depolaması ve sunucu logları",
+          "google": "Google ile giriş seçeneğini kullanmanız hâlinde, izin verdiğiniz kapsamda Google'dan aktarılan ad ve e-posta adresi",
+          "automated": "Yapay zekâ destekli puanlama sisteminin ürettiği sonuçlar"
+        }
+      },
+      "s5": {
+        "heading": "5. Kişisel Verilerin Aktarılması",
+        "body": "Kişisel verileriniz satılmaz. Yalnızca aşağıdaki alıcılara, amaçla sınırlı ve ölçülü olarak aktarılabilir.",
+        "domesticHeading": "Yurt içi aktarım (KVKK m.8):",
+        "domestic": {
+          "experts": "Uzman profiliniz: yalnız rehberde yayımlanmasına açık rıza vermeniz hâlinde ve rehber yayına girdikten sonra, Platform'a üye kurumlara (proje ortaklığı ve danışmanlık eşleştirmesi amacıyla)",
+          "advisors": "Muhasebe, mali müşavirlik ve hukuk danışmanlığı hizmeti alınan kişiler",
+          "authorities": "Yetkili kamu kurum ve kuruluşları ile yargı mercileri (talep hâlinde, yasal yükümlülük kapsamında)",
+          "hosting": "Vulut (Türkiye): veritabanı, uygulama sunucusu ve e-posta barındırması"
+        },
+        "abroadHeading": "Yurt dışı aktarım (KVKK m.9, 7499 sayılı Kanun ile değişik):",
+        "abroadBody": "Platform, aşağıdaki hizmetler için yurt dışında sunucu bulunduran hizmet sağlayıcılardan yararlanır:",
+        "colRecipient": "Alıcı",
+        "colLocation": "Konum",
+        "colData": "Aktarılan veri ve amaç",
+        "rows": {
+          "anthropic": {
+            "recipient": "Anthropic PBC",
+            "location": "ABD",
+            "data": "Yapay zekâ destekli metin üretimi ve ön değerlendirme için gönderdiğiniz metinler (kapasite açıklaması, teklif taslağı, değerlendirilen belge içeriği)"
+          },
+          "google": {
+            "recipient": "Google LLC",
+            "location": "ABD",
+            "data": "Google ile oturum açarken Google hesabınıza yönlendirilirsiniz; Google, Platform'a giriş yaptığınızı ve bağlantı bilgilerinizi işler. Ad ve e-posta Google'dan Platform'a gelir (bölüm 4)"
+          },
+          "stripe": {
+            "recipient": "Stripe, Inc.",
+            "location": "ABD",
+            "data": "Abonelik ve ödeme yönetimi için müşteri tanımlayıcısı ve faturalama durumu; ödeme sayfasında doğrudan Stripe'a girdiğiniz e-posta, kart ve fatura bilgileri (Stripe'ın kendi aydınlatmasına tabidir)"
+          },
+          "openai": {
+            "recipient": "OpenAI, L.L.C.",
+            "location": "ABD",
+            "data": "Yüklenen belgelerin embedding'i için metin"
+          },
+          "cloudflare": {
+            "recipient": "Cloudflare, Inc.",
+            "location": "Bölge hesap ayarına bağlı",
+            "data": "Yüklenen dosya ve ekran görüntüleri"
+          },
+          "posthog": {
+            "recipient": "PostHog Inc.",
+            "location": "Avrupa Birliği bölgesi (varsayılan)",
+            "data": "Olay adları ve anonim tarayıcı kimliği (yalnız çerez onayıyla); bağlantı gereği IP adresiniz PostHog'a ulaşır, konum çözümleme kapalıdır"
+          }
+        },
+        "safeguards": "Bu aktarımlar KVKK m.9 hükümlerine tabidir. Her alıcı için dayanılan güvence: [YURT DIŞI AKTARIM MEKANİZMASI — HUKUK TEYİDİ]. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
+        "ownTransfer": "AB proje başvurularında, başvuru sahibi olarak sizin talimatınızla Avrupa Komisyonu portalına (Funding & Tenders) veya proje ortaklarınıza iletilen bilgiler, sizin tarafınızdan yapılan aktarım niteliğindedir. {brand} portala sizin adınıza başvuru göndermez."
+      },
+      "s6": {
+        "heading": "6. Saklama Süreleri, İmha ve Güvenlik",
+        "body": "Veriler, işleme amacının gerektirdiği ve mevzuatın öngördüğü süre boyunca saklanır; süre sonunda silinir, yok edilir veya anonim hâle getirilir.",
+        "colData": "Veri",
+        "colPeriod": "Saklama süresi",
+        "rows": {
+          "account": {
+            "data": "Üyelik ve profil verileri",
+            "period": "Üyelik süresince; hesap silme talebinizden 30 gün sonra kalıcı olarak silinir (bu sürede talebinizi iptal edebilirsiniz)"
+          },
+          "invoices": {
+            "data": "Fatura ve muhasebe kayıtları",
+            "period": "10 yıl (6102 sayılı TTK m.82, 213 sayılı VUK)"
+          },
+          "trafficLogs": {
+            "data": "Trafik / log kayıtları",
+            "period": "[LOG SAKLAMA SÜRESİ — barındırma sağlayıcısı teyidi]"
+          },
+          "leads": {
+            "data": "Fon hazırlık karnesi iletişim formu talepleri",
+            "period": "Talebin bırakıldığı tarihten itibaren {months} ay"
+          },
+          "expertPrereg": {
+            "data": "Uzman ön kayıt bilgileri",
+            "period": "Formun ilk gönderildiği tarihten itibaren {months} ay (doğrulanmamış kayıtlar dahil)"
+          },
+          "teamInvites": {
+            "data": "Ekip davetleri",
+            "period": "Kabulden ya da davet bağlantısının süresinin dolmasından itibaren {days} gün"
+          },
+          "notifications": {
+            "data": "Platform içi bildirimler",
+            "period": "{days} gün"
+          },
+          "records": {
+            "data": "Denetim kayıtları ve yapay zekâ kullanım günlüğü",
+            "period": "Süresiz; hesabınız silindiğinde kayıtların sizinle kimlik bağlantısı kaldırılır ya da tek yönlü özetle değiştirilir"
+          },
+          "browser": {
+            "data": "Çerezler ve tarayıcı depolaması",
+            "period": "Oturum açma çerezi 30 gün (kullandıkça yenilenir); dil tercihi çerezi tarayıcı oturumu süresince; tema çerezi 1 yıl; davet ve kayıt adımlarındaki geçici çerezler 15–30 dakika; çerez tercihiniz, sepet içeriği ve anonim analiz kimliği (tarayıcı depolaması) tarayıcınızdan silinene kadar"
+          }
+        },
+        "disposal": "Süresi dolan kayıtlar her gece çalışan otomatik silme işleriyle silinir. Hesabınızı silmeniz hâlinde, yasal saklama yükümlülüğü bulunmayan veriler 30 günlük bekleme süresinin sonunda silinir.",
+        "securityHeading": "Güvenlik",
+        "securityBody": "Kiracıya ait verileriniz uygulama katmanında diğer kiracılardan ayrılır: kiracı verisine erişen sorgular kiracı kimliğinizle sınırlanır; tanımlı ve sınırlı sistem işlemleri (platform yönetimi, veri sahibi talepleri, zamanlanmış işler) kiracılar arası çalışabilir. PostgreSQL Row-Level Security (RLS) politikaları veritabanında tanımlıdır; ancak bu politikalar uygulamanın veritabanı bağlantısında etkin değildir. Dosya ekleriniz şifreli bulut depolama (R2/S3) üzerinde saklanır."
+      },
+      "s7": {
+        "heading": "7. Çerezler",
+        "body": "Platform, zorunlu çerezleri ve tarayıcı depolamasını hizmetin çalışması için izinsiz; analiz amaçlı depolamayı ise yalnızca çerez panelinde \"Tümünü kabul et\" seçeneğini seçmeniz hâlinde kullanır. Platform pazarlama veya reklam çerezi kullanmaz. Zorunlu olmayan depolama varsayılan olarak kapalıdır.",
+        "colType": "Çerez türü",
+        "colPurpose": "Amaç",
+        "colConsent": "İzin",
+        "rows": {
+          "essential": {
+            "type": "Zorunlu",
+            "purpose": "Oturum, güvenlik, dil tercihi (TR/EN), tema seçimi (1 yıl), sepet içeriği (tarayıcı depolaması), çerez tercihinizin kaydı, davet ve kayıt adımlarında 15–30 dakikalık geçici çerezler",
+            "consent": "Gerekmez"
+          },
+          "analytics": {
+            "type": "Analiz",
+            "purpose": "Anonim ürün kullanım istatistikleri (PostHog, AB bölgesi)",
+            "consent": "Açık rıza"
+          }
+        },
+        "withdraw": "Onayınızı, tarayıcınızda bu siteye ait verileri silerek dilediğiniz an geri alabilirsiniz; çerez paneli bir sonraki ziyaretinizde yeniden gösterilir."
+      },
+      "s8": {
+        "heading": "8. Haklarınız ve Başvuru Yolu",
+        "body": "KVKK m.11 (ve kapsamındaysanız GDPR) uyarınca {brand}'e başvurarak şu haklarınızı kullanabilirsiniz:",
+        "rights": {
+          "r1": "Kişisel verilerinizin işlenip işlenmediğini öğrenme",
+          "r2": "İşlenmişse buna ilişkin bilgi talep etme — verilerinizi \"Ayarlar → Gizlilik ve Verilerim\" ekranından JSON biçiminde dışa aktarabilirsiniz",
+          "r3": "İşlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme",
+          "r4": "Yurt içinde veya yurt dışında aktarıldığı üçüncü kişileri bilme",
+          "r5": "Eksik veya yanlış işlenmişse düzeltilmesini isteme",
+          "r6": "KVKK m.7 çerçevesinde silinmesini veya yok edilmesini isteme — \"Ayarlar → Gizlilik ve Verilerim\" ekranından hesabınızın silinmesini talep edebilirsiniz (hesabınız derhal kapatılır, 30 gün sonra kalıcı olarak silinir, bu süre içinde iptal edebilirsiniz)",
+          "r7": "5. ve 6. maddelerdeki işlemlerin, verilerin aktarıldığı üçüncü kişilere bildirilmesini isteme",
+          "r8": "Münhasıran otomatik sistemlerle analiz edilmesi sonucu aleyhinize bir sonuç çıkmasına itiraz etme (ürün içi puanlama bu kapsamdadır)",
+          "r9": "Kanuna aykırı işleme nedeniyle zarara uğramanız hâlinde zararın giderilmesini talep etme"
+        },
+        "exportNote": "Güvenlik gereği, kimlik doğrulama anahtarları (OAuth ve oturum jetonları) dışa aktarıma dahil edilmez.",
+        "rightsLink": "Gizlilik ve Verilerim ekranına git",
+        "howHeading": "Nasıl başvurulur?",
+        "howBody": "Veri Sorumlusuna Başvuru Usul ve Esasları Hakkında Tebliğ uyarınca başvurunuzu Türkçe olarak; ad-soyad, T.C. kimlik no (yabancılar için uyruk ve pasaport/kimlik no), tebligata esas adres, varsa e-posta ve telefon ile talep konusunu içerecek şekilde şu yollardan biriyle iletebilirsiniz:",
+        "channels": {
+          "post": "Islak imzalı dilekçe ile şahsen veya noter aracılığıyla: Kadıköy Mahallesi No:55, İlkadım / SAMSUN",
+          "kep": "Kayıtlı elektronik posta (KEP) ile: fonbridge@hs01.kep.tr",
+          "esign": "Güvenli elektronik imza veya mobil imza ile: info@fonbridge.com",
+          "email": "Platform'a kayıtlı e-posta adresinizden: info@fonbridge.com"
+        },
+        "response": "Başvurular en geç 30 gün içinde ücretsiz sonuçlandırılır. İşlemin ayrıca bir maliyet gerektirmesi hâlinde Kurul'un belirlediği tarifedeki ücret alınabilir. Başvuru yaptığınız tarihte hesabınız olmasa da bu hakları kullanabilirsiniz.",
+        "complaint": "Başvurunuzun reddedilmesi, cevabı yetersiz bulmanız veya süresinde cevap verilmemesi hâlinde, cevabı öğrendiğiniz tarihten itibaren 30 gün ve her hâlde başvuru tarihinden itibaren 60 gün içinde Kişisel Verileri Koruma Kurulu'na şikâyette bulunabilirsiniz."
+      },
+      "s9": {
+        "heading": "9. Açık Rıza ve Yürürlük",
+        "body": "Platform açık rızanızı yalnızca aşağıdaki işlemler için, aydınlatma metninden ayrı ve önceden işaretlenmemiş biçimde ister. Üyelik, bu onaylardan herhangi birinin verilmesine bağlanmaz.",
+        "consents": {
+          "analytics": "Analiz çerezi: çerez panelindeki \"Tümünü kabul et\" seçeneğiyle",
+          "lead": "Fon hazırlık karnesi iletişim formu: formdaki onay kutusuyla",
+          "expert": "Uzman profilinin rehberde yayımlanması: uzman ön kaydındaki onayla"
+        },
+        "withdraw": "Açık rızanızı dilediğiniz an info@fonbridge.com adresine yazarak, analiz çerezi için ayrıca 7. bölümde anlatılan yolla geri alabilirsiniz. Geri alma, önceki işlemlerin hukuka uygunluğunu etkilemez.",
+        "effective": "Bu metin [YÜRÜRLÜK TARİHİ] tarihinden itibaren geçerlidir. Değişiklikler sitede yayımlandığı tarihte yürürlüğe girer; esaslı değişikliklerde bu sayfadaki yürürlük tarihi güncellenir."
+      }
     },
     "terms": {
       "metaTitle": "Kullanım Koşulları ve Hizmet Sözleşmesi — {brand}",
@@ -1013,7 +1335,10 @@
       "description": "Sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. \"Tümünü Kabul Et\" seçerseniz, ürün iyileştirmesi için analitik çerezleri (PostHog) de kullanırız. Üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
       "privacyLink": "Gizlilik Bildirimi",
       "acceptAll": "Tümünü Kabul Et",
-      "essentialOnly": "Gerekli Çerezler"
+      "essentialOnly": "Gerekli Çerezler",
+      "preferencesLink": "Çerez tercihleri",
+      "currentAll": "Şu anki seçiminiz: tüm çerezler kabul edildi. \"Gerekli Çerezler\" seçerseniz analitik onayınız geri alınır ve analitik verileri bu tarayıcıdan silinir.",
+      "currentEssential": "Şu anki seçiminiz: yalnızca gerekli çerezler."
     }
   },
   "feedback": {
@@ -1502,6 +1827,7 @@
       "PILOT_MANAGERS_ONLY": "{module} modülü pilot aşamasında; yalnızca çalışma alanı yöneticileri kullanabilir.",
       "NO_TENANT": "Oturumunuz bir çalışma alanına bağlı değil.",
       "NOT_AUTHENTICATED": "Bu sayfayı görmek için giriş yapmanız gerekiyor.",
+      "READ_ONLY_PLAN": "{module} modülü planınızda salt okunur. Kayıt oluşturmak ve değiştirmek şu planlarda var: {plans}.",
       "COMING_SOON": "{module} modülü yakında kullanıma açılacak."
     }
   },
@@ -1894,7 +2220,7 @@
       "metricWorkspaceSlug": "Slug: {slug}",
       "modulesTitle": "Planınız kapsamındaki yetkili modüller",
       "modulesBody": "Mevcut aboneliğiniz dahilinde kullanabileceğiniz AB proje modülleri.",
-      "modulesLink": "Modülleri yönet (M1-M11) →",
+      "modulesLink": "Modülleri yönet →",
       "moduleChip": "Modül {module}",
       "plansTitle": "Abonelik planları ve yükseltme",
       "plansBody": "Ar-Ge operasyonlarınıza ve ekip büyüklüğünüze en uygun planı seçin.",
@@ -1970,24 +2296,25 @@
       "invoiceExportGenericError": "Fatura indirilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.",
       "notMeasured": "ölçülmedi",
       "notMeasuredHint": "Bu değer okunamadı; yerine bir rakam gösterilmiyor.",
+      "moduleLimited": "{id} (sınırlı)",
       "plans": {
         "basic": {
           "desc": "Solo başlangıç — ilk adım.",
           "seats": "2 kullanıcı / 1 çalışma alanı",
           "credits": "100 YZ kredisi / ay",
-          "modules": "Modüller: M2, M3, M5"
+          "modules": "Modüller: {modules}"
         },
         "pro": {
           "desc": "Ciddi günlük kullanım ve projeler.",
           "seats": "6 kullanıcı / 1 çalışma alanı",
           "credits": "500 YZ kredisi / ay",
-          "modules": "Modüller: M1-M6, M8"
+          "modules": "Modüller: {modules}"
         },
         "ultra": {
           "desc": "Tüm ekosistem ve kurumsal konsorsiyumlar.",
           "seats": "15 kullanıcı / 5 çalışma alanı",
           "credits": "2.000 YZ kredisi / ay",
-          "modules": "Modüller: M1-M11"
+          "modules": "Modüller: {modules}"
         }
       },
       "plansUnavailable": "Paket listesi şu anda okunamıyor. Yanlış bir fiyat göstermemek için burada rakam vermiyoruz; birazdan tekrar deneyin.",
@@ -3394,6 +3721,55 @@
     "totalLabel": "Toplam Katılım:",
     "ecContributionLabel": "Koordine Edilen AB Katkısı:"
   },
+  "PartnerResources": {
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbResources": "AB Portalları & Kaynaklar",
+    "title": "AB Portalları & Ortak Arama Kaynakları",
+    "intro": "Ortak ararken en çok kullanılan resmî AB portalları ve ağları. Her bağlantı yeni sekmede, ilgili kurumun kendi sitesinde açılır.",
+    "opensInNewTab": "(yeni sekmede açılır)",
+    "items": {
+      "fundingTenders": {
+        "name": "Funding & Tenders Portal",
+        "description": "Açık çağrılar, Partner Search ilanları ve başvuru gönderimi için AB Komisyonu'nun resmî portalı."
+      },
+      "horizonTr": {
+        "name": "Ufuk Avrupa Portalı",
+        "description": "TÜBİTAK'ın Ufuk Avrupa ulusal irtibat noktası: duyurular, etkinlikler ve Türkiye'ye özel destekler."
+      },
+      "erasmusResults": {
+        "name": "Erasmus+ Project Results",
+        "description": "Tamamlanmış ve süren Erasmus+ projelerinde deneyimli kurumları bulmak için proje sonuçları veritabanı."
+      },
+      "cordis": {
+        "name": "CORDIS",
+        "description": "AB destekli araştırma projeleri ve katılımcıları; konu bazında deneyimli koordinatörleri keşfedin."
+      },
+      "cost": {
+        "name": "COST",
+        "description": "Araştırmacı ağları (COST Actions): mevcut bir aksiyona katılarak Avrupa çapında ortak edinin."
+      },
+      "een": {
+        "name": "Enterprise Europe Network (EEN)",
+        "description": "İş birliği ve ortaklık profilleri; teknoloji ve araştırma ortağı arayan KOBİ'ler için."
+      },
+      "tubitakNetworks": {
+        "name": "TÜBİTAK Ağlara Üyelik Desteği",
+        "description": "Avrupa ağlarına ve platformlarına üyelik ücretleri için TÜBİTAK desteği."
+      },
+      "b2match": {
+        "name": "B2Match",
+        "description": "Brokerage etkinlikleri ve ikili görüşmeler: AB bilgi günlerinde ortaklarla randevu ayarlayın."
+      },
+      "linkedin": {
+        "name": "LinkedIn",
+        "description": "Kurum ve uzman profilleri; çağrı temalı gruplarda potansiyel ortaklara doğrudan ulaşın."
+      },
+      "participantRegister": {
+        "name": "PIC / Kurum Kaydı",
+        "description": "Kurumunuz için PIC (Katılımcı Kimlik Kodu) almak ya da mevcut kaydı aramak için Katılımcı Kaydı."
+      }
+    }
+  },
   "PartnersPage": {
     "crossLinks": {
       "label": "İlgili sayfalar",
@@ -3472,7 +3848,6 @@
       "consents_legend": "Onaylar",
       "kvkk_label": "<link>KVKK Aydınlatma Metni</link>'ni okudum.",
       "visibility_label": "Profilimin uzman rehberinde yayımlanmasına rıza veriyorum (lansmanla birlikte).",
-      "marketing_label": "FonBridge duyurularını e-posta ile almak istiyorum.",
       "required_mark_sr": "(zorunlu)",
       "honeypot_label": "Bu alanı boş bırakın",
       "submit": "Ön kaydı gönder",
@@ -3522,6 +3897,8 @@
       "no_founder": "Kurucu kadro tamamlanmıştı; kaydınız rehbere alındı. Lansmanda haber vereceğiz.",
       "heading_expired": "Bağlantının süresi dolmuş",
       "text_expired": "Doğrulama bağlantısı {hours} saat geçerlidir. info@fonbridge.com adresine yazın, yeni bağlantı gönderelim.",
+      "heading_already": "E-postanız zaten doğrulanmış",
+      "text_already": "Bu bağlantı daha önce kullanılmış; yapmanız gereken başka bir şey yok. Kaydınız Uzman Dizini'nde.",
       "heading_invalid": "Bağlantı geçersiz",
       "text_invalid": "Bağlantı eksik kopyalanmış ya da daha önce kullanılmış olabilir. E-postadaki düğmeyi yeniden deneyin.",
       "back": "Uzman Rehberi sayfasına dön"
@@ -3749,6 +4126,10 @@
   },
   "ApiKeysSettings": {
     "createTitle": "Yeni API Anahtarı Oluştur",
+    "readOnly": {
+      "title": "Planınızda API anahtarı oluşturulamaz",
+      "upgrade": "Planı yükselt"
+    },
     "revoke": {
       "title": "Mevcut API anahtarları",
       "description": "Modül kapalıyken de mevcut anahtarlarınızı buradan iptal edebilirsiniz. İptal edilen anahtar hemen geçersiz olur. Anahtar değerleri gösterilmez.",
@@ -3817,6 +4198,8 @@
     }
   },
   "partnersPage": {
+    "searchQuotaExhausted": "Bu ay {limit} ortak aramasının tamamını kullandınız. Planınızda ortak arama sınırlı; sınırsız arama şu planlarda var: {plans}.",
+    "searchQuotaUsed": "Bu ay {limit} ortak aramasından {used} tanesini kullandınız.",
     "breadcrumbDashboard": "Panel",
     "breadcrumbCurrent": "Ortak Arama & CORDIS / Interreg (M1/M8)",
     "title": "M1 Partner Intelligence Database & CORDIS Ortak Arama",
@@ -3865,6 +4248,90 @@
     "chipSearch": "Arama: \"{query}\"",
     "chipCountry": "Ülke: {country}",
     "chipType": "Tip: {type}"
+  },
+  "adminPartnerSearch": {
+    "title": "Partner Search veri alımı",
+    "navLabel": "Partner Search alımı",
+    "navDesc": "Çalışmalar, bayrak, eşleşmeyen kuruluşlar",
+    "subtitle": "F&T Portal Partner Search ilanlarının alımı: son çalışmalar, elle tetikleme ve CORDIS ile eşleşmeyen kuruluşlar.",
+    "statFlag": "Global bayrak",
+    "statLastRun": "Son çalışma",
+    "statUnmatched": "Eşleşmeyen",
+    "statOpenAlerts": "Açık alarm",
+    "flagOn": "AÇIK",
+    "flagOff": "KAPALI",
+    "none": "Yok",
+    "loadError": "Veriler yüklenemedi. Sayfayı yenileyin; sorun sürerse sunucu kayıtlarına bakın.",
+    "settingsTitle": "Bayrak ve strateji",
+    "flagLabel": "Partner Search alımı",
+    "flagTurnOn": "Alımı aç",
+    "flagTurnOff": "Alımı kapat",
+    "flagHelp": "Yalnız süper admin değiştirebilir; her değişiklik audit kaydına yazılır. Üretimde bu bayrağı patron açar.",
+    "flagConfirm": "Alım açılınca gece çalışması ve elle tetikleme F&T Portal'dan ilan çekmeye başlar. Açmak istediğinize emin misiniz?",
+    "flagConfirmYes": "Evet, aç",
+    "cancel": "Vazgeç",
+    "flagNowOn": "Alım bayrağı açıldı.",
+    "flagNowOff": "Alım bayrağı kapatıldı.",
+    "strategyLabel": "Alım stratejisi",
+    "strategyApi": "API (SEDIA arama)",
+    "strategyHtml": "HTML",
+    "strategyHybrid": "Hibrit",
+    "unavailable": "mevcut değil",
+    "runTitle": "Elle çalıştırma",
+    "runNow": "Şimdi çalıştır",
+    "runNowHelp": "Tam çalışma iş kuyruğuna eklenir; worker bitirince çalışma listesinde görünür.",
+    "runDisabledFlagOff": "Bayrak kapalıyken çalışma başlatılamaz.",
+    "runQueued": "Tam çalışma kuyruğa eklendi. Sonucu görmek için birazdan sayfayı yenileyin.",
+    "runAlreadyQueued": "Bekleyen bir elle çalışma zaten kuyrukta.",
+    "refetchLabel": "Topic bazlı yeniden çekim",
+    "refetch": "Yeniden çek",
+    "refetchHelp": "Açık veya yakında açılacak {count} topic arasından seçin ya da kimliği yazın.",
+    "refetchDone": "Yeniden çekim bitti: {status} · {created} yeni, {updated} güncel, {withdrawn} geri çekilmiş.",
+    "errorFlagOff": "Alım bayrağı kapalı; önce bayrağı açın.",
+    "errorEnqueue": "Çalışma kuyruğa eklenemedi. Tekrar deneyin.",
+    "errorTopicNotFound": "Bu kimlikte açık veya yakında açılacak bir topic yok.",
+    "errorTopicInvalid": "Topic kimliği geçersiz.",
+    "errorRun": "Yeniden çekim başarısız oldu. Ayrıntı sunucu kayıtlarında.",
+    "errorOwnerConnection": "Bayrak bu veritabanı bağlantısıyla yazılamıyor (sahip bağlantısı gerekli). Bayrak değişmedi.",
+    "errorFlagSave": "Bayrak kaydedilemedi. Tekrar deneyin.",
+    "statusSUCCESS": "Başarılı",
+    "statusPARTIAL": "Kısmi",
+    "statusFAILED": "Başarısız",
+    "statusRUNNING": "Sürüyor",
+    "triggerFULL": "Tam (zamanlı)",
+    "triggerINCREMENTAL": "Artımlı",
+    "triggerMANUAL": "Elle",
+    "runsTitle": "Son çalışmalar",
+    "runsEmpty": "Henüz çalışma yok.",
+    "colStarted": "Başlangıç",
+    "colTrigger": "Tetik",
+    "colStatus": "Durum",
+    "colTopics": "Topic",
+    "colChanges": "Yeni / güncel / geri",
+    "colPersons": "Kişi ilanı",
+    "colError": "Hata kaydı",
+    "changes": "{created} / {updated} / {withdrawn}",
+    "showError": "Hatayı göster ({count} satır)",
+    "hideError": "Hatayı gizle",
+    "unmatchedTitle": "Eşleşmeyen kuruluşlar ({count})",
+    "unmatchedHelp": "CORDIS'te bulunamayan kuruluşlar. Doğru PIC'i girince kuruluşun ilanları bağlanır ve işlem audit kaydına yazılır.",
+    "filterLabel": "Ad, ülke veya PIC ile süz",
+    "colOrganisation": "Kuruluş",
+    "colCountry": "Ülke",
+    "colPortalPic": "Portal PIC",
+    "colLastSeen": "Son görülme",
+    "colLink": "CORDIS PIC eşle",
+    "unmatchedEmpty": "Eşleşmeyen kuruluş yok.",
+    "picInputLabel": "{name} için CORDIS PIC",
+    "picPlaceholder": "999999999",
+    "link": "Eşle",
+    "resolveDone": "{name} → PIC {pic} eşlendi; {count} ilan bağlandı.",
+    "errorPicInvalid": "PIC yalnız rakamlardan oluşmalı (genelde 9 hane).",
+    "errorOrgNotFound": "Bu PIC ile CORDIS kuruluşu bulunamadı.",
+    "errorAlreadyResolved": "Bu kuruluş zaten eşlenmiş. Sayfayı yenileyin.",
+    "errorUnmatchedGone": "Kayıt artık yok. Sayfayı yenileyin.",
+    "errorResolveSave": "Eşleme kaydedilemedi. Tekrar deneyin.",
+    "resolvedTitle": "Son eşlenenler ({count})"
   },
   "PartnerSignal": {
     "box": {
@@ -3955,5 +4422,9 @@
       "liveIntro": "Funding & Tenders Portalı'ndaki Partner Search ilanları: partner arayan ve uzmanlık sunan kurumlar. İletişim portal üzerinden kurulur."
     },
     "attribution": "Kaynak: <portal>Avrupa Komisyonu, Funding & Tenders Portalı — Partner Search</portal>. Veriler <license>CC BY 4.0</license> lisansıyla yeniden kullanılır; özetler kısaltılmış ve kişisel veriler maskelenmiştir."
+  },
+  "moduleCount": {
+    "summary": "{active} aktif modül{soon, plural, =0 {} other { + # yakında}}",
+    "badge": "{active} aktif{soon, plural, =0 {} other { + # yakında}}"
   }
 }

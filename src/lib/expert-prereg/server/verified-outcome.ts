@@ -25,11 +25,11 @@ const SIG_LENGTH = 43;
 
 export type VerifiedOutcome =
   | { outcome: 'ok'; founderNumber: number | null }
-  | { outcome: 'expired' | 'invalid'; founderNumber: null };
+  | { outcome: 'expired' | 'invalid' | 'already'; founderNumber: null };
 
 interface Payload {
   v: 1;
-  o: 'ok' | 'expired' | 'invalid';
+  o: 'ok' | 'expired' | 'invalid' | 'already';
   n: number | null;
   /** Expiry, unix seconds. */
   exp: number;
@@ -80,7 +80,7 @@ export function decodeVerifiedOutcome(raw: unknown, { secret, now = Date.now() }
   if (!p || typeof p !== 'object') return null;
   const { v, o, n, exp } = p as Record<string, unknown>;
   if (v !== 1 || typeof exp !== 'number' || !(exp > Math.floor(now / 1000))) return null;
-  if (o === 'expired' || o === 'invalid') return n === null ? { outcome: o, founderNumber: null } : null;
+  if (o === 'expired' || o === 'invalid' || o === 'already') return n === null ? { outcome: o, founderNumber: null } : null;
   if (o !== 'ok') return null;
   if (n === null) return { outcome: 'ok', founderNumber: null };
   return typeof n === 'number' && Number.isInteger(n) && n >= 1 ? { outcome: 'ok', founderNumber: n } : null;

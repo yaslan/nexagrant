@@ -6,13 +6,14 @@
  * Turkish-locale spreadsheet splits on it, which would let a formula cell
  * escape its quotes.
  *
- * A cell that starts with = + - @ or a tab or carriage return is read as a
+ * A cell that starts with = + - @ (after any leading whitespace) or a tab or
+ * carriage return is read as a
  * formula by a spreadsheet, so it gets a leading apostrophe, and so does any
  * piece of it after a `;` or a line break (see FORMULA_AFTER_BREAK). Numbers are
  * never text here and are written as they are.
  */
 
-const FORMULA_START = /^[=+\-@\t\r]/;
+const FORMULA_START = /^\s*[=+\-@]|^[\t\r]/;
 
 /**
  * Quotes count only at the start of a field. A reader that splits this
@@ -21,7 +22,7 @@ const FORMULA_START = /^[=+\-@\t\r]/;
  * other cell a `;`, or a line break, starts a new field of its own. That piece
  * gets the apostrophe too, so `Kurum;=cmd|…` cannot open a formula there.
  */
-const FORMULA_AFTER_BREAK = /([;\r\n])(?=[" \t]*[=+\-@\t\r])/g;
+const FORMULA_AFTER_BREAK = /([;\r\n])(?=(?:[^\S\r\n]|")*[=+\-@\t\r])/g;
 
 export function csvCell(value: string | number | null): string {
   if (value === null) return '';

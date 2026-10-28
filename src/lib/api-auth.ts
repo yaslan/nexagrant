@@ -181,6 +181,13 @@ export async function authenticateApiKey(req: Request): Promise<
     if (!access.allowed) {
       return moduleDenied();
     }
+    // FO-41: a plan granting M1 in limited form (Discover, Basic, TTO Edition)
+    // meters partner searches per month. This API counts nothing, so it is not
+    // part of the limited mode; such a tenant cannot mint a key either
+    // (`assertModuleWrite` in settings/api-keys/actions.ts).
+    if (access.limits) {
+      return moduleDenied();
+    }
 
     return {
       authenticated: true,

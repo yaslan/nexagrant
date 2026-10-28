@@ -169,7 +169,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 
 ### E3 · Modül çekirdeği + yönetici konsolu (S3)
 
-- [x] `ModuleManifest` tipi, registry, derleme zamanı doğrulama; 11 manifest (`src/modules/m1`–`m11`, boş UI ile).
+- [x] `ModuleManifest` tipi, registry, derleme zamanı doğrulama; modül manifestleri (`src/modules/m*`; ilk teslimde M1–M11, boş UI ile — güncel sayı `getModuleCounts()`).
 - [x] `state-machine.ts` (`canEnable/enable/disable/cascade`) + birim testleri (`tests/modules/state-machine.test.ts`, `tests/admin-modules.test.ts`).
 - [x] `requireModule`, `useModuleEnabled` (`src/lib/modules/access.ts`, `hooks.tsx`), nav filtreleme; `/settings/modules`, `/admin/modules`.
 - Kabul: PROJECT.md §8 modül maddeleri.
@@ -430,6 +430,7 @@ Aynı önekle kapatılan iki kart daha var (6'ya dahil değil): **TASK-MTRJSOWFH
     - **K-1 → seçenek A, salt-okunur.** Veri silinmez ve okunur. Yazma sunucuda reddedilir (`requireTenantAction`, `requireTenantApi({ write: true })` → 403 `PILOT_EXPIRED`). Çalışma alanında turuncu (amber) bant (`PilotBanner.tsx`). Satın alma kapalı (`/api/billing/checkout` → 403 `PILOT_CHECKOUT_CLOSED`). Uzatmayı yalnız platform yöneticisi yapar, 90'ar gün (`grantPilot` `extend: true`). Reddedilen: B otomatik uzatma, C Keşif'e düşme. Kod bu kararla aynı (`a6b22241`). **güncel 29.09 gece:** tek istisna olan B-1 (M11 portalı) da kapandı: `fe021b59`, İNCELEME-19 canlı ONAY (`79ff1312`). Reddedilen işlemde "Pilot süresi doldu" mesajı: `0b93f2ed` (TASK-MUMIIUEGJ6N8B, review).
     - **K-2 → M6 pilotta açık.** `public-team` → `pro` = M1, M2, M3, M4, M5, M6, M8 (`src/lib/billing/catalog.ts`). `docs/BUSINESS_MODEL.md` §5.1'de M6 Ekip'e dahil değil, §5.2'de Ekip için €99/ay eklenti. Bu fark kamu paketinde bilerek var: Belediye Ekip M6'yı içerir. Özel sektör Ekip planı değişmedi. Belgeler hizalandı (`docs/kamu/ILKADIM-PILOT.md` §2.2, §6.2).
     - **K-3 → öncelikli yüzeyler, "yalnız" değil.** Pilot Ekip'in bütün modüllerini açar. Davet kodu, karne ve radar pilotun öncelikli yüzeyleridir. Bu üçü modül kapısına bağlı değil (`moduleGate` / `assertModuleAccess` çağrısı yok), plan onları açıp kapatmaz.
+25. **[AÇIK 2026-10-27 — FO-41 incelemesi, Ö-A] Basic + M1 eklentisi: sayaç ve canlı sekme limiti çelişiyor.** `docs/BILLING.md` iki cümlesi birbirine zıt: satır 48–49 "M1 eklentisi alan bir Basic kiracı Basic'in 10'unu korur" (canlı sekme sayacı `partnerSearchGrant('basic', true)` → 10/ay, `src/lib/billing/catalog.ts:729`); FO-41 paragrafı (satır ~60) "bir eklenti … modülü tam açar" (`src/lib/billing.ts:193` M1 limitini siler → sınırsız, sayaç yok, salt okunur da kalkar). Kullanıcı zarar görmüyor (fazlasını alıyor), ama iki kural aynı sayacı paylaşıyor. Karar verilmedi; kod iki yolda da değişmedi. Açık soru `TASK-MVCH2R3VSLAJN` ile birleştirilecek. Kanıt: `docs/agent-results/TASK-MVC4JRKUKYPLU-be-fb-fix-4.md` (Ö-A).
 
 ### E10 kapanışına bırakılan uyum boşlukları (patron kararı, 2026-09-08)
 

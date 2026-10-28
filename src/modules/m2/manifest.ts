@@ -22,6 +22,7 @@ export const m2Manifest: ModuleManifest = {
     { path: 'opportunities/[id]/m2', permission: 'concept-note:read' },
   ],
   nav: [{ labelKey: 'conceptNotes', routeKey: 'conceptNotes', order: 40 }],
+  opportunityTabs: [{ labelKey: 'conceptNote', routeKey: 'opportunityConceptNote', order: 10 }],
   permissions: [
     { id: 'concept-note:read', minRole: Role.MEMBER },
     { id: 'concept-note:write', minRole: Role.WRITER },
@@ -33,5 +34,7 @@ export const m2Manifest: ModuleManifest = {
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
+  addonPurchasable: false,
+  trialDays: 7,
   programTemplates: ['horizon-europe', 'eurostars', 'digital-europe', 'eic-accelerator'],
 };

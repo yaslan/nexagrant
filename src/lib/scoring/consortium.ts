@@ -84,6 +84,20 @@ interface PartnerProfileRow {
   totalProjects: number;
 }
 
+/**
+ * K-572451=A: keep one live-demand owner in the top `limit`. When none of the first
+ * `limit` candidates published a request, the best-scored owner below the cut takes
+ * slot `limit` in place of the last one. Scores and weights are untouched.
+ * `sorted` must already be ordered by score, highest first.
+ */
+export function withLiveDemandSlot<T extends { demandOwner: boolean }>(sorted: T[], limit: number): T[] {
+  const top = sorted.slice(0, limit);
+  if (limit < 1 || top.some((c) => c.demandOwner)) return top;
+  const owner = sorted.find((c, i) => i >= limit && c.demandOwner);
+  if (!owner) return top;
+  return [...top.slice(0, limit - 1), owner];
+}
+
 export async function scoreCandidatesForSeat(
   tenantId: string,
   seatId: string,
@@ -198,6 +212,21 @@ async function runScoring(
         ).map((r) => ({ organizationPic: r.organizationPic, publishedAt: r.publishedAt })),
       }
     : null;
+  // 4c. Ö1: organisations that published a request on this topic join the pool even
+  // when their track record puts them outside the top CANDIDATE_POOL, so a small
+  // partner with live demand is not dropped before scoring. Bounded by the request
+  // ceiling (LIVE_DEMAND_REQUEST_LIMIT), so the pool is at most CANDIDATE_POOL + 500.
+  const pooled = new Set(candidates.map((c) => c.organisationId));
+  const demandPicIds = [
+    ...new Set((liveDemand?.requests ?? []).map((r) => r.organizationPic).filter((id): id is string => Boolean(id))),
+  ].filter((id) => !pooled.has(id) && !existingOrgIds.includes(id));
+  if (demandPicIds.length) {
+    const demandProfiles: PartnerProfileRow[] = await tx.cordisPartnerProfile.findMany({
+      where: { organisationId: { in: demandPicIds } },
+      select: { organisationId: true, country: true, sme: true, totalProjects: true },
+    });
+    candidates.push(...demandProfiles);
+  }
   const now = new Date();
 
   // 5. Score each candidate. Every component is scaled to 0–1 and the weights
@@ -224,6 +253,7 @@ async function runScoring(
 
     return {
       organizationId: org.organisationId,
+      demandOwner: demand.ownRequestAgeDays !== null,
       score: {
         topicExperience,
         networkCentrality,
@@ -237,9 +267,14 @@ async function runScoring(
     };
   });
 
-  // 6. Sort by total score descending, take top N.
+  // 6. Sort by total score descending, take top N. K-572451=A: the top N keeps one
+  // live-demand owner, so a small partner with a request is not cut off by the track record.
   scored.sort((a, b) => b.score.total - a.score.total);
-  const results = scored.slice(0, limit).map((c, i) => ({ ...c, rank: i + 1 }));
+  const results = withLiveDemandSlot(scored, limit).map(({ organizationId, score }, i) => ({
+    organizationId,
+    score,
+    rank: i + 1,
+  }));
 
   // 7. Persist. `deleteMany` carries the tenant so a guessed seat id from
   // another tenant cannot clear its candidates.

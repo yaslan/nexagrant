@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { getPublicRoute, getWorkspaceRoute } from '@/lib/routes';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { expertPreregPath } from '@/components/expert-prereg/paths';
+import CookiePreferencesButton from '@/components/CookiePreferencesButton';
 
 interface PublicFooterProps {
   locale: string;
@@ -73,7 +74,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
               </li>
               <li>
                 <Link href={getPublicRoute('modules', locale)} className="hover:text-ink transition">
-                  {isTr ? 'Modül Kataloğu (M1-M11)' : 'Module Catalog'}
+                  {tFooter('moduleCatalog')}
                 </Link>
               </li>
             </ul>
@@ -138,6 +139,9 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
                 <Link href={getPublicRoute('dpa', locale)} className="hover:text-ink transition">
                   {isTr ? 'Veri İşleme Sözleşmesi (DPA)' : 'Data Processing Agreement'}
                 </Link>
+              </li>
+              <li>
+                <CookiePreferencesButton className="hover:text-ink transition text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded" />
               </li>
               <li>
                 <a href="mailto:info@fonbridge.com" className="hover:text-ink transition">

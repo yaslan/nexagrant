@@ -2,6 +2,7 @@ import { cache } from 'react';
 
 import { auth } from '@/lib/auth';
 import { getEntitlements } from '@/lib/billing';
+import { planNamesGrantingModuleInFull, type ModuleLimits } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import { tenantScopeOf, TenantScopeError, type TenantScope } from '@/lib/tenant';
 import type { ModuleDenyReason, SessionViewer } from '@/lib/modules/state-machine';
@@ -42,6 +43,8 @@ export class ModuleAccessError extends Error {
     readonly moduleId: ModuleId,
     readonly status: ModuleStatus,
     readonly reason: ModuleDenyReason,
+    /** Plans that would lift the refusal, by display name (FO-41). */
+    readonly requiredPlans: string[] = [],
   ) {
     super(`Module ${moduleId} is not available (${status}/${reason}).`);
     this.name = 'ModuleAccessError';
@@ -72,6 +75,7 @@ export const requestSession = cache(() => auth());
 interface TenantModuleFacts {
   statusById: ReadonlyMap<string, ModuleStatus>;
   allowedModules: readonly string[];
+  moduleLimits: Readonly<Record<string, ModuleLimits>>;
 }
 
 const tenantModuleFacts = cache(
@@ -89,6 +93,7 @@ const tenantModuleFacts = cache(
           states.map((row: { moduleId: string; status: string }) => [row.moduleId, row.status as ModuleStatus]),
         ),
         allowedModules: entitlements.allowedModules,
+        moduleLimits: entitlements.moduleLimits ?? {},
       };
     }),
 );
@@ -125,7 +130,13 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
   }
 
   const facts = await tenantModuleFacts(scope.tenantId);
-  return decideModuleAccess(moduleId, facts.statusById.get(moduleId) ?? 'OFF', facts.allowedModules, sessionViewerOf(scope));
+  return decideModuleAccess(
+    moduleId,
+    facts.statusById.get(moduleId) ?? 'OFF',
+    facts.allowedModules,
+    sessionViewerOf(scope),
+    facts.moduleLimits[moduleId],
+  );
 }
 
 /**
@@ -137,16 +148,45 @@ export async function checkModuleAccess(moduleId: ModuleId): Promise<ModuleAcces
  * entries still runs `moduleGate` and every action `assertModuleAccess`.
  */
 export async function listAccessibleModules(): Promise<ModuleId[]> {
+  return (await listModuleNav()).activeModules;
+}
+
+/**
+ * What the app shell's navigation shows, read off the same per-module decision
+ * as `checkModuleAccess`:
+ *
+ *   - `activeModules` — open for this viewer (the `listAccessibleModules` answer);
+ *   - `previewStatus` — the open ones that are not `ON` yet (`PILOT`, `DEV`), so
+ *     the sidebar can say the module is a preview rather than finished;
+ *   - `upgradeModules` — refused only because the plan does not include them
+ *     (`PLAN_UPGRADE_REQUIRED`), shown locked so a paid module can be found
+ *     before it is bought. A module switched off, out of the viewer's audience or
+ *     "Yakında" is not listed: nothing the viewer can do opens it.
+ */
+export interface ModuleNavState {
+  activeModules: ModuleId[];
+  previewStatus: Partial<Record<ModuleId, 'PILOT' | 'DEV'>>;
+  upgradeModules: ModuleId[];
+}
+
+export async function listModuleNav(): Promise<ModuleNavState> {
+  const nav: ModuleNavState = { activeModules: [], previewStatus: {}, upgradeModules: [] };
   const scope = tenantScopeOf(await requestSession());
-  if (!scope) return [];
+  if (!scope) return nav;
 
   const facts = await tenantModuleFacts(scope.tenantId);
   const viewer = sessionViewerOf(scope);
 
-  return getAllManifests().map((m) => m.id).filter(
-    (id) =>
-      decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, viewer).allowed,
-  );
+  for (const { id } of getAllManifests()) {
+    const access = decideModuleAccess(id, facts.statusById.get(id) ?? 'OFF', facts.allowedModules, viewer);
+    if (access.allowed) {
+      nav.activeModules.push(id);
+      if (access.status === 'PILOT' || access.status === 'DEV') nav.previewStatus[id] = access.status;
+    } else if (access.reason === 'PLAN_UPGRADE_REQUIRED') {
+      nav.upgradeModules.push(id);
+    }
+  }
+  return nav;
 }
 
 /**
@@ -161,10 +201,25 @@ export async function listAccessibleModules(): Promise<ModuleId[]> {
  * `TenantScopeError` that `requireTenantAction` would have thrown a line later,
  * so the browser says "sign in again" rather than "the module is switched off".
  */
-export async function assertModuleAccess(moduleId: ModuleId): Promise<void> {
+export async function assertModuleAccess(moduleId: ModuleId): Promise<ModuleAccessResult> {
   const access = await checkModuleAccess(moduleId);
   if (access.reason === 'NO_TENANT') throw new TenantScopeError();
   if (!access.allowed) {
     throw new ModuleAccessError(moduleId, access.status, access.reason ?? 'MODULE_OFF');
+  }
+  return access;
+}
+
+/**
+ * FO-41 — for server actions that create or change something in the module.
+ * Everything `assertModuleAccess` refuses, plus a plan that grants the module
+ * read only (Discover's M1): such a tenant may look, not write. Reads keep
+ * calling `assertModuleAccess`; an action that only *reduces* access (revoking
+ * an API key) calls neither.
+ */
+export async function assertModuleWrite(moduleId: ModuleId): Promise<void> {
+  const access = await assertModuleAccess(moduleId);
+  if (access.limits?.readOnly) {
+    throw new ModuleAccessError(moduleId, access.status, 'READ_ONLY_PLAN', planNamesGrantingModuleInFull(moduleId));
   }
 }

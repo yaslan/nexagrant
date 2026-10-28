@@ -34,7 +34,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/billing', () => ({ getEntitlements: h.getEntitlements }));
 
-import { checkModuleAccess, assertModuleAccess, ModuleAccessError } from '@/lib/modules/access';
+import { checkModuleAccess, assertModuleAccess, assertModuleWrite, ModuleAccessError } from '@/lib/modules/access';
 import { getAllManifests } from '@/lib/modules/registry';
 
 /** A plain tenant member — no platform-admin or manager bypass in play. */
@@ -54,11 +54,16 @@ function rowsAt(status: string | null) {
   return status === null ? [] : getAllManifests().map((m) => ({ moduleId: m.id, status }));
 }
 
-function arrange(opts: { status: string | null; allowedModules: string[] }) {
+function arrange(opts: {
+  status: string | null;
+  allowedModules: string[];
+  moduleLimits?: Record<string, { partnerSearchPerMonth?: number; readOnly?: boolean }>;
+}) {
   h.auth.mockResolvedValue(SESSION);
   h.moduleStateFindMany.mockResolvedValue(rowsAt(opts.status));
   h.getEntitlements.mockResolvedValue({
     allowedModules: opts.allowedModules,
+    moduleLimits: opts.moduleLimits ?? {},
     seats: 6,
     workspaces: 1,
     aiCreditsMonthly: 500,
@@ -162,9 +167,41 @@ describe('assertModuleAccess — server actions stop before any side effect', ()
     });
   });
 
-  it('returns quietly when the tenant owns the module and it is ON', async () => {
+  it('returns the allowed answer when the tenant owns the module and it is ON', async () => {
     arrange({ status: 'ON', allowedModules: PRO_MODULES });
 
-    await expect(assertModuleAccess('M8')).resolves.toBeUndefined();
+    await expect(assertModuleAccess('M8')).resolves.toEqual({ allowed: true, status: 'ON' });
+  });
+});
+
+describe('assertModuleWrite — FO-41 read-only plan grant', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const LIMITED_M1 = { M1: { partnerSearchPerMonth: 10, readOnly: true } };
+
+  it('a limited M1 is open to read, and the answer carries the limits', async () => {
+    arrange({ status: 'ON', allowedModules: ['M1', 'M5'], moduleLimits: LIMITED_M1 });
+
+    await expect(assertModuleAccess('M1')).resolves.toEqual({
+      allowed: true,
+      status: 'ON',
+      limits: LIMITED_M1.M1,
+    });
+  });
+
+  it('refuses a write on a read-only M1 with READ_ONLY_PLAN and the plans that lift it', async () => {
+    arrange({ status: 'ON', allowedModules: ['M1', 'M5'], moduleLimits: LIMITED_M1 });
+
+    const refusal = await assertModuleWrite('M1').catch((e: unknown) => e);
+    expect(refusal).toBeInstanceOf(ModuleAccessError);
+    expect(refusal).toMatchObject({ moduleId: 'M1', reason: 'READ_ONLY_PLAN', requiredPlans: ['Pro', 'Ultra'] });
+  });
+
+  it('writes on a full M1, and refuses on a closed one as the read gate does', async () => {
+    arrange({ status: 'ON', allowedModules: PRO_MODULES });
+    await expect(assertModuleWrite('M1')).resolves.toBeUndefined();
+
+    arrange({ status: 'OFF', allowedModules: PRO_MODULES });
+    await expect(assertModuleWrite('M1')).rejects.toMatchObject({ reason: 'MODULE_OFF' });
   });
 });

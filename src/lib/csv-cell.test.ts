@@ -10,6 +10,14 @@ describe('csvCell', () => {
     expect(csvCell('\tcmd')).toBe(`'\tcmd`);
   });
 
+  it('neutralises a formula that starts after leading whitespace (FO-141 F10)', () => {
+    expect(csvCell(' =1+1')).toBe(`' =1+1`);
+    expect(csvCell('   @SUM(A1)')).toBe(`'   @SUM(A1)`);
+    expect(csvCell(' \t-2')).toBe(`' \t-2`);
+    expect(csvCell('\u00a0+1')).toBe(`'\u00a0+1`);
+    expect(csvCell(' hello')).toBe(' hello');
+  });
+
   it('quotes a cell with a comma, a quote or a line break, and doubles its quotes', () => {
     expect(csvCell('Ayşe, Yılmaz')).toBe('"Ayşe, Yılmaz"');
     expect(csvCell('say "hi"')).toBe('"say ""hi"""');
@@ -26,6 +34,7 @@ describe('csvCell', () => {
     expect(csvCell('a\r=1')).toBe(`"a\r'=1"`);
     expect(csvCell('a;-1')).toBe(`"a;'-1"`);
     expect(csvCell('\rcmd')).toBe('"\'\rcmd"');
+    expect(csvCell('Kurum;\u00a0=cmd')).toBe(`"Kurum;'\u00a0=cmd"`);
   });
 
   it('writes numbers as they are and null as an empty cell', () => {

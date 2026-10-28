@@ -83,11 +83,18 @@ afterEach(() => {
 });
 
 describe('ExpertPreregForm', () => {
-  test('all three consent boxes start unticked', () => {
+  test('both consent boxes start unticked', () => {
     renderForm();
-    for (const id of ['ep-kvkkAccepted', 'ep-visibilityConsent', 'ep-marketingConsent']) {
+    for (const id of ['ep-kvkkAccepted', 'ep-visibilityConsent']) {
       expect((document.getElementById(id) as HTMLInputElement).checked).toBe(false);
     }
+  });
+
+  test('FO-144 (K-572235): there is no marketing consent box', () => {
+    renderForm();
+    expect(document.getElementById('ep-marketingConsent')).toBeNull();
+    expect(document.querySelector('input[name="marketingConsent"]')).toBeNull();
+    expect(screen.queryByText(/duyurularını e-posta ile almak/)).toBeNull();
   });
 
   test('empty submit: field-level errors, linked by aria-describedby, focus on the first', async () => {
@@ -107,7 +114,6 @@ describe('ExpertPreregForm', () => {
     expect(document.getElementById('languages-error')).toBeNull();
     expect(document.getElementById('ep-kvkkAccepted-error')?.textContent).toBe(tr.errors.consent_required);
     expect(document.getElementById('ep-visibilityConsent-error')?.textContent).toBe(tr.errors.consent_required);
-    expect(document.getElementById('ep-marketingConsent-error')).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -133,10 +139,10 @@ describe('ExpertPreregForm', () => {
       languages: [],
       kvkkAccepted: true,
       visibilityConsent: true,
-      marketingConsent: false,
       website: '',
       locale: 'tr',
     });
+    expect(body).not.toHaveProperty('marketingConsent');
     const share = screen.getByTestId('ep-share-linkedin');
     expect(share.getAttribute('href')).toContain('linkedin.com');
     expect(decodeURIComponent(share.getAttribute('href') ?? '')).toContain('https://example.test/tr/uzman');
@@ -309,7 +315,7 @@ describe('helpers', () => {
 
   test('parseKvkkMarkdown reads the shipped notice', async () => {
     const { readFile } = await import('node:fs/promises');
-    for (const f of ['content/kvkk-uzman-v2.md', 'content/kvkk-uzman-v2.en.md']) {
+    for (const f of ['content/kvkk-uzman-v3.md', 'content/kvkk-uzman-v3.en.md']) {
       const blocks = parseKvkkMarkdown(await readFile(f, 'utf8'));
       expect(blocks[0]?.kind).toBe('title');
       expect(blocks.filter((b) => b.kind === 'heading')).toHaveLength(8);

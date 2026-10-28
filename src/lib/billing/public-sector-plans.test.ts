@@ -47,7 +47,10 @@ describe('public-sector packages — owner-approved terms (ILKADIM-PILOT.md §6.
     for (const [publicId, baseId] of pairs) {
       const pub = grantsFor(publicId)!;
       const base = grantsFor(baseId)!;
-      expect([...pub.moduleIds].sort()).toEqual([...base.moduleIds].sort());
+      // FO-41: a module the base grants only limited (Basic's M1) is not in the contract.
+      const fullBase = base.moduleIds.filter((id) => !base.moduleLimits?.[id]);
+      expect([...pub.moduleIds].sort()).toEqual([...fullBase].sort());
+      expect(pub.moduleLimits).toBeUndefined();
       expect(pub.workspaces).toBe(base.workspaces);
       expect(pub.aiCreditsMonthly).toBe(base.aiCreditsMonthly);
     }

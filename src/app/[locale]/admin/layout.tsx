@@ -10,6 +10,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import UserMenu from '@/components/UserMenu';
 import AdminSidebarNav from '@/components/AdminSidebarNav';
+import { getModuleCounts } from '@/lib/modules/registry';
 import {
   ChevronRight,
   ExternalLink,
@@ -39,6 +40,7 @@ export default async function AdminLayout({
   // The user menu's workspace switcher lists real Workspace rows of the admin's
   // own tenant, not the two names that used to be written into the component.
   const workspaces = await listSessionWorkspaces(session);
+  const moduleCounts = getModuleCounts();
 
   // The admin navigation is rendered by <AdminSidebarNav />; this file used to carry a
   // second copy of the same list that nothing read.
@@ -67,6 +69,7 @@ export default async function AdminLayout({
         userImage={userImage}
         roleName={roleName}
         workspaces={workspaces}
+        moduleCounts={moduleCounts}
       />
 
       {/* Desktop Header */}
@@ -111,7 +114,7 @@ export default async function AdminLayout({
               </span>
             </div>
 
-            <AdminSidebarNav locale={locale} />
+            <AdminSidebarNav locale={locale} moduleCounts={moduleCounts} />
           </div>
         </aside>
 
