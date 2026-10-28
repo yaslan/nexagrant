@@ -38,6 +38,7 @@ export const JOB_IDS = [
   'evidence-expiring',
   'partner-search',
   'partner-search-retention',
+  'm17-text-retention',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];
@@ -77,6 +78,8 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   { id: 'expert-prereg-cleanup', cron: '55 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // ADR-0011 §3.4: notifications older than 90 days.
   { id: 'notifications-retention', cron: '50 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
+  // FO-195: M17 document text, 30 days from each slot's own upload (ADR-0010 §M17).
+  { id: 'm17-text-retention', cron: '35 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // ADR-0011 §2.2: 08:20 Istanbul, verified documents within the badge's EXPIRING_SOON window.
   { id: 'evidence-expiring', cron: '20 5 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // Between k1-daily-calls (02:00) and k1-topic-match (02:30): embeds the topics

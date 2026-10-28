@@ -17,14 +17,21 @@
  * open table is a frame held until it closes, so nesting is what turned 118 KB
  * into 564 MB), the XML is capped well below the old 50 MB, and one document is
  * read at a time so parallel uploads cannot stack their parses.
+ *
+ * CPU bound (FO-195 Ö1): none of that limits the time of the XML walk itself, and a
+ * FLAT hostile file under the cap (1.5 M empty paragraphs, 30 KB on disk) held the
+ * event loop for hundreds of ms to seconds. The whole read therefore runs in a
+ * `worker_threads` Worker (./docx.worker.ts), as the PDF path does
+ * (src/lib/rag-pdf-extract.ts): a wall-clock deadline and a V8 heap ceiling end the
+ * thread, not the server, and are refused as `parse_too_heavy`.
  */
-import unzipper from 'unzipper';
-
-import { decodeXmlText } from '@/lib/k3-topic-stats/xlsx';
+import { Worker } from 'node:worker_threads';
 
 import { INTERREG_UPLOAD_LIMITS } from '../limits';
+import { parseDocumentXml, DocxRefusal } from './docx.worker';
+import type { DocxWorkerInput, DocxWorkerOutput } from './docx.worker';
 
-export type DocxReadErrorCode = 'not_docx' | 'malformed' | 'too_large' | 'too_long';
+export type DocxReadErrorCode = 'not_docx' | 'malformed' | 'too_large' | 'too_long' | 'parse_too_heavy';
 
 export class DocxReadError extends Error {
   constructor(
@@ -44,17 +51,15 @@ export interface DocxLimits {
   maxChars: number;
   /** Tables in tables, or paragraphs in paragraphs, deeper than this are `malformed`. */
   maxNesting: number;
-}
-
-/** A table being read: finished rows, the row in progress, the cell in progress. */
-interface TableFrame {
-  rows: string[];
-  row: string[] | null;
-  cell: string[] | null;
+  /** Wall-clock for the whole read; past it the thread is ended (default {@link INTERREG_UPLOAD_LIMITS.maxDocxParseMs}). */
+  maxParseMs?: number;
+  /** V8 heap of the reading thread (default {@link INTERREG_UPLOAD_LIMITS.maxDocxHeapMb}). */
+  maxHeapMb?: number;
 }
 
 /**
- * Text of a `word/document.xml` body. Pure; exported for the unit tests.
+ * Text of a `word/document.xml` body, on the CALLING thread. Pure; for the unit tests
+ * of the walk itself — an upload never comes through here (see {@link readDocxText}).
  * Throws {@link DocxReadError} `too_long` past `maxChars`, `malformed` past `maxNesting`.
  */
 export function documentXmlToText(
@@ -62,171 +67,12 @@ export function documentXmlToText(
   maxChars: number = Number.POSITIVE_INFINITY,
   maxNesting: number = INTERREG_UPLOAD_LIMITS.maxDocxNesting,
 ): string {
-  const lines: string[] = [];
-  const tables: TableFrame[] = [];
-  // Paragraphs nest when a text box sits inside a run; each keeps its own buffer.
-  const paragraphs: string[][] = [];
-  let tabsDepth = 0; // <w:tabs> holds tab-stop definitions, also spelled <w:tab/>
-  let fallbackDepth = 0; // <mc:Fallback> repeats the <mc:Choice> content
-  let total = 0;
-
-  const sink = (): string[] => {
-    const top = tables[tables.length - 1];
-    return top?.cell ?? lines;
-  };
-  const emit = (target: string[], line: string) => {
-    const clean = line.replace(/[ \t]+$/u, '');
-    if (clean.trim() === '') return;
-    total += clean.length + 1;
-    if (total > maxChars) throw new DocxReadError('too_long', `Text passes ${maxChars} characters.`);
-    target.push(clean);
-  };
-  const tooDeep = (what: string) =>
-    new DocxReadError('malformed', `${what} nested deeper than ${maxNesting}; refused.`);
-  const append = (s: string) => {
-    const p = paragraphs[paragraphs.length - 1];
-    if (p) p.push(s);
-  };
-
-  let pos = 0;
-  const n = xml.length;
-  while (pos < n) {
-    const lt = xml.indexOf('<', pos);
-    if (lt < 0) break;
-    if (xml.startsWith('<!--', lt)) {
-      const end = xml.indexOf('-->', lt + 4);
-      pos = end < 0 ? n : end + 3;
-      continue;
-    }
-    if (xml.startsWith('<?', lt)) {
-      const end = xml.indexOf('?>', lt + 2);
-      pos = end < 0 ? n : end + 2;
-      continue;
-    }
-    if (xml.startsWith('<![CDATA[', lt)) {
-      const end = xml.indexOf(']]>', lt + 9);
-      pos = end < 0 ? n : end + 3;
-      continue;
-    }
-    const gt = xml.indexOf('>', lt + 1);
-    if (gt < 0) break;
-    pos = gt + 1;
-
-    const closing = xml[lt + 1] === '/';
-    const selfClosing = xml[gt - 1] === '/';
-    let i = closing ? lt + 2 : lt + 1;
-    const nameStart = i;
-    while (i < gt) {
-      const ch = xml[i];
-      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '/') break;
-      i++;
-    }
-    const name = xml.slice(nameStart, i);
-
-    if (name === 'mc:Fallback') {
-      if (selfClosing) continue;
-      fallbackDepth += closing ? -1 : 1;
-      if (fallbackDepth < 0) fallbackDepth = 0;
-      continue;
-    }
-    if (fallbackDepth > 0) continue;
-
-    switch (name) {
-      case 'w:t': {
-        if (closing || selfClosing) break;
-        const end = xml.indexOf('<', pos);
-        const raw = xml.slice(pos, end < 0 ? n : end);
-        append(decodeXmlText(raw));
-        pos = end < 0 ? n : end;
-        break;
-      }
-      case 'w:tabs':
-        if (!selfClosing) tabsDepth += closing ? -1 : 1;
-        if (tabsDepth < 0) tabsDepth = 0;
-        break;
-      case 'w:tab':
-        if (!closing && tabsDepth === 0) append('\t');
-        break;
-      case 'w:br':
-      case 'w:cr':
-        if (!closing) append(' ');
-        break;
-      case 'w:p':
-        if (selfClosing) break;
-        if (!closing) {
-          if (paragraphs.length >= maxNesting) throw tooDeep('Paragraphs');
-          paragraphs.push([]);
-        } else {
-          const buf = paragraphs.pop();
-          if (buf) emit(sink(), buf.join(''));
-        }
-        break;
-      case 'w:tbl':
-        if (selfClosing) break;
-        if (!closing) {
-          if (tables.length >= maxNesting) throw tooDeep('Tables');
-          tables.push({ rows: [], row: null, cell: null });
-        } else {
-          const done = tables.pop();
-          if (done) for (const row of done.rows) emit(sink(), row);
-        }
-        break;
-      case 'w:tr': {
-        const t = tables[tables.length - 1];
-        if (!t || selfClosing) break;
-        if (!closing) {
-          t.row = [];
-        } else if (t.row) {
-          const row = t.row.join(' | ');
-          if (row.replace(/[\s|]/gu, '') !== '') t.rows.push(row);
-          t.row = null;
-        }
-        break;
-      }
-      case 'w:tc': {
-        const t = tables[tables.length - 1];
-        if (!t) break;
-        if (selfClosing) {
-          t.row?.push('');
-        } else if (!closing) {
-          t.cell = [];
-        } else {
-          (t.row ??= []).push((t.cell ?? []).join(' ').trim());
-          t.cell = null;
-        }
-        break;
-      }
-      default:
-        break;
-    }
+  try {
+    return parseDocumentXml(xml, maxChars, maxNesting);
+  } catch (err) {
+    if (err instanceof DocxRefusal) throw new DocxReadError(err.code, err.message);
+    throw err;
   }
-  // An unterminated document still yields what was read.
-  for (const buf of paragraphs) emit(sink(), buf.join(''));
-  return lines.join('\n');
-}
-
-type ZipFile = Awaited<ReturnType<typeof unzipper.Open.buffer>>['files'][number];
-
-/** Inflate one entry, refusing to go past `limit` bytes whatever the entry claims. */
-async function readEntry(file: ZipFile, limit: number): Promise<Buffer> {
-  return new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let total = 0;
-    const stream = file.stream();
-    stream.on('data', (chunk: Buffer) => {
-      total += chunk.length;
-      if (total > limit) {
-        stream.destroy();
-        reject(new DocxReadError('too_large', `${file.path} inflates past ${limit} bytes.`));
-        return;
-      }
-      chunks.push(chunk);
-    });
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', (err: Error) =>
-      reject(new DocxReadError('malformed', `${file.path} could not be inflated: ${err.message}`)),
-    );
-  });
 }
 
 /** Whether the bytes start with a zip local-file header (a .docx is a zip). */
@@ -237,27 +83,61 @@ export function hasZipSignature(bytes: Uint8Array): boolean {
 /** One document at a time; the next waits here, without holding the event loop (as rag-pdf-extract.ts). */
 let queue: Promise<unknown> = Promise.resolve();
 
-/** Text of a .docx file. Throws {@link DocxReadError} on anything that is not a readable, bounded document. */
+/**
+ * Text of a .docx file, read off the web server's thread. Throws {@link DocxReadError}
+ * on anything that is not a readable, bounded document; `parse_too_heavy` when the
+ * deadline or the heap ceiling ended the thread.
+ */
 export function readDocxText(bytes: Buffer, limits: DocxLimits): Promise<string> {
-  const run = queue.then(() => readDocxTextNow(bytes, limits));
+  const run = queue.then(() => readInWorker(bytes, limits));
   queue = run.catch(() => undefined);
   return run;
 }
 
-async function readDocxTextNow(bytes: Buffer, limits: DocxLimits): Promise<string> {
-  if (!hasZipSignature(bytes)) throw new DocxReadError('not_docx', 'Zip signature missing.');
-  let directory: Awaited<ReturnType<typeof unzipper.Open.buffer>>;
-  try {
-    directory = await unzipper.Open.buffer(bytes);
-  } catch (err) {
-    throw new DocxReadError('not_docx', `Not a readable zip: ${(err as Error).message}`);
-  }
-  if (directory.files.length > limits.maxEntries) {
-    throw new DocxReadError('too_large', `Archive holds more than ${limits.maxEntries} entries.`);
-  }
-  const file = directory.files.find((f) => f.path.replace(/^\/+/, '') === 'word/document.xml');
-  if (!file) throw new DocxReadError('not_docx', 'No word/document.xml — not a Word document.');
-  const xml = (await readEntry(file, limits.maxXmlBytes)).toString('utf8');
-  if (/<!DOCTYPE/i.test(xml)) throw new DocxReadError('malformed', 'document.xml declares a DOCTYPE; refused.');
-  return documentXmlToText(xml, limits.maxChars, limits.maxNesting);
+function readInWorker(bytes: Buffer, limits: DocxLimits): Promise<string> {
+  const maxParseMs = limits.maxParseMs ?? INTERREG_UPLOAD_LIMITS.maxDocxParseMs;
+  const maxHeapMb = limits.maxHeapMb ?? INTERREG_UPLOAD_LIMITS.maxDocxHeapMb;
+  // A copy the thread owns: `bytes` may be a view into a shared pool.
+  const copy = new Uint8Array(bytes);
+  const input: DocxWorkerInput = {
+    bytes: copy,
+    limits: {
+      maxXmlBytes: limits.maxXmlBytes,
+      maxEntries: limits.maxEntries,
+      maxChars: limits.maxChars,
+      maxNesting: limits.maxNesting,
+    },
+  };
+  const tooHeavy = () =>
+    new DocxReadError('parse_too_heavy', `Reading passed ${maxParseMs} ms or ${maxHeapMb} MB of heap.`);
+
+  return new Promise<string>((resolve, reject) => {
+    const worker = new Worker(new URL('./docx.worker.ts', import.meta.url), {
+      workerData: input,
+      transferList: [copy.buffer],
+      resourceLimits: { maxOldGenerationSizeMb: maxHeapMb },
+    });
+    let settled = false;
+    // Answer only once the thread is gone, so the next read in the queue never
+    // runs beside a thread that is still being torn down.
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      worker.terminate().then(fn, fn);
+    };
+    const deadline = setTimeout(() => settle(() => reject(tooHeavy())), maxParseMs);
+
+    worker.once('message', (out: DocxWorkerOutput) =>
+      settle(() => {
+        if (out.kind === 'ok') resolve(out.text);
+        else if (out.kind === 'refused') reject(new DocxReadError(out.code, out.message));
+        else reject(new Error(`DOCX could not be read: ${out.message}`));
+      }),
+    );
+    worker.once('error', (e: Error & { code?: string }) =>
+      settle(() => reject(e.code === 'ERR_WORKER_OUT_OF_MEMORY' ? tooHeavy() : e)),
+    );
+    worker.once('exit', (code) => settle(() => reject(new Error(`DOCX reading thread exited (${code}) without an answer`))));
+  });
 }

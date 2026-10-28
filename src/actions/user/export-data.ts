@@ -61,6 +61,9 @@ export async function exportUserData(): Promise<ExportResult> {
       approvals,
       opportunities,
       notifications,
+      interregAnalyses,
+      interregResults,
+      interregMarks,
     ] = await withSystemScope('subject-scoped', 'gdpr-export.subjectRows', (tx) =>
       Promise.all([
         tx.user.findUnique({
@@ -152,6 +155,71 @@ export async function exportUserData(): Promise<ExportResult> {
           },
           orderBy: { createdAt: 'asc' },
         }),
+        // M17 (FO-195, ADR-0010 Ek A 76-78): the subject's Interreg pre-assessments in
+        // every tenant. The extracted document text is included while it is still held
+        // (at most 30 days per slot, then the m17-text-retention job empties it); the
+        // original files were never stored. The grid (InterregRubric) is platform data.
+        tx.interregAnalysis.findMany({
+          where: { userId },
+          select: {
+            id: true,
+            tenantId: true,
+            rubricId: true,
+            status: true,
+            callFileName: true,
+            callFormat: true,
+            callPages: true,
+            callChars: true,
+            callText: true,
+            callExtractedAt: true,
+            callTextExpiresAt: true,
+            projectFileName: true,
+            projectFormat: true,
+            projectPages: true,
+            projectChars: true,
+            projectText: true,
+            projectExtractedAt: true,
+            projectTextExpiresAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        }),
+        tx.interregAnalysisResult.findMany({
+          where: { analysis: { userId } },
+          select: {
+            id: true,
+            tenantId: true,
+            analysisId: true,
+            rawScore: true,
+            score100: true,
+            passesThresholds: true,
+            knockouts: true,
+            reportMarkdown: true,
+            redFlags: true,
+            improvements: true,
+            rewriteSample: true,
+            model: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        }),
+        tx.interregCriterionMark.findMany({
+          where: { analysis: { userId } },
+          select: {
+            id: true,
+            tenantId: true,
+            analysisId: true,
+            criterionId: true,
+            mark: true,
+            strengths: true,
+            weaknesses: true,
+            evidenceQuote: true,
+            evidenceLocator: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        }),
       ])
     );
 
@@ -190,6 +258,9 @@ export async function exportUserData(): Promise<ExportResult> {
       AiUsageLog: aiUsage,
       ApprovalRequest: approvals,
       Notification: notifications,
+      InterregAnalysis: interregAnalyses,
+      InterregAnalysisResult: interregResults,
+      InterregCriterionMark: interregMarks,
     };
 
     await recordAccessAudit(userId, tenantId, tables);
@@ -204,8 +275,8 @@ export async function exportUserData(): Promise<ExportResult> {
         // than relying on a badge the reader can no longer see. Bilingual because the
         // file has no locale of its own.
         notice: {
-          tr: 'Evaluation kayıtları iç ön değerlendirmedir; resmî Komisyon değerlendirmesi yerine geçmez.',
-          en: 'Evaluation records are an internal pre-assessment; they do not replace the official Commission evaluation.',
+          tr: 'Evaluation kayıtları iç ön değerlendirmedir; resmî Komisyon değerlendirmesi yerine geçmez. InterregAnalysisResult ve InterregCriterionMark kayıtları da iç ön değerlendirmedir; hakem raporu ya da resmî skor değildir.',
+          en: 'Evaluation records are an internal pre-assessment; they do not replace the official Commission evaluation. InterregAnalysisResult and InterregCriterionMark records are likewise an internal pre-assessment, not a referee report or an official score.',
         },
         tables,
       },

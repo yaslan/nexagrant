@@ -49,6 +49,15 @@ export const INTERREG_UPLOAD_LIMITS = {
    * without a cap ~2.6 M nested tables in 118 KB held 564 MB (se-fb B3).
    */
   maxDocxNesting: 10,
+  /**
+   * DOCX: wall-clock for one read, which runs in its own thread (FO-195 Ö1). The
+   * 400 000-character cap parses in well under a second; a flat hostile file under
+   * the XML cap held the event loop 0.3–5 s (se-fb), now it only holds the thread,
+   * which is ended here and refused as `parse_too_heavy`.
+   */
+  maxDocxParseMs: 5_000,
+  /** DOCX: V8 heap of the reading thread; past it the thread dies, not the server. */
+  maxDocxHeapMb: 256,
   /** Days the extracted text is kept after the last upload (FO-185 decision 3). */
   textRetentionDays: 30,
 } as const;

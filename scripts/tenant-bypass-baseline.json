@@ -295,6 +295,15 @@
     },
     {
       "check": "D",
+      "file": "src/modules/m17/server/retention.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "purgeExpiredInterregText(), run nightly by the m17-text-retention cron (FO-195, ADR-0010 §M17): empties every tenant's InterregAnalysis document slot whose callTextExpiresAt / projectTextExpiresAt has passed (30 days from that slot's own upload), recomputes the status with the upload rule and deletes the dependent F2 result and criterion marks. The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; InterregAnalysis is FORCE RLS, so an unscoped updateMany under fabrika_app would match 0 rows and report success while every text stayed. It only removes data (nulls the slot, deletes result rows) and returns counts; it never reads a text."
+    },
+    {
+      "check": "D",
       "file": "src/lib/invitations/retention.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,

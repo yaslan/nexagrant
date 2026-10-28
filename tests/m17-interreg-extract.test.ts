@@ -7,6 +7,7 @@
  * the shared worker-thread extractor, which is not mocked.
  */
 import { crc32, deflateRawSync } from 'node:zlib';
+import { performance } from 'node:perf_hooks';
 
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun } from 'docx';
 import { createTranslator } from 'next-intl';
@@ -18,6 +19,9 @@ import { formatFromFileName, INTERREG_API_ERRORS, INTERREG_ERROR_ARGS, INTERREG_
 import { DocxReadError, documentXmlToText, readDocxText } from '../src/modules/m17/server/docx-text';
 import { extractInterregDocument, InterregExtractError, tidy } from '../src/modules/m17/server/extract';
 import { acceptsUpload } from '../src/modules/m17/server/status';
+import { decodeXmlText as xlsxDecodeXmlText } from '../src/lib/k3-topic-stats/xlsx';
+import { decodeXmlText } from '../src/modules/m17/server/docx.worker';
+import { HOSTILE_FLAT, legitLargeDocx } from './helpers/hostile-docx';
 import { syntheticPdf, densePageLines } from './helpers/synthetic-pdf';
 
 const PROSE =
@@ -226,6 +230,59 @@ describe('readDocxText — real .docx files', () => {
     // A refusal does not block the queue for the next document.
     await expect(readDocxText(storedZip({ 'x.xml': '<x/>' }), limits)).rejects.toMatchObject({ code: 'not_docx' });
     await expect(readDocxText(docx, limits)).resolves.toBe(texts[0]);
+  });
+
+  // FO-195 Ö1 (se-fb re-review of FO-186): flat hostile XML under the 20 MB cap — 30–50 KB on
+  // disk, nothing nested — was walked on the web server's thread and held the event loop for
+  // 250–580 ms here (seconds under load). The read now runs in its own thread, so a 1 ms
+  // heartbeat on this thread must keep ticking. The gap is the longest wait any other
+  // request would have had.
+  describe.each(Object.entries(HOSTILE_FLAT))('flat hostile file %s (FO-195 Ö1)', (_name, make) => {
+    it('does not hold the event loop, and is still refused', async () => {
+      const bytes = make();
+      expect(bytes.length).toBeLessThan(100 * 1024);
+      let maxGap = 0;
+      let last = performance.now();
+      const beat = setInterval(() => {
+        const now = performance.now();
+        maxGap = Math.max(maxGap, now - last);
+        last = now;
+      }, 1);
+      try {
+        await expect(readDocxText(bytes, limits)).resolves.toBe(''); // empty paragraphs/cells: no text
+      } finally {
+        await new Promise((r) => setTimeout(r, 5));
+        clearInterval(beat);
+      }
+      expect(maxGap).toBeLessThan(120);
+    });
+  });
+
+  it('ends the reading thread at its deadline and refuses with parse_too_heavy; the next read is unaffected', async () => {
+    const t0 = Date.now();
+    await expect(readDocxText(HOSTILE_FLAT.para19(), { ...limits, maxParseMs: 25 })).rejects.toMatchObject({
+      code: 'parse_too_heavy',
+    });
+    expect(Date.now() - t0).toBeLessThan(1_500);
+    await expect(readDocxText(await realDocx(), limits)).resolves.toContain('Partnership');
+  });
+
+  it('ends the reading thread at its heap ceiling and refuses with parse_too_heavy', async () => {
+    await expect(readDocxText(HOSTILE_FLAT.wide19(), { ...limits, maxHeapMb: 4 })).rejects.toMatchObject({
+      code: 'parse_too_heavy',
+    });
+  });
+
+  it('still reads an 80-page application (≈350 000 characters) within the default bounds', async () => {
+    const text = await readDocxText(legitLargeDocx(), limits);
+    expect(text.length).toBeGreaterThan(300_000);
+    expect(text.length).toBeLessThanOrEqual(INTERREG_UPLOAD_LIMITS.maxChars);
+  });
+
+  it("the worker's copy of decodeXmlText agrees with the shared one (it cannot import it)", () => {
+    for (const s of ['R&amp;D', '&lt;3&gt; &quot;q&quot; &apos;a&apos;', '&#65;&#x42;&#xD800;&#0;&#x110000;', '&unknown; & plain', '']) {
+      expect(decodeXmlText(s)).toBe(xlsxDecodeXmlText(s));
+    }
   });
 
   it('refuses a zip that is not a Word document, and an archive with too many entries', async () => {

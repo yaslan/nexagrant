@@ -4,7 +4,8 @@
 -- Purpose: storage for the M17 module (plan: docs/agent-results/FO-185-leed-fb.md).
 --   • InterregAnalysis        — one call guide + one project file a user uploaded,
 --                               as EXTRACTED TEXT only (the uploaded bytes are never
---                               stored); `textExpiresAt` = 30 days (owner decision).
+--                               stored); text kept 30 days per slot (owner decision; the
+--                               per-slot expiry columns come from add-interreg-slot-retention.sql, FO-195).
 --   • InterregAnalysisResult  — the F2 LLM output (internal pre-assessment, never an
 --                               official score). Nothing writes it in F1.
 --   • InterregCriterionMark   — one rubric criterion's mark (F2). Nothing writes it in F1.
@@ -110,13 +111,11 @@ CREATE TABLE IF NOT EXISTS "InterregAnalysis" (
   "projectChars"       INTEGER,
   "projectText"        TEXT,
   "projectExtractedAt" TIMESTAMP(3),
-  "textExpiresAt"      TIMESTAMP(3),
   "createdAt"          TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt"          TIMESTAMP(3) NOT NULL,
   CONSTRAINT "InterregAnalysis_pkey" PRIMARY KEY ("id")
 );
 CREATE INDEX IF NOT EXISTS "InterregAnalysis_tenantId_userId_createdAt_idx" ON "InterregAnalysis"("tenantId", "userId", "createdAt");
-CREATE INDEX IF NOT EXISTS "InterregAnalysis_textExpiresAt_idx" ON "InterregAnalysis"("textExpiresAt");
 CREATE INDEX IF NOT EXISTS "InterregAnalysis_rubricId_idx" ON "InterregAnalysis"("rubricId");
 
 CREATE TABLE IF NOT EXISTS "InterregAnalysisResult" (

@@ -2025,7 +2025,7 @@ model Consent {
 //
 // FO-186 (TASK-MVRIV9LCDHYKO). One analysis = one call guide + one project file,
 // uploaded by a user and extracted to text on the server. The uploaded bytes are
-// never stored: only the extracted text, and only until `textExpiresAt`
+// never stored: only the extracted text, and only until each slot's own `…TextExpiresAt`
 // (30 days, owner decision in FO-185). Output is an *internal* pre-assessment,
 // never an official score (CLAUDE.md "Yapma"). Migration: add-interreg-review.sql.
 //
@@ -2134,6 +2134,9 @@ model InterregAnalysis {
   callChars       Int?
   callText        String?            @db.Text
   callExtractedAt DateTime?
+  /// The call text is purged at this instant (30 days from THIS slot's upload, FO-195 B5).
+  /// Set exactly when `callText` is (CHECK InterregAnalysis_text_expiry_pair).
+  callTextExpiresAt DateTime?
 
   projectFileName    String?
   projectFormat      InterregDocFormat?
@@ -2141,12 +2144,11 @@ model InterregAnalysis {
   projectChars       Int?
   projectText        String?            @db.Text
   projectExtractedAt DateTime?
+  /// Same for the project text, counted from its own upload.
+  projectTextExpiresAt DateTime?
 
-  /// Extracted text is purged after this instant (30 days from the last upload).
-  /// The purge job is F3 (se-fb); the column is set from the first upload on.
-  textExpiresAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -2159,7 +2161,7 @@ model InterregAnalysis {
   @@unique([id, tenantId])
   @@unique([id, tenantId, rubricId])
   @@index([tenantId, userId, createdAt])
-  @@index([textExpiresAt])
+  /// Partial indexes (WHERE … IS NOT NULL) are in add-interreg-slot-retention.sql; Prisma cannot express them.
   @@index([rubricId])
 }
 

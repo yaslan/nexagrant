@@ -154,7 +154,33 @@ describe('saveDocument — the status rule (crw2 Ö1)', () => {
     expect(again).toMatchObject({ ok: true, analysis: { status: 'READY', call: { fileName: 'guide-v2.txt' } } });
     const row = await admin!.interregAnalysis.findUniqueOrThrow({ where: { id } });
     expect(row.callText).toBe('call text v2');
-    expect(row.textExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 29 * 864e5);
+    expect(row.callTextExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 29 * 864e5);
+    expect(row.projectTextExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 29 * 864e5);
+  });
+
+  test('each slot is kept 30 days from ITS OWN upload: a later project upload does not extend the call text (FO-195 B5)', async () => {
+    const id = await newAnalysis(alice);
+    const DAY = 864e5;
+    const t0 = new Date('2026-10-01T10:00:00.000Z');
+    const t10 = new Date(t0.getTime() + 10 * DAY);
+    const t12 = new Date(t0.getTime() + 12 * DAY);
+
+    const first = await saveDocument(alice, id, 'call', 'guide.txt', doc('call'), t0);
+    expect(first).toMatchObject({ ok: true, analysis: { call: { expiresAt: '2026-10-31T10:00:00.000Z' }, project: null } });
+    const second = await saveDocument(alice, id, 'project', 'draft.txt', doc('project'), t10);
+    expect(second).toMatchObject({
+      ok: true,
+      analysis: { call: { expiresAt: '2026-10-31T10:00:00.000Z' }, project: { expiresAt: '2026-11-10T10:00:00.000Z' } },
+    });
+    // Replacing the call guide moves only the call's expiry.
+    const third = await saveDocument(alice, id, 'call', 'guide-v2.txt', doc('call v2'), t12);
+    expect(third).toMatchObject({
+      ok: true,
+      analysis: { call: { expiresAt: '2026-11-12T10:00:00.000Z' }, project: { expiresAt: '2026-11-10T10:00:00.000Z' } },
+    });
+    const row = await admin!.interregAnalysis.findUniqueOrThrow({ where: { id } });
+    expect(row.callTextExpiresAt?.toISOString()).toBe('2026-11-12T10:00:00.000Z');
+    expect(row.projectTextExpiresAt?.toISOString()).toBe('2026-11-10T10:00:00.000Z');
   });
 
   test('the call guide alone is CALL_READY', async () => {
