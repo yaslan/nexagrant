@@ -4117,6 +4117,10 @@
   },
   "ApiKeysSettings": {
     "createTitle": "Create new API key",
+    "readOnly": {
+      "title": "Your plan cannot create API keys",
+      "upgrade": "Upgrade plan"
+    },
     "revoke": {
       "title": "Active API keys",
       "description": "You can revoke your existing keys here while the module is off. A revoked key stops working immediately. Key values are never shown.",
