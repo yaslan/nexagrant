@@ -5,6 +5,7 @@ import { test, expect, type Page } from '@playwright/test';
 import trMessages from '../../messages/tr.json';
 import enMessages from '../../messages/en.json';
 import { prisma } from '../../src/lib/db';
+import { isComingSoon } from '../../src/lib/modules/state-machine';
 import type { InterregResultView } from '../../src/modules/m17/result-view';
 import { shotsDir } from './fixtures/shots';
 import { signInAs } from './fixtures/session';
@@ -20,9 +21,17 @@ import { expectHydrated } from './fixtures/hydration';
  * `evaluate` route (FO-188) answers a fixed InterregResultView here, so the spec
  * spends no credits and does not depend on a provider key.
  *
- * Own tenant on `pro` (which grants M17 since FO-189) with M17 switched ON;
- * deleting the tenant at the end cascades to its analyses.
+ * Own tenant on `pro` with M17 switched ON; deleting the tenant at the end
+ * cascades to its analyses.
+ *
+ * While M17 is `soon` every gate refuses it before plan or ModuleState are read
+ * (`decideModuleAccess`), so no seed can reach the screen and none should: the
+ * screen ships dark and opens with its own commit (statusBadge 'beta' + the Pro/Ultra
+ * grant, held until FO-188 and the credit price). Which half of this spec runs is
+ * read from the manifest, not a flag: `soon` → the gate is proved shut, page and
+ * API; open → the happy path. The day the module opens, the same file walks it.
  */
+const M17_OPEN = !isComingSoon('M17');
 
 const SHOTS = shotsDir('TASK-MVRIW2N3NG7BD-evidence');
 const TENANT = 'e2e-m17-tenant';
@@ -128,53 +137,88 @@ async function open(page: Page, locale: 'tr' | 'en', baseURL: string) {
   await expectHydrated(page.getByTestId('m17-choose-call'));
 }
 
-test.describe('M17 Interreg pre-assessment (FO-189)', () => {
-  test.beforeAll(async () => {
-    await prisma.tenant.upsert({
-      where: { id: TENANT },
-      create: { id: TENANT, name: 'm17 e2e (internal)', slug: TENANT, country: 'TR', orgType: 'SME' },
-      update: {},
-    });
-    await prisma.subscription.upsert({
-      where: { tenantId: TENANT },
-      create: { tenantId: TENANT, planId: 'pro', status: 'ACTIVE' },
-      update: { planId: 'pro', status: 'ACTIVE', planVersionId: null },
-    });
-    await prisma.moduleState.upsert({
-      where: { tenantId_moduleId: { tenantId: TENANT, moduleId: 'M17' } },
-      create: { tenantId: TENANT, moduleId: 'M17', status: 'ON', changedBy: 'm17 e2e fixture' },
-      update: { status: 'ON' },
-    });
-    await prisma.workspace.upsert({
-      where: { id: WORKSPACE_ID },
-      create: { id: WORKSPACE_ID, tenantId: TENANT, name: 'm17 e2e', slug: WORKSPACE },
-      update: { slug: WORKSPACE },
-    });
-    await prisma.user.upsert({
-      where: { id: USER_ID },
-      create: { id: USER_ID, email: EMAIL, name: 'M17 E2E', locale: 'tr' },
-      update: { email: EMAIL },
-    });
-    await prisma.membership.upsert({
-      where: { tenantId_userId: { tenantId: TENANT, userId: USER_ID } },
-      create: { tenantId: TENANT, userId: USER_ID, role: 'TENANT_OWNER', workspaceIds: [WORKSPACE_ID] },
-      update: { role: 'TENANT_OWNER', workspaceIds: [WORKSPACE_ID] },
-    });
+async function seedTenant() {
+  await prisma.tenant.upsert({
+    where: { id: TENANT },
+    create: { id: TENANT, name: 'm17 e2e (internal)', slug: TENANT, country: 'TR', orgType: 'SME' },
+    update: {},
   });
+  await prisma.subscription.upsert({
+    where: { tenantId: TENANT },
+    create: { tenantId: TENANT, planId: 'pro', status: 'ACTIVE' },
+    update: { planId: 'pro', status: 'ACTIVE', planVersionId: null },
+  });
+  await prisma.moduleState.upsert({
+    where: { tenantId_moduleId: { tenantId: TENANT, moduleId: 'M17' } },
+    create: { tenantId: TENANT, moduleId: 'M17', status: 'ON', changedBy: 'm17 e2e fixture' },
+    update: { status: 'ON' },
+  });
+  await prisma.workspace.upsert({
+    where: { id: WORKSPACE_ID },
+    create: { id: WORKSPACE_ID, tenantId: TENANT, name: 'm17 e2e', slug: WORKSPACE },
+    update: { slug: WORKSPACE },
+  });
+  await prisma.user.upsert({
+    where: { id: USER_ID },
+    create: { id: USER_ID, email: EMAIL, name: 'M17 E2E', locale: 'tr' },
+    update: { email: EMAIL },
+  });
+  await prisma.membership.upsert({
+    where: { tenantId_userId: { tenantId: TENANT, userId: USER_ID } },
+    create: { tenantId: TENANT, userId: USER_ID, role: 'TENANT_OWNER', workspaceIds: [WORKSPACE_ID] },
+    update: { role: 'TENANT_OWNER', workspaceIds: [WORKSPACE_ID] },
+  });
+}
+
+async function removeTenant() {
+  await prisma.interregAnalysis.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
+  await prisma.membership.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
+  await prisma.moduleState.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
+  await prisma.subscription.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
+  await prisma.workspace.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
+  await prisma.user.deleteMany({ where: { id: 'e2e-m17-owner' } });
+  await prisma.tenant.deleteMany({ where: { id: 'e2e-m17-tenant' } });
+  await prisma.$disconnect();
+}
+
+test.describe('M17 while `soon`: the screen ships dark (FO-189)', () => {
+  test.skip(M17_OPEN, 'M17 is open: the happy path below covers it');
+  test.beforeAll(seedTenant);
+  test.afterAll(removeTenant);
+
+  for (const [locale, messages] of [
+    ['tr', trMessages],
+    ['en', enMessages],
+  ] as const) {
+    test(`${locale}: a Pro tenant with M17 ON gets the coming-soon page, and the API refuses`, async ({
+      page,
+      baseURL,
+    }) => {
+      await signInAs(page, { id: USER_ID, email: EMAIL, tenantId: TENANT, role: 'TENANT_OWNER' }, baseURL as string);
+      await page.goto(`/${locale}/${WORKSPACE}/modules/interreg-review`);
+      await expect(page.getByTestId('module-coming-soon')).toContainText(messages.modules['interreg-review'].name);
+      await expect(page.getByTestId('m17-review')).toHaveCount(0);
+
+      // The page is not the only door: the API answers the same, and writes nothing.
+      for (const res of [
+        await page.request.get('/api/interreg-review/analyses'),
+        await page.request.post('/api/interreg-review/analyses'),
+      ]) {
+        expect(res.status()).toBe(403);
+        expect(await res.json()).toEqual({ error: 'module_unavailable', reason: 'COMING_SOON' });
+      }
+      expect(await prisma.interregAnalysis.count({ where: { tenantId: TENANT } })).toBe(0);
+    });
+  }
+});
+
+test.describe('M17 Interreg pre-assessment (FO-189)', () => {
+  test.skip(!M17_OPEN, 'M17 is `soon`: the screen opens with fe-fb/fo189-m17-beta-open');
+  test.beforeAll(seedTenant);
+  test.afterAll(removeTenant);
 
   test.beforeEach(async () => {
     await prisma.interregAnalysis.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
-  });
-
-  test.afterAll(async () => {
-    await prisma.interregAnalysis.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
-    await prisma.membership.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
-    await prisma.moduleState.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
-    await prisma.subscription.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
-    await prisma.workspace.deleteMany({ where: { tenantId: 'e2e-m17-tenant' } });
-    await prisma.user.deleteMany({ where: { id: 'e2e-m17-owner' } });
-    await prisma.tenant.deleteMany({ where: { id: 'e2e-m17-tenant' } });
-    await prisma.$disconnect();
   });
 
   for (const [locale, messages] of [
@@ -315,6 +359,15 @@ test.describe('M17 Interreg pre-assessment (FO-189)', () => {
     await expect(error).toHaveText(known ?? ui.genericError);
     await expect(page.getByTestId('m17-check')).toBeEnabled();
     await expect(page.getByTestId('m17-report')).toHaveCount(0);
+
+    // No report, but the files are the user's: Reset asks first, and "cancel" keeps them.
+    page.once('dialog', (d) => {
+      expect(d.message()).toBe(ui.resetConfirmFiles);
+      void d.dismiss();
+    });
+    await page.getByTestId('m17-reset').click();
+    await expect(page.getByTestId('m17-badge-call')).toContainText('call-guide.md');
+    expect(await prisma.interregAnalysis.count({ where: { tenantId: TENANT } })).toBe(1);
   });
 
   test('keyboard: Tab skips the hidden input, Enter opens the chooser; a wrong type is refused', async ({
