@@ -12,7 +12,8 @@ BEGIN
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','Consent',
-    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage'
+    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage',
+    'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -75,7 +76,8 @@ AS $fn$ SELECT count(*)::int FROM "LifetimeLicence" $fn$;
 
 COMMENT ON FUNCTION public.lifetime_licence_count() IS 'Cross-tenant count for the public scarcity badge. Returns a number only — never a row.';
 
--- Platform tables (Plan, PlanVersion, PlanFeature): readable by anyone, never
+-- Platform tables (Plan, PlanVersion, PlanFeature; M17's assessment grids
+-- InterregRubric, InterregRubricCriterion — FO-186): readable by anyone, never
 -- writable through a tenant connection. A policy names exactly one command, and
 -- an INSERT policy is expressed with WITH CHECK rather than USING, so the three
 -- write commands need three policies. Platform writes run as the owning role
@@ -83,7 +85,7 @@ COMMENT ON FUNCTION public.lifetime_licence_count() IS 'Cross-tenant count for t
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['Plan','PlanVersion','PlanFeature'] LOOP
+  FOREACH t IN ARRAY ARRAY['Plan','PlanVersion','PlanFeature','InterregRubric','InterregRubricCriterion'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS platform_read ON %I', t);
     EXECUTE format('DROP POLICY IF EXISTS platform_write ON %I', t);

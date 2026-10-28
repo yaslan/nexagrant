@@ -180,7 +180,7 @@ describe('modules page — catalogue-driven card details', () => {
     renderModules(pro);
     expect(screen.getByTestId('category-summary-core').textContent).toContain(M.category.core);
     expect(screen.getByTestId('category-summary-core').textContent).toMatch(/2\s*\/ 8/);
-    expect(screen.getByTestId('category-summary-ai').textContent).toMatch(/0\s*\/ 3/);
+    expect(screen.getByTestId('category-summary-ai').textContent).toMatch(/0\s*\/ 4/);
     expect(screen.getByTestId('pipeline-coverage').textContent).toMatch(/\d\/5 aşama/);
     expect(screen.queryByText(/Kapsam Oranı/)).toBeNull();
   });
@@ -203,6 +203,7 @@ describe('modules page — catalogue-driven card details', () => {
       'module-card-M6',
       'module-card-M8',
       'module-card-M14',
+      'module-card-M17',
     ]);
   });
 });

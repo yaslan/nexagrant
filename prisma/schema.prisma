@@ -51,6 +51,7 @@ model Tenant {
   stripeEvents  StripeEventLog[]
   notifications Notification[]
   partnerSearchQuota PartnerSearchQuotaUsage[]
+  interregAnalyses InterregAnalysis[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -132,6 +133,7 @@ model User {
   reviewerSeats Reviewer[]
   requestedApprovals ApprovalRequest[] @relation("Requester")
   approvedApprovals  ApprovalRequest[] @relation("Approver")
+  interregAnalyses   InterregAnalysis[]
   @@index([deletionRequestedAt])
   @@index([deletedAt])
 }
@@ -2017,4 +2019,188 @@ model Consent {
   @@index([tenantId, userId, purpose])
   @@index([tenantId, purpose, documentVersion])
   @@index([userId, grantedAt])
+}
+
+// ───────────────────────── M17 Interreg pre-assessment ─────────────────────────
+//
+// FO-186 (TASK-MVRIV9LCDHYKO). One analysis = one call guide + one project file,
+// uploaded by a user and extracted to text on the server. The uploaded bytes are
+// never stored: only the extracted text, and only until `textExpiresAt`
+// (30 days, owner decision in FO-185). Output is an *internal* pre-assessment,
+// never an official score (CLAUDE.md "Yapma"). Migration: add-interreg-review.sql.
+//
+// The rubric is data, not code (FO-187): InterregRubric + InterregRubricCriterion
+// are platform reference tables (no tenant, read-only for the app role — the
+// platform_read block of prisma/rls.sql), written by prisma/seed-interreg-rubrics.ts
+// from the programme's published assessment grid. Another programme or call is a
+// new InterregRubric row, never a code change. A rubric row is referenced by
+// analyses and marks, so its numbers are not edited in place: a revised grid is a
+// new `id` (e.g. `…call3.regular`).
+
+enum InterregAnalysisStatus {
+  UPLOADING // created; neither document extracted yet (or only the project file)
+  EXTRACTING // reserved for an asynchronous extractor; the F1 route extracts in-request
+  CALL_READY // call guide extracted, project file missing
+  READY // both extracted — the UI enables "check the project"
+  ANALYZING // F2: the LLM run is in progress
+  DONE // F2: InterregAnalysisResult written
+  FAILED // F2: the LLM run failed; documents are kept
+}
+
+enum InterregDocFormat {
+  PDF
+  DOCX
+  MD
+  TXT
+}
+
+/// One assessment grid of one programme call and project type, e.g.
+/// `interreg-next-bsb.call2.regular` (Annex 7 Quality Assessment Grid).
+model InterregRubric {
+  /// Stable, versioned key: `<programme>.<call>.<project type>`.
+  id                String   @id
+  /// Programme key, e.g. `interreg-next-bsb`; groups the profiles a user picks from.
+  programme         String
+  /// Display label; carries "internal pre-assessment — not an official score".
+  label             String
+  /// The profile used when a new analysis names none (at most one per programme, by convention).
+  isDefault         Boolean  @default(false)
+  /// Marks a criterion may take, e.g. [1, 1.5, 2, …, 4] (half points, no 0).
+  allowedMarks      Json
+  /// Sum of the criteria's `maxMark` (56 for 14 × 4); checked against them by the seed.
+  maxRaw            Decimal  @db.Decimal(6, 1)
+  /// Total below which the programme rejects (37 of 56); `null` = no total threshold.
+  passRaw           Decimal? @db.Decimal(6, 1)
+  /// Interreg funding range, minor units (cent) + currency (CLAUDE.md §9).
+  budgetMinMinor    Int?
+  budgetMaxMinor    Int?
+  currency          String?
+  maxDurationMonths Int?
+  /// Where the grid comes from: documents, URL, what could not be verified.
+  source            Json
+  /// Ordered tie-break keys (`section:<key>` | `criterion:<key>`).
+  tieBreak          Json     @default("[]")
+  /// Programme rules outside the grid (indicators, partnership, budget, duration).
+  programChecks     Json     @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  criteria InterregRubricCriterion[]
+  analyses InterregAnalysis[]
+
+  @@index([programme])
+}
+
+model InterregRubricCriterion {
+  id                  String   @id @default(cuid())
+  rubricId            String
+  /// Stable key within the rubric, e.g. `relevance_so_fit`.
+  criterionKey        String
+  /// The programme's own number, e.g. `1.1`.
+  officialRef         String
+  section             String
+  /// `strategic` | `operational` (Annex 7 parts I/II).
+  group               String
+  name                String
+  position            Int
+  maxMark             Decimal  @db.Decimal(4, 1)
+  /// A mark below this rejects the application whatever the total (1.1, 1.2, 5.1 < 3).
+  knockoutBelow       Decimal? @db.Decimal(4, 1)
+  subQuestions        Json     @default("[]")
+  /// Application form sections the evidence is read from.
+  afSections          Json     @default("[]")
+  evidenceExpectation String?  @db.Text
+
+  rubric InterregRubric          @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  marks  InterregCriterionMark[]
+
+  @@unique([rubricId, criterionKey])
+  @@index([rubricId, position])
+}
+
+model InterregAnalysis {
+  id       String                 @id @default(cuid())
+  tenantId String
+  userId   String
+  /// The grid this analysis is assessed against, chosen at creation.
+  rubricId String
+  status   InterregAnalysisStatus @default(UPLOADING)
+
+  callFileName    String?
+  callFormat      InterregDocFormat?
+  callPages       Int? // PDF only
+  callChars       Int?
+  callText        String?            @db.Text
+  callExtractedAt DateTime?
+
+  projectFileName    String?
+  projectFormat      InterregDocFormat?
+  projectPages       Int?
+  projectChars       Int?
+  projectText        String?            @db.Text
+  projectExtractedAt DateTime?
+
+  /// Extracted text is purged after this instant (30 days from the last upload).
+  /// The purge job is F3 (se-fb); the column is set from the first upload on.
+  textExpiresAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rubric InterregRubric          @relation(fields: [rubricId], references: [id], onDelete: Restrict)
+  result InterregAnalysisResult?
+  marks  InterregCriterionMark[]
+
+  @@index([tenantId, userId, createdAt])
+  @@index([textExpiresAt])
+  @@index([rubricId])
+}
+
+/// The F2 LLM output for one analysis: at most one row, replaced on re-run.
+/// Scores are on the rubric's own scale (`rawScore` of `maxRaw`) plus the
+/// proportional 0..100 view (FO-187 §5.1) — an internal estimate, never official.
+model InterregAnalysisResult {
+  id               String   @id @default(cuid())
+  tenantId         String
+  analysisId       String   @unique
+  rawScore         Decimal  @db.Decimal(6, 1)
+  score100         Decimal  @db.Decimal(4, 1)
+  /// `rawScore` ≥ rubric `passRaw` and no knockout criterion below its floor.
+  passesThresholds Boolean
+  /// criterionKeys whose mark fell below `knockoutBelow`.
+  knockouts        Json     @default("[]")
+  reportMarkdown   String   @db.Text
+  redFlags         Json     @default("[]")
+  improvements     Json     @default("[]")
+  rewriteSample    Json     @default("{}")
+  model            String
+  promptHash       String
+  createdAt        DateTime @default(now())
+
+  analysis InterregAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+/// One rubric criterion's mark for an analysis (F2), on the rubric's scale
+/// (one of `allowedMarks`), with the strengths and weaknesses behind it.
+model InterregCriterionMark {
+  id              String   @id @default(cuid())
+  tenantId        String
+  analysisId      String
+  criterionId     String
+  mark            Decimal  @db.Decimal(4, 1)
+  strengths       Json     @default("[]")
+  weaknesses      Json     @default("[]")
+  evidenceQuote   String?  @db.Text
+  evidenceLocator String?
+  createdAt       DateTime @default(now())
+
+  analysis  InterregAnalysis        @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  criterion InterregRubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+
+  @@unique([analysisId, criterionId])
+  @@index([tenantId])
+  @@index([criterionId])
 }

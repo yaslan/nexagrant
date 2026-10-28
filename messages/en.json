@@ -4030,6 +4030,10 @@
       "name": "Post-Award Management",
       "tagline": "Reporting, effort tracking and deliverables after a grant is signed."
     },
+    "interreg-review": {
+      "name": "Interreg Pre-Assessment",
+      "tagline": "Run your project file through an internal pre-assessment against the call guide — an estimated score, not an official one."
+    },
     "tr-layer": {
       "name": "Turkish National Layer",
       "tagline": "Turkish national programmes such as TÜBİTAK and KOSGEB, alongside the EU pipeline."
@@ -4413,5 +4417,32 @@
   "moduleCount": {
     "summary": "{active, plural, one {# live module} other {# live modules}}{soon, plural, =0 {} other { + # coming soon}}",
     "badge": "{active} live{soon, plural, =0 {} other { + # soon}}"
+  },
+  "InterregReview": {
+    "assessmentNotice": "Internal pre-assessment — not an official score.",
+    "errors": {
+      "unauthorized": "Your session is not linked to a workspace. Please sign in again.",
+      "module_unavailable": "The Interreg Pre-Assessment module is not enabled in this workspace.",
+      "forbidden_role": "This action needs the writer role or above.",
+      "pilot_expired": "The free pilot has ended; the workspace is read-only.",
+      "not_found": "Analysis not found.",
+      "bad_form": "The upload could not be read.",
+      "no_file": "Choose a file.",
+      "bad_kind": "Say whether the file is the call guide or the project file.",
+      "bad_file_name": "The file name is not valid.",
+      "too_large": "The file is too large (20 MB at most).",
+      "unsupported_type": "Unsupported file type. Upload a PDF, DOCX, MD or TXT file.",
+      "type_mismatch": "The file's content does not match its extension.",
+      "bad_encoding": "The text file is not UTF-8 or contains binary data.",
+      "malformed": "The file could not be read; it is damaged or in an unsupported structure.",
+      "no_text": "The file has no readable text (it may be a scan).",
+      "too_long": "The document is too long (400,000 characters at most).",
+      "too_many_pages": "The PDF has too many pages.",
+      "parse_too_heavy": "The PDF is too heavy to process; simplify it and try again.",
+      "analysis_busy": "The analysis is running; you can upload again when it finishes.",
+      "bad_rubric": "That assessment grid does not exist.",
+      "rubric_unavailable": "No assessment grid is set up yet; please contact support.",
+      "upload_failed": "Something went wrong during the upload. Please try again."
+    }
   }
 }

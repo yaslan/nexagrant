@@ -24,11 +24,12 @@ import { moduleGate } from '@/lib/modules/guard';
 import { getAllManifests } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
 
-const SOON: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'];
+// M17 (FO-186): Interreg pre-assessment, `soon` until its page and credit price ship.
+const SOON: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
 const admin = { role: 'TENANT_OWNER', isPlatformAdmin: true };
 
 describe('decideModuleAccess — Yakında modules', () => {
-  it('lists exactly the six FO-40 modules as soon', () => {
+  it('lists exactly the six FO-40 modules and M17 as soon', () => {
     expect(getAllManifests().filter((m) => m.statusBadge === 'soon').map((m) => m.id).sort()).toEqual(
       [...SOON].sort(),
     );

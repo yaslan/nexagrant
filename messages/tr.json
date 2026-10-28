@@ -4030,6 +4030,10 @@
       "name": "Sözleşme Sonrası Yönetim",
       "tagline": "Hibe imzalandıktan sonra raporlama, efor takibi ve teslimatlar."
     },
+    "interreg-review": {
+      "name": "Interreg Ön Değerlendirme",
+      "tagline": "Proje dosyanızı çağrı rehberine göre iç ön değerlendirmeden geçirin — tahmini puan, resmî puan değildir."
+    },
     "tr-layer": {
       "name": "Türkiye Ulusal Katmanı",
       "tagline": "AB hattının yanında TÜBİTAK, KOSGEB gibi ulusal programlar."
@@ -4413,5 +4417,32 @@
   "moduleCount": {
     "summary": "{active} aktif modül{soon, plural, =0 {} other { + # yakında}}",
     "badge": "{active} aktif{soon, plural, =0 {} other { + # yakında}}"
+  },
+  "InterregReview": {
+    "assessmentNotice": "İç ön değerlendirme — resmî puan değildir.",
+    "errors": {
+      "unauthorized": "Oturumunuz bir çalışma alanına bağlı değil. Lütfen tekrar giriş yapın.",
+      "module_unavailable": "Interreg Ön Değerlendirme modülü bu çalışma alanında açık değil.",
+      "forbidden_role": "Bu işlem için yazar ya da üstü bir rol gerekir.",
+      "pilot_expired": "Ücretsiz pilot süresi doldu; çalışma alanı salt-okunur.",
+      "not_found": "Analiz bulunamadı.",
+      "bad_form": "Dosya yüklenemedi; form okunamadı.",
+      "no_file": "Bir dosya seçin.",
+      "bad_kind": "Dosyanın çağrı rehberi mi proje dosyası mı olduğu belirtilmedi.",
+      "bad_file_name": "Dosya adı geçersiz.",
+      "too_large": "Dosya çok büyük (en fazla 20 MB).",
+      "unsupported_type": "Desteklenmeyen dosya türü. PDF, DOCX, MD veya TXT yükleyin.",
+      "type_mismatch": "Dosyanın içeriği uzantısıyla uyuşmuyor.",
+      "bad_encoding": "Metin dosyası UTF-8 değil ya da ikili veri içeriyor.",
+      "malformed": "Dosya okunamadı; bozuk ya da desteklenmeyen bir yapıda.",
+      "no_text": "Dosyada okunabilir metin yok (taranmış bir belge olabilir).",
+      "too_long": "Belge çok uzun (en fazla 400.000 karakter).",
+      "too_many_pages": "PDF'te çok fazla sayfa var.",
+      "parse_too_heavy": "PDF işlenemeyecek kadar ağır; sadeleştirip yeniden deneyin.",
+      "analysis_busy": "Analiz şu anda çalışıyor; bitince yeniden yükleyebilirsiniz.",
+      "bad_rubric": "Bu değerlendirme tablosu bulunamadı.",
+      "rubric_unavailable": "Henüz tanımlı bir değerlendirme tablosu yok; lütfen destekle iletişime geçin.",
+      "upload_failed": "Yükleme sırasında beklenmeyen bir hata oluştu. Lütfen tekrar deneyin."
+    }
   }
 }
