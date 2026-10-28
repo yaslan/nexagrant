@@ -18,7 +18,11 @@ import {
  * stored rows of all three old scales from their breakdown.
  */
 
-vi.mock('@/lib/env', () => ({ consortiumLiveDemandWeight: undefined }));
+// Keep the real env module (db.ts reads `env.DATABASE_URL` at import time); only pin the weight.
+vi.mock('@/lib/env', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/env')>()),
+  consortiumLiveDemandWeight: undefined,
+}));
 
 const weights = consortiumWeights();
 
