@@ -20,6 +20,7 @@ import seedGateDecisions from './seed-gate-decisions';
 import seedProposals from './seed-proposals';
 import seedEfforts from './seed-efforts';
 import seedE11Feedback from './seed-e11-feedback';
+import seedInterregRubrics from './seed-interreg-rubrics';
 
 // Module catalog — also used to derive the demo tenant's ModuleState rows.
 const modules = [
@@ -386,6 +387,9 @@ async function main() {
       await prisma.conceptTemplate.create({ data: t });
     }
   }
+
+  // 6. M17 assessment grids (FO-186) — platform reference data, prisma/seed-data/interreg-rubrics.ts.
+  await seedInterregRubrics();
 
   // E10 Seed Data
   await seedTenantWorkspace();

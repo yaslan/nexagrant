@@ -68,7 +68,12 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
  * platform block in prisma/rls.sql (platform_read + platform_no_*). Their RLS is
  * on on purpose. tests/rls-coverage.test.ts pins this set to that block.
  */
-export const PLATFORM_POLICY: ReadonlySet<string> = new Set(['Plan', 'PlanVersion', 'PlanFeature']);
+export const PLATFORM_POLICY: ReadonlySet<string> = new Set([
+  'Plan', 'PlanVersion', 'PlanFeature',
+  // FO-186: M17's assessment grids (Annex 7 as data). Reference rows written by
+  // prisma/seed-interreg-rubrics.ts as owner; the app role only reads them.
+  'InterregRubric', 'InterregRubricCriterion',
+]);
 
 /**
  * SYSTEM_WIDE tables whose RLS is ON with one policy: `system_scope` alone, no

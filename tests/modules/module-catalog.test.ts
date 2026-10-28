@@ -184,7 +184,7 @@ describe("manifest catalogue fields", () => {
         .filter((m) => m.category === c)
         .map((m) => m.id);
     expect(byCat("core")).toEqual(["M0", "M1", "M2", "M3", "M4", "M5", "M13", "M16"]);
-    expect(byCat("ai")).toEqual(["M6", "M8", "M14"]);
+    expect(byCat("ai")).toEqual(["M6", "M8", "M14", "M17"]);
     expect(byCat("tools")).toEqual(["M7", "M9", "M10", "M11", "M12", "M15"]);
   });
 
@@ -233,7 +233,7 @@ describe("pipelineCoverage / categorySummary", () => {
   it("gives active/total per category", () => {
     expect(categorySummary(["M1", "M6", "M11"])).toEqual({
       core: { active: 1, total: 8 },
-      ai: { active: 1, total: 3 },
+      ai: { active: 1, total: 4 },
       tools: { active: 1, total: 6 },
     });
   });
@@ -259,7 +259,7 @@ describe("navFeatureModule", () => {
 describe("Yakında modules and programme templates", () => {
   it("declares the six new manifests with the agreed categories, dependencies and badge", () => {
     const byId = Object.fromEntries(getAllManifests().map((m) => [m.id, m]));
-    expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16"]);
+    expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16", "M17"]);
     expect(byId.M13?.requires).toEqual(["M5"]);
     expect(byId.M13?.recommends).toEqual(["M11"]);
     expect(byId.M14?.requires).toEqual(["M11"]);
@@ -267,6 +267,8 @@ describe("Yakında modules and programme templates", () => {
     expect(byId.M0?.requires).toEqual([]);
     expect(byId.M12?.requires).toEqual([]);
     expect(byId.M16?.requires).toEqual([]);
+    expect(byId.M17?.requires).toEqual([]);
+    expect(byId.M17?.category).toBe("ai");
   });
 
   it("M11 recommends M13 and the application/concept modules ship the programme templates", () => {

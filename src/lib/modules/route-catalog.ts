@@ -27,6 +27,7 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'modules/call-fit',
   'modules/compliance',
   'modules/expert-pool',
+  'modules/interreg-review',
   'modules/post-award',
   'modules/tr-layer',
   'notifications',

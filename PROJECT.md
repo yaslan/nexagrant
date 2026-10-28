@@ -21,7 +21,7 @@ Dil: arayüz **Türkçe (varsayılan) ve İngilizce**; kod, tablo/alan adları v
 
 **MVP sonrası (v1.1–v1.3):** M6 Evaluator Lens, M9 Meeting Briefs, M10 Follow-up Documents, M11 Full Application Production, M7 TTO Accelerator, API lisansı. (Pazar yeri kaldırıldı — ADR-0005.)
 
-**Hedef olmayanlar:** Funding & Tenders portalına otomatik gönderim (yasak/desteklenmiyor — kullanıcı portalda kendisi gönderir); proje yürütme/muhasebe (EMDESK alanı; entegrasyon olarak düşünülür); hakemlik otomasyonu (YZ yalnızca iç ön değerlendirme; Komisyon kuralı).
+**Hedef olmayanlar:** Funding & Tenders portalına otomatik gönderim (yasak/desteklenmiyor — kullanıcı portalda kendisi gönderir); proje yürütme/muhasebe (EMDESK alanı; entegrasyon olarak düşünülür); hakemlik otomasyonu (YZ yalnızca iç ön değerlendirme; Komisyon kuralı). M17 Interreg Ön Değerlendirme (kartlarda "M15" diye geçen modül; M15 Post-Award'a ait olduğu için M17) yalnız iç ön değerlendirme/tahmini skor üretir; resmî hakemlik değildir.
 
 ## 2. Kullanıcı rolleri
 
@@ -65,6 +65,7 @@ Durumlar: `off → dev → pilot → on`. Yalnızca `on` kullanıcı menüsünde
 | M9 | Meeting Briefs | M1, M4 | — | İşletme | v1.1 |
 | M10 | Follow-up Documents | M4 | M9 | İşletme | v1.2 |
 | M11 | Full Application Production | M2, M3, M5, M8 | — | İşletme / eklenti €149 | v1.2 |
+| M17 | Interreg Ön Değerlendirme (iç ön değerlendirme — resmî puan değildir) | — | — | Pro ve üstü | F1 iskelet (FO-186) |
 
 Her modülün işlevsel spesifikasyonu `docs/MODULES.md`'de; her modül `src/modules/<id>/` altında `manifest.ts` ile tanımlanır (`docs/ARCHITECTURE.md §3`).
 
