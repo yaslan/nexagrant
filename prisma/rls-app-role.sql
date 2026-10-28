@@ -83,6 +83,15 @@ BEGIN
   IF to_regclass('public."PlatformSetting"') IS NOT NULL THEN
     EXECUTE format('REVOKE INSERT, UPDATE, DELETE ON "PlatformSetting" FROM %I', app_role);
   END IF;
+  -- 3c. The M17 rubric tables are platform reference data, written only by the seed
+  --     as owner (FO-186, se-fb D3). The platform_no_* policies refuse a write too;
+  --     this takes the privilege away so the refusal does not rest on policy alone.
+  IF to_regclass('public."InterregRubric"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "InterregRubric" FROM %I', app_role);
+  END IF;
+  IF to_regclass('public."InterregRubricCriterion"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "InterregRubricCriterion" FROM %I', app_role);
+  END IF;
 
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as fabrika (or fabrika_migrate); default privileges are recorded per

@@ -99,6 +99,16 @@ BEGIN
   END LOOP;
 END $$;
 
+-- The M17 rubric tables are not writable through fabrika_app at the privilege level
+-- either (FO-186, se-fb D3): db:rls-role grants DML on every table, so this is
+-- repeated on each run. Plan* keep their grants (out of scope here).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+    REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public."InterregRubric", public."InterregRubricCriterion" FROM fabrika_app;
+  END IF;
+END $$;
+
 -- Policy-less platform tables (TASK-MUWDA86A7U4LK): no tenantId, no policy, RLS
 -- off, on purpose — policylessSystemWide() in scripts/rls-models.ts, which
 -- tests/rls-coverage.test.ts pins this list to. Supabase's `ensure_rls` event

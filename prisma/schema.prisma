@@ -2114,6 +2114,8 @@ model InterregRubricCriterion {
   rubric InterregRubric          @relation(fields: [rubricId], references: [id], onDelete: Cascade)
   marks  InterregCriterionMark[]
 
+  /// Target of InterregCriterionMark's (criterionId, rubricId) FK.
+  @@unique([id, rubricId])
   @@unique([rubricId, criterionKey])
   @@index([rubricId, position])
 }
@@ -2152,6 +2154,10 @@ model InterregAnalysis {
   result InterregAnalysisResult?
   marks  InterregCriterionMark[]
 
+  /// Targets of the composite FKs below (se-fb D1 / crw2 Ö5): a result or mark can
+  /// only point at an analysis of its own tenant, and a mark only at that analysis's rubric.
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, rubricId])
   @@index([tenantId, userId, createdAt])
   @@index([textExpiresAt])
   @@index([rubricId])
@@ -2178,8 +2184,10 @@ model InterregAnalysisResult {
   promptHash       String
   createdAt        DateTime @default(now())
 
-  analysis InterregAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  /// (analysisId, tenantId): the database refuses a result filed under another tenant's analysis.
+  analysis InterregAnalysis @relation(fields: [analysisId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
+  @@unique([analysisId, tenantId])
   @@index([tenantId])
 }
 
@@ -2189,6 +2197,8 @@ model InterregCriterionMark {
   id              String   @id @default(cuid())
   tenantId        String
   analysisId      String
+  /// Copy of the analysis's rubricId, so the two FKs below can tie the criterion to it.
+  rubricId        String
   criterionId     String
   mark            Decimal  @db.Decimal(4, 1)
   strengths       Json     @default("[]")
@@ -2197,8 +2207,9 @@ model InterregCriterionMark {
   evidenceLocator String?
   createdAt       DateTime @default(now())
 
-  analysis  InterregAnalysis        @relation(fields: [analysisId], references: [id], onDelete: Cascade)
-  criterion InterregRubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+  /// Same tenant and same rubric as the analysis; the criterion must belong to that rubric.
+  analysis  InterregAnalysis        @relation(fields: [analysisId, tenantId, rubricId], references: [id, tenantId, rubricId], onDelete: Cascade)
+  criterion InterregRubricCriterion @relation(fields: [criterionId, rubricId], references: [id, rubricId], onDelete: Restrict)
 
   @@unique([analysisId, criterionId])
   @@index([tenantId])

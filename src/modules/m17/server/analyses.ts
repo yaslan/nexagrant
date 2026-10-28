@@ -222,7 +222,11 @@ export async function saveDocument(
       return { ok: false, error: 'not_found' } as const;
     }
 
-    // Same rule as statusAfterUpload(), evaluated on the locked row.
+    // The one copy of the status rule (crw2 Ö1), read on the row as it is after
+    // both slots' writes:
+    //   neither document → UPLOADING · call guide only → CALL_READY
+    //   both → READY (the "check the project" button opens)
+    //   project file only → UPLOADING (the call guide is still missing)
     await tx.$executeRaw`
       UPDATE "InterregAnalysis"
          SET "status" = (CASE

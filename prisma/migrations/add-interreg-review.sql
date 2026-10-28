@@ -15,6 +15,20 @@
 --     tenant: the platform_read block of prisma/rls.sql (readable by all, no write
 --     through fabrika_app). Rows come from prisma/seed-interreg-rubrics.ts, not here.
 --
+-- Integrity (se-fb D1, crw2 Ö5): RLS checks a row's own tenantId, but a foreign key
+-- check does not go through RLS, so a single-column FK would let a tenant file a mark
+-- under another tenant's analysis id, or mark a criterion of another rubric. Composite
+-- FKs close both in the database: result (analysisId, tenantId) → analysis (id,
+-- tenantId); mark (analysisId, tenantId, rubricId) → analysis (id, tenantId, rubricId)
+-- and mark (criterionId, rubricId) → criterion (id, rubricId). The mark carries a copy
+-- of the analysis's rubricId for that. A database that ran the first version of this
+-- file (single-column FKs, no mark.rubricId) is upgraded in place: column added and
+-- backfilled from the analysis, old FKs dropped by name, new ones added.
+--
+-- Grants (se-fb D3): the rubric tables are SELECT-only for fabrika_app at the table
+-- level too, not just by policy — rls-app-role.sql grants DML on all tables, so the
+-- REVOKE is repeated there and in prisma/rls.sql.
+--
 -- Deletion: InterregAnalysis cascades from Tenant and from User (a user's erasure
 -- removes their uploads); the two child tables cascade from InterregAnalysis. A rubric
 -- or criterion still referenced by an analysis or a mark cannot be deleted (RESTRICT).
@@ -129,6 +143,7 @@ CREATE TABLE IF NOT EXISTS "InterregCriterionMark" (
   "id"              TEXT NOT NULL,
   "tenantId"        TEXT NOT NULL,
   "analysisId"      TEXT NOT NULL,
+  "rubricId"        TEXT NOT NULL,
   "criterionId"     TEXT NOT NULL,
   "mark"            DECIMAL(4,1) NOT NULL,
   "strengths"       JSONB NOT NULL DEFAULT '[]',
@@ -141,6 +156,23 @@ CREATE TABLE IF NOT EXISTS "InterregCriterionMark" (
 CREATE UNIQUE INDEX IF NOT EXISTS "InterregCriterionMark_analysisId_criterionId_key" ON "InterregCriterionMark"("analysisId", "criterionId");
 CREATE INDEX IF NOT EXISTS "InterregCriterionMark_tenantId_idx" ON "InterregCriterionMark"("tenantId");
 CREATE INDEX IF NOT EXISTS "InterregCriterionMark_criterionId_idx" ON "InterregCriterionMark"("criterionId");
+
+-- Upgrade of a database that ran the first version of this file: mark.rubricId.
+ALTER TABLE "InterregCriterionMark" ADD COLUMN IF NOT EXISTS "rubricId" TEXT;
+UPDATE "InterregCriterionMark" m SET "rubricId" = a."rubricId"
+  FROM "InterregAnalysis" a WHERE a."id" = m."analysisId" AND m."rubricId" IS NULL;
+ALTER TABLE "InterregCriterionMark" ALTER COLUMN "rubricId" SET NOT NULL;
+
+-- Targets of the composite FKs (a FK needs a unique constraint on exactly its columns).
+CREATE UNIQUE INDEX IF NOT EXISTS "InterregAnalysis_id_tenantId_key" ON "InterregAnalysis"("id", "tenantId");
+CREATE UNIQUE INDEX IF NOT EXISTS "InterregAnalysis_id_tenantId_rubricId_key" ON "InterregAnalysis"("id", "tenantId", "rubricId");
+CREATE UNIQUE INDEX IF NOT EXISTS "InterregRubricCriterion_id_rubricId_key" ON "InterregRubricCriterion"("id", "rubricId");
+CREATE UNIQUE INDEX IF NOT EXISTS "InterregAnalysisResult_analysisId_tenantId_key" ON "InterregAnalysisResult"("analysisId", "tenantId");
+
+-- The single-column FKs of the first version, replaced by the composite ones below.
+ALTER TABLE "InterregCriterionMark" DROP CONSTRAINT IF EXISTS "InterregCriterionMark_criterionId_fkey";
+ALTER TABLE "InterregCriterionMark" DROP CONSTRAINT IF EXISTS "InterregCriterionMark_analysisId_fkey";
+ALTER TABLE "InterregAnalysisResult" DROP CONSTRAINT IF EXISTS "InterregAnalysisResult_analysisId_fkey";
 
 DO $$
 BEGIN
@@ -156,10 +188,10 @@ BEGIN
       FOREIGN KEY ("rubricId") REFERENCES "InterregRubric"("id")
       ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterregCriterionMark_criterionId_fkey') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterregCriterionMark_criterionId_rubricId_fkey') THEN
     ALTER TABLE "InterregCriterionMark"
-      ADD CONSTRAINT "InterregCriterionMark_criterionId_fkey"
-      FOREIGN KEY ("criterionId") REFERENCES "InterregRubricCriterion"("id")
+      ADD CONSTRAINT "InterregCriterionMark_criterionId_rubricId_fkey"
+      FOREIGN KEY ("criterionId", "rubricId") REFERENCES "InterregRubricCriterion"("id", "rubricId")
       ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterregAnalysis_tenantId_fkey') THEN
@@ -174,16 +206,16 @@ BEGIN
       FOREIGN KEY ("userId") REFERENCES "User"("id")
       ON DELETE CASCADE ON UPDATE CASCADE;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterregAnalysisResult_analysisId_fkey') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterregAnalysisResult_analysisId_tenantId_fkey') THEN
     ALTER TABLE "InterregAnalysisResult"
-      ADD CONSTRAINT "InterregAnalysisResult_analysisId_fkey"
-      FOREIGN KEY ("analysisId") REFERENCES "InterregAnalysis"("id")
+      ADD CONSTRAINT "InterregAnalysisResult_analysisId_tenantId_fkey"
+      FOREIGN KEY ("analysisId", "tenantId") REFERENCES "InterregAnalysis"("id", "tenantId")
       ON DELETE CASCADE ON UPDATE CASCADE;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterregCriterionMark_analysisId_fkey') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'InterregCriterionMark_analysisId_tenantId_rubricId_fkey') THEN
     ALTER TABLE "InterregCriterionMark"
-      ADD CONSTRAINT "InterregCriterionMark_analysisId_fkey"
-      FOREIGN KEY ("analysisId") REFERENCES "InterregAnalysis"("id")
+      ADD CONSTRAINT "InterregCriterionMark_analysisId_tenantId_rubricId_fkey"
+      FOREIGN KEY ("analysisId", "tenantId", "rubricId") REFERENCES "InterregAnalysis"("id", "tenantId", "rubricId")
       ON DELETE CASCADE ON UPDATE CASCADE;
   END IF;
 END $$;
@@ -230,5 +262,7 @@ BEGIN
       "InterregAnalysis", "InterregAnalysisResult", "InterregCriterionMark"
     TO fabrika_app;
     GRANT SELECT ON "InterregRubric", "InterregRubricCriterion" TO fabrika_app;
+    -- Default privileges may have granted DML when the tables were created (se-fb D3).
+    REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "InterregRubric", "InterregRubricCriterion" FROM fabrika_app;
   END IF;
 END $$;
