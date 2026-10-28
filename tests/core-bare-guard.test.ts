@@ -14,7 +14,7 @@ import { gitEnvFor } from '../scripts/tenant-bypass-scan';
  */
 
 const ROOT = resolve('.');
-const COPIED = ['githooks/pre-commit', 'githooks/pre-push', 'scripts/git-core-bare.sh', 'scripts/db-target.sh'];
+const COPIED = ['githooks/pre-commit', 'githooks/pre-push', 'scripts/git-core-bare.sh', 'scripts/db-target.sh', 'scripts/db-loopback-check.mjs'];
 const dirs: string[] = [];
 
 afterEach(() => {
