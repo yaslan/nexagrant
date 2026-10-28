@@ -72,6 +72,7 @@ E2E postası: `playwright.config.ts` e2e sunucusuna `SMTP_HOST=localhost`, `SMTP
 ## Yapma
 - F&T Portal'a otomatik gönderim ya da portal oturumu taklidi.
 - Evaluator Lens çıktısını "resmî puan" gibi sunma; her yerde "iç ön değerlendirme" etiketi.
+- M17 (Interreg ön değerlendirme) çıktısını "hakem raporu" veya "resmî skor" diye adlandırma; yalnızca "iç ön değerlendirme / yazım denetimi" olarak sun, her ekranda etiketle.
 - Başarı primini "uygun maliyet" olarak modelleme (`docs/BILLING.md`).
 - `any`, `// @ts-ignore`, çevre değişkenlerini doğrudan `process.env` ile okuma (`src/lib/env.ts` kullan).
 
