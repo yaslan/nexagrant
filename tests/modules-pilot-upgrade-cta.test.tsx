@@ -23,7 +23,7 @@ import type { ModulesPlanView } from '@/app/[locale]/(app)/[workspace]/settings/
 afterEach(cleanup);
 
 // The pilot's Pro grant: M7, M9, M10 and M11 sit outside it (ultra only).
-const PRO_GRANT = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8'] as ModulesPlanView['entitledModules'];
+const PRO_GRANT = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8', 'M17'] as ModulesPlanView['entitledModules'];
 const LOCKED = ['M7', 'M9', 'M10', 'M11'];
 
 const pilotPlan: ModulesPlanView = {

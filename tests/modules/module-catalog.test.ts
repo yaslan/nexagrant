@@ -259,7 +259,9 @@ describe("navFeatureModule", () => {
 describe("Yakında modules and programme templates", () => {
   it("declares the six new manifests with the agreed categories, dependencies and badge", () => {
     const byId = Object.fromEntries(getAllManifests().map((m) => [m.id, m]));
-    expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16", "M17"]);
+    expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16"]);
+    // M17 opened with its screen (FO-189).
+    expect(byId.M17?.statusBadge).toBe("beta");
     expect(byId.M13?.requires).toEqual(["M5"]);
     expect(byId.M13?.recommends).toEqual(["M11"]);
     expect(byId.M14?.requires).toEqual(["M11"]);

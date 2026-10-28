@@ -24,12 +24,12 @@ import { moduleGate } from '@/lib/modules/guard';
 import { getAllManifests } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
 
-// M17 (FO-186): Interreg pre-assessment, `soon` until its page and credit price ship.
-const SOON: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'];
+// M17 (FO-186) was `soon` too; it opened as `beta` with its screen (FO-189).
+const SOON: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'];
 const admin = { role: 'TENANT_OWNER', isPlatformAdmin: true };
 
 describe('decideModuleAccess — Yakında modules', () => {
-  it('lists exactly the six FO-40 modules and M17 as soon', () => {
+  it('lists exactly the six FO-40 modules as soon', () => {
     expect(getAllManifests().filter((m) => m.statusBadge === 'soon').map((m) => m.id).sort()).toEqual(
       [...SOON].sort(),
     );
@@ -46,6 +46,10 @@ describe('decideModuleAccess — Yakında modules', () => {
   it('leaves a released module to the plan and the switch', () => {
     expect(decideModuleAccess('M3', 'ON', ['M3'], admin).allowed).toBe(true);
     expect(decideModuleAccess('M3', 'ON', [], admin).reason).toBe('PLAN_UPGRADE_REQUIRED');
+    // M17 since FO-189: the plan and the switch decide, as for any released module.
+    expect(decideModuleAccess('M17', 'ON', ['M17'], admin).allowed).toBe(true);
+    expect(decideModuleAccess('M17', 'ON', [], admin).reason).toBe('PLAN_UPGRADE_REQUIRED');
+    expect(decideModuleAccess('M17', 'OFF', ['M17'], admin).reason).toBe('MODULE_OFF');
   });
 });
 

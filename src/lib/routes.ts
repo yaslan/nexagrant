@@ -39,6 +39,7 @@ export type WorkspaceRouteKey =
   | 'conceptNoteDetail'
   | 'approvals'
   | 'tto'
+  | 'interregReview'
   | 'notifications'
   | 'settingsProfile'
   | 'settingsModules'
@@ -140,6 +141,8 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/onay-merkezi` : `/${locale}/${workspace}/approvals`;
     case 'tto':
       return isTr ? `/${locale}/${workspace}/tto-hizlandirici` : `/${locale}/${workspace}/tto`;
+    case 'interregReview':
+      return `/${locale}/${workspace}/modules/interreg-review`;
     case 'notifications':
       return isTr ? `/${locale}/${workspace}/bildirimler` : `/${locale}/${workspace}/notifications`;
     case 'settingsProfile':
