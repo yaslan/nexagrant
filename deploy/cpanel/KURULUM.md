@@ -198,3 +198,5 @@ Kaçan bir saat felaket değildir: worker açılınca kaçan işleri 6 saat (ayl
 | Worker log'u boş | Cron satırı yok ya da yanlış. `worker.sh` izni 755 değil. `.fonbridge-worker.env` yok. Log'da `no node binary` → Cron'a `FB_NODE=/home/fonbridge/nodevenv/fonbridge-app/22/bin/node /bin/bash …` yazın. |
 
 Teknik ayrıntı: paket nasıl üretilir, yeniden üretmek için `deploy/cpanel/build-package.sh <commit> <klasör>` (Docker, linux/amd64).
+
+Paket, gizlilik metni (/privacy) yayına hazır değilse **üretilmez** (FO-180): derleme `pnpm privacy:publish-check` ve `tests/privacy-notice.test.ts`'i paketlenen commit üzerinde koşar; yer tutucu ya da demo değer kaldıkça betik `privacy:publish-check — N blocker(s)` yazıp durur, zip çıkmaz. Çözüm metni doldurmaktır (hukuk + patron), kapıyı atlamak değil. Kapı yalnız `build-package.sh`'da; elle üretilen zip bu kapıdan geçmez.

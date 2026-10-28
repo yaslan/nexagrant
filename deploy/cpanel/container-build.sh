@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euxo pipefail
+echo "SRC_COMMIT ${SRC_COMMIT:?build-package.sh must pass SRC_COMMIT}"
 uname -m; node -v; ldd --version > /tmp/ldd.txt; sed -n 1p /tmp/ldd.txt
 rm -rf /app; mkdir -p /app && tar -x -C /app -f /out/src.tar && cd /app
 corepack enable
@@ -9,6 +10,11 @@ export NEXT_TELEMETRY_DISABLED=1 CI=1
 printf '\nnodeLinker: hoisted\n' >> pnpm-workspace.yaml
 pnpm install --frozen-lockfile
 test ! -L node_modules/next || { echo "node_modules is not flat (node-linker)"; exit 1; }
+# Privacy publish gate (FO-180): the commit being packaged must carry no
+# placeholder or demo value in /privacy. Run on the archived sources, before the
+# build, so a red check costs one install, not a build. Never part of `pnpm gate`.
+pnpm privacy:publish-check
+node_modules/.bin/vitest run tests/privacy-notice.test.ts
 node_modules/.bin/prisma generate
 # R2_PUBLIC_HOST comes from build-package.sh (docker -e); next.config freezes it.
 NODE_ENV=production DEMO_LOGIN_ENABLED=false NEXT_PUBLIC_APP_URL=https://fonbridge.com R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" pnpm build
@@ -19,5 +25,7 @@ node_modules/esbuild/bin/esbuild scripts/jobs-worker.ts --bundle --platform=node
   --external:@prisma/client --external:.prisma/client --external:pg-native --external:sharp --log-level=warning
 echo WORKER_OK
 LINKS=$(find .next/standalone -type l | wc -l); echo "symlinks: $LINKS"
-tar -C /app -cf /out/build-out.tar .next/standalone .next/static public certs worker-out
+echo "$SRC_COMMIT" > /app/BUILD-SRC
+tar -C /app -cf /out/build-out.tar .next/standalone .next/static public certs worker-out BUILD-SRC
+echo "TAR_SHA256 $(sha256sum /out/build-out.tar | cut -d' ' -f1)"
 echo TAR_OK
