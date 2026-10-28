@@ -1,12 +1,12 @@
 /**
- * TASK-MUN80XIW5NPV1 (security scan TASK-MUN66T2HM4A4E O-2) — the anonymous
- * /api/cordis/* routes. `?limit=zz` used to reach Prisma as `take: NaN`, and a
+ * TASK-MUN80XIW5NPV1 (security scan TASK-MUN66T2HM4A4E O-2) — the /api/cordis/*
+ * routes. `?limit=zz` used to reach Prisma as `take: NaN`, and a
  * NUL byte in the id reached Postgres; both 500s quoted the Prisma query back
  * to the caller. Malformed input is now a 400 with no query run, and any 500
  * carries a fixed code.
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const db = vi.hoisted(() => ({
   profileCount: vi.fn(),
@@ -27,6 +27,13 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+// The input and 500 tests below are about what the routes do once a caller is
+// let in, so the caller is let in here. Who may call is pinned in
+// cordis-api-auth.test.ts; the wiring test at the end pins that a refusal stops
+// the route before any query.
+const auth = vi.hoisted(() => ({ check: vi.fn() }));
+vi.mock('@/lib/cordis-api-auth', () => ({ authenticateCordisRequest: auth.check }));
+
 import { GET as getOrganizations } from '@/app/api/cordis/organizations/route';
 import { GET as getProjects } from '@/app/api/cordis/projects/route';
 import { GET as getOrganization } from '@/app/api/cordis/organizations/[id]/route';
@@ -42,6 +49,29 @@ beforeEach(() => {
   db.profileCount.mockResolvedValue(0);
   db.projectCount.mockResolvedValue(0);
   db.orgFindUnique.mockResolvedValue(null);
+  auth.check.mockReset().mockResolvedValue({ authenticated: true });
+});
+
+describe('/api/cordis/* refusal is returned as is, before any query', () => {
+  const refusal = () => ({
+    authenticated: false,
+    errorResponse: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+  });
+
+  test.each([
+    ['projects', () => getProjects(req('/api/cordis/projects')), () => db.projectFindMany],
+    ['organizations', () => getOrganizations(req('/api/cordis/organizations')), () => db.profileFindMany],
+    [
+      'organization profile',
+      () => getOrganization(req('/api/cordis/organizations/123'), { params: Promise.resolve({ id: '123' }) }),
+      () => db.orgFindUnique,
+    ],
+  ])('%s: anonymous caller gets the helper response and no query runs', async (_name, call, query) => {
+    auth.check.mockResolvedValue(refusal());
+    const res = await call();
+    expect(res.status).toBe(401);
+    expect(query()).not.toHaveBeenCalled();
+  });
 });
 
 describe('/api/cordis/* input validation', () => {

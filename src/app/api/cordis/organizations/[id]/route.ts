@@ -8,11 +8,15 @@ import type {
   CordisOrganizationSummary,
   CordisParticipationWithProject,
 } from '@/lib/k2-cordis/rows';
+import { authenticateCordisRequest } from '@/lib/cordis-api-auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authRes = await authenticateCordisRequest(req);
+  if (!authRes.authenticated) return authRes.errorResponse;
+
   try {
     const idParse = cordisOrganisationIdSchema.safeParse((await params).id);
     if (!idParse.success) {
