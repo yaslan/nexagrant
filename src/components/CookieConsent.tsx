@@ -37,6 +37,7 @@ export default function CookieConsent() {
    */
   const [reopened, setReopened] = useState<{ current: 'all' | 'essential' | null } | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
+  const dialog = useRef<HTMLDivElement>(null);
   const firstButton = useRef<HTMLButtonElement>(null);
   const visible = isHydrated && (reopened !== null || (!answered && !dismissed));
   const locale = useLocale();
@@ -51,10 +52,48 @@ export default function CookieConsent() {
     return () => window.removeEventListener(OPEN_COOKIE_PREFERENCES_EVENT, open);
   }, []);
 
-  // Opened on purpose: the keyboard user who pressed the link lands in the banner.
+  /**
+   * FO-183: focus lands on the least-committing answer when the banner opens. On a first
+   * visit it does so only if nothing else holds focus yet (an autofocused field keeps it);
+   * the Tab trap below still brings the keyboard into the banner from there.
+   */
   useEffect(() => {
-    if (reopened) firstButton.current?.focus();
-  }, [reopened]);
+    if (!visible) return;
+    if (reopened || document.activeElement === null || document.activeElement === document.body) {
+      firstButton.current?.focus();
+    }
+  }, [visible, reopened]);
+
+  /**
+   * FO-183: the banner is `aria-modal`, so Tab and Shift+Tab cycle through its own
+   * controls and never reach the page behind the overlay.
+   */
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog.current) return;
+      const focusable = Array.from(
+        dialog.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      const inside = active instanceof Node && dialog.current.contains(active);
+      if (!inside) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [visible]);
 
   const close = () => {
     setDismissed(true);
@@ -64,11 +103,15 @@ export default function CookieConsent() {
     }
   };
 
-  // Only a reopened banner can be left without an answer: one is already stored.
+  /**
+   * Escape closes the banner only when an answer is already stored: it then keeps that
+   * answer. Without one (first visit, even if opened from the link) the banner stays and
+   * waits for a choice, so Escape is ignored rather than half-closing it.
+   */
   useEffect(() => {
     if (!reopened) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || !hasStoredConsent()) return;
       setReopened(null);
       trigger.current?.focus();
     };
@@ -100,6 +143,7 @@ export default function CookieConsent() {
 
   return (
     <div
+      ref={dialog}
       className="fixed inset-0 z-50 bg-black/50"
       role="alertdialog"
       aria-modal="true"

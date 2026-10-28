@@ -21,6 +21,12 @@ const COPY = {
 
 const banner = (page: Page) => page.getByRole('alertdialog');
 const stored = (page: Page, key: string) => page.evaluate((k) => window.localStorage.getItem(k), key);
+/** FO-183: where keyboard focus is — inside the banner, or the page behind it. */
+const focusInBanner = (page: Page) =>
+  page.evaluate(() => {
+    const dialog = document.querySelector('[role="alertdialog"]');
+    return Boolean(dialog && document.activeElement && dialog.contains(document.activeElement));
+  });
 
 for (const locale of ['tr', 'en'] as const) {
   const c = COPY[locale];
@@ -72,6 +78,51 @@ for (const locale of ['tr', 'en'] as const) {
       await banner(page).getByRole('button', { name: c.accept }).click();
       await expect(banner(page)).toBeHidden();
       expect(JSON.parse((await stored(page, CONSENT)) ?? '{}').accepted).toBe(true);
+    });
+    test('FO-183: Tab and Shift+Tab stay in the reopened banner; Escape returns focus to the link', async ({ page }) => {
+      await page.goto(c.privacy);
+      await banner(page).getByRole('button', { name: c.accept }).click();
+      await expect(banner(page)).toBeHidden();
+
+      const link = page.getByRole('main').getByRole('button', { name: c.link });
+      await link.focus();
+      await page.keyboard.press('Enter');
+      await expect(banner(page)).toBeVisible();
+      await expect(banner(page).getByRole('button', { name: c.essential })).toBeFocused();
+
+      // Three controls (privacy link, Essential, Accept): eight presses each way go round twice.
+      for (let i = 0; i < 8; i += 1) {
+        await page.keyboard.press('Tab');
+        expect(await focusInBanner(page), `Tab #${i + 1}`).toBe(true);
+      }
+      for (let i = 0; i < 8; i += 1) {
+        await page.keyboard.press('Shift+Tab');
+        expect(await focusInBanner(page), `Shift+Tab #${i + 1}`).toBe(true);
+      }
+      // The cycle wraps: from the last control, Tab goes to the first.
+      await banner(page).getByRole('button', { name: c.accept }).focus();
+      await page.keyboard.press('Tab');
+      await expect(banner(page).getByRole('link')).toBeFocused();
+
+      await page.keyboard.press('Escape');
+      await expect(banner(page)).toBeHidden();
+      await expect(link).toBeFocused();
+      expect(JSON.parse((await stored(page, CONSENT)) ?? '{}').accepted).toBe(true);
+    });
+
+    test('FO-183: first visit — focus starts in the banner, Tab stays there, Escape does not skip the answer', async ({ page }) => {
+      await page.goto(c.home);
+      await expect(banner(page)).toBeVisible();
+      await expect(banner(page).getByRole('button', { name: c.essential })).toBeFocused();
+      for (let i = 0; i < 5; i += 1) {
+        await page.keyboard.press('Tab');
+        expect(await focusInBanner(page), `Tab #${i + 1}`).toBe(true);
+      }
+      await page.keyboard.press('Escape');
+      await expect(banner(page)).toBeVisible();
+      expect(await stored(page, CONSENT)).toBeNull();
+      await banner(page).getByRole('button', { name: c.essential }).click();
+      await expect(banner(page)).toBeHidden();
     });
   });
 }
