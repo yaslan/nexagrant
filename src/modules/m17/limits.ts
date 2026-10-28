@@ -33,11 +33,34 @@ export const INTERREG_UPLOAD_LIMITS = {
    */
   maxChars: 400_000,
   maxFileNameLength: 255,
-  /** DOCX: a zip; `word/document.xml` may inflate to this much, whatever it claims. */
-  maxDocxXmlBytes: 50 * 1024 * 1024,
+  /** Multipart framing and the `kind` field on top of the file: the body is cut past maxFileBytes + this. */
+  maxFormOverheadBytes: 64 * 1024,
+  /**
+   * DOCX: a zip; `word/document.xml` may inflate to this much, whatever it claims.
+   * Word's markup is ~10–30 bytes per character of text, so 20 MB covers the
+   * 400 000-character cap; it was 50 MB, which let 118 KB inflate into a 49 MB
+   * parse (se-fb B3).
+   */
+  maxDocxXmlBytes: 20 * 1024 * 1024,
   maxDocxEntries: 2_000,
+  /**
+   * DOCX: tables inside tables, and paragraphs inside paragraphs (a text box in a
+   * run), deeper than this are refused as `malformed`. Real documents stay at 2–3;
+   * without a cap ~2.6 M nested tables in 118 KB held 564 MB (se-fb B3).
+   */
+  maxDocxNesting: 10,
   /** Days the extracted text is kept after the last upload (FO-185 decision 3). */
   textRetentionDays: 30,
+} as const;
+
+/**
+ * The arguments of the limit-bearing messages (`too_large` {maxMb}, `too_long`
+ * {maxChars}, crw2 Ö4): the numbers come from the limits above, never from the
+ * message text. Pass to every `t(`errors.${code}`, …)`; unused arguments are ignored.
+ */
+export const INTERREG_ERROR_ARGS = {
+  maxMb: INTERREG_UPLOAD_LIMITS.maxFileBytes / (1024 * 1024),
+  maxChars: INTERREG_UPLOAD_LIMITS.maxChars,
 } as const;
 
 /**

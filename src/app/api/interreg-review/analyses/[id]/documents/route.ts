@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { internalError } from '@/lib/api-error';
+import { readCappedBytes } from '@/lib/read-capped';
 import { isPresentId } from '@/lib/required-id';
 import { INTERREG_DOC_KINDS, INTERREG_UPLOAD_LIMITS } from '@/modules/m17/limits';
 import { getAnalysis, saveDocument } from '@/modules/m17/server/analyses';
@@ -61,22 +62,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!current) return refuse('not_found', 404);
   if (!acceptsUpload(current.status)) return refuse('analysis_busy', 409);
 
+  // The declared length is only a shortcut for an honest client. A chunked body
+  // has none and a lying one can say anything, so the body itself is counted as
+  // it arrives and cut at the first byte past the cap (se-fb B2), before
+  // formData() would buffer all of it.
+  const tooLarge = () => refuse('too_large', 413, { maxBytes: INTERREG_UPLOAD_LIMITS.maxFileBytes });
+  const bodyCap = INTERREG_UPLOAD_LIMITS.maxFileBytes + INTERREG_UPLOAD_LIMITS.maxFormOverheadBytes;
   const declared = Number(req.headers.get('content-length') ?? '0');
-  if (declared > INTERREG_UPLOAD_LIMITS.maxFileBytes + 64 * 1024) {
-    return refuse('too_large', 413, { maxBytes: INTERREG_UPLOAD_LIMITS.maxFileBytes });
-  }
+  if (Number.isFinite(declared) && declared > bodyCap) return tooLarge();
+  const body = await readCappedBytes(req.body, bodyCap);
+  if (body === null) return tooLarge();
 
   let form: FormData;
   try {
-    form = await req.formData();
+    form = await new Response(body, {
+      headers: { 'content-type': req.headers.get('content-type') ?? '' },
+    }).formData();
   } catch {
     return refuse('bad_form', 400);
   }
   const file = form.get('file');
   if (!(file instanceof File) || file.size === 0) return refuse('no_file', 400);
-  if (file.size > INTERREG_UPLOAD_LIMITS.maxFileBytes) {
-    return refuse('too_large', 413, { maxBytes: INTERREG_UPLOAD_LIMITS.maxFileBytes });
-  }
+  if (file.size > INTERREG_UPLOAD_LIMITS.maxFileBytes) return tooLarge();
   const kind = form.get('kind');
   if (typeof kind !== 'string' || !(INTERREG_DOC_KINDS as readonly string[]).includes(kind)) {
     return refuse('bad_kind', 400);

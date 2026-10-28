@@ -33,9 +33,16 @@ export interface ExtractOptions {
   maxChars?: number;
 }
 
-/** Collapse runs of blank lines and trailing spaces; the readers' line structure is kept. */
-function tidy(text: string): string {
+/**
+ * Collapse runs of blank lines and trailing spaces; the readers' line structure is kept.
+ * Also what Postgres `text` or a JSON encoder would choke on (se-fb D2): a DOCX can
+ * carry `&#0;` and a PDF a NUL in its text layer — dropped; a lone UTF-16 surrogate
+ * (`&#xD800;`) — U+FFFD. Exported for the unit tests.
+ */
+export function tidy(text: string): string {
   return text
+    .replace(/\u0000/g, '')
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD')
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -97,6 +104,7 @@ export async function extractInterregDocument(
           maxXmlBytes: INTERREG_UPLOAD_LIMITS.maxDocxXmlBytes,
           maxEntries: INTERREG_UPLOAD_LIMITS.maxDocxEntries,
           maxChars,
+          maxNesting: INTERREG_UPLOAD_LIMITS.maxDocxNesting,
         });
       } catch (err) {
         if (err instanceof DocxReadError) {

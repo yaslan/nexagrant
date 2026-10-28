@@ -12,10 +12,17 @@
  * by " | " (a cell's own paragraphs joined by a space); a table nested in a cell is
  * inlined into that cell. Headers, footers, footnotes, comments and deleted
  * (tracked-change) text are not read.
+ *
+ * Work bounds (se-fb B3): table and paragraph nesting stop at `maxNesting` (each
+ * open table is a frame held until it closes, so nesting is what turned 118 KB
+ * into 564 MB), the XML is capped well below the old 50 MB, and one document is
+ * read at a time so parallel uploads cannot stack their parses.
  */
 import unzipper from 'unzipper';
 
 import { decodeXmlText } from '@/lib/k3-topic-stats/xlsx';
+
+import { INTERREG_UPLOAD_LIMITS } from '../limits';
 
 export type DocxReadErrorCode = 'not_docx' | 'malformed' | 'too_large' | 'too_long';
 
@@ -35,6 +42,8 @@ export interface DocxLimits {
   maxEntries: number;
   /** Characters of extracted text; one more is `too_long`. */
   maxChars: number;
+  /** Tables in tables, or paragraphs in paragraphs, deeper than this are `malformed`. */
+  maxNesting: number;
 }
 
 /** A table being read: finished rows, the row in progress, the cell in progress. */
@@ -46,9 +55,13 @@ interface TableFrame {
 
 /**
  * Text of a `word/document.xml` body. Pure; exported for the unit tests.
- * Throws {@link DocxReadError} `too_long` past `maxChars`.
+ * Throws {@link DocxReadError} `too_long` past `maxChars`, `malformed` past `maxNesting`.
  */
-export function documentXmlToText(xml: string, maxChars: number = Number.POSITIVE_INFINITY): string {
+export function documentXmlToText(
+  xml: string,
+  maxChars: number = Number.POSITIVE_INFINITY,
+  maxNesting: number = INTERREG_UPLOAD_LIMITS.maxDocxNesting,
+): string {
   const lines: string[] = [];
   const tables: TableFrame[] = [];
   // Paragraphs nest when a text box sits inside a run; each keeps its own buffer.
@@ -68,6 +81,8 @@ export function documentXmlToText(xml: string, maxChars: number = Number.POSITIV
     if (total > maxChars) throw new DocxReadError('too_long', `Text passes ${maxChars} characters.`);
     target.push(clean);
   };
+  const tooDeep = (what: string) =>
+    new DocxReadError('malformed', `${what} nested deeper than ${maxNesting}; refused.`);
   const append = (s: string) => {
     const p = paragraphs[paragraphs.length - 1];
     if (p) p.push(s);
@@ -139,6 +154,7 @@ export function documentXmlToText(xml: string, maxChars: number = Number.POSITIV
       case 'w:p':
         if (selfClosing) break;
         if (!closing) {
+          if (paragraphs.length >= maxNesting) throw tooDeep('Paragraphs');
           paragraphs.push([]);
         } else {
           const buf = paragraphs.pop();
@@ -148,6 +164,7 @@ export function documentXmlToText(xml: string, maxChars: number = Number.POSITIV
       case 'w:tbl':
         if (selfClosing) break;
         if (!closing) {
+          if (tables.length >= maxNesting) throw tooDeep('Tables');
           tables.push({ rows: [], row: null, cell: null });
         } else {
           const done = tables.pop();
@@ -217,8 +234,17 @@ export function hasZipSignature(bytes: Uint8Array): boolean {
   return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
 }
 
+/** One document at a time; the next waits here, without holding the event loop (as rag-pdf-extract.ts). */
+let queue: Promise<unknown> = Promise.resolve();
+
 /** Text of a .docx file. Throws {@link DocxReadError} on anything that is not a readable, bounded document. */
-export async function readDocxText(bytes: Buffer, limits: DocxLimits): Promise<string> {
+export function readDocxText(bytes: Buffer, limits: DocxLimits): Promise<string> {
+  const run = queue.then(() => readDocxTextNow(bytes, limits));
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+async function readDocxTextNow(bytes: Buffer, limits: DocxLimits): Promise<string> {
   if (!hasZipSignature(bytes)) throw new DocxReadError('not_docx', 'Zip signature missing.');
   let directory: Awaited<ReturnType<typeof unzipper.Open.buffer>>;
   try {
@@ -233,5 +259,5 @@ export async function readDocxText(bytes: Buffer, limits: DocxLimits): Promise<s
   if (!file) throw new DocxReadError('not_docx', 'No word/document.xml — not a Word document.');
   const xml = (await readEntry(file, limits.maxXmlBytes)).toString('utf8');
   if (/<!DOCTYPE/i.test(xml)) throw new DocxReadError('malformed', 'document.xml declares a DOCTYPE; refused.');
-  return documentXmlToText(xml, limits.maxChars);
+  return documentXmlToText(xml, limits.maxChars, limits.maxNesting);
 }

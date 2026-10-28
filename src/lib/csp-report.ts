@@ -1,5 +1,6 @@
 import { logger } from '@/lib/logger';
 import { clientIpFrom, ipBucket } from '@/lib/leads/public-lead';
+import { readCappedBytes } from '@/lib/read-capped';
 
 /**
  * CSP violation reports (İNCELEME-57 Ö-1, TASK-MUNRAZC9Q758W).
@@ -142,21 +143,8 @@ export class ReportLimiter {
 
 /** Reads at most `limit` bytes; null when the body is longer. */
 export async function readCapped(body: ReadableStream<Uint8Array> | null, limit: number): Promise<string | null> {
-  if (!body) return '';
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) {
-      await reader.cancel().catch(() => {});
-      return null;
-    }
-    chunks.push(value);
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  const bytes = await readCappedBytes(body, limit);
+  return bytes === null ? null : new TextDecoder().decode(bytes);
 }
 
 const limiter = new ReportLimiter();
