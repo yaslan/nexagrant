@@ -195,6 +195,8 @@ export type LlmGenerateOptions = {
   model?: string;
   provider?: LlmProvider;
   maxTokens?: number;
+  /** Epoch ms after which the provider request is abandoned and not retried. Unset: no limit. */
+  deadlineAt?: number;
 } & (
   | { prompt: string; system?: string; messages?: never }
   | { messages: LlmMessage[]; prompt?: never; system?: never }
@@ -219,7 +221,8 @@ export class LlmProviderError extends Error {
 async function withRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelay: number = 1000
+  baseDelay: number = 1000,
+  deadlineAt?: number
 ): Promise<T> {
   let attempt = 0;
   while (true) {
@@ -230,7 +233,9 @@ async function withRetry<T>(
       // An error with no status is not a client error, so it stays retryable.
       const status = errorStatus(error);
       const isClientError = status !== undefined && status !== 429 && status >= 400 && status < 500;
-      if (attempt > maxRetries || isClientError) {
+      // Past the deadline a retry can only be cut off again, so it is not made.
+      const pastDeadline = deadlineAt !== undefined && Date.now() >= deadlineAt;
+      if (attempt > maxRetries || isClientError || pastDeadline) {
         throw error;
       }
       const delay = baseDelay * Math.pow(2, attempt - 1);
@@ -270,11 +275,20 @@ function textFromAnthropicContent(content: unknown): string {
   return '';
 }
 
+/**
+ * The abort signal for one provider request. No deadline, no signal: callers that
+ * set none keep the unbounded request they always had.
+ */
+function signalUntil(deadlineAt: number | undefined): AbortSignal | undefined {
+  if (deadlineAt === undefined) return undefined;
+  return AbortSignal.timeout(Math.max(1, deadlineAt - Date.now()));
+}
+
 async function callProvider(
   messages: LlmMessage[],
-  opts: { provider: LlmProvider; model: string; maxTokens: number }
+  opts: { provider: LlmProvider; model: string; maxTokens: number; deadlineAt?: number }
 ): Promise<ProviderResult & { refusalCategory?: string | null }> {
-  const { provider, model, maxTokens } = opts;
+  const { provider, model, maxTokens, deadlineAt } = opts;
 
   if (provider === 'anthropic') {
     const apiKey = requireApiKey('anthropic');
@@ -300,6 +314,7 @@ async function callProvider(
         system: systemMsg,
         messages: userMessages,
       }),
+      signal: signalUntil(deadlineAt),
     });
 
     if (!res.ok) {
@@ -334,6 +349,7 @@ async function callProvider(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
+      signal: signalUntil(deadlineAt),
     });
 
     if (!res.ok) {
@@ -429,15 +445,22 @@ export function resolveCredits(module: string, purpose: string): AiCreditQuote {
  * evaluation, FO-188 B1). The price is `resolveCredits` — the one formula — so
  * this cannot disagree with the catalogue. Returns the credits booked (0 books
  * no row).
+ *
+ * With `tx`, the row is written inside the caller's transaction, so a failed
+ * write rolls back whatever that transaction already did (FO-188 Soru 3).
  */
-export async function chargeAiAction(params: { tenantId: string; module: string; purpose: string; refId: string }): Promise<number> {
+export async function chargeAiAction(
+  params: { tenantId: string; module: string; purpose: string; refId: string },
+  tx?: TenantTx,
+): Promise<number> {
   const { credits } = resolveCredits(params.module, params.purpose);
   if (credits > 0) {
-    await withTenant(params.tenantId, (tx) =>
-      tx.creditLedger.create({
-        data: { tenantId: params.tenantId, delta: -credits, reason: `usage:${params.module}`, refId: params.refId },
-      }),
-    );
+    const data = { tenantId: params.tenantId, delta: -credits, reason: `usage:${params.module}`, refId: params.refId };
+    if (tx) {
+      await tx.creditLedger.create({ data });
+    } else {
+      await withTenant(params.tenantId, (own) => own.creditLedger.create({ data }));
+    }
   }
   return credits;
 }
@@ -530,8 +553,11 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   const { credits: price } = resolveCredits(options.module, options.purpose);
 
   requireApiKey(provider);
-  const { outcome, refusalCategory, ...result } = await withRetry(() =>
-    callProvider(messages, { provider, model, maxTokens })
+  const { outcome, refusalCategory, ...result } = await withRetry(
+    () => callProvider(messages, { provider, model, maxTokens, deadlineAt: options.deadlineAt }),
+    3,
+    1000,
+    options.deadlineAt
   );
 
   // A truncated or refused answer is not the product the tenant paid for, so

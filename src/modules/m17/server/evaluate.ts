@@ -12,8 +12,9 @@
  * `buildReportMarkdown`). An answer that fails the schema is asked again once.
  *
  * Both model calls are priced 0 (`M17:evaluate-attempt`, `M17:evaluate-retry`).
- * The price (`M17:evaluate`) is booked once, as one ledger row, after the result
- * is saved — a run that fails, or whose claim was taken over, costs nothing.
+ * The price (`M17:evaluate`) is booked once, as one ledger row, in the same
+ * transaction that saves the result — a run that fails, or whose claim was taken
+ * over, costs nothing.
  *
  * The ANALYZING claim is identified by its `updatedAt` (the claim instant). The
  * writes that end a run (DONE, FAILED) match on it, so a run whose claim was
@@ -240,7 +241,9 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
       content: renderPrompt('m17/evaluate', { rubric: serializeRubric(promptRubric), project_context: fitted.projectText }, locale),
     },
   ];
-  const base = { tenantId, userId, module: EVALUATE_MODULE };
+  // The run's whole budget counts from the claim: each provider request is cut off at this
+  // instant (FO-188 Ö1), so the run ends before the route's maxDuration kills it mid-write.
+  const base = { tenantId, userId, module: EVALUATE_MODULE, deadlineAt: row.claimedAt.getTime() + MAX_RUN_MS };
 
   // Both calls are priced 0; the run's price is booked once, after the result is saved.
   const first = await generateCompletion({ ...base, purpose: EVALUATE_ATTEMPT_PURPOSE, messages });
@@ -284,7 +287,9 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
   const promptHash = hashMessages(messages);
   const criterionIds = new Map(rubric.criteria.map((c) => [c.criterionKey, c.id]));
 
-  await withTenant(tenantId, async (tx) => {
+  // The price is booked in the same transaction as the result: a ledger write that fails
+  // rolls the result back, so the tenant is never charged for an analysis that is not DONE.
+  const credits = await withTenant(tenantId, async (tx) => {
     await tx.interregCriterionMark.deleteMany({ where: { analysisId: id, tenantId } });
     await tx.interregAnalysisResult.deleteMany({ where: { analysisId: id, tenantId } });
     await tx.interregAnalysisResult.create({
@@ -325,10 +330,10 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
       data: { status: 'DONE' },
     });
     if (done.count !== 1) throw new Error('analysis claim was taken over before the result was written');
-  });
 
-  // After the result is saved, and only then: one ledger row for the run.
-  const credits = await chargeAiAction({ tenantId, module: EVALUATE_MODULE, purpose: EVALUATE_PURPOSE, refId: id });
+    // One ledger row for the run, written last in the same transaction.
+    return chargeAiAction({ tenantId, module: EVALUATE_MODULE, purpose: EVALUATE_PURPOSE, refId: id }, tx);
+  });
 
   return {
     analysisId: id,

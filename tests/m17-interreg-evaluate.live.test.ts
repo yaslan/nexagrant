@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
+import type { TenantTx } from '@/lib/db';
 import type { LlmCompletion, LlmGenerateOptions } from '@/lib/llm';
 
 /**
@@ -16,7 +17,8 @@ import type { LlmCompletion, LlmGenerateOptions } from '@/lib/llm';
  *  - a stale ANALYZING claim is taken over;
  *  - a fresh ANALYZING claim gives analysis_busy;
  *  - another tenant's analysis, or a colleague's, gives not_found;
- *  - a claim taken over mid-run: the run writes nothing and the later claim stays (B3).
+ *  - a claim taken over mid-run: the run writes nothing and the later claim stays (B3);
+ *  - a ledger write that fails: the result is rolled back and the analysis is FAILED (Soru 3).
  *
  * `.live`: needs the docker-compose Postgres, `pnpm db:setup` (seeded rubric) and
  * `pnpm db:rls-role`. No provider is called.
@@ -37,14 +39,28 @@ const state = vi.hoisted(() => ({
   calls: [] as LlmGenerateOptions[],
   /** Runs once, inside the next call, before its answer is returned. */
   beforeAnswer: undefined as (() => Promise<void>) | undefined,
+  /** While set, every `creditLedger` write inside a tenant transaction fails. */
+  failLedger: false,
 }));
 
 vi.mock('@/lib/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db')>();
+  // A ledger write that the database refuses: only `create` throws, and only inside the caller's
+  // own transaction; the balance read beside it is the real one.
+  const failingLedger = (tx: TenantTx): TenantTx =>
+    new Proxy(tx, {
+      get: (target, prop) => {
+        if (prop !== 'creditLedger') return Reflect.get(target, prop);
+        const ledger = Reflect.get(target, prop);
+        return new Proxy(ledger, {
+          get: (t, p) => (p === 'create' ? async () => { throw new Error('scripted ledger write failure'); } : Reflect.get(t, p)),
+        });
+      },
+    });
   return {
     ...actual,
     withTenant: (tenantId: string, cb: Parameters<typeof actual.withTenant>[1]) =>
-      actual.withTenantOn(state.rls!, tenantId, cb),
+      actual.withTenantOn(state.rls!, tenantId, (tx) => cb(state.failLedger ? failingLedger(tx) : tx)),
   };
 });
 
@@ -185,6 +201,7 @@ beforeEach(async (ctx) => {
   state.answers = [];
   state.calls = [];
   state.beforeAnswer = undefined;
+  state.failLedger = false;
 });
 
 afterAll(async () => {
@@ -273,6 +290,20 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
 
     expect(state.calls).toHaveLength(0);
     expect(await statusOf(id)).toBe('READY');
+    expect(await ledgerFor(id)).toEqual([]);
+  });
+
+  test('a ledger write that fails: the result is rolled back, the analysis is FAILED, nothing is charged (FO-188 Soru 3)', async () => {
+    const id = await readyAnalysis(alice);
+    state.answers.push(goodAnswer());
+    state.failLedger = true;
+
+    const run = await runEvaluation(alice, id, { locale: 'en' });
+
+    expect(run).toEqual({ ok: false, error: 'evaluation_failed' });
+    expect(await statusOf(id)).toBe('FAILED');
+    expect(await marksOf(id)).toBe(0);
+    expect(await resultsOf(id)).toBe(0);
     expect(await ledgerFor(id)).toEqual([]);
   });
 

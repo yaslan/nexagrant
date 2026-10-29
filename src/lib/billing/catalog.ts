@@ -860,7 +860,7 @@ export const AI_ACTION_CREDITS: Readonly<Record<string, AiCreditEntry>> = {
       'Interreg pre-assessment (FO-188). Proposed 3 = the M6 evaluation class: the FO-185 ' +
       'plan the owner approved says "kredi fiyatı M6 değerlendirmesiyle aynı sınıfta başlar", ' +
       'and it is the same shape — a whole application read against an official grid. ' +
-      'Charged once, as one ledger row, after the result is written; the model calls ' +
+      'Charged once, as one ledger row, in the same transaction as the result; the model calls ' +
       'themselves are priced 0 (evaluate-attempt, evaluate-retry), so a failed run costs nothing.',
   },
   'M17:evaluate-attempt': {
