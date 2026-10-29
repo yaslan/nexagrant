@@ -43,7 +43,7 @@ overrides:
   # Cross-line: 0.33 and older have no patch of their own either
   # (GHSA-f88m-g3jw-g9cj <0.35.0 also covers GHSA-54xq <0.32.6, GHSA-gp95 <0.30.5).
   'sharp@<0.34.0': '0.35.5'
-  'undici@>=7.0.0 <7.29.1': '7.29.1'
+  'undici@>=7.0.0 <7.30.1': '7.30.1'
   'undici@>=8.0.0 <8.10.2': '8.10.2'
   # 6.x carries its own patch (GHSA-rfgv-xxqx-mfg5, GHSA-3wwx-pv8p-q78v,
   # GHSA-r53p-7pc4-xj5r: 6.28.1).
@@ -52,22 +52,26 @@ overrides:
   # GHSA-vxpw-j846-p89q (high, <6.27.0) and GHSA-vrm6-8vpv-qv8q (high, <6.24.0);
   # fixed only in 6.x, so 5.29.0 is not a patch for this line.
   'undici@<6.0.0': '6.28.1'
-  'hono@>=4.0.0 <4.13.7': '4.13.7'
+  'hono@>=4.0.0 <4.13.11': '4.13.11'
   # Cross-major: 3.x has no patch of its own (GHSA-m732-5p4w-x69g >=1.1.0
   # <4.10.2, high; GHSA-88fw-hqm2-52qc <4.12.25, high; fixed only in 4.x).
-  'hono@>=3.0.0 <4.0.0': '4.13.7'
+  'hono@>=3.0.0 <4.0.0': '4.13.11'
   # Cross-major: 0.x/1.x/2.x likewise (GHSA-m732-5p4w-x69g >=1.1.0 <4.10.2,
   # high; GHSA-88fw-hqm2-52qc <4.12.25, high).
-  'hono@<3.0.0': '4.13.7'
+  'hono@<3.0.0': '4.13.11'
   '@hono/node-server@>=1.0.0 <1.19.15': '1.19.15'
   # 2.x carries its own patch (GHSA-9mqv-5hh9-4cgg <=2.0.9, GHSA-frvp-7c67-39w9).
   '@hono/node-server@>=2.0.0 <2.0.10': '2.0.10'
   # Cross-major: 0.x has no patch of its own (GHSA-wc8c-qw6v-h7f6 <1.19.10,
   # high; GHSA-frvp-7c67-39w9 <1.19.15).
   '@hono/node-server@<1.0.0': '1.19.15'
-  '@modelcontextprotocol/sdk@>=1.0.0 <1.31.0': '1.31.0'
+  '@modelcontextprotocol/sdk@>=1.0.0 <1.32.0': '1.32.0'
   # Cross-major: 0.x has no patch of its own (GHSA-w48q-cv73-mx4w <1.24.0, high).
-  '@modelcontextprotocol/sdk@<1.0.0': '1.31.0'
+  '@modelcontextprotocol/sdk@<1.0.0': '1.32.0'
+  # TASK-MVPOEXQ1LVQNN (FO-166): body-parser 2.x via express (shadcn MCP SDK), GHSA high <2.4.0.
+  'body-parser@>=2.0.0 <2.4.0': '2.4.0'
+  # TASK-MVPOEXQ1LVQNN (FO-166): zod 4.5.x under shadcn (GHSA-mrhx-c7xc-m3w5, high <4.6.6).
+  'zod@>=4.0.0 <4.6.6': '4.6.6'
   'proxy-addr@>=2.0.0 <2.0.8': '2.0.8'
   # Cross-major: 1.x has no patch of its own (GHSA-jqcg-44mw-7w3h, critical,
   # >=1.1.0 <2.0.8; fixed only in 2.0.8). Lower bound follows the advisory.
@@ -80,17 +84,17 @@ overrides:
   # deepmerge-ts 7.x exactly and no patched 7.x exists. The one override that
   # crosses a major; first line to revisit on a Prisma upgrade.
   'deepmerge-ts@<8.0.0': '8.0.0'
-  'fast-uri@>=3.0.0 <3.1.8': '3.1.8'
+  'fast-uri@>=3.0.0 <3.1.9': '3.1.9'
   # 2.x and 4.x carry their own patches (GHSA-hrr3-gc8f-f4qj: 2.4.7, 4.1.5).
   'fast-uri@>=2.0.0 <2.4.7': '2.4.7'
   'fast-uri@>=4.0.0 <4.1.5': '4.1.5'
   # Cross-major: 0.x/1.x have no patch of their own (GHSA-hrr3-gc8f-f4qj <2.4.7,
   # GHSA-qw65-cvwx-89v3 <2.4.6, high).
   'fast-uri@<2.0.0': '2.4.7'
-  'ip-address@>=10.0.0 <10.7.1': '10.7.1'
+  'ip-address@>=10.0.0 <10.7.4': '10.7.4'
   # Cross-major: 9.x and older have no patch of their own (GHSA-h3mg-xc3c-68pw
   # and GHSA-j6r3-76f7-8jcv <=10.7.0; GHSA-mwp4-54f8-5fhr <=10.3.0, high).
-  'ip-address@<10.0.0': '10.7.1'
+  'ip-address@<10.0.0': '10.7.4'
   'source-map-js@>=1.0.0 <1.2.2': '1.2.2'
   'postcss-selector-parser@>=7.0.0 <7.1.6': '7.1.6'
   # Cross-major: 6.x and older have no patch of their own (GHSA-rj75-hqrm-r3gf

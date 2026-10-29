@@ -195,6 +195,9 @@ test.describe.serial('admin blog — links and images in a post', () => {
   ] as const) {
     test(`raw markdown with ${name} posted to the save action is refused`, async ({ page }) => {
       let rewritten = 0;
+      // The save's answer, kept by the route: the page navigates on as soon as
+      // it arrives and Chromium then drops the body (response.text() fails).
+      let answerBody = '';
       await page.route('**/tr/admin/blog', async (route: Route) => {
         const req = route.request();
         if (req.method() !== 'POST' || !req.headers()['next-action']) return route.continue();
@@ -202,19 +205,16 @@ test.describe.serial('admin blog — links and images in a post', () => {
         if (body[0] !== RAW_SLUG || !body[1]) return route.continue();
         body[1].content = `${ORIGINAL}\n\n${injected}`;
         rewritten++;
-        return route.continue({ postData: JSON.stringify(body) });
+        const response = await route.fetch({ postData: JSON.stringify(body) });
+        answerBody = await response.text();
+        return route.fulfill({ response, body: answerBody });
       });
 
       await openEdit(page, RAW_SLUG);
-      // The page sends other server actions too; this is the save of this post.
-      const answer = page.waitForResponse(
-        (r) => Boolean(r.request().headers()['next-action']) && (r.request().postData() ?? '').startsWith(`["${RAW_SLUG}"`)
-      );
       await page.getByTestId('blog-submit').click();
-      const res = await answer;
-      expect(rewritten).toBe(1);
-      expect(await res.text()).toMatch(/invalid_content_(link|image)/);
       await expect(page.getByTestId('blog-form-error')).toContainText(message);
+      expect(rewritten).toBe(1);
+      expect(answerBody).toMatch(/invalid_content_(link|image)/);
       await expect(page.getByTestId('blog-success')).toHaveCount(0);
       expect((await prisma.blogPost.findUnique({ where: { slug: RAW_SLUG } }))?.content).toBe(ORIGINAL);
     });
