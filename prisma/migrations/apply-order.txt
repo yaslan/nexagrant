@@ -79,3 +79,4 @@ platform-setting-write-guard.sql
 drop-blog-read-time.sql
 module-state-grandfathered.sql
 add-interreg-review.sql
+add-interreg-slot-retention.sql

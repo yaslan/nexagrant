@@ -17,6 +17,7 @@ import { k1TopicMatchTask } from './k1-topic-match';
 import { k1EmbeddingsTask } from './k1-embeddings';
 import { m4StaleRelationshipsTask } from './m4-stale-relationships';
 import { jobQueueHealthTask } from './job-queue-health';
+import { m17TextRetentionTask } from './m17-text-retention';
 import { notificationsRetentionTask } from './notifications-retention';
 import { evidenceExpiringTask } from './evidence-expiring';
 import { partnerSearchTask } from './partner-search';
@@ -45,6 +46,7 @@ export const taskList: Record<JobId, Task> = {
   'k1-embeddings': k1EmbeddingsTask,
   'm4-stale-relationships': m4StaleRelationshipsTask,
   'job-queue-health': jobQueueHealthTask,
+  'm17-text-retention': m17TextRetentionTask,
   'notifications-retention': notificationsRetentionTask,
   'evidence-expiring': evidenceExpiringTask,
   'partner-search': partnerSearchTask,

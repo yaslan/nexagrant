@@ -17,7 +17,8 @@ import { acceptsUpload } from '@/modules/m17/server/status';
  *
  * The file is read into memory, turned into text and dropped: the bytes are
  * never written to disk, object storage or the database — only the extracted
- * text is, in the caller's tenant, until `textExpiresAt` (30 days). A second
+ * text is, in the caller's tenant, for 30 days from this upload (the slot's
+ * `expiresAt`; the nightly m17-text-retention job purges it, per slot). A second
  * upload of the same kind replaces the first and clears any earlier F2 result.
  *
  *   200 `{ analysis: InterregAnalysisView }` — status CALL_READY / READY / UPLOADING

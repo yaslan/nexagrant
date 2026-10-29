@@ -200,6 +200,27 @@ async function seed() {
       { tenantId: ids.tenantA, userId: ids.neighbour, type: 'SAVED_SEARCH_MATCH', payload: { matchCount: 4 }, dedupeKey: `neighbour-${RUN}` },
     ],
   });
+  // M17 (FO-195): one Interreg analysis each, with extracted text and an F2 result. `userId`
+  // is an FK with ON DELETE CASCADE, so erasing the user must take texts and result with it.
+  const rubric = await db.interregRubric.findFirstOrThrow({ select: { id: true } });
+  const criterion = await db.interregRubricCriterion.findFirstOrThrow({ where: { rubricId: rubric.id }, select: { id: true } });
+  for (const [who, userId] of [['subject', ids.subject], ['neighbour', ids.neighbour]] as const) {
+    const a = await db.interregAnalysis.create({
+      data: {
+        tenantId: ids.tenantA, userId, rubricId: rubric.id, status: 'READY',
+        callFileName: `${who}-call.txt`, callFormat: 'TXT', callChars: 20, callText: `${who}-call-text-${RUN}`,
+        callExtractedAt: new Date(), callTextExpiresAt: new Date(Date.now() + 30 * 864e5),
+        projectFileName: `${who}-project.txt`, projectFormat: 'TXT', projectChars: 20, projectText: `${who}-project-text-${RUN}`,
+        projectExtractedAt: new Date(), projectTextExpiresAt: new Date(Date.now() + 30 * 864e5),
+      },
+    });
+    await db.interregAnalysisResult.create({
+      data: { tenantId: ids.tenantA, analysisId: a.id, rawScore: 40, score100: 71.4, passesThresholds: true, reportMarkdown: `${who}-report-${RUN}`, model: 'm', promptHash: 'h' },
+    });
+    await db.interregCriterionMark.create({
+      data: { tenantId: ids.tenantA, analysisId: a.id, rubricId: rubric.id, criterionId: criterion.id, mark: 3, evidenceQuote: `${who}-quote-${RUN}` },
+    });
+  }
   await db.feedback.createMany({
     data: [
       { tenantId: ids.tenantA, userId: ids.subject, category: 'BUG', title: `Subject report ${RUN}`, body: 'subject-body' },
@@ -244,6 +265,7 @@ async function cleanup() {
   await db.calendarConnection.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.savedSearch.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.notification.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
+  await db.interregAnalysis.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.feedback.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.relationship.deleteMany({ where: { tenantId: { in: [ids.tenantA, ids.tenantB] } } });
   await db.tenant.deleteMany({ where: { id: { in: [ids.tenantA, ids.tenantB] } } });
@@ -288,12 +310,20 @@ describe.skipIf(!HAS_DB)('GDPR export — live', () => {
     expect(tables.AiUsageLog).toHaveLength(1);
     expect(tables.ApprovalRequest).toHaveLength(1);
     expect(tables.Proposal).toHaveLength(1);
+    expect(tables.InterregAnalysis).toHaveLength(1);
+    expect(tables.InterregAnalysis?.[0]).toMatchObject({ callText: `subject-call-text-${RUN}`, projectText: `subject-project-text-${RUN}`, status: 'READY' });
+    expect(tables.InterregAnalysisResult).toHaveLength(1);
+    expect(tables.InterregCriterionMark).toHaveLength(1);
+    expect(result.data!.notice.en).toContain('not a referee report');
     expect(tables.Notification).toHaveLength(1);
     expect(tables.Notification?.[0]).toMatchObject({ tenantId: ids.tenantA, type: 'SAVED_SEARCH_MATCH', payload: { matchCount: 3 } });
 
     // Absent: a co-tenant's rows. This is the isolation that matters most here —
     // the endpoint runs inside a shared tenant, so "my data" must not mean
     // "my tenant's data".
+    expect(flat).not.toContain(`neighbour-call-text-${RUN}`);
+    expect(flat).not.toContain(`neighbour-report-${RUN}`);
+    expect(flat).not.toContain(`neighbour-quote-${RUN}`);
     expect(flat).not.toContain('neighbour-notes');
     expect(flat).not.toContain('neighbour-effort');
     expect(flat).not.toContain(ids.neighbour);
@@ -494,6 +524,8 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
       calendarConnection: await db.calendarConnection.count({ where: { userId: ids.subject } }),
       savedSearch: await db.savedSearch.count({ where: { userId: ids.subject } }),
       notification: await db.notification.count({ where: { userId: ids.subject } }),
+      interregAnalysis: await db.interregAnalysis.count({ where: { userId: ids.subject } }),
+      interregResult: await db.interregAnalysisResult.count({ where: { analysis: { userId: ids.subject } } }),
       feedback: await db.feedback.count({ where: { userId: ids.subject } }),
       auditActor: await db.auditEvent.count({ where: { actorId: ids.subject } }),
       opportunityOwner: await db.opportunity.count({ where: { ownerId: ids.subject } }),
@@ -503,6 +535,8 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
       calendarConnection: 0,
       savedSearch: 0,
       notification: 0,
+      interregAnalysis: 0,
+      interregResult: 0,
       feedback: 0,
       auditActor: 0,
       opportunityOwner: 0,
@@ -568,6 +602,9 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     expect(await db.calendarConnection.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.savedSearch.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.notification.count({ where: { userId: ids.neighbour } })).toBe(1);
+    expect(await db.interregAnalysis.count({ where: { userId: ids.neighbour } })).toBe(1);
+    expect(await db.interregAnalysisResult.count({ where: { analysis: { userId: ids.neighbour } } })).toBe(1);
+    expect(await db.interregCriterionMark.count({ where: { analysis: { userId: ids.neighbour } } })).toBe(1);
     expect(await db.feedback.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.auditEvent.count({ where: { actorId: ids.neighbour } })).toBe(1);
     expect(await db.opportunity.count({ where: { ownerId: ids.neighbour } })).toBe(1);

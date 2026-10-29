@@ -13,7 +13,7 @@ import { requireActionId } from '@/lib/required-id';
 
 import { INTERREG_UPLOAD_LIMITS, type InterregDocKind } from '../limits';
 import type { ExtractedDocument } from './extract';
-import { acceptsUpload } from './status';
+import { acceptsUpload, STATUS_FROM_TEXTS_SQL } from './status';
 
 /** Fixed label on every M17 payload: an internal pre-assessment, never an official score. */
 export const INTERREG_ASSESSMENT_KIND = 'internal_pre_assessment' as const;
@@ -24,17 +24,18 @@ const VIEW_SELECT = {
   rubric: { select: { id: true, label: true, maxRaw: true, passRaw: true } },
   createdAt: true,
   updatedAt: true,
-  textExpiresAt: true,
   callFileName: true,
   callFormat: true,
   callPages: true,
   callChars: true,
   callExtractedAt: true,
+  callTextExpiresAt: true,
   projectFileName: true,
   projectFormat: true,
   projectPages: true,
   projectChars: true,
   projectExtractedAt: true,
+  projectTextExpiresAt: true,
 } satisfies Prisma.InterregAnalysisSelect;
 
 type ViewRow = Prisma.InterregAnalysisGetPayload<{ select: typeof VIEW_SELECT }>;
@@ -45,6 +46,8 @@ export interface InterregDocumentView {
   pages: number | null;
   chars: number;
   extractedAt: string;
+  /** This slot's text is purged at this instant: 30 days from ITS OWN upload (FO-195 B5). */
+  expiresAt: string;
 }
 
 /** The grid an analysis is assessed against; the full grid is GET /api/interreg-review/rubrics. */
@@ -62,7 +65,6 @@ export interface InterregAnalysisView {
   rubric: InterregAnalysisRubricRef;
   call: InterregDocumentView | null;
   project: InterregDocumentView | null;
-  textExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,9 +75,17 @@ function documentView(
   pages: number | null,
   chars: number | null,
   extractedAt: Date | null,
+  expiresAt: Date | null,
 ): InterregDocumentView | null {
-  if (!fileName || !format || chars === null || !extractedAt) return null;
-  return { fileName, format, pages, chars, extractedAt: extractedAt.toISOString() };
+  if (!fileName || !format || chars === null || !extractedAt || !expiresAt) return null;
+  return {
+    fileName,
+    format,
+    pages,
+    chars,
+    extractedAt: extractedAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  };
 }
 
 export function toView(row: ViewRow): InterregAnalysisView {
@@ -89,15 +99,22 @@ export function toView(row: ViewRow): InterregAnalysisView {
       maxRaw: Number(row.rubric.maxRaw),
       passRaw: row.rubric.passRaw === null ? null : Number(row.rubric.passRaw),
     },
-    call: documentView(row.callFileName, row.callFormat, row.callPages, row.callChars, row.callExtractedAt),
+    call: documentView(
+      row.callFileName,
+      row.callFormat,
+      row.callPages,
+      row.callChars,
+      row.callExtractedAt,
+      row.callTextExpiresAt,
+    ),
     project: documentView(
       row.projectFileName,
       row.projectFormat,
       row.projectPages,
       row.projectChars,
       row.projectExtractedAt,
+      row.projectTextExpiresAt,
     ),
-    textExpiresAt: row.textExpiresAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -186,6 +203,8 @@ export async function saveDocument(
   doc: ExtractedDocument,
   now: Date = new Date(),
 ): Promise<SaveDocumentResult> {
+  // Per slot (FO-195 B5): only the slot being written gets a new 30 days; the other keeps its own.
+  const expiresAt = new Date(now.getTime() + INTERREG_UPLOAD_LIMITS.textRetentionDays * 24 * 60 * 60 * 1000);
   const fields =
     kind === 'call'
       ? {
@@ -195,6 +214,7 @@ export async function saveDocument(
           callChars: doc.chars,
           callText: doc.text,
           callExtractedAt: now,
+          callTextExpiresAt: expiresAt,
         }
       : {
           projectFileName: fileName,
@@ -203,17 +223,17 @@ export async function saveDocument(
           projectChars: doc.chars,
           projectText: doc.text,
           projectExtractedAt: now,
+          projectTextExpiresAt: expiresAt,
         };
   const tenantId = requireActionId(owner.tenantId, 'tenantId');
   const userId = requireActionId(owner.userId, 'userId');
   const id = requireActionId(analysisId, 'analysisId');
-  const textExpiresAt = new Date(now.getTime() + INTERREG_UPLOAD_LIMITS.textRetentionDays * 24 * 60 * 60 * 1000);
 
   return withTenant(tenantId, async (tx) => {
     const where = { id, tenantId, userId };
     const { count } = await tx.interregAnalysis.updateMany({
       where: { id, tenantId, userId, status: { not: 'ANALYZING' } },
-      data: { ...fields, textExpiresAt },
+      data: fields,
     });
     if (count === 0) {
       const existing = await tx.interregAnalysis.findFirst({ where, select: { status: true } });
@@ -222,18 +242,11 @@ export async function saveDocument(
       return { ok: false, error: 'not_found' } as const;
     }
 
-    // The one copy of the status rule (crw2 Ö1), read on the row as it is after
-    // both slots' writes:
-    //   neither document → UPLOADING · call guide only → CALL_READY
-    //   both → READY (the "check the project" button opens)
-    //   project file only → UPLOADING (the call guide is still missing)
+    // The one copy of the status rule (crw2 Ö1; ./status.ts), read on the row as it is
+    // after both slots' writes.
     await tx.$executeRaw`
       UPDATE "InterregAnalysis"
-         SET "status" = (CASE
-               WHEN "callText" IS NOT NULL AND "projectText" IS NOT NULL THEN 'READY'
-               WHEN "callText" IS NOT NULL THEN 'CALL_READY'
-               ELSE 'UPLOADING'
-             END)::"InterregAnalysisStatus",
+         SET "status" = ${STATUS_FROM_TEXTS_SQL},
              "updatedAt" = ${now}
        WHERE "id" = ${id} AND "tenantId" = ${tenantId}`;
     await tx.interregCriterionMark.deleteMany({ where: { analysisId: id, tenantId } });

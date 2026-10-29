@@ -60,6 +60,10 @@ const KNOWN: Record<string, string> = {
     '`withdrawnBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
   'src/modules/m1/server/partner-search/retention.ts lt: closedBefore':
     '`closedBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
+  'src/modules/m17/server/retention.ts lte: now':
+    '`now` is checked at the top of purgeExpiredInterregText, which throws on an invalid Date; cron input, no client (FO-195)',
+  'src/modules/m17/server/retention.ts in: ids':
+    '`ids` are the primary keys of the InterregAnalysis rows the `findMany` just above returned in the same transaction; an empty list leaves the loop before any write (FO-195)',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts version: existing.version':
