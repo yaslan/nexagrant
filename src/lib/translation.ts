@@ -72,6 +72,29 @@ export function translationStats(): { cacheSize: number; active: number; queued:
 }
 
 /**
+ * After MyMemory refuses for quota (HTTP 429, or its "MYMEMORY WARNING" text),
+ * no further calls go out for this long (FO-204). Each search used to resend
+ * every untranslated text, so a full quota cost dozens of refused calls per
+ * request; now one refusal pauses them and the English list comes back at once.
+ */
+export const TRANSLATION_QUOTA_PAUSE_MS = 10 * 60_000;
+let quotaPausedUntil = 0;
+
+function pauseForQuota(now = Date.now()): void {
+  quotaPausedUntil = now + TRANSLATION_QUOTA_PAUSE_MS;
+}
+
+/** True while the service is paused after a quota refusal. */
+export function translationQuotaPaused(now = Date.now()): boolean {
+  return now < quotaPausedUntil;
+}
+
+/** Test seam: forget a pause so one test's refusal does not leak into the next. */
+export function resetTranslationQuotaPause(): void {
+  quotaPausedUntil = 0;
+}
+
+/**
  * Common EU Funding Terms Dictionary for fast & high-quality Turkish translations
  */
 const EU_DICTIONARY: Record<string, string> = {
@@ -133,24 +156,35 @@ async function translateTextOrNull(
   try {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(trimmed)}&langpair=en|${targetLang}`;
     const translated = await withTranslationSlot(async () => {
+      // Checked inside the slot too, so calls already queued behind a refusal do not go out.
+      if (translationQuotaPaused()) return null;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
       const cancel = () => controller.abort();
       signal?.addEventListener('abort', cancel, { once: true });
       try {
         const res = await fetch(url, { signal: controller.signal });
+        if (res.status === 429) {
+          pauseForQuota();
+          return null;
+        }
         if (!res.ok) return null;
         const data = await res.json();
         const text: unknown = data.responseData?.translatedText;
-        return typeof text === 'string' ? text : null;
+        if (typeof text !== 'string') return null;
+        // MyMemory answers an exhausted quota with a 200 whose text is a warning, not a translation.
+        if (text.includes('MYMEMORY WARNING')) {
+          pauseForQuota();
+          return null;
+        }
+        return text;
       } finally {
         clearTimeout(timeoutId);
         signal?.removeEventListener('abort', cancel);
       }
     }, signal);
 
-    // MyMemory answers an exhausted quota with a 200 whose text is a warning, not a translation.
-    if (translated && !translated.includes('QUERY LENGTH LIMIT EXCEEDED') && !translated.includes('MYMEMORY WARNING')) {
+    if (translated && !translated.includes('QUERY LENGTH LIMIT EXCEEDED')) {
       cacheTranslation(cacheKey, translated);
       return translated;
     }
@@ -165,46 +199,47 @@ async function translateTextOrNull(
 /**
  * Batch translates array of items (titles and descriptions) into target language.
  * Once `signal` fires, queued calls are dropped, calls in flight are aborted and
- * the remaining texts come back untranslated. `onUntranslated` runs once for each
- * text that came back in English because the service gave no translation (quota,
- * timeout, error), so the caller can tell a complete result from a partial one.
+ * the remaining texts come back untranslated. `untranslated` counts the texts that
+ * came back in English because the service gave no translation (quota, timeout,
+ * error), so the caller can tell a complete result from a partial one.
  */
 export async function translateTopicsBatch<T extends { title: string; description?: string }>(
   topics: T[],
   targetLang = 'tr',
-  signal?: AbortSignal,
-  options?: { onUntranslated?: () => void }
-): Promise<T[]> {
+  signal?: AbortSignal
+): Promise<{ items: T[]; untranslated: number }> {
   if (targetLang === 'en' || !topics || topics.length === 0) {
-    return topics;
+    return { items: topics, untranslated: 0 };
   }
 
-  const translateOrKeep = async (value: string): Promise<string> => {
+  const translateOrKeep = async (value: string): Promise<{ text: string; missed: number }> => {
     const out = await translateTextOrNull(value, targetLang, signal);
-    if (out === null) {
-      options?.onUntranslated?.();
-      return value;
-    }
-    return out;
+    return out === null ? { text: value, missed: 1 } : { text: out, missed: 0 };
   };
 
   // Items start together; the outbound calls themselves queue on withTranslationSlot.
-  const translated = await Promise.all(
+  const results = await Promise.all(
     topics.map(async (topic) => {
-      const translatedTitle = await translateOrKeep(topic.title);
-      let translatedDescription = topic.description;
+      const title = await translateOrKeep(topic.title);
+      let description: { text: string; missed: number } | undefined;
 
       if (topic.description && topic.description.length < 500) {
-        translatedDescription = await translateOrKeep(topic.description);
+        description = await translateOrKeep(topic.description);
       }
 
       return {
-        ...topic,
-        title: translatedTitle,
-        description: translatedDescription,
+        item: {
+          ...topic,
+          title: title.text,
+          description: description ? description.text : topic.description,
+        },
+        missed: title.missed + (description?.missed ?? 0),
       };
     })
   );
 
-  return translated;
+  return {
+    items: results.map((r) => r.item),
+    untranslated: results.reduce((sum, r) => sum + r.missed, 0),
+  };
 }

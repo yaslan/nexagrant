@@ -36,7 +36,7 @@ describe('translation bounds', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const topics = Array.from({ length: 60 }, (_, i) => ({ title: `concurrency title ${i}`, description: `desc ${i}` }));
-    const out = await translateTopicsBatch(topics, 'tr');
+    const { items: out } = await translateTopicsBatch(topics, 'tr');
 
     expect(fetchMock).toHaveBeenCalledTimes(120);
     expect(peak).toBeLessThanOrEqual(MAX_CONCURRENT_TRANSLATIONS);
@@ -100,7 +100,7 @@ describe('translation bounds', () => {
     // The queue empties on the abort itself, not when the slots happen to free up.
     expect(translationStats().queued).toBe(0);
 
-    const out = await batch;
+    const { items: out } = await batch;
     expect(translationStats()).toMatchObject({ active: 0, queued: 0 });
     // Only the calls that already held a slot were ever sent.
     expect(fetchMock).toHaveBeenCalledTimes(MAX_CONCURRENT_TRANSLATIONS);

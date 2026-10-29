@@ -14,7 +14,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   session: { ok: true, userId: 'u-1' } as { ok: boolean; userId: string },
   searchSedia: vi.fn(),
-  translate: vi.fn(async <T,>(topics: T[]) => topics),
+  translate: vi.fn(async <T,>(topics: T[]) => ({ items: topics, untranslated: 0 })),
   topicUpsert: vi.fn(),
 }));
 
@@ -60,7 +60,7 @@ beforeEach(() => {
   mocks.session.ok = true;
   // A user per test, so the per-user limit below never leaks between tests.
   mocks.session.userId = `u-${++testNo}`;
-  mocks.searchSedia.mockReset().mockResolvedValue({ totalResults: 1, pageNumber: 1, pageSize: 20, topics: [TOPIC] });
+  mocks.searchSedia.mockReset().mockResolvedValue({ totalResults: 1, pageNumber: 1, pageSize: 20, topics: [TOPIC], errors: [] });
   mocks.translate.mockClear();
   mocks.topicUpsert.mockReset().mockResolvedValue({});
 });

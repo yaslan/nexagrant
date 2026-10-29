@@ -68,7 +68,10 @@ beforeEach(() => {
   mocks.searchSedia.mockReset().mockResolvedValue(ok([TOPIC]));
   mocks.translate
     .mockReset()
-    .mockImplementation(async (topics: Array<typeof TOPIC>) => topics.map((t) => ({ ...t, title: `TR ${t.title}` })));
+    .mockImplementation(async (topics: Array<typeof TOPIC>) => ({
+      items: topics.map((t) => ({ ...t, title: `TR ${t.title}` })),
+      untranslated: 0,
+    }));
 });
 
 afterEach(() => {
@@ -111,7 +114,7 @@ describe('/api/cagrilar time budget', () => {
     mocks.translate.mockImplementation(async (topics: Array<typeof TOPIC>, _lang: string, signal: AbortSignal) => {
       await untilAborted(signal);
       // What a cancelled batch hands back: some titles done, the rest original.
-      return topics.map((t) => ({ ...t, title: `TR ${t.title}` }));
+      return { items: topics.map((t) => ({ ...t, title: `TR ${t.title}` })), untranslated: 1 };
     });
 
     const pending = get();
@@ -150,7 +153,7 @@ describe('/api/cagrilar time budget', () => {
     mocks.translate.mockImplementation(async (topics: unknown[], _lang: string, signal: AbortSignal) => {
       translateSignal = signal;
       await untilAborted(signal);
-      return topics;
+      return { items: topics, untranslated: 0 };
     });
     const client = new AbortController();
 

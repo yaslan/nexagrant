@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { internalError } from '@/lib/api-error';
-import { SediaAdapter } from '@/lib/adapters/sedia';
+import { SediaAdapter, type SediaSearchOptions } from '@/lib/adapters/sedia';
 import { translateTopicsBatch } from '@/lib/translation';
 import { requireTenantApi } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 import { SEDIA_RESULT_WINDOW } from '@/lib/calls-paging';
-import { cagrilarCache } from '@/lib/cagrilar-cache';
+import { cagrilarCache, searchCacheKey, shareInFlight } from '@/lib/cagrilar-cache';
 
 /**
  * The largest page this route asks SEDIA for. Every title on the page is
@@ -49,6 +49,18 @@ export const CAGRILAR_BUDGET_MS = 20_000;
  */
 export const CAGRILAR_PER_USER_PER_MINUTE = 30;
 const limiter = new UserWindowLimiter(CAGRILAR_PER_USER_PER_MINUTE);
+
+/**
+ * One SEDIA call, remembered when it came back whole. A page cut short by the
+ * budget or carrying a SEDIA error is not stored: the next visitor would be
+ * served the gap for ten minutes.
+ */
+async function searchSediaAndRemember(cacheKey: string, options: SediaSearchOptions) {
+  const result = await new SediaAdapter().searchSedia(options);
+  const aborted = options.signal?.aborted ?? false;
+  if (!aborted && result.errors.length === 0) cagrilarCache.set(cacheKey, result);
+  return result;
+}
 
 export async function GET(request: NextRequest) {
   // Signed-in members only: the one consumer is the (app) calls page, and an
@@ -119,22 +131,24 @@ export async function GET(request: NextRequest) {
     const typeParam = searchParams.get('type') || '1';
     const types = typeParam.split(',').map(t => t.trim());
 
-    const cacheKey = JSON.stringify([text, page, pageSize, lang, statuses, frameworkProgrammes, types]);
-    const cached = cagrilarCache.get(cacheKey);
-    if (cached) return NextResponse.json(cached);
-
-    const adapter = new SediaAdapter();
-    const result = await adapter.searchSedia({
-      text,
-      pageSize,
-      startPage: page,
-      maxPages: 1, // One SEDIA call per request: the page the caller asked for
-      statuses,
-      frameworkProgrammes,
-      types,
-      languages: [lang, 'en'],
-      signal,
-    });
+    // The English SEDIA page is what gets remembered; translation runs on every
+    // request below, so a quota outage never leaves the list stuck in English.
+    const cacheKey = searchCacheKey({ text, page, pageSize, lang, statuses, frameworkProgrammes, types });
+    const result =
+      cagrilarCache.get(cacheKey) ??
+      (await shareInFlight(cacheKey, () =>
+        searchSediaAndRemember(cacheKey, {
+          text,
+          pageSize,
+          startPage: page,
+          maxPages: 1, // One SEDIA call per request: the page the caller asked for
+          statuses,
+          frameworkProgrammes,
+          types,
+          languages: [lang, 'en'],
+          signal,
+        })
+      ));
 
     // Not one page came back: SEDIA is down or slower than the budget. A 200
     // with no topics would read as "no calls match", which is not what happened.
@@ -156,16 +170,12 @@ export async function GET(request: NextRequest) {
     // If requested language is Turkish, translate titles & descriptions to Turkish,
     // within what is left of the budget. A partial translation is thrown away so
     // the list is never half Turkish, half English; the list then stays English
-    // with `translated: false` (MyMemory quota, timeout or error).
-    let translationFailed = false;
+    // with `translated: false` (MyMemory quota, timeout or error). Texts that were
+    // translated before come from translation.ts's cache, so only new ones are sent.
     if (lang === 'tr' && processedTopics.length > 0 && !signal.aborted) {
-      const turkish = await translateTopicsBatch(processedTopics, 'tr', signal, {
-        onUntranslated: () => {
-          translationFailed = true;
-        },
-      });
-      if (!signal.aborted && !translationFailed) {
-        processedTopics = turkish;
+      const batch = await translateTopicsBatch(processedTopics, 'tr', signal);
+      if (!signal.aborted && batch.untranslated === 0) {
+        processedTopics = batch.items;
         translated = true;
       }
     }
@@ -176,19 +186,14 @@ export async function GET(request: NextRequest) {
     // nightly k1-daily-calls job's job (src/lib/jobs/tasks/k1-daily-calls.ts,
     // cron 02:00); a live search only reads SEDIA.
 
-    const payload = {
+    return NextResponse.json({
       success: true,
       totalResults: result.totalResults,
       pageNumber: result.pageNumber,
       pageSize: result.pageSize,
       topics: processedTopics,
       translated,
-    };
-    // An answer cut short by the budget or the client leaving is not stored, and
-    // neither is one whose translation failed: the next visitor would get the
-    // English list for ten minutes.
-    if (!signal.aborted && !translationFailed) cagrilarCache.set(cacheKey, payload);
-    return NextResponse.json(payload);
+    });
   } catch (error) {
     // If the client aborted the request (closed page, cancelled, etc), the signal fires and
     // any pending work (e.g., SEDIA fetch or translation) throws AbortError. This is expected,
