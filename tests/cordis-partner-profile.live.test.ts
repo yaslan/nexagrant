@@ -159,6 +159,29 @@ function expectSameTopList<T extends { count: number }>(
   expect(members(actual), `${label}: members`).toEqual(members(expected));
 }
 
+/**
+ * FO-198 — both jobs return a count over every organisation in the database,
+ * and other live files (cordis-auth, consortium-live-demand,
+ * cordis-coordinator-leaders, keep-eu-sync, partner-search-ingest) insert and
+ * delete CordisOrganization rows while this file runs. One organisation added
+ * between the two job runs made `expected 42 to be 41`; one deleted under the
+ * legacy job made its profile upsert fail on
+ * CordisPartnerProfile_organisationId_fkey. A SHARE lock held in its own
+ * transaction while both jobs run blocks those writers until both are done;
+ * reads, and the jobs' own writes to the profile and co-participation
+ * tables, go on. Organisation deletes cascade to CordisParticipation, which
+ * the co-participation count reads, so that table is locked too.
+ */
+async function withCordisWritesBlocked<T>(run: () => Promise<T>): Promise<T> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`LOCK TABLE "CordisOrganization", "CordisParticipation" IN SHARE MODE`;
+      return run();
+    },
+    { maxWait: 60_000, timeout: 120_000 }
+  );
+}
+
 beforeAll(async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -179,14 +202,16 @@ describe('generatePartnerProfiles (paged) vs the in-memory original', () => {
   test('writes the same profiles and co-participations as the legacy job', async (ctx) => {
     if (!ready) ctx.skip();
 
-    const legacy = await generatePartnerProfilesLegacy();
-    const before = await snapshot();
+    const { legacy, before, paged, after } = await withCordisWritesBlocked(async () => {
+      const legacy = await generatePartnerProfilesLegacy();
+      const before = await snapshot();
 
-    await prisma.cordisPartnerProfile.deleteMany({ where: { organisationId: { startsWith: P } } });
-    await prisma.cordisCoParticipation.deleteMany({ where: { orgA: { startsWith: P } } });
+      await prisma.cordisPartnerProfile.deleteMany({ where: { organisationId: { startsWith: P } } });
+      await prisma.cordisCoParticipation.deleteMany({ where: { orgA: { startsWith: P } } });
 
-    const paged = await generatePartnerProfiles({ pageSize: 7 });
-    const after = await snapshot();
+      const paged = await generatePartnerProfiles({ pageSize: 7 });
+      return { legacy, before, paged, after: await snapshot() };
+    });
 
     // The fixture must actually reach the branches it claims to.
     expect(before.profiles).toHaveLength(41);
