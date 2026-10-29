@@ -99,6 +99,10 @@ export const INTERREG_API_ERRORS = [
   'bad_rubric',
   'rubric_unavailable',
   'upload_failed',
+  // F2 run (FO-188)
+  'not_ready',
+  'insufficient_credits',
+  'evaluation_failed',
 ] as const;
 export type InterregApiError = (typeof INTERREG_API_ERRORS)[number];
 

@@ -21,18 +21,25 @@ import {
 const REPO = resolve(__dirname, '../../../..');
 
 describe('registry', () => {
-  test('holds the 14 prompts, each in its own file', () => {
-    expect(PROMPT_IDS).toHaveLength(14);
+  test('holds the 17 prompts, each in its own file per locale it has', () => {
+    // 14 moved out of the call sites + 3 M17 (FO-188), the only ones with a `tr` text.
+    expect(PROMPT_IDS).toHaveLength(17);
     const dir = resolve(__dirname);
     const files = readdirSync(dir)
       .filter((d) => statSync(join(dir, d)).isDirectory())
       .flatMap((d) => readdirSync(join(dir, d)).map((f) => `${d}/${f}`));
-    expect(files.sort()).toEqual(PROMPT_IDS.map((id) => `${id}.en.ts`).sort());
+    const expected = PROMPT_IDS.flatMap((id) => [`${id}.en.ts`, ...(id.startsWith('m17/') ? [`${id}.tr.ts`] : [])]);
+    expect(files.sort()).toEqual(expected.sort());
   });
 
   test.each(PROMPT_IDS)('%s: placeholders and declared variables are the same set', (id) => {
     const placeholders = new Set([...promptTemplate(id).matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]));
     expect([...placeholders].sort()).toEqual([...promptVars(id)].sort());
+  });
+
+  test.each(PROMPT_IDS)('%s: every locale text has the same placeholders as en', (id) => {
+    const set = (locale: string) => [...new Set([...promptTemplate(id, locale).matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))].sort();
+    for (const locale of PROMPT_LOCALES) expect(set(locale), `${id} ${locale}`).toEqual(set('en'));
   });
 
   test('the locale list matches the app routing', () => {

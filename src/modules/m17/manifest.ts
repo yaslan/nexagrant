@@ -8,8 +8,9 @@ import { ModuleManifest } from '@/lib/modules/types';
 // FO-186 (TASK-MVRIV9LCDHYKO), owner-approved plan FO-185. The plan called it
 // "M15", but M15 is Post-Award Management (FO-40), so it takes the next free id.
 // F1 ships the data model and the upload/extract API only: the page is a gated
-// placeholder (fe-fb's screens replace it in F2/F3), and no LLM call until its credit price
-// is approved (`AI_ACTION_CREDITS`). Until then it is `soon` — listed as a preview
+// placeholder (fe-fb's screens replace it in F2/F3). F2 (FO-188) adds the LLM run
+// (POST …/analyses/[id]/evaluate, `M17:evaluate` in `AI_ACTION_CREDITS`, price pending
+// the owner's approval). Until the screens ship it stays `soon` — listed as a preview
 // on Pro and Ultra, refused by every gate (COMING_SOON) whatever ModuleState says.
 // Opening it = statusBadge 'beta' + a route/nav entry + `moduleIds` in the catalogue.
 // The grid it assesses against is data, not code (FO-187): InterregRubric, seeded

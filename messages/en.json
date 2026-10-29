@@ -4469,7 +4469,10 @@
       "analysis_busy": "The analysis is running; you can upload again when it finishes.",
       "bad_rubric": "That assessment grid does not exist.",
       "rubric_unavailable": "No assessment grid is set up yet; please contact support.",
-      "upload_failed": "Something went wrong during the upload. Please try again."
+      "upload_failed": "Something went wrong during the upload. Please try again.",
+      "not_ready": "Upload both the call guide and the project file first.",
+      "insufficient_credits": "Not enough AI credits for the pre-assessment.",
+      "evaluation_failed": "The check could not be completed. Your documents are kept; please try again."
     },
     "ui": {
       "title": "Interreg Pre-Assessment",
@@ -4514,6 +4517,90 @@
       "retry": "Try again",
       "genericError": "Something went wrong. Please try again.",
       "stillRunning": "The analysis still seems to be running. Refresh the page in a few minutes to look again."
+    },
+    "criteria": {
+      "relevance_so_fit": "Relevance to the programme specific objective and expected results",
+      "relevance_transnational_value": "Added value of transnational cooperation",
+      "coherence_intervention_logic": "Consistent and clearly defined intervention logic",
+      "coherence_indicators": "Indicators correctly identified and quantified",
+      "results_durability": "Impact of the outputs beyond the project lifetime",
+      "results_synergies_cma": "Synergies, horizontal principles and capitalisation",
+      "results_impact_synergies": "Impact, synergies, horizontal principles and capitalisation",
+      "partnership_relevance": "Relevant partners to address the common challenge",
+      "partnership_capacity": "Partners' competence and financial capacity",
+      "partnership_lead_capacity": "Lead partner's competence and financial capacity",
+      "workplan_coherent": "Coherent work plan",
+      "workplan_realistic": "Realistic work plan",
+      "management_risk": "Project management, coordination and risk mitigation",
+      "communication": "Communication reaching target groups and stakeholders",
+      "budget_value_for_money": "Budget value for money",
+      "budget_eligibility": "Eligible and reasonable costs"
+    },
+    "programChecks": {
+      "rco87_present": "Mandatory output indicator RCO87",
+      "rco07_if_research_so1": "RCO07 when a research organisation works under SO1",
+      "cma_contribution": "Contribution to the Common Maritime Agenda",
+      "partnership_composition": "Partnership composition",
+      "budget_range": "Interreg budget range",
+      "duration": "Project duration",
+      "so_open_in_call": "Specific objective open in this call"
+    },
+    "report": {
+      "sections": {
+        "summary": "📊 Interreg BSB compliance summary and estimated score",
+        "critical": "🔴 Critical cross-border gaps (elimination risks)",
+        "improve": "🟡 Areas to improve (points to gain)",
+        "rewrite": "✍️ Rewrite suggestion in Interreg vocabulary"
+      },
+      "eliminationRisk": "Elimination risk — the programme rejects an application for any of these, whatever the total:",
+      "scoreLine": "**Estimated: {score100}/100** (≈{raw}/{maxRaw} on the Annex 7 scale) — internal pre-assessment, not an official score",
+      "threshold": "Pass mark of the grid: {passRaw}/{maxRaw} ({pass100}/100).",
+      "table": {
+        "ref": "No.",
+        "criterion": "Criterion",
+        "mark": "Mark"
+      },
+      "checksHeading": "Programme rules",
+      "checkStatus": {
+        "met": "✅ Met",
+        "missing": "❌ Missing",
+        "unclear": "❔ Unclear"
+      },
+      "callGridNote": "The call guide's own grid:",
+      "contextTrimmed": "The call guide was too long to read whole: its last {chars} characters were left out.",
+      "projectTrimmed": "The project file was too long to read whole: its last {chars} characters were left out.",
+      "noRedFlags": "No elimination risk found.",
+      "noImprovements": "No improvement area found.",
+      "finding": "Finding",
+      "why": "Why it is a problem",
+      "fix": "Suggested fix",
+      "weakness": "Weakness",
+      "strength": "Strength",
+      "evidence": "Evidence",
+      "suggestion": "Suggestion",
+      "original": "Original",
+      "revised": "Revised (EN)",
+      "flagCriterion": {
+        "finding": "{ref} {name}: mark {mark}, below {floor}",
+        "why": "A mark below {floor} on this criterion rejects the application whatever the total.",
+        "fix": "Answer each sub-question of {ref} explicitly in the project file, with evidence; see the suggestions under {ref} below."
+      },
+      "flagTotal": {
+        "finding": "Total {raw}/{maxRaw}, below the pass mark {passRaw}",
+        "why": "An application below {passRaw}/{maxRaw} is rejected.",
+        "fix": "Start with the lowest-marked criteria below; each half point counts."
+      },
+      "flagCheck": {
+        "finding": "{check}: not met — {note}",
+        "why": "This is a rule of the call; an application that does not meet it can be rejected before the quality assessment.",
+        "fix": "State in the project file how {check} is met."
+      }
+    },
+    "evaluate": {
+      "start": "Check the project",
+      "running": "Checking the project…",
+      "done": "Pre-assessment ready",
+      "failed": "The check could not be completed. Your documents are kept; please try again."
     }
   }
 }

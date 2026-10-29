@@ -1,5 +1,11 @@
 import m10StandardDocEn from './m10/standard-doc.en';
 import m10StandardDocSystemEn from './m10/standard-doc-system.en';
+import m17CallContextEn from './m17/call-context.en';
+import m17CallContextTr from './m17/call-context.tr';
+import m17EvaluateEn from './m17/evaluate.en';
+import m17EvaluateTr from './m17/evaluate.tr';
+import m17EvaluateRetryEn from './m17/evaluate-retry.en';
+import m17EvaluateRetryTr from './m17/evaluate-retry.tr';
 import m2ConceptNoteSectionEn from './m2/concept-note-section.en';
 import m2SectionDraftSystemEn from './m2/section-draft-system.en';
 import m2SectionDraftUserEn from './m2/section-draft-user.en';
@@ -29,11 +35,12 @@ import ragRetrievedContextEn from './rag/retrieved-context.en';
  * does not pass, throws — a half-filled prompt is never sent.
  *
  * Locale: `renderPrompt` takes the caller's locale (see `promptLocale()` in
- * ./locale.ts) and falls back to `en`. Every prompt exists in `en` only today —
- * the text is the pre-move text byte for byte, including the language
- * instructions baked into some of them — so the output is the same for every
+ * ./locale.ts) and falls back to `en`. Every prompt but M17's exists in `en`
+ * only — the text is the pre-move text byte for byte, including the language
+ * instructions baked into some of them — so their output is the same for every
  * locale until a `<name>.tr.ts` is added and registered here. Adding one is a
- * behaviour change and is reviewed as such.
+ * behaviour change and is reviewed as such. M17 (FO-188) was written with both,
+ * and tests/prompt-snapshots.test.ts pins both.
  */
 
 /**
@@ -65,6 +72,10 @@ const PROMPTS = {
   'm9/meeting-brief-system': { vars: [], text: { en: m9MeetingBriefSystemEn } },
   'm10/standard-doc': { vars: ['kind', 'opportunityTitle'], text: { en: m10StandardDocEn } },
   'm10/standard-doc-system': { vars: [], text: { en: m10StandardDocSystemEn } },
+  // M17 Interreg pre-assessment (FO-188): stage 1 = call guide as system context, stage 2 = project vs grid.
+  'm17/call-context': { vars: ['call_context'], text: { en: m17CallContextEn, tr: m17CallContextTr } },
+  'm17/evaluate': { vars: ['rubric', 'project_context'], text: { en: m17EvaluateEn, tr: m17EvaluateTr } },
+  'm17/evaluate-retry': { vars: ['problems'], text: { en: m17EvaluateRetryEn, tr: m17EvaluateRetryTr } },
   'm2/concept-note-section': {
     vars: ['topicTitle', 'topicIdentifier', 'opportunityTitle', 'inputsJson', 'context', 'task', 'maxWords'],
     text: { en: m2ConceptNoteSectionEn },

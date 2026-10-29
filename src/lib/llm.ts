@@ -58,9 +58,19 @@ const DEFAULT_MAX_TOKENS = 4096;
  * the tail a truncated call used to lose. 8192 is ~2x the longest measured
  * complete document, and keeps a worst-case non-streaming call near 90 s.
  */
+/**
+ * M17 pre-assessment (FO-188): one JSON object with strengths, weaknesses and
+ * quoted evidence for each of 12–14 criteria plus a rewrite. 12288 cut the Turkish
+ * run mid-object (stop_reason max_tokens, FO-188 round 2), so both evaluate calls
+ * take 24576; the ceiling is a cap, not a charge.
+ */
+const M17_EVALUATE_MAX_TOKENS = 24576;
+
 const MAX_TOKENS_OVERRIDES: Readonly<Record<string, number>> = {
   M7: 8192,
   M10: 8192,
+  'M17:evaluate-attempt': M17_EVALUATE_MAX_TOKENS,
+  'M17:evaluate-retry': M17_EVALUATE_MAX_TOKENS,
 };
 
 /** Output ceiling for one call: explicit > per-action table > default. */
@@ -192,6 +202,8 @@ export type LlmGenerateOptions = {
   model?: string;
   provider?: LlmProvider;
   maxTokens?: number;
+  /** Epoch ms after which the provider request is abandoned and not retried. Unset: no limit. */
+  deadlineAt?: number;
 } & (
   | { prompt: string; system?: string; messages?: never }
   | { messages: LlmMessage[]; prompt?: never; system?: never }
@@ -216,7 +228,9 @@ export class LlmProviderError extends Error {
 async function withRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelay: number = 1000
+  baseDelay: number = 1000,
+  deadlineAt?: number,
+  signal?: AbortSignal
 ): Promise<T> {
   let attempt = 0;
   while (true) {
@@ -227,7 +241,10 @@ async function withRetry<T>(
       // An error with no status is not a client error, so it stays retryable.
       const status = errorStatus(error);
       const isClientError = status !== undefined && status !== 429 && status >= 400 && status < 500;
-      if (attempt > maxRetries || isClientError) {
+      // Past the deadline, or once the request's signal has fired (the clock and the signal can
+      // disagree by a tick), a retry can only be cut off again, so it is not made.
+      const pastDeadline = (deadlineAt !== undefined && Date.now() >= deadlineAt) || signal?.aborted === true;
+      if (attempt > maxRetries || isClientError || pastDeadline) {
         throw error;
       }
       const delay = baseDelay * Math.pow(2, attempt - 1);
@@ -267,11 +284,20 @@ function textFromAnthropicContent(content: unknown): string {
   return '';
 }
 
+/**
+ * The abort signal for one provider request. No deadline, no signal: callers that
+ * set none keep the unbounded request they always had.
+ */
+function signalUntil(deadlineAt: number | undefined): AbortSignal | undefined {
+  if (deadlineAt === undefined) return undefined;
+  return AbortSignal.timeout(Math.max(1, deadlineAt - Date.now()));
+}
+
 async function callProvider(
   messages: LlmMessage[],
-  opts: { provider: LlmProvider; model: string; maxTokens: number }
+  opts: { provider: LlmProvider; model: string; maxTokens: number; signal?: AbortSignal }
 ): Promise<ProviderResult & { refusalCategory?: string | null }> {
-  const { provider, model, maxTokens } = opts;
+  const { provider, model, maxTokens, signal } = opts;
 
   if (provider === 'anthropic') {
     const apiKey = requireApiKey('anthropic');
@@ -297,6 +323,7 @@ async function callProvider(
         system: systemMsg,
         messages: userMessages,
       }),
+      signal,
     });
 
     if (!res.ok) {
@@ -331,6 +358,7 @@ async function callProvider(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
+      signal,
     });
 
     if (!res.ok) {
@@ -421,6 +449,32 @@ export function resolveCredits(module: string, purpose: string): AiCreditQuote {
 }
 
 /**
+ * Books one AI action's price as a single `CreditLedger` row, for a caller whose
+ * model calls were priced 0 and whose product is only now delivered (M17
+ * evaluation, FO-188 B1). The price is `resolveCredits` — the one formula — so
+ * this cannot disagree with the catalogue. Returns the credits booked (0 books
+ * no row).
+ *
+ * With `tx`, the row is written inside the caller's transaction, so a failed
+ * write rolls back whatever that transaction already did (FO-188 Soru 3).
+ */
+export async function chargeAiAction(
+  params: { tenantId: string; module: string; purpose: string; refId: string },
+  tx?: TenantTx,
+): Promise<number> {
+  const { credits } = resolveCredits(params.module, params.purpose);
+  if (credits > 0) {
+    const data = { tenantId: params.tenantId, delta: -credits, reason: `usage:${params.module}`, refId: params.refId };
+    if (tx) {
+      await tx.creditLedger.create({ data });
+    } else {
+      await withTenant(params.tenantId, (own) => own.creditLedger.create({ data }));
+    }
+  }
+  return credits;
+}
+
+/**
  * `promptHash` for an `AiUsageLog` row: sha256, full 64 hex digits, over every
  * message including the system prompt.
  *
@@ -430,7 +484,7 @@ export function resolveCredits(module: string, purpose: string): AiCreditQuote {
  * rows. Only the hash is ever stored; the prompt text itself never reaches the
  * database.
  */
-function hashMessages(messages: LlmMessage[]): string {
+export function hashMessages(messages: LlmMessage[]): string {
   return crypto
     .createHash('sha256')
     .update(messages.map(m => `${m.role}:${m.content}`).join('\n'))
@@ -508,8 +562,14 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   const { credits: price } = resolveCredits(options.module, options.purpose);
 
   requireApiKey(provider);
-  const { outcome, refusalCategory, ...result } = await withRetry(() =>
-    callProvider(messages, { provider, model, maxTokens })
+  // One signal for the whole request: every attempt gives up at the same instant.
+  const signal = signalUntil(options.deadlineAt);
+  const { outcome, refusalCategory, ...result } = await withRetry(
+    () => callProvider(messages, { provider, model, maxTokens, signal }),
+    3,
+    1000,
+    options.deadlineAt,
+    signal
   );
 
   // A truncated or refused answer is not the product the tenant paid for, so
