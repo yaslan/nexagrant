@@ -41,10 +41,11 @@ P=55xx                                          # boş bir port seç (lsof -nP -
 DB=<is>                                         # `fabrika` OLMASIN: tests/expert-prereg-retention.live.test.ts `fabrika` adlı DB'de kendini atlar (paylaşılan DB sanar)
 docker run -d --name <is>-pg -e POSTGRES_DB=$DB -e POSTGRES_USER=fabrika -e POSTGRES_PASSWORD=fabrika \
   -p 127.0.0.1:$P:5432 pgvector/pgvector:pg16
-cp .env.example .env && perl -pi -e "s#\@localhost:5433/fabrika#\@localhost:$P/$DB#g" .env   # perl: mac ve Linux'ta aynı (sed -i '' yalnız BSD)
+cp .env.example .env && perl -pi -e "s#\@localhost:5433/fabrika#\@127.0.0.1:$P/$DB#g" .env   # perl: mac ve Linux'ta aynı (sed -i '' yalnız BSD)
+                                                # 127.0.0.1, localhost değil: -p yalnız IPv4'ü yayımlar; ::1 tarafını başka süreç alırsa psql kırılır (FO-203, pre-push durur)
 perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env
 pnpm install --frozen-lockfile && pnpm db:setup  # db:rls-role, DATABASE_URL_RLS_TEST'i bu .env'e ekler
-E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: localhost:$P/$DB" yazar
+E2E_PORT=<boş port> git push -u origin <dal>     # kanca "→ veritabanı: 127.0.0.1:$P/$DB" yazar
 docker rm -f <is>-pg                            # iş bitince
 ```
 Ana checkout "must be run in a work tree" veriyorsa `core.bare=true` olmuştur. Belirti, kontrol ve düzeltme için bkz. `docs/RELEASE_CHECKLIST.md` §9.1. `GIT_DIR` set iken başka dizinde `git init` ya da `git config` koşma.
