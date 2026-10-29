@@ -200,19 +200,37 @@ const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
 export const CORDIS_WIDGET_SOURCE = 'https://cordis.europa.eu/datalab/visualisations/';
 
 /**
+ * A request path as Next's router matches it: percent-decoded once. The router
+ * serves `/tr/embed/%63ordis` and `/%74r/embed/cordis` from the embed route; the
+ * proxy's `nextUrl.pathname` may still be encoded (a NextRequest built from the raw
+ * URL is; a review measured it on a production build, FO-169 Y-1). Decoding here
+ * makes the match right either way. A malformed escape (`/%E0%A4%A`) cannot be
+ * decoded: the raw path is used.
+ */
+function routedPath(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
+/**
  * The CORDIS widget's own document: `/tr/embed/cordis`, `/en/embed/cordis`
- * (optional trailing slash). Lower case only — anything else gets the default policy.
+ * (optional trailing slash), however it is percent-encoded. Lower case only —
+ * anything else gets the default policy.
  */
 export function isCordisWidgetPath(pathname: string): boolean {
-  return /^\/(?:tr|en)\/embed\/cordis\/?$/.test(pathname);
+  return /^\/(?:tr|en)\/embed\/cordis\/?$/.test(routedPath(pathname));
 }
 
 /**
  * The pages that frame the CORDIS embed: the home page, `/tr` and `/en`
- * (localePrefix is 'always'; `/` redirects to one of them). Lower case only.
+ * (localePrefix is 'always'; `/` redirects to one of them), however it is
+ * percent-encoded. Lower case only.
  */
 export function isCordisWidgetHostPath(pathname: string): boolean {
-  return /^\/(?:tr|en)\/?$/.test(pathname);
+  return /^\/(?:tr|en)\/?$/.test(routedPath(pathname));
 }
 
 /** `https://host[:port]` of a URL, or null when it is blank or unparsable. */
@@ -297,14 +315,22 @@ function r2EndpointOrigin(endpoint: string | null | undefined): string | null {
 }
 
 /**
- * An enforced header that carries only the sandbox, for the embed's own document.
- * Its tokens are the iframe's (`CORDIS_IFRAME_SANDBOX`, one source), so opening the
- * embed directly gives the same opaque origin the home page's frame has. In
- * `CSP_MODE=report-only` the full policy is only reported, and a report-only
+ * An enforced header for the embed's own document: the sandbox and who may frame it.
+ * The sandbox tokens are the iframe's (`CORDIS_IFRAME_SANDBOX`, one source), so
+ * opening the embed directly gives the same opaque origin the home page's frame has.
+ * In `CSP_MODE=report-only` the full policy is only reported, and a report-only
  * `sandbox` is not enforced, so src/proxy.ts sends this header as well.
+ *
+ * `frame-ancestors 'self'` (FO-169 Ö-1): next.config sends `X-Frame-Options: DENY`
+ * on every path, and browsers ignore it only when an *enforced* policy has
+ * `frame-ancestors`. Without it, report-only mode refused the home page's frame.
+ *
+ * Not set by the embed route itself: on a path the proxy runs on, Next sends the
+ * proxy's `Content-Security-Policy` and drops the route's (measured, Next 16.3.8),
+ * so the proxy's path match is what counts — see `routedPath`.
  */
 export function cordisSandboxPolicy(): string {
-  return `sandbox ${CORDIS_IFRAME_SANDBOX}`;
+  return `sandbox ${CORDIS_IFRAME_SANDBOX}; frame-ancestors 'self'`;
 }
 
 export function buildContentSecurityPolicy(opts: CspOptions): string {

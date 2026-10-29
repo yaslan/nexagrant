@@ -75,6 +75,19 @@ test.describe('landing page CORDIS projects block (FO-169)', () => {
     expect(await page.evaluate(() => window.origin)).toBe('null');
   });
 
+  // FO-169 Y-1: the router decodes the path, so these reach the embed route too.
+  test('percent-encoded embed paths: when the widget answers (200), the enforced policy sandboxes it', async ({ request }) => {
+    for (const path of ['/tr/embed/%63ordis', '/%74r/embed/cordis']) {
+      const res = await request.get(path, { headers: { 'Sec-Fetch-Dest': 'iframe' }, maxRedirects: 0 });
+      expect(new URL(res.url()).pathname, path).toBe(path);
+      const policy = res.headers()['content-security-policy'] ?? '';
+      if (res.status() === 200) expect(await res.text(), path).toContain('cordis-widget-loader');
+      else expect(res.status(), path).toBe(404); // no key on this server
+      expect(policy, path).toContain(`sandbox ${CORDIS_IFRAME_SANDBOX}`);
+      expect(policy, path).toContain("frame-ancestors 'self'");
+    }
+  });
+
   test('no key: no frame at all, and the embed route is a 404', async ({ page, request }) => {
     test.skip(HAS_KEY, 'the server has a widget key');
     await page.goto('/en');

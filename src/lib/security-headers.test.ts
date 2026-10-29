@@ -344,6 +344,34 @@ describe('CORDIS widget CSP (FO-168, sandboxed iframe since FO-169 / K-573263) â
     }
   });
 
+  // FO-169 Y-1: the router decodes the path, so an encoded alias reaches the embed route.
+  it('isCordisWidgetPath / isCordisWidgetHostPath: percent-encoded aliases count, a malformed escape does not throw', () => {
+    for (const p of ['/tr/embed/%63ordis', '/%74r/embed/cordis', '/tr/%65mbed/cordis', '/tr/embed/cord%69s', '/en/embed/%63ordis', '/tr/embed/cordis%2F']) {
+      expect(isCordisWidgetPath(p), p).toBe(true);
+    }
+    for (const p of ['/tr/embed/%43ordis', '/tr/embed/%2563ordis', '/tr/embed/cordis%2Fx', '/tr/embed/%E0%A4%A', '/tr/embed/cordis%']) {
+      expect(isCordisWidgetPath(p), p).toBe(false);
+    }
+    for (const p of ['/%74r', '/e%6E', '/%74r%2F']) expect(isCordisWidgetHostPath(p), p).toBe(true);
+    for (const p of ['/%54R', '/tr%', '/%E0%A4%A']) expect(isCordisWidgetHostPath(p), p).toBe(false);
+  });
+
+  it('the proxy sandboxes the embed whatever way its path is percent-encoded, in both CSP modes', () => {
+    const prev = process.env.CSP_MODE;
+    try {
+      for (const p of ['/tr/embed/%63ordis', '/%74r/embed/cordis', '/tr/%65mbed/cordis', '/en/embed/%63ordis']) {
+        delete process.env.CSP_MODE;
+        expect(csp(p), p).toMatch(/(^|; )sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox(;|$)/);
+        expect(csp(p), p).toMatch(/frame-ancestors 'self'/);
+        process.env.CSP_MODE = 'report-only';
+        expect(proxy(new NextRequest(`http://localhost${p}`)).headers.get('content-security-policy'), p).toBe(cordisSandboxPolicy());
+      }
+    } finally {
+      if (prev === undefined) delete process.env.CSP_MODE;
+      else process.env.CSP_MODE = prev;
+    }
+  });
+
   it('isCordisWidgetHostPath: /tr and /en (optional trailing slash) only', () => {
     for (const p of ['/tr', '/en', '/tr/', '/en/']) expect(isCordisWidgetHostPath(p), p).toBe(true);
     for (const p of [
@@ -436,8 +464,9 @@ describe('CORDIS widget CSP (FO-168, sandboxed iframe since FO-169 / K-573263) â
     expect(cspHeaderName(env({ CSP_MODE: 'report-only' }))).toBe('Content-Security-Policy-Report-Only');
   });
 
-  it('the enforced sandbox-only header carries the iframe tokens and nothing else', () => {
-    expect(cordisSandboxPolicy()).toBe(`sandbox ${CORDIS_IFRAME_SANDBOX}`);
+  it('the enforced sandbox header carries the iframe tokens and frame-ancestors self, nothing else', () => {
+    // frame-ancestors (FO-169 Ã–-1): without it in an enforced policy, X-Frame-Options DENY refuses the frame
+    expect(cordisSandboxPolicy()).toBe(`sandbox ${CORDIS_IFRAME_SANDBOX}; frame-ancestors 'self'`);
     expect(cordisSandboxPolicy()).not.toContain('allow-same-origin');
   });
 
