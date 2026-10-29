@@ -104,6 +104,44 @@ describe('GET /api/cagrilar cache', () => {
     expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
   });
 
+  test('a visitor who leaves does not fail the others waiting on the same search (A-1)', async () => {
+    // Like the real adapter: an aborted call comes back empty with an error, not thrown.
+    let finish: () => void = () => {};
+    mocks.searchSedia.mockImplementation(
+      (opts: { signal?: AbortSignal }) =>
+        new Promise((resolve) => {
+          finish = () => resolve(ok());
+          opts.signal?.addEventListener('abort', () =>
+            resolve({ ...ok(), topics: [], errors: ['aborted'] })
+          );
+        })
+    );
+    const q = '?q=cache-leaves&lang=en';
+    const leaving = new AbortController();
+
+    const first = GET(new NextRequest(`http://localhost/api/cagrilar${q}`, { signal: leaving.signal }));
+    const second = get(q);
+    await vi.waitFor(() => expect(mocks.searchSedia).toHaveBeenCalledTimes(1));
+    leaving.abort();
+    await new Promise((r) => setTimeout(r, 10));
+    finish();
+
+    const answer = await second;
+    expect(answer.status).toBe(200);
+    expect((await answer.json()).topics).toHaveLength(1);
+    await first;
+    expect(mocks.searchSedia).toHaveBeenCalledTimes(1);
+  });
+
+  test('a search that failed in flight is not kept: the next visit asks SEDIA again (A-2)', async () => {
+    mocks.searchSedia.mockRejectedValueOnce(new Error('sedia down')).mockResolvedValueOnce(ok());
+    const q = '?q=cache-failed-flight&lang=en';
+
+    expect((await get(q)).status).not.toBe(200);
+    expect((await get(q)).status).toBe(200);
+    expect(mocks.searchSedia).toHaveBeenCalledTimes(2);
+  });
+
   test('a SEDIA page with an error is served but not remembered', async () => {
     mocks.searchSedia.mockResolvedValue(ok(['Page 1 fetch error: boom']));
     const q = '?q=cache-partial&lang=en';

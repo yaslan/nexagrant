@@ -73,15 +73,47 @@ export function translationStats(): { cacheSize: number; active: number; queued:
 
 /**
  * After MyMemory refuses for quota (HTTP 429, or its "MYMEMORY WARNING" text),
- * no further calls go out for this long (FO-204). Each search used to resend
- * every untranslated text, so a full quota cost dozens of refused calls per
- * request; now one refusal pauses them and the English list comes back at once.
+ * no further calls go out for a while (FO-204). The first pause is short so a
+ * Turkish list comes back soon after the quota resets; when the single probe call
+ * after the pause is refused again, the pause doubles up to the cap.
  */
-export const TRANSLATION_QUOTA_PAUSE_MS = 10 * 60_000;
+export const TRANSLATION_QUOTA_PAUSE_FIRST_MS = 60_000;
+export const TRANSLATION_QUOTA_PAUSE_MAX_MS = 10 * 60_000;
 let quotaPausedUntil = 0;
+let quotaPauseMs = 0;
+let quotaProbing = false;
 
+/**
+ * A refusal while the pause runs (a call sent before the pause) does not extend
+ * it. A refusal after the pause ended is the probe failing, so the pause doubles.
+ */
 function pauseForQuota(now = Date.now()): void {
-  quotaPausedUntil = now + TRANSLATION_QUOTA_PAUSE_MS;
+  if (now < quotaPausedUntil) return;
+  quotaPauseMs =
+    quotaPauseMs === 0
+      ? TRANSLATION_QUOTA_PAUSE_FIRST_MS
+      : Math.min(quotaPauseMs * 2, TRANSLATION_QUOTA_PAUSE_MAX_MS);
+  quotaPausedUntil = now + quotaPauseMs;
+  quotaProbing = false;
+}
+
+/** A translation came back: the service works, so the pause and its backoff are forgotten. */
+function recoverFromQuota(): void {
+  quotaPausedUntil = 0;
+  quotaPauseMs = 0;
+  quotaProbing = false;
+}
+
+/**
+ * Decides whether a call may go out. While paused, nothing does. Once the pause
+ * ends exactly one call goes out as the probe; the others wait for its answer.
+ * Returns `null` for "do not call", otherwise whether this call is the probe.
+ */
+function claimQuotaCall(now = Date.now()): { probe: boolean } | null {
+  if (now < quotaPausedUntil || quotaProbing) return null;
+  if (quotaPausedUntil === 0) return { probe: false };
+  quotaProbing = true;
+  return { probe: true };
 }
 
 /** True while the service is paused after a quota refusal. */
@@ -91,7 +123,7 @@ export function translationQuotaPaused(now = Date.now()): boolean {
 
 /** Test seam: forget a pause so one test's refusal does not leak into the next. */
 export function resetTranslationQuotaPause(): void {
-  quotaPausedUntil = 0;
+  recoverFromQuota();
 }
 
 /**
@@ -157,7 +189,8 @@ async function translateTextOrNull(
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(trimmed)}&langpair=en|${targetLang}`;
     const translated = await withTranslationSlot(async () => {
       // Checked inside the slot too, so calls already queued behind a refusal do not go out.
-      if (translationQuotaPaused()) return null;
+      const claim = claimQuotaCall();
+      if (claim === null) return null;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
       const cancel = () => controller.abort();
@@ -177,10 +210,13 @@ async function translateTextOrNull(
           pauseForQuota();
           return null;
         }
+        recoverFromQuota();
         return text;
       } finally {
         clearTimeout(timeoutId);
         signal?.removeEventListener('abort', cancel);
+        // A probe that ended without a quota answer (timeout, error) frees the next probe.
+        if (claim.probe) quotaProbing = false;
       }
     }, signal);
 

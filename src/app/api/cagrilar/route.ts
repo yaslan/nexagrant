@@ -54,6 +54,10 @@ const limiter = new UserWindowLimiter(CAGRILAR_PER_USER_PER_MINUTE);
  * One SEDIA call, remembered when it came back whole. A page cut short by the
  * budget or carrying a SEDIA error is not stored: the next visitor would be
  * served the gap for ten minutes.
+ *
+ * The shared call is bound to the budget only, never to the first caller's
+ * request signal: a visitor who closes the page must not turn the call into a
+ * 503 for the others waiting on it (FO-204 A-1).
  */
 async function searchSediaAndRemember(cacheKey: string, options: SediaSearchOptions) {
   const result = await new SediaAdapter().searchSedia(options);
@@ -146,7 +150,7 @@ export async function GET(request: NextRequest) {
           frameworkProgrammes,
           types,
           languages: [lang, 'en'],
-          signal,
+          signal: budget.signal,
         })
       ));
 

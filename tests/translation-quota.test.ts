@@ -2,15 +2,20 @@
  * FO-204 — when the free translation service is over quota (HTTP 429 or its
  * "MYMEMORY WARNING" text), the batch reports how many texts it could not
  * translate and gives back the English originals. The service is then left
- * alone for TRANSLATION_QUOTA_PAUSE_MS, and a text that never got a translation
- * is not remembered as English.
+ * alone for TRANSLATION_QUOTA_PAUSE_FIRST_MS; after the pause exactly one call
+ * probes it, and a failed probe doubles the pause up to TRANSLATION_QUOTA_PAUSE_MAX_MS.
+ * A text that never got a translation is not remembered as English.
  */
 import { describe, test, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
-  TRANSLATION_QUOTA_PAUSE_MS,
+  TRANSLATION_QUOTA_PAUSE_FIRST_MS,
   resetTranslationQuotaPause,
   translateTopicsBatch,
 } from '@/lib/translation';
+
+const translatedOk = (text: string) =>
+  new Response(JSON.stringify({ responseData: { translatedText: text } }), { status: 200 });
+const quotaRefused = () => new Response('quota', { status: 429 });
 
 beforeEach(() => {
   resetTranslationQuotaPause();
@@ -49,12 +54,7 @@ describe('translateTopicsBatch when the service is over quota', () => {
 
   test('while paused no call goes out; after the pause a failed text is translated', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response('quota', { status: 429 }))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ responseData: { translatedText: 'gamma çevrildi' } }), { status: 200 })
-      );
+    const fetchMock = vi.fn().mockResolvedValueOnce(quotaRefused()).mockResolvedValueOnce(translatedOk('gamma çevrildi'));
     vi.stubGlobal('fetch', fetchMock);
 
     const first = await translateTopicsBatch([{ title: 'quota retry gamma' }], 'tr');
@@ -63,11 +63,93 @@ describe('translateTopicsBatch when the service is over quota', () => {
     expect(during.untranslated).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    vi.setSystemTime(Date.now() + TRANSLATION_QUOTA_PAUSE_MS + 1);
+    vi.setSystemTime(Date.now() + TRANSLATION_QUOTA_PAUSE_FIRST_MS + 1);
     const after = await translateTopicsBatch([{ title: 'quota retry gamma' }], 'tr');
 
     expect(after.untranslated).toBe(0);
     expect(after.items[0]?.title).toBe('gamma çevrildi');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('a refusal from a call sent before the pause does not extend it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const replies: Array<(r: Response) => void> = [];
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => replies.push(resolve)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const early = translateTopicsBatch([{ title: 'pause early delta' }], 'tr');
+    const first = translateTopicsBatch([{ title: 'pause refused delta' }], 'tr');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const start = Date.now();
+
+    replies[1]!(quotaRefused());
+    await first;
+    vi.setSystemTime(start + 30_000);
+    replies[0]!(quotaRefused());
+    await early;
+
+    // 61 s after the first refusal the pause is over, the 30 s refusal notwithstanding.
+    vi.setSystemTime(start + TRANSLATION_QUOTA_PAUSE_FIRST_MS + 1_000);
+    const probe = translateTopicsBatch([{ title: 'pause probe delta' }], 'tr');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    replies[2]!(translatedOk('delta çevrildi'));
+
+    expect((await probe).untranslated).toBe(0);
+  });
+
+  test('after the pause only one call probes the service; the rest wait for its answer', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const replies: Array<(r: Response) => void> = [];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(quotaRefused())
+      .mockImplementation(() => new Promise<Response>((resolve) => replies.push(resolve)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await translateTopicsBatch([{ title: 'single probe epsilon' }], 'tr');
+    vi.setSystemTime(Date.now() + TRANSLATION_QUOTA_PAUSE_FIRST_MS + 1);
+
+    const a = translateTopicsBatch([{ title: 'single probe zeta' }], 'tr');
+    const b = translateTopicsBatch([{ title: 'single probe eta' }], 'tr');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    replies[0]!(translatedOk('zeta çevrildi'));
+    expect((await a).untranslated).toBe(0);
+    expect((await b).untranslated).toBe(1);
+  });
+
+  test('a failed probe doubles the pause, and a successful one clears it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(quotaRefused())
+      .mockResolvedValueOnce(quotaRefused())
+      .mockResolvedValueOnce(translatedOk('theta çevrildi'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await translateTopicsBatch([{ title: 'backoff theta' }], 'tr');
+    vi.setSystemTime(Date.now() + TRANSLATION_QUOTA_PAUSE_FIRST_MS + 1);
+    await translateTopicsBatch([{ title: 'backoff theta' }], 'tr');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // The second pause is twice the first: a minute later it still holds.
+    vi.setSystemTime(Date.now() + TRANSLATION_QUOTA_PAUSE_FIRST_MS);
+    await translateTopicsBatch([{ title: 'backoff theta' }], 'tr');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.setSystemTime(Date.now() + TRANSLATION_QUOTA_PAUSE_FIRST_MS + 1);
+    const recovered = await translateTopicsBatch([{ title: 'backoff theta' }], 'tr');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(recovered.items[0]?.title).toBe('theta çevrildi');
+
+    // Success resets the backoff: the next outage starts again at the short pause.
+    const fourth = vi.fn(async () => quotaRefused());
+    vi.stubGlobal('fetch', fourth);
+    await translateTopicsBatch([{ title: 'backoff iota' }], 'tr');
+    vi.setSystemTime(Date.now() + TRANSLATION_QUOTA_PAUSE_FIRST_MS + 1);
+    await translateTopicsBatch([{ title: 'backoff iota' }], 'tr');
+    expect(fourth).toHaveBeenCalledTimes(2);
   });
 });
