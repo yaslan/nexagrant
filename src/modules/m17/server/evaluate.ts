@@ -9,8 +9,15 @@
  *
  * The model returns marks; the score, the knockout flags and the report are
  * computed here from the marks and the grid (`scoreMarks`, `knockoutFlags`,
- * `buildReportMarkdown`). An answer that fails the schema is asked again once
- * (`M17:evaluate-retry`, priced 0 — the user already paid for the run).
+ * `buildReportMarkdown`). An answer that fails the schema is asked again once.
+ *
+ * Both model calls are priced 0 (`M17:evaluate-attempt`, `M17:evaluate-retry`).
+ * The price (`M17:evaluate`) is booked once, as one ledger row, after the result
+ * is saved — a run that fails, or whose claim was taken over, costs nothing.
+ *
+ * The ANALYZING claim is identified by its `updatedAt` (the claim instant). The
+ * writes that end a run (DONE, FAILED) match on it, so a run whose claim was
+ * taken over by a later one cannot overwrite that later run's state.
  */
 import type { Prisma } from '@prisma/client';
 import { createTranslator } from 'next-intl';
@@ -18,7 +25,7 @@ import { createTranslator } from 'next-intl';
 import { renderPrompt, type PromptLocale } from '@/lib/ai/prompts';
 import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
-import { generateCompletion, getCreditBalance, hashMessages, resolveCredits, type LlmMessage } from '@/lib/llm';
+import { chargeAiAction, generateCompletion, getCreditBalance, hashMessages, resolveCredits, type LlmMessage } from '@/lib/llm';
 import { requireActionId } from '@/lib/required-id';
 
 import { knockoutFlags, scoreMarks } from '../rubric';
@@ -33,11 +40,20 @@ import enMessages from '../../../../messages/en.json';
 const MESSAGES = { tr: trMessages, en: enMessages };
 
 export const EVALUATE_MODULE = 'M17';
+/** The price of a delivered run (`AI_ACTION_CREDITS`); booked by `chargeAiAction`, never by a model call. */
 export const EVALUATE_PURPOSE = 'evaluate';
+export const EVALUATE_ATTEMPT_PURPOSE = 'evaluate-attempt';
 export const EVALUATE_RETRY_PURPOSE = 'evaluate-retry';
 
-/** A run that crashed mid-way (process killed) leaves ANALYZING; after this it may be claimed again. */
-export const STALE_CLAIM_MS = 15 * 60 * 1000;
+/** `maxDuration` of the POST route (`app/api/interreg-review/analyses/[id]/evaluate/route.ts`). Keep them equal. */
+const MAX_RUN_MS = 300 * 1000;
+
+/**
+ * A run that crashed mid-way (process killed) leaves ANALYZING; after this it may be
+ * claimed again. A margin over MAX_RUN_MS: a run the platform has not killed is
+ * not taken over (FO-188 Ö1).
+ */
+export const STALE_CLAIM_MS = MAX_RUN_MS + 60 * 1000;
 
 const RUN_RUBRIC_SELECT = {
   id: true,
@@ -118,6 +134,8 @@ type Claimed = {
   rubricId: string;
   callText: string;
   projectText: string;
+  /** The claim's `updatedAt`: this run's identity on the row (FO-188 B3). */
+  claimedAt: Date;
 };
 
 /** READY/DONE/FAILED (or a stale ANALYZING) with both texts → ANALYZING, in one UPDATE. */
@@ -144,17 +162,18 @@ async function claim(owner: Owner, analysisId: string, now: Date): Promise<{ ok:
     });
     if (!row) return { ok: false, error: 'not_found' } as const;
     if (count === 0) return { ok: false, error: row.status === 'ANALYZING' ? 'analysis_busy' : 'not_ready' } as const;
-    return { ok: true, row: { rubricId: row.rubricId, callText: row.callText ?? '', projectText: row.projectText ?? '' } } as const;
+    return { ok: true, row: { rubricId: row.rubricId, callText: row.callText ?? '', projectText: row.projectText ?? '', claimedAt: now } } as const;
   });
 }
 
-async function markFailed(owner: Owner, analysisId: string): Promise<void> {
+/** ANALYZING → FAILED, only while this run still holds the claim. */
+async function markFailed(owner: Owner, analysisId: string, claimedAt: Date): Promise<void> {
   const tenantId = requireActionId(owner.tenantId, 'tenantId');
   const userId = requireActionId(owner.userId, 'userId');
   const id = requireActionId(analysisId, 'analysisId');
   await withTenant(tenantId, (tx) =>
     tx.interregAnalysis.updateMany({
-      where: { id, tenantId, userId, status: 'ANALYZING' },
+      where: { id, tenantId, userId, status: 'ANALYZING', updatedAt: claimedAt },
       data: { status: 'FAILED' },
     }),
   );
@@ -181,7 +200,7 @@ export async function runEvaluation(owner: Owner, analysisId: string, opts: Eval
   } catch (error) {
     // No document text in the log: the analysis id and the reason are enough to find the AiUsageLog row.
     console.error('[interreg-review][evaluate]', id, errorMessage(error));
-    await markFailed(owner, id);
+    await markFailed(owner, id, claimed.row.claimedAt);
     return { ok: false, error: 'evaluation_failed' };
   }
 }
@@ -223,10 +242,11 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
   ];
   const base = { tenantId, userId, module: EVALUATE_MODULE };
 
-  const first = await generateCompletion({ ...base, purpose: EVALUATE_PURPOSE, messages });
+  // Both calls are priced 0; the run's price is booked once, after the result is saved.
+  const first = await generateCompletion({ ...base, purpose: EVALUATE_ATTEMPT_PURPOSE, messages });
   let completion = first;
   let parsed = parseEvaluation(first.text, grid);
-  let usage = { credits: first.credits, inputTokens: first.inputTokens, outputTokens: first.outputTokens };
+  let usage = { inputTokens: first.inputTokens, outputTokens: first.outputTokens };
   if (!parsed.ok) {
     const retry: LlmMessage[] = [
       ...messages,
@@ -235,7 +255,6 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
     ];
     completion = await generateCompletion({ ...base, purpose: EVALUATE_RETRY_PURPOSE, messages: retry });
     usage = {
-      credits: usage.credits + completion.credits,
       inputTokens: usage.inputTokens + completion.inputTokens,
       outputTokens: usage.outputTokens + completion.outputTokens,
     };
@@ -258,6 +277,7 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
     flags,
     output,
     callCharsOmitted: fitted.callCharsOmitted,
+    projectCharsOmitted: fitted.projectCharsOmitted,
   };
   const reportMarkdown = buildReportMarkdown(reportInput);
   const redFlags = redFlagsOf(reportInput);
@@ -298,13 +318,17 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
         evidence: m.evidence,
       })),
     });
-    // Still ours: nothing else moves an ANALYZING row but a stale-claim takeover.
+    // Still this run's: a later claim moved `updatedAt`, so this write matches nothing and the
+    // whole transaction (marks and result included) rolls back.
     const done = await tx.interregAnalysis.updateMany({
-      where: { id, tenantId, userId, status: 'ANALYZING' },
+      where: { id, tenantId, userId, status: 'ANALYZING', updatedAt: row.claimedAt },
       data: { status: 'DONE' },
     });
-    if (done.count !== 1) throw new Error('analysis left ANALYZING before the result was written');
+    if (done.count !== 1) throw new Error('analysis claim was taken over before the result was written');
   });
+
+  // After the result is saved, and only then: one ledger row for the run.
+  const credits = await chargeAiAction({ tenantId, module: EVALUATE_MODULE, purpose: EVALUATE_PURPOSE, refId: id });
 
   return {
     analysisId: id,
@@ -326,7 +350,7 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
       evidence: m.evidence,
     })),
     model: completion.model,
-    credits: usage.credits,
+    credits,
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
     callCharsOmitted: fitted.callCharsOmitted,

@@ -859,15 +859,24 @@ export const AI_ACTION_CREDITS: Readonly<Record<string, AiCreditEntry>> = {
     note:
       'Interreg pre-assessment (FO-188). Proposed 3 = the M6 evaluation class: the FO-185 ' +
       'plan the owner approved says "kredi fiyatı M6 değerlendirmesiyle aynı sınıfta başlar", ' +
-      'and it is the same shape — a whole application read against an official grid.',
+      'and it is the same shape — a whole application read against an official grid. ' +
+      'Charged once, as one ledger row, after the result is written; the model calls ' +
+      'themselves are priced 0 (evaluate-attempt, evaluate-retry), so a failed run costs nothing.',
+  },
+  'M17:evaluate-attempt': {
+    credits: 0,
+    approval: 'pending-owner-approval',
+    note:
+      'The first model call of an M17:evaluate run (FO-188). Priced 0: the price is taken once, ' +
+      'after the result is saved, under M17:evaluate. The call is still logged in AiUsageLog.',
   },
   'M17:evaluate-retry': {
     credits: 0,
     approval: 'pending-owner-approval',
     note:
-      'The one re-ask after an answer that failed the output schema (FO-188). Proposed 0: ' +
-      'the user pressed one button and already paid M17:evaluate; a malformed answer is ' +
-      'our defect, not a second purchase. The call is still logged in AiUsageLog.',
+      'The one re-ask after an answer that failed the output schema (FO-188). Priced 0: the ' +
+      'user pressed one button and pays M17:evaluate only when a result is delivered; a malformed ' +
+      'answer is our defect, not a second purchase. The call is still logged in AiUsageLog.',
   },
   'M6:esr-parser': {
     credits: 0,

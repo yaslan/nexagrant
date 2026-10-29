@@ -424,6 +424,25 @@ export function resolveCredits(module: string, purpose: string): AiCreditQuote {
 }
 
 /**
+ * Books one AI action's price as a single `CreditLedger` row, for a caller whose
+ * model calls were priced 0 and whose product is only now delivered (M17
+ * evaluation, FO-188 B1). The price is `resolveCredits` — the one formula — so
+ * this cannot disagree with the catalogue. Returns the credits booked (0 books
+ * no row).
+ */
+export async function chargeAiAction(params: { tenantId: string; module: string; purpose: string; refId: string }): Promise<number> {
+  const { credits } = resolveCredits(params.module, params.purpose);
+  if (credits > 0) {
+    await withTenant(params.tenantId, (tx) =>
+      tx.creditLedger.create({
+        data: { tenantId: params.tenantId, delta: -credits, reason: `usage:${params.module}`, refId: params.refId },
+      }),
+    );
+  }
+  return credits;
+}
+
+/**
  * `promptHash` for an `AiUsageLog` row: sha256, full 64 hex digits, over every
  * message including the system prompt.
  *

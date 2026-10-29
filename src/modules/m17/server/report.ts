@@ -28,6 +28,8 @@ export interface ReportInput {
   output: EvaluationOutput;
   /** Characters of the call guide left out to fit the context window (0 = all of it was read). */
   callCharsOmitted: number;
+  /** Characters of the project file left out to fit the context window (0 = all of it was read). */
+  projectCharsOmitted: number;
 }
 
 export interface RedFlag {
@@ -117,6 +119,7 @@ export function buildReportMarkdown(input: ReportInput): string {
   }
   if (output.callGridNote) push('', `_${t('report.callGridNote')}_ ${cell(output.callGridNote)}`);
   if (input.callCharsOmitted > 0) push('', `_${t('report.contextTrimmed', { chars: n(input.callCharsOmitted) })}_`);
+  if (input.projectCharsOmitted > 0) push('', `_${t('report.projectTrimmed', { chars: n(input.projectCharsOmitted) })}_`);
   push('');
 
   // 2 — critical cross-border gaps.

@@ -4568,6 +4568,7 @@
       },
       "callGridNote": "The call guide's own grid:",
       "contextTrimmed": "The call guide was too long to read whole: its last {chars} characters were left out.",
+      "projectTrimmed": "The project file was too long to read whole: its last {chars} characters were left out.",
       "noRedFlags": "No elimination risk found.",
       "noImprovements": "No improvement area found.",
       "finding": "Finding",

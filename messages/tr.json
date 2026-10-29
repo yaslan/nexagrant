@@ -4568,6 +4568,7 @@
       },
       "callGridNote": "Çağrı kılavuzunun kendi tablosu:",
       "contextTrimmed": "Çağrı kılavuzu tamamı okunamayacak kadar uzundu: son {chars} karakteri dışarıda kaldı.",
+      "projectTrimmed": "Proje dosyası tamamı okunamayacak kadar uzundu: son {chars} karakteri dışarıda kaldı.",
       "noRedFlags": "Eleme riski bulunmadı.",
       "noImprovements": "Geliştirme alanı bulunmadı.",
       "finding": "Bulgu",

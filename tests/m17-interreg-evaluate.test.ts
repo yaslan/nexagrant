@@ -184,6 +184,7 @@ function reportInput(locale: 'tr' | 'en', marks: Record<string, number>, over: R
     flags: knockoutFlags(def, marks),
     output: parsed.output,
     callCharsOmitted: 0,
+    projectCharsOmitted: 0,
   };
 }
 

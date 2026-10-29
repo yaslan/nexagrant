@@ -486,8 +486,8 @@ describe('AI credit catalogue — docs/BILLING.md and the code say one number', 
       .filter(([, e]) => e.approval === 'pending-owner-approval')
       .map(([k]) => k)
       .sort();
-    // M17 (FO-188): the Interreg pre-assessment and its schema retry, until the owner approves.
-    expect(pending).toEqual(['M17:evaluate', 'M17:evaluate-retry', 'M6:esr-parser', 'M7']);
+    // M17 (FO-188): the Interreg pre-assessment, its two free model calls, until the owner approves.
+    expect(pending).toEqual(['M17:evaluate', 'M17:evaluate-attempt', 'M17:evaluate-retry', 'M6:esr-parser', 'M7']);
   });
 
   it('gives every entry a reason a human can read', () => {

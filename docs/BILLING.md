@@ -189,6 +189,7 @@ Bkz. `docs/agent-results/ADR-0002-geli-tirici-2.md` §6.
 | M6 | ESR Ayrıştırıcı | 0 | Bekliyor |
 | M7 | TTO Hızlandırıcı | 1 | Bekliyor |
 | M17 | Interreg ön değerlendirme | 3 | Bekliyor |
+| M17 | Ön değerlendirme — ilk model çağrısı (ücretsiz; kredi yalnız sonuç kaydedilince tek satır düşer) | 0 | Bekliyor |
 | M17 | Ön değerlendirme — biçim hatası sonrası tek yeniden deneme | 0 | Bekliyor |
 | M9 | Brifing | 1 | Yayımlandı |
 | M10 | Belge | 1 | Yayımlandı |
