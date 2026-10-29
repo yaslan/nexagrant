@@ -1046,3 +1046,27 @@ Plan: `docs/agent-results/FO-185-leed-fb.md` (kartta "M15"; M15 Post-Award'a ait
 - **`InterregCriterionMark`:** alt kriter başına puan (F2): `rubricId` (analizin `rubricId`'sinin kopyası), `criterionId`; iki bileşik FK: `(analysisId, tenantId, rubricId)` → `InterregAnalysis(id, tenantId, rubricId)` `CASCADE` ve `(criterionId, rubricId)` → `InterregRubricCriterion(id, rubricId)` `RESTRICT` (tekil `(id, rubricId)`). Böylece puan yalnız kendi kiracısının analizine ve o analizin rubriğindeki bir kritere bağlanabilir (se-fb D1, crw2 Ö5). `mark` `Decimal(4,1)` (rubriğin `allowedMarks`'ından biri — `scoreMarks` doğrular), `strengths`/`weaknesses` (JSONB), `evidenceQuote?`, `evidenceLocator?`; tekil `(analysisId, criterionId)`. Ağırlık yok (Annex 7 ek ağırlık uygulamaz). F1'de yazan yok.
 - **CHECK yok:** puan ölçeği F2 yazıcısında `scoreMarks` ile doğrulanır (`prisma db push` ile kurulmuş bir DB'de `CREATE TABLE IF NOT EXISTS` içindeki CHECK kaybolur — add-blog-post.sql notu).
 - **Analiz seed'i yok:** analiz satırları kullanıcı yüklemesiyle oluşur.
+
+## 26. `SeatCandidate.score` tek ölçek 0–100 (FO-147 · TASK-MVO2QV0INUNSW)
+
+Kolonu iki puanlayıcı yazar: konsorsiyum oluşturucunun "Aday Bul"u (`src/lib/scoring/consortium.ts`) ve
+koltuk eşleştiricisi (`src/modules/m8/server/matching.ts`). Boyutları farklıdır, saklanan sayı aynı
+tabloda kıyaslanır; ikisi de sonucu kendi maksimumuna oranla `normalizeSeatScore()`'a
+(`src/lib/scoring/seat-score.ts`) verir ve **0–100**, iki ondalık, kırpılmış (clamp) değer saklar.
+Rakip cezası skoru 0'ın altına düşüremez; sıra ham toplamdan kurulur, kırpma sırayı değiştirmez.
+
+| Yazan | `breakdown` anahtarları | Ham aralık | 0–100'e |
+|---|---|---|---|
+| Aday Bul (FO-63 sonrası) | `topicExperience, networkCentrality, countryDiversity, smeBonus, warmthBonus, liveDemandSignal, liveDemandReason, total` | 0–1 ağırlıklı | `consortiumSeatScore` |
+| Aday Bul (FO-63 öncesi, eski satır) | aynı, `liveDemandSignal` yok, `total` 0–10 | 0–10 | `consortiumSeatScore`, sinyal 0 |
+| Eşleştirici | `topicExperience, geographicBalance, collabHistory, relationshipWarmth, centrality, rivalRisk` (ham puan) | −10…90 | `matchSeatScore` = toplam / 90 |
+
+**Şema değişikliği yok.** Ölçek sürümü kolonu (ör. `scoreScale`) eklenmedi: her satır kendi
+`breakdown`'ını taşıdığı için skor ondan yeniden türetilebilir; ölçek bilgisi breakdown'un biçiminden
+okunur ve yeniden hesaplama bu yüzden kendiliğinden idempotenttir. Eşleştiricinin `breakdown`'ı ham
+puan olarak kalır (UI dökümü bunları gösterir); Aday Bul satırlarında `breakdown.total` = `score`.
+
+Eski satırlar: `pnpm jobs:seat-rescore -- --all-tenants` (kuru koşu) / `-- --all-tenants --apply` (`scripts/rescore-seat-candidates.ts`). Kapsam bayrağı zorunlu: `--tenant <id>` ya da `--all-tenants`; değersiz `--tenant` hata verir. Yerel olmayan `DATABASE_URL` üzerinde `--apply` ayrıca `--confirm-remote-db` ister (`src/lib/scoring/seat-rescore-args.ts`).
+Kiracı başına `withTenant` içinde okur/yazar, koltuğun sıralarını yeni skora göre yeniden kurar,
+`breakdown`'ı iki puanlayıcıdan hiçbirine uymayan koltuğu dokunmadan "SKIPPED" diye raporlar. İkinci
+koşu 0 satır yazar. Canlı ortamda ayrı onayla koşulur.

@@ -36,7 +36,9 @@ import {
   liveDemandSignalFor,
   normalizedWeights,
   DEFAULT_LIVE_DEMAND_WEIGHT,
+  type LiveDemandWeights,
 } from '@/lib/scoring/live-demand';
+import { normalizeSeatScore } from '@/lib/scoring/seat-score';
 
 export interface ScoringBreakdown {
   topicExperience: number;
@@ -70,6 +72,38 @@ const DIMENSION_MAX = {
   smeBonus: 1.0,
   warmthBonus: 1.5,
 } as const;
+
+/** The raw dimensions a consortium breakdown stores, each in 0…its DIMENSION_MAX. */
+export type ConsortiumDimensions = Pick<
+  ScoringBreakdown,
+  'topicExperience' | 'networkCentrality' | 'countryDiversity' | 'smeBonus' | 'warmthBonus'
+>;
+
+/**
+ * The consortium score of one candidate on the 0–100 seat scale. Every component
+ * is scaled to 0–1 and the weights sum to 1, so whatever the config weight is,
+ * the fraction handed to {@link normalizeSeatScore} is 0–1. Also used by the
+ * SeatCandidate rescore (src/lib/scoring/seat-rescore.ts) on stored breakdowns.
+ */
+export function consortiumSeatScore(
+  dims: ConsortiumDimensions,
+  liveDemandSignal: number,
+  weights: LiveDemandWeights
+): number {
+  const fraction =
+    weights.topicExperience * (dims.topicExperience / DIMENSION_MAX.topicExperience) +
+    weights.networkCentrality * (dims.networkCentrality / DIMENSION_MAX.networkCentrality) +
+    weights.countryDiversity * (dims.countryDiversity / DIMENSION_MAX.countryDiversity) +
+    weights.smeBonus * (dims.smeBonus / DIMENSION_MAX.smeBonus) +
+    weights.warmthBonus * (dims.warmthBonus / DIMENSION_MAX.warmthBonus) +
+    weights.liveDemand * liveDemandSignal;
+  return normalizeSeatScore(fraction);
+}
+
+/** The weights the consortium scorer uses: option, then CONSORTIUM_LIVE_DEMAND_WEIGHT, then 15 %. */
+export function consortiumWeights(liveDemandWeight?: number): LiveDemandWeights {
+  return normalizedWeights(liveDemandWeight ?? consortiumLiveDemandWeight ?? DEFAULT_LIVE_DEMAND_WEIGHT);
+}
 
 /** Bounds on the search space, mirroring src/modules/m8/server/matching.ts. */
 const TOPIC_PROJECT_LIMIT = 2_000;
@@ -124,9 +158,7 @@ async function runScoring(
 ) {
   const { tenantId, seatId, opportunityId, topicId, limit, options } = params;
   const liveDemandVisible = options.liveDemandVisible === true;
-  const weights = normalizedWeights(
-    options.liveDemandWeight ?? consortiumLiveDemandWeight ?? DEFAULT_LIVE_DEMAND_WEIGHT
-  );
+  const weights = consortiumWeights(options.liveDemandWeight);
   // The persist step is `deleteMany({ tenantId, seatId })`: a missing seat id would
   // wipe the candidates of every seat of the tenant (TASK-MUN2KUHP1BP18).
   if (!isPresentId(seatId) || !isPresentId(tenantId)) throw new Error('Seat not found in this workspace.');
@@ -229,8 +261,7 @@ async function runScoring(
   }
   const now = new Date();
 
-  // 5. Score each candidate. Every component is scaled to 0–1 and the weights
-  // sum to 1, so the total is a 0–100 value whatever the config weight is.
+  // 5. Score each candidate, on the 0–100 seat scale (consortiumSeatScore).
   const scored = candidates.map((org) => {
     const topicExperience = topicOrgIds.has(org.organisationId) ? DIMENSION_MAX.topicExperience : 0;
     const networkCentrality = Math.min(org.totalProjects / 10, DIMENSION_MAX.networkCentrality); // normalise to 0-3
@@ -242,14 +273,11 @@ async function runScoring(
       ? liveDemandSignalFor(liveDemand, org.organisationId, now)
       : { signal: 0, ownRequestAgeDays: null };
 
-    const weighted =
-      weights.topicExperience * (topicExperience / DIMENSION_MAX.topicExperience) +
-      weights.networkCentrality * (networkCentrality / DIMENSION_MAX.networkCentrality) +
-      weights.countryDiversity * (countryDiversity / DIMENSION_MAX.countryDiversity) +
-      weights.smeBonus * (smeBonus / DIMENSION_MAX.smeBonus) +
-      weights.warmthBonus * (warmthBonus / DIMENSION_MAX.warmthBonus) +
-      weights.liveDemand * demand.signal;
-    const total = Math.round(weighted * 100 * 100) / 100;
+    const total = consortiumSeatScore(
+      { topicExperience, networkCentrality, countryDiversity, smeBonus, warmthBonus },
+      demand.signal,
+      weights
+    );
 
     return {
       organizationId: org.organisationId,

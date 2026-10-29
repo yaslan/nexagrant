@@ -163,10 +163,11 @@ describe('runSeatMatch', () => {
     expect(result).toHaveLength(2);
 
     // org-a: 2 participations of which 1 a coordination (20) + free country FR
-    // (15) + 2 shared projects with the confirmed partner (10) + degree 2 (0.2).
-    expect(created[0]?.score).toBeCloseTo(45.2, 5);
-    // org-b: 1 participation (5) + free country TR (15) + hot warmth (15) = 35.
-    expect(created[1]?.score).toBe(35);
+    // (15) + 2 shared projects with the confirmed partner (10) + degree 2 (0.2)
+    // = 45.2 raw points of 90, stored on the 0–100 seat scale (FO-147).
+    expect(created[0]?.score).toBe(50.22);
+    // org-b: 1 participation (5) + free country TR (15) + hot warmth (15) = 35 of 90.
+    expect(created[1]?.score).toBe(38.89);
     expect(created.map((c) => c.rank)).toEqual([1, 2]);
   });
 

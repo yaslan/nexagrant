@@ -422,6 +422,7 @@
     "rank": "Rank",
     "organization": "Organization",
     "score": "Score",
+    "scoreOutOf": "{score} / 100",
     "action": "Action",
     "breakdown": "Score breakdown",
     "computing": "Computing candidates…",
