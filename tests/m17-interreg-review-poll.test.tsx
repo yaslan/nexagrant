@@ -18,7 +18,14 @@ import { InterregReviewClient } from '@/app/[locale]/(app)/[workspace]/modules/i
  * still arrives; after 120 looks the page stops and says so.
  */
 
-const DOC = { fileName: 'call.md', format: 'md', pages: null, chars: 900, extractedAt: '2026-10-28T10:00:00.000Z' };
+const DOC = {
+  fileName: 'call.md',
+  format: 'md',
+  pages: null,
+  chars: 900,
+  extractedAt: '2026-10-28T10:00:00.000Z',
+  expiresAt: '2026-11-27T10:00:00.000Z',
+};
 
 function view(status: InterregAnalysisView['status']): InterregAnalysisView {
   return {
@@ -28,7 +35,6 @@ function view(status: InterregAnalysisView['status']): InterregAnalysisView {
     rubric: { id: 'bsb', label: 'BSB', maxRaw: 60, passRaw: 36 },
     call: DOC,
     project: { ...DOC, fileName: 'project.txt', format: 'txt' },
-    textExpiresAt: null,
     createdAt: '2026-10-28T10:00:00.000Z',
     updatedAt: '2026-10-28T10:00:00.000Z',
   };
