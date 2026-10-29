@@ -14,7 +14,11 @@ import enMessages from '../messages/en.json';
  * scorers actually produce.
  */
 
-vi.mock('@/lib/env', () => ({ consortiumLiveDemandWeight: undefined }));
+// Keep the real env module (db.ts reads `env.DATABASE_URL` at import time); only pin the weight.
+vi.mock('@/lib/env', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/env')>()),
+  consortiumLiveDemandWeight: undefined,
+}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 vi.mock('@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions', () => ({
   addSeat: vi.fn(),
