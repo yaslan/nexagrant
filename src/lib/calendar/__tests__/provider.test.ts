@@ -79,7 +79,7 @@ describe('CalendarProvider', () => {
   describe('GoogleCalendarProvider', () => {
     let provider: GoogleCalendarProvider;
 
-    const live = { NODE_ENV: 'production' as const, NEXT_PUBLIC_APP_URL: 'https://fonbridge.com/' };
+    const live = { NODE_ENV: 'production' as const, NEXT_PUBLIC_APP_URL: 'https://nexagrant.com/' };
 
     beforeEach(() => {
       provider = new GoogleCalendarProvider('client123', 'secret123', live);
@@ -90,14 +90,14 @@ describe('CalendarProvider', () => {
       const url = new URL(result.authUrl);
       expect(url.origin + url.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
       expect(url.searchParams.get('client_id')).toBe('client123');
-      expect(url.searchParams.get('redirect_uri')).toBe('https://fonbridge.com/api/calendar/callback');
+      expect(url.searchParams.get('redirect_uri')).toBe('https://nexagrant.com/api/calendar/callback');
       expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/calendar.events');
       expect(url.searchParams.get('response_type')).toBe('code');
       // Without it Google returns no refresh token (İNCELEME-39 A6).
       expect(url.searchParams.get('access_type')).toBe('offline');
       expect(result.authUrl).not.toContain('localhost');
       // Encoded, not pasted raw into the query string.
-      expect(result.authUrl).toContain('redirect_uri=https%3A%2F%2Ffonbridge.com%2Fapi%2Fcalendar%2Fcallback');
+      expect(result.authUrl).toContain('redirect_uri=https%3A%2F%2Fnexagrant.com%2Fapi%2Fcalendar%2Fcallback');
     });
 
     it('follows NEXT_PUBLIC_APP_URL in development', async () => {
@@ -126,9 +126,9 @@ describe('CalendarProvider', () => {
         '  ',
         'http://localhost:3000',
         'not a url',
-        'http://fonbridge.com',
-        'https://fonbridge.com/?x=1',
-        'https://fonbridge.com#x',
+        'http://nexagrant.com',
+        'https://nexagrant.com/?x=1',
+        'https://nexagrant.com#x',
       ]) {
         const p = new GoogleCalendarProvider('client123', undefined, { NODE_ENV: 'production', NEXT_PUBLIC_APP_URL });
         const refused = await p.connect().then(

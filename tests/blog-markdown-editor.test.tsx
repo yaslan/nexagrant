@@ -76,7 +76,7 @@ describe('BlogMarkdownEditor', () => {
 
     // Fill URL
     const urlInput = screen.getByPlaceholderText(t.linkModal.urlPlaceholder) as HTMLInputElement;
-    fireEvent.change(urlInput, { target: { value: 'https://fonbridge.com/rehber' } });
+    fireEvent.change(urlInput, { target: { value: 'https://nexagrant.com/rehber' } });
 
     // Submit
     fireEvent.click(screen.getByRole('button', { name: t.linkModal.submit }));
@@ -85,7 +85,7 @@ describe('BlogMarkdownEditor', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
 
-    expect(el.value).toBe('Detaylı bilgi [için](https://fonbridge.com/rehber) tıklayın');
+    expect(el.value).toBe('Detaylı bilgi [için](https://nexagrant.com/rehber) tıklayın');
   });
 
   test('Image modal allows entering URL and inserts image markdown', async () => {

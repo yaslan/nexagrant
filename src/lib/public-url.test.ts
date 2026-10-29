@@ -14,18 +14,18 @@ describe('publicUrl', () => {
   });
 
   it('uses AUTH_URL when set', () => {
-    process.env.AUTH_URL = 'https://fonbridge.com';
-    expect(publicUrl()).toBe('https://fonbridge.com');
+    process.env.AUTH_URL = 'https://nexagrant.com';
+    expect(publicUrl()).toBe('https://nexagrant.com');
   });
 
   it('strips path from AUTH_URL', () => {
-    process.env.AUTH_URL = 'https://fonbridge.com/api/auth/callback';
-    expect(publicUrl()).toBe('https://fonbridge.com');
+    process.env.AUTH_URL = 'https://nexagrant.com/api/auth/callback';
+    expect(publicUrl()).toBe('https://nexagrant.com');
   });
 
   it('preserves port in AUTH_URL', () => {
-    process.env.AUTH_URL = 'https://fonbridge.com:8443/path';
-    expect(publicUrl()).toBe('https://fonbridge.com:8443');
+    process.env.AUTH_URL = 'https://nexagrant.com:8443/path';
+    expect(publicUrl()).toBe('https://nexagrant.com:8443');
   });
 
   it('falls back to NEXT_PUBLIC_APP_URL when AUTH_URL is unset', () => {
@@ -35,9 +35,9 @@ describe('publicUrl', () => {
   });
 
   it('ignores NEXT_PUBLIC_APP_URL when AUTH_URL is set', () => {
-    process.env.AUTH_URL = 'https://fonbridge.com';
+    process.env.AUTH_URL = 'https://nexagrant.com';
     process.env.NEXT_PUBLIC_APP_URL = 'https://example.com';
-    expect(publicUrl()).toBe('https://fonbridge.com');
+    expect(publicUrl()).toBe('https://nexagrant.com');
   });
 
   it('falls back to localhost when both are unset', () => {
@@ -66,9 +66,9 @@ describe('publicUrl', () => {
   });
 
   it('prefers AUTH_URL over request origin', () => {
-    process.env.AUTH_URL = 'https://fonbridge.com';
+    process.env.AUTH_URL = 'https://nexagrant.com';
     const req = new NextRequest('https://proxy.example.com/path');
-    expect(publicUrl(req)).toBe('https://fonbridge.com');
+    expect(publicUrl(req)).toBe('https://nexagrant.com');
   });
 
   it('prefers NEXT_PUBLIC_APP_URL over request origin', () => {

@@ -86,20 +86,20 @@ describe('toggleBlock', () => {
 
 describe('insertLink', () => {
   it('inserts link using selected text as label', () => {
-    const r = insertLink('Detaylı bilgi için tıklayın.', 14, 18, 'https://fonbridge.com', undefined, 'Bağlantı');
-    expect(r.value).toBe('Detaylı bilgi [için](https://fonbridge.com) tıklayın.');
+    const r = insertLink('Detaylı bilgi için tıklayın.', 14, 18, 'https://nexagrant.com', undefined, 'Bağlantı');
+    expect(r.value).toBe('Detaylı bilgi [için](https://nexagrant.com) tıklayın.');
     expect(r.selectionStart).toBe(14);
     expect(r.selectionEnd).toBe(43);
   });
 
   it('inserts link with explicitly provided text', () => {
-    const r = insertLink('Buradan ulaşabilirsiniz.', 0, 0, 'https://fonbridge.com', 'FonBridge Portalı', 'Bağlantı');
-    expect(r.value).toBe('[FonBridge Portalı](https://fonbridge.com)Buradan ulaşabilirsiniz.');
+    const r = insertLink('Buradan ulaşabilirsiniz.', 0, 0, 'https://nexagrant.com', 'FonBridge Portalı', 'Bağlantı');
+    expect(r.value).toBe('[FonBridge Portalı](https://nexagrant.com)Buradan ulaşabilirsiniz.');
   });
 
   it('uses the caller-supplied fallback label when selection and text are both empty', () => {
-    const r = insertLink('Metin', 5, 5, 'https://fonbridge.com', undefined, 'Link');
-    expect(r.value).toBe('Metin[Link](https://fonbridge.com)');
+    const r = insertLink('Metin', 5, 5, 'https://nexagrant.com', undefined, 'Link');
+    expect(r.value).toBe('Metin[Link](https://nexagrant.com)');
   });
 });
 

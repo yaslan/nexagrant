@@ -56,7 +56,7 @@ pnpm test                      # .env'i vitest.config.mts kendisi yükler; `sour
   `src/lib/email/mailer.ts`, `fe9fd31c`) gidiyor; Resend kaldırıldı. Ayarlar `SMTP_*` env'inde
   (`.env.example`). Yerelde Mailpit'e göndermek için `SMTP_HOST=localhost`, `SMTP_PORT=1025`
   (arayüz :8025). `SMTP_HOST` boşsa e-posta gönderilmez ve üretimde `SystemAlert` yazılır.
-  Canlıda: `mail.fonbridge.com` (Vulut), gönderici `info@fonbridge.com` — kurulum ve DNS: `docs/SMTP-SUNUCU.md`.
+  Canlıda: `mail.nexagrant.com` (Hostinger; posta kutusu henüz açılmadı), gönderici `info@nexagrant.com` — kurulum ve DNS: `docs/SMTP-SUNUCU.md`.
 - **Sabit adlar.** Konteyner adları (`fabrika-postgres`…) ve volume adları (`fabrika_pgdata`,
   `fabrika_redisdata`) sabit; `-p` ile başka proje adı vermek bunları **değiştirmez**. İkinci,
   izole bir yığın (ör. temiz klonda deneme) için adları da değiştiren ek bir `-f` dosyası kullan,

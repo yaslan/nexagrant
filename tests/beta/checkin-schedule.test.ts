@@ -122,7 +122,7 @@ const unfold = (ics: string) => ics.replace(/\r\n /g, '');
 describe('buildCheckinIcs', () => {
   const schedule = buildCheckinSchedule(START, 8);
   const ics = buildCheckinIcs(schedule, {
-    organizerEmail: 'info@fonbridge.com',
+    organizerEmail: 'info@nexagrant.com',
     attendees: ['partner01@example.invalid'],
     dtstamp: new Date(Date.UTC(2026, 8, 6)),
   });
@@ -145,7 +145,7 @@ describe('buildCheckinIcs', () => {
   });
 
   it('carries organizer and attendee', () => {
-    expect(unfold(ics)).toContain(`ORGANIZER;CN=${PRODUCT_NAME} Beta:mailto:info@fonbridge.com`);
+    expect(unfold(ics)).toContain(`ORGANIZER;CN=${PRODUCT_NAME} Beta:mailto:info@nexagrant.com`);
     expect(unfold(ics)).toContain(
       'ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:partner01@example.invalid'
     );
@@ -153,7 +153,7 @@ describe('buildCheckinIcs', () => {
 
   it('is byte-identical when regenerated with the same stamp', () => {
     const again = buildCheckinIcs(schedule, {
-      organizerEmail: 'info@fonbridge.com',
+      organizerEmail: 'info@nexagrant.com',
       attendees: ['partner01@example.invalid'],
       dtstamp: new Date(Date.UTC(2026, 8, 6)),
     });

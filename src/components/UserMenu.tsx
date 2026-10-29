@@ -647,7 +647,7 @@ export default function UserMenu({
                 <span>{isTr ? 'GDPR & Veri Gizliliği' : 'GDPR & Data Privacy'}</span>
               </Link>
               <a
-                href="https://fonbridge.com/yardim"
+                href="https://nexagrant.com/yardim"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"

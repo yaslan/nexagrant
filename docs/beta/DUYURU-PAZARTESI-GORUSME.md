@@ -31,7 +31,7 @@ Fabrika Beta programı ve İlkadım pilotu için ortak haftalık görüşmenin z
 Takviminize otomatik olarak yeni zamanı eklemek için, güncellenmiş davet dosyasını (`beta-weekly-sync.ics`) kullanınız. Takviminizde 8 Ekim ve sonrasına ait Perşembe davetleri kaldıysa lütfen **siliniz**; takvim uygulamanız bunları kendiliğinden güncellemeyebilir.
 
 ### Sorular veya Sorunlar
-Beta programına ilişkin tüm sorularınız için: **info@fonbridge.com**
+Beta programına ilişkin tüm sorularınız için: **info@nexagrant.com**
 
 ---
 
@@ -63,7 +63,7 @@ The joint weekly sync for the Fabrika Beta programme and the İlkadım pilot is 
 To automatically add the new time to your calendar, use the updated invitation file (`beta-weekly-sync.ics`). If Thursday invitations for October 8 or later are still in your calendar, please **delete** them; your calendar app may not update them automatically.
 
 ### Questions or Issues
-For any questions about the beta programme: **info@fonbridge.com**
+For any questions about the beta programme: **info@nexagrant.com**
 
 ---
 

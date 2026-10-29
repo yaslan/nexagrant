@@ -46,8 +46,8 @@ export const BETA_CHECKIN_HOUR = 15;
 export const BETA_CHECKIN_MINUTE = 0;
 export const BETA_CHECKIN_DURATION_MIN = 30;
 
-export const BETA_SUPPORT_EMAIL = process.env.BETA_SUPPORT_EMAIL ?? 'info@fonbridge.com';
-export const BETA_FEEDBACK_EMAIL = process.env.BETA_FEEDBACK_EMAIL ?? 'info@fonbridge.com';
+export const BETA_SUPPORT_EMAIL = process.env.BETA_SUPPORT_EMAIL ?? 'info@nexagrant.com';
+export const BETA_FEEDBACK_EMAIL = process.env.BETA_FEEDBACK_EMAIL ?? 'info@nexagrant.com';
 export const BETA_APP_URL = appUrl();
 export const BETA_MEETING_URL = process.env.BETA_MEETING_URL ?? 'https://meet.google.com/eio-ftwm-wak';
 

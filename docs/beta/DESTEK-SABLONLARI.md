@@ -9,7 +9,7 @@
 ## Kullanım kuralları
 
 1. **Köşeli ayraçlı alanlar** (`[Ad]`, `[tarih]`) göndermeden önce doldurulur. `[DESTEK ADRESİ]` ve
-   `[İMZA]` boş kalamaz; pilot destek adresi **info@fonbridge.com**'dur (SSS G2, P-9 çözüldü).
+   `[İMZA]` boş kalamaz; pilot destek adresi **info@nexagrant.com**'dur (SSS G2, P-9 çözüldü).
 2. **[DOĞRULANMADI]** işaretli cümle, patron cevabı gelmeden gönderilmez; şablonda o cümleyi silin ya
    da "ekibimize sorup size döneceğim" yazın.
 3. **Fiyat, tarih, SLA, hukuki taahhüt yazılmaz.** Uzatma ya da ücretli geçiş sözü verilmez. Yanıt

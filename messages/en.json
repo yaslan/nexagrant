@@ -987,7 +987,7 @@
       "heading": "Privacy Policy & KVKK Disclosure",
       "s1": {
         "heading": "1. Data Controller",
-        "body": "This privacy notice is issued under article 10 of Turkish Law No. 6698 on the Protection of Personal Data (\"KVKK\") and the Communiqué on the Procedures and Principles for Fulfilling the Obligation to Inform, to tell you about the personal data processed through the fonbridge.com website and the {brand} platform (the \"Platform\"). The same principles apply to users within the scope of the EU General Data Protection Regulation (\"GDPR\").",
+        "body": "This privacy notice is issued under article 10 of Turkish Law No. 6698 on the Protection of Personal Data (\"KVKK\") and the Communiqué on the Procedures and Principles for Fulfilling the Obligation to Inform, to tell you about the personal data processed through the nexagrant.com website and the {brand} platform (the \"Platform\"). The same principles apply to users within the scope of the EU General Data Protection Regulation (\"GDPR\").",
         "colItem": "Item",
         "colValue": "Value",
         "rows": {
@@ -1009,7 +1009,7 @@
           },
           "email": {
             "label": "Email",
-            "value": "info@fonbridge.com"
+            "value": "info@nexagrant.com"
           },
           "kep": {
             "label": "KEP (registered email) address",
@@ -1199,7 +1199,7 @@
             "data": "Event names and an anonymous browser identifier (only with cookie consent); your IP address reaches PostHog as part of the connection, location lookup is turned off"
           }
         },
-        "safeguards": "These transfers are subject to KVKK article 9. The safeguard relied on for each recipient: [CROSS-BORDER TRANSFER MECHANISM — LEGAL CONFIRMATION]. Please send any questions about transfers abroad to info@fonbridge.com.",
+        "safeguards": "These transfers are subject to KVKK article 9. The safeguard relied on for each recipient: [CROSS-BORDER TRANSFER MECHANISM — LEGAL CONFIRMATION]. Please send any questions about transfers abroad to info@nexagrant.com.",
         "ownTransfer": "In EU project applications, information passed on your instructions, as the applicant, to the European Commission portal (Funding & Tenders) or to your project partners is a transfer made by you. {brand} does not submit applications to the portal on your behalf."
       },
       "s6": {
@@ -1290,8 +1290,8 @@
         "channels": {
           "post": "A wet-signed letter, in person or through a notary: Kadıköy Mahallesi No:55, İlkadım / SAMSUN, Türkiye",
           "kep": "Registered electronic mail (KEP): fonbridge@hs01.kep.tr",
-          "esign": "Secure electronic signature or mobile signature: info@fonbridge.com",
-          "email": "From the email address registered on the Platform: info@fonbridge.com"
+          "esign": "Secure electronic signature or mobile signature: info@nexagrant.com",
+          "email": "From the email address registered on the Platform: info@nexagrant.com"
         },
         "response": "Applications are answered free of charge within 30 days at the latest. If the action involves an additional cost, the fee in the Board's tariff may be charged. You can exercise these rights even if you do not have an account when you apply.",
         "complaint": "If your application is rejected, you find the answer insufficient, or no answer is given in time, you may complain to the Personal Data Protection Board within 30 days of learning the answer and in any case within 60 days of your application."
@@ -1304,7 +1304,7 @@
           "lead": "Funding readiness scorecard contact form: by the tick box on the form",
           "expert": "Publishing an expert profile in the directory: by the consent in the expert pre-registration"
         },
-        "withdraw": "You can withdraw your explicit consent at any time by writing to info@fonbridge.com and, for analytics storage, also as described in section 7. Withdrawal does not affect the lawfulness of processing before it.",
+        "withdraw": "You can withdraw your explicit consent at any time by writing to info@nexagrant.com and, for analytics storage, also as described in section 7. Withdrawal does not affect the lawfulness of processing before it.",
         "effective": "This notice is effective from [EFFECTIVE DATE]. Changes take effect when published on the site; for material changes the effective date on this page is updated."
       }
     },
@@ -1321,7 +1321,7 @@
       "billingHeading": "4. Billing, Pricing and Taxes",
       "billingBody": "Subscription fees are charged at the beginning of each billing period. Current plans include Basic, Pro and Ultra. A lifetime license option (no annual renewal) is available for the first 20 entities. AI credits are defined per plan and renew monthly. Promotional codes and campaign coupons are subject to separate terms.",
       "refundHeading": "5. Refunds",
-      "refundBody": "A 14-day money-back guarantee applies to subscription purchases. The guarantee includes purchases made with lifetime licenses and coupons. To request a refund, please contact info@fonbridge.com.",
+      "refundBody": "A 14-day money-back guarantee applies to subscription purchases. The guarantee includes purchases made with lifetime licenses and coupons. To request a refund, please contact info@nexagrant.com.",
       "trialHeading": "6. Pilot Period",
       "trialBody": "When a workspace is created, pilot (trial) access is granted for a limited time. After the pilot expires, new calculations and changes are paused. To continue, your workspace administrator must set up a subscription.",
       "terminationHeading": "7. Account Termination and Data Deletion",
@@ -1335,7 +1335,7 @@
       "changesHeading": "11. Changes to Terms",
       "changesBody": "These terms may be modified at any time. The date and version of any change to these terms are recorded. New registrations are subject to the current terms.",
       "contactHeading": "12. Contact",
-      "contactBody": "For questions about the service, please contact {brand} at info@fonbridge.com. Complaints may be submitted in writing to our contact details."
+      "contactBody": "For questions about the service, please contact {brand} at info@nexagrant.com. Complaints may be submitted in writing to our contact details."
     },
     "dpa": {
       "metaTitle": "Data Processing Agreement (DPA) — {brand}",
@@ -3903,14 +3903,14 @@
       "verify_q": "How does verification work?",
       "verify_a": "Level 0: e-mail verified. Level 1: project codes or ORCID matched against public sources. Level 2: your project role confirmed with a document. Level 3: endorsed by a reference organisation.",
       "delete_q": "Can I delete my data?",
-      "delete_a": "Yes. Just write to info@fonbridge.com."
+      "delete_a": "Yes. Just write to info@nexagrant.com."
     },
     "verified": {
       "heading_ok": "Your e-mail is verified",
       "founder": "Your Founding Expert number: #{number}",
       "no_founder": "The founding cohort was already complete; your registration is in the directory. We will let you know at launch.",
       "heading_expired": "This link has expired",
-      "text_expired": "Verification links are valid for {hours} hours. Write to info@fonbridge.com and we will send you a new one.",
+      "text_expired": "Verification links are valid for {hours} hours. Write to info@nexagrant.com and we will send you a new one.",
       "heading_already": "Your e-mail is already verified",
       "text_already": "This link has been used before; there is nothing more to do. Your registration is in the Expert Directory.",
       "heading_invalid": "This link is not valid",

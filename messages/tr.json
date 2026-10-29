@@ -987,7 +987,7 @@
       "heading": "Gizlilik Politikası ve KVKK Aydınlatma Metni",
       "s1": {
         "heading": "1. Veri Sorumlusu",
-        "body": "Bu aydınlatma metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") m.10 ve Aydınlatma Yükümlülüğünün Yerine Getirilmesinde Uyulacak Usul ve Esaslar Hakkında Tebliğ uyarınca, fonbridge.com internet sitesi ve {brand} platformu (\"Platform\") üzerinden işlenen kişisel veriler hakkında sizi bilgilendirmek amacıyla hazırlanmıştır. AB Genel Veri Koruma Tüzüğü (\"GDPR\") kapsamındaki kullanıcılarımız için de aynı esaslar uygulanır.",
+        "body": "Bu aydınlatma metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") m.10 ve Aydınlatma Yükümlülüğünün Yerine Getirilmesinde Uyulacak Usul ve Esaslar Hakkında Tebliğ uyarınca, nexagrant.com internet sitesi ve {brand} platformu (\"Platform\") üzerinden işlenen kişisel veriler hakkında sizi bilgilendirmek amacıyla hazırlanmıştır. AB Genel Veri Koruma Tüzüğü (\"GDPR\") kapsamındaki kullanıcılarımız için de aynı esaslar uygulanır.",
         "colItem": "Bilgi",
         "colValue": "Değer",
         "rows": {
@@ -1009,7 +1009,7 @@
           },
           "email": {
             "label": "E-posta",
-            "value": "info@fonbridge.com"
+            "value": "info@nexagrant.com"
           },
           "kep": {
             "label": "KEP adresi",
@@ -1199,7 +1199,7 @@
             "data": "Olay adları ve anonim tarayıcı kimliği (yalnız çerez onayıyla); bağlantı gereği IP adresiniz PostHog'a ulaşır, konum çözümleme kapalıdır"
           }
         },
-        "safeguards": "Bu aktarımlar KVKK m.9 hükümlerine tabidir. Her alıcı için dayanılan güvence: [YURT DIŞI AKTARIM MEKANİZMASI — HUKUK TEYİDİ]. Yurt dışı aktarımla ilgili sorularınızı info@fonbridge.com adresine iletebilirsiniz.",
+        "safeguards": "Bu aktarımlar KVKK m.9 hükümlerine tabidir. Her alıcı için dayanılan güvence: [YURT DIŞI AKTARIM MEKANİZMASI — HUKUK TEYİDİ]. Yurt dışı aktarımla ilgili sorularınızı info@nexagrant.com adresine iletebilirsiniz.",
         "ownTransfer": "AB proje başvurularında, başvuru sahibi olarak sizin talimatınızla Avrupa Komisyonu portalına (Funding & Tenders) veya proje ortaklarınıza iletilen bilgiler, sizin tarafınızdan yapılan aktarım niteliğindedir. {brand} portala sizin adınıza başvuru göndermez."
       },
       "s6": {
@@ -1290,8 +1290,8 @@
         "channels": {
           "post": "Islak imzalı dilekçe ile şahsen veya noter aracılığıyla: Kadıköy Mahallesi No:55, İlkadım / SAMSUN",
           "kep": "Kayıtlı elektronik posta (KEP) ile: fonbridge@hs01.kep.tr",
-          "esign": "Güvenli elektronik imza veya mobil imza ile: info@fonbridge.com",
-          "email": "Platform'a kayıtlı e-posta adresinizden: info@fonbridge.com"
+          "esign": "Güvenli elektronik imza veya mobil imza ile: info@nexagrant.com",
+          "email": "Platform'a kayıtlı e-posta adresinizden: info@nexagrant.com"
         },
         "response": "Başvurular en geç 30 gün içinde ücretsiz sonuçlandırılır. İşlemin ayrıca bir maliyet gerektirmesi hâlinde Kurul'un belirlediği tarifedeki ücret alınabilir. Başvuru yaptığınız tarihte hesabınız olmasa da bu hakları kullanabilirsiniz.",
         "complaint": "Başvurunuzun reddedilmesi, cevabı yetersiz bulmanız veya süresinde cevap verilmemesi hâlinde, cevabı öğrendiğiniz tarihten itibaren 30 gün ve her hâlde başvuru tarihinden itibaren 60 gün içinde Kişisel Verileri Koruma Kurulu'na şikâyette bulunabilirsiniz."
@@ -1304,7 +1304,7 @@
           "lead": "Fon hazırlık karnesi iletişim formu: formdaki onay kutusuyla",
           "expert": "Uzman profilinin rehberde yayımlanması: uzman ön kaydındaki onayla"
         },
-        "withdraw": "Açık rızanızı dilediğiniz an info@fonbridge.com adresine yazarak, analiz çerezi için ayrıca 7. bölümde anlatılan yolla geri alabilirsiniz. Geri alma, önceki işlemlerin hukuka uygunluğunu etkilemez.",
+        "withdraw": "Açık rızanızı dilediğiniz an info@nexagrant.com adresine yazarak, analiz çerezi için ayrıca 7. bölümde anlatılan yolla geri alabilirsiniz. Geri alma, önceki işlemlerin hukuka uygunluğunu etkilemez.",
         "effective": "Bu metin [YÜRÜRLÜK TARİHİ] tarihinden itibaren geçerlidir. Değişiklikler sitede yayımlandığı tarihte yürürlüğe girer; esaslı değişikliklerde bu sayfadaki yürürlük tarihi güncellenir."
       }
     },
@@ -1321,7 +1321,7 @@
       "billingHeading": "4. Ücretler, Fiyatlandırma ve KDV",
       "billingBody": "Abonelik ücretleri seçilen faturalama döneminin başında tahsil edilir. Mevcut planlar Basic, Pro ve Ultra'dır. İlk 20 kurum ömür boyu (yıllık yenileme gerektirmeyen) lisans seçeneğine uygun. Yapay zeka kredileri plan tarafından tanımlanır ve ayda bir yenilenir. Tanıtım kodları ve kampanya kuponları ayrı şartlar altında uygulanır.",
       "refundHeading": "5. İade",
-      "refundBody": "Abonelik satın alımlarında 14 gün para iade garantisi sağlanır. Ömür boyu ve kupon ile yapılan satın alımlar da dahil olmak üzere iade hakkı geçerlidir. İade talebi için info@fonbridge.com adresine yazabilirsiniz.",
+      "refundBody": "Abonelik satın alımlarında 14 gün para iade garantisi sağlanır. Ömür boyu ve kupon ile yapılan satın alımlar da dahil olmak üzere iade hakkı geçerlidir. İade talebi için info@nexagrant.com adresine yazabilirsiniz.",
       "trialHeading": "6. Pilot Periyodu",
       "trialBody": "Çalışma alanının açılması sırasında, belirli bir süre boyunca pilot (deneme) erişimi sağlanır. Pilot süresi dolduğunda yeni hesaplamalar ve değişiklikler askıya alınır. Uzatmak için çalışma alanı yöneticiniz tarafından abonelik kurulması gerekir.",
       "terminationHeading": "7. Hesap Fesih ve Veri Silme",
@@ -1335,7 +1335,7 @@
       "changesHeading": "11. Şartlarda Değişiklik",
       "changesBody": "Bu şartlar değiştirilebilir. Şartlardaki değişiklik tarihi ve versiyonu kayıt altına alınır. Yeni kayıtlara geçerli olan şartlar uygulanır.",
       "contactHeading": "12. İletişim",
-      "contactBody": "Hizmet hakkında sorularınız için {brand}'a info@fonbridge.com adresinden yazabilirsiniz. Şekayetleriniz yazılı olarak iletişim bilgilerimize gönderilebilir."
+      "contactBody": "Hizmet hakkında sorularınız için {brand}'a info@nexagrant.com adresinden yazabilirsiniz. Şekayetleriniz yazılı olarak iletişim bilgilerimize gönderilebilir."
     },
     "dpa": {
       "metaTitle": "Veri İşleme Sözleşmesi (DPA) — {brand}",
@@ -3903,14 +3903,14 @@
       "verify_q": "Doğrulama nasıl çalışır?",
       "verify_a": "Seviye 0: e-posta doğrulandı. Seviye 1: proje kodları ya da ORCID kamu kaynaklarıyla eşleşti. Seviye 2: proje rolünüz belgeyle teyit edildi. Seviye 3: referans kurum onayı alındı.",
       "delete_q": "Verilerimi silebilir miyim?",
-      "delete_a": "Evet. info@fonbridge.com adresine yazmanız yeterli."
+      "delete_a": "Evet. info@nexagrant.com adresine yazmanız yeterli."
     },
     "verified": {
       "heading_ok": "E-postanız doğrulandı",
       "founder": "Kurucu Uzman numaranız: #{number}",
       "no_founder": "Kurucu kadro tamamlanmıştı; kaydınız rehbere alındı. Lansmanda haber vereceğiz.",
       "heading_expired": "Bağlantının süresi dolmuş",
-      "text_expired": "Doğrulama bağlantısı {hours} saat geçerlidir. info@fonbridge.com adresine yazın, yeni bağlantı gönderelim.",
+      "text_expired": "Doğrulama bağlantısı {hours} saat geçerlidir. info@nexagrant.com adresine yazın, yeni bağlantı gönderelim.",
       "heading_already": "E-postanız zaten doğrulanmış",
       "text_already": "Bu bağlantı daha önce kullanılmış; yapmanız gereken başka bir şey yok. Kaydınız Uzman Dizini'nde.",
       "heading_invalid": "Bağlantı geçersiz",

@@ -222,8 +222,8 @@ Every ratio on the dashboard is backed by a record; with no source, the metric s
 
 | Purpose | Address |
 |---|---|
-| Support, bugs, account | **info@fonbridge.com** |
-| Product feedback, feature requests | **info@fonbridge.com** |
+| Support, bugs, account | **info@nexagrant.com** |
+| Product feedback, feature requests | **info@nexagrant.com** |
 
 > These addresses come from the `BETA_SUPPORT_EMAIL` / `BETA_FEEDBACK_EMAIL` environment
 > variables ([`src/lib/beta/constants.ts`](../src/lib/beta/constants.ts)), so the invitation

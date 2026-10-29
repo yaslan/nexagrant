@@ -6,8 +6,8 @@ import { isSafeUrl, renderBlogContent, renderInline } from '@/components/blog/bl
 
 describe('isSafeUrl', () => {
   test('accepts https, mailto, local paths and fragments; rejects http', () => {
-    expect(isSafeUrl('https://fonbridge.com/test')).toBe(true);
-    expect(isSafeUrl('mailto:info@fonbridge.com')).toBe(true);
+    expect(isSafeUrl('https://nexagrant.com/test')).toBe(true);
+    expect(isSafeUrl('mailto:info@nexagrant.com')).toBe(true);
     expect(isSafeUrl('/tr/partners')).toBe(true);
     expect(isSafeUrl('#section')).toBe(true);
     expect(isSafeUrl('http://images.unsplash.com/photo-1')).toBe(false);
