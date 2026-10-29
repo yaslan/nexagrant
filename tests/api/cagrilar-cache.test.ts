@@ -75,3 +75,22 @@ describe('GET /api/cagrilar cache', () => {
     expect(mocks.searchSedia).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('GET /api/cagrilar when translation fails', () => {
+  test('a list that could not be translated says so and is not cached', async () => {
+    mocks.searchSedia.mockResolvedValue(ok());
+    mocks.translate.mockImplementation(async (topics: unknown[], _lang: unknown, _signal: unknown, opts: { onUntranslated: () => void }) => {
+      opts.onUntranslated();
+      return topics;
+    });
+    const q = '?q=cache-quota&lang=tr';
+
+    const first = await (await get(q)).json();
+    const second = await (await get(q)).json();
+
+    expect(first.translated).toBe(false);
+    expect(first.topics[0].title).toBe('Clean energy');
+    expect(second.translated).toBe(false);
+    expect(mocks.searchSedia).toHaveBeenCalledTimes(2);
+  });
+});

@@ -155,10 +155,16 @@ export async function GET(request: NextRequest) {
 
     // If requested language is Turkish, translate titles & descriptions to Turkish,
     // within what is left of the budget. A partial translation is thrown away so
-    // the list is never half Turkish, half English.
+    // the list is never half Turkish, half English; the list then stays English
+    // with `translated: false` (MyMemory quota, timeout or error).
+    let translationFailed = false;
     if (lang === 'tr' && processedTopics.length > 0 && !signal.aborted) {
-      const turkish = await translateTopicsBatch(processedTopics, 'tr', signal);
-      if (!signal.aborted) {
+      const turkish = await translateTopicsBatch(processedTopics, 'tr', signal, {
+        onUntranslated: () => {
+          translationFailed = true;
+        },
+      });
+      if (!signal.aborted && !translationFailed) {
         processedTopics = turkish;
         translated = true;
       }
@@ -178,9 +184,10 @@ export async function GET(request: NextRequest) {
       topics: processedTopics,
       translated,
     };
-    // An answer cut short by the budget or the client leaving is not stored: the
-    // next visitor would get the untranslated list for ten minutes.
-    if (!signal.aborted) cagrilarCache.set(cacheKey, payload);
+    // An answer cut short by the budget or the client leaving is not stored, and
+    // neither is one whose translation failed: the next visitor would get the
+    // English list for ten minutes.
+    if (!signal.aborted && !translationFailed) cagrilarCache.set(cacheKey, payload);
     return NextResponse.json(payload);
   } catch (error) {
     // If the client aborted the request (closed page, cancelled, etc), the signal fires and

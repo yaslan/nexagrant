@@ -92,12 +92,24 @@ const EU_DICTIONARY: Record<string, string> = {
 
 /**
  * Translates a single text string from English to target language (default Turkish 'tr').
+ * Falls back to the original text when no translation comes back.
  */
 export async function translateText(
   text: string,
   targetLang = 'tr',
   signal?: AbortSignal
 ): Promise<string> {
+  return (await translateTextOrNull(text, targetLang, signal)) ?? text;
+}
+
+/**
+ * The translation, or `null` when the service gave none (quota, timeout, cancel).
+ */
+async function translateTextOrNull(
+  text: string,
+  targetLang = 'tr',
+  signal?: AbortSignal
+): Promise<string | null> {
   if (!text || !text.trim() || targetLang === 'en') {
     return text;
   }
@@ -137,40 +149,53 @@ export async function translateText(
       }
     }, signal);
 
-    if (translated && !translated.includes('QUERY LENGTH LIMIT EXCEEDED')) {
+    // MyMemory answers an exhausted quota with a 200 whose text is a warning, not a translation.
+    if (translated && !translated.includes('QUERY LENGTH LIMIT EXCEEDED') && !translated.includes('MYMEMORY WARNING')) {
       cacheTranslation(cacheKey, translated);
       return translated;
     }
   } catch {
-    // Network or timeout error -> fallback gracefully
+    // Network or timeout error -> reported as no translation below
   }
 
-  // Fallback: return original text if translation fails or was cancelled
-  return text;
+  // No translation: the service failed, was over quota, or the call was cancelled.
+  return null;
 }
 
 /**
  * Batch translates array of items (titles and descriptions) into target language.
  * Once `signal` fires, queued calls are dropped, calls in flight are aborted and
- * the remaining texts come back untranslated.
+ * the remaining texts come back untranslated. `onUntranslated` runs once for each
+ * text that came back in English because the service gave no translation (quota,
+ * timeout, error), so the caller can tell a complete result from a partial one.
  */
 export async function translateTopicsBatch<T extends { title: string; description?: string }>(
   topics: T[],
   targetLang = 'tr',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { onUntranslated?: () => void }
 ): Promise<T[]> {
   if (targetLang === 'en' || !topics || topics.length === 0) {
     return topics;
   }
 
+  const translateOrKeep = async (value: string): Promise<string> => {
+    const out = await translateTextOrNull(value, targetLang, signal);
+    if (out === null) {
+      options?.onUntranslated?.();
+      return value;
+    }
+    return out;
+  };
+
   // Items start together; the outbound calls themselves queue on withTranslationSlot.
   const translated = await Promise.all(
     topics.map(async (topic) => {
-      const translatedTitle = await translateText(topic.title, targetLang, signal);
+      const translatedTitle = await translateOrKeep(topic.title);
       let translatedDescription = topic.description;
 
       if (topic.description && topic.description.length < 500) {
-        translatedDescription = await translateText(topic.description, targetLang, signal);
+        translatedDescription = await translateOrKeep(topic.description);
       }
 
       return {
