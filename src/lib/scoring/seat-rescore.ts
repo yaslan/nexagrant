@@ -21,6 +21,7 @@ import type { Prisma } from '@prisma/client';
 
 import { consortiumSeatScore, type ConsortiumDimensions } from '@/lib/scoring/consortium';
 import type { LiveDemandWeights } from '@/lib/scoring/live-demand';
+import { seatBreakdownWriter } from '@/lib/scoring/seat-dimension-scale';
 import { matchSeatScore, type MatchBreakdown } from '@/modules/m8/server/matching';
 
 export interface StoredSeatCandidate {
@@ -47,29 +48,8 @@ export interface SeatRescorePlan {
   skippedSeats: { seatId: string; rowIds: string[] }[];
 }
 
-const MATCH_KEYS = [
-  'topicExperience',
-  'geographicBalance',
-  'collabHistory',
-  'relationshipWarmth',
-  'centrality',
-  'rivalRisk',
-] as const satisfies readonly (keyof MatchBreakdown)[];
-
-const CONSORTIUM_KEYS = [
-  'topicExperience',
-  'networkCentrality',
-  'countryDiversity',
-  'smeBonus',
-  'warmthBonus',
-] as const satisfies readonly (keyof ConsortiumDimensions)[];
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hasNumbers(b: Record<string, unknown>, keys: readonly string[]): boolean {
-  return keys.every((k) => typeof b[k] === 'number' && Number.isFinite(b[k]));
 }
 
 /** The 0–100 score of one stored breakdown, or null when neither scorer wrote it. */
@@ -80,11 +60,12 @@ export function rescoreBreakdown(
   if (!isRecord(breakdown)) return null;
   // Read back from the `breakdown` JSON column, so every value in it is JSON.
   const stored = breakdown as Prisma.InputJsonObject;
-  // The matcher's keys are checked first: `topicExperience` is shared, the rest is not.
-  if (hasNumbers(breakdown, MATCH_KEYS)) {
+  // The one place that tells the writers apart (seat-dimension-scale.ts), shared with the UI.
+  const writer = seatBreakdownWriter(breakdown);
+  if (writer === 'match') {
     return { score: matchSeatScore(breakdown as MatchBreakdown), breakdown: stored };
   }
-  if (hasNumbers(breakdown, CONSORTIUM_KEYS)) {
+  if (writer === 'consortium') {
     const signal = typeof breakdown.liveDemandSignal === 'number' ? breakdown.liveDemandSignal : 0;
     const score = consortiumSeatScore(breakdown as unknown as ConsortiumDimensions, signal, weights);
     return { score, breakdown: { ...stored, total: score } };
