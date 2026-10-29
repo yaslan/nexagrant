@@ -14,7 +14,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   session: { ok: true, userId: 'u-1' } as { ok: boolean; userId: string },
   searchSedia: vi.fn(),
-  translate: vi.fn(async <T,>(topics: T[]) => topics),
+  translate: vi.fn(async <T,>(topics: T[]) => ({ items: topics, untranslated: 0 })),
   topicUpsert: vi.fn(),
 }));
 
@@ -37,6 +37,10 @@ vi.mock('@/lib/translation', () => ({ translateTopicsBatch: mocks.translate }));
 vi.mock('@/lib/db', () => ({ prisma: { topic: { upsert: mocks.topicUpsert } } }));
 
 import { GET, CAGRILAR_PER_USER_PER_MINUTE } from '@/app/api/cagrilar/route';
+import { cagrilarCache } from '@/lib/cagrilar-cache';
+
+// Each case starts with no remembered answers, so one case's search is never another's.
+beforeEach(() => cagrilarCache.clear());
 
 const TOPIC = {
   identifier: 'HORIZON-CL5-2027-03-D5-06',
@@ -56,7 +60,7 @@ beforeEach(() => {
   mocks.session.ok = true;
   // A user per test, so the per-user limit below never leaks between tests.
   mocks.session.userId = `u-${++testNo}`;
-  mocks.searchSedia.mockReset().mockResolvedValue({ totalResults: 1, pageNumber: 1, pageSize: 20, topics: [TOPIC] });
+  mocks.searchSedia.mockReset().mockResolvedValue({ totalResults: 1, pageNumber: 1, pageSize: 20, topics: [TOPIC], errors: [] });
   mocks.translate.mockClear();
   mocks.topicUpsert.mockReset().mockResolvedValue({});
 });
@@ -183,7 +187,8 @@ describe('/api/cagrilar hardening', () => {
   // İNCELEME-75 D-3 (TASK-MUNY0O53ITDU4): one signed-in client in a loop could
   // spend the shared SEDIA and translation quota for every tenant.
   test('a user over the per-minute limit gets 429 with Retry-After and no outbound call', async () => {
-    for (let i = 0; i < CAGRILAR_PER_USER_PER_MINUTE; i++) expect((await get('?lang=en')).status).toBe(200);
+    // Distinct queries: a repeat would be answered from the cache, and the limit counts the request either way.
+    for (let i = 0; i < CAGRILAR_PER_USER_PER_MINUTE; i++) expect((await get(`?lang=en&q=limit-${i}`)).status).toBe(200);
     expect(mocks.searchSedia).toHaveBeenCalledTimes(CAGRILAR_PER_USER_PER_MINUTE);
 
     const res = await get('?lang=en');

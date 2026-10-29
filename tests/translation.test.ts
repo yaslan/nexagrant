@@ -13,7 +13,7 @@ describe('Translation Utility', () => {
       { title: 'Quantum computing algorithms for SMEs', description: 'Another description' }
     ];
 
-    const translated = await translateTopicsBatch(topics, 'tr');
+    const { items: translated } = await translateTopicsBatch(topics, 'tr');
     expect(translated).toHaveLength(2);
     expect(translated[0]?.title).not.toEqual('Digital democracy and civic engagement');
     expect(translated[1]?.title).not.toEqual('Quantum computing algorithms for SMEs');
