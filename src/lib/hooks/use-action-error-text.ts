@@ -25,7 +25,9 @@ import { isLlmRefused, isLlmTruncated } from '@/lib/llm-outcome';
  * TASK-MUOF85BU7BV3X), and an action the module gate refused
  * (src/lib/module-unavailable.ts, TASK-MUUS5HE3OW0CT), and an action called
  * without a signed-in session (src/lib/session-required.ts,
- * TASK-MV15MNI79MSWO). Pass a function when the fallback is looked up from
+ * TASK-MV15MNI79MSWO) — or with a session that has no tenant, which is the
+ * same refusal, so that one sentence covers both and also points to the
+ * workspace administrator (TASK-MVNI0HJ9PMZ62). Pass a function when the fallback is looked up from
  * the code itself (`() => t(`errors.${code}`)`), so the lookup never runs for
  * `'pilotExpired'`, which that namespace does not have.
  * A site that showed nothing for a thrown error passes `null`: it still shows

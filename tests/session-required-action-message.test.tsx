@@ -16,6 +16,11 @@ import enMessages from '../messages/en.json';
  * the hook says `Common.sessionExpired`. A module that is really off still says
  * `Common.moduleUnavailable`.
  *
+ * TASK-MVNI0HJ9PMZ62 (CE-704) — `tenantScopeOf` also answers null for a
+ * signed-in user with no tenant (membership removed, tab still open), so that
+ * user gets the same refusal. Signing in again does not fix it, so the one
+ * sentence now covers both cases and points to the workspace administrator.
+ *
  * The gate is the real one; only the session, the database and the plan are faked.
  */
 
@@ -38,6 +43,9 @@ import { TenantScopeError } from '@/lib/tenant';
 import { isModuleUnavailable } from '@/lib/module-unavailable';
 import { isSessionRequired, SESSION_REQUIRED_DIGEST } from '@/lib/session-required';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+
+/** Signed in, but no tenant: e.g. the membership was removed while the tab stayed open. */
+const NO_TENANT_SESSION = { user: { id: 'user-1' }, role: 'MEMBER', workspaceIds: [], isPlatformAdmin: false };
 
 const SESSION = {
   user: { id: 'user-1' },
@@ -94,6 +102,17 @@ describe('assertModuleAccess — no session is not a module refusal', () => {
     expect(h.getEntitlements).not.toHaveBeenCalled();
   });
 
+  test('signed in without a tenant throws the same TenantScopeError', async () => {
+    h.auth.mockResolvedValue(NO_TENANT_SESSION);
+
+    const error = await gateError();
+
+    expect(error).toBeInstanceOf(TenantScopeError);
+    expect(isSessionRequired(error)).toBe(true);
+    expect(isModuleUnavailable(error)).toBe(false);
+    expect(h.getEntitlements).not.toHaveBeenCalled();
+  });
+
   test('M7 off still throws ModuleAccessError', async () => {
     h.auth.mockResolvedValue(SESSION);
     h.moduleStateFindMany.mockResolvedValue([{ moduleId: 'M7', status: 'OFF' }]);
@@ -116,6 +135,23 @@ describe('useActionErrorText — what the TTO form says', () => {
     expect(result.current(error, null)).toBe(text);
     expect(result.current(asBrowserSees(error), null)).toBe(text);
     expect(text).not.toBe((locale === 'tr' ? trMessages : enMessages).Common.moduleUnavailable);
+  });
+
+  // Not only "sign in again": a user with no workspace is also sent to the administrator.
+  test.each([
+    ['tr', /çalışma alanına bağlı değil/, /yöneticinize başvurun/],
+    ['en', /not linked to a workspace/, /workspace administrator/],
+  ] as const)('%s: signed in without a tenant → the sentence names the workspace case', async (locale, noWorkspace, admin) => {
+    h.auth.mockResolvedValue(NO_TENANT_SESSION);
+    const error = await gateError();
+    const { result } = renderHook(() => useActionErrorText(), { wrapper: wrap(locale) });
+    const messages = locale === 'tr' ? trMessages : enMessages;
+
+    const text = result.current(asBrowserSees(error), null);
+    expect(text).toBe(messages.Common.sessionExpired);
+    expect(text).toMatch(noWorkspace);
+    expect(text).toMatch(admin);
+    expect(text).not.toBe(messages.Common.moduleUnavailable);
   });
 
   test.each(['tr', 'en'] as const)('%s: M7 off → Common.moduleUnavailable', async (locale) => {
