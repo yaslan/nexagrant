@@ -5,6 +5,8 @@ import { useTranslations } from 'next-intl';
 import { addSeat, findCandidates, assignSeat, getConflicts } from './actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import type { ScoringBreakdown } from '@/lib/scoring/consortium';
+import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
+import { dimensionValueText } from '@/modules/m8/components/dimension-value';
 
 // Local types matching prisma/schema.prisma — the generated client is not
 // available here (see src/types/prisma-override.d.ts).
@@ -33,6 +35,16 @@ export interface OrgInfo {
   country: string | null;
   isSme: boolean;
 }
+
+/** The consortium scorer's dimensions, in the order the breakdown is rendered. */
+const BUILDER_DIMENSIONS = [
+  'topicExperience',
+  'networkCentrality',
+  'countryDiversity',
+  'smeBonus',
+  'warmthBonus',
+  'liveDemandSignal',
+] as const satisfies readonly (keyof ScoringBreakdown)[];
 
 interface Props {
   opportunityId: string;
@@ -245,17 +257,29 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                               <p className="mt-1 text-xs text-muted">{t('liveDemandReason', { days: bd.liveDemandReason.days })}</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                            <div className="text-xs text-muted space-x-2">
-                              {bd && (
-                                <>
-                                  <span title="Topic Experience">🎯{bd.topicExperience?.toFixed(1)}</span>
-                                  <span title="Network Centrality">🕸️{bd.networkCentrality?.toFixed(1)}</span>
-                                  <span title="Country Diversity">🌍{bd.countryDiversity?.toFixed(1)}</span>
-                                  <span title="Warmth Bonus">🤝{bd.warmthBonus?.toFixed(1)}</span>
-                                </>
-                              )}
-                            </div>
+                          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                            {bd && (
+                              // Was four emoji with English `title`s: invisible to keyboard and
+                              // touch users, and read as points out of the /100 total (FO-155).
+                              <details className="text-xs text-muted basis-full sm:basis-auto">
+                                <summary className="cursor-pointer min-h-11 flex items-center">{t('breakdown')}</summary>
+                                <dl className="mt-1 space-y-0.5">
+                                  {BUILDER_DIMENSIONS.map((key) => (
+                                    <div key={key} className="flex gap-2 justify-between">
+                                      <dt>{t(`dimension.${key}`)}</dt>
+                                      <dd className="tabular-nums whitespace-nowrap" data-testid={`m8-builder-dimension-${key}`}>
+                                        {dimensionValueText(
+                                          t,
+                                          seatBreakdownWriter(bd) === 'consortium' ? seatScoreDimensionScale('consortium', key) : null,
+                                          typeof bd[key] === 'number' ? bd[key] : 0
+                                        )}
+                                      </dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                                <p className="mt-1">{t('breakdownNote')}</p>
+                              </details>
+                            )}
                             <span className="font-bold text-ok text-xs font-mono">{t('scoreOutOf', { score: (typeof c.score === 'number' ? c.score : c.score?.total || 0).toFixed(1) })}</span>
                             <button
                               onClick={() => handleAssign(seat.id, c.organizationId)}

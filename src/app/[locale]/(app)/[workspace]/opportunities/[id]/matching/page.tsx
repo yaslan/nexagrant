@@ -6,6 +6,8 @@ import FindCandidatesButton from '@/modules/m8/components/find-candidates-button
 import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
 import { moduleGate } from '@/lib/modules/guard';
 import type { MatchBreakdown } from '@/modules/m8/server/matching';
+import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
+import { dimensionValueText } from '@/modules/m8/components/dimension-value';
 
 /**
  * M8 consortium role matrix.
@@ -191,6 +193,9 @@ export default async function MatchingPage({
                       {seatCandidates.map((c) => {
                         const org = c.organizationId ? orgById.get(c.organizationId) : null;
                         const breakdown = readBreakdown(c.breakdown);
+                        // A row the consortium builder wrote shares the seat; its
+                        // topicExperience is 0–3, not 0–35, so no range is shown for it.
+                        const writer = seatBreakdownWriter(c.breakdown);
                         return (
                           <tr key={c.id} className="border-b border-border align-top">
                             <td className="py-2 px-4 font-medium text-ink">#{c.rank}</td>
@@ -212,10 +217,17 @@ export default async function MatchingPage({
                                   {DIMENSIONS.map((key) => (
                                     <div key={key} className="flex gap-2 justify-between">
                                       <dt>{t(`dimension.${key}` as 'dimension.centrality')}</dt>
-                                      <dd className="tabular-nums">{(breakdown[key] ?? 0).toFixed(1)}</dd>
+                                      <dd className="tabular-nums whitespace-nowrap" data-testid={`m8-dimension-${key}`}>
+                                        {dimensionValueText(
+                                          t,
+                                          writer === 'match' ? seatScoreDimensionScale('match', key) : null,
+                                          breakdown[key] ?? 0
+                                        )}
+                                      </dd>
                                     </div>
                                   ))}
                                 </dl>
+                                <p className="mt-1">{t('breakdownNote')}</p>
                               </details>
                             </td>
                             <td className="py-2 px-4">

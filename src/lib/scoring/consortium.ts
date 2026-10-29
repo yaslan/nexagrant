@@ -39,6 +39,7 @@ import {
   type LiveDemandWeights,
 } from '@/lib/scoring/live-demand';
 import { normalizeSeatScore } from '@/lib/scoring/seat-score';
+import { CONSORTIUM_DIMENSION_MAX } from '@/lib/scoring/seat-dimension-scale';
 
 export interface ScoringBreakdown {
   topicExperience: number;
@@ -64,14 +65,8 @@ export interface SeatScoringOptions {
 /** Ceiling of the live-demand request set read per topic. */
 const LIVE_DEMAND_REQUEST_LIMIT = 500;
 
-/** Each raw dimension's maximum, so every component can be scaled to 0–1. */
-const DIMENSION_MAX = {
-  topicExperience: 3.0,
-  networkCentrality: 3.0,
-  countryDiversity: 1.5,
-  smeBonus: 1.0,
-  warmthBonus: 1.5,
-} as const;
+/** Each raw dimension's maximum, so every component can be scaled to 0–1. Shared with the UI (FO-155). */
+const DIMENSION_MAX = CONSORTIUM_DIMENSION_MAX;
 
 /** The raw dimensions a consortium breakdown stores, each in 0…its DIMENSION_MAX. */
 export type ConsortiumDimensions = Pick<
