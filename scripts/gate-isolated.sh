@@ -95,8 +95,8 @@ for i in $(seq 1 30); do
 done
 
 # ci.yml job env.
-export DATABASE_URL="postgresql://fabrika:fabrika@localhost:$pg_port/$db"
-export DATABASE_URL_RLS_TEST="postgresql://fabrika_app:fabrika_app_ci@localhost:$pg_port/$db"
+export DATABASE_URL="postgresql://fabrika:fabrika@127.0.0.1:$pg_port/$db"
+export DATABASE_URL_RLS_TEST="postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:$pg_port/$db"
 # ci.yml Test step. KEEP_EU_LIVE=1 runs keep-eu-sync.live against this throwaway DB.
 export AUTH_SECRET='ci-vitest-auth-secret-fixture-not-for-any-deployment'
 export KEEP_EU_LIVE=1
@@ -114,7 +114,7 @@ export R2_PUBLIC_BUCKET=test-public
 export R2_PUBLIC_HOST="$R2_ENDPOINT/test-public"
 export E2E_PORT="$e2e_port"
 
-log "db:setup on localhost:$pg_port/$db"
+log "db:setup on 127.0.0.1:$pg_port/$db"
 pnpm db:setup
 
 log "MinIO buckets on $R2_ENDPOINT"
