@@ -58,12 +58,19 @@ const DEFAULT_MAX_TOKENS = 4096;
  * the tail a truncated call used to lose. 8192 is ~2x the longest measured
  * complete document, and keeps a worst-case non-streaming call near 90 s.
  */
+/**
+ * M17 pre-assessment (FO-188): one JSON object with strengths, weaknesses and
+ * quoted evidence for each of 12–14 criteria plus a rewrite. 12288 cut the Turkish
+ * run mid-object (stop_reason max_tokens, FO-188 round 2), so both evaluate calls
+ * take 24576; the ceiling is a cap, not a charge.
+ */
+const M17_EVALUATE_MAX_TOKENS = 24576;
+
 const MAX_TOKENS_OVERRIDES: Readonly<Record<string, number>> = {
   M7: 8192,
   M10: 8192,
-  // M17 pre-assessment (FO-188): one JSON object with strengths, weaknesses and
-  // quoted evidence for each of 12–14 criteria plus a rewrite.
-  M17: 12288,
+  'M17:evaluate-attempt': M17_EVALUATE_MAX_TOKENS,
+  'M17:evaluate-retry': M17_EVALUATE_MAX_TOKENS,
 };
 
 /** Output ceiling for one call: explicit > per-action table > default. */
