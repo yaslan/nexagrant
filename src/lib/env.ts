@@ -32,6 +32,14 @@ const envSchema = z.object({
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
   /**
+   * CORDIS's own project-list widget on the landing page (FO-169,
+   * src/components/CordisProjectsSection.tsx). The key ends up in the page as the
+   * loader's `data-apikey`, so it is public by nature — but it is still the
+   * owner's key and lives only in the environment. Unset or blank: the section
+   * shows a plain link to the same CORDIS search instead of the widget.
+   */
+  NEXT_PUBLIC_CORDIS_WIDGET_KEY: blankToUndefined(z.string().optional()),
+  /**
    * Scheduled jobs (graphile-worker, `pnpm jobs:worker`, ADR-0008).
    *
    * JOBS_CRON_ENABLED decides whether this worker schedules the crontab. It

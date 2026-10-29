@@ -4,8 +4,10 @@ import {routing} from './i18n/routing';
 import {
   buildContentSecurityPolicy,
   cspHeaderName,
+  cordisSandboxPolicy,
   cspOptionsFromEnv,
   generateNonce,
+  isCordisWidgetHostPath,
   isCordisWidgetPath,
 } from './lib/security-headers';
 
@@ -35,9 +37,11 @@ function isPolicyOnlyPath(pathname: string): boolean {
  */
 export function proxy(request: NextRequest) {
   const nonce = generateNonce();
+  const cordisWidget = isCordisWidgetPath(request.nextUrl.pathname);
   const csp = buildContentSecurityPolicy({
     ...cspOptionsFromEnv(nonce),
-    cordisWidget: isCordisWidgetPath(request.nextUrl.pathname),
+    cordisWidget,
+    cordisWidgetHost: isCordisWidgetHostPath(request.nextUrl.pathname),
   });
 
   const requestHeaders = new Headers(request.headers);
@@ -47,7 +51,12 @@ export function proxy(request: NextRequest) {
   const response = isPolicyOnlyPath(request.nextUrl.pathname)
     ? NextResponse.next({ request: { headers: requestHeaders } })
     : handleIntl(new NextRequest(request, { headers: requestHeaders }));
-  response.headers.set(cspHeaderName(), csp);
+  const headerName = cspHeaderName();
+  response.headers.set(headerName, csp);
+  // A report-only `sandbox` is not enforced: the embed also gets an enforced sandbox-only policy.
+  if (cordisWidget && headerName !== 'Content-Security-Policy') {
+    response.headers.append('Content-Security-Policy', cordisSandboxPolicy());
+  }
   return response;
 }
 

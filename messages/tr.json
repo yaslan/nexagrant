@@ -704,7 +704,17 @@
     "ecosystemSubtitle": "İster bağımsız bir danışman olun, ister büyük bir üniversite; {brand} iş akışınızı hızlandırır.",
     "closingSubtitle": "{brand} ile teklif hazırlama sürenizi kısaltın; CORDIS ağ analitiği ve hakem bakış açısıyla teklifinizi güçlendirin.",
     "heroCompliance": "GDPR / KVKK Uyumlu Güvenli Bulut",
-    "modulesTitle": "AB Proje Yönetimi İçin {active} Aktif Modül{soon, plural, =0 {} other { + # Yakında}}"
+    "modulesTitle": "AB Proje Yönetimi İçin {active} Aktif Modül{soon, plural, =0 {} other { + # Yakında}}",
+    "cordisProjects": {
+      "eyebrow": "CORDIS canlı veri",
+      "title": "Türkiye'nin yer aldığı güncel Horizon Europe projeleri",
+      "subtitle": "Avrupa Komisyonu CORDIS veritabanından canlı olarak güncellenir: Türkiye'den katılımcısı olan, en son güncellenen 6 proje.",
+      "frameTitle": "CORDIS – Türkiye katılımcılı Horizon Europe projeleri listesi",
+      "loading": "Projeler CORDIS'ten yükleniyor…",
+      "fallback": "Proje listesi şu an yüklenemedi. Aynı aramayı doğrudan CORDIS'te görebilirsiniz.",
+      "fallbackLink": "Türkiye katılımcılı Horizon Europe projelerini CORDIS'te aç",
+      "source": "Kaynak: CORDIS – EU research results, Avrupa Birliği Yayın Ofisi"
+    }
   },
   "pricing": {
     "title": "{brand} Fiyatlandırması",

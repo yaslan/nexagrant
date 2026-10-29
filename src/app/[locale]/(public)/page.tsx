@@ -4,6 +4,7 @@ import { PRODUCT_NAME } from '@/lib/brand';
 import React from 'react';
 import Link from 'next/link';
 import BlogSection from '@/components/BlogSection';
+import CordisProjectsSection from '@/components/CordisProjectsSection';
 import { getPublicRoute, getWorkspaceRoute } from '@/lib/routes';
 import { getModuleCounts } from '@/lib/modules/registry';
 
@@ -570,6 +571,9 @@ export default async function HomePage({
             </div>
           </div>
         </section>
+
+        {/* ─── CORDIS CANLI PROJE LİSTESİ (FO-169) ─── */}
+        <CordisProjectsSection locale={locale} />
 
         {/* ─── KİMLER İÇİN İDEAL? (TARGET AUDIENCES) ─── */}
         <section className="py-20 lg:py-28 bg-ground/50 border-b border-border">

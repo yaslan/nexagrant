@@ -34,20 +34,26 @@
  *   file straight to the R2 presigned URL (`<account>.r2.cloudflarestorage.com`).
  *   Anthropic/OpenAI/SEDIA/CORDIS are called from the server only and are
  *   deliberately absent.
- * - CORDIS widget (FO-168): the home page (`/tr`, `/en` — `isCordisWidgetPath`) embeds
- *   CORDIS's official project-list widget, so only its policy grows by the one path
- *   `https://cordis.europa.eu/datalab/visualisations/` in style-src, img-src and
- *   font-src. Measured with Playwright (CSP off, then enforced): the nonced
- *   widgetLoader.js injects jQuery, three helper scripts, three stylesheets and the
- *   spinner, then fetches its data as JSONP (`<script src=…/widget/api/*.php>`), not
- *   XHR. Scripts need no host entry — 'strict-dynamic' trusts what the nonced loader
- *   injects (the loader tag must carry the request nonce); connect-src and frame-src
- *   stay as they are. Every other route keeps the policy above, byte for byte.
+ * - CORDIS widget (FO-168, moved into a sandboxed iframe by FO-169 / K-573263): the
+ *   widget's scripts never run in a page of ours with our origin. The home page
+ *   (`/tr`, `/en` — `isCordisWidgetHostPath`) only frames `/<locale>/embed/cordis`
+ *   (`frame-src 'self'`) in `<iframe sandbox="allow-scripts allow-popups
+ *   allow-popups-to-escape-sandbox">` — no `allow-same-origin`, so the document
+ *   inside has an opaque origin and cannot read our DOM, storage or cookies or call
+ *   our API as the visitor. The embed route (`isCordisWidgetPath`) is the only
+ *   policy that names CORDIS: the one path `https://cordis.europa.eu/datalab/visualisations/`
+ *   in style-src, img-src and font-src, and `frame-ancestors 'self'` so only our
+ *   home page can frame it. Measured with Playwright (CSP off, then enforced): the
+ *   nonced widgetLoader.js injects jQuery, three helper scripts, three stylesheets
+ *   and the spinner, then fetches its data as JSONP (`<script src=…/widget/api/*.php>`),
+ *   not XHR. Scripts need no host entry — 'strict-dynamic' trusts what the nonced
+ *   loader injects; connect-src stays as it is. Every other route keeps the policy
+ *   above, byte for byte.
  * - form-action: Auth.js signs in with a form POST to /api/auth/signin/google that
  *   redirects to accounts.google.com; Chrome applies form-action to that redirect.
  * - frame-ancestors 'none' (with X-Frame-Options DENY for old browsers),
  *   object-src 'none', base-uri 'self', frame-src 'none' — nothing embeds us and
- *   we embed nothing.
+ *   we embed nothing, except the CORDIS embed above.
  * - report-uri: violations are POSTed to `/api/csp-report`, which only logs a
  *   trimmed summary (İNCELEME-57 Ö-1). Without it a report-only rollout shows
  *   nothing but the visitor's own console. Deliberately no `report-to`: once a
@@ -65,6 +71,8 @@
  * policy that turns out to block something in production can be defanged with an
  * env change + restart instead of a rebuild.
  */
+
+import { CORDIS_IFRAME_SANDBOX } from './cordis-widget';
 
 export type HeaderEntry = { key: string; value: string };
 
@@ -180,8 +188,10 @@ export type CspOptions = {
   r2PublicHost?: string | null;
   /** R2_ENDPOINT — S3-compatible endpoint (MinIO, etc.). Origin only, safe HTTP for loopback. */
   r2Endpoint?: string | null;
-  /** The page embeds the CORDIS widget (`isCordisWidgetPath`): allow its path for styles, images, fonts. */
+  /** The CORDIS widget's own document (`isCordisWidgetPath`): its path for styles, images, fonts; framed by us only. */
   cordisWidget?: boolean;
+  /** The page that frames the CORDIS embed (`isCordisWidgetHostPath`): `frame-src 'self'`, nothing from CORDIS. */
+  cordisWidgetHost?: boolean;
 };
 
 const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
@@ -190,12 +200,37 @@ const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com';
 export const CORDIS_WIDGET_SOURCE = 'https://cordis.europa.eu/datalab/visualisations/';
 
 /**
- * The only pages that embed the CORDIS widget: the home page, `/tr` and `/en`
- * (localePrefix is 'always'; `/` redirects to one of them). Lower case only — anything
- * else (`/TR`, `/tr/login`, `/tr/x`) gets the default policy.
+ * A request path as Next's router matches it: percent-decoded once. The router
+ * serves `/tr/embed/%63ordis` and `/%74r/embed/cordis` from the embed route; the
+ * proxy's `nextUrl.pathname` may still be encoded (a NextRequest built from the raw
+ * URL is; a review measured it on a production build, FO-169 Y-1). Decoding here
+ * makes the match right either way. A malformed escape (`/%E0%A4%A`) cannot be
+ * decoded: the raw path is used.
+ */
+function routedPath(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
+/**
+ * The CORDIS widget's own document: `/tr/embed/cordis`, `/en/embed/cordis`
+ * (optional trailing slash), however it is percent-encoded. Lower case only —
+ * anything else gets the default policy.
  */
 export function isCordisWidgetPath(pathname: string): boolean {
-  return /^\/(?:tr|en)\/?$/.test(pathname);
+  return /^\/(?:tr|en)\/embed\/cordis\/?$/.test(routedPath(pathname));
+}
+
+/**
+ * The pages that frame the CORDIS embed: the home page, `/tr` and `/en`
+ * (localePrefix is 'always'; `/` redirects to one of them), however it is
+ * percent-encoded. Lower case only.
+ */
+export function isCordisWidgetHostPath(pathname: string): boolean {
+  return /^\/(?:tr|en)\/?$/.test(routedPath(pathname));
 }
 
 /** `https://host[:port]` of a URL, or null when it is blank or unparsable. */
@@ -279,6 +314,25 @@ function r2EndpointOrigin(endpoint: string | null | undefined): string | null {
   }
 }
 
+/**
+ * An enforced header for the embed's own document: the sandbox and who may frame it.
+ * The sandbox tokens are the iframe's (`CORDIS_IFRAME_SANDBOX`, one source), so
+ * opening the embed directly gives the same opaque origin the home page's frame has.
+ * In `CSP_MODE=report-only` the full policy is only reported, and a report-only
+ * `sandbox` is not enforced, so src/proxy.ts sends this header as well.
+ *
+ * `frame-ancestors 'self'` (FO-169 Ö-1): next.config sends `X-Frame-Options: DENY`
+ * on every path, and browsers ignore it only when an *enforced* policy has
+ * `frame-ancestors`. Without it, report-only mode refused the home page's frame.
+ *
+ * Not set by the embed route itself: on a path the proxy runs on, Next sends the
+ * proxy's `Content-Security-Policy` and drops the route's (measured, Next 16.3.8),
+ * so the proxy's path match is what counts — see `routedPath`.
+ */
+export function cordisSandboxPolicy(): string {
+  return `sandbox ${CORDIS_IFRAME_SANDBOX}; frame-ancestors 'self'`;
+}
+
 export function buildContentSecurityPolicy(opts: CspOptions): string {
   const posthog = originOf(opts.posthogHost);
   const r2Upload = r2UploadOrigin(opts.r2AccountId);
@@ -302,11 +356,12 @@ export function buildContentSecurityPolicy(opts: CspOptions): string {
     ['media-src', ["'self'", 'blob:']],
     ['worker-src', ["'self'", 'blob:']],
     ['manifest-src', ["'self'"]],
-    ['frame-src', ["'none'"]],
+    ['frame-src', [opts.cordisWidgetHost ? "'self'" : "'none'"]],
     ['object-src', ["'none'"]],
     ['base-uri', ["'self'"]],
     ['form-action', ["'self'", 'https://accounts.google.com']],
-    ['frame-ancestors', ["'none'"]],
+    ['frame-ancestors', [opts.cordisWidget ? "'self'" : "'none'"]],
+    ...(opts.cordisWidget ? [['sandbox', CORDIS_IFRAME_SANDBOX.split(' ')] as [string, string[]]] : []),
     ['report-uri', [CSP_REPORT_PATH]],
   ];
   return directives.map(([name, values]) => `${name} ${values.join(' ')}`).join('; ');
