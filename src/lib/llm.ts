@@ -222,7 +222,8 @@ async function withRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
   baseDelay: number = 1000,
-  deadlineAt?: number
+  deadlineAt?: number,
+  signal?: AbortSignal
 ): Promise<T> {
   let attempt = 0;
   while (true) {
@@ -233,8 +234,9 @@ async function withRetry<T>(
       // An error with no status is not a client error, so it stays retryable.
       const status = errorStatus(error);
       const isClientError = status !== undefined && status !== 429 && status >= 400 && status < 500;
-      // Past the deadline a retry can only be cut off again, so it is not made.
-      const pastDeadline = deadlineAt !== undefined && Date.now() >= deadlineAt;
+      // Past the deadline, or once the request's signal has fired (the clock and the signal can
+      // disagree by a tick), a retry can only be cut off again, so it is not made.
+      const pastDeadline = (deadlineAt !== undefined && Date.now() >= deadlineAt) || signal?.aborted === true;
       if (attempt > maxRetries || isClientError || pastDeadline) {
         throw error;
       }
@@ -286,9 +288,9 @@ function signalUntil(deadlineAt: number | undefined): AbortSignal | undefined {
 
 async function callProvider(
   messages: LlmMessage[],
-  opts: { provider: LlmProvider; model: string; maxTokens: number; deadlineAt?: number }
+  opts: { provider: LlmProvider; model: string; maxTokens: number; signal?: AbortSignal }
 ): Promise<ProviderResult & { refusalCategory?: string | null }> {
-  const { provider, model, maxTokens, deadlineAt } = opts;
+  const { provider, model, maxTokens, signal } = opts;
 
   if (provider === 'anthropic') {
     const apiKey = requireApiKey('anthropic');
@@ -314,7 +316,7 @@ async function callProvider(
         system: systemMsg,
         messages: userMessages,
       }),
-      signal: signalUntil(deadlineAt),
+      signal,
     });
 
     if (!res.ok) {
@@ -349,7 +351,7 @@ async function callProvider(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({ model, max_tokens: maxTokens, messages }),
-      signal: signalUntil(deadlineAt),
+      signal,
     });
 
     if (!res.ok) {
@@ -553,11 +555,14 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   const { credits: price } = resolveCredits(options.module, options.purpose);
 
   requireApiKey(provider);
+  // One signal for the whole request: every attempt gives up at the same instant.
+  const signal = signalUntil(options.deadlineAt);
   const { outcome, refusalCategory, ...result } = await withRetry(
-    () => callProvider(messages, { provider, model, maxTokens, deadlineAt: options.deadlineAt }),
+    () => callProvider(messages, { provider, model, maxTokens, signal }),
     3,
     1000,
-    options.deadlineAt
+    options.deadlineAt,
+    signal
   );
 
   // A truncated or refused answer is not the product the tenant paid for, so

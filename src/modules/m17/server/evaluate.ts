@@ -50,6 +50,12 @@ export const EVALUATE_RETRY_PURPOSE = 'evaluate-retry';
 const MAX_RUN_MS = 300 * 1000;
 
 /**
+ * Time kept back from the run's deadline for the writes after the last provider answer
+ * (the result transaction, or FAILED). Without it the platform can kill the route first.
+ */
+const RUN_DEADLINE_MARGIN_MS = 30 * 1000;
+
+/**
  * A run that crashed mid-way (process killed) leaves ANALYZING; after this it may be
  * claimed again. A margin over MAX_RUN_MS: a run the platform has not killed is
  * not taken over (FO-188 Ö1).
@@ -241,9 +247,16 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
       content: renderPrompt('m17/evaluate', { rubric: serializeRubric(promptRubric), project_context: fitted.projectText }, locale),
     },
   ];
-  // The run's whole budget counts from the claim: each provider request is cut off at this
-  // instant (FO-188 Ö1), so the run ends before the route's maxDuration kills it mid-write.
-  const base = { tenantId, userId, module: EVALUATE_MODULE, deadlineAt: row.claimedAt.getTime() + MAX_RUN_MS };
+  // The run's budget counts from the claim, less a margin: each provider request is cut off at
+  // this instant (FO-188 Ö1), so the run ends before the route's maxDuration kills it mid-write.
+  // The clock starts at the claim, a few steps after the request began (gate, credit check):
+  // that gap is small and is not counted here.
+  const base = {
+    tenantId,
+    userId,
+    module: EVALUATE_MODULE,
+    deadlineAt: row.claimedAt.getTime() + MAX_RUN_MS - RUN_DEADLINE_MARGIN_MS,
+  };
 
   // Both calls are priced 0; the run's price is booked once, after the result is saved.
   const first = await generateCompletion({ ...base, purpose: EVALUATE_ATTEMPT_PURPOSE, messages });

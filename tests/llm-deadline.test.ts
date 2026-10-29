@@ -42,6 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('generateCompletion — provider deadline', () => {
@@ -53,6 +54,19 @@ describe('generateCompletion — provider deadline', () => {
     expect(Date.now() - started).toBeLessThan(900); // a retry would have waited 1 s before the second attempt
     expect(state.fetches).toHaveLength(1);
     expect(state.fetches[0]!.signal).toBeInstanceOf(AbortSignal);
+    expect(state.fetches[0]!.signal!.aborted).toBe(true);
+  });
+
+  test('a request whose signal has fired is not retried, even if the clock says there is time left', async () => {
+    // The signal runs on its own clock; the wall clock is frozen before the deadline, so only
+    // the fired signal tells withRetry the request is over (FO-188 review B-2).
+    const started = performance.now();
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+
+    await expect(generateCompletion({ ...base, deadlineAt: 1_000_000 + 80 })).rejects.toThrow();
+
+    expect(performance.now() - started).toBeLessThan(900); // a retry would have waited 1 s
+    expect(state.fetches).toHaveLength(1);
     expect(state.fetches[0]!.signal!.aborted).toBe(true);
   });
 
