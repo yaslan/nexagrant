@@ -29,6 +29,10 @@ vi.mock('@/lib/adapters/sedia', () => ({
 vi.mock('@/lib/translation', () => ({ translateTopicsBatch: mocks.translate }));
 
 import { GET, CAGRILAR_BUDGET_MS } from '@/app/api/cagrilar/route';
+import { cagrilarCache } from '@/lib/cagrilar-cache';
+
+// Each case starts with no remembered answers, so one case's search is never another's.
+beforeEach(() => cagrilarCache.clear());
 
 const TOPIC = {
   identifier: 'HORIZON-CL5-2027-03-D5-06',

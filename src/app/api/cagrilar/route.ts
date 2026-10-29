@@ -7,6 +7,7 @@ import { requireTenantApi } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 import { SEDIA_RESULT_WINDOW } from '@/lib/calls-paging';
+import { cagrilarCache } from '@/lib/cagrilar-cache';
 
 /**
  * The largest page this route asks SEDIA for. Every title on the page is
@@ -118,6 +119,10 @@ export async function GET(request: NextRequest) {
     const typeParam = searchParams.get('type') || '1';
     const types = typeParam.split(',').map(t => t.trim());
 
+    const cacheKey = JSON.stringify([text, page, pageSize, lang, statuses, frameworkProgrammes, types]);
+    const cached = cagrilarCache.get(cacheKey);
+    if (cached) return NextResponse.json(cached);
+
     const adapter = new SediaAdapter();
     const result = await adapter.searchSedia({
       text,
@@ -165,14 +170,18 @@ export async function GET(request: NextRequest) {
     // nightly k1-daily-calls job's job (src/lib/jobs/tasks/k1-daily-calls.ts,
     // cron 02:00); a live search only reads SEDIA.
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       totalResults: result.totalResults,
       pageNumber: result.pageNumber,
       pageSize: result.pageSize,
       topics: processedTopics,
       translated,
-    });
+    };
+    // An answer cut short by the budget or the client leaving is not stored: the
+    // next visitor would get the untranslated list for ten minutes.
+    if (!signal.aborted) cagrilarCache.set(cacheKey, payload);
+    return NextResponse.json(payload);
   } catch (error) {
     // If the client aborted the request (closed page, cancelled, etc), the signal fires and
     // any pending work (e.g., SEDIA fetch or translation) throws AbortError. This is expected,
