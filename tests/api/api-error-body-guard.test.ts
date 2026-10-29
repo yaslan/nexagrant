@@ -153,6 +153,9 @@ describe('API route 5xx bodies', () => {
 const KNOWN_ACTION_LEAKS: Record<string, string[]> = {};
 
 describe('server action error returns', () => {
+  // FO-200: ~10 s alone (one TypeScript analysis per action file and per imported
+  // module, 269 in all); 33-60 s inside the full parallel run on the shared machine.
+  // Only this test gets the longer budget; the global testTimeout stays at 30 s.
   test('no server action returns what it caught (beyond the known list)', () => {
     // Imports are followed into src/ (TASK-MUOBO31H8EPR5, İNCELEME-100 Y-1):
     // a service that returns what it caught leaks through the action that returns it.
@@ -163,7 +166,7 @@ describe('server action error returns', () => {
       if (leaks.length > 0) found[rel(file)] = leaks.map((f) => `line ${f.line} ← ${f.via}`);
     }
     expect(found).toEqual(KNOWN_ACTION_LEAKS);
-  });
+  }, 120_000);
 
   test('the directive is found past comments and inside a function, and only as a directive', () => {
     expect(hasUseServerDirective("/** m8 */\n'use server';\nexport async function a() {}")).toBe(true);
