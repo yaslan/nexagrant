@@ -47,6 +47,16 @@ fi
 source "$(dirname "$0")/pg-url.sh"
 pg_url_split RESTORE_DATABASE_URL || fail "RESTORE_DATABASE_URL could not be parsed (see above)"
 
+# Role precondition, before anything is written: the dump GRANTs to fabrika_app.
+# shellcheck source=pg-app-role.sh
+source "$(dirname "$0")/pg-app-role.sh"
+rc=0; pg_app_role_exists "$PG_CONN" "$PG_PASS" || rc=$?
+case "$rc" in
+  0) ;;
+  1) fail "role fabrika_app does not exist on the target cluster; the dump's GRANTs would stop the restore midway. Create the role first (locally: pnpm db:rls-role; production: docs/RELEASE_CHECKLIST.md §4.4), then retry" ;;
+  *) fail "could not query pg_roles on the target database" ;;
+esac
+
 # Emptiness guard: relations (tables, views, sequences, …) in the two schemas
 # a dump writes. A fresh `createdb` has none; the pgvector extension and
 # graphile_worker come from the dump itself.

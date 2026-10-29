@@ -107,6 +107,17 @@ counts_of() {
 # The restored database: same server and credentials as the admin URL, new db name.
 restored_conn="$admin_prefix/$RESTORE_DB${admin_query:+?$admin_query}"
 
+# Role precondition, before the scratch database is dropped: the dump GRANTs to
+# fabrika_app, and a cluster without it fails the restore on the first GRANT.
+# shellcheck source=pg-app-role.sh
+source "$(dirname "$0")/pg-app-role.sh"
+rc=0; pg_app_role_exists "$admin_conn" "$admin_pass" || rc=$?
+case "$rc" in
+  0) ;;
+  1) fail "role fabrika_app does not exist on the target cluster; the dump's GRANTs would fail the restore. Create the role first (locally: pnpm db:rls-role; production: docs/RELEASE_CHECKLIST.md §4.4), then retry" ;;
+  *) fail "could not query pg_roles via RESTORE_ADMIN_URL" ;;
+esac
+
 started=$(date +%s)
 log "recreating scratch database $RESTORE_DB"
 PGPASSWORD="$admin_pass" psql "$admin_conn" -X -q -v ON_ERROR_STOP=1 \
