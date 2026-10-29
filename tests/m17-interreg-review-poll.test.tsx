@@ -62,6 +62,17 @@ function renderClient() {
   );
 }
 
+/**
+ * The screen and the interval behind it land in separate steps: `findByTestId` returns
+ * once the analyzing block is in the DOM, but the effect that starts the interval can
+ * still be pending (FO-208: under full-suite load the first tick then fired into
+ * nothing, and the run counted 119 looks). Wait for the interval itself.
+ */
+async function pollingStarted() {
+  await screen.findByTestId('m17-analyzing');
+  await vi.waitFor(() => expect(vi.getTimerCount()).toBe(1));
+}
+
 /** One poll tick, then let its fetch chain settle. */
 async function tick() {
   await act(async () => {
@@ -93,7 +104,7 @@ describe('M17 screen — polling a run started elsewhere', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     renderClient();
-    expect(await screen.findByTestId('m17-analyzing')).toBeTruthy();
+    await pollingStarted();
 
     await tick(); // network error: caught, still analyzing
     expect(screen.queryByTestId('m17-report')).toBeNull();
@@ -119,7 +130,7 @@ describe('M17 screen — polling a run started elsewhere', () => {
     );
 
     renderClient();
-    await screen.findByTestId('m17-analyzing');
+    await pollingStarted();
     for (let i = 0; i < 120; i += 1) await tick();
     expect(looks).toBe(120);
     expect(screen.queryByTestId('m17-action-error')).toBeNull();
