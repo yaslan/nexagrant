@@ -27,6 +27,7 @@ const CALL = `${RUN.toUpperCase()}-CALL`;
 const ORG_A = `${RUN}-pic-a`;
 const ORG_B = `${RUN}-pic-b`;
 const DAY_MS = 24 * 3600_000;
+const PROJECTS_PER_ORG = 60;
 
 const state = vi.hoisted(() => ({ rls: undefined as PrismaClient | undefined }));
 
@@ -89,11 +90,35 @@ beforeAll(async () => {
     })
   ).id;
 
-  // Far more projects than any seeded organisation, so both land in the candidate pool.
+  // The profile job (partnerProfileJob.ts) rewrites every CordisPartnerProfile row
+  // from CordisParticipation, so a profile that is not backed by participations gets
+  // overwritten mid-test (TASK-MVSID84JQXITR). Each organisation therefore gets
+  // PROJECTS_PER_ORG real participations and a profile with the value the job computes.
+  // Both sides are equal, so the job writes the same totalProjects whenever it runs.
+  // 30 is where networkCentrality saturates (DIMENSION_MAX); 60 keeps the organisations
+  // in the 50-candidate pool.
   for (const pic of [ORG_A, ORG_B]) {
-    await admin.cordisOrganization.create({ data: { organisationId: pic, name: `${RUN} ${pic}`, country: 'DE' } });
-    await admin.cordisPartnerProfile.create({
-      data: { organisationId: pic, name: `${RUN} ${pic}`, country: 'DE', totalProjects: 1_000_000 },
+    await admin.cordisOrganization.upsert({
+      where: { organisationId: pic },
+      update: {},
+      create: { organisationId: pic, name: `${RUN} ${pic}`, country: 'DE' },
+    });
+    const projectIds = Array.from({ length: PROJECTS_PER_ORG }, (_, i) => `${RUN}-${pic}-p${i}`);
+    await admin.cordisProject.createMany({
+      data: projectIds.map((id) => ({ id, title: `${RUN} ${id}`, framework: 'HORIZON' })),
+    });
+    await admin.cordisParticipation.createMany({
+      data: projectIds.map((projectId) => ({ projectId, organisationId: pic, role: 'participant' })),
+    });
+    const profile = {
+      name: `${RUN} ${pic}`,
+      country: 'DE',
+      totalProjects: PROJECTS_PER_ORG,
+    };
+    await admin.cordisPartnerProfile.upsert({
+      where: { organisationId: pic },
+      update: profile,
+      create: { organisationId: pic, ...profile },
     });
   }
   const announcement = (externalId: string, pic: string, type: 'EXPERTISE_REQUEST' | 'EXPERTISE_OFFER', extra = {}) =>
@@ -144,6 +169,8 @@ afterAll(async () => {
     await admin.topic.deleteMany({ where: { identifier: TOPIC } }).catch(() => {});
     await admin.call.deleteMany({ where: { callIdentifier: CALL } }).catch(() => {});
     await admin.cordisOrganization.deleteMany({ where: { organisationId: { in: [ORG_A, ORG_B] } } }).catch(() => {});
+    // Participations cascade with the organisations; the projects they point at do not.
+    await admin.cordisProject.deleteMany({ where: { id: { startsWith: `${RUN}-` } } }).catch(() => {});
   }
   await Promise.all([state.rls, admin].map((c) => c?.$disconnect().catch(() => {})));
 });
