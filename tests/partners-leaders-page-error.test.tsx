@@ -20,6 +20,8 @@ vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: unknown }) => <a href={href}>{children as never}</a>,
 }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
+// FO-163: the session/M1/window gate has its own test; these pin the data path.
+vi.mock('@/lib/cordis-api-auth', () => ({ authenticateCordisSession: async () => ({ authenticated: true }) }));
 vi.mock('@/lib/db', () => ({ prisma: { cordisPartnerProfile: { findMany } } }));
 vi.mock('@/lib/k2-cordis/coordinator-leaders', () => ({ coordinatorLeaders }));
 

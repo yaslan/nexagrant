@@ -48,6 +48,8 @@ Partner Search (FO-61) aynı yollarla `/api/v1/` altında da var (`partner-searc
 
 Rate limit: `429` + `Retry-After`; kullanım `ApiUsage` tablosuna; lisans metni türev veri/AB açık veri ayrımını belirtir.
 
+**CORDIS okuma yolları (/api/cordis/*, /partners/leaders sayfası):** aylık kota yok. Anahtar (`x-api-key`) ya da oturum; oturumda M1 tam açık olmalı (sınırlı plan 403), kullanıcı başına dakikada 60 istek (`CORDIS_SESSION_PER_USER_PER_MINUTE`, aşımda 429 + `Retry-After`).
+
 ## Olaylar (`src/core/events`)
 
 `opportunity.created|stage.changed`, `gate.decided`, `seat.status.changed`, `concept.approved`, `esr.uploaded`, `module.state.changed`, `subscription.updated`, `ai.used`, `relationship.stale` (60 gün), `topic.deadline.approaching` (T-30/T-14/T-7/T-1).

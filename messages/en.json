@@ -3721,7 +3721,10 @@
     "picLabel": "PIC:",
     "coordinatedLabel": "Projects Coordinated:",
     "totalLabel": "Total Projects:",
-    "ecContributionLabel": "EU Contribution Coordinated:"
+    "ecContributionLabel": "EU Contribution Coordinated:",
+    "signInRequired": "Sign in to see top leaders.",
+    "limitedPlan": "The top leaders list is not included in your current plan.",
+    "rateLimited": "Too many lookups in a short time. Try again in a minute."
   },
   "PartnerResources": {
     "breadcrumbDashboard": "Dashboard",
