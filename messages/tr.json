@@ -1550,8 +1550,8 @@
       "submitButton": "Kalibrasyon Hesapla ve Kaydet",
       "resultLabel": "Hesaplanan Kalibrasyon Sapması (Variance):",
       "deviationLabel": "Sapma: {value} puan",
-      "goodMessage": "🎯 Harika! İç değerlendirme modeliniz resmî ESR puanına çok yakın (≤ 0.5 puan sapma).",
-      "driftMessage": "⚠️ Modeliniz resmî puandan biraz sapma gösteriyor. Gelecek projelerde kalibrasyon katsayısı güncellenecektir.",
+      "goodMessage": "🎯 Harika! İç ön değerlendirmeniz Komisyonun açıkladığı ESR sonucuna çok yakın (≤ 0.5 puan sapma).",
+      "driftMessage": "⚠️ İç ön değerlendirmeniz Komisyonun açıkladığı ESR sonucundan belirgin biçimde sapıyor. Sapma bu değerlendirmeye kaydedildi; sonraki ön değerlendirmelerde dikkate alın.",
       "noScoredEvaluations": "Kalibre edilecek puanlanmış bir değerlendirme yok. Önce bir ön değerlendirme tamamlayın."
     },
     "form": {
