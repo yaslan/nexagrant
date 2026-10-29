@@ -24,6 +24,9 @@ const REPO_ROOT = path.resolve(__dirname, '..');
  */
 const DB_ROW = 'value read from a non-null column of a row fetched just above, not client input';
 const KNOWN: Record<string, string> = {
+  'src/modules/m17/server/evaluate.ts updatedAt: claimedAt':
+    'the claim instant: `now` that claim() set on the row in the same run (the run\'s own identity, FO-188 B3); a server Date, never client input',
+  'src/modules/m17/server/evaluate.ts updatedAt: row.claimedAt': 'same claim instant, read back from the claim() result; server-side, never client input',
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.proposal.id': DB_ROW,
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.id': DB_ROW,
   'src/lib/billing/plan-repository.ts planId: draft.planId': DB_ROW,
