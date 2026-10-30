@@ -28,8 +28,8 @@ Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (aja
 | # | Madde | Durum | Kanıt (kısa) |
 |---|---|---|---|
 | 1.1 | DNS bölgesi `fonbridge.com` | **PATRON** | `dig +norec SOA fonbridge.com @ns1/ns2.iyisunucu.com.tr` → `REFUSED` (29.09 21:43 UTC); aynı NS'de `usfinbridge.com` → `NOERROR`; `@8.8.8.8` A/AAAA/MX/TXT → `SERVFAIL` |
-| 1.2 | Uygulama sunucusu (web + worker + Postgres 16/pgvector) nerede koşacak | **PATRON** | `77.92.144.187` paylaşımlı cPanel/Exim sunucusu; Docker, uzun yaşayan worker süreci ve pgvector'ün orada olup olmadığı **ölçülmedi**. `<APP_IP>` hâlâ yok (`docs/SMTP-SUNUCU.md` §8 madde 2) |
-| 1.3 | Ters vekil + TLS + `www`→kök 301 | **EKSİK** (1.2'ye bağlı) | Caddyfile hazır (`docs/SMTP-SUNUCU.md` §10.1), kurulmadı |
+| 1.2 | Uygulama sunucusu (web + worker + Postgres 16/pgvector) nerede koşacak | **PATRON** (sunucuyu alır) | Karar: **Hostinger KVM 2, Frankfurt** (K-573894). Paket hazır: `deploy/vps/` (compose, Caddyfile, `.env.prod.example`, yedek, `RUNBOOK.md`, FO-244). `77.92.144.187` cPanel'i artık yalnız posta sunucusu; uygulama oraya kurulmayacak. Sunucu kurulumu ve IP bilgisi patronda |
+| 1.3 | Ters vekil + TLS + `www`→kök 301 | **HAZIR** (paket) / **PATRON** (DNS + kurulum) | `deploy/vps/Caddyfile` (nexagrant.com; HSTS yorumda). Kurulum için DNS A kaydı ve onay: `deploy/vps/RUNBOOK.md` §3 |
 | 1.4 | SMTP (`mail.fonbridge.com`) | **PATRON** | 1.1'e bağlı; kutular, DKIM, AutoSSL `docs/SMTP-SUNUCU.md` §8 |
 | 2 | Üretim ortam değişkenleri | **EKSİK** (liste hazır, değerler PATRON) | §2 |
 | 3 | Migration sırası + geri dönüş | **HAZIR** (2 not) | §3 |
@@ -63,7 +63,7 @@ Sonuç: **şemadaki her anahtar `.env.example`'da var.** Fark ters yönde ve şe
 | DB TLS: `DATABASE_URL`, `JOBS_DATABASE_URL` ve migration/`rls.sql` URL'inin sonu | `certs/supabase-prod-ca-2021.crt`, `certs/README.md` (TASK-MUOG51GJ3PUOG R-S7) | **`?sslmode=verify-full&sslrootcert=/app/certs/supabase-prod-ca-2021.crt`** (imaj dışında: `certs/`'in mutlak yolu). node-pg (web, worker, tsx betikleri) ve psql bunu URL'den okur, sunucuyu CA'ya ve ana bilgisayar adına karşı doğrular. **Prisma CLI** (`db push`, `migrate diff --from-config-datasource`) bu iki parametreyi tanımaz (`verify-full`'u `prefer` sayar, yanlış CA ile de bağlanır; crw2-fb Y-1). Aynı URL'i verin, elle değiştirmeyin: `prisma.config.ts` (`prisma/cli-url.ts`) CLI'ya `sslmode=require&sslaccept=strict&sslcert=<CA mutlak yolu>` biçimini kendisi verir; CA dosyası yoksa komut bağlanmadan durur. Dönüşmüş biçimi node-pg'ye **vermeyin** (`sslcert`'i istemci sertifikası sayar, bağlanamaz). `--from-url`/`--to-url` ile URL'i doğrudan Prisma'ya vermek bu dönüşümü atlar: kullanmayın. **Yasak:** `sslmode=require`'ı CA'sız bırakmak (node-pg `SELF_SIGNED_CERT_IN_CHAIN` ile bağlanamaz), `uselibpqcompat=true`, `rejectUnauthorized:false`. Kanıt: `DATABASE_URL=<app URL> pnpm rls:verify --require-db` → exit 0 (TLS kurulamazsa exit 1, eskisi gibi "ATLANDI" + exit 0 değil); worker URL'i: `psql "<jobs URL>" -c 'select current_user'` | HAZIR (CA repoda, imajda); PATRON (URL'ler) |
 | `AUTH_SECRET` | `src/lib/auth-secret.ts` | ≥32 karakter, `openssl rand -base64 32`; eksik/kısa/eski anahtar → sunucu **başlamaz** (`src/instrumentation.ts`) | PATRON |
 | `NEXT_PUBLIC_APP_URL=https://fonbridge.com` | env.ts, `.env.example:6` | davet/e-posta bağlantıları; yanlışsa yalnız uyarı (instrumentation) | PATRON |
-| `TRUSTED_PROXY_HOPS=1` | `src/lib/leads/public-lead.ts` `trustedProxyHops` (env.ts şemasında yok), `.env.example` | canlı topoloji: `77.92.144.187` önünde **tek** LiteSpeed, CDN yok (FO-51 ölçümü 17.10.2026: `curl -sI` cf-ray/CDN başlığı yok). Yanlış değer → ön kayıt IP sınırı sahte `X-Forwarded-For` ile aşılır. cPanel "Setup Node.js App" → Environment Variables'a girilir | PATRON (cPanel'e tek satır) |
+| `TRUSTED_PROXY_HOPS=1` | `src/lib/leads/public-lead.ts` `trustedProxyHops` (env.ts şemasında yok), `.env.example` | canlı topoloji: VPS'te **tek** Caddy ters vekili önde (`deploy/vps/Caddyfile`), CDN yok. Yanlış değer → ön kayıt IP sınırı sahte `X-Forwarded-For` ile aşılır. Değer `deploy/vps/.env.prod` içinde (sunucuda, chmod 600) | PATRON (sunucuda değer girilir) |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | `src/lib/auth.ts:331` | **yeni `fonbridges` GCP istemcisi**; yönlendirme URI'si `https://fonbridge.com/api/auth/callback/google` (`basePath: "/api/auth"`, `trustHost: true`). `GOOGLE_CLIENT_*` yalnız eski ad | PATRON |
 | `DEMO_LOGIN_ENABLED` | env.ts, `src/lib/demo-login.ts` | **boş ya da `false`**; üretimde `true` → sunucu başlamaz | HAZIR (kodla korunuyor) |
 | `JOBS_CRON_ENABLED` (yalnız worker) | env.ts `jobsCronEnabled` | `false` → sonra `true` (§3.3 sırası); boşsa üretim worker'ı **başlamaz** | HAZIR (kodla korunuyor) |
@@ -416,8 +416,8 @@ origin  https://github.com/yaslan/fonbridge.git
 
 Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabilenler aynı numarada harfle).
 
-1. **Uygulama sunucusu kararı:** web + worker + Postgres 16 (pgvector) nerede koşacak? `77.92.144.187` paylaşımlı cPanel sunucusu; orada Docker/uzun yaşayan süreç/pgvector olup olmadığını Vulut'a sor. Olmuyorsa Vulut VPS (öneri: 2 vCPU / 4 GB / 60 GB SSD) — **`<APP_IP>`**'yi bize ilet.
-2. **fonbridge.com'u `srv.iyisunucu.com.tr` cPanel'ine ekle** (bugün NS'ler `REFUSED`). NS değişmez.
+1. **Uygulama sunucusu:** karar verildi — Hostinger KVM 2, Frankfurt (K-573894). Patron sunucuyu alır; kurulum ve değerler `deploy/vps/RUNBOOK.md` §1–§5'e göre, hiçbir şey onaysız canlıya yazılmaz.
+2. **DNS:** `nexagrant.com` ve `www` A kaydı → VPS IPv4 (`deploy/vps/RUNBOOK.md` §3). Eski `fonbridge.com` cPanel DNS adımı bu pakette yok; alan adı tutarlılığı ayrı iş (RUNBOOK §10 K11).
 3. Zone Editor: kök `A` → `<APP_IP>`, `www` → kök, `mail A 77.92.144.187`, MX, SPF, DMARC, DKIM (2048 bit) — tam liste `docs/SMTP-SUNUCU.md` §3.0/§8 madde 3. TTL 300.
 4. Posta kutuları `info@` + `dmarc@`; **S-1 kararı** (uygulama `info@` ile mi, ayrı `bildirim@` ile mi göndersin — öneri ayrı kutu). AutoSSL çalıştır.
 5. Vulut'a tek bilet (`docs/SMTP-SUNUCU.md` §8 madde 7 a–g) + 1. maddedeki sunucu sorusu aynı bilette.
