@@ -241,6 +241,39 @@ async function acquireMeasurer(
   return null;
 }
 
+/**
+ * The connection the expected row counts are taken from. It must see every row:
+ * the measured role reads 0 outside `system_scope`, so counting through it
+ * expects 0 and then reports the scope's real row as a policy failure
+ * (TASK-MVUPDK0P6ZT0N). DATABASE_URL serves when its role is exempt; otherwise
+ * OWNER_DATABASE_URL (the BYPASSRLS owner, fabrika_owner). Null when neither is.
+ */
+async function acquireTruth(
+  admin: pg.Client,
+  adminCaps: RoleCaps,
+  dotenv: Record<string, string>
+): Promise<Measurer | null> {
+  if (isExempt(adminCaps)) {
+    return { client: admin, caps: adminCaps, source: 'DATABASE_URL', cleanup: async () => {} };
+  }
+  const ownerUrl = process.env.OWNER_DATABASE_URL ?? dotenv.OWNER_DATABASE_URL;
+  if (!ownerUrl) return null;
+  const client = new pg.Client({ connectionString: ownerUrl, connectionTimeoutMillis: 3000 });
+  try {
+    await client.connect();
+  } catch (e) {
+    console.log(`   OWNER_DATABASE_URL: bağlanılamadı (${e instanceof Error ? e.message : String(e)})`);
+    return null;
+  }
+  const caps = await roleCaps(client);
+  if (!isExempt(caps)) {
+    console.log(`   OWNER_DATABASE_URL: rol ${describeCaps(caps)} — satır beklentisi için BYPASSRLS gerekir.`);
+    await client.end();
+    return null;
+  }
+  return { client, caps, source: 'OWNER_DATABASE_URL', cleanup: () => client.end() };
+}
+
 interface Populated {
   table: string;
   tenantId: string;
@@ -867,6 +900,7 @@ async function main() {
   }
 
   let measurer: Measurer | null = null;
+  let truth: Measurer | null = null;
   try {
     const models = tenantScopedModels();
 
@@ -1023,6 +1057,14 @@ async function main() {
       process.exit(1);
     }
 
+    const needsTruth = SYSTEM_SCOPE_TABLES.some((s) => existing.has(s.table)) || existing.has(EXPERT_TABLE);
+    truth = needsTruth ? await acquireTruth(client, adminCaps, dotenv) : null;
+    if (needsTruth && !truth) {
+      console.error('\n❌ SİSTEM KAPSAMI SATIR BEKLENTİSİ ÖLÇÜLEMEDİ — yeşil YAZILMIYOR.');
+      console.error('   Toplam satır sayısı BYPASSRLS bir bağlantıdan (OWNER_DATABASE_URL) alınmalı; uygulama rolü 0 görür.');
+      process.exit(1);
+    }
+
     const populated = await populatedTables(client, models, existing);
     const { failures, checks } = await probeIsolation(
       measurer.client,
@@ -1031,13 +1073,13 @@ async function main() {
     );
     for (const spec of SYSTEM_SCOPE_TABLES) {
       if (!existing.has(spec.table)) continue;
-      const rows = Number((await client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(spec.table)}`)).rows[0]?.n ?? 0);
+      const rows = Number((await truth!.client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(spec.table)}`)).rows[0]?.n ?? 0);
       const probe = await probeSystemScopeTable(measurer.client, spec, rlsOn.has(spec.table), rows);
       failures.push(...probe.failures);
       checks.push(...probe.checks);
     }
     if (existing.has(EXPERT_TABLE)) {
-      const purposes = await probePurposeTables(measurer.client, measurer.client === client ? null : client);
+      const purposes = await probePurposeTables(measurer.client, truth!.client === measurer.client ? null : truth!.client);
       failures.push(...purposes.failures);
       checks.push(...purposes.checks);
     }
@@ -1065,6 +1107,7 @@ async function main() {
     );
   } finally {
     await measurer?.cleanup().catch(() => {});
+    await truth?.cleanup().catch(() => {});
     await client.end();
   }
 }
