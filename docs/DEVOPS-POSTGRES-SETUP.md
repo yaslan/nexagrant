@@ -34,7 +34,15 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-Expected seed output:
+`pnpm db:seed` always writes the reference data (plans, module catalogue,
+add-ons, programmes, concept templates, Interreg rubrics, blog launch posts).
+The demo tenant and its users, calls and opportunities are written only when
+`SEED_DEMO` is on: unset means on outside production and off with
+`NODE_ENV=production`; `SEED_DEMO=true` in production still runs and prints a
+warning (FO-251). A production seed therefore prints
+`Skipping demo data (SEED_DEMO is off) — reference data only.`
+
+Expected seed output (development, demo on):
 ```
 Seeding Database...
 Tenant and users seeded (Fabrika Beta with alice, bob, charlie).

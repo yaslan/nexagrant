@@ -29,6 +29,13 @@ const envSchema = z.object({
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
     z.enum(['true', 'false']).optional()
   ),
+  /**
+   * Whether `pnpm db:seed` also writes the demo tenant, its users and its
+   * opportunities (FO-251, {@link seedDemoDecision}). Reference data (plans,
+   * module catalogue, programmes, templates, rubrics) is written either way.
+   * Unset or blank: on outside production, off with NODE_ENV=production.
+   */
+  SEED_DEMO: blankToUndefined(z.enum(['true', 'false']).optional()),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
   /**
@@ -325,6 +332,28 @@ export function jobsCronEnabled(
   if (source.JOBS_CRON_ENABLED === 'false') return false;
   if (source.NODE_ENV === 'production') throw new JobsCronUnsetInProductionError();
   return true;
+}
+
+/**
+ * Whether the seed writes the demo data (FO-251). `SEED_DEMO` wins when set;
+ * unset means on outside production and off in production, so a production
+ * seed fills the catalogue without opening `demo-tenant`. An explicit `true` in
+ * production is obeyed, with a warning for the seed to print.
+ */
+export function seedDemoDecision(
+  source: { SEED_DEMO?: string; NODE_ENV?: string } = env
+): { enabled: boolean; warning: string | null } {
+  const production = source.NODE_ENV === 'production';
+  if (source.SEED_DEMO === 'false') return { enabled: false, warning: null };
+  if (source.SEED_DEMO === 'true') {
+    return {
+      enabled: true,
+      warning: production
+        ? '⚠️  SEED_DEMO=true with NODE_ENV=production: writing demo-tenant and its demo users into this database.'
+        : null,
+    };
+  }
+  return { enabled: !production, warning: null };
 }
 
 /**
