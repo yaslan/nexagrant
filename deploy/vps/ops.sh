@@ -10,7 +10,8 @@
 #   deploy/vps/ops.sh verify     # RLS canlı doğrulama (scripts/check-rls-live.ts --require-db) — uygulama rolü
 #
 # Roller: sahip (fabrika_owner) OWNER_DATABASE_URL ile bağlanır; DATABASE_URL o adımlarda
-# sahip URL'iyle değiştirilir. verify DATABASE_URL'i (fabrika_app) olduğu gibi kullanır.
+# sahip URL'iyle değiştirilir. verify DATABASE_URL'i (fabrika_app) olduğu gibi kullanır; satır
+# beklentisini ise OWNER_DATABASE_URL'den (BYPASSRLS sahip) ölçer — uygulama rolü 0 satır görür.
 # worker imajı compose ağında koşar: servis adı `postgres` çözülür, --network host ve URL
 # dönüşümü yok. Host psql'i (migrate, bootstrap) 127.0.0.1:5432'yi (loopback'e yayınlı) kullanır.
 # Parolalar komut satırına GİRMEZ: konteyner ortamında (env_file) ya da stdin üzerinden gider.
