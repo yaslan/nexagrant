@@ -41,7 +41,7 @@ fonbridge-app/
 | K-5 | **CORDIS aylık yenileme** (`WORKER_URL`) pilotta gerekli mi? | Gerekmiyorsa ayda bir alarm görürsünüz | 🟥 PATRON KARARI |
 | K-6 | Sunucunun **Node.js sürümü** 22.18 ya da üstü mü? (§3) | Worker 22.18 ister. Web 20.9+ ile de çalışır. | kontrol |
 
-Ayrıca hazır olması gerekenler: `fonbridge.com` DNS'i bu sunucuyu göstermeli (RELEASE_CHECKLIST madde 1.1), AutoSSL sertifikası çıkmış olmalı, OpenAI anahtarı yenilenmiş olmalı (madde 7).
+Ayrıca hazır olması gerekenler: `nexagrant.com` DNS'i bu sunucuyu göstermeli (RELEASE_CHECKLIST madde 1.1), AutoSSL sertifikası çıkmış olmalı, OpenAI anahtarı yenilenmiş olmalı (madde 7).
 
 ## 2. Canlı veritabanı (Supabase) hazırlığı: 🟧 PATRON ONAYI
 
@@ -73,7 +73,7 @@ Bu adımları biz (devop-fb) yaparız. Sizden istenen: **onay + sahip rolü URL'
 | **Node.js version** | listedeki en yüksek **22.x** (22.18 ya da üstü). 22 yoksa 20.x web için yeter, ama worker çalışmaz. Bize haber verin. |
 | **Application mode** | `Production` |
 | **Application root** | `fonbridge-app` (yani `/home/fonbridge/fonbridge-app`). **`public_html` DEĞİL.** |
-| **Application URL** | `fonbridge.com`, yol kısmı **boş** |
+| **Application URL** | `nexagrant.com`, yol kısmı **boş** |
 | **Application startup file** | `app.js` |
 | **Passenger log file** | `/home/fonbridge/logs/fonbridge-app.log` (sorun çıkınca ilk bakılacak yer) |
 
@@ -101,7 +101,7 @@ LiteSpeed, `public_html` içinde gerçekten var olan bir dosyayı (ör. `index.h
 
 ## 6. Ortam değişkenleri
 
-Setup Node.js App → `fonbridge.com` satırındaki kalem (edit) → **Environment variables** → her değişken için **ADD VARIABLE** → ad + değer → ✓. Bitince sayfanın üstündeki **SAVE**.
+Setup Node.js App → `nexagrant.com` satırındaki kalem (edit) → **Environment variables** → her değişken için **ADD VARIABLE** → ad + değer → ✓. Bitince sayfanın üstündeki **SAVE**.
 
 Hangi değişkenler, hangi biçimde: **`ENV-LISTESI.md`** §1 (zorunlu) ve §2 (işlevsel). En sık yapılan üç hata:
 
@@ -114,10 +114,10 @@ Hangi değişkenler, hangi biçimde: **`ENV-LISTESI.md`** §1 (zorunlu) ve §2 (
 1. **START APP** (ya da **RESTART**). İlk açılış 10-30 saniye sürebilir.
 2. Tarayıcıda ya da kendi bilgisayarınızın terminalinde:
    ```
-   curl -I https://fonbridge.com/            → 307, location: /tr   (dil yönlendirmesi, doğru davranış)
-   curl -IL https://fonbridge.com/           → son satır 200 (/tr)
-   curl -I https://fonbridge.com/robots.txt  → 200
-   curl -I https://fonbridge.com/tr/giris    → 200
+   curl -I https://nexagrant.com/            → 307, location: /tr   (dil yönlendirmesi, doğru davranış)
+   curl -IL https://nexagrant.com/           → son satır 200 (/tr)
+   curl -I https://nexagrant.com/robots.txt  → 200
+   curl -I https://nexagrant.com/tr/giris    → 200
    ```
    Bu adresler, aynı zip Linux x86_64 konteynerlerinde (Debian 12 ve CloudLinux 8 tabanıyla aynı glibc'ye sahip AlmaLinux 8) açılarak denendi. Sonuçlar yukarıdakiyle aynı çıktı (rapor: `docs/agent-results/TASK-MUST2PP2NHP6L-devop-fb.md`). Passenger'ın kendisi o testte yoktu. Onu ilk açılışınız ölçecek.
 3. `/tr/giris` sayfasında yalnız **Google ile giriş** düğmesi görünmeli. E-posta kutusu ("demo giriş") görünmemeli.
@@ -191,7 +191,7 @@ Kaçan bir saat felaket değildir: worker açılınca kaçan işleri 6 saat (ayl
 | `/tr/blog` açılıyor ama yazı yok; `/admin/blog`'da kaydetmek `row-level security policy` hatası veriyor | Supabase projesinde `ensure_rls` olay tetikleyicisi var. Yeni tablolarda RLS'i kendisi açar. `BlogPost` herkese açık içeriktir ve bilerek RLS'siz tasarlandı. RLS açılınca `fabrika_app` hiçbir satırı göremez. Düzeltme (sahip rolüyle, 🟧 onayla): `ALTER TABLE "BlogPost" DISABLE ROW LEVEL SECURITY;`, sonra blog içeriği yüklenir. Ayrıntı: `docs/agent-results/TASK-MUTP1R1C13GE3-devop-fb-2.md`. |
 | Ana sayfa yerine eski site görünüyor | `public_html` içinde eski `index.html` kalmış (§4). |
 | Ana sayfa açılıyor, ama CSS/JS yüklenmiyor | Zip yanlış yere açılmış. `/home/fonbridge/fonbridge-app/app/.next/static` var olmalı. |
-| Google girişi "redirect_uri_mismatch" | Google Console'da yönlendirme adresi `https://fonbridge.com/api/auth/callback/google` olmalı. |
+| Google girişi "redirect_uri_mismatch" | Google Console'da yönlendirme adresi `https://nexagrant.com/api/auth/callback/google` olmalı. |
 | Dosya yüklerken "dosya deposu yapılandırılmamış" | R2 değişkenleri yok (K-2). Beklenen davranış. |
 | Passenger log'da `[app.js] restored link …` satırları | Sorun değil. Zip açılırken 5 kısayol (symlink) kaybolmuş, `app.js` onları yeniden kurdu. Bu yol test edildi. |
 | "Run NPM Install" hata verdi | Basılması gerekmiyordu. Bir şey bozulmaz. |

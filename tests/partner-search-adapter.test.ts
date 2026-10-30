@@ -49,7 +49,7 @@ describe('PartnerSearchClient.fetchTopic', () => {
     );
     expect(calls[0]?.init.method).toBe('POST');
     expect(new Headers(calls[0]?.init.headers).get('User-Agent')).toBe(PARTNER_SEARCH_USER_AGENT);
-    expect(PARTNER_SEARCH_USER_AGENT).toContain('info@fonbridge.com');
+    expect(PARTNER_SEARCH_USER_AGENT).toContain('info@nexagrant.com');
     // HTTP header values are ByteStrings: the User-Agent must stay within code points ≤ 255.
     expect([...PARTNER_SEARCH_USER_AGENT].every((c) => c.charCodeAt(0) <= 255)).toBe(true);
   });

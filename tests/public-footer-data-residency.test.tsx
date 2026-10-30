@@ -36,9 +36,9 @@ describe('public footer — data residency', () => {
 
     expect(screen.getByText(residency)).toBeDefined();
     expect(container.textContent).not.toMatch(FALSE_HOSTING_CLAIM);
-    // usfinbridge.com was voided on 29.09.2026; the live domain is fonbridge.com.
+    // usfinbridge.com was voided on 29.09.2026; the live domain is nexagrant.com.
     const mail = container.querySelector('a[href^="mailto:"]');
-    expect(mail?.getAttribute('href')).toBe('mailto:info@fonbridge.com');
+    expect(mail?.getAttribute('href')).toBe('mailto:info@nexagrant.com');
   });
 
   it.each(['tr', 'en'] as const)('the %s catalogue carries no Frankfurt / EU-cloud claim', (locale) => {

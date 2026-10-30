@@ -2,7 +2,7 @@ import { env } from '@/lib/env';
 
 /**
  * The app's own public origin, read from NEXT_PUBLIC_APP_URL (TASK-MUN3OAFIVW9NA).
- * The live one is https://fonbridge.com (patron, 29.09).
+ * The live one is https://nexagrant.com (patron, 30.10.2026, FO-233).
  *
  * Every link the app builds to itself — OAuth redirect URIs, mail links,
  * Stripe return URLs, `metadataBase` — goes through here, so no file carries its
@@ -13,7 +13,7 @@ import { env } from '@/lib/env';
 export type AppUrlSource = Pick<typeof env, 'NODE_ENV' | 'NEXT_PUBLIC_APP_URL'>;
 
 /** The live domain, used only when production has no usable NEXT_PUBLIC_APP_URL. */
-export const CANONICAL_APP_URL = 'https://fonbridge.com';
+export const CANONICAL_APP_URL = 'https://nexagrant.com';
 const DEV_APP_URL = 'http://localhost:3000';
 
 /**
@@ -53,7 +53,7 @@ export type AppUrlProblem = 'unset' | 'invalid' | 'loopback' | 'insecure';
  * `appBaseUrl()` null there too.
  *   • `invalid`: not a URL, or more than an origin — a query, a fragment, a
  *     path or credentials. A link built as `${base}/path` would carry them in
- *     the wrong place (`https://fonbridge.com/?x=1/api/calendar/callback`).
+ *     the wrong place (`https://nexagrant.com/?x=1/api/calendar/callback`).
  *   • `insecure`: not https. OAuth providers refuse such a redirect_uri for
  *     anything but localhost, and invitation links would go out in the clear.
  */
@@ -64,7 +64,7 @@ export function appUrlProblem(source: AppUrlSource = env): AppUrlProblem | null 
   if (!url) return 'invalid';
   if (isLoopback(url.hostname)) return 'loopback';
   if (url.protocol !== 'https:') return 'insecure';
-  // `https://fonbridge.com?` parses to an empty `search`, hence the raw check.
+  // `https://nexagrant.com?` parses to an empty `search`, hence the raw check.
   const raw = source.NEXT_PUBLIC_APP_URL.trim();
   if (url.search || url.hash || raw.includes('?') || raw.includes('#')) return 'invalid';
   if (url.pathname !== '/' || url.username || url.password) return 'invalid';

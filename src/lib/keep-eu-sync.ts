@@ -40,7 +40,7 @@ export const DEFAULT_TURKEY_PROGRAMME_IDS: readonly number[] = [305, 387, 385, 6
  * bot traffic with HTTP 403, and in that case we alert and stop instead of retrying
  * under a different identity. Access must be agreed with Interact (keep.support@interact.eu).
  */
-export const KEEP_EU_HTTP_USER_AGENT = 'FonBridge/1.0 (+https://fonbridge.com/contact)';
+export const KEEP_EU_HTTP_USER_AGENT = 'FonBridge/1.0 (+https://nexagrant.com/contact)';
 
 /** Upper bound for one keep.eu request; a hung upstream must not block a job or admin action. */
 export const KEEP_EU_FETCH_TIMEOUT_MS = 30_000;

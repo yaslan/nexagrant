@@ -30,7 +30,7 @@ describe('renderBetaInviteEmail', () => {
       expect(body).toContain(base.inviteUrl);
       expect(body).toContain(base.guideUrl);
       expect(body).toContain(base.feedbackFormUrl);
-      expect(body).toContain('info@fonbridge.com');
+      expect(body).toContain('info@nexagrant.com');
       expect(body).toContain('Acme BV');
       expect(body).toContain('Jane Doe');
     }
@@ -61,14 +61,14 @@ describe('renderBetaInviteEmail', () => {
 // back to the one mailbox that exists. The rendering test above cannot tell the
 // two apart once they share a value, so pin each default on its own.
 describe('beta contact defaults', () => {
-  it('fall back to info@fonbridge.com when the env vars are unset', async () => {
+  it('fall back to info@nexagrant.com when the env vars are unset', async () => {
     vi.stubEnv('BETA_SUPPORT_EMAIL', undefined);
     vi.stubEnv('BETA_FEEDBACK_EMAIL', undefined);
     vi.resetModules();
     try {
       const c = await import('@/lib/beta/constants');
-      expect(c.BETA_SUPPORT_EMAIL).toBe('info@fonbridge.com');
-      expect(c.BETA_FEEDBACK_EMAIL).toBe('info@fonbridge.com');
+      expect(c.BETA_SUPPORT_EMAIL).toBe('info@nexagrant.com');
+      expect(c.BETA_FEEDBACK_EMAIL).toBe('info@nexagrant.com');
     } finally {
       vi.unstubAllEnvs();
       vi.resetModules();

@@ -34,7 +34,7 @@ const SEDIA_API_KEY = 'SEDIA';
  * The card's wording is "iletişim"; HTTP header values are ByteStrings (code points ≤ 255),
  * so `ş` would make fetch throw on every request. The ASCII spelling keeps the same contact.
  */
-export const PARTNER_SEARCH_USER_AGENT = 'FonBridge/0.1.0 (iletisim: info@fonbridge.com)';
+export const PARTNER_SEARCH_USER_AGENT = 'FonBridge/0.1.0 (iletisim: info@nexagrant.com)';
 
 export const PARTNER_SEARCH_MIN_INTERVAL_MS = 1_000;
 export const PARTNER_SEARCH_TIMEOUT_MS = 10_000;

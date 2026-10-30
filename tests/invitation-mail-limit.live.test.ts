@@ -486,7 +486,7 @@ describe('POST /api/invitations — mail limits', () => {
         expect.objectContaining({ level: 'error', dedupeKey: 'invitation-mail-app-url-missing' })
       );
       // The inviter still gets a link to pass on by hand, never an http:// one.
-      expect(res.body.inviteLink).toMatch(/^https:\/\/fonbridge\.com\/tr\/accept-invite\?token=/);
+      expect(res.body.inviteLink).toMatch(/^https:\/\/nexagrant\.com\/tr\/accept-invite\?token=/);
       await admin!.invitation.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
     }
     expect(send).not.toHaveBeenCalled();

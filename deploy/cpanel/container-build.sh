@@ -17,7 +17,7 @@ pnpm privacy:publish-check
 node_modules/.bin/vitest run tests/privacy-notice.test.ts
 node_modules/.bin/prisma generate
 # R2_PUBLIC_HOST comes from build-package.sh (docker -e); next.config freezes it.
-NODE_ENV=production DEMO_LOGIN_ENABLED=false NEXT_PUBLIC_APP_URL=https://fonbridge.com R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" pnpm build
+NODE_ENV=production DEMO_LOGIN_ENABLED=false NEXT_PUBLIC_APP_URL=https://nexagrant.com R2_PUBLIC_HOST="${R2_PUBLIC_HOST:-}" pnpm build
 echo BUILD_OK
 # Scheduled-job worker as one CJS file; @prisma/client resolves from the standalone node_modules.
 node_modules/esbuild/bin/esbuild scripts/jobs-worker.ts --bundle --platform=node --target=node22 --format=cjs \

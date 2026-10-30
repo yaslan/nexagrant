@@ -23,7 +23,7 @@ Bu sözleşme, aşağıdaki tabloda bilgileri yazılı iki taraf arasında yapı
 | Adres                      | ............................... | Karasamsun Mahallesi, İlkadım, SAMSUN [tamamlanacak] |
 | Vergi dairesi / VKN        | ............................... | 29120352230                     |
 | MERSİS no                  | ............................... | ............................... |
-| Bildirim e-posta adresi    | ............................... | info@fonbridge.com              |
+| Bildirim e-posta adresi    | ............................... | info@nexagrant.com              |
 
 Veri İşleyen FonBridge'dir. Veri Sorumlusu, FonBridge tarafından işletilen FonBridge platformunu ("Platform") kullanan kurumdur. Veri Sorumlusu, Platform'a yüklediği kişisel verilerin işlenme amaç ve vasıtalarını belirler. Veri İşleyen, bu verileri yalnızca Veri Sorumlusu'nun talimatları doğrultusunda işler.
 
@@ -93,7 +93,7 @@ Veri İşleyen, bu sözleşmedeki yükümlülüklere uyduğunu göstermek için 
 
 ## 10. İletişim ve Bildirimler
 
-Bu sözleşme kapsamındaki bildirimler (ihlal bildirimi, alt işleyen değişikliği, dışa aktarım ve imha talepleri, veri sahibi başvurularının iletilmesi) yazılı olarak, 1. maddedeki tabloda yazılı bildirim e-posta adreslerine yapılır. Veri İşleyen'in bildirim adresi **info@fonbridge.com**'dur. Taraflar adres değişikliğini birbirine yazılı olarak bildirir.
+Bu sözleşme kapsamındaki bildirimler (ihlal bildirimi, alt işleyen değişikliği, dışa aktarım ve imha talepleri, veri sahibi başvurularının iletilmesi) yazılı olarak, 1. maddedeki tabloda yazılı bildirim e-posta adreslerine yapılır. Veri İşleyen'in bildirim adresi **info@nexagrant.com**'dur. Taraflar adres değişikliğini birbirine yazılı olarak bildirir.
 
 ## 11. Sürüm ve Değişiklik
 

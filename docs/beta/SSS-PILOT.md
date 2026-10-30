@@ -181,15 +181,15 @@ Kurallar:
 - Kurum Sahibi'ni yalnız başka bir Kurum Sahibi çıkarabilir. Kurum Yöneticisi bir sahibi çıkaramaz.
 - Kurumun son sahibi çıkarılamaz ("Kurumun son sahibi çıkarılamaz.").
 - Pilot süresi bittiyse çıkarma ve iptal yapılamaz (liste görünür). Bu durumda
-  **info@fonbridge.com** adresine yazın.
+  **info@nexagrant.com** adresine yazın.
 
 **Yanlış kişi kurumunuzdaki bilgileri görmüş olabilir.** Kişiyi çıkardıktan sonra da
-**info@fonbridge.com** adresine yazın: kurum adınızı, ne zaman fark ettiğinizi ve kişinin ne kadar
+**info@nexagrant.com** adresine yazın: kurum adınızı, ne zaman fark ettiğinizi ve kişinin ne kadar
 süre erişimi olduğunu ekleyin. Bunu acil sayarız (ilk yanıt hedefi: iş saatleri içinde 2 saat, bkz.
 G3). Bu bir hedeftir, taahhüt değildir. Ekranı açamıyorsanız da aynı adrese yazın; talep Kurum Sahibi
 ya da Kurum Yöneticisi'nden gelmelidir ve kimliğinizi doğrularız.
 
-- Rol değiştirme ekranda yoktur; rol değişikliği için info@fonbridge.com adresine yazın.
+- Rol değiştirme ekranda yoktur; rol değişikliği için info@nexagrant.com adresine yazın.
 - Kaynak: QA Y-3 ekranı (kart TASK-MUPUHBAE811KP, inceleme ONAY:
   `docs/agent-results/TASK-MUPUHBAE811KP-crw2-fb.md`); `src/app/api/team/members/[id]/route.ts`
   (kendini çıkarma, sahip ve son sahip kuralları), `src/lib/team/access.ts` (yalnız Sahip/Yönetici),
@@ -209,14 +209,14 @@ Credits** → **Manage team members →** in the seats box. Direct address:
 
 Rules: you cannot remove yourself. Only another Owner can remove an Owner; a Tenant Admin cannot.
 The last Owner cannot be removed. When the pilot has ended, you can see the list but you cannot
-remove or cancel; write to info@fonbridge.com.
+remove or cancel; write to info@nexagrant.com.
 
 **The wrong person may have seen your organisation's data.** After you remove the person, also write
-to info@fonbridge.com: add your organisation name, when you noticed, and how long the person had
+to info@nexagrant.com: add your organisation name, when you noticed, and how long the person had
 access. We treat it as urgent (first-response target: 2 hours within business hours, see G3). This
 is a target, not a guarantee. If you cannot open the page, write to the same address; the request
 must come from the Owner or a Tenant Admin, and we verify who you are. To change a role, write to
-info@fonbridge.com; the page cannot change roles.
+info@nexagrant.com; the page cannot change roles.
 
 ### B8. Davet ederken hangi rolü seçmeliyim?
 
@@ -276,7 +276,7 @@ An amber banner shows. Known issue Y-4: the Company Profile page says "saved" bu
 
 Süreyi yalnız **platform yöneticisi** uzatır; her uzatma 90 gündür. Otomatik uzatma yoktur ve kendi
 başınıza uzatamazsınız. Her talep ayrı ayrı değerlendirilir; uzatma sözü verilmez. Talebinizi süre
-bitmeden **info@fonbridge.com** adresine yazmanızı öneririz. Süre dolsa bile
+bitmeden **info@nexagrant.com** adresine yazmanızı öneririz. Süre dolsa bile
 verileriniz silinmez; çalışma alanı salt-okunur olur (bkz. C3).
 
 - Kaynak: `docs/adr/ADR-0007-ilkadim-free-pilot.md:25-26`, `messages/tr.json:1726-1727`; patron kararı
@@ -284,7 +284,7 @@ verileriniz silinmez; çalışma alanı salt-okunur olur (bkz. C3).
 
 **EN:** Only the platform admin can extend the pilot, 90 days at a time. There is no automatic extension
 and you cannot extend it yourself. We review each request; we cannot promise an extension. We
-recommend writing to info@fonbridge.com before your pilot period ends. If the pilot ends, your
+recommend writing to info@nexagrant.com before your pilot period ends. If the pilot ends, your
 data is not deleted; the workspace becomes read-only (see C3).
 
 ### C5. Pilot sırasında ücretli plana geçebilir miyim?
@@ -496,7 +496,7 @@ Takvim desteği yalnız **Google Takvim** ve **.ics** dosyasıdır. Outlook takv
 
 ### E8. E-postalar kimden gelir?
 
-Bildirim ve davet e-postaları kendi sunucumuzdan, `info@fonbridge.com` adresinden gelir.
+Bildirim ve davet e-postaları kendi sunucumuzdan, `info@nexagrant.com` adresinden gelir.
 
 - Kaynak: `src/lib/env.ts:96-99`, `docs/kamu/VERI-YERLESIMI.md` (e-posta satırı).
 - **[DOĞRULANMADI — patrona sor]** Canlı SMTP kurulumu ve DNS (SPF/DKIM/DMARC) henüz yapılmadı
@@ -504,7 +504,7 @@ Bildirim ve davet e-postaları kendi sunucumuzdan, `info@fonbridge.com` adresind
   durumda kurum sahibi bağlantıyı ekrandan kopyalayıp iletir (QA akış 2: "Bağlantı ekranda
   gösterildi (SMTP yok)"). Gelmeyen e-posta için önce spam klasörüne bakın.
 
-**EN:** From `info@fonbridge.com`, our own mail server. Live SMTP set-up is not done yet: *ask the
+**EN:** From `info@nexagrant.com`, our own mail server. Live SMTP set-up is not done yet: *ask the
 owner*. Until then the Owner can copy the invitation link from the screen.
 
 ---
@@ -544,11 +544,11 @@ you want (PNG/JPEG/WebP, max 2 MB). Hide personal data in screenshots first.
 
 ### G2. Destek e-posta adresi ve telefon var mı?
 
-Pilot destek adresi **info@fonbridge.com**. Hata, hesap ve ürün geri bildirimi için bu adrese yazın.
+Pilot destek adresi **info@nexagrant.com**. Hata, hesap ve ürün geri bildirimi için bu adrese yazın.
 Koddaki varsayılan (`src/lib/beta/constants.ts:49-50`) bu adrestir (TASK-MUPIR7Y1P7AH4). Kutunun posta
 aldığı 01.10.2026'da patronun deneme e-postasıyla doğrulandı. Telefon hattı yok.
 
-**EN:** The pilot support address is **info@fonbridge.com**. Write to it for bugs, account questions and
+**EN:** The pilot support address is **info@nexagrant.com**. Write to it for bugs, account questions and
 product feedback. There is no phone line.
 
 ### G3. Ne kadar sürede cevap alırım?
@@ -564,7 +564,7 @@ Sorunu bildirirken önceliği P0–P3 olarak belirtin. Hedeflerimiz **iş saatle
 | P3 | Öneri | Haftalık görüşmede ele alınır |
 
 Yoğun dönemlerde ya da arıza sırasında gecikme olabilir. P0 şüphesinde beklemeyin; doğrudan
-**info@fonbridge.com** adresine yazın. Pilot planında SLA yoktur.
+**info@nexagrant.com** adresine yazın. Pilot planında SLA yoktur.
 
 - Kaynak: `docs/BETA_GUIDE.md` § 5 (pilot ve beta için tek tablo); patron kararı 01.10.2026 (K-5).
   Takibi proje yöneticisi (PM) yapar.
@@ -574,20 +574,20 @@ Yoğun dönemlerde ya da arıza sırasında gecikme olabilir. P0 şüphesinde be
 cannot sign in, or you believe you can see another organisation's data): first answer in 2 hours; P1
 (main flow blocked): 1 business day; P2 (annoying, has a workaround): 2 business days; P3 (suggestion):
 discussed in the weekly meeting. There may be delays in busy periods or during an incident. If you
-suspect P0, do not wait; write to info@fonbridge.com directly. The pilot plan has no SLA.
+suspect P0, do not wait; write to info@nexagrant.com directly. The pilot plan has no SLA.
 
 ### G4. Haftalık görüşme var mı?
 
 Evet. Pilot ve beta ortakları birlikte, her **Pazartesi 15:00'te** (İstanbul saati, UTC+03:00, yıl boyu
 aynı) **30 dakikalık** bir görüşme yaparız. Görüşme Google Meet üzerinden yapılır. Toplantı bağlantısı
-ve takvim daveti (.ics) e-postanızla gelir. Takvim bağlantısı çalışmazsa info@fonbridge.com adresine
+ve takvim daveti (.ics) e-postanızla gelir. Takvim bağlantısı çalışmazsa info@nexagrant.com adresine
 yazın.
 
 - Kaynak: patron kararı 01.10.2026 (K-1, K-2, K-3); `docs/BETA_GUIDE.md` § 4.
 
 **EN:** Yes. Pilot and beta partners meet together every **Monday at 15:00** (Istanbul time, UTC+03:00,
 the same all year) for **30 minutes** on Google Meet. The meeting link and a calendar invitation
-(.ics) arrive by e-mail. If the calendar link does not work, write to info@fonbridge.com.
+(.ics) arrive by e-mail. If the calendar link does not work, write to info@nexagrant.com.
 
 ---
 
@@ -603,5 +603,5 @@ the same all year) for **30 minutes** on Google Meet. The meeting link and a cal
 | P-6 | İmzalı DPA ve üründeki DPA adresi pilot için güncel mi? | D7 |
 | P-7 | ~~Pilot haftalık görüşme günü/saati~~ → **karar verildi: Pazartesi 15:00 Europe/Istanbul** (01.10.2026). Pilot ve beta birlikte, 30 dk, Google Meet (K-1..K-3). Açık kalan: ilk görüşmenin tarihi ve toplantı bağlantısı davetle gider | E7, G4 |
 | P-8 | Canlı SMTP kurulumu ne zaman biter? | E8 |
-| P-9 | ~~Pilot destek e-posta adresi~~ → **karar verildi: info@fonbridge.com** (01.10.2026, posta alımı doğrulandı) | G2 |
+| P-9 | ~~Pilot destek e-posta adresi~~ → **karar verildi: info@nexagrant.com** (01.10.2026, posta alımı doğrulandı) | G2 |
 | P-10 | ~~Pilot yanıt süresi hedefleri~~ → **karar verildi** (K-5, 01.10.2026): P0 2 saat / P1 1 iş günü / P2 2 iş günü, iş saatleri içinde, takip PM | G3 |

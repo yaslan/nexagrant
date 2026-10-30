@@ -23,7 +23,7 @@ This agreement is made between the two parties whose details are set out in the 
 | Address                    | ...............................    | Karasamsun Quarter, İlkadım, SAMSUN [to be completed] |
 | Tax office / tax number    | ...............................    | 29120352230                     |
 | Trade registry (MERSİS) no | ...............................    | ............................... |
-| Notice email address       | ...............................    | info@fonbridge.com              |
+| Notice email address       | ...............................    | info@nexagrant.com              |
 
 The Processor is FonBridge. The Controller is the organisation that uses the FonBridge platform (the "Platform") operated by FonBridge. The Controller determines the purposes and means of processing the personal data it uploads to the Platform. The Processor processes that data only on the Controller's documented instructions.
 
@@ -93,7 +93,7 @@ The Processor makes available to the Controller all information necessary to dem
 
 ## 10. Contact and Notices
 
-Notices under this agreement (breach notifications, sub-processor changes, export and deletion requests, forwarding of data subject requests) are made in writing to the notice email addresses in the table in section 1. The Processor's notice address is **info@fonbridge.com**. Each party tells the other in writing if its address changes.
+Notices under this agreement (breach notifications, sub-processor changes, export and deletion requests, forwarding of data subject requests) are made in writing to the notice email addresses in the table in section 1. The Processor's notice address is **info@nexagrant.com**. Each party tells the other in writing if its address changes.
 
 ## 11. Version and Amendment
 

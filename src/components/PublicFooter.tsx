@@ -144,7 +144,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
                 <CookiePreferencesButton className="hover:text-ink transition text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded" />
               </li>
               <li>
-                <a href="mailto:info@fonbridge.com" className="hover:text-ink transition">
+                <a href="mailto:info@nexagrant.com" className="hover:text-ink transition">
                   {isTr ? 'İletişim & Demo Talebi' : 'Contact Support'}
                 </a>
               </li>
