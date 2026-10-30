@@ -312,6 +312,7 @@ RESTORE_DATABASE_URL=postgresql://<sahip-rol>@localhost:5432/fabrika_restored \
 pnpm backup:restore /var/backups/fonbridge/fonbridge-<damga>.dump
 DATABASE_URL=postgresql://<sahip-rol>@localhost:5432/fabrika_restored pnpm db:rls && \
 DATABASE_URL=postgresql://<sahip-rol>@localhost:5432/fabrika_restored pnpm rls:verify --require-db
+#   → rls:verify uygulama rolüyle (DATABASE_URL_RLS_TEST) koşulur; süperkullanıcıyla anlamsız (FO-225 Bulgu 2)
 #   → uygulamanın DATABASE_URL'ini yeni DB'ye çevir; eski DB'yi hemen silme
 #   → db:rls, prisma/rls.sql'i uygular (aşağıdaki DISABLE döngüsü dahil).
 #   → rls:verify --require-db (scripts/check-rls-live.ts): localhost kısıtı YOK; DATABASE_URL erişilemezse exit 1.
