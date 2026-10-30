@@ -107,8 +107,10 @@ Lider kararları uygulandı: sahip rol `fabrika_owner` (süper kullanıcı deği
 - Push denemesi 4 (`bash scripts/gate-isolated.sh git push origin devop-fb/fo244-vps-deploy`, yerel head `99056cce`): **pre-push gate reddetti**, `PUSH_EXIT=1`. Kırmızı 12 test / 4 dosya: `m17-interreg-extract` (event-loop zamanlama eşikleri), `rag-pdf-worker-isolation` (bomb sınırları, süre). Yani FO-254 kapsamındaki aynı kararsız aile; bu dalın değişikliğiyle ilgisi yok.
 - Uzak dal hâlâ `407b6394`; PR #218 head `407b6394`, draft, açık. **Push YAPILMADI.** Hook'u atlamadım.
 
-### Yeni karar gerekli (lider):
-- (a) FO-254 kapanana kadar push'u bekletmek, ya da (b) lider açık onayıyla bu tek push'ta gate'i atlamak (`--no-verify`) — bu kararı ben vermem. Push tamamlanınca yeni head SHA (`99056cce` veya sonrası) bu rapora eklenecek.
+### Lider kararı: (a) — push BEKLETİLİYOR
+- Push, FO-254 (TASK-MVV72UUJXVN1) kapanana kadar yapılmayacak. `--no-verify` YOK.
+- Yerel dal `devop-fb/fo244-vps-deploy` head: `444d466d` (kod `99056cce`, rapor `444d466d`); uzak dal `407b6394`; PR #218 draft, açık, merge yok.
+- FO-254 kapandığında: gate'i temiz koş, push et, PR #218 head'ini doğrula, bu rapora yeni SHA'yı ekle. Kartın durumu: FO-250 blokeli (push bekliyor).
 
 ### Önceki karar notları (arşiv): (1) gate kararsızlığı için ayrı kart (yük altında zamanlama eşikleri ve live DB yarışı testleri), (2) `check-rls-live` sayım düzeltmesi (yukarıdaki BLOKER), (3) push'un hangi koşumla yapılacağı. Push tamamlanınca yeni head SHA bu rapora eklenecek.
 
