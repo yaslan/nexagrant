@@ -10,7 +10,7 @@ Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. ("FonBridge").
 
 - Address: [ADDRESS — owner]
 - Registered e-mail (KEP) address: [KEP ADDRESS — owner]
-- E-mail: info@nexagrant.com
+- E-mail: info@fonbridge.com
 
 ## 2. Personal data processed
 
@@ -56,7 +56,7 @@ Under KVKK Art. 11 you may apply to the data controller to:
 - object to a result against you that arises solely from the analysis of your data by automated systems,
 - claim compensation if you suffer damage because your data was processed unlawfully.
 
-You may withdraw your consent to processing based on explicit consent at any time; withdrawal does not affect processing carried out before it. You can withdraw your consent to announcement e-mails and to directory publication by writing to info@nexagrant.com.
+You may withdraw your consent to processing based on explicit consent at any time; withdrawal does not affect processing carried out before it. You can withdraw your consent to announcement e-mails and to directory publication by writing to info@fonbridge.com.
 
 ## 8. How to apply
 
@@ -64,6 +64,6 @@ Under the Communiqué on the Procedures and Principles of Application to the Dat
 
 - with a wet-signed letter to the address above, in person or through a notary,
 - to our registered e-mail (KEP) address, signed with a secure electronic signature or mobile signature,
-- to info@nexagrant.com from the e-mail address you gave us earlier and that is registered in our system.
+- to info@fonbridge.com from the e-mail address you gave us earlier and that is registered in our system.
 
 Your request must include your full name, signature, residential or business address for notification, an e-mail address or telephone number for notification if you have one, and the subject of your request. It is answered free of charge within 30 days at the latest; if the request involves an additional cost, the fee set by the Personal Data Protection Board may apply. If your request is rejected, the answer is insufficient or no answer is given in time, you may lodge a complaint with the Personal Data Protection Board (KVKK Art. 14).

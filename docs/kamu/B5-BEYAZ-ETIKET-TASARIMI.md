@@ -298,7 +298,7 @@ bir noktada, her oturum okumasında çalışır. İNCELEME-114 bu seçimi doğru
      doğrulanmamış Host'tan kurulur. Uygulama kartının sürüm notu bu sırayı yazar.
    - **Çerez:** host-only kalır (Auth.js varsayılanı, `auth.ts`'te `cookies:` yok). `Domain=` yok, `__Secure-` öneki
      ve `Secure` bayrağı var: §2.3'teki test sabitler.
-   - **Kapsam dışı yan bulgu (lider için, §8-L1):** bugünkü `nexagrant.com` dağıtımı bu compose ile yapılıyorsa Google
+   - **Kapsam dışı yan bulgu (lider için, §8-L1):** bugünkü `fonbridge.com` dağıtımı bu compose ile yapılıyorsa Google
      dönüşü `http://localhost:3000/...` olur ve çerez `Secure` bayraksız basılır. B5'ten bağımsız, ayrı kart.
 2. **Claim:** `jwt` callback'i `trigger === 'signIn'` iken `token.host`'u yazar (sıra 3. maddede). Host
    `resolveBrandHost` ile çözülemezse giriş reddedilir.
@@ -618,7 +618,7 @@ fark çalışma kitabına yazılır.
 
 ## 5. HSTS (Ö-3, Karar-1 C)
 
-- **`nexagrant.com`: Karar-1 C (patron, 30.09) uygulandı.** HSTS yalnız Caddy'de. Uygulama başlığı kaldırıldı
+- **`fonbridge.com`: Karar-1 C (patron, 30.09) uygulandı.** HSTS yalnız Caddy'de. Uygulama başlığı kaldırıldı
   (`devop-fb/merge-hsts`, `c6fad2ac`, dev'de: `security-headers.ts`'te `HSTS_VALUE` yok). Kurulum sırası
   `docs/SMTP-SUNUCU.md` §10.1 ve `docs/RELEASE_CHECKLIST.md` §5.4'te (gün 1 `max-age=300` → sonra `31536000`).
   `includeSubDomains` kökte yok. `RELEASE_CHECKLIST.md` §5.4-3'teki "gün 366: `includeSubDomains` eklenebilir"
@@ -738,13 +738,13 @@ R2-Y1'deki env kaldırma aynı sürümde) → talep olursa 2 → gerekirse 3.
 | 6 | B5 OKA lisansına mı dahil, ayrı kalem mi? | **AÇIK** (`OKA-KANAL-ONERISI.md:73-75` lisans tutarı hâlâ açık). Efor artık ≈ 25-36 kişi-gün |
 | 7 | Beyaz etikette birinci hat destek ajans mı, biz mi? | **AÇIK** |
 | 8 | Ajans ayrılınca bağlı kurumlar `nexagrant.com`'a taşınsın mı, bildirim süresi? | **AÇIK.** Öneri: 30 gün bildirim, alan 180 gün `SUSPENDED` |
-| 9 | `nexagrant.com` HSTS'i yalnız Caddy'de ayarlansın, uygulama göndermesin mi? `includeSubDomains` kalksın mı? | **KAPANDI — Karar-1 C (patron, 30.09), uygulandı** (`devop-fb/merge-hsts`). Yalnız Caddy, `includeSubDomains` yok |
+| 9 | `fonbridge.com` HSTS'i yalnız Caddy'de ayarlansın, uygulama göndermesin mi? `includeSubDomains` kalksın mı? | **KAPANDI — Karar-1 C (patron, 30.09), uygulandı** (`devop-fb/merge-hsts`). Yalnız Caddy, `includeSubDomains` yok |
 | 10 | İlk uygulama kartından önce C yolu gerekecek mi? (ikinci ajans + Google alan doğrulaması darboğazı) | **AÇIK**, 2. yıl planlamasında. C seçilirse §3.3 zorunlu tasarım girdisi |
 
 ### 8.2 Lider için (patron sorusu değil)
 
 | # | Konu | Öneri |
 |---|---|---|
-| L1 | R2-Y1 yan bulgusu: bugünkü `nexagrant.com` dağıtımı `docker-compose.yml:39` (`NEXTAUTH_URL=http://localhost:3000`) ile mi koşuyor? Evetse Google dönüşü ve çerezin `Secure` bayrağı bugün etkilenir | B5'ten bağımsız ayrı kart (devop-fb): canlı env'i kontrol et; tek site için `AUTH_URL=https://nexagrant.com` bugün doğrudur, B5 aşama 1'de §3.2-1'e göre kalkar |
+| L1 | R2-Y1 yan bulgusu: bugünkü `fonbridge.com` dağıtımı `docker-compose.yml:39` (`NEXTAUTH_URL=http://localhost:3000`) ile mi koşuyor? Evetse Google dönüşü ve çerezin `Secure` bayrağı bugün etkilenir | B5'ten bağımsız ayrı kart (devop-fb): canlı env'i kontrol et; tek site için `AUTH_URL=https://fonbridge.com` bugün doğrudur, B5 aşama 1'de §3.2-1'e göre kalkar |
 | L2 | `fb-edge-sync`'in sahibi | devop-fb (işletme güven sınırı). Uygulama kartı aşama 1b |
 | L3 | İNCELEME-120 Ö-4: web `fabrika` (SUPERUSER + BYPASSRLS) ile bağlandığı sürece B5'in DB düzeyindeki yetki kısıtları (`AgencyDomainEdgeState` GRANT'ı, `AgencyDomain` `CHECK`'i) web'de bir RCE'ye karşı zorlanmaz (ölçüldü). Patron 29.09'da bağlantının kalmasına karar verdi (ROADMAP #16). B5 tasarımı buna dayanmıyor: kenar katman 3 ile korunuyor, alarm eşitleyicide | Karar yeniden açılmıyor. Bu yalnız bilgi: ROADMAP #16 bir gün yeniden açılırsa B5'in GRANT satırları kendiliğinden etkin olur. B5 canlı öncesi sızma testinin (aşama 1) kapsamına "web RCE varsayımıyla kenar" senaryosu eklenir |

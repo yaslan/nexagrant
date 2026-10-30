@@ -26,7 +26,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 > - **P-9 destek adresi** `6dee2cce`, **RELEASE_CHECKLIST R-2 notu** `04bb4ef5`, **ADR-0010 taslağı** `73ae2613`
 >   (TASK-MUPL20074JQ0V, `done`; rapor `docs/agent-results/TASK-MUPL20074JQ0V-qae-fb.md`). Kaynak kartlar:
 >   TASK-MUPIR7Y1P7AH4 (P-9, `done`), TASK-MUPE21TEA2UB0 (checklist, `done`), TASK-MUPIQODOCEZH9 (ADR-0010, `review`).
->   `info@nexagrant.com` **kutusunun** var olduğu doğrulanmadı (`docs/agent-results/TASK-MUPIR7Y1P7AH4-devop-fb.md`).
+>   `info@fonbridge.com` **kutusunun** var olduğu doğrulanmadı (`docs/agent-results/TASK-MUPIR7Y1P7AH4-devop-fb.md`).
 >
 > **Kapılar (01.10 akşam).** Yerel fabrika DB'si silinmişti. devop-fb sıfırdan kurdu; tam `npm test`
 > **303 dosya geçti, 6 atlandı; 4050 test geçti, 117 atlandı**, 0 kırmızı (TASK-MUPL268JAAWHD, `done`, rapor

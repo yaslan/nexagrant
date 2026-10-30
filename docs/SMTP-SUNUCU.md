@@ -1,10 +1,12 @@
-# E-posta: nexagrant.com SMTP — Vulut cPanel/Exim (Seçenek A)
+# E-posta: fonbridge.com SMTP — Vulut cPanel/Exim (Seçenek A)
+
+> **Güncel durum (30.10.2026, FO-233, patron):** canlı alan adı `nexagrant.com`; gönderici `info@nexagrant.com`, SMTP `mail.nexagrant.com`. Bu belgedeki 29.09.2026 kayıtları ve ölçümler tarihsel olarak `fonbridge.com`'a aittir.
 
 Karar (patron, 29.09.2026, **güncellendi**): e-posta **Vulut'un cPanel e-posta hizmetinden (Seçenek A)** çıkar;
 kendi posta sunucumuzu (MTA) işletmiyoruz.
-- Gönderici: **`info@nexagrant.com`** (önceki `info@usfinbridge.com` kararının yerini aldı)
-- SMTP sunucusu: **`mail.nexagrant.com`**
-- Canlı uygulama alan adı: **`nexagrant.com`**; barındırma: **Vulut**
+- Gönderici: **`info@fonbridge.com`** (önceki `info@usfinbridge.com` kararının yerini aldı)
+- SMTP sunucusu: **`mail.fonbridge.com`**
+- Canlı uygulama alan adı: **`fonbridge.com`**; barındırma: **Vulut**
 - **SMTP modeli — Karar: A (patron 29.09.2026, TASK-MUN4U4PR3DWMT):** Vulut cPanel/Exim (`srv.iyisunucu.com.tr`,
   `77.92.144.187`). Posta Vulut'un cPanel e-posta hizmetiyle çıkar; sunucunun bakımı ve güncellemeleri Vulut'ta.
   PTR `srv.iyisunucu.com.tr` olarak kalır. **B (kendi MTA / docker-mailserver) ve C seçilmedi** (§2).
@@ -15,8 +17,8 @@ Kod tarafı: `src/lib/email/mailer.ts` (nodemailer), ayarlar yalnız ortamdan (`
 Görev: TASK-MUN2PKA5AG2IV. **Canlı sunucu kurulumu ve DNS değişikliği patron onayı olmadan yapılmaz.**
 Patronun yapacakları: §8 — **ilk adım nexagrant.com'u `srv.iyisunucu.com.tr` cPanel'ine alan adı olarak eklemek**. Web tarafı (`www` → kök 301, `nexagrant.com` + `www` TLS): §10.
 
-**Plan çerçevesi (güncelleme-2, 29.09 — _geçmiş; A kararıyla aşıldı_, geçerli olan §1'in sonucu: nexagrant.com cPanel'e
-**sıfırdan** eklenir):** patron "`mail.nexagrant.com` Vulut'ta **kurulu**" diyor. Bu yüzden plan
+**Plan çerçevesi (güncelleme-2, 29.09 — _geçmiş; A kararıyla aşıldı_, geçerli olan §1'in sonucu: fonbridge.com cPanel'e
+**sıfırdan** eklenir):** patron "`mail.fonbridge.com` Vulut'ta **kurulu**" diyor. Bu yüzden plan
 "sıfırdan kur" değil, **"mevcut sunucuyu doğrula ve DNS'i tamamla"**: (1) kurulu sunucunun hangisi olduğunu ve IP'sini
 netleştir (§1.1), (2) bölgeyi o sunucuyu yöneten ad sunucusunda aç ve §3.0 kayıtlarını gir, (3) §7 komutlarıyla doğrula.
 
@@ -24,11 +26,11 @@ netleştir (§1.1), (2) bölgeyi o sunucuyu yöneten ad sunucusunda aç ve §3.0
 
 | Soru | Ölçüm | Sonuç |
 |---|---|---|
-| `.com` kaydı hangi NS'i gösteriyor? | `dig NS nexagrant.com @a.gtld-servers.net` → `ns1/ns2.iyisunucu.com.tr` | alan adı bu NS'lere devredilmiş |
+| `.com` kaydı hangi NS'i gösteriyor? | `dig NS fonbridge.com @a.gtld-servers.net` → `ns1/ns2.iyisunucu.com.tr` | alan adı bu NS'lere devredilmiş |
 | Bu NS'ler kimin? | `ns1 → 77.92.144.187`, `ns2 → 77.92.144.188`; RIPE: **VULUT BILISIM**; `77.92.144.187` PTR `srv.iyisunucu.com.tr` = aynı cPanel/Exim sunucusu | **iyisunucu.com.tr = Vulut'un cPanel sunucusunun kendi DNS'i.** "iyisunucu mu Vulut mu" ayrı iki şirket değil; tutarsızlık NS adında değil, **bölgenin o sunucuda olmamasında** |
-| NS'ler bölgeyi biliyor mu? | `dig SOA nexagrant.com @ns1` ve `@ns2` (`+norec`) → **REFUSED**; aynı NS'lerde `usfinbridge.com` → NOERROR | bölge (zone) **tanımlı değil**. Bu "henüz yayılmadı" değildir: yetkili sunucu kendi bölgesini anında cevaplar, yayılma yalnız önbellekli çözücüler için geçerlidir. Lider ölçümündeki "boş cevap" ile aynı durum |
+| NS'ler bölgeyi biliyor mu? | `dig SOA fonbridge.com @ns1` ve `@ns2` (`+norec`) → **REFUSED**; aynı NS'lerde `usfinbridge.com` → NOERROR | bölge (zone) **tanımlı değil**. Bu "henüz yayılmadı" değildir: yetkili sunucu kendi bölgesini anında cevaplar, yayılma yalnız önbellekli çözücüler için geçerlidir. Lider ölçümündeki "boş cevap" ile aynı durum |
 | Genel çözücüler | `@8.8.8.8` → **SERVFAIL**; `@1.1.1.1` boş; A/AAAA/`www`/`mail`/MX/SPF/DKIM/DMARC hiçbiri yok | yukarıdakinin sonucu |
-| Bu Vulut sunucusu nexagrant.com'u hiç tanıyor mu? | `77.92.144.187`'e SNI `nexagrant.com` / `www.` / `mail.` ile 443 → başka bir müşterinin varsayılan sertifikası (`CN=webdisk.aigent.com.tr`); 465 ve 587 STARTTLS → `CN=autoconfig.srv.iyisunucu.com.tr`. Karşılaştırma: `usfinbridge.com` → kendi sertifikası | `srv.iyisunucu.com.tr` üzerinde nexagrant.com için **ne vhost, ne sertifika, ne DNS bölgesi var** |
+| Bu Vulut sunucusu fonbridge.com'u hiç tanıyor mu? | `77.92.144.187`'e SNI `fonbridge.com` / `www.` / `mail.` ile 443 → başka bir müşterinin varsayılan sertifikası (`CN=webdisk.aigent.com.tr`); 465 ve 587 STARTTLS → `CN=autoconfig.srv.iyisunucu.com.tr`. Karşılaştırma: `usfinbridge.com` → kendi sertifikası | `srv.iyisunucu.com.tr` üzerinde fonbridge.com için **ne vhost, ne sertifika, ne DNS bölgesi var** |
 
 **Yorum — iki olasılık, patron/Vulut paneli ayırır:**
 1. **Kurulum `srv.iyisunucu.com.tr` üzerinde yapıldı ama yarım kaldı** (ör. hizmet/paket alındı, alan adı cPanel'e
@@ -42,12 +44,14 @@ netleştir (§1.1), (2) bölgeyi o sunucuyu yöneten ad sunucusunda aç ve §3.0
    ekranına (NS'ler oraya bakmıyorken) girmek, "girdim ama görünmüyor" durumunun en sık sebebidir — lider ölçümündeki
    "patron kurulu diyor ama NS1 boş dönüyor" tablosu tam da buna uyar.
 
-**Karar A ile (29.09):** olasılık 1'in yolu izlenir — nexagrant.com `srv.iyisunucu.com.tr` cPanel'ine eklenir, NS
+**Karar A ile (29.09):** olasılık 1'in yolu izlenir — fonbridge.com `srv.iyisunucu.com.tr` cPanel'ine eklenir, NS
 değişmez, `<MAIL_IP>` = `77.92.144.187`. Aşağıdaki soru yalnız patron başka bir Vulut hizmetinde yarım bir kurulum
 biliyorsa geçerlidir (o kurulum kullanılmaz; karar cPanel/Exim).
 
 Patrondan istenecek tek bilgi: **Vulut panelinde `mail.nexagrant.com`'un kurulu olduğu hizmetin adı ve IP'si**
 (cPanel ise sağ sütunda "Paylaşılan IP Adresi"; VPS ise panelde sunucu IP'si). Bu IP `<MAIL_IP>` olur.
+
+> **Güncel durum (30.10.2026):** nexagrant.com için DNS/SMTP/blocklist ölçümü henüz yapılmadı (VPS kurulumunda yapılacak). Aşağıdaki ölçümler fonbridge.com'a aittir.
 
 ## 1. Önceki ölçüm (29.09.2026 ~23:00 TRT, salt-okunur `dig` / `whois` / TLS el sıkışması) — 20:19 UTC'de tekrarlandı, değişmedi
 
@@ -55,12 +59,12 @@ Patrondan istenecek tek bilgi: **Vulut panelinde `mail.nexagrant.com`'un kurulu 
 |---|---|---|
 | Kayıt | 29.09.2026 19:57 UTC, Squarespace Domains, bitiş 29.09.2027 | alan adı **bugün** alınmış |
 | NS (`.com` kaydında) | `ns1/ns2.iyisunucu.com.tr` | Vulut'un cPanel DNS'i (iyisunucu = Vulut altyapısındaki marka) |
-| NS'lerin cevabı | `nexagrant.com SOA @ns1/ns2.iyisunucu.com.tr` → **REFUSED** | **bölge (zone) Vulut'ta henüz açılmamış** — alan adı hiçbir cPanel hesabına eklenmemiş. `usfinbridge.com` aynı NS'lerde NOERROR döner, yani sorun alan adına özgü |
+| NS'lerin cevabı | `fonbridge.com SOA @ns1/ns2.iyisunucu.com.tr` → **REFUSED** | **bölge (zone) Vulut'ta henüz açılmamış** — alan adı hiçbir cPanel hesabına eklenmemiş. `usfinbridge.com` aynı NS'lerde NOERROR döner, yani sorun alan adına özgü |
 | A / MX / TXT / `mail` / `_dmarc` / DKIM | **hiçbiri yok** (`@8.8.8.8` boş) | yukarıdakinin sonucu |
-| TLS `mail.nexagrant.com` | yok. `77.92.144.187:465`'e SNI `mail.nexagrant.com` ile bağlanınca sunucunun varsayılanı `CN=autoconfig.srv.iyisunucu.com.tr` geliyor; crt.sh'ta nexagrant.com için hiç sertifika yok | uygulama bu hâliyle bağlanırsa TLS doğrulaması düşer (`ESOCKET`) — doğru davranış |
+| TLS `mail.fonbridge.com` | yok. `77.92.144.187:465`'e SNI `mail.fonbridge.com` ile bağlanınca sunucunun varsayılanı `CN=autoconfig.srv.iyisunucu.com.tr` geliyor; crt.sh'ta fonbridge.com için hiç sertifika yok | uygulama bu hâliyle bağlanırsa TLS doğrulaması düşer (`ESOCKET`) — doğru davranış |
 | Posta sunucusu `77.92.144.187` | 465 ve 587 **açık** (bu ağdan); Exim 4.100.1; PTR `srv.iyisunucu.com.tr` | usfinbridge.com'u zaten taşıyan Vulut cPanel/Exim sunucusu |
 
-Sonuç: nexagrant.com için **sıfırdan** kurulum gerekiyor; ilk adım alan adının Vulut'ta bir cPanel hesabına
+Sonuç: fonbridge.com için **sıfırdan** kurulum gerekiyor; ilk adım alan adının Vulut'ta bir cPanel hesabına
 (ya da addon domain olarak mevcut hesaba) eklenmesi. O yapılmadan hiçbir DNS kaydı yayına çıkmaz.
 
 ## 2. Sunucu seçimi (1-3-1)
@@ -164,7 +168,7 @@ MTA'nın HELO adı = PTR = `mail.nexagrant.com` (Postfix `myhostname`, docker-ma
 ### 3.3 Yayılımı doğrulama
 ```sh
 for r in 8.8.8.8 1.1.1.1; do
-  dig +short SOA nexagrant.com @$r            # boş = bölge hâlâ yok (bugünkü REFUSED durumu)
+  dig +short SOA nexagrant.com @$r            # boş = bölge hâlâ yok (kurulum öncesi boş beklenir)
   dig +short A mail.nexagrant.com @$r
   dig +short MX nexagrant.com @$r
   dig +short TXT nexagrant.com @$r            # SPF — TEK v=spf1 kaydı olmalı
@@ -185,7 +189,7 @@ sertifika adı `mail.nexagrant.com`'u kapsamazsa gönderim `ESOCKET` ile düşer
   Postfix `smtpd_tls_chain_files`.
 - Kontrol: `openssl s_client -connect mail.nexagrant.com:465 -servername mail.nexagrant.com </dev/null | openssl x509 -noout -subject -enddate -text | grep DNS:`
   → `DNS:mail.nexagrant.com` görünmeli. 587 için: `openssl s_client -starttls smtp -connect mail.nexagrant.com:587 -servername mail.nexagrant.com`.
-- Bugün (29.09): SNI `mail.nexagrant.com` → `CN=autoconfig.srv.iyisunucu.com.tr` (varsayılan) → **hazır değil**.
+- Bugün (29.09): SNI `mail.fonbridge.com` → `CN=autoconfig.srv.iyisunucu.com.tr` (varsayılan) → **hazır değil**.
 
 ## 5. Uygulama ayarları
 
@@ -262,7 +266,7 @@ dig +short 2.0.0.127.zen.spamhaus.org      # boş dönerse çözücü Spamhaus'a
 for bl in zen.spamhaus.org bl.spamcop.net b.barracudacentral.org dnsbl.sorbs.net bl.mailspike.net dnsbl-2.uceprotect.net dnsbl-3.uceprotect.net; do
   echo "$bl: $(dig +short $rev.$bl A)"; done   # boş = temiz
 ```
-Alan adı listeleri (29.09 ölçüm): `dig +short nexagrant.com.dbl.spamhaus.org` ve `nexagrant.com.multi.surbl.org` → **boş (temiz)**;
+Alan adı listeleri (29.09 ölçüm): `dig +short fonbridge.com.dbl.spamhaus.org` ve `fonbridge.com.multi.surbl.org` → **boş (temiz)**;
 bilinen-pozitif `dbltest.com.dbl.spamhaus.org` → `127.0.1.2`, yani sorgu gerçekten çalışıyor.
 Microsoft (Outlook/Hotmail): https://sender.office.com ile delist; SNDS'e IP kaydı önerilir.
 
@@ -273,7 +277,7 @@ hizalı DKIM + `p=reject` kapatır. Daha dar: `v=spf1 ip4:77.92.144.187 -all` �
 taşırsa kırılır; önce Vulut'a sorulmalı (§8). Öneri: şimdilik include.
 
 ### 6.5 Yeni alan adı
-nexagrant.com 29.09.2026'da kaydedildi. Birçok filtre ilk ~30 gündeki alan adlarına şüpheyle bakar. İlk haftalarda
+fonbridge.com 29.09.2026'da kaydedildi. Birçok filtre ilk ~30 gündeki alan adlarına şüpheyle bakar. İlk haftalarda
 hacmi düşük tutun (davet/bildirim zaten düşük), toplu gönderim yapmayın, DMARC raporlarını izleyin.
 
 ### 6.6 Parola TLS'ten önce istenebiliyor (B-3, İNCELEME-41)
@@ -328,7 +332,7 @@ cPanel'in "Posta İstemcisi Yapılandırma" ekranındaki **"Güvenli SSL/TLS Aya
 ### 7.0 Doğrulama komutları (DNS yayıldıktan sonra; hepsi salt-okur — yalnız adım 4–5 tek deneme iletisi gönderir, adım 7–9 ileti bırakmaz)
 ```sh
 # 1) Bölge yetkili NS'de var mı (yayılmayı beklemeden, ilk bakılacak yer)
-dig SOA nexagrant.com @ns1.iyisunucu.com.tr +norec | grep status   # NOERROR olmalı (bugün REFUSED)
+dig SOA nexagrant.com @ns1.iyisunucu.com.tr +norec | grep status   # NOERROR olmalı
 # 2) Kayıtlar genel çözücülerde — §3.3 döngüsü + www:
 dig +short www.nexagrant.com @8.8.8.8; dig +short AAAA nexagrant.com @8.8.8.8
 # 3) Posta portları ve sertifika adı (465 örtük TLS, 587 STARTTLS; 25 yalnız sunucu-sunucu)
@@ -337,7 +341,7 @@ openssl s_client -connect mail.nexagrant.com:465 -servername mail.nexagrant.com 
 openssl s_client -starttls smtp -connect mail.nexagrant.com:587 -servername mail.nexagrant.com </dev/null 2>/dev/null \
   | openssl x509 -noout -subject -text | grep -E 'subject=|DNS:'
 openssl s_client -starttls smtp -connect mail.nexagrant.com:25 -servername mail.nexagrant.com </dev/null 2>/dev/null | head -3   # 25'e çıkış gerekir: önce adım 7-ön (25 çıkışı ön kontrolü)
-#    beklenen: DNS:mail.nexagrant.com (bugün CN=autoconfig.srv.iyisunucu.com.tr)
+#    beklenen: DNS:mail.nexagrant.com
 # 4) Uçtan uca test gönderimi (swaks; brew install swaks / apt install swaks). Parola komut satırına YAZILMAZ:
 #    --auth-password verilmezse swaks sorar; geçmişe ve `ps` çıktısına düşmez.
 swaks --server mail.nexagrant.com --port 465 --tls-on-connect --tls-verify \
@@ -499,7 +503,7 @@ Uygulama postası için artık kullanılmıyor; DNS'ine dokunulmadı (ölçüm: 
 `info@usfinbridge.com` kutusu açık kalabilir. Sitenin iletişim bağlantısı (`src/components/PublicFooter.tsx:135`) ve bazı
 hukuk/uyum belgeleri hâlâ `info@usfinbridge.com` diyor — bunlar ayrı iş (sahipleri: fe / cs).
 
-## 10. Web: `www.nexagrant.com` → `https://nexagrant.com` (301) ve TLS (patron kararı 29.09)
+## 10. Web: `www.nexagrant.com` → `https://nexagrant.com` (301) ve TLS (patron kararı 30.10.2026, FO-233)
 
 Kanonik adres **`https://nexagrant.com`** (çıplak alan, `www`'siz). Uygulama bir Node konteyneri (`Dockerfile`:
 `node server.js`, `PORT=3000`, düz HTTP); TLS'i ve yönlendirmeyi **önündeki ters vekil** yapar. Next.js'e host

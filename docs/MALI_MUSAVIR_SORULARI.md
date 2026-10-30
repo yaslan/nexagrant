@@ -116,7 +116,7 @@ edebiliriz.
 
 İyi çalışmalar,
 Dr. Yasin ASLAN · Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.
-bilgi@nexagrant.com · 0533 461 55 95
+info@nexagrant.com · 0533 461 55 95
 
 ---
 

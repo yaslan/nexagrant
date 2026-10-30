@@ -10,7 +10,7 @@ Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. ("FonBridge").
 
 - Adres: [ADRES — patron]
 - KEP adresi: [KEP ADRESİ — patron]
-- E-posta: info@nexagrant.com
+- E-posta: info@fonbridge.com
 
 ## 2. İşlenen kişisel veriler
 
@@ -56,7 +56,7 @@ KVKK m.11 uyarınca veri sorumlusuna başvurarak:
 - işlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle aleyhinize bir sonucun ortaya çıkmasına itiraz etme,
 - kanuna aykırı olarak işlenmesi sebebiyle zarara uğramanız hâlinde zararın giderilmesini talep etme
 
-haklarına sahipsiniz. Açık rızaya dayanan işlemler için rızanızı dilediğiniz zaman geri alabilirsiniz; geri alma, o tarihe kadar yapılan işlemleri etkilemez. Duyuru e-postası ve rehber yayını rızanızı info@nexagrant.com adresine yazarak geri alabilirsiniz.
+haklarına sahipsiniz. Açık rızaya dayanan işlemler için rızanızı dilediğiniz zaman geri alabilirsiniz; geri alma, o tarihe kadar yapılan işlemleri etkilemez. Duyuru e-postası ve rehber yayını rızanızı info@fonbridge.com adresine yazarak geri alabilirsiniz.
 
 ## 8. Başvuru yöntemi
 
@@ -64,6 +64,6 @@ Veri Sorumlusuna Başvuru Usul ve Esasları Hakkında Tebliğ uyarınca talepler
 
 - yukarıdaki adrese ıslak imzalı dilekçe ile şahsen veya noter aracılığıyla,
 - KEP adresimize, güvenli elektronik imza veya mobil imza ile,
-- daha önce bize bildirdiğiniz ve sistemimizde kayıtlı olan e-posta adresinizden info@nexagrant.com adresine.
+- daha önce bize bildirdiğiniz ve sistemimizde kayıtlı olan e-posta adresinizden info@fonbridge.com adresine.
 
 Başvurunuzda ad soyadınız, imzanız, tebligata esas yerleşim yeri veya iş yeri adresiniz, varsa bildirime esas e-posta adresiniz ya da telefon numaranız ve talebinizin konusu bulunmalıdır. Başvurunuz en geç 30 gün içinde ücretsiz olarak sonuçlandırılır; işlemin ayrıca bir maliyet gerektirmesi hâlinde Kişisel Verileri Koruma Kurulunca belirlenen tarife uygulanabilir. Başvurunuzun reddedilmesi, cevabın yetersiz bulunması veya süresinde cevap verilmemesi hâlinde Kişisel Verileri Koruma Kuruluna şikâyette bulunabilirsiniz (KVKK m.14).
