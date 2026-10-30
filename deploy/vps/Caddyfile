@@ -6,8 +6,8 @@
 # 80 ve 443 dışarıdan açık olmalı. Kayıt yayına girmeden Caddy'yi başlatmak Let's
 # Encrypt hız sınırını yer (RUNBOOK §5, dig kontrolü).
 {
-	# ACME e-posta adresi (sertifika süresi uyarıları). Patron onayıyla eklenir.
-	# email ops@nexagrant.com
+	# ACME e-posta adresi (sertifika süresi uyarıları). Patron girdisi (FO-250): info@nexagrant.com.
+	email info@nexagrant.com
 	# Yalnız IPv4 (AAAA kaydı yok; docs/SMTP-SUNUCU.md §10.1).
 	default_bind tcp4/0.0.0.0
 }

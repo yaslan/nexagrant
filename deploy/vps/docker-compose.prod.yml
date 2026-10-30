@@ -11,8 +11,10 @@
 # Kullanım (depo kökünden):
 #   docker compose -f deploy/vps/docker-compose.prod.yml up -d --build
 #
-# Bellek sınırları 8 GB'a göre: postgres 2g + web 1.5g + worker 1.5g + caddy 128m
-# = ~5.1 GB; kalan pay işletim sistemi ve Postgres sayfa önbelleği için.
+# Bellek sınırları 8 GB'a göre: postgres 2g + web 1536m + worker 1g + caddy 128m
+# = ~4.7 GB; kalan ≈3.3 GB işletim sistemi ve Postgres sayfa önbelleği için (FO-250, Y-2).
+# web'in Node heap'i 1024 MB ile sınırlı (NODE_OPTIONS): aşımda kernel öldürmesi yerine JS OOM hatası.
+# CORDIS içe aktarımı bu yığında koşmaz (tek seferlik konteyner, RUNBOOK §11).
 name: fonbridge
 
 services:
@@ -50,6 +52,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
+      - NODE_OPTIONS=--max-old-space-size=1024
     expose:
       - "3000"
     depends_on:
@@ -84,7 +87,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 1536m
+    mem_limit: 1g
     logging:
       driver: json-file
       options:
