@@ -85,6 +85,11 @@ const envSchema = z.object({
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
   FEEDBACK_DIGEST_TO: z.string().email().optional(),
+  /**
+   * Where the hourly `alerts-ops-digest` mail (new `error` SystemAlerts) goes
+   * (FO-246). Unset or blank = the job skips and says so once; nothing is mailed.
+   */
+  ALERTS_OPS_EMAIL: blankToUndefined(z.string().email().optional()),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
   AUTH_URL: z.string().optional(),
