@@ -272,6 +272,20 @@ const envSchema = z.object({
       .regex(/^(0(\.[0-9]+)?|1(\.0+)?)$/, 'must be a decimal between 0 and 1 (e.g. 0.15)')
       .optional()
   ),
+  /**
+   * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
+   * blank = 1000, the production value, which fails fast into the fallback path.
+   * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
+   * 10000): on a loaded machine a fresh connection can take longer than 1 s, and
+   * the page answered 500 instead of waiting (FO-253). Capped at 60 s.
+   */
+  DB_CONNECT_TIMEOUT_MS: blankToUndefined(
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'DB_CONNECT_TIMEOUT_MS must be a positive integer (milliseconds)')
+      .refine((value) => Number(value) <= 60_000, 'DB_CONNECT_TIMEOUT_MS must be at most 60000')
+      .optional()
+  ),
 });
 
 const _env = envSchema.safeParse(process.env);
@@ -333,3 +347,10 @@ export function jobsCronEnabled(
  */
 export const consortiumLiveDemandWeight: number | undefined =
   env.CONSORTIUM_LIVE_DEMAND_WEIGHT === undefined ? undefined : Number(env.CONSORTIUM_LIVE_DEMAND_WEIGHT);
+
+/**
+ * The numeric view of `DB_CONNECT_TIMEOUT_MS`; 1000 ms when unset (production).
+ * Read by {@link createDbClient} in src/lib/db.ts.
+ */
+export const dbConnectTimeoutMs: number =
+  env.DB_CONNECT_TIMEOUT_MS === undefined ? 1000 : Number(env.DB_CONNECT_TIMEOUT_MS);
