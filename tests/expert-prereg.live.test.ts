@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { prisma } from '@/lib/db';
+import { createDbClient } from '@/lib/db';
 import { hashSecretToken } from '@/lib/secret-token';
 import { exportExpertPreRegistrationsCsv } from '@/lib/expert-prereg/server/admin';
 import { FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
@@ -25,6 +25,16 @@ const PREFIX = 'expertprereg-live-';
 const COUNT = 20;
 
 // Decided before the suite is collected: skipIf reads it at definition time.
+// FO-254: the shared app pool gives up after 1 s to open a connection (src/lib/db.ts). Under
+// gate load (20 parallel verifications on a busy host) that timed out, and the test failed before
+// it measured anything. This file gets its own client with a 15 s connect wait; the assertions
+// and the production pool are unchanged.
+const EXPERT_RACE_CONNECT_MS = 15_000;
+const prisma = createDbClient(process.env.DATABASE_URL ?? 'postgresql://unset@127.0.0.1:1/unset', {
+  max: 20,
+  connectionTimeoutMillis: EXPERT_RACE_CONNECT_MS,
+});
+
 const reachable = await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false);
 const tokens = Array.from({ length: COUNT }, () => randomBytes(32).toString('hex'));
 let before = 0;
