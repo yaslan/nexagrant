@@ -32,6 +32,8 @@ set -a; . "$ENV_FILE"; set +a
 
 : "${R2_ACCOUNT_ID:?backup.env: R2_ACCOUNT_ID}"
 : "${R2_BACKUP_BUCKET:?backup.env: R2_BACKUP_BUCKET}"
+# Şifreleme zorunlu: boşsa pg-backup.sh düz döküm bırakır ve R2'ye şifresiz yedek gider (FO-250 Ö-1).
+: "${BACKUP_AGE_RECIPIENT:?backup.env: BACKUP_AGE_RECIPIENT (age açık anahtarı; yedek şifresiz gitmez)}"
 command -v aws >/dev/null 2>&1 || fail "aws (AWS CLI v2) yok"
 
 REPO="${FONBRIDGE_REPO:-/opt/fonbridge}"
@@ -42,10 +44,14 @@ ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 # 1) Yerel yedek (şifreleme ve doğrulama pg-backup.sh içinde).
 bash "$REPO/scripts/backup/pg-backup.sh"
 
-# 2) En yeni döküm (düz ya da .age). .sha256 dosyaları hariç.
-latest="$(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'fonbridge-*.dump' -o -name 'fonbridge-*.dump.age' \) -print0 \
+# 2) En yeni döküm. Yalnız şifreli (.age) kabul edilir; .sha256 dosyaları hariç.
+latest="$(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'fonbridge-*.dump.age' -print0 \
   | xargs -0 ls -1t 2>/dev/null | head -n 1 || true)"
-[ -n "$latest" ] && [ -s "$latest" ] || fail "yerelde yeni döküm bulunamadı ($BACKUP_DIR)"
+[ -n "$latest" ] && [ -s "$latest" ] || fail "yerelde şifreli (.age) yeni döküm bulunamadı ($BACKUP_DIR)"
+case "$latest" in
+  *.age) ;;
+  *) fail "şifresiz döküm reddedildi: $latest" ;;
+esac
 name="$(basename "$latest")"
 local_size="$(wc -c < "$latest" | tr -d ' ')"
 

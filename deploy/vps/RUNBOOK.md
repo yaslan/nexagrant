@@ -18,7 +18,8 @@ Dosyalar (hepsi `deploy/vps/` altında):
 | `.env.prod.example` | değişken ADLARI; değer yok. Sunucuda `.env.prod` olarak kopyalanır |
 | `backup-to-r2.sh` | günlük `pg_dump` → yerel → R2 + boyut doğrulama |
 | `fonbridge-backup.cron` | `/etc/cron.d` girdisi (01:30 UTC) |
-| `ops.sh` | tek seferlik DB işleri: `push`, `rls-role`, `rls`, `migrate`, `seed` |
+| `bootstrap-roles.sql` | ilk kurulum rolleri: `fabrika_owner` (sahip), `fabrika_jobs` (worker), pgvector (`ops.sh bootstrap` koşturur) |
+| `ops.sh` | tek seferlik DB işleri: `bootstrap`, `push`, `rls-role`, `rls`, `migrate`, `seed`, `verify` |
 
 ---
 
@@ -40,6 +41,16 @@ Dosyalar (hepsi `deploy/vps/` altında):
 ## 1. Sunucu hazırlığı (patron, Hostinger panelinde sunucu alındıktan sonra)
 
 1. Sunucuya **yalnız SSH anahtarıyla** gir; parola girişini kapat. Root ile günlük iş yapma.
+   `/etc/ssh/sshd_config` (ya da `/etc/ssh/sshd_config.d/99-fonbridge.conf`):
+   ```
+   PasswordAuthentication no
+   PermitRootLogin no
+   ```
+   Sonra `sudo sshd -t && sudo systemctl reload ssh`. Kendi oturumunu kapatmadan önce ikinci bir SSH
+   oturumunun açıldığını doğrula (kilitlenme riski).
+1a. **Swap (4 GB):** 8 GB RAM'de tepe yük (derleme, bellek sıçraması) için. `fallocate -l 4G /swapfile`,
+   `chmod 600 /swapfile`, `mkswap /swapfile`, `swapon /swapfile`, `/etc/fstab`'a `/swapfile none swap sw 0 0`.
+   Kanıt: `swapon --show`.
 2. Güvenlik duvarı (UFW): `OpenSSH`, `80/tcp`, `443/tcp` açık; gerisi kapalı. Postgres 5432 dışarıya
    **açılmaz** (compose onu zaten yalnız 127.0.0.1'e yayınlar).
    ```bash
@@ -73,12 +84,18 @@ $EDITOR deploy/vps/.env.prod         # değerleri elle doldur
 
 Doldururken:
 
-- `POSTGRES_PASSWORD`, `AUTH_SECRET`: `openssl rand -base64 32` (≥32 karakter). Çıktıyı ekrana
-  yazdırıp kopyalamak yerine doğrudan dosyaya yaz: `openssl rand -base64 32 | sed 's/^/AUTH_SECRET=/' >> …`
-  (ayrıca kopyası parola kasasında).
+- `POSTGRES_PASSWORD`, `AUTH_SECRET`: `AUTH_SECRET` için `openssl rand -base64 32` (≥32 karakter);
+  **`POSTGRES_PASSWORD` ve üç rol parolası için `openssl rand -hex 32`** — base64'ün `/ + =` karakterleri
+  `postgresql://…` URL'sini bozar. Çıktıyı ekrana yazdırıp kopyalamak yerine doğrudan dosyaya yaz:
+  `openssl rand -hex 32 | sed 's/^/POSTGRES_PASSWORD=/' >> …` (ayrıca kopyası parola kasasında).
+- `OWNER_DATABASE_URL`: `postgresql://fabrika_owner:<şifre>@postgres:5432/fabrika?schema=public`
+  (sahip rol; süper kullanıcı değil). `ops.sh bootstrap` rolü bu URL'nin parolasıyla kurar.
 - `DATABASE_URL`: `postgresql://fabrika_app:<şifre>@postgres:5432/fabrika?schema=public`
   (uygulama rolü; `BYPASSRLS` yok). Şifre, `DATABASE_URL_RLS_TEST` ile **aynı** olmalı (§4, rol kurulumu
   bu değişkenin şifresini kullanır ve mevcut rolün şifresini değiştirmez).
+- `JOBS_DATABASE_URL`: `postgresql://fabrika_jobs:<şifre>@postgres:5432/fabrika?schema=public`
+  (worker'ın `graphile_worker` şeması; `CREATE ON DATABASE`, `BYPASSRLS` yok). Boş bırakılmaz.
+- Tüm bu URL'lerde parola yalnız hex olsun (yukarıdaki `openssl rand -hex 32`).
 - `JOBS_CRON_ENABLED`: ilk kurulumda **`false`**; §4'teki sıra gereği sonra `true`.
 - `TRUSTED_PROXY_HOPS=1` (Caddy tek vekil; boş bırakma).
 - `DEMO_LOGIN_ENABLED`: boş ya da `false`. `true` ise sunucu başlamaz.
@@ -86,7 +103,12 @@ Doldururken:
 - `OPENAI_API_KEY`: `docs/RELEASE_CHECKLIST.md` §8 madde 7 — eski anahtar açığa çıktı; yenisini kullan.
 
 Yedek sırları **ayrı dosyada**: `/etc/fonbridge/backup.env` (chmod 600, root). Adları ve amacı
-`backup-to-r2.sh` başlığında. Burada uygulama sırları yok.
+`backup-to-r2.sh` başlığında. Burada uygulama sırları yok. `BACKUP_AGE_RECIPIENT` zorunludur: yoksa
+yedek betiği başlamaz ve şifresiz döküm R2'ye gitmez.
+
+Patron girdileri: `ACME` e-posta `info@nexagrant.com` (Caddyfile `email`, yazıldı). Alarm alıcısı
+`ALERTS_OPS_EMAIL=info@nexagrant.com` değeridir (sır değil); değişken FO-246 ile gelir, o birleşince
+`.env.prod`'a eklenir.
 
 ## 3. DNS ve sertifika (patron onayı)
 
@@ -109,27 +131,49 @@ docker compose -f deploy/vps/docker-compose.prod.yml up -d postgres
 docker compose -f deploy/vps/docker-compose.prod.yml ps        # postgres: healthy
 ```
 
-Sıra, `docs/RELEASE_CHECKLIST.md` §3.1 ve `scripts/db-setup.sh` ile aynıdır; **canlıda her adım
-öncesi kontrol edilir**:
+Sıra, `docs/RELEASE_CHECKLIST.md` §3.1 ile aynıdır. Rol modeli: süper kullanıcı `fabrika` yalnız
+adım 0'da ve yedekte; şema işleri (adım 2–6) **sahip rol `fabrika_owner`** ile koşar (`ops.sh` bunu
+`OWNER_DATABASE_URL`'den yapar); uygulama rolü `fabrika_app` yalnız adım 7'de (`verify`) kullanılır.
 
-1. **Şema (boş veritabanı):** `deploy/vps/ops.sh push`. Canlıda, mevcut bir veritabanına karşı
-   **önce** `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code`
-   ile fark ölçülür; `--accept-data-loss` **kullanılmaz** (RELEASE_CHECKLIST §3.1 madde 1).
-2. **Uygulama rolü:** `DATABASE_URL_RLS_TEST` `.env.prod`'da tanımlıyken `deploy/vps/ops.sh rls-role`.
-   Rolü yeniden kurar ve grant'leri uygular; mevcut rol varsa şifresi değişmez (script kendisi reddeder).
-3. **RLS:** `deploy/vps/ops.sh rls`.
-4. **Migrasyonlar:** `deploy/vps/ops.sh migrate` (host psql, `apply-migrations.sh`, `apply-order.txt` sırası).
-   `prisma migrate deploy` **kullanılmaz** (`prisma.config.ts` reddeder).
+**Fark (`scripts/db-setup.sh` ile):** `ensure_rls` olay tetikleyicisi bu kurulumda **kurulmaz** (K4
+kararı). RLS yalnız `ops.sh rls` ile kurulur; her güncellemede `ops.sh rls` ve `ops.sh verify` zorunludur
+(§6).
+
+Her adım öncesi kontrol edilir; canlıda hiçbir adım atlanmaz:
+
+0. **Roller ve pgvector (yalnız ilk kurulum):** `deploy/vps/ops.sh bootstrap`. `fabrika_owner`
+   (süper kullanıcı değil, BYPASSRLS, CREATEROLE), `fabrika_jobs` (CONNECT + CREATE ON DATABASE) ve
+   `vector` uzantısını kurar; veritabanı sahipliğini `fabrika_owner`'a verir. Parolalar
+   `OWNER_DATABASE_URL` ve `JOBS_DATABASE_URL`'den okunur. Tekrar koşması zararsızdır (var olan
+   roller değişmez). Kanıt: `docker compose -f deploy/vps/docker-compose.prod.yml exec postgres psql -U fabrika -d fabrika -c '\du'`
+   — `fabrika_owner`, `fabrika_jobs`, `fabrika_app` (adım 3'ten sonra) görünmeli, `fabrika` süper kullanıcı.
+1. **Şema (boş veritabanı):** `deploy/vps/ops.sh push` (`prisma db push`, sahip rol). Mevcut bir
+   veritabanına karşı **önce** fark ölçülür (salt okur, sahip rol):
+   ```bash
+   docker compose -f deploy/vps/docker-compose.prod.yml run --rm --no-deps worker sh -c \
+     'export DATABASE_URL="$OWNER_DATABASE_URL"; exec node_modules/.bin/prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code'
+   ```
+   `--accept-data-loss` **kullanılmaz** (RELEASE_CHECKLIST §3.1 madde 1). Çıkış 2 = fark var: dur, incele.
+2. **Uygulama rolü:** `deploy/vps/ops.sh rls-role`. `DATABASE_URL_RLS_TEST` `.env.prod`'da dolu olmalı
+   (ops reddeder). Rolü sahip rolle kurar ve grant'leri uygular; mevcut rolün şifresi değişmez.
+3. **RLS:** `deploy/vps/ops.sh rls` (sahip rol).
+4. **Migrasyonlar:** `deploy/vps/ops.sh migrate` (host psql, `OWNER_DATABASE_URL`, `apply-migrations.sh`,
+   `apply-order.txt` sırası). `prisma migrate deploy` **kullanılmaz** (`prisma.config.ts` reddeder).
 5. **RLS (ikinci kez):** `deploy/vps/ops.sh rls` — migrasyonların eklediği tablolar için.
-6. **Seed:** `deploy/vps/ops.sh seed`. **Dikkat:** seed demo kiracı da oluşturur. Canlıda bunun
-   istenip istenmediği patron kararı (§10); karar yoksa seed çalıştırılmaz.
-7. **Doğrulama:** `deploy/vps/ops.sh verify` (`rls:verify --require-db`). Başarısızsa web açılmaz.
+6. **Seed (K3):** `deploy/vps/ops.sh seed`. **Yalnız referans veri (plan, modül kataloğu, rubrikler);
+   demo kiracı YOK.** `SEED_DEMO=false` ile koşar. `prisma/seed.ts` bu ayrımı henüz yapmaz (FO-251):
+   ayrım birleşene kadar `ops.sh seed` kendi kapısını kapatır ve çalışmaz. Karar yoksa seed çalışmaz.
+7. **Doğrulama:** `deploy/vps/ops.sh verify` (`rls:verify --require-db`, uygulama rolü `fabrika_app`).
+   Başarısızsa web açılmaz.
+   **BİLİNEN ENGEL (FO-250 provaası, 2026-10-30):** migrasyon sonrası `ExpertFounderCounter` tablosu
+   `add-expert-founder-counter.sql` ile `id=1` satırıyla tohumlanıyor. `scripts/check-rls-live.ts` beklenen
+   satır sayısını uygulama rolünün sistem kapsamı DIŞI okumasından (0) alıyor; kapsam İÇİNDE 1 görüldü →
+   `1/0` hatası. Politika doğru, ölçüm yanlış. Bu betik bu PR'da değiştirilmedi (ayrı iş). Düzelene kadar
+   canlıda `verify` kırmızıdır ve web açılmaz; geçici DB provaasında `rls` + `verify` bu yüzden geçmedi.
 
 Notlar:
-- `ensure_rls` olay tetikleyicisi (`.github/ci/supabase-ensure-rls.sql`) Supabase canlısında vardı.
-  Kendi Postgres'imizde yeni tablolar RLS'siz başlayabilir. Bu tetikleyiciyi kurup kurmamak bir karar
-  (§10); kurulmazsa her yeni tablo için `ops.sh rls` ve RLS denetimi elle yapılır.
-- Bu bölümün hiçbiri canlıda henüz koşulmadı. Yerel provası için bkz. §11.
+- Bu bölümün hiçbiri canlıda henüz koşulmadı. Yerel provası ve sonucu §11'de.
+- Yeni tablo eklenirse RLS denetimi `ops.sh rls` ve `ops.sh verify` ile elle yapılır (K4).
 
 ## 5. Uygulamayı başlat
 
@@ -155,28 +199,48 @@ curl -sI http://www.nexagrant.com | head -n 3         # 301 → https://nexagran
 ```
 
 - Caddy'de `Strict-Transport-Security` **kapalı** (Caddyfile'da satır yorumda). Patron kararıyla açılır.
+- **CORDIS içe aktarımı panelden yapılmaz** (`src/app/[locale]/admin/cordis/actions.ts` web sürecinde
+  4,7 GB tepe ölçüldü). Tek seferlik konteyner, worker durdurulmuş, sahip rolle, bellek sınırı 5 GB:
+  ```bash
+  docker compose -f deploy/vps/docker-compose.prod.yml stop worker
+  docker run --rm --memory 5g --network fonbridge_default --env-file deploy/vps/.env.prod \
+    fonbridge-worker:local sh -c \
+    'export DATABASE_URL="$OWNER_DATABASE_URL"; exec node_modules/.bin/tsx scripts/cordis-import.ts "$@"' sh <argümanlar>
+  docker compose -f deploy/vps/docker-compose.prod.yml up -d worker
+  ```
+  Parola komut satırına girmez: `OWNER_DATABASE_URL` konteyner ortamında (`--env-file`) zaten vardır.
+  Konteyner `--rm` ile silinir. Akışlı okumaya geçiş ayrı bir karttır (Y-2 önerisi).
 - İlk gün admin `/[locale]/admin/alerts` ekranında `job-queue` ve worker log'u kontrol edilir
   (RELEASE_CHECKLIST §3.3 madde 5).
 
 ## 6. Güncelleme (deploy)
 
-Yeni bir commit için:
+Yeni bir commit için (sıra `docs/RELEASE_CHECKLIST.md` §3.1 ile aynı; 0a ve 2a atıfları orada):
 
 ```bash
 cd /opt/fonbridge
 git fetch --all --prune && git checkout <yeni-commit>
-# 1. Şema değişti mi? RELEASE_CHECKLIST §3.1: yeni migrasyon dosyası varsa ops.sh migrate + rls
-# 2. İmajı yedekle (geri alma için)
+# 0. Yedek (§8.1) bu güncellemeden önce alındı mı? Yoksa dur.
+# 0a. Go-live ön kontrolü R-1 (RELEASE_CHECKLIST §3.1 adım 0a): db push'tan ÖNCE, sahip rolle.
+# 1. Şema değişti mi? Yeni migrasyon dosyası varsa: ops.sh push (fark ölçümü §4 adım 1), ops.sh migrate
+# 2. Eski worker'ı durdur (RELEASE_CHECKLIST §3.1 adım 2a): stop -t 300, sonra kilitli iş sayısı 0
+docker compose -f deploy/vps/docker-compose.prod.yml stop -t 300 worker
+# 3. İmajı yedekle (geri alma için)
 docker tag fonbridge-web:local fonbridge-web:prev   2>/dev/null || true
 docker tag fonbridge-worker:local fonbridge-worker:prev 2>/dev/null || true
-# 3. Worker önce durur (§3.3 ters sırası), sonra web
-docker compose -f deploy/vps/docker-compose.prod.yml stop worker
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --build web worker
+# 4. Şema değiştiyse RLS ve doğrulama ZORUNLU (ensure_rls tetikleyicisi yok, K4):
+deploy/vps/ops.sh rls
+deploy/vps/ops.sh verify          # başarısızsa web'i başlatma
+# 5. Derleme: worker durmuş olmalı (Y-2: derleme tepesi 2 vCPU / 8 GB'da worker ile birlikte taşabilir)
+docker compose -f deploy/vps/docker-compose.prod.yml up -d --build web
+docker compose -f deploy/vps/docker-compose.prod.yml up -d worker
 docker compose -f deploy/vps/docker-compose.prod.yml ps
 ```
 
-Uygulama değişikliği yoksa, yalnız `up -d --build` çalışır. Her güncellemeden önce §8'deki yedek
-(en az bir gün önceki) elde olmalı.
+Uygulama değişikliği yoksa (şema değişmediyse) adım 1 ve 4 atlanır; yalnız `stop`, `up -d --build web` ve
+`up -d worker` çalışır. Her güncellemeden önce §8'deki yedek (en az bir gün önceki) elde olmalı.
+Derleme sırasında `docker compose … stop worker` ile worker'ı durdurmak, derlemenin bellek tepesini
+worker ile aynı anda taşımamasını sağlar.
 
 ## 7. Geri alma (rollback)
 
@@ -235,7 +299,11 @@ patron kasasından geçici olarak alınır.
 
 ```bash
 # Prova: geçici DB'ye yükler, satır sayılarını karşılaştırır (kendi DB'sini kendisi kurar/siler)
-bash scripts/backup/pg-restore-drill.sh <dump>
+RESTORE_ADMIN_URL=postgresql://fabrika@127.0.0.1:5432/postgres \
+BACKUP_DATABASE_URL=postgresql://fabrika@127.0.0.1:5432/fabrika \
+  bash scripts/backup/pg-restore-drill.sh <dump>
+# (parolalar PGPASSWORD ya da ~/.pgpass ile; URL'lerde yazılmaz. RESTORE_ADMIN_URL: süper kullanıcı ya da
+#  CREATEDB rolü, postgres veritabanına bağlı. BACKUP_DATABASE_URL: karşılaştırılacak kaynak.)
 # Gerçek geri yükleme (felaket): YALNIZ boş hedef DB; betik DB oluşturmaz, dolu hedefi reddeder
 RESTORE_DATABASE_URL=postgresql://fabrika@127.0.0.1:5432/fabrika_restored bash scripts/backup/pg-restore.sh <dump>
 ```
@@ -259,8 +327,8 @@ bağla, giriş yap. Süreyi yaz (RTO ölçümü). `docs/RELEASE_CHECKLIST.md` §
 |---|---|---|
 | K1 | nexagrant.com A kaydı → VPS IP (DNS) | Caddy sertifikası ve yayın için şart |
 | K2 | `CALENDAR`/`EXPERT_PREREG_IP_SALT` ve diğer sırlar değerleri | Sunucuda elle girilir |
-| K3 | Canlıda seed (demo kiracı) | `ops.sh seed` demo kiracı oluşturur; karar yoksa çalıştırılmaz |
-| K4 | `ensure_rls` olay tetikleyicisi kurulacak mı | Supabase'de vardı; kendi Postgres'te yoksa yeni tablolar RLS'siz başlayabilir |
+| K3 | Canlıda seed: **karar verildi (lider, FO-250): referans veri zorunlu, demo yok.** `SEED_DEMO=false`; ayrım FO-251'de (fe-fb) | `ops.sh seed` FO-251 birleşene kadar kendi kapısıyla çalışmaz |
+| K4 | `ensure_rls` olay tetikleyicisi: **karar verildi (lider, FO-250): kurulmaz.** Güncellemede `ops.sh rls && ops.sh verify` zorunlu (§6) | Tetikleyici sistem geneli tabloları da etkiler (BlogPost olayı); RLS denetimi `rls:verify` ile ölçülür |
 | K5 | Postgres iç bağlantısı TLS'siz (yalnız iç ağ) mi | Alternatif: sertifikalı Postgres (ayrı iş) |
 | K6 | HSTS (`max-age=300` → sonra `31536000`) | Caddyfile'da yorumda |
 | K7 | ACME e-posta adresi (`email` satırı) | Sertifika uyarıları |
@@ -268,6 +336,7 @@ bağla, giriş yap. Süreyi yaz (RTO ölçümü). `docs/RELEASE_CHECKLIST.md` §
 | K9 | Dış kalp atışı ve uptime izleyici | §5.3, §9 |
 | K10 | RPO/RTO hedefi (öneri RPO ≤ 24 sa, RTO ≤ 4 sa) | RELEASE_CHECKLIST §4.2 |
 | K11 | Alan adı tutarlılığı: docs/RELEASE_CHECKLIST.md ve docs/SMTP-SUNUCU.md `fonbridge.com` diyor, kod ve bu paket `nexagrant.com` | Ayrı temizlik işi; bu pakette nexagrant.com kullanıldı |
+| K12 | `fabrika_owner` BYPASSRLS mi (öneri: evet) | Süper kullanıcı değil, ama FORCE RLS altında migrasyon/seed/verify için satır görmesi gerekir (RELEASE_CHECKLIST §3.1 adım 1a). Uygulama rolü `fabrika_app` BYPASSRLS'siz kalır |
 
 Python CORDIS servisi (`workers/cordis`) bu yığında **yok**: Dockerfile yok ve giriş noktası tutarsız
 (`package.json` `worker:dev` `app:app` diyor, dosya `main.py`). Ayrı kart.
