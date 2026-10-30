@@ -96,6 +96,20 @@ Lider kararları uygulandı: sahip rol `fabrika_owner` (süper kullanıcı deği
 
 `.dockerignore` · `deploy/vps/.env.prod.example` · `deploy/vps/Caddyfile` · `deploy/vps/RUNBOOK.md` · `deploy/vps/backup-to-r2.sh` · `deploy/vps/bootstrap-roles.sql` (yeni) · `deploy/vps/docker-compose.prod.yml` · `deploy/vps/ops.sh` · `docs/ROADMAP.md` · `prisma/rls-app-role.sql` · `scripts/apply-rls.ts` · `scripts/setup-rls-role.ts`
 
-**Yeni karar gerekli (lider):** (1) gate kararsızlığı için ayrı kart (yük altında zamanlama eşikleri ve live DB yarışı testleri), (2) `check-rls-live` sayım düzeltmesi (yukarıdaki BLOKER), (3) push'un hangi koşumla yapılacağı. Push tamamlanınca yeni head SHA bu rapora eklenecek.
+### Güncelleme: lider kararları ve 4. push denemesi
+
+- Lider: (1-a) check-rls-live satır beklentisi BYPASSRLS sahipten ölçülsün — **uygulandı**, commit `99056cce` (`scripts/check-rls-live.ts`, `deploy/vps/ops.sh` yorum). (2) gate kararsızlığı için ayrı kart — **açıldı: FO-254 (TASK-MVV72UUJXVN1)**. (3) push onaylı — **denendi, reddedildi**.
+- Doğrulama (geçici pgvector:pg16, 127.0.0.1:55432, işi bitince silindi; `db-setup.sh` ile kuruldu):
+  - ESKİ betik (HEAD), uygulama rolü `fabrika_app`: `ExpertFounderCounter: sistem kapsamı İÇİNDE 1/0` → exit 1 (raporlanan hatanın yeniden üretimi).
+  - YENİ betik, `DATABASE_URL=fabrika_app`, `OWNER_DATABASE_URL=fabrika_owner` (BYPASSRLS, süper değil): `ExpertFounderCounter … 1/1`, `✅ 51 kiracıya özel tabloda … GERÇEKTEN ölçüldü` → exit 0.
+  - Negatif: owner URL yok → `❌ SİSTEM KAPSAMI SATIR BEKLENTİSİ ÖLÇÜLEMEDİ` exit 1. Owner URL RLS'e tabi (`fabrika_app`) → `rol fabrika_app … BYPASSRLS gerekir` + aynı ret, exit 1.
+  - `tsc --noEmit` 0 hata; eslint temiz.
+- Push denemesi 4 (`bash scripts/gate-isolated.sh git push origin devop-fb/fo244-vps-deploy`, yerel head `99056cce`): **pre-push gate reddetti**, `PUSH_EXIT=1`. Kırmızı 12 test / 4 dosya: `m17-interreg-extract` (event-loop zamanlama eşikleri), `rag-pdf-worker-isolation` (bomb sınırları, süre). Yani FO-254 kapsamındaki aynı kararsız aile; bu dalın değişikliğiyle ilgisi yok.
+- Uzak dal hâlâ `407b6394`; PR #218 head `407b6394`, draft, açık. **Push YAPILMADI.** Hook'u atlamadım.
+
+### Yeni karar gerekli (lider):
+- (a) FO-254 kapanana kadar push'u bekletmek, ya da (b) lider açık onayıyla bu tek push'ta gate'i atlamak (`--no-verify`) — bu kararı ben vermem. Push tamamlanınca yeni head SHA (`99056cce` veya sonrası) bu rapora eklenecek.
+
+### Önceki karar notları (arşiv): (1) gate kararsızlığı için ayrı kart (yük altında zamanlama eşikleri ve live DB yarışı testleri), (2) `check-rls-live` sayım düzeltmesi (yukarıdaki BLOKER), (3) push'un hangi koşumla yapılacağı. Push tamamlanınca yeni head SHA bu rapora eklenecek.
 
 DONE/FAIL: `FAIL:st1` — düzeltmeler commit'li ama (a) uzak dala PUSH EDİLMEDİ (pre-push gate 3 denemede kırmızı, PR #218 head hâlâ `407b6394`), (b) zorunlu `verify` kapısı kapsam dışı ölçüm hatası yüzünden kırmızı (BLOKER).
