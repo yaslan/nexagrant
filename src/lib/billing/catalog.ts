@@ -516,10 +516,10 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     seats: 6,
     workspaces: 1,
     aiCreditsMonthly: 500,
-    moduleIds: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8'],
-    // M17 Interreg pre-assessment: "Pro and above" (FO-185). A preview while it is
-    // `soon` (no page, no credit price yet); it moves to `moduleIds` when it opens.
-    previewModuleIds: ['M0', 'M12', 'M13', 'M16', 'M17'],
+    // M17 Interreg pre-assessment: "Pro and above" (FO-185); open since its screen
+    // shipped (FO-189).
+    moduleIds: ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8', 'M17'],
+    previewModuleIds: ['M0', 'M12', 'M13', 'M16'],
   },
   {
     planId: 'ultra',
@@ -528,8 +528,8 @@ const SELF_SERVE_GRANTS: readonly PlanGrant[] = [
     seats: 15,
     workspaces: 5,
     aiCreditsMonthly: 2_000,
-    moduleIds: ALL_MODULE_IDS,
-    previewModuleIds: ['M0', 'M12', 'M13', 'M14', 'M15', 'M16', 'M17'],
+    moduleIds: [...ALL_MODULE_IDS, 'M17'],
+    previewModuleIds: ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'],
     limits: { partner_search_export: true },
   },
 ];

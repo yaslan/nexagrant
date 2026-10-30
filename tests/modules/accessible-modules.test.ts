@@ -34,7 +34,7 @@ import type { ModuleId } from '@/lib/modules/types';
 const ALL = getAllManifests().map((m) => m.id);
 
 /** The `pro` grant in PLAN_GRANTS. */
-const PRO = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8'];
+const PRO = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M8', 'M17'];
 
 function arrange(opts: {
   rows: Partial<Record<ModuleId, string>>;
