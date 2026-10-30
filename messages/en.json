@@ -1550,8 +1550,8 @@
       "submitButton": "Calculate and Save Calibration",
       "resultLabel": "Calculated Calibration Variance:",
       "deviationLabel": "Deviation: {value} points",
-      "goodMessage": "🎯 Great! Your internal evaluation model is very close to the official ESR score (≤ 0.5 point deviation).",
-      "driftMessage": "⚠️ Your model shows some drift from the official score. The calibration coefficient will be updated for future projects.",
+      "goodMessage": "🎯 Great! Your internal pre-assessment is very close to the ESR result the Commission announced (≤ 0.5 point deviation).",
+      "driftMessage": "⚠️ Your internal pre-assessment differs noticeably from the ESR result the Commission announced. The deviation has been saved on this evaluation — keep it in mind for future pre-assessments.",
       "noScoredEvaluations": "There is no scored evaluation to calibrate. Complete a pre-assessment first."
     },
     "form": {
