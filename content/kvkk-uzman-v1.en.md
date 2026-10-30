@@ -6,7 +6,7 @@ This notice is given under Article 10 of the Turkish Personal Data Protection La
 
 ## 1. Data controller
 
-[FonBridge tüzel kişi unvanı] ("FonBridge"). Contact: info@fonbridge.com
+[FonBridge tüzel kişi unvanı] ("FonBridge"). Contact: info@nexagrant.com
 
 ## 2. Personal data processed
 
@@ -38,4 +38,4 @@ Your pre-registration is kept while the directory operates or until you ask for 
 
 ## 7. Your rights
 
-Under KVKK Art. 11 you may learn whether your data is processed, request information, ask for correction or deletion, withdraw consent and object. Send requests to info@fonbridge.com.
+Under KVKK Art. 11 you may learn whether your data is processed, request information, ask for correction or deletion, withdraw consent and object. Send requests to info@nexagrant.com.

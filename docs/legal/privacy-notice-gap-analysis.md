@@ -133,7 +133,7 @@ Karşılaştırma yüzeyi: `messages/{tr,en}.json` → `legal.privacy.*` (bu dal
 
 | #   | md.10 unsuru | §2 ölçümü (10.09) | Bugün | Ne kapandı / ne açık |
 | --- | --- | --- | --- | --- |
-| a   | Veri sorumlusunun kimliği | YOK | **YOK (açık)** | Hâlâ yalnız ürün adı (`{brand}`). Unvan, adres, MERSİS, KEP metinde yok; `info@fonbridge.com` yalnız başvuru kanalı olarak geçiyor. Bilerek eklenmedi: tüzel kişi bilgisi patron kararı |
+| a   | Veri sorumlusunun kimliği | YOK | **YOK (açık)** | Hâlâ yalnız ürün adı (`{brand}`). Unvan, adres, MERSİS, KEP metinde yok; `info@nexagrant.com` yalnız başvuru kanalı olarak geçiyor. Bilerek eklenmedi: tüzel kişi bilgisi patron kararı |
 | b   | İşleme amaçları | KISMİ (5 amaç / 18 faaliyet) | **KISMİ, belirgin iyileşti** | `legalBasisBody` 19 faaliyeti adıyla sayıyor (envanterdeki 23 "Hukuki sebep" satırından 19 faaliyet; kalan 4'ün gerekçesi raporda). Amaç cümleleri hâlâ kısa; saklama süresi yok |
 | c   | Aktarım: kime, ne amaçla | YOK | **KISMİ** | 7 alıcı adıyla ve ülke/bölgeyle yazılı: Anthropic, Google, Stripe, OpenAI, Cloudflare, PostHog, Vulut. Yurt dışı aktarımın hukuki dayanağı cümlesi **bilerek yazılmadı** (patron + hukukçu kararı; envanter §21: imzalı SCC yok). iyzico, Microsoft, Resend alıcı değil |
 | ç   | Toplama yöntemi ve hukuki sebep | YOK | **VAR (hukukçu teyidi bekliyor)** | `collectionMethodHeading` (5 yol) ve `legalBasisHeading` (md.5/2-c, -ç, -e, -f, md.5/1) eklendi. Ajans kanalı ve ziyaretçi talebi envanterde hâlâ "taslak" |
@@ -236,7 +236,7 @@ Bu ikisi **eksiklik değil, fazla/yanlış beyan**dır ve düzeltmeleri hukuk gi
 | **Merkez adresi**      | `docs/EFATURA_SETUP.md:41-42`         | Örnek `Kızılırmak Mah. 1450. Cad. No:3` / `Ankara`                                                              | **YOK**                                                                                                                                                                                          |
 | **MERSİS**             | —                                     | Repoda hiç geçmiyor (0 eşleşme)                                                                                 | **YOK**                                                                                                                                                                                          |
 | **KEP adresi**         | —                                     | Repoda hiç geçmiyor (`messages/*.json`'daki tek "kep" eşleşmesi İngilizce _"kept"_ kelimesinden yanlış pozitif) | **YOK**                                                                                                                                                                                          |
-| **İletişim e-postası** | `src/components/PublicFooter.tsx:136` | ~~`info@usfinbridge.com`~~ → `info@fonbridge.com` (**29.09.2026:** canlı alan adı `fonbridge.com`; `usfinbridge.com` iptal) — **kodda gömülü**, i18n katalogunda değil                                               | **YOK** — üstelik `/[locale]/privacy` sayfası PublicFooter'ı **render etmiyor** (üç yasal sayfanın üçünde de `info@usfinbridge.com` yok), yani metnin üzerinde hiçbir iletişim kanalı görünmüyor |
+| **İletişim e-postası** | `src/components/PublicFooter.tsx:136` | ~~`info@usfinbridge.com`~~ → `info@nexagrant.com` (**29.09.2026:** canlı alan adı `nexagrant.com`; `usfinbridge.com` iptal) — **kodda gömülü**, i18n katalogunda değil                                               | **YOK** — üstelik `/[locale]/privacy` sayfası PublicFooter'ı **render etmiyor** (üç yasal sayfanın üçünde de `info@usfinbridge.com` yok), yani metnin üzerinde hiçbir iletişim kanalı görünmüyor |
 
 `INVOICE_SUPPLIER_*` ortam değişkenleri **bir kimlik taşıyor** (`src/lib/env.ts:65-71`: NAME,
 VKN, TAX_OFFICE, ADDRESS, CITY, COUNTRY, EMAIL) ve fatura belgesine basılıyor
@@ -260,13 +260,13 @@ okunmadı (ve okunmamalı).
    **Sözleşmenin tarafı adıyla belirsizdir.**
 3. **Dört ayrı alan adı, tek kanonik kimlik yok.** Test/örnek dosyaları hariç `src/` içinde:
    `usfinbridge.com` (`info@`, `demo@`, `noreply@` — o gün `src/lib/env.ts:49` varsayılan gönderen),
-   **29.09.2026 notu:** canlı alan adı `fonbridge.com`; `usfinbridge.com` iptal. Varsayılan gönderen
-   artık `info@fonbridge.com` (`src/lib/env.ts:99`, `NEXT_PUBLIC_SMTP_FROM_ADDRESS`); altbilgi iletişim
-   adresi de `info@fonbridge.com`. `usfinbridge.com` yalnız demo hesaplarında kaldı
+   **29.09.2026 notu:** canlı alan adı `nexagrant.com`; `usfinbridge.com` iptal. Varsayılan gönderen
+   artık `info@nexagrant.com` (`src/lib/env.ts:99`, `NEXT_PUBLIC_SMTP_FROM_ADDRESS`); altbilgi iletişim
+   adresi de `info@nexagrant.com`. `usfinbridge.com` yalnız demo hesaplarında kaldı
    (`src/lib/auth.ts:84`, `src/app/[locale]/login/AuthCard.tsx:37`).
    `fabrika.app` (API örnekleri, `docs.fabrika.app`, takvim UID'leri),
    `fabrika.dev` (`support@`, `feedback@`, `app.fabrika.dev` — `src/lib/beta/constants.ts:49-51`),
-   **01.10.2026 notu:** beta `support@`/`feedback@` varsayılanları `info@fonbridge.com`'a taşındı
+   **01.10.2026 notu:** beta `support@`/`feedback@` varsayılanları `info@nexagrant.com`'a taşındı
    (TASK-MUPIR7Y1P7AH4); `app.fabrika.dev` artık `src/`'de yok (`src/lib/app-url.ts`). Kalan tek iz
    takvim UID'lerindeki `@fabrika.dev` (`src/lib/beta/checkin-schedule.ts`) — posta adresi değil.
    `yasinaslan.com.tr` (`admin@` — platform yöneticisi kimliği, `src/lib/auth.ts:30`).

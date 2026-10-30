@@ -6,7 +6,7 @@ Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu'nun ("KVKK") 10. ma
 
 ## 1. Veri sorumlusu
 
-[FonBridge tüzel kişi unvanı] ("FonBridge"). İletişim: info@fonbridge.com
+[FonBridge tüzel kişi unvanı] ("FonBridge"). İletişim: info@nexagrant.com
 
 ## 2. İşlenen kişisel veriler
 
@@ -38,4 +38,4 @@ Kişisel verileriniz, yalnız hizmetin barındırılması ve e-posta gönderimi 
 
 ## 7. Haklarınız
 
-KVKK m.11 uyarınca; verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltilmesini veya silinmesini isteme, rızanızı geri alma ve itiraz etme haklarına sahipsiniz. Taleplerinizi info@fonbridge.com adresine iletebilirsiniz.
+KVKK m.11 uyarınca; verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltilmesini veya silinmesini isteme, rızanızı geri alma ve itiraz etme haklarına sahipsiniz. Taleplerinizi info@nexagrant.com adresine iletebilirsiniz.

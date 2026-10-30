@@ -73,7 +73,7 @@ kısa bir görüşme talep edebilir.
 
 İyi çalışmalar,
 Dr. Yasin ASLAN · Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.
-bilgi@fonbridge.com · 0533 461 55 95
+bilgi@nexagrant.com · 0533 461 55 95
 
 ---
 
