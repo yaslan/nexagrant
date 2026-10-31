@@ -19,6 +19,7 @@ import { presentIds } from '../helpers/teardown-guard';
  */
 
 const SHOTS = shotsDir('TASK-MTR4CH9IDK4D7-screenshots');
+const FO277_SHOTS = shotsDir('FO-277-evidence');
 const TENANT = 'demo-tenant';
 const WORKSPACE = 'main';
 const OPP = 'm8-e2e-opp';
@@ -380,6 +381,10 @@ test.describe('M8 consortium matching', () => {
     await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 3$/);
     await expect(builderDetails.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+,\d \/ 1,5$/);
     await expect(builderDetails.getByTestId('m8-builder-dimension-liveDemandSignal')).toHaveText(/^\d+,\d \/ 1$/);
+    // FO-277: the candidate button was a hard-coded English "Invite" on the Turkish page.
+    await expect(builderSeat.getByRole('button', { name: 'Davet Et' }).first()).toBeEnabled({ timeout: 30_000 });
+    await expect(builderSeat.getByRole('button', { name: 'Invite' })).toHaveCount(0);
+    await builderSeat.screenshot({ path: `${FO277_SHOTS}/tr-consortium-invite.png` });
     await page.screenshot({ path: `${SHOTS}/05c-builder-breakdown.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05-consortium-builder.png`, fullPage: true });
 
@@ -424,6 +429,8 @@ test.describe('M8 consortium matching', () => {
     await builderDetailsEn.locator('summary').click();
     await expect(builderDetailsEn).toContainText('Country diversity');
     await expect(builderDetailsEn.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+\.\d \/ 1\.5$/);
+    await expect(builderSeatEn.getByRole('button', { name: 'Invite' }).first()).toBeEnabled({ timeout: 30_000 });
+    await builderSeatEn.screenshot({ path: `${FO277_SHOTS}/en-consortium-invite.png` });
     await page.screenshot({ path: `${SHOTS}/05d-builder-breakdown-en.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05b-consortium-builder-en.png`, fullPage: true });
 

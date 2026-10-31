@@ -188,7 +188,10 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
       {/* Conflict Warnings */}
       {conflicts.length > 0 && (
         <div className="bg-bad/10 border border-bad/30 rounded-xl p-4 mb-6">
-          <h3 className="font-bold text-bad mb-2">⚠ Conflicts Detected</h3>
+          <h3 className="font-bold text-bad mb-2">
+            <span aria-hidden="true">⚠ </span>
+            {t('conflict')}
+          </h3>
           <ul className="list-disc list-inside text-xs text-bad">
             {conflicts.map((c, i) => (
               <li key={i}>{c}</li>
@@ -288,7 +291,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                               disabled={isPending}
                               className="text-xs bg-ok text-white font-semibold px-3 py-1 rounded-lg hover:opacity-90 disabled:opacity-50 transition shadow-2xs"
                             >
-                              Invite
+                              {t('invite')}
                             </button>
                           </div>
                         </div>
