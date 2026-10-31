@@ -22,6 +22,14 @@ pnpm gate:isolated git push -u origin <dal>
 
 Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortamını öncelikli okur); checkout'un kendi `.env`'i karışmaz. Tüm kimlik bilgileri atılabilir yerel değerlerdir (ci.yml'deki ile aynı); sır değildir.
 
+### Kilit beklerken foreground zaman aşımı (FO-254)
+
+`pnpm gate` ve `pnpm gate:isolated` makine çapındaki kilidi (`scripts/gate-lock.mjs`, `~/.cache/fonbridge-gate.lock`) bekleyebilir: başka bir worktree'nin gate'i bitene kadar sıra bekler. Bu bekleme, tam bir gate süresine (~15–17 dk) eklenir. Bash aracı foreground'da 600 sn'de keser; kesilen bir gate kilidi bırakmaz ama çıktı kaybolur. Bu yüzden:
+
+- Gate'i **arka planda** koş ve logu dosyaya yaz: `bash scripts/gate-isolated.sh > /path/gate.log 2>&1; echo "GATE_EXIT=$?" >> /path/gate.log`.
+- Kilit beklenip beklenmediğini `gate.log`'daki `⏳ Gate kilidi meşgul` satırından gör.
+- `git push` (pre-push kancası) da aynı kilidi kullanır; push'u da arka planda ya da kilit boşken yap.
+
 ## Elle koşarken düşülen 6 tuzak — FO-161
 
 `.env`'li elle tarif (worktree başına kalıcı izole DB): `CLAUDE.md` "Worktree'de gate".
