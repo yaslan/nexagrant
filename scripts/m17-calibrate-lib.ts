@@ -28,6 +28,12 @@ export const USAGE =
   'usage: pnpm m17:calibrate -- --project <md|txt|docx|pdf> --call <md|txt|docx|pdf> ' +
   '[--locale tr|en] [--runs 1-5] [--out <json>] [--max-credits 9] [--rubric <id>]';
 
+/**
+ * The only flags the harness understands. Anything else is refused: a typo such as
+ * `--maxcredits 100` must not silently fall back to the default budget.
+ */
+export const KNOWN_FLAGS = ['project', 'call', 'locale', 'runs', 'out', 'max-credits', 'rubric'] as const;
+
 /** Reads `--key value` pairs. Throws with the usage line on anything malformed. */
 export function parseArgs(argv: string[]): CalibrateArgs {
   // `pnpm m17:calibrate -- --project …` can hand the separator on to the script; it is not a flag.
@@ -37,7 +43,12 @@ export function parseArgs(argv: string[]): CalibrateArgs {
     const key = tokens[i];
     const value = tokens[i + 1];
     if (!key?.startsWith('--') || value === undefined || value.startsWith('--')) throw new Error(USAGE);
-    flags.set(key.slice(2), value);
+    const name = key.slice(2);
+    if (!(KNOWN_FLAGS as readonly string[]).includes(name)) {
+      throw new Error(`unknown flag --${name} (known: ${KNOWN_FLAGS.map((f) => `--${f}`).join(', ')})`);
+    }
+    if (flags.has(name)) throw new Error(`--${name} given twice; pass it once`);
+    flags.set(name, value);
   }
   const project = flags.get('project');
   const call = flags.get('call');
@@ -60,12 +71,36 @@ export function parseArgs(argv: string[]): CalibrateArgs {
   };
 }
 
+/**
+ * Plain decimal digits only. `Number()` would accept `0x3`, `1e1` and `" 3 "`, and a budget of
+ * `1e1` read as 10 is exactly the kind of surprise the guard exists to stop.
+ */
 function integerFlag(flags: Map<string, string>, name: string, fallback: number, min: number, max: number): number {
   const raw = flags.get(name);
   if (raw === undefined) return fallback;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`--${name} must be an integer ${min}-${max} (got "${raw}")`);
+  const n = /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(n) || n < min || n > max) throw new Error(`--${name} must be an integer ${min}-${max} (got "${raw}")`);
   return n;
+}
+
+/**
+ * The run must never touch the shared :5433 database. Checks the port in DATABASE_URL (including
+ * `?port=5433` and `host=…&port=5433` query forms) and PGPORT. An unreadable URL fails closed.
+ */
+export function assertIsolatedDatabase(env: Record<string, string | undefined>): void {
+  const raw = env.DATABASE_URL;
+  if (!raw) throw new Error('DATABASE_URL tanımlı değil; izole veritabanı doğrulanamadı');
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error('DATABASE_URL okunamadı; izole veritabanı doğrulanamadı');
+  }
+  const SHARED = '5433';
+  const ports = [url.port, url.searchParams.get('port'), env.PGPORT].filter((p): p is string => p !== undefined && p !== null);
+  if (ports.includes(SHARED)) {
+    throw new Error('DATABASE_URL paylaşılan :5433 veritabanını gösteriyor; pnpm gate:isolated ile çalıştır');
+  }
 }
 
 /**
@@ -141,9 +176,25 @@ export async function runCalibration(input: LoopInput): Promise<LoopResult> {
       stoppedBy = 'budget';
       break;
     }
-    const outcome = await input.runOnce(run);
+    let outcome: RunOutcome;
+    try {
+      outcome = await input.runOnce(run);
+    } catch (err) {
+      // An unexpected throw must not lose the runs already finished: it becomes a failed run.
+      // Only the error class is kept, because a message can echo request details.
+      outcome = {
+        creditsCharged: 0,
+        record: { run, status: 'failed', analysisId: null, error: `exception: ${err instanceof Error ? err.name : 'unknown'}`, durationMs: 0 },
+      };
+    }
     records.push(outcome.record);
     creditsSpent += outcome.creditsCharged;
+    if (creditsSpent > input.maxCredits) {
+      // The ledger is the truth: if what was actually charged passes the budget, stop here
+      // even when the per-run estimate said the next run would fit.
+      stoppedBy = 'budget';
+      break;
+    }
     if (outcome.record.status === 'failed') {
       // A failed run is charged its price here even though the ledger refunds it: the ceiling is
       // about how many paid model calls were burnt, not what the tenant was left with.

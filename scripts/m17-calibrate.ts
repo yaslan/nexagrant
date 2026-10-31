@@ -4,12 +4,19 @@
  *
  *   pnpm m17:calibrate -- --project <file> --call <file> --locale tr --runs 3 --out <json>
  *
- * Run it on an isolated database (`pnpm gate:isolated pnpm m17:calibrate -- …`), never on the
- * shared :5433 one. The model is the production path: `runEvaluation` → `generateCompletion`
- * in `src/lib/llm.ts`; nothing here calls a provider directly.
+ * Run it only on an isolated database (`pnpm gate:isolated pnpm m17:calibrate -- …`). The guard
+ * refuses the shared :5433 database in any spelling (URL port, `?port=`, PGPORT). The model is the
+ * production path: `runEvaluation` → `generateCompletion` in `src/lib/llm.ts`; nothing here calls
+ * a provider directly. Unknown flags are refused, so a typo cannot fall back to the default budget.
  *
- * The API key is read from the process environment, which `dotenv/config` fills from `.env`
- * (or from `DOTENV_CONFIG_PATH`). The value is never printed or written to the report.
+ * Why `process.env` is read directly here, not through `src/lib/env.ts`: this script is a dev
+ * harness that runs before the app is loaded, and the guard must check the raw DATABASE_URL and
+ * PGPORT that the process will actually connect with. The API key is read from the process
+ * environment, which `dotenv/config` fills from `.env` (or from `DOTENV_CONFIG_PATH`). The value is
+ * never printed or written to the report.
+ *
+ * Output is an internal pre-assessment (iç ön değerlendirme) and a calibration measurement, not an
+ * official score.
  */
 import 'dotenv/config';
 
@@ -17,6 +24,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 
 import {
+  assertIsolatedDatabase,
   parseArgs,
   renderMarkdown,
   requireAnthropicKey,
@@ -28,11 +36,7 @@ import {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   requireAnthropicKey(process.env);
-
-  const dbUrl = process.env.DATABASE_URL ?? '';
-  if (dbUrl.includes(':5433')) {
-    throw new Error('DATABASE_URL points at the shared :5433 database; run this through pnpm gate:isolated');
-  }
+  assertIsolatedDatabase(process.env);
 
   // Imported after dotenv has run: the app reads its config at import time.
   const { prisma } = await import('../src/lib/db');
@@ -77,16 +81,18 @@ async function main(): Promise<void> {
         creditsCharged: 0,
       });
 
-      const created = await createAnalysis(owner, args.rubric);
-      if (!created.ok) return fail(null, created.error);
-      const id = created.analysis.id;
-      const c = await saveDocument(owner, id, 'call', basename(args.call), callDoc);
-      if (!c.ok) return fail(id, c.error);
-      const p = await saveDocument(owner, id, 'project', basename(args.project), projectDoc);
-      if (!p.ok) return fail(id, p.error);
-
+      // Every step after the analysis exists keeps its id in the record, and a throw in any step
+      // becomes a failed run instead of ending the whole report.
+      let id: string | null = null;
       let outcome: Awaited<ReturnType<typeof runEvaluation>>;
       try {
+        const created = await createAnalysis(owner, args.rubric);
+        if (!created.ok) return fail(null, created.error);
+        id = created.analysis.id;
+        const c = await saveDocument(owner, id, 'call', basename(args.call), callDoc);
+        if (!c.ok) return fail(id, c.error);
+        const p = await saveDocument(owner, id, 'project', basename(args.project), projectDoc);
+        if (!p.ok) return fail(id, p.error);
         outcome = await runEvaluation(owner, id, { locale: args.locale });
       } catch (err) {
         // Only the error class is recorded: a provider message could echo request details.
