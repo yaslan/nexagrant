@@ -8,8 +8,9 @@
  * and expiry — exactly the state of a slot nobody uploaded to, then:
  *   • the status is recomputed by the same rule an upload uses (./status.ts), so a
  *     READY analysis whose project file expired is CALL_READY again, not a READY with
- *     nothing to read. ANALYZING is left alone: the F2 run owns it (contract for F2:
- *     read both texts, and treat a NULL one as "expired, ask for a new upload").
+ *     nothing to read. ANALYZING is left alone while both texts are still there (the F2
+ *     run owns it); once a slot is emptied the status is recomputed like any other row's
+ *     (FO-191 B4: the run can no longer finish, and a row left ANALYZING refuses uploads).
  *   • the F2 result and criterion marks are deleted: their quotes are the document's
  *     text, and a mark without the text it was drawn from cannot be re-checked.
  * The analysis row itself stays (the user's list, the rubric choice); the user's own
@@ -114,7 +115,14 @@ interface BatchOutcome {
   analyses: number;
 }
 
-/** One page, one transaction: scan, empty the slots, recompute status, drop the derived rows. */
+/**
+ * One page, one transaction: scan, empty the slots, recompute status, drop the derived rows.
+ *
+ * An ANALYZING row keeps its status only while both texts are still there. A run whose text
+ * the purge just emptied can never finish (its result write needs both), and the purge's own
+ * `updatedAt` bump has already cost it its claim, so its failure handler would leave the row
+ * ANALYZING for good, and an ANALYZING row refuses every upload (FO-191 B4).
+ */
 async function purgeBatch(
   tx: SystemTx,
   now: Date,
@@ -161,7 +169,8 @@ async function purgeBatch(
     await tx.$executeRaw`
       UPDATE "InterregAnalysis"
          SET "status" = ${STATUS_FROM_TEXTS_SQL}
-       WHERE "id" IN (${Prisma.join(ids)}) AND "status" <> 'ANALYZING'`;
+       WHERE "id" IN (${Prisma.join(ids)})
+         AND ("status" <> 'ANALYZING' OR "callText" IS NULL OR "projectText" IS NULL)`;
     await tx.interregCriterionMark.deleteMany({ where: { analysisId: { in: ids } } });
     await tx.interregAnalysisResult.deleteMany({ where: { analysisId: { in: ids } } });
   }

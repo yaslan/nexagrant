@@ -127,7 +127,7 @@ export interface Owner {
 
 export type CreateAnalysisResult =
   | { ok: true; analysis: InterregAnalysisView }
-  | { ok: false; error: 'bad_rubric' | 'rubric_unavailable' };
+  | { ok: false; error: 'bad_rubric' | 'rubric_unavailable' | 'too_many_analyses' };
 
 /**
  * A new, empty analysis against `rubricId`, or against the default rubric when
@@ -144,6 +144,11 @@ export async function createAnalysis(owner: Owner, rubricId?: string): Promise<C
           select: { id: true },
         });
     if (!rubric) return { ok: false, error: rubricId ? 'bad_rubric' : 'rubric_unavailable' } as const;
+    // Counted in the same transaction as the insert. Two creates racing can both pass
+    // (read committed), so the cap can be overshot by the number of parallel requests;
+    // it bounds storage, it is not an exact quota.
+    const held = await tx.interregAnalysis.count({ where: { tenantId: owner.tenantId, userId: owner.userId } });
+    if (held >= INTERREG_UPLOAD_LIMITS.maxAnalysesPerUser) return { ok: false, error: 'too_many_analyses' } as const;
     const row = await tx.interregAnalysis.create({
       data: { tenantId: owner.tenantId, userId: owner.userId, rubricId: rubric.id },
       select: VIEW_SELECT,

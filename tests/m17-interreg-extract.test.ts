@@ -420,7 +420,7 @@ describe('i18n', () => {
   it('takes the limits in the messages from INTERREG_ERROR_ARGS, formatted per locale (crw2 Ö4)', () => {
     const say = (locale: 'tr' | 'en', messages: typeof tr, code: string) =>
       createTranslator({ locale, messages, namespace: 'InterregReview.errors' as never })(code as never, INTERREG_ERROR_ARGS as never);
-    expect(INTERREG_ERROR_ARGS).toEqual({ maxMb: 20, maxChars: 400_000 });
+    expect(INTERREG_ERROR_ARGS).toEqual({ maxMb: 20, maxChars: 400_000, maxAnalyses: 50 });
     expect(say('tr', tr, 'too_large')).toBe('Dosya çok büyük (en fazla 20 MB).');
     expect(say('en', en, 'too_large')).toBe('The file is too large (20 MB at most).');
     expect(say('tr', tr, 'too_long')).toBe('Belge çok uzun (en fazla 400.000 karakter).');
@@ -430,7 +430,8 @@ describe('i18n', () => {
       const errors = (messages as unknown as { InterregReview: { errors: Record<string, string> } }).InterregReview.errors;
       expect(errors.too_large).toContain('{maxMb}');
       expect(errors.too_long).toContain('{maxChars, number}');
-      expect(Object.values(errors).join(' ')).not.toMatch(/\b(20|400[.,]000)\b/);
+      expect(errors.too_many_analyses).toContain('{maxAnalyses}');
+      expect(Object.values(errors).join(' ')).not.toMatch(/\b(20|50|400[.,]000)\b/);
     }
   });
 });

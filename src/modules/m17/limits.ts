@@ -60,6 +60,19 @@ export const INTERREG_UPLOAD_LIMITS = {
   maxDocxHeapMb: 256,
   /** Days the extracted text is kept after the last upload (FO-185 decision 3). */
   textRetentionDays: 30,
+  /**
+   * Analyses one user may hold. Each can carry two documents of `maxChars`
+   * characters; the list shows 50 (`listAnalyses`), so past this a row the user
+   * cannot even see would keep filling the table (FO-191 B3).
+   */
+  maxAnalysesPerUser: 50,
+  /**
+   * Uploads one user may start per minute (per server process, like /api/cagrilar:
+   * src/lib/user-rate-limit.ts). Each upload is a body read plus a PDF or DOCX parse;
+   * the DOCX parses queue behind one another, so a loop of uploads would hold the
+   * next users' reads for as long as it lasts (FO-191 B3).
+   */
+  uploadsPerMinute: 20,
 } as const;
 
 /**
@@ -70,6 +83,7 @@ export const INTERREG_UPLOAD_LIMITS = {
 export const INTERREG_ERROR_ARGS = {
   maxMb: INTERREG_UPLOAD_LIMITS.maxFileBytes / (1024 * 1024),
   maxChars: INTERREG_UPLOAD_LIMITS.maxChars,
+  maxAnalyses: INTERREG_UPLOAD_LIMITS.maxAnalysesPerUser,
 } as const;
 
 /**
@@ -99,6 +113,9 @@ export const INTERREG_API_ERRORS = [
   'bad_rubric',
   'rubric_unavailable',
   'upload_failed',
+  // FO-191
+  'too_many_analyses',
+  'rate_limited',
   // F2 run (FO-188)
   'not_ready',
   'insufficient_credits',

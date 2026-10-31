@@ -60,6 +60,27 @@ export function serializeRubric(r: PromptRubric): string {
  */
 export const CONTEXT_CHAR_BUDGET = 560_000;
 
+/**
+ * The prompt tags the documents are fenced in (src/lib/ai/prompts/m17/*.en|tr.ts).
+ * The call guide sits in the SYSTEM message, between <call_context> tags; the project
+ * file and the grid sit in the user message. Both are strangers' text.
+ */
+const FENCE_TAGS = ['call_context', 'project_context', 'rubric'] as const;
+
+const FENCE_TAG_RE = new RegExp(`<(?=\\s*/?\\s*(?:${FENCE_TAGS.join('|')})(?![\\w-]))`, 'gi');
+
+/**
+ * A document that writes `</call_context>` closes the fence early and what follows it
+ * reads as the prompt's own text — in the system message, for the call guide (FO-191 B1).
+ * The `<` of any such tag (either case, with or without a slash, any spacing) becomes the
+ * full-width `＜`, so no tag the prompt uses can appear inside a fenced document. One
+ * character for one, so lengths, the context budget and `…CharsOmitted` are unchanged;
+ * every other character, including other tags and markup, is untouched.
+ */
+export function neutralizeFenceTags(text: string): string {
+  return text.replace(FENCE_TAG_RE, '\uFF1C');
+}
+
 export interface FittedContext {
   callText: string;
   projectText: string;
@@ -79,8 +100,8 @@ export function fitContext(callText: string, projectText: string, budget = CONTE
   const project = projectText.slice(0, budget);
   const call = callText.slice(0, Math.max(0, budget - project.length));
   return {
-    callText: call,
-    projectText: project,
+    callText: neutralizeFenceTags(call),
+    projectText: neutralizeFenceTags(project),
     callCharsOmitted: callText.length - call.length,
     projectCharsOmitted: projectText.length - project.length,
   };
