@@ -43,6 +43,7 @@
     "beta:esr-preflight": "tsx scripts/esr-calibration.ts --preflight",
     "a11y:check": "tsx scripts/a11y-check.ts",
     "jobs:g0-rescore": "tsx scripts/rescore-g0.ts",
+    "m17:calibrate": "tsx scripts/m17-calibrate.ts",
     "jobs:seat-rescore": "tsx scripts/rescore-seat-candidates.ts",
     "jobs:alerts-sweep": "tsx scripts/run-alerts-sweep.ts",
     "jobs:partner-search": "tsx scripts/run-partner-search.ts",
