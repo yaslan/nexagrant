@@ -152,7 +152,8 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const young = await analysis(b, 'READY', { text, expiresInDays: 5 }, { text, expiresInDays: 6 });
     // E: no documents at all.
     const empty = await analysis(a, 'UPLOADING', null, null, false);
-    // F: ANALYZING with a due call text: text goes, the F2-owned status stays.
+    // F: ANALYZING with a due call text: text goes, and so does ANALYZING (FO-191 B4): the run cannot finish
+    //    without it, and an ANALYZING row refuses the re-upload that would fix it. Project slot not due -> UPLOADING.
     const analyzing = await analysis(a, 'ANALYZING', { text, expiresInDays: -1 }, { text, expiresInDays: 9 }, false);
 
     const result = await purgeExpiredInterregText(NOW);
@@ -185,7 +186,7 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     expect(await derived(young)).toEqual([1, 1]);
 
     expect(await load(empty)).toMatchObject({ status: 'UPLOADING', callText: null, projectText: null });
-    expect(await load(analyzing)).toMatchObject({ status: 'ANALYZING', callText: null });
+    expect(await load(analyzing)).toMatchObject({ status: 'UPLOADING', callText: null, projectText: text });
 
     // Raw proof: no text of this run is left past its expiry, and no row holds text without an expiry.
     const leftover = await admin.$queryRaw<Array<{ n: bigint }>>`

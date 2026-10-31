@@ -13,6 +13,7 @@ import { gateInterreg, refuse } from '@/modules/m17/server/gate';
  *          body (optional JSON): `{ rubricId?: string }` — one of GET /api/interreg-review/rubrics;
  *          omitted = the default rubric (Interreg NEXT BSB 2nd call Regular).
  *          400 bad_form | bad_rubric · 409 rubric_unavailable (no rubric seeded)
+ *          | too_many_analyses (the user holds INTERREG_UPLOAD_LIMITS.maxAnalysesPerUser; delete one)
  *
  * Refusals are `{ error: code }` (src/modules/m17/limits.ts INTERREG_API_ERRORS).
  * Every payload says `assessmentKind: 'internal_pre_assessment'`: what this

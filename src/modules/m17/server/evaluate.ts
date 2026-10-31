@@ -150,6 +150,9 @@ async function claim(owner: Owner, analysisId: string, now: Date): Promise<{ ok:
   const tenantId = requireActionId(owner.tenantId, 'tenantId');
   const userId = requireActionId(owner.userId, 'userId');
   const id = requireActionId(analysisId, 'analysisId');
+  // An Invalid Date would turn `gt: now` into a filter that matches nothing, and every analysis
+  // would answer `not_ready` with no hint why (FO-191 B4).
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error('claim: now must be a valid Date');
   return withTenant(tenantId, async (tx) => {
     const staleBefore = new Date(now.getTime() - STALE_CLAIM_MS);
     const { count } = await tx.interregAnalysis.updateMany({
@@ -159,6 +162,10 @@ async function claim(owner: Owner, analysisId: string, now: Date): Promise<{ ok:
         userId,
         callText: { not: null },
         projectText: { not: null },
+        // A text past its 30 days is no longer ours to read, even before the nightly purge
+        // reaches it (FO-191 B4); the user is asked to upload again (`not_ready`).
+        callTextExpiresAt: { gt: now },
+        projectTextExpiresAt: { gt: now },
         OR: [{ status: { in: ['READY', 'DONE', 'FAILED'] } }, { status: 'ANALYZING', updatedAt: { lt: staleBefore } }],
       },
       data: { status: 'ANALYZING', updatedAt: now },
@@ -339,10 +346,13 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
     // Still this run's: a later claim moved `updatedAt`, so this write matches nothing and the
     // whole transaction (marks and result included) rolls back.
     const done = await tx.interregAnalysis.updateMany({
-      where: { id, tenantId, userId, status: 'ANALYZING', updatedAt: row.claimedAt },
+      // Both texts still present: the purge may have emptied a slot while the model ran, and a
+      // result quoting text that is gone would outlive it (the slot's expiry is NULL then, so no
+      // later purge would match it) — FO-191 B4. The transaction rolls back and the run is FAILED.
+      where: { id, tenantId, userId, status: 'ANALYZING', updatedAt: row.claimedAt, callText: { not: null }, projectText: { not: null } },
       data: { status: 'DONE' },
     });
-    if (done.count !== 1) throw new Error('analysis claim was taken over before the result was written');
+    if (done.count !== 1) throw new Error('analysis claim was taken over, or a document expired, before the result was written');
 
     // One ledger row for the run, written last in the same transaction.
     return chargeAiAction({ tenantId, module: EVALUATE_MODULE, purpose: EVALUATE_PURPOSE, refId: id }, tx);
