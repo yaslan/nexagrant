@@ -27,6 +27,7 @@
  * `warn` (never picked up by this job) so the console still shows it.
  */
 
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
 import { env } from '@/lib/env';
@@ -36,6 +37,7 @@ import { escapeHtml } from '@/lib/feedback/digest';
 import {
   ALERT_DIGESTED_AT_KEY,
   ALERT_DIGESTED_COUNT_KEY,
+  ALERT_REPEAT_COUNT_KEY,
   recordAlert,
   repeatCountOf,
   lastSeenAtOf,
@@ -47,8 +49,13 @@ export const OPS_DIGEST_SOURCE = 'alerts-ops-digest';
 /** A digested row comes back when its repeat counter grew by this much since the stamp. */
 export const REPEAT_DIGEST_STEP = 10;
 
-/** Open `error` rows examined per run. Rows past the cap wait for the next run. */
-const CANDIDATE_LIMIT = 1000;
+/**
+ * Rows that still owe a mail, taken per run (newest first). The limit applies
+ * AFTER the pending test (see `findPending`), so rows past it are all unmailed
+ * and unstamped: the next run, once this run's batch is stamped, reaches them.
+ * Hitting the limit is logged.
+ */
+export const CANDIDATE_LIMIT = 1000;
 /** Groups listed in the mail body; the rest are counted, not listed. */
 const MAX_LISTED_GROUPS = 25;
 
@@ -60,16 +67,74 @@ export interface DigestAlertRow {
   createdAt: Date;
 }
 
-/** The slice of the Prisma client this module touches; tests pass a fake. */
+/**
+ * The two database operations this module needs; tests pass a fake, production
+ * uses {@link prismaDigestDb}. They are named for the guarantee, not the query:
+ * the real implementation is SQL because both guarantees (pending-only
+ * selection, atomic stamp) need the database to evaluate the JSON, which
+ * Prisma's JSON filters cannot do (no field-to-field comparison).
+ */
 export interface DigestDbClient {
-  systemAlert: {
-    findMany: (args: {
-      where: { level: string; resolvedAt: null; source: { not: string } };
-      orderBy: { createdAt: 'desc' };
-      take: number;
-      select: { id: true; source: true; level: true; meta: true; createdAt: true };
-    }) => Promise<DigestAlertRow[]>;
-    update: (args: { where: { id: string }; data: { meta: Record<string, unknown> } }) => Promise<unknown>;
+  /**
+   * Open `error` rows (not from `excludeSource`) that {@link needsDigest} would
+   * accept, newest first, at most `limit`. The limit must apply after that test.
+   */
+  findPending: (args: { limit: number; excludeSource: string }) => Promise<DigestAlertRow[]>;
+  /**
+   * Atomically merge the digest stamp into the row's meta. Must touch no other
+   * key: a concurrent `recordAlert` counter bump has to survive.
+   */
+  stamp: (args: { id: string; at: Date; count: number }) => Promise<void>;
+}
+
+/**
+ * The real implementation. `sourcePrefix` narrows selection to sources that
+ * start with it — for the live test on a shared database; production passes none.
+ *
+ * The WHERE mirrors {@link needsDigest} exactly (same number coercions; the
+ * nested CASEs matter — a cast must not run on a non-number), and
+ * `runAlertsOpsDigest` still applies `needsDigest` to what comes back.
+ */
+export function prismaDigestDb(client: Pick<PrismaClient, '$queryRaw' | '$executeRaw'>, scope: { sourcePrefix?: string } = {}): DigestDbClient {
+  const prefix = scope.sourcePrefix ?? null;
+  return {
+    findPending: ({ limit, excludeSource }) =>
+      client.$queryRaw<DigestAlertRow[]>(Prisma.sql`
+        SELECT s."id", s."source", s."level", s."meta", s."createdAt"
+        FROM "SystemAlert" s
+        WHERE s."level" = 'error'
+          AND s."resolvedAt" IS NULL
+          AND s."source" <> ${excludeSource}
+          AND (${prefix}::text IS NULL OR starts_with(s."source", ${prefix}::text))
+          AND (
+            jsonb_typeof(s."meta"->${ALERT_DIGESTED_AT_KEY}::text) IS DISTINCT FROM 'string'
+            OR (
+              CASE WHEN jsonb_typeof(s."meta"->${ALERT_REPEAT_COUNT_KEY}::text) = 'number'
+                   THEN CASE WHEN (s."meta"->>${ALERT_REPEAT_COUNT_KEY}::text)::numeric >= 1
+                             THEN floor((s."meta"->>${ALERT_REPEAT_COUNT_KEY}::text)::numeric) ELSE 1 END
+                   ELSE 1 END
+              >=
+              CASE WHEN jsonb_typeof(s."meta"->${ALERT_DIGESTED_COUNT_KEY}::text) = 'number'
+                   THEN CASE WHEN (s."meta"->>${ALERT_DIGESTED_COUNT_KEY}::text)::numeric >= 1
+                             THEN floor((s."meta"->>${ALERT_DIGESTED_COUNT_KEY}::text)::numeric) ELSE 1 END
+                   ELSE 1 END
+              + ${REPEAT_DIGEST_STEP}::int
+            )
+          )
+        ORDER BY s."createdAt" DESC, s."id"
+        LIMIT ${limit}::int
+      `),
+    stamp: async ({ id, at, count }) => {
+      await client.$executeRaw(Prisma.sql`
+        UPDATE "SystemAlert"
+        SET "meta" = (CASE WHEN jsonb_typeof("meta") = 'object' THEN "meta" ELSE '{}'::jsonb END)
+          || jsonb_build_object(
+               ${ALERT_DIGESTED_AT_KEY}::text, ${at.toISOString()}::text,
+               ${ALERT_DIGESTED_COUNT_KEY}::text, ${count}::int
+             )
+        WHERE "id" = ${id}
+      `);
+    },
   };
 }
 
@@ -208,9 +273,11 @@ export interface OpsDigestOptions {
 }
 
 let warnedNoRecipient = false;
+let warnedNoMailer = false;
 /** Test hook: the "warn once" memory is module state. */
 export function resetOpsDigestWarnings(): void {
   warnedNoRecipient = false;
+  warnedNoMailer = false;
 }
 
 export async function runAlertsOpsDigest(options: OpsDigestOptions = {}): Promise<OpsDigestResult> {
@@ -223,18 +290,19 @@ export async function runAlertsOpsDigest(options: OpsDigestOptions = {}): Promis
     return { outcome: 'no_recipient', alerts: 0, stampFailures: 0 };
   }
 
-  const db = options.db ?? (prisma as unknown as DigestDbClient);
+  const db = options.db ?? prismaDigestDb(prisma);
   const now = options.now ?? new Date();
 
   // SystemAlert has no tenant column and no row security (system-alert.ts), so
   // the plain client is the right one here, as it is for `recordAlert`.
-  const open = await db.systemAlert.findMany({
-    where: { level: 'error', resolvedAt: null, source: { not: OPS_DIGEST_SOURCE } },
-    orderBy: { createdAt: 'desc' },
-    take: CANDIDATE_LIMIT,
-    select: { id: true, source: true, level: true, meta: true, createdAt: true },
-  });
-  const fresh = open.filter(needsDigest);
+  const pending = await db.findPending({ limit: CANDIDATE_LIMIT, excludeSource: OPS_DIGEST_SOURCE });
+  if (pending.length >= CANDIDATE_LIMIT) {
+    logger.warn('[alerts-ops-digest] pending-row limit reached; the rest are mailed by the following runs', {
+      limit: CANDIDATE_LIMIT,
+    });
+  }
+  // The database already applied this; it stays as the contract for any other client.
+  const fresh = pending.filter(needsDigest);
   if (fresh.length === 0) return { outcome: 'nothing_new', alerts: 0, stampFailures: 0 };
 
   const mailer = 'mailer' in options ? options.mailer : smtpMailer();
@@ -242,7 +310,10 @@ export async function runAlertsOpsDigest(options: OpsDigestOptions = {}): Promis
     // Nothing is stamped: the rows wait for a provider. `reportMailNotConfigured`
     // is deliberately not used — it writes an `error` row that this job would
     // then try to mail.
-    logger.warn('[alerts-ops-digest] SMTP_HOST is unset: error alerts are not mailed', { pending: fresh.length });
+    if (!warnedNoMailer) {
+      warnedNoMailer = true;
+      logger.warn('[alerts-ops-digest] SMTP_HOST is unset: error alerts are not mailed', { pending: fresh.length });
+    }
     return { outcome: 'no_mail_provider', alerts: 0, stampFailures: 0 };
   }
 
@@ -274,16 +345,9 @@ export async function runAlertsOpsDigest(options: OpsDigestOptions = {}): Promis
   let stampFailures = 0;
   for (const row of fresh) {
     try {
-      await db.systemAlert.update({
-        where: { id: row.id },
-        data: {
-          meta: {
-            ...asObject(row.meta),
-            [ALERT_DIGESTED_AT_KEY]: now.toISOString(),
-            [ALERT_DIGESTED_COUNT_KEY]: repeatCountOf(row.meta),
-          },
-        },
-      });
+      // The count is the one the mail carried (the snapshot), not whatever the
+      // row says now: a repeat that landed after the select was not mailed.
+      await db.stamp({ id: row.id, at: now, count: repeatCountOf(row.meta) });
     } catch {
       stampFailures += 1;
     }
