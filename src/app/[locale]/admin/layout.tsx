@@ -1,5 +1,5 @@
 import React from 'react';
-import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import { auth } from '@/lib/auth';
 import { isPlatformAdminSession } from '@/lib/tenant';
 import { getTranslations } from 'next-intl/server';
@@ -47,7 +47,6 @@ export default async function AdminLayout({
 
   const user = session?.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });
-  const tCommon = await getTranslations({ locale, namespace: 'Common' });
 
   // Same rule as the workspace frame: never invent who is signed in. The console used to
   // fall back onto a fixed title and onto a real person's e-mail address, so an admin
@@ -76,7 +75,7 @@ export default async function AdminLayout({
       <header className="hidden md:flex bg-slate-900 text-white border-b border-slate-800 px-6 py-3.5 items-center justify-between sticky top-0 z-40 shadow-md">
         <div className="flex items-center space-x-4">
           <Link href={`/${locale}`} title={locale === 'tr' ? 'Ana Sayfa' : 'Home'} className="flex items-center space-x-2.5 hover:opacity-90 transition">
-            <Image src="/logo.png" alt={tCommon('logoAlt', { brand: PRODUCT_NAME })} width={40} height={40} className="object-contain brightness-0 invert" />
+            <BrandLogo height={36} tone="dark" />
             <div>
               <span className="font-bold text-base tracking-tight text-white block leading-none">
                 Admin Console

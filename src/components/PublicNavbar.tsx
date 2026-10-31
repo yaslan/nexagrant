@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
-import { useTranslations } from 'next-intl';
 import { getPublicRoute, switchLocalePath } from '@/lib/routes';
-import { PRODUCT_NAME } from '@/lib/brand';
 
 interface PublicNavbarProps {
   locale: string;
@@ -26,7 +24,6 @@ export default function PublicNavbar({
   roleName,
 }: PublicNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const tCommon = useTranslations('Common');
   const isTr = locale === 'tr';
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -52,13 +49,7 @@ export default function PublicNavbar({
           className="flex items-center gap-3 group cursor-pointer"
           title={isTr ? "Ana Sayfa" : "Home"}
         >
-          <Image
-            src="/logo.png"
-            alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
-            width={56}
-            height={56}
-            className="object-contain group-hover:scale-105 transition dark:brightness-0 dark:invert"
-          />
+          <BrandLogo height={44} className="group-hover:scale-105 transition" />
         </Link>
 
         {/* Desktop Nav Links */}

@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import Link from 'next/link';
 import SidebarNav from './SidebarNav';
 import UserMenu, { type UserMenuWorkspace } from './UserMenu';
 import ThemeToggle from './ThemeToggle';
 import { Menu, X } from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { PRODUCT_NAME } from '@/lib/brand';
 import CoBrandBadge from './CoBrandBadge';
 import type { ShellCoBrand } from '@/lib/agency/cobrand-store';
 
@@ -40,7 +38,6 @@ export default function MobileAppHeader({
   cobrand = null,
 }: MobileAppHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const tCommon = useTranslations('Common');
 
   return (
     <>
@@ -56,13 +53,7 @@ export default function MobileAppHeader({
           </button>
 
           <Link href={`/${locale}`} className="flex items-center">
-            <Image
-              src="/logo.png"
-              alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
-              width={32}
-              height={32}
-              className="object-contain dark:brightness-0 dark:invert"
-            />
+            <BrandLogo height={32} />
           </Link>
           {cobrand ? <CoBrandBadge cobrand={cobrand} compact /> : null}
         </div>
@@ -96,13 +87,7 @@ export default function MobileAppHeader({
             {/* Drawer Header */}
             <div className="p-4 border-b border-border flex items-center justify-between">
               <Link href={`/${locale}`} onClick={() => setMobileOpen(false)}>
-                <Image
-                  src="/logo.png"
-                  alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
-                  width={40}
-                  height={40}
-                  className="object-contain dark:brightness-0 dark:invert"
-                />
+                <BrandLogo height={36} />
               </Link>
               <button
                 onClick={() => setMobileOpen(false)}
