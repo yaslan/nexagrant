@@ -150,6 +150,9 @@ async function claim(owner: Owner, analysisId: string, now: Date): Promise<{ ok:
   const tenantId = requireActionId(owner.tenantId, 'tenantId');
   const userId = requireActionId(owner.userId, 'userId');
   const id = requireActionId(analysisId, 'analysisId');
+  // An Invalid Date would turn `gt: now` into a filter that matches nothing, and every analysis
+  // would answer `not_ready` with no hint why (FO-191 B4).
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error('claim: now must be a valid Date');
   return withTenant(tenantId, async (tx) => {
     const staleBefore = new Date(now.getTime() - STALE_CLAIM_MS);
     const { count } = await tx.interregAnalysis.updateMany({
