@@ -26,7 +26,16 @@ import { createTranslator } from 'next-intl';
 import { renderPrompt, type PromptLocale } from '@/lib/ai/prompts';
 import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
-import { chargeAiAction, generateCompletion, getCreditBalance, hashMessages, resolveCredits, type LlmMessage } from '@/lib/llm';
+import {
+  creditBalanceIn,
+  generateCompletion,
+  hashMessages,
+  lockTenantCredits,
+  releaseAiReservation,
+  reserveAiAction,
+  resolveCredits,
+  type LlmMessage,
+} from '@/lib/llm';
 import { requireActionId } from '@/lib/required-id';
 
 import { knockoutFlags, scoreMarks } from '../rubric';
@@ -41,7 +50,7 @@ import enMessages from '../../../../messages/en.json';
 const MESSAGES = { tr: trMessages, en: enMessages };
 
 export const EVALUATE_MODULE = 'M17';
-/** The price of a delivered run (`AI_ACTION_CREDITS`); booked by `chargeAiAction`, never by a model call. */
+/** The price of a delivered run (`AI_ACTION_CREDITS`); reserved before the first model call, released if no result is written (FO-274). */
 export const EVALUATE_PURPOSE = 'evaluate';
 export const EVALUATE_ATTEMPT_PURPOSE = 'evaluate-attempt';
 export const EVALUATE_RETRY_PURPOSE = 'evaluate-retry';
@@ -154,7 +163,20 @@ async function claim(owner: Owner, analysisId: string, now: Date): Promise<{ ok:
   // would answer `not_ready` with no hint why (FO-191 B4).
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error('claim: now must be a valid Date');
   return withTenant(tenantId, async (tx) => {
+    // The balance check, the claim and the reservation are one step per tenant (FO-274): the lock
+    // keeps a second run of this tenant from reading the same credits before this one debits them.
+    await lockTenantCredits(tx, tenantId);
     const staleBefore = new Date(now.getTime() - STALE_CLAIM_MS);
+    // A run that died still holds its reservation; release it before the balance is read.
+    const dead = await tx.interregAnalysis.findFirst({
+      where: { id, tenantId, userId, status: 'ANALYZING', updatedAt: { lt: staleBefore } },
+      select: { updatedAt: true },
+    });
+    if (dead) await releaseAiReservation(tx, { tenantId, module: EVALUATE_MODULE, refId: runRef(id, dead.updatedAt) });
+    // Refused before the claim, while nothing has changed: a run the tenant cannot pay for.
+    if ((await creditBalanceIn(tx, tenantId)) < resolveCredits(EVALUATE_MODULE, EVALUATE_PURPOSE).credits) {
+      return { ok: false, error: 'insufficient_credits' } as const;
+    }
     const { count } = await tx.interregAnalysis.updateMany({
       where: {
         id,
@@ -176,21 +198,39 @@ async function claim(owner: Owner, analysisId: string, now: Date): Promise<{ ok:
     });
     if (!row) return { ok: false, error: 'not_found' } as const;
     if (count === 0) return { ok: false, error: row.status === 'ANALYZING' ? 'analysis_busy' : 'not_ready' } as const;
+    const reserved = await reserveAiAction(tx, {
+      tenantId,
+      module: EVALUATE_MODULE,
+      purpose: EVALUATE_PURPOSE,
+      refId: runRef(id, now),
+    });
+    // The balance was read under the same lock a moment ago; a refusal here is a broken invariant.
+    if (!reserved) throw new Error('credit reservation refused after the balance check');
     return { ok: true, row: { rubricId: row.rubricId, callText: row.callText ?? '', projectText: row.projectText ?? '', claimedAt: now } } as const;
   });
 }
 
-/** ANALYZING → FAILED, only while this run still holds the claim. */
+/** The ledger reference of one run: the analysis and its claim instant, so each run's reservation is its own. */
+function runRef(analysisId: string, claimedAt: Date): string {
+  return `${analysisId}:${claimedAt.getTime()}`;
+}
+
+/**
+ * ANALYZING → FAILED, only while this run still holds the claim. The run's reservation is released
+ * either way: a run that wrote no result must not keep the credits it reserved (FO-274).
+ */
 async function markFailed(owner: Owner, analysisId: string, claimedAt: Date): Promise<void> {
   const tenantId = requireActionId(owner.tenantId, 'tenantId');
   const userId = requireActionId(owner.userId, 'userId');
   const id = requireActionId(analysisId, 'analysisId');
-  await withTenant(tenantId, (tx) =>
-    tx.interregAnalysis.updateMany({
+  await withTenant(tenantId, async (tx) => {
+    await lockTenantCredits(tx, tenantId);
+    await tx.interregAnalysis.updateMany({
       where: { id, tenantId, userId, status: 'ANALYZING', updatedAt: claimedAt },
       data: { status: 'FAILED' },
-    }),
-  );
+    });
+    await releaseAiReservation(tx, { tenantId, module: EVALUATE_MODULE, refId: runRef(id, claimedAt) });
+  });
 }
 
 export interface EvaluateOptions {
@@ -202,10 +242,7 @@ export async function runEvaluation(owner: Owner, analysisId: string, opts: Eval
   const id = requireActionId(analysisId, 'analysisId');
   const now = opts.now ?? new Date();
 
-  // Refused before the claim, while nothing has changed: a run the tenant cannot pay for.
-  const { credits: price } = resolveCredits(EVALUATE_MODULE, EVALUATE_PURPOSE);
-  if ((await getCreditBalance(owner.tenantId)) < price) return { ok: false, error: 'insufficient_credits' };
-
+  // Claim, balance check and reservation happen in one locked transaction (see claim).
   const claimed = await claim(owner, id, now);
   if (!claimed.ok) return claimed;
 
@@ -263,6 +300,9 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
     userId,
     module: EVALUATE_MODULE,
     deadlineAt: row.claimedAt.getTime() + MAX_RUN_MS - RUN_DEADLINE_MARGIN_MS,
+    // The price was reserved in the claim; the balance pre-check of generateCompletion would
+    // refuse the run once the reservation has taken the balance to 0 (FO-274).
+    creditsReserved: true,
   };
 
   // Both calls are priced 0; the run's price is booked once, after the result is saved.
@@ -307,9 +347,10 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
   const promptHash = hashMessages(messages);
   const criterionIds = new Map(rubric.criteria.map((c) => [c.criterionKey, c.id]));
 
-  // The price is booked in the same transaction as the result: a ledger write that fails
-  // rolls the result back, so the tenant is never charged for an analysis that is not DONE.
-  const credits = await withTenant(tenantId, async (tx) => {
+  // The price was reserved before the first model call (claim). The result and its status change
+  // are one transaction; if they fail, the run's reservation is released by markFailed.
+  const { credits } = resolveCredits(EVALUATE_MODULE, EVALUATE_PURPOSE);
+  await withTenant(tenantId, async (tx) => {
     await tx.interregCriterionMark.deleteMany({ where: { analysisId: id, tenantId } });
     await tx.interregAnalysisResult.deleteMany({ where: { analysisId: id, tenantId } });
     await tx.interregAnalysisResult.create({
@@ -353,9 +394,6 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
       data: { status: 'DONE' },
     });
     if (done.count !== 1) throw new Error('analysis claim was taken over, or a document expired, before the result was written');
-
-    // One ledger row for the run, written last in the same transaction.
-    return chargeAiAction({ tenantId, module: EVALUATE_MODULE, purpose: EVALUATE_PURPOSE, refId: id }, tx);
   });
 
   return {

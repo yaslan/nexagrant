@@ -204,6 +204,12 @@ export type LlmGenerateOptions = {
   maxTokens?: number;
   /** Epoch ms after which the provider request is abandoned and not retried. Unset: no limit. */
   deadlineAt?: number;
+  /**
+   * The caller reserved this run's price before the first call (`reserveAiAction`, FO-274).
+   * The pre-call balance check is skipped: the reservation has already taken the balance down,
+   * so a balance of 0 here is the reserved state, not "out of credits".
+   */
+  creditsReserved?: boolean;
 } & (
   | { prompt: string; system?: string; messages?: never }
   | { messages: LlmMessage[]; prompt?: never; system?: never }
@@ -475,6 +481,66 @@ export async function chargeAiAction(
 }
 
 /**
+ * The credit lock of one tenant (FO-274). A run checks the balance and reserves its price in one
+ * step; two runs of the same tenant must not interleave that step, or both pass the check on the
+ * same credits. Transaction-level: released at commit or rollback.
+ */
+export async function lockTenantCredits(tx: TenantTx, tenantId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId}, 0))`;
+}
+
+/**
+ * The balance as the caller's transaction sees it, including reservations it has already
+ * written. Use this inside a locked transaction; {@link getCreditBalance} opens its own.
+ */
+export async function creditBalanceIn(tx: TenantTx, tenantId: string): Promise<number> {
+  const result = await tx.creditLedger.aggregate({ where: { tenantId }, _sum: { delta: true } });
+  return result._sum.delta || 0;
+}
+
+/**
+ * Reserves one AI action's price before its model calls (FO-274): one `CreditLedger` debit,
+ * the same reason and price as {@link chargeAiAction}. Returns `false`, writing nothing, when the
+ * balance does not cover it. Call with the tenant lock held ({@link lockTenantCredits}).
+ */
+export async function reserveAiAction(
+  tx: TenantTx,
+  params: { tenantId: string; module: string; purpose: string; refId: string },
+): Promise<boolean> {
+  const { credits } = resolveCredits(params.module, params.purpose);
+  if (credits <= 0) return true;
+  if ((await creditBalanceIn(tx, params.tenantId)) < credits) return false;
+  await tx.creditLedger.create({
+    data: { tenantId: params.tenantId, delta: -credits, reason: `usage:${params.module}`, refId: params.refId },
+  });
+  return true;
+}
+
+/**
+ * Gives a reservation back when the run did not deliver its result (FO-274): one `refund` row
+ * that offsets the debit with the same `refId`. Idempotent; writes nothing when no debit exists
+ * for `refId` or it was already refunded. Call with the tenant lock held.
+ */
+export async function releaseAiReservation(
+  tx: TenantTx,
+  params: { tenantId: string; module: string; refId: string },
+): Promise<void> {
+  const debit = await tx.creditLedger.findFirst({
+    where: { tenantId: params.tenantId, refId: params.refId, reason: `usage:${params.module}`, delta: { lt: 0 } },
+    select: { delta: true },
+  });
+  if (!debit) return;
+  const refunded = await tx.creditLedger.findFirst({
+    where: { tenantId: params.tenantId, refId: params.refId, reason: `refund:${params.module}` },
+    select: { id: true },
+  });
+  if (refunded) return;
+  await tx.creditLedger.create({
+    data: { tenantId: params.tenantId, delta: -debit.delta, reason: `refund:${params.module}`, refId: params.refId },
+  });
+}
+
+/**
  * `promptHash` for an `AiUsageLog` row: sha256, full 64 hex digits, over every
  * message including the system prompt.
  *
@@ -537,9 +603,11 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
  * was spent (TASK-MTVBM0C2QWPCL).
  */
 export async function generateCompletion(options: LlmGenerateOptions): Promise<LlmCompletion> {
-  const balance = await getCreditBalance(options.tenantId);
-  if (balance <= 0) {
-    throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
+  if (!options.creditsReserved) {
+    const balance = await getCreditBalance(options.tenantId);
+    if (balance <= 0) {
+      throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
+    }
   }
 
   const provider = options.provider || DEFAULT_PROVIDER;
