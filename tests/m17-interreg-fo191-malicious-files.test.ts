@@ -8,7 +8,6 @@
  * disk, huge XML), the hostile flat shapes, and a prompt-injection document that is a perfectly
  * legal file (it must be STORED as text — the defence is in the prompt, not in the parser).
  */
-import { appendFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,9 +53,7 @@ async function upload(fileName: string, content: Buffer) {
   const res = await POST(req, { params: Promise.resolve({ id: 'a1' }) });
   const ms = Math.round(performance.now() - started);
   const json = (await res.json()) as { error?: string };
-  const out = { status: res.status, error: json.error, ms, bytes: content.length };
-  if (process.env.FO191_TRACE) appendFileSync(process.env.FO191_TRACE, `${fileName} ${JSON.stringify(out)}\n`);
-  return out;
+  return { status: res.status, error: json.error, ms, bytes: content.length };
 }
 
 beforeEach(() => saveDocument.mockClear());
