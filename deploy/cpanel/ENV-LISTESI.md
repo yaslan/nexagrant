@@ -36,7 +36,7 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `SMTP_SECURE` | ✓ | `true` | |
 | `SMTP_USER` | ✓ | `info@nexagrant.com` | **PATRON KARARI S-1:** `info@` mi, ayrı `bildirim@` mi (`docs/SMTP-SUNUCU.md` §8 madde 4). |
 | `SMTP_PASS` | ✓ | `<kutunun şifresi>` | cPanel → Email Accounts'taki kutunun şifresi. |
-| `SMTP_FROM` | ✓ | `FonBridge <info@nexagrant.com>` | |
+| `SMTP_FROM` | ✓ | `NexaGrant <info@nexagrant.com>` | |
 | `ANTHROPIC_API_KEY` | ✓ | `sk-ant-<...>` | Yapay zekâ özellikleri. |
 | `OPENAI_API_KEY` | ✓ | `sk-<...>` | Embedding (`text-embedding-3-large`). **Sohbette açığa çıkan anahtarı kullanmayın.** Yenisini üretin, eskisini iptal edin, OpenAI panelinde aylık harcama limiti koyun (RELEASE_CHECKLIST madde 7). |
 
