@@ -425,7 +425,7 @@ async function main(): Promise<void> {
         text: email.text,
         attachments: [
           {
-            filename: 'fonbridge-beta-checkins.ics',
+            filename: 'nexagrant-beta-checkins.ics',
             content: Buffer.from(
               buildCheckinIcs(schedule, {
                 organizerEmail: BETA_SUPPORT_EMAIL,

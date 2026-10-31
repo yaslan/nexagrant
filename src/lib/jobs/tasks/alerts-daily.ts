@@ -10,6 +10,7 @@ import { AlertsDailyOutputSchema, type AlertsDailyOutput } from '../events';
 import { parseSavedSearchFilters } from '@/lib/saved-search-filters';
 import { recordNotification, savedSearchDedupeKey } from '@/lib/notifications/store';
 import { escapeHtml } from '@/lib/feedback/digest';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 /**
  * Why a search's alert did not go out, when the reason is the mail provider
@@ -122,11 +123,11 @@ export function renderSavedSearchAlert(params: {
   return {
     subject: `New Call Opportunities: ${subjectName} (${params.matchCount} new)`,
     html: `
-            <h2>FonBridge Saved Search Alert</h2>
+            <h2>${PRODUCT_NAME} Saved Search Alert</h2>
             <p>Hi there,</p>
             <p>We checked for new opportunities matching your saved search <strong>${escapeHtml(params.name)}</strong>.</p>
             <p>Found <strong>${params.matchCount} new opportunities</strong>. <a href="${href}">View them now</a></p>
-            <p>Happy hunting!<br/>FonBridge Team</p>
+            <p>Happy hunting!<br/>${PRODUCT_NAME} Team</p>
           `,
   };
 }

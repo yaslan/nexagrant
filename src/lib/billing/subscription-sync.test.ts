@@ -195,21 +195,21 @@ describe('logInvoicePayment', () => {
     }
 
     it('writes the Turkish sentence for a Turkish tenant', async () => {
-      expect(await issuedLineName('tr')).toBe('FonBridge abonelik dönemi');
+      expect(await issuedLineName('tr')).toBe(`${PRODUCT_NAME} abonelik dönemi`);
     });
 
     it('writes the English sentence for an English tenant', async () => {
-      expect(await issuedLineName('en')).toBe('FonBridge subscription period');
+      expect(await issuedLineName('en')).toBe(`${PRODUCT_NAME} subscription period`);
     });
 
     it('falls to Turkish — the column default — for a locale it does not know', async () => {
       // `Tenant.locale` is a free-text column. An unrecognised value must not
       // throw on an invoice the customer has already paid for.
-      expect(await issuedLineName('de')).toBe('FonBridge abonelik dönemi');
+      expect(await issuedLineName('de')).toBe(`${PRODUCT_NAME} abonelik dönemi`);
     });
 
     it('falls to Turkish when the tenant row cannot be read', async () => {
-      expect(await issuedLineName(undefined)).toBe('FonBridge abonelik dönemi');
+      expect(await issuedLineName(undefined)).toBe(`${PRODUCT_NAME} abonelik dönemi`);
     });
 
     it('carries the product name from PRODUCT_NAME, never as a catalogue literal', () => {

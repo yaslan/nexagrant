@@ -1,10 +1,11 @@
 import type { MetadataRoute } from 'next';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'FonBridge',
-    short_name: 'FonBridge',
-    description: 'FonBridge — Fon Yönetimi Platformu',
+    name: PRODUCT_NAME,
+    short_name: PRODUCT_NAME,
+    description: `${PRODUCT_NAME} — Fon Yönetimi Platformu`,
     start_url: '/tr',
     scope: '/',
     display: 'standalone',

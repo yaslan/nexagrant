@@ -7,6 +7,7 @@
  */
 
 import { PRIORITY_SLA_HOURS, type FeedbackPriorityValue } from './triage';
+import { PRODUCT_NAME } from '@/lib/brand';
 
 export interface DigestRow {
   id: string;
@@ -114,13 +115,13 @@ function rowsTable(rows: DigestRow[], emptyText: string): string {
 export function renderDigestSubject(summary: DigestSummary): string {
   const urgent = summary.byPriority.P0 + summary.byPriority.P1;
   const urgentPart = urgent > 0 ? `, ${urgent} urgent` : '';
-  return `FonBridge beta feedback — ${summary.newCount} new${urgentPart} (week of ${formatDate(summary.windowStart)})`;
+  return `${PRODUCT_NAME} beta feedback — ${summary.newCount} new${urgentPart} (week of ${formatDate(summary.windowStart)})`;
 }
 
 export function renderDigestHtml(summary: DigestSummary, appUrl: string): string {
   const boardUrl = `${appUrl.replace(/\/$/, '')}/tr/admin/feedback`;
   return `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#0f172a;max-width:720px">
-  <h2 style="margin:0 0 4px">FonBridge beta feedback — weekly digest</h2>
+  <h2 style="margin:0 0 4px">${PRODUCT_NAME} beta feedback — weekly digest</h2>
   <p style="margin:0 0 16px;color:#64748b;font-size:13px">
     ${formatDate(summary.windowStart)} → ${formatDate(summary.windowEnd)}
   </p>
