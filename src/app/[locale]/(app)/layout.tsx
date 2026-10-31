@@ -1,5 +1,5 @@
 import React from 'react';
-import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import Link from 'next/link';
 import SidebarNav from '@/components/SidebarNav';
 import UserMenu from '@/components/UserMenu';
@@ -8,7 +8,6 @@ import { LocaleUpdater } from '@/components/LocaleUpdater';
 import { isPlatformAdminDemoEmail } from '@/lib/demo-login';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { PRODUCT_NAME } from '@/lib/brand';
 import { displayUserName } from '@/lib/user-display';
 import { listSessionWorkspaces } from '@/lib/workspaces';
 import { tenantScopeOf } from '@/lib/tenant';
@@ -63,7 +62,6 @@ export default async function AppLayout({
 
   const user = session.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });
-  const tCommon = await getTranslations({ locale, namespace: 'Common' });
 
   // Never invent an identity. The name falls back to the e-mail local part and then to a
   // translated "unnamed user" label; the e-mail is shown only if the session carries one.
@@ -139,13 +137,7 @@ export default async function AppLayout({
           title={locale === 'tr' ? 'Ana Sayfa' : 'Home'}
           className="p-4 border-b border-border flex items-center justify-center hover:bg-surface-hover transition-colors group cursor-pointer"
         >
-          <Image
-            src="/logo.png"
-            alt={tCommon('logoAlt', { brand: PRODUCT_NAME })}
-            width={72}
-            height={72}
-            className="object-contain group-hover:scale-105 transition shrink-0 dark:brightness-0 dark:invert"
-          />
+          <BrandLogo height={48} className="group-hover:scale-105 transition shrink-0" />
         </Link>
 
         <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} canManageUsers={canManageUsers} />
