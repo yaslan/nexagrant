@@ -346,7 +346,7 @@ Kanıt (FO-165, izole pgvector:pg16 konteyner, `pnpm db:setup` tohumlu): yedek 8
 
 ### 5.2 Canlıdan önce kapatılması gerekenler
 
-- [ ] **EKSİK — alarm e-postası:** `error` seviyeli yeni (ya da tekrar sayacı eşiği aşan) `SystemAlert` için günlük/saatlik özet e-postası (mevcut `smtpMailer` ile, yeni bir iş `alerts-ops-digest`). Alıcı adresi **PATRON** (öneri: `info@fonbridge.com` ya da ayrı `ops@`). Kişisel veri taşımaz (alarm satırı zaten taşımıyor).
+- [ ] **KOD HAZIR, alıcı PATRON — alarm e-postası (FO-246):** saatlik (:20 UTC) graphile işi `alerts-ops-digest` (`src/lib/observability/alerts-ops-digest.ts`), yeni ya da sayacı 10 artan `error` `SystemAlert`'leri tek özet e-postada `smtpMailer` ile gönderir; satır `meta`'sına damga yazar (tekrar göndermez), kaynak/seviye/sayı/ilk-son görülme taşır, `message`/`meta` taşımaz. **Kapanması için:** PATRON adresi verir (öneri: `info@nexagrant.com` ya da ayrı `ops@`) → sunucu `.env`'ine `ALERTS_OPS_EMAIL=<adres>` (+ `SMTP_HOST`); boşsa iş atlar ve worker logunda bir kez `warn` yazar. İlk koşuda açık tüm `error` alarmlar tek e-postada gider.
 - [ ] **EKSİK — dış kalp atışı (ADR-0008 §9.3 "henüz yok"):** harici uptime izleyici (ör. UptimeRobot/Better Stack ücretsiz katman — **PATRON** hesap açar):
   - `https://fonbridge.com/` (ya da bir sağlık ucu) 5 dk'da bir, 200 bekler.
   - Worker: `graphile_worker._private_known_crontabs` içinde `job-queue-health` `last_execution` 70 dk'dan eskiyse alarm — bunun için web'de yetki gerektiren küçük bir sağlık ucu gerekir (EKSİK kartı).
