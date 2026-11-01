@@ -12,6 +12,9 @@
 #   5. scripts/apply-migrations.sh         prisma/migrations in apply-order.txt order
 #   6. pnpm db:rls                         again, for the tables and columns the migrations added
 #   7. pnpm db:seed                        plans, module catalogue, demo tenant
+#                                          (SEED_DEMO=true unless the caller set it: an
+#                                          unset SEED_DEMO without NODE_ENV writes no demo
+#                                          tenant since FO-296, and e2e/CI need it)
 #
 # Why not `prisma migrate deploy`: prisma/migrations is not a Prisma Migrate
 # history. Prisma sees only the six folder migrations, and add-m10 then fails on
@@ -71,5 +74,9 @@ PSQL=$psql_bin scripts/apply-migrations.sh
 step 6 "db:rls"
 pnpm db:rls
 step 7 "db:seed"
-pnpm db:seed
+# FO-296: seedDemoDecision fails closed when NODE_ENV is unset, and this script
+# runs without one (CI, gate:isolated, a laptop). It is local/CI-only (non-local
+# hosts are refused above), so it asks for the demo tenant explicitly; a caller
+# that exports SEED_DEMO=false still gets reference data only.
+SEED_DEMO=${SEED_DEMO:-true} pnpm db:seed
 echo "db-setup: done ($target)"
