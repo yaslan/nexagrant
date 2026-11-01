@@ -60,6 +60,10 @@ HTML yanıtları CDN'de `DYNAMIC` (önbelleğe alınmıyor); oturumlu sayfalar C
   `worker.sh`, `BUILD-INFO.txt`, `certs/` (Supabase CA), `app/` (Next standalone: `server.js`, `node_modules`, `.next`, `public`, `jobs-worker.cjs`).
 - Hostinger build ayarı: `node_version` 22 (ya da 24, bkz. §1.1-1), `app_type: other`, `root_directory: .`,
   `entry_file: app.js`, `build_script: build`, `package_manager: npm`, `output_directory: .`.
+- **Gizlilik kapısı (FO-180) canlıya alma ENGELİ:** `build-package.sh`, `/privacy` metninde yer tutucu ya da demo değer
+  varken paket ÜRETMEZ (atlatma seçeneği yok, bilerek). 01.11.2026 ölçümü: 7 engel — vergi dairesi/no, MERSİS no,
+  VERBİS durumu, yurt dışı aktarım mekanizması, trafik logu saklama süresi (barındırma teyidi: Hostinger), yürürlük tarihi,
+  demo KEP adresi. Bunlar hukuk/şirket bilgisiyle doldurulmadan yüklenebilir paket çıkmaz.
 - Sağlık ucu: `GET /api/health` → `200 {"status":"ok"}`, `Cache-Control: no-store`; DB'ye ve oturuma dokunmaz.
 - Prisma motoru: `binaryTargets` içinde `rhel-openssl-3.0.x` var (CloudLinux 9 / RHEL uyumlu); sürücü adaptörü `pg`.
 
@@ -109,7 +113,7 @@ Cron satırı (✋ adım 10):
 
 | # | Adım | Onay | Doğrulama | Geri alma |
 |---|---|---|---|---|
-| 1 | **Kararlar:** Supabase prod projesi (§2.2), R2 açılsın mı (K-2), posta planı (deneme → ücretli), DMARC aşaması (§6) | ✋ | karar kartları kapalı | — |
+| 1 | **Kararlar + engeller:** Supabase prod projesi (§2.2), R2 açılsın mı (K-2), posta planı (deneme → ücretli), DMARC aşaması (§6); **gizlilik metni yer tutucuları** (§2.1, hukuk) | ✋ | karar kartları kapalı; `pnpm privacy:publish-check` yeşil | — |
 | 2 | **Yedek:** mevcut `public_html` (`default.php`) indirilir; hesapta başka site (arsalog.com) olduğu için yalnız bu vhost'a dokunulur | yok (okuma) | dosya yerelde, sha256 not edildi | — |
 | 3 | **Supabase prod:** yeni proje (AB bölgesi), `vector` uzantısı, `fabrika_app` rolü, migration (`prisma migrate deploy`, sahip rolüyle), `pnpm db:rls`, `pnpm rls:verify --require-db` | ✋ | `_prisma_migrations` son kayıt = paketteki migration; `rls:verify` yeşil | Yeni proje boştu: projeyi duraklat/sil; mevcut Tokyo projesine **dokunulmaz** |
 | 4 | **Paket:** `R2_PUBLIC_HOST=… deploy/cpanel/build-package.sh <dev-commit> out/` (ya da `FB_NO_PUBLIC_ASSETS=1`); SHA256 kontrolü; arşivi `hosting_files_generate-upload-url` ile `public_html`'e yükle; `hosting_nodejs_build-settings-from-archive` ile önizle (salt-okunur) | ✋ yükleme | önizleme `other` / `app.js` diyor | Yüklenen zip'i sil; site henüz değişmedi |
