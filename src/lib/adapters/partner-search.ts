@@ -25,6 +25,13 @@ import { errorMessage } from './schemas/common';
 
 export const PARTNER_SEARCH_SOURCE = 'partner_search';
 
+/**
+ * The `SystemAlert.source` the ingestor writes. `createAdapterAlert` stores every
+ * adapter alert as `${source}_adapter`, so the admin console's open-alert count must
+ * query this value, not PARTNER_SEARCH_SOURCE (FO-66 BUG-1 / FO-326).
+ */
+export const PARTNER_SEARCH_ALERT_SOURCE = `${PARTNER_SEARCH_SOURCE}_adapter`;
+
 const PORTAL_BASE = 'https://ec.europa.eu/info/funding-tenders/opportunities/api/partnerSearch';
 const SEDIA_SEARCH_URL = 'https://api.tech.ec.europa.eu/search-api/prod/rest/search';
 const SEDIA_API_KEY = 'SEDIA';

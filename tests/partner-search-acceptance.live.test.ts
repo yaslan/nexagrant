@@ -30,7 +30,7 @@ vi.mock('@/modules/m1/server/partner-search/flag', async (importOriginal) => ({
 }));
 
 const { prisma, withTenant } = await import('@/lib/db');
-const { PartnerSearchClient, PARTNER_SEARCH_SOURCE } = await import('@/lib/adapters/partner-search');
+const { PartnerSearchClient, PARTNER_SEARCH_ALERT_SOURCE } = await import('@/lib/adapters/partner-search');
 const { runPartnerSearchIngestion } = await import('@/modules/m1/server/partner-search/ingestor');
 const { readPartnerSignal, readAnnouncementsForExport, toAnnouncementDto, toExportCsv, toExportJson } = await import(
   '@/modules/m1/server/partner-search/api'
@@ -299,7 +299,7 @@ describe.skipIf(!RUN)('FO-66 Partner Search acceptance (live database)', () => {
       expect(run.status).toBe('FAILED');
       // What /admin/alerts lists: every open SystemAlert, newest first.
       const alert = await prisma.systemAlert.findFirst({
-        where: { source: `${PARTNER_SEARCH_SOURCE}_adapter`, resolvedAt: null, message: { contains: 'API schema change' } },
+        where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null, message: { contains: 'API schema change' } },
       });
       expect(alert).not.toBeNull();
       evidence('C3 drift', { runStatus: run.status, alert: { source: alert?.source, level: alert?.level, message: alert?.message } });
@@ -313,26 +313,25 @@ describe.skipIf(!RUN)('FO-66 Partner Search acceptance (live database)', () => {
       });
       expect(outcome.kind === 'done' && outcome.status).toBe('FAILED');
       const alert = await prisma.systemAlert.findFirst({
-        where: { source: `${PARTNER_SEARCH_SOURCE}_adapter`, resolvedAt: null, message: { contains: 'HTTP 403/429' } },
+        where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null, message: { contains: 'HTTP 403/429' } },
       });
       expect(alert?.level).toBe('error');
       evidence('C3 blocked', { source: alert?.source, level: alert?.level, message: alert?.message });
     });
 
     /**
-     * FO-66 BUG-1 (product code, not fixed here): the admin console's "Open alerts"
-     * figure (src/app/[locale]/admin/partner-search/page.tsx) counts
-     * `source = PARTNER_SEARCH_SOURCE` ('partner_search'), but the ingestor's alerts go
-     * through createAdapterAlert, which stores `'partner_search_adapter'`. The alarm is
-     * on /admin/alerts; the console figure stays 0. `it.fails` pins that: when the
-     * page query is fixed, this goes red — turn it into a plain `it`.
+     * FO-66 BUG-1, fixed in FO-326: the admin console's "Open alerts" figure
+     * (src/app/[locale]/admin/partner-search/page.tsx) used to count
+     * `source = 'partner_search'`, while the ingestor's alerts are stored as
+     * `'partner_search_adapter'` by createAdapterAlert. The page now reads
+     * PARTNER_SEARCH_ALERT_SOURCE, the same constant this test counts with.
      */
-    it.fails('BUG-1: the console figure counts the open ingestion alerts', async () => {
-      const consoleFigure = await prisma.systemAlert.count({ where: { source: PARTNER_SEARCH_SOURCE, resolvedAt: null } });
-      const open = await prisma.systemAlert.count({ where: { source: `${PARTNER_SEARCH_SOURCE}_adapter`, resolvedAt: null } });
-      evidence('C3 BUG-1', { consoleFigure, openIngestionAlerts: open });
-      expect(open).toBeGreaterThan(0);
-      expect(consoleFigure).toBe(open);
+    it('BUG-1: the console figure counts the open ingestion alerts', async () => {
+      // The page's figure is this exact query (page.tsx imports PARTNER_SEARCH_ALERT_SOURCE);
+      // the drift and 403 alerts above were written by createAdapterAlert under that source.
+      const consoleFigure = await prisma.systemAlert.count({ where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null } });
+      evidence('C3 BUG-1', { consoleFigure, source: PARTNER_SEARCH_ALERT_SOURCE });
+      expect(consoleFigure).toBeGreaterThan(0);
     });
   });
 
