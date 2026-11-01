@@ -125,14 +125,44 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     );
   });
 
+  it('keeps the 403/429 reason on the run row even after 20 earlier topic errors', async () => {
+    enableFlag(true);
+    // 21 open topics: the first 20 have no ccm2Id (each adds one error), the 21st is refused with 403.
+    const identifiers = Array.from({ length: 21 }, (_, i) => `HORIZON-TEST-${i + 1}`);
+    db.topic.findMany.mockResolvedValue(identifiers.map((identifier) => ({ identifier })));
+    const fetchTopic = vi.fn(async () => {
+      throw new PartnerSearchBlockedError(403);
+    });
+    const client = {
+      fetchCcm2Map: vi.fn(async () => new Map([[identifiers[20], '999']])),
+      fetchTopic,
+      circuitOpen: false,
+    } as unknown as PartnerSearchClient;
+
+    const outcome = await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(outcome.kind).toBe('done');
+    expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ error: expect.stringContaining('HTTP 403/429') }),
+      })
+    );
+  });
+
   it('schema drift raises a drift alert, stops, and writes no topic rows', async () => {
     enableFlag(true);
-    const fetchTopic = vi.fn(async () => ({
-      status: 'drift' as const,
-      topicIdentifier: 'HORIZON-TEST-1',
-      schemaDrift: ['topicOrganisations[0].pic: missing'],
-    }));
-    const client = fakeClient({ fetchTopic });
+    // Real adapter path: the portal answers with an ORGANISATION row that has no `expertise`,
+    // so fetchTopic builds the drift message itself (`topicOrganizations[${index}]: <zod message>`).
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          topicOrganizations: [{ type: 'ORGANISATION', id: 'o-1', organisationName: 'Org A' }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    const client = new PartnerSearchClient({ fetchImpl, sleep: async () => {}, minIntervalMs: 0 });
+    vi.spyOn(client, 'fetchCcm2Map').mockResolvedValue(new Map([['HORIZON-TEST-1', '123']]));
 
     const outcome = await runPartnerSearchIngestion({ trigger: 'FULL', client });
 
@@ -141,14 +171,16 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     expect(outcome.status).toBe('FAILED');
     expect(alerts.reportSchemaDrift).toHaveBeenCalledWith(
       expect.any(String),
-      ['topicOrganisations[0].pic: missing']
+      [expect.stringMatching(/^topicOrganizations\[0\]: .+/)]
     );
     expect(alerts.createAdapterAlert).not.toHaveBeenCalled();
     expect(db.partnerSearchTopicStat.upsert).not.toHaveBeenCalled();
-    // FO-327: the drift reason is kept on the run row.
+    // FO-327: the drift reason is kept on the run row, in the adapter's real format.
     expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ error: expect.stringContaining('schema drift: topicOrganisations[0].pic: missing') }),
+        data: expect.objectContaining({
+          error: expect.stringMatching(/schema drift: topicOrganizations\[0\]: .+/),
+        }),
       })
     );
   });
