@@ -85,7 +85,10 @@ const USERS = Object.values(U);
 const mail = (u: string) => `${u}@example.test`;
 
 const DAY = 24 * 60 * 60 * 1000;
-const NOW = new Date();
+// Pinned to midday UTC, not the wall clock: a run that starts at 23:58 and
+// crosses 00:00Z used to split its own fixtures across two UTC days (FO-299).
+// The midnight case has its own test below, with explicit instants.
+const NOW = new Date('2026-11-01T12:00:00.000Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
 
 const R: Record<string, string> = {};
@@ -153,14 +156,14 @@ beforeAll(async () => {
     await admin.subscription.create({ data: { tenantId: id, planId: 'pro', status: 'ACTIVE' } });
   }
   await admin.subscription.create({
-    data: { tenantId: T.expired, planId: 'public-team', status: 'TRIALING', provider: 'pilot', trialEndsAt: new Date(Date.now() - 60_000) },
+    data: { tenantId: T.expired, planId: 'public-team', status: 'TRIALING', provider: 'pilot', trialEndsAt: new Date(NOW.getTime() - 60_000) },
   });
   const status: Record<string, 'ON' | 'PILOT' | 'OFF'> = { [T.on]: 'ON', [T.on2]: 'ON', [T.pilotModule]: 'PILOT', [T.off]: 'OFF', [T.noPlan]: 'ON', [T.expired]: 'ON', [Y1.a]: 'ON', [Y1.b]: 'ON', [D2.a]: 'ON', [D2.b]: 'ON' };
   for (const [tenantId, s] of Object.entries(status)) await admin.moduleState.create({ data: { tenantId, moduleId: 'M4', status: s } });
 
   await admin.user.create({ data: { id: U.tr, email: mail(U.tr), locale: 'tr' } });
   await admin.user.create({ data: { id: U.en, email: mail(U.en), locale: 'en' } });
-  await admin.user.create({ data: { id: U.gone, email: mail(U.gone), deletionRequestedAt: new Date() } });
+  await admin.user.create({ data: { id: U.gone, email: mail(U.gone), deletionRequestedAt: new Date(NOW.getTime() - DAY) } });
   await admin.user.create({ data: { id: U.member, email: mail(U.member) } });
   await admin.user.create({ data: { id: U.manager, email: mail(U.manager) } });
   await admin.user.create({ data: { id: U.y1, email: mail(U.y1) } });
@@ -727,6 +730,37 @@ describe.skipIf(!HAS_DB)('M4 stale relationship reminder (live, fabrika_app)', (
     const rc = await runD2(c.mailer, new Date(d1.getTime() + 22 * 60_000), [D2.a, D2.b]);
     expect(c.sent).toHaveLength(0);
     expect(rc.skippedMailedToday).toBe(1);
+  });
+
+  test('a run that crosses UTC midnight: the day it started on is claimed, the next UTC day still sends (FO-299)', async () => {
+    // 23:59:47Z: the digest for this UTC day goes out and claims the day.
+    const eve = new Date(dayStartUtc(y1Day(600)).getTime() + 23 * 60 * 60_000 + 59 * 60_000 + 47_000);
+    await rel('midA', D2.a, U.d2, new Date(eve.getTime() - 60 * DAY));
+    const first = fakeMailer();
+    await runD2(first.mailer, eve, [D2.a, D2.b]);
+    expect(first.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+    expect(first.sent[0]!.text).toContain(`midA-${RUN}`);
+    expect((await claimOf(U.d2))?.getTime()).toBe(dayStartUtc(eve).getTime());
+
+    // 00:00:27Z the next day, a different row now due: it is the next day's digest, not a duplicate.
+    const after = new Date(eve.getTime() + 40_000);
+    await rel('midB', D2.b, U.d2, new Date(after.getTime() - 60 * DAY));
+    const second = fakeMailer();
+    await runD2(second.mailer, after, [D2.a, D2.b]);
+    expect(second.sent.map((m) => m.to)).toEqual([mail(U.d2)]);
+    expect(second.sent[0]!.text).toContain(`midB-${RUN}`);
+    expect(second.sent[0]!.text).not.toContain(`midA-${RUN}`);
+    expect((await claimOf(U.d2))?.getTime()).toBe(dayStartUtc(after).getTime());
+
+    // Ten seconds later, same new UTC day: no third digest.
+    const third = fakeMailer();
+    const r3 = await runD2(third.mailer, new Date(after.getTime() + 10_000), [D2.a, D2.b]);
+    expect(third.sent).toHaveLength(0);
+    expect(r3.digestsSent).toBe(0);
+
+    // The rows are ours alone: the backfill test further down reads every D2 stamp.
+    await admin.relationship.deleteMany({ where: { id: { in: [R.midA!, R.midB!] } } });
+    await admin.user.update({ where: { id: U.d2 }, data: { staleDigestOn: null } });
   });
 
   test('the migration backfills the latest membership claim, never lowers one, and leaves Membership FORCEd (İNCELEME-95 T-3)', async () => {
