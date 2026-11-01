@@ -352,6 +352,10 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
   // are one transaction; if they fail, the run's reservation is released by markFailed.
   const { credits } = resolveCredits(EVALUATE_MODULE, EVALUATE_PURPOSE);
   await withTenant(tenantId, async (tx) => {
+    // The tenant lock first, as in every write that touches this run's reservation (FO-303 Ö-1):
+    // a purge or a delete that releases the reservation of a run still ANALYZING cannot interleave
+    // between this DONE and its own release, which would refund a delivered result.
+    await lockTenantCredits(tx, tenantId);
     await tx.interregCriterionMark.deleteMany({ where: { analysisId: id, tenantId } });
     await tx.interregAnalysisResult.deleteMany({ where: { analysisId: id, tenantId } });
     await tx.interregAnalysisResult.create({

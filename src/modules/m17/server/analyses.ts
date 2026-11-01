@@ -13,7 +13,7 @@ import { lockTenantCredits, releaseAiReservation } from '@/lib/llm';
 import { requireActionId } from '@/lib/required-id';
 
 import { INTERREG_UPLOAD_LIMITS, type InterregDocKind } from '../limits';
-import { EVALUATE_MODULE, runRef } from './evaluate';
+import { EVALUATE_MODULE, runRef, STALE_CLAIM_MS } from './evaluate';
 import type { ExtractedDocument } from './extract';
 import { acceptsUpload, STATUS_FROM_TEXTS_SQL } from './status';
 
@@ -183,20 +183,23 @@ export async function getAnalysis(owner: Owner, id: string): Promise<InterregAna
  * Deletes the analysis, its texts and any F2 output now (user's right to delete, FO-185 decision 3).
  *
  * A run still holding the claim (ANALYZING) has reserved its price (FO-274). Deleting the row
- * would leave that reservation with no run to release it, so it is given back here, under the
- * tenant lock, before the row goes (FO-291 B1).
+ * would leave a DEAD run's reservation with no run to release it, so only a stale claim (past
+ * STALE_CLAIM_MS) is given back here, under the tenant lock, before the row goes (FO-291 B1).
+ * A live run keeps its reservation: its own markFailed releases it even after the row is gone
+ * (FO-303 Y-1). Refunding it here would let the tenant start a second provider run on the same credits.
  */
 export async function deleteAnalysis(owner: Owner, analysisId: string): Promise<boolean> {
   const tenantId = requireActionId(owner.tenantId, 'tenantId');
   const userId = requireActionId(owner.userId, 'userId');
   const id = requireActionId(analysisId, 'analysisId');
+  const staleBefore = new Date(Date.now() - STALE_CLAIM_MS);
   const { count } = await withTenant(tenantId, async (tx) => {
     await lockTenantCredits(tx, tenantId);
     const row = await tx.interregAnalysis.findFirst({
       where: { id, tenantId, userId },
       select: { status: true, updatedAt: true },
     });
-    if (row?.status === 'ANALYZING') {
+    if (row?.status === 'ANALYZING' && row.updatedAt < staleBefore) {
       await releaseAiReservation(tx, { tenantId, module: EVALUATE_MODULE, refId: runRef(id, row.updatedAt) });
     }
     return tx.interregAnalysis.deleteMany({ where: { id, tenantId, userId } });

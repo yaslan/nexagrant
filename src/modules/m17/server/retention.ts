@@ -143,16 +143,26 @@ async function purgeBatch(
   const ids = rows.map((r) => r.id);
 
   // A run still holding the claim (ANALYZING) whose text is due loses that text below and can
-  // never finish, so its reservation is given back first (FO-291 B1). This must come before the
-  // updates: they bump `updatedAt`, which is the run's ledger reference (runRef).
-  // The page is already the due rows, so its ANALYZING ones are the runs to release.
+  // never finish, so its reservation is given back first (FO-291 B1). The releases, and the reads
+  // they depend on, come before the updates: the updates bump `updatedAt`, which is the claim's
+  // ledger reference (runRef), so read after them a run's reservation would no longer be found.
+  // The scan is not locked, so a run may have finished (DONE) or failed since it was read. The
+  // status and `updatedAt` are read again under the tenant lock, and only rows still ANALYZING and
+  // due are released: a DONE run's reservation is its delivered result and must not be refunded (FO-303 Ö-1).
   const running = rows.filter((r) => r.status === 'ANALYZING');
   // Tenant locks in one fixed order, then the releases: two batches cannot wait on each other.
-  for (const tenantId of [...new Set(running.map((r) => r.tenantId))].sort()) {
+  const tenants = [...new Set(running.map((r) => r.tenantId))].sort();
+  for (const tenantId of tenants) {
     await lockTenantCredits(tx, tenantId);
   }
-  for (const r of running) {
-    await releaseAiReservation(tx, { tenantId: r.tenantId, module: EVALUATE_MODULE, refId: runRef(r.id, r.updatedAt) });
+  if (running.length > 0) {
+    const stillRunning = await tx.interregAnalysis.findMany({
+      where: { id: { in: running.map((r) => r.id) }, status: 'ANALYZING', OR: due.OR },
+      select: { id: true, tenantId: true, updatedAt: true },
+    });
+    for (const r of stillRunning) {
+      await releaseAiReservation(tx, { tenantId: r.tenantId, module: EVALUATE_MODULE, refId: runRef(r.id, r.updatedAt) });
+    }
   }
 
   // The expiry is part of each write's WHERE: a row re-uploaded since the scan is skipped.
