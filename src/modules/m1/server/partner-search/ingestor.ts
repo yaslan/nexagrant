@@ -300,7 +300,9 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
 
   if (blocked) {
     // Written once here, so both the in-loop and the outer catch paths leave the same line.
-    errors.push('portal refused the request (HTTP 403/429)');
+    // Unshift, not push: run.error keeps only the first 20 lines, and the block reason is the
+    // cause an operator needs most, so it must survive a run with many earlier topic errors.
+    errors.unshift('portal refused the request (HTTP 403/429)');
     await createAdapterAlert(
       PARTNER_SEARCH_SOURCE,
       'error',
