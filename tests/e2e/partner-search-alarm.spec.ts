@@ -157,4 +157,34 @@ test.describe.serial('partner search — an ingestion error reaches the admin (F
     await expect(message).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/03-tr-alerts-390.png`, fullPage: true });
   });
+
+  /**
+   * FO-327: a FAILED run must show its reason in "Hata kaydı" (run.error, not null).
+   * The toggle is opened and closed with a real click and a real Enter key press.
+   */
+  test('FO-327: the run row "Hata kaydı" opens with a click and closes with Enter', async ({ page, baseURL }) => {
+    const shots = shotsDir('FO-327-partner-search-run-error');
+    const run = requireId(runId, 'runId');
+
+    await signInAs(page, { id: ADMIN.userId, email: ADMIN.email, tenantId: ADMIN.tenantId, role: ADMIN.role }, baseURL as string);
+    await page.goto('/tr/admin/partner-search');
+    const runRow = page.getByTestId(`ps-run-${run}`);
+    await expect(runRow).toBeVisible();
+    const toggle = runRow.locator(`button[aria-controls="ps-run-error-${run}"]`);
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await page.screenshot({ path: `${shots}/01-run-error-collapsed.png`, fullPage: true });
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const detail = page.locator(`#ps-run-error-${run}`);
+    await expect(detail).toContainText('schema drift');
+    await page.screenshot({ path: `${shots}/02-run-error-open.png`, fullPage: true });
+
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(detail).toHaveCount(0);
+    await page.screenshot({ path: `${shots}/03-run-error-closed.png`, fullPage: true });
+  });
 });

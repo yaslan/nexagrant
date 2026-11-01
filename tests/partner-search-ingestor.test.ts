@@ -117,6 +117,12 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) })
     );
+    // FO-327: a FAILED run must carry its reason, not null.
+    expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ error: expect.stringContaining('HTTP 403/429') }),
+      })
+    );
   });
 
   it('schema drift raises a drift alert, stops, and writes no topic rows', async () => {
@@ -139,6 +145,12 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     );
     expect(alerts.createAdapterAlert).not.toHaveBeenCalled();
     expect(db.partnerSearchTopicStat.upsert).not.toHaveBeenCalled();
+    // FO-327: the drift reason is kept on the run row.
+    expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ error: expect.stringContaining('schema drift: topicOrganisations[0].pic: missing') }),
+      })
+    );
   });
 });
 
