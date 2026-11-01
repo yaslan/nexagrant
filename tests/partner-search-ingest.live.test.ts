@@ -8,6 +8,7 @@ import { PARTNER_SEARCH_FLAG_KEY, setPartnerSearchIngestionFlag } from '@/module
 import { runPartnerSearchIngestion } from '@/modules/m1/server/partner-search/ingestor';
 import { EMAIL_MASK, PHONE_MASK } from '@/modules/m1/server/partner-search/mask';
 import { runPartnerSearchRetention } from '@/modules/m1/server/partner-search/retention';
+import { PARTNER_SEARCH_INGESTION_LOCK, holdTestDbLock } from './helpers/test-db-lock';
 
 /**
  * Partner Search ingestion against real Postgres (FO-60 / TASK-MVCH2J271U5VY).
@@ -76,7 +77,11 @@ async function cleanup() {
 }
 
 describe.skipIf(!RUN)('partner-search ingestion (live database)', () => {
+  // FO-66: partner-search-acceptance.live also runs the ingestor and raises alerts.
+  let releaseLock: (() => Promise<void>) | undefined;
+
   beforeAll(async () => {
+    releaseLock = await holdTestDbLock(process.env.DATABASE_URL ?? '', PARTNER_SEARCH_INGESTION_LOCK);
     await cleanup();
     await prisma.programme.upsert({
       where: { id: 'HE' },
@@ -102,6 +107,7 @@ describe.skipIf(!RUN)('partner-search ingestion (live database)', () => {
   afterAll(async () => {
     await setFlag(false);
     await cleanup();
+    await releaseLock?.();
   });
 
   it('flag OFF (default): the run is a no-op and writes no run row', async () => {
