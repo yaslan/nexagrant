@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
-import { PartnerSearchClient } from '../../src/lib/adapters/partner-search';
+import { PartnerSearchClient, PARTNER_SEARCH_ALERT_SOURCE } from '../../src/lib/adapters/partner-search';
 import { setPartnerSearchIngestionFlag } from '../../src/modules/m1/server/partner-search/flag';
 import { runPartnerSearchIngestion } from '../../src/modules/m1/server/partner-search/ingestor';
 import { requireId } from '../helpers/teardown-guard';
@@ -14,9 +14,8 @@ import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
  * FAILED run on /tr/admin/partner-search, follows the "Açık alarm" link and opens the
  * drift alert on /tr/admin/alerts.
  *
- * The console's own "Açık alarm" figure is read and attached, not asserted: it counts
- * `source = 'partner_search'` while the ingestor's alerts are `partner_search_adapter`
- * (FO-66 BUG-1, pinned by tests/partner-search-acceptance.live.test.ts).
+ * The console's "Açık alarm" figure must be at least 1 (FO-326, FO-66 BUG-1): the
+ * page counts PARTNER_SEARCH_ALERT_SOURCE, the same source the ingestor's alerts carry.
  */
 
 const SHOTS = shotsDir('FO-66-partner-search-alarm');
@@ -99,7 +98,7 @@ test.describe.serial('partner search — an ingestion error reaches the admin (F
     }
     runId = outcome.runId;
     const alert = await prisma.systemAlert.findFirst({
-      where: { source: 'partner_search_adapter', resolvedAt: null, message: { contains: 'API schema change detected' } },
+      where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null, message: { contains: 'API schema change detected' } },
       orderBy: { createdAt: 'desc' },
       select: { id: true },
     });
@@ -131,8 +130,11 @@ test.describe.serial('partner search — an ingestion error reaches the admin (F
     await expect(runRow).toContainText('Başarısız'); // status FAILED
     await page.screenshot({ path: `${SHOTS}/01-tr-console-failed-run.png`, fullPage: true });
 
+    // FO-326: the console figure counts the open ingestion alarm (was 0, FO-66 BUG-1).
     const figure = page.locator('dt', { hasText: 'Açık alarm' }).locator('xpath=following-sibling::dd[1]').getByRole('link');
-    info.annotations.push({ type: 'FO-66 BUG-1 console figure', description: (await figure.textContent())?.trim() ?? '' });
+    await expect(figure).toHaveText(/^[1-9]\d*$/);
+    info.annotations.push({ type: 'console open alarm count', description: (await figure.textContent())?.trim() ?? '' });
+    await page.screenshot({ path: `${SHOTS}/01b-tr-console-alarm-count.png`, fullPage: true });
     await figure.click();
     await expect(page).toHaveURL(/\/tr\/admin\/alerts/);
 
