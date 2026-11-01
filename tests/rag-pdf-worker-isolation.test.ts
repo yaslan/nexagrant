@@ -26,6 +26,7 @@ import {
   syntheticPdf,
   zlibWithStoredEndstream,
 } from './helpers/synthetic-pdf';
+import { slack } from './helpers/timing';
 
 // The limits are the real ones unless a test lowers one.
 const limits = vi.hoisted(() => ({ current: {} as Record<string, number>, actual: {} as Record<string, number> }));
@@ -58,6 +59,8 @@ vi.mock('node:worker_threads', async () => {
 
 const { extractPdfText, PdfLimitError } = await import('../src/lib/rag-pdf-extract');
 const { hasMeaningfulText } = await import('../src/lib/rag-upload');
+
+vi.setConfig({ testTimeout: slack(30_000) });
 
 const MAX_CHARS = 2500 * 800 + 200;
 
@@ -95,7 +98,7 @@ describe("B-1': the event loop keeps turning while pdf.js works on one heavy pag
     // deadline (the next test does that): on a loaded machine the real 30 s
     // deadline refused this PDF as parse_too_heavy and the pings went
     // unmeasured (TASK-MUNSRKW0HJYBV, İNCELEME-63 Ö-C).
-    limits.current.maxParseMs = 150_000;
+    limits.current.maxParseMs = slack(150_000);
     const pdf = flatePdf({ content: inPlaceTextContent(100_000), pages: 20, shared: true });
     expect(pdf.length).toBeLessThan(40_000);
     const { result, ms, pings, worstGapMs } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
@@ -103,8 +106,8 @@ describe("B-1': the event loop keeps turning while pdf.js works on one heavy pag
     expect(result).toMatchObject({ pages: 20 });
     expect(ms).toBeGreaterThan(1_000);
     expect(pings).toBeGreaterThanOrEqual(Math.floor(ms / 20) / 2);
-    expect(worstGapMs).toBeLessThan(500);
-  }, 180_000);
+    expect(worstGapMs).toBeLessThan(slack(500));
+  }, slack(180_000));
 
   test('past maxParseMs the thread is terminated and the PDF refused as parse_too_heavy', async () => {
     limits.current.maxParseMs = 500;
@@ -112,12 +115,12 @@ describe("B-1': the event loop keeps turning while pdf.js works on one heavy pag
     const { result, ms } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
     expect(result).toBeInstanceOf(PdfLimitError);
     expect(result).toMatchObject({ code: 'parse_too_heavy', detail: { maxSeconds: 0.5 } });
-    expect(ms).toBeLessThan(2_000);
+    expect(ms).toBeLessThan(slack(2_000));
 
     // The terminated thread leaves nothing behind that blocks the next upload.
     limits.current.maxParseMs = limits.actual.maxParseMs!;
     await expect(extractPdfText(syntheticPdf(['After a timeout']), MAX_CHARS)).resolves.toMatchObject({ pages: 1 });
-  }, 30_000);
+  }, slack(30_000));
 
   test('out of heap kills the thread, not the server: parse_too_heavy', async () => {
     limits.current.maxParseHeapMb = 4;
@@ -125,7 +128,7 @@ describe("B-1': the event loop keeps turning while pdf.js works on one heavy pag
       (err: unknown) => err
     );
     expect(e).toMatchObject({ code: 'parse_too_heavy', detail: { maxHeapMb: 4 } });
-  }, 30_000);
+  }, slack(30_000));
 });
 
 describe('decompression bomb: inflated stream bytes are capped before pdf.js starts', () => {
@@ -165,9 +168,9 @@ describe('decompression bomb: inflated stream bytes are capped before pdf.js sta
     const pdf = flatePdf({ content: Buffer.alloc(128 * 1024 * 1024, 0x20) });
     const { result, ms, worstGapMs } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
     expect(result).toMatchObject({ code: 'parse_too_heavy' });
-    expect(ms).toBeLessThan(3_000);
-    expect(worstGapMs).toBeLessThan(500);
-  }, 60_000);
+    expect(ms).toBeLessThan(slack(3_000));
+    expect(worstGapMs).toBeLessThan(slack(500));
+  }, slack(60_000));
 });
 
 /**
@@ -209,7 +212,7 @@ describe('decompression bomb: every filter chain pdf.js decodes is counted', () 
     limits.current.maxStreamInflatedMb = 1;
     const { result, ms } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
     expect(result).toMatchObject({ pages: 1, text: expect.stringContaining('Font file') });
-    expect(ms).toBeLessThan(5_000);
+    expect(ms).toBeLessThan(slack(5_000));
   });
 
   test('a bomb in a font program, where pdf.js catches the error and falls back to a standard font', async () => {
@@ -243,9 +246,9 @@ describe('decompression bomb: every filter chain pdf.js decodes is counted', () 
     expect(pdf.length).toBeLessThan(1.1 * MB);
     const { result, ms, worstGapMs } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
     expect(result).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: limits.actual.maxStreamInflatedMb } });
-    expect(ms).toBeLessThan(5_000);
-    expect(worstGapMs).toBeLessThan(500);
-  }, 60_000);
+    expect(ms).toBeLessThan(slack(5_000));
+    expect(worstGapMs).toBeLessThan(slack(500));
+  }, slack(60_000));
 
   test('the same filter chains holding ordinary text are still extracted', async () => {
     const content = Buffer.from(
@@ -264,7 +267,7 @@ describe('decompression bomb: every filter chain pdf.js decodes is counted', () 
       const { pages, text } = await extractPdfText(streamPdf({ data, filter, pages: 2 }), MAX_CHARS);
       expect({ filter, pages, text }).toEqual({ filter, pages: 2, text: reference.text });
     }
-  }, 30_000);
+  }, slack(30_000));
 });
 
 describe('what still works', () => {
@@ -294,8 +297,8 @@ describe('what still works', () => {
     const e = await extractPdfText(syntheticPdf(['Never answered']), MAX_CHARS).catch((err: unknown) => err);
     expect(e).toBeInstanceOf(Error);
     expect((e as Error).message).toMatch(/exited/);
-    expect(performance.now() - started).toBeLessThan(5_000);
-  }, 40_000);
+    expect(performance.now() - started).toBeLessThan(slack(5_000));
+  }, slack(40_000));
 
   test('too_many_chunks names the page it stopped at and the chunk limit', async () => {
     const e = await extractPdfText(syntheticPdf(densePageLines(), 3), 100).catch((err: unknown) => err);

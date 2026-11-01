@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockPrisma = vi.hoisted(() => ({
   aiUsageLog: { create: vi.fn() },
-  creditLedger: { aggregate: vi.fn(), create: vi.fn() },
+  creditLedger: { aggregate: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
   withTenant: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({ withTenant: mockPrisma.withTenant }));
@@ -31,6 +31,7 @@ import {
   maxTokensFor,
   LlmTruncatedError,
   LlmRefusalError,
+  AiUsageLogWriteError,
 } from './llm';
 import { isLlmRefused, isLlmTruncated, LLM_REFUSED_DIGEST, LLM_TRUNCATED_DIGEST } from './llm-outcome';
 
@@ -69,6 +70,10 @@ function stubOpenAI(finishReason: string) {
   return fetchMock;
 }
 
+/** Sum of every ledger movement written: a reserved and then refunded call nets to 0. */
+function netLedgerMovement(): number {
+  return mockPrisma.creditLedger.create.mock.calls.reduce((sum, c) => sum + (c[0]?.data?.delta ?? 0), 0);
+}
 function usageRow() {
   return mockPrisma.aiUsageLog.create.mock.calls[0]?.[0]?.data;
 }
@@ -82,9 +87,11 @@ beforeEach(() => {
   mockPrisma.creditLedger.aggregate.mockResolvedValue({ _sum: { delta: 500 } });
   mockPrisma.aiUsageLog.create.mockResolvedValue({ id: 'log_1' });
   mockPrisma.creditLedger.create.mockResolvedValue({ id: 'ledger_1' });
+  // FO-288: the reservation is a debit row; its refund looks the debit up by refId.
+  mockPrisma.creditLedger.findFirst.mockImplementation(async (args: { where: { delta?: unknown } }) => (args.where.delta ? { delta: -1 } : null));
   mockPrisma.withTenant.mockImplementation(
     async (_tenantId: string, cb: (tx: unknown) => Promise<unknown>) =>
-      cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger })
+      cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger, $executeRaw: async () => 0 })
   );
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -141,9 +148,22 @@ describe('Anthropic stop_reason — max_tokens (cut off)', () => {
 
     await expect(generateCompletion(baseOptions)).rejects.toThrow(/cut off at the length limit/);
 
-    expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+    expect(netLedgerMovement()).toBe(0);
     expect(mockPrisma.aiUsageLog.create).toHaveBeenCalledTimes(1);
     expect(usageRow()).toMatchObject({ credits: 0, outputTokens: 8192, module: 'M10' });
+  });
+
+  it('refunds the reservation even when the usage row fails to write (FO-310 Y-1)', async () => {
+    // The refund is its own transaction, so a failing AiUsageLog insert must not roll it back.
+    stubAnthropic('max_tokens');
+    mockPrisma.aiUsageLog.create.mockRejectedValue(new Error('db down'));
+
+    const error = await generateCompletion(baseOptions).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AiUsageLogWriteError);
+    expect(mockPrisma.creditLedger.create).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.creditLedger.create.mock.calls[1]?.[0]?.data).toMatchObject({ delta: 1, reason: 'refund:M10' });
+    expect(netLedgerMovement()).toBe(0);
   });
 
   it('carries the digest the browser receives in production', async () => {
@@ -163,7 +183,7 @@ describe('Anthropic stop_reason — max_tokens (cut off)', () => {
   it('treats model_context_window_exceeded as a cut-off too', async () => {
     stubAnthropic('model_context_window_exceeded');
     await expect(generateCompletion(baseOptions)).rejects.toBeInstanceOf(LlmTruncatedError);
-    expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+    expect(netLedgerMovement()).toBe(0);
   });
 });
 
@@ -177,7 +197,7 @@ describe('Anthropic stop_reason — refusal', () => {
     expect((err as LlmRefusalError).category).toBe('cyber');
     expect((err as { digest: string }).digest).toBe(LLM_REFUSED_DIGEST);
     expect(isLlmRefused(err)).toBe(true);
-    expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+    expect(netLedgerMovement()).toBe(0);
     expect(usageRow()).toMatchObject({ credits: 0 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -204,14 +224,14 @@ describe('OpenAI finish_reason — the same rule', () => {
   it('length: LlmTruncatedError, no credit, row with credits 0', async () => {
     stubOpenAI('length');
     await expect(generateCompletion(openai)).rejects.toBeInstanceOf(LlmTruncatedError);
-    expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+    expect(netLedgerMovement()).toBe(0);
     expect(usageRow()).toMatchObject({ credits: 0, provider: 'openai' });
   });
 
   it('content_filter: LlmRefusalError, no credit', async () => {
     stubOpenAI('content_filter');
     await expect(generateCompletion(openai)).rejects.toBeInstanceOf(LlmRefusalError);
-    expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+    expect(netLedgerMovement()).toBe(0);
   });
 });
 

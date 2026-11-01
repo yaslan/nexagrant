@@ -25,7 +25,7 @@ import { createTranslator } from 'next-intl';
 
 import { renderPrompt, type PromptLocale } from '@/lib/ai/prompts';
 import { withTenant } from '@/lib/db';
-import { errorMessage } from '@/lib/errors';
+import { errorCode } from '@/lib/errors';
 import {
   creditBalanceIn,
   generateCompletion,
@@ -249,8 +249,9 @@ export async function runEvaluation(owner: Owner, analysisId: string, opts: Eval
   try {
     return { ok: true, result: await evaluateClaimed(owner, id, claimed.row, opts.locale) };
   } catch (error) {
-    // No document text in the log: the analysis id and the reason are enough to find the AiUsageLog row.
-    console.error('[interreg-review][evaluate]', id, errorMessage(error));
+    // No document text in the log (FO-289 K-5): an error message can quote the model's answer or the user's
+    // documents, so only the error class and code are logged; the analysis id finds the AiUsageLog row.
+    console.error('[interreg-review][evaluate]', id, error instanceof Error ? error.name : typeof error, errorCode(error) ?? '-');
     await markFailed(owner, id, claimed.row.claimedAt);
     return { ok: false, error: 'evaluation_failed' };
   }
@@ -394,6 +395,8 @@ async function evaluateClaimed(owner: Owner, analysisId: string, row: Claimed, l
       // Both texts still present: the purge may have emptied a slot while the model ran, and a
       // result quoting text that is gone would outlive it (the slot's expiry is NULL then, so no
       // later purge would match it) — FO-191 B4. The transaction rolls back and the run is FAILED.
+      // `{ not: null }` is the second safety: the main guard is the `updatedAt` lock (a Prisma write bumps
+      // it), but a raw-SQL write does not, and only this filter catches that path (FO-289, FO-281 K-1).
       where: { id, tenantId, userId, status: 'ANALYZING', updatedAt: row.claimedAt, callText: { not: null }, projectText: { not: null } },
       data: { status: 'DONE' },
     });

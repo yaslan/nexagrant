@@ -2,6 +2,7 @@
 # Canlı kümede tek seferlik veritabanı işleri (RUNBOOK §4). Her biri idempotent.
 #
 #   deploy/vps/ops.sh bootstrap  # sahip ve jobs rolleri, pgvector (YALNIZ ilk kurulum; postgres süper kullanıcısı)
+#   deploy/vps/ops.sh r1         # go-live R-1 TopicMatch kontrolü (RELEASE_CHECKLIST §3.1 adım 0a) — sahip rol, salt okur
 #   deploy/vps/ops.sh diff       # prisma migrate diff — sahip rol, salt okur; çıkış 2 = şema farkı (RUNBOOK §4 adım 1)
 #   deploy/vps/ops.sh push       # prisma db push — sahip rol; YALNIZ boş veritabanı; canlıda önce RUNBOOK §4 diff kontrolü
 #   deploy/vps/ops.sh rls-role   # fabrika_app rolü + grant (scripts/setup-rls-role.ts) — sahip rol
@@ -21,7 +22,8 @@
 # beklentisini ise OWNER_DATABASE_URL'den (BYPASSRLS sahip) ölçer — uygulama rolü 0 satır görür.
 # worker imajı compose ağında koşar: servis adı `postgres` çözülür, --network host ve URL
 # dönüşümü yok. Host psql'i (migrate, bootstrap) 127.0.0.1:$OPS_PG_HOST_PORT (varsayılan 5432,
-# loopback'e yayınlı) kullanır; OPS_PG_HOST_PORT ve compose'taki PG_HOST_PORT yalnız yerel provada değiştirilir.
+# loopback'e yayınlı) kullanır. Varsayılan: OPS_PG_HOST_PORT → PG_HOST_PORT → 5432 (FO-308 D-12); canlıda ikisi de 5432.
+# Her worker komutu önce imajın revision etiketini HEAD ile karşılaştırır (FO-308 R-1): uyuşmazsa durur.
 # Parolalar komut satırına GİRMEZ: konteyner ortamında (env_file / -e) ya da stdin üzerinden gider.
 set -euo pipefail
 
@@ -29,7 +31,7 @@ cd "$(dirname "$0")/../.."
 COMPOSE=(docker compose -f deploy/vps/docker-compose.prod.yml)
 ENV_FILE=deploy/vps/.env.prod
 DB_ENV_FILE=deploy/vps/.env.db
-OPS_PG_HOST_PORT="${OPS_PG_HOST_PORT:-5432}"
+OPS_PG_HOST_PORT="${OPS_PG_HOST_PORT:-${PG_HOST_PORT:-5432}}"
 [ -f "$ENV_FILE" ] || { echo "ops: $ENV_FILE yok" >&2; exit 1; }
 [ -f "$DB_ENV_FILE" ] || { echo "ops: $DB_ENV_FILE yok" >&2; exit 1; }
 
@@ -52,9 +54,20 @@ pw_from_url() {
 # owner: DATABASE_URL, konteynerdeki OWNER_DATABASE_URL ile değiştirilir.
 # app:   DATABASE_URL olduğu gibi kalır (fabrika_app). verify yine de OWNER_DATABASE_URL'i ister (satır beklentisi).
 # OWNER_DATABASE_URL yalnız bu tek seferlik konteynere, `-e` ile host ortamından geçer; kalıcı servislere girmez.
+# FO-308 R-1: imajın revision etiketi (Dockerfile ARG GIT_REVISION → LABEL) checkout'taki HEAD ile aynı olmalı.
+# Operatör derlemeyi atlarsa ya da eski imajı yeniden etiketlerse eski schema/rls dosyalarıyla koşmasın.
+check_worker_revision() {
+  local want built
+  want="$(git rev-parse HEAD 2>/dev/null)" || die "git HEAD okunamadı (depo kökünde değil)"
+  built="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' fonbridge-worker:local 2>/dev/null)" \
+    || die "fonbridge-worker:local imajı yok; önce derleyin (RUNBOOK §6 adım 3)"
+  [ "$built" = "$want" ] || die "imaj revision uyuşmuyor (imaj=${built:-yok}, HEAD=$want). GIT_REVISION=\$(git rev-parse HEAD) ile yeniden derleyin (RUNBOOK §6 adım 3)"
+}
+
 worker_run() {
   local role="$1"
   shift
+  check_worker_revision
   local owner_url
   owner_url="$(db_value OWNER_DATABASE_URL)"
   [ -n "$owner_url" ] || die "OWNER_DATABASE_URL $DB_ENV_FILE içinde boş"
@@ -85,6 +98,18 @@ case "${1:-}" in
     # Demo ayrımı (SEED_DEMO) kapısı İMAJIN İÇİNDE denetlenir (FO-301 D-9): host checkout'u değil,
     # koşan imajdaki prisma/seed.ts. Eski imajda SEED_DEMO yoksa seed başlamadan durur.
     worker_run owner sh -c 'grep -q SEED_DEMO prisma/seed.ts || { echo "ops: imajdaki prisma/seed.ts SEED_DEMO desteklemiyor (FO-251 birleşmeden canlıda seed çalıştırılmaz)" >&2; exit 1; }; exec node_modules/.bin/tsx prisma/seed.ts' ;;
+  r1)
+    # R-1 (RELEASE_CHECKLIST §3.1 adım 0a): sahip rolle salt okur betik. Parola ne URL'de ne argv'de: PGPASSWORD ortamda.
+    raw="$(db_value OWNER_DATABASE_URL)"
+    [ -n "$raw" ] || die "OWNER_DATABASE_URL boş ($DB_ENV_FILE)"
+    url="$(printf %s "$raw" | sed -E "s#@postgres:[0-9]+/#@127.0.0.1:${OPS_PG_HOST_PORT}/#; s/([?&])schema=[^&]*&?/\1/; s/[?&]$//; s#^(postgresql://[^:/@]+):[^@]*@#\1@#")"
+    out="$(PGPASSWORD="$(pw_from_url "$raw")" psql "$url" -X -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql 2>&1)" \
+      || { printf '%s\n' "$out" >&2; die "R-1 betiği hata verdi"; }
+    printf '%s\n' "$out"
+    # Karar R1_SONUC satırında. DUR_MUKERRER ve RLS_KOR durdurur; diğerleri (TEMIZ, DB_PUSH_ONCESI, ANAHTAR_YOK, NULLS_DISTINCT) devam.
+    printf '%s\n' "$out" | grep -qE 'R1_SONUC[[:space:]]*\|[[:space:]]*(TEMIZ|DB_PUSH_ONCESI|ANAHTAR_YOK|NULLS_DISTINCT)[[:space:]]*$' \
+      || die "R-1 DUR: TopicMatch kontrolü devam ettirmiyor (bkz. R1_SONUC satırı yukarıda)"
+    ;;
   verify)   worker_run app node_modules/.bin/tsx scripts/check-rls-live.ts --require-db ;;
   migrate)
     # Host psql: sahip URL'i (.env.db'deki OWNER_DATABASE_URL) okur; dosyayı source etmez, şifreyi ekrana basmaz.
@@ -94,7 +119,7 @@ case "${1:-}" in
     DATABASE_URL="$url" scripts/apply-migrations.sh
     ;;
   *)
-    echo "kullanım: $0 {bootstrap|diff|push|rls-role|rls|migrate|seed|verify}" >&2
+    echo "kullanım: $0 {bootstrap|r1|diff|push|rls-role|rls|migrate|seed|verify}" >&2
     exit 2
     ;;
 esac

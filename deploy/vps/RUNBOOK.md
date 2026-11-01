@@ -20,7 +20,7 @@ Dosyalar (hepsi `deploy/vps/` altında):
 | `backup-to-r2.sh` | günlük `pg_dump` → yerel → R2 + boyut doğrulama |
 | `fonbridge-backup.cron` | `/etc/cron.d` girdisi (01:30 UTC) |
 | `bootstrap-roles.sql` | ilk kurulum rolleri: `fabrika_owner` (sahip), `fabrika_jobs` (worker), pgvector (`ops.sh bootstrap` koşturur) |
-| `ops.sh` | tek seferlik DB işleri: `bootstrap`, `diff`, `push`, `rls-role`, `rls`, `migrate`, `seed`, `verify` |
+| `ops.sh` | tek seferlik DB işleri: `bootstrap`, `r1`, `diff`, `push`, `rls-role`, `rls`, `migrate`, `seed`, `verify` |
 
 ---
 
@@ -208,14 +208,17 @@ curl -sI http://www.nexagrant.com | head -n 3         # 301 → https://nexagran
   4,7 GB tepe ölçüldü). Tek seferlik konteyner, worker durdurulmuş, sahip rolle, bellek sınırı 5 GB:
   ```bash
   docker compose -f deploy/vps/docker-compose.prod.yml stop worker
+  # Yalnız sahip URL'i host ortamına alınır (.env.db'nin tamamı ya da POSTGRES_PASSWORD konteynere girmez, FO-308 D-11).
+  export OWNER_DATABASE_URL="$(grep -E '^OWNER_DATABASE_URL=' deploy/vps/.env.db | cut -d= -f2-)"
   docker run --rm --memory 5g --network fonbridge_default \
-    --env-file deploy/vps/.env.prod --env-file deploy/vps/.env.db \
+    --env-file deploy/vps/.env.prod -e OWNER_DATABASE_URL \
     fonbridge-worker:local sh -c \
     'export DATABASE_URL="$OWNER_DATABASE_URL"; exec node_modules/.bin/tsx scripts/cordis-import.ts "$@"' sh <argümanlar>
+  unset OWNER_DATABASE_URL
   docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
   ```
-  Parola komut satırına girmez: `OWNER_DATABASE_URL` bu tek seferlik konteynerin ortamında (`.env.db`) vardır;
-  kalıcı web ve worker konteynerlerinde yoktur.
+  Parola komut satırına girmez: `-e OWNER_DATABASE_URL` değeri host ortamından alır (argv'de yalnız ad vardır).
+  Konteynerde `POSTGRES_PASSWORD` ve `.env.db` yoktur (kanıt: FO-308 raporu). `fonbridge-worker:local` GÜNCEL revision ile derlenmiş olmalı (§6 adım 3).
   Konteyner `--rm` ile silinir. Akışlı okumaya geçiş ayrı bir karttır (Y-2 önerisi).
 - İlk gün admin `/[locale]/admin/alerts` ekranında `job-queue` ve worker log'u kontrol edilir
   (RELEASE_CHECKLIST §3.3 madde 5).
@@ -235,10 +238,13 @@ docker tag fonbridge-web:local fonbridge-web:prev   2>/dev/null || true
 docker tag fonbridge-worker:local fonbridge-worker:prev 2>/dev/null || true
 # 3. Yeni imajları ÖNCE derle (FO-301 Y-6). web ve worker ayrı hedef imajlar; ops adımları worker imajını
 #    koşar. Bu adım atlanırsa ops eski şemayı/RLS dosyasını yeni kodla eşleşmeden uygular.
+#    GIT_REVISION (FO-308 R-1) zorunlu: imajın revision etiketi HEAD'le eşleşmezse ops.sh her worker komutunda durur.
 #    Derleme sırasında worker durmuş olmalı (Y-2: derleme tepesi 2 vCPU / 8 GB'da worker ile birlikte taşabilir).
-docker compose -f deploy/vps/docker-compose.prod.yml build web worker
-# 4. Şema değiştiyse: go-live ön kontrolü R-1 (RELEASE_CHECKLIST §3.1 adım 0a) — db push'tan ÖNCE, sahip rolle:
-deploy/vps/ops.sh diff            # çıkış 2 = fark var: dur, incele
+GIT_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/vps/docker-compose.prod.yml build web worker
+# 4. Şema değiştiyse: go-live ön kontrolü R-1 (RELEASE_CHECKLIST §3.1 adım 0a) — db push'tan ÖNCE, sahip rolle.
+#    `r1` son satırda R1_SONUC | TEMIZ / DB_PUSH_ONCESI / ANAHTAR_YOK / NULLS_DISTINCT değilse durur (DUR_MUKERRER, RLS_KOR).
+deploy/vps/ops.sh r1              # çıkış ≠ 0 = DUR: çıktıyı incele
+deploy/vps/ops.sh diff            # çıkış 2 = şema farkı: dur, incele
 deploy/vps/ops.sh push
 deploy/vps/ops.sh migrate
 # 5. Şema değiştiyse RLS ve doğrulama ZORUNLU (ensure_rls tetikleyicisi yok, K4):

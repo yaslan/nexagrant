@@ -24,6 +24,9 @@ vi.mock('@/lib/auth', () => ({
   auth: async () => ({ user: { id: 'service-busy-user' }, tenantId: TENANT, role: 'TENANT_OWNER' }),
 }));
 
+// The gate raises the connect timeout to 10 s (DB_CONNECT_TIMEOUT_MS, FO-256); this file
+// pins the production 1 s, or the waiters outlast the 2.5 s holders and never hit pg-pool's timeout.
+process.env.DB_CONNECT_TIMEOUT_MS = '1000';
 const db = await import('@/lib/db');
 const { requireTenantAction, ServiceBusyError } = await import('@/lib/tenant');
 const { SERVICE_BUSY_DIGEST } = await import('@/lib/service-busy');

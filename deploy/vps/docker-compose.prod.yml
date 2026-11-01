@@ -12,8 +12,9 @@
 #   deploy/vps/.env.db    → süper kullanıcı parolası ve sahip rol (BYPASSRLS) URL'i. YALNIZ postgres alır.
 # Sahip URL'i web/worker konteynerlerinin ortamına HİÇ girmez (FO-301 Y-5): ops.sh onu yalnız tek
 # seferlik `run` konteynerine, host ortamından `-e` ile geçirir.
-# Kullanım (depo kökünden):
-#   docker compose -f deploy/vps/docker-compose.prod.yml up -d --build
+# Kullanım (depo kökünden). Revision etiketi zorunlu (FO-308 R-1), yoksa ops.sh imajı reddeder:
+#   GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml build web worker
+#   docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build
 #
 # Bellek sınırları 8 GB'a göre: postgres 2g + web 1536m + worker 1g + caddy 128m
 # = ~4.7 GB; kalan ≈3.3 GB işletim sistemi ve Postgres sayfa önbelleği için (FO-250, Y-2).
@@ -48,6 +49,9 @@ services:
       context: ../..
       dockerfile: Dockerfile
       target: runner
+      args:
+        # FO-308 R-1: ops.sh bu değeri HEAD ile karşılaştırır. Derlerken GIT_REVISION=$(git rev-parse HEAD) verin.
+        GIT_REVISION: ${GIT_REVISION:-unknown}
     image: fonbridge-web:local
     container_name: fonbridge-web
     restart: unless-stopped
@@ -81,6 +85,9 @@ services:
       context: ../..
       dockerfile: Dockerfile
       target: worker
+      args:
+        # FO-308 R-1: ops.sh bu değeri HEAD ile karşılaştırır. Derlerken GIT_REVISION=$(git rev-parse HEAD) verin.
+        GIT_REVISION: ${GIT_REVISION:-unknown}
     image: fonbridge-worker:local
     container_name: fonbridge-worker
     restart: unless-stopped
