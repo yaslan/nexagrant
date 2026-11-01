@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { encodeVerifiedOutcome } from '../../src/lib/expert-prereg/server/verified-outcome';
-import { FOUNDER_SEAT_LIMIT, VERIFY_TOKEN_TTL_MS } from '../../src/lib/expert-prereg/server/constants';
+import { EXPERT_PREREG_CONSENT_VERSION, FOUNDER_SEAT_LIMIT, VERIFY_TOKEN_TTL_MS } from '../../src/lib/expert-prereg/server/constants';
 import { shotsDir } from './fixtures/shots';
 import { e2eAuthSecret } from './fixtures/auth-secret';
 
@@ -187,9 +187,24 @@ test.describe('expert pre-registration (FO-20)', () => {
     const dialog = page.getByRole('dialog', { name: 'Uzman Ön Kayıt Aydınlatma Metni' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.');
+    // FO-332: the notice names the product NexaGrant, not FonBridge, and is the version the server stores.
+    await expect(dialog).toContainText('NexaGrant');
+    await expect(dialog).toContainText(`Sürüm: ${EXPERT_PREREG_CONSENT_VERSION}`);
+    await expect(dialog).not.toContainText('FonBridge');
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(page.getByLabel(/KVKK Aydınlatma Metni/)).not.toBeChecked();
+  });
+
+  test('FO-332: the English KVKK notice names NexaGrant and carries the stored version', async ({ page }) => {
+    await page.goto('/en/experts');
+    await page.getByRole('button', { name: 'KVKK Privacy Notice' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Expert Pre-registration Privacy Notice' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('NexaGrant');
+    await expect(dialog).toContainText(`Version: ${EXPERT_PREREG_CONSENT_VERSION}`);
+    await expect(dialog).toContainText('Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.');
+    await expect(dialog).not.toContainText('FonBridge');
   });
 
   test('register → verify mail → Founding Expert number → admin row + CSV; same e-mail refused', async ({
@@ -208,6 +223,12 @@ test.describe('expert pre-registration (FO-20)', () => {
     await noRawMessageKeys(page);
     await expect(page.getByTestId('ep-share-linkedin')).toHaveAttribute('href', /linkedin\.com/);
     await page.screenshot({ path: `${SHOTS}/e2e-02-success.png`, fullPage: true });
+    // FO-332: the stored row names the notice version the visitor saw (kvkk-v4, product NexaGrant).
+    const stored = await withSystemScope('platform-admin', 'e2e.fo332.read', (tx) =>
+      tx.expertPreRegistration.findUnique({ where: { email }, select: { consentTextVersion: true } }),
+    );
+    expect(stored?.consentTextVersion).toBe(EXPERT_PREREG_CONSENT_VERSION);
+    expect(stored?.consentTextVersion).toBe('kvkk-v4');
 
     let link = '';
     await expect

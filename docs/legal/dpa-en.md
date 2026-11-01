@@ -1,6 +1,6 @@
 # Data Processing Agreement (DPA)
 
-**Version:** 1.3 · **Text date:** 2026-10-02 · **Effective date:** the date of the last signature in section 12
+**Version:** 1.4 · **Text date:** 2026-11-02 · **Effective date:** the date of the last signature in section 12
 
 ## Version History
 
@@ -10,7 +10,8 @@
 | 1.0     | 2026-09-08 | Section 7 changed; version number and date were not updated                                                                                 |
 | 1.1     | 2026-10-01 | Parties, notices, signature and effective-date sections added; section 6 aligned with the code; sub-processors listed by name in Annex 1 |
 | 1.2     | 2026-10-01 | Section 13 (language precedence, governing law, jurisdiction) added; GDPR art. 28(3) and KVKK art. 12 elements and the international transfer basis added to sections 4, 5, 7, 8, 9; basis for the "no model training" statement explained in section 5; sections 7.2/7.3 aligned with the actual state (sub-processor contracts and transfer basis as of today); 13.3 jurisdiction set to Samsun; processor legal name added |
-| 1.3     | 2026-10-02 | Y-2: Section 13 (language, governing law, jurisdiction) converted to placeholders and choice lists (law choice deferred to counsel); conflict of laws risk in section 3 noted in 13.1. Y-3: sections 7.2 (art. 28(4) objection rights and sub-processor obligations detail) and 8 (DPIA and prior consultation assistance detail) expanded. Ö-1: section 5 model training provider basis made reference-ready; docs/SECURITY_COMPLIANCE.md:140 verification pending. Ö-2: processing-register.md "Fabrika" role names changed to "FonBridge". |
+| 1.3     | 2026-10-02 | Y-2: Section 13 (language, governing law, jurisdiction) converted to placeholders and choice lists (law choice deferred to counsel); conflict of laws risk in section 3 noted in 13.1. Y-3: sections 7.2 (art. 28(4) objection rights and sub-processor obligations detail) and 8 (DPIA and prior consultation assistance detail) expanded. Ö-1: section 5 model training provider basis made reference-ready; docs/SECURITY_COMPLIANCE.md:140 verification pending. Ö-2: processing-register.md "Fabrika" role names changed to "NexaGrant". |
+| 1.4     | 2026-11-02 | 01.11.2026 — product name NexaGrant (owner decision): the product name "FonBridge" became "NexaGrant"; the first mention now states that NexaGrant is a product of Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. and that this company is the Processor. Legal name, address, tax number and notice address are unchanged. |
 
 ## 1. Parties and Roles
 
@@ -18,14 +19,14 @@ This agreement is made between the two parties whose details are set out in the 
 
 | Detail                     | Controller (customer organisation) | Processor                       |
 | -------------------------- | ---------------------------------- | ------------------------------- |
-| Name                       | ...............................    | FonBridge                       |
+| Name                       | ...............................    | NexaGrant                       |
 | Registered legal name      | ...............................    | Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.             |
 | Address                    | ...............................    | Karasamsun Quarter, İlkadım, SAMSUN [to be completed] |
 | Tax office / tax number    | ...............................    | 29120352230                     |
 | Trade registry (MERSİS) no | ...............................    | ............................... |
 | Notice email address       | ...............................    | info@nexagrant.com              |
 
-The Processor is FonBridge. The Controller is the organisation that uses the FonBridge platform (the "Platform") operated by FonBridge. The Controller determines the purposes and means of processing the personal data it uploads to the Platform. The Processor processes that data only on the Controller's documented instructions.
+The Processor is Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti. NexaGrant is a product of that company. The Controller is the organisation that uses the NexaGrant platform (the "Platform") operated by the Processor. The Controller determines the purposes and means of processing the personal data it uploads to the Platform. The Processor processes that data only on the Controller's documented instructions.
 
 ## 2. Subject Matter and Duration
 

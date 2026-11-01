@@ -1,6 +1,6 @@
 # Ajans Kanalı Aydınlatma Eki — TASLAK (TR + EN)
 
-> Sürüm **0.4-taslak** · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULRRHM9N7XPM (FB-KAMU-2, B12) · Kodla hizalama: TASK-MULWC74HGLY9T, TASK-MULXXDG4O483Y (il, tek pencere, tek kırılım, yuvarlama), TASK-MUM3WSS7DOGJL (B6 karne sonucu kodla eşlendi; davet kodlarının kullanım sınırı kalktı; İNCELEME-12 düzeltmesi: `TASK-MUM3WSS7DOGJL-cs-fb-2.md`) · 29.09 gece: "Google / Microsoft ile kayıtta" → "Google ile kayıtta" (Microsoft girişi `acc35b07` ile kaldırıldı; TASK-MUMNAUBUDL5E7)
+> Sürüm **0.5-taslak** · 02.11.2026 (ilk taslak 29.09.2026) · Hazırlayan: CS-FB · Kart: TASK-MULRRHM9N7XPM (FB-KAMU-2, B12) · Kodla hizalama: TASK-MULWC74HGLY9T, TASK-MULXXDG4O483Y (il, tek pencere, tek kırılım, yuvarlama), TASK-MUM3WSS7DOGJL (B6 karne sonucu kodla eşlendi; davet kodlarının kullanım sınırı kalktı; İNCELEME-12 düzeltmesi: `TASK-MUM3WSS7DOGJL-cs-fb-2.md`) · 29.09 gece: "Google / Microsoft ile kayıtta" → "Google ile kayıtta" (Microsoft girişi `acc35b07` ile kaldırıldı; TASK-MUMNAUBUDL5E7) · 02.11.2026: 01.11.2026 — ürün adı NexaGrant (patron kararı, FO-332); metindeki "FonBridge" ürün adı "NexaGrant" oldu, işletmeci unvanı (`Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.`) ve tarihli kayıtlar değişmedi
 >
 > **Durum: TASLAK. Hukuk onayı YOK. Yayında DEĞİL.** Bu belge bir hukuki metin değildir; hukuk ekibinin önüne konacak bir çalışma taslağıdır. Hukuk incelemesi gereken her yer **[HUKUK]** diye işaretlidir. İşaretsiz bir cümle de hukuken onaylı sayılmaz.
 >
@@ -26,9 +26,9 @@
 
 | Taraf                                                                 | Bu akıştaki rolü                                                                                                                   | Not                                                                                                                                                                                                                                                                                               |
 | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **FonBridge işletmecisi** (unvan: `Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.`, patron 2026-10-17) | Kayıt olan kişinin hesap verisi ve **kurumun ajansa bağlanma kaydı** için veri sorumlusu                                           | **[HUKUK-1]** Unvan patron tarafından verildi (2026-10-17); MERSİS, adres, KEP henüz teyitli değil (`privacy-notice-gap-analysis.md` §4.1). Ekte ana metinle **aynı** kimlik yazılmalı.                                                                                                                                                  |
+| **NexaGrant işletmecisi** (unvan: `Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.`, patron 2026-10-17) | Kayıt olan kişinin hesap verisi ve **kurumun ajansa bağlanma kaydı** için veri sorumlusu                                           | **[HUKUK-1]** Unvan patron tarafından verildi (2026-10-17); MERSİS, adres, KEP henüz teyitli değil (`privacy-notice-gap-analysis.md` §4.1). Ekte ana metinle **aynı** kimlik yazılmalı.                                                                                                                                                  |
 | **Kalkınma ajansı** (ör. OKA)                                         | Davet kodunu dağıtır. Yalnız **anonim, toplulaştırılmış sayılar** alır (§2). Kurumların hesaplarına, içeriğine ve kişilere erişmez | **[HUKUK-2]** Ajans, yalnız anonim veri aldığı için kişisel veri **alıcısı** sayılmaz varsayımıyla yazıldı (KVKK md.3/1-b anonimleştirme; md.28/1-ç istatistik). Bu varsayım §3'teki küçük sayı kuralına bağlıdır. Ajansın **ortak veri sorumlusu** sayılıp sayılmayacağı da hukukçuya sorulmalı. |
-| **Kurum** (kiracı: belediye, KOBİ, …)                                 | Bugün olduğu gibi, kendi yüklediği proje verisi için veri sorumlusu; FonBridge bu veride veri işleyendir (`dpa-tr.md` §1)          | Bu ek kurumun kendi içeriğiyle ilgili rolleri **değiştirmez**.                                                                                                                                                                                                                                    |
+| **Kurum** (kiracı: belediye, KOBİ, …)                                 | Bugün olduğu gibi, kendi yüklediği proje verisi için veri sorumlusu; NexaGrant bu veride veri işleyendir (`dpa-tr.md` §1)          | Bu ek kurumun kendi içeriğiyle ilgili rolleri **değiştirmez**.                                                                                                                                                                                                                                    |
 
 ## 2. Ajansa GİDEN veri — tam liste
 
@@ -99,7 +99,7 @@ Kaynak: kod, commit `897d3608` (TASK-MULRR8P7HIII4, fe-fb). Dosya:satır eşleme
 - **Açık risk (kayıt bağlantısı):** sonuç kodu kayıt sayfasının adresinde (`karne=`) taşındığı için, sayfa isteğinin adresi barındırma sağlayıcısının erişim kayıtlarına yazılırsa kod orada da görülebilir. Bu kurum verisidir (kurum türü + cevaplar), kişi adı ya da e-posta taşımaz. Erişim kayıtlarının saklanması bu belgenin kapsamı dışındadır; HUKUK-12 ile birlikte değerlendirilmeli.
 - **[HUKUK-12]** Karne cevapları kurumun kendi hazırlık değerlendirmesidir. Kutunun hukuki niteliği (rıza mı, aydınlatma + kullanıcının kendi eylemi mi) ve saklama süresi hukukçuya sorulmalı. Bugün sonuç kurum hesabı açık kaldıkça durur; ürün içinden silme yoktur. Kutu davet kodu olmadan kayıt olan kurumlara da çıktığı için, bu işlemenin **ana aydınlatma metnine de** (kodsuz kayıt dahil) yazılıp yazılmayacağı da hukukçuya sorulmalı (il için [HUKUK-11]'deki sorunun aynısı). Envanter satırı: `processing-register.md` §18c (g).
 
-**[HUKUK-3]** Sayıların **üretilmesi** (anonimleştirmeden önceki hesaplama) FonBridge'in veritabanında yapılan bir işlemedir. Bu işlemenin hukuki sebebi için taslak önerisi: KVKK md.5/2-f (meşru menfaat) — gerekçe: kurumun ajans kanalıyla gelmesi ve kanalın ölçülmesi. Alternatif: md.5/2-c (kurumla kurulan sözleşmenin, yani kanal hizmetinin, ifası). Seçim ve gerekirse dengeleme testi hukukçunun.
+**[HUKUK-3]** Sayıların **üretilmesi** (anonimleştirmeden önceki hesaplama) NexaGrant'ın veritabanında yapılan bir işlemedir. Bu işlemenin hukuki sebebi için taslak önerisi: KVKK md.5/2-f (meşru menfaat) — gerekçe: kurumun ajans kanalıyla gelmesi ve kanalın ölçülmesi. Alternatif: md.5/2-c (kurumla kurulan sözleşmenin, yani kanal hizmetinin, ifası). Seçim ve gerekirse dengeleme testi hukukçunun.
 
 ## 3. Ajansa GİTMEYEN veri — açık liste
 
@@ -159,7 +159,7 @@ Saldırgan testi (`src/lib/agency/funnel.attack.test.ts`) hem "silinen kurum say
 **Sürüm:** `<<HUKUK: sürüm ve yürürlük tarihi>>`
 
 **1. Bu ek neyi kapsar?**
-Bu ek, bir kalkınma ajansının verdiği davet koduyla FonBridge'e kayıt olan kurumlar ve bu kurumların kullanıcıları içindir. [Gizlilik Politikası ve KVKK Aydınlatma Metni](/tr/privacy) sizin için aynen geçerlidir. Bu ek, davet koduyla kayıt olunca **ek olarak** ne olduğunu anlatır.
+Bu ek, bir kalkınma ajansının verdiği davet koduyla NexaGrant'a kayıt olan kurumlar ve bu kurumların kullanıcıları içindir. [Gizlilik Politikası ve KVKK Aydınlatma Metni](/tr/privacy) sizin için aynen geçerlidir. Bu ek, davet koduyla kayıt olunca **ek olarak** ne olduğunu anlatır.
 
 **2. Veri sorumlusu**
 `<<HUKUK-1: MERSİS no, merkez adresi, KEP adresi, başvuru e-postası — ana metinle aynı>>`
@@ -179,7 +179,7 @@ Fon hazırlık karnesinden gelip kayıt formundaki "Karne sonucumu hesabıma ekl
 Hesabınız için işlenen diğer veriler (ad, e-posta vb.) ana aydınlatma metninde yazılıdır.
 
 **4. Amaç**
-Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, davet ettiği kurumların FonBridge'i nasıl kullandığını **toplu sayılarla** göstermek.
+Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, davet ettiği kurumların NexaGrant'ı nasıl kullandığını **toplu sayılarla** göstermek.
 
 **5. Hukuki sebep**
 `<<HUKUK-3: md.5/2-f meşru menfaat mi, md.5/2-c sözleşmenin ifası mı; dengeleme testi gerekiyor mu>>`
@@ -188,16 +188,16 @@ Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, davet ettiğ
 Ajans **yalnız toplu kurum sayılarını** görür. Sayılar birikimlidir: ajansın kodlarıyla bugüne kadar kayıt olmuş bütün kurumları kapsar. Ajans şunları görür: kodla kaç kurumun kayıt olduğu; kaç kurumun kayıtlı arama oluşturduğu, bir çağrıyı takibe aldığı ve konsept not ürettiği; kaç kurumun karne sonucunu hesabına eklediği (cevapları ve puanı değil); kaç kurumun en az bir başvurusunu gönderildi olarak işaretlediği ve kaç kurumun en az bir başvurusunun kabul ya da red olarak işaretlendiği. Başvuru sayısını görmez. Bu sayılar bir seferde tek bir kırılımla da gösterilir: ya kurum türüne göre ya da seçilen tek bir ile göre; il ve kurum türü birlikte gösterilmez. Bir grupta 5'ten az kurum varsa ya da sayı başka sayılardan geri hesaplanabiliyorsa sayı gösterilmez, "<5" yazılır. Gösterilen her sayı 5'in katına yuvarlanır; bu yüzden parçaların toplamı toplamı tutmayabilir. Ajans kendi davet kodlarının durumunu da görür (etkin, iptal edildi, süresi doldu); bir kodun kaç kez kullanıldığını görmez. Davet kodlarının kullanım sınırı yoktur. Kullanılamayan bir kodla (süresi dolmuş ya da iptal edilmiş) deneme yapılırsa ajansın kendi kayıt alanına denemenin nedeni ve zamanı yazılır; bu kayıtta deneyen kişinin bilgisi yoktur. Ajansa yeni bir sayı gösterilmeden önce bu ek güncellenir. `<<HUKUK-5: eşik teyidi>>`
 
 **7. Ajans neyi görmez?**
-Kurumunuzun adı ajansa gösterilmez. Ajans ayrıca adınızı, e-postanızı, kurumunuzun hangi davet kodunu kullandığını, karne cevaplarınızı, tek başına kurumunuzun puanını, konsept notlarınızı, yüklediğiniz belgeleri, kayıtlı aramalarınızı ve fatura bilgilerinizi **görmez**. FonBridge bu verileri ajansa aktarmaz.
+Kurumunuzun adı ajansa gösterilmez. Ajans ayrıca adınızı, e-postanızı, kurumunuzun hangi davet kodunu kullandığını, karne cevaplarınızı, tek başına kurumunuzun puanını, konsept notlarınızı, yüklediğiniz belgeleri, kayıtlı aramalarınızı ve fatura bilgilerinizi **görmez**. NexaGrant bu verileri ajansa aktarmaz.
 
 **8. Yurt dışına aktarım**
-Bu ek yeni bir yurt dışı aktarım getirmez. Ajans sayıları FonBridge içindeki panosunda görür. Hesabınızla ilgili yurt dışı aktarımlar ana aydınlatma metninde yazılıdır. `<<HUKUK-6: rapor ileride e-postayla gönderilirse (B3) bu madde yeniden yazılır>>`
+Bu ek yeni bir yurt dışı aktarım getirmez. Ajans sayıları NexaGrant içindeki panosunda görür. Hesabınızla ilgili yurt dışı aktarımlar ana aydınlatma metninde yazılıdır. `<<HUKUK-6: rapor ileride e-postayla gönderilirse (B3) bu madde yeniden yazılır>>`
 
 **9. Saklama süresi**
 Ajans bağı, kurum hesabınız açık kaldığı sürece saklanır. Kurum hesabınız silinirse kurumunuz ajansın sayılarına girmez. Bağ kaldırılırsa (madde 10) bağ kaydının ne kadar tutulacağı: `<<HUKUK-7: süre>>`. Ajansın daha önce gördüğü sayılar anonim olduğu için geri çekilemez.
 
 **10. Haklarınız ve ajans bağını kaldırma**
-KVKK md.11 kapsamındaki haklarınız ana aydınlatma metninde yazılıdır. Ajans bağını bugün ürün içinden kaldıramazsınız. Kurumunuzun yöneticisi madde 11'deki kanaldan talep ederse FonBridge bağı elle kaldırır. Bağ kaldırıldıktan sonra kurumunuz ajansın sayılarına **girmez**. Ürün içinden kaldırma özelliği planlanıyor. `<<ürün kararı A3: elle kaldırma süreci ve yanıt süresi>>` `<<HUKUK-8: bağı kaldırma bir md.11 hakkı mı, sözleşmesel bir seçenek mi>>`
+KVKK md.11 kapsamındaki haklarınız ana aydınlatma metninde yazılıdır. Ajans bağını bugün ürün içinden kaldıramazsınız. Kurumunuzun yöneticisi madde 11'deki kanaldan talep ederse NexaGrant bağı elle kaldırır. Bağ kaldırıldıktan sonra kurumunuz ajansın sayılarına **girmez**. Ürün içinden kaldırma özelliği planlanıyor. `<<ürün kararı A3: elle kaldırma süreci ve yanıt süresi>>` `<<HUKUK-8: bağı kaldırma bir md.11 hakkı mı, sözleşmesel bir seçenek mi>>`
 
 **11. Başvuru**
 `<<HUKUK-1: başvuru kanalı — ana metinle aynı>>`
@@ -211,7 +211,7 @@ KVKK md.11 kapsamındaki haklarınız ana aydınlatma metninde yazılıdır. Aja
 **Version:** `<<LEGAL: version and effective date>>`
 
 **1. What this addendum covers**
-This addendum is for organisations that sign up to FonBridge with an invite code from a regional development agency, and for their users. The [Privacy Policy and Data Protection Notice](/en/privacy) still applies to you in full. This addendum tells you what happens **in addition** when you sign up with an invite code.
+This addendum is for organisations that sign up to NexaGrant with an invite code from a regional development agency, and for their users. The [Privacy Policy and Data Protection Notice](/en/privacy) still applies to you in full. This addendum tells you what happens **in addition** when you sign up with an invite code.
 
 **2. Controller**
 `<<LEGAL-1: legal name, registry number, registered address, contact for data requests — same as the main notice>>`
@@ -231,7 +231,7 @@ If you come from the funding readiness scorecard and tick "Add my scorecard resu
 The other data we process for your account (name, email, etc.) is listed in the main notice.
 
 **4. Purpose**
-To link your organisation to the channel of the agency that invited you, and to show the agency, **as aggregate numbers only**, how the organisations it invited use FonBridge.
+To link your organisation to the channel of the agency that invited you, and to show the agency, **as aggregate numbers only**, how the organisations it invited use NexaGrant.
 
 **5. Legal basis**
 `<<LEGAL-3: legitimate interest (GDPR art.6(1)(f)) or performance of a contract (art.6(1)(b)); balancing test needed?>>`
@@ -240,16 +240,16 @@ To link your organisation to the channel of the agency that invited you, and to 
 The agency sees **aggregate numbers of organisations only**. The numbers are cumulative: they include all organisations that ever signed up with the agency's codes. The agency sees: how many organisations signed up with a code; how many created a saved search, tracked a call and wrote a concept note; how many added their scorecard result to their account (not the answers or the score); how many marked at least one application as submitted, and how many had at least one application marked as accepted or rejected. It does not see the number of applications. The numbers can also be shown with one breakdown at a time: by organisation type, or for one selected province; never by province and type together. If a group has fewer than 5 organisations, or if a number can be worked out from other numbers, the number is not shown; the dashboard shows "<5". Each number shown is rounded to a multiple of 5, so the parts may not add up to the total. The agency also sees the status of its own invite codes (active, revoked, expired); it does not see how many times a code was used. Invite codes have no use limit. If someone tries an unusable code (expired or revoked), the reason and the time are written to the agency's own records. This record contains no information about the person who tried. We update this addendum before the agency is shown any new number. `<<LEGAL-5: threshold>>`
 
 **7. What the agency does not see**
-The agency is not shown your organisation's name. The agency also does **not** see your name, your email, which invite code your organisation used, your scorecard answers, your organisation's own score, your concept notes, the documents you upload, your saved searches or your billing data. FonBridge does not give this data to the agency.
+The agency is not shown your organisation's name. The agency also does **not** see your name, your email, which invite code your organisation used, your scorecard answers, your organisation's own score, your concept notes, the documents you upload, your saved searches or your billing data. NexaGrant does not give this data to the agency.
 
 **8. Transfers outside Türkiye**
-This addendum adds no new transfer outside Türkiye. The agency sees the numbers on its dashboard inside FonBridge. Transfers related to your account are listed in the main notice. `<<LEGAL-6: rewrite this item if a report is later sent by email (B3)>>`
+This addendum adds no new transfer outside Türkiye. The agency sees the numbers on its dashboard inside NexaGrant. Transfers related to your account are listed in the main notice. `<<LEGAL-6: rewrite this item if a report is later sent by email (B3)>>`
 
 **9. How long we keep it**
 We keep the agency link while your organisation's account is open. If your organisation's account is deleted, your organisation is no longer counted in the agency's numbers. If the link is removed (item 10), we keep the link record for `<<LEGAL-7: period>>`. Numbers that the agency already saw are anonymous, so we cannot recall them.
 
 **10. Your rights and removing the agency link**
-Your rights are listed in the main notice. Today you cannot remove the agency link in the product. If an admin of your organisation asks through the contact channel in item 11, FonBridge removes the link manually. After the link is removed, your organisation is no longer counted in the agency's numbers. A way to remove the link in the product is planned. `<<product decision A3: manual removal process and response time>>` `<<LEGAL-8>>`
+Your rights are listed in the main notice. Today you cannot remove the agency link in the product. If an admin of your organisation asks through the contact channel in item 11, NexaGrant removes the link manually. After the link is removed, your organisation is no longer counted in the agency's numbers. A way to remove the link in the product is planned. `<<product decision A3: manual removal process and response time>>` `<<LEGAL-8>>`
 
 **11. Contact**
 `<<LEGAL-1: contact channel — same as the main notice>>`
