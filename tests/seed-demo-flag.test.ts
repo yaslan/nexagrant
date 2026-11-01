@@ -120,6 +120,16 @@ describe('prisma/seed.ts wiring', () => {
     expect(reference).not.toMatch(/\b(?:prisma|tx)\s*\.\s*(?:tenant|user|call|opportunity|moduleState|membership)\s*\./);
   });
 
+  // FO-296: db-setup.sh (CI, gate:isolated, laptops) runs without NODE_ENV, so
+  // the fail-closed default would leave e2e without demo-tenant. The local/CI
+  // setup path must ask for it explicitly, and still let a caller turn it off.
+  it('scripts/db-setup.sh seeds with SEED_DEMO on unless the caller set it', () => {
+    const setup = readFileSync(resolve(import.meta.dirname, '../scripts/db-setup.sh'), 'utf8');
+    const commands = setup.split('\n').filter((l) => !l.trimStart().startsWith('#'));
+    const seeds = commands.filter((l) => /\bpnpm db:seed\b/.test(l));
+    expect(seeds).toEqual(['SEED_DEMO=${SEED_DEMO:-true} pnpm db:seed']);
+  });
+
   it('runs the demo part only after the switch says so', () => {
     const main = body('main');
     const ref = main.indexOf('await seedReferenceData()');
