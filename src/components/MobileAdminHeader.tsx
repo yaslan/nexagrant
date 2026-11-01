@@ -1,13 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import Link from 'next/link';
 import AdminSidebarNav from './AdminSidebarNav';
 import UserMenu, { type UserMenuWorkspace } from './UserMenu';
 import { Menu, X, ShieldCheck } from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { PRODUCT_NAME } from '@/lib/brand';
 import type { ModuleCounts } from '@/lib/modules/registry';
 
 interface MobileAdminHeaderProps {
@@ -32,7 +30,6 @@ export default function MobileAdminHeader({
   moduleCounts,
 }: MobileAdminHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const tCommon = useTranslations('Common');
 
   return (
     <>
@@ -48,7 +45,7 @@ export default function MobileAdminHeader({
           </button>
 
           <Link href={`/${locale}`} title={locale === 'tr' ? 'Ana Sayfa' : 'Home'} className="flex items-center space-x-2 hover:opacity-90 transition">
-            <Image src="/logo.png" alt={tCommon('logoAlt', { brand: PRODUCT_NAME })} width={32} height={32} className="object-contain brightness-0 invert" />
+            <BrandLogo height={28} tone="dark" />
             <span className="font-bold text-sm tracking-tight text-white">Admin</span>
           </Link>
         </div>

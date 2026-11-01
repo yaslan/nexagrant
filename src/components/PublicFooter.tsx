@@ -1,5 +1,5 @@
 import React from 'react';
-import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { getPublicRoute, getWorkspaceRoute } from '@/lib/routes';
@@ -24,7 +24,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
           {/* Col 1: Brand */}
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <Image src="/logo.png" alt={tCommon('logoAlt', { brand: PRODUCT_NAME })} width={72} height={72} className="object-contain" />
+              <BrandLogo height={56} />
             </div>
             <p className="text-muted text-xs leading-relaxed max-w-sm">
               {isTr

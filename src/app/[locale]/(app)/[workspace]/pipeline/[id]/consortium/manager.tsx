@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { addSeat, findCandidates, assignSeat, getConflicts } from './actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import type { ScoringBreakdown } from '@/lib/scoring/consortium';
 import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
-import { dimensionValueText } from '@/modules/m8/components/dimension-value';
+import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 
 // Local types matching prisma/schema.prisma — the generated client is not
 // available here (see src/types/prisma-override.d.ts).
@@ -85,6 +85,7 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
 
 export default function ConsortiumManager({ opportunityId, seats: initSeats, candidates: initCandidates, orgMap }: Props) {
   const t = useTranslations('Consortium');
+  const format = useFormatter();
   const [seats, setSeats] = useState(initSeats);
   const [candidateMap, setCandidateMap] = useState<Record<string, SeatCandidate[]>>(() => {
     const map: Record<string, SeatCandidate[]> = {};
@@ -187,7 +188,10 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
       {/* Conflict Warnings */}
       {conflicts.length > 0 && (
         <div className="bg-bad/10 border border-bad/30 rounded-xl p-4 mb-6">
-          <h3 className="font-bold text-bad mb-2">⚠ Conflicts Detected</h3>
+          <h3 className="font-bold text-bad mb-2">
+            <span aria-hidden="true">⚠ </span>
+            {t('conflict')}
+          </h3>
           <ul className="list-disc list-inside text-xs text-bad">
             {conflicts.map((c, i) => (
               <li key={i}>{c}</li>
@@ -270,6 +274,7 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                                       <dd className="tabular-nums whitespace-nowrap" data-testid={`m8-builder-dimension-${key}`}>
                                         {dimensionValueText(
                                           t,
+                                          format.number,
                                           seatBreakdownWriter(bd) === 'consortium' ? seatScoreDimensionScale('consortium', key) : null,
                                           typeof bd[key] === 'number' ? bd[key] : 0
                                         )}
@@ -280,13 +285,13 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                                 <p className="mt-1">{t('breakdownNote')}</p>
                               </details>
                             )}
-                            <span className="font-bold text-ok text-xs font-mono">{t('scoreOutOf', { score: (typeof c.score === 'number' ? c.score : c.score?.total || 0).toFixed(1) })}</span>
+                            <span className="font-bold text-ok text-xs font-mono">{t('scoreOutOf', { score: scoreNumberText(format.number, typeof c.score === 'number' ? c.score : c.score?.total || 0) })}</span>
                             <button
                               onClick={() => handleAssign(seat.id, c.organizationId)}
                               disabled={isPending}
                               className="text-xs bg-ok text-white font-semibold px-3 py-1 rounded-lg hover:opacity-90 disabled:opacity-50 transition shadow-2xs"
                             >
-                              Invite
+                              {t('invite')}
                             </button>
                           </div>
                         </div>

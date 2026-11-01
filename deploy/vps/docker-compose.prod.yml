@@ -1,0 +1,134 @@
+# Canlı yığın — Hostinger KVM 2 (Frankfurt, Ubuntu 24.04, 2 vCPU / 8 GB / 100 GB).
+# Kart: FO-244 (TASK-MVUMVNK4FCPHD). Adım adım kurulum ve geri alma: deploy/vps/RUNBOOK.md.
+#
+# Dışarıya açık tek port Caddy'nin 80/443'üdür. web ve worker yalnız iç ağda konuşur;
+# postgres yalnız 127.0.0.1'e bağlıdır (sunucu üzerindeki yedek ve ops betikleri için).
+# Redis yok: REDIS_URL hiçbir yerde okunmuyor (FO-243).
+# Python CORDIS servisi bu dosyada YOK: workers/cordis için Dockerfile ve giriş
+# noktası tutarsız (package.json `worker:dev` app:app diyor, dosya main.py). Ayrı kart.
+#
+# Sırlar bu dosyada YOK. İki ayrı dosya (ikisi de git'e girmez, izin 600):
+#   deploy/vps/.env.prod  → uygulama sırları. YALNIZ web ve worker alır.
+#   deploy/vps/.env.db    → süper kullanıcı parolası ve sahip rol (BYPASSRLS) URL'i. YALNIZ postgres alır.
+# Sahip URL'i web/worker konteynerlerinin ortamına HİÇ girmez (FO-301 Y-5): ops.sh onu yalnız tek
+# seferlik `run` konteynerine, host ortamından `-e` ile geçirir.
+# Kullanım (depo kökünden):
+#   docker compose -f deploy/vps/docker-compose.prod.yml up -d --build
+#
+# Bellek sınırları 8 GB'a göre: postgres 2g + web 1536m + worker 1g + caddy 128m
+# = ~4.7 GB; kalan ≈3.3 GB işletim sistemi ve Postgres sayfa önbelleği için (FO-250, Y-2).
+# web'in Node heap'i 1024 MB ile sınırlı (NODE_OPTIONS): aşımda kernel öldürmesi yerine JS OOM hatası.
+# CORDIS içe aktarımı bu yığında koşmaz (tek seferlik konteyner, RUNBOOK §5).
+name: fonbridge
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: fonbridge-caddy
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: runner
+    image: fonbridge-web:local
+    container_name: fonbridge-web
+    restart: unless-stopped
+    env_file: ./.env.prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NODE_OPTIONS=--max-old-space-size=1024
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Uygulamanın kendi sayfa kökü: /api/health yok (kontrol edildi). Sayfa 200 dönene dek sağlıksız sayılır.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    mem_limit: 1536m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: worker
+    image: fonbridge-worker:local
+    container_name: fonbridge-worker
+    restart: unless-stopped
+    # JOBS_CRON_ENABLED .env.prod'da açıkça true/false olmalı; boşsa üretim worker'ı başlamaz (src/lib/env.ts).
+    env_file: ./.env.prod
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: fonbridge-postgres
+    restart: unless-stopped
+    env_file: ./.env.db
+    environment:
+      POSTGRES_USER: fabrika
+      POSTGRES_DB: fabrika
+    # Yalnız loopback: dış ağdan erişilmez; sunucu üzerindeki yedek ve ops betikleri 127.0.0.1:5432'yi kullanır.
+    ports:
+      - "127.0.0.1:${PG_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fabrika -d fabrika"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # shared_buffers ~ RAM'in %25'i; 2g sınırı içinde.
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "max_connections=100"]
+    mem_limit: 2g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  pgdata:
+    name: fonbridge_pgdata
+  caddy_data:
+    name: fonbridge_caddy_data
+  caddy_config:
+    name: fonbridge_caddy_config
