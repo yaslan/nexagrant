@@ -1,0 +1,6 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55102/fabci RLS=postgresql://fabrika_app:***@127.0.0.1:55102/fabci
+vitest exit=0
+typecheck exit=0
+lint exit=0
+rls:verify exit=0
+build exit=0

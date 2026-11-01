@@ -1,0 +1,20 @@
+===== 2026-09-07T17:39:42Z — pnpm db:rls =====
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsx scripts/apply-rls.ts
+✅ prisma/rls.sql applied. Policies in public: 43 → 43
+
+===== pnpm rls:check =====
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsx scripts/check-rls.ts
+Found 40 tenant-scoped models requiring RLS policies:
+AddOn, AiUsageLog, ApiKey, ApplicationPart, ApprovalRequest, AuditEvent, CalendarConnection, Claim, ConceptNote, ConsortiumSeat, CreditLedger, Criterion, Effort, Evaluation, Evidence, Feedback, FollowupDoc, GateDecision, Interaction, Invitation, Invoice, LifetimeLicence, MarketplaceListing, MeetingBrief, Membership, ModuleState, Opportunity, PartnerOrg, Proposal, ProposalUsage, Relationship, Reviewer, SavedSearch, Score, SeatCandidate, Subscription, TenantProfile, TopicMatch, TtoPortfolioItem, Workspace
+
+✅ SUCCESS: All 40 tenant-scoped models have RLS policies registered.
+   (Declared, not measured — `pnpm rls:verify` asks the database.)
+
+===== pnpm rls:verify (live measurement) =====
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsx scripts/check-rls-live.ts
+Kiracıya özel model: 40 · RLS açık tablo: 43 · tenant_isolation politikası: 40
+
+✅ Veritabanı 40 kiracıya özel tablonun tamamında izolasyonu uyguluyor.

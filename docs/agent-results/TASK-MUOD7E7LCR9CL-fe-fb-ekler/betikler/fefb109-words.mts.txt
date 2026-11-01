@@ -1,0 +1,27 @@
+import { chromium } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
+const token = await encode({ token: { sub: 'demo-user-superadmin', id: 'demo-user-superadmin', email: 'admin@yasinaslan.com.tr', tenantId: 'demo-tenant', role: 'TENANT_OWNER' }, secret: process.env.AUTH_SECRET!, salt: 'authjs.session-token', maxAge: 3600 });
+const b = await chromium.launch({ channel: 'chrome' });
+for (const [label, port] of [['once', 3110], ['sonra', 3109]] as const) {
+  const ctx = await b.newContext({ viewport: { width: 768, height: 900 } });
+  await ctx.addCookies([{ name: 'authjs.session-token', value: token, url: `http://localhost:${port}` }]);
+  await ctx.addInitScript(() => { try { localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false })); } catch {} });
+  const p = await ctx.newPage(); await p.goto(`http://localhost:${port}/tr/fabrika-beta/approvals`);
+  await p.getByRole('heading', { name: 'WP3 bütçe revizyonu onayı' }).waitFor();
+  for (const w of [768, 800, 850, 900, 950, 1000, 1023, 1024]) {
+    await p.setViewportSize({ width: w, height: 900 }); await p.waitForTimeout(200);
+    const r = await p.evaluate(() => {
+      const h = [...document.querySelectorAll('main h3')].find((e) => e.textContent === 'WP3 bütçe revizyonu onayı')!;
+      const block = h.parentElement!; const acts = block.nextElementSibling!;
+      let broken: string[] = [];
+      for (const el of [h, block.querySelector('p')!]) {
+        const tn = el.firstChild!; const txt = tn.textContent!; let i = 0;
+        for (const wd of txt.split(' ')) { const rg = document.createRange(); rg.setStart(tn, i); rg.setEnd(tn, i + wd.length); const lines = new Set([...rg.getClientRects()].map((q) => Math.round(q.top))); if (lines.size > 1) broken.push(wd); i += wd.length + 1; }
+      }
+      return `metin=${Math.round(block.getBoundingClientRect().width)} aksiyon=${Math.round(acts.getBoundingClientRect().width)} bölünen=[${broken.join(',')}]`;
+    });
+    console.log(label, w, r);
+  }
+  await ctx.close();
+}
+await b.close();

@@ -1,0 +1,29 @@
+PATH                               CODE CSP  NONCE REPORT SCRPT CACHE
+/                                  307  yes  yes   yes    0     
+/tr                                200  yes  yes   yes    39    private, no-cache, no-store, max-age=0, must-revalidate
+/foo.bar                           404  yes  yes   yes    31    private, no-cache, no-store, max-age=0, must-revalidate
+/tr/yok.html                       404  yes  yes   yes    19    private, no-cache, no-store, max-age=0, must-revalidate
+/a.b/c                             404  yes  yes   yes    19    private, no-cache, no-store, max-age=0, must-revalidate
+/.well-known/security.txt          404  NO   -     -      19    private, no-cache, no-store, max-age=0, must-revalidate
+/blog/v1.2                         404  yes  yes   yes    19    private, no-cache, no-store, max-age=0, must-revalidate
+/en/x.y/z                          404  yes  yes   yes    19    private, no-cache, no-store, max-age=0, must-revalidate
+/tr/yok                            404  yes  yes   yes    19    private, no-cache, no-store, max-age=0, must-revalidate
+/yok                               307  yes  yes   yes    0     
+/foo.js                            404  NO   -     -      31    private, no-cache, no-store, max-age=0, must-revalidate
+/foo.txt                           404  NO   -     -      31    private, no-cache, no-store, max-age=0, must-revalidate
+/x.svg                             404  NO   -     -      31    private, no-cache, no-store, max-age=0, must-revalidate
+/foo.css                           404  NO   -     -      31    private, no-cache, no-store, max-age=0, must-revalidate
+/foo.js.map                        404  NO   -     -      32    private, no-cache, no-store, max-age=0, must-revalidate
+/x.json                            404  yes  yes   yes    31    private, no-cache, no-store, max-age=0, must-revalidate
+/FOO.PNG                           404  yes  yes   yes    31    private, no-cache, no-store, max-age=0, must-revalidate
+/tr/logo.png                       404  yes  yes   yes    19    private, no-cache, no-store, max-age=0, must-revalidate
+/robots.txt                        404  NO   -     -      32    private, no-cache, no-store, max-age=0, must-revalidate
+/sitemap.xml                       404  NO   -     -      32    private, no-cache, no-store, max-age=0, must-revalidate
+/favicon.ico                       200  NO   -     -      0     public, max-age=0, must-revalidate
+/logo.png                          200  NO   -     -      0     public, max-age=0
+/globe.svg                         200  NO   -     -      0     public, max-age=0
+/_next/static/chunks/02whlr2tmk7oe 200  NO   -     -      0     public, max-age=31536000, immutable
+/_next/image?url=%2Flogo.png&w=64& 200  yes  -     -      0     public, max-age=14400, must-revalidate
+/api/health                        404  yes  -     -      19    private, no-cache, no-store, max-age=0, must-revalidate
+/api.html                          404  NO   -     -      31    private, no-cache, no-store, max-age=0, must-revalidate
+/apifoo                            404  NO   -     -      31    private, no-cache, no-store, max-age=0, must-revalidate

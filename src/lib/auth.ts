@@ -1,0 +1,880 @@
+import NextAuth, { type NextAuthConfig } from "next-auth";
+import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { Adapter, AdapterAccount, AdapterSession, AdapterUser } from "next-auth/adapters";
+import type { OrgType, Role } from "@prisma/client";
+import { prisma } from "./db";
+import { withSystemScope } from "./system-scope";
+import { env } from "./env";
+import { errorMessage } from '@/lib/errors';
+import { PRODUCT_NAME } from './brand';
+import { acknowledgementMatchesCurrent } from './legal/consent-documents';
+import {
+  clearRegistrationAcknowledgementCookie,
+  readRegistrationAcknowledgement,
+} from './legal/registration-ack-cookie';
+import { clearRegistrationProvinceCookie, readRegistrationProvince } from './registration-province-cookie';
+import { clearRegistrationReadinessCookie, readRegistrationReadiness } from './registration-readiness-cookie';
+import { readinessSettings, toReadinessCode } from './readiness/account';
+import { toTenantProvince } from './province';
+import { recordAlert } from './observability/system-alert';
+import {
+  bindTransactionToTenant,
+  writeRegistrationConsent,
+} from './legal/registration-consent';
+import { InviteCodeRejectedError, noteInviteRejection, redeemInviteCode } from './agency/codes';
+import { InvalidInviteCodeSignin } from './agency/invite-signin-error';
+import {
+  clearRegistrationInviteCookie,
+  readRegistrationInvite,
+  setRegistrationInviteRefusal,
+} from './agency/registration-invite-cookie';
+import {
+  bootstrapOAuthTenant,
+  decideOAuthSignIn,
+  probeInviteCode,
+  registerOAuthUserWithInvite,
+} from './oauth-registration';
+import { readParkedInvitation } from './invitations/accept-cookie';
+import { readInvitationForSignIn, registerInvitedOAuthUser } from './invitations/accept';
+import {
+  PLATFORM_ADMIN_DEMO_EMAIL,
+  isDemoLoginEnabled,
+  isPlatformAdminDemoEmail,
+} from './demo-login';
+
+/**
+ * TASK-MULSCEK4JHK8X — read once per process. Off unless DEMO_LOGIN_ENABLED=true
+ * outside production; see src/lib/demo-login.ts for what "off" closes.
+ */
+const demoLoginEnabled = isDemoLoginEnabled();
+
+/**
+ * TASK-MTRNQHC3IV2BE — the demo sign-in seeds an ORGANISATION, never a person.
+ *
+ * These entries used to carry a `name` too ("Dr. Mehmet Yılmaz", "Prof. Dr. Ayşe
+ * Kaya", "Dr. Can Demir") and the jwt callback re-applied it on every token
+ * refresh. Two things followed. A real account registered on one of these
+ * addresses was renamed to an invented person with an invented academic title
+ * whatever the User row said, and every screenshot of the product named somebody
+ * who does not exist. src/lib/user-display.ts already states the rule: fall back
+ * only onto data the session actually carries.
+ *
+ * What survives is the tenant scaffolding a first sign-in needs — org name, org
+ * type, seat role, the platform-admin flag. The display name is derived from the
+ * address the user actually signed in with, and after that it is whatever the
+ * User row holds.
+ */
+const DEMO_PROFILES: Record<string, { orgName: string; orgType: OrgType; role: Role; isPlatformAdmin?: boolean }> = {
+  [PLATFORM_ADMIN_DEMO_EMAIL]: {
+    orgName: `${PRODUCT_NAME} HQ`,
+    orgType: "CONSULTANCY",
+    role: "TENANT_OWNER",
+    isPlatformAdmin: true,
+  },
+  // The rule this seat has to satisfy is unchanged: a demo address printed on
+  // the public login page must never look like a real mailbox at a company we
+  // do not control. It was parked on the domain RFC 2606 reserves for
+  // documentation while the brand domain was in flux (TASK-MTV5ESBVAHUEV);
+  // usfinbridge.com is our own domain, so a seat on it names nobody else's
+  // mailbox and reads as ours rather than as a placeholder (owner's decision,
+  // 2026-09-10, TASK-MTV69TO4K8NVZ). If this ever has to move off a domain the
+  // company owns, move it back to that reserved domain — never invent a
+  // plausible third-party one.
+  "demo@usfinbridge.com": {
+    orgName: `${PRODUCT_NAME} SME Ar-Ge Ltd.`,
+    orgType: "SME",
+    role: "TENANT_OWNER",
+  },
+  "ayse@tto.edu.tr": {
+    orgName: "İstanbul Teknik Üniversitesi TTO",
+    orgType: "UNIVERSITY",
+    role: "TENANT_OWNER",
+  },
+  "can@arge-lab.com": {
+    orgName: "Biyo-Teknoloji Araştırma Merkezi",
+    orgType: "RESEARCH",
+    role: "PIPELINE_MANAGER",
+  },
+};
+
+const baseAdapter = PrismaAdapter(prisma);
+
+/**
+ * The Prisma adapter with every call wrapped so a database outage degrades to a
+ * signed-in session instead of a 500. Typed as `Adapter` rather than `any` so a
+ * method whose signature drifts from Auth.js is a build error.
+ */
+/**
+ * TASK-MUM676F010E9G — which users the adapter's `createUser` really created in
+ * this process, and whether it already built their tenant.
+ *
+ * Auth.js calls `events.createUser` after linking an OAuth login to an
+ * EXISTING user by e-mail too (@auth/core handle-login.js, the
+ * allowDangerousEmailAccountLinking branch), not only after a new one. The
+ * event used to bootstrap a tenant every time, so linking Google to an
+ * existing account gave that person a second, empty "My Organization" tenant
+ * (found by tests/oauth-registration.live.test.ts). The event now bootstraps
+ * only a user this map says is new, and only once. Same request, same process:
+ * the entry is set by the adapter and removed by the event.
+ *
+ * - 'pending': a plain registration; the event builds the tenant.
+ * - 'bootstrapped': an invite-code registration (the adapter already built the
+ *   tenant) or a tenant-invitation registration (the adapter joined the
+ *   inviting tenant; there is no tenant to build, TASK-MUN2793A57Z9I).
+ */
+const createdByAdapter = new Map<string, 'pending' | 'bootstrapped'>();
+
+/**
+ * İNCELEME-12 Ö-1 (TASK-MUM74FUB1DRCM) — the province and scorecard cookies are
+ * single use, like the invite and acknowledgement cookies. Each `createUser`
+ * that could read them clears them straight after, whether or not the
+ * registration then succeeds. They used to be only read, so a result parked
+ * for a sign-up abandoned at Google's consent screen stayed for 15 minutes and
+ * was written onto whichever account registered next in that browser.
+ */
+async function clearRegistrationChoiceCookies(): Promise<void> {
+  await clearRegistrationProvinceCookie();
+  await clearRegistrationReadinessCookie();
+}
+
+const safeAdapter: Adapter = {
+  ...baseAdapter,
+  async createUser(user: AdapterUser) {
+    // TASK-MUN2793A57Z9I — a Google registration started from a tenant
+    // invitation's accept screen joins the inviting tenant and opens none of
+    // its own. The signIn callback let it through only with a verified,
+    // matching address and a current acknowledgement (decideOAuthSignIn);
+    // registerInvitedOAuthUser checks the invitation again and does user,
+    // membership, spent link and consent rows in one transaction. No fake-user
+    // fallback: a failure here must not become an account without the join.
+    // The invitation cookie stays: the accept screen it returns to reads it.
+    const parkedInvitation = await readParkedInvitation();
+    if (parkedInvitation) {
+      await clearRegistrationInviteCookie();
+      await clearRegistrationChoiceCookies();
+      try {
+        const created = await registerInvitedOAuthUser(prisma, {
+          user,
+          token: parkedInvitation.token,
+          locale: parkedInvitation.locale,
+        });
+        // 'bootstrapped': the adapter already did everything; events.createUser
+        // must not build a tenant for this user.
+        createdByAdapter.set(created.id, 'bootstrapped');
+        return created as AdapterUser;
+      } finally {
+        await clearRegistrationAcknowledgementCookie();
+      }
+    }
+    // ADR-0006 — an OAuth registration with an agency invite code. The signIn
+    // callback has already refused a bad code, a stale cookie and a missing
+    // acknowledgement; this is where the code is actually used, atomically
+    // with the account. No fake-user fallback on this path (see
+    // registerOAuthUserWithInvite).
+    const invite = await readRegistrationInvite();
+    if (invite.status === 'ok') {
+      if (!acknowledgementMatchesCurrent(invite.invite.acknowledgement, { agency: true })) {
+        await clearRegistrationInviteCookie();
+        await clearRegistrationChoiceCookies();
+        throw new Error('registration refused: agency addendum not acknowledged');
+      }
+      const province = await readRegistrationProvince();
+      const readiness = await readRegistrationReadiness();
+      await clearRegistrationChoiceCookies();
+      try {
+        const created = await registerOAuthUserWithInvite(prisma, {
+          user,
+          code: invite.invite.code,
+          locale: invite.invite.locale === 'en' ? 'en' : 'tr',
+          province,
+          readiness,
+        });
+        createdByAdapter.set(created.id, 'bootstrapped');
+        return created as AdapterUser;
+      } catch (e) {
+        if (e instanceof InviteCodeRejectedError) {
+          // Only reachable if the code died between the signIn probe and here.
+          await noteInviteRejection(prisma, invite.invite.code).catch((err) =>
+            console.warn(`[AuthAdapter.createUser] could not record a refused invite code: ${errorMessage(err)}`)
+          );
+          // Auth.js reports this as `Configuration`; the note lets pages.error
+          // show the invite message instead (İNCELEME-14 K-1).
+          await setRegistrationInviteRefusal(invite.invite.locale === 'en' ? 'en' : 'tr');
+        }
+        throw e;
+      } finally {
+        await clearRegistrationInviteCookie();
+        await clearRegistrationAcknowledgementCookie();
+      }
+    }
+    try {
+      const created = await baseAdapter.createUser!(user);
+      createdByAdapter.set(created.id, 'pending');
+      return created;
+    } catch (e) {
+      console.warn(`[AuthAdapter.createUser] DB error/fallback: ${errorMessage(e)}`);
+      return {
+        id: `user-oauth-${Date.now()}`,
+        email: user.email,
+        name: user.name || user.email?.split("@")[0],
+        image: user.image,
+        emailVerified: new Date(),
+      };
+    }
+  },
+  async getUser(id: string) {
+    try {
+      return await baseAdapter.getUser!(id);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getUser] DB error/fallback: ${errorMessage(e)}`);
+      return null;
+    }
+  },
+  async getUserByEmail(email: string) {
+    try {
+      return await baseAdapter.getUserByEmail!(email);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getUserByEmail] DB error/fallback: ${errorMessage(e)}`);
+      return null;
+    }
+  },
+  async getUserByAccount(account: Pick<AdapterAccount, 'provider' | 'providerAccountId'>) {
+    try {
+      return await baseAdapter.getUserByAccount!(account);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getUserByAccount] DB error/fallback: ${errorMessage(e)}`);
+      return null;
+    }
+  },
+  // The Adapter contract lets these return either the row or nothing; the
+  // wrappers normalise the adapter's `void` to `undefined` (the same value at
+  // runtime) so one arm of the union covers both the success and the fallback.
+  async linkAccount(account: AdapterAccount): Promise<AdapterAccount | undefined> {
+    try {
+      return (await baseAdapter.linkAccount!(account)) ?? undefined;
+    } catch (e) {
+      console.warn(`[AuthAdapter.linkAccount] DB error/fallback: ${errorMessage(e)}`);
+      return account;
+    }
+  },
+  async createSession(session: { sessionToken: string; userId: string; expires: Date }) {
+    try {
+      return await baseAdapter.createSession!(session);
+    } catch (e) {
+      console.warn(`[AuthAdapter.createSession] DB error/fallback: ${errorMessage(e)}`);
+      return session;
+    }
+  },
+  async getSessionAndUser(sessionToken: string) {
+    try {
+      return await baseAdapter.getSessionAndUser!(sessionToken);
+    } catch (e) {
+      console.warn(`[AuthAdapter.getSessionAndUser] DB error/fallback: ${errorMessage(e)}`);
+      return null;
+    }
+  },
+  async updateSession(
+    session: Partial<AdapterSession> & Pick<AdapterSession, 'sessionToken'>
+  ): Promise<AdapterSession | null | undefined> {
+    try {
+      return await baseAdapter.updateSession!(session);
+    } catch (e) {
+      console.warn(`[AuthAdapter.updateSession] DB error/fallback: ${errorMessage(e)}`);
+      // The fallback echoes the patch it was given, which is a partial session
+      // by construction — the database is what would have filled the rest in.
+      // Sessions are JWT-backed here, so nothing reads this value.
+      return session as AdapterSession;
+    }
+  },
+  async deleteSession(sessionToken: string): Promise<AdapterSession | null | undefined> {
+    try {
+      return (await baseAdapter.deleteSession!(sessionToken)) ?? undefined;
+    } catch (e) {
+      console.warn(`[AuthAdapter.deleteSession] DB error/fallback: ${errorMessage(e)}`);
+      return undefined;
+    }
+  },
+};
+
+/**
+ * The pool could not hand out a connection: a new one took longer than
+ * `connectionTimeoutMillis` (src/lib/db.ts) to open, or the wait for a free one
+ * did. The query never reached the database.
+ */
+const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect/;
+
+/**
+ * The jwt callback reads the database on every request, so a burst after an
+ * idle spell opens several connections at once; on a loaded host one of them
+ * can miss the 1 s deadline, and that one request came back tenantless
+ * (TASK-MUNWZA26VGK0B, İNCELEME-68 Ö-2). That read is retried once. Anything
+ * else — a query error, or the second attempt failing too — is thrown to the
+ * callback, which stays fail-closed.
+ */
+async function retryOnceIfNotConnected<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (e) {
+    if (!NOT_CONNECTED.test(errorMessage(e))) throw e;
+    return read();
+  }
+}
+
+/**
+ * The tenant an `unstable_update({ tenantId })` call asks the token to be
+ * bound to. The payload is whatever the caller sent (a browser can POST it to
+ * /api/auth/session as well), so it is only a request: the jwt callback binds
+ * to it only when the user holds a membership there.
+ */
+function requestedTenantOf(session: unknown): string | null {
+  if (typeof session !== "object" || session === null) return null;
+  const tenantId = (session as { tenantId?: unknown }).tenantId;
+  return typeof tenantId === "string" && tenantId.trim() !== "" ? tenantId : null;
+}
+
+/**
+ * The whole configuration, exported so the live test can run the real
+ * callbacks, adapter and events behind a fake OAuth provider
+ * (tests/oauth-registration.live.test.ts, TASK-MUM676F010E9G). Nothing else
+ * should build a second NextAuth from it.
+ */
+export const authConfig = {
+  adapter: safeAdapter,
+  session: { strategy: "jwt" },
+  trustHost: true,
+  // No fallback: a literal here was a signing key anyone with the repository
+  // could use to mint a session for any user, and it silenced Auth.js's own
+  // MissingSecret check. Startup refuses to run without it (src/instrumentation.ts).
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  basePath: "/api/auth",
+  pages: {
+    // İNCELEME-12 Ö-1 (TASK-MUM74FUB1DRCM) — ADR-0006: an OAuth sign-in starts
+    // only from loginWithSocialAction, which writes or clears every registration
+    // cookie first. Without this, `GET /api/auth/signin` rendered Auth.js's own
+    // page, whose buttons start Google past that action. Auth.js now
+    // redirects that page here, and its sign-in errors (OAuthAccountNotLinked,
+    // OAuthCallbackError, …) land here as `?error=<type>` too.
+    signIn: "/tr/giris",
+    // İNCELEME-14 K-1 (TASK-MUMAC8JELIZ5H) — errors of kind "error"
+    // (Configuration, AdapterError, …) used to render Auth.js's English page.
+    // This route sends them to the login card, and a registration whose invite
+    // code died after the signIn probe to the invite message.
+    error: "/api/auth/hata",
+  },
+  providers: [
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET,
+      // Linking by e-mail stays on, but the signIn callback lets it happen only
+      // when Google says the address is verified (ADR-0006, providerVerifiedEmail
+      // in src/lib/oauth-registration.ts). Google is the only OAuth provider
+      // (ADR-0006, owner decision 29.09: Microsoft Entra removed).
+      allowDangerousEmailAccountLinking: true,
+    }),
+    // TASK-MULSCEK4JHK8X — this provider checks no password, so it is only
+    // registered when demo sign-in is on. Off, `/api/auth/callback/credentials`
+    // has no provider to sign anyone in with.
+    ...(demoLoginEnabled ? [Credentials({
+      name: "Email / Demo",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        // The versions of the privacy notice and terms that were on screen when
+        // the box was ticked — not a bare "true". A stale tab that showed an
+        // older notice sends an older stamp and is refused, because accepting
+        // it would record agreement to a text the person never read.
+        // See src/lib/legal/consent-documents.ts.
+        acknowledgement: { label: "Acknowledgement", type: "text" },
+        // FB KAMU B1 (TASK-MULRQJQYM0NAM): an agency invite code from
+        // /kayit?kod=…. Only the registration branch reads it; signing in to an
+        // existing account ignores it (linking an existing tenant is not B1).
+        inviteCode: { label: "Invite code", type: "text" },
+        // TASK-MULV3JXS1AW5X — optional province of the new organisation. Read
+        // on the registration branch only, and only one of TR_PROVINCES counts.
+        province: { label: "Province", type: "text" },
+        // FB KAMU B6 (TASK-MULRR8P7HIII4) — the scorecard result code, sent
+        // only when the person ticked "add my result to my account". Read on
+        // the registration branch only; an existing account is never changed.
+        readiness: { label: "Readiness result", type: "text" },
+      },
+      async authorize(credentials) {
+        const email = (credentials?.email as string)?.trim()?.toLowerCase();
+        if (!email) return null;
+
+        const acknowledgement = credentials?.acknowledgement;
+        const inviteCode =
+          typeof credentials?.inviteCode === "string" && credentials.inviteCode.trim()
+            ? credentials.inviteCode
+            : null;
+        // Every account opened here is a TR tenant (below), so the province is
+        // judged against "TR". A value outside the list is dropped, not refused.
+        const province = toTenantProvince(credentials?.province, "TR");
+        // B6 — a code that does not decode exactly is dropped, not refused.
+        const readiness = toReadinessCode(credentials?.readiness);
+
+        const demoProfile = DEMO_PROFILES[email];
+        // Derived from the address the user typed, never from a profile table.
+        // `email` is non-empty (checked above) and `String.split` always yields at
+        // least one element, so the local part is never undefined; `?? email` is the
+        // type checker's fallback, not a behaviour change.
+        const computedName = (email.split("@")[0] ?? email)
+          .replace(/[._]/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+
+        try {
+          // Find or create user. No `include: { memberships: true }`: nothing in
+          // `authorize` reads them (the jwt callback does its own membership
+          // lookup below), and the include is what made this variable
+          // `User & { memberships }` while the create path a few lines down
+          // returns a plain `User` — the type mismatch that
+          // src/types/prisma-override.d.ts was hiding, and the reason `user`
+          // read as possibly null all the way to the return.
+          let user = await prisma.user.findUnique({ where: { email } });
+
+          if (!user) {
+            // TASK-MTSWLANXSU0IG (A3) — this branch is the registration. Signing
+            // in with an address nobody has used before does not authenticate
+            // anyone; it CREATES an account, a tenant and an owner membership.
+            // Until now it did that without ever telling the person what would
+            // be done with their data, and without leaving a trace that it had.
+            //
+            // The check sits here, before the transaction, because refusing is
+            // only meaningful while there is still nothing to undo. An existing
+            // user signing in is untouched: they acknowledged the notice when
+            // they registered, and demanding it again on every sign-in would
+            // teach people to tick past it.
+            // With an invite code the stamp must name the agency addendum too
+            // (TASK-MUM676F010E9G): a stamp from a screen that never showed it
+            // cannot open an account linked to an agency.
+            if (!acknowledgementMatchesCurrent(acknowledgement, { agency: inviteCode !== null })) {
+              console.warn(
+                '[Auth.authorize] registration refused: privacy notice and terms were not acknowledged, or the version acknowledged is no longer current'
+              );
+              return null;
+            }
+
+            // Auto create user and organization
+            user = await prisma.$transaction(async (tx) => {
+              const newUser = await tx.user.create({
+                data: {
+                  email,
+                  name: computedName,
+                  locale: "tr",
+                  // No `isPlatformAdmin` here, ever. A demo seat's admin right
+                  // is the `demoAdmin` claim (jwt callback), which dies with the
+                  // flag. Written to the row it outlived the flag, and with
+                  // `allowDangerousEmailAccountLinking` the Google account on
+                  // that address became a platform admin (TASK-MULU7GVFBTRXX K-2).
+                },
+              });
+
+              // FB KAMU B1 — the code is used in THIS transaction, so a
+              // registration that fails later gives the use back. Every kind
+              // of unusable code comes back as null and ends the registration
+              // the same way: no account, one uniform message.
+              let agencyId: string | null = null;
+              if (inviteCode) {
+                agencyId = await redeemInviteCode(tx, inviteCode);
+                if (!agencyId) throw new InviteCodeRejectedError();
+              }
+
+              const tenant = await tx.tenant.create({
+                data: {
+                  name: demoProfile?.orgName || `${computedName} Kuruluşu`,
+                  slug: `org-${newUser.id.slice(-6)}`,
+                  country: "TR",
+                  orgType: demoProfile?.orgType || "SME",
+                  province,
+                  // B6 — the scorecard result, only with the person's tick.
+                  settings: readinessSettings(readiness),
+                  // No plan is written: a tenant without a subscription is on
+                  // Discover (FALLBACK_PLAN_ID), which is what a code grants.
+                  agencyId,
+                },
+              });
+
+              // Everything below this line writes a tenant-scoped table, so the
+              // transaction has to carry a tenant from here on. See
+              // bindTransactionToTenant for why registration cannot use
+              // `withTenant` and what was silently relying on a superuser
+              // connection before this call existed.
+              await bindTransactionToTenant(tx, tenant.id);
+
+              const workspace = await tx.workspace.create({
+                data: {
+                  tenantId: tenant.id,
+                  name: "Ana Çalışma Alanı",
+                  slug: "default",
+                },
+              });
+
+              await tx.membership.create({
+                data: {
+                  userId: newUser.id,
+                  tenantId: tenant.id,
+                  role: demoProfile?.role || "TENANT_OWNER",
+                  workspaceIds: [workspace.id],
+                },
+              });
+
+              // In the SAME transaction as the account it is about. If this
+              // write fails, the user, tenant, workspace and membership all
+              // roll back with it — an account whose disclosure cannot be
+              // proven is exactly the state this card exists to remove, so it
+              // must not be reachable by a partial failure either.
+              await writeRegistrationConsent(tx, {
+                tenantId: tenant.id,
+                userId: newUser.id,
+                locale: "tr",
+                agency: agencyId !== null,
+              });
+
+              if (agencyId) {
+                await tx.auditEvent.create({
+                  data: {
+                    tenantId: tenant.id,
+                    actorId: newUser.id,
+                    type: "agency.invite.redeemed",
+                    data: { agencyId },
+                  },
+                });
+              }
+
+              return newUser;
+            });
+          }
+          // An existing user is signed in as they are: no write. This branch
+          // used to set `User.isPlatformAdmin = true` for the demo admin seat
+          // (and `name` before that) — see the create call above for why not.
+
+          // `user` is `User | null` all the way down this branch: the lookup can
+          // miss and the create path is an assignment TypeScript does not carry
+          // through the if/else. src/types/prisma-override.d.ts hid the four
+          // TS18047 "possibly null" errors, so the only thing standing between a
+          // null here and `Cannot read properties of null (reading 'id')` inside
+          // `authorize` was luck. A sign-in with no user row is refused, not
+          // dereferenced — returning null is NextAuth's "these credentials are
+          // not valid", which is the truthful answer.
+          if (!user) {
+            console.error('[Auth.authorize] sign-in refused: no user row after lookup/create');
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name || computedName,
+            image: user.image,
+          };
+        } catch (error) {
+          // FB KAMU B1 — the transaction has rolled back (no user, no tenant,
+          // no use of the code). Count the refusal on its own connection, then
+          // refuse with the one message every unusable code gets. This must
+          // come before the demo fallback below, which would otherwise sign
+          // the person in as a demo user.
+          if (error instanceof InviteCodeRejectedError) {
+            await noteInviteRejection(prisma, inviteCode).catch((e) =>
+              console.warn(`[Auth.authorize] could not record a refused invite code: ${errorMessage(e)}`)
+            );
+            throw new InvalidInviteCodeSignin();
+          }
+          // Signing in against a fabricated user id is a development
+          // convenience only: in production — or with demo sign-in off, where
+          // this provider is not even registered — a database outage must fail
+          // the sign-in, not mint a session for an account nobody verified.
+          if (env.NODE_ENV === "production" || !demoLoginEnabled) {
+            console.error(`[Auth.authorize] sign-in refused, database unavailable: ${errorMessage(error)}`);
+            return null;
+          }
+          console.warn(`[Auth.authorize] DB fallback for demo: ${errorMessage(error)}`);
+          // Deliberately tenantless — see the jwt callback below.
+          return {
+            id: email === PLATFORM_ADMIN_DEMO_EMAIL ? "superadmin-yasin" : "demo-user-mehmet",
+            email,
+            name: computedName,
+          };
+        }
+      },
+    })] : []),
+  ],
+  callbacks: {
+    /**
+     * ADR-0006 / TASK-MUM676F010E9G — runs after Google answers and
+     * before the adapter writes anything: the one point an OAuth registration
+     * can still be refused cleanly. The rules are in
+     * src/lib/oauth-registration.ts; this only wires them to the database and
+     * the cookie jar. Credentials (demo) sign-ins do their own checks in
+     * `authorize` and pass straight through.
+     */
+    async signIn({ user, account, profile }) {
+      if (!account || (account.type !== "oauth" && account.type !== "oidc")) return true;
+      const decision = await decideOAuthSignIn(
+        {
+          provider: account.provider,
+          providerAccountId: account.providerAccountId,
+          email: user?.email,
+          profile: profile as Record<string, unknown> | undefined,
+        },
+        {
+          accountExists: async (provider, providerAccountId) =>
+            (await prisma.account.findUnique({
+              where: { provider_providerAccountId: { provider, providerAccountId } },
+              select: { userId: true },
+            })) !== null,
+          userExistsByEmail: async (email) =>
+            (await prisma.user.findUnique({ where: { email }, select: { id: true } })) !== null,
+          readInvite: readRegistrationInvite,
+          readAcknowledged: readRegistrationAcknowledgement,
+          probeInviteCode: (code) => probeInviteCode(prisma, code),
+          noteRejection: (code) => noteInviteRejection(prisma, code),
+          clearInvite: clearRegistrationInviteCookie,
+          readInvitation: readInvitationForSignIn,
+        }
+      );
+      // İNCELEME-13 B-1 — the plain acknowledgement belongs to the one
+      // registration it was ticked for. A returning login, an e-mail link, an
+      // invite registration (its tick is in the invite cookie) and any refusal
+      // spend it here; only a plain registration leaves it for
+      // events.createUser, which records it and clears it.
+      if (!(decision.allow && decision.plainRegistration)) {
+        await clearRegistrationAcknowledgementCookie();
+      }
+      if (decision.allow) return true;
+      // A refused registration is over; the next one starts from
+      // loginWithSocialAction again (İNCELEME-12 Ö-1).
+      await clearRegistrationChoiceCookies();
+      return decision.redirect;
+    },
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
+        token.image = user.image;
+      }
+
+      // Two claims, two sources, both recomputed on EVERY call (TASK-MULU7GVFBTRXX Ö-2).
+      // They used to share `isPlatformAdmin`, which was only ever set to true:
+      // a token minted while demo sign-in was on stayed admin after the flag
+      // went off, and a crafted claim on a non-admin user was believed.
+      //
+      // `demoAdmin` — the demo seat's grant. With demo sign-in off an e-mail
+      // address grants nothing, and the session callback ignores this claim.
+      // (`token.name = demo.name` used to run here on every refresh, so the DB
+      // name lost to a hardcoded one; only the grant is left.)
+      const emailLower = typeof token.email === "string" ? token.email.toLowerCase() : null;
+      token.demoAdmin =
+        demoLoginEnabled &&
+        emailLower !== null &&
+        (DEMO_PROFILES[emailLower]?.isPlatformAdmin === true || isPlatformAdminDemoEmail(emailLower));
+
+      // `isPlatformAdmin` — the database's answer, read below. Fail closed: no
+      // user id, no row, or no database means no platform admin for this call.
+      const claimedAdmin = token.isPlatformAdmin === true;
+      token.isPlatformAdmin = false;
+
+      if (typeof token.id === "string") {
+        // Role and tenant are re-read on EVERY call too (TASK-MUNQB0GR306U0,
+        // İNCELEME-59 Y-2). They used to be read only on sign-in or while the
+        // token had no tenant, so a member demoted or removed kept the old
+        // role for as long as the token lived — 30 days, sliding.
+        //
+        // The token stays bound to the tenant it was given: `boundTenantId`
+        // survives the loss of the membership, so a removed member of tenant A
+        // who also belongs to B is left tenantless, never moved to B behind
+        // their back. Only a sign-in picks a tenant afresh.
+        //
+        // The one other way to move the bond is an explicit request:
+        // `unstable_update({ tenantId })` (trigger "update") after the user
+        // accepted an invitation (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1). It is
+        // honoured only when the membership exists, so it grants nothing the
+        // user does not already have; asked for a tenant they are not in, the
+        // token stays where it was.
+        const heldTenantId = typeof token.tenantId === "string" ? token.tenantId : token.boundTenantId;
+        const boundTenantId = trigger !== "signIn" && typeof heldTenantId === "string" ? heldTenantId : null;
+        const requestedTenantId = trigger === "update" ? requestedTenantOf(session) : null;
+        const lookupTenantIds = [...new Set([requestedTenantId, boundTenantId])].filter(
+          (id): id is string => typeof id === "string"
+        );
+        // Nothing is kept from the previous call: whatever the lookup below
+        // does not grant again, the token no longer has.
+        delete token.tenantId;
+        delete token.role;
+        delete token.workspaceIds;
+        delete token.boundTenantId;
+        if (boundTenantId) token.boundTenantId = boundTenantId;
+        try {
+          // One Prisma call, as before: the flag plus at most one membership
+          // row — the bound tenant's, or the oldest one when none is bound.
+          // Prisma sends it as two statements, the second on the
+          // (tenantId, userId) unique index. Only a rebind request asks for
+          // two rows: the requested tenant's and, as a fallback, the bound one.
+          //
+          // A soft-deleted tenant (`Tenant.deletedAt`, in its hold before the
+          // purge) grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1). Its
+          // row is filtered in the same statement, so a token bound to it goes
+          // tenantless like a removed member's, a sign-in skips it, and a
+          // rebind request for it keeps the token where it was — as an
+          // invitation to it is already refused (src/lib/invitations/accept.ts).
+          // Clearing `deletedAt` gives the same token its tenant back.
+          //
+          // Through the system scope (TASK-MUPYHVSBW47GD#auth): "Membership" is
+          // FORCE ROW LEVEL SECURITY under `tenant_isolation`, and this lookup is
+          // what DISCOVERS the tenant, so there is no app.tenant_id to give it.
+          // Under the superuser of local dev and CI it worked by accident; under
+          // fabrika_app (production, Supabase) it read ZERO memberships and every
+          // session came out tenantless ("no workspace", "no role"). The read
+          // stays bound to `userId`: the relation filter is
+          // "Membership"."userId" = token.id, so no other user's row can match.
+          const userId = token.id;
+          const dbUser = await retryOnceIfNotConnected(() => withSystemScope('tenant-discovery', 'auth.jwt.membership', (tx) => tx.user.findUnique({
+            where: { id: userId },
+            select: {
+              name: true,
+              isPlatformAdmin: true,
+              memberships: {
+                where: {
+                  tenant: { deletedAt: null },
+                  ...(lookupTenantIds.length === 0
+                    ? {}
+                    : lookupTenantIds.length === 1
+                      ? { tenantId: lookupTenantIds[0] }
+                      : { tenantId: { in: lookupTenantIds } }),
+                },
+                orderBy: { createdAt: "asc" },
+                take: Math.max(1, lookupTenantIds.length),
+                select: { tenantId: true, role: true, workspaceIds: true },
+              },
+            },
+          })));
+          token.isPlatformAdmin = dbUser?.isPlatformAdmin === true;
+          // Narrowed off the element itself rather than off `.length`: an absent
+          // membership must leave the token tenantless, which is the same safe
+          // outcome the catch below documents.
+          const activeMembership =
+            dbUser?.memberships?.find((m) => m.tenantId === requestedTenantId) ?? dbUser?.memberships?.[0];
+          if (dbUser && activeMembership) {
+            token.tenantId = activeMembership.tenantId;
+            token.boundTenantId = activeMembership.tenantId;
+            token.role = activeMembership.role;
+            token.workspaceIds = activeMembership.workspaceIds;
+            if (dbUser.name) token.name = dbUser.name;
+          }
+        } catch (e) {
+          if (claimedAdmin) {
+            console.warn(`[Auth.jwt] platform-admin lookup failed, admin withheld for this request: ${errorMessage(e)}`);
+          }
+          // No fallback tenant here on purpose. A hardcoded demo tenant id
+          // used to be assigned when the membership lookup failed, which
+          // handed the session a tenant it was never granted — and some of
+          // those ids match real rows in the database. A tenantless token is
+          // the safe outcome: the UI routes such a user to the "no workspace"
+          // screen instead of into another tenant's data. See src/lib/tenant.ts.
+          console.warn(`[Auth.jwt] membership lookup failed, session stays tenantless: ${errorMessage(e)}`);
+        }
+      }
+
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = (token.id as string) || (token.sub as string);
+        session.user.name = (token.name as string) || session.user.name;
+        session.user.email = (token.email as string) || session.user.email;
+        session.user.image = (token.image as string) || session.user.image;
+        // tenantId/role are only ever what the membership lookup produced.
+        // Defaulting them (to a demo tenant, or to TENANT_OWNER) is how a user
+        // with no membership silently gained another tenant's data and an
+        // owner's permissions.
+        // The token is a `Record<string, unknown>` (see src/types/next-auth.d.ts
+        // for why it is not augmented), so each claim is narrowed on the way out
+        // rather than asserted.
+        session.tenantId = typeof token.tenantId === "string" ? token.tenantId : null;
+        session.role = typeof token.role === "string" ? token.role : null;
+        session.workspaceIds = Array.isArray(token.workspaceIds)
+          ? token.workspaceIds.filter((id): id is string => typeof id === "string")
+          : [];
+        // `demoAdmin` counts only while demo sign-in is on, so a token minted
+        // before the flag went off carries it to nothing (TASK-MULU7GVFBTRXX Ö-2).
+        session.isPlatformAdmin =
+          token.isPlatformAdmin === true || (demoLoginEnabled && token.demoAdmin === true);
+      }
+      return session;
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      const userId = user.id;
+      if (!userId) return;
+      // Only a user the adapter just created (see createdByAdapter): a linked
+      // existing account already has its tenant. An invite-code registration
+      // has one too — the adapter built it with the agency link and the
+      // consent rows in one transaction.
+      const created = createdByAdapter.get(userId);
+      createdByAdapter.delete(userId);
+      if (created !== 'pending') {
+        // A linked existing account uses none of them; they are spent anyway,
+        // so they cannot wait here for the next registration.
+        await clearRegistrationChoiceCookies();
+        await clearRegistrationAcknowledgementCookie();
+        return;
+      }
+
+      // TASK-MTSWLANXSU0IG (A3) — the OAuth half of registration. Read before
+      // the transaction opens: `cookies()` wants the request context, and
+      // holding a transaction open across it buys nothing.
+      const acknowledged = await readRegistrationAcknowledgement();
+      // TASK-MULV3JXS1AW5X — the optional province, parked the same way.
+      const province = await readRegistrationProvince();
+      // FB KAMU B6 — the scorecard result, parked only when the box was ticked.
+      const readiness = await readRegistrationReadiness();
+      await clearRegistrationChoiceCookies();
+
+      try {
+        await prisma.$transaction((tx) =>
+          bootstrapOAuthTenant(tx, {
+            userId,
+            userName: user.name,
+            province,
+            readiness,
+            agencyId: null,
+            // Only when the acknowledgement really travelled with this sign-up.
+            // Writing the rows unconditionally would be the worst outcome
+            // available here: a record asserting that someone was shown a
+            // notice when nothing knows whether they were. A missing record is
+            // a known gap; a fabricated one is a false answer to an audit.
+            acknowledged,
+          })
+        );
+      } catch (err) {
+        console.warn(`[Auth.createUser] DB error: ${errorMessage(err)}`);
+      }
+      // Single use: the acknowledgement has been recorded (or found missing).
+      await clearRegistrationAcknowledgementCookie();
+
+      // Outside the transaction: an account that exists without a disclosure
+      // record is a compliance defect, not a reason to undo the registration.
+      // The alert is what makes it visible — silence here is what let the gap
+      // live unmeasured until this card.
+      if (!acknowledged) {
+        await recordAlert({
+          level: 'warn',
+          source: 'auth-registration-consent',
+          message: 'Account created without a disclosure acknowledgement record',
+          meta: { userId, path: 'oauth-createUser' },
+          // A new `userId` every registration meant one alert per affected
+          // account and a console that grew with signup volume. The
+          // registration path is the problem an operator fixes, so it is the
+          // key. Folding costs nothing recoverable: the affected accounts are
+          // exactly the `User` rows with no matching `Consent` row, which is a
+          // query, not something the alert trail has to carry.
+          dedupeKey: 'auth-registration-consent:oauth-createUser',
+        });
+      }
+    },
+  },
+} satisfies NextAuthConfig;
+
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth(authConfig);

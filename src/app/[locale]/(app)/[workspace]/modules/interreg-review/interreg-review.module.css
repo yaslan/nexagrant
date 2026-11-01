@@ -1,0 +1,36 @@
+/*
+ * M17 Interreg pre-assessment screen tokens (FO-189). The owner asked for vivid
+ * pink upload areas and Fonbridge blue actions; they belong to this module only,
+ * so they live here and never in globals.css. Light and dark, each measured for
+ * WCAG AA (dark zones over --surface #0B1324): white on --m17-pink 4.60:1 / 6.04:1,
+ * white on --m17-blue 5.17:1 / 6.70:1, --m17-pink-ink on its zone 7.22:1 / 9.4:1,
+ * --muted on the zone 4.99:1 (light), --m17-ok on its zone 5.21:1 / 10.4:1.
+ */
+.root {
+  --m17-pink: #db2777; /* pink-600: pink-500 #ec4899 is 3.53:1 with white text */
+  --m17-pink-hover: #be185d;
+  --m17-pink-zone: #fdf2f8;
+  --m17-pink-zone-active: #fce7f3;
+  --m17-pink-line: #ec4899;
+  --m17-pink-ink: #9d174d;
+  --m17-blue: #2563eb; /* blue-600 */
+  --m17-blue-hover: #1d4ed8;
+  --m17-ok: #047857;
+  --m17-ok-zone: #ecfdf5;
+  --m17-ok-line: #6ee7b7;
+}
+
+:global(.dark) .root,
+:global([data-theme='dark']) .root {
+  --m17-pink: #be185d;
+  --m17-pink-hover: #9d174d;
+  --m17-pink-zone: rgba(236, 72, 153, 0.1);
+  --m17-pink-zone-active: rgba(236, 72, 153, 0.2);
+  --m17-pink-line: #f472b6;
+  --m17-pink-ink: #f9a8d4;
+  --m17-blue: #1d4ed8;
+  --m17-blue-hover: #1e40af;
+  --m17-ok: #6ee7b7;
+  --m17-ok-zone: rgba(16, 185, 129, 0.12);
+  --m17-ok-line: #047857;
+}

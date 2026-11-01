@@ -1,0 +1,30 @@
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt
+
+ ❯ tests/stale-relationship-reminder.live.test.ts (25 tests | 1 failed) 1697ms
+     × re-running the idempotency backfill leaves a day the user already claimed off "Membership" (İNCELEME-106 Y-1) 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > re-running the idempotency backfill leaves a day the user already claimed off "Membership" (İNCELEME-106 Y-1)
+error: operator does not exist: text >= date
+ ❯ node_modules/.pnpm/pg@8.23.0/node_modules/pg/lib/client.js:694:17
+ ❯ tests/stale-relationship-reminder.live.test.ts:797:7
+    795|     await client.connect();
+    796|     try {
+    797|       await client.query(sql);
+       |       ^
+    798|       await client.query(sql);
+    799|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 24 passed (25)
+   Start at  20:51:44
+   Duration  2.15s (transform 177ms, setup 0ms, import 361ms, tests 1.70s, environment 0ms)
+

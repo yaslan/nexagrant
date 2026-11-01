@@ -1,0 +1,17 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { actionReturnLeaks, hasUseServerDirective } from '../tests/api/action-leak-scan.ts';
+const walk = (d: string): string[] => readdirSync(d).flatMap((n) => { const f = join(d, n); return statSync(f).isDirectory() ? walk(f) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [f] : []; });
+const files = walk('src');
+const t0 = performance.now(); const c0 = process.cpuUsage();
+let actions = 0, leaksInActions = 0;
+const other: [string, number[]][] = [];
+for (const f of files) {
+  const s = readFileSync(f, 'utf8');
+  if (hasUseServerDirective(s, f)) { actions++; leaksInActions += actionReturnLeaks(s, f).length; }
+  else if (/catch\s*\(|\.catch\(|\.then\(/.test(s)) { const l = actionReturnLeaks(s, f); if (l.length) other.push([f, l]); }
+}
+const c = process.cpuUsage(c0);
+console.log(`files=${files.length} actionFiles=${actions} leaksInActions=${leaksInActions} wall=${(performance.now()-t0).toFixed(0)}ms`);
+console.log(`non-action files with catch-return flow: ${other.length}`);
+for (const [f, l] of other) console.log(f, JSON.stringify(l));

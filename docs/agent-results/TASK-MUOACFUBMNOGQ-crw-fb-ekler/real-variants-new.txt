@@ -1,0 +1,6 @@
+files=529 bareSpecs=263
+today: aliasProblems=[] specDiffs=0 [] useServer=44 findings=0 [] cpu=0.53s
+baseUrl .: aliasProblems=[] specDiffs=0 [] useServer=44 findings=0 [] cpu=0.50s
+baseUrl ./src: aliasProblems=[] specDiffs=0 [] useServer=44 findings=0 [] cpu=0.51s
+catch-all *: aliasProblems=[] specDiffs=0 [] useServer=44 findings=0 [] cpu=0.41s
+catch-all * + baseUrl .: aliasProblems=[] specDiffs=0 [] useServer=44 findings=0 [] cpu=0.43s

@@ -1,0 +1,21 @@
+13:06  up 15:19, 1 user, load averages: 34.04 29.88 31.17
+vitest EXIT=0
+live-skip gate: 41 live files, 363 live tests passed, 1 allowed skip(s)
+  allowed: tests/k1-embeddings.live.test.ts :: K1 embeddings (live, REAL OpenAI) real vectors rank each tenant’s own topic first [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload types outside the list, a type that disagrees with the extension, and bad sizes get no URL [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload the URL signs type and length and carries no empty-body checksum (B-3) [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload the store refuses a PUT whose type differs from the signed one [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload the store refuses a PUT larger or smaller than the signed length [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a key that was never uploaded, and writes no row [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a stored object whose bytes are not the key’s type, and removes that one object [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a stored object whose content type is not the key’s, even with PDF bytes [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload confirm refuses a stored object over the limit, whatever size the browser claims [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-1: only an allowed type of a bounded size gets a signed upload positive control: a real PDF goes through, and the row records the store’s size and type [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant a CONFIDENTIAL file cannot be read without a session, neither from the store nor through the app [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant another tenant’s evidence is a 404 and no signed URL is handed out [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant a row of A that names B’s object does not open it [skipped]
+  SKIPPED: tests/evidence-upload-s3.live.test.ts :: B-2: evidence is read only by a signed-in member of its tenant positive control: the owner gets a 5-minute signed download of the same bytes, as an attachment [skipped]
+live-skip gate: FAILED — a live test did not run. In CI that is a false green; see scripts/live-skip-gate.ts.
+gate EXIT=1
+ Test Files  274 passed | 2 skipped (276)
+      Tests  3326 passed | 22 skipped (3348)

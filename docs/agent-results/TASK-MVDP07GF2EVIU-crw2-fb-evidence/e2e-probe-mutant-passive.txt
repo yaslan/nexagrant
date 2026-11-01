@@ -1,0 +1,171 @@
+
+
+
+
+[e2e-gate] Dev server info: PID=59036
+[e2e-gate] Test data: INVOICE_SUPPLIER_NAME loaded
+
+Running 6 tests using 1 worker
+
+[1/6] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast keys under 8x CPU: editor and saved row hold every character
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast keys under 8x CPU: editor and saved row hold every character
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PROBE OK keys
+
+[2/6] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast insertText under 8x CPU: editor and saved row hold every character
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast insertText under 8x CPU: editor and saved row hold every character
+PROBE OK insertText
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[3/6] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast keys under 8x CPU: editor and saved row hold every character
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast keys under 8x CPU: editor and saved row hold every character
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PROBE OK keys
+
+[4/6] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast insertText under 8x CPU: editor and saved row hold every character
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast insertText under 8x CPU: editor and saved row hold every character
+PROBE OK insertText
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+[5/6] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast keys under 8x CPU: editor and saved row hold every character
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast keys under 8x CPU: editor and saved row hold every character
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.seed"}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PROBE OK keys
+
+[6/6] [chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast insertText under 8x CPU: editor and saved row hold every character
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[chromium] › ../FONBRIDGE/.claude/worktrees/crw2fb-review-fo77/tests/e2e/zz-crw2-rewind-probe.spec.ts:34:9 › crw2 rewind probe › fast insertText under 8x CPU: editor and saved row hold every character
+PROBE OK insertText
+
+[DEBUG] cross-tenant read {"purpose":"platform-admin","context":"e2e.session.cleanup"}
+
+  6 passed (3.5m)
+exit=0

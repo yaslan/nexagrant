@@ -1,0 +1,44 @@
+# O6-deleted-tenant-filter [Ö-6] scripts/k1-embeddings-unlock-rejected.ts
+# - 'where: { deletedAt: null, '
+# + 'where: { '
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ tests/k1-embeddings-unlock.live.test.ts (6 tests | 1 failed) 1998ms
+     × deleted tenants are not unlocked (Ö-6) 153ms
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 121 passed | 1 skipped (123)
+   Start at  22:02:36
+   Duration  3.96s (transform 3.86s, setup 0ms, import 7.11s, tests 3.97s, environment 0ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+(node:85327) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/k1-embeddings-unlock.live.test.ts > k1-embeddings-unlock-rejected (live, fabrika_app) > deleted tenants are not unlocked (Ö-6)
+AssertionError: expected [ 't-active-5z26aytb', …(1) ] to deeply equal [ 't-active-5z26aytb' ]
+
+- Expected
++ Received
+
+  [
+    "t-active-5z26aytb",
++   "t-deleted-5z26aytb",
+  ]
+
+ ❯ tests/k1-embeddings-unlock.live.test.ts:189:49
+    187|       const r = await unlockRejected({ tenantIds: [T_DELETED, T_ACTIVE…
+    188|       // Only the active tenant's profile is cleared
+    189|       expect(r.profiles.map((p) => p.tenantId)).toEqual([T_ACTIVE]);
+       |                                                 ^
+    190|       const deletedProfile = await admin.tenantProfile.findUnique({ wh…
+    191|       const activeProfile = await admin.tenantProfile.findUnique({ whe…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

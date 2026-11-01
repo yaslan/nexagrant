@@ -1,0 +1,6 @@
+pnpm exec,prisma,db,push EXIT 0 | │    npm i @prisma/client@latest                          │ / └─────────────────────────────────────────────────────────┘
+pnpm -s,db:rls-role EXIT 0 |    DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@localhost:55476/fabrika / $ tsx scripts/setup-rls-role.ts
+bash scripts/apply-migrations.sh EXIT 0 | psql:<stdin>:23: NOTICE:  column "rateWindowCount" of relation "ApiKey" already exists, skipping / psql:<stdin>:49: NOTICE:  relation "Evidence_tenantId_r2ObjectKey_key" already exists, skipping
+bash scripts/apply-migrations.sh EXIT 0 | psql:<stdin>:23: NOTICE:  column "rateWindowCount" of relation "ApiKey" already exists, skipping / psql:<stdin>:49: NOTICE:  relation "Evidence_tenantId_r2ObjectKey_key" already exists, skipping
+pnpm -s,db:rls EXIT 0 | ✅ prisma/rls.sql applied. Policies in public: 28 → 112 / $ tsx scripts/apply-rls.ts
+pnpm -s,db:seed EXIT 0 | $ tsx prisma/seed.ts /   G0 demo evidence: skipping 5 K1 match(es) — no such Topic: demo-topic-1, demo-topic-2, demo-topic-3, demo-topic-5, demo-topic-6. G0 alignment (weight 30) stays unseeded.

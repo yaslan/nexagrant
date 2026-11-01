@@ -1,0 +1,6 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/oauth-registration.live.test.ts > acknowledgement cookie is spent by every OAuth outcome (İNCELEME-13 B-1) > crw-fb's scenario: A ticks and gives up, B starts unticked with a new Google account — refused, no user, no consent
+ FAIL  tests/teardown-where-guard.test.ts > test teardowns cannot run a filterless deleteMany/updateMany > no test file in the repo has an unguarded where
+ Test Files  2 failed | 254 passed | 2 skipped (258)
+      Tests  2 failed | 3120 passed | 9 skipped (3131)
+exit=1

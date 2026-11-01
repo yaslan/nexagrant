@@ -1,0 +1,84 @@
+// cs-fb TASK-MUNTFQ8Q5Z9UM — browser evidence, NOT committed. Real clicks on `next start`.
+import { chromium, type Page } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
+import { prisma } from '../src/lib/db';
+import { PLAN_E2E, seed } from '../scripts/seed-plan-e2e';
+
+const BASE = process.env.BASE_URL ?? 'http://localhost:3071';
+const OUT = process.env.SHOTS!;
+const U = PLAN_E2E.ultra;
+const COOKIE = 'authjs.session-token';
+
+async function doc(kind: string) {
+  return prisma.followupDoc.create({ data: { tenantId: U.tenantId, opportunityId: U.opportunityId, kind, version: 1 }, select: { id: true } });
+}
+const inViewport = async (page: Page, sel: string) =>
+  page.locator(sel).evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const inWindow = r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth && r.height > 0;
+    // Not clipped by an overflow ancestor: both text ends are the topmost element there.
+    const y = r.top + r.height / 2;
+    const a = document.elementFromPoint(r.left + 4, y);
+    const b = document.elementFromPoint(r.right - 4, y);
+    return inWindow && !!a && !!b && el.contains(a) && el.contains(b);
+  });
+
+async function main() {
+  await seed();
+  await prisma.membership.update({ where: { tenantId_userId: { tenantId: U.tenantId, userId: U.userId } }, data: { role: 'WRITER' } });
+  await prisma.followupDoc.deleteMany({ where: { tenantId: U.tenantId, opportunityId: U.opportunityId } });
+  const cookie = await encode({ token: { sub: U.userId, id: U.userId, name: 'i65 Writer', email: U.email, tenantId: U.tenantId, role: 'WRITER' }, secret: process.env.AUTH_SECRET!, salt: COOKIE, maxAge: 3600 });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME });
+  const results: Record<string, unknown> = {};
+  for (const [label, width, height] of [['390', 390, 844], ['1440', 1440, 900]] as const) {
+    await prisma.followupDoc.deleteMany({ where: { tenantId: U.tenantId, opportunityId: U.opportunityId } });
+    const nda = await doc('NDA');
+    const variant = await doc('NDA ');           // a pre-fix row, as crw-fb spoofed it
+    const esrOk = await doc('ESR_DEBRIEF');
+    const esrGone = await doc('AWARD_PACK');     // removed after load → DOC_NOT_FOUND refusal
+    const ctx = await browser.newContext({ viewport: { width, height } });
+    await ctx.addCookies([{ name: COOKIE, value: cookie, url: BASE }]);
+    await ctx.addInitScript(() => localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: true, marketing: true })));
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}/tr/${U.workspaceSlug}/opportunities/${U.opportunityId}/documents`, { waitUntil: 'networkidle' });
+    const r: Record<string, unknown> = {};
+    r.signButtons = {
+      nda: await page.getByTestId(`sign-${nda.id}`).count(),
+      variant: await page.getByTestId(`sign-${variant.id}`).count(),
+      esr: await page.getByTestId(`sign-${esrOk.id}`).count(),
+      award: await page.getByTestId(`sign-${esrGone.id}`).count(),
+    };
+    await page.getByTestId(`submit-approval-${variant.id}`).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${OUT}/i65fix-${label}-table.png` });
+    // Legal filter: the "NDA " row is listed there now.
+    await page.getByRole('button', { name: /Yasal Anlaşmalar/ }).first().click();
+    r.legalFilterRows = await page.locator('tbody tr').count();
+    r.legalFilterVariantVisible = await page.getByTestId(`submit-approval-${variant.id}`).isVisible();
+    await page.getByTestId(`submit-approval-${variant.id}`).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${OUT}/i65fix-${label}-legal-filter.png` });
+    await page.getByRole('button', { name: /Tüm Dokümanlar/ }).first().click();
+    // Y-1: a refusal is said under the clicked row, in view.
+    await prisma.followupDoc.delete({ where: { id: esrGone.id } });
+    await page.getByTestId(`sign-${esrGone.id}`).scrollIntoViewIfNeeded();
+    await page.getByTestId(`sign-${esrGone.id}`).click();
+    const alert = page.getByTestId(`sign-error-${esrGone.id}`);
+    await alert.waitFor();
+    r.refusalText = await alert.innerText();
+    r.refusalInViewport = await inViewport(page, `[data-testid="sign-error-${esrGone.id}"]`);
+    await page.screenshot({ path: `${OUT}/i65fix-${label}-row-refusal.png` });
+    // Counterfactual: a direct kind still signs with one click.
+    await page.getByTestId(`sign-${esrOk.id}`).scrollIntoViewIfNeeded();
+    await page.getByTestId(`sign-${esrOk.id}`).click();
+    await page.waitForFunction((id) => !document.querySelector(`[data-testid="sign-${id}"]`), esrOk.id);
+    r.esrSignedAt = (await prisma.followupDoc.findUnique({ where: { id: esrOk.id }, select: { signedAt: true } }))?.signedAt;
+    r.ndaRow = await prisma.followupDoc.findUnique({ where: { id: nda.id }, select: { signedAt: true } });
+    r.variantRow = await prisma.followupDoc.findUnique({ where: { id: variant.id }, select: { signedAt: true } });
+    await page.screenshot({ path: `${OUT}/i65fix-${label}-esr-signed.png` });
+    results[label] = r;
+    await ctx.close();
+  }
+  await browser.close();
+  console.log(JSON.stringify(results, null, 2));
+  await prisma.$disconnect();
+}
+main().catch((e) => { console.error(e); process.exit(1); });

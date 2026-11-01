@@ -1,0 +1,28 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/macbook/alan/FONBRIDGE/.claude/worktrees/fo61-ps-api
+
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+10:43:03 AM [vite] (ssr) warning: invalid import "../../src/app/[locale]/(app)/[workspace]/modules/${manifest.key}/page". A file extension must be included in the static part of the import. For example: import(`./foo/${bar}.js`).
+  Plugin: vite:dynamic-import-vars
+  File: /Users/macbook/alan/FONBRIDGE/.claude/worktrees/fo61-ps-api/tests/modules/coming-soon.test.tsx
+(node:29738) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Not implemented: Window's open() method
+Not implemented: navigation to another Document
+(node:29763) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29770) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29745) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:29782) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  62 passed (62)
+      Tests  931 passed (931)
+   Start at  10:43:00
+   Duration  12.43s (transform 7.28s, setup 0ms, import 33.39s, tests 41.79s, environment 3.99s)
+

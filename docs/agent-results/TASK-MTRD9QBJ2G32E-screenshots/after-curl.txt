@@ -1,0 +1,78 @@
+===== AFTER — 2026-09-07T17:43:21Z — supplier identity configured via env (test values, server process only) =====
+tenant A = cmtri5doi0000fuxk0efrc9d2   invoice A = FB-MTRD9QBJ2G32E-A-0001
+tenant B = cmtri5dos0001fuxkgabtxdch   invoice B = FB-MTRD9QBJ2G32E-B-0001
+
+### 1) var olan fatura + DOĞRU kiracı  →  beklenen 200
+HTTP/1.1 200 OK
+vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+cache-control: private, no-store
+content-disposition: attachment; filename="FB-MTRD9QBJ2G32E-A-0001_UBL_TR.xml"
+content-type: application/xml; charset=utf-8
+Date: Mon, 07 Sep 2026 17:43:21 GMT
+
+### 2) OLMAYAN id  →  beklenen 404
+HTTP/1.1 404 Not Found
+content-type: application/json
+{"error":"invoice_not_found"}
+### 3) BAŞKA KİRACININ id'si (kiracı sızıntısı testi)  →  beklenen 404
+HTTP/1.1 404 Not Found
+content-type: application/json
+{"error":"invoice_not_found"}
+### 4) OTURUMSUZ çağrı, uydurma id  (DÜZELTME ÖNCESİ: 200 + uydurma e-Fatura)  →  beklenen 401
+HTTP/1.1 401 Unauthorized
+content-type: application/json
+{"error":"unauthorized"}
+### 5) desteklenmeyen format  →  beklenen 400
+HTTP/1.1 400 Bad Request
+{"error":"unsupported_format","supported":["xml","pdf","html"]}
+### belge GERÇEK satırdan üretiliyor mu (200 gövdesi, ilk 26 satır)
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
+  <cbc:ProfileID>TICARIFATURA</cbc:ProfileID>
+  <cbc:ID>FB-MTRD9QBJ2G32E-A-0001</cbc:ID>
+  <cbc:CopyIndicator>false</cbc:CopyIndicator>
+  <cbc:UUID>dd97ae62-dda9-4cc5-8aef-3001ba0a3791</cbc:UUID>
+  <cbc:IssueDate>2026-09-07</cbc:IssueDate>
+  <cbc:IssueTime>09:15:00</cbc:IssueTime>
+  <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
+  <cbc:Note>ÖRNEK BELGE — GİB'e gönderilmemiştir, mali mühür taşımaz ve mali değeri yoktur.</cbc:Note>
+  <cbc:DocumentCurrencyCode>TRY</cbc:DocumentCurrencyCode>
+
+  <!-- Tedarikçi / Satıcı Bilgileri -->
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="VKN">1000000000</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>E2E Test Tedarikçi A.Ş.</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+
+### emekli edilen uydurma sabitler gövdede var mı?
+  yok: 3810459281
+  yok: 3880194821
+  yok: Maslak Vergi Dairesi
+  yok: c8f3b4a1-7d2e-4b9c-8a1f-3e5d7c9b0a2f
+  yok: FonBridge Teknoloji
+  yok: mali mühür ile onaylanmıştır
+
+### ETTN: DB satırı == belge?
+  satır: dd97ae62-dda9-4cc5-8aef-3001ba0a3791
+  belge: dd97ae62-dda9-4cc5-8aef-3001ba0a3791
+
+### tutar: satırda 250000 minor unit → belgede
+<cbc:PriceAmount currencyID="TRY">2500.00
+
+===== 2026-09-07T17:46:20Z — aynı sunucu, tedarikçi kimliği YAPILANDIRILMAMIŞ (deponun gerçek hâli) =====
+### var olan fatura + doğru kiracı → belge ÜRETİLMEZ, eksik ayarlar ADIYLA söylenir
+HTTP/1.1 503 Service Unavailable
+content-type: application/json
+{"error":"supplier_identity_not_configured","missing":["INVOICE_SUPPLIER_NAME","INVOICE_SUPPLIER_VKN","INVOICE_SUPPLIER_TAX_OFFICE","INVOICE_SUPPLIER_ADDRESS","INVOICE_SUPPLIER_CITY"]}
+### olmayan id, yapılandırma olmadan da 404 (arama, tedarikçi kontrolünden ÖNCE)
+HTTP/1.1 404 Not Found
+{"error":"invoice_not_found"}

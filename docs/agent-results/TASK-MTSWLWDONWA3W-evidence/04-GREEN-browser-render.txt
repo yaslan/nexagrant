@@ -1,0 +1,16 @@
+
+=== USD — as a browser renders it ===
+Para Birimi: USD
+Sıra	Hizmet / Ürün Açıklaması	Miktar	Birim Fiyat	KDV Oranı	Toplam Tutar
+1	Fabrika Pro (1 ay)	1 Adet	$99,00	%20	$99,00
+Ara Toplam (Matrah):	$99,00
+ÖDENECEK GENEL TOPLAM:	$118,80
+  lira sign visible: false · dollar sign visible: true
+
+=== TRY — as a browser renders it ===
+Para Birimi: TRY
+Sıra	Hizmet / Ürün Açıklaması	Miktar	Birim Fiyat	KDV Oranı	Toplam Tutar
+1	Fabrika Pro (1 ay)	1 Adet	₺99,00	%20	₺99,00
+Ara Toplam (Matrah):	₺99,00
+ÖDENECEK GENEL TOPLAM:	₺118,80
+  lira sign visible: true · dollar sign visible: false

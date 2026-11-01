@@ -1,0 +1,59 @@
+'use server';
+
+import { withTenant } from '@/lib/db';
+import { auth } from '@/lib/auth';
+import { can } from '@/lib/rbac';
+import { Role } from '@prisma/client';
+import { resolveDashboardRange } from '@/modules/m5/server/range';
+import { opportunityCsv, type OpportunityCsvRow } from '@/lib/dashboard/opportunity-csv';
+
+export async function exportDashboardCSV(params: {
+  from?: string;
+  to?: string;
+}): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    const session = (await auth()) as unknown;
+    const sessionObj = session as { tenantId?: string; role?: string } | null;
+    const tenantId = sessionObj?.tenantId;
+
+    if (!tenantId) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // The export carries the same tenant data as the dashboard, so it needs the
+    // same permission — the endpoint must not be softer than the page linking to it.
+    if (!can(sessionObj?.role as Role | undefined, 'evaluate_gates')) {
+      return { success: false, error: 'Forbidden' };
+    }
+
+    // Same resolution as the page, so the CSV matches what the user is looking at.
+    const { from: fromDate, rangeEnd } = resolveDashboardRange(params.from, params.to);
+
+    // Tenant scope goes through withTenant so RLS backs up the explicit filter.
+    const opportunities = await withTenant<OpportunityCsvRow[]>(tenantId, async (tx) =>
+      tx.opportunity.findMany({
+        // `deletedAt: null`: an archived opportunity is off the dashboard, so it must be off
+        // the export the dashboard links to — otherwise the CSV contradicts the screen.
+        where: { tenantId, deletedAt: null, createdAt: { gte: fromDate, lte: rangeEnd } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          stage: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+    );
+
+    return {
+      success: true,
+      data: opportunityCsv(opportunities),
+    };
+  } catch (error) {
+    // Keep database detail server-side; the caller gets a stable, generic reason.
+    console.error('[Dashboard] CSV export failed:', error);
+    return { success: false, error: 'ExportFailed' };
+  }
+}

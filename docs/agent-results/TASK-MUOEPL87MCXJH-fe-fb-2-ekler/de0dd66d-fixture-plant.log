@@ -1,0 +1,2 @@
+plant: HATA -> Foreign key constraint violated on the constraint: `ApprovalRequest_requesterId_fkey`
+temizlik: approval=0 opp=1 user=1

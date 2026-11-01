@@ -1,0 +1,458 @@
+import http from 'node:http';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { PrismaClient } from '@prisma/client';
+
+/**
+ * İNCELEME-103 (TASK-MUOBDG82TXKKS, devop-fb) — fe-fb's confirm pool fix
+ * (TASK-MUO9IFMMVRUDJ) under attack. Unlike the evidence suites, nothing in
+ * @/lib/db is mocked: this process runs with DATABASE_URL = the fabrika_app
+ * (RLS subject) URL, so `withTenant` is the real application pool (10) and
+ * `withTenantLockPool` the real lock pool (3), as in production.
+ * The store is MinIO behind an in-process proxy that injects delay.
+ */
+
+const S3 = {
+  endpoint: process.env.EVIDENCE_S3_TEST_ENDPOINT!,
+  bucket: process.env.EVIDENCE_S3_TEST_BUCKET!,
+};
+const ADMIN_URL = process.env.DVP_ADMIN_URL!;
+const RUN = `dvp103-${Date.now().toString(36)}`;
+
+type Session = { user: { id: string }; tenantId: string; role: string };
+const als = vi.hoisted(() => new (process.getBuiltinModule('node:async_hooks').AsyncLocalStorage)<Session>());
+const state = vi.hoisted(() => {
+  const e = process.env;
+  const proxyPort = 33000 + (process.pid % 3000);
+  e.R2_ACCOUNT_ID = 'minio-test';
+  e.R2_ENDPOINT = `http://127.0.0.1:${proxyPort}`;
+  e.R2_ACCESS_KEY_ID = e.EVIDENCE_S3_TEST_ACCESS_KEY;
+  e.R2_SECRET_ACCESS_KEY = e.EVIDENCE_S3_TEST_SECRET_KEY;
+  e.R2_BUCKET = e.EVIDENCE_S3_TEST_BUCKET;
+  return {
+    proxyPort,
+    session: null as null | Session,
+    hook: null as null | ((r: { method: string; path: string; isCopy: boolean }) => Promise<void>),
+    copyLog: [] as { at: number; dst: string; status: number }[],
+  };
+});
+vi.mock('@/lib/auth', () => ({ auth: async () => als.getStore() ?? state.session }));
+vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
+
+const db = await import('@/lib/db');
+const evidence = await import('@/app/[locale]/(app)/[workspace]/evidence/actions');
+const storage = await import('@/lib/storage');
+
+let admin: PrismaClient;
+let proxy: http.Server;
+const t = { a: '', b: '', userA: '', userB: '' };
+const keys: string[] = [];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const log = (...a: unknown[]) => { console.log('ATK', ...a); if (process.env.DVP_LOG) process.getBuiltinModule('node:fs').appendFileSync(process.env.DVP_LOG, `ATK ${a.map(String).join(' ')}\n`); };
+const finalOf = (k: string) => k.replace(/^([^/]+)\/incoming\//, '$1/');
+const PDF = (s: string) => Buffer.from(`%PDF-1.4\n% ${s}\n%%EOF\n`);
+const lockKeyOf = (finalKey: string) => createHash('sha256').update(`evidence-confirm:${finalKey}`).digest().readBigInt64BE(0);
+const put = (url: string, body: Buffer) =>
+  fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: new Uint8Array(body) });
+const sessA = (): Session => ({ user: { id: t.userA }, tenantId: t.a, role: 'TENANT_OWNER' });
+const sessB = (): Session => ({ user: { id: t.userB }, tenantId: t.b, role: 'TENANT_OWNER' });
+
+async function uploaded(name: string, s: Session = sessA()) {
+  return als.run(s, async () => {
+    const body = PDF(name);
+    const p = await evidence.getPresignedUploadUrlAction('certificate', `${name}.pdf`, 'application/pdf', body.length);
+    if (!p.success) throw new Error(`presign refused: ${p.error}`);
+    keys.push(p.objectKey, finalOf(p.objectKey));
+    expect((await put(p.uploadUrl, body)).status).toBe(200);
+    return { ...p, finalKey: finalOf(p.objectKey), body };
+  });
+}
+const confirm = (objectKey: string, s: Session = sessA()) =>
+  als.run(s, () =>
+    evidence.confirmEvidenceUploadAction({
+      title: `${RUN} upload`, category: 'CAT-03', objectKey, fileName: 'belge.pdf', fileSizeBytes: 10, mimeType: 'application/pdf',
+    })
+  );
+const rowsOf = (tenantId: string, finalKey: string) => admin.evidence.findMany({ where: { tenantId, r2ObjectKey: finalKey } });
+async function stored(key: string) {
+  const h = state.hook;
+  state.hook = null;
+  try {
+    return await storage.getObjectBytes(key);
+  } finally {
+    state.hook = h;
+  }
+}
+/** Is the confirm lock of this final key held by someone? (admin session, try-lock in its own tx) */
+async function lockHeld(finalKey: string) {
+  return admin.$transaction(async (tx) => {
+    const [r] = await tx.$queryRaw<{ got: boolean }[]>`SELECT pg_try_advisory_xact_lock(${lockKeyOf(finalKey)}) AS got`;
+    return !r!.got;
+  });
+}
+type Act = { app: string; state: string; n: number };
+async function activity(): Promise<Act[]> {
+  return admin.$queryRaw<Act[]>`SELECT coalesce(application_name,'') AS app, coalesce(state,'') AS state, count(*)::int AS n
+    FROM pg_stat_activity WHERE usename = 'fabrika_app' AND pid <> pg_backend_pid() GROUP BY 1, 2 ORDER BY 1, 2`;
+}
+const fmtAct = (a: Act[]) => a.map((r) => `${r.app || 'app'}:${r.state}=${r.n}`).join(' ');
+
+beforeAll(async () => {
+  const upstream = new URL(S3.endpoint);
+  proxy = http.createServer(async (req, res) => {
+    const isCopy = req.method === 'PUT' && Boolean(req.headers['x-amz-copy-source']);
+    if (state.hook) await state.hook({ method: req.method ?? '', path: (req.url ?? '').split('?')[0] ?? '', isCopy });
+    if (req.socket.destroyed) return;
+    const up = http.request({ host: upstream.hostname, port: upstream.port, method: req.method, path: req.url, headers: req.headers }, (ur) => {
+      res.writeHead(ur.statusCode ?? 502, ur.headers);
+      ur.pipe(res);
+      ur.on('end', () => {
+        if (isCopy) state.copyLog.push({ at: Date.now(), dst: (req.url ?? '').split('?')[0] ?? '', status: ur.statusCode ?? 0 });
+      });
+    });
+    up.on('error', () => res.destroy());
+    req.pipe(up);
+  });
+  await new Promise<void>((r) => proxy.listen(state.proxyPort, '127.0.0.1', () => r()));
+  admin = db.createDbClient(ADMIN_URL);
+  const [who] = await db.prisma.$queryRaw<{ u: string }[]>`SELECT current_user AS u`;
+  log(`app pool role=${who!.u}`);
+  expect(who!.u).toBe('fabrika_app');
+  expect(storage.hasObjectStore).toBe(true);
+  t.a = (await admin.tenant.create({ data: { name: `${RUN} A`, slug: RUN, country: 'TR', kind: 'ORGANIZATION' }, select: { id: true } })).id;
+  t.b = (await admin.tenant.create({ data: { name: `${RUN} B`, slug: `${RUN}-b`, country: 'TR', kind: 'ORGANIZATION' }, select: { id: true } })).id;
+  t.userA = (await admin.user.create({ data: { email: `${RUN}@example.invalid`, name: 'a' } })).id;
+  t.userB = (await admin.user.create({ data: { email: `${RUN}-b@example.invalid`, name: 'b' } })).id;
+});
+
+beforeEach(() => {
+  state.session = sessA();
+  state.hook = null;
+  state.copyLog = [];
+});
+
+afterAll(async () => {
+  state.hook = null;
+  for (const k of keys) await storage.deleteObjectBytes(k).catch(() => {});
+  for (const id of [t.a, t.b].filter(Boolean)) {
+    await admin.evidence.deleteMany({ where: { tenantId: id } }).catch(() => {});
+    await admin.tenant.delete({ where: { id } }).catch(() => {});
+  }
+  await admin.user.deleteMany({ where: { id: { in: [t.userA, t.userB].filter(Boolean) } } }).catch(() => {});
+  await admin.$disconnect();
+  await db.prisma.$disconnect();
+  await new Promise((r) => proxy.close(r));
+});
+
+describe('İNCELEME-103 devop-fb', () => {
+  test('D1 (B-1 senaryom): her depo çağrısı 2.5 sn (zincir ~10 sn) — A 10 confirm; B kiracısı paralel isteklerle normal sürede, uygulama havuzu tükenmez', async () => {
+    const ups = await Promise.all(Array.from({ length: 10 }, (_, i) => uploaded(`d1-${i}`)));
+    state.hook = async () => sleep(2_500);
+    const t0 = Date.now();
+    const confirms = ups.map((u) =>
+      confirm(u.objectKey).then((r) => ({ r, ms: Date.now() - t0 }))
+    );
+    const probes: { at: number; ok: boolean; ms: number; err?: string }[] = [];
+    const samples: string[] = [];
+    let peakLock = 0;
+    let peakAppIdleTx = 0;
+    const stopAt = t0 + 12_000;
+    const prober = (async () => {
+      while (Date.now() < stopAt) {
+        // B: five parallel "requests" through the real application pool.
+        await Promise.all(
+          Array.from({ length: 5 }, async () => {
+            const s = Date.now();
+            try {
+              await db.withTenant(t.b, (tx) => tx.evidence.count());
+              probes.push({ at: s - t0, ok: true, ms: Date.now() - s });
+            } catch (e) {
+              probes.push({ at: s - t0, ok: false, ms: Date.now() - s, err: (e instanceof Error ? e.message : String(e)).split('\n').slice(-1)[0]?.slice(0, 80) });
+            }
+          })
+        );
+        await sleep(250);
+      }
+    })();
+    const sampler = (async () => {
+      while (Date.now() < stopAt) {
+        const a = await activity();
+        const lock = a.filter((r) => r.app === db.LOCK_POOL_NAME).reduce((s, r) => s + r.n, 0);
+        const appIdleTx = a.filter((r) => r.app !== db.LOCK_POOL_NAME && r.state === 'idle in transaction').reduce((s, r) => s + r.n, 0);
+        peakLock = Math.max(peakLock, lock);
+        // From 1 s on: at 0 s every confirm is still in its short pilot check on the app pool.
+        if (Date.now() - t0 >= 1_000) peakAppIdleTx = Math.max(peakAppIdleTx, appIdleTx);
+        samples.push(`${((Date.now() - t0) / 1000).toFixed(1)}s ${fmtAct(a)}`);
+        await sleep(1_000);
+      }
+    })();
+    const res = await Promise.all(confirms);
+    await Promise.all([prober, sampler]);
+    state.hook = null;
+    const bad = probes.filter((p) => !p.ok);
+    const maxMs = Math.max(...probes.map((p) => p.ms));
+    log(`D1 confirms: ${res.map((x) => `${x.r.success ? 'ok' : x.r.error}@${x.ms}`).join(', ')}`);
+    log(`D1 B probes: ${probes.length} total, ${bad.length} FAIL, max ${maxMs} ms, p50 ${probes.map((p) => p.ms).sort((a, b) => a - b)[Math.floor(probes.length / 2)]} ms`);
+    for (const s of samples) log(`D1 pg_stat_activity ${s}`);
+    log(`D1 peak lock-pool conns=${peakLock} peak app-pool idle-in-tx (≥1 s)=${peakAppIdleTx}`);
+    // No fake success: every ok has exactly one row; every failure has none and keeps its staging object.
+    for (const [i, x] of res.entries()) {
+      const rows = await rowsOf(t.a, ups[i]!.finalKey);
+      if (x.r.success) expect(rows).toHaveLength(1);
+      else {
+        expect(rows).toHaveLength(0);
+        expect((await stored(ups[i]!.objectKey))?.equals(ups[i]!.body)).toBe(true);
+      }
+    }
+    const failed = res.map((x, i) => (x.r.success ? null : ups[i]!)).filter((u) => u !== null);
+    const retries = await Promise.all(failed.map((u) => confirm(u!.objectKey)));
+    log(`D1 retries: ${retries.map((r) => (r.success ? 'ok' : r.error)).join(',')}`);
+    expect(bad).toHaveLength(0);
+    expect(maxMs).toBeLessThan(500);
+    expect(peakLock).toBeLessThanOrEqual(db.LOCK_POOL_MAX);
+    expect(peakAppIdleTx).toBe(0);
+    expect(retries.every((r) => r.success)).toBe(true);
+  }, 120_000);
+
+  test('D2: kilit havuzu doluyken 4. ve 5. confirm — bekleme süresi, anlamlı hata, sahte başarı yok, sızan bağlantı yok', async () => {
+    const ups = await Promise.all(Array.from({ length: 5 }, (_, i) => uploaded(`d2-${i}`)));
+    let inCopy = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    state.hook = async ({ isCopy }) => {
+      if (isCopy) {
+        inCopy += 1;
+        await Promise.race([gate, sleep(12_000)]);
+      }
+    };
+    const first = ups.slice(0, 3).map((u) => confirm(u.objectKey));
+    while (inCopy < 3) await sleep(50);
+    const warns: string[] = [];
+    const spy = vi.spyOn(console, 'warn').mockImplementation((...a: unknown[]) => void warns.push(a.map(String).join(' ').slice(0, 200)));
+    const t0 = Date.now();
+    const extra = await Promise.all(ups.slice(3).map((u) => confirm(u.objectKey).then((r) => ({ r, ms: Date.now() - t0 }))));
+    spy.mockRestore();
+    const act = await activity();
+    release();
+    const firstRes = await Promise.all(first);
+    state.hook = null;
+    log(`D2 4th/5th: ${extra.map((x) => `${JSON.stringify(x.r)} in ${x.ms} ms`).join(' | ')}`);
+    log(`D2 warn: ${warns.join(' || ')}`);
+    log(`D2 while full: ${fmtAct(act)}`);
+    log(`D2 first three: ${firstRes.map((r) => (r.success ? 'ok' : r.error)).join(',')}`);
+    for (const x of extra) {
+      expect(x.r).toEqual({ success: false, error: 'save_failed' });
+      expect(x.ms).toBeGreaterThanOrEqual(4_500);
+      expect(x.ms).toBeLessThan(7_000);
+    }
+    for (const u of ups.slice(3)) {
+      expect(await rowsOf(t.a, u.finalKey)).toHaveLength(0);
+      expect((await stored(u.objectKey))?.equals(u.body)).toBe(true);
+      expect(await stored(u.finalKey)).toBeNull();
+    }
+    await sleep(6_000); // let a discarded late start (if any) happen
+    const after = await activity();
+    log(`D2 after (6 s): ${fmtAct(after)}`);
+    expect(after.filter((r) => r.app === db.LOCK_POOL_NAME && r.state === 'idle in transaction')).toHaveLength(0);
+    const retry = await Promise.all(ups.slice(3).map((u) => confirm(u.objectKey)));
+    log(`D2 retry: ${retry.map((r) => (r.success ? 'ok' : r.error)).join(',')}`);
+    expect(retry.every((r) => r.success)).toBe(true);
+    expect(firstRes.every((r) => r.success)).toBe(true);
+  }, 90_000);
+
+  test('D3: tx-yerel sınırlar sızmaz — başarı, already_confirmed, object_missing, statement_timeout ve lock_timeout yollarından sonra kilit havuzunun her bağlantısı temiz', async () => {
+    const ok = await uploaded('d3-ok');
+    expect((await confirm(ok.objectKey)).success).toBe(true);
+    // already_confirmed
+    const again = await uploaded('d3-again');
+    expect((await confirm(again.objectKey)).success).toBe(true);
+    await put(again.uploadUrl, again.body);
+    const r2 = await confirm(again.objectKey);
+    // object_missing (shape-valid key, nothing uploaded)
+    const missingKey = ok.objectKey.replace(/[^/]+\.pdf$/, 'zzzzzzzz_missing.pdf');
+    const r3 = await confirm(missingKey);
+    // statement_timeout: the Evidence table is locked by an admin tx for 8 s, so findFirst blocks after the advisory lock.
+    const st = await uploaded('d3-stmt');
+    const hold = admin.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('LOCK TABLE "Evidence" IN ACCESS EXCLUSIVE MODE');
+      await sleep(8_000);
+    }, { timeout: 20_000 });
+    await sleep(200);
+    let s0 = Date.now();
+    const r4 = await confirm(st.objectKey);
+    const r4ms = Date.now() - s0;
+    await hold;
+    // lock_timeout: the confirm lock of this key is held by an admin tx for 12 s.
+    const lt = await uploaded('d3-lock');
+    const holdLock = admin.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKeyOf(lt.finalKey)})`;
+      await sleep(12_000);
+    }, { timeout: 20_000 });
+    await sleep(200);
+    s0 = Date.now();
+    const r5 = await confirm(lt.objectKey);
+    const r5ms = Date.now() - s0;
+    await holdLock;
+    log(`D3 paths: already=${JSON.stringify(r2)} missing=${JSON.stringify(r3)} stmt=${JSON.stringify(r4)}@${r4ms}ms lock=${JSON.stringify(r5)}@${r5ms}ms`);
+    // Every live lock-pool connection, at once (LOCK_POOL_MAX in parallel, each held briefly).
+    const seen = await Promise.all(
+      Array.from({ length: db.LOCK_POOL_MAX }, () =>
+        db.withTenantLockPool(t.a, (tx) =>
+          tx.$queryRawUnsafe<Record<string, string | number>[]>(`SELECT pg_backend_pid() AS pid, current_setting('lock_timeout') AS lock_timeout,
+            current_setting('statement_timeout') AS statement_timeout, current_setting('idle_in_transaction_session_timeout') AS idle, pg_sleep(0.3)::text AS z`)
+        )
+      )
+    );
+    const livePids = await admin.$queryRaw<{ pid: number }[]>`SELECT pid FROM pg_stat_activity WHERE application_name = ${db.LOCK_POOL_NAME}`;
+    const appSeen = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        db.withTenant(t.a, (tx) => tx.$queryRawUnsafe<Record<string, string>[]>(`SELECT current_setting('lock_timeout') AS l, current_setting('statement_timeout') AS s, current_setting('idle_in_transaction_session_timeout') AS i, pg_sleep(0.2)::text AS z`))
+      )
+    );
+    log(`D3 lock pool: ${JSON.stringify(seen.map((x) => x[0]))} live=${livePids.map((p) => p.pid).join(',')}`);
+    log(`D3 app pool: ${JSON.stringify([...new Set(appSeen.map((x) => `${x[0]!.l}/${x[0]!.s}/${x[0]!.i}`))])}`);
+    expect(r2).toEqual({ success: false, error: 'already_confirmed' });
+    expect(r3).toEqual({ success: false, error: 'object_missing' });
+    expect(r4).toEqual({ success: false, error: 'save_failed' });
+    expect(r4ms).toBeLessThan(7_000);
+    expect(r5).toEqual({ success: false, error: 'save_failed' });
+    expect(new Set(seen.map((x) => x[0]!.pid)).size).toBe(livePids.length);
+    for (const x of seen) expect([x[0]!.lock_timeout, x[0]!.statement_timeout, x[0]!.idle]).toEqual(['0', '0', '0']);
+    for (const x of appSeen) expect([x[0]!.l, x[0]!.s, x[0]!.i]).toEqual(['0', '0', '0']);
+    // Both staged uploads are intact and go through now.
+    expect((await confirm(st.objectKey)).success).toBe(true);
+    expect((await confirm(lt.objectKey)).success).toBe(true);
+  }, 90_000);
+
+  test('D4: idle-in-transaction ile öldürülen bağlantı kilit havuzuna ölü dönmez', async () => {
+    let err = '';
+    const s0 = Date.now();
+    try {
+      await db.withTenantLockPool(t.a, async (tx) => {
+        await tx.$executeRaw`SELECT set_config('idle_in_transaction_session_timeout', '1000ms', true)`;
+        await sleep(2_500);
+        await tx.$queryRaw`SELECT 1`;
+      });
+    } catch (e) {
+      err = (e instanceof Error ? e.message : String(e)).split('\n').filter(Boolean).slice(-1)[0]!.slice(0, 160);
+    }
+    const res = await Promise.allSettled(Array.from({ length: 9 }, () => db.withTenantLockPool(t.a, (tx) => tx.$queryRaw`SELECT pg_sleep(0.1)::text AS z`)));
+    log(`D4 killed tx: "${err}" after ${Date.now() - s0} ms; next 9 lock-pool tx: ${res.map((r) => (r.status === 'fulfilled' ? 'ok' : 'ERR ' + String((r as PromiseRejectedResult).reason).slice(0, 120))).join(',')}`);
+    expect(err).not.toBe('');
+    expect(res.every((r) => r.status === 'fulfilled')).toBe(true);
+  }, 30_000);
+
+  test('D5 RACE-N (İNCELEME-92): 6 eşzamanlı confirm + araya 6 farklı PUT, 3 tur — success sonrası final nesne değişmez, tek satır', async () => {
+    for (let round = 0; round < 3; round += 1) {
+      const up = await uploaded(`d5-${round}`);
+      const variants = Array.from({ length: 6 }, (_, i) => {
+        const tag = `V${round}${i}-`;
+        const b = PDF(tag.padEnd(up.body.length - PDF('').length, tag.slice(-1)));
+        expect(b.length).toBe(up.body.length);
+        return b;
+      });
+      state.hook = async ({ isCopy, method }) => {
+        if (isCopy) await sleep(700 + Math.random() * 800);
+        else if (method === 'HEAD') await sleep(Math.random() * 300);
+      };
+      let successAt = 0;
+      let bytesAtSuccess: Buffer | null = null;
+      const puts = (async () => {
+        for (const v of variants) {
+          await sleep(250 + Math.random() * 300);
+          await put(up.uploadUrl, v);
+        }
+      })();
+      const results = await Promise.all(
+        Array.from({ length: 6 }, async (_, i) => {
+          await sleep(i * 180);
+          const r = await confirm(up.objectKey);
+          if (r.success && !successAt) {
+            successAt = Date.now();
+            bytesAtSuccess = await stored(up.finalKey);
+          }
+          return r;
+        })
+      );
+      await puts;
+      state.hook = null;
+      await sleep(2_000);
+      const rows = await rowsOf(t.a, up.finalKey);
+      const finalNow = await stored(up.finalKey);
+      const late = state.copyLog.filter((c) => c.dst.endsWith(up.finalKey) && c.at > successAt && c.status < 300);
+      const errs = results.map((r) => (r.success ? 'success' : r.error));
+      log(`D5 r${round}: ${errs.join(',')} rows=${rows.length} copies=${state.copyLog.length} lateCopiesAfterSuccess=${late.length} finalUnchanged=${bytesAtSuccess ? finalNow?.equals(bytesAtSuccess) : 'n/a'} size==row=${finalNow?.length === rows[0]?.fileSizeBytes}`);
+      expect(errs.filter((e) => e === 'success')).toHaveLength(1);
+      expect(rows).toHaveLength(1);
+      expect(late).toHaveLength(0);
+      expect(finalNow?.equals(bytesAtSuccess!)).toBe(true);
+      state.copyLog = [];
+    }
+  }, 180_000);
+
+  test('D6 süreç ölümü: kilidi tutan AYRI süreç (gerçek confirm, kopya tutuluyor) SIGKILL → kilit hemen; SIGSTOP → 20 sn civarı (idle_in_transaction)', async () => {
+    const out: string[] = [];
+    const run = async (sig: 'SIGKILL' | 'SIGSTOP') => {
+      const up = await uploaded(`d6-${sig}`);
+      const child: ChildProcess = spawn(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', 'tests/zz-devopfb103-child.live.test.ts', '--pool=threads'], {
+        env: { ...process.env, DVP_CHILD: '1', DVP_CHILD_KEY: up.objectKey, DVP_CHILD_TENANT: t.a, DVP_CHILD_USER: t.userA },
+        stdio: 'ignore',
+      });
+      try {
+        const w0 = Date.now();
+        while (!(await lockHeld(up.finalKey))) {
+          if (Date.now() - w0 > 60_000) throw new Error('child never took the lock');
+          await sleep(100);
+        }
+        await sleep(500);
+        const [holder] = await admin.$queryRaw<{ app: string; state: string }[]>`SELECT application_name AS app, state FROM pg_stat_activity WHERE application_name = ${db.LOCK_POOL_NAME} AND state = 'idle in transaction' LIMIT 1`;
+        const k0 = Date.now();
+        process.kill(child.pid!, sig);
+        let confirmWhileHeld = '';
+        if (sig === 'SIGSTOP') {
+          const c0 = Date.now();
+          const r = await confirm(up.objectKey);
+          confirmWhileHeld = ` confirm-while-held=${JSON.stringify(r)} in ${Date.now() - c0} ms;`;
+          expect(r).toEqual({ success: false, error: 'save_failed' });
+        }
+        while (await lockHeld(up.finalKey)) {
+          if (Date.now() - k0 > 60_000) throw new Error('lock never released');
+          await sleep(25);
+        }
+        const releasedMs = Date.now() - k0;
+        const r = await confirm(up.objectKey);
+        const rows = await rowsOf(t.a, up.finalKey);
+        out.push(`${sig}: holder=${holder?.app}/${holder?.state};${confirmWhileHeld} lock released ${releasedMs} ms after signal; retry=${r.success ? 'success' : JSON.stringify(r)} rows=${rows.length} final==uploaded=${(await stored(up.finalKey))?.equals(up.body)}`);
+        expect(r.success).toBe(true);
+        expect(rows).toHaveLength(1);
+        return releasedMs;
+      } finally {
+        try { process.kill(child.pid!, 'SIGKILL'); } catch { /* gone */ }
+      }
+    };
+    const killed = await run('SIGKILL');
+    const stopped = await run('SIGSTOP');
+    for (const l of out) log(`D6 ${l}`);
+    expect(killed).toBeLessThan(2_000);
+    expect(stopped).toBeLessThan(25_000);
+  }, 180_000);
+
+  test('D7 kilit havuzu kiracılar arası paylaşımlı: depo SAĞLIKLI, A kiracısı 150 eşzamanlı confirm seli → B kiracısının confirm\'ü ne olur?', async () => {
+    const upB = await uploaded('d7-b', sessB());
+    const pattern = (await uploaded('d7-a')).objectKey;
+    const flood = Array.from({ length: 150 }, (_, i) =>
+      confirm(pattern.replace(/[^/]+\.pdf$/, `${String(i).padStart(8, '0')}_flood.pdf`)).then((r) => (r.success ? 'ok' : r.error), (e) => `THROW ${String(e instanceof Error ? e.message : e).split('\n').slice(-1)[0]!.slice(0, 60)}`)
+    );
+    await sleep(30);
+    const b0 = Date.now();
+    const rb = await confirm(upB.objectKey, sessB()).catch((e) => ({ success: false as const, error: `THROW ${String(e instanceof Error ? e.message : e).slice(0, 60)}` }));
+    const bms = Date.now() - b0;
+    const fr = await Promise.all(flood);
+    const tally = fr.reduce<Record<string, number>>((m, e) => ((m[e] = (m[e] ?? 0) + 1), m), {});
+    log(`D7 flood A: ${JSON.stringify(tally)} | B confirm: ${JSON.stringify(rb.success ? 'success' : rb)} in ${bms} ms`);
+    await sleep(1_500);
+    if (!rb.success) expect((await confirm(upB.objectKey, sessB())).success).toBe(true);
+  }, 120_000);
+});

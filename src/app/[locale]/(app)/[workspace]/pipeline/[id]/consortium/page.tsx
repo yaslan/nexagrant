@@ -1,0 +1,196 @@
+import { withTenant } from '@/lib/db';
+import { requireTenantPage } from '@/lib/tenant';
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
+import { errorMessage } from '@/lib/errors';
+import { moduleGate } from '@/lib/modules/guard';
+import { recordAlert } from '@/lib/observability/system-alert';
+
+/** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
+interface CordisOrgRow {
+  organisationId: string;
+  name: string;
+  shortName: string | null;
+  country: string | null;
+  sme: boolean;
+}
+
+/** The header fields this page renders for an opportunity. */
+interface ConsortiumOpportunity {
+  id: string;
+  title: string;
+  stage: string;
+  status: string;
+  topicId: string | null;
+  intendedRole: string | null;
+  g0Score: number | null;
+}
+
+/**
+ * TASK-MTQYXISOPUJ53 — fabricated fallbacks.
+ *
+ * A `DEMO_OPPORTUNITIES` map used to sit here: four invented opportunities keyed
+ * by the ids the demo seed happens to use (`demo-opp-1` … `demo-opp-4`), each
+ * with a title, a stage and a G0 score ("FLEX-GRID: Decarbonised Smart Grid
+ * Flexibility Solutions", G0, 88). When the tenant-scoped query below returned
+ * nothing — an id belonging to another tenant, a deleted row, a failed query —
+ * the page served one of them as this tenant's own opportunity. Measured on
+ * 2026-09-08 against a tenant with zero `Opportunity` rows: the consortium
+ * builder rendered "FLEX-GRID … — Stage G0". The map is gone; the header now
+ * shows only a row this tenant owns.
+ */
+
+/**
+ * M8 consortium page.
+ *
+ * This page used to resolve its tenant as
+ * `session.tenantId ?? prisma.tenant.findFirst()` and then apply the tenant to
+ * the WHERE clause only `if (tenantId)`. With no session the fallback handed
+ * the request whichever tenant happened to be seeded first, and if the table
+ * was empty the condition was dropped entirely — so `opportunity.findFirst({
+ * where: { id } })` returned *any* tenant's opportunity by guessed id. The seat
+ * candidates were never tenant-scoped at all.
+ *
+ * It now follows the same rule as `./actions.ts`: the tenant comes from
+ * `requireTenantPage()` (no fallback — anonymous visitors are redirected) and
+ * every query runs inside `withTenant`, matched on `(id, tenantId)`.
+ */
+export default async function ConsortiumPage({
+  params,
+}: {
+  params: Promise<{ id: string; locale: string; workspace: string }>;
+}) {
+  const { id, locale, workspace } = await params;
+  const locked = await moduleGate('M8', locale);
+  if (locked) return locked;
+  const { tenantId } = await requireTenantPage(locale);
+
+  const isTr = locale === 'tr';
+
+  let queryFailed = false;
+  let opportunity: ConsortiumOpportunity | null = null;
+  let seats: ConsortiumSeat[] = [];
+  let candidates: SeatCandidate[] = [];
+  let orgs: OrgInfo[] = [];
+
+  try {
+    opportunity = await withTenant<ConsortiumOpportunity | null>(tenantId, (tx) =>
+      tx.opportunity.findFirst({
+        where: { id, tenantId },
+      })
+    );
+
+    if (opportunity) {
+      const rawSeats = await withTenant(tenantId, (tx) =>
+        tx.consortiumSeat.findMany({
+          where: { opportunityId: id, tenantId },
+          orderBy: { roleKey: 'asc' },
+        })
+      );
+      seats = rawSeats as unknown as ConsortiumSeat[];
+
+      const seatIds = seats.map((s) => s.id);
+      if (seatIds.length > 0) {
+        const rawCandidates = await withTenant(tenantId, (tx) =>
+          tx.seatCandidate.findMany({
+            where: { seatId: { in: seatIds }, tenantId },
+            orderBy: { rank: 'asc' },
+          })
+        );
+        candidates = rawCandidates as unknown as SeatCandidate[];
+      }
+
+      const orgIds = [
+        ...seats.map((s) => s.organizationId).filter(Boolean),
+        ...candidates.map((c) => c.organizationId).filter(Boolean),
+      ] as string[];
+
+      // Organizations are shared CORDIS reference data, not tenant rows; the ids
+      // here already come from rows read inside this tenant. `prisma.organization`
+      // is not a model in prisma/schema.prisma — the query threw on every render
+      // and the catch below swallowed it with a console.warn.
+      if (orgIds.length > 0) {
+        const cordisOrgs = await withTenant<CordisOrgRow[]>(tenantId, (tx) =>
+          tx.cordisOrganization.findMany({
+            where: { organisationId: { in: orgIds } },
+            select: { organisationId: true, name: true, shortName: true, country: true, sme: true },
+          })
+        );
+        orgs = cordisOrgs.map((o) => ({
+          id: o.organisationId,
+          name: o.name,
+          shortName: o.shortName,
+          country: o.country,
+          isSme: o.sme,
+        }));
+      }
+    }
+  } catch (e) {
+    // Reported, not replaced with an invented opportunity (CLAUDE.md rule 6).
+    // The old catch only warned to the console and fell through to the demo map,
+    // so a permanently broken query looked like a working page.
+    console.error(`[ConsortiumPage] query failed for ${id}: ${errorMessage(e)}`);
+    await recordAlert({
+      level: 'warn',
+      source: 'consortium_page_query_failed',
+      message: `Consortium lookup failed: ${errorMessage(e)}`,
+      meta: { module: 'M8', table: 'Opportunity', opportunityId: id },
+      // This runs on every render of the page, so with `opportunityId` in the
+      // identity a database that is down for an hour wrote one alert per page
+      // view. A failed read of the Opportunity table is one infrastructure
+      // fault; the opportunity that happened to be open when it was noticed
+      // stays on the row as detail.
+      dedupeKey: 'consortium-page-query-failed',
+    });
+    queryFailed = true;
+  }
+
+  // "We could not read it" and "this tenant has no such opportunity" are two
+  // different answers, and only the second one is a 404.
+  if (queryFailed) {
+    return (
+      <div className="max-w-5xl mx-auto py-8 sm:px-4">
+        <div
+          role="alert"
+          className="border border-amber-200 bg-amber-50 text-amber-900 text-sm rounded-lg p-4"
+        >
+          {isTr
+            ? 'Konsorsiyum verisi okunamadı. Sorun kaydedildi; lütfen birazdan tekrar deneyin.'
+            : 'Consortium data could not be read. The failure has been recorded; please try again shortly.'}
+        </div>
+      </div>
+    );
+  }
+
+  if (!opportunity) return notFound();
+
+  const orgMap = Object.fromEntries(orgs.map((o) => [o.id, o]));
+
+  return (
+    <div className="max-w-5xl mx-auto py-8 sm:px-4">
+      <div className="mb-6">
+        <Link
+          href={`/${locale}/${workspace}/pipeline`}
+          className="text-muted hover:text-ink"
+        >
+          ← Back to Pipeline
+        </Link>
+      </div>
+
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold font-heading">Consortium Builder</h1>
+        <p className="text-muted mt-1">
+          {opportunity.title} — Stage {opportunity.stage}
+        </p>
+      </div>
+
+      <ConsortiumManager
+        opportunityId={id}
+        seats={seats}
+        candidates={candidates}
+        orgMap={orgMap}
+      />
+    </div>
+  );
+}

@@ -1,0 +1,35 @@
+DATABASE_URL=postgresql://own:***@127.0.0.1:55141/f
+-- 1. düz SET (yer tutucu GUC, USERSET):
+BEGIN
+SET
+ current_setting 
+-----------------
+ on
+(1 row)
+
+ROLLBACK
+-- 2. fonksiyonun SET yan cümlesi:
+BEGIN
+psql:/private/tmp/claude-501/-Users-macbook-alan/2248852b-13be-4302-924a-217856f73044/scratchpad/probe.sql:4: ERROR:  permission denied to set parameter "app.system_scope"
+ROLLBACK
+-- 3. gövdede set_config:
+BEGIN
+CREATE FUNCTION
+ q 
+---
+ 1
+(1 row)
+
+ROLLBACK
+
+== BYPASSRLS verildi (süper kullanıcı: ALTER ROLE own BYPASSRLS) ==
+2. adım yeniden: BEGIN ERROR:  permission denied to set parameter "app.system_scope" 
+== GRANT SET ON PARAMETER app.system_scope TO own (süper kullanıcı) ==
+2. adım yeniden: BEGIN CREATE FUNCTION ROLLBACK 
+== own kendi kendine GRANT deneyebilir mi? ==
+ERROR:  permission denied for parameter app.system_scope
+
+== fabrika_app çağrı anında SET yan cümleli fonksiyonu çalıştırabilir mi (süper kullanıcının kurduğu public.t_probe) ==
+fabrika_app|on
+own super=false bypassrls=false
+0

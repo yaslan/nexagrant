@@ -1,0 +1,21 @@
+BEGIN
+ kind | hex | n | signed | standard 
+------+-----+---+--------+----------
+(0 rows)
+
+ nonstandard_rows 
+------------------
+                0
+(1 row)
+
+ nonstandard_signed_without_steps 
+----------------------------------
+                                0
+(1 row)
+
+ROLLBACK
+== postgres: BEGIN ERROR:  relation "FollowupDoc" does not exist LINE 1: ...I','COMMITMENT','ESR_DEBRIEF','AWARD_PACK')) from "FollowupD...                                                              ^ 
+== fabrika_db: ERROR:  relation "FollowupDoc" does not exist LINE 1: ...I','COMMITMENT','ESR_DEBRIEF','AWARD_PACK')) from "FollowupD...                                                              ^ BEGIN 
+== fabrika: BEGIN 0 rows, nonstandard=0 ROLLBACK 
+== sefb_mulql2: BEGIN 0 rows, nonstandard=0 ROLLBACK 
+== fabrika_planver_probe: BEGIN ERROR:  relation "FollowupDoc" does not exist LINE 1: ...I','COMMITMENT','ESR_DEBRIEF','AWARD_PACK')) from "FollowupD...                                                              ^ 

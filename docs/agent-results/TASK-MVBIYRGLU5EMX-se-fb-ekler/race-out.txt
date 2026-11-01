@@ -1,0 +1,8 @@
+N=110 clicks=220 workers=64 seconds=1.2 http={307: 220}
+verified rows      : 110
+numbered rows      : 100
+distinct numbers   : 100
+min/max number     : 1|100
+gaps 1..100        : 0
+verified w/o number: 10
+unique index       : CREATE UNIQUE INDEX "ExpertPreRegistration_founderNumber_key" ON public."ExpertPreRegistration" USING btree ("founderNumber")

@@ -1,0 +1,6 @@
+YAŞADI | S-c | sink yalnız dosya + dış fonksiyonlar (iç içe fonksiyon dönüşleri sayılmaz) | 22 passed (22)
+YAŞADI | S-f | .code muafiyeti her ifadeye (e.cause.code dahil) | 22 passed (22)
+YAŞADI | S-g | for…of akışı kaldırıldı | 22 passed (22)
+YAŞADI | S-j | eleman erişimi yalnız indeksle (e['message'] temiz) | 22 passed (22)
+YAŞADI | S-k | new ifadesi hiç sızmaz (new Error(e.message) temiz) | 22 passed (22)
+YAŞADI | S-l | koşul ifadesinde yalnız whenTrue | 22 passed (22)

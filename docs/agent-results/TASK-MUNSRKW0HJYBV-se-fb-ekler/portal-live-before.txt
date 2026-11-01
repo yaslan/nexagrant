@@ -1,0 +1,13 @@
+CROSS MEMBER(A)+OWNER(X) session=A → 200 {"url":"https://billing.stripe.test/cus_X"} stripe=1 customer=cus_X
+ × tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > cross case: MEMBER of A who owns X → 403, Stripe never called 210ms
+CROSS same user session=X → 200 customer=cus_X
+ ✓ tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > same user with session in X (where they own) → the portal of X 127ms
+OWNER-BOTH session=A → 200 customer=cus_X; session=X → 200 customer=cus_X
+O-B session=N → 500 body={"error":"No Stripe customer found for tenant <tenantId-maskeli>. Please complete subscription setup first."} bodyHasTenantId=true logHasTenantId=true
+ × tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > owner of A and X: session A → cus_A, session X → cus_X 138ms
+ × tests/munsrk-portal.live.test.ts > billing portal follows the session tenant (Ö-A) and hides internals (Ö-B), live DB > Ö-B: no Stripe customer → 500 with a fixed sentence; the tenant id stays in the log 64ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+     70|     console.log(`CROSS MEMBER(A)+OWNER(X) session=A → ${r.status} ${JS…
+     86|     console.log(`OWNER-BOTH session=A → ${a.status} customer=${a.custo…
+     94|     console.log(`O-B session=N → ${r.status} body=${JSON.stringify(r.b…
+      Tests  3 failed | 1 passed (4)

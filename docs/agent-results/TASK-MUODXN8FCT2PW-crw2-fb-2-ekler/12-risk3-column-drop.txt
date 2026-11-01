@@ -1,0 +1,14 @@
+# E7 — risk 3 (kolon kaldırma): kolon düşünce zincir ne yapar?
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/f
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/r3 (ayrı DB)
+push in-sync: 1
+Membership.staleDigestOn var mı: false
+$ 41. dosya tek başına (kolon yok):
+psql:prisma/migrations/m4-stale-digest-user-claim.sql:81: ERROR:  column "staleDigestOn" does not exist
+LINE 4:       SELECT "userId", max("staleDigestOn") AS day
+                                   ^
+exit=3
+$ 38. dosya tek başına (kolon yok):
+exit=0
+Membership.staleDigestOn var mı: true
+→ 38. dosyanın 52. satırı (ADD COLUMN IF NOT EXISTS) düşürülen kolonu her zincir koşusunda GERİ EKLER; UPDATE hata vermez

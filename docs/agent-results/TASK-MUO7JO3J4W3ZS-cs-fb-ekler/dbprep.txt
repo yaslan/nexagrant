@@ -1,0 +1,37 @@
+generate 0
+diff 0     1847
+ERROR:  syntax error at or near "◇"
+LINE 1: ◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet...
+        ^
+schema 3
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@localhost:55890/fabrika
+rls-role 0
+ERROR:  relation "Evaluation" does not exist
+ERROR:  relation "Evaluation" does not exist
+❌ relation "Membership" does not exist
+}
+Loaded Prisma config from prisma.config.ts.
+
+-- CreateSchema
+ERROR:  syntax error at or near "Loaded"
+LINE 1: Loaded Prisma config from prisma.config.ts.
+        ^
+schema 3
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@localhost:55890/fabrika
+ERROR:  relation "Evaluation" does not exist
+mig1 0
+ERROR:  relation "Evaluation" does not exist
+❌ relation "Membership" does not exist
+}
+NOTICE:  schema "public" already exists, skipping
+NOTICE:  identifier "┌─────────────────────────────────────────────────────────┐" will be truncated to "┌────────────────────"
+ERROR:  syntax error at or near "┌─────────────────────────────────────────────────────────┐"
+LINE 1: ┌─────────────────────────────────────────────────────────┐
+        ^
+schema 3
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@localhost:55890/fabrika
+apply-migrations: 40 files applied
+apply-migrations: 40 files applied
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+Seeding completed with E10 data.
+schema: banner at end, all DDL before it applied

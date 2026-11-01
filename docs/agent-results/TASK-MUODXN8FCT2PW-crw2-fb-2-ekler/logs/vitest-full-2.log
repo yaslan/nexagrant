@@ -1,0 +1,1728 @@
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt
+
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5414) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a second invitation to the same address within 10 minutes sends no mail and keeps the mailed link valid
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a second invitation to the same address within 10 minutes sends no mail and keeps the mailed link valid
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with another role leaves the mailed invitation as it is and is recorded
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with another role leaves the mailed invitation as it is and is recorded
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with the same role pushes the expiry out and keeps the token
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > within the cooldown a re-invite with the same role pushes the expiry out and keeps the token
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > an address inside its cooldown is recently_sent even when the tenant is at the daily limit
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > an address inside its cooldown is recently_sent even when the tenant is at the daily limit
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > after the cooldown the same address is mailed again
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > after the cooldown the same address is mailed again
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > re-inviting an address whose earlier invitation was accepted reopens it with a fresh link
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > re-inviting an address whose earlier invitation was accepted reopens it with a fresh link
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > 9 minutes after a mail the same address is still cooling down
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > 9 minutes after a mail the same address is still cooling down
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a send the SMTP server refused does not start a cooldown
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > a send the SMTP server refused does not start a cooldown
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations to one address send one mail
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations to one address send one mail
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > two concurrent invitations with different roles leave the mailed role in place
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit no mail is sent, the invitation is still issued, and a warning is raised
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit a re-invitation still gets a fresh link that works
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > past the daily limit a re-invitation still gets a fresh link that works
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > rows 23 hours old still count toward the daily limit
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > code dies between probe and adapter: choice cookies are spent
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > code dies between probe and adapter: choice cookies are spent
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > rows older than 24 hours do not count toward the daily limit
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stdout | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+K-1 race (tr): http://localhost:3000/api/auth/hata?error=Configuration
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > without a usable NEXT_PUBLIC_APP_URL in production nothing is mailed and an error alert is raised
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stderr | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+[31m[auth][error][0m AdapterError: Read more at https://errors.authjs.dev#adaptererror
+[31m[auth][cause][0m: InviteCodeRejectedError: invite code rejected
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/oauth-registration.ts:361:26
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at Proxy._transactionWithCallback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at createUser (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/auth.ts:186:25)
+    at acc.<computed> (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/init.js:161:24)
+    at handleLoginOrRegister (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/handle-login.js:260:20)
+    at Module.callback (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/actions/callback/index.js:70:50)
+    at AuthInternal (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/lib/index.js:29:24)
+    at Auth (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@auth+core@0.41.3_nodemailer@10.0.12/node_modules/@auth/core/index.js:111:34)
+    at callback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/oauth-registration.live.test.ts:99:15)
+[31m[auth][details][0m: {}
+
+stdout | tests/oauth-registration.live.test.ts > crw-fb M2: adapter throws after the signIn probe > K-1: the registration that loses the race gets invite_invalid, not the Configuration page
+K-1 race (en): http://localhost:3000/api/auth/hata?error=Configuration
+
+stdout | tests/invitation-mail-limit.live.test.ts > POST /api/invitations — mail limits > the mailed link is built from NEXT_PUBLIC_APP_URL and the subject carries a cut tenant name
+[Invitations] invitation issued for tenant cmuoemy9x00006ixkgwdyi87z
+
+ ✓ tests/oauth-registration.live.test.ts (20 tests) 5478ms
+     ✓ Google: a code + addendum acknowledgement opens an account linked to the agency, with 3 consent rows  517ms
+     ✓ crw-fb's scenario: A ticks and gives up, B starts unticked with a new Google account — refused, no user, no consent  417ms
+     ✓ K-1: the registration that loses the race gets invite_invalid, not the Configuration page  327ms
+ ✓ tests/invitation-mail-limit.live.test.ts (16 tests) 4196ms
+     ✓ a second invitation to the same address within 10 minutes sends no mail and keeps the mailed link valid  580ms
+     ✓ two concurrent invitations to one address send one mail  584ms
+     ✓ two concurrent invitations with different roles leave the mailed role in place  578ms
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/where-guard-src.test.ts (3 tests) 7709ms
+     ✓ every unguarded where under src/ is a known, explained one  3970ms
+     ✓ KNOWN has no stale entries  3721ms
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/agency-invite.live.test.ts (18 tests) 3728ms
+     ✓ no use limit: a live code works N times in a row, and the counter keeps count  539ms
+     ✓ two connections on one code: the row lock serialises them, both win, no use is lost  447ms
+     ✓ after the function fails mid-call the scope is not left open  856ms
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/stale-relationship-reminder.live.test.ts (25 tests) 9063ms
+     ✓ without a mail provider nothing is sent and nothing is stamped  541ms
+     ✓ one digest per user across tenants, only the due rows, module and pilot gates held  511ms
+     ✓ a row that goes stale later the same day waits for tomorrow: one digest per user per day  659ms
+     ✓ a rejected send stamps nothing for that user; the others still go out  731ms
+     ✓ a contact after the reminder starts a new 60-day period  619ms
+     ✓ a worker killed after the send and before the stamp sends no second digest that day (İNCELEME-51 B-1)  968ms
+     ✓ the claim is a compare-and-set: a run that loses the race after reading the day as free sends nothing  301ms
+     ✓ a contact logged while the digest is being sent is not stamped as reminded  358ms
+     ✓ a contact logged after the reminder but dated before it starts a new period (İNCELEME-51 B-2)  641ms
+     ✓ a tenant skipped on the second run (M4 closed) does not hide the day claimed there: no second digest (İNCELEME-56 Y-1)  322ms
+     ✓ a tenant whose read fails on the second run does not hide the day claimed there (İNCELEME-56 Y-1)  302ms
+     ✓ a member removed from the tenant the day was claimed through gets no second digest that day (İNCELEME-69 D-1)  311ms
+     ✓ the day is the UTC day in any process time zone: +14 claims the UTC day, and the next UTC day still sends (İNCELEME-95 T-1)  355ms
+     ✓ a rejected send gives back only its own day: a later day claimed meanwhile stays (İNCELEME-95 T-2)  305ms
+ ✓ tests/action-missing-id.live.test.ts (36 tests) 8752ms
+     ✓ m11 addSectionComment  330ms
+     ✓ refuses a missing opportunity id before reading or writing  351ms
+ ✓ src/app/api/concept-notes/[id]/export/route.edge.test.ts (8 tests) 6123ms
+     ✓ B-1 K4: the image budget is per document — two sections cannot each spend it  5365ms
+(node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/billing/plan-admin.test.ts (25 tests) 3028ms
+     ✓ refuses to edit a published version  698ms
+ ✓ src/lib/docx-safe-html.image-size.test.ts (11 tests) 14433ms
+     ✓ png: truncations and byte flips  3460ms
+     ✓ gif: truncations and byte flips  6509ms
+     ✓ jpeg: truncations and byte flips  4436ms
+ ✓ src/modules/m8/server/schema-contract.test.ts (16 tests) 6150ms
+     ✓ actually walks the write bodies in src/  1340ms
+     ✓ names only models, relations and columns that exist  1439ms
+     ✓ keeps the known-broken field list from going stale  1533ms
+     ✓ actually reads the queries it is checking  586ms
+     ✓ has no unknown-model call outside the known-broken list  471ms
+     ✓ keeps the known-broken list from going stale  657ms
+ ✓ tests/invitation-accept.live.test.ts (18 tests) 3178ms
+     ✓ valid: membership with the invited role, link spent, audit row; a second accept is idempotent  377ms
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > the next request sees the membership as it is now (İNCELEME-59 Y-2) > demoted to MEMBER: the next request is MEMBER and an edit is refused
+Y2_DEMOTE {"signedIn":"TENANT_OWNER","asOwner":"ok:{\"success\":true}","demoted":{"tenantA":true,"role":"MEMBER"},"asMember":"throw:FORBIDDEN_ROLE","left":1}
+
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > the next request sees the membership as it is now (İNCELEME-59 Y-2) > membership removed: the next request is tenantless, not moved to the other tenant, and an edit is refused
+Y2_REMOVE {"removed":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"write":"throw:TENANT_SCOPE_REQUIRED","left":1}
+
+ ✓ tests/rag-pdf-real-parse.test.ts (19 tests) 15144ms
+     ✓ a one-page PDF with no text layer (what a scan extracts to)  1348ms
+     ✓ a 300-page scan: once 300 paid "-- N of 300 --" chunks  808ms
+     ✓ a 300-page scan whose only text is a stamped page label  580ms
+     ✓ a broken text layer that yields only symbols  417ms
+     ✓ the extracted text carries no page separator  541ms
+     ✓ a real text PDF is stored, and no chunk is a separator  624ms
+     ✓ maxPages (1000) pages is accepted  2571ms
+     ✓ one page over maxPages is refused without extracting text  580ms
+     ✓ İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second  1366ms
+     ✓ 1000 dense pages stop extracting as soon as maxChunks is out of reach  3575ms
+     ✓ the event loop keeps turning while a large PDF is extracted  2731ms
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > accepting an invitation moves the session to that tenant (TASK-MUNWZA26VGK0B, İNCELEME-68 Y-1) > removed from the bound tenant, accepting C makes the very next request C, with the same browser
+Y1_REBIND {"stranded":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"accepted":"throw:NEXT_REDIRECT;replace;/tr/default/dashboard;307;","joined":{"c":true,"role":"WRITER"},"again":true}
+
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > a soft-deleted tenant grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1) > the bound tenant is deleted: the next request is tenantless, not moved to B; undeleted, it is back
+O1_BOUND_DELETED {"deleted":{"tenantA":false,"tenantB":false,"tenantId":null,"role":null},"write":"throw:TENANT_SCOPE_REQUIRED","left":1,"restored":{"tenantA":true,"role":"TENANT_OWNER"}}
+
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > a soft-deleted tenant grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1) > a sign-in skips a deleted tenant even when it is the oldest membership
+O1_SIGNIN {"tenantA":false,"tenantB":true,"tenantId":"cmuoen9j60018bkxkwt47gqr0","role":"TENANT_OWNER"}
+
+stdout | tests/auth-jwt-membership-refresh.live.test.ts > a soft-deleted tenant grants nothing (TASK-MUO2B59ZNY7D7, İNCELEME-81 O-1) > [A9] asked to be bound to a deleted tenant it is a member of, the session stays where it was
+O1_A9 {"d":false,"tenantA":true,"role":"TENANT_OWNER"}
+
+ ✓ tests/auth-jwt-membership-refresh.live.test.ts (8 tests) 2560ms
+     ✓ demoted to MEMBER: the next request is MEMBER and an edit is refused  413ms
+ ✓ src/lib/billing/invoice-writer.test.ts (26 tests) 4887ms
+     ✓ reconstructs the charged amount exactly, for every amount and rate swept  3932ms
+     ✓ never needs more than one minor unit of rounding  941ms
+ ✓ tests/i18n-check-script.test.ts (8 tests) 3788ms
+     ✓ passes when both catalogs agree  400ms
+     ✓ fails when a key ships in Turkish only (CLAUDE.md rule 8)  525ms
+     ✓ fails when a key used in code is missing from a catalog  469ms
+     ✓ does not treat a template-literal key as a missing literal key  561ms
+     ✓ still fails a template-literal key whose whole group is missing in one language  512ms
+     ✓ resolves each variable against its own namespace  332ms
+     ✓ re-reads the namespace when a later function rebinds the same variable  498ms
+     ✓ ignores t() written inside a comment  485ms
+ ✓ tests/prisma-delegate-types-are-real.test.ts (2 tests) 18261ms
+     ✓ tsc rejects a phantom model and a phantom column  18106ms
+(node:5692) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/teardown-where-guard.test.ts (6 tests) 3420ms
+     ✓ no test file in the repo has an unguarded where  3240ms
+ ✓ tests/m10-sign-dual-approval.live.test.ts (27 tests) 1953ms
+     ✓ a revision committed between the read and the write is not signed on the old approvals  328ms
+ ✓ tests/api/api-error-body-guard.test.ts (22 tests) 19280ms
+     ✓ the guard sees the files it is meant to guard  848ms
+     ✓ no server action returns what it caught (beyond the known list)  17793ms
+ ✓ tests/withholding-rounding.test.ts (8 tests) 4265ms
+     ✓ every net from 1 to 3000, at each VAT rate and each withholding rate  4220ms
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+stderr | tests/m9-briefs-form-errors.test.tsx > P2-9 — a half-filled meeting date is reported, not dropped > leaves an empty pair alone — scheduling a meeting stays optional
+[M9] generateMeetingBrief returned no brief: { success: true, brief: null }
+
+ ✓ tests/cordis-partner-profile.live.test.ts (1 test) 3098ms
+     ✓ writes the same profiles and co-participations as the legacy job  2330ms
+stderr | tests/stripe-webhook-tenant-scope.live.test.ts > stripe webhook tenant scope (live database) > a redelivered subscription event moves the subscription, add-on and credit rows exactly once
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+stdout | tests/stripe-webhook-tenant-scope.live.test.ts > stripe webhook tenant scope (live database) > a redelivered subscription event moves the subscription, add-on and credit rows exactly once
+Event evt-scope-sync-p56fq1fd already processed; skipping
+
+ ✓ src/lib/agency/report.test.ts (16 tests) 3858ms
+     ✓ property: 300 random tables — every cell of the report is the dashboard’s cell  3718ms
+ ✓ tests/pilot-expired-write-paths.test.tsx (12 tests) 3483ms
+     ✓ budget line: a refused add says the pilot ended; the line is not added  1244ms
+     ✓ work package: a refused add says the pilot ended; any other failure stays silent, as before  635ms
+     ✓ Part B editor: a refused lock and a refused save both say the pilot ended  534ms
+ ✓ tests/deleted-tenant-sessionless.live.test.ts (5 tests) 2747ms
+     ✓ a soft-deleted tenant’s key is 401 and leaves no trace; restoring the tenant restores the key  669ms
+stderr | tests/m9-briefs-form-errors.test.tsx > TASK-MTQURC2H4E0WF — brief generation never fails in silence > is dismissible, like the calendar band — one error surface, one behaviour
+Error generating brief: Error: boom
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/m9-briefs-form-errors.test.tsx:309:44
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ tests/m9-briefs-form-errors.test.tsx (12 tests) 2806ms
+     ✓ blocks submit and explains that the time is missing  787ms
+     ✓ renders a dismissible alert region when the brief has no meeting time  353ms
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > the Stripe sync and cancellation leave a pilot row alone
+[ERROR] Stripe subscription names a tenant on the free pilot; not synced {
+  tenantId: 'cmuoenem3000ueuxkjdxhgmap',
+  eventId: 'evt_pilot_sync_1790790875113-q2sgjo',
+  stripeSubscriptionId: 'sub_forged_pilot'
+} 
+
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > the Stripe sync and cancellation leave a pilot row alone
+[ERROR] Stripe cancellation names a tenant on the free pilot; not applied {
+  tenantId: 'cmuoenem3000ueuxkjdxhgmap',
+  eventId: 'evt_pilot_cancel_1790790875141-cyqr1v',
+  stripeSubscriptionId: 'sub_forged_pilot'
+} 
+
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > a grant landing after the Stripe fast-path read is still caught inside the sync transaction (Ö-4)
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+stderr | src/lib/billing/pilot.test.ts > grantPilot (live DB) > a grant landing after the Stripe fast-path read is still caught inside the sync transaction (Ö-4)
+[ERROR] Stripe subscription names a tenant on the free pilot; not synced {
+  tenantId: 'cmuoeneq5000xeuxkpgq0ph9n',
+  eventId: 'evt_pilot_race_1790790875229-02vxf4',
+  stripeSubscriptionId: 'sub_race_pilot'
+} 
+
+ ✓ tests/seat-assignment-authz.live.test.ts (27 tests) 1989ms
+ ✓ src/lib/billing/pilot.test.ts (14 tests) 2174ms
+ ✓ tests/stripe-webhook-tenant-scope.live.test.ts (5 tests) 2423ms
+     ✓ a redelivered subscription event moves the subscription, add-on and credit rows exactly once  313ms
+     ✓ ten simultaneous webhooks all complete without exhausting the connection pool  453ms
+stdout | tests/public-lead.live.test.ts > public lead form (live database, fabrika_app) > a filled honeypot answers ok and stores nothing
+[INFO] public lead dropped by honeypot {"source":"fon-hazirlik"}
+
+ ✓ tests/k3-topic-stats-parse.test.ts (48 tests) 2482ms
+     ✓ stops inflating a part that grows past the cap, whatever its header claims (zip bomb)  1195ms
+     ✓ charges row holes to the same budget (<row r="100000"/> in many parts)  606ms
+ ✓ tests/vat-by-country.test.ts (30 tests) 2965ms
+     ✓ gross is always net plus the tax, exactly, with no third number  2044ms
+     ✓ document, panel and helper agree on every net from 1 to 2000  745ms
+ ✓ tests/agency-funnel.live.test.ts (13 tests) 2490ms
+     ✓ getAgencyFunnel with a province: that province over every type, masked; an empty one is all "<5"  381ms
+ ✓ tests/topic-match-nightly.live.test.ts (9 tests) 1624ms
+stderr | tests/evidence-dev-store.live.test.ts > B-1 on the dev store (TASK-MUO64MVW8TLMX, İNCELEME-82 T-2) > the row save fails: save_failed, no row, the staging file kept as uploaded; the retry succeeds
+[confirmEvidenceUploadAction] DB error: injected: the row insert failed
+
+ ✓ tests/public-lead.live.test.ts (16 tests) 2394ms
+     ✓ addresses rotated inside one IPv6 /64 share one IP bucket  377ms
+ ✓ tests/evidence-dev-store.live.test.ts (9 tests) 2048ms
+     ✓ no session, a role without edit_proposal, another tenant’s key, no key, a traversal, a final key  339ms
+     ✓ exactly 25 MB is accepted: the limit is inclusive  320ms
+ ✓ tests/use-server-exports.test.ts (2 tests) 2101ms
+     ✓ export only async functions  2098ms
+(node:5761) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a first delivery writes the money, the key and the audit row together
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a redelivery of the same event changes no row in any of the five tables
+Event evt-rls-sync-mtvsbe-1790790878609 already processed; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790790878609 already processed; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790790878609 already processed; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > a stale active event replayed after a cancellation grants no second allowance
+Event evt-rls-stale-mtvsbe-1790790878609 already processed; skipping
+
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/server-action-rbac-guard.test.ts (64 tests) 4626ms
+         ✓ B-1 (İNCELEME-101): the same through a relative import of a directory index  1575ms
+         ✓ B-1: with a catch-all `"*": ["./src/*"]`, a package is still a package and src/ still src/  1388ms
+(node:5741) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/billing/public-sector-assignment.test.ts (6 tests) 1578ms
+     ✓ seeding twice leaves the same rows (idempotent)  399ms
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790790878609 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790790878609 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790790878609 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790790878609 claimed concurrently; skipping
+
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790790878609 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790790878609 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+Event evt-rls-race-mtvsbe-1790790878609 claimed concurrently; skipping
+
+stdout | tests/stripe-webhook-idempotency-rls.live.test.ts > stripe webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the database, not by a read
+wave=8 applied=1 skipped=7 rejected=0 | keys=1 creditRows=1 balance=777
+
+Not implemented: Window's open() method
+ ✓ tests/stripe-webhook-idempotency-rls.live.test.ts (7 tests) 1571ms
+     ✓ a first delivery writes the money, the key and the audit row together  367ms
+Not implemented: navigation to another Document
+ ✓ tests/agency-report.live.test.ts (5 tests) 2185ms
+     ✓ the run writes one snapshot per agency, in its own tenant, for the month that closed  575ms
+     ✓ the stored numbers are the dashboard’s: none, by type and each province, cell for cell  531ms
+ ✓ tests/translation.test.ts (2 tests) 1467ms
+     ✓ should translate a batch of topics to Turkish  1456ms
+stderr | tests/modules/settings-modules-plan.test.ts > modules settings — plan and state from entitlements > no subscription: Discover, nothing active, Pro module refused and not written
+[toggleModuleState] Error: Error: Modül etkinleştirilemez: Plan upgrade required.
+    at Module.toggleModuleState (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/app/[locale]/(app)/[workspace]/settings/modules/actions.ts:52:15)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/modules/settings-modules-plan.test.ts:72:5
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ tests/lock-pool.live.test.ts (2 tests) 1251ms
+     ✓ never holds more than 3 connections, however many transactions ask  817ms
+stderr | src/lib/llm.generate.test.ts > credits and failures > retries a rate limit and still charges once
+[AI Retry] Attempt 1 failed with 429. Retrying in 1000ms...
+
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/billing-settings-invoices.test.tsx (9 tests) 2467ms
+     ✓ shows an empty state, and none of the retired demo rows, when nothing was issued  325ms
+     ✓ lists a real invoice with its stored total and both export buttons  842ms
+     ✓ fetches the export route rather than navigating to it directly  383ms
+ ✓ tests/k1-embeddings.live.test.ts (11 tests | 1 skipped) 1514ms
+stderr | tests/modules/settings-modules-plan.test.ts > modules settings — plan and state from entitlements > running pilot: Belediye Ekip with its last day, Pro grant, M1 can be switched on
+[toggleModuleState] Error: Error: Modül etkinleştirilemez: Plan upgrade required.
+    at Module.toggleModuleState (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/app/[locale]/(app)/[workspace]/settings/modules/actions.ts:52:15)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/modules/settings-modules-plan.test.ts:101:5
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/modules/settings-modules-plan.test.ts (6 tests) 1634ms
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > reports a failed AiUsageLog write as AiUsageLogWriteError
+[generateCompletion] AiUsageLog write failed after a provider call Error: db down
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/llm.generate.test.ts:635:52
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > reports a failed CreditLedger write as AiUsageLogWriteError too
+[generateCompletion] AiUsageLog write failed after a provider call Error: db down
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/llm.generate.test.ts:643:54
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > reports an RLS refusal on the bookkeeping transaction as a log-write failure
+[generateCompletion] AiUsageLog write failed after a provider call Error: new row violates row-level security policy for table "AiUsageLog"
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/llm.generate.test.ts:652:7
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2039'
+}
+
+stderr | src/lib/llm.generate.test.ts > generateCompletion — an unrecorded paid call is named, not raw > carries the original database error as `cause`
+[generateCompletion] AiUsageLog write failed after a provider call Error: db down
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/llm.generate.test.ts:669:36
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2002'
+}
+
+ ✓ src/lib/llm.generate.test.ts (50 tests) 1020ms
+     ✓ retries a rate limit and still charges once  1001ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/live-skip-gate.test.ts (12 tests) 970ms
+     ✓ the CLI exits 1 on a skip and 0 on a clean report  957ms
+ ✓ src/lib/billing/plan-repository.test.ts (10 tests) 1759ms
+       ✓ should fetch the published version of a plan  617ms
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+stderr | tests/gdpr-data-subject.live.test.ts > GDPR erasure request — live > marks the account soft-deleted and destroys nothing
+[mail] request-deletion: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | tests/gdpr-data-subject.live.test.ts > GDPR erasure request — live > warns that the subject is the sole owner of their tenant
+[mail] request-deletion: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+ ✓ tests/plan-storefront.spec.ts (10 tests) 1471ms
+stderr | src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts > cron jobs write under the tenant they are iterating > credits-monthly-grant: a stale tenant id is refused by the database, not misfiled
+Failed to grant credits for tenant cmuoenjn70004goxkm9gc8smv: PrismaClientKnownRequestError: 
+Invalid `tx.creditLedger.createMany()` invocation in
+/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/jobs/tasks/credits-monthly-grant.ts:98:51
+
+  95   alreadyGrantedCount++;
+  96   return;
+  97 }
+→ 98 const { count } = await tx.creditLedger.createMany(
+Database error. Code: `42501`. Message: `new row violates row-level security policy for table "CreditLedger"`
+    at vn.handleRequestError (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:8643)
+    at vn.handleAndLogRequestError (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:7932)
+    at vn.request (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:7639)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at a (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:6935)
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/jobs/tasks/credits-monthly-grant.ts:98:29
+    at Proxy._transactionWithCallback (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:99:4868)
+    at grantCreditsToTenants (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/jobs/tasks/credits-monthly-grant.ts:89:7)
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts:450:20
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 {
+  code: 'P2039',
+  meta: {
+    modelName: 'CreditLedger',
+    driverAdapterError: DriverAdapterError: new row violates row-level security policy for table "CreditLedger"
+        at PgTransaction.onError (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+adapter-pg@7.10.0/node_modules/@prisma/adapter-pg/dist/index.mjs:666:11)
+        at PgTransaction.performIO (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+adapter-pg@7.10.0/node_modules/@prisma/adapter-pg/dist/index.mjs:661:12)
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at PgTransaction.executeRaw (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+adapter-pg@7.10.0/node_modules/@prisma/adapter-pg/dist/index.mjs:634:13)
+        at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:11:70205
+        at e.interpretNode (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:11:71857)
+        at e.run (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:11:69273)
+        at execute (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:57:815)
+        at yr.request (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:58:2425)
+        at Object.singleLoader (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@prisma+client@7.10.0_prisma@7.10.0_@types+react-dom@19.2.5_@types+react@19.2.18__@type_416914cd5d1dd40e5194dda4da3358ea/node_modules/@prisma/client/runtime/client.js:65:6920) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.10.0'
+}
+
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/gdpr-data-subject.live.test.ts > GDPR accountability audit — live > a request and its cancellation are both recorded
+[mail] request-deletion: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | src/lib/billing/pilot-gates.test.ts > pilot gates > only a platform admin can grant a pilot
+[WARN] [admin/plans] grantPilot refused {"code":"PLATFORM_ADMIN_REQUIRED"}
+
+ ✓ src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts (14 tests) 1925ms
+     ✓ credits-monthly-grant: a second run for the same month grants nothing (ADR-0008 §6.2)  408ms
+ ✓ tests/rls.spec.ts (6 tests) 1409ms
+ ✓ tests/gdpr-data-subject.live.test.ts (20 tests) 1801ms
+     ✓ returns the subject rows and no other member of the same tenant  331ms
+stderr | tests/plan-entitlement-version.spec.ts > entitlements come from the plan version the subscription is on > a pointer at another plan version is refused, not honoured
+[WARN] Subscription plan version refused; entitling from the catalogue {"tenantId":"cmuoenkm50002hkxkkcfgd2cn","planId":"pro","planVersionId":"cmuoenkw00003hkxk32tfyh5c","reason":"wrong-plan"}
+
+stderr | tests/plan-entitlement-version.spec.ts > entitlements come from the plan version the subscription is on > a pointer at a draft is refused — nothing was sold under one
+[WARN] Subscription plan version refused; entitling from the catalogue {"tenantId":"cmuoenklp0000hkxkrbnbn97z","planId":"entitlement-version-fixture","planVersionId":"cmuoenl8n0005hkxk5a2ugaxh","reason":"draft"}
+
+ ✓ tests/weekly-active-users.live.test.ts (3 tests) 1308ms
+ ✓ tests/plan-entitlement-version.spec.ts (8 tests) 1682ms
+     ✓ publishing a new version in the studio moves the live tenant onto it  347ms
+ ✓ src/lib/billing/pilot-gates.test.ts (5 tests) 1568ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/registration-consent.live.test.ts (4 tests) 873ms
+stderr | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > a row of A that already names B’s object loses the row, B keeps the file
+[R2 Storage] Refused to delete an object outside tenant cmuoenmbt0000ijxkatu88ua5's prefix
+
+stderr | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > a row of A that already names B’s object loses the row, B keeps the file
+[R2 Storage] Refused to delete an object outside tenant cmuoenmbt0000ijxkatu88ua5's prefix
+
+stdout | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > positive control: A records and deletes its own presigned upload, the file goes
+[R2 Storage (Dev Fallback)] Deleted object: cmuoenmbt0000ijxkatu88ua5/org-default/certificate/2026/73b50f2f_kalite_belgesi_pdf.pdf
+
+stdout | tests/evidence-object-key.live.test.ts > evidence object keys stay inside their tenant (Y-4) > FormData upload: the file name cannot steer the key, and the bytes are really stored
+[R2 Storage (Dev Fallback)] Deleted object: cmuoenmbt0000ijxkatu88ua5/org-default/______cmuoenmck0002ijxkekouz6fw/2026/cdcc7bf0_______cmuoenmck0002ijxkekouz6fw_org-default_x_pdf.pdf
+
+ ✓ tests/api/action-leak-scan.test.ts (46 tests) 1075ms
+ ✓ tests/evidence-object-key.live.test.ts (5 tests) 1267ms
+ ✓ tests/k1-embeddings-unlock.live.test.ts (4 tests) 1137ms
+ ✓ tests/api-key-rate-limit.live.test.ts (4 tests) 1227ms
+     ✓ counts each request on the key row and records lastUsedAt  802ms
+stdout | tests/iyzico-webhook-idempotency-rls.live.test.ts > iyzico webhook idempotency under fabrika_app (live database) > simultaneous deliveries of one event are settled by the advisory lock, not by a read
+wave=8 synced=1 duplicate=7 rejected=0 | creditRows=1 balance=777
+
+ ✓ tests/iyzico-webhook-idempotency-rls.live.test.ts (6 tests) 1032ms
+ ✓ tests/system-scope.live.test.ts (6 tests) 937ms
+ ✓ tests/modules-pilot-upgrade-cta.test.tsx (4 tests) 1439ms
+     ✓ pilot: no "Planı Yükselt" anywhere, locked cards say "Pilotta kapalı", header link stays  909ms
+ ✓ tests/m11-partb-editor-buffer.test.tsx (4 tests) 1549ms
+     ✓ shows the active section content and reports it synchronised  832ms
+stdout | tests/relationship-tenant-scope.test.ts > M4 relationship detail — tenant scope
+[seed-relationship-e2e] ready — A=rel-e2e-tenant-a/rel-e2e-relationship-a B=rel-e2e-tenant-b/rel-e2e-relationship-b
+
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/docx-safe-html.test.ts (40 tests) 865ms
+     ✓ flattens absurd nesting to text instead of recursing without bound  841ms
+stdout | tests/relationship-tenant-scope.test.ts > M4 relationship detail — tenant scope
+[seed-relationship-e2e] rolled back
+
+ ✓ tests/relationship-tenant-scope.test.ts (8 tests) 1010ms
+stdout | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[Invitations] invitation issued for tenant cmuoeno720000koxk6p7oyy9l
+
+stderr | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[mail] invitations: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stdout | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[Invitations] invitation issued for tenant cmuoeno720000koxk6p7oyy9l
+
+stderr | tests/bearer-token-hash.live.test.ts > bearer tokens are stored as SHA-256 only (live DB) > an invitation stores the hash of the link token, and the response does not carry the row's secret
+[mail] invitations: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+ ✓ tests/bearer-token-hash.live.test.ts (3 tests) 1392ms
+     ✓ an invitation stores the hash of the link token, and the response does not carry the row's secret  1084ms
+ ✓ tests/double-charge-prevention.test.ts (5 tests) 1332ms
+     ✓ M6 generateAiEvaluation: charges tenant exactly ONCE (-3 credits)  408ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/plan-visibility-rls.spec.ts (5 tests) 1200ms
+ ✓ tests/application-outcome.live.test.ts (9 tests) 1454ms
+     ✓ counts declarations summed across the given tenants only  534ms
+stderr | tests/stripe-webhook-idempotency.live.test.ts > stripe webhook idempotency (live database) > a redelivered subscription event writes no second audit row
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+stdout | tests/stripe-webhook-idempotency.live.test.ts > stripe webhook idempotency (live database) > a redelivered subscription event writes no second audit row
+Event evt-sync-m5mka8x2 already processed; skipping
+
+stdout | tests/stripe-webhook-idempotency.live.test.ts > stripe webhook idempotency (live database) > a stale event replayed after a cancellation grants no second allowance
+Event evt-replay-m5mka8x2 already processed; skipping
+
+ ✓ tests/pilot-expired-action-message.test.tsx (9 tests) 1017ms
+     ✓ value-returning action (province setting): pilotExpired → Common.pilotExpired; failed unchanged  482ms
+     ✓ throwing action (add to pipeline): the production-shaped rejection → Common.pilotExpired; other errors keep their label  514ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/stripe-webhook-idempotency.live.test.ts (4 tests) 963ms
+ ✓ tests/consortium-find-candidates-pilot.live.test.ts (2 tests) 1095ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/cordis-csv.test.ts > runCordisImport — skipped records > a record it cannot read, over the limit, fails the run before any write
+[ERROR] [k2-cordis] import failed CordisSkipLimitError: CORDIS dump rejected: skipped records over the 0.1% limit — project.csv: 1/2 skipped (line 4: expected 22 fields, got 3)
+    at assertSkipBudget (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/k2-cordis/importer.ts:254:9)
+    at runCordisImport (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/k2-cordis/importer.ts:407:5)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/cordis-csv.test.ts:222:17
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 {"runId":"run-1","dataset":"HORIZON","errorCode":"SKIP_LIMIT_EXCEEDED"}
+
+stderr | tests/cordis-csv.test.ts > runCordisImport — skipped records > a participation of an unknown project is skipped, counted, and fails at the default limit
+[ERROR] [k2-cordis] import failed CordisSkipLimitError: CORDIS dump rejected: skipped records over the 0.1% limit — organization.csv: 1/3 skipped (unknown project 555555555)
+    at assertSkipBudget (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/k2-cordis/importer.ts:254:9)
+    at runCordisImport (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/k2-cordis/importer.ts:407:5)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/cordis-csv.test.ts:256:20
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 {"runId":"run-1","dataset":"HORIZON","errorCode":"SKIP_LIMIT_EXCEEDED"}
+
+ ✓ tests/invitation-retention.live.test.ts (6 tests) 882ms
+ ✓ tests/cordis-csv.test.ts (15 tests) 374ms
+ ✓ tests/auditevent-null-system-only.live.test.ts (5 tests) 943ms
+ ✓ tests/k3-topic-stats-import.live.test.ts (5 tests) 998ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/app/api/concept-notes/[id]/export/route.ssrf.test.ts (12 tests) 868ms
+ ✓ tests/relationship-owner-assignment.live.test.ts (9 tests) 670ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/pipeline-surface-tenant-scope.live.test.ts (5 tests) 657ms
+ ✓ src/lib/auth-callbacks.test.ts (32 tests) 974ms
+stderr | tests/prompt-snapshots.test.ts > prompt text is byte-identical to the pre-move inline literals > M7 IP checklist (prompt + system)
+[generateIpChecklist] LLM fallback: captured
+
+stderr | tests/prompt-snapshots.test.ts > prompt text is byte-identical to the pre-move inline literals > M9 meeting brief (prompt + system)
+[M9 generateMeetingBrief] LLM call fallback: captured
+
+ ✓ tests/social-action-disclosure.test.ts (2 tests) 697ms
+   ✓ a code without the addendum tick: refused before the redirect, in the reader’s language, nothing parked  696ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/prompt-snapshots.test.ts > prompt text is byte-identical to the pre-move inline literals > M10 standard document (prompt + system)
+[m10 generateStandardDoc] generation failed for NDA: captured
+
+(node:6069) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/prompt-snapshots.test.ts (8 tests) 653ms
+(node:6064) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/auth-card-signin-errors.test.tsx (10 tests) 902ms
+     ✓ OAuthAccountNotLinked gets its own message  329ms
+ ✓ tests/concept-template-tenant-scope.live.test.ts (6 tests) 586ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/system-alert.live.test.ts (1 test) 833ms
+     ✓ a real Prisma error becomes a SystemAlert row and nothing is sent over the network  531ms
+ ✓ tests/translation-bounds.test.ts (3 tests) 909ms
+     ✓ the cache stops growing at its cap  399ms
+ ✓ src/lib/jobs/tasks/__tests__/alerts-daily.test.ts (12 tests) 698ms
+     ✓ accepts the saved-search query — no relation is included  601ms
+(node:6017) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/billing-settings-lifetime-badge.test.tsx (5 tests) 878ms
+     ✓ claims no owner count when the count could not be read  522ms
+ ✓ tests/m9-brief-opportunity.live.test.ts (4 tests) 532ms
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
+ ✓ tests/calendar-token-db.live.test.ts (2 tests) 710ms
+ ✓ tests/notifications-read-store.test.tsx (6 tests) 580ms
+ ✓ tests/admin-cordis-client-import-error.test.tsx (3 tests) 1103ms
+     ✓ a thrown action shows IMPORT_FAILED, not the error text  838ms
+stdout | tests/billing-k1-tenant-scope.live.test.ts > billing K1 call sites under fabrika_app (TASK-MULQKFER4MF0Y) > recordLifetimeLicence writes the licence under the RLS role
+[INFO] Lifetime licence already recorded; skipping {"eventId":"evt-k1-mulqk-1790790894360","seq":1}
+
+ ✓ tests/billing-k1-tenant-scope.live.test.ts (4 tests) 530ms
+ ✓ tests/stripe-event-retention.live.test.ts (5 tests) 435ms
+ ✓ src/lib/calendar/__tests__/sync.test.ts (12 tests) 544ms
+       ✓ produces a row the real SystemAlert schema accepts  529ms
+ ✓ src/lib/agency/invite-code.test.ts (5 tests) 244ms
+ ✓ tests/billing-checkout-auth.test.ts (3 tests) 443ms
+     ✓ a signed-in tenant still checks out, priced under its own tenant id  379ms
+stderr | tests/rag-pdf-ingest-partial.test.ts > processPdfAndStore leaves the corpus consistent > an orphan that survives cleanup is named in a SystemAlert, not left quiet
+[processPdfAndStore] orphan document doc-0 ("A paper") left behind
+
+ ✓ tests/rag-pdf-ingest-partial.test.ts (8 tests) 175ms
+stderr | tests/admin-upload-authz.test.ts > POST /api/admin/documents/upload > fails closed when the session lookup itself throws
+Upload error: Error: auth backend down
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/admin-upload-authz.test.ts:127:32
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ tests/i18n.test.ts (4 tests) 357ms
+ ✓ tests/beta/pricing-analysis.test.ts (23 tests) 84ms
+stderr | tests/fabricated-fallbacks.test.ts > M10 generateStandardDoc — a failed generation is an error, not a document > writes no document and charges no credit when the LLM call throws
+[m10 generateStandardDoc] generation failed for AWARD_PACK: upstream 503
+
+stderr | tests/admin-upload-authz.test.ts > POST /api/admin/documents/upload — input validation (TASK-MULQL8QB679LQ) > an ingest failure → 500 upload_failed
+Upload error: Error: provider down
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/admin-upload-authz.test.ts:267:46
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ tests/admin-upload-authz.test.ts (20 tests) 318ms
+ ✓ tests/fabricated-fallbacks.test.ts (23 tests) 189ms
+ ✓ tests/efatura-foreign-currency.test.ts (14 tests) 88ms
+ ✓ tests/efatura-integrator.test.ts (9 tests) 270ms
+ ✓ tests/m9-calendar-tenant-scope.live.test.ts (3 tests) 288ms
+ ✓ src/app/[locale]/admin/billing/plans/actions.test.ts (42 tests) 119ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/app/[locale]/(app)/ajans/actions.test.ts (2 tests) 273ms
+ ✓ tests/brand-surfaces-render.test.tsx (2 tests) 564ms
+     ✓ public footer renders the product name (tr)  457ms
+ ✓ tests/cart-checkout-signed-out.test.tsx (1 test) 853ms
+     ✓ sends the visitor to the login page and keeps the cart  852ms
+ ✓ tests/storage-public-url.test.ts (3 tests) 321ms
+     ✓ are not built even when R2_PUBLIC_HOST is set  312ms
+(node:6167) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/invoice-fx-tcmb.test.ts (21 tests) 109ms
+ ✓ src/lib/agency/funnel.test.ts (20 tests) 92ms
+ ✓ tests/secret-model-select-guard.test.ts (34 tests) 224ms
+(node:6177) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/dashboard-tenantless.test.ts (3 tests) 369ms
+     ✓ a signed-in user with no tenant goes to /no-workspace, not to "access denied"  366ms
+ ✓ tests/jobs-schedule.test.ts (17 tests) 165ms
+ ✓ src/app/api/concept-notes/[id]/export/route.test.ts (4 tests) 171ms
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+[createOpportunity] member lookup bypassed: REACHED_BEHIND_THE_GATE
+[createOpportunity] refused by the database, not buffered: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+[createOpportunity] member lookup bypassed: REACHED_BEHIND_THE_GATE
+[createOpportunity] refused by the database, not buffered: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.createOpportunity needs manage_workspaces
+[createOpportunity] member lookup bypassed: REACHED_BEHIND_THE_GATE
+[createOpportunity] refused by the database, not buffered: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.evaluateOpportunityGate needs evaluate_gates
+[evaluateOpportunityGate] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.evaluateOpportunityGate needs evaluate_gates
+[evaluateOpportunityGate] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.evaluateOpportunityGate needs evaluate_gates
+[evaluateOpportunityGate] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > pipeline.logEffort needs edit_proposal
+[logEffort] failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.getPresignedUploadUrlAction needs edit_proposal
+[getPresignedUploadUrlAction] presign error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.createEvidence needs edit_proposal
+[createEvidence] DB fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.deleteEvidence needs edit_proposal
+[deleteEvidence] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > evidence.verifyEvidenceAction needs edit_proposal
+[verifyEvidenceAction] DB error: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m7.generateIpChecklist needs edit_proposal
+[generateIpChecklist] LLM fallback: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m9.savePostMeetingNotes needs edit_proposal
+[savePostMeetingNotes] DB update failed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.acquireSectionLock needs edit_proposal
+[m11 acquireSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.releaseSectionLock needs edit_proposal
+[m11 releaseSectionLock] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updateSectionContent needs edit_proposal
+[m11 updateSectionContent] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addSectionComment needs edit_proposal
+[m11 addSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.resolveSectionComment needs edit_proposal
+[m11 resolveSectionComment] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.restoreSectionRevision needs edit_proposal
+[m11 restoreSectionRevision] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.updatePresenceHeartbeat needs edit_proposal
+[m11 updatePresenceHeartbeat] DB bypass: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addBudgetLine needs edit_proposal
+[m11 addBudgetLine] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+stderr | tests/server-action-rbac.test.ts > every mapped write action follows rbac.ts for all six roles > m11.addWorkPackage needs edit_proposal
+[m11 addWorkPackage] DB update bypassed: REACHED_BEHIND_THE_GATE
+
+ ✓ tests/evidence-form-file-clear.test.tsx (4 tests) 321ms
+     ✓ clears a previously chosen file when the picker comes back empty  318ms
+ ✓ tests/server-action-rbac.test.ts (65 tests) 306ms
+ ✓ src/lib/agency/cobrand.test.ts (13 tests) 9ms
+(node:6201) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/modules/m6.test.ts (13 tests) 127ms
+stdout | src/lib/leads/public-lead.test.ts > input > refuses before any database call when consent is missing or outdated, or the honeypot is filled
+[INFO] public lead dropped by honeypot {"source":"fon-hazirlik"}
+
+stderr | src/lib/leads/public-lead.test.ts > client IP > reads the proxy count from TRUSTED_PROXY_HOPS, 1 when unset or unusable
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"-1"}
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"1.5"}
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"two"}
+[WARN] TRUSTED_PROXY_HOPS is not a whole number 0..5; using 1 {"value":"NaN"}
+
+(node:6198) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/leads/public-lead.test.ts (16 tests) 33ms
+ ✓ tests/api/stripe-webhook-bodies.test.ts (3 tests) 205ms
+ ✓ tests/modules/ai-module-gate.test.ts (12 tests) 159ms
+ ✓ tests/document-exporter.test.ts (15 tests) 371ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/m8-seat-candidates-form-errors.test.ts (7 tests) 216ms
+ ✓ src/lib/content-disposition.test.ts (8 tests) 148ms
+(node:6203) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/rls-coverage.test.ts (27 tests) 73ms
+ ✓ tests/rag-ingest-silent-failure.test.ts (8 tests) 154ms
+ ✓ src/modules/m2/server/actions.test.ts (6 tests) 183ms
+ ✓ tests/client-clock-hooks.test.tsx (4 tests) 122ms
+ ✓ tests/gates.test.ts (16 tests) 79ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/cordis-k2-job.test.ts (10 tests) 89ms
+(node:6229) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/retired-brand-name.test.ts (5 tests) 161ms
+ ✓ tests/cordis-rag.test.ts (11 tests) 270ms
+stderr | tests/feedback-digest-run.test.ts > runFeedbackDigest delivery branches > skips outside production when a recipient exists but SMTP is not configured
+[mail] feedback-digest: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | tests/feedback-digest-run.test.ts > runFeedbackDigest delivery branches > fails with an error SystemAlert in production when SMTP is not configured
+[mail] feedback-digest: SMTP is not configured (SMTP_HOST unset) — mail not sent
+
+stderr | tests/feedback-digest-run.test.ts > runFeedbackDigest delivery branches > reports a transport failure instead of throwing out of the job
+[ERROR] feedback digest email failed Error: smtp is down
+    at sender (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/feedback-digest-run.test.ts:123:15)
+    at Module.runFeedbackDigest (/private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/feedback/digest-run.ts:147:11)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/feedback-digest-run.test.ts:119:20
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20 
+
+ ✓ tests/feedback-digest-run.test.ts (7 tests) 272ms
+ ✓ tests/invoice-i18n.test.ts (14 tests) 57ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/csp-report.test.ts (12 tests) 186ms
+stderr | tests/api/v1-calls.test.ts > GET /api/v1/calls > answers a failed query with 500, never with fabricated rows
+[/api/v1/calls] query failed: connect ECONNREFUSED
+
+ ✓ tests/verify-deployed-bytecode.test.ts (6 tests) 54ms
+ ✓ tests/api/v1-calls.test.ts (11 tests) 25ms
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a cut-off generation's error and creates no document
+[m10 generateStandardDoc] generation failed for AWARD_PACK: cut off at the length limit
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a cut-off generation's error and creates no document
+[recordAlert] could not write SystemAlert: Cannot read properties of undefined (reading 'findMany')
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a refused generation's error too
+[m10 generateStandardDoc] generation failed for NDA: declined
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc keeps a refused generation's error too
+[recordAlert] could not write SystemAlert: Cannot read properties of undefined (reading 'findMany')
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc still reports any other failure generically
+[m10 generateStandardDoc] generation failed for NDA: socket hang up
+
+stderr | tests/modules/m10.test.ts > M10 Follow-up Documents Module > generateStandardDoc still reports any other failure generically
+[recordAlert] could not write SystemAlert: Cannot read properties of undefined (reading 'findMany')
+
+ ✓ tests/modules/m10.test.ts (13 tests) 138ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/money.test.ts (25 tests) 85ms
+ ✓ src/lib/security-headers.test.ts (127 tests) 178ms
+ ✓ tests/admin-actions-authz.test.ts (33 tests) 31ms
+(node:6243) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/api/cordis-public-hardening.test.ts > /api/cordis/* 500 bodies > projects: the Prisma message stays out of the body
+[ERROR] [API /api/cordis/projects] query failed Error: 
+Invalid `prisma.cordisProject.findMany()` invocation:
+{ where: {}, skip: NaN, include: { participations: … } }
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/api/cordis-public-hardening.test.ts:93:42
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+stderr | tests/api/cordis-public-hardening.test.ts > /api/cordis/* 500 bodies > organizations: the Prisma message stays out of the body
+[ERROR] [API /api/cordis/organizations] query failed Error: 
+Invalid `prisma.cordisProject.findMany()` invocation:
+{ where: {}, skip: NaN, include: { participations: … } }
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/api/cordis-public-hardening.test.ts:102:42
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+stderr | tests/api/cordis-public-hardening.test.ts > /api/cordis/* 500 bodies > organization profile: the Prisma message stays out of the body
+[ERROR] [API /api/cordis/organizations/[id]] query failed Error: 
+Invalid `prisma.cordisProject.findMany()` invocation:
+{ where: {}, skip: NaN, include: { participations: … } }
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/api/cordis-public-hardening.test.ts:109:40
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+ ✓ tests/api/cordis-public-hardening.test.ts (11 tests) 71ms
+ ✓ src/lib/rag.test.ts (17 tests) 119ms
+ ✓ src/lib/iyzico.test.ts (23 tests) 118ms
+ ✓ tests/llm-outcome-message.test.tsx (5 tests) 129ms
+ ✓ tests/invoice-document.test.ts (9 tests) 102ms
+ ✓ src/lib/jobs/tasks/__tests__/k1-embeddings.test.ts (11 tests) 17ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/app-url-self-links.test.ts (4 tests) 77ms
+ ✓ src/app/[locale]/(app)/ajans/cobrand-actions.test.ts (8 tests) 237ms
+ ✓ tests/modules/m9.test.ts (6 tests) 151ms
+ ✓ tests/tenant-fallback-guard.test.ts (1 test) 130ms
+ ✓ tests/cordis-delta.test.ts (8 tests) 152ms
+ ✓ src/modules/m6/server/__tests__/scoring.test.ts (40 tests) 13ms
+ ✓ tests/beta/pricing-report.test.ts (6 tests) 193ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > returns ok with topics for a well-formed payload
+[INFO] [SediaAdapter] Fetching page 1/1, size=1 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > returns ok with topics for a well-formed payload
+[INFO] [SediaAdapter] Total fetched: 1 topics across 1 pages 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > reports { status: error, reason, topicsProcessed: 0 } instead of throwing
+[INFO] [SediaAdapter] Fetching page 1/1, size=100 
+
+ ✓ src/lib/scoring/embeddings.test.ts (94 tests) 217ms
+stderr | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > reports { status: error, reason, topicsProcessed: 0 } instead of throwing
+[ERROR] [SediaAdapter] Error on page 1: Error: ECONNREFUSED
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/k1-adapters.test.ts:138:50
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+[WARN] [SediaAdapter] 1 errors during fetch {"firstErrors":["Page 1 fetch error: ECONNREFUSED"]}
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > reports { status: error, reason, topicsProcessed: 0 } instead of throwing
+[INFO] [SediaAdapter] Total fetched: 0 topics across 0 pages 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > raises a SystemAlert when the upstream envelope changes shape
+[INFO] [SediaAdapter] Fetching page 1/1, size=100 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > raises a SystemAlert when the upstream envelope changes shape
+[INFO] [SediaAdapter] No results on page 1, stopping pagination 
+[INFO] [SediaAdapter] Total fetched: 0 topics across 0 pages 
+
+stderr | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > raises a SystemAlert when the upstream envelope changes shape
+[WARN] [sedia] schema drift detected {"count":1,"sample":["search envelope changed on page 1: totalResults Invalid input: expected number, received undefined; results Invalid input: expected array, received undefined"]}
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > skips a result whose required metadata is missing, and records the drift
+[INFO] [SediaAdapter] Fetching page 1/1, size=100 
+
+stdout | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > skips a result whose required metadata is missing, and records the drift
+[INFO] [SediaAdapter] Total fetched: 0 topics across 1 pages 
+
+stderr | tests/k1-adapters.test.ts > SediaAdapter.fetchSediaTopics > skips a result whose required metadata is missing, and records the drift
+[WARN] [sedia] schema drift detected {"count":1,"sample":["result missing required metadata: metadata.identifier"]}
+
+stdout | tests/k1-adapters.test.ts > EurostarsAdapter > reports an error envelope when the page is blocked
+[INFO] [EurostarsAdapter] Fetching Eurostars calls 
+
+stdout | tests/k1-adapters.test.ts > EurostarsAdapter > flags schema drift when a 200 page yields no recognizable call
+[INFO] [EurostarsAdapter] Fetching Eurostars calls 
+
+stderr | tests/k1-adapters.test.ts > EurostarsAdapter > flags schema drift when a 200 page yields no recognizable call
+[WARN] [eurostars] schema drift detected {"count":1,"sample":["Eurostars page returned 200 but matched no known call-id pattern"]}
+
+stdout | tests/k1-adapters.test.ts > EurostarsAdapter > flags schema drift when a 200 page yields no recognizable call
+[INFO] [EurostarsAdapter] Fetched 0 Eurostars calls 
+
+stdout | tests/k1-adapters.test.ts > TubitakAdapter > reports an error envelope when the page 404s
+[INFO] [TubitakAdapter] Fetching TÜBİTAK calls 
+
+ ✓ tests/k1-adapters.test.ts (16 tests) 254ms
+stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a query the database refuses is a refusal, not an outage: CREATE_FAILED, nothing buffered
+[createOpportunity] refused by the database, not buffered: invalid byte sequence for encoding "UTF8": 0x00
+
+stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a scoring failure after the row is committed keeps the created row, unbuffered
+[createOpportunity] G0 scoring skipped for opp-1: scoring blew up
+
+stderr | tests/workspace-scoped-writes.test.ts > createOpportunity refuses what is not a workspace slug, before the database > a real outage (connection refused) still falls back to the buffer
+[createOpportunity] DB query bypassed, stored in resilient pipeline store: Unknown error
+
+ ✓ tests/workspace-scoped-writes.test.ts (34 tests) 74ms
+stderr | tests/api/cagrilar-hardening.test.ts > /api/cagrilar hardening > a 500 carries a fixed code, never the underlying message
+[ERROR] [API /api/cagrilar] Internal error: Error: 
+Invalid `prisma.topic.upsert()` invocation: relation "Topic" secret detail
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/api/cagrilar-hardening.test.ts:107:7
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 
+
+ ✓ tests/api/cagrilar-hardening.test.ts (9 tests) 142ms
+ ✓ tests/efatura-unit.test.ts (25 tests) 142ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/billing-manage-billing-role.test.ts (17 tests) 146ms
+ ✓ tests/call-topic-route.test.ts (12 tests) 42ms
+ ✓ tests/public-footer-data-residency.test.tsx (4 tests) 514ms
+     ✓ states where the database is hosted, and nothing else (tr)  489ms
+ ✓ src/lib/public-sector/catalog.test.ts (10 tests) 73ms
+ ✓ tests/m9-calendar-connect.test.ts (15 tests) 28ms
+ ✓ tests/modules/m6/scoring-tenant-scope.test.ts (15 tests) 29ms
+stdout | src/lib/billing/lifetime-licence.test.ts > recordLifetimeLicence > writes nothing the second time the same event arrives
+[INFO] Lifetime licence already recorded; skipping {"eventId":"evt_1","seq":1}
+
+stdout | src/lib/billing/lifetime-licence.test.ts > recordLifetimeLicence > writes nothing when the same session arrives under a new event id
+[INFO] Lifetime licence already recorded; skipping {"eventId":"evt_redelivered","seq":1}
+
+stderr | src/lib/billing/lifetime-licence.test.ts > recordLifetimeLicence > does not record a session whose payment has not settled
+[WARN] Lifetime checkout completed without payment; not recording a licence {"sessionId":"cs_test_lifetime_1","paymentStatus":"unpaid"}
+
+ ✓ src/lib/billing/lifetime-licence.test.ts (20 tests) 14ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:6305) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > should throw when client ID is missing
+[MOCK/DEV] Google Calendar connect attempted without GOOGLE_OAUTH_CLIENT_ID (mock/dev mode)
+
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > refuses to invent an event id for an API it does not call
+[MOCK/DEV] Google Calendar createEvent called in mock/dev mode: no real event created
+
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > refuses to invent an event id for an API it does not call
+[MOCK/DEV] Google Calendar updateEvent called in mock/dev mode
+
+stderr | src/lib/calendar/__tests__/provider.test.ts > CalendarProvider > GoogleCalendarProvider > refuses to invent an event id for an API it does not call
+[MOCK/DEV] Google Calendar deleteEvent called in mock/dev mode
+
+ ✓ tests/efatura-xml-minor-units.test.ts (11 tests) 8ms
+ ✓ src/lib/calendar/__tests__/provider.test.ts (19 tests) 34ms
+ ✓ tests/modules/m2.test.ts (3 tests) 43ms
+stderr | src/lib/billing/subscription-sync.test.ts > logInvoicePayment > lets the payment stand even if issuing the invoice throws
+[logInvoicePayment] invoice not issued for in_test_1: database is down
+
+stderr | src/lib/billing/subscription-sync.test.ts > logInvoicePayment > when Stripe sends no line description > lets the payment stand when the tenant lookup itself fails
+[logInvoicePayment] invoice not issued for in_test_1: database is down
+
+stderr | src/lib/billing/subscription-sync.test.ts > logInvoicePayment > writes nothing at all when the subscription carries no tenant
+Unable to determine tenantId for invoice in_test_1; skipping log
+
+stderr | src/lib/llm.embed.test.ts > embedText — every provider call leaves an AiUsageLog row > reports an RLS refusal as a log-write failure rather than returning the vector
+[embedText] AiUsageLog write failed after a provider call Error: new row violates row-level security policy for table "AiUsageLog"
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/llm.embed.test.ts:216:21
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2039'
+}
+
+stderr | src/lib/llm.embed.test.ts > embedText — every provider call leaves an AiUsageLog row > surfaces a failed log write instead of returning a silently unlogged vector
+[embedText] AiUsageLog write failed after a provider call Error: db down
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/llm.embed.test.ts:228:52
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+ ✓ src/lib/llm.embed.test.ts (12 tests) 12ms
+ ✓ tests/efatura.test.ts (8 tests) 107ms
+ ✓ src/lib/billing/subscription-sync.test.ts (15 tests) 117ms
+stderr | tests/users-scheduled-deletion.test.ts > purgeDueUsers — erasure > one failed purge does not abort the rest of the batch
+[users-scheduled-deletion] failed for user bad: Error: FK violation
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/users-scheduled-deletion.test.ts:248:38
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64
+
+stderr | tests/users-scheduled-deletion.test.ts > purgeDueUsers — a failed run raises an alarm > writes a SystemAlert when an erasure could not be completed
+[users-scheduled-deletion] failed for user bad: Error: Null constraint violation
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/users-scheduled-deletion.test.ts:271:52
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2011'
+}
+
+stderr | tests/users-scheduled-deletion.test.ts > purgeDueUsers — a failed run raises an alarm > a second failing night folds into the open alert instead of a new row
+[users-scheduled-deletion] failed for user bad: Error: Null constraint violation
+    at /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/tests/users-scheduled-deletion.test.ts:333:48
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:2956:64 {
+  code: 'P2011'
+}
+
+ ✓ tests/users-scheduled-deletion.test.ts (13 tests) 14ms
+ ✓ tests/modules/m6/comparison-tenant-scope.test.ts (7 tests) 40ms
+ ✓ tests/feedback-alerts.test.ts (11 tests) 8ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/agency/codes.test.ts (10 tests) 9ms
+stderr | src/lib/billing/catalog.test.ts > active tier resolution > falls back loudly instead of guessing when the setting is unreadable
+[WARN] BILLING_ACTIVE_TIER names no known tier; falling back to the default tier {"configured":"50%","fallback":"NONE","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+ ✓ src/lib/billing/catalog.test.ts (68 tests) 191ms
+ ✓ tests/adapters/sedia-circuit-breaker.test.ts (5 tests) 27ms
+ ✓ tests/esr-calibration.test.ts (66 tests) 175ms
+ ✓ src/lib/readiness/score.test.ts (19 tests) 29ms
+ ✓ src/lib/jobs/tasks/alerts-sweep.test.ts (12 tests) 81ms
+ ✓ src/lib/jobs/tasks/__tests__/k1-topic-match-m4-stale.test.ts (8 tests) 21ms
+ ✓ tests/m10-dual-approval-action.test.ts (15 tests) 16ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/no-ssg-under-dynamic-root.test.ts (3 tests) 33ms
+ ✓ tests/app-shell-no-loading-boundary.test.ts (1 test) 9ms
+ ✓ src/modules/m2/server/templates.test.ts (22 tests) 96ms
+ ✓ src/lib/agency/funnel.attack.test.ts (24 tests) 52259ms
+     ✓ seed 1, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined  4310ms
+     ✓ seed 7, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined  4444ms
+     ✓ seed 42, D ≥ 0, random codes: 300 random small tables, every view and the code panel joined  4198ms
+     ✓ seed 1, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  4675ms
+     ✓ seed 7, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  3923ms
+     ✓ seed 42, D ≥ 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  4269ms
+     ✓ seed 1, D = 0, random codes: 300 random small tables, every view and the code panel joined  4617ms
+     ✓ seed 7, D = 0, random codes: 300 random small tables, every view and the code panel joined  4624ms
+     ✓ seed 42, D = 0, random codes: 300 random small tables, every view and the code panel joined  4316ms
+     ✓ seed 1, D = 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  4185ms
+     ✓ seed 7, D = 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  3811ms
+     ✓ seed 42, D = 0, sequential codes of 6: 300 random small tables, every view and the code panel joined  4701ms
+ ✓ tests/scripts-dotenv-first.test.ts (7 tests) 18ms
+ ✓ tests/beta/checkin-schedule.test.ts (21 tests) 35ms
+ ✓ tests/k1-sync-topics.test.ts (6 tests) 8ms
+stdout | tests/k3-topic-stats-authz.test.ts > POST /api/admin/topic-stats/rescore > a platform admin reaches the rescore
+[INFO] K3 G0 rescore after TopicStat import {"userId":"u-admin","prefixes":1,"opportunities":1,"scored":1,"unscorable":0,"failed":0,"truncated":false}
+
+ ✓ tests/k3-topic-stats-authz.test.ts (8 tests) 46ms
+ ✓ tests/modules/route-catalog.test.ts (7 tests) 4ms
+(node:5409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/src/lib/rag-pdf.worker.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/wt/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/email/__tests__/mailer.test.ts (20 tests) 51ms
+ ✓ tests/api/v1-partners.test.ts (8 tests) 14ms
+ ✓ tests/beta/pricing-survey.test.ts (11 tests) 35ms
+ ✓ tests/beta/roster.test.ts (13 tests) 8ms
+stderr | tests/fabricated-identity-strings.test.ts > listSessionWorkspaces — the switcher answers from Workspace rows > a failed lookup yields an empty switcher, not an invented workspace
+[listSessionWorkspaces] lookup failed, switcher stays empty: connection refused
+
+ ✓ tests/fabricated-identity-strings.test.ts (27 tests) 17ms
+ ✓ tests/rag-pdf-worker-isolation.test.ts (25 tests) 53574ms
+     ✓ İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators  27300ms
+     ✓ past maxParseMs the thread is terminated and the PDF refused as parse_too_heavy  1023ms
+     ✓ one stream inflating past maxStreamInflatedMb  420ms
+     ✓ a stream at exactly maxStreamInflatedMb is not refused for its size  661ms
+     ✓ streams under the per-stream cap that add up past maxInflatedMb  808ms
+     ✓ a stream compressed twice ([/FlateDecode /FlateDecode]) is measured through both layers  836ms
+     ✓ a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast  4081ms
+     ✓ LZWDecode  826ms
+     ✓ [/ASCIIHexDecode /FlateDecode]  760ms
+     ✓ [/ASCII85Decode /FlateDecode]  781ms
+     ✓ /RunLengthDecode  832ms
+     ✓ [/FlateDecode /FlateDecode /FlateDecode /FlateDecode]  670ms
+     ✓ an image decoder reached through a font program (/JBIG2Decode) does not run  537ms
+     ✓ a bomb in a font program, where pdf.js catches the error and falls back to a standard font  498ms
+     ✓ `endstream` bytes inside the compressed data do not end the count  596ms
+     ✓ LZW streams under the per-stream cap that add up past maxInflatedMb  3440ms
+     ✓ a 1.3 GB LZW bomb (~1 MB file) is refused at the real limits, fast, the event loop turning  2403ms
+     ✓ the same filter chains holding ordinary text are still extracted  3549ms
+     ✓ a real Flate-compressed text PDF is extracted, without page separators  532ms
+     ✓ parallel uploads are extracted one at a time and all answer  2170ms
+     ✓ too_many_chunks names the page it stopped at and the chunk limit  426ms
+     ✓ a file pdf.js cannot read is an ordinary error, not a limit  369ms
+ ✓ tests/api/gdpr-500-body.test.ts (13 tests) 117ms
+ ✓ src/lib/billing/public-sector-plans.test.ts (6 tests) 10ms
+ ✓ tests/evidence-incoming-key.test.ts (15 tests) 8ms
+ ✓ tests/registration-consent.test.ts (8 tests) 23ms
+ ✓ tests/g0-compute.test.ts (21 tests) 14ms
+ ✓ tests/modules/api-keys.test.ts (25 tests) 35ms
+ ✓ tests/billing-invoice-list.test.ts (10 tests) 31ms
+ ✓ tests/i18n-hardcoded-detector.test.ts (24 tests) 12ms
+ ✓ src/lib/llm.stop-reason.test.ts (17 tests) 10ms
+ ✓ tests/proposal-outcome.test.ts (15 tests) 7ms
+ ✓ tests/modules/state-machine.test.ts (13 tests) 7ms
+ ✓ tests/server-action-missing-id.test.ts (15 tests) 69ms
+ ✓ tests/modules/m5-dashboard-range.test.ts (14 tests) 4ms
+ ✓ tests/modules/module-plan-gate.test.ts (9 tests) 9ms
+ ✓ src/modules/m1/outreach.test.ts (14 tests) 15ms
+ ✓ tests/db-unavailable.test.ts (17 tests) 4ms
+ ✓ src/app/api/saved-searches/route.test.ts (7 tests) 24ms
+ ✓ tests/public-calls-links.test.ts (15 tests) 13ms
+ ✓ tests/evidence-object-key.test.ts (28 tests) 6ms
+ ✓ tests/page-loader-tenant-scope.test.ts (24 tests) 14ms
+ ✓ tests/marketing-unsourced-figures.test.ts (36 tests) 11ms
+ ✓ tests/secret-model-props.test.tsx (5 tests) 189ms
+ ✓ tests/pipeline-actions-pilot-digest.test.ts (15 tests) 19ms
+ ✓ src/lib/app-url.test.ts (15 tests) 7ms
+ ✓ tests/evidence-mock-upload-gate.test.ts (4 tests) 36ms
+ ✓ tests/m9-meeting-schedule.test.ts (7 tests) 4ms
+ ✓ src/lib/calendar/__tests__/encryption.test.ts (14 tests) 9ms
+ ✓ src/lib/observability/__tests__/system-alert-dedupe.test.ts (20 tests) 13ms
+ ✓ tests/helpers/live-db-role.test.ts (17 tests) 8ms
+ ✓ tests/beta/pricing-transition.test.ts (16 tests) 24ms
+ ✓ src/lib/ai/prompts/prompts.test.ts (21 tests) 23ms
+stderr | src/lib/billing/subscription-sync-tenant-scope.test.ts > syncStripeSubscription — tenant scope > writes the subscription, the credit grant and the add-ons through withTenant
+[WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+
+stdout | src/lib/billing/subscription-sync-tenant-scope.test.ts > syncStripeSubscription — tenant scope > rolls the money back when a concurrent delivery claimed the event first
+Event evt_3c claimed concurrently; skipping
+
+ ✓ tests/api/admin-cordis-import-500.test.ts (2 tests) 16ms
+stdout | src/lib/billing/subscription-sync-tenant-scope.test.ts > syncStripeSubscription — tenant scope > does nothing at all when the event was already processed
+Event evt_5 already processed; skipping
+
+ ✓ src/lib/billing/subscription-sync-tenant-scope.test.ts (10 tests) 19ms
+ ✓ tests/followup-doc-kinds.test.ts (24 tests) 10ms
+ ✓ tests/oauth-registration.test.ts (17 tests) 29ms
+ ✓ src/lib/billing/price-lock.test.ts (28 tests) 6ms
+stderr | tests/billing-identity-action.test.ts > saveBillingIdentity — what reaches the database > a database failure is reported as a failure, not as a save
+[ERROR] billing identity write failed connection refused {"tenantId":"tenant-1"}
+
+ ✓ tests/billing-identity-action.test.ts (13 tests) 39ms
+ ✓ tests/kpi-metrics.test.ts (6 tests) 3ms
+stderr | tests/api/api-key-rate-limit.test.ts > authenticateApiKey rate limit > a counter that cannot be written fails closed
+[authenticateApiKey] key lookup failed: connection refused
+
+ ✓ tests/api/api-key-rate-limit.test.ts (5 tests) 12ms
+(node:6433) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/billing/storefront.test.ts (10 tests) 11ms
+ ✓ tests/modules/m11.test.ts (15 tests) 10ms
+ ✓ src/lib/demo-login.test.ts (8 tests) 5ms
+ ✓ tests/k5-pipeline-store-tenant.test.ts (8 tests) 9ms
+ ✓ tests/evidence-page-role.test.ts (9 tests) 8ms
+ ✓ src/app/api/saved-searches/[id]/route.test.ts (7 tests) 8ms
+ ✓ tests/required-id.test.ts (12 tests) 16ms
+ ✓ tests/modules/m6/scoring.test.ts (9 tests) 10ms
+ ✓ src/modules/m8/server/matching.test.ts (17 tests) 5ms
+ ✓ tests/feedback-digest.test.ts (14 tests) 5ms
+ ✓ tests/adapters.test.ts (6 tests | 2 skipped) 5ms
+ ✓ src/lib/auth-secret.test.ts (7 tests) 5ms
+ ✓ tests/jobs-enqueue-and-tick.test.ts (2 tests) 9ms
+ ✓ src/lib/calendar.test.ts (10 tests) 14ms
+ ✓ tests/admin-cordis-failure-code.test.ts (15 tests) 12ms
+ ✓ tests/absence-not-zero.test.ts (23 tests) 19ms
+ ✓ tests/dual-approval.test.ts (24 tests) 16ms
+stderr | tests/cordis-import.test.ts > K2 CORDIS Ingestion & M1 Partner Intelligence Engine > 5,000 row import execution, idempotency, coordinator counts, and EC contributions
+Sample zip not available locally; skipping zip integration test.
+
+ ✓ tests/cordis-import.test.ts (5 tests) 7ms
+ ✓ src/lib/secret-token.test.ts (5 tests) 8ms
+ ✓ src/lib/jobs/tasks/__tests__/public-lead-cleanup.test.ts (4 tests) 10ms
+ ✓ src/lib/metrics/weekly-active-users.test.ts (13 tests) 25ms
+ ✓ src/lib/invitations/accept.test.ts (18 tests) 7ms
+ ✓ tests/g0-scoring.test.ts (27 tests) 48ms
+ ✓ tests/efatura-line-withholding-xml.test.ts (7 tests) 7ms
+ ✓ src/lib/jobs/tasks/__tests__/invitation-cleanup.test.ts (7 tests) 10ms
+stderr | tests/m9-brief-persistence.test.ts > generateMeetingBrief — persistence > a failed write is reported as a failure, never as a saved brief
+[M9 generateMeetingBrief] DB write failed: insert failed: RLS
+
+stderr | tests/m9-brief-persistence.test.ts > generateMeetingBrief — persistence > a template draft costs no credit and says, in the stored content, that it is one
+[M9 generateMeetingBrief] LLM call fallback: 401 invalid x-api-key
+
+stderr | tests/m9-brief-persistence.test.ts > generateMeetingBrief — persistence > a template draft uses template text and does not call generateText
+[M9 generateMeetingBrief] LLM call fallback: 401 invalid x-api-key
+
+ ✓ tests/m9-brief-persistence.test.ts (6 tests) 51ms
+ ✓ tests/g0-features.test.ts (26 tests) 9ms
+stderr | tests/api/v1-opportunities.test.ts > GET /api/v1/opportunities > answers a failed query with 500, never with fabricated rows
+[/api/v1/opportunities] query failed: connect ECONNREFUSED
+
+ ✓ tests/api/v1-opportunities.test.ts (6 tests) 9ms
+ ✓ src/lib/readiness/share.test.ts (7 tests) 14ms
+ ✓ src/lib/public-sector/radar.test.ts (8 tests) 8ms
+ ✓ tests/api/api-error.test.ts (2 tests) 7ms
+ ✓ tests/safe-callback-url.test.ts (21 tests) 13ms
+ ✓ tests/opportunity-archive-permission.test.ts (4 tests) 5ms
+ ✓ tests/feedback-triage.test.ts (17 tests) 24ms
+ ✓ tests/billing-identity.test.ts (18 tests) 52ms
+ ✓ tests/localized-routes.test.ts (4 tests) 9ms
+ ✓ tests/next-image-remote-patterns.test.ts (4 tests) 4ms
+ ✓ tests/modules/m7.test.ts (7 tests) 29ms
+ ✓ src/lib/user-rate-limit.test.ts (2 tests) 15ms
+ ✓ src/lib/billing/entitlement-source.test.ts (7 tests) 5ms
+ ✓ tests/evidence-status.test.ts (14 tests) 7ms
+ ✓ tests/modules/esr-parser.test.ts (5 tests) 86ms
+ ✓ tests/pipeline-note-input-shape.test.ts (3 tests) 3ms
+ ✓ src/lib/scoring/g0-scoring.test.ts (19 tests) 25ms
+ ✓ tests/admin-modules.test.ts (4 tests) 10ms
+ ✓ src/lib/province.test.ts (4 tests) 4ms
+ ✓ tests/accept-invite-headers.test.ts (1 test) 6ms
+ ✓ tests/application-outcome.test.ts (7 tests) 3ms
+ ✓ tests/mobile-edge-gutter.test.ts (6 tests) 7ms
+ ✓ tests/accept-invite-rebind-failure.test.ts (2 tests) 6ms
+ ✓ tests/evidence-confirm-store-faults.live.test.ts (20 tests | 20 skipped) 16ms
+ ✓ tests/beta/invite-email.test.ts (6 tests) 3ms
+ ✓ tests/modules/module-gate-alias.test.ts (3 tests) 7ms
+ ✓ tests/m4-weekly-summary.test.ts (4 tests) 5ms
+ ✓ src/lib/public-sector/fit.test.ts (6 tests) 6ms
+ ✓ tests/modules/module-gate-coverage.test.ts (1 test) 3ms
+ ✓ src/lib/calendar/__tests__/token-envelope.test.ts (3 tests) 4ms
+ ✓ tests/user-display.test.ts (6 tests) 3ms
+ ✓ tests/concept-note-editor-sections.test.ts (3 tests) 3ms
+ ✓ tests/evidence-upload-s3.live.test.ts (21 tests | 21 skipped) 3ms
+ ✓ tests/analytics-posthog.test.ts (7 tests) 10ms
+ ✓ src/modules/m6/server/__tests__/comparison.test.ts (6 tests) 2ms
+ ↓ tests/k1-daily-calls.test.ts (4 tests | 4 skipped)
+ ↓ tests/sedia-adapter.test.ts (2 tests | 2 skipped)
+
+ Test Files  301 passed | 2 skipped (303)
+      Tests  3921 passed | 50 skipped (3971)
+   Start at  20:54:11
+   Duration  58.23s (transform 22.04s, setup 0ms, import 144.52s, tests 376.87s, environment 34.65s)
+
+JSON report written to /private/tmp/claude-501/-Users-macbook-alan/6b4bf0a8-11ea-4f02-841f-49270074e445/scratchpad/ev/vitest-report.json

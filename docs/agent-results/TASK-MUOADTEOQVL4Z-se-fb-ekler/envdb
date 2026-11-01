@@ -1,0 +1,4 @@
+DB=$1
+export PATH=/private/tmp/claude-501/-Users-macbook-alan/38783fc8-b464-478b-8fdc-d8cd02ca585a/scratchpad/bin:$PATH PGDB=$DB
+export DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55801/$DB
+export DATABASE_URL_RLS_TEST=postgresql://fabrika_app:fabrika_app_sefbad@127.0.0.1:55801/$DB

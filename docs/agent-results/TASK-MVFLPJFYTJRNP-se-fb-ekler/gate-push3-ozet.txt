@@ -1,0 +1,16 @@
+ Test Files  363 passed | 7 skipped (370)
+      Tests  4798 passed | 120 skipped (4918)
+✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+✅ SUCCESS: All 47 tenant-scoped models have RLS policies registered.
+✅ SUCCESS: every one of them carries ENABLE + FORCE + tenant_isolation in its own migration.
+✅ SUCCESS: every one of them DISABLEs row level security in its own migration.
+✅ SUCCESS: no new tenant bypass. 0 call site(s) allowed with a recorded reason, 44 on the sanctioned cross-tenant path, 0 still owed.
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+✅ fabrika_app already exists; DATABASE_URL_RLS_TEST logs in as fabrika_app. Password left unchanged.
+  ✘   59 [chromium] › tests/e2e/billing-identity-form.spec.ts:99:7 › billing identity form › an owner with no identity on file is told so, and given the form (14.3s)
+  ✘  320 [chromium] › tests/e2e/relationship-owner-assign.spec.ts:152:7 › M4 relationships — focal-point assignment › the assignment survives a reload (142ms)
+  2 failed
+  10 skipped
+  5 did not run
+  370 passed (20.8m)
+error: failed to push some refs to 'https://github.com/yaslan/fonbridge.git'

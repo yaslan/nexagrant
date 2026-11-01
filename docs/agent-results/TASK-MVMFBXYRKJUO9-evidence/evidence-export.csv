@@ -1,0 +1,2 @@
+ID,Title,Category,IssuingAuthority,ValidUntil,Status,FileName
+cmvmgt70e0002vzxk7mzewkbb,'=cmd|' /C calc'!A0,CAT-01,"TSE;'=cmd|x",,VALID,'+SUM(A1)

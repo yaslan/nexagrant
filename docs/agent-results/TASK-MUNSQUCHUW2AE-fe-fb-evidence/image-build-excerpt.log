@@ -1,0 +1,6 @@
+420:#15 [builder 5/5] RUN pnpm build
+537:#15 135.2 ✓ Compiled successfully in 106s
+545:#15 251.6 ✓ Generating static pages using 11 workers (31/31) in 821ms
+703:#15 DONE 256.5s
+734: Image fefb67-fabrika-web Built 
+735:build exit=0

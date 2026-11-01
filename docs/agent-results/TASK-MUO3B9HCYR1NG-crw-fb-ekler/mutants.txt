@@ -1,0 +1,25 @@
+KILLED   N1 404 de yeniden-denenebilir sayılır (storeFailure hep storage_unavailable)  (⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯)
+           × confirm refuses a key that was never uploaded, and writes no row 89ms
+KILLED   N2 her depo hatası object_missing  (⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯)
+           × the store is down before the copy: storage_unavailable, nothing lost; the retry succeeds 152ms
+           × the store dies right after the copy: storage_unavailable, nothing lost; the retry succeeds 360ms
+           × the staging object is replaced between the check and the copy: the unchecked bytes never reach the final key 126ms
+KILLED   N3 satır kaydı hatasında staging silinir (veri kaybı)  (⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯)
+           × the row save outlives its transaction: save_failed, no row, the upload kept; the retry succeeds 5824ms
+KILLED   N4 zaten-kayıtlı dalı staging silmez  (⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯)
+           × D-1 on the dev store: a PUT after confirm does not reach the recorded file 386ms
+           × A1: a PUT after confirm, same URL, type and length, leaves the recorded file as it was 222ms
+SURVIVED N5 ön-kontrol DB hatası yutulur, kopyaya devam  (Tests  112 passed (112))
+KILLED   N6 isFinalUploadRefusal her hatayı kalıcı sayar (depo hatasında staging silinir)  (⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯)
+           × the staging object is replaced between the check and the copy: the unchecked bytes never reach the final key 289ms
+SURVIVED N7 anahtar biçimi ^ çapası yok  (Tests  112 passed (112))
+SURVIVED N8 final HEAD yalnız boyut (tür karşılaştırılmaz)  (Tests  112 passed (112))
+SURVIVED N9 dev deposu staging'i taşır (rename, eski davranış)  (Tests  112 passed (112))
+KILLED   N10 P2002 (eşzamanlı) sahte başarı döner  (⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯)
+           × two confirms at the same time: one row, one success, the file stays 374ms
+KILLED   N11 D-2 kısmi: yalnız MEMBER için rol yok sayılır  (⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯)
+           × MEMBER: the loader gets that role 34ms
+SURVIVED N12 ETag yoksa devam (kopya sabitlenmez)  (Tests  112 passed (112))
+SURVIVED N13 dev .partial hatada silinmez  (Tests  112 passed (112))
+SURVIVED N14 dev: kopya sonrası final doğrulaması yok  (Tests  112 passed (112))
+git status --short src after restore: []

@@ -1,0 +1,120 @@
+name: Accessibility Check
+
+# docs/ROADMAP.md E10 accepts the milestone at "Lighthouse a11y >= 90". That
+# number used to be produced only by hand, so a regression stayed invisible
+# until somebody remembered to measure. This job runs the same audit on every
+# PR that touches the UI and fails below the threshold.
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'messages/**'
+      - 'scripts/a11y-check.ts'
+      - 'package.json'
+      - '.github/workflows/a11y-check.yml'
+  workflow_dispatch:
+
+env:
+  # The single source of the threshold. Raise it here once a higher score holds.
+  A11Y_MIN_SCORE: '90'
+  A11Y_BASE_URL: 'http://localhost:3100'
+
+jobs:
+  lighthouse-a11y:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # Version comes from `packageManager` in package.json.
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The audited pages are public and server-rendered on demand, so the
+      # build needs no database and the server needs no seed.
+      - name: Build
+        run: pnpm build
+
+      # `next start` refuses to boot without a session-signing key
+      # (src/lib/auth-secret.ts), so without one the gate measured nothing.
+      # The audited pages are public; the key only has to exist. It is made
+      # fresh for this run and given to this process alone: no repository
+      # value, no secret store entry, never the key of any deployment.
+      - name: Start server
+        run: |
+          AUTH_SECRET="$(openssl rand -base64 32)" pnpm start -p 3100 > /tmp/next-start.log 2>&1 &
+          echo "server started"
+
+      # The script waits for the port itself and exits non-zero below the
+      # threshold — that non-zero exit is the gate.
+      - name: Lighthouse accessibility gate
+        id: a11y
+        # `pipefail` is explicit: without it `tee` would swallow the gate's
+        # non-zero exit and the step would always pass.
+        run: |
+          set -o pipefail
+          pnpm a11y:check 2>&1 | tee /tmp/a11y.log
+        continue-on-error: true
+
+      - name: Comment on PR if the gate failed
+        if: github.event_name == 'pull_request' && steps.a11y.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let log = '(no output captured)';
+            try {
+              log = fs.readFileSync('/tmp/a11y.log', 'utf8').slice(-6000);
+            } catch (e) {
+              console.error('could not read a11y log', e);
+            }
+
+            const body = [
+              '## ♿ Lighthouse Accessibility Gate Failed',
+              '',
+              `At least one public page scored below **${process.env.A11Y_MIN_SCORE}**.`,
+              '',
+              '```',
+              log,
+              '```',
+              '',
+              '**Reproduce locally:**',
+              '```bash',
+              'pnpm build && pnpm start -p 3100 &',
+              'A11Y_BASE_URL=http://localhost:3100 pnpm a11y:check',
+              '```',
+              '',
+              'Two application-wide defects have historically caused this:',
+              'a missing `lang` on `<html>` (fixed by reading `getLocale()` in the root layout),',
+              'and white text on `bg-accent` in the dark theme (use `bg-accent-strong`).',
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+      - name: Upload server log on failure
+        if: steps.a11y.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-logs
+          path: |
+            /tmp/a11y.log
+            /tmp/next-start.log
+          if-no-files-found: ignore
+
+      - name: Fail if the accessibility gate failed
+        if: steps.a11y.outcome == 'failure'
+        run: exit 1

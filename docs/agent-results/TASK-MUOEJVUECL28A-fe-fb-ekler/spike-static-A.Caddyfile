@@ -1,0 +1,13 @@
+{
+	servers {
+		strict_sni_host on
+	}
+}
+panel.oka-ornek.test, fonbridge.test {
+	tls internal
+	respond "site={host}" 200
+}
+:443 {
+	tls internal
+	respond "catchall host={host}" 421
+}

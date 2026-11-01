@@ -1,0 +1,35 @@
+# Build context for ./Dockerfile (TASK-MUM6CYJFKW69I K-2).
+# Without this file `COPY . .` carried the local .env into the image: Next's
+# `output: 'standalone'` copies .env into .next/standalone, so local secrets and
+# local-only switches (INNGEST_DEV=1, DEMO_LOGIN_ENABLED) shipped with it.
+# Runtime configuration comes from the container environment (docker-compose.yml).
+
+# env files: every one except the placeholder template, at ANY depth.
+# `.env*` alone matches only the context root: deploy/vps/.env.prod (live secrets,
+# incl. the owner password) went into the worker image through `COPY . .` (FO-250 Y-1).
+**/.env*
+!**/.env*.example
+
+# installed / built on the host: the image installs and builds its own
+node_modules
+.next
+.venv
+coverage
+out
+build
+*.tsbuildinfo
+
+# test output
+test-artifacts
+test-results
+playwright-report
+
+# VCS, editor and agent state
+.git
+.github
+.DS_Store
+.agentspace
+.claude
+.gemini
+.qwen
+.dev-objects

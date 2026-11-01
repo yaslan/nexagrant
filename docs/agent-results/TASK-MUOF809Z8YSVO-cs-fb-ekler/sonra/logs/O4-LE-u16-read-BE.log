@@ -1,0 +1,68 @@
+# O4-LE-u16-read-BE [Ö-4] src/lib/docx-safe-html.ts
+# - 'b.readUInt16BE(at) : b.readUInt16LE(at)'
+# + 'b.readUInt16BE(at) : b.readUInt16BE(at)'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ src/lib/docx-safe-html.image-size.test.ts (26 tests | 4 failed) 13058ms
+     × entry cut at 6 bytes (little-endian, count=1, Ö-4) 5ms
+     × entry cut at 7 bytes (little-endian, count=1, Ö-4) 1ms
+     × entry cut at 8 bytes (little-endian, count=1, Ö-4) 1ms
+     × entry cut at 12 bytes (little-endian, count=1, Ö-4) 6ms
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  4 failed | 99 passed (103)
+   Start at  22:08:59
+   Duration  13.75s (transform 753ms, setup 0ms, import 4.12s, tests 19.18s, environment 1ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/docx-safe-html.image-size.test.ts > the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19) > entry cut at 6 bytes (little-endian, count=1, Ö-4)
+ FAIL  src/lib/docx-safe-html.image-size.test.ts > the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19) > entry cut at 7 bytes (little-endian, count=1, Ö-4)
+ FAIL  src/lib/docx-safe-html.image-size.test.ts > the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19) > entry cut at 8 bytes (little-endian, count=1, Ö-4)
+AssertionError: expected { kept: true } to deeply equal { kept: false }
+
+- Expected
++ Received
+
+  {
+-   "kept": false,
++   "kept": true,
+  }
+
+ ❯ src/lib/docx-safe-html.image-size.test.ts:121:22
+    119|       () => false
+    120|     );
+    121|     expect({ kept }).toEqual({ kept: libraryReads });
+       |                      ^
+    122|     expect(kept).toBe(entryLen >= 10);
+    123|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/lib/docx-safe-html.image-size.test.ts > the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19) > entry cut at 12 bytes (little-endian, count=1, Ö-4)
+AssertionError: expected { kept: false } to deeply equal { kept: true }
+
+- Expected
++ Received
+
+  {
+-   "kept": true,
++   "kept": false,
+  }
+
+ ❯ src/lib/docx-safe-html.image-size.test.ts:121:22
+    119|       () => false
+    120|     );
+    121|     expect({ kept }).toEqual({ kept: libraryReads });
+       |                      ^
+    122|     expect(kept).toBe(entryLen >= 10);
+    123|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+

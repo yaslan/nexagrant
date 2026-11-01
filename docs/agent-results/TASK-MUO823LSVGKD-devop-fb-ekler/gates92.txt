@@ -1,0 +1,5 @@
+typecheck rc=0 · lint rc=0 · i18n rc=0 (✅ i18n check passed: both catalogs agree…) · build rc=0
+CI=true npx vitest run (izole DB + MinIO env, AUTH_SECRET test değeri):
+ Test Files  294 passed | 2 skipped (296)
+      Tests  3696 passed | 9 skipped (3705)
+vitest rc=0

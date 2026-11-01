@@ -1,0 +1,5 @@
+export PATH=/private/tmp/claude-501/-Users-macbook-alan/38783fc8-b464-478b-8fdc-d8cd02ca585a/scratchpad/bin:$PATH PGDB=$DB
+export DATABASE_URL=postgresql://fabrika_app:fabrika_app_sefbad@127.0.0.1:55801/$DB
+export JOBS_DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55801/$DB
+export JOBS_CRON_ENABLED=false NODE_ENV=development AUTH_SECRET=sefbad-local-fixture-not-a-secret
+export SMTP_HOST=127.0.0.1 SMTP_PORT=11801 SMTP_SECURE=false SMTP_FROM=noreply@example.test NEXT_PUBLIC_APP_URL=http://localhost:3000

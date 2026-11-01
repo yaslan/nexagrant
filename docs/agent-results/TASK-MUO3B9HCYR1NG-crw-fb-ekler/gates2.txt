@@ -1,0 +1,5 @@
+vitest rc=1
+typecheck rc=0
+lint rc=0
+i18n rc=0 ✅ i18n check passed: both catalogs agree, every key used in src/ resolves, and no file gained hard-coded text.
+build rc=0

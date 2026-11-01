@@ -1,0 +1,33 @@
+v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=
+s-w-------    1 root     root             0 Sep 30 21:05 /run/caddy/admin.sock
+== 0. rev.3 hatası: .tmp içinde yeni host, yer tutucusuz adapt:
+["fonbridge.com","www.fonbridge.com"]
+   aynı .tmp, FB_AGENCIES ile:
+["fonbridge.com","panel.oka.org.tr","www.fonbridge.com"]
+== 1. etkinleştirme: OKA
+adapt(tmp) host kümesi: [fonbridge.com panel.oka.org.tr www.fonbridge.com]  beklenen: [fonbridge.com panel.oka.org.tr www.fonbridge.com]
+reload rc=0
+çalışan host kümesi:     [fonbridge.com panel.oka.org.tr www.fonbridge.com]
+SONUÇ: senkron
+== 2. ikinci ajans
+adapt(tmp) host kümesi: [fonbridge.com panel.baka.gov.tr panel.oka.org.tr www.fonbridge.com]  beklenen: [fonbridge.com panel.baka.gov.tr panel.oka.org.tr www.fonbridge.com]
+reload rc=0
+çalışan host kümesi:     [fonbridge.com panel.baka.gov.tr panel.oka.org.tr www.fonbridge.com]
+SONUÇ: senkron
+== 3. askıya alma: OKA
+adapt(tmp) host kümesi: [fonbridge.com panel.baka.gov.tr www.fonbridge.com]  beklenen: [fonbridge.com panel.baka.gov.tr www.fonbridge.com]
+reload rc=0
+çalışan host kümesi:     [fonbridge.com panel.baka.gov.tr www.fonbridge.com]
+SONUÇ: senkron
+== 4. fazladan blok
+adapt(tmp) host kümesi: [evil.example.com fonbridge.com panel.baka.gov.tr www.fonbridge.com]  beklenen: [fonbridge.com panel.baka.gov.tr www.fonbridge.com]
+DUR: küme farkı
+   rc=1  canlı dosya md5 önce=0bbb6dcb7ae9 sonra=0bbb6dcb7ae9
+== 5. :443 satırı
+DUR: adapt hatası: Error: ambiguous site definition: :443
+   rc=1  canlı dosya md5 önce=0bbb6dcb7ae9 sonra=0bbb6dcb7ae9
+== 6. FB_AGENCIES rename sonrası ortamda kalırsa:
+Error: adapting config using caddyfile: File to import not found: /etc/caddy/agencies.d/agencies.caddy.tmp, at /etc/caddy/Caddyfile:16
+   çalışan küme hâlâ: ["fonbridge.com","panel.baka.gov.tr","www.fonbridge.com"]
+== 7. son hâl:
+agencies.caddy

@@ -1,0 +1,13 @@
+J1 {"before":{"t":"A","role":"TENANT_OWNER","admin":true},"after":{"t":null,"role":null,"admin":true}}
+J2 {"s":{"t":null,"role":null,"admin":false},"plain":{"t":"A","role":"TENANT_OWNER","admin":false}}
+J3 {"stranded":{"t":null,"role":null,"admin":false},"moved":{"t":"D","role":"TENANT_OWNER","admin":false},"refused":{"t":"D","role":"TENANT_OWNER","admin":false}}
+J4 {"out":"ok:{\"error\":\"errors.revoked\"}","after":{"t":"A","role":"TENANT_OWNER","admin":false},"joined":0}
+P1 {"live":200,"deleted":200,"total":1,"title":"rv86-muo3gqsu secret opp"}
+ ✓ tests/review-o3bu.live.test.ts > jwt probes > J1 platform admin bound to a deleted tenant keeps admin, loses tenant 117ms
+ ✓ tests/review-o3bu.live.test.ts > jwt probes > J2 every membership deleted: sign-in tenantless; restore → back 20ms
+ ✓ tests/review-o3bu.live.test.ts > jwt probes > J3 bound A deleted; explicit update to live D moves there; update back to deleted A refused 19ms
+ ✓ tests/review-o3bu.live.test.ts > jwt probes > J4 invitation to a deleted tenant: accept refused, session unchanged 21ms
+ ✓ tests/review-o3bu.live.test.ts > sessionless tenant paths (not covered by the fix) > P1 API key of a soft-deleted tenant 32ms
+P2 {"out":"ok:{\"success\":true,\"requestedTotal\":13750}","budget":1}
+ ✓ tests/review-o3bu.live.test.ts > sessionless tenant paths (not covered by the fix) > P2 partner portal magic token of a soft-deleted tenant 37ms
+      Tests  6 passed (6)

@@ -1,0 +1,5 @@
+CROSS MEMBER(A)+OWNER(X) session=A → 403 {"error":"No tenant found or insufficient permissions"} stripe=0 customer=null
+CROSS same user session=X → 200 customer=cus_X
+OWNER-BOTH session=A → 200 customer=cus_A; session=X → 200 customer=cus_X
+O-B session=N → 500 body={"error":"Failed to create portal session"} bodyHasTenantId=false logHasTenantId=true
+      Tests  4 passed (4)

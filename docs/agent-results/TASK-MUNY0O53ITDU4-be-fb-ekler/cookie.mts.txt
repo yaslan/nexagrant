@@ -1,0 +1,5 @@
+import { encode } from 'next-auth/jwt';
+const secret = process.env.AUTH_SECRET!;
+const salt = 'authjs.session-token';
+const token = await encode({ secret, salt, maxAge: 3600, token: { sub: 'demo-user-alice', id: 'demo-user-alice', email: 'alice@demo.local', tenantId: 'demo-tenant' } });
+process.stdout.write(`${salt}=${token}`);

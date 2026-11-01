@@ -1,0 +1,17 @@
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/opportunities/demo-opp-1/evaluations (1836 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/admin/cordis (1665 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/admin/alerts (1679 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/approvals (1682 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/onay-merkezi (1655 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/ayarlar/kapilar (1634 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/settings/gates (1623 ms)
+  ✓ no sideways scroll inside <main> on a phone › /tr/fabrika-beta/firsatlar/demo-opp-1 (1707 ms)
+  ✓ long real-world content stays inside <main> › approvals: a link pasted into the title and description (4045 ms)
+  ✓ long real-world content stays inside <main> › opportunity detail: a link pasted into the title (3154 ms)
+  ✘ long real-world content stays inside <main> › gate settings: a longer weight name than today’s
+      gate settings at 320px: <main>.scrollWidth − clientWidth
+      expect(received).toBe(expected) // Object.is equality
+      Expected: 0
+      Received: 204
+  ✓ long real-world content stays inside <main> › cordis tabs: every tab reached with the keyboard is fully visible (1280 ms)
+11 passed, 1 failed, 0 skipped

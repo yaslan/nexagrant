@@ -1,0 +1,50 @@
+# B-O6-MAX_DEPTH-33 [be-fb] src/lib/docx-safe-html.ts
+# - 'const MAX_DEPTH = 32;'
+# + 'const MAX_DEPTH = 33;'
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ src/lib/docx-safe-html.test.ts (41 tests | 2 failed) 523ms
+     × flattens absurd nesting to text instead of recursing without bound 472ms
+     × keeps exactly 32 levels of nesting and flattens the 33rd to its text (MAX_DEPTH boundary, İNCELEME-113) 5ms
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  2 failed | 101 passed (103)
+   Start at  22:12:06
+   Duration  12.70s (transform 583ms, setup 0ms, import 3.66s, tests 18.13s, environment 0ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/docx-safe-html.test.ts > sanitizeHtmlForDocx — no URL survives as an image source (TASK-MUN80RJ96EG0O) > flattens absurd nesting to text instead of recursing without bound
+AssertionError: expected 33 to be less than or equal to 32
+ ❯ src/lib/docx-safe-html.test.ts:79:48
+     77|     const out = sanitizeHtmlForDocx(deep, budget());
+     78|     expect(out).toContain('core');
+     79|     expect((out.match(/<div>/g) ?? []).length).toBeLessThanOrEqual(32);
+       |                                                ^
+     80|   });
+     81|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lib/docx-safe-html.test.ts > sanitizeHtmlForDocx — no URL survives as an image source (TASK-MUN80RJ96EG0O) > keeps exactly 32 levels of nesting and flattens the 33rd to its text (MAX_DEPTH boundary, İNCELEME-113)
+AssertionError: expected '<b><b><b><b><b><b><b><b><b><b><b><b><…' to be '<b><b><b><b><b><b><b><b><b><b><b><b><…' // Object.is equality
+
+Expected: "<b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b>core</b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b>"
+Received: "<b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><b><i>core</i></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b></b>"
+
+ ❯ src/lib/docx-safe-html.test.ts:85:68
+     83|     const nest = (n: number, core = 'core') => '<b>'.repeat(n) + core …
+     84|     expect(sanitizeHtmlForDocx(nest(32), budget())).toBe(nest(32));
+     85|     expect(sanitizeHtmlForDocx(nest(32, '<i>core</i>'), budget())).toB…
+       |                                                                    ^
+     86|   });
+     87| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

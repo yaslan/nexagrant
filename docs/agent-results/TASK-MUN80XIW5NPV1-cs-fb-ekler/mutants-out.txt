@@ -1,0 +1,13 @@
+| M1 cagrilar: session check removed | KIRMIZI Tests  1 failed | 4 passed (5) | geri al: yesil Tests  5 passed (5) |
+| M2 cagrilar: limit clamp removed | KIRMIZI Tests  1 failed | 4 passed (5) | geri al: yesil Tests  5 passed (5) |
+| M3 cagrilar: Topic upsert restored | KIRMIZI Tests  1 failed | 4 passed (5) | geri al: yesil Tests  5 passed (5) |
+| M4 cagrilar: raw error body | KIRMIZI Tests  1 failed | 4 passed (5) | geri al: yesil Tests  5 passed (5) |
+| M5 translation: no concurrency slot | KIRMIZI Tests  1 failed | 1 passed (2) | geri al: yesil Tests  2 passed (2) |
+| M6 translation: cache uncapped | KIRMIZI Tests  1 failed | 1 passed (2) | geri al: yesil Tests  2 passed (2) |
+| M7 cordis/projects: zod bypassed | KIRMIZI Tests  4 failed | 7 passed (11) | geri al: yesil Tests  11 passed (11) |
+| M8 cordis/[id]: id check bypassed | KIRMIZI Tests  1 failed | 10 passed (11) | geri al: yesil Tests  11 passed (11) |
+| M9 cordis/projects: raw Prisma body | KIRMIZI Tests  1 failed | 10 passed (11) | geri al: yesil Tests  11 passed (11) |
+| M10 billing/quote: errorMessage body | KIRMIZI Tests  1 failed | 1 passed (2) | geri al: yesil Tests  2 passed (2) |
+| M11 api-auth: 429 check removed | KIRMIZI Tests  3 failed | 6 passed (9) | geri al: yesil Tests  9 passed (9) |
+| M12 api-auth: window never resets | KIRMIZI Tests  1 failed | 3 passed (4) | geri al: yesil Tests  4 passed (4) |
+exit=0

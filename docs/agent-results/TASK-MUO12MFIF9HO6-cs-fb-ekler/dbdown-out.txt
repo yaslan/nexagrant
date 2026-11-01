@@ -1,0 +1,17 @@
+[H0] healthy        : 200 0.036519s tenant=cf81-b role=MEMBER admin=False
+[H0] healthy        : 200 0.071803s tenant=cf81-b role=MEMBER admin=False
+--- docker stop (connection refused) ---
+[S1] db stopped     : 200 0.031523s tenant=None role=None admin=False
+[S2] db stopped     : 200 0.047118s tenant=None role=None admin=False
+[S3] db stopped     : 200 0.032302s tenant=None role=None admin=False
+[S4] 20 parallel: min=0.278522s median=0.474932s max=0.520484s
+[S5] dashboard      : 307 0.493008s -> http://localhost:3481/tr/no-workspace
+[S6] restarted      : 200 0.093484s tenant=cf81-b role=MEMBER admin=False
+--- docker pause (connect never completes -> 1 s timeout, retried once) ---
+[P1] db paused      : 200 2.082803s tenant=None role=None admin=False
+[P2] db paused      : 200 2.061951s tenant=None role=None admin=False
+[P3] db paused      : 200 2.057368s tenant=None role=None admin=False
+[P4] 20 parallel: min=5.284743s median=6.307302s max=8.915957s
+[P5] unpaused       : 200 0.317104s tenant=cf81-b role=MEMBER admin=False
+--- dev.log since outage (warnings) ---
+tail: illegal offset -- +: Invalid argument

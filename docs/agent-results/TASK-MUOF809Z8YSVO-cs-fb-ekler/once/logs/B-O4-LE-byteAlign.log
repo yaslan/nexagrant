@@ -1,0 +1,46 @@
+# B-O4-LE-byteAlign [be-fb] src/lib/docx-safe-html.ts
+# - "if (!bigEndian && byteAlign !== '4949') return true;"
+# + "if (!bigEndian && byteAlign === '4949') return true;"
+# restored_clean=True
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/ddace75c-be72-4b5d-ab0e-0cce77253d82/scratchpad/wt
+
+ ❯ src/lib/docx-safe-html.image-size.test.ts (20 tests | 3 failed) 11440ms
+     × entry cut at 6 bytes (little-endian, count=1, Ö-4) 20ms
+     × entry cut at 7 bytes (little-endian, count=1, Ö-4) 13ms
+     × entry cut at 8 bytes (little-endian, count=1, Ö-4) 2ms
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  3 failed | 92 passed (95)
+   Start at  22:04:08
+   Duration  12.55s (transform 624ms, setup 0ms, import 4.89s, tests 17.81s, environment 1ms)
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.mts:6:37). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/docx-safe-html.image-size.test.ts > the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19) > entry cut at 6 bytes (little-endian, count=1, Ö-4)
+ FAIL  src/lib/docx-safe-html.image-size.test.ts > the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19) > entry cut at 7 bytes (little-endian, count=1, Ö-4)
+ FAIL  src/lib/docx-safe-html.image-size.test.ts > the Exif orientation entry: kept exactly when the bundled image-size can read it (İNCELEME-88 O-1 D19) > entry cut at 8 bytes (little-endian, count=1, Ö-4)
+AssertionError: expected { kept: true } to deeply equal { kept: false }
+
+- Expected
++ Received
+
+  {
+-   "kept": false,
++   "kept": true,
+  }
+
+ ❯ src/lib/docx-safe-html.image-size.test.ts:121:22
+    119|       () => false
+    120|     );
+    121|     expect({ kept }).toEqual({ kept: libraryReads });
+       |                      ^
+    122|     expect(kept).toBe(entryLen >= 10);
+    123|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+

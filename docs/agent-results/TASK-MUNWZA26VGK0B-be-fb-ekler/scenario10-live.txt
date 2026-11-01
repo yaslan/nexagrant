@@ -1,0 +1,14 @@
+[1] signed in (A oldest)        : tenant=wz-a role=TENANT_OWNER
+[2] removed from A (B kept)     : tenant=None role=None
+[3] invited to C (PIPELINE_MANAGER), token parked for the browser
+[B1] tenantless /tr/default/dashboard -> 200 http://localhost:3491/tr/no-workspace | session {"tenantId":null,"role":null}
+     text: 🔑 Henüz bir çalışma alanınız yok Hesabınız açık, ancak hiçbir kuruluşun çalışma alanına bağlı değil. Bu yüzden size ait olmayan hiçbir veriyi gösteremiyoruz. Bir kuruluşa davet edildiyseniz davet e-postasındaki bağlantıyı kullanın; değilse kuruluşunuzun yö
+     cookie dialog buttons: ["Gerekli Çerezler","Tümünü Kabul Et"]
+[B2] accept screen -> http://localhost:3491/tr/accept-invite/continue | token in URL? false
+[B3] after "Kabul Et" -> http://localhost:3491/tr/default/dashboard | session {"tenantId":"wz-c","role":"PIPELINE_MANAGER"}
+     text: ÇALIŞMA ALANI Panel Çağrılar Fırsatlar Ortaklar İlişkiler Kanıtlar TTO Hızlandırıcısı (M7) Onay Merkezi (4-Eyes) Partner REST API Ayarlar WK Wz Kullanıcı Panel Gerçek zamanlı ölçümler ve eğilimler 📅 31 Ağu 2026 — 30 Eyl 2026 Genel Bakış Eğilimler Dışa Aktar
+[B4] reload, same browser  | session {"tenantId":"wz-c","role":"PIPELINE_MANAGER"}
+wz-b|TENANT_OWNER
+wz-c|PIPELINE_MANAGER
+t
+invitation.accepted

@@ -1,0 +1,24 @@
+import { chromium } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
+const [port, label] = process.argv.slice(2);
+const BASE = `http://localhost:${port}`;
+const routes = ['/tr/fabrika-beta/opportunities/demo-opp-1/evaluations', '/tr/admin/cordis', '/tr/admin/alerts', '/tr/fabrika-beta/approvals', '/tr/fabrika-beta/settings/gates', '/tr/fabrika-beta/firsatlar/demo-opp-1', '/tr/fabrika-beta/dashboard', '/tr/fabrika-beta/opportunities/demo-opp-1/documents'];
+const token = await encode({ token: { sub: 'demo-user-superadmin', id: 'demo-user-superadmin', name: 'Y', email: 'admin@yasinaslan.com.tr', tenantId: 'demo-tenant', role: 'TENANT_OWNER' }, secret: process.env.AUTH_SECRET!, salt: 'authjs.session-token', maxAge: 3600 });
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+for (const w of [768, 1280]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, reducedMotion: 'reduce' });
+  await ctx.addCookies([{ name: 'authjs.session-token', value: token, url: BASE }]);
+  await ctx.addInitScript(() => { try { localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false })); } catch {} });
+  const p = await ctx.newPage();
+  for (const r of routes) {
+    await p.goto(BASE + r, { waitUntil: 'networkidle', timeout: 90000 }).catch(() => {});
+    await p.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+    await p.waitForTimeout(600);
+    // main kaydırma kutusu: tüm içeriği görmek için main'i yükseklikte aç
+    await p.evaluate(() => { const m = document.querySelector('main') as HTMLElement; m.style.overflow = 'visible'; m.style.height = 'auto'; let e = m.parentElement; while (e) { e.style.overflow = 'visible'; e.style.height = 'auto'; e = e.parentElement; } });
+    await p.waitForTimeout(200);
+    await p.screenshot({ path: `${process.env.OUT}/px/${label}-${w}-${r.split('/').slice(-2).join('_')}.png`, fullPage: true });
+  }
+  await ctx.close();
+}
+await browser.close();

@@ -1,0 +1,5 @@
+-- §3.1 doğrulama sorgusu (fabrika_migrate) — beklenen <sahip>|f|f|f|0|0
+fabrika_migrate|f|f|f|0|0
+-- canlı Supabase (PG17) ↔ yerel CI kümesi (PG16, süper kullanıcı zinciri): tables|rls_on|forced|policies|policy_md5|rls_tables_md5
+supabase: 75|53|47|112|8183175e4abb43a1f67e967f6c0ac818|eb0d1c3be204104bb000c1c35b8ad099
+yerel16:  75|53|47|112|8183175e4abb43a1f67e967f6c0ac818|eb0d1c3be204104bb000c1c35b8ad099

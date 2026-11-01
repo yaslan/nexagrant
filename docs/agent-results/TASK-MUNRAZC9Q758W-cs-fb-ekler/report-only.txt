@@ -1,0 +1,9 @@
+content-security-policy-report-only
+/foo.bar injected inline ran = 1 | next runtime present = true
+/tr injected inline ran = 1 | next runtime present = true
+console CSP errors: 4 Loading the image 'https://evil.example/p.png' violates the following Content Security Policy directive: "img-src 'self' data: blob: https:/
+report requests: 4 POST application/csp-report
+   1 [WARN] csp violation {"directive":"img-src","blocked":"https://evil.example","page":"/foo.bar","disposition":"report"}
+   1 [WARN] csp violation {"directive":"img-src","blocked":"https://evil.example","page":"/tr","disposition":"report"}
+   1 [WARN] csp violation {"directive":"script-src-attr","blocked":"inline","page":"/foo.bar","disposition":"report"}
+   1 [WARN] csp violation {"directive":"script-src-attr","blocked":"inline","page":"/tr","disposition":"report"}

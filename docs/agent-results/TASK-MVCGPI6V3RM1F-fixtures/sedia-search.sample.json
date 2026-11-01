@@ -1,0 +1,96 @@
+{
+  "totalResults": 1001,
+  "pageSize": 100,
+  "results_sample": [
+    {
+      "type": [
+        "1"
+      ],
+      "callIdentifier": [
+        "HORIZON-CL5-2027-05"
+      ],
+      "frameworkProgramme": [
+        "43108390"
+      ],
+      "descriptionByte": "…",
+      "identifier": [
+        "HORIZON-CL5-2027-05-D4-05"
+      ],
+      "deadlineDate": [
+        "2027-09-15T00:00:00.000+0000"
+      ],
+      "actions": "…",
+      "status": [
+        "31094501"
+      ],
+      "topicConditions": "…",
+      "ccm2Id": [
+        "50130167"
+      ],
+      "allowPartnerSearch": [
+        "true"
+      ],
+      "budgetOverview": "…"
+    },
+    {
+      "topicConditions": "…",
+      "type": [
+        "1"
+      ],
+      "callIdentifier": [
+        "HORIZON-CL5-2027-03"
+      ],
+      "ccm2Id": [
+        "50130325"
+      ],
+      "frameworkProgramme": [
+        "43108390"
+      ],
+      "descriptionByte": "…",
+      "identifier": [
+        "HORIZON-CL5-2027-03-D5-03"
+      ],
+      "deadlineDate": [
+        "2027-04-14T00:00:00.000+0000"
+      ],
+      "actions": "…",
+      "allowPartnerSearch": [
+        "true"
+      ],
+      "budgetOverview": "…",
+      "status": [
+        "31094501"
+      ]
+    },
+    {
+      "topicConditions": "…",
+      "type": [
+        "1"
+      ],
+      "callIdentifier": [
+        "HORIZON-CL5-2027-05"
+      ],
+      "ccm2Id": [
+        "50130277"
+      ],
+      "frameworkProgramme": [
+        "43108390"
+      ],
+      "descriptionByte": "…",
+      "identifier": [
+        "HORIZON-CL5-2027-05-D4-09"
+      ],
+      "deadlineDate": [
+        "2027-09-15T00:00:00.000+0000"
+      ],
+      "actions": "…",
+      "allowPartnerSearch": [
+        "true"
+      ],
+      "budgetOverview": "…",
+      "status": [
+        "31094501"
+      ]
+    }
+  ]
+}

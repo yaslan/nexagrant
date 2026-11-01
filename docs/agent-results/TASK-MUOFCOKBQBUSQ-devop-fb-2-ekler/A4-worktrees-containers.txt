@@ -1,0 +1,52 @@
+--- git worktree list (be-fb/crw-fb ilgili)
+/private/tmp/claude-501/-Users-macbook-alan/36c8a2f6-2e33-4641-b967-534b0b62c0a7/scratchpad/wt52    1ff82bed (detached HEAD)
+/private/tmp/claude-501/-Users-macbook-alan/72c459bc-6745-4b51-90b1-ab8307a5cd8f/scratchpad/wt-g1   5d2ac526 [be-fb/g1-wip]
+/private/tmp/claude-501/-Users-macbook-alan/72c459bc-6745-4b51-90b1-ab8307a5cd8f/scratchpad/wt-t5   7a6e666d [crw-fb/t5-wip]
+/private/tmp/claude-501/-Users-macbook-alan/7a4f5e2f-4aea-44e0-b105-88f384e1e40a/scratchpad/wtt5    bb855b31 [crw-fb/t5-head-final]
+/private/tmp/claude-501/-Users-macbook-alan/7e4c634b-2c1b-4030-9b91-e3c017fcc93a/scratchpad/wt57    05cf050f (detached HEAD)
+/private/tmp/claude-501/-Users-macbook-alan/99395806-1ecd-49c4-9dff-166fa294d010/scratchpad/wt59    05cf050f (detached HEAD)
+/private/tmp/claude-501/-Users-macbook-alan/ca6e3058-fe20-4805-9125-5a079c26255b/scratchpad/wt-g1   8ad7b66c [be-fb/g1-pool-timeout]
+/private/tmp/claude-501/-Users-macbook-alan/d188ed13-bb34-4079-a48b-6fb8c0d4f7f7/scratchpad/wt56    05cf050f (detached HEAD)
+/private/tmp/claude-501/-Users-macbook-alan/d188ed13-bb34-4079-a48b-6fb8c0d4f7f7/scratchpad/wt56m   362cbb82 (detached HEAD)
+--- /private/tmp/claude-501/-Users-macbook-alan/7a4f5e2f-4aea-44e0-b105-88f384e1e40a/scratchpad/wtt5
+bb855b31 merge: cs-fb/muodxb-guard-dyn (TASK-MUODXBIM9H1PP) — İNCELEME-107: eylem sızıntı bekçisi import()/require() izler, .code güveni yazımla biter, Y-1..Y-6, T-1 11 mutant KILLED, Ö-1 iz, Ö-2 FP; gerçek ağaç 0 sızıntı
+b5ba75a3 Merge branch 'dev' into cs-fb/muodxb-guard-dyn
+bdde68b0 test(guard): TASK-MUODXBIM9H1PP — action leak scan follows import()/require() and ends .code trust on write (İNCELEME-107)
+status:
+diff stat:
+total 2760
+drwxr-xr-x@  48 macbook  wheel    1536 Sep 30 21:17 .
+drwx------@   5 macbook  wheel     160 Sep 30 21:14 ..
+--- /private/tmp/claude-501/-Users-macbook-alan/ca6e3058-fe20-4805-9125-5a079c26255b/scratchpad/wt-g1
+8ad7b66c docs: prior task TASK-MUODYIZIF6FLZ result (3rd delivery)
+a89fdef6 test: TASK-MUODYIZIF6FLZ 3rd delivery — 13 mutants, 6 KILLED, gates pass
+e860b035 docs(agent-results): TASK-MUOEJVUECL28A fe-fb — merge sha
+status:
+ M src/app/[locale]/(app)/[workspace]/evidence/actions.ts
+?? docs/agent-results/TASK-MUOF85BU7BV3X-be-fb-ekler/
+?? src/lib/tenant.ts.m0
+?? tests/g1-pool-timeout-mutants.test.ts
+diff stat:
+ src/app/[locale]/(app)/[workspace]/evidence/actions.ts | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+total 2864
+drwxr-xr-x@  48 macbook  wheel    1536 Sep 30 21:17 .
+drwx------@   3 macbook  wheel      96 Sep 30 21:11 ..
+--- branch-vs-dev
+8ad7b66c docs: prior task TASK-MUODYIZIF6FLZ result (3rd delivery)
+--- containers (be-fb/crw-fb)
+crwfb-t5-minio bitnamilegacy/minio:latest Up 3 minutes 127.0.0.1:59162->9000/tcp
+crw2fb-gate-pg pgvector/pgvector:pg16 Up 4 minutes 127.0.0.1:55120->5432/tcp
+crwfb-t5-pg pgvector/pgvector:pg16 Up 5 minutes 127.0.0.1:55162->5432/tcp
+crw3gnd94-pg pgvector/pgvector:pg16 Up 3 hours 127.0.0.1:55394->5432/tcp
+sefb4gp-pg pgvector/pgvector:pg16 Up 5 hours 127.0.0.1:55740->5432/tcp
+csfb-80x-pg pgvector/pgvector:pg16 Up 11 hours 127.0.0.1:55880->5432/tcp
+crwfb65-pg pgvector/pgvector:pg16 Up 11 hours 127.0.0.1:5465->5432/tcp
+crwfb56-pg pgvector/pgvector:pg16 Up 17 hours 127.0.0.1:5499->5432/tcp
+fabrika-postgres pgvector/pgvector:pg16 Up 23 hours 0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp
+--- konteyner silme (crw-fb T-5; befb-g1-pg mevcut değil)
+/crwfb-t5-pg mounts=volume:27a62bd68a284c28989ef83de4f97d07a455ecdd7895e8a55b6a4303dc06492e 
+/crwfb-t5-minio mounts=volume:46c6490e864acec404c06d3e67e11f896e46b5cf33402d530aef16ed0598b269 volume:719c2eedb63808ac49c014aeb78aaa078fed27220fd73d99e7061166f10b240a 
+crwfb-t5-pg
+crwfb-t5-minio
+kalan: yok

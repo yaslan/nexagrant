@@ -1,0 +1,25 @@
+### 1) Pro (M1 ON) — list, default (withdrawn excluded)
+{"success":true,"meta":{"page":1,"pageSize":20,"total":3},"data":[{"id":"fo61-a4","topicIdentifier":"HORIZON-CL6-2026-D3-01","callIdentifier":"HORIZON-CL6-2026","type":"EXPERTISE_OFFER","description":"=HYPERLINK(\"http://x\") municipality offering test site.","publishedAt":"2026-09-10T10:00:00.000Z","lastSeenAt":"2026-10-20T06:00:00.000Z","organization":{"pic":"999000001","name":"Acme Batarya","type":"PRC","isSme":true,"country":"TR","city":"Ankara"},"keywords":["water"],"programmeCodes":["HE"]},{"id":"fo61-a2","topicIdentifier":"HORIZON-CL5-2026-D4-01","callIdentifier":"HORIZON-CL5-2026","type":"EXPERTISE_REQUEST","description":"University lab seeking industrial partner for pilot line.","publishedAt":"2026-09-05T10:00:00.000Z","lastSeenAt":"2026-10-21T06:00:00.000Z","organization":{"pic":"999000002","name":"TU Example","type":"HES","isSme":false,"country":"DE","city":"Berlin"},"keywords":["pilot line"],"programmeCodes":["HE"]},{"id":"fo61-a1","topicIdentifier":"HORIZON-CL5-2026-D4-01","callIdentifier":"HORIZON-CL5-2026","type":"EXPERTISE_OFFER","description":"Battery recycling SME. Contact [email] or [phone].","publishedAt":"2026-09-01T10:00:00.000Z","lastSeenAt":"2026-10-22T06:00:00.000Z","organization":{"pic":"999000001","name":"Acme Batarya","type":"PRC","isSme":true,"country":"TR","city":"Ankara"},"keywords":["batteries","recycling"],"programmeCodes":["HE"]}]}
+<HTTP 200>
+### 2) Pro — filter country=tr&type=expertise_offer
+{"success":true,"meta":{"page":1,"pageSize":20,"total":2},"data":[{"id":"fo61-a4","topicIdentifier":"HORIZON-CL6-2026-D3-01","callIdentifier":"HORIZON-CL6-2026","type":"EXPERTISE_OFFER","description":"=HYPERLINK(\"http://x\") municipality offering test site.","publishedAt":"2026-09-10T10:00:00.000Z","lastSeenAt":"2026-10-20T06:00:00.000Z","organization":{"pic":"999000001","name":"Acme Batarya","type":"PRC","isSme":true,"country":"TR","city":"Ankara"},"keywords":["water"],"programmeCodes":["HE"]},{"id":"fo61-a1","topicIdentifier":"HORIZON-CL5-2026-D4-01","callIdentifier":"HORIZON-CL5-2026","type":"EXPERTISE_OFFER","description":"Battery recycling SME. Contact [email] or [phone].","publishedAt":"2026-09-01T10:00:00.000Z","lastSeenAt":"2026-10-22T06:00:00.000Z","organization":{"pic":"999000001","name":"Acme Batarya","type":"PRC","isSme":true,"country":"TR","city":"Ankara"},"keywords":["batteries","recycling"],"programmeCodes":["HE"]}]}
+<HTTP 200>
+### 3) Pro — org announcements by PIC
+{"success":true,"meta":{"page":1,"pageSize":20,"total":2},"data":[{"id":"fo61-a4","topicIdentifier":"HORIZON-CL6-2026-D3-01","callIdentifier":"HORIZON-CL6-2026","type":"EXPERTISE_OFFER","description":"=HYPERLINK(\"http://x\") municipality offering test site.","publishedAt":"2026-09-10T10:00:00.000Z","lastSeenAt":"2026-10-20T06:00:00.000Z","organization":{"pic":"999000001","name":"Acme Batarya","type":"PRC","isSme":true,"country":"TR","city":"Ankara"},"keywords":["water"],"programmeCodes":["HE"]},{"id":"fo61-a1","topicIdentifier":"HORIZON-CL5-2026-D4-01","callIdentifier":"HORIZON-CL5-2026","type":"EXPERTISE_OFFER","description":"Battery recycling SME. Contact [email] or [phone].","publishedAt":"2026-09-01T10:00:00.000Z","lastSeenAt":"2026-10-22T06:00:00.000Z","organization":{"pic":"999000001","name":"Acme Batarya","type":"PRC","isSme":true,"country":"TR","city":"Ankara"},"keywords":["batteries","recycling"],"programmeCodes":["HE"]}]}
+<HTTP 200>
+### 4) Pro — partner signal
+{"success":true,"topicIdentifier":"HORIZON-CL5-2026-D4-01","data":{"total":2,"requests":1,"offers":1,"byCountry":{"TR":1,"DE":1},"byOrgType":{"HES":1,"REC":0,"PRC":1,"PUB":0,"OTH":0},"trCount":1}}
+<HTTP 200>
+### 5) Pro M1 OFF — list / org / signal
+{"error":"MODULE_ACCESS_DENIED","module":"M1","reason":"MODULE_OFF"}
+<HTTP 403>
+{"error":"MODULE_ACCESS_DENIED","module":"M1","reason":"MODULE_OFF"}
+<HTTP 403>
+{"error":"MODULE_ACCESS_DENIED","module":"M1","reason":"MODULE_OFF"}
+<HTTP 403>
+### 6) Bad query
+{"error":"invalid_query"}
+<HTTP 400>
+### 7) No session
+{"error":"Unauthorized","message":"Oturumunuz bir çalışma alanına bağlı değil. Lütfen tekrar giriş yapın.","code":"TENANT_SCOPE_REQUIRED"}
+<HTTP 401>

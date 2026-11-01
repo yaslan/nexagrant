@@ -1,0 +1,6 @@
+$ pnpm exec eslint src/lib/dual-approval.ts src/modules/m10/server/actions.ts tests/dual-approval.test.ts tests/m10-dual-approval-action.test.ts tests/e2e/m10-audit-identity.spec.ts tests/modules/m10.test.ts
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+(exit 0)
+
+$ pnpm typecheck  — my files only
+(no errors in dual-approval / m10)

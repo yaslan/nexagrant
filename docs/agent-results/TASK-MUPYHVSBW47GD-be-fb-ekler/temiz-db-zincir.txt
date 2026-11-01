@@ -1,0 +1,21 @@
+### prisma db push
+
+### db:rls-role
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+### apply-migrations #1
+exit=0
+apply-migrations: 41 files applied as fabrika
+### apply-migrations #2
+exit=0
+apply-migrations: 41 files applied as fabrika
+### db:rls
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+### rls:verify
+exit=0
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+### definer proconfig
+agency_funnel_counts | search_path=public, pg_temp
+agency_funnel_counts_by_province | search_path=public, pg_temp
+note_agency_invite_rejection | search_path=public, pg_temp
+redeem_agency_invite | search_path=public, pg_temp
+funcs with app.* in proconfig: 0

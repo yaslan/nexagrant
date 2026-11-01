@@ -1,0 +1,79 @@
+Pager usage is off.
+ANALYZE
+ANALYZE
+== owner: GDPR export / request-deletion (userId =)
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Seq Scan on "Membership" (actual time=0.235..10.256 rows=6 loops=1)
+   Filter: ("userId" = 'bulk95-u12345'::text)
+   Rows Removed by Filter: 119415
+ Planning Time: 0.170 ms
+ Execution Time: 10.285 ms
+(5 rows)
+
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Seq Scan on "Membership" (actual time=0.118..18.661 rows=6 loops=1)
+   Filter: ("userId" = 'bulk95-u12345'::text)
+   Rows Removed by Filter: 119415
+ Planning Time: 0.052 ms
+ Execution Time: 18.679 ms
+(5 rows)
+
+== owner: auth.ts jwt memberships (userId IN + tenant join)
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
+ Hash Join (actual time=0.412..11.060 rows=6 loops=1)
+   Hash Cond: (m."tenantId" = t.id)
+   ->  Seq Scan on "Membership" m (actual time=0.249..10.869 rows=6 loops=1)
+         Filter: ("userId" = 'bulk95-u12345'::text)
+         Rows Removed by Filter: 119415
+   ->  Hash (actual time=0.150..0.151 rows=408 loops=1)
+         Buckets: 1024  Batches: 1  Memory Usage: 26kB
+         ->  Seq Scan on "Tenant" t (actual time=0.006..0.098 rows=408 loops=1)
+               Filter: ("deletedAt" IS NULL)
+ Planning Time: 0.421 ms
+ Execution Time: 11.082 ms
+(11 rows)
+
+Pager usage is off.
+BEGIN
+ enter_system_scope 
+--------------------
+ subject-scoped
+(1 row)
+
+== fabrika_app + system scope: GDPR export (userId =)
+                                                                                        QUERY PLAN                                                                                        
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Gather (actual time=0.749..14.553 rows=6 loops=1)
+   Workers Planned: 1
+   Workers Launched: 1
+   ->  Parallel Seq Scan on "Membership" (actual time=2.708..7.763 rows=3 loops=2)
+         Filter: (("userId" = 'bulk95-u12345'::text) AND (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text)))
+         Rows Removed by Filter: 59708
+ Planning Time: 0.465 ms
+ Execution Time: 14.598 ms
+(8 rows)
+
+                                                                                        QUERY PLAN                                                                                        
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Gather (actual time=0.411..12.146 rows=6 loops=1)
+   Workers Planned: 1
+   Workers Launched: 1
+   ->  Parallel Seq Scan on "Membership" (actual time=1.620..6.313 rows=3 loops=2)
+         Filter: (("userId" = 'bulk95-u12345'::text) AND (("tenantId" = current_setting('app.tenant_id'::text, true)) OR (current_setting('app.system_scope'::text, true) = 'on'::text)))
+         Rows Removed by Filter: 59708
+ Planning Time: 0.081 ms
+ Execution Time: 12.170 ms
+(8 rows)
+
+ROLLBACK
+before-DELETE:  Trigger for constraint Account_userId_fkey: time=0.114 calls=1
+before-DELETE:  Trigger for constraint Session_userId_fkey: time=0.051 calls=1
+before-DELETE:  Trigger for constraint Membership_userId_fkey: time=4.568 calls=1
+before-DELETE:  Trigger for constraint Evaluation_userId_fkey: time=0.214 calls=1
+before-DELETE:  Trigger for constraint Reviewer_userId_fkey: time=0.102 calls=1
+before-DELETE:  Trigger for constraint ApprovalRequest_requesterId_fkey: time=0.065 calls=1
+before-DELETE:  Trigger for constraint ApprovalRequest_approverId_fkey: time=0.020 calls=1
+before-DELETE:  Execution Time: 5.228 ms

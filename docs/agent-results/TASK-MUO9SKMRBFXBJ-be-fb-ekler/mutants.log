@@ -1,0 +1,22 @@
+=== M1-pipeline-baslik-min-w-0-sil (değişen satır: 1)
+8 passed, 0 failed
+=== M2-gates-min-w-0-sil (değişen satır: 2)
+8 passed, 0 failed
+=== M3-evaluations-serit-overflow-x-auto-sil (değişen satır: 1)
+✘ /tr/fabrika-beta/opportunities/demo-opp-1/evaluations 320:409 360:369 390:339 472:257 640:135 — 320px over=409
+7 passed, 1 failed
+=== M4-alerts-dl-eski-flex-shrink-0 (değişen satır: 1)
+✘ /tr/admin/alerts 320:41 360:1 390:0 472:0 640:0 — 320px over=41
+7 passed, 1 failed
+=== M5-approvals-flex-wrap-sil (değişen satır: 1)
+✘ /tr/fabrika-beta/approvals 320:24 360:0 390:0 472:0 640:0 — 320px over=24
+✘ /tr/fabrika-beta/onay-merkezi 320:24 360:0 390:0 472:0 640:0 — 320px over=24
+6 passed, 2 failed
+=== M6-cordis-calistirma-flex-wrap-sil (değişen satır: 1)
+✘ /tr/admin/cordis 320:46 360:6 390:0 472:0 640:0 — 320px over=46
+7 passed, 1 failed
+=== M7-pipeline-satir-sm-flex-wrap-sil (değişen satır: 1)
+8 passed, 0 failed
+=== M8-cordis-serit-overflow-x-auto-sil (değişen satır: 1)
+✘ /tr/admin/cordis 320:446 360:406 390:376 472:294 640:156 — 320px over=446
+7 passed, 1 failed

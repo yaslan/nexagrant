@@ -1,0 +1,144 @@
+
+> next-temp@0.1.0 test
+> vitest run --passWithNoTests tests/cordis-csv.test.ts tests/admin-cordis-failure-code.test.ts
+
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/894639b0-ce81-47f9-a4ac-ad42ffb6de0b/scratchpad/cordis-mutation-test
+
+ ❯ tests/admin-cordis-failure-code.test.ts (15 tests | 7 failed) 13ms
+     × a raw message becomes IMPORT_FAILED 4ms
+     × a fetch error text becomes IMPORT_FAILED 1ms
+     × a translation-key lookalike becomes IMPORT_FAILED 1ms
+     × a listed code in another case becomes IMPORT_FAILED 1ms
+     × an Object.prototype name becomes IMPORT_FAILED 0ms
+     × an empty string becomes IMPORT_FAILED 1ms
+     × a raw text in errorCode is replaced by IMPORT_FAILED; nothing else of the result leaves 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > cordisImportFailureCode — the whitelist on its own > a raw message becomes IMPORT_FAILED
+AssertionError: expected 'relation "CordisProject" does not exi…' to be 'IMPORT_FAILED' // Object.is equality
+
+Expected: "IMPORT_FAILED"
+Received: "relation "CordisProject" does not exist at /srv/secret/cordis.zip"
+
+ ❯ tests/admin-cordis-failure-code.test.ts:72:44
+     70|     ['an Error', new Error(SECRET)],
+     71|   ])('%s becomes IMPORT_FAILED', (_label, input) => {
+     72|     expect(cordisImportFailureCode(input)).toBe('IMPORT_FAILED');
+       |                                            ^
+     73|   });
+     74| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > cordisImportFailureCode — the whitelist on its own > a fetch error text becomes IMPORT_FAILED
+AssertionError: expected 'fetch failed' to be 'IMPORT_FAILED' // Object.is equality
+
+Expected: "IMPORT_FAILED"
+Received: "fetch failed"
+
+ ❯ tests/admin-cordis-failure-code.test.ts:72:44
+     70|     ['an Error', new Error(SECRET)],
+     71|   ])('%s becomes IMPORT_FAILED', (_label, input) => {
+     72|     expect(cordisImportFailureCode(input)).toBe('IMPORT_FAILED');
+       |                                            ^
+     73|   });
+     74| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > cordisImportFailureCode — the whitelist on its own > a translation-key lookalike becomes IMPORT_FAILED
+AssertionError: expected 'importErrors.IMPORT_FAILED' to be 'IMPORT_FAILED' // Object.is equality
+
+Expected: "IMPORT_FAILED"
+Received: "importErrors.IMPORT_FAILED"
+
+ ❯ tests/admin-cordis-failure-code.test.ts:72:44
+     70|     ['an Error', new Error(SECRET)],
+     71|   ])('%s becomes IMPORT_FAILED', (_label, input) => {
+     72|     expect(cordisImportFailureCode(input)).toBe('IMPORT_FAILED');
+       |                                            ^
+     73|   });
+     74| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > cordisImportFailureCode — the whitelist on its own > a listed code in another case becomes IMPORT_FAILED
+AssertionError: expected 'skip_limit_exceeded' to be 'IMPORT_FAILED' // Object.is equality
+
+Expected: "IMPORT_FAILED"
+Received: "skip_limit_exceeded"
+
+ ❯ tests/admin-cordis-failure-code.test.ts:72:44
+     70|     ['an Error', new Error(SECRET)],
+     71|   ])('%s becomes IMPORT_FAILED', (_label, input) => {
+     72|     expect(cordisImportFailureCode(input)).toBe('IMPORT_FAILED');
+       |                                            ^
+     73|   });
+     74| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > cordisImportFailureCode — the whitelist on its own > an Object.prototype name becomes IMPORT_FAILED
+AssertionError: expected 'toString' to be 'IMPORT_FAILED' // Object.is equality
+
+Expected: "IMPORT_FAILED"
+Received: "toString"
+
+ ❯ tests/admin-cordis-failure-code.test.ts:72:44
+     70|     ['an Error', new Error(SECRET)],
+     71|   ])('%s becomes IMPORT_FAILED', (_label, input) => {
+     72|     expect(cordisImportFailureCode(input)).toBe('IMPORT_FAILED');
+       |                                            ^
+     73|   });
+     74| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > cordisImportFailureCode — the whitelist on its own > an empty string becomes IMPORT_FAILED
+AssertionError: expected '' to be 'IMPORT_FAILED' // Object.is equality
+
+- Expected
++ Received
+
+- IMPORT_FAILED
+
+ ❯ tests/admin-cordis-failure-code.test.ts:72:44
+     70|     ['an Error', new Error(SECRET)],
+     71|   ])('%s becomes IMPORT_FAILED', (_label, input) => {
+     72|     expect(cordisImportFailureCode(input)).toBe('IMPORT_FAILED');
+       |                                            ^
+     73|   });
+     74| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > handleRunCordisImportAction — second layer (action whitelist) > a raw text in errorCode is replaced by IMPORT_FAILED; nothing else of the result leaves
+AssertionError: expected { success: false, …(1) } to strictly equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "errorCode": "IMPORT_FAILED",
++   "errorCode": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
+    "success": false,
+  }
+
+ ❯ tests/admin-cordis-failure-code.test.ts:82:17
+     80|     const res = await handleRunCordisImportAction('HORIZON');
+     81|
+     82|     expect(res).toStrictEqual({ success: false, errorCode: 'IMPORT_FAI…
+       |                 ^
+     83|     expect(JSON.stringify(res)).not.toMatch(/CordisProject|\/srv\/secr…
+     84|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  7 failed | 23 passed (30)
+   Start at  20:51:47
+   Duration  262ms (transform 121ms, setup 0ms, import 117ms, tests 120ms, environment 0ms)
+

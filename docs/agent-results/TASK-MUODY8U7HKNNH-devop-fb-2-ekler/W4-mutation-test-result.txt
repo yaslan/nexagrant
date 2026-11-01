@@ -1,0 +1,236 @@
+
+> next-temp@0.1.0 test
+> vitest run --passWithNoTests tests/cordis-csv.test.ts tests/admin-cordis-failure-code.test.ts
+
+
+ RUN  v4.1.11 /private/tmp/claude-501/-Users-macbook-alan/894639b0-ce81-47f9-a4ac-ad42ffb6de0b/scratchpad/cordis-mutation-test
+
+ ❯ tests/admin-cordis-failure-code.test.ts (15 tests | 3 failed) 16ms
+     × a raw text in errorCode is replaced by IMPORT_FAILED; nothing else of the result leaves 8ms
+     × a failure without a code is IMPORT_FAILED 2ms
+     × a listed code reaches the console as it is 1ms
+ ❯ tests/cordis-csv.test.ts (15 tests | 2 failed) 119ms
+     × a download error returns IMPORT_FAILED; the message stays on the run row 4ms
+     × a dump over the skip limit returns SKIP_LIMIT_EXCEEDED, without the CSV lines 13ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > handleRunCordisImportAction — second layer (action whitelist) > a raw text in errorCode is replaced by IMPORT_FAILED; nothing else of the result leaves
+AssertionError: expected { Object (success, runId, ...) } to strictly equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "errorCode": "IMPORT_FAILED",
++   "durationMs": 12,
++   "error": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
++   "errorCode": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
++   "rowCounts": {
++     "organizations": 0,
++     "participations": 0,
++     "projects": 0,
++     "scivocs": 0,
++     "topics": 0,
++   },
++   "runId": "run-7",
++   "skippedRecords": [
++     {
++       "file": "project.csv",
++       "records": 2,
++       "samples": [
++         {
++           "line": 4,
++           "reason": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
++         },
++       ],
++       "skipped": 1,
++     },
++   ],
+    "success": false,
+  }
+
+ ❯ tests/admin-cordis-failure-code.test.ts:82:17
+     80|     const res = await handleRunCordisImportAction('HORIZON');
+     81|
+     82|     expect(res).toStrictEqual({ success: false, errorCode: 'IMPORT_FAI…
+       |                 ^
+     83|     expect(JSON.stringify(res)).not.toMatch(/CordisProject|\/srv\/secr…
+     84|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > handleRunCordisImportAction — second layer (action whitelist) > a failure without a code is IMPORT_FAILED
+AssertionError: expected { Object (success, runId, ...) } to strictly equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "errorCode": "IMPORT_FAILED",
++   "durationMs": 12,
++   "error": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
++   "errorCode": undefined,
++   "rowCounts": {
++     "organizations": 0,
++     "participations": 0,
++     "projects": 0,
++     "scivocs": 0,
++     "topics": 0,
++   },
++   "runId": "run-7",
++   "skippedRecords": [
++     {
++       "file": "project.csv",
++       "records": 2,
++       "samples": [
++         {
++           "line": 4,
++           "reason": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
++         },
++       ],
++       "skipped": 1,
++     },
++   ],
+    "success": false,
+  }
+
+ ❯ tests/admin-cordis-failure-code.test.ts:89:55
+     87|     vi.mocked(runCordisImport).mockResolvedValue(failedImport(undefine…
+     88|
+     89|     await expect(handleRunCordisImportAction('H2020')).resolves.toStri…
+       |                                                       ^
+     90|       success: false,
+     91|       errorCode: 'IMPORT_FAILED',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  tests/admin-cordis-failure-code.test.ts > handleRunCordisImportAction — second layer (action whitelist) > a listed code reaches the console as it is
+AssertionError: expected { Object (success, runId, ...) } to strictly equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
++   "durationMs": 12,
++   "error": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
+    "errorCode": "SKIP_LIMIT_EXCEEDED",
++   "rowCounts": {
++     "organizations": 0,
++     "participations": 0,
++     "projects": 0,
++     "scivocs": 0,
++     "topics": 0,
++   },
++   "runId": "run-7",
++   "skippedRecords": [
++     {
++       "file": "project.csv",
++       "records": 2,
++       "samples": [
++         {
++           "line": 4,
++           "reason": "relation \"CordisProject\" does not exist at /srv/secret/cordis.zip",
++         },
++       ],
++       "skipped": 1,
++     },
++   ],
+    "success": false,
+  }
+
+ ❯ tests/admin-cordis-failure-code.test.ts:98:57
+     96|     vi.mocked(runCordisImport).mockResolvedValue(failedImport('SKIP_LI…
+     97|
+     98|     await expect(handleRunCordisImportAction('HORIZON')).resolves.toSt…
+       |                                                         ^
+     99|       success: false,
+    100|       errorCode: 'SKIP_LIMIT_EXCEEDED',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  tests/cordis-csv.test.ts > handleRunCordisImportAction — failure text > a download error returns IMPORT_FAILED; the message stays on the run row
+AssertionError: expected { Object (success, runId, ...) } to strictly equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
++   "durationMs": 0,
+    "errorCode": "IMPORT_FAILED",
++   "rowCounts": {
++     "organizations": 0,
++     "participations": 0,
++     "projects": 0,
++     "scivocs": 0,
++     "topics": 0,
++   },
++   "runId": "run-1",
+    "success": false,
+  }
+
+ ❯ tests/cordis-csv.test.ts:311:17
+    309|     const res = await handleRunCordisImportAction('HORIZON');
+    310|
+    311|     expect(res).toStrictEqual({ success: false, errorCode: 'IMPORT_FAI…
+       |                 ^
+    312|     expect(JSON.stringify(res)).not.toMatch(/ECONNREFUSED|10\.0\.0\.5|…
+    313|     const [run] = [...writes.runs.values()];
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  tests/cordis-csv.test.ts > handleRunCordisImportAction — failure text > a dump over the skip limit returns SKIP_LIMIT_EXCEEDED, without the CSV lines
+AssertionError: expected { Object (success, runId, ...) } to strictly equal { success: false, …(1) }
+
+- Expected
++ Received
+
+  {
++   "durationMs": 11,
+    "errorCode": "SKIP_LIMIT_EXCEEDED",
++   "rowCounts": {
++     "organizations": 0,
++     "participations": 0,
++     "projects": 0,
++     "scivocs": 0,
++     "topics": 0,
++   },
++   "runId": "run-1",
++   "skippedRecords": [
++     {
++       "file": "project.csv",
++       "records": 2,
++       "samples": [
++         {
++           "line": 4,
++           "reason": "expected 22 fields, got 3",
++         },
++       ],
++       "skipped": 1,
++     },
++     {
++       "file": "organization.csv",
++       "records": 1,
++       "samples": [],
++       "skipped": 0,
++     },
++   ],
+    "success": false,
+  }
+
+ ❯ tests/cordis-csv.test.ts:329:17
+    327|     const res = await handleRunCordisImportAction('HORIZON');
+    328|
+    329|     expect(res).toStrictEqual({ success: false, errorCode: 'SKIP_LIMIT…
+       |                 ^
+    330|     const [run] = [...writes.runs.values()];
+    331|     expect(run?.error).toContain('line 4: expected 22 fields, got 3');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 25 passed (30)
+   Start at  20:51:49
+   Duration  261ms (transform 131ms, setup 0ms, import 110ms, tests 135ms, environment 0ms)
+

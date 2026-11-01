@@ -1,0 +1,35 @@
+ok  U1   [KIRMIZI bekl.] uzantısız → .js                                            → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2))
+ok  U2   [KIRMIZI bekl.] göreli uzantısız → .js                                     → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2))
+ok  E1   [KIRMIZI bekl.] './x.js' → x.ts                                            → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/tsimpl.ts:2, via wipe (lib/i89/tsimpl))
+ok  E1r  [KIRMIZI bekl.] göreli '../x.js' → x.ts                                    → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/tsimpl.ts:2, via wipe (lib/i89/tsimpl))
+ok  E2   [KIRMIZI bekl.] './x.jsx' → x.tsx                                          → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/tsximpl.tsx:2, via wipe (lib/i89/tsximpl))
+ok  E2b  [KIRMIZI bekl.] './x.js' → x.tsx                                           → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/tsximpl.tsx:2, via wipe (lib/i89/tsximpl))
+ok  E3   [KIRMIZI bekl.] './x.mjs' → x.mts                                          → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/mtsimpl.mts:2, via wipe (lib/i89/mtsimpl))
+ok  E4   [KIRMIZI bekl.] './x.cjs' → x.cts                                          → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/ctsimpl.cts:2, via wipe (lib/i89/ctsimpl))
+ok  E5   [KIRMIZI bekl.] './x.ts' (allowImportingTsExtensions biçimi)               → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/tsimpl.ts:2, via wipe (lib/i89/tsimpl))
+ok  C1   [KIRMIZI bekl.] .cjs, ESM sözdizimi, uzantılı                              → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/esmcjs.cjs:2, via wipe (lib/i89/esmcjs))
+ok  C2   [KIRMIZI bekl.] .cjs module.exports = { wipe } + import { wipe }           → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/cjsexp.cjs:2, via ?wipe (lib/i89/cjsexp)); prisma.evidence.delete (lib/i89/cjsexp.cjs:2, via wipe (lib/i89/cjsexp))
+ok  C3   [KIRMIZI bekl.] .cjs exports.wipe = … + import { wipe }                    → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/cjsexports.cjs:2, via ?wipe (lib/i89/cjsexports))
+ok  C4   [KIRMIZI bekl.] require('@/lib/i89/cjsexp.cjs').wipe                       → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/cjsexp.cjs:2, via ?* (lib/i89/cjsexp)); prisma.evidence.delete (lib/i89/cjsexp.cjs:2, via wipe (lib/i89/cjsexp))
+ok  C5   [KIRMIZI bekl.] import d from .cjs (default)                               → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/cjsexp.cjs:2, via ?default (lib/i89/cjsexp)); prisma.evidence.delete (lib/i89/cjsexp.cjs:2, via wipe (lib/i89/cjsexp))
+ok  I1   [KIRMIZI bekl.] dizin → dir/index.ts                                       → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/dir/index.ts:2, via wipe (lib/i89/dir/index))
+ok  I1s  [KIRMIZI bekl.] dizin, sonda '/'                                           → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/dir/index.ts:2, via wipe (lib/i89/dir/index))
+ok  I1x  [KIRMIZI bekl.] dir/index açık                                             → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/dir/index.ts:2, via wipe (lib/i89/dir/index))
+ok  I2   [KIRMIZI bekl.] dizin → dirjs/index.js                                     → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/dirjs/index.js:2, via wipe (lib/i89/dirjs/index))
+ok  I3   [KIRMIZI bekl.] dizin → dirmts/index.mts                                   → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/dirmts/index.mts:2, via wipe (lib/i89/dirmts/index))
+ok  I4   [KIRMIZI bekl.] göreli '..' dizin                                          → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/dir/index.ts:2, via wipe (lib/i89/dir/index))
+XX  T1   [KIRMIZI bekl.] ikiz: twin.ts (okur) + twin.js (yazar) — bundler hangisini? → YEŞİL
+ok  T2   [KIRMIZI bekl.] typed.d.ts + typed.js                                      → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/typed.js:2, via wipe (lib/i89/typed))
+ok  B1   [KIRMIZI bekl.] barrel .ts: export * from './legacy2.js'                   → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2))
+ok  D1   [KIRMIZI bekl.] await import('@/lib/i89/legacy2.js').wipe                  → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/legacy2.js:2, via wipe (lib/i89/legacy2))
+ok  D2   [KIRMIZI bekl.] const { wipe } = await import('@/lib/i89/dirjs')           → KIRMIZI  readOnly: true but writes: prisma.evidence.delete (lib/i89/dirjs/index.js:2, via wipe (lib/i89/dirjs/index))
+ok  X1   [KIRMIZI bekl.] çözülemeyen @/ (fail-closed mesajı)                        → KIRMIZI  readOnly: true but writes: import of src/lib/i89/missing, which is no file the guard can read (fail-closed)
+ok  X2   [KIRMIZI bekl.] çözülemeyen göreli (fail-closed)                           → KIRMIZI  readOnly: true but writes: import of src/app/[locale]/i89/missing, which is no file the guard can read (fail-closed)
+ok  X3   [KIRMIZI bekl.] çözülemeyen uzantılı .js                                   → KIRMIZI  readOnly: true but writes: import of src/lib/i89/missing.js, which is no file the guard can read (fail-closed)
+ok  X4   [YEŞİL bekl.] çözülemeyen yan-etki import '@/app/nope.css' (yazma yok)   → YEŞİL
+ok  X5   [YEŞİL bekl.] var olan json '@/contracts/…json'                          → YEŞİL
+ok  X6   [YEŞİL bekl.] çözülemeyen, ama yalnız tip import                         → YEŞİL
+ok  X7   [KIRMIZI bekl.] çözülemeyen ad-alanı import * as ns                        → KIRMIZI  readOnly: true but writes: import of src/lib/i89/missing, which is no file the guard can read (fail-closed)
+XX  X8   [YEŞİL bekl.] çözülemeyen import VAR ama readOnly action onu çağırmıyor  → KIRMIZI  exported value is not a function the guard can read (declare the action as a function)
+XX  P1   [KIRMIZI bekl.] '#i89/…' package.json imports alias'ı (bundler çözer)      → YEŞİL
+beklenenden sapan: 3/34

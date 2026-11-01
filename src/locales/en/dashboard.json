@@ -1,0 +1,43 @@
+{
+  "dashboard": {
+    "title": "Pipeline Dashboard",
+    "description": "Real-time metrics and trends",
+    "tabs": {
+      "overview": "Overview",
+      "trends": "Trends",
+      "export": "Export"
+    },
+    "kpi": {
+      "totalOffers": "Total Offers",
+      "totalOffersDesc": "Active opportunities in this period",
+      "successRate": "Success Rate",
+      "successRateDesc": "Funded or above-threshold proposals",
+      "averageScore": "Average Score",
+      "averageScoreDesc": "Average evaluation score",
+      "personDays": "Person-Days",
+      "personDaysDesc": "Total effort in person-days",
+      "g0ToG2": "G0→G2 Timeline",
+      "g0ToG2Desc": "Average gate progression time",
+      "activeModules": "Active Modules",
+      "activeModulesDesc": "Enabled platform modules"
+    },
+    "dateRange": {
+      "button": "📅",
+      "quickSelect": "Quick Select",
+      "last7Days": "Last 7 days",
+      "last30Days": "Last 30 days",
+      "thisMonth": "This month",
+      "thisYear": "This year"
+    },
+    "trends": {
+      "title": "Offers & Success Rate",
+      "offers": "Offers",
+      "successRate": "Success Rate (%)"
+    },
+    "export": {
+      "title": "Export Data",
+      "description": "Export trend data as CSV for analysis and reporting.",
+      "button": "Export CSV"
+    }
+  }
+}

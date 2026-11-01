@@ -1,0 +1,6 @@
+tsc exit=0
+eslint (değişen 4 dosya) exit=0
+npm run lint exit=0
+build exit=1
+build exit=1 (node_modules APFS klonu ile)
+build exit=0 (yalnız .env dosyası, kabuğa export yok)

@@ -1,0 +1,12 @@
+# Gate — typecheck, lint, unit tests (mac, 2026-09-10 14:22)
+
+$ pnpm typecheck
+$ tsc --noEmit
+
+$ pnpm lint
+$ eslint
+
+$ pnpm test
+ Test Files  149 passed | 2 skipped (151)
+      Tests  1795 passed | 8 skipped (1803)
+   Duration  13.75s (transform 8.87s, setup 0ms, import 40.92s, tests 56.11s, environment 12.62s)

@@ -1,0 +1,75 @@
+########## RUN 1 ##########
+applied: prisma/migrations/rename-feedback-alert-columns.sql
+Feedback alert/sentry columns: [ 'alertId', 'alertStatus' ]
+Feedback row count: 16
+┌─────────┬──────────┬────┐
+│ (index) │ st       │ n  │
+├─────────┼──────────┼────┤
+│ 0       │ 'legacy' │ 11 │
+│ 1       │ null     │ 5  │
+└─────────┴──────────┴────┘
+archive row: [
+  {
+    id: 'feedback-migration-alert-columns',
+    source: 'feedback-migration',
+    archived_rows: 11
+  }
+]
+########## RUN 2 (idempotency) ##########
+applied: prisma/migrations/rename-feedback-alert-columns.sql
+Feedback alert/sentry columns: [ 'alertId', 'alertStatus' ]
+Feedback row count: 16
+┌─────────┬──────────┬────┐
+│ (index) │ st       │ n  │
+├─────────┼──────────┼────┤
+│ 0       │ 'legacy' │ 11 │
+│ 1       │ null     │ 5  │
+└─────────┴──────────┴────┘
+archive row: [
+  {
+    id: 'feedback-migration-alert-columns',
+    source: 'feedback-migration',
+    archived_rows: 11
+  }
+]
+########## ROLLBACK ##########
+applied: prisma/migrations/rename-feedback-alert-columns.down.sql
+Feedback alert/sentry columns: [ 'sentryEventId', 'sentryStatus' ]
+Feedback row count: 16
+┌─────────┬───────────┬────┐
+│ (index) │ st        │ n  │
+├─────────┼───────────┼────┤
+│ 0       │ 'sent'    │ 10 │
+│ 1       │ 'skipped' │ 1  │
+│ 2       │ null      │ 5  │
+└─────────┴───────────┴────┘
+archive row: []
+########## ROLLBACK RUN 2 (idempotency) ##########
+applied: prisma/migrations/rename-feedback-alert-columns.down.sql
+Feedback alert/sentry columns: [ 'sentryEventId', 'sentryStatus' ]
+Feedback row count: 16
+┌─────────┬───────────┬────┐
+│ (index) │ st        │ n  │
+├─────────┼───────────┼────┤
+│ 0       │ 'sent'    │ 10 │
+│ 1       │ 'skipped' │ 1  │
+│ 2       │ null      │ 5  │
+└─────────┴───────────┴────┘
+archive row: []
+########## RE-APPLY UP (final state) ##########
+applied: prisma/migrations/rename-feedback-alert-columns.sql
+Feedback alert/sentry columns: [ 'alertId', 'alertStatus' ]
+Feedback row count: 16
+┌─────────┬──────────┬────┐
+│ (index) │ st       │ n  │
+├─────────┼──────────┼────┤
+│ 0       │ 'legacy' │ 11 │
+│ 1       │ null     │ 5  │
+└─────────┴──────────┴────┘
+archive row: [
+  {
+    id: 'feedback-migration-alert-columns',
+    source: 'feedback-migration',
+    archived_rows: 11
+  }
+]

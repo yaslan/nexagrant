@@ -1,0 +1,28 @@
+# Ters vekil + TLS (Let's Encrypt, Caddy kendisi alır ve yeniler).
+# Alan adı: nexagrant.com (FO-233, dev'de birleşti). docs/RELEASE_CHECKLIST.md ve
+# docs/SMTP-SUNUCU.md hâlâ fonbridge.com diyor; onlar ayrı temizlik işi.
+#
+# Önkoşul: nexagrant.com ve www.nexagrant.com A kaydı bu VPS'in IPv4'ünü göstermeli,
+# 80 ve 443 dışarıdan açık olmalı. Kayıt yayına girmeden Caddy'yi başlatmak Let's
+# Encrypt hız sınırını yer (RUNBOOK §5, dig kontrolü).
+{
+	# ACME e-posta adresi (sertifika süresi uyarıları). Patron girdisi (FO-250): info@nexagrant.com.
+	email info@nexagrant.com
+	# Yalnız IPv4 (AAAA kaydı yok; docs/SMTP-SUNUCU.md §10.1).
+	default_bind tcp4/0.0.0.0
+}
+
+nexagrant.com {
+	encode zstd gzip
+	reverse_proxy web:3000
+	# HSTS: yalnız Caddy gönderir, uygulama eklemez. Patron kararı bekliyor
+	# (RELEASE_CHECKLIST §5.4): ilk hafta max-age=300, sonra 31536000.
+	# includeSubDomains EKLENMEZ (mail., webmail. ayrı sertifika düzeni).
+	# header Strict-Transport-Security "max-age=300"
+}
+
+# www → kök, tek 301. http:// adları açıkça yazılır: Caddy'nin otomatik
+# HTTP→HTTPS yönlendirmesi iki sıçrama yapardı (docs/SMTP-SUNUCU.md §10.1).
+www.nexagrant.com, http://www.nexagrant.com, http://nexagrant.com {
+	redir https://nexagrant.com{uri} permanent
+}

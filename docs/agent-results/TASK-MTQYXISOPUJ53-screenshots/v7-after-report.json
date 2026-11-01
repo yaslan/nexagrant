@@ -1,0 +1,18 @@
+[
+  {
+    "name": "consortium-demo-opp-1",
+    "url": "http://localhost:3000/tr/default/pipeline/demo-opp-1/consortium",
+    "status": "clean",
+    "hits": [],
+    "shot": "docs/agent-results/TASK-MTQYXISOPUJ53-screenshots/v7-after-consortium-demo-opp-1.png",
+    "chars": 118
+  },
+  {
+    "name": "consortium-demo-opp-3",
+    "url": "http://localhost:3000/tr/default/pipeline/demo-opp-3/consortium",
+    "status": "clean",
+    "hits": [],
+    "shot": "docs/agent-results/TASK-MTQYXISOPUJ53-screenshots/v7-after-consortium-demo-opp-3.png",
+    "chars": 118
+  }
+]

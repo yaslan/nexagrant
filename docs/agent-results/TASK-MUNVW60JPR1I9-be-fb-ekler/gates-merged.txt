@@ -1,0 +1,12 @@
+## birleşik ağaç 2bed3b6c
+typecheck exit=0
+lint exit=0
+i18n exit=0
+rls:check exit=0
+✅ SUCCESS: no new tenant bypass. 0 call site(s) allowed with a recorded reason, 36 on the sanctioned cross-tenant path, 0 still owed.
+build exit=0 Compiled successfully in 3.0s
+vitest exit=0
+ Test Files  297 passed | 2 skipped (299)
+      Tests  3712 passed | 41 skipped (3753)
+live-skip gate: 44 live files, 390 live tests passed, 33 allowed skip(s)
+live-skip exit=0

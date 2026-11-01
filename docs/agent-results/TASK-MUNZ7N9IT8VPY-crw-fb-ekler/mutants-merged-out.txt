@@ -1,0 +1,27 @@
+# birleşik ağaç HEAD 08745684
+M1 errorMessage(e) geri (eski sızıntı): KIRMIZI (öldü)
+    × a Prisma error becomes computeFailed; its text stays in the server log 13ms
+    × a plain Error is not mistaken for a domain error 1ms
+    × no server action returns what it caught (beyond the known list) 30ms
+M2 String(e) ile sızıntı: KIRMIZI (öldü)
+    × a Prisma error becomes computeFailed; its text stays in the server log 15ms
+    × a plain Error is not mistaken for a domain error 1ms
+    × no server action returns what it caught (beyond the known list) 31ms
+M3 alan hatası dalı silindi: KIRMIZI (öldü)
+    × a seat outside the workspace answers seatNotFound 4ms
+    × the matcher's own not-found (opportunity gone mid-run) answers seatNotFound 1ms
+M4 her hata seatNotFound: KIRMIZI (öldü)
+    × a Prisma error becomes computeFailed; its text stays in the server log 16ms
+    × a plain Error is not mistaken for a domain error 1ms
+M5 eksik id eski TR metni: KIRMIZI (öldü)
+    × no seat id answers seatNotFound without reaching the matcher 3ms
+    × no opportunity id answers seatNotFound without reaching the matcher 1ms
+M6 log yok: KIRMIZI (öldü)
+    × a Prisma error becomes computeFailed; its text stays in the server log 14ms
+M7 matcher opportunity-not-found düz Error: KIRMIZI (öldü)
+    × refuses a missing opportunity with SeatNotFoundError 3ms
+M8 computeSeatCandidates seat-not-found düz Error: KIRMIZI (öldü)
+    × a seat outside the workspace answers seatNotFound 6ms
+M9 buton seatNotFound çevirmiyor: KIRMIZI (öldü)
+    × "Aday Bul": a pilot refusal says the pilot ended; other failures get their own translated sentence, never the caught text 1021ms
+yaşayan mutant: 0

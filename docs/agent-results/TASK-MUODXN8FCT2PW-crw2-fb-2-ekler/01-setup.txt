@@ -1,0 +1,52 @@
+# CI 'Prepare database' sırası — 2026-09-30T17:45:28Z — worktree b8cde55e (dev)
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/f
+$ pnpm exec prisma db push
+Datasource "db": PostgreSQL database "f", schema "public" at "127.0.0.1:55110"
+
+🚀  Your database is now in sync with your Prisma schema. Done in 694ms
+
+exit=0
+$ pnpm db:rls-role
+│ 0       │ 'fabrika_app' │ false    │ false        │ true        │ false       │ false         │
+└─────────┴───────────────┴──────────┴──────────────┴─────────────┴─────────────┴───────────────┘
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55110/f
+$ psql --version
+psql (PostgreSQL) 18.4
+$ scripts/apply-migrations.sh  (#1)
+exit=0 ; 41 dosya başlığı; son satır: apply-migrations: 41 files applied
+198:==> [38/41] m4-stale-reminder-idempotency.sql
+199:psql:prisma/migrations/m4-stale-reminder-idempotency.sql:52: NOTICE:  column "staleDigestOn" of relation "Membership" already exists, skipping
+200:psql:prisma/migrations/m4-stale-reminder-idempotency.sql:53: NOTICE:  column "staleRemindedContactAt" of relation "Relationship" already exists, skipping
+206:==> [41/41] m4-stale-digest-user-claim.sql
+207:psql:prisma/migrations/m4-stale-digest-user-claim.sql:53: NOTICE:  column "staleDigestOn" of relation "User" already exists, skipping
+208:psql:prisma/migrations/m4-stale-digest-user-claim.sql:55: NOTICE:  relation "Membership_userId_idx" already exists, skipping
+$ scripts/apply-migrations.sh  (#2)
+exit=0 ; 41 dosya başlığı; son satır: apply-migrations: 41 files applied
+170:==> [38/41] m4-stale-reminder-idempotency.sql
+171:psql:prisma/migrations/m4-stale-reminder-idempotency.sql:52: NOTICE:  column "staleDigestOn" of relation "Membership" already exists, skipping
+172:psql:prisma/migrations/m4-stale-reminder-idempotency.sql:53: NOTICE:  column "staleRemindedContactAt" of relation "Relationship" already exists, skipping
+178:==> [41/41] m4-stale-digest-user-claim.sql
+179:psql:prisma/migrations/m4-stale-digest-user-claim.sql:53: NOTICE:  column "staleDigestOn" of relation "User" already exists, skipping
+180:psql:prisma/migrations/m4-stale-digest-user-claim.sql:55: NOTICE:  relation "Membership_userId_idx" already exists, skipping
+$ pnpm db:rls
+$ tsx scripts/apply-rls.ts
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+exit=0
+$ pnpm db:seed
+
+Node.js v26.5.0
+[ELIFECYCLE] Command failed with exit code 1.
+exit=0
+
+# ek: worktree taze pnpm install → prisma client üretilmemişti (CI install sonrası postinstall/generate yapar); generate + seed yeniden
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/f
+$ pnpm exec prisma generate
+
+
+exit=0
+$ pnpm db:seed
+exit=0
+M6 evaluator lens seeded (1 evaluation, 2 reviewers pending, 4 criteria, 0 scores).
+✓ E11.2 feedback seed complete
+Seeding completed with E10 data.

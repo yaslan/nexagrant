@@ -1,0 +1,88 @@
+# cs-fb İNCELEME-79 mutantları: gerçek dosyada tek değişiklik -> ilgili testi koş -> geri al.
+import subprocess, pathlib, sys
+W = pathlib.Path(sys.argv[1]); only = sys.argv[2:]  # optional ids
+CAG = 'src/app/api/cagrilar/route.ts'
+CATCH = "return internalError({ success: false, error: 'internal_error' });"
+GUARD = 'tests/api/api-error-body-guard.test.ts'
+LEAKMSG = '(error as Error).message'
+ACT = 'src/app/[locale]/admin/modules/actions.ts'
+M = [
+ ('K1', 'bekçi: aynı dosyada `status: 400` tipli parametre + başka fonksiyonda değişken status 500 (gölgeleme)', GUARD,
+  [(CAG, CATCH, "const status = (error as { status?: number }).status ?? 500; return NextResponse.json({ success: false, error: " + LEAKMSG + " }, { status });"),
+   (CAG, "export async function GET(", "function refuse(error: string, status: 400) { return NextResponse.json({ error }, { status }); }\nvoid refuse;\nexport async function GET(")]),
+ ('K2', "bekçi: tırnaklı anahtar { 'status': 500 }", GUARD,
+  [(CAG, CATCH, "return NextResponse.json({ success: false, error: " + LEAKMSG + " }, { 'status': 500 });")]),
+ ('K3', 'bekçi: src/app içinde route.ts olmayan kardeş yardımcı 500 kuruyor', GUARD,
+  [(CAG, CATCH, "return fail(error);"), (CAG, "import { UserWindowLimiter }", "import { fail } from './respond';\nimport { UserWindowLimiter }"),
+   ('src/app/api/cagrilar/respond.ts', None, "import { NextResponse } from 'next/server';\nexport function fail(e: unknown) {\n  return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });\n}\n")]),
+ ('K4', 'bekçi: dosyada ters tırnak içeren regex literal, alttaki 500 maskeleniyor', GUARD,
+  [(CAG, CATCH, "return NextResponse.json({ success: false, error: " + LEAKMSG + " }, { status: 500 });"),
+   (CAG, "const MAX_PAGES = 5;", "const MAX_PAGES = 5;\nexport const TICK = /`/;")]),
+ ('K5', 'internalError: ids.requestId içine err.message (tsc+bekçi)', GUARD + '|tsc',
+  [(CAG, CATCH, "return internalError({ success: false, error: 'internal_error' }, { ids: { requestId: " + LEAKMSG + " } });")]),
+ ('K6', 'internalError: headers içine err.message (tsc+bekçi)', GUARD + '|tsc',
+  [(CAG, CATCH, "return internalError({ success: false, error: 'internal_error' }, { headers: { 'x-error': " + LEAKMSG + " } });")]),
+ ('K7', "internalError: `as 'internal_error'` tip kaçışı (tsc+lint+bekçi)", GUARD + '|tsc|eslint',
+  [(CAG, CATCH, "return internalError({ success: false, error: " + LEAKMSG + " as 'internal_error' });")]),
+ ('K8', 'action bekçisi: catch dışına atanıp sonra dönen hata metni', GUARD,
+  [(ACT, None, "APPEND\nexport async function csProbeA2() {\n  let err = '';\n  try { await Promise.resolve(); } catch (e) { err = (e as Error).message; }\n  return { ok: false, error: err };\n}\n")]),
+ ('K9', 'action bekçisi: Promise .catch((e) => ({ error: e.message }))', GUARD,
+  [(ACT, None, "APPEND\nexport async function csProbeA1() {\n  return Promise.resolve(1).then(() => ({ ok: true, error: '' })).catch((e: unknown) => ({ ok: false, error: (e as Error).message }));\n}\n")]),
+ ('D1', 'cagrilar: sınır userId yerine tenantId ile tutuluyor', 'tests/api/cagrilar-hardening.test.ts',
+  [(CAG, "limiter.take(tenant.scope.userId)", "limiter.take(tenant.scope.tenantId)")]),
+ ('D2', 'cagrilar: Retry-After başlığı yok', 'tests/api/cagrilar-hardening.test.ts',
+  [(CAG, "{ status: 429, headers: { 'Retry-After': String(retryAfter) } }", "{ status: 429 }")]),
+ ('D3', 'cagrilar: 429 yerine 503', 'tests/api/cagrilar-hardening.test.ts',
+  [(CAG, "{ status: 429, headers:", "{ status: 403, headers:")]),
+ ('D4', 'cagrilar: sınır 31 (off-by-one)', 'tests/api/cagrilar-hardening.test.ts',
+  [(CAG, "new UserWindowLimiter(CAGRILAR_PER_USER_PER_MINUTE)", "new UserWindowLimiter(CAGRILAR_PER_USER_PER_MINUTE + 1)")]),
+ ('D5', 'limiter: pencere hiç sıfırlanmıyor', 'src/lib/user-rate-limit.test.ts|tests/api/cagrilar-hardening.test.ts',
+  [('src/lib/user-rate-limit.ts', "if (now - this.windowStart >= this.windowMs) {", "if (this.windowStart === -Infinity) {")]),
+ ('D6', 'limiter: Retry-After 0 olabilir (Math.max(1,…) kaldırıldı)', 'src/lib/user-rate-limit.test.ts|tests/api/cagrilar-hardening.test.ts',
+  [('src/lib/user-rate-limit.ts', "Math.max(1, Math.ceil((this.windowStart + this.windowMs - now) / 1000))", "Math.floor((this.windowStart + this.windowMs - now) / 1000)")]),
+ ('S1', 'stripe: sırsız 503 gövdesinde literal yapılandırma adı', 'tests/api/stripe-webhook-bodies.test.ts',
+  [('src/app/api/webhooks/stripe/route.ts', "internalError({ error: 'service_unavailable' }, { status: 503 })", "internalError({ error: 'webhook_secret_missing' }, { status: 503 })")]),
+ ('S2', 'stripe: sırsız 200 (Stripe yeniden denemez, olay kaybolur)', 'tests/api/stripe-webhook-bodies.test.ts',
+  [('src/app/api/webhooks/stripe/route.ts', "return internalError({ error: 'service_unavailable' }, { status: 503 });", "return NextResponse.json({ received: true });")]),
+ ('S3', 'stripe: işleme hatası yutulup 200', 'tests/api/stripe-webhook-bodies.test.ts',
+  [('src/app/api/webhooks/stripe/route.ts', "    return internalError();\n", "    return NextResponse.json({ received: true });\n")]),
+ ('S4', 'stripe: bozuk imza 400 gövdesine SDK metni', 'tests/api/stripe-webhook-bodies.test.ts|' + GUARD,
+  [('src/app/api/webhooks/stripe/route.ts', "new NextResponse('invalid_signature', { status: 400 })", "new NextResponse(`invalid_signature: ${error.message}`, { status: 400 })")]),
+ ('G1', "gdpr: 'Unauthorized' dalı 500'e düşüyor (gdpr/delete)", 'tests/api/gdpr-500-body.test.ts',
+  [('src/app/api/gdpr/delete/route.ts', "if (result.error === 'Unauthorized') return", "if (result.error === 'Unauthorised') return")]),
+ ('G2', 'gdpr: başarılı dışa aktarım 200 yerine boş gövde', 'tests/api/gdpr-500-body.test.ts|tests',
+  [('src/app/api/gdpr/export/route.ts', "JSON.stringify(result.data, null, 2)", "JSON.stringify({}, null, 2)")]),
+ ('G3', 'gdpr: request-deletion POST başarıda deletedAt düşüyor', 'tests/api/gdpr-500-body.test.ts|tests',
+  [('src/app/api/user/request-deletion/route.ts', "      status: result.status,\n      deletedAt: result.deletedAt,", "      status: result.status,")]),
+ ('G4', 'gdpr: cancel hatası 500 yerine 200 success', 'tests/api/gdpr-500-body.test.ts',
+  [('src/app/api/user/request-deletion/route.ts', "return internalError({ error: 'cancel_failed' });", "return NextResponse.json({ status: 'active' });")]),
+]
+def run(spec):
+    out = []
+    for part in spec.split('|'):
+        if part == 'tsc': r = subprocess.run(['npx','tsc','--noEmit','-p','tsconfig.json'], cwd=W, capture_output=True, text=True)
+        elif part == 'eslint': r = subprocess.run(['npx','eslint','src/app/api/cagrilar'], cwd=W, capture_output=True, text=True)
+        else: r = subprocess.run(['npx','vitest','run', part], cwd=W, capture_output=True, text=True)
+        out.append((part, r.returncode))
+    return out
+for mid, desc, spec, edits in M:
+    if only and mid not in only: continue
+    created = []
+    try:
+        for path, old, new in edits:
+            p = W / path
+            if old is None and not new.startswith('APPEND'):
+                p.write_text(new); created.append(p); continue
+            s = p.read_text()
+            if old is None: p.write_text(s + new[len('APPEND'):]); continue
+            assert s.count(old) == 1, f'{mid}: anchor not unique/absent in {path}: {old[:40]}'
+            p.write_text(s.replace(old, new))
+        res = run(spec)
+        red = [f'{k}={c}' for k, c in res]
+        verdict = 'ÖLDÜ (kırmızı)' if any(c != 0 for _, c in res) else 'YAŞADI (yeşil)'
+        print(f'{mid} {desc}: {verdict}  [{", ".join(red)}]', flush=True)
+    finally:
+        for p in created: p.unlink()
+        subprocess.run(['git','checkout','--','src'], cwd=W)
+d = subprocess.run(['git','status','--porcelain','src','tests'], cwd=W, capture_output=True, text=True).stdout
+print('git status src/tests (mutant kalıntısı):', 'temiz' if not d.strip() else d)

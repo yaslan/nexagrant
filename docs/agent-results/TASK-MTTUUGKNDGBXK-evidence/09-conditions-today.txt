@@ -1,0 +1,26 @@
+=== env the alerting jobs depend on ===
+  OPENAI_API_KEY           UNSET
+  WORKER_URL               UNSET
+  TCMB_BASE_URL            UNSET
+  INVOICE_VAT_RATE         UNSET
+  CORDIS_DELTA_URL         UNSET
+  CORDIS_DELTA_ENDPOINT    UNSET
+  CORDIS_HE_ZIP_URL        UNSET
+  CORDIS_H2020_ZIP_URL     UNSET
+  INVOICE_SUPPLIER_NAME    UNSET
+  INVOICE_SUPPLIER_VKN     UNSET
+
+=== billing identity: can the %77 alert still fire? ===
+  Tenant rows                 : 21
+  TenantBillingIdentity rows  : 0
+  tenants with NO identity    : 21  -> each is one future alert on next payment
+
+=== how many open alerts point at a tenant that no longer exists ===
+  distinct tenantId in those alerts : 227
+  tenant still exists               : 1
+  tenant DELETED (test debris)      : 226
+
+=== VAT: do the two invoice_vat_country_unknown alerts still hold? ===
+  resolveVatRate("Türkiye") -> undefined
+  resolveVatRate("TR") -> undefined
+  resolveVatRate("Turkey") -> undefined

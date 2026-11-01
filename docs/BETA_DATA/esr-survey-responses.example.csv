@@ -1,0 +1,22 @@
+# Fabrika — ESR calibration survey response sheet, EXAMPLE / HARNESS SELF-TEST.
+#
+# ⚠️ These are NOT design-partner answers. Nobody wrote them but the E11.3 build, and they exist for
+# exactly one reason: to prove that `--responses=` ingests verdicts, rolls them up by majority and
+# re-labels a sample end to end. Any accuracy printed from this file is a self-test, not a finding.
+#
+# The real sheets are generated per partner at
+#   docs/BETA_DATA/generated/esr-calibration/survey/<partner-slug>.responses.csv
+# and come back filled in. Concatenate them and pass the result:
+#   pnpm tsx scripts/esr-calibration.ts --responses=/secure/path/responses.csv
+#
+# agrees=true  → the partner endorses whatever Fabrika decided for that sample
+# agrees=false → `verdict` (GO|NO_GO) is the partner's own call and is required
+partnerSlug,sampleId,agrees,verdict,comment
+beta-anadolu-teknoloji,S01,true,,Skor ve karar bizim okumamızla aynı
+beta-anadolu-teknoloji,S04,false,GO,Bu çağrıda eşiği geçen teklif bizce kovalanmalıydı
+beta-ege-arge,S04,false,GO,Aynı görüşteyiz; bileşik eşik burada fazla sert
+beta-bogazici-tto,S19,true,,CSA taban oranı yüksek; biz de denerdik
+beta-odtu-arge,S19,true,,Denemenin maliyeti düşük
+beta-marmara-danismanlik,S13,true,,Açık NO_GO
+beta-ankara-kume,S10,false,GO,Eşiği tam tutturmuş bir teklif kaçırılmamalı
+beta-izmir-belediye,S10,false,GO,Aynı görüş

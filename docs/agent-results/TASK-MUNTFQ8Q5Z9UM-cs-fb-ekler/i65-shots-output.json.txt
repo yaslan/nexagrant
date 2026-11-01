@@ -1,0 +1,41 @@
+[seed-plan-e2e] ready — ultra=plan-e2e-ultra-ws (ultra) flip=plan-e2e-flip-ws (pro) lens=plan-e2e-lens-ws (basic)
+{
+  "390": {
+    "signButtons": {
+      "nda": 0,
+      "variant": 0,
+      "esr": 1,
+      "award": 1
+    },
+    "legalFilterRows": 2,
+    "legalFilterVariantVisible": true,
+    "refusalText": "Doküman bu çalışma alanında bulunamadı.",
+    "refusalInViewport": true,
+    "esrSignedAt": "2026-09-30T08:40:56.741Z",
+    "ndaRow": {
+      "signedAt": null
+    },
+    "variantRow": {
+      "signedAt": null
+    }
+  },
+  "1440": {
+    "signButtons": {
+      "nda": 0,
+      "variant": 0,
+      "esr": 1,
+      "award": 1
+    },
+    "legalFilterRows": 2,
+    "legalFilterVariantVisible": true,
+    "refusalText": "Doküman bu çalışma alanında bulunamadı.",
+    "refusalInViewport": true,
+    "esrSignedAt": "2026-09-30T08:40:58.463Z",
+    "ndaRow": {
+      "signedAt": null
+    },
+    "variantRow": {
+      "signedAt": null
+    }
+  }
+}

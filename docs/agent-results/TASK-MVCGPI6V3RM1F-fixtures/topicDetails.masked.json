@@ -1,0 +1,24 @@
+{
+  "expertiseList": [
+    "Expertise_request",
+    "Expertise_offer"
+  ],
+  "topicPersonsWithdrawCount": 2,
+  "topic": {
+    "pic": null,
+    "ccm2Id": "50127991",
+    "identifier": "HORIZON-CL4-2027-01-MAT-PROD-22",
+    "title": "Innovative advanced materials and new production processes –…",
+    "status": "Forthcoming",
+    "requestedDate": null,
+    "showTopicsWithStatus": null,
+    "summary": null,
+    "expertise": null,
+    "interestStatus": null,
+    "actions": [],
+    "fp_code": null,
+    "topicOrganisationId": null,
+    "announcementType": null,
+    "identifierAndTitle": "<a href=\"#\" data-uri=\"../opportunities/null/topics/horizon-c…"
+  }
+}

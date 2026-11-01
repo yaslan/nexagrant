@@ -1,0 +1,72 @@
+{
+  "log": [
+    "/tr status=200 lang=tr",
+    "/en status=200 lang=en",
+    "/tr/fiyatlandirma status=200 lang=tr",
+    "/en/blog status=200 lang=en",
+    "/tr/calls/turkey status=200 lang=tr",
+    "/en/login status=200 lang=en",
+    "google redirect=https://accounts.google.com/o/oauth2/v2/auth",
+    "readiness result reached=true",
+    "lead form success box=false",
+    "print button → window.print called=1",
+    "390px scrollWidth=390",
+    "dashboard status=200 url=http://127.0.0.1:47957/tr/main/dashboard",
+    "sidebar evidence link count=1",
+    "client-side nav kept window (no full reload)=true",
+    "uploaded row visible=true",
+    "documents status=200 docx links=1",
+    "docx name=NDA.docx bytes=9062 PK=true",
+    "print page status=200 csp=default-src 'none'; script-src 'unsafe-h",
+    "print onclick ran=1",
+    "en dashboard lang=en scrollWidth=390",
+    "control: injected inline ran=false; aria-expanded false→true (React handlers live)",
+    "CSP violations total=7 (outside CONTROL=0)",
+    "{\"step\":\"CONTROL\",\"console\":\"Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'nonce-M9XHooQJELVTAX2Im9qlWA==' 'strict-dynamic''. Either the 'unsafe-inline' keyword, a hash ('sha256-1576lC6QtRZkbResT3/wbIFimq3pQ3Pcr2BbP14lYzg='), or a nonce ('nonce-...') is required to enable i\"}",
+    "{\"step\":\"CONTROL\",\"console\":\"Loading the script 'https://evil.example/x.js' violates the following Content Security Policy directive: \\\"script-src 'self' 'nonce-M9XHooQJELVTAX2Im9qlWA==' 'strict-dynamic'\\\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.\"}",
+    "{\"step\":\"CONTROL\",\"directive\":\"script-src-elem\",\"blocked\":\"inline\",\"source\":\"http://127.0.0.1:47957/tr/main/dashboard\",\"disposition\":\"enforce\"}",
+    "{\"step\":\"CONTROL\",\"directive\":\"script-src-elem\",\"blocked\":\"https://evil.example/x.js\",\"source\":\"\",\"disposition\":\"enforce\"}",
+    "{\"step\":\"CONTROL\",\"console\":\"Connecting to 'https://evil.example/exfil' violates the following Content Security Policy directive: \\\"connect-src 'self'\\\". The action has been blocked.\"}",
+    "{\"step\":\"CONTROL\",\"console\":\"Fetch API cannot load https://evil.example/exfil. Refused to connect because it violates the document's Content Security Policy.\"}",
+    "{\"step\":\"CONTROL\",\"directive\":\"connect-src\",\"blocked\":\"https://evil.example/exfil\",\"source\":\"\",\"disposition\":\"enforce\"}"
+  ],
+  "violations": [
+    {
+      "step": "CONTROL",
+      "console": "Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'nonce-M9XHooQJELVTAX2Im9qlWA==' 'strict-dynamic''. Either the 'unsafe-inline' keyword, a hash ('sha256-1576lC6QtRZkbResT3/wbIFimq3pQ3Pcr2BbP14lYzg='), or a nonce ('nonce-...') is required to enable i"
+    },
+    {
+      "step": "CONTROL",
+      "console": "Loading the script 'https://evil.example/x.js' violates the following Content Security Policy directive: \"script-src 'self' 'nonce-M9XHooQJELVTAX2Im9qlWA==' 'strict-dynamic'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "step": "CONTROL",
+      "directive": "script-src-elem",
+      "blocked": "inline",
+      "source": "http://127.0.0.1:47957/tr/main/dashboard",
+      "disposition": "enforce"
+    },
+    {
+      "step": "CONTROL",
+      "directive": "script-src-elem",
+      "blocked": "https://evil.example/x.js",
+      "source": "",
+      "disposition": "enforce"
+    },
+    {
+      "step": "CONTROL",
+      "console": "Connecting to 'https://evil.example/exfil' violates the following Content Security Policy directive: \"connect-src 'self'\". The action has been blocked."
+    },
+    {
+      "step": "CONTROL",
+      "console": "Fetch API cannot load https://evil.example/exfil. Refused to connect because it violates the document's Content Security Policy."
+    },
+    {
+      "step": "CONTROL",
+      "directive": "connect-src",
+      "blocked": "https://evil.example/exfil",
+      "source": "",
+      "disposition": "enforce"
+    }
+  ]
+}

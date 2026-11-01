@@ -1,0 +1,3 @@
+K3 utcDay yerel gün (toLocaleDateString): Tests  2 failed | 22 passed (24)
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: −11 sends no 
+     FAIL  tests/stale-relationship-reminder.live.test.ts > M4 stale relationship reminder (live, fabrika_app) > the day is the UTC day in any process time zone: +14 claims th

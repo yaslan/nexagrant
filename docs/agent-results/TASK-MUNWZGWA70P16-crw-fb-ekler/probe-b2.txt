@@ -1,0 +1,11 @@
+tr/calls distinct-links=20 old-style=/tr/calls/<ID>:0 signed-out-codes: 20 200 
+tr/calls/germany distinct-links=18 old-style=/tr/calls/<ID>:0 signed-out-codes: 18 200 
+en/calls distinct-links=20 old-style=/en/calls/<ID>:0 signed-out-codes: 20 200 
+en/calls/germany distinct-links=18 old-style=/en/calls/<ID>:0 signed-out-codes: 18 200 
+sitemap.xml 404 · robots.txt 404
+detail signed-out: /tr/default/cagrilar/EUROSTARS-2026-01-01 -> 307 http://127.0.0.1:47181/tr/giris
+signed-in /tr/default/cagrilar/HORIZON-CL5-2026-D4-01 200
+signed-in /tr/default/cagrilar/HORIZON-CL2-2026-D1-01 200
+signed-in /en/default/calls/HORIZON-GEO-2026-02-01 200
+signed-in /en/default/calls/HORIZON-CL6-2026-D3-01 200
+signed-in /tr/default/cagrilar/EUROSTARS-2026-01-01 200

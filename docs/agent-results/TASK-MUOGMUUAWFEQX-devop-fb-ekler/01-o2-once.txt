@@ -1,0 +1,35 @@
+== ÖNCE (dev d6d12b8d, kod değişmemiş) — Ö-2 yeniden üretim
+DATABASE_URL=postgresql://fabrika_migrate:***@127.0.0.1:55225/fb_o2 (sahip; :5433 DEĞİL)
+fabrika_migrate|f|f
+apply-migrations: 41 files applied as fabrika_migrate
+zincir#1 exit=0
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+apply-migrations: 41 files applied as fabrika_migrate
+fikstür (eski şekil) yüklendi
+apply-migrations: 41 files applied as fabrika_migrate
+-- up sonrası (07 arşivledi mi):
+3|4
+
+$ psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f prisma/migrations/rename-feedback-alert-columns.down.sql   # SET YOK (fb_o2_noset)
+DO
+DO
+DO
+UPDATE 0
+exit=0
+ geri_gelen_eventid | geri_gelen_status | arsiv_satiri 
+--------------------+-------------------+--------------
+                  0 |                 0 |            0
+(1 row)
+
+$ psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -c "SET app.system_scope = 'on'" -f …down.sql   # SET VAR (fb_o2_set, karşılaştırma)
+SET
+DO
+DO
+DO
+UPDATE 1
+exit=0
+ geri_gelen_eventid | geri_gelen_status | arsiv_satiri 
+--------------------+-------------------+--------------
+                  2 |                 3 |            0
+(1 row)
+

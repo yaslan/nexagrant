@@ -1,0 +1,33 @@
+BEGIN
+GRANT ROLE
+psql:prisma/rls-app-role.sql:77: NOTICE:  created role fabrika_app
+DO
+   rolname   | rolsuper | rolbypassrls | rolcanlogin | rolcreatedb | rolcreaterole 
+-------------+----------+--------------+-------------+-------------+---------------
+ fabrika_app | f        | f            | t           | f           | f
+(1 row)
+
+ALTER ROLE
+REVOKE ROLE
+COMMIT
+ rolname  |    member_of    
+----------+-----------------
+ postgres | fabrika_migrate
+ postgres | fabrika_jobs
+ postgres | fabrika_app
+(3 rows)
+
+   defaclrole    | defaclobjtype |             defaclacl              
+-----------------+---------------+------------------------------------
+ fabrika_migrate | S             | {fabrika_app=rU/fabrika_migrate}
+ fabrika_migrate | r             | {fabrika_app=arwd/fabrika_migrate}
+(2 rows)
+
+fabrika_app|public, extensions|1|t
+      role       |  member  |    grantor     | admin_option | inherit_option | set_option 
+-----------------+----------+----------------+--------------+----------------+------------
+ fabrika_migrate | postgres | supabase_admin | t            | f              | f
+ fabrika_jobs    | postgres | supabase_admin | t            | f              | f
+ fabrika_app     | postgres | supabase_admin | t            | f              | f
+(3 rows)
+

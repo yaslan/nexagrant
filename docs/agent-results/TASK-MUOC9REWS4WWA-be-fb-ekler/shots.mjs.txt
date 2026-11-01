@@ -1,0 +1,35 @@
+// be-fb TASK-MUOC9REWS4WWA — gerçek tarayıcı (headless chromium, kendi süreci): admin CORDIS "Şimdi Çalıştır" tıkla,
+// role=alert metnini oku + kare al. Oturum: next-auth encode() çerezi (demo login prod'da kapalı).
+import { chromium } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
+import { writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const psql = (sql) => execFileSync('docker', ['exec', 'befb105-pg', 'psql', '-U', 'fabrika', '-d', 'fabrika', '-tAc', sql]).toString().trim();
+const OUT = process.env.OUT;
+const token = await encode({ token: { id: 'demo-user-superadmin', sub: 'demo-user-superadmin' }, secret: process.env.AUTH_SECRET, salt: 'authjs.session-token', maxAge: 3600 });
+const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const runs = JSON.parse(process.env.RUNS); // [{label, base, locale, modeFile, mode}]
+for (const r of runs) {
+  writeFileSync(r.modeFile, r.mode);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: r.locale });
+  await ctx.addCookies([{ name: 'authjs.session-token', value: token, url: r.base }]);
+  const page = await ctx.newPage();
+  await page.goto(`${r.base}/${r.locale}/admin/cordis`, { waitUntil: 'networkidle' });
+  const dlg = page.getByRole('alertdialog');
+  try { await dlg.waitFor({ state: 'visible', timeout: 8000 }); await dlg.getByRole('button').first().click(); await dlg.waitFor({ state: 'hidden' }); } catch {}
+  const btn = page.getByRole('button', { name: /Şimdi Çalıştır/ });
+  await btn.scrollIntoViewIfNeeded();
+  const alertLoc = r.old ? page.locator('span', { hasText: 'İçe Aktarım Hatası' }).first() : page.getByRole('alert').filter({ hasText: /İçe aktarım|Import failed/ }).first();
+  if (r.pre) psql(r.pre);
+  try { await btn.click();
+  await alertLoc.waitFor({ timeout: 20000 }); } finally { if (r.post) psql(r.post); }
+  const text = (await alertLoc.innerText()).trim();
+  const box = alertLoc.locator('xpath=ancestor::div[1]');
+  await box.scrollIntoViewIfNeeded();
+  const file = `${OUT}/${r.label}.png`;
+  await page.screenshot({ path: file, clip: await (async () => { const b = await box.boundingBox(); return { x: 0, y: Math.max(0, b.y - 260), width: 1280, height: 420 }; })() });
+  await page.screenshot({ path: `${OUT}/${r.label}-tam.png`, fullPage: true });
+  console.log(`[${r.label}] role=alert/span metni: "${text}" → ${file}`);
+  await ctx.close();
+}
+await browser.close();

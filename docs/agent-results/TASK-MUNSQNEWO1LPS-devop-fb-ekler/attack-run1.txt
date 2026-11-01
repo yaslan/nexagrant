@@ -1,0 +1,53 @@
+A1 re-PUT text/html -> 403
+A1 re-PUT application/pdf, HTML bytes, same length -> 200
+A1 stored now: type= application/pdf bytes starts= "<html><script>"
+A1 row still: mime= application/pdf size= 38 status= UNVERIFIED
+A1 download:  200 application/pdf attachment; filename="belge.pdf" "<html><script>"
+ ✓ tests/zz-devfb66-attack.live.test.ts > ATTACK > A1 after confirm, the same presigned URL overwrites the confirmed object with non-PDF bytes of the same length 1074ms
+A2 second confirm success= true
+A2 rows with that key = 2
+A2 surviving row download: route 302 store 404
+ ✓ tests/zz-devfb66-attack.live.test.ts > ATTACK > A2 the same key confirmed twice -> two rows; deleting one orphans the other 305ms
+A3 "cmunsyvlz00029vxkz2bkne5t/org-default/ce" -> {"success":false,"error":"invalid_object_key"}
+A3 "https://files.example.org/cmunsyvlz00029" -> {"success":false,"error":"invalid_object_key"}
+A3 "cmunsyvjn00009vxkxl0j9qxj/../cmunsyvlz00" -> {"success":false,"error":"invalid_object_key"}
+A3 "cmunsyvjn00009vxkxl0j9qxj/%2e%2e/cmunsyv" -> {"success":false,"error":"invalid_object_key"}
+A3 " cmunsyvlz00029vxkz2bkne5t/org-default/c" -> {"success":false,"error":"invalid_object_key"}
+A3 "cmunsyvjn00009vxkxl0j9qxj//cmunsyvlz0002" -> {"success":false,"error":"invalid_object_key"}
+ ✓ tests/zz-devfb66-attack.live.test.ts > ATTACK > A3 confirm of B's key, in raw, URL and traversal form, as A 933ms
+A4 ["__proto__",null,10] -> unsupported_type
+A4 ["x.constructor",null,10] -> unsupported_type
+A4 ["x.__proto__",null,10] -> unsupported_type
+A4 [["x.pdf"],"application/pdf",10] -> unsupported_type
+A4 ["x.pdf",["application/pdf"],10] -> unsupported_type
+A4 ["x.pdf","application/pdf","10"] -> empty_file
+A4 ["x.pdf","application/pdf",100000000000000000000] -> empty_file
+A4 ["x.pdf","Application/PDF",10] -> unsupported_type
+A4 ["x.pdf ","application/pdf",10] -> unsupported_type
+A4 ["x.pdf","application/pdf; charset=utf-8",10] -> unsupported_type
+A4 ["x.svg.pdf","application/pdf",10] -> OK key=cmunsyvjn00009vxkxl0j9qxj/org-default/certificate/2026/a90a5be6_x_svg_pdf.pdf
+A4 ["x.pdf","application/pdf",26214400] -> OK key=cmunsyvjn00009vxkxl0j9qxj/org-default/certificate/2026/4528b770_x_pdf.pdf
+ ✓ tests/zz-devfb66-attack.live.test.ts > ATTACK > A4 presign argument confusion 1178ms
+A5 chunked (no content-length) -> 411
+A5 no content-type -> 400
+A5 content-type with params -> 403
+A5 +Content-Disposition inline +x-amz-meta +Content-Encoding (unsigned) -> 400
+A5 nothing stored NoSuchKey: The specified key does not exist.
+A5 +x-amz-acl public-read -> 200
+A5 Expires tampered -> 403
+A5 other key, same signature -> 403
+A5 anonymous store GET -> 403
+A5 anonymous bucket LIST -> 403
+ ✓ tests/zz-devfb66-attack.live.test.ts > ATTACK > A5 PUT variations against a signed URL 274ms
+A6 inline -> 403
+A6 addType -> 403
+A6 expires -> 403
+A6 otherTenantPath -> 403
+A6 role MEMBER download 302 presign {"thrown":"ForbiddenRoleError: Forbidden: this role cannot edit_proposa"}
+A6 role GUEST_PARTNER download 302 presign {"thrown":"ForbiddenRoleError: Forbidden: this role cannot edit_proposa"}
+A6 role WRITER download 302 presign {"success":true,"uploadUrl":"http://127.0.0.1:59466/devfb66-evidence/cmunsyvjn00
+ ✓ tests/zz-devfb66-attack.live.test.ts > ATTACK > A6 download URL tampering and roles 592ms
+A7 mock-upload with store -> 404
+ ✓ tests/zz-devfb66-attack.live.test.ts > ATTACK > A7 the dev upload route is closed whenever an object store is configured 2ms
+ Test Files  1 passed (1)
+      Tests  7 passed (7)

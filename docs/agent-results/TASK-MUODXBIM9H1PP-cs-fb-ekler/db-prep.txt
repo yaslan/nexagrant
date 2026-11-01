@@ -1,0 +1,13 @@
+DATABASE_URL → postgresql://fabrika:***@127.0.0.1:55187/fabrika
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+warn Preview feature "driverAdapters" is deprecated. The functionality can be used without specifying it as a preview feature.
+└─────────────────────────────────────────────────────────┘
+
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+   DATABASE_URL_RLS_TEST=postgresql://fabrika_app:***@127.0.0.1:55187/fabrika
+apply-migrations: 41 files applied
+apply-migrations: 41 files applied
+✅ prisma/rls.sql applied. Policies in public: 28 → 112
+SEED_EXIT=0

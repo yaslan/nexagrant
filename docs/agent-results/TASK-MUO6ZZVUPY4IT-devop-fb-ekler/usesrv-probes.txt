@@ -1,0 +1,22 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/server-action-rbac-guard.test.ts > server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B) > every write action checks the caller role, and no readOnly action writes
+AssertionError: expected [ …(5) ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "app/[locale]/i89/actions-cjs.cjs#zzDrop: readOnly: true but writes: prisma.evidence.delete (line 6)",
++   "app/[locale]/i89/actions-cts.cts#zzDrop: readOnly: true but writes: prisma.evidence.delete (line 6)",
++   "app/[locale]/i89/actions-js.js#zzDrop: readOnly: true but writes: prisma.evidence.delete (line 6)",
++   "app/[locale]/i89/actions-jsx.jsx#zzDrop: readOnly: true but writes: prisma.evidence.delete (line 6)",
++   "app/[locale]/i89/actions-mjs.mjs#zzDrop: readOnly: true but writes: prisma.evidence.delete (line 6)",
++ ]
+ ❯ tests/server-action-rbac-guard.test.ts:1646:64
+    1644|
+    1645|   it('every write action checks the caller role, and no readOnly actio…
+    1646|     expect(scan.findings.map((f) => `${f.key}: ${f.problem}`)).toEqual…
+       |                                                                ^
+    1647|   });
+    1648|
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+ Test Files  1 failed (1)

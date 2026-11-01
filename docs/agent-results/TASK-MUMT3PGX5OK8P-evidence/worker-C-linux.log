@@ -1,0 +1,5 @@
+[jobs] worker up (pid 23): k1-daily-calls, k2-monthly-cordis, alerts-daily, credits-monthly-grant, m4-weekly-summary, users-scheduled-deletion, feedback-weekly-digest, alerts-sweep, stripe-event-cleanup, agency-monthly-report, job-queue-health
+[core] INFO: Worker connected and looking for jobs... (task names: 'k1-daily-calls', 'k2-monthly-cordis', 'alerts-daily', 'credits-monthly-grant', 'm4-weekly-summary', 'users-scheduled-deletion', 'feedback-weekly-digest', 'alerts-sweep', 'stripe-event-cleanup', 'agency-monthly-report', 'job-queue-health')
+[job(worker-d5df5ad2269f84725a: stripe-event-cleanup{20})] INFO: [stripe-event-cleanup] START job=20 attempt=1/5 tick=-
+[job(worker-d5df5ad2269f84725a: stripe-event-cleanup{20})] INFO: [stripe-event-cleanup] DONE job=20 attempt=1/5 tick=- {"success":true,"deletedCount":0}
+[worker(worker-d5df5ad2269f84725a)] INFO: Completed task 20 (stripe-event-cleanup, 145.62ms) with success

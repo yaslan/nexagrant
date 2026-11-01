@@ -1,0 +1,27 @@
+import subprocess
+A='src/lib/auth.ts'; ACT='src/app/[locale]/accept-invite/continue/actions.ts'; D='src/app/[locale]/(app)/[workspace]/dashboard/page.tsx'
+TESTS=['src/lib/auth-callbacks.test.ts','tests/auth-jwt-membership-refresh.live.test.ts','tests/dashboard-tenantless.test.ts','tests/invitation-accept.live.test.ts']
+M=[
+ ('N1 requestedTenantOf String() coercion (7 -> "7", [a,b] -> "a,b")',A,'return typeof tenantId === "string" && tenantId.trim() !== "" ? tenantId : null;','return tenantId != null && String(tenantId).trim() !== "" ? String(tenantId) : null;'),
+ ('N2 retry regex widened to /timeout/i (statement timeout retried too)',A,'const NOT_CONNECTED = /Connection terminated due to connection timeout|timeout exceeded when trying to connect/;','const NOT_CONNECTED = /timeout/i;'),
+ ('N3 unbounded retry (recursion)',A,'    return read();\n  }\n}','    return retryOnceIfNotConnected(read);\n  }\n}'),
+ ('N4 accept: rebind error not caught',ACT,"  try {\n    await unstable_update({ tenantId: outcome.tenantId });\n  } catch (error) {\n    console.error(`[AcceptInvite] session rebind failed: ${error instanceof Error ? error.name : 'unknown'}`);\n  }\n","  await unstable_update({ tenantId: outcome.tenantId });\n"),
+ ('N5 dashboard redirect without locale',D,'redirect(`/${locale}/no-workspace`);','redirect(`/no-workspace`);'),
+ ('N6 session falls back to boundTenantId',A,'session.tenantId = typeof token.tenantId === "string" ? token.tenantId : null;','session.tenantId = typeof token.tenantId === "string" ? token.tenantId : typeof token.boundTenantId === "string" ? token.boundTenantId : null;'),
+ ('N7 newest row instead of requested',A,'dbUser?.memberships?.find((m) => m.tenantId === requestedTenantId) ?? dbUser?.memberships?.[0]','dbUser?.memberships?.at(-1)'),
+ ('N8 second failure swallowed (null, no warn)',A,'    return read();\n  }\n}','    return read().catch(() => null as T);\n  }\n}'),
+ ('N9 accept rebinds to the tenant the session already had',ACT,'await unstable_update({ tenantId: outcome.tenantId });','await unstable_update({ tenantId: session.tenantId ?? outcome.tenantId });'),
+ ('N10 rebind also on signIn trigger (requested from any session payload)',A,'const requestedTenantId = trigger === "update" ? requestedTenantOf(session) : null;','const requestedTenantId = trigger !== undefined ? requestedTenantOf(session) : null;'),
+ ('N11 session exposes boundTenantId claim',A,'        session.role = typeof token.role === "string" ? token.role : null;','        session.role = typeof token.role === "string" ? token.role : null;\n        (session as unknown as Record<string, unknown>).boundTenantId = token.boundTenantId;'),
+]
+for name,f,old,new in M:
+  s=open(f).read(); assert s.count(old)==1,(name, s.count(old))
+  open(f,'w').write(s.replace(old,new))
+  r=subprocess.run(['npx','vitest','run',*TESTS],capture_output=True,text=True)
+  open(f,'w').write(s)
+  out=r.stdout+r.stderr
+  line=[l for l in out.splitlines() if l.strip().startswith('Tests ')]
+  print(f'{name}: exit={r.returncode} {line[-1].strip() if line else out[-300:]}',flush=True)
+r=subprocess.run(['npx','vitest','run',*TESTS],capture_output=True,text=True)
+print('baseline after restore:', [l.strip() for l in (r.stdout+r.stderr).splitlines() if l.strip().startswith('Tests ')][-1])
+print(subprocess.run(['git','status','--short','src'],capture_output=True,text=True).stdout or 'src restored clean')

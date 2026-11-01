@@ -1,0 +1,10 @@
+== admin/cordis/import (CORDIS indirmesi preload ile 503)
+-- oturumsuz:
+{"error":"Unauthorized","message":"Bu işlem için giriş yapmanız gerekiyor.","code":"UNAUTHENTICATED"}  HTTP 401
+-- demo-user-alice (platform admin değil):
+{"error":"Forbidden","message":"Bu işlem yalnızca platform yöneticileri tarafından yapılabilir.","code":"PLATFORM_ADMIN_REQUIRED"}  HTTP 403
+-- platform admin:
+{"success":false,"error":"import_failed","runId":"cmunwaz7w0000x4xkntce2yeq"}  HTTP 500
+
+== sunucu log'u (ayrıntı yalnız burada):
+[ERROR] [API /api/admin/cordis/import] import run failed Failed to download CORDIS zip from https://cordis.europa.eu/data/cordis-HORIZONprojects-csv.zip: Service Unavailable secret-upstream-detail {"runId":"cmunwaz7w0000

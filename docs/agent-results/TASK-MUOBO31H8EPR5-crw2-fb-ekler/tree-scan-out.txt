@@ -1,0 +1,32 @@
+eylem: dinamik import/require: 1
+  src/modules/m11/server/actions.ts
+eylem: export {…} from / export *: 0
+eylem: export const x = ident / call (fonksiyon değil): 0
+eylem: export default ident: 0
+src: new Promise: 7
+  src/app/[locale]/(app)/[workspace]/evidence/EvidenceForm.tsx
+  src/app/[locale]/(app)/[workspace]/settings/gates/page.tsx
+  src/app/[locale]/(app)/[workspace]/settings/profile/page.tsx
+  src/lib/k3-topic-stats/xlsx.ts
+  src/lib/llm.ts
+  src/lib/rag-pdf-extract.ts
+  src/lib/translation.ts
+src: allSettled: 0
+src: captureException: 0
+src: catch binding .code ataması: 0
+src: onError/ callback param: 15
+  src/app/[locale]/(app)/[workspace]/opportunities/[id]/evaluations/client.tsx
+  src/app/[locale]/(app)/[workspace]/pipeline/[id]/client.tsx
+  src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager.tsx
+  src/app/[locale]/(app)/[workspace]/settings/api-keys/client.tsx
+  src/app/[locale]/(app)/[workspace]/tto/client.tsx
+  src/app/[locale]/(app)/ajans/actions.ts
+  src/lib/agency/actions.ts
+  src/lib/billing/pilot.ts
+  src/lib/billing/plan-repository.ts
+  src/lib/calendar/google.ts
+  src/lib/demo-login.ts
+  src/lib/env.ts
+src: export let: 1
+  src/lib/blog.ts
+eylem dosyası: 37 src dosyası: 532

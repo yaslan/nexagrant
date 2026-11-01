@@ -1,0 +1,8 @@
+### Reachability probe of the five M10 server actions (dev server, real HTTP POST)
+URL: http://localhost:3000/tr/main/opportunities/demo-opp-1/documents
+
+submitDualApprovalAction   HTTP 404  Server action not found
+departmentApproveAction    HTTP 404  Server action not found
+signDocument               HTTP 500  TenantScopeError
+createNewVersion           HTTP 500  TenantScopeError
+generateStandardDoc        HTTP 500  TenantScopeError

@@ -1,0 +1,24 @@
+# cs-fb TASK-MUOACB79XEL25 — analizcinin (tests/api/action-leak-scan.ts) kendisine mutant: her kural gevşetilince bekçi testi kırmızı olmalı.
+import subprocess, sys, pathlib
+W = pathlib.Path(sys.argv[1]); S = 'tests/api/action-leak-scan.ts'; G = 'tests/api/api-error-body-guard.test.ts'
+M = {
+ 'S1 catch yapıbozumu yalnız düz ad': ("for (const b of catchBindings) for (const id of bindingIds(b)) add(id);", "for (const b of catchBindings) if (ts.isIdentifier(b)) add(b);"),
+ 'S2 alan/dış değişken ataması taşımaz': ("            if (root) changed = add(root) || changed;\n          }\n        } else if (ts.isForOfStatement(f)) {", "          }\n        } else if (ts.isForOfStatement(f)) {"),
+ 'S3 .catch sonucu izlenmez': ("          return leaks(receiver) || handlerLeaks(h);", "          return leaks(receiver);"),
+ 'S4 sanitiser ada göre (yerel gövde bakılmaz)': ("      const fn = localFunction(s);\n      return fn && clean.has(fn) ? 'clean' : 'dirty';", "      return SANITISERS[e.text] || e.text === 'planFailure' ? 'clean' : 'dirty';"),
+ 'S5 import modülü denetlenmez': ("    return normalize(resolved).split('\\\\').join('/').replace(/\\.tsx?$/, '') === expected;", "    return true;"),
+ 'S6 direktif yalnız ilk satırda (eski regex)': ("  if (!/['\"]use server['\"]/.test(src)) return false;", "  if (!/^\\s*['\"]use server['\"]/.test(src)) return false;"),
+ 'S7 method çağrısı alıcıyı kirletmez': ("          if (root) changed = add(root) || changed;\n        }\n      }\n    }\n    return leaks;", "        }\n      }\n    }\n    return leaks;"),
+ 'S8 üç-terimli koşul da sayılır (FP yönü)': ("if (ts.isConditionalExpression(n)) return leaks(n.whenTrue) || leaks(n.whenFalse);", "if (ts.isConditionalExpression(n)) return leaks(n.condition) || leaks(n.whenTrue) || leaks(n.whenFalse);"),
+ 'S9 .code muafiyeti her ifadeye (gevşek)': ("if (n.name.text === 'code' && ts.isIdentifier(skipWrappers(n.expression))) return false;", "if (n.name.text === 'code' || n.name.text === 'message') return false;"),
+}
+p = W / S; orig = p.read_text()
+for name, (old, new) in M.items():
+    if orig.count(old) != 1: print(f'!! {name}: kalıp {orig.count(old)} kez'); continue
+    p.write_text(orig.replace(old, new))
+    r = subprocess.run(['npx', 'vitest', 'run', G], cwd=W, capture_output=True, text=True)
+    fails = sorted({l.strip()[:150] for l in (r.stdout + r.stderr).splitlines() if l.strip().startswith('×')})
+    print(f'{"ÖLDÜ" if r.returncode else "YAŞADI":6} | {name} | kırmızı test: {len(fails)}')
+    for l in fails[:4]: print('    ', l)
+    p.write_text(orig)
+print('diff:', subprocess.run(['git', 'diff', '--stat'], cwd=W, capture_output=True, text=True).stdout.strip() or 'temiz')

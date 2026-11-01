@@ -1,0 +1,18 @@
+round=1 jobs=6,7 left=0
+w1: job=6 job=7 job=6 "skippedMailedToday":60 "digestsSent":60 "digestsFailed":0 job=7 "skippedMailedToday":60 "digestsSent":60 "digestsFailed":0
+w2: 
+shutdown: 2
+round=2 jobs=8,9 left=0
+w1: job=8 job=9 job=9 "skippedMailedToday":30 "digestsSent":30 "digestsFailed":0 job=8 "skippedMailedToday":30 "digestsSent":30 "digestsFailed":0
+w2: 
+shutdown: 2
+round=3 jobs=10,11 left=0
+w1: 
+w2: job=10 job=11 job=11 "skippedMailedToday":0 "digestsSent":0 "digestsFailed":0 job=10 "skippedMailedToday":0 "digestsSent":0 "digestsFailed":0
+shutdown: 2
+race users mailed 180 dist Counter({1: 180})
+round=4 jobs=12,13 left=0
+w1: job=13 job=13 "skippedMailedToday":40 "digestsSent":40 "digestsFailed":0
+w2: job=12 job=12 "skippedMailedToday":40 "digestsSent":40 "digestsFailed":0
+shutdown: 2
+round4 users mailed 80 dist Counter({1: 80})

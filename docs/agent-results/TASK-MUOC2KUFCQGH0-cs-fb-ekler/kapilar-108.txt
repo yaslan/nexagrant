@@ -1,0 +1,13 @@
+DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:55108/fabrika
+HEAD a0bec578
+vitest exit=0
+ Test Files  299 passed | 2 skipped (301)
+      Tests  3896 passed | 50 skipped (3946)
+  allowed: tests/evidence-upload-s3.live.test.ts :: Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence a role outside the enum (a stale token) reads nothing [skipped]
+  allowed: tests/k1-embeddings.live.test.ts :: K1 embeddings (live, REAL OpenAI) real vectors rank each tenant’s own topic first [skipped]
+gate exit=0
+tsc exit=0 lines=       0
+lint exit=0
+$ eslint
+build exit=0
+274:├ ƒ /api/concept-notes/[id]/export

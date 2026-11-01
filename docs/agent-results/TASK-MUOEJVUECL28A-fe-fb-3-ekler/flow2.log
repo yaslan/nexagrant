@@ -1,0 +1,18 @@
+chromium 151.0.7922.34
+no-referrer                      2. aracı girişi            origin=null                     cookie=(yok)      → RET (Origin=null)
+no-referrer                      5. handoff (siteler arası) origin=null                     cookie=(yok)      → (Origin kontrolü yok)
+no-referrer                      6. complete                origin=null                     cookie=nonce=abc  → RET (Origin=null)
+strict-origin                    2. aracı girişi            origin=http://127.0.0.1:18711   cookie=(yok)      → KABUL
+strict-origin                    5. handoff (siteler arası) origin=http://localhost:18712   cookie=(yok)      → (Origin kontrolü yok)
+strict-origin                    6. complete                origin=http://127.0.0.1:18711   cookie=nonce=abc  → KABUL
+strict-origin-when-cross-origin  2. aracı girişi            origin=http://127.0.0.1:18711   cookie=(yok)      → KABUL
+strict-origin-when-cross-origin  5. handoff (siteler arası) origin=http://localhost:18712   cookie=(yok)      → (Origin kontrolü yok)
+strict-origin-when-cross-origin  6. complete                origin=http://127.0.0.1:18711   cookie=nonce=abc  → KABUL
+saldırgan(no-referrer)→aracı     2. aracı girişi            origin=null                     cookie=(yok)      → RET (Origin=null)
+saldırgan(no-referrer)→aracı     5. handoff (siteler arası) origin=http://localhost:18712   cookie=(yok)      → (Origin kontrolü yok)
+saldırgan(no-referrer)→aracı     6. complete                origin=http://127.0.0.1:18711   cookie=(yok)      → KABUL + nonce çerezi YOK
+saldırgan(unsafe-url)→aracı      2. aracı girişi            origin=http://[::1]:18713       cookie=(yok)      → RET (Origin=http://[::1]:18713)
+saldırgan(unsafe-url)→aracı      5. handoff (siteler arası) origin=http://localhost:18712   cookie=(yok)      → (Origin kontrolü yok)
+saldırgan(unsafe-url)→aracı      6. complete                origin=http://127.0.0.1:18711   cookie=(yok)      → KABUL + nonce çerezi YOK
+saldırgan(no-referrer)→complete  6. complete                origin=null                     cookie=(yok)      → RET (Origin=null) + nonce çerezi YOK
+saldırgan(unsafe-url)→complete   6. complete                origin=http://[::1]:18713       cookie=(yok)      → RET (Origin=http://[::1]:18713) + nonce çerezi YOK

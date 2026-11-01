@@ -1,0 +1,6 @@
+W1 yazma action, çözülemeyen import kontrolden ÖNCE          → KIRMIZI  writes before any role check covers them: import of src/lib/i89/missing, which is no file the guard can read (fail-closed)
+W2 yazma action, çözülemeyen import kontrolden SONRA         → YEŞİL
+TP1 üçüncü parti: zod/next/headers/@prisma/client/@auth scoped → YEŞİL
+TP2 dinamik üçüncü parti import                              → YEŞİL
+J1 var olan src json                                         → YEŞİL
+J2 var olmayan src json (tsc de kırar)                       → KIRMIZI  readOnly: true but writes: import of src/locales/en/nope.json, which is no file the guard can read (fail-closed)

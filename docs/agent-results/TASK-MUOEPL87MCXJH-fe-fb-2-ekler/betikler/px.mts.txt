@@ -1,0 +1,34 @@
+// fe-fb TASK-MUOD7E7LCR9CL — 768/1024/1280 piksel regresyonu, kısa/orta gerçekçi veri. Commit'lenmez.
+import { chromium } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
+import { mkdirSync } from 'node:fs';
+const [port, label, out] = process.argv.slice(2);
+const BASE = `http://localhost:${port}`;
+mkdirSync(`${out}/px`, { recursive: true });
+const token = await encode({ token: { sub: 'demo-user-superadmin', id: 'demo-user-superadmin', name: 'Y', email: 'admin@yasinaslan.com.tr', tenantId: 'demo-tenant', role: 'TENANT_OWNER' }, secret: process.env.AUTH_SECRET!, salt: 'authjs.session-token', maxAge: 3600 });
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const shots: [string, string, ((p: import('@playwright/test').Page) => Promise<void>)?][] = [
+  ['approvals', '/tr/fabrika-beta/approvals'],
+  ['approvals-taleplerim', '/tr/fabrika-beta/approvals', async (p) => { await p.getByRole('button', { name: /Taleplerim/ }).click(); await p.waitForTimeout(400); }],
+  ['approvals-modal', '/tr/fabrika-beta/approvals', async (p) => { await p.locator('main').getByRole('button', { name: /Detay/ }).first().click(); await p.waitForTimeout(400); }],
+  ['onay-merkezi', '/tr/fabrika-beta/onay-merkezi'],
+  ['firsat-kisa', '/tr/fabrika-beta/firsatlar/fefb109-px-opp'],
+  ['firsat-demo', '/tr/fabrika-beta/firsatlar/demo-opp-1'],
+];
+for (const w of [768, 1024, 1280]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, reducedMotion: 'reduce' });
+  await ctx.addCookies([{ name: 'authjs.session-token', value: token, url: BASE }]);
+  await ctx.addInitScript(() => { try { localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false })); } catch {} });
+  for (const [name, r, act] of shots) {
+    const p = await ctx.newPage();
+    await p.goto(BASE + r, { waitUntil: 'networkidle', timeout: 90000 }).catch(() => {});
+    await p.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+    await p.waitForFunction(() => { const b = document.querySelector('main button'); return !b || Object.keys(b).some((k) => k.startsWith('__reactProps$')); });
+    if (act) await act(p);
+    await p.waitForTimeout(500);
+    await p.screenshot({ path: `${out}/px/${label}-${w}-${name}.png`, fullPage: false });
+    await p.close();
+  }
+  await ctx.close();
+}
+await browser.close();

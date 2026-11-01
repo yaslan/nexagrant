@@ -1,0 +1,7 @@
+YAKALADI | taban (statik import, İNCELEME-100 Y-1 hâli) | [22,30,100] | 108344 ms
+YAKALADI | dinamik import | [100] | 97398 ms
+YAKALADI | sonuç parametre üzerinden (servis çağrıyı sarar: out nesnesi) | [22,103] | 161432 ms
+m11 overlay uygulandı: true
+m11 sızdıran withSystemScope — gerçek dinamik import: [65,66,76,92,121,134,180,368,421,528,570] | statik import'a çevrilince: [66,67,77,93,122,135,148,181,369,422,529,571]
+
+[exited with code 0]

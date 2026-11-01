@@ -1,0 +1,3 @@
+O2 round 1: {"undefined":20}
+O2 warnings: 20 ["[Auth.jwt] membership lookup failed, session stays tenantless: timeout exceeded when trying to connect"]
+ ✓ zz-befb-o2.test.ts > o2 burst through slow proxy 8341ms

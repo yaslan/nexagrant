@@ -1,0 +1,8 @@
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55203/fabrika
+vitest rc=0
+ Test Files  297 passed | 2 skipped (299)
+      Tests  3870 passed | 9 skipped (3879)
+typecheck rc=0
+lint rc=0
+i18n rc=0 (✅ i18n check passed: both catalogs agree…)
+build rc=0

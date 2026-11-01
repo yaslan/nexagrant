@@ -1,0 +1,6 @@
+# /etc/cron.d/fonbridge-backup — günlük Postgres yedeği, R2'ye (RELEASE_CHECKLIST §4.1).
+# 01:30 UTC; yedek saat 02:00 UTC'den önce biter (k1-daily-calls ile çakışmaz).
+# Kurulum: sudo install -m 644 deploy/vps/fonbridge-backup.cron /etc/cron.d/fonbridge-backup
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 1 * * * root /opt/fonbridge/deploy/vps/backup-to-r2.sh >> /var/log/fonbridge-backup.log 2>&1

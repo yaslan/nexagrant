@@ -1,0 +1,12 @@
+NOTICE:  database "fabrika_m" does not exist, skipping
+== mutant min
+exit=0
+mismatch=10989
+u95-p4=2026-10-04
+Membership FORCE=true
+== mutant noforce-restore
+exit=0
+mismatch=0
+u95-p4=2026-10-05
+Membership FORCE=false
+after db:rls Membership FORCE=true

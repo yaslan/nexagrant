@@ -1,0 +1,19 @@
+llm.ts connection role: {"usr":"fabrika_app","rolbypassrls":false}
+=== 1. getCreditBalance (a 500-credit row exists) ===
+  getCreditBalance(tenantId)
+     -> balance = 500
+=== 2. generateCompletion — usage row + ledger row ===
+  generateCompletion({ tenantId, module: M2 })
+     -> returned 1 credit(s) charged
+=== 3. embedText — tenant scope ===
+  embedText(text, { tenantId })
+     -> vector of 1536 dims
+=== 4. embedText — platform scope (shared CORDIS corpus) ===
+  embedText(text, { tenantId: null })
+     -> vector of 1536 dims
+=== 5. what actually landed in the database ===
+    {"tenantId":"<tenant>","module":"M2","purpose":"concept_note_draft","inputTokens":4000,"credits":1}
+    {"tenantId":"__platform__","module":"K6","purpose":"cordis_ingest_embedding","inputTokens":137,"credits":0}
+    {"tenantId":"<tenant>","module":"K6","purpose":"rag_ingest_embedding","inputTokens":137,"credits":0}
+    ledger: [{"delta":500,"reason":"probe:grant"},{"delta":-1,"reason":"usage:M2"}]
+    AiUsageLog rows written: 3  (expected 3)

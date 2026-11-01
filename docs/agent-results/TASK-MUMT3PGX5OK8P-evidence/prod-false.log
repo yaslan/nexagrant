@@ -1,0 +1,6 @@
+[core] INFO: Failed to read crontab file '/Users/macbook/alan/FONBRIDGE/crontab'; cron is disabled
+[jobs] JOBS_CRON_ENABLED=false: this worker runs queued jobs only; no cron tick is scheduled.
+[core] INFO: Worker connected and looking for jobs... (task names: 'k1-daily-calls', 'k2-monthly-cordis', 'alerts-daily', 'credits-monthly-grant', 'm4-weekly-summary', 'users-scheduled-deletion', 'feedback-weekly-digest', 'alerts-sweep', 'stripe-event-cleanup', 'agency-monthly-report', 'job-queue-health')
+[jobs] worker up (pid 15353): k1-daily-calls, k2-monthly-cordis, alerts-daily, credits-monthly-grant, m4-weekly-summary, users-scheduled-deletion, feedback-weekly-digest, alerts-sweep, stripe-event-cleanup, agency-monthly-report, job-queue-health
+[core] INFO: Received 'SIGTERM'; attempting global graceful shutdown... (all termination signals will be ignored for the next 5 seconds)
+[core] INFO: Global graceful shutdown complete; killing self via SIGTERM

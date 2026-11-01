@@ -1,0 +1,7 @@
+BASELINE exit=0 Test Files  1 passed (1) · Tests  136 passed (136) timeouts=0
+A1   | dynamic load used as value → clean | SURVIVED | Test Files  1 passed (1) · Tests  136 passed (136) | timeouts=0
+A3   | catch binding handed to an import not a write | KILLED | Test Files  1 failed (1) · Tests  1 failed | 135 passed (136) | timeouts=0
+       × tests/api/action-leak-scan.test.ts > Y-4: witness tests for TASK-MUOIBQJJDKL28 (İNCELEME-116 gap coverage) > A3: catch binding handed to imported function, then .code read 11ms
+A4   | Reflect.apply(fn, e) not a write | SURVIVED | Test Files  1 passed (1) · Tests  136 passed (136) | timeouts=0
+A10  | effects of (await import()).f(out) dropped | SURVIVED | Test Files  1 passed (1) · Tests  136 passed (136) | timeouts=0
+md5 orijinal eccae237cb942c535c299a83b088dbef · dosya şimdi eccae237cb942c535c299a83b088dbef

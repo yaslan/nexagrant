@@ -1,0 +1,26 @@
+actions 36
+(app)/[workspace]/evidence/actions.ts:83: [field-pass] if (!allowed.ok) return { success: false as const, error: allowed.error };
+(app)/[workspace]/evidence/actions.ts:237: [field-pass] if (!copied.ok) return { kind: 'not_copied' as const, error: copied.error };
+(app)/[workspace]/evidence/actions.ts:303: [field-pass] return { success: false as const, error: outcome.error };
+(app)/[workspace]/evidence/actions.ts:471: [direct-return calculateEvidenceHealthScore] if (!readable) return calculateEvidenceHealthScore([]);
+(app)/[workspace]/evidence/actions.ts:488: [direct-return calculateEvidenceHealthScore] return calculateEvidenceHealthScore(items);
+(app)/[workspace]/evidence/actions.ts:494: [direct-return calculateEvidenceHealthScore] return calculateEvidenceHealthScore([]);
+(app)/[workspace]/pipeline/[id]/consortium/actions.ts:122: [direct-return detectConflicts] return await detectConflicts(opportunityId, tenantId);
+(app)/[workspace]/pipeline/actions.ts:43: [direct-return tenantScopeOf] return tenantScopeOf((await auth()));
+(app)/[workspace]/pipeline/actions.ts:809: [field-pass] if (!result.ok) return { success: false, error: result.error };
+(app)/[workspace]/settings/profile/actions.ts:28: [direct-return withTenant] return await withTenant(scope.tenantId, async (tx) => {
+(app)/ajans/actions.ts:42: [direct-return failureCode] return failureCode(e, 'failed');
+(app)/ajans/actions.ts:97: [direct-return withTenant] return withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId));
+(app)/ajans/cobrand-actions.ts:35: [field-pass] if (!checked.ok) return { ok: false, error: checked.error };
+accept-invite/continue/actions.ts:83: [field-pass] if (!outcome.ok) return { error: t(`errors.${outcome.reason}`) };
+admin/cordis/actions.ts:78: [direct-return syncCordisBigData] return await syncCordisBigData();
+admin/cordis/actions.ts:83: [direct-return aggregateCordisMetrics] return await aggregateCordisMetrics();
+admin/cordis/actions.ts:88: [direct-return fetchLiveCordisDelta] return await fetchLiveCordisDelta(sinceDays);
+admin/cordis/actions.ts:93: [direct-return getCordisLiveStreamLogs] return await getCordisLiveStreamLogs();
+fon-hazirlik/actions.ts:13: [direct-return submitPublicLead] return submitPublicLead(input, { ip });
+src/lib/agency/actions.ts:29: [direct-return withTenant] return withTenant(scope.tenantId, (tx) =>
+src/lib/agency/actions.ts:50: [direct-return withTenant] return withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId));
+src/modules/m6/server/actions.ts:302: [direct-return withTenant] return withTenant(tenantId, async (tx) => {
+src/modules/m6/server/actions.ts:310: [direct-return getPanelScoresForProposal] return getPanelScoresForProposal(tx, tenantId, propId);
+src/modules/m9/server/calendar-actions.ts:34: [direct-return withTenant] return withTenant(tenantId, async (tx) => {
+src/modules/m9/server/calendar-actions.ts:92: [direct-return withTenant] return withTenant(tenantId, async (tx) => {

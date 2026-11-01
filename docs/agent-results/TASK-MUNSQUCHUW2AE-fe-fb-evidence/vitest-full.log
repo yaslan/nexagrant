@@ -1,0 +1,47 @@
+## run 1
+{ 22.53 37.89 34.75 }
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > B-1': the event loop keeps turning while pdf.js works on one heavy page > İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
+ FAIL  tests/withholding-rounding.test.ts > the document and the panel withhold the same amount > every net from 1 to 3000, at each VAT rate and each withholding rate
+ Test Files  2 failed | 256 passed | 2 skipped (260)
+      Tests  2 failed | 3130 passed | 22 skipped (3154)
+   Duration  87.88s (transform 25.36s, setup 0ms, import 222.53s, tests 475.69s, environment 57.13s)
+exit=1
+## run 1 failed files alone ×2
+{ 34.60 38.77 35.52 }
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+{ 30.44 37.74 35.19 }
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+## run 2
+{ 22.97 35.36 34.40 }
+ FAIL  tests/rag-pdf-real-parse.test.ts > B-1: page and chunk limits hold on real PDFs before any embedding call > İNCELEME-45 shape: 30 000 pages in 4.8 MB is refused in well under a second
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > B-1': the event loop keeps turning while pdf.js works on one heavy page > İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > what still works > parallel uploads are extracted one at a time and all answer
+ FAIL  tests/vat-by-country.test.ts > vatOnNetMinor — one rounding rule for the whole system > gross is always net plus the tax, exactly, with no third number
+ FAIL  tests/withholding-rounding.test.ts > the document and the panel withhold the same amount > every net from 1 to 3000, at each VAT rate and each withholding rate
+ FAIL  src/lib/agency/report.test.ts > report numbers == dashboard response > property: 300 random tables — every cell of the report is the dashboard’s cell
+ FAIL  src/lib/billing/invoice-writer.test.ts > decomposeGrossAmount > reconstructs the charged amount exactly, for every amount and rate swept
+ Test Files  6 failed | 252 passed | 2 skipped (260)
+      Tests  7 failed | 3125 passed | 22 skipped (3154)
+   Duration  156.78s (transform 36.24s, setup 0ms, import 373.55s, tests 882.89s, environment 113.31s)
+exit=1
+   1 AssertionError: expected 5415.804875000002 to be less than 3000
+   1 AssertionError: expected PdfLimitError: PDF refused (parse_too_hea… { …(2) } to match object { pages: 20 }
+   1 Error: Test timed out in 120000ms.
+   4 Error: Test timed out in 5000ms.
+## run 2 failed files alone (default timeouts)
+{ 56.31 47.33 39.77 }
+
+ Test Files  5 failed | 1 passed (6)
+      Tests  5 failed | 108 passed (113)
+   Start at  11:05:32
+   Duration  87.63s (transform 7.91s, setup 0ms, import 12.75s, tests 204.17s, environment 30ms)
+
+## same, --testTimeout=120000
+{ 48.45 47.41 40.70 }
+ FAIL  tests/rag-pdf-worker-isolation.test.ts > B-1': the event loop keeps turning while pdf.js works on one heavy page > İNCELEME-52 shape: 20 pages sharing one compressed stream of 100 000 text operators
+AssertionError: expected PdfLimitError: PDF refused (parse_too_hea… { …(2) } to match object { pages: 20 }
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 112 passed (113)
+(boş = merge bu dosyalara dokunmadı)

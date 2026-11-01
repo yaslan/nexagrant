@@ -1,0 +1,31 @@
+== 1. kart linkleri (girişsiz; herkese aynı)
+tr/calls topic-linkleri=20 default/callbackUrl-linkleri=0 örnek=href="/tr/calls/topic/EUROSTARS-2026-01-01"
+en/calls topic-linkleri=20 default/callbackUrl-linkleri=0 örnek=href="/en/calls/topic/EUROSTARS-2026-01-01"
+tr/calls/germany topic-linkleri=18 default/callbackUrl-linkleri=0 örnek=href="/tr/calls/topic/EUROSTARS-2026-01-01"
+en/calls/germany topic-linkleri=18 default/callbackUrl-linkleri=0 örnek=href="/en/calls/topic/EUROSTARS-2026-01-01"
+== 2. yönlendirme rotası
+girişsiz tr: 307 /tr/giris?callbackUrl=%2Ftr%2Fcalls%2Ftopic%2FHORIZON-CL5-2026-D4-01
+girişsiz en: 307 /en/login?callbackUrl=%2Fen%2Fcalls%2Ftopic%2FHORIZON-CL5-2026-D4-01
+alice tr: 307 /tr/main/cagrilar/HORIZON-CL5-2026-D4-01
+alice en: 307 /en/main/calls/HORIZON-CL5-2026-D4-01
+owner tr: 307 /tr/ws-a/cagrilar/HORIZON-CL5-2026-D4-01
+owner en: 307 /en/ws-a/calls/HORIZON-CL5-2026-D4-01
+restr tr: 307 /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01
+restr en: 307 /en/ws-b/calls/HORIZON-CL5-2026-D4-01
+del tr: 307 /tr/yeni/cagrilar/HORIZON-CL5-2026-D4-01
+del en: 307 /en/yeni/calls/HORIZON-CL5-2026-D4-01
+none tr: 307 /tr/no-workspace
+none en: 307 /en/no-workspace
+de/..: 307 /tr/de/calls/topic/HORIZON-CL5-2026-D4-01 · uzun id: 404 
+== 3. detay sayfası: URL slug'ına güvenilmiyor
+restr /tr/ws-a/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/calls/topic/HORIZON-CL5-2026-D4-01
+restr /tr/default/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01
+restr /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 -> 200 
+del /tr/default/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/yeni/cagrilar/HORIZON-CL5-2026-D4-01
+del /tr/yeni/cagrilar/HORIZON-CL5-2026-D4-01 -> 200 
+owner /tr/default/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/ws-a/cagrilar/HORIZON-CL5-2026-D4-01
+owner /tr/ws-b/cagrilar/HORIZON-CL5-2026-D4-01 -> 200 
+owner /tr/nope/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/calls/topic/HORIZON-CL5-2026-D4-01
+alice /tr/default/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/main/cagrilar/HORIZON-CL5-2026-D4-01
+alice /tr/ws-a/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/calls/topic/HORIZON-CL5-2026-D4-01
+none /tr/default/cagrilar/HORIZON-CL5-2026-D4-01 -> 307 /tr/calls/topic/HORIZON-CL5-2026-D4-01

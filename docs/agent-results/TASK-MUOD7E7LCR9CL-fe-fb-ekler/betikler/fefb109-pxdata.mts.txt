@@ -1,0 +1,15 @@
+import { prisma } from '../src/lib/db';
+const ids = ['fefb109-px-a', 'fefb109-px-b', 'fefb109-px-c'];
+await prisma.approvalRequest.deleteMany({ where: { id: { in: ids } } });
+await prisma.opportunity.deleteMany({ where: { id: { in: ['fefb109-px-opp'] } } });
+if (process.argv[2] === 'plant') {
+  const createdAt = new Date('2026-09-30T10:00:00Z');
+  const base = { tenantId: 'demo-tenant', workspaceId: 'demo-workspace', actionType: 'BUDGET_ALLOCATION', payload: { amount: 125000, currency: 'EUR' }, expiresAt: new Date('2026-12-30T10:00:00Z'), createdAt };
+  await prisma.opportunity.create({ data: { id: 'fefb109-px-opp', tenantId: 'demo-tenant', workspaceId: 'demo-workspace', title: 'WP3 bütçe revizyonu ve konsorsiyum ortaklarının ek maliyet tablosu', topicId: 'HORIZON-CL5-2027-D3-01-10' } });
+  await prisma.approvalRequest.createMany({ data: [
+    { ...base, id: 'fefb109-px-a', title: 'WP3 bütçe revizyonu onayı', description: 'Revize bütçe tablosu, konsorsiyum ortaklarının ek maliyetleri ve 2027 Q1 nakit akışı planı ile birlikte.', requesterId: 'demo-user-ivan' },
+    { ...base, id: 'fefb109-px-b', title: 'Kısa talep', description: 'Kısa', requesterId: 'demo-user-superadmin' },
+    { ...base, id: 'fefb109-px-c', title: 'Reddedilen talep', description: 'Açıklama', requesterId: 'demo-user-superadmin', status: 'REJECTED', rejectionReason: 'Eksik belge: imzalı ortaklık beyanı yok' },
+  ] as never });
+}
+await prisma.$disconnect();

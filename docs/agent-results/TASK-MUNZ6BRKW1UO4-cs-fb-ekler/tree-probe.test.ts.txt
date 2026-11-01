@@ -1,0 +1,24 @@
+import { test } from 'vitest';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+import { responseCalls, maskSource } from '../api/response-status-scan';
+const ROOT = resolve(__dirname, '../..');
+function walk(d: string): string[] { return readdirSync(d).flatMap((n) => { const f = join(d, n); return statSync(f).isDirectory() ? walk(f) : [f]; }); }
+test('tree', () => {
+  const all = walk(join(ROOT, 'src')).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f));
+  const scanned = all.filter((f) => f.endsWith('/route.ts') || (!f.startsWith(join(ROOT, 'src/app')) && !f.endsWith('api-error.ts') && /\b(?:NextResponse|Response)\b/.test(readFileSync(f, 'utf8'))));
+  let hidden = 0, statusCount: Record<string, number> = {};
+  for (const f of scanned) {
+    const src = readFileSync(f, 'utf8');
+    const raw = [...src.matchAll(/\b(?:NextResponse\.json|Response\.json|new\s+NextResponse|new\s+Response)\s*\(/g)].length;
+    const seen = responseCalls(src).length;
+    if (raw !== seen) { hidden++; console.log(`MASK-DIFF ${relative(ROOT, f)} raw=${raw} scanned=${seen}`); }
+    for (const c of responseCalls(src)) { const k = c.statuses === null ? 'null' : c.statuses.join('|'); statusCount[k] = (statusCount[k] ?? 0) + 1; }
+    // unscanned response construction forms
+    for (const m of src.matchAll(/(const\s*\{\s*json\s*\}\s*=\s*NextResponse|NextResponse\[|new\s+globalThis\.Response|['"]status['"]\s*:)/g)) console.log(`ODD ${relative(ROOT, f)}: ${m[0]}`);
+  }
+  const notScanned = all.filter((f) => !scanned.includes(f) && /\b(?:NextResponse\.json|new\s+NextResponse|new\s+Response|Response\.json)\s*\(/.test(readFileSync(f, 'utf8')));
+  console.log(`SCANNED ${scanned.length} files; mask-diff files=${hidden}; statuses=${JSON.stringify(statusCount)}`);
+  for (const f of notScanned) console.log(`NOT-SCANNED-BUILDER ${relative(ROOT, f)}`);
+  void maskSource;
+});

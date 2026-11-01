@@ -1,0 +1,25 @@
+# RLS — TenantBillingIdentity cross-tenant isolation (mac, 2026-09-10 14:23)
+
+$ pnpm rls:verify
+$ tsx scripts/check-rls-live.ts
+Kiracıya özel model: 45 · RLS açık tablo: 52 · tenant_isolation politikası: 45
+
+⚠  DATABASE_URL rolü fabrika (rolsuper=true, rolbypassrls=true) — RLS bu bağlantıda hiç uygulanmıyor.
+   Bu rolle yapılan bir izolasyon ölçümü GEÇERSİZDİR; RLS'e tabi bir rol aranıyor:
+
+Ölçüm rolü: fabrika_app (rolsuper=false, rolbypassrls=false) — kaynak: DATABASE_URL_RLS_TEST
+   ✓ okuma (negatif): app.tenant_id yokken 19 dolu tablonun hepsi 0 satır döndü
+   ✓ okuma (pozitif): AiUsageLog kendi kiracısı bağlamında 9 satır döndü
+   ✓ yazma (negatif): app.tenant_id yokken INSERT reddedildi
+   ✓ yazma (pozitif): kendi kiracısına INSERT kabul edildi (geri alındı)
+   ✓ yazma (çapraz): başka kiracıya INSERT reddedildi
+
+✅ 45 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+
+## Targeted probe on TenantBillingIdentity (scratchpad script, rolled back)
+measuring role: { current_user: 'fabrika_app', bypass: false }
+own context (demo-tenant) sees: 1 [ { tenantId: 'demo-tenant', buyerVknTckn: '1000000000' } ]
+OTHER tenant context (cmtrhjys10001ncxk13gwtbcb) sees: 0 []
+no tenant context sees: 0
+✅ TenantBillingIdentity: own=1, cross-tenant=0, unscoped=0 — isolation holds
+(probe row rolled back)

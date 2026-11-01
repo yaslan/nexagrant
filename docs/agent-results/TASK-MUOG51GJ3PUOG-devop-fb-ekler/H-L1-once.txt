@@ -1,0 +1,14 @@
+  current_user   |         ts          
+-----------------+---------------------
+ fabrika_migrate | 2026-10-01 23:52:38
+
+             fn              | proacl | anon | authd | app | jobs 
+-----------------------------+--------+------+-------+-----+------
+ lifetime_licence_count()    |        | t    | t     | t   | t
+ system_scope_sealed()       |        | t    | t     | t   | t
+ system_scope_open(regclass) |        | t    | t     | t   | t
+
+ sahip_fonk_toplam | api_cagirabilir 
+-------------------+-----------------
+                 8 |               3
+

@@ -1,0 +1,36 @@
+# Madde 2 — db push'suz zincir
+
+## 2.1 Tamamen boş DB, db push YOK:
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/empty0
+==> [1/41] add-m6-evaluator-lens.sql
+psql:prisma/migrations/add-m6-evaluator-lens.sql:23: ERROR:  relation "Evaluation" does not exist
+exit=3
+
+## 2.2 Üretimin user-claim ÖNCESİ hali: taban tablolar var, User.staleDigestOn YOK (push sonra DROP COLUMN) → zincir 38. dosyayı kolon yokken koşar
+DATABASE_URL=postgresql://fabrika:***@127.0.0.1:55110/np
+🚀  Your database is now in sync with your Prisma schema. Done in 406ms
+push exit=0
+User.staleDigestOn kolonu var mı: false
+$ 38. dosya TEK BAŞINA (41. dosyadan önce), ON_ERROR_STOP=1:
+exit=0
+  np-u1 Membership=2026-09-30
+  np-u2 Membership=2026-09-25
+User.staleDigestOn kolonu var mı: false
+$ karşılaştırma: düzeltme ÖNCESİ dosya (63f6205f^) aynı duruma — sonuç aynı olmalı
+exit=0
+  np-u1 Membership=2026-09-30
+  np-u2 Membership=2026-09-25
+$ tam zincir (38 kolon yokken → 41 kolonu ekler + kopyalar):
+exit=0 ; apply-migrations: 41 files applied
+==> [38/41] m4-stale-reminder-idempotency.sql
+==> [39/41] add-api-key-rate-window.sql
+--
+==> [41/41] m4-stale-digest-user-claim.sql
+apply-migrations: 41 files applied
+  np-u1 User=2026-09-30 Membership=2026-09-30
+  np-u2 User=2026-09-25 Membership=2026-09-25
+$ zincir 2. kez (şimdi kolon var; u1 User=D kapsıyor, Membership zaten dolu → değişmemeli):
+apply-migrations: 41 files applied
+exit=0
+  np-u1 User=2026-09-30 Membership=2026-09-30
+  np-u2 User=2026-09-25 Membership=2026-09-25

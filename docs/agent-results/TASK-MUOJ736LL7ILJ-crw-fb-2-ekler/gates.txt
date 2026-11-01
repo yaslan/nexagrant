@@ -1,0 +1,3 @@
+tsc exit=2
+lint exit=0
+vitest exit=0

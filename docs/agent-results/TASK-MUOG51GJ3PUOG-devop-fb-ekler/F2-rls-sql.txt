@@ -1,0 +1,103 @@
+$ psql <fabrika_migrate> -v ON_ERROR_STOP=1 -f prisma/rls.sql
+ policies_before 
+-----------------
+              28
+(1 row)
+
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Membership" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Workspace" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "TenantProfile" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ModuleState" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Subscription" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "AddOn" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "CreditLedger" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "TopicMatch" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "SavedSearch" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Opportunity" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "GateDecision" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ConsortiumSeat" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "PartnerOrg" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Proposal" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Effort" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Evidence" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ConceptNote" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Relationship" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Interaction" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "SeatCandidate" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "AiUsageLog" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Evaluation" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "FollowupDoc" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ApplicationPart" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Invitation" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "TtoPortfolioItem" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ApiKey" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ApprovalRequest" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "Claim" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ProposalUsage" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "ClaimEvidenceLink" does not exist, skipping
+psql:prisma/rls.sql:24: NOTICE:  policy "tenant_isolation" for relation "EvidenceReminder" does not exist, skipping
+psql:prisma/rls.sql:39: NOTICE:  policy "tenant_isolation" for relation "Document" does not exist, skipping
+psql:prisma/rls.sql:39: NOTICE:  policy "tenant_or_shared" for relation "Document" does not exist, skipping
+psql:prisma/rls.sql:39: NOTICE:  policy "tenant_isolation" for relation "Chunk" does not exist, skipping
+psql:prisma/rls.sql:39: NOTICE:  policy "tenant_or_shared" for relation "Chunk" does not exist, skipping
+psql:prisma/rls.sql:39: NOTICE:  policy "tenant_isolation" for relation "ConceptTemplate" does not exist, skipping
+psql:prisma/rls.sql:39: NOTICE:  policy "tenant_or_shared" for relation "ConceptTemplate" does not exist, skipping
+psql:prisma/rls.sql:59: NOTICE:  policy "tenant_or_shared" for relation "AuditEvent" does not exist, skipping
+psql:prisma/rls.sql:98: NOTICE:  policy "platform_write" for relation "Plan" does not exist, skipping
+psql:prisma/rls.sql:98: NOTICE:  policy "platform_write" for relation "PlanVersion" does not exist, skipping
+psql:prisma/rls.sql:98: NOTICE:  policy "platform_write" for relation "PlanFeature" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "AddOn" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "AgencyInviteCode" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "AiUsageLog" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ApiKey" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ApplicationPart" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ApprovalRequest" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "CalendarConnection" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Chunk" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Claim" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ClaimEvidenceLink" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ConceptNote" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ConceptTemplate" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Consent" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ConsortiumSeat" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "CreditLedger" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Criterion" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Document" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "DualApprovalStep" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Effort" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Evaluation" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Evidence" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "EvidenceReminder" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Feedback" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "FollowupDoc" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "GateDecision" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Interaction" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Invitation" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Invoice" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "LifetimeLicence" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "MeetingBrief" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Membership" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ModuleState" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Opportunity" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "PartnerOrg" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "PlanAssignment" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Proposal" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "ProposalUsage" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Relationship" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Reviewer" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "SavedSearch" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Score" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "SeatCandidate" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "StripeEventLog" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Subscription" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "TenantBillingIdentity" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "TenantProfile" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "TopicMatch" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "TtoPortfolioItem" does not exist, skipping
+psql:prisma/rls.sql:303: NOTICE:  policy "system_scope" for relation "Workspace" does not exist, skipping
+ policies_after 
+----------------
+            112
+(1 row)
+
+exit=0

@@ -1,0 +1,40 @@
+=== psql <url> -X -q -v ON_ERROR_STOP=1 -f .github/ci/supabase-ensure-rls.sql
+=== rc=0 (psql <url> -X -q -v ON_ERROR_STOP=1 -f .github/ci/supabase-ensure-rls.sql)
+=== pnpm exec prisma db push
+=== rc=0 (pnpm exec prisma db push)
+=== pnpm db:rls-role
+✅ fabrika_app connects as fabrika_app, app.tenant_id unset by default.
+=== rc=0 (pnpm db:rls-role)
+=== pnpm db:rls
+✅ prisma/rls.sql applied. Policies in public: 0 → 112
+=== rc=0 (pnpm db:rls)
+=== bash scripts/apply-migrations.sh
+apply-migrations: 47 files applied as fabrika
+=== rc=0 (bash scripts/apply-migrations.sh)
+=== bash scripts/apply-migrations.sh
+apply-migrations: 47 files applied as fabrika
+=== rc=0 (bash scripts/apply-migrations.sh)
+=== pnpm db:rls
+✅ prisma/rls.sql applied. Policies in public: 112 → 112
+=== rc=0 (pnpm db:rls)
+=== pnpm db:seed
+=== rc=0 (pnpm db:seed)
+=== pnpm rls:verify --require-db
+✅ 47 kiracıya özel tabloda politika yerinde ve izolasyon fabrika_app rolüyle GERÇEKTEN ölçüldü: okuma ve yazma, kiracı sınırında reddedildi.
+=== rc=0 (pnpm rls:verify --require-db)
+=== pnpm rls:bypass-check
+✅ SUCCESS: no new tenant bypass. 0 call site(s) allowed with a recorded reason, 39 on the sanctioned cross-tenant path, 0 still owed.
+=== rc=0 (pnpm rls:bypass-check)
+=== pnpm alerts:check
+✅ Öksüz alarm yok: her açık alarm ya bir tenant adı taşımıyor ya da yaşayan bir tenant’ı gösteriyor.
+=== rc=0 (pnpm alerts:check)
+=== pnpm lint
+✖ 4 problems (0 errors, 4 warnings)
+=== rc=0 (pnpm lint)
+=== pnpm typecheck
+=== rc=0 (pnpm typecheck)
+=== pnpm test
+ Test Files  355 passed | 2 skipped (357)
+      Tests  4634 passed | 54 skipped (4688)
+=== rc=0 (pnpm test)
+GATE_FAIL=0

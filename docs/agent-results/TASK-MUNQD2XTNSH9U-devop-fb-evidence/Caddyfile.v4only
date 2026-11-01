@@ -1,0 +1,8 @@
+# §10.1 Caddyfile shape, local: http only, upstream = harness. The global block is the one the runbook adds.
+{
+	default_bind tcp4/0.0.0.0
+	auto_https off
+}
+:80 {
+	reverse_proxy host.docker.internal:3962
+}

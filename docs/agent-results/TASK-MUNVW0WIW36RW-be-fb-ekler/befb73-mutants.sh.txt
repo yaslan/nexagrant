@@ -1,0 +1,26 @@
+#!/bin/bash
+cd "$(dirname "$0")/wt73"
+export DATABASE_URL=postgresql://fabrika:fabrika@127.0.0.1:5473/fabrika DATABASE_URL_RLS_TEST=postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:5473/fabrika AUTH_SECRET=ci-vitest-auth-secret-fixture-not-for-any-deployment CI=true
+K=src/lib/followup-doc-kinds.ts; A=src/modules/m10/server/actions.ts
+declare -a NAME FILE EXPR
+add(){ NAME+=("$1"); FILE+=("$2"); EXPR+=("$3"); }
+add N1-no-NFKC        $K 's/kind\.normalize\(.NFKC.\)\./kind./'
+add N2-empty-failopen $K 's/(export function documentKindRequiresDualApproval\(kind: string\): boolean \{)/$1\n  if (kind === "") return false;/'
+add N3-prefix-match   $K 's/return \(FOLLOWUP_DOC_KINDS as readonly string\[\]\)\.includes\(normalized\) \? \(normalized as FollowupDocKind\) : null;/const hit = FOLLOWUP_DOC_KINDS.find((k) => normalized.startsWith(k)); return hit ?? null;/'
+add N4-tr-locale      $K "s/\.trim\(\)\.toUpperCase\(\)/.trim().toLocaleUpperCase('tr')/"
+add N5-write-failopen $A 's/if \(!parsedKind\.success\) \{/if (!parsedKind.success \&\& typeof requestedKind !== "string") {/; s/const kind = parsedKind\.data;/const kind = (parsedKind.success ? parsedKind.data : requestedKind) as FollowupDocKind;/'
+add N6-noflow-bypass  $A "s/if \(flow\?\.stage !== 'APPROVED_AND_SIGNED'\)/if (flow \&\& flow.stage !== 'APPROVED_AND_SIGNED')/"
+add N7-cf-zwsp-only   $K 's/\/\\p\{Cf\}\/gu/\/\\u200B\/g/'
+add N8-signedAt-new   $A 's/signedAt = existing\.signedAt \?\? signedAt;/signedAt = new Date();/'
+CS="tests/followup-doc-kinds.test.ts tests/m10-sign-dual-approval.live.test.ts tests/modules/m10.test.ts"
+for i in "${!NAME[@]}"; do
+  perl -0pi -e "${EXPR[$i]}" "${FILE[$i]}"
+  if git diff --quiet; then echo "${NAME[$i]}: APPLY-FAILED"; continue; fi
+  cs=$(npx vitest run $CS 2>&1 | grep -E "^\s+Tests " | tail -1)
+  cp ../befb73-attack.live.test.ts tests/
+  mine=$(npx vitest run tests/befb73-attack.live.test.ts 2>&1 | grep -E "^\s+Tests " | tail -1)
+  rm tests/befb73-attack.live.test.ts
+  echo "${NAME[$i]} | cs-fb suite: $cs | be-fb attack: $mine"
+  git checkout -- "${FILE[$i]}"
+done
+git status --short
