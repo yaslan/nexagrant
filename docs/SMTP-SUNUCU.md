@@ -98,7 +98,7 @@ TTL: canlıya geçiş haftasında **300**, oturunca 3600.
 | 2 | `nexagrant.com.` | AAAA | `<APP_IPV6>` | **yalnız** sunucu IPv6'da 80/443 dinliyorsa; yoksa kaydı hiç girme (yarım IPv6 = bazı ziyaretçilerde site açılmaz, AutoSSL/ACME düşer) |
 | 3 | `www.nexagrant.com.` | CNAME | `nexagrant.com.` | 301'i ters vekil yapar (§10); CNAME yerine `A <APP_IP>` da olur. cPanel'in ekleyebileceği `www` A kaydı varsa sil (aynı adda CNAME + A olamaz) |
 | 4 | `mail.nexagrant.com.` | A | `<MAIL_IP>` | sertifika (AutoSSL) bu kayıt yayına girince çıkar |
-| 5 | `mail.nexagrant.com.` | AAAA | `<MAIL_IPV6>` | **yalnız** posta sunucusu IPv6'dan da gönderiyorsa; o zaman SPF'e `ip6:` ve PTR v6 da gerekir. Bugün `77.92.144.187` için v6 yok → girme |
+| 5 | `mail.nexagrant.com.` | AAAA | `<MAIL_IPV6>` | **yalnız** posta sunucusu IPv6'dan da gönderiyorsa; o zaman SPF'e `ip6:` ve PTR v6 da gerekir. 29.09.2026 ölçümünde `77.92.144.187` için v6 yoktu → girme |
 | 6 | `nexagrant.com.` | MX 10 | `mail.nexagrant.com.` | cPanel varsayılanı `nexagrant.com`'dur → `mail.` yap |
 | 7 | `nexagrant.com.` | TXT | `v=spf1 include:_spf.vulut.com -all` | A seçeneği. B/C: `v=spf1 ip4:<MAIL_IP> -all`. Bölgede **tek** `v=spf1` olmalı. `~all` yerine `-all`: tek gönderici var; yönlendirmede kırılan SPF'i hizalı DKIM kapatır |
 | 8 | `default._domainkey.nexagrant.com.` | TXT | `v=DKIM1; k=rsa; p=<cPanel üretir>` | A: cPanel → E-posta Teslim Edilebilirliği → "Onar/Kur". **Anahtar 2048 bit olmalı** — yayınlanınca §7.0 adım 8 ile ölç; 1024 çıkarsa §3.1'deki "DKIM anahtar boyu" adımı. B/C: seçici `fb2026`, §3.2 |
@@ -349,7 +349,7 @@ swaks --server mail.nexagrant.com --port 465 --tls-on-connect --tls-verify \
       --from info@nexagrant.com --h-From 'FonBridge <info@nexagrant.com>' \
       --to <kendi-gmail-adresiniz> --h-Subject 'fonbridge SMTP test 465'
 swaks --server mail.nexagrant.com --port 587 --tls --tls-verify --auth LOGIN --auth-user info@nexagrant.com \
-      --from info@nexagrant.com --to <kendi-gmail-adresiniz> --h-Subject 'fonbridge SMTP test 587'
+      --from info@nexagrant.com --to <kendi-gmail-adresiniz> --h-Subject 'nexagrant SMTP test 587'
 #    beklenen: `<~ 235 … Authentication successful` ve `<~ 250 …` (DATA sonrası kuyruk id'si).
 #    --tls-verify ŞART: swaks varsayılan olarak sertifika doğrulaması DÜŞSE BİLE gönderir (yalnız "failed CA
 #    verification" yazar) — yani bugünkü yanlış sertifikada da "başarılı" görünürdü. Uygulama (nodemailer) doğrular;
