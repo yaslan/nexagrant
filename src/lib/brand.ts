@@ -2,7 +2,8 @@
  * The product name, in one place.
  *
  * The platform shipped under the name "FonBridge", was renamed to "Fabrika" in 2026-Q1, and
- * returned to "FonBridge" on 2026-09-10 per patron directive. The rename history exposed a defect:
+ * returned to "FonBridge" on 2026-09-10 per patron directive, and became "NexaGrant" on 2026-10-31 per patron directive
+ * (the domain had already moved to nexagrant.com, FO-233). The rename history exposed a defect:
  * when changed before, the old name was copied as a literal into 32 source files — page copy, logo
  * alt text, the SMTP "from" default, the evidence-pack download filename, the generated-document
  * footer — and had to be corrected 52 times. Any site that was missed kept printing the dead
@@ -15,7 +16,7 @@
  */
 
 /** The product name as it is written to users, in both languages. */
-export const PRODUCT_NAME = 'FonBridge';
+export const PRODUCT_NAME = 'NexaGrant';
 
 /**
  * Substitutes `{brand}` in a catalogue string with {@link PRODUCT_NAME}.

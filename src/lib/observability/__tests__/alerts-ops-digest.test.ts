@@ -90,7 +90,7 @@ describe('alerts-ops-digest', () => {
     expect(result).toEqual({ outcome: 'sent', alerts: 3, stampFailures: 0 });
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to).toBe('ops@example.com');
-    expect(sent[0]!.subject).toBe('[FonBridge] 3 open error alerts to review');
+    expect(sent[0]!.subject).toBe('[NexaGrant] 3 open error alerts to review');
     expect(sent[0]!.html).toContain('job-queue');
     expect(sent[0]!.html).toContain('https://nexagrant.com/tr/admin/alerts');
     // job-queue: 2 alerts standing for 4 + 1 occurrences, first seen 04:00.
@@ -291,7 +291,7 @@ describe('renderOpsDigest', () => {
       alertCount: 1,
       consoleUrl: 'https://nexagrant.com/tr/admin/alerts',
     });
-    expect(subject).toBe('[FonBridge] 1 open error alert to review');
+    expect(subject).toBe('[NexaGrant] 1 open error alert to review');
     for (const part of ['job-queue', 'error', '2026-10-30T01:00:00.000Z', 'https://nexagrant.com/tr/admin/alerts']) {
       expect(html).toContain(part);
     }

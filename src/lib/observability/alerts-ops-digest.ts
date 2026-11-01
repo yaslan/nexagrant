@@ -30,6 +30,7 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/logger';
 import { smtpMailer, MailSendError, type Mailer } from '@/lib/email/mailer';
@@ -211,7 +212,7 @@ export function renderOpsDigest(params: {
   const { groups, alertCount, consoleUrl } = params;
   const listed = groups.slice(0, MAX_LISTED_GROUPS);
   const hidden = groups.length - listed.length;
-  const subject = `[FonBridge] ${alertCount} open error alert${alertCount === 1 ? '' : 's'} to review`
+  const subject = `[${PRODUCT_NAME}] ${alertCount} open error alert${alertCount === 1 ? '' : 's'} to review`
     .replace(HEADER_UNSAFE, ' ')
     .trim();
   const cell = 'padding:6px 10px;border-bottom:1px solid #e2e8f0';
@@ -230,7 +231,7 @@ export function renderOpsDigest(params: {
     .join('');
   const more = hidden > 0 ? `<p>…and ${hidden} more source${hidden === 1 ? '' : 's'} in the console.</p>` : '';
   const html = `
-    <h2>FonBridge — open error alerts</h2>
+    <h2>${PRODUCT_NAME} — open error alerts</h2>
     <p>${alertCount} error alert${alertCount === 1 ? ' is' : 's are'} new or have repeated since the last digest.</p>
     <table style="border-collapse:collapse;font-size:14px">
       <thead>

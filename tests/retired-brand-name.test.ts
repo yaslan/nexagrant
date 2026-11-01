@@ -82,6 +82,20 @@ describe('retired product name', () => {
     }
   });
 
+  /**
+   * FO-275 — "FonBridge" is retired as of 2026-10-31 (the product is NexaGrant). The catalogues
+   * must not re-type it. Case-sensitive on purpose: the legal entity ("Fonbridge Eğitim, Proje ve
+   * Danışmanlık Ltd. Şti.") and its KEP mailbox are facts about the company, not the product name.
+   */
+  test('neither message catalogue names the previous product name "FonBridge"', () => {
+    expect(PRODUCT_NAME).not.toBe('FonBridge');
+    expect(PRODUCT_NAME).not.toBe(RETIRED);
+    for (const locale of ['tr', 'en'] as const) {
+      const catalogue = readFileSync(join(ROOT, 'messages', `${locale}.json`), 'utf8');
+      expect(catalogue).not.toContain('FonBridge');
+    }
+  });
+
   test('catalogue strings hold a {brand} placeholder rather than the name itself', () => {
     for (const locale of ['tr', 'en'] as const) {
       const messages = JSON.parse(

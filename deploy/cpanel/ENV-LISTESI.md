@@ -36,7 +36,7 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `SMTP_SECURE` | ✓ | `true` | |
 | `SMTP_USER` | ✓ | `info@nexagrant.com` | **PATRON KARARI S-1:** `info@` mi, ayrı `bildirim@` mi (`docs/SMTP-SUNUCU.md` §8 madde 4). |
 | `SMTP_PASS` | ✓ | `<kutunun şifresi>` | cPanel → Email Accounts'taki kutunun şifresi. |
-| `SMTP_FROM` | ✓ | `FonBridge <info@nexagrant.com>` | |
+| `SMTP_FROM` | ✓ | `NexaGrant <info@nexagrant.com>` | |
 | `ANTHROPIC_API_KEY` | ✓ | `sk-ant-<...>` | Yapay zekâ özellikleri. |
 | `OPENAI_API_KEY` | ✓ | `sk-<...>` | Embedding (`text-embedding-3-large`). **Sohbette açığa çıkan anahtarı kullanmayın.** Yenisini üretin, eskisini iptal edin, OpenAI panelinde aylık harcama limiti koyun (RELEASE_CHECKLIST madde 7). |
 
@@ -93,13 +93,13 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=<...>
 SMTP_PASS=<...>
-SMTP_FROM=FonBridge <info@nexagrant.com>
+SMTP_FROM=NexaGrant <info@nexagrant.com>
 ANTHROPIC_API_KEY=<...>
 OPENAI_API_KEY=<...>
 FEEDBACK_DIGEST_TO=<...>
 # R2_* (varsa), WORKER_URL/WORKER_TOKEN (varsa), CALENDAR_ENCRYPTION_KEY (varsa)
 ```
 
-Değerde boşluk ya da `#` varsa çift tırnak içine alın: `SMTP_FROM="FonBridge <info@nexagrant.com>"`.
+Değerde boşluk ya da `#` varsa çift tırnak içine alın: `SMTP_FROM="NexaGrant <info@nexagrant.com>"`.
 
 **Değerin sonunda boşluk bırakmayın.** cPanel ekranı sondaki boşluğu silmez. `DATABASE_URL`'in sonunda boşluk kalırsa sertifika yolu `…crt ` olur ve uygulama `ENOENT` verir (KURULUM.md §10).

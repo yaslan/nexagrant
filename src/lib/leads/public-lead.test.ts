@@ -192,6 +192,16 @@ const CONSENT_TEXT_SHA256: Record<string, { tr: string; en: string; withdraw: { 
       en: 'b5b7c72ea5dbd7c9080a4204c11934736a73c35a78269718cee9fa757228a6f7',
     },
   },
+  // FO-275: the product name inside the consent box changed (FonBridge -> NexaGrant), so this is
+  // a new text and a new version. The withdraw line names no product, hence its digest is unchanged.
+  '2026-10-31.1': {
+    tr: 'b13dca9e9a0eeab4976e43446c71ee58d07734146ccdd93aaa3e48d67b367245',
+    en: '34da689f508e31556c67dc936e07982500dbb7594ab059d4499d317efae5cf96',
+    withdraw: {
+      tr: 'c0375312f72af7b54ac1f6f780e741f7e209bb1f71f76bca9af859e8cf38887e',
+      en: 'b5b7c72ea5dbd7c9080a4204c11934736a73c35a78269718cee9fa757228a6f7',
+    },
+  },
 };
 
 function renderedConsent(locale: 'tr' | 'en', messageKey: string = PUBLIC_LEAD_CONSENT.messageKey): string {
@@ -227,7 +237,12 @@ describe('consent text version', () => {
   });
 
   it('never re-uses a digest for a different version', () => {
-    const seen = Object.values(CONSENT_TEXT_SHA256).flatMap((d) => [d.tr, d.en, d.withdraw.tr, d.withdraw.en]);
-    expect(new Set(seen).size).toBe(seen.length);
+    // The consent-box text is what a version stands for: a new version must carry new tr/en text.
+    const boxes = Object.values(CONSENT_TEXT_SHA256).flatMap((d) => [d.tr, d.en]);
+    expect(new Set(boxes).size).toBe(boxes.length);
+    // The withdraw line may stay as it was when only the box changed (FO-275 renamed the product,
+    // which the line never names), but no two versions may be the same text in every part.
+    const whole = Object.values(CONSENT_TEXT_SHA256).map((d) => [d.tr, d.en, d.withdraw.tr, d.withdraw.en].join('|'));
+    expect(new Set(whole).size).toBe(whole.length);
   });
 });
