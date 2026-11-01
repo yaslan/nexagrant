@@ -503,7 +503,7 @@ Uygulama postası için artık kullanılmıyor; DNS'ine dokunulmadı (ölçüm: 
 `info@usfinbridge.com` kutusu açık kalabilir. Sitenin iletişim bağlantısı (`src/components/PublicFooter.tsx:135`) ve bazı
 hukuk/uyum belgeleri hâlâ `info@usfinbridge.com` diyor — bunlar ayrı iş (sahipleri: fe / cs).
 
-## 10. Web: `www.nexagrant.com` → `https://nexagrant.com` (301) ve TLS (patron kararı 30.10.2026, FO-233)
+## 10. Web: `www.fonbridge.com` → `https://fonbridge.com` (301) ve TLS (patron kararı 29.09)
 
 Kanonik adres **`https://nexagrant.com`** (çıplak alan, `www`'siz). Uygulama bir Node konteyneri (`Dockerfile`:
 `node server.js`, `PORT=3000`, düz HTTP); TLS'i ve yönlendirmeyi **önündeki ters vekil** yapar. Next.js'e host
