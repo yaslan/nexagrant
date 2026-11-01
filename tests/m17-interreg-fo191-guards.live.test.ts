@@ -162,22 +162,28 @@ describe('FO-281 K-1 — the DONE write refuses a slot emptied without touching 
   for (const slot of ['call', 'project'] as const) {
     test(`${slot} text set to NULL by raw SQL while the model runs: run FAILS, no result, no mark, no charge`, async () => {
       const id = await readyAnalysis();
+      let statusInHook: string | undefined;
       state.answers.push(goodAnswer());
       state.beforeAnswer = async () => {
         // Raw SQL: Prisma's client-side `@updatedAt` does not run, so status stays ANALYZING and `updatedAt`
         // stays the claim instant. The expiry column goes with the text (CHECK InterregAnalysis_text_expiry_pair).
         if (slot === 'call') await admin!.$executeRaw`UPDATE "InterregAnalysis" SET "callText" = NULL, "callTextExpiresAt" = NULL WHERE "id" = ${id}`;
         else await admin!.$executeRaw`UPDATE "InterregAnalysis" SET "projectText" = NULL, "projectTextExpiresAt" = NULL WHERE "id" = ${id}`;
-        const row = await admin!.interregAnalysis.findUniqueOrThrow({ where: { id }, select: { status: true } });
-        expect(row.status, 'the run must still look like the claim holder').toBe('ANALYZING');
+        // Recorded here, asserted after `runEvaluation` returns: an `expect` thrown inside this hook lands in
+        // runEvaluation's own catch, which turns it into the very `evaluation_failed` this test wants (FO-293 D1).
+        statusInHook = (await admin!.interregAnalysis.findUniqueOrThrow({ where: { id }, select: { status: true } })).status;
       };
 
       const run = await runEvaluation(owner, id, { locale: 'en' });
 
+      expect(statusInHook, 'the hook ran, and the run still looked like the claim holder when it did').toBe('ANALYZING');
       expect(run).toEqual({ ok: false, error: 'evaluation_failed' });
       expect(await admin!.interregAnalysisResult.count({ where: { analysisId: id } })).toBe(0);
       expect(await admin!.interregCriterionMark.count({ where: { analysisId: id } })).toBe(0);
-      expect((await admin!.creditLedger.findMany({ where: { refId: id }, select: { delta: true } })).map((r) => r.delta)).toEqual([]);
+      // `startsWith`, not equality: after PR #228 the ledger refId is `<id>:<ms>`, so `refId: id` matches nothing
+      // and would pass even with the refund removed. Net zero holds on both bases (no row / charge + refund).
+      const ledger = await admin!.creditLedger.aggregate({ where: { tenantId, refId: { startsWith: id } }, _sum: { delta: true } });
+      expect(ledger._sum.delta ?? 0, 'no net charge for the failed run').toBe(0);
       expect((await admin!.interregAnalysis.findUniqueOrThrow({ where: { id }, select: { status: true } })).status).toBe('FAILED');
     });
   }
