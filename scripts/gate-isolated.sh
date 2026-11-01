@@ -114,6 +114,15 @@ export R2_PUBLIC_BUCKET=test-public
 export R2_PUBLIC_HOST="$R2_ENDPOINT/test-public"
 export E2E_PORT="$e2e_port"
 
+# Wall-clock budgets of the timing tests (tests/helpers/timing.ts) scale with the
+# load: 1 on an idle machine, ceil(2 * load1 / cpus) under load. The 1-minute average
+# lags the parallel tests it is measuring, hence the 2x. A value set by the
+# caller wins. Behaviour assertions do not depend on it (FO-261).
+cpus=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+if [ -r /proc/loadavg ]; then load1=$(cut -d' ' -f1 /proc/loadavg); else load1=$(sysctl -n vm.loadavg | awk '{print $2}'); fi
+export TEST_TIMING_SLACK="${TEST_TIMING_SLACK:-$(awk -v l="$load1" -v c="$cpus" 'BEGIN { r = l / c; r = 2 * r; s = (r <= 1) ? 1 : int(r) + (r > int(r)); printf "%d", s }')}"
+log "TEST_TIMING_SLACK=$TEST_TIMING_SLACK (load1 $load1, $cpus cpus)"
+
 log "db:setup on 127.0.0.1:$pg_port/$db"
 pnpm db:setup
 
