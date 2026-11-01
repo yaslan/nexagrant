@@ -1,0 +1,5 @@
+SELECT email, locale, "consentTextVersion", status, "kvkkAcceptedAt" IS NOT NULL AS kvkk_ok, "visibilityConsentAt" IS NOT NULL AS vis_ok
+FROM "ExpertPreRegistration" WHERE email LIKE 'fo332-proof-%' ORDER BY locale;
+fo332-proof-en-mvyhcqnn@e2e.fabrika.test | en | kvkk-v4 | pending | true | true
+fo332-proof-tr-mvyhcp3r@e2e.fabrika.test | tr | kvkk-v4 | pending | true | true
+(2 rows)
