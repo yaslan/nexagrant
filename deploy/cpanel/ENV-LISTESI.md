@@ -1,18 +1,21 @@
-# FonBridge: cPanel ortam değişkenleri listesi
+# NexaGrant: ortam değişkenleri listesi (Hostinger Cloud hosting · eski cPanel hedefi)
 
-Paket: `fonbridge-app-3d63de7b.zip` (dev @ 3d63de7b) · Uygulama kökü: `/home/fonbridge/fonbridge-app`
-Kaynaklar: `docs/RELEASE_CHECKLIST.md` §2, `src/lib/env.ts`, `.env.example`. Hazırlayan: devop-fb, TASK-MUST2PP2NHP6L.
+**Güncel hedef (K-574987 = A, 01.11.2026):** Hostinger Cloud Economy, site `nexagrant.com`, kullanıcı `u605628300`,
+uygulama kökü `/home/u605628300/domains/nexagrant.com/public_html`. Kurulum sırası: `docs/DEPLOY-NEXAGRANT-HOSTINGER.md`.
+Bu listedeki `/home/fonbridge/fonbridge-app` yolları eski Vulut cPanel hedefinden kalır; Hostinger'da yerine
+`/home/u605628300/domains/nexagrant.com/public_html` yazılır (`APP_ROOT` aşağıda).
+Kaynaklar: `docs/RELEASE_CHECKLIST.md` §2, `src/lib/env.ts`, `.env.example`. Hazırlayan: devop-fb, TASK-MUST2PP2NHP6L, FO-260.
 
-> **Bu dosyada değer yok, yalnız değişken adları var.** Değerleri (şifre, anahtar, bağlantı adresi) yalnız cPanel ekranına yazın. Bu dosyaya, sohbete ya da e-postaya yazmayın.
+> **Bu dosyada değer yok, yalnız değişken adları var.** Değerleri (şifre, anahtar, bağlantı adresi) yalnız barındırma panelinin ekranına (Hostinger hPanel) ya da worker dosyasına yazın. Bu dosyaya, sohbete ya da e-postaya yazmayın.
 
 ## Değişkenler iki yere girilir
 
 | Nereye | Kim okur | Nasıl girilir |
 |---|---|---|
-| **A. cPanel → Setup Node.js App → (uygulama) → Environment variables** → `ADD VARIABLE` → `SAVE` → `RESTART` | web uygulaması (Passenger) | ekranda, tek tek |
-| **B. `/home/fonbridge/.fonbridge-worker.env`** (izin **600**, uygulama kökünün DIŞINDA) | zamanlanmış işler (worker, cPanel Cron) | File Manager → Settings → "Show Hidden Files" → `+ File` → satır başına `AD=değer` |
+| **A. Hostinger hPanel → Websites → nexagrant.com → Node.js → Environment variables** (ya da API `hosting_nodejs_replace-environment-variables`: TÜM listeyi birden değiştirir, maskeli değer geri okunmaz) → uygulamayı yeniden başlat | web uygulaması | ekranda, tek tek (API ile girilecekse değerler sohbete/log'a yazılmaz) |
+| **B. `/home/u605628300/.nexagrant-worker.env`** (izin **600**, `public_html` DIŞINDA; cron satırı `FB_WORKER_ENV` ile bu dosyayı gösterir) | zamanlanmış işler (worker, Hostinger Cron) | hPanel File Manager → üst dizin `/home/u605628300` → yeni dosya → satır başına `AD=değer` |
 
-cPanel Cron, A'daki değişkenleri **görmez**. Worker çalışacaksa B dosyası ayrıca gerekir (KURULUM.md §7).
+Hostinger Cron (eski hedefte cPanel Cron), A'daki değişkenleri **görmez**. Worker çalışacaksa B dosyası ayrıca gerekir (KURULUM.md §7).
 Sütun "W" = B dosyasına da yazılacak değişkenler.
 
 Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek değer değildir.
@@ -24,18 +27,18 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | Değişken | W | Örnek biçim (değer değil) | Açıklama |
 |---|---|---|---|
 | `NODE_ENV` | ✓ | `production` | `app.js` ve `worker.sh` bunu zaten ayarlar. Yine de girin. "Application mode = Production" da aynı işi görür. |
-| `DATABASE_URL` | ✓ | `postgresql://fabrika_app.<proje-ref>:<şifre>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=/home/fonbridge/fonbridge-app/certs/supabase-prod-ca-2021.crt` | **Web için rol `fabrika_app` olmalı** (BYPASSRLS yok). Sahip rolünü ya da `postgres`'i kullanmayın. Sondaki `sslmode=verify-full&sslrootcert=...` kısmı **aynen** yazılır; CA dosyası pakettedir (`certs/`). `sslmode=require` tek başına kullanılmaz (bağlanmaz). `rejectUnauthorized`/`uselibpqcompat` eklenmez. |
+| `DATABASE_URL` | ✓ | `postgresql://fabrika_app.<proje-ref>:<şifre>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=/home/u605628300/domains/nexagrant.com/public_html/certs/supabase-prod-ca-2021.crt` (pooler adresindeki bölge Supabase projesinin bölgesidir; NexaGrant prod projesi henüz yok, bkz. deploy belgesi §2.2) | **Web için rol `fabrika_app` olmalı** (BYPASSRLS yok). Sahip rolünü ya da `postgres`'i kullanmayın. Sondaki `sslmode=verify-full&sslrootcert=...` kısmı **aynen** yazılır; CA dosyası pakettedir (`certs/`). `sslmode=require` tek başına kullanılmaz (bağlanmaz). `rejectUnauthorized`/`uselibpqcompat` eklenmez. |
 | `AUTH_URL` | | `https://nexagrant.com` | **Zorunlu.** Sitenin dışarıdan görünen adresi. Sonunda `/` olmaz. Passenger, isteğin `Host` bilgisini `localhost:3000` yapar. Bu değişken yoksa Auth.js girişten sonra `https://localhost:3000/...` adresine yönlendirir ve oturum açılmaz. Davet ve hata yönlendirmeleri de bu değeri kullanır (`src/lib/public-url.ts`, PR #29). TASK-MUTP1R1C13GE3. |
 | `AUTH_SECRET` | | 44 karakterlik rastgele dize (`openssl rand -base64 32` çıktısı) | Oturum imza anahtarı. En az 32 karakter. Eksik, kısa ya da eski (git geçmişinde yayımlanmış) anahtar → **uygulama başlamaz** (`src/instrumentation.ts`). Bir kez üretin, değiştirirseniz herkesin oturumu düşer. |
 | `NEXT_PUBLIC_APP_URL` | ✓ | `https://nexagrant.com` | Sonunda `/` olmaz. Yanlışsa davet ve e-posta bağlantıları bozulur. Uygulama açılır, log'a uyarı düşer. Paket bu değerle derlendi. |
 | `AUTH_GOOGLE_ID` | | `<istemci-no>.apps.googleusercontent.com` | Google ile giriş. **Yeni `fonbridges` GCP istemcisi.** Google Console'da izinli yönlendirme adresi: `https://nexagrant.com/api/auth/callback/google` |
 | `AUTH_GOOGLE_SECRET` | | `GOCSPX-<...>` | Aynı istemcinin gizli anahtarı. |
 | `DEMO_LOGIN_ENABLED` | ✓ | **boş bırakın** ya da `false` | `true` girilirse uygulama **başlamaz** (bilinçli kilit; test edildi). Şifresiz demo girişi canlıda kapalıdır. |
-| `SMTP_HOST` | ✓ | `mail.nexagrant.com` | Boşsa hiç e-posta gitmez, panelde `SystemAlert` görünür. |
+| `SMTP_HOST` | ✓ | `smtp.hostinger.com` | Hostinger posta kutusu (31.10.2026 kararı; MX/SPF/DKIM zaten Hostinger'da). Boşsa hiç e-posta gitmez, panelde `SystemAlert` görünür. |
 | `SMTP_PORT` | ✓ | `465` | |
 | `SMTP_SECURE` | ✓ | `true` | |
 | `SMTP_USER` | ✓ | `info@nexagrant.com` | **PATRON KARARI S-1:** `info@` mi, ayrı `bildirim@` mi (`docs/SMTP-SUNUCU.md` §8 madde 4). |
-| `SMTP_PASS` | ✓ | `<kutunun şifresi>` | cPanel → Email Accounts'taki kutunun şifresi. |
+| `SMTP_PASS` | ✓ | `<kutunun şifresi>` | hPanel → Emails → `info@nexagrant.com` kutusunun şifresi. |
 | `SMTP_FROM` | ✓ | `NexaGrant <info@nexagrant.com>` | |
 | `ANTHROPIC_API_KEY` | ✓ | `sk-ant-<...>` | Yapay zekâ özellikleri. |
 | `OPENAI_API_KEY` | ✓ | `sk-<...>` | Embedding (`text-embedding-3-large`). **Sohbette açığa çıkan anahtarı kullanmayın.** Yenisini üretin, eskisini iptal edin, OpenAI panelinde aylık harcama limiti koyun (RELEASE_CHECKLIST madde 7). |
@@ -49,7 +52,7 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `R2_SECRET_ACCESS_KEY` | ✓ | `<...>` | R2_ACCOUNT_ID ile birlikte. |
 | `R2_BUCKET` | ✓ | `fonbridge-evidence` | Boşsa kod `fonbridge-evidence` kullanır. `.env.example`'daki `fabrika` eskidir, kullanmayın. |
 | `R2_PUBLIC_BUCKET` | | `fonbridge-public` | **Blog kapak görseli yüklenemez** (form "dosya deposu yapılandırılmamış" der, 503). Herkese açık okunan **ayrı** bir bucket olmalı; `R2_BUCKET` ile aynı ad verilirse kod onu reddeder (kanıt bucket'ı gizli kalır). TASK-MVCH99A54WALG. |
-| `R2_PUBLIC_HOST` | | `https://files.nexagrant.com` ya da `https://pub-<id>.r2.dev` | `R2_PUBLIC_BUCKET`'ın herkese açık adresi, `https://` ile, sonda `/` yok. Boşsa blog görseli yüklenemez. **Paket bu değerle DERLENİR** (`R2_PUBLIC_HOST=… deploy/cpanel/build-package.sh …`): cPanel'deki değer derlemedekinden farklıysa yükleme çalışır ama görsel sitede **görünmez** (`/_next/image` 400). Değişirse paket yeniden derlenir. Hangi değerle derlendiği `BUILD-INFO.txt` → `images.remotePatterns` satırında. |
+| `R2_PUBLIC_HOST` | | `https://files.nexagrant.com` ya da `https://pub-<id>.r2.dev` | `R2_PUBLIC_BUCKET`'ın herkese açık adresi, `https://` ile, sonda `/` yok. Boşsa blog görseli yüklenemez. **Paket bu değerle DERLENİR** (`R2_PUBLIC_HOST=… deploy/cpanel/build-package.sh …`): paneldeki değer derlemedekinden farklıysa yükleme çalışır ama görsel sitede **görünmez** (`/_next/image` 400). Değişirse paket yeniden derlenir. Hangi değerle derlendiği `BUILD-INFO.txt` → `images.remotePatterns` satırında. |
 | `R2_ENDPOINT` | ✓ | boş | Yalnız R2 dışında S3 uyumlu bir depo kullanılırsa doldurulur. Boşsa R2 adresi otomatik kurulur. |
 | `R2_REGION` | | `auto` | `src/lib/storage.ts` okur; boşsa `auto`. R2 bölgeyi yok sayar; yalnız R2 dışı S3 uyumlu depo (ör. Supabase Storage) kendi bölgesini ister. Cloudflare R2 için boş bırakın. |
 | `JOBS_CRON_ENABLED` | **yalnız W** | `false`, sonra `true` | **Yalnız worker dosyasına yazılır, web ekranına değil.** Boşsa üretim worker'ı başlamaz. Açılış sırası KURULUM.md §7'de. |
@@ -60,8 +63,8 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `BETA_SUPPORT_EMAIL`, `BETA_FEEDBACK_EMAIL` | ✓ | boş (varsayılan `info@nexagrant.com`) | |
 | `BETA_MEETING_URL` | ✓ | `https://meet.google.com/<...>` | Beta davetindeki toplantı bağlantısı. |
 | `CALENDAR_ENCRYPTION_KEY` | ✓ | `openssl rand -base64 32` | Takvim bağlantısı özelliği. **Boş değer YAZMAYIN.** Kullanılmayacaksa değişkeni hiç eklemeyin. Değiştirilirse kullanıcılar takvimi yeniden bağlar. |
-| `TRUSTED_PROXY_HOPS` | | `1` | Önünüzdeki ters vekil sayısı. Ölçüm (17.10.2026, `curl -sI https://nexagrant.com`): `77.92.144.187` önünde tek LiteSpeed, CDN başlığı yok → **`1`**. Ziyaretçi formunun IP sınırı buna göre çalışır. Bir fazla ya da eksik olursa sınır sahte başlıkla aşılır. |
-| `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | | boş | Analitik kapalı (zararsız). **Not:** tarayıcı tarafı bu anahtarı **derleme anında** okur. Bu paket anahtarsız derlendi. cPanel'e girmek analitiği açmaz; açmak için yeniden derleme gerekir. |
+| `TRUSTED_PROXY_HOPS` | | **ölçülecek** (beklenen `2`) | Önünüzdeki ters vekil sayısı. Hostinger ölçümü (01.11.2026, `curl -sI https://nexagrant.com`): `server: hcdn`, `x-hcdn-request-id: …-fra-edge6` → önde **Hostinger CDN**, arkasında barındırmanın kendi web sunucusu var. 17.10.2026'daki `1` değeri eski Vulut sunucusu içindi, **kullanmayın**. Kesin değer canlıya almada `X-Forwarded-For` zinciri sayılarak bulunur (deploy belgesi runbook adım 7). Bir fazla ya da eksik olursa ziyaretçi formunun IP sınırı sahte başlıkla aşılır. |
+| `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | | boş | Analitik kapalı (zararsız). **Not:** tarayıcı tarafı bu anahtarı **derleme anında** okur. Bu paket anahtarsız derlendi. Panele girmek analitiği açmaz; açmak için yeniden derleme gerekir. |
 | `CSP_MODE` | | boş | Boş = içerik güvenlik politikası uygulanır. `report-only` yalnız sorun ararken kullanılır. |
 | `K1_EMBEDDING_MAX_USD_PER_RUN` | W | `0.05` | Gece embedding işinin koşu başına dolar tavanı. |
 | `ALERTS_SWEEP_FAILURE_THRESHOLD` | W | boş | Varsayılan yeterli. |
@@ -74,21 +77,22 @@ Hiçbirini eklemeyin: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PUBL
 
 `AI_PROVIDER`, `APIFY_TOKEN`, `CORDIS_*_ZIP_URL`, `DATABASE_URL_MIGRATE`, `DEFAULT_LOCALE`, `EMBEDDING_*`, `SEDIA_*`, `UPSTASH_*`, `REDIS_URL`. Bunlar hiçbir şeyi değiştirmez.
 `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` eski adlardır. Yalnız `AUTH_*` adlarını kullanın.
-`PORT`, `HOSTNAME`: girmeyin. Passenger kendi soketini kullanır. `app.js` gerisini ayarlar.
+`PORT`, `HOSTNAME`: girmeyin. Barındırma (Passenger ya da Hostinger'ın Node.js çalıştırıcısı) `PORT`'u kendisi verir; `app.js` `127.0.0.1`'e bağlanır. Hostinger'ın vekili uygulamaya başka bir adresten bağlanıyorsa (canlıda 502), yalnız o zaman `FB_LISTEN_HOST=0.0.0.0` eklenir.
+`KEEP_EU_HTTP_USER_AGENT`: env değil, koddaki sabittir (`src/lib/keep-eu-sync.ts`) ve bilerek `FonBridge/1.0 (+https://nexagrant.com/contact)` kalır (K-574984 = A). Ortama eklemek bir şey değiştirmez.
 
 ## 5. Migration (şema) için ayrı URL: uygulamaya GİRİLMEZ
 
-Şema kurulumu **sahip rolüyle** yapılır (`postgres` değil, tabloların sahibi). O URL ne cPanel'e ne de worker dosyasına yazılır. Yalnız migration koşusunda, o anda kullanılır (KURULUM.md §8).
+Şema kurulumu **sahip rolüyle** yapılır (`postgres` değil, tabloların sahibi). O URL ne panele ne de worker dosyasına yazılır. Yalnız migration koşusunda, o anda kullanılır (KURULUM.md §8).
 
-## Worker dosyası örnek iskeleti (`/home/fonbridge/.fonbridge-worker.env`, izin 600)
+## Worker dosyası örnek iskeleti (Hostinger: `/home/u605628300/.nexagrant-worker.env`, izin 600)
 
 ```
 NODE_ENV=production
-DATABASE_URL=<web ile aynı fabrika_app URL'i, sslmode=verify-full&sslrootcert=/home/fonbridge/fonbridge-app/certs/supabase-prod-ca-2021.crt>
+DATABASE_URL=<web ile aynı fabrika_app URL'i, sslmode=verify-full&sslrootcert=/home/u605628300/domains/nexagrant.com/public_html/certs/supabase-prod-ca-2021.crt>
 JOBS_CRON_ENABLED=false
 JOBS_CONCURRENCY=1
 NEXT_PUBLIC_APP_URL=https://nexagrant.com
-SMTP_HOST=mail.nexagrant.com
+SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=<...>
@@ -102,4 +106,4 @@ FEEDBACK_DIGEST_TO=<...>
 
 Değerde boşluk ya da `#` varsa çift tırnak içine alın: `SMTP_FROM="NexaGrant <info@nexagrant.com>"`.
 
-**Değerin sonunda boşluk bırakmayın.** cPanel ekranı sondaki boşluğu silmez. `DATABASE_URL`'in sonunda boşluk kalırsa sertifika yolu `…crt ` olur ve uygulama `ENOENT` verir (KURULUM.md §10).
+**Değerin sonunda boşluk bırakmayın.** Panel ekranı sondaki boşluğu silmeyebilir. `DATABASE_URL`'in sonunda boşluk kalırsa sertifika yolu `…crt ` olur ve uygulama `ENOENT` verir (KURULUM.md §10).
