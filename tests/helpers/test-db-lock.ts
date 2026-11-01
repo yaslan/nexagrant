@@ -55,3 +55,25 @@ export const PUBLIC_SECTOR_PLANS_LOCK = 'PlanFeature:public-sector';
  * one database, so gates pointed at different databases are not serialised.
  */
 export const MIGRATION_OWNER_CHAIN_LOCK = 'cluster:app.system_scope-defaults';
+
+/**
+ * FO-66 — runPartnerSearchIngestion against the live database. Two files run it
+ * (partner-search-ingest.live, partner-search-acceptance.live): one counts
+ * PartnerSearchIngestionRun rows around a no-op run and deletes every
+ * `partner_search_adapter` alert, the other raises those alerts. Each holds this
+ * for the whole file.
+ */
+export const PARTNER_SEARCH_INGESTION_LOCK = 'PartnerSearch:ingestion';
+
+/**
+ * The lock held from a `beforeAll` to its `afterAll`, for a file that shares a
+ * database object in every test. Returns the release; call it in `afterAll`.
+ */
+export async function holdTestDbLock(url: string, name: string): Promise<() => Promise<void>> {
+  const client = new pg.Client({ connectionString: url });
+  await client.connect();
+  await client.query('SELECT pg_advisory_lock(hashtext($1))', [`test:${name}`]);
+  return async () => {
+    await client.end().catch(() => {});
+  };
+}
