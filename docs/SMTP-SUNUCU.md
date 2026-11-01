@@ -34,9 +34,9 @@ netleştir (§1.1), (2) bölgeyi o sunucuyu yöneten ad sunucusunda aç ve §3.0
 
 **Yorum — iki olasılık, patron/Vulut paneli ayırır:**
 1. **Kurulum `srv.iyisunucu.com.tr` üzerinde yapıldı ama yarım kaldı** (ör. hizmet/paket alındı, alan adı cPanel'e
-   eklenmedi ya da ekleme hatası). Çözüm: nexagrant.com'u o cPanel'e (hesap ya da addon domain) eklemek — bölge
+   eklenmedi ya da ekleme hatası). Çözüm: fonbridge.com'u o cPanel'e (hesap ya da addon domain) eklemek — bölge
    `ns1/ns2.iyisunucu.com.tr`'de otomatik açılır, NS **değişmez**. Bu durumda `<MAIL_IP>` = `77.92.144.187`.
-2. **`mail.nexagrant.com` başka bir Vulut sunucusunda kurulu** (ör. ayrı VPS + kendi paneli/DNS'i). O zaman NS ile
+2. **`mail.fonbridge.com` başka bir Vulut sunucusunda kurulu** (ör. ayrı VPS + kendi paneli/DNS'i). O zaman NS ile
    barındırma **gerçekten tutarsız**: ya (a) Squarespace'te NS o sunucunun ad sunucularına çevrilir, ya da (b) NS
    iyisunucu'da kalır ve bölge + §3.0 kayıtları `srv.iyisunucu` cPanel'inde elle, o VPS'in IP'sini gösterecek şekilde
    açılır. **Öneri (b):** alan adı zaten iyisunucu'ya devredilmiş ve usfinbridge.com da orada; tek değişiklik bölgeyi
@@ -48,10 +48,10 @@ netleştir (§1.1), (2) bölgeyi o sunucuyu yöneten ad sunucusunda aç ve §3.0
 değişmez, `<MAIL_IP>` = `77.92.144.187`. Aşağıdaki soru yalnız patron başka bir Vulut hizmetinde yarım bir kurulum
 biliyorsa geçerlidir (o kurulum kullanılmaz; karar cPanel/Exim).
 
-Patrondan istenecek tek bilgi: **Vulut panelinde `mail.nexagrant.com`'un kurulu olduğu hizmetin adı ve IP'si**
+Patrondan istenecek tek bilgi: **Vulut panelinde `mail.fonbridge.com`'un kurulu olduğu hizmetin adı ve IP'si**
 (cPanel ise sağ sütunda "Paylaşılan IP Adresi"; VPS ise panelde sunucu IP'si). Bu IP `<MAIL_IP>` olur.
 
-> **Güncel durum (30.10.2026):** nexagrant.com için DNS/SMTP/blocklist ölçümü henüz yapılmadı (VPS kurulumunda yapılacak). Aşağıdaki ölçümler fonbridge.com'a aittir.
+> **Güncel durum (30.10.2026):** nexagrant.com için DNS/SMTP/blocklist ölçümü henüz yapılmadı (canlı kurulumda — Hostinger Cloud hosting, K-574987 — yapılacak). Aşağıdaki ölçümler fonbridge.com'a aittir.
 
 ## 1. Önceki ölçüm (29.09.2026 ~23:00 TRT, salt-okunur `dig` / `whois` / TLS el sıkışması) — 20:19 UTC'de tekrarlandı, değişmedi
 
@@ -347,7 +347,7 @@ openssl s_client -starttls smtp -connect mail.nexagrant.com:25 -servername mail.
 swaks --server mail.nexagrant.com --port 465 --tls-on-connect --tls-verify \
       --auth LOGIN --auth-user info@nexagrant.com \
       --from info@nexagrant.com --h-From 'FonBridge <info@nexagrant.com>' \
-      --to <kendi-gmail-adresiniz> --h-Subject 'fonbridge SMTP test 465'
+      --to <kendi-gmail-adresiniz> --h-Subject 'nexagrant SMTP test 465'
 swaks --server mail.nexagrant.com --port 587 --tls --tls-verify --auth LOGIN --auth-user info@nexagrant.com \
       --from info@nexagrant.com --to <kendi-gmail-adresiniz> --h-Subject 'nexagrant SMTP test 587'
 #    beklenen: `<~ 235 … Authentication successful` ve `<~ 250 …` (DATA sonrası kuyruk id'si).
@@ -400,7 +400,7 @@ swaks --server mail.nexagrant.com --port 587 --tls --tls-verify --quit-after RCP
 #    Exim relay kararından ÖNCE göndericiyi doğrular (sender verify): (a) büyük olasılıkla `550 Sender verify failed`
 #    alır — o da geçer, önemli olan 250 DÖNMEMESİ. Relay politikasının KENDİSİNİ (b) sınar (gönderici geçerli yerel adres).
 #    29.09 ön ölçümü (587, STARTTLS, DATA yok): (a) → `<~* 550 Sender verify failed`; (b) → `<~* 451 Temporary local
-#    problem` (nexagrant.com bölgesi yok) → relay politikası henüz ÖLÇÜLEMEDİ.
+#    problem` (fonbridge.com bölgesi yok) → relay politikası henüz ÖLÇÜLEMEDİ.
 #    a/b/c'de `<~ 250 Accepted` / `<- 250 Accepted` görülürse: DUR, gönderimi açma, Vulut'a acil bilet (sunucu açık relay;
 #    paylaşımlı IP 77.92.144.187 kara listeye girer ve nexagrant.com postası da düşer). 4xx (451/421) = geçici ret,
 #    sonuç anlamsız → birkaç dakika sonra tekrarla.
@@ -458,7 +458,7 @@ dig +short TXT default._domainkey.nexagrant.com | tr -d '" ' | sed 's/.*p=//;s/;
 **Karar verildi: A (Vulut cPanel/Exim), patron 29.09.2026.** B seçilmedi. Canlı kurulum şimdilik yapılmıyor; patron
 başlatınca sıra şudur:
 1. **İLK ADIM:** **nexagrant.com**'u `srv.iyisunucu.com.tr` cPanel'ine **alan adı olarak ekle** (yeni hesap ya da mevcut
-   hesaba addon domain). Bugün NS'ler bu alan için REFUSED dönüyor; bu adım olmadan aşağıdakilerin hiçbiri yayına çıkmaz.
+   hesaba addon domain). 29.09.2026 ölçümünde NS'ler fonbridge.com için REFUSED dönüyordu (nexagrant.com için bu ölçüm yapılmadı); bu adım olmadan aşağıdakilerin hiçbiri yayına çıkmaz.
    NS değişmez (`ns1/ns2.iyisunucu.com.tr`), `<MAIL_IP>` = `77.92.144.187`.
 2. **Bilgi:** uygulama hangi sunucuda koşacak, IP'si (`<APP_IP>`, varsa IPv6) ne? Bu gelmeden §3.0'daki kök `A` kaydı
    (satır 1–2) doldurulamaz; posta kayıtları (satır 4–9) bunu beklemez.
@@ -549,15 +549,15 @@ HSTS: ilk hafta `max-age=300`; her şey oturunca `31536000`. `includeSubDomains`
 Yerel kanıt (29.09, mac + Docker `caddy:2`, `local_certs`, `reverse_proxy` yerine sabit 200; iş bitince konteyner silindi):
 ```
 caddy validate                                   → Valid configuration
-İLK SÜRÜM (yalnız "www.nexagrant.com { redir … }", otomatik HTTP→HTTPS'e güvenerek):
-  http://www.nexagrant.com/tr/pricing?a=1  → 308 https://www.nexagrant.com/tr/pricing?a=1   ✗ (308 + iki sıçrama)
-  http://nexagrant.com/tr/pricing?a=1      → 308 https://nexagrant.com/tr/pricing?a=1       ✗ (301 değil)
+İLK SÜRÜM (yalnız "www.fonbridge.com { redir … }", otomatik HTTP→HTTPS'e güvenerek):
+  http://www.fonbridge.com/tr/pricing?a=1  → 308 https://www.fonbridge.com/tr/pricing?a=1   ✗ (308 + iki sıçrama)
+  http://fonbridge.com/tr/pricing?a=1      → 308 https://fonbridge.com/tr/pricing?a=1       ✗ (301 değil)
 YUKARIDAKİ SÜRÜM:
-  http://www.nexagrant.com/tr/pricing?a=1  → 301 https://nexagrant.com/tr/pricing?a=1   ✓
-  https://www.nexagrant.com/tr/pricing?a=1 → 301 https://nexagrant.com/tr/pricing?a=1   ✓
-  http://nexagrant.com/tr/pricing?a=1      → 301 https://nexagrant.com/tr/pricing?a=1   ✓
-  https://nexagrant.com/tr/pricing?a=1     → 200, strict-transport-security: max-age=300
-  sertifika SAN (SNI nexagrant.com ve www) → DNS:nexagrant.com, DNS:www.nexagrant.com
+  http://www.fonbridge.com/tr/pricing?a=1  → 301 https://fonbridge.com/tr/pricing?a=1   ✓
+  https://www.fonbridge.com/tr/pricing?a=1 → 301 https://fonbridge.com/tr/pricing?a=1   ✓
+  http://fonbridge.com/tr/pricing?a=1      → 301 https://fonbridge.com/tr/pricing?a=1   ✓
+  https://fonbridge.com/tr/pricing?a=1     → 200, strict-transport-security: max-age=300
+  sertifika SAN (SNI fonbridge.com ve www) → DNS:fonbridge.com, DNS:www.fonbridge.com
 ```
 Gerçek ACME yerelde **koşulamadı** (herkese açık DNS + 80/443 gerekir). Caddy HTTP-01 meydan okumasını site
 yollarından önce yakalar, ayrıca 443'te TLS-ALPN-01 de dener; yani 80'deki 301 sertifika almayı engellemez.
@@ -592,7 +592,7 @@ dışa açmayın ya da güvenlik duvarında kapatın. Compose `TRUSTED_PROXY_HOP
 Sertifika (tek sertifika, iki ad): `certbot certonly --webroot -w /var/www/acme -d nexagrant.com -d www.nexagrant.com`;
 yenileme `certbot.timer` + `--deploy-hook "systemctl reload nginx"`.
 Yerel kanıt (Docker `nginx:1.30.5`, kendinden imzalı sertifika aynı yola): `nginx -t` başarılı; üç giriş de
-`301 https://nexagrant.com/tr/pricing?a=1`, `https://nexagrant.com` → 200; `http://www…/.well-known/acme-challenge/tok` → 200
+`301 https://fonbridge.com/tr/pricing?a=1`, `https://fonbridge.com` → 200; `http://www…/.well-known/acme-challenge/tok` → 200
 (webroot'tan dosya döner, yönlendirilmez). `http2 on;` nginx ≥ 1.25.1 ister (eskisinde `listen 443 ssl http2;`).
 
 **Yalnız IPv4 (patron kararı 30.09.2026: prod'da AAAA kaydı açılmaz).** Yukarıdaki iki yapılandırma bilerek yalnız
@@ -615,8 +615,8 @@ RewriteCond %{HTTP_HOST} ^www\. [NC,OR]
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://nexagrant.com%{REQUEST_URI} [R=301,L]
 ```
-Yerel kanıt (Docker `httpd:2.4`, `AllowOverride All` + mod_rewrite): `http://www…` ve `http://nexagrant.com…` →
-`301 https://nexagrant.com/tr/pricing?a=1`; `/.well-known/acme-challenge/tok` → 200. (HTTPS kolu burada koşulamadı: cPanel'in
+Yerel kanıt (Docker `httpd:2.4`, `AllowOverride All` + mod_rewrite): `http://www…` ve `http://fonbridge.com…` →
+`301 https://fonbridge.com/tr/pricing?a=1`; `/.well-known/acme-challenge/tok` → 200. (HTTPS kolu burada koşulamadı: cPanel'in
 SSL vhost'u gerekir; kural aynı `RewriteCond` zinciri.)
 Not: Next.js'in cPanel'de koşması (Node.js App / Passenger) bu projenin hedefi değil; kök A kaydının `<APP_IP>` olması
 (§3.0 #1) 10.1 varsayımıdır.

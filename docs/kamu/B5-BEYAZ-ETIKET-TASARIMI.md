@@ -597,11 +597,11 @@ fark çalışma kitabına yazılır.
    döngü aynı adımları yeniden koşar. `reload` hatasında Caddy son geçerli yapılandırmada çalışmaya devam eder
    (ölçüldü). Ölçüm (`caddy:2.11.4`, bu adımların kabuk karşılığı `…-fe-fb-3-ekler/sync.sh`, ham çıktı `caddy-sync.log`, özet):
    ```
-   0. rev.3 hatası: yer tutucusuz adapt   → ["nexagrant.com","www.nexagrant.com"]            (.tmp'deki panel.oka.org.tr YOK)
-      aynı .tmp, FB_AGENCIES ile          → ["nexagrant.com","panel.oka.org.tr","www.nexagrant.com"]
+   0. rev.3 hatası: yer tutucusuz adapt   → ["fonbridge.com","www.fonbridge.com"]            (.tmp'deki panel.oka.org.tr YOK)
+      aynı .tmp, FB_AGENCIES ile          → ["fonbridge.com","panel.oka.org.tr","www.fonbridge.com"]
    1. etkinleştirme OKA   adapt(tmp) = beklenen · reload rc=0 · çalışan küme = beklenen → senkron
    2. ikinci ajans        adapt(tmp) = beklenen · reload rc=0 · çalışan küme = beklenen → senkron
-   3. askıya alma OKA     adapt(tmp) = {nexagrant.com panel.baka.gov.tr www.nexagrant.com} · çalışan küme aynı → senkron
+   3. askıya alma OKA     adapt(tmp) = {fonbridge.com panel.baka.gov.tr www.fonbridge.com} · çalışan küme aynı → senkron
    4. fazladan blok       adapt(tmp) kümesinde evil.example.com → DUR: küme farkı (canlı dosya değişmedi)
    5. ":443 {…}" satırı   DUR: adapt hatası: ambiguous site definition: :443
    6. FB_AGENCIES rename sonrası ortamda → reload: File to import not found: …agencies.caddy.tmp

@@ -133,7 +133,7 @@ Karşılaştırma yüzeyi: `messages/{tr,en}.json` → `legal.privacy.*` (bu dal
 
 | #   | md.10 unsuru | §2 ölçümü (10.09) | Bugün | Ne kapandı / ne açık |
 | --- | --- | --- | --- | --- |
-| a   | Veri sorumlusunun kimliği | YOK | **YOK (açık)** | Hâlâ yalnız ürün adı (`{brand}`). Unvan, adres, MERSİS, KEP metinde yok; `info@nexagrant.com` yalnız başvuru kanalı olarak geçiyor. Bilerek eklenmedi: tüzel kişi bilgisi patron kararı |
+| a   | Veri sorumlusunun kimliği | YOK | **YOK (açık)** | Hâlâ yalnız ürün adı (`{brand}`). Unvan, adres, MERSİS, KEP metinde yok; `info@fonbridge.com` yalnız başvuru kanalı olarak geçiyor. Bilerek eklenmedi: tüzel kişi bilgisi patron kararı |
 | b   | İşleme amaçları | KISMİ (5 amaç / 18 faaliyet) | **KISMİ, belirgin iyileşti** | `legalBasisBody` 19 faaliyeti adıyla sayıyor (envanterdeki 23 "Hukuki sebep" satırından 19 faaliyet; kalan 4'ün gerekçesi raporda). Amaç cümleleri hâlâ kısa; saklama süresi yok |
 | c   | Aktarım: kime, ne amaçla | YOK | **KISMİ** | 7 alıcı adıyla ve ülke/bölgeyle yazılı: Anthropic, Google, Stripe, OpenAI, Cloudflare, PostHog, Vulut. Yurt dışı aktarımın hukuki dayanağı cümlesi **bilerek yazılmadı** (patron + hukukçu kararı; envanter §21: imzalı SCC yok). iyzico, Microsoft, Resend alıcı değil |
 | ç   | Toplama yöntemi ve hukuki sebep | YOK | **VAR (hukukçu teyidi bekliyor)** | `collectionMethodHeading` (5 yol) ve `legalBasisHeading` (md.5/2-c, -ç, -e, -f, md.5/1) eklendi. Ajans kanalı ve ziyaretçi talebi envanterde hâlâ "taslak" |
