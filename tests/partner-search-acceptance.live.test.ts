@@ -297,6 +297,8 @@ describe.skipIf(!RUN)('FO-66 Partner Search acceptance (live database)', () => {
 
       const run = await prisma.partnerSearchIngestionRun.findUniqueOrThrow({ where: { id: outcome.runId } });
       expect(run.status).toBe('FAILED');
+      // FO-327: the console's "Hata kaydı" column reads run.error; it must not be null on a FAILED run.
+      expect(run.error).toMatch(/schema drift/);
       // What /admin/alerts lists: every open SystemAlert, newest first.
       const alert = await prisma.systemAlert.findFirst({
         where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null, message: { contains: 'API schema change' } },
@@ -312,6 +314,11 @@ describe.skipIf(!RUN)('FO-66 Partner Search acceptance (live database)', () => {
         client: client(portal(() => ({}), 403)),
       });
       expect(outcome.kind === 'done' && outcome.status).toBe('FAILED');
+      // FO-327: a FAILED run keeps its reason for the console's "Hata kaydı" column.
+      if (outcome.kind === 'done') {
+        const run = await prisma.partnerSearchIngestionRun.findUniqueOrThrow({ where: { id: outcome.runId } });
+        expect(run.error).toMatch(/HTTP 403\/429/);
+      }
       const alert = await prisma.systemAlert.findFirst({
         where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null, message: { contains: 'HTTP 403/429' } },
       });

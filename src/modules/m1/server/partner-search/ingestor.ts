@@ -264,6 +264,8 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
       }
       if (result.status === 'drift') {
         drift = true;
+        // Field paths and validation messages only: no person data, no raw payload.
+        errors.push(`${topic.identifier}: schema drift: ${result.schemaDrift.slice(0, 3).join('; ')}`);
         await reportSchemaDrift(PARTNER_SEARCH_SOURCE, result.schemaDrift);
         break;
       }
@@ -297,6 +299,8 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
   }
 
   if (blocked) {
+    // Written once here, so both the in-loop and the outer catch paths leave the same line.
+    errors.push('portal refused the request (HTTP 403/429)');
     await createAdapterAlert(
       PARTNER_SEARCH_SOURCE,
       'error',
