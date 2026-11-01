@@ -13,9 +13,12 @@ vi.mock('@/lib/env', () => ({ env: { ANTHROPIC_API_KEY: 'test-key', OPENAI_API_K
 
 vi.mock('@/lib/db', () => {
   const tx = {
+    $executeRaw: async () => 0,
     creditLedger: {
       aggregate: async () => ({ _sum: { delta: 100 } }),
       create: async () => ({}),
+      // FO-288: the refund of a call that delivered nothing looks its debit up.
+      findFirst: async () => null,
     },
     aiUsageLog: { create: async () => ({}) },
   };
