@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PARTNER_SEARCH_INGESTION_LOCK, holdTestDbLock } from './helpers/test-db-lock';
-import { requireId } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 /**
  * FO-66 (PS-K7) — the five acceptance criteria of M1 Partner Search, against real
@@ -135,7 +135,7 @@ async function cleanup() {
   await prisma.partnerSearchTopicStat.deleteMany({ where: { topicIdentifier: { in: TOPICS } } });
   await prisma.partnerSearchAnnouncement.deleteMany({ where: { topicIdentifier: { in: TOPICS } } });
   await prisma.rawFetch.deleteMany({ where: { source: 'partner_search', key: { in: TOPICS } } });
-  await prisma.unmatchedOrganization.deleteMany({ where: { matchKey: { in: MATCH_KEYS } } });
+  await prisma.unmatchedOrganization.deleteMany({ where: { matchKey: { in: presentIds(MATCH_KEYS) } } });
   await prisma.topic.deleteMany({ where: { identifier: { in: TOPICS } } });
   await prisma.call.deleteMany({ where: { callIdentifier: CALL } });
 }
