@@ -111,6 +111,7 @@ vi.mock('@/lib/db', async (importOriginal) => {
       // scope as of TASK-MTVR9T834EPUC (all rows since TASK-MVBEM10PJYU0E) —
       // same spy as the `prisma` entry above, so a test that stubs one sees it
       // whichever way the gate reaches the rows.
+      $executeRaw: async () => 0,
       moduleState: { findMany: h.moduleStateFindMany },
       aiUsageLog: { create: h.aiUsageLogCreate },
       creditLedger: { create: h.creditLedgerCreate, aggregate: h.creditLedgerAggregate },

@@ -16,7 +16,7 @@ import crypto from 'crypto';
 
 const mockPrisma = vi.hoisted(() => ({
   aiUsageLog: { create: vi.fn() },
-  creditLedger: { aggregate: vi.fn(), create: vi.fn() },
+  creditLedger: { aggregate: vi.fn(), create: vi.fn(), findFirst: vi.fn() },
   withTenant: vi.fn(),
 }));
 
@@ -79,7 +79,7 @@ function stubAnthropic(opts: StubOptions = {}) {
 function runTransactions() {
   mockPrisma.withTenant.mockImplementation(
     async (_tenantId: string, cb: (tx: unknown) => Promise<unknown>) =>
-      cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger })
+      cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger, $executeRaw: async () => 0 })
   );
 }
 
@@ -100,6 +100,10 @@ const baseOptions = {
 function usageRow() {
   return mockPrisma.aiUsageLog.create.mock.calls[0]?.[0]?.data;
 }
+/** Sum of every ledger movement written: a reserved and then refunded call nets to 0. */
+function netLedgerMovement(): number {
+  return mockPrisma.creditLedger.create.mock.calls.reduce((sum, c) => sum + (c[0]?.data?.delta ?? 0), 0);
+}
 function ledgerRow() {
   return mockPrisma.creditLedger.create.mock.calls[0]?.[0]?.data;
 }
@@ -113,6 +117,8 @@ beforeEach(() => {
   mockPrisma.creditLedger.aggregate.mockResolvedValue({ _sum: { delta: 500 } });
   mockPrisma.aiUsageLog.create.mockResolvedValue({ id: 'log_1' });
   mockPrisma.creditLedger.create.mockResolvedValue({ id: 'ledger_1' });
+  // FO-288: the reservation is a debit row; its refund looks the debit up by refId.
+  mockPrisma.creditLedger.findFirst.mockImplementation(async (args: { where: { delta?: unknown } }) => (args.where.delta ? { delta: -1 } : null));
   runTransactions();
 });
 
@@ -315,7 +321,9 @@ describe('generateCompletion — one usage row and one ledger row per call', () 
 
     await generateCompletion({ ...baseOptions, proposalId: 'note_9', section: 'impact' });
 
-    expect(ledgerRow().refId).toBe('note_9');
+    // FO-288: the ledger row's refId is the call's own reservation key (unique per call, so its
+    // refund finds exactly its own debit). The proposal link lives on the usage row.
+    expect(ledgerRow()).toMatchObject({ reason: 'usage:M2', delta: -1 });
     expect(usageRow().proposalId).toBe('note_9');
     expect(usageRow().section).toBe('impact');
   });
@@ -614,7 +622,7 @@ describe('credits and failures', () => {
     await expect(generateCompletion(baseOptions)).rejects.toThrow(/400/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mockPrisma.aiUsageLog.create).not.toHaveBeenCalled();
-    expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+    expect(netLedgerMovement()).toBe(0);
   });
 });
 
@@ -637,12 +645,17 @@ describe('generateCompletion — an unrecorded paid call is named, not raw', () 
     await expect(generateCompletion(baseOptions)).rejects.toBeInstanceOf(AiUsageLogWriteError);
   });
 
-  it('reports a failed CreditLedger write as AiUsageLogWriteError too', async () => {
-    // Same hole from the other side: the call is paid for and unbilled.
-    stubAnthropic();
+  it('a failed reservation is a plain error, and the provider is never called', async () => {
+    // FO-288: the price is reserved BEFORE the provider, so a failed ledger write here means nothing
+    // was spent. It must not wear AiUsageLogWriteError, which promises "paid and unrecorded".
+    const fetchMock = stubAnthropic();
     mockPrisma.creditLedger.create.mockRejectedValue(new Error('db down'));
 
-    await expect(generateCompletion(baseOptions)).rejects.toBeInstanceOf(AiUsageLogWriteError);
+    const error = await generateCompletion(baseOptions).catch((e: unknown) => e);
+
+    expect(error).not.toBeInstanceOf(AiUsageLogWriteError);
+    expect((error as Error).message).toBe('db down');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reports an RLS refusal on the bookkeeping transaction as a log-write failure', async () => {
@@ -657,7 +670,7 @@ describe('generateCompletion — an unrecorded paid call is named, not raw', () 
         // The balance read must still succeed — only the post-call write fails,
         // otherwise this would be testing a pre-call fault again.
         if (mockPrisma.withTenant.mock.calls.length > 1) throw refusal;
-        return cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger });
+        return cb({ aiUsageLog: mockPrisma.aiUsageLog, creditLedger: mockPrisma.creditLedger, $executeRaw: async () => 0 });
       }
     );
 

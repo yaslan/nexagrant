@@ -34,6 +34,7 @@ export const JOB_IDS = [
   'k1-embeddings',
   'm4-stale-relationships',
   'job-queue-health',
+  'alerts-ops-digest',
   'notifications-retention',
   'evidence-expiring',
   'partner-search',
@@ -133,6 +134,17 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     missedTickAlert: true,
   },
   { id: 'job-queue-health', cron: '5 * * * *', maxAttempts: 3, missedTickAlert: false },
+  // FO-246: hourly at :20, after job-queue-health (:05) has written its alerts. Own
+  // queue: two overlapping runs would both mail the same rows before either stamped them.
+  // No missed-tick alert and no backfill, like job-queue-health: the digest catches up on
+  // its own (the next tick mails every row still unstamped), so a missed tick loses nothing.
+  {
+    id: 'alerts-ops-digest',
+    cron: '20 * * * *',
+    maxAttempts: 3,
+    queue: 'alerts-ops-digest',
+    missedTickAlert: false,
+  },
 ];
 
 /** The queue a job runs in (also used for jobs added by hand, so they serialise with the cron's). */

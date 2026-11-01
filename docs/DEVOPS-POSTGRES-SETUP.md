@@ -34,7 +34,18 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-Expected seed output:
+`pnpm db:seed` always writes the reference data (plans, module catalogue,
+add-ons, programmes, concept templates, Interreg rubrics, blog launch posts).
+The demo tenant and its users, calls and opportunities are written only when
+`SEED_DEMO` is on. Unset fails closed: on only when `NODE_ENV` is explicitly
+`development` or `test`, off with `NODE_ENV=production` and off when `NODE_ENV`
+is not set at all — a `pnpm db:seed` from a server shell writes no demo tenant
+(FO-296). `SEED_DEMO=true` is always obeyed and in production prints a warning
+(FO-251). Local development: `.env.example` has `NODE_ENV=development`, so a
+copied `.env` keeps the demo on. A production seed therefore prints
+`Skipping demo data (SEED_DEMO is off) — reference data only.`
+
+Expected seed output (development, demo on):
 ```
 Seeding Database...
 Tenant and users seeded (Fabrika Beta with alice, bob, charlie).
@@ -52,6 +63,8 @@ Seeding completed with E10 data.
 psql -h localhost -U fabrika -d fabrika_db -c "SELECT COUNT(*) as calls FROM public.Call;"
 # Expected: 20+
 ```
+
+`DB_CONNECT_TIMEOUT_MS` (`.env`, optional) sets how long the pool waits for a connection; blank = 1000 ms. Raise it only on a loaded test machine; the gate sets 10000 by itself.
 
 ### 5. Start Dev Server
 ```bash

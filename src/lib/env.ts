@@ -29,6 +29,14 @@ const envSchema = z.object({
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
     z.enum(['true', 'false']).optional()
   ),
+  /**
+   * Whether `pnpm db:seed` also writes the demo tenant, its users and its
+   * opportunities (FO-251, {@link seedDemoDecision}). Reference data (plans,
+   * module catalogue, programmes, templates, rubrics) is written either way.
+   * Unset or blank: on only when NODE_ENV is explicitly `development` or
+   * `test`; off with NODE_ENV=production and off when NODE_ENV is not set.
+   */
+  SEED_DEMO: blankToUndefined(z.enum(['true', 'false']).optional()),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: optionalUrl,
   /**
@@ -85,6 +93,11 @@ const envSchema = z.object({
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
   FEEDBACK_DIGEST_TO: z.string().email().optional(),
+  /**
+   * Where the hourly `alerts-ops-digest` mail (new `error` SystemAlerts) goes
+   * (FO-246). Unset or blank = the job skips and says so once; nothing is mailed.
+   */
+  ALERTS_OPS_EMAIL: blankToUndefined(z.string().email().optional()),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
   AUTH_URL: z.string().optional(),
@@ -272,6 +285,20 @@ const envSchema = z.object({
       .regex(/^(0(\.[0-9]+)?|1(\.0+)?)$/, 'must be a decimal between 0 and 1 (e.g. 0.15)')
       .optional()
   ),
+  /**
+   * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
+   * blank = 1000, the production value, which fails fast into the fallback path.
+   * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
+   * 10000): on a loaded machine a fresh connection can take longer than 1 s, and
+   * the page answered 500 instead of waiting (FO-253). Capped at 60 s.
+   */
+  DB_CONNECT_TIMEOUT_MS: blankToUndefined(
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'DB_CONNECT_TIMEOUT_MS must be a positive integer (milliseconds)')
+      .refine((value) => Number(value) <= 60_000, 'DB_CONNECT_TIMEOUT_MS must be at most 60000')
+      .optional()
+  ),
 });
 
 const _env = envSchema.safeParse(process.env);
@@ -286,6 +313,17 @@ if (!_env.success) {
 }
 
 export const env = _env.data;
+
+/**
+ * NODE_ENV as the process actually set it, before the schema's
+ * `.default('development')`: `undefined` when the variable is absent (a blank
+ * one already fails the enum above).
+ * Only for decisions that must fail closed when nobody said which environment
+ * this is ({@link seedDemoDecision}); everything else keeps reading
+ * `env.NODE_ENV`. A present value has already passed the enum above.
+ */
+export const declaredNodeEnv: 'development' | 'test' | 'production' | undefined =
+  process.env.NODE_ENV === undefined ? undefined : env.NODE_ENV;
 
 /**
  * The key NextAuth signs sessions with, for code that derives a labelled key of
@@ -328,8 +366,41 @@ export function jobsCronEnabled(
 }
 
 /**
+ * Whether the seed writes the demo data (FO-251). `SEED_DEMO` wins when set.
+ * Unset fails closed: demo data only when NODE_ENV is explicitly `development`
+ * or `test`; with NODE_ENV=production *or no NODE_ENV at all* (a `pnpm db:seed`
+ * from a server shell, FO-296) the seed fills the catalogue without opening
+ * `demo-tenant`. The default source therefore reads {@link declaredNodeEnv},
+ * not `env.NODE_ENV`, whose schema default would turn "unset" into
+ * `development`. An explicit `true` in production is obeyed, with a warning
+ * for the seed to print.
+ */
+export function seedDemoDecision(
+  source: { SEED_DEMO?: string; NODE_ENV?: string } = { SEED_DEMO: env.SEED_DEMO, NODE_ENV: declaredNodeEnv }
+): { enabled: boolean; warning: string | null } {
+  const production = source.NODE_ENV === 'production';
+  if (source.SEED_DEMO === 'false') return { enabled: false, warning: null };
+  if (source.SEED_DEMO === 'true') {
+    return {
+      enabled: true,
+      warning: production
+        ? '⚠️  SEED_DEMO=true with NODE_ENV=production: writing demo-tenant and its demo users into this database.'
+        : null,
+    };
+  }
+  return { enabled: source.NODE_ENV === 'development' || source.NODE_ENV === 'test', warning: null };
+}
+
+/**
  * The numeric view of `CONSORTIUM_LIVE_DEMAND_WEIGHT`; `undefined` when unset,
  * so the scorer falls back to its own default.
  */
 export const consortiumLiveDemandWeight: number | undefined =
   env.CONSORTIUM_LIVE_DEMAND_WEIGHT === undefined ? undefined : Number(env.CONSORTIUM_LIVE_DEMAND_WEIGHT);
+
+/**
+ * The numeric view of `DB_CONNECT_TIMEOUT_MS`; 1000 ms when unset (production).
+ * Read by {@link createDbClient} in src/lib/db.ts.
+ */
+export const dbConnectTimeoutMs: number =
+  env.DB_CONNECT_TIMEOUT_MS === undefined ? 1000 : Number(env.DB_CONNECT_TIMEOUT_MS);

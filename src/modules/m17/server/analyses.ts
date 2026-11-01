@@ -9,9 +9,11 @@
 import type { InterregAnalysisStatus, Prisma } from '@prisma/client';
 
 import { withTenant } from '@/lib/db';
+import { lockTenantCredits, releaseAiReservation } from '@/lib/llm';
 import { requireActionId } from '@/lib/required-id';
 
 import { INTERREG_UPLOAD_LIMITS, type InterregDocKind } from '../limits';
+import { EVALUATE_MODULE, runRef } from './evaluate';
 import type { ExtractedDocument } from './extract';
 import { acceptsUpload, STATUS_FROM_TEXTS_SQL } from './status';
 
@@ -127,7 +129,7 @@ export interface Owner {
 
 export type CreateAnalysisResult =
   | { ok: true; analysis: InterregAnalysisView }
-  | { ok: false; error: 'bad_rubric' | 'rubric_unavailable' };
+  | { ok: false; error: 'bad_rubric' | 'rubric_unavailable' | 'too_many_analyses' };
 
 /**
  * A new, empty analysis against `rubricId`, or against the default rubric when
@@ -144,6 +146,11 @@ export async function createAnalysis(owner: Owner, rubricId?: string): Promise<C
           select: { id: true },
         });
     if (!rubric) return { ok: false, error: rubricId ? 'bad_rubric' : 'rubric_unavailable' } as const;
+    // Counted in the same transaction as the insert. Two creates racing can both pass
+    // (read committed), so the cap can be overshot by the number of parallel requests;
+    // it bounds storage, it is not an exact quota.
+    const held = await tx.interregAnalysis.count({ where: { tenantId: owner.tenantId, userId: owner.userId } });
+    if (held >= INTERREG_UPLOAD_LIMITS.maxAnalysesPerUser) return { ok: false, error: 'too_many_analyses' } as const;
     const row = await tx.interregAnalysis.create({
       data: { tenantId: owner.tenantId, userId: owner.userId, rubricId: rubric.id },
       select: VIEW_SELECT,
@@ -172,14 +179,28 @@ export async function getAnalysis(owner: Owner, id: string): Promise<InterregAna
   return row ? toView(row) : null;
 }
 
-/** Deletes the analysis, its texts and any F2 output now (user's right to delete, FO-185 decision 3). */
+/**
+ * Deletes the analysis, its texts and any F2 output now (user's right to delete, FO-185 decision 3).
+ *
+ * A run still holding the claim (ANALYZING) has reserved its price (FO-274). Deleting the row
+ * would leave that reservation with no run to release it, so it is given back here, under the
+ * tenant lock, before the row goes (FO-291 B1).
+ */
 export async function deleteAnalysis(owner: Owner, analysisId: string): Promise<boolean> {
   const tenantId = requireActionId(owner.tenantId, 'tenantId');
   const userId = requireActionId(owner.userId, 'userId');
   const id = requireActionId(analysisId, 'analysisId');
-  const { count } = await withTenant(owner.tenantId, (tx) =>
-    tx.interregAnalysis.deleteMany({ where: { id, tenantId, userId } }),
-  );
+  const { count } = await withTenant(tenantId, async (tx) => {
+    await lockTenantCredits(tx, tenantId);
+    const row = await tx.interregAnalysis.findFirst({
+      where: { id, tenantId, userId },
+      select: { status: true, updatedAt: true },
+    });
+    if (row?.status === 'ANALYZING') {
+      await releaseAiReservation(tx, { tenantId, module: EVALUATE_MODULE, refId: runRef(id, row.updatedAt) });
+    }
+    return tx.interregAnalysis.deleteMany({ where: { id, tenantId, userId } });
+  });
   return count > 0;
 }
 

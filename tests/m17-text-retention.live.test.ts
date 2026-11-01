@@ -152,7 +152,8 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const young = await analysis(b, 'READY', { text, expiresInDays: 5 }, { text, expiresInDays: 6 });
     // E: no documents at all.
     const empty = await analysis(a, 'UPLOADING', null, null, false);
-    // F: ANALYZING with a due call text: text goes, the F2-owned status stays.
+    // F: ANALYZING with a due call text: text goes, and so does ANALYZING (FO-191 B4): the run cannot finish
+    //    without it, and an ANALYZING row refuses the re-upload that would fix it. Project slot not due -> UPLOADING.
     const analyzing = await analysis(a, 'ANALYZING', { text, expiresInDays: -1 }, { text, expiresInDays: 9 }, false);
 
     const result = await purgeExpiredInterregText(NOW);
@@ -185,7 +186,7 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     expect(await derived(young)).toEqual([1, 1]);
 
     expect(await load(empty)).toMatchObject({ status: 'UPLOADING', callText: null, projectText: null });
-    expect(await load(analyzing)).toMatchObject({ status: 'ANALYZING', callText: null });
+    expect(await load(analyzing)).toMatchObject({ status: 'UPLOADING', callText: null, projectText: text });
 
     // Raw proof: no text of this run is left past its expiry, and no row holds text without an expiry.
     const leftover = await admin.$queryRaw<Array<{ n: bigint }>>`
@@ -305,5 +306,25 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     await admin.tenant.delete({ where: { id: t2.tenantId } });
     expect(await admin.interregAnalysis.count({ where: { id: id2 } })).toBe(0);
     expect(await derived(id2)).toEqual([0, 0]);
+  });
+
+  test('FO-291 B1: a dead run whose text the purge empties gives its reservation back, once, and the balance is whole', async () => {
+    const t = await makeTenant('reserve');
+    // A run that died holding its claim: ANALYZING, its call text already due, its reservation still on the ledger.
+    const id = await analysis(t, 'ANALYZING', { text: 'c'.repeat(50), expiresInDays: -1 }, { text: 'p'.repeat(50), expiresInDays: 20 });
+    const { updatedAt } = await load(id);
+    await admin.creditLedger.create({
+      data: { tenantId: t.tenantId, delta: -3, reason: 'usage:M17', refId: `${id}:${updatedAt.getTime()}` },
+    });
+    const ledger = () =>
+      admin.creditLedger.findMany({ where: { refId: { startsWith: id } }, select: { delta: true } }).then((rs) => rs.map((r) => r.delta).sort((a, b) => a - b));
+
+    const result = await purgeExpiredInterregText(NOW);
+    expect(result.callSlots).toBe(1);
+    expect(await ledger()).toEqual([-3, 3]);
+
+    // A second purge (or a second run of the same batch) must not refund again.
+    await purgeExpiredInterregText(NOW);
+    expect(await ledger()).toEqual([-3, 3]);
   });
 });

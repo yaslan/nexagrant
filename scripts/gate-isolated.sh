@@ -100,6 +100,10 @@ export DATABASE_URL_RLS_TEST="postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:
 # ci.yml Test step. KEEP_EU_LIVE=1 runs keep-eu-sync.live against this throwaway DB.
 export AUTH_SECRET='ci-vitest-auth-secret-fixture-not-for-any-deployment'
 export KEEP_EU_LIVE=1
+# FO-256: the pool's 1 s connect timeout failed under load (FO-253). Here, and only
+# here, it gets 10 s; prod and dev keep 1000 ms (src/lib/env.ts). Vitest and the
+# Playwright webServer both inherit this environment.
+export DB_CONNECT_TIMEOUT_MS=10000
 # ci.yml E2E step: R2 -> local MinIO, so admin-blog-image-upload.spec runs
 # instead of skipping. Exported for the whole gate (gate:core is one chain).
 # SMTP, NEXT_PUBLIC_APP_URL and the e2e AUTH_SECRET are NOT set here:
@@ -113,6 +117,15 @@ export R2_BUCKET=test-evidence
 export R2_PUBLIC_BUCKET=test-public
 export R2_PUBLIC_HOST="$R2_ENDPOINT/test-public"
 export E2E_PORT="$e2e_port"
+
+# Wall-clock budgets of the timing tests (tests/helpers/timing.ts) scale with the
+# load: 1 on an idle machine, ceil(2 * load1 / cpus) under load. The 1-minute average
+# lags the parallel tests it is measuring, hence the 2x. A value set by the
+# caller wins. Behaviour assertions do not depend on it (FO-261).
+cpus=$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+if [ -r /proc/loadavg ]; then load1=$(cut -d' ' -f1 /proc/loadavg); else load1=$(sysctl -n vm.loadavg | awk '{print $2}'); fi
+export TEST_TIMING_SLACK="${TEST_TIMING_SLACK:-$(awk -v l="$load1" -v c="$cpus" 'BEGIN { r = l / c; r = 2 * r; s = (r <= 1) ? 1 : int(r) + (r > int(r)); printf "%d", s }')}"
+log "TEST_TIMING_SLACK=$TEST_TIMING_SLACK (load1 $load1, $cpus cpus)"
 
 log "db:setup on 127.0.0.1:$pg_port/$db"
 pnpm db:setup

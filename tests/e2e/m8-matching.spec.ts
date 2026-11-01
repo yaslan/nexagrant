@@ -19,6 +19,7 @@ import { presentIds } from '../helpers/teardown-guard';
  */
 
 const SHOTS = shotsDir('TASK-MTR4CH9IDK4D7-screenshots');
+const FO277_SHOTS = shotsDir('FO-277-evidence');
 const TENANT = 'demo-tenant';
 const WORKSPACE = 'main';
 const OPP = 'm8-e2e-opp';
@@ -275,8 +276,9 @@ test.describe('M8 consortium matching', () => {
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText('M8E2E Institute of Grids');
     await expect(rows.nth(0)).toContainText('#1');
-    // One 0–100 scale for both surfaces (FO-147), and the label says so.
-    await expect(rows.nth(0)).toContainText('/ 100');
+    // One 0–100 scale for both surfaces (FO-147), and the label says so — with
+    // the Turkish decimal comma, not "61.5" (FO-162).
+    await expect(rows.nth(0)).toContainText(/\d+,\d \/ 100/);
 
     // The seated partner is already on the consortium and is not offered again.
     await expect(table).not.toContainText('M8E2E Nordwerk GmbH');
@@ -287,14 +289,15 @@ test.describe('M8 consortium matching', () => {
     const details = rows.nth(0).locator('details');
     await details.locator('summary').click();
     await expect(details).toContainText('Konu deneyimi');
-    // Each dimension against its own range, not a bare number next to "/ 100" (FO-155).
-    await expect(details.getByTestId('m8-dimension-topicExperience')).toHaveText(/^\d+\.\d \/ 35$/);
-    await expect(details.getByTestId('m8-dimension-rivalRisk')).toHaveText(/^-?\d+\.\d \(aralık -10…0\)$/);
+    // Each dimension against its own range, not a bare number next to "/ 100" (FO-155),
+    // in the Turkish number format (FO-162).
+    await expect(details.getByTestId('m8-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 35$/);
+    await expect(details.getByTestId('m8-dimension-rivalRisk')).toHaveText(/^-?\d+,\d \(aralık -10…0\)$/);
     await page.screenshot({ path: `${SHOTS}/04-breakdown-expanded.png`, fullPage: true });
 
     // The same ranked seat in English carries the same scale label.
     await page.goto(URL.replace('/tr/', '/en/'));
-    await expect(page.getByTestId('m8-seat-research').locator('tbody tr').first()).toContainText('/ 100', {
+    await expect(page.getByTestId('m8-seat-research').locator('tbody tr').first()).toContainText(/\d+\.\d \/ 100/, {
       timeout: 30_000,
     });
     const detailsEn = page.getByTestId('m8-seat-research').locator('tbody tr').first().locator('details');
@@ -372,11 +375,16 @@ test.describe('M8 consortium matching', () => {
 
     await expect(page.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
     await expectNoRuntimeError(page);
-    await expect(builderSeat).toContainText('/ 100');
+    await expect(builderSeat).toContainText(/\d+,\d \/ 100/);
     const builderDetails = builderSeat.locator('details').first();
     await builderDetails.locator('summary').click();
-    await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+\.\d \/ 3$/);
-    await expect(builderDetails.getByTestId('m8-builder-dimension-liveDemandSignal')).toHaveText(/^\d+\.\d \/ 1$/);
+    await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 3$/);
+    await expect(builderDetails.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+,\d \/ 1,5$/);
+    await expect(builderDetails.getByTestId('m8-builder-dimension-liveDemandSignal')).toHaveText(/^\d+,\d \/ 1$/);
+    // FO-277: the candidate button was a hard-coded English "Invite" on the Turkish page.
+    await expect(builderSeat.getByRole('button', { name: 'Davet Et' }).first()).toBeEnabled({ timeout: 30_000 });
+    await expect(builderSeat.getByRole('button', { name: 'Invite' })).toHaveCount(0);
+    await builderSeat.screenshot({ path: `${FO277_SHOTS}/tr-consortium-invite.png` });
     await page.screenshot({ path: `${SHOTS}/05c-builder-breakdown.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05-consortium-builder.png`, fullPage: true });
 
@@ -416,11 +424,13 @@ test.describe('M8 consortium matching', () => {
     const findCandidatesEn = builderSeatEn.getByRole('button', { name: /Find Candidates/ });
     await expectHydrated(findCandidatesEn);
     await findCandidatesEn.click();
-    await expect(builderSeatEn).toContainText('/ 100', { timeout: 30_000 });
+    await expect(builderSeatEn).toContainText(/\d+\.\d \/ 100/, { timeout: 30_000 });
     const builderDetailsEn = builderSeatEn.locator('details').first();
     await builderDetailsEn.locator('summary').click();
     await expect(builderDetailsEn).toContainText('Country diversity');
     await expect(builderDetailsEn.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+\.\d \/ 1\.5$/);
+    await expect(builderSeatEn.getByRole('button', { name: 'Invite' }).first()).toBeEnabled({ timeout: 30_000 });
+    await builderSeatEn.screenshot({ path: `${FO277_SHOTS}/en-consortium-invite.png` });
     await page.screenshot({ path: `${SHOTS}/05d-builder-breakdown-en.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05b-consortium-builder-en.png`, fullPage: true });
 

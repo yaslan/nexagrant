@@ -63,6 +63,8 @@ const KNOWN: Record<string, string> = {
     '`withdrawnBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
   'src/modules/m1/server/partner-search/retention.ts lt: closedBefore':
     '`closedBefore` comes from retentionCutoffs(), which throws on an invalid date; cron input, no client (FO-65 F4)',
+  'src/modules/m17/server/evaluate.ts gt: now':
+    '`now` is checked at the top of claim(), which throws on an invalid Date; both text-expiry filters read it; server clock, never client input (FO-191 B4)',
   'src/modules/m17/server/retention.ts lte: now':
     '`now` is checked at the top of purgeExpiredInterregText, which throws on an invalid Date; cron input, no client (FO-195)',
   'src/modules/m17/server/retention.ts in: ids':

@@ -18,7 +18,8 @@ import type { LlmCompletion, LlmGenerateOptions } from '@/lib/llm';
  *  - a fresh ANALYZING claim gives analysis_busy;
  *  - another tenant's analysis, or a colleague's, gives not_found;
  *  - a claim taken over mid-run: the run writes nothing and the later claim stays (B3);
- *  - a ledger write that fails: the result is rolled back and the analysis is FAILED (Soru 3).
+ *  - a reservation the database refuses: the run stops before the model (FO-274).
+ *  - two runs of one tenant with credits for one: one runs, the balance never goes below zero (FO-274).
  *
  * `.live`: needs the docker-compose Postgres, `pnpm db:setup` (seeded rubric) and
  * `pnpm db:rls-role`. No provider is called.
@@ -80,9 +81,10 @@ vi.mock('@/lib/llm', async (importOriginal) => {
   };
 });
 
-const { createDbClient } = await import('@/lib/db');
-const { createAnalysis, saveDocument } = await import('@/modules/m17/server/analyses');
-const { runEvaluation, EVALUATE_ATTEMPT_PURPOSE, EVALUATE_RETRY_PURPOSE, STALE_CLAIM_MS } = await import('@/modules/m17/server/evaluate');
+const { createDbClient, withTenant } = await import('@/lib/db');
+const { releaseAiReservation, reserveAiAction } = await import('@/lib/llm');
+const { createAnalysis, deleteAnalysis, saveDocument } = await import('@/modules/m17/server/analyses');
+const { runEvaluation, runRef, EVALUATE_ATTEMPT_PURPOSE, EVALUATE_PURPOSE, EVALUATE_RETRY_PURPOSE, STALE_CLAIM_MS } = await import('@/modules/m17/server/evaluate');
 type Owner = { tenantId: string; userId: string };
 
 let admin: PrismaClient | undefined;
@@ -99,13 +101,13 @@ let carol: Owner; // tenant B
 
 const doc = (text: string) => ({ format: 'TXT' as const, text, pages: null, chars: text.length });
 
-async function makeTenant(key: string, people: string[]): Promise<Owner[]> {
+async function makeTenant(key: string, people: string[], grant = GRANT): Promise<Owner[]> {
   const t = await admin!.tenant.create({
     data: { name: `${RUN} ${key}`, slug: `${RUN}-${key}`, country: 'TR', kind: 'ORGANIZATION' },
     select: { id: true },
   });
   tenants.push(t.id);
-  await admin!.creditLedger.create({ data: { tenantId: t.id, delta: GRANT, reason: 'purchase' } });
+  await admin!.creditLedger.create({ data: { tenantId: t.id, delta: grant, reason: 'purchase' } });
   const out: Owner[] = [];
   for (const n of people) {
     const u = await admin!.user.create({ data: { email: `${RUN}-${key}-${n}@example.com`, name: n } });
@@ -157,11 +159,18 @@ async function setClaim(id: string, status: 'READY' | 'ANALYZING', updatedAt: Da
   await admin!.interregAnalysis.update({ where: { id }, data: { status, updatedAt } });
 }
 
-/** The ledger deltas written for one analysis (`refId`). */
+/**
+ * The ledger deltas of one analysis, sorted. A run's rows carry `refId = "<analysis>:<claim ms>"`
+ * (FO-274), so every run of the analysis is matched.
+ */
 async function ledgerFor(id: string): Promise<number[]> {
-  const rows = await admin!.creditLedger.findMany({ where: { refId: id }, select: { delta: true } });
-  return rows.map((r) => r.delta);
+  const rows = await admin!.creditLedger.findMany({ where: { refId: { startsWith: id } }, select: { delta: true } });
+  return rows.map((r) => r.delta).sort((a, b) => a - b);
 }
+
+/** The tenant's whole balance, as the ledger sums it. */
+const balanceOf = async (tenantId: string) =>
+  (await admin!.creditLedger.aggregate({ where: { tenantId }, _sum: { delta: true } }))._sum.delta ?? 0;
 
 const marksOf = (id: string) => admin!.interregCriterionMark.count({ where: { analysisId: id } });
 const resultsOf = (id: string) => admin!.interregAnalysisResult.count({ where: { analysisId: id } });
@@ -213,7 +222,7 @@ afterAll(async () => {
 });
 
 describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
-  test('a good answer: DONE, 14 marks, one ledger row of −3, both model calls priced as free attempts', async () => {
+  test('a good answer: DONE, 14 marks, one reservation of −3, both model calls priced as free attempts', async () => {
     const id = await readyAnalysis(alice);
     state.answers.push(goodAnswer());
 
@@ -227,7 +236,7 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     expect(state.calls.map((c) => c.purpose)).toEqual([EVALUATE_ATTEMPT_PURPOSE]);
   });
 
-  test('two malformed answers: FAILED, no marks, no result, no ledger row (B1)', async () => {
+  test('two malformed answers: FAILED, no marks, no result, the reservation is released (B1, FO-274)', async () => {
     const id = await readyAnalysis(alice);
     state.answers.push(badAnswer, badAnswer);
 
@@ -237,11 +246,11 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     expect(await statusOf(id)).toBe('FAILED');
     expect(await marksOf(id)).toBe(0);
     expect(await resultsOf(id)).toBe(0);
-    expect(await ledgerFor(id)).toEqual([]);
+    expect(await ledgerFor(id)).toEqual([-3, 3]);
     expect(state.calls.map((c) => c.purpose)).toEqual([EVALUATE_ATTEMPT_PURPOSE, EVALUATE_RETRY_PURPOSE]);
   });
 
-  test('a malformed answer then a good one: DONE, and still one ledger row of −3', async () => {
+  test('a malformed answer then a good one: DONE, and still one reservation of −3', async () => {
     const id = await readyAnalysis(alice);
     state.answers.push(badAnswer, goodAnswer());
 
@@ -251,6 +260,24 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     expect(await statusOf(id)).toBe('DONE');
     expect(await ledgerFor(id)).toEqual([-3]);
     expect(state.calls.map((c) => c.purpose)).toEqual([EVALUATE_ATTEMPT_PURPOSE, EVALUATE_RETRY_PURPOSE]);
+  });
+
+  test('two runs at once, credits for one: exactly one reaches the model and the balance never goes below zero (FO-274)', async () => {
+    const [dan, erin] = (await makeTenant('d', ['dan', 'erin'], 3)) as [Owner, Owner];
+    const idDan = await readyAnalysis(dan);
+    const idErin = await readyAnalysis(erin);
+    state.answers.push(goodAnswer(), goodAnswer());
+
+    const [first, second] = await Promise.all([
+      runEvaluation(dan, idDan, { locale: 'en' }),
+      runEvaluation(erin, idErin, { locale: 'en' }),
+    ]);
+
+    const outcomes = [first, second];
+    expect(outcomes.filter((r) => r.ok)).toHaveLength(1);
+    expect(outcomes.filter((r) => !r.ok)).toEqual([{ ok: false, error: 'insufficient_credits' }]);
+    expect(state.calls.filter((c) => c.purpose === EVALUATE_ATTEMPT_PURPOSE)).toHaveLength(1);
+    expect(await balanceOf(dan.tenantId)).toBe(0);
   });
 
   test('a stale ANALYZING claim (a run that died) is taken over', async () => {
@@ -263,6 +290,20 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     expect(run).toMatchObject({ ok: true });
     expect(await statusOf(id)).toBe('DONE');
     expect(await ledgerFor(id)).toEqual([-3]);
+  });
+
+  test('a dead run keeps its reservation until the takeover: the takeover releases it, then reserves its own (FO-274)', async () => {
+    const id = await readyAnalysis(alice);
+    const died = new Date(Date.now() - STALE_CLAIM_MS - 60_000);
+    // What the dead run wrote before it died: its reservation, and no result.
+    await admin!.creditLedger.create({ data: { tenantId: alice.tenantId, delta: -3, reason: 'usage:M17', refId: `${id}:${died.getTime()}` } });
+    await setClaim(id, 'ANALYZING', died);
+    state.answers.push(goodAnswer());
+
+    const run = await runEvaluation(alice, id, { locale: 'en' });
+
+    expect(run).toMatchObject({ ok: true });
+    expect(await ledgerFor(id)).toEqual([-3, -3, 3]);
   });
 
   test('a fresh ANALYZING claim gives analysis_busy, and the other run is left alone', async () => {
@@ -293,21 +334,21 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     expect(await ledgerFor(id)).toEqual([]);
   });
 
-  test('a ledger write that fails: the result is rolled back, the analysis is FAILED, nothing is charged (FO-188 Soru 3)', async () => {
+  test('a reservation the database refuses: the run stops before the model, the analysis stays READY, nothing is charged', async () => {
     const id = await readyAnalysis(alice);
     state.answers.push(goodAnswer());
     state.failLedger = true;
 
-    const run = await runEvaluation(alice, id, { locale: 'en' });
+    await expect(runEvaluation(alice, id, { locale: 'en' })).rejects.toThrow('scripted ledger write failure');
 
-    expect(run).toEqual({ ok: false, error: 'evaluation_failed' });
-    expect(await statusOf(id)).toBe('FAILED');
+    expect(state.calls).toHaveLength(0);
+    expect(await statusOf(id)).toBe('READY');
     expect(await marksOf(id)).toBe(0);
     expect(await resultsOf(id)).toBe(0);
     expect(await ledgerFor(id)).toEqual([]);
   });
 
-  test('a claim taken over during the run: this run writes nothing, the later claim stays, no ledger row (B3)', async () => {
+  test('a claim taken over during the run: this run writes nothing, its reservation is released, the later claim stays (B3)', async () => {
     const id = await readyAnalysis(alice);
     const takeover = new Date(Date.now() + 5000);
     state.beforeAnswer = () => setClaim(id, 'ANALYZING', takeover);
@@ -322,6 +363,54 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     ).toBe(takeover.getTime());
     expect(await marksOf(id)).toBe(0);
     expect(await resultsOf(id)).toBe(0);
-    expect(await ledgerFor(id)).toEqual([]);
+    expect(await ledgerFor(id)).toEqual([-3, 3]);
+  });
+
+  test('FO-291 B1: deleting the analysis of a dead run gives its reservation back, before the row goes', async () => {
+    const id = await readyAnalysis(alice);
+    // A run that died holding its claim: ANALYZING, its price reserved and never released.
+    const claimedAt = new Date(Date.now() - 60_000);
+    await setClaim(id, 'ANALYZING', claimedAt);
+    expect(
+      await withTenant(alice.tenantId, (tx) =>
+        reserveAiAction(tx, { tenantId: alice.tenantId, module: 'M17', purpose: EVALUATE_PURPOSE, refId: runRef(id, claimedAt) }),
+      ),
+    ).toBe(true);
+    const reserved = await balanceOf(alice.tenantId);
+
+    expect(await deleteAnalysis(alice, id)).toBe(true);
+
+    expect(await admin!.interregAnalysis.count({ where: { id } })).toBe(0);
+    expect(await ledgerFor(id)).toEqual([-3, 3]);
+    expect(await balanceOf(alice.tenantId)).toBe(reserved + 3);
+  });
+
+  test('FO-291 M4: giving a reservation back is idempotent: a second release of the same run refunds nothing more', async () => {
+    const id = await readyAnalysis(bob);
+    const claimedAt = new Date(Date.now() - 60_000);
+    await setClaim(id, 'ANALYZING', claimedAt);
+    const refId = runRef(id, claimedAt);
+    await withTenant(bob.tenantId, (tx) =>
+      reserveAiAction(tx, { tenantId: bob.tenantId, module: 'M17', purpose: EVALUATE_PURPOSE, refId }),
+    );
+
+    // The takeover's release, then the old run's own failure: two releases of one reservation.
+    await withTenant(bob.tenantId, (tx) => releaseAiReservation(tx, { tenantId: bob.tenantId, module: 'M17', refId }));
+    await withTenant(bob.tenantId, (tx) => releaseAiReservation(tx, { tenantId: bob.tenantId, module: 'M17', refId }));
+
+    expect(await ledgerFor(id)).toEqual([-3, 3]);
+  });
+
+  test('FO-291 M5: a tenant whose balance is exactly the price can run; the reservation is not checked a second time', async () => {
+    const [dan] = (await makeTenant('c', ['dan'], 3)) as [Owner];
+    const id = await readyAnalysis(dan);
+    state.answers.push(goodAnswer());
+
+    const run = await runEvaluation(dan, id, { locale: 'en' });
+
+    expect(run).toMatchObject({ ok: true });
+    expect(await statusOf(id)).toBe('DONE');
+    expect(await balanceOf(dan.tenantId)).toBe(0);
+    expect(await ledgerFor(id)).toEqual([-3]);
   });
 });

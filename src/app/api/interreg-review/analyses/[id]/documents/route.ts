@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { internalError } from '@/lib/api-error';
 import { readCappedBytes } from '@/lib/read-capped';
+import { UserWindowLimiter } from '@/lib/user-rate-limit';
 import { isPresentId } from '@/lib/required-id';
 import { INTERREG_DOC_KINDS, INTERREG_UPLOAD_LIMITS } from '@/modules/m17/limits';
 import { getAnalysis, saveDocument } from '@/modules/m17/server/analyses';
@@ -27,6 +28,7 @@ import { acceptsUpload } from '@/modules/m17/server/status';
  *   413 too_large | too_long | too_many_pages | parse_too_heavy
  *   415 unsupported_type | type_mismatch
  *   422 bad_encoding | malformed | no_text (fewer than 200 letters/digits, or a scan)
+ *   429 rate_limited (more than INTERREG_UPLOAD_LIMITS.uploadsPerMinute a minute; `Retry-After`)
  */
 const FormSchema = z.object({
   kind: z.enum(INTERREG_DOC_KINDS),
@@ -38,6 +40,9 @@ const FormSchema = z.object({
     // A display name, never a path: no separators, no control characters.
     .refine((name) => !/[\\/\u0000-\u001f\u007f]/u.test(name)),
 });
+
+/** Per user and process; see INTERREG_UPLOAD_LIMITS.uploadsPerMinute. */
+const uploadLimiter = new UserWindowLimiter(INTERREG_UPLOAD_LIMITS.uploadsPerMinute);
 
 const STATUS_OF: Record<string, 400 | 413 | 415 | 422> = {
   too_large: 413,
@@ -57,6 +62,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!gate.ok) return gate.response;
   const { id } = await params;
   if (!isPresentId(id)) return refuse('not_found', 404);
+  // Before anything is read or parsed: a refused request costs neither.
+  const retryAfter = uploadLimiter.take(gate.scope.userId);
+  if (retryAfter !== null) {
+    const res = refuse('rate_limited', 429, { retryAfter });
+    res.headers.set('Retry-After', String(retryAfter));
+    return res;
+  }
   // Before the body is parsed, so an unknown or busy analysis costs no extraction.
   // saveDocument checks both again under the write, which is the one that counts.
   const current = await getAnalysis(gate.scope, id);

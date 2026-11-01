@@ -2,7 +2,7 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { createTranslator, NextIntlClientProvider } from 'next-intl';
+import { createFormatter, createTranslator, NextIntlClientProvider } from 'next-intl';
 
 import trMessages from '../messages/tr.json';
 import enMessages from '../messages/en.json';
@@ -35,7 +35,7 @@ import {
 } from '@/lib/scoring/seat-dimension-scale';
 import { consortiumSeatScore, consortiumWeights, type ScoringBreakdown } from '@/lib/scoring/consortium';
 import { MATCH_MAX_TOTAL, scoreCandidate, type CandidateSignals } from '@/modules/m8/server/matching';
-import { dimensionValueText } from '@/modules/m8/components/dimension-value';
+import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 import { findCandidates } from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions';
 import ConsortiumManager from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager';
 
@@ -134,17 +134,27 @@ describe('seatBreakdownWriter', () => {
 describe('dimensionValueText', () => {
   const tr = createTranslator({ locale: 'tr', messages: trMessages, namespace: 'Consortium' });
   const en = createTranslator({ locale: 'en', messages: enMessages, namespace: 'Consortium' });
+  // What `getFormatter()` / `useFormatter()` hand the pages (FO-162).
+  const trNumber = createFormatter({ locale: 'tr' }).number;
+  const enNumber = createFormatter({ locale: 'en' }).number;
 
   it.each([
-    ['tr', tr, '3.0 / 35', '-10.0 (aralık -10…0)'],
-    ['en', en, '3.0 / 35', '-10.0 (range -10…0)'],
-  ] as const)('%s: "x / max", and a penalty with its range', (_locale, t, outOf, penalty) => {
-    expect(dimensionValueText(t, seatScoreDimensionScale('match', 'topicExperience'), 3)).toBe(outOf);
-    expect(dimensionValueText(t, seatScoreDimensionScale('match', 'rivalRisk'), -10)).toBe(penalty);
+    ['tr', tr, trNumber, '3,0 / 35', '-10,0 (aralık -10…0)', '1,5 / 1,5'],
+    ['en', en, enNumber, '3.0 / 35', '-10.0 (range -10…0)', '1.5 / 1.5'],
+  ] as const)('%s: "x / max", and a penalty with its range, in the locale', (_locale, t, num, outOf, penalty, fractionalMax) => {
+    expect(dimensionValueText(t, num, seatScoreDimensionScale('match', 'topicExperience'), 3)).toBe(outOf);
+    expect(dimensionValueText(t, num, seatScoreDimensionScale('match', 'rivalRisk'), -10)).toBe(penalty);
+    expect(dimensionValueText(t, num, seatScoreDimensionScale('consortium', 'countryDiversity'), 1.5)).toBe(fractionalMax);
   });
 
-  it('without a known range only the number is shown', () => {
-    expect(dimensionValueText(tr, null, 3)).toBe('3.0');
+  it('without a known range only the number is shown, in the locale', () => {
+    expect(dimensionValueText(tr, trNumber, null, 3)).toBe('3,0');
+    expect(dimensionValueText(en, enNumber, null, 3)).toBe('3.0');
+  });
+
+  it('a score keeps exactly one decimal', () => {
+    expect(scoreNumberText(trNumber, 61.54)).toBe('61,5');
+    expect(scoreNumberText(enNumber, 50)).toBe('50.0');
   });
 });
 
@@ -188,19 +198,22 @@ describe('consortium builder breakdown', () => {
     return messages;
   }
 
-  it.each(['tr', 'en'] as const)('%s: each dimension against its own maximum, labelled', async (locale) => {
+  it.each([
+    ['tr', '3,0 / 3', '1,5 / 1,5', '0,4 / 1', '61,5 / 100'],
+    ['en', '3.0 / 3', '1.5 / 1.5', '0.4 / 1', '61.5 / 100'],
+  ] as const)('%s: each dimension against its own maximum, labelled, in the locale', async (locale, topic, country, demand, total) => {
     const messages = await showBreakdown(locale, scored);
-    expect(screen.getByTestId('m8-builder-dimension-topicExperience').textContent).toBe('3.0 / 3');
-    expect(screen.getByTestId('m8-builder-dimension-countryDiversity').textContent).toBe('1.5 / 1.5');
-    expect(screen.getByTestId('m8-builder-dimension-liveDemandSignal').textContent).toBe('0.4 / 1');
+    expect(screen.getByTestId('m8-builder-dimension-topicExperience').textContent).toBe(topic);
+    expect(screen.getByTestId('m8-builder-dimension-countryDiversity').textContent).toBe(country);
+    expect(screen.getByTestId('m8-builder-dimension-liveDemandSignal').textContent).toBe(demand);
     expect(screen.getByText(messages.Consortium.dimension.networkCentrality)).toBeTruthy();
     expect(screen.getByText(messages.Consortium.breakdownNote)).toBeTruthy();
-    expect(screen.getByText('61.5 / 100')).toBeTruthy();
+    expect(screen.getByText(total)).toBeTruthy();
   });
 
   it('a breakdown no scorer wrote shows bare numbers and does not throw', async () => {
     await showBreakdown('tr', { topicExperience: 3, total: 3 });
-    expect(screen.getByTestId('m8-builder-dimension-topicExperience').textContent).toBe('3.0');
-    expect(screen.getByTestId('m8-builder-dimension-smeBonus').textContent).toBe('0.0');
+    expect(screen.getByTestId('m8-builder-dimension-topicExperience').textContent).toBe('3,0');
+    expect(screen.getByTestId('m8-builder-dimension-smeBonus').textContent).toBe('0,0');
   });
 });
