@@ -6,16 +6,20 @@ import type { InterregAnalysisStatus } from '@prisma/client';
  *
  *  1. The tenant credit lock of the DONE transaction (evaluate.ts, FO-303 Ö-1), on TWO connections:
  *     connection A holds the run's DONE transaction open just after taking the lock; connection B
- *     runs a writer that releases reservations (the text purge, the stale-run sweeper). B must WAIT
+ *     runs a writer that releases a dead run's reservation (the stale-run sweeper, the user's
+ *     delete). B must WAIT
  *     on the advisory lock until A commits, then see DONE and refund nothing. Remove the lock from
  *     the DONE transaction and B no longer waits: these tests go red (mutation, FO-317 report).
  *  2. The stale-run sweeper (stale-runs.ts): a dead run's reservation is released once — a second
  *     sweep, and two at once, refund nothing more — and a fresh claim is not touched.
  *
- * Both writers are cross-tenant. They run here with a `now` in 2001, and every row of this file is
- * dated around then, so the sweep and the purge match only this file's rows and never another live
- * suite's, which run in parallel against the same database. Like m17-text-retention.live, it still
- * refuses the shared local database named `fabrika` outside CI.
+ * The sweeper is cross-tenant and other live suites run in parallel against the same database. It
+ * matches claims OLDER than its `now`, so it runs with a `now` in 2001 against rows claimed then
+ * (T0): no other suite's row matches. The text purge (retention.ts takes the same lock) is NOT used
+ * as connection B: it matches every expired text in the database, and a second purge running beside
+ * m17-text-retention.live broke that suite's idempotency counts (seen in the gate, FO-317); its
+ * lock order is pinned there (FO-303 Ö-1). Like
+ * m17-text-retention.live, the file still refuses the shared local database named `fabrika` outside CI.
  *
  * Only the model is replaced: `generateCompletion` returns a scripted answer. The singleton is
  * swapped to the RLS URL (as m17-text-retention.live), so withTenant and withSystemScope both run
@@ -99,7 +103,7 @@ vi.mock('@/lib/llm', async (importOriginal) => {
 const { createDbClient, prisma } = await import('@/lib/db');
 const { runEvaluation, runRef, STALE_CLAIM_MS } = await import('@/modules/m17/server/evaluate');
 const { releaseStaleRuns } = await import('@/modules/m17/server/stale-runs');
-const { purgeExpiredInterregText } = await import('@/modules/m17/server/retention');
+const { deleteAnalysis } = await import('@/modules/m17/server/analyses');
 const { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } = await import('./helpers/live-db-role');
 const { presentIds } = await import('./helpers/teardown-guard');
 
@@ -240,26 +244,28 @@ describe.skipIf(!HAS_DB)('M17 credit follow-ups (FO-317, live, fabrika_app)', ()
     await admin.$disconnect();
   });
 
-  // Connection B, one per writer that releases a reservation. Each sees A's run as one to refund:
-  // the sweeper because the claim is past STALE_CLAIM_MS at its `now`, the purge because the texts
-  // are past their expiry at its `now`. Only the DONE transaction's lock keeps them from refunding a
-  // result that is being delivered.
+  // Connection B, one per writer that releases a reservation. Each sees A's run, claimed at T0, as a
+  // dead one to refund: the sweeper at its `now`, the delete at the real clock. Only the DONE
+  // transaction's lock keeps them from refunding a result that is being delivered.
   const writers = [
     {
       name: 'the stale-run sweeper',
-      expiresAt: () => new Date(Date.now() + 30 * 24 * 60 * MIN),
       run: () => releaseStaleRuns(new Date(T0.getTime() + STALE_CLAIM_MS + MIN)),
+      // The re-read under the lock finds it DONE and leaves it.
+      after: 'DONE' as string | null,
     },
     {
-      name: 'the text purge',
-      expiresAt: () => new Date(T0.getTime() + 30_000),
-      run: () => purgeExpiredInterregText(new Date(T0.getTime() + MIN)),
+      // Per tenant: a claim from 2001 is stale to deleteAnalysis's real clock, so it would refund it.
+      name: "the user's delete",
+      run: (owner: Owner, id: string) => deleteAnalysis(owner, id),
+      // It deletes the row, but only after DONE committed, so without refunding it.
+      after: null,
     },
   ];
 
   test.each(writers)('DONE holds the tenant credit lock: $name on a second connection waits, then refunds nothing', async (writer) => {
     const owner = await makeTenant(`lock-${writer.name.split(' ').at(-1)}`);
-    const id = await analysis(owner, 'READY', T0, writer.expiresAt());
+    const id = await analysis(owner, 'READY', T0);
     let held!: () => void;
     const reachedDone = new Promise<void>((r) => (held = r));
     let release!: () => void;
@@ -271,7 +277,7 @@ describe.skipIf(!HAS_DB)('M17 credit follow-ups (FO-317, live, fabrika_app)', ()
 
     // Connection B: starts while A holds the transaction open.
     let bSettled = false;
-    const b = writer.run().finally(() => {
+    const b = writer.run(owner, id).finally(() => {
       bSettled = true;
     });
     const waited = await eventually(async () => (await waitersOn(owner.tenantId)) > 0, 5000);
@@ -283,7 +289,8 @@ describe.skipIf(!HAS_DB)('M17 credit follow-ups (FO-317, live, fabrika_app)', ()
     expect(run).toMatchObject({ ok: true });
     // The delivered result keeps its charge: one debit, no refund.
     expect(await ledgerFor(id)).toEqual([-PRICE]);
-    expect((await load(id)).status).not.toBe('FAILED');
+    const row = await admin.interregAnalysis.findUnique({ where: { id }, select: { status: true } });
+    expect(row?.status ?? null).toBe(writer.after);
   });
 
   test('a dead run: its reservation is released and the row is FAILED; a second sweep refunds nothing more', async () => {

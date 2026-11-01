@@ -69,6 +69,11 @@ const KNOWN: Record<string, string> = {
     '`now` is checked at the top of purgeExpiredInterregText, which throws on an invalid Date; cron input, no client (FO-195)',
   'src/modules/m17/server/retention.ts in: ids':
     '`ids` are the primary keys of the InterregAnalysis rows the `findMany` just above returned in the same transaction; an empty list leaves the loop before any write (FO-195)',
+  'src/modules/m17/server/stale-runs.ts id: r.id':
+    '`r` is a row of the `findMany` re-read under the tenant lock just above (InterregAnalysis primary key); cron input, no client (FO-317)',
+  'src/modules/m17/server/stale-runs.ts tenantId: r.tenantId': 'non-null `tenantId` column of the same row (FO-317)',
+  'src/modules/m17/server/stale-runs.ts updatedAt: r.updatedAt':
+    'non-null `updatedAt` (the claim instant) of the same row, pinning the claim that was found stale (FO-317)',
   'src/modules/m10/server/actions.ts followupDocId: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts id: existing.id': DB_ROW,
   'src/modules/m10/server/actions.ts version: existing.version':
