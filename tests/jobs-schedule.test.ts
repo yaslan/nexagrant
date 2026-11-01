@@ -51,6 +51,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'partner-search': '0 3 * * *',
       'partner-search-retention': '15 3 * * *',
       'm17-text-retention': '35 3 * * *',
+      'm17-stale-runs': '*/15 * * * *',
       'invitation-cleanup': '30 3 * * *',
       'public-lead-cleanup': '45 3 * * *',
       'expert-prereg-cleanup': '55 3 * * *',

@@ -40,6 +40,7 @@ export const JOB_IDS = [
   'partner-search',
   'partner-search-retention',
   'm17-text-retention',
+  'm17-stale-runs',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];
@@ -143,6 +144,17 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     cron: '20 * * * *',
     maxAttempts: 3,
     queue: 'alerts-ops-digest',
+    missedTickAlert: false,
+  },
+  // FO-317: every 15 minutes, gives back the credit reservation of an M17 run whose process
+  // died while ANALYZING (src/modules/m17/server/stale-runs.ts). Own queue, so a job added by
+  // hand waits for the cron's run. No missed-tick alert and no backfill: the next tick releases
+  // every run still stale, so a missed tick loses nothing.
+  {
+    id: 'm17-stale-runs',
+    cron: '*/15 * * * *',
+    maxAttempts: 3,
+    queue: 'm17-stale-runs',
     missedTickAlert: false,
   },
 ];

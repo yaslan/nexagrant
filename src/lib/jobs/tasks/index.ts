@@ -19,6 +19,7 @@ import { m4StaleRelationshipsTask } from './m4-stale-relationships';
 import { jobQueueHealthTask } from './job-queue-health';
 import { alertsOpsDigestTask } from './alerts-ops-digest';
 import { m17TextRetentionTask } from './m17-text-retention';
+import { m17StaleRunsTask } from './m17-stale-runs';
 import { notificationsRetentionTask } from './notifications-retention';
 import { evidenceExpiringTask } from './evidence-expiring';
 import { partnerSearchTask } from './partner-search';
@@ -49,6 +50,7 @@ export const taskList: Record<JobId, Task> = {
   'job-queue-health': jobQueueHealthTask,
   'alerts-ops-digest': alertsOpsDigestTask,
   'm17-text-retention': m17TextRetentionTask,
+  'm17-stale-runs': m17StaleRunsTask,
   'notifications-retention': notificationsRetentionTask,
   'evidence-expiring': evidenceExpiringTask,
   'partner-search': partnerSearchTask,
