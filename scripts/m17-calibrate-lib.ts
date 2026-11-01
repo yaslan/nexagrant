@@ -1,10 +1,13 @@
 /**
  * Pure part of the M17 calibration harness (FO-278): argument parsing, the budget guard,
- * the run loop, statistics across runs and the report. No database, no model, no env reads
- * here — `scripts/m17-calibrate.ts` supplies those, and the unit test drives this with a fake run.
+ * the run loop, statistics across runs and the report. No database connection, no model call, no
+ * env reads here — `scripts/m17-calibrate.ts` supplies those, and the unit test drives this with a fake run.
+ * (The isolation guard builds a `pg.Client` only to read the port it would dial; it never connects.)
  *
  * Internal pre-assessment only: the output is a calibration measurement, not an official score.
  */
+
+import pg from 'pg';
 
 export const DEFAULT_MAX_CREDITS = 9;
 /** Failed runs may cost at most this much in total before the harness stops (card FO-278). */
@@ -83,9 +86,23 @@ function integerFlag(flags: Map<string, string>, name: string, fallback: number,
   return n;
 }
 
+const SHARED_PORT = 5433;
+
 /**
- * The run must never touch the shared :5433 database. Checks the port in DATABASE_URL (including
- * `?port=5433` and `host=…&port=5433` query forms) and PGPORT. An unreadable URL fails closed.
+ * The port `pg` would dial for this config. pg's typings say `port: number`, but at runtime it takes the
+ * raw string from PGPORT and parses it itself, so the value is passed through unchanged.
+ * `connectionParameters` is pg's internal field, missing from its typings.
+ */
+function dialedPort(config: { connectionString?: string; port?: string }): number {
+  const client = new pg.Client(config as unknown as pg.ClientConfig) as pg.Client & { connectionParameters: { port: number } };
+  return Number(client.connectionParameters.port);
+}
+
+/**
+ * The run must never touch the shared :5433 database. The port is not parsed here: it is read from
+ * `pg` itself (`connectionParameters.port`), the same code that dials, so the guard and the
+ * connection cannot disagree on spellings such as `?port=05433` or `PGPORT=" 5433"`. Building a
+ * `pg.Client` opens no connection. Only `postgres:` / `postgresql:` URLs pass. An unreadable URL fails closed.
  */
 export function assertIsolatedDatabase(env: Record<string, string | undefined>): void {
   const raw = env.DATABASE_URL;
@@ -96,9 +113,17 @@ export function assertIsolatedDatabase(env: Record<string, string | undefined>):
   } catch {
     throw new Error('DATABASE_URL okunamadı; izole veritabanı doğrulanamadı');
   }
-  const SHARED = '5433';
-  const ports = [url.port, url.searchParams.get('port'), env.PGPORT].filter((p): p is string => p !== undefined && p !== null);
-  if (ports.includes(SHARED)) {
+  // A schemeless `localhost:5433` parses as protocol `localhost:` and would be silently ignored by pg.
+  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
+    throw new Error('DATABASE_URL protokolü postgres: ya da postgresql: olmalı; izole veritabanı doğrulanamadı');
+  }
+  let dialed: number[];
+  try {
+    dialed = [dialedPort({ connectionString: raw }), dialedPort({ port: env.PGPORT })];
+  } catch {
+    throw new Error('DATABASE_URL okunamadı; izole veritabanı doğrulanamadı');
+  }
+  if (dialed.some((p) => Number(p) === SHARED_PORT)) {
     throw new Error('DATABASE_URL paylaşılan :5433 veritabanını gösteriyor; pnpm gate:isolated ile çalıştır');
   }
 }

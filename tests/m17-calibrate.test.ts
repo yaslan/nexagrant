@@ -118,6 +118,34 @@ describe('assertIsolatedDatabase: never the shared :5433 database', () => {
     expect(() => assertIsolatedDatabase({ DATABASE_URL: 'postgresql://u:p@localhost/iso', PGPORT: '5433' })).toThrow(/5433/);
   });
 
+  // FO-297 K-1: each of these reached :5433 before, because the guard compared text while pg parses the value.
+  test.each([
+    ['postgres://u:p@localhost/iso?port=05433', undefined],
+    ['postgres://u:p@localhost/iso?port=5432&port=5433', undefined],
+    ['postgres://u:p@localhost/iso', ' 5433'],
+    ['postgres://u:p@localhost/iso', '05433'],
+  ])('refuses the spelling that pg dials as 5433: %s PGPORT=%s', (dbUrl, pgport) => {
+    const env: Record<string, string | undefined> = { DATABASE_URL: dbUrl, PGPORT: pgport };
+    expect(() => assertIsolatedDatabase(env)).toThrow(/5433/);
+  });
+
+  test.each([
+    'postgres://u:p@[::1]:5433/iso',
+    'POSTGRES://u:p@LOCALHOST:5433/iso',
+    'postgresql+ssl://u:p@localhost:5433/iso',
+  ])('refuses port 5433 in IPv6, upper-case and postgresql+ssl spellings: %s', (dbUrl) => {
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: dbUrl })).toThrow();
+  });
+
+  test('refuses a schemeless URL (FO-297 Ö-1): pg would ignore its port', () => {
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'localhost:5433' })).toThrow(/postgres/);
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'localhost:55432' })).toThrow(/postgres/);
+  });
+
+  test('accepts an upper-case scheme and IPv6 host on an isolated port', () => {
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'POSTGRES://u:p@[::1]:55432/iso' })).not.toThrow();
+  });
+
   test('accepts an isolated port, and an unset PGPORT', () => {
     expect(() => assertIsolatedDatabase(url('postgresql://u:p@localhost:55432/iso'))).not.toThrow();
     expect(() => assertIsolatedDatabase({ DATABASE_URL: 'postgresql://u:p@localhost:55432/iso', PGPORT: '55432' })).not.toThrow();
@@ -204,6 +232,20 @@ describe('runCalibration: budget guard', () => {
       },
     });
     expect(calls).toBe(1);
+    expect(loop.creditsSpent).toBe(7);
+    expect(loop.stoppedBy).toBe('budget');
+  });
+
+  // FO-297 K-2: the only run is the last one, so without the charged-credits check the loop would end
+  // as 'completed'. This is the test that fails when that check is removed.
+  test('last-run overrun by the ledger is reported as budget, not completed', async () => {
+    const loop = await runCalibration({
+      runs: 1,
+      price: 0,
+      maxCredits: 6,
+      runOnce: async (run) => ({ ...okOutcome(run, 30, {}), creditsCharged: 7 }),
+    });
+    expect(loop.records).toHaveLength(1);
     expect(loop.creditsSpent).toBe(7);
     expect(loop.stoppedBy).toBe('budget');
   });
