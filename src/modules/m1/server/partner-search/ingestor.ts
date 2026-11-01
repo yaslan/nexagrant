@@ -265,7 +265,8 @@ export async function runPartnerSearchIngestion(options: RunOptions): Promise<Pa
       if (result.status === 'drift') {
         drift = true;
         // Field paths and validation messages only: no person data, no raw payload.
-        errors.push(`${topic.identifier}: schema drift: ${result.schemaDrift.slice(0, 3).join('; ')}`);
+        // Unshift, not push: the same 20-line cap as the 403/429 line above; drift is the stop cause.
+        errors.unshift(`${topic.identifier}: schema drift: ${result.schemaDrift.slice(0, 3).join('; ')}`);
         await reportSchemaDrift(PARTNER_SEARCH_SOURCE, result.schemaDrift);
         break;
       }
