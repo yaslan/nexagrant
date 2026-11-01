@@ -10,13 +10,18 @@
 #
 #   * * * * * /bin/bash /home/fonbridge/fonbridge-app/worker.sh
 #
+# Hostinger Cloud hosting (nexagrant.com, docs/DEPLOY-NEXAGRANT-HOSTINGER.md):
+#
+#   * * * * * FB_WORKER_ENV=/home/u605628300/.nexagrant-worker.env /bin/bash /home/u605628300/domains/nexagrant.com/public_html/worker.sh
+#
 # Environment: the variables set in "Setup Node.js App" do NOT reach cron.
 # The worker reads its own file (default ~/.fonbridge-worker.env, chmod 600,
 # outside the application root) through dotenv. It must hold at least
 # DATABASE_URL and JOBS_CRON_ENABLED (true|false); production refuses to start
 # without JOBS_CRON_ENABLED.
 #
-# Node: FB_NODE, else the Node.js Selector's virtual environment, else `node`.
+# Node: FB_NODE, else the Node.js Selector's virtual environment, else CloudLinux's
+# alt-nodejs 24/22 (Hostinger), else `node`. The worker needs Node >= 22.18.
 #
 #   worker.sh stop   SIGTERM to this app's worker: it finishes the jobs in flight
 #                    and exits; the next cron minute starts a fresh one (that is
@@ -42,10 +47,17 @@ fi
 
 if [ -z "${FB_NODE:-}" ]; then
   FB_NODE="$(ls -d "$HOME"/nodevenv/"$(basename "$APP_ROOT")"/*/bin/node 2>/dev/null | sort -V | tail -1 || true)"
+  for alt in /opt/alt/alt-nodejs24/root/usr/bin/node /opt/alt/alt-nodejs22/root/usr/bin/node; do
+    [ -n "$FB_NODE" ] || { [ -x "$alt" ] && FB_NODE="$alt"; } || true
+  done
   [ -n "$FB_NODE" ] || FB_NODE="$(command -v node || true)"
 fi
 if [ -z "$FB_NODE" ] || [ ! -x "$FB_NODE" ]; then
   echo "$(date -u +%FT%TZ) worker.sh: no node binary (set FB_NODE)" >> "$LOG"; exit 1
+fi
+# A host may offer only an older 22.x: refuse it here, in the log, not as a crash loop.
+if ! "$FB_NODE" -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=18)?0:1)'; then
+  echo "$(date -u +%FT%TZ) worker.sh: $FB_NODE is $("$FB_NODE" -v), need >= 22.18 (set FB_NODE)" >> "$LOG"; exit 1
 fi
 if [ ! -r "$ENV_FILE" ]; then
   echo "$(date -u +%FT%TZ) worker.sh: env file $ENV_FILE missing" >> "$LOG"; exit 1

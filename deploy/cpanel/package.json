@@ -1,9 +1,10 @@
 {
   "name": "fonbridge-app",
   "private": true,
-  "description": "FonBridge web (Next standalone) for cPanel Setup Node.js App. No dependencies: the server's modules are in app/node_modules.",
+  "description": "NexaGrant web (Next standalone, prebuilt) for a Node.js host: cPanel Setup Node.js App or Hostinger Cloud hosting (app type other, entry app.js). No dependencies: the server's modules are in app/node_modules.",
   "main": "app.js",
   "scripts": {
+    "build": "node -e \"console.log('prebuilt package: nothing to build (deploy/cpanel/build-package.sh)')\"",
     "start": "node app.js"
   },
   "engines": {

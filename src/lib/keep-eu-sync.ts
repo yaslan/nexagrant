@@ -39,8 +39,11 @@ export const DEFAULT_TURKEY_PROGRAMME_IDS: readonly number[] = [305, 387, 385, 6
  * Honest client identification. We do not impersonate a browser: keep.eu may refuse
  * bot traffic with HTTP 403, and in that case we alert and stop instead of retrying
  * under a different identity. Access must be agreed with Interact (keep.support@interact.eu).
+ * The product token stays `FonBridge` on purpose after the NexaGrant rename (K-574984 = A):
+ * an access arrangement with Interact may be tied to this exact User-Agent. Do not rename it
+ * without a new decision; the other adapters may say NexaGrant.
  */
-export const KEEP_EU_HTTP_USER_AGENT = 'NexaGrant/1.0 (+https://nexagrant.com/contact)';
+export const KEEP_EU_HTTP_USER_AGENT = 'FonBridge/1.0 (+https://nexagrant.com/contact)';
 
 /** Upper bound for one keep.eu request; a hung upstream must not block a job or admin action. */
 export const KEEP_EU_FETCH_TIMEOUT_MS = 30_000;
