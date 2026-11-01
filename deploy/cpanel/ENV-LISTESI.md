@@ -93,13 +93,13 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=<...>
 SMTP_PASS=<...>
-SMTP_FROM=FonBridge <info@nexagrant.com>
+SMTP_FROM=NexaGrant <info@nexagrant.com>
 ANTHROPIC_API_KEY=<...>
 OPENAI_API_KEY=<...>
 FEEDBACK_DIGEST_TO=<...>
 # R2_* (varsa), WORKER_URL/WORKER_TOKEN (varsa), CALENDAR_ENCRYPTION_KEY (varsa)
 ```
 
-Değerde boşluk ya da `#` varsa çift tırnak içine alın: `SMTP_FROM="FonBridge <info@nexagrant.com>"`.
+Değerde boşluk ya da `#` varsa çift tırnak içine alın: `SMTP_FROM="NexaGrant <info@nexagrant.com>"`.
 
 **Değerin sonunda boşluk bırakmayın.** cPanel ekranı sondaki boşluğu silmez. `DATABASE_URL`'in sonunda boşluk kalırsa sertifika yolu `…crt ` olur ve uygulama `ENOENT` verir (KURULUM.md §10).

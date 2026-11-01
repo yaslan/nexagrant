@@ -1,5 +1,12 @@
 # NexaGrant → nexagrant.com (Hostinger): dağıtım hazırlığı
 
+> **DURUM (2026-11-01, dev ile birleştirme sonrası): bu belgenin dağıtım hedefi KISMEN GEÇERSİZ.**
+> Dev'e bu kartın dışında FO-244/FO-250/FO-308 ile **Hostinger KVM 2 VPS** paketi girdi (`deploy/vps/`, `deploy/vps/RUNBOOK.md`);
+> `deploy/cpanel/` "kullanılmıyor" diye işaretlendi (`deploy/cpanel/ESKI-KULLANILMIYOR.md`). Aşağıdaki §1 "VPS: yok", §3 (cPanel/Passenger/`build-package.sh`),
+> §4 (paylaşılan plan) ve §6 (paket yükleme sırası) bu yüzden **eskidir**; canlı yığın için tek kaynak `deploy/vps/RUNBOOK.md`.
+> Hâlâ geçerli kalanlar: ürün adı/marka bölümü (§2), değişmeyen kimlikler listesi, `SMTP_FROM` görünen adı, Google OAuth yönlendirme adresi (§5-6), DNS'e dokunmama ilkesi
+> (VPS'te `@`/`www` ALIAS/CNAME yerine **A** kaydı gerekir: RUNBOOK K1). Alan adı tutarlılığı (`RELEASE_CHECKLIST.md`/`SMTP-SUNUCU.md` hâlâ `fonbridge.com`) RUNBOOK K11'de ayrı iş olarak açık.
+
 Kart: FO-275 (TASK-MVWT5NUHYLW5A) · Hazırlayan: se-fb · Tarih: 2026-10-31 · Kaynak: patron talimatı "sunucu Node.js destekliyor, adı NexaGrant yap, nexagrant.com'da dağıtılacak şekilde hazırla".
 
 **Bu belge hiçbir şey dağıtmaz.** Hostinger'a yalnız salt-okunur sorgu yapıldı (alan adı, DNS, hosting siparişi, VPS listesi, abonelikler). Yükleme, DNS ve veritabanı değişikliği yok; her biri patron onayı ister.
