@@ -1,10 +1,13 @@
 /**
  * Pure part of the M17 calibration harness (FO-278): argument parsing, the budget guard,
- * the run loop, statistics across runs and the report. No database, no model, no env reads
- * here — `scripts/m17-calibrate.ts` supplies those, and the unit test drives this with a fake run.
+ * the run loop, statistics across runs and the report. No database connection, no model call, no
+ * env reads here — `scripts/m17-calibrate.ts` supplies those, and the unit test drives this with a fake run.
+ * (The isolation guard builds a `pg.Client` only to read the port it would dial; it never connects.)
  *
  * Internal pre-assessment only: the output is a calibration measurement, not an official score.
  */
+
+import pg from 'pg';
 
 export const DEFAULT_MAX_CREDITS = 9;
 /** Failed runs may cost at most this much in total before the harness stops (card FO-278). */
@@ -28,6 +31,12 @@ export const USAGE =
   'usage: pnpm m17:calibrate -- --project <md|txt|docx|pdf> --call <md|txt|docx|pdf> ' +
   '[--locale tr|en] [--runs 1-5] [--out <json>] [--max-credits 9] [--rubric <id>]';
 
+/**
+ * The only flags the harness understands. Anything else is refused: a typo such as
+ * `--maxcredits 100` must not silently fall back to the default budget.
+ */
+export const KNOWN_FLAGS = ['project', 'call', 'locale', 'runs', 'out', 'max-credits', 'rubric'] as const;
+
 /** Reads `--key value` pairs. Throws with the usage line on anything malformed. */
 export function parseArgs(argv: string[]): CalibrateArgs {
   // `pnpm m17:calibrate -- --project …` can hand the separator on to the script; it is not a flag.
@@ -37,7 +46,12 @@ export function parseArgs(argv: string[]): CalibrateArgs {
     const key = tokens[i];
     const value = tokens[i + 1];
     if (!key?.startsWith('--') || value === undefined || value.startsWith('--')) throw new Error(USAGE);
-    flags.set(key.slice(2), value);
+    const name = key.slice(2);
+    if (!(KNOWN_FLAGS as readonly string[]).includes(name)) {
+      throw new Error(`unknown flag --${name} (known: ${KNOWN_FLAGS.map((f) => `--${f}`).join(', ')})`);
+    }
+    if (flags.has(name)) throw new Error(`--${name} given twice; pass it once`);
+    flags.set(name, value);
   }
   const project = flags.get('project');
   const call = flags.get('call');
@@ -60,12 +74,58 @@ export function parseArgs(argv: string[]): CalibrateArgs {
   };
 }
 
+/**
+ * Plain decimal digits only. `Number()` would accept `0x3`, `1e1` and `" 3 "`, and a budget of
+ * `1e1` read as 10 is exactly the kind of surprise the guard exists to stop.
+ */
 function integerFlag(flags: Map<string, string>, name: string, fallback: number, min: number, max: number): number {
   const raw = flags.get(name);
   if (raw === undefined) return fallback;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`--${name} must be an integer ${min}-${max} (got "${raw}")`);
+  const n = /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(n) || n < min || n > max) throw new Error(`--${name} must be an integer ${min}-${max} (got "${raw}")`);
   return n;
+}
+
+const SHARED_PORT = 5433;
+
+/**
+ * The port `pg` would dial for this config. pg's typings say `port: number`, but at runtime it takes the
+ * raw string from PGPORT and parses it itself, so the value is passed through unchanged.
+ * `connectionParameters` is pg's internal field, missing from its typings.
+ */
+function dialedPort(config: { connectionString?: string; port?: string }): number {
+  const client = new pg.Client(config as unknown as pg.ClientConfig) as pg.Client & { connectionParameters: { port: number } };
+  return Number(client.connectionParameters.port);
+}
+
+/**
+ * The run must never touch the shared :5433 database. The port is not parsed here: it is read from
+ * `pg` itself (`connectionParameters.port`), the same code that dials, so the guard and the
+ * connection cannot disagree on spellings such as `?port=05433` or `PGPORT=" 5433"`. Building a
+ * `pg.Client` opens no connection. Only `postgres:` / `postgresql:` URLs pass. An unreadable URL fails closed.
+ */
+export function assertIsolatedDatabase(env: Record<string, string | undefined>): void {
+  const raw = env.DATABASE_URL;
+  if (!raw) throw new Error('DATABASE_URL tanımlı değil; izole veritabanı doğrulanamadı');
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error('DATABASE_URL okunamadı; izole veritabanı doğrulanamadı');
+  }
+  // A schemeless `localhost:5433` parses as protocol `localhost:` and would be silently ignored by pg.
+  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
+    throw new Error('DATABASE_URL protokolü postgres: ya da postgresql: olmalı; izole veritabanı doğrulanamadı');
+  }
+  let dialed: number[];
+  try {
+    dialed = [dialedPort({ connectionString: raw }), dialedPort({ port: env.PGPORT })];
+  } catch {
+    throw new Error('DATABASE_URL okunamadı; izole veritabanı doğrulanamadı');
+  }
+  if (dialed.some((p) => Number(p) === SHARED_PORT)) {
+    throw new Error('DATABASE_URL paylaşılan :5433 veritabanını gösteriyor; pnpm gate:isolated ile çalıştır');
+  }
 }
 
 /**
@@ -141,9 +201,25 @@ export async function runCalibration(input: LoopInput): Promise<LoopResult> {
       stoppedBy = 'budget';
       break;
     }
-    const outcome = await input.runOnce(run);
+    let outcome: RunOutcome;
+    try {
+      outcome = await input.runOnce(run);
+    } catch (err) {
+      // An unexpected throw must not lose the runs already finished: it becomes a failed run.
+      // Only the error class is kept, because a message can echo request details.
+      outcome = {
+        creditsCharged: 0,
+        record: { run, status: 'failed', analysisId: null, error: `exception: ${err instanceof Error ? err.name : 'unknown'}`, durationMs: 0 },
+      };
+    }
     records.push(outcome.record);
     creditsSpent += outcome.creditsCharged;
+    if (creditsSpent > input.maxCredits) {
+      // The ledger is the truth: if what was actually charged passes the budget, stop here
+      // even when the per-run estimate said the next run would fit.
+      stoppedBy = 'budget';
+      break;
+    }
     if (outcome.record.status === 'failed') {
       // A failed run is charged its price here even though the ledger refunds it: the ceiling is
       // about how many paid model calls were burnt, not what the tenant was left with.

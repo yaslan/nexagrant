@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  assertIsolatedDatabase,
   DEFAULT_MAX_CREDITS,
   DEFAULT_RUBRIC,
   FAILED_CREDIT_CEILING,
@@ -68,6 +69,26 @@ describe('parseArgs', () => {
     expect(parseArgs(['--', '--project', 'p.md', '--call', 'c.docx'])).toMatchObject({ project: 'p.md', call: 'c.docx' });
   });
 
+  test('rejects an unknown flag with a message that names it (typo --maxcredits is not silently ignored)', () => {
+    expect(() => parseArgs(['--project', 'p.md', '--call', 'c.docx', '--maxcredits', '100'])).toThrow(/unknown flag --maxcredits/);
+    expect(() => parseArgs(['--project', 'p.md', '--call', 'c.docx', '--runz', '2'])).toThrow(/unknown flag --runz/);
+  });
+
+  test('rejects a flag given twice instead of letting the last one win', () => {
+    expect(() => parseArgs(['--project', 'p.md', '--call', 'c.docx', '--runs', '2', '--runs', '5'])).toThrow(/--runs given twice/);
+  });
+
+  test('accepts only plain decimal integers for numeric flags', () => {
+    const base = ['--project', 'p.md', '--call', 'c.docx'];
+    for (const bad of ['0x3', '1e1', ' 3 ', '3.0', '+3', '', '٣']) {
+      expect(() => parseArgs([...base, '--runs', bad]), `runs=${JSON.stringify(bad)}`).toThrow(/--runs/);
+    }
+    for (const bad of ['0x9', '9e0', ' 9', '-1']) {
+      expect(() => parseArgs([...base, '--max-credits', bad]), `max-credits=${JSON.stringify(bad)}`).toThrow(/--max-credits/);
+    }
+    expect(parseArgs([...base, '--runs', '04']).runs).toBe(4);
+  });
+
   test('refuses a missing input, a bad locale, and run counts outside 1-5', () => {
     expect(() => parseArgs(['--call', 'c.docx'])).toThrow(/usage/);
     expect(() => parseArgs(['--project', 'p.md'])).toThrow(/usage/);
@@ -75,6 +96,64 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['--project', 'p.md', '--call', 'c.docx', '--runs', '0'])).toThrow(/--runs/);
     expect(() => parseArgs(['--project', 'p.md', '--call', 'c.docx', '--runs', '6'])).toThrow(/--runs/);
     expect(() => parseArgs(['--project', 'p.md', '--call', 'c.docx', '--runs', '2.5'])).toThrow(/--runs/);
+  });
+});
+
+describe('assertIsolatedDatabase: never the shared :5433 database', () => {
+  const url = (s: string) => ({ DATABASE_URL: s });
+
+  test('refuses every spelling of port 5433 in DATABASE_URL', () => {
+    for (const s of [
+      'postgresql://u:p@localhost:5433/fabrika',
+      'postgresql://u:p@localhost:5433/fabrika?schema=public',
+      'postgresql://u:p@localhost/fabrika?port=5433',
+      'postgresql://u:p@localhost/fabrika?host=localhost&port=5433',
+      'postgresql://u:p@localhost/fabrika?sslmode=disable&port=5433&connect_timeout=5',
+    ]) {
+      expect(() => assertIsolatedDatabase(url(s)), s).toThrow(/5433/);
+    }
+  });
+
+  test('refuses PGPORT=5433 even when DATABASE_URL names no port', () => {
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'postgresql://u:p@localhost/iso', PGPORT: '5433' })).toThrow(/5433/);
+  });
+
+  // FO-297 K-1: each of these reached :5433 before, because the guard compared text while pg parses the value.
+  test.each([
+    ['postgres://u:p@localhost/iso?port=05433', undefined],
+    ['postgres://u:p@localhost/iso?port=5432&port=5433', undefined],
+    ['postgres://u:p@localhost/iso', ' 5433'],
+    ['postgres://u:p@localhost/iso', '05433'],
+  ])('refuses the spelling that pg dials as 5433: %s PGPORT=%s', (dbUrl, pgport) => {
+    const env: Record<string, string | undefined> = { DATABASE_URL: dbUrl, PGPORT: pgport };
+    expect(() => assertIsolatedDatabase(env)).toThrow(/5433/);
+  });
+
+  test.each([
+    'postgres://u:p@[::1]:5433/iso',
+    'POSTGRES://u:p@LOCALHOST:5433/iso',
+    'postgresql+ssl://u:p@localhost:5433/iso',
+  ])('refuses port 5433 in IPv6, upper-case and postgresql+ssl spellings: %s', (dbUrl) => {
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: dbUrl })).toThrow();
+  });
+
+  test('refuses a schemeless URL (FO-297 Ö-1): pg would ignore its port', () => {
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'localhost:5433' })).toThrow(/postgres/);
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'localhost:55432' })).toThrow(/postgres/);
+  });
+
+  test('accepts an upper-case scheme and IPv6 host on an isolated port', () => {
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'POSTGRES://u:p@[::1]:55432/iso' })).not.toThrow();
+  });
+
+  test('accepts an isolated port, and an unset PGPORT', () => {
+    expect(() => assertIsolatedDatabase(url('postgresql://u:p@localhost:55432/iso'))).not.toThrow();
+    expect(() => assertIsolatedDatabase({ DATABASE_URL: 'postgresql://u:p@localhost:55432/iso', PGPORT: '55432' })).not.toThrow();
+  });
+
+  test('fails closed when DATABASE_URL is missing or cannot be read as a URL', () => {
+    expect(() => assertIsolatedDatabase({})).toThrow(/DATABASE_URL/);
+    expect(() => assertIsolatedDatabase(url('not a url :5433'))).toThrow(/DATABASE_URL/);
   });
 });
 
@@ -139,6 +218,53 @@ describe('runCalibration: budget guard', () => {
     expect(loop.stoppedBy).toBe('failed_budget');
   });
 
+  test('stops when the ledger-charged credits pass the budget even though the estimate said it fit', async () => {
+    // The estimate is 0 per run, so the pre-run check never stops anything; the ledger charged 7 on the
+    // first run, which is past the budget of 6. Only the charged-credits check can stop the loop here.
+    let calls = 0;
+    const loop = await runCalibration({
+      runs: 3,
+      price: 0,
+      maxCredits: 6,
+      runOnce: async (run) => {
+        calls++;
+        return { ...okOutcome(run, 30, {}), creditsCharged: 7 };
+      },
+    });
+    expect(calls).toBe(1);
+    expect(loop.creditsSpent).toBe(7);
+    expect(loop.stoppedBy).toBe('budget');
+  });
+
+  // FO-297 K-2: the only run is the last one, so without the charged-credits check the loop would end
+  // as 'completed'. This is the test that fails when that check is removed.
+  test('last-run overrun by the ledger is reported as budget, not completed', async () => {
+    const loop = await runCalibration({
+      runs: 1,
+      price: 0,
+      maxCredits: 6,
+      runOnce: async (run) => ({ ...okOutcome(run, 30, {}), creditsCharged: 7 }),
+    });
+    expect(loop.records).toHaveLength(1);
+    expect(loop.creditsSpent).toBe(7);
+    expect(loop.stoppedBy).toBe('budget');
+  });
+
+  test('a run that throws is recorded as a failed run, and the records so far are kept', async () => {
+    const loop = await runCalibration({
+      runs: 2,
+      price: 3,
+      maxCredits: 9,
+      runOnce: async (run) => {
+        if (run === 1) return okOutcome(run, 30, {});
+        throw new Error('database closed');
+      },
+    });
+    expect(loop.records).toHaveLength(2);
+    expect(loop.records[1]).toMatchObject({ run: 2, status: 'failed', error: 'exception: Error' });
+    expect(loop.creditsSpent).toBe(3);
+  });
+
   test('all runs completing ends as completed, spend equal to the sum of the runs', async () => {
     const loop = await runCalibration({
       runs: 3,
@@ -183,21 +309,31 @@ describe('statistics and the report shape', () => {
   });
 
   test('the JSON report carries the run records, and no key value or secret appears in it', async () => {
+    // A fake key in the environment, and a provider error that echoes it: neither may reach the report.
     const secret = 'sk-ant-TEST-SECRET-VALUE';
+    const env = { ANTHROPIC_API_KEY: secret };
+    expect(requireAnthropicKey(env)).toBe(secret);
     const loop = await runCalibration({
-      runs: 2,
+      runs: 3,
       price: 3,
       maxCredits: 9,
-      runOnce: async (run) => (run === 1 ? okOutcome(run, 30, { c1: 3 }) : failedOutcome(run)),
+      runOnce: async (run) => {
+        if (run === 1) return okOutcome(run, 30, { c1: 3 });
+        if (run === 2) return failedOutcome(run);
+        throw new Error(`401 invalid x-api-key ${secret}`);
+      },
     });
-    const report = { meta: { rubric: DEFAULT_RUBRIC, locale: 'tr', pricePerRun: 3 }, runs: loop.records, summary: summarize(loop, 2) };
+    const report = { meta: { rubric: DEFAULT_RUBRIC, locale: 'tr', pricePerRun: 3 }, runs: loop.records, summary: summarize(loop, 3) };
     const json = JSON.stringify(report);
+    const md = renderMarkdown(report.meta, loop, report.summary);
 
-    expect(report.runs).toHaveLength(2);
+    expect(report.runs).toHaveLength(3);
     expect(report.runs[0]).toMatchObject({ status: 'ok', rawScore: 30, credits: 3, inputTokens: 1000, outputTokens: 500 });
     expect(report.runs[1]).toMatchObject({ status: 'failed', error: 'evaluation_failed' });
+    expect(report.runs[2]).toMatchObject({ status: 'failed', error: 'exception: Error' });
     expect(json).not.toContain(secret);
     expect(json).not.toMatch(/sk-ant-/);
+    expect(md).not.toContain(secret);
   });
 
   test('the markdown says it is an internal pre-assessment and lists each run', async () => {
