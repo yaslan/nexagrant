@@ -11,7 +11,7 @@ import { performance } from 'node:perf_hooks';
 
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun } from 'docx';
 import { createTranslator } from 'next-intl';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import en from '../messages/en.json';
 import tr from '../messages/tr.json';
@@ -23,6 +23,20 @@ import { decodeXmlText as xlsxDecodeXmlText } from '../src/lib/k3-topic-stats/xl
 import { decodeXmlText } from '../src/modules/m17/server/docx.worker';
 import { HOSTILE_FLAT, legitLargeDocx } from './helpers/hostile-docx';
 import { syntheticPdf, densePageLines } from './helpers/synthetic-pdf';
+import { slack } from './helpers/timing';
+vi.setConfig({ testTimeout: slack(30_000) });
+
+// The read budget is the real one, scaled by TEST_TIMING_SLACK on a loaded
+// machine: a legitimate DOCX must not be refused as parse_too_heavy for taking
+// longer than 5 s under load (FO-261). The deadline test below sets its own.
+vi.mock('../src/modules/m17/limits', async () => {
+  const { slack: scale } = await import('./helpers/timing');
+  const actual = await vi.importActual<typeof import('../src/modules/m17/limits')>('../src/modules/m17/limits');
+  return {
+    ...actual,
+    INTERREG_UPLOAD_LIMITS: { ...actual.INTERREG_UPLOAD_LIMITS, maxDocxParseMs: scale(actual.INTERREG_UPLOAD_LIMITS.maxDocxParseMs) },
+  };
+});
 
 const PROSE =
   'The project addresses cross-border cooperation between regions in the programme area, with measurable outputs. ';
@@ -172,7 +186,7 @@ describe('documentXmlToText — reading order', () => {
     // …and with the cap lifted the scan itself is still one linear pass.
     const t0 = Date.now();
     documentXmlToText(xml, Infinity, Infinity);
-    expect(Date.now() - t0).toBeLessThan(2_000);
+    expect(Date.now() - t0).toBeLessThan(slack(2_000));
   });
 });
 
@@ -215,12 +229,12 @@ describe('readDocxText — real .docx files', () => {
     expect(original.length).toBeLessThan(200 * 1024);
     let t0 = Date.now();
     await expect(readDocxText(original, limits)).rejects.toMatchObject({ code: 'too_large' });
-    expect(Date.now() - t0).toBeLessThan(1_500);
+    expect(Date.now() - t0).toBeLessThan(slack(1_500));
 
     const underCap = bomb(INTERREG_UPLOAD_LIMITS.maxDocxXmlBytes - 1024 * 1024); // fits the cap: the depth cap decides
     t0 = Date.now();
     await expect(readDocxText(underCap, limits)).rejects.toMatchObject({ code: 'malformed' });
-    expect(Date.now() - t0).toBeLessThan(1_500);
+    expect(Date.now() - t0).toBeLessThan(slack(1_500));
   });
 
   it('reads one document at a time and answers every caller', async () => {
@@ -254,7 +268,7 @@ describe('readDocxText — real .docx files', () => {
         await new Promise((r) => setTimeout(r, 5));
         clearInterval(beat);
       }
-      expect(maxGap).toBeLessThan(120);
+      expect(maxGap).toBeLessThan(slack(120));
     });
   });
 
@@ -263,7 +277,7 @@ describe('readDocxText — real .docx files', () => {
     await expect(readDocxText(HOSTILE_FLAT.para19(), { ...limits, maxParseMs: 25 })).rejects.toMatchObject({
       code: 'parse_too_heavy',
     });
-    expect(Date.now() - t0).toBeLessThan(1_500);
+    expect(Date.now() - t0).toBeLessThan(slack(1_500));
     await expect(readDocxText(await realDocx(), limits)).resolves.toContain('Partnership');
   });
 

@@ -25,10 +25,9 @@ vi.mock('@/lib/db', async (importOriginal) => {
 
 vi.mock('@/lib/llm', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/llm')>();
-  // The credit pre-check runs before the claim; give the tenant plenty so the run reaches it. After PR #228 the
-  // check becomes an atomic reservation that this mock does not cover; the invalid-clock throw still comes first
-  // (withTenant is never reached), so this stays valid. Revisit if #228 moves the reservation ahead of claim() (FO-293).
-  return { ...actual, getCreditBalance: async () => 1_000_000 };
+  // Since PR #228 the balance is read inside the locked claim transaction (`creditBalanceIn`), not through
+  // `getCreditBalance`. Neither is reached here: the invalid-clock throw comes before `withTenant` (FO-293, FO-289).
+  return { ...actual, creditBalanceIn: async () => 1_000_000 };
 });
 
 const { runEvaluation } = await import('@/modules/m17/server/evaluate');
