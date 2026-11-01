@@ -3801,9 +3801,9 @@
   },
   "ExpertPrereg": {
     "meta": {
-      "title": "AB Proje Uzmanları Rehberi — Ön Kayıt | FonBridge",
+      "title": "AB Proje Uzmanları Rehberi — Ön Kayıt | {brand}",
       "description": "Türkiye'nin doğrulanmış AB proje uzmanları rehberine ücretsiz ön kayıt. İlk {limit} kayıt Kurucu Uzman rozeti ve ömür boyu Pro üyelik kazanır.",
-      "verified_title": "E-posta doğrulama | FonBridge Uzman Rehberi"
+      "verified_title": "E-posta doğrulama | {brand} Uzman Rehberi"
     },
     "nav_label": "Uzman Havuzu",
     "hero": {
@@ -3892,7 +3892,7 @@
       "verify": "E-postanızı doğrulayın: {email} adresine gönderdiğimiz bağlantıya {hours} saat içinde tıklayın. Doğrulanmayan kayıt rehbere alınmaz.",
       "share": "LinkedIn'de paylaş",
       "share_new_tab": "(yeni sekmede açılır)",
-      "share_text": "FonBridge AB Proje Uzmanları Rehberi'ne ön kayıt yaptım. AB projelerinde deneyimliysen sen de katıl: {url}"
+      "share_text": "{brand} AB Proje Uzmanları Rehberi'ne ön kayıt yaptım. AB projelerinde deneyimliysen sen de katıl: {url}"
     },
     "faq": {
       "heading": "Sık sorulan sorular",

@@ -28,7 +28,8 @@ export const PUBLIC_LEAD_RETENTION_DAYS = 365;
  */
 export const PUBLIC_LEAD_CONSENT = {
   id: 'public-lead-contact',
-  version: '2026-09-30.1',
+  // 2026-10-31.1: the consent text names the product, which became NexaGrant (FO-275).
+  version: '2026-10-31.1',
   messageKey: 'readiness.lead.consent_label',
   /** The line printed right under the box; part of what the visitor agrees with (İNCELEME-61 Ö-3). */
   withdrawKey: 'readiness.lead.consent_withdraw',

@@ -3801,9 +3801,9 @@
   },
   "ExpertPrereg": {
     "meta": {
-      "title": "EU Project Experts Directory — Pre-registration | FonBridge",
+      "title": "EU Project Experts Directory — Pre-registration | {brand}",
       "description": "Free pre-registration for Türkiye's directory of verified EU project experts. The first {limit} sign-ups become Founding Experts with a permanent badge and lifetime Pro membership.",
-      "verified_title": "E-mail verification | FonBridge Expert Directory"
+      "verified_title": "E-mail verification | {brand} Expert Directory"
     },
     "nav_label": "Expert Pool",
     "hero": {
@@ -3892,7 +3892,7 @@
       "verify": "Verify your e-mail: click the link we sent to {email} within {hours} hours. Unverified registrations are not added to the directory.",
       "share": "Share on LinkedIn",
       "share_new_tab": "(opens in a new tab)",
-      "share_text": "I pre-registered for the FonBridge EU Project Experts Directory. If you have EU project experience, join too: {url}"
+      "share_text": "I pre-registered for the {brand} EU Project Experts Directory. If you have EU project experience, join too: {url}"
     },
     "faq": {
       "heading": "Frequently asked questions",

@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config as loadDotenv } from 'dotenv';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // The runner reads the same .env that `next dev` reads. Without it, the runner's
 // own DB clients fall back to src/lib/db.ts's CI default (port 5432), which is not
@@ -47,6 +49,19 @@ process.env.AUTH_SECRET = E2E_AUTH_SECRET;
  * That lock is deliberate and is not bypassed here.
  */
 const E2E_WEB_SERVER = process.env.E2E_WEB_SERVER === 'start' ? 'start' : 'dev';
+
+/**
+ * The web server never closes an idle keep-alive connection (FO-199). The specs'
+ * API calls share one keep-alive agent in the worker; Node's server closed an idle
+ * socket after ~6 s, and a call sent at that moment failed with `read ECONNRESET`
+ * (signInAs, GET /api/auth/session). `next dev` has no --keepAliveTimeout flag, so
+ * a preload sets it. Why and how measured: tests/e2e/support/server-keep-alive.mjs.
+ */
+// A file:// URL, so --import takes it on Windows too (a bare C:\ path is read as a URL scheme).
+const KEEP_ALIVE_PRELOAD = pathToFileURL(path.join(__dirname, 'tests/e2e/support/server-keep-alive.mjs')).href;
+const WEB_SERVER_NODE_OPTIONS = [process.env.NODE_OPTIONS, `--import ${JSON.stringify(KEEP_ALIVE_PRELOAD)}`]
+  .filter(Boolean)
+  .join(' ');
 
 // Set E2E_DATABASE_URL to process.env.DATABASE_URL so both runner and webServer see it
 if (process.env.E2E_DATABASE_URL) {
@@ -109,6 +124,7 @@ export default defineConfig({
     env: {
       ...process.env,
       ...testEnv,
+      NODE_OPTIONS: WEB_SERVER_NODE_OPTIONS,
       // Blank LLM keys in dev E2E so tests use template fallback, not real API calls
       // (matches CI behavior; reduces cost, ensures deterministic failures like CI).
       // Opt-in live tests (e.g. E2E_LIVE_EMBED=1) can override OPENAI_API_KEY if needed.

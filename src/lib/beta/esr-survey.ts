@@ -89,11 +89,11 @@ export function coveragePerSample(assignments: SurveyAssignment[]): Map<string, 
 
 const COPY = {
   tr: {
-    subject: 'FonBridge Beta — G0 skoru doğrulama anketi (5 dakika)',
+    subject: `${PRODUCT_NAME} Beta — G0 skoru doğrulama anketi (5 dakika)`,
     greeting: (name: string) => `Merhaba ${name},`,
     intro: (n: number) =>
-      `FonBridge'in G0 triyaj skorunu gerçek değerlendirme sonuçlarıyla kalibre ediyoruz. ` +
-      `Aşağıda ${n} örnek fırsat var; her biri için FonBridge'in verdiği skoru ve kararı görüyorsunuz.`,
+      `${PRODUCT_NAME}'in G0 triyaj skorunu gerçek değerlendirme sonuçlarıyla kalibre ediyoruz. ` +
+      `Aşağıda ${n} örnek fırsat var; her biri için ${PRODUCT_NAME}'in verdiği skoru ve kararı görüyorsunuz.`,
     ask: 'Tek sorumuz şu: siz olsanız aynı kararı verir miydiniz?',
     howTitle: 'Nasıl yanıtlanır',
     how: [
@@ -285,7 +285,7 @@ export function buildResponseTemplateCsv(assignment: SurveyAssignment): string {
     [assignment.partner.slug, item.sampleId, '', '', ''].join(','),
   );
   return [
-    '# FonBridge ESR calibration survey — one row per sample.',
+    `# ${PRODUCT_NAME} ESR calibration survey — one row per sample.`,
     '# agrees: true|false   verdict: GO|NO_GO (required only when agrees=false)   comment: free text',
     header,
     ...rows,

@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { connection } from 'next/server';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { BadgeCheck, Building2, Gift } from 'lucide-react';
 import { appUrl } from '@/lib/app-url';
 import { errorMessage } from '@/lib/errors';
@@ -18,7 +19,7 @@ export async function expertPreregMetadata({ params }: PageProps): Promise<Metad
   const t = await getTranslations({ locale, namespace: 'ExpertPrereg.meta' });
   const base = appUrl();
   const url = `${base}${expertPreregPath(locale)}`;
-  const title = t('title');
+  const title = t('title', { brand: PRODUCT_NAME });
   const description = t('description', { limit: FOUNDER_SEAT_LIMIT });
   return {
     title,

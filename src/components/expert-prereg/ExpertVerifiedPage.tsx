@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { CircleAlert, CircleCheck } from 'lucide-react';
 import { authSecret } from '@/lib/env';
 import { decodeVerifiedOutcome } from '@/lib/expert-prereg/server/verified-outcome';
@@ -16,7 +17,7 @@ type PageProps = {
 export async function expertVerifiedMetadata({ params }: Pick<PageProps, 'params'>): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'ExpertPrereg.meta' });
-  return { title: t('verified_title'), robots: { index: false, follow: false }, referrer: 'no-referrer' };
+  return { title: t('verified_title', { brand: PRODUCT_NAME }), robots: { index: false, follow: false }, referrer: 'no-referrer' };
 }
 
 /**

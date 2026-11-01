@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslations } from 'next-intl';
+import { PRODUCT_NAME } from '@/lib/brand';
 import { EXPERTISE_AREAS, LANGUAGES, PROGRAMMES, ROLES } from '@/lib/expert-prereg/options';
 import {
   EXPERT_PREREG_ERROR_CODES,
@@ -216,7 +217,7 @@ export default function ExpertPreregForm({ locale, kvkkBlocks, pageUrl, verifyHo
   }
 
   if (sentTo) {
-    const shareText = t('success.share_text', { url: pageUrl });
+    const shareText = t('success.share_text', { url: pageUrl, brand: PRODUCT_NAME });
     const shareHref = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText)}`;
     return (
       <section aria-labelledby="ep-success" className="rounded-xl border border-ok bg-surface p-5 sm:p-6">

@@ -15,6 +15,7 @@
 
 import { aiCreditEntry } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
+import { recordAlert } from '@/lib/observability/system-alert';
 import crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
@@ -586,6 +587,48 @@ async function releaseCallCredits(options: LlmGenerateOptions, refId: string): P
   });
 }
 
+/** Refund writes tried before a reservation is left standing and alerted (FO-319). */
+const REFUND_ATTEMPTS = 3;
+const REFUND_RETRY_BASE_MS = 200;
+
+/**
+ * Gives a reservation back, retrying a failed write (FO-319 Y-3, Ö-3). Never throws: the caller's
+ * own outcome — the provider error, or the truncated / refused answer — is what it reports, not a
+ * bookkeeping fault. A refund that still fails leaves the debit standing; that is logged and
+ * recorded as an `error` SystemAlert (`llm-refund`, deduplicated per module and purpose) so an
+ * operator can reconcile it. The alert carries no tenant id: SystemAlert is outside RLS.
+ */
+async function refundOrAlert(options: LlmGenerateOptions, refId: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= REFUND_ATTEMPTS; attempt++) {
+    try {
+      await releaseCallCredits(options, refId);
+      return;
+    } catch (e) {
+      lastError = e;
+      if (attempt < REFUND_ATTEMPTS) {
+        await new Promise(res => setTimeout(res, REFUND_RETRY_BASE_MS * attempt));
+      }
+    }
+  }
+  console.error('[generateCompletion] refund failed after retries; reservation debit left standing', {
+    module: options.module,
+    purpose: options.purpose,
+    refId,
+  }, lastError);
+  try {
+    await recordAlert({
+      level: 'error',
+      source: 'llm-refund',
+      message: 'AI credit reservation could not be refunded; the debit stands until reconciled',
+      meta: { module: options.module, purpose: options.purpose, reservation: refId },
+      dedupeKey: `llm-refund:${options.module}:${options.purpose}`,
+    });
+  } catch {
+    // Best-effort: an alert that cannot be written must not replace the caller's outcome.
+  }
+}
+
 /**
  * Call the model, record the call in `AiUsageLog`, deduct the credits.
  *
@@ -604,6 +647,9 @@ async function releaseCallCredits(options: LlmGenerateOptions, refId: string): P
  * the one failure where the tenant's prompt has already left the building and
  * the provider is owed for it. Any other throw from this function means nothing
  * was spent (TASK-MTVBM0C2QWPCL).
+ *
+ * A reservation that cannot be refunded changes none of this: the refund is retried, then recorded
+ * as an `llm-refund` SystemAlert, and the error thrown is still the one described above (FO-319).
  */
 export async function generateCompletion(options: LlmGenerateOptions): Promise<LlmCompletion> {
   const provider = options.provider || DEFAULT_PROVIDER;
@@ -644,7 +690,8 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
     signal
   ).catch(async (e: unknown) => {
     // No answer came back, so nothing was delivered: give the reservation back before rethrowing.
-    if (reservation) await releaseCallCredits(options, reservation);
+    // The rethrown error is the provider's, whatever happens to the refund (FO-319 Ö-3).
+    if (reservation) await refundOrAlert(options, reservation);
     throw e;
   });
 
@@ -705,12 +752,10 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   } catch (e) {
     writeFailures.push(e);
   }
+  // FO-319 Y-3: the refund is not a usage-log write. When the row above was written and only the
+  // refund failed, the usage row exists — so it must not be reported as "could not be written".
   if (reservation && credits === 0) {
-    try {
-      await releaseCallCredits(options, reservation);
-    } catch (e) {
-      writeFailures.push(e);
-    }
+    await refundOrAlert(options, reservation);
   }
   if (writeFailures.length > 0) {
     console.error('[generateCompletion] AiUsageLog write failed after a provider call', ...writeFailures);

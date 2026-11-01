@@ -143,7 +143,7 @@ test.describe('expert pre-registration (FO-20)', () => {
       if (r.url().endsWith('/api/expert-preregistration') && r.method() === 'POST') posts += 1;
     });
     await page.goto('/tr/uzman');
-    await expect(page).toHaveTitle('AB Proje Uzmanları Rehberi — Ön Kayıt | FonBridge');
+    await expect(page).toHaveTitle('AB Proje Uzmanları Rehberi — Ön Kayıt | NexaGrant');
     await expectFounderLimit(page, 'tr');
     for (const name of [/KVKK Aydınlatma Metni/, /Profilimin uzman rehberinde/]) {
       await expect(page.getByLabel(name)).not.toBeChecked();
@@ -277,7 +277,7 @@ test.describe('expert pre-registration (FO-20)', () => {
   test('English page, verified-page errors, 375px without horizontal scroll', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/en/experts');
-    await expect(page).toHaveTitle('EU Project Experts Directory — Pre-registration | FonBridge');
+    await expect(page).toHaveTitle('EU Project Experts Directory — Pre-registration | NexaGrant');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your EU project experience visible');
     await expectFounderLimit(page, 'en');
     await noHorizontalScroll(page);

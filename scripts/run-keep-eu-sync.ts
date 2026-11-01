@@ -93,7 +93,7 @@ function parseCliArgs(): CliOptions {
 
 function printHelp() {
   console.log(`
-FonBridge — keep.eu Interreg Live Synchronization CLI
+NexaGrant — keep.eu Interreg Live Synchronization CLI
 
 Usage:
   tsx scripts/run-keep-eu-sync.ts [options]
@@ -130,7 +130,7 @@ async function main() {
   const programmeIds = options.programmes ?? [...DEFAULT_TURKEY_PROGRAMME_IDS];
 
   console.log('═══════════════════════════════════════════════════════════════════════════════');
-  console.log('   FonBridge — keep.eu Interreg Live Synchronization CLI');
+  console.log('   NexaGrant — keep.eu Interreg Live Synchronization CLI');
   console.log('═══════════════════════════════════════════════════════════════════════════════');
   console.log(`Timestamp:        ${new Date().toISOString()}`);
   console.log(`Programmes:       ${programmeIds.join(', ')}`);
