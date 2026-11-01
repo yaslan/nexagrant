@@ -25,7 +25,9 @@ echo "→ veritabanı: $(db_target "$db")"
 # FO-203: localhost URL'si Postgres'i yalnız 127.0.0.1'de buluyorsa ::1 tarafı sahipsizdir;
 # başka bir süreç o portu alınca psql kırılır ve gate rastgele kırmızı verir. Gate'ten önce dur.
 node scripts/db-loopback-check.mjs || exit 1
-echo "→ pnpm gate (lint + typecheck + test, proje geneli)"
+# FO-339: aynı tree için yeşil kayıt varsa gate-lock "önbellek: <tree> <tarih>" basıp döner;
+# yalnız belge farkıysa lint + i18n:check. Kod dokunulmuşsa tam gate koşar (kısaltma yok).
+echo "→ pnpm gate (önbellek / belge-yalnız / tam gate: gate-lock karar verir)"
 pnpm gate
 # FO-114: core.bare'i kimin yazdığı kanıtlanmadı; gate (GIT_DIR sızıntısı + git init) muhtemel
 # yazıcı, doğrulanmadı (docs/RELEASE_CHECKLIST.md §9.1).
