@@ -31,6 +31,7 @@ import {
   maxTokensFor,
   LlmTruncatedError,
   LlmRefusalError,
+  AiUsageLogWriteError,
 } from './llm';
 import { isLlmRefused, isLlmTruncated, LLM_REFUSED_DIGEST, LLM_TRUNCATED_DIGEST } from './llm-outcome';
 
@@ -150,6 +151,19 @@ describe('Anthropic stop_reason — max_tokens (cut off)', () => {
     expect(netLedgerMovement()).toBe(0);
     expect(mockPrisma.aiUsageLog.create).toHaveBeenCalledTimes(1);
     expect(usageRow()).toMatchObject({ credits: 0, outputTokens: 8192, module: 'M10' });
+  });
+
+  it('refunds the reservation even when the usage row fails to write (FO-310 Y-1)', async () => {
+    // The refund is its own transaction, so a failing AiUsageLog insert must not roll it back.
+    stubAnthropic('max_tokens');
+    mockPrisma.aiUsageLog.create.mockRejectedValue(new Error('db down'));
+
+    const error = await generateCompletion(baseOptions).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AiUsageLogWriteError);
+    expect(mockPrisma.creditLedger.create).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.creditLedger.create.mock.calls[1]?.[0]?.data).toMatchObject({ delta: 1, reason: 'refund:M10' });
+    expect(netLedgerMovement()).toBe(0);
   });
 
   it('carries the digest the browser receives in production', async () => {

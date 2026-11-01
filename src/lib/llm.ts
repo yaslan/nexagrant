@@ -475,7 +475,7 @@ export async function creditBalanceIn(tx: Prisma.TransactionClient, tenantId: st
 
 /**
  * Reserves one AI action's price before its model calls (FO-274): one `CreditLedger` debit,
- * the same reason and price as {@link chargeAiAction}. Returns `false`, writing nothing, when the
+ * the same reason (`usage:<module>`) and price a delivered call is deducted at. Returns `false`, writing nothing, when the
  * balance does not cover it. Call with the tenant lock held ({@link lockTenantCredits}).
  */
 export async function reserveAiAction(
@@ -663,6 +663,11 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // reached the provider, and a raw Prisma error cannot tell the two apart.
   // The try starts *here* deliberately — widening it upwards would label the
   // balance read's own failure as a paid-but-unrecorded call.
+  // Two writes, two transactions (FO-288 review, Y-1). The usage row (and, for a caller that did not
+  // reserve, the deduction) is one transaction. The refund of a reservation whose answer was cut off
+  // or refused is another, idempotent, transaction of its own. A failing usage row must not roll the
+  // refund back: the tenant would then pay for an answer it never received.
+  const writeFailures: unknown[] = [];
   try {
     // `withTenant`, not a bare `$transaction`: both tables below are FORCE RLS
     // and their WITH CHECK compares "tenantId" to app.tenant_id, which only
@@ -684,14 +689,9 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
           section: options.section,
         },
       });
-      if (reservation) {
-        // The price is already debited under the reservation. A delivered answer keeps it; anything
-        // else gives it back in this same transaction, so the usage row and the refund stand together.
-        if (credits === 0) {
-          await lockTenantCredits(tx, options.tenantId);
-          await releaseAiReservation(tx, { tenantId: options.tenantId, module: options.module, refId: reservation });
-        }
-      } else if (credits > 0) {
+      // A reserved call's price is already debited; a delivered answer keeps it. An unreserved caller
+      // (M17, `creditsReserved`) is deducted here as before.
+      if (!reservation && credits > 0) {
         await tx.creditLedger.create({
           data: {
             tenantId: options.tenantId,
@@ -703,10 +703,20 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
       }
     });
   } catch (e) {
-    console.error('[generateCompletion] AiUsageLog write failed after a provider call', e);
+    writeFailures.push(e);
+  }
+  if (reservation && credits === 0) {
+    try {
+      await releaseCallCredits(options, reservation);
+    } catch (e) {
+      writeFailures.push(e);
+    }
+  }
+  if (writeFailures.length > 0) {
+    console.error('[generateCompletion] AiUsageLog write failed after a provider call', ...writeFailures);
     throw new AiUsageLogWriteError(
       'Completion call completed but its AiUsageLog row and credit deduction could not be written',
-      e
+      writeFailures[0]
     );
   }
 
