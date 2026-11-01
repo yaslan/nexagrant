@@ -39,6 +39,7 @@ yarn-error.log*
 !.env.example
 # VPS deploy template (FO-244): names only, no values. .env.prod stays ignored.
 !deploy/vps/.env.prod.example
+!deploy/vps/.env.db.example
 
 # vercel
 .vercel

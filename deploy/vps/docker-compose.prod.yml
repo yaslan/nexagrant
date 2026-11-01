@@ -7,14 +7,18 @@
 # Python CORDIS servisi bu dosyada YOK: workers/cordis için Dockerfile ve giriş
 # noktası tutarsız (package.json `worker:dev` app:app diyor, dosya main.py). Ayrı kart.
 #
-# Sırlar bu dosyada YOK. Hepsi deploy/vps/.env.prod içinde (git'e girmez, izin 600).
+# Sırlar bu dosyada YOK. İki ayrı dosya (ikisi de git'e girmez, izin 600):
+#   deploy/vps/.env.prod  → uygulama sırları. YALNIZ web ve worker alır.
+#   deploy/vps/.env.db    → süper kullanıcı parolası ve sahip rol (BYPASSRLS) URL'i. YALNIZ postgres alır.
+# Sahip URL'i web/worker konteynerlerinin ortamına HİÇ girmez (FO-301 Y-5): ops.sh onu yalnız tek
+# seferlik `run` konteynerine, host ortamından `-e` ile geçirir.
 # Kullanım (depo kökünden):
 #   docker compose -f deploy/vps/docker-compose.prod.yml up -d --build
 #
 # Bellek sınırları 8 GB'a göre: postgres 2g + web 1536m + worker 1g + caddy 128m
 # = ~4.7 GB; kalan ≈3.3 GB işletim sistemi ve Postgres sayfa önbelleği için (FO-250, Y-2).
 # web'in Node heap'i 1024 MB ile sınırlı (NODE_OPTIONS): aşımda kernel öldürmesi yerine JS OOM hatası.
-# CORDIS içe aktarımı bu yığında koşmaz (tek seferlik konteyner, RUNBOOK §11).
+# CORDIS içe aktarımı bu yığında koşmaz (tek seferlik konteyner, RUNBOOK §5).
 name: fonbridge
 
 services:
@@ -98,13 +102,13 @@ services:
     image: pgvector/pgvector:pg16
     container_name: fonbridge-postgres
     restart: unless-stopped
-    env_file: ./.env.prod
+    env_file: ./.env.db
     environment:
       POSTGRES_USER: fabrika
       POSTGRES_DB: fabrika
     # Yalnız loopback: dış ağdan erişilmez; sunucu üzerindeki yedek ve ops betikleri 127.0.0.1:5432'yi kullanır.
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${PG_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

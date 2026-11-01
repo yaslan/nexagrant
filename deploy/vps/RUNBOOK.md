@@ -16,10 +16,11 @@ Dosyalar (hepsi `deploy/vps/` altında):
 | `docker-compose.prod.yml` | canlı yığın (web, worker, postgres, caddy) |
 | `Caddyfile` | nexagrant.com TLS + www → kök 301 |
 | `.env.prod.example` | değişken ADLARI; değer yok. Sunucuda `.env.prod` olarak kopyalanır |
+| `.env.db.example` | veritabanı sır ADLARI (`POSTGRES_PASSWORD`, `OWNER_DATABASE_URL`); değer yok. Sunucuda `.env.db` olarak kopyalanır, yalnız postgres ve `ops.sh` okur |
 | `backup-to-r2.sh` | günlük `pg_dump` → yerel → R2 + boyut doğrulama |
 | `fonbridge-backup.cron` | `/etc/cron.d` girdisi (01:30 UTC) |
 | `bootstrap-roles.sql` | ilk kurulum rolleri: `fabrika_owner` (sahip), `fabrika_jobs` (worker), pgvector (`ops.sh bootstrap` koşturur) |
-| `ops.sh` | tek seferlik DB işleri: `bootstrap`, `push`, `rls-role`, `rls`, `migrate`, `seed`, `verify` |
+| `ops.sh` | tek seferlik DB işleri: `bootstrap`, `diff`, `push`, `rls-role`, `rls`, `migrate`, `seed`, `verify` |
 
 ---
 
@@ -75,20 +76,30 @@ Dosyalar (hepsi `deploy/vps/` altında):
 
 ## 2. Gizli değerler (sunucuda, repoya yazılmaz)
 
+İki ayrı dosya, ikisi de `chmod 600`, ikisi de git'e girmez:
+
+- `deploy/vps/.env.prod` — uygulama sırları. **Yalnız web ve worker** konteynerleri alır.
+- `deploy/vps/.env.db` — süper kullanıcı parolası ve sahip rol (`OWNER_DATABASE_URL`, BYPASSRLS).
+  **Yalnız postgres konteyneri ve `ops.sh` okur**; web ve worker'ın ortamına girmez (FO-301 Y-5).
+
 ```bash
 cd /opt/fonbridge
 cp deploy/vps/.env.prod.example deploy/vps/.env.prod
-chmod 600 deploy/vps/.env.prod
-$EDITOR deploy/vps/.env.prod         # değerleri elle doldur
+cp deploy/vps/.env.db.example deploy/vps/.env.db
+chmod 600 deploy/vps/.env.prod deploy/vps/.env.db
+$EDITOR deploy/vps/.env.prod         # uygulama değerleri elle doldur
+$EDITOR deploy/vps/.env.db           # POSTGRES_PASSWORD ve OWNER_DATABASE_URL
 ```
 
 Doldururken:
 
-- `POSTGRES_PASSWORD`, `AUTH_SECRET`: `AUTH_SECRET` için `openssl rand -base64 32` (≥32 karakter);
-  **`POSTGRES_PASSWORD` ve üç rol parolası için `openssl rand -hex 32`** — base64'ün `/ + =` karakterleri
+- **Değerleri tırnaksız yazın** (`KEY=değer`, `KEY="değer"` değil). Compose `env_file` tırnağı soyar,
+  `ops.sh` soymaz; tırnaklı parola bootstrap'te sessizce yanlış okunur (FO-301 D-8).
+- `AUTH_SECRET`: `openssl rand -base64 32` (≥32 karakter).
+- **`POSTGRES_PASSWORD` ve üç rol parolası için `openssl rand -hex 32`** — base64'ün `/ + =` karakterleri
   `postgresql://…` URL'sini bozar. Çıktıyı ekrana yazdırıp kopyalamak yerine doğrudan dosyaya yaz:
-  `openssl rand -hex 32 | sed 's/^/POSTGRES_PASSWORD=/' >> …` (ayrıca kopyası parola kasasında).
-- `OWNER_DATABASE_URL`: `postgresql://fabrika_owner:<şifre>@postgres:5432/fabrika?schema=public`
+  `openssl rand -hex 32 | sed 's/^/POSTGRES_PASSWORD=/' >> deploy/vps/.env.db` (ayrıca kopyası parola kasasında).
+- `OWNER_DATABASE_URL` (`.env.db`): `postgresql://fabrika_owner:<şifre>@postgres:5432/fabrika?schema=public`
   (sahip rol; süper kullanıcı değil). `ops.sh bootstrap` rolü bu URL'nin parolasıyla kurar.
 - `DATABASE_URL`: `postgresql://fabrika_app:<şifre>@postgres:5432/fabrika?schema=public`
   (uygulama rolü; `BYPASSRLS` yok). Şifre, `DATABASE_URL_RLS_TEST` ile **aynı** olmalı (§4, rol kurulumu
@@ -150,8 +161,7 @@ Her adım öncesi kontrol edilir; canlıda hiçbir adım atlanmaz:
 1. **Şema (boş veritabanı):** `deploy/vps/ops.sh push` (`prisma db push`, sahip rol). Mevcut bir
    veritabanına karşı **önce** fark ölçülür (salt okur, sahip rol):
    ```bash
-   docker compose -f deploy/vps/docker-compose.prod.yml run --rm --no-deps worker sh -c \
-     'export DATABASE_URL="$OWNER_DATABASE_URL"; exec node_modules/.bin/prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code'
+   deploy/vps/ops.sh diff
    ```
    `--accept-data-loss` **kullanılmaz** (RELEASE_CHECKLIST §3.1 madde 1). Çıkış 2 = fark var: dur, incele.
 2. **Uygulama rolü:** `deploy/vps/ops.sh rls-role`. `DATABASE_URL_RLS_TEST` `.env.prod`'da dolu olmalı
@@ -165,11 +175,6 @@ Her adım öncesi kontrol edilir; canlıda hiçbir adım atlanmaz:
    ayrım birleşene kadar `ops.sh seed` kendi kapısını kapatır ve çalışmaz. Karar yoksa seed çalışmaz.
 7. **Doğrulama:** `deploy/vps/ops.sh verify` (`rls:verify --require-db`, uygulama rolü `fabrika_app`).
    Başarısızsa web açılmaz.
-   **BİLİNEN ENGEL (FO-250 provaası, 2026-10-30):** migrasyon sonrası `ExpertFounderCounter` tablosu
-   `add-expert-founder-counter.sql` ile `id=1` satırıyla tohumlanıyor. `scripts/check-rls-live.ts` beklenen
-   satır sayısını uygulama rolünün sistem kapsamı DIŞI okumasından (0) alıyor; kapsam İÇİNDE 1 görüldü →
-   `1/0` hatası. Politika doğru, ölçüm yanlış. Bu betik bu PR'da değiştirilmedi (ayrı iş). Düzelene kadar
-   canlıda `verify` kırmızıdır ve web açılmaz; geçici DB provaasında `rls` + `verify` bu yüzden geçmedi.
 
 Notlar:
 - Bu bölümün hiçbiri canlıda henüz koşulmadı. Yerel provası ve sonucu §11'de.
@@ -203,12 +208,14 @@ curl -sI http://www.nexagrant.com | head -n 3         # 301 → https://nexagran
   4,7 GB tepe ölçüldü). Tek seferlik konteyner, worker durdurulmuş, sahip rolle, bellek sınırı 5 GB:
   ```bash
   docker compose -f deploy/vps/docker-compose.prod.yml stop worker
-  docker run --rm --memory 5g --network fonbridge_default --env-file deploy/vps/.env.prod \
+  docker run --rm --memory 5g --network fonbridge_default \
+    --env-file deploy/vps/.env.prod --env-file deploy/vps/.env.db \
     fonbridge-worker:local sh -c \
     'export DATABASE_URL="$OWNER_DATABASE_URL"; exec node_modules/.bin/tsx scripts/cordis-import.ts "$@"' sh <argümanlar>
-  docker compose -f deploy/vps/docker-compose.prod.yml up -d worker
+  docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
   ```
-  Parola komut satırına girmez: `OWNER_DATABASE_URL` konteyner ortamında (`--env-file`) zaten vardır.
+  Parola komut satırına girmez: `OWNER_DATABASE_URL` bu tek seferlik konteynerin ortamında (`.env.db`) vardır;
+  kalıcı web ve worker konteynerlerinde yoktur.
   Konteyner `--rm` ile silinir. Akışlı okumaya geçiş ayrı bir karttır (Y-2 önerisi).
 - İlk gün admin `/[locale]/admin/alerts` ekranında `job-queue` ve worker log'u kontrol edilir
   (RELEASE_CHECKLIST §3.3 madde 5).
@@ -221,26 +228,30 @@ Yeni bir commit için (sıra `docs/RELEASE_CHECKLIST.md` §3.1 ile aynı; 0a ve 
 cd /opt/fonbridge
 git fetch --all --prune && git checkout <yeni-commit>
 # 0. Yedek (§8.1) bu güncellemeden önce alındı mı? Yoksa dur.
-# 0a. Go-live ön kontrolü R-1 (RELEASE_CHECKLIST §3.1 adım 0a): db push'tan ÖNCE, sahip rolle.
-# 1. Şema değişti mi? Yeni migrasyon dosyası varsa: ops.sh push (fark ölçümü §4 adım 1), ops.sh migrate
-# 2. Eski worker'ı durdur (RELEASE_CHECKLIST §3.1 adım 2a): stop -t 300, sonra kilitli iş sayısı 0
+# 1. Eski worker'ı durdur (RELEASE_CHECKLIST §3.1 adım 2a): stop -t 300, sonra kilitli iş sayısı 0
 docker compose -f deploy/vps/docker-compose.prod.yml stop -t 300 worker
-# 3. İmajı yedekle (geri alma için)
+# 2. İmajı yedekle (geri alma için)
 docker tag fonbridge-web:local fonbridge-web:prev   2>/dev/null || true
 docker tag fonbridge-worker:local fonbridge-worker:prev 2>/dev/null || true
-# 4. Şema değiştiyse RLS ve doğrulama ZORUNLU (ensure_rls tetikleyicisi yok, K4):
+# 3. Yeni imajları ÖNCE derle (FO-301 Y-6). web ve worker ayrı hedef imajlar; ops adımları worker imajını
+#    koşar. Bu adım atlanırsa ops eski şemayı/RLS dosyasını yeni kodla eşleşmeden uygular.
+#    Derleme sırasında worker durmuş olmalı (Y-2: derleme tepesi 2 vCPU / 8 GB'da worker ile birlikte taşabilir).
+docker compose -f deploy/vps/docker-compose.prod.yml build web worker
+# 4. Şema değiştiyse: go-live ön kontrolü R-1 (RELEASE_CHECKLIST §3.1 adım 0a) — db push'tan ÖNCE, sahip rolle:
+deploy/vps/ops.sh diff            # çıkış 2 = fark var: dur, incele
+deploy/vps/ops.sh push
+deploy/vps/ops.sh migrate
+# 5. Şema değiştiyse RLS ve doğrulama ZORUNLU (ensure_rls tetikleyicisi yok, K4):
 deploy/vps/ops.sh rls
 deploy/vps/ops.sh verify          # başarısızsa web'i başlatma
-# 5. Derleme: worker durmuş olmalı (Y-2: derleme tepesi 2 vCPU / 8 GB'da worker ile birlikte taşabilir)
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --build web
-docker compose -f deploy/vps/docker-compose.prod.yml up -d worker
+# 6. Başlat (imajlar adım 3'te derlendi; --no-build ile yeniden derlenmez)
+docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build web
+docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
 docker compose -f deploy/vps/docker-compose.prod.yml ps
 ```
 
-Uygulama değişikliği yoksa (şema değişmediyse) adım 1 ve 4 atlanır; yalnız `stop`, `up -d --build web` ve
-`up -d worker` çalışır. Her güncellemeden önce §8'deki yedek (en az bir gün önceki) elde olmalı.
-Derleme sırasında `docker compose … stop worker` ile worker'ı durdurmak, derlemenin bellek tepesini
-worker ile aynı anda taşımamasını sağlar.
+Şema değişmediyse adım 4 ve 5 atlanır; yalnız `stop`, `build`, `up -d --no-build` çalışır. Her güncellemeden
+önce §8'deki yedek (en az bir gün önceki) elde olmalı.
 
 ## 7. Geri alma (rollback)
 
@@ -347,5 +358,8 @@ Yapılanlar ve sonuçları FO-244 raporunda (`docs/agent-results/TASK-MVUMVNK4FC
 - `docker compose -f deploy/vps/docker-compose.prod.yml config` → geçerli
 - `caddy validate` (caddy:2-alpine) → geçerli
 - `docker build --target runner` yerelde denendi (sonuç rapora)
+- FO-302 (Y-5/Y-6/D-7..D-9): `.env.db` ayrımı sonrası `config` çıktısında web ve worker'da
+  `OWNER_DATABASE_URL` / `POSTGRES_PASSWORD` yok; geçici `pgvector:pg16` üzerinde
+  bootstrap → diff → push → rls-role → rls → migrate → rls → verify zinciri geçti (sonuç FO-302 raporunda)
 
 Yapılmayanlar: sunucu, DNS, gerçek sertifika, canlı veritabanı, R2 yedek yazımı, Hostinger.
