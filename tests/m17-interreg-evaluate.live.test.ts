@@ -369,7 +369,8 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
   test('FO-291 B1: deleting the analysis of a dead run gives its reservation back, before the row goes', async () => {
     const id = await readyAnalysis(alice);
     // A run that died holding its claim: ANALYZING, its price reserved and never released.
-    const claimedAt = new Date(Date.now() - 60_000);
+    // Past STALE_CLAIM_MS, so the claim is dead (FO-303 Y-1: only a dead run is released here).
+    const claimedAt = new Date(Date.now() - STALE_CLAIM_MS - 60_000);
     await setClaim(id, 'ANALYZING', claimedAt);
     expect(
       await withTenant(alice.tenantId, (tx) =>
@@ -383,6 +384,46 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     expect(await admin!.interregAnalysis.count({ where: { id } })).toBe(0);
     expect(await ledgerFor(id)).toEqual([-3, 3]);
     expect(await balanceOf(alice.tenantId)).toBe(reserved + 3);
+  });
+
+  test('FO-303 Y-1: deleting a LIVE run keeps its reservation, so a second run of the tenant is refused until the live run ends', async () => {
+    const [erin] = (await makeTenant('y1', ['erin'], 3)) as [Owner];
+    const live = await readyAnalysis(erin);
+    const other = await readyAnalysis(erin);
+    state.answers.push(goodAnswer());
+    // The live run's delete lands after its claim and reservation, while it is still in its model call.
+    // Outcomes are recorded here and asserted after the run: an `expect` thrown inside this hook would
+    // land in runEvaluation's own catch and read as `evaluation_failed` (FO-293 D1).
+    let balanceInHook: number | undefined;
+    let deleted = false;
+    let secondRun: unknown;
+    state.beforeAnswer = async () => {
+      deleted = await deleteAnalysis(erin, live);
+      balanceInHook = await balanceOf(erin.tenantId);
+      secondRun = await runEvaluation(erin, other, { locale: 'en' });
+    };
+
+    const run = await runEvaluation(erin, live, { locale: 'en' });
+
+    expect(deleted).toBe(true);
+    // Balance is 0 and the live run's debit is still on the ledger: the second run is refused.
+    expect(balanceInHook).toBe(0);
+    expect(secondRun).toEqual({ ok: false, error: 'insufficient_credits' });
+    expect(state.calls.filter((c) => c.purpose === EVALUATE_ATTEMPT_PURPOSE)).toHaveLength(1);
+    // The live run's result write matches nothing (its row is gone): it rolls back and refunds itself.
+    expect(run).toEqual({ ok: false, error: 'evaluation_failed' });
+    expect(await ledgerFor(live)).toEqual([-3, 3]);
+    expect(await balanceOf(erin.tenantId)).toBe(3);
+  });
+
+  test('FO-303 Ö-2: deleting a DONE analysis keeps its charge: the ledger holds the one debit and no refund', async () => {
+    const id = await readyAnalysis(bob);
+    state.answers.push(goodAnswer());
+    expect(await runEvaluation(bob, id, { locale: 'en' })).toMatchObject({ ok: true });
+
+    expect(await deleteAnalysis(bob, id)).toBe(true);
+
+    expect(await ledgerFor(id)).toEqual([-3]);
   });
 
   test('FO-291 M4: giving a reservation back is idempotent: a second release of the same run refunds nothing more', async () => {
