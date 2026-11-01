@@ -189,8 +189,9 @@ async function main() {
   console.log('Seeding Database...');
   await seedReferenceData();
 
-  // FO-251: the demo tenant only when SEED_DEMO says so (default: on outside
-  // production, off in it), so a production seed fills the catalogue alone.
+  // FO-251: the demo tenant only when SEED_DEMO says so (default: on only with
+  // NODE_ENV=development|test; off in production and when NODE_ENV is unset,
+  // FO-296), so a production seed fills the catalogue alone.
   const demo = seedDemoDecision();
   if (demo.warning) console.warn(demo.warning);
   if (!demo.enabled) {

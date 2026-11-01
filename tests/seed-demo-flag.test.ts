@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { seedDemoDecision } from '@/lib/env';
@@ -10,8 +10,54 @@ import { seedDemoDecision } from '@/lib/env';
  */
 
 describe('seedDemoDecision', () => {
-  it.each(['development', 'test', undefined])('unset is on with NODE_ENV=%s', (NODE_ENV) => {
+  it.each(['development', 'test'])('unset is on with NODE_ENV=%s', (NODE_ENV) => {
     expect(seedDemoDecision({ NODE_ENV })).toEqual({ enabled: true, warning: null });
+  });
+
+  // FO-296: a seed run from a server shell has no NODE_ENV. Unset must not
+  // read as development — the demo tenant stays out (fail closed).
+  it.each([undefined, ''])('unset is off when NODE_ENV is not set (%j)', (NODE_ENV) => {
+    expect(seedDemoDecision({ NODE_ENV })).toEqual({ enabled: false, warning: null });
+    expect(seedDemoDecision({ NODE_ENV, SEED_DEMO: undefined })).toEqual({ enabled: false, warning: null });
+  });
+
+  it('true without NODE_ENV is still obeyed', () => {
+    expect(seedDemoDecision({ SEED_DEMO: 'true' })).toEqual({ enabled: true, warning: null });
+  });
+
+  describe('default source (the env this process really has)', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+    const load = async (NODE_ENV: string | undefined, SEED_DEMO = '') => {
+      vi.stubEnv('NODE_ENV', NODE_ENV);
+      vi.stubEnv('SEED_DEMO', SEED_DEMO);
+      vi.resetModules();
+      return import('@/lib/env');
+    };
+
+    it('NODE_ENV absent: env.NODE_ENV falls back to development, the seed still stays off', async () => {
+      const m = await load(undefined);
+      expect(m.env.NODE_ENV).toBe('development');
+      expect(m.declaredNodeEnv).toBeUndefined();
+      expect(m.seedDemoDecision()).toEqual({ enabled: false, warning: null });
+    });
+
+    it('NODE_ENV blank never reaches the decision: env.ts refuses it at import', async () => {
+      await expect(load('')).rejects.toThrow(/NODE_ENV/);
+    });
+
+    it.each(['development', 'test'])('NODE_ENV=%s: on', async (NODE_ENV) => {
+      const m = await load(NODE_ENV);
+      expect(m.declaredNodeEnv).toBe(NODE_ENV);
+      expect(m.seedDemoDecision()).toEqual({ enabled: true, warning: null });
+    });
+
+    it('NODE_ENV absent with SEED_DEMO=true: on', async () => {
+      const m = await load(undefined, 'true');
+      expect(m.seedDemoDecision()).toEqual({ enabled: true, warning: null });
+    });
   });
 
   it('unset is off with NODE_ENV=production', () => {
@@ -65,6 +111,13 @@ describe('prisma/seed.ts wiring', () => {
       expect(reference, demo).not.toContain(`${demo}(`);
       expect(body('seedDemoData'), demo).toContain(`await ${demo}(`);
     }
+  });
+
+  // FO-296: the name list above only sees the helpers; a demo row written
+  // straight through the client in the reference part must fail too.
+  it('writes no tenant-scoped demo rows directly in the reference part', () => {
+    const reference = body('seedReferenceData');
+    expect(reference).not.toMatch(/\b(?:prisma|tx)\s*\.\s*(?:tenant|user|call|opportunity|moduleState|membership)\s*\./);
   });
 
   it('runs the demo part only after the switch says so', () => {

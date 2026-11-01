@@ -33,7 +33,8 @@ const envSchema = z.object({
    * Whether `pnpm db:seed` also writes the demo tenant, its users and its
    * opportunities (FO-251, {@link seedDemoDecision}). Reference data (plans,
    * module catalogue, programmes, templates, rubrics) is written either way.
-   * Unset or blank: on outside production, off with NODE_ENV=production.
+   * Unset or blank: on only when NODE_ENV is explicitly `development` or
+   * `test`; off with NODE_ENV=production and off when NODE_ENV is not set.
    */
   SEED_DEMO: blankToUndefined(z.enum(['true', 'false']).optional()),
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
@@ -295,6 +296,17 @@ if (!_env.success) {
 export const env = _env.data;
 
 /**
+ * NODE_ENV as the process actually set it, before the schema's
+ * `.default('development')`: `undefined` when the variable is absent (a blank
+ * one already fails the enum above).
+ * Only for decisions that must fail closed when nobody said which environment
+ * this is ({@link seedDemoDecision}); everything else keeps reading
+ * `env.NODE_ENV`. A present value has already passed the enum above.
+ */
+export const declaredNodeEnv: 'development' | 'test' | 'production' | undefined =
+  process.env.NODE_ENV === undefined ? undefined : env.NODE_ENV;
+
+/**
  * The key NextAuth signs sessions with, for code that derives a labelled key of
  * its own from it (FO-29, src/lib/expert-prereg/server/verified-outcome.ts).
  * `null` only in a process that skipped the startup check.
@@ -335,13 +347,17 @@ export function jobsCronEnabled(
 }
 
 /**
- * Whether the seed writes the demo data (FO-251). `SEED_DEMO` wins when set;
- * unset means on outside production and off in production, so a production
- * seed fills the catalogue without opening `demo-tenant`. An explicit `true` in
- * production is obeyed, with a warning for the seed to print.
+ * Whether the seed writes the demo data (FO-251). `SEED_DEMO` wins when set.
+ * Unset fails closed: demo data only when NODE_ENV is explicitly `development`
+ * or `test`; with NODE_ENV=production *or no NODE_ENV at all* (a `pnpm db:seed`
+ * from a server shell, FO-296) the seed fills the catalogue without opening
+ * `demo-tenant`. The default source therefore reads {@link declaredNodeEnv},
+ * not `env.NODE_ENV`, whose schema default would turn "unset" into
+ * `development`. An explicit `true` in production is obeyed, with a warning
+ * for the seed to print.
  */
 export function seedDemoDecision(
-  source: { SEED_DEMO?: string; NODE_ENV?: string } = env
+  source: { SEED_DEMO?: string; NODE_ENV?: string } = { SEED_DEMO: env.SEED_DEMO, NODE_ENV: declaredNodeEnv }
 ): { enabled: boolean; warning: string | null } {
   const production = source.NODE_ENV === 'production';
   if (source.SEED_DEMO === 'false') return { enabled: false, warning: null };
@@ -353,7 +369,7 @@ export function seedDemoDecision(
         : null,
     };
   }
-  return { enabled: !production, warning: null };
+  return { enabled: source.NODE_ENV === 'development' || source.NODE_ENV === 'test', warning: null };
 }
 
 /**

@@ -37,9 +37,12 @@ pnpm db:seed
 `pnpm db:seed` always writes the reference data (plans, module catalogue,
 add-ons, programmes, concept templates, Interreg rubrics, blog launch posts).
 The demo tenant and its users, calls and opportunities are written only when
-`SEED_DEMO` is on: unset means on outside production and off with
-`NODE_ENV=production`; `SEED_DEMO=true` in production still runs and prints a
-warning (FO-251). A production seed therefore prints
+`SEED_DEMO` is on. Unset fails closed: on only when `NODE_ENV` is explicitly
+`development` or `test`, off with `NODE_ENV=production` and off when `NODE_ENV`
+is not set at all — a `pnpm db:seed` from a server shell writes no demo tenant
+(FO-296). `SEED_DEMO=true` is always obeyed and in production prints a warning
+(FO-251). Local development: `.env.example` has `NODE_ENV=development`, so a
+copied `.env` keeps the demo on. A production seed therefore prints
 `Skipping demo data (SEED_DEMO is off) — reference data only.`
 
 Expected seed output (development, demo on):
