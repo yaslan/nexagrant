@@ -81,6 +81,7 @@ vi.mock('@/lib/email/mailer', async (importOriginal) => {
 vi.mock('@/lib/env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/env')>();
   return {
+    ...actual,
     env: new Proxy(actual.env, {
       get: (target, key) => (key in envOverride ? envOverride[key as keyof typeof envOverride] : Reflect.get(target, key)),
     }),

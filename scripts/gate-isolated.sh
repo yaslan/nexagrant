@@ -100,6 +100,10 @@ export DATABASE_URL_RLS_TEST="postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:
 # ci.yml Test step. KEEP_EU_LIVE=1 runs keep-eu-sync.live against this throwaway DB.
 export AUTH_SECRET='ci-vitest-auth-secret-fixture-not-for-any-deployment'
 export KEEP_EU_LIVE=1
+# FO-256: the pool's 1 s connect timeout failed under load (FO-253). Here, and only
+# here, it gets 10 s; prod and dev keep 1000 ms (src/lib/env.ts). Vitest and the
+# Playwright webServer both inherit this environment.
+export DB_CONNECT_TIMEOUT_MS=10000
 # ci.yml E2E step: R2 -> local MinIO, so admin-blog-image-upload.spec runs
 # instead of skipping. Exported for the whole gate (gate:core is one chain).
 # SMTP, NEXT_PUBLIC_APP_URL and the e2e AUTH_SECRET are NOT set here:

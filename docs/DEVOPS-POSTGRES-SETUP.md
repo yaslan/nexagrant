@@ -64,6 +64,8 @@ psql -h localhost -U fabrika -d fabrika_db -c "SELECT COUNT(*) as calls FROM pub
 # Expected: 20+
 ```
 
+`DB_CONNECT_TIMEOUT_MS` (`.env`, optional) sets how long the pool waits for a connection; blank = 1000 ms. Raise it only on a loaded test machine; the gate sets 10000 by itself.
+
 ### 5. Start Dev Server
 ```bash
 pnpm dev
