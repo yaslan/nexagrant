@@ -122,6 +122,8 @@ const RESERVED_META_KEYS = [
   'alertLastSeenAt',
   'alertDedupeKey',
   'alertResolvedBy',
+  'alertDigestedAt',
+  'alertDigestedCount',
 ] as const;
 
 export const ALERT_REPEAT_COUNT_KEY = 'alertRepeatCount';
@@ -132,6 +134,12 @@ export const ALERT_DEDUPE_KEY_KEY = 'alertDedupeKey';
 /** Stamped by `resolveAlerts` on the row it closes, so an operator reading a
  *  resolved alert can tell it closed itself rather than being ticked off. */
 export const ALERT_RESOLVED_BY_KEY = 'alertResolvedBy';
+/** Stamped by the `alerts-ops-digest` job on a row it has mailed (FO-246): when,
+ *  and how many occurrences the row stood for then. Reserved for the same reason
+ *  as the keys above — a stored stamp must not make the row stop matching the
+ *  next plain occurrence of the same alert. */
+export const ALERT_DIGESTED_AT_KEY = 'alertDigestedAt';
+export const ALERT_DIGESTED_COUNT_KEY = 'alertDigestedCount';
 
 function isSensitiveKey(key: string): boolean {
   const lower = key.toLowerCase();

@@ -16,6 +16,7 @@
 import { aiCreditEntry } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import crypto from 'crypto';
+import type { Prisma } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
 import { errorStatus } from '@/lib/errors';
@@ -204,6 +205,12 @@ export type LlmGenerateOptions = {
   maxTokens?: number;
   /** Epoch ms after which the provider request is abandoned and not retried. Unset: no limit. */
   deadlineAt?: number;
+  /**
+   * The caller reserved this run's price before the first call (`reserveAiAction`, FO-274), so
+   * `generateCompletion` does not reserve it again. Without the flag `generateCompletion` reserves
+   * the price itself, under the tenant credit lock, before the provider is called (FO-288).
+   */
+  creditsReserved?: boolean;
 } & (
   | { prompt: string; system?: string; messages?: never }
   | { messages: LlmMessage[]; prompt?: never; system?: never }
@@ -449,29 +456,63 @@ export function resolveCredits(module: string, purpose: string): AiCreditQuote {
 }
 
 /**
- * Books one AI action's price as a single `CreditLedger` row, for a caller whose
- * model calls were priced 0 and whose product is only now delivered (M17
- * evaluation, FO-188 B1). The price is `resolveCredits` — the one formula — so
- * this cannot disagree with the catalogue. Returns the credits booked (0 books
- * no row).
- *
- * With `tx`, the row is written inside the caller's transaction, so a failed
- * write rolls back whatever that transaction already did (FO-188 Soru 3).
+ * The credit lock of one tenant (FO-274). A run checks the balance and reserves its price in one
+ * step; two runs of the same tenant must not interleave that step, or both pass the check on the
+ * same credits. Transaction-level: released at commit or rollback.
  */
-export async function chargeAiAction(
+export async function lockTenantCredits(tx: Prisma.TransactionClient, tenantId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId}, 0))`;
+}
+
+/**
+ * The balance as the caller's transaction sees it, including reservations it has already
+ * written. Use this inside a locked transaction; {@link getCreditBalance} opens its own.
+ */
+export async function creditBalanceIn(tx: Prisma.TransactionClient, tenantId: string): Promise<number> {
+  const result = await tx.creditLedger.aggregate({ where: { tenantId }, _sum: { delta: true } });
+  return result._sum.delta || 0;
+}
+
+/**
+ * Reserves one AI action's price before its model calls (FO-274): one `CreditLedger` debit,
+ * the same reason (`usage:<module>`) and price a delivered call is deducted at. Returns `false`, writing nothing, when the
+ * balance does not cover it. Call with the tenant lock held ({@link lockTenantCredits}).
+ */
+export async function reserveAiAction(
+  tx: Prisma.TransactionClient,
   params: { tenantId: string; module: string; purpose: string; refId: string },
-  tx?: TenantTx,
-): Promise<number> {
+): Promise<boolean> {
   const { credits } = resolveCredits(params.module, params.purpose);
-  if (credits > 0) {
-    const data = { tenantId: params.tenantId, delta: -credits, reason: `usage:${params.module}`, refId: params.refId };
-    if (tx) {
-      await tx.creditLedger.create({ data });
-    } else {
-      await withTenant(params.tenantId, (own) => own.creditLedger.create({ data }));
-    }
-  }
-  return credits;
+  if (credits <= 0) return true;
+  if ((await creditBalanceIn(tx, params.tenantId)) < credits) return false;
+  await tx.creditLedger.create({
+    data: { tenantId: params.tenantId, delta: -credits, reason: `usage:${params.module}`, refId: params.refId },
+  });
+  return true;
+}
+
+/**
+ * Gives a reservation back when the run did not deliver its result (FO-274): one `refund` row
+ * that offsets the debit with the same `refId`. Idempotent; writes nothing when no debit exists
+ * for `refId` or it was already refunded. Call with the tenant lock held.
+ */
+export async function releaseAiReservation(
+  tx: Prisma.TransactionClient,
+  params: { tenantId: string; module: string; refId: string },
+): Promise<void> {
+  const debit = await tx.creditLedger.findFirst({
+    where: { tenantId: params.tenantId, refId: params.refId, reason: `usage:${params.module}`, delta: { lt: 0 } },
+    select: { delta: true },
+  });
+  if (!debit) return;
+  const refunded = await tx.creditLedger.findFirst({
+    where: { tenantId: params.tenantId, refId: params.refId, reason: `refund:${params.module}` },
+    select: { id: true },
+  });
+  if (refunded) return;
+  await tx.creditLedger.create({
+    data: { tenantId: params.tenantId, delta: -debit.delta, reason: `refund:${params.module}`, refId: params.refId },
+  });
 }
 
 /**
@@ -520,11 +561,39 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
 }
 
 /**
+ * Takes the call's price out of the balance before the provider is called (FO-288). Under the
+ * tenant credit lock, a priced call needs the balance to cover its price ({@link reserveAiAction});
+ * an unpriced call keeps the old rule and is refused only on an empty balance. Two concurrent calls
+ * therefore cannot both pass on the same credits.
+ */
+async function reserveCallCredits(options: LlmGenerateOptions, price: number, refId: string): Promise<void> {
+  const refused = await withTenant(options.tenantId, async (tx) => {
+    await lockTenantCredits(tx, options.tenantId);
+    if (price > 0) {
+      const reserved = await reserveAiAction(tx, { tenantId: options.tenantId, module: options.module, purpose: options.purpose, refId });
+      return !reserved;
+    }
+    return (await creditBalanceIn(tx, options.tenantId)) <= 0;
+  });
+  if (refused) throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
+}
+
+/** Gives back a reservation whose call delivered nothing (FO-288). Idempotent, see {@link releaseAiReservation}. */
+async function releaseCallCredits(options: LlmGenerateOptions, refId: string): Promise<void> {
+  await withTenant(options.tenantId, async (tx) => {
+    await lockTenantCredits(tx, options.tenantId);
+    await releaseAiReservation(tx, { tenantId: options.tenantId, module: options.module, refId });
+  });
+}
+
+/**
  * Call the model, record the call in `AiUsageLog`, deduct the credits.
  *
- * Throws when the tenant has no credits left, and when the provider rejects the
- * request after retries. Throws {@link LlmTruncatedError} when the answer hit
- * the output ceiling and {@link LlmRefusalError} when it was declined — both
+ * The price is reserved under the tenant credit lock before the provider is called (FO-288), so
+ * this throws when the balance cannot cover it, and it reaches no provider. A reservation whose
+ * call delivers nothing is refunded. Also throws when the provider rejects the request after
+ * retries. Throws {@link LlmTruncatedError} when the answer hit the output ceiling and
+ * {@link LlmRefusalError} when it was declined — both
  * after writing a credits-0 usage row and moving no credit. Returns the usage
  * the call actually produced —
  * including the credits charged — so a caller that wants to show the cost reads
@@ -537,11 +606,6 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
  * was spent (TASK-MTVBM0C2QWPCL).
  */
 export async function generateCompletion(options: LlmGenerateOptions): Promise<LlmCompletion> {
-  const balance = await getCreditBalance(options.tenantId);
-  if (balance <= 0) {
-    throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
-  }
-
   const provider = options.provider || DEFAULT_PROVIDER;
   const maxTokens = maxTokensFor(options.module, options.purpose, options.maxTokens);
   const messages = toMessages(options);
@@ -562,6 +626,14 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   const { credits: price } = resolveCredits(options.module, options.purpose);
 
   requireApiKey(provider);
+
+  // FO-288 — the price is reserved BEFORE the provider is called, under the tenant's credit lock,
+  // the same model M17 uses (FO-274). The old check read the balance outside any lock and only then
+  // called the model, so two concurrent calls could both pass it and drive the balance below zero.
+  // A caller that reserved already (M17) passes `creditsReserved` and is not reserved twice.
+  const reservation = options.creditsReserved ? undefined : `${options.module}:${options.purpose}:${crypto.randomUUID()}`;
+  if (reservation) await reserveCallCredits(options, price, reservation);
+
   // One signal for the whole request: every attempt gives up at the same instant.
   const signal = signalUntil(options.deadlineAt);
   const { outcome, refusalCategory, ...result } = await withRetry(
@@ -570,7 +642,11 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
     1000,
     options.deadlineAt,
     signal
-  );
+  ).catch(async (e: unknown) => {
+    // No answer came back, so nothing was delivered: give the reservation back before rethrowing.
+    if (reservation) await releaseCallCredits(options, reservation);
+    throw e;
+  });
 
   // A truncated or refused answer is not the product the tenant paid for, so
   // the ledger does not move (TASK-MUN4PSBP19RKK). The usage row is still
@@ -587,6 +663,11 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // reached the provider, and a raw Prisma error cannot tell the two apart.
   // The try starts *here* deliberately — widening it upwards would label the
   // balance read's own failure as a paid-but-unrecorded call.
+  // Two writes, two transactions (FO-288 review, Y-1). The usage row (and, for a caller that did not
+  // reserve, the deduction) is one transaction. The refund of a reservation whose answer was cut off
+  // or refused is another, idempotent, transaction of its own. A failing usage row must not roll the
+  // refund back: the tenant would then pay for an answer it never received.
+  const writeFailures: unknown[] = [];
   try {
     // `withTenant`, not a bare `$transaction`: both tables below are FORCE RLS
     // and their WITH CHECK compares "tenantId" to app.tenant_id, which only
@@ -608,7 +689,9 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
           section: options.section,
         },
       });
-      if (credits > 0) {
+      // A reserved call's price is already debited; a delivered answer keeps it. An unreserved caller
+      // (M17, `creditsReserved`) is deducted here as before.
+      if (!reservation && credits > 0) {
         await tx.creditLedger.create({
           data: {
             tenantId: options.tenantId,
@@ -620,10 +703,20 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
       }
     });
   } catch (e) {
-    console.error('[generateCompletion] AiUsageLog write failed after a provider call', e);
+    writeFailures.push(e);
+  }
+  if (reservation && credits === 0) {
+    try {
+      await releaseCallCredits(options, reservation);
+    } catch (e) {
+      writeFailures.push(e);
+    }
+  }
+  if (writeFailures.length > 0) {
+    console.error('[generateCompletion] AiUsageLog write failed after a provider call', ...writeFailures);
     throw new AiUsageLogWriteError(
       'Completion call completed but its AiUsageLog row and credit deduction could not be written',
-      e
+      writeFailures[0]
     );
   }
 

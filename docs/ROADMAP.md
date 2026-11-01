@@ -344,7 +344,7 @@ Board'da FB-GAP-1: 43 kart (bu kart dahil). Kanıt: commit hash'leri `git log --
 **güncel 29.09 gece — FB-GAP-1'de kapananlar (bu listeden):** TASK-MULQMKP4YOM04 PostHog/Sentry (`488313b1`, `done`) · TASK-MULQMFVLJYZ5V MVP kabul ölçümü (`858c139a`, `done`; bkz. E10) · TASK-MULQLQIE3ES6G prompt'lar + `MeetingBrief.opportunityId` (`3e7bf7ac`, `2cc3fdf0`, `done`) · TASK-MULV9UJBSYJCD bakım (`b11a7b03`, `done`) · TASK-MUMH7CVD8P2J0 K2 gerçek CORDIS dökümü (`b7a4992e`, `7feb745e`, `done`; bkz. E6).
 **Review'da:** TASK-MULQLL2T8ZJX4 portal ve davet token'ları yalnız SHA-256 olarak saklanıyor (`587a50e0`, canlı test `ce2e7432`, rapor `84d11af4`) · TASK-MUMJ9STRA6RJK Sentry'ye yalnız maskelenmiş ilk satır (`061aa58c`; İNCELEME-20 ONAY `d49312bd`, Ö-1/Ö-2 DSN açılmadan önce).
 **karar 29.09 — yeni FB-GAP-1 kartları (dış hizmetten çıkış):** TASK-MUMLEUIQWSI59 Sentry'yi kaldır (in_progress, se-fb) · TASK-MUMLF57HOYFSB Resend → SMTP (in_progress, be-fb) · TASK-MUMLFDTNQ53VJ Inngest → kendi iş kuyruğumuz, önce ADR + spike (todo, devop-fb). TASK-MULQM9UCIRY1A `done` (#16 HAYIR).
-**Hâlâ açık:** TASK-MUMJ7W0GUI6N1 M1 ortak profil işi 4 GB bellek taşması (in_progress) · TASK-MUMACETT8NSI4 GitHub push, 1 Ekim (todo) · TASK-MULQLF067H75P · TASK-MULQL8QB679LQ · TASK-MULQL2NYKRGJX (backlog) · patron: TASK-MULQM9UCIRY1A, TASK-MULQM3LFB4KRA (todo).
+**Kapandı:** M1 ortak profil işi bellek taşması 4,6 GB OOM → **602 MB RSS, çözüldü** (`e46d9798`, TASK-MUMJ7W0GUI6N1). **Hâlâ açık:** TASK-MUMACETT8NSI4 GitHub push, 1 Ekim (todo) · TASK-MULQLF067H75P · TASK-MULQL8QB679LQ · TASK-MULQL2NYKRGJX (backlog) · patron: TASK-MULQM9UCIRY1A, TASK-MULQM3LFB4KRA (todo).
 
 ## Pilot kapıları (İlkadım pilotu başlamadan kapanmalı)
 

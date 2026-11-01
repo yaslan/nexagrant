@@ -2,7 +2,7 @@ import { PrismaClient, type Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { assertEnvelopedOrNull } from '@/lib/calendar/token-envelope';
-import { env } from '@/lib/env';
+import { dbConnectTimeoutMs, env } from '@/lib/env';
 
 /**
  * FO-141: no built-in fallback URL. A process without DATABASE_URL used to
@@ -89,10 +89,11 @@ function withCalendarTokenGate(client: PrismaClient): PrismaClient {
  * exempt from them. See prisma/rls-app-role.sql.
  */
 export function createDbClient(url: string, poolOptions: DbPoolOptions = {}): PrismaClient {
-  // 1s fast timeout for instant fallback in dev
+  // 1s by default (fast fallback); DB_CONNECT_TIMEOUT_MS raises it in the test/gate env.
+  // poolOptions still wins, so a caller that sets its own value keeps it.
   const pool = new pg.Pool({
     connectionString: url,
-    connectionTimeoutMillis: 1000,
+    connectionTimeoutMillis: dbConnectTimeoutMs,
     idleTimeoutMillis: 5000,
     ...poolOptions,
   });

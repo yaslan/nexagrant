@@ -4470,6 +4470,8 @@
       "bad_rubric": "Bu değerlendirme tablosu bulunamadı.",
       "rubric_unavailable": "Henüz tanımlı bir değerlendirme tablosu yok; lütfen destekle iletişime geçin.",
       "upload_failed": "Yükleme sırasında beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
+      "too_many_analyses": "En fazla analiz sayısına ulaştınız ({maxAnalyses}). Yenisini başlatmak için birini silin.",
+      "rate_limited": "Kısa sürede çok fazla yükleme yapıldı. Bir dakika sonra yeniden deneyin.",
       "not_ready": "Önce çağrı kılavuzunu ve proje dosyasını yükleyin.",
       "insufficient_credits": "Ön değerlendirme için yeterli YZ krediniz yok.",
       "evaluation_failed": "Kontrol tamamlanamadı. Belgeleriniz duruyor; lütfen yeniden deneyin."

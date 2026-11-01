@@ -31,6 +31,19 @@ function readDotenv(): Record<string, string> {
   return out;
 }
 
+/** Hosts this script may touch. Matched on the parsed hostname, never a substring:
+ * `?x=@postgres:` in a query string must not pass for the compose service. */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', 'postgres']);
+
+/** Unparseable URL → '' (not in LOCAL_HOSTS, so the guard fails closed). */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
 function redact(url: string): string {
   return url.replace(/:\/\/([^:/@]+):([^@]*)@/, (_m, user) => `://${user}:***@`);
 }
@@ -56,8 +69,9 @@ async function main() {
   if (!adminUrl) throw new Error('DATABASE_URL is not set; cannot reach the database.');
 
   // Same guard as scripts/setup-rls-role.ts: this rewrites security policy, so
-  // it may only ever run against a local database.
-  if (!/localhost|127\.0\.0\.1/.test(adminUrl)) {
+  // it may only ever run against a local database. `@postgres:` is the compose
+  // service on the VPS (deploy/vps/ops.sh runs this inside the compose network).
+  if (!LOCAL_HOSTS.has(hostOf(adminUrl))) {
     throw new Error(`Refusing to run against a non-local database: ${redact(adminUrl)}`);
   }
 

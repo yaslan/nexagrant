@@ -1,13 +1,13 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
 import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
 import { moduleGate } from '@/lib/modules/guard';
 import type { MatchBreakdown } from '@/modules/m8/server/matching';
 import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
-import { dimensionValueText } from '@/modules/m8/components/dimension-value';
+import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 
 /**
  * M8 consortium role matrix.
@@ -71,6 +71,7 @@ export default async function MatchingPage({
   if (locked) return locked;
   const { tenantId } = await requireTenantPage(locale);
   const t = await getTranslations({ locale, namespace: 'Consortium' });
+  const format = await getFormatter({ locale });
 
   // Everything below is read inside the session tenant. The page used to load
   // the opportunity by `(id, workspace slug)` with no tenant at all, so any
@@ -206,7 +207,7 @@ export default async function MatchingPage({
                               </div>
                             </td>
                             <td className="py-2 px-4">
-                              <div className="font-bold tabular-nums">{t('scoreOutOf', { score: c.score.toFixed(1) })}</div>
+                              <div className="font-bold tabular-nums">{t('scoreOutOf', { score: scoreNumberText(format.number, c.score) })}</div>
                               {/* Was a `title` attribute — invisible to keyboard and
                                   touch users, who could not see why a partner ranked. */}
                               <details className="text-xs text-muted mt-1">
@@ -220,6 +221,7 @@ export default async function MatchingPage({
                                       <dd className="tabular-nums whitespace-nowrap" data-testid={`m8-dimension-${key}`}>
                                         {dimensionValueText(
                                           t,
+                                          format.number,
                                           writer === 'match' ? seatScoreDimensionScale('match', key) : null,
                                           breakdown[key] ?? 0
                                         )}

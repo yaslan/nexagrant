@@ -94,10 +94,14 @@ BEGIN
   END IF;
 
   -- 4. And on everything created later, per owning role. Prisma migrations run
-  --    as fabrika (or fabrika_migrate); default privileges are recorded per
-  --    grantor, so both owners are covered when they exist.
+  --    as the owner role (fabrika_owner on the VPS; fabrika locally). Default
+  --    privileges are recorded per grantor. Only roles the caller is a member of
+  --    are touched: ALTER DEFAULT PRIVILEGES FOR ROLE <other> is a superuser-only
+  --    act, so a non-superuser owner fails here unless it skips the superuser role.
   FOR owner_role IN
-    SELECT rolname FROM pg_roles WHERE rolname IN ('fabrika', 'fabrika_migrate')
+    SELECT rolname FROM pg_roles
+     WHERE rolname IN ('fabrika', 'fabrika_migrate', 'fabrika_owner')
+       AND pg_has_role(current_user, rolname, 'MEMBER')
   LOOP
     EXECUTE format(
       'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I',

@@ -321,7 +321,7 @@ describe('TASK-MUN3W76B4XEJE: consortium page', () => {
     // getConflicts(), so "Invite" first appears disabled; a click then is
     // dropped and assignSeat never runs. Click only once it is enabled
     // (TASK-MUN7B4ZIEBJML: the full-suite "timed out in 5000ms").
-    const invite = await enabled(await screen.findByRole('button', { name: 'Invite' }));
+    const invite = await enabled(await screen.findByRole('button', { name: trMessages.Consortium.invite }));
 
     fireEvent.click(invite);
     await waitFor(() => expect(vi.mocked(assignSeat)).toHaveBeenCalledTimes(1));

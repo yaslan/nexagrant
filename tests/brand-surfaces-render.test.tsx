@@ -49,7 +49,9 @@ describe('brand surfaces', () => {
     expect(copyright.textContent).not.toMatch(/[.,]\d{3}/);
     expect(copyright.textContent).not.toContain(RETIRED_BRAND);
 
-    expect(screen.getByAltText(new RegExp(PRODUCT_NAME))).toBeDefined();
+    // BrandLogo renders both cuts (light and dark lettering) and CSS shows one per theme, so
+    // the alt text is there twice; both must carry the interpolated name.
+    expect(screen.getAllByAltText(new RegExp(PRODUCT_NAME))).toHaveLength(2);
   });
 
 });

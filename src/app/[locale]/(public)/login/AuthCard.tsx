@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useId, useState } from 'react';
-import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import { useSearchParams } from 'next/navigation';
 import { loginWithCredentialsAction, loginWithSocialAction } from '@/lib/actions/auth';
 import { useTranslations } from 'next-intl';
@@ -71,7 +71,6 @@ export default function AuthCard({
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const isTr = locale === 'tr';
   const tDemo = useTranslations('DemoSignIn');
-  const tCommon = useTranslations('Common');
   const tAuthCard = useTranslations('Auth');
 
   // Same-origin paths only: this value ends up in `window.location.href` (safe-callback-url.ts).
@@ -329,7 +328,7 @@ export default function AuthCard({
       {/* Dynamic Header */}
       <div className="text-center space-y-2 pt-1">
         <div className="flex items-center justify-center pb-1">
-          <Image src="/logo.png" alt={tCommon('logoAlt', { brand: PRODUCT_NAME })} width={64} height={64} className="object-contain" />
+          <BrandLogo height={56} />
         </div>
         <h1 className="text-2xl font-bold font-heading text-ink tracking-tight">
           {mode === 'login'

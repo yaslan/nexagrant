@@ -55,6 +55,18 @@ function loadSql(file: string): string {
     .join('\n');
 }
 
+/** Hosts this script may touch; parsed hostname, not a substring (see scripts/apply-rls.ts). */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', 'postgres']);
+
+/** Unparseable URL → '' (fails the guard closed). */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
 function redact(url: string): string {
   return url.replace(/:\/\/([^:/@]+):([^@]*)@/, (_m, user) => `://${user}:***@`);
 }
@@ -64,7 +76,7 @@ async function main() {
   const adminUrl = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
   if (!adminUrl) throw new Error('DATABASE_URL is not set; cannot reach the local database.');
 
-  if (!/localhost|127\.0\.0\.1/.test(adminUrl)) {
+  if (!LOCAL_HOSTS.has(hostOf(adminUrl))) {
     throw new Error(`Refusing to run against a non-local database: ${redact(adminUrl)}`);
   }
 

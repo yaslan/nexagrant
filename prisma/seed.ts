@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../src/lib/db';
+import { seedDemoDecision } from '../src/lib/env';
 import {
   CATALOG_CURRENCY,
   PLAN_GRANTS,
@@ -186,7 +187,28 @@ async function seedG0DemoEvidence() {
 
 async function main() {
   console.log('Seeding Database...');
+  await seedReferenceData();
 
+  // FO-251: the demo tenant only when SEED_DEMO says so (default: on only with
+  // NODE_ENV=development|test; off in production and when NODE_ENV is unset,
+  // FO-296), so a production seed fills the catalogue alone.
+  const demo = seedDemoDecision();
+  if (demo.warning) console.warn(demo.warning);
+  if (!demo.enabled) {
+    console.log('Skipping demo data (SEED_DEMO is off) — reference data only.');
+    return;
+  }
+  await seedDemoData();
+  console.log('Seeding completed with E10 data.');
+}
+
+/**
+ * Platform reference data — written on every run, production included:
+ * module catalogue, plans, add-ons, programmes, concept templates, M17 rubrics
+ * and the public blog launch posts. Every write is an upsert (or insert-only),
+ * so a second run leaves the same rows.
+ */
+async function seedReferenceData() {
   // 1. ModuleCatalog
 
   for (const m of modules) {
@@ -391,15 +413,21 @@ async function main() {
   // 6. M17 assessment grids (FO-186) — platform reference data, prisma/seed-data/interreg-rubrics.ts.
   await seedInterregRubrics();
 
-  // E10 Seed Data
-  await seedTenantWorkspace();
-  await seedDemoModuleStates();
-  await seedCalls();
-
   // Public blog launch posts (AKTAR-MURBCJ0A-1). Insert-only: an existing slug,
   // including one an admin edited, is left as it is.
   const blog = await seedBlogPosts(prisma);
   console.log(`Blog posts seeded (${blog.inserted} inserted, ${blog.kept} already present).`);
+}
+
+/**
+ * Demo data (E10/E11) — only when SEED_DEMO is on: demo-tenant and its users,
+ * module states, the sample calls and topics, opportunities, G0 evidence, gate
+ * decisions, proposals, efforts, the M6 panel and feedback.
+ */
+async function seedDemoData() {
+  await seedTenantWorkspace();
+  await seedDemoModuleStates();
+  await seedCalls();
   await seedOpportunities();
   await seedG0DemoEvidence();
   await seedGateDecisions();
@@ -409,8 +437,6 @@ async function main() {
 
   // E11.2 Feedback
   await seedE11Feedback();
-
-  console.log('Seeding completed with E10 data.');
 }
 
 /**
@@ -453,7 +479,8 @@ async function seedDemoModuleStates() {
 }
 
 /**
- * M6 Evaluator Lens panel — DEVELOPMENT ONLY (TASK-MTPZH6T9L6E2E).
+ * M6 Evaluator Lens panel — demo data (TASK-MTPZH6T9L6E2E); runs only inside
+ * `seedDemoData`, so SEED_DEMO decides (FO-251), not a NODE_ENV check here.
  *
  * Layers a panel evaluation onto rows the E10 seed already created:
  * demo-proposal-3 (GFLEX, on demo-opp-3) reviewed by alice and bob.
@@ -463,11 +490,6 @@ async function seedDemoModuleStates() {
  * Seeded state: 1 evaluation (draft) / 2 reviewers (both pending) / 4 criteria / 0 scores.
  */
 async function seedM6EvaluatorLens() {
-  if (process.env.NODE_ENV === 'production') {
-    console.log('Skipping M6 evaluator lens seed (NODE_ENV=production).');
-    return;
-  }
-
   const TENANT_ID = 'demo-tenant';
   const PROPOSAL_ID = 'demo-proposal-3'; // GFLEX — HORIZON-CL5 grid flexibility platform
   const OPPORTUNITY_ID = 'demo-opp-3';

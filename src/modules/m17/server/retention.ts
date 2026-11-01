@@ -8,8 +8,9 @@
  * and expiry — exactly the state of a slot nobody uploaded to, then:
  *   • the status is recomputed by the same rule an upload uses (./status.ts), so a
  *     READY analysis whose project file expired is CALL_READY again, not a READY with
- *     nothing to read. ANALYZING is left alone: the F2 run owns it (contract for F2:
- *     read both texts, and treat a NULL one as "expired, ask for a new upload").
+ *     nothing to read. ANALYZING is left alone while both texts are still there (the F2
+ *     run owns it); once a slot is emptied the status is recomputed like any other row's
+ *     (FO-191 B4: the run can no longer finish, and a row left ANALYZING refuses uploads).
  *   • the F2 result and criterion marks are deleted: their quotes are the document's
  *     text, and a mark without the text it was drawn from cannot be re-checked.
  * The analysis row itself stays (the user's list, the rubric choice); the user's own
@@ -27,8 +28,10 @@
  */
 import { Prisma } from '@prisma/client';
 
+import { lockTenantCredits, releaseAiReservation } from '@/lib/llm';
 import { withSystemScope, type SystemTx } from '@/lib/system-scope';
 
+import { EVALUATE_MODULE, runRef } from './evaluate';
 import { STATUS_FROM_TEXTS_SQL } from './status';
 
 const BATCH = 500;
@@ -114,7 +117,14 @@ interface BatchOutcome {
   analyses: number;
 }
 
-/** One page, one transaction: scan, empty the slots, recompute status, drop the derived rows. */
+/**
+ * One page, one transaction: scan, empty the slots, recompute status, drop the derived rows.
+ *
+ * An ANALYZING row keeps its status only while both texts are still there. A run whose text
+ * the purge just emptied can never finish (its result write needs both), and the purge's own
+ * `updatedAt` bump has already cost it its claim, so its failure handler would leave the row
+ * ANALYZING for good, and an ANALYZING row refuses every upload (FO-191 B4).
+ */
 async function purgeBatch(
   tx: SystemTx,
   now: Date,
@@ -124,13 +134,36 @@ async function purgeBatch(
   const due = { OR: [{ callTextExpiresAt: { lte: now } }, { projectTextExpiresAt: { lte: now } }] };
   const rows = await tx.interregAnalysis.findMany({
     where: cursor === null ? due : { AND: [due, { id: { gt: cursor } }] },
-    select: { id: true },
+    select: { id: true, tenantId: true, status: true, updatedAt: true },
     orderBy: { id: 'asc' },
     take: batchSize,
   });
   const lastId = rows.at(-1)?.id ?? null;
   if (rows.length === 0) return { scanned: 0, lastId, callSlots: 0, projectSlots: 0, analyses: 0 };
   const ids = rows.map((r) => r.id);
+
+  // A run still holding the claim (ANALYZING) whose text is due loses that text below and can
+  // never finish, so its reservation is given back first (FO-291 B1). The releases, and the reads
+  // they depend on, come before the updates: the updates bump `updatedAt`, which is the claim's
+  // ledger reference (runRef), so read after them a run's reservation would no longer be found.
+  // The scan is not locked, so a run may have finished (DONE) or failed since it was read. The
+  // status and `updatedAt` are read again under the tenant lock, and only rows still ANALYZING and
+  // due are released: a DONE run's reservation is its delivered result and must not be refunded (FO-303 Ö-1).
+  const running = rows.filter((r) => r.status === 'ANALYZING');
+  // Tenant locks in one fixed order, then the releases: two batches cannot wait on each other.
+  const tenants = [...new Set(running.map((r) => r.tenantId))].sort();
+  for (const tenantId of tenants) {
+    await lockTenantCredits(tx, tenantId);
+  }
+  if (running.length > 0) {
+    const stillRunning = await tx.interregAnalysis.findMany({
+      where: { id: { in: running.map((r) => r.id) }, status: 'ANALYZING', OR: due.OR },
+      select: { id: true, tenantId: true, updatedAt: true },
+    });
+    for (const r of stillRunning) {
+      await releaseAiReservation(tx, { tenantId: r.tenantId, module: EVALUATE_MODULE, refId: runRef(r.id, r.updatedAt) });
+    }
+  }
 
   // The expiry is part of each write's WHERE: a row re-uploaded since the scan is skipped.
   const call = await tx.interregAnalysis.updateMany({
@@ -161,7 +194,8 @@ async function purgeBatch(
     await tx.$executeRaw`
       UPDATE "InterregAnalysis"
          SET "status" = ${STATUS_FROM_TEXTS_SQL}
-       WHERE "id" IN (${Prisma.join(ids)}) AND "status" <> 'ANALYZING'`;
+       WHERE "id" IN (${Prisma.join(ids)})
+         AND ("status" <> 'ANALYZING' OR "callText" IS NULL OR "projectText" IS NULL)`;
     await tx.interregCriterionMark.deleteMany({ where: { analysisId: { in: ids } } });
     await tx.interregAnalysisResult.deleteMany({ where: { analysisId: { in: ids } } });
   }

