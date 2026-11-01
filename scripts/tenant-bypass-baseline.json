@@ -304,6 +304,15 @@
     },
     {
       "check": "D",
+      "file": "src/modules/m17/server/stale-runs.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "releaseStaleRuns(), run every 15 minutes by the m17-stale-runs cron (FO-317): finds every tenant's InterregAnalysis still ANALYZING with updatedAt older than STALE_CLAIM_MS (a run whose process died), releases its credit reservation with releaseAiReservation under that tenant's credit lock and marks it FAILED. The WHERE clause is a status and a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; InterregAnalysis and CreditLedger are FORCE RLS, so an unscoped scan under fabrika_app would match 0 rows and report success while every reservation stayed. It writes only the refund row and the status; it never reads a document text."
+    },
+    {
+      "check": "D",
       "file": "src/lib/invitations/retention.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
