@@ -2,6 +2,20 @@
 
 Kapı = `gate:core` (`package.json`): `db:generate → lint → typecheck → test → i18n:check → rls:check → rls:bypass-check → rls:verify --require-db → db:rls-role → test:e2e → alerts:check`. `pnpm gate` bunu makine çapındaki kilitle (`scripts/gate-lock.mjs`, aynı anda tek gate) koşar. `githooks/pre-push` da aynısını koşar (`pnpm hooks:install`).
 
+## Sonuç önbelleği, sıra ve belge-yalnız yol (FO-339)
+
+Aynı kodu üç kez tam koşmamak için (yazar gate'i, pre-push kancası, inceleyici) `pnpm gate` üç kademeli karar verir (`scripts/gate-lock.mjs` + `scripts/gate-cache.mjs`):
+
+1. **Önbellek hit:** `git rev-parse HEAD^{tree}` + `pnpm-lock.yaml` hash'i için `~/.cache/fonbridge-gate-pass/<tree>` kaydı varsa `önbellek: <tree> <tarih>` basılır ve tam gate atlanır. Kayıt yalnız `gate:core` exit 0 iken, çalışma ağacı baştan sona temizken (`git status` boş, untracked dahil) ve koşu boyunca tree değişmediyse yazılır. Kırmızı koşu yazmaz.
+2. **Belge-yalnız kısa yol:** `origin/dev...HEAD` farkı yalnız `docs/**` ve `src/`, `tests/`, `prisma/`, `content/`, `messages/`, `config/` dışındaki `*.md` ise tam gate yerine `lint` + `i18n:check` koşar. Kirli ağaç ya da boş fark tam gate'e düşer. Bu kayıt tam gate yerine geçmez; kayda yazılmaz.
+3. **Tam gate:** diğer her durum. `gate:core` adımları değişmedi.
+
+Kilit sırası: bekleyenler `~/.cache/fonbridge-gate.lock.queue/` altında bilet bırakır; kilidi yalnız en eski canlı bilet alır. Bekleme satırı sıra no'sunu, önündeki iş sayısını ve tahmini başlama saatini basar (tahmin: `~/.cache/fonbridge-gate.lock.history.jsonl` medyanı; geçmiş yoksa 30 dk). Eski sürümle kilidi alan bir bekleyen bilet bırakmadığı için araya girebilir; kilit dizininin biçimi (`owner.json`) değişmedi.
+
+Önbelleği bilerek atlamak: `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`. Önbelleği temizlemek: `~/.cache/fonbridge-gate-pass/` dizinini silmek güvenlidir.
+
+`pnpm gate:isolated` (argümansız) aynı kararı önce verir; önbellek ya da belge-yalnız ise konteyner kurmadan doğrudan `pnpm gate`'e geçer.
+
 ## Kısa yol: `pnpm gate:isolated` (önerilen)
 
 ```bash
