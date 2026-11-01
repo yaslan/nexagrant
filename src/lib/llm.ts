@@ -16,6 +16,7 @@
 import { aiCreditEntry } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
 import crypto from 'crypto';
+import type { Prisma } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
 import { errorStatus } from '@/lib/errors';
@@ -485,7 +486,7 @@ export async function chargeAiAction(
  * step; two runs of the same tenant must not interleave that step, or both pass the check on the
  * same credits. Transaction-level: released at commit or rollback.
  */
-export async function lockTenantCredits(tx: TenantTx, tenantId: string): Promise<void> {
+export async function lockTenantCredits(tx: Prisma.TransactionClient, tenantId: string): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${tenantId}, 0))`;
 }
 
@@ -493,7 +494,7 @@ export async function lockTenantCredits(tx: TenantTx, tenantId: string): Promise
  * The balance as the caller's transaction sees it, including reservations it has already
  * written. Use this inside a locked transaction; {@link getCreditBalance} opens its own.
  */
-export async function creditBalanceIn(tx: TenantTx, tenantId: string): Promise<number> {
+export async function creditBalanceIn(tx: Prisma.TransactionClient, tenantId: string): Promise<number> {
   const result = await tx.creditLedger.aggregate({ where: { tenantId }, _sum: { delta: true } });
   return result._sum.delta || 0;
 }
@@ -504,7 +505,7 @@ export async function creditBalanceIn(tx: TenantTx, tenantId: string): Promise<n
  * balance does not cover it. Call with the tenant lock held ({@link lockTenantCredits}).
  */
 export async function reserveAiAction(
-  tx: TenantTx,
+  tx: Prisma.TransactionClient,
   params: { tenantId: string; module: string; purpose: string; refId: string },
 ): Promise<boolean> {
   const { credits } = resolveCredits(params.module, params.purpose);
@@ -522,7 +523,7 @@ export async function reserveAiAction(
  * for `refId` or it was already refunded. Call with the tenant lock held.
  */
 export async function releaseAiReservation(
-  tx: TenantTx,
+  tx: Prisma.TransactionClient,
   params: { tenantId: string; module: string; refId: string },
 ): Promise<void> {
   const debit = await tx.creditLedger.findFirst({

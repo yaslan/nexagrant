@@ -28,8 +28,10 @@
  */
 import { Prisma } from '@prisma/client';
 
+import { lockTenantCredits, releaseAiReservation } from '@/lib/llm';
 import { withSystemScope, type SystemTx } from '@/lib/system-scope';
 
+import { EVALUATE_MODULE, runRef } from './evaluate';
 import { STATUS_FROM_TEXTS_SQL } from './status';
 
 const BATCH = 500;
@@ -132,13 +134,26 @@ async function purgeBatch(
   const due = { OR: [{ callTextExpiresAt: { lte: now } }, { projectTextExpiresAt: { lte: now } }] };
   const rows = await tx.interregAnalysis.findMany({
     where: cursor === null ? due : { AND: [due, { id: { gt: cursor } }] },
-    select: { id: true },
+    select: { id: true, tenantId: true, status: true, updatedAt: true },
     orderBy: { id: 'asc' },
     take: batchSize,
   });
   const lastId = rows.at(-1)?.id ?? null;
   if (rows.length === 0) return { scanned: 0, lastId, callSlots: 0, projectSlots: 0, analyses: 0 };
   const ids = rows.map((r) => r.id);
+
+  // A run still holding the claim (ANALYZING) whose text is due loses that text below and can
+  // never finish, so its reservation is given back first (FO-291 B1). This must come before the
+  // updates: they bump `updatedAt`, which is the run's ledger reference (runRef).
+  // The page is already the due rows, so its ANALYZING ones are the runs to release.
+  const running = rows.filter((r) => r.status === 'ANALYZING');
+  // Tenant locks in one fixed order, then the releases: two batches cannot wait on each other.
+  for (const tenantId of [...new Set(running.map((r) => r.tenantId))].sort()) {
+    await lockTenantCredits(tx, tenantId);
+  }
+  for (const r of running) {
+    await releaseAiReservation(tx, { tenantId: r.tenantId, module: EVALUATE_MODULE, refId: runRef(r.id, r.updatedAt) });
+  }
 
   // The expiry is part of each write's WHERE: a row re-uploaded since the scan is skipped.
   const call = await tx.interregAnalysis.updateMany({

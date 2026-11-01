@@ -211,7 +211,7 @@ async function claim(owner: Owner, analysisId: string, now: Date): Promise<{ ok:
 }
 
 /** The ledger reference of one run: the analysis and its claim instant, so each run's reservation is its own. */
-function runRef(analysisId: string, claimedAt: Date): string {
+export function runRef(analysisId: string, claimedAt: Date): string {
   return `${analysisId}:${claimedAt.getTime()}`;
 }
 

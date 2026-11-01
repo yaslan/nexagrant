@@ -81,9 +81,10 @@ vi.mock('@/lib/llm', async (importOriginal) => {
   };
 });
 
-const { createDbClient } = await import('@/lib/db');
-const { createAnalysis, saveDocument } = await import('@/modules/m17/server/analyses');
-const { runEvaluation, EVALUATE_ATTEMPT_PURPOSE, EVALUATE_RETRY_PURPOSE, STALE_CLAIM_MS } = await import('@/modules/m17/server/evaluate');
+const { createDbClient, withTenant } = await import('@/lib/db');
+const { releaseAiReservation, reserveAiAction } = await import('@/lib/llm');
+const { createAnalysis, deleteAnalysis, saveDocument } = await import('@/modules/m17/server/analyses');
+const { runEvaluation, runRef, EVALUATE_ATTEMPT_PURPOSE, EVALUATE_PURPOSE, EVALUATE_RETRY_PURPOSE, STALE_CLAIM_MS } = await import('@/modules/m17/server/evaluate');
 type Owner = { tenantId: string; userId: string };
 
 let admin: PrismaClient | undefined;
@@ -363,5 +364,53 @@ describe('runEvaluation — the run on a real database (FO-188 B2)', () => {
     expect(await marksOf(id)).toBe(0);
     expect(await resultsOf(id)).toBe(0);
     expect(await ledgerFor(id)).toEqual([-3, 3]);
+  });
+
+  test('FO-291 B1: deleting the analysis of a dead run gives its reservation back, before the row goes', async () => {
+    const id = await readyAnalysis(alice);
+    // A run that died holding its claim: ANALYZING, its price reserved and never released.
+    const claimedAt = new Date(Date.now() - 60_000);
+    await setClaim(id, 'ANALYZING', claimedAt);
+    expect(
+      await withTenant(alice.tenantId, (tx) =>
+        reserveAiAction(tx, { tenantId: alice.tenantId, module: 'M17', purpose: EVALUATE_PURPOSE, refId: runRef(id, claimedAt) }),
+      ),
+    ).toBe(true);
+    const reserved = await balanceOf(alice.tenantId);
+
+    expect(await deleteAnalysis(alice, id)).toBe(true);
+
+    expect(await admin!.interregAnalysis.count({ where: { id } })).toBe(0);
+    expect(await ledgerFor(id)).toEqual([-3, 3]);
+    expect(await balanceOf(alice.tenantId)).toBe(reserved + 3);
+  });
+
+  test('FO-291 M4: giving a reservation back is idempotent: a second release of the same run refunds nothing more', async () => {
+    const id = await readyAnalysis(bob);
+    const claimedAt = new Date(Date.now() - 60_000);
+    await setClaim(id, 'ANALYZING', claimedAt);
+    const refId = runRef(id, claimedAt);
+    await withTenant(bob.tenantId, (tx) =>
+      reserveAiAction(tx, { tenantId: bob.tenantId, module: 'M17', purpose: EVALUATE_PURPOSE, refId }),
+    );
+
+    // The takeover's release, then the old run's own failure: two releases of one reservation.
+    await withTenant(bob.tenantId, (tx) => releaseAiReservation(tx, { tenantId: bob.tenantId, module: 'M17', refId }));
+    await withTenant(bob.tenantId, (tx) => releaseAiReservation(tx, { tenantId: bob.tenantId, module: 'M17', refId }));
+
+    expect(await ledgerFor(id)).toEqual([-3, 3]);
+  });
+
+  test('FO-291 M5: a tenant whose balance is exactly the price can run; the reservation is not checked a second time', async () => {
+    const [dan] = (await makeTenant('c', ['dan'], 3)) as [Owner];
+    const id = await readyAnalysis(dan);
+    state.answers.push(goodAnswer());
+
+    const run = await runEvaluation(dan, id, { locale: 'en' });
+
+    expect(run).toMatchObject({ ok: true });
+    expect(await statusOf(id)).toBe('DONE');
+    expect(await balanceOf(dan.tenantId)).toBe(0);
+    expect(await ledgerFor(id)).toEqual([-3]);
   });
 });
