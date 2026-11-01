@@ -595,7 +595,7 @@ const REFUND_RETRY_BASE_MS = 200;
  * Gives a reservation back, retrying a failed write (FO-319 Y-3, Ö-3). Never throws: the caller's
  * own outcome — the provider error, or the truncated / refused answer — is what it reports, not a
  * bookkeeping fault. A refund that still fails leaves the debit standing; that is logged and
- * recorded as an `error` SystemAlert (`llm-refund`, deduplicated per module and purpose) so an
+ * recorded as an `error` SystemAlert (`llm-refund`, deduplicated per reservation) so an
  * operator can reconcile it. The alert carries no tenant id: SystemAlert is outside RLS.
  */
 async function refundOrAlert(options: LlmGenerateOptions, refId: string): Promise<void> {
@@ -622,7 +622,9 @@ async function refundOrAlert(options: LlmGenerateOptions, refId: string): Promis
       source: 'llm-refund',
       message: 'AI credit reservation could not be refunded; the debit stands until reconciled',
       meta: { module: options.module, purpose: options.purpose, reservation: refId },
-      dedupeKey: `llm-refund:${options.module}:${options.purpose}`,
+      // Per reservation (FO-329): refId already carries module, purpose and a unique id, so two
+      // unrefunded calls of the same module and purpose each keep their own open alert.
+      dedupeKey: `llm-refund:${refId}`,
     });
   } catch {
     // Best-effort: an alert that cannot be written must not replace the caller's outcome.

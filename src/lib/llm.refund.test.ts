@@ -120,6 +120,43 @@ describe('FO-319 Y-3 — a refund that does not land is retried, alerted, and no
   });
 });
 
+describe('FO-329 — one unrefunded reservation, one open alert, per reservation', () => {
+  it('two unrefunded reservations of the same module and purpose record two alerts, each keyed to its own reservation', async () => {
+    stubAnthropic('max_tokens');
+    failRefunds(99);
+
+    await generateCompletion(baseOptions).catch(() => undefined);
+    await generateCompletion(baseOptions).catch(() => undefined);
+
+    expect(mockAlert.recordAlert).toHaveBeenCalledTimes(2);
+    const alerts = mockAlert.recordAlert.mock.calls.map(
+      c => c[0] as { dedupeKey: string; meta: { reservation: string } }
+    );
+    const keys = alerts.map(a => a.dedupeKey);
+    // Distinct dedupe keys: the second reservation must not fold into the first open alert.
+    expect(new Set(keys).size).toBe(2);
+    // Each alert's key names the reservation it reports, so the operator can reconcile every one.
+    for (const a of alerts) {
+      expect(a.dedupeKey).toContain(a.meta.reservation);
+    }
+  });
+
+  it('R2 — the extra latency a failing refund adds to the call path is bounded and measured', async () => {
+    stubAnthropic('max_tokens');
+    failRefunds(99);
+
+    const started = Date.now();
+    await generateCompletion(baseOptions).catch(() => undefined);
+    const elapsedMs = Date.now() - started;
+
+    // Three refund writes with 200 ms and 400 ms backoff between them: ~600 ms of sleep, plus the
+    // write work. Measured here so the report carries a number, not an estimate.
+    console.info(`[FO-329 R2] refund-failure path added ${elapsedMs} ms to generateCompletion`);
+    expect(elapsedMs).toBeGreaterThanOrEqual(600);
+    expect(elapsedMs).toBeLessThan(5000);
+  });
+});
+
 describe('FO-319 Ö-3 — a refund failure never replaces the provider error', () => {
   it('a provider rejection keeps its own error when the refund also fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => 'bad request' }));
