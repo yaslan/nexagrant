@@ -1,6 +1,7 @@
 # FonBridge — Veriniz nerede? (kamu kurumları için tek sayfa)
 
 > Sürüm 1.3 · 29.09.2026 · Hazırlayan: CS-FB · Kart: TASK-MULRS7WKYEFOP (FB-KAMU-2, B9); 1.1: TASK-MUN2UXWTAX1AQ (barındırma kararı: Vulut, Türkiye); 1.2: TASK-MUN2PNAR729H8 (e-posta: `info@fonbridge.com`, sunucu `mail.fonbridge.com`, alan adı `fonbridge.com`); 1.3: TASK-MUN4U4PR3DWMT (e-posta Vulut'un cPanel e-posta hizmetiyle gider — SMTP Seçenek A)
+> **Güncel durum (30.10.2026, FO-233, patron):** canlı alan adı `nexagrant.com`; gönderici `info@nexagrant.com`, SMTP `mail.nexagrant.com`. Bu belgedeki 29.09.2026 kayıtları ve ölçümler tarihsel olarak `fonbridge.com`'a aittir.
 >
 > **Durum: TASLAK.** Pilot görüşmesinden önce patron okur. Her satırın kaynağı sağ sütundadır; "K" kodları sonuç raporundaki (`docs/agent-results/TASK-MULRS7WKYEFOP-cs-fb.md`) envanter satırlarıdır. Koddan ya da sağlayıcının resmî belgesinden doğrulayamadığımız her şey **[DOĞRULANMADI]** diye işaretlidir. **1.1 (29.09.2026):** barındırma kararı verildi. Veritabanı, uygulama sunucusu, iş kuyruğu ve e-posta sunucusu Türkiye'de (Vulut). Yurt dışına giden akışlar aşağıda ayrı ve açık yazılıdır. Bu yüzden "tüm veri Türkiye'de" demiyoruz; "veritabanı Türkiye'de" diyoruz.
 

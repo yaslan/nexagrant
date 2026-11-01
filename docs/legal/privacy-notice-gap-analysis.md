@@ -272,6 +272,8 @@ okunmadı (ve okunmamalı).
    `yasinaslan.com.tr` (`admin@` — platform yöneticisi kimliği, `src/lib/auth.ts:30`).
    Aydınlatma metninin başvuru kanalı olarak hangisini göstereceği **karar konusudur**.
 
+   **Güncel durum (30.10.2026, FO-233, patron):** canlı alan adı `nexagrant.com`; gönderici `info@nexagrant.com`, SMTP `mail.nexagrant.com`. Bu belgedeki 29.09.2026 kayıtları ve ölçümler tarihsel olarak `fonbridge.com`'a aittir.
+
 ---
 
 ## 5. Ölçülemeyenler — ve nasıl ölçülür

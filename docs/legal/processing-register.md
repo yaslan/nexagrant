@@ -10,6 +10,8 @@ Versiyon 1.0 — 2026-09-08. Bu belge, KVKK md.16 (VERBİS'e esas envanter yük�
 
 ## 1. Hesap oluşturma ve kimlik doğrulama
 
+**Güncel durum (30.10.2026, FO-233, patron):** canlı alan adı `nexagrant.com`; gönderici `info@nexagrant.com`, SMTP `mail.nexagrant.com`. Bu belgedeki 29.09.2026 kayıtları ve ölçümler tarihsel olarak `fonbridge.com`'a aittir.
+
 | Alan                           | Değer                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Sorumlu/işleyen rolü**       | FonBridge = veri sorumlusu                                                                                                                                                                                                                                                                                                      |

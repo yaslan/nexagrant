@@ -84,7 +84,7 @@ Rev. 3 ve rev. 4 yalnız belge değişikliğidir. Rev. 4'ün iki Y çözümü cr
 | Platform alanları (`mail.*`, `mode`) | `Tenant.settings.cobrand` içinde | ayrı `AgencyWhitelabel` tablosu, yalnız platform yöneticisi yazar | Y-2 |
 | Askıya alma | "Caddy depodan sil, işletme adımı" | tek otomatik akış: DB + önbellek + Caddy bloğu + reload + Google `redirect_uri` + doğrulama (rev. 3: Caddy adımını eşitleyici yapar) | Y-3 |
 | C devri | "60 sn, hedef-host'a bağlı kod" | + tarayıcı nonce'u, DB'de tek kullanım, POST ile taşıma, Google kodu aracıda kalır | Y-4 |
-| E1 önkoşulu | yok | `fonbridge.com` DMARC `p=reject` (en az `quarantine`) | Y-5 |
+| E1 önkoşulu | yok | `nexagrant.com` DMARC `p=reject` (en az `quarantine`) | Y-5 |
 | `From` | dize | `{ name, address }` nesnesi + ad politikası | Y-6 |
 
 ---
@@ -105,13 +105,13 @@ ve eşitleyicinin ürettiği **ajans dosyası** (§4.3). Ana dosya:
 		strict_sni_host on              # SNI ≠ Host → 421 (İNCELEME-114 §1.2 ölçtü)
 	}
 }
-fonbridge.com {
+nexagrant.com {
 	encode zstd gzip
 	header >Strict-Transport-Security "max-age=31536000"   # Karar-1 C: HSTS yalnız burada (§5)
 	reverse_proxy 127.0.0.1:3000
 }
-www.fonbridge.com, http://www.fonbridge.com, http://fonbridge.com {
-	redir https://fonbridge.com{uri} permanent
+www.nexagrant.com, http://www.nexagrant.com, http://nexagrant.com {
+	redir https://nexagrant.com{uri} permanent
 }
 import {$FB_AGENCIES:/etc/caddy/agencies.d/agencies.caddy}   # YALNIZ fb-edge-sync yazar (§4.3); boş dosya geçerlidir.
                                    # Yer tutucu yalnız eşitleyicinin denetim komutunda verilir (İNCELEME-120 Y-1)
@@ -164,7 +164,7 @@ Notlar:
 
 ```ts
 type BrandHost =
-  | { kind: 'root' }                                  // fonbridge.com (+ yerel geliştirmede localhost)
+  | { kind: 'root' }                                  // nexagrant.com (+ yerel geliştirmede localhost)
   | { kind: 'agency'; agencyId: string; hostname: string };
 
 export function normalizeHost(raw: string | null): string | null;   // Ö-1: küçük harf, port at, sondaki '.' at, IDN → punycode
@@ -198,7 +198,7 @@ export async function assertBrandHost(): Promise<BrandHost>;        // R2-Ö2: o
 
 - `/api/webhooks/*` (Stripe vb.) yalnız `root` host'ta kabul edilir. Ajans host'undan gelen webhook 421 alır.
 - `/api/internal/*` (varsa) yalnız `root`. Caddy dışarıya açmaz.
-- 421 gövdesi boştur ve `Cache-Control: no-store` taşır. Yönlendirme yapılmaz: askıdaki alandan `fonbridge.com`'a
+- 421 gövdesi boştur ve `Cache-Control: no-store` taşır. Yönlendirme yapılmaz: askıdaki alandan `nexagrant.com`'a
   otomatik 30x, alanı ele geçiren tarafa meşruiyet kazandırır.
 - `matcher` testi (`src/lib/security-headers.test.ts`, İNCELEME-57 Y-2 kalıbı) `/api/auth/callback/google`,
   `/api/brand/logo` ve `/api/v1/...` örneklerinin proxy'den geçtiğini sabitler.
@@ -323,25 +323,25 @@ bir noktada, her oturum okumasında çalışır. İNCELEME-114 bu seçimi doğru
    `tenant.id === here.agencyId || tenant.agencyId === here.agencyId` ile filtrelenir. Bu filtre üç yere uygulanır:
    giriş, `unstable_update({ tenantId })` rebind'i (`auth.ts:696`) ve varsayılan üyelik (`memberships[0]` yerine
    filtrelenmiş kümenin ilki, `auth.ts:747`). Küme boşsa `null` döner ve giriş sayfası "Bu hesap bu ajansın panelinde
-   değil, fonbridge.com'dan girin" der. Kiracı yine oturumdan gelir. Host kiracı seçmez, yalnız reddeder.
+   değil, nexagrant.com'dan girin" der. Kiracı yine oturumdan gelir. Host kiracı seçmez, yalnız reddeder.
 5. **Tek kontrol noktasının bekçisi (R2-Ö3):** host bağı yalnız `jwt` callback'inde. Onu atlayan bir okuma (çözülmüş
    token'ı doğrudan okuyan route handler) bağı sessizce deler. Bugün yok (`grep -rln "getToken\|next-auth/jwt" src`
    boş). Uygulama kartına kaynak bekçisi eklenir: `src/` altında `next-auth/jwt`, `@auth/core/jwt` içe aktarımı ve
    `decode(` çağrısı yasak (tek istisna yok). Oturum yalnız `auth()` ile okunur.
 6. **Patlama yarıçapı:** ajans alanında basılan token yalnız o alanda ve yalnız o ajansın kurumlarıyla geçerlidir.
-   Alanın DNS'ini ele geçiren taraf en fazla o ajansın kurumlarına erişir. `fonbridge.com`'a ve diğer ajanslara
+   Alanın DNS'ini ele geçiren taraf en fazla o ajansın kurumlarına erişir. `nexagrant.com`'a ve diğer ajanslara
    erişemez.
 7. **Google OAuth (Ö-5):** sağlayıcıya `checks: ["pkce", "state"]`. `redirect` callback'i özelleştirilmez (aynı köken).
 
 ### 3.3 C yolu: merkezi giriş aracısı (Y-4, R2-Y3, R2-Ö4) — yalnız C'ye geçilirse
 
-**Tarayıcı kuralı (tasarımın dayandığı):** `fonbridge.com` ile `oka.org.tr` farklı kayıtlı alanlardır. Aralarındaki her
+**Tarayıcı kuralı (tasarımın dayandığı):** `nexagrant.com` ile `oka.org.tr` farklı kayıtlı alanlardır. Aralarındaki her
 istek siteler arasıdır. `SameSite=Lax` çerez siteler arası isteklerde yalnız üst düzey **GET** gezintisinde gönderilir,
 POST'ta gönderilmez. Bu yüzden siteler arası her POST **çerezsiz** varsayılır ve çerez gerektiren her iş aynı köken
 bir isteğe taşınır. `SameSite=None` kullanılmaz: nonce kimlik doğrulama değil bağ olsa da `None`, çerezi bütün üçüncü
 taraf bağlamlarına açar ve tarayıcıların üçüncü taraf çerez kısıtlarına takılır. İki adımlı iniş daha az şaşırtıcıdır.
 
-- Google yetki kodu ajans host'una **hiç** gitmez. `redirect_uri` yalnız `https://fonbridge.com/api/auth/callback/google`.
+- Google yetki kodu ajans host'una **hiç** gitmez. `redirect_uri` yalnız `https://nexagrant.com/api/auth/callback/google`.
   Kodu aracı değiştirir.
 - Auth.js `redirectProxyUrl` / `AUTH_REDIRECT_PROXY_URL` **yasak** (izin listesi olmadan `state.origin`'e
   yönlendiriyor). §3.2-1'deki açılış kontrolü bu değişkeni de kapsar.
@@ -372,7 +372,7 @@ taraf bağlamlarına açar ve tarayıcıların üçüncü taraf çerez kısıtla
 **Akış:**
 
 1. **Başlatma (ajans host'u).** `panel.oka.org.tr/giris` → host-only `__Host-fb-handoff-nonce` çerezi basılır (32 bayt,
-   `Secure; Path=/; SameSite=Lax; HttpOnly`, 5 dk). Sayfa `https://fonbridge.com/giris/araci` adresine POST formu
+   `Secure; Path=/; SameSite=Lax; HttpOnly`, 5 dk). Sayfa `https://nexagrant.com/giris/araci` adresine POST formu
    gönderir: `{ target: 'panel.oka.org.tr', nonceHash }`.
 2. **Aracı girişi (siteler arası POST, çerezsiz).**
    - **Origin kontrolü (R2-Ö4, İNCELEME-120 Y-2):** üç dal, sırayla:
@@ -386,7 +386,7 @@ taraf bağlamlarına açar ve tarayıcıların üçüncü taraf çerez kısıtla
    - `target` `resolveBrandHost` mantığıyla doğrulanır: `ACTIVE` olmalı, **tam eşleşme** aranır, sonek eşleşmesi
      yapılmaz, DNS kontrolü son 24 saat içinde olmalı. `nonceHash` 64 hex karakter olmalı.
    - Aracı sunucu tarafında `HandoffRequest { id (32 bayt), targetHost, nonceHash, expiresAt = now + 5 dk, usedAt }`
-     yazar (DB'de `sha256(id)`) ve **`303`** ile `GET https://fonbridge.com/giris/araci?r=<id>`'ye yönlendirir. Bu GET
+     yazar (DB'de `sha256(id)`) ve **`303`** ile `GET https://nexagrant.com/giris/araci?r=<id>`'ye yönlendirir. Bu GET
      üst düzey gezinti olduğu için aracının kendi `Lax` oturum çerezleri gelir (R2-Y3'ün 1. adım yarısı). `r` bir
      kimlik bilgisi değildir: yalnız hedef ve `nonceHash`'e işaret eder, tek kullanımlıktır ve sonucu yalnız o nonce
      çerezini taşıyan tarayıcı kullanabilir.
@@ -412,11 +412,11 @@ taraf bağlamlarına açar ve tarayıcıların üçüncü taraf çerez kısıtla
    - **Gevşetme yasağı:** nonce kontrolü uygulama kartında "kaldırılamaz" olarak işaretlenir. Test: nonce çerezi
      olmadan (ya da başka tarayıcının nonce'uyla) gelen geçerli belirteç reddedilir.
 7. **Çıkış senkronu (aynı kural).** Hedef host'ta çıkış (aynı köken POST, Auth.js `signOut`) yapılınca yanıt `303` ile
-   `GET https://fonbridge.com/giris/cikis?from=<host>` adresine gider. Bu üst düzey GET'te aracının oturum çerezi gelir.
-   Sayfa "fonbridge.com oturumunu da kapat" onayını gösterir. Onay, aracının kendi kökenine yapılan bir POST'tur
+   `GET https://nexagrant.com/giris/cikis?from=<host>` adresine gider. Bu üst düzey GET'te aracının oturum çerezi gelir.
+   Sayfa "nexagrant.com oturumunu da kapat" onayını gösterir. Onay, aracının kendi kökenine yapılan bir POST'tur
    (Auth.js CSRF belirteciyle). GET ile kendiliğinden çıkış yapılmaz (çıkış-CSRF). Rev. 2'deki siteler arası
    `POST /api/auth/handoff/logout` kaldırıldı: `Lax` altında aracının çerezi o POST'ta gelmezdi.
-- CSP `form-action`'a `https://fonbridge.com` eklenir (yalnız ajans host'unda). Aracıda `form-action`'a o ajans host'u
+- CSP `form-action`'a `https://nexagrant.com` eklenir (yalnız ajans host'unda). Aracıda `form-action`'a o ajans host'u
   eklenir. Joker kullanılmaz, liste `AgencyDomain`'den gelir.
 - Uygulama kartının e2e'si gerçek tarayıcıda (Chromium + WebKit) iki kayıtlı alanla koşar. İNCELEME-114 bu davranışı
   tarayıcıda koşmadan (belirtimden) çıkardı. İNCELEME-120 ve rev. 4 iki adımlı inişi, `Lax` nonce çerezinin gelişini ve
@@ -535,7 +535,7 @@ fark çalışma kitabına yazılır.
 1. **Hostname doğrulaması (üç katman, aynı kural):**
    - Kural: `normalizeHost` sonrası (küçük harf, punycode)
      `^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`. Joker (`*`) yok. IP değil (IPv4 ya da
-     köşeli IPv6 biçimi reddedilir). Kök alanımıza eşit ya da altında olamaz (`fonbridge.com`, `*.fonbridge.com`).
+     köşeli IPv6 biçimi reddedilir). Kök alanımıza eşit ya da altında olamaz (`nexagrant.com`, `*.nexagrant.com`).
      Karar-2 A gereği kayıtlı alanın kendisi ya da bir genel son ek olamaz (İNCELEME-120 Ö-1):
      ```ts
      const d = getDomain(h, { allowPrivateDomains: true });   // tldts
@@ -549,7 +549,7 @@ fark çalışma kitabına yazılır.
      `include_psl_private_domains=True`, yani pakete gömülü liste, çalışma anında ağ yok, sürüm sabit). Ölçüldü:
      `tldts` 7.4.16 ve `tldextract` 5.3.0, 9 örnekte aynı sonucu verdi (`…-fe-fb-3-ekler/psl*.log`). İki listenin tarihi
      farklı olabilir. Katman 1 ile 3 anlaşamazsa eşitleyici durur ve alarm verir (kapalı kalır). Kök alanımız
-     (`fonbridge.com`) ayrıca açık listeyle dışlanır.
+     (`nexagrant.com`) ayrıca açık listeyle dışlanır.
    - Katman 1: web, yazma anında (`isValidAgencyHostname`, platform yöneticisi eylemi): düzenli ifade + PSL.
    - Katman 2: DB `CHECK` kısıtı (§4.1): düzenli ifade + kök alan dışlaması (PSL DB'de yok, katman 1 ve 3 yapar).
    - Katman 3: eşitleyici, şablona koymadan hemen önce, bağımsız kendi kopyasıyla. Tek bir geçersiz satır bütün
@@ -578,7 +578,7 @@ fark çalışma kitabına yazılır.
       - `apps.http.servers.*.strict_sni_host === true` (her sunucu),
       - tam bir `static_response` 421 rotası (catch-all),
       - `admin.listen` bir unix soketi,
-      - rotalardaki `match[].host[]` birleşim kümesi == DB'deki ACTIVE küme ∪ {`fonbridge.com`, `www.fonbridge.com`}.
+      - rotalardaki `match[].host[]` birleşim kümesi == DB'deki ACTIVE küme ∪ {`nexagrant.com`, `www.nexagrant.com`}.
         Fazlası ya da eksiği varsa dur.
 
       `adapt` hata verirse ya da bir denetim tutmazsa `.tmp` silinir, canlı dosyaya dokunulmaz, sonuç ve hata yazılır.
@@ -622,7 +622,7 @@ fark çalışma kitabına yazılır.
   (`devop-fb/merge-hsts`, `c6fad2ac`, dev'de: `security-headers.ts`'te `HSTS_VALUE` yok). Kurulum sırası
   `docs/SMTP-SUNUCU.md` §10.1 ve `docs/RELEASE_CHECKLIST.md` §5.4'te (gün 1 `max-age=300` → sonra `31536000`).
   `includeSubDomains` kökte yok. `RELEASE_CHECKLIST.md` §5.4-3'teki "gün 366: `includeSubDomains` eklenebilir"
-  maddesi yalnız `fonbridge.com` bloğu içindir, ajans bloklarına kopyalanmaz.
+  maddesi yalnız `nexagrant.com` bloğu içindir, ajans bloklarına kopyalanmaz.
 - **Ajans host'u:** `max-age=31536000`, `includeSubDomains` **yok**. Karar-2 A ile yalnız alt alan desteklendiği için
   etki `*.panel.<ajans>` ile sınırlı olurdu. Yine de gönderilmez: ajansın alt alan düzenine karışmıyoruz. Başlık
   şablonun sabit kısmındadır (§2.1), eşitleyici değiştiremez.
@@ -737,7 +737,7 @@ R2-Y1'deki env kaldırma aynı sürümde) → talep olursa 2 → gerekirse 3.
 | 5 | Görünen adı kim belirler? | **KAPANDI (tasarım kararı, onay bekliyor):** platform yöneticisi, sözleşmedeki resmi ad. Veri modelinde de ajans yazamaz (Y-2) |
 | 6 | B5 OKA lisansına mı dahil, ayrı kalem mi? | **AÇIK** (`OKA-KANAL-ONERISI.md:73-75` lisans tutarı hâlâ açık). Efor artık ≈ 25-36 kişi-gün |
 | 7 | Beyaz etikette birinci hat destek ajans mı, biz mi? | **AÇIK** |
-| 8 | Ajans ayrılınca bağlı kurumlar `fonbridge.com`'a taşınsın mı, bildirim süresi? | **AÇIK.** Öneri: 30 gün bildirim, alan 180 gün `SUSPENDED` |
+| 8 | Ajans ayrılınca bağlı kurumlar `nexagrant.com`'a taşınsın mı, bildirim süresi? | **AÇIK.** Öneri: 30 gün bildirim, alan 180 gün `SUSPENDED` |
 | 9 | `fonbridge.com` HSTS'i yalnız Caddy'de ayarlansın, uygulama göndermesin mi? `includeSubDomains` kalksın mı? | **KAPANDI — Karar-1 C (patron, 30.09), uygulandı** (`devop-fb/merge-hsts`). Yalnız Caddy, `includeSubDomains` yok |
 | 10 | İlk uygulama kartından önce C yolu gerekecek mi? (ikinci ajans + Google alan doğrulaması darboğazı) | **AÇIK**, 2. yıl planlamasında. C seçilirse §3.3 zorunlu tasarım girdisi |
 
