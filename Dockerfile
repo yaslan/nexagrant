@@ -39,6 +39,10 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN node_modules/.bin/prisma generate
+# Revision label (FO-308 R-1): deploy/vps/ops.sh compares it with `git rev-parse HEAD` and refuses a
+# mismatch. Build with: GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml build
+ARG GIT_REVISION=unknown
+LABEL org.opencontainers.image.revision=$GIT_REVISION
 USER node
 CMD ["node_modules/.bin/tsx", "scripts/jobs-worker.ts"]
 
@@ -61,6 +65,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # sslmode=verify-full&sslrootcert=/app/certs/... (docs/RELEASE_CHECKLIST.md §2.1).
 # The worker stage has it through `COPY . .`.
 COPY --from=builder /app/certs ./certs
+
+ARG GIT_REVISION=unknown
+LABEL org.opencontainers.image.revision=$GIT_REVISION
 
 USER nextjs
 
