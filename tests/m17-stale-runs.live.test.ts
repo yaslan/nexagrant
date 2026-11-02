@@ -20,7 +20,8 @@ import type { InterregAnalysisStatus } from '@prisma/client';
  * m17-text-retention.live broke that suite's idempotency counts (seen in the gate, FO-317); its
  * lock order is pinned there (FO-303 Ö-1). Like
  * m17-text-retention.live, the file still refuses the shared local database named `fabrika`, unless
- * ALLOW_SWEEP_ON_SHARED_DB=1 says that database is a throwaway one (FO-343: the `fabrika` of ci.yml).
+ * ALLOW_SWEEP_ON_SHARED_DB=1 in the command's environment says that database is a throwaway one
+ * (FO-343: the `fabrika` of ci.yml). vitest.config.mts does not take that flag from `.env` (FO-357).
  *
  * Only the model is replaced: `generateCompletion` returns a scripted answer. The singleton is
  * swapped to the RLS URL (as m17-text-retention.live), so withTenant and withSystemScope both run
@@ -105,7 +106,7 @@ const { createDbClient, prisma } = await import('@/lib/db');
 const { runEvaluation, runRef, STALE_CLAIM_MS } = await import('@/modules/m17/server/evaluate');
 const { releaseStaleRuns } = await import('@/modules/m17/server/stale-runs');
 const { deleteAnalysis } = await import('@/modules/m17/server/analyses');
-const { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } = await import('./helpers/live-db-role');
+const { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } = await import('./helpers/live-db-role');
 const { presentIds } = await import('./helpers/teardown-guard');
 
 const SUITE = 'm17-stale-runs.live';
@@ -115,17 +116,13 @@ const REACHABLE =
   requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
-const DB_NAME = REACHABLE
-  ? ((await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`)[0]?.db ?? '')
-  : '';
+const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
 const SHARED = DB_NAME === 'fabrika' && process.env.ALLOW_SWEEP_ON_SHARED_DB !== '1';
 if (SHARED) {
   const reason = 'the sweep works across every tenant; refusing to run on the shared "fabrika" database, so its credit-lock tests did NOT run';
-  skipOrFailInCi(SUITE, reason, 'Set ALLOW_SWEEP_ON_SHARED_DB=1 if this "fabrika" is a throwaway database.');
-  // Vitest drops the helper's console.warn when every test of a file skips (measured, FO-343).
-  process.stderr.write(`WARNING ${SUITE} skipped: ${reason}\n`);
+  skipOrFailInCi(SUITE, reason, 'Set ALLOW_SWEEP_ON_SHARED_DB=1 in the command\'s environment (`.env` does not count) if this "fabrika" is a throwaway database.');
 }
-const HAS_DB = REACHABLE && !SHARED;
+const HAS_DB = DB_NAME !== undefined && !SHARED;
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = `m17s-${Math.random().toString(36).slice(2, 10)}`;
