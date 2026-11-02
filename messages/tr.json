@@ -948,6 +948,8 @@
       "g1Heading": "G1 · Rol kontrolü",
       "g1Coordinator": "Hedeflenen rol koordinatörse koordinatörlük geçmişi",
       "g1Recorded": "Kararla birlikte kaydedilir; kapıyı engellemez",
+      "g1CriticalSeats": "Her kritik rol dolu",
+      "g1BackupCandidates": "Her kritik rol için yedek aday",
       "off": "Kapalı",
       "g2Heading": "G2 · Konsorsiyum kilidi",
       "g2Seats": "Tüm konsorsiyum koltuklarının dolu olması",

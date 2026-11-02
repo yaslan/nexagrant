@@ -17,6 +17,10 @@ export const DEFAULT_GATE_RULES = {
   },
   G1: {
     requireCoordinatorHistoryIfCoordinator: true,
+    requireCriticalSeatsFilled: true,
+    requireBackupForCriticalSeats: true,
+    // Minimum partners and countries are per-call and no call record carries them as a number yet,
+    // so they are deliberately absent here rather than filled with a guess.
   },
   G2: {
     requireAllSeatsFilled: true,
