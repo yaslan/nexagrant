@@ -181,6 +181,9 @@ jobs:
         # Opt-in for keep-eu-sync.live.test.ts (TASK-MVIAOEGRE2JJT, FO-113 Y1).
         # CI's DATABASE_URL is the throwaway service container prepared above.
         KEEP_EU_LIVE: '1'
+        # m17-stale-runs.live refuses a database named `fabrika` unless told it is a
+        # throwaway one (FO-343). This job's `fabrika` is the service container above.
+        ALLOW_SWEEP_ON_SHARED_DB: '1'
 
     # Same reason: the browsers must match the pinned @playwright/test.
     - name: Install Playwright browsers

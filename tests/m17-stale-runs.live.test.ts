@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { InterregAnalysisStatus } from '@prisma/client';
 
 /**
@@ -19,7 +19,8 @@ import type { InterregAnalysisStatus } from '@prisma/client';
  * as connection B: it matches every expired text in the database, and a second purge running beside
  * m17-text-retention.live broke that suite's idempotency counts (seen in the gate, FO-317); its
  * lock order is pinned there (FO-303 Ö-1). Like
- * m17-text-retention.live, the file still refuses the shared local database named `fabrika` outside CI.
+ * m17-text-retention.live, the file still refuses the shared local database named `fabrika`, unless
+ * ALLOW_SWEEP_ON_SHARED_DB=1 says that database is a throwaway one (FO-343: the `fabrika` of ci.yml).
  *
  * Only the model is replaced: `generateCompletion` returns a scripted answer. The singleton is
  * swapped to the RLS URL (as m17-text-retention.live), so withTenant and withSystemScope both run
@@ -104,7 +105,7 @@ const { createDbClient, prisma } = await import('@/lib/db');
 const { runEvaluation, runRef, STALE_CLAIM_MS } = await import('@/modules/m17/server/evaluate');
 const { releaseStaleRuns } = await import('@/modules/m17/server/stale-runs');
 const { deleteAnalysis } = await import('@/modules/m17/server/analyses');
-const { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } = await import('./helpers/live-db-role');
+const { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } = await import('./helpers/live-db-role');
 const { presentIds } = await import('./helpers/teardown-guard');
 
 const SUITE = 'm17-stale-runs.live';
@@ -117,8 +118,13 @@ if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`dock
 const DB_NAME = REACHABLE
   ? ((await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`)[0]?.db ?? '')
   : '';
-const SHARED = DB_NAME === 'fabrika' && !isCi();
-if (SHARED) console.warn(`${SUITE} skipped: the sweep works across every tenant; refusing to run on the shared "fabrika" database`);
+const SHARED = DB_NAME === 'fabrika' && process.env.ALLOW_SWEEP_ON_SHARED_DB !== '1';
+if (SHARED) {
+  const reason = 'the sweep works across every tenant; refusing to run on the shared "fabrika" database, so its credit-lock tests did NOT run';
+  skipOrFailInCi(SUITE, reason, 'Set ALLOW_SWEEP_ON_SHARED_DB=1 if this "fabrika" is a throwaway database.');
+  // Vitest drops the helper's console.warn when every test of a file skips (measured, FO-343).
+  process.stderr.write(`WARNING ${SUITE} skipped: ${reason}\n`);
+}
 const HAS_DB = REACHABLE && !SHARED;
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
@@ -133,6 +139,7 @@ const tenantIds: string[] = [];
 const userIds: string[] = [];
 let criterionKeys: string[] = [];
 let programCheckKeys: string[] = [];
+let passed = 0;
 
 type Owner = { tenantId: string; userId: string };
 
@@ -235,7 +242,14 @@ describe.skipIf(!HAS_DB)('M17 credit follow-ups (FO-317, live, fabrika_app)', ()
     state.pauseDone = undefined;
   });
 
+  afterEach(({ task }) => {
+    if (task.result?.state === 'pass') passed++;
+  });
+
   afterAll(async () => {
+    // The default reporter prints no line for a fast file that passes: this is the gate's proof that
+    // the suite ran, and where (FO-343).
+    process.stderr.write(`${SUITE}: ${passed} tests passed on database "${DB_NAME}"\n`);
     await admin.interregAnalysis.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
     await admin.creditLedger.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
     await admin.membership.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
