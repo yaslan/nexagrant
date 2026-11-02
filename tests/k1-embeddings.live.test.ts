@@ -31,7 +31,7 @@ import { runK1Embeddings, embeddingHash, profileEmbeddingText, topicEmbeddingTex
 import { recomputeAllTopicMatches } from '@/lib/scoring/topic-match';
 import { LlmProviderError, PLATFORM_SCOPE_TENANT_ID } from '@/lib/llm';
 import { fakeEmbedding } from './helpers/fake-embedding';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -42,12 +42,10 @@ const REACHABLE =
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
-const DB_NAME = REACHABLE
-  ? ((await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`)[0]?.db ?? '')
-  : '';
+const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
 const SHARED = DB_NAME === 'fabrika' && !isCi();
-if (SHARED) console.warn(`${SUITE} skipped: the sweep reads every topic and tenant; refusing the shared "fabrika" database`);
-const HAS_DB = REACHABLE && !SHARED;
+if (SHARED) skipOrFailInCi(SUITE, 'the sweep reads every topic and tenant; refusing the shared "fabrika" database');
+const HAS_DB = DB_NAME !== undefined && !SHARED;
 const REAL = HAS_DB && process.env.K1_EMBEDDINGS_REAL_OPENAI === '1';
 
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
