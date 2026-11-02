@@ -450,3 +450,5 @@ grep -rn "usfinbridge\.com\|fabrika\.app\|fabrika\.dev" src/ --include="*.ts" --
 
 **Not:** `.env`, `.env.local` ve benzeri dosyalar **bilinçli olarak okunmadı**; `INVOICE_SUPPLIER_*`
 canlı değerleri bu analizin girdisi değildir (§5).
+
+> **01.11.2026: ürün adı NexaGrant'e geçti, v4.** Bu analiz tarihlidir ve yukarıdaki metin değiştirilmedi. Uzman ön kayıt rızası `kvkk-v4`, DPA 1.4, işleme envanteri 1.1 ve ajans kanalı eki 0.5-taslak ürün adını NexaGrant olarak taşır (FO-332); tüzel kişi unvanı, KEP ve tarihli kayıtlar aynı kaldı.
