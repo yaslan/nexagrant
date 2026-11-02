@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
 import { prisma } from '../../src/lib/db';
@@ -23,7 +24,9 @@ import { signInAs } from './fixtures/session';
  */
 
 const SHOTS = shotsDir('TASK-MTVR9T834EPUC-screenshots');
-const RUN = `tvr9t8-e2e-${Date.now()}`;
+// Date.now() alone collides between parallel workers: same ids, a Tenant_pkey failure in one,
+// and its afterAll deleting the other's tenant (measured with --workers=2, FO-336).
+const RUN = `tvr9t8-e2e-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
 const F = {
   tenantId: `${RUN}-tenant`,
@@ -113,8 +116,14 @@ test('the board loads a wrapped query and a wrapped action still writes', async 
   // 2. The write path: `assignOpportunityOwner` is one of the five calls this
   //    slice wrapped. Driven by a real selection on the card's owner dropdown,
   //    which is the only place the product offers it.
+  //    The members come from an effect after mount, and the dropdown is empty until
+  //    they do, so their arrival in the toolbar's owner filter is the board's ready
+  //    signal. Same budget as expectHydrated: a cold dev server compiles the action.
   const cardHeading = card.getByRole('heading', { name: F.oppTitle });
   await expectHydrated(cardHeading);
+  await expect(page.locator(`option[value="${F.secondUserId}"]`).first()).toBeAttached({
+    timeout: 30_000,
+  });
   await cardHeading.click();
 
   const ownerSelect = card.locator('select[title="Sorumlu kullanıcıyı değiştir"]');
@@ -138,6 +147,34 @@ test('the board loads a wrapped query and a wrapped action still writes', async 
     .toBe(F.secondUserId);
 
   await page.screenshot({ path: `${SHOTS}/02-owner-assigned.png`, fullPage: true });
+});
+
+test('the board does not move when the members arrive', async ({ page }) => {
+  // FO-336. The owner filter used to grow with its longest name, wrap the toolbar and drop
+  // the board 56 px. Arriving between a press and its release, that took the card title out
+  // from under the pointer: the browser sent the click to a common ancestor, the title's
+  // onClick never ran, and nothing reported it. Playwright checks its target on the first
+  // pointer event only, so it does not retry either.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(`**${BOARD_URL}`, async (route) => {
+    if (route.request().method() === 'POST') await held;
+    await route.continue();
+  });
+
+  await signIn(page, BOARD_URL);
+  const heading = page.getByTestId(`pipeline-card-${F.oppId}`).getByRole('heading', { name: F.oppTitle });
+  await expectHydrated(heading);
+  const before = await heading.boundingBox();
+
+  release();
+  await expect(page.locator(`option[value="${F.secondUserId}"]`).first()).toBeAttached({
+    timeout: 30_000,
+  });
+
+  expect(await heading.boundingBox()).toEqual(before);
 });
 
 test('the KPI export reports the rows the wrapped loader returned', async ({ page }) => {
