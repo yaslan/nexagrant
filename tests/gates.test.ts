@@ -79,6 +79,69 @@ const OPPORTUNITIES: Record<string, Record<string, unknown>> = {
   },
 };
 
+/**
+ * G1 fixtures. `opp-g1-ready` fills both critical roles and has a backup for each; every other
+ * fixture breaks exactly one thing about it, so a failure names the condition that caught it.
+ */
+const SEATED = 'org-seated';
+const seatRow = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  roleKey: 'research',
+  required: true,
+  status: 'CONFIRMED',
+  organizationId: `${SEATED}-${id}`,
+  partnerOrgId: null,
+  ...over,
+});
+const g1Opportunity = (id: string, seats: unknown[], intendedRole = 'partner') => ({
+  id,
+  tenantId: 'tenant-1',
+  topicId: null,
+  title: id,
+  stage: 'G0',
+  status: 'ACTIVE',
+  intendedRole,
+  g0Score: null,
+  seats,
+  proposal: null,
+  evaluations: [],
+});
+Object.assign(OPPORTUNITIES, {
+  'opp-g1-ready': g1Opportunity(
+    'opp-g1-ready',
+    [seatRow('s-coord', { roleKey: 'coordinator' }), seatRow('s-research')],
+    'coordinator',
+  ),
+  'opp-g1-no-seats': g1Opportunity('opp-g1-no-seats', [], 'coordinator'),
+  'opp-g1-no-required': g1Opportunity('opp-g1-no-required', [seatRow('s-optional-only', { required: false })]),
+  'opp-g1-open': g1Opportunity('opp-g1-open', [seatRow('s-open', { status: 'OPEN', organizationId: null })]),
+  'opp-g1-invited': g1Opportunity('opp-g1-invited', [seatRow('s-invited', { status: 'INVITED' })]),
+  'opp-g1-nobody': g1Opportunity('opp-g1-nobody', [seatRow('s-nobody', { organizationId: null })]),
+  'opp-g1-no-backup': g1Opportunity('opp-g1-no-backup', [seatRow('s-no-backup')]),
+  'opp-g1-only-occupant': g1Opportunity('opp-g1-only-occupant', [seatRow('s-only-occupant')]),
+  'opp-g1-foreign-backup': g1Opportunity('opp-g1-foreign-backup', [seatRow('s-foreign-backup')]),
+  'opp-g1-optional-open': g1Opportunity('opp-g1-optional-open', [
+    seatRow('s-research'),
+    seatRow('s-optional-open', { required: false, status: 'OPEN', organizationId: null }),
+  ]),
+  'opp-g1-two-faults': g1Opportunity('opp-g1-two-faults', [
+    seatRow('s-open', { status: 'OPEN', organizationId: null }),
+    seatRow('s-no-backup', { roleKey: 'end_user' }),
+  ]),
+});
+
+const SEAT_CANDIDATES = [
+  { tenantId: 'tenant-1', seatId: 's-coord', organizationId: 'org-backup', partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-research', organizationId: `${SEATED}-s-research`, partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-research', organizationId: null, partnerOrgId: 'partner-backup' },
+  { tenantId: 'tenant-1', seatId: 's-optional-only', organizationId: 'org-backup', partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-open', organizationId: 'org-backup', partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-invited', organizationId: 'org-backup', partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-nobody', organizationId: 'org-backup', partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-only-occupant', organizationId: `${SEATED}-s-only-occupant`, partnerOrgId: null },
+  { tenantId: 'tenant-2', seatId: 's-foreign-backup', organizationId: 'org-backup', partnerOrgId: null },
+];
+
 const TENANTS: Record<string, { country: string | null; pic: string | null; settings: unknown }> = {
   // A tenant with a CORDIS record: three coordinations in the HORIZON-CL5-2026-09-D4 family and
   // 25 distinct collaborators.
@@ -160,6 +223,17 @@ vi.mock('../src/lib/db', () => {
                   { roleKey: 'end_user', status: 'CONFIRMED' },
                 ]
               : [],
+          ),
+        ),
+      },
+      seatCandidate: {
+        // Honours the clauses it is given, so a query that drops `tenantId` picks up the other
+        // tenant's row in `SEAT_CANDIDATES` here exactly as it would on an RLS-exempt role.
+        findMany: vi.fn(({ where }: { where: { tenantId?: string; seatId: { in: string[] } } }) =>
+          Promise.resolve(
+            SEAT_CANDIDATES.filter(
+              (c) => (!where.tenantId || c.tenantId === where.tenantId) && where.seatId.in.includes(c.seatId),
+            ),
           ),
         ),
       },
@@ -367,5 +441,85 @@ describe('Gate Evaluation Engine — G3 evaluation scores', () => {
         if (inputs[key] !== undefined) expect(Number.isNaN(inputs[key] as number)).toBe(false);
       }
     }
+  });
+});
+
+describe('G1 gate: critical roles and their backups', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const filed = () =>
+    (prisma.gateDecision.create as unknown as { mock: { calls: [{ data: { passed: boolean; inputs: Record<string, unknown> } }][] } })
+      .mock.calls[0]![0].data;
+
+  test.each([
+    ['opp-g1-no-seats', /no critical seat/i],
+    ['opp-g1-no-required', /no critical seat/i],
+    ['opp-g1-open', /research.*not filled.*OPEN/i],
+    ['opp-g1-invited', /research.*not filled.*INVITED/i],
+    ['opp-g1-nobody', /research.*not filled.*names no organisation/i],
+    ['opp-g1-no-backup', /research.*no backup candidate/i],
+    ['opp-g1-only-occupant', /research.*no backup candidate/i],
+    ['opp-g1-foreign-backup', /research.*no backup candidate/i],
+  ])('%s is refused, files the refusal and does not move the stage', async (id, reason) => {
+    const result = await evaluateGate(id, 'G1', 'tenant-1');
+
+    expect(result.passed).toBe(false);
+    expect(result.reasons.join(' | ')).toMatch(reason);
+    expect(filed().passed).toBe(false);
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('every fault is reported at once, not just the first', async () => {
+    const result = await evaluateGate('opp-g1-two-faults', 'G1', 'tenant-1');
+
+    expect(result.passed).toBe(false);
+    expect(result.reasons).toHaveLength(2);
+    expect(result.reasons.join(' | ')).toMatch(/research.*not filled/i);
+    expect(result.reasons.join(' | ')).toMatch(/end_user.*no backup candidate/i);
+  });
+
+  test('filled critical roles with a backup each pass and advance the stage', async () => {
+    const result = await evaluateGate('opp-g1-ready', 'G1', 'tenant-1');
+
+    expect(result).toEqual({ passed: true, reasons: [] });
+    expect(prisma.opportunity.updateMany).toHaveBeenCalledWith({
+      where: { id: 'opp-g1-ready', tenantId: 'tenant-1' },
+      data: { stage: 'G1' },
+    });
+  });
+
+  test('an optional seat neither blocks the gate nor stands in for a critical one', async () => {
+    expect((await evaluateGate('opp-g1-optional-open', 'G1', 'tenant-1')).passed).toBe(true);
+  });
+
+  test('the checked values are filed as inputs and the coordinator check is kept', async () => {
+    await evaluateGate('opp-g1-ready', 'G1', 'tenant-1');
+    expect(filed().inputs).toMatchObject({
+      coordinatorRoleCheck: true,
+      criticalSeatsCount: 2,
+      unfilledCriticalRoles: [],
+      criticalRolesWithoutBackup: [],
+    });
+
+    vi.clearAllMocks();
+    await evaluateGate('opp-g1-no-seats', 'G1', 'tenant-1');
+    expect(filed().inputs).toMatchObject({ coordinatorRoleCheck: true, criticalSeatsCount: 0 });
+  });
+
+  test('a partner-role opportunity still does not get the coordinator marker', async () => {
+    await evaluateGate('opp-g1-no-backup', 'G1', 'tenant-1');
+    expect(filed().inputs).not.toHaveProperty('coordinatorRoleCheck');
+  });
+
+  test('backups are read inside the tenant', async () => {
+    await evaluateGate('opp-g1-ready', 'G1', 'tenant-1');
+    expect(prisma.seatCandidate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tenantId: 'tenant-1' }) }),
+    );
+  });
+
+  test('the other gates never read candidates', async () => {
+    await evaluateGate('opp-pass', 'G2', 'tenant-1');
+    expect(prisma.seatCandidate.findMany).not.toHaveBeenCalled();
   });
 });
