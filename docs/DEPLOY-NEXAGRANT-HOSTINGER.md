@@ -67,18 +67,24 @@ HTML yanıtları CDN'de `DYNAMIC` (önbelleğe alınmıyor); oturumlu sayfalar C
 - Sağlık ucu: `GET /api/health` → `200 {"status":"ok"}`, `Cache-Control: no-store`; DB'ye ve oturuma dokunmaz.
 - Prisma motoru: `binaryTargets` içinde `rhel-openssl-3.0.x` var (CloudLinux 9 / RHEL uyumlu); sürücü adaptörü `pg`.
 
-### 2.2 Supabase (salt-okunur ölçüm, 01.11.2026)
+### 2.2 Supabase (salt-okunur ölçüm, 01.11–02.11.2026)
 
-| Kalem | Değer |
-|---|---|
-| Hesaptaki projeler | **1**: `pxojxhvsvadqqaqudiok` ("4445506@gmail.com's Project"), bölge **ap-northeast-1 (Tokyo)**, Postgres 17, ACTIVE_HEALTHY |
-| Bu projenin içeriği | Başka bir ürünün tabloları (`listings`, `orders`, `pickup_points`, `posts` …). NexaGrant şeması **yok** |
-| pgvector | Uzantı **mevcut ama kurulu değil** (`vector` 0.8.0, `installed_version: null`) |
-| Migration | Supabase migration kaydı boş; NexaGrant (Prisma) migration'ı koşulmamış |
+İki ayrı Supabase hesabı var; AgentSpace Supabase entegrasyonu yalnız birini görüyor.
 
-**Sonuç:** NexaGrant için hazır bir **prod Supabase projesi YOK**. Mevcut proje başka bir ürüne ait ve Tokyo'da
-(AB verisi + Frankfurt CDN ile gecikme). Yeni bir proje (AB bölgesi, ör. `eu-central-1` Frankfurt) açılması
-**patron kararıdır** (ücretli plan/fatura, geri alınamaz veri yeri seçimi). Karar gelmeden migration ve canlıya alma yapılamaz.
+| Kalem | FonBridge canlı projesi (`.env.supabase.local`) | Entegrasyonun gördüğü proje |
+|---|---|---|
+| Bölge | **eu-west-1 (İrlanda)**, pooler `aws-0-eu-west-1.pooler.supabase.com:5432` | ap-northeast-1 (Tokyo), `pxojxhvsvadqqaqudiok` |
+| Sahibi | FonBridge (rename sonrası NexaGrant) | Başka bir ürün (`listings`, `orders`, `pickup_points` …) |
+| Postgres | 17.11 | 17.6 |
+| Uzantılar | `vector` 0.8.2 **kurulu**, `pgcrypto` 1.3 | `vector` kurulu değil |
+| Şema | `public` 76 tablo, 53'ünde RLS; `fabrika_private` şeması var | NexaGrant şeması yok |
+| Roller | `fabrika_migrate` (sahip), `fabrika_app` (uygulama), `fabrika_jobs` (worker) | — |
+| Migration | Düz `.sql` dosyaları `scripts/apply-migrations.sh` ile uygulanır (`_prisma_migrations` tablosu bu yolda yoktur) | — |
+
+Ölçüm `BEGIN READ ONLY … ROLLBACK` ile yapıldı; hiçbir şey yazılmadı.
+
+**Sonuç:** NexaGrant için **yeni Supabase projesi gerekmiyor**. Prod veritabanı FonBridge'in eu-west-1'deki canlı projesidir; veri AB içinde kalır.
+Tokyo projesi başka bir ürüne aittir ve **dokunulmaz**. Plan, PITR ve anahtar bilgileri entegrasyondan okunamaz; Supabase panelinden patron kontrol eder.
 
 ### 2.3 Bilerek değişmeyen kimlikler
 
@@ -113,9 +119,9 @@ Cron satırı (✋ adım 10):
 
 | # | Adım | Onay | Doğrulama | Geri alma |
 |---|---|---|---|---|
-| 1 | **Kararlar + engeller:** Supabase prod projesi (§2.2), R2 açılsın mı (K-2), posta planı (deneme → ücretli), DMARC aşaması (§6); **gizlilik metni yer tutucuları** (§2.1, hukuk) | ✋ | karar kartları kapalı; `pnpm privacy:publish-check` yeşil | — |
-| 2 | **Yedek:** mevcut `public_html` (`default.php`) indirilir; hesapta başka site (arsalog.com) olduğu için yalnız bu vhost'a dokunulur | yok (okuma) | dosya yerelde, sha256 not edildi | — |
-| 3 | **Supabase prod:** yeni proje (AB bölgesi), `vector` uzantısı, `fabrika_app` rolü, migration (`prisma migrate deploy`, sahip rolüyle), `pnpm db:rls`, `pnpm rls:verify --require-db` | ✋ | `_prisma_migrations` son kayıt = paketteki migration; `rls:verify` yeşil | Yeni proje boştu: projeyi duraklat/sil; mevcut Tokyo projesine **dokunulmaz** |
+| 1 | **Kararlar + engeller:** R2 açılsın mı (K-2), posta planı (deneme → ücretli), DMARC aşaması (§6); **gizlilik metni yer tutucuları** (§2.1, hukuk) | ✋ | karar kartları kapalı; `pnpm privacy:publish-check` yeşil | — |
+| 2 | **Yedek:** mevcut `public_html` (`default.php`) indirilir; aynı hesapta 15 site var (fonbridge.com, arsalog.com, hipervizyon.com …; Cloud Economy kaynağını paylaşırlar), yalnız bu vhost'a dokunulur | yok (okuma) | dosya yerelde, sha256 not edildi | — |
+| 3 | **Supabase prod (mevcut eu-west-1 projesi):** önce yedek (`pg_dump`, pgvector:pg17 konteyneri), sonra paketteki migration'lar `scripts/apply-migrations.sh` ile (sahip rolü, idempotent: 2. koşu da 0 çıkmalı), `pnpm db:rls`, `pnpm rls:verify` | ✋ | `apply-migrations.sh` 0 ile çıktı, `rls:verify` yeşil, `vector` kurulu | Ters sırada `apply-migrations.sh --down <dosya>`; gerekirse yedekten geri yükleme. Tokyo projesine **dokunulmaz** |
 | 4 | **Paket:** `R2_PUBLIC_HOST=… deploy/cpanel/build-package.sh <dev-commit> out/` (ya da `FB_NO_PUBLIC_ASSETS=1`); SHA256 kontrolü; arşivi `hosting_files_generate-upload-url` ile `public_html`'e yükle; `hosting_nodejs_build-settings-from-archive` ile önizle (salt-okunur) | ✋ yükleme | önizleme `other` / `app.js` diyor | Yüklenen zip'i sil; site henüz değişmedi |
 | 5 | **Ortam değişkenleri:** hPanel (ya da `replace-environment-variables`) ile §3 + ENV-LISTESI §1–2 | ✋ | `list-environment-variables` anahtar adları tam | Önceki liste boştu: listeyi boşalt |
 | 6 | **Build/başlat:** `hosting_nodejs_start-build` (node 22, `other`, `entry_file: app.js`, `build_script: build`, arşiv yolu); `hosting_get-deployment` ile `completed` olana kadar izle; logdaki `node -v` ≥ 22.18 değilse 24 ile yeniden | ✋ | `curl -sI https://nexagrant.com/api/health` → 200; `/` → 200/307 (dil yönlendirmesi) | Adım 2 yedeğini (`default.php`) geri yükle (static deploy) ya da önceki zip ile yeniden build |
@@ -123,11 +129,11 @@ Cron satırı (✋ adım 10):
 | 8 | **Google OAuth:** Cloud Console'a `https://nexagrant.com/api/auth/callback/google` (+ takvim `…/api/calendar/callback`) eklenir | ✋ owner | Google ile giriş çalışıyor | URI'yi kaldır |
 | 9 | **SMTP testi:** `swaks --to <test> --server smtp.hostinger.com --port 465 --tls-on-connect --auth LOGIN --auth-user info@nexagrant.com --tls-verify` (parola sorulur, komut satırına yazılmaz) + uygulama içi deneme postası | yok | posta geldi, SPF/DKIM `pass` | — |
 | 10 | **Worker:** `/home/u605628300/.nexagrant-worker.env` (600, `JOBS_CRON_ENABLED=false`) + §3 cron satırı; ilk koşu logu (`~/fonbridge-logs/worker.log`) node yolu ve sürümü; sonra `JOBS_CRON_ENABLED=true` + `worker.sh stop` | ✋ | log'da worker başladı, `graphile_worker` şeması var, tek süreç (`flock`) | Cron işini sil (`hosting_cron-jobs_delete`), `worker.sh stop` |
-| 11 | **fonbridge.com → nexagrant.com 301:** fonbridge.com Squarespace Domains'te; Squarespace alan adı yönlendirmesiyle (yol korunarak) 301 + Search Console "adres değişikliği" | ✋ | `curl -sI https://fonbridge.com/x` → 301 `https://nexagrant.com/x` | Yönlendirmeyi kaldır |
+| 11 | **fonbridge.com → nexagrant.com 301:** fonbridge.com bu Hostinger hesabında addon site (`/home/u605628300/domains/fonbridge.com/public_html`). Şu an orada **canlı bir WordPress + WooCommerce sitesi ("Fon Bridge") çalışıyor**. DNS Hostinger'da, alan adının kayıt şirketi Squarespace (yalnız kayıt). 301 bu siteyi kapatır: **ayrı patron onayı** + önce site yedeği (dosyalar + WP veritabanı); sonra `hosting_redirects_create-website` (yol korunarak) + Search Console "adres değişikliği" | ✋ | `curl -sI https://fonbridge.com/x` → 301 `https://nexagrant.com/x` | Yönlendirmeyi sil; WP sitesi dosyaları değişmediyse kendiliğinden döner, değiştiyse yedekten |
 | 12 | **İzleme (ilk 48 saat):** dış uptime izleme `GET /api/health` (1 dk), `hosting_get-deployment`/uygulama logu, `SystemAlert` ekranı, `pnpm alerts:check`, Hostinger kaynak metriği (`listOrderResourceUsageMetrics`); HSTS önce `max-age=300` (RELEASE_CHECKLIST §5.4) | HSTS ✋ | 48 saat 5xx yok, worker log düzenli | HSTS satırını kaldır; adım 6 geri alma |
 
 **Genel geri alma:** DNS hiç değişmediği için geri dönüş, `public_html`'i adım 2 yedeğine döndürmek ve cron işini silmektir
-(dakikalar). Supabase prod projesi ayrı olduğu için mevcut projeye etki yok.
+(dakikalar). Veritabanı tarafında geri dönüş adım 3'ün `--down` dosyaları ya da yedeğidir; Tokyo projesine hiçbir adım dokunmaz.
 
 ## 5. Posta (SMTP)
 
