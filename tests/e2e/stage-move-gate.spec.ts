@@ -4,6 +4,7 @@ import type { Gate } from '@prisma/client';
 import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { signInAs } from './fixtures/session';
+import { presentIds } from '../helpers/teardown-guard';
 
 /**
  * NG-25: a forward stage move goes through the gate, measured the way a user makes it.
@@ -38,9 +39,9 @@ const STARTING_STAGE: Record<string, Gate> = { [OPP.boardBack]: 'G2', [OPP.detai
 async function rollback() {
   await prisma.seatCandidate.deleteMany({ where: { tenantId: TENANT } });
   await prisma.consortiumSeat.deleteMany({ where: { tenantId: TENANT } });
-  await prisma.gateDecision.deleteMany({ where: { opportunityId: { in: OPP_IDS } } });
+  await prisma.gateDecision.deleteMany({ where: { opportunityId: { in: presentIds(OPP_IDS) } } });
   await prisma.auditEvent.deleteMany({ where: { tenantId: TENANT } });
-  await prisma.opportunity.deleteMany({ where: { id: { in: OPP_IDS } } });
+  await prisma.opportunity.deleteMany({ where: { id: { in: presentIds(OPP_IDS) } } });
   await prisma.membership.deleteMany({ where: { tenantId: TENANT } });
   await prisma.moduleState.deleteMany({ where: { tenantId: TENANT } });
   await prisma.user.deleteMany({ where: { id: USER } });
