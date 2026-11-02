@@ -35,7 +35,7 @@ if (!v.ok) {
   const ci = (process.env.CI ?? '').trim().toLowerCase();
   if (v.skipped.length > 0 && ['', '0', 'false'].includes(ci)) {
     console.error(
-      'live-skip gate: note — CI is not set. Suites that guard the shared "fabrika" database skip outside CI; to reproduce the CI job run vitest with CI=true against a throwaway database.',
+      'live-skip gate: note — CI is not set. Suites that guard the shared "fabrika" database skip outside CI; to reproduce the CI job run vitest with CI=true against a throwaway database (m17-stale-runs.live also wants ALLOW_SWEEP_ON_SHARED_DB=1 if that database is named "fabrika").',
     );
   }
   process.exit(1);

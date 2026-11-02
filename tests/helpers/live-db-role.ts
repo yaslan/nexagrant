@@ -14,6 +14,10 @@
  *      gate reports green having measured nothing. `skipOrFailInCi` warns
  *      locally and throws when `CI` is set.
  *
+ * A third way is specific to the suites that refuse the shared `fabrika`
+ * database: the name they checked was not the database they then ran on.
+ * `usedDatabaseName` reads it from the connection the suite's code uses.
+ *
  * Some live suites deliberately run as the app's own BYPASSRLS role, because
  * the property they measure is the application code's own guard and RLS would
  * hide the defect (tests/concept-template-tenant-scope.live.test.ts explains
@@ -57,7 +61,10 @@ export function skipOrFailInCi(suite: string, reason: string, fix = DB_FIX): voi
   if (isCi()) {
     throw new Error(`${suite}: refusing to skip in CI — ${reason}. ${fix}`);
   }
-  console.warn(`${suite} skipped: ${reason}`);
+  // process.stderr, not console.warn: vitest's `agent` reporter (chosen by itself when CLAUDECODE or
+  // AI_AGENT is set), `--silent` and the json-only and tap reporters all drop the console output of
+  // a file whose every test skipped, so the one line saying nothing ran went missing (measured, FO-357).
+  process.stderr.write(`WARNING ${suite} skipped: ${reason}\n`);
 }
 
 /**
@@ -106,6 +113,55 @@ export function isLocalDbUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+type DbIdentity = { db: string; cluster: string };
+
+async function readDbIdentity(client: RawQueryable): Promise<DbIdentity> {
+  const rows = await client.$queryRawUnsafe<DbIdentity[]>(
+    'SELECT current_database()::text AS db, system_identifier::text AS cluster FROM pg_control_system()',
+  );
+  const identity = rows[0];
+  if (!identity) throw new Error("could not read the connected database's identity");
+  return identity;
+}
+
+/**
+ * The name to judge "is this the shared database?" by: the database of `used`,
+ * the connection the suite's code runs on, not of `fixtures`, the owner connection
+ * that builds its rows. A live suite swaps the singleton to DATABASE_URL_RLS_TEST
+ * and keeps the owner on DATABASE_URL, so with the two pointing apart a guard
+ * reading the owner approves one database and the sweep runs on the other (FO-356
+ * scenario I).
+ *
+ * Two connections on different databases, or the same name on different clusters,
+ * throw in CI and locally alike: the fixtures would not be where the code looks, so
+ * nothing the suite could report would mean anything. `used` being unreadable (a
+ * stale fabrika_app password, 28P01) is a skip: nothing ran.
+ *
+ * @returns the database name, or `undefined` when the suite must skip.
+ */
+export async function usedDatabaseName(
+  used: RawQueryable,
+  fixtures: RawQueryable,
+  suite: string,
+): Promise<string | undefined> {
+  let target: DbIdentity;
+  try {
+    target = await readDbIdentity(used);
+  } catch (e) {
+    skipOrFailInCi(suite, `could not read which database it would run on (${e instanceof Error ? e.message.split('\n')[0] : String(e)})`);
+    return undefined;
+  }
+  const other = await readDbIdentity(fixtures);
+  if (target.db !== other.db || target.cluster !== other.cluster) {
+    throw new Error(
+      `${suite}: DATABASE_URL and DATABASE_URL_RLS_TEST point at different databases ` +
+        `("${other.db}" on cluster ${other.cluster}, "${target.db}" on cluster ${target.cluster}). ` +
+        "Fixtures would go to one and the code under test would run on the other; point both at the same throwaway database.",
+    );
+  }
+  return target.db;
 }
 
 export async function readRole(client: RawQueryable): Promise<RoleFacts> {
