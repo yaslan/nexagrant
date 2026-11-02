@@ -149,6 +149,36 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     );
   });
 
+  it('keeps the schema-drift reason on the run row even after 20 earlier topic errors', async () => {
+    enableFlag(true);
+    // 21 open topics: the first 20 have no ccm2Id (each adds one error), the 21st answers with drift.
+    const identifiers = Array.from({ length: 21 }, (_, i) => `HORIZON-TEST-${i + 1}`);
+    db.topic.findMany.mockResolvedValue(identifiers.map((identifier) => ({ identifier })));
+    const fetchTopic = vi.fn(async (identifier: string) => ({
+      status: 'drift' as const,
+      topicIdentifier: identifier,
+      schemaDrift: ['topicOrganizations[0]: expertise: Invalid option'],
+    }));
+    const client = {
+      fetchCcm2Map: vi.fn(async () => new Map([[identifiers[20], '999']])),
+      fetchTopic,
+      circuitOpen: false,
+    } as unknown as PartnerSearchClient;
+
+    const outcome = await runPartnerSearchIngestion({ trigger: 'FULL', client });
+
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind !== 'done') return;
+    expect(outcome.status).toBe('FAILED');
+    expect(db.partnerSearchIngestionRun.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error: expect.stringContaining('schema drift: topicOrganizations[0]: expertise'),
+        }),
+      })
+    );
+  });
+
   it('schema drift raises a drift alert, stops, and writes no topic rows', async () => {
     enableFlag(true);
     // Real adapter path: the portal answers with an ORGANISATION row that has no `expertise`,
@@ -156,7 +186,10 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     const fetchImpl = vi.fn(async () =>
       new Response(
         JSON.stringify({
-          topicOrganizations: [{ type: 'ORGANISATION', id: 'o-1', organisationName: 'Org A' }],
+          // No `expertise` on purpose: that is the single drift cause pinned below.
+          topicOrganizations: [
+            { type: 'ORGANISATION', id: 'o-1', organisationName: 'Org A', topicIdentifier: 'HORIZON-TEST-1' },
+          ],
         }),
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
@@ -171,7 +204,8 @@ describe('runPartnerSearchIngestion — stop and alert paths', () => {
     expect(outcome.status).toBe('FAILED');
     expect(alerts.reportSchemaDrift).toHaveBeenCalledWith(
       expect.any(String),
-      [expect.stringMatching(/^topicOrganizations\[0\]: .+/)]
+      // Pinned to the exact zod message for `expertise` (the only drift cause in this fixture).
+      ['topicOrganizations[0]: Invalid option: expected one of "Expertise_offer"|"Expertise_request"']
     );
     expect(alerts.createAdapterAlert).not.toHaveBeenCalled();
     expect(db.partnerSearchTopicStat.upsert).not.toHaveBeenCalled();
