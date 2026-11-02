@@ -47,7 +47,7 @@ import { withSystemScope } from '@/lib/system-scope';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
 import { EXPERT_PREREG_PURGED, purgeOldExpertPreRegistrations } from '@/lib/expert-prereg/server/retention';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { acquireExpertPreRegLiveLock, holdFounderCounter } from './helpers/expert-prereg-live-lock';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -58,16 +58,10 @@ const REACHABLE =
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
-const DB_NAME = REACHABLE
-  ? ((await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`)[0]?.db ?? '')
-  : '';
+const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
 const SHARED = DB_NAME === 'fabrika' && !isCi();
-if (SHARED) {
-  console.warn(
-    `${SUITE} skipped: the purge deletes by date across the table; refusing to run on the shared "fabrika" database`
-  );
-}
-const HAS_DB = REACHABLE && !SHARED;
+if (SHARED) skipOrFailInCi(SUITE, 'the purge deletes by date across the table; refusing to run on the shared "fabrika" database');
+const HAS_DB = DB_NAME !== undefined && !SHARED;
 
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 

@@ -25,7 +25,9 @@ import { describe, test, expect, beforeAll, afterAll, afterEach, vi } from 'vite
  *
  * All estate-wide pruning lives in this ONE file on purpose: the prune deletes
  * every old row, so a second file seeding old rows in parallel would inflate
- * the exact counts asserted below.
+ * the exact counts asserted below. For the same reason it never runs on the shared
+ * `fabrika` database: outside CI it skips there (FO-366 F5 measured a real old row
+ * gone); ci.yml's `fabrika` is a throwaway service container.
  */
 const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
   const { readFileSync, existsSync } = await import('node:fs');
@@ -51,17 +53,22 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
 
 import { createDbClient, prisma } from '@/lib/db';
 import { pruneOldStripeEvents, STRIPE_EVENT_RETENTION_DAYS } from '@/lib/billing/stripe-event-retention';
-import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 
 const SUITE = 'stripe event retention test';
 
-const HAS_DB =
+const REACHABLE =
   requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 
-if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
+if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
+
+const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
+const SHARED = DB_NAME === 'fabrika' && !isCi();
+if (SHARED) skipOrFailInCi(SUITE, 'the prune deletes across every tenant; refusing to run on the shared "fabrika" database');
+const HAS_DB = DB_NAME !== undefined && !SHARED;
 
 // The prune runs over the swapped singleton; on a BYPASSRLS role it would
 // delete across tenants and the fix this file pins would be invisible.

@@ -14,16 +14,21 @@ const root = import.meta.dirname || __dirname;
  * - The process environment wins: CI has no `.env` and gets its URLs from the
  *   job's `env:`, and a developer's `DATABASE_URL=… pnpm test` still overrides.
  * - `NODE_ENV` is never taken from `.env` (it says `development`); vitest owns it.
+ * - The switches that open a live suite's guard on the shared `fabrika` database,
+ *   `CI` and `ALLOW_SWEEP_ON_SHARED_DB`, are never taken from `.env` either. A file
+ *   stays behind and opens the guard for every later run; these must be said by the
+ *   one command they apply to (FO-357).
  * - `util.parseEnv` (Node >= 21.7) instead of vite's `loadEnv`: `vite` is not a
  *   direct dependency, so pnpm does not let this file import it.
  */
-function dotenvForTests(): Record<string, string> {
-  const file = path.join(root, '.env');
+const NEVER_FROM_DOTENV = new Set(['NODE_ENV', 'CI', 'ALLOW_SWEEP_ON_SHARED_DB']);
+
+export function dotenvForTests(file = path.join(root, '.env')): Record<string, string> {
   if (!existsSync(file)) return {};
   const parsed = parseEnv(readFileSync(file, 'utf8')) as Record<string, string>;
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(parsed)) {
-    if (key === 'NODE_ENV' || process.env[key] !== undefined) continue;
+    if (NEVER_FROM_DOTENV.has(key) || process.env[key] !== undefined) continue;
     env[key] = value;
   }
   return env;

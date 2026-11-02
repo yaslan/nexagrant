@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
-import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 import type { TenantTx } from '@/lib/db';
 import type { LlmCompletion, LlmGenerateOptions } from '@/lib/llm';
@@ -173,9 +173,14 @@ beforeAll(async () => {
     return;
   }
   await assertRlsSubjectRole(state.rls, SUITE);
-  // The mid-run test runs the real purge, which works across every tenant by date: never on the shared database.
-  const dbRows = await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`;
-  if (dbRows[0]?.db === 'fabrika') {
+  // The mid-run test runs the real purge, which works across every tenant by date: never on the shared
+  // database. ci.yml's service container is also named `fabrika`, and it is a throwaway one.
+  const dbName = await usedDatabaseName(state.rls, admin, SUITE);
+  if (dbName === undefined) {
+    skipReason = 'could not read which database the RLS connection is on';
+    return;
+  }
+  if (dbName === 'fabrika' && !isCi()) {
     skipReason = 'refusing to run the cross-tenant purge on the shared "fabrika" database';
     skipOrFailInCi(SUITE, skipReason);
     return;

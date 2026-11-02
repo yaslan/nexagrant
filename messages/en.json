@@ -948,6 +948,8 @@
       "g1Heading": "G1 · Role check",
       "g1Coordinator": "Coordinator history, when the intended role is coordinator",
       "g1Recorded": "Recorded with the decision; does not block the gate",
+      "g1CriticalSeats": "Every critical role filled",
+      "g1BackupCandidates": "A backup candidate for every critical role",
       "off": "Off",
       "g2Heading": "G2 · Consortium lock",
       "g2Seats": "Every consortium seat filled",
