@@ -6,9 +6,12 @@
 // Yalnız ŞU koşulda yazılır (scripts/gate-lock.mjs): gate:core exit 0, çalışma ağacı baştan sona
 // temiz (git status boş, untracked dahil), tree koşu boyunca değişmedi. Kırmızı koşu yazmaz.
 //
-// Belge-yalnız kısa yol (karar K-575105 = B): fark (origin/dev...HEAD) yalnız docs/** ve
-// src/tests/prisma/content/messages/config DIŞINDAKİ *.md ise tam gate yerine lint + i18n:check.
-// Çalışma ağacı kirliyse ya da fark boşsa kısa yol YOK, tam gate koşar.
+// Belge-yalnız kısa yol (karar K-575105 = B, daraltma FO-348 K2 lider kararı): fark (origin/dev...HEAD)
+// yalnız docs/**/*.md ise tam gate yerine lint + i18n:check. Bunun dışındaki HER dosya (kök dosyalar,
+// .github/, content/, messages/, src/, docs/ altındaki .md olmayanlar, FULL_GATE_DOCS) tam gate koşar.
+// Çalışma ağacı kirliyse (untracked dahil) ya da fark boşsa kısa yol YOK. Yeniden adlandırma
+// (git mv) iki yol olarak raporlanır: kaynak tam gate'i tetikler (--no-renames).
+// Kirli ağaçta önbellek kaydı ne okunur ne yazılır (readPass).
 //
 // CLI:
 //   node scripts/gate-cache.mjs hit        exit 0: aynı tree için yeşil kayıt var (satır basar)
@@ -22,8 +25,13 @@ import { pathToFileURL } from 'node:url'
 
 export const PASS_DIR = process.env.FONBRIDGE_GATE_PASS_DIR || path.join(os.homedir(), '.cache', 'fonbridge-gate-pass')
 export const DOCS_BASE = process.env.FONBRIDGE_GATE_BASE || 'origin/dev'
-// Bu yollarda bir *.md bile belge sayılmaz (içerik/kod/yapılandırma).
-const NOT_DOCS_PREFIXES = ['src/', 'tests/', 'prisma/', 'content/', 'messages/', 'config/']
+// docs/ altında olsa da KOD ya da çalışma zamanı girdisi olan belgeler: tam gate.
+// Neden (hangi kod okuyor / render ediyor):
+// - docs/BILLING.md → src/lib/billing/catalog.test.ts tablosunu okur.
+// - docs/legal/      → src/app/[locale]/(public)/compliance/dpa/page.tsx sayfada render eder.
+// - docs/BETA_DATA/  → scripts/beta-pricing-survey.ts girdi olarak okur.
+// Eşleşme büyük/küçük harf duyarsız (macOS dosya sistemi); yeni istisna buraya eklenir.
+const FULL_GATE_DOCS = ['docs/BILLING.md', 'docs/legal/', 'docs/BETA_DATA/']
 
 function tryGit(args) {
   try {
@@ -53,9 +61,12 @@ export function cleanTree() {
 }
 
 export function isDocsOnlyPath(file) {
-  if (file.startsWith('docs/')) return true
-  if (!file.endsWith('.md')) return false
-  return !NOT_DOCS_PREFIXES.some((p) => file.startsWith(p))
+  if (!file.startsWith('docs/') || !file.endsWith('.md')) return false
+  const lower = file.toLowerCase()
+  return !FULL_GATE_DOCS.some((p) => {
+    const q = p.toLowerCase()
+    return q.endsWith('/') ? lower.startsWith(q) : lower === q
+  })
 }
 
 // Belge-yalnız mı? Sebebiyle birlikte döner (ekrana basılır).
@@ -64,7 +75,8 @@ export function docsOnly() {
   if (tryGit(['rev-parse', '--verify', '--quiet', DOCS_BASE]) === null) {
     return { ok: false, reason: `${DOCS_BASE} yok` }
   }
-  const diff = tryGit(['diff', '--name-only', `${DOCS_BASE}...HEAD`])
+  // --no-renames: git mv src/x.ts docs/x.ts farkta iki yol (silinen kaynak + yeni hedef) olur.
+  const diff = tryGit(['diff', '--no-renames', '--name-only', `${DOCS_BASE}...HEAD`])
   if (diff === null) return { ok: false, reason: 'fark alınamadı' }
   const files = diff.split('\n').filter(Boolean)
   if (files.length === 0) return { ok: false, reason: 'fark boş' }
@@ -78,8 +90,10 @@ function passFile(tree) {
 }
 
 // Kayıt yalnız aynı tree ve aynı lockfile hash'i ile eşleşirse geçerlidir.
+// Kirli çalışma ağacı (untracked dahil) hiçbir kaydı okutmaz: yerel kirli kod yeşil sayılmaz (FO-348 K3).
 export function readPass(tree = treeHash(), lock = lockHash()) {
   if (!tree || !lock) return null
+  if (!cleanTree()) return null
   let rec
   try {
     rec = JSON.parse(fs.readFileSync(passFile(tree), 'utf8'))

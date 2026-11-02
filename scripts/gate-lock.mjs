@@ -13,7 +13,8 @@
 //   sıradaki (en eski canlı bilet) alır. Bekleme mesajı sıra no'sunu ve tahmini başlama saatini basar.
 //   Kilidi eski sürümle alan bekleyen (bilet bırakmaz) hâlâ araya girebilir; kilit biçimi değişmedi.
 // - Önbellek: `pnpm run gate:core` aynı git tree + pnpm-lock için yeşilse tekrar koşmaz (scripts/gate-cache.mjs).
-//   Yalnız docs/** ve kod dışı *.md farkında tam gate yerine lint + i18n:check koşar.
+//   Kilit alındıktan sonra kayıt yeniden okunur (kuyrukta beklerken yazılmış olabilir; FO-348 K4).
+//   Yalnız docs/**/*.md farkında (allowlist: scripts/gate-cache.mjs) tam gate yerine lint + i18n:check koşar.
 // - Süre geçmişi: <LOCK_DIR>.history.jsonl; ETA medyanından hesaplanır.
 import { spawn, spawnSync, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -243,24 +244,19 @@ async function main() {
   const nested = process.env.FONBRIDGE_GATE_LOCK_HELD === '1'
   const isGate = !nested && IS_GATE
 
-  let tree0 = null
-  let lock0 = null
-  if (isGate) {
-    if (process.env.FONBRIDGE_GATE_NO_CACHE !== '1') {
-      const rec = readPass()
-      if (rec) {
-        console.log(`önbellek: ${rec.tree} ${rec.date} (aynı tree + pnpm-lock için yeşil kayıt; tam gate atlandı)`)
-        process.exit(0)
-      }
-      const d = docsOnly()
-      if (d.ok) {
-        console.log(`belge-yalnız: ${d.reason} → lint + i18n:check (tam gate atlandı)`)
-        process.exit(runSteps([['pnpm', 'run', 'lint'], ['pnpm', 'run', 'i18n:check']]))
-      }
-      console.log(`tam gate: ${d.reason}`)
+  const useCache = isGate && process.env.FONBRIDGE_GATE_NO_CACHE !== '1'
+  if (useCache) {
+    const rec = readPass()
+    if (rec) {
+      console.log(`önbellek: ${rec.tree} ${rec.date} (aynı tree + pnpm-lock için yeşil kayıt; tam gate atlandı)`)
+      process.exit(0)
     }
-    tree0 = treeHash()
-    lock0 = lockHash()
+    const d = docsOnly()
+    if (d.ok) {
+      console.log(`belge-yalnız: ${d.reason} → lint + i18n:check (tam gate atlandı)`)
+      process.exit(runSteps([['pnpm', 'run', 'lint'], ['pnpm', 'run', 'i18n:check']]))
+    }
+    console.log(`tam gate: ${d.reason}`)
   }
 
   let runStart = Date.now()
@@ -268,6 +264,24 @@ async function main() {
     await acquire()
     process.on('exit', release)
     runStart = Date.now()
+  }
+
+  // Ağaç ve kilit hash'i kilit alındıktan SONRA alınır: kuyrukta beklerken değişen ağaç bu koşunun değil.
+  let tree0 = null
+  let lock0 = null
+  if (isGate) {
+    tree0 = treeHash()
+    lock0 = lockHash()
+    // FO-348 K4: kuyrukta bekleyen aynı tree, önden koşan gate yeşil kaydı yazdıktan sonra kilidi alabilir.
+    // Kayıt varsa ikinci kez koşmak yerine çık (kilit bu süreçte: release).
+    if (useCache && tree0 && lock0) {
+      const rec = readPass(tree0, lock0)
+      if (rec) {
+        console.log(`önbellek: ${rec.tree} ${rec.date} (kuyrukta beklerken yazıldı; tam gate atlandı)`)
+        release()
+        process.exit(0)
+      }
+    }
   }
 
   const child = spawn(argv[0], argv.slice(1), {
