@@ -228,6 +228,10 @@ async function main() {
   console.log(`Upstream OK:             ${syncResult.upstreamOk ? 'YES' : 'NO (keep.eu was not read)'}`);
   console.log(`Success:                 ${syncResult.success ? 'YES' : 'PARTIAL / COMPLETED WITH SKIPS'}`);
   console.log(`Synced Projects:         ${syncResult.syncedProjectsCount}`);
+  console.log(`RAG excluded (names):   ${syncResult.ragExcludedCount}`);
+  if (syncResult.ragExclusionMissingCount > 0) {
+    console.warn(`⚠️  RAG exclusion ids not found in upstream data: ${syncResult.ragExclusionMissingCount}`);
+  }
   console.log(`Synced Partners:         ${syncResult.syncedPartnersCount}`);
   console.log(`Skipped Projects:        ${syncResult.skippedCount}`);
   console.log(`Total EU Funding (Run):  ${formatEur(syncResult.totalEuFundingEUR)}`);

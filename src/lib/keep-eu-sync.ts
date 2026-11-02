@@ -64,6 +64,20 @@ function splitKeepEuKey(storedId: string): { pic: string | null; beneficiaryId: 
 /** How many already-imported projects a no-argument sync mirrors into RAG. */
 const DEFAULT_DATABASE_BATCH = 200;
 
+/**
+ * keep.eu projects whose text must not reach OpenAI: each names a real person (K-575447 = C, FO-363).
+ * Auto-detection missed 2 of 5 such cases, so the list is hand-verified and is a code constant on
+ * purpose: the default is always "exclude", so a forgotten flag can never re-enable embedding.
+ * These projects stay in the database; only the RAG embedding step skips them.
+ */
+export const RAG_EXCLUDED_PROJECT_IDS: readonly string[] = [
+  'BGTR0300118',
+  'BGTR0300121',
+  'BGTR0300153',
+  'BGTR0300155',
+  'BGTR0300162',
+];
+
 export interface KeepEuPartnerRecord {
   partnerName: string;
   partnerTranslatedName?: string | null;
@@ -125,6 +139,10 @@ export interface KeepEuSyncResult {
   ragEmbeddedCount: number;
   /** Projects whose stored RAG chunks already matched the record, so nothing was embedded. */
   ragUnchangedCount: number;
+  /** Synced projects kept out of the RAG step by the personal-name exclusion list. */
+  ragExcludedCount: number;
+  /** Excluded ids that the upstream data did not contain (checked before any --limit cut). */
+  ragExclusionMissingCount: number;
   syncedAt: string;
 }
 
@@ -817,6 +835,11 @@ export interface KeepEuSyncOptions {
   /** When the keep.eu request fails, re-index existing DB rows instead of stopping. Reported as `success:false`. */
   allowDatabaseFallback?: boolean;
   skipRag?: boolean;
+  /**
+   * Project ids kept out of RAG embedding. Omit to apply RAG_EXCLUDED_PROJECT_IDS (the default).
+   * Pass an empty array only in tests.
+   */
+  ragExcludeProjectIds?: readonly string[];
   limit?: number;
   onProgress?: (info: {
     current: number;
@@ -865,6 +888,20 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     }
   }
 
+  const excludedIds = new Set(options?.ragExcludeProjectIds ?? RAG_EXCLUDED_PROJECT_IDS);
+  const upstreamIds = new Set(dataset.map((r) => r.projectId));
+  const missingExcluded = [...excludedIds].filter((id) => !upstreamIds.has(id));
+  // The database source only loads a batch, so a missing id there proves nothing; warn only on full upstream data.
+  if (missingExcluded.length > 0 && source !== 'database' && !options?.limit) {
+    await recordAlert({
+      level: 'warn',
+      source: KEEP_EU_SYNC_ALERT_SOURCE,
+      message: `RAG exclusion: ${missingExcluded.length} listed project id(s) not in upstream data`,
+      meta: { missingCount: missingExcluded.length },
+      dedupeKey: 'keep-eu-sync:rag-exclusion-missing',
+    });
+  }
+
   if (typeof options?.limit === 'number' && options.limit > 0) {
     dataset = dataset.slice(0, options.limit);
   }
@@ -876,6 +913,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
   let totalBudgetEUR = 0;
   let ragEmbeddedCount = 0;
   let ragUnchangedCount = 0;
+  let ragExcludedCount = 0;
 
   for (let i = 0; i < dataset.length; i++) {
     const record = dataset[i]!;
@@ -897,7 +935,9 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
         }
       }
 
-      if (!options?.skipRag) {
+      if (excludedIds.has(record.projectId)) {
+        ragExcludedCount++;
+      } else if (!options?.skipRag) {
         const docTitle = `INTERREG Project: ${record.acronym ?? record.projectId} - ${record.title}`;
         const body = buildKeepEuRagBody(record);
 
@@ -971,6 +1011,8 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     programmesCount,
     ragEmbeddedCount,
     ragUnchangedCount,
+    ragExcludedCount,
+    ragExclusionMissingCount: missingExcluded.length,
     syncedAt: new Date().toISOString(),
   };
 }

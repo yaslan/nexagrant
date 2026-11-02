@@ -617,6 +617,67 @@ describe('syncKeepEuData', () => {
   });
 });
 
+describe('RAG personal-name exclusion (FO-363, K-575447)', () => {
+  const EXCLUDED = ['BGTR0300118', 'BGTR0300121', 'BGTR0300153', 'BGTR0300155', 'BGTR0300162'];
+
+  function projectWithId(projectId: string, acronym = projectId) {
+    return { ...sampleKeepEuProject(), projectId, acronym, title: `Title ${projectId}` };
+  }
+
+  test('an excluded project is persisted but never sent to the embedding step', async () => {
+    const keep = projectWithId('BGTR0200037');
+    const excluded = projectWithId('BGTR0300118');
+    const res = await syncKeepEuData({ records: [keep, excluded] });
+
+    expect(res.syncedProjectsCount).toBe(2);
+    expect(db.rows('cordisProject')).toHaveLength(2);
+    expect(res.ragExcludedCount).toBe(1);
+    expect(res.ragEmbeddedCount).toBe(1);
+    const texts = embedTextMock.mock.calls.map((c) => String(c[0]));
+    expect(texts.some((t) => t.includes('Title BGTR0300118'))).toBe(false);
+    expect(texts.some((t) => t.includes('Title BGTR0200037'))).toBe(true);
+  });
+
+  test('default excludes all five identified projects: 280 of 285 are embedded', async () => {
+    const records = [
+      ...EXCLUDED.map((id) => projectWithId(id)),
+      ...Array.from({ length: 280 }, (_, i) => projectWithId(`BGTR09${String(i).padStart(5, '0')}`)),
+    ];
+    const res = await syncKeepEuData({ records, skipRag: false });
+
+    expect(res.syncedProjectsCount).toBe(285);
+    expect(res.ragExcludedCount).toBe(5);
+    expect(res.ragEmbeddedCount).toBe(280);
+    expect(db.rows('document')).toHaveLength(280);
+  });
+
+  test('an explicit empty list disables the exclusion (test-only escape hatch)', async () => {
+    const res = await syncKeepEuData({ records: [projectWithId('BGTR0300118')], ragExcludeProjectIds: [] });
+
+    expect(res.ragExcludedCount).toBe(0);
+    expect(res.ragEmbeddedCount).toBe(1);
+  });
+
+  test('an excluded id missing from the upstream data raises an alert and does not fail the run', async () => {
+    const res = await syncKeepEuData({ records: [projectWithId('BGTR0200037')] });
+
+    expect(res.success).toBe(true);
+    expect(res.ragExclusionMissingCount).toBe(5);
+    const alerts = db.rows('systemAlert');
+    expect(alerts.some((a) => String(a.message).includes('RAG exclusion'))).toBe(true);
+  });
+
+  test('a limited run does not warn about excluded ids that were cut by the limit', async () => {
+    const res = await syncKeepEuData({
+      records: [projectWithId('BGTR0300118'), projectWithId('BGTR0200037')],
+      limit: 1,
+    });
+
+    expect(res.ragExclusionMissingCount).toBe(4);
+    expect(db.rows('systemAlert').some((a) => String(a.message).includes('RAG exclusion'))).toBe(false);
+  });
+});
+
 describe('aggregateKeepEuMetrics', () => {
   test('empty database returns zeros rather than hard-coded literals (CLAUDE.md #7)', async () => {
     const metrics = await aggregateKeepEuMetrics();
