@@ -386,11 +386,13 @@ export default function KanbanBoard({
             <span className="absolute left-2.5 top-2.5 text-muted text-xs">🔍</span>
           </div>
 
-          {/* User Filter */}
+          {/* User Filter. A fixed width: members load after mount, and a select sized by its
+              longest option would wrap this toolbar then and push the board down under the
+              pointer, losing a click on a card (FO-336). */}
           <select
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
-            className="text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+            className="w-40 truncate text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">👥 Tüm Kullanıcılar</option>
             {members.map((m) => (
