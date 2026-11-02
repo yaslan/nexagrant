@@ -9,6 +9,29 @@ export type GateEvaluationResult = {
   reasons: string[];
 };
 
+type G1Seat = {
+  id: string;
+  roleKey: string;
+  required: boolean;
+  status: string;
+  organizationId: string | null;
+  partnerOrgId: string | null;
+};
+type SeatCandidateRef = { seatId: string; organizationId: string | null; partnerOrgId: string | null };
+
+/** A CONFIRMED seat with no organisation confirms nobody (src/modules/m8/server/seat-transitions.ts). */
+function isSeatFilled(seat: G1Seat): boolean {
+  return seat.status === 'CONFIRMED' && Boolean(seat.organizationId || seat.partnerOrgId);
+}
+
+/** A backup is someone other than whoever holds the seat; the matcher can list the holder too. */
+function isBackupFor(candidate: SeatCandidateRef, seat: G1Seat): boolean {
+  return (
+    (candidate.organizationId !== null && candidate.organizationId !== seat.organizationId) ||
+    (candidate.partnerOrgId !== null && candidate.partnerOrgId !== seat.partnerOrgId)
+  );
+}
+
 /**
  * The opportunity is not visible to this tenant — it does not exist, or it belongs to someone else.
  *
@@ -145,6 +168,43 @@ async function runGate(
       const rules = DEFAULT_GATE_RULES.G1;
       if (rules.requireCoordinatorHistoryIfCoordinator && opp.intendedRole === 'coordinator') {
         inputs.coordinatorRoleCheck = true;
+      }
+
+      const criticalSeats = opp.seats.filter((s: G1Seat) => s.required);
+      inputs.criticalSeatsCount = criticalSeats.length;
+      if (criticalSeats.length === 0) {
+        // `required` defaults to true, so this is an opportunity nobody has put a consortium on.
+        // No critical role on file proves nothing about the roles being filled.
+        passed = false;
+        reasons.push('Consortium check failed: no critical seat is defined for this opportunity');
+      }
+
+      if (rules.requireCriticalSeatsFilled) {
+        const unfilled = criticalSeats.filter((s: G1Seat) => !isSeatFilled(s));
+        inputs.unfilledCriticalRoles = unfilled.map((s: G1Seat) => s.roleKey);
+        for (const seat of unfilled) {
+          passed = false;
+          reasons.push(
+            seat.status === 'CONFIRMED'
+              ? `Critical role ${seat.roleKey} is not filled: the confirmed seat names no organisation`
+              : `Critical role ${seat.roleKey} is not filled: seat status is ${seat.status}`,
+          );
+        }
+      }
+
+      if (rules.requireBackupForCriticalSeats) {
+        const candidates: SeatCandidateRef[] = await tx.seatCandidate.findMany({
+          where: { tenantId, seatId: { in: criticalSeats.map((s: G1Seat) => s.id) } },
+          select: { seatId: true, organizationId: true, partnerOrgId: true },
+        });
+        const withoutBackup = criticalSeats.filter(
+          (s: G1Seat) => !candidates.some((c) => c.seatId === s.id && isBackupFor(c, s)),
+        );
+        inputs.criticalRolesWithoutBackup = withoutBackup.map((s: G1Seat) => s.roleKey);
+        for (const seat of withoutBackup) {
+          passed = false;
+          reasons.push(`Critical role ${seat.roleKey} has no backup candidate`);
+        }
       }
       break;
     }
