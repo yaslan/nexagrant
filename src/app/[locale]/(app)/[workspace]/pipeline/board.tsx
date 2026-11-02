@@ -160,6 +160,10 @@ export default function KanbanBoard({
     }, 4000);
   };
 
+  // Why the gate kept a card where it was. A panel, not a toast: the reasons are what the user
+  // has to act on, and a four-second toast would take them away.
+  const [moveRefusal, setMoveRefusal] = useState<{ title: string; stage: Gate; reasons: string[] } | null>(null);
+
   // Drag & Drop
   const handleDragStart = (e: React.DragEvent, oppId: string) => {
     e.dataTransfer.setData('oppId', oppId);
@@ -173,16 +177,33 @@ export default function KanbanBoard({
     const opp = opps.find((o) => o.id === oppId);
     if (!opp || opp.stage === newStage) return;
 
-    setOpps((prev) => prev.map((o) => (o.id === oppId ? { ...o, stage: newStage } : o)));
+    setMoveRefusal(null);
 
+    // Not optimistic: the card leaves its column only after the gate said so, so a refusal has
+    // nothing to undo and nothing else on the board is touched.
     startTransition(async () => {
       try {
-        await moveOpportunityStage(oppId, newStage);
-        showToast(`Fırsat ${newStage} aşamasına taşındı.`, 'info');
+        const res = await moveOpportunityStage(oppId, newStage);
+        if (!res.success) {
+          showToast(t(`moveError.${res.error}`), 'error');
+          return;
+        }
+        if (!res.passed) {
+          setMoveRefusal({
+            title: opp.title,
+            stage: newStage,
+            reasons:
+              res.refusal === 'STAGE_SKIP'
+                ? [t('moveSkipped', { from: opp.stage, to: newStage, next: res.nextStage ?? '' })]
+                : res.reasons,
+          });
+          return;
+        }
+        setOpps((prev) => prev.map((o) => (o.id === oppId ? { ...o, stage: newStage } : o)));
+        showToast(t('moved', { stage: newStage }), 'success');
       } catch (err) {
         console.error(err);
-        showToast(errorText(err, 'Aşama güncellenirken hata oluştu.'), 'error');
-        setOpps(initialOpps);
+        showToast(errorText(err, t('moveError.STAGE_MOVE_FAILED')), 'error');
       }
     });
   };
@@ -332,6 +353,33 @@ export default function KanbanBoard({
 
   return (
     <div className="space-y-6" data-testid="pipeline-board">
+      {moveRefusal && (
+        <div
+          role="alert"
+          data-testid="pipeline-move-refused"
+          className="rounded-xl border border-bad/30 bg-bad/15 px-4 py-3 text-sm text-bad flex items-start justify-between gap-4"
+        >
+          <div className="space-y-1 min-w-0">
+            <p className="font-semibold">
+              {t('moveRefused', { title: moveRefusal.title, stage: moveRefusal.stage })}
+            </p>
+            <ul className="list-disc list-inside text-xs break-words">
+              {moveRefusal.reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMoveRefusal(null)}
+            data-testid="pipeline-move-refused-dismiss"
+            className="shrink-0 font-semibold underline cursor-pointer"
+          >
+            {t('moveRefusedDismiss')}
+          </button>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div className="fixed top-5 right-5 z-50 animate-in slide-in-from-top-2">
@@ -432,6 +480,7 @@ export default function KanbanBoard({
           return (
             <div
               key={key}
+              data-testid={`pipeline-column-${key}`}
               className={`bg-ground/50 border border-border rounded-2xl flex flex-col border-t-4 ${color} transition-all shadow-2xs`}
               onDragOver={allowDrop}
               onDrop={(e) => handleDrop(e, key)}
