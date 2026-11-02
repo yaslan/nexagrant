@@ -116,6 +116,9 @@ async function sweepBatch(tx: SystemTx, staleBefore: Date, cursor: string | null
   let released = 0;
   for (const r of dead) {
     await releaseAiReservation(tx, { tenantId: r.tenantId, module: EVALUATE_MODULE, refId: runRef(r.id, r.updatedAt) });
+    // The claim-instant match is a second guarantee under the tenant lock: every writer that could
+    // move this row takes the same lock or refuses ANALYZING, so it cannot be tested on its own
+    // (FO-342 Mutant 2 stays green). The double-refund guard the tests pin is the lock (Mutant 3).
     const { count } = await tx.interregAnalysis.updateMany({
       where: { id: r.id, tenantId: r.tenantId, status: 'ANALYZING', updatedAt: r.updatedAt },
       data: { status: 'FAILED' },
