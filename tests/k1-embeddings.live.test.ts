@@ -15,7 +15,7 @@ import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
  *      then asserts the ranking k1-topic-match produces from them.
  *
  * The sweep reads the whole Topic catalogue and every tenant, so this suite
- * refuses the shared `fabrika` database outside CI. Point DATABASE_URL /
+ * refuses the shared `fabrika` database outside GitHub Actions. Point DATABASE_URL /
  * DATABASE_URL_RLS_TEST at a throwaway database (recipe in
  * docs/agent-results/TASK-MUN7C48UHPOGI-se-fb.md).
  */
@@ -31,7 +31,7 @@ import { runK1Embeddings, embeddingHash, profileEmbeddingText, topicEmbeddingTex
 import { recomputeAllTopicMatches } from '@/lib/scoring/topic-match';
 import { LlmProviderError, PLATFORM_SCOPE_TENANT_ID } from '@/lib/llm';
 import { fakeEmbedding } from './helpers/fake-embedding';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -43,7 +43,7 @@ const REACHABLE =
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
-const SHARED = DB_NAME === 'fabrika' && !isCi();
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
 if (SHARED) skipOrFailInCi(SUITE, 'the sweep reads every topic and tenant; refusing the shared "fabrika" database');
 const HAS_DB = DB_NAME !== undefined && !SHARED;
 const REAL = HAS_DB && process.env.K1_EMBEDDINGS_REAL_OPENAI === '1';

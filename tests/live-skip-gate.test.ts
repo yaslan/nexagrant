@@ -97,10 +97,11 @@ describe('checkLiveSkips', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'live-skip-'));
     const bad = path.join(dir, 'bad.json');
     writeFileSync(bad, JSON.stringify(report({ 'tests/a.live.test.ts': [['x', 'passed'], ['y', 'skipped']] })));
-    const stderr = (ci: string | undefined) => {
+    const stderr = (vars: Record<string, string>) => {
       const env = { ...process.env };
-      if (ci === undefined) delete env.CI;
-      else env.CI = ci;
+      delete env.CI;
+      delete env.GITHUB_ACTIONS;
+      Object.assign(env, vars);
       try {
         execFileSync(path.join(root, 'node_modules/.bin/tsx'), [path.join(root, 'scripts/check-live-skips.ts'), bad], {
           stdio: 'pipe',
@@ -112,12 +113,16 @@ describe('checkLiveSkips', () => {
         return { status: x.status, err: x.stderr.toString() };
       }
     };
-    const local = stderr(undefined);
+    const local = stderr({});
     expect(local.status).toBe(1);
-    expect(local.err).toMatch(/note — CI is not set/);
-    const ci = stderr('true');
+    expect(local.err).toMatch(/note — GITHUB_ACTIONS is not set/);
+    // FO-376: a hand-typed CI=true is not GitHub Actions; it opens nothing, so the note stays.
+    const handTyped = stderr({ CI: 'true' });
+    expect(handTyped.status).toBe(1);
+    expect(handTyped.err).toMatch(/note — GITHUB_ACTIONS is not set/);
+    const ci = stderr({ GITHUB_ACTIONS: 'true' });
     expect(ci.status).toBe(1);
-    expect(ci.err).not.toMatch(/CI is not set/);
+    expect(ci.err).not.toMatch(/GITHUB_ACTIONS is not set/);
   });
 });
 
