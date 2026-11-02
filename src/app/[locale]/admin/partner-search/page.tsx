@@ -3,8 +3,8 @@ import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 import { PRODUCT_NAME } from '@/lib/brand';
-import { PARTNER_SEARCH_ALERT_SOURCE } from '@/lib/adapters/partner-search';
 import { isPartnerSearchIngestionEnabled } from '@/modules/m1/server/partner-search/flag';
+import { countOpenIngestionAlerts } from '@/modules/m1/server/partner-search/alerts';
 import PartnerSearchConsoleClient, { type RunRow, type UnmatchedRow } from './client';
 
 export const dynamic = 'force-dynamic';
@@ -59,7 +59,7 @@ export default async function AdminPartnerSearchPage({ params }: { params: Promi
         orderBy: { identifier: 'asc' },
         take: MAX_TOPIC_SUGGESTIONS,
       }),
-      prisma.systemAlert.count({ where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null } }),
+      countOpenIngestionAlerts(prisma),
     ]);
     runs = runRows.map((r) => ({
       id: r.id,

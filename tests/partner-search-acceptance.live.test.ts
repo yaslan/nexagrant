@@ -32,6 +32,7 @@ vi.mock('@/modules/m1/server/partner-search/flag', async (importOriginal) => ({
 const { prisma, withTenant } = await import('@/lib/db');
 const { PartnerSearchClient, PARTNER_SEARCH_ALERT_SOURCE } = await import('@/lib/adapters/partner-search');
 const { runPartnerSearchIngestion } = await import('@/modules/m1/server/partner-search/ingestor');
+const { countOpenIngestionAlerts } = await import('@/modules/m1/server/partner-search/alerts');
 const { readPartnerSignal, readAnnouncementsForExport, toAnnouncementDto, toExportCsv, toExportJson } = await import(
   '@/modules/m1/server/partner-search/api'
 );
@@ -331,12 +332,12 @@ describe.skipIf(!RUN)('FO-66 Partner Search acceptance (live database)', () => {
      * (src/app/[locale]/admin/partner-search/page.tsx) used to count
      * `source = 'partner_search'`, while the ingestor's alerts are stored as
      * `'partner_search_adapter'` by createAdapterAlert. The page now reads
-     * PARTNER_SEARCH_ALERT_SOURCE, the same constant this test counts with.
+     * countOpenIngestionAlerts (alerts.ts), which this test calls too.
      */
     it('BUG-1: the console figure counts the open ingestion alerts', async () => {
-      // The page's figure is this exact query (page.tsx imports PARTNER_SEARCH_ALERT_SOURCE);
+      // The page's figure is this same function (page.tsx calls countOpenIngestionAlerts);
       // the drift and 403 alerts above were written by createAdapterAlert under that source.
-      const consoleFigure = await prisma.systemAlert.count({ where: { source: PARTNER_SEARCH_ALERT_SOURCE, resolvedAt: null } });
+      const consoleFigure = await countOpenIngestionAlerts(prisma);
       evidence('C3 BUG-1', { consoleFigure, source: PARTNER_SEARCH_ALERT_SOURCE });
       expect(consoleFigure).toBeGreaterThan(0);
     });
