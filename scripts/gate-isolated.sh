@@ -38,6 +38,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# FO-339: aynı tree için yeşil kayıt (önbellek) ya da yalnız belge farkı varsa konteyner/DB kurmadan
+# `pnpm gate` koşulur; karar ve satır scripts/gate-lock.mjs'te verilir. Komut verilmişse atlanmaz.
+if [ $# -eq 0 ] && node scripts/gate-cache.mjs skippable >/dev/null; then
+  exec pnpm gate
+fi
+
 log() { printf '%s [gate-isolated] %s\n' "$(date -u +%FT%TZ)" "$*"; }
 fail() { log "FAIL: $*" >&2; exit 1; }
 

@@ -2,6 +2,29 @@
 
 Kapı = `gate:core` (`package.json`): `db:generate → lint → typecheck → test → i18n:check → rls:check → rls:bypass-check → rls:verify --require-db → db:rls-role → test:e2e → alerts:check`. `pnpm gate` bunu makine çapındaki kilitle (`scripts/gate-lock.mjs`, aynı anda tek gate) koşar. `githooks/pre-push` da aynısını koşar (`pnpm hooks:install`).
 
+## Sonuç önbelleği, sıra ve belge-yalnız yol (FO-339)
+
+Aynı kodu üç kez tam koşmamak için (yazar gate'i, pre-push kancası, inceleyici) `pnpm gate` üç kademeli karar verir (`scripts/gate-lock.mjs` + `scripts/gate-cache.mjs`):
+
+1. **Önbellek hit:** `git rev-parse HEAD^{tree}` + `pnpm-lock.yaml` hash'i için `~/.cache/fonbridge-gate-pass/<tree>` kaydı varsa `önbellek: <tree> <tarih>` basılır ve tam gate atlanır. Kayıt yalnız `gate:core` exit 0 iken, çalışma ağacı baştan sona temizken (`git status` boş, untracked dahil) ve koşu boyunca tree değişmediyse yazılır. Kırmızı koşu yazmaz. **Kirli ağaçta kayıt ne yazılır ne okunur** (FO-348 K3): yerel kirli kod yeşil sayılmaz. Kilit alındıktan sonra kayıt yeniden okunur (FO-348 K4): kuyrukta beklerken aynı tree için yeşil kayıt yazıldıysa ikinci kez koşmadan çıkılır. Tree ve lock hash'i kilit alındıktan sonra alınır (FO-348 K6).
+2. **Belge-yalnız kısa yol (allowlist, FO-348 K2):** `origin/dev...HEAD` farkının **her** dosyası `docs/**/*.md` ise tam gate yerine `lint` + `i18n:check` koşar. Tek bir dosya bile bu dışındaysa tam gate koşar. Dışarıda kalanlar:
+   - kök dosyalar (`README.md` dahil), `.github/**`, `content/**`, `messages/**`, `src/**`, `tests/**`, `prisma/**`, `scripts/**`, `githooks/**`, `config/**`;
+   - `docs/` altındaki `.md` olmayan her dosya (`.csv`, `.txt`, `.json`, görseller…) ve büyük harfli `.MD`;
+   - istisna listesi (`FULL_GATE_DOCS` in `scripts/gate-cache.mjs`, büyük/küçük harf duyarsız): `docs/BILLING.md` (`src/lib/billing/catalog.test.ts` okur), `docs/legal/**` (`compliance/dpa` sayfası render eder), `docs/BETA_DATA/**` (`scripts/beta-pricing-survey.ts` girdisi okur).
+
+   Fark `--no-renames` ile alınır: `git mv src/x.ts docs/x.ts` kaynak yolu da farkta gösterir ve tam gate tetikler (FO-348 K1). Kirli ağaç ya da boş fark tam gate'e düşer. Kısa yol kayda yazılmaz; tam gate yerine geçmez.
+3. **Tam gate:** diğer her durum. `gate:core` adımları değişmedi.
+
+Yeni bir belge bir istisnaya ihtiyaç duyarsa (ör. bir test ya da sayfa onu okuyorsa) `FULL_GATE_DOCS`'a yorumuyla ekle ve `tests/gate-cache.test.ts` içindeki istisna vakasına bak.
+
+Kilit sırası: bekleyenler `~/.cache/fonbridge-gate.lock.queue/` altında bilet bırakır; kilidi yalnız en eski canlı bilet alır. Bekleme satırı sıra no'sunu, önündeki iş sayısını ve tahmini başlama saatini basar (tahmin: `~/.cache/fonbridge-gate.lock.history.jsonl` medyanı; geçmiş yoksa 30 dk). Eski sürümle kilidi alan bir bekleyen bilet bırakmadığı için araya girebilir; kilit dizininin biçimi (`owner.json`) değişmedi.
+
+Bilinen kalan risk (FO-348 K6): kayıt yazımı yalnız koşu sonunda tree'yi karşılaştırır; koşu sırasında bir dosya değiştirilip geri alınırsa bu yakalanmaz. Tam kapama için koşunun tree'sinin ayrı bir worktree'de koşması gerekir (yapılmadı).
+
+Önbelleği bilerek atlamak: `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`. Önbelleği temizlemek: `~/.cache/fonbridge-gate-pass/` dizinini silmek güvenlidir.
+
+`pnpm gate:isolated` (argümansız) aynı kararı önce verir; önbellek ya da belge-yalnız ise konteyner kurmadan doğrudan `pnpm gate`'e geçer.
+
 ## Kısa yol: `pnpm gate:isolated` (önerilen)
 
 ```bash
