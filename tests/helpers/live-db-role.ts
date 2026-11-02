@@ -117,6 +117,17 @@ export function isLocalDbUrl(url: string): boolean {
 
 type DbIdentity = { db: string; cluster: string };
 
+/**
+ * The line of an error that says why. Prisma's message opens with a blank line and then
+ * "Invalid `prisma.$queryRawUnsafe()` invocation:", neither of which does; the cause comes
+ * after them (measured, FO-366 F1).
+ */
+function errorCause(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const lines = e.message.split('\n').map((line) => line.trim()).filter(Boolean);
+  return lines.find((line) => !/^Invalid `.*` invocation/.test(line)) ?? lines[0] ?? e.name;
+}
+
 async function readDbIdentity(client: RawQueryable): Promise<DbIdentity> {
   const rows = await client.$queryRawUnsafe<DbIdentity[]>(
     'SELECT current_database()::text AS db, system_identifier::text AS cluster FROM pg_control_system()',
@@ -150,14 +161,25 @@ export async function usedDatabaseName(
   try {
     target = await readDbIdentity(used);
   } catch (e) {
-    skipOrFailInCi(suite, `could not read which database it would run on (${e instanceof Error ? e.message.split('\n')[0] : String(e)})`);
+    const reason = `could not read which database it would run on (${errorCause(e)})`;
+    // 42501: the login worked but this role may not call pg_control_system() (a server that revoked
+    // it from PUBLIC). Re-creating the role, which is what DB_FIX says, would not change that.
+    if (e instanceof Error && e.message.includes('Code: `42501`')) {
+      skipOrFailInCi(
+        suite,
+        `${reason}; as a superuser run GRANT EXECUTE ON FUNCTION pg_control_system() TO the role of this connection`,
+        '`pnpm db:rls-role` does not grant this.',
+      );
+    } else {
+      skipOrFailInCi(suite, reason);
+    }
     return undefined;
   }
   const other = await readDbIdentity(fixtures);
   if (target.db !== other.db || target.cluster !== other.cluster) {
     throw new Error(
       `${suite}: DATABASE_URL and DATABASE_URL_RLS_TEST point at different databases ` +
-        `("${other.db}" on cluster ${other.cluster}, "${target.db}" on cluster ${target.cluster}). ` +
+        `(DATABASE_URL: "${other.db}" on cluster ${other.cluster}; DATABASE_URL_RLS_TEST: "${target.db}" on cluster ${target.cluster}). ` +
         "Fixtures would go to one and the code under test would run on the other; point both at the same throwaway database.",
     );
   }

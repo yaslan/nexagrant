@@ -60,6 +60,16 @@ describe('usedDatabaseName', () => {
     }) as RawQueryable['$queryRawUnsafe'],
   };
 
+  const failing = (message: string): RawQueryable => ({
+    $queryRawUnsafe: (async () => {
+      throw new Error(message);
+    }) as RawQueryable['$queryRawUnsafe'],
+  });
+  // The text Prisma's driver adapter really produced for these roles (FO-366 F1, measured).
+  const prismaError = (code: string, message: string): string =>
+    `\nInvalid \`prisma.$queryRawUnsafe()\` invocation:\n\n\nRaw query failed. Code: \`${code}\`. Message: \`${message}\``;
+  const denied = failing(prismaError('42501', 'permission denied for function pg_control_system'));
+
   it('returns the name both connections agree on', async () => {
     await expect(usedDatabaseName(conn('throwaway'), conn('throwaway'), 's')).resolves.toBe('throwaway');
   });
@@ -67,7 +77,7 @@ describe('usedDatabaseName', () => {
   it.each([[''], ['true']])('refuses two databases with CI=%j, naming both (FO-356 scenario I)', async (ci) => {
     vi.stubEnv('CI', ci);
     await expect(usedDatabaseName(conn('fabrika'), conn('fabrika_probe'), 's')).rejects.toThrow(
-      /different databases.*"fabrika_probe".*"fabrika"/,
+      /different databases \(DATABASE_URL: "fabrika_probe".*DATABASE_URL_RLS_TEST: "fabrika"/,
     );
   });
 
@@ -82,6 +92,49 @@ describe('usedDatabaseName', () => {
     expect(write).toHaveBeenCalledWith(
       'WARNING s skipped: could not read which database it would run on (password authentication failed for user "fabrika_app")\n',
     );
+  });
+
+  it('locally: names the cause of a Prisma error, not its blank first line or its header', async () => {
+    vi.stubEnv('CI', '');
+    const write = muteStderr();
+    const stale = failing(prismaError('28P01', 'password authentication failed for user "fabrika_app"'));
+    await expect(usedDatabaseName(stale, conn('fabrika'), 's')).resolves.toBeUndefined();
+    expect(write).toHaveBeenCalledWith(
+      'WARNING s skipped: could not read which database it would run on (Raw query failed. Code: `28P01`. Message: `password authentication failed for user "fabrika_app"`)\n',
+    );
+  });
+
+  it('locally: a role refused pg_control_system() (42501) is told to GRANT it', async () => {
+    vi.stubEnv('CI', '');
+    const write = muteStderr();
+    await expect(usedDatabaseName(denied, conn('fabrika'), 's')).resolves.toBeUndefined();
+    const line = String(write.mock.calls[0]?.[0]);
+    expect(line).toContain('permission denied for function pg_control_system');
+    expect(line).toContain('GRANT EXECUTE ON FUNCTION pg_control_system()');
+    expect(line).not.toContain('Provide the database');
+  });
+
+  it('in CI: 42501 throws with the GRANT, and sends nobody to db:rls-role for it', async () => {
+    vi.stubEnv('CI', 'true');
+    const thrown = await usedDatabaseName(denied, conn('fabrika'), 's').catch((e: Error) => e.message);
+    expect(thrown).toContain('refusing to skip in CI');
+    expect(thrown).toContain('permission denied for function pg_control_system');
+    expect(thrown).toContain('GRANT EXECUTE ON FUNCTION pg_control_system()');
+    expect(thrown).toContain('`pnpm db:rls-role` does not grant this');
+    expect(thrown).not.toContain('Provide the database');
+  });
+
+  it('does not take 42501 in a port number for the permission code', async () => {
+    vi.stubEnv('CI', 'true');
+    const unreachable = failing(prismaError('N/A', "Can't reach database server at 127.0.0.1:42501"));
+    await expect(usedDatabaseName(unreachable, conn('fabrika'), 's')).rejects.toThrow(/Provide the database/);
+  });
+
+  it('does not read an error without a message as an empty cause', async () => {
+    vi.stubEnv('CI', '');
+    const write = muteStderr();
+    await expect(usedDatabaseName(failing('\n\n'), conn('fabrika'), 's')).resolves.toBeUndefined();
+    expect(write).toHaveBeenCalledWith('WARNING s skipped: could not read which database it would run on (Error)\n');
   });
 
   it('in CI: an unreadable used connection throws', async () => {

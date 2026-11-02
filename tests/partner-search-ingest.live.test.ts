@@ -8,7 +8,7 @@ import { PARTNER_SEARCH_FLAG_KEY, setPartnerSearchIngestionFlag } from '@/module
 import { runPartnerSearchIngestion } from '@/modules/m1/server/partner-search/ingestor';
 import { EMAIL_MASK, PHONE_MASK } from '@/modules/m1/server/partner-search/mask';
 import { runPartnerSearchRetention } from '@/modules/m1/server/partner-search/retention';
-import { skipOrFailInCi } from './helpers/live-db-role';
+import { isCi, skipOrFailInCi } from './helpers/live-db-role';
 import { PARTNER_SEARCH_INGESTION_LOCK, holdTestDbLock } from './helpers/test-db-lock';
 
 /**
@@ -22,7 +22,7 @@ import { PARTNER_SEARCH_INGESTION_LOCK, holdTestDbLock } from './helpers/test-db
  */
 const dbName = new URL(process.env.DATABASE_URL ?? 'postgresql://x/none').pathname.replace('/', '');
 const HAS_DB = Boolean(process.env.DATABASE_URL);
-const SHARED = dbName === 'fabrika' && process.env.CI !== 'true';
+const SHARED = dbName === 'fabrika' && !isCi();
 const RUN = HAS_DB && !SHARED;
 if (!HAS_DB) skipOrFailInCi('partner-search-ingest.live', 'DATABASE_URL is not set');
 if (SHARED) skipOrFailInCi('partner-search-ingest.live', 'it flips the one global flag row; refusing the shared "fabrika" database');
