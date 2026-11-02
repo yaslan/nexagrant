@@ -33,7 +33,8 @@ const USED_CONNECTION = [
 /**
  * Exception: these read the name from the DATABASE_URL in `process.env`. They do not swap the
  * singleton to DATABASE_URL_RLS_TEST, so that URL is the connection the destructive code uses.
- * There is no second connection for the name to disagree with.
+ * The ingest suite does open DATABASE_URL_RLS_TEST, but only for writes that must be refused
+ * with 42501; it does no destructive work there, so the name is not read from it.
  */
 const URL_BASED = ['tests/partner-search-acceptance.live.test.ts', 'tests/partner-search-ingest.live.test.ts'];
 
