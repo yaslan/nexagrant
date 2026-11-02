@@ -9,7 +9,8 @@ type TableName =
   | 'cordisProjectTopic'
   | 'systemAlert'
   | 'rawFetch'
-  | 'document';
+  | 'document'
+  | 'chunk';
 
 function createKeepEuStub() {
   const store = new Map<TableName, Map<string, Row>>();
@@ -179,6 +180,7 @@ function createKeepEuStub() {
         table('document').set(id, { id, ...args.data });
         return { id };
       },
+      // Prisma reports an unset tenantId as null on read; the stub does the same.
       deleteMany: async (args?: { where?: Row }): Promise<{ count: number }> => {
         let count = 0;
         if (!args?.where) {
@@ -189,7 +191,7 @@ function createKeepEuStub() {
         for (const [id, row] of [...table('document').entries()]) {
           let match = true;
           for (const [k, v] of Object.entries(args.where)) {
-            if (row[k] !== v) {
+            if ((row[k] ?? null) !== v) {
               match = false;
               break;
             }
@@ -200,6 +202,17 @@ function createKeepEuStub() {
           }
         }
         return { count };
+      },
+      findMany: async (args: { where: Row; take?: number }): Promise<Row[]> => {
+        const matches = [...table('document').values()].filter((row) =>
+          Object.entries(args.where).every(([k, v]) => (row[k] ?? null) === v),
+        );
+        return matches.slice(0, args.take ?? matches.length).map((doc) => ({
+          ...doc,
+          chunks: rows('chunk')
+            .filter((c) => c.documentId === doc.id)
+            .sort((a, b) => Number(a.ordinal) - Number(b.ordinal)),
+        }));
       },
     },
 
@@ -253,7 +266,14 @@ function createKeepEuStub() {
       }));
     },
 
-    $executeRawUnsafe: async (): Promise<number> => 1,
+    // ingestDocument's chunk insert: ($1 documentId, $2 tenantId, $3 ordinal, $4 text, $5 embedding).
+    $executeRawUnsafe: async (sql: string, ...params: unknown[]): Promise<number> => {
+      if (sql.includes('INSERT INTO "Chunk"')) {
+        const id = `chunk-${seq++}`;
+        table('chunk').set(id, { id, documentId: params[0], ordinal: params[2], text: params[3] });
+      }
+      return 1;
+    },
   };
 
   return {
@@ -485,6 +505,56 @@ describe('persistKeepEuRecord', () => {
 
     const alerts = db.rows('systemAlert');
     expect(alerts.some((a) => String(a.message).includes('missing project id'))).toBe(true);
+  });
+});
+
+describe('syncKeepEuData RAG mirror', () => {
+  test('re-running an unchanged project embeds nothing the second time', async () => {
+    const proj = sampleKeepEuProject();
+    const first = await syncKeepEuData({ records: [proj] });
+    const embeddedFirst = embedTextMock.mock.calls.length;
+    expect(embeddedFirst).toBeGreaterThan(0);
+    expect(first.ragEmbeddedCount).toBe(1);
+    expect(first.ragUnchangedCount).toBe(0);
+
+    embedTextMock.mockClear();
+    const second = await syncKeepEuData({ records: [proj] });
+
+    expect(embedTextMock).not.toHaveBeenCalled();
+    expect(second.ragEmbeddedCount).toBe(0);
+    expect(second.ragUnchangedCount).toBe(1);
+    expect(db.rows('document')).toHaveLength(1);
+    expect(db.rows('chunk')).toHaveLength(embeddedFirst);
+  });
+
+  test('a changed project is re-embedded and an unchanged neighbour is not', async () => {
+    const a = sampleKeepEuProject();
+    const b = { ...sampleKeepEuProject(), projectId: 'OTHER-B', acronym: 'OTHER B', title: 'Second project' };
+    await syncKeepEuData({ records: [a, b] });
+
+    embedTextMock.mockClear();
+    const changedA = { ...a, status: 'completed' };
+    const res = await syncKeepEuData({ records: [changedA, b] });
+
+    expect(res.ragEmbeddedCount).toBe(1);
+    expect(res.ragUnchangedCount).toBe(1);
+    const texts = embedTextMock.mock.calls.map((c) => String(c[0]));
+    expect(texts.some((t) => t.includes('Status: completed'))).toBe(true);
+    expect(texts.some((t) => t.includes('Second project'))).toBe(false);
+    expect(db.rows('document')).toHaveLength(2);
+  });
+
+  test('a new project is embedded on its first run', async () => {
+    const a = sampleKeepEuProject();
+    await syncKeepEuData({ records: [a] });
+
+    embedTextMock.mockClear();
+    const fresh = { ...a, projectId: 'NEW-C', acronym: 'NEW C', title: 'Brand new project' };
+    const res = await syncKeepEuData({ records: [a, fresh] });
+
+    expect(res.ragEmbeddedCount).toBe(1);
+    expect(res.ragUnchangedCount).toBe(1);
+    expect(embedTextMock.mock.calls.some((c) => String(c[0]).includes('Brand new project'))).toBe(true);
   });
 });
 

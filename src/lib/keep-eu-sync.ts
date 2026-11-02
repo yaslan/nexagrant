@@ -16,7 +16,7 @@
 
 import { createHash } from 'node:crypto';
 import { prisma } from './db';
-import { ingestDocument } from './rag';
+import { ingestDocument, splitText } from './rag';
 import { env } from '@/lib/env';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
@@ -121,6 +121,10 @@ export interface KeepEuSyncResult {
   totalEuFundingEUR: number;
   totalBudgetEUR: number;
   programmesCount: number;
+  /** Projects whose RAG document was (re)embedded this run. */
+  ragEmbeddedCount: number;
+  /** Projects whose stored RAG chunks already matched the record, so nothing was embedded. */
+  ragUnchangedCount: number;
   syncedAt: string;
 }
 
@@ -870,6 +874,8 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
   let skippedCount = 0;
   let totalEuFundingEUR = 0;
   let totalBudgetEUR = 0;
+  let ragEmbeddedCount = 0;
+  let ragUnchangedCount = 0;
 
   for (let i = 0; i < dataset.length; i++) {
     const record = dataset[i]!;
@@ -893,20 +899,23 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
 
       if (!options?.skipRag) {
         const docTitle = `INTERREG Project: ${record.acronym ?? record.projectId} - ${record.title}`;
-        await prisma.document.deleteMany({
-          where: {
-            tenantId: null,
-            kind: 'INTERREG_PROJECT',
-            title: docTitle,
-          },
-        });
+        const body = buildKeepEuRagBody(record);
 
-        // Shared public RAG corpus (tenantId is undefined)
-        await ingestDocument(
-          docTitle,
-          buildKeepEuRagBody(record),
-          'INTERREG_PROJECT'
-        );
+        if (await ragMirrorIsCurrent(docTitle, body)) {
+          ragUnchangedCount++;
+        } else {
+          await prisma.document.deleteMany({
+            where: {
+              tenantId: null,
+              kind: 'INTERREG_PROJECT',
+              title: docTitle,
+            },
+          });
+
+          // Shared public RAG corpus (tenantId is undefined)
+          await ingestDocument(docTitle, body, 'INTERREG_PROJECT');
+          ragEmbeddedCount++;
+        }
       }
 
       syncedProjectsCount++;
@@ -960,8 +969,33 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     totalEuFundingEUR,
     totalBudgetEUR,
     programmesCount,
+    ragEmbeddedCount,
+    ragUnchangedCount,
     syncedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * True when the shared RAG document for this project already holds exactly the
+ * chunks `body` would produce, so re-embedding it would change nothing.
+ *
+ * Compares the stored `Chunk.text` rows (ordinal order) with `splitText(body)`.
+ * That needs no new column: the stored chunks are the record's text, and any
+ * change to the record changes at least one chunk. Only a single existing
+ * document counts as current; zero or several (a legacy duplicate) means
+ * rebuild. Failing closed here costs one re-embed, never a missing document.
+ */
+async function ragMirrorIsCurrent(docTitle: string, body: string): Promise<boolean> {
+  const existing = await prisma.document.findMany({
+    where: { tenantId: null, kind: 'INTERREG_PROJECT', title: docTitle },
+    select: { chunks: { orderBy: { ordinal: 'asc' }, select: { text: true } } },
+    take: 2,
+  });
+  if (existing.length !== 1) return false;
+
+  const stored = existing[0]!.chunks.map((c) => c.text);
+  const wanted = splitText(body);
+  return stored.length === wanted.length && stored.every((text, i) => text === wanted[i]);
 }
 
 interface CountryAggregateRow {
