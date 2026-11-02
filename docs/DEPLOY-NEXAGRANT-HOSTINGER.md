@@ -1,74 +1,154 @@
-# NexaGrant → nexagrant.com (Hostinger): dağıtım hazırlığı
+# NexaGrant → nexagrant.com (Hostinger Cloud hosting): dağıtım belgesi
 
-> **DURUM (2026-11-01, dev ile birleştirme sonrası): bu belgenin dağıtım hedefi KISMEN GEÇERSİZ.**
-> Dev'e bu kartın dışında FO-244/FO-250/FO-308 ile **Hostinger KVM 2 VPS** paketi girdi (`deploy/vps/`, `deploy/vps/RUNBOOK.md`);
-> `deploy/cpanel/` "kullanılmıyor" diye işaretlendi (`deploy/cpanel/ESKI-KULLANILMIYOR.md`). Aşağıdaki §1 "VPS: yok", §3 (cPanel/Passenger/`build-package.sh`),
-> §4 (paylaşılan plan) ve §6 (paket yükleme sırası) bu yüzden **eskidir**; canlı yığın için tek kaynak `deploy/vps/RUNBOOK.md`.
-> Hâlâ geçerli kalanlar: ürün adı/marka bölümü (§2), değişmeyen kimlikler listesi, `SMTP_FROM` görünen adı, Google OAuth yönlendirme adresi (§5-6), DNS'e dokunmama ilkesi
-> (VPS'te `@`/`www` ALIAS/CNAME yerine **A** kaydı gerekir: RUNBOOK K1). Alan adı tutarlılığı (`RELEASE_CHECKLIST.md`/`SMTP-SUNUCU.md` hâlâ `fonbridge.com`) RUNBOOK K11'de ayrı iş olarak açık.
+**Hedef (patron kararı K-574987 = A, 01.11.2026):** NexaGrant, Hostinger'daki **hazır** `nexagrant.com` sitesine
+(Cloud Economy, sipariş 1010267304, addon vhost, kullanıcı `u605628300`, kök
+`/home/u605628300/domains/nexagrant.com/public_html`) **Node.js uygulaması** olarak yüklenir.
+**VPS alınmaz**; `deploy/vps/` (FO-244 KVM 2 paketi, `deploy/vps/RUNBOOK.md`) bu hedef için **kullanılmıyor**.
+Veritabanı Supabase Postgres + pgvector. Worker (graphile-worker) Hostinger cron + `flock` ile.
 
-Kart: FO-275 (TASK-MVWT5NUHYLW5A) · Hazırlayan: se-fb · Tarih: 2026-10-31 · Kaynak: patron talimatı "sunucu Node.js destekliyor, adı NexaGrant yap, nexagrant.com'da dağıtılacak şekilde hazırla".
+Kart: FO-260 (TASK-MVVMJ9T2LKSJ) · Hazırlayan: devop-fb · Ölçüm: 01.11.2026 (salt-okunur).
+**Bu belge hiçbir şey dağıtmaz.** Yükleme, ortam değişkeni, migration, cron ve DNS işlemleri patron onayıyla (✋) yapılır.
 
-**Bu belge hiçbir şey dağıtmaz.** Hostinger'a yalnız salt-okunur sorgu yapıldı (alan adı, DNS, hosting siparişi, VPS listesi, abonelikler). Yükleme, DNS ve veritabanı değişikliği yok; her biri patron onayı ister.
+İlgili: `deploy/cpanel/ENV-LISTESI.md` (değişkenler), `deploy/cpanel/build-package.sh` (paket),
+`deploy/cpanel/worker.sh` (cron worker), `deploy/cpanel/KURULUM.md` (eski cPanel rehberi, kavramlar geçerli).
 
-## 1. Ölçülen durum (Hostinger, 31.10.2026)
+---
 
-| Kalem | Değer | Kaynak |
+## 1. Ölçülen durum (Hostinger API, 01.11.2026, salt-okunur)
+
+| Kalem | Değer | Kaynak (API işlemi) |
 |---|---|---|
-| Alan adı | `nexagrant.com`, aktif, 29.10.2027'ye kadar | Hostinger domain listesi |
-| Hosting planı | `cloud_economy_v7`, sipariş 1010267304, aktif | Hostinger hosting siparişleri |
-| Site kaydı | `nexagrant.com`, addon vhost, etkin, kök `/home/u605628300/domains/nexagrant.com/public_html`, algılanan tür `other` | Hostinger hosting siteleri |
-| VPS | yok | Hostinger VPS listesi |
-| DNS `@`, `www` | Hostinger CDN'ine (`*.cdn.hstgr.net`) gidiyor | DNS bölgesi |
-| Posta | MX/SPF/DKIM Hostinger mail'e kurulu; DMARC `p=none` | DNS bölgesi |
-| Node.js desteği | patron beyanı ("sunucu Node.js destekliyor"). **Sürüm ve çalıştırma modeli doğrulanmadı.** | patron |
+| Site | `nexagrant.com`, addon, etkin, tür `other`, kök `/home/u605628300/domains/nexagrant.com/public_html` | `hosting_websites_list` |
+| `public_html` içeriği | yalnız `default.php` (Hostinger karşılama sayfası, 42 585 B) | `hosting_files_list-website-and-directories` |
+| Node.js build/çalıştırma | Bu sitede henüz Node.js build'i yok (`build: null`) | `hosting_get-deployment` |
+| Node sürümleri | API yalnız **ana sürüm** kabul eder: 18, 20, 22, 24. Alt sürüm (22.x) API'de görünmez | `hosting_nodejs_start-build` şeması |
+| Çalıştırma modeli | Arşivden (`source_type: archive`) ya da Git'ten build; `app_type` (`next`, `other`…), `root_directory`, `entry_file`, `build_script`, `package_manager`. Build sonucu `public_html` içeriğinin **üzerine yazar** | `hosting_nodejs_start-build`, `hosting_nodejs_build-settings-from-archive` |
+| Node env değişkenleri | Şu an boş (`[]`); değişiklik `replace` ile TÜM liste; değerler maskeli, geri okunmaz | `hosting_nodejs_list-environment-variables` |
+| Cron | Hesap düzeyinde (`hosting_cron-jobs_create`, standart 5 alanlı ifade). Hesapta mevcut tek iş `*/5 * * * *` (arsalog.com). Dakikalık (`* * * * *`) ifade şemada serbest, **canlıda denenmedi** | `hosting_cron-jobs_list` |
+| SSL | `active`, sağlayıcı `hssl`, ömür boyu, HTTPS yönlendirme açık, bitiş 2027-01-27 (otomatik yenilenir) | `hosting_websites_get-settings` |
+| CDN | **açık** (Hostinger CDN); sunucu önbelleği kapalı | `hosting_websites_get-settings` |
 
-## 2. Koddan yana durum
+**DNS (salt-okunur, `dns_records_list` + `dig`):** `@` ALIAS → `nexagrant.com.cdn.hstgr.net.`, `www` CNAME →
+`www.nexagrant.com.cdn.hstgr.net.`; MX `mx1/mx2.hostinger.com`; SPF Hostinger mail + Reach; DKIM `hostingermail-a/b/c`;
+DMARC `p=none`. Canlı yanıt: `HTTP/2 200`, `server: hcdn`, `x-hcdn-request-id: …-fra-edge6`, `x-hcdn-cache-status: DYNAMIC`;
+`http://` → 301 `https://`; `www` → 200.
 
-- Ürün adı tek yerden okunur: `src/lib/brand.ts` → `PRODUCT_NAME = 'NexaGrant'` (commit `c433d3e3`).
-- Alan adı koda zaten taşınmıştı (FO-233, `071cc341`): `AUTH_URL`, `NEXT_PUBLIC_APP_URL`, `SMTP_*` örnekleri `nexagrant.com`.
-- Üretim paketi hazır araçla çıkar: `deploy/cpanel/build-package.sh` (Next `output: 'standalone'`, Linux x86_64, Docker gerekir) + Passenger uyumlu `app.js` + worker için `worker.sh`.
-- **Bilerek adı değişmeyenler** (değişirse veri/oturum bozulur): cookie ve localStorage anahtarları, HMAC anahtar etiketleri, R2 kovası `fonbridge-evidence`, yedek dosya kalıbı `fonbridge-*.dump`, `fabrika_app` DB rolü. Tüzel kişi unvanı (Fonbridge Eğitim, Proje ve Danışmanlık Ltd. Şti.) ve KEP adresi şirket gerçeğidir, ürün adı değildir.
+**DNS ile uyum:** Cloud hosting'in Node.js uygulaması aynı vhost'un arkasında çalışır; `@`/`www` zaten bu sitenin
+CDN'ini gösteriyor. **Canlıya almada DNS değişikliği GEREKMEZ** (VPS planındaki A kaydı değişikliği bu hedefte yok).
+HTML yanıtları CDN'de `DYNAMIC` (önbelleğe alınmıyor); oturumlu sayfalar CDN'den başkasına sızmaz. Statik
+`/_next/static/*` dosyaları değişmez adlı (hash'li) olduğu için CDN önbelleği güvenlidir.
 
-## 3. Eski rehberle (`deploy/cpanel/*`, `docs/RELEASE_CHECKLIST.md`, `docs/SMTP-SUNUCU.md`) çelişenler
+### 1.1 Doğrulanamayanlar (canlı ölçüm onay gerektiriyor)
 
-Bu belgeler **Vulut cPanel** (`srv.iyisunucu.com.tr`, `/home/fonbridge`) için yazıldı. Hedef şimdi Hostinger.
+1. **Node 22'nin alt sürümü** (worker ≥ 22.18 ister). Ana sürüm 22 seçilip build başlatılınca build logu sürümü yazar.
+   22.x < 22.18 ise **24** seçilir. `worker.sh` < 22.18 ile çalışmayı reddeder ve log'a yazar (sessiz çökme yok).
+2. **Cron'un `node` yolu:** `worker.sh` sırasıyla `FB_NODE`, cPanel `nodevenv`, CloudLinux `/opt/alt/alt-nodejs{24,22}`,
+   `command -v node` dener. Hostinger'da hangisi var, ilk cron koşusunun logunda görünür.
+3. **Ön vekil sayısı (`TRUSTED_PROXY_HOPS`):** CDN + barındırma web sunucusu → beklenen `2`; runbook adım 7'de ölçülür.
+4. **Hostinger'ın `other` tipinde önceden derlenmiş paketi olduğu gibi çalıştırması:** arşiv yüklendikten sonra salt-okunur
+   `hosting_nodejs_build-settings-from-archive` ile önizlenir (adım 4).
+5. **Cloud Economy süreç/bellek sınırları** (Next standalone + worker aynı hesapta).
 
-| Eski varsayım | Şimdi | İş |
+## 2. Koddan ve dış servislerden yana durum
+
+### 2.1 Paket
+
+- Araç: `deploy/cpanel/build-package.sh <commit> <çıktı-dizini>` → `fonbridge-app-<kısa>.zip` + `SHA256SUMS`.
+  Docker `linux/amd64`, `node:22-bookworm-slim`; `git archive` ile yalnız commit içeriği girer, `.env` girmez.
+  Gizlilik kapısı (`privacy:publish-check`) kırmızıysa paket çıkmaz.
+- Zip doğrudan `public_html`'e açılır: `app.js` (giriş), `package.json` (bağımlılık yok, `build` no-op, `start: node app.js`),
+  `worker.sh`, `BUILD-INFO.txt`, `certs/` (Supabase CA), `app/` (Next standalone: `server.js`, `node_modules`, `.next`, `public`, `jobs-worker.cjs`).
+- Hostinger build ayarı: `node_version` 22 (ya da 24, bkz. §1.1-1), `app_type: other`, `root_directory: .`,
+  `entry_file: app.js`, `build_script: build`, `package_manager: npm`, `output_directory: .`.
+- **Gizlilik kapısı (FO-180) canlıya alma ENGELİ:** `build-package.sh`, `/privacy` metninde yer tutucu ya da demo değer
+  varken paket ÜRETMEZ (atlatma seçeneği yok, bilerek). 01.11.2026 ölçümü: 7 engel — vergi dairesi/no, MERSİS no,
+  VERBİS durumu, yurt dışı aktarım mekanizması, trafik logu saklama süresi (barındırma teyidi: Hostinger), yürürlük tarihi,
+  demo KEP adresi. Bunlar hukuk/şirket bilgisiyle doldurulmadan yüklenebilir paket çıkmaz.
+- Sağlık ucu: `GET /api/health` → `200 {"status":"ok"}`, `Cache-Control: no-store`; DB'ye ve oturuma dokunmaz.
+- Prisma motoru: `binaryTargets` içinde `rhel-openssl-3.0.x` var (CloudLinux 9 / RHEL uyumlu); sürücü adaptörü `pg`.
+
+### 2.2 Supabase (salt-okunur ölçüm, 01.11–02.11.2026)
+
+İki ayrı Supabase hesabı var; AgentSpace Supabase entegrasyonu yalnız birini görüyor.
+
+| Kalem | FonBridge canlı projesi (`.env.supabase.local`) | Entegrasyonun gördüğü proje |
 |---|---|---|
-| Barındırma Vulut, NS `ns1/ns2.iyisunucu.com.tr` | Hostinger, DNS Hostinger'da | `RELEASE_CHECKLIST.md` §0, §1.1–1.2 ve `SMTP-SUNUCU.md` güncellenmeli (bu kartta değiştirilmedi: patron kararı sonrası) |
-| Uygulama kökü `/home/fonbridge/fonbridge-app` | `/home/u605628300/...` (kesin yol hPanel'de belli olur) | `ENV-LISTESI.md` içindeki `sslrootcert=/home/fonbridge/...` yolları, `worker.sh` crontab satırı |
-| "Setup Node.js App" (cPanel Selector + Passenger) | Hostinger'ın Node.js uygulama aracı | `app.js` Passenger içindir. Hostinger'ın aracı Passenger kullanıyorsa aynen çalışır; kullanmıyorsa doğrudan `app/server.js` başlatılır (`PORT`/`HOSTNAME` ile). **Doğrulanmadı** |
-| SMTP `mail.nexagrant.com` (Vulut Exim) | Hostinger mail (`smtp.hostinger.com`, 465/SSL, kutu şifresi hPanel'de) | `SMTP_HOST` değişir; MX/SPF/DKIM zaten Hostinger'da. Sunucu adı Hostinger belgesinden teyit edilmeli |
-| `TRUSTED_PROXY_HOPS=1` (tek LiteSpeed) | Hostinger CDN + LiteSpeed olabilir | Canlıda `curl -sI` ile ölçülmeli; yanlışsa ziyaretçi formu IP sınırı yanlış IP'yi görür |
-| `SMTP_FROM` `FonBridge <...>` | `NexaGrant <info@nexagrant.com>` | `.env.example` bu kartta düzeltildi; `deploy/cpanel/ENV-LISTESI.md` satır 39 ayrıca düzeltilecek |
+| Bölge | **eu-west-1 (İrlanda)**, pooler `aws-0-eu-west-1.pooler.supabase.com:5432` | ap-northeast-1 (Tokyo), `pxojxhvsvadqqaqudiok` |
+| Sahibi | FonBridge (rename sonrası NexaGrant) | Başka bir ürün (`listings`, `orders`, `pickup_points` …) |
+| Postgres | 17.11 | 17.6 |
+| Uzantılar | `vector` 0.8.2 **kurulu**, `pgcrypto` 1.3 | `vector` kurulu değil |
+| Şema | `public` 76 tablo, 53'ünde RLS; `fabrika_private` şeması var | NexaGrant şeması yok |
+| Roller | `fabrika_migrate` (sahip), `fabrika_app` (uygulama), `fabrika_jobs` (worker) | — |
+| Migration | Düz `.sql` dosyaları `scripts/apply-migrations.sh` ile uygulanır (`_prisma_migrations` tablosu bu yolda yoktur) | — |
 
-## 4. Barındırmanın taşıyamadıkları (paylaşılan plan)
+Ölçüm `BEGIN READ ONLY … ROLLBACK` ile yapıldı; hiçbir şey yazılmadı.
 
-- **Postgres 16 + pgvector:** Hostinger'da yok. Önceki karar Supabase (`ENV-LISTESI.md`, `RELEASE_CHECKLIST.md` §3). Bu geçerli kalır; yeni bir şey gerekmez.
-- **Worker (graphile-worker):** uzun yaşayan süreç. Hostinger cron'u varsa `worker.sh` (flock'lı) her dakika başlatır, tıpkı cPanel'deki gibi. Cron'un dakikalık aralığı ve Node sürümü (worker ≥ 22.18) **doğrulanmadı**.
-- **Dosya yükleme:** R2 hesabı gerekir (PATRON KARARI K-2). Yoksa yükleme kapalı, site açılır.
+**Sonuç:** NexaGrant için **yeni Supabase projesi gerekmiyor**. Prod veritabanı FonBridge'in eu-west-1'deki canlı projesidir; veri AB içinde kalır.
+Tokyo projesi başka bir ürüne aittir ve **dokunulmaz**. Plan, PITR ve anahtar bilgileri entegrasyondan okunamaz; Supabase panelinden patron kontrol eder.
 
-## 5. Patrondan gereken kararlar
+### 2.3 Bilerek değişmeyen kimlikler
 
-1. **Node.js sürümü ve modeli:** hPanel'de uygulamayı oluştururken hangi Node sürümleri listeleniyor (22.18+ mı)? Yoksa web çalışır, worker çalışmaz.
-2. **Worker nerede koşacak:** Hostinger cron mu, ayrı makine mi (KURULUM.md K-1).
-3. **R2 (dosya deposu)** açılacak mı (K-2).
-4. **SMTP kutusu:** `info@` mi, ayrı `bildirim@` mi (K-3).
-5. **Canlı veritabanı:** Supabase prod projesi hazır mı; migration koşma onayı ve yedek (KURULUM.md §2).
-6. **Google OAuth:** izinli yönlendirme adresi `https://nexagrant.com/api/auth/callback/google` eklenmeli.
+- **keep.eu User-Agent:** `FonBridge/1.0 (+https://nexagrant.com/contact)` (K-574984 = A; Interact erişim anlaşması bu
+  UA'ya bağlı olabilir). Diğer adaptörler (`eurostars`, `tubitak`) `NexaGrant/1.0`.
+- Cookie/localStorage anahtarları, HMAC etiketleri, R2 kovası `fonbridge-evidence`, yedek kalıbı `fonbridge-*.dump`,
+  DB rolü `fabrika_app`, paket adı `fonbridge-app-*.zip`, worker env varsayılanı. Tüzel kişi unvanı şirket gerçeğidir.
 
-## 6. Önerilen sıra (hiçbiri bu kartta koşulmadı)
+## 3. Ortam değişkenleri
 
-1. FO-191 ve FO-275 `dev`'e merge (gate yeşil).
-2. `deploy/cpanel/build-package.sh <commit> <çıktı-dizini>` ile paket (Docker, `R2_PUBLIC_HOST` ya da `FB_NO_PUBLIC_ASSETS=1`). Gizlilik bildirimi kapısı (`privacy:publish-check`) kırmızıysa paket çıkmaz: bilerek.
-3. Staging: `staging.nexagrant.com` alt alan adı + ayrı uygulama; DB için ayrı Supabase dalı. Migration ve `pnpm rls:verify --require-db` orada.
-4. Yedek → canlı migration (patron onayı) → paket yükleme → ortam değişkenleri → başlatma.
-5. DNS'e dokunma: `@` ALIAS ve `www` CNAME zaten Hostinger'ı gösteriyor; MX/SPF/DKIM bozulmamalı.
-6. Doğrulama: `curl -sI https://nexagrant.com`, giriş, e-posta gönderimi, ziyaretçi formu. Repoda `/api/health` ucu **yok** (`src/app/api/health` bulunmuyor); dış kalp atışı/izleme için eklenmesi ayrı iş.
+Tam liste ve biçimler: `deploy/cpanel/ENV-LISTESI.md`. Hostinger'a özgü olanlar:
 
-## 7. Bilinmeyenler (varsayım)
+| Değişken | Değer / not |
+|---|---|
+| `AUTH_URL`, `NEXT_PUBLIC_APP_URL` | `https://nexagrant.com` (paket bu değerle derlenir) |
+| `DATABASE_URL` | `fabrika_app` rolü, `…?sslmode=verify-full&sslrootcert=/home/u605628300/domains/nexagrant.com/public_html/certs/supabase-prod-ca-2021.crt` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | `smtp.hostinger.com` / `465` / `true` |
+| `SMTP_USER` / `SMTP_FROM` | `info@nexagrant.com` / `NexaGrant <info@nexagrant.com>`; `SMTP_PASS` yalnız panelde |
+| `TRUSTED_PROXY_HOPS` | ölçülecek (beklenen `2`), adım 7 |
+| `PORT`, `HOSTNAME` | girilmez (barındırma verir; `app.js` 127.0.0.1'e bağlanır, gerekirse `FB_LISTEN_HOST`) |
+| Worker dosyası | `/home/u605628300/.nexagrant-worker.env` (600, `public_html` dışında); `JOBS_CRON_ENABLED=false` ile başlar |
 
-- Hostinger Node.js aracının Passenger kullanıp kullanmadığı, desteklenen sürümler, cron aralığı, süreç ve bellek sınırları (Cloud Economy planı).
-- `public_html` şu an ne yayınlıyor (okunmadı).
-- Bu planda dış Postgres'e (Supabase pooler) çıkış bağlantısının serbest olup olmadığı.
+Cron satırı (✋ adım 10):
+
+```
+* * * * * FB_WORKER_ENV=/home/u605628300/.nexagrant-worker.env /bin/bash /home/u605628300/domains/nexagrant.com/public_html/worker.sh
+```
+
+## 4. Canlıya alma runbook'u (12 adım)
+
+✋ = patron onayı olmadan koşulmaz. Her adımın geri alma yolu yazılıdır. Adımlar idempotenttir (tekrar koşmak zarar vermez).
+
+| # | Adım | Onay | Doğrulama | Geri alma |
+|---|---|---|---|---|
+| 1 | **Kararlar + engeller:** R2 açılsın mı (K-2), posta planı (deneme → ücretli), DMARC aşaması (§6); **gizlilik metni yer tutucuları** (§2.1, hukuk) | ✋ | karar kartları kapalı; `pnpm privacy:publish-check` yeşil | — |
+| 2 | **Yedek:** mevcut `public_html` (`default.php`) indirilir; aynı hesapta 15 site var (fonbridge.com, arsalog.com, hipervizyon.com …; Cloud Economy kaynağını paylaşırlar), yalnız bu vhost'a dokunulur | yok (okuma) | dosya yerelde, sha256 not edildi | — |
+| 3 | **Supabase prod (mevcut eu-west-1 projesi):** önce yedek (`pg_dump`, pgvector:pg17 konteyneri), sonra paketteki migration'lar `scripts/apply-migrations.sh` ile (sahip rolü, idempotent: 2. koşu da 0 çıkmalı), `pnpm db:rls`, `pnpm rls:verify` | ✋ | `apply-migrations.sh` 0 ile çıktı, `rls:verify` yeşil, `vector` kurulu | Ters sırada `apply-migrations.sh --down <dosya>`; gerekirse yedekten geri yükleme. Tokyo projesine **dokunulmaz** |
+| 4 | **Paket:** `R2_PUBLIC_HOST=… deploy/cpanel/build-package.sh <dev-commit> out/` (ya da `FB_NO_PUBLIC_ASSETS=1`); SHA256 kontrolü; arşivi `hosting_files_generate-upload-url` ile `public_html`'e yükle; `hosting_nodejs_build-settings-from-archive` ile önizle (salt-okunur) | ✋ yükleme | önizleme `other` / `app.js` diyor | Yüklenen zip'i sil; site henüz değişmedi |
+| 5 | **Ortam değişkenleri:** hPanel (ya da `replace-environment-variables`) ile §3 + ENV-LISTESI §1–2 | ✋ | `list-environment-variables` anahtar adları tam | Önceki liste boştu: listeyi boşalt |
+| 6 | **Build/başlat:** `hosting_nodejs_start-build` (node 22, `other`, `entry_file: app.js`, `build_script: build`, arşiv yolu); `hosting_get-deployment` ile `completed` olana kadar izle; logdaki `node -v` ≥ 22.18 değilse 24 ile yeniden | ✋ | `curl -sI https://nexagrant.com/api/health` → 200; `/` → 200/307 (dil yönlendirmesi) | Adım 2 yedeğini (`default.php`) geri yükle (static deploy) ya da önceki zip ile yeniden build |
+| 7 | **`TRUSTED_PROXY_HOPS` ölçümü:** geçici `xff.php` (yalnız `X-Forwarded-For` uzunluğunu yazan) ya da uygulama logu ile vekil sayısı bulunur, değer env'e girilir, dosya silinir | ✋ | ziyaretçi formu IP sınırı doğru IP'yi sayıyor | Değişkeni eski değere al; geçici dosyayı sil |
+| 8 | **Google OAuth:** Cloud Console'a `https://nexagrant.com/api/auth/callback/google` (+ takvim `…/api/calendar/callback`) eklenir | ✋ owner | Google ile giriş çalışıyor | URI'yi kaldır |
+| 9 | **SMTP testi:** `swaks --to <test> --server smtp.hostinger.com --port 465 --tls-on-connect --auth LOGIN --auth-user info@nexagrant.com --tls-verify` (parola sorulur, komut satırına yazılmaz) + uygulama içi deneme postası | yok | posta geldi, SPF/DKIM `pass` | — |
+| 10 | **Worker:** `/home/u605628300/.nexagrant-worker.env` (600, `JOBS_CRON_ENABLED=false`) + §3 cron satırı; ilk koşu logu (`~/fonbridge-logs/worker.log`) node yolu ve sürümü; sonra `JOBS_CRON_ENABLED=true` + `worker.sh stop` | ✋ | log'da worker başladı, `graphile_worker` şeması var, tek süreç (`flock`) | Cron işini sil (`hosting_cron-jobs_delete`), `worker.sh stop` |
+| 11 | **fonbridge.com → nexagrant.com 301:** fonbridge.com bu Hostinger hesabında addon site (`/home/u605628300/domains/fonbridge.com/public_html`). Şu an orada **canlı bir WordPress + WooCommerce sitesi ("Fon Bridge") çalışıyor**. DNS Hostinger'da, alan adının kayıt şirketi Squarespace (yalnız kayıt). 301 bu siteyi kapatır: **ayrı patron onayı** + önce site yedeği (dosyalar + WP veritabanı); sonra `hosting_redirects_create-website` (yol korunarak) + Search Console "adres değişikliği" | ✋ | `curl -sI https://fonbridge.com/x` → 301 `https://nexagrant.com/x` | Yönlendirmeyi sil; WP sitesi dosyaları değişmediyse kendiliğinden döner, değiştiyse yedekten |
+| 12 | **İzleme (ilk 48 saat):** dış uptime izleme `GET /api/health` (1 dk), `hosting_get-deployment`/uygulama logu, `SystemAlert` ekranı, `pnpm alerts:check`, Hostinger kaynak metriği (`listOrderResourceUsageMetrics`); HSTS önce `max-age=300` (RELEASE_CHECKLIST §5.4) | HSTS ✋ | 48 saat 5xx yok, worker log düzenli | HSTS satırını kaldır; adım 6 geri alma |
+
+**Genel geri alma:** DNS hiç değişmediği için geri dönüş, `public_html`'i adım 2 yedeğine döndürmek ve cron işini silmektir
+(dakikalar). Veritabanı tarafında geri dönüş adım 3'ün `--down` dosyaları ya da yedeğidir; Tokyo projesine hiçbir adım dokunmaz.
+
+## 5. Posta (SMTP)
+
+Gönderim `smtp.hostinger.com` (465, örtük TLS) üzerinden; MX/SPF/DKIM zaten Hostinger'da, değişiklik gerekmez.
+`info@nexagrant.com` kutusu Hostinger'ın **deneme** posta planında (31.10.2026 ölçümü, `is_trial: true`): ücretli plana
+geçiş patron kararıdır.
+
+## 6. DMARC aşamalı geçiş (✋ patron kararı, DNS yazması)
+
+1. Şimdi: `v=DMARC1; p=none; rua=mailto:info@nexagrant.com; adkim=r; aspf=r` (rapor toplama).
+2. 2–4 hafta sonra raporlar temizse `p=quarantine`, sonra `p=reject`.
+Geri alma: TXT kaydını `v=DMARC1; p=none` değerine döndür (TTL 3600).
+
+## 7. Bu belgede yapılmayanlar
+
+- Hostinger'a yükleme, env girme, build başlatma, cron kurma, DNS/SSL/CDN ayarı: **yok**.
+- Supabase'te proje açma, uzantı kurma, migration: **yok**.
+- Hiçbir şifre, token veya bağlantı adresi repoya ya da bu belgeye yazılmadı.
