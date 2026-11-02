@@ -667,6 +667,16 @@ describe('RAG personal-name exclusion (FO-363, K-575447)', () => {
     expect(alerts.some((a) => String(a.message).includes('RAG exclusion'))).toBe(true);
   });
 
+  test('an upstream outage does not raise the missing-id alert', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 403, statusText: 'Forbidden' })));
+    const res = await syncKeepEuData({ programmeIds: [305], apiKey: 'test-key' });
+    vi.unstubAllGlobals();
+
+    expect(res.upstreamOk).toBe(false);
+    expect(res.ragExclusionMissingCount).toBe(0);
+    expect(db.rows('systemAlert').some((a) => String(a.message).includes('RAG exclusion'))).toBe(false);
+  });
+
   test('a limited run does not warn about excluded ids that were cut by the limit', async () => {
     const res = await syncKeepEuData({
       records: [projectWithId('BGTR0300118'), projectWithId('BGTR0200037')],

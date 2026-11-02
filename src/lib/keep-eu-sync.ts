@@ -890,7 +890,8 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
 
   const excludedIds = new Set(options?.ragExcludeProjectIds ?? RAG_EXCLUDED_PROJECT_IDS);
   const upstreamIds = new Set(dataset.map((r) => r.projectId));
-  const missingExcluded = [...excludedIds].filter((id) => !upstreamIds.has(id));
+  // An upstream outage yields no data at all: that is not evidence that an id is missing.
+  const missingExcluded = upstreamOk && dataset.length > 0 ? [...excludedIds].filter((id) => !upstreamIds.has(id)) : [];
   // The database source only loads a batch, so a missing id there proves nothing; warn only on full upstream data.
   if (missingExcluded.length > 0 && source !== 'database' && !options?.limit) {
     await recordAlert({
