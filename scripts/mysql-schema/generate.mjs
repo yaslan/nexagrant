@@ -46,6 +46,9 @@ export function toMysqlSchema(source, decisions = []) {
   let inGenerator = false;
   let currentModel = null;
   const decided = new Map(decisions.filter((d) => d.status === 'DECIDED').map((d) => [`${d.model}.${d.field}`, d]));
+  // OPEN: kept as the Prisma default (VARCHAR(191) on mysql) with no @db line; the length is not proven
+  // and the column is a Faz 2 input (FO-375 rev. 7). Counted apart from PENDING so it stays visible.
+  const open = new Set(decisions.filter((d) => d.status === 'OPEN').map((d) => `${d.model}.${d.field}`));
   const applied = new Set();
 
   for (const line of source.split('\n')) {
@@ -100,6 +103,8 @@ export function toMysqlSchema(source, decisions = []) {
         next = next.replace(/^(\s+\w+\s+String\??)/, `$1 @db.${d.type}`);
         applied.add(key);
         stats.stringDecided += 1;
+      } else if (open.has(key)) {
+        stats.stringOpen = (stats.stringOpen ?? 0) + 1;
       } else {
         stats.stringPending += 1;
       }
@@ -211,17 +216,30 @@ export function toDownSql(initSql) {
 //   prisma/mysql/view-schema.prisma  second Prisma client: every reachable model is mapped to `v_<table>`
 //   prisma/mysql/views.sql           fabrika_current_tenant() + one view per reachable model
 //   prisma/mysql/views.down.sql      drops those views and the function
-// Classes (91 models, see the FO-375 report):
+// Classes (91 models; revision 7, FO-375 lead decision, measured per model in the report):
 //   tenant   (54) tenantId present      → v_<table> filters on fabrika_current_tenant()
-//   platform (5)  salt-okur platform    → ALGORITHM=TEMPTABLE, no filter, read-only use
-//   system   (32) everything else       → NO view. Reachable only through the table client
-//                                         (src/lib/system-scope.ts, İ-2 A, Faz 2). Its fields that
-//                                         point at a system model are dropped from the view schema,
-//                                         so the view client cannot reach it through relations.
+//   platform (16) read on a tenant's request path, or written from one → ALGORITHM=TEMPTABLE view,
+//                                         no filter. Writes never go through the view: they use the
+//                                         system scope (src/lib/system-scope.ts, Faz 2).
+//   system   (21) admin or job/ingest path only → NO view. Reachable only through the table client.
+//                                         Its fields that point at a system model are dropped from the
+//                                         view schema, so the view client cannot reach it via relations.
+// Rule (lead, istisnasız): "herkese açık veri = sistem tablosu" is NOT an exception. A table read on a
+// tenant request path is a platform view, whatever its data.
 // No GRANT exists (A-TEK): the tenant filter in the view is the isolation mechanism.
 
-export const PLATFORM_VIEW_MODELS = ['Plan', 'PlanVersion', 'PlanFeature', 'InterregRubric', 'InterregRubricCriterion'];
+export const PLATFORM_VIEW_MODELS = [
+  // rev. 6 (catalogue / plan data)
+  'Plan', 'PlanVersion', 'PlanFeature', 'InterregRubric', 'InterregRubricCriterion',
+  // rev. 7: EU public data read on request paths (api/v1/partners, api/cordis, calls pages)
+  'CordisProject', 'CordisOrganization', 'CordisParticipation', 'CordisProjectTopic',
+  'CordisPartnerProfile', 'CordisCoParticipation', 'Topic', 'PartnerSearchAnnouncement',
+  // rev. 7: tenant-less rows touched on request paths (login, profile, invitations, alerts)
+  'Tenant', 'User', 'SystemAlert',
+];
 export const EXPECTED_TENANT_MODELS = 54;
+export const EXPECTED_PLATFORM_MODELS = 16;
+export const EXPECTED_VIEW_COUNT = EXPECTED_TENANT_MODELS + EXPECTED_PLATFORM_MODELS; // 70
 export const EXPECTED_MODELS = 91;
 export const VIEW_CLIENT_OUTPUT = '../../node_modules/.prisma/client-mysql-view';
 export const VIEW_SCHEMA_PATH = resolve(ROOT, 'prisma/mysql/view-schema.prisma');
@@ -251,7 +269,36 @@ export function classifyModels(mysqlSchemaText) {
   }
   const missing = PLATFORM_VIEW_MODELS.filter((n) => result.get(n)?.kind !== 'platform');
   if (missing.length > 0) throw new Error(`platform view model(s) missing or tenant-scoped: ${missing.join(', ')}`);
+  if (count('platform') !== EXPECTED_PLATFORM_MODELS) {
+    throw new Error(`platform model count ${count('platform')}, expected ${EXPECTED_PLATFORM_MODELS}: classification drifted`);
+  }
   return result;
+}
+
+/**
+ * Pure: committed views.sql text + the classification → list of errors (empty = pass).
+ * The explicit expected-view-list gate (FO-375 rev. 7): every platform model must have exactly one
+ * `ALGORITHM=TEMPTABLE` view, every tenant model exactly one filtered view, and nothing else.
+ * A platform view deleted from the file fails here even if someone also regenerates the hash.
+ */
+export function checkViewList(viewsSqlText, mysqlSchemaText) {
+  const models = classifyModels(mysqlSchemaText);
+  const errors = [];
+  const created = [...viewsSqlText.matchAll(/^CREATE OR REPLACE (ALGORITHM=TEMPTABLE )?VIEW `v_(\w+)`/gm)];
+  const temptable = new Set(created.filter((m) => m[1]).map((m) => m[2]));
+  const filtered = new Set(created.filter((m) => !m[1]).map((m) => m[2]));
+  for (const [name, { mapped, kind }] of models) {
+    if (kind === 'system') {
+      if (temptable.has(mapped) || filtered.has(mapped)) errors.push(`system model ${name} must not have a view`);
+    } else if (kind === 'platform') {
+      if (!temptable.has(mapped)) errors.push(`platform view v_${mapped} (${name}) missing or not ALGORITHM=TEMPTABLE`);
+    } else if (!filtered.has(mapped)) {
+      errors.push(`tenant view v_${mapped} (${name}) missing or without the tenant filter`);
+    }
+  }
+  const total = created.length;
+  if (total !== EXPECTED_VIEW_COUNT) errors.push(`view count ${total}, expected ${EXPECTED_VIEW_COUNT}`);
+  return errors;
 }
 
 /** Pure: MariaDB schema text → view-client Prisma schema text (models mapped to v_<table>). */
@@ -412,7 +459,7 @@ function main() {
   const viewSchema = toViewSchema(text);
   const viewsSql = toViewsSql(text);
   const viewsDown = toViewsDownSql(text);
-  stats.views = (viewsSql.match(/^CREATE OR REPLACE VIEW/gm) ?? []).length;
+  stats.views = (viewsSql.match(/^CREATE OR REPLACE (ALGORITHM=TEMPTABLE )?VIEW/gm) ?? []).length;
   stats.platformViews = (viewsSql.match(/ALGORITHM=TEMPTABLE/g) ?? []).length;
 
   if (check) {
@@ -428,6 +475,11 @@ function main() {
     const committedKeyed = longTextInKeys(committedSchema);
     if (committedKeyed.length > 0) {
       console.error(`LONGTEXT column(s) used as a key or index in committed prisma/mysql/schema.prisma: ${committedKeyed.join(', ')}`);
+      process.exit(1);
+    }
+    const viewListErrors = checkViewList(committed(VIEWS_SQL_PATH) ?? '', committedSchema);
+    if (viewListErrors.length > 0) {
+      console.error(`expected view list violated in prisma/mysql/views.sql:\n  ${viewListErrors.join('\n  ')}`);
       process.exit(1);
     }
     if (committedSchema !== text) stale.push('prisma/mysql/schema.prisma');

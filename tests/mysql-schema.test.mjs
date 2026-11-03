@@ -7,6 +7,7 @@ import {
   EXPECTED_CI_BASE,
   SOURCE_PATH,
   ciColumns,
+  checkViewList,
   classifyModels,
   insensitiveFieldNames,
   longTextInKeys,
@@ -153,18 +154,35 @@ describe('toDownSql', () => {
 describe('view artifacts (real schema)', () => {
   const real = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8')).text;
 
-  it('classifies 91 models into 54 tenant, 5 platform, 32 system', () => {
+  it('classifies 91 models into 54 tenant, 16 platform, 21 system', () => {
     const models = classifyModels(real);
     const kinds = [...models.values()].map((m) => m.kind);
     expect(models.size).toBe(91);
     expect(kinds.filter((k) => k === 'tenant')).toHaveLength(54);
-    expect(kinds.filter((k) => k === 'platform')).toHaveLength(5);
-    expect(kinds.filter((k) => k === 'system')).toHaveLength(32);
+    expect(kinds.filter((k) => k === 'platform')).toHaveLength(16);
+    expect(kinds.filter((k) => k === 'system')).toHaveLength(21);
+  });
+
+  it('keeps the rev. 7 platform set: request-path reads and writes, and the system-only tables stay out', () => {
+    const models = classifyModels(real);
+    for (const n of ['CordisProject', 'CordisCoParticipation', 'Topic', 'Tenant', 'User', 'SystemAlert', 'PartnerSearchAnnouncement']) {
+      expect(models.get(n)?.kind).toBe('platform');
+    }
+    for (const n of ['TopicStat', 'RawFetch']) expect(models.get(n)?.kind).toBe('system');
+  });
+
+  it('checkViewList passes on the generated views and names a deleted platform view', () => {
+    const sql = toViewsSql(real);
+    expect(checkViewList(sql, real)).toEqual([]);
+    const mutant = sql.replace('CREATE OR REPLACE ALGORITHM=TEMPTABLE VIEW `v_Topic` AS SELECT * FROM `Topic`;\n', '');
+    const errors = checkViewList(mutant, real);
+    expect(errors.some((e) => e.includes('v_Topic'))).toBe(true);
+    expect(errors.some((e) => e.includes('view count 69'))).toBe(true);
   });
 
   it('maps every view model in the view schema and keeps system models out of it', () => {
     const view = toViewSchema(real);
-    expect(view.match(/^  @@map\("v_/gm)).toHaveLength(59);
+    expect(view.match(/^  @@map\("v_/gm)).toHaveLength(70);
     expect(view).toContain('output          = "../../node_modules/.prisma/client-mysql-view"');
     expect(view).toContain('@@map("v_Plan")');
   });
@@ -179,7 +197,7 @@ describe('view artifacts (real schema)', () => {
   it('drops every view and the function in the down script', () => {
     const down = toViewsDownSql(real);
     expect(down).toContain('DROP FUNCTION IF EXISTS `fabrika_current_tenant`;');
-    expect(down.match(/DROP VIEW IF EXISTS/g)).toHaveLength(59);
+    expect(down.match(/DROP VIEW IF EXISTS/g)).toHaveLength(70);
   });
 });
 

@@ -1275,7 +1275,7 @@ model Evidence {
   version            Int                  @default(1)
   
   // Cloudflare R2 Depolama Bilgileri
-  r2ObjectKey        String? @db.VarChar(191)              // tenantId/orgId/cat/hash.ext
+  r2ObjectKey        String?              // tenantId/orgId/cat/hash.ext
   fileBucket         String @db.LongText               @default("fonbridge-evidence")
   fileName           String? @db.LongText
   fileSizeBytes      Int?
