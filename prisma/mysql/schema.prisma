@@ -19,7 +19,7 @@ model Tenant {
   id            String @db.VarChar(128)   @id @default(cuid())
   name          String
   slug          String   @unique
-  country       String   // ISO-3166-1 alpha-2
+  country       String @db.LongText   // ISO-3166-1 alpha-2
   // TASK-MULV3JXS1AW5X — Turkish province, spelled as TR_PROVINCES
   // (src/lib/readiness/provinces.ts), the dictionary the scorecard and the
   // public-sector catalogue use. NULL = not given / not in Türkiye. A CHECK in
@@ -28,12 +28,12 @@ model Tenant {
   orgType       OrgType  @default(SME)
   pic           String?  // EU Participant Identification Code
   locale        String   @default("tr")
-  timezone      String   @default("Europe/Istanbul")
+  timezone      String @db.LongText   @default("Europe/Istanbul")
   settings      Json     @default("{}") // scoringWeights, gateRules, aiRegion...
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
-  deletionReason String?
+  deletionReason String? @db.LongText
 
   users         Membership[]
   workspaces    Workspace[]
@@ -82,14 +82,14 @@ model AgencyInviteCode {
   id        String @db.VarChar(128)    @id @default(cuid())
   tenantId  String @db.VarChar(128)
   codeHash  String    @unique
-  codeHint  String
+  codeHint  String @db.LongText
   label     String?
   maxUses   Int?
   usedCount Int       @default(0)
   expiresAt DateTime
   revokedAt DateTime?
-  revokedBy String?
-  createdBy String
+  revokedBy String? @db.LongText
+  createdBy String @db.LongText
   createdAt DateTime  @default(now())
   agency    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -112,14 +112,14 @@ model User {
   id            String @db.VarChar(128)   @id @default(cuid())
   email         String @db.VarChar(254)   @unique
   emailVerified DateTime?
-  image         String?
+  image         String? @db.LongText
   name          String?
   locale        String   @default("tr")
   isPlatformAdmin Boolean @default(false)
   // KVKK md.7/md.11 · GDPR art.17 — erasure grace period. See prisma/migrations/add-soft-delete.sql
   deletionRequestedAt DateTime?  // set when the subject asks for erasure; purge job scans this
   deletedAt     DateTime?        // soft-delete marker: hidden from the product, still restorable
-  deletionReason String?         // subject_request | policy | tenant_cascade
+  deletionReason String? @db.LongText         // subject_request | policy | tenant_cascade
   /// UTC day the `m4-stale-relationships` digest for this user was claimed,
   /// set BEFORE the mail goes (compare-and-set) so no second run can send a
   /// second digest the same day. m4-stale-digest-user-claim.sql
@@ -143,13 +143,13 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.LongText
+  access_token      String? @db.LongText
   expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
+  token_type        String? @db.LongText
+  scope             String? @db.LongText
+  id_token          String? @db.LongText
+  session_state     String? @db.LongText
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -212,7 +212,7 @@ model Workspace {
   slug      String
   createdAt DateTime @default(now())
   deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
-  deletionReason String?
+  deletionReason String? @db.LongText
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   opportunities Opportunity[]
   @@unique([tenantId, slug])
@@ -221,14 +221,14 @@ model Workspace {
 
 model TenantProfile {
   tenantId      String @db.VarChar(128)   @id
-  capabilities  String   // free text, used for embedding
+  capabilities  String @db.LongText   // free text, used for embedding
   keywords      Json
   naceCodes     Json
   trlRange      Json    // [min,max]
   preferredRoles Json // coordinator, tech_provider, pilot_site, dissemination...
   priorProjects Json     @default("[]")
   embedding     Json?
-  embeddingHash String?  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
+  embeddingHash String? @db.LongText  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
   updatedAt     DateTime @updatedAt
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -239,11 +239,11 @@ model ModuleCatalog {           // platform-level, seeded from manifests
   id          String @db.VarChar(64)  @id      // "M1".."M11"
   key         String  @unique
   name        String
-  version     String
+  version     String @db.LongText
   requires    Json
   recommends  Json
   planTiers   Json
-  addOnSku    String?
+  addOnSku    String? @db.LongText
   isActive    Boolean @default(true)
 }
 
@@ -260,7 +260,7 @@ model ModuleState {
   moduleId  String
   status    ModuleStatus @default(OFF)
   settings  Json         @default("{}")
-  changedBy String?
+  changedBy String? @db.LongText
   changedAt DateTime     @default(now())
   // FO-41: keeps the module entitled whatever the plan (M3 for pre-FO-41
   // Discover tenants). Set by migrations only; a trigger refuses fabrika_app.
@@ -280,9 +280,9 @@ model Plan {                    // projection of src/lib/billing/catalog.ts; see
   workspaces    Int
   aiCreditsMonthly Int
   modules       Json       // default ON modules
-  stripePriceMonthly String?
-  stripePriceYearly  String?
-  visibility    String  @default("public") // public | private | archived
+  stripePriceMonthly String? @db.LongText
+  stripePriceYearly  String? @db.LongText
+  visibility    String @db.LongText  @default("public") // public | private | archived
   versions      PlanVersion[]
   assignments   PlanAssignment[]
 }
@@ -303,7 +303,7 @@ model PlanVersion {
   aiCreditsMonthly Int
   modules       Json @default("[]") // modules granted by this version
   features      PlanFeature[]
-  publishedBy   String?        // user id who published this version
+  publishedBy   String? @db.LongText        // user id who published this version
   publishedAt   DateTime?      // when this version was published (immutable after)
   subscriptions Subscription[]
   createdAt     DateTime @default(now())
@@ -319,9 +319,9 @@ model PlanFeature {
   order         Int             // display order (1, 2, 3, ...)
   kind          String          // module | limit | text
   moduleId      String?         // if kind='module': module identifier (M1, M8, etc)
-  limitKey      String?         // if kind='limit': limit identifier (e.g. "seats", "credits")
-  textTr        String?         // if kind='text': Turkish label or description
-  textEn        String?         // if kind='text': English label or description
+  limitKey      String? @db.LongText         // if kind='limit': limit identifier (e.g. "seats", "credits")
+  textTr        String? @db.LongText         // if kind='text': Turkish label or description
+  textEn        String? @db.LongText         // if kind='text': English label or description
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
@@ -334,7 +334,7 @@ model PlanAssignment {
   plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   tenantId      String @db.VarChar(128)
   tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  assignedBy    String?        // user id who made the assignment
+  assignedBy    String? @db.LongText        // user id who made the assignment
   assignedAt    DateTime @default(now())
   note          String?        // reason or memo
   createdAt     DateTime @default(now())
@@ -349,21 +349,21 @@ model AddOnCatalog {
   monthlyCents  Int?
   oneTimeCents  Int?
   currency      String @default("EUR")
-  grantsModule  String?
+  grantsModule  String? @db.LongText
   grantsSeats   Int?
   grantsCredits Int?
   grantsWorkspaces Int?
-  stripePriceId String?
+  stripePriceId String? @db.LongText
 }
 
 model Subscription {
   tenantId          String @db.VarChar(128)   @id
   planId            String
   status            SubStatus @default(TRIALING)
-  billingInterval   String   @default("month") // month|year
-  provider          String   @default("stripe") // stripe|iyzico
-  providerCustomerId String?
-  providerSubId     String?
+  billingInterval   String @db.LongText   @default("month") // month|year
+  provider          String @db.LongText   @default("stripe") // stripe|iyzico
+  providerCustomerId String? @db.LongText
+  providerSubId     String? @db.LongText
   currentPeriodEnd  DateTime?
   seatsExtra        Int      @default(0)
   workspacesExtra   Int      @default(0)
@@ -375,10 +375,10 @@ model Subscription {
   // reasoning live in src/lib/billing/price-lock.ts. All five are nullable
   // together: a row with none of them is a subscription sold before the lock
   // existed and is priced at the shopfront tier, as it was.
-  lockedTierCode    String?   // campaign the rate came from, e.g. ILK5 (provenance)
+  lockedTierCode    String? @db.LongText   // campaign the rate came from, e.g. ILK5 (provenance)
   lockedPercentOff  Int?      // the rate honoured on renewal, whole percent
   lockedAmountMinor Int?      // what one period cost at that rate, minor units (rule 9)
-  lockedCurrency    String?   // currency of lockedAmountMinor
+  lockedCurrency    String? @db.LongText   // currency of lockedAmountMinor
   priceLockedAt     DateTime? // when the rate was locked
   planVersionId     String? @db.VarChar(128)  // current plan version (ADIM 2: checkout writes this)
   planVersion       PlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
@@ -401,7 +401,7 @@ model AddOn {
   tenantId       String @db.VarChar(128)
   sku            String
   quantity       Int      @default(1)
-  providerItemId String?
+  providerItemId String? @db.LongText
   startedAt      DateTime @default(now())
   endedAt        DateTime?
   subscription   Subscription @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
@@ -415,7 +415,7 @@ model LifetimeLicence {          // one-time "first 20 companies" purchase; the 
   sku               String   @default("lifetime-ultra")
   amountMinor       Int                // what was actually charged, minor units
   currency          String   @default("USD")
-  provider          String   @default("stripe")
+  provider          String @db.LongText   @default("stripe")
   providerEventId   String   @unique   // idempotency: one webhook event writes at most one licence
   providerSessionId String?  @unique   // idempotency: one checkout session writes at most one licence
   purchasedAt       DateTime @default(now())
@@ -442,20 +442,20 @@ model Invoice {                 // an invoice actually issued to a tenant; TASK-
   // document, so the invoice is not issued at all rather than issued wrong.
   fxRate             Decimal?  @db.Decimal(18, 6) // TCMB döviz alış kuru: 1 `currency` → TRY
   fxRateDate         DateTime? @db.Date           // publication date of the rate actually used; may precede `issuedAt` across a weekend or public holiday
-  fxRateSource       String?                      // where the rate came from, e.g. "TCMB"; never a guess
+  fxRateSource       String? @db.LongText                      // where the rate came from, e.g. "TCMB"; never a guess
   grandTotalTryMinor Int?                         // TL karşılığı of the payable grand total, minor units (CLAUDE.md rule 9)
   // The buyer's fiscal identity, frozen at issue time. An invoice must keep
   // saying who it was issued to even after the tenant renames itself or moves,
   // so these are a snapshot on the row and never a join to Tenant.
-  buyerName      String
-  buyerVknTckn   String             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
-  buyerTaxOffice String
-  buyerAddress   String
-  buyerCity      String
-  buyerCountry   String  @default("Türkiye")
+  buyerName      String @db.LongText
+  buyerVknTckn   String @db.LongText             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
+  buyerTaxOffice String @db.LongText
+  buyerAddress   String @db.LongText
+  buyerCity      String @db.LongText
+  buyerCountry   String @db.LongText  @default("Türkiye")
   lines         Json                // InvoiceLine[]; unit prices are minor units (CLAUDE.md rule 9)
-  profileId     String   @default("TICARIFATURA")  // TICARIFATURA | TEMELFATURA | EARSIVFATURA
-  invoiceType   String   @default("SATIS")         // SATIS | ISTISNA | TEVKIFAT
+  profileId     String @db.LongText   @default("TICARIFATURA")  // TICARIFATURA | TEMELFATURA | EARSIVFATURA
+  invoiceType   String @db.LongText   @default("SATIS")         // SATIS | ISTISNA | TEVKIFAT
   ettn          String   @unique    // the document's own UUID, assigned when the row is written
   // Set only once GİB has actually accepted the filing through an integrator.
   // NULL means the document was never filed: the exporter marks it as carrying
@@ -486,12 +486,12 @@ model Invoice {                 // an invoice actually issued to a tenant; TASK-
 /// missing fields instead.
 model TenantBillingIdentity {
   tenantId       String @db.VarChar(128)   @id
-  buyerName      String
-  buyerVknTckn   String             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
-  buyerTaxOffice String
-  buyerAddress   String
-  buyerCity      String
-  buyerCountry   String   @default("Türkiye")
+  buyerName      String @db.LongText
+  buyerVknTckn   String @db.LongText             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
+  buyerTaxOffice String @db.LongText
+  buyerAddress   String @db.LongText
+  buyerCity      String @db.LongText
+  buyerCountry   String @db.LongText   @default("Türkiye")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
   tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -502,7 +502,7 @@ model CreditLedger {
   tenantId  String @db.VarChar(128)
   delta     Int      // + grant, - usage
   reason    String   // monthly_grant | purchase | usage:M2 | refund
-  refId     String?
+  refId     String? @db.LongText
   /// `YYYY-MM` of the scheduled monthly grant (credits-monthly-grant job) and
   /// NULL on every other row. The unique key makes that job one grant per
   /// tenant per month however often it runs (ADR-0008 §6.2, TASK-MUMT3PGX5OK8P).
@@ -526,7 +526,7 @@ model PlatformSetting {
 model Programme {
   id        String @db.VarChar(64) @id          // "HE", "DEP", "EUROSTARS", "CETP", "DUT", "ERASMUS", "EIT", "EUREKA", "TUBITAK"
   name      String
-  sourceKey String             // adapter key
+  sourceKey String @db.LongText             // adapter key
   calls     Call[]
 }
 
@@ -549,7 +549,7 @@ model Topic {
   identifier     String   @unique // HORIZON-CL5-2026-09-D4-01
   title          String
   status         TopicStatus @default(FORTHCOMING)
-  typeOfAction   String?   // RIA IA CSA ...
+  typeOfAction   String? @db.LongText   // RIA IA CSA ...
   isLumpSum      Boolean  @default(false)
   isTwoStage     Boolean  @default(false)
   budgetPerProjectCents BigInt?
@@ -557,13 +557,13 @@ model Topic {
   deadlines      Json     // [{stage:1, at:"2026-09-15T17:00:00Z", tz:"Europe/Brussels"}]
   nextDeadlineAt DateTime?
   eligibility    Json     @default("{}") // { restricted: "EU_EEA_CH_ONLY" | null, countriesExcluded: [] , notes }
-  destination    String?
+  destination    String? @db.LongText
   keywords       Json
   description    String?  // expected outcomes + scope (from topicDetails)
-  sourceUrl      String?
-  rawHash        String?
+  sourceUrl      String? @db.LongText
+  rawHash        String? @db.LongText
   embedding      Json?
-  embeddingHash  String?  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
+  embeddingHash  String? @db.LongText  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
   fetchedAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   call           Call     @relation(fields: [callId], references: [id])
@@ -585,8 +585,8 @@ model TopicStat {                 // K3 — Horizon Dashboard imports (shared)
   id            String @db.VarChar(128) @id @default(cuid())
   topicId       String? @db.VarChar(128)
   topicPrefix   String            // e.g. HORIZON-CL5-2025-02-D4
-  country       String?           // null = all
-  orgType       String?
+  country       String? @db.LongText           // null = all
+  orgType       String? @db.LongText
   proposals     Int?
   funded        Int?
   successRate   Float?
@@ -601,7 +601,7 @@ model RawFetch {
   source    String
   key       String
   hash      String
-  storageUrl String?
+  storageUrl String? @db.LongText
   payload   Json?
   fetchedAt DateTime @default(now())
   @@index([source, key])
@@ -638,7 +638,7 @@ model BlogPost {
   id           String @db.VarChar(128)   @id @default(cuid())
   slug         String   @unique
   title        String
-  excerpt      String
+  excerpt      String @db.LongText
   /// Markdown subset rendered as React text nodes (no HTML) — see blog/[slug]/page.tsx.
   content      String
   category     String
@@ -649,10 +649,10 @@ model BlogPost {
   publishedAt  DateTime
   authorName   String?
   authorRole   String?
-  authorAvatar String?
-  image        String
+  authorAvatar String? @db.LongText
+  image        String @db.LongText
   featured     Boolean  @default(false)
-  createdById  String?
+  createdById  String? @db.LongText
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   @@index([publishedAt])
@@ -674,11 +674,11 @@ model PublicLead {
   district       String?
   /// `<orgType>.<15 answers>` (src/lib/readiness/share.ts); total and level are
   /// recomputed from it on the server, never taken from the client.
-  readinessCode  String?
+  readinessCode  String? @db.LongText
   readinessTotal Int?
-  readinessLevel String?
+  readinessLevel String? @db.LongText
   /// Version of the explicit-consent text the visitor ticked (src/lib/leads/public-lead.ts).
-  consentVersion String
+  consentVersion String @db.LongText
   consentAt      DateTime
   /// Funnel page the request came from, e.g. `fon-hazirlik`.
   source         String
@@ -714,20 +714,20 @@ model ExpertPreRegistration {
   expertiseAreas       Json
   roles                Json
   programmes           Json
-  projectCodes         String?
+  projectCodes         String? @db.LongText
   /// ORCID iD, upper-cased, checksum-validated (src/lib/expert-prereg/schema.ts).
-  orcid                String?
-  linkedinUrl          String?
+  orcid                String? @db.LongText
+  linkedinUrl          String? @db.LongText
   languages            Json
   referredBy           String?
-  utmSource            String?
-  utmMedium            String?
-  utmCampaign          String?
+  utmSource            String? @db.LongText
+  utmMedium            String? @db.LongText
+  utmCampaign          String? @db.LongText
   kvkkAcceptedAt       DateTime
   visibilityConsentAt  DateTime
   marketingConsentAt   DateTime?
   /// Version of the consent text the expert ticked; a server constant, never a client field.
-  consentTextVersion   String    @default("kvkk-v1")
+  consentTextVersion   String @db.LongText    @default("kvkk-v1")
   /// `tr` or `en`: the language of the verification mail and of the redirect after it.
   locale               String
   /// SHA-256 of the one-time verification token. The raw token exists only in the mail.
@@ -799,7 +799,7 @@ model ExpertFounderCounter {
 /// the K1 row is read and written with findFirst/create rather than an upsert on the compound key.
 model TopicMatch {
   id        String @db.VarChar(128)   @id @default(cuid())
-  tenantId  String
+  tenantId  String @db.VarChar(128)
   topicId   String @db.VarChar(128)
   /// The opportunity this G0 evidence belongs to; NULL on a topic-level K1 match row.
   opportunityId String? @db.VarChar(128)
@@ -816,8 +816,8 @@ model TopicMatch {
 
 model SavedSearch {
   id        String @db.VarChar(128)   @id @default(cuid())
-  tenantId  String
-  userId    String
+  tenantId  String @db.VarChar(128)
+  userId    String @db.LongText
   name      String
   filters   Json
   notify    Boolean  @default(true)
@@ -830,14 +830,14 @@ model SavedSearch {
 
 model CordisProject {
   id                 String @db.VarChar(64)     @id // CORDIS project id (PK)
-  rcn                String?
+  rcn                String? @db.LongText
   acronym            String?
   title              String
   objective          String?    @db.LongText
   status             String?
   framework          String     // HORIZON | H2020
   masterCall         String?
-  subCall            String?
+  subCall            String? @db.LongText
   fundingScheme      String?
   legalBasis         String?
   startDate          DateTime?
@@ -1127,7 +1127,7 @@ model PartnerSearchQuotaUsage {
 
 model Opportunity {
   id           String @db.VarChar(128)   @id @default(cuid())
-  tenantId     String
+  tenantId     String @db.VarChar(128)
   workspaceId  String @db.VarChar(128)
   topicId      String?
   title        String
@@ -1173,7 +1173,7 @@ enum OppStatus {
 
 model GateDecision {
   id            String @db.VarChar(128)   @id @default(cuid())
-  tenantId      String
+  tenantId      String @db.VarChar(128)
   opportunityId String @db.VarChar(128)
   gate          Gate
   passed        Boolean
@@ -1190,7 +1190,7 @@ model GateDecision {
 
 model ConsortiumSeat {
   id            String @db.VarChar(128)   @id @default(cuid())
-  tenantId      String
+  tenantId      String @db.VarChar(128)
   opportunityId String @db.VarChar(128)
   roleKey       String   // coordinator | research | industry | end_user | widening | dissemination | custom
   required      Boolean  @default(true)
@@ -1213,7 +1213,7 @@ enum SeatStatus {
 
 model PartnerOrg {                 // tenant-private orgs not in CORDIS
   id        String @db.VarChar(128)  @id @default(cuid())
-  tenantId  String
+  tenantId  String @db.VarChar(128)
   name      String
   country   String?
   orgType   String?
@@ -1225,7 +1225,7 @@ model PartnerOrg {                 // tenant-private orgs not in CORDIS
 
 model Proposal {
   id            String @db.VarChar(128)   @id @default(cuid())
-  tenantId      String
+  tenantId      String @db.VarChar(128)
   opportunityId String @db.VarChar(128)   @unique
   acronym       String?
   submittedAt   DateTime?
@@ -1241,7 +1241,7 @@ model Proposal {
 
 model Effort {
   id            String @db.VarChar(128)   @id @default(cuid())
-  tenantId      String
+  tenantId      String @db.VarChar(128)
   opportunityId String @db.VarChar(128)
   userId        String
   date          DateTime
@@ -1258,7 +1258,7 @@ model Effort {
 
 model Evidence {
   id                 String @db.VarChar(128)               @id @default(cuid())
-  tenantId           String
+  tenantId           String @db.VarChar(128)
   kind               String               // corporate | financial | certificate | infrastructure | performance | ethics | partner | personnel
   category           String               @default("certificate") // CAT-01 .. CAT-08
   title              String
@@ -1309,7 +1309,7 @@ model Evidence {
 
 model Claim {
   id                 String @db.VarChar(128)               @id @default(cuid())
-  tenantId           String
+  tenantId           String @db.VarChar(128)
   statement          String               @db.LongText
   statementEn        String?              @db.LongText
   confidenceScore    Float                @default(1.0)
@@ -1328,7 +1328,7 @@ model Claim {
 // follow a foreign key (TASK-MTU6HUB8FUHMG B-1).
 model ClaimEvidenceLink {
   id                 String @db.VarChar(128)               @id @default(cuid())
-  tenantId           String
+  tenantId           String @db.VarChar(128)
   claimId            String @db.VarChar(128)
   evidenceId         String @db.VarChar(128)
   isPrimary          Boolean              @default(true)
@@ -1343,7 +1343,7 @@ model ClaimEvidenceLink {
 
 model ProposalUsage {
   id                 String @db.VarChar(128)               @id @default(cuid())
-  tenantId           String
+  tenantId           String @db.VarChar(128)
   opportunityId      String
   evidenceId         String @db.VarChar(128)
   sectionKey         String               // "PartB_Sec3_2", "Annex_4", "ConceptNote_G0"
@@ -1359,7 +1359,7 @@ model ProposalUsage {
 
 model ConceptTemplate {             // platform + tenant templates
   id        String @db.VarChar(128)  @id @default(cuid())
-  tenantId  String? // null = platform
+  tenantId  String? @db.VarChar(128) // null = platform
   key       String  // cetp_pre, dut_pre, eurostars_summary, he_stage1_blind, eic_step1, hopon
   name      String
   schema    Json    // sections[] {key,labelKey,maxWords,promptKey}
@@ -1368,7 +1368,7 @@ model ConceptTemplate {             // platform + tenant templates
 
 model ConceptNote {
   id            String @db.VarChar(128)   @id @default(cuid())
-  tenantId      String
+  tenantId      String @db.VarChar(128)
   opportunityId String
   templateId    String
   content       Json     // {sectionKey: markdown}
@@ -1393,7 +1393,7 @@ model ConceptNote {
 /// went the other way and is retained, because there an approval is a signature.
 model Relationship {
   id             String @db.VarChar(128)   @id @default(cuid())
-  tenantId       String
+  tenantId       String @db.VarChar(128)
   organizationId String?  // CORDIS PIC
   partnerOrgId   String?
   kind           String   // partner | ncp | city | cluster | consultant | tto
@@ -1419,7 +1419,7 @@ model Relationship {
 
 model Interaction {
   id             String @db.VarChar(128)   @id @default(cuid())
-  tenantId       String
+  tenantId       String @db.VarChar(128)
   relationshipId String
   kind           String   // meeting | email | call | event
   at             DateTime
@@ -1433,7 +1433,7 @@ model Interaction {
 
 model SeatCandidate {
   id             String @db.VarChar(128) @id @default(cuid())
-  tenantId       String
+  tenantId       String @db.VarChar(128)
   seatId         String
   organizationId String?
   partnerOrgId   String?
@@ -1448,7 +1448,7 @@ model SeatCandidate {
 
 model AiUsageLog {
   id          String @db.VarChar(128)   @id @default(cuid())
-  tenantId    String
+  tenantId    String @db.VarChar(128)
   userId      String?
   module      String
   purpose     String
@@ -1467,7 +1467,7 @@ model AiUsageLog {
 
 model Document {
   id        String @db.VarChar(128)   @id @default(cuid())
-  tenantId  String?  // null = shared public (work programmes)
+  tenantId  String? @db.VarChar(128)  // null = shared public (work programmes)
   kind      String   // work_programme | topic | cordis_summary | tenant_upload
   title     String
   sourceUrl String?
@@ -1479,7 +1479,7 @@ model Document {
 model Chunk {
   id         String @db.VarChar(128) @id @default(cuid())
   documentId String @db.VarChar(128)
-  tenantId   String?
+  tenantId   String? @db.VarChar(128)
   ordinal    Int
   text       String
   embedding  Json?
@@ -1581,7 +1581,7 @@ enum NotificationType {
 // The v1.1 columns are all nullable or defaulted, so existing v1.0 rows and callers are unaffected.
 model Evaluation {
   id             String @db.VarChar(128)      @id @default(cuid())
-  tenantId       String
+  tenantId       String @db.VarChar(128)
   opportunityId  String @db.VarChar(128)
   opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   proposalId     String? @db.VarChar(128)     // v1.1 — set for PANEL evaluations
@@ -1607,7 +1607,7 @@ model Evaluation {
 // One assigned reviewer on a PANEL evaluation. A user may sit on an evaluation once.
 model Reviewer {
   id           String @db.VarChar(128)     @id @default(cuid())
-  tenantId     String
+  tenantId     String @db.VarChar(128)
   evaluationId String @db.VarChar(128)
   evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   userId       String @db.VarChar(128)
@@ -1625,7 +1625,7 @@ model Reviewer {
 // A weighted scoring axis of a PANEL evaluation. Weights are 0..1 and should sum to 1 per evaluation.
 model Criterion {
   id           String @db.VarChar(128)     @id @default(cuid())
-  tenantId     String
+  tenantId     String @db.VarChar(128)
   evaluationId String @db.VarChar(128)
   evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   name         String @db.VarChar(200)     // Innovation | Feasibility | Impact | Communication
@@ -1641,7 +1641,7 @@ model Criterion {
 // submittedAt stays null while the reviewer is still drafting.
 model Score {
   id          String @db.VarChar(128)    @id @default(cuid())
-  tenantId    String
+  tenantId    String @db.VarChar(128)
   reviewerId  String @db.VarChar(128)
   reviewer    Reviewer  @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
   criterionId String @db.VarChar(128)
@@ -1658,7 +1658,7 @@ model Score {
 
 model MeetingBrief {
   id                  String @db.VarChar(128)      @id @default(cuid())
-  tenantId            String
+  tenantId            String @db.VarChar(128)
   interactionId       String      @unique
   partnerName         String?
   content             String
@@ -1679,7 +1679,7 @@ model MeetingBrief {
 
 model CalendarConnection {
   id                String @db.VarChar(128)    @id @default(cuid())
-  tenantId          String
+  tenantId          String @db.VarChar(128)
   userId            String
   provider          String    // 'google' | 'outlook' | 'ics'
   externalId        String?   // Google: calendar ID, Outlook: mailbox address
@@ -1701,7 +1701,7 @@ model CalendarConnection {
 
 model FollowupDoc {
   id             String @db.VarChar(128)      @id @default(cuid())
-  tenantId       String
+  tenantId       String @db.VarChar(128)
   opportunityId  String @db.VarChar(128)
   opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   kind           String      // NDA, LOI, COMMITMENT, ESR_DEBRIEF, AWARD_PACK
@@ -1730,7 +1730,7 @@ model FollowupDoc {
 /// the record must outlive a change to the user row that made it.
 model DualApprovalStep {
   id            String @db.VarChar(128)      @id @default(cuid())
-  tenantId      String
+  tenantId      String @db.VarChar(128)
   followupDocId String @db.VarChar(128)
   followupDoc   FollowupDoc @relation(fields: [followupDocId], references: [id], onDelete: Cascade)
   department    String      // FINANCE | LEGAL
@@ -1746,7 +1746,7 @@ model DualApprovalStep {
 
 model ApplicationPart {
   id             String @db.VarChar(128)      @id @default(cuid())
-  tenantId       String
+  tenantId       String @db.VarChar(128)
   opportunityId  String @db.VarChar(128)
   opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   part           String      // PART_A, PART_B
@@ -1760,7 +1760,7 @@ model ApplicationPart {
 
 model TtoPortfolioItem {
   id           String @db.VarChar(128)   @id @default(cuid())
-  tenantId     String
+  tenantId     String @db.VarChar(128)
   title        String
   trl          Int      @default(5)
   patentStatus String   // pending | granted | licensed
@@ -1773,7 +1773,7 @@ model TtoPortfolioItem {
 
 model ApiKey {
   id          String @db.VarChar(128)    @id @default(cuid())
-  tenantId    String
+  tenantId    String @db.VarChar(128)
   name        String
   keyHash     String    @unique
   prefix      String
@@ -1850,7 +1850,7 @@ enum ApprovalStatus {
 /// get calibrated during the beta.
 model Feedback {
   id            String @db.VarChar(128)            @id @default(cuid())
-  tenantId      String
+  tenantId      String @db.VarChar(128)
   userId        String?
   workspaceSlug String?
   category      FeedbackCategory
@@ -1984,7 +1984,7 @@ model Consent {
   /// CLAUDE.md rule 1. The subject gives the disclosure to Fabrika, but the row
   /// is scoped to the tenant the account was provisioned into, so a tenant
   /// owner can audit their own members' records and no one else's.
-  tenantId String
+  tenantId String @db.VarChar(128)
 
   /// Deliberately NOT a foreign key, and deliberately NOT nulled on erasure —
   /// the same call, on the same basis, that §12 makes for
@@ -2170,7 +2170,7 @@ model InterregAnalysis {
 /// proportional 0..100 view (FO-187 §5.1) — an internal estimate, never official.
 model InterregAnalysisResult {
   id               String @db.VarChar(128)   @id @default(cuid())
-  tenantId         String
+  tenantId         String @db.VarChar(128)
   analysisId       String   @unique
   rawScore         Decimal  @db.Decimal(6, 1)
   score100         Decimal  @db.Decimal(4, 1)
@@ -2199,7 +2199,7 @@ model InterregAnalysisResult {
 /// (one of `allowedMarks`), with the strengths and weaknesses behind it.
 model InterregCriterionMark {
   id              String @db.VarChar(128)   @id @default(cuid())
-  tenantId        String
+  tenantId        String @db.VarChar(128)
   analysisId      String
   /// Copy of the analysis's rubricId, so the two FKs below can tie the criterion to it.
   rubricId        String

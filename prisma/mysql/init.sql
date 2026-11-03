@@ -3,17 +3,17 @@ CREATE TABLE `Tenant` (
     `id` VARCHAR(128) NOT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `slug` VARCHAR(191) NOT NULL,
-    `country` VARCHAR(191) NOT NULL,
+    `country` LONGTEXT NOT NULL,
     `province` VARCHAR(191) NULL,
     `orgType` ENUM('SME', 'LARGE', 'UNIVERSITY', 'RESEARCH', 'PUBLIC', 'NGO', 'CONSULTANCY', 'CLUSTER', 'MUNICIPALITY') NOT NULL DEFAULT 'SME',
     `pic` VARCHAR(191) NULL,
     `locale` VARCHAR(191) NOT NULL DEFAULT 'tr',
-    `timezone` VARCHAR(191) NOT NULL DEFAULT 'Europe/Istanbul',
+    `timezone` LONGTEXT NOT NULL DEFAULT 'Europe/Istanbul',
     `settings` JSON NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
     `deletedAt` DATETIME(3) NULL,
-    `deletionReason` VARCHAR(191) NULL,
+    `deletionReason` LONGTEXT NULL,
     `kind` ENUM('ORGANIZATION', 'AGENCY') NOT NULL DEFAULT 'ORGANIZATION',
     `agencyId` VARCHAR(128) NULL,
 
@@ -28,14 +28,14 @@ CREATE TABLE `AgencyInviteCode` (
     `id` VARCHAR(128) NOT NULL,
     `tenantId` VARCHAR(128) NOT NULL,
     `codeHash` VARCHAR(191) NOT NULL,
-    `codeHint` VARCHAR(191) NOT NULL,
+    `codeHint` LONGTEXT NOT NULL,
     `label` VARCHAR(191) NULL,
     `maxUses` INTEGER NULL,
     `usedCount` INTEGER NOT NULL DEFAULT 0,
     `expiresAt` DATETIME(3) NOT NULL,
     `revokedAt` DATETIME(3) NULL,
-    `revokedBy` VARCHAR(191) NULL,
-    `createdBy` VARCHAR(191) NOT NULL,
+    `revokedBy` LONGTEXT NULL,
+    `createdBy` LONGTEXT NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     UNIQUE INDEX `AgencyInviteCode_codeHash_key`(`codeHash`),
@@ -48,13 +48,13 @@ CREATE TABLE `User` (
     `id` VARCHAR(128) NOT NULL,
     `email` VARCHAR(254) NOT NULL,
     `emailVerified` DATETIME(3) NULL,
-    `image` VARCHAR(191) NULL,
+    `image` LONGTEXT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NULL,
     `locale` VARCHAR(191) NOT NULL DEFAULT 'tr',
     `isPlatformAdmin` BOOLEAN NOT NULL DEFAULT false,
     `deletionRequestedAt` DATETIME(3) NULL,
     `deletedAt` DATETIME(3) NULL,
-    `deletionReason` VARCHAR(191) NULL,
+    `deletionReason` LONGTEXT NULL,
     `staleDigestOn` DATE NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -71,13 +71,13 @@ CREATE TABLE `Account` (
     `type` VARCHAR(191) NOT NULL,
     `provider` VARCHAR(191) NOT NULL,
     `providerAccountId` VARCHAR(191) NOT NULL,
-    `refresh_token` VARCHAR(191) NULL,
-    `access_token` VARCHAR(191) NULL,
+    `refresh_token` LONGTEXT NULL,
+    `access_token` LONGTEXT NULL,
     `expires_at` INTEGER NULL,
-    `token_type` VARCHAR(191) NULL,
-    `scope` VARCHAR(191) NULL,
-    `id_token` VARCHAR(191) NULL,
-    `session_state` VARCHAR(191) NULL,
+    `token_type` LONGTEXT NULL,
+    `scope` LONGTEXT NULL,
+    `id_token` LONGTEXT NULL,
+    `session_state` LONGTEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -127,7 +127,7 @@ CREATE TABLE `Workspace` (
     `slug` VARCHAR(191) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `deletedAt` DATETIME(3) NULL,
-    `deletionReason` VARCHAR(191) NULL,
+    `deletionReason` LONGTEXT NULL,
 
     INDEX `Workspace_deletedAt_idx`(`deletedAt`),
     UNIQUE INDEX `Workspace_tenantId_slug_key`(`tenantId`, `slug`),
@@ -137,14 +137,14 @@ CREATE TABLE `Workspace` (
 -- CreateTable
 CREATE TABLE `TenantProfile` (
     `tenantId` VARCHAR(128) NOT NULL,
-    `capabilities` VARCHAR(191) NOT NULL,
+    `capabilities` LONGTEXT NOT NULL,
     `keywords` JSON NOT NULL,
     `naceCodes` JSON NOT NULL,
     `trlRange` JSON NOT NULL,
     `preferredRoles` JSON NOT NULL,
     `priorProjects` JSON NOT NULL,
     `embedding` JSON NULL,
-    `embeddingHash` VARCHAR(191) NULL,
+    `embeddingHash` LONGTEXT NULL,
     `updatedAt` DATETIME(3) NOT NULL,
 
     PRIMARY KEY (`tenantId`)
@@ -155,11 +155,11 @@ CREATE TABLE `ModuleCatalog` (
     `id` VARCHAR(64) NOT NULL,
     `key` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-    `version` VARCHAR(191) NOT NULL,
+    `version` LONGTEXT NOT NULL,
     `requires` JSON NOT NULL,
     `recommends` JSON NOT NULL,
     `planTiers` JSON NOT NULL,
-    `addOnSku` VARCHAR(191) NULL,
+    `addOnSku` LONGTEXT NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT true,
 
     UNIQUE INDEX `ModuleCatalog_key_key`(`key`),
@@ -173,7 +173,7 @@ CREATE TABLE `ModuleState` (
     `moduleId` VARCHAR(191) NOT NULL,
     `status` ENUM('OFF', 'DEV', 'PILOT', 'ON') NOT NULL DEFAULT 'OFF',
     `settings` JSON NOT NULL,
-    `changedBy` VARCHAR(191) NULL,
+    `changedBy` LONGTEXT NULL,
     `changedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `grandfathered` BOOLEAN NOT NULL DEFAULT false,
 
@@ -192,9 +192,9 @@ CREATE TABLE `Plan` (
     `workspaces` INTEGER NOT NULL,
     `aiCreditsMonthly` INTEGER NOT NULL,
     `modules` JSON NOT NULL,
-    `stripePriceMonthly` VARCHAR(191) NULL,
-    `stripePriceYearly` VARCHAR(191) NULL,
-    `visibility` VARCHAR(191) NOT NULL DEFAULT 'public',
+    `stripePriceMonthly` LONGTEXT NULL,
+    `stripePriceYearly` LONGTEXT NULL,
+    `visibility` LONGTEXT NOT NULL DEFAULT 'public',
 
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
@@ -212,7 +212,7 @@ CREATE TABLE `PlanVersion` (
     `workspaces` INTEGER NOT NULL,
     `aiCreditsMonthly` INTEGER NOT NULL,
     `modules` JSON NOT NULL,
-    `publishedBy` VARCHAR(191) NULL,
+    `publishedBy` LONGTEXT NULL,
     `publishedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -228,9 +228,9 @@ CREATE TABLE `PlanFeature` (
     `order` INTEGER NOT NULL,
     `kind` VARCHAR(191) NOT NULL,
     `moduleId` VARCHAR(191) NULL,
-    `limitKey` VARCHAR(191) NULL,
-    `textTr` VARCHAR(191) NULL,
-    `textEn` VARCHAR(191) NULL,
+    `limitKey` LONGTEXT NULL,
+    `textTr` LONGTEXT NULL,
+    `textEn` LONGTEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -243,7 +243,7 @@ CREATE TABLE `PlanAssignment` (
     `id` VARCHAR(128) NOT NULL,
     `planId` VARCHAR(64) NOT NULL,
     `tenantId` VARCHAR(128) NOT NULL,
-    `assignedBy` VARCHAR(191) NULL,
+    `assignedBy` LONGTEXT NULL,
     `assignedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `note` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -260,11 +260,11 @@ CREATE TABLE `AddOnCatalog` (
     `monthlyCents` INTEGER NULL,
     `oneTimeCents` INTEGER NULL,
     `currency` VARCHAR(191) NOT NULL DEFAULT 'EUR',
-    `grantsModule` VARCHAR(191) NULL,
+    `grantsModule` LONGTEXT NULL,
     `grantsSeats` INTEGER NULL,
     `grantsCredits` INTEGER NULL,
     `grantsWorkspaces` INTEGER NULL,
-    `stripePriceId` VARCHAR(191) NULL,
+    `stripePriceId` LONGTEXT NULL,
 
     PRIMARY KEY (`sku`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
@@ -274,18 +274,18 @@ CREATE TABLE `Subscription` (
     `tenantId` VARCHAR(128) NOT NULL,
     `planId` VARCHAR(191) NOT NULL,
     `status` ENUM('TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'PAUSED') NOT NULL DEFAULT 'TRIALING',
-    `billingInterval` VARCHAR(191) NOT NULL DEFAULT 'month',
-    `provider` VARCHAR(191) NOT NULL DEFAULT 'stripe',
-    `providerCustomerId` VARCHAR(191) NULL,
-    `providerSubId` VARCHAR(191) NULL,
+    `billingInterval` LONGTEXT NOT NULL DEFAULT 'month',
+    `provider` LONGTEXT NOT NULL DEFAULT 'stripe',
+    `providerCustomerId` LONGTEXT NULL,
+    `providerSubId` LONGTEXT NULL,
     `currentPeriodEnd` DATETIME(3) NULL,
     `seatsExtra` INTEGER NOT NULL DEFAULT 0,
     `workspacesExtra` INTEGER NOT NULL DEFAULT 0,
     `trialEndsAt` DATETIME(3) NULL,
-    `lockedTierCode` VARCHAR(191) NULL,
+    `lockedTierCode` LONGTEXT NULL,
     `lockedPercentOff` INTEGER NULL,
     `lockedAmountMinor` INTEGER NULL,
-    `lockedCurrency` VARCHAR(191) NULL,
+    `lockedCurrency` LONGTEXT NULL,
     `priceLockedAt` DATETIME(3) NULL,
     `planVersionId` VARCHAR(128) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -300,7 +300,7 @@ CREATE TABLE `AddOn` (
     `tenantId` VARCHAR(128) NOT NULL,
     `sku` VARCHAR(191) NOT NULL,
     `quantity` INTEGER NOT NULL DEFAULT 1,
-    `providerItemId` VARCHAR(191) NULL,
+    `providerItemId` LONGTEXT NULL,
     `startedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `endedAt` DATETIME(3) NULL,
 
@@ -316,7 +316,7 @@ CREATE TABLE `LifetimeLicence` (
     `sku` VARCHAR(191) NOT NULL DEFAULT 'lifetime-ultra',
     `amountMinor` INTEGER NOT NULL,
     `currency` VARCHAR(191) NOT NULL DEFAULT 'USD',
-    `provider` VARCHAR(191) NOT NULL DEFAULT 'stripe',
+    `provider` LONGTEXT NOT NULL DEFAULT 'stripe',
     `providerEventId` VARCHAR(191) NOT NULL,
     `providerSessionId` VARCHAR(191) NULL,
     `purchasedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -338,17 +338,17 @@ CREATE TABLE `Invoice` (
     `currency` VARCHAR(191) NOT NULL DEFAULT 'TRY',
     `fxRate` DECIMAL(18, 6) NULL,
     `fxRateDate` DATE NULL,
-    `fxRateSource` VARCHAR(191) NULL,
+    `fxRateSource` LONGTEXT NULL,
     `grandTotalTryMinor` INTEGER NULL,
-    `buyerName` VARCHAR(191) NOT NULL,
-    `buyerVknTckn` VARCHAR(191) NOT NULL,
-    `buyerTaxOffice` VARCHAR(191) NOT NULL,
-    `buyerAddress` VARCHAR(191) NOT NULL,
-    `buyerCity` VARCHAR(191) NOT NULL,
-    `buyerCountry` VARCHAR(191) NOT NULL DEFAULT 'Türkiye',
+    `buyerName` LONGTEXT NOT NULL,
+    `buyerVknTckn` LONGTEXT NOT NULL,
+    `buyerTaxOffice` LONGTEXT NOT NULL,
+    `buyerAddress` LONGTEXT NOT NULL,
+    `buyerCity` LONGTEXT NOT NULL,
+    `buyerCountry` LONGTEXT NOT NULL DEFAULT 'Türkiye',
     `lines` JSON NOT NULL,
-    `profileId` VARCHAR(191) NOT NULL DEFAULT 'TICARIFATURA',
-    `invoiceType` VARCHAR(191) NOT NULL DEFAULT 'SATIS',
+    `profileId` LONGTEXT NOT NULL DEFAULT 'TICARIFATURA',
+    `invoiceType` LONGTEXT NOT NULL DEFAULT 'SATIS',
     `ettn` VARCHAR(191) NOT NULL,
     `gibEnvelopeId` VARCHAR(191) NULL,
     `paymentRef` VARCHAR(191) NULL,
@@ -364,12 +364,12 @@ CREATE TABLE `Invoice` (
 -- CreateTable
 CREATE TABLE `TenantBillingIdentity` (
     `tenantId` VARCHAR(128) NOT NULL,
-    `buyerName` VARCHAR(191) NOT NULL,
-    `buyerVknTckn` VARCHAR(191) NOT NULL,
-    `buyerTaxOffice` VARCHAR(191) NOT NULL,
-    `buyerAddress` VARCHAR(191) NOT NULL,
-    `buyerCity` VARCHAR(191) NOT NULL,
-    `buyerCountry` VARCHAR(191) NOT NULL DEFAULT 'Türkiye',
+    `buyerName` LONGTEXT NOT NULL,
+    `buyerVknTckn` LONGTEXT NOT NULL,
+    `buyerTaxOffice` LONGTEXT NOT NULL,
+    `buyerAddress` LONGTEXT NOT NULL,
+    `buyerCity` LONGTEXT NOT NULL,
+    `buyerCountry` LONGTEXT NOT NULL DEFAULT 'Türkiye',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -382,7 +382,7 @@ CREATE TABLE `CreditLedger` (
     `tenantId` VARCHAR(128) NOT NULL,
     `delta` INTEGER NOT NULL,
     `reason` VARCHAR(191) NOT NULL,
-    `refId` VARCHAR(191) NULL,
+    `refId` LONGTEXT NULL,
     `grantPeriod` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -404,7 +404,7 @@ CREATE TABLE `PlatformSetting` (
 CREATE TABLE `Programme` (
     `id` VARCHAR(64) NOT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-    `sourceKey` VARCHAR(191) NOT NULL,
+    `sourceKey` LONGTEXT NOT NULL,
 
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
@@ -431,7 +431,7 @@ CREATE TABLE `Topic` (
     `identifier` VARCHAR(191) NOT NULL,
     `title` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `status` ENUM('FORTHCOMING', 'OPEN', 'CLOSED') NOT NULL DEFAULT 'FORTHCOMING',
-    `typeOfAction` VARCHAR(191) NULL,
+    `typeOfAction` LONGTEXT NULL,
     `isLumpSum` BOOLEAN NOT NULL DEFAULT false,
     `isTwoStage` BOOLEAN NOT NULL DEFAULT false,
     `budgetPerProjectCents` BIGINT NULL,
@@ -439,13 +439,13 @@ CREATE TABLE `Topic` (
     `deadlines` JSON NOT NULL,
     `nextDeadlineAt` DATETIME(3) NULL,
     `eligibility` JSON NOT NULL,
-    `destination` VARCHAR(191) NULL,
+    `destination` LONGTEXT NULL,
     `keywords` JSON NOT NULL,
     `description` VARCHAR(191) COLLATE utf8mb4_unicode_ci NULL,
-    `sourceUrl` VARCHAR(191) NULL,
-    `rawHash` VARCHAR(191) NULL,
+    `sourceUrl` LONGTEXT NULL,
+    `rawHash` LONGTEXT NULL,
     `embedding` JSON NULL,
-    `embeddingHash` VARCHAR(191) NULL,
+    `embeddingHash` LONGTEXT NULL,
     `fetchedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -460,8 +460,8 @@ CREATE TABLE `TopicStat` (
     `id` VARCHAR(128) NOT NULL,
     `topicId` VARCHAR(128) NULL,
     `topicPrefix` VARCHAR(191) NOT NULL,
-    `country` VARCHAR(191) NULL,
-    `orgType` VARCHAR(191) NULL,
+    `country` LONGTEXT NULL,
+    `orgType` LONGTEXT NULL,
     `proposals` INTEGER NULL,
     `funded` INTEGER NULL,
     `successRate` DOUBLE NULL,
@@ -478,7 +478,7 @@ CREATE TABLE `RawFetch` (
     `source` VARCHAR(191) NOT NULL,
     `key` VARCHAR(191) NOT NULL,
     `hash` VARCHAR(191) NOT NULL,
-    `storageUrl` VARCHAR(191) NULL,
+    `storageUrl` LONGTEXT NULL,
     `payload` JSON NULL,
     `fetchedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -507,17 +507,17 @@ CREATE TABLE `BlogPost` (
     `id` VARCHAR(128) NOT NULL,
     `slug` VARCHAR(191) NOT NULL,
     `title` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-    `excerpt` VARCHAR(191) NOT NULL,
+    `excerpt` LONGTEXT NOT NULL,
     `content` VARCHAR(191) NOT NULL,
     `category` VARCHAR(191) NOT NULL,
     `readMinutes` INTEGER NOT NULL,
     `publishedAt` DATETIME(3) NOT NULL,
     `authorName` VARCHAR(191) NULL,
     `authorRole` VARCHAR(191) NULL,
-    `authorAvatar` VARCHAR(191) NULL,
-    `image` VARCHAR(191) NOT NULL,
+    `authorAvatar` LONGTEXT NULL,
+    `image` LONGTEXT NOT NULL,
     `featured` BOOLEAN NOT NULL DEFAULT false,
-    `createdById` VARCHAR(191) NULL,
+    `createdById` LONGTEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -534,10 +534,10 @@ CREATE TABLE `PublicLead` (
     `organisation` VARCHAR(191) NOT NULL,
     `province` VARCHAR(191) NULL,
     `district` VARCHAR(191) NULL,
-    `readinessCode` VARCHAR(191) NULL,
+    `readinessCode` LONGTEXT NULL,
     `readinessTotal` INTEGER NULL,
-    `readinessLevel` VARCHAR(191) NULL,
-    `consentVersion` VARCHAR(191) NOT NULL,
+    `readinessLevel` LONGTEXT NULL,
+    `consentVersion` LONGTEXT NOT NULL,
     `consentAt` DATETIME(3) NOT NULL,
     `source` VARCHAR(191) NOT NULL,
     `locale` VARCHAR(191) NOT NULL,
@@ -563,18 +563,18 @@ CREATE TABLE `ExpertPreRegistration` (
     `expertiseAreas` JSON NOT NULL,
     `roles` JSON NOT NULL,
     `programmes` JSON NOT NULL,
-    `projectCodes` VARCHAR(191) NULL,
-    `orcid` VARCHAR(191) NULL,
-    `linkedinUrl` VARCHAR(191) NULL,
+    `projectCodes` LONGTEXT NULL,
+    `orcid` LONGTEXT NULL,
+    `linkedinUrl` LONGTEXT NULL,
     `languages` JSON NOT NULL,
     `referredBy` VARCHAR(191) NULL,
-    `utmSource` VARCHAR(191) NULL,
-    `utmMedium` VARCHAR(191) NULL,
-    `utmCampaign` VARCHAR(191) NULL,
+    `utmSource` LONGTEXT NULL,
+    `utmMedium` LONGTEXT NULL,
+    `utmCampaign` LONGTEXT NULL,
     `kvkkAcceptedAt` DATETIME(3) NOT NULL,
     `visibilityConsentAt` DATETIME(3) NOT NULL,
     `marketingConsentAt` DATETIME(3) NULL,
-    `consentTextVersion` VARCHAR(191) NOT NULL DEFAULT 'kvkk-v1',
+    `consentTextVersion` LONGTEXT NOT NULL DEFAULT 'kvkk-v1',
     `locale` VARCHAR(191) NOT NULL,
     `verifyTokenHash` VARCHAR(191) NULL,
     `verifyTokenExpiresAt` DATETIME(3) NULL,
@@ -618,7 +618,7 @@ CREATE TABLE `ExpertFounderCounter` (
 -- CreateTable
 CREATE TABLE `TopicMatch` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `topicId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NULL,
     `fitScore` DOUBLE NOT NULL,
@@ -635,8 +635,8 @@ CREATE TABLE `TopicMatch` (
 -- CreateTable
 CREATE TABLE `SavedSearch` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
-    `userId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
+    `userId` LONGTEXT NOT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `filters` JSON NOT NULL,
     `notify` BOOLEAN NOT NULL DEFAULT true,
@@ -650,14 +650,14 @@ CREATE TABLE `SavedSearch` (
 -- CreateTable
 CREATE TABLE `CordisProject` (
     `id` VARCHAR(64) NOT NULL,
-    `rcn` VARCHAR(191) NULL,
+    `rcn` LONGTEXT NULL,
     `acronym` VARCHAR(191) COLLATE utf8mb4_unicode_ci NULL,
     `title` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `objective` LONGTEXT COLLATE utf8mb4_unicode_ci NULL,
     `status` VARCHAR(191) NULL,
     `framework` VARCHAR(191) NOT NULL,
     `masterCall` VARCHAR(191) NULL,
-    `subCall` VARCHAR(191) NULL,
+    `subCall` LONGTEXT NULL,
     `fundingScheme` VARCHAR(191) NULL,
     `legalBasis` VARCHAR(191) NULL,
     `startDate` DATETIME(3) NULL,
@@ -910,7 +910,7 @@ CREATE TABLE `PartnerSearchQuotaUsage` (
 -- CreateTable
 CREATE TABLE `Opportunity` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `workspaceId` VARCHAR(128) NOT NULL,
     `topicId` VARCHAR(191) NULL,
     `title` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -933,7 +933,7 @@ CREATE TABLE `Opportunity` (
 -- CreateTable
 CREATE TABLE `GateDecision` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NOT NULL,
     `gate` ENUM('G0', 'G1', 'G2', 'G3', 'G4') NOT NULL,
     `passed` BOOLEAN NOT NULL,
@@ -952,7 +952,7 @@ CREATE TABLE `GateDecision` (
 -- CreateTable
 CREATE TABLE `ConsortiumSeat` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NOT NULL,
     `roleKey` VARCHAR(191) NOT NULL,
     `required` BOOLEAN NOT NULL DEFAULT true,
@@ -969,7 +969,7 @@ CREATE TABLE `ConsortiumSeat` (
 -- CreateTable
 CREATE TABLE `PartnerOrg` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `country` VARCHAR(191) NULL,
     `orgType` VARCHAR(191) NULL,
@@ -984,7 +984,7 @@ CREATE TABLE `PartnerOrg` (
 -- CreateTable
 CREATE TABLE `Proposal` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NOT NULL,
     `acronym` VARCHAR(191) COLLATE utf8mb4_unicode_ci NULL,
     `submittedAt` DATETIME(3) NULL,
@@ -1002,7 +1002,7 @@ CREATE TABLE `Proposal` (
 -- CreateTable
 CREATE TABLE `Effort` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `date` DATETIME(3) NOT NULL,
@@ -1019,7 +1019,7 @@ CREATE TABLE `Effort` (
 -- CreateTable
 CREATE TABLE `Evidence` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `kind` VARCHAR(191) NOT NULL,
     `category` VARCHAR(191) NOT NULL DEFAULT 'certificate',
     `title` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -1062,7 +1062,7 @@ CREATE TABLE `Evidence` (
 -- CreateTable
 CREATE TABLE `Claim` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `statement` LONGTEXT NOT NULL,
     `statementEn` LONGTEXT NULL,
     `confidenceScore` DOUBLE NOT NULL DEFAULT 1.0,
@@ -1077,7 +1077,7 @@ CREATE TABLE `Claim` (
 -- CreateTable
 CREATE TABLE `ClaimEvidenceLink` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `claimId` VARCHAR(128) NOT NULL,
     `evidenceId` VARCHAR(128) NOT NULL,
     `isPrimary` BOOLEAN NOT NULL DEFAULT true,
@@ -1091,7 +1091,7 @@ CREATE TABLE `ClaimEvidenceLink` (
 -- CreateTable
 CREATE TABLE `ProposalUsage` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(191) NOT NULL,
     `evidenceId` VARCHAR(128) NOT NULL,
     `sectionKey` VARCHAR(191) NOT NULL,
@@ -1105,7 +1105,7 @@ CREATE TABLE `ProposalUsage` (
 -- CreateTable
 CREATE TABLE `ConceptTemplate` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NULL,
+    `tenantId` VARCHAR(128) NULL,
     `key` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `schema` JSON NOT NULL,
@@ -1117,7 +1117,7 @@ CREATE TABLE `ConceptTemplate` (
 -- CreateTable
 CREATE TABLE `ConceptNote` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(191) NOT NULL,
     `templateId` VARCHAR(191) NOT NULL,
     `content` JSON NOT NULL,
@@ -1134,7 +1134,7 @@ CREATE TABLE `ConceptNote` (
 -- CreateTable
 CREATE TABLE `Relationship` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `organizationId` VARCHAR(191) NULL,
     `partnerOrgId` VARCHAR(191) NULL,
     `kind` VARCHAR(191) NOT NULL,
@@ -1158,7 +1158,7 @@ CREATE TABLE `Relationship` (
 -- CreateTable
 CREATE TABLE `Interaction` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `relationshipId` VARCHAR(191) NOT NULL,
     `kind` VARCHAR(191) NOT NULL,
     `at` DATETIME(3) NOT NULL,
@@ -1173,7 +1173,7 @@ CREATE TABLE `Interaction` (
 -- CreateTable
 CREATE TABLE `SeatCandidate` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `seatId` VARCHAR(191) NOT NULL,
     `organizationId` VARCHAR(191) NULL,
     `partnerOrgId` VARCHAR(191) NULL,
@@ -1189,7 +1189,7 @@ CREATE TABLE `SeatCandidate` (
 -- CreateTable
 CREATE TABLE `AiUsageLog` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `userId` VARCHAR(191) NULL,
     `module` VARCHAR(191) NOT NULL,
     `purpose` VARCHAR(191) NOT NULL,
@@ -1211,7 +1211,7 @@ CREATE TABLE `AiUsageLog` (
 -- CreateTable
 CREATE TABLE `Document` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NULL,
+    `tenantId` VARCHAR(128) NULL,
     `kind` VARCHAR(191) NOT NULL,
     `title` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `sourceUrl` VARCHAR(191) NULL,
@@ -1225,7 +1225,7 @@ CREATE TABLE `Document` (
 CREATE TABLE `Chunk` (
     `id` VARCHAR(128) NOT NULL,
     `documentId` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NULL,
+    `tenantId` VARCHAR(128) NULL,
     `ordinal` INTEGER NOT NULL,
     `text` VARCHAR(191) NOT NULL,
     `embedding` JSON NULL,
@@ -1282,7 +1282,7 @@ CREATE TABLE `Notification` (
 -- CreateTable
 CREATE TABLE `Evaluation` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NOT NULL,
     `proposalId` VARCHAR(128) NULL,
     `userId` VARCHAR(128) NULL,
@@ -1305,7 +1305,7 @@ CREATE TABLE `Evaluation` (
 -- CreateTable
 CREATE TABLE `Reviewer` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `evaluationId` VARCHAR(128) NOT NULL,
     `userId` VARCHAR(128) NOT NULL,
     `role` VARCHAR(191) NOT NULL DEFAULT 'evaluator',
@@ -1322,7 +1322,7 @@ CREATE TABLE `Reviewer` (
 -- CreateTable
 CREATE TABLE `Criterion` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `evaluationId` VARCHAR(128) NOT NULL,
     `name` VARCHAR(200) NOT NULL,
     `weight` DOUBLE NOT NULL DEFAULT 0,
@@ -1337,7 +1337,7 @@ CREATE TABLE `Criterion` (
 -- CreateTable
 CREATE TABLE `Score` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `reviewerId` VARCHAR(128) NOT NULL,
     `criterionId` VARCHAR(128) NOT NULL,
     `score` INTEGER NOT NULL,
@@ -1355,7 +1355,7 @@ CREATE TABLE `Score` (
 -- CreateTable
 CREATE TABLE `MeetingBrief` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `interactionId` VARCHAR(191) NOT NULL,
     `partnerName` VARCHAR(191) NULL,
     `content` VARCHAR(191) NOT NULL,
@@ -1373,7 +1373,7 @@ CREATE TABLE `MeetingBrief` (
 -- CreateTable
 CREATE TABLE `CalendarConnection` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `provider` VARCHAR(191) NOT NULL,
     `externalId` VARCHAR(191) NULL,
@@ -1394,7 +1394,7 @@ CREATE TABLE `CalendarConnection` (
 -- CreateTable
 CREATE TABLE `FollowupDoc` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NOT NULL,
     `kind` VARCHAR(191) NOT NULL,
     `version` INTEGER NOT NULL DEFAULT 1,
@@ -1411,7 +1411,7 @@ CREATE TABLE `FollowupDoc` (
 -- CreateTable
 CREATE TABLE `DualApprovalStep` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `followupDocId` VARCHAR(128) NOT NULL,
     `department` VARCHAR(191) NOT NULL,
     `actorUserId` VARCHAR(191) NOT NULL,
@@ -1428,7 +1428,7 @@ CREATE TABLE `DualApprovalStep` (
 -- CreateTable
 CREATE TABLE `ApplicationPart` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `opportunityId` VARCHAR(128) NOT NULL,
     `part` VARCHAR(191) NOT NULL,
     `content` JSON NULL,
@@ -1443,7 +1443,7 @@ CREATE TABLE `ApplicationPart` (
 -- CreateTable
 CREATE TABLE `TtoPortfolioItem` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `title` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `trl` INTEGER NOT NULL DEFAULT 5,
     `patentStatus` VARCHAR(191) NOT NULL,
@@ -1459,7 +1459,7 @@ CREATE TABLE `TtoPortfolioItem` (
 -- CreateTable
 CREATE TABLE `ApiKey` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `name` VARCHAR(191) COLLATE utf8mb4_unicode_ci NOT NULL,
     `keyHash` VARCHAR(191) NOT NULL,
     `prefix` VARCHAR(191) NOT NULL,
@@ -1517,7 +1517,7 @@ CREATE TABLE `ApprovalRequest` (
 -- CreateTable
 CREATE TABLE `Feedback` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `userId` VARCHAR(191) NULL,
     `workspaceSlug` VARCHAR(191) NULL,
     `category` ENUM('BUG', 'FEATURE_REQUEST', 'UX', 'PERFORMANCE', 'DATA_QUALITY', 'OTHER') NOT NULL,
@@ -1552,7 +1552,7 @@ CREATE TABLE `Feedback` (
 -- CreateTable
 CREATE TABLE `Consent` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `kind` ENUM('DISCLOSURE_ACK', 'TERMS_ACCEPTANCE', 'EXPLICIT_CONSENT') NOT NULL,
     `purpose` ENUM('ACCOUNT_REGISTRATION', 'CALENDAR_OAUTH') NOT NULL,
@@ -1648,7 +1648,7 @@ CREATE TABLE `InterregAnalysis` (
 -- CreateTable
 CREATE TABLE `InterregAnalysisResult` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `analysisId` VARCHAR(191) NOT NULL,
     `rawScore` DECIMAL(6, 1) NOT NULL,
     `score100` DECIMAL(4, 1) NOT NULL,
@@ -1672,7 +1672,7 @@ CREATE TABLE `InterregAnalysisResult` (
 -- CreateTable
 CREATE TABLE `InterregCriterionMark` (
     `id` VARCHAR(128) NOT NULL,
-    `tenantId` VARCHAR(191) NOT NULL,
+    `tenantId` VARCHAR(128) NOT NULL,
     `analysisId` VARCHAR(191) NOT NULL,
     `rubricId` VARCHAR(191) NOT NULL,
     `criterionId` VARCHAR(191) NOT NULL,
