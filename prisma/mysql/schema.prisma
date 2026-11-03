@@ -81,7 +81,7 @@ enum TenantKind {
 model AgencyInviteCode {
   id        String @db.VarChar(128)    @id @default(cuid())
   tenantId  String @db.VarChar(128)
-  codeHash  String    @unique
+  codeHash  String @db.VarChar(64)    @unique
   codeHint  String @db.LongText
   label     String? @db.LongText
   maxUses   Int?
@@ -685,7 +685,7 @@ model PublicLead {
   locale         String @db.LongText
   /// HMAC-SHA256 of the client IP under AUTH_SECRET — the per-IP rate limit only;
   /// the address itself is never stored. Deleted with the row.
-  ipHash         String?
+  ipHash         String? @db.VarChar(64)
   createdAt      DateTime @default(now())
   @@index([createdAt])
   @@index([email, createdAt])
@@ -731,14 +731,14 @@ model ExpertPreRegistration {
   /// `tr` or `en`: the language of the verification mail and of the redirect after it.
   locale               String @db.LongText
   /// SHA-256 of the one-time verification token. The raw token exists only in the mail.
-  verifyTokenHash      String?   @unique
+  verifyTokenHash      String? @db.VarChar(64)   @unique
   verifyTokenExpiresAt DateTime?
   /// Set once, on verification, for the first 100 verified experts (Kurucu Uzman). Unique: no duplicate number.
   founderNumber        Int?      @unique
   /// `pending` | `verified` | `disabled`.
   status               String    @default("pending")
   /// HMAC-SHA256 of the client IP under EXPERT_PREREG_IP_SALT: the per-IP limit only.
-  ipHash               String?
+  ipHash               String? @db.VarChar(64)
   /// Verification mails sent to this address in the current day window (FO-45 F5, EXPERT_PREREG_DAILY_MAIL_LIMIT).
   verifyMailCount      Int       @default(0)
   /// Start of the day window `verifyMailCount` counts from. NULL = no mail yet.
@@ -759,7 +759,7 @@ model ExpertPreRegistration {
 /// than 24 hours are deleted on every submission (register.ts). SYSTEM_WIDE, RLS off.
 model ExpertPreRegAttempt {
   id        String @db.VarChar(128)   @id @default(cuid())
-  ipHash    String
+  ipHash    String @db.VarChar(64)
   createdAt DateTime @default(now())
   @@index([createdAt])
   @@index([ipHash, createdAt])
@@ -1753,7 +1753,7 @@ model ApplicationPart {
   content        Json?       // Section tree, budget tables, etc.
   // SHA-256 (hex) of the partner portal token; the raw token is shown once and
   // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
-  magicTokenHash String?     @unique
+  magicTokenHash String? @db.VarChar(64)     @unique
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 }
@@ -1775,7 +1775,7 @@ model ApiKey {
   id          String @db.VarChar(128)    @id @default(cuid())
   tenantId    String @db.VarChar(128)
   name        String @db.LongText
-  keyHash     String    @unique
+  keyHash     String @db.VarChar(64)    @unique
   prefix      String @db.LongText
   lastUsedAt  DateTime?
   /// Per-key rate limit window (src/lib/api-auth.ts): when the current one-minute window began.
@@ -1793,7 +1793,7 @@ model Invitation {
   role      Role     @default(MEMBER)
   // SHA-256 (hex) of the invite link token; the raw token is shown once and
   // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
-  tokenHash String   @unique
+  tokenHash String @db.VarChar(64)   @unique
   expires   DateTime
   // Set when the link is accepted (single use, TASK-MUN2793A57Z9I); NULL while
   // pending. A re-invite of the same address clears it with the new token.

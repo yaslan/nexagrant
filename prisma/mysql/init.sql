@@ -27,7 +27,7 @@ CREATE TABLE `Tenant` (
 CREATE TABLE `AgencyInviteCode` (
     `id` VARCHAR(128) NOT NULL,
     `tenantId` VARCHAR(128) NOT NULL,
-    `codeHash` VARCHAR(191) NOT NULL,
+    `codeHash` VARCHAR(64) NOT NULL,
     `codeHint` LONGTEXT NOT NULL,
     `label` LONGTEXT NULL,
     `maxUses` INTEGER NULL,
@@ -541,7 +541,7 @@ CREATE TABLE `PublicLead` (
     `consentAt` DATETIME(3) NOT NULL,
     `source` LONGTEXT NOT NULL,
     `locale` LONGTEXT NOT NULL,
-    `ipHash` VARCHAR(191) NULL,
+    `ipHash` VARCHAR(64) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     INDEX `PublicLead_createdAt_idx`(`createdAt`),
@@ -576,11 +576,11 @@ CREATE TABLE `ExpertPreRegistration` (
     `marketingConsentAt` DATETIME(3) NULL,
     `consentTextVersion` LONGTEXT NOT NULL DEFAULT 'kvkk-v1',
     `locale` LONGTEXT NOT NULL,
-    `verifyTokenHash` VARCHAR(191) NULL,
+    `verifyTokenHash` VARCHAR(64) NULL,
     `verifyTokenExpiresAt` DATETIME(3) NULL,
     `founderNumber` INTEGER NULL,
     `status` VARCHAR(191) NOT NULL DEFAULT 'pending',
-    `ipHash` VARCHAR(191) NULL,
+    `ipHash` VARCHAR(64) NULL,
     `verifyMailCount` INTEGER NOT NULL DEFAULT 0,
     `verifyMailWindowStart` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -598,7 +598,7 @@ CREATE TABLE `ExpertPreRegistration` (
 -- CreateTable
 CREATE TABLE `ExpertPreRegAttempt` (
     `id` VARCHAR(128) NOT NULL,
-    `ipHash` VARCHAR(191) NOT NULL,
+    `ipHash` VARCHAR(64) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     INDEX `ExpertPreRegAttempt_createdAt_idx`(`createdAt`),
@@ -1432,7 +1432,7 @@ CREATE TABLE `ApplicationPart` (
     `opportunityId` VARCHAR(128) NOT NULL,
     `part` LONGTEXT NOT NULL,
     `content` JSON NULL,
-    `magicTokenHash` VARCHAR(191) NULL,
+    `magicTokenHash` VARCHAR(64) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -1461,7 +1461,7 @@ CREATE TABLE `ApiKey` (
     `id` VARCHAR(128) NOT NULL,
     `tenantId` VARCHAR(128) NOT NULL,
     `name` LONGTEXT COLLATE utf8mb4_unicode_ci NOT NULL,
-    `keyHash` VARCHAR(191) NOT NULL,
+    `keyHash` VARCHAR(64) NOT NULL,
     `prefix` LONGTEXT NOT NULL,
     `lastUsedAt` DATETIME(3) NULL,
     `rateWindowStartedAt` DATETIME(3) NULL,
@@ -1479,7 +1479,7 @@ CREATE TABLE `Invitation` (
     `email` VARCHAR(254) NOT NULL,
     `tenantId` VARCHAR(128) NOT NULL,
     `role` ENUM('TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER', 'WRITER', 'MEMBER', 'GUEST_PARTNER') NOT NULL DEFAULT 'MEMBER',
-    `tokenHash` VARCHAR(191) NOT NULL,
+    `tokenHash` VARCHAR(64) NOT NULL,
     `expires` DATETIME(3) NOT NULL,
     `acceptedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

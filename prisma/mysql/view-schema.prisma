@@ -31,7 +31,7 @@ enum TenantKind {
 model AgencyInviteCode {
   id        String @db.VarChar(128)    @id @default(cuid())
   tenantId  String @db.VarChar(128)
-  codeHash  String    @unique
+  codeHash  String @db.VarChar(64)    @unique
   codeHint  String @db.LongText
   label     String? @db.LongText
   maxUses   Int?
@@ -1110,7 +1110,7 @@ model ApplicationPart {
   content        Json?       // Section tree, budget tables, etc.
   // SHA-256 (hex) of the partner portal token; the raw token is shown once and
   // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
-  magicTokenHash String?     @unique
+  magicTokenHash String? @db.VarChar(64)     @unique
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   @@map("v_ApplicationPart")
@@ -1134,7 +1134,7 @@ model ApiKey {
   id          String @db.VarChar(128)    @id @default(cuid())
   tenantId    String @db.VarChar(128)
   name        String @db.LongText
-  keyHash     String    @unique
+  keyHash     String @db.VarChar(64)    @unique
   prefix      String @db.LongText
   lastUsedAt  DateTime?
   /// Per-key rate limit window (src/lib/api-auth.ts): when the current one-minute window began.
@@ -1153,7 +1153,7 @@ model Invitation {
   role      Role     @default(MEMBER)
   // SHA-256 (hex) of the invite link token; the raw token is shown once and
   // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
-  tokenHash String   @unique
+  tokenHash String @db.VarChar(64)   @unique
   expires   DateTime
   // Set when the link is accepted (single use, TASK-MUN2793A57Z9I); NULL while
   // pending. A re-invite of the same address clears it with the new token.
