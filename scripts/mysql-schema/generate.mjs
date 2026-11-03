@@ -22,7 +22,7 @@
 //   * `COLLATE utf8mb4_unicode_ci` → `COLLATE utf8mb4_bin` (default; case-insensitive search
 //     columns are set separately, see FO-375 step 4)
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -98,11 +98,71 @@ export function toMysqlSchema(source) {
   return { text, stats };
 }
 
+/**
+ * Field names that a `mode: 'insensitive'` search touches, read from the application source.
+ * Pure: takes the source texts. Matches `<field>: { contains: ..., mode: 'insensitive' }` on one line.
+ */
+export function insensitiveFieldNames(sourceTexts) {
+  const names = new Set();
+  const re = /(\w+):\s*\{\s*contains:[^}]*mode:\s*'insensitive'/g;
+  for (const text of sourceTexts) {
+    for (const m of text.matchAll(re)) names.add(m[1]);
+  }
+  return names;
+}
+
+/**
+ * Pure: MariaDB schema text → Set of "Table.column" that get utf8mb4_unicode_ci.
+ * A column qualifies when its field name is in `fieldNames`, it is a String scalar, and it is
+ * NEITHER unique NOR a primary key: a case-insensitive unique index would reject `A@x` after
+ * `a@x` where PostgreSQL accepts both, which is a behaviour change, not a search fix.
+ */
+export function ciColumns(mysqlSchemaText, fieldNames) {
+  const result = new Set();
+  const models = mysqlSchemaText.split(/^model /m).slice(1);
+  for (const block of models) {
+    const name = /^(\w+)\s*\{/.exec(block)?.[1];
+    if (!name) continue;
+    const mapped = /@@map\("([^"]+)"\)/.exec(block)?.[1] ?? name;
+    const uniqueFields = new Set();
+    for (const u of block.matchAll(/@@(?:unique|id)\(\[([^\]]+)\]/g)) {
+      for (const f of u[1].split(',')) uniqueFields.add(f.trim());
+    }
+    const fieldLines = block.split('\n').slice(1);
+    for (const line of fieldLines) {
+      const f = /^\s+(\w+)\s+String\??(?:\s|$)/.exec(line);
+      if (!f) continue;
+      const field = f[1];
+      if (/@unique\b|@id\b/.test(line) || uniqueFields.has(field)) continue;
+      if (!fieldNames.has(field)) continue;
+      const col = /@map\("([^"]+)"\)/.exec(line)?.[1] ?? field;
+      result.add(`${mapped}.${col}`);
+    }
+  }
+  return result;
+}
+
 /** Pure: raw `prisma migrate diff --script` stdout → MariaDB DDL (banner stripped). */
-export function toInitSql(diffStdout) {
+export function toInitSql(diffStdout, ciSet = new Set()) {
   const start = diffStdout.search(/^-- /m);
   if (start < 0) throw new Error('migrate diff produced no DDL');
-  const body = diffStdout.slice(start).replace(/COLLATE utf8mb4_unicode_ci/g, 'COLLATE utf8mb4_bin');
+  // Table default: binary. Search columns get their own collation below.
+  const lines = diffStdout.slice(start).replace(/COLLATE utf8mb4_unicode_ci/g, 'COLLATE utf8mb4_bin').split('\n');
+  let table = null;
+  const applied = new Set();
+  const out = lines.map((line) => {
+    const create = /^CREATE TABLE `([^`]+)`/.exec(line);
+    if (create) table = create[1];
+    else if (/^\)/.test(line)) table = null;
+    if (table === null) return line;
+    const col = /^(\s+`(\w+)`\s+)(VARCHAR\(\d+\)|CHAR\(\d+\)|LONGTEXT|TEXT)(?=\s)/.exec(line);
+    if (!col || !ciSet.has(`${table}.${col[2]}`)) return line;
+    applied.add(`${table}.${col[2]}`);
+    return line.replace(col[3], `${col[3]} COLLATE utf8mb4_unicode_ci`);
+  });
+  const missing = [...ciSet].filter((k) => !applied.has(k));
+  if (missing.length > 0) throw new Error(`collation target column(s) not in DDL: ${missing.join(', ')}`);
+  const body = out.join('\n');
   return body.endsWith('\n') ? body : `${body}\n`;
 }
 
@@ -134,9 +194,26 @@ function migrateDiffScript() {
   }
 }
 
+/** Reads every .ts/.tsx under src/ (the app code that issues insensitive searches). */
+function appSourceTexts() {
+  const texts = [];
+  const walk = (dir) => {
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const p = resolve(dir, ent.name);
+      if (ent.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(ent.name)) texts.push(readFileSync(p, 'utf8'));
+    }
+  };
+  walk(resolve(ROOT, 'src'));
+  return texts;
+}
+
 function main() {
   const check = process.argv.includes('--check');
   const { text, stats } = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8'));
+  const fieldNames = insensitiveFieldNames(appSourceTexts());
+  const ci = ciColumns(text, fieldNames);
+  stats.ciColumns = ci.size;
 
   if (check) {
     const stale = [];
@@ -148,7 +225,7 @@ function main() {
       }
     };
     if (committed(MYSQL_SCHEMA_PATH) !== text) stale.push('prisma/mysql/schema.prisma');
-    const init = toInitSql(migrateDiffScript());
+    const init = toInitSql(migrateDiffScript(), ci);
     if (committed(INIT_SQL_PATH) !== init) stale.push('prisma/mysql/init.sql');
     if (committed(DOWN_SQL_PATH) !== toDownSql(init)) stale.push('prisma/mysql/init.down.sql');
     if (stale.length > 0) {
@@ -161,7 +238,7 @@ function main() {
 
   mkdirSync(dirname(MYSQL_SCHEMA_PATH), { recursive: true });
   writeFileSync(MYSQL_SCHEMA_PATH, text);
-  const init = toInitSql(migrateDiffScript());
+  const init = toInitSql(migrateDiffScript(), ci);
   writeFileSync(INIT_SQL_PATH, init);
   writeFileSync(DOWN_SQL_PATH, toDownSql(init));
   console.log(`wrote prisma/mysql/{schema.prisma,init.sql,init.down.sql} (${JSON.stringify(stats)})`);
