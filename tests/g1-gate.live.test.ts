@@ -57,6 +57,11 @@ const tenants: string[] = [];
 
 async function opportunity(title: string): Promise<string> {
   const o = await admin!.opportunity.create({ data: { tenantId, workspaceId, title: `${RUN} ${title}`, stage: 'G0' } });
+  // These cases measure the seat conditions, so the G0 condition (NG-26) is met for all of them;
+  // tests/stage-move-gate.live.test.ts covers that one.
+  await admin!.gateDecision.create({
+    data: { tenantId, opportunityId: o.id, gate: 'G0', passed: true, inputs: {}, ruleVersion: '1.0', decidedBy: `${RUN}-fixture` },
+  });
   return o.id;
 }
 async function seat(opportunityId: string): Promise<string> {
