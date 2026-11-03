@@ -3,6 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
+  DECISIONS_PATH,
+  EXPECTED_CI_BASE,
   SOURCE_PATH,
   ciColumns,
   classifyModels,
@@ -59,7 +61,7 @@ describe('toMysqlSchema', () => {
 
   it('matches the FO-375 decision counts on the real schema (18 lists, 15 Text, 3 vectors)', () => {
     const { stats } = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8'));
-    expect(stats).toEqual({ listFields: 18, longText: 15, vectorFields: 3 });
+    expect(stats).toEqual({ listFields: 18, longText: 15, vectorFields: 3, stringDecided: 0, stringPending: 555 });
   });
 });
 
@@ -189,5 +191,52 @@ describe('toViewSchema: system models are unreachable from the view client', () 
     const types = [...view.matchAll(/^  \w+\s+(\w+)/gm)].map((m) => m[1]);
     expect(types.filter((t) => system.has(t))).toEqual([]);
     expect(view).not.toMatch(/^model (SystemThing|Session|Account)\b/m);
+  });
+});
+
+describe('String decisions (FO-375 lead rule: no bare String without a proven type)', () => {
+  const table = JSON.parse(readFileSync(DECISIONS_PATH, 'utf8')).decisions;
+  const decided = table.filter((d) => d.status === 'DECIDED');
+  const pending = table.filter((d) => d.status === 'PENDING');
+
+  it('has one entry per String field, each DECIDED with a type and evidence, or PENDING', () => {
+    expect(table.length).toBe(555);
+    expect(new Set(table.map((d) => `${d.model}.${d.field}`)).size).toBe(555);
+    for (const d of decided) {
+      expect(d.type).toMatch(/^(VarChar\(\d+\)|LongText)$/);
+      expect(d.evidence.length).toBeGreaterThanOrEqual(20);
+    }
+    for (const d of pending) expect(d.type ?? null).toBeNull();
+  });
+
+  it('applies a decided type with @db and counts the undecided fields as pending', () => {
+    const src = 'model Plan {\n  id String @id\n  name String\n}\n';
+    const { text, stats } = toMysqlSchema(src, [
+      { model: 'Plan', field: 'id', status: 'DECIDED', type: 'VarChar(64)', evidence: 'catalog key, seed-written only' },
+    ]);
+    expect(text).toContain('id String @db.VarChar(64)');
+    expect(text).toContain('name String\n');
+    expect(stats.stringDecided).toBe(1);
+    expect(stats.stringPending).toBe(1);
+  });
+
+  it('fails loudly when a decision matches no String field in the source', () => {
+    expect(() =>
+      toMysqlSchema('model Plan {\n  id String @id\n}\n', [
+        { model: 'Plan', field: 'gone', status: 'DECIDED', type: 'LongText', evidence: 'stale decision entry here' },
+      ]),
+    ).toThrow(/match no String field/);
+  });
+
+  it('the committed schema carries exactly the DECIDED types and leaves the PENDING ones as String', () => {
+    const { text, stats } = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8'), table);
+    expect(stats.stringDecided).toBe(decided.length);
+    expect(stats.stringPending).toBe(pending.length);
+    const committed = readFileSync(new URL('../prisma/mysql/schema.prisma', import.meta.url), 'utf8');
+    expect(committed).toBe(text);
+  });
+
+  it('pins the base-table _ci count (41 columns; the 16 view copies are inherited, not generated)', () => {
+    expect(EXPECTED_CI_BASE).toBe(41);
   });
 });

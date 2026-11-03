@@ -32,17 +32,26 @@ export const SOURCE_PATH = resolve(ROOT, 'prisma/schema.prisma');
 export const MYSQL_SCHEMA_PATH = resolve(ROOT, 'prisma/mysql/schema.prisma');
 export const INIT_SQL_PATH = resolve(ROOT, 'prisma/mysql/init.sql');
 export const DOWN_SQL_PATH = resolve(ROOT, 'prisma/mysql/init.down.sql');
+export const DECISIONS_PATH = resolve(ROOT, 'prisma/mysql/string-decisions.json');
+/** Pinned (FO-375): taban tablolarda `mode:'insensitive'` alanları _ci. Görünümlerdeki 16 kopya bunu miras alır. */
+export const EXPECTED_CI_BASE = 41;
 
 const LIST_FIELD = /^(\s*\w+\s+)(String|Int)\[\]((?:\s|$).*)$/;
 
 /** Pure: PostgreSQL schema text → MariaDB schema text. Throws if a PG-only construct survives. */
-export function toMysqlSchema(source) {
-  const stats = { listFields: 0, longText: 0, vectorFields: 0 };
+export function toMysqlSchema(source, decisions = []) {
+  const stats = { listFields: 0, longText: 0, vectorFields: 0, stringDecided: 0, stringPending: 0 };
   const out = [];
   let inDatasource = false;
   let inGenerator = false;
+  let currentModel = null;
+  const decided = new Map(decisions.filter((d) => d.status === 'DECIDED').map((d) => [`${d.model}.${d.field}`, d]));
+  const applied = new Set();
 
   for (const line of source.split('\n')) {
+    const modelStart = /^model (\w+) \{/.exec(line);
+    if (modelStart) currentModel = modelStart[1];
+    if (/^\}/.test(line)) currentModel = null;
     if (/^datasource db \{/.test(line)) {
       inDatasource = true;
       out.push(line, '  provider = "mysql"');
@@ -83,7 +92,24 @@ export function toMysqlSchema(source) {
       stats.longText += 1;
       next = next.replace(/@db\.Text\b/, '@db.LongText');
     }
+    const str = /^\s+(\w+)\s+String\??(\s|$)/.exec(next);
+    if (str && currentModel && !/@db\./.test(next)) {
+      const key = `${currentModel}.${str[1]}`;
+      const d = decided.get(key);
+      if (d) {
+        next = next.replace(/^(\s+\w+\s+String\??)/, `$1 @db.${d.type}`);
+        applied.add(key);
+        stats.stringDecided += 1;
+      } else {
+        stats.stringPending += 1;
+      }
+    }
     out.push(next);
+  }
+
+  const unapplied = [...decided.keys()].filter((k) => !applied.has(k));
+  if (unapplied.length > 0) {
+    throw new Error(`string decision(s) match no String field in the source: ${unapplied.join(', ')}`);
   }
 
   const text = out.join('\n');
@@ -328,10 +354,18 @@ function appSourceTexts() {
 
 function main() {
   const check = process.argv.includes('--check');
-  const { text, stats } = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8'));
+  const strictStrings = process.argv.includes('--strict-strings');
+  const decisions = JSON.parse(readFileSync(DECISIONS_PATH, 'utf8')).decisions;
+  const { text, stats } = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8'), decisions);
   const fieldNames = insensitiveFieldNames(appSourceTexts());
   const ci = ciColumns(text, fieldNames);
   stats.ciColumns = ci.size;
+  if (ci.size !== EXPECTED_CI_BASE) {
+    throw new Error(`_ci column count is ${ci.size}, pinned at ${EXPECTED_CI_BASE}; change EXPECTED_CI_BASE only with a reviewed decision`);
+  }
+  if (strictStrings && stats.stringPending > 0) {
+    throw new Error(`${stats.stringPending} String field(s) still PENDING in prisma/mysql/string-decisions.json (strict mode)`);
+  }
   const viewSchema = toViewSchema(text);
   const viewsSql = toViewsSql(text);
   const viewsDown = toViewsDownSql(text);
