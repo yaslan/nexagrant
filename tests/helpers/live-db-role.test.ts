@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isCi, isLocalDbUrl, requireRlsTestUrl, requireTestEnv, skipOrFailInCi, usedDatabaseName, type RawQueryable } from './live-db-role';
+import { assertAppConnection, isCi, isGithubActions, isLocalDbUrl, requireRlsTestUrl, requireTestEnv, skipOrFailInCi, usedDatabaseName, type RawQueryable } from './live-db-role';
 
 /**
  * İNCELEME-62 O-1 — these four decide whether a live suite in CI throws or
@@ -23,6 +23,19 @@ describe('isCi', () => {
   });
   it.each([[undefined], [''], ['0'], ['false'], [' False ']])('CI=%j is not', (v) => {
     expect(isCi(env({ CI: v }))).toBe(false);
+  });
+});
+
+describe('isGithubActions (FO-376: what opens a suite on a database named "fabrika")', () => {
+  it('is true only for GITHUB_ACTIONS=true', () => {
+    expect(isGithubActions(env({ GITHUB_ACTIONS: 'true' }))).toBe(true);
+  });
+  it.each([[undefined], [''], ['1'], ['yes'], ['TRUE'], ['false']])('GITHUB_ACTIONS=%j is not', (v) => {
+    expect(isGithubActions(env({ GITHUB_ACTIONS: v }))).toBe(false);
+  });
+  it.each([['true'], ['1'], ['yes']])('a hand-typed CI=%s alone is not (FO-371 measured it deleting rows)', (ci) => {
+    expect(isGithubActions(env({ CI: ci }))).toBe(false);
+    expect(isCi(env({ CI: ci }))).toBe(true);
   });
 });
 
@@ -205,5 +218,57 @@ describe('isLocalDbUrl', () => {
     ['not a url'],
   ])('%s is not', (url) => {
     expect(isLocalDbUrl(url)).toBe(false);
+  });
+});
+
+describe('assertAppConnection (FO-376: the second connection of partner-search-ingest)', () => {
+  /** Answers the identity query and the role query the helpers send. */
+  const app = (identity: { db: string; cluster: string }, role: { user: string; rolsuper: boolean; rolbypassrls: boolean }): RawQueryable => ({
+    $queryRawUnsafe: (async (query: string) => (query.includes('pg_control_system') ? [identity] : [role])) as RawQueryable['$queryRawUnsafe'],
+  });
+  const fixtures = app({ db: 'throwaway', cluster: 'c1' }, { user: 'fabrika', rolsuper: true, rolbypassrls: true });
+  const subject = { user: 'fabrika_app', rolsuper: false, rolbypassrls: false };
+
+  it('accepts an RLS-subject role on the fixtures database', async () => {
+    await expect(assertAppConnection(app({ db: 'throwaway', cluster: 'c1' }, subject), fixtures, 's')).resolves.toMatchObject({ user: 'fabrika_app' });
+  });
+
+  it.each([
+    ['rolsuper', { user: 'fabrika', rolsuper: true, rolbypassrls: true }],
+    ['rolbypassrls only', { user: 'bypasser', rolsuper: false, rolbypassrls: true }],
+  ])('refuses a privileged role (%s), in CI and locally alike', async (_label, role) => {
+    for (const ci of ['', 'true']) {
+      vi.stubEnv('CI', ci);
+      await expect(assertAppConnection(app({ db: 'throwaway', cluster: 'c1' }, role), fixtures, 's')).rejects.toThrow(/RLS does not apply to this role/);
+    }
+  });
+
+  it('refuses another database, naming both', async () => {
+    await expect(assertAppConnection(app({ db: 'fabrika', cluster: 'c1' }, subject), fixtures, 's')).rejects.toThrow(
+      /different databases \(DATABASE_URL: "throwaway".*DATABASE_URL_RLS_TEST: "fabrika"/,
+    );
+  });
+
+  it('refuses the same name on another cluster', async () => {
+    await expect(assertAppConnection(app({ db: 'throwaway', cluster: 'c2' }, subject), fixtures, 's')).rejects.toThrow(/different databases/);
+  });
+
+  it('checks the database before the role: a privileged role on the wrong database reports the database', async () => {
+    const wrongAndPrivileged = app({ db: 'fabrika', cluster: 'c1' }, { user: 'fabrika', rolsuper: true, rolbypassrls: true });
+    await expect(assertAppConnection(wrongAndPrivileged, fixtures, 's')).rejects.toThrow(/different databases/);
+  });
+
+  it('throws, not skips, when the connection cannot be read (nothing may be written through it unchecked)', async () => {
+    vi.stubEnv('CI', '');
+    const write = muteStderr();
+    const broken: RawQueryable = {
+      $queryRawUnsafe: (async () => {
+        throw new Error('password authentication failed for user "fabrika_app"');
+      }) as RawQueryable['$queryRawUnsafe'],
+    };
+    await expect(assertAppConnection(broken, fixtures, 's')).rejects.toThrow(
+      's: could not verify the second connection before writing through it (password authentication failed for user "fabrika_app")',
+    );
+    expect(write).not.toHaveBeenCalled();
   });
 });

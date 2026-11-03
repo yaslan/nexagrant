@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 import type { TenantTx } from '@/lib/db';
 import type { LlmCompletion, LlmGenerateOptions } from '@/lib/llm';
@@ -180,7 +180,7 @@ beforeAll(async () => {
     skipReason = 'could not read which database the RLS connection is on';
     return;
   }
-  if (dbName === 'fabrika' && !isCi()) {
+  if (dbName === 'fabrika' && !isGithubActions()) {
     skipReason = 'refusing to run the cross-tenant purge on the shared "fabrika" database';
     skipOrFailInCi(SUITE, skipReason);
     return;
