@@ -187,6 +187,13 @@ describe('refusing a line', () => {
     );
   });
 
+  it('refuses a catalogue sku the database does not show, rather than selling it from the catalogue', async () => {
+    listPublicPlans.mockResolvedValue([row('pro', 8_700, 74_700)]);
+    await expect(priceLineForTenant({ sku: 'plan-basic' }, NO_DISCOUNT_TIER, null)).rejects.toBeInstanceOf(
+      PlanNotAvailableError
+    );
+  });
+
   it('does not let a failed read become a purchase', async () => {
     // The listing degrades to "unmeasured". The *purchase* must not degrade at
     // all: a database that cannot say whether this tenant may buy a plan is not

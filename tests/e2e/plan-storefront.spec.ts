@@ -20,12 +20,16 @@ import { e2eAuthSecret } from './fixtures/auth-secret';
  *      price checkout charges — measured with a figure (`$777.00`) that appears
  *      nowhere in catalog.ts, so a passing assertion cannot be the old path.
  *   2. A plan turned private with no assignment disappears from the public page
- *      *and* is refused at checkout when its sku is posted by hand.
+ *      *and* is refused at checkout when its sku is posted by hand. These checks
+ *      use a plan this spec creates (`PLAN_ID`), never a seeded one: deleting
+ *      `basic`'s assignments here would delete real ones on a shared database
+ *      (FO-377). The same plan is first shown and sold while public, so its
+ *      later absence is about visibility and not about a broken fixture.
  *   3. The guard from TASK-MTR6Q2IODYQRC still holds on the new path: a request
  *      that names its own price is charged the server's.
  *
- * The fixture restores every row it changes, so the run leaves the database as
- * it found it.
+ * The fixture restores every row it changes and removes the plan it creates, so
+ * the run leaves the database as it found it.
  */
 
 const SHOTS = shotsDir('TASK-MTSHVKTSGC8A4-screenshots');
@@ -42,6 +46,12 @@ const STUDIO_YEARLY = 777_000;
 const STUDIO_MONTHLY_TEXT = /777[.,]00/;
 /** What catalog.ts would have quoted for Ultra monthly — must NOT appear. */
 const CATALOGUE_MONTHLY_TEXT = /147[.,]00/;
+
+/** The plan the visibility checks change. It exists only while this spec runs. */
+const PLAN_ID = 'e2e-storefront-plan';
+const PLAN_SKU = 'plan-e2e-storefront-plan';
+/** $333.00 / month. Neither catalog.ts nor the seed has this figure. */
+const OWN_PLAN_MONTHLY = 33_300;
 
 let ultraBefore: { monthlyCents: number; yearlyCents: number } | null = null;
 
@@ -84,6 +94,41 @@ function consent(page: Page) {
       'fabrika_cookie_consent',
       JSON.stringify({ necessary: true, analytics: true, marketing: true })
     );
+  });
+}
+
+/**
+ * Deletes only this spec's rows. Runs before each create too, so a run that was
+ * killed before its teardown cannot leave the next one a stale plan.
+ */
+async function removeOwnPlan(): Promise<void> {
+  await prisma.planAssignment.deleteMany({ where: { planId: 'e2e-storefront-plan' } });
+  await prisma.planVersion.deleteMany({ where: { planId: 'e2e-storefront-plan' } });
+  await prisma.plan.deleteMany({ where: { id: 'e2e-storefront-plan' } });
+}
+
+async function createOwnPlan(visibility: 'public' | 'private'): Promise<void> {
+  await removeOwnPlan();
+  const limits = { seats: 1, workspaces: 1, aiCreditsMonthly: 1, modules: [] };
+  await prisma.plan.create({
+    data: {
+      id: PLAN_ID,
+      name: 'E2E Storefront',
+      monthlyCents: OWN_PLAN_MONTHLY,
+      yearlyCents: OWN_PLAN_MONTHLY * 10,
+      visibility,
+      ...limits,
+      versions: {
+        create: {
+          version: 1,
+          status: 'published',
+          monthlyCents: OWN_PLAN_MONTHLY,
+          yearlyCents: OWN_PLAN_MONTHLY * 10,
+          publishedAt: new Date(),
+          ...limits,
+        },
+      },
+    },
   });
 }
 
@@ -183,15 +228,46 @@ test.describe('the studio price is the price the shopfront quotes and charges', 
   });
 });
 
-test.describe('a private plan is neither shown nor sold to a tenant it was not assigned to', () => {
+test.describe('a public plan is shown and sold, which is what makes its later absence mean something', () => {
   test.beforeAll(async () => {
-    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'private' WHERE "id" = 'basic'`;
-    // No PlanAssignment row: nobody has been given it.
-    await prisma.$executeRaw`DELETE FROM "PlanAssignment" WHERE "planId" = 'basic'`;
+    await createOwnPlan('public');
   });
 
   test.afterAll(async () => {
-    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'public' WHERE "id" = 'basic'`;
+    await removeOwnPlan();
+  });
+
+  test('it is on the public pricing page', async ({ page }) => {
+    await consent(page);
+    await page.goto('/tr/pricing');
+    await expect(page.getByTestId(`plan-card-${PLAN_ID}`)).toBeVisible();
+  });
+
+  test("it is on a tenant's billing panel", async ({ page, baseURL }) => {
+    await signIn(page, baseURL as string);
+    await consent(page);
+    await page.goto(BILLING_URL);
+    await expect(page.getByTestId(`settings-plan-card-${PLAN_ID}`)).toBeVisible();
+  });
+
+  test('checkout sells it at its published price', async ({ request }) => {
+    const response = await request.post('/api/billing/checkout', {
+      headers: await tenantHeaders(),
+      data: { items: [{ sku: PLAN_SKU, billingCycle: 'monthly' }] },
+    });
+    expect(response.status()).toBe(200);
+    expect((await response.json()).totalMinor).toBe(OWN_PLAN_MONTHLY);
+  });
+});
+
+test.describe('a private plan is neither shown nor sold to a tenant it was not assigned to', () => {
+  test.beforeAll(async () => {
+    // No PlanAssignment row: nobody has been given it.
+    await createOwnPlan('private');
+  });
+
+  test.afterAll(async () => {
+    await removeOwnPlan();
   });
 
   test('it is gone from the public pricing page', async ({ page }) => {
@@ -200,7 +276,7 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
     // Not vacuous: the other public plans are there, so the grid has rendered and the
     // missing card below is absent rather than not drawn yet.
     await expect(page.getByTestId('plan-card-pro')).toBeVisible();
-    await expect(page.getByTestId('plan-card-basic')).toHaveCount(0);
+    await expect(page.getByTestId(`plan-card-${PLAN_ID}`)).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/04-private-plan-hidden.png`, fullPage: true });
   });
 
@@ -211,16 +287,17 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
     // The pro card first: it proves the grid has rendered, so the count below is an
     // absence rather than a page that has not drawn yet.
     await expect(page.getByTestId('settings-plan-card-pro')).toBeVisible();
-    await expect(page.getByTestId('settings-plan-card-basic')).toHaveCount(0);
+    await expect(page.getByTestId(`settings-plan-card-${PLAN_ID}`)).toHaveCount(0);
     await page.getByTestId('settings-plan-card-pro').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/05-private-plan-hidden-panel.png` });
   });
 
   test('and it cannot be bought even when the sku is posted by hand', async ({ request }) => {
     // The separate measurement the card asks for. A hidden card proves nothing
-    // about the endpoint: before this task the same request answered 200 with
-    // `totalMinor: 4500`.
-    for (const sku of ['plan-basic', 'basic', 'BASIC']) {
+    // about the endpoint: before TASK-MTSHVKTSGC8A4 a private `basic` was sold
+    // for `totalMinor: 4500`. PLAN_ID is not in catalog.ts, so this cannot catch
+    // a checkout that falls back to the catalogue for a sku listed there (FO-377).
+    for (const sku of [PLAN_SKU, PLAN_ID, PLAN_ID.toUpperCase()]) {
       const response = await request.post('/api/billing/checkout', {
         headers: await tenantHeaders(),
         data: { items: [{ sku, billingCycle: 'monthly' }] },
@@ -246,23 +323,22 @@ test.describe('a private plan is neither shown nor sold to a tenant it was not a
 
 test.describe('a private plan assigned to a tenant is shown and sold to that tenant', () => {
   test.beforeAll(async () => {
-    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'private' WHERE "id" = 'basic'`;
-    await prisma.$executeRaw`INSERT INTO "PlanAssignment" ("id","planId","tenantId","assignedBy","updatedAt")
-       VALUES ('pa_e2e_storefront','basic',${TENANT_ID},'e2e-fixture',CURRENT_TIMESTAMP)
-       ON CONFLICT ("planId","tenantId") DO NOTHING`;
+    await createOwnPlan('private');
+    await prisma.planAssignment.create({
+      data: { planId: PLAN_ID, tenantId: TENANT_ID, assignedBy: 'e2e-fixture' },
+    });
   });
 
   test.afterAll(async () => {
-    await prisma.$executeRaw`DELETE FROM "PlanAssignment" WHERE "id" = 'pa_e2e_storefront'`;
-    await prisma.$executeRaw`UPDATE "Plan" SET "visibility" = 'public' WHERE "id" = 'basic'`;
+    await removeOwnPlan();
   });
 
   test('the assigned tenant sees it in its billing panel and can be quoted', async ({ page, baseURL }) => {
     await signIn(page, baseURL as string);
     await consent(page);
     await page.goto(BILLING_URL);
-    await expect(page.getByTestId('settings-plan-card-basic')).toBeVisible();
-    await page.getByTestId('settings-plan-card-basic').scrollIntoViewIfNeeded();
+    await expect(page.getByTestId(`settings-plan-card-${PLAN_ID}`)).toBeVisible();
+    await page.getByTestId(`settings-plan-card-${PLAN_ID}`).scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/06-private-plan-assigned-visible.png` });
   });
 
@@ -271,6 +347,6 @@ test.describe('a private plan assigned to a tenant is shown and sold to that ten
     await page.goto('/tr/pricing');
     // The grid has rendered once a public card is on it; only then is a count of 0 an absence.
     await expect(page.getByTestId('plan-card-pro')).toBeVisible();
-    await expect(page.getByTestId('plan-card-basic')).toHaveCount(0);
+    await expect(page.getByTestId(`plan-card-${PLAN_ID}`)).toHaveCount(0);
   });
 });
