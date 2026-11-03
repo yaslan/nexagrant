@@ -125,7 +125,13 @@ Lider kararındaki "Prisma `has` kullanımı yok" varsayımı **yanlıştı**: `
 - Kapı mutantları A ve B → exit 1 (yukarıda)
 - `npx vitest run tests/mysql-schema.test.mjs` → 8/8 geçti
 - `npx eslint scripts/mysql-schema/generate.mjs tests/mysql-schema.test.mjs` → exit 0
-- `pnpm gate` (izole): aşağıda ham çıktı eklenecek (push sırasında koşar)
+- `env -u CI -u DATABASE_URL FONBRIDGE_GATE_NO_CACHE=1 bash scripts/gate-isolated.sh pnpm gate` → **GATE_EXIT=0** (3. tur, `origin/dev` `92315c31` ile birleştirildikten sonra, merge commit `1ee87901`). Ham günlük: `/private/tmp/claude-501/-Users-macbook-alan-FONBRIDGE/ed80b82e-55d4-4a27-a334-7f0efd9e49f4/scratchpad/fo375-gate2.log`
+  - `Test Files 487 passed | 2 skipped (489)`, `Tests 6311 passed | 54 skipped (6365)`
+  - e2e: `475 passed (9.0m)`, `7 skipped`
+  - lint: `4 problems (0 errors, 4 warnings)`
+  - `check-orphan-alerts`: açık alarm 3, öksüz 0
+  - `gate-isolated] ok: pnpm finished on an isolated database`
+- Önceki turdaki gate (`GATE_EXIT=1`, 85 e2e kırığı) tarayıcı önbelleği eksikliğindendi (`browserType.launch`); bu turda tarayıcı kuruluyken geçti.
 
 ## Sonraki adım
 
