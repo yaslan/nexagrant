@@ -6,7 +6,7 @@ import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
  * mocks. Fixtures and read-backs go through the owner role.
  *
  * The run reads the shared `Topic` catalogue and writes `TopicMatch` rows, so
- * it refuses the shared `fabrika` database outside CI, like
+ * it refuses the shared `fabrika` database outside GitHub Actions, like
  * tests/invitation-retention.live.test.ts. Point DATABASE_URL /
  * DATABASE_URL_RLS_TEST at a throwaway database (recipe in
  * docs/agent-results/TASK-MULQL2NYKRGJX-se-fb.md).
@@ -42,7 +42,7 @@ import {
 } from '@/lib/scoring/topic-match';
 import { k1TopicMatchTask } from '@/lib/jobs/tasks/k1-topic-match';
 import type { JobHelpers } from 'graphile-worker';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -54,7 +54,7 @@ const REACHABLE =
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
-const SHARED = DB_NAME === 'fabrika' && !isCi();
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
 if (SHARED) skipOrFailInCi(SUITE, 'the run writes TopicMatch for every tenant; refusing the shared "fabrika" database');
 const HAS_DB = DB_NAME !== undefined && !SHARED;
 

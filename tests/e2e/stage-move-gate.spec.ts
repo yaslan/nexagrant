@@ -21,6 +21,7 @@ const WORKSPACE = 'stage-move-e2e-workspace';
 const SLUG = 'stage-move-e2e';
 const USER = 'stage-move-e2e-user';
 const EMAIL = 'stage-move-e2e@fabrika.test';
+const FIXTURE = 'stage-move-e2e-fixture';
 const SHOTS = shotsDir('NG-25-screenshots');
 
 const OPP = {
@@ -66,8 +67,11 @@ async function seed() {
       data: { id, tenantId: TENANT, workspaceId: WORKSPACE, title: id, stage: STARTING_STAGE[id] ?? 'G0' },
     });
   }
-  // The real G1 conditions: a filled critical seat and a backup candidate.
+  // The real G1 conditions: G0 passed, a filled critical seat and a backup candidate.
   for (const id of [OPP.boardReady, OPP.detailReady]) {
+    await prisma.gateDecision.create({
+      data: { tenantId: TENANT, opportunityId: id, gate: 'G0', passed: true, inputs: {}, ruleVersion: '1.0', decidedBy: FIXTURE },
+    });
     const seat = await prisma.consortiumSeat.create({
       data: { tenantId: TENANT, opportunityId: id, roleKey: 'research', status: 'CONFIRMED', organizationId: `${id}-org` },
     });
@@ -80,7 +84,11 @@ async function seed() {
 const stageOf = async (id: string) =>
   (await prisma.opportunity.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage;
 const decisionsOf = (id: string) =>
-  prisma.gateDecision.findMany({ where: { opportunityId: id }, select: { gate: true, passed: true, decidedBy: true } });
+  prisma.gateDecision.findMany({
+    where: { opportunityId: id },
+    orderBy: { decidedAt: 'asc' },
+    select: { gate: true, passed: true, decidedBy: true },
+  });
 
 async function openBoard(page: Page) {
   await signInAs(page, { id: USER, email: EMAIL, role: 'TENANT_OWNER', tenantId: TENANT });
@@ -134,7 +142,7 @@ test.describe('NG-25: forward stage moves go through the gate', () => {
     const refused = page.getByTestId('pipeline-move-refused');
     await expect(refused).toBeVisible({ timeout: 30_000 });
     await expect(refused).toContainText(OPP.boardBlocked);
-    await expect(refused).toContainText('no critical seat');
+    await expect(refused).toContainText('tanımlı kritik rol yok');
     await expect(card(page, 'G0', OPP.boardBlocked)).toBeVisible();
     await expect(card(page, 'G1', OPP.boardBlocked)).toHaveCount(0);
     await expect(page.getByText('aşamasına taşındı')).toHaveCount(0);
@@ -159,7 +167,10 @@ test.describe('NG-25: forward stage moves go through the gate', () => {
     await page.screenshot({ path: `${SHOTS}/NG-25-02-board-advanced.png`, fullPage: true });
 
     expect(await stageOf(OPP.boardReady)).toBe('G1');
-    expect(await decisionsOf(OPP.boardReady)).toEqual([{ gate: 'G1', passed: true, decidedBy: USER }]);
+    expect(await decisionsOf(OPP.boardReady)).toEqual([
+      { gate: 'G0', passed: true, decidedBy: FIXTURE },
+      { gate: 'G1', passed: true, decidedBy: USER },
+    ]);
   });
 
   test('board, skipping a stage: refused before any gate runs', async ({ page }) => {
@@ -200,7 +211,7 @@ test.describe('NG-25: forward stage moves go through the gate', () => {
     const result = main.getByTestId('pipeline-gate-result');
     await expect(result).toBeVisible({ timeout: 30_000 });
     await expect(result).toContainText('G1 kapısı geçilmedi; fırsat G0 aşamasında kaldı.');
-    await expect(result).toContainText('no critical seat');
+    await expect(result).toContainText('tanımlı kritik rol yok');
     await page.screenshot({ path: `${SHOTS}/NG-25-05-detail-refused.png`, fullPage: true });
 
     expect(await stageOf(OPP.detailBlocked)).toBe('G0');
@@ -220,7 +231,10 @@ test.describe('NG-25: forward stage moves go through the gate', () => {
     await page.screenshot({ path: `${SHOTS}/NG-25-06-detail-advanced.png`, fullPage: true });
 
     expect(await stageOf(OPP.detailReady)).toBe('G1');
-    expect(await decisionsOf(OPP.detailReady)).toEqual([{ gate: 'G1', passed: true, decidedBy: USER }]);
+    expect(await decisionsOf(OPP.detailReady)).toEqual([
+      { gate: 'G0', passed: true, decidedBy: FIXTURE },
+      { gate: 'G1', passed: true, decidedBy: USER },
+    ]);
   });
 
   test('detail button on the last stage: disabled, and says why', async ({ page }) => {

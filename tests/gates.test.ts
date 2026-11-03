@@ -84,6 +84,42 @@ const OPPORTUNITIES: Record<string, Record<string, unknown>> = {
  * fixture breaks exactly one thing about it, so a failure names the condition that caught it.
  */
 const SEATED = 'org-seated';
+/**
+ * A G0 decision per G1 fixture: the fixtures below measure the seat conditions, so all of them have
+ * passed G0. The `opp-g1-g0-*` ones and `opp-g1-no-g0` break this condition instead.
+ */
+type G0DecisionRow = { id: string; tenantId: string; opportunityId: string; passed: boolean; decidedAt: number; deletedAt: Date | null };
+const g0Row = (opportunityId: string, passed: boolean, decidedAt = 1, over: Partial<G0DecisionRow> = {}): G0DecisionRow => ({
+  id: `${opportunityId}-${decidedAt}`,
+  tenantId: 'tenant-1',
+  opportunityId,
+  passed,
+  decidedAt,
+  deletedAt: null,
+  ...over,
+});
+const G0_DECISIONS: G0DecisionRow[] = [
+  ...[
+    'opp-g1-ready',
+    'opp-g1-no-seats',
+    'opp-g1-no-required',
+    'opp-g1-open',
+    'opp-g1-invited',
+    'opp-g1-nobody',
+    'opp-g1-no-backup',
+    'opp-g1-only-occupant',
+    'opp-g1-foreign-backup',
+    'opp-g1-optional-open',
+    'opp-g1-two-faults',
+  ].map((id) => g0Row(id, true)),
+  g0Row('opp-g1-g0-failed', false),
+  g0Row('opp-g1-g0-pass-then-fail', true, 1),
+  g0Row('opp-g1-g0-pass-then-fail', false, 2),
+  g0Row('opp-g1-g0-fail-then-pass', false, 1),
+  g0Row('opp-g1-g0-fail-then-pass', true, 2),
+  g0Row('opp-g1-g0-erased-pass', true, 1, { deletedAt: new Date(0) }),
+  g0Row('opp-g1-g0-foreign-pass', true, 1, { tenantId: 'tenant-2' }),
+];
 const seatRow = (id: string, over: Record<string, unknown> = {}) => ({
   id,
   roleKey: 'research',
@@ -111,6 +147,16 @@ Object.assign(OPPORTUNITIES, {
     'opp-g1-ready',
     [seatRow('s-coord', { roleKey: 'coordinator' }), seatRow('s-research')],
     'coordinator',
+  ),
+  ...Object.fromEntries(
+    [
+      'opp-g1-no-g0',
+      'opp-g1-g0-failed',
+      'opp-g1-g0-pass-then-fail',
+      'opp-g1-g0-fail-then-pass',
+      'opp-g1-g0-erased-pass',
+      'opp-g1-g0-foreign-pass',
+    ].map((id) => [id, g1Opportunity(id, [seatRow('s-research')])]),
   ),
   'opp-g1-no-seats': g1Opportunity('opp-g1-no-seats', [], 'coordinator'),
   'opp-g1-no-required': g1Opportunity('opp-g1-no-required', [seatRow('s-optional-only', { required: false })]),
@@ -237,7 +283,23 @@ vi.mock('../src/lib/db', () => {
           ),
         ),
       },
-      gateDecision: { create: vi.fn().mockResolvedValue({ id: 'decision-1' }) },
+      gateDecision: {
+        create: vi.fn().mockResolvedValue({ id: 'decision-1' }),
+        // Honours the clauses it is given and picks the first row of the ordering, so a query that
+        // drops `tenantId` or `deletedAt` picks up the wrong row here as it would in Postgres.
+        findFirst: vi.fn(
+          ({ where }: { where: { tenantId?: string; opportunityId: string; gate: string; deletedAt?: null } }) => {
+            const rows = G0_DECISIONS.filter(
+              (d) =>
+                (!where.tenantId || d.tenantId === where.tenantId) &&
+                d.opportunityId === where.opportunityId &&
+                where.gate === 'G0' &&
+                (where.deletedAt !== null || d.deletedAt === null),
+            ).sort((a, b) => b.decidedAt - a.decidedAt);
+            return Promise.resolve(rows[0] ?? null);
+          },
+        ),
+      },
   };
   return {
     prisma,
@@ -441,6 +503,54 @@ describe('Gate Evaluation Engine — G3 evaluation scores', () => {
         if (inputs[key] !== undefined) expect(Number.isNaN(inputs[key] as number)).toBe(false);
       }
     }
+  });
+});
+
+describe('G1 gate: G0 has to be passed first (NG-26)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('no G0 decision: refused, filed, the stage stays, and the other faults are still reported', async () => {
+    const result = await evaluateGate('opp-g1-no-g0', 'G1', 'tenant-1');
+
+    expect(result).toEqual({
+      passed: false,
+      reasons: ['G0 has not been passed: no G0 decision is on file'],
+      reasonDetails: [{ code: 'G1_G0_NOT_DECIDED' }],
+    });
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+    expect(prisma.gateDecision.create).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['opp-g1-g0-failed', 'G1_G0_LAST_FAILED'],
+    ['opp-g1-g0-pass-then-fail', 'G1_G0_LAST_FAILED'],
+    ['opp-g1-g0-erased-pass', 'G1_G0_NOT_DECIDED'],
+    ['opp-g1-g0-foreign-pass', 'G1_G0_NOT_DECIDED'],
+  ])('%s → %s', async (id, code) => {
+    const result = await evaluateGate(id, 'G1', 'tenant-1');
+
+    expect(result.passed).toBe(false);
+    expect(result.reasonDetails).toEqual([{ code }]);
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('failed, then passed: the latest decision counts', async () => {
+    expect(await evaluateGate('opp-g1-g0-fail-then-pass', 'G1', 'tenant-1')).toEqual({ passed: true, reasons: [] });
+  });
+
+  test('the decision is read in the tenant, for this opportunity and gate, newest first, skipping erased rows', async () => {
+    await evaluateGate('opp-g1-ready', 'G1', 'tenant-1');
+    expect(prisma.gateDecision.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: 'tenant-1', opportunityId: 'opp-g1-ready', gate: 'G0', deletedAt: null },
+        orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  test('the other gates do not read it', async () => {
+    await evaluateGate('opp-pass', 'G2', 'tenant-1');
+    expect(prisma.gateDecision.findFirst).not.toHaveBeenCalled();
   });
 });
 

@@ -276,6 +276,9 @@
     },
     "heading": "Fırsat & Teklif Boru Hattı",
     "subtitle": "G0 Triage fizibilitesinden G4 nihai başvuru teslimine kadar çalışma grubunuzdaki kullanıcılarla tekliflerinizi yönetin.",
+    "addToG0": "G0 aşamasına yeni fırsat ekle",
+    "emptyG0": "Buraya sürükleyin veya ekleyin",
+    "emptyLater": "Önceki aşamadan buraya sürükleyin; kapı koşulları denetlenir.",
     "createRefused": "Fırsat oluşturulamadı: bu çalışma alanına yazma yetkiniz yok ya da alan artık yok.",
     "moved": "Fırsat {stage} aşamasına taşındı.",
     "moveRefused": "“{title}” {stage} aşamasına taşınamadı; yerinde kaldı.",
@@ -286,6 +289,26 @@
       "INVALID_INPUT": "Aşama değiştirilemedi: geçersiz fırsat ya da aşama.",
       "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı ya da arşivlenmiş; aşaması değiştirilemez.",
       "STAGE_MOVE_FAILED": "Aşama değiştirilemedi. Fırsat yerinde kaldı; lütfen tekrar deneyin."
+    }
+  },
+  "GateReason": {
+    "G0_NO_EVIDENCE": "G0 puanı hesaplanamadı: bu fırsat için henüz puanlama kanıtı yok.",
+    "G0_SCORE_BELOW": "G0 bileşik puanı {score}; asgari eşik {min}.",
+    "G0_ALIGNMENT_BELOW": "Stratejik uyum {value}; asgari eşik {min}.",
+    "G0_BASE_RATE_BELOW": "Başarı taban oranı %{value}; asgari eşik %{min}.",
+    "G0_COUNTRY_NOT_ELIGIBLE": "Ülke bu çağrı için uygun değil.",
+    "G1_G0_NOT_DECIDED": "G0 kapısı henüz geçilmedi: bu fırsat için kayıtlı G0 kararı yok.",
+    "G1_G0_LAST_FAILED": "G0 kapısı geçilmiş sayılmıyor: son kararı olumsuz. G0 kapısını yeniden çalıştırın.",
+    "G1_NO_CRITICAL_SEAT": "Konsorsiyum denetimi geçilemedi: bu fırsat için tanımlı kritik rol yok.",
+    "G1_SEAT_NO_ORGANISATION": "Kritik rol doldurulmadı ({role}): onaylanan koltukta kuruluş yok.",
+    "G1_SEAT_NOT_FILLED": "Kritik rol doldurulmadı ({role}): koltuk durumu {status}.",
+    "G1_NO_BACKUP": "Kritik rolün yedek adayı yok ({role}).",
+    "G2_OPEN_SEATS": "Konsorsiyum kilitlenemedi: {count, plural, other {# koltuk}} hâlâ açık.",
+    "G3_CRITERION_BELOW": "Kriter puanı {score}; asgari {min} gerekiyor.",
+    "G3_TOTAL_BELOW": "Toplam değerlendirme puanı {score}; asgari {min} gerekiyor.",
+    "G4_STATUS_BLOCKED": {
+      "WITHDRAWN": "Fırsat geri çekildi; başvuru yapılamaz.",
+      "REJECTED": "Fırsat reddedildi; başvuru yapılamaz."
     }
   },
   "Evidence": {

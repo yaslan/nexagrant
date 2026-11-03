@@ -121,7 +121,7 @@ export default async function OpportunityDetailPage({
     decision: loaded.g0?.decision ?? null,
     measuredSources: loaded.g0?.sources.filter((s) => s.status === 'measured').length ?? 0,
     totalSources: loaded.g0?.sources.length ?? 0,
-    reasons: loaded.g0?.reasons ?? [],
+    reasons: loaded.g0?.reasonDetails ?? [],
     minScore: DEFAULT_GATE_RULES.G0.minScore,
   };
 

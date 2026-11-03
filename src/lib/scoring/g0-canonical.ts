@@ -26,6 +26,7 @@
  */
 
 import { DEFAULT_GATE_RULES, DEFAULT_SCORING_WEIGHTS } from './defaults';
+import type { GateReason } from '../gates/reasons';
 
 /** The seven weighted G0 features, each normalised to 0–100. */
 // A type alias rather than an interface on purpose: this payload is written
@@ -78,6 +79,8 @@ export interface G0Result {
   contributions: Record<keyof G0Features, number>;
   /** Human-readable reasons, empty when the decision is GO. */
   reasons: string[];
+  /** The same reasons as codes, for a screen to put into its own language. */
+  reasonDetails: GateReason[];
 }
 
 export type G0Weights = typeof DEFAULT_SCORING_WEIGHTS;
@@ -175,18 +178,23 @@ export function decideG0(
 ): G0Result {
   const score = scoreG0(features, weights);
   const reasons: string[] = [];
+  const reasonDetails: GateReason[] = [];
 
   if (rules.minScore !== null && score < rules.minScore) {
     reasons.push(`composite score ${score.toFixed(2)} < ${rules.minScore}`);
+    reasonDetails.push({ code: 'G0_SCORE_BELOW', values: { score, min: rules.minScore } });
   }
   if (rules.minAlignment !== null && clamp01to100(features.alignment) < rules.minAlignment) {
     reasons.push(`alignment ${clamp01to100(features.alignment).toFixed(2)} < ${rules.minAlignment}`);
+    reasonDetails.push({ code: 'G0_ALIGNMENT_BELOW', values: { value: round2(clamp01to100(features.alignment)), min: rules.minAlignment } });
   }
   if (facts.baseRatePct < rules.minBaseRate) {
     reasons.push(`base rate ${facts.baseRatePct}% < ${rules.minBaseRate}%`);
+    reasonDetails.push({ code: 'G0_BASE_RATE_BELOW', values: { value: facts.baseRatePct, min: rules.minBaseRate } });
   }
   if (rules.requireEligibleCountry && !facts.countryEligible) {
     reasons.push('country not eligible for this call');
+    reasonDetails.push({ code: 'G0_COUNTRY_NOT_ELIGIBLE' });
   }
 
   return {
@@ -194,6 +202,7 @@ export function decideG0(
     score,
     contributions: g0Contributions(features, weights),
     reasons,
+    reasonDetails,
   };
 }
 

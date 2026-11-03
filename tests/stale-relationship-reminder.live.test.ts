@@ -6,7 +6,7 @@ import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
  * provider is the only fake: it records what would have been sent.
  *
  * The run walks every live tenant, so it refuses the shared `fabrika`
- * database outside CI (same guard as tests/invitation-retention.live.test.ts)
+ * database outside GitHub Actions (same guard as tests/invitation-retention.live.test.ts)
  * and is narrowed to this file's tenants with `tenantIds`.
  */
 const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
@@ -35,7 +35,7 @@ import { createDbClient, prisma, withTenant } from '@/lib/db';
 import { sendStaleRelationshipReminders, STALE_REMINDER_AUDIT } from '@/lib/relationships/stale-reminder';
 import { dayStartUtc, isReminderDue, isStaleRelationship } from '@/lib/relationships/stale';
 import type { MailMessage } from '@/lib/email/mailer';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 import { sqlStatements } from './helpers/sql-statements';
 
@@ -48,7 +48,7 @@ const REACHABLE =
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
-const SHARED = DB_NAME === 'fabrika' && !isCi();
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
 if (SHARED) skipOrFailInCi(SUITE, 'the run mails and stamps across tenants; refusing the shared "fabrika" database');
 const HAS_DB = DB_NAME !== undefined && !SHARED;
 

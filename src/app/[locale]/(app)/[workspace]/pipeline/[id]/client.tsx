@@ -13,6 +13,8 @@ import { getOpportunityTabs } from '@/lib/modules/registry';
 
 import { archiveOpportunity, declareApplication, evaluateOpportunityGate } from '../actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { useGateReasonText } from '@/lib/hooks/use-gate-reason-text';
+import type { GateReason } from '@/lib/gates/reasons';
 import { nextStageOf } from '@/lib/gates/transition';
 import { errorMessage } from '@/lib/errors';
 import { EffortTracker, type EffortEntry } from './effort';
@@ -31,8 +33,8 @@ export interface G0Display {
   /** How much of the weighted feature set had real evidence behind it. */
   measuredSources: number;
   totalSources: number;
-  /** Non-localised diagnostics from the scorer; rendered as data, never as UI copy. */
-  reasons: string[];
+  /** Why the scorer said no, as codes: the screen words them through `useGateReasonText`. */
+  reasons: GateReason[];
   /** `DEFAULT_GATE_RULES.G0.minScore`, so the screen names the threshold it is judged against. */
   minScore: number;
 }
@@ -70,6 +72,7 @@ export function OpportunityDetailClient({
   workspace: string;
 }) {
   const t = useTranslations('Pipeline');
+  const reasonText = useGateReasonText();
   const activeModules = useActiveModules();
   // The per-opportunity pages other modules own, from each manifest's
   // `opportunityTabs[]`. Until these links existed they were reachable only by typing
@@ -115,7 +118,7 @@ export function OpportunityDetailClient({
           return;
         }
         // The stage on screen changes after the refresh; the banner names what was decided here.
-        setOutcome({ gate, stageBefore: opportunity.stage, passed: res.passed, reasons: res.reasons });
+        setOutcome({ gate, stageBefore: opportunity.stage, passed: res.passed, reasons: res.reasonDetails?.map(reasonText) ?? res.reasons });
         // The gate writes the score and, on a pass, the new stage: re-read the server component
         // rather than guessing the new state on the client.
         router.refresh();
@@ -337,7 +340,7 @@ export function OpportunityDetailClient({
                     : t('detail.gateAdvanced', { gate: outcome.gate })}
               </p>
               {outcome.reasons.length > 0 && (
-                <ul className="list-disc list-inside font-mono text-xs opacity-90">
+                <ul className="list-disc list-inside text-xs opacity-90">
                   {outcome.reasons.map((reason) => (
                     <li key={reason}>{reason}</li>
                   ))}
@@ -500,9 +503,9 @@ export function OpportunityDetailClient({
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
                     {t('detail.scoreReasons')}
                   </h3>
-                  <ul className="list-disc list-inside text-xs text-ink-2 font-mono space-y-1">
+                  <ul className="list-disc list-inside text-xs text-ink-2 space-y-1">
                     {g0.reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
+                      <li key={reason.code}>{reasonText(reason)}</li>
                     ))}
                   </ul>
                 </div>

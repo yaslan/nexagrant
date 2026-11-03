@@ -7,7 +7,7 @@ import type { InterregAnalysisStatus } from '@prisma/client';
  *
  * purgeExpiredInterregText() works across EVERY tenant by date, so like
  * notification-retention.live this file refuses to run on the shared local database
- * named `fabrika` outside CI. Singleton swap as there: the code under test runs as
+ * named `fabrika` outside GitHub Actions. Singleton swap as there: the code under test runs as
  * fabrika_app, where an unscoped updateMany would match no row and report 0; fixtures
  * and counts go through the owner role.
  */
@@ -53,8 +53,9 @@ vi.mock('@/lib/llm', async (importOriginal) => {
 });
 
 import { purgeExpiredInterregText } from '@/modules/m17/server/retention';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
+import { M17_INTERREG_TEXT_PURGE_LOCK, holdTestDbLock } from './helpers/test-db-lock';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const SUITE = 'm17 text retention test';
@@ -65,7 +66,7 @@ const REACHABLE =
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
-const SHARED = DB_NAME === 'fabrika' && !isCi();
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
 if (SHARED) skipOrFailInCi(SUITE, 'the purge works across every tenant; refusing to run on the shared "fabrika" database');
 const HAS_DB = DB_NAME !== undefined && !SHARED;
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
@@ -130,6 +131,17 @@ async function analysis(
 }
 
 const load = (id: string) => admin.interregAnalysis.findUniqueOrThrow({ where: { id } });
+// Due call texts of ONE tenant. Global counts (`callSlots` and friends) are exact only while every live file
+// that writes due texts holds M17_INTERREG_TEXT_PURGE_LOCK (this file and fo191 do; the analyses file writes
+// none due). Per-tenant reads stay per tenant, so a row another file leaves behind cannot change this file's answer.
+const dueCallOf = async (tenantId: string) =>
+  Number(
+    (
+      await admin.$queryRaw<Array<{ n: bigint }>>`
+        SELECT count(*)::bigint AS n FROM "InterregAnalysis"
+         WHERE "tenantId" = ${tenantId} AND "callText" IS NOT NULL AND "callTextExpiresAt" <= ${NOW}`
+    )[0]?.n,
+  );
 const derived = (id: string) =>
   Promise.all([
     admin.interregCriterionMark.count({ where: { analysisId: id } }),
@@ -137,11 +149,18 @@ const derived = (id: string) =>
   ]);
 
 describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
+  // Held for the whole file: fo191's purge (cross-tenant, by date) must not run while these counts are taken.
+  // The lock is a session advisory lock on its own connection, so it drops with the connection if the run dies.
+  let releaseLock: (() => Promise<void>) | undefined;
+
   beforeAll(async () => {
+    releaseLock = await holdTestDbLock(RLS_URL!, M17_INTERREG_TEXT_PURGE_LOCK);
+    // Due texts left by an earlier run that died would otherwise be counted in the first purge below.
+    await purgeExpiredInterregText(new Date());
     const c = await admin.interregRubricCriterion.findFirst({ where: { rubricId: RUBRIC }, select: { id: true } });
     if (!c) throw new Error(`rubric ${RUBRIC} is not seeded (pnpm db:seed)`);
     criterionId = c.id;
-  });
+  }, 300_000);
 
   afterAll(async () => {
     await admin.interregAnalysis.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
@@ -149,6 +168,7 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     await admin.tenant.deleteMany({ where: { id: { in: presentIds(tenantIds) } } });
     await admin.user.deleteMany({ where: { id: { in: presentIds(userIds) } } });
     await admin.$disconnect();
+    await releaseLock?.();
   });
 
   test('empties each slot on its OWN expiry, in every tenant, and keeps the analysis consistent', async () => {
@@ -215,12 +235,13 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const text = 'y'.repeat(300);
     const id = await analysis(t, 'READY', { text, expiresInDays: -1 }, { text, expiresInDays: 4 });
     const [first, second] = await Promise.all([purgeExpiredInterregText(NOW), purgeExpiredInterregText(NOW)]);
-    expect(first.callSlots + second.callSlots).toBeGreaterThanOrEqual(1);
+    expect(first.callSlots + second.callSlots).toBe(1);
     const after = await load(id);
     const again = await purgeExpiredInterregText(NOW);
     expect(again.callSlots).toBe(0);
     expect(again.projectSlots).toBe(0);
     expect(again.analyses).toBe(0);
+    expect(await dueCallOf(t.tenantId)).toBe(0);
     expect(await load(id)).toEqual(after); // updatedAt included: nothing was written
   });
 
@@ -257,29 +278,25 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const text = 'q'.repeat(300);
     const ids: string[] = [];
     for (let i = 0; i < 8; i++) ids.push(await analysis(t, 'CALL_READY', { text, expiresInDays: -2 }, null, false));
-    const dueNow = async () =>
-      Number(
-        (
-          await admin.$queryRaw<Array<{ n: bigint }>>`
-            SELECT count(*)::bigint AS n FROM "InterregAnalysis" WHERE "tenantId" = ANY(${tenantIds}) AND "callText" IS NOT NULL AND "callTextExpiresAt" <= ${NOW}`
-        )[0]?.n,
-      );
-    const before = await dueNow();
+    const before = await dueCallOf(t.tenantId);
     expect(before).toBeGreaterThanOrEqual(8);
 
-    // Two pages of 2, then stop: the 4 rows of those pages are gone (committed), the rest stay.
+    // Two pages of 2, then stop: the pages it finished are gone (committed), the rest stay. The file holds
+    // the purge lock and drained the due texts at its start, so this run is the only one that empties rows.
     const first = await purgeExpiredInterregText(NOW, { batchSize: 2, maxBatches: 2 });
     expect(first.more).toBe(true);
     expect(first.callSlots).toBe(4);
-    expect(await dueNow()).toBe(before - 4);
+    const afterFirst = await dueCallOf(t.tenantId);
+    expect(before - afterFirst).toBe(4); // the committed pages, read back from the database
 
     // The next run is the same call: it finishes the backlog and the one after finds nothing.
     const second = await purgeExpiredInterregText(NOW, { batchSize: 2 });
     expect(second.more).toBe(false);
-    expect(second.callSlots).toBe(before - 4);
-    expect(await dueNow()).toBe(0);
+    expect(second.callSlots).toBe(afterFirst);
+    expect(await dueCallOf(t.tenantId)).toBe(0);
     const third = await purgeExpiredInterregText(NOW, { batchSize: 2 });
     expect(third).toEqual({ callSlots: 0, projectSlots: 0, analyses: 0, more: false });
+    expect(await dueCallOf(t.tenantId)).toBe(0);
     for (const id of ids) expect((await load(id)).callText).toBeNull();
   });
 
@@ -289,7 +306,8 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     for (let i = 0; i < 4; i++) await analysis(t, 'CALL_READY', { text, expiresInDays: -2 }, null, false);
     const r = await purgeExpiredInterregText(NOW, { batchSize: 2, budgetMs: 1e-9 });
     expect(r.more).toBe(true);
-    expect(r.callSlots).toBe(2);
+    expect(r.callSlots).toBe(2); // exactly one page: the budget is spent after it
+    expect(4 - (await dueCallOf(t.tenantId))).toBe(2); // and it committed: two of this tenant's rows are left
     await purgeExpiredInterregText(NOW); // leave the database clean for the other tests
   });
 
@@ -333,7 +351,9 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
       admin.creditLedger.findMany({ where: { refId: { startsWith: id } }, select: { delta: true } }).then((rs) => rs.map((r) => r.delta).sort((a, b) => a - b));
 
     const result = await purgeExpiredInterregText(NOW);
+    // Its own slot is emptied and the row leaves ANALYZING. Under the file's lock this is the only due call text, so the count is exact.
     expect(result.callSlots).toBe(1);
+    expect(await load(id)).toMatchObject({ status: 'UPLOADING', callText: null, callTextExpiresAt: null, projectText: 'p'.repeat(50) });
     expect(await ledger()).toEqual([-3, 3]);
 
     // A second purge (or a second run of the same batch) must not refund again.
