@@ -291,6 +291,45 @@ export function toViewSchema(mysqlSchemaText) {
   return text;
 }
 
+/**
+ * Pure: MariaDB schema text → list of "Model.field" where a LONGTEXT column is part of a key.
+ * InnoDB cannot index LONGTEXT without a prefix, so such a column in @id, @unique, @@id,
+ * @@unique, @@index or a relation's fields:[] / references:[] is a hard failure at migrate time.
+ * Caught here so the generator and --check refuse it before the DB sees it (FO-375 round 6).
+ */
+export function longTextInKeys(mysqlSchemaText) {
+  const models = new Map(); // name -> { longText:Set, keyed:Set }
+  let current = null;
+  for (const line of mysqlSchemaText.split('\n')) {
+    const m = line.match(/^model (\w+) \{/);
+    if (m) { current = m[1]; models.set(current, { longText: new Set(), keyed: new Set(), fields: new Map() }); continue; }
+    if (/^\}/.test(line)) { current = null; continue; }
+    if (!current) continue;
+    const model = models.get(current);
+    const f = line.match(/^\s+(\w+)\s+(\w+)\??(\s|$)/);
+    if (f && !/^@@/.test(line.trim())) {
+      model.fields.set(f[1], f[2]);
+      if (/@db\.LongText\b/.test(line)) model.longText.add(f[1]);
+      if (/@(id|unique)\b/.test(line)) model.keyed.add(f[1]);
+      const rel = line.match(/@relation\([^)]*\)/);
+      if (rel) {
+        const fromList = (k) => { const r = rel[0].match(new RegExp(k + ':\\s*\\[([^\\]]*)\\]')); return r ? r[1].split(',').map((x) => x.trim()).filter(Boolean) : []; };
+        for (const c of fromList('fields')) model.keyed.add(c);
+        model.refs = [...(model.refs ?? []), { target: f[2], cols: fromList('references') }];
+      }
+    }
+    const at = line.match(/^\s*@@(id|unique|index)\(\[([^\]]*)\]/);
+    if (at) for (const c of at[2].split(',')) model.keyed.add(c.trim().replace(/\(.*$/, '').trim());
+  }
+  for (const model of models.values()) for (const r of model.refs ?? []) {
+    const t = models.get(r.target);
+    if (t) for (const c of r.cols) t.keyed.add(c);
+  }
+  const bad = [];
+  for (const [name, model] of models) for (const c of model.longText) if (model.keyed.has(c)) bad.push(name + '.' + c);
+  return bad;
+}
+
 /** Pure: MariaDB schema text → views.sql (function first, then views in name order). */
 export function toViewsSql(mysqlSchemaText) {
   const models = classifyModels(mysqlSchemaText);
@@ -366,6 +405,10 @@ function main() {
   if (strictStrings && stats.stringPending > 0) {
     throw new Error(`${stats.stringPending} String field(s) still PENDING in prisma/mysql/string-decisions.json (strict mode)`);
   }
+  const keyed = longTextInKeys(text);
+  if (keyed.length > 0) {
+    throw new Error(`LONGTEXT column(s) used as a key or index (MariaDB refuses these): ${keyed.join(', ')}`);
+  }
   const viewSchema = toViewSchema(text);
   const viewsSql = toViewsSql(text);
   const viewsDown = toViewsDownSql(text);
@@ -381,7 +424,13 @@ function main() {
         return null;
       }
     };
-    if (committed(MYSQL_SCHEMA_PATH) !== text) stale.push('prisma/mysql/schema.prisma');
+    const committedSchema = committed(MYSQL_SCHEMA_PATH) ?? '';
+    const committedKeyed = longTextInKeys(committedSchema);
+    if (committedKeyed.length > 0) {
+      console.error(`LONGTEXT column(s) used as a key or index in committed prisma/mysql/schema.prisma: ${committedKeyed.join(', ')}`);
+      process.exit(1);
+    }
+    if (committedSchema !== text) stale.push('prisma/mysql/schema.prisma');
     const init = toInitSql(migrateDiffScript(), ci);
     if (committed(INIT_SQL_PATH) !== init) stale.push('prisma/mysql/init.sql');
     if (committed(DOWN_SQL_PATH) !== toDownSql(init)) stale.push('prisma/mysql/init.down.sql');

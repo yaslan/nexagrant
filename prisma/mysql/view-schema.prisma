@@ -89,7 +89,7 @@ model Workspace {
   id        String @db.VarChar(128)   @id @default(cuid())
   tenantId  String @db.VarChar(128)
   name      String @db.LongText   // e.g. client name for consultancies
-  slug      String
+  slug      String @db.VarChar(191)
   createdAt DateTime @default(now())
   deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
   deletionReason String? @db.LongText
@@ -125,7 +125,7 @@ enum ModuleStatus {
 model ModuleState {
   id        String @db.VarChar(128)       @id @default(cuid())
   tenantId  String @db.VarChar(128)
-  moduleId  String
+  moduleId  String @db.VarChar(64)
   status    ModuleStatus @default(OFF)
   settings  Json         @default("{}")
   changedBy String? @db.LongText
@@ -257,7 +257,7 @@ enum SubStatus {
 model AddOn {
   id             String @db.VarChar(128)   @id @default(cuid())
   tenantId       String @db.VarChar(128)
-  sku            String
+  sku            String @db.VarChar(191)
   quantity       Int      @default(1)
   providerItemId String? @db.LongText
   startedAt      DateTime @default(now())
@@ -275,8 +275,8 @@ model LifetimeLicence {          // one-time "first 20 companies" purchase; the 
   amountMinor       Int                // what was actually charged, minor units
   currency          String @db.LongText   @default("USD")
   provider          String @db.LongText   @default("stripe")
-  providerEventId   String   @unique   // idempotency: one webhook event writes at most one licence
-  providerSessionId String?  @unique   // idempotency: one checkout session writes at most one licence
+  providerEventId   String @db.VarChar(191)   @unique   // idempotency: one webhook event writes at most one licence
+  providerSessionId String? @db.VarChar(191)  @unique   // idempotency: one checkout session writes at most one licence
   purchasedAt       DateTime @default(now())
   createdAt         DateTime @default(now())
   @@index([tenantId, purchasedAt])
@@ -286,7 +286,7 @@ model LifetimeLicence {          // one-time "first 20 companies" purchase; the 
 model Invoice {                 // an invoice actually issued to a tenant; TASK-MTRD9QBJ2G32E
   id            String @db.VarChar(128)   @id @default(cuid())
   tenantId      String @db.VarChar(128)
-  number        String              // what the customer sees and cites, e.g. "FB-2026-000001"
+  number        String @db.VarChar(32)              // what the customer sees and cites, e.g. "FB-2026-000001"
   issuedAt      DateTime            // UTC, like every other timestamp (CLAUDE.md rule 10)
   currency      String @db.LongText   @default("TRY")
   // VUK 215/280/385 (ADR-0002, option (b)): an invoice denominated in a foreign
@@ -315,7 +315,7 @@ model Invoice {                 // an invoice actually issued to a tenant; TASK-
   lines         Json                // InvoiceLine[]; unit prices are minor units (CLAUDE.md rule 9)
   profileId     String @db.LongText   @default("TICARIFATURA")  // TICARIFATURA | TEMELFATURA | EARSIVFATURA
   invoiceType   String @db.LongText   @default("SATIS")         // SATIS | ISTISNA | TEVKIFAT
-  ettn          String   @unique    // the document's own UUID, assigned when the row is written
+  ettn          String @db.VarChar(36)   @unique    // the document's own UUID, assigned when the row is written
   // Set only once GİB has actually accepted the filing through an integrator.
   // NULL means the document was never filed: the exporter marks it as carrying
   // no fiscal value rather than claiming a fiscal seal it does not have.
@@ -323,7 +323,7 @@ model Invoice {                 // an invoice actually issued to a tenant; TASK-
   // The provider payment this invoice was issued for. Unique per tenant, so a
   // redelivered webhook cannot issue a second invoice for one payment; NULL on
   // rows written before the write path existed (TASK-MTSWL8ADKZKDM).
-  paymentRef    String?
+  paymentRef    String? @db.VarChar(191)
   createdAt     DateTime @default(now())
   @@unique([tenantId, number])
   @@unique([tenantId, paymentRef])
@@ -365,7 +365,7 @@ model CreditLedger {
   /// `YYYY-MM` of the scheduled monthly grant (credits-monthly-grant job) and
   /// NULL on every other row. The unique key makes that job one grant per
   /// tenant per month however often it runs (ADR-0008 §6.2, TASK-MUMT3PGX5OK8P).
-  grantPeriod String?
+  grantPeriod String? @db.VarChar(191)
   createdAt DateTime @default(now())
   @@index([tenantId, createdAt])
   @@unique([tenantId, grantPeriod])
@@ -448,7 +448,7 @@ enum PartnerSearchRunStatus {
 model PartnerSearchQuotaUsage {
   id        String @db.VarChar(128)   @id @default(cuid())
   tenantId  String @db.VarChar(128)
-  month     String   // 'YYYY-MM' (UTC)
+  month     String @db.VarChar(7)   // 'YYYY-MM' (UTC)
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
 
@@ -598,8 +598,8 @@ model Effort {
 model Evidence {
   id                 String @db.VarChar(128)               @id @default(cuid())
   tenantId           String @db.VarChar(128)
-  kind               String               // corporate | financial | certificate | infrastructure | performance | ethics | partner | personnel
-  category           String               @default("certificate") // CAT-01 .. CAT-08
+  kind               String @db.VarChar(32)               // corporate | financial | certificate | infrastructure | performance | ethics | partner | personnel
+  category           String @db.VarChar(16)               @default("certificate") // CAT-01 .. CAT-08
   title              String @db.LongText
   body               String               @db.LongText
   description        String?              @db.LongText
@@ -610,11 +610,11 @@ model Evidence {
   validFrom          DateTime?
   validUntil         DateTime?
   confidentiality    String @db.LongText               @default("INTERNAL") // PUBLIC | CONSORTIUM | INTERNAL | RESTRICTED
-  status             String               @default("VALID") // UNVERIFIED | VALID | EXPIRING_SOON | EXPIRED | REJECTED
+  status             String @db.VarChar(32)               @default("VALID") // UNVERIFIED | VALID | EXPIRING_SOON | EXPIRED | REJECTED
   version            Int                  @default(1)
   
   // Cloudflare R2 Depolama Bilgileri
-  r2ObjectKey        String?              // tenantId/orgId/cat/hash.ext
+  r2ObjectKey        String? @db.VarChar(191)              // tenantId/orgId/cat/hash.ext
   fileBucket         String @db.LongText               @default("fonbridge-evidence")
   fileName           String? @db.LongText
   fileSizeBytes      Int?
@@ -686,7 +686,7 @@ model ClaimEvidenceLink {
 model ProposalUsage {
   id                 String @db.VarChar(128)               @id @default(cuid())
   tenantId           String @db.VarChar(128)
-  opportunityId      String
+  opportunityId      String @db.VarChar(128)
   evidenceId         String @db.VarChar(128)
   sectionKey         String @db.LongText               // "PartB_Sec3_2", "Annex_4", "ConceptNote_G0"
   usedAt             DateTime             @default(now())
@@ -713,7 +713,7 @@ model ConceptTemplate {             // platform + tenant templates
 model ConceptNote {
   id            String @db.VarChar(128)   @id @default(cuid())
   tenantId      String @db.VarChar(128)
-  opportunityId String
+  opportunityId String @db.VarChar(128)
   templateId    String @db.LongText
   content       Json     // {sectionKey: markdown}
   status        String @db.LongText   @default("draft") // draft | review | approved
@@ -742,7 +742,7 @@ model Relationship {
   organizationId String? @db.LongText  // CORDIS PIC
   partnerOrgId   String? @db.LongText
   kind           String @db.LongText   // partner | ncp | city | cluster | consultant | tto
-  ownerUserId    String?  // internal focal point; NULL = unassigned (or erased)
+  ownerUserId    String? @db.VarChar(128)  // internal focal point; NULL = unassigned (or erased)
   counterpartName String? @db.LongText
   counterpartEmail String? @db.LongText
   warmth         String @db.LongText   @default("cold") // cold | warm | hot | active
@@ -766,7 +766,7 @@ model Relationship {
 model Interaction {
   id             String @db.VarChar(128)   @id @default(cuid())
   tenantId       String @db.VarChar(128)
-  relationshipId String
+  relationshipId String @db.VarChar(128)
   kind           String @db.LongText   // meeting | email | call | event
   at             DateTime
   summary        String? @db.LongText
@@ -781,7 +781,7 @@ model Interaction {
 model SeatCandidate {
   id             String @db.VarChar(128) @id @default(cuid())
   tenantId       String @db.VarChar(128)
-  seatId         String
+  seatId         String @db.VarChar(128)
   organizationId String? @db.LongText
   partnerOrgId   String? @db.LongText
   score          Float
@@ -806,7 +806,7 @@ model AiUsageLog {
   inputTokens Int
   outputTokens Int
   credits     Int
-  proposalId  String?
+  proposalId  String? @db.VarChar(128)
   section     String? @db.LongText
   createdAt   DateTime @default(now())
   @@index([tenantId, createdAt])
@@ -882,7 +882,7 @@ model AuditEvent {
 model StripeEventLog {
   id            String @db.VarChar(128)   @id @default(cuid())
   tenantId      String @db.VarChar(128)
-  stripeEventId String   @unique
+  stripeEventId String @db.VarChar(191)   @unique
   handler       String @db.LongText   // subscription.sync | subscription.cancel | invoice.payment
   processedAt   DateTime @default(now())
   @@index([tenantId, processedAt])
@@ -901,11 +901,11 @@ model StripeEventLog {
 model Notification {
   id          String @db.VarChar(128)           @id @default(cuid())
   tenantId    String @db.VarChar(128)
-  userId      String           // recipient; User.id, no FK (SavedSearch.userId pattern)
+  userId      String @db.VarChar(128)           // recipient; User.id, no FK (SavedSearch.userId pattern)
   workspaceId String? @db.LongText          // NULL = tenant-wide (both MVP producers)
   type        NotificationType
   payload     Json             @default("{}")
-  dedupeKey   String?          // same event twice -> one row (@@unique below)
+  dedupeKey   String? @db.VarChar(191)          // same event twice -> one row (@@unique below)
   createdAt   DateTime         @default(now())
   readAt      DateTime?        // NULL = unread
 
@@ -963,7 +963,7 @@ model Reviewer {
   evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   userId       String @db.VarChar(128)
   role         String @db.LongText     @default("evaluator") // evaluator | coordinator
-  status       String     @default("pending")   // pending | completed
+  status       String @db.VarChar(16)     @default("pending")   // pending | completed
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @default(now()) @updatedAt
   scores       Score[]
@@ -1012,7 +1012,7 @@ model Score {
 model MeetingBrief {
   id                  String @db.VarChar(128)      @id @default(cuid())
   tenantId            String @db.VarChar(128)
-  interactionId       String      @unique
+  interactionId       String @db.VarChar(128)      @unique
   partnerName         String? @db.LongText
   content             String @db.LongText
   meetingScheduledAt  DateTime?   // UTC meeting time
@@ -1034,8 +1034,8 @@ model MeetingBrief {
 model CalendarConnection {
   id                String @db.VarChar(128)    @id @default(cuid())
   tenantId          String @db.VarChar(128)
-  userId            String
-  provider          String    // 'google' | 'outlook' | 'ics'
+  userId            String @db.VarChar(128)
+  provider          String @db.VarChar(16)    // 'google' | 'outlook' | 'ics'
   externalId        String? @db.LongText   // Google: calendar ID, Outlook: mailbox address
   accessToken       String? @db.LongText   // Plaintext. Column is unpopulated today — no OAuth writer exists yet
                                // (google/outlook `connectCalendar` refuses with CALENDAR_OAUTH_NOT_CONFIGURED,
@@ -1089,8 +1089,8 @@ model DualApprovalStep {
   tenantId      String @db.VarChar(128)
   followupDocId String @db.VarChar(128)
   followupDoc   FollowupDoc @relation(fields: [followupDocId], references: [id], onDelete: Cascade)
-  department    String      // FINANCE | LEGAL
-  actorUserId   String
+  department    String @db.VarChar(16)      // FINANCE | LEGAL
+  actorUserId   String @db.VarChar(128)
   actorName     String @db.LongText
   note          String? @db.LongText
   decidedAt     DateTime    @default(now())
@@ -1350,7 +1350,7 @@ model Consent {
   /// `DualApprovalStep.actorUserId`. Detaching the person from the record would
   /// destroy the only thing the record exists to prove.
   /// See src/lib/inngest/jobs/users-scheduled-deletion.ts.
-  userId String
+  userId String @db.VarChar(128)
 
   kind    ConsentKind
   purpose ConsentPurpose
@@ -1363,7 +1363,7 @@ model Consent {
   /// then says exactly what it should say: this person agreed to something
   /// else. A stored copy could not say that; it would just look current.
   documentId      String @db.LongText
-  documentVersion String
+  documentVersion String @db.VarChar(191)
 
   /// Which language the person actually read.
   locale String @db.LongText @default("tr")
@@ -1420,7 +1420,7 @@ model InterregRubric {
   /// Stable, versioned key: `<programme>.<call>.<project type>`.
   id                String @db.VarChar(64)   @id
   /// Programme key, e.g. `interreg-next-bsb`; groups the profiles a user picks from.
-  programme         String
+  programme         String @db.VarChar(64)
   /// Display label; carries "internal pre-assessment — not an official score".
   label             String @db.LongText
   /// The profile used when a new analysis names none (at most one per programme, by convention).
@@ -1456,7 +1456,7 @@ model InterregRubricCriterion {
   id                  String @db.VarChar(128)   @id @default(cuid())
   rubricId            String @db.VarChar(64)
   /// Stable key within the rubric, e.g. `relevance_so_fit`.
-  criterionKey        String
+  criterionKey        String @db.VarChar(191)
   /// The programme's own number, e.g. `1.1`.
   officialRef         String @db.LongText
   section             String @db.LongText
@@ -1532,7 +1532,7 @@ model InterregAnalysis {
 model InterregAnalysisResult {
   id               String @db.VarChar(128)   @id @default(cuid())
   tenantId         String @db.VarChar(128)
-  analysisId       String   @unique
+  analysisId       String @db.VarChar(128)   @unique
   rawScore         Decimal  @db.Decimal(6, 1)
   score100         Decimal  @db.Decimal(4, 1)
   /// `rawScore` ≥ rubric `passRaw` and no knockout criterion below its floor.
@@ -1562,10 +1562,10 @@ model InterregAnalysisResult {
 model InterregCriterionMark {
   id              String @db.VarChar(128)   @id @default(cuid())
   tenantId        String @db.VarChar(128)
-  analysisId      String
+  analysisId      String @db.VarChar(128)
   /// Copy of the analysis's rubricId, so the two FKs below can tie the criterion to it.
   rubricId        String @db.VarChar(64)
-  criterionId     String
+  criterionId     String @db.VarChar(128)
   mark            Decimal  @db.Decimal(4, 1)
   strengths       Json     @default("[]")
   weaknesses      Json     @default("[]")

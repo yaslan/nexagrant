@@ -9,6 +9,7 @@ import {
   ciColumns,
   classifyModels,
   insensitiveFieldNames,
+  longTextInKeys,
   toDownSql,
   toInitSql,
   toMysqlSchema,
@@ -238,5 +239,39 @@ describe('String decisions (FO-375 lead rule: no bare String without a proven ty
 
   it('pins the base-table _ci count (41 columns; the 16 view copies are inherited, not generated)', () => {
     expect(EXPECTED_CI_BASE).toBe(41);
+  });
+});
+
+describe('longTextInKeys (FO-375 round 6 gate)', () => {
+  const schema = [
+    'model Parent {',
+    '  id   String @db.VarChar(128) @id',
+    '  name String @db.LongText',
+    '}',
+    'model Child {',
+    '  id       String @db.VarChar(128) @id',
+    '  parentId String @db.VarChar(128)',
+    '  note     String @db.LongText',
+    '  code     String @db.VarChar(64)',
+    '  @@index([parentId])',
+    '  @@unique([id, code])',
+    '  parent Parent @relation(fields: [parentId], references: [id])',
+    '}',
+  ].join('\n');
+
+  it('passes when no LONGTEXT column is a key, index or relation column', () => {
+    expect(longTextInKeys(schema)).toEqual([]);
+  });
+
+  it('flags a LONGTEXT column named in @@unique / @@index', () => {
+    expect(longTextInKeys(schema.replace('@@unique([id, code])', '@@unique([id, note])'))).toEqual(['Child.note']);
+    expect(longTextInKeys(schema.replace('@@index([parentId])', '@@index([note])'))).toEqual(['Child.note']);
+  });
+
+  it('flags a LONGTEXT relation column and the LONGTEXT referenced column', () => {
+    const fk = schema.replace('parentId String @db.VarChar(128)', 'parentId String @db.LongText');
+    expect(longTextInKeys(fk)).toContain('Child.parentId');
+    const ref = schema.replace('id   String @db.VarChar(128) @id', 'id   String @db.LongText @id');
+    expect(longTextInKeys(ref)).toContain('Parent.id');
   });
 });
