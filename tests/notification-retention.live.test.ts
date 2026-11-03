@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
  *
  * pruneOldNotifications() deletes across EVERY tenant by date, so like
  * invitation-retention.live this file refuses to run on the shared local
- * database named `fabrika` outside CI. CI's database is its own container.
+ * database named `fabrika` outside GitHub Actions. CI's database is its own container.
  *
  * Singleton swap as in stripe-event-retention.live: the code under test runs as
  * fabrika_app, where an unscoped deleteMany would see no rows and report 0;
@@ -36,7 +36,7 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
 
 import { createDbClient, prisma } from '@/lib/db';
 import { NOTIFICATION_RETENTION_DAYS, pruneOldNotifications } from '@/lib/notifications/retention';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -48,7 +48,7 @@ const REACHABLE =
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
-const SHARED = DB_NAME === 'fabrika' && !isCi();
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
 if (SHARED) skipOrFailInCi(SUITE, 'the prune deletes across every tenant; refusing to run on the shared "fabrika" database');
 const HAS_DB = DB_NAME !== undefined && !SHARED;
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);

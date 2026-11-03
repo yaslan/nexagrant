@@ -31,7 +31,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 > **Kapılar (01.10 akşam).** Yerel fabrika DB'si silinmişti. devop-fb sıfırdan kurdu; tam `npm test`
 > **303 dosya geçti, 6 atlandı; 4050 test geçti, 117 atlandı**, 0 kırmızı (TASK-MUPL268JAAWHD, `done`, rapor
 > `docs/agent-results/TASK-MUPL268JAAWHD-devop-fb-2.md`, dev `d97c1328`). Bu sayı 30.09'daki 3987'yi ezer.
-> 3 live dosyası paylaşılan `fabrika` DB'sinde bilerek atlanıyor (`SHARED = DB_NAME==='fabrika' && !isCi()`), CI'da koşar.
+> 3 live dosyası paylaşılan `fabrika` DB'sinde bilerek atlanıyor (`SHARED = DB_NAME==='fabrika' && !isGithubActions()`), CI'da koşar.
 > `prisma migrate deploy` boş DB'de düşer; kurulum CI sırasıyla yapılır (aynı rapor §1 adım 3). qae-fb de
 > `0e834904`'te izole bir PostgreSQL 16 ile rls:verify/lint/tsc/i18n/vitest/build'i yeşil geçti.
 > Evidence live **57/57** MinIO ile (TASK-MUOJFCOZBM3PU, `done`); mobil e2e **12/12**, `pnpm exec playwright` ile
