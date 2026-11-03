@@ -1674,7 +1674,7 @@ CREATE TABLE `InterregCriterionMark` (
     `id` VARCHAR(128) NOT NULL,
     `tenantId` VARCHAR(128) NOT NULL,
     `analysisId` VARCHAR(191) NOT NULL,
-    `rubricId` LONGTEXT NOT NULL,
+    `rubricId` VARCHAR(64) NOT NULL,
     `criterionId` VARCHAR(191) NOT NULL,
     `mark` DECIMAL(4, 1) NOT NULL,
     `strengths` JSON NOT NULL,

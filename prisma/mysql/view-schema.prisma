@@ -1564,7 +1564,7 @@ model InterregCriterionMark {
   tenantId        String @db.VarChar(128)
   analysisId      String
   /// Copy of the analysis's rubricId, so the two FKs below can tie the criterion to it.
-  rubricId        String @db.LongText
+  rubricId        String @db.VarChar(64)
   criterionId     String
   mark            Decimal  @db.Decimal(4, 1)
   strengths       Json     @default("[]")
