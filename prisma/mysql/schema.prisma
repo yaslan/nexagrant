@@ -838,14 +838,14 @@ model CordisProject {
   framework          String     // HORIZON | H2020
   masterCall         String?
   subCall            String? @db.LongText
-  fundingScheme      String?
-  legalBasis         String?
+  fundingScheme      String? @db.LongText
+  legalBasis         String? @db.LongText
   startDate          DateTime?
   endDate            DateTime?
   ecSignatureDate    DateTime?
   totalCost          BigInt?
   ecMaxContribution  BigInt?
-  grantDoi           String?
+  grantDoi           String? @db.LongText
   contentUpdateDate  DateTime?
   rawJson            Json?
   importedAt         DateTime   @default(now())
@@ -863,15 +863,15 @@ model CordisOrganization {
   organisationId     String @db.VarChar(40)     @id // CORDIS organisationID (PIC)
   name               String
   nameNormalized     String?
-  shortName          String?
-  vatNumber          String?
+  shortName          String? @db.LongText
+  vatNumber          String? @db.LongText
   activityType       String?    // HES | REC | PRC | PUB | OTH
   sme                Boolean    @default(false)
   country            String?
-  city               String?
-  postCode           String?
-  nutsCode           String?
-  geolocation        String?
+  city               String? @db.LongText
+  postCode           String? @db.LongText
+  nutsCode           String? @db.LongText
+  geolocation        String? @db.LongText
   url                String?
   isTurkish          Boolean    @default(false)
   rawJson            Json?
@@ -913,7 +913,7 @@ model CordisParticipation {
 model CordisProjectTopic {
   projectId          String @db.VarChar(64)
   topicCode          String
-  topicTitle         String?
+  topicTitle         String? @db.LongText
 
   project            CordisProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -924,8 +924,8 @@ model CordisProjectTopic {
 model CordisProjectSciVoc {
   projectId          String @db.VarChar(64)
   scivocCode         String
-  scivocPath         String?
-  scivocTitle        String?
+  scivocPath         String? @db.LongText
+  scivocTitle        String? @db.LongText
 
   project            CordisProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -934,7 +934,7 @@ model CordisProjectSciVoc {
 
 model CordisImportRun {
   runId              String @db.VarChar(128)     @id @default(cuid())
-  dataset            String     // HORIZON | H2020
+  dataset            String @db.LongText     // HORIZON | H2020
   startedAt          DateTime   @default(now())
   finishedAt         DateTime?
   status             String     // RUNNING | SUCCESS | FAILED
@@ -946,7 +946,7 @@ model CordisImportRun {
 model CordisPartnerProfile {
   organisationId        String @db.VarChar(40)     @id
   name                  String
-  nameNormalized        String?
+  nameNormalized        String? @db.LongText
   country               String?
   activityType          String?
   sme                   Boolean    @default(false)
@@ -1034,11 +1034,11 @@ model PartnerSearchAnnouncement {
   missedScans      Int                           @default(0) // consecutive scans without this row; 2 → withdrawn
   missedScanAt     DateTime?                     // UTC day of the last counted miss: one miss per day (FO-60 review 2)
   organizationPic  String?                       // CordisOrganization.organisationId when matched
-  organizationName String
+  organizationName String @db.LongText
   organizationType PartnerSearchOrgType          @default(OTH)
   isSme            Boolean                       @default(false)
   country          String?                       // ISO-3166-1 alpha-2
-  city             String?
+  city             String? @db.LongText
   keywords         Json                          @default("[]") // string[]
   programmeCodes   Json                          @default("[]") // string[]
   source           PartnerSearchSource
@@ -1060,7 +1060,7 @@ model PartnerProfileSnapshot {
   name              String
   type              PartnerSearchOrgType @default(OTH)
   country           String?
-  city              String?
+  city              String? @db.LongText
   description       String?  @db.LongText
   keywords          Json     @default("[]") // string[]
   projectCount      Int      @default(0)
@@ -1094,7 +1094,7 @@ model UnmatchedOrganization {
   matchKey    String    @unique // matchKeyFor(): "pic:<pic>" or "name:<COUNTRY>:<normalized name>"
   pic         String? @db.VarChar(40)
   name        String
-  country     String?
+  country     String? @db.LongText
   firstSeenAt DateTime  @default(now())
   lastSeenAt  DateTime
   resolvedPic String?   // set once an admin or a later CORDIS import links it
@@ -1129,18 +1129,18 @@ model Opportunity {
   id           String @db.VarChar(128)   @id @default(cuid())
   tenantId     String @db.VarChar(128)
   workspaceId  String @db.VarChar(128)
-  topicId      String?
+  topicId      String? @db.LongText
   title        String
   stage        Gate     @default(G0)
   status       OppStatus @default(ACTIVE)
-  intendedRole String?  // coordinator | partner
-  ownerId      String?
+  intendedRole String? @db.LongText  // coordinator | partner
+  ownerId      String? @db.LongText
   g0Score      Float?
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
-  deletionReason String?
+  deletionReason String? @db.LongText
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   proposal     Proposal?
   gateDecisions GateDecision[]
@@ -1178,11 +1178,11 @@ model GateDecision {
   gate          Gate
   passed        Boolean
   inputs        Json     // values evaluated
-  ruleVersion   String
-  decidedBy     String
+  ruleVersion   String @db.LongText
+  decidedBy     String @db.LongText
   decidedAt     DateTime @default(now())
   deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
-  deletionReason String?
+  deletionReason String? @db.LongText
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   @@index([tenantId, opportunityId])
   @@index([deletedAt])
@@ -1192,7 +1192,7 @@ model ConsortiumSeat {
   id            String @db.VarChar(128)   @id @default(cuid())
   tenantId      String @db.VarChar(128)
   opportunityId String @db.VarChar(128)
-  roleKey       String   // coordinator | research | industry | end_user | widening | dissemination | custom
+  roleKey       String @db.LongText   // coordinator | research | industry | end_user | widening | dissemination | custom
   required      Boolean  @default(true)
   organizationId String? // filled seat (CORDIS PIC) or
   partnerOrgId  String?  // tenant-private partner record
@@ -1215,8 +1215,8 @@ model PartnerOrg {                 // tenant-private orgs not in CORDIS
   id        String @db.VarChar(128)  @id @default(cuid())
   tenantId  String @db.VarChar(128)
   name      String
-  country   String?
-  orgType   String?
+  country   String? @db.LongText
+  orgType   String? @db.LongText
   pic       String?
   website   String?
   createdAt DateTime @default(now())
@@ -1230,10 +1230,10 @@ model Proposal {
   acronym       String?
   submittedAt   DateTime?
   esrScores     Json?    // {excellence, impact, implementation, total, threshold}
-  esrFileUrl    String?
+  esrFileUrl    String? @db.LongText
   outcome       String?  // funded | reserve | above_threshold | below
   deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
-  deletionReason String?
+  deletionReason String? @db.LongText
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   evaluations   Evaluation[]
   @@index([deletedAt])
@@ -1243,12 +1243,12 @@ model Effort {
   id            String @db.VarChar(128)   @id @default(cuid())
   tenantId      String @db.VarChar(128)
   opportunityId String @db.VarChar(128)
-  userId        String
+  userId        String @db.LongText
   date          DateTime
   hours         Float
   note          String?
   deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
-  deletionReason String?
+  deletionReason String? @db.LongText
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   @@index([tenantId, opportunityId])
   @@index([deletedAt])
@@ -1264,33 +1264,33 @@ model Evidence {
   title              String
   body               String               @db.LongText
   description        String?              @db.LongText
-  language           String               @default("tr") // tr | en | bilingual
-  issuingAuthority   String?              // TSE, İTO, TÜRKAK, Audit Firm
-  documentNumber     String?              // Certificate / Doc No
+  language           String @db.LongText               @default("tr") // tr | en | bilingual
+  issuingAuthority   String? @db.LongText              // TSE, İTO, TÜRKAK, Audit Firm
+  documentNumber     String? @db.LongText              // Certificate / Doc No
   issuedAt           DateTime?
   validFrom          DateTime?
   validUntil         DateTime?
-  confidentiality    String               @default("INTERNAL") // PUBLIC | CONSORTIUM | INTERNAL | RESTRICTED
+  confidentiality    String @db.LongText               @default("INTERNAL") // PUBLIC | CONSORTIUM | INTERNAL | RESTRICTED
   status             String               @default("VALID") // UNVERIFIED | VALID | EXPIRING_SOON | EXPIRED | REJECTED
   version            Int                  @default(1)
   
   // Cloudflare R2 Depolama Bilgileri
   r2ObjectKey        String?              // tenantId/orgId/cat/hash.ext
-  fileBucket         String               @default("fonbridge-evidence")
+  fileBucket         String @db.LongText               @default("fonbridge-evidence")
   fileName           String?
   fileSizeBytes      Int?
-  mimeType           String?
-  checksumSha256     String?
-  fileUrl            String?
-  sourceUrl          String?
+  mimeType           String? @db.LongText
+  checksumSha256     String? @db.LongText
+  fileUrl            String? @db.LongText
+  sourceUrl          String? @db.LongText
   sourceDate         DateTime?
 
   // YZ & OCR Metadata
   ocrText            String?              @db.LongText
   extractedFields    Json                 @default("{}")
   tags               Json
-  lastUsedIn         String?              // proposalId
-  createdBy          String               @default("system")
+  lastUsedIn         String? @db.LongText              // proposalId
+  createdBy          String @db.LongText               @default("system")
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -1346,9 +1346,9 @@ model ProposalUsage {
   tenantId           String @db.VarChar(128)
   opportunityId      String
   evidenceId         String @db.VarChar(128)
-  sectionKey         String               // "PartB_Sec3_2", "Annex_4", "ConceptNote_G0"
+  sectionKey         String @db.LongText               // "PartB_Sec3_2", "Annex_4", "ConceptNote_G0"
   usedAt             DateTime             @default(now())
-  usedByUserId       String?
+  usedByUserId       String? @db.LongText
 
   evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 
@@ -1363,18 +1363,18 @@ model ConceptTemplate {             // platform + tenant templates
   key       String  // cetp_pre, dut_pre, eurostars_summary, he_stage1_blind, eic_step1, hopon
   name      String
   schema    Json    // sections[] {key,labelKey,maxWords,promptKey}
-  version   String
+  version   String @db.LongText
 }
 
 model ConceptNote {
   id            String @db.VarChar(128)   @id @default(cuid())
   tenantId      String @db.VarChar(128)
   opportunityId String
-  templateId    String
+  templateId    String @db.LongText
   content       Json     // {sectionKey: markdown}
   status        String   @default("draft") // draft | review | approved
   version       Int      @default(1)
-  createdBy     String
+  createdBy     String @db.LongText
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   @@index([tenantId, opportunityId])
@@ -1424,8 +1424,8 @@ model Interaction {
   kind           String   // meeting | email | call | event
   at             DateTime
   summary        String?
-  briefId        String?   // M9
-  createdBy      String
+  briefId        String? @db.LongText   // M9
+  createdBy      String @db.LongText
   @@index([tenantId, relationshipId])
 }
 
@@ -1449,10 +1449,10 @@ model SeatCandidate {
 model AiUsageLog {
   id          String @db.VarChar(128)   @id @default(cuid())
   tenantId    String @db.VarChar(128)
-  userId      String?
+  userId      String? @db.LongText
   module      String
   purpose     String
-  provider    String
+  provider    String @db.LongText
   model       String
   promptHash  String
   inputTokens Int
@@ -1470,8 +1470,8 @@ model Document {
   tenantId  String? @db.VarChar(128)  // null = shared public (work programmes)
   kind      String   // work_programme | topic | cordis_summary | tenant_upload
   title     String
-  sourceUrl String?
-  fileUrl   String?
+  sourceUrl String? @db.LongText
+  fileUrl   String? @db.LongText
   createdAt DateTime @default(now())
   chunks    Chunk[]
 }
@@ -1498,7 +1498,7 @@ model Chunk {
 model AuditEvent {
   id        String @db.VarChar(128)   @id @default(cuid())
   tenantId  String? @db.VarChar(128)
-  actorId   String?
+  actorId   String? @db.LongText
   type      String   // module.state.changed | gate.decided | subscription.updated | ...
   target    String?
   data      Json?
@@ -1532,7 +1532,7 @@ model StripeEventLog {
   id            String @db.VarChar(128)   @id @default(cuid())
   tenantId      String @db.VarChar(128)
   stripeEventId String   @unique
-  handler       String   // subscription.sync | subscription.cancel | invoice.payment
+  handler       String @db.LongText   // subscription.sync | subscription.cancel | invoice.payment
   processedAt   DateTime @default(now())
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   @@index([tenantId, processedAt])
@@ -1551,7 +1551,7 @@ model Notification {
   id          String @db.VarChar(128)           @id @default(cuid())
   tenantId    String @db.VarChar(128)
   userId      String           // recipient; User.id, no FK (SavedSearch.userId pattern)
-  workspaceId String?          // NULL = tenant-wide (both MVP producers)
+  workspaceId String? @db.LongText          // NULL = tenant-wide (both MVP producers)
   type        NotificationType
   payload     Json             @default("{}")
   dedupeKey   String?          // same event twice -> one row (@@unique below)
@@ -1588,7 +1588,7 @@ model Evaluation {
   proposal       Proposal?   @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   userId         String? @db.VarChar(128)     // owning evaluator / creator
   user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  readerType     String      @default("HUMAN") // "HUMAN" | "AI" | "PANEL"
+  readerType     String @db.LongText      @default("HUMAN") // "HUMAN" | "AI" | "PANEL"
   status         String      @default("draft") // draft | in-progress | completed
   avgScore       Float?      // weighted 1-5 panel average; null until reviewers submit
   excellence     Float       @default(0)
@@ -1660,10 +1660,10 @@ model MeetingBrief {
   id                  String @db.VarChar(128)      @id @default(cuid())
   tenantId            String @db.VarChar(128)
   interactionId       String      @unique
-  partnerName         String?
+  partnerName         String? @db.LongText
   content             String
   meetingScheduledAt  DateTime?   // UTC meeting time
-  meetingScheduledTz  String      @default("Europe/Brussels")
+  meetingScheduledTz  String @db.LongText      @default("Europe/Brussels")
   createdAt           DateTime    @default(now())
   // The opportunity the brief was prepared for (add-meeting-brief-opportunity.sql).
   // NULL = "not linked to an opportunity": every brief written before the column
@@ -1682,12 +1682,12 @@ model CalendarConnection {
   tenantId          String @db.VarChar(128)
   userId            String
   provider          String    // 'google' | 'outlook' | 'ics'
-  externalId        String?   // Google: calendar ID, Outlook: mailbox address
-  accessToken       String?   // Plaintext. Column is unpopulated today — no OAuth writer exists yet
+  externalId        String? @db.LongText   // Google: calendar ID, Outlook: mailbox address
+  accessToken       String? @db.LongText   // Plaintext. Column is unpopulated today — no OAuth writer exists yet
                                // (google/outlook `connectCalendar` refuses with CALENDAR_OAUTH_NOT_CONFIGURED,
                                // `/api/calendar/callback` does not exist). Must be encrypted before that
                                // OAuth flow ships — see docs/ROADMAP.md open decision #12, TASK-MTSHP3BMTAD3Y.
-  refreshToken      String?   // Same as accessToken above.
+  refreshToken      String? @db.LongText   // Same as accessToken above.
   tokenExpiresAt    DateTime?
   isConnected       Boolean   @default(true)
   lastSyncAt        DateTime?
@@ -1706,7 +1706,7 @@ model FollowupDoc {
   opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   kind           String      // NDA, LOI, COMMITMENT, ESR_DEBRIEF, AWARD_PACK
   version        Int         @default(1)
-  contentUrl     String?
+  contentUrl     String? @db.LongText
   signedAt       DateTime?
   createdAt      DateTime    @default(now())
 
@@ -1715,8 +1715,8 @@ model FollowupDoc {
   // `signedAt` above. `approvalSubmittedByName` is a snapshot of the display name
   // as the session carried it, so the record stays readable after a rename.
   approvalSubmittedAt     DateTime?
-  approvalSubmittedById   String?
-  approvalSubmittedByName String?
+  approvalSubmittedById   String? @db.LongText
+  approvalSubmittedByName String? @db.LongText
 
   approvalSteps  DualApprovalStep[]
 }
@@ -1735,7 +1735,7 @@ model DualApprovalStep {
   followupDoc   FollowupDoc @relation(fields: [followupDocId], references: [id], onDelete: Cascade)
   department    String      // FINANCE | LEGAL
   actorUserId   String
-  actorName     String
+  actorName     String @db.LongText
   note          String?
   decidedAt     DateTime    @default(now())
 
@@ -1763,7 +1763,7 @@ model TtoPortfolioItem {
   tenantId     String @db.VarChar(128)
   title        String
   trl          Int      @default(5)
-  patentStatus String   // pending | granted | licensed
+  patentStatus String @db.LongText   // pending | granted | licensed
   summary      String
   keywords     Json
   createdAt    DateTime @default(now())
@@ -1808,8 +1808,8 @@ model Invitation {
 model ApprovalRequest {
   id              String @db.VarChar(128)         @id @default(cuid())
   tenantId        String @db.VarChar(128)
-  workspaceId     String?
-  actionType      String         // GATE_G4_SUBMISSION | BUDGET_ALLOCATION | LEGAL_COMMITMENT | MEMBER_ROLE_ELEVATION | SENSITIVE_SETTINGS_CHANGE
+  workspaceId     String? @db.LongText
+  actionType      String @db.LongText         // GATE_G4_SUBMISSION | BUDGET_ALLOCATION | LEGAL_COMMITMENT | MEMBER_ROLE_ELEVATION | SENSITIVE_SETTINGS_CHANGE
   title           String
   description     String?
   payload         Json
@@ -1817,7 +1817,7 @@ model ApprovalRequest {
   requiredRole    Role           @default(TENANT_ADMIN)
   requesterId     String @db.VarChar(128)
   approverId      String? @db.VarChar(128)
-  rejectionReason String?
+  rejectionReason String? @db.LongText
   auditHash       String?
   expiresAt       DateTime
   executedAt      DateTime?
@@ -1851,7 +1851,7 @@ enum ApprovalStatus {
 model Feedback {
   id            String @db.VarChar(128)            @id @default(cuid())
   tenantId      String @db.VarChar(128)
-  userId        String?
+  userId        String? @db.LongText
   workspaceSlug String?
   category      FeedbackCategory
   impact        FeedbackImpact    @default(MINOR)
@@ -1860,16 +1860,16 @@ model Feedback {
   status        FeedbackStatus    @default(NEW)
   title         String
   body          String
-  triageReason  String?           // which rule fired, for auditability
+  triageReason  String? @db.LongText           // which rule fired, for auditability
   pageUrl       String?
   userAgent     String?
-  appVersion    String?
+  appVersion    String? @db.LongText
   locale        String            @default("tr")
-  screenshotKey String?           // R2 object key; the URL is signed on demand
-  alertId       String?           // SystemAlert.id raised for this report
-  alertStatus   String?           // recorded | failed ('legacy' = predates the SystemAlert channel)
+  screenshotKey String? @db.LongText           // R2 object key; the URL is signed on demand
+  alertId       String? @db.LongText           // SystemAlert.id raised for this report
+  alertStatus   String? @db.LongText           // recorded | failed ('legacy' = predates the SystemAlert channel)
   triageNote    String?
-  triagedById   String?
+  triagedById   String? @db.LongText
   triagedAt     DateTime?
   resolvedAt    DateTime?
   createdAt     DateTime          @default(now())
@@ -2003,7 +2003,7 @@ model Consent {
   /// whole point — when the text changes, the version changes, and an old row
   /// then says exactly what it should say: this person agreed to something
   /// else. A stored copy could not say that; it would just look current.
-  documentId      String
+  documentId      String @db.LongText
   documentVersion String
 
   /// Which language the person actually read.
@@ -2128,7 +2128,7 @@ model InterregAnalysis {
   rubricId String @db.VarChar(64)
   status   InterregAnalysisStatus @default(UPLOADING)
 
-  callFileName    String?
+  callFileName    String? @db.LongText
   callFormat      InterregDocFormat?
   callPages       Int? // PDF only
   callChars       Int?
@@ -2138,7 +2138,7 @@ model InterregAnalysis {
   /// Set exactly when `callText` is (CHECK InterregAnalysis_text_expiry_pair).
   callTextExpiresAt DateTime?
 
-  projectFileName    String?
+  projectFileName    String? @db.LongText
   projectFormat      InterregDocFormat?
   projectPages       Int?
   projectChars       Int?
@@ -2208,7 +2208,7 @@ model InterregCriterionMark {
   strengths       Json     @default("[]")
   weaknesses      Json     @default("[]")
   evidenceQuote   String?  @db.LongText
-  evidenceLocator String?
+  evidenceLocator String? @db.LongText
   /// Every [{ quote, location }] behind the mark; evidenceQuote/Locator keep the first (FO-188).
   evidence        Json     @default("[]")
   createdAt       DateTime @default(now())
