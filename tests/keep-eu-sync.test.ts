@@ -9,7 +9,8 @@ type TableName =
   | 'cordisProjectTopic'
   | 'systemAlert'
   | 'rawFetch'
-  | 'document';
+  | 'document'
+  | 'chunk';
 
 function createKeepEuStub() {
   const store = new Map<TableName, Map<string, Row>>();
@@ -179,6 +180,7 @@ function createKeepEuStub() {
         table('document').set(id, { id, ...args.data });
         return { id };
       },
+      // Prisma reports an unset tenantId as null on read; the stub does the same.
       deleteMany: async (args?: { where?: Row }): Promise<{ count: number }> => {
         let count = 0;
         if (!args?.where) {
@@ -189,7 +191,7 @@ function createKeepEuStub() {
         for (const [id, row] of [...table('document').entries()]) {
           let match = true;
           for (const [k, v] of Object.entries(args.where)) {
-            if (row[k] !== v) {
+            if ((row[k] ?? null) !== v) {
               match = false;
               break;
             }
@@ -200,6 +202,23 @@ function createKeepEuStub() {
           }
         }
         return { count };
+      },
+      findMany: async (args: {
+        where: Row;
+        take?: number;
+        select?: { chunks?: { orderBy?: Row } };
+      }): Promise<Row[]> => {
+        const matches = [...table('document').values()].filter((row) =>
+          Object.entries(args.where).every(([k, v]) => (row[k] ?? null) === v),
+        );
+        return matches.slice(0, args.take ?? matches.length).map((doc) => {
+          const chunks = rows('chunk').filter((c) => c.documentId === doc.id);
+          // Like Postgres: chunks come back in insertion order unless the query orders them.
+          if (args.select?.chunks?.orderBy) {
+            chunks.sort((a, b) => Number(a.ordinal) - Number(b.ordinal));
+          }
+          return { ...doc, chunks };
+        });
       },
     },
 
@@ -253,7 +272,14 @@ function createKeepEuStub() {
       }));
     },
 
-    $executeRawUnsafe: async (): Promise<number> => 1,
+    // ingestDocument's chunk insert: ($1 documentId, $2 tenantId, $3 ordinal, $4 text, $5 embedding).
+    $executeRawUnsafe: async (sql: string, ...params: unknown[]): Promise<number> => {
+      if (sql.includes('INSERT INTO "Chunk"')) {
+        const id = `chunk-${seq++}`;
+        table('chunk').set(id, { id, documentId: params[0], ordinal: params[2], text: params[3] });
+      }
+      return 1;
+    },
   };
 
   return {
@@ -263,6 +289,26 @@ function createKeepEuStub() {
     reset: () => {
       store.clear();
       seq = 0;
+    },
+    // Writes a stored document directly, as a legacy or tenant-owned copy would exist.
+    seedDocument: (doc: { tenantId: string | null; kind: string; title: string; texts: string[] }): string => {
+      const id = `doc-${seq++}`;
+      table('document').set(id, { id, tenantId: doc.tenantId, kind: doc.kind, title: doc.title });
+      doc.texts.forEach((text, ordinal) => {
+        const cid = `chunk-${seq++}`;
+        table('chunk').set(cid, { id: cid, documentId: id, ordinal, text });
+      });
+      return id;
+    },
+    // Same chunks and ordinals, but stored in reverse physical order.
+    reverseChunks: (documentId: string): void => {
+      const t = table('chunk');
+      const mine = [...t.entries()].filter(([, r]) => r.documentId === documentId);
+      for (const [key] of mine) t.delete(key);
+      for (const [key, row] of mine.reverse()) t.set(key, row);
+    },
+    deleteRow: (name: TableName, id: string): void => {
+      table(name).delete(id);
     },
   };
 }
@@ -485,6 +531,158 @@ describe('persistKeepEuRecord', () => {
 
     const alerts = db.rows('systemAlert');
     expect(alerts.some((a) => String(a.message).includes('missing project id'))).toBe(true);
+  });
+});
+
+describe('syncKeepEuData RAG mirror', () => {
+  test('re-running an unchanged project embeds nothing the second time', async () => {
+    const proj = sampleKeepEuProject();
+    const first = await syncKeepEuData({ records: [proj] });
+    const embeddedFirst = embedTextMock.mock.calls.length;
+    expect(embeddedFirst).toBeGreaterThan(0);
+    expect(first.ragEmbeddedCount).toBe(1);
+    expect(first.ragUnchangedCount).toBe(0);
+
+    embedTextMock.mockClear();
+    const second = await syncKeepEuData({ records: [proj] });
+
+    expect(embedTextMock).not.toHaveBeenCalled();
+    expect(second.ragEmbeddedCount).toBe(0);
+    expect(second.ragUnchangedCount).toBe(1);
+    expect(db.rows('document')).toHaveLength(1);
+    expect(db.rows('chunk')).toHaveLength(embeddedFirst);
+  });
+
+  test('a changed project is re-embedded and an unchanged neighbour is not', async () => {
+    const a = sampleKeepEuProject();
+    const b = { ...sampleKeepEuProject(), projectId: 'OTHER-B', acronym: 'OTHER B', title: 'Second project' };
+    await syncKeepEuData({ records: [a, b] });
+
+    embedTextMock.mockClear();
+    const changedA = { ...a, status: 'completed' };
+    const res = await syncKeepEuData({ records: [changedA, b] });
+
+    expect(res.ragEmbeddedCount).toBe(1);
+    expect(res.ragUnchangedCount).toBe(1);
+    const texts = embedTextMock.mock.calls.map((c) => String(c[0]));
+    expect(texts.some((t) => t.includes('Status: completed'))).toBe(true);
+    expect(texts.some((t) => t.includes('Second project'))).toBe(false);
+    expect(db.rows('document')).toHaveLength(2);
+  });
+
+  test('a new project is embedded on its first run', async () => {
+    const a = sampleKeepEuProject();
+    await syncKeepEuData({ records: [a] });
+
+    embedTextMock.mockClear();
+    const fresh = { ...a, projectId: 'NEW-C', acronym: 'NEW C', title: 'Brand new project' };
+    const res = await syncKeepEuData({ records: [a, fresh] });
+
+    expect(res.ragEmbeddedCount).toBe(1);
+    expect(res.ragUnchangedCount).toBe(1);
+    expect(embedTextMock.mock.calls.some((c) => String(c[0]).includes('Brand new project'))).toBe(true);
+  });
+
+  // A body long enough to split into several chunks, so ordinal and tail checks mean something.
+  function longProject(): ReturnType<typeof sampleKeepEuProject> {
+    const description = Array.from(
+      { length: 120 },
+      (_, i) => `Activity ${i}: cross-border cooperation on heritage, tourism and infrastructure.`,
+    ).join(' ');
+    return { ...sampleKeepEuProject(), description };
+  }
+
+  function storedTexts(documentId: string): string[] {
+    return db
+      .rows('chunk')
+      .filter((c) => c.documentId === documentId)
+      .sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
+      .map((c) => String(c.text));
+  }
+
+  test('two shared documents with the same title are rebuilt into one, never kept as current', async () => {
+    const proj = sampleKeepEuProject();
+    await syncKeepEuData({ records: [proj] });
+    const original = db.rows('document')[0]!;
+    db.seedDocument({
+      tenantId: null,
+      kind: 'INTERREG_PROJECT',
+      title: String(original.title),
+      texts: storedTexts(String(original.id)),
+    });
+    expect(db.rows('document')).toHaveLength(2);
+
+    embedTextMock.mockClear();
+    const res = await syncKeepEuData({ records: [proj] });
+
+    expect(res.ragEmbeddedCount).toBe(1);
+    expect(res.ragUnchangedCount).toBe(0);
+    expect(embedTextMock).toHaveBeenCalled();
+    expect(db.rows('document')).toHaveLength(1);
+  });
+
+  test('a stored copy missing its last chunk is re-embedded, not kept as current', async () => {
+    const proj = longProject();
+    await syncKeepEuData({ records: [proj] });
+    const doc = db.rows('document')[0]!;
+    const chunks = db.rows('chunk').filter((c) => c.documentId === doc.id);
+    expect(chunks.length).toBeGreaterThan(1);
+    const wantedCount = chunks.length;
+    const lastChunk = chunks.reduce((a, b) => (Number(a.ordinal) > Number(b.ordinal) ? a : b));
+    db.deleteRow('chunk', String(lastChunk.id));
+
+    embedTextMock.mockClear();
+    const res = await syncKeepEuData({ records: [proj] });
+
+    expect(res.ragEmbeddedCount).toBe(1);
+    expect(res.ragUnchangedCount).toBe(0);
+    expect(embedTextMock).toHaveBeenCalled();
+    // The rebuilt document has a new id; the rebuilt copy must hold every chunk again.
+    const rebuilt = db.rows('document');
+    expect(rebuilt).toHaveLength(1);
+    expect(storedTexts(String(rebuilt[0]!.id))).toHaveLength(wantedCount);
+  });
+
+  test('chunks stored in reverse physical order with correct ordinals still count as unchanged', async () => {
+    const proj = longProject();
+    await syncKeepEuData({ records: [proj] });
+    const doc = db.rows('document')[0]!;
+    db.reverseChunks(String(doc.id));
+    const physical = db.rows('chunk').filter((c) => c.documentId === doc.id);
+    expect(Number(physical[0]!.ordinal)).toBeGreaterThan(Number(physical[physical.length - 1]!.ordinal));
+
+    embedTextMock.mockClear();
+    const res = await syncKeepEuData({ records: [proj] });
+
+    expect(embedTextMock).not.toHaveBeenCalled();
+    expect(res.ragEmbeddedCount).toBe(0);
+    expect(res.ragUnchangedCount).toBe(1);
+  });
+
+  test('a tenant-owned document with the same title is neither compared against nor deleted', async () => {
+    const proj = sampleKeepEuProject();
+    await syncKeepEuData({ records: [proj] });
+    const shared = db.rows('document')[0]!;
+    db.seedDocument({
+      tenantId: 'tenant-1',
+      kind: 'INTERREG_PROJECT',
+      title: String(shared.title),
+      texts: ['tenant-owned copy'],
+    });
+
+    // Shared copy is current: the tenant copy must not make it look like a duplicate.
+    embedTextMock.mockClear();
+    const unchanged = await syncKeepEuData({ records: [proj] });
+    expect(unchanged.ragUnchangedCount).toBe(1);
+    expect(embedTextMock).not.toHaveBeenCalled();
+
+    // Shared copy changes: only the shared copy is replaced; the tenant copy survives.
+    const changed = { ...proj, status: 'completed' };
+    const rebuilt = await syncKeepEuData({ records: [changed] });
+    expect(rebuilt.ragEmbeddedCount).toBe(1);
+    const docs = db.rows('document');
+    expect(docs.filter((d) => d.tenantId === 'tenant-1')).toHaveLength(1);
+    expect(docs.filter((d) => d.tenantId == null)).toHaveLength(1);
   });
 });
 

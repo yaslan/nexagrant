@@ -30,6 +30,7 @@ vi.mock('@/modules/m1/server/partner-search/flag', async (importOriginal) => ({
 }));
 
 const { prisma, withTenant } = await import('@/lib/db');
+const { isCi, skipOrFailInCi } = await import('./helpers/live-db-role');
 const { PartnerSearchClient, PARTNER_SEARCH_ALERT_SOURCE } = await import('@/lib/adapters/partner-search');
 const { runPartnerSearchIngestion } = await import('@/modules/m1/server/partner-search/ingestor');
 const { countOpenIngestionAlerts } = await import('@/modules/m1/server/partner-search/alerts');
@@ -39,8 +40,10 @@ const { readPartnerSignal, readAnnouncementsForExport, toAnnouncementDto, toExpo
 
 const dbName = new URL(process.env.DATABASE_URL ?? 'postgresql://x/none').pathname.replace('/', '');
 const HAS_DB = Boolean(process.env.DATABASE_URL);
-const SHARED = dbName === 'fabrika' && process.env.CI !== 'true';
+const SHARED = dbName === 'fabrika' && !isCi();
 const RUN = HAS_DB && !SHARED;
+if (!HAS_DB) skipOrFailInCi('partner-search-acceptance.live', 'DATABASE_URL is not set');
+if (SHARED) skipOrFailInCi('partner-search-acceptance.live', 'it runs the real ingestor and deletes SystemAlert rows by source; refusing the shared "fabrika" database');
 const EVIDENCE = process.env.FO66_EVIDENCE === '1';
 
 const CALL = 'FO66-ACC-CALL';

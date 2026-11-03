@@ -230,6 +230,14 @@ async function main() {
   console.log(`Synced Projects:         ${syncResult.syncedProjectsCount}`);
   console.log(`Synced Partners:         ${syncResult.syncedPartnersCount}`);
   console.log(`Skipped Projects:        ${syncResult.skippedCount}`);
+  if (options.skipRag) {
+    // Zero counts would read as "nothing embedded"; with --skip-rag no embedding step ran at all.
+    console.log(`RAG Embedded:            SKIPPED (--skip-rag, no embedding calls)`);
+    console.log(`RAG Unchanged:           SKIPPED (--skip-rag)`);
+  } else {
+    console.log(`RAG Embedded (new/changed): ${syncResult.ragEmbeddedCount}`);
+    console.log(`RAG Unchanged (no embed):   ${syncResult.ragUnchangedCount}`);
+  }
   console.log(`Total EU Funding (Run):  ${formatEur(syncResult.totalEuFundingEUR)}`);
   console.log(`Total Budget (Run):      ${formatEur(syncResult.totalBudgetEUR)}`);
   console.log('───────────────────────────────────────────────────────────────────────────────');
