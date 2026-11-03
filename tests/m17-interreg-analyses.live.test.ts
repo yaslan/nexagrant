@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
+import { INTERREG_UPLOAD_LIMITS } from '@/modules/m17/limits';
 
 /**
  * FO-186 fix — M17 storage on a real database, over `fabrika_app` (NOBYPASSRLS,
@@ -160,27 +161,33 @@ describe('saveDocument — the status rule (crw2 Ö1)', () => {
 
   test('each slot is kept 30 days from ITS OWN upload: a later project upload does not extend the call text (FO-195 B5)', async () => {
     const id = await newAnalysis(alice);
+    // Anchored on the run's clock, not a fixed calendar date: a fixed date went due on 2026-10-31 and
+    // left this file's own rows past their expiry for the text purge to find (FO-379 B2).
     const DAY = 864e5;
-    const t0 = new Date('2026-10-01T10:00:00.000Z');
+    const RETENTION = INTERREG_UPLOAD_LIMITS.textRetentionDays * DAY;
+    const t0 = new Date();
     const t10 = new Date(t0.getTime() + 10 * DAY);
     const t12 = new Date(t0.getTime() + 12 * DAY);
+    const callAt0 = new Date(t0.getTime() + RETENTION).toISOString();
+    const projectAt10 = new Date(t10.getTime() + RETENTION).toISOString();
+    const callAt12 = new Date(t12.getTime() + RETENTION).toISOString();
 
     const first = await saveDocument(alice, id, 'call', 'guide.txt', doc('call'), t0);
-    expect(first).toMatchObject({ ok: true, analysis: { call: { expiresAt: '2026-10-31T10:00:00.000Z' }, project: null } });
+    expect(first).toMatchObject({ ok: true, analysis: { call: { expiresAt: callAt0 }, project: null } });
     const second = await saveDocument(alice, id, 'project', 'draft.txt', doc('project'), t10);
     expect(second).toMatchObject({
       ok: true,
-      analysis: { call: { expiresAt: '2026-10-31T10:00:00.000Z' }, project: { expiresAt: '2026-11-10T10:00:00.000Z' } },
+      analysis: { call: { expiresAt: callAt0 }, project: { expiresAt: projectAt10 } },
     });
     // Replacing the call guide moves only the call's expiry.
     const third = await saveDocument(alice, id, 'call', 'guide-v2.txt', doc('call v2'), t12);
     expect(third).toMatchObject({
       ok: true,
-      analysis: { call: { expiresAt: '2026-11-12T10:00:00.000Z' }, project: { expiresAt: '2026-11-10T10:00:00.000Z' } },
+      analysis: { call: { expiresAt: callAt12 }, project: { expiresAt: projectAt10 } },
     });
     const row = await admin!.interregAnalysis.findUniqueOrThrow({ where: { id } });
-    expect(row.callTextExpiresAt?.toISOString()).toBe('2026-11-12T10:00:00.000Z');
-    expect(row.projectTextExpiresAt?.toISOString()).toBe('2026-11-10T10:00:00.000Z');
+    expect(row.callTextExpiresAt?.toISOString()).toBe(callAt12);
+    expect(row.projectTextExpiresAt?.toISOString()).toBe(projectAt10);
   });
 
   test('the call guide alone is CALL_READY', async () => {

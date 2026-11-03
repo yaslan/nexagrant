@@ -131,8 +131,9 @@ async function analysis(
 }
 
 const load = (id: string) => admin.interregAnalysis.findUniqueOrThrow({ where: { id } });
-// Due call texts of ONE tenant. The purge is cross-tenant and other live files run against the same
-// database, so a global count (or a global `callSlots`) also counts their rows; this one does not.
+// Due call texts of ONE tenant. Global counts (`callSlots` and friends) are exact only while every live file
+// that writes due texts holds M17_INTERREG_TEXT_PURGE_LOCK (this file and fo191 do; the analyses file writes
+// none due). Per-tenant reads stay per tenant, so a row another file leaves behind cannot change this file's answer.
 const dueCallOf = async (tenantId: string) =>
   Number(
     (
@@ -234,9 +235,12 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const text = 'y'.repeat(300);
     const id = await analysis(t, 'READY', { text, expiresInDays: -1 }, { text, expiresInDays: 4 });
     const [first, second] = await Promise.all([purgeExpiredInterregText(NOW), purgeExpiredInterregText(NOW)]);
-    expect(first.callSlots + second.callSlots).toBeGreaterThanOrEqual(1);
+    expect(first.callSlots + second.callSlots).toBe(1);
     const after = await load(id);
-    await purgeExpiredInterregText(NOW);
+    const again = await purgeExpiredInterregText(NOW);
+    expect(again.callSlots).toBe(0);
+    expect(again.projectSlots).toBe(0);
+    expect(again.analyses).toBe(0);
     expect(await dueCallOf(t.tenantId)).toBe(0);
     expect(await load(id)).toEqual(after); // updatedAt included: nothing was written
   });
@@ -283,15 +287,15 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     expect(first.more).toBe(true);
     expect(first.callSlots).toBe(4);
     const afterFirst = await dueCallOf(t.tenantId);
-    expect(before - afterFirst).toBeGreaterThanOrEqual(1); // the committed pages, read back from the database
-    expect(before - afterFirst).toBe(4);
+    expect(before - afterFirst).toBe(4); // the committed pages, read back from the database
 
     // The next run is the same call: it finishes the backlog and the one after finds nothing.
     const second = await purgeExpiredInterregText(NOW, { batchSize: 2 });
     expect(second.more).toBe(false);
     expect(second.callSlots).toBe(afterFirst);
     expect(await dueCallOf(t.tenantId)).toBe(0);
-    await purgeExpiredInterregText(NOW, { batchSize: 2 });
+    const third = await purgeExpiredInterregText(NOW, { batchSize: 2 });
+    expect(third).toEqual({ callSlots: 0, projectSlots: 0, analyses: 0, more: false });
     expect(await dueCallOf(t.tenantId)).toBe(0);
     for (const id of ids) expect((await load(id)).callText).toBeNull();
   });
@@ -347,8 +351,8 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
       admin.creditLedger.findMany({ where: { refId: { startsWith: id } }, select: { delta: true } }).then((rs) => rs.map((r) => r.delta).sort((a, b) => a - b));
 
     const result = await purgeExpiredInterregText(NOW);
-    // Its own slot is emptied and the row leaves ANALYZING; callSlots is global, so it is only a lower bound.
-    expect(result.callSlots).toBeGreaterThanOrEqual(1);
+    // Its own slot is emptied and the row leaves ANALYZING. Under the file's lock this is the only due call text, so the count is exact.
+    expect(result.callSlots).toBe(1);
     expect(await load(id)).toMatchObject({ status: 'UPLOADING', callText: null, callTextExpiresAt: null, projectText: 'p'.repeat(50) });
     expect(await ledger()).toEqual([-3, 3]);
 
