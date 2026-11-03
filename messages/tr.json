@@ -156,7 +156,10 @@
       "evaluateGate": "{gate} Kapısını Değerlendir",
       "evaluating": "Değerlendiriliyor…",
       "gatePassed": "{gate} kapısı geçildi.",
-      "gateFailed": "{gate} kapısı geçilmedi.",
+      "gateAdvanced": "{gate} kapısı geçildi; fırsat {gate} aşamasına ilerledi.",
+      "gateFailed": "{gate} kapısı geçilmedi; fırsat {stage} aşamasında kaldı.",
+      "evaluateNextGate": "{gate} kapısını değerlendir ve ilerlet",
+      "finalStage": "Son aşama: {gate}",
       "g0Score": "G0 Puanı",
       "g0NotComputed": "Hesaplanamadı",
       "g0NotComputedHint": "Bu fırsat için henüz puanlanacak kanıt yok. Konu eşleşmesi, başarı oranı ve kurum geçmişi girildiğinde puan hesaplanır.",
@@ -224,6 +227,7 @@
       "error": {
         "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Lütfen yeniden giriş yapın.",
         "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı; kapı değerlendirilemez.",
+        "GATE_OUT_OF_ORDER": "Bu kapı şu an değerlendirilemez: fırsatın aşaması değişmiş olabilir. Sayfayı yenileyin.",
         "GATE_EVALUATION_FAILED": "Kapı değerlendirilemedi. Lütfen tekrar deneyin."
       },
       "application": {
@@ -272,7 +276,17 @@
     },
     "heading": "Fırsat & Teklif Boru Hattı",
     "subtitle": "G0 Triage fizibilitesinden G4 nihai başvuru teslimine kadar çalışma grubunuzdaki kullanıcılarla tekliflerinizi yönetin.",
-    "createRefused": "Fırsat oluşturulamadı: bu çalışma alanına yazma yetkiniz yok ya da alan artık yok."
+    "createRefused": "Fırsat oluşturulamadı: bu çalışma alanına yazma yetkiniz yok ya da alan artık yok.",
+    "moved": "Fırsat {stage} aşamasına taşındı.",
+    "moveRefused": "“{title}” {stage} aşamasına taşınamadı; yerinde kaldı.",
+    "moveRefusedDismiss": "Kapat",
+    "moveSkipped": "{from} aşamasından {to} aşamasına atlanamaz: önce {next} kapısı geçilmeli.",
+    "moveError": {
+      "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Lütfen yeniden giriş yapın.",
+      "INVALID_INPUT": "Aşama değiştirilemedi: geçersiz fırsat ya da aşama.",
+      "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı ya da arşivlenmiş; aşaması değiştirilemez.",
+      "STAGE_MOVE_FAILED": "Aşama değiştirilemedi. Fırsat yerinde kaldı; lütfen tekrar deneyin."
+    }
   },
   "Evidence": {
     "title": "Kanıt Çekmecesi",
