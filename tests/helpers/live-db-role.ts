@@ -49,6 +49,18 @@ export function isCi(env: NodeJS.ProcessEnv = process.env): boolean {
   );
 }
 
+/**
+ * True only on a GitHub Actions runner (`GITHUB_ACTIONS=true`, which the runner sets itself).
+ *
+ * This, not `isCi()`, is what lets a live suite run on a database named `fabrika`: that name
+ * is the shared dev database everywhere except ci.yml's service container. `isCi()` takes any
+ * `CI=1` typed in a shell, and with it 12 suites deleted rows from the shared database
+ * (measured, FO-371). `skipOrFailInCi` keeps `isCi()`: refusing to skip is the safe direction.
+ */
+export function isGithubActions(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.GITHUB_ACTIONS === 'true';
+}
+
 const DB_FIX =
   "Provide the database and DATABASE_URL_RLS_TEST (`pnpm db:rls-role`) in the CI job.";
 
@@ -176,6 +188,11 @@ export async function usedDatabaseName(
     return undefined;
   }
   const other = await readDbIdentity(fixtures);
+  throwIfDifferentDatabase(suite, target, other);
+  return target.db;
+}
+
+function throwIfDifferentDatabase(suite: string, target: DbIdentity, other: DbIdentity): void {
   if (target.db !== other.db || target.cluster !== other.cluster) {
     throw new Error(
       `${suite}: DATABASE_URL and DATABASE_URL_RLS_TEST point at different databases ` +
@@ -183,7 +200,6 @@ export async function usedDatabaseName(
         "Fixtures would go to one and the code under test would run on the other; point both at the same throwaway database.",
     );
   }
-  return target.db;
 }
 
 export async function readRole(client: RawQueryable): Promise<RoleFacts> {
@@ -229,4 +245,26 @@ export async function assertAppOwnerRole(
     );
   }
   return role;
+}
+
+/**
+ * For a suite that opens a second connection of its own (a raw `pg` client on
+ * DATABASE_URL_RLS_TEST) and writes through it. Throws, never skips, unless `used` is on the same
+ * database and cluster as `fixtures` AND is a role RLS applies to: pointed at a privileged role on
+ * the shared database, the writes the suite expects to be refused would be applied (FO-371 §2).
+ * Call it before the first write.
+ */
+export async function assertAppConnection(
+  used: RawQueryable,
+  fixtures: RawQueryable,
+  suite: string,
+): Promise<RoleFacts> {
+  let target: DbIdentity;
+  try {
+    target = await readDbIdentity(used);
+  } catch (e) {
+    throw new Error(`${suite}: could not verify the second connection before writing through it (${errorCause(e)})`);
+  }
+  throwIfDifferentDatabase(suite, target, await readDbIdentity(fixtures));
+  return assertRlsSubjectRole(used, suite);
 }

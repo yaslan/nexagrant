@@ -7,7 +7,7 @@ import type { InterregAnalysisStatus } from '@prisma/client';
  *
  * purgeExpiredInterregText() works across EVERY tenant by date, so like
  * notification-retention.live this file refuses to run on the shared local database
- * named `fabrika` outside CI. Singleton swap as there: the code under test runs as
+ * named `fabrika` outside GitHub Actions. Singleton swap as there: the code under test runs as
  * fabrika_app, where an unscoped updateMany would match no row and report 0; fixtures
  * and counts go through the owner role.
  */
@@ -53,7 +53,7 @@ vi.mock('@/lib/llm', async (importOriginal) => {
 });
 
 import { purgeExpiredInterregText } from '@/modules/m17/server/retention';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -65,7 +65,7 @@ const REACHABLE =
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
 const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
-const SHARED = DB_NAME === 'fabrika' && !isCi();
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
 if (SHARED) skipOrFailInCi(SUITE, 'the purge works across every tenant; refusing to run on the shared "fabrika" database');
 const HAS_DB = DB_NAME !== undefined && !SHARED;
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);

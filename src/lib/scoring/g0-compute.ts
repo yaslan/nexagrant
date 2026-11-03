@@ -25,6 +25,7 @@ import { withTenant } from '../db';
 import { isPresentId } from '../required-id';
 import { decideG0, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
 import { DEFAULT_SCORING_WEIGHTS } from './defaults';
+import type { GateReason } from '../gates/reasons';
 import {
   extractG0Features,
   topicPrefixOf,
@@ -48,6 +49,7 @@ export interface G0Computation {
   features: G0Features;
   contributions: Record<keyof G0Features, number> | null;
   reasons: string[];
+  reasonDetails: GateReason[];
   sources: G0Source[];
   coverage: number;
   scoringVersion: string;
@@ -277,6 +279,7 @@ export function computeG0FromSnapshot(
       features,
       contributions: null,
       reasons: ['no scoring evidence available for this opportunity'],
+      reasonDetails: [{ code: 'G0_NO_EVIDENCE' }],
       sources,
       coverage,
       scoringVersion: G0_SCORING_VERSION,
@@ -293,6 +296,7 @@ export function computeG0FromSnapshot(
     features,
     contributions: result.contributions,
     reasons: result.reasons,
+    reasonDetails: result.reasonDetails,
     sources,
     coverage,
     scoringVersion: G0_SCORING_VERSION,
