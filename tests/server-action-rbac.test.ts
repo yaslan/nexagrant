@@ -231,7 +231,7 @@ describe('every mapped write action follows rbac.ts for all six roles', () => {
 
 describe('real flows, fake transaction', () => {
   test('gate evaluation: PIPELINE_MANAGER evaluates, WRITER and MEMBER are refused before the engine', async () => {
-    const tx = { opportunity: { findFirst: vi.fn(async () => ({ id: 'opp-1' })) } };
+    const tx = { opportunity: { findFirst: vi.fn(async () => ({ stage: 'G0' })) } };
     m.withTenant.mockImplementation(async (_t: string, fn: (t: typeof tx) => unknown) => fn(tx));
     m.evaluateGate.mockResolvedValue({ passed: true, reasons: ['ok'] });
 

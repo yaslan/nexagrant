@@ -13,6 +13,7 @@ import { getOpportunityTabs } from '@/lib/modules/registry';
 
 import { archiveOpportunity, declareApplication, evaluateOpportunityGate } from '../actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { nextStageOf } from '@/lib/gates/transition';
 import { errorMessage } from '@/lib/errors';
 import { EffortTracker, type EffortEntry } from './effort';
 
@@ -45,7 +46,7 @@ export interface OpportunityView {
   intendedRole: string | null;
 }
 
-type GateOutcome = { passed: boolean; reasons: string[] };
+type GateOutcome = { gate: Gate; stageBefore: Gate; passed: boolean; reasons: string[] };
 
 const TASK_TEMPLATE = ['T-6', 'T-5', 'T-4'] as const;
 
@@ -94,21 +95,27 @@ export function OpportunityDetailClient({
    * one-second timer — a pass announced without anything being evaluated and without the stage
    * moving. `evaluateGate` scores the opportunity, records a `GateDecision` and advances the
    * stage only when the rules actually pass, so the answer on screen is the stored decision.
+   *
+   * The main button runs the gate in front of the opportunity. A stage records a gate already
+   * passed, so running the stage's own gate could never have moved it, whatever the label said.
    */
-  const handleEvaluateGate = () => {
+  const nextStage = nextStageOf(opportunity.stage);
+
+  const handleEvaluateGate = (gate: Gate) => {
     setActionError(null);
     setOutcome(null);
     startTransition(async () => {
       try {
         const res = await evaluateOpportunityGate({
           opportunityId: opportunity.id,
-          gate: opportunity.stage,
+          gate,
         });
         if (!res.success) {
           setActionError(t(`detail.error.${res.error}`));
           return;
         }
-        setOutcome({ passed: res.passed, reasons: res.reasons });
+        // The stage on screen changes after the refresh; the banner names what was decided here.
+        setOutcome({ gate, stageBefore: opportunity.stage, passed: res.passed, reasons: res.reasons });
         // The gate writes the score and, on a pass, the new stage: re-read the server component
         // rather than guessing the new state on the client.
         router.refresh();
@@ -196,17 +203,31 @@ export function OpportunityDetailClient({
             {opportunity.topicId && <p className="text-muted font-mono text-sm">{opportunity.topicId}</p>}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <button
-              onClick={handleEvaluateGate}
-              disabled={isPending}
+              onClick={() => nextStage && handleEvaluateGate(nextStage)}
+              disabled={isPending || !nextStage}
               data-testid="pipeline-evaluate-gate"
               className="bg-accent hover:opacity-90 disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-lg transition shadow-2xs cursor-pointer"
             >
-              {isPending
-                ? t('detail.evaluating')
-                : t('detail.evaluateGate', { gate: opportunity.stage })}
+              {!nextStage
+                ? t('detail.finalStage', { gate: opportunity.stage })
+                : isPending
+                  ? t('detail.evaluating')
+                  : t('detail.evaluateNextGate', { gate: nextStage })}
             </button>
+
+            {/* G0 is the one gate no move leads to, and its score is read from this decision. */}
+            {opportunity.stage === 'G0' && (
+              <button
+                onClick={() => handleEvaluateGate('G0')}
+                disabled={isPending}
+                data-testid="pipeline-evaluate-current-gate"
+                className="border border-border text-ink-2 hover:text-ink hover:border-ink-2 disabled:opacity-50 font-semibold py-2.5 px-5 rounded-lg transition cursor-pointer"
+              >
+                {t('detail.evaluateGate', { gate: 'G0' })}
+              </button>
+            )}
 
             {canArchive && !confirmingArchive && (
               <button
@@ -309,9 +330,11 @@ export function OpportunityDetailClient({
             )}
             <div className="space-y-1">
               <p className="font-semibold">
-                {outcome.passed
-                  ? t('detail.gatePassed', { gate: opportunity.stage })
-                  : t('detail.gateFailed', { gate: opportunity.stage })}
+                {!outcome.passed
+                  ? t('detail.gateFailed', { gate: outcome.gate, stage: outcome.stageBefore })
+                  : outcome.gate === outcome.stageBefore
+                    ? t('detail.gatePassed', { gate: outcome.gate })
+                    : t('detail.gateAdvanced', { gate: outcome.gate })}
               </p>
               {outcome.reasons.length > 0 && (
                 <ul className="list-disc list-inside font-mono text-xs opacity-90">
