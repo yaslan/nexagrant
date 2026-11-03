@@ -121,7 +121,7 @@ test.describe('G0 score comes from the canonical scorer', () => {
     expect(afterVisit?.g0Score).toBeNull();
 
     // ── 2. Running the gate stores the same number, with its breakdown.
-    await app.getByTestId('pipeline-evaluate-gate').click();
+    await app.getByTestId('pipeline-evaluate-current-gate').click();
     await expect(app.getByTestId('pipeline-gate-result')).toBeVisible({ timeout: 30_000 });
     await shot(page, '02-detail-after-gate-run');
 
