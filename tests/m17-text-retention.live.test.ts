@@ -130,6 +130,16 @@ async function analysis(
 }
 
 const load = (id: string) => admin.interregAnalysis.findUniqueOrThrow({ where: { id } });
+// Due call texts of ONE tenant. The purge is cross-tenant and other live files run against the same
+// database, so a global count (or a global `callSlots`) also counts their rows; this one does not.
+const dueCallOf = async (tenantId: string) =>
+  Number(
+    (
+      await admin.$queryRaw<Array<{ n: bigint }>>`
+        SELECT count(*)::bigint AS n FROM "InterregAnalysis"
+         WHERE "tenantId" = ${tenantId} AND "callText" IS NOT NULL AND "callTextExpiresAt" <= ${NOW}`
+    )[0]?.n,
+  );
 const derived = (id: string) =>
   Promise.all([
     admin.interregCriterionMark.count({ where: { analysisId: id } }),
@@ -217,10 +227,8 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const [first, second] = await Promise.all([purgeExpiredInterregText(NOW), purgeExpiredInterregText(NOW)]);
     expect(first.callSlots + second.callSlots).toBeGreaterThanOrEqual(1);
     const after = await load(id);
-    const again = await purgeExpiredInterregText(NOW);
-    expect(again.callSlots).toBe(0);
-    expect(again.projectSlots).toBe(0);
-    expect(again.analyses).toBe(0);
+    await purgeExpiredInterregText(NOW);
+    expect(await dueCallOf(t.tenantId)).toBe(0);
     expect(await load(id)).toEqual(after); // updatedAt included: nothing was written
   });
 
@@ -257,29 +265,23 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const text = 'q'.repeat(300);
     const ids: string[] = [];
     for (let i = 0; i < 8; i++) ids.push(await analysis(t, 'CALL_READY', { text, expiresInDays: -2 }, null, false));
-    const dueNow = async () =>
-      Number(
-        (
-          await admin.$queryRaw<Array<{ n: bigint }>>`
-            SELECT count(*)::bigint AS n FROM "InterregAnalysis" WHERE "tenantId" = ANY(${tenantIds}) AND "callText" IS NOT NULL AND "callTextExpiresAt" <= ${NOW}`
-        )[0]?.n,
-      );
-    const before = await dueNow();
+    const before = await dueCallOf(t.tenantId);
     expect(before).toBeGreaterThanOrEqual(8);
 
-    // Two pages of 2, then stop: the 4 rows of those pages are gone (committed), the rest stay.
+    // Two pages of 2, then stop: the pages it finished are gone (committed), the rest stay. Pages are
+    // global, so another file's due row can take a slot of ours: only an upper bound is exact here.
     const first = await purgeExpiredInterregText(NOW, { batchSize: 2, maxBatches: 2 });
     expect(first.more).toBe(true);
-    expect(first.callSlots).toBe(4);
-    expect(await dueNow()).toBe(before - 4);
+    const afterFirst = await dueCallOf(t.tenantId);
+    expect(before - afterFirst).toBeLessThanOrEqual(4);
 
     // The next run is the same call: it finishes the backlog and the one after finds nothing.
     const second = await purgeExpiredInterregText(NOW, { batchSize: 2 });
     expect(second.more).toBe(false);
-    expect(second.callSlots).toBe(before - 4);
-    expect(await dueNow()).toBe(0);
-    const third = await purgeExpiredInterregText(NOW, { batchSize: 2 });
-    expect(third).toEqual({ callSlots: 0, projectSlots: 0, analyses: 0, more: false });
+    expect(second.callSlots).toBeGreaterThanOrEqual(afterFirst);
+    expect(await dueCallOf(t.tenantId)).toBe(0);
+    await purgeExpiredInterregText(NOW, { batchSize: 2 });
+    expect(await dueCallOf(t.tenantId)).toBe(0);
     for (const id of ids) expect((await load(id)).callText).toBeNull();
   });
 
@@ -289,7 +291,7 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     for (let i = 0; i < 4; i++) await analysis(t, 'CALL_READY', { text, expiresInDays: -2 }, null, false);
     const r = await purgeExpiredInterregText(NOW, { batchSize: 2, budgetMs: 1e-9 });
     expect(r.more).toBe(true);
-    expect(r.callSlots).toBe(2);
+    expect(4 - (await dueCallOf(t.tenantId))).toBeLessThanOrEqual(2); // one page of 2 at most, of this tenant's rows
     await purgeExpiredInterregText(NOW); // leave the database clean for the other tests
   });
 
@@ -333,7 +335,9 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
       admin.creditLedger.findMany({ where: { refId: { startsWith: id } }, select: { delta: true } }).then((rs) => rs.map((r) => r.delta).sort((a, b) => a - b));
 
     const result = await purgeExpiredInterregText(NOW);
-    expect(result.callSlots).toBe(1);
+    // Its own slot is emptied and the row leaves ANALYZING; callSlots is global, so it is only a lower bound.
+    expect(result.callSlots).toBeGreaterThanOrEqual(1);
+    expect(await load(id)).toMatchObject({ status: 'UPLOADING', callText: null, callTextExpiresAt: null, projectText: 'p'.repeat(50) });
     expect(await ledger()).toEqual([-3, 3]);
 
     // A second purge (or a second run of the same batch) must not refund again.
