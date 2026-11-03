@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { Gate, PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { presentIds } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 /**
  * NG-25: a forward stage move goes through the gate, whichever door it comes in by.
@@ -284,7 +284,7 @@ describe('G1 reads the latest G0 decision of this opportunity in this tenant', (
     const opp = await opportunity('erased pass');
     await fillSeatsForG1(opp);
     await fileG0(opp, true);
-    await admin!.gateDecision.updateMany({ where: { opportunityId: opp }, data: { deletedAt: new Date() } });
+    await admin!.gateDecision.updateMany({ where: { opportunityId: requireId(opp, 'opp') }, data: { deletedAt: new Date() } });
 
     const result = await moveOpportunityStage(opp, 'G1');
 
