@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FO-375 — applies prisma/mysql/init.sql to a MariaDB database that must be empty.
+# FO-375 — applies prisma/mysql/init.sql, then views.sql, to a MariaDB database that must be empty.
 #
 #   MYSQL_PWD=... scripts/mysql-schema/apply.sh --reset     # drop + create the scratch DB, then apply
 #   MYSQL_PWD=... scripts/mysql-schema/apply.sh             # apply to an existing empty DB
@@ -54,13 +54,16 @@ case "$MODE" in
     refuse_remote
     client -e "DROP DATABASE IF EXISTS \`${DB}\`; CREATE DATABASE \`${DB}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
     client "$DB" < "$ROOT/prisma/mysql/init.sql"
+    client "$DB" < "$ROOT/prisma/mysql/views.sql"
     ;;
   --down)
     refuse_remote
+    client "$DB" < "$ROOT/prisma/mysql/views.down.sql"
     client "$DB" < "$ROOT/prisma/mysql/init.down.sql"
     ;;
   apply | "")
     client "$DB" < "$ROOT/prisma/mysql/init.sql"
+    client "$DB" < "$ROOT/prisma/mysql/views.sql"
     ;;
   *)
     echo "usage: $0 [--reset|--down]" >&2

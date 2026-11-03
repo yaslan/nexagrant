@@ -29,7 +29,7 @@
     "rls:bypass-check": "tsx scripts/check-tenant-bypass.ts",
     "rls:verify": "tsx scripts/check-rls-live.ts",
     "alerts:check": "tsx scripts/check-orphan-alerts.ts",
- "mysql:check": "node scripts/mysql-schema/generate.mjs --check",
+    "mysql:check": "node scripts/mysql-schema/generate.mjs --check",
     "privacy:publish-check": "tsx scripts/privacy-publish-check.ts",
     "i18n:check": "tsx scripts/i18n-check.ts",
     "beta:onboard": "tsx scripts/beta-onboarding.ts",

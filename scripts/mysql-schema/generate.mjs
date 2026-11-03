@@ -180,6 +180,124 @@ export function toDownSql(initSql) {
   return lines.join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Views (FO-375 lead decision, A-TEK): the table schema is the single source. From it we derive
+//   prisma/mysql/view-schema.prisma  second Prisma client: every reachable model is mapped to `v_<table>`
+//   prisma/mysql/views.sql           fabrika_current_tenant() + one view per reachable model
+//   prisma/mysql/views.down.sql      drops those views and the function
+// Classes (91 models, see the FO-375 report):
+//   tenant   (54) tenantId present      → v_<table> filters on fabrika_current_tenant()
+//   platform (5)  salt-okur platform    → ALGORITHM=TEMPTABLE, no filter, read-only use
+//   system   (32) everything else       → NO view. Reachable only through the table client
+//                                         (src/lib/system-scope.ts, İ-2 A, Faz 2). Its fields that
+//                                         point at a system model are dropped from the view schema,
+//                                         so the view client cannot reach it through relations.
+// No GRANT exists (A-TEK): the tenant filter in the view is the isolation mechanism.
+
+export const PLATFORM_VIEW_MODELS = ['Plan', 'PlanVersion', 'PlanFeature', 'InterregRubric', 'InterregRubricCriterion'];
+export const EXPECTED_TENANT_MODELS = 54;
+export const EXPECTED_MODELS = 91;
+export const VIEW_CLIENT_OUTPUT = '../../node_modules/.prisma/client-mysql-view';
+export const VIEW_SCHEMA_PATH = resolve(ROOT, 'prisma/mysql/view-schema.prisma');
+export const VIEWS_SQL_PATH = resolve(ROOT, 'prisma/mysql/views.sql');
+export const VIEWS_DOWN_SQL_PATH = resolve(ROOT, 'prisma/mysql/views.down.sql');
+
+/** Splits schema text into top-level blocks (header, model, enum), keeping each block's text. */
+function splitBlocks(text) {
+  return text.split(/^(?=model |enum )/m);
+}
+
+/** Pure: MariaDB schema text → Map<ModelName, { mapped, kind }>. Throws if the classification drifts. */
+export function classifyModels(mysqlSchemaText) {
+  const result = new Map();
+  for (const block of splitBlocks(mysqlSchemaText)) {
+    const name = /^model (\w+) \{/.exec(block)?.[1];
+    if (!name) continue;
+    const mapped = /@@map\("([^"]+)"\)/.exec(block)?.[1] ?? name;
+    const tenant = /^\s+tenantId\s+String/m.test(block);
+    const kind = tenant ? 'tenant' : PLATFORM_VIEW_MODELS.includes(name) ? 'platform' : 'system';
+    result.set(name, { mapped, kind });
+  }
+  const count = (k) => [...result.values()].filter((v) => v.kind === k).length;
+  if (result.size !== EXPECTED_MODELS) throw new Error(`model count ${result.size}, expected ${EXPECTED_MODELS}`);
+  if (count('tenant') !== EXPECTED_TENANT_MODELS) {
+    throw new Error(`tenant model count ${count('tenant')}, expected ${EXPECTED_TENANT_MODELS}: classification drifted`);
+  }
+  const missing = PLATFORM_VIEW_MODELS.filter((n) => result.get(n)?.kind !== 'platform');
+  if (missing.length > 0) throw new Error(`platform view model(s) missing or tenant-scoped: ${missing.join(', ')}`);
+  return result;
+}
+
+/** Pure: MariaDB schema text → view-client Prisma schema text (models mapped to v_<table>). */
+export function toViewSchema(mysqlSchemaText) {
+  const models = classifyModels(mysqlSchemaText);
+  const system = new Set([...models].filter(([, v]) => v.kind === 'system').map(([k]) => k));
+  const out = splitBlocks(mysqlSchemaText).map((block) => {
+    // The header chunk also holds the file's leading comments, so match the generator block inside it.
+    if (/generator client \{/.test(block)) {
+      return block.replace(/(generator client \{[\s\S]*?)output\s*=\s*"[^"]+"/, `$1output          = "${VIEW_CLIENT_OUTPUT}"`);
+    }
+    const m = /^model (\w+) \{/.exec(block);
+    if (!m) return block;
+    if (system.has(m[1])) return '';
+    const info = models.get(m[1]);
+    const kept = block.split('\n').filter((line) => {
+      const field = /^  (\w+)\s+(\w+)(\[\]|\?)?(\s|$)/.exec(line);
+      return !(field && system.has(field[2]));
+    });
+    const lines2 = [...kept];
+    const mapLine = `  @@map("v_${info.mapped}")`;
+    const mapAt = lines2.findIndex((l) => /^  @@map\(/.test(l));
+    if (mapAt >= 0) lines2[mapAt] = mapLine;
+    else {
+      // The model's own closing brace: the first line that is exactly "}" after the header.
+      const close = lines2.findIndex((l, i) => i > 0 && l === '}');
+      if (close < 0) throw new Error(`model ${m[1]}: no closing brace`);
+      lines2.splice(close, 0, mapLine);
+    }
+    return lines2.join('\n');
+  });
+  const text = out.join('');
+  const mapped = (text.match(/^  @@map\("v_/gm) ?? []).length;
+  if (mapped !== models.size - system.size) {
+    throw new Error(`view mapping count ${mapped}, expected ${models.size - system.size}`);
+  }
+  return text;
+}
+
+/** Pure: MariaDB schema text → views.sql (function first, then views in name order). */
+export function toViewsSql(mysqlSchemaText) {
+  const models = classifyModels(mysqlSchemaText);
+  const byName = [...models.entries()].sort((a, b) => a[1].mapped.localeCompare(b[1].mapped));
+  const lines = [
+    '-- FO-375 generated from prisma/mysql/schema.prisma. Do not edit by hand (mysql:check).',
+    '-- Tenant scope comes from the session variable @app_tenant_id. Unset → NULL → no tenant rows.',
+    '-- Tenant views carry WITH CASCADED CHECK OPTION: an INSERT/UPDATE whose tenantId is not the session tenant is rejected.',
+    "CREATE OR REPLACE FUNCTION `fabrika_current_tenant`() RETURNS VARCHAR(191) READS SQL DATA NOT DETERMINISTIC RETURN NULLIF(@app_tenant_id, '');",
+  ];
+  for (const [, { mapped, kind }] of byName) {
+    if (kind === 'system') continue;
+    if (kind === 'tenant') {
+      lines.push(`CREATE OR REPLACE VIEW \`v_${mapped}\` AS SELECT * FROM \`${mapped}\` WHERE \`tenantId\` = fabrika_current_tenant() WITH CASCADED CHECK OPTION;`);
+    } else {
+      lines.push(`CREATE OR REPLACE ALGORITHM=TEMPTABLE VIEW \`v_${mapped}\` AS SELECT * FROM \`${mapped}\`;`);
+    }
+  }
+  return lines.join('\n') + '\n';
+}
+
+/** Pure: views.sql text → down script (views first, then the function). */
+export function toViewsDownSql(mysqlSchemaText) {
+  const models = classifyModels(mysqlSchemaText);
+  const views = [...models.values()].filter((v) => v.kind !== 'system').map((v) => `v_${v.mapped}`).sort();
+  return [
+    '-- FO-375 down script for views.sql: drops every view, then the tenant function.',
+    ...views.map((v) => `DROP VIEW IF EXISTS \`${v}\`;`),
+    'DROP FUNCTION IF EXISTS `fabrika_current_tenant`;',
+    '',
+  ].join('\n');
+}
+
 function migrateDiffScript() {
   try {
     return execFileSync(
@@ -214,6 +332,11 @@ function main() {
   const fieldNames = insensitiveFieldNames(appSourceTexts());
   const ci = ciColumns(text, fieldNames);
   stats.ciColumns = ci.size;
+  const viewSchema = toViewSchema(text);
+  const viewsSql = toViewsSql(text);
+  const viewsDown = toViewsDownSql(text);
+  stats.views = (viewsSql.match(/^CREATE OR REPLACE VIEW/gm) ?? []).length;
+  stats.platformViews = (viewsSql.match(/ALGORITHM=TEMPTABLE/g) ?? []).length;
 
   if (check) {
     const stale = [];
@@ -228,10 +351,14 @@ function main() {
     const init = toInitSql(migrateDiffScript(), ci);
     if (committed(INIT_SQL_PATH) !== init) stale.push('prisma/mysql/init.sql');
     if (committed(DOWN_SQL_PATH) !== toDownSql(init)) stale.push('prisma/mysql/init.down.sql');
+    if (committed(VIEW_SCHEMA_PATH) !== viewSchema) stale.push('prisma/mysql/view-schema.prisma');
+    if (committed(VIEWS_SQL_PATH) !== viewsSql) stale.push('prisma/mysql/views.sql');
+    if (committed(VIEWS_DOWN_SQL_PATH) !== viewsDown) stale.push('prisma/mysql/views.down.sql');
     if (stale.length > 0) {
       console.error(`stale or hand-edited: ${stale.join(', ')}. Run: node scripts/mysql-schema/generate.mjs`);
       process.exit(1);
     }
+    validateSchemas([MYSQL_SCHEMA_PATH, VIEW_SCHEMA_PATH]);
     console.log(`mysql artifacts up to date (${JSON.stringify(stats)})`);
     return;
   }
@@ -241,7 +368,27 @@ function main() {
   const init = toInitSql(migrateDiffScript(), ci);
   writeFileSync(INIT_SQL_PATH, init);
   writeFileSync(DOWN_SQL_PATH, toDownSql(init));
-  console.log(`wrote prisma/mysql/{schema.prisma,init.sql,init.down.sql} (${JSON.stringify(stats)})`);
+  writeFileSync(VIEW_SCHEMA_PATH, viewSchema);
+  writeFileSync(VIEWS_SQL_PATH, viewsSql);
+  writeFileSync(VIEWS_DOWN_SQL_PATH, viewsDown);
+  validateSchemas([MYSQL_SCHEMA_PATH, VIEW_SCHEMA_PATH]);
+  // Two clients: table (system-scope + migrations) and view (tenant/platform reads).
+  for (const schema of [MYSQL_SCHEMA_PATH, VIEW_SCHEMA_PATH]) {
+    execFileSync('npx', ['prisma', 'generate', '--schema', schema], { cwd: ROOT, stdio: 'pipe' });
+  }
+  console.log(`wrote prisma/mysql/{schema,init,view-schema,views,...}; clients generated (${JSON.stringify(stats)})`);
+}
+
+/** Runs `prisma validate` on each schema (no DB needed). Throws on the first invalid one. */
+function validateSchemas(paths) {
+  for (const p of paths) {
+    try {
+      execFileSync('npx', ['prisma', 'validate', '--schema', p], { cwd: ROOT, stdio: 'pipe' });
+    } catch (err) {
+      const reason = String(err.stderr ?? err.message).split('\n').filter((l) => /error|Error/.test(l)).slice(0, 5);
+      throw new Error(`prisma validate failed for ${p}:\n${reason.join('\n')}`);
+    }
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

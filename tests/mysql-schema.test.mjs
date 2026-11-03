@@ -5,10 +5,14 @@ import { readFileSync } from 'node:fs';
 import {
   SOURCE_PATH,
   ciColumns,
+  classifyModels,
   insensitiveFieldNames,
   toDownSql,
   toInitSql,
   toMysqlSchema,
+  toViewSchema,
+  toViewsDownSql,
+  toViewsSql,
 } from '../scripts/mysql-schema/generate.mjs';
 
 const PG_HEADER = `generator client {
@@ -139,5 +143,51 @@ describe('toDownSql', () => {
     expect(drops).toEqual(['B', 'A']);
     expect(down).toMatch(/^SET FOREIGN_KEY_CHECKS = 0;/m);
     expect(down).toMatch(/SET FOREIGN_KEY_CHECKS = 1;\n$/);
+  });
+});
+
+// FO-375 views: classification, view schema and view SQL. The real schema is read from disk.
+describe('view artifacts (real schema)', () => {
+  const real = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8')).text;
+
+  it('classifies 91 models into 54 tenant, 5 platform, 32 system', () => {
+    const models = classifyModels(real);
+    const kinds = [...models.values()].map((m) => m.kind);
+    expect(models.size).toBe(91);
+    expect(kinds.filter((k) => k === 'tenant')).toHaveLength(54);
+    expect(kinds.filter((k) => k === 'platform')).toHaveLength(5);
+    expect(kinds.filter((k) => k === 'system')).toHaveLength(32);
+  });
+
+  it('maps every view model in the view schema and keeps system models out of it', () => {
+    const view = toViewSchema(real);
+    expect(view.match(/^  @@map\("v_/gm)).toHaveLength(59);
+    expect(view).toContain('output          = "../../node_modules/.prisma/client-mysql-view"');
+    expect(view).toContain('@@map("v_Plan")');
+  });
+
+  it('builds tenant views with a cascaded check option and platform views as TEMPTABLE', () => {
+    const sql = toViewsSql(real);
+    expect(sql).toMatch(/CREATE OR REPLACE VIEW `v_Workspace` AS SELECT \* FROM `Workspace` WHERE `tenantId` = fabrika_current_tenant\(\) WITH CASCADED CHECK OPTION;/);
+    expect(sql).toContain('CREATE OR REPLACE ALGORITHM=TEMPTABLE VIEW `v_Plan` AS SELECT * FROM `Plan`;');
+    expect(sql.match(/^CREATE OR REPLACE VIEW .*WITH CASCADED CHECK OPTION;$/gm)).toHaveLength(54);
+  });
+
+  it('drops every view and the function in the down script', () => {
+    const down = toViewsDownSql(real);
+    expect(down).toContain('DROP FUNCTION IF EXISTS `fabrika_current_tenant`;');
+    expect(down.match(/DROP VIEW IF EXISTS/g)).toHaveLength(59);
+  });
+});
+
+describe('toViewSchema: system models are unreachable from the view client', () => {
+  const real = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8')).text;
+  it('has no field whose type is a system model', () => {
+    const models = classifyModels(real);
+    const system = new Set([...models].filter(([, v]) => v.kind === 'system').map(([k]) => k));
+    const view = toViewSchema(real);
+    const types = [...view.matchAll(/^  \w+\s+(\w+)/gm)].map((m) => m[1]);
+    expect(types.filter((t) => system.has(t))).toEqual([]);
+    expect(view).not.toMatch(/^model (SystemThing|Session|Account)\b/m);
   });
 });
