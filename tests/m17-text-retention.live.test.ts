@@ -55,6 +55,7 @@ vi.mock('@/lib/llm', async (importOriginal) => {
 import { purgeExpiredInterregText } from '@/modules/m17/server/retention';
 import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
+import { M17_INTERREG_TEXT_PURGE_LOCK, holdTestDbLock } from './helpers/test-db-lock';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const SUITE = 'm17 text retention test';
@@ -147,11 +148,18 @@ const derived = (id: string) =>
   ]);
 
 describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
+  // Held for the whole file: fo191's purge (cross-tenant, by date) must not run while these counts are taken.
+  // The lock is a session advisory lock on its own connection, so it drops with the connection if the run dies.
+  let releaseLock: (() => Promise<void>) | undefined;
+
   beforeAll(async () => {
+    releaseLock = await holdTestDbLock(RLS_URL!, M17_INTERREG_TEXT_PURGE_LOCK);
+    // Due texts left by an earlier run that died would otherwise be counted in the first purge below.
+    await purgeExpiredInterregText(new Date());
     const c = await admin.interregRubricCriterion.findFirst({ where: { rubricId: RUBRIC }, select: { id: true } });
     if (!c) throw new Error(`rubric ${RUBRIC} is not seeded (pnpm db:seed)`);
     criterionId = c.id;
-  });
+  }, 300_000);
 
   afterAll(async () => {
     await admin.interregAnalysis.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
@@ -159,6 +167,7 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     await admin.tenant.deleteMany({ where: { id: { in: presentIds(tenantIds) } } });
     await admin.user.deleteMany({ where: { id: { in: presentIds(userIds) } } });
     await admin.$disconnect();
+    await releaseLock?.();
   });
 
   test('empties each slot on its OWN expiry, in every tenant, and keeps the analysis consistent', async () => {
@@ -268,17 +277,19 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     const before = await dueCallOf(t.tenantId);
     expect(before).toBeGreaterThanOrEqual(8);
 
-    // Two pages of 2, then stop: the pages it finished are gone (committed), the rest stay. Pages are
-    // global, so another file's due row can take a slot of ours: only an upper bound is exact here.
+    // Two pages of 2, then stop: the pages it finished are gone (committed), the rest stay. The file holds
+    // the purge lock and drained the due texts at its start, so this run is the only one that empties rows.
     const first = await purgeExpiredInterregText(NOW, { batchSize: 2, maxBatches: 2 });
     expect(first.more).toBe(true);
+    expect(first.callSlots).toBe(4);
     const afterFirst = await dueCallOf(t.tenantId);
-    expect(before - afterFirst).toBeLessThanOrEqual(4);
+    expect(before - afterFirst).toBeGreaterThanOrEqual(1); // the committed pages, read back from the database
+    expect(before - afterFirst).toBe(4);
 
     // The next run is the same call: it finishes the backlog and the one after finds nothing.
     const second = await purgeExpiredInterregText(NOW, { batchSize: 2 });
     expect(second.more).toBe(false);
-    expect(second.callSlots).toBeGreaterThanOrEqual(afterFirst);
+    expect(second.callSlots).toBe(afterFirst);
     expect(await dueCallOf(t.tenantId)).toBe(0);
     await purgeExpiredInterregText(NOW, { batchSize: 2 });
     expect(await dueCallOf(t.tenantId)).toBe(0);
@@ -291,7 +302,8 @@ describe.skipIf(!HAS_DB)('M17 text retention (live, fabrika_app)', () => {
     for (let i = 0; i < 4; i++) await analysis(t, 'CALL_READY', { text, expiresInDays: -2 }, null, false);
     const r = await purgeExpiredInterregText(NOW, { batchSize: 2, budgetMs: 1e-9 });
     expect(r.more).toBe(true);
-    expect(4 - (await dueCallOf(t.tenantId))).toBeLessThanOrEqual(2); // one page of 2 at most, of this tenant's rows
+    expect(r.callSlots).toBe(2); // exactly one page: the budget is spent after it
+    expect(4 - (await dueCallOf(t.tenantId))).toBe(2); // and it committed: two of this tenant's rows are left
     await purgeExpiredInterregText(NOW); // leave the database clean for the other tests
   });
 
