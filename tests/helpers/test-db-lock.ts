@@ -77,3 +77,10 @@ export async function holdTestDbLock(url: string, name: string): Promise<() => P
     await client.end().catch(() => {});
   };
 }
+
+/**
+ * purgeExpiredInterregText() is cross-tenant and date-driven: a run from one live file empties the
+ * due texts another file is counting. m17-text-retention.live and m17-interreg-fo191.live hold this
+ * for their whole file (beforeAll → afterAll), so neither one's purge can take the other's rows.
+ */
+export const M17_INTERREG_TEXT_PURGE_LOCK = 'M17:interreg-text-purge';
