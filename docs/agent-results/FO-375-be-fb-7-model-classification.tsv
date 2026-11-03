@@ -1,0 +1,92 @@
+model	kind	request_read	request_write	job_read	job_write	request_write_sites_sample	note
+Tenant	platform	20	4	2	2	W src/app/[locale]/(app)/[workspace]/settings/profile/actions.ts:125; W src/lib/agency/actions.ts:59; W src/lib/auth.ts:483; W src/lib/oauth-registration.ts:268	İstek yazması: settings/profile/actions.ts:125; oauth-registration.ts:268; auth.ts:483; agency/cobrand-store.ts:113; agency/actions.ts:59. Yazma system-scope Faz 2.
+AgencyInviteCode	tenant	0	0	0	0		
+User	platform	9	5	1	6	W src/actions/user/request-deletion.ts:104; W src/actions/user/request-deletion.ts:156; W src/lib/auth.ts:460; W src/lib/invitations/accept.ts:353	İstek yazması: request-deletion.ts:104,156; oauth-registration.ts:352; auth.ts:460; invitations/accept.ts:353. İş yazması users-scheduled-deletion.ts:196. Yazma system-scope Faz 2.
+Account	system	2	0	0	0		
+Session	system	0	0	0	0		
+VerificationToken	system	0	0	0	0		
+Membership	tenant	14	4	2	2	W src/app/api/team/members/[id]/route.ts:44; W src/lib/auth.ts:513; W src/lib/invitations/accept.ts:228; W src/lib/oauth-registration.ts:289	
+Workspace	tenant	1	2	0	0	W src/lib/auth.ts:505; W src/lib/oauth-registration.ts:285	
+TenantProfile	tenant	2	2	0	0	W src/app/[locale]/(app)/[workspace]/settings/profile/actions.ts:63; W src/app/[locale]/(app)/[workspace]/settings/profile/actions.ts:72	
+ModuleCatalog	system	0	0	0	0		
+ModuleState	tenant	3	4	0	0	W src/app/[locale]/(app)/[workspace]/settings/modules/actions.ts:57; W src/app/[locale]/(app)/[workspace]/settings/modules/actions.ts:106; W src/app/[locale]/admin/modules/actions.ts:85; W src/app/[locale]/admin/modules/actions.ts:102	
+Plan	platform	0	0	0	0		
+PlanVersion	platform	0	0	0	0		
+PlanFeature	platform	0	0	0	0		
+PlanAssignment	tenant	0	0	0	0		
+AddOnCatalog	system	0	0	0	0		
+Subscription	tenant	3	0	0	0		
+AddOn	tenant	0	0	0	0		
+LifetimeLicence	tenant	0	0	0	0		
+Invoice	tenant	2	0	0	0		
+TenantBillingIdentity	tenant	1	1	0	0	W src/app/[locale]/(app)/[workspace]/settings/billing/identity-actions.ts:99	
+CreditLedger	tenant	1	0	11	12		
+PlatformSetting	system	0	0	0	0		
+Programme	system	0	0	0	1		
+Call	system	0	0	0	1		
+Topic	platform	14	0	9	2		İstek okuması (calls/*, api/v1/calls, sitemap, pipeline/actions, scoring raw SQL) → platform görünümü.
+TopicStat	system	2	0	1	2		Yalnız ADMIN/JOB → sistem. public/page.tsx:498 yalnız yorum.
+RawFetch	system	0	0	3	2		Yalnız JOB (k2-cordis/raw-fetch.ts, keep-eu-sync, k3 importer, k2-monthly, m1 retention) → sistem.
+SystemAlert	platform	3	1	1	1	W src/app/[locale]/admin/alerts/actions.ts:39	Yazma yolu recordAlert helper (system-alert.ts:329/342/443). İstek yolunda recordAlert çağıran 4 app dosyası + settings/billing/identity-actions.ts + modules/m10/server/actions.ts. Platform kararı: istek okuması/yazması var.
+BlogPost	system	0	0	0	0		
+PublicLead	system	0	0	0	0		
+ExpertPreRegistration	system	0	0	0	0		
+ExpertPreRegAttempt	system	0	0	0	0		
+ExpertFounderCounter	system	0	0	0	0		
+TopicMatch	tenant	1	0	0	0		
+SavedSearch	tenant	2	3	4	8	W src/app/api/saved-searches/[id]/route.ts:40; W src/app/api/saved-searches/[id]/route.ts:71; W src/app/api/saved-searches/route.ts:78	
+CordisProject	platform	3	0	9	3		
+CordisOrganization	platform	15	0	3	5		5 iş yolu yazması (keep-eu-sync.ts:670,690; cordis-sync.ts:227; k2-cordis/importer.ts:510; m1 ingestor.ts:525); istek okuması 15. Lider varsayımı (tek yazma) yanlış.
+CordisParticipation	platform	11	0	2	3		
+CordisProjectTopic	platform	2	0	0	3		
+CordisProjectSciVoc	system	0	0	0	1		
+CordisImportRun	system	1	0	2	5		
+CordisPartnerProfile	platform	6	0	0	0		
+CordisCoParticipation	platform	2	0	0	0		İstek okuması 2 (api/cordis/organizations/[id]/route.ts:57; api/v1/partners/[pic]/route.ts:254). Yazma: iş yolu raw SQL partnerProfileJob.ts:136 (bu ölçüm prisma-accessor dışında).
+PartnerSearchAnnouncement	platform	1	1	3	3	W src/app/[locale]/admin/partner-search/actions.ts:182	İstek okuması api.ts:211 → platform görünümü. Yazmalar (admin actions.ts:182, retention.ts:66/70, ingestor.ts:444/480/489) system-scope Faz 2.
+PartnerProfileSnapshot	system	0	0	0	0		
+PartnerSearchIngestionRun	system	1	0	0	2		
+UnmatchedOrganization	system	4	1	0	1	W src/app/[locale]/admin/partner-search/actions.ts:176	
+PartnerSearchTopicStat	system	0	0	0	1		
+PartnerSearchQuotaUsage	tenant	0	0	0	0		
+Opportunity	tenant	31	5	1	1	W src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:273; W src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:381; W src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:503; W src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:659	
+GateDecision	tenant	0	0	0	0		
+ConsortiumSeat	tenant	5	2	0	0	W src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions.ts:36; W src/modules/m8/server/actions.ts:150	
+PartnerOrg	tenant	0	0	0	0		
+Proposal	tenant	2	2	0	0	W src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:844; W src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:848	
+Effort	tenant	3	1	0	1	W src/app/[locale]/(app)/[workspace]/pipeline/actions.ts:760	
+Evidence	tenant	7	4	0	0	W src/app/[locale]/(app)/[workspace]/evidence/actions.ts:267; W src/app/[locale]/(app)/[workspace]/evidence/actions.ts:386; W src/app/[locale]/(app)/[workspace]/evidence/actions.ts:452; W src/app/[locale]/(app)/[workspace]/evidence/actions.ts:477	Tenant modeli; r2ObjectKey alanı OPEN (rev.7). Model kararı değişmedi.
+Claim	tenant	0	0	0	0		
+ClaimEvidenceLink	tenant	0	0	0	0		
+ProposalUsage	tenant	0	0	0	1		
+ConceptTemplate	tenant	1	0	0	0		
+ConceptNote	tenant	9	6	0	0	W src/app/[locale]/(app)/[workspace]/concept-notes/actions.ts:43; W src/app/[locale]/(app)/[workspace]/concept-notes/actions.ts:79; W src/app/[locale]/(app)/[workspace]/concept-notes/actions.ts:139; W src/app/[locale]/(app)/[workspace]/concept-notes/actions.ts:169	
+Relationship	tenant	6	5	1	1	W src/app/[locale]/(app)/[workspace]/relationships/actions.ts:110; W src/app/[locale]/(app)/[workspace]/relationships/actions.ts:173; W src/modules/m4/server/actions.ts:85; W src/modules/m4/server/actions.ts:133	
+Interaction	tenant	1	2	0	0	W src/app/[locale]/(app)/[workspace]/relationships/actions.ts:161; W src/modules/m4/server/actions.ts:121	
+SeatCandidate	tenant	2	0	0	0		
+AiUsageLog	tenant	2	0	0	1		
+Document	tenant	0	0	1	1		
+Chunk	tenant	0	0	0	0		
+AuditEvent	tenant	2	24	0	3	W src/actions/user/export-data.ts:325; W src/actions/user/export-data.ts:332; W src/actions/user/request-deletion.ts:264; W src/actions/user/request-deletion.ts:271	
+StripeEventLog	tenant	0	0	0	0		
+Notification	tenant	1	0	1	2		
+Evaluation	tenant	4	4	0	0	W src/modules/m6/server/actions.ts:106; W src/modules/m6/server/actions.ts:154; W src/modules/m6/server/actions.ts:197; W src/modules/m6/server/actions.ts:271	
+Reviewer	tenant	1	1	0	0	W src/modules/m6/server/actions.ts:263	
+Criterion	tenant	0	0	0	0		
+Score	tenant	0	1	0	0	W src/modules/m6/server/actions.ts:250	
+MeetingBrief	tenant	2	3	0	0	W src/modules/m9/server/actions.ts:93; W src/modules/m9/server/actions.ts:105; W src/modules/m9/server/actions.ts:175	
+CalendarConnection	tenant	1	0	0	1		
+FollowupDoc	tenant	6	5	0	0	W src/modules/m10/server/actions.ts:148; W src/modules/m10/server/actions.ts:210; W src/modules/m10/server/actions.ts:242; W src/modules/m10/server/actions.ts:384	
+DualApprovalStep	tenant	0	2	0	0	W src/modules/m10/server/actions.ts:240; W src/modules/m10/server/actions.ts:445	
+ApplicationPart	tenant	7	2	0	0	W src/modules/m11/server/actions.ts:76; W src/modules/m11/server/actions.ts:92	
+TtoPortfolioItem	tenant	2	1	0	0	W src/modules/m7/server/actions.ts:45	
+ApiKey	tenant	2	2	0	0	W src/app/[locale]/(app)/[workspace]/settings/api-keys/actions.ts:65; W src/app/[locale]/(app)/[workspace]/settings/api-keys/actions.ts:106	
+Invitation	tenant	5	3	0	0	W src/app/api/invitations/route.ts:144; W src/app/api/team/invitations/[id]/route.ts:31; W src/lib/invitations/accept.ts:216	
+ApprovalRequest	tenant	1	0	0	0		
+Feedback	tenant	1	1	0	1	W src/app/[locale]/admin/feedback/actions.ts:50	
+Consent	tenant	0	0	0	0		
+InterregRubric	platform	0	0	0	0		
+InterregRubricCriterion	platform	0	0	0	0		
+InterregAnalysis	tenant	1	0	0	0		
+InterregAnalysisResult	tenant	1	0	0	0		
+InterregCriterionMark	tenant	1	0	0	0		
