@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { tenantScopeOf, TenantScope, assertTenantActionWritable, assertTenantActionRole } from '@/lib/tenant';
-import { Gate } from '@prisma/client';
+import type { Gate } from '@prisma/client';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import {
@@ -22,6 +22,7 @@ import { withTenant } from '@/lib/db';
 import { findScopedWorkspace, isWorkspaceSlug } from '@/lib/workspaces';
 import { isDatabaseUnavailable } from '@/lib/db-unavailable';
 import { evaluateGate } from '@/lib/gates/evaluate';
+import type { GateReason } from '@/lib/gates/reasons';
 import { classifyStageMove, isStage, nextStageOf } from '@/lib/gates/transition';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 import {
@@ -79,7 +80,7 @@ const text = (max: number) => z.string().max(max).regex(/^[^\u0000-\u0008\u000b\
  * signature is not checked at runtime. A `workspaceSlug` of `{foo:1}`, `["ws-a"]`,
  * `7` or `"ws-a\u0000"` used to reach the workspace query and make it throw, and the
  * catch below buffered the row as if the database were down. Every field is now a
- * bounded string (or the Gate enum) before anything touches the database.
+ * bounded string before anything touches the database.
  */
 const CreateOpportunityInput = z.object({
   workspaceSlug: z.string().refine(isWorkspaceSlug),
@@ -88,9 +89,10 @@ const CreateOpportunityInput = z.object({
   intendedRole: text(50).optional(),
   ownerId: text(200).optional(),
   ownerName: text(200).optional(),
-  stage: z.nativeEnum(Gate).optional(),
   notes: text(10_000).optional(),
-});
+  // A new opportunity starts at G0 and nothing else. Strict, so a client that still names a stage
+  // is refused rather than quietly put somewhere it did not ask for.
+}).strict();
 
 /** B7 declaration input. */
 const DeclareInput = z.object({
@@ -167,7 +169,6 @@ export async function createOpportunity(input: {
   intendedRole?: string;
   ownerId?: string;
   ownerName?: string;
-  stage?: Gate;
   notes?: string;
 }) {
   const scope = await sessionScope();
@@ -181,7 +182,6 @@ export async function createOpportunity(input: {
     intendedRole = 'coordinator',
     ownerId,
     ownerName,
-    stage = 'G0',
     notes,
   } = parsed.data;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
@@ -218,7 +218,7 @@ export async function createOpportunity(input: {
     intendedRole,
     ownerId: ownerId || resolvedOwner?.id || userId,
     ownerName: ownerName || resolvedOwner?.name || null,
-    stage: stage || 'G0',
+    stage: 'G0',
     status: 'ACTIVE',
     // Scored below, from the opportunity's own evidence. This used to be
     // `Math.floor(Math.random() * 15 + 80)` — an invented 80–94 that the board displayed as a
@@ -278,7 +278,7 @@ export async function createOpportunity(input: {
           topicId: topicId ? topicId.trim() : null,
           intendedRole,
           ownerId: ownerId || userId || null,
-          stage: stage || 'G0',
+          stage: 'G0',
           status: 'ACTIVE',
           g0Score: null,
           notes: notes || null
@@ -447,7 +447,7 @@ export async function addOpportunityNote({
  */
 export type MoveStageResult =
   | { success: true; passed: true; reasons: string[] }
-  | { success: true; passed: false; reasons: string[]; refusal?: 'STAGE_SKIP'; nextStage?: Gate }
+  | { success: true; passed: false; reasons: string[]; reasonDetails?: GateReason[]; refusal?: 'STAGE_SKIP'; nextStage?: Gate }
   | {
       success: false;
       error: 'TENANT_SCOPE_REQUIRED' | 'INVALID_INPUT' | 'OPPORTUNITY_NOT_FOUND' | 'STAGE_MOVE_FAILED';
@@ -497,7 +497,7 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
     if (move === 'next') {
       const gate = await evaluateGate(opportunityId, newStage, tenantId, userId || 'system');
       revalidatePipeline();
-      if (!gate.passed) return { success: true, passed: false, reasons: gate.reasons };
+      if (!gate.passed) return { success: true, passed: false, reasons: gate.reasons, reasonDetails: gate.reasonDetails };
     } else {
       const { count } = await withTenant(tenantId, (tx) =>
         tx.opportunity.updateMany({
@@ -561,7 +561,7 @@ export async function evaluateOpportunityGate({
   opportunityId: string;
   gate: Gate;
 }): Promise<
-  | { success: true; passed: boolean; reasons: string[] }
+  | { success: true; passed: boolean; reasons: string[]; reasonDetails?: GateReason[] }
   | {
       success: false;
       error: 'TENANT_SCOPE_REQUIRED' | 'OPPORTUNITY_NOT_FOUND' | 'GATE_OUT_OF_ORDER' | 'GATE_EVALUATION_FAILED';
@@ -590,7 +590,7 @@ export async function evaluateOpportunityGate({
 
     revalidatePipeline();
 
-    return { success: true, passed: result.passed, reasons: result.reasons };
+    return { success: true, ...result };
   } catch (err) {
     // The raw driver message is kept in the server log, not handed to the browser.
     console.warn(`[evaluateOpportunityGate] failed: ${errorMessage(err)}`);

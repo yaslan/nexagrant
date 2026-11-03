@@ -15,6 +15,7 @@ import {
 import type { NoteEntry, OpportunityItem, WorkspaceMember } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { useGateReasonText } from '@/lib/hooks/use-gate-reason-text';
 
 interface KanbanBoardProps {
   /**
@@ -87,6 +88,7 @@ export default function KanbanBoard({
   const [opps, setOpps] = useState<OpportunityItem[]>(initialOpps);
   const [isPending, startTransition] = useTransition();
   const errorText = useActionErrorText();
+  const reasonText = useGateReasonText();
 
   // Real tenant members and live call topics — fetched once on mount, since this
   // client component has no server context of its own to read them with.
@@ -130,7 +132,6 @@ export default function KanbanBoard({
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalStage, setModalStage] = useState<Gate>('G0');
 
   // New Opportunity Form
   const [formData, setFormData] = useState({
@@ -138,7 +139,6 @@ export default function KanbanBoard({
     topicId: '',
     intendedRole: 'coordinator',
     ownerId: '',
-    stage: 'G0' as Gate,
     notes: '',
   });
 
@@ -195,7 +195,7 @@ export default function KanbanBoard({
             reasons:
               res.refusal === 'STAGE_SKIP'
                 ? [t('moveSkipped', { from: opp.stage, to: newStage, next: res.nextStage ?? '' })]
-                : res.reasons,
+                : (res.reasonDetails?.map(reasonText) ?? res.reasons),
           });
           return;
         }
@@ -281,7 +281,6 @@ export default function KanbanBoard({
     e.preventDefault();
     if (!formData.title.trim()) return;
 
-    const targetStage = formData.stage || modalStage || 'G0';
     const member = members.find((m) => m.id === selectedOwnerId);
 
     startTransition(async () => {
@@ -293,7 +292,6 @@ export default function KanbanBoard({
           intendedRole: formData.intendedRole,
           ownerId: selectedOwnerId || undefined,
           ownerName: member?.name || undefined,
-          stage: targetStage,
           notes: formData.notes.trim() || undefined,
         });
 
@@ -306,7 +304,6 @@ export default function KanbanBoard({
             topicId: '',
             intendedRole: 'coordinator',
             ownerId: '',
-            stage: 'G0',
             notes: '',
           });
           showToast(`"${res.opportunity.title}" fırsatı ${member?.name || ''} üzerine atanarak oluşturuldu!`, 'success');
@@ -345,11 +342,7 @@ export default function KanbanBoard({
     });
   }, [opps, searchQuery, roleFilter, ownerFilter]);
 
-  const openCreateModalForStage = (gate: Gate) => {
-    setModalStage(gate);
-    setFormData((prev) => ({ ...prev, stage: gate }));
-    setIsModalOpen(true);
-  };
+  const openCreateModal = () => setIsModalOpen(true);
 
   return (
     <div className="space-y-6" data-testid="pipeline-board">
@@ -463,7 +456,7 @@ export default function KanbanBoard({
 
           {/* + New Opportunity Main Trigger Button */}
           <button
-            onClick={() => openCreateModalForStage('G0')}
+            onClick={openCreateModal}
             className="bg-accent hover:opacity-90 text-white font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-all flex items-center gap-2 shrink-0 cursor-pointer"
           >
             <span className="text-base leading-none font-bold">+</span>
@@ -497,14 +490,18 @@ export default function KanbanBoard({
                   <div className="text-[11px] text-muted font-medium mt-0.5">{subtitle}</div>
                 </div>
 
-                {/* Quick Add Button per Column */}
-                <button
-                  onClick={() => openCreateModalForStage(key)}
-                  title={`${key} aşamasına yeni fırsat ekle`}
-                  className="w-6 h-6 rounded-lg bg-ground hover:bg-accent/15 text-muted hover:text-accent-ink border border-border flex items-center justify-center font-bold text-sm transition"
-                >
-                  +
-                </button>
+                {/* A new opportunity starts at G0; the later columns are reached through the gates. */}
+                {key === 'G0' && (
+                  <button
+                    onClick={openCreateModal}
+                    title={t('addToG0')}
+                    aria-label={t('addToG0')}
+                    data-testid="pipeline-add-G0"
+                    className="w-6 h-6 rounded-lg bg-ground hover:bg-accent/15 text-muted hover:text-accent-ink border border-border flex items-center justify-center font-bold text-sm transition"
+                  >
+                    +
+                  </button>
+                )}
               </div>
 
               {/* Column Cards Drop Area */}
@@ -759,15 +756,24 @@ export default function KanbanBoard({
                   );
                 })}
 
-                {stageOpps.length === 0 && (
-                  <div
-                    onClick={() => openCreateModalForStage(key)}
-                    className="h-28 text-center text-xs text-muted flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl hover:border-accent hover:bg-surface/50 cursor-pointer transition"
-                  >
-                    <span className="text-base mb-1">+</span>
-                    <span>Buraya sürükleyin veya ekleyin</span>
-                  </div>
-                )}
+                {stageOpps.length === 0 &&
+                  (key === 'G0' ? (
+                    <div
+                      onClick={openCreateModal}
+                      data-testid="pipeline-empty-G0"
+                      className="h-28 text-center text-xs text-muted flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl hover:border-accent hover:bg-surface/50 cursor-pointer transition"
+                    >
+                      <span className="text-base mb-1">+</span>
+                      <span>{t('emptyG0')}</span>
+                    </div>
+                  ) : (
+                    <div
+                      data-testid={`pipeline-empty-${key}`}
+                      className="h-28 px-3 text-center text-xs text-muted flex items-center justify-center border-2 border-dashed border-border rounded-xl"
+                    >
+                      <span>{t('emptyLater')}</span>
+                    </div>
+                  ))}
               </div>
             </div>
           );
@@ -800,7 +806,7 @@ export default function KanbanBoard({
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleCreateSubmit} className="space-y-4">
+            <form onSubmit={handleCreateSubmit} data-testid="pipeline-create-form" className="space-y-4">
               {/* Title */}
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
@@ -809,6 +815,7 @@ export default function KanbanBoard({
                 <input
                   type="text"
                   required
+                  data-testid="pipeline-create-title"
                   placeholder="Örn: AI-Optimized Battery Systems for Heavy Transport"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -871,39 +878,20 @@ export default function KanbanBoard({
                 )}
               </div>
 
-              {/* Role & Stage selection grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-ink mb-1">
-                    Hedeflenen Rol
-                  </label>
-                  <select
-                    value={formData.intendedRole}
-                    onChange={(e) => setFormData({ ...formData, intendedRole: e.target.value })}
-                    className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink focus:outline-none focus:ring-2 focus:ring-accent"
-                  >
-                    <option value="coordinator">👑 Koordinatör (Lead)</option>
-                    <option value="partner">🤝 Konsorsiyum Ortağı</option>
-                    <option value="tech_provider">🔬 Teknoloji Sağlayıcı</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-ink mb-1">
-                    Başlangıç Kapısı
-                  </label>
-                  <select
-                    value={formData.stage}
-                    onChange={(e) => setFormData({ ...formData, stage: e.target.value as Gate })}
-                    className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink focus:outline-none focus:ring-2 focus:ring-accent font-mono"
-                  >
-                    <option value="G0">G0: Triage & Fizibilite</option>
-                    <option value="G1">G1: Konsept & Mimari</option>
-                    <option value="G2">G2: Konsorsiyum</option>
-                    <option value="G3">G3: Tam Başvuru</option>
-                    <option value="G4">G4: Nihai Teslim</option>
-                  </select>
-                </div>
+              {/* Role */}
+              <div>
+                <label className="block text-xs font-bold text-ink mb-1">
+                  Hedeflenen Rol
+                </label>
+                <select
+                  value={formData.intendedRole}
+                  onChange={(e) => setFormData({ ...formData, intendedRole: e.target.value })}
+                  className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="coordinator">👑 Koordinatör (Lead)</option>
+                  <option value="partner">🤝 Konsorsiyum Ortağı</option>
+                  <option value="tech_provider">🔬 Teknoloji Sağlayıcı</option>
+                </select>
               </div>
 
               {/* Initial Note */}

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { Gate, PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { presentIds } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 /**
  * NG-25: a forward stage move goes through the gate, whichever door it comes in by.
@@ -20,6 +20,7 @@ const SUITE = 'stage-move-gate.live';
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 const ADMIN_URL = envValue('DATABASE_URL');
 const RUN = `stage-move-${Date.now().toString(36)}`;
+const FIXTURE = `${RUN}-fixture`;
 
 const state = vi.hoisted(() => ({
   rls: undefined as PrismaClient | undefined,
@@ -79,8 +80,14 @@ async function opportunity(title: string, stage: Gate = 'G0', owner?: { tenantId
   });
   return o.id;
 }
-/** Meets every G1 condition the engine checks: a filled critical seat and a backup candidate. */
-async function makeReadyForG1(opportunityId: string) {
+/** A G0 decision on file, written the way the engine writes one. */
+async function fileG0(opportunityId: string, passed: boolean, decidedAt = new Date(), owner = tenantId) {
+  await admin!.gateDecision.create({
+    data: { tenantId: owner, opportunityId, gate: 'G0', passed, inputs: {}, ruleVersion: '1.0', decidedBy: FIXTURE, decidedAt },
+  });
+}
+/** Meets the seat conditions of G1: a filled critical seat and a backup candidate. */
+async function fillSeatsForG1(opportunityId: string) {
   const seat = await admin!.consortiumSeat.create({
     data: { tenantId, opportunityId, roleKey: 'research', status: 'CONFIRMED', organizationId: `${RUN}-org-seated` },
   });
@@ -88,11 +95,17 @@ async function makeReadyForG1(opportunityId: string) {
     data: { tenantId, seatId: seat.id, organizationId: `${RUN}-org-backup`, score: 9, breakdown: {}, rank: 1 },
   });
 }
+/** Meets every G1 condition the engine checks: G0 passed, plus the seats. */
+async function makeReadyForG1(opportunityId: string) {
+  await fileG0(opportunityId, true);
+  await fillSeatsForG1(opportunityId);
+}
 const stageOf = async (id: string) =>
   (await admin!.opportunity.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage;
 const decisionsOf = (opportunityId: string) =>
   admin!.gateDecision.findMany({
     where: { opportunityId },
+    orderBy: { decidedAt: 'asc' },
     select: { gate: true, passed: true, decidedBy: true },
   });
 
@@ -169,7 +182,24 @@ describe('moveOpportunityStage', () => {
     expect(await moveOpportunityStage(opp, 'G1')).toEqual({ success: true, passed: true, reasons: [] });
 
     expect(await stageOf(opp)).toBe('G1');
-    expect(await decisionsOf(opp)).toEqual([{ gate: 'G1', passed: true, decidedBy: `${RUN}-user` }]);
+    expect(await decisionsOf(opp)).toEqual([
+      { gate: 'G0', passed: true, decidedBy: FIXTURE },
+      { gate: 'G1', passed: true, decidedBy: `${RUN}-user` },
+    ]);
+  });
+
+  test('no G0 decision on file, seats fine: refused for that reason alone, stage stays, refusal filed', async () => {
+    const opp = await opportunity('no g0');
+    await fillSeatsForG1(opp);
+
+    const result = await moveOpportunityStage(opp, 'G1');
+
+    expect(result).toMatchObject({ success: true, passed: false });
+    expect((result as { reasons: string[] }).reasons).toEqual(['G0 has not been passed: no G0 decision is on file']);
+    expect((result as { reasonDetails: unknown[] }).reasonDetails).toEqual([{ code: 'G1_G0_NOT_DECIDED' }]);
+    expect(await stageOf(opp)).toBe('G0');
+    expect(await decisionsOf(opp)).toEqual([{ gate: 'G1', passed: false, decidedBy: `${RUN}-user` }]);
+    expect(store.updateStage).not.toHaveBeenCalled();
   });
 
   test('skipping a stage is refused before any gate runs, even when the skipped-to gate would pass', async () => {
@@ -221,6 +251,76 @@ describe('moveOpportunityStage', () => {
 
     expect(await moveOpportunityStage(opp, 'G9' as Gate)).toEqual({ success: false, error: 'INVALID_INPUT' });
     expect(await stageOf(opp)).toBe('G0');
+  });
+});
+
+describe('G1 reads the latest G0 decision of this opportunity in this tenant', () => {
+  const HOUR = 3_600_000;
+  const ago = (hours: number) => new Date(Date.now() - hours * HOUR);
+
+  test('passed, then failed: the latest counts, refused', async () => {
+    const opp = await opportunity('pass then fail');
+    await fillSeatsForG1(opp);
+    await fileG0(opp, true, ago(2));
+    await fileG0(opp, false, ago(1));
+
+    const result = await moveOpportunityStage(opp, 'G1');
+
+    expect((result as { reasonDetails: unknown[] }).reasonDetails).toEqual([{ code: 'G1_G0_LAST_FAILED' }]);
+    expect(await stageOf(opp)).toBe('G0');
+  });
+
+  test('failed, then passed: the latest counts, moves', async () => {
+    const opp = await opportunity('fail then pass');
+    await fillSeatsForG1(opp);
+    await fileG0(opp, false, ago(2));
+    await fileG0(opp, true, ago(1));
+
+    expect(await moveOpportunityStage(opp, 'G1')).toEqual({ success: true, passed: true, reasons: [] });
+    expect(await stageOf(opp)).toBe('G1');
+  });
+
+  test('a soft-deleted pass is not a pass', async () => {
+    const opp = await opportunity('erased pass');
+    await fillSeatsForG1(opp);
+    await fileG0(opp, true);
+    await admin!.gateDecision.updateMany({ where: { opportunityId: requireId(opp, 'opp') }, data: { deletedAt: new Date() } });
+
+    const result = await moveOpportunityStage(opp, 'G1');
+
+    expect((result as { reasonDetails: unknown[] }).reasonDetails).toEqual([{ code: 'G1_G0_NOT_DECIDED' }]);
+    expect(await stageOf(opp)).toBe('G0');
+  });
+
+  test('a pass filed under another tenant is not a pass', async () => {
+    const opp = await opportunity('foreign pass');
+    await fillSeatsForG1(opp);
+    await fileG0(opp, true, new Date(), otherTenantId);
+
+    const result = await moveOpportunityStage(opp, 'G1');
+
+    expect((result as { reasonDetails: unknown[] }).reasonDetails).toEqual([{ code: 'G1_G0_NOT_DECIDED' }]);
+    expect(await stageOf(opp)).toBe('G0');
+  });
+
+  test('the detail path answers the same: refused without G0, filed, and the outcome is in the inputs', async () => {
+    const opp = await opportunity('detail no g0');
+    await fillSeatsForG1(opp);
+
+    const result = await evaluateOpportunityGate({ opportunityId: opp, gate: 'G1' });
+
+    expect(result).toMatchObject({ success: true, passed: false, reasonDetails: [{ code: 'G1_G0_NOT_DECIDED' }] });
+    expect(await stageOf(opp)).toBe('G0');
+    const filed = await admin!.gateDecision.findMany({ where: { opportunityId: opp }, select: { gate: true, inputs: true } });
+    expect(filed).toMatchObject([{ gate: 'G1', inputs: { latestG0Passed: null } }]);
+  });
+
+  test('the detail path moves an opportunity that passed G0', async () => {
+    const opp = await opportunity('detail ready');
+    await makeReadyForG1(opp);
+
+    expect(await evaluateOpportunityGate({ opportunityId: opp, gate: 'G1' })).toEqual({ success: true, passed: true, reasons: [] });
+    expect(await stageOf(opp)).toBe('G1');
   });
 });
 
