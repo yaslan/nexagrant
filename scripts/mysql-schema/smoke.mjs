@@ -7,6 +7,7 @@
 // Creates one tenant row, reads/updates/searches it, deletes it. Pool tuning is out of scope (Faz 2).
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '../../node_modules/.prisma/client-mysql/index.js';
+import { createViewClient } from './tenant-client.mjs';
 
 const HOST = process.env.MYSQL_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.MYSQL_PORT ?? 3306);
@@ -32,6 +33,15 @@ const adapter = new PrismaMariaDb({
 const prisma = new PrismaClient({ adapter });
 
 const id = `smoke_${Date.now()}`;
+const docId = `${id}_doc`;
+const view = createViewClient({
+  host: HOST,
+  port: PORT,
+  user: USER,
+  password: PASSWORD,
+  database: DATABASE,
+  connectionLimit: 2,
+});
 const results = [];
 const step = (label, ok, detail = '') => {
   results.push({ label, ok });
@@ -58,10 +68,22 @@ try {
 
   const [mode] = await prisma.$queryRawUnsafe('SELECT @@SESSION.sql_mode AS m');
   step('session sql_mode is strict (initSql applied)', String(mode.m).includes('STRICT_ALL_TABLES'), String(mode.m));
+
+  // View client (FO-381 B1): reads through the tenant transaction only.
+  await prisma.document.create({ data: { id: docId, tenantId: id, kind: 'topic', title: 'smoke view row' } });
+  const inTenant = await view.tenant(id, (tx) => tx.document.count({ where: { id: docId } }));
+  step('view client sees own row inside tenant tx', inTenant === 1, `count=${inTenant}`);
+
+  const otherTenant = await view.tenant(`${id}_other`, (tx) => tx.document.count({ where: { id: docId } }));
+  step('view client hides another tenant row', otherTenant === 0, `count=${otherTenant}`);
+
+  const outside = await view.prisma.document.count({ where: { id: docId } });
+  step('view client without tenant sees nothing (no leaked context)', outside === 0, `count=${outside}`);
 } catch (err) {
   step('unexpected error', false, String(err.message ?? err).split('\n')[0]);
 } finally {
   try {
+    await prisma.document.deleteMany({ where: { id: docId } });
     await prisma.tenant.deleteMany({ where: { id } });
     const left = await prisma.tenant.count({ where: { id } });
     step('cleanup: scratch row removed', left === 0);
@@ -69,6 +91,7 @@ try {
     step('cleanup', false, String(err.message ?? err).split('\n')[0]);
   }
   await prisma.$disconnect();
+  await view.disconnect();
 }
 
 const failed = results.filter((r) => !r.ok).length;
