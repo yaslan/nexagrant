@@ -164,17 +164,26 @@ test('the board does not move when the members arrive', async ({ page }) => {
     await route.continue();
   });
 
-  await signIn(page, BOARD_URL);
-  const heading = page.getByTestId(`pipeline-card-${F.oppId}`).getByRole('heading', { name: F.oppTitle });
-  await expectHydrated(heading);
-  const before = await heading.boundingBox();
+  try {
+    await signIn(page, BOARD_URL);
+    const heading = page.getByTestId(`pipeline-card-${F.oppId}`).getByRole('heading', { name: F.oppTitle });
+    await expectHydrated(heading);
+    const before = await heading.boundingBox();
 
-  release();
-  await expect(page.locator(`option[value="${F.secondUserId}"]`).first()).toBeAttached({
-    timeout: 30_000,
-  });
+    // The members are still held back: without this, a route that stopped holding the POST
+    // would let the test pass without ever moving the board (PR #253 review, suggestion 1).
+    await expect(page.locator(`option[value="${F.secondUserId}"]`)).toHaveCount(0);
 
-  expect(await heading.boundingBox()).toEqual(before);
+    release();
+    await expect(page.locator(`option[value="${F.secondUserId}"]`).first()).toBeAttached({
+      timeout: 30_000,
+    });
+
+    expect(await heading.boundingBox()).toEqual(before);
+  } finally {
+    // Idempotent: a failure before the release above must not leave the route hanging.
+    release();
+  }
 });
 
 test('the KPI export reports the rows the wrapped loader returned', async ({ page }) => {
