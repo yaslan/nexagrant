@@ -194,6 +194,18 @@ describe('view artifacts (real schema)', () => {
     expect(sql.match(/^CREATE OR REPLACE VIEW .*WITH CASCADED CHECK OPTION;$/gm)).toHaveLength(54);
   });
 
+  // FO-381 B2: PG `tenant_or_shared` (rls.sql:27-40) shows NULL tenantId rows to everyone, for
+  // Document, Chunk and ConceptTemplate only. AuditEvent is strict on purpose (rls.sql comment).
+  it('shows shared (NULL tenantId) rows only in Document, Chunk and ConceptTemplate views', () => {
+    const sql = toViewsSql(real);
+    const shared = sql.match(/^CREATE OR REPLACE VIEW .*OR `tenantId` IS NULL WITH CASCADED CHECK OPTION;$/gm) ?? [];
+    expect(shared).toHaveLength(3);
+    for (const name of ['Document', 'Chunk', 'ConceptTemplate']) {
+      expect(sql).toContain(`VIEW \`v_${name}\` AS SELECT * FROM \`${name}\` WHERE \`tenantId\` = fabrika_current_tenant() OR \`tenantId\` IS NULL WITH CASCADED CHECK OPTION;`);
+    }
+    expect(sql).toContain('VIEW `v_AuditEvent` AS SELECT * FROM `AuditEvent` WHERE `tenantId` = fabrika_current_tenant() WITH CASCADED CHECK OPTION;');
+  });
+
   it('drops every view and the function in the down script', () => {
     const down = toViewsDownSql(real);
     expect(down).toContain('DROP FUNCTION IF EXISTS `fabrika_current_tenant`;');

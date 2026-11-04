@@ -237,6 +237,13 @@ export const PLATFORM_VIEW_MODELS = [
   // rev. 7: tenant-less rows touched on request paths (login, profile, invitations, alerts)
   'Tenant', 'User', 'SystemAlert',
 ];
+/**
+ * FO-381 B2: tenant models whose tenantId is nullable and means "shared, visible to every tenant"
+ * (rls.sql:27-40 `tenant_or_shared`). Their views also show NULL rows. The check option stays, so
+ * a tenant may write a NULL row exactly as the PostgreSQL WITH CHECK allows. AuditEvent is NOT here:
+ * its NULL rows belong to no tenant and stay hidden (rls.sql, AuditEvent comment).
+ */
+export const SHARED_TENANT_MODELS = ['Document', 'Chunk', 'ConceptTemplate'];
 export const EXPECTED_TENANT_MODELS = 54;
 export const EXPECTED_PLATFORM_MODELS = 16;
 export const EXPECTED_VIEW_COUNT = EXPECTED_TENANT_MODELS + EXPECTED_PLATFORM_MODELS; // 70
@@ -390,7 +397,8 @@ export function toViewsSql(mysqlSchemaText) {
   for (const [, { mapped, kind }] of byName) {
     if (kind === 'system') continue;
     if (kind === 'tenant') {
-      lines.push(`CREATE OR REPLACE VIEW \`v_${mapped}\` AS SELECT * FROM \`${mapped}\` WHERE \`tenantId\` = fabrika_current_tenant() WITH CASCADED CHECK OPTION;`);
+      const shared = SHARED_TENANT_MODELS.includes(mapped) ? ' OR `tenantId` IS NULL' : '';
+      lines.push(`CREATE OR REPLACE VIEW \`v_${mapped}\` AS SELECT * FROM \`${mapped}\` WHERE \`tenantId\` = fabrika_current_tenant()${shared} WITH CASCADED CHECK OPTION;`);
     } else {
       lines.push(`CREATE OR REPLACE ALGORITHM=TEMPTABLE VIEW \`v_${mapped}\` AS SELECT * FROM \`${mapped}\`;`);
     }
