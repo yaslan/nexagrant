@@ -59,6 +59,9 @@ Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortam�
 | 4 | Davet/posta testleri 500 ya da SMTP hatası | `.env.example`'daki boş anahtarlar rastgele doldurulmuş | SMTP'yi `playwright.config.ts`'e bırak (mailpit :1025); vitest SMTP'siz koşmalı |
 | 5 | e2e `EADDRINUSE :3000` | Başka bir `next dev` 3000'de | `E2E_PORT=<boş port>` |
 | 6 | Sonraki koşuda `server-action-rbac-guard` B-1 kırmızı | e2e'nin `next dev`'i `tsconfig.json`'ı yeniden yazdı | `git checkout -- tsconfig.json` |
+| 7 | e2e'nin çoğu (FO-254 koşusunda 342 test) 0 ms'de kırmızı, `browserType.launch: Executable doesn't exist ... chrome-headless-shell` | Playwright chromium binary'si `~/Library/Caches/ms-playwright` altında yok (yeni makine ya da Playwright sürümü değişti); birim testler yeşil kalır | `pnpm exec playwright install chromium`, sonra koşuyu yeniden başlat |
+
+Uzun koşular (`pnpm gate` ~10 dk; kilit bekleyen koşu daha uzun sürer) foreground Bash'te 600 sn sınırına takılabilir: `run_in_background` ile koş, logu dosyaya yaz (`… > log 2>&1; echo GATE_EXIT=$? >> log`).
 
 Ek: `CI=true` verirsen `keep-eu-sync.live` `KEEP_EU_LIVE` tanımsızsa "CI'da atlanamaz" diye düşer; ya ikisini birlikte ver (CI gibi) ya da hiçbirini.
 
