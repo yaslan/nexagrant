@@ -6,8 +6,12 @@ import {
   DECISIONS_PATH,
   EXPECTED_CI_BASE,
   SOURCE_PATH,
+  DB_OBJECTS_PATH,
+  checkDbObjects,
   ciColumns,
   checkViewList,
+  pgDbObjects,
+  readPgSources,
   classifyModels,
   insensitiveFieldNames,
   longTextInKeys,
@@ -210,6 +214,51 @@ describe('view artifacts (real schema)', () => {
     const down = toViewsDownSql(real);
     expect(down).toContain('DROP FUNCTION IF EXISTS `fabrika_current_tenant`;');
     expect(down.match(/DROP VIEW IF EXISTS/g)).toHaveLength(70);
+  });
+});
+
+// FO-381 B3: every PostgreSQL CHECK / trigger / function must have an inventory entry, so a new
+// object cannot disappear from the MariaDB build without a recorded decision.
+describe('db objects inventory (FO-381 B3)', () => {
+  const inventory = JSON.parse(readFileSync(DB_OBJECTS_PATH, 'utf8'));
+
+  it('extracts CHECK, trigger and function names from PostgreSQL sources (pure)', () => {
+    const found = pgDbObjects([
+      {
+        path: 'x.sql',
+        text:
+          'ALTER TABLE "T" ADD CONSTRAINT "T_a_check" CHECK ("a" > 0);\n' +
+          'CREATE OR REPLACE FUNCTION fabrika_private.f_one() RETURNS trigger AS $$ $$;\n' +
+          'CREATE TRIGGER "T_trg" BEFORE UPDATE ON "T" FOR EACH ROW EXECUTE FUNCTION f_one();\n' +
+          '-- comment: CREATE OR REPLACE FUNCTION, DROP TRIGGER IF EXISTS.\n',
+      },
+    ]);
+    expect([...found.keys()].sort()).toEqual(['check:T_a_check', 'function:f_one', 'trigger:T_trg']);
+  });
+
+  it('the committed inventory matches every object in the PostgreSQL migrations (real sources)', () => {
+    expect(checkDbObjects(pgDbObjects(readPgSources()), inventory)).toEqual([]);
+  });
+
+  it('counts the real objects: 13 CHECK, 2 trigger, 12 function', () => {
+    const found = pgDbObjects(readPgSources());
+    const count = (k) => [...found.values()].filter((o) => o.kind === k).length;
+    expect([count('check'), count('trigger'), count('function')]).toEqual([13, 2, 12]);
+  });
+
+  it('fails when a new PostgreSQL CHECK has no entry (mutant: a dropped object would be silent)', () => {
+    const found = pgDbObjects(readPgSources());
+    found.set('check:New_silent_check', { kind: 'check', name: 'New_silent_check' });
+    const errors = checkDbObjects(found, inventory);
+    expect(errors.some((e) => e.includes('check:New_silent_check') && e.includes('no entry'))).toBe(true);
+  });
+
+  it('fails on a stale entry and on an unknown decision', () => {
+    const found = pgDbObjects(readPgSources());
+    const stale = { objects: [...inventory.objects, { kind: 'check', name: 'Gone_check', decision: 'taşı', reason: 'removed upstream, entry left behind' }] };
+    expect(checkDbObjects(found, stale).some((e) => e.includes('check:Gone_check') && e.includes('stale'))).toBe(true);
+    const badDecision = { objects: inventory.objects.map((o, i) => (i === 0 ? { ...o, decision: 'maybe' } : o)) };
+    expect(checkDbObjects(found, badDecision).some((e) => e.includes('decision'))).toBe(true);
   });
 });
 

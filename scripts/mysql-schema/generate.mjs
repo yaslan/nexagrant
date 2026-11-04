@@ -418,6 +418,55 @@ export function toViewsDownSql(mysqlSchemaText) {
   ].join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// FO-381 B3: PostgreSQL CHECK / trigger / function inventory (prisma/mysql/db-objects.json).
+export const DB_OBJECTS_PATH = resolve(ROOT, 'prisma/mysql/db-objects.json');
+export const DB_OBJECT_DECISIONS = ['taşı', 'uygulamaya al', 'bırak'];
+
+/** Pure: [{path, text}] → Map "kind:name" → { kind, name }. Schema prefixes (public., fabrika_private.) are dropped. */
+export function pgDbObjects(sources) {
+  const found = new Map();
+  const add = (kind, name) => found.set(`${kind}:${name}`, { kind, name });
+  for (const { text } of sources) {
+    for (const m of text.matchAll(/CONSTRAINT\s+"?(\w+)"?\s+CHECK\s*\(/gi)) add('check', m[1]);
+    for (const m of text.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:\w+\.)?(\w+)/gi)) add('function', m[1]);
+    for (const m of text.matchAll(/CREATE\s+TRIGGER\s+"?(\w+)"?/gi)) add('trigger', m[1]);
+  }
+  return found;
+}
+
+/** Pure: found objects vs. inventory → error lines (empty = the inventory is complete and current). */
+export function checkDbObjects(found, inventory) {
+  const errors = [];
+  const listed = new Map();
+  for (const o of inventory.objects ?? []) {
+    const key = `${o.kind}:${o.name}`;
+    if (listed.has(key)) errors.push(`${key}: duplicate inventory entry`);
+    listed.set(key, o);
+    if (!DB_OBJECT_DECISIONS.includes(o.decision)) {
+      errors.push(`${key}: decision "${o.decision}" is not one of ${DB_OBJECT_DECISIONS.join(' | ')}`);
+    }
+    if (typeof o.reason !== 'string' || o.reason.trim().length < 10) errors.push(`${key}: reason missing`);
+  }
+  for (const key of found.keys()) {
+    if (!listed.has(key)) errors.push(`${key} exists in PostgreSQL sources but has no entry in prisma/mysql/db-objects.json (no entry)`);
+  }
+  for (const key of listed.keys()) {
+    if (!found.has(key)) errors.push(`${key} is in db-objects.json but no PostgreSQL source defines it (stale entry)`);
+  }
+  return errors;
+}
+
+/** Up migrations and RLS scripts only: down and rollback scripts re-create objects and must not count twice. */
+export function readPgSources() {
+  const dir = resolve(ROOT, 'prisma/migrations');
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith('.sql') && !/\.down\.sql$|rollback/.test(f))
+    .map((f) => resolve(dir, f));
+  files.push(resolve(ROOT, 'prisma/rls.sql'), resolve(ROOT, 'prisma/rls-app-role.sql'));
+  return files.map((p) => ({ path: p, text: readFileSync(p, 'utf8') }));
+}
+
 function migrateDiffScript() {
   try {
     return execFileSync(
@@ -488,6 +537,14 @@ function main() {
     const viewListErrors = checkViewList(committed(VIEWS_SQL_PATH) ?? '', committedSchema);
     if (viewListErrors.length > 0) {
       console.error(`expected view list violated in prisma/mysql/views.sql:\n  ${viewListErrors.join('\n  ')}`);
+      process.exit(1);
+    }
+    const objectErrors = checkDbObjects(
+      pgDbObjects(readPgSources()),
+      JSON.parse(committed(DB_OBJECTS_PATH) ?? '{"objects":[]}'),
+    );
+    if (objectErrors.length > 0) {
+      console.error(`PostgreSQL objects not accounted for in prisma/mysql/db-objects.json:\n  ${objectErrors.join('\n  ')}`);
       process.exit(1);
     }
     if (committedSchema !== text) stale.push('prisma/mysql/schema.prisma');
