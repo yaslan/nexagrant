@@ -10,7 +10,9 @@ import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
  * gate on any A/AA violation axe finds on the first pages a user meets: the public home, the
  * sign-in screen, and — signed in — the main app layout. Locales tr and en.
  *
- * Not loosened: no rule is disabled. If a page fails, the page is fixed.
+ * Not loosened: `scan` disables nothing and no call passes a rule list. If a page fails, the page
+ * is fixed. (The KPI card links once needed label-content-name-mismatch off; their accessible name
+ * is now the visible text plus the action hint, so WCAG 2.5.3 is checked like every other rule.)
  * The last test proves the scanner is live: it injects a button with no name and expects axe
  * to report it, so a scan that silently finds nothing cannot pass for a clean page.
  */
@@ -33,8 +35,8 @@ async function acceptCookies(page: Page) {
   });
 }
 
-async function scan(page: Page, disableRules: string[] = []) {
-  const results = await new AxeBuilder({ page }).withTags(TAGS).disableRules(disableRules).analyze();
+async function scan(page: Page) {
+  const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   return results.violations.map((v) => ({
     rule: v.id,
     impact: v.impact,
@@ -67,11 +69,7 @@ test.describe('WCAG A/AA — signed in, main layout', () => {
       await signInAs(page, { id: OWNER.userId, email: OWNER.email, tenantId: OWNER.tenantId, role: OWNER.role });
       await page.goto(url);
       await expect(page.locator('#dashboard-panel-overview')).toBeVisible({ timeout: 30_000 });
-      // label-content-name-mismatch (WCAG 2.5.3) is the one rule left off, and only here: the KPI
-      // card links are named "<title> — <suffix>" on purpose (FO-69, dashboard-kpi-links.spec.ts
-      // asserts the exact name; the figure is the description), while axe wants the whole visible
-      // text inside the name. Open decision, see the NG-5 report; do not widen this list.
-      expect(await scan(page, ['label-content-name-mismatch']), url).toEqual([]);
+      expect(await scan(page), url).toEqual([]);
     });
   }
 });
@@ -87,4 +85,20 @@ test('the scanner is live: a nameless button is reported', async ({ page }) => {
   });
   const found = await scan(page);
   expect(found.map((v) => v.rule)).toContain('button-name');
+});
+
+test('label-content-name-mismatch (WCAG 2.5.3) is live: a link whose name drops its visible text is reported', async ({ page }) => {
+  await acceptCookies(page);
+  await page.goto('/tr/giris');
+  await expect(page.locator('main')).toBeVisible();
+  await page.evaluate(() => {
+    const a = document.createElement('a');
+    a.id = 'a11y-selftest-label';
+    a.href = '/tr';
+    a.setAttribute('aria-label', 'Ayrıntıya git');
+    a.textContent = 'Toplam Teklif 5 proje';
+    document.querySelector('main')!.appendChild(a);
+  });
+  const found = await scan(page);
+  expect(found.map((v) => v.rule)).toContain('label-content-name-mismatch');
 });

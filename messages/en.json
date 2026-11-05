@@ -143,7 +143,8 @@
     "readinessMoreGaps": "{count} more gaps; see the full result for all of them.",
     "readinessViewResult": "View the full result",
     "readinessRetake": "Retake the scorecard",
-    "cardLinkAria": "{title} — go to details"
+    "cardLinkAria": "{title} — go to details",
+    "cardLinkAction": "— go to details"
   },
   "Pipeline": {
     "title": "Opportunity Pipeline",

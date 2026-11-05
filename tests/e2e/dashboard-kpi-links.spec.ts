@@ -13,6 +13,13 @@ import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
  * its figure is worked on. The expected targets are written out per locale rather than built
  * with getWorkspaceRoute, so the spec states the mapping instead of agreeing with the code.
  *
+ * The link's accessible name is the card's own visible text — title, figure, unit, description —
+ * followed by the hidden action hint (WCAG 2.5.3 Label in Name; NG-5). `cardLink` reads that
+ * visible text from the DOM and asserts the name EQUALS `<visible text> <suffix>` exactly, while
+ * the title and the suffix stay written out per locale here. What FO-69 guards is unchanged: a
+ * card is found by its title, its link says it leads somewhere, and the href is the mapped page.
+ * The figures themselves depend on the seeded data and are not this spec's subject.
+ *
  * Two seats of this spec's own on the demo tenant: an owner, who may open Settings › Modules,
  * and a pipeline manager, who may open the panel but not that page — so the active-modules
  * card must not be a link for them. (A member never reaches the panel: page.tsx sends every
@@ -85,6 +92,35 @@ async function acceptCookies(page: Page) {
   });
 }
 
+/**
+ * The link of the KPI card titled `title`. `visibleName` is the text the card shows (title,
+ * figure parts, description), in reading order, read from the DOM without the hidden hint.
+ */
+function cardLink(page: Page, title: string) {
+  const link = page
+    .locator('#dashboard-panel-overview a[href]')
+    .filter({ has: page.getByRole('heading', { name: title, exact: true }) });
+  const visibleName = () =>
+    link.evaluate((a) => {
+      const parts = [
+        a.querySelector('h3')?.textContent,
+        ...Array.from(a.querySelectorAll('.items-baseline > *')).map((e) => e.textContent),
+        a.querySelector('p')?.textContent,
+      ];
+      return parts.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    });
+  return { link, visibleName };
+}
+
+/** Exact accessible name: the card's visible text, then the action hint. */
+async function expectCardName(page: Page, title: string, suffix: string) {
+  const { link, visibleName } = cardLink(page, title);
+  const visible = await visibleName();
+  expect(visible.startsWith(`${title} `), `visible text of "${title}": ${visible}`).toBe(true);
+  await expect(link).toHaveAccessibleName(`${visible}${suffix}`);
+  return link;
+}
+
 async function openPanel(page: Page, seat: typeof OWNER | typeof MANAGER, path: string) {
   await acceptCookies(page);
   await signInAs(page, { id: seat.userId, email: seat.email, tenantId: seat.tenantId, role: seat.role });
@@ -130,10 +166,7 @@ for (const [locale, l] of Object.entries(LOCALES)) {
     await page.screenshot({ path: `${SHOTS}/01-${locale}-owner-panel.png`, fullPage: true });
 
     for (const [title, href] of l.cards) {
-      await expect(page.getByRole('link', { name: `${title}${l.suffix}`, exact: true })).toHaveAttribute(
-        'href',
-        href,
-      );
+      await expect(await expectCardName(page, title, l.suffix)).toHaveAttribute('href', href);
     }
     const readiness = page.getByTestId('readiness-card-link');
     await expect(readiness).toHaveAccessibleName(`${l.readiness}${l.suffix}`);
@@ -146,13 +179,14 @@ test('tr: a click and a keyboard Enter each open the target page', async ({ page
   await openPanel(page, OWNER, l.panel);
 
   // Mouse: the person-days card opens the person-days report.
-  await page.getByRole('link', { name: `Kişi-Gün / Teklif${l.suffix}`, exact: true }).click();
+  await (await expectCardName(page, 'Kişi-Gün / Teklif', l.suffix)).click();
   await page.waitForURL('**/tr/main/reports/person-days', { timeout: 30_000 });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Adam-Gün Raporu');
 
   // Keyboard: focus the first card, check the ring is the focus-visible one, press Enter.
   await page.goto(`${l.panel}?${RANGE}`);
-  const first = page.getByRole('link', { name: `Toplam Teklif${l.suffix}`, exact: true });
+  await expect(page.locator('#dashboard-panel-overview')).toBeVisible({ timeout: 30_000 });
+  const first = await expectCardName(page, 'Toplam Teklif', l.suffix);
   await expect(first).toBeVisible({ timeout: 30_000 });
   await first.focus();
   await page.keyboard.press('Shift+Tab');
@@ -183,10 +217,10 @@ test('en: a pipeline manager gets no link to Settings › Modules', async ({ pag
 
   // The card is there, as a plain block …
   await expect(page.getByRole('heading', { name: 'Active Modules', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: `Active Modules${l.suffix}` })).toHaveCount(0);
+  await expect(cardLink(page, 'Active Modules').link).toHaveCount(0);
   await expect(page.locator('a[href="/en/main/settings/modules"]')).toHaveCount(0);
   // … while the cards this role can open still link.
-  await expect(page.getByRole('link', { name: `Total Proposals${l.suffix}`, exact: true })).toHaveAttribute(
+  await expect(await expectCardName(page, 'Total Proposals', l.suffix)).toHaveAttribute(
     'href',
     '/en/main/pipeline',
   );
