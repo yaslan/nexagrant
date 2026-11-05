@@ -516,11 +516,17 @@ test.describe('FO-387 — a profile form left open', () => {
       { locale: 'en', width: 1280, height: 720 },
     ] as const;
 
-    /** Server actions are POSTs to the page itself; a check the browser makes sends none. */
-    function actionPosts(page: Page) {
+    /**
+     * Profile saves: server actions are POSTs to the page itself, and the page sends others too, so
+     * a save is told apart by what it carries. A check the browser makes sends none.
+     */
+    function profileSaves(page: Page, carrying: string) {
       const posts: string[] = [];
       page.on('request', (request) => {
-        if (request.method() === 'POST' && request.url().includes('/settings/profile')) posts.push(request.url());
+        const body = request.postData() ?? '';
+        if (request.method() === 'POST' && request.url().includes('/settings/profile') && body.includes(carrying)) {
+          posts.push(body);
+        }
       });
       return posts;
     }
@@ -584,7 +590,7 @@ test.describe('FO-387 — a profile form left open', () => {
           const first = await addOwner(`n2-${locale}`);
           const f = await open(page, first, url);
           await colleagueSetsTrl(browser, `n2-${locale}`, '2', '7');
-          const posts = actionPosts(page);
+          const posts = profileSaves(page, 'trlMin');
           const auditsBefore = await profileAudits(PP_TENANT);
 
           await f.trlMin.fill('8');
@@ -701,7 +707,7 @@ test.describe('FO-387 — a profile form left open', () => {
           await page.setViewportSize({ width, height });
           const owner = await addPicProber();
           const f = await open(page, owner, `/${locale}/${PP_OTHER_WORKSPACE}/settings/profile`);
-          const posts = actionPosts(page);
+          const posts = profileSaves(page, 'only keywords');
 
           await f.keywords.fill('only keywords');
           await f.pic.fill(PP_PIC_UNMATCHED);
