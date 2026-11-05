@@ -2,7 +2,7 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { moduleGate } from '@/lib/modules/guard';
 
 import { toEvaluationNotes } from '@/modules/m6/types';
@@ -48,7 +48,7 @@ export default async function EvaluationsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, id } = await params;
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   // Module gate (M6). A tenant whose ModuleState says OFF/DEV/PILOT must not
   // reach this page just because it can guess the URL.
