@@ -39,6 +39,10 @@ const KNOWN: Record<string, string> = {
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts usedByUserId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerUserId: userId': 'same `user.id` as above',
+  'src/lib/scoring/g0-compute.ts ...where':
+    '`where` is `{ id, tenantId }` with both ids checked by isPresentId in persistG0 a few lines above (it returns when either is missing); the spread only adds the `updatedAt` read by findFirst on that same where (FO-384 O3)',
+  'src/lib/scoring/g0-compute.ts updatedAt: current.updatedAt':
+    'the `updatedAt` of the row findFirst read on the same guarded where a line above: a stored Date, never client input (FO-384 O3)',
   'src/lib/k3-topic-stats/importer.ts topicPrefix: p.topicPrefix':
     'importer rows typed `string` / `string | null` (null is a value, not a dropped key); CLI input, no client',
   'src/lib/k3-topic-stats/importer.ts topicId: p.topicId': 'importer row, as above',
