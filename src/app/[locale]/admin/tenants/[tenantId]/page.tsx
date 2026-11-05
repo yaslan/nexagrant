@@ -53,7 +53,8 @@ export default async function AdminTenantDetailPage({
     id: string;
     actorId: string | null;
     createdAt: Date;
-    data: { pic?: string; reason?: string } | null;
+    type: string;
+    data: { pic?: string; reason?: string; cap?: number } | null;
   }
 
   const tenant = (await prisma.tenant.findUnique({
@@ -89,10 +90,11 @@ export default async function AdminTenantDetailPage({
         select: { id: true, type: true, actorId: true, createdAt: true, data: true },
       })) as PicAuditRow[],
       (await tx.auditEvent.findMany({
-        where: { tenantId, type: 'tenant.pic.refused' },
+        // FO-389: the summary row that says the day's row cap was reached sits among the refusals.
+        where: { tenantId, type: { in: ['tenant.pic.refused', 'tenant.pic.refusal.capped'] } },
         orderBy: { createdAt: 'desc' },
         take: 20,
-        select: { id: true, actorId: true, createdAt: true, data: true },
+        select: { id: true, type: true, actorId: true, createdAt: true, data: true },
       })) as PicRefusalRow[],
       tenant.pic
         ? ((await tx.cordisOrganization.findUnique({
@@ -200,9 +202,11 @@ export default async function AdminTenantDetailPage({
                 <li key={r.id} className="p-3 text-sm space-y-0.5">
                   <div className="flex flex-wrap justify-between gap-2">
                     <span className="font-semibold text-ink break-words font-mono">
-                      {r.data?.reason === 'rateLimited'
-                        ? t('pic.eventRateLimited', { pic: r.data?.pic ?? '-' })
-                        : t('pic.eventRefused', { pic: r.data?.pic ?? '-' })}
+                      {r.type === 'tenant.pic.refusal.capped'
+                        ? t('pic.refusalsCapped', { cap: r.data?.cap ?? 0 })
+                        : r.data?.reason === 'rateLimited'
+                          ? t('pic.eventRateLimited', { pic: r.data?.pic ?? '-' })
+                          : t('pic.eventRefused', { pic: r.data?.pic ?? '-' })}
                     </span>
                     <span className="text-xs text-muted">{dateFmt.format(new Date(r.createdAt))}</span>
                   </div>

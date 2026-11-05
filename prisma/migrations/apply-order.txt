@@ -81,4 +81,5 @@ module-state-grandfathered.sql
 add-interreg-review.sql
 add-interreg-slot-retention.sql
 add-interreg-f2-result.sql
+add-pic-lookup-budget.sql
 add-org-readiness-tables.sql

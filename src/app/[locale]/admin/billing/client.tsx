@@ -140,7 +140,7 @@ export function BillingClient({
             <button
               onClick={() => setBillingCycle('monthly')}
               className={`px-4 py-1.5 text-xs font-bold rounded-lg transition ${
-                billingCycle === 'monthly' ? 'bg-accent text-slate-950 shadow-xs' : 'text-muted hover:text-ink'
+                billingCycle === 'monthly' ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink'
               }`}
             >
               {t('cycleMonthly')}
@@ -148,7 +148,7 @@ export function BillingClient({
             <button
               onClick={() => setBillingCycle('yearly')}
               className={`px-4 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1 ${
-                billingCycle === 'yearly' ? 'bg-accent text-slate-950 shadow-xs' : 'text-muted hover:text-ink'
+                billingCycle === 'yearly' ? 'bg-accent text-white shadow-xs' : 'text-muted hover:text-ink'
               }`}
             >
               <span>{t('cycleYearly')}</span>
@@ -190,7 +190,7 @@ export function BillingClient({
                 }`}
               >
                 {recommended && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-slate-950 text-[10px] font-bold font-mono px-3 py-0.5 rounded-full uppercase shadow-xs">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-white text-[10px] font-bold font-mono px-3 py-0.5 rounded-full uppercase shadow-xs">
                     {t('mostPopular')}
                   </span>
                 )}
@@ -245,7 +245,7 @@ export function BillingClient({
                   className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center justify-center gap-2 ${
                     isCurrent
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-accent hover:opacity-90 text-slate-950 font-extrabold'
+                      : 'bg-accent hover:opacity-90 text-white font-extrabold'
                   }`}
                 >
                   <ShoppingBag className="w-4 h-4" />
