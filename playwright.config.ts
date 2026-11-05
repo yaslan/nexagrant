@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 import { config as loadDotenv } from 'dotenv';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+// FO-385: the runner and its workers log a received signal too; the server gets it through NODE_OPTIONS below.
+import './tests/e2e/support/server-signal-log.mjs';
 
 // The runner reads the same .env that `next dev` reads. Without it, the runner's
 // own DB clients fall back to src/lib/db.ts's CI default (port 5432), which is not
@@ -59,7 +61,13 @@ const E2E_WEB_SERVER = process.env.E2E_WEB_SERVER === 'start' ? 'start' : 'dev';
  */
 // A file:// URL, so --import takes it on Windows too (a bare C:\ path is read as a URL scheme).
 const KEEP_ALIVE_PRELOAD = pathToFileURL(path.join(__dirname, 'tests/e2e/support/server-keep-alive.mjs')).href;
-const WEB_SERVER_NODE_OPTIONS = [process.env.NODE_OPTIONS, `--import ${JSON.stringify(KEEP_ALIVE_PRELOAD)}`]
+// FO-385: logs any signal a server process receives. Why: tests/e2e/support/server-supervisor.mjs.
+const SIGNAL_LOG_PRELOAD = pathToFileURL(path.join(__dirname, 'tests/e2e/support/server-signal-log.mjs')).href;
+const WEB_SERVER_NODE_OPTIONS = [
+  process.env.NODE_OPTIONS,
+  `--import ${JSON.stringify(KEEP_ALIVE_PRELOAD)}`,
+  `--import ${JSON.stringify(SIGNAL_LOG_PRELOAD)}`,
+]
   .filter(Boolean)
   .join(' ');
 
@@ -117,7 +125,8 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: E2E_WEB_SERVER === 'start' ? `pnpm start --port ${PORT}` : `pnpm dev --port ${PORT}`,
+    // The supervisor reports how the server ended and stops the run if it dies (FO-385).
+    command: `node tests/e2e/support/server-supervisor.mjs pnpm ${E2E_WEB_SERVER === 'start' ? 'start' : 'dev'} --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 180_000,
@@ -125,6 +134,8 @@ export default defineConfig({
       ...process.env,
       ...testEnv,
       NODE_OPTIONS: WEB_SERVER_NODE_OPTIONS,
+      E2E_RUNNER_PID: String(process.pid),
+      E2E_PORT: String(PORT),
       // Blank LLM keys in dev E2E so tests use template fallback, not real API calls
       // (matches CI behavior; reduces cost, ensures deterministic failures like CI).
       // Opt-in live tests (e.g. E2E_LIVE_EMBED=1) can override OPENAI_API_KEY if needed.
