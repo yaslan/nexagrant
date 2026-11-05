@@ -263,6 +263,9 @@ Kısaltmalar:
 | 76 | InterregAnalysis (M17) | tenantId → Tenant, userId → User | **Y** (kullanıcının yüklediği çağrı/proje belgesinin çıkarılmış metni: `callText`, `projectText`, dosya adları; üçüncü kişi adı içerebilir) | E — metin **yalnız tutulduğu sürece** (yuva başına ≤ 30 gün) | C (+ kullanıcı silinince `User` cascade'i) |
 | 77 | InterregAnalysisResult (M17) | → InterregAnalysis (bileşik FK), tenantId | D (belgeden türeyen rapor metni, `reportMarkdown`) | E | C |
 | 78 | InterregCriterionMark (M17) | → InterregAnalysis (bileşik FK), tenantId | Y (`evidenceQuote`: belgeden alıntı) | E | C |
+| 79 | OrgReadiness (NG-34) | tenantId → Tenant | D (EU Login/LEAR cevabı; kişi verisi yok) | E | C |
+| 80 | InternalApproval (NG-34) | → Opportunity (bileşik FK), tenantId; approvedById → User (SetNull) | D (eş finansman taahhüdü, karar referansı) | E | C |
+| 81 | PartnerBudgetShare (NG-34) | → ConsortiumSeat (bileşik FK), tenantId; agreedById → User (SetNull) | D (ortak bütçe payı aralığı) | E | C |
 
 **M17 (FO-195, B4) — dışa aktarma ve silme kapsamı.** Ek A sayımına (75) sonradan eklendi (satırlar 76–78; `InterregRubric` / `InterregRubricCriterion` platform katalogudur, kişisel veri yok, dokunulmaz — A.3 gibi).
 

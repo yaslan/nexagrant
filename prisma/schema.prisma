@@ -52,6 +52,7 @@ model Tenant {
   notifications Notification[]
   partnerSearchQuota PartnerSearchQuotaUsage[]
   interregAnalyses InterregAnalysis[]
+  orgReadiness  OrgReadiness[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -134,6 +135,8 @@ model User {
   requestedApprovals ApprovalRequest[] @relation("Requester")
   approvedApprovals  ApprovalRequest[] @relation("Approver")
   interregAnalyses   InterregAnalysis[]
+  internalApprovals  InternalApproval[]
+  agreedBudgetShares PartnerBudgetShare[]
   @@index([deletionRequestedAt])
   @@index([deletedAt])
 }
@@ -1152,6 +1155,8 @@ model Opportunity {
   applicationParts ApplicationPart[]
   evaluations Evaluation[]
   meetingBriefs MeetingBrief[]
+  internalApproval InternalApproval?
+  @@unique([id, tenantId])
   @@index([deletedAt])
 }
 
@@ -1200,7 +1205,69 @@ model ConsortiumSeat {
   budgetCents   BigInt?
   personMonths  Float?
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  budgetShare   PartnerBudgetShare?
+  @@unique([id, tenantId])
   @@index([tenantId, opportunityId])
+}
+
+// NG-34 — what G0 and G1 ask of an organisation besides its PIC (spec §12, §17.1).
+// PIC has no column here: the tenant's own lives on Tenant.pic and a partner's on its seat
+// or PartnerOrg; src/lib/gates/readiness-records.ts reads it from there. null = not answered,
+// which is not the same as false. `subject` names the organisation:
+// 'self' | 'cordis:<ConsortiumSeat.organizationId>' | 'partner:<PartnerOrg.id>'.
+model OrgReadiness {
+  id           String   @id @default(cuid())
+  tenantId     String
+  subject      String
+  euLoginReady Boolean?
+  learReady    Boolean?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, subject])
+}
+
+// NG-34 — spec §17.1: internal sign-off, co-financing commitment, council or presidency
+// decision. One per opportunity. The composite key is the tenant boundary: a foreign key
+// check does not go through RLS.
+model InternalApproval {
+  id                         String    @id @default(cuid())
+  tenantId                   String
+  opportunityId              String
+  approvedAt                 DateTime?
+  approvedById               String?
+  cofinancingCommitmentCents BigInt?
+  currency                   String    @default("EUR")
+  councilDecisionRef         String?
+  councilDecisionAt          DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  opportunity                Opportunity @relation(fields: [opportunityId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  approvedBy                 User?     @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+  @@unique([opportunityId, tenantId])
+  @@index([tenantId])
+  @@index([approvedById])
+}
+
+// NG-34 — spec §12 G1: the budget share range each partner has agreed. One per seat. An
+// amount, as ConsortiumSeat.budgetCents is; the spec sets no bound, so the writer checks only
+// that the range is a range. agreedAt null = proposed, not agreed.
+model PartnerBudgetShare {
+  id         String    @id @default(cuid())
+  tenantId   String
+  seatId     String
+  minCents   BigInt
+  maxCents   BigInt
+  currency   String    @default("EUR")
+  agreedAt   DateTime?
+  agreedById String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  seat       ConsortiumSeat @relation(fields: [seatId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  agreedBy   User?     @relation(fields: [agreedById], references: [id], onDelete: SetNull)
+  @@unique([seatId, tenantId])
+  @@index([tenantId])
+  @@index([agreedById])
 }
 
 enum SeatStatus {
