@@ -145,7 +145,7 @@ test.afterAll(async () => {
     await tx.membership.deleteMany({ where: { tenantId: { in: tenants } } });
     await tx.user.deleteMany({ where: { id: { in: [...userIds, fx.ownerId] } } });
     await tx.auditEvent.deleteMany({ where: { tenantId: { in: tenants } } });
-    await tx.agencyInviteCode.deleteMany({ where: { tenantId: fx.agencyId } });
+    await tx.agencyInviteCode.deleteMany({ where: { tenantId: requireId(fx.agencyId, 'agencyId') } });
     if (orgIds.length) await tx.tenant.deleteMany({ where: { id: { in: presentIds(orgIds) } } });
     await tx.tenant.deleteMany({ where: { id: requireId(fx.agencyId, 'agencyId') } });
   });
