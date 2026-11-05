@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import type { Role } from '@prisma/client';
 
 import trMessages from '../../messages/tr.json';
-import { signInAs } from './fixtures/session';
+import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 import {
   RG_OPP_ID,
   RG_OPP_TITLE,
@@ -129,6 +129,37 @@ test.describe.serial('NG-64 page role gates', () => {
         data: { email: `ng64-${role.toLowerCase()}@invite.e2e.fabrika.test`, role: 'MEMBER' },
       });
       expect(res.status(), role).toBe(403);
+    }
+  });
+});
+
+/**
+ * The same doors on the demo seed itself: the card's measure is that a guest
+ * never sees 'District renovation pilot — İzmir'. A MEMBER seat on the same
+ * tenant is the control that the title is there to be seen.
+ */
+test.describe.serial('NG-64 page role gates on the demo seed', () => {
+  const DEMO_TITLE = 'District renovation pilot — İzmir';
+  const GUEST = { id: 'ng64-demo-guest', email: 'guest@ng64-demo.e2e.fabrika.test' };
+  const MEMBER = { id: 'ng64-demo-member', email: 'member@ng64-demo.e2e.fabrika.test' };
+
+  test.beforeAll(async () => {
+    await seedIdentity({ userId: GUEST.id, email: GUEST.email, role: 'GUEST_PARTNER', tenantId: 'demo-tenant', workspaceIds: ['demo-workspace'] });
+    await seedIdentity({ userId: MEMBER.id, email: MEMBER.email, role: 'MEMBER', tenantId: 'demo-tenant', workspaceIds: ['demo-workspace'] });
+  });
+  test.afterAll(async () => {
+    await cleanupIdentity(['ng64-demo-guest', 'ng64-demo-member']);
+  });
+
+  test('MEMBER sees the seeded opportunity; GUEST_PARTNER gets 403 and never its title', async ({ page }) => {
+    await signInAs(page, { id: MEMBER.id, email: MEMBER.email, tenantId: 'demo-tenant', role: 'MEMBER' });
+    await expectOpen(page, '/tr/main/pipeline/demo-opp-1');
+    await expect(page.getByText(DEMO_TITLE).first()).toBeVisible();
+
+    await signInAs(page, { id: GUEST.id, email: GUEST.email, tenantId: 'demo-tenant', role: 'GUEST_PARTNER' });
+    for (const path of ['/tr/main/firsatlar', '/tr/main/pipeline/demo-opp-1', '/tr/main/opportunities/demo-opp-1/m2', '/tr/main/konsept-notlar', '/tr/main/onay-merkezi']) {
+      await expectClosed(page, path);
+      expect(await page.content(), path).not.toContain(DEMO_TITLE);
     }
   });
 });
