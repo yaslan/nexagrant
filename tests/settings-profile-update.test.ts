@@ -333,8 +333,6 @@ describe('updateTenantProfile action', () => {
         ['keywords with no keyword in them', { keywords: ' , ' }],
         ['a TRL out of range', { trlMax: 10 }],
         ['a TRL that is not whole', { trlMin: 2.5 }],
-        ['a minimum over the stored maximum', { trlMin: 8 }],
-        ['a maximum under the stored minimum', { trlMax: 3 }],
         ['a minimum over the maximum sent with it', { trlMin: 6, trlMax: 5 }],
       ])('refuses %s and writes nothing', async (_name, input) => {
         const before = await row();
@@ -343,6 +341,41 @@ describe('updateTenantProfile action', () => {
 
         expect((await row()).updatedAt).toEqual(before.updatedAt);
         expect(await profileAudits()).toHaveLength(0);
+      });
+
+      // FO-387 review, B1. Only the row makes this half of the range wrong, so the answer carries the
+      // row: the form may be stale, and without it the user is stuck until they reload the page.
+      it.each([
+        ['a minimum over the stored maximum', { trlMin: 8 }],
+        ['a maximum under the stored minimum', { trlMax: 3 }],
+      ])('refuses %s with its own code and the stored range, and writes nothing', async (_name, input) => {
+        const before = await row();
+
+        expect(await updateTenantProfile(input)).toEqual({ ok: false, error: 'trlRangeConflict', trlRange: [4, 7] });
+
+        expect((await row()).updatedAt).toEqual(before.updatedAt);
+        expect((await row()).trlRange).toEqual([4, 7]);
+        expect(await profileAudits()).toHaveLength(0);
+      });
+
+      it('a TRL conflict takes the text and the PIC down with it, and asks CORDIS nothing', async () => {
+        const before = await row();
+        const picRows = () =>
+          prisma.auditEvent.count({ where: { tenantId, type: { in: ['tenant.pic.updated', 'tenant.pic.refused'] } } });
+
+        expect(await updateTenantProfile({ keywords: 'draft', trlMax: 3, pic: '987654322' })).toEqual({
+          ok: false,
+          error: 'trlRangeConflict',
+          trlRange: [4, 7],
+        });
+
+        expect((await row()).keywords).toEqual(before.keywords);
+        expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })).pic).toBeNull();
+        expect(await picRows()).toBe(0);
+        // The form sends no TRL on the next try: that one goes through.
+        expect(await updateTenantProfile({ keywords: 'draft', pic: '987654322' })).toMatchObject({ ok: true });
+        expect(await row()).toMatchObject({ keywords: ['draft'], trlRange: [4, 7] });
+        expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })).pic).toBe('987654322');
       });
 
       it('a refused PIC keeps the changed field out too', async () => {

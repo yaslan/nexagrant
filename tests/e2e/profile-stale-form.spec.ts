@@ -250,6 +250,171 @@ test.describe('FO-387 — a profile form left open', () => {
     });
   });
 
+  // ── Review B1: the TRL range a colleague moved out from under the form ──────
+  test.describe('a TRL range that conflicts with what a colleague saved', () => {
+    const CONFLICT = 'tenant-trl-error';
+
+    /** Form open on [4,7]; a colleague saves [8,9] from a session of their own. */
+    async function colleagueMovesTrl(browser: Browser, tag: string) {
+      const colleague = await addOwner(`trl-colleague-${tag}`);
+      await inAnotherSession(browser, async (other) => {
+        const c = await open(other, colleague);
+        await c.trlMax.fill('9');
+        await c.trlMin.fill('8');
+        await saved(other);
+      });
+    }
+
+    test('says what happened, learns the range, keeps the drafts, and the next save goes through', async ({ page, browser }) => {
+      const first = await addOwner('trl-first');
+      const f = await open(page, first);
+      await f.keywords.fill('my draft');
+      await f.pic.fill(PP_PIC_UNMATCHED);
+      await colleagueMovesTrl(browser, 'flow');
+      const auditsBefore = await profileAudits(PP_TENANT);
+
+      await f.trlMax.fill('6');
+      probe('TRL form before save (looks valid)', { min: await f.trlMin.inputValue(), max: await f.trlMax.inputValue() });
+      await f.saveButton.click();
+
+      const message = page.getByTestId(CONFLICT);
+      await expect(message).toBeVisible();
+      await expect(message).toContainText('8–9');
+      await expect(message).toContainText('4–6');
+      await expect(page.getByText('Lütfen tüm alanları doğru şekilde doldurun')).toHaveCount(0);
+      probe('TRL message', await message.innerText());
+
+      // Refused whole: the row stays, nothing else slipped through.
+      const refused = await storedProfile(PP_TENANT);
+      probe('TRL row after the refusal', refused);
+      probe('TRL pic after the refusal', await storedPic(PP_TENANT));
+      expect(refused).toEqual({ ...OPENED, trlRange: [8, 9] });
+      expect(await storedPic(PP_TENANT)).toBeNull();
+      expect(await profileAudits(PP_TENANT)).toBe(auditsBefore);
+
+      // The form learned the range without a reload; the drafts are still there.
+      await expect(f.trlMin).toHaveValue('8');
+      await expect(f.trlMax).toHaveValue('9');
+      await expect(f.keywords).toHaveValue('my draft');
+      await expect(f.pic).toHaveValue(PP_PIC_UNMATCHED);
+
+      // The same button again, no reload: PIC and draft go out, the colleague's range stays.
+      await saved(page);
+      await expect(message).toHaveCount(0);
+      const after = await storedProfile(PP_TENANT);
+      probe('TRL row after the second save', after);
+      probe('TRL pic after the second save', await storedPic(PP_TENANT));
+      expect(after).toEqual({ ...OPENED, keywords: ['my draft'], trlRange: [8, 9] });
+      expect(await storedPic(PP_TENANT)).toBe(PP_PIC_UNMATCHED);
+    });
+
+    test('a PIC alone is not held up once the form has learned the range', async ({ page, browser }) => {
+      const first = await addOwner('trl-pic');
+      const f = await open(page, first);
+      await colleagueMovesTrl(browser, 'pic');
+
+      await f.trlMax.fill('6');
+      await f.saveButton.click();
+      await expect(page.getByTestId(CONFLICT)).toBeVisible();
+      await expect(f.trlMin).toHaveValue('8');
+      await expect(f.trlMax).toHaveValue('9');
+
+      await f.pic.fill(PP_PIC_UNMATCHED);
+      await saved(page);
+      expect(await storedPic(PP_TENANT)).toBe(PP_PIC_UNMATCHED);
+      expect((await storedProfile(PP_TENANT))?.trlRange).toEqual([8, 9]);
+    });
+
+    test('a user who wants their range can enter both ends and it is saved', async ({ page, browser }) => {
+      const first = await addOwner('trl-both');
+      const f = await open(page, first);
+      await colleagueMovesTrl(browser, 'both');
+
+      await f.trlMax.fill('6');
+      await f.saveButton.click();
+      await expect(page.getByTestId(CONFLICT)).toBeVisible();
+
+      await f.trlMin.fill('4');
+      await f.trlMax.fill('6');
+      await saved(page);
+      expect((await storedProfile(PP_TENANT))?.trlRange).toEqual([4, 6]);
+    });
+
+    test('a range the user got wrong on a current form does not blame a colleague', async ({ page }) => {
+      const owner = await addOwner('trl-own');
+      const f = await open(page, owner);
+
+      await f.trlMin.fill('8');
+      await f.saveButton.click();
+
+      const message = page.getByTestId(CONFLICT);
+      await expect(message).toHaveText('Lütfen tüm alanları doğru şekilde doldurun');
+      await expect(message).toBeInViewport();
+      // Theirs to fix: what they typed stays.
+      await expect(f.trlMin).toHaveValue('8');
+      await expect(f.trlMax).toHaveValue('7');
+      expect((await storedProfile(PP_TENANT))?.trlRange).toEqual([4, 7]);
+    });
+
+    for (const { width, height } of [
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 720 },
+    ]) {
+      test(`the message is on screen after the button is pressed at ${width}x${height}`, async ({ page, browser }) => {
+        await page.setViewportSize({ width, height });
+        const first = await addOwner(`trl-view-${width}`);
+        const f = await open(page, first);
+        await colleagueMovesTrl(browser, `view-${width}`);
+
+        await f.trlMax.fill('6');
+        await f.saveButton.scrollIntoViewIfNeeded();
+        await f.saveButton.click();
+
+        const message = page.getByTestId(CONFLICT);
+        await expect(message).toBeInViewport({ ratio: 1 });
+        await expect(message).toBeFocused();
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        probe(`TRL message at ${width}x${height}`, { overflow, focused: true });
+        expect(overflow).toBeLessThanOrEqual(0);
+        await page.screenshot({ path: test.info().outputPath(`trl-conflict-tr-${width}.png`) });
+      });
+    }
+
+    test('the message comes into view on Enter from a field at the top of the form', async ({ page, browser }) => {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      const first = await addOwner('trl-enter');
+      const f = await open(page, first);
+      await colleagueMovesTrl(browser, 'enter');
+
+      await f.trlMax.fill('6');
+      await f.keywords.fill('from the top');
+      await f.keywords.press('Enter');
+
+      await expect(page.getByTestId(CONFLICT)).toBeInViewport({ ratio: 1 });
+    });
+
+    test('in English too', async ({ page, browser }) => {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      const first = await addOwner('trl-en');
+      await signInAs(page, { id: first.id, email: first.email, tenantId: first.tenantId, role: 'TENANT_OWNER' });
+      await page.goto(`/en/${PP_WORKSPACE}/settings/profile`);
+      const save = page.getByRole('button', { name: 'Save Profile' });
+      await expectHydrated(save);
+      await colleagueMovesTrl(browser, 'en');
+
+      await page.locator('input[type="number"]').nth(1).fill('6');
+      await save.click();
+
+      const message = page.getByTestId(CONFLICT);
+      await expect(message).toBeInViewport({ ratio: 1 });
+      await expect(message).toContainText('Someone else changed the TRL range to 8–9');
+      await expect(message).toContainText('4–6');
+      probe('TRL message en', await message.innerText());
+      await page.screenshot({ path: test.info().outputPath('trl-conflict-en-1280.png') });
+    });
+  });
+
   // ── Y4: a refresh must not take what the user is typing ──────────────────────
   test.describe('what the user is typing', () => {
     test('Y4: a page refresh brings the row into untouched fields and leaves the drafts', async ({ page, browser }) => {

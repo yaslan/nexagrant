@@ -55,7 +55,9 @@ export default function TenantProfileForm({
   const workspace = (params?.workspace as string) || 'default';
   const t = useTranslations('Profile');
 
-  const stored = storedFields(initial);
+  const loaded = storedFields(initial);
+  // What this form knows the row holds: the page's last read, or a refusal that told it more.
+  const [stored, setStored] = useState(loaded);
   const [capabilities, setCapabilities] = useState(stored.capabilities);
   const [keywords, setKeywords] = useState(stored.keywords);
   const [trlMin, setTrlMin] = useState(stored.trlMin);
@@ -63,6 +65,9 @@ export default function TenantProfileForm({
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState('');
+  // Beside the TRL fields, next to the button: the banner above the form can be off screen here.
+  const [trlError, setTrlError] = useState('');
+  const trlErrorRef = useRef<HTMLParagraphElement>(null);
 
   // FO-383. `savedPic` + `savedPicMatch` are what the database holds; the line under the field
   // describes them and only them, so it goes quiet while the user is typing something else.
@@ -85,13 +90,14 @@ export default function TenantProfileForm({
 
   // FO-387. Same rule as the PIC below, for the other fields: a re-read page brings the row into
   // whatever the user has not edited and leaves the rest alone.
-  const [seenStored, setSeenStored] = useState(stored);
-  if (JSON.stringify(stored) !== JSON.stringify(seenStored)) {
-    setSeenStored(stored);
-    if (sameCapabilities(capabilities, seenStored.capabilities)) setCapabilities(stored.capabilities);
-    if (sameKeywords(keywords, seenStored.keywords)) setKeywords(stored.keywords);
-    if (trlMin === seenStored.trlMin) setTrlMin(stored.trlMin);
-    if (trlMax === seenStored.trlMax) setTrlMax(stored.trlMax);
+  const [seenLoaded, setSeenLoaded] = useState(loaded);
+  if (JSON.stringify(loaded) !== JSON.stringify(seenLoaded)) {
+    setSeenLoaded(loaded);
+    setStored(loaded);
+    if (sameCapabilities(capabilities, stored.capabilities)) setCapabilities(loaded.capabilities);
+    if (sameKeywords(keywords, stored.keywords)) setKeywords(loaded.keywords);
+    if (trlMin === stored.trlMin) setTrlMin(loaded.trlMin);
+    if (trlMax === stored.trlMax) setTrlMax(loaded.trlMax);
   }
   const capabilitiesEdited = !sameCapabilities(capabilities, stored.capabilities);
   const keywordsEdited = !sameKeywords(keywords, stored.keywords);
@@ -119,11 +125,16 @@ export default function TenantProfileForm({
   useEffect(() => {
     if (pendingMatch) confirmRef.current?.focus();
   }, [pendingMatch]);
+  // Focus also brings it on screen when the save came from Enter in a field at the top of the form.
+  useEffect(() => {
+    if (trlError) trlErrorRef.current?.focus();
+  }, [trlError]);
 
   const save = async (confirmedPic?: string) => {
     setSaving(true);
     setSavedSuccess(false);
     setError('');
+    setTrlError('');
     setPicError(null);
     setPicCleared(false);
 
@@ -166,6 +177,20 @@ export default function TenantProfileForm({
       setPendingMatch(null);
       setPicError(result.error === 'picInvalid' ? 'invalid' : 'taken');
       picInputRef.current?.focus();
+    } else if (result.error === 'trlRangeConflict') {
+      setPendingMatch(null);
+      const [rowMin, rowMax] = result.trlRange;
+      if (rowMin === stored.trlMin && rowMax === stored.trlMax) {
+        // Nobody moved the range: the user's own numbers are the problem, and they stay to be fixed.
+        setTrlError(t('errorInvalid'));
+      } else {
+        // The fields go back to the row, or the same refusal would hold up the next save and any PIC
+        // in it. The message keeps the range the user typed; every other draft stays in its field.
+        setTrlError(t('errorTrlConflict', { min: rowMin, max: rowMax, typedMin: trlMin, typedMax: trlMax }));
+        setStored((known) => ({ ...known, trlMin: rowMin, trlMax: rowMax }));
+        setTrlMin(rowMin);
+        setTrlMax(rowMax);
+      }
     } else {
       setPendingMatch(null);
       const errorMessages: Record<string, string> = {
@@ -430,6 +455,19 @@ export default function TenantProfileForm({
             </p>
           </div>
         </div>
+
+        {trlError && (
+          <p
+            ref={trlErrorRef}
+            tabIndex={-1}
+            role="alert"
+            data-testid="tenant-trl-error"
+            className="p-4 rounded-xl bg-bad/10 border border-bad/30 text-bad flex items-start gap-3 text-xs font-semibold scroll-mt-4 focus:outline-none focus:ring-2 focus:ring-bad"
+          >
+            <AlertCircle className="w-4 h-4 text-bad shrink-0" aria-hidden="true" />
+            <span>{trlError}</span>
+          </p>
+        )}
 
         <div className="flex justify-end pt-2">
           <button

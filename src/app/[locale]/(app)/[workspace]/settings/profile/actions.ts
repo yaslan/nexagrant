@@ -273,6 +273,7 @@ export async function updateTenantProfile(
   | { ok: true; pic?: PicSaveOutcome }
   | { ok: false; error: ProfileActionError }
   | { ok: false; error: 'picConfirmationRequired'; match: PicCordisMatch }
+  | { ok: false; error: 'trlRangeConflict'; trlRange: [number, number] }
   | { ok: false; error: 'picRateLimited'; retryAfterSeconds: number }
 > {
   try {
@@ -308,7 +309,20 @@ export async function updateTenantProfile(
       ] as const;
       if (profileChanged) {
         if (capabilities === undefined || keywords === undefined) return { ok: false as const, error: 'invalid' as const };
-        if (trlRange[0] > trlRange[1]) return { ok: false as const, error: 'invalid' as const };
+        if (trlRange[0] > trlRange[1]) {
+          // One end sent, and only the stored other end makes it wrong. The form may be showing an old
+          // range, so the answer says what the row holds: the user can go on without a reload.
+          const oneEndSent = (fields.trlMin === undefined) !== (fields.trlMax === undefined);
+          if (!existing || !oneEndSent) return { ok: false as const, error: 'invalid' as const };
+          return {
+            ok: false as const,
+            error: 'trlRangeConflict' as const,
+            trlRange: [
+              existing.trlRange[0] ?? DEFAULT_TRL_RANGE.min,
+              existing.trlRange[1] ?? DEFAULT_TRL_RANGE.max,
+            ] as [number, number],
+          };
+        }
       }
 
       // Refusals come before any write: a refused PIC saves nothing, the profile text included.

@@ -3770,6 +3770,7 @@
     "picClearedNotice": "PIC removed. Coordination and network history is no longer used in the G0 score.",
     "errorForbidden": "You do not have permission to perform this action",
     "errorInvalid": "Please fill all fields correctly",
+    "errorTrlConflict": "Not saved. Someone else changed the TRL range to {min}–{max}, which conflicts with the {typedMin}–{typedMax} you entered. The TRL fields now show the current range and everything else you typed is still here. Check it and save again.",
     "errorFailed": "Failed to save profile",
     "errorPilotExpired": "Pilot period has ended",
     "errorGeneric": "An error occurred",

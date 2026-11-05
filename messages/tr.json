@@ -3770,6 +3770,7 @@
     "picClearedNotice": "PIC kaldırıldı. G0 puanında koordinatörlük ve ağ geçmişi artık kullanılmaz.",
     "errorForbidden": "Bu işlem için yetkiniz yok",
     "errorInvalid": "Lütfen tüm alanları doğru şekilde doldurun",
+    "errorTrlConflict": "Kaydedilmedi. Başka biri TRL aralığını {min}–{max} olarak değiştirdi; girdiğiniz {typedMin}–{typedMax} bununla çelişiyor. TRL alanları güncel değere döndü, yazdığınız diğer bilgiler duruyor. Kontrol edip yeniden kaydedin.",
     "errorFailed": "Profil kaydedilemedi",
     "errorPilotExpired": "Pilot süresi doldu",
     "errorGeneric": "Bir hata oluştu",
