@@ -10,6 +10,7 @@
  * src/app/[locale]/(app)/ajans/actions.ts.
  */
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { withTenant, type TenantTx } from '@/lib/db';
 import {
   PIC_LOOKUPS_PER_HOUR,
@@ -22,7 +23,9 @@ import { toTenantProvince, provinceAppliesTo } from '@/lib/province';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
+import { rescoreTenantG0AfterPicChange, type PicChangeTrigger } from '@/lib/scoring/g0-rescore-tenant';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
+import { DEFAULT_TRL_RANGE, parseKeywords } from './profile-fields';
 
 const HOUR_MS = 3_600_000;
 /**
@@ -38,11 +41,15 @@ const picLimitRecordLimiter = new UserWindowLimiter(1, HOUR_MS);
 
 export type ProvinceActionError = 'forbidden' | 'notApplicable' | 'invalid' | 'failed' | PilotExpiredCode;
 
+/**
+ * FO-387. A field is absent when the user did not change it, and an absent field is not written: a
+ * form opened before a colleague's save would otherwise put the old value back.
+ */
 export interface UpdateProfileInput {
-  capabilities: string;
-  keywords: string;
-  trlMin: number;
-  trlMax: number;
+  capabilities?: string;
+  keywords?: string;
+  trlMin?: number;
+  trlMax?: number;
   /** FO-383. Absent: the stored PIC is left alone. Empty: it is cleared. */
   pic?: string;
   /** The PIC the user confirmed after seeing the CORDIS organisation it belongs to. */
@@ -70,6 +77,14 @@ type PicPlan =
   | { kind: 'limit'; pic: string; retryAfterSeconds: number }
   | { kind: 'confirm'; match: PicCordisMatch }
   | { kind: 'write'; from: string | null; to: string | null; match: PicCordisMatch | null };
+
+const TrlSchema = z.number().int().min(1).max(9).optional();
+const ProfileFieldsSchema = z.object({
+  capabilities: z.string().trim().min(1).optional(),
+  keywords: z.string().transform(parseKeywords).pipe(z.array(z.string()).min(1)).optional(),
+  trlMin: TrlSchema,
+  trlMax: TrlSchema,
+});
 
 const LIVE_SUBSCRIPTION_STATUSES: readonly string[] = ['ACTIVE', 'TRIALING', 'PAST_DUE'];
 
@@ -259,36 +274,61 @@ export async function updateTenantProfile(
   | { ok: true; pic?: PicSaveOutcome }
   | { ok: false; error: ProfileActionError }
   | { ok: false; error: 'picConfirmationRequired'; match: PicCordisMatch }
+  | { ok: false; error: 'trlRangeConflict'; trlRange: [number, number] }
   | { ok: false; error: 'picRateLimited'; retryAfterSeconds: number }
 > {
   try {
     const scope = await requireTenantAction();
 
     // Girdi doğrulaması (yetki kontrolleri öncesi, çünkü keşif süreci)
-    if (!input.capabilities?.trim()) return { ok: false, error: 'invalid' };
-    if (!input.keywords?.trim()) return { ok: false, error: 'invalid' };
-    if (input.trlMin < 1 || input.trlMin > 9) return { ok: false, error: 'invalid' };
-    if (input.trlMax < 1 || input.trlMax > 9) return { ok: false, error: 'invalid' };
-    if (input.trlMin > input.trlMax) return { ok: false, error: 'invalid' };
+    const parsedFields = ProfileFieldsSchema.safeParse(input);
+    if (!parsedFields.success) return { ok: false, error: 'invalid' };
+    const fields = parsedFields.data;
     const picInput = input.pic === undefined ? null : TenantPicInputSchema.safeParse(input.pic);
     if (picInput && !picInput.success) return { ok: false, error: 'picInvalid' };
 
     // Kurumsal profili güncelleme izni: kurum sahibi veya yönetici (YETKİ KONTROL ÖNCEKİ TÜM GİRDİLER GEÇ)
     if (!can(asRole(scope.role), 'manage_users')) return { ok: false, error: 'forbidden' };
 
-    // Keywords ve TRL range'i ön işleme (withTenant'dan önce)
-    const keywords = input.keywords
-      .split(',')
-      .map((k) => k.trim())
-      .filter((k) => k);
-
-    if (!keywords.length) return { ok: false, error: 'invalid' };
-
-    const trlRange = [input.trlMin, input.trlMax];
-
     const confirmedPic = input.confirmedPic === undefined ? undefined : TenantPicInputSchema.safeParse(input.confirmedPic).data;
 
-    return await withTenant(scope.tenantId, async (tx) => {
+    const profileChanged = Object.values(fields).some((value) => value !== undefined);
+
+    // FO-384: set by the PIC write below; the rescore runs after that transaction has committed.
+    let picChange: { trigger: PicChangeTrigger; auditEventId: string } | null = null;
+
+    const outcome = await withTenant(scope.tenantId, async (tx) => {
+      const existing = await tx.tenantProfile.findUnique({
+        where: { tenantId: scope.tenantId },
+        select: { capabilities: true, keywords: true, trlRange: true },
+      });
+
+      // What the row will hold: the fields sent, over what is stored. A first row needs both texts.
+      // A PIC-only save on a tenant with no profile stays that way: no row, nothing invented.
+      const capabilities = fields.capabilities ?? existing?.capabilities;
+      const keywords = fields.keywords ?? existing?.keywords;
+      const trlRange = [
+        fields.trlMin ?? existing?.trlRange[0] ?? DEFAULT_TRL_RANGE.min,
+        fields.trlMax ?? existing?.trlRange[1] ?? DEFAULT_TRL_RANGE.max,
+      ] as const;
+      if (profileChanged) {
+        if (capabilities === undefined || keywords === undefined) return { ok: false as const, error: 'invalid' as const };
+        if (trlRange[0] > trlRange[1]) {
+          // One end sent, and only the stored other end makes it wrong. The form may be showing an old
+          // range, so the answer says what the row holds: the user can go on without a reload.
+          const oneEndSent = (fields.trlMin === undefined) !== (fields.trlMax === undefined);
+          if (!existing || !oneEndSent) return { ok: false as const, error: 'invalid' as const };
+          return {
+            ok: false as const,
+            error: 'trlRangeConflict' as const,
+            trlRange: [
+              existing.trlRange[0] ?? DEFAULT_TRL_RANGE.min,
+              existing.trlRange[1] ?? DEFAULT_TRL_RANGE.max,
+            ] as [number, number],
+          };
+        }
+      }
+
       // Refusals come before any write: a refused PIC saves nothing, the profile text included.
       const picPlan: PicPlan = picInput?.success
         ? await planPicChange(tx, scope.tenantId, scope.userId, picInput.data, confirmedPic)
@@ -305,50 +345,44 @@ export async function updateTenantProfile(
         return { ok: false as const, error: 'picConfirmationRequired' as const, match: picPlan.match };
       }
 
-      // Mevcut profili bul veya yeni oluştur
-      const existing = await tx.tenantProfile.findUnique({
-        where: { tenantId: scope.tenantId },
-      });
+      if (profileChanged && capabilities !== undefined && keywords !== undefined) {
+        const trlChanged = fields.trlMin !== undefined || fields.trlMax !== undefined;
+        if (existing) {
+          await tx.tenantProfile.update({
+            where: { tenantId: scope.tenantId },
+            data: {
+              capabilities: fields.capabilities,
+              keywords: fields.keywords,
+              trlRange: trlChanged ? [...trlRange] : undefined,
+            },
+          });
+        } else {
+          await tx.tenantProfile.create({
+            data: {
+              tenantId: scope.tenantId,
+              capabilities,
+              keywords,
+              trlRange: [...trlRange],
+              naceCodes: [],
+              preferredRoles: [],
+            },
+          });
+        }
 
-      if (existing) {
-        await tx.tenantProfile.update({
-          where: { tenantId: scope.tenantId },
-          data: {
-            capabilities: input.capabilities.trim(),
-            keywords,
-            trlRange,
-          },
-        });
-      } else {
-        await tx.tenantProfile.create({
+        // Denetim olayı
+        await tx.auditEvent.create({
           data: {
             tenantId: scope.tenantId,
-            capabilities: input.capabilities.trim(),
-            keywords,
-            trlRange,
-            naceCodes: [],
-            preferredRoles: [],
+            actorId: scope.userId,
+            type: 'tenant.profile.updated',
+            data: { capabilities, keywords, trlRange: [...trlRange] },
           },
         });
       }
 
-      // Denetim olayı
-      await tx.auditEvent.create({
-        data: {
-          tenantId: scope.tenantId,
-          actorId: scope.userId,
-          type: 'tenant.profile.updated',
-          data: {
-            capabilities: input.capabilities.trim(),
-            keywords,
-            trlRange,
-          },
-        },
-      });
-
       if (picPlan.kind === 'write') {
         await tx.tenant.update({ where: { id: scope.tenantId }, data: { pic: picPlan.to } });
-        await tx.auditEvent.create({
+        const audit = await tx.auditEvent.create({
           data: {
             tenantId: scope.tenantId,
             actorId: scope.userId,
@@ -356,6 +390,7 @@ export async function updateTenantProfile(
             data: { from: picPlan.from, to: picPlan.to, cordisName: picPlan.match?.name ?? null },
           },
         });
+        picChange = { trigger: picPlan.to === null ? 'tenant_cleared' : 'tenant_saved', auditEventId: String(audit.id) };
       }
 
       revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');
@@ -368,6 +403,11 @@ export async function updateTenantProfile(
             : { status: 'unmatched', value: picPlan.to };
       return { ok: true as const, pic };
     });
+
+    // FO-384: the stored G0 scores follow the PIC. Never rejects; a failure is an alert, not a
+    // refused save, because the PIC is already committed.
+    if (picChange) await rescoreTenantG0AfterPicChange(scope.tenantId, picChange);
+    return outcome;
   } catch (error) {
     return { ok: false, error: failureCode(error, 'failed') };
   }
