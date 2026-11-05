@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { presentIds } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 /**
  * NG-34 — the three G1 records on a real database, over `fabrika_app` (NOBYPASSRLS, asserted).
@@ -100,12 +100,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (admin) {
-    const tenantIds = presentIds(tenants);
-    const userIds = presentIds(users);
-    await admin.auditEvent.deleteMany({ where: { tenantId: { in: tenantIds } } });
-    await admin.workspace.deleteMany({ where: { tenantId: { in: tenantIds } } });
-    await admin.tenant.deleteMany({ where: { id: { in: tenantIds } } });
-    await admin.user.deleteMany({ where: { id: { in: userIds } } });
+    await admin.auditEvent.deleteMany({ where: { tenantId: { in: presentIds(tenants) } } });
+    await admin.workspace.deleteMany({ where: { tenantId: { in: presentIds(tenants) } } });
+    await admin.tenant.deleteMany({ where: { id: { in: presentIds(tenants) } } });
+    await admin.user.deleteMany({ where: { id: { in: presentIds(users) } } });
     await admin.$disconnect();
   }
   await state.rls?.$disconnect();
@@ -189,7 +187,7 @@ describe('org_readiness', () => {
       ),
     ).rejects.toThrow(/row-level security|violates/i);
     const updated = await withTenantOn(state.rls!, b.tenantId, (tx) =>
-      tx.orgReadiness.updateMany({ where: { tenantId: a.tenantId }, data: { learReady: false } }),
+      tx.orgReadiness.updateMany({ where: { tenantId: requireId(a.tenantId, 'a') }, data: { learReady: false } }),
     );
     expect(updated.count).toBe(0);
     expect((await records.getOwnReadiness(a)).lear).toBe('yes');
