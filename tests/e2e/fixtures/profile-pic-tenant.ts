@@ -155,7 +155,8 @@ export async function setupProfilePic() {
 
 /**
  * An owner of the other tenant used only by the FO-386 limit test. Fresh on every call: the count
- * lives in the server process, so a fixed id would start the next run already over the limit.
+ * lives in the server process, so a fixed id would start a repeat on the same server (--repeat-each)
+ * already over the limit. Playwright starts its own server, so a new run begins at zero either way.
  */
 export async function addPicProber() {
   const id = `pp-e2e-prober-${Date.now()}`;
