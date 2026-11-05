@@ -8,6 +8,9 @@
  * paying, pilot or contract subscription, audited, protected from Stripe sync —
  * are in src/lib/billing/internal-plan.ts; this file is the authorisation and
  * validation edge. Failures come back as a listed code, never as text.
+ *
+ * `removeTenantPicAction` takes a disputed PIC off a tenant (FO-383); the write and
+ * its audit row are in src/lib/tenant-pic-removal.ts.
  */
 
 import { revalidatePath } from 'next/cache';
@@ -15,6 +18,7 @@ import { z } from 'zod';
 import { requirePlatformAdmin } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import { assignInternalPlan, INTERNAL_PLAN_CHOICES, type AssignInternalPlanResult } from '@/lib/billing/internal-plan';
+import { removeTenantPic } from '@/lib/tenant-pic-removal';
 import { tenantFailureCode, type TenantFailureCode } from './failure-codes';
 
 export type TenantActionResult<T> = { ok: true; data: T } | { ok: false; code: TenantFailureCode };
@@ -22,6 +26,16 @@ export type TenantActionResult<T> = { ok: true; data: T } | { ok: false; code: T
 const assignSchema = z.object({
   tenantId: z.string().min(1).max(64),
   planId: z.enum(INTERNAL_PLAN_CHOICES),
+  note: z.string().trim().min(1).max(500),
+});
+
+/**
+ * `pic` is the value the operator saw, compared as stored. It is not held to the nine-digit input
+ * rule: a value older than that rule is exactly what may need removing.
+ */
+const removePicSchema = z.object({
+  tenantId: z.string().min(1).max(64),
+  pic: z.string().min(1).max(64),
   note: z.string().trim().min(1).max(500),
 });
 
@@ -56,5 +70,27 @@ export async function assignInternalPlanAction(input: {
     return { ok: true, data: result };
   } catch (e) {
     return tenantFailure(e, 'assignInternalPlan');
+  }
+}
+
+export async function removeTenantPicAction(input: {
+  tenantId: string;
+  pic: string;
+  note: string;
+}): Promise<TenantActionResult<null>> {
+  try {
+    const { userId } = await requirePlatformAdmin();
+    const parsed = removePicSchema.safeParse(input);
+    if (!parsed.success) {
+      const noteMissing = parsed.error.issues.some((issue) => issue.path[0] === 'note');
+      return { ok: false, code: noteMissing ? 'NOTE_REQUIRED' : 'INVALID_INPUT' };
+    }
+    const { tenantId, pic, note } = parsed.data;
+    await removeTenantPic(tenantId, pic, userId, note);
+    revalidatePath('/[locale]/admin/tenants', 'page');
+    revalidatePath('/[locale]/admin/tenants/[tenantId]', 'page');
+    return { ok: true, data: null };
+  } catch (e) {
+    return tenantFailure(e, 'removeTenantPic');
   }
 }

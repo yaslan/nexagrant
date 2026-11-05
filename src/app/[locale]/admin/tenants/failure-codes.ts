@@ -13,6 +13,8 @@ export const TENANT_FAILURE_CODES = [
   'NOTE_REQUIRED',
   // src/lib/billing/subscription-owner.ts internalPlanBlocker, thrown by internal-plan.ts
   'TRIAL_PROTECTED',
+  // src/lib/tenant-pic-removal.ts
+  'PIC_CHANGED',
   // src/lib/tenant.ts requirePlatformAdmin()
   'PLATFORM_ADMIN_REQUIRED',
   // actions.ts: arguments that fail the zod schema

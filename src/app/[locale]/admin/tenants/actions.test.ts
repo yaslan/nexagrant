@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import tr from '../../../../../messages/tr.json';
 import en from '../../../../../messages/en.json';
 
-const h = vi.hoisted(() => ({ thrown: null as unknown, admin: vi.fn(), assign: vi.fn() }));
+const h = vi.hoisted(() => ({ thrown: null as unknown, admin: vi.fn(), assign: vi.fn(), removePic: vi.fn() }));
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/tenant', async (importActual) => ({
@@ -20,12 +20,17 @@ vi.mock('@/lib/billing/internal-plan', async (importActual) => ({
   ...(await importActual<typeof import('@/lib/billing/internal-plan')>()),
   assignInternalPlan: h.assign,
 }));
+vi.mock('@/lib/tenant-pic-removal', async (importActual) => ({
+  ...(await importActual<typeof import('@/lib/tenant-pic-removal')>()),
+  removeTenantPic: h.removePic,
+}));
 
 import { logger } from '@/lib/logger';
 import { LiveProviderSubscriptionError } from '@/lib/billing/plan-repository';
 import { InternalPlanNoteRequiredError } from '@/lib/billing/internal-plan';
 import { PlatformAdminRequiredError } from '@/lib/tenant';
-import { assignInternalPlanAction } from './actions';
+import { TenantPicChangedError } from '@/lib/tenant-pic-removal';
+import { assignInternalPlanAction, removeTenantPicAction } from './actions';
 import { TENANT_FAILURE_CODES } from './failure-codes';
 
 const call = (over: Partial<{ tenantId: string; planId: string; note: string }> = {}) =>
@@ -82,6 +87,52 @@ describe('assignInternalPlanAction', () => {
       expect(JSON.stringify(res)).not.toMatch(/P2002|secret_col/);
     }
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[admin/tenants]'), e);
+  });
+});
+
+describe('removeTenantPicAction (FO-383)', () => {
+  const remove = (over: Partial<{ tenantId: string; pic: string; note: string }> = {}) =>
+    removeTenantPicAction({ tenantId: 't-1', pic: '987654321', note: 'owner disputed', ...over });
+
+  beforeEach(() => {
+    h.removePic.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('passes the validated input and the admin id through', async () => {
+    expect(await remove({ note: '  owner disputed  ' })).toStrictEqual({ ok: true, data: null });
+    expect(h.removePic).toHaveBeenCalledWith('t-1', '987654321', 'admin-1', 'owner disputed');
+  });
+
+  it('a non-admin gets PLATFORM_ADMIN_REQUIRED and nothing is written', async () => {
+    h.admin.mockRejectedValue(new PlatformAdminRequiredError());
+    expect(await remove()).toStrictEqual({ ok: false, code: 'PLATFORM_ADMIN_REQUIRED' });
+    expect(h.removePic).not.toHaveBeenCalled();
+  });
+
+  it('a non-admin learns nothing about the input: the gate comes before validation', async () => {
+    h.admin.mockRejectedValue(new PlatformAdminRequiredError());
+    expect(await remove({ note: '' })).toStrictEqual({ ok: false, code: 'PLATFORM_ADMIN_REQUIRED' });
+  });
+
+  it('an empty note is NOTE_REQUIRED and a bad id or PIC is INVALID_INPUT, before the write', async () => {
+    expect(await remove({ note: '   ' })).toStrictEqual({ ok: false, code: 'NOTE_REQUIRED' });
+    expect(await remove({ note: 'x'.repeat(501) })).toStrictEqual({ ok: false, code: 'NOTE_REQUIRED' });
+    expect(await remove({ tenantId: '' })).toStrictEqual({ ok: false, code: 'INVALID_INPUT' });
+    expect(await remove({ tenantId: 'x'.repeat(65) })).toStrictEqual({ ok: false, code: 'INVALID_INPUT' });
+    expect(await remove({ pic: '' })).toStrictEqual({ ok: false, code: 'INVALID_INPUT' });
+    expect(h.removePic).not.toHaveBeenCalled();
+  });
+
+  it('a stored value older than the nine-digit rule can still be removed', async () => {
+    expect(await remove({ pic: 'LEGACY-1' })).toStrictEqual({ ok: true, data: null });
+    expect(h.removePic).toHaveBeenCalledWith('t-1', 'LEGACY-1', 'admin-1', 'owner disputed');
+  });
+
+  it('a PIC that changed meanwhile answers PIC_CHANGED; a database error stays UNKNOWN', async () => {
+    h.removePic.mockRejectedValueOnce(new TenantPicChangedError());
+    expect(await remove()).toStrictEqual({ ok: false, code: 'PIC_CHANGED' });
+    h.removePic.mockRejectedValueOnce(Object.assign(new Error('secret_col'), { code: 'P2002' }));
+    expect(await remove()).toStrictEqual({ ok: false, code: 'UNKNOWN' });
   });
 });
 
