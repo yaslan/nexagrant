@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Building, Sparkles, Key, CheckCircle, AlertCircle, Fingerprint } from 'lucide-react';
@@ -66,6 +66,12 @@ export default function TenantProfileForm({
   const picHelpId = useId();
   const picFeedbackId = useId();
 
+  // Keyboard and screen-reader users land on the question. In an effect, not a frame after
+  // the setState: a slow commit left the ref empty then, and the focus was simply lost.
+  useEffect(() => {
+    if (pendingMatch) confirmRef.current?.focus();
+  }, [pendingMatch]);
+
   const save = async (confirmedPic?: string) => {
     setSaving(true);
     setSavedSuccess(false);
@@ -100,8 +106,6 @@ export default function TenantProfileForm({
       setTimeout(() => setSavedSuccess(false), 4000);
     } else if (result.error === 'picConfirmationRequired') {
       setPendingMatch(result.match);
-      // After the panel has rendered: keyboard and screen-reader users land on the question.
-      requestAnimationFrame(() => confirmRef.current?.focus());
     } else if (result.error === 'picInvalid' || result.error === 'picTaken') {
       setPendingMatch(null);
       setPicError(result.error === 'picInvalid' ? 'invalid' : 'taken');

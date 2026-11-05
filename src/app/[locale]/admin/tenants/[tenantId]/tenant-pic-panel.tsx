@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useTransition } from 'react';
+import React, { useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { removeTenantPicAction } from '../actions';
@@ -27,12 +27,25 @@ export function TenantPicPanel({
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const removeRef = useRef<HTMLButtonElement>(null);
   const noticeRef = useRef<HTMLParagraphElement>(null);
+  const returnFocus = useRef(false);
+
+  // In effects, after the commit: a frame after the setState can come before it, and then
+  // the ref is empty and the focus is lost (seen on the profile form under load, FO-383).
+  useEffect(() => {
+    if (confirming || !returnFocus.current) return;
+    returnFocus.current = false;
+    removeRef.current?.focus();
+  }, [confirming]);
+
+  // The button that opened the panel is gone with the PIC.
+  useEffect(() => {
+    if (notice?.kind === 'ok') noticeRef.current?.focus();
+  }, [notice]);
 
   const cancel = () => {
+    returnFocus.current = true;
     setConfirming(false);
     setNote('');
-    // After the panel is gone, focus goes back to the button that opened it.
-    requestAnimationFrame(() => removeRef.current?.focus());
   };
 
   const submit = (e: React.FormEvent, stored: string) => {
@@ -54,8 +67,6 @@ export function TenantPicPanel({
       setConfirming(false);
       setNote('');
       router.refresh();
-      // The button that opened the panel is gone with the PIC.
-      requestAnimationFrame(() => noticeRef.current?.focus());
     });
   };
 
