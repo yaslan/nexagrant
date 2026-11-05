@@ -33,10 +33,14 @@ const moduleBoundaryBlocks = moduleNames.map((own) => {
   // not see, so it is matched with no-restricted-syntax on the literal source.
   // The regex is the union of the two forms above. Slashes are escaped for the
   // esquery /regex/ literal.
-  const dynamicSource = `^(?:@/modules/(?:${otherAlt})(?:/|$)|(?:\\.{1,2}/)*\\.\\./(?:modules/)?(?:${otherAlt})(?:/|$))`;
+  // Alias paths with a `..` segment (`@/modules/m1/../m9/x`) are blocked
+  // outright: the alias cannot be resolved here (no tsconfig-paths resolver),
+  // so the climb cannot be normalized. Legit code never climbs after an alias.
+  const aliasClimb = "^@/modules/.*(?:^|/)\\.\\.(?:/|$)";
+  const dynamicSource = `^(?:@/modules/(?:${otherAlt})(?:/|$)|@/modules/.*(?:^|/)\\.\\.(?:/|$)|(?:\\.{1,2}/)*\\.\\./(?:modules/)?(?:${otherAlt})(?:/|$))`;
   const dynamicSelector = `ImportExpression > Literal[value=/${dynamicSource.replace(/\//g, "\\/")}/]`;
   return {
-    files: [`src/modules/${own}/**/*.{ts,tsx}`],
+    files: [`src/modules/${own}/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}`],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -52,6 +56,27 @@ const moduleBoundaryBlocks = moduleNames.map((own) => {
             },
             {
               regex: relativeIntoOther,
+              message: moduleBoundaryMessage,
+            },
+            {
+              regex: aliasClimb,
+              message: moduleBoundaryMessage,
+            },
+          ],
+        },
+      ],
+      // import/no-restricted-paths resolves relative paths on disk, so a
+      // `..` climb that lands in another module is caught wherever the `..`
+      // sits (`../m1/../m9/x`). It also sees dynamic import() and require().
+      // In this plugin `target` is the restricted importer (this module) and
+      // `from` is the directory it may not import (every other module).
+      "import/no-restricted-paths": [
+        "error",
+        {
+          zones: [
+            {
+              target: `./src/modules/${own}`,
+              from: others.map((other) => `./src/modules/${other}`),
               message: moduleBoundaryMessage,
             },
           ],
