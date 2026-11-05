@@ -7,15 +7,24 @@
  *
  * What it guarantees:
  *   • it never rejects: the PIC change is already committed when this runs, so a failure here is an
- *     alert (`SystemAlert`, no tenant id, no PIC value), never an error back to the user;
+ *     alert (`SystemAlert`, no tenant id, no PIC value), never an error back to the user. The one
+ *     exception is the worker's own run: a failed queue write is rethrown so the queue retries it;
  *   • it stops at a time budget and queues the rest as a job (`g0-rescore-tenant`) that resumes
  *     after the last opportunity it reached, so a large tenant is finished by the queue (FO-384 B2);
+ *   • a row lock is waited for at most `G0_RESCORE_LOCK_TIMEOUT_MS`, so the budget holds (Y2);
+ *   • an opportunity archived during the run is counted as `archived`, not as a failure (O2);
  *   • a score the scorer can no longer compute is cleared, not left at its old value;
  *   • a rescore keeps each opportunity's `updatedAt` (see `rescoreOpportunityG0`).
  */
 import { withTenant } from '@/lib/db';
 import { recordAlert } from '@/lib/observability/system-alert';
-import { clearStoredG0, rescoreOpportunityG0, type G0Computation } from './g0-compute';
+import {
+  clearStoredG0,
+  G0_RESCORE_LOCK_TIMEOUT_MS,
+  limitLockWait,
+  rescoreOpportunityG0,
+  type G0Computation,
+} from './g0-compute';
 
 export type PicChangeTrigger = 'tenant_saved' | 'tenant_cleared' | 'admin_removed';
 export interface PicChange {
@@ -33,8 +42,10 @@ export interface G0TenantRescoreSummary {
   rescored: number;
   cleared: number;
   failed: number;
-  /** Opportunities this run did not finish: the ones it could not reach, plus any that moved. */
+  /** Opportunities this run did not finish: the ones it could not reach. Not an archived one. */
   skipped: number;
+  /** Opportunities archived after the listing and before their turn: not this tenant's any more, no alert. */
+  archived: number;
   /** True when the rest was handed to the `g0-rescore-tenant` job. */
   queued: boolean;
 }
@@ -45,6 +56,11 @@ export interface G0TenantRescoreDeps {
   enqueueContinuation?: (tenantId: string, run: G0RescoreRun) => Promise<void>;
   now?: () => number;
   budgetMs?: number;
+  /**
+   * The worker sets this: a failed queue write is rethrown so the queue retries the job (from the
+   * same cursor; a rescore is idempotent). The request path keeps resolving and raises an alert.
+   */
+  rethrowQueueFailure?: boolean;
 }
 
 export const G0_RESCORE_ALERT_SOURCE = 'g0-rescore-after-pic';
@@ -123,12 +139,13 @@ export async function rescoreTenantG0AfterPicChange(
   deps: G0TenantRescoreDeps = {},
 ): Promise<G0TenantRescoreSummary> {
   const listIds = deps.listOpportunityIds ?? listLiveOpportunityIds;
-  const rescore = deps.rescore ?? ((t: string, id: string) => rescoreOpportunityG0(t, id));
+  const rescore =
+    deps.rescore ?? ((t: string, id: string) => rescoreOpportunityG0(t, id, { lockTimeoutMs: G0_RESCORE_LOCK_TIMEOUT_MS }));
   const enqueue = deps.enqueueContinuation ?? queueRest;
   const now = deps.now ?? Date.now;
   const budgetMs = deps.budgetMs ?? G0_RESCORE_BUDGET_MS;
 
-  const summary: G0TenantRescoreSummary = { total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0, queued: false };
+  const summary: G0TenantRescoreSummary = { total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0, archived: 0, queued: false };
   const unfinished: string[] = [];
   let ids: string[] = [];
   let next = 0;
@@ -146,11 +163,14 @@ export async function rescoreTenantG0AfterPicChange(
       try {
         const computation = await rescore(tenantId, id);
         if (!computation) {
-          // Archived or moved between the listing and this call: not this tenant's any more.
-          summary.skipped++;
-          unfinished.push(id);
+          // Archived between the listing and this call: not this tenant's any more, so not a failure.
+          summary.archived++;
         } else if (computation.score === null) {
-          await withTenant(tenantId, (tx) => clearStoredG0(tx, { ...computation, tenantId, opportunityId: id }));
+          await withTenant(tenantId, async (tx) => {
+            await limitLockWait(tx, G0_RESCORE_LOCK_TIMEOUT_MS);
+            // A rescore is not an edit of the opportunity: keep its `updatedAt` (FO-384 E1).
+            await clearStoredG0(tx, { ...computation, tenantId, opportunityId: id }, { keepUpdatedAt: true });
+          });
           summary.cleared++;
         } else {
           summary.rescored++;
@@ -174,6 +194,9 @@ export async function rescoreTenantG0AfterPicChange(
       summary.queued = true;
     } catch (error) {
       console.error('G0 rescore continuation could not be queued', errorCode(error));
+      // In the worker the throw is the retry: the queue runs this job again from the same cursor.
+      // The alert comes from the queue once its attempts run out (`job-queue`).
+      if (deps.rethrowQueueFailure) throw error;
       unfinished.push(...remaining);
     }
   }

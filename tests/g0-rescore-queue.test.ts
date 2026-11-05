@@ -83,7 +83,7 @@ describe('FO-384 B2: the rest of a G0 rescore is queued and finished', () => {
   it('a rescore that stops at its budget queues one job per cursor, and the job finishes the tenant', async () => {
     // A budget of zero: the request reaches no opportunity and hands all of them to the queue.
     const summary = await rescoreTenantG0AfterPicChange(tenantId, { trigger: 'tenant_saved', auditEventId }, { budgetMs: 0 });
-    expect(summary).toEqual({ total: OPPORTUNITIES, rescored: 0, cleared: 0, failed: 0, skipped: OPPORTUNITIES, queued: true });
+    expect(summary).toEqual({ total: OPPORTUNITIES, rescored: 0, cleared: 0, failed: 0, skipped: OPPORTUNITIES, archived: 0, queued: true });
     expect(await storedScores()).toEqual(Array(OPPORTUNITIES).fill(STALE));
 
     const rows = await prisma.$queryRaw<Array<{ task_identifier: string; key: string; payload: G0RescoreRun & { tenantId: string } }>>`
@@ -104,5 +104,21 @@ describe('FO-384 B2: the rest of a G0 rescore is queued and finished', () => {
     );
     expect(fresh.every((score) => score !== null)).toBe(true);
     expect(await storedScores()).toEqual(fresh);
+  });
+
+  it('the task resumes after the afterId in its payload: what was reached stays as it was (Y1)', async () => {
+    const cursor = oppIds[14]!;
+    const helpers = { job: { id: '2', attempts: 1, max_attempts: 5 }, logger: { info() {}, warn() {}, error() {}, debug() {} } } as unknown as JobHelpers;
+
+    await g0RescoreTenantTask({ tenantId, trigger: 'tenant_saved', auditEventId: `${auditEventId}-cursor`, afterId: cursor }, helpers);
+
+    const scores = await storedScores();
+    // Ids up to and including the cursor were reached by an earlier run, so the task must not touch them.
+    expect(scores.slice(0, 15)).toEqual(Array(15).fill(STALE));
+    const fresh = await Promise.all(
+      oppIds.slice(15).map((id) => withTenant(tenantId, (tx) => computeG0ForOpportunity(tx, tenantId, id)).then((c) => c?.score ?? null)),
+    );
+    expect(fresh.every((score) => score !== null)).toBe(true);
+    expect(scores.slice(15)).toEqual(fresh);
   });
 });

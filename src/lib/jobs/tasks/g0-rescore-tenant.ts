@@ -7,8 +7,9 @@ import { rescoreTenantG0AfterPicChange } from '@/lib/scoring/g0-rescore-tenant';
  *
  * Queued by `rescoreTenantG0AfterPicChange` (enqueueJob, key per change and cursor). It resumes
  * after `afterId`, and queues the next continuation itself if its budget ends first. It has no
- * cron: a PIC change is the only thing that queues it. A thrown error (a failed queue write) is
- * retried by the queue and ends as a `job-queue` alert.
+ * cron: a PIC change is the only thing that queues it. A failed queue write is rethrown
+ * (`rethrowQueueFailure`), so the queue retries this job from the same cursor; when the attempts
+ * run out the queue raises a `job-queue` alert (FO-384 O1).
  */
 const G0RescoreTenantPayload = z.object({
   tenantId: z.string().min(1),
@@ -19,5 +20,5 @@ const G0RescoreTenantPayload = z.object({
 
 export const g0RescoreTenantTask = defineJob('g0-rescore-tenant', async ({ payload }) => {
   const run = G0RescoreTenantPayload.parse(payload);
-  return rescoreTenantG0AfterPicChange(run.tenantId, run);
+  return rescoreTenantG0AfterPicChange(run.tenantId, run, { rethrowQueueFailure: true });
 });

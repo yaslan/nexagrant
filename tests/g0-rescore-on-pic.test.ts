@@ -10,30 +10,39 @@ const h = vi.hoisted(() => ({
   scope: null as Record<string, unknown> | null,
   failFor: new Set<string>(),
   rescoreCalls: [] as string[],
+  enqueueJob: vi.fn(async (..._args: unknown[]) => ({ added: true })),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/tenant', () => ({ requireTenantAction: vi.fn(async () => h.scope) }));
+// The queue is only reached when a run's budget ends first; the worker test below makes it fail.
+vi.mock('@/lib/jobs/enqueue', () => ({ enqueueJob: (...args: unknown[]) => h.enqueueJob(...args) }));
 vi.mock('@/lib/scoring/g0-compute', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/scoring/g0-compute')>();
   return {
     ...actual,
-    rescoreOpportunityG0: vi.fn(async (tenantId: string, opportunityId: string) => {
+    rescoreOpportunityG0: vi.fn(async (tenantId: string, opportunityId: string, rescoreOptions?: { lockTimeoutMs?: number }) => {
       h.rescoreCalls.push(opportunityId);
       if (h.failFor.has(opportunityId)) throw new Error('injected rescore failure');
-      return actual.rescoreOpportunityG0(tenantId, opportunityId);
+      return actual.rescoreOpportunityG0(tenantId, opportunityId, rescoreOptions);
     }),
   };
 });
 
 import { updateTenantProfile } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
 import { prisma, withTenant } from '@/lib/db';
-import { computeG0ForOpportunity, type G0Computation } from '@/lib/scoring/g0-compute';
+import {
+  computeG0ForOpportunity,
+  G0ConcurrentEditError,
+  type G0Computation,
+  persistG0,
+} from '@/lib/scoring/g0-compute';
 import {
   G0_RESCORE_ALERT_SOURCE,
   rescoreTenantG0AfterPicChange,
   type PicChange,
 } from '@/lib/scoring/g0-rescore-tenant';
+import { g0RescoreTenantTask } from '@/lib/jobs/tasks/g0-rescore-tenant';
 import { removeTenantPic } from '@/lib/tenant-pic-removal';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
@@ -299,7 +308,7 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
         },
       });
       consoleError.mockRestore();
-      expect(summary).toEqual({ total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0, queued: false });
+      expect(summary).toEqual({ total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0, archived: 0, queued: false });
       expect((await alertsFor(auditEventId))[0]?.meta).toMatchObject({ total: null, opportunityIds: [] });
     });
   });
@@ -324,7 +333,7 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
         queued.push({ tenantId: tenant, run });
       },
     });
-    expect(summary).toEqual({ total: 3, rescored: 1, cleared: 0, failed: 0, skipped: 2, queued: true });
+    expect(summary).toEqual({ total: 3, rescored: 1, cleared: 0, failed: 0, skipped: 2, archived: 0, queued: true });
     expect(listed).toEqual([undefined]);
     expect(queued).toEqual([{ tenantId, run: { trigger: 'tenant_saved', auditEventId, afterId: 'a' } }]);
     // The rest is in the queue, so nothing is alerted: an alert would say a rescore is lost.
@@ -345,7 +354,7 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
       },
     });
     expect(rescored).toEqual(['b', 'c']);
-    expect(summary).toEqual({ total: 2, rescored: 2, cleared: 0, failed: 0, skipped: 0, queued: false });
+    expect(summary).toEqual({ total: 2, rescored: 2, cleared: 0, failed: 0, skipped: 0, archived: 0, queued: false });
   });
 
   it('alerts when the rest cannot be queued, with the counts and no tenant id', async () => {
@@ -365,7 +374,7 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
       },
     });
     consoleError.mockRestore();
-    expect(summary).toEqual({ total: 2, rescored: 1, cleared: 0, failed: 0, skipped: 1, queued: false });
+    expect(summary).toEqual({ total: 2, rescored: 1, cleared: 0, failed: 0, skipped: 1, archived: 0, queued: false });
     const alerts = await alertsFor(auditEventId);
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toMatchObject({ level: 'error' });
@@ -402,7 +411,7 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
       rescore: async () => ({ ...real!, score: null, decision: null, coverage: 0 }),
     });
 
-    expect(summary).toEqual({ total: 1, rescored: 0, cleared: 1, failed: 0, skipped: 0, queued: false });
+    expect(summary).toEqual({ total: 1, rescored: 0, cleared: 1, failed: 0, skipped: 0, archived: 0, queued: false });
     expect(await stored(oppId)).toEqual({ opportunity: null, topicMatch: null });
     const row = await prisma.topicMatch.findFirst({ where: { opportunityId: oppId }, select: { breakdown: true } });
     expect(row?.breakdown).toMatchObject({ score: null, coverage: 0, g0ScorerPlaceholderFitScore: true });
@@ -443,6 +452,188 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
 
     expect(computation?.score).toBeNull();
     expect(await stored(`${key}-notopic`)).toEqual({ opportunity: null, topicMatch: null });
+  });
+
+  it('a PIC change that leaves a topicless opportunity unscored keeps its updatedAt (E1)', async () => {
+    const noTopic = `${key}-notopic-e1`;
+    await prisma.opportunity.create({
+      data: { id: noTopic, tenantId, workspaceId: `${tenantId}-w`, title: 'no topic', topicId: null, stage: 'G0', status: 'ACTIVE', intendedRole: 'coordinator', g0Score: 55 },
+    });
+    const old = new Date('2026-03-03T10:00:00Z');
+    await prisma.opportunity.update({ where: { id: noTopic }, data: { updatedAt: old } });
+
+    // No injected `rescore`: the real scorer decides that this opportunity now has no score.
+    const summary = await rescoreTenantG0AfterPicChange(tenantId, change(`${key}-e1`), {
+      listOpportunityIds: async () => [noTopic],
+    });
+
+    expect(summary).toMatchObject({ total: 1, cleared: 1, failed: 0 });
+    expect(await stored(noTopic)).toEqual({ opportunity: null, topicMatch: null });
+    expect((await prisma.opportunity.findUnique({ where: { id: noTopic }, select: { updatedAt: true } }))?.updatedAt).toEqual(old);
+  });
+
+  it('resumes after the cursor in id order, read from the real database (Y1)', async () => {
+    // Created last: its id sorts between `oppId` and `secondOppId`, but its createdAt is the latest.
+    // Ordered by createdAt the same rows come back in another order.
+    const between = `${key}-opp0`;
+    await prisma.opportunity.create({
+      data: { id: between, tenantId, workspaceId: `${tenantId}-w`, title: between, topicId, stage: 'G0', status: 'ACTIVE', intendedRole: 'coordinator' },
+    });
+    const rescored: string[] = [];
+    const summary = await rescoreTenantG0AfterPicChange(tenantId, { ...change(`${key}-cursor`), afterId: oppId }, {
+      rescore: async (_tenant, id) => {
+        rescored.push(id);
+        return { score: 50 } as G0Computation;
+      },
+      enqueueContinuation: async () => {
+        throw new Error('must not queue a finished run');
+      },
+    });
+    expect(rescored).toEqual([between, secondOppId]);
+    expect(summary).toMatchObject({ total: 2, rescored: 2, queued: false });
+  });
+
+  it('a row lock held by another transaction does not hold the request past its budget; the opportunity is alerted (Y2)', async () => {
+    const auditEventId = `${key}-lock`;
+    let locked!: () => void;
+    const lockTaken = new Promise<void>((resolve) => (locked = resolve));
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Opportunity" WHERE id = ${oppId} FOR UPDATE`;
+        locked();
+        await new Promise((resolve) => setTimeout(resolve, 8_000));
+      },
+      { timeout: 20_000, maxWait: 10_000 },
+    );
+    await lockTaken;
+    const continuations: Array<{ afterId?: string }> = [];
+    const started = Date.now();
+    const summary = await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId), {
+      budgetMs: 1_000,
+      listOpportunityIds: async () => [oppId, secondOppId],
+      enqueueContinuation: async (_tenant, run) => {
+        continuations.push(run);
+      },
+    });
+    const elapsed = Date.now() - started;
+    await holder;
+
+    // The wait ends at the lock timeout (2 s), not when the holder lets go (8 s).
+    expect(elapsed).toBeLessThan(6_000);
+    expect(summary).toEqual({ total: 2, rescored: 0, cleared: 0, failed: 1, skipped: 1, archived: 0, queued: true });
+    // Not lost: the locked opportunity is named in the alert, the rest is queued after it.
+    expect(continuations).toEqual([expect.objectContaining({ afterId: oppId })]);
+    const alerts = await alertsFor(auditEventId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ level: 'error' });
+    expect(alerts[0]?.meta).toMatchObject({ failed: 1, opportunityIds: [oppId] });
+  }, 40_000);
+
+  it('an opportunity archived after the listing is counted as archived, not as a failure (O2)', async () => {
+    const auditEventId = `${key}-archived-mid`;
+    const summary = await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId), {
+      listOpportunityIds: async () => {
+        // Archived after the listing and before its turn in the run.
+        await prisma.opportunity.update({ where: { id: secondOppId }, data: { deletedAt: new Date() } });
+        return [oppId, secondOppId];
+      },
+    });
+    expect(summary).toMatchObject({ total: 2, failed: 0, skipped: 0, archived: 1, queued: false });
+    expect(summary.rescored + summary.cleared).toBe(1);
+    expect(await alertsFor(auditEventId)).toEqual([]);
+  });
+
+  it('an edit made between the rescore read and its write is not overwritten (O3)', async () => {
+    await prisma.opportunity.update({ where: { id: oppId }, data: { g0Score: 1 } });
+    const userEditAt = new Date('2026-11-05T12:00:00Z');
+    const computation = (await withTenant(tenantId, (tx) => computeG0ForOpportunity(tx, tenantId, oppId)))!;
+    expect(computation.score).not.toBeNull();
+
+    await expect(
+      withTenant(tenantId, (tx) => {
+        const opportunity = new Proxy(tx.opportunity, {
+          get(target, prop) {
+            if (prop !== 'findFirst') return Reflect.get(target, prop, target);
+            return async (args: Parameters<typeof target.findFirst>[0]) => {
+              const row = await target.findFirst(args);
+              // The user's edit lands after the rescore's read and before its write.
+              await prisma.opportunity.update({ where: { id: oppId }, data: { title: 'user edit', updatedAt: userEditAt } });
+              return row;
+            };
+          },
+        });
+        const racing = new Proxy(tx, {
+          get: (target, prop) => (prop === 'opportunity' ? opportunity : Reflect.get(target, prop, target)),
+        });
+        return persistG0(racing as unknown as Parameters<typeof persistG0>[0], computation, { keepUpdatedAt: true });
+      }),
+    ).rejects.toBeInstanceOf(G0ConcurrentEditError);
+
+    const row = await prisma.opportunity.findUnique({ where: { id: oppId }, select: { title: true, updatedAt: true, g0Score: true } });
+    expect(row).toEqual({ title: 'user edit', updatedAt: userEditAt, g0Score: 1 });
+  });
+
+  it('a retried run adds to one alert, not a second row (H1, dedupe key)', async () => {
+    const auditEventId = `${key}-dedupe`;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // First run: one of two fails. Second run: both fail. The messages differ, so only the dedupe key joins them.
+    await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId), {
+      listOpportunityIds: async () => [oppId, secondOppId],
+      rescore: async (_tenant, id) => {
+        if (id === oppId) throw new Error('first run failure');
+        return { score: 50 } as G0Computation;
+      },
+    });
+    await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId), {
+      listOpportunityIds: async () => [oppId, secondOppId],
+      rescore: async () => {
+        throw new Error('second run failure');
+      },
+    });
+    consoleError.mockRestore();
+
+    const alerts = await alertsFor(auditEventId);
+    expect(alerts).toHaveLength(1);
+    // The repeat is counted on the one row. Its meta keeps the first run's counts (an open, low-severity point).
+    expect(alerts[0]?.meta).toMatchObject({ alertRepeatCount: 2 });
+  });
+
+  it('logs the error code of a failed rescore, never its message (M12)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = Object.assign(new Error(`value for ${pic}`), { code: 'P2028' });
+    await rescoreTenantG0AfterPicChange(tenantId, change(`${key}-code`), {
+      listOpportunityIds: async () => [oppId],
+      rescore: async () => {
+        throw error;
+      },
+    });
+    const logged = consoleError.mock.calls.flat().map(String).join(' ');
+    consoleError.mockRestore();
+    expect(logged).toContain('P2028');
+    expect(logged).not.toContain(pic);
+  });
+
+  it('the worker rethrows a failed queue write, so the queue retries the job (O1)', async () => {
+    const auditEventId = `${key}-worker`;
+    h.enqueueJob.mockRejectedValueOnce(new Error('queue is down'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Every clock read jumps 30 s: the budget ends after the first opportunity, so the rest must be queued.
+    let clock = 0;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => (clock += 30_000));
+    try {
+      await expect(
+        g0RescoreTenantTask(
+          { tenantId, trigger: 'tenant_saved', auditEventId },
+          { job: { id: '3', attempts: 1, max_attempts: 5 }, logger: { info() {}, warn() {}, error() {}, debug() {} } } as unknown as Parameters<typeof g0RescoreTenantTask>[1],
+        ),
+      ).rejects.toThrow('queue is down');
+    } finally {
+      nowSpy.mockRestore();
+      consoleError.mockRestore();
+    }
+    expect(h.enqueueJob).toHaveBeenCalledTimes(1);
+    // The retry is the queue's; the request path's "could not queue" alert is not raised for it.
+    expect(await alertsFor(auditEventId)).toEqual([]);
   });
 
   it('never rejects, whatever fails', async () => {

@@ -414,6 +414,26 @@ export interface G0StoreOptions {
   keepUpdatedAt?: boolean;
 }
 
+/**
+ * Longest wait for a row lock during a rescore that a PIC change started (FO-384 Y2). A blocked
+ * write otherwise holds the request for as long as the other transaction holds the row, past the
+ * time budget. Set per transaction, so no other caller of the scorer waits any differently.
+ */
+export const G0_RESCORE_LOCK_TIMEOUT_MS = 2_000;
+
+/** Ends a wait for a row lock after `ms`, inside this transaction only (`set_config(..., true)`). */
+export async function limitLockWait(client: TenantTx, ms: number): Promise<void> {
+  await client.$executeRaw`SELECT set_config('lock_timeout', ${String(ms)}, true)`;
+}
+
+/** The opportunity changed between this rescore's read and its write; the edit is kept (FO-384 O3). */
+export class G0ConcurrentEditError extends Error {
+  constructor() {
+    super('G0 rescore: the opportunity changed during the rescore');
+    this.name = 'G0ConcurrentEditError';
+  }
+}
+
 /** Writes `g0Score` on the opportunity; with `keepUpdatedAt` an unchanged value is not written. */
 async function writeOpportunityScore(
   client: TenantTx,
@@ -429,8 +449,14 @@ async function writeOpportunityScore(
   }
   const current = await client.opportunity.findFirst({ where, select: { g0Score: true, updatedAt: true } });
   if (!current || current.g0Score === value) return;
-  // An explicit `updatedAt` overrides Prisma's `@updatedAt`, so the last human edit stays the last.
-  await client.opportunity.updateMany({ where, data: { g0Score: value, updatedAt: current.updatedAt } });
+  // Guarded on the `updatedAt` just read. An edit that landed after the read matches nothing, so it
+  // is not overwritten with the stale `title`/`updatedAt` (O3): the rescore fails and is alerted instead.
+  const written = await client.opportunity.updateMany({
+    where: { ...where, updatedAt: current.updatedAt },
+    // An explicit `updatedAt` overrides Prisma's `@updatedAt`, so the last human edit stays the last.
+    data: { g0Score: value, updatedAt: current.updatedAt },
+  });
+  if (written.count === 0) throw new G0ConcurrentEditError();
 }
 
 /**
@@ -539,8 +565,10 @@ export async function clearStoredG0(
 export async function rescoreOpportunityG0(
   tenantId: string,
   opportunityId: string,
+  rescoreOptions: { lockTimeoutMs?: number } = {},
 ): Promise<G0Computation | null> {
   return withTenant(tenantId, async (tx) => {
+    if (rescoreOptions.lockTimeoutMs !== undefined) await limitLockWait(tx, rescoreOptions.lockTimeoutMs);
     const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId);
     if (!computation) return null;
     // A rescore is not an edit of the opportunity: keep its `updatedAt` (FO-384 B1).
