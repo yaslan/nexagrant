@@ -106,6 +106,7 @@ export type DbPoolOptions = { max?: number; connectionTimeoutMillis?: number; ap
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   lockPool: PrismaClient | undefined;
+  picBudgetPool: PrismaClient | undefined;
 };
 
 export const prisma: PrismaClient =
@@ -136,6 +137,31 @@ export const LOCK_POOL_OPTIONS: DbPoolOptions = {
 function lockPoolClient(): PrismaClient {
   globalForPrisma.lockPool ??= createDbClient(requireDatabaseUrl(), LOCK_POOL_OPTIONS);
   return globalForPrisma.lockPool;
+}
+
+/**
+ * FO-389 (review B-1): the pool of the shared PIC budget (`src/lib/pic-budget.ts`).
+ * The budget is spent while the profile transaction holds a connection of the application
+ * pool, and it has to commit on its own (a rolled-back save must not hand the question back), so
+ * it cannot ride that transaction. On the application pool it asked for a second connection while
+ * holding the first: ten unsolicited questions at once took all ten and every other query of
+ * every tenant failed after 1 s. Here the spend waits on a pool nothing else uses. The spend is one
+ * statement of a millisecond or two, so two connections carry far more than the app can send.
+ * Its connections show up in `pg_stat_activity` under `application_name = PIC_BUDGET_POOL_NAME`.
+ */
+export const PIC_BUDGET_POOL_MAX = 2;
+export const PIC_BUDGET_QUEUE_MS = 5_000;
+export const PIC_BUDGET_POOL_NAME = 'fonbridge-pic-budget';
+export const PIC_BUDGET_POOL_OPTIONS: DbPoolOptions = {
+  max: PIC_BUDGET_POOL_MAX,
+  connectionTimeoutMillis: PIC_BUDGET_QUEUE_MS,
+  application_name: PIC_BUDGET_POOL_NAME,
+};
+
+/** The client of {@link PIC_BUDGET_POOL_OPTIONS}; created on first use, one per process. */
+export function picBudgetClient(): PrismaClient {
+  globalForPrisma.picBudgetPool ??= createDbClient(requireDatabaseUrl(), PIC_BUDGET_POOL_OPTIONS);
+  return globalForPrisma.picBudgetPool;
 }
 
 declare const tenantScopeBrand: unique symbol;

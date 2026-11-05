@@ -690,6 +690,14 @@ test.describe('NG-27 where a new user stops', () => {
     await expectG0('18 ortak, en iyi konu', best.id, 70.2, true, '17-ag-gecmisi-70-gecti');
     await expectG0('18 ortak, sıradan konu', plain.id, 62.2, false, '17b-ag-gecmisi-62-red');
 
+    // FO-389: this account asks four PIC questions in a row, and a tenant nobody vouched for gets three
+    // an hour. The first three are asked exactly as a new, uninvited account asks them (FO-389 review
+    // Ö-1: the spec used to invite it from the start and stopped proving that path). Before the fourth
+    // an agency invites it (the Pro tenant plays the agency): still on Discover with no plan and no M8,
+    // which is all the rest of this spec is about. The limit itself has its own spec
+    // (profile-pic-unsolicited).
+    expect(await prisma.tenant.findUniqueOrThrow({ where: { id: FRESH }, select: { agencyId: true } })).toEqual({ agencyId: null });
+    await prisma.tenant.update({ where: { id: FRESH }, data: { agencyId: PRO } });
     await confirmCordisPic(page, FRESH_SLUG, FRESH, PIC_RICH, 'G0G1 E2E History rich');
     await expectG0('zengin geçmiş, en iyi konu', best.id, 88, true, '18-zengin-gecmis-88-gecti');
     await expectG0('zengin geçmiş, sıradan konu', plain.id, 80, true, '18b-zengin-gecmis-80-gecti');
