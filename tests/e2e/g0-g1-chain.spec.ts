@@ -719,17 +719,18 @@ test.describe('NG-27 where a new user stops', () => {
     await signInPro(page);
     await saveProfile(page, PRO_SLUG, PRO);
 
-    // ── Every UI-reachable point without a history, on a topic with neither flag: 30 + 15 + 12 + 10 = 67.
+    // ── Every UI-reachable point without a history, on a topic with neither flag. The seats are OPEN, and an OPEN
+    //    seat scores nothing (FO-382), so the research and end-user 12 is gone: 30 + 15 + 10 = 55.
     const plain = await createFromForm(page, PRO_SLUG, PRO, 'NG-27 sıradan konu', PLAIN_TOPIC.identifier);
     await openConsortium(page, PRO_SLUG, plain.id);
     await addSeat(page, plain.id, 'research');
     await addSeat(page, plain.id, 'end_user');
     const plainG0 = await runG0(page, PRO_SLUG, plain.id);
     dump('G0 tıklandı, sıradan konu, koltuklu', plainG0);
-    await shot(page, '15-siradan-konu-67-red');
+    await shot(page, '15-siradan-konu-55-red');
     expect(plainG0.passed).toBe(false);
-    expect(storedScore(plainG0.inputs)).toBe(67);
-    expect((await prisma.opportunity.findUniqueOrThrow({ where: { id: plain.id } })).g0Score).toBe(67);
+    expect(storedScore(plainG0.inputs)).toBe(55);
+    expect((await prisma.opportunity.findUniqueOrThrow({ where: { id: plain.id } })).g0Score).toBe(55);
 
     // ── The same user on a topic the platform has imported no base rate for.
     const noStat = await createFromForm(page, PRO_SLUG, PRO, 'NG-27 oransız konu', NO_STAT_TOPIC.identifier);
@@ -740,8 +741,9 @@ test.describe('NG-27 where a new user stops', () => {
     dump('G0 tıklandı, başarı oranı içe aktarılmamış konu, koltuklu', noStatG0);
     await shot(page, '16-oransiz-konu-red');
     expect(noStatG0.passed).toBe(false);
-    // Only the base-rate rule and the composite stand in the way: 30 + 12 + 10 + 8 = 60.
-    expect(storedScore(noStatG0.inputs)).toBe(60);
+    // Only the base-rate rule and the composite stand in the way. The OPEN seats score nothing (FO-382),
+    // so the research and end-user 12 is gone: 30 + 10 + 8 = 48.
+    expect(storedScore(noStatG0.inputs)).toBe(48);
     expect(noStatG0.banner).toContain('Başarı taban oranı %0; asgari eşik %8');
   });
 });
