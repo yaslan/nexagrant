@@ -86,7 +86,7 @@ test.describe('feature pages behind M5 / M1 — the URL is a door, not just the 
       await page.goto(url);
       await expect(gate(page)).toContainText(messages.ModuleGate.title);
       await expect(gate(page)).toContainText(
-        messages.ModuleGate.reason.MODULE_OFF.replace('{module}', 'Proposal Production Workflows'),
+        messages.ModuleGate.reason.MODULE_OFF.replace('{module}', messages.modules.workflows.name),
       );
       await expect(page.locator('body')).not.toContainText(messages.Approvals.title);
       await page.screenshot({ path: `${SHOTS}/m5-off-${locale}.png`, fullPage: true });
@@ -117,7 +117,7 @@ test.describe('feature pages behind M5 / M1 — the URL is a door, not just the 
       await page.goto(url);
       await expect(gate(page)).toContainText(messages.ModuleGate.title);
       await expect(gate(page)).toContainText(
-        messages.ModuleGate.reason.MODULE_OFF.replace('{module}', 'Partner Intelligence Database'),
+        messages.ModuleGate.reason.MODULE_OFF.replace('{module}', messages.modules['partner-intel'].name),
       );
       await expect(page.locator('body')).not.toContainText('Yeni API Anahtarı Oluştur');
       await page.screenshot({ path: `${SHOTS}/m1-off-${locale}.png`, fullPage: true });
