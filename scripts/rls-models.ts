@@ -61,6 +61,9 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   'UnmatchedOrganization', 'PartnerSearchTopicStat',
   // FO-60 (TASK-MVCH2J271U5VY): the partner-search ingestion flag. See add-platform-setting.sql.
   'PlatformSetting',
+  // FO-389: the daily shared budget of unsolicited PIC lookups. A count per UTC day, no tenant data.
+  // See prisma/migrations/add-pic-lookup-budget.sql.
+  'PicLookupBudget',
 ]);
 
 /**

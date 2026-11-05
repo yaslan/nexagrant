@@ -18,6 +18,7 @@
 // - Süre geçmişi: <LOCK_DIR>.history.jsonl; ETA medyanından hesaplanır.
 import { spawn, spawnSync, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { cleanTree, docsOnly, lockHash, readPass, treeHash, writePass } from './gate-cache.mjs'
@@ -32,6 +33,8 @@ const NOTIFY_MS = 30_000
 const NO_OWNER_STALE_MS = 15_000
 // Geçmiş yoksa tahmin: bir tam gate yaklaşık 25-40 dk (FO-339 ölçümü).
 const DEFAULT_EST_MS = 30 * 60_000
+// FO-388: e2e portu kilit alındıktan sonra seçilir; taban 3400 (gate-isolated.sh ile aynı).
+const E2E_PORT_BASE = Number(process.env.FONBRIDGE_E2E_PORT_BASE || 3400)
 
 const argv = process.argv.slice(2)
 if (argv.length === 0) {
@@ -99,14 +102,42 @@ function clearIfStale() {
     stale = Date.now() - mtimeMs > NO_OWNER_STALE_MS
   }
   if (!stale) return false
+  // FO-388 (3. inceleme): okuma ile taşıma arasında başka bir süreç bayat kilidi temizleyip canlı bir kilit
+  // alabilir; o zaman buradaki rename canlı kilidi taşırdı. Önce taşınır, sonra taşınanın sahibine bakılır:
+  // hâlâ aynı ölü sahipse silinir, değilse geri adlandırılır.
   const graveyard = `${LOCK_DIR}.stale-${process.pid}-${Date.now()}`
   try {
     fs.renameSync(LOCK_DIR, graveyard)
-    fs.rmSync(graveyard, { recursive: true, force: true })
-    console.log(`🧹 Bayat gate kilidi temizlendi (sahip pid ${owner?.pid ?? '?'} artık çalışmıyor).`)
-    return true
   } catch {
     return false
+  }
+  const taken = readOwnerAt(path.join(graveyard, 'owner.json'))
+  let stillStale
+  if (owner) {
+    stillStale = taken !== null && taken.pid === owner.pid && !pidAlive(taken.pid)
+  } else {
+    // Sahipsiz dizin: hâlâ sahipsiz ve eski olmalı (taze bir mkdir ile yazım arasındaki kilit değil).
+    const mtimeMs = fs.statSync(graveyard).mtimeMs
+    stillStale = taken === null && Date.now() - mtimeMs > NO_OWNER_STALE_MS
+  }
+  if (!stillStale) {
+    try {
+      fs.renameSync(graveyard, LOCK_DIR)
+    } catch (err) {
+      console.warn(`⚠ Canlı gate kilidi geri yüklenemedi (${err.code}); kilit dizini ${graveyard} altında kaldı, elle kontrol et.`)
+    }
+    return false
+  }
+  fs.rmSync(graveyard, { recursive: true, force: true })
+  console.log(`🧹 Bayat gate kilidi temizlendi (sahip pid ${owner?.pid ?? '?'} artık çalışmıyor).`)
+  return true
+}
+
+function readOwnerAt(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return null
   }
 }
 
@@ -222,6 +253,57 @@ async function acquire() {
   }
 }
 
+// FO-388 (3. inceleme): bir dinleyici yalnız kendi adresinde görünür (macOS ölçümü: 127.0.0.1, 0.0.0.0,
+// ::1, :: birbirini görmüyor; Next dev `::` dinler). Bu yüzden port dört adreste de denenir ve ancak
+// hepsinde boşsa boş sayılır. Yalnız EADDRINUSE meşgul demektir; IPv6 yoksa (EADDRNOTAVAIL/EAFNOSUPPORT)
+// o adres atlanır.
+const PROBE_HOSTS = ['127.0.0.1', '0.0.0.0', '::1', '::']
+
+function bindFree(port, host) {
+  return new Promise((resolve) => {
+    const srv = net.createServer()
+    srv.once('error', (err) => resolve(err.code !== 'EADDRINUSE'))
+    srv.once('listening', () => srv.close(() => resolve(true)))
+    srv.listen(port, host)
+  })
+}
+
+async function portFree(port) {
+  for (const host of PROBE_HOSTS) {
+    if (!(await bindFree(port, host))) return false
+  }
+  return true
+}
+
+async function firstFreePort(from) {
+  let p = from
+  while (!(await portFree(p))) p += 1
+  return p
+}
+
+// FO-388: kilit alındıktan sonra e2e portu. Otomatik seçimde (FONBRIDGE_E2E_PORT_AUTO=1, gate-isolated.sh)
+// taban portun dolu olduğu, kuyrukta beklerken de değişmiş olabilir: seçim burada, test adımlarından önce
+// yapılır. Elle verilen E2E_PORT değiştirilmez; doluysa hata atılır. Hiçbiri yoksa undefined (eski davranış).
+async function resolveE2ePort() {
+  if (process.env.FONBRIDGE_E2E_PORT_AUTO === '1') {
+    // FO-388 (3. inceleme): gate-isolated.sh kendi ön seçimini E2E_PORT'a yazıp FONBRIDGE_E2E_PORT_PREPICK
+    // ile işaretler; o değer sessizce yok sayılır. İşaretsiz bir E2E_PORT elle verilmiştir: yok sayılır,
+    // ama görünür uyarı basılır (hata değil: git push ve pre-push gate'i kırılmasın).
+    const explicit = process.env.E2E_PORT
+    const port = await firstFreePort(E2E_PORT_BASE)
+    if (explicit && explicit !== process.env.FONBRIDGE_E2E_PORT_PREPICK) {
+      console.warn(`⚠ E2E_PORT=${explicit} elle verilmiş ama FONBRIDGE_E2E_PORT_AUTO=1; yok sayıldı, e2e portu ${port} seçildi.`)
+    }
+    return port
+  }
+  const explicit = process.env.E2E_PORT
+  if (explicit) {
+    if (await portFree(Number(explicit))) return Number(explicit)
+    throw new Error(`E2E_PORT ${explicit} dolu; kilit alındı ama port boş değil, koşu başlatılmadı`)
+  }
+  return undefined
+}
+
 function release() {
   const owner = readOwner()
   if (owner && owner.pid === process.pid) {
@@ -260,10 +342,18 @@ async function main() {
   }
 
   let runStart = Date.now()
+  let e2ePort
   if (!nested) {
     await acquire()
     process.on('exit', release)
     runStart = Date.now()
+    try {
+      e2ePort = await resolveE2ePort()
+    } catch (err) {
+      console.error(`✖ ${err.message}`)
+      process.exit(1)
+    }
+    if (e2ePort !== undefined) console.log(`e2e portu: ${e2ePort} (kilit alındıktan sonra seçildi)`)
   }
 
   // Ağaç ve kilit hash'i kilit alındıktan SONRA alınır: kuyrukta beklerken değişen ağaç bu koşunun değil.
@@ -286,7 +376,7 @@ async function main() {
 
   const child = spawn(argv[0], argv.slice(1), {
     stdio: 'inherit',
-    env: { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '1' },
+    env: { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '1', ...(e2ePort !== undefined ? { E2E_PORT: String(e2ePort) } : {}) },
     shell: process.platform === 'win32',
   })
   for (const sig of ['SIGINT', 'SIGTERM']) {

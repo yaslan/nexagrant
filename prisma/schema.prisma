@@ -523,6 +523,15 @@ model PlatformSetting {
   updatedAt DateTime @updatedAt
 }
 
+// FO-389: the shared daily budget of PIC-ownership questions that accounts with no invitation,
+// pilot or paid plan may spend between them. One row per UTC day. Global (no tenantId): the
+// point is a total that adding accounts cannot raise. See prisma/migrations/add-pic-lookup-budget.sql.
+model PicLookupBudget {
+  day       String   @id // 'YYYY-MM-DD' (UTC)
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
 model Programme {
   id        String @id          // "HE", "DEP", "EUROSTARS", "CETP", "DUT", "ERASMUS", "EIT", "EUREKA", "TUBITAK"
   name      String
