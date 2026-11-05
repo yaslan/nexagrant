@@ -4,8 +4,10 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 // NexaGrant module boundary (NG-1). Every directory under src/modules is one
-// module. A file inside module X may not import the internals of module Y
-// through the `@/modules/Y/...` alias. Module list is read from disk, so a new
+// module. A file inside module X may not import the internals of module Y,
+// either through the `@/modules/Y/...` alias or through a relative path that
+// climbs out of X into Y (`../Y/...`, `../../Y/...`, any depth). Same-module
+// relative imports are not restricted. Module list is read from disk, so a new
 // src/modules/<m> directory is covered without editing this file.
 const moduleNames = readdirSync(new URL("./src/modules", import.meta.url), {
   withFileTypes: true,
@@ -14,25 +16,37 @@ const moduleNames = readdirSync(new URL("./src/modules", import.meta.url), {
   .map((entry) => entry.name)
   .sort();
 
-const moduleBoundaryBlocks = moduleNames.map((own) => ({
-  files: [`src/modules/${own}/**/*.{ts,tsx}`],
-  rules: {
-    "no-restricted-imports": [
-      "error",
-      {
-        patterns: [
-          {
-            group: moduleNames
-              .filter((other) => other !== own)
-              .map((other) => `@/modules/${other}/**`),
-            message:
-              "Modüller arası iç dosya importu yasak (NG-1 sınır kuralı). Başka modülün dosyasını doğrudan import etme; ortak kod src/lib altında olmalı ya da FONBRIDGE PR akışı (K-573059) ile karar verilmeli.",
-          },
-        ],
-      },
-    ],
-  },
-}));
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const moduleBoundaryMessage =
+  "Modüller arası iç dosya importu yasak (NG-1 sınır kuralı). Başka modülün dosyasını doğrudan import etme (alias da göreli yol da); ortak kod src/lib altında olmalı ya da FONBRIDGE PR akışı (K-573059) ile karar verilmeli.";
+
+const moduleBoundaryBlocks = moduleNames.map((own) => {
+  const others = moduleNames.filter((other) => other !== own);
+  return {
+    files: [`src/modules/${own}/**/*.{ts,tsx}`],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: others.map((other) => `@/modules/${other}/**`),
+              message: moduleBoundaryMessage,
+            },
+            {
+              // One or more `../` then the other module's directory name. The
+              // depth is not fixed, so `../m9/x` and `../../m9/x` both match.
+              // `./x` and same-module `../<own>/x` do not match.
+              regex: `^(\\.\\./)+(${others.map(escapeRegex).join("|")})(/|$)`,
+              message: moduleBoundaryMessage,
+            },
+          ],
+        },
+      ],
+    },
+  };
+});
 
 const eslintConfig = defineConfig([
   ...nextVitals,
