@@ -8,6 +8,7 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 
 import { prisma, withTenant } from '../../src/lib/db';
+import { PIC_LOOKUPS_PER_HOUR } from '../../src/lib/pic';
 import { computeG0ForOpportunity, rescoreOpportunityG0 } from '../../src/lib/scoring/g0-compute';
 import { expectHydrated } from './fixtures/hydration';
 import { signInAs } from './fixtures/session';
@@ -24,6 +25,7 @@ import {
   PP_PIC_UNMATCHED,
   PP_TENANT,
   PP_WORKSPACE,
+  addPicProber,
   picAuditRows,
   setupProfilePic,
   storedG0,
@@ -176,6 +178,51 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
     const refusal = feedback(page).getByRole('alert');
     await expect(refusal).toContainText('registered on another account');
     await expect(refusal.getByRole('link', { name: 'info@nexagrant.com' })).toHaveAttribute('href', 'mailto:info@nexagrant.com');
+  });
+
+  // ── FO-386: the same yes-or-no, asked in a loop ──────────────────────────────
+  test('a user asking too often is stopped in both languages, and staff can see it', async ({ page }) => {
+    test.setTimeout(180_000);
+    const prober = await addPicProber();
+    await openProfile(page, prober, `/tr/${PP_OTHER_WORKSPACE}/settings/profile`);
+
+    for (let i = 0; i < PIC_LOOKUPS_PER_HOUR; i++) {
+      await input(page).fill(PP_PIC_MATCHED);
+      await save(page);
+      await expect(feedback(page).getByRole('alert')).toContainText('başka bir hesapta kayıtlı');
+      await input(page).fill('');
+    }
+
+    await input(page).fill(PP_PIC_MATCHED);
+    await save(page);
+    const limited = feedback(page).getByRole('alert');
+    await expect(limited).toContainText('çok fazla PIC denemesi');
+    await expect(limited).toContainText(/\d+ dakika sonra/);
+    await expect(limited).not.toContainText('başka bir hesapta');
+    await expect(input(page)).toBeFocused();
+    expect(await storedPic(PP_OTHER_TENANT)).not.toBe(PP_PIC_MATCHED);
+
+    // Reloaded, so the count is the server's and not the form's.
+    await page.goto(`/en/${PP_OTHER_WORKSPACE}/settings/profile`);
+    await expectHydrated(input(page));
+    await input(page).fill(PP_PIC_MATCHED);
+    await page.getByRole('button', { name: 'Save Profile' }).click();
+    await expect(feedback(page).getByRole('alert')).toContainText('Too many PIC attempts');
+
+    // The raw rows: one per refused question, one for the limit, however often it was hit.
+    const rows = (await picAuditRows(PP_OTHER_TENANT, 'tenant.pic.refused')).filter((r) => r.actorId === prober.id);
+    console.log(`[FO-386] refused rows for the prober: ${rows.length}, last=${JSON.stringify(rows.at(-1))}`);
+    expect(rows.filter((r) => (r.data as { reason?: string }).reason === 'picTaken')).toHaveLength(PIC_LOOKUPS_PER_HOUR);
+    expect(rows.filter((r) => (r.data as { reason?: string }).reason === 'rateLimited')).toHaveLength(1);
+    expect(JSON.stringify(rows)).not.toContain(PP_TENANT);
+
+    // Staff read it on the tenant that asked; the list of real PIC changes is not pushed out by it.
+    await signInAs(page, { id: PP_ADMIN.id, email: PP_ADMIN.email, tenantId: PP_ADMIN.tenantId, role: 'TENANT_OWNER', isPlatformAdmin: true });
+    await page.goto(`/tr/admin/tenants/${PP_OTHER_TENANT}`);
+    const refusals = page.getByTestId('tenant-pic-refusals');
+    await expect(refusals).toContainText(`Sınır aşıldı: ${PP_PIC_MATCHED}`);
+    await expect(refusals).toContainText(`Başka hesapta kayıtlı: ${PP_PIC_MATCHED}`);
+    await expect(page.getByTestId('tenant-pic-history')).not.toContainText(`Başka hesapta kayıtlı`);
   });
 
   // ── K-576942: staff take a disputed PIC off a tenant ─────────────────────────

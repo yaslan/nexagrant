@@ -15,6 +15,7 @@ vi.mock('@/lib/tenant', () => ({
 
 import { prisma, withTenant } from '@/lib/db';
 import { updateTenantProfile, type UpdateProfileInput } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
+import { PIC_LOOKUPS_PER_HOUR } from '@/lib/pic';
 import { TenantPicChangedError, removeTenantPic } from '@/lib/tenant-pic-removal';
 import { requireId } from './helpers/teardown-guard';
 
@@ -25,8 +26,8 @@ describe('updateTenantProfile action', () => {
   let userId: string;
 
   beforeEach(async () => {
-    tenantId = requireId('tenant', suffix());
-    userId = requireId('user', suffix());
+    tenantId = requireId(`tenant-${suffix()}`, 'tenantId');
+    userId = requireId(`user-${suffix()}`, 'userId');
 
     // Create test tenant and user
     await prisma.tenant.create({
@@ -381,6 +382,101 @@ describe('updateTenantProfile action', () => {
       expect(await picAudits()).toHaveLength(0);
     });
 
+    // ── FO-386: the refusal answers yes or no, so it is counted and leaves a trace ──
+    describe('lookup limit and refusal record', () => {
+      const refusals = () =>
+        prisma.auditEvent.findMany({
+          where: { tenantId, type: 'tenant.pic.refused' },
+          orderBy: { createdAt: 'asc' },
+          select: { actorId: true, data: true },
+        });
+      /** Spends the whole allowance on PICs nobody holds and CORDIS does not know. */
+      const spendAllowance = async () => {
+        for (let i = 0; i < PIC_LOOKUPS_PER_HOUR; i++) {
+          const pic = newPic();
+          expect(await updateTenantProfile({ ...base, pic })).toMatchObject({ ok: true, pic: { status: 'unmatched', value: pic } });
+        }
+      };
+
+      it('writes who and which PIC on a refusal, and nothing about the holder', async () => {
+        owner();
+        const pic = await cordisOrg('Real Org');
+        const holder = await otherTenantHolding(pic);
+        await updateTenantProfile({ ...base, pic });
+        expect(await refusals()).toEqual([{ actorId: userId, data: { pic, reason: 'picTaken' } }]);
+        expect(JSON.stringify(await refusals())).not.toContain(holder);
+        // The record is on the asker's tenant: the holder's own log learns nothing either.
+        expect(await prisma.auditEvent.count({ where: { tenantId: holder } })).toBe(0);
+      });
+
+      it('counts every kind of answer, not only the refusal: the next one is refused unasked', async () => {
+        owner();
+        const asked = await cordisOrg('Listed Org');
+        expect(await updateTenantProfile({ ...base, pic: asked })).toMatchObject({ error: 'picConfirmationRequired' });
+        for (let i = 1; i < PIC_LOOKUPS_PER_HOUR; i++) {
+          await updateTenantProfile({ ...base, pic: newPic() });
+        }
+
+        // A PIC someone holds, one nobody holds and one CORDIS lists: one answer, so no oracle left.
+        const held = await cordisOrg('Held Org');
+        await otherTenantHolding(held);
+        const answers = [
+          await updateTenantProfile({ ...base, pic: held }),
+          await updateTenantProfile({ ...base, pic: newPic() }),
+          await updateTenantProfile({ ...base, pic: asked, confirmedPic: asked }),
+        ];
+        for (const answer of answers) {
+          expect(answer).toEqual({ ok: false, error: 'picRateLimited', retryAfterSeconds: expect.any(Number) });
+          expect((answer as { retryAfterSeconds: number }).retryAfterSeconds).toBeGreaterThan(0);
+          expect((answer as { retryAfterSeconds: number }).retryAfterSeconds).toBeLessThanOrEqual(3600);
+        }
+        expect(await prisma.tenant.count({ where: { id: tenantId, pic: asked } })).toBe(0);
+      });
+
+      it('saves nothing on the limit, and records it once however long the loop runs', async () => {
+        owner();
+        await spendAllowance();
+        const before = await storedPic();
+        const capabilities = 'Must not be saved';
+        for (let i = 0; i < 5; i++) {
+          await updateTenantProfile({ ...base, capabilities, pic: newPic() });
+        }
+        expect(await storedPic()).toBe(before);
+        const profile = await prisma.tenantProfile.findUnique({ where: { tenantId } });
+        expect(profile?.capabilities).not.toBe(capabilities);
+        const rows = await refusals();
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toEqual({ actorId: userId, data: { pic: expect.any(String), reason: 'rateLimited' } });
+      });
+
+      it('holds each user to their own count', async () => {
+        owner();
+        await spendAllowance();
+        expect(await updateTenantProfile({ ...base, pic: newPic() })).toMatchObject({ error: 'picRateLimited' });
+        tenantScope.current = { tenantId, userId: `${userId}-colleague`, role: 'TENANT_OWNER' };
+        expect(await updateTenantProfile({ ...base, pic: newPic() })).toMatchObject({ ok: true });
+      });
+
+      it('leaves alone a save that asks nothing: keywords only, the same PIC, or clearing it', async () => {
+        owner();
+        await spendAllowance();
+        const stored = await storedPic();
+        expect(await updateTenantProfile({ ...base, keywords: 'kept' })).toEqual({ ok: true });
+        expect(await updateTenantProfile({ ...base, pic: stored ?? '' })).toEqual({ ok: true });
+        expect(await updateTenantProfile({ ...base, pic: '' })).toEqual({ ok: true, pic: { status: 'cleared' } });
+      });
+
+      it('does not spend the allowance of a member, who gets no answer at all', async () => {
+        tenantScope.current = { tenantId, userId, role: 'MEMBER' };
+        for (let i = 0; i <= PIC_LOOKUPS_PER_HOUR; i++) {
+          expect(await updateTenantProfile({ ...base, pic: newPic() })).toEqual({ ok: false, error: 'forbidden' });
+        }
+        expect(await refusals()).toHaveLength(0);
+        owner();
+        expect(await updateTenantProfile({ ...base, pic: newPic() })).toMatchObject({ ok: true });
+      });
+    });
+
     // ── K-576942: the real owner's way back ───────────────────────────────────
     describe('removeTenantPic', () => {
       const removedAudits = () =>
@@ -446,7 +542,8 @@ describe('updateTenantProfile action', () => {
         for (let round = 1; round <= ROUNDS; round++) {
           const pic = newPic();
           for (const id of claimants) {
-            vi.mocked(requireTenantAction).mockResolvedValueOnce({ tenantId: id, userId, role: 'TENANT_OWNER' } as never);
+            // One user per tenant, as in life: one user claiming 80 times would meet the FO-386 limit.
+            vi.mocked(requireTenantAction).mockResolvedValueOnce({ tenantId: id, userId: `${userId}-${id}`, role: 'TENANT_OWNER' } as never);
           }
           const results = await Promise.all(claimants.map(() => updateTenantProfile({ ...base, pic })));
           expect({ round, holders: await prisma.tenant.count({ where: { pic } }) }).toEqual({ round, holders: 1 });

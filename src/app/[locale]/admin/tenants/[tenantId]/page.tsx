@@ -49,6 +49,13 @@ export default async function AdminTenantDetailPage({
     data: { from?: string | null; to?: string | null; cordisName?: string | null; note?: string } | null;
   }
 
+  interface PicRefusalRow {
+    id: string;
+    actorId: string | null;
+    createdAt: Date;
+    data: { pic?: string; reason?: string } | null;
+  }
+
   const tenant = (await prisma.tenant.findUnique({
     where: { id: tenantId },
     select: { id: true, name: true, slug: true, country: true, orgType: true, pic: true },
@@ -58,10 +65,11 @@ export default async function AdminTenantDetailPage({
   let subscription: SubscriptionRow | null = null;
   let history: AuditRow[] = [];
   let picHistory: PicAuditRow[] = [];
+  let picRefusals: PicRefusalRow[] = [];
   let picOrgName: string | null = null;
   let loadError = false;
   try {
-    [subscription, history, picHistory, picOrgName] = await withTenant(tenantId, async (tx) => [
+    [subscription, history, picHistory, picRefusals, picOrgName] = await withTenant(tenantId, async (tx) => [
       (await tx.subscription.findUnique({
         where: { tenantId },
         select: { planId: true, status: true, provider: true },
@@ -73,11 +81,19 @@ export default async function AdminTenantDetailPage({
         select: { id: true, type: true, actorId: true, createdAt: true, data: true },
       })) as AuditRow[],
       (await tx.auditEvent.findMany({
-        where: { tenantId, type: { startsWith: 'tenant.pic.' } },
+        // Not `startsWith`: 20 refused questions, an hour's work for the tenant, would push the
+        // changes staff need in a dispute off this list.
+        where: { tenantId, type: { in: ['tenant.pic.updated', 'tenant.pic.removed'] } },
         orderBy: { createdAt: 'desc' },
         take: 20,
         select: { id: true, type: true, actorId: true, createdAt: true, data: true },
       })) as PicAuditRow[],
+      (await tx.auditEvent.findMany({
+        where: { tenantId, type: 'tenant.pic.refused' },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, actorId: true, createdAt: true, data: true },
+      })) as PicRefusalRow[],
       tenant.pic
         ? ((await tx.cordisOrganization.findUnique({
             where: { organisationId: tenant.pic },
@@ -175,6 +191,27 @@ export default async function AdminTenantDetailPage({
             </li>
           ))}
         </ul>
+
+        {picRefusals.length > 0 && (
+          <>
+            <h3 className="text-sm font-semibold text-ink pt-2">{t('pic.refusals')}</h3>
+            <ul className="divide-y divide-border border border-border rounded-lg" data-testid="tenant-pic-refusals">
+              {picRefusals.map((r) => (
+                <li key={r.id} className="p-3 text-sm space-y-0.5">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className="font-semibold text-ink break-words font-mono">
+                      {r.data?.reason === 'rateLimited'
+                        ? t('pic.eventRateLimited', { pic: r.data?.pic ?? '-' })
+                        : t('pic.eventRefused', { pic: r.data?.pic ?? '-' })}
+                    </span>
+                    <span className="text-xs text-muted">{dateFmt.format(new Date(r.createdAt))}</span>
+                  </div>
+                  <p className="text-xs text-muted break-words">{t('internalPlan.by', { actor: actorLabel(r.actorId) })}</p>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
 
       <section className="bg-surface border rounded-xl p-4 sm:p-5 space-y-3">
