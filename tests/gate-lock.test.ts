@@ -41,7 +41,9 @@ function waitFor(cond: () => boolean, ms = 15_000): Promise<void> {
 // scripts/gate-lock.mjs'i gerçek süreç olarak koşar; kilit dizini geçici bir yola yönlendirilir.
 const script = path.join(import.meta.dirname, '..', 'scripts', 'gate-lock.mjs');
 // Bu test bir gate'in içinde koşabilir; miras gelen HELD=1 kilidi atlatır ve testi boşa çıkarır.
-const baseEnv = { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '' };
+// FO-388: gate-isolated.sh FONBRIDGE_E2E_PORT_AUTO=1 dışa aktarır; miras gelirse elle verilen
+// E2E_PORT yok sayılır ve "dolu port" testi hata üretmez. Her testin kendi bayrağı açıkça verilir.
+const baseEnv = { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '', FONBRIDGE_E2E_PORT_AUTO: '' };
 
 describe('gate-lock (FO-55)', () => {
   let root: string;
