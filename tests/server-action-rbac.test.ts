@@ -119,6 +119,8 @@ const ACTIONS: [string, Action, () => Promise<unknown>][] = [
   ['consortium.addSeat', 'manage_workspaces', () => consortium.addSeat('opp-1', 'coordinator')],
   ['consortium.findCandidates', 'manage_workspaces', () => consortium.findCandidates('seat-1')],
   ['consortium.assignSeat', 'manage_workspaces', () => consortium.assignSeat('seat-1', 'org-1')],
+  ['consortium.confirmSeat', 'manage_approvals', () => consortium.confirmSeat('seat-1', 'opp-1', 'org-1')],
+  ['m8.confirmSeatAssignment', 'manage_approvals', () => m8.confirmSeatAssignment('seat-1', 'opp-1')],
   ['m8.computeSeatCandidates', 'manage_workspaces', () => m8.computeSeatCandidates('opp-1', 'seat-1')],
   ['m8.inviteCandidateToSeat', 'manage_workspaces', () => m8.inviteCandidateToSeat('seat-1', 'org-1', 'opp-1')],
   // evidence
@@ -204,8 +206,8 @@ beforeEach(() => {
 });
 
 describe('every mapped write action follows rbac.ts for all six roles', () => {
-  test('the table covers all 58 mapped actions (Y-3 appendix A minus the portal and two reads, plus 8 the inventory mis-marked, plus updateRelationship)', () => {
-    expect(ACTIONS).toHaveLength(58);
+  test('the table covers all 60 mapped actions (Y-3 appendix A minus the portal and two reads, plus 8 the inventory mis-marked, plus updateRelationship, plus the 2 seat confirmations)', () => {
+    expect(ACTIONS).toHaveLength(60);
   });
 
   for (const [name, permission, call] of ACTIONS) {
