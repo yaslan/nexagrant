@@ -7,17 +7,17 @@ import { signInAs } from './fixtures/session';
 
 /**
  * NG-27: one opportunity, from the "Yeni Fırsat" form through G0 to G1, by real clicks.
+ * NG-28: the seat confirmation is now a click as well, with its refusals.
  *
- * The opportunity, the profile keywords, the seats, the candidates, the invitations and both gate
- * decisions come from the browser. What the product offers no screen for comes from this file, and
- * each such write is tagged FIXTURE below so the report can list them:
+ * The opportunity, the profile keywords, the seats, the candidates, the invitations, the seat
+ * confirmations and both gate decisions come from the browser. What the product offers no screen
+ * for comes from this file, and each such write is tagged FIXTURE below so the report can list them:
  *
  *   1. The Pro subscription: a new tenant is on Discover, which has no M8. Payment is out of scope.
  *   2. ModuleState M5 + M8 on the Pro tenant (the fresh-tenant test turns M5 on by the real switch).
  *   3. Topic and its call: the catalogue comes from the platform's import, no tenant writes it.
  *   4. TopicStat: only the platform-admin xlsx import writes it.
  *   5. CordisOrganization + CordisPartnerProfile: the CORDIS import, the only source of candidates.
- *   6. ConsortiumSeat INVITED → CONFIRMED: `confirmSeatAssignment` exists, no screen calls it.
  *
  * The tests that pin the dead ends assert what happens today. They are not skipped or marked
  * expected-to-fail; when a fix lands they go red and have to be rewritten with it.
@@ -30,6 +30,9 @@ const PRO_WORKSPACE = 'g0g1-chain-pro-workspace';
 const PRO_SLUG = 'g0g1-chain-pro';
 const PRO_USER = 'g0g1-chain-pro-user';
 const PRO_EMAIL = 'g0g1-chain-pro@fabrika.test';
+/** A member of the Pro tenant: `manage_approvals` is not among a MEMBER's permissions. */
+const PRO_MEMBER = 'g0g1-chain-pro-member';
+const PRO_MEMBER_EMAIL = 'g0g1-chain-pro-member@fabrika.test';
 
 const FRESH = 'g0g1-chain-fresh-tenant';
 const FRESH_WORKSPACE = 'g0g1-chain-fresh-workspace';
@@ -51,7 +54,7 @@ const NO_STAT_TOPIC = { id: 'g0g1-chain-topic-nostat', identifier: 'HORIZON-G0G1
 
 const PICS = ['G0G1E2E-PIC-1', 'G0G1E2E-PIC-2', 'G0G1E2E-PIC-3', 'G0G1E2E-PIC-4', 'G0G1E2E-PIC-5'];
 
-const SHOTS = shotsDir('NG-27-screenshots');
+const SHOTS = shotsDir('NG-28-screenshots');
 
 /** Raw database output, one line per step, so the run log is the evidence. */
 function dump(step: string, value: unknown) {
@@ -74,7 +77,7 @@ async function rollback() {
   await prisma.subscription.deleteMany({ where: { tenantId: tenants } });
   await prisma.membership.deleteMany({ where: { tenantId: tenants } });
   await prisma.moduleState.deleteMany({ where: { tenantId: tenants } });
-  await prisma.user.deleteMany({ where: { id: { in: [PRO_USER, FRESH_USER] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [PRO_USER, PRO_MEMBER, FRESH_USER] } } });
   await prisma.workspace.deleteMany({ where: { tenantId: tenants } });
   await prisma.tenant.deleteMany({ where: { id: tenants } });
   await prisma.topicStat.deleteMany({ where: { source: STAT_SOURCE } });
@@ -97,6 +100,8 @@ async function seed() {
 
   await seedIdentity(FRESH, FRESH_WORKSPACE, FRESH_SLUG, FRESH_USER, FRESH_EMAIL);
   await seedIdentity(PRO, PRO_WORKSPACE, PRO_SLUG, PRO_USER, PRO_EMAIL);
+  await prisma.user.create({ data: { id: PRO_MEMBER, email: PRO_MEMBER_EMAIL, name: 'member', locale: 'tr' } });
+  await prisma.membership.create({ data: { userId: PRO_MEMBER, tenantId: PRO, role: 'MEMBER', workspaceIds: [PRO_WORKSPACE] } });
 
   // FIXTURE 1 and 2.
   await prisma.subscription.create({ data: { tenantId: PRO, planId: 'pro', status: 'ACTIVE' } });
@@ -236,7 +241,7 @@ async function runG0(page: Page, slug: string, id: string) {
   return { ...after[after.length - 1]!, banner };
 }
 
-const CONSORTIUM_ROLES = { research: 'Araştırma Ortağı', end_user: 'Son Kullanıcı' } as const;
+const CONSORTIUM_ROLES = { research: 'Araştırma Ortağı', end_user: 'Son Kullanıcı', industry: 'Sanayi Ortağı' } as const;
 
 async function openConsortium(page: Page, slug: string, id: string) {
   await page.goto(`/tr/${slug}/pipeline/${id}/consortium`);
@@ -255,10 +260,18 @@ async function addSeat(page: Page, id: string, roleKey: keyof typeof CONSORTIUM_
   return seat;
 }
 
-async function findAndInvite(page: Page, seatId: string, roleKey: keyof typeof CONSORTIUM_ROLES) {
+async function findAndInvite(page: Page, seatId: string, roleKey: keyof typeof CONSORTIUM_ROLES, organizationId?: string) {
   const card = page.getByTestId(`m8-builder-seat-${roleKey}`);
   await card.getByRole('button', { name: /Aday Bul/ }).click();
-  const invite = card.getByRole('button', { name: 'Davet Et' }).first();
+  // The list names an organisation by its PIC until the page is reloaded.
+  const invite = organizationId
+    ? card
+        .locator('div')
+        .filter({ hasText: organizationId })
+        .filter({ has: page.getByRole('button', { name: 'Davet Et' }) })
+        .last()
+        .getByRole('button', { name: 'Davet Et' })
+    : card.getByRole('button', { name: 'Davet Et' }).first();
   await expect(invite).toBeVisible({ timeout: 60_000 });
   await invite.click();
   await expect
@@ -272,6 +285,21 @@ async function findAndInvite(page: Page, seatId: string, roleKey: keyof typeof C
   }));
 }
 
+const seatRow = (id: string) =>
+  prisma.consortiumSeat.findUniqueOrThrow({ where: { id }, select: { roleKey: true, status: true, organizationId: true } });
+
+/** The onay düğmesi: the screen may say ONAYLANDI only after the server wrote it. */
+async function confirmByClick(page: Page, seatId: string, roleKey: keyof typeof CONSORTIUM_ROLES) {
+  const card = page.getByTestId(`m8-builder-seat-${roleKey}`);
+  await expect(card.getByText('ONAYLANDI')).toHaveCount(0);
+  await card.getByTestId('m8-builder-seat-confirm').click();
+  await expect(card.getByText('ONAYLANDI')).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByTestId('m8-builder-seat-confirm')).toHaveCount(0);
+  const row = await seatRow(seatId);
+  dump(`koltuk düğmeyle onaylandı ${roleKey}`, row);
+  expect(row.status).toBe('CONFIRMED');
+}
+
 test.describe.configure({ mode: 'serial' });
 test.use({ viewport: { width: 1440, height: 2400 } });
 
@@ -282,7 +310,7 @@ test.afterAll(async () => {
 });
 
 test.describe('NG-27 the chain on one opportunity', () => {
-  test('form → G0 by the detail button → G1, with the one write the product has no screen for', async ({ page }) => {
+  test('form → G0 by the detail button → seat confirmation by its button → G1', async ({ page }) => {
     test.setTimeout(300_000);
     await signInPro(page);
 
@@ -316,8 +344,12 @@ test.describe('NG-27 the chain on one opportunity', () => {
     await expect(page.getByTestId('m8-builder-seat-research')).toBeVisible({ timeout: 30_000 });
     await shot(page, '04-koltuklar-davet-edildi');
 
-    // ── The dead end: nothing on this page moves an invited seat to CONFIRMED.
-    await expect(page.locator('main').getByRole('button', { name: /onayla|teyit|confirm/i })).toHaveCount(0);
+    // ── The owner is offered the confirmation on both invited seats.
+    for (const roleKey of ['research', 'end_user'] as const) {
+      await expect(page.getByTestId(`m8-builder-seat-${roleKey}`).getByTestId('m8-builder-seat-confirm')).toHaveText(
+        'Kurum katılımını teyit etti',
+      );
+    }
 
     const candidates = await prisma.seatCandidate.findMany({
       where: { seatId: { in: [research.id, endUser.id] } },
@@ -355,12 +387,13 @@ test.describe('NG-27 the chain on one opportunity', () => {
     expect(refusedG1.passed).toBe(false);
     expect((refusedG1.inputs as { unfilledCriticalRoles?: string[] }).unfilledCriticalRoles?.sort()).toEqual(['end_user', 'research']);
 
-    // ── 7. FIXTURE 6: the column write `confirmSeatAssignment` would make. Nothing else is touched;
-    //    the organisation and the backups on these seats are the ones the clicks above put there.
-    for (const id of [research.id, endUser.id]) {
-      await prisma.consortiumSeat.update({ where: { id }, data: { status: 'CONFIRMED' } });
-    }
-    dump('FİKSTÜR: koltuklar CONFIRMED yapıldı', await prisma.consortiumSeat.findMany({
+    // ── 7. The seats' move to CONFIRMED, by the button on the consortium page. Nothing is written
+    //    from this file: the status comes from `confirmSeatAssignment`.
+    await openConsortium(page, PRO_SLUG, opp.id);
+    await confirmByClick(page, research.id, 'research');
+    await confirmByClick(page, endUser.id, 'end_user');
+    await shot(page, '06b-koltuklar-dugmeyle-onaylandi');
+    dump('koltuklar düğmeyle onaylandı', await prisma.consortiumSeat.findMany({
       where: { opportunityId: opp.id },
       select: { roleKey: true, status: true, organizationId: true, required: true },
       orderBy: { roleKey: 'asc' },
@@ -398,6 +431,108 @@ test.describe('NG-27 the chain on one opportunity', () => {
       timeout: 30_000,
     });
     await shot(page, '08-pano-g1-sutunu');
+  });
+});
+
+test.describe('NG-28 what the seat confirmation refuses', () => {
+  test('a same-call conflict, a seat that changed behind the screen, and a role without the permission', async ({ browser }) => {
+    test.setTimeout(300_000);
+    const context = await browser.newContext({ viewport: { width: 1440, height: 2400 } });
+    const page = await context.newPage();
+    await signInAs(page, { id: PRO_USER, email: PRO_EMAIL, role: 'TENANT_OWNER', tenantId: PRO });
+
+    // Confirmed on the chain's opportunity, an active one on the same call but another topic.
+    const chain = await prisma.opportunity.findFirstOrThrow({ where: { tenantId: PRO, title: 'NG-27 zincir fırsatı' }, select: { id: true } });
+    const confirmedElsewhere = await prisma.consortiumSeat.findFirstOrThrow({
+      where: { opportunityId: chain.id, roleKey: 'research', status: 'CONFIRMED' },
+      select: { organizationId: true },
+    });
+    const conflictOrg = confirmedElsewhere.organizationId!;
+
+    const opp = await createFromForm(page, PRO_SLUG, PRO, 'NG-28 onay sınırları', PLAIN_TOPIC.identifier);
+    await openConsortium(page, PRO_SLUG, opp.id);
+    const research = await addSeat(page, opp.id, 'research');
+    const endUser = await addSeat(page, opp.id, 'end_user');
+    const industry = await addSeat(page, opp.id, 'industry');
+    await findAndInvite(page, research.id, 'research', conflictOrg);
+    await findAndInvite(page, endUser.id, 'end_user');
+    await findAndInvite(page, industry.id, 'industry');
+    await page.reload();
+    await expectHydrated(page.getByTestId('m8-builder-seat-research').getByTestId('m8-builder-seat-confirm'));
+
+    const alert = page.locator('main').getByRole('alert');
+
+    // ── Conflict, in Turkish: a sentence, no raw English, no other opportunity's name.
+    await page.getByTestId('m8-builder-seat-research').getByTestId('m8-builder-seat-confirm').click();
+    await expect(alert).toContainText('aynı çağrıda başka bir etkin fırsatta', { timeout: 30_000 });
+    console.log(`[NG-28 EKRAN] çakışma: ${await alert.innerText()}`);
+    await expect(alert).not.toContainText('NG-27');
+    await expect(alert).not.toContainText('Conflict');
+    await expect(page.getByTestId('m8-builder-seat-research').getByText('ONAYLANDI')).toHaveCount(0);
+    await shot(page, '20-cakisma-tr');
+    dump('çakışma sonrası koltuk', await seatRow(research.id));
+    expect(await seatRow(research.id)).toEqual({ roleKey: 'research', status: 'INVITED', organizationId: conflictOrg });
+
+    // ── The same refusal in English.
+    await page.goto(`/en/${PRO_SLUG}/pipeline/${opp.id}/consortium`);
+    const enConfirm = page.getByTestId('m8-builder-seat-research').getByTestId('m8-builder-seat-confirm');
+    await expectHydrated(enConfirm);
+    await expect(enConfirm).toHaveText('Organisation confirmed participation');
+    await enConfirm.click();
+    await expect(alert).toContainText('another active opportunity on the same call', { timeout: 30_000 });
+    console.log(`[NG-28 EKRAN] çakışma EN: ${await alert.innerText()}`);
+    await expect(alert).not.toContainText('NG-27');
+    await shot(page, '21-cakisma-en');
+    expect((await seatRow(research.id)).status).toBe('INVITED');
+
+    // ── The seat changes after the page rendered: the write matches 0 rows, and that is no success.
+    await page.goto(`/tr/${PRO_SLUG}/pipeline/${opp.id}/consortium`);
+    const stale = page.getByTestId('m8-builder-seat-end_user').getByTestId('m8-builder-seat-confirm');
+    await expectHydrated(stale);
+    // Not a fixture of the chain: another session's change, staged between the render and the click.
+    await prisma.consortiumSeat.update({ where: { id: endUser.id }, data: { status: 'DECLINED' } });
+    await stale.click();
+    await expect(alert).toContainText('Bu koltuğun durumu değişti', { timeout: 30_000 });
+    console.log(`[NG-28 EKRAN] 0 satır: ${await alert.innerText()}`);
+    await expect(page.getByTestId('m8-builder-seat-end_user').getByText('ONAYLANDI')).toHaveCount(0);
+    await shot(page, '22-koltuk-degisti');
+    dump('0 satır sonrası koltuk', await seatRow(endUser.id));
+    expect((await seatRow(endUser.id)).status).toBe('DECLINED');
+
+    // ── The same seat re-invited to someone else: the button named the organisation on screen.
+    await prisma.consortiumSeat.update({ where: { id: endUser.id }, data: { status: 'INVITED', organizationId: 'G0G1E2E-PIC-3' } });
+    await page.reload();
+    await expectHydrated(stale);
+    await prisma.consortiumSeat.update({ where: { id: endUser.id }, data: { organizationId: 'G0G1E2E-PIC-5' } });
+    await stale.click();
+    await expect(alert).toContainText('Bu koltuğun durumu değişti', { timeout: 30_000 });
+    dump('başka kuruma yeniden davet sonrası koltuk', await seatRow(endUser.id));
+    expect(await seatRow(endUser.id)).toEqual({ roleKey: 'end_user', status: 'INVITED', organizationId: 'G0G1E2E-PIC-5' });
+
+    // ── A role without the permission on a page rendered for the owner: this click is the direct
+    //    call. Only the session changes; the server has to say no by itself.
+    await page.reload();
+    const held = page.getByTestId('m8-builder-seat-industry').getByTestId('m8-builder-seat-confirm');
+    await expectHydrated(held);
+    await context.clearCookies();
+    await signInAs(page, { id: PRO_MEMBER, email: PRO_MEMBER_EMAIL, role: 'MEMBER', tenantId: PRO });
+    const sent = page.waitForRequest((r) => r.method() === 'POST' && r.headers()['next-action'] !== undefined);
+    const answered = page.waitForResponse((r) => r.request().method() === 'POST' && r.request().headers()['next-action'] !== undefined);
+    await held.click();
+    await sent;
+    console.log(`[NG-28 HTTP] MEMBER eylem çağrısı: ${(await answered).status()}`);
+    await expect(alert).toContainText('Rolünüz bu işlem için yetkili değil', { timeout: 30_000 });
+    await shot(page, '23-yetkisiz-dogrudan-cagri');
+    dump('MEMBER doğrudan çağrı sonrası koltuk', await seatRow(industry.id));
+    expect((await seatRow(industry.id)).status).toBe('INVITED');
+
+    // ── The same member, on a fresh render: no button at all, the seat's state still shown.
+    await page.goto(`/tr/${PRO_SLUG}/pipeline/${opp.id}/consortium`);
+    await expect(page.getByTestId('m8-builder-seat-industry').getByText('DAVET EDİLDİ')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('m8-builder-seat-confirm')).toHaveCount(0);
+    await shot(page, '24-member-dugme-yok');
+
+    await context.close();
   });
 });
 

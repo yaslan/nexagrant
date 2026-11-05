@@ -2,7 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { addSeat, findCandidates, assignSeat, getConflicts } from './actions';
+import { addSeat, findCandidates, assignSeat, confirmSeat, getConflicts } from './actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import type { ScoringBreakdown } from '@/lib/scoring/consortium';
 import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
@@ -51,6 +51,8 @@ interface Props {
   seats: ConsortiumSeat[];
   candidates: SeatCandidate[];
   orgMap: Record<string, OrgInfo>;
+  /** The viewer's role may confirm seats, decided on the server. The action checks it again. */
+  canConfirm?: boolean;
 }
 
 // Keys only — the labels used to be hardcoded English, so a Turkish page showed
@@ -83,7 +85,7 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
   dissemination: 'role.dissemination',
 };
 
-export default function ConsortiumManager({ opportunityId, seats: initSeats, candidates: initCandidates, orgMap }: Props) {
+export default function ConsortiumManager({ opportunityId, seats: initSeats, candidates: initCandidates, orgMap, canConfirm = false }: Props) {
   const t = useTranslations('Consortium');
   const format = useFormatter();
   const [seats, setSeats] = useState(initSeats);
@@ -178,6 +180,27 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
     });
   };
 
+  const handleConfirm = (seatId: string, orgId: string) => {
+    setActionError(null);
+    startTransition(async () => {
+      let answer: Awaited<ReturnType<typeof confirmSeat>>;
+      try {
+        answer = await confirmSeat(seatId, opportunityId, orgId);
+      } catch (err) {
+        refuse(err);
+        return;
+      }
+      // Only the server's ok turns the seat CONFIRMED on screen.
+      if (!answer.ok) {
+        setActionError(t(answer.code));
+        return;
+      }
+      setSeats(prev => prev.map(s => (s.id === seatId ? { ...s, status: 'CONFIRMED' } : s)));
+      const c = await getConflicts(opportunityId);
+      setConflicts(c);
+    });
+  };
+
   return (
     <div>
       {actionError && (
@@ -224,7 +247,10 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {org ? (
+                  {seat.organizationId && !org ? (
+                    // Invited on this render: the map arrives with the next page load.
+                    <div className="text-xs font-semibold text-ink">{seat.organizationId}</div>
+                  ) : org ? (
                     <div className="text-xs text-ink-2">
                       <span className="font-semibold text-ink">{org.shortName || org.name}</span>
                       <span className="text-muted ml-2">{org.country}</span>
@@ -237,6 +263,16 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                       className="text-xs bg-accent text-white px-3.5 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50 font-semibold shadow-2xs transition"
                     >
                       {isPending && isExpanded ? `⏳ ${t('computing')}` : `🔍 ${t('findCandidates')}`}
+                    </button>
+                  )}
+                  {canConfirm && seat.status === 'INVITED' && seat.organizationId && (
+                    <button
+                      data-testid="m8-builder-seat-confirm"
+                      onClick={() => handleConfirm(seat.id, seat.organizationId as string)}
+                      disabled={isPending}
+                      className="text-xs bg-ok text-white font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50 transition shadow-2xs"
+                    >
+                      {t('confirmParticipation')}
                     </button>
                   )}
                 </div>

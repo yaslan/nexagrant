@@ -8,6 +8,14 @@ import { checkModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import { inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
+import { confirmSeatAssignment } from '@/modules/m8/server/actions';
+import {
+  SEAT_CONFIRM_CONFLICT_CODE,
+  SEAT_NOT_CONFIRMABLE_CODE,
+  SeatConfirmConflictError,
+  SeatNotConfirmableError,
+  type SeatConfirmErrorCode,
+} from '@/modules/m8/server/errors';
 
 /**
  * M8 consortium seats.
@@ -21,6 +29,27 @@ import { inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
  */
 
 const PIPELINE_PATH = '/[locale]/(app)/[workspace]/pipeline';
+
+export type ConfirmSeatResult = { ok: true } | { ok: false; code: SeatConfirmErrorCode };
+
+/**
+ * The confirmation button: "the organisation confirmed its participation".
+ *
+ * The role, conflict and seat rules are `confirmSeatAssignment`'s; nothing is decided here. Its two
+ * refusals the user can act on become codes, because Next hides a thrown message in production. A
+ * role or pilot refusal leaves as it came, with the digest the screen reads.
+ */
+export async function confirmSeat(seatId: string, opportunityId: string, organizationId: string): Promise<ConfirmSeatResult> {
+  try {
+    await confirmSeatAssignment(seatId, opportunityId, organizationId);
+  } catch (err) {
+    if (err instanceof SeatConfirmConflictError) return { ok: false, code: SEAT_CONFIRM_CONFLICT_CODE };
+    if (err instanceof SeatNotConfirmableError) return { ok: false, code: SEAT_NOT_CONFIRMABLE_CODE };
+    throw err;
+  }
+  revalidatePath(PIPELINE_PATH, 'page');
+  return { ok: true };
+}
 
 export async function addSeat(opportunityId: string, roleKey: string, required: boolean = true) {
   const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });

@@ -1,5 +1,6 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
+import { canConfirmSeat } from '@/modules/m8/server/seat-transitions';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
@@ -64,7 +65,7 @@ export default async function ConsortiumPage({
   const { id, locale, workspace } = await params;
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId, role } = await requireTenantPage(locale);
 
   const isTr = locale === 'tr';
 
@@ -186,6 +187,7 @@ export default async function ConsortiumPage({
       </div>
 
       <ConsortiumManager
+        canConfirm={canConfirmSeat(role)}
         opportunityId={id}
         seats={seats}
         candidates={candidates}
