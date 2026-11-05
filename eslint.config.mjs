@@ -23,6 +23,18 @@ const moduleBoundaryMessage =
 
 const moduleBoundaryBlocks = moduleNames.map((own) => {
   const others = moduleNames.filter((other) => other !== own);
+  const otherAlt = others.map(escapeRegex).join("|");
+  // Relative path that climbs out of this module into another one:
+  // `../m9/x`, `../../m9/x`, `./../m9/x`, `../../modules/m9/x` all match. The
+  // depth is not fixed and the optional `modules/` segment is allowed. Same
+  // module (`../<own>/x`, `./x`) and names such as `m90` do not match.
+  const relativeIntoOther = `^(?:\\.{1,2}/)*\\.\\./(?:modules/)?(${otherAlt})(/|$)`;
+  // Dynamic import() is an ImportExpression, which no-restricted-imports does
+  // not see, so it is matched with no-restricted-syntax on the literal source.
+  // The regex is the union of the two forms above. Slashes are escaped for the
+  // esquery /regex/ literal.
+  const dynamicSource = `^(?:@/modules/(?:${otherAlt})(?:/|$)|(?:\\.{1,2}/)*\\.\\./(?:modules/)?(?:${otherAlt})(?:/|$))`;
+  const dynamicSelector = `ImportExpression > Literal[value=/${dynamicSource.replace(/\//g, "\\/")}/]`;
   return {
     files: [`src/modules/${own}/**/*.{ts,tsx}`],
     rules: {
@@ -31,17 +43,25 @@ const moduleBoundaryBlocks = moduleNames.map((own) => {
         {
           patterns: [
             {
-              group: others.map((other) => `@/modules/${other}/**`),
+              // Bare `@/modules/m9` (module entry) and `@/modules/m9/...`.
+              group: others.flatMap((other) => [
+                `@/modules/${other}`,
+                `@/modules/${other}/**`,
+              ]),
               message: moduleBoundaryMessage,
             },
             {
-              // One or more `../` then the other module's directory name. The
-              // depth is not fixed, so `../m9/x` and `../../m9/x` both match.
-              // `./x` and same-module `../<own>/x` do not match.
-              regex: `^(\\.\\./)+(${others.map(escapeRegex).join("|")})(/|$)`,
+              regex: relativeIntoOther,
               message: moduleBoundaryMessage,
             },
           ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: dynamicSelector,
+          message: moduleBoundaryMessage,
         },
       ],
     },
