@@ -1,13 +1,13 @@
 'use server';
 
 import { withTenant } from '@/lib/db';
-import { requireTenantAction } from '@/lib/tenant';
+import { ForbiddenRoleError, requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
 import { checkModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
-import { inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
+import { CONFIRM_SEAT_PERMISSION, canConfirmSeat, inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
 import { confirmSeatAssignment } from '@/modules/m8/server/actions';
 import {
   SEAT_CONFIRM_CONFLICT_CODE,
@@ -35,11 +35,14 @@ export type ConfirmSeatResult = { ok: true } | { ok: false; code: SeatConfirmErr
 /**
  * The confirmation button: "the organisation confirmed its participation".
  *
- * The role, conflict and seat rules are `confirmSeatAssignment`'s; nothing is decided here. Its two
+ * The conflict and seat rules are `confirmSeatAssignment`'s; nothing is decided here. Its two
  * refusals the user can act on become codes, because Next hides a thrown message in production. A
- * role or pilot refusal leaves as it came, with the digest the screen reads.
+ * role or pilot refusal leaves as it came, with the digest the screen reads. The role line asks the
+ * same `canConfirmSeat`: the RBAC guard requires to see it in the file that exports the action.
  */
 export async function confirmSeat(seatId: string, opportunityId: string, organizationId: string): Promise<ConfirmSeatResult> {
+  const { role } = await requireTenantAction();
+  if (!canConfirmSeat(role)) throw new ForbiddenRoleError(CONFIRM_SEAT_PERMISSION);
   try {
     await confirmSeatAssignment(seatId, opportunityId, organizationId);
   } catch (err) {

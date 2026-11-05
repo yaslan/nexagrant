@@ -327,11 +327,11 @@ describe('confirmSeatAssignment on the topic reference a user-made opportunity h
 describe('consortium page confirmation button (confirmSeat)', () => {
   /** Runs `body` with both opportunities holding what the board form writes: the portal identifier. */
   async function onIdentifier(body: () => Promise<void>, ids: string[] = [a.opp, a.sibling]) {
-    await admin!.opportunity.updateMany({ where: { id: { in: ids } }, data: { topicId: `${RUN}-T1` } });
+    await admin!.opportunity.updateMany({ where: { id: { in: presentIds(ids) } }, data: { topicId: `${RUN}-T1` } });
     try {
       await body();
     } finally {
-      await admin!.opportunity.updateMany({ where: { id: { in: ids } }, data: { topicId } });
+      await admin!.opportunity.updateMany({ where: { id: { in: presentIds(ids) } }, data: { topicId } });
     }
   }
 
