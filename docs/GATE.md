@@ -98,3 +98,16 @@ Bilinen açık (e2e portu, FO-388 ile düzeltildi): Eskiden `gate-isolated` e2e 
 Konteyner portu (`GATE_PG_PORT`) aynı sınıf hatadan etkilenmez: konteyner `docker run -d` ile portu hemen bağlar ve kilit beklerken de tutar; ön kontrol bu portu dolu görür (bash ile ölçüldü, FO-388). İki başlatma aynı boş portu aynı anda seçerse ikincisi `Bind for 127.0.0.1:<port> failed: port is already allocated` ile çıkış 125 verir; bu açık bir hatadır, sessiz değildir. Yeniden denemeye gerek yok, yeniden çalıştır.
 
 Hâlâ geçerli: kilidi almayan bir komutu `gate-isolated.sh <komut>` ile verirsen (ör. `pnpm gate:isolated pnpm test:e2e`), e2e portu bu yolda kilitten önce seçilir. Paralel koşuda orada `E2E_PORT` ver.
+
+## Founder-number kırmızısı (FO-380)
+
+`tests/expert-prereg.live.test.ts` "founder number race" testinin FO-250 döneminde (2026-10-30) görülen kırmızısı yeniden üretilemedi. Ölçüm: tam gate, 36 `yes` yükü altında (load1 ~23 → ~84), izole DB'de yeşil (6357 birim, 489 e2e); founder testi üç ayrı izole koşumda geçti. Ham çıktı ve yük kaydı: `docs/agent-results/TASK-MW2MMHM0Q18US-devop-fb.md`.
+
+Eşzamanlılık garantisi kodda: atama `pg_advisory_xact_lock` altında (`src/lib/expert-prereg/server/verify.ts`), sayaç yalnız yükselir (`founder-counter.ts`), `founderNumber` `@unique` ve tek satırlık sayaç `CHECK (id = 1)`.
+
+Kırmızı yeniden görülürse:
+1. Gate logunu sakla (`gate-isolated` çıktısının tamamı; `GATE_KEEP=1` ile konteyneri de tut). Yük kaydı (`uptime`) ve koşunun `E2E_PORT` / `GATE_PG_PORT` değerleri logda kalsın.
+2. Hatanın tam süitte mi, tek dosyada mı olduğuna bak. Tek dosyada geçiyorsa yarış değil, koşu sırası (`expert-prereg-reissue.live.test.ts` aynı tabloyu kullanır; `tests/helpers/expert-prereg-live-lock` ile seri tutulur) ya da zaman aşımıdır. `DB_CONNECT_TIMEOUT_MS=10000` gate-isolated'ta ayarlıdır.
+3. Hata numara çakışması ya da boşluk gösteriyorsa gerçek eşzamanlılık hatasıdır: `verify.ts` kilidini ve unique kısıtı kontrol et, testi gevşetme. Sayaç ile `max(founderNumber)` farkı, kilit dışından yazım olduğunu gösterir.
+4. Kırmızı yalnız bağlantı zaman aşımıysa (`DB_CONNECT_TIMEOUT_MS`) ve koşu paylaşımlı `:5433` DB'ye karşıysa, koşu izole değildi: `pnpm gate:isolated` ile yeniden koş.
+5. Üç koşu da yeşilse kırmızıyı kaydet ve kartı kapatma; ham log olmadan kök neden yazma.
