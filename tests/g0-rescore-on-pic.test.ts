@@ -30,10 +30,12 @@ vi.mock('@/lib/scoring/g0-compute', async (importActual) => {
 });
 
 import { updateTenantProfile } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
-import { prisma, withTenant } from '@/lib/db';
+import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import {
   computeG0ForOpportunity,
+  G0_RESCORE_SCOPE,
   G0ConcurrentEditError,
+  G0LeftScopeError,
   type G0Computation,
   persistG0,
 } from '@/lib/scoring/g0-compute';
@@ -239,6 +241,129 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
       await prisma.tenant.update({ where: { id: tenantId }, data: { pic } });
       await expect(removeTenantPic(tenantId, newPic(), userId, 'stale')).rejects.toThrow();
       expect(h.rescoreCalls).toEqual([]);
+    });
+  });
+
+  describe('K-577267: only G0 active opportunities are rescored', () => {
+    /** An opportunity outside the scope, holding a sentinel score on both records and a gate decision. */
+    const parked = async (id: string, data: { stage: 'G0' | 'G1'; status?: 'ACTIVE' | 'FUNDED' | 'WITHDRAWN' }) => {
+      await prisma.opportunity.create({
+        data: { id, tenantId, workspaceId: `${tenantId}-w`, title: id, topicId, intendedRole: 'coordinator', g0Score: 1.25, ...data },
+      });
+      await prisma.topicMatch.create({ data: { tenantId, topicId, opportunityId: id, fitScore: 0, g0Score: 1.25, breakdown: {} } });
+      await prisma.gateDecision.create({
+        data: { tenantId, opportunityId: id, gate: 'G0', passed: false, inputs: {}, ruleVersion: 'fo384-k577267', decidedBy: userId },
+      });
+    };
+    /** Everything a rescore could touch on a row. Stage and status are read to show the row did not move. */
+    const snapshot = async (id: string) => {
+      const opp = await prisma.opportunity.findUniqueOrThrow({
+        where: { id },
+        select: { stage: true, status: true, g0Score: true, updatedAt: true },
+      });
+      const match = await prisma.topicMatch.findFirst({ where: { opportunityId: id }, select: { g0Score: true, breakdown: true } });
+      const decisions = await prisma.gateDecision.findMany({
+        where: { opportunityId: id },
+        orderBy: { id: 'asc' },
+        select: { gate: true, passed: true, ruleVersion: true, decidedAt: true },
+      });
+      return { ...opp, updatedAt: opp.updatedAt.toISOString(), topicMatch: match ?? null, decisions };
+    };
+
+    it('the save rescores the G0 active opportunities and leaves every other row exactly as it was', async () => {
+      await parked(`${key}-opp1`, { stage: 'G1' });
+      await parked(`${key}-fund`, { stage: 'G0', status: 'FUNDED' });
+      await parked(`${key}-wd`, { stage: 'G0', status: 'WITHDRAWN' });
+      await prisma.opportunity.update({ where: { id: archivedOppId }, data: { g0Score: 1.25 } });
+      const untouched = [`${key}-opp1`, `${key}-fund`, `${key}-wd`, archivedOppId];
+      const before: Record<string, Awaited<ReturnType<typeof snapshot>>> = {};
+      for (const id of untouched) before[id] = await snapshot(id);
+
+      await prisma.tenant.update({ where: { id: tenantId }, data: { pic } });
+      const auditEventId = `${key}-scope`;
+      const summary = await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId));
+
+      expect(summary).toMatchObject({ total: 2, rescored: 2, failed: 0, skipped: 0, archived: 0, queued: false });
+      await expectStoredIsFresh(oppId);
+      await expectStoredIsFresh(secondOppId);
+      for (const id of untouched) expect(await snapshot(id)).toEqual(before[id]);
+      expect(await alertsFor(auditEventId)).toEqual([]);
+    });
+
+    it('a resumed page keeps the filter: a G1 opportunity between the cursor and the end is not rescored', async () => {
+      await prisma.opportunity.create({
+        data: { id: `${key}-opp0`, tenantId, workspaceId: `${tenantId}-w`, title: 'between', topicId, stage: 'G0', status: 'ACTIVE', intendedRole: 'coordinator' },
+      });
+      await parked(`${key}-opp1`, { stage: 'G1' });
+      const rescored: string[] = [];
+      const summary = await rescoreTenantG0AfterPicChange(tenantId, { ...change(`${key}-page`), afterId: oppId }, {
+        rescore: async (_tenant, id) => {
+          rescored.push(id);
+          return { score: 50 } as G0Computation;
+        },
+        enqueueContinuation: async () => {
+          throw new Error('must not queue a finished run');
+        },
+      });
+      expect(rescored).toEqual([`${key}-opp0`, secondOppId]);
+      expect(summary).toMatchObject({ total: 2, queued: false });
+    });
+
+    it('an opportunity that left G0 after the listing is archived, not failed, and raises no alert', async () => {
+      const auditEventId = `${key}-stale-list`;
+      const summary = await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId), {
+        listOpportunityIds: async () => {
+          await prisma.opportunity.update({ where: { id: secondOppId }, data: { stage: 'G1' } });
+          return [oppId, secondOppId];
+        },
+      });
+      expect(summary).toMatchObject({ total: 2, failed: 0, skipped: 0, archived: 1, queued: false });
+      expect(summary.rescored + summary.cleared).toBe(1);
+      expect(await alertsFor(auditEventId)).toEqual([]);
+    });
+
+    it('a stage change between the read and the write writes nothing, the TopicMatch included', async () => {
+      await prisma.opportunity.update({ where: { id: oppId }, data: { g0Score: 1.25 } });
+      const computation = await withTenant(tenantId, (tx) => computeG0ForOpportunity(tx, tenantId, oppId, { scope: G0_RESCORE_SCOPE }));
+      expect(computation?.score).not.toBeNull();
+      const before = await snapshot(oppId);
+
+      // The stage moves right after the write's first read, on a second connection so this transaction
+      // holds no lock. It is a raw UPDATE, so `updatedAt` does not move: only the scope can stop the
+      // write. The guarded write then matches nothing, and that is G0LeftScopeError, not an error alert.
+      let armed = true;
+      const racing = (tx: TenantTx): TenantTx =>
+        new Proxy(tx, {
+          get(target, prop) {
+            if (prop !== 'opportunity') return Reflect.get(target, prop);
+            const model = target.opportunity;
+            return new Proxy(model, {
+              get(m, p) {
+                const value = Reflect.get(m, p);
+                if (p !== 'findFirst' || typeof value !== 'function') return typeof value === 'function' ? value.bind(m) : value;
+                return async (args: unknown) => {
+                  const found = await value.call(m, args);
+                  if (armed) {
+                    armed = false;
+                    await prisma.$executeRaw`UPDATE "Opportunity" SET stage = 'G1'::"Gate" WHERE id = ${oppId}`;
+                  }
+                  return found;
+                };
+              },
+            });
+          },
+        }) as TenantTx;
+
+      await expect(
+        withTenant(tenantId, (tx) => persistG0(racing(tx), computation!, { keepUpdatedAt: true, rescope: true })),
+      ).rejects.toBeInstanceOf(G0LeftScopeError);
+      expect(armed).toBe(false);
+
+      const after = await snapshot(oppId);
+      expect(after.stage).toBe('G1');
+      expect(after.g0Score).toBe(before.g0Score);
+      expect(after.topicMatch).toEqual(before.topicMatch);
+      expect(after.decisions).toEqual(before.decisions);
     });
   });
 

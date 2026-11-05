@@ -724,8 +724,15 @@ hiçbir şey yazmaz. `Opportunity.g0Score` bir önbellek sütunudur: `persistG0`
 verisi de yazabildiği için hiçbir ekran onu doğrudan çizmez.
 
 **PIC değişince yeniden hesaplama (FO-384).** Kiracı PIC kaydeder, temizler veya yönetici kaldırırsa
-kiracının canlı (`deletedAt` boş) fırsatları `rescoreOpportunityG0` ile yeniden puanlanır
-(`src/lib/scoring/g0-rescore-tenant.ts`). Kural: puan değişmediyse `Opportunity` satırına hiç
+kiracının **G0 aşamasındaki aktif** fırsatları `rescoreOpportunityG0` ile yeniden puanlanır
+(`src/lib/scoring/g0-rescore-tenant.ts`). "Aktif" şemadan okunur: `stage = G0`, `status = ACTIVE`
+ve `deletedAt` boş (`G0_RESCORE_SCOPE`, `src/lib/scoring/g0-compute.ts`; K-577267 seçenek A). Liste,
+sayfalı devam, kuyruk işi ve yazım aynı filtreyi kullanır. G1–G4 ile `FUNDED`, `WITHDRAWN`,
+`SUBMITTED`, `REJECTED`, `ABOVE_THRESHOLD` ve arşivli satırların `g0Score`, `TopicMatch.g0Score`,
+`updatedAt` ve `GateDecision` kayıtları PIC değişiminde yazılmaz. Liste ile yazım arasında aşaması
+değişen fırsat yazılmaz (`TopicMatch` dahil); bu `failed` değil, `archived` sayılır ve alarm
+üretmez (`G0LeftScopeError`). Kapı yolu (`persistG0`, `scripts/rescore-g0.ts`) bu filtreden etkilenmez.
+Puan değişmediyse `Opportunity` satırına hiç
 yazılmaz; değiştiyse `updatedAt` korunur (pano "son dokunulan" sırasını bozmaz). `TopicMatch`
 kanıt kaydı her koşuda yenilenir. Puan hesaplanamazsa (`coverage === 0`) saklanan değer `null`
 ile değiştirilir. İstek içinde 25 sn'lik bütçe biter ve kalan fırsatlar `g0-rescore-tenant`

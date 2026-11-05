@@ -12,7 +12,7 @@
  *   • it stops at a time budget and queues the rest as a job (`g0-rescore-tenant`) that resumes
  *     after the last opportunity it reached, so a large tenant is finished by the queue (FO-384 B2);
  *   • a row lock is waited for at most `G0_RESCORE_LOCK_TIMEOUT_MS`, so the budget holds (Y2);
- *   • an opportunity archived during the run is counted as `archived`, not as a failure (O2);
+ *   • an opportunity archived, or moved past G0, during the run is counted as `archived`, not as a failure (O2, K-577267);
  *   • a score the scorer can no longer compute is cleared, not left at its old value;
  *   • a rescore keeps each opportunity's `updatedAt` (see `rescoreOpportunityG0`).
  */
@@ -21,6 +21,8 @@ import { recordAlert } from '@/lib/observability/system-alert';
 import {
   clearStoredG0,
   G0_RESCORE_LOCK_TIMEOUT_MS,
+  G0_RESCORE_SCOPE,
+  G0LeftScopeError,
   limitLockWait,
   rescoreOpportunityG0,
   type G0Computation,
@@ -44,7 +46,7 @@ export interface G0TenantRescoreSummary {
   failed: number;
   /** Opportunities this run did not finish: the ones it could not reach. Not an archived one. */
   skipped: number;
-  /** Opportunities archived after the listing and before their turn: not this tenant's any more, no alert. */
+  /** Opportunities archived, or moved out of G0 / ACTIVE, after the listing and before their turn: no alert. */
   archived: number;
   /** True when the rest was handed to the `g0-rescore-tenant` job. */
   queued: boolean;
@@ -69,17 +71,38 @@ export const G0_RESCORE_BUDGET_MS = 25_000;
 /** Alert meta lists at most this many unfinished opportunity ids; the counts stay whole. */
 const ALERT_ID_LIMIT = 10;
 
-/** Live (not archived) opportunities of one tenant after `afterId`, read under its RLS context. */
+/**
+ * The tenant's G0 active opportunities after `afterId`, read under its RLS context. The same
+ * {@link G0_RESCORE_SCOPE} as the write, so a stored score outside it is never listed.
+ */
 async function listLiveOpportunityIds(tenantId: string, afterId: string | undefined): Promise<string[]> {
   const rows = await withTenant(tenantId, (tx) =>
     tx.opportunity.findMany({
-      where: { tenantId, deletedAt: null, ...(afterId ? { id: { gt: afterId } } : {}) },
+      where: { tenantId, ...G0_RESCORE_SCOPE, ...(afterId ? { id: { gt: afterId } } : {}) },
       select: { id: true },
       // Id order is the cursor's order; `createdAt` ties would make a resumed run skip rows.
       orderBy: { id: 'asc' },
     }),
   );
   return rows.map((row) => String(row.id));
+}
+
+/**
+ * Clears a stored score the scorer can no longer compute, if the opportunity is still in scope.
+ * `false` when it left the scope first: nothing was written, and that is not a failure (K-577267).
+ */
+async function clearStillInScope(tenantId: string, computation: G0Computation): Promise<boolean> {
+  try {
+    await withTenant(tenantId, async (tx) => {
+      await limitLockWait(tx, G0_RESCORE_LOCK_TIMEOUT_MS);
+      // A rescore is not an edit of the opportunity: keep its `updatedAt` (FO-384 E1).
+      await clearStoredG0(tx, computation, { keepUpdatedAt: true, rescope: true });
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof G0LeftScopeError) return false;
+    throw error;
+  }
 }
 
 async function queueRest(tenantId: string, run: G0RescoreRun): Promise<void> {
@@ -163,15 +186,12 @@ export async function rescoreTenantG0AfterPicChange(
       try {
         const computation = await rescore(tenantId, id);
         if (!computation) {
-          // Archived between the listing and this call: not this tenant's any more, so not a failure.
+          // Archived, or no longer G0 and ACTIVE, between the listing and this call: not a failure.
           summary.archived++;
         } else if (computation.score === null) {
-          await withTenant(tenantId, async (tx) => {
-            await limitLockWait(tx, G0_RESCORE_LOCK_TIMEOUT_MS);
-            // A rescore is not an edit of the opportunity: keep its `updatedAt` (FO-384 E1).
-            await clearStoredG0(tx, { ...computation, tenantId, opportunityId: id }, { keepUpdatedAt: true });
-          });
-          summary.cleared++;
+          const stillInScope = await clearStillInScope(tenantId, { ...computation, tenantId, opportunityId: id });
+          if (stillInScope) summary.cleared++;
+          else summary.archived++;
         } else {
           summary.rescored++;
         }

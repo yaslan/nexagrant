@@ -41,6 +41,8 @@ const KNOWN: Record<string, string> = {
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerUserId: userId': 'same `user.id` as above',
   'src/lib/scoring/g0-compute.ts ...where':
     '`where` is `{ id, tenantId }` with both ids checked by isPresentId in persistG0 a few lines above (it returns when either is missing); the spread only adds the `updatedAt` read by findFirst on that same where (FO-384 O3)',
+  'src/lib/scoring/g0-compute.ts ...scope':
+    '`scope` is the constant G0_RESCORE_SCOPE (stage G0, status ACTIVE, deletedAt null): a fixed filter, never client input; the `{ id, tenantId }` it is spread onto is checked by isPresentId at the top of writeOpportunityScore (FO-384 K-577267)',
   'src/lib/scoring/g0-compute.ts updatedAt: current.updatedAt':
     'the `updatedAt` of the row findFirst read on the same guarded where a line above: a stored Date, never client input (FO-384 O3)',
   'src/lib/k3-topic-stats/importer.ts topicPrefix: p.topicPrefix':

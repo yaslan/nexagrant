@@ -330,12 +330,13 @@ export async function computeG0ForOpportunity(
   client: TenantTx,
   tenantId: string,
   opportunityId: string,
+  options: { scope?: G0RescopeFilter } = {},
 ): Promise<G0Computation | null> {
   const opp: { id: string; topicId: string | null; intendedRole: string | null } | null =
     await client.opportunity.findFirst({
       // Archived opportunities are not scored: `deletedAt` means the row is out of the product,
       // and a score computed for it would still be read by anything that re-renders the id.
-      where: { id: opportunityId, tenantId, deletedAt: null },
+      where: { id: opportunityId, tenantId, deletedAt: null, ...(options.scope ?? {}) },
       select: { id: true, topicId: true, intendedRole: true },
     });
   if (!opp) return null;
@@ -412,7 +413,22 @@ export interface G0StoreOptions {
    * and a score that is already stored is not written at all.
    */
   keepUpdatedAt?: boolean;
+  /**
+   * A rescore writes only an opportunity that is still in {@link G0_RESCORE_SCOPE}. One that left it
+   * between the read and the write is not written, its TopicMatch included, and
+   * {@link G0LeftScopeError} is thrown (K-577267).
+   */
+  rescope?: boolean;
 }
+
+/**
+ * Which opportunities a PIC rescore may write (K-577267, option A): still in stage G0, `status`
+ * ACTIVE and not soft-deleted. The other statuses (WITHDRAWN, SUBMITTED, FUNDED, REJECTED,
+ * ABOVE_THRESHOLD) and the later stages (G1 to G4) keep their stored score and `updatedAt`. The
+ * listing, the paged continuation, the queued job and the write all use this one filter.
+ */
+export const G0_RESCORE_SCOPE = { stage: 'G0', status: 'ACTIVE', deletedAt: null } as const;
+export type G0RescopeFilter = typeof G0_RESCORE_SCOPE;
 
 /**
  * Longest wait for a row lock during a rescore that a PIC change started (FO-384 Y2). A blocked
@@ -434,29 +450,55 @@ export class G0ConcurrentEditError extends Error {
   }
 }
 
+/**
+ * The opportunity left {@link G0_RESCORE_SCOPE} (archived, moved past G0, not ACTIVE) between the
+ * rescore's read and its write. Not a failure: nothing was written for it (K-577267).
+ */
+export class G0LeftScopeError extends Error {
+  constructor() {
+    super('G0 rescore: the opportunity is no longer a G0 active opportunity');
+    this.name = 'G0LeftScopeError';
+  }
+}
+
 /** Writes `g0Score` on the opportunity; with `keepUpdatedAt` an unchanged value is not written. */
 async function writeOpportunityScore(
   client: TenantTx,
   ids: { opportunityId: string; tenantId: string },
   value: number | null,
-  keepUpdatedAt: boolean,
+  options: G0StoreOptions,
 ): Promise<void> {
   if (!isPresentId(ids.opportunityId) || !isPresentId(ids.tenantId)) return;
   const where = { id: ids.opportunityId, tenantId: ids.tenantId };
-  if (!keepUpdatedAt) {
+  if (!options.keepUpdatedAt) {
     await client.opportunity.updateMany({ where, data: { g0Score: value } });
     return;
   }
-  const current = await client.opportunity.findFirst({ where, select: { g0Score: true, updatedAt: true } });
-  if (!current || current.g0Score === value) return;
+  const scope = options.rescope ? G0_RESCORE_SCOPE : {};
+  const current = await client.opportunity.findFirst({
+    where: { ...where, ...scope },
+    select: { g0Score: true, updatedAt: true },
+  });
+  if (!current) {
+    if (options.rescope) throw new G0LeftScopeError();
+    return;
+  }
+  if (current.g0Score === value) return;
   // Guarded on the `updatedAt` just read. An edit that landed after the read matches nothing, so it
   // is not overwritten with the stale `title`/`updatedAt` (O3): the rescore fails and is alerted instead.
   const written = await client.opportunity.updateMany({
-    where: { ...where, updatedAt: current.updatedAt },
+    where: { ...where, ...scope, updatedAt: current.updatedAt },
     // An explicit `updatedAt` overrides Prisma's `@updatedAt`, so the last human edit stays the last.
     data: { g0Score: value, updatedAt: current.updatedAt },
   });
-  if (written.count === 0) throw new G0ConcurrentEditError();
+  if (written.count === 0) {
+    // A stage change also moves `updatedAt`, so it looks like an edit here. Ask the scope first:
+    // a row that left G0 is not a concurrent edit and must not raise an error alert (K-577267).
+    if (options.rescope && !(await client.opportunity.findFirst({ where: { ...where, ...G0_RESCORE_SCOPE }, select: { id: true } }))) {
+      throw new G0LeftScopeError();
+    }
+    throw new G0ConcurrentEditError();
+  }
 }
 
 /**
@@ -477,7 +519,7 @@ export async function persistG0(
 ): Promise<boolean> {
   if (computation.score === null || !isPresentId(computation.opportunityId) || !isPresentId(computation.tenantId)) return false;
 
-  await writeOpportunityScore(client, { opportunityId: computation.opportunityId, tenantId: computation.tenantId }, computation.score, options.keepUpdatedAt === true);
+  await writeOpportunityScore(client, { opportunityId: computation.opportunityId, tenantId: computation.tenantId }, computation.score, options);
 
   if (computation.topicId) {
     const evidence = g0EvidencePayload(computation);
@@ -527,7 +569,7 @@ export async function clearStoredG0(
 ): Promise<boolean> {
   if (computation.score !== null || !isPresentId(computation.opportunityId) || !isPresentId(computation.tenantId)) return false;
 
-  await writeOpportunityScore(client, { opportunityId: computation.opportunityId, tenantId: computation.tenantId }, null, options.keepUpdatedAt === true);
+  await writeOpportunityScore(client, { opportunityId: computation.opportunityId, tenantId: computation.tenantId }, null, options);
 
   if (computation.topicId) {
     const evidence = g0EvidencePayload(computation);
@@ -559,8 +601,9 @@ export async function clearStoredG0(
 
 /**
  * Score an existing opportunity and store the result, inside the tenant's RLS context.
- * Returns `null` when the opportunity does not belong to the tenant. A computation with no score
- * replaces the stored one with null (see {@link clearStoredG0}) instead of leaving it behind.
+ * Returns `null` when the opportunity does not belong to the tenant, or is no longer in
+ * {@link G0_RESCORE_SCOPE} (archived, moved past G0, not ACTIVE); nothing is written for it then.
+ * A computation with no score replaces the stored one with null (see {@link clearStoredG0}).
  */
 export async function rescoreOpportunityG0(
   tenantId: string,
@@ -569,12 +612,18 @@ export async function rescoreOpportunityG0(
 ): Promise<G0Computation | null> {
   return withTenant(tenantId, async (tx) => {
     if (rescoreOptions.lockTimeoutMs !== undefined) await limitLockWait(tx, rescoreOptions.lockTimeoutMs);
-    const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId);
+    const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId, { scope: G0_RESCORE_SCOPE });
     if (!computation) return null;
-    // A rescore is not an edit of the opportunity: keep its `updatedAt` (FO-384 B1).
-    const options = { keepUpdatedAt: true };
-    if (computation.score === null) await clearStoredG0(tx, computation, options);
-    else await persistG0(tx, computation, options);
+    // A rescore is not an edit of the opportunity: keep its `updatedAt` (FO-384 B1). It writes only
+    // what is still in scope (K-577267).
+    const options: G0StoreOptions = { keepUpdatedAt: true, rescope: true };
+    try {
+      if (computation.score === null) await clearStoredG0(tx, computation, options);
+      else await persistG0(tx, computation, options);
+    } catch (error) {
+      if (error instanceof G0LeftScopeError) return null;
+      throw error;
+    }
     return computation;
   });
 }
