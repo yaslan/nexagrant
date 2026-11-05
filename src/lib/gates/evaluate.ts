@@ -153,6 +153,11 @@ async function runGate(
 
       const g0Score = computation?.score ?? null;
       inputs.calculatedG0Score = g0Score;
+      // `g0Score` above is the column as it was before this run. Once a fresh score exists, the
+      // decision must show that one: otherwise `inputs.g0Score` and `g0Evidence.score` disagree on
+      // the same record (NG-27 side finding). The old column value is kept for the audit trail.
+      inputs.g0ScoreStored = opp.g0Score;
+      if (g0Score !== null) inputs.g0Score = g0Score;
 
       if (g0Score === null) {
         // Not a failure on merit: there is no evidence to score this opportunity on. Saying that

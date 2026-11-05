@@ -154,8 +154,10 @@ test.describe('G0 score comes from the canonical scorer', () => {
     });
     const inputs = decision?.inputs as Record<string, unknown> | undefined;
     expect(inputs?.calculatedG0Score).toBe(expected);
-    // What the column held when the gate ran — recorded for the audit trail, and it was null.
-    expect(inputs?.g0Score ?? null).toBeNull();
+    // The score the gate used is the computed one (FO-382 makes inputs.g0Score mirror it).
+    expect(inputs?.g0Score).toBe(expected);
+    // What the column held when the gate ran — kept for the audit trail, and it was null.
+    expect(inputs?.g0ScoreStored ?? null).toBeNull();
 
     // ── 3. The board badge is the computed number — and only ever a computed number.
     await page.goto(BOARD_URL);
