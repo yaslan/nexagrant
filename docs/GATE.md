@@ -87,7 +87,7 @@ Belirti: testler bir noktadan sonra `ERR_CONNECTION_REFUSED` veya `ERR_EMPTY_RES
 
 Sunucu hazır olduktan sonra ölürse denetleyici (`tests/e2e/support/server-supervisor.mjs`) runner'a `SIGINT` yollar. Koşu kırmızı biter, kalan testler dakikalarca boşa düşmez. Yeniden başlatma ve yeniden deneme yoktur.
 
-**Gönderen araması.** macOS ve Node sinyali kimin yolladığını söylemez. O yüzden gönderen, zaman eşleşmesiyle bulunur: `~/.claude/projects/*/*.jsonl` içinde olayın zamanından hemen önceki `pkill`, `killall`, `kill` komutlarına bak. FO-385'te incelenen dört sonlanmanın dördü de ve teşhisin canlı yakaladığı iki olay da başka projedeki bir oturumun makine geneli `pkill -f` komutlarıyla eşleşti. Canlı olaylarda paralel koşan sunucular aynı milisaniyede `SIGTERM` aldı; bu desen tek bir makine geneli komutu gösterir.
+**Gönderen araması.** macOS ve Node sinyali kimin yolladığını söylemez. O yüzden gönderen, zaman eşleşmesiyle bulunur: `~/.claude/projects/*/*.jsonl` içinde olayın zamanından hemen önceki `pkill`, `killall`, `kill` komutlarına bak. FO-385'te incelenen dört sonlanmanın zamanı ve süreç listesi, başka projedeki bir oturumun makine geneli `pkill -f` komutlarıyla zaman olarak uyuşuyor. Bu bir eşleşmedir, kanıt değildir: gönderen kaydı yok, yani `pkill` komutunun sunucuya gittiği gösterilmedi. Teşhisin canlı yakaladığı olaylarda paralel koşan sunucular aynı anda `SIGTERM` aldı; bu da zaman uyumudur, gönderen kanıtı değildir.
 
 **Kural.** Bu makinede `pkill -f` ile `next dev`, `next-server` veya `@playwright/test` hedefleme: desen, başka ajanın sunucusuna da uyar. Kendi sürecini `kill <pid>` ile durdur.
 
