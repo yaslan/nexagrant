@@ -5,11 +5,13 @@ import { useTranslations } from 'next-intl';
 import type { InviteCodeStatus, InviteCodeSummary } from '@/lib/agency/codes';
 import { createInviteCode, listInviteCodes, revokeInviteCode, type InviteActionError } from './actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { INVITE_CODE_DEFAULT_USE_LIMIT, INVITE_CODE_DEFAULT_VALIDITY_DAYS } from '@/lib/agency/invite-policy';
 
 /**
  * B-1 (TASK-MUM17YBJVAHRR): the server sends each code's status, never its use count.
- * No "exhausted" either (TASK-MUM2RMN3YIBGC), and no use limit to reach
- * (TASK-MUM4WVYLSH9IT): a code is governed by its end date and by revocation.
+ * FO-392: a new code carries a use limit, so the status may be "exhausted" and the
+ * limit itself (a policy number, not a count) is shown; a code from before FO-392
+ * has none and says so.
  */
 export type InviteCodeRow = InviteCodeSummary;
 
@@ -23,6 +25,7 @@ const STATUS_CLASS: Record<InviteCodeStatus, string> = {
   active: 'border-ok text-ok',
   revoked: 'border-bad text-bad',
   expired: 'border-border text-ink-2',
+  exhausted: 'border-border text-ink-2',
 };
 
 function isoDay(from: number, offsetDays: number): string {
@@ -46,8 +49,8 @@ export default function InviteCodesPanel({
 }) {
   const t = useTranslations('agency.codes');
   const [codes, setCodes] = useState(initialCodes);
-  // Short by default: an unlimited code that leaks is closed by its end date or by revoking it.
-  const [expiresOn, setExpiresOn] = useState(isoDay(now, 30));
+  // A code that leaks is closed by its use limit, its end date or by revoking it. The default is the policy's.
+  const [expiresOn, setExpiresOn] = useState(isoDay(now, INVITE_CODE_DEFAULT_VALIDITY_DAYS));
   const [label, setLabel] = useState('');
   const [error, setError] = useState<InviteActionError | null>(null);
   const errorText = useActionErrorText();
@@ -109,7 +112,9 @@ export default function InviteCodesPanel({
           {t('title')}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description')}</p>
-        <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('countsNote')}</p>
+        <p className="mt-1 max-w-2xl text-sm text-ink-2" data-testid="invite-codes-limit-note">
+          {t('countsNote', { limit: INVITE_CODE_DEFAULT_USE_LIMIT })}
+        </p>
       </div>
 
       {canManage ? (
@@ -206,6 +211,7 @@ export default function InviteCodesPanel({
                 <th scope="col" className="px-4 py-3">{t('colCode')}</th>
                 <th scope="col" className="px-4 py-3">{t('colLabel')}</th>
                 <th scope="col" className="px-4 py-3">{t('colExpires')}</th>
+                <th scope="col" className="px-4 py-3">{t('colLimit')}</th>
                 <th scope="col" className="px-4 py-3">{t('colStatus')}</th>
                 <th scope="col" className="px-4 py-3">
                   <span className="sr-only">{t('colActions')}</span>
@@ -222,6 +228,9 @@ export default function InviteCodesPanel({
                     </td>
                     <td className="px-4 py-3 text-ink-2">{c.label ?? '—'}</td>
                     <td className="px-4 py-3 text-ink-2">{dateFmt.format(new Date(c.expiresAt))}</td>
+                    <td className="px-4 py-3 text-ink-2" data-testid={`invite-limit-${c.hint}`}>
+                      {c.useLimit === null ? t('limitUnlimited') : t('limitUses', { limit: c.useLimit })}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_CLASS[status]}`}>
                         {t(`status.${status}`)}

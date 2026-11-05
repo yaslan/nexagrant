@@ -10,6 +10,7 @@ import {
 } from './funnel';
 import type { TrProvince } from '@/lib/readiness/provinces';
 import { inviteCodeRow } from './codes';
+import { INVITE_CODE_DEFAULT_USE_LIMIT } from './invite-policy';
 
 /**
  * TASK-MULZATEX4G92H (FB KAMU B2 sızıntı-2) — the gate for the small-cell rule
@@ -143,6 +144,8 @@ interface Leak {
 interface TrueCode {
   /** A retired column (TASK-MUM4WVYLSH9IT): set on codes made while codes had a limit, enforced by nothing. */
   maxUses?: number;
+  /** FO-392: the live limit. Undefined = a code from before it, unlimited. */
+  useLimit?: number;
   used: number;
   revoked?: boolean;
   expired?: boolean;
@@ -160,8 +163,9 @@ const NOW = Date.UTC(2026, 8, 29, 12);
 const DELETED = 'codes|deleted';
 
 /**
- * Whether the panel has an "exhausted" status at all, read off the function that
- * builds it: a much-used code. Before TASK-MUM2RMN3YIBGC it had.
+ * Whether the panel has an "exhausted" status for a code WITHOUT a limit, read off the
+ * function that builds it: a much-used code. Before TASK-MUM2RMN3YIBGC it had. Since FO-392
+ * only a code with a useLimit can be exhausted ({@link PANEL_SAYS_EXHAUSTED_WITH_LIMIT}).
  */
 const PANEL_SAYS_EXHAUSTED =
   inviteCodeRow(
@@ -170,6 +174,22 @@ const PANEL_SAYS_EXHAUSTED =
       hint: 'ABCD',
       label: null,
       usedCount: 10_000,
+      expiresAt: new Date(NOW + 86_400_000),
+      revokedAt: null,
+      createdAt: new Date(NOW - 86_400_000),
+    },
+    NOW
+  ).status === ('exhausted' as string);
+
+/** FO-392: the same probe on a code that has reached its useLimit. */
+const PANEL_SAYS_EXHAUSTED_WITH_LIMIT =
+  inviteCodeRow(
+    {
+      id: 'probe',
+      hint: 'ABCD',
+      label: null,
+      usedCount: 6,
+      useLimit: 6,
       expiresAt: new Date(NOW + 86_400_000),
       revokedAt: null,
       createdAt: new Date(NOW - 86_400_000),
@@ -202,6 +222,15 @@ const FORM_NOW: FormRule = {
 const FORM_WITH_LIMIT: FormRule = {
   accepts: (c) => FORM_NOW.accepts(c) && c.used < (c.maxUses ?? Infinity),
   cap: (c) => c.maxUses ?? Infinity,
+};
+
+/**
+ * FO-392: redeem_agency_invite() as agency-invite-use-limit.sql defines it - refused at
+ * used = useLimit; a code with no limit (NULL) is never refused for its uses.
+ */
+const FORM_USELIMIT: FormRule = {
+  accepts: (c) => FORM_NOW.accepts(c) && c.used < (c.useLimit ?? Infinity),
+  cap: (c) => c.useLimit ?? Infinity,
 };
 
 /** How far the attacker scans an unbounded code's uses for ones consistent with the form's answer. */
@@ -246,6 +275,7 @@ function publishCodes(codes: TrueCode[], form?: FormRule): CodeKnowledge[] {
             hint: 'ABCD',
             label: null,
             usedCount: c.used,
+            useLimit: c.useLimit ?? null,
             expiresAt: new Date(NOW + (c.expired ? -1 : 30) * 86_400_000),
             revokedAt: c.revoked ? new Date(NOW - 60_000) : null,
             createdAt: new Date(NOW - 86_400_000),
@@ -255,6 +285,7 @@ function publishCodes(codes: TrueCode[], form?: FormRule): CodeKnowledge[] {
       )
     ) as Record<string, unknown>;
     // A limit the panel still sent would cap the uses; none is sent, and none is enforced.
+    // (FO-392: the limit the panel sends is a number the agency set by policy, not a count.)
     const max = typeof row.maxUses === 'number' ? row.maxUses : Infinity;
     let lo = 0;
     let hi = max;
@@ -263,7 +294,8 @@ function publishCodes(codes: TrueCode[], form?: FormRule): CodeKnowledge[] {
     const status =
       (row.status as string | undefined) ??
       (row.revokedAt ? 'revoked' : Date.parse(row.expiresAt as string) <= NOW ? 'expired' : row.exhausted ? 'exhausted' : 'active');
-    if (status === 'exhausted') lo = Math.max(lo, max);
+    if (status === 'exhausted') lo = Math.max(lo, typeof row.useLimit === 'number' ? row.useLimit : max);
+    if (typeof row.useLimit === 'number') hi = Math.min(hi, row.useLimit);
     if (form) [lo, hi] = probe(c, form, lo, hi);
     return { truth: c.used, lo, hi };
   });
@@ -534,6 +566,39 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
     });
   });
 
+  describe('FO-392: the use limit is back, so a used-up code is read again (K-577141)', () => {
+    // The same cohort as above, but the first four codes carry a LIVE limit of 6.
+    const t = tableOf({
+      [NO_PROVINCE]: { MUNICIPALITY: [3, 2, 3, 0, 0, 0, 0], UNIVERSITY: [3, 2, 3, 1, 0, 0, 0] },
+      Samsun: { MUNICIPALITY: [6, 4, 6, 2, 1, 0, 0], UNIVERSITY: [5, 2, 5, 1, 1, 1, 0] },
+      Tokat: { MUNICIPALITY: [4, 3, 4, 3, 0, 0, 0], UNIVERSITY: [6, 4, 6, 0, 3, 2, 0] },
+    });
+    const small: TrueCode[] = [6, 6, 6, 6, 3].map((used) => ({ useLimit: 6, used }));
+
+    test('the panel says "exhausted" for a code at its limit and never for one without a limit', () => {
+      expect(PANEL_SAYS_EXHAUSTED_WITH_LIMIT).toBe(true);
+      expect(PANEL_SAYS_EXHAUSTED).toBe(false);
+    });
+
+    test('positive control: a SMALL limit (6) is read back, the fifth code as 2..3 - this is why the default is large', () => {
+      const codes = publishCodes(small, FORM_USELIMIT);
+      expect(codes.slice(0, 4).map((c) => [c.lo, c.hi])).toEqual([[6, 6], [6, 6], [6, 6], [6, 6]]);
+      expect(attack(t, publish(t), { codes, noneDeleted: true })).toContainEqual({ target: 'code#4', truth: 3, lo: 2, hi: 3 });
+    });
+
+    test('the shipped default limit, same cohort: nobody reaches it, so nothing is read back', () => {
+      const codes = publishCodes([6, 6, 6, 6, 3].map((used) => ({ useLimit: INVITE_CODE_DEFAULT_USE_LIMIT, used })), FORM_USELIMIT);
+      expect(codes.every((c) => c.lo === c.truth || c.hi > c.truth)).toBe(true);
+      expect(attack(t, publish(t), { codes, noneDeleted: true })).toEqual([]);
+      expect(attack(t, publish(t), { codes })).toEqual([]);
+    });
+
+    test('legacy codes (no limit) behave as before FO-392: the form tells nothing the panel does not', () => {
+      const legacy: TrueCode[] = [6, 6, 6, 6, 3].map((used) => ({ used }));
+      expect(publishCodes(legacy, FORM_USELIMIT)).toEqual(publishCodes(legacy));
+    });
+  });
+
   test('former residual closed: codes made with a limit under 5 no longer bound their uses to 1..4', () => {
     // Before TASK-MUM4WVYLSH9IT two 4-use codes and a funnel of 5 gave each ≥ 1 (the agency
     // knew the limit it set). The retired column still holds 4, but no rule enforces it.
@@ -607,7 +672,11 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
     if (sequential) {
       const codes: TrueCode[] = [];
       for (let n = total; n > 0 || !codes.length; n -= SEQUENTIAL_BATCH) {
-        codes.push({ maxUses: SEQUENTIAL_BATCH, used: Math.max(0, Math.min(SEQUENTIAL_BATCH, n)) });
+        codes.push({
+          maxUses: SEQUENTIAL_BATCH,
+          useLimit: rand() < 0.5 ? INVITE_CODE_DEFAULT_USE_LIMIT : undefined,
+          used: Math.max(0, Math.min(SEQUENTIAL_BATCH, n)),
+        });
       }
       return codes;
     }
@@ -618,6 +687,8 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
       const legacy = rand();
       return {
         maxUses: legacy < 0.3 ? Math.max(1, u - ri(0, 3)) : legacy < 0.5 ? u + ri(0, 12) : undefined,
+        // FO-392: a new code carries the default limit, a code from before it none.
+        useLimit: rand() < 0.5 ? INVITE_CODE_DEFAULT_USE_LIMIT : undefined,
         used: u,
         revoked: r < 0.1,
         expired: r >= 0.1 && r < 0.2,
@@ -653,7 +724,7 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
             // Every funnel group, every code's uses, and the deleted organisations are gated.
             // The attacker also tries every code on the registration form (TASK-MUM4WVYLSH9IT).
             const leaks = attack(t, publish(t), {
-              codes: publishCodes(randomCodes(t, codeRand, noneDeleted, sequential), FORM_NOW),
+              codes: publishCodes(randomCodes(t, codeRand, noneDeleted, sequential), FORM_USELIMIT),
               noneDeleted,
             });
             if (leaks.length) tablesWithLeak++;

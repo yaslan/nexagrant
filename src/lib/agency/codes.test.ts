@@ -10,6 +10,7 @@ import {
   validateInviteCodeInput,
   type InviteCodeRecord,
 } from './codes';
+import { INVITE_CODE_DEFAULT_USE_LIMIT, INVITE_CODE_DEFAULT_VALIDITY_DAYS } from './invite-policy';
 import type { TenantTx } from '@/lib/db';
 
 /**
@@ -36,26 +37,32 @@ function record(over: Partial<InviteCodeRecord>): InviteCodeRecord {
 describe('inviteCodeRow', () => {
   test('no use count in any form: not the number, not "<5", not what is left', () => {
     for (const usedCount of [0, 1, 4, 5, 7, 24, 25]) {
-      const row = inviteCodeRow(record({ usedCount }), NOW);
+      const row = inviteCodeRow(record({ usedCount, useLimit: 500 }), NOW);
       expect(Object.keys(row).sort()).toEqual(
-        ['createdAt', 'expiresAt', 'hint', 'id', 'label', 'revokedAt', 'status'].sort()
+        ['createdAt', 'expiresAt', 'hint', 'id', 'label', 'revokedAt', 'status', 'useLimit'].sort()
       );
-      expect(JSON.stringify(row)).not.toMatch(/used|left|exhausted|maxUses|limit/i);
+      // The limit is a policy number the agency is told; the count is never on the wire.
+      expect(JSON.stringify(row)).not.toMatch(/used|left|maxUses/i);
+      expect(row.useLimit).toBe(500);
     }
   });
 
-  test('status: revoked, then expired, else active â€” a used-up code included', () => {
-    expect(inviteCodeRow(record({ usedCount: 3 }), NOW).status).toBe('active');
-    expect(inviteCodeRow(record({ usedCount: 25 }), NOW).status).toBe('active');
-    expect(inviteCodeRow(record({ usedCount: 25, expiresAt: new Date(NOW) }), NOW).status).toBe('expired');
-    expect(inviteCodeRow(record({ usedCount: 25, revokedAt: new Date(NOW - 1) }), NOW).status).toBe('revoked');
+  test('status: revoked, then expired, then exhausted, else active', () => {
+    expect(inviteCodeRow(record({ usedCount: 3, useLimit: 500 }), NOW).status).toBe('active');
+    expect(inviteCodeRow(record({ usedCount: 499, useLimit: 500 }), NOW).status).toBe('active');
+    expect(inviteCodeRow(record({ usedCount: 500, useLimit: 500 }), NOW).status).toBe('exhausted');
+    expect(inviteCodeRow(record({ usedCount: 500, useLimit: 500, expiresAt: new Date(NOW) }), NOW).status).toBe('expired');
+    expect(inviteCodeRow(record({ usedCount: 500, useLimit: 500, revokedAt: new Date(NOW - 1) }), NOW).status).toBe('revoked');
   });
 
-  test('no "exhausted" at any use count: there is no limit to reach (TASK-MUM4WVYLSH9IT)', () => {
+  test('a code from before FO-392 (useLimit NULL) is unlimited: never exhausted at any count', () => {
     for (const usedCount of [0, 1, 6, 25, 10_000, 1_000_000]) {
-      expect(inviteCodeRow(record({ usedCount }), NOW).status).toBe('active');
+      const row = inviteCodeRow(record({ usedCount, useLimit: null }), NOW);
+      expect(row.status).toBe('active');
+      expect(row.useLimit).toBeNull();
     }
     expect(inviteCodeRow(record({ usedCount: undefined }), NOW).status).toBe('active');
+    expect(inviteCodeRow(record({ usedCount: undefined, useLimit: 5 }), NOW).status).toBe('active');
   });
 });
 
@@ -99,7 +106,7 @@ describe('lastExpiryDay: the date field max comes from MAX_VALIDITY_DAYS (K-7, Ä
 });
 
 describe('createInviteCodeIn', () => {
-  test('writes no use limit and records none in the audit event', async () => {
+  test('writes the default use limit from invite-policy, and no count, and puts the limit in the audit event', async () => {
     const writes: Record<string, unknown>[] = [];
     const tx = {
       tenant: { findUnique: async () => ({ kind: 'AGENCY', deletedAt: null }) },
@@ -118,30 +125,37 @@ describe('createInviteCodeIn', () => {
     });
     expect(Object.keys(created).sort()).toEqual(['code', 'expiresAt', 'hint', 'id']);
     expect(writes).toHaveLength(2);
+    expect(writes[0]).toMatchObject({ useLimit: INVITE_CODE_DEFAULT_USE_LIMIT });
+    expect(writes[1]).toMatchObject({ data: { useLimit: INVITE_CODE_DEFAULT_USE_LIMIT } });
     expect(JSON.stringify(writes)).not.toMatch(/maxUses|usedCount/);
+  });
+
+  test('the policy numbers are sane: a limit above 0, a default validity inside the cap', () => {
+    expect(Number.isInteger(INVITE_CODE_DEFAULT_USE_LIMIT) && INVITE_CODE_DEFAULT_USE_LIMIT > 0).toBe(true);
+    expect(INVITE_CODE_DEFAULT_VALIDITY_DAYS).toBeGreaterThan(0);
+    expect(INVITE_CODE_DEFAULT_VALIDITY_DAYS).toBeLessThanOrEqual(MAX_VALIDITY_DAYS);
   });
 });
 
 describe('listInviteCodesIn', () => {
-  test('does not select usedCount, returns none of it', async () => {
+  test('selects usedCount only to decide "exhausted"; none of it reaches the list', async () => {
     const rows = [
-      { ...record({ id: 'a', usedCount: 7 }), codeHint: 'AAAA' },
-      { ...record({ id: 'b', usedCount: 3 }), codeHint: 'BBBB' },
-      { ...record({ id: 'c', usedCount: 25 }), codeHint: 'CCCC' },
+      { ...record({ id: 'a', usedCount: 7, useLimit: 500 }), codeHint: 'AAAA' },
+      { ...record({ id: 'b', usedCount: 3, useLimit: null }), codeHint: 'BBBB' },
+      { ...record({ id: 'c', usedCount: 500, useLimit: 500 }), codeHint: 'CCCC' },
+      { ...record({ id: 'd', usedCount: 25, useLimit: null }), codeHint: 'DDDD' },
     ].map(({ hint: _hint, ...r }) => r);
-    let select: Record<string, unknown> = {};
     const tx = {
-      agencyInviteCode: {
-        findMany: async (args: { select: Record<string, unknown> }) => ((select = args.select), rows),
-      },
+      agencyInviteCode: { findMany: async () => rows },
     } as unknown as TenantTx;
     const list = await listInviteCodesIn(tx, 'agency', NOW);
-    expect(list.map((c) => [c.hint, c.status])).toEqual([
-      ['AAAA', 'active'],
-      ['BBBB', 'active'],
-      ['CCCC', 'active'],
+    expect(list.map((c) => [c.hint, c.status, c.useLimit])).toEqual([
+      ['AAAA', 'active', 500],
+      ['BBBB', 'active', null],
+      ['CCCC', 'exhausted', 500],
+      ['DDDD', 'active', null],
     ]);
-    expect(select).not.toHaveProperty('usedCount');
     expect(JSON.stringify(list)).not.toMatch(/usedCount|"used/);
+    expect(JSON.stringify(list)).not.toMatch(/"(7|3|25)"|:7\b|:3\b|:25\b/);
   });
 });

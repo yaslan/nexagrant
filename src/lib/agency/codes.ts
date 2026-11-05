@@ -14,6 +14,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
+import { INVITE_CODE_DEFAULT_USE_LIMIT } from './invite-policy';
 import {
   generateInviteCode,
   hashInviteCode,
@@ -71,8 +72,13 @@ export interface CreatedInviteCode {
  * one code: R ≤ Σ used) read a code's 1..4 uses back; with a single code it was
  * the exact registration total. src/lib/agency/funnel.attack.test.ts joins
  * this panel with the funnel.
+ *
+ * FO-392 adds 'exhausted' for a code that reached its useLimit. That is the one
+ * place a number's consequence shows again; the registration form already says
+ * the same to anyone who types the code, so the panel adds nothing to what the
+ * agency can find out (see the report, K-577141).
  */
-export type InviteCodeStatus = 'active' | 'revoked' | 'expired';
+export type InviteCodeStatus = 'active' | 'revoked' | 'expired' | 'exhausted';
 
 /** One code as it leaves the server: the dashboard's props and every list action. No count. */
 export interface InviteCodeSummary {
@@ -80,6 +86,8 @@ export interface InviteCodeSummary {
   hint: string;
   label: string | null;
   status: InviteCodeStatus;
+  /** Uses the code may reach; `null` = unlimited (a code from before FO-392). Never the used count. */
+  useLimit: number | null;
   expiresAt: string;
   revokedAt: string | null;
   createdAt: string;
@@ -92,24 +100,24 @@ export interface InviteCodeRecord {
   label: string | null;
   /** Never read for the panel (TASK-MUM2RMN3YIBGC); allowed here so a full row can be passed. */
   usedCount?: number;
+  /** `null` = unlimited. */
+  useLimit?: number | null;
   expiresAt: Date;
   revokedAt: Date | null;
   createdAt: Date;
 }
 
 /**
- * No "exhausted", and no use limit behind it (leed-fb 29.09). The panel first
- * dropped the status (TASK-MUM2RMN3YIBGC): it gave the code's exact use count
- * (= its limit), which joined with the funnel's rounded bounds put the one code
- * still active at 1..4 uses (TASK-MUM1OTRM75QS2-crw-fb.md B-1). The agency could
- * still try its own code on the registration form and read the same count
- * from a refusal (TASK-MUM3TMP8HU76G-crw-fb.md Ö-1), so the limit itself went
- * (TASK-MUM4WVYLSH9IT): a code is usable until it expires or is revoked, which
- * the agency already knows. `usedCount` is not read here at all.
+ * Status for the panel. Revoked and expired win over exhausted, as in
+ * note_agency_invite_rejection(). 'exhausted' is the only status that reads
+ * `usedCount`, and only against the code's own limit: the number itself still
+ * never leaves the server (inviteCodeRow). A code without a limit (NULL, from
+ * before FO-392) is never exhausted.
  */
 export function inviteCodeStatus(c: InviteCodeRecord, now: number): InviteCodeStatus {
   if (c.revokedAt) return 'revoked';
   if (c.expiresAt.getTime() <= now) return 'expired';
+  if (c.useLimit != null && (c.usedCount ?? 0) >= c.useLimit) return 'exhausted';
   return 'active';
 }
 
@@ -120,6 +128,7 @@ export function inviteCodeRow(c: InviteCodeRecord, now: number): InviteCodeSumma
     hint: c.hint,
     label: c.label,
     status: inviteCodeStatus(c, now),
+    useLimit: c.useLimit ?? null,
     expiresAt: c.expiresAt.toISOString(),
     revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),
@@ -160,6 +169,7 @@ export async function createInviteCodeIn(
       codeHash: hashInviteCode(normalized),
       codeHint: inviteCodeHint(normalized),
       label: input.label?.trim() || null,
+      useLimit: INVITE_CODE_DEFAULT_USE_LIMIT,
       expiresAt: input.expiresAt,
       createdBy: input.createdBy,
     },
@@ -171,7 +181,7 @@ export async function createInviteCodeIn(
       actorId: input.createdBy,
       type: 'agency.invite.created',
       target: row.id,
-      data: { expiresAt: row.expiresAt.toISOString() },
+      data: { expiresAt: row.expiresAt.toISOString(), useLimit: INVITE_CODE_DEFAULT_USE_LIMIT },
     },
   });
   return { id: row.id, code, hint: row.codeHint, expiresAt: row.expiresAt };
@@ -215,18 +225,20 @@ export async function listInviteCodesIn(
       id: true,
       codeHint: true,
       label: true,
+      useLimit: true,
+      usedCount: true,
       expiresAt: true,
       revokedAt: true,
       createdAt: true,
     },
   });
-  // No usedCount: nothing the panel shows depends on it (TASK-MUM2RMN3YIBGC).
+  // usedCount is read only to decide 'exhausted'; inviteCodeRow drops it (TASK-MUM2RMN3YIBGC).
   return rows.map(({ codeHint, ...r }) => inviteCodeRow({ ...r, hint: codeHint }, now));
 }
 
 /**
  * Uses the code once and returns the agency's tenant id, or `null` for every
- * kind of unusable code — malformed, unknown, expired, revoked, or
+ * kind of unusable code — malformed, unknown, expired, revoked, used up, or
  * belonging to an agency that no longer is one. The caller cannot tell these
  * apart, and neither can whoever typed the code.
  *
