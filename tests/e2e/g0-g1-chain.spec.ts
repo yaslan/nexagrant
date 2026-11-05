@@ -124,6 +124,11 @@ async function seed() {
 
   await seedIdentity(FRESH, FRESH_WORKSPACE, FRESH_SLUG, FRESH_USER, FRESH_EMAIL);
   await seedIdentity(PRO, PRO_WORKSPACE, PRO_SLUG, PRO_USER, PRO_EMAIL);
+  // FO-389: this account asks four PIC questions in a row. A tenant nobody vouched for gets three an
+  // hour, so it comes in with an agency's invitation (the Pro tenant plays the agency): still on
+  // Discover with no plan and no M8, which is all this spec is about. The open-account limit has its
+  // own spec (profile-pic-unsolicited).
+  await prisma.tenant.update({ where: { id: FRESH }, data: { agencyId: PRO } });
   await prisma.user.create({ data: { id: PRO_MEMBER, email: PRO_MEMBER_EMAIL, name: 'member', locale: 'tr' } });
   await prisma.membership.create({ data: { userId: PRO_MEMBER, tenantId: PRO, role: 'MEMBER', workspaceIds: [PRO_WORKSPACE] } });
 
