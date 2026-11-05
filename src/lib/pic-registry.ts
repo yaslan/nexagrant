@@ -17,8 +17,59 @@
 export const PIC_REGISTRY_STATUSES = ['FOUND', 'NOT_FOUND', 'UNKNOWN'] as const;
 export type PicRegistryStatus = (typeof PIC_REGISTRY_STATUSES)[number];
 
+import { env } from '@/lib/env';
+
 export const PIC_REGISTRY_DEFAULT_URL =
   'https://ec.europa.eu/info/funding-tenders/opportunities/api/orgProfile/data.json';
+
+/** The only host a production call may reach (SSRF guard: a configured URL cannot point elsewhere). */
+const PRODUCTION_HOSTS: ReadonlySet<string> = new Set(['ec.europa.eu']);
+/** Reachable only when the test flag is on (a local stub in the test runs). */
+const LOCAL_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost']);
+
+/**
+ * True when the address may be called at all: the host is on the allow-list, no credentials are
+ * embedded, and production hosts use https. Local hosts are allowed only with `allowLocal`.
+ */
+export function isAllowedRegistryUrl(raw: string, allowLocal: boolean): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.username !== '' || url.password !== '') return false;
+  if (PRODUCTION_HOSTS.has(url.hostname)) return url.protocol === 'https:';
+  if (allowLocal && LOCAL_HOSTS.has(url.hostname)) return url.protocol === 'http:' || url.protocol === 'https:';
+  return false;
+}
+
+export interface PicRegistrySettings {
+  url?: string;
+  off?: boolean;
+  allowLocal?: boolean;
+  nodeEnv?: string;
+}
+
+function settingsFromEnv(): PicRegistrySettings {
+  return {
+    url: env.PIC_REGISTRY_URL,
+    off: env.PIC_REGISTRY_OFF === 'true',
+    allowLocal: env.PIC_REGISTRY_ALLOW_LOCAL === 'true' || env.NODE_ENV === 'test',
+    nodeEnv: env.NODE_ENV,
+  };
+}
+
+/**
+ * The address to ask, or `null` when no call may be made. Off wins. Without a configured URL only
+ * production uses the public address; anywhere else (dev, test, e2e) there is no call (fail-closed).
+ */
+export function resolvePicRegistryUrl(source: PicRegistrySettings = settingsFromEnv()): string | null {
+  if (source.off) return null;
+  const candidate = source.url ?? (source.nodeEnv === 'production' ? PIC_REGISTRY_DEFAULT_URL : null);
+  if (candidate === null) return null;
+  return isAllowedRegistryUrl(candidate, source.allowLocal === true) ? candidate : null;
+}
 
 /** Five seconds: the save waits for this, so a slow register must not hold the form. */
 export const PIC_REGISTRY_TIMEOUT_MS = 5_000;
@@ -34,7 +85,11 @@ export type PicRegistryReason =
   | 'http_error'
   | 'too_large'
   | 'bad_json'
-  | 'schema_changed';
+  | 'schema_changed'
+  /** No address is configured for this environment, or the check is switched off: nothing is sent. */
+  | 'disabled'
+  /** A configured address whose host is not on the allow-list: nothing is sent. */
+  | 'host_not_allowed';
 
 export interface PicRegistryResult {
   status: PicRegistryStatus;
@@ -46,6 +101,8 @@ export interface PicRegistryDeps {
   baseUrl?: string;
   timeoutMs?: number;
   maxBytes?: number;
+  /** Test-only: allow 127.0.0.1 / localhost as the address (a local stub). Default: the env flag. */
+  allowLocal?: boolean;
 }
 
 /**
@@ -87,10 +144,18 @@ async function readCapped(response: Response, maxBytes: number): Promise<string 
 
 /** Asks the register about one PIC. Input is the bare nine digits (see `TenantPicSchema`). */
 export async function checkPicRegistry(pic: string, deps: PicRegistryDeps = {}): Promise<PicRegistryResult> {
+  const settings = settingsFromEnv();
+  // FO-396 fail-closed: check the address BEFORE any fetch. No address, switched off, or a host off
+  // the allow-list → UNKNOWN with no request sent.
+  if (settings.off) return { status: 'UNKNOWN', reason: 'disabled' };
+  const base = deps.baseUrl ?? resolvePicRegistryUrl(settings);
+  if (base === null) return { status: 'UNKNOWN', reason: 'disabled' };
+  if (!isAllowedRegistryUrl(base, deps.allowLocal ?? settings.allowLocal === true)) return { status: 'UNKNOWN', reason: 'host_not_allowed' };
+
   const doFetch = deps.fetch ?? fetch;
   const timeoutMs = deps.timeoutMs ?? PIC_REGISTRY_TIMEOUT_MS;
   const maxBytes = deps.maxBytes ?? PIC_REGISTRY_MAX_BYTES;
-  const url = `${deps.baseUrl ?? PIC_REGISTRY_DEFAULT_URL}?pic=${encodeURIComponent(pic)}`;
+  const url = `${base}?pic=${encodeURIComponent(pic)}`;
 
   let response: Response;
   try {

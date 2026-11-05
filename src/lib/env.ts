@@ -89,6 +89,17 @@ const envSchema = z.object({
    * apply; the route logs that once. Set it to a random string of 32+ characters.
    */
   EXPERT_PREREG_IP_SALT: blankToUndefined(z.string().min(32).optional()),
+  /**
+   * FO-396. The EU participant register's organisation-profile address (src/lib/pic-registry.ts).
+   * Unset with NODE_ENV=production = the production address; unset anywhere else = no call at all
+   * (fail-closed, the answer is UNKNOWN). Only `ec.europa.eu` is called, unless the test flag below
+   * is on.
+   */
+  PIC_REGISTRY_URL: optionalUrl,
+  /** FO-396. Test-only: lets the register check reach 127.0.0.1 / localhost (a local stub). Unset = off. */
+  PIC_REGISTRY_ALLOW_LOCAL: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /** FO-396. Switches the register check off entirely (the e2e web server). Unset = off. */
+  PIC_REGISTRY_OFF: blankToUndefined(z.enum(['true', 'false']).optional()),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
