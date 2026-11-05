@@ -40,7 +40,7 @@ pnpm gate:isolated git push -u origin <dal>
 1. Boş bir port üzerinde yeni `pgvector/pgvector:pg16` konteyneri (CI'ın imajı), DB adı `fabrika_gate` — `fabrika` değil: `tests/expert-prereg-retention.live.test.ts` o adda kendini atlar. Paylaşılan `:5433` veritabanına ve oradaki `fabrika_app` parolasına dokunmaz.
 2. `pnpm db:setup` (CI'ın kullandığı yol: ensure_rls → db push → db:rls-role → db:rls → migrations → db:rls → seed).
 3. `pnpm storage:setup` ile `test-evidence` + `test-public` (anonim okuma) bucket'ları.
-4. CI'ın test değerleri: `DATABASE_URL`, `DATABASE_URL_RLS_TEST` (`fabrika_app_ci`), `AUTH_SECRET` + `KEEP_EU_LIVE=1` (vitest), `R2_*` → MinIO (e2e); boş bir `E2E_PORT` (3400'den başlar).
+4. CI'ın test değerleri: `DATABASE_URL`, `DATABASE_URL_RLS_TEST` (`fabrika_app_ci`), `AUTH_SECRET` + `KEEP_EU_LIVE=1` (vitest), `R2_*` → MinIO (e2e); `E2E_PORT` (3400'den başlar; kilit alındıktan sonra `gate-lock.mjs` seçer, FO-388).
 5. Çıkışta konteyneri siler (`GATE_KEEP=1` tutar) ve `next dev`'in yeniden biçimlendirdiği `tsconfig.json`'ı, başta temizse geri alır.
 
 Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortamını öncelikli okur); checkout'un kendi `.env`'i karışmaz. Tüm kimlik bilgileri atılabilir yerel değerlerdir (ci.yml'deki ile aynı); sır değildir.
@@ -72,3 +72,48 @@ Ek: `CI=true` verirsen `keep-eu-sync.live` `KEEP_EU_LIVE` tanımsızsa "CI'da at
 ## Platform
 
 Betikler bash (macOS 3.2 ve Linux bash ile uyumlu; `/dev/tcp` port yoklaması bash yerleşiği). Docker ve pnpm gerekir. Windows'ta yalnız WSL/Git Bash içinde çalışır; denenmedi.
+
+## e2e sunucusu koşu ortasında kapanırsa (FO-385)
+
+Belirti: testler bir noktadan sonra `ERR_CONNECTION_REFUSED` veya `ERR_EMPTY_RESPONSE` ile düşer. Önce kodu değil, logun sonundaki `[e2e-server-diag]` satırlarını oku. `pnpm gate:isolated` bu satırları çıkışta bir kez daha basar. Düz `pnpm test:e2e`te yalnız `[WebServer]` önekiyle koşu sırasında görünürler.
+
+| Olay | Anlamı | Bakılacak yer |
+|---|---|---|
+| `signal-received` + `server-exit` | Sunucu dışarıdan sinyal aldı. `next dev` `SIGTERM`te 0 ile çıkar, yani `code:0` temiz bitiş demek değildir; kanıt `signal-received` satırıdır. | Aşağıdaki gönderen araması |
+| Yalnız `server-exit` (`signal-received` yok) | Sinyal yakalanamadı (`SIGKILL`: `code` boş, `signal` dolu) ya da sunucu kendi düştü (`code` sıfırdan farklı). | `freeMemMb`, `load`, logdaki son `[WebServer]` hatası |
+| `server-port-closed` | Süreç duruyor, port 30 saniyedir kapalı. | `processes` listesi |
+| `wall-clock-jump` | Süreç `gapSec` saniye çalışamadı: makine uyudu veya donduruldu. `lastSleep` macOS'ta uykunun nedenini yazar (`Clamshell Sleep` = kapak kapandı). Bu aralıkta `net::ERR_NETWORK_IO_SUSPENDED` ve `ENOTFOUND` beklenir; kod hatası değildir. | `pmset -g log` |
+| `runner-gone` | Runner sunucuyu kapatmadan bitti; denetleyici yetim sunucu bırakmamak için sunucuyu kapattı. | Runner için `signal-received` |
+
+Sunucu hazır olduktan sonra ölürse denetleyici (`tests/e2e/support/server-supervisor.mjs`) runner'a `SIGINT` yollar. Koşu kırmızı biter, kalan testler dakikalarca boşa düşmez. Yeniden başlatma ve yeniden deneme yoktur.
+
+**Gönderen araması.** macOS ve Node sinyali kimin yolladığını söylemez. O yüzden gönderen, zaman eşleşmesiyle bulunur: `~/.claude/projects/*/*.jsonl` içinde olayın zamanından hemen önceki `pkill`, `killall`, `kill` komutlarına bak. FO-385'te incelenen dört sonlanmanın zamanı ve süreç listesi, başka projedeki bir oturumun makine geneli `pkill -f` komutlarıyla zaman olarak uyuşuyor. Bu bir eşleşmedir, kanıt değildir: gönderen kaydı yok, yani `pkill` komutunun sunucuya gittiği gösterilmedi. Teşhisin canlı yakaladığı olaylarda paralel koşan sunucular aynı anda `SIGTERM` aldı; bu da zaman uyumudur, gönderen kanıtı değildir.
+
+**Kural.** Bu makinede `pkill -f` ile `next dev`, `next-server` veya `@playwright/test` hedefleme: desen, başka ajanın sunucusuna da uyar. Kendi sürecini `kill <pid>` ile durdur.
+
+`uncaughtException: Error: aborted` (`ECONNRESET`) satırları ölüm nedeni değildir: yeşil koşularda da onlarca kez görünür ve sunucu ayakta kalır.
+
+Bilinen açık (e2e portu, FO-388 ile düzeltildi): Eskiden `gate-isolated` e2e portunu kilitten önce, "ilk boş" diye seçiyordu. Kuyrukta bekleyen koşu sırası gelene kadar bu portun başkası tarafından alındığını göremiyordu (FO-386: 27 dk bekledikten sonra `http://localhost:3400 is already used`). Şimdi e2e portu `scripts/gate-lock.mjs` kilidi alındıktan sonra, birim ve i18n adımlarından önce, 3400'den ilk boş port olarak seçilir ve koşunun ortamına (`E2E_PORT`) yazılır. Elle verilen `E2E_PORT` değiştirilmez: kilit alındığında doluysa koşu hemen `E2E_PORT <p> dolu` hatasıyla düşer, komut çalışmaz. Kanıt: `tests/gate-lock.test.ts` (kuyrukta bekleyen koşu, taban port dolu olduğunda başka port seçer; düzeltme öncesi bu test kırmızıydı).
+
+Konteyner portu (`GATE_PG_PORT`) aynı sınıf hatadan etkilenmez: konteyner `docker run -d` ile portu hemen bağlar ve kilit beklerken de tutar; ön kontrol bu portu dolu görür (bash ile ölçüldü, FO-388). İki başlatma aynı boş portu aynı anda seçerse ikincisi `Bind for 127.0.0.1:<port> failed: port is already allocated` ile çıkış 125 verir; bu açık bir hatadır, sessiz değildir. Yeniden denemeye gerek yok, yeniden çalıştır.
+
+Port yoklaması (FO-388, üçüncü inceleme): bir port boş sayılması için dört adreste de boş olmalı: `127.0.0.1`, `0.0.0.0`, `::1`, `::`. macOS'ta ölçüldü (Node): her dinleyici türü yalnız kendi adresinde görünür; tek adres yoklaması wildcard ve loopback dinleyicilerini kaçırır. `next dev --port` (Next 16.4.3) `::` dinler; yalnız `127.0.0.1` yoklayan eski sürüm bunu boş sayıp koşuyu `already used` ile kırmızı bitiriyordu. Yalnız `EADDRINUSE` meşgul demektir; IPv6 yoksa ilgili adres atlanır. Vaka başına testler: `tests/gate-lock.test.ts`.
+
+Betiğin kendi ön seçimi (kilidi almayan `gate-isolated.sh <komut>` yolu, ör. `git push`): betik portu `E2E_PORT`'a yazar ve aynı değeri `FONBRIDGE_E2E_PORT_PREPICK` ile işaretler. `gate-lock.mjs` AUTO modunda bu işaretli değeri sessizce yok sayar ve kilitten sonra yeniden seçer. İşaretsiz bir `E2E_PORT` elle verilmiştir: yok sayılır ve stderr'de `⚠ E2E_PORT=<p> elle verilmiş ama FONBRIDGE_E2E_PORT_AUTO=1; yok sayıldı` uyarısı çıkar. Hata vermez, push'u kırmaz. Karar testleri: `tests/gate-isolated-e2e-port.test.ts` (`GATE_ISOLATED_DRY_RUN=1` karar satırını basar).
+
+Bayat kilit temizliği (`clearIfStale`): sahip okunup kilit taşınana kadar başka bir süreç kilidi alabilir. Bu yüzden önce taşınır, sonra taşınanın sahibine bakılır; hâlâ aynı ölü sahipse silinir, değilse geri adlandırılır. Okuma-taşıma arası yarış test edilemez (araya girmek için üretim koduna kanca gerekir); test yalnız normal yolu doğrular.
+
+Hâlâ geçerli: kilidi almayan bir komutu `gate-isolated.sh <komut>` ile verirsen (ör. `pnpm gate:isolated pnpm test:e2e`), e2e portu bu yolda kilitten önce seçilir. Paralel koşuda orada `E2E_PORT` ver.
+
+## Founder-number kırmızısı (FO-380)
+
+`tests/expert-prereg.live.test.ts` "founder number race" testinin FO-250 döneminde (2026-10-30) görülen kırmızısı yeniden üretilemedi. Ölçüm: tam gate, 36 `yes` yükü altında (load1 ~23 → ~84), izole DB'de yeşil (6357 birim, 489 e2e); founder testi üç ayrı izole koşumda geçti. Ham çıktı ve yük kaydı: `docs/agent-results/TASK-MW2MMHM0Q18US-devop-fb.md`.
+
+Eşzamanlılık garantisi kodda: atama `pg_advisory_xact_lock` altında (`src/lib/expert-prereg/server/verify.ts`), sayaç yalnız yükselir (`founder-counter.ts`), `founderNumber` `@unique` ve tek satırlık sayaç `CHECK (id = 1)`.
+
+Kırmızı yeniden görülürse:
+1. Gate logunu sakla (`gate-isolated` çıktısının tamamı; `GATE_KEEP=1` ile konteyneri de tut). Yük kaydı (`uptime`) ve koşunun `E2E_PORT` / `GATE_PG_PORT` değerleri logda kalsın.
+2. Hatanın tam süitte mi, tek dosyada mı olduğuna bak. Tek dosyada geçiyorsa yarış değil, koşu sırası (`expert-prereg-reissue.live.test.ts` aynı tabloyu kullanır; `tests/helpers/expert-prereg-live-lock` ile seri tutulur) ya da zaman aşımıdır. `DB_CONNECT_TIMEOUT_MS=10000` gate-isolated'ta ayarlıdır.
+3. Hata numara çakışması ya da boşluk gösteriyorsa gerçek eşzamanlılık hatasıdır: `verify.ts` kilidini ve unique kısıtı kontrol et, testi gevşetme. Sayaç ile `max(founderNumber)` farkı, kilit dışından yazım olduğunu gösterir.
+4. Kırmızı yalnız bağlantı zaman aşımıysa (`DB_CONNECT_TIMEOUT_MS`) ve koşu paylaşımlı `:5433` DB'ye karşıysa, koşu izole değildi: `pnpm gate:isolated` ile yeniden koş.
+5. Üç koşu da yeşilse kırmızıyı kaydet ve kartı kapatma; ham log olmadan kök neden yazma.

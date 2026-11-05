@@ -14,13 +14,13 @@
   --ink-2: #334155;
   --muted: #5B6B7F; /* 5.03:1 on --ground, 5.45:1 on white; #64748B was 4.39 (K-4) */
   --line: #E2E8F0;
-  --accent: #0369A1;
-  --accent-ink: #0369A1;
-  --accent-light: rgba(3, 105, 161, 0.12);
-  /* Solid fills that carry white text. --accent alone drops to 3.68:1 against
-     white in dark mode, which fails WCAG AA for body-size text, so buttons use
-     this darker step instead. Light mode is already compliant at 6.4:1. */
-  --accent-strong: #0369A1;
+  /* Accent = logo blue (NG-2, K-576956). Light uses the logo's deep blue #012C9C for every step:
+     #2563FF is 4.45:1 on --surface-hover, 3.68 on its own tint and 4.13 under white text at
+     hover:opacity-90. Ratios are enforced in tests/theme-token-contrast.test.ts. */
+  --accent: #012C9C;
+  --accent-ink: #012C9C;
+  --accent-light: rgba(1, 44, 156, 0.12);
+  --accent-strong: #012C9C; /* solid fill that carries white text */
   --amber: #D97706;
   --ok: #059669;
   --bad: #DC2626;
@@ -41,10 +41,12 @@
   --ink-2: #CBD5E1;
   --muted: #94A3B8;
   --line: #1E293B;
-  --accent: #0891B2;
-  --accent-ink: #67E8F9;
-  --accent-light: rgba(8, 145, 178, 0.12);
-  --accent-strong: #0E7490; /* 5.36:1 against white */
+  /* #2563FF carries white text (4.88:1) and clears 3:1 as a border or ring, but is only 3.59-3.98
+     as text on these grounds, so text takes the same hue lifted to #8FB0FF (--text-color-accent). */
+  --accent: #2563FF;
+  --accent-ink: #8FB0FF;
+  --accent-light: rgba(37, 99, 255, 0.12);
+  --accent-strong: #2563FF;
   --amber: #FBBF24;
   --ok: #34D399;
   --bad: #F87171;
@@ -66,6 +68,9 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-light: var(--accent-light);
   --color-accent-strong: var(--accent-strong);
+  /* `text-accent` is text, whatever `bg-accent` needs to be: no single blue on the dark grounds
+     passes 4.5:1 both under white text and as text. Only the text-* utilities read this. */
+  --text-color-accent: var(--accent-ink);
   --color-amber: var(--amber);
   --color-ok: var(--ok);
   --color-bad: var(--bad);
@@ -82,7 +87,7 @@
   --color-popover: var(--surface);
   --color-popover-foreground: var(--ink);
   --color-primary: var(--accent);
-  --color-primary-foreground: #020617;
+  --color-primary-foreground: #FFFFFF;
   --color-secondary: var(--ground);
   --color-secondary-foreground: var(--ink);
   --color-muted-foreground: var(--muted);
