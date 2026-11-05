@@ -3652,6 +3652,7 @@
     "picPlaceholder": "e.g. 999999999",
     "picHelper": "Optional. Your organisation's 9-digit EU code; search your organisation's name in the <register>Participant Register</register> to find it. Your project history in CORDIS is read with this code for the coordination and network criteria of the G0 score.",
     "picErrorInvalid": "A PIC has 9 digits. Nothing was saved.",
+    "picErrorRateLimited": "Too many PIC attempts in a short time. Nothing was saved. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
     "picErrorTaken": "This PIC is registered on another account. Nothing was saved. If it belongs to your organisation, write to <support>{email}</support>; we will review it and remove the record if needed.",
     "picConfirmTitle": "In CORDIS this PIC belongs to the organisation below. Is it yours?",
     "picConfirmWarning": "Confirm only your organisation's own PIC: this organisation's project history counts towards your score, and your confirmation goes into the audit log. We cannot check portal ownership automatically.",
@@ -4259,7 +4260,10 @@
       "history": "PIC history",
       "historyEmpty": "This tenant has no PIC history.",
       "eventUpdated": "{from} → {to}",
-      "eventRemoved": "Removed by staff: {pic}"
+      "eventRemoved": "Removed by staff: {pic}",
+      "refusals": "Refused PIC attempts",
+      "eventRefused": "Registered on another account: {pic}",
+      "eventRateLimited": "Limit reached: {pic}"
     },
     "internalPlan": {
       "title": "Internal plan assignment",

@@ -11,11 +11,18 @@
  */
 import { revalidatePath } from 'next/cache';
 import { withTenant, type TenantTx } from '@/lib/db';
-import { TenantPicInputSchema } from '@/lib/pic';
+import { PIC_LOOKUPS_PER_HOUR, TenantPicInputSchema } from '@/lib/pic';
 import { toTenantProvince, provinceAppliesTo } from '@/lib/province';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
+import { UserWindowLimiter } from '@/lib/user-rate-limit';
+
+const HOUR_MS = 3_600_000;
+/** FO-386. One process, so N instances allow N times this; see UserWindowLimiter. */
+const picLookupLimiter = new UserWindowLimiter(PIC_LOOKUPS_PER_HOUR, HOUR_MS);
+/** A loop against the limit is worth one audit row an hour, not one row per request. */
+const picLimitRecordLimiter = new UserWindowLimiter(1, HOUR_MS);
 
 export type ProvinceActionError = 'forbidden' | 'notApplicable' | 'invalid' | 'failed' | PilotExpiredCode;
 
@@ -47,7 +54,8 @@ export type PicSaveOutcome =
 
 type PicPlan =
   | { kind: 'keep' }
-  | { kind: 'refuse'; error: 'picTaken' }
+  | { kind: 'refuse'; pic: string }
+  | { kind: 'limit'; pic: string; retryAfterSeconds: number }
   | { kind: 'confirm'; match: PicCordisMatch }
   | { kind: 'write'; from: string | null; to: string | null; match: PicCordisMatch | null };
 
@@ -63,20 +71,33 @@ type PicPlan =
  * Tenant is system-wide (no RLS), so the duplicate check sees other tenants. Its answer is yes or
  * no: their identity never leaves this function. There is no unique index behind it, so the lock
  * is what keeps two tenants claiming one PIC at once from both passing. It is held to commit.
+ *
+ * FO-386: that yes or no, asked over the public CORDIS list, says who our customers are. So every
+ * question counts against the user, whatever the answer turns out to be, and is counted before the
+ * lock and the lookup: past the limit nothing is looked up, so the answer cannot depend on the PIC.
  */
-async function planPicChange(tx: TenantTx, tenantId: string, next: string, confirmedPic: string | undefined): Promise<PicPlan> {
+async function planPicChange(
+  tx: TenantTx,
+  tenantId: string,
+  userId: string,
+  next: string,
+  confirmedPic: string | undefined
+): Promise<PicPlan> {
   const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { pic: true } });
   const current = tenant?.pic ?? null;
   const to = next === '' ? null : next;
   if (current === to) return { kind: 'keep' };
   if (to === null) return { kind: 'write', from: current, to: null, match: null };
 
+  const retryAfterSeconds = picLookupLimiter.take(userId);
+  if (retryAfterSeconds !== null) return { kind: 'limit', pic: to, retryAfterSeconds };
+
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`tenant-pic:${to}`}, 0))`;
   const holder = await tx.tenant.findFirst({
     where: { pic: to, id: { not: tenantId }, deletedAt: null },
     select: { id: true },
   });
-  if (holder) return { kind: 'refuse', error: 'picTaken' };
+  if (holder) return { kind: 'refuse', pic: to };
 
   const match = await tx.cordisOrganization.findUnique({
     where: { organisationId: to },
@@ -86,12 +107,29 @@ async function planPicChange(tx: TenantTx, tenantId: string, next: string, confi
   return { kind: 'write', from: current, to, match };
 }
 
+/**
+ * FO-386 — who asked for which PIC, on the tenant that asked. Only what the asker typed: the holder
+ * is not named here and the holder's own log gets no row, so staff read this without it telling
+ * anyone else who holds what.
+ */
+function recordPicRefusal(
+  tx: TenantTx,
+  scope: { tenantId: string; userId: string },
+  pic: string,
+  reason: 'picTaken' | 'rateLimited'
+) {
+  return tx.auditEvent.create({
+    data: { tenantId: scope.tenantId, actorId: scope.userId, type: 'tenant.pic.refused', data: { pic, reason } },
+  });
+}
+
 export async function updateTenantProfile(
   input: UpdateProfileInput
 ): Promise<
   | { ok: true; pic?: PicSaveOutcome }
   | { ok: false; error: ProfileActionError }
   | { ok: false; error: 'picConfirmationRequired'; match: PicCordisMatch }
+  | { ok: false; error: 'picRateLimited'; retryAfterSeconds: number }
 > {
   try {
     const scope = await requireTenantAction();
@@ -123,9 +161,16 @@ export async function updateTenantProfile(
     return await withTenant(scope.tenantId, async (tx) => {
       // Refusals come before any write: a refused PIC saves nothing, the profile text included.
       const picPlan: PicPlan = picInput?.success
-        ? await planPicChange(tx, scope.tenantId, picInput.data, confirmedPic)
+        ? await planPicChange(tx, scope.tenantId, scope.userId, picInput.data, confirmedPic)
         : { kind: 'keep' };
-      if (picPlan.kind === 'refuse') return { ok: false as const, error: picPlan.error };
+      if (picPlan.kind === 'limit') {
+        if (picLimitRecordLimiter.take(scope.userId) === null) await recordPicRefusal(tx, scope, picPlan.pic, 'rateLimited');
+        return { ok: false as const, error: 'picRateLimited' as const, retryAfterSeconds: picPlan.retryAfterSeconds };
+      }
+      if (picPlan.kind === 'refuse') {
+        await recordPicRefusal(tx, scope, picPlan.pic, 'picTaken');
+        return { ok: false as const, error: 'picTaken' as const };
+      }
       if (picPlan.kind === 'confirm') {
         return { ok: false as const, error: 'picConfirmationRequired' as const, match: picPlan.match };
       }

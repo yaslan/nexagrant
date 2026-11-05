@@ -58,7 +58,8 @@ export default function TenantProfileForm({
   const [savedPic, setSavedPic] = useState(initialPic ?? '');
   const [savedPicMatch, setSavedPicMatch] = useState(initialPicMatch);
   const [picCleared, setPicCleared] = useState(false);
-  const [picError, setPicError] = useState<'invalid' | 'taken' | null>(null);
+  const [picError, setPicError] = useState<'invalid' | 'taken' | 'rateLimited' | null>(null);
+  const [picRetryMinutes, setPicRetryMinutes] = useState(0);
   const [pendingMatch, setPendingMatch] = useState<PicCordisMatch | null>(null);
   const picInputRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
@@ -119,6 +120,11 @@ export default function TenantProfileForm({
       setTimeout(() => setSavedSuccess(false), 4000);
     } else if (result.error === 'picConfirmationRequired') {
       setPendingMatch(result.match);
+    } else if (result.error === 'picRateLimited') {
+      setPendingMatch(null);
+      setPicRetryMinutes(Math.ceil(result.retryAfterSeconds / 60));
+      setPicError('rateLimited');
+      picInputRef.current?.focus();
     } else if (result.error === 'picInvalid' || result.error === 'picTaken') {
       setPendingMatch(null);
       setPicError(result.error === 'picInvalid' ? 'invalid' : 'taken');
@@ -281,16 +287,17 @@ export default function TenantProfileForm({
               <p role="alert" className="font-semibold text-bad flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>
-                  {picError === 'invalid'
-                    ? t('picErrorInvalid')
-                    : t.rich('picErrorTaken', {
-                        email: supportEmail,
-                        support: (chunks) => (
-                          <a href={`mailto:${supportEmail}`} className="underline underline-offset-2 break-all">
-                            {chunks}
-                          </a>
-                        ),
-                      })}
+                  {picError === 'invalid' && t('picErrorInvalid')}
+                  {picError === 'rateLimited' && t('picErrorRateLimited', { minutes: picRetryMinutes })}
+                  {picError === 'taken' &&
+                    t.rich('picErrorTaken', {
+                      email: supportEmail,
+                      support: (chunks) => (
+                        <a href={`mailto:${supportEmail}`} className="underline underline-offset-2 break-all">
+                          {chunks}
+                        </a>
+                      ),
+                    })}
                 </span>
               </p>
             )}

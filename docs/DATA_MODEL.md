@@ -929,6 +929,14 @@ tenant.pic.removed` (`{ from, note }`, `actorId` = yönetici, `tenantId` = hedef
 yeniden puanlama yapmaz: `Opportunity.g0Score` ve `TopicMatch.g0Score` bir sonraki yeniden
 hesaba kadar eski değerde kalır.
 
+FO-386: "başka hesapta kayıtlı" cevabı evet/hayır olduğundan, yeni bir PIC'i soran her kayıt
+kullanıcı başına sayılır (`PIC_LOOKUPS_PER_HOUR`, `UserWindowLimiter`: süreç içi, N örnek N katı
+izin verir, yeniden başlatma sayacı sıfırlar). Sayım kilitten ve sorgudan önce yapılır; sınır
+aşılınca hiçbir şey sorgulanmaz ve kaydedilmez. Ret `AuditEvent: tenant.pic.refused`
+(`{ pic, reason }`, `reason` = `picTaken` | `rateLimited`, `actorId` = soran, `tenantId` = soranın
+kiracısı) yazar; PIC'i tutan kiracı satırda geçmez, onun kaydına da satır düşmez. `rateLimited`
+kullanıcı başına saatte bir satırdır. Şema değişmedi.
+
 **RLS.** `Tenant` sistem geneli bir tablodur (`tenantId` sütunu yok), `tenant_isolation`
 kapsamı dışındadır; `relrowsecurity = false`, politika 0. Yeni politika gerekmez.
 

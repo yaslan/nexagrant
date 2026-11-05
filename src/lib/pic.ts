@@ -20,3 +20,11 @@ export const TenantPicInputSchema = z
   .max(40)
   .transform((raw) => raw.trim())
   .pipe(z.union([z.literal(''), TenantPicSchema]));
+
+/**
+ * How many times one user may ask, in an hour, whether a PIC can be taken (FO-386). The answer says
+ * whether another account holds that PIC, and the CORDIS list of PICs is public, so this is what
+ * stands between the form and a list of who our customers are. Saving a listed PIC takes two asks,
+ * the question and the confirmation, so this leaves ten honest attempts an hour.
+ */
+export const PIC_LOOKUPS_PER_HOUR = 20;
