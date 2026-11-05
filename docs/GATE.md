@@ -72,3 +72,25 @@ Ek: `CI=true` verirsen `keep-eu-sync.live` `KEEP_EU_LIVE` tanımsızsa "CI'da at
 ## Platform
 
 Betikler bash (macOS 3.2 ve Linux bash ile uyumlu; `/dev/tcp` port yoklaması bash yerleşiği). Docker ve pnpm gerekir. Windows'ta yalnız WSL/Git Bash içinde çalışır; denenmedi.
+
+## e2e sunucusu koşu ortasında kapanırsa (FO-385)
+
+Belirti: testler bir noktadan sonra `ERR_CONNECTION_REFUSED` veya `ERR_EMPTY_RESPONSE` ile düşer. Önce kodu değil, logun sonundaki `[e2e-server-diag]` satırlarını oku. `pnpm gate:isolated` bu satırları çıkışta bir kez daha basar. Düz `pnpm test:e2e`te yalnız `[WebServer]` önekiyle koşu sırasında görünürler.
+
+| Olay | Anlamı | Bakılacak yer |
+|---|---|---|
+| `signal-received` + `server-exit` | Sunucu dışarıdan sinyal aldı. `next dev` `SIGTERM`te 0 ile çıkar, yani `code:0` temiz bitiş demek değildir; kanıt `signal-received` satırıdır. | Aşağıdaki gönderen araması |
+| Yalnız `server-exit` (`signal-received` yok) | Sinyal yakalanamadı (`SIGKILL`: `code` boş, `signal` dolu) ya da sunucu kendi düştü (`code` sıfırdan farklı). | `freeMemMb`, `load`, logdaki son `[WebServer]` hatası |
+| `server-port-closed` | Süreç duruyor, port 30 saniyedir kapalı. | `processes` listesi |
+| `wall-clock-jump` | Süreç `gapSec` saniye çalışamadı: makine uyudu veya donduruldu. `lastSleep` macOS'ta uykunun nedenini yazar (`Clamshell Sleep` = kapak kapandı). Bu aralıkta `net::ERR_NETWORK_IO_SUSPENDED` ve `ENOTFOUND` beklenir; kod hatası değildir. | `pmset -g log` |
+| `runner-gone` | Runner sunucuyu kapatmadan bitti; denetleyici yetim sunucu bırakmamak için sunucuyu kapattı. | Runner için `signal-received` |
+
+Sunucu hazır olduktan sonra ölürse denetleyici (`tests/e2e/support/server-supervisor.mjs`) runner'a `SIGINT` yollar. Koşu kırmızı biter, kalan testler dakikalarca boşa düşmez. Yeniden başlatma ve yeniden deneme yoktur.
+
+**Gönderen araması.** macOS ve Node sinyali kimin yolladığını söylemez. O yüzden gönderen, zaman eşleşmesiyle bulunur: `~/.claude/projects/*/*.jsonl` içinde olayın zamanından hemen önceki `pkill`, `killall`, `kill` komutlarına bak. FO-385'te incelenen dört sonlanmanın zamanı ve süreç listesi, başka projedeki bir oturumun makine geneli `pkill -f` komutlarıyla zaman olarak uyuşuyor. Bu bir eşleşmedir, kanıt değildir: gönderen kaydı yok, yani `pkill` komutunun sunucuya gittiği gösterilmedi. Teşhisin canlı yakaladığı olaylarda paralel koşan sunucular aynı anda `SIGTERM` aldı; bu da zaman uyumudur, gönderen kanıtı değildir.
+
+**Kural.** Bu makinede `pkill -f` ile `next dev`, `next-server` veya `@playwright/test` hedefleme: desen, başka ajanın sunucusuna da uyar. Kendi sürecini `kill <pid>` ile durdur.
+
+`uncaughtException: Error: aborted` (`ECONNRESET`) satırları ölüm nedeni değildir: yeşil koşularda da onlarca kez görünür ve sunucu ayakta kalır.
+
+Bilinen açık: `gate-isolated` portu "ilk boş" diye seçer ve sunucu bağlanana kadar kimse portu tutmaz. Aynı anda başlayan koşular çakışır (Docker bind hatası, çıkış 125 veya `http://localhost:<port> is already used`). Bunlar hemen ve açık hatayla düşer; sunucu ölümü değildir. Paralel koşacaksan `E2E_PORT` ve `GATE_PG_PORT` ver.

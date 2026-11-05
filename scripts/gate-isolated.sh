@@ -70,8 +70,17 @@ db=fabrika_gate
 tsconfig_was_clean=0
 git diff --quiet -- tsconfig.json 2>/dev/null && tsconfig_was_clean=1
 
+# FO-385: how the e2e server ended, printed last so it sits next to the failure summary.
+diag_file="$(mktemp -t fabrika-e2e-server-diag.XXXXXX)"
+export E2E_SERVER_DIAG_FILE="$diag_file"
+
 cleanup() {
   local rc=$?
+  if grep -q '\] {' "$diag_file" 2>/dev/null; then
+    log "e2e server diagnostics (what this means: docs/GATE.md, FO-385):"
+    grep '\] {' "$diag_file" || true
+  fi
+  rm -f "$diag_file"
   if [ "$tsconfig_was_clean" = 1 ] && ! git diff --quiet -- tsconfig.json 2>/dev/null; then
     git checkout -- tsconfig.json && log "tsconfig.json restored (next dev rewrote it)"
   fi
