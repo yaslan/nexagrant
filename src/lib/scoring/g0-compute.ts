@@ -28,6 +28,7 @@ import { DEFAULT_SCORING_WEIGHTS } from './defaults';
 import type { GateReason } from '../gates/reasons';
 import {
   extractG0Features,
+  isPartnerRole,
   topicPrefixOf,
   type G0CordisSnapshot,
   type G0SeatSnapshot,
@@ -152,7 +153,7 @@ async function loadCordisSnapshot(
   // missing data, not a history of zero, so it stays null and the scorer keeps the standard basis.
   // A tenant with no PIC is a measured "no record" only for the partner role: the FO-382 rule is
   // partner-only, and coordinator / unset-role scoring must stay exactly as it was (`cordis: null`).
-  const isPartner = (intendedRole ?? '').trim().toLowerCase() === 'partner';
+  const isPartner = isPartnerRole(intendedRole);
   const noRecord = async (): Promise<G0CordisSnapshot | null> => {
     const anyRow: { projectId: string } | null = await client.cordisParticipation.findFirst({
       select: { projectId: true },

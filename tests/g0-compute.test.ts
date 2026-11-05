@@ -165,6 +165,17 @@ describe('computeG0FromSnapshot()', () => {
     expect(computation.reasons.join(' ')).toContain('no scoring evidence');
   });
 
+  // FO-382 review B2: a seat that is only OPEN or DECLINED is not evidence of anything. With no
+  // topic and no CORDIS record the only thing left is that seat, so the answer is no evidence, not
+  // a measured 0 (which would print a score and count towards coverage).
+  it.each(['OPEN', 'DECLINED'])('gives G0_NO_EVIDENCE when the only seat is %s and nothing else is known', (status) => {
+    const snapshot = { ...emptySnapshot(), intendedRole: 'coordinator', seats: [{ roleKey: 'research', status }] };
+    const c = computeG0FromSnapshot('t1', subject, snapshot);
+    expect(c.coverage).toBe(0);
+    expect(c.score).toBeNull();
+    expect(c.reasonDetails[0]?.code).toBe('G0_NO_EVIDENCE');
+  });
+
   it('honours tenant weights', () => {
     const snapshot = snapshotWithEvidence({ topicFitScore: 100, baseRatePct: 0 });
     const withDefaults = computeG0FromSnapshot('t1', subject, snapshot);

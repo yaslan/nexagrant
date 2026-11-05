@@ -4,6 +4,7 @@ import {
   isCountryEligible,
   isFilledSeat,
   isNoHistoryPartner,
+  isPartnerRole,
   keywordCoverageScore,
   topicPrefixOf,
   type G0Snapshot,
@@ -180,8 +181,9 @@ describe('extractG0Features()', () => {
     });
     const { features, sources } = extractG0Features(s);
     expect(features.researchAndEndUser).toBe(0);
-    // Measured as zero, not missing: the seats exist and the answer is that nobody is attached.
-    expect(sources.find((x) => x.feature === 'researchAndEndUser')?.status).toBe('measured');
+    // Missing, not measured: no seat has a named organisation, so there is no evidence about the
+    // research / end-user roles. Scored 0 either way; only the coverage changes (FO-382 review, B2).
+    expect(sources.find((x) => x.feature === 'researchAndEndUser')?.status).toBe('missing');
   });
 
   it('counts CANDIDATE, INVITED and CONFIRMED seats as having a named partner', () => {
@@ -328,6 +330,16 @@ describe('FO-382 normalisation: status and role spelling', () => {
     expect(isNoHistoryPartner({ intendedRole: role, cordis: noHistory })).toBe(true);
     const ex = extractG0Features(fullSnapshot({ intendedRole: role, cordis: noHistory }));
     expect(ex.scoringBasis).toBe('no_history_evidence');
+  });
+
+  // FO-382 review B4: the compute path (`g0-compute.ts`, record lookup) and the scorer share this one
+  // helper, so a spelling that breaks one breaks both and is caught here.
+  it.each([' Partner ', 'PARTNER', 'partner'])('isPartnerRole accepts %j', (role) => {
+    expect(isPartnerRole(role)).toBe(true);
+  });
+
+  it.each(['coordinator', 'partners', '', null])('isPartnerRole rejects %j', (role) => {
+    expect(isPartnerRole(role)).toBe(false);
   });
 });
 

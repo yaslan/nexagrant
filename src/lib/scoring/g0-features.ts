@@ -83,7 +83,10 @@ export interface G0CordisSnapshot {
 export const FILLED_SEAT_STATUSES = ['CANDIDATE', 'INVITED', 'CONFIRMED'] as const;
 const FILLED_SEAT_STATUS_SET: ReadonlySet<string> = new Set<string>(FILLED_SEAT_STATUSES);
 
-/** True when a seat has a named organisation on it (see `FILLED_SEAT_STATUSES`). */
+/**
+ * True when the seat's status says it is taken (see `FILLED_SEAT_STATUSES`). Only the status is
+ * read here: the seat's organisation is not checked.
+ */
 export function isFilledSeat(seat: { status: string }): boolean {
   return FILLED_SEAT_STATUS_SET.has(seat.status.trim().toUpperCase());
 }
@@ -148,7 +151,7 @@ export interface G0Extraction {
    * can tell which denominator produced it.
    */
   scoringBasis: 'standard' | 'no_history_evidence';
-  /** Seats with a named organisation (see `FILLED_SEAT_STATUSES`); the no-history gate reads it. */
+  /** Seats whose status is filled (see `FILLED_SEAT_STATUSES`); the no-history gate reads it. */
   filledSeats: number;
 }
 
@@ -347,18 +350,29 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
   // 4 — research + end user (weight 12). Read off the consortium seats that have a named
   // organisation on them. An OPEN seat has no partner yet and a DECLINED one has left; neither
   // scores (FO-382: an open seat used to earn the full 12 points).
+  // No filled seat (none defined, or only OPEN / DECLINED ones) is missing evidence, not a measured
+  // zero: it leaves the coverage, so a snapshot with nothing else on it reads as no evidence
+  // (FO-382 review, B2). The score is 0 in both cases.
   let researchAndEndUser = 0;
-  if (snapshot.seats.length === 0) {
-    record('researchAndEndUser', 'ConsortiumSeat.roleKey', 'missing', 0, 'no consortium seats defined yet');
+  const scoring = snapshot.seats.filter(isFilledSeat);
+  if (scoring.length === 0) {
+    record(
+      'researchAndEndUser',
+      'ConsortiumSeat.roleKey (status CANDIDATE/INVITED/CONFIRMED)',
+      'missing',
+      0,
+      snapshot.seats.length === 0
+        ? 'no consortium seats defined yet'
+        : 'no seat has a named organisation yet (OPEN and DECLINED do not count)',
+    );
   } else {
-    const scoring = snapshot.seats.filter(isFilledSeat);
     const roles = new Set(scoring.map((s) => s.roleKey.trim().toLowerCase()));
     const hasResearch = roles.has('research');
     const hasEndUser = roles.has('end_user');
     researchAndEndUser = (hasResearch ? 50 : 0) + (hasEndUser ? 50 : 0);
     record(
       'researchAndEndUser',
-      'ConsortiumSeat.roleKey (status not OPEN/DECLINED)',
+      'ConsortiumSeat.roleKey (status CANDIDATE/INVITED/CONFIRMED)',
       'measured',
       researchAndEndUser,
       `research seat: ${hasResearch}, end-user seat: ${hasEndUser}`,
@@ -472,6 +486,13 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
  * participation of any role. An unset role (`null`) and the coordinator role never qualify.
  */
 export function isNoHistoryPartner(snapshot: Pick<G0Snapshot, 'intendedRole' | 'cordis'>): boolean {
-  const role = (snapshot.intendedRole ?? '').trim().toLowerCase();
-  return role === 'partner' && snapshot.cordis !== null && snapshot.cordis.participationsOverall === 0;
+  return isPartnerRole(snapshot.intendedRole) && snapshot.cordis !== null && snapshot.cordis.participationsOverall === 0;
+}
+
+/**
+ * The one place that decides whether an intended role is the partner ("ortak") role. Case and
+ * surrounding spaces are ignored; anything else, including an unset role, is not a partner.
+ */
+export function isPartnerRole(intendedRole: string | null): boolean {
+  return (intendedRole ?? '').trim().toLowerCase() === 'partner';
 }

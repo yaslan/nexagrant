@@ -182,8 +182,9 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 2. Aynı durumda en az bir **dolu** koltuk olmalı. Dolu = `CANDIDATE`, `INVITED` veya `CONFIRMED`
    (tek kaynak: `FILLED_SEAT_STATUSES`, `src/lib/scoring/g0-features.ts`). `OPEN`, `DECLINED` ve hiç
    koltuk olmaması dolu sayılmaz → G0 geçilemez (`G0_NO_HISTORY_NO_FILLED_SEAT`).
-3. Eşik 70, `minAlignment`, taban oran ≥ %8 ve ülke uygunluğu değişmedi. Koordinatör ve rolü boş
-   (`null`) kayıtlar değişmedi. Kural yalnız ortak (`partner`) rolüne uygulanır. CORDIS verisi yoksa
+3. Eşik 70, `minAlignment`, taban oran ≥ %8 ve ülke uygunluğu değişmedi. 75 paydası ve dolu koltuk
+   kuralı yalnız ortak (`partner`) rolüne uygulanır; boş koltuk her rolde puan vermez, bu yüzden
+   koordinatör ve rolü boş kayıtların puanı da yalnız boş koltuk yüzünden düşer. CORDIS verisi yoksa
    kural uygulanmaz: PIC yok **ve** CORDIS tablosu boşsa `cordis = null`. PIC yok ama tablo doluysa
    kural uygulanır (PIC'siz ortak CORDIS'te kayıt bulamaz). Kapsam dışı olan yalnız boş tablodur.
    Boş koltuk (`OPEN`, `DECLINED`) hiçbir rolde puan vermez (K-576987 = A).
