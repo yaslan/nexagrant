@@ -1,6 +1,38 @@
+import { readdirSync } from "node:fs";
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+
+// NexaGrant module boundary (NG-1). Every directory under src/modules is one
+// module. A file inside module X may not import the internals of module Y
+// through the `@/modules/Y/...` alias. Module list is read from disk, so a new
+// src/modules/<m> directory is covered without editing this file.
+const moduleNames = readdirSync(new URL("./src/modules", import.meta.url), {
+  withFileTypes: true,
+})
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+const moduleBoundaryBlocks = moduleNames.map((own) => ({
+  files: [`src/modules/${own}/**/*.{ts,tsx}`],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            group: moduleNames
+              .filter((other) => other !== own)
+              .map((other) => `@/modules/${other}/**`),
+            message:
+              "Modüller arası iç dosya importu yasak (NG-1 sınır kuralı). Başka modülün dosyasını doğrudan import etme; ortak kod src/lib altında olmalı ya da FONBRIDGE PR akışı (K-573059) ile karar verilmeli.",
+          },
+        ],
+      },
+    ],
+  },
+}));
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -40,6 +72,7 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  ...moduleBoundaryBlocks,
   {
     // TASK-MUM033NPP7UFI — E2E runs against `next dev`, whose HMR websocket keeps
     // the page from ever going network-idle, so a `networkidle` wait is a race that
