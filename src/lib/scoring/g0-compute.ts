@@ -144,18 +144,10 @@ async function loadCordisSnapshot(
   pic: string | null,
   topicIdentifier: string | null,
 ): Promise<G0CordisSnapshot | null> {
-  if (!pic) return null;
-
-  const participations: { role: string; projectId: string; project: { masterCall: string | null } | null }[] =
-    await client.cordisParticipation.findMany({
-      where: { organisationId: pic },
-      select: { role: true, projectId: true, project: { select: { masterCall: true } } },
-      take: 500,
-    });
-  if (participations.length === 0) {
-    // "No row for this PIC" is only a fact about the organisation when CORDIS itself is loaded.
-    // An empty table (not imported yet) is missing data, not a history of zero, so it stays null
-    // and the scorer keeps the standard basis instead of excluding every partner.
+  // "No record" = no PIC, or a PIC with no CORDIS row (FO-382, card definition). It is only a fact
+  // about the organisation when CORDIS itself is loaded. An empty table (not imported yet) is
+  // missing data, not a history of zero, so it stays null and the scorer keeps the standard basis.
+  const noRecord = async (): Promise<G0CordisSnapshot | null> => {
     const anyRow: { projectId: string } | null = await client.cordisParticipation.findFirst({
       select: { projectId: true },
     });
@@ -166,7 +158,17 @@ async function loadCordisSnapshot(
       distinctCollaborators: 0,
       participationsOverall: 0,
     };
-  }
+  };
+
+  if (!pic) return noRecord();
+
+  const participations: { role: string; projectId: string; project: { masterCall: string | null } | null }[] =
+    await client.cordisParticipation.findMany({
+      where: { organisationId: pic },
+      select: { role: true, projectId: true, project: { select: { masterCall: true } } },
+      take: 500,
+    });
+  if (participations.length === 0) return noRecord();
 
   const family = topicIdentifier ? topicPrefixOf(topicIdentifier) : null;
   const coordinations = participations.filter((p) => p.role.trim().toLowerCase() === 'coordinator');

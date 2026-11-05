@@ -345,12 +345,32 @@ describe('loadG0Snapshot()', () => {
     expect(snapshot.baseRatePct).toBe(17);
   });
 
-  it('reports no CORDIS history when the tenant has no PIC, instead of scoring one', async () => {
+  it('no PIC with CORDIS loaded is a measured "no record" (FO-382), not missing data', async () => {
     const { client } = fakeClient({ tenant: { country: 'DE', pic: null }, topics: [topicRow] });
     const snapshot = await loadG0Snapshot(client, 'tenant-1', {
       opportunityId: 'opp-1',
       topicId: 'topic-1',
-      intendedRole: 'coordinator',
+      intendedRole: 'partner',
+      seats: [],
+    });
+    expect(snapshot.cordis).toEqual({
+      coordinationsInTopicFamily: 0,
+      coordinationsOverall: 0,
+      distinctCollaborators: 0,
+      participationsOverall: 0,
+    });
+  });
+
+  it('no PIC and an empty CORDIS table is missing data: cordis stays null, the standard basis holds', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: null },
+      topics: [topicRow],
+      cordisTableEmpty: true,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1',
+      topicId: 'topic-1',
+      intendedRole: 'partner',
       seats: [],
     });
     expect(snapshot.cordis).toBeNull();

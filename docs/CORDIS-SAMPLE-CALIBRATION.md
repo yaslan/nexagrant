@@ -170,6 +170,34 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 > ```
 
 
-## FO-382 notu (2026-11-04)
+## FO-382 notu (2026-11-05): CORDIS geçmişi olmayan ortak
 
-Bu tabloların özellik değerleri dokümanda yok, bu yüzden 17 örnek yeniden hesaplanmadı. Ürün kuralı ortak rolü için iki hesabı ayırır: CORDIS geçmişi olmayan ortakta skor `Σ(katkı)/75` olur (eski `/100` yerine). Sıfır geçmiş için tek fark paydadır; katkı toplamı değişmez, yani her örnekte skor ×100/75 büyür. Örnek: 63 → 84,00; 55 → 73,33. Bu büyüme ürün kararıdır; eşik 70 değişmedi. Kapı kararı değişen örnek sayısı DB ile ölçülmeli (`pnpm` kalibrasyon düzeneği) ve bu not henüz o sayıyla güncellenmedi.
+Kural (patron K-576759 = A): `intendedRole = partner` ve CORDIS'te bu PIC için kayıt yok. Bu durumda
+`coordinatorHistory` (15) ve `networkCentrality` (10) paydadan çıkar: skor `Σ(katkı) / 75`
+(eskiden `/ 100`). Katkı toplamı değişmez, yani her örnekte skor ×100/75 büyür. Eşik 70, `minAlignment`,
+taban oran ≥ %8 ve ülke uygunluğu değişmedi.
+
+**Ölçüm** (`scripts/esr-calibration.ts` ile aynı `decideG0` ve `DEFAULT_GATE_RULES.G0`; 20 örnek;
+saf fonksiyon, veritabanı yok). Her örnek "geçmişi olmayan ortak" varsayımıyla yeniden koşuldu:
+`coordinatorHistory = networkCentrality = 0`, diğer özellikler CSV'den.
+
+- Koordinatör yolu: 0 değişiklik (kural yalnız ortak rolüne uygulanır).
+- Geçmişsiz ortak, eski `/100` → yeni `/75`: **8 karar değişiyor** (hepsi NO_GO → GO).
+- Skor ≥ 70 olan: 9 örnek. Biri (S16 QUANTLINK, ülke uygunsuz) sert kuralla yine NO_GO.
+- Uzman etiketiyle uyum: 8/20 → 14/20.
+- **Yeni yanlış pozitif: S19 NETSUPP** (uzman NO_GO, yeni karar GO). Eşik değişmedi; bu, kuralın
+  ürün kararı olduğunu gösterir ve raporda açıkça izlenmeli.
+
+| Örnek | Eski (/100) | Yeni (/75) | Eski karar | Yeni karar | Uzman |
+|---|---:|---:|---|---|---|
+| S01 DISTRENOV | 62,00 | 82,67 | NO_GO | GO | GO |
+| S03 AGRISENSE | 67,30 | 89,73 | NO_GO | GO | GO |
+| S05 CLIMANEUT | 68,70 | 91,60 | NO_GO | GO | GO |
+| S06 SMERAD | 63,50 | 84,67 | NO_GO | GO | GO |
+| S08 GRIDFLEX | 64,76 | 86,35 | NO_GO | GO | GO |
+| S11 SOLIDBAT | 60,69 | 80,92 | NO_GO | GO | GO |
+| S12 GEOHEAT | 63,96 | 85,28 | NO_GO | GO | GO |
+| S19 NETSUPP | 60,40 | 80,53 | NO_GO | GO | NO_GO |
+
+Diğer 12 örnekte karar değişmiyor (NO_GO kalıyor). Ölçüm koşusu: geçici betik, repo dışında; bu not
+üretilen dosyanın yerine elle yazıldı. `esr-calibration.ts` yeniden çalıştırılırsa bu bölüm silinir.

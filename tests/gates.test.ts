@@ -259,6 +259,8 @@ vi.mock('../src/lib/db', () => {
             })),
           );
         }),
+        // CORDIS is loaded (a row exists), so "no PIC" is a measured "no record" (FO-382).
+        findFirst: vi.fn(() => Promise.resolve({ projectId: 'p0' })),
       },
       consortiumSeat: {
         findMany: vi.fn(({ where }: { where: { opportunityId: string } }) =>
