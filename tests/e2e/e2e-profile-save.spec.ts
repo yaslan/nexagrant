@@ -28,7 +28,7 @@ function profileForm(page: Page) {
   return {
     saveButton,
     capabilities: form.locator('textarea'),
-    keywords: form.locator('input[type="text"]'),
+    keywords: form.locator('input[name="keywords"]'),
     trlMin: form.locator('input[type="number"]').nth(0),
     trlMax: form.locator('input[type="number"]').nth(1),
   };

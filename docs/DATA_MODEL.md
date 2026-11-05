@@ -916,6 +916,14 @@ NULL'dur (alan isteğe bağlı, kaydı durdurmaz).
 - Kurum ayarları (`settings/profile`): sahip/yönetici (`manage_users`) değiştirir; her
   değişiklik `AuditEvent: tenant.province.updated` (`{ from, to }`).
 
+**`Tenant.pic` (FO-383).** Kurumun PIC'i; G0 puanı CORDIS geçmişini bununla okur. Ayarlar →
+Kurumsal Profil'den sahip/yönetici (`manage_users`) girer, değiştirir, temizler; 9 hane
+(`src/lib/pic.ts`). CORDIS'te karşılığı varsa kuruluş adı gösterilip onay istenir (onay sunucuda
+zorunlu), karşılığı yoksa kaydedilir ve geçmiş puanı eklenmeyeceği söylenir. Silinmemiş başka bir
+kiracıda duran PIC reddedilir; benzersizlik indeksi yok, yarışı PIC başına
+`pg_advisory_xact_lock` kapatır. Her değişiklik `AuditEvent: tenant.pic.updated`
+(`{ from, to, cordisName }`). Portaldaki gerçek sahiplik otomatik doğrulanmaz.
+
 **RLS.** `Tenant` sistem geneli bir tablodur (`tenantId` sütunu yok), `tenant_isolation`
 kapsamı dışındadır; `relrowsecurity = false`, politika 0. Yeni politika gerekmez.
 

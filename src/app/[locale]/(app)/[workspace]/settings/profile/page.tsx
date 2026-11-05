@@ -11,12 +11,23 @@ import TenantProfileForm from './profile-form';
 export default async function TenantProfilePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const scope = await requireTenantPage(locale);
-  const initial = await withTenant(scope.tenantId, (tx) =>
-    tx.tenantProfile.findUnique({
-      where: { tenantId: scope.tenantId },
-      select: { capabilities: true, keywords: true, trlRange: true },
-    })
-  );
+  const { initial, pic, picMatch } = await withTenant(scope.tenantId, async (tx) => {
+    const tenant = await tx.tenant.findUnique({ where: { id: scope.tenantId }, select: { pic: true } });
+    const storedPic = tenant?.pic ?? null;
+    return {
+      initial: await tx.tenantProfile.findUnique({
+        where: { tenantId: scope.tenantId },
+        select: { capabilities: true, keywords: true, trlRange: true },
+      }),
+      pic: storedPic,
+      picMatch: storedPic
+        ? await tx.cordisOrganization.findUnique({
+            where: { organisationId: storedPic },
+            select: { name: true, city: true, country: true },
+          })
+        : null,
+    };
+  });
 
-  return <TenantProfileForm initial={initial} />;
+  return <TenantProfileForm initial={initial} initialPic={pic} initialPicMatch={picMatch} />;
 }
