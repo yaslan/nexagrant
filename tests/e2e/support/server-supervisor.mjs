@@ -21,6 +21,8 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 
+import { redact } from './redact.mjs';
+
 const [command, ...args] = process.argv.slice(2);
 if (!command) {
   console.error('usage: server-supervisor.mjs <command> [args...]');
@@ -56,12 +58,6 @@ function emit(line) {
     }
   }
 }
-
-// Command lines of other sessions can carry credentials: a password in a URL, or a value
-// after NAME= or --name= where NAME contains KEY, TOKEN, SECRET or PASSWORD (any case).
-const SECRET_NAME = '[\\w-]*(?:KEY|TOKEN|SECRET|PASSWORD)[\\w-]*';
-const redact = (text) =>
-  text.replace(/:\/\/[^\s/@]+@/g, '://***@').replace(new RegExp(`(${SECRET_NAME}=)\\S+`, 'gi'), '$1***');
 
 function processList() {
   try {
