@@ -4,7 +4,9 @@
  * store and read; the gate rule that uses them is NG-33 and the G0 scorer does not read them.
  *
  * PIC is not stored here. It stays where it already lives (Tenant.pic, the seat, PartnerOrg)
- * and a read reports only present or missing, never the number.
+ * and a read reports only present or missing, never the number. Nor does a read name the
+ * organisation: it says `kind` (self, cordis, partner); the stored key, which for a CORDIS seat
+ * is the PIC itself, never leaves this file.
  *
  * Every read and write runs in `withTenant`. Another tenant's id answers `null`, as an id that
  * does not exist does, so the caller cannot tell them apart. An audit row names what changed,
@@ -53,8 +55,9 @@ export type BudgetShareInput = Omit<z.input<typeof BudgetShareInputSchema>, 'sea
 
 export type ReadinessAnswer = 'yes' | 'no' | 'unknown';
 export type ReadinessField = 'pic' | 'euLogin' | 'lear';
+export type ReadinessKind = 'self' | 'cordis' | 'partner';
 export type ReadinessView = {
-  subject: string;
+  kind: ReadinessKind;
   pic: 'present' | 'missing';
   euLogin: ReadinessAnswer;
   lear: ReadinessAnswer;
@@ -69,7 +72,7 @@ function answer(value: boolean | null | undefined): ReadinessAnswer {
 }
 
 function readinessView(
-  subject: string,
+  kind: ReadinessKind,
   hasPic: boolean,
   row: { euLoginReady: boolean | null; learReady: boolean | null } | null,
 ): ReadinessView {
@@ -79,7 +82,7 @@ function readinessView(
   if (!hasPic) missing.push('pic');
   if (euLogin !== 'yes') missing.push('euLogin');
   if (lear !== 'yes') missing.push('lear');
-  return { subject, pic: hasPic ? 'present' : 'missing', euLogin, lear, missing, complete: missing.length === 0 };
+  return { kind, pic: hasPic ? 'present' : 'missing', euLogin, lear, missing, complete: missing.length === 0 };
 }
 
 const SELF = 'self';
@@ -97,13 +100,13 @@ async function seatOrganisation(tx: Tx, tenantId: string, seatId: string) {
     where: { id: seatId, tenantId, opportunity: { deletedAt: null } },
     select: { organizationId: true, partnerOrgId: true },
   });
-  if (seat?.organizationId) return { subject: `cordis:${seat.organizationId}`, hasPic: true };
+  if (seat?.organizationId) return { kind: 'cordis' as const, subject: `cordis:${seat.organizationId}`, hasPic: true };
   if (seat?.partnerOrgId) {
     const partner = await tx.partnerOrg.findFirst({
       where: { id: seat.partnerOrgId, tenantId },
       select: { pic: true },
     });
-    return { subject: `partner:${seat.partnerOrgId}`, hasPic: Boolean(partner?.pic) };
+    return { kind: 'partner' as const, subject: `partner:${seat.partnerOrgId}`, hasPic: Boolean(partner?.pic) };
   }
   return null;
 }
@@ -125,14 +128,14 @@ export function getOwnReadiness(scope: Pick<Scope, 'tenantId'>): Promise<Readine
     const row = await tx.orgReadiness.findUnique({
       where: { tenantId_subject: { tenantId: scope.tenantId, subject: SELF } },
     });
-    return readinessView(SELF, await ownHasPic(tx, scope.tenantId), row);
+    return readinessView('self', await ownHasPic(tx, scope.tenantId), row);
   });
 }
 
 export function saveOwnReadiness(scope: Scope, input: ReadinessInput): Promise<ReadinessView> {
   return withTenant(scope.tenantId, async (tx) => {
     const row = await writeReadiness(tx, scope, SELF, input);
-    return readinessView(SELF, await ownHasPic(tx, scope.tenantId), row);
+    return readinessView('self', await ownHasPic(tx, scope.tenantId), row);
   });
 }
 
@@ -143,7 +146,7 @@ export function getSeatReadiness(scope: Pick<Scope, 'tenantId'>, seatId: string)
     const row = await tx.orgReadiness.findUnique({
       where: { tenantId_subject: { tenantId: scope.tenantId, subject: organisation.subject } },
     });
-    return readinessView(organisation.subject, organisation.hasPic, row);
+    return readinessView(organisation.kind, organisation.hasPic, row);
   });
 }
 
@@ -152,7 +155,7 @@ export function saveSeatReadiness(scope: Scope, seatId: string, input: Readiness
     const organisation = await seatOrganisation(tx, scope.tenantId, seatId);
     if (!organisation) return null;
     const row = await writeReadiness(tx, scope, organisation.subject, input);
-    return readinessView(organisation.subject, organisation.hasPic, row);
+    return readinessView(organisation.kind, organisation.hasPic, row);
   });
 }
 

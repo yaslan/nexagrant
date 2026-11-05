@@ -9,9 +9,9 @@ const session = vi.hoisted(() => ({
   result: { ok: true, scope: { tenantId: 't1', userId: 'u1', role: 'TENANT_OWNER', workspaceIds: [], isPlatformAdmin: false } } as unknown,
 }));
 const stubs = vi.hoisted(() => ({
-  own: vi.fn(async () => ({ subject: 'self' })),
+  own: vi.fn(async () => ({ kind: 'self' })),
   seat: vi.fn(async (): Promise<unknown> => null),
-  saveOwn: vi.fn(async () => ({ subject: 'self' })),
+  saveOwn: vi.fn(async () => ({ kind: 'self' })),
   saveSeat: vi.fn(async (): Promise<unknown> => null),
   approval: vi.fn(async () => null),
   saveApproval: vi.fn(async (): Promise<unknown> => ({ approved: true })),

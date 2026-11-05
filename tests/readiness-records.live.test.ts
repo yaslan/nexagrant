@@ -114,7 +114,7 @@ describe('org_readiness', () => {
     if (!ready) return ctx.skip(skipReason);
     const view = await records.getOwnReadiness(a);
     expect(view).toEqual({
-      subject: 'self',
+      kind: 'self',
       pic: 'missing',
       euLogin: 'unknown',
       lear: 'unknown',
@@ -157,14 +157,17 @@ describe('org_readiness', () => {
   test("a partner's readiness is keyed on the organisation, and its PIC comes from the seat", async (ctx) => {
     if (!ready) return ctx.skip(skipReason);
     const before = await records.getSeatReadiness(a, a.seatId);
-    expect(before).toMatchObject({ subject: `cordis:${RUN}-pic-a`, pic: 'present', euLogin: 'unknown' });
+    expect(before).toMatchObject({ kind: 'cordis', pic: 'present', euLogin: 'unknown' });
+    // The read says what kind of organisation it is, never which one: the seat's PIC stays out.
+    expect(before).not.toHaveProperty('subject');
+    expect(JSON.stringify(before)).not.toContain(`${RUN}-pic-a`);
     expect(await records.saveSeatReadiness(a, a.seatId, { euLoginReady: true, learReady: true })).toMatchObject({ complete: true });
     expect(await records.getSeatReadiness(a, a.seatId)).toMatchObject({ complete: true });
     // A seat nobody fills has no organisation to hold a record for.
     expect(await records.getSeatReadiness(a, a.partnerSeatId)).toBeNull();
     expect(await records.saveSeatReadiness(a, a.partnerSeatId, { euLoginReady: true })).toBeNull();
     // The tenant's own row did not move.
-    expect((await records.getOwnReadiness(a)).subject).toBe('self');
+    expect((await records.getOwnReadiness(a)).kind).toBe('self');
   });
 
   test('a private partner with no PIC on its record reads as missing', async (ctx) => {
@@ -172,7 +175,9 @@ describe('org_readiness', () => {
     const partner = await admin!.partnerOrg.create({ data: { tenantId: b.tenantId, name: `${RUN} private` } });
     await admin!.consortiumSeat.update({ where: { id: b.partnerSeatId }, data: { partnerOrgId: partner.id } });
     const view = await records.getSeatReadiness(b, b.partnerSeatId);
-    expect(view).toMatchObject({ subject: `partner:${partner.id}`, pic: 'missing', complete: false });
+    expect(view).toMatchObject({ kind: 'partner', pic: 'missing', complete: false });
+    expect(view).not.toHaveProperty('subject');
+    expect(JSON.stringify(view)).not.toContain(partner.id);
     expect(view?.missing).toContain('pic');
   });
 
