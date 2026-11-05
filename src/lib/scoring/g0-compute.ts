@@ -457,8 +457,55 @@ export async function persistG0(
 }
 
 /**
+ * Replaces a stored score with "no score" when the scorer can no longer compute one (FO-384).
+ *
+ * `persistG0` writes nothing for a null score, so without this a PIC change that removes the last
+ * evidence would leave the previous number on the opportunity and on its TopicMatch. The breakdown
+ * keeps the evidence record (`coverage: 0`) and the placeholder flag, so the row says why it is empty.
+ */
+export async function clearStoredG0(
+  client: TenantTx,
+  computation: G0Computation,
+): Promise<boolean> {
+  if (computation.score !== null || !isPresentId(computation.opportunityId) || !isPresentId(computation.tenantId)) return false;
+
+  await client.opportunity.updateMany({
+    where: { id: computation.opportunityId, tenantId: computation.tenantId },
+    data: { g0Score: null },
+  });
+
+  if (computation.topicId) {
+    const evidence = g0EvidencePayload(computation);
+    const breakdown = alignmentCameFromTopicMatch(computation)
+      ? evidence
+      : { ...evidence, [G0_FIT_SCORE_PLACEHOLDER]: true };
+    await client.topicMatch.upsert({
+      where: {
+        tenantId_topicId_opportunityId: {
+          tenantId: computation.tenantId,
+          topicId: computation.topicId,
+          opportunityId: computation.opportunityId,
+        },
+      },
+      update: { g0Score: null, breakdown },
+      create: {
+        tenantId: computation.tenantId,
+        topicId: computation.topicId,
+        opportunityId: computation.opportunityId,
+        fitScore: 0,
+        g0Score: null,
+        breakdown,
+      },
+    });
+  }
+
+  return true;
+}
+
+/**
  * Score an existing opportunity and store the result, inside the tenant's RLS context.
- * Returns `null` when the opportunity does not belong to the tenant.
+ * Returns `null` when the opportunity does not belong to the tenant. A computation with no score
+ * replaces the stored one with null (see {@link clearStoredG0}) instead of leaving it behind.
  */
 export async function rescoreOpportunityG0(
   tenantId: string,
@@ -467,7 +514,8 @@ export async function rescoreOpportunityG0(
   return withTenant(tenantId, async (tx) => {
     const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId);
     if (!computation) return null;
-    await persistG0(tx, computation);
+    if (computation.score === null) await clearStoredG0(tx, computation);
+    else await persistG0(tx, computation);
     return computation;
   });
 }

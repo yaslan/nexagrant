@@ -259,12 +259,13 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
         { actorId: PP_ADMIN.id, data: { from: PP_PIC_MATCHED, note: 'Gerçek sahip destek talebiyle itiraz etti' } },
       ]);
 
-      // G0: a new computation drops at once; what is stored stays until something rescores.
+      // G0: a new computation drops, and the stored score follows it (FO-384: the removal rescores
+      // the tenant's opportunities after the PIC write has committed).
       const fresh = await g0Score();
       const stored = await storedG0(PP_TENANT, PP_OPP_ID);
-      console.log(`[FO-383] G0 after removal: withPic=${withPic} fresh=${fresh} stored=${JSON.stringify(stored)}`);
+      console.log(`[FO-384] G0 after removal: withPic=${withPic} fresh=${fresh} stored=${JSON.stringify(stored)}`);
       expect(fresh).toBeLessThan(withPic ?? Number.NEGATIVE_INFINITY);
-      expect(stored).toEqual({ opportunity: withPic, topicMatch: withPic });
+      expect(stored).toEqual({ opportunity: fresh, topicMatch: fresh });
 
       // The real owner, on the other account, can now take it.
       await openProfile(page, PP_OTHER_OWNER, `/tr/${PP_OTHER_WORKSPACE}/settings/profile`);
