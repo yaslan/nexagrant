@@ -1033,7 +1033,9 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
 
   // The gate for the self-burning agency. Measured (seed 31, 900 tables per mode): single province
   // and every D >= 0 mode leak nothing, but the multi-province D = 0 mode leaks a hidden 1..4 in
-  // ~6 % of the tables (57/900). The funnel's complementary suppression is built for a window of
+  // 57-84 of 900 tables over five runs with random limits (mean ~8 %, ABOVE the ~5.8 % a FIXED 500
+  // leaks). The residual test below draws the limits from a seeded stream, so it is deterministic
+  // (limitSeed 3101: 10/150 = 6.7 %, 74/900 = 8.2 %). The funnel's complementary suppression is built for a window of
   // 25 per code; once the filled codes are exact, the rounding step (5) is all that is left, and
   // across several provinces it sometimes closes onto 1..4. That is the residual risk of patron
   // decision A (K-577268, crw-fb B-3), which is NOT hidden in the code: the notice addendum says
@@ -1042,7 +1044,13 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
   // stay below a ceiling, so a change that makes it worse - or an accidental fix, which should
   // update the notice - turns this red.
   const RESIDUAL_MODE = (m: Mode) => !m.single && m.noneDeleted;
-  const RESIDUAL_CEILING = 0.15;
+  const RESIDUAL_CEILING = 0.1;
+  const RESIDUAL_LIMIT_SEED = 3101;
+  /** Limits for the residual gate: same uniform law as newInviteCodeUseLimit(), seeded, so no flake. */
+  function seededUseLimit(seed: number): () => number {
+    const u = stream(seed);
+    return () => INVITE_CODE_MIN_USE_LIMIT + Math.floor(u() * (INVITE_CODE_USE_LIMIT_SPREAD + 1));
+  }
   for (const mode of MODES) {
     const label = `${mode.single ? 'single' : 'spread'}, ${mode.noneDeleted ? 'D = 0' : 'D >= 0'}`;
     if (!RESIDUAL_MODE(mode)) {
@@ -1053,8 +1061,10 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
       }, TIMEOUT_MS);
     } else {
       test(`self-burn KNOWN RESIDUAL, ${label}: a hidden 1..4 is read back in some tables (accepted risk of K-577268 A, asked to the lawyer), below ${RESIDUAL_CEILING * 100} %`, () => {
-        const { withLeak, found } = sweep(31, mode, TABLES, newInviteCodeUseLimit, POLICY_KNOWLEDGE, true);
-        measure(`SELFBURN-SWEEP seed=31 ${label} tables=${TABLES} tablesWithLeak=${withLeak} (known residual)`);
+        // Deterministic: the limits come from a seeded stream (same 500..524 law as
+        // newInviteCodeUseLimit(), without the CSPRNG), so this count is the same on every run.
+        const { withLeak, found } = sweep(31, mode, TABLES, seededUseLimit(RESIDUAL_LIMIT_SEED), POLICY_KNOWLEDGE, true);
+        measure(`SELFBURN-SWEEP seed=31 limitSeed=${RESIDUAL_LIMIT_SEED} ${label} tables=${TABLES} tablesWithLeak=${withLeak} (known residual)`);
         for (const f of found.slice(0, 3)) measure(`  e.g. ${f}`);
         expect(withLeak, 'the residual is real: if it is gone, update the notice and the lawyer question').toBeGreaterThan(0);
         expect(withLeak / TABLES).toBeLessThan(RESIDUAL_CEILING);

@@ -27,8 +27,9 @@
  * about that many real records (500..524, visible on the platform). With the
  * filled codes exact, the window for another code's uses shrinks to the funnel's
  * rounding step (+-2), and in the multi-province, no-deletion case a hidden 1..4
- * is read back in about 6 % of simulated tables (funnel.attack.test.ts, "self-burn
- * KNOWN RESIDUAL"). The owner accepted this and kept the behaviour; the notice
+ * is read back in 57-84 of 900 simulated tables, about 8 % on average and above
+ * the ~5.8 % a FIXED 500 leaks (funnel.attack.test.ts, "self-burn KNOWN RESIDUAL"; the
+ * rate moves between runs because the limits are drawn at random). The owner accepted this and kept the behaviour; the notice
  * addendum says so and the lawyer is asked (HUKUK-SORULARI-2026-09.md). Do not
  * claim in code, docs or UI that an agency "cannot learn" the limit.
  *
