@@ -77,8 +77,8 @@ enum TenantKind {
 /// atomically and returns the agency id or NULL.
 /// Use limit (FO-392): useLimit is the number of uses a code may reach over its life;
 /// NULL = unlimited, which is every code created before FO-392 (TASK-MUM4WVYLSH9IT
-/// had removed the limit). New codes get INVITE_CODE_DEFAULT_USE_LIMIT
-/// (src/lib/agency/invite-policy.ts). maxUses is a retired column: nullable, never
+/// had removed the limit). A new code gets 500 + a random 0..24 (K-577268), drawn once in
+/// src/lib/agency/invite-policy.ts; the real number never leaves the server. maxUses is a retired column: nullable, never
 /// written by new codes, never read - legacy rows can hold maxUses < usedCount.
 /// usedCount is an internal counter nobody is shown.
 model AgencyInviteCode {

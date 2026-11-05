@@ -44,12 +44,15 @@
  * Ö-2): the refused-code audit rows, `agency.invite.rejected` with `reason` and
  * `codeId`, sit in the agency's own tenant
  * (prisma/migrations/fix-agency-invite-rejection-audit.sql). `reason =
- * 'exhausted'` for a code was the very status the code panel dropped
- * (TASK-MUM2RMN3YIBGC): used = maxUses. Codes have no use limit since
- * agency-invite-no-max-uses.sql (TASK-MUM4WVYLSH9IT) and no new row carries it,
- * but rows written before stay. A screen that shows those rows — or counts of them — joins this funnel
- * and must go through the same attacker (funnel.attack.test.ts, D ≥ 0 and
- * D = 0) before it ships.
+ * 'exhausted'` for a code is the status the code panel shows as "limit reached"
+ * (FO-392): used = the code's hidden useLimit. TASK-MUM4WVYLSH9IT had removed the
+ * use limit and no row carried it; FO-392 brought it back (agency-invite-use-limit.sql),
+ * so NEW `exhausted` rows are written again for codes made since, next to the ones
+ * written before. The audit row names the code (`codeId`), so a screen that shows
+ * those rows — or counts of them — would show WHICH code was used up and when, which
+ * is the panel's own status plus a time. It joins this funnel and must go through
+ * the same attacker (funnel.attack.test.ts, D ≥ 0 and D = 0, saturated cohort) before
+ * it ships.
  */
 import type { OrgType } from '@prisma/client';
 import { prisma, withTenant } from '@/lib/db';

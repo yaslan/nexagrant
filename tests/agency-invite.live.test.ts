@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
-import { INVITE_CODE_DEFAULT_USE_LIMIT } from '@/lib/agency/invite-policy';
+import { INVITE_CODE_MAX_USE_LIMIT, INVITE_CODE_MIN_USE_LIMIT } from '@/lib/agency/invite-policy';
 import {
   createInviteCodeIn,
   listInviteCodesIn,
@@ -56,7 +56,7 @@ async function newTenant(kind: 'AGENCY' | 'ORGANIZATION', suffix: string): Promi
   return t.id;
 }
 
-/** A new code: it carries the default use limit (FO-392, src/lib/agency/invite-policy.ts). */
+/** A new code: it carries a real, hidden use limit of 500..524 (FO-392, K-577268, src/lib/agency/invite-policy.ts). */
 async function makeCode(agency: string, days = 30): Promise<{ id: string; code: string }> {
   return withTenantOn(rls!, agency, (tx) =>
     createInviteCodeIn(tx, {
@@ -202,18 +202,61 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
     expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
   });
 
-  // FO-392: a new code carries the default limit; a code from before it (NULL) has none.
-  test('a new code is written with the default use limit and no retired maxUses', async () => {
+  // FO-392: a new code carries a hidden limit of 500..524; a code from before it (NULL) has none.
+  test('a new code is written with a real limit in 500..524 and no retired maxUses; the audit trail does not carry the limit', async () => {
     const { id } = await makeCode(ids.agencyA);
     const row = await admin!.agencyInviteCode.findUniqueOrThrow({ where: { id }, select: { maxUses: true, useLimit: true } });
-    expect(row.useLimit).toBe(INVITE_CODE_DEFAULT_USE_LIMIT);
+    expect(row.useLimit).toBeGreaterThanOrEqual(INVITE_CODE_MIN_USE_LIMIT);
+    expect(row.useLimit).toBeLessThanOrEqual(INVITE_CODE_MAX_USE_LIMIT);
     expect(row.maxUses).toBeNull();
     const audit = await admin!.auditEvent.findFirstOrThrow({
       where: { tenantId: ids.agencyA, type: 'agency.invite.created', target: id },
       select: { data: true },
     });
-    expect(audit.data).toMatchObject({ useLimit: INVITE_CODE_DEFAULT_USE_LIMIT });
+    expect(audit.data).toMatchObject({ limited: true });
+    expect(JSON.stringify(audit.data)).not.toMatch(/useLimit|5[0-2][0-9]\b/);
   });
+
+  test('new codes get different limits (not one fixed number): 40 codes, more than 10 distinct values', async () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 40; i++) {
+      const { id } = await makeCode(ids.agencyA);
+      const row = await admin!.agencyInviteCode.findUniqueOrThrow({ where: { id }, select: { useLimit: true } });
+      seen.add(row.useLimit!);
+    }
+    expect(seen.size).toBeGreaterThan(10);
+  });
+
+  test('FO-392 follow-up: the agency fills its OWN code to learn its earlier uses - it learns a 25-wide window, never a 1..4 one', async () => {
+    // The attack of FO-392-crw-fb.md ("kendi kodunu doldurma"): a code already has u0 uses
+    // (organisations the agency may not know about). The agency registers k accounts itself
+    // until the form refuses, then reads u0 = limit - k. With a fixed limit that is exact.
+    // With the hidden spread the agency only knows limit in [500, 524], so u0 in [500-k, 524-k].
+    // Measured on the real redeem function, real limit, 500+ real redemptions.
+    const u0 = 3;
+    const { id, code } = await makeCode(ids.agencyA);
+    for (let i = 0; i < u0; i++) expect(await redeemAsNewTenant(rls!, code)).toBe(ids.agencyA);
+    let k = 0;
+    for (;;) {
+      if ((await redeemAsNewTenant(rls!, code)) === null) break;
+      k++;
+      expect(k).toBeLessThanOrEqual(INVITE_CODE_MAX_USE_LIMIT);
+    }
+    const limit = await usedCount(id);
+    expect(limit).toBe(u0 + k); // the counter stopped at the real limit
+    const lo = Math.max(0, INVITE_CODE_MIN_USE_LIMIT - k);
+    const hi = INVITE_CODE_MAX_USE_LIMIT - k;
+    console.log(`SELF-BURN u0=${u0} k=${k} realLimit=${limit} attackerWindow=[${lo},${hi}] width=${hi - lo + 1}`);
+    expect(u0).toBeGreaterThanOrEqual(lo);
+    expect(u0).toBeLessThanOrEqual(hi);
+    // The funnel's rule: a hidden count must never be read back as lying in 1..4. The window is
+    // [max(0, 500-k), 524-k]. lo >= 1 needs k <= 499, hi <= 4 needs k >= 520: both cannot hold.
+    // (Near k = 520 the window is [0, 4]: it holds 0, so "1..4" is not learned. With a FIXED
+    // limit lo = hi = u0 and any u0 in 1..4 is read exactly - that is the leak this spread closes.)
+    expect(lo >= 1 && hi <= 4).toBe(false);
+    // Over the whole range of k the window is as wide as the spread, except where 0 clamps it.
+    expect(hi - lo + 1).toBe(Math.min(INVITE_CODE_MAX_USE_LIMIT - INVITE_CODE_MIN_USE_LIMIT + 1, hi + 1));
+  }, 120_000);
 
   test('a code from before FO-392 (useLimit NULL) is unlimited: it works N times in a row and the counter keeps count', async () => {
     const { id, code } = await makeCode(ids.agencyA);
@@ -276,16 +319,16 @@ describe('redeeming an agency invite code (fabrika_app)', () => {
     await expect(admin!.agencyInviteCode.update({ where: { id }, data: { useLimit: 1 } })).rejects.toThrow(/within_useLimit/);
   });
 
-  test('the panel list: a used-up code reads "exhausted" with its limit, a legacy code reads "active" with no limit, no count anywhere', async () => {
+  test('the panel list: a used-up code reads "exhausted", a legacy code reads "active" and unlimited; neither count nor limit anywhere', async () => {
     const used = await makeCodeWithLimit(ids.agencyA, 2);
     const legacy = await makeLegacyCodePastItsLimit(ids.agencyA);
     await redeemAsNewTenant(rls!, used.code);
     await redeemAsNewTenant(rls!, used.code);
     const list = await withTenantOn(rls!, ids.agencyA, (tx) => listInviteCodesIn(tx, ids.agencyA));
     const byId = new Map(list.map((c) => [c.id, c]));
-    expect(byId.get(used.id)).toMatchObject({ status: 'exhausted', useLimit: 2 });
-    expect(byId.get(legacy.id)).toMatchObject({ status: 'active', useLimit: null });
-    expect(JSON.stringify(list)).not.toMatch(/usedCount|"used/);
+    expect(byId.get(used.id)).toMatchObject({ status: 'exhausted', limited: true });
+    expect(byId.get(legacy.id)).toMatchObject({ status: 'active', limited: false });
+    expect(JSON.stringify(list)).not.toMatch(/usedCount|"used|useLimit/);
   });
 
   test('a code made under the old limit and used past it still works: the old limit is not read', async () => {

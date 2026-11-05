@@ -10,7 +10,9 @@
 --   * "AgencyInviteCode"."useLimit" INTEGER NULL: the number of uses a code may
 --     reach over its life. NULL = unlimited, which is every row that exists now:
 --     no row is changed, so the codes agencies use today work as they did.
---     New codes get a value from src/lib/agency/invite-policy.ts.
+--     A NEW code gets 500 + a random 0..24, drawn once at creation by
+--     src/lib/agency/invite-policy.ts. The real number is stored and enforced
+--     here, and never sent to a client (the panel says "at least 500").
 --   * redeem_agency_invite() adds one condition to its single UPDATE:
 --     ("useLimit" IS NULL OR "usedCount" < "useLimit"). The UPDATE takes the row
 --     lock and re-checks its WHERE clause under READ COMMITTED, so two
@@ -23,9 +25,11 @@
 -- (some are used past them). Reading "maxUses" again would shut codes that
 -- agencies use today (TASK-MUM4WVYLSH9IT). "maxUses" stays retired and unread.
 --
--- Trade-off, decided by the owner in K-577141: a limit brings back a refusal
--- that means "used up" - the probing channel TASK-MUM4WVYLSH9IT closed
--- (crw-fb TASK-MUM3TMP8HU76G Ö-1). See docs/agent-results/FO-392-se-fb.md.
+-- Trade-off: a limit brings back a refusal that means "used up" - the probing
+-- channel TASK-MUM4WVYLSH9IT closed (crw-fb TASK-MUM3TMP8HU76G Ö-1). Who decided
+-- what: the use limit and its 500 are the autopilot default of K-577141 (the owner
+-- did not answer); the hidden 0..24 spread that closes the channel is the owner's
+-- decision K-577268. See docs/agent-results/FO-392-se-fb.md and FO-392-se-fb-2.md.
 --
 -- RLS: no new table; "AgencyInviteCode" keeps tenant_isolation. The functions
 -- keep their signature, SECURITY DEFINER, SET clauses and grants.
@@ -103,7 +107,7 @@ END $$;
 
 -- ---------------------------------------------------------------------------
 -- note_agency_invite_rejection(code_hash): the body of
--- fix-agency-invite-rejection-audit.sql without the 'exhausted' branch.
+-- fix-agency-invite-rejection-audit.sql WITH an added 'exhausted' branch.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.note_agency_invite_rejection(code_hash text)
 RETURNS void

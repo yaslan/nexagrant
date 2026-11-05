@@ -14,7 +14,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
-import { INVITE_CODE_DEFAULT_USE_LIMIT } from './invite-policy';
+import { newInviteCodeUseLimit } from './invite-policy';
 import {
   generateInviteCode,
   hashInviteCode,
@@ -74,9 +74,10 @@ export interface CreatedInviteCode {
  * this panel with the funnel.
  *
  * FO-392 adds 'exhausted' for a code that reached its useLimit. That is the one
- * place a number's consequence shows again; the registration form already says
- * the same to anyone who types the code, so the panel adds nothing to what the
- * agency can find out (see the report, K-577141).
+ * place a number's consequence shows again. The real limit is hidden and differs
+ * from code to code (invite-policy.ts, K-577268), so "exhausted" says only "at least
+ * INVITE_CODE_MIN_USE_LIMIT", and the registration form says the same to anyone who
+ * types the code: the panel adds nothing to what the agency can find out.
  */
 export type InviteCodeStatus = 'active' | 'revoked' | 'expired' | 'exhausted';
 
@@ -86,8 +87,11 @@ export interface InviteCodeSummary {
   hint: string;
   label: string | null;
   status: InviteCodeStatus;
-  /** Uses the code may reach; `null` = unlimited (a code from before FO-392). Never the used count. */
-  useLimit: number | null;
+  /**
+   * Whether the code has a use limit at all (`false` = a code from before FO-392, unlimited).
+   * The limit itself is NOT here: it is hidden and per code (K-577268), like the used count.
+   */
+  limited: boolean;
   expiresAt: string;
   revokedAt: string | null;
   createdAt: string;
@@ -110,8 +114,8 @@ export interface InviteCodeRecord {
 /**
  * Status for the panel. Revoked and expired win over exhausted, as in
  * note_agency_invite_rejection(). 'exhausted' is the only status that reads
- * `usedCount`, and only against the code's own limit: the number itself still
- * never leaves the server (inviteCodeRow). A code without a limit (NULL, from
+ * `usedCount`, and only against the code's own (hidden) limit: neither number
+ * leaves the server (inviteCodeRow). A code without a limit (NULL, from
  * before FO-392) is never exhausted.
  */
 export function inviteCodeStatus(c: InviteCodeRecord, now: number): InviteCodeStatus {
@@ -128,7 +132,7 @@ export function inviteCodeRow(c: InviteCodeRecord, now: number): InviteCodeSumma
     hint: c.hint,
     label: c.label,
     status: inviteCodeStatus(c, now),
-    useLimit: c.useLimit ?? null,
+    limited: c.useLimit != null,
     expiresAt: c.expiresAt.toISOString(),
     revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),
@@ -163,13 +167,15 @@ export async function createInviteCodeIn(
 
   const code = generateInviteCode();
   const normalized = normalizeInviteCode(code)!;
+  // The real limit: stored, enforced by the database, never returned (invite-policy.ts).
+  const useLimit = newInviteCodeUseLimit();
   const row = await tx.agencyInviteCode.create({
     data: {
       tenantId: input.tenantId,
       codeHash: hashInviteCode(normalized),
       codeHint: inviteCodeHint(normalized),
       label: input.label?.trim() || null,
-      useLimit: INVITE_CODE_DEFAULT_USE_LIMIT,
+      useLimit,
       expiresAt: input.expiresAt,
       createdBy: input.createdBy,
     },
@@ -181,7 +187,8 @@ export async function createInviteCodeIn(
       actorId: input.createdBy,
       type: 'agency.invite.created',
       target: row.id,
-      data: { expiresAt: row.expiresAt.toISOString(), useLimit: INVITE_CODE_DEFAULT_USE_LIMIT },
+      // No useLimit here: the audit trail is read outside the database too, and the limit is hidden.
+      data: { expiresAt: row.expiresAt.toISOString(), limited: true },
     },
   });
   return { id: row.id, code, hint: row.codeHint, expiresAt: row.expiresAt };

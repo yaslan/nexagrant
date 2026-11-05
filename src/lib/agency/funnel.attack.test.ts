@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import type { OrgType } from '@prisma/client';
 import {
@@ -10,7 +11,12 @@ import {
 } from './funnel';
 import type { TrProvince } from '@/lib/readiness/provinces';
 import { inviteCodeRow } from './codes';
-import { INVITE_CODE_DEFAULT_USE_LIMIT } from './invite-policy';
+import {
+  INVITE_CODE_MAX_USE_LIMIT,
+  INVITE_CODE_MIN_USE_LIMIT,
+  INVITE_CODE_USE_LIMIT_SPREAD,
+  newInviteCodeUseLimit,
+} from './invite-policy';
 
 /**
  * TASK-MULZATEX4G92H (FB KAMU B2 sızıntı-2) — the gate for the small-cell rule
@@ -37,15 +43,19 @@ import { INVITE_CODE_DEFAULT_USE_LIMIT } from './invite-policy';
  *     exactly as `inviteCodeRow` sends it, and how codes relate to the funnel:
  *     every organisation of the cohort registered with one use of one code, so
  *     R (registered, all) ≤ Σ used. Uses whose organisation was since deleted
- *     are the slack: Σ used = R + D. Codes have no use limit any more
- *     (TASK-MUM4WVYLSH9IT), so nothing bounds a code's uses from above; it reads
- *     whether the panel can say "exhausted" off `inviteCodeRow` itself, see
- *     {@link PANEL_SAYS_EXHAUSTED}.
+ *     are the slack: Σ used = R + D. A code from before FO-392 has no use limit, so
+ *     nothing bounds its uses from above; it reads whether the panel can say
+ *     "exhausted" off `inviteCodeRow` itself, see {@link PANEL_SAYS_EXHAUSTED}.
+ *     A code made since FO-392 has a real limit of 500..524 that is hidden
+ *     (K-577268): the attacker knows the range ({@link POLICY_KNOWLEDGE}, read off
+ *     the exports of invite-policy.ts, so removing the spread gives it the exact
+ *     number), not the code's own value.
  *
  *   - (TASK-MUM4WVYLSH9IT, crw-fb TASK-MUM3TMP8HU76G Ö-1) the registration form:
  *     the agency tries each of its own codes there and sees accepted or refused
- *     ({@link formAccepts}). Under a use limit, "refused" on a code it had
- *     neither revoked nor let expire meant used = limit.
+ *     ({@link formUseLimit}). Under a use limit, "refused" on a code it had
+ *     neither revoked nor let expire meant used = limit. Since K-577268 the
+ *     limit is not known exactly, so "refused" means used in [500, 524].
  *
  *   - (TASK-MUM2RMN3YIBGC, crw-fb TASK-MUM1OTRM75QS2 Ö-1) optionally, that no
  *     organisation was ever deleted: D = 0. Deleting an organisation takes a KVKK
@@ -144,12 +154,25 @@ interface Leak {
 interface TrueCode {
   /** A retired column (TASK-MUM4WVYLSH9IT): set on codes made while codes had a limit, enforced by nothing. */
   maxUses?: number;
-  /** FO-392: the live limit. Undefined = a code from before it, unlimited. */
+  /** FO-392: the live, hidden limit. Undefined = a code from before it, unlimited. */
   useLimit?: number;
   used: number;
   revoked?: boolean;
   expired?: boolean;
 }
+
+/**
+ * What the attacker knows about the hidden limit of a code made since FO-392: only its range.
+ * Read off the policy exports on purpose: if the spread is removed (min = max), the attacker
+ * knows the number and the saturated-cohort gate below goes red (mutant "no spread").
+ */
+interface LimitKnowledge {
+  min: number;
+  max: number;
+}
+const POLICY_KNOWLEDGE: LimitKnowledge = { min: INVITE_CODE_MIN_USE_LIMIT, max: INVITE_CODE_MAX_USE_LIMIT };
+/** The pre-K-577268 design: one fixed limit that the agency was told. Positive control only. */
+const FIXED_LIMIT = (n: number): LimitKnowledge => ({ min: n, max: n });
 
 /** A code as the attacker has it: the true uses (for scoring only) and what the panel lets it bound them to. */
 interface CodeKnowledge {
@@ -204,6 +227,11 @@ const PANEL_SAYS_EXHAUSTED_WITH_LIMIT =
 interface FormRule {
   accepts(c: TrueCode): boolean;
   cap(c: TrueCode): number;
+  /**
+   * Is a use count `u` consistent with the answer `seen`, for an attacker that does not know
+   * the code's real limit? Defaults to asking `accepts` about a code with `u` uses.
+   */
+  consistent?(seen: boolean, c: TrueCode, u: number): boolean;
 }
 
 /**
@@ -227,11 +255,24 @@ const FORM_WITH_LIMIT: FormRule = {
 /**
  * FO-392: redeem_agency_invite() as agency-invite-use-limit.sql defines it - refused at
  * used = useLimit; a code with no limit (NULL) is never refused for its uses.
+ *
+ * `know` is what the attacker knows of the real limit. The answer itself comes from the true
+ * code (`accepts`); which use counts are consistent with it is judged against `know`: with
+ * [500, 524] "accepted" means used < 524, "refused" (on a live code) means used in [500, 524].
+ * With a fixed `know` both collapse to the old exact reading.
  */
-const FORM_USELIMIT: FormRule = {
-  accepts: (c) => FORM_NOW.accepts(c) && c.used < (c.useLimit ?? Infinity),
-  cap: (c) => c.useLimit ?? Infinity,
-};
+function formUseLimit(know: LimitKnowledge): FormRule {
+  return {
+    accepts: (c) => FORM_NOW.accepts(c) && c.used < (c.useLimit ?? Infinity),
+    cap: (c) => (c.useLimit === undefined ? Infinity : know.max),
+    consistent(seen, c, u) {
+      if (!FORM_NOW.accepts(c)) return !seen; // revoked or expired: refused at any count
+      if (c.useLimit === undefined) return seen; // no limit: always accepted
+      return seen ? u < know.max : u >= know.min;
+    },
+  };
+}
+const FORM_USELIMIT = formUseLimit(POLICY_KNOWLEDGE);
 
 /** How far the attacker scans an unbounded code's uses for ones consistent with the form's answer. */
 const PROBE_SCAN = 200;
@@ -251,7 +292,7 @@ function probe(c: TrueCode, rule: FormRule, lo: number, hi: number): [number, nu
   let first = -1;
   let last = -1;
   for (let u = lo; u <= top; u++) {
-    if (rule.accepts({ ...c, used: u }) !== seen) continue;
+    if (!(rule.consistent ? rule.consistent(seen, c, u) : rule.accepts({ ...c, used: u }) === seen)) continue;
     if (first < 0) first = u;
     last = u;
   }
@@ -265,7 +306,7 @@ function probe(c: TrueCode, rule: FormRule, lo: number, hi: number): [number, nu
  * through JSON as the browser receives it. The attacker reads whatever is there,
  * and, with `form`, tries every code on the registration form as well.
  */
-function publishCodes(codes: TrueCode[], form?: FormRule): CodeKnowledge[] {
+function publishCodes(codes: TrueCode[], form?: FormRule, know: LimitKnowledge = POLICY_KNOWLEDGE): CodeKnowledge[] {
   return codes.map((c, i) => {
     const row = JSON.parse(
       JSON.stringify(
@@ -284,18 +325,21 @@ function publishCodes(codes: TrueCode[], form?: FormRule): CodeKnowledge[] {
         )
       )
     ) as Record<string, unknown>;
-    // A limit the panel still sent would cap the uses; none is sent, and none is enforced.
-    // (FO-392: the limit the panel sends is a number the agency set by policy, not a count.)
+    // A limit the panel still sent would cap the uses. The retired maxUses is not sent. Since
+    // K-577268 the real limit is not sent either; if some change put it back (`useLimit` as a
+    // number), the attacker reads it, and the saturated-cohort gate goes red.
     const max = typeof row.maxUses === 'number' ? row.maxUses : Infinity;
     let lo = 0;
     let hi = max;
+    if (typeof row.useLimit === 'number') hi = Math.min(hi, row.useLimit);
+    else if (row.limited === true) hi = Math.min(hi, know.max); // the range is public
     if (typeof row.usedCount === 'number') lo = hi = row.usedCount;
     else if (row.usedCount === null) hi = Math.min(hi, SMALL_CELL_THRESHOLD - 1); // "<5"
     const status =
       (row.status as string | undefined) ??
       (row.revokedAt ? 'revoked' : Date.parse(row.expiresAt as string) <= NOW ? 'expired' : row.exhausted ? 'exhausted' : 'active');
-    if (status === 'exhausted') lo = Math.max(lo, typeof row.useLimit === 'number' ? row.useLimit : max);
-    if (typeof row.useLimit === 'number') hi = Math.min(hi, row.useLimit);
+    // "Limit reached": at least the smallest limit a code can have - or, if the panel sent it, exactly the limit.
+    if (status === 'exhausted') lo = Math.max(lo, typeof row.useLimit === 'number' ? row.useLimit : know.min);
     if (form) [lo, hi] = probe(c, form, lo, hi);
     return { truth: c.used, lo, hi };
   });
@@ -566,7 +610,7 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
     });
   });
 
-  describe('FO-392: the use limit is back, so a used-up code is read again (K-577141)', () => {
+  describe('FO-392: the use limit is back, so a used-up code could be read again (K-577141, K-577268)', () => {
     // The same cohort as above, but the first four codes carry a LIVE limit of 6.
     const t = tableOf({
       [NO_PROVINCE]: { MUNICIPALITY: [3, 2, 3, 0, 0, 0, 0], UNIVERSITY: [3, 2, 3, 1, 0, 0, 0] },
@@ -580,14 +624,15 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
       expect(PANEL_SAYS_EXHAUSTED).toBe(false);
     });
 
-    test('positive control: a SMALL limit (6) is read back, the fifth code as 2..3 - this is why the default is large', () => {
-      const codes = publishCodes(small, FORM_USELIMIT);
+    test('positive control: a SMALL, KNOWN limit (6) is read back, the fifth code as 2..3 - what a fixed limit costs', () => {
+      const know = FIXED_LIMIT(6);
+      const codes = publishCodes(small, formUseLimit(know), know);
       expect(codes.slice(0, 4).map((c) => [c.lo, c.hi])).toEqual([[6, 6], [6, 6], [6, 6], [6, 6]]);
       expect(attack(t, publish(t), { codes, noneDeleted: true })).toContainEqual({ target: 'code#4', truth: 3, lo: 2, hi: 3 });
     });
 
-    test('the shipped default limit, same cohort: nobody reaches it, so nothing is read back', () => {
-      const codes = publishCodes([6, 6, 6, 6, 3].map((used) => ({ useLimit: INVITE_CODE_DEFAULT_USE_LIMIT, used })), FORM_USELIMIT);
+    test('the shipped limit (hidden, 500..524), same small cohort: nobody reaches it, so nothing is read back', () => {
+      const codes = publishCodes([6, 6, 6, 6, 3].map((used) => ({ useLimit: newInviteCodeUseLimit(), used })), FORM_USELIMIT);
       expect(codes.every((c) => c.lo === c.truth || c.hi > c.truth)).toBe(true);
       expect(attack(t, publish(t), { codes, noneDeleted: true })).toEqual([]);
       expect(attack(t, publish(t), { codes })).toEqual([]);
@@ -596,6 +641,24 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
     test('legacy codes (no limit) behave as before FO-392: the form tells nothing the panel does not', () => {
       const legacy: TrueCode[] = [6, 6, 6, 6, 3].map((used) => ({ used }));
       expect(publishCodes(legacy, FORM_USELIMIT)).toEqual(publishCodes(legacy));
+    });
+
+    test('the panel row carries neither the real limit nor a count (what the attacker is given)', () => {
+      const row = inviteCodeRow(
+        {
+          id: 'x',
+          hint: 'ABCD',
+          label: null,
+          usedCount: 518,
+          useLimit: 518,
+          expiresAt: new Date(NOW + 86_400_000),
+          revokedAt: null,
+          createdAt: new Date(NOW - 86_400_000),
+        },
+        NOW
+      );
+      expect(row.status).toBe('exhausted');
+      expect(JSON.stringify(row)).not.toMatch(/518|useLimit|usedCount/);
     });
   });
 
@@ -674,7 +737,7 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
       for (let n = total; n > 0 || !codes.length; n -= SEQUENTIAL_BATCH) {
         codes.push({
           maxUses: SEQUENTIAL_BATCH,
-          useLimit: rand() < 0.5 ? INVITE_CODE_DEFAULT_USE_LIMIT : undefined,
+          useLimit: rand() < 0.5 ? INVITE_CODE_MIN_USE_LIMIT + ri(0, INVITE_CODE_USE_LIMIT_SPREAD) : undefined,
           used: Math.max(0, Math.min(SEQUENTIAL_BATCH, n)),
         });
       }
@@ -687,8 +750,8 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
       const legacy = rand();
       return {
         maxUses: legacy < 0.3 ? Math.max(1, u - ri(0, 3)) : legacy < 0.5 ? u + ri(0, 12) : undefined,
-        // FO-392: a new code carries the default limit, a code from before it none.
-        useLimit: rand() < 0.5 ? INVITE_CODE_DEFAULT_USE_LIMIT : undefined,
+        // FO-392: a new code carries a hidden limit of 500..524, a code from before it none.
+        useLimit: rand() < 0.5 ? INVITE_CODE_MIN_USE_LIMIT + ri(0, INVITE_CODE_USE_LIMIT_SPREAD) : undefined,
         used: u,
         revoked: r < 0.1,
         expired: r >= 0.1 && r < 0.2,
@@ -735,4 +798,179 @@ describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92
       }
     }
   }
+});
+
+/**
+ * FO-392 B-1 / K-577268: the saturated cohort. The earlier gate above never filled a code
+ * (its largest table has ~50 organisations, the limit is 500), so it called a used-up code
+ * "unreachable". crw-fb measured the hole it hid: with a FIXED limit, an agency that really
+ * fills codes to the limit, D = 0 and a funnel total rounded to 5 reads the LAST code's 1..4
+ * uses back (37-45 of 900 tables). Here codes ARE filled to a limit drawn by the product's own
+ * `newInviteCodeUseLimit()`, and the attacker is the same one, knowing only what the policy
+ * exports say (range 500..524).
+ *
+ * Reproduce a bigger sweep (one-off measurement, 900 tables per mode):
+ *   FO392_TABLES=900 pnpm vitest run src/lib/agency/funnel.attack.test.ts -t "saturated cohort"
+ */
+describe('FO-392: saturated cohort - codes really filled to their (hidden) limit', () => {
+  const TABLES = Number(process.env.FO392_TABLES ?? '') || 150;
+  const CONTROL_TABLES = 300;
+  const TIMEOUT_MS = 300_000;
+  const PROVS = ['Samsun', 'Tokat', 'Amasya'];
+  /** One-off measurement lines, appended to the file named by FO392_LOG (vitest buffers console here). */
+  const measure = (line: string): void => {
+    const file = process.env.FO392_LOG;
+    if (file) appendFileSync(file, `${line}\n`);
+  };
+
+  function stream(seed: number): () => number {
+    let s = seed >>> 0;
+    return () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let x = Math.imul(s ^ (s >>> 15), 1 | s);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 2 ** 32;
+    };
+  }
+
+  /** `reg` organisations as one cell's seven funnel counts (+ readiness), like randomTable. */
+  function cellRow(rand: () => number, reg: number): number[] {
+    const ri = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
+    const pipeline = ri(0, reg);
+    const submitted = ri(0, reg);
+    return [reg, ri(0, reg), pipeline, ri(0, pipeline), submitted, ri(0, submitted), ri(0, submitted), ri(0, reg)];
+  }
+
+  /**
+   * A table with exactly R registered organisations. `single`: one province and type (plus
+   * the NO_PROVINCE bucket half the time); otherwise 2-3 provinces x 1-3 types. A few small
+   * cells (1..14) are always present, the ones the funnel masks - the rest of R is spread
+   * over the big cells.
+   */
+  function bigTable(rand: () => number, R: number, single: boolean): Table {
+    const ri = (a: number, b: number) => a + Math.floor(rand() * (b - a + 1));
+    const provs = single ? [PROVS[0]!] : PROVS.slice(0, ri(2, 3));
+    if (rand() < 0.5) provs.push(NO_PROVINCE);
+    const types = [...ORG_TYPES].sort(() => rand() - 0.5).slice(0, single ? 1 : ri(1, 3));
+    const cells: Array<[string, OrgType]> = [];
+    for (const p of provs) for (const ty of types) cells.push([p, ty]);
+    const sizes = cells.map(() => 0);
+    let left = R;
+    // small, maskable cells first
+    for (let i = 1; i < cells.length && left > 40; i++) {
+      if (rand() < 0.6) {
+        const s = ri(1, 14);
+        sizes[i] = s;
+        left -= s;
+      }
+    }
+    // the rest over the cells, random weights
+    const w = cells.map(() => rand() + 0.05);
+    const wSum = w.reduce((a, b) => a + b, 0);
+    let given = 0;
+    for (let i = 0; i < cells.length; i++) {
+      const add = i === cells.length - 1 ? left - given : Math.floor((left * w[i]!) / wSum);
+      sizes[i]! += add;
+      given += add;
+    }
+    const spec: Record<string, Partial<Record<OrgType, number[]>>> = {};
+    cells.forEach(([p, ty], i) => {
+      spec[p] ??= {};
+      spec[p]![ty] = cellRow(rand, sizes[i]!);
+    });
+    return tableOf(spec);
+  }
+
+  /**
+   * The codes of an agency that really filled `nFull` of them to their limit, plus a last
+   * code with `r` uses (the one a leak would expose). Returns the codes and R = Σ used - D.
+   * `draw` gives each code's real limit.
+   */
+  function saturatedCodes(draw: () => number, nFull: number, r: number, d: number): { codes: TrueCode[]; R: number } {
+    const codes: TrueCode[] = [];
+    for (let i = 0; i < nFull; i++) {
+      const lim = draw();
+      codes.push({ useLimit: lim, used: lim });
+    }
+    codes.push({ useLimit: draw(), used: r });
+    const sum = codes.reduce((a, c) => a + c.used, 0);
+    return { codes, R: sum - d };
+  }
+
+  type Mode = { single: boolean; noneDeleted: boolean };
+  const MODES: Mode[] = [
+    { single: true, noneDeleted: true },
+    { single: false, noneDeleted: true },
+    { single: true, noneDeleted: false },
+    { single: false, noneDeleted: false },
+  ];
+
+  function sweep(seed: number, mode: Mode, tables: number, draw: () => number, know: LimitKnowledge) {
+    const rand = stream(seed);
+    let withLeak = 0;
+    const found: string[] = [];
+    for (let k = 0; k < tables; k++) {
+      const nFull = 1 + Math.floor(rand() * 2); // 1 or 2 filled codes
+      const r = rand() < 0.8 ? 1 + Math.floor(rand() * 4) : 5 + Math.floor(rand() * 30); // mostly the 1..4 a leak would expose
+      const d = mode.noneDeleted ? 0 : Math.floor(rand() * 4);
+      const { codes, R } = saturatedCodes(draw, nFull, r, d);
+      const t = bigTable(rand, R, mode.single);
+      const leaks = attack(t, publish(t), {
+        codes: publishCodes(codes, formUseLimit(know), know),
+        noneDeleted: mode.noneDeleted,
+      });
+      if (leaks.length) {
+        withLeak++;
+        for (const l of leaks.slice(0, 2)) found.push(`#${k} ${l.target}=${l.truth} ∈ [${l.lo}, ${l.hi}]`);
+      }
+    }
+    return { withLeak, found };
+  }
+
+  for (const mode of MODES) {
+    for (const seed of [11, 23]) {
+      test(`seed ${seed}, ${mode.single ? 'single' : 'spread'}, ${mode.noneDeleted ? 'D = 0' : 'D >= 0'}: ${TABLES} tables, limits drawn by newInviteCodeUseLimit() - anyLeak = 0`, () => {
+        const { withLeak, found } = sweep(seed, mode, TABLES, newInviteCodeUseLimit, POLICY_KNOWLEDGE);
+        measure(`SATURATED seed=${seed} ${mode.single ? 'single' : 'spread'} ${mode.noneDeleted ? 'D=0' : 'D>=0'} tables=${TABLES} tablesWithLeak=${withLeak}`);
+        expect(found, `${withLeak}/${TABLES} tables leak`).toEqual([]);
+      }, TIMEOUT_MS);
+    }
+  }
+
+  // Positive control: the attack is real. Same cohorts, but the limit is the pre-K-577268
+  // FIXED 500 and the attacker knows it (as the panel used to tell it). This must leak.
+  test('positive control: a FIXED limit of 500 with the same saturated cohorts leaks in some tables (D = 0)', () => {
+    let leaking = 0;
+    let total = 0;
+    for (const single of [true, false]) {
+      const r = sweep(5, { single, noneDeleted: true }, CONTROL_TABLES, () => 500, FIXED_LIMIT(500));
+      leaking += r.withLeak;
+      total += CONTROL_TABLES;
+    }
+    measure(`SATURATED-CONTROL fixed500 D=0 tablesWithLeak=${leaking}/${total}`);
+    expect(leaking).toBeGreaterThan(0);
+  }, TIMEOUT_MS);
+
+  // The mutant the jitter must not be reduced to: the attacker is told the limit is 500..500
+  // while codes are really 500..524 draws. Pins that the gate reads the *range* from the policy.
+  test('self-burn model: the agency learns a window as wide as the spread, never one inside 1..4', () => {
+    // It fills its own code (u0 earlier uses it cannot see) until refused after k uses:
+    // real limit = u0 + k, so u0 in [MIN - k, MAX - k].
+    for (const u0 of [0, 1, 2, 3, 4, 17]) {
+      for (let lim = INVITE_CODE_MIN_USE_LIMIT; lim <= INVITE_CODE_MAX_USE_LIMIT; lim++) {
+        const k = lim - u0;
+        const lo = Math.max(0, INVITE_CODE_MIN_USE_LIMIT - k);
+        const hi = INVITE_CODE_MAX_USE_LIMIT - k;
+        expect(u0).toBeGreaterThanOrEqual(lo);
+        expect(u0).toBeLessThanOrEqual(hi);
+        expect(lo >= 1 && hi <= 4).toBe(false);
+      }
+    }
+    // With a FIXED limit the same attack is exact (window of one value) - what K-577268 closes.
+    const fixed = FIXED_LIMIT(500);
+    for (const u0 of [1, 2, 3, 4]) {
+      const k = 500 - u0;
+      expect([fixed.min - k, fixed.max - k]).toEqual([u0, u0]);
+    }
+  });
 });

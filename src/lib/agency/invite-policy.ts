@@ -1,23 +1,63 @@
 /**
- * Agency invite codes — the defaults a NEW code gets (FO-392).
+ * Agency invite codes — the numbers a NEW code gets (FO-392).
  *
- * The one place the numbers live. The create action, the panel's default date and
- * the tests read them from here; none of them writes its own copy.
+ * The one place they live. The create action, the panel and the tests read them
+ * from here; none of them writes its own copy.
  *
  * Why there is a limit at all: a code is a bearer secret, and everyone who
  * registers with it is exempt from the PIC lookup limit and the shared daily
  * budget. Before FO-392 one code took 300 registrations in a measurement run
  * (0 refused). The limit caps what a leaked code can open.
  *
- * Why it is large: a limit that is small enough to be useful as a gate is also
- * small enough to read back through the funnel's rounded totals (leed-fb
- * TASK-MUM4WVYLSH9IT, funnel.attack.test.ts). 500 lifetime uses is the owner's
- * choice in K-577141 (default A); change it here, nowhere else. Existing codes
- * (useLimit NULL) are not touched: they stay unlimited.
+ * Why the limit is a hidden, per-code number (K-577268, option A): a code that
+ * stops at a fixed N tells the agency "this code used exactly N". Joined with the
+ * funnel's rounded registration total (funnel.attack.test.ts) that read another
+ * code's last 1..4 uses back in about 4-5 % of the tables of a cohort that had
+ * really filled a code (crw-fb, FO-392-crw-fb.md B-1). So a new code's real limit
+ * is {@link INVITE_CODE_MIN_USE_LIMIT} + a uniformly random 0..{@link INVITE_CODE_USE_LIMIT_SPREAD},
+ * drawn once when the code is made. The real number is stored (the database
+ * enforces it) and never leaves the server; the panel says only "at least
+ * {@link INVITE_CODE_MIN_USE_LIMIT}". A limit that varies over 25 values hides a
+ * count behind a window wider than the 1..4 the funnel masks.
+ *
+ * Where the numbers come from: the 500 is the autopilot default of K-577141
+ * (no owner answer); the 0..24 spread is the owner's decision K-577268. Change
+ * them here and in the pinning test (invite-policy.test.ts), nowhere else.
+ * Existing codes (useLimit NULL) are not touched: they stay unlimited.
  */
 
-/** Uses a new code may reach over its life. */
-export const INVITE_CODE_DEFAULT_USE_LIMIT = 500;
+/** Uses every new code can reach at least; the number the panel names. */
+export const INVITE_CODE_MIN_USE_LIMIT = 500;
+
+/** A new code's real limit is MIN + a random integer in [0, SPREAD]. */
+export const INVITE_CODE_USE_LIMIT_SPREAD = 24;
+
+/** The highest real limit a new code can get. Never shown. */
+export const INVITE_CODE_MAX_USE_LIMIT = INVITE_CODE_MIN_USE_LIMIT + INVITE_CODE_USE_LIMIT_SPREAD;
 
 /** Days a new code stays valid when the agency does not pick a day (the cap is MAX_VALIDITY_DAYS). */
 export const INVITE_CODE_DEFAULT_VALIDITY_DAYS = 90;
+
+/**
+ * A uniform integer in [0, n) from the platform CSPRNG (Web Crypto, present in
+ * Node and in the browser, so this file stays importable by the client panel).
+ * Rejection sampling: no modulo bias.
+ */
+function secureInt(n: number): number {
+  const range = 0x1_0000_0000; // 2^32
+  const limit = range - (range % n);
+  const buf = new Uint32Array(1);
+  for (;;) {
+    globalThis.crypto.getRandomValues(buf);
+    if (buf[0]! < limit) return buf[0]! % n;
+  }
+}
+
+/**
+ * The real use limit for ONE new code. Call once per code, at creation. The result
+ * is written to `AgencyInviteCode.useLimit` and must not be sent to a client,
+ * logged to a tenant-visible place, or returned by any action.
+ */
+export function newInviteCodeUseLimit(): number {
+  return INVITE_CODE_MIN_USE_LIMIT + secureInt(INVITE_CODE_USE_LIMIT_SPREAD + 1);
+}

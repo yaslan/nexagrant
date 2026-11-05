@@ -3215,10 +3215,10 @@
       "colStatus": "Durum",
       "colActions": "İşlemler",
       "hintSr": "{hint} ile biten kod",
-      "countsNote": "Yeni her kod, en fazla {limit} kez ve son geçerlilik gününe kadar (hangisi önce gelirse) kullanılabilir; dilediğiniz an iptal edebilirsiniz. Sınırına ulaşan kod yeni kayıtlar için çalışmaz. Daha önce oluşturulan kodların sınırı yoktur. Kurumlar tanınmasın diye bir kodun kaç kez kullanıldığı gösterilmez. Kayıtlı kurum sayısı yukarıdaki panelde.",
+      "countsNote": "Yeni her kodun bir kullanım sınırı vardır: en az {min} kez ve son geçerlilik gününe kadar (hangisi önce gelirse) kullanılabilir; dilediğiniz an iptal edebilirsiniz. Sınırın kesin değeri her kodda farklıdır ve gösterilmez; sınırına ulaşan kod yeni kayıtlar için çalışmaz. Daha önce oluşturulan kodların sınırı yoktur. Kurumlar tanınmasın diye bir kodun kaç kez kullanıldığı da gösterilmez. Kayıtlı kurum sayısı yukarıdaki panelde.",
       "colLimit": "Kullanım sınırı",
       "limitUnlimited": "Sınırsız (eski kod)",
-      "limitUses": "{limit} kullanım",
+      "limitAtLeast": "En az {min} kullanım",
       "status": {
         "active": "Etkin",
         "revoked": "İptal edildi",

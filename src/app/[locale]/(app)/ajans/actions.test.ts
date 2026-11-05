@@ -10,8 +10,8 @@ const rows = [
   // maxUses is a retired column (TASK-MUM4WVYLSH9IT): an old row still has a value, a new one NULL.
   // useLimit (FO-392): NULL on a code from before it, a number on a new one.
   { codeHint: 'AAAA', usedCount: 7, maxUses: 25, useLimit: null },
-  { codeHint: 'BBBB', usedCount: 3, maxUses: null, useLimit: 500 },
-  { codeHint: 'CCCC', usedCount: 500, maxUses: null, useLimit: 500 },
+  { codeHint: 'BBBB', usedCount: 3, maxUses: null, useLimit: 511 },
+  { codeHint: 'CCCC', usedCount: 511, maxUses: null, useLimit: 511 },
 ].map((r, i) => ({
   id: `code-${i}`,
   label: null,
@@ -39,16 +39,17 @@ describe('invite-code list actions', () => {
   ])('%s: status per code, no usedCount in the response', async (_name, call) => {
     const res = await call();
     const wire = JSON.stringify(res);
-    expect(wire).not.toMatch(/usedCount|"used|left|maxUses/);
+    // FO-392 / K-577268: nor the code's real limit (511), which differs per code and is hidden.
+    expect(wire).not.toMatch(/usedCount|"used|left|maxUses|useLimit|511/);
     expect(wire).not.toMatch(/"(7|3)"|:7\b|:3\b/); // neither 7 nor 3 anywhere as a value
-    expect(res.map((c) => [c.hint, c.status, c.useLimit])).toEqual([
-      ['AAAA', 'active', null], // legacy code: unlimited, however much it was used
-      ['BBBB', 'active', 500],
-      ['CCCC', 'exhausted', 500], // reached its own limit (FO-392)
+    expect(res.map((c) => [c.hint, c.status, c.limited])).toEqual([
+      ['AAAA', 'active', false], // legacy code: unlimited, however much it was used
+      ['BBBB', 'active', true],
+      ['CCCC', 'exhausted', true], // reached its own limit (FO-392)
     ]);
     // What the select asked for is the database's business; what leaves is not.
     expect(Object.keys(res[0]!).sort()).toEqual(
-      ['createdAt', 'expiresAt', 'hint', 'id', 'label', 'revokedAt', 'status', 'useLimit'].sort()
+      ['createdAt', 'expiresAt', 'hint', 'id', 'label', 'limited', 'revokedAt', 'status'].sort()
     );
   });
 });

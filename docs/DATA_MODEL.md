@@ -864,11 +864,14 @@ yazılır. Ajans silinirse bağ `SET NULL` olur.
 araçları tabloyu olduğu gibi kapsar). Kodun kendisi saklanmaz: yalnız normalize edilmiş halinin
 SHA-256'sı (`codeHash`) ve gösterim için son 4 karakter (`codeHint`). Kod 12 karakter,
 0/O/1/I/L/U içermeyen 30 harflik alfabeden (`src/lib/agency/invite-code.ts`).
-**Kullanım sınırı** (FO-392, K-577141): `useLimit INTEGER NULL` = kodun ömrü boyunca ulaşabileceği
-kullanım sayısı. `NULL` = sınırsız: FO-392 öncesi açılmış her kod böyledir ve değişmedi
+**Kullanım sınırı** (FO-392; 500 = otopilot varsayılanı K-577141, gizli sapma = patron kararı K-577268):
+`useLimit INTEGER NULL` = kodun ömrü boyunca ulaşabileceği kullanım sayısı. `NULL` = sınırsız: FO-392 öncesi açılmış her kod böyledir ve değişmedi
 (TASK-MUM4WVYLSH9IT sınırı kaldırmıştı; çalışan ajans akışları kırılmasın diye geriye dönük
-doldurma yok). Yeni kod `INVITE_CODE_DEFAULT_USE_LIMIT` (500) ile açılır; sayı yalnız
-`src/lib/agency/invite-policy.ts`'te durur. CHECK'ler: `AgencyInviteCode_useLimit_positive`
+doldurma yok). Yeni kodun gerçek sınırı `500 + rastgele 0..24`'tür (kriptografik rastgele, kod başına bir kez, oluştururken
+çekilir; `newInviteCodeUseLimit()`); sayılar yalnız `src/lib/agency/invite-policy.ts`'te durur. Gerçek sınır
+**istemciye gitmez** (liste yanıtı, sayfa/RSC yükü, action yanıtı; denetim kaydı da yazmaz): panel yalnız
+"en az 500" der. Sebep: sabit N, "bu kod tam N kez kullanıldı" bilgisini verir; huni toplamıyla birleşince başka bir
+kodun son 1-4 kullanımı okunuyordu (crw-fb, FO-392 B-1). CHECK'ler: `AgencyInviteCode_useLimit_positive`
 (`useLimit IS NULL OR useLimit > 0`) ve `AgencyInviteCode_usedCount_within_useLimit`
 (`useLimit IS NULL OR usedCount <= useLimit`). Kod ayrıca `expiresAt` (≤ 1 yıl, panelde varsayılan
 90 gün) ve `revokedAt` ile yönetilir. `usedCount` iç sayaçtır, ajansa gösterilmez;
@@ -883,8 +886,8 @@ revokedAt IS NULL AND expiresAt > now AND (useLimit IS NULL OR usedCount < useLi
 RETURNING tenantId` (`agency-invite-use-limit.sql`). Satır kilidi eşzamanlı kullanımları sıraya
 koyar ve kilit sonrası WHERE yeniden değerlendirilir (READ COMMITTED): son kullanım için yarışan
 iki kayıttan yalnız biri kazanır, sayaç sınırı aşmaz. Sınırlı kodda ret artık "tükendi"
-anlamına gelebilir; bunu kodu kayıt formunda deneyen ajans zaten öğrenir, panel buna
-`exhausted` durumunu ekler, sayaç yine gösterilmez (TASK-MUM3TMP8HU76G Ö-1, FO-392). Fonksiyon ajans
+anlamına gelebilir; bunu kodu kayıt formunda deneyen ajans zaten öğrenir ("en az 500", kesin sayı değil), panel buna
+`exhausted` ("Sınıra ulaştı") durumunu ekler, sayaç ve gerçek sınır yine gösterilmez (TASK-MUM3TMP8HU76G Ö-1, FO-392). Fonksiyon ajans
 id'si ya da NULL döndürür; kodun var olup olmadığı, süresinin dolup dolmadığı dışarıdan ayırt
 edilemez. `app.system_scope` fonksiyon düzeyinde açılır, çıkışta (hata dahil) geri alınır.
 Reddedilen denemeler `public.note_agency_invite_rejection(code_hash)` ile `AuditEvent`'e

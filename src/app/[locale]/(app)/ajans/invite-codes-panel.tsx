@@ -5,13 +5,13 @@ import { useTranslations } from 'next-intl';
 import type { InviteCodeStatus, InviteCodeSummary } from '@/lib/agency/codes';
 import { createInviteCode, listInviteCodes, revokeInviteCode, type InviteActionError } from './actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
-import { INVITE_CODE_DEFAULT_USE_LIMIT, INVITE_CODE_DEFAULT_VALIDITY_DAYS } from '@/lib/agency/invite-policy';
+import { INVITE_CODE_MIN_USE_LIMIT, INVITE_CODE_DEFAULT_VALIDITY_DAYS } from '@/lib/agency/invite-policy';
 
 /**
  * B-1 (TASK-MUM17YBJVAHRR): the server sends each code's status, never its use count.
- * FO-392: a new code carries a use limit, so the status may be "exhausted" and the
- * limit itself (a policy number, not a count) is shown; a code from before FO-392
- * has none and says so.
+ * FO-392: a new code carries a use limit, so the status may be "exhausted". The real
+ * limit is hidden and differs per code (K-577268): the panel says "at least N" for a
+ * code that has one, and "unlimited" for a code from before FO-392.
  */
 export type InviteCodeRow = InviteCodeSummary;
 
@@ -113,7 +113,7 @@ export default function InviteCodesPanel({
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description')}</p>
         <p className="mt-1 max-w-2xl text-sm text-ink-2" data-testid="invite-codes-limit-note">
-          {t('countsNote', { limit: INVITE_CODE_DEFAULT_USE_LIMIT })}
+          {t('countsNote', { min: INVITE_CODE_MIN_USE_LIMIT })}
         </p>
       </div>
 
@@ -229,7 +229,7 @@ export default function InviteCodesPanel({
                     <td className="px-4 py-3 text-ink-2">{c.label ?? '—'}</td>
                     <td className="px-4 py-3 text-ink-2">{dateFmt.format(new Date(c.expiresAt))}</td>
                     <td className="px-4 py-3 text-ink-2" data-testid={`invite-limit-${c.hint}`}>
-                      {c.useLimit === null ? t('limitUnlimited') : t('limitUses', { limit: c.useLimit })}
+                      {c.limited ? t('limitAtLeast', { min: INVITE_CODE_MIN_USE_LIMIT }) : t('limitUnlimited')}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_CLASS[status]}`}>

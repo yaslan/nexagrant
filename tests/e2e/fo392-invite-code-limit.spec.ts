@@ -5,7 +5,7 @@ import { prisma } from '../../src/lib/db';
 import { withTenant } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { createInviteCodeIn } from '../../src/lib/agency/codes';
-import { INVITE_CODE_DEFAULT_USE_LIMIT } from '../../src/lib/agency/invite-policy';
+import { INVITE_CODE_MAX_USE_LIMIT, INVITE_CODE_MIN_USE_LIMIT } from '../../src/lib/agency/invite-policy';
 import trMessages from '../../messages/tr.json';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
@@ -225,7 +225,22 @@ test('a code from before FO-392 has no limit and still registers', async ({ page
   expect(await usedCount(fx.legacy.id)).toBe(1);
 });
 
-test('the agency panel: limit column, "Sınıra ulaştı" on the full code, "Sınırsız (eski kod)" on the old one, and a new code carries the default', async ({ page }) => {
+test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never the exact limit or a count - and a new code carries a hidden limit of 500..524', async ({ page }) => {
+  // N-2 (FO-392-crw-fb.md): everything the browser receives while the panel loads and a code is
+  // made - the HTML, the RSC payloads, the server-action response - is collected and searched.
+  const bodies: Array<{ url: string; kind: string; text: string }> = [];
+  const pending: Array<Promise<void>> = [];
+  page.on('response', (res) => {
+    const type = res.request().resourceType();
+    if (!['document', 'fetch', 'xhr'].includes(type)) return;
+    pending.push(
+      res
+        .text()
+        .then((text) => void bodies.push({ url: res.url(), kind: `${res.request().method()} ${type}`, text }))
+        .catch(() => undefined),
+    );
+  });
+
   await signInAs(page, { id: fx.ownerId, email: fx.ownerEmail, name: 'FO392 owner', tenantId: fx.agencyId, role: 'TENANT_OWNER' });
   await page.goto('/tr/ajans');
   const table = page.getByTestId('invite-codes-table');
@@ -238,9 +253,12 @@ test('the agency panel: limit column, "Sınıra ulaştı" on the full code, "Sı
     );
     return table.getByTestId(`invite-row-${row.codeHint}`);
   };
+  const atLeast = trMessages.agency.codes.limitAtLeast.replace('{min}', String(INVITE_CODE_MIN_USE_LIMIT));
   const full = await rowOf(fx.two.id);
   await expect(full).toContainText(trMessages.agency.codes.status.exhausted);
-  await expect(full).toContainText('2 kullanım');
+  // The code's real limit is 2 here (fixture), the panel still says only "at least 500".
+  await expect(full).toContainText(atLeast);
+  await expect(full).not.toContainText('2 kullanım');
   const old = await rowOf(fx.legacy.id);
   await expect(old).toContainText(trMessages.agency.codes.limitUnlimited);
   await expect(old).toContainText(trMessages.agency.codes.status.active);
@@ -260,6 +278,28 @@ test('the agency panel: limit column, "Sınıra ulaştı" on the full code, "Sı
       select: { useLimit: true, expiresAt: true, createdAt: true },
     }),
   );
-  expect(created.useLimit).toBe(INVITE_CODE_DEFAULT_USE_LIMIT);
+  // A real limit, in the window, and not the one fixed number.
+  expect(created.useLimit).toBeGreaterThanOrEqual(INVITE_CODE_MIN_USE_LIMIT);
+  expect(created.useLimit).toBeLessThanOrEqual(INVITE_CODE_MAX_USE_LIMIT);
   await page.screenshot({ path: `${SHOTS}/03-agency-panel.png`, fullPage: true });
+
+  // N-2: nothing received by the browser carries the limit or a use count.
+  await page.reload();
+  await expectHydrated(page.getByTestId('invite-codes-limit-note'));
+  await Promise.all(pending);
+  expect(bodies.length).toBeGreaterThan(0);
+  const exact = created.useLimit!;
+  for (const b of bodies) {
+    expect(b.text, `${b.kind} ${b.url} carries useLimit`).not.toMatch(/useLimit/);
+    expect(b.text, `${b.kind} ${b.url} carries usedCount`).not.toMatch(/usedCount/);
+  }
+  // Server-action responses are small: the code's exact limit must not be among them.
+  const actions = bodies.filter((b) => b.kind.startsWith('POST'));
+  expect(actions.length).toBeGreaterThan(0);
+  if (exact !== INVITE_CODE_MIN_USE_LIMIT) {
+    for (const b of actions) expect(b.text, `${b.url} carries the exact limit ${exact}`).not.toMatch(new RegExp(`(?<![0-9A-Za-z])${exact}(?![0-9A-Za-z])`));
+    const visible = await page.locator('main').innerText();
+    expect(visible).not.toMatch(new RegExp(`(?<![0-9])${exact}(?![0-9])`));
+  }
+  await expect(page.getByTestId('invite-codes-limit-note')).toContainText(String(INVITE_CODE_MIN_USE_LIMIT));
 });
