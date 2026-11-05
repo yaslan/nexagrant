@@ -397,8 +397,8 @@ describe('loadG0Snapshot()', () => {
     expect(snapshot.baseRatePct).toBe(17);
   });
 
-  it('no PIC with CORDIS loaded is a measured "no record" (FO-382), not missing data', async () => {
-    const { client } = fakeClient({ tenant: { country: 'DE', pic: null }, topics: [topicRow] });
+  it('a PIC with no CORDIS row is a measured "no record" for the partner (FO-382)', async () => {
+    const { client } = fakeClient({ tenant: { country: 'DE', pic: 'PIC-NEW' }, topics: [topicRow] });
     const snapshot = await loadG0Snapshot(client, 'tenant-1', {
       opportunityId: 'opp-1',
       topicId: 'topic-1',
@@ -413,8 +413,10 @@ describe('loadG0Snapshot()', () => {
     });
   });
 
-  it.each([['coordinator'], [null]])(
-    'no PIC with CORDIS loaded stays missing for intendedRole=%s (FO-382 B1: partner-only "no record")',
+  // Patron 05.11: "PIC boşsa kolaylık yok". Without a PIC there is no organisation to look up, so
+  // the record is absent, not empty: every role keeps the standard basis (FO-382 review, PIC rule).
+  it.each([['partner'], ['coordinator'], [null]])(
+    'no PIC stays missing for intendedRole=%s: cordis is null, never a measured "no record"',
     async (role) => {
       const { client } = fakeClient({ tenant: { country: 'DE', pic: null }, topics: [topicRow] });
       const snapshot = await loadG0Snapshot(client, 'tenant-1', {
@@ -426,6 +428,21 @@ describe('loadG0Snapshot()', () => {
       expect(snapshot.cordis).toBeNull();
     },
   );
+
+  it('a PIC with an empty CORDIS table is missing data, not a measured "no record"', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: 'PIC-NEW' },
+      topics: [topicRow],
+      cordisTableEmpty: true,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1',
+      topicId: 'topic-1',
+      intendedRole: 'partner',
+      seats: [],
+    });
+    expect(snapshot.cordis).toBeNull();
+  });
 
   it('no PIC and an empty CORDIS table is missing data: cordis stays null, the standard basis holds', async () => {
     const { client } = fakeClient({

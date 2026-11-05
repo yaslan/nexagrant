@@ -12,14 +12,21 @@ import { signInAs } from './fixtures/session';
  * that, such a partner must have at least one FILLED seat (CANDIDATE, INVITED or CONFIRMED) or G0
  * refuses it, whatever the score. Without the rule the same partner passed with 84.
  *
+ * The rule needs a PIC (patron 05.11: "PIC boşsa kolaylık yok"). The tenant here HAS a PIC that has
+ * no CORDIS row; the PIC-less case is step 3.
+ *
  * By real clicks, in a browser, on an isolated database:
- *   0. A new tenant with no PIC; CORDIS is loaded (other organisations have participations) but
- *      none of them is this tenant. Profile → "Yeni Fırsat" form with role "Konsorsiyum Ortağı".
- *      No seat yet: G0 is refused (no filled seat), score 0 seats filled.
+ *   0. A new tenant with a PIC that has no CORDIS row. CORDIS is loaded (other organisations have
+ *      participations) but none of them is this PIC. Profile → "Yeni Fırsat" form with role
+ *      "Konsorsiyum Ortağı". No seat yet: G0 is refused (no filled seat), score 0 seats filled.
+ *      The PIC is set on the tenant as a fixture after the profile save, not by clicks.
  *   1. Two seats added as OPEN. G0 is refused: the score is 84 but no seat is filled, so the hard
  *      rule refuses it; the stored evidence gives researchAndEndUser 0.
  *   2. Both seats invited from the candidate search. G0 is run again: scoringBasis
  *      no_history_evidence, denominator 75, two filled seats, score 100, and the gate passes.
+ *   3. The PIC is removed (fixture). Same two invited seats: the PIC-less partner is scored on the
+ *      standard basis, denominator 100, and the score must not be higher than with the PIC (removing
+ *      the PIC never lifts the score). The expected 75 is measured and reported, not assumed.
  *
  * CANDIDATE, CONFIRMED and DECLINED are covered by the unit tests (tests/g0-features.test.ts), not
  * by clicks here: this spec drives only the invite path the UI exposes.
@@ -29,6 +36,8 @@ import { signInAs } from './fixtures/session';
  */
 
 const TENANT = 'fo382-partner-tenant';
+/** The tenant's PIC in step 0-2: it has no CORDIS participation (a measured "no record"). */
+const NEW_PIC = 'FO382-NEW-PIC';
 const WORKSPACE = 'fo382-partner-workspace';
 const SLUG = 'fo382-partner';
 const USER = 'fo382-partner-user';
@@ -45,6 +54,7 @@ const OTHER_PIC = 'FO382-OTHER-PIC';
 const OTHER_PROJECT = 'FO382-OTHER-PROJECT';
 /** Candidate pool for the invitations (CordisOrganization + profile, no participations). */
 const PICS = ['FO382-PIC-1', 'FO382-PIC-2', 'FO382-PIC-3'];
+const ALL_PICS = [OTHER_PIC, NEW_PIC, ...PICS];
 
 const SHOTS = shotsDir('FO-382-screenshots');
 const CONSORTIUM_ROLES = { research: 'Araştırma Ortağı', end_user: 'Son Kullanıcı' } as const;
@@ -77,7 +87,7 @@ async function rollback() {
   await prisma.programme.deleteMany({ where: { id: PROGRAMME } });
   await prisma.cordisProject.deleteMany({ where: { id: OTHER_PROJECT } });
   await prisma.cordisOrganization.deleteMany({
-    where: { organisationId: { in: [OTHER_PIC, ...PICS] } },
+    where: { organisationId: { in: ALL_PICS } },
   });
 }
 
@@ -137,6 +147,11 @@ async function seed() {
     data: { projectId: OTHER_PROJECT, organisationId: OTHER_PIC, role: 'coordinator' },
   });
 
+  // FIXTURE: the tenant's own PIC is known to CORDIS but has no participation (step 0-2).
+  await prisma.cordisOrganization.create({
+    data: { organisationId: NEW_PIC, name: 'FO382 New Partner', country: 'TR' },
+  });
+
   // FIXTURE: the candidate pool the invitations are drawn from.
   for (const [i, pic] of PICS.entries()) {
     await prisma.cordisOrganization.create({
@@ -165,6 +180,8 @@ async function saveProfile(page: Page) {
       timeout: 30_000,
     })
     .toEqual(KEYWORDS);
+  // FIXTURE: set the PIC after the save, so the profile form cannot clear it.
+  await prisma.tenant.update({ where: { id: TENANT }, data: { pic: NEW_PIC } });
 }
 
 /** "Yeni Fırsat" on the board, role set to "Konsorsiyum Ortağı" (partner). */
@@ -340,5 +357,19 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(ev.researchAndEndUser).toBe(50 + 50);
     expect(ev.score).toBe(100);
     expect(invitedRun.passed).toBe(true);
+
+    // ── 3. The PIC is removed (fixture). The same two invited seats now score on the standard basis.
+    // "PIC boşsa kolaylık yok": the 75-point denominator must not apply, and removing the PIC must not
+    // raise the score. The 75 below is the measured standard score, reported in the result file.
+    await prisma.tenant.update({ where: { id: TENANT }, data: { pic: null } });
+    const picLessRun = await runG0(page, opp.id);
+    const picLess = evidenceOf(picLessRun);
+    dump('G0, PIC kaldırıldı, koltuklar INVITED', { passed: picLessRun.passed, evidence: picLess });
+    expect(picLess.scoringBasis).toBe('standard');
+    expect(picLess.excludedFeatures).toEqual([]);
+    expect(picLess.denominator).toBe(100);
+    expect(picLess.noHistoryWithoutFilledSeat).toBe(false);
+    expect(picLess.score).toBeLessThanOrEqual(ev.score!);
+    expect(picLess.score).toBe(75);
   });
 });

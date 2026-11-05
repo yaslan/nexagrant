@@ -484,6 +484,10 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
  * The rule's condition, kept apart so it can be read and tested on its own: the intended role is
  * "partner" (`ortak`), the snapshot came from a real CORDIS lookup, and that lookup found no
  * participation of any role. An unset role (`null`) and the coordinator role never qualify.
+ *
+ * "A real lookup" means the tenant entered a PIC and CORDIS is loaded: `loadCordisSnapshot` returns
+ * `null` for a missing PIC or an empty table (FO-382, patron 05.11: "PIC boşsa kolaylık yok"), so a
+ * non-null `cordis` here always implies a PIC.
  */
 export function isNoHistoryPartner(snapshot: Pick<G0Snapshot, 'intendedRole' | 'cordis'>): boolean {
   return isPartnerRole(snapshot.intendedRole) && snapshot.cordis !== null && snapshot.cordis.participationsOverall === 0;

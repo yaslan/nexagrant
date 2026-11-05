@@ -28,7 +28,6 @@ import { DEFAULT_SCORING_WEIGHTS } from './defaults';
 import type { GateReason } from '../gates/reasons';
 import {
   extractG0Features,
-  isPartnerRole,
   topicPrefixOf,
   type G0CordisSnapshot,
   type G0SeatSnapshot,
@@ -146,14 +145,13 @@ async function loadCordisSnapshot(
   client: TenantTx,
   pic: string | null,
   topicIdentifier: string | null,
-  intendedRole: string | null,
 ): Promise<G0CordisSnapshot | null> {
-  // "No record" = no PIC, or a PIC with no CORDIS row (FO-382, card definition). It is only a fact
-  // about the organisation when CORDIS itself is loaded. An empty table (not imported yet) is
-  // missing data, not a history of zero, so it stays null and the scorer keeps the standard basis.
-  // A tenant with no PIC is a measured "no record" only for the partner role: the FO-382 rule is
-  // partner-only, and coordinator / unset-role scoring must stay exactly as it was (`cordis: null`).
-  const isPartner = isPartnerRole(intendedRole);
+  // "No record" = a PIC was entered and no CORDIS row exists for it (FO-382, patron 05.11: "PIC
+  // boşsa kolaylık yok"). It is only a fact about the organisation when CORDIS itself is loaded. An
+  // empty table (not imported yet) is missing data, not a history of zero, so it stays null and the
+  // scorer keeps the standard basis. No PIC is never a "no record": the partner keeps the standard
+  // basis, and `cordis: null` is the only way the scorer knows the PIC is absent.
+  // The partner-only rule is applied in the scorer (`isNoHistoryPartner`), not here.
   const noRecord = async (): Promise<G0CordisSnapshot | null> => {
     const anyRow: { projectId: string } | null = await client.cordisParticipation.findFirst({
       select: { projectId: true },
@@ -167,7 +165,7 @@ async function loadCordisSnapshot(
     };
   };
 
-  if (!pic) return isPartner ? noRecord() : null;
+  if (!pic) return null;
 
   const participations: { role: string; projectId: string; project: { masterCall: string | null } | null }[] =
     await client.cordisParticipation.findMany({
@@ -282,7 +280,7 @@ export async function loadG0Snapshot(
     }
   }
 
-  const cordis = await loadCordisSnapshot(client, tenant?.pic ?? null, topic?.identifier ?? null, subject.intendedRole);
+  const cordis = await loadCordisSnapshot(client, tenant?.pic ?? null, topic?.identifier ?? null);
 
   return {
     tenant: { country: tenant?.country ?? null, pic: tenant?.pic ?? null },
