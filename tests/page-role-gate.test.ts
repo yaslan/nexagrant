@@ -12,8 +12,8 @@ import { can, type Action } from '@/lib/rbac';
  *   1. `requireTenantPageRole` lets through exactly the roles `can()` lets
  *      through (the answer is read from rbac.ts, never restated here) and
  *      refuses an unknown or missing role;
- *   2. the two downloads behind those pages refuse a role without
- *      `view_proposal` before any tenant read;
+ *   2. the downloads behind those pages refuse a role without their action
+ *      (`view_proposal`, and `manage_billing` for an invoice) before any tenant read;
  *   3. each page names its door in source, so a new copy of a page cannot drop it.
  */
 
@@ -45,9 +45,17 @@ vi.mock('@/lib/db', () => ({ withTenant: m.withTenant }));
 import { requireTenantPageRole } from '@/lib/page-role';
 import { GET as exportConceptNote } from '@/app/api/concept-notes/[id]/export/route';
 import { GET as exportDocument } from '@/app/api/documents/export/route';
+import { GET as exportInvoice } from '@/app/api/billing/invoices/[id]/export/route';
 
 const ROLES: Role[] = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER', 'WRITER', 'MEMBER', 'GUEST_PARTNER'];
-const ACTIONS: Action[] = ['view_proposal', 'view_partner_search', 'request_dual_approval', 'manage_users'];
+const ACTIONS: Action[] = [
+  'view_proposal',
+  'view_partner_search',
+  'request_dual_approval',
+  'manage_users',
+  'manage_billing',
+  'evaluate_gates',
+];
 
 beforeEach(() => {
   m.scope = null;
@@ -116,6 +124,38 @@ describe('downloads behind view_proposal', () => {
   });
 });
 
+describe('invoice export behind manage_billing (NG-64 review B-1)', () => {
+  const call = () =>
+    exportInvoice(new Request('http://x/api/billing/invoices/FB-1/export?format=xml'), {
+      params: Promise.resolve({ id: 'FB-1' }),
+    });
+
+  for (const role of ROLES) {
+    const allowed = can(role, 'manage_billing');
+    test(`${role} ${allowed ? 'passes the role door' : 'gets 403 before any invoice read'}`, async () => {
+      m.session = { user: { id: 'u1' }, tenantId: 't1', role };
+      if (allowed) {
+        // The read stub throws; the route turns that into its own 500, so the
+        // proof the door let it through is that the read was attempted.
+        await call();
+        expect(m.withTenant).toHaveBeenCalledTimes(1);
+        return;
+      }
+      const res = await call();
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' });
+      expect(m.withTenant).not.toHaveBeenCalled();
+    });
+  }
+
+  test.each([null, 'OWNER', 'SUPER_ADMIN'])('an invoice export with role %j is refused', async (role) => {
+    m.session = { user: { id: 'u1' }, tenantId: 't1', role };
+    const res = await call();
+    expect(res.status).toBe(403);
+    expect(m.withTenant).not.toHaveBeenCalled();
+  });
+});
+
 /** Page file (under the workspace segment) → the action its door names. */
 const PAGE_DOORS: Record<string, Action> = {
   'pipeline/page.tsx': 'view_proposal',
@@ -138,6 +178,9 @@ const PAGE_DOORS: Record<string, Action> = {
   'settings/api-keys/page.tsx': 'view_partner_search',
   'approvals/page.tsx': 'request_dual_approval',
   'settings/members/page.tsx': 'manage_users',
+  // NG-64 review B-1/B-2 (K-577543: existing actions only, rbac.ts unchanged).
+  'settings/billing/page.tsx': 'manage_billing',
+  'settings/gates/page.tsx': 'evaluate_gates',
 };
 
 describe('each gated page names its door', () => {

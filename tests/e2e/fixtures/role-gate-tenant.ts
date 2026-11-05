@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { Role } from '@prisma/client';
 
 import { prisma } from '../../../src/lib/db';
@@ -16,6 +18,9 @@ export const RG_REL_ID = 'ng64-role-gate-e2e-rel';
 /** Text only the seeded rows carry: seen on a page or in a body, the door is open. */
 export const RG_OPP_TITLE = 'NG64 kiracıya özel fırsat — Kapı testi';
 export const RG_REL_NAME = 'NG64 kiracıya özel ilişki';
+/** One issued invoice: its number on a page or in a body means the billing door is open (review B-1). */
+export const RG_INVOICE_ID = 'ng64-role-gate-e2e-invoice';
+export const RG_INVOICE_NO = 'NG64-KAPI-000001';
 
 /** A domain only this fixture uses: `User.email` is unique (NG-4 review N-1). */
 export const RG_SEATS: Record<Role, { id: string; email: string }> = {
@@ -81,10 +86,29 @@ export async function setupRoleGateTenant() {
     create: { id: RG_REL_ID, tenantId: RG_TENANT, kind: 'partner', counterpartName: RG_REL_NAME },
     update: { counterpartName: RG_REL_NAME },
   });
+  await prisma.invoice.upsert({
+    where: { id: RG_INVOICE_ID },
+    create: {
+      id: RG_INVOICE_ID,
+      tenantId: RG_TENANT,
+      number: RG_INVOICE_NO,
+      issuedAt: new Date('2026-09-01T09:00:00.000Z'),
+      currency: 'TRY',
+      buyerName: 'NG64 kapı testi alıcısı',
+      buyerVknTckn: '1000000000',
+      buyerTaxOffice: 'Test V.D.',
+      buyerAddress: 'Test adresi',
+      buyerCity: 'Ankara',
+      lines: [{ name: 'NG64 test satırı', quantity: 1, unitCode: 'MON', unitPriceMinor: 100_000, vatRate: 20 }],
+      ettn: randomUUID(),
+    },
+    update: { number: RG_INVOICE_NO },
+  });
 }
 
 /** Literal ids only: tests/teardown-where-guard.test.ts. */
 export async function teardownRoleGateTenant() {
+  await prisma.invoice.deleteMany({ where: { id: 'ng64-role-gate-e2e-invoice' } });
   await prisma.relationship.deleteMany({ where: { id: 'ng64-role-gate-e2e-rel' } });
   await prisma.opportunity.deleteMany({ where: { id: 'ng64-role-gate-e2e-opp' } });
   await prisma.membership.deleteMany({ where: { tenantId: 'ng64-role-gate-e2e-tenant' } });

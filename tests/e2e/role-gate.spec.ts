@@ -4,6 +4,7 @@ import type { Role } from '@prisma/client';
 import trMessages from '../../messages/tr.json';
 import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 import {
+  RG_INVOICE_NO,
   RG_OPP_ID,
   RG_OPP_TITLE,
   RG_REL_ID,
@@ -45,7 +46,15 @@ const GUEST_CLOSED = [
   `${ws}/onay-merkezi`,
   `${ws}/ayarlar/uyeler`,
   `${ws}/ayarlar/api-anahtarlari`,
+  // Review B-1/B-2: the tenant's invoices and its scoring weights.
+  `${ws}/ayarlar/faturalama`,
+  `${ws}/settings/billing`,
+  `${ws}/ayarlar/kapilar`,
+  `${ws}/settings/gates`,
 ];
+
+/** Any CORDIS-shaped PIC: the door is the role, the PIC is never reached. */
+const PIC = '999999999';
 
 async function signIn(page: Page, role: Role) {
   const seat = RG_SEATS[role];
@@ -59,6 +68,7 @@ async function expectClosed(page: Page, path: string) {
   const html = await page.content();
   expect(html, path).not.toContain(RG_OPP_TITLE);
   expect(html, path).not.toContain(RG_REL_NAME);
+  expect(html, path).not.toContain(RG_INVOICE_NO);
 }
 
 async function expectOpen(page: Page, path: string) {
@@ -84,6 +94,56 @@ test.describe.serial('NG-64 page role gates', () => {
     expect(await note.json()).toEqual({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' });
     const doc = await page.request.get('/api/documents/export?partId=ng64-none');
     expect(doc.status()).toBe(403);
+    // Review B-1: the invoice the billing page lists, by its real number.
+    for (const format of ['xml', 'pdf'] as const) {
+      const invoice = await page.request.get(`/api/billing/invoices/${RG_INVOICE_NO}/export?format=${format}`);
+      expect(invoice.status(), format).toBe(403);
+      const body = await invoice.text();
+      expect(JSON.parse(body), format).toEqual({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' });
+      expect(body, format).not.toContain(RG_INVOICE_NO);
+    }
+  });
+
+  test('GUEST_PARTNER gets no Partner Search announcements (review B-3)', async ({ page }) => {
+    await signIn(page, 'GUEST_PARTNER');
+    for (const url of [`/api/organizations/${PIC}/announcements`, '/api/partner-search/announcements/export?format=json']) {
+      const res = await page.request.get(url);
+      expect(res.status(), url).toBe(403);
+      const body = await res.json();
+      expect(body, url).toMatchObject({ error: 'MODULE_ACCESS_DENIED', reason: 'ROLE_FORBIDDEN' });
+      expect(body, url).not.toHaveProperty('data');
+    }
+    // The /api/v1 twin answers to an API key only; a member's cookie is not one.
+    const v1 = await page.request.get(`/api/v1/organizations/${PIC}/announcements`);
+    expect(v1.status()).toBe(401);
+    expect(await v1.json()).not.toHaveProperty('data');
+  });
+
+  test('MEMBER is the control: the same announcements read answers 200', async ({ page }) => {
+    await signIn(page, 'MEMBER');
+    const res = await page.request.get(`/api/organizations/${PIC}/announcements`);
+    expect(res.status()).toBe(200);
+    expect(await res.json()).toHaveProperty('data');
+  });
+
+  test('billing is manage_billing: MEMBER and TENANT_ADMIN get 403, TENANT_OWNER reads the invoice', async ({ page }) => {
+    test.setTimeout(120_000);
+    for (const role of ['MEMBER', 'TENANT_ADMIN'] as const) {
+      await signIn(page, role);
+      await expectClosed(page, `${ws}/ayarlar/faturalama`);
+      const res = await page.request.get(`/api/billing/invoices/${RG_INVOICE_NO}/export?format=xml`);
+      expect(res.status(), role).toBe(403);
+    }
+    await signIn(page, 'TENANT_OWNER');
+    await expectOpen(page, `${ws}/ayarlar/faturalama`);
+    await expect(page.getByText(RG_INVOICE_NO).first()).toBeVisible();
+  });
+
+  test('gate settings are evaluate_gates: MEMBER gets 403, PIPELINE_MANAGER opens them', async ({ page }) => {
+    await signIn(page, 'MEMBER');
+    await expectClosed(page, `${ws}/ayarlar/kapilar`);
+    await signIn(page, 'PIPELINE_MANAGER');
+    await expectOpen(page, `${ws}/ayarlar/kapilar`);
   });
 
   test('GUEST_PARTNER keeps the pages that have no tenant read behind a role', async ({ page }) => {
