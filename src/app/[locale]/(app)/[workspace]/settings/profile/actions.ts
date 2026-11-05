@@ -23,6 +23,7 @@ import { toTenantProvince, provinceAppliesTo } from '@/lib/province';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
+import { refreshTenantPicRegistry } from '@/lib/pic-registry-refresh';
 import { rescoreTenantG0AfterPicChange, type PicChangeTrigger } from '@/lib/scoring/g0-rescore-tenant';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 import { DEFAULT_TRL_RANGE, parseKeywords } from './profile-fields';
@@ -296,6 +297,8 @@ export async function updateTenantProfile(
 
     // FO-384: set by the PIC write below; the rescore runs after that transaction has committed.
     let picChange: { trigger: PicChangeTrigger; auditEventId: string } | null = null;
+    // FO-396: the new PIC to ask the EU register about, set only when the PIC really changed to a value.
+    let picToCheck: string | null = null;
 
     const outcome = await withTenant(scope.tenantId, async (tx) => {
       const existing = await tx.tenantProfile.findUnique({
@@ -381,7 +384,13 @@ export async function updateTenantProfile(
       }
 
       if (picPlan.kind === 'write') {
-        await tx.tenant.update({ where: { id: scope.tenantId }, data: { pic: picPlan.to } });
+        // FO-396 (B3): the stored register answer belongs to the PIC it was asked about. A new PIC starts
+        // unverified, so the previous FOUND never carries over to the new number.
+        await tx.tenant.update({
+          where: { id: scope.tenantId },
+          data: { pic: picPlan.to, picRegistryStatus: null, picRegistryCheckedAt: null },
+        });
+        picToCheck = picPlan.to;
         const audit = await tx.auditEvent.create({
           data: {
             tenantId: scope.tenantId,
@@ -406,6 +415,15 @@ export async function updateTenantProfile(
 
     // FO-384: the stored G0 scores follow the PIC. Never rejects; a failure is an alert, not a
     // refused save, because the PIC is already committed.
+    // FO-396 (B1): ask the register once the new PIC is committed, before the rescore reads it. Only when the
+    // PIC changed (the write plan); a failure leaves the PIC saved and the status UNKNOWN (no grant).
+    if (picToCheck !== null) {
+      try {
+        await refreshTenantPicRegistry(scope.tenantId, picToCheck);
+      } catch {
+        // The PIC is already committed. The stored status stays null, which the scorer reads as no grant.
+      }
+    }
     if (picChange) await rescoreTenantG0AfterPicChange(scope.tenantId, picChange);
     return outcome;
   } catch (error) {

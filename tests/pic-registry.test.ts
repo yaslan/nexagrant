@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkPicRegistry, classifyPicRegistryBody, PIC_REGISTRY_MAX_BYTES } from '@/lib/pic-registry';
+import { checkPicRegistry, classifyPicRegistryBody, PIC_REGISTRY_MAX_BYTES, PIC_REGISTRY_TIMEOUT_MS } from '@/lib/pic-registry';
 
 const json = (body: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' }, ...init });
@@ -19,6 +19,21 @@ describe('FO-396 classifyPicRegistryBody', () => {
     expect(classifyPicRegistryBody({ publicOrganizationData: 'x' })).toEqual({ status: 'UNKNOWN', reason: 'schema_changed' });
     expect(classifyPicRegistryBody(null)).toEqual({ status: 'UNKNOWN', reason: 'schema_changed' });
     expect(classifyPicRegistryBody({ publicOrganizationData: { legalName: 42 } }).status).toBe('UNKNOWN');
+  });
+
+  it('a missing legalName field is a changed shape (UNKNOWN), not "not registered"', () => {
+    expect(classifyPicRegistryBody({ publicOrganizationData: {} })).toEqual({ status: 'UNKNOWN', reason: 'schema_changed' });
+    expect(classifyPicRegistryBody({ publicOrganizationData: { legal_name: 'ACME' } })).toEqual({
+      status: 'UNKNOWN',
+      reason: 'schema_changed',
+    });
+  });
+
+  it('an explicit null legalName is the register saying "no such organisation" (NOT_FOUND)', () => {
+    expect(classifyPicRegistryBody({ publicOrganizationData: { legalName: null } })).toEqual({
+      status: 'NOT_FOUND',
+      reason: 'not_registered',
+    });
   });
 });
 
@@ -52,6 +67,24 @@ describe('FO-396 checkPicRegistry (no network: injected fetch)', () => {
 
     const slow = (async () => { throw new DOMException('signal timed out', 'TimeoutError'); }) as typeof fetch;
     expect(await checkPicRegistry('123456789', { fetch: slow })).toEqual({ status: 'UNKNOWN', reason: 'timeout' });
+  });
+
+  it('gives up at the timeout: a hanging register is UNKNOWN in about timeoutMs, not later', async () => {
+    // A fetch that only ever settles when its signal aborts, like a server that never answers.
+    const hangs = ((_url: string, init: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      })) as typeof fetch;
+    const started = Date.now();
+    const result = await checkPicRegistry('123456789', { fetch: hangs, timeoutMs: 50 });
+    const elapsed = Date.now() - started;
+    expect(result).toEqual({ status: 'UNKNOWN', reason: 'timeout' });
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+    expect(elapsed).toBeLessThan(2_000);
+  });
+
+  it('the default timeout is five seconds', () => {
+    expect(PIC_REGISTRY_TIMEOUT_MS).toBe(5_000);
   });
 
   it('UNKNOWN when the declared size is over the cap', async () => {

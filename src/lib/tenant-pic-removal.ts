@@ -32,7 +32,8 @@ export async function removeTenantPic(tenantId: string, expectedPic: string, act
   const auditEventId = await withTenant(tenantId, async (tx) => {
     const { count } = await tx.tenant.updateMany({
       where: { id: tenantId, pic: seenPic },
-      data: { pic: null },
+      // FO-396 (B3): the stored register answer belonged to the removed PIC; clear it in the same statement.
+      data: { pic: null, picRegistryStatus: null, picRegistryCheckedAt: null },
     });
     if (count === 0) throw new TenantPicChangedError();
     const audit = await tx.auditEvent.create({

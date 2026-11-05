@@ -7,9 +7,10 @@ import { checkPicRegistry, type PicRegistryDeps, type PicRegistryResult } from '
  *
  * Runs OUTSIDE any DB transaction (it waits on the network, up to the registry timeout). The
  * caller decides what to do with the status; the G0 scorer reads only the stored value and never
- * calls the register itself. A `null` pic clears the stored answer. Never throws: a failed lookup
- * is stored as UNKNOWN, and a changed response shape also raises a SystemAlert (the data is fine,
- * our reading of it is not).
+ * calls the register itself. A `null` pic clears the stored answer. A failed lookup is stored as
+ * UNKNOWN, and a changed response shape also raises a SystemAlert (the data is fine, our reading of
+ * it is not). `checkPicRegistry` never throws, but the database writes here can (a missing tenant,
+ * a lost connection), so callers wrap this in try/catch and keep their own save intact.
  */
 export async function refreshTenantPicRegistry(
   tenantId: string,

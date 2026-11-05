@@ -59,9 +59,9 @@ export function classifyPicRegistryBody(body: unknown): PicRegistryResult {
   if (typeof data !== 'object' || data === null) return { status: 'UNKNOWN', reason: 'schema_changed' };
   const legalName = (data as { legalName?: unknown }).legalName;
   if (typeof legalName === 'string' && legalName.trim() !== '') return { status: 'FOUND', reason: 'found' };
-  if (legalName === undefined || legalName === null || typeof legalName === 'string') {
-    return { status: 'NOT_FOUND', reason: 'not_registered' };
-  }
+  // Explicit empty or null is the register saying "no such organisation". A missing field means the
+  // shape changed: UNKNOWN with an alert, so a renamed field is not silently read as "not registered".
+  if (legalName === null || typeof legalName === 'string') return { status: 'NOT_FOUND', reason: 'not_registered' };
   return { status: 'UNKNOWN', reason: 'schema_changed' };
 }
 
