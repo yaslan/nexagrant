@@ -11,6 +11,7 @@ import { test, expect, type Browser, type Page } from '@playwright/test';
 import { prisma, withTenant } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { computeG0ForOpportunity } from '../../src/lib/scoring/g0-compute';
+import { requireId } from '../helpers/teardown-guard';
 import { expectHydrated } from './fixtures/hydration';
 import { signInAs } from './fixtures/session';
 import {
@@ -172,7 +173,7 @@ test.describe('FO-387 — a profile form left open', () => {
 
   test('Y1: without a TopicMatch, G0 keeps the keywords a colleague saved', async ({ page, browser }) => {
     await withSystemScope('platform-admin', 'e2e.profile-stale.no-match', (tx) =>
-      tx.topicMatch.deleteMany({ where: { tenantId: PP_TENANT } }),
+      tx.topicMatch.deleteMany({ where: { tenantId: requireId(PP_TENANT, 'PP_TENANT') } }),
     );
     const score = async () => {
       const computed = await withTenant(PP_TENANT, (tx) => computeG0ForOpportunity(tx, PP_TENANT, PP_OPP_ID));
@@ -204,7 +205,7 @@ test.describe('FO-387 — a profile form left open', () => {
   test.describe('a tenant that never saved a profile', () => {
     test.beforeEach(() =>
       withSystemScope('platform-admin', 'e2e.profile-stale.never-saved', (tx) =>
-        tx.tenantProfile.deleteMany({ where: { tenantId: PP_OTHER_TENANT } }),
+        tx.tenantProfile.deleteMany({ where: { tenantId: requireId(PP_OTHER_TENANT, 'PP_OTHER_TENANT') } }),
       ),
     );
 
