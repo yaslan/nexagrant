@@ -73,13 +73,13 @@ Her modülün işlevsel spesifikasyonu `docs/MODULES.md`'de; her modül `src/mod
 
 | Kapı | Kural |
 |---|---|
-| G0 Konu triyajı | uyum ≥ 70/100 **ve** taban oran ≥ %8 **ve** ülke uygun |
+| G0 Konu triyajı | uyum ≥ 70/100 **ve** taban oran ≥ %8 **ve** ülke uygun **ve** (geçmişsiz ortakta) en az bir dolu koltuk |
 | G1 Rol kararı | koordinasyon için erişilebilir koordinatörde ≥1 önceki FP koordinasyonu; yoksa "ortak" |
 | G2 Konsorsiyum kilidi | son tarihe ≥14 hafta kala tüm koltuklar dolu + bütçe onayı; G0→G2 ≤ 8 hafta |
 | G3 Sahte değerlendirme | her kriter ≥ 4,0 ve toplam ≥ 12/15 (M6 yoksa manuel puan girişi) |
 | G4 Gönderim | son tarihten ≥24 saat önce "gönderildi" işareti; ESR yüklenince puanlar kaydedilir |
 
-G0 puanlama ağırlıkları (100): uyum 30, taban oran 15, koordinatör geçmişi 15, araştırma+son kullanıcı 12, ağ merkeziliği 10, bütçe/rol ekonomisi 10, lump-sum/iki aşamalı 8. Ağırlıklar `TenantSettings.scoringWeights` JSON'unda; varsayılanlar `src/lib/scoring/defaults.ts`. **FO-382 (2026-11-04):** ortak rolünde CORDIS geçmişi olmayan kuruluşta koordinatör geçmişi ve ağ merkeziliği paydadan çıkar (kalan 75 puan üzerinden); `OPEN` koltuk puan vermez. Eşik ve sert kurallar değişmedi.
+G0 puanlama ağırlıkları (100): uyum 30, taban oran 15, koordinatör geçmişi 15, araştırma+son kullanıcı 12, ağ merkeziliği 10, bütçe/rol ekonomisi 10, lump-sum/iki aşamalı 8. Ağırlıklar `TenantSettings.scoringWeights` JSON'unda; varsayılanlar `src/lib/scoring/defaults.ts`. **FO-382 (2026-11-05):** ortak rolünde CORDIS geçmişi olmayan kuruluşta koordinatör geçmişi ve ağ merkeziliği paydadan çıkar (kalan 75 puan üzerinden) **ve** en az bir dolu koltuk (`CANDIDATE`, `INVITED`, `CONFIRMED`) şarttır; `OPEN`, `DECLINED` ya da hiç koltuk yoksa G0 geçilemez. Eşik ve üç sert kural değişmedi.
 
 > **⚠️ Doküman/kod farkı (ölçüldü 2026-09-07):** Yukarıdaki kural (satır 75) ve ağırlıklar (bu satır) kanonik `scoreG0()`/`decideG0()` fonksiyonlarında (`src/lib/scoring/g0-canonical.ts`) doğru tanımlı, ama üretim kodunda **hiçbir yerden çağrılmıyor**. `Opportunity.g0Score` bugün ya `prisma/seed-opportunities.ts`'teki sabit değerlerden (75, 82, 85, 88, 92) ya da demo pipeline'daki `Math.random() * 15 + 80`'den geliyor; `src/lib/gates/evaluate.ts` kapı kararını bu üretilmemiş sayıyla veriyor. Yani kullanıcıya gösterilen G0 puanı şu an bu sayfadaki formülün ürünü değil. Kanıt: `docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`, `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md`. Kapatma işi board'da **TASK-MTQ63RR8Z0G8E** (henüz açık — kanonik fonksiyonu üretime bağlamak kaldı).
 

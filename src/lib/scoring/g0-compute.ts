@@ -37,7 +37,7 @@ import {
 } from './g0-features';
 
 /** Bumped whenever the feature mapping changes, so a stored breakdown says which rules produced it. */
-export const G0_SCORING_VERSION = '2.1';
+export const G0_SCORING_VERSION = '2.2';
 
 export interface G0Computation {
   tenantId: string;
@@ -59,6 +59,8 @@ export interface G0Computation {
   excludedFeatures: (keyof G0Features)[];
   /** Sum of the weights actually scored; `score` is normalised by this. */
   denominator: number;
+  /** Seats with a named organisation (FILLED_SEAT_STATUSES). The no-history rule needs at least one. */
+  filledSeats: number;
 }
 
 /**
@@ -301,7 +303,7 @@ export function computeG0FromSnapshot(
   snapshot: G0Snapshot,
   weights: typeof DEFAULT_SCORING_WEIGHTS = DEFAULT_SCORING_WEIGHTS,
 ): G0Computation {
-  const { features, facts, sources, coverage, excludedFeatures, scoringBasis } = extractG0Features(snapshot);
+  const { features, facts, sources, coverage, excludedFeatures, scoringBasis, filledSeats } = extractG0Features(snapshot);
   const scoredWeights = effectiveWeights(weights, excludedFeatures);
   const denominator = weightsTotal(scoredWeights);
 
@@ -324,6 +326,7 @@ export function computeG0FromSnapshot(
       scoringBasis,
       excludedFeatures,
       denominator,
+      filledSeats,
     };
   }
 
@@ -344,6 +347,7 @@ export function computeG0FromSnapshot(
     scoringBasis,
     excludedFeatures,
     denominator,
+    filledSeats,
   };
 }
 
@@ -442,6 +446,8 @@ export function g0EvidencePayload(computation: G0Computation): JsonObject {
     scoringBasis: computation.scoringBasis,
     excludedFeatures: computation.excludedFeatures,
     denominator: computation.denominator,
+    filledSeats: computation.filledSeats,
+    noHistoryWithoutFilledSeat: computation.reasonDetails.some((r) => r.code === 'G0_NO_HISTORY_NO_FILLED_SEAT'),
     features: computation.features,
     contributions: computation.contributions,
     reasons: computation.reasons,

@@ -6,7 +6,7 @@ import {
   topicPrefixOf,
   type G0Snapshot,
 } from '../src/lib/scoring/g0-features';
-import { scoreG0 } from '../src/lib/scoring/g0-canonical';
+import { scoreG0, decideG0 } from '../src/lib/scoring/g0-canonical';
 import { DEFAULT_SCORING_WEIGHTS } from '../src/lib/scoring/defaults';
 
 /**
@@ -310,5 +310,67 @@ describe('partner with no CORDIS history (FO-382)', () => {
     const excludedWeights = { ...DEFAULT_SCORING_WEIGHTS, coordinatorHistory: 0, networkCentrality: 0 };
     const excl = scoreG0(extractG0Features(snap).features, excludedWeights);
     expect(excl).toBeCloseTo(std * (100 / 75), 1);
+  });
+});
+
+// ───────────────────────── FO-382 hard rule: no history needs a filled seat ─────────────────────────
+
+describe('no-history partner needs a filled seat (FO-382 hard rule)', () => {
+  const noHistory = { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 };
+  const partner = (seats: G0Snapshot['seats']) => fullSnapshot({ intendedRole: 'partner', cordis: noHistory, seats });
+
+  it('refuses a no-history partner with no seats at all (84 was passing this before)', () => {
+    const ex = extractG0Features(partner([]));
+    expect(ex.filledSeats).toBe(0);
+    expect(ex.facts.noHistoryWithoutFilledSeat).toBe(true);
+  });
+
+  it.each(['OPEN', 'DECLINED'])('refuses a no-history partner whose only seat is %s', (status) => {
+    const ex = extractG0Features(partner([{ roleKey: 'research', status }]));
+    expect(ex.filledSeats).toBe(0);
+    expect(ex.facts.noHistoryWithoutFilledSeat).toBe(true);
+  });
+
+  it.each(['CANDIDATE', 'INVITED', 'CONFIRMED'])('lets a no-history partner through with one %s seat', (status) => {
+    const ex = extractG0Features(partner([{ roleKey: 'research', status }]));
+    expect(ex.filledSeats).toBe(1);
+    expect(ex.facts.noHistoryWithoutFilledSeat).toBe(false);
+  });
+
+  it('counts only filled seats: an OPEN seat next to a DECLINED one is still zero', () => {
+    const ex = extractG0Features(
+      partner([
+        { roleKey: 'research', status: 'OPEN' },
+        { roleKey: 'end_user', status: 'DECLINED' },
+      ]),
+    );
+    expect(ex.filledSeats).toBe(0);
+    expect(ex.facts.noHistoryWithoutFilledSeat).toBe(true);
+  });
+
+  it('never fires for a coordinator, an unset role, or a partner with CORDIS history', () => {
+    const coord = extractG0Features(fullSnapshot({ intendedRole: 'coordinator', cordis: noHistory, seats: [] }));
+    const unset = extractG0Features(fullSnapshot({ intendedRole: null, cordis: noHistory, seats: [] }));
+    const hasHistory = extractG0Features(
+      fullSnapshot({
+        intendedRole: 'partner',
+        cordis: { ...noHistory, participationsOverall: 2 },
+        seats: [],
+      }),
+    );
+    expect(coord.facts.noHistoryWithoutFilledSeat).toBe(false);
+    expect(unset.facts.noHistoryWithoutFilledSeat).toBe(false);
+    expect(hasHistory.facts.noHistoryWithoutFilledSeat).toBe(false);
+  });
+
+  it('the decision carries the rule as a refusal reason and a code; the other rules are untouched', () => {
+    const ex = extractG0Features(partner([]));
+    const refused = decideG0(ex.features, ex.facts, undefined, DEFAULT_SCORING_WEIGHTS);
+    expect(refused.decision).toBe('NO_GO');
+    expect(refused.reasonDetails.map((r) => r.code)).toContain('G0_NO_HISTORY_NO_FILLED_SEAT');
+
+    const withSeat = extractG0Features(partner([{ roleKey: 'research', status: 'INVITED' }]));
+    const passed = decideG0(withSeat.features, withSeat.facts, undefined, DEFAULT_SCORING_WEIGHTS);
+    expect(passed.reasonDetails.map((r) => r.code)).not.toContain('G0_NO_HISTORY_NO_FILLED_SEAT');
   });
 });

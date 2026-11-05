@@ -6,17 +6,23 @@ import { shotsDir } from './fixtures/shots';
 import { signInAs } from './fixtures/session';
 
 /**
- * FO-382 (patron K-576759 = A): a consortium PARTNER whose PIC has no CORDIS record is scored
- * without the two CORDIS-only features (coordinatorHistory 15, networkCentrality 10), so the
- * denominator is 75 instead of 100. An OPEN seat (no organisation yet) earns nothing.
+ * FO-382 (patron K-576759 = A + hard rule): a consortium PARTNER whose PIC has no CORDIS record is
+ * scored without the two CORDIS-only features (coordinatorHistory 15, networkCentrality 10), so the
+ * denominator is 75 instead of 100. An OPEN seat (no organisation yet) earns nothing. On top of
+ * that, such a partner must have at least one FILLED seat (CANDIDATE, INVITED or CONFIRMED) or G0
+ * refuses it, whatever the score. Without the rule the same partner passed with 84.
  *
  * By real clicks, in a browser, on an isolated database:
- *   1. A new tenant with no PIC; CORDIS is loaded (other organisations have participations) but
+ *   0. A new tenant with no PIC; CORDIS is loaded (other organisations have participations) but
  *      none of them is this tenant. Profile → "Yeni Fırsat" form with role "Konsorsiyum Ortağı".
- *   2. Two seats added as OPEN. G0 is run from the detail page: refused, and the stored evidence
- *      gives researchAndEndUser 0 — an open seat does not score.
- *   3. Both seats invited from the candidate search. G0 is run again: the stored evidence says
- *      scoringBasis no_history_evidence, denominator 75, and the gate passes.
+ *      No seat yet: G0 is refused (no filled seat), score 0 seats filled.
+ *   1. Two seats added as OPEN. G0 is refused: the score is 84 but no seat is filled, so the hard
+ *      rule refuses it; the stored evidence gives researchAndEndUser 0.
+ *   2. Both seats invited from the candidate search. G0 is run again: scoringBasis
+ *      no_history_evidence, denominator 75, two filled seats, score 100, and the gate passes.
+ *
+ * CANDIDATE, CONFIRMED and DECLINED are covered by the unit tests (tests/g0-features.test.ts), not
+ * by clicks here: this spec drives only the invite path the UI exposes.
  *
  * Every database row read back is printed with a [FO-382 DB] prefix; that output is the evidence.
  * FO382_KEEP=1 leaves the rows in place.
@@ -218,7 +224,15 @@ async function runG0(page: Page, id: string) {
 function evidenceOf(decision: { inputs: unknown }) {
   const inputs = decision.inputs as {
     calculatedG0Score?: number | null;
-    g0Evidence?: { score?: number; scoringBasis?: string; excludedFeatures?: string[]; denominator?: number; features?: Record<string, number> };
+    g0Evidence?: {
+      score?: number;
+      scoringBasis?: string;
+      excludedFeatures?: string[];
+      denominator?: number;
+      filledSeats?: number;
+      noHistoryWithoutFilledSeat?: boolean;
+      features?: Record<string, number>;
+    };
   } | null;
   const ev = inputs?.g0Evidence;
   return {
@@ -227,6 +241,8 @@ function evidenceOf(decision: { inputs: unknown }) {
     scoringBasis: ev?.scoringBasis ?? null,
     excludedFeatures: ev?.excludedFeatures ?? null,
     denominator: ev?.denominator ?? null,
+    filledSeats: ev?.filledSeats ?? null,
+    noHistoryWithoutFilledSeat: ev?.noHistoryWithoutFilledSeat ?? null,
     researchAndEndUser: ev?.features?.researchAndEndUser ?? null,
     coordinatorHistory: ev?.features?.coordinatorHistory ?? null,
     networkCentrality: ev?.features?.networkCentrality ?? null,
@@ -271,7 +287,7 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     await rollback();
   });
 
-  test('form → G0: open seats earn nothing, the gate passes on the 75-point basis, invited seats reach 100', async ({ page }) => {
+  test('form → G0: no filled seat refuses a no-history partner; an invited seat passes it on the 75-point basis', async ({ page }) => {
     test.setTimeout(420_000);
     await signIn(page);
     await saveProfile(page);
@@ -279,7 +295,14 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     const opp = await createPartnerFromForm(page, 'FO-382 yeni ortak');
     await shot(page, '01-formdan-ortak');
 
-    // ── 1. Two seats, both OPEN. G0 is refused, and an open seat has scored nothing.
+    // ── 0. No seat at all. Refused: a no-history partner needs one filled seat.
+    const noSeatRun = await runG0(page, opp.id);
+    dump('G0, koltuk yok', { passed: noSeatRun.passed, evidence: evidenceOf(noSeatRun) });
+    expect(noSeatRun.passed).toBe(false);
+    expect(evidenceOf(noSeatRun).filledSeats).toBe(0);
+    expect(evidenceOf(noSeatRun).noHistoryWithoutFilledSeat).toBe(true);
+
+    // ── 1. Two seats, both OPEN. The score reaches 84, but no seat is filled: refused.
     await page.goto(`/tr/${SLUG}/pipeline/${opp.id}/consortium`);
     await expectHydrated(page.getByRole('button', { name: `+ ${CONSORTIUM_ROLES.research}` }));
     const research = await addSeat(page, opp.id, 'research');
@@ -287,14 +310,16 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     const openRun = await runG0(page, opp.id);
     dump('G0, koltuklar OPEN', { passed: openRun.passed, evidence: evidenceOf(openRun) });
     await shot(page, '02-g0-acik-koltuk-red');
-    // Measured: 63 + 21 = 84 is NOT reached through the seats. Alignment 30 + base rate 15 +
-    // budget 10 + lump sum 8 = 63 over a 75-point denominator gives 84, and the gate passes with
-    // no organisation on any seat. The open seats contribute nothing (researchAndEndUser 0).
-    expect(openRun.passed).toBe(true);
+    // Measured: alignment 30 + base rate 15 + budget 10 + lump sum 8 = 63 over a 75-point
+    // denominator gives 84. The open seats contribute nothing (researchAndEndUser 0), and the hard
+    // rule refuses the partner because no seat is filled.
+    expect(openRun.passed).toBe(false);
     expect(evidenceOf(openRun).scoringBasis).toBe('no_history_evidence');
     expect(evidenceOf(openRun).researchAndEndUser).toBe(0);
     expect(evidenceOf(openRun).denominator).toBe(75);
     expect(evidenceOf(openRun).score).toBe(84);
+    expect(evidenceOf(openRun).filledSeats).toBe(0);
+    expect(evidenceOf(openRun).noHistoryWithoutFilledSeat).toBe(true);
 
     // ── 2. Both seats invited from the candidate search. Now the seats name organisations.
     await page.goto(`/tr/${SLUG}/pipeline/${opp.id}/consortium`);
@@ -309,6 +334,8 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(ev.scoringBasis).toBe('no_history_evidence');
     expect(ev.excludedFeatures).toEqual(['coordinatorHistory', 'networkCentrality']);
     expect(ev.denominator).toBe(75);
+    expect(ev.filledSeats).toBe(2);
+    expect(ev.noHistoryWithoutFilledSeat).toBe(false);
     // Both seats now name an organisation: research + end user earn their 12 points → 75/75.
     expect(ev.researchAndEndUser).toBe(50 + 50);
     expect(ev.score).toBe(100);

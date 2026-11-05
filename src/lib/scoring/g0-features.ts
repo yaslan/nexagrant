@@ -76,10 +76,17 @@ export interface G0CordisSnapshot {
 }
 
 /**
- * Seat statuses that do not score. `OPEN` has no partner attached yet; `DECLINED` is a partner who
- * left. Every other status (`CANDIDATE`, `INVITED`, `CONFIRMED`) has a named organisation on it.
+ * Seat statuses that count as FILLED: a named candidate, invitee or confirmed organisation sits on
+ * the seat. `OPEN` (nobody yet) and `DECLINED` (left) are not filled. This is the one place the set
+ * is written down; the scorer and the no-history gate both derive from it.
  */
-const NON_SCORING_SEAT_STATUSES = new Set(['OPEN', 'DECLINED']);
+export const FILLED_SEAT_STATUSES = ['CANDIDATE', 'INVITED', 'CONFIRMED'] as const;
+const FILLED_SEAT_STATUS_SET: ReadonlySet<string> = new Set<string>(FILLED_SEAT_STATUSES);
+
+/** True when a seat has a named organisation on it (see `FILLED_SEAT_STATUSES`). */
+export function isFilledSeat(seat: { status: string }): boolean {
+  return FILLED_SEAT_STATUS_SET.has(seat.status.trim().toUpperCase());
+}
 
 /**
  * Features dropped from the denominator when a partner has no CORDIS history at all (FO-382,
@@ -141,6 +148,8 @@ export interface G0Extraction {
    * can tell which denominator produced it.
    */
   scoringBasis: 'standard' | 'no_history_evidence';
+  /** Seats with a named organisation (see `FILLED_SEAT_STATUSES`); the no-history gate reads it. */
+  filledSeats: number;
 }
 
 // ───────────────────────── helpers ─────────────────────────
@@ -342,7 +351,7 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
   if (snapshot.seats.length === 0) {
     record('researchAndEndUser', 'ConsortiumSeat.roleKey', 'missing', 0, 'no consortium seats defined yet');
   } else {
-    const scoring = snapshot.seats.filter((s) => !NON_SCORING_SEAT_STATUSES.has(s.status.trim().toUpperCase()));
+    const scoring = snapshot.seats.filter(isFilledSeat);
     const roles = new Set(scoring.map((s) => s.roleKey.trim().toLowerCase()));
     const hasResearch = roles.has('research');
     const hasEndUser = roles.has('end_user');
@@ -437,13 +446,23 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
     .filter((key) => !excluded(key))
     .reduce((sum, key) => sum + (DEFAULT_SCORING_WEIGHTS[key] ?? 0), 0);
 
+  // Hard rule (FO-382, patron): a partner with no CORDIS history must have at least one FILLED seat.
+  // Only the no-history basis triggers it; the standard and coordinator paths never see it.
+  const filledSeats = snapshot.seats.filter(isFilledSeat).length;
+  const scoringBasis: G0Extraction['scoringBasis'] = excludedFeatures.length > 0 ? 'no_history_evidence' : 'standard';
+
   return {
     features,
-    facts: { baseRatePct: baseRatePct ?? 0, countryEligible: eligibility.eligible },
+    facts: {
+      baseRatePct: baseRatePct ?? 0,
+      countryEligible: eligibility.eligible,
+      noHistoryWithoutFilledSeat: scoringBasis === 'no_history_evidence' && filledSeats === 0,
+    },
     sources,
     coverage: totalWeight > 0 ? round2(measuredWeight / totalWeight) : 0,
     excludedFeatures,
-    scoringBasis: excludedFeatures.length > 0 ? 'no_history_evidence' : 'standard',
+    scoringBasis,
+    filledSeats,
   };
 }
 

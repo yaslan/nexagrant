@@ -170,34 +170,64 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 > ```
 
 
-## FO-382 notu (2026-11-05): CORDIS geçmişi olmayan ortak
+## FO-382 notu (2026-11-05): CORDIS geçmişi olmayan ortak — yeniden ölçüm
 
-Kural (patron K-576759 = A): `intendedRole = partner` ve CORDIS'te bu PIC için kayıt yok. Bu durumda
-`coordinatorHistory` (15) ve `networkCentrality` (10) paydadan çıkar: skor `Σ(katkı) / 75`
-(eskiden `/ 100`). Katkı toplamı değişmez, yani her örnekte skor ×100/75 büyür. Eşik 70, `minAlignment`,
-taban oran ≥ %8 ve ülke uygunluğu değişmedi.
+> **Kurgusal örnek seti.** Aşağıdaki sayılar `docs/BETA_DATA/esr-calibration-samples.csv` üzerindedir
+> (kürate fixture, gerçek CORDIS verisi değil). Gerçek bir ortağın koltuk durumu bu sette yoktur;
+> bu yüzden koltuk varsayımı açıkça ayrılmıştır. Gerçek sayı ancak gerçek veriyle üretilir.
 
-**Ölçüm** (`scripts/esr-calibration.ts` ile aynı `decideG0` ve `DEFAULT_GATE_RULES.G0`; 20 örnek;
-saf fonksiyon, veritabanı yok). Her örnek "geçmişi olmayan ortak" varsayımıyla yeniden koşuldu:
-`coordinatorHistory = networkCentrality = 0`, diğer özellikler CSV'den.
+**Kural (patron K-576759 = A + ek kural):**
+1. `intendedRole = partner` ve CORDIS'te bu PIC için hiç katılım yok → `coordinatorHistory` (15) ve
+   `networkCentrality` (10) paydadan çıkar; skor `Σ(katkı) / 75`.
+2. Aynı durumda en az bir **dolu** koltuk olmalı. Dolu = `CANDIDATE`, `INVITED` veya `CONFIRMED`
+   (tek kaynak: `FILLED_SEAT_STATUSES`, `src/lib/scoring/g0-features.ts`). `OPEN`, `DECLINED` ve hiç
+   koltuk olmaması dolu sayılmaz → G0 geçilemez (`G0_NO_HISTORY_NO_FILLED_SEAT`).
+3. Eşik 70, `minAlignment`, taban oran ≥ %8 ve ülke uygunluğu değişmedi. Koordinatör ve rolü boş
+   (`null`) kayıtlar değişmedi. CORDIS verisi yoksa (PIC yok ya da tablo boş) kural uygulanmaz.
 
-- Koordinatör yolu: 0 değişiklik (kural yalnız ortak rolüne uygulanır).
-- Geçmişsiz ortak, eski `/100` → yeni `/75`: **8 karar değişiyor** (hepsi NO_GO → GO).
-- Skor ≥ 70 olan: 9 örnek. Biri (S16 QUANTLINK, ülke uygunsuz) sert kuralla yine NO_GO.
-- Uzman etiketiyle uyum: 8/20 → 14/20.
-- **Yeni yanlış pozitif: S19 NETSUPP** (uzman NO_GO, yeni karar GO). Eşik değişmedi; bu, kuralın
-  ürün kararı olduğunu gösterir ve raporda açıkça izlenmeli.
+**Koltuk varsayımı.** Örneklerde koltuk bilgisi yok. Bu yüzden her örnek iki ayrı varsayımla koşuldu:
+- **D — koltuk dolu:** kural 2 sağlanır; yalnız kural 1 (`/75`) etkili olur.
+- **B — koltuk boş:** kural 2 tutmaz; geçmişsiz ortak her örnekte G0'dan geçemez (puan yine hesaplanır).
+- **Taban:** aynı geçmişsiz ortak, eski davranış (`coordinatorHistory = networkCentrality = 0`, `/100`).
 
-| Örnek | Eski (/100) | Yeni (/75) | Eski karar | Yeni karar | Uzman |
-|---|---:|---:|---|---|---|
-| S01 DISTRENOV | 62,00 | 82,67 | NO_GO | GO | GO |
-| S03 AGRISENSE | 67,30 | 89,73 | NO_GO | GO | GO |
-| S05 CLIMANEUT | 68,70 | 91,60 | NO_GO | GO | GO |
-| S06 SMERAD | 63,50 | 84,67 | NO_GO | GO | GO |
-| S08 GRIDFLEX | 64,76 | 86,35 | NO_GO | GO | GO |
-| S11 SOLIDBAT | 60,69 | 80,92 | NO_GO | GO | GO |
-| S12 GEOHEAT | 63,96 | 85,28 | NO_GO | GO | GO |
-| S19 NETSUPP | 60,40 | 80,53 | NO_GO | GO | NO_GO |
+Ölçüm: DB'siz, `decideG0` + `DEFAULT_G0_RULES` + `effectiveWeights` (`scripts/esr-calibration.ts`
+ile aynı canonical yol). Geçici betik repo dışında; tekrar üretmek için `docs/BETA_DATA` CSV'si ve
+`decideG0` yeterli.
 
-Diğer 12 örnekte karar değişmiyor (NO_GO kalıyor). Ölçüm koşusu: geçici betik, repo dışında; bu not
-üretilen dosyanın yerine elle yazıldı. `esr-calibration.ts` yeniden çalıştırılırsa bu bölüm silinir.
+| Senaryo | Uzman ile uyum (20 örnek) | Değişen karar (tabana göre) |
+|---|---:|---|
+| Taban: geçmişsiz, /100 | 8/20 | — |
+| D: koltuk dolu, /75 | 14/20 | 8 karar NO_GO→GO: S01 DISTRENOV, S03 AGRISENSE, S05 CLIMANEUT, S06 SMERAD, S08 GRIDFLEX, S11 SOLIDBAT, S12 GEOHEAT, S19 NETSUPP |
+| B: koltuk boş, /75 + kural | 8/20 | 0 karar: taban zaten NO_GO; kural bu örneklerde GO'yu tümüyle engeller |
+
+**Yorum.** D altında 8 karar değişiyor; bunlardan biri (S19 NETSUPP) uzman etiketine aykırı
+yeni bir yanlış pozitif. B altında kural, geçmişsiz ortağın hiçbir örnekte geçmesine izin vermiyor.
+Yani kuralın etkisi tamamen koltuk durumuna bağlı; gerçek koltuk verisi olmadan eşik seçilmez.
+
+Örnek başına sonuç (puanlar `/100` tabanı ve `/75` yeni hesap; ✅/❌ uzman etiketine göre):
+
+| Örnek | Kısaltma | Gerçek (uzman) | Taban: geçmişsiz, /100 | Varsayım D: koltuk dolu, /75 | Varsayım B: koltuk boş, /75 + kural |
+|---|---|---|---|---|---|
+| S01 | DISTRENOV | GO | 62.00 NO_GO ❌ | 82.67 GO ✅ | 69.87 NO_GO ❌ |
+| S02 | DIGITWIN | GO | 51.25 NO_GO ❌ | 68.33 NO_GO ❌ | 53.93 NO_GO ❌ |
+| S03 | AGRISENSE | GO | 67.30 NO_GO ❌ | 89.73 GO ✅ | 76.13 NO_GO ❌ |
+| S04 | CULTHER | GO | 45.35 NO_GO ❌ | 60.47 NO_GO ❌ | 49.27 NO_GO ❌ |
+| S05 | CLIMANEUT | GO | 68.70 NO_GO ❌ | 91.60 GO ✅ | 76.40 NO_GO ❌ |
+| S06 | SMERAD | GO | 63.50 NO_GO ❌ | 84.67 GO ✅ | 75.07 NO_GO ❌ |
+| S07 | BATTREC | GO | 46.80 NO_GO ❌ | 62.40 NO_GO ❌ | 50.40 NO_GO ❌ |
+| S08 | GRIDFLEX | GO | 64.76 NO_GO ❌ | 86.35 GO ✅ | 72.27 NO_GO ❌ |
+| S09 | DOCNET | GO | 49.60 NO_GO ❌ | 66.13 NO_GO ❌ | 52.53 NO_GO ❌ |
+| S10 | HEALTHEQ | GO | 42.78 NO_GO ❌ | 57.03 NO_GO ❌ | 45.83 NO_GO ❌ |
+| S11 | SOLIDBAT | GO | 60.69 NO_GO ❌ | 80.92 GO ✅ | 67.80 NO_GO ❌ |
+| S12 | GEOHEAT | GO | 63.96 NO_GO ❌ | 85.28 GO ✅ | 72.80 NO_GO ❌ |
+| S13 | VAGUEAI | NO_GO | 30.15 NO_GO ✅ | 40.20 NO_GO ✅ | 33.80 NO_GO ✅ |
+| S14 | HYDROPT | NO_GO | 40.25 NO_GO ✅ | 53.67 NO_GO ✅ | 44.87 NO_GO ✅ |
+| S15 | SOCINN | NO_GO | 40.05 NO_GO ✅ | 53.40 NO_GO ✅ | 43.80 NO_GO ✅ |
+| S16 | QUANTLINK | NO_GO | 62.55 NO_GO ✅ | 83.40 NO_GO ✅ | 70.60 NO_GO ✅ |
+| S17 | SMARTPARK | NO_GO | 36.40 NO_GO ✅ | 48.53 NO_GO ✅ | 40.53 NO_GO ✅ |
+| S18 | SCALEUP | NO_GO | 37.25 NO_GO ✅ | 49.67 NO_GO ✅ | 42.47 NO_GO ✅ |
+| S19 | NETSUPP | NO_GO | 60.40 NO_GO ✅ | 80.53 GO ❌ | 70.13 NO_GO ✅ |
+| S20 | BIOPACK | NO_GO | 40.96 NO_GO ✅ | 54.61 NO_GO ✅ | 45.33 NO_GO ✅ |
+
+*Not:* Önceki FO-382 notu (2026-11-05 öncesi) yalnız D varsayımını gösteriyordu; "8 karar değişiyor"
+doğruydu ama koltuk boşken kural bu geçişi geri alır. Mevcut tablo iki varsayımı ayrı verir.
