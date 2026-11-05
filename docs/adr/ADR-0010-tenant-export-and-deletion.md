@@ -267,6 +267,8 @@ Kısaltmalar:
 | 80 | InternalApproval (NG-34) | → Opportunity (bileşik FK), tenantId; approvedById → User (SetNull) | D (eş finansman taahhüdü, karar referansı) | E | C |
 | 81 | PartnerBudgetShare (NG-34) | → ConsortiumSeat (bileşik FK), tenantId; agreedById → User (SetNull) | D (ortak bütçe payı aralığı) | E | C |
 
+**NG-34 — dışa aktarma ve silme kapsamı (satırlar 79–81).** Kişi dışa aktarması (`src/actions/user/export-data.ts`) `InternalApproval` ve `PartnerBudgetShare` satırlarından yalnız kişiyi bağlayan onay/mutabakat kaydını verir; tutarlar kurumun verisidir, girmez. Kişi silinince `approvedById` / `agreedById` boşalır, kurumun kaydı kalır. `OrgReadiness` kişiye bağlı değildir. Üçü de kiracı silinince cascade ile gider.
+
 **M17 (FO-195, B4) — dışa aktarma ve silme kapsamı.** Ek A sayımına (75) sonradan eklendi (satırlar 76–78; `InterregRubric` / `InterregRubricCriterion` platform katalogudur, kişisel veri yok, dokunulmaz — A.3 gibi).
 
 - **Baytlar:** yüklenen dosyanın kendisi hiçbir yerde (DB, R2, disk) saklanmaz; yalnız çıkarılan metin. Dışa aktarılacak dosya yoktur.
