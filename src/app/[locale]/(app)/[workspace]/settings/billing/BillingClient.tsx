@@ -568,7 +568,7 @@ export function BillingClient({
                     className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition shadow-2xs flex items-center justify-center gap-1.5 ${
                       isCurrent
                         ? 'bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 cursor-default'
-                        : 'bg-accent hover:opacity-90 text-slate-950 font-extrabold cursor-pointer'
+                        : 'bg-accent hover:opacity-90 text-white font-extrabold cursor-pointer'
                     }`}
                   >
                     <ShoppingBag className="w-3.5 h-3.5" />
