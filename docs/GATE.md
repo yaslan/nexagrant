@@ -87,8 +87,10 @@ Belirti: testler bir noktadan sonra `ERR_CONNECTION_REFUSED` veya `ERR_EMPTY_RES
 
 Sunucu hazır olduktan sonra ölürse denetleyici (`tests/e2e/support/server-supervisor.mjs`) runner'a `SIGINT` yollar. Koşu kırmızı biter, kalan testler dakikalarca boşa düşmez. Yeniden başlatma ve yeniden deneme yoktur.
 
-**Gönderen araması.** macOS ve Node sinyali kimin yolladığını söylemez. O yüzden gönderen, zaman eşleşmesiyle bulunur: `~/.claude/projects/*/*.jsonl` içinde olayın zamanından hemen önceki `pkill`, `killall`, `kill` komutlarına bak. FO-385'teki üç ölümün üçü de başka projedeki bir oturumun makine geneli `pkill -f "next dev"` veya `pkill -f next-server` komutuyla eşleşti.
+**Gönderen araması.** macOS ve Node sinyali kimin yolladığını söylemez. O yüzden gönderen, zaman eşleşmesiyle bulunur: `~/.claude/projects/*/*.jsonl` içinde olayın zamanından hemen önceki `pkill`, `killall`, `kill` komutlarına bak. FO-385'te incelenen dört sonlanmanın dördü de ve teşhisin canlı yakaladığı iki olay da başka projedeki bir oturumun makine geneli `pkill -f` komutlarıyla eşleşti. Canlı olaylarda paralel koşan sunucular aynı milisaniyede `SIGTERM` aldı; bu desen tek bir makine geneli komutu gösterir.
 
 **Kural.** Bu makinede `pkill -f` ile `next dev`, `next-server` veya `@playwright/test` hedefleme: desen, başka ajanın sunucusuna da uyar. Kendi sürecini `kill <pid>` ile durdur.
 
 `uncaughtException: Error: aborted` (`ECONNRESET`) satırları ölüm nedeni değildir: yeşil koşularda da onlarca kez görünür ve sunucu ayakta kalır.
+
+Bilinen açık: `gate-isolated` portu "ilk boş" diye seçer ve sunucu bağlanana kadar kimse portu tutmaz. Aynı anda başlayan koşular çakışır (Docker bind hatası, çıkış 125 veya `http://localhost:<port> is already used`). Bunlar hemen ve açık hatayla düşer; sunucu ölümü değildir. Paralel koşacaksan `E2E_PORT` ve `GATE_PG_PORT` ver.
