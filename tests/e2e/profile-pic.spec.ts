@@ -5,7 +5,7 @@
  * CORDIS history could not earn its coordination and network points. The last test is the point
  * of the field: the score of the same opportunity moves, through the scorer as it stands.
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Browser, type Page } from '@playwright/test';
 
 import { prisma, withTenant } from '../../src/lib/db';
 import { computeG0ForOpportunity, rescoreOpportunityG0 } from '../../src/lib/scoring/g0-compute';
@@ -274,6 +274,133 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
       await page.getByTestId('tenant-pic-confirm-yes').click();
       await expect(feedback(page)).toContainText(`CORDIS kaydı: ${PP_ORG_NAME}`);
       expect(await storedPic(PP_OTHER_TENANT)).toBe(PP_PIC_MATCHED);
+    });
+  });
+
+  // ── FO-383 B1: a form left open must not rewrite a PIC nobody touched in it ──
+  test.describe('a form left open', () => {
+    // Listed in CORDIS with no holder, so a stale save would meet the confirmation panel.
+    const PIC_IN_CORDIS = '987654331';
+    const keywordsInput = (page: Page) => page.locator('input[name="keywords"]');
+
+    const storedKeywords = async () =>
+      (await withTenant(PP_TENANT, (tx) => tx.tenantProfile.findUnique({ where: { tenantId: PP_TENANT }, select: { keywords: true } })))?.keywords;
+
+    const setPic = (pic: string | null) => prisma.tenant.update({ where: { id: PP_TENANT }, data: { pic } });
+
+    /** Another session in its own browser context, which the open form knows nothing about. */
+    async function inAnotherSession<T>(browser: Browser, user: TestUser, work: (page: Page) => Promise<T>): Promise<T> {
+      const context = await browser.newContext();
+      try {
+        const page = await context.newPage();
+        await signInAs(page, { id: user.id, email: user.email, tenantId: user.tenantId, role: user.role as 'TENANT_OWNER' });
+        return await work(page);
+      } finally {
+        await context.close();
+      }
+    }
+
+    const staffRemovesPic = (browser: Browser) =>
+      inAnotherSession(browser, PP_ADMIN, async (admin) => {
+        await admin.goto(ADMIN_URL);
+        await expectHydrated(admin.getByTestId('tenant-pic-remove'));
+        await admin.getByTestId('tenant-pic-remove').click();
+        await admin.getByTestId('tenant-pic-remove-note').fill('owner disputed');
+        await admin.getByTestId('tenant-pic-remove-confirm').click();
+        await expect(admin.getByTestId('tenant-pic-none')).toBeVisible();
+      });
+
+    async function saveKeywordsOnly(page: Page, keywords: string) {
+      await keywordsInput(page).fill(keywords);
+      await save(page);
+      await expect(page.getByText('başarıyla güncellendi')).toBeVisible();
+      expect(await storedKeywords()).toEqual([keywords]);
+    }
+
+    for (const [label, pic] of [
+      ['without a CORDIS record', PP_PIC_UNMATCHED],
+      ['with a CORDIS record', PIC_IN_CORDIS],
+    ] as const) {
+      test(`A: a PIC ${label} that staff removed does not come back when the tenant saves its keywords`, async ({ page, browser }) => {
+        await setPic(pic);
+        await openProfile(page, PP_OWNER);
+        await expect(input(page)).toHaveValue(pic);
+
+        await staffRemovesPic(browser);
+        expect(await storedPic(PP_TENANT)).toBeNull();
+        const updatesBefore = (await picAuditRows(PP_TENANT)).length;
+        const removalsBefore = (await picAuditRows(PP_TENANT, 'tenant.pic.removed')).length;
+
+        await saveKeywordsOnly(page, `stale form a ${pic}`);
+
+        await expect(page.getByTestId('tenant-pic-confirm')).toHaveCount(0);
+        expect(await storedPic(PP_TENANT)).toBeNull();
+        expect(await picAuditRows(PP_TENANT)).toHaveLength(updatesBefore);
+        expect(await picAuditRows(PP_TENANT, 'tenant.pic.removed')).toHaveLength(removalsBefore);
+        // The open form catches up with the row instead of still offering the removed code.
+        await expect(input(page)).toHaveValue('');
+      });
+    }
+
+    test('B: a PIC a colleague saved is not wiped by a form opened before it', async ({ page, browser }) => {
+      await setPic(null);
+      await openProfile(page, PP_OWNER);
+      await expect(input(page)).toHaveValue('');
+
+      await inAnotherSession(browser, PP_OWNER, async (colleague) => {
+        await colleague.goto(PROFILE_URL);
+        await expectHydrated(input(colleague));
+        await input(colleague).fill(PP_PIC_UNMATCHED);
+        await save(colleague);
+        await expect(feedback(colleague)).toContainText("CORDIS'te bu koda ait kayıt bulamadık");
+      });
+      expect(await storedPic(PP_TENANT)).toBe(PP_PIC_UNMATCHED);
+      const updatesBefore = (await picAuditRows(PP_TENANT)).length;
+
+      await saveKeywordsOnly(page, 'stale form b');
+
+      await expect(feedback(page)).not.toContainText('PIC kaldırıldı');
+      expect(await storedPic(PP_TENANT)).toBe(PP_PIC_UNMATCHED);
+      expect(await picAuditRows(PP_TENANT)).toHaveLength(updatesBefore);
+      await expect(input(page)).toHaveValue(PP_PIC_UNMATCHED);
+    });
+
+    test('a PIC saved in this form counts as unchanged from then on', async ({ page, browser }) => {
+      await setPic(null);
+      await openProfile(page, PP_OWNER);
+      await input(page).fill(PP_PIC_UNMATCHED);
+      await save(page);
+      await expect(feedback(page)).toContainText("CORDIS'te bu koda ait kayıt bulamadık");
+
+      await staffRemovesPic(browser);
+      await saveKeywordsOnly(page, 'saved in this form');
+
+      expect(await storedPic(PP_TENANT)).toBeNull();
+    });
+
+    test('a change the user does make still goes through', async ({ page }) => {
+      await setPic(PP_PIC_UNMATCHED);
+      await openProfile(page, PP_OWNER);
+      await input(page).fill('');
+      await save(page);
+      await expect(feedback(page)).toContainText('PIC kaldırıldı');
+      expect(await storedPic(PP_TENANT)).toBeNull();
+    });
+
+    test('B6: an old-format PIC does not block a save that leaves it alone, and is refused once edited', async ({ page }) => {
+      await setPic('12345');
+      await openProfile(page, PP_OWNER);
+      await expect(input(page)).toHaveValue('12345');
+
+      await saveKeywordsOnly(page, 'old format pic');
+      await expect(feedback(page).getByRole('alert')).toHaveCount(0);
+      expect(await storedPic(PP_TENANT)).toBe('12345');
+
+      await input(page).fill('123456');
+      await save(page);
+      await expect(feedback(page).getByRole('alert')).toContainText('9 rakam');
+      expect(await storedPic(PP_TENANT)).toBe('12345');
+      await setPic(null);
     });
   });
 });

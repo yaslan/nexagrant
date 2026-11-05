@@ -66,6 +66,17 @@ export default function TenantProfileForm({
   const picHelpId = useId();
   const picFeedbackId = useId();
 
+  // A save re-reads the page (revalidatePath), so a form left open learns what someone else did to
+  // the PIC meanwhile. What the user is in the middle of typing stays theirs.
+  const loadedPic = initialPic ?? '';
+  const [seenLoadedPic, setSeenLoadedPic] = useState(loadedPic);
+  if (loadedPic !== seenLoadedPic) {
+    setSeenLoadedPic(loadedPic);
+    setSavedPic(loadedPic);
+    setSavedPicMatch(initialPicMatch);
+    if (pic === savedPic) setPic(loadedPic);
+  }
+
   // Keyboard and screen-reader users land on the question. In an effect, not a frame after
   // the setState: a slow commit left the ref empty then, and the focus was simply lost.
   useEffect(() => {
@@ -84,7 +95,9 @@ export default function TenantProfileForm({
       keywords,
       trlMin,
       trlMax,
-      pic,
+      // Only a PIC the user changed: sending the one this form opened with would undo whatever
+      // staff or a colleague did to it since, on a save that was about the keywords.
+      pic: pic === savedPic ? undefined : pic,
       confirmedPic,
     });
 

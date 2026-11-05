@@ -425,26 +425,41 @@ describe('updateTenantProfile action', () => {
       });
     });
 
-    it('lets one of two tenants win when both claim a PIC at the same moment', async () => {
+    it('lets one tenant win however many claim a PIC at the same moment, round after round', async () => {
+      // No unique index stands behind the check, so the advisory lock is the only thing here that
+      // can fail this test. One pair, once, stayed green without the lock when the whole file ran:
+      // the race is timing, so it gets more claimants and more chances.
+      const CLAIMANTS = 8;
+      const ROUNDS = 10;
       owner();
-      const pic = newPic();
-      const secondId = `second-${suffix()}`;
-      await prisma.tenant.create({ data: { id: secondId, name: 'Second', slug: `second-${suffix()}`, country: 'TR', orgType: 'SME' } });
-      otherTenants.push(secondId);
+      const claimants = [tenantId];
+      for (let i = 1; i < CLAIMANTS; i++) {
+        const id = `rival-${suffix()}`;
+        await prisma.tenant.create({ data: { id, name: 'Rival', slug: `rival-${suffix()}`, country: 'TR', orgType: 'SME' } });
+        otherTenants.push(id);
+        claimants.push(id);
+      }
 
       // `requireTenantAction` is mocked; each call answers for one tenant, in call order.
       const { requireTenantAction } = await import('@/lib/tenant');
-      vi.mocked(requireTenantAction)
-        .mockResolvedValueOnce({ tenantId, userId, role: 'TENANT_OWNER' } as never)
-        .mockResolvedValueOnce({ tenantId: secondId, userId, role: 'TENANT_OWNER' } as never);
-
-      const results = await Promise.all([updateTenantProfile({ ...base, pic }), updateTenantProfile({ ...base, pic })]);
-      expect(results.filter((r) => r.ok)).toHaveLength(1);
-      expect(results.filter((r) => !r.ok && r.error === 'picTaken')).toHaveLength(1);
-      expect(await prisma.tenant.count({ where: { pic } })).toBe(1);
-      await prisma.tenantProfile.deleteMany({ where: { tenantId: requireId(secondId, 'secondId') } });
-      await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(secondId, 'secondId') } });
-    });
+      try {
+        for (let round = 1; round <= ROUNDS; round++) {
+          const pic = newPic();
+          for (const id of claimants) {
+            vi.mocked(requireTenantAction).mockResolvedValueOnce({ tenantId: id, userId, role: 'TENANT_OWNER' } as never);
+          }
+          const results = await Promise.all(claimants.map(() => updateTenantProfile({ ...base, pic })));
+          expect({ round, holders: await prisma.tenant.count({ where: { pic } }) }).toEqual({ round, holders: 1 });
+          expect(results.filter((r) => r.ok)).toHaveLength(1);
+          expect(results.filter((r) => !r.ok && r.error === 'picTaken')).toHaveLength(CLAIMANTS - 1);
+        }
+      } finally {
+        for (const id of claimants.slice(1)) {
+          await prisma.tenantProfile.deleteMany({ where: { tenantId: requireId(id, 'claimant') } });
+          await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(id, 'claimant') } });
+        }
+      }
+    }, 60_000);
 
     it('does not let a soft-deleted tenant block its PIC', async () => {
       owner();
