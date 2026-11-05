@@ -183,7 +183,10 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
    (tek kaynak: `FILLED_SEAT_STATUSES`, `src/lib/scoring/g0-features.ts`). `OPEN`, `DECLINED` ve hiç
    koltuk olmaması dolu sayılmaz → G0 geçilemez (`G0_NO_HISTORY_NO_FILLED_SEAT`).
 3. Eşik 70, `minAlignment`, taban oran ≥ %8 ve ülke uygunluğu değişmedi. Koordinatör ve rolü boş
-   (`null`) kayıtlar değişmedi. CORDIS verisi yoksa (PIC yok ya da tablo boş) kural uygulanmaz.
+   (`null`) kayıtlar değişmedi. Kural yalnız ortak (`partner`) rolüne uygulanır. CORDIS verisi yoksa
+   kural uygulanmaz: PIC yok **ve** CORDIS tablosu boşsa `cordis = null`. PIC yok ama tablo doluysa
+   kural uygulanır (PIC'siz ortak CORDIS'te kayıt bulamaz). Kapsam dışı olan yalnız boş tablodur.
+   Boş koltuk (`OPEN`, `DECLINED`) hiçbir rolde puan vermez (K-576987 = A).
 
 **Koltuk varsayımı.** Örneklerde koltuk bilgisi yok. Bu yüzden her örnek iki ayrı varsayımla koşuldu:
 - **D — koltuk dolu:** kural 2 sağlanır; yalnız kural 1 (`/75`) etkili olur.
@@ -194,11 +197,11 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 ile aynı canonical yol). Geçici betik repo dışında; tekrar üretmek için `docs/BETA_DATA` CSV'si ve
 `decideG0` yeterli.
 
-| Senaryo | Uzman ile uyum (20 örnek) | Değişen karar (tabana göre) |
-|---|---:|---|
-| Taban: geçmişsiz, /100 | 8/20 | — |
-| D: koltuk dolu, /75 | 14/20 | 8 karar NO_GO→GO: S01 DISTRENOV, S03 AGRISENSE, S05 CLIMANEUT, S06 SMERAD, S08 GRIDFLEX, S11 SOLIDBAT, S12 GEOHEAT, S19 NETSUPP |
-| B: koltuk boş, /75 + kural | 8/20 | 0 karar: taban zaten NO_GO; kural bu örneklerde GO'yu tümüyle engeller |
+| Senaryo | Uzman ile uyum (20 örnek) | GO kararı sayısı (20 örnek) | Değişen karar (tabana göre) |
+|---|---:|---:|---|
+| Taban: geçmişsiz, /100 | 8/20 | 0 | — |
+| D: koltuk dolu, /75 | 14/20 | 8 | 8 karar NO_GO→GO: S01 DISTRENOV, S03 AGRISENSE, S05 CLIMANEUT, S06 SMERAD, S08 GRIDFLEX, S11 SOLIDBAT, S12 GEOHEAT, S19 NETSUPP |
+| B: koltuk boş, /75 + kural | 8/20 | 0 | 0 karar: taban zaten NO_GO; kural bu örneklerde GO'yu tümüyle engeller |
 
 **Yorum.** D altında 8 karar değişiyor; bunlardan biri (S19 NETSUPP) uzman etiketine aykırı
 yeni bir yanlış pozitif. B altında kural, geçmişsiz ortağın hiçbir örnekte geçmesine izin vermiyor.

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   extractG0Features,
   isCountryEligible,
+  isFilledSeat,
+  isNoHistoryPartner,
   keywordCoverageScore,
   topicPrefixOf,
   type G0Snapshot,
@@ -276,7 +278,7 @@ describe('partner with no CORDIS history (FO-382)', () => {
     expect(ex.scoringBasis).toBe('standard');
   });
 
-  it('keeps the standard basis when CORDIS data is missing (no PIC or empty table), so a data gap is not read as no history', () => {
+  it('keeps the standard basis when CORDIS data is missing (empty table), so a data gap is not read as no history', () => {
     const ex = extractG0Features(fullSnapshot({ intendedRole: 'partner', cordis: null }));
     expect(ex.scoringBasis).toBe('standard');
     expect(ex.excludedFeatures).toEqual([]);
@@ -314,6 +316,20 @@ describe('partner with no CORDIS history (FO-382)', () => {
 });
 
 // ───────────────────────── FO-382 hard rule: no history needs a filled seat ─────────────────────────
+
+describe('FO-382 normalisation: status and role spelling', () => {
+  const noHistory = { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 };
+
+  it.each(['invited', ' Candidate ', 'confirmed'])('counts the seat status %j as filled (M7)', (status) => {
+    expect(isFilledSeat({ status })).toBe(true);
+  });
+
+  it.each([' Partner ', 'PARTNER', 'partner'])('applies the no-history rule to the role %j (M10)', (role) => {
+    expect(isNoHistoryPartner({ intendedRole: role, cordis: noHistory })).toBe(true);
+    const ex = extractG0Features(fullSnapshot({ intendedRole: role, cordis: noHistory }));
+    expect(ex.scoringBasis).toBe('no_history_evidence');
+  });
+});
 
 describe('no-history partner needs a filled seat (FO-382 hard rule)', () => {
   const noHistory = { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 };

@@ -405,7 +405,7 @@ Aynı önekle kapatılan iki kart daha var (6'ya dahil değil): **TASK-MTRJSOWFH
    CORDIS'te hiç katılım kaydı olmayan kuruluşta `coordinatorHistory` (15) ve `networkCentrality` (10)
    paydadan çıkar; bileşik skor kalan 75 puanla hesaplanır (`scoringBasis = no_history_evidence`).
    Eşik 70 ve üç sert kural değişmez; koordinatör ve rolü boş (`null`) kayıtlar eski hesapta kalır;
-   CORDIS verisi yoksa (PIC yok ya da tablo boş) kural uygulanmaz. Boş (`OPEN`) koltuk artık puan
+   CORDIS verisi yoksa (PIC yok ve tablo boş) kural uygulanmaz; PIC yok ama tablo doluysa kural uygulanır. Boş (`OPEN`) koltuk artık puan
    vermez. **Sert kural (2026-11-05, patron):** aynı durumda en az bir dolu koltuk şart; dolu =
    `CANDIDATE`, `INVITED`, `CONFIRMED` (`FILLED_SEAT_STATUSES`). `OPEN`, `DECLINED` ya da koltuk yoksa G0
    geçilmez (`G0_NO_HISTORY_NO_FILLED_SEAT`). `G0_SCORING_VERSION` = `2.2`.

@@ -175,6 +175,47 @@ describe('computeG0FromSnapshot()', () => {
     expect(alignmentHeavy.score!).toBeGreaterThan(withDefaults.score!);
   });
 
+  it('scores a no-history partner over the 75-point denominator with default weights (FO-382, Ö1)', () => {
+    const snapshot = snapshotWithEvidence({
+      intendedRole: 'partner',
+      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
+      seats: [{ roleKey: 'research', status: 'INVITED' }],
+    });
+    const c = computeG0FromSnapshot('t1', subject, snapshot);
+    expect(c.scoringBasis).toBe('no_history_evidence');
+    expect(c.excludedFeatures).toEqual(['coordinatorHistory', 'networkCentrality']);
+    expect(c.denominator).toBe(75);
+    // (30·90 + 15·70 + 12·50 + 10·100 + 8·100) / 75 = 6150 / 75 = 82
+    expect(c.score).toBeCloseTo(82, 5);
+  });
+
+  it('keeps the same score when every weight doubles: denominator 150, score unchanged (FO-382, Ö1)', () => {
+    const snapshot = snapshotWithEvidence({
+      intendedRole: 'partner',
+      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
+      seats: [{ roleKey: 'research', status: 'INVITED' }],
+    });
+    const doubled = Object.fromEntries(
+      Object.entries(DEFAULT_SCORING_WEIGHTS).map(([k, v]) => [k, v * 2]),
+    ) as typeof DEFAULT_SCORING_WEIGHTS;
+    const c = computeG0FromSnapshot('t1', subject, snapshot, doubled);
+    expect(c.denominator).toBe(150);
+    // (30·90 + 15·70 + 12·50 + 10·100 + 8·100) / 75 = 6150 / 75 = 82
+    expect(c.score).toBeCloseTo(82, 5);
+  });
+
+  it('gives 0 over an empty denominator when only the excluded features carry weight (FO-382, Ö1)', () => {
+    const snapshot = snapshotWithEvidence({
+      intendedRole: 'partner',
+      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
+      seats: [{ roleKey: 'research', status: 'INVITED' }],
+    });
+    const onlyExcluded = { ...DEFAULT_SCORING_WEIGHTS, alignment: 0, baseRate: 0, researchAndEndUser: 0, budgetRoleEconomy: 0, lumpSumTwoStage: 0 };
+    const c = computeG0FromSnapshot('t1', subject, snapshot, onlyExcluded);
+    expect(c.denominator).toBe(0);
+    expect(c.score).toBe(0);
+  });
+
   it('is deterministic across repeated runs', () => {
     const scores = Array.from({ length: 20 }, () =>
       computeG0FromSnapshot('t1', subject, snapshotWithEvidence()).score,
@@ -360,6 +401,20 @@ describe('loadG0Snapshot()', () => {
       participationsOverall: 0,
     });
   });
+
+  it.each([['coordinator'], [null]])(
+    'no PIC with CORDIS loaded stays missing for intendedRole=%s (FO-382 B1: partner-only "no record")',
+    async (role) => {
+      const { client } = fakeClient({ tenant: { country: 'DE', pic: null }, topics: [topicRow] });
+      const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+        opportunityId: 'opp-1',
+        topicId: 'topic-1',
+        intendedRole: role,
+        seats: [],
+      });
+      expect(snapshot.cordis).toBeNull();
+    },
+  );
 
   it('no PIC and an empty CORDIS table is missing data: cordis stays null, the standard basis holds', async () => {
     const { client } = fakeClient({

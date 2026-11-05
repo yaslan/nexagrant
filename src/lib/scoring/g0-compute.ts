@@ -59,7 +59,7 @@ export interface G0Computation {
   excludedFeatures: (keyof G0Features)[];
   /** Sum of the weights actually scored; `score` is normalised by this. */
   denominator: number;
-  /** Seats with a named organisation (FILLED_SEAT_STATUSES). The no-history rule needs at least one. */
+  /** Seats whose status is a filled one (FILLED_SEAT_STATUSES); only the status is read, not the organisation column. The no-history rule needs at least one. */
   filledSeats: number;
 }
 
@@ -145,10 +145,14 @@ async function loadCordisSnapshot(
   client: TenantTx,
   pic: string | null,
   topicIdentifier: string | null,
+  intendedRole: string | null,
 ): Promise<G0CordisSnapshot | null> {
   // "No record" = no PIC, or a PIC with no CORDIS row (FO-382, card definition). It is only a fact
   // about the organisation when CORDIS itself is loaded. An empty table (not imported yet) is
   // missing data, not a history of zero, so it stays null and the scorer keeps the standard basis.
+  // A tenant with no PIC is a measured "no record" only for the partner role: the FO-382 rule is
+  // partner-only, and coordinator / unset-role scoring must stay exactly as it was (`cordis: null`).
+  const isPartner = (intendedRole ?? '').trim().toLowerCase() === 'partner';
   const noRecord = async (): Promise<G0CordisSnapshot | null> => {
     const anyRow: { projectId: string } | null = await client.cordisParticipation.findFirst({
       select: { projectId: true },
@@ -162,7 +166,7 @@ async function loadCordisSnapshot(
     };
   };
 
-  if (!pic) return noRecord();
+  if (!pic) return isPartner ? noRecord() : null;
 
   const participations: { role: string; projectId: string; project: { masterCall: string | null } | null }[] =
     await client.cordisParticipation.findMany({
@@ -277,7 +281,7 @@ export async function loadG0Snapshot(
     }
   }
 
-  const cordis = await loadCordisSnapshot(client, tenant?.pic ?? null, topic?.identifier ?? null);
+  const cordis = await loadCordisSnapshot(client, tenant?.pic ?? null, topic?.identifier ?? null, subject.intendedRole);
 
   return {
     tenant: { country: tenant?.country ?? null, pic: tenant?.pic ?? null },
