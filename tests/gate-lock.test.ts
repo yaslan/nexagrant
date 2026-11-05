@@ -1,16 +1,16 @@
-import { execFileSync, spawn } from 'child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { execFileSync, spawn, spawnSync } from 'child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import net from 'net';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 // FO-388 yardımcıları: bir portu dinleyip kapatmadan tutmak ve süreç çıktısını toplamak.
-function holdPort(port: number): Promise<net.Server> {
+function holdPort(port: number, host = '127.0.0.1'): Promise<net.Server> {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
     srv.once('error', reject);
-    srv.listen(port, '127.0.0.1', () => resolve(srv));
+    srv.listen(port, host, () => resolve(srv));
   });
 }
 function freePort(): Promise<number> {
@@ -142,6 +142,106 @@ describe('gate-lock (FO-55)', () => {
     });
   }, 30_000);
 
+  // FO-388 (3. inceleme): clearIfStale taşı-doğrula-sil yolu. Ölü sahipli bayat kilit temizlenmeli,
+  // komut koşmalı ve kilit dizini kalmamalı. (Okuma-taşıma arasındaki yarış penceresi test edilemez:
+  // araya girmek için üretim koduna test kancası gerekir; bu test yalnız normal yolu doğrular.)
+  it('FO-388: ölü sahipli bayat kilit temizlenir, komut koşar, kilit dizini kalmaz', () => {
+    const lockDir = path.join(root, 'stale', 'lock');
+    mkdirSync(lockDir, { recursive: true });
+    writeFileSync(path.join(lockDir, 'owner.json'), JSON.stringify({ pid: 999999, cwd: '/x', branch: 'x', command: 'x', startedAt: '2000-01-01T00:00:00Z' }));
+    const res = spawnSync(process.execPath, [script, process.execPath, '-e', 'console.log("calisti")'], {
+      env: { ...baseEnv, FONBRIDGE_GATE_LOCK_DIR: lockDir },
+      encoding: 'utf8',
+    });
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain('calisti');
+    expect(res.stdout).toContain('Bayat gate kilidi temizlendi');
+    expect(existsSync(lockDir)).toBe(false);
+  }, 30_000);
+
+  // FO-388 (3. inceleme): AUTO iken E2E_PORT, betiğin kendi ön seçimi (FONBRIDGE_E2E_PORT_PREPICK)
+  // değilse elle verilmiştir: yok sayılır ve görünür uyarı basılır. Ön seçim sessizce yok sayılır.
+  it('FO-388: AUTO iken elle verilen E2E_PORT yok sayılır ve stderr\'de uyarı çıkar', async () => {
+    const lockDir = path.join(root, 'warn', 'lock');
+    const base = await freePort();
+    const manual = await freePort();
+    const res = spawnSync(
+      process.execPath,
+      [script, process.execPath, '-e', 'console.log("E2E=" + process.env.E2E_PORT)'],
+      {
+        env: {
+          ...baseEnv,
+          FONBRIDGE_GATE_LOCK_DIR: lockDir,
+          FONBRIDGE_E2E_PORT_AUTO: '1',
+          FONBRIDGE_E2E_PORT_BASE: String(base),
+          E2E_PORT: String(manual),
+        },
+        encoding: 'utf8',
+      },
+    );
+    expect(res.status).toBe(0);
+    expect(res.stderr).toContain(`E2E_PORT=${manual} elle verilmiş`);
+    expect(Number(/E2E=(\d+)/.exec(res.stdout)?.[1])).toBe(base);
+  }, 30_000);
+
+  it('FO-388: AUTO iken betiğin kendi ön seçimi (PREPICK) sessizce yok sayılır, uyarı çıkmaz', async () => {
+    const lockDir = path.join(root, 'prepick', 'lock');
+    const base = await freePort();
+    const res = spawnSync(
+      process.execPath,
+      [script, process.execPath, '-e', 'console.log("E2E=" + process.env.E2E_PORT)'],
+      {
+        env: {
+          ...baseEnv,
+          FONBRIDGE_GATE_LOCK_DIR: lockDir,
+          FONBRIDGE_E2E_PORT_AUTO: '1',
+          FONBRIDGE_E2E_PORT_BASE: String(base),
+          E2E_PORT: String(base + 1000),
+          FONBRIDGE_E2E_PORT_PREPICK: String(base + 1000),
+        },
+        encoding: 'utf8',
+      },
+    );
+    expect(res.status).toBe(0);
+    expect(res.stderr).not.toContain('elle verilmiş');
+    expect(Number(/E2E=(\d+)/.exec(res.stdout)?.[1])).toBe(base);
+  }, 30_000);
+
+  // FO-388 (3. inceleme): her dinleyici türü ayrı test edilir. Yoklama yalnız 127.0.0.1'e bakarsa
+  // 0.0.0.0, ::1 ve :: dinleyicileri boş görünür (macOS ölçümü; Next dev `::` dinler). Düzeltme
+  // geri alınınca 127.0.0.1 dışındaki vakalar kırmızı olmalı.
+  for (const host of ['127.0.0.1', '0.0.0.0', '::1', '::']) {
+    it(`FO-388: ${host} dinleyicisi varken elle verilen E2E_PORT dolu sayılır`, () => {
+      const lockDir = path.join(root, `host-${host.replace(/[^0-9a-z]/g, '_')}`, 'lock');
+      const marker = path.join(root, `ran-${host.replace(/[^0-9a-z]/g, '_')}.txt`);
+      return freePort().then(async (port) => {
+        const holder = await holdPort(port, host);
+        let status: number | undefined;
+        let stderr = '';
+        try {
+          execFileSync(
+            process.execPath,
+            [script, process.execPath, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`],
+            {
+              env: { ...baseEnv, FONBRIDGE_GATE_LOCK_DIR: lockDir, E2E_PORT: String(port) },
+              stdio: ['ignore', 'ignore', 'pipe'],
+              encoding: 'utf8',
+            },
+          );
+        } catch (err) {
+          const e = err as { status?: number; stderr?: string };
+          status = e.status;
+          stderr = e.stderr ?? '';
+        } finally {
+          await closeServer(holder);
+        }
+        expect(status).toBe(1);
+        expect(stderr).toContain(`E2E_PORT ${port} dolu`);
+        expect(existsSync(marker)).toBe(false);
+      });
+    }, 30_000);
+  }
+
   // FO-388 yeniden üretimi: A kilidi tutarken B bekler; B beklerken taban port bir dinleyiciyle
   // doldurulur. Düzeltme öncesi B taban portu miras alır (kırmızı); düzeltme sonrası başka port seçer.
   it('FO-388: kuyrukta bekleyen koşu, kilit alındığında taban portun dolu olduğunu görür ve başka port seçer', async () => {
@@ -164,6 +264,7 @@ describe('gate-lock (FO-55)', () => {
           FONBRIDGE_E2E_PORT_AUTO: '1',
           FONBRIDGE_E2E_PORT_BASE: String(base),
           E2E_PORT: String(base),
+          FONBRIDGE_E2E_PORT_PREPICK: String(base),
         },
         stdio: 'ignore',
       },

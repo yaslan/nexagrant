@@ -102,14 +102,42 @@ function clearIfStale() {
     stale = Date.now() - mtimeMs > NO_OWNER_STALE_MS
   }
   if (!stale) return false
+  // FO-388 (3. inceleme): okuma ile taşıma arasında başka bir süreç bayat kilidi temizleyip canlı bir kilit
+  // alabilir; o zaman buradaki rename canlı kilidi taşırdı. Önce taşınır, sonra taşınanın sahibine bakılır:
+  // hâlâ aynı ölü sahipse silinir, değilse geri adlandırılır.
   const graveyard = `${LOCK_DIR}.stale-${process.pid}-${Date.now()}`
   try {
     fs.renameSync(LOCK_DIR, graveyard)
-    fs.rmSync(graveyard, { recursive: true, force: true })
-    console.log(`🧹 Bayat gate kilidi temizlendi (sahip pid ${owner?.pid ?? '?'} artık çalışmıyor).`)
-    return true
   } catch {
     return false
+  }
+  const taken = readOwnerAt(path.join(graveyard, 'owner.json'))
+  let stillStale
+  if (owner) {
+    stillStale = taken !== null && taken.pid === owner.pid && !pidAlive(taken.pid)
+  } else {
+    // Sahipsiz dizin: hâlâ sahipsiz ve eski olmalı (taze bir mkdir ile yazım arasındaki kilit değil).
+    const mtimeMs = fs.statSync(graveyard).mtimeMs
+    stillStale = taken === null && Date.now() - mtimeMs > NO_OWNER_STALE_MS
+  }
+  if (!stillStale) {
+    try {
+      fs.renameSync(graveyard, LOCK_DIR)
+    } catch (err) {
+      console.warn(`⚠ Canlı gate kilidi geri yüklenemedi (${err.code}); kilit dizini ${graveyard} altında kaldı, elle kontrol et.`)
+    }
+    return false
+  }
+  fs.rmSync(graveyard, { recursive: true, force: true })
+  console.log(`🧹 Bayat gate kilidi temizlendi (sahip pid ${owner?.pid ?? '?'} artık çalışmıyor).`)
+  return true
+}
+
+function readOwnerAt(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return null
   }
 }
 
@@ -225,14 +253,26 @@ async function acquire() {
   }
 }
 
-// FO-388: bir portu 127.0.0.1'de dinleyip bırakarak boş olup olmadığını bakar.
-function portFree(port) {
+// FO-388 (3. inceleme): bir dinleyici yalnız kendi adresinde görünür (macOS ölçümü: 127.0.0.1, 0.0.0.0,
+// ::1, :: birbirini görmüyor; Next dev `::` dinler). Bu yüzden port dört adreste de denenir ve ancak
+// hepsinde boşsa boş sayılır. Yalnız EADDRINUSE meşgul demektir; IPv6 yoksa (EADDRNOTAVAIL/EAFNOSUPPORT)
+// o adres atlanır.
+const PROBE_HOSTS = ['127.0.0.1', '0.0.0.0', '::1', '::']
+
+function bindFree(port, host) {
   return new Promise((resolve) => {
     const srv = net.createServer()
-    srv.once('error', () => resolve(false))
+    srv.once('error', (err) => resolve(err.code !== 'EADDRINUSE'))
     srv.once('listening', () => srv.close(() => resolve(true)))
-    srv.listen(port, '127.0.0.1')
+    srv.listen(port, host)
   })
+}
+
+async function portFree(port) {
+  for (const host of PROBE_HOSTS) {
+    if (!(await bindFree(port, host))) return false
+  }
+  return true
 }
 
 async function firstFreePort(from) {
@@ -245,7 +285,17 @@ async function firstFreePort(from) {
 // taban portun dolu olduğu, kuyrukta beklerken de değişmiş olabilir: seçim burada, test adımlarından önce
 // yapılır. Elle verilen E2E_PORT değiştirilmez; doluysa hata atılır. Hiçbiri yoksa undefined (eski davranış).
 async function resolveE2ePort() {
-  if (process.env.FONBRIDGE_E2E_PORT_AUTO === '1') return firstFreePort(E2E_PORT_BASE)
+  if (process.env.FONBRIDGE_E2E_PORT_AUTO === '1') {
+    // FO-388 (3. inceleme): gate-isolated.sh kendi ön seçimini E2E_PORT'a yazıp FONBRIDGE_E2E_PORT_PREPICK
+    // ile işaretler; o değer sessizce yok sayılır. İşaretsiz bir E2E_PORT elle verilmiştir: yok sayılır,
+    // ama görünür uyarı basılır (hata değil: git push ve pre-push gate'i kırılmasın).
+    const explicit = process.env.E2E_PORT
+    const port = await firstFreePort(E2E_PORT_BASE)
+    if (explicit && explicit !== process.env.FONBRIDGE_E2E_PORT_PREPICK) {
+      console.warn(`⚠ E2E_PORT=${explicit} elle verilmiş ama FONBRIDGE_E2E_PORT_AUTO=1; yok sayıldı, e2e portu ${port} seçildi.`)
+    }
+    return port
+  }
   const explicit = process.env.E2E_PORT
   if (explicit) {
     if (await portFree(Number(explicit))) return Number(explicit)

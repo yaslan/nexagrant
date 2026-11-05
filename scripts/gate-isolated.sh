@@ -70,9 +70,22 @@ if [ -n "${E2E_PORT:-}" ]; then
 else
   export FONBRIDGE_E2E_PORT_AUTO=1
   unset E2E_PORT
-  # A command given as arguments that is not `pnpm gate` takes no gate lock, so it gets its port now.
-  if [ $# -gt 0 ]; then export E2E_PORT="$(first_free 3400)"; fi
+  # FO-388 (3. inceleme): a command given as arguments that is not `pnpm gate` takes no gate lock, so it
+  # gets a port now. The pre-pick is marked FONBRIDGE_E2E_PORT_PREPICK: gate-lock.mjs treats a value with
+  # that mark as the script's own and ignores it silently (a `git push` runs `pnpm gate` in its hook, which
+  # takes the lock and picks again). Without the mark it would look like a manual E2E_PORT and warn.
+  if [ $# -gt 0 ]; then
+    pick="$(first_free 3400)"
+    export FONBRIDGE_E2E_PORT_PREPICK="$pick"
+    export E2E_PORT="$pick"
+  fi
   e2e_desc="E2E_PORT kilit alındıktan sonra seçilir"
+fi
+
+# Test hook: print the e2e decision and stop before any container or database work.
+if [ "${GATE_ISOLATED_DRY_RUN:-0}" = 1 ]; then
+  log "dry-run e2e: auto=${FONBRIDGE_E2E_PORT_AUTO:-} e2e_port=${E2E_PORT:-} prepick=${FONBRIDGE_E2E_PORT_PREPICK:-} ($e2e_desc)"
+  exit 0
 fi
 
 container="fabrika-gate-$(date -u +%Y%m%d%H%M%S)-$$"
