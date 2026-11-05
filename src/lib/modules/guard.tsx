@@ -35,11 +35,11 @@ export async function moduleGate(
 
   const t = await getTranslations({ locale, namespace: 'ModuleGate' });
   const manifest = getManifest(moduleId);
+  const tModules = await getTranslations({ locale, namespace: 'modules' });
 
   // A "Yakında" module is not closed, it does not exist yet (FO-40): no lock, no
   // "ask your administrator" — nobody can open it. Its name is the translated one.
   if (access.reason === 'COMING_SOON' && manifest) {
-    const tModules = await getTranslations({ locale, namespace: 'modules' });
     return (
       <section
         role="status"
@@ -73,7 +73,8 @@ export async function moduleGate(
       </h1>
       <p className="mt-3 text-slate-600 dark:text-slate-400">
         {t(`reason.${access.reason ?? 'MODULE_OFF'}`, {
-          module: manifest?.name ?? moduleId,
+          // The translated name: `manifest.name` is English, also on a Turkish page.
+          module: manifest ? tModules(`${manifest.key}.name`) : moduleId,
           // Only `PLAN_UPGRADE_REQUIRED` renders it; the other reasons ignore the
           // extra parameter. An empty list would leave a dangling "included in ."
           // sentence, so a module no plan sells falls back to the em dash.
