@@ -23,7 +23,7 @@ import {
 } from '@/lib/pic';
 import { budgetDay } from '@/lib/pic-budget';
 import { TenantPicChangedError, removeTenantPic } from '@/lib/tenant-pic-removal';
-import { requireId } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -514,10 +514,10 @@ describe('updateTenantProfile action', () => {
       const limited = { ok: false, error: 'picRateLimited', retryAfterSeconds: expect.any(Number) };
 
       beforeEach(async () => {
-        await prisma.picLookupBudget.deleteMany({ where: { day: budgetDay(new Date()) } });
+        await prisma.picLookupBudget.deleteMany({ where: { day: requireId(budgetDay(new Date()), 'day') } });
       });
       afterEach(async () => {
-        await prisma.picLookupBudget.deleteMany({ where: { day: budgetDay(new Date()) } });
+        await prisma.picLookupBudget.deleteMany({ where: { day: requireId(budgetDay(new Date()), 'day') } });
         await prisma.lifetimeLicence.deleteMany({ where: { tenantId: { in: otherTenants } } });
       });
 
@@ -654,7 +654,7 @@ describe('updateTenantProfile action', () => {
       describe('the day does not reset on a request, only at UTC midnight', () => {
         const days: string[] = [];
         afterEach(async () => {
-          await prisma.picLookupBudget.deleteMany({ where: { day: { in: days.splice(0) } } });
+          await prisma.picLookupBudget.deleteMany({ where: { day: { in: presentIds(days.splice(0)) } } });
         });
 
         it('counts per UTC day and tells how long until the next', async () => {

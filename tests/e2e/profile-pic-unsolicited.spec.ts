@@ -15,6 +15,7 @@ import { prisma } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { PIC_LOOKUPS_PER_HOUR_UNSOLICITED, PIC_UNSOLICITED_LOOKUPS_PER_DAY } from '../../src/lib/pic';
 import { budgetDay } from '../../src/lib/pic-budget';
+import { presentIds, requireId } from '../helpers/teardown-guard';
 import { expectHydrated } from './fixtures/hydration';
 import { signInAs } from './fixtures/session';
 
@@ -38,13 +39,13 @@ const USER_IDS = SEATS.map((s) => s.user.id);
 async function teardown() {
   await withSystemScope('platform-admin', 'e2e.profile-pic-unsolicited.teardown', async (tx) => {
     await tx.cordisOrganization.deleteMany({ where: { organisationId: LISTED_PIC } });
-    await tx.membership.deleteMany({ where: { tenantId: { in: TENANT_IDS } } });
-    await tx.subscription.deleteMany({ where: { tenantId: { in: TENANT_IDS } } });
-    await tx.workspace.deleteMany({ where: { tenantId: { in: TENANT_IDS } } });
-    await tx.user.deleteMany({ where: { id: { in: USER_IDS } } });
-    await tx.tenant.deleteMany({ where: { id: { in: TENANT_IDS } } });
+    await tx.membership.deleteMany({ where: { tenantId: { in: presentIds(TENANT_IDS) } } });
+    await tx.subscription.deleteMany({ where: { tenantId: { in: presentIds(TENANT_IDS) } } });
+    await tx.workspace.deleteMany({ where: { tenantId: { in: presentIds(TENANT_IDS) } } });
+    await tx.user.deleteMany({ where: { id: { in: presentIds(USER_IDS) } } });
+    await tx.tenant.deleteMany({ where: { id: { in: presentIds(TENANT_IDS) } } });
   });
-  await prisma.picLookupBudget.deleteMany({ where: { day: budgetDay(new Date()) } });
+  await prisma.picLookupBudget.deleteMany({ where: { day: requireId(budgetDay(new Date()), 'day') } });
 }
 
 async function setup() {
