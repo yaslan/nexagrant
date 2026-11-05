@@ -269,7 +269,12 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
   await table.screenshot({ path: `${SHOTS}/03-agency-panel-table.png` });
 
   // A new code from the panel's own form.
+  // The server-action response is awaited on its own (not through the generic listener): a body
+  // still being read when the page navigates is lost, which left it out in the isolated gate run.
+  const actionResponse = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/ajans'));
   await page.getByRole('button', { name: trMessages.agency.codes.create }).click();
+  const actionRes = await actionResponse;
+  bodies.push({ url: actionRes.url(), kind: 'POST action', text: await actionRes.text() });
   await expect(page.getByText(trMessages.agency.codes.createdTitle)).toBeVisible();
   const created = await withSystemScope('platform-admin', 'e2e.fo392.read', (tx) =>
     tx.agencyInviteCode.findFirstOrThrow({
@@ -284,6 +289,9 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
   await page.screenshot({ path: `${SHOTS}/03-agency-panel.png`, fullPage: true });
 
   // N-2: nothing received by the browser carries the limit or a use count.
+  // Read every body BEFORE the reload: a body still being read when the page navigates is lost,
+  // which in the isolated gate run left the server-action response out of the list.
+  await Promise.all(pending);
   await page.reload();
   await expectHydrated(page.getByTestId('invite-codes-limit-note'));
   await Promise.all(pending);
@@ -296,6 +304,7 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
   // Server-action responses are small: the code's exact limit must not be among them.
   const actions = bodies.filter((b) => b.kind.startsWith('POST'));
   expect(actions.length).toBeGreaterThan(0);
+  expect(actions.some((b) => b.text.includes('code'))).toBe(true); // it really is the create response
   if (exact !== INVITE_CODE_MIN_USE_LIMIT) {
     for (const b of actions) expect(b.text, `${b.url} carries the exact limit ${exact}`).not.toMatch(new RegExp(`(?<![0-9A-Za-z])${exact}(?![0-9A-Za-z])`));
     const visible = await page.locator('main').innerText();
