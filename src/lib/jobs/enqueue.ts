@@ -37,6 +37,14 @@ export async function enqueueJob(
     // can only fail. The job checks it again when it runs.
     const period = requestedReportPeriod(payload, new Date());
     key = `agency-report:${period}`;
+  } else if (id === 'g0-rescore-tenant') {
+    // One key per PIC change and cursor: a repeated request adds nothing, while the rest of the
+    // same change (a later cursor) is a new run (FO-384 B2).
+    if (!isPresentId(payload.tenantId) || !isPresentId(payload.auditEventId)) {
+      throw new Error('g0-rescore-tenant: tenantId and auditEventId are required');
+    }
+    const cursor = typeof payload.afterId === 'string' && payload.afterId !== '' ? payload.afterId : 'start';
+    key = `g0-rescore-tenant:${String(payload.auditEventId)}:${cursor}`;
   } else if (id === 'k1-embeddings' && payload.tenantId !== undefined) {
     // One key per tenant: saving a profile five times queues one embedding.
     if (!isPresentId(payload.tenantId)) throw new Error('k1-embeddings: tenantId must be a non-empty string');
