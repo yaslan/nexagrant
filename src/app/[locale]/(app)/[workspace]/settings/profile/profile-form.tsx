@@ -309,17 +309,6 @@ export default function TenantProfileForm({
         </div>
       )}
 
-      {nothingToSave && (
-        <div
-          role="status"
-          data-testid="tenant-profile-no-changes"
-          className="mb-6 p-4 rounded-xl bg-ground border border-border text-ink-2 flex items-center gap-3 text-xs font-semibold"
-        >
-          <CheckCircle className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
-          <span>{t('noChangesMessage')}</span>
-        </div>
-      )}
-
       {error && (
         <div className="mb-6 p-4 rounded-xl bg-bad/10 border border-bad/30 text-bad flex items-center gap-3 text-xs font-semibold animate-in fade-in">
           <AlertCircle className="w-4 h-4 text-bad shrink-0" />
@@ -536,6 +525,18 @@ export default function TenantProfileForm({
           >
             <AlertCircle className="w-4 h-4 text-bad shrink-0" aria-hidden="true" />
             <span>{trlError}</span>
+          </p>
+        )}
+
+        {/* Beside the button, like the TRL message: the banner above the form can be off screen here. */}
+        {nothingToSave && (
+          <p
+            role="status"
+            data-testid="tenant-profile-no-changes"
+            className="p-4 rounded-xl bg-ground border border-border text-ink-2 flex items-start gap-3 text-xs font-semibold"
+          >
+            <CheckCircle className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
+            <span>{t('noChangesMessage')}</span>
           </p>
         )}
 

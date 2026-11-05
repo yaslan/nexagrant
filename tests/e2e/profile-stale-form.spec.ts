@@ -626,10 +626,11 @@ test.describe('FO-387 — a profile form left open', () => {
           // B2's case: the user edits, then types the opening text back, so nothing is sent.
           await f.capabilities.fill('Something else');
           await f.capabilities.fill(OPENED.capabilities);
+          await f.saveButton.scrollIntoViewIfNeeded();
           await f.saveButton.click();
 
           const notice = page.getByTestId(NO_CHANGES);
-          await expect(notice).toBeVisible();
+          await expect(notice).toBeInViewport({ ratio: 1 });
           await expect(notice).toHaveAttribute('role', 'status');
           await expect(page.getByText(COPY[locale].success)).toHaveCount(0);
           // The empty save re-read the page: the untouched field shows the colleague's text.
