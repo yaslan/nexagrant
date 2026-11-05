@@ -949,6 +949,18 @@ harcamaz, tavandan etkilenmez. `tenant.pic.refused` satırı kiracı başına g�
 yine de verilir, yalnız satır yazılmaz. Sebep başına sayılır ki bir günlük `picTaken` satırı "sınır aşıldı"
 satırını gizlemesin. Yeni tablo: `PicLookupBudget` (§24, `SYSTEM_WIDE`, politikasız).
 
+FO-389 inceleme düzeltmeleri: bütçe harcaması profil işleminin içinden, uygulama havuzundan ikinci
+bir bağlantı isteyemez (10 eşzamanlı davetsiz soru havuzu kilitliyordu); harcama
+`picBudgetClient()` ile kendi küçük havuzunda (`PIC_BUDGET_POOL_MAX` = 2, bekleme 5 sn,
+`application_name = fonbridge-pic-budget`) ve işlemden bağımsız commit olur. Bütçeye ya da
+veritabanına ulaşılamazsa istek `failed` döner (tavan atlanmaz) ve kullanıcının saatlik hakkı geri
+verilir (`UserWindowLimiter.refund`). Günlük tavan dolup bir soru geri çevrildiğinde UTC günü başına
+tek `SystemAlert` açılır (`source: pic-budget`, `level: warn`, `dedupeKey: pic-budget-spent:<gün>`,
+meta yalnız `{ day, ceiling }`; PIC, kiracı ve kullanıcı kimliği yok). Ret satırı tavanına
+(`PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY`) ulaşılan gün, kiracı ve sebep başına tek özet satırı
+`AuditEvent: tenant.pic.refusal.capped` (`{ reason, cap }`) yazılır; sonraki retler satır
+bırakmaz, tavan kalkmaz. Admin → Kiracılar → kiracı detayında ret listesinde görünür.
+
 **RLS.** `Tenant` sistem geneli bir tablodur (`tenantId` sütunu yok), `tenant_isolation`
 kapsamı dışındadır; `relrowsecurity = false`, politika 0. Yeni politika gerekmez.
 

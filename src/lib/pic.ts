@@ -24,16 +24,17 @@ export const TenantPicInputSchema = z
 /**
  * How many times one user may ask, in an hour, whether a PIC can be taken (FO-386). The answer says
  * whether another account holds that PIC, and the CORDIS list of PICs is public, so this is what
- * stands between the form and a list of who our customers are. Saving a listed PIC takes two asks,
- * the question and the confirmation, so this leaves ten honest attempts an hour.
+ * stands between the form and a list of who our customers are. The "yes" to a confirmation just
+ * shown is the same question and is not counted again (FO-389), so this is twenty attempts an hour,
+ * a PIC with a CORDIS match included.
  */
 export const PIC_LOOKUPS_PER_HOUR = 20;
 
 /**
  * FO-389. The same question for an account that has nothing behind it: no agency invitation, no
  * pilot, no paid plan. Such an account costs an attacker nothing to open, so it gets the least a
- * real user needs. Saving a listed PIC takes two asks (the question and the confirmation), so
- * three leaves one honest attempt and a retry an hour.
+ * real user needs. A confirmation's "yes" is not counted again, so three is three attempts an hour:
+ * a first try and two corrections of a typo.
  */
 export const PIC_LOOKUPS_PER_HOUR_UNSOLICITED = 3;
 

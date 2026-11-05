@@ -4415,7 +4415,8 @@
       "eventRemoved": "Removed by staff: {pic}",
       "refusals": "Refused PIC attempts",
       "eventRefused": "Registered on another account: {pic}",
-      "eventRateLimited": "Limit reached: {pic}"
+      "eventRateLimited": "Limit reached: {pic}",
+      "refusalsCapped": "Row cap of {cap} a day reached: later refused attempts that day left no row"
     },
     "internalPlan": {
       "title": "Internal plan assignment",

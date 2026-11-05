@@ -42,4 +42,21 @@ describe('UserWindowLimiter', () => {
     l.take('late', 120_000);
     expect((l as unknown as { hits: Map<string, number[]> }).hits.size).toBe(1);
   });
+
+  // FO-389: a request that failed on our side gives its slot back.
+  test('refund gives back exactly the request it names, and only that user\'s', () => {
+    const l = new UserWindowLimiter(2, 60_000);
+    expect(l.take('a', 1_000)).toBeNull();
+    expect(l.take('a', 2_000)).toBeNull();
+    expect(l.take('b', 2_000)).toBeNull();
+    expect(l.take('a', 3_000)).not.toBeNull();
+    l.refund('a', 2_000);
+    expect(l.take('a', 3_000)).toBeNull(); // the slot is back...
+    expect(l.take('a', 3_500)).not.toBeNull(); // ...once
+    // 'b' keeps its own request, and a refund for a time nobody took changes nothing.
+    l.refund('b', 9_999);
+    l.refund('nobody', 1_000);
+    expect(l.take('b', 2_500)).toBeNull();
+    expect(l.take('b', 2_600)).not.toBeNull();
+  });
 });

@@ -4415,7 +4415,8 @@
       "eventRemoved": "Yönetici kaldırdı: {pic}",
       "refusals": "Reddedilen PIC denemeleri",
       "eventRefused": "Başka hesapta kayıtlı: {pic}",
-      "eventRateLimited": "Sınır aşıldı: {pic}"
+      "eventRateLimited": "Sınır aşıldı: {pic}",
+      "refusalsCapped": "Günlük {cap} satır tavanına ulaşıldı: o gün sonraki reddedilen denemeler satır bırakmadı"
     },
     "internalPlan": {
       "title": "İç plan ataması",

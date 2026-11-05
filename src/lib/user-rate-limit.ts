@@ -45,6 +45,17 @@ export class UserWindowLimiter {
     return null;
   }
 
+  /**
+   * Gives back the request `take` counted for `userId` at `at`. For a request that failed on our side
+   * before it did what it was counted for: the user did nothing wrong and must not lose the allowance.
+   * No effect when the request already left the window (or the process restarted).
+   */
+  refund(userId: string, at: number): void {
+    const times = this.hits.get(userId);
+    const i = times ? times.lastIndexOf(at) : -1;
+    if (times && i >= 0) times.splice(i, 1);
+  }
+
   /** At most once a window, drops users whose newest request has left it, so the map stays one window wide. */
   private sweep(now: number): void {
     if (now - this.lastSweep < this.windowMs) return;

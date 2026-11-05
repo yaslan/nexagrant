@@ -161,31 +161,44 @@ async function planPicChange(
   const solicited = tenant !== null && isSolicitedTenant(tenant);
   // The "yes" to a confirmation this user was just shown is the same question: not counted again.
   const alreadyCounted = confirmedPic === to && takePicConfirmation(userId, to);
+  let giveBack: (() => void) | null = null;
   if (!alreadyCounted) {
-    const retryAfterSeconds = (solicited ? picLookupLimiter : picUnsolicitedLookupLimiter).take(userId);
+    const limiter = solicited ? picLookupLimiter : picUnsolicitedLookupLimiter;
+    const takenAt = Date.now();
+    const retryAfterSeconds = limiter.take(userId, takenAt);
     if (retryAfterSeconds !== null) return { kind: 'limit', pic: to, retryAfterSeconds };
-    if (!solicited) {
+    giveBack = () => limiter.refund(userId, takenAt);
+  }
+
+  // From here a throw is our failure (the budget cannot be reached, the database does not answer), not an
+  // answer to the asker: the hourly allowance taken above goes back and the error goes on. The ceiling is
+  // never skipped to avoid it.
+  try {
+    if (!alreadyCounted && !solicited) {
       const budgetRetry = await spendUnsolicitedPicLookup();
       if (budgetRetry !== null) return { kind: 'limit', pic: to, retryAfterSeconds: budgetRetry };
     }
-  }
 
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`tenant-pic:${to}`}, 0))`;
-  const holder = await tx.tenant.findFirst({
-    where: { pic: to, id: { not: tenantId }, deletedAt: null },
-    select: { id: true },
-  });
-  if (holder) return { kind: 'refuse', pic: to };
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`tenant-pic:${to}`}, 0))`;
+    const holder = await tx.tenant.findFirst({
+      where: { pic: to, id: { not: tenantId }, deletedAt: null },
+      select: { id: true },
+    });
+    if (holder) return { kind: 'refuse', pic: to };
 
-  const match = await tx.cordisOrganization.findUnique({
-    where: { organisationId: to },
-    select: { name: true, city: true, country: true },
-  });
-  if (match && confirmedPic !== to) {
-    rememberPicConfirmation(userId, to);
-    return { kind: 'confirm', match };
+    const match = await tx.cordisOrganization.findUnique({
+      where: { organisationId: to },
+      select: { name: true, city: true, country: true },
+    });
+    if (match && confirmedPic !== to) {
+      rememberPicConfirmation(userId, to);
+      return { kind: 'confirm', match };
+    }
+    return { kind: 'write', from: current, to, match };
+  } catch (error) {
+    giveBack?.();
+    throw error;
   }
-  return { kind: 'write', from: current, to, match };
 }
 
 /**
@@ -212,9 +225,31 @@ async function recordPicRefusal(
       data: { path: ['reason'], equals: reason },
     },
   });
-  if (today >= PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY) return;
+  if (today < PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY) {
+    await tx.auditEvent.create({
+      data: { tenantId: scope.tenantId, actorId: scope.userId, type: 'tenant.pic.refused', data: { pic, reason } },
+    });
+    return;
+  }
+  // The cap was reached today. One summary row per tenant, reason and day says so, so the silence after
+  // it is not mistaken for no activity. Not the PICs asked, not who asked: that detail is what the cap
+  // gives up. Its own type, so the count above (and the staff list of refusals) still reads the cap.
+  const summarised = await tx.auditEvent.count({
+    where: {
+      tenantId: scope.tenantId,
+      type: 'tenant.pic.refusal.capped',
+      createdAt: { gte: startOfDay },
+      data: { path: ['reason'], equals: reason },
+    },
+  });
+  if (summarised > 0) return;
   await tx.auditEvent.create({
-    data: { tenantId: scope.tenantId, actorId: scope.userId, type: 'tenant.pic.refused', data: { pic, reason } },
+    data: {
+      tenantId: scope.tenantId,
+      actorId: scope.userId,
+      type: 'tenant.pic.refusal.capped',
+      data: { reason, cap: PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY },
+    },
   });
 }
 

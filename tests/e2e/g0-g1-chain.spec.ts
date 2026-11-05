@@ -124,11 +124,6 @@ async function seed() {
 
   await seedIdentity(FRESH, FRESH_WORKSPACE, FRESH_SLUG, FRESH_USER, FRESH_EMAIL);
   await seedIdentity(PRO, PRO_WORKSPACE, PRO_SLUG, PRO_USER, PRO_EMAIL);
-  // FO-389: this account asks four PIC questions in a row. A tenant nobody vouched for gets three an
-  // hour, so it comes in with an agency's invitation (the Pro tenant plays the agency): still on
-  // Discover with no plan and no M8, which is all this spec is about. The open-account limit has its
-  // own spec (profile-pic-unsolicited).
-  await prisma.tenant.update({ where: { id: FRESH }, data: { agencyId: PRO } });
   await prisma.user.create({ data: { id: PRO_MEMBER, email: PRO_MEMBER_EMAIL, name: 'member', locale: 'tr' } });
   await prisma.membership.create({ data: { userId: PRO_MEMBER, tenantId: PRO, role: 'MEMBER', workspaceIds: [PRO_WORKSPACE] } });
 
@@ -695,6 +690,14 @@ test.describe('NG-27 where a new user stops', () => {
     await expectG0('18 ortak, en iyi konu', best.id, 70.2, true, '17-ag-gecmisi-70-gecti');
     await expectG0('18 ortak, sıradan konu', plain.id, 62.2, false, '17b-ag-gecmisi-62-red');
 
+    // FO-389: this account asks four PIC questions in a row, and a tenant nobody vouched for gets three
+    // an hour. The first three are asked exactly as a new, uninvited account asks them (FO-389 review
+    // Ö-1: the spec used to invite it from the start and stopped proving that path). Before the fourth
+    // an agency invites it (the Pro tenant plays the agency): still on Discover with no plan and no M8,
+    // which is all the rest of this spec is about. The limit itself has its own spec
+    // (profile-pic-unsolicited).
+    expect(await prisma.tenant.findUniqueOrThrow({ where: { id: FRESH }, select: { agencyId: true } })).toEqual({ agencyId: null });
+    await prisma.tenant.update({ where: { id: FRESH }, data: { agencyId: PRO } });
     await confirmCordisPic(page, FRESH_SLUG, FRESH, PIC_RICH, 'G0G1 E2E History rich');
     await expectG0('zengin geçmiş, en iyi konu', best.id, 88, true, '18-zengin-gecmis-88-gecti');
     await expectG0('zengin geçmiş, sıradan konu', plain.id, 80, true, '18b-zengin-gecmis-80-gecti');

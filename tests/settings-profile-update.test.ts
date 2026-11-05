@@ -13,6 +13,13 @@ vi.mock('@/lib/tenant', () => ({
   requireTenantAction: vi.fn(async () => tenantScope.current),
 }));
 
+// FO-389: passes straight through to the real budget; a test makes it fail once to stand for an
+// unreachable database, which no honest request can be made to hit on demand.
+vi.mock('@/lib/pic-budget', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/pic-budget')>();
+  return { ...actual, spendUnsolicitedPicLookup: vi.fn(actual.spendUnsolicitedPicLookup) };
+});
+
 import { prisma, withTenant } from '@/lib/db';
 import { updateTenantProfile, type UpdateProfileInput } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
 import {
@@ -21,9 +28,10 @@ import {
   PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY,
   PIC_UNSOLICITED_LOOKUPS_PER_DAY,
 } from '@/lib/pic';
-import { budgetDay } from '@/lib/pic-budget';
+import { budgetDay, resetPicBudgetAlertMemo, spendUnsolicitedPicLookup } from '@/lib/pic-budget';
 import { TenantPicChangedError, removeTenantPic } from '@/lib/tenant-pic-removal';
 import { presentIds, requireId } from './helpers/teardown-guard';
+import { slack } from './helpers/timing';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -786,6 +794,187 @@ describe('updateTenantProfile action', () => {
         expect(
           await prisma.auditEvent.count({ where: { tenantId: scope.tenantId, type: 'tenant.pic.refused', createdAt: { gt: yesterday } } })
         ).toBe(1);
+      });
+
+      // ── FO-389 review: B-1 (one pool at a time), the hourly allowance, the confirmation's clock,
+      //    the alert and the refusal summary.
+
+      describe('the budget spend does not take its connection from the pool that asks (review B-1)', () => {
+        it.each([10, 20])('%i simultaneous first questions all pass, and an unrelated query is not held up', async (n) => {
+          const scopes = await Promise.all(Array.from({ length: n }, () => account()));
+          // Each ask reads its scope in the synchronous start of the action, so switching it between calls is safe.
+          const asks = scopes.map((scope) => {
+            as(scope);
+            return ask(newPic());
+          });
+          // Somebody else's query while every one of those transactions is open.
+          const started = Date.now();
+          const bystander = prisma.$queryRaw<{ one: number }[]>`SELECT 1 AS one`.then((rows) => ({ rows, ms: Date.now() - started }));
+          const answers = await Promise.all(asks);
+          const seen = await bystander;
+          expect(answers.filter((a) => a.ok)).toHaveLength(n);
+          expect(seen.rows).toEqual([{ one: 1 }]);
+          // Held up, it waited for the others to fail: more than the pool's 1 s wait.
+          expect(seen.ms).toBeLessThan(slack(900));
+          expect((await budgetRow())?.count).toBe(n);
+        }, 60_000);
+      });
+
+      describe('a failure on our side gives the hourly allowance back (review item 3)', () => {
+        it('does not charge the asker for a budget that could not be reached, and does not skip the ceiling', async () => {
+          const scope = await account();
+          as(scope);
+          const spend = vi.mocked(spendUnsolicitedPicLookup);
+          for (let i = 0; i < PIC_LOOKUPS_PER_HOUR_UNSOLICITED + 1; i++) {
+            spend.mockRejectedValueOnce(new Error('timeout exceeded when trying to connect'));
+            expect(await ask(newPic())).toEqual({ ok: false, error: 'failed' });
+          }
+          // Nothing was spent, nothing saved, and the whole allowance is still there.
+          expect(await budgetRow()).toBeNull();
+          expect((await prisma.tenant.findUnique({ where: { id: scope.tenantId }, select: { pic: true } }))?.pic).toBeNull();
+          for (let i = 0; i < PIC_LOOKUPS_PER_HOUR_UNSOLICITED; i++) expect(await ask(newPic())).toMatchObject({ ok: true });
+          expect(await ask(newPic())).toEqual(limited);
+          expect((await budgetRow())?.count).toBe(PIC_LOOKUPS_PER_HOUR_UNSOLICITED);
+        });
+
+        it('still charges an answered question: only a failure gives it back', async () => {
+          as(await account());
+          await setBudget(PIC_UNSOLICITED_LOOKUPS_PER_DAY);
+          for (let i = 0; i < PIC_LOOKUPS_PER_HOUR_UNSOLICITED; i++) expect(await ask(newPic())).toEqual(limited);
+          // The day is spent and the user's three are spent with it: the fourth is refused by the hourly limit.
+          const spend = vi.mocked(spendUnsolicitedPicLookup);
+          const before = spend.mock.calls.length;
+          expect(await ask(newPic())).toEqual(limited);
+          expect(spend.mock.calls.length).toBe(before);
+        });
+      });
+
+      describe('the "yes" to a confirmation is the same question for ten minutes (review Ö-2)', () => {
+        afterEach(() => {
+          vi.useRealTimers();
+        });
+
+        it('is not counted again at 9 min 59 s, and is counted again once the ten minutes are over', async () => {
+          // Noon UTC of today, so ten minutes later is still the same budget day.
+          const noon = new Date(`${budgetDay(new Date())}T12:00:00.000Z`).getTime();
+          const listed = await cordisOrg('Listed Org');
+          const other = await cordisOrg('Other Listed Org');
+          vi.useFakeTimers({ toFake: ['Date'] });
+
+          vi.setSystemTime(noon);
+          as(await account());
+          expect(await ask(listed)).toMatchObject({ error: 'picConfirmationRequired' });
+          vi.setSystemTime(noon + 10 * 60_000 - 1000);
+          expect(await ask(listed, { confirmedPic: listed })).toMatchObject({ ok: true });
+          expect((await budgetRow())?.count).toBe(1); // the question and its "yes" are one
+
+          vi.setSystemTime(noon);
+          as(await account());
+          expect(await ask(other)).toMatchObject({ error: 'picConfirmationRequired' });
+          expect((await budgetRow())?.count).toBe(2);
+          vi.setSystemTime(noon + 10 * 60_000 + 1);
+          expect(await ask(other, { confirmedPic: other })).toMatchObject({ ok: true });
+          expect((await budgetRow())?.count).toBe(3); // too late: a question of its own
+        });
+      });
+
+      describe('a spent day tells the operator once (review Ö-3)', () => {
+        const alerts = () => prisma.systemAlert.findMany({ where: { source: 'pic-budget' }, orderBy: { createdAt: 'asc' } });
+        const clearAlerts = async () => {
+          resetPicBudgetAlertMemo();
+          await prisma.systemAlert.deleteMany({ where: { id: { in: presentIds((await alerts()).map((a) => a.id)) } } });
+        };
+        beforeEach(clearAlerts);
+        afterEach(clearAlerts);
+
+        it('writes one open alert for the day however many accounts are turned away, with no PIC and no tenant in it', async () => {
+          const secret = await cordisOrg('Listed Org');
+          await setBudget(PIC_UNSOLICITED_LOOKUPS_PER_DAY);
+          const turnedAway = await Promise.all(Array.from({ length: 4 }, () => account()));
+          for (const scope of turnedAway) {
+            as(scope);
+            expect(await ask(secret)).toEqual(limited);
+          }
+          const rows = await alerts();
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({ level: 'warn', resolvedAt: null });
+          expect(rows[0]?.meta).toMatchObject({ day: budgetDay(new Date()), ceiling: PIC_UNSOLICITED_LOOKUPS_PER_DAY });
+          const written = JSON.stringify(rows);
+          expect(written).not.toContain(secret);
+          for (const scope of turnedAway) {
+            expect(written).not.toContain(scope.tenantId);
+            expect(written).not.toContain(scope.userId);
+          }
+        });
+
+        it('folds another process (or a restart) into the same row, and says nothing while the day still has questions', async () => {
+          await setBudget(PIC_UNSOLICITED_LOOKUPS_PER_DAY - 1);
+          as(await account());
+          expect(await ask(newPic())).toMatchObject({ ok: true }); // the last question of the day is not an alert
+          expect(await alerts()).toHaveLength(0);
+
+          as(await account());
+          expect(await ask(newPic())).toEqual(limited);
+          resetPicBudgetAlertMemo(); // a second process that has not alerted today
+          as(await account());
+          expect(await ask(newPic())).toEqual(limited);
+          const rows = await alerts();
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.meta).toMatchObject({ alertRepeatCount: 2 });
+        });
+
+        it('does not alert for a pilot, which does not spend the budget', async () => {
+          await setBudget(PIC_UNSOLICITED_LOOKUPS_PER_DAY);
+          as(await account({ subscription: { create: pilot } }));
+          expect(await ask(newPic())).toMatchObject({ ok: true });
+          expect(await alerts()).toHaveLength(0);
+        });
+      });
+
+      describe('the refusal cap leaves one summary row a day (review Ö-4)', () => {
+        const capped = (tenant: string) => prisma.auditEvent.findMany({ where: { tenantId: tenant, type: 'tenant.pic.refusal.capped' } });
+
+        it('writes a single summary for the day the cap was reached, however many asks follow, and no PIC in it', async () => {
+          const held = await cordisOrg('Held Org');
+          await otherTenantHolding(held);
+          const scope = await account({ subscription: { create: pilot } });
+          for (let i = 0; i < PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY + 5; i++) {
+            as({ ...scope, userId: `${scope.userId}-${i}` });
+            expect(await ask(held)).toEqual({ ok: false, error: 'picTaken' });
+          }
+          const summary = await capped(scope.tenantId);
+          expect(summary).toHaveLength(1);
+          expect(summary[0]?.data).toEqual({ reason: 'picTaken', cap: PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY });
+          expect(JSON.stringify(summary)).not.toContain(held);
+          // The cap itself did not move: the refusal rows are still exactly the cap.
+          expect(await prisma.auditEvent.count({ where: { tenantId: scope.tenantId, type: 'tenant.pic.refused' } })).toBe(
+            PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY
+          );
+        });
+
+        it('writes nothing extra while the cap is not reached, and starts a new summary on a new day', async () => {
+          const held = await cordisOrg('Held Org');
+          await otherTenantHolding(held);
+          const scope = await account({ subscription: { create: pilot } });
+          as(scope);
+          expect(await ask(held)).toEqual({ ok: false, error: 'picTaken' });
+          expect(await capped(scope.tenantId)).toHaveLength(0);
+
+          const yesterday = new Date(Date.now() - 36 * 3_600_000);
+          const other = await account({ subscription: { create: pilot } });
+          await prisma.auditEvent.createMany({
+            data: [
+              ...Array.from({ length: PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY }, () => ({
+                tenantId: other.tenantId, type: 'tenant.pic.refused', data: { pic: held, reason: 'picTaken' },
+              })),
+              { tenantId: other.tenantId, type: 'tenant.pic.refusal.capped', data: { reason: 'picTaken', cap: 50 }, createdAt: yesterday },
+            ],
+          });
+          as(other);
+          expect(await ask(held)).toEqual({ ok: false, error: 'picTaken' });
+          expect(await ask(held)).toEqual({ ok: false, error: 'picTaken' });
+          expect(await capped(other.tenantId)).toHaveLength(2); // yesterday's and today's, not yesterday's alone
+        });
       });
     });
 
