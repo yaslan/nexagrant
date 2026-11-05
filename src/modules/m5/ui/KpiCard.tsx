@@ -81,7 +81,7 @@ export function KpiCard({
           <span
             className={
               unmeasured
-                ? 'text-base font-medium text-gray-500 dark:text-gray-400'
+                ? 'text-base font-medium text-gray-600 dark:text-gray-400'
                 : 'text-3xl font-bold text-gray-900 dark:text-white'
             }
           >
