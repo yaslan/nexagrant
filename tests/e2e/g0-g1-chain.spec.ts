@@ -263,11 +263,13 @@ async function addSeat(page: Page, id: string, roleKey: keyof typeof CONSORTIUM_
 async function findAndInvite(page: Page, seatId: string, roleKey: keyof typeof CONSORTIUM_ROLES, organizationId?: string) {
   const card = page.getByTestId(`m8-builder-seat-${roleKey}`);
   await card.getByRole('button', { name: /Aday Bul/ }).click();
-  // The list names an organisation by its PIC until the page is reloaded.
+  // The search revalidates the page: a row shows the PIC, then the organisation's name once the
+  // refresh lands. Which one a slow run sees is a race, so the row is found by either, and the
+  // database below says which organisation the click actually invited.
   const invite = organizationId
     ? card
         .locator('div')
-        .filter({ hasText: organizationId })
+        .filter({ hasText: new RegExp(`${organizationId}(?!\\d)|G0G1 E2E Org ${PICS.indexOf(organizationId) + 1}(?!\\d)`) })
         .filter({ has: page.getByRole('button', { name: 'Davet Et' }) })
         .last()
         .getByRole('button', { name: 'Davet Et' })
@@ -279,10 +281,12 @@ async function findAndInvite(page: Page, seatId: string, roleKey: keyof typeof C
       timeout: 30_000,
     })
     .toBe('INVITED');
-  dump(`koltuk davet edildi ${roleKey}`, await prisma.consortiumSeat.findUnique({
+  const invited = await prisma.consortiumSeat.findUniqueOrThrow({
     where: { id: seatId },
     select: { roleKey: true, status: true, organizationId: true },
-  }));
+  });
+  dump(`koltuk davet edildi ${roleKey}`, invited);
+  if (organizationId) expect(invited.organizationId).toBe(organizationId);
 }
 
 const seatRow = (id: string) =>
