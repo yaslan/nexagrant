@@ -186,7 +186,9 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
    kuralı yalnız ortak (`partner`) rolüne uygulanır; boş koltuk her rolde puan vermez, bu yüzden
    koordinatör ve rolü boş kayıtların puanı da yalnız boş koltuk yüzünden düşer. CORDIS verisi yoksa
    kural uygulanmaz: PIC yok **ve** CORDIS tablosu boşsa `cordis = null`. PIC yok ama tablo doluysa
-   kural uygulanır (PIC'siz ortak CORDIS'te kayıt bulamaz). Kapsam dışı olan yalnız boş tablodur.
+   kural uygulanır (PIC'siz ortak CORDIS'te kayıt bulamaz). **Bu paragraf 2026-11-05 PIC kuralıyla
+   değişti:** PIC boşsa kural uygulanmaz (aşağıdaki "FO-382 PIC kuralı" bölümü). Kapsam dışı olan yalnız
+   boş tablodur.
    Boş koltuk (`OPEN`, `DECLINED`) hiçbir rolde puan vermez (K-576987 = A).
 
 **Koltuk varsayımı.** Örneklerde koltuk bilgisi yok. Bu yüzden her örnek iki ayrı varsayımla koşuldu:
@@ -235,3 +237,39 @@ Yani kuralın etkisi tamamen koltuk durumuna bağlı; gerçek koltuk verisi olma
 
 *Not:* Önceki FO-382 notu (2026-11-05 öncesi) yalnız D varsayımını gösteriyordu; "8 karar değişiyor"
 doğruydu ama koltuk boşken kural bu geçişi geri alır. Mevcut tablo iki varsayımı ayrı verir.
+
+## FO-382 PIC kuralı (2026-11-05): "PIC boşsa kolaylık yok"
+
+Patron kararı: paydadan çıkarma (75) yalnız PIC girilmiş ve o PIC için CORDIS kaydı çıkmamış ortağa
+uygulanır. PIC boş ortak standart hesapta (/100) kalır. Gerekçe: birleşik ağaçta ölçüm
+(`docs/agent-results/FO-384-crw2-fb.md`), PIC kaldırınca partner puanı 53,08'den 69,11'e çıkıyordu.
+
+**Ölçüm.** Ayrı bir betik (repo dışı, `scratchpad`) `computeG0FromSnapshot` ile koştu; DB yok, saf
+hesap. Kullanılan girdi: `Discover` = uyum 100, taban oran %22, bütçe 6 M EUR, lump-sum ve iki aşamalı;
+`sıradan konu` = uyum 60, taban oran %10, aynı bütçe ve bayraklar. Koltuk "dolu" = iki koltuk `INVITED`
+(araştırma + son kullanıcı), "boş" = iki koltuk `OPEN`.
+
+| Senaryo | Puan | Payda | `scoringBasis` | Hariç özellikler | Kapı nedeni |
+|---|---:|---:|---|---|---|
+| Discover, PIC yok, koltuk dolu | 75 | 100 | standard | — | geçer (≥ 70) |
+| Discover, PIC var kayıt yok, koltuk dolu | 100 | 75 | no_history_evidence | coordinatorHistory, networkCentrality | geçer |
+| Discover, PIC yok, koltuk boş | 63 | 100 | standard | — | `G0_SCORE_BELOW` |
+| Discover, PIC var kayıt yok, koltuk boş | 84 | 75 | no_history_evidence | coordinatorHistory, networkCentrality | `G0_NO_HISTORY_NO_FILLED_SEAT` |
+| Sıradan konu, PIC yok, koltuk dolu | 55,5 | 100 | standard | — | `G0_SCORE_BELOW` |
+| Sıradan konu, PIC var kayıt yok, koltuk dolu | 74 | 75 | no_history_evidence | coordinatorHistory, networkCentrality | `G0_ALIGNMENT_BELOW` |
+
+**Okuma.**
+- PIC kaldırmak puanı yükseltmez: Discover 100 → 75, sıradan konu 74 → 55,5. Patron şartı sağlanır.
+- PIC'siz ortak, iki koltuk dolu ise Discover'da 75 ile **geçer**. Dolu koltuk sert kuralı (K-576980)
+  PIC'siz ortağa uygulanmaz, çünkü kural yalnız geçmişsiz (PIC'li, kaydı yok) ortağa bağlı. Yeni bir kural
+  eklenmedi. Karar lidere: PIC'siz dolu koltuklu ortak geçsin mi?
+- Sıradan konu PIC'siz dolu koltukla 55,5 alır ve geçmez. Bu, eski `/100` tabanındaki 55 ile aynı.
+
+**Tabloya göre sert kuralın PIC'siz ortağa etkisi.** `no_history` sert kuralı (`G0_NO_HISTORY_NO_FILLED_SEAT`)
+PIC'siz ortakta hiç tetiklenmez. Boş koltukta PIC'siz ortak `G0_SCORE_BELOW` ile düşer; kural değil puan
+belirler.
+
+**Açık risk (kod yazılmadı).** Kayıtsız bir PIC numarası yazan ortak kolaylık alır, çünkü PIC beyana dayanır
+ve CORDIS'te olup olmadığı doğrulanmaz. Reddedilen PIC'siz ortağa ekranda ne görüneceği FE işidir (FO-391).
+`scoringBasis` değerleri: `standard` (PIC yok ya da CORDIS dolu ve kayıt var) ve `no_history_evidence`
+(PIC var, kayıt yok).
