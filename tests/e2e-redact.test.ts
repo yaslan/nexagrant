@@ -63,6 +63,22 @@ describe('e2e process listing redaction (FO-385)', () => {
     expect(redact("SECRET='x y")).toBe('SECRET=***');
   });
 
+  // FO-388: service-role / private / api-key names were not in the list (SUPABASE_SERVICE_ROLE leaked).
+  it('masks SUPABASE_SERVICE_ROLE=value (ROLE is a secret name)', () => {
+    expect(redact('SUPABASE_SERVICE_ROLE=eyJabc node')).toBe('SUPABASE_SERVICE_ROLE=*** node');
+  });
+
+  it('masks PRIVATE=value and APIKEY=value', () => {
+    expect(redact('PRIVATE_KEY_ID=abc node')).toBe('PRIVATE_KEY_ID=*** node');
+    expect(redact('PRIVATE=abc node')).toBe('PRIVATE=*** node');
+    expect(redact('APIKEY=abc node')).toBe('APIKEY=*** node');
+  });
+
+  it('masks --service-role value and --private-key=value', () => {
+    expect(redact('node x --service-role eyJabc --port 3400')).toBe('node x --service-role *** --port 3400');
+    expect(redact('node x --private-key=abc')).toBe('node x --private-key=***');
+  });
+
   it('masks COOKIE=session=value', () => {
     expect(redact('COOKIE=session=abcdef node')).toBe('COOKIE=*** node');
   });
