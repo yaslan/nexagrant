@@ -23,6 +23,7 @@ import { toTenantProvince, provinceAppliesTo } from '@/lib/province';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
+import { rescoreTenantG0AfterPicChange, type PicChangeTrigger } from '@/lib/scoring/g0-rescore-tenant';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 import { DEFAULT_TRL_RANGE, parseKeywords } from './profile-fields';
 
@@ -293,7 +294,10 @@ export async function updateTenantProfile(
 
     const profileChanged = Object.values(fields).some((value) => value !== undefined);
 
-    return await withTenant(scope.tenantId, async (tx) => {
+    // FO-384: set by the PIC write below; the rescore runs after that transaction has committed.
+    let picChange: { trigger: PicChangeTrigger; auditEventId: string } | null = null;
+
+    const outcome = await withTenant(scope.tenantId, async (tx) => {
       const existing = await tx.tenantProfile.findUnique({
         where: { tenantId: scope.tenantId },
         select: { capabilities: true, keywords: true, trlRange: true },
@@ -378,7 +382,7 @@ export async function updateTenantProfile(
 
       if (picPlan.kind === 'write') {
         await tx.tenant.update({ where: { id: scope.tenantId }, data: { pic: picPlan.to } });
-        await tx.auditEvent.create({
+        const audit = await tx.auditEvent.create({
           data: {
             tenantId: scope.tenantId,
             actorId: scope.userId,
@@ -386,6 +390,7 @@ export async function updateTenantProfile(
             data: { from: picPlan.from, to: picPlan.to, cordisName: picPlan.match?.name ?? null },
           },
         });
+        picChange = { trigger: picPlan.to === null ? 'tenant_cleared' : 'tenant_saved', auditEventId: String(audit.id) };
       }
 
       revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');
@@ -398,6 +403,11 @@ export async function updateTenantProfile(
             : { status: 'unmatched', value: picPlan.to };
       return { ok: true as const, pic };
     });
+
+    // FO-384: the stored G0 scores follow the PIC. Never rejects; a failure is an alert, not a
+    // refused save, because the PIC is already committed.
+    if (picChange) await rescoreTenantG0AfterPicChange(scope.tenantId, picChange);
+    return outcome;
   } catch (error) {
     return { ok: false, error: failureCode(error, 'failed') };
   }
