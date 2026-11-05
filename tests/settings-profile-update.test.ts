@@ -15,6 +15,7 @@ vi.mock('@/lib/tenant', () => ({
 
 import { prisma, withTenant } from '@/lib/db';
 import { updateTenantProfile, type UpdateProfileInput } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
+import { TenantPicChangedError, removeTenantPic } from '@/lib/tenant-pic-removal';
 import { requireId } from './helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -296,6 +297,7 @@ describe('updateTenantProfile action', () => {
       const id = `other-${suffix()}`;
       await prisma.tenant.create({ data: { id, name: 'Other', slug: `other-${suffix()}`, country: 'TR', orgType: 'SME', pic, deletedAt } });
       otherTenants.push(id);
+      return id;
     };
 
     it('leaves the stored PIC alone when the field is absent', async () => {
@@ -377,6 +379,50 @@ describe('updateTenantProfile action', () => {
       expect(result).toEqual({ ok: false, error: 'picTaken' });
       expect(await storedPic()).toBeNull();
       expect(await picAudits()).toHaveLength(0);
+    });
+
+    // ── K-576942: the real owner's way back ───────────────────────────────────
+    describe('removeTenantPic', () => {
+      const removedAudits = () =>
+        prisma.auditEvent.findMany({ where: { tenantId, type: 'tenant.pic.removed' } });
+
+      it('clears the PIC, writes who, whose and what, and only that', async () => {
+        const pic = newPic();
+        await prisma.tenant.update({ where: { id: tenantId }, data: { pic } });
+        await removeTenantPic(tenantId, pic, userId, 'owner disputed');
+        expect(await storedPic()).toBeNull();
+        const audits = await removedAudits();
+        expect(audits).toHaveLength(1);
+        expect(audits[0]).toMatchObject({ tenantId, actorId: userId, data: { from: pic, note: 'owner disputed' } });
+      });
+
+      it('refuses a PIC the tenant no longer holds: the newer value stays and no audit row is written', async () => {
+        const seen = newPic();
+        const saved = newPic();
+        await prisma.tenant.update({ where: { id: tenantId }, data: { pic: saved } });
+        await expect(removeTenantPic(tenantId, seen, userId, 'stale')).rejects.toBeInstanceOf(TenantPicChangedError);
+        expect(await storedPic()).toBe(saved);
+        expect(await removedAudits()).toHaveLength(0);
+      });
+
+      it('touches no other tenant holding the same value', async () => {
+        const pic = newPic();
+        await prisma.tenant.update({ where: { id: tenantId }, data: { pic } });
+        const other = await otherTenantHolding(pic);
+        await removeTenantPic(tenantId, pic, userId, 'owner disputed');
+        expect((await prisma.tenant.findUnique({ where: { id: other }, select: { pic: true } }))?.pic).toBe(pic);
+      });
+
+      it('frees the PIC for the real owner', async () => {
+        owner();
+        const pic = newPic();
+        const holder = await otherTenantHolding(pic);
+        expect(await updateTenantProfile({ ...base, pic })).toEqual({ ok: false, error: 'picTaken' });
+        await removeTenantPic(holder, pic, userId, 'owner disputed');
+        expect(await updateTenantProfile({ ...base, pic })).toEqual({ ok: true, pic: { status: 'unmatched', value: pic } });
+        expect(await storedPic()).toBe(pic);
+        await prisma.auditEvent.deleteMany({ where: { tenantId: requireId(holder, 'holder') } });
+      });
     });
 
     it('lets one of two tenants win when both claim a PIC at the same moment', async () => {

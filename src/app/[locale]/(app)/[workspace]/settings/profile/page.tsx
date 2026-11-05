@@ -1,3 +1,4 @@
+import { BETA_SUPPORT_EMAIL } from '@/lib/beta/constants';
 import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import TenantProfileForm from './profile-form';
@@ -29,5 +30,5 @@ export default async function TenantProfilePage({ params }: { params: Promise<{ 
     };
   });
 
-  return <TenantProfileForm initial={initial} initialPic={pic} initialPicMatch={picMatch} />;
+  return <TenantProfileForm initial={initial} initialPic={pic} initialPicMatch={picMatch} supportEmail={BETA_SUPPORT_EMAIL} />;
 }

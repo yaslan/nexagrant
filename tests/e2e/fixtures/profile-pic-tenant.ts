@@ -19,6 +19,15 @@ export const PP_OWNER = { id: 'pp-e2e-owner', email: 'pp-e2e-owner@profile.test'
 export const PP_MEMBER = { id: 'pp-e2e-member', email: 'pp-e2e-member@profile.test', tenantId: PP_TENANT, role: 'MEMBER' };
 export const PP_OTHER_OWNER = { id: 'pp-e2e-other-owner', email: 'pp-e2e-other-owner@profile.test', tenantId: PP_OTHER_TENANT, role: 'TENANT_OWNER' };
 
+/** Staff. Its membership is on the other tenant: what opens the admin console is `User.isPlatformAdmin`. */
+export const PP_ADMIN = {
+  id: 'pp-e2e-admin',
+  email: 'pp-e2e-admin@profile.test',
+  tenantId: PP_OTHER_TENANT,
+  role: 'TENANT_OWNER',
+  isPlatformAdmin: true,
+};
+
 export const PP_PIC_MATCHED = '987654321';
 export const PP_PIC_UNMATCHED = '987654322';
 export const PP_ORG_NAME = 'PP E2E Teknoloji Enstitüsü';
@@ -31,7 +40,7 @@ const CALL_ID = 'pp-e2e-call';
 const TOPIC_ID = 'pp-e2e-topic';
 const TOPIC_IDENTIFIER = 'HORIZON-PPE2E-2026-01-D1-01';
 const ALL_ORGS = [PP_PIC_MATCHED, ...COLLABORATORS];
-const USER_IDS = [PP_OWNER.id, PP_MEMBER.id, PP_OTHER_OWNER.id];
+const USER_IDS = [PP_OWNER.id, PP_MEMBER.id, PP_OTHER_OWNER.id, PP_ADMIN.id];
 const TENANT_IDS = [PP_TENANT, PP_OTHER_TENANT];
 
 export async function teardownProfilePic() {
@@ -75,9 +84,11 @@ export async function setupProfilePic() {
         },
       });
     }
-    for (const user of [PP_OWNER, PP_MEMBER, PP_OTHER_OWNER]) {
+    for (const user of [PP_OWNER, PP_MEMBER, PP_OTHER_OWNER, PP_ADMIN]) {
       const workspaceId = user.tenantId === PP_TENANT ? PP_WORKSPACE_ID : PP_OTHER_WORKSPACE_ID;
-      await tx.user.create({ data: { id: user.id, email: user.email, name: user.id, locale: 'tr' } });
+      await tx.user.create({
+        data: { id: user.id, email: user.email, name: user.id, locale: 'tr', isPlatformAdmin: user === PP_ADMIN },
+      });
       await tx.membership.create({
         data: { tenantId: user.tenantId, userId: user.id, role: user.role as 'MEMBER', workspaceIds: [workspaceId] },
       });
@@ -147,12 +158,21 @@ export async function storedPic(tenantId: string): Promise<string | null> {
   return row?.pic ?? null;
 }
 
-export async function picAuditRows(tenantId: string) {
+export async function picAuditRows(tenantId: string, type = 'tenant.pic.updated') {
   return withSystemScope('platform-admin', 'e2e.profile-pic.audit', (tx) =>
     tx.auditEvent.findMany({
-      where: { tenantId, type: 'tenant.pic.updated' },
+      where: { tenantId, type },
       orderBy: { createdAt: 'asc' },
       select: { actorId: true, data: true },
     }),
   );
+}
+
+/** What the board and the metrics read for the opportunity, as opposed to a fresh computation. */
+export async function storedG0(tenantId: string, opportunityId: string) {
+  return withSystemScope('platform-admin', 'e2e.profile-pic.stored-g0', async (tx) => {
+    const opp = await tx.opportunity.findUnique({ where: { id: opportunityId }, select: { g0Score: true } });
+    const match = await tx.topicMatch.findFirst({ where: { tenantId, opportunityId }, select: { g0Score: true } });
+    return { opportunity: opp?.g0Score ?? null, topicMatch: match?.g0Score ?? null };
+  });
 }

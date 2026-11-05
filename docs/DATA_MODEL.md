@@ -922,7 +922,12 @@ Kurumsal Profil'den sahip/yönetici (`manage_users`) girer, değiştirir, temizl
 zorunlu), karşılığı yoksa kaydedilir ve geçmiş puanı eklenmeyeceği söylenir. Silinmemiş başka bir
 kiracıda duran PIC reddedilir; benzersizlik indeksi yok, yarışı PIC başına
 `pg_advisory_xact_lock` kapatır. Her değişiklik `AuditEvent: tenant.pic.updated`
-(`{ from, to, cordisName }`). Portaldaki gerçek sahiplik otomatik doğrulanmaz.
+(`{ from, to, cordisName }`). Portaldaki gerçek sahiplik otomatik doğrulanmaz. Red mesajı gerçek
+sahibi destek adresine yönlendirir; platform yöneticisi Admin → Kiracılar → kiracı detayından
+PIC'i kaldırır (K-576942): zorunlu not, yalnız ekranda görülen değer silinir, `AuditEvent:
+tenant.pic.removed` (`{ from, note }`, `actorId` = yönetici, `tenantId` = hedef kiracı). Kaldırma
+yeniden puanlama yapmaz: `Opportunity.g0Score` ve `TopicMatch.g0Score` bir sonraki yeniden
+hesaba kadar eski değerde kalır.
 
 **RLS.** `Tenant` sistem geneli bir tablodur (`tenantId` sütunu yok), `tenant_isolation`
 kapsamı dışındadır; `relrowsecurity = false`, politika 0. Yeni politika gerekmez.

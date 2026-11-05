@@ -27,10 +27,13 @@ export default function TenantProfileForm({
   initial,
   initialPic = null,
   initialPicMatch = null,
+  supportEmail,
 }: {
   initial: StoredTenantProfile | null;
   initialPic?: string | null;
   initialPicMatch?: PicCordisMatch | null;
+  /** Where the real owner of a PIC held by another account can write (K-576942). */
+  supportEmail: string;
 }) {
   const params = useParams();
   const locale = (params?.locale as string) || 'tr';
@@ -55,7 +58,7 @@ export default function TenantProfileForm({
   const [savedPic, setSavedPic] = useState(initialPic ?? '');
   const [savedPicMatch, setSavedPicMatch] = useState(initialPicMatch);
   const [picCleared, setPicCleared] = useState(false);
-  const [picError, setPicError] = useState('');
+  const [picError, setPicError] = useState<'invalid' | 'taken' | null>(null);
   const [pendingMatch, setPendingMatch] = useState<PicCordisMatch | null>(null);
   const picInputRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
@@ -67,7 +70,7 @@ export default function TenantProfileForm({
     setSaving(true);
     setSavedSuccess(false);
     setError('');
-    setPicError('');
+    setPicError(null);
     setPicCleared(false);
 
     const result = await updateTenantProfile({
@@ -101,7 +104,7 @@ export default function TenantProfileForm({
       requestAnimationFrame(() => confirmRef.current?.focus());
     } else if (result.error === 'picInvalid' || result.error === 'picTaken') {
       setPendingMatch(null);
-      setPicError(result.error === 'picInvalid' ? t('picErrorInvalid') : t('picErrorTaken'));
+      setPicError(result.error === 'picInvalid' ? 'invalid' : 'taken');
       picInputRef.current?.focus();
     } else {
       setPendingMatch(null);
@@ -234,7 +237,7 @@ export default function TenantProfileForm({
             aria-invalid={picError ? true : undefined}
             onChange={(e) => {
               setPic(e.target.value);
-              setPicError('');
+              setPicError(null);
               setPendingMatch(null);
               setPicCleared(false);
             }}
@@ -260,7 +263,18 @@ export default function TenantProfileForm({
             {picError && (
               <p role="alert" className="font-semibold text-bad flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
-                <span>{picError}</span>
+                <span>
+                  {picError === 'invalid'
+                    ? t('picErrorInvalid')
+                    : t.rich('picErrorTaken', {
+                        email: supportEmail,
+                        support: (chunks) => (
+                          <a href={`mailto:${supportEmail}`} className="underline underline-offset-2 break-all">
+                            {chunks}
+                          </a>
+                        ),
+                      })}
+                </span>
               </p>
             )}
             {!picError && picCleared && <p role="status" className="text-ink-2">{t('picClearedNotice')}</p>}
