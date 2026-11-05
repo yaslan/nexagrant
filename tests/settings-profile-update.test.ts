@@ -28,7 +28,9 @@ import {
   PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY,
   PIC_UNSOLICITED_LOOKUPS_PER_DAY,
 } from '@/lib/pic';
+import { DEFAULT_TRL_RANGE } from '@/app/[locale]/(app)/[workspace]/settings/profile/profile-fields';
 import { budgetDay, resetPicBudgetAlertMemo, spendUnsolicitedPicLookup } from '@/lib/pic-budget';
+import { embeddingHash, profileEmbeddingText } from '@/lib/scoring/embeddings';
 import { TenantPicChangedError, removeTenantPic } from '@/lib/tenant-pic-removal';
 import { presentIds, requireId } from './helpers/teardown-guard';
 import { slack } from './helpers/timing';
@@ -281,6 +283,169 @@ describe('updateTenantProfile action', () => {
     expect(profile?.keywords).toEqual(['AI', 'ML', 'Robotics']);
   });
   // ── FO-383: PIC ────────────────────────────────────────────────────────────
+  // FO-387: a field the form did not send is a field nobody changed.
+  describe('a save that sends only what changed', () => {
+    const stored = { capabilities: 'Stored capabilities', keywords: ['stored'], trlRange: [4, 7] };
+    const row = () => prisma.tenantProfile.findUniqueOrThrow({ where: { tenantId } });
+    const profileAudits = () =>
+      prisma.auditEvent.findMany({ where: { tenantId, type: 'tenant.profile.updated' }, orderBy: { createdAt: 'asc' } });
+
+    beforeEach(() => {
+      session.current = { tenantId, userId, role: 'TENANT_OWNER' };
+      tenantScope.current = { tenantId, userId, role: 'TENANT_OWNER' };
+    });
+
+    describe('with a stored profile', () => {
+      beforeEach(async () => {
+        await prisma.tenantProfile.create({ data: { tenantId, naceCodes: [], preferredRoles: [], ...stored } });
+      });
+
+      it.each([
+        ['capabilities', { capabilities: ' New ' }, { capabilities: 'New' }],
+        ['keywords', { keywords: 'a, b ,' }, { keywords: ['a', 'b'] }],
+        ['the TRL minimum', { trlMin: 2 }, { trlRange: [2, 7] }],
+        ['the TRL maximum', { trlMax: 9 }, { trlRange: [4, 9] }],
+      ])('writes %s and nothing else', async (_name, input, change) => {
+        expect(await updateTenantProfile(input)).toEqual({ ok: true });
+
+        const after = await row();
+        expect({ capabilities: after.capabilities, keywords: after.keywords, trlRange: after.trlRange }).toEqual({
+          ...stored,
+          ...change,
+        });
+        // The trail records what the row now holds, not only the part that was sent.
+        const audits = await profileAudits();
+        expect(audits).toHaveLength(1);
+        expect(audits[0]?.data).toEqual({ ...stored, ...change });
+      });
+
+      it('a PIC-only save leaves the row, its updatedAt and the trail alone', async () => {
+        const before = await row();
+
+        expect(await updateTenantProfile({ pic: '' })).toEqual({ ok: true });
+
+        expect((await row()).updatedAt).toEqual(before.updatedAt);
+        expect(await profileAudits()).toHaveLength(0);
+      });
+
+      it.each([
+        ['an empty capabilities', { capabilities: '   ' }],
+        ['keywords with no keyword in them', { keywords: ' , ' }],
+        ['a TRL out of range', { trlMax: 10 }],
+        ['a TRL that is not whole', { trlMin: 2.5 }],
+        ['a minimum over the maximum sent with it', { trlMin: 6, trlMax: 5 }],
+      ])('refuses %s and writes nothing', async (_name, input) => {
+        const before = await row();
+
+        expect(await updateTenantProfile(input)).toEqual({ ok: false, error: 'invalid' });
+
+        expect((await row()).updatedAt).toEqual(before.updatedAt);
+        expect(await profileAudits()).toHaveLength(0);
+      });
+
+      // FO-387 review, B1. Only the row makes this half of the range wrong, so the answer carries the
+      // row: the form may be stale, and without it the user is stuck until they reload the page.
+      it.each([
+        ['a minimum over the stored maximum', { trlMin: 8 }],
+        ['a maximum under the stored minimum', { trlMax: 3 }],
+      ])('refuses %s with its own code and the stored range, and writes nothing', async (_name, input) => {
+        const before = await row();
+
+        expect(await updateTenantProfile(input)).toEqual({ ok: false, error: 'trlRangeConflict', trlRange: [4, 7] });
+
+        expect((await row()).updatedAt).toEqual(before.updatedAt);
+        expect((await row()).trlRange).toEqual([4, 7]);
+        expect(await profileAudits()).toHaveLength(0);
+      });
+
+      it('a TRL conflict takes the text and the PIC down with it, and asks CORDIS nothing', async () => {
+        const before = await row();
+        const picRows = () =>
+          prisma.auditEvent.count({ where: { tenantId, type: { in: ['tenant.pic.updated', 'tenant.pic.refused'] } } });
+        const spend = vi.mocked(spendUnsolicitedPicLookup);
+        spend.mockClear();
+
+        expect(await updateTenantProfile({ keywords: 'draft', trlMax: 3, pic: '987654322' })).toEqual({
+          ok: false,
+          error: 'trlRangeConflict',
+          trlRange: [4, 7],
+        });
+
+        expect((await row()).keywords).toEqual(before.keywords);
+        expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })).pic).toBeNull();
+        expect(await picRows()).toBe(0);
+        // The refusal comes before the PIC plan: no lookup quota and no daily budget spent on it.
+        expect(spend).not.toHaveBeenCalled();
+        // The form sends no TRL on the next try: that one goes through.
+        expect(await updateTenantProfile({ keywords: 'draft', pic: '987654322' })).toMatchObject({ ok: true });
+        expect(await row()).toMatchObject({ keywords: ['draft'], trlRange: [4, 7] });
+        expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })).pic).toBe('987654322');
+      });
+
+      it('a refused PIC keeps the changed field out too', async () => {
+        const before = await row();
+
+        const result = await updateTenantProfile({ keywords: 'changed', pic: 'not-a-pic' });
+
+        expect(result.ok).toBe(false);
+        expect((await row()).keywords).toEqual(before.keywords);
+      });
+
+      // embeddings.ts drops a finished vector when updatedAt moved, and re-embeds when the text changed.
+      it('asks for a new embedding only when the embedded text changed', async () => {
+        const text = async () => {
+          const { capabilities, keywords } = await row();
+          return embeddingHash(profileEmbeddingText({ capabilities, keywords }));
+        };
+        const opened = await text();
+
+        await updateTenantProfile({ pic: '' });
+        expect(await text()).toBe(opened);
+        await updateTenantProfile({ trlMin: 2 });
+        expect(await text()).toBe(opened);
+        await updateTenantProfile({ keywords: 'changed' });
+        expect(await text()).not.toBe(opened);
+      });
+    });
+
+    describe('with no profile yet', () => {
+      const noRow = async () =>
+        expect(await prisma.tenantProfile.findUnique({ where: { tenantId } })).toBeNull();
+
+      it('a PIC-only save creates no row and no trail', async () => {
+        expect(await updateTenantProfile({ pic: '' })).toEqual({ ok: true });
+
+        await noRow();
+        expect(await profileAudits()).toHaveLength(0);
+      });
+
+      it.each([
+        ['capabilities alone', { capabilities: 'Only this' }],
+        ['keywords alone', { keywords: 'only, these' }],
+        ['a TRL alone', { trlMin: 2 }],
+      ])('refuses %s: a first row needs both texts', async (_name, input) => {
+        expect(await updateTenantProfile(input)).toEqual({ ok: false, error: 'invalid' });
+
+        await noRow();
+      });
+
+      it('refuses a minimum over the TRL the form shows by default', async () => {
+        expect(await updateTenantProfile({ capabilities: 'c', keywords: 'k', trlMin: 9 })).toEqual({
+          ok: false,
+          error: 'invalid',
+        });
+
+        await noRow();
+      });
+
+      it('creates the first row with the TRL the form shows by default', async () => {
+        expect(await updateTenantProfile({ capabilities: 'c', keywords: 'k' })).toEqual({ ok: true });
+
+        expect((await row()).trlRange).toEqual([DEFAULT_TRL_RANGE.min, DEFAULT_TRL_RANGE.max]);
+      });
+    });
+  });
+
   describe('PIC', () => {
     const base: UpdateProfileInput = { capabilities: 'Caps', keywords: 'AI', trlMin: 3, trlMax: 6 };
     const owner = () => {
