@@ -6,7 +6,7 @@
   "src/app/[locale]/(app)/[workspace]/evidence/evidence-client.tsx": 4,
   "src/app/[locale]/(app)/[workspace]/evidence/EvidenceForm.tsx": 18,
   "src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx": 3,
-  "src/app/[locale]/(app)/[workspace]/pipeline/board.tsx": 46,
+  "src/app/[locale]/(app)/[workspace]/pipeline/board.tsx": 39,
   "src/app/[locale]/(app)/[workspace]/settings/api-keys/client.tsx": 28,
   "src/app/[locale]/(public)/calls/page.tsx": 3,
   "src/app/[locale]/(public)/i18n-check/page.tsx": 7,

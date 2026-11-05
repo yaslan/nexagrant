@@ -8,6 +8,7 @@ import { PARTNER_SEARCH_FLAG_KEY, setPartnerSearchIngestionFlag } from '@/module
 import { runPartnerSearchIngestion } from '@/modules/m1/server/partner-search/ingestor';
 import { EMAIL_MASK, PHONE_MASK } from '@/modules/m1/server/partner-search/mask';
 import { runPartnerSearchRetention } from '@/modules/m1/server/partner-search/retention';
+import { assertAppConnection, isGithubActions, skipOrFailInCi, type RawQueryable } from './helpers/live-db-role';
 import { PARTNER_SEARCH_INGESTION_LOCK, holdTestDbLock } from './helpers/test-db-lock';
 
 /**
@@ -16,13 +17,15 @@ import { PARTNER_SEARCH_INGESTION_LOCK, holdTestDbLock } from './helpers/test-db
  * The portal is the only fake: `fetchImpl` answers from the masked fixture. Everything
  * else is real: Prisma, the flag row, the RawFetch / SystemAlert / run writes.
  *
- * Runs only on an isolated database. The `fabrika` name is refused outside CI
+ * Runs only on an isolated database. The `fabrika` name is refused outside GitHub Actions
  * (the shared dev DB), so point DATABASE_URL at a copy, e.g. `fabrika_fo60`.
  */
 const dbName = new URL(process.env.DATABASE_URL ?? 'postgresql://x/none').pathname.replace('/', '');
 const HAS_DB = Boolean(process.env.DATABASE_URL);
-const SHARED = dbName === 'fabrika' && process.env.CI !== 'true';
+const SHARED = dbName === 'fabrika' && !isGithubActions();
 const RUN = HAS_DB && !SHARED;
+if (!HAS_DB) skipOrFailInCi('partner-search-ingest.live', 'DATABASE_URL is not set');
+if (SHARED) skipOrFailInCi('partner-search-ingest.live', 'it flips the one global flag row; refusing the shared "fabrika" database');
 
 const FIXTURE = JSON.parse(
   readFileSync(path.join(process.cwd(), 'tests/fixtures/partner-search/topicOrganisations.sample.json'), 'utf8')
@@ -384,10 +387,38 @@ async function retentionCleanup() {
   await prisma.user.deleteMany({ where: { id: { in: [ADMIN_ID, NON_ADMIN_ID] } } });
 }
 
+/** The raw `pg` client behind the shape the live-db-role helpers read through. */
+function queryable(app: pg.Client): RawQueryable {
+  return { $queryRawUnsafe: (async (query: string) => (await app.query(query)).rows) as RawQueryable['$queryRawUnsafe'] };
+}
+
+/**
+ * FO-376: the writes through APP_URL must be refused with 42501. That holds only if APP_URL is the app role
+ * on the database `prisma` (DATABASE_URL) is on. A privileged role would apply them to a database nobody
+ * meant to touch; another database would make every assertion here measure the wrong one. Throws.
+ */
+async function assertAppUrlIsSafe(app: pg.Client): Promise<void> {
+  await assertAppConnection(queryable(app), prisma, 'partner-search-ingest.live (second connection)');
+}
+
+// Before any test of this file: a wrong DATABASE_URL_RLS_TEST breaks the whole file, not one test among
+// many. `withApp` checks again, on the very connection it is about to write through.
+beforeAll(async () => {
+  if (!RUN || !APP_URL) return;
+  const app = new pg.Client({ connectionString: APP_URL });
+  await app.connect();
+  try {
+    await assertAppUrlIsSafe(app);
+  } finally {
+    await app.end();
+  }
+});
+
 async function withApp<T>(fn: (app: pg.Client) => Promise<T>): Promise<T> {
   const app = new pg.Client({ connectionString: APP_URL });
   await app.connect();
   try {
+    await assertAppUrlIsSafe(app);
     return await fn(app);
   } finally {
     await app.end();

@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { tenantScopeOf, TenantScope, assertTenantActionWritable, assertTenantActionRole } from '@/lib/tenant';
-import { Gate } from '@prisma/client';
+import type { Gate } from '@prisma/client';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import {
@@ -22,6 +22,8 @@ import { withTenant } from '@/lib/db';
 import { findScopedWorkspace, isWorkspaceSlug } from '@/lib/workspaces';
 import { isDatabaseUnavailable } from '@/lib/db-unavailable';
 import { evaluateGate } from '@/lib/gates/evaluate';
+import type { GateReason } from '@/lib/gates/reasons';
+import { classifyStageMove, isStage, nextStageOf } from '@/lib/gates/transition';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 import {
   APPLICATION_DECLARATIONS,
@@ -78,7 +80,7 @@ const text = (max: number) => z.string().max(max).regex(/^[^\u0000-\u0008\u000b\
  * signature is not checked at runtime. A `workspaceSlug` of `{foo:1}`, `["ws-a"]`,
  * `7` or `"ws-a\u0000"` used to reach the workspace query and make it throw, and the
  * catch below buffered the row as if the database were down. Every field is now a
- * bounded string (or the Gate enum) before anything touches the database.
+ * bounded string before anything touches the database.
  */
 const CreateOpportunityInput = z.object({
   workspaceSlug: z.string().refine(isWorkspaceSlug),
@@ -87,9 +89,10 @@ const CreateOpportunityInput = z.object({
   intendedRole: text(50).optional(),
   ownerId: text(200).optional(),
   ownerName: text(200).optional(),
-  stage: z.nativeEnum(Gate).optional(),
   notes: text(10_000).optional(),
-});
+  // A new opportunity starts at G0 and nothing else. Strict, so a client that still names a stage
+  // is refused rather than quietly put somewhere it did not ask for.
+}).strict();
 
 /** B7 declaration input. */
 const DeclareInput = z.object({
@@ -166,7 +169,6 @@ export async function createOpportunity(input: {
   intendedRole?: string;
   ownerId?: string;
   ownerName?: string;
-  stage?: Gate;
   notes?: string;
 }) {
   const scope = await sessionScope();
@@ -180,7 +182,6 @@ export async function createOpportunity(input: {
     intendedRole = 'coordinator',
     ownerId,
     ownerName,
-    stage = 'G0',
     notes,
   } = parsed.data;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
@@ -217,7 +218,7 @@ export async function createOpportunity(input: {
     intendedRole,
     ownerId: ownerId || resolvedOwner?.id || userId,
     ownerName: ownerName || resolvedOwner?.name || null,
-    stage: stage || 'G0',
+    stage: 'G0',
     status: 'ACTIVE',
     // Scored below, from the opportunity's own evidence. This used to be
     // `Math.floor(Math.random() * 15 + 80)` — an invented 80–94 that the board displayed as a
@@ -277,7 +278,7 @@ export async function createOpportunity(input: {
           topicId: topicId ? topicId.trim() : null,
           intendedRole,
           ownerId: ownerId || userId || null,
-          stage: stage || 'G0',
+          stage: 'G0',
           status: 'ACTIVE',
           g0Score: null,
           notes: notes || null
@@ -439,37 +440,99 @@ export async function addOpportunityNote({
   return { success: true, note: noteObj };
 }
 
-export async function moveOpportunityStage(opportunityId: string, newStage: Gate) {
+/**
+ * What a stage move answers. `success` says the action ran; `passed` says the card may stand in the
+ * column it was dropped on. A refusal is a normal answer, an error is not: a database failure
+ * comes back as `success: false` and must never read as a move.
+ */
+export type MoveStageResult =
+  | { success: true; passed: true; reasons: string[] }
+  | { success: true; passed: false; reasons: string[]; reasonDetails?: GateReason[]; refusal?: 'STAGE_SKIP'; nextStage?: Gate }
+  | {
+      success: false;
+      error: 'TENANT_SCOPE_REQUIRED' | 'INVALID_INPUT' | 'OPPORTUNITY_NOT_FOUND' | 'STAGE_MOVE_FAILED';
+    };
+
+/**
+ * The pipeline board's drop.
+ *
+ * Forward to the next stage runs that stage's gate, and only the gate writes the stage. A skip is
+ * refused without running anything: the stages in between were never decided. Backward stays free
+ * and files no decision; the specification's reopen rules are separate work.
+ *
+ * The role check is `manage_workspaces` alone: rbac.ts grants `evaluate_gates` to the same roles.
+ */
+export async function moveOpportunityStage(opportunityId: string, newStage: Gate): Promise<MoveStageResult> {
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
   // Read-only once a free pilot has ended (src/lib/billing/pilot.ts).
   await assertTenantActionWritable(scope.tenantId);
   // The role half (rbac.ts; TASK-MUN80UOUPB2A4, FB GÜVENLİK Y-3).
   assertTenantActionRole(scope, 'manage_workspaces');
-  const { tenantId } = scope;
+  const { tenantId, userId } = scope;
   // Client-supplied: Prisma drops an `undefined` key from `where` (TASK-MUN2KUHP1BP18).
-  if (!isPresentId(opportunityId)) return { success: false as const, error: 'INVALID_INPUT' as const };
-
-  updateInMemoryOpportunityStage(tenantId, opportunityId, newStage);
-
-  try {
-    // `tenantId` is always part of the filter — an empty tenant clause here used
-    // to update the row whatever tenant it belonged to.
-    await withTenant(tenantId, (tx) =>
-      tx.opportunity.updateMany({
-        where: { id: opportunityId, tenantId },
-        data: { stage: newStage }
-      })
-    );
-  } catch (err) {
-    console.warn(`[moveOpportunityStage] DB update bypassed: ${errorMessage(err)}`);
+  if (!isPresentId(opportunityId) || !isStage(newStage)) {
+    return { success: false, error: 'INVALID_INPUT' };
   }
 
   try {
+    const owned = await findOwnedStage(tenantId, opportunityId);
+    // Also the answer for a row that lives only in the in-memory fallback: there is nothing on
+    // file for a gate to decide on, so it cannot move.
+    if (!owned) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
+
+    const move = classifyStageMove(owned.stage, newStage);
+    if (move === 'same') return { success: true, passed: true, reasons: [] };
+    if (move === 'skip') {
+      const nextStage = nextStageOf(owned.stage) ?? undefined;
+      return {
+        success: true,
+        passed: false,
+        refusal: 'STAGE_SKIP',
+        nextStage,
+        reasons: [`Cannot skip from ${owned.stage} to ${newStage}: ${nextStage} comes first`],
+      };
+    }
+
+    if (move === 'next') {
+      const gate = await evaluateGate(opportunityId, newStage, tenantId, userId || 'system');
+      revalidatePipeline();
+      if (!gate.passed) return { success: true, passed: false, reasons: gate.reasons, reasonDetails: gate.reasonDetails };
+    } else {
+      const { count } = await withTenant(tenantId, (tx) =>
+        tx.opportunity.updateMany({
+          where: { id: opportunityId, tenantId, deletedAt: null },
+          data: { stage: newStage },
+        }),
+      );
+      if (count === 0) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
+      revalidatePipeline();
+    }
+
+    updateInMemoryOpportunityStage(tenantId, opportunityId, newStage);
+    return { success: true, passed: true, reasons: [] };
+  } catch (err) {
+    // The raw driver message is kept in the server log, not handed to the browser.
+    console.warn(`[moveOpportunityStage] failed: ${errorMessage(err)}`);
+    return { success: false, error: 'STAGE_MOVE_FAILED' };
+  }
+}
+
+function findOwnedStage(tenantId: string, opportunityId: string) {
+  return withTenant<{ stage: Gate } | null>(tenantId, (tx) =>
+    tx.opportunity.findFirst({
+      where: { id: opportunityId, tenantId, deletedAt: null },
+      select: { stage: true },
+    }),
+  );
+}
+
+function revalidatePipeline() {
+  try {
     revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
+    revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
     revalidatePath('/[locale]/(app)/[workspace]/firsatlar', 'page');
   } catch {}
-  return { success: true };
 }
 
 /**
@@ -486,6 +549,10 @@ export async function moveOpportunityStage(opportunityId: string, newStage: Gate
  * answers this action can give (`OPPORTUNITY_NOT_FOUND` for an id that is not this tenant's or
  * lives only in the in-memory fallback, `GATE_EVALUATION_FAILED` for a gate that broke), and a
  * future third caller inherits the engine's guarantee rather than this file's.
+ *
+ * The engine writes `stage = gate` on a pass and trusts the gate it is handed, so the browser may
+ * only name the next gate or re-run the current one. Any other gate would be a way round the
+ * order: G4 passes on a G0 opportunity, and an old gate would pull a later one backward.
  */
 export async function evaluateOpportunityGate({
   opportunityId,
@@ -494,8 +561,11 @@ export async function evaluateOpportunityGate({
   opportunityId: string;
   gate: Gate;
 }): Promise<
-  | { success: true; passed: boolean; reasons: string[] }
-  | { success: false; error: 'TENANT_SCOPE_REQUIRED' | 'OPPORTUNITY_NOT_FOUND' | 'GATE_EVALUATION_FAILED' }
+  | { success: true; passed: boolean; reasons: string[]; reasonDetails?: GateReason[] }
+  | {
+      success: false;
+      error: 'TENANT_SCOPE_REQUIRED' | 'OPPORTUNITY_NOT_FOUND' | 'GATE_OUT_OF_ORDER' | 'GATE_EVALUATION_FAILED';
+    }
 > {
   const scope = await sessionScope();
   if (!scope) return NO_TENANT;
@@ -508,24 +578,19 @@ export async function evaluateOpportunityGate({
   if (!isPresentId(opportunityId)) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
 
   try {
-    const owned = await withTenant<{ id: string } | null>(tenantId, (tx) =>
-      tx.opportunity.findFirst({
-        where: { id: opportunityId, tenantId, deletedAt: null },
-        select: { id: true },
-      }),
-    );
+    const owned = await findOwnedStage(tenantId, opportunityId);
     // Also the honest answer for an opportunity that only exists in the in-memory fallback
     // buffer: there is nothing on file to evaluate, so no gate decision can be recorded.
     if (!owned) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
 
+    const move = classifyStageMove(owned.stage, gate);
+    if (move !== 'next' && move !== 'same') return { success: false, error: 'GATE_OUT_OF_ORDER' };
+
     const result = await evaluateGate(opportunityId, gate, tenantId, userId || 'system');
 
-    try {
-      revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
-      revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
-    } catch {}
+    revalidatePipeline();
 
-    return { success: true, passed: result.passed, reasons: result.reasons };
+    return { success: true, ...result };
   } catch (err) {
     // The raw driver message is kept in the server log, not handed to the browser.
     console.warn(`[evaluateOpportunityGate] failed: ${errorMessage(err)}`);

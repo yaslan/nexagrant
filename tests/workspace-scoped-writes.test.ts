@@ -239,9 +239,17 @@ describe('createOpportunity refuses what is not a workspace slug, before the dat
   });
 
   it('a well-formed request still lands in the permitted workspace (notes with newlines kept)', async () => {
-    const res = await call({ workspaceSlug: 'ws-b', title: 'Fırsat', notes: 'satır 1\nsatır 2\t.', stage: 'G1' });
+    const res = await call({ workspaceSlug: 'ws-b', title: 'Fırsat', notes: 'satır 1\nsatır 2\t.' });
     expect(res.success).toBe(true);
-    expect(db.created).toEqual([expect.objectContaining({ workspaceId: 'ws-b', stage: 'G1', notes: 'satır 1\nsatır 2\t.' })]);
+    expect(db.created).toEqual([expect.objectContaining({ workspaceId: 'ws-b', stage: 'G0', notes: 'satır 1\nsatır 2\t.' })]);
+  });
+
+  // NG-26: a stage records a gate already passed, so nothing starts past G0. A caller naming a
+  // stage is refused rather than quietly opened somewhere it did not ask for.
+  it.each(['G0', 'G1', 'G2', 'G3', 'G4'])('stage %s from the client → INVALID_INPUT, nothing written, nothing buffered', async (stage) => {
+    expect(await call({ workspaceSlug: 'ws-b', title: 'Fırsat', stage })).toEqual({ success: false, error: 'INVALID_INPUT' });
+    expect(db.created).toEqual([]);
+    expect(buffered).not.toHaveBeenCalled();
   });
 
   it('a query the database refuses is a refusal, not an outage: CREATE_FAILED, nothing buffered', async () => {

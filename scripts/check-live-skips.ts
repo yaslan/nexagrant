@@ -27,15 +27,14 @@ for (const p of v.problems) console.error(`  PROBLEM: ${p}`);
 for (const s of v.skipped) console.error(`  SKIPPED: ${s}`);
 if (!v.ok) {
   console.error('live-skip gate: FAILED — a live test did not run. In CI that is a false green; see scripts/live-skip-gate.ts.');
-  // TASK-MUOEY2GBFHY7U: a laptop run without `CI` skips on purpose the suites
-  // that refuse the shared "fabrika" database (`DB_NAME === 'fabrika' &&
-  // !isCi()`), and this gate then fails where GitHub Actions (which sets
-  // CI=true) passes. The verdict stays the same; the note says how to get the
-  // CI result.
-  const ci = (process.env.CI ?? '').trim().toLowerCase();
-  if (v.skipped.length > 0 && ['', '0', 'false'].includes(ci)) {
+  // TASK-MUOEY2GBFHY7U: a laptop run skips on purpose the suites that refuse the shared "fabrika"
+  // database (`DB_NAME === 'fabrika' && !isGithubActions()`), and this gate then fails where GitHub
+  // Actions (which sets GITHUB_ACTIONS=true) passes. The verdict stays the same; the note says how to get
+  // the CI result. FO-376: a hand-typed CI=true no longer opens them (it deleted rows from the shared
+  // database, FO-371), so the note is keyed on GITHUB_ACTIONS and names that variable.
+  if (v.skipped.length > 0 && process.env.GITHUB_ACTIONS !== 'true') {
     console.error(
-      'live-skip gate: note — CI is not set. Suites that guard the shared "fabrika" database skip outside CI; to reproduce the CI job run vitest with CI=true against a throwaway database.',
+      'live-skip gate: note — GITHUB_ACTIONS is not set. Suites that guard the shared "fabrika" database skip outside GitHub Actions; CI=true does not open them. To reproduce the CI job run vitest with GITHUB_ACTIONS=true against a throwaway database, never the shared one (m17-stale-runs.live also wants ALLOW_SWEEP_ON_SHARED_DB=1 if that database is named "fabrika").',
     );
   }
   process.exit(1);

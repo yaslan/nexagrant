@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
-import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
+import { M17_INTERREG_TEXT_PURGE_LOCK, holdTestDbLock } from './helpers/test-db-lock';
 import type { TenantTx } from '@/lib/db';
 import type { LlmCompletion, LlmGenerateOptions } from '@/lib/llm';
 
@@ -94,6 +95,8 @@ const users: string[] = [];
 let alice: Owner; // tenant A
 let bob: Owner; // tenant A, a colleague
 let carol: Owner; // tenant B
+/** Held for the whole file: the B4 mid-run test runs the cross-tenant purge, which would empty the text file's rows. */
+let releaseLock: (() => Promise<void>) | undefined;
 
 const doc = (text: string) => ({ format: 'TXT' as const, text, pages: null, chars: text.length });
 
@@ -173,9 +176,14 @@ beforeAll(async () => {
     return;
   }
   await assertRlsSubjectRole(state.rls, SUITE);
-  // The mid-run test runs the real purge, which works across every tenant by date: never on the shared database.
-  const dbRows = await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`;
-  if (dbRows[0]?.db === 'fabrika') {
+  // The mid-run test runs the real purge, which works across every tenant by date: never on the shared
+  // database. ci.yml's service container is also named `fabrika`, and it is a throwaway one.
+  const dbName = await usedDatabaseName(state.rls, admin, SUITE);
+  if (dbName === undefined) {
+    skipReason = 'could not read which database the RLS connection is on';
+    return;
+  }
+  if (dbName === 'fabrika' && !isGithubActions()) {
     skipReason = 'refusing to run the cross-tenant purge on the shared "fabrika" database';
     skipOrFailInCi(SUITE, skipReason);
     return;
@@ -188,10 +196,11 @@ beforeAll(async () => {
   }
   criterionKeys = rubric.criteria.map((c) => c.criterionKey);
   programCheckKeys = (rubric.programChecks as { key: string }[]).map((c) => c.key);
+  releaseLock = await holdTestDbLock(RLS_URL!, M17_INTERREG_TEXT_PURGE_LOCK);
   [alice, bob] = (await makeTenant('a', ['alice', 'bob'])) as [Owner, Owner];
   [carol] = (await makeTenant('b', ['carol'])) as [Owner];
   ready = true;
-});
+}, 300_000);
 
 beforeEach(async (ctx) => {
   if (!ready) ctx.skip(skipReason);
@@ -207,6 +216,7 @@ afterAll(async () => {
     await admin.user.deleteMany({ where: { id: { in: presentIds(users) } } }).catch(() => {});
   }
   await Promise.all([state.rls, admin].map((c) => c?.$disconnect().catch(() => {})));
+  await releaseLock?.();
 });
 
 

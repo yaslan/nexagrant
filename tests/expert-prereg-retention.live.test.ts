@@ -6,7 +6,7 @@ import { describe, test, expect, beforeAll, afterAll, afterEach, vi } from 'vite
  *
  * purgeOldExpertPreRegistrations() is the nightly job. It deletes by date across the
  * whole table, so on the shared local `fabrika` database it would delete other people's
- * rows. This file refuses to run there outside CI; point DATABASE_URL_RLS_TEST at a
+ * rows. This file refuses to run there outside GitHub Actions; point DATABASE_URL_RLS_TEST at a
  * throwaway database, as tests/public-lead.live.test.ts does.
  *
  * Founder numbers are seeded above the last one given, so the file never collides with
@@ -47,7 +47,7 @@ import { withSystemScope } from '@/lib/system-scope';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
 import { EXPERT_PREREG_PURGED, purgeOldExpertPreRegistrations } from '@/lib/expert-prereg/server/retention';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { acquireExpertPreRegLiveLock, holdFounderCounter } from './helpers/expert-prereg-live-lock';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -58,16 +58,10 @@ const REACHABLE =
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
-const DB_NAME = REACHABLE
-  ? ((await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`)[0]?.db ?? '')
-  : '';
-const SHARED = DB_NAME === 'fabrika' && !isCi();
-if (SHARED) {
-  console.warn(
-    `${SUITE} skipped: the purge deletes by date across the table; refusing to run on the shared "fabrika" database`
-  );
-}
-const HAS_DB = REACHABLE && !SHARED;
+const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
+if (SHARED) skipOrFailInCi(SUITE, 'the purge deletes by date across the table; refusing to run on the shared "fabrika" database');
+const HAS_DB = DB_NAME !== undefined && !SHARED;
 
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 

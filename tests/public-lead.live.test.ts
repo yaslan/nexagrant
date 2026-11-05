@@ -8,7 +8,7 @@ import { describe, test, expect, beforeAll, afterAll, afterEach, vi } from 'vite
  * purgeOldPublicLeads() is the nightly retention job, which deletes by date
  * across the whole table. On the shared local dev database that would delete
  * other people's rows, so this file refuses to run on a database named
- * `fabrika` outside CI — point DATABASE_URL / DATABASE_URL_RLS_TEST at a
+ * `fabrika` outside GitHub Actions — point DATABASE_URL / DATABASE_URL_RLS_TEST at a
  * throwaway database (docs/agent-results/TASK-MULR765AR5G0C-fe-fb.md §2).
  *
  * Singleton swap exactly as tests/invitation-retention.live.test.ts: the code
@@ -50,7 +50,7 @@ import {
 } from '@/lib/leads/public-lead';
 import { publicLeadCleanupTask } from '@/lib/jobs/tasks/public-lead-cleanup';
 import type { JobHelpers } from 'graphile-worker';
-import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const SUITE = 'public lead test';
@@ -60,14 +60,10 @@ const REACHABLE =
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 if (RLS_URL && !REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compose up -d`)');
 
-const DB_NAME = REACHABLE
-  ? ((await admin.$queryRaw<Array<{ db: string }>>`SELECT current_database()::text AS db`)[0]?.db ?? '')
-  : '';
-const SHARED = DB_NAME === 'fabrika' && !isCi();
-if (SHARED) {
-  console.warn(`${SUITE} skipped: the purge deletes by date across the table; refusing to run on the shared "fabrika" database`);
-}
-const HAS_DB = REACHABLE && !SHARED;
+const DB_NAME = REACHABLE ? await usedDatabaseName(prisma, admin, SUITE) : undefined;
+const SHARED = DB_NAME === 'fabrika' && !isGithubActions();
+if (SHARED) skipOrFailInCi(SUITE, 'the purge deletes by date across the table; refusing to run on the shared "fabrika" database');
+const HAS_DB = DB_NAME !== undefined && !SHARED;
 
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 

@@ -156,7 +156,10 @@
       "evaluateGate": "Evaluate Gate {gate}",
       "evaluating": "Evaluating…",
       "gatePassed": "Gate {gate} passed.",
-      "gateFailed": "Gate {gate} did not pass.",
+      "gateAdvanced": "Gate {gate} passed; the opportunity moved to stage {gate}.",
+      "gateFailed": "Gate {gate} did not pass; the opportunity stays at stage {stage}.",
+      "evaluateNextGate": "Evaluate gate {gate} and advance",
+      "finalStage": "Final stage: {gate}",
       "g0Score": "G0 Score",
       "g0NotComputed": "Not computed",
       "g0NotComputedHint": "There is no evidence to score this opportunity on yet. The score is computed once a topic match, a success rate or organisation history is on file.",
@@ -224,6 +227,7 @@
       "error": {
         "TENANT_SCOPE_REQUIRED": "Your session is not attached to a workspace. Please sign in again.",
         "OPPORTUNITY_NOT_FOUND": "This opportunity was not found in the database; the gate cannot be evaluated.",
+        "GATE_OUT_OF_ORDER": "This gate cannot be evaluated now: the opportunity's stage may have changed. Refresh the page.",
         "GATE_EVALUATION_FAILED": "The gate could not be evaluated. Please try again."
       },
       "application": {
@@ -272,7 +276,40 @@
     },
     "heading": "Opportunity & Proposal Pipeline",
     "subtitle": "Manage your proposals with the people in your workspace, from G0 triage feasibility through to G4 final submission.",
-    "createRefused": "Could not create the opportunity: you cannot write to this workspace, or it no longer exists."
+    "addToG0": "Add a new opportunity at G0",
+    "emptyG0": "Drag here or add one",
+    "emptyLater": "Drag here from the previous stage; the gate conditions are checked.",
+    "createRefused": "Could not create the opportunity: you cannot write to this workspace, or it no longer exists.",
+    "moved": "Opportunity moved to stage {stage}.",
+    "moveRefused": "“{title}” could not move to stage {stage}; it stayed where it was.",
+    "moveRefusedDismiss": "Close",
+    "moveSkipped": "Cannot skip from {from} to {to}: gate {next} has to pass first.",
+    "moveError": {
+      "TENANT_SCOPE_REQUIRED": "Your session is not linked to a workspace. Please sign in again.",
+      "INVALID_INPUT": "The stage could not be changed: invalid opportunity or stage.",
+      "OPPORTUNITY_NOT_FOUND": "This opportunity was not found in the database or has been archived; its stage cannot be changed.",
+      "STAGE_MOVE_FAILED": "The stage could not be changed. The opportunity stayed where it was; please try again."
+    }
+  },
+  "GateReason": {
+    "G0_NO_EVIDENCE": "The G0 score could not be calculated: there is no scoring evidence for this opportunity yet.",
+    "G0_SCORE_BELOW": "G0 composite score is {score}; the minimum is {min}.",
+    "G0_ALIGNMENT_BELOW": "Strategic alignment is {value}; the minimum is {min}.",
+    "G0_BASE_RATE_BELOW": "Base success rate is {value}%; the minimum is {min}%.",
+    "G0_COUNTRY_NOT_ELIGIBLE": "The country is not eligible for this call.",
+    "G1_G0_NOT_DECIDED": "G0 has not been passed: no G0 decision is on file for this opportunity.",
+    "G1_G0_LAST_FAILED": "G0 does not count as passed: its latest decision is a refusal. Run the G0 gate again.",
+    "G1_NO_CRITICAL_SEAT": "Consortium check failed: no critical role is defined for this opportunity.",
+    "G1_SEAT_NO_ORGANISATION": "Critical role not filled ({role}): the confirmed seat names no organisation.",
+    "G1_SEAT_NOT_FILLED": "Critical role not filled ({role}): seat status is {status}.",
+    "G1_NO_BACKUP": "Critical role has no backup candidate ({role}).",
+    "G2_OPEN_SEATS": "Consortium lock failed: {count, plural, one {# seat is} other {# seats are}} still open.",
+    "G3_CRITERION_BELOW": "Criterion score is {score}; at least {min} is required.",
+    "G3_TOTAL_BELOW": "Total evaluation score is {score}; at least {min} is required.",
+    "G4_STATUS_BLOCKED": {
+      "WITHDRAWN": "The opportunity was withdrawn; submission is not permitted.",
+      "REJECTED": "The opportunity was rejected; submission is not permitted."
+    }
   },
   "Evidence": {
     "title": "Evidence Pack",
@@ -948,6 +985,8 @@
       "g1Heading": "G1 · Role check",
       "g1Coordinator": "Coordinator history, when the intended role is coordinator",
       "g1Recorded": "Recorded with the decision; does not block the gate",
+      "g1CriticalSeats": "Every critical role filled",
+      "g1BackupCandidates": "A backup candidate for every critical role",
       "off": "Off",
       "g2Heading": "G2 · Consortium lock",
       "g2Seats": "Every consortium seat filled",

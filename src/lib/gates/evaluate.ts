@@ -3,11 +3,38 @@ import { withTenant, type TenantTx } from '../db';
 import { isPresentId } from '../required-id';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
+import type { GateReason } from './reasons';
 
 export type GateEvaluationResult = {
   passed: boolean;
+  /** English, for logs and the record. A screen shows `reasonDetails`. */
   reasons: string[];
+  /** The same refusals as codes, one per line of `reasons`. Absent when there is nothing to explain. */
+  reasonDetails?: GateReason[];
 };
+
+type G1Seat = {
+  id: string;
+  roleKey: string;
+  required: boolean;
+  status: string;
+  organizationId: string | null;
+  partnerOrgId: string | null;
+};
+type SeatCandidateRef = { seatId: string; organizationId: string | null; partnerOrgId: string | null };
+
+/** A CONFIRMED seat with no organisation confirms nobody (src/modules/m8/server/seat-transitions.ts). */
+function isSeatFilled(seat: G1Seat): boolean {
+  return seat.status === 'CONFIRMED' && Boolean(seat.organizationId || seat.partnerOrgId);
+}
+
+/** A backup is someone other than whoever holds the seat; the matcher can list the holder too. */
+function isBackupFor(candidate: SeatCandidateRef, seat: G1Seat): boolean {
+  return (
+    (candidate.organizationId !== null && candidate.organizationId !== seat.organizationId) ||
+    (candidate.partnerOrgId !== null && candidate.partnerOrgId !== seat.partnerOrgId)
+  );
+}
 
 /**
  * The opportunity is not visible to this tenant — it does not exist, or it belongs to someone else.
@@ -71,6 +98,12 @@ async function runGate(
   if (!isPresentId(opportunityId) || !isPresentId(tenantId)) throw new GateOpportunityNotFoundError(String(opportunityId), tenantId);
   let passed = true;
   const reasons: string[] = [];
+  const reasonDetails: GateReason[] = [];
+  const refuse = (text: string, detail: GateReason) => {
+    passed = false;
+    reasons.push(text);
+    reasonDetails.push(detail);
+  };
 
   const opp = await tx.opportunity.findFirst({
     where: { id: opportunityId, tenantId },
@@ -125,26 +158,87 @@ async function runGate(
         // Not a failure on merit: there is no evidence to score this opportunity on. Saying that
         // is the difference between "we assessed you and you fell short" and "we cannot assess
         // you yet"; the outcome (no pass) is unchanged either way.
-        passed = false;
-        reasons.push('G0 score could not be calculated: no scoring evidence for this opportunity yet');
+        refuse('G0 score could not be calculated: no scoring evidence for this opportunity yet', { code: 'G0_NO_EVIDENCE' });
         break;
       }
 
       if (rules.minScore !== null && g0Score < rules.minScore) {
-        passed = false;
-        reasons.push(`G0 composite score ${g0Score} is below minimum threshold ${rules.minScore}`);
+        refuse(`G0 composite score ${g0Score} is below minimum threshold ${rules.minScore}`, {
+          code: 'G0_SCORE_BELOW',
+          values: { score: g0Score, min: rules.minScore },
+        });
       }
 
       if (rules.minAlignment !== null && computation?.decision === 'NO_GO' && computation?.reasons?.length > 0) {
         passed = false;
         reasons.push(...computation.reasons);
+        // The composite is already explained above; the scorer's list repeats it.
+        reasonDetails.push(...computation.reasonDetails.filter((r) => r.code !== 'G0_SCORE_BELOW'));
       }
       break;
     }
     case 'G1': {
       const rules = DEFAULT_GATE_RULES.G1;
+
+      // A stage says which gate was passed, and an opportunity can stand at G0 before passing it, so
+      // only the decision on file can say G0 was passed. The latest one counts: the spec reopens a
+      // gate when its grounds change (02-Yazilim-Sartnamesi §12), so a fresh refusal outranks an
+      // older pass, and a fresh pass an older refusal. An erased row is no decision. Same transaction
+      // and tenant as the write below, so both ways into this gate read the same answer.
+      const latestG0 = await tx.gateDecision.findFirst({
+        where: { tenantId, opportunityId, gate: 'G0', deletedAt: null },
+        orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+        select: { passed: true },
+      });
+      inputs.latestG0Passed = latestG0?.passed ?? null;
+      if (!latestG0) {
+        refuse('G0 has not been passed: no G0 decision is on file', { code: 'G1_G0_NOT_DECIDED' });
+      } else if (!latestG0.passed) {
+        refuse('G0 has not been passed: its latest decision is a refusal', { code: 'G1_G0_LAST_FAILED' });
+      }
+
       if (rules.requireCoordinatorHistoryIfCoordinator && opp.intendedRole === 'coordinator') {
         inputs.coordinatorRoleCheck = true;
+      }
+
+      const criticalSeats = opp.seats.filter((s: G1Seat) => s.required);
+      inputs.criticalSeatsCount = criticalSeats.length;
+      if (criticalSeats.length === 0) {
+        // `required` defaults to true, so this is an opportunity nobody has put a consortium on.
+        // No critical role on file proves nothing about the roles being filled.
+        refuse('Consortium check failed: no critical seat is defined for this opportunity', { code: 'G1_NO_CRITICAL_SEAT' });
+      }
+
+      if (rules.requireCriticalSeatsFilled) {
+        const unfilled = criticalSeats.filter((s: G1Seat) => !isSeatFilled(s));
+        inputs.unfilledCriticalRoles = unfilled.map((s: G1Seat) => s.roleKey);
+        for (const seat of unfilled) {
+          if (seat.status === 'CONFIRMED') {
+            refuse(`Critical role ${seat.roleKey} is not filled: the confirmed seat names no organisation`, {
+              code: 'G1_SEAT_NO_ORGANISATION',
+              values: { role: seat.roleKey },
+            });
+          } else {
+            refuse(`Critical role ${seat.roleKey} is not filled: seat status is ${seat.status}`, {
+              code: 'G1_SEAT_NOT_FILLED',
+              values: { role: seat.roleKey, status: seat.status },
+            });
+          }
+        }
+      }
+
+      if (rules.requireBackupForCriticalSeats) {
+        const candidates: SeatCandidateRef[] = await tx.seatCandidate.findMany({
+          where: { tenantId, seatId: { in: criticalSeats.map((s: G1Seat) => s.id) } },
+          select: { seatId: true, organizationId: true, partnerOrgId: true },
+        });
+        const withoutBackup = criticalSeats.filter(
+          (s: G1Seat) => !candidates.some((c) => c.seatId === s.id && isBackupFor(c, s)),
+        );
+        inputs.criticalRolesWithoutBackup = withoutBackup.map((s: G1Seat) => s.roleKey);
+        for (const seat of withoutBackup) {
+          refuse(`Critical role ${seat.roleKey} has no backup candidate`, { code: 'G1_NO_BACKUP', values: { role: seat.roleKey } });
+        }
       }
       break;
     }
@@ -152,8 +246,10 @@ async function runGate(
       const rules = DEFAULT_GATE_RULES.G2;
       const openSeats = opp.seats.filter((s: { status: string }) => s.status === 'OPEN');
       if (rules.requireAllSeatsFilled && openSeats.length > 0) {
-        passed = false;
-        reasons.push(`Consortium lock failed: ${openSeats.length} seats are still OPEN`);
+        refuse(`Consortium lock failed: ${openSeats.length} seats are still OPEN`, {
+          code: 'G2_OPEN_SEATS',
+          values: { count: openSeats.length },
+        });
       }
       break;
     }
@@ -172,12 +268,16 @@ async function runGate(
         inputs.totalScore = totalScore;
 
         if (minScore < rules.minCriterionScore) {
-          passed = false;
-          reasons.push(`Criterion score ${minScore} is below minimum required ${rules.minCriterionScore}`);
+          refuse(`Criterion score ${minScore} is below minimum required ${rules.minCriterionScore}`, {
+            code: 'G3_CRITERION_BELOW',
+            values: { score: minScore, min: rules.minCriterionScore },
+          });
         }
         if (totalScore < rules.minTotalScore) {
-          passed = false;
-          reasons.push(`Total evaluation score ${totalScore} is below minimum required ${rules.minTotalScore}`);
+          refuse(`Total evaluation score ${totalScore} is below minimum required ${rules.minTotalScore}`, {
+            code: 'G3_TOTAL_BELOW',
+            values: { score: totalScore, min: rules.minTotalScore },
+          });
         }
       } else {
         inputs.mockEvaluation = true;
@@ -189,8 +289,10 @@ async function runGate(
       // gate only refuses withdrawn and rejected opportunities. Recorded in the
       // TASK-MTQ60SGW45T0X report rather than added silently.
       if (opp.status === 'WITHDRAWN' || opp.status === 'REJECTED') {
-        passed = false;
-        reasons.push(`Opportunity status is ${opp.status}, submission not permitted`);
+        refuse(`Opportunity status is ${opp.status}, submission not permitted`, {
+          code: 'G4_STATUS_BLOCKED',
+          values: { status: opp.status },
+        });
       }
       break;
     }
@@ -219,5 +321,5 @@ async function runGate(
     });
   }
 
-  return { passed, reasons };
+  return reasonDetails.length > 0 ? { passed, reasons, reasonDetails } : { passed, reasons };
 }

@@ -96,18 +96,18 @@ export async function seed() {
     },
   });
 
-  // G2 rather than G0: G0 refuses when the tenant has no scoring evidence on file, and a fixture
-  // tenant has none. G2 decides on seats, which the fixture can state outright — so the happy
+  // A stands at G1, so the detail button's next gate is G2 (NG-25). G2 rather than G0: G0 refuses
+  // when the tenant has no scoring evidence on file, and a fixture tenant has none. G2 decides on seats, which the fixture can state outright — so the happy
   // path measures the gate running and filing a decision, not the scorer's evidence coverage.
   await prisma.opportunity.upsert({
     where: { id: GATE_E2E.opportunityId },
-    update: { stage: 'G2', status: 'ACTIVE', deletedAt: null },
+    update: { stage: 'G1', status: 'ACTIVE', deletedAt: null },
     create: {
       id: GATE_E2E.opportunityId,
       tenantId: GATE_E2E.tenantId,
       workspaceId: GATE_E2E.workspaceId,
       title: 'Gate E2E — tenant A opportunity',
-      stage: 'G2',
+      stage: 'G1',
       status: 'ACTIVE',
       intendedRole: 'coordinator',
     },

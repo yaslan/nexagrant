@@ -14,6 +14,10 @@
  *      gate reports green having measured nothing. `skipOrFailInCi` warns
  *      locally and throws when `CI` is set.
  *
+ * A third way is specific to the suites that refuse the shared `fabrika`
+ * database: the name they checked was not the database they then ran on.
+ * `usedDatabaseName` reads it from the connection the suite's code uses.
+ *
  * Some live suites deliberately run as the app's own BYPASSRLS role, because
  * the property they measure is the application code's own guard and RLS would
  * hide the defect (tests/concept-template-tenant-scope.live.test.ts explains
@@ -45,6 +49,18 @@ export function isCi(env: NodeJS.ProcessEnv = process.env): boolean {
   );
 }
 
+/**
+ * True only on a GitHub Actions runner (`GITHUB_ACTIONS=true`, which the runner sets itself).
+ *
+ * This, not `isCi()`, is what lets a live suite run on a database named `fabrika`: that name
+ * is the shared dev database everywhere except ci.yml's service container. `isCi()` takes any
+ * `CI=1` typed in a shell, and with it 12 suites deleted rows from the shared database
+ * (measured, FO-371). `skipOrFailInCi` keeps `isCi()`: refusing to skip is the safe direction.
+ */
+export function isGithubActions(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.GITHUB_ACTIONS === 'true';
+}
+
 const DB_FIX =
   "Provide the database and DATABASE_URL_RLS_TEST (`pnpm db:rls-role`) in the CI job.";
 
@@ -57,7 +73,10 @@ export function skipOrFailInCi(suite: string, reason: string, fix = DB_FIX): voi
   if (isCi()) {
     throw new Error(`${suite}: refusing to skip in CI — ${reason}. ${fix}`);
   }
-  console.warn(`${suite} skipped: ${reason}`);
+  // process.stderr, not console.warn: vitest's `agent` reporter (chosen by itself when CLAUDECODE or
+  // AI_AGENT is set), `--silent` and the json-only and tap reporters all drop the console output of
+  // a file whose every test skipped, so the one line saying nothing ran went missing (measured, FO-357).
+  process.stderr.write(`WARNING ${suite} skipped: ${reason}\n`);
 }
 
 /**
@@ -108,6 +127,81 @@ export function isLocalDbUrl(url: string): boolean {
   }
 }
 
+type DbIdentity = { db: string; cluster: string };
+
+/**
+ * The line of an error that says why. Prisma's message opens with a blank line and then
+ * "Invalid `prisma.$queryRawUnsafe()` invocation:", neither of which does; the cause comes
+ * after them (measured, FO-366 F1).
+ */
+function errorCause(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const lines = e.message.split('\n').map((line) => line.trim()).filter(Boolean);
+  return lines.find((line) => !/^Invalid `.*` invocation/.test(line)) ?? lines[0] ?? e.name;
+}
+
+async function readDbIdentity(client: RawQueryable): Promise<DbIdentity> {
+  const rows = await client.$queryRawUnsafe<DbIdentity[]>(
+    'SELECT current_database()::text AS db, system_identifier::text AS cluster FROM pg_control_system()',
+  );
+  const identity = rows[0];
+  if (!identity) throw new Error("could not read the connected database's identity");
+  return identity;
+}
+
+/**
+ * The name to judge "is this the shared database?" by: the database of `used`,
+ * the connection the suite's code runs on, not of `fixtures`, the owner connection
+ * that builds its rows. A live suite swaps the singleton to DATABASE_URL_RLS_TEST
+ * and keeps the owner on DATABASE_URL, so with the two pointing apart a guard
+ * reading the owner approves one database and the sweep runs on the other (FO-356
+ * scenario I).
+ *
+ * Two connections on different databases, or the same name on different clusters,
+ * throw in CI and locally alike: the fixtures would not be where the code looks, so
+ * nothing the suite could report would mean anything. `used` being unreadable (a
+ * stale fabrika_app password, 28P01) is a skip: nothing ran.
+ *
+ * @returns the database name, or `undefined` when the suite must skip.
+ */
+export async function usedDatabaseName(
+  used: RawQueryable,
+  fixtures: RawQueryable,
+  suite: string,
+): Promise<string | undefined> {
+  let target: DbIdentity;
+  try {
+    target = await readDbIdentity(used);
+  } catch (e) {
+    const reason = `could not read which database it would run on (${errorCause(e)})`;
+    // 42501: the login worked but this role may not call pg_control_system() (a server that revoked
+    // it from PUBLIC). Re-creating the role, which is what DB_FIX says, would not change that.
+    if (e instanceof Error && e.message.includes('Code: `42501`')) {
+      skipOrFailInCi(
+        suite,
+        `${reason}; as a superuser run GRANT EXECUTE ON FUNCTION pg_control_system() TO the role of this connection`,
+        '`pnpm db:rls-role` does not grant this.',
+      );
+    } else {
+      skipOrFailInCi(suite, reason);
+    }
+    return undefined;
+  }
+  const other = await readDbIdentity(fixtures);
+  throwIfDifferentDatabase(suite, target, other);
+  return target.db;
+}
+
+function throwIfDifferentDatabase(suite: string, target: DbIdentity, other: DbIdentity): void {
+  if (target.db !== other.db || target.cluster !== other.cluster) {
+    throw new Error(
+      `${suite}: DATABASE_URL and DATABASE_URL_RLS_TEST point at different databases ` +
+        `(DATABASE_URL: "${other.db}" on cluster ${other.cluster}; DATABASE_URL_RLS_TEST: "${target.db}" on cluster ${target.cluster}). ` +
+        "Fixtures would go to one and the code under test would run on the other; point both at the same throwaway database.",
+    );
+  }
+}
+
 export async function readRole(client: RawQueryable): Promise<RoleFacts> {
   const rows = await client.$queryRawUnsafe<RoleFacts[]>(
     'SELECT current_user::text AS "user", rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user',
@@ -151,4 +245,26 @@ export async function assertAppOwnerRole(
     );
   }
   return role;
+}
+
+/**
+ * For a suite that opens a second connection of its own (a raw `pg` client on
+ * DATABASE_URL_RLS_TEST) and writes through it. Throws, never skips, unless `used` is on the same
+ * database and cluster as `fixtures` AND is a role RLS applies to: pointed at a privileged role on
+ * the shared database, the writes the suite expects to be refused would be applied (FO-371 §2).
+ * Call it before the first write.
+ */
+export async function assertAppConnection(
+  used: RawQueryable,
+  fixtures: RawQueryable,
+  suite: string,
+): Promise<RoleFacts> {
+  let target: DbIdentity;
+  try {
+    target = await readDbIdentity(used);
+  } catch (e) {
+    throw new Error(`${suite}: could not verify the second connection before writing through it (${errorCause(e)})`);
+  }
+  throwIfDifferentDatabase(suite, target, await readDbIdentity(fixtures));
+  return assertRlsSubjectRole(used, suite);
 }

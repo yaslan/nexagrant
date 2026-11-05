@@ -349,7 +349,13 @@ describe('the same paths still write one row when given a real id', () => {
     expect(await evidence.verifyEvidenceAction(ids.evidence[0]!, 'verified')).toEqual({ success: true });
     expect(await admin!.evidence.count({ where: { tenantId: t, status: 'verified' } })).toBe(1);
 
-    expect(await pipeline.moveOpportunityStage(ids.opp[0]!, 'G3' as never)).toEqual({ success: true });
+    // One step forward, as a real move has to be: G3 is the next stage after G2 (NG-25).
+    await admin!.opportunity.update({ where: { id: ids.opp[0]! }, data: { stage: 'G2' } });
+    expect(await pipeline.moveOpportunityStage(ids.opp[0]!, 'G3' as never)).toEqual({
+      success: true,
+      passed: true,
+      reasons: [],
+    });
     expect(await admin!.opportunity.count({ where: { tenantId: t, stage: 'G3' } })).toBe(1);
 
     expect(await updateNextStep(ids.rel[0]!, 'written', null)).toEqual({ success: true });
