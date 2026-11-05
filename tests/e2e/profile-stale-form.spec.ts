@@ -504,15 +504,20 @@ test.describe('FO-387 — a profile form left open', () => {
         success: 'başarıyla güncellendi',
         order: 'Kaydedilmedi. En düşük TRL (8) en yüksek TRL değerinden (7) büyük olamaz.',
         colleague: 'Başka biri',
+        typedMin: 'girdiğiniz en düşük TRL değeri 5 bununla',
+        typedMax: 'en yüksek TRL değeri',
       },
       en: {
         success: 'successfully updated',
         order: 'Not saved. The minimum TRL (8) cannot be higher than the maximum TRL (7).',
         colleague: 'Someone else',
+        typedMin: 'the minimum TRL of 5 you entered',
+        typedMax: 'maximum TRL of',
       },
     } as const;
     const VIEWS = [
       { locale: 'tr', width: 390, height: 844 },
+      { locale: 'tr', width: 768, height: 1024 },
       { locale: 'en', width: 1280, height: 720 },
     ] as const;
 
@@ -648,6 +653,35 @@ test.describe('FO-387 — a profile form left open', () => {
           await savedIn(page, locale);
           await expect(notice).toHaveCount(0);
           expect((await storedProfile(PP_TENANT))?.keywords).toEqual(['after nothing']);
+        });
+
+        test('N3: when only the minimum was sent, the refusal calls the minimum the one the user entered', async ({ page, browser }) => {
+          const first = await addOwner(`n3b-${locale}`);
+          const f = await open(page, first, url);
+          await colleagueSetsTrl(browser, `n3b-${locale}`, '2', '3');
+          const posts = profileSaves(page, 'trlMin');
+          const auditsBefore = await profileAudits(PP_TENANT);
+
+          // [5,7] is a valid range on the form, so it goes out; only the minimum was touched.
+          await f.trlMin.fill('5');
+          await f.saveButton.click();
+
+          const message = page.getByTestId(CONFLICT);
+          await expect(message).toBeVisible();
+          await expect(message).toContainText('2–3');
+          await expect(message).toContainText(COPY[locale].typedMin);
+          await expect(message).not.toContainText(COPY[locale].typedMax);
+          await expect(f.trlMin).toHaveValue('2');
+          await expect(f.trlMax).toHaveValue('3');
+          const row = await storedProfile(PP_TENANT);
+          probe(`N3b-min ${locale} ${width}`, { posts: posts.length, row, message: await message.innerText() });
+          expect(posts).toHaveLength(1);
+          // Only the minimum went out: the action's body carries an untouched end as "$undefined".
+          expect(posts[0]).toContain('"trlMin":5');
+          expect(posts[0]).toContain('"trlMax":"$undefined"');
+          expect(row?.trlRange).toEqual([2, 3]);
+          expect(await profileAudits(PP_TENANT)).toBe(auditsBefore);
+          await page.screenshot({ path: shot('n3b-min') });
         });
 
         test('N3: the refusal message goes once the user starts fixing the TRL fields', async ({ page, browser }) => {
