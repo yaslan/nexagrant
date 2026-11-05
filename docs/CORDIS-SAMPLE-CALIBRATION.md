@@ -168,3 +168,8 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 > ```bash
 > pnpm beta:esr-preflight
 > ```
+
+
+## FO-382 notu (2026-11-04)
+
+Bu tabloların özellik değerleri dokümanda yok, bu yüzden 17 örnek yeniden hesaplanmadı. Ürün kuralı ortak rolü için iki hesabı ayırır: CORDIS geçmişi olmayan ortakta skor `Σ(katkı)/75` olur (eski `/100` yerine). Sıfır geçmiş için tek fark paydadır; katkı toplamı değişmez, yani her örnekte skor ×100/75 büyür. Örnek: 63 → 84,00; 55 → 73,33. Bu büyüme ürün kararıdır; eşik 70 değişmedi. Kapı kararı değişen örnek sayısı DB ile ölçülmeli (`pnpm` kalibrasyon düzeneği) ve bu not henüz o sayıyla güncellenmedi.

@@ -34,7 +34,7 @@ function snapshotWithEvidence(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
     baseRatePct: 14,
     intendedRole: 'coordinator',
     seats: [{ roleKey: 'research', status: 'CONFIRMED' }],
-    cordis: { coordinationsInTopicFamily: 1, coordinationsOverall: 2, distinctCollaborators: 10 },
+    cordis: { coordinationsInTopicFamily: 1, coordinationsOverall: 2, distinctCollaborators: 10, participationsOverall: 3 },
     ...overrides,
   };
 }
@@ -62,6 +62,8 @@ interface FakeDb {
   collaborators?: { organisationId: string }[];
   opportunities?: { id: string; tenantId: string; topicId: string | null; intendedRole: string | null }[];
   seats?: { roleKey: string; status: string }[];
+  /** `true` simulates a CORDIS table with no rows at all (not imported yet). */
+  cordisTableEmpty?: boolean;
 }
 
 /**
@@ -107,6 +109,7 @@ function fakeClient(db: FakeDb) {
       findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
         'projectId' in where ? (db.collaborators ?? []) : (db.participations ?? []),
       ),
+      findFirst: vi.fn(async () => (db.cordisTableEmpty ? null : { projectId: 'any' })),
     },
     opportunity: {
       findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) =>
@@ -374,6 +377,37 @@ describe('loadG0Snapshot()', () => {
       coordinationsInTopicFamily: 1,
       coordinationsOverall: 2,
       distinctCollaborators: 2,
+      participationsOverall: 3,
+    });
+  });
+
+  it('reports missing CORDIS data (null), not a zero history, when the CORDIS table is empty (FO-382)', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: 'PIC-1' },
+      topics: [topicRow],
+      cordisTableEmpty: true,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1', topicId: 'topic-1', intendedRole: 'partner', seats: [],
+    });
+    expect(snapshot.cordis).toBeNull();
+  });
+
+  it('reports a measured empty history for a PIC with no row while the table has data (FO-382)', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: 'PIC-NEW' },
+      topics: [topicRow],
+      participations: [],
+      cordisTableEmpty: false,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1', topicId: 'topic-1', intendedRole: 'partner', seats: [],
+    });
+    expect(snapshot.cordis).toEqual({
+      coordinationsInTopicFamily: 0,
+      coordinationsOverall: 0,
+      distinctCollaborators: 0,
+      participationsOverall: 0,
     });
   });
 });

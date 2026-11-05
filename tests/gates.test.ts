@@ -336,7 +336,10 @@ describe('Gate Evaluation Engine (M5)', () => {
     const decisions = createCalls.map((call) => call[0]!.data.inputs);
     const passInputs = decisions.find((i: Record<string, unknown>) => i.opportunityId === 'opp-pass')!;
     expect(passInputs.calculatedG0Score).toBe(93);
-    expect(passInputs.g0Score).toBe(12); // the stale column, recorded but not used
+    // FO-382: `g0Score` now carries the score the gate used, so it cannot disagree with the
+    // evidence on the same record. The stale column value is kept under `g0ScoreStored`.
+    expect(passInputs.g0Score).toBe(93);
+    expect(passInputs.g0ScoreStored).toBe(12);
   });
 
   test('G0 gate writes the score breakdown into the decision record', async () => {

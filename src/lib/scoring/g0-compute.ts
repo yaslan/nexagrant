@@ -23,7 +23,7 @@ import type { JsonObject } from '@/types/json';
 import type { TenantTx } from '../db';
 import { withTenant } from '../db';
 import { isPresentId } from '../required-id';
-import { decideG0, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
+import { decideG0, weightsTotal, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
 import { DEFAULT_SCORING_WEIGHTS } from './defaults';
 import type { GateReason } from '../gates/reasons';
 import {
@@ -37,7 +37,7 @@ import {
 } from './g0-features';
 
 /** Bumped whenever the feature mapping changes, so a stored breakdown says which rules produced it. */
-export const G0_SCORING_VERSION = '2.0';
+export const G0_SCORING_VERSION = '2.1';
 
 export interface G0Computation {
   tenantId: string;
@@ -53,6 +53,27 @@ export interface G0Computation {
   sources: G0Source[];
   coverage: number;
   scoringVersion: string;
+  /** Which denominator produced `score` — see `G0Extraction.scoringBasis`. */
+  scoringBasis: 'standard' | 'no_history_evidence';
+  /** Features left out of the denominator (empty on the standard path). */
+  excludedFeatures: (keyof G0Features)[];
+  /** Sum of the weights actually scored; `score` is normalised by this. */
+  denominator: number;
+}
+
+/**
+ * The weights the composite is computed with: the tenant's (or default) weights with the excluded
+ * features set to 0. `scoreG0` and `g0Contributions` already normalise by the weight total, so the
+ * formula itself is unchanged — only the denominator moves.
+ */
+export function effectiveWeights(
+  weights: typeof DEFAULT_SCORING_WEIGHTS,
+  excluded: readonly (keyof G0Features)[],
+): typeof DEFAULT_SCORING_WEIGHTS {
+  if (excluded.length === 0) return weights;
+  const out = { ...weights };
+  for (const key of excluded) out[key] = 0;
+  return out;
 }
 
 /** What the score is computed *about* — an existing opportunity or one about to be created. */
@@ -132,7 +153,19 @@ async function loadCordisSnapshot(
       take: 500,
     });
   if (participations.length === 0) {
-    return { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0 };
+    // "No row for this PIC" is only a fact about the organisation when CORDIS itself is loaded.
+    // An empty table (not imported yet) is missing data, not a history of zero, so it stays null
+    // and the scorer keeps the standard basis instead of excluding every partner.
+    const anyRow: { projectId: string } | null = await client.cordisParticipation.findFirst({
+      select: { projectId: true },
+    });
+    if (!anyRow) return null;
+    return {
+      coordinationsInTopicFamily: 0,
+      coordinationsOverall: 0,
+      distinctCollaborators: 0,
+      participationsOverall: 0,
+    };
   }
 
   const family = topicIdentifier ? topicPrefixOf(topicIdentifier) : null;
@@ -153,6 +186,7 @@ async function loadCordisSnapshot(
     coordinationsInTopicFamily,
     coordinationsOverall: coordinations.length,
     distinctCollaborators: collaborators.length,
+    participationsOverall: participations.length,
   };
 }
 
@@ -265,7 +299,9 @@ export function computeG0FromSnapshot(
   snapshot: G0Snapshot,
   weights: typeof DEFAULT_SCORING_WEIGHTS = DEFAULT_SCORING_WEIGHTS,
 ): G0Computation {
-  const { features, facts, sources, coverage } = extractG0Features(snapshot);
+  const { features, facts, sources, coverage, excludedFeatures, scoringBasis } = extractG0Features(snapshot);
+  const scoredWeights = effectiveWeights(weights, excludedFeatures);
+  const denominator = weightsTotal(scoredWeights);
 
   // No evidence at all → no score. Storing a 0 here would be a fabricated figure wearing a
   // different mask, and `gates/evaluate.ts` already has an honest branch for "not scored yet".
@@ -283,10 +319,13 @@ export function computeG0FromSnapshot(
       sources,
       coverage,
       scoringVersion: G0_SCORING_VERSION,
+      scoringBasis,
+      excludedFeatures,
+      denominator,
     };
   }
 
-  const result: G0Result = decideG0(features, facts, undefined, weights);
+  const result: G0Result = decideG0(features, facts, undefined, scoredWeights);
   return {
     tenantId,
     opportunityId: subject.opportunityId,
@@ -300,6 +339,9 @@ export function computeG0FromSnapshot(
     sources,
     coverage,
     scoringVersion: G0_SCORING_VERSION,
+    scoringBasis,
+    excludedFeatures,
+    denominator,
   };
 }
 
@@ -395,6 +437,9 @@ export function g0EvidencePayload(computation: G0Computation): JsonObject {
     score: computation.score,
     decision: computation.decision,
     coverage: computation.coverage,
+    scoringBasis: computation.scoringBasis,
+    excludedFeatures: computation.excludedFeatures,
+    denominator: computation.denominator,
     features: computation.features,
     contributions: computation.contributions,
     reasons: computation.reasons,

@@ -7,6 +7,7 @@ import {
   type G0Snapshot,
 } from '../src/lib/scoring/g0-features';
 import { scoreG0 } from '../src/lib/scoring/g0-canonical';
+import { DEFAULT_SCORING_WEIGHTS } from '../src/lib/scoring/defaults';
 
 /**
  * A snapshot with every source present. Individual tests strip what they want to be absent, so a
@@ -32,7 +33,7 @@ function fullSnapshot(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
       { roleKey: 'research', status: 'CONFIRMED' },
       { roleKey: 'end_user', status: 'INVITED' },
     ],
-    cordis: { coordinationsInTopicFamily: 2, coordinationsOverall: 5, distinctCollaborators: 18 },
+    cordis: { coordinationsInTopicFamily: 2, coordinationsOverall: 5, distinctCollaborators: 18, participationsOverall: 9 },
     ...overrides,
   };
 }
@@ -147,14 +148,14 @@ describe('extractG0Features()', () => {
 
   it('gives full coordinator marks at three coordinations in the topic family', () => {
     const s = fullSnapshot({
-      cordis: { coordinationsInTopicFamily: 3, coordinationsOverall: 3, distinctCollaborators: 0 },
+      cordis: { coordinationsInTopicFamily: 3, coordinationsOverall: 3, distinctCollaborators: 0, participationsOverall: 3 },
     });
     expect(extractG0Features(s).features.coordinatorHistory).toBe(100);
   });
 
   it('caps coordination outside the topic family at half marks', () => {
     const s = fullSnapshot({
-      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 12, distinctCollaborators: 0 },
+      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 12, distinctCollaborators: 0, participationsOverall: 12 },
     });
     expect(extractG0Features(s).features.coordinatorHistory).toBe(50);
   });
@@ -162,10 +163,30 @@ describe('extractG0Features()', () => {
   it('splits the research/end-user feature evenly between the two seat roles', () => {
     const both = extractG0Features(fullSnapshot()).features.researchAndEndUser;
     const researchOnly = extractG0Features(
-      fullSnapshot({ seats: [{ roleKey: 'research', status: 'OPEN' }] }),
+      fullSnapshot({ seats: [{ roleKey: 'research', status: 'CONFIRMED' }] }),
     ).features.researchAndEndUser;
     expect(both).toBe(100);
     expect(researchOnly).toBe(50);
+  });
+
+  it('gives no research/end-user marks for OPEN seats: no partner is attached yet (FO-382)', () => {
+    const s = fullSnapshot({
+      seats: [
+        { roleKey: 'research', status: 'OPEN' },
+        { roleKey: 'end_user', status: 'OPEN' },
+      ],
+    });
+    const { features, sources } = extractG0Features(s);
+    expect(features.researchAndEndUser).toBe(0);
+    // Measured as zero, not missing: the seats exist and the answer is that nobody is attached.
+    expect(sources.find((x) => x.feature === 'researchAndEndUser')?.status).toBe('measured');
+  });
+
+  it('counts CANDIDATE, INVITED and CONFIRMED seats as having a named partner', () => {
+    for (const status of ['CANDIDATE', 'INVITED', 'CONFIRMED']) {
+      const s = fullSnapshot({ seats: [{ roleKey: 'research', status }] });
+      expect(extractG0Features(s).features.researchAndEndUser, status).toBe(50);
+    }
   });
 
   it('does not count a declined seat as a partner', () => {
@@ -230,5 +251,64 @@ describe('extractG0Features()', () => {
     for (let i = 0; i < 10; i++) {
       expect(scoreG0(extractG0Features(fullSnapshot()).features)).toBe(scoreG0(first.features));
     }
+  });
+});
+
+// ───────────────────────── FO-382: partner with no CORDIS history ─────────────────────────
+
+describe('partner with no CORDIS history (FO-382)', () => {
+  const noHistory = { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 };
+
+  it('excludes coordinatorHistory and networkCentrality for a partner with a measured empty CORDIS record', () => {
+    const ex = extractG0Features(fullSnapshot({ intendedRole: 'partner', cordis: noHistory }));
+    expect(ex.scoringBasis).toBe('no_history_evidence');
+    expect(ex.excludedFeatures).toEqual(['coordinatorHistory', 'networkCentrality']);
+  });
+
+  it('keeps the standard basis for a coordinator with no CORDIS history (coordinator rule unchanged)', () => {
+    const ex = extractG0Features(fullSnapshot({ intendedRole: 'coordinator', cordis: noHistory }));
+    expect(ex.scoringBasis).toBe('standard');
+    expect(ex.excludedFeatures).toEqual([]);
+  });
+
+  it('keeps the standard basis when the intended role is unset: the rule never applies to null', () => {
+    const ex = extractG0Features(fullSnapshot({ intendedRole: null, cordis: noHistory }));
+    expect(ex.scoringBasis).toBe('standard');
+  });
+
+  it('keeps the standard basis when CORDIS data is missing (no PIC or empty table), so a data gap is not read as no history', () => {
+    const ex = extractG0Features(fullSnapshot({ intendedRole: 'partner', cordis: null }));
+    expect(ex.scoringBasis).toBe('standard');
+    expect(ex.excludedFeatures).toEqual([]);
+  });
+
+  it('keeps the standard basis for a partner who has any CORDIS participation', () => {
+    const ex = extractG0Features(
+      fullSnapshot({
+        intendedRole: 'partner',
+        cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 1 },
+      }),
+    );
+    expect(ex.scoringBasis).toBe('standard');
+  });
+
+  it('leaves excluded features out of coverage instead of counting them as measured', () => {
+    // Partner, no history, no seats or topic budget: the two excluded features (25) and the
+    // other unmeasured ones must not inflate coverage. Only the excluded pair is removed here.
+    const ex = extractG0Features(
+      fullSnapshot({ intendedRole: 'partner', cordis: noHistory, seats: [] }),
+    );
+    // Scored: alignment 30, baseRate 15, researchAndEndUser 12 (missing), budget 10, lumpSum 8
+    // measured = 30+15+10+8 = 63 of 75 scored weight.
+    expect(ex.coverage).toBeCloseTo(63 / 75, 2);
+  });
+
+  it('scores the same evidence on the 75-point denominator: the excluded score is the standard score × 100/75', () => {
+    const snap = fullSnapshot({ intendedRole: 'partner', cordis: noHistory });
+    const std = scoreG0(extractG0Features(snap).features, undefined);
+    // Standard: the two excluded features contribute 0 (no history), so only the denominator moves.
+    const excludedWeights = { ...DEFAULT_SCORING_WEIGHTS, coordinatorHistory: 0, networkCentrality: 0 };
+    const excl = scoreG0(extractG0Features(snap).features, excludedWeights);
+    expect(excl).toBeCloseTo(std * (100 / 75), 1);
   });
 });
