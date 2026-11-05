@@ -58,6 +58,8 @@ interface UserMenuProps {
   workspaces?: UserMenuWorkspace[];
   canManageModules?: boolean;
   canManageUsers?: boolean;
+  /** The sidebar's `apiKeys` rule, same server answer: `hiddenNavKeysFor`. */
+  hideApiKeys?: boolean;
 }
 
 export default function UserMenu({
@@ -70,6 +72,7 @@ export default function UserMenu({
   workspaces = [],
   canManageModules = false,
   canManageUsers = false,
+  hideApiKeys = false,
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -485,14 +488,16 @@ export default function UserMenu({
                 </Link>
               )}
 
-              <Link
-                href={getWorkspaceRoute('settingsApiKeys', locale, routeWorkspace ?? undefined)}
-                onClick={() => setIsOpen(false)}
-                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
-              >
-                <Key className="w-4 h-4 text-muted" />
-                <span>{isTr ? 'API Anahtarları & Entegrasyonlar' : 'API Keys & Integrations'}</span>
-              </Link>
+              {!hideApiKeys && (
+                <Link
+                  href={getWorkspaceRoute('settingsApiKeys', locale, routeWorkspace ?? undefined)}
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+                >
+                  <Key className="w-4 h-4 text-muted" />
+                  <span>{isTr ? 'API Anahtarları & Entegrasyonlar' : 'API Keys & Integrations'}</span>
+                </Link>
+              )}
 
               {/*
                 KVKK md.11 / GDPR art.12 — the data subject console has to be
