@@ -7,6 +7,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { prisma, withTenant } from '@/lib/db';
+import { requireId } from './helpers/teardown-guard';
 import { isNoHistoryPartner } from '@/lib/scoring/g0-features';
 import { loadG0Snapshot, type G0Subject } from '@/lib/scoring/g0-compute';
 
@@ -43,7 +44,7 @@ describe('FO-396 loadG0Snapshot reads the stored register answer', () => {
     await prisma.tenant.deleteMany({ where: { id: tenantId } });
     await prisma.cordisParticipation.deleteMany({ where: { projectId: otherProject } });
     await prisma.cordisProject.deleteMany({ where: { id: otherProject } });
-    await prisma.cordisOrganization.deleteMany({ where: { organisationId: otherPic } });
+    await prisma.cordisOrganization.deleteMany({ where: { organisationId: requireId(otherPic, 'otherPic') } });
   });
 
   it('passes FOUND through, and only FOUND earns the no-history grant', async () => {
