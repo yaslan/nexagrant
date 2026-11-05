@@ -296,9 +296,9 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             <div className="flex items-center gap-2">
               <span className="bg-accent/20 text-accent-ink border border-accent/30 text-xs font-mono font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-accent" />
-                <span>M3 EVIDENCE PACK HEALTH ENGINE</span>
+                <span>{t('healthEngineBadge')}</span>
               </span>
-              <span className="text-xs text-slate-400 font-mono">1 GB Free Storage</span>
+              <span className="text-xs text-slate-400 font-mono">{t('freeStorage')}</span>
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-extrabold font-heading tracking-tight text-white">
@@ -578,7 +578,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   <h3 className="font-bold font-heading text-ink text-base">
                     {isTr ? 'Cloudflare R2 Kanıt Yükleme' : 'Upload Evidence to R2'}
                   </h3>
-                  <p className="text-[11px] text-muted">Sözleşme & AB Hakem Standartlarına Uyumlu</p>
+                  <p className="text-[11px] text-muted">{t('uploadCompliance')}</p>
                 </div>
               </div>
               <button
@@ -648,7 +648,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   </label>
                   <input
                     type="text"
-                    placeholder="TÜRKAK / İTO / BSI"
+                    placeholder={t('authorityPlaceholder')}
                     value={uploadAuthority}
                     onChange={(e) => setUploadAuthority(e.target.value)}
                     className="w-full bg-ground border border-border rounded-xl p-2.5 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
@@ -762,7 +762,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                 <div className="flex justify-between">
                   <span className="text-muted">{isTr ? 'Son Geçerlilik:' : 'Valid Until:'}</span>
                   <span className="font-mono text-ink">
-                    {selectedDoc.validUntil ? new Date(selectedDoc.validUntil).toLocaleDateString(isTr ? 'tr-TR' : 'en-US') : 'Süresiz / N/A'}
+                    {selectedDoc.validUntil ? new Date(selectedDoc.validUntil).toLocaleDateString(isTr ? 'tr-TR' : 'en-US') : t('noExpiry')}
                   </span>
                 </div>
                 <div className="flex justify-between">

@@ -47,3 +47,41 @@ describe.each(Object.entries(themes))('--muted contrast (%s)', (_, tokens) => {
     expect(contrast(fg, ground)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+/**
+ * NG-2 — the green/yellow/red status language has to be readable as text. `--ok`, `--amber` and
+ * `--bad` are fine as accents in the dark theme, but in the light one they measure 3.77, 3.19 and
+ * 4.83 on white and fall further on --ground and on their own tint, so text uses the `-ink` step
+ * (the same split as --accent / --accent-ink). `-strong` carries white text (--accent-strong).
+ */
+function hexToRgb(hex: string): [number, number, number] {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+/** The solid colour a `bg-x/15` utility paints over `under`. */
+function tint(hex: string, under: string, alpha: number): string {
+  const [f, u] = [hexToRgb(hex), hexToRgb(under)];
+  return `#${f.map((c, i) => Math.round(c * alpha + (u[i] as number) * (1 - alpha)).toString(16).padStart(2, '0')).join('')}`;
+}
+
+describe.each(Object.entries(themes))('status language contrast (%s)', (_, tokens) => {
+  const need = (name: string): string => {
+    const value = tokens[name];
+    if (!value) throw new Error(`--${name} missing from globals.css`);
+    return value;
+  };
+
+  describe.each(['ok', 'amber', 'bad'])('--%s-ink', (status) => {
+    test.each(['ground', 'surface', 'surface-hover'])('on --%s is at least 4.5:1', (bg) => {
+      expect(contrast(need(`${status}-ink`), need(bg))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test.each(['ground', 'surface'])('on its own tint over --%s is at least 4.5:1', (bg) => {
+      expect(contrast(need(`${status}-ink`), tint(need(status), need(bg), 0.15))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  test.each(['accent-strong', 'bad-strong'])('white on --%s is at least 4.5:1', (fill) => {
+    expect(contrast('#ffffff', need(fill))).toBeGreaterThanOrEqual(4.5);
+  });
+});
