@@ -871,7 +871,7 @@ doldurma yok). Yeni kodun gerçek sınırı `500 + rastgele 0..24`'tür (kriptog
 çekilir; `newInviteCodeUseLimit()`); sayılar yalnız `src/lib/agency/invite-policy.ts`'te durur. Gerçek sınır
 **istemciye gitmez** (liste yanıtı, sayfa/RSC yükü, action yanıtı; denetim kaydı da yazmaz): panel yalnız
 "en az 500" der. Sebep: sabit N, "bu kod tam N kez kullanıldı" bilgisini verir; huni toplamıyla birleşince başka bir
-kodun son 1-4 kullanımı okunuyordu (crw-fb, FO-392 B-1). CHECK'ler: `AgencyInviteCode_useLimit_positive`
+kodun son 1-4 kullanımı okunuyordu (crw-fb, FO-392 B-1). Sapma yalnız kod dolmadan önce korur: kodu kendisi dolduran ajans (~500 gerçek kayıt) durumun "Sınıra ulaştı"ya döndüğü anda sınırı tam öğrenir (crw-fb FO-392-crw-fb-2 B-3; patron kararı A: davranış aynı kaldı, risk `docs/legal/HUKUK-SORULARI-2026-09.md` soru 5e'de hukukçuya sorulur). CHECK'ler: `AgencyInviteCode_useLimit_positive`
 (`useLimit IS NULL OR useLimit > 0`) ve `AgencyInviteCode_usedCount_within_useLimit`
 (`useLimit IS NULL OR usedCount <= useLimit`). Kod ayrıca `expiresAt` (≤ 1 yıl, panelde varsayılan
 90 gün) ve `revokedAt` ile yönetilir. `usedCount` iç sayaçtır, ajansa gösterilmez;

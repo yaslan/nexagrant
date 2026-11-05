@@ -17,8 +17,20 @@
  * is {@link INVITE_CODE_MIN_USE_LIMIT} + a uniformly random 0..{@link INVITE_CODE_USE_LIMIT_SPREAD},
  * drawn once when the code is made. The real number is stored (the database
  * enforces it) and never leaves the server; the panel says only "at least
- * {@link INVITE_CODE_MIN_USE_LIMIT}". A limit that varies over 25 values hides a
- * count behind a window wider than the 1..4 the funnel masks.
+ * {@link INVITE_CODE_MIN_USE_LIMIT}". Before a code is full, a limit that varies
+ * over 25 values hides its count behind a window wider than the 1..4 the funnel masks.
+ *
+ * What the spread does NOT do (crw-fb FO-392-crw-fb-2.md B-3, patron decision A): it
+ * protects a code only until it is full. The status turns "Limit reached" (panel)
+ * and the form refuses at exactly the limit, so an agency that makes a fresh code
+ * and registers on it itself until the flip learns its limit EXACTLY. The price is
+ * about that many real records (500..524, visible on the platform). With the
+ * filled codes exact, the window for another code's uses shrinks to the funnel's
+ * rounding step (+-2), and in the multi-province, no-deletion case a hidden 1..4
+ * is read back in about 6 % of simulated tables (funnel.attack.test.ts, "self-burn
+ * KNOWN RESIDUAL"). The owner accepted this and kept the behaviour; the notice
+ * addendum says so and the lawyer is asked (HUKUK-SORULARI-2026-09.md). Do not
+ * claim in code, docs or UI that an agency "cannot learn" the limit.
  *
  * Where the numbers come from: the 500 is the autopilot default of K-577141
  * (no owner answer); the 0..24 spread is the owner's decision K-577268. Change

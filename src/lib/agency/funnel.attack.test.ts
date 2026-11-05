@@ -306,7 +306,18 @@ function probe(c: TrueCode, rule: FormRule, lo: number, hi: number): [number, nu
  * through JSON as the browser receives it. The attacker reads whatever is there,
  * and, with `form`, tries every code on the registration form as well.
  */
-function publishCodes(codes: TrueCode[], form?: FormRule, know: LimitKnowledge = POLICY_KNOWLEDGE): CodeKnowledge[] {
+function publishCodes(
+  codes: TrueCode[],
+  form?: FormRule,
+  know: LimitKnowledge = POLICY_KNOWLEDGE,
+  /**
+   * FO-392 B-3 (patron decision A): the agency filled its own codes itself, from a known 0 uses,
+   * and watched the status flip to "exhausted" (panel) or the form refuse. The flip happens at
+   * exactly useLimit, so a code it filled itself is known to the exact count. The price is those
+   * ~500 real registrations per code. Off = the agency only sees the public range 500..524.
+   */
+  selfBurn = false
+): CodeKnowledge[] {
   return codes.map((c, i) => {
     const row = JSON.parse(
       JSON.stringify(
@@ -341,6 +352,9 @@ function publishCodes(codes: TrueCode[], form?: FormRule, know: LimitKnowledge =
     // "Limit reached": at least the smallest limit a code can have - or, if the panel sent it, exactly the limit.
     if (status === 'exhausted') lo = Math.max(lo, typeof row.useLimit === 'number' ? row.useLimit : know.min);
     if (form) [lo, hi] = probe(c, form, lo, hi);
+    if (selfBurn && c.useLimit !== undefined && c.used === c.useLimit) {
+      lo = hi = c.used; // the flip pinned the limit and the agency counted every use itself
+    }
     return { truth: c.used, lo, hi };
   });
 }
@@ -905,7 +919,7 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     { single: false, noneDeleted: false },
   ];
 
-  function sweep(seed: number, mode: Mode, tables: number, draw: () => number, know: LimitKnowledge) {
+  function sweep(seed: number, mode: Mode, tables: number, draw: () => number, know: LimitKnowledge, selfBurn = false) {
     const rand = stream(seed);
     let withLeak = 0;
     const found: string[] = [];
@@ -916,7 +930,7 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
       const { codes, R } = saturatedCodes(draw, nFull, r, d);
       const t = bigTable(rand, R, mode.single);
       const leaks = attack(t, publish(t), {
-        codes: publishCodes(codes, formUseLimit(know), know),
+        codes: publishCodes(codes, formUseLimit(know), know, selfBurn),
         noneDeleted: mode.noneDeleted,
       });
       if (leaks.length) {
@@ -951,26 +965,100 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     expect(leaking).toBeGreaterThan(0);
   }, TIMEOUT_MS);
 
-  // The mutant the jitter must not be reduced to: the attacker is told the limit is 500..500
-  // while codes are really 500..524 draws. Pins that the gate reads the *range* from the policy.
-  test('self-burn model: the agency learns a window as wide as the spread, never one inside 1..4', () => {
-    // It fills its own code (u0 earlier uses it cannot see) until refused after k uses:
-    // real limit = u0 + k, so u0 in [MIN - k, MAX - k].
-    for (const u0 of [0, 1, 2, 3, 4, 17]) {
-      for (let lim = INVITE_CODE_MIN_USE_LIMIT; lim <= INVITE_CODE_MAX_USE_LIMIT; lim++) {
-        const k = lim - u0;
-        const lo = Math.max(0, INVITE_CODE_MIN_USE_LIMIT - k);
-        const hi = INVITE_CODE_MAX_USE_LIMIT - k;
-        expect(u0).toBeGreaterThanOrEqual(lo);
-        expect(u0).toBeLessThanOrEqual(hi);
-        expect(lo >= 1 && hi <= 4).toBe(false);
-      }
+  // ---------------------------------------------------------------------------------------
+  // B-3 (crw-fb FO-392-crw-fb-2.md, patron decision A): the limit is NOT secret from an agency
+  // that fills its own code. The status flips to "exhausted" (and the form refuses) at exactly
+  // useLimit, so an agency that makes a fresh code (0 uses, known) and registers on it until the
+  // flip learns its limit exactly. The cost is about L real records. The spread protects only a
+  // code that is not yet full. The two tests below measure what the agency gains from that.
+  // ---------------------------------------------------------------------------------------
+
+  /** What the agency learns by filling a fresh code (u0 = 0) until the form refuses: the refusal point. */
+  function learnedByFilling(limit: number, know: LimitKnowledge): number {
+    const form = formUseLimit(know);
+    const code: TrueCode = { useLimit: limit, used: 0 };
+    let k = 0;
+    while (form.accepts({ ...code, used: k })) k++; // k real registrations later the form refuses
+    return k;
+  }
+
+  test('self-burn: filling a fresh code until the flip gives the agency its limit EXACTLY (all 25 values)', () => {
+    const learned: number[] = [];
+    for (let lim = INVITE_CODE_MIN_USE_LIMIT; lim <= INVITE_CODE_MAX_USE_LIMIT; lim++) {
+      const k = learnedByFilling(lim, POLICY_KNOWLEDGE);
+      expect(k, `limit ${lim}`).toBe(lim); // exact, not a window
+      learned.push(k);
     }
-    // With a FIXED limit the same attack is exact (window of one value) - what K-577268 closes.
-    const fixed = FIXED_LIMIT(500);
-    for (const u0 of [1, 2, 3, 4]) {
-      const k = 500 - u0;
-      expect([fixed.min - k, fixed.max - k]).toEqual([u0, u0]);
-    }
+    measure(`SELFBURN-FLIP limits=${INVITE_CODE_MIN_USE_LIMIT}..${INVITE_CODE_MAX_USE_LIMIT} exactlyLearned=${learned.length}/${INVITE_CODE_USE_LIMIT_SPREAD + 1} costRealRecords=${INVITE_CODE_MIN_USE_LIMIT}..${INVITE_CODE_MAX_USE_LIMIT}`);
+    expect(learned.length).toBe(INVITE_CODE_USE_LIMIT_SPREAD + 1);
   });
+
+  test('self-burn: with the filled codes known exactly, the window for the last code (from the grand total alone) shrinks from ~25 per code to the rounding step (5)', () => {
+    // The agency filled nFull codes itself (it knows each one's uses exactly) and a last code holds
+    // r uses it did not make. The funnel total is shown rounded to 5 (true value within +-2), D = 0:
+    //   r in [shown - 2 - S, shown + 2 - S]   with S = sum of the uses of the filled codes.
+    // Without the self-burn S is only known to [nFull * MIN, nFull * MAX].
+    const rand = stream(77);
+    const widthKnown: number[] = [];
+    const widthRange: number[] = [];
+    let inside14 = 0;
+    const N = 400;
+    for (let n = 0; n < N; n++) {
+      const nFull = 1 + Math.floor(rand() * 2);
+      const r = 1 + Math.floor(rand() * 4);
+      const { codes, R } = saturatedCodes(newInviteCodeUseLimit, nFull, r, 0);
+      const t = bigTable(rand, R, false);
+      const shown = publish(t).get(id('registered', ALL, ALL));
+      if (shown == null) throw new Error('the grand total of a big cohort must be shown');
+      const filled = codes.slice(0, nFull);
+      const sExact = filled.reduce((a, c) => a + c.used, 0);
+      const known = [Math.max(0, shown - 2 - sExact), shown + 2 - sExact];
+      const range = [Math.max(0, shown - 2 - nFull * INVITE_CODE_MAX_USE_LIMIT), shown + 2 - nFull * INVITE_CODE_MIN_USE_LIMIT];
+      expect(r).toBeGreaterThanOrEqual(known[0]!);
+      expect(r).toBeLessThanOrEqual(known[1]!);
+      widthKnown.push(known[1]! - known[0]! + 1);
+      widthRange.push(range[1]! - range[0]! + 1);
+      if (known[0]! >= 1 && known[1]! <= 4) inside14++;
+    }
+    const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+    measure(`SELFBURN-WINDOW tables=${N} D=0 windowSelfBurnedAvg=${avg(widthKnown).toFixed(2)} max=${Math.max(...widthKnown)} windowPublicRangeAvg=${avg(widthRange).toFixed(2)} min=${Math.min(...widthRange)} windowsInside1to4=${inside14}`);
+    // The agency pins the last code's uses to the rounding step (5 values, i.e. +-2)...
+    expect(Math.max(...widthKnown)).toBeLessThanOrEqual(5);
+    // ...which is a narrower window than the public range alone gives (the spread only helped before the flip)...
+    expect(avg(widthKnown)).toBeLessThan(avg(widthRange));
+    // ...and a window of 5 values cannot sit inside 1..4 by itself. The full attack below combines the
+    // grand total with the per-province cells, and that does close onto 1..4 in some tables.
+    expect(inside14).toBe(0);
+  });
+
+  // The gate for the self-burning agency. Measured (seed 31, 900 tables per mode): single province
+  // and every D >= 0 mode leak nothing, but the multi-province D = 0 mode leaks a hidden 1..4 in
+  // ~6 % of the tables (57/900). The funnel's complementary suppression is built for a window of
+  // 25 per code; once the filled codes are exact, the rounding step (5) is all that is left, and
+  // across several provinces it sometimes closes onto 1..4. That is the residual risk of patron
+  // decision A (K-577268, crw-fb B-3), which is NOT hidden in the code: the notice addendum says
+  // so and HUKUK-SORULARI-2026-09.md asks the lawyer whether it is acceptable (together with R-1).
+  // It is pinned here, not loosened: the three clean modes stay at 0, and the leaking mode must
+  // stay below a ceiling, so a change that makes it worse - or an accidental fix, which should
+  // update the notice - turns this red.
+  const RESIDUAL_MODE = (m: Mode) => !m.single && m.noneDeleted;
+  const RESIDUAL_CEILING = 0.15;
+  for (const mode of MODES) {
+    const label = `${mode.single ? 'single' : 'spread'}, ${mode.noneDeleted ? 'D = 0' : 'D >= 0'}`;
+    if (!RESIDUAL_MODE(mode)) {
+      test(`self-burn gate, ${label}: codes the agency filled itself are exact - anyLeak = 0`, () => {
+        const { withLeak, found } = sweep(31, mode, TABLES, newInviteCodeUseLimit, POLICY_KNOWLEDGE, true);
+        measure(`SELFBURN-SWEEP seed=31 ${label} tables=${TABLES} tablesWithLeak=${withLeak}`);
+        expect(found, `${withLeak}/${TABLES} tables leak`).toEqual([]);
+      }, TIMEOUT_MS);
+    } else {
+      test(`self-burn KNOWN RESIDUAL, ${label}: a hidden 1..4 is read back in some tables (accepted risk of K-577268 A, asked to the lawyer), below ${RESIDUAL_CEILING * 100} %`, () => {
+        const { withLeak, found } = sweep(31, mode, TABLES, newInviteCodeUseLimit, POLICY_KNOWLEDGE, true);
+        measure(`SELFBURN-SWEEP seed=31 ${label} tables=${TABLES} tablesWithLeak=${withLeak} (known residual)`);
+        for (const f of found.slice(0, 3)) measure(`  e.g. ${f}`);
+        expect(withLeak, 'the residual is real: if it is gone, update the notice and the lawyer question').toBeGreaterThan(0);
+        expect(withLeak / TABLES).toBeLessThan(RESIDUAL_CEILING);
+      }, TIMEOUT_MS);
+    }
+  }
 });

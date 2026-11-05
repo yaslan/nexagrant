@@ -75,9 +75,12 @@ export interface CreatedInviteCode {
  *
  * FO-392 adds 'exhausted' for a code that reached its useLimit. That is the one
  * place a number's consequence shows again. The real limit is hidden and differs
- * from code to code (invite-policy.ts, K-577268), so "exhausted" says only "at least
- * INVITE_CODE_MIN_USE_LIMIT", and the registration form says the same to anyone who
- * types the code: the panel adds nothing to what the agency can find out.
+ * from code to code (invite-policy.ts, K-577268), so "exhausted" tells an agency that did
+ * not fill the code itself only "at least INVITE_CODE_MIN_USE_LIMIT", and the registration
+ * form says the same to anyone who types the code: the panel adds nothing to what the
+ * agency can find out. An agency that fills a fresh code itself sees the status flip at
+ * exactly the limit and learns it in full (about that many real records); that residual
+ * risk is accepted and documented in invite-policy.ts.
  */
 export type InviteCodeStatus = 'active' | 'revoked' | 'expired' | 'exhausted';
 

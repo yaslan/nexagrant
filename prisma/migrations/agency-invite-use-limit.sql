@@ -28,8 +28,10 @@
 -- Trade-off: a limit brings back a refusal that means "used up" - the probing
 -- channel TASK-MUM4WVYLSH9IT closed (crw-fb TASK-MUM3TMP8HU76G Ö-1). Who decided
 -- what: the use limit and its 500 are the autopilot default of K-577141 (the owner
--- did not answer); the hidden 0..24 spread that closes the channel is the owner's
--- decision K-577268. See docs/agent-results/FO-392-se-fb.md and FO-392-se-fb-2.md.
+-- did not answer); the hidden 0..24 spread is the owner's decision K-577268. The spread
+-- narrows the channel only while a code is not full: an agency that fills its own code
+-- learns the limit exactly (patron decision A, crw-fb FO-392-crw-fb-2.md B-3; the
+-- remaining risk is in invite-policy.ts and asked to the lawyer). See docs/agent-results/FO-392-se-fb.md and FO-392-se-fb-2.md.
 --
 -- RLS: no new table; "AgencyInviteCode" keeps tenant_isolation. The functions
 -- keep their signature, SECURITY DEFINER, SET clauses and grants.
