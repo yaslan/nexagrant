@@ -40,7 +40,7 @@ pnpm gate:isolated git push -u origin <dal>
 1. Boş bir port üzerinde yeni `pgvector/pgvector:pg16` konteyneri (CI'ın imajı), DB adı `fabrika_gate` — `fabrika` değil: `tests/expert-prereg-retention.live.test.ts` o adda kendini atlar. Paylaşılan `:5433` veritabanına ve oradaki `fabrika_app` parolasına dokunmaz.
 2. `pnpm db:setup` (CI'ın kullandığı yol: ensure_rls → db push → db:rls-role → db:rls → migrations → db:rls → seed).
 3. `pnpm storage:setup` ile `test-evidence` + `test-public` (anonim okuma) bucket'ları.
-4. CI'ın test değerleri: `DATABASE_URL`, `DATABASE_URL_RLS_TEST` (`fabrika_app_ci`), `AUTH_SECRET` + `KEEP_EU_LIVE=1` (vitest), `R2_*` → MinIO (e2e); boş bir `E2E_PORT` (3400'den başlar).
+4. CI'ın test değerleri: `DATABASE_URL`, `DATABASE_URL_RLS_TEST` (`fabrika_app_ci`), `AUTH_SECRET` + `KEEP_EU_LIVE=1` (vitest), `R2_*` → MinIO (e2e); `E2E_PORT` (3400'den başlar; kilit alındıktan sonra `gate-lock.mjs` seçer, FO-388).
 5. Çıkışta konteyneri siler (`GATE_KEEP=1` tutar) ve `next dev`'in yeniden biçimlendirdiği `tsconfig.json`'ı, başta temizse geri alır.
 
 Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortamını öncelikli okur); checkout'un kendi `.env`'i karışmaz. Tüm kimlik bilgileri atılabilir yerel değerlerdir (ci.yml'deki ile aynı); sır değildir.
@@ -93,4 +93,8 @@ Sunucu hazır olduktan sonra ölürse denetleyici (`tests/e2e/support/server-sup
 
 `uncaughtException: Error: aborted` (`ECONNRESET`) satırları ölüm nedeni değildir: yeşil koşularda da onlarca kez görünür ve sunucu ayakta kalır.
 
-Bilinen açık: `gate-isolated` portu "ilk boş" diye seçer ve sunucu bağlanana kadar kimse portu tutmaz. Aynı anda başlayan koşular çakışır (Docker bind hatası, çıkış 125 veya `http://localhost:<port> is already used`). Bunlar hemen ve açık hatayla düşer; sunucu ölümü değildir. Paralel koşacaksan `E2E_PORT` ve `GATE_PG_PORT` ver.
+Bilinen açık (e2e portu, FO-388 ile düzeltildi): Eskiden `gate-isolated` e2e portunu kilitten önce, "ilk boş" diye seçiyordu. Kuyrukta bekleyen koşu sırası gelene kadar bu portun başkası tarafından alındığını göremiyordu (FO-386: 27 dk bekledikten sonra `http://localhost:3400 is already used`). Şimdi e2e portu `scripts/gate-lock.mjs` kilidi alındıktan sonra, birim ve i18n adımlarından önce, 3400'den ilk boş port olarak seçilir ve koşunun ortamına (`E2E_PORT`) yazılır. Elle verilen `E2E_PORT` değiştirilmez: kilit alındığında doluysa koşu hemen `E2E_PORT <p> dolu` hatasıyla düşer, komut çalışmaz. Kanıt: `tests/gate-lock.test.ts` (kuyrukta bekleyen koşu, taban port dolu olduğunda başka port seçer; düzeltme öncesi bu test kırmızıydı).
+
+Konteyner portu (`GATE_PG_PORT`) aynı sınıf hatadan etkilenmez: konteyner `docker run -d` ile portu hemen bağlar ve kilit beklerken de tutar; ön kontrol bu portu dolu görür (bash ile ölçüldü, FO-388). İki başlatma aynı boş portu aynı anda seçerse ikincisi `Bind for 127.0.0.1:<port> failed: port is already allocated` ile çıkış 125 verir; bu açık bir hatadır, sessiz değildir. Yeniden denemeye gerek yok, yeniden çalıştır.
+
+Hâlâ geçerli: kilidi almayan bir komutu `gate-isolated.sh <komut>` ile verirsen (ör. `pnpm gate:isolated pnpm test:e2e`), e2e portu bu yolda kilitten önce seçilir. Paralel koşuda orada `E2E_PORT` ver.

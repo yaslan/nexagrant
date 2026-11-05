@@ -18,6 +18,7 @@
 // - Süre geçmişi: <LOCK_DIR>.history.jsonl; ETA medyanından hesaplanır.
 import { spawn, spawnSync, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { cleanTree, docsOnly, lockHash, readPass, treeHash, writePass } from './gate-cache.mjs'
@@ -32,6 +33,8 @@ const NOTIFY_MS = 30_000
 const NO_OWNER_STALE_MS = 15_000
 // Geçmiş yoksa tahmin: bir tam gate yaklaşık 25-40 dk (FO-339 ölçümü).
 const DEFAULT_EST_MS = 30 * 60_000
+// FO-388: e2e portu kilit alındıktan sonra seçilir; taban 3400 (gate-isolated.sh ile aynı).
+const E2E_PORT_BASE = Number(process.env.FONBRIDGE_E2E_PORT_BASE || 3400)
 
 const argv = process.argv.slice(2)
 if (argv.length === 0) {
@@ -222,6 +225,35 @@ async function acquire() {
   }
 }
 
+// FO-388: bir portu 127.0.0.1'de dinleyip bırakarak boş olup olmadığını bakar.
+function portFree(port) {
+  return new Promise((resolve) => {
+    const srv = net.createServer()
+    srv.once('error', () => resolve(false))
+    srv.once('listening', () => srv.close(() => resolve(true)))
+    srv.listen(port, '127.0.0.1')
+  })
+}
+
+async function firstFreePort(from) {
+  let p = from
+  while (!(await portFree(p))) p += 1
+  return p
+}
+
+// FO-388: kilit alındıktan sonra e2e portu. Otomatik seçimde (FONBRIDGE_E2E_PORT_AUTO=1, gate-isolated.sh)
+// taban portun dolu olduğu, kuyrukta beklerken de değişmiş olabilir: seçim burada, test adımlarından önce
+// yapılır. Elle verilen E2E_PORT değiştirilmez; doluysa hata atılır. Hiçbiri yoksa undefined (eski davranış).
+async function resolveE2ePort() {
+  if (process.env.FONBRIDGE_E2E_PORT_AUTO === '1') return firstFreePort(E2E_PORT_BASE)
+  const explicit = process.env.E2E_PORT
+  if (explicit) {
+    if (await portFree(Number(explicit))) return Number(explicit)
+    throw new Error(`E2E_PORT ${explicit} dolu; kilit alındı ama port boş değil, koşu başlatılmadı`)
+  }
+  return undefined
+}
+
 function release() {
   const owner = readOwner()
   if (owner && owner.pid === process.pid) {
@@ -260,10 +292,18 @@ async function main() {
   }
 
   let runStart = Date.now()
+  let e2ePort
   if (!nested) {
     await acquire()
     process.on('exit', release)
     runStart = Date.now()
+    try {
+      e2ePort = await resolveE2ePort()
+    } catch (err) {
+      console.error(`✖ ${err.message}`)
+      process.exit(1)
+    }
+    if (e2ePort !== undefined) console.log(`e2e portu: ${e2ePort} (kilit alındıktan sonra seçildi)`)
   }
 
   // Ağaç ve kilit hash'i kilit alındıktan SONRA alınır: kuyrukta beklerken değişen ağaç bu koşunun değil.
@@ -286,7 +326,7 @@ async function main() {
 
   const child = spawn(argv[0], argv.slice(1), {
     stdio: 'inherit',
-    env: { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '1' },
+    env: { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '1', ...(e2ePort !== undefined ? { E2E_PORT: String(e2ePort) } : {}) },
     shell: process.platform === 'win32',
   })
   for (const sig of ['SIGINT', 'SIGTERM']) {

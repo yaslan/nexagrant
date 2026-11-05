@@ -17,7 +17,8 @@
 #      fabrika_app is created fresh with a known throwaway password, as in CI.
 #   2. `pnpm db:setup` (scripts/db-setup.sh), the path CI takes.
 #   3. MinIO buckets test-evidence + test-public (`pnpm storage:setup`).
-#   4. CI's R2 test values (MinIO) and a free E2E_PORT; SMTP/mailpit come from playwright.config.ts.
+#   4. CI's R2 test values (MinIO); the e2e port is picked by gate-lock.mjs after the lock (FO-388).
+#      SMTP/mailpit come from playwright.config.ts.
 #   5. `pnpm gate` (gate-lock + gate:core), unchanged.
 #   6. tsconfig.json restored if it was clean before and `next dev` rewrote it.
 #
@@ -28,7 +29,8 @@
 #
 # Env (all optional):
 #   GATE_PG_PORT   host port for the container   (default: first free from 55400)
-#   E2E_PORT       port for the e2e next server   (default: first free from 3400)
+#   E2E_PORT       port for the e2e next server   (default: first free from 3400, picked AFTER the
+#                  gate lock is taken; set it only to pin a port: a busy one fails at once)
 #   GATE_KEEP=1    keep the container afterwards (prints its name)
 #
 # Every credential here is a local throwaway, the same ones ci.yml uses.
@@ -59,8 +61,19 @@ first_free() {
 
 pg_port=${GATE_PG_PORT:-$(first_free 55400)}
 port_free "$pg_port" || fail "GATE_PG_PORT $pg_port is in use"
-e2e_port=${E2E_PORT:-$(first_free 3400)}
-port_free "$e2e_port" || fail "E2E_PORT $e2e_port is in use"
+# FO-388: the e2e port is NOT picked here. scripts/gate-lock.mjs picks it after the gate lock is
+# taken, before any test step: a port picked here sat unused through the whole queue wait, and
+# another run took it. An explicit E2E_PORT is checked now and again after the lock.
+if [ -n "${E2E_PORT:-}" ]; then
+  port_free "$E2E_PORT" || fail "E2E_PORT $E2E_PORT is in use"
+  e2e_desc="E2E_PORT=$E2E_PORT, elle verilmiş"
+else
+  export FONBRIDGE_E2E_PORT_AUTO=1
+  unset E2E_PORT
+  # A command given as arguments that is not `pnpm gate` takes no gate lock, so it gets its port now.
+  if [ $# -gt 0 ]; then export E2E_PORT="$(first_free 3400)"; fi
+  e2e_desc="E2E_PORT kilit alındıktan sonra seçilir"
+fi
 
 container="fabrika-gate-$(date -u +%Y%m%d%H%M%S)-$$"
 # Not `fabrika`: tests/expert-prereg-retention.live.test.ts skips itself on a
@@ -131,7 +144,6 @@ export R2_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY:-minioadmin}"
 export R2_BUCKET=test-evidence
 export R2_PUBLIC_BUCKET=test-public
 export R2_PUBLIC_HOST="$R2_ENDPOINT/test-public"
-export E2E_PORT="$e2e_port"
 
 # Wall-clock budgets of the timing tests (tests/helpers/timing.ts) scale with the
 # load: 1 on an idle machine, ceil(2 * load1 / cpus) under load. The 1-minute average
@@ -149,11 +161,11 @@ log "MinIO buckets on $R2_ENDPOINT"
 pnpm storage:setup
 
 if [ $# -gt 0 ]; then
-  log "$* (E2E_PORT=$e2e_port)"
+  log "$* ($e2e_desc)"
   "$@"
   log "ok: $1 finished on an isolated database"
 else
-  log "pnpm gate (E2E_PORT=$e2e_port)"
+  log "pnpm gate ($e2e_desc)"
   pnpm gate
   log "ok: gate green on an isolated database"
 fi
