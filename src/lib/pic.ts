@@ -28,3 +28,28 @@ export const TenantPicInputSchema = z
  * the question and the confirmation, so this leaves ten honest attempts an hour.
  */
 export const PIC_LOOKUPS_PER_HOUR = 20;
+
+/**
+ * FO-389. The same question for an account that has nothing behind it: no agency invitation, no
+ * pilot, no paid plan. Such an account costs an attacker nothing to open, so it gets the least a
+ * real user needs. Saving a listed PIC takes two asks (the question and the confirmation), so
+ * three leaves one honest attempt and a retry an hour.
+ */
+export const PIC_LOOKUPS_PER_HOUR_UNSOLICITED = 3;
+
+/**
+ * FO-389. What ALL such accounts together may ask in one UTC day. Per-user limits are beaten by
+ * opening accounts; this total is not. At 2,000 a day a full pass over the 35,625 CORDIS
+ * organisations takes about 18 days instead of one. Invited, pilot and paid tenants do not spend it,
+ * so filling it locks out nobody who is a customer.
+ */
+export const PIC_UNSOLICITED_LOOKUPS_PER_DAY = 2000;
+
+/**
+ * FO-389. How many `tenant.pic.refused` audit rows of one reason (`picTaken`, `rateLimited`) one tenant
+ * may add in a UTC day. The audit table grows with the number of accounts, not only with the number
+ * of asks, so each tenant's share is capped; the asks past it are still refused, they just stop
+ * leaving a row. 50 is above what one honest owner meets (a typo or two) and below the 480 a single
+ * user could add under the hourly limit alone.
+ */
+export const PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY = 50;

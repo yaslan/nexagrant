@@ -2017,7 +2017,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
           "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
             after,
         );
-      only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: tx.$executeRaw (line 95, via planPicChange); tx.auditEvent.create (line 121, via recordPicRefusal); tx.auditEvent.create (line 121, via recordPicRefusal); tx.tenantProfile.update (line 183); tx.tenantProfile.create (line 192); tx.auditEvent.create (line 205); tx.tenant.update (line 219); tx.auditEvent.create (line 220)');
+      only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: prisma.$queryRaw (writing SQL) (lib/pic-budget.ts:38, via spendUnsolicitedPicLookup (lib/pic-budget)); tx.$executeRaw (line 145, via planPicChange); tx.auditEvent.create (line 185, via recordPicRefusal); tx.auditEvent.create (line 185, via recordPicRefusal); tx.tenantProfile.update (line 247); tx.tenantProfile.create (line 256); tx.auditEvent.create (line 269); tx.tenant.update (line 283); tx.auditEvent.create (line 284)');
     });
 
     it('G7: an action exported through `export { … }`', () => {

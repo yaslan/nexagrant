@@ -11,7 +11,13 @@
  */
 import { revalidatePath } from 'next/cache';
 import { withTenant, type TenantTx } from '@/lib/db';
-import { PIC_LOOKUPS_PER_HOUR, TenantPicInputSchema } from '@/lib/pic';
+import {
+  PIC_LOOKUPS_PER_HOUR,
+  PIC_LOOKUPS_PER_HOUR_UNSOLICITED,
+  PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY,
+  TenantPicInputSchema,
+} from '@/lib/pic';
+import { budgetDay, spendUnsolicitedPicLookup } from '@/lib/pic-budget';
 import { toTenantProvince, provinceAppliesTo } from '@/lib/province';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
@@ -19,8 +25,14 @@ import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 
 const HOUR_MS = 3_600_000;
-/** FO-386. One process, so N instances allow N times this; see UserWindowLimiter. */
+/**
+ * FO-386. One process, so N instances allow N times this; see UserWindowLimiter. That multiplier is
+ * only ever paid by tenants with something behind them; the accounts anyone can open are held by the
+ * database total below (FO-389), which no process count changes.
+ */
 const picLookupLimiter = new UserWindowLimiter(PIC_LOOKUPS_PER_HOUR, HOUR_MS);
+/** FO-389. The same question from an account with no invitation, pilot or paid plan. */
+const picUnsolicitedLookupLimiter = new UserWindowLimiter(PIC_LOOKUPS_PER_HOUR_UNSOLICITED, HOUR_MS);
 /** A loop against the limit is worth one audit row an hour, not one row per request. */
 const picLimitRecordLimiter = new UserWindowLimiter(1, HOUR_MS);
 
@@ -59,6 +71,24 @@ type PicPlan =
   | { kind: 'confirm'; match: PicCordisMatch }
   | { kind: 'write'; from: string | null; to: string | null; match: PicCordisMatch | null };
 
+const LIVE_SUBSCRIPTION_STATUSES: readonly string[] = ['ACTIVE', 'TRIALING', 'PAST_DUE'];
+
+/**
+ * FO-389. True when something other than the self-service form put this tenant here: it came in with
+ * an agency's invitation code (`agencyId`), or it has a live subscription (a pilot, a plan someone
+ * paid for or was granted), or it bought a lifetime licence. A tenant with none of these is one anyone
+ * could have opened for free. A missing tenant row counts as unsolicited: the stricter side.
+ */
+function isSolicitedTenant(tenant: {
+  agencyId: string | null;
+  subscription: { status: string } | null;
+  lifetimeLicences: { id: string }[];
+}): boolean {
+  if (tenant.agencyId !== null) return true;
+  if (tenant.subscription && LIVE_SUBSCRIPTION_STATUSES.includes(tenant.subscription.status)) return true;
+  return tenant.lifetimeLicences.length > 0;
+}
+
 /**
  * FO-383 — decides what a submitted PIC may do; writes nothing.
  *
@@ -75,6 +105,13 @@ type PicPlan =
  * FO-386: that yes or no, asked over the public CORDIS list, says who our customers are. So every
  * question counts against the user, whatever the answer turns out to be, and is counted before the
  * lock and the lookup: past the limit nothing is looked up, so the answer cannot depend on the PIC.
+ *
+ * FO-389: a per-user limit is beaten by opening accounts, and anyone can open one. A tenant counts
+ * as solicited when something other than a form got it in: an agency invitation, a pilot or any live
+ * subscription, or a lifetime licence. Every other tenant gets the lower hourly limit AND spends from
+ * one daily budget shared by all of them (`spendUnsolicitedPicLookup`), so a hundred accounts do not
+ * ask a hundred times as much. Past either limit the answer is the same `limit` plan and does not
+ * depend on the PIC. Solicited tenants never touch the budget, so exhausting it locks out no customer.
  */
 async function planPicChange(
   tx: TenantTx,
@@ -83,14 +120,27 @@ async function planPicChange(
   next: string,
   confirmedPic: string | undefined
 ): Promise<PicPlan> {
-  const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { pic: true } });
+  const tenant = await tx.tenant.findUnique({
+    where: { id: tenantId },
+    select: {
+      pic: true,
+      agencyId: true,
+      subscription: { select: { status: true } },
+      lifetimeLicences: { select: { id: true }, take: 1 },
+    },
+  });
   const current = tenant?.pic ?? null;
   const to = next === '' ? null : next;
   if (current === to) return { kind: 'keep' };
   if (to === null) return { kind: 'write', from: current, to: null, match: null };
 
-  const retryAfterSeconds = picLookupLimiter.take(userId);
+  const solicited = tenant !== null && isSolicitedTenant(tenant);
+  const retryAfterSeconds = (solicited ? picLookupLimiter : picUnsolicitedLookupLimiter).take(userId);
   if (retryAfterSeconds !== null) return { kind: 'limit', pic: to, retryAfterSeconds };
+  if (!solicited) {
+    const budgetRetry = await spendUnsolicitedPicLookup();
+    if (budgetRetry !== null) return { kind: 'limit', pic: to, retryAfterSeconds: budgetRetry };
+  }
 
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`tenant-pic:${to}`}, 0))`;
   const holder = await tx.tenant.findFirst({
@@ -112,13 +162,27 @@ async function planPicChange(
  * is not named here and the holder's own log gets no row, so staff read this without it telling
  * anyone else who holds what.
  */
-function recordPicRefusal(
+async function recordPicRefusal(
   tx: TenantTx,
   scope: { tenantId: string; userId: string },
   pic: string,
   reason: 'picTaken' | 'rateLimited'
 ) {
-  return tx.auditEvent.create({
+  // FO-389: the rows grow with the number of accounts, so each tenant's share of a day is capped.
+  // Asks past the cap are still refused, they just stop leaving a row. Read and write are not locked
+  // together, so concurrent asks can overshoot by a few: the cap bounds growth, it is not a quota.
+  const startOfDay = new Date(`${budgetDay(new Date())}T00:00:00.000Z`);
+  // Counted per reason, so a day of `picTaken` rows never hides the row that says the limit was hit.
+  const today = await tx.auditEvent.count({
+    where: {
+      tenantId: scope.tenantId,
+      type: 'tenant.pic.refused',
+      createdAt: { gte: startOfDay },
+      data: { path: ['reason'], equals: reason },
+    },
+  });
+  if (today >= PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY) return;
+  await tx.auditEvent.create({
     data: { tenantId: scope.tenantId, actorId: scope.userId, type: 'tenant.pic.refused', data: { pic, reason } },
   });
 }
