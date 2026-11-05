@@ -32,9 +32,11 @@ interface SidebarNavProps {
   isPlatformAdmin?: boolean;
   canManageModules?: boolean;
   canManageUsers?: boolean;
+  /** Entries the session's role is not offered, decided on the server: `hiddenNavKeysFor`. */
+  hiddenNavKeys?: readonly string[];
 }
 
-export default function SidebarNav({ locale, isPlatformAdmin = false, canManageModules = false, canManageUsers = false }: SidebarNavProps) {
+export default function SidebarNav({ locale, isPlatformAdmin = false, canManageModules = false, canManageUsers = false, hiddenNavKeys = [] }: SidebarNavProps) {
   const t = useTranslations('Navigation');
   const tModules = useTranslations('modules');
   const pathname = usePathname();
@@ -67,7 +69,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
     upgrade: upgradeModules.includes(item.moduleId),
   }));
 
-  const navItems: NavItem[] = [
+  const allItems: NavItem[] = [
     { key: 'dashboard', href: getWorkspaceRoute('dashboard', locale, workspaceSlug), label: t('dashboard') },
     { key: 'calls', href: getWorkspaceRoute('calls', locale, workspaceSlug), label: t('calls') },
     ...moduleItems,
@@ -84,6 +86,7 @@ export default function SidebarNav({ locale, isPlatformAdmin = false, canManageM
       label: t('settings')
     },
   ];
+  const navItems = allItems.filter((item) => !hiddenNavKeys.includes(item.key));
 
   const adminItem = {
     key: 'adminModules',
