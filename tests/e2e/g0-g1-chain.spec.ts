@@ -18,6 +18,9 @@ import { signInAs } from './fixtures/session';
  *   3. Topic and its call: the catalogue comes from the platform's import, no tenant writes it.
  *   4. TopicStat: only the platform-admin xlsx import writes it.
  *   5. CordisOrganization + CordisPartnerProfile: the CORDIS import, the only source of candidates.
+ *   6. CordisProject + CordisParticipation: the same import, the only source of a PIC's history.
+ *
+ * The PIC itself and its confirmation are clicks on the profile form (FO-383).
  *
  * The tests that pin the dead ends assert what happens today. They are not skipped or marked
  * expected-to-fail; when a fix lands they go red and have to be rewritten with it.
@@ -54,6 +57,16 @@ const NO_STAT_TOPIC = { id: 'g0g1-chain-topic-nostat', identifier: 'HORIZON-G0G1
 
 const PICS = ['G0G1E2E-PIC-1', 'G0G1E2E-PIC-2', 'G0G1E2E-PIC-3', 'G0G1E2E-PIC-4', 'G0G1E2E-PIC-5'];
 
+/** Saved on the profile form. Nine digits, and no CORDIS row carries this one. */
+const PIC_NO_RECORD = '911000001';
+/** One coordination outside the topic's family, two collaborators. */
+const PIC_THIN = '911000002';
+/** No coordination at all, 18 collaborators: the least history that clears 70 on the ideal topic. */
+const PIC_NETWORK = '911000003';
+/** Three coordinations in each topic's family, 25 collaborators: full marks on both features. */
+const PIC_RICH = '911000004';
+const COLLABORATORS = Array.from({ length: 25 }, (_, i) => String(922000000 + i));
+
 const SHOTS = shotsDir('NG-28-screenshots');
 
 /** Raw database output, one line per step, so the run log is the evidence. */
@@ -85,6 +98,17 @@ async function rollback() {
   await prisma.call.deleteMany({ where: { id: CALL } });
   await prisma.programme.deleteMany({ where: { id: PROGRAMME } });
   await prisma.cordisOrganization.deleteMany({ where: { organisationId: { startsWith: 'G0G1E2E-PIC-' } } });
+  await prisma.cordisParticipation.deleteMany({ where: { projectId: { startsWith: 'g0g1-chain-project-' } } });
+  await prisma.cordisProject.deleteMany({ where: { id: { startsWith: 'g0g1-chain-project-' } } });
+  await prisma.cordisOrganization.deleteMany({ where: { name: { startsWith: 'G0G1 E2E History' } } });
+}
+
+async function seedCordisProject(key: string, masterCall: string, members: [organisationId: string, role: string][]) {
+  const id = `g0g1-chain-project-${key}`;
+  await prisma.cordisProject.create({ data: { id, title: id, framework: 'HORIZON', masterCall } });
+  await prisma.cordisParticipation.createMany({
+    data: members.map(([organisationId, role]) => ({ projectId: id, organisationId, role })),
+  });
 }
 
 async function seedIdentity(tenantId: string, workspaceId: string, slug: string, userId: string, email: string) {
@@ -157,6 +181,25 @@ async function seed() {
       },
     });
   }
+
+  // FIXTURE 6. None has a CordisPartnerProfile, so none joins the candidate pool of the tests above.
+  await prisma.cordisOrganization.createMany({
+    data: [
+      { organisationId: PIC_THIN, name: 'G0G1 E2E History thin', city: 'Ankara', country: 'TR' },
+      { organisationId: PIC_NETWORK, name: 'G0G1 E2E History network', city: 'Ankara', country: 'TR' },
+      { organisationId: PIC_RICH, name: 'G0G1 E2E History rich', city: 'Ankara', country: 'TR' },
+      ...COLLABORATORS.map((organisationId) => ({ organisationId, name: `G0G1 E2E History partner ${organisationId}`, country: 'DE' })),
+    ],
+  });
+  const partners = (count: number) => COLLABORATORS.slice(0, count).map((pic): [string, string] => [pic, 'participant']);
+  await seedCordisProject('thin', 'HORIZON-G0G1E2E-OTHER-2020', [[PIC_THIN, 'coordinator'], ...partners(2)]);
+  await seedCordisProject('network', 'HORIZON-G0G1E2E-OTHER-2021', [[PIC_NETWORK, 'participant'], ...partners(18)]);
+  for (const [i, family] of ['01', '01', '01', '02', '02', '02'].entries()) {
+    await seedCordisProject(`rich-${i}`, `HORIZON-G0G1E2E-2026-${family}-D1`, [
+      [PIC_RICH, 'coordinator'],
+      ...(i === 0 ? partners(25) : []),
+    ]);
+  }
 }
 
 const signInPro = (page: Page) => signInAs(page, { id: PRO_USER, email: PRO_EMAIL, role: 'TENANT_OWNER', tenantId: PRO });
@@ -178,6 +221,29 @@ async function saveProfile(page: Page, slug: string, tenantId: string) {
     })
     .toEqual(KEYWORDS);
   dump('profil formu kaydedildi', await prisma.tenantProfile.findUnique({ where: { tenantId }, select: { keywords: true } }));
+}
+
+const storedPic = async (tenantId: string) =>
+  (await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { pic: true } })).pic;
+
+/** The PIC field on the profile form, up to the point the form asks or answers. */
+async function submitPic(page: Page, slug: string, pic: string) {
+  await page.goto(`/tr/${slug}/settings/profile`);
+  const input = page.getByTestId('tenant-pic-input');
+  await expectHydrated(input);
+  await input.fill(pic);
+  await page.getByRole('button', { name: 'Profili Kaydet' }).click();
+}
+
+/** A PIC CORDIS knows: the form names the organisation and stores nothing before the yes. */
+async function confirmCordisPic(page: Page, slug: string, tenantId: string, pic: string, organisation: string) {
+  await submitPic(page, slug, pic);
+  const confirm = page.getByTestId('tenant-pic-confirm');
+  await expect(confirm).toContainText(organisation, { timeout: 30_000 });
+  expect(await storedPic(tenantId)).not.toBe(pic);
+  await page.getByTestId('tenant-pic-confirm-yes').click();
+  await expect.poll(() => storedPic(tenantId), { timeout: 30_000 }).toBe(pic);
+  dump(`PIC onaylandı ${organisation}`, await storedPic(tenantId));
 }
 
 /** "Yeni Fırsat" on the board. Returns the id the database gave the row. */
@@ -541,8 +607,8 @@ test.describe('NG-28 what the seat confirmation refuses', () => {
 });
 
 test.describe('NG-27 where a new user stops', () => {
-  test('a brand-new tenant cannot reach 70 on any screen open to it', async ({ page }) => {
-    test.setTimeout(240_000);
+  test('on the free plan only a confirmed CORDIS history clears 70, and G1 stays shut without M8', async ({ page }) => {
+    test.setTimeout(360_000);
     await signInFresh(page);
 
     // ── 1. The board is closed until the owner finds the module switch.
@@ -576,38 +642,84 @@ test.describe('NG-27 where a new user stops', () => {
     expect(noEvidence.passed).toBe(false);
     expect(storedScore(noEvidence.inputs)).toBeNull();
 
-    // ── 3. Everything a Discover tenant can do, on the best topic the catalogue can hold.
+    // ── 3. Everything a Discover tenant with no PIC can do, on the best topic the catalogue can hold.
     await saveProfile(page, FRESH_SLUG, FRESH);
-    await expect(page.locator('main').getByLabel(/PIC/)).toHaveCount(0);
-    await expect(page.locator('main').getByText(/\bPIC\b/)).toHaveCount(0);
-    await shot(page, '12-taze-hesap-profilde-pic-yok');
+    await expect(page.getByTestId('tenant-pic-input')).toHaveValue('');
+    await shot(page, '12-taze-hesap-pic-bos');
+    expect(await storedPic(FRESH)).toBeNull();
 
     const best = await createFromForm(page, FRESH_SLUG, FRESH, 'NG-27 en iyi konu', IDEAL_TOPIC.identifier);
-    const refused = await runG0(page, FRESH_SLUG, best.id);
-    dump('G0 tıklandı, en iyi konu, koltuk yok', refused);
-    await shot(page, '13-taze-hesap-63-red');
-    expect(refused.passed).toBe(false);
-    expect(storedScore(refused.inputs)).toBe(63);
-    expect((await prisma.opportunity.findUniqueOrThrow({ where: { id: best.id } })).g0Score).toBe(63);
+    const plain = await createFromForm(page, FRESH_SLUG, FRESH, 'NG-27 sıradan konu, ücretsiz', PLAIN_TOPIC.identifier);
+    // Every score below is the coordinator's scale: the form opens an opportunity with that role.
+    expect(best.intendedRole).toBe('coordinator');
+    expect(plain.intendedRole).toBe('coordinator');
 
-    // ── 4. The 12 points that are missing need seats, and seats need M8, which Discover has not got.
+    const expectG0 = async (label: string, id: string, score: number, passed: boolean, shotName: string) => {
+      const run = await runG0(page, FRESH_SLUG, id);
+      dump(`G0 tıklandı, ${label}`, { pic: await storedPic(FRESH), passed: run.passed, score: storedScore(run.inputs), banner: run.banner });
+      await shot(page, shotName);
+      expect(storedScore(run.inputs)).toBe(score);
+      expect(run.passed).toBe(passed);
+      expect((await prisma.opportunity.findUniqueOrThrow({ where: { id } })).g0Score).toBe(score);
+    };
+
+    await expectG0('PIC yok, en iyi konu', best.id, 63, false, '13-taze-hesap-63-red');
+    await expectG0('PIC yok, sıradan konu', plain.id, 55, false, '13b-taze-hesap-siradan-55-red');
+
+    // ── 4. The 12 points the seats would give need M8, which Discover has not got.
     await page.goto(`/tr/${FRESH_SLUG}/pipeline/${best.id}/consortium`);
     await expect(page.getByRole('alert').filter({ hasText: /./ }).first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: `+ ${CONSORTIUM_ROLES.research}` })).toHaveCount(0);
     await shot(page, '14-taze-hesap-konsorsiyum-kilitli');
 
+    // ── 5. A PIC with no CORDIS record adds nothing: a new organisation with no history stays below 70.
+    await submitPic(page, FRESH_SLUG, PIC_NO_RECORD);
+    await expect(page.getByTestId('tenant-pic-feedback')).toContainText("CORDIS'te bu koda ait kayıt bulamadık", { timeout: 30_000 });
+    expect(await storedPic(FRESH)).toBe(PIC_NO_RECORD);
+    await expectG0('PIC var, CORDIS kaydı yok, en iyi konu', best.id, 63, false, '15-pic-cordis-yok-63-red');
+    await expectG0('PIC var, CORDIS kaydı yok, sıradan konu', plain.id, 55, false, '15b-pic-cordis-yok-55-red');
+
+    // ── 6. A thin history moves the score and does not clear the threshold.
+    await confirmCordisPic(page, FRESH_SLUG, FRESH, PIC_THIN, 'G0G1 E2E History thin');
+    await expectG0('ince geçmiş, en iyi konu', best.id, 65.05, false, '16-ince-gecmis-65-red');
+    await expectG0('ince geçmiş, sıradan konu', plain.id, 57.05, false, '16b-ince-gecmis-57-red');
+
+    // ── 7. K-577043 = A: history is what clears 70 on the free plan, and the confirmation is a
+    //    declaration, not proof of ownership (FO-383). 63 + 18/25 of the network feature's 10.
+    await confirmCordisPic(page, FRESH_SLUG, FRESH, PIC_NETWORK, 'G0G1 E2E History network');
+    await expectG0('18 ortak, en iyi konu', best.id, 70.2, true, '17-ag-gecmisi-70-gecti');
+    await expectG0('18 ortak, sıradan konu', plain.id, 62.2, false, '17b-ag-gecmisi-62-red');
+
+    await confirmCordisPic(page, FRESH_SLUG, FRESH, PIC_RICH, 'G0G1 E2E History rich');
+    await expectG0('zengin geçmiş, en iyi konu', best.id, 88, true, '18-zengin-gecmis-88-gecti');
+    await expectG0('zengin geçmiş, sıradan konu', plain.id, 80, true, '18b-zengin-gecmis-80-gecti');
+
+    // ── 8. G0 passed, and the free plan still ends here: G1 needs seats, seats need M8.
+    const main = await openDetail(page, FRESH_SLUG, best.id);
+    await main.getByTestId('pipeline-evaluate-gate').click();
+    await expect(main.getByTestId('pipeline-gate-result')).toContainText('tanımlı kritik rol yok', { timeout: 30_000 });
+    await expect(main.getByTestId('pipeline-evaluate-gate')).toBeEnabled({ timeout: 30_000 });
+    await shot(page, '19-g0-gecti-g1-red');
+    const refusedG1 = (await decisions(best.id)).at(-1)!;
+    expect([refusedG1.gate, refusedG1.passed]).toEqual(['G1', false]);
+
+    await page.goto(`/tr/${FRESH_SLUG}/pipeline/${best.id}/consortium`);
+    await expect(page.getByRole('alert').filter({ hasText: /./ }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: `+ ${CONSORTIUM_ROLES.research}` })).toHaveCount(0);
+
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: FRESH }, select: { pic: true, country: true } });
     const stage = await prisma.opportunity.findUniqueOrThrow({ where: { id: best.id }, select: { stage: true, g0Score: true } });
     dump('SON: taze hesap', { tenant, stage, seats: await prisma.consortiumSeat.count({ where: { tenantId: FRESH } }) });
-    expect(tenant.pic).toBeNull();
+    expect(stage).toEqual({ stage: 'G0', g0Score: 88 });
+    expect(await prisma.consortiumSeat.count({ where: { tenantId: FRESH } })).toBe(0);
   });
 
-  test('on a plan that has M8: an ordinary topic tops out below 70, and no imported rate is a hard stop', async ({ page }) => {
+  test('on a plan that has M8 with no CORDIS history: an ordinary topic tops out below 70, and no imported rate is a hard stop', async ({ page }) => {
     test.setTimeout(240_000);
     await signInPro(page);
     await saveProfile(page, PRO_SLUG, PRO);
 
-    // ── Every UI-reachable point on a topic with neither flag: 30 + 15 + 12 + 10 = 67.
+    // ── Every UI-reachable point without a history, on a topic with neither flag: 30 + 15 + 12 + 10 = 67.
     const plain = await createFromForm(page, PRO_SLUG, PRO, 'NG-27 sıradan konu', PLAIN_TOPIC.identifier);
     await openConsortium(page, PRO_SLUG, plain.id);
     await addSeat(page, plain.id, 'research');
