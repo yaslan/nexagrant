@@ -723,6 +723,17 @@ yazılır (`src/lib/scoring/g0-compute.ts`, `prisma/seed.ts`); fırsat satırı 
 hiçbir şey yazmaz. `Opportunity.g0Score` bir önbellek sütunudur: `persistG0` doldurur, ama tohum
 verisi de yazabildiği için hiçbir ekran onu doğrudan çizmez.
 
+**PIC değişince yeniden hesaplama (FO-384).** Kiracı PIC kaydeder, temizler veya yönetici kaldırırsa
+kiracının canlı (`deletedAt` boş) fırsatları `rescoreOpportunityG0` ile yeniden puanlanır
+(`src/lib/scoring/g0-rescore-tenant.ts`). Kural: puan değişmediyse `Opportunity` satırına hiç
+yazılmaz; değiştiyse `updatedAt` korunur (pano "son dokunulan" sırasını bozmaz). `TopicMatch`
+kanıt kaydı her koşuda yenilenir. Puan hesaplanamazsa (`coverage === 0`) saklanan değer `null`
+ile değiştirilir. İstek içinde 25 sn'lik bütçe biter ve kalan fırsatlar `g0-rescore-tenant`
+işine (`src/lib/jobs/tasks/g0-rescore-tenant.ts`) bırakılır; iş kiracı ve değişiklik kimliğiyle
+kaldığı imleçten (`afterId`, fırsat kimliği sırası) devam eder. Kuyruğa koyamazsa `SystemAlert`
+(`source: g0-rescore-after-pic`, kiracı kimliği yok) üretilir. Canlı veriye geriye dönük yazma
+bu yoldan yapılmaz; `pnpm jobs:g0-rescore` ayrı bir patron kararıdır.
+
 **Geri doldurma.** `prisma/migrations/topicmatch-per-opportunity/migration.sql` eski konu-başına
 satırları şöyle ayırır: kanıt yükü taşıyan bir satır, o kiracıda o konuda **tek** canlı fırsat
 varsa o fırsata bağlanır (gerçek K1 `fitScore`'u da varsa puan yeni bir fırsat satırına taşınır,

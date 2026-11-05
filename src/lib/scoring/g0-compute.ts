@@ -7,8 +7,9 @@
  *
  * What it guarantees:
  *   • the score is derived, never invented — if the snapshot carries no evidence at all
- *     (`coverage === 0`) the score is `null` and nothing is written, because a stored 0 would be
- *     just as fabricated as the `Math.random()` it replaces;
+ *     (`coverage === 0`) the score is `null`; no 0 is ever written, because a stored 0 would be
+ *     just as fabricated as the `Math.random()` it replaces. The gate path leaves an earlier value
+ *     alone, the rescore path replaces it with null (`clearStoredG0`, FO-384);
  *   • every stored score comes with its breakdown: `TopicMatch.breakdown` keeps the per-feature
  *     contributions and the source trail, which is the record CLAUDE.md §7 requires behind any
  *     figure shown to a user;
@@ -403,6 +404,35 @@ export function g0EvidencePayload(computation: G0Computation): JsonObject {
   };
 }
 
+/** Options for the stores below. The default is the gate path; a rescore passes `keepUpdatedAt`. */
+export interface G0StoreOptions {
+  /**
+   * A PIC change re-derives scores but does not edit the opportunity, so the board's "recently
+   * touched" order must not move (FO-384 B1). With this set, the opportunity keeps its `updatedAt`
+   * and a score that is already stored is not written at all.
+   */
+  keepUpdatedAt?: boolean;
+}
+
+/** Writes `g0Score` on the opportunity; with `keepUpdatedAt` an unchanged value is not written. */
+async function writeOpportunityScore(
+  client: TenantTx,
+  ids: { opportunityId: string; tenantId: string },
+  value: number | null,
+  keepUpdatedAt: boolean,
+): Promise<void> {
+  if (!isPresentId(ids.opportunityId) || !isPresentId(ids.tenantId)) return;
+  const where = { id: ids.opportunityId, tenantId: ids.tenantId };
+  if (!keepUpdatedAt) {
+    await client.opportunity.updateMany({ where, data: { g0Score: value } });
+    return;
+  }
+  const current = await client.opportunity.findFirst({ where, select: { g0Score: true, updatedAt: true } });
+  if (!current || current.g0Score === value) return;
+  // An explicit `updatedAt` overrides Prisma's `@updatedAt`, so the last human edit stays the last.
+  await client.opportunity.updateMany({ where, data: { g0Score: value, updatedAt: current.updatedAt } });
+}
+
 /**
  * Writes the score onto the opportunity and its provenance onto `TopicMatch`.
  *
@@ -410,17 +440,18 @@ export function g0EvidencePayload(computation: G0Computation): JsonObject {
  * what the schema reserves for this, so the breakdown a user sees and the number the gate reads
  * come out of the same write. The row is keyed by `opportunityId`, which is what makes it *this*
  * opportunity's record rather than the topic's. A computation with no score writes nothing.
+ *
+ * The TopicMatch evidence is refreshed on every call; only the opportunity's own score and
+ * `updatedAt` follow {@link G0StoreOptions}.
  */
 export async function persistG0(
   client: TenantTx,
   computation: G0Computation,
+  options: G0StoreOptions = {},
 ): Promise<boolean> {
   if (computation.score === null || !isPresentId(computation.opportunityId) || !isPresentId(computation.tenantId)) return false;
 
-  await client.opportunity.updateMany({
-    where: { id: computation.opportunityId, tenantId: computation.tenantId },
-    data: { g0Score: computation.score },
-  });
+  await writeOpportunityScore(client, { opportunityId: computation.opportunityId, tenantId: computation.tenantId }, computation.score, options.keepUpdatedAt === true);
 
   if (computation.topicId) {
     const evidence = g0EvidencePayload(computation);
@@ -466,13 +497,11 @@ export async function persistG0(
 export async function clearStoredG0(
   client: TenantTx,
   computation: G0Computation,
+  options: G0StoreOptions = {},
 ): Promise<boolean> {
   if (computation.score !== null || !isPresentId(computation.opportunityId) || !isPresentId(computation.tenantId)) return false;
 
-  await client.opportunity.updateMany({
-    where: { id: computation.opportunityId, tenantId: computation.tenantId },
-    data: { g0Score: null },
-  });
+  await writeOpportunityScore(client, { opportunityId: computation.opportunityId, tenantId: computation.tenantId }, null, options.keepUpdatedAt === true);
 
   if (computation.topicId) {
     const evidence = g0EvidencePayload(computation);
@@ -514,8 +543,10 @@ export async function rescoreOpportunityG0(
   return withTenant(tenantId, async (tx) => {
     const computation = await computeG0ForOpportunity(tx, tenantId, opportunityId);
     if (!computation) return null;
-    if (computation.score === null) await clearStoredG0(tx, computation);
-    else await persistG0(tx, computation);
+    // A rescore is not an edit of the opportunity: keep its `updatedAt` (FO-384 B1).
+    const options = { keepUpdatedAt: true };
+    if (computation.score === null) await clearStoredG0(tx, computation, options);
+    else await persistG0(tx, computation, options);
     return computation;
   });
 }

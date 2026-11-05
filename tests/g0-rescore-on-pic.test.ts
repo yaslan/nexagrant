@@ -253,7 +253,7 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
       const alerts = await alertsFor(auditEventId);
       expect(alerts).toHaveLength(1);
       expect(alerts[0]).toMatchObject({ level: 'error', resolvedAt: null });
-      expect(alerts[0]?.meta).toEqual({
+      expect(alerts[0]?.meta).toMatchObject({
         trigger: 'tenant_saved',
         auditEventId,
         total: 2,
@@ -261,6 +261,7 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
         cleared: 0,
         failed: 1,
         skipped: 0,
+        queued: false,
         opportunityIds: [secondOppId],
       });
       const row = JSON.stringify(alerts[0]);
@@ -298,25 +299,78 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
         },
       });
       consoleError.mockRestore();
-      expect(summary).toEqual({ total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0 });
+      expect(summary).toEqual({ total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0, queued: false });
       expect((await alertsFor(auditEventId))[0]?.meta).toMatchObject({ total: null, opportunityIds: [] });
     });
   });
 
-  it('stops at the time budget and says how many it did not reach', async () => {
+  it('stops at the time budget and queues the rest after the last opportunity it reached', async () => {
     const auditEventId = `${key}-budget`;
+    const listed: Array<string | undefined> = [];
+    const queued: Array<{ tenantId: string; run: { afterId?: string } }> = [];
     let clock = 0;
     const summary = await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId), {
       budgetMs: 100,
       now: () => clock,
-      listOpportunityIds: async () => ['a', 'b', 'c'],
+      listOpportunityIds: async (_tenant, afterId) => {
+        listed.push(afterId);
+        return ['a', 'b', 'c'];
+      },
       rescore: async () => {
         clock += 100;
         return { score: 50 } as G0Computation;
       },
+      enqueueContinuation: async (tenant, run) => {
+        queued.push({ tenantId: tenant, run });
+      },
     });
-    expect(summary).toEqual({ total: 3, rescored: 1, cleared: 0, failed: 0, skipped: 2 });
-    expect((await alertsFor(auditEventId))[0]?.meta).toMatchObject({ skipped: 2, opportunityIds: ['b', 'c'] });
+    expect(summary).toEqual({ total: 3, rescored: 1, cleared: 0, failed: 0, skipped: 2, queued: true });
+    expect(listed).toEqual([undefined]);
+    expect(queued).toEqual([{ tenantId, run: { trigger: 'tenant_saved', auditEventId, afterId: 'a' } }]);
+    // The rest is in the queue, so nothing is alerted: an alert would say a rescore is lost.
+    expect(await alertsFor(auditEventId)).toEqual([]);
+  });
+
+  it('resumes after the cursor it was given', async () => {
+    const auditEventId = `${key}-resume`;
+    const rescored: string[] = [];
+    const summary = await rescoreTenantG0AfterPicChange(tenantId, { ...change(auditEventId), afterId: 'a' }, {
+      listOpportunityIds: async (_tenant, afterId) => (afterId === 'a' ? ['b', 'c'] : ['a', 'b', 'c']),
+      rescore: async (_tenant, id) => {
+        rescored.push(id);
+        return { score: 50 } as G0Computation;
+      },
+      enqueueContinuation: async () => {
+        throw new Error('must not queue a finished run');
+      },
+    });
+    expect(rescored).toEqual(['b', 'c']);
+    expect(summary).toEqual({ total: 2, rescored: 2, cleared: 0, failed: 0, skipped: 0, queued: false });
+  });
+
+  it('alerts when the rest cannot be queued, with the counts and no tenant id', async () => {
+    const auditEventId = `${key}-noqueue`;
+    let clock = 0;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const summary = await rescoreTenantG0AfterPicChange(tenantId, change(auditEventId), {
+      budgetMs: 100,
+      now: () => clock,
+      listOpportunityIds: async () => ['a', 'b'],
+      rescore: async () => {
+        clock += 100;
+        return { score: 50 } as G0Computation;
+      },
+      enqueueContinuation: async () => {
+        throw new Error('queue is down');
+      },
+    });
+    consoleError.mockRestore();
+    expect(summary).toEqual({ total: 2, rescored: 1, cleared: 0, failed: 0, skipped: 1, queued: false });
+    const alerts = await alertsFor(auditEventId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ level: 'error' });
+    expect(alerts[0]?.meta).toMatchObject({ skipped: 1, queued: false, opportunityIds: ['b'] });
+    expect(JSON.stringify(alerts[0])).not.toContain(tenantId);
   });
 
   it('lists an alert\'s opportunity ids up to a limit, the counts stay whole', async () => {
@@ -348,11 +402,47 @@ describe('FO-384: stored G0 scores follow a PIC change', () => {
       rescore: async () => ({ ...real!, score: null, decision: null, coverage: 0 }),
     });
 
-    expect(summary).toEqual({ total: 1, rescored: 0, cleared: 1, failed: 0, skipped: 0 });
+    expect(summary).toEqual({ total: 1, rescored: 0, cleared: 1, failed: 0, skipped: 0, queued: false });
     expect(await stored(oppId)).toEqual({ opportunity: null, topicMatch: null });
     const row = await prisma.topicMatch.findFirst({ where: { opportunityId: oppId }, select: { breakdown: true } });
     expect(row?.breakdown).toMatchObject({ score: null, coverage: 0, g0ScorerPlaceholderFitScore: true });
     expect(await alertsFor(`${key}-null`)).toEqual([]);
+  });
+
+  it('a rescore that changes the score keeps the opportunity updatedAt', async () => {
+    await storeCurrentScore(oppId);
+    const old = new Date('2026-03-03T10:00:00Z');
+    await prisma.opportunity.update({ where: { id: oppId }, data: { updatedAt: old } });
+
+    await updateTenantProfile({ ...profile, pic, confirmedPic: pic });
+
+    await expectStoredIsFresh(oppId);
+    expect((await prisma.opportunity.findUnique({ where: { id: oppId }, select: { updatedAt: true } }))?.updatedAt).toEqual(old);
+  });
+
+  it('a rescore that leaves the score unchanged does not touch the opportunity row', async () => {
+    await storeCurrentScore(oppId);
+    const old = new Date('2026-03-03T10:00:00Z');
+    await prisma.opportunity.update({ where: { id: oppId }, data: { updatedAt: old } });
+    const { rescoreOpportunityG0 } = await import('@/lib/scoring/g0-compute');
+
+    await rescoreOpportunityG0(tenantId, oppId);
+
+    expect((await prisma.opportunity.findUnique({ where: { id: oppId }, select: { updatedAt: true } }))?.updatedAt).toEqual(old);
+    await expectStoredIsFresh(oppId);
+  });
+
+  it('rescoreOpportunityG0 clears a stored score that the scorer can no longer compute', async () => {
+    // An opportunity without a topic has no evidence, so the scorer returns no score (coverage 0).
+    await prisma.opportunity.create({
+      data: { id: `${key}-notopic`, tenantId, workspaceId: `${tenantId}-w`, title: 'no topic', topicId: null, stage: 'G0', status: 'ACTIVE', intendedRole: 'coordinator', g0Score: 55 },
+    });
+    const { rescoreOpportunityG0 } = await import('@/lib/scoring/g0-compute');
+
+    const computation = await rescoreOpportunityG0(tenantId, `${key}-notopic`);
+
+    expect(computation?.score).toBeNull();
+    expect(await stored(`${key}-notopic`)).toEqual({ opportunity: null, topicMatch: null });
   });
 
   it('never rejects, whatever fails', async () => {

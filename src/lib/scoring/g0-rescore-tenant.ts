@@ -8,10 +8,13 @@
  * What it guarantees:
  *   • it never rejects: the PIC change is already committed when this runs, so a failure here is an
  *     alert (`SystemAlert`, no tenant id, no PIC value), never an error back to the user;
- *   • it stops at a time budget and says how many opportunities it did not reach;
- *   • a score the scorer can no longer compute is cleared, not left at its old value.
+ *   • it stops at a time budget and queues the rest as a job (`g0-rescore-tenant`) that resumes
+ *     after the last opportunity it reached, so a large tenant is finished by the queue (FO-384 B2);
+ *   • a score the scorer can no longer compute is cleared, not left at its old value;
+ *   • a rescore keeps each opportunity's `updatedAt` (see `rescoreOpportunityG0`).
  */
-import { prisma, withTenant } from '@/lib/db';
+import { withTenant } from '@/lib/db';
+import { recordAlert } from '@/lib/observability/system-alert';
 import { clearStoredG0, rescoreOpportunityG0, type G0Computation } from './g0-compute';
 
 export type PicChangeTrigger = 'tenant_saved' | 'tenant_cleared' | 'admin_removed';
@@ -20,96 +23,126 @@ export interface PicChange {
   /** The `AuditEvent` row written by the PIC change, so an alert can be traced back to it. */
   auditEventId: string;
 }
+/** A run of the rescore. `afterId` resumes a run the queue continues: the last opportunity it reached. */
+export interface G0RescoreRun extends PicChange {
+  afterId?: string;
+}
 export interface G0TenantRescoreSummary {
   /** `null` when the opportunity list itself could not be read. */
   total: number | null;
   rescored: number;
   cleared: number;
   failed: number;
+  /** Opportunities this run did not finish: the ones it could not reach, plus any that moved. */
   skipped: number;
+  /** True when the rest was handed to the `g0-rescore-tenant` job. */
+  queued: boolean;
 }
 export interface G0TenantRescoreDeps {
-  listOpportunityIds?: (tenantId: string) => Promise<string[]>;
+  listOpportunityIds?: (tenantId: string, afterId: string | undefined) => Promise<string[]>;
   rescore?: (tenantId: string, opportunityId: string) => Promise<G0Computation | null>;
+  /** Queues the rest of this run. Resolves once the job is in the queue. */
+  enqueueContinuation?: (tenantId: string, run: G0RescoreRun) => Promise<void>;
   now?: () => number;
   budgetMs?: number;
 }
 
 export const G0_RESCORE_ALERT_SOURCE = 'g0-rescore-after-pic';
-/** Within a server action's lifetime; a tenant with more opportunities is finished by a later run. */
+/** Within a server action's lifetime; the rest of a larger tenant is queued, not dropped. */
 export const G0_RESCORE_BUDGET_MS = 25_000;
 /** Alert meta lists at most this many unfinished opportunity ids; the counts stay whole. */
 const ALERT_ID_LIMIT = 10;
 
-/** Live (not archived) opportunities of one tenant, read under its RLS context. */
-async function listLiveOpportunityIds(tenantId: string): Promise<string[]> {
+/** Live (not archived) opportunities of one tenant after `afterId`, read under its RLS context. */
+async function listLiveOpportunityIds(tenantId: string, afterId: string | undefined): Promise<string[]> {
   const rows = await withTenant(tenantId, (tx) =>
     tx.opportunity.findMany({
-      where: { tenantId, deletedAt: null },
+      where: { tenantId, deletedAt: null, ...(afterId ? { id: { gt: afterId } } : {}) },
       select: { id: true },
-      orderBy: { createdAt: 'asc' },
+      // Id order is the cursor's order; `createdAt` ties would make a resumed run skip rows.
+      orderBy: { id: 'asc' },
     }),
   );
   return rows.map((row) => String(row.id));
 }
 
+async function queueRest(tenantId: string, run: G0RescoreRun): Promise<void> {
+  // Imported here so the scoring module does not load the queue client for a run that finishes.
+  const { enqueueJob } = await import('@/lib/jobs/enqueue');
+  await enqueueJob('g0-rescore-tenant', { ...run, tenantId });
+}
+
+/** The code of an error (a Prisma or driver code), never its message: messages can carry values. */
+function errorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === 'string') return code;
+  return error instanceof Error ? error.name : 'unknown';
+}
+
 async function raiseAlert(
-  change: PicChange,
+  run: G0RescoreRun,
   summary: G0TenantRescoreSummary,
   unfinished: string[],
   errored: boolean,
 ): Promise<void> {
-  const level = errored || summary.total === null || summary.failed > 0 ? 'error' : 'warn';
-  try {
-    await prisma.systemAlert.create({
-      data: {
-        level,
-        source: G0_RESCORE_ALERT_SOURCE,
-        // No tenant id and no PIC value: the alert is read by staff across tenants.
-        message: `G0 rescore after PIC change: ${summary.failed} failed, ${summary.skipped} not reached (of ${summary.total ?? 'unknown'})`,
-        meta: {
-          trigger: change.trigger,
-          auditEventId: change.auditEventId,
-          total: summary.total,
-          rescored: summary.rescored,
-          cleared: summary.cleared,
-          failed: summary.failed,
-          skipped: summary.skipped,
-          opportunityIds: unfinished.slice(0, ALERT_ID_LIMIT),
-        },
-      },
-    });
-  } catch (error) {
-    console.error('G0 rescore alert could not be written', error instanceof Error ? error.name : 'unknown');
-  }
+  // Work that nobody will do (a failed listing, a failed opportunity, a rest that could not be queued) is an error.
+  const lost = errored || summary.total === null || summary.failed > 0 || (summary.skipped > 0 && !summary.queued);
+  const level = lost ? 'error' : 'warn';
+  // `recordAlert` never throws. The dedupe key is per PIC change, so a retried run adds a count to
+  // one alert instead of a second row (H1).
+  await recordAlert({
+    level,
+    source: G0_RESCORE_ALERT_SOURCE,
+    // No tenant id and no PIC value: the alert is read by staff across tenants.
+    message: `G0 rescore after PIC change: ${summary.failed} failed, ${summary.skipped} not reached (of ${summary.total ?? 'unknown'})`,
+    meta: {
+      trigger: run.trigger,
+      auditEventId: run.auditEventId,
+      total: summary.total,
+      rescored: summary.rescored,
+      cleared: summary.cleared,
+      failed: summary.failed,
+      skipped: summary.skipped,
+      queued: summary.queued,
+      opportunityIds: unfinished.slice(0, ALERT_ID_LIMIT),
+    },
+    dedupeKey: `${G0_RESCORE_ALERT_SOURCE}:${run.auditEventId}`,
+  });
 }
 
 /**
- * Rescores every live opportunity of the tenant after its PIC changed. Resolves in every case.
+ * Rescores the tenant's live opportunities after its PIC changed. Resolves in every case.
+ *
+ * Runs in id order from `run.afterId`. When the time budget ends first, the rest goes to the queue
+ * as a job that starts after the last opportunity reached. Only a failure to queue it, a failed
+ * opportunity or an unreadable list raises an alert.
  */
 export async function rescoreTenantG0AfterPicChange(
   tenantId: string,
-  change: PicChange,
+  run: G0RescoreRun,
   deps: G0TenantRescoreDeps = {},
 ): Promise<G0TenantRescoreSummary> {
   const listIds = deps.listOpportunityIds ?? listLiveOpportunityIds;
   const rescore = deps.rescore ?? ((t: string, id: string) => rescoreOpportunityG0(t, id));
+  const enqueue = deps.enqueueContinuation ?? queueRest;
   const now = deps.now ?? Date.now;
   const budgetMs = deps.budgetMs ?? G0_RESCORE_BUDGET_MS;
 
-  const summary: G0TenantRescoreSummary = { total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0 };
+  const summary: G0TenantRescoreSummary = { total: null, rescored: 0, cleared: 0, failed: 0, skipped: 0, queued: false };
   const unfinished: string[] = [];
   let ids: string[] = [];
   let next = 0;
+  let lastReached: string | undefined = run.afterId;
   let errored = false;
 
   try {
-    ids = await listIds(tenantId);
+    ids = await listIds(tenantId, run.afterId);
     summary.total = ids.length;
     const start = now();
     for (; next < ids.length; next++) {
       if (now() - start >= budgetMs) break;
       const id = ids[next]!;
+      lastReached = id;
       try {
         const computation = await rescore(tenantId, id);
         if (!computation) {
@@ -125,22 +158,28 @@ export async function rescoreTenantG0AfterPicChange(
       } catch (error) {
         summary.failed++;
         unfinished.push(id);
-        console.error('G0 rescore failed for one opportunity', error instanceof Error ? error.name : 'unknown');
+        console.error('G0 rescore failed for one opportunity', errorCode(error));
       }
     }
-    summary.skipped += ids.length - next;
-    unfinished.push(...ids.slice(next));
   } catch (error) {
     errored = true;
-    console.error('G0 rescore after PIC change aborted', error instanceof Error ? error.name : 'unknown');
-    if (summary.total !== null) {
-      summary.skipped += ids.length - next;
-      unfinished.push(...ids.slice(next));
+    console.error('G0 rescore after PIC change aborted', errorCode(error));
+  }
+
+  const remaining = summary.total === null ? [] : ids.slice(next);
+  if (remaining.length > 0) {
+    summary.skipped += remaining.length;
+    try {
+      await enqueue(tenantId, { ...run, afterId: lastReached });
+      summary.queued = true;
+    } catch (error) {
+      console.error('G0 rescore continuation could not be queued', errorCode(error));
+      unfinished.push(...remaining);
     }
   }
 
-  if (errored || summary.total === null || summary.failed > 0 || summary.skipped > 0) {
-    await raiseAlert({ ...change }, summary, unfinished, errored);
+  if (errored || summary.total === null || summary.failed > 0 || (summary.skipped > 0 && !summary.queued)) {
+    await raiseAlert(run, summary, unfinished, errored);
   }
   return summary;
 }
