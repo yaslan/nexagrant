@@ -1,14 +1,16 @@
 'use server';
 
 import { withTenant } from '@/lib/db';
-import { requireTenantAction } from '@/lib/tenant';
+import { ForbiddenRoleError, requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { PILOT_EXPIRED_CODE, isPilotExpired, type PilotExpiredCode } from '@/lib/pilot-expired';
 import { FORBIDDEN_ROLE_CODE, isForbiddenRole, type ForbiddenRoleCode } from '@/lib/forbidden-role';
 import { revalidatePath } from 'next/cache';
 import { generateSeatCandidates } from './matching';
-import { canConfirmSeat, inviteSeatCandidate } from './seat-transitions';
+import { CONFIRM_SEAT_PERMISSION, canConfirmSeat, inviteSeatCandidate } from './seat-transitions';
 import {
+  SeatConfirmConflictError,
+  SeatNotConfirmableError,
   COMPUTE_FAILED_CODE,
   SEAT_NOT_FOUND_CODE,
   SeatNotFoundError,
@@ -85,12 +87,14 @@ export async function inviteCandidateToSeat(
 /**
  * Confirms the organisation already invited to a seat. Only a role with
  * `manage_approvals` (owner, admin, pipeline manager) may; the organisation is
- * read from the seat, not taken from the client.
+ * read from the seat, not taken from the client. `expectedOrganizationId` only
+ * narrows: a button that named one organisation does not confirm another one
+ * invited to the seat since the page rendered.
  */
-export async function confirmSeatAssignment(seatId: string, opportunityId: string) {
+export async function confirmSeatAssignment(seatId: string, opportunityId: string, expectedOrganizationId?: string) {
   const { tenantId, role } = await requireTenantAction();
   if (!canConfirmSeat(role)) {
-    throw new Error('Your role cannot confirm consortium seats.');
+    throw new ForbiddenRoleError(CONFIRM_SEAT_PERMISSION);
   }
   if (!isPresentId(seatId) || !isPresentId(opportunityId)) {
     throw new Error('Seat not found in this workspace.');
@@ -103,6 +107,7 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
     });
     const organizationId = seat?.organizationId;
     if (!organizationId) return 0;
+    if (expectedOrganizationId !== undefined && expectedOrganizationId !== organizationId) return 0;
 
     const opp = await tx.opportunity.findFirst({
       where: { id: opportunityId, tenantId },
@@ -114,14 +119,18 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
     // `Opportunity` carries a `topicId` column but no `topic` relation and no
     // `callId`, so the call is resolved in two steps rather than included —
     // `include: { topic: true }` threw PrismaClientValidationError here.
+    // The column holds the Topic's id or its portal identifier: the board form
+    // and the call page write the identifier (see src/lib/scoring/g0-compute.ts).
+    // Looked up by id alone, the rule never fired on an opportunity a user opened.
     const topic = opp.topicId
-      ? await tx.topic.findUnique({ where: { id: opp.topicId }, select: { callId: true } })
+      ? ((await tx.topic.findUnique({ where: { id: opp.topicId }, select: { callId: true } })) ??
+        (await tx.topic.findUnique({ where: { identifier: opp.topicId }, select: { callId: true } })))
       : null;
 
     if (topic?.callId) {
-      const siblingTopics: { id: string }[] = await tx.topic.findMany({
+      const siblingTopics: { id: string; identifier: string }[] = await tx.topic.findMany({
         where: { callId: topic.callId },
-        select: { id: true }
+        select: { id: true, identifier: true }
       });
 
       // The conflict check stays inside the tenant: another tenant's
@@ -133,7 +142,7 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
           organizationId,
           status: 'CONFIRMED',
           opportunity: {
-            topicId: { in: siblingTopics.map((t) => t.id) },
+            topicId: { in: siblingTopics.flatMap((t) => [t.id, t.identifier]) },
             id: { not: opportunityId },
             status: 'ACTIVE'
           }
@@ -141,7 +150,7 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
         include: { opportunity: true }
       });
       if (conflict) {
-        throw new Error(`Conflict: Organization is already CONFIRMED in another active opportunity for the same call (${conflict.opportunity.title}).`);
+        throw new SeatConfirmConflictError(`Conflict: Organization is already CONFIRMED in another active opportunity for the same call (${conflict.opportunity.title}).`);
       }
     }
 
@@ -154,7 +163,7 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
     return result.count;
   });
 
-  if (updated === 0) throw new Error(`Seat ${seatId} has no invited organisation to confirm in this workspace.`);
+  if (updated === 0) throw new SeatNotConfirmableError(`Seat ${seatId} has no invited organisation to confirm in this workspace.`);
 
   revalidatePath(MATCHING_PATH, 'page');
 }

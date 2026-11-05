@@ -731,7 +731,7 @@ export default function CallsPage({
                         </span>
                         {call.isLumpSum && (
                           <span className="text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                            Lump Sum
+                            {t('lumpSum')}
                           </span>
                         )}
                         {call.isTwoStage && (
@@ -909,7 +909,7 @@ export default function CallsPage({
                 <div className="space-y-2">
                   {selectedTopic.deadlines.map((dl, i) => (
                     <div key={i} className="flex justify-between items-center bg-ground px-3 py-2 rounded-lg text-xs">
-                      <span className="font-medium text-ink">Stage {dl.stage}</span>
+                      <span className="font-medium text-ink">{t('stageNumber', { stage: dl.stage })}</span>
                       <span className="font-mono text-accent font-semibold">{formatDate(dl.at)}</span>
                     </div>
                   ))}

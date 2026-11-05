@@ -59,6 +59,7 @@ export async function teardownProfilePic() {
     await tx.subscription.deleteMany({ where: { tenantId: { in: TENANT_IDS } } });
     await tx.workspace.deleteMany({ where: { tenantId: { in: TENANT_IDS } } });
     await tx.user.deleteMany({ where: { id: { in: USER_IDS } } });
+    await tx.user.deleteMany({ where: { id: { startsWith: 'pp-e2e-prober-' } } });
     await tx.tenant.deleteMany({ where: { id: { in: TENANT_IDS } } });
   });
 }
@@ -150,6 +151,23 @@ export async function setupProfilePic() {
       },
     });
   });
+}
+
+/**
+ * An owner of the other tenant used only by the FO-386 limit test. Fresh on every call: the count
+ * lives in the server process, so a fixed id would start a repeat on the same server (--repeat-each)
+ * already over the limit. Playwright starts its own server, so a new run begins at zero either way.
+ */
+export async function addPicProber() {
+  const id = `pp-e2e-prober-${Date.now()}`;
+  const prober = { id, email: `${id}@profile.test`, tenantId: PP_OTHER_TENANT, role: 'TENANT_OWNER' };
+  await withSystemScope('platform-admin', 'e2e.profile-pic.prober', async (tx) => {
+    await tx.user.create({ data: { id, email: prober.email, name: id, locale: 'tr' } });
+    await tx.membership.create({
+      data: { tenantId: PP_OTHER_TENANT, userId: id, role: 'TENANT_OWNER', workspaceIds: [PP_OTHER_WORKSPACE_ID] },
+    });
+  });
+  return prober;
 }
 
 /** `Tenant.pic` as stored, read past the page. */

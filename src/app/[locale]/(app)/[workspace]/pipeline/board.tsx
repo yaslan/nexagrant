@@ -39,12 +39,12 @@ const nextToastId = () => (toastSequence += 1);
 /** The intended-role filter above the board; matches the <option> values. */
 type RoleFilter = 'all' | 'coordinator' | 'partner';
 
-const GATES: { key: Gate; subtitle: string; color: string }[] = [
-  { key: 'G0', subtitle: 'Stratejik Uygunluk & Filtre', color: 'border-t-blue-500' },
-  { key: 'G1', subtitle: 'Konsept Notu & Mimari', color: 'border-t-teal-500' },
-  { key: 'G2', subtitle: 'Partner Eşleştirme & Bütçe', color: 'border-t-purple-500' },
-  { key: 'G3', subtitle: 'Part A & B / Hakem Simülasyonu', color: 'border-t-amber-500' },
-  { key: 'G4', subtitle: 'AB Portalına Teslim & Onay', color: 'border-t-emerald-500' },
+const GATES: { key: Gate; color: string }[] = [
+  { key: 'G0', color: 'border-t-blue-500' },
+  { key: 'G1', color: 'border-t-teal-500' },
+  { key: 'G2', color: 'border-t-purple-500' },
+  { key: 'G3', color: 'border-t-amber-500' },
+  { key: 'G4', color: 'border-t-emerald-500' },
 ];
 
 /**
@@ -224,10 +224,10 @@ export default function KanbanBoard({
     startTransition(async () => {
       try {
         await assignOpportunityOwner({ opportunityId: oppId, ownerId: memberId, ownerName });
-        showToast(`Fırsat ${ownerName} kişisine atandı!`, 'success');
+        showToast(t('board.assignedToast', { owner: ownerName }), 'success');
       } catch (err) {
         console.error(err);
-        showToast(errorText(err, 'Atama sırasında hata oluştu.'), 'error');
+        showToast(errorText(err, t('board.assignFailed')), 'error');
       }
     });
   };
@@ -239,7 +239,7 @@ export default function KanbanBoard({
 
     const author = members.find((m) => m.id === cardInput.authorId) || members[0];
     if (!author) {
-      showToast('Kullanıcı listesi henüz yüklenmedi, lütfen tekrar deneyin.', 'error');
+      showToast(t('board.membersNotLoaded'), 'error');
       return;
     }
     const text = cardInput.text.trim();
@@ -267,11 +267,11 @@ export default function KanbanBoard({
           // Clear note input text for this card
           setNoteInputs((prev) => clearNoteText(prev, oppId, author.id));
 
-          showToast(`${author.name} kullanıcısının notu eklendi!`, 'success');
+          showToast(t('board.noteAdded', { author: author.name }), 'success');
         }
       } catch (err) {
         console.error(err);
-        showToast(errorText(err, 'Not eklenirken hata oluştu.'), 'error');
+        showToast(errorText(err, t('board.noteFailed')), 'error');
       }
     });
   };
@@ -306,13 +306,13 @@ export default function KanbanBoard({
             ownerId: '',
             notes: '',
           });
-          showToast(`"${res.opportunity.title}" fırsatı ${member?.name || ''} üzerine atanarak oluşturuldu!`, 'success');
+          showToast(t('board.createdToast', { title: res.opportunity.title, owner: member?.name || '' }), 'success');
         } else if (!res.success) {
           // e.g. WORKSPACE_NOT_FOUND (TASK-MUO12A7NHANOT): a refusal is a value, not a throw.
           showToast(t('createRefused'), 'error');
         }
       } catch (err) {
-        showToast(errorText(err, () => errorMessage(err, 'Fırsat oluşturulurken hata meydana geldi.')), 'error');
+        showToast(errorText(err, () => errorMessage(err, t('board.createFailed'))), 'error');
       }
     });
   };
@@ -410,16 +410,16 @@ export default function KanbanBoard({
           <button
             onClick={toggleAllExpand}
             className="text-xs bg-ground border border-border hover:bg-surface text-ink-2 font-medium px-3 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-            title="Tüm kartları genişlet veya küçült"
+            title={t('board.toggleAllTitle')}
           >
-            <span>{allExpanded ? '▲ Tümünü Küçült' : '▼ Tümünü Genişlet'}</span>
+            <span>{allExpanded ? t('board.collapseAll') : t('board.expandAll')}</span>
           </button>
 
           {/* Search Input */}
           <div className="relative w-44 sm:w-56">
             <input
               type="text"
-              placeholder="Fırsat, not veya kişi ara..."
+              placeholder={t('board.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full text-xs bg-ground border border-border rounded-xl px-3 py-2.5 pl-8 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
@@ -435,7 +435,7 @@ export default function KanbanBoard({
             onChange={(e) => setOwnerFilter(e.target.value)}
             className="w-40 truncate text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            <option value="all">👥 Tüm Kullanıcılar</option>
+            <option value="all">{t('board.allUsers')}</option>
             {members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.avatar} {m.name}
@@ -449,9 +449,9 @@ export default function KanbanBoard({
             onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
             className="text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            <option value="all">Tüm Roller</option>
-            <option value="coordinator">👑 Koordinatör</option>
-            <option value="partner">🤝 Ortak</option>
+            <option value="all">{t('board.allRoles')}</option>
+            <option value="coordinator">{t('board.roleCoordinator')}</option>
+            <option value="partner">{t('board.rolePartner')}</option>
           </select>
 
           {/* + New Opportunity Main Trigger Button */}
@@ -460,14 +460,14 @@ export default function KanbanBoard({
             className="bg-accent hover:opacity-90 text-white font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-all flex items-center gap-2 shrink-0 cursor-pointer"
           >
             <span className="text-base leading-none font-bold">+</span>
-            <span>Yeni Fırsat Ekle</span>
+            <span>{t('board.addOpportunity')}</span>
           </button>
         </div>
       </div>
 
       {/* Kanban Board Column Container */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-280px)]">
-        {GATES.map(({ key, subtitle, color }) => {
+        {GATES.map(({ key, color }) => {
           const stageOpps = filteredOpps.filter((o) => o.stage === key);
 
           return (
@@ -487,7 +487,7 @@ export default function KanbanBoard({
                       {stageOpps.length}
                     </span>
                   </div>
-                  <div className="text-[11px] text-muted font-medium mt-0.5">{subtitle}</div>
+                  <div className="text-[11px] text-muted font-medium mt-0.5">{t(`board.gateSubtitle.${key}`)}</div>
                 </div>
 
                 {/* A new opportunity starts at G0; the later columns are reached through the gates. */}
@@ -509,7 +509,7 @@ export default function KanbanBoard({
                 {stageOpps.map((opp) => {
                   const isCoord = (opp.intendedRole || 'coordinator').toLowerCase() === 'coordinator';
                   const currentMember = members.find((m) => m.id === opp.ownerId) || {
-                    name: opp.ownerName || 'Atanmadı',
+                    name: opp.ownerName || t('board.unassigned'),
                     avatar: '👤',
                   };
                   const isExpanded = !!expandedCardIds[opp.id];
@@ -538,7 +538,7 @@ export default function KanbanBoard({
                             }`}
                           >
                             <span>{isCoord ? '👑' : '🤝'}</span>
-                            <span>{isCoord ? 'Koordinatör' : 'Ortak'}</span>
+                            <span>{isCoord ? t('board.coordinatorBadge') : t('board.partnerBadge')}</span>
                           </span>
 
                           {/* Minimized User Badge */}
@@ -573,7 +573,7 @@ export default function KanbanBoard({
                                   ? 'bg-ok/15 text-ok border border-ok/30'
                                   : 'bg-amber/15 text-amber border border-amber/30'
                               }`}
-                              title="AI Gate Uyum Skoru"
+                              title={t('board.g0ScoreTitle')}
                             >
                               ⭐ {opp.g0Score}
                             </span>
@@ -587,7 +587,7 @@ export default function KanbanBoard({
                               toggleExpand(opp.id);
                             }}
                             className="text-[10px] bg-ground hover:bg-accent/15 text-muted hover:text-accent-ink border border-border px-1.5 py-0.5 rounded font-bold transition cursor-pointer"
-                            title={isExpanded ? 'Kartı Küçült' : 'Detaylar İçin Genişlet'}
+                            title={isExpanded ? t('board.collapseCard') : t('board.expandCard')}
                           >
                             {isExpanded ? '▲' : '▼'}
                           </button>
@@ -617,14 +617,14 @@ export default function KanbanBoard({
 
                           {/* Full Assigned User Dropdown Pill */}
                           <div className="flex items-center justify-between bg-ground/80 border border-border rounded-lg px-2.5 py-1 text-[11px] min-w-0 overflow-hidden">
-                            <span className="text-muted text-[10px] font-semibold shrink-0">Atanan:</span>
+                            <span className="text-muted text-[10px] font-semibold shrink-0">{t('board.assignee')}</span>
                             <div className="flex items-center gap-1 min-w-0 overflow-hidden max-w-[170px]">
                               <span className="text-xs shrink-0">{currentMember.avatar}</span>
                               <select
                                 value={opp.ownerId || ''}
                                 onChange={(e) => handleAssignOwner(opp.id, e.target.value)}
                                 className="bg-transparent font-bold text-ink text-[11px] focus:outline-none cursor-pointer hover:text-blue-600 truncate max-w-full"
-                                title="Sorumlu kullanıcıyı değiştir"
+                                title={t('board.changeOwnerTitle')}
                               >
                                 {members.map((m) => (
                                   <option key={m.id} value={m.id}>
@@ -638,9 +638,9 @@ export default function KanbanBoard({
                           {/* ─── USER-ATTRIBUTED NOTES LIST ─── */}
                           <div className="space-y-2 pt-1 border-t border-border/40">
                             <div className="flex items-center justify-between text-[11px] font-bold text-ink">
-                              <span>💬 Notlar & Güncellemeler</span>
+                              <span>{t('board.notesHeading')}</span>
                               <span className="text-[10px] text-muted font-normal">
-                                ({notesList.length} Not)
+                                {t('board.noteCount', { count: notesList.length })}
                               </span>
                             </div>
 
@@ -665,14 +665,14 @@ export default function KanbanBoard({
                               </div>
                             ) : (
                               <p className="text-[10px] text-muted italic">
-                                Henüz not eklenmedi.
+                                {t('board.noNotes')}
                               </p>
                             )}
 
                             {/* Add New Note Inline Input */}
                             <div className="bg-ground border border-border rounded-xl p-2 space-y-2">
                               <div className="flex items-center justify-between gap-1 text-[10px]">
-                                <span className="text-muted font-semibold">Not Yazan:</span>
+                                <span className="text-muted font-semibold">{t('board.noteAuthor')}</span>
                                 <select
                                   data-testid={`pipeline-note-author-${opp.id}`}
                                   value={cardNoteInput.authorId}
@@ -699,7 +699,7 @@ export default function KanbanBoard({
                                 <input
                                   data-testid={`pipeline-note-text-${opp.id}`}
                                   type="text"
-                                  placeholder="Not veya güncelleme yazın..."
+                                  placeholder={t('board.notePlaceholder')}
                                   value={cardNoteInput.text}
                                   onChange={(e) =>
                                     setNoteInputs((prev) => ({
@@ -725,7 +725,7 @@ export default function KanbanBoard({
                                   disabled={!cardNoteInput.text.trim()}
                                   className="bg-accent hover:opacity-90 disabled:opacity-40 text-white font-bold text-[10px] px-2.5 py-1.5 rounded-lg transition shrink-0 cursor-pointer"
                                 >
-                                  Ekle
+                                  {t('board.addNote')}
                                 </button>
                               </div>
                             </div>
@@ -737,17 +737,17 @@ export default function KanbanBoard({
                               href={`/${locale}/${workspace}/pipeline/${opp.id}`}
                               className="text-accent hover:underline font-semibold flex items-center gap-1"
                             >
-                              <span>İncele</span>
+                              <span>{t('board.review')}</span>
                               <span>→</span>
                             </Link>
 
                             <Link
                               href={`/${locale}/${workspace}/pipeline/${opp.id}/consortium`}
                               className="text-muted hover:text-ink font-medium flex items-center gap-1"
-                              title="Konsorsiyum Masası"
+                              title={t('board.consortiumTitle')}
                             >
                               <span>👥</span>
-                              <span>Konsorsiyum</span>
+                              <span>{t('board.consortium')}</span>
                             </Link>
                           </div>
                         </div>
@@ -788,13 +788,13 @@ export default function KanbanBoard({
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div>
                 <div className="text-xs font-bold text-accent uppercase tracking-wider mb-1">
-                  Stage-Gate Yönetimi
+                  {t('board.modalEyebrow')}
                 </div>
                 <h2 className="text-xl font-bold font-heading text-ink">
-                  Yeni Fonlama Fırsatı / Teklif Ekle
+                  {t('board.modalTitle')}
                 </h2>
                 <p className="text-xs text-muted mt-0.5">
-                  Fırsatı boru hattına ekleyin, çalışma grubunuzdan bir kullanıcıya atayın ve G0 Triage sürecini başlatın.
+                  {t('board.modalDescription')}
                 </p>
               </div>
               <button
@@ -810,13 +810,13 @@ export default function KanbanBoard({
               {/* Title */}
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  Proje / Teklif Başlığı <span className="text-bad">*</span>
+                  {t('board.titleLabel')} <span className="text-bad">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   data-testid="pipeline-create-title"
-                  placeholder="Örn: AI-Optimized Battery Systems for Heavy Transport"
+                  placeholder={t('board.titlePlaceholder')}
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
@@ -826,14 +826,14 @@ export default function KanbanBoard({
               {/* Assigned Responsible User */}
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  Sorumlu Kullanıcı / Atanan Kişi <span className="text-accent">*</span>
+                  {t('board.ownerLabel')} <span className="text-accent">*</span>
                 </label>
                 <select
                   value={selectedOwnerId}
                   onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
                   className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  {members.length === 0 && <option value="">Yükleniyor…</option>}
+                  {members.length === 0 && <option value="">{t('board.membersLoading')}</option>}
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.avatar} {m.name} — ({m.role})
@@ -846,13 +846,13 @@ export default function KanbanBoard({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-bold text-ink">
-                    Hedef Çağrı / Topic Kodu
+                    {t('board.topicLabel')}
                   </label>
-                  <span className="text-[10px] text-muted">Opsiyonel</span>
+                  <span className="text-[10px] text-muted">{t('board.optional')}</span>
                 </div>
                 <input
                   type="text"
-                  placeholder="Örn: HORIZON-CL5-2026-D3-01-01"
+                  placeholder={t('board.topicPlaceholder')}
                   value={formData.topicId}
                   onChange={(e) => setFormData({ ...formData, topicId: e.target.value })}
                   className="w-full text-xs bg-ground border border-border rounded-xl p-3 font-mono text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
@@ -862,7 +862,7 @@ export default function KanbanBoard({
                     block renders nothing when there is nothing real to suggest. */}
                 {suggestedTopics.length > 0 && (
                   <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] text-muted">Önerilenler:</span>
+                    <span className="text-[10px] text-muted">{t('board.suggested')}</span>
                     {suggestedTopics.map((t) => (
                       <button
                         key={t.identifier}
@@ -881,27 +881,27 @@ export default function KanbanBoard({
               {/* Role */}
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  Hedeflenen Rol
+                  {t('board.roleLabel')}
                 </label>
                 <select
                   value={formData.intendedRole}
                   onChange={(e) => setFormData({ ...formData, intendedRole: e.target.value })}
                   className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink focus:outline-none focus:ring-2 focus:ring-accent"
                 >
-                  <option value="coordinator">👑 Koordinatör (Lead)</option>
-                  <option value="partner">🤝 Konsorsiyum Ortağı</option>
-                  <option value="tech_provider">🔬 Teknoloji Sağlayıcı</option>
+                  <option value="coordinator">{t('board.roleLead')}</option>
+                  <option value="partner">{t('board.roleConsortiumPartner')}</option>
+                  <option value="tech_provider">{t('board.roleTechProvider')}</option>
                 </select>
               </div>
 
               {/* Initial Note */}
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  İlk Not / Stratejiniz
+                  {t('board.initialNoteLabel')}
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Projenin temel amacı, hedef TRL aralığı veya ortak profili..."
+                  placeholder={t('board.initialNotePlaceholder')}
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="w-full text-xs bg-ground border border-border rounded-xl p-3 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
@@ -915,7 +915,7 @@ export default function KanbanBoard({
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2.5 text-xs font-semibold border border-border rounded-xl hover:bg-surface-hover text-ink-2 transition"
                 >
-                  İptal
+                  {t('board.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -925,10 +925,10 @@ export default function KanbanBoard({
                   {isPending ? (
                     <>
                       <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      <span>Oluşturuluyor...</span>
+                      <span>{t('board.creating')}</span>
                     </>
                   ) : (
-                    <span>Fırsatı Oluştur & Ata</span>
+                    <span>{t('board.create')}</span>
                   )}
                 </button>
               </div>

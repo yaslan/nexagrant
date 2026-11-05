@@ -2017,7 +2017,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
           "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
             after,
         );
-      only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: tx.$executeRaw (line 75, via planPicChange); tx.tenantProfile.update (line 142); tx.tenantProfile.create (line 151); tx.auditEvent.create (line 164); tx.tenant.update (line 178); tx.auditEvent.create (line 179)');
+      only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: tx.$executeRaw (line 96, via planPicChange); tx.auditEvent.create (line 122, via recordPicRefusal); tx.auditEvent.create (line 122, via recordPicRefusal); tx.tenantProfile.update (line 187); tx.tenantProfile.create (line 196); tx.auditEvent.create (line 209); tx.tenant.update (line 223); tx.auditEvent.create (line 224); client.opportunity.updateMany (lib/scoring/g0-compute.ts:472, via clearStoredG0 (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:482, via clearStoredG0 (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:420, via persistG0 (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:434, via persistG0 (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:472, via clearStoredG0 (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:482, via clearStoredG0 (lib/scoring/g0-compute)); prisma.systemAlert.create (lib/scoring/g0-rescore-tenant.ts:64, via raiseAlert (lib/scoring/g0-rescore-tenant))');
     });
 
     it('G7: an action exported through `export { … }`', () => {

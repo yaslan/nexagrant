@@ -289,6 +289,68 @@
       "INVALID_INPUT": "The stage could not be changed: invalid opportunity or stage.",
       "OPPORTUNITY_NOT_FOUND": "This opportunity was not found in the database or has been archived; its stage cannot be changed.",
       "STAGE_MOVE_FAILED": "The stage could not be changed. The opportunity stayed where it was; please try again."
+    },
+    "board": {
+      "gateSubtitle": {
+        "G0": "Strategic Fit & Filter",
+        "G1": "Concept Note & Architecture",
+        "G2": "Partner Matching & Budget",
+        "G3": "Part A & B / Evaluator Simulation",
+        "G4": "EU Portal Submission & Approval"
+      },
+      "assignedToast": "Opportunity assigned to {owner}.",
+      "assignFailed": "Could not assign the opportunity.",
+      "membersNotLoaded": "The user list has not loaded yet. Please try again.",
+      "noteAdded": "Note added for {author}.",
+      "noteFailed": "Could not add the note.",
+      "createdToast": "Opportunity \"{title}\" created and assigned to {owner}.",
+      "createFailed": "Could not create the opportunity.",
+      "unassigned": "Unassigned",
+      "toggleAllTitle": "Expand or collapse all cards",
+      "collapseAll": "▲ Collapse all",
+      "expandAll": "▼ Expand all",
+      "searchPlaceholder": "Search opportunities, notes or people...",
+      "allUsers": "👥 All users",
+      "allRoles": "All roles",
+      "roleCoordinator": "👑 Coordinator",
+      "rolePartner": "🤝 Partner",
+      "addOpportunity": "Add new opportunity",
+      "g0ScoreTitle": "AI gate fit score",
+      "assignee": "Assigned to:",
+      "changeOwnerTitle": "Change the responsible user",
+      "notesHeading": "💬 Notes & updates",
+      "noteCount": "{count, plural, one {(# note)} other {(# notes)}}",
+      "noNotes": "No notes yet.",
+      "noteAuthor": "Note by:",
+      "notePlaceholder": "Write a note or an update...",
+      "addNote": "Add",
+      "review": "Review",
+      "consortiumTitle": "Consortium desk",
+      "consortium": "Consortium",
+      "modalEyebrow": "Stage-Gate management",
+      "modalTitle": "Add a new funding opportunity / proposal",
+      "modalDescription": "Add the opportunity to the pipeline, assign it to someone in your workspace and start G0 triage.",
+      "titleLabel": "Project / proposal title",
+      "titlePlaceholder": "e.g. AI-Optimized Battery Systems for Heavy Transport",
+      "ownerLabel": "Responsible user / assignee",
+      "membersLoading": "Loading…",
+      "topicLabel": "Target call / topic code",
+      "optional": "Optional",
+      "topicPlaceholder": "e.g. HORIZON-CL5-2026-D3-01-01",
+      "suggested": "Suggested:",
+      "roleLabel": "Intended role",
+      "roleLead": "👑 Coordinator (Lead)",
+      "roleConsortiumPartner": "🤝 Consortium partner",
+      "roleTechProvider": "🔬 Technology provider",
+      "initialNoteLabel": "First note / your strategy",
+      "initialNotePlaceholder": "The main aim of the project, target TRL range or partner profile...",
+      "cancel": "Cancel",
+      "creating": "Creating...",
+      "create": "Create & assign opportunity",
+      "coordinatorBadge": "Coordinator",
+      "partnerBadge": "Partner",
+      "collapseCard": "Collapse card",
+      "expandCard": "Expand for details"
     }
   },
   "GateReason": {
@@ -355,7 +417,12 @@
         "put_failed": "The file could not be uploaded to storage (HTTP {status}).",
         "object_store_unconfigured": "Document upload is not available on this installation yet: no file storage is configured. Your file was not sent; please tell your administrator."
       }
-    }
+    },
+    "healthEngineBadge": "M3 EVIDENCE PACK HEALTH ENGINE",
+    "freeStorage": "1 GB Free Storage",
+    "uploadCompliance": "Compliant with contract and EU evaluator standards",
+    "authorityPlaceholder": "TÜRKAK / İTO / BSI",
+    "noExpiry": "No expiry"
   },
   "ConceptNote": {
     "title": "Concept Notes",
@@ -380,6 +447,42 @@
       "placeholder": "Write the {label} section...",
       "words": "Words: {count} / {max}",
       "noTemplate": "No concept note template found in the system. Run the seed."
+    },
+    "status": {
+      "draft": "Draft",
+      "review": "In review",
+      "approved": "Approved"
+    },
+    "detail": {
+      "fallbackTitle": "Concept Note",
+      "downloadDocx": "Download DOCX"
+    },
+    "list": {
+      "subtitle": "Draft and manage AI-assisted concept notes for your opportunities.",
+      "templates": "Available Templates",
+      "yourNotes": "Your Notes",
+      "noteVersion": "Concept Note v{version}",
+      "opportunity": "Opportunity: {id}",
+      "empty": "No concept notes yet. Create one from an opportunity in your pipeline."
+    },
+    "workspaceEditor": {
+      "sections": "Sections",
+      "status": "Status",
+      "sectionWords": "{words}/{max} words",
+      "aiUsage": "AI Usage Disclosure",
+      "creditsUsed": "Credits used: {count}",
+      "inputTokens": "Input tokens: {count}",
+      "outputTokens": "Output tokens: {count}",
+      "maxWords": "Max {max} words",
+      "evidenceHub": "Evidence Hub",
+      "generating": "⏳ Generating...",
+      "aiDraft": "✨ AI Draft",
+      "aiFailed": "AI generation failed",
+      "saving": "Saving...",
+      "save": "Save",
+      "words": "Words:",
+      "overLimit": "⚠ Over limit!",
+      "version": "Version: {version}"
     }
   },
   "Relationships": {
@@ -430,6 +533,9 @@
     "title": "Consortium Builder",
     "findCandidates": "Find Candidates",
     "invite": "Invite",
+    "confirmParticipation": "Organisation confirmed participation",
+    "seatConfirmConflict": "This organisation is already confirmed on another active opportunity on the same call, so it cannot be confirmed for this seat. The seat stays invited.",
+    "seatNotConfirmable": "The status of this seat has changed, so nothing was confirmed. Refresh the page to see its current state.",
     "conflict": "Conflict Warning",
     "addRoleToConsortium": "ADD ROLE TO CONSORTIUM",
     "topCandidates": "TOP CANDIDATES",
@@ -483,7 +589,8 @@
     },
     "dimensionOutOf": "{score} / {max}",
     "dimensionRange": "{score} (range {min}…{max})",
-    "breakdownNote": "Dimensions are raw points, each on its own range; the total is out of 100."
+    "breakdownNote": "Dimensions are raw points, each on its own range; the total is out of 100.",
+    "stageLine": "{title} — Stage {stage}"
   },
   "Auth": {
     "signIn": "Sign In",
@@ -2069,7 +2176,9 @@
     "convertToOpportunity": "Convert to Opportunity →",
     "viewOnEuPortal": "View on EU Portal",
     "notSpecified": "N/A",
-    "seeDetails": "See Details"
+    "seeDetails": "See Details",
+    "lumpSum": "Lump Sum",
+    "stageNumber": "Stage {stage}"
   },
   "billingPanels": {
     "cart": {
@@ -3652,6 +3761,7 @@
     "picPlaceholder": "e.g. 999999999",
     "picHelper": "Optional. Your organisation's 9-digit EU code; search your organisation's name in the <register>Participant Register</register> to find it. Your project history in CORDIS is read with this code for the coordination and network criteria of the G0 score.",
     "picErrorInvalid": "A PIC has 9 digits. Nothing was saved.",
+    "picErrorRateLimited": "Too many PIC attempts in a short time. Nothing was saved. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
     "picErrorTaken": "This PIC is registered on another account. Nothing was saved. If it belongs to your organisation, write to <support>{email}</support>; we will review it and remove the record if needed.",
     "picConfirmTitle": "In CORDIS this PIC belongs to the organisation below. Is it yours?",
     "picConfirmWarning": "Confirm only your organisation's own PIC: this organisation's project history counts towards your score, and your confirmation goes into the audit log. We cannot check portal ownership automatically.",
@@ -4217,6 +4327,49 @@
         "forbidden": "Only the workspace owner or an admin can revoke API keys.",
         "failed": "The key could not be revoked. Please try again."
       }
+    },
+    "page": {
+      "eyebrow": "Partner Intelligence REST API",
+      "heading": "API Keys & B2B Developer Portal",
+      "description": "Connect CORDIS partner intelligence, open calls and your opportunity pipeline to your in-house ERP/CRM systems.",
+      "apiActive": "v1 REST API active",
+      "activeKeys": "Active API keys",
+      "keyUnit": "{count, plural, one {key} other {keys}}",
+      "rateLimit": "Rate limit",
+      "perMinute": "requests / min",
+      "protocol": "Protocol & format",
+      "protocolValue": "HTTPS REST / JSON",
+      "authorization": "Authorization",
+      "authorizationValue": "x-api-key / Bearer",
+      "nameLabel": "Key name / service description",
+      "namePlaceholder": "e.g. SAP ERP pipeline sync",
+      "securityTitle": "Security notice:",
+      "securityBody": "The full key is shown only once. Store it somewhere safe.",
+      "generating": "Generating...",
+      "generate": "Create API key (fp_live_...)",
+      "newKeyTitle": "⚠️ Your new secret API key (copy it now):",
+      "savedKeys": "Saved API keys",
+      "keyCount": "{count, plural, one {# key} other {# keys}}",
+      "colName": "Key name",
+      "colPrefix": "Prefix",
+      "colLastUsed": "Last used",
+      "colAction": "Action",
+      "revokeTitle": "Revoke key",
+      "revokeConfirm": "Revoke the API key \"{name}\"? This cannot be undone.",
+      "quickStart": "Quick start & API integration examples",
+      "quickStartBody": "Partner Intelligence API call templates for developers, in cURL, Node.js and Python.",
+      "tabNode": "Node.js / JS",
+      "tabPython": "Python",
+      "error": {
+        "forbidden": "Only the organization owner or an admin can manage API keys.",
+        "invalidName": "The key name must be between 1 and 100 characters."
+      },
+      "sample": {
+        "partners": "CORDIS partner search (research organizations in Germany & Türkiye)",
+        "calls": "List open Horizon Europe and TÜBİTAK calls",
+        "opportunities": "Query the tenant opportunity pipeline",
+        "found": "Organizations found:"
+      }
     }
   },
   "adminTenants": {
@@ -4259,7 +4412,10 @@
       "history": "PIC history",
       "historyEmpty": "This tenant has no PIC history.",
       "eventUpdated": "{from} → {to}",
-      "eventRemoved": "Removed by staff: {pic}"
+      "eventRemoved": "Removed by staff: {pic}",
+      "refusals": "Refused PIC attempts",
+      "eventRefused": "Registered on another account: {pic}",
+      "eventRateLimited": "Limit reached: {pic}"
     },
     "internalPlan": {
       "title": "Internal plan assignment",
@@ -4677,5 +4833,62 @@
       "done": "Pre-assessment ready",
       "failed": "The check could not be completed. Your documents are kept; please try again."
     }
+  },
+  "adminDesignSystem": {
+    "title": "Design system",
+    "intro": "The shared components in src/components/ui. Use the theme switch to compare the light and dark views. The copy is sample text.",
+    "buttons": "Button",
+    "primary": "Primary",
+    "secondary": "Secondary",
+    "danger": "Destructive action",
+    "ghost": "Plain",
+    "small": "Small",
+    "disabled": "Disabled",
+    "inputs": "Input",
+    "inputLabel": "Project name",
+    "inputHint": "Write a short, descriptive name.",
+    "inputPlaceholder": "Sample project",
+    "inputErrorLabel": "Email",
+    "inputError": "Enter a valid email address.",
+    "cards": "Card",
+    "cardTitle": "Card title",
+    "cardBody": "Secondary text in a card body looks like this.",
+    "table": "Table",
+    "tableCaption": "Sample list of calls",
+    "tableName": "Call",
+    "tableOwner": "Owner",
+    "tableStatus": "Status",
+    "rowA": "Sample call A",
+    "rowB": "Sample call B",
+    "rowC": "Sample call C",
+    "rowOwner": "Sample organisation",
+    "chips": "Chip",
+    "chipToggle": "Selectable",
+    "chipStatic": "Label only",
+    "chipRemovable": "Removable",
+    "chipRemove": "Remove the Removable filter",
+    "badges": "Badge",
+    "badgeNeutral": "Draft",
+    "badgeAccent": "New",
+    "status": "Status language",
+    "statusOk": "Eligible",
+    "statusWarn": "Caution",
+    "statusBad": "Not eligible",
+    "modal": "Modal",
+    "modalOpen": "Open modal",
+    "modalTitle": "Sample modal",
+    "modalBody": "Focus stays inside this window. Esc or the Close button closes it and focus returns to the button that opened it.",
+    "modalClose": "Close",
+    "modalConfirm": "Confirm",
+    "tabs": "Tab",
+    "tabOne": "General",
+    "tabTwo": "Documents",
+    "tabThree": "History",
+    "tabOneBody": "Content of the General tab.",
+    "tabTwoBody": "Content of the Documents tab.",
+    "tabThreeBody": "Content of the History tab.",
+    "pagination": "Pagination",
+    "previous": "Previous",
+    "next": "Next"
   }
 }
