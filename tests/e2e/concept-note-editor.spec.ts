@@ -64,7 +64,7 @@ test.describe.serial('concept note editor — HTML mode unchanged', () => {
     await expect(editor.locator('em')).toHaveText('eğik ek');
     await page.screenshot({ path: `${SHOTS}/06-concept-note-editor.png` });
 
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
     await expect
       .poll(async () => {
         const note = await withTenant(USER.tenantId, (tx) => tx.conceptNote.findUnique({ where: { id: NOTE_ID } }));

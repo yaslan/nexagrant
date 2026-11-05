@@ -116,7 +116,7 @@ test.describe('module entry points — reached by clicking', () => {
       ['conceptNote', /\/opportunities\/[^/]+\/m2$/, /Konsept Notu Editörü/],
       ['evaluations', /\/opportunities\/[^/]+\/evaluations$/, /İç Ön Değerlendirme/],
       ['matching', /\/opportunities\/[^/]+\/matching$/, /Konsorsiyum Rol Matrisi/],
-      ['consortium', /\/pipeline\/[^/]+\/consortium$/, /Consortium Builder/],
+      ['consortium', /\/pipeline\/[^/]+\/consortium$/, /Konsorsiyum Oluşturucu/],
       ['briefs', /\/opportunities\/[^/]+\/briefs$/, /Görüşme Brifingi/],
       ['documents', /\/opportunities\/[^/]+\/documents$/, /Takip Belgeleri/],
       ['application', /\/opportunities\/[^/]+\/application$/, /Part A & Part B Başvuru Üretim Paneli/],

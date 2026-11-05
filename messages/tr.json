@@ -289,6 +289,68 @@
       "INVALID_INPUT": "Aşama değiştirilemedi: geçersiz fırsat ya da aşama.",
       "OPPORTUNITY_NOT_FOUND": "Bu fırsat veritabanında bulunamadı ya da arşivlenmiş; aşaması değiştirilemez.",
       "STAGE_MOVE_FAILED": "Aşama değiştirilemedi. Fırsat yerinde kaldı; lütfen tekrar deneyin."
+    },
+    "board": {
+      "gateSubtitle": {
+        "G0": "Stratejik Uygunluk & Filtre",
+        "G1": "Konsept Notu & Mimari",
+        "G2": "Partner Eşleştirme & Bütçe",
+        "G3": "Part A & B / Hakem Simülasyonu",
+        "G4": "AB Portalına Teslim & Onay"
+      },
+      "assignedToast": "Fırsat {owner} kişisine atandı!",
+      "assignFailed": "Atama sırasında hata oluştu.",
+      "membersNotLoaded": "Kullanıcı listesi henüz yüklenmedi, lütfen tekrar deneyin.",
+      "noteAdded": "{author} kullanıcısının notu eklendi!",
+      "noteFailed": "Not eklenirken hata oluştu.",
+      "createdToast": "\"{title}\" fırsatı {owner} üzerine atanarak oluşturuldu!",
+      "createFailed": "Fırsat oluşturulurken hata meydana geldi.",
+      "unassigned": "Atanmadı",
+      "toggleAllTitle": "Tüm kartları genişlet veya küçült",
+      "collapseAll": "▲ Tümünü Küçült",
+      "expandAll": "▼ Tümünü Genişlet",
+      "searchPlaceholder": "Fırsat, not veya kişi ara...",
+      "allUsers": "👥 Tüm Kullanıcılar",
+      "allRoles": "Tüm Roller",
+      "roleCoordinator": "👑 Koordinatör",
+      "rolePartner": "🤝 Ortak",
+      "addOpportunity": "Yeni Fırsat Ekle",
+      "g0ScoreTitle": "AI Gate Uyum Skoru",
+      "assignee": "Atanan:",
+      "changeOwnerTitle": "Sorumlu kullanıcıyı değiştir",
+      "notesHeading": "💬 Notlar & Güncellemeler",
+      "noteCount": "({count} Not)",
+      "noNotes": "Henüz not eklenmedi.",
+      "noteAuthor": "Not Yazan:",
+      "notePlaceholder": "Not veya güncelleme yazın...",
+      "addNote": "Ekle",
+      "review": "İncele",
+      "consortiumTitle": "Konsorsiyum Masası",
+      "consortium": "Konsorsiyum",
+      "modalEyebrow": "Stage-Gate Yönetimi",
+      "modalTitle": "Yeni Fonlama Fırsatı / Teklif Ekle",
+      "modalDescription": "Fırsatı boru hattına ekleyin, çalışma grubunuzdan bir kullanıcıya atayın ve G0 Triage sürecini başlatın.",
+      "titleLabel": "Proje / Teklif Başlığı",
+      "titlePlaceholder": "Örn: AI-Optimized Battery Systems for Heavy Transport",
+      "ownerLabel": "Sorumlu Kullanıcı / Atanan Kişi",
+      "membersLoading": "Yükleniyor…",
+      "topicLabel": "Hedef Çağrı / Topic Kodu",
+      "optional": "Opsiyonel",
+      "topicPlaceholder": "Örn: HORIZON-CL5-2026-D3-01-01",
+      "suggested": "Önerilenler:",
+      "roleLabel": "Hedeflenen Rol",
+      "roleLead": "👑 Koordinatör (Lead)",
+      "roleConsortiumPartner": "🤝 Konsorsiyum Ortağı",
+      "roleTechProvider": "🔬 Teknoloji Sağlayıcı",
+      "initialNoteLabel": "İlk Not / Stratejiniz",
+      "initialNotePlaceholder": "Projenin temel amacı, hedef TRL aralığı veya ortak profili...",
+      "cancel": "İptal",
+      "creating": "Oluşturuluyor...",
+      "create": "Fırsatı Oluştur & Ata",
+      "coordinatorBadge": "Koordinatör",
+      "partnerBadge": "Ortak",
+      "collapseCard": "Kartı Küçült",
+      "expandCard": "Detaylar İçin Genişlet"
     }
   },
   "GateReason": {
@@ -355,7 +417,12 @@
         "put_failed": "Dosya depoya yüklenemedi (HTTP {status}).",
         "object_store_unconfigured": "Belge yükleme bu kurulumda henüz açık değil: dosya deposu yapılandırılmamış. Dosyanız gönderilmedi; lütfen yöneticinize bildirin."
       }
-    }
+    },
+    "healthEngineBadge": "M3 KANIT PAKETİ SAĞLIK MOTORU",
+    "freeStorage": "1 GB Ücretsiz Depolama",
+    "uploadCompliance": "Sözleşme & AB Hakem Standartlarına Uyumlu",
+    "authorityPlaceholder": "TÜRKAK / İTO / BSI",
+    "noExpiry": "Süresiz"
   },
   "ConceptNote": {
     "title": "Konsept Notlar",
@@ -380,6 +447,42 @@
       "placeholder": "{label} bölümünü yazın...",
       "words": "Kelime: {count} / {max}",
       "noTemplate": "Sistemde konsept notu şablonu bulunamadı. Seed verisini yükleyin."
+    },
+    "status": {
+      "draft": "Taslak",
+      "review": "İncelemede",
+      "approved": "Onaylandı"
+    },
+    "detail": {
+      "fallbackTitle": "Konsept Notu",
+      "downloadDocx": "DOCX İndir"
+    },
+    "list": {
+      "subtitle": "Fırsatlarınız için yapay zekâ destekli konsept notları hazırlayın ve yönetin.",
+      "templates": "Mevcut Şablonlar",
+      "yourNotes": "Notlarınız",
+      "noteVersion": "Konsept Notu v{version}",
+      "opportunity": "Fırsat: {id}",
+      "empty": "Henüz konsept notu yok. Boru hattınızdaki bir fırsattan oluşturun."
+    },
+    "workspaceEditor": {
+      "sections": "Bölümler",
+      "status": "Durum",
+      "sectionWords": "{words}/{max} kelime",
+      "aiUsage": "YZ Kullanım Beyanı",
+      "creditsUsed": "Kullanılan kredi: {count}",
+      "inputTokens": "Girdi jetonu: {count}",
+      "outputTokens": "Çıktı jetonu: {count}",
+      "maxWords": "En fazla {max} kelime",
+      "evidenceHub": "Kanıt Merkezi",
+      "generating": "⏳ Üretiliyor...",
+      "aiDraft": "✨ YZ Taslağı",
+      "aiFailed": "YZ taslağı üretilemedi",
+      "saving": "Kaydediliyor...",
+      "save": "Kaydet",
+      "words": "Kelime:",
+      "overLimit": "⚠ Limit aşıldı!",
+      "version": "Sürüm: {version}"
     }
   },
   "Relationships": {
@@ -483,7 +586,8 @@
     },
     "dimensionOutOf": "{score} / {max}",
     "dimensionRange": "{score} (aralık {min}…{max})",
-    "breakdownNote": "Boyutlar ham puandır, her biri kendi aralığında; toplam 100 üzerinden."
+    "breakdownNote": "Boyutlar ham puandır, her biri kendi aralığında; toplam 100 üzerinden.",
+    "stageLine": "{title} — Aşama {stage}"
   },
   "Auth": {
     "signIn": "Giriş Yap",
@@ -2069,7 +2173,9 @@
     "convertToOpportunity": "Proje Fırsatına Dönüştür →",
     "viewOnEuPortal": "AB Portalında İncele",
     "notSpecified": "Belirtilmedi",
-    "seeDetails": "Bütçe Detayda"
+    "seeDetails": "Bütçe Detayda",
+    "lumpSum": "Götürü Bedel",
+    "stageNumber": "Aşama {stage}"
   },
   "billingPanels": {
     "cart": {
@@ -4204,6 +4310,49 @@
       "error": {
         "forbidden": "API anahtarlarını yalnızca kurum sahibi veya yöneticisi iptal edebilir.",
         "failed": "Anahtar iptal edilemedi. Lütfen tekrar deneyin."
+      }
+    },
+    "page": {
+      "eyebrow": "Partner Intelligence REST API",
+      "heading": "API Anahtarları & B2B Geliştirici Portalı",
+      "description": "CORDIS ortak zekası, açık çağrılar ve fırsat pipeline verilerinizi kurum içi ERP/CRM sistemlerinize entegre edin.",
+      "apiActive": "v1 REST API Aktif",
+      "activeKeys": "Aktif API Anahtarı",
+      "keyUnit": "Anahtar",
+      "rateLimit": "Hız Limiti (Rate Limit)",
+      "perMinute": "istek / dk",
+      "protocol": "Protokol & Format",
+      "protocolValue": "HTTPS REST / JSON",
+      "authorization": "Yetkilendirme",
+      "authorizationValue": "x-api-key / Bearer",
+      "nameLabel": "Anahtar Adı / Servis Tanımı",
+      "namePlaceholder": "Örn: SAP ERP Pipeline Senkronu",
+      "securityTitle": "Güvenlik Uyarısı:",
+      "securityBody": "Üretilen anahtar yalnızca bir kez tam olarak gösterilir. Lütfen güvenli bir ortamda saklayın.",
+      "generating": "Üretiliyor...",
+      "generate": "API Key Oluştur (fp_live_...)",
+      "newKeyTitle": "⚠️ Yeni Üretilen Gizli API Key (Lütfen Kopyalayın):",
+      "savedKeys": "Kayıtlı API Anahtarları",
+      "keyCount": "{count} Anahtar",
+      "colName": "Anahtar Tanımı",
+      "colPrefix": "Önek (Prefix)",
+      "colLastUsed": "Son Kullanım",
+      "colAction": "İşlem",
+      "revokeTitle": "Anahtarı İptal Et",
+      "revokeConfirm": "\"{name}\" adlı API anahtarını iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
+      "quickStart": "Hızlı Başlangıç & API Entegrasyon Örnekleri",
+      "quickStartBody": "Geliştiriciler için cURL, Node.js ve Python ile Partner Intelligence API çağrı şablonları.",
+      "tabNode": "Node.js / JS",
+      "tabPython": "Python",
+      "error": {
+        "forbidden": "API anahtarlarını yalnızca kurum sahibi veya yöneticisi yönetebilir.",
+        "invalidName": "Anahtar adı 1 ile 100 karakter arasında olmalı."
+      },
+      "sample": {
+        "partners": "CORDIS Ortak Arama (Almanya & Türkiye Araştırma Kuruluşları)",
+        "calls": "Açık Ufuk Avrupa ve TÜBİTAK Çağrılarını Listeleme",
+        "opportunities": "Kiracı Fırsat Pipeline Sorgulama",
+        "found": "Bulunan Kurumlar:"
       }
     }
   },
