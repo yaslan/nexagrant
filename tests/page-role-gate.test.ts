@@ -181,6 +181,9 @@ const PAGE_DOORS: Record<string, Action> = {
   // NG-64 review B-1/B-2 (K-577543: existing actions only, rbac.ts unchanged).
   'settings/billing/page.tsx': 'manage_billing',
   'settings/gates/page.tsx': 'evaluate_gates',
+  // Review R-1 (first round B-1), K-577556: a guest reviewer reaches the panel to
+  // score; the panel-wide table stays behind view_proposal (checked below).
+  'opportunities/[id]/evaluations/panel/page.tsx': 'contribute_assigned',
 };
 
 describe('each gated page names its door', () => {
@@ -194,4 +197,23 @@ describe('each gated page names its door', () => {
       expect(source).not.toMatch(/from '@\/lib\/auth'/);
     });
   }
+});
+
+describe('evaluation panel: the panel-wide scores are view_proposal only (review R-1)', () => {
+  const source = readFileSync(
+    path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]/opportunities/[id]/evaluations/panel/page.tsx'),
+    'utf8',
+  );
+
+  test('the page asks rbac.ts for view_proposal before it reads the panel scores', () => {
+    const ask = source.indexOf("can(asRole(role), 'view_proposal')");
+    expect(ask).toBeGreaterThan(-1);
+    const read = source.indexOf('listPanelScores(');
+    expect(read).toBeGreaterThan(ask);
+  });
+
+  test('GUEST_PARTNER may score but does not hold view_proposal', () => {
+    expect(can('GUEST_PARTNER', 'contribute_assigned')).toBe(true);
+    expect(can('GUEST_PARTNER', 'view_proposal')).toBe(false);
+  });
 });

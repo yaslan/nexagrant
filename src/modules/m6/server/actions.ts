@@ -297,7 +297,10 @@ export async function listPanelScores(proposalId: string): Promise<PanelScoreQue
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
-  const { tenantId } = await requireTenantAction({ readOnly: true });
+  // NG-64 review R-1 (K-577556): every row averages all reviewers' marks, so a
+  // guest reviewer (contribute_assigned only) is refused here, before any read —
+  // the panel page hides the table, but this action is callable on its own.
+  const { tenantId } = await requireTenantAction({ readOnly: true, can: 'view_proposal' });
 
   return withTenant(tenantId, async (tx) => {
     const proposal = await tx.proposal.findFirst({

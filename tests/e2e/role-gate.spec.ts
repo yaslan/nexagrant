@@ -7,6 +7,7 @@ import {
   RG_INVOICE_NO,
   RG_OPP_ID,
   RG_OPP_TITLE,
+  RG_PANEL_AVG_TEXT,
   RG_REL_ID,
   RG_REL_NAME,
   RG_SEATS,
@@ -144,6 +145,27 @@ test.describe.serial('NG-64 page role gates', () => {
     await expectClosed(page, `${ws}/ayarlar/kapilar`);
     await signIn(page, 'PIPELINE_MANAGER');
     await expectOpen(page, `${ws}/ayarlar/kapilar`);
+  });
+
+  test('evaluation panel (review R-1, K-577556): a guest reviewer scores on their own seat, never sees the panel table', async ({ page }) => {
+    const panel = `${ws}/opportunities/${RG_OPP_ID}/evaluations/panel`;
+    await signIn(page, 'GUEST_PARTNER');
+    await expectOpen(page, panel);
+    // Their own seat: the scoring form, not the "not seated" note.
+    await expect(page.getByTestId('m6-evaluator-form')).toBeVisible();
+    await expect(page.getByTestId('m6-not-seated')).toHaveCount(0);
+    // The other reviewer's marks, carried in the panel-wide average, are nowhere.
+    await expect(page.getByTestId('m6-dashboard')).toHaveCount(0);
+    const html = await page.content();
+    expect(html).not.toContain(RG_PANEL_AVG_TEXT);
+    expect(html).not.toContain(RG_OPP_TITLE);
+
+    // MEMBER (view_proposal) is the control: the whole table, with the stored average.
+    await signIn(page, 'MEMBER');
+    await expectOpen(page, panel);
+    await expect(page.getByTestId('m6-dashboard')).toBeVisible();
+    await expect(page.getByTestId('m6-panel-score').first()).toHaveText(RG_PANEL_AVG_TEXT);
+    await expect(page.getByTestId('m6-not-seated')).toBeVisible();
   });
 
   test('GUEST_PARTNER keeps the pages that have no tenant read behind a role', async ({ page }) => {

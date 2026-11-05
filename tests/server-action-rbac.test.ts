@@ -352,3 +352,25 @@ describe('real flows, fake transaction', () => {
     });
   });
 });
+
+/**
+ * NG-64 review R-1 (K-577556): `listPanelScores` is a server action, so a guest
+ * reviewer can call it straight from the browser. Its rows are panel-wide
+ * averages built from every reviewer's marks; a role without `view_proposal`
+ * is refused before any read, whatever the page shows.
+ */
+describe('m6.listPanelScores is a view_proposal read (review R-1)', () => {
+  test('follows rbac.ts for all six roles, refused before the transaction', async () => {
+    const seen: Record<string, 'forbidden' | 'passed'> = {};
+    for (const role of ROLES) {
+      vi.clearAllMocks();
+      m.withTenant.mockImplementation(reached);
+      m.session = sessionFor(role);
+      seen[role] = await gateOutcome(() => m6.listPanelScores('prop-1'));
+      if (seen[role] === 'forbidden') expect(m.withTenant, role).not.toHaveBeenCalled();
+      else expect(m.withTenant, role).toHaveBeenCalledTimes(1);
+    }
+    expect(seen).toEqual(Object.fromEntries(ROLES.map((r) => [r, can(r, 'view_proposal') ? 'passed' : 'forbidden'])));
+    expect(seen.GUEST_PARTNER).toBe('forbidden');
+  });
+});

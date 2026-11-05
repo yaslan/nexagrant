@@ -21,6 +21,16 @@ export const RG_REL_NAME = 'NG64 kiracıya özel ilişki';
 /** One issued invoice: its number on a page or in a body means the billing door is open (review B-1). */
 export const RG_INVOICE_ID = 'ng64-role-gate-e2e-invoice';
 export const RG_INVOICE_NO = 'NG64-KAPI-000001';
+/**
+ * A PANEL evaluation on the opportunity (review R-1): the guest and the owner are
+ * both seated; only the owner has submitted. The stored panel average is a value
+ * the evaluator form can never show (four integer sliders average to x.00/.25/.50/.75),
+ * so '4.37' in a guest's HTML means the panel-wide table reached them.
+ */
+export const RG_PROPOSAL_ID = 'ng64-role-gate-e2e-proposal';
+export const RG_PANEL_EVAL_ID = 'ng64-role-gate-e2e-panel';
+export const RG_PANEL_AVG = 4.37;
+export const RG_PANEL_AVG_TEXT = '4.37';
 
 /** A domain only this fixture uses: `User.email` is unique (NG-4 review N-1). */
 export const RG_SEATS: Record<Role, { id: string; email: string }> = {
@@ -81,6 +91,44 @@ export async function setupRoleGateTenant() {
     },
     update: { title: RG_OPP_TITLE, deletedAt: null },
   });
+  await prisma.proposal.upsert({
+    where: { id: RG_PROPOSAL_ID },
+    create: { id: RG_PROPOSAL_ID, tenantId: RG_TENANT, opportunityId: RG_OPP_ID },
+    update: { deletedAt: null },
+  });
+  await prisma.evaluation.upsert({
+    where: { id: RG_PANEL_EVAL_ID },
+    create: {
+      id: RG_PANEL_EVAL_ID,
+      tenantId: RG_TENANT,
+      opportunityId: RG_OPP_ID,
+      proposalId: RG_PROPOSAL_ID,
+      readerType: 'PANEL',
+      status: 'in-progress',
+      avgScore: RG_PANEL_AVG,
+    },
+    update: { avgScore: RG_PANEL_AVG, status: 'in-progress' },
+  });
+  const criterion = await prisma.criterion.upsert({
+    where: { evaluationId_name: { evaluationId: RG_PANEL_EVAL_ID, name: 'Innovation' } },
+    create: { tenantId: RG_TENANT, evaluationId: RG_PANEL_EVAL_ID, name: 'Innovation', weight: 1 },
+    update: { weight: 1 },
+  });
+  const ownerSeat = await prisma.reviewer.upsert({
+    where: { evaluationId_userId: { evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.TENANT_OWNER.id } },
+    create: { tenantId: RG_TENANT, evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.TENANT_OWNER.id, status: 'completed' },
+    update: { status: 'completed' },
+  });
+  await prisma.score.upsert({
+    where: { reviewerId_criterionId: { reviewerId: ownerSeat.id, criterionId: criterion.id } },
+    create: { tenantId: RG_TENANT, reviewerId: ownerSeat.id, criterionId: criterion.id, score: 4, submittedAt: new Date() },
+    update: { score: 4, submittedAt: new Date() },
+  });
+  await prisma.reviewer.upsert({
+    where: { evaluationId_userId: { evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.GUEST_PARTNER.id } },
+    create: { tenantId: RG_TENANT, evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.GUEST_PARTNER.id },
+    update: { status: 'pending' },
+  });
   await prisma.relationship.upsert({
     where: { id: RG_REL_ID },
     create: { id: RG_REL_ID, tenantId: RG_TENANT, kind: 'partner', counterpartName: RG_REL_NAME },
@@ -110,6 +158,9 @@ export async function setupRoleGateTenant() {
 export async function teardownRoleGateTenant() {
   await prisma.invoice.deleteMany({ where: { id: 'ng64-role-gate-e2e-invoice' } });
   await prisma.relationship.deleteMany({ where: { id: 'ng64-role-gate-e2e-rel' } });
+  // Cascades to the PANEL evaluation, its criteria, seats and scores.
+  await prisma.evaluation.deleteMany({ where: { id: 'ng64-role-gate-e2e-panel' } });
+  await prisma.proposal.deleteMany({ where: { id: 'ng64-role-gate-e2e-proposal' } });
   await prisma.opportunity.deleteMany({ where: { id: 'ng64-role-gate-e2e-opp' } });
   await prisma.membership.deleteMany({ where: { tenantId: 'ng64-role-gate-e2e-tenant' } });
   await prisma.moduleState.deleteMany({ where: { tenantId: 'ng64-role-gate-e2e-tenant' } });
