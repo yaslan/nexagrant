@@ -41,6 +41,8 @@ export const JOB_IDS = [
   'partner-search-retention',
   'm17-text-retention',
   'm17-stale-runs',
+  // FO-384 B2: queued by a PIC change, never on a cron. Not in SCHEDULE (no tick, no missed-tick check).
+  'g0-rescore-tenant',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];

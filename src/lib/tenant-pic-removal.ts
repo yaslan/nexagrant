@@ -5,10 +5,12 @@
  * refused until staff take the claim off the other account. The authorisation edge is the action
  * (`requirePlatformAdmin`) in src/app/[locale]/admin/tenants/actions.ts.
  *
- * This only clears `Tenant.pic`. A stored `g0Score` stays as it was until the next rescore.
+ * Clears `Tenant.pic`, then rescores the tenant's stored G0 scores (FO-384). The rescore runs after
+ * the write has committed and never rejects, so a failure there cannot undo the removal.
  */
 import { withTenant } from '@/lib/db';
 import { requireActionId } from '@/lib/required-id';
+import { rescoreTenantG0AfterPicChange } from '@/lib/scoring/g0-rescore-tenant';
 
 /** The tenant no longer holds the PIC the operator saw: it changed, or it is already gone. */
 export class TenantPicChangedError extends Error {
@@ -27,14 +29,17 @@ export class TenantPicChangedError extends Error {
 export async function removeTenantPic(tenantId: string, expectedPic: string, actorId: string, note: string): Promise<void> {
   // `undefined` would drop out of the where and turn this into "clear whatever is there".
   const seenPic = requireActionId(expectedPic, 'expectedPic');
-  await withTenant(tenantId, async (tx) => {
+  const auditEventId = await withTenant(tenantId, async (tx) => {
     const { count } = await tx.tenant.updateMany({
       where: { id: tenantId, pic: seenPic },
       data: { pic: null },
     });
     if (count === 0) throw new TenantPicChangedError();
-    await tx.auditEvent.create({
+    const audit = await tx.auditEvent.create({
       data: { tenantId, actorId, type: 'tenant.pic.removed', data: { from: seenPic, note } },
     });
+    return String(audit.id);
   });
+  // FO-384: after the commit, so the rescore reads the cleared PIC.
+  await rescoreTenantG0AfterPicChange(tenantId, { trigger: 'admin_removed', auditEventId });
 }
