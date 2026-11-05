@@ -36,8 +36,8 @@ export const SPEC_ROLE_MAPPING: Record<SpecRole, SpecRoleMapping> = {
     status: 'partial',
     gaps: [
       'PIPELINE_MANAGER has no approve_dual_approval and code has no expense approval.',
-      'The specification limits it to its own projects; view_proposal is not limited to assigned projects.',
-      'project.role (coordinator or partner) is per project; Role is per tenant.',
+      'The specification limits it to its own projects; code scopes access by workspace, not by project.',
+      'The specification has project.role per project; that field is not in the schema, and Role is per tenant.',
     ],
   },
   ORTAK: {
