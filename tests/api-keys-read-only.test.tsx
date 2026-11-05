@@ -72,6 +72,19 @@ describe('API keys form on a read-only M1 plan (FO-157)', () => {
     expect(screen.getByRole('link', { name: enMessages.ApiKeysSettings.readOnly.upgrade })).toBeTruthy();
   });
 
+  it('NG-3: the page shell follows the language, with no Turkish left on the English page', () => {
+    const { unmount } = renderClient(null, 'en');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('API Keys & B2B Developer Portal');
+    expect(screen.getByRole('button', { name: 'Create API key (fp_live_...)' })).toBeTruthy();
+    expect(document.body.textContent).toContain('requests / min');
+    expect(document.body.textContent).not.toMatch(/Anahtar|istek \/ dk|Yetkilendirme|Güvenlik/);
+    unmount();
+
+    renderClient(null, 'tr');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('API Anahtarları');
+    expect(document.body.textContent).toContain('istek / dk');
+  });
+
   it('leaves the form open on a plan that grants M1 in full', async () => {
     generateApiKey.mockResolvedValue({
       apiKeyRecord: { id: 'k1', name: 'ERP', prefix: 'fp_live_abcd', lastUsedAt: null, createdAt: new Date() },

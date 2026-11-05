@@ -131,7 +131,7 @@ test.describe('internal plan assignment from Admin > Tenants', () => {
     await signInOwner(page);
     await page.goto(CONCEPT_NOTES_URL);
     // The page itself rendered, not just an absent lock (an error page has no lock either).
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Concept Notes');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Konsept Notlar');
     await expect(planLock(page)).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/04-m2-open-pro.png`, fullPage: true });
   });

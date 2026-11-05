@@ -2,6 +2,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantPage } from '@/lib/tenant';
 import { canConfirmSeat } from '@/modules/m8/server/seat-transitions';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
@@ -167,6 +168,8 @@ export default async function ConsortiumPage({
   if (!opportunity) return notFound();
 
   const orgMap = Object.fromEntries(orgs.map((o) => [o.id, o]));
+  const t = await getTranslations({ locale, namespace: 'Consortium' });
+  const tPipeline = await getTranslations({ locale, namespace: 'Pipeline' });
 
   return (
     <div className="max-w-5xl mx-auto py-8 sm:px-4">
@@ -175,14 +178,14 @@ export default async function ConsortiumPage({
           href={`/${locale}/${workspace}/pipeline`}
           className="text-muted hover:text-ink"
         >
-          ← Back to Pipeline
+          ← {tPipeline('detail.back')}
         </Link>
       </div>
 
       <div className="mb-8">
-        <h1 className="text-2xl font-bold font-heading">Consortium Builder</h1>
+        <h1 className="text-2xl font-bold font-heading">{t('title')}</h1>
         <p className="text-muted mt-1">
-          {opportunity.title} — Stage {opportunity.stage}
+          {t('stageLine', { title: opportunity.title, stage: opportunity.stage })}
         </p>
       </div>
 

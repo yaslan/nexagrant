@@ -5,6 +5,7 @@ import { saveSectionContent, generateSectionDraft, updateNoteStatus } from '../a
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import type { Editor } from '@tiptap/react';
 import { EvidenceDrawer } from '@/components/evidence/EvidenceDrawer';
+import { useTranslations } from 'next-intl';
 import { errorMessage } from '@/lib/errors';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
@@ -39,6 +40,8 @@ export default function ConceptNoteEditor({
   const [lastAiUsage, setLastAiUsage] = useState<{ creditsUsed: number; inputTokens: number; outputTokens: number } | null>(null);
   const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
   const errorText = useActionErrorText();
+  const t = useTranslations('ConceptNote.workspaceEditor');
+  const tStatus = useTranslations('ConceptNote.status');
 
   /** An ended pilot is said as such; any other error goes on to the error boundary, as before. */
   const refuse = (err: unknown) => {
@@ -76,7 +79,7 @@ export default function ConceptNoteEditor({
         outputTokens: result.outputTokens,
       });
     } catch (err) {
-      alert(errorText(err, () => errorMessage(err) || 'AI generation failed'));
+      alert(errorText(err, () => errorMessage(err) || t('aiFailed')));
     } finally {
       setAiLoading(null);
     }
@@ -100,7 +103,7 @@ export default function ConceptNoteEditor({
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-180px)]">
       {/* Sidebar - Section Navigation */}
       <div className="w-full lg:w-64 flex-shrink-0 bg-surface border border-border rounded-xl p-4 overflow-y-auto shadow-2xs">
-        <h3 className="font-bold text-xs text-muted uppercase tracking-wider mb-3">Sections</h3>
+        <h3 className="font-bold text-xs text-muted uppercase tracking-wider mb-3">{t('sections')}</h3>
         <div className="space-y-1">
           {sections.map(s => {
             const words = wordCount(content[s.key] || '');
@@ -117,7 +120,7 @@ export default function ConceptNoteEditor({
               >
                 <div className="font-medium truncate">{s.labelKey}</div>
                 <div className={`text-[10px] mt-0.5 ${activeSection === s.key ? 'text-white/80' : overLimit ? 'text-bad font-bold' : 'text-muted'}`}>
-                  {words}/{s.maxWords} words
+                  {t('sectionWords', { words, max: s.maxWords })}
                 </div>
               </button>
             );
@@ -128,7 +131,7 @@ export default function ConceptNoteEditor({
 
         {/* Status Controls */}
         <div className="space-y-1.5">
-          <h3 className="font-bold text-xs text-muted uppercase tracking-wider mb-2">Status</h3>
+          <h3 className="font-bold text-xs text-muted uppercase tracking-wider mb-2">{t('status')}</h3>
           {['draft', 'review', 'approved'].map(s => (
             <button
               key={s}
@@ -138,7 +141,7 @@ export default function ConceptNoteEditor({
                 status === s ? 'bg-ok/15 text-ok border border-ok/30 font-bold' : 'border border-border text-ink-2 hover:bg-surface-hover hover:text-ink'
               }`}
             >
-              {s}
+              {tStatus(s)}
             </button>
           ))}
         </div>
@@ -146,10 +149,10 @@ export default function ConceptNoteEditor({
         {/* AI Usage Disclosure */}
         {lastAiUsage && (
           <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-xs text-ink-2">
-            <div className="font-bold text-purple-400 mb-1">AI Usage Disclosure</div>
-            <div>Credits used: {lastAiUsage.creditsUsed}</div>
-            <div>Input tokens: {lastAiUsage.inputTokens}</div>
-            <div>Output tokens: {lastAiUsage.outputTokens}</div>
+            <div className="font-bold text-purple-400 mb-1">{t('aiUsage')}</div>
+            <div>{t('creditsUsed', { count: lastAiUsage.creditsUsed })}</div>
+            <div>{t('inputTokens', { count: lastAiUsage.inputTokens })}</div>
+            <div>{t('outputTokens', { count: lastAiUsage.outputTokens })}</div>
           </div>
         )}
       </div>
@@ -162,7 +165,7 @@ export default function ConceptNoteEditor({
             <div className="px-6 py-4 border-b border-border bg-ground/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <h2 className="text-lg md:text-xl font-bold font-heading text-ink">{section.labelKey}</h2>
-                <p className="text-xs text-muted">Max {section.maxWords} words</p>
+                <p className="text-xs text-muted">{t('maxWords', { max: section.maxWords })}</p>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button
@@ -170,7 +173,7 @@ export default function ConceptNoteEditor({
                   className="bg-surface text-ink-2 border border-border px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-surface-hover hover:text-ink flex items-center gap-1.5 transition"
                 >
                   <span>🔍</span>
-                  <span>Evidence Hub</span>
+                  <span>{t('evidenceHub')}</span>
                 </button>
                 <button
                   onClick={() => handleGenerate(section)}
@@ -178,9 +181,9 @@ export default function ConceptNoteEditor({
                   className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5 shadow-2xs transition"
                 >
                   {aiLoading === section.key ? (
-                    <>⏳ Generating...</>
+                    <>{t('generating')}</>
                   ) : (
-                    <>✨ AI Draft</>
+                    <>{t('aiDraft')}</>
                   )}
                 </button>
                 <button
@@ -188,7 +191,7 @@ export default function ConceptNoteEditor({
                   disabled={isPending}
                   className="bg-accent text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 disabled:opacity-50 shadow-2xs transition"
                 >
-                  {isPending ? 'Saving...' : 'Save'}
+                  {isPending ? t('saving') : t('save')}
                 </button>
               </div>
             </div>
@@ -207,12 +210,12 @@ export default function ConceptNoteEditor({
             {/* Word Count Footer */}
             <div className="px-6 py-2.5 border-t border-border bg-ground/50 text-xs text-muted flex justify-between items-center">
               <span>
-                Words: <strong className="text-ink">{wordCount(content[section.key] || '')}</strong>/{section.maxWords}
+                {t('words')} <strong className="text-ink">{wordCount(content[section.key] || '')}</strong>/{section.maxWords}
                 {wordCount(content[section.key] || '') > section.maxWords && (
-                  <span className="text-bad ml-2 font-bold">⚠ Over limit!</span>
+                  <span className="text-bad ml-2 font-bold">{t('overLimit')}</span>
                 )}
               </span>
-              <span className="font-mono text-[11px]">Version: {initialVersion}</span>
+              <span className="font-mono text-[11px]">{t('version', { version: initialVersion })}</span>
             </div>
           </div>
         ))}
