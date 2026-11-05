@@ -7,7 +7,11 @@ import {
   EXPECTED_CI_BASE,
   SOURCE_PATH,
   DB_OBJECTS_PATH,
+  KEY_WIDTH_PATH,
+  MYSQL_SCHEMA_PATH,
   checkDbObjects,
+  checkKeyWidths,
+  keyWidths,
   ciColumns,
   checkViewList,
   pgDbObjects,
@@ -262,6 +266,45 @@ describe('db objects inventory (FO-381 B3)', () => {
   });
 });
 
+// FO-381 N4: audit mutants M6b (key shrunk), M6c (key grown past InnoDB), M7 / M7c (tenant filter
+// or check option removed from a view). Each must fail the gate even when regenerated.
+describe('key width pin and tenant view filter (FO-381 N4)', () => {
+  const real = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8')).text;
+  // Key widths come from the committed MariaDB schema (decisions applied), not from a raw rebuild.
+  const committed = readFileSync(MYSQL_SCHEMA_PATH, 'utf8');
+  const pinned = JSON.parse(readFileSync(KEY_WIDTH_PATH, 'utf8'));
+
+  it('the committed schema matches the pinned key widths and every key fits InnoDB', () => {
+    expect(checkKeyWidths(keyWidths(committed), pinned)).toEqual([]);
+  });
+
+  it('M6b: a shrunk VARCHAR on a unique key fails against the pin', () => {
+    const mutant = committed.replace(/(model Tenant \{[\s\S]*?slug\s+String\s+@db\.VarChar\()191\)/, '$12)');
+    const errors = checkKeyWidths(keyWidths(mutant), pinned);
+    expect(errors.some((e) => e.startsWith('Tenant.slug:') && e.includes('pinned 764'))).toBe(true);
+  });
+
+  it('M6c: a grown VARCHAR(2000) key fails the InnoDB limit', () => {
+    const mutant = committed.replace(/(model Tenant \{[\s\S]*?slug\s+String\s+@db\.VarChar\()191\)/, '$12000)');
+    const errors = checkKeyWidths(keyWidths(mutant), pinned);
+    expect(errors.some((e) => e.startsWith('Tenant.slug:') && e.includes('exceeds the InnoDB limit'))).toBe(true);
+  });
+
+  it('M7: a tenant view without its WHERE filter fails, even when views.sql is regenerated', () => {
+    const sql = toViewsSql(real).replace(
+      'CREATE OR REPLACE VIEW `v_Workspace` AS SELECT * FROM `Workspace` WHERE `tenantId` = fabrika_current_tenant() WITH CASCADED CHECK OPTION;',
+      'CREATE OR REPLACE VIEW `v_Workspace` AS SELECT * FROM `Workspace` WITH CASCADED CHECK OPTION;',
+    );
+    expect(checkViewList(sql, real).some((e) => e.includes('v_Workspace') && e.includes('lost its tenant filter'))).toBe(true);
+  });
+
+  it('M7c: a tenant view without WITH CASCADED CHECK OPTION fails', () => {
+    const sql = toViewsSql(real).replace('`tenantId` IS NULL WITH CASCADED CHECK OPTION;', '`tenantId` IS NULL;');
+    expect(sql).not.toEqual(toViewsSql(real));
+    expect(checkViewList(sql, real).some((e) => e.includes('lost its tenant filter or WITH CASCADED CHECK OPTION'))).toBe(true);
+  });
+});
+
 describe('toViewSchema: system models are unreachable from the view client', () => {
   const real = toMysqlSchema(readFileSync(SOURCE_PATH, 'utf8')).text;
   it('has no field whose type is a system model', () => {
@@ -316,7 +359,7 @@ describe('String decisions (FO-375 lead rule: no bare String without a proven ty
     expect(committed).toBe(text);
   });
 
-  it('pins the base-table _ci count (41 columns; the 16 view copies are inherited, not generated)', () => {
+  it('pins the base-table _ci count (41 columns; the 29 view copies are inherited, not generated)', () => {
     expect(EXPECTED_CI_BASE).toBe(41);
   });
 });

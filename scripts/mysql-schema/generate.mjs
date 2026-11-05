@@ -301,6 +301,12 @@ export function checkViewList(viewsSqlText, mysqlSchemaText) {
       if (!temptable.has(mapped)) errors.push(`platform view v_${mapped} (${name}) missing or not ALGORITHM=TEMPTABLE`);
     } else if (!filtered.has(mapped)) {
       errors.push(`tenant view v_${mapped} (${name}) missing or without the tenant filter`);
+    } else {
+      // FO-381 N4 / audit M7, M7c: the filter and the check option must be in the statement itself.
+      const line = viewsSqlText.split('\n').find((l) => l.startsWith(`CREATE OR REPLACE VIEW \`v_${mapped}\` `)) ?? '';
+      if (!line.includes('WHERE `tenantId` = fabrika_current_tenant()') || !line.includes('WITH CASCADED CHECK OPTION')) {
+        errors.push(`tenant view v_${mapped} (${name}) lost its tenant filter or WITH CASCADED CHECK OPTION`);
+      }
     }
   }
   const total = created.length;
@@ -457,6 +463,65 @@ export function checkDbObjects(found, inventory) {
   return errors;
 }
 
+// ---------------------------------------------------------------------------
+// FO-381 N4/N5: key width. Pinned by hand in prisma/mysql/key-widths.json; the generator never
+// writes that file, so a changed VARCHAR length is caught here even when views and schema are
+// regenerated together (audit M6b, M6c).
+export const KEY_WIDTH_LIMIT_BYTES = 3072; // InnoDB, DYNAMIC row format
+export const KEY_WIDTH_PATH = resolve(ROOT, 'prisma/mysql/key-widths.json');
+const NON_VARCHAR_BYTES = { Int: 4, BigInt: 8, Boolean: 1, DateTime: 8, Float: 8, Decimal: 16 };
+
+function columnBytes(type, attrs) {
+  const m = attrs.match(/@db\.VarChar\((\d+)\)/);
+  if (m) return Number(m[1]) * 4; // utf8mb4: up to 4 bytes per character
+  if (type === 'String') return 191 * 4; // Prisma's MySQL default
+  return NON_VARCHAR_BYTES[type] ?? 8; // enums and other types
+}
+
+/** Pure: MariaDB schema text → Map "Model.key" → index bytes (PK, @unique, @@unique, @@index). */
+export function keyWidths(mysqlSchemaText) {
+  const out = new Map();
+  for (const block of splitBlocks(mysqlSchemaText)) {
+    const head = block.match(/^model (\w+) \{/m);
+    if (!head) continue;
+    const model = head[1];
+    const fields = new Map();
+    const keys = [];
+    for (const line of block.split('\n').slice(1)) {
+      const k = line.match(/^\s+@@(unique|index|id)\(\[([^\]]*)\]/);
+      if (k) {
+        const cols = k[2].split(',').map((s) => s.trim()).filter(Boolean);
+        keys.push({ name: `${k[1]}(${cols.join(',')})`, cols });
+        continue;
+      }
+      const f = line.match(/^\s+(\w+)\s+(\w+)\??\s*(.*)$/);
+      if (!f || line.trim().startsWith('@@')) continue;
+      const [, name, type, attrs] = f;
+      fields.set(name, columnBytes(type, attrs));
+      if (/@id\b|@unique\b/.test(attrs)) keys.push({ name, cols: [name] });
+    }
+    for (const key of keys) {
+      const bytes = key.cols.reduce((sum, c) => sum + (fields.get(c) ?? 0), 0);
+      out.set(`${model}.${key.name}`, bytes);
+    }
+  }
+  return out;
+}
+
+/** Pure: computed key widths vs. the pinned snapshot → error lines (empty = matches and fits). */
+export function checkKeyWidths(widths, pinned) {
+  const errors = [];
+  for (const [key, bytes] of widths) {
+    if (bytes > KEY_WIDTH_LIMIT_BYTES) errors.push(`${key}: ${bytes} bytes exceeds the InnoDB limit ${KEY_WIDTH_LIMIT_BYTES}`);
+    if (!(key in pinned)) errors.push(`${key}: ${bytes} bytes, not pinned in prisma/mysql/key-widths.json`);
+    else if (pinned[key] !== bytes) errors.push(`${key}: ${bytes} bytes, pinned ${pinned[key]}; review the key, then update key-widths.json`);
+  }
+  for (const key of Object.keys(pinned)) {
+    if (!widths.has(key)) errors.push(`${key}: pinned but no longer in the schema`);
+  }
+  return errors;
+}
+
 /** Up migrations and RLS scripts only: down and rollback scripts re-create objects and must not count twice. */
 export function readPgSources() {
   const dir = resolve(ROOT, 'prisma/migrations');
@@ -545,6 +610,14 @@ function main() {
     );
     if (objectErrors.length > 0) {
       console.error(`PostgreSQL objects not accounted for in prisma/mysql/db-objects.json:\n  ${objectErrors.join('\n  ')}`);
+      process.exit(1);
+    }
+    const widthErrors = checkKeyWidths(
+      keyWidths(committedSchema),
+      JSON.parse(committed(KEY_WIDTH_PATH) ?? '{}'),
+    );
+    if (widthErrors.length > 0) {
+      console.error(`key width check failed (prisma/mysql/key-widths.json):\n  ${widthErrors.join('\n  ')}`);
       process.exit(1);
     }
     if (committedSchema !== text) stale.push('prisma/mysql/schema.prisma');
