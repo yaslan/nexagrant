@@ -28,6 +28,45 @@ describe('e2e process listing redaction (FO-385)', () => {
     expect(redact('tool --api-key "a b" --x 1')).toBe('tool --api-key *** --x 1');
   });
 
+  // FO-385 round 2 (review finding A): forms that leaked in the first mask.
+  it('masks PASS= and DB_PASS= (PASS is a secret name, not only PASSWORD)', () => {
+    expect(redact('DB_PASS=hunter2 node server.js')).toBe('DB_PASS=*** node server.js');
+    expect(redact('PASS=hunter4 next dev')).toBe('PASS=*** next dev');
+  });
+
+  it('masks --passwd=value', () => {
+    expect(redact('mysql --passwd=hunter3 -h x')).toBe('mysql --passwd=*** -h x');
+  });
+
+  it('masks the password after sshpass -p', () => {
+    expect(redact('sshpass -p hunter5 ssh host')).toBe('sshpass -p *** ssh host');
+    expect(redact("sshpass -p 'a b' ssh host")).toBe("sshpass -p *** ssh host");
+  });
+
+  it('masks an Authorization header value (Bearer token) inside quotes', () => {
+    expect(redact('curl -H "Authorization: Bearer ZZZ" https://x')).toBe(
+      'curl -H "Authorization: Bearer ***" https://x',
+    );
+    expect(redact('curl -H Authorization:abc123 x')).toBe('curl -H Authorization:*** x');
+  });
+
+  it('masks a URL password that contains a slash', () => {
+    expect(redact('postgres://user:p/ss@host/db')).toBe('postgres://***@host/db');
+  });
+
+  it('masks a URL password that contains an @ (up to the last @ of the token)', () => {
+    expect(redact('postgres://user:p@ss@host/db')).toBe('postgres://***@host/db');
+  });
+
+  it('masks an unterminated quoted value to the end of the line', () => {
+    expect(redact('TOKEN="abc def ghi')).toBe('TOKEN=***');
+    expect(redact("SECRET='x y")).toBe('SECRET=***');
+  });
+
+  it('masks COOKIE=session=value', () => {
+    expect(redact('COOKIE=session=abcdef node')).toBe('COOKIE=*** node');
+  });
+
   it('leaves lines without secrets unchanged', () => {
     expect(redact('next dev --port 3400')).toBe('next dev --port 3400');
     expect(redact('playwright test tests/e2e/auth.spec.ts')).toBe('playwright test tests/e2e/auth.spec.ts');
