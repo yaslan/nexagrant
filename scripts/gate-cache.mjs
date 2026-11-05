@@ -123,6 +123,11 @@ function main() {
     process.exit(0)
   }
   if (cmd === 'skippable') {
+    // NG-72: NO_CACHE=1 önbelleği de belge-yalnız kısa yolunu da kapatır (gate-lock.mjs ile aynı kural).
+    if (process.env.FONBRIDGE_GATE_NO_CACHE === '1') {
+      console.log('FONBRIDGE_GATE_NO_CACHE=1: önbellek ve belge-yalnız kısa yolu kapalı; tam gate gerekli')
+      process.exit(1)
+    }
     const rec = readPass()
     if (rec) {
       console.log(`önbellek: ${rec.tree} ${rec.date}`)
@@ -140,4 +145,13 @@ function main() {
   process.exit(2)
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
+// NG-72: argv[1] sembolik bağlantı üzerinden gelebilir (macOS: /var → /private/var). import.meta.url her zaman
+// gerçek yoldur; karşılaştırma realpath ile yapılmazsa main() hiç koşmaz ve betik sessizce 0 döner (skippable = "atla").
+const invokedDirectly = (() => {
+  try {
+    return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href
+  } catch {
+    return false
+  }
+})()
+if (invokedDirectly) main()

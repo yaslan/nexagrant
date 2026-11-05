@@ -40,14 +40,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# FO-339: aynı tree için yeşil kayıt (önbellek) ya da yalnız belge farkı varsa konteyner/DB kurmadan
-# `pnpm gate` koşulur; karar ve satır scripts/gate-lock.mjs'te verilir. Komut verilmişse atlanmaz.
-if [ $# -eq 0 ] && node scripts/gate-cache.mjs skippable >/dev/null; then
-  exec pnpm gate
-fi
-
 log() { printf '%s [gate-isolated] %s\n' "$(date -u +%FT%TZ)" "$*"; }
 fail() { log "FAIL: $*" >&2; exit 1; }
+
+# FO-339: aynı tree için yeşil kayıt (önbellek) ya da yalnız belge farkı varsa konteyner/DB kurmadan
+# `pnpm gate` koşulur; karar ve satır scripts/gate-lock.mjs'te verilir. Komut verilmişse atlanmaz.
+# NG-72: FONBRIDGE_GATE_NO_CACHE=1 iken gate-cache.mjs skippable 1 döner, yani kısa yol hiç denenmez.
+if [ $# -eq 0 ]; then
+  if skip_msg="$(node scripts/gate-cache.mjs skippable)"; then
+    log "kısa yol: $skip_msg; izole DB kurulmadan pnpm gate"
+    exec pnpm gate
+  fi
+fi
 
 command -v docker >/dev/null 2>&1 || fail "docker not found on PATH"
 command -v pnpm >/dev/null 2>&1 || fail "pnpm not found on PATH"
