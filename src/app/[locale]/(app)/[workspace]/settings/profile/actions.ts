@@ -74,6 +74,30 @@ type PicPlan =
 const LIVE_SUBSCRIPTION_STATUSES: readonly string[] = ['ACTIVE', 'TRIALING', 'PAST_DUE'];
 
 /**
+ * FO-389. A question that ended in "CORDIS knows this PIC, confirm it?" has been counted and answered.
+ * The "yes" that follows is the same question, so it is not counted a second time: without this a
+ * new account spends two of its three hourly questions on one confirmation. One entry per user, for
+ * one PIC, taken once, and only a counted question can leave it, so it opens no way to ask for free.
+ * In memory like the limiter: after a restart the "yes" is simply counted, the stricter side.
+ */
+const PIC_CONFIRM_WINDOW_MS = 10 * 60_000;
+const picAwaitingConfirmation = new Map<string, { pic: string; until: number }>();
+
+function rememberPicConfirmation(userId: string, pic: string, now = Date.now()) {
+  if (picAwaitingConfirmation.size > 1000) {
+    for (const [id, entry] of picAwaitingConfirmation) if (entry.until <= now) picAwaitingConfirmation.delete(id);
+  }
+  picAwaitingConfirmation.set(userId, { pic, until: now + PIC_CONFIRM_WINDOW_MS });
+}
+
+function takePicConfirmation(userId: string, pic: string, now = Date.now()): boolean {
+  const entry = picAwaitingConfirmation.get(userId);
+  if (!entry) return false;
+  picAwaitingConfirmation.delete(userId);
+  return entry.pic === pic && entry.until > now;
+}
+
+/**
  * FO-389. True when something other than the self-service form put this tenant here: it came in with
  * an agency's invitation code (`agencyId`), or it has a live subscription (a pilot, a plan someone
  * paid for or was granted), or it bought a lifetime licence. A tenant with none of these is one anyone
@@ -135,11 +159,15 @@ async function planPicChange(
   if (to === null) return { kind: 'write', from: current, to: null, match: null };
 
   const solicited = tenant !== null && isSolicitedTenant(tenant);
-  const retryAfterSeconds = (solicited ? picLookupLimiter : picUnsolicitedLookupLimiter).take(userId);
-  if (retryAfterSeconds !== null) return { kind: 'limit', pic: to, retryAfterSeconds };
-  if (!solicited) {
-    const budgetRetry = await spendUnsolicitedPicLookup();
-    if (budgetRetry !== null) return { kind: 'limit', pic: to, retryAfterSeconds: budgetRetry };
+  // The "yes" to a confirmation this user was just shown is the same question: not counted again.
+  const alreadyCounted = confirmedPic === to && takePicConfirmation(userId, to);
+  if (!alreadyCounted) {
+    const retryAfterSeconds = (solicited ? picLookupLimiter : picUnsolicitedLookupLimiter).take(userId);
+    if (retryAfterSeconds !== null) return { kind: 'limit', pic: to, retryAfterSeconds };
+    if (!solicited) {
+      const budgetRetry = await spendUnsolicitedPicLookup();
+      if (budgetRetry !== null) return { kind: 'limit', pic: to, retryAfterSeconds: budgetRetry };
+    }
   }
 
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`tenant-pic:${to}`}, 0))`;
@@ -153,7 +181,10 @@ async function planPicChange(
     where: { organisationId: to },
     select: { name: true, city: true, country: true },
   });
-  if (match && confirmedPic !== to) return { kind: 'confirm', match };
+  if (match && confirmedPic !== to) {
+    rememberPicConfirmation(userId, to);
+    return { kind: 'confirm', match };
+  }
   return { kind: 'write', from: current, to, match };
 }
 

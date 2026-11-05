@@ -432,17 +432,20 @@ describe('updateTenantProfile action', () => {
         // A PIC someone holds, one nobody holds and one CORDIS lists: one answer, so no oracle left.
         const held = await cordisOrg('Held Org');
         await otherTenantHolding(held);
+        // The third is a "yes" with no prompt shown to this user before it (FO-389 only spares the "yes"
+        // that answers a prompt), so it is a question like any other.
+        const unprompted = await cordisOrg('Unprompted Org');
         const answers = [
           await updateTenantProfile({ ...base, pic: held }),
           await updateTenantProfile({ ...base, pic: newPic() }),
-          await updateTenantProfile({ ...base, pic: asked, confirmedPic: asked }),
+          await updateTenantProfile({ ...base, pic: unprompted, confirmedPic: unprompted }),
         ];
         for (const answer of answers) {
           expect(answer).toEqual({ ok: false, error: 'picRateLimited', retryAfterSeconds: expect.any(Number) });
           expect((answer as { retryAfterSeconds: number }).retryAfterSeconds).toBeGreaterThan(0);
           expect((answer as { retryAfterSeconds: number }).retryAfterSeconds).toBeLessThanOrEqual(3600);
         }
-        expect(await prisma.tenant.count({ where: { id: tenantId, pic: asked } })).toBe(0);
+        expect(await prisma.tenant.count({ where: { id: tenantId, pic: { in: [asked, unprompted] } } })).toBe(0);
       });
 
       it('saves nothing on the limit, and records it once however long the loop runs', async () => {
@@ -573,6 +576,46 @@ describe('updateTenantProfile action', () => {
           for (let i = 0; i < PIC_LOOKUPS_PER_HOUR_UNSOLICITED; i++) await ask(newPic());
           expect(await ask(newPic())).toEqual(limited);
         }
+      });
+
+      it('counts a confirmation once: the "yes" to a prompt just shown is the same question', async () => {
+        const listed = await cordisOrg('Listed Org');
+        const scope = await account();
+        as(scope);
+        expect(await ask(listed)).toMatchObject({ error: 'picConfirmationRequired' });
+        expect(await ask(listed, { confirmedPic: listed })).toMatchObject({ ok: true });
+        expect((await budgetRow())?.count).toBe(1);
+        // Two of the three hourly questions are still there, the fourth is not.
+        for (let i = 0; i < PIC_LOOKUPS_PER_HOUR_UNSOLICITED - 1; i++) expect(await ask(newPic())).toMatchObject({ ok: true });
+        expect(await ask(newPic())).toEqual(limited);
+        expect((await budgetRow())?.count).toBe(PIC_LOOKUPS_PER_HOUR_UNSOLICITED);
+      });
+
+      it('does not let a "yes" stand in for a question that was never asked or answered', async () => {
+        const listed = await cordisOrg('Listed Org');
+        // A "yes" sent without a prompt before it is a question like any other.
+        as(await account());
+        for (let i = 0; i < PIC_LOOKUPS_PER_HOUR_UNSOLICITED; i++) {
+          const pic = newPic();
+          await ask(pic, { confirmedPic: pic });
+        }
+        expect(await ask(newPic())).toEqual(limited);
+        expect((await budgetRow())?.count).toBe(PIC_LOOKUPS_PER_HOUR_UNSOLICITED);
+
+        // The prompt is one user's, for one PIC, and is used up by the first "yes".
+        const other = await cordisOrg('Other Org');
+        const first = await account();
+        as(first);
+        await ask(listed); // prompt shown to `first`
+        as(await account());
+        const before = (await budgetRow())?.count ?? 0;
+        await ask(listed, { confirmedPic: listed }); // someone else's "yes": counted
+        expect((await budgetRow())?.count).toBe(before + 1);
+        as(first);
+        await ask(other, { confirmedPic: other }); // `first`'s prompt was for another PIC: counted
+        expect((await budgetRow())?.count).toBe(before + 2);
+        await ask(listed, { confirmedPic: listed }); // and the prompt was used up by the line above, whatever PIC it carried
+        expect((await budgetRow())?.count).toBe(before + 3);
       });
 
       it('spends one from the shared budget per unsolicited question, from any account', async () => {
