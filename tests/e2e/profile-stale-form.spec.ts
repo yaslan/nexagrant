@@ -52,7 +52,7 @@ async function addOwner(tag: string): Promise<Owner> {
 }
 
 function formOf(page: Page) {
-  const saveButton = page.getByRole('button', { name: 'Profili Kaydet' });
+  const saveButton = page.getByRole('button', { name: /^(Profili Kaydet|Save Profile)$/ });
   const form = page.locator('form').filter({ has: saveButton });
   return {
     form,
@@ -280,7 +280,9 @@ test.describe('FO-387 — a profile form left open', () => {
       const message = page.getByTestId(CONFLICT);
       await expect(message).toBeVisible();
       await expect(message).toContainText('8–9');
-      await expect(message).toContainText('4–6');
+      // FO-393 N3: only the end the user sent is "theirs"; the minimum 4 was never touched.
+      await expect(message).toContainText('girdiğiniz en yüksek TRL değeri 6 bununla');
+      await expect(message).not.toContainText('4–6');
       await expect(page.getByText('Lütfen tüm alanları doğru şekilde doldurun')).toHaveCount(0);
       probe('TRL message', await message.innerText());
 
@@ -348,7 +350,7 @@ test.describe('FO-387 — a profile form left open', () => {
       await f.saveButton.click();
 
       const message = page.getByTestId(CONFLICT);
-      await expect(message).toHaveText('Lütfen tüm alanları doğru şekilde doldurun');
+      await expect(message).toHaveText('Kaydedilmedi. En düşük TRL (8) en yüksek TRL değerinden (7) büyük olamaz.');
       await expect(message).toBeInViewport();
       // Theirs to fix: what they typed stays.
       await expect(f.trlMin).toHaveValue('8');
@@ -409,7 +411,8 @@ test.describe('FO-387 — a profile form left open', () => {
       const message = page.getByTestId(CONFLICT);
       await expect(message).toBeInViewport({ ratio: 1 });
       await expect(message).toContainText('Someone else changed the TRL range to 8–9');
-      await expect(message).toContainText('4–6');
+      await expect(message).toContainText('the maximum TRL of 6 you entered');
+      await expect(message).not.toContainText('4–6');
       probe('TRL message en', await message.innerText());
       await page.screenshot({ path: test.info().outputPath('trl-conflict-en-1280.png') });
     });
@@ -489,6 +492,244 @@ test.describe('FO-387 — a profile form left open', () => {
 
       await saved(page);
       expect((await storedProfile(PP_TENANT))?.keywords).toEqual(['typed during the save']);
+    });
+  });
+
+  // ── FO-393: what the FO-387 reviews left on a form left open ─────────────────
+  test.describe('FO-393 follow-ups', () => {
+    const CONFLICT = 'tenant-trl-error';
+    const NO_CHANGES = 'tenant-profile-no-changes';
+    const COPY = {
+      tr: {
+        success: 'başarıyla güncellendi',
+        order: 'Kaydedilmedi. En düşük TRL (8) en yüksek TRL değerinden (7) büyük olamaz.',
+        colleague: 'Başka biri',
+      },
+      en: {
+        success: 'successfully updated',
+        order: 'Not saved. The minimum TRL (8) cannot be higher than the maximum TRL (7).',
+        colleague: 'Someone else',
+      },
+    } as const;
+    const VIEWS = [
+      { locale: 'tr', width: 390, height: 844 },
+      { locale: 'en', width: 1280, height: 720 },
+    ] as const;
+
+    /** Server actions are POSTs to the page itself; a check the browser makes sends none. */
+    function actionPosts(page: Page) {
+      const posts: string[] = [];
+      page.on('request', (request) => {
+        if (request.method() === 'POST' && request.url().includes('/settings/profile')) posts.push(request.url());
+      });
+      return posts;
+    }
+
+    async function savedIn(page: Page, locale: 'tr' | 'en') {
+      await formOf(page).saveButton.click();
+      await expect(page.getByText(COPY[locale].success)).toBeVisible();
+    }
+
+    /** A colleague, in a session of their own, saves this TRL range on the main tenant. */
+    async function colleagueSetsTrl(browser: Browser, tag: string, min: string, max: string) {
+      const colleague = await addOwner(`fo393-${tag}`);
+      await inAnotherSession(browser, async (other) => {
+        const c = await open(other, colleague);
+        // Max first when it goes up, min first when it comes down: each step is a valid range.
+        if (Number(max) >= Number(await c.trlMax.inputValue())) {
+          await c.trlMax.fill(max);
+          await c.trlMin.fill(min);
+        } else {
+          await c.trlMin.fill(min);
+          await c.trlMax.fill(max);
+        }
+        await saved(other);
+      });
+    }
+
+    for (const view of VIEWS) {
+      const { locale, width, height } = view;
+      const url = `/${locale}/${PP_WORKSPACE}/settings/profile`;
+      const shot = (name: string) => test.info().outputPath(`fo393-${name}-${locale}-${width}.png`);
+
+      test.describe(`${locale} ${width}x${height}`, () => {
+        test.beforeEach(({ page }) => page.setViewportSize({ width, height }));
+
+        test('N1: a range learned from a refusal follows the row when it goes back to the opening value', async ({ page, browser }) => {
+          const first = await addOwner(`n1-${locale}`);
+          const f = await open(page, first, url);
+          await colleagueSetsTrl(browser, `n1a-${locale}`, '8', '9');
+
+          await f.trlMax.fill('6');
+          await f.saveButton.click();
+          await expect(page.getByTestId(CONFLICT)).toBeVisible();
+          await expect(f.trlMin).toHaveValue('8');
+          await expect(f.trlMax).toHaveValue('9');
+
+          // Back to the range this page was opened with, then a save that is about the PIC only.
+          await colleagueSetsTrl(browser, `n1b-${locale}`, '4', '7');
+          await f.pic.fill(PP_PIC_UNMATCHED);
+          await savedIn(page, locale);
+
+          const row = await storedProfile(PP_TENANT);
+          probe(`N1 ${locale} ${width} row`, row);
+          probe(`N1 ${locale} ${width} form`, [await f.trlMin.inputValue(), await f.trlMax.inputValue()]);
+          expect(row?.trlRange).toEqual([4, 7]);
+          await expect(f.trlMin).toHaveValue('4');
+          await expect(f.trlMax).toHaveValue('7');
+          await page.screenshot({ path: shot('n1') });
+        });
+
+        test('N2: an own range that is wrong as typed is said so, before anything is sent', async ({ page, browser }) => {
+          const first = await addOwner(`n2-${locale}`);
+          const f = await open(page, first, url);
+          await colleagueSetsTrl(browser, `n2-${locale}`, '2', '7');
+          const posts = actionPosts(page);
+          const auditsBefore = await profileAudits(PP_TENANT);
+
+          await f.trlMin.fill('8');
+          await f.saveButton.click();
+
+          const message = page.getByTestId(CONFLICT);
+          await expect(message).toHaveText(COPY[locale].order);
+          await expect(message).toBeFocused();
+          await expect(message).toBeInViewport({ ratio: 1 });
+          await expect(message).not.toContainText(COPY[locale].colleague);
+          await expect(f.trlMin).toHaveValue('8');
+          await expect(f.trlMax).toHaveValue('7');
+          const row = await storedProfile(PP_TENANT);
+          probe(`N2 ${locale} ${width}`, { posts: posts.length, row, message: await message.innerText() });
+          expect(posts).toEqual([]);
+          expect(row?.trlRange).toEqual([2, 7]);
+          expect(await profileAudits(PP_TENANT)).toBe(auditsBefore);
+          await page.screenshot({ path: shot('n2') });
+        });
+
+        test('N3: a save with nothing changed says so, not "updated", and the form catches up', async ({ page, browser }) => {
+          const first = await addOwner(`n3a-${locale}`);
+          const colleague = await addOwner(`n3a-colleague-${locale}`);
+          const f = await open(page, first, url);
+          await inAnotherSession(browser, async (other) => {
+            const c = await open(other, colleague);
+            await c.capabilities.fill('Colleague capabilities');
+            await saved(other);
+          });
+          const before = await storedProfile(PP_TENANT);
+          const auditsBefore = await profileAudits(PP_TENANT);
+
+          // B2's case: the user edits, then types the opening text back, so nothing is sent.
+          await f.capabilities.fill('Something else');
+          await f.capabilities.fill(OPENED.capabilities);
+          await f.saveButton.click();
+
+          const notice = page.getByTestId(NO_CHANGES);
+          await expect(notice).toBeVisible();
+          await expect(notice).toHaveAttribute('role', 'status');
+          await expect(page.getByText(COPY[locale].success)).toHaveCount(0);
+          // The empty save re-read the page: the untouched field shows the colleague's text.
+          await expect(f.capabilities).toHaveValue('Colleague capabilities');
+          const after = await storedProfile(PP_TENANT);
+          probe(`N3a ${locale} ${width}`, { before, after, notice: await notice.innerText() });
+          expect(after).toEqual(before);
+          expect(await profileAudits(PP_TENANT)).toBe(auditsBefore);
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+          expect(overflow).toBeLessThanOrEqual(0);
+          await page.screenshot({ path: shot('n3a') });
+
+          // A real change afterwards is a real save again.
+          await f.keywords.fill('after nothing');
+          await savedIn(page, locale);
+          await expect(notice).toHaveCount(0);
+          expect((await storedProfile(PP_TENANT))?.keywords).toEqual(['after nothing']);
+        });
+
+        test('N3: the refusal message goes once the user starts fixing the TRL fields', async ({ page, browser }) => {
+          const first = await addOwner(`n3c-${locale}`);
+          const f = await open(page, first, url);
+          await colleagueSetsTrl(browser, `n3c-${locale}`, '8', '9');
+
+          await f.trlMax.fill('6');
+          await f.saveButton.click();
+          const message = page.getByTestId(CONFLICT);
+          await expect(message).toBeVisible();
+          await page.screenshot({ path: shot('n3b') });
+
+          await f.trlMin.fill('5');
+          await expect(message).toHaveCount(0);
+          probe(`N3c ${locale} ${width}`, { messageAfterTyping: await message.count() });
+        });
+      });
+    }
+
+    test.describe('a tenant that never saved a profile', () => {
+      test.beforeEach(() =>
+        withSystemScope('platform-admin', 'e2e.profile-stale.fo393-never-saved', (tx) =>
+          tx.tenantProfile.deleteMany({ where: { tenantId: requireId(PP_OTHER_TENANT, 'PP_OTHER_TENANT') } }),
+        ),
+      );
+
+      for (const { locale, width, height } of VIEWS) {
+        test(`B3 ${locale} ${width}x${height}: keywords alone are saved once a colleague has made the row`, async ({ page, browser }) => {
+          await page.setViewportSize({ width, height });
+          const url = `/${locale}/${PP_OTHER_WORKSPACE}/settings/profile`;
+          const first = await addPicProber();
+          const colleague = await addPicProber();
+          const f = await open(page, first, url);
+          await expect(f.capabilities).toHaveValue('');
+
+          await inAnotherSession(browser, async (other) => {
+            const c = await open(other, colleague, url);
+            await c.capabilities.fill('Mate first');
+            await c.keywords.fill('mate');
+            await savedIn(other, locale);
+          });
+          const made = await storedProfile(PP_OTHER_TENANT);
+          probe(`B3 ${locale} ${width} row made by the colleague`, made);
+
+          await f.keywords.fill('only keyword');
+          await savedIn(page, locale);
+
+          const row = await storedProfile(PP_OTHER_TENANT);
+          probe(`B3 ${locale} ${width} row after keywords alone`, row);
+          expect(row).toEqual({ capabilities: 'Mate first', keywords: ['only keyword'], trlRange: [3, 8] });
+          // The save re-read the page: the text the user never touched is the colleague's.
+          await expect(f.capabilities).toHaveValue('Mate first');
+          await page.screenshot({ path: test.info().outputPath(`fo393-b3-${locale}-${width}.png`) });
+        });
+
+        test(`B3 ${locale} ${width}x${height}: with no row at all the server refuses and the field says what is missing`, async ({ page }) => {
+          await page.setViewportSize({ width, height });
+          const owner = await addPicProber();
+          const f = await open(page, owner, `/${locale}/${PP_OTHER_WORKSPACE}/settings/profile`);
+          const posts = actionPosts(page);
+
+          await f.keywords.fill('only keywords');
+          await f.pic.fill(PP_PIC_UNMATCHED);
+          await f.saveButton.click();
+
+          await expect(f.capabilities).toBeFocused();
+          expect(await f.capabilities.evaluate((el: HTMLTextAreaElement) => el.validity.valueMissing)).toBe(true);
+          // Refused whole, PIC included.
+          const row = await storedProfile(PP_OTHER_TENANT);
+          probe(`B3 ${locale} ${width} no row`, { posts: posts.length, row, pic: await storedPic(PP_OTHER_TENANT) });
+          expect(posts.length).toBe(1);
+          expect(row).toBeNull();
+          expect(await storedPic(PP_OTHER_TENANT)).toBeNull();
+
+          // From now on the browser holds the save itself: no second request.
+          await f.saveButton.click();
+          await expect(f.capabilities).toBeFocused();
+          expect(posts.length).toBe(1);
+
+          await f.capabilities.fill('Real capabilities');
+          await savedIn(page, locale);
+          expect(await storedProfile(PP_OTHER_TENANT)).toEqual({
+            capabilities: 'Real capabilities',
+            keywords: ['only keywords'],
+            trlRange: [3, 8],
+          });
+        });
+      }
     });
   });
 });
