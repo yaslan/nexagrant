@@ -7,6 +7,7 @@ import { Building, Sparkles, Key, CheckCircle, AlertCircle, Fingerprint } from '
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { updateTenantProfile, type PicCordisMatch } from './actions';
+import { DEFAULT_TRL_RANGE, parseKeywords } from './profile-fields';
 
 const PARTICIPANT_REGISTER_URL =
   'https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/how-to-participate/participant-register';
@@ -22,6 +23,20 @@ export interface StoredTenantProfile {
   keywords: string[];
   trlRange: number[];
 }
+
+/** The row as the fields show it. A tenant with no row starts empty: the sample text is a placeholder. */
+function storedFields(initial: StoredTenantProfile | null) {
+  return {
+    capabilities: initial?.capabilities ?? '',
+    keywords: initial?.keywords.join(', ') ?? '',
+    trlMin: initial?.trlRange[0] ?? DEFAULT_TRL_RANGE.min,
+    trlMax: initial?.trlRange[1] ?? DEFAULT_TRL_RANGE.max,
+  };
+}
+
+/** Compared the way the action stores them, so a stray space does not count as a change. */
+const sameCapabilities = (a: string, b: string) => a.trim() === b.trim();
+const sameKeywords = (a: string, b: string) => parseKeywords(a).join() === parseKeywords(b).join();
 
 export default function TenantProfileForm({
   initial,
@@ -40,14 +55,11 @@ export default function TenantProfileForm({
   const workspace = (params?.workspace as string) || 'default';
   const t = useTranslations('Profile');
 
-  const [capabilities, setCapabilities] = useState(
-    initial?.capabilities ?? t('capabilitiesDefaultText')
-  );
-  const [keywords, setKeywords] = useState(
-    initial ? initial.keywords.join(', ') : t('keywordsDefaultText')
-  );
-  const [trlMin, setTrlMin] = useState(initial?.trlRange[0] ?? 3);
-  const [trlMax, setTrlMax] = useState(initial?.trlRange[1] ?? 8);
+  const stored = storedFields(initial);
+  const [capabilities, setCapabilities] = useState(stored.capabilities);
+  const [keywords, setKeywords] = useState(stored.keywords);
+  const [trlMin, setTrlMin] = useState(stored.trlMin);
+  const [trlMax, setTrlMax] = useState(stored.trlMax);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -66,6 +78,30 @@ export default function TenantProfileForm({
   const picInputId = useId();
   const picHelpId = useId();
   const picFeedbackId = useId();
+  const capabilitiesId = useId();
+  const keywordsId = useId();
+  const trlMinId = useId();
+  const trlMaxId = useId();
+
+  // FO-387. Same rule as the PIC below, for the other fields: a re-read page brings the row into
+  // whatever the user has not edited and leaves the rest alone.
+  const [seenStored, setSeenStored] = useState(stored);
+  if (JSON.stringify(stored) !== JSON.stringify(seenStored)) {
+    setSeenStored(stored);
+    if (sameCapabilities(capabilities, seenStored.capabilities)) setCapabilities(stored.capabilities);
+    if (sameKeywords(keywords, seenStored.keywords)) setKeywords(stored.keywords);
+    if (trlMin === seenStored.trlMin) setTrlMin(stored.trlMin);
+    if (trlMax === seenStored.trlMax) setTrlMax(stored.trlMax);
+  }
+  const capabilitiesEdited = !sameCapabilities(capabilities, stored.capabilities);
+  const keywordsEdited = !sameKeywords(keywords, stored.keywords);
+  const trlMinEdited = trlMin !== stored.trlMin;
+  const trlMaxEdited = trlMax !== stored.trlMax;
+  // A tenant with no profile may save only a PIC; the first thing it writes into the profile needs
+  // both texts. With a row, a text is required once the user has emptied it.
+  const profileEdited = capabilitiesEdited || keywordsEdited || trlMinEdited || trlMaxEdited;
+  const capabilitiesRequired = initial ? capabilitiesEdited : profileEdited;
+  const keywordsRequired = initial ? keywordsEdited : profileEdited;
 
   // A save re-reads the page (revalidatePath), so a form left open learns what someone else did to
   // the PIC meanwhile. What the user is in the middle of typing stays theirs.
@@ -92,10 +128,11 @@ export default function TenantProfileForm({
     setPicCleared(false);
 
     const result = await updateTenantProfile({
-      capabilities,
-      keywords,
-      trlMin,
-      trlMax,
+      // Only what the user changed, for the reason given under `pic`.
+      capabilities: capabilitiesEdited ? capabilities : undefined,
+      keywords: keywordsEdited ? keywords : undefined,
+      trlMin: trlMinEdited ? trlMin : undefined,
+      trlMax: trlMaxEdited ? trlMax : undefined,
       // Only a PIC the user changed: sending the one this form opened with would undo whatever
       // staff or a colleague did to it since, on a save that was about the keywords.
       pic: pic === savedPic ? undefined : pic,
@@ -205,12 +242,13 @@ export default function TenantProfileForm({
 
       <form onSubmit={handleSave} className="space-y-6 bg-surface p-6 md:p-8 rounded-2xl border border-border shadow-xs">
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-ink mb-1.5 flex items-center gap-2">
+          <label htmlFor={capabilitiesId} className="block text-xs font-bold uppercase tracking-wider text-ink mb-1.5 flex items-center gap-2">
             <Building className="w-3.5 h-3.5 text-accent" />
             <span>{t('capabilitiesLabel')}</span>
           </label>
           <textarea
-            required
+            id={capabilitiesId}
+            required={capabilitiesRequired}
             rows={5}
             value={capabilities}
             onChange={(e) => setCapabilities(e.target.value)}
@@ -223,14 +261,15 @@ export default function TenantProfileForm({
         </div>
 
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-ink mb-1.5 flex items-center gap-2">
+          <label htmlFor={keywordsId} className="block text-xs font-bold uppercase tracking-wider text-ink mb-1.5 flex items-center gap-2">
             <Key className="w-3.5 h-3.5 text-accent" />
             <span>{t('keywordsLabel')}</span>
           </label>
           <input
+            id={keywordsId}
             type="text"
             name="keywords"
-            required
+            required={keywordsRequired}
             value={keywords}
             onChange={(e) => setKeywords(e.target.value)}
             className="w-full bg-ground border border-border p-3 rounded-xl text-xs text-ink focus:outline-none focus:ring-2 focus:ring-accent"
@@ -356,10 +395,11 @@ export default function TenantProfileForm({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="p-4 bg-ground border border-border rounded-xl">
-            <label className="block text-xs font-bold text-ink mb-1">
+            <label htmlFor={trlMinId} className="block text-xs font-bold text-ink mb-1">
               {t('trlMinLabel')}
             </label>
             <input
+              id={trlMinId}
               type="number"
               min="1"
               max="9"
@@ -373,10 +413,11 @@ export default function TenantProfileForm({
           </div>
 
           <div className="p-4 bg-ground border border-border rounded-xl">
-            <label className="block text-xs font-bold text-ink mb-1">
+            <label htmlFor={trlMaxId} className="block text-xs font-bold text-ink mb-1">
               {t('trlMaxLabel')}
             </label>
             <input
+              id={trlMaxId}
               type="number"
               min="1"
               max="9"
