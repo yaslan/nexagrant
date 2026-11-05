@@ -362,6 +362,8 @@ describe('updateTenantProfile action', () => {
         const before = await row();
         const picRows = () =>
           prisma.auditEvent.count({ where: { tenantId, type: { in: ['tenant.pic.updated', 'tenant.pic.refused'] } } });
+        const spend = vi.mocked(spendUnsolicitedPicLookup);
+        spend.mockClear();
 
         expect(await updateTenantProfile({ keywords: 'draft', trlMax: 3, pic: '987654322' })).toEqual({
           ok: false,
@@ -372,6 +374,8 @@ describe('updateTenantProfile action', () => {
         expect((await row()).keywords).toEqual(before.keywords);
         expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })).pic).toBeNull();
         expect(await picRows()).toBe(0);
+        // The refusal comes before the PIC plan: no lookup quota and no daily budget spent on it.
+        expect(spend).not.toHaveBeenCalled();
         // The form sends no TRL on the next try: that one goes through.
         expect(await updateTenantProfile({ keywords: 'draft', pic: '987654322' })).toMatchObject({ ok: true });
         expect(await row()).toMatchObject({ keywords: ['draft'], trlRange: [4, 7] });
