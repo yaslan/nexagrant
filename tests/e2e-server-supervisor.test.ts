@@ -175,15 +175,24 @@ describe('e2e server supervisor (FO-385)', () => {
     await waitFor(() => !pidAlive(pid), 'server gone');
   }, 30_000);
 
-  it('hides a password in a process listing', async () => {
+  // Each form a sibling session's argv can take. The listing filter keeps lines with "next", so every
+  // sibling carries that word. The secret value must never reach the diagnostics.
+  it.each([
+    ['a password in a URL', 'postgres://u:fo385-url-pw@h/db', 'fo385-url-pw'],
+    ['NAME=value (KEY)', 'OPENAI_API_KEY=fo385-env-key', 'fo385-env-key'],
+    ['--name=value (api-key flag)', '--api-key=fo385-flag-key', 'fo385-flag-key'],
+    ['NAME=value (TOKEN, lower case)', 'access_token=fo385-tok', 'fo385-tok'],
+    ['--name=value (SECRET)', '--client-secret=fo385-sec', 'fo385-sec'],
+    ['NAME=value (PASSWORD)', 'DB_PASSWORD=fo385-db-pw', 'fo385-db-pw'],
+  ])('hides a secret in a process listing: %s', async (_form, arg, secret) => {
     const port = await freePort();
-    const secret = 'fo385-do-not-print';
-    // The sibling's argv carries a URL with a password and a name the listing filter keeps.
-    track(spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)', 'next', `postgres://u:${secret}@h/db`], { stdio: 'ignore' }));
+    // The sibling's argv carries the secret in one form and a name the listing filter keeps.
+    track(spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)', 'next', arg], { stdio: 'ignore' }));
     await sleep(300);
     supervise(port, 'process.exit(1)', undefined);
 
     await waitFor(findEvent('server-exit'), 'server-exit');
+    expect(diagText()).toContain('next');
     expect(diagText()).not.toContain(secret);
   }, 30_000);
 });

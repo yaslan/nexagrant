@@ -57,8 +57,11 @@ function emit(line) {
   }
 }
 
-// Command lines of other sessions can carry credentials in a URL.
-const redact = (text) => text.replace(/:\/\/[^\s/@]+@/g, '://***@');
+// Command lines of other sessions can carry credentials: a password in a URL, or a value
+// after NAME= or --name= where NAME contains KEY, TOKEN, SECRET or PASSWORD (any case).
+const SECRET_NAME = '[\\w-]*(?:KEY|TOKEN|SECRET|PASSWORD)[\\w-]*';
+const redact = (text) =>
+  text.replace(/:\/\/[^\s/@]+@/g, '://***@').replace(new RegExp(`(${SECRET_NAME}=)\\S+`, 'gi'), '$1***');
 
 function processList() {
   try {
