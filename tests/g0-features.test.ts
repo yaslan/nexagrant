@@ -18,7 +18,7 @@ import { DEFAULT_SCORING_WEIGHTS } from '../src/lib/scoring/defaults';
  */
 function fullSnapshot(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
   return {
-    tenant: { country: 'TR', pic: 'PIC-1' },
+    tenant: { country: 'TR', pic: 'PIC-1', picRegistryStatus: 'FOUND' },
     profile: { keywords: ['hydrogen', 'district heating', 'digital twin'] },
     topic: {
       id: 'topic-1',
@@ -44,7 +44,7 @@ function fullSnapshot(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
 /** Everything a brand-new opportunity with no linked topic and no imported data looks like. */
 function emptySnapshot(): G0Snapshot {
   return {
-    tenant: { country: null, pic: null },
+    tenant: { country: null, pic: null, picRegistryStatus: null },
     profile: null,
     topic: null,
     topicFitScore: null,
@@ -327,9 +327,16 @@ describe('FO-382 normalisation: status and role spelling', () => {
   });
 
   it.each([' Partner ', 'PARTNER', 'partner'])('applies the no-history rule to the role %j (M10)', (role) => {
-    expect(isNoHistoryPartner({ intendedRole: role, cordis: noHistory })).toBe(true);
+    expect(isNoHistoryPartner({ intendedRole: role, cordis: noHistory, tenant: { picRegistryStatus: 'FOUND' } })).toBe(true);
     const ex = extractG0Features(fullSnapshot({ intendedRole: role, cordis: noHistory }));
     expect(ex.scoringBasis).toBe('no_history_evidence');
+  });
+
+  // FO-396: zero CORDIS rows is not proof of newness. The grant needs the EU register to say FOUND.
+  it.each(['NOT_FOUND', 'UNKNOWN', null] as const)('grants no no-history basis when the register says %j', (picRegistryStatus) => {
+    expect(isNoHistoryPartner({ intendedRole: 'partner', cordis: noHistory, tenant: { picRegistryStatus } })).toBe(false);
+    const ex = extractG0Features(fullSnapshot({ intendedRole: 'partner', cordis: noHistory, tenant: { country: 'TR', pic: 'PIC-1', picRegistryStatus } }));
+    expect(ex.scoringBasis).not.toBe('no_history_evidence');
   });
 
   // FO-382 review B4: the compute path (`g0-compute.ts`, record lookup) and the scorer share this one

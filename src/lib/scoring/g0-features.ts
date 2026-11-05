@@ -32,6 +32,8 @@ export interface G0TenantSnapshot {
   country: string | null;
   /** `Tenant.pic` — the EU Participant Identification Code, which is also the CORDIS org id. */
   pic: string | null;
+  /** FO-396. `Tenant.picRegistryStatus`: what the EU register said about `pic`. null = never checked. */
+  picRegistryStatus: 'FOUND' | 'NOT_FOUND' | 'UNKNOWN' | null;
 }
 
 export interface G0ProfileSnapshot {
@@ -489,8 +491,17 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
  * `null` for a missing PIC or an empty table (FO-382, patron 05.11: "PIC boşsa kolaylık yok"), so a
  * non-null `cordis` here always implies a PIC.
  */
-export function isNoHistoryPartner(snapshot: Pick<G0Snapshot, 'intendedRole' | 'cordis'>): boolean {
-  return isPartnerRole(snapshot.intendedRole) && snapshot.cordis !== null && snapshot.cordis.participationsOverall === 0;
+export function isNoHistoryPartner(
+  snapshot: Pick<G0Snapshot, 'intendedRole' | 'cordis'> & { tenant: Pick<G0TenantSnapshot, 'picRegistryStatus'> }
+): boolean {
+  // FO-396: zero CORDIS rows is not proof of a new organisation. The grant needs the EU register to
+  // say the PIC is registered; NOT_FOUND, UNKNOWN and never-checked all get no grant.
+  return (
+    isPartnerRole(snapshot.intendedRole) &&
+    snapshot.cordis !== null &&
+    snapshot.cordis.participationsOverall === 0 &&
+    snapshot.tenant.picRegistryStatus === 'FOUND'
+  );
 }
 
 /**

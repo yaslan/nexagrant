@@ -1134,3 +1134,18 @@ Eski satırlar: `pnpm jobs:seat-rescore -- --all-tenants` (kuru koşu) / `-- --a
 Kiracı başına `withTenant` içinde okur/yazar, koltuğun sıralarını yeni skora göre yeniden kurar,
 `breakdown`'ı iki puanlayıcıdan hiçbirine uymayan koltuğu dokunmadan "SKIPPED" diye raporlar. İkinci
 koşu 0 satır yazar. Canlı ortamda ayrı onayla koşulur.
+
+## 19. `Tenant.picRegistryStatus` — AB kayıt sitesi doğrulaması (FO-396)
+
+`Tenant.picRegistryStatus` (`FOUND` | `NOT_FOUND` | `UNKNOWN`, boş = hiç kontrol edilmedi) ve
+`Tenant.picRegistryCheckedAt`. AB'nin açık kuruluş profili uç noktası (`src/lib/pic-registry.ts`)
+kuruluş numarasını sorar; sonuç `src/lib/pic-registry-refresh.ts` ile kiracı satırına yazılır. Kontrol
+DB işleminin dışında, 5 sn zaman aşımı ve 256 KB sınırıyla yapılır; hata/zaman aşımı `UNKNOWN`'dur.
+
+**Neden:** Sıfır CORDIS kaydı tek başına "yeni kuruluş" demez. Yanlış ya da kayıtsız bir numara da sıfır
+kayıt verir. Geçmişsiz ortak kolaylığı (`isNoHistoryPartner`, payda 75) yalnızca `FOUND` ise verilir.
+Kayıtsız numara 77,11 GO → 57,83 NO_GO'ya düşer. `G0_SCORING_VERSION` 2.3.
+
+**Migration:** `prisma/migrations/tenant-pic-registry-status/` — iki `ADD COLUMN IF NOT EXISTS`,
+veri geçişi yok; ikinci çalıştırma no-op (kanıt: FO-396 raporu). Geri alma: `down.sql` (kolonları
+ve kontrol sonuçlarını siler; kolon yoksa kolaylık da yoktur). `Tenant` sistem geneli tablo, RLS yok.

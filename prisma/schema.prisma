@@ -27,6 +27,9 @@ model Tenant {
   province      String?
   orgType       OrgType  @default(SME)
   pic           String?  // EU Participant Identification Code
+  // FO-396. Result of the EU registry lookup for `pic`: FOUND | NOT_FOUND | UNKNOWN; null = never checked.
+  picRegistryStatus    String?
+  picRegistryCheckedAt DateTime?
   locale        String   @default("tr")
   timezone      String   @default("Europe/Istanbul")
   settings      Json     @default("{}") // scoringWeights, gateRules, aiRegion...
