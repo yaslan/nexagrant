@@ -50,8 +50,11 @@ export const KEEP_EU_FETCH_TIMEOUT_MS = 30_000;
 
 export const KEEP_EU_API_BASE_URL = 'https://keep.eu/api/open-data';
 
-/** Namespace prefix for keep.eu-only project and organisation ids (never a CORDIS id). */
-const KEEP_EU_KEY_PREFIX = 'KEU:';
+/**
+ * Namespace prefix for keep.eu-only project and organisation ids (never a CORDIS id).
+ * cordis-sync reads it to keep keep.eu rows out of the CORDIS re-index (FO-363).
+ */
+export const KEEP_EU_KEY_PREFIX = 'KEU:';
 
 /** Maps a stored id back to keep.eu terms: keep.eu-only keys become beneficiary ids, CORDIS PICs stay PICs. */
 function splitKeepEuKey(storedId: string): { pic: string | null; beneficiaryId: string | null } {
