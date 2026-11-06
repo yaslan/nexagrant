@@ -113,7 +113,7 @@ export function Dashboard({
         description={opts.description}
         variant={opts.variant ?? 'default'}
         href={opts.href}
-        ariaLabel={cardAria(opts.title)}
+        actionHint={t('cardLinkAction')}
       />
     ) : (
       <KpiCard
@@ -123,7 +123,7 @@ export function Dashboard({
         variant="default"
         unmeasured
         href={opts.href}
-        ariaLabel={cardAria(opts.title)}
+        actionHint={t('cardLinkAction')}
       />
     );
 
@@ -138,7 +138,6 @@ export function Dashboard({
   const modulesHref = canManageModules
     ? getWorkspaceRoute('settingsModules', locale, workspace)
     : undefined;
-  const cardAria = (title: string) => t('cardLinkAria', { title });
 
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'overview', label: t('tabOverview') },
@@ -227,7 +226,7 @@ export function Dashboard({
                 description={t('descTotalProposals')}
                 variant="default"
                 href={pipelineHref}
-                ariaLabel={cardAria(t('totalProposals'))}
+                actionHint={t('cardLinkAction')}
               />
               {metricCard({
                 title: t('hitRate'),
@@ -278,7 +277,7 @@ export function Dashboard({
                 description={t('descActiveModules')}
                 variant="success"
                 href={modulesHref}
-                ariaLabel={modulesHref ? cardAria(t('activeModules')) : undefined}
+                actionHint={modulesHref ? t('cardLinkAction') : undefined}
               />
             </div>
           )}

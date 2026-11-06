@@ -67,7 +67,7 @@ afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 beforeEach(() => {
   vi.clearAllMocks();
   hits.length = 0;
-  vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1' } as never);
+  vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1', role: 'MEMBER' } as never);
 });
 
 function seed(content: Record<string, string>, title = 'Smart Grids', templateName = 'Standard Template') {

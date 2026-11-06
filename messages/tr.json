@@ -143,7 +143,8 @@
     "readinessMoreGaps": "{count} eksik adım daha var; tamamı ayrıntılı sonuçta.",
     "readinessViewResult": "Ayrıntılı sonucu gör",
     "readinessRetake": "Karneyi yeniden yap",
-    "cardLinkAria": "{title} — ayrıntıya git"
+    "cardLinkAria": "{title} — ayrıntıya git",
+    "cardLinkAction": "— ayrıntıya git"
   },
   "Pipeline": {
     "title": "Fırsat Pipeline",
@@ -3164,7 +3165,7 @@
   },
   "Forbidden": {
     "title": "Bu sayfaya erişiminiz yok",
-    "description": "Bu sayfa yalnız kalkınma ajansı hesaplarının üyelerine açıktır. Erişim gerektiğini düşünüyorsanız kurum yöneticinize başvurun.",
+    "description": "Hesabınızın rolü ya da hesap türü bu sayfayı açmaya izin vermiyor. Erişim gerektiğini düşünüyorsanız kurum yöneticinize başvurun.",
     "backHome": "Ana Sayfaya Dön"
   },
   "agency": {

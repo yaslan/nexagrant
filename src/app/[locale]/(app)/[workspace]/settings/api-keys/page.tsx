@@ -1,6 +1,6 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { ApiKeysClient, type ApiKeyRecord } from './client';
 import { RevokeApiKeysPanel } from './revoke-panel';
 import { errorMessage } from '@/lib/errors';
@@ -66,7 +66,7 @@ export default async function ApiKeysSettingsPage({
   if (locked) {
     // Closed module: the gate stays, and under it only the withdrawal path shows
     // (FO-81). Real rows only: the demo placeholders below are for the open page.
-    const scope = await requireTenantPage(locale);
+    const scope = await requireTenantPageRole(locale, 'view_partner_search');
     const activeKeys = (await loadApiKeys(scope.tenantId)) ?? [];
     return (
       <div className="max-w-6xl mx-auto py-6 sm:px-6 space-y-6">
@@ -81,7 +81,7 @@ export default async function ApiKeysSettingsPage({
     );
   }
 
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_partner_search');
 
   // FO-157: a plan that grants M1 read only (FO-41) may look at its keys but not
   // mint one; `generateApiKey` refuses with READ_ONLY_PLAN. The flag is the

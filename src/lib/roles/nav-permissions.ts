@@ -1,5 +1,6 @@
 import type { Role } from '@prisma/client';
 
+import { EVIDENCE_READ_ACTION } from '@/lib/evidence-access';
 import { can, type Action } from '@/lib/rbac';
 
 /**
@@ -18,7 +19,7 @@ export const NAV_ITEM_ACTION: Readonly<Record<string, Action>> = {
   pipeline: 'view_proposal',
   conceptNotes: 'view_proposal',
   interregReview: 'view_proposal',
-  evidence: 'view_proposal',
+  evidence: EVIDENCE_READ_ACTION,
   relationships: 'view_proposal',
   tto: 'view_proposal',
   partners: 'view_partner_search',

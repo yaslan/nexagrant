@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { withTenant } from '@/lib/db';
 import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
 import { auth } from '@/lib/auth';
+import { asRole, can } from '@/lib/rbac';
 import HTMLtoDOCX from 'html-to-docx';
 import { escapeHtmlText, MAX_TOTAL_IMAGE_BYTES, sanitizeHtmlForDocx } from '@/lib/docx-safe-html';
 import { attachmentContentDisposition } from '@/lib/content-disposition';
@@ -27,6 +28,12 @@ export async function GET(
 
   if (!tenantId) {
     return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  // Role door (NG-64): the editor page that links here needs `view_proposal`,
+  // and so does its download. A guest partner got the note as a Word file.
+  if (!can(asRole(session?.role), 'view_proposal')) {
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' }, { status: 403 });
   }
 
   // Both tenant-scoped reads share one scope. The `conceptTemplate` lookup
