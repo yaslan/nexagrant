@@ -1,8 +1,8 @@
 import { listApprovalRequests } from '@/lib/approval-requests';
 import { effectiveApprovalStatus } from '@/lib/approval-request-rules';
-import { auth } from '@/lib/auth';
 import ApprovalsClient, { type ApprovalRequestItem } from './client';
-import { Role } from '@prisma/client';
+import type { Role } from '@prisma/client';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
 import { getTranslations } from 'next-intl/server';
@@ -18,11 +18,12 @@ export default async function ApprovalsPage({
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
 
+  // Role door (NG-64): the page used to read the session itself and draw the
+  // list for a session without a role as if it were MEMBER. A role that cannot
+  // ask for a dual approval gets the 403 screen; the role is never assumed.
+  const { tenantId, userId: currentUserId, role } = await requireTenantPageRole(locale, 'request_dual_approval');
+  const currentUserRole = role as Role;
   const t = await getTranslations('Approvals');
-  const session = await auth();
-  const tenantId = session?.tenantId;
-  const currentUserId = session?.user?.id || '';
-  const currentUserRole = (session?.role as Role) || 'MEMBER';
 
   let requests: ApprovalRequestItem[] = [];
   try {

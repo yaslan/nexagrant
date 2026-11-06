@@ -1,6 +1,6 @@
 import { execFileSync, spawn, spawnSync } from 'child_process';
 import crypto from 'crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -296,4 +296,131 @@ describe('gate önbelleği (FO-348 K3, K5)', () => {
       holder.kill();
     }
   }, 30_000);
+});
+
+// ---- NG-72: FONBRIDGE_GATE_NO_CACHE=1 önbellek ve belge-yalnız kısa yolunu kapatır; gate-isolated komutsuz yolda uygular ----
+
+describe('FONBRIDGE_GATE_NO_CACHE=1 kısa yolu kapatır (NG-72)', () => {
+  let root: string;
+  let repo: string;
+  let binDir: string;
+  let passDir: string;
+  let dockerLog: string;
+  let pnpmLog: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(path.join(os.tmpdir(), 'gate-nocache-root-'));
+    repo = path.join(root, 'repo');
+    binDir = path.join(root, 'bin');
+    passDir = path.join(root, 'pass');
+    dockerLog = path.join(root, 'docker.log');
+    pnpmLog = path.join(root, 'pnpm.log');
+    mkdirSync(repo);
+    mkdirSync(binDir);
+    // Betikler gerçek kopyası: gate-isolated.sh kendi deposunu (`dirname/..`) referans alır.
+    mkdirSync(path.join(repo, 'scripts'));
+    for (const f of ['gate-isolated.sh', 'gate-cache.mjs']) {
+      writeFileSync(path.join(repo, 'scripts', f), readFileSync(path.join(scripts, f)));
+    }
+    git(repo, 'init', '-q', '-b', 'main');
+    writeIn(repo, 'pnpm-lock.yaml', 'lockfile-v1\n');
+    writeIn(repo, 'src/lib/x.ts', 'export const x = 1\n');
+    writeIn(repo, 'docs/README.md', 'belge\n');
+    commit(repo, 'base');
+    git(repo, 'branch', 'base');
+    git(repo, 'checkout', '-q', '-b', 'feat');
+    // Yalnız belge değişikliği: belge-yalnız kısa yolu bu koşuda geçerli olurdu.
+    writeIn(repo, 'docs/notlar.md', 'yeni\n');
+    commit(repo, 'feat');
+    // Sahte docker: konteyner açılamaz (izole yolun başladığını kanıtlar, gerçek konteyner yok). Sahte pnpm: çağrıyı kaydeder.
+    writeFileSync(path.join(binDir, 'docker'), `#!/bin/sh\necho "docker $*" >> "${dockerLog}"\nexit 1\n`);
+    writeFileSync(path.join(binDir, 'pnpm'), `#!/bin/sh\necho "pnpm $*" >> "${pnpmLog}"\nexit 0\n`);
+    execFileSync('chmod', ['+x', path.join(binDir, 'docker'), path.join(binDir, 'pnpm')]);
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  function env(extra: Record<string, string> = {}) {
+    return cleanEnv({
+      PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+      FONBRIDGE_GATE_BASE: 'base',
+      FONBRIDGE_GATE_PASS_DIR: passDir,
+      ...extra,
+    });
+  }
+
+  function skippable(extra: Record<string, string> = {}) {
+    return spawnSync(process.execPath, [path.join(repo, 'scripts', 'gate-cache.mjs'), 'skippable'], { cwd: repo, encoding: 'utf8', env: env(extra) });
+  }
+
+  function isolated(extra: Record<string, string> = {}) {
+    return spawnSync('bash', [path.join(repo, 'scripts', 'gate-isolated.sh')], { cwd: repo, encoding: 'utf8', env: env(extra) });
+  }
+
+  function read(file: string): string {
+    try {
+      return readFileSync(file, 'utf8');
+    } catch {
+      return '';
+    }
+  }
+
+  // Koşunun yazacağı kaydın birebir aynısı (HEAD tree + lockfile hash), elle tohumlanır.
+  function seedRecord() {
+    mkdirSync(passDir, { recursive: true });
+    const tree = git(repo, 'rev-parse', 'HEAD^{tree}');
+    const lockHash = crypto.createHash('sha256').update(readFileSync(path.join(repo, 'pnpm-lock.yaml'))).digest('hex');
+    writeFileSync(path.join(passDir, tree), JSON.stringify({ tree, lockHash, date: new Date().toISOString(), gateExit: 0, log: null, command: 'pnpm run gate:core' }));
+  }
+
+  it('ön koşul: yalnız-belge farkında NO_CACHE yokken belge-yalnız kısa yolu geçer (0)', () => {
+    expect(skippable().status).toBe(0);
+  });
+
+  it('NO_CACHE=1 iken belge-yalnız kısa yolu kapalı: skippable 1 döner', () => {
+    const r = skippable({ FONBRIDGE_GATE_NO_CACHE: '1' });
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('FONBRIDGE_GATE_NO_CACHE=1');
+  });
+
+  it('NO_CACHE=1 iken yeşil önbellek kaydı yok sayılır: skippable 1 döner', () => {
+    seedRecord();
+    expect(skippable().status).toBe(0);
+    expect(skippable({ FONBRIDGE_GATE_NO_CACHE: '1' }).status).toBe(1);
+  });
+
+  it('komutsuz + NO_CACHE=1: izole DB yolu koşar (konteyner başlatılır), pnpm gate doğrudan koşmaz', () => {
+    seedRecord();
+    const r = isolated({ FONBRIDGE_GATE_NO_CACHE: '1' });
+    expect(r.stdout).toContain('starting');
+    expect(read(dockerLog)).toContain('docker run');
+    expect(read(pnpmLog)).toBe('');
+    expect(r.status).not.toBe(0);
+  });
+
+  it('komutsuz + kısa yol (NO_CACHE yok): geçiş çıktıda açıkça yazılır ve pnpm gate koşar', () => {
+    const r = isolated();
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('belge-yalnız');
+    expect(read(pnpmLog)).toContain('pnpm gate');
+    expect(read(dockerLog)).toBe('');
+  });
+
+  // NG-72 regresyonu (crw2 bulgu 1): scripts/ sembolik bağlantıysa ve Node ana modülü symlink'i çözmüyorsa
+  // gate-cache.mjs main() koşmaz, boş çıktıyla 0 döner. Bu "kısa yol" sayılmamalı: izole yol koşmalı (fail-closed).
+  it('regresyon: scripts/ sembolik bağlantı + --preserve-symlinks-main: boş skippable çıktısı kısa yol sayılmaz, izole yol koşar', () => {
+    const real = path.join(repo, 'real-scripts');
+    renameSync(path.join(repo, 'scripts'), real);
+    symlinkSync(real, path.join(repo, 'scripts'));
+    const nodeOpts = '--preserve-symlinks-main';
+    const sk = spawnSync(process.execPath, [path.join(repo, 'scripts', 'gate-cache.mjs'), 'skippable'], { cwd: repo, encoding: 'utf8', env: env({ NODE_OPTIONS: nodeOpts }) });
+    expect(sk.stdout).toBe(''); // kanıt: CLI koruması eşleşmedi, çıktı yok
+    const r = isolated({ NODE_OPTIONS: nodeOpts });
+    expect(r.stdout).not.toContain('kısa yol');
+    expect(r.stdout).toContain('starting');
+    expect(read(dockerLog)).toContain('docker run');
+    expect(read(pnpmLog)).toBe('');
+  });
 });
