@@ -21,7 +21,7 @@ Kilit sırası: bekleyenler `~/.cache/fonbridge-gate.lock.queue/` altında bilet
 
 Bilinen kalan risk (FO-348 K6): kayıt yazımı yalnız koşu sonunda tree'yi karşılaştırır; koşu sırasında bir dosya değiştirilip geri alınırsa bu yakalanmaz. Tam kapama için koşunun tree'sinin ayrı bir worktree'de koşması gerekir (yapılmadı).
 
-Önbelleği bilerek atlamak: `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`. Önbelleği temizlemek: `~/.cache/fonbridge-gate-pass/` dizinini silmek güvenlidir.
+Önbelleği bilerek atlamak: `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`. Aynı değişken `pnpm gate:isolated` (argümansız) için de geçerlidir: önbellek ve belge-yalnız kısa yolu kapanır, izole DB'li tam gate koşar. Önbelleği temizlemek: `~/.cache/fonbridge-gate-pass/` dizinini silmek güvenlidir.
 
 `pnpm gate:isolated` (argümansız) aynı kararı önce verir; önbellek ya da belge-yalnız ise konteyner kurmadan doğrudan `pnpm gate`'e geçer.
 
