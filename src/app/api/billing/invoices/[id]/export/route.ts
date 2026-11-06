@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { internalError } from '@/lib/api-error';
 import { auth } from '@/lib/auth';
+import { asRole, can } from '@/lib/rbac';
 import { withTenant } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { env } from '@/lib/env';
@@ -25,6 +26,8 @@ import {
  * Now it reads one row, and only one:
  *   - no session                  → 401
  *   - session with no tenant      → 403 (a user with no membership has no invoices)
+ *   - role without manage_billing → 403 FORBIDDEN_ROLE, before any read (NG-64 review B-1):
+ *                                   the billing page that links here is the owner's alone
  *   - id not in *this* tenant     → 404, the same answer as an id that exists nowhere,
  *                                   so the route cannot be used to probe another tenant
  *   - seller identity unset       → 503, naming the settings, rather than a plausible VKN
@@ -69,6 +72,10 @@ export async function GET(
   const tenantId = session.tenantId;
   if (!tenantId) {
     return NextResponse.json({ error: 'no_tenant' }, { status: 403 });
+  }
+
+  if (!can(asRole(session.role), 'manage_billing')) {
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' }, { status: 403 });
   }
 
   let record: InvoiceRecord | null;

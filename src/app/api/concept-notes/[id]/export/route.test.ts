@@ -57,7 +57,7 @@ describe('GET /api/concept-notes/[id]/export — phantom relation regression', (
   });
 
   it('fetches the note without `include: { opportunity: true }` and looks up the opportunity separately', async () => {
-    vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1' } as never);
+    vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1', role: 'MEMBER' } as never);
     vi.mocked(prisma.conceptNote.findFirst).mockResolvedValue(
       partialRow<ConceptNote>({
         id: 'note_1',
@@ -92,7 +92,7 @@ describe('GET /api/concept-notes/[id]/export — phantom relation regression', (
   });
 
   it('returns 404 without ever building the document when the note does not exist', async () => {
-    vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1' } as never);
+    vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1', role: 'MEMBER' } as never);
     vi.mocked(prisma.conceptNote.findFirst).mockResolvedValue(null);
 
     const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'missing' }) });
@@ -102,7 +102,7 @@ describe('GET /api/concept-notes/[id]/export — phantom relation regression', (
   });
 
   it('falls back to "Untitled"/"ConceptNote" when the opportunity no longer resolves, instead of throwing', async () => {
-    vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1' } as never);
+    vi.mocked(auth).mockResolvedValue({ tenantId: 'tenant_1', role: 'MEMBER' } as never);
     vi.mocked(prisma.conceptNote.findFirst).mockResolvedValue(
       partialRow<ConceptNote>({
         id: 'note_1',

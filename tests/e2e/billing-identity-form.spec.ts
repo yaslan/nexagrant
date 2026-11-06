@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { test, expect, type Page } from '@playwright/test';
 
 import { createDbClient } from '../../src/lib/db';
+import trMessages from '../../messages/tr.json';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
@@ -182,9 +183,12 @@ test.describe('billing identity form', () => {
     const row = await prisma.tenantBillingIdentity.findUnique({ where: { tenantId: TENANT_ID } });
     expect(row?.buyerVknTckn, 'nothing on file, so this proves nothing').toBe(VALID_VKN);
 
-    await signIn(page, NON_OWNER);
-
-    await expect(page.getByTestId('billing-identity-locked')).toBeVisible();
+    // Since NG-64 review B-1 the whole billing page is `manage_billing`: a
+    // PIPELINE_MANAGER is refused the page itself (403), not shown a locked form.
+    await signInAs(page, { id: NON_OWNER.userId, email: NON_OWNER.email, tenantId: NON_OWNER.tenantId, role: NON_OWNER.role });
+    const res = await page.goto(BILLING_URL);
+    expect(res?.status()).toBe(403);
+    await expect(page.getByRole('heading', { name: trMessages.Forbidden.title })).toBeVisible();
     await expect(page.getByTestId('billing-identity-save')).toHaveCount(0);
 
     // `content()` is the whole document: the markup *and* the serialised server
@@ -194,8 +198,6 @@ test.describe('billing identity form', () => {
     expect(payload, 'the VKN reached a member who may not edit it').not.toContain(VALID_VKN);
     expect(payload, 'the VKN reached a member in its masked form').not.toContain('Maslak');
 
-    await page.getByTestId('billing-identity-locked').screenshot({
-      path: `${SHOTS}/05-non-owner-locked.png`,
-    });
+    await page.screenshot({ path: `${SHOTS}/05-non-owner-forbidden.png` });
   });
 });

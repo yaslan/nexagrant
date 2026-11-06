@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { moduleGate } from '@/lib/modules/guard';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { withTenant } from '@/lib/db';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
@@ -70,7 +70,7 @@ export default async function PersonDaysReportPage({
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
 
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let groupedData: EffortGroup[] = [];
   let queryFailed = false;

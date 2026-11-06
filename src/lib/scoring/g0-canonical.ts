@@ -56,6 +56,11 @@ export interface G0HardFacts {
   baseRatePct: number;
   /** Country eligibility for the call (associated/participating country, no exclusion). */
   countryEligible: boolean;
+  /**
+   * FO-382 hard rule: a partner with no CORDIS history and no filled consortium seat cannot pass.
+   * Optional so callers that do not know seats (and the sample calibration) keep the old rules.
+   */
+  noHistoryWithoutFilledSeat?: boolean;
 }
 
 export interface G0Rules {
@@ -195,6 +200,10 @@ export function decideG0(
   if (rules.requireEligibleCountry && !facts.countryEligible) {
     reasons.push('country not eligible for this call');
     reasonDetails.push({ code: 'G0_COUNTRY_NOT_ELIGIBLE' });
+  }
+  if (facts.noHistoryWithoutFilledSeat) {
+    reasons.push('partner with no CORDIS history has no filled consortium seat (candidate, invited or confirmed)');
+    reasonDetails.push({ code: 'G0_NO_HISTORY_NO_FILLED_SEAT' });
   }
 
   return {

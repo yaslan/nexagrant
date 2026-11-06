@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import type { RelationshipRow } from '@/types/db-rows';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { moduleGate } from '@/lib/modules/guard';
 import { isStaleRelationship } from '@/lib/relationships/stale';
 
@@ -28,7 +28,7 @@ export default async function RelationshipsPage({
   // it is *no filter*, so a session without a tenant listed every relationship
   // in the database. `requireTenantPage` cannot return without a tenant, so the
   // conditional has nothing left to express and is gone.
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let relationships: RelationshipRow[] = [];
   try {
