@@ -147,8 +147,8 @@ describe('monthly agency report (fabrika_app)', () => {
       expect(Boolean(row)).toBe(shows);
       if (row) expect(row.view).toEqual(f.breakdown.view);
     }
-    // 6 organisations → shown rounded: 5. 4 SMEs and 2 municipalities are each under 5: masked.
-    expect(snap!.all.registered).toEqual({ state: 'count', value: 5 });
+    // 6 organisations → shown rounded: 10 (unit 10 since FO-398; was 5). 4 SMEs and 2 municipalities are each under 5: masked.
+    expect(snap!.all.registered).toEqual({ state: 'count', value: 10 });
     expect(snap!.byOrgType.SME.registered).toEqual({ state: 'small' });
     expect(snap!.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
   });
