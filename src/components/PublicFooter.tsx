@@ -32,7 +32,7 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
                 : 'End-to-end intelligent proposal and consortium management platform for Horizon Europe, Digital Europe, and Eurostars. Strengthen your proposal with CORDIS graph analytics and AI evaluator simulation.'}
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-2 text-muted">
-              <span className="flex items-center gap-1 text-[11px] bg-surface border border-border px-2.5 py-1 rounded-md text-ok font-mono">
+              <span className="flex items-center gap-1 text-[11px] bg-surface border border-border px-2.5 py-1 rounded-md text-ok-ink font-mono">
                 {tFooter('residencyBadge')}
               </span>
               <span className="text-[11px] bg-surface border border-border px-2.5 py-1 rounded-md text-muted font-mono">
