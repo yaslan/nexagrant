@@ -26,7 +26,7 @@ vi.mock('next-intl/server', async () => {
 });
 vi.mock('next/navigation', () => ({ notFound: () => null }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
-vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't-1' }) }));
+vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't-1', role: 'MEMBER' }) }));
 vi.mock('@/modules/m8/components/find-candidates-button', () => ({ default: () => null }));
 vi.mock('@/modules/m8/components/invite-candidate-button', () => ({ default: () => null }));
 vi.mock('@/lib/db', () => ({

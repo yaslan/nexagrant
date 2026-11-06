@@ -1,6 +1,6 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { getEntitlements } from '@/lib/billing';
 import { BillingClient } from './BillingClient';
 import { BillingIdentityForm, type BillingIdentityValuesOnFile } from './BillingIdentityForm';
@@ -26,7 +26,7 @@ import {
 /**
  * The lifetime badge counts rows, so this page must not be served from a cache
  * — a stale "19 owners" is how the 21st licence gets sold. The page already
- * renders dynamically because `requireTenantPage` reads the session cookie;
+ * renders dynamically because `requireTenantPageRole` reads the session cookie;
  * this states the reason that must keep holding even if the auth call moves,
  * and matches `/[locale]/pricing`, the other panel reading the same count.
  */
@@ -66,12 +66,18 @@ export default async function BillingSettingsPage({
   // The tenant comes from the session and nowhere else. Re-resolving it from
   // "the first membership of this user" quietly picked a different tenant than
   // the one the session was issued for.
-  const { tenantId, role } = await requireTenantPage(locale);
+  //
+  // Role door (NG-64 review B-1, K-577543): the page lists the tenant's invoices
+  // and plan, so it stands behind `manage_billing` — TENANT_OWNER alone, read
+  // from rbac.ts. Any other role gets the 403 screen before a tenant read runs.
+  const { tenantId, role } = await requireTenantPageRole(locale, 'manage_billing');
 
   // Who may see and write the buyer's fiscal identity: `manage_billing`, which
   // `src/lib/rbac.ts` grants to TENANT_OWNER alone. The gate is applied to the
   // *read* as well as the form, so a member's page never carries a VKN/TCKN in
   // its payload — a hidden section still ships the data it hides.
+  // Behind the door above this is always true today; it stays as the second
+  // lock on the VKN/TCKN should the page door ever widen to a read action.
   const canEditIdentity = can(role as Role, 'manage_billing');
 
   // Null until the tenant row is actually read. It used to default to

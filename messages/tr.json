@@ -3123,7 +3123,7 @@
   },
   "Forbidden": {
     "title": "Bu sayfaya erişiminiz yok",
-    "description": "Bu sayfa yalnız kalkınma ajansı hesaplarının üyelerine açıktır. Erişim gerektiğini düşünüyorsanız kurum yöneticinize başvurun.",
+    "description": "Hesabınızın rolü ya da hesap türü bu sayfayı açmaya izin vermiyor. Erişim gerektiğini düşünüyorsanız kurum yöneticinize başvurun.",
     "backHome": "Ana Sayfaya Dön"
   },
   "agency": {

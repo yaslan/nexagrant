@@ -1,5 +1,5 @@
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
@@ -69,7 +69,7 @@ export default async function MatchingPage({
   const { locale, workspace, id } = await params;
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const t = await getTranslations({ locale, namespace: 'Consortium' });
   const format = await getFormatter({ locale });
 

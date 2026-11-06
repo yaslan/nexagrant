@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { getFormatter, getTranslations } from 'next-intl/server';
 
 import { getWorkspaceRoute } from '@/lib/routes';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { withTenant } from '@/lib/db';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { errorMessage } from '@/lib/errors';
@@ -46,7 +46,9 @@ export default async function GateSettingsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  const { tenantId } = await requireTenantPage(locale);
+  // Role door (NG-64 review B-2, K-577543): the tenant's scoring weights are
+  // the gate evaluators' screen, so `evaluate_gates` (rbac.ts) opens it.
+  const { tenantId } = await requireTenantPageRole(locale, 'evaluate_gates');
   const t = await getTranslations({ locale, namespace: 'settings.gates' });
   const format = await getFormatter({ locale });
 
