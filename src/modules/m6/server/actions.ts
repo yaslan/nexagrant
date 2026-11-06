@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
+import { asRole, can } from '@/lib/rbac';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/llm';
 import { renderPrompt } from '@/lib/ai/prompts';
@@ -221,7 +222,7 @@ export async function saveEvaluation(data: {
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M6');
-  const { tenantId, userId } = await requireTenantAction({ can: 'contribute_assigned' });
+  const { tenantId, userId, role } = await requireTenantAction({ can: 'contribute_assigned' });
 
   const avgScore = await withTenant<number | null>(tenantId, async (tx) => {
     const evaluation = await tx.evaluation.findFirst({
@@ -281,7 +282,11 @@ export async function saveEvaluation(data: {
   });
 
   revalidateQuietly(PROPOSAL_PATH);
-  return { avgScore };
+  // NG-64 review 3 E-1 (K-577556): the recomputed average is built from every seated
+  // reviewer's marks. A guest reviewer saves on their own seat but sees only their own
+  // marks, and a server action's return value reaches the browser whatever the form
+  // does with it — so only a role that reads the panel gets the number.
+  return { avgScore: can(asRole(role), 'view_proposal') ? avgScore : null };
 }
 
 /**

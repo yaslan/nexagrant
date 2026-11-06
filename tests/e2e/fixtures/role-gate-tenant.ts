@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Role } from '@prisma/client';
 
 import { prisma } from '../../../src/lib/db';
+import { DEFAULT_CRITERIA } from '../../../src/modules/m6/types';
 
 /**
  * The tenant `tests/e2e/role-gate.spec.ts` runs in (NG-64): one seat per code
@@ -23,7 +24,7 @@ export const RG_INVOICE_ID = 'ng64-role-gate-e2e-invoice';
 export const RG_INVOICE_NO = 'NG64-KAPI-000001';
 /**
  * A PANEL evaluation on the opportunity (review R-1): the guest and the owner are
- * both seated; only the owner has submitted. The stored panel average is a value
+ * both seated; only the owner has submitted (a 1 on each of the four criteria). The stored panel average is a value
  * the evaluator form can never show (four integer sliders average to x.00/.25/.50/.75),
  * so '4.37' in a guest's HTML means the panel-wide table reached them.
  */
@@ -31,6 +32,14 @@ export const RG_PROPOSAL_ID = 'ng64-role-gate-e2e-proposal';
 export const RG_PANEL_EVAL_ID = 'ng64-role-gate-e2e-panel';
 export const RG_PANEL_AVG = 4.37;
 export const RG_PANEL_AVG_TEXT = '4.37';
+/** The owner's submitted mark on every criterion (review 3 E-1). */
+export const RG_OWNER_MARK = 1;
+
+/** The stored panel average, as the save recomputed it. */
+export async function readPanelAverage(): Promise<number | null> {
+  const row = await prisma.evaluation.findUnique({ where: { id: RG_PANEL_EVAL_ID }, select: { avgScore: true } });
+  return row?.avgScore ?? null;
+}
 
 /** A domain only this fixture uses: `User.email` is unique (NG-4 review N-1). */
 export const RG_SEATS: Record<Role, { id: string; email: string }> = {
@@ -109,26 +118,38 @@ export async function setupRoleGateTenant() {
     },
     update: { avgScore: RG_PANEL_AVG, status: 'in-progress' },
   });
-  const criterion = await prisma.criterion.upsert({
-    where: { evaluationId_name: { evaluationId: RG_PANEL_EVAL_ID, name: 'Innovation' } },
-    create: { tenantId: RG_TENANT, evaluationId: RG_PANEL_EVAL_ID, name: 'Innovation', weight: 1 },
-    update: { weight: 1 },
-  });
+  // The four criteria the evaluator form submits (review 3 E-1: the guest's save has
+  // to land). The owner's submitted marks are all 1, the form's default is 3, so the
+  // panel average after a guest save is a number that is not the guest's own score.
+  const criteria = await Promise.all(
+    DEFAULT_CRITERIA.map((c) =>
+      prisma.criterion.upsert({
+        where: { evaluationId_name: { evaluationId: RG_PANEL_EVAL_ID, name: c.name } },
+        create: { tenantId: RG_TENANT, evaluationId: RG_PANEL_EVAL_ID, name: c.name, weight: c.weight },
+        update: { weight: c.weight },
+      }),
+    ),
+  );
   const ownerSeat = await prisma.reviewer.upsert({
     where: { evaluationId_userId: { evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.TENANT_OWNER.id } },
     create: { tenantId: RG_TENANT, evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.TENANT_OWNER.id, status: 'completed' },
     update: { status: 'completed' },
   });
-  await prisma.score.upsert({
-    where: { reviewerId_criterionId: { reviewerId: ownerSeat.id, criterionId: criterion.id } },
-    create: { tenantId: RG_TENANT, reviewerId: ownerSeat.id, criterionId: criterion.id, score: 4, submittedAt: new Date() },
-    update: { score: 4, submittedAt: new Date() },
-  });
-  await prisma.reviewer.upsert({
+  for (const criterion of criteria) {
+    await prisma.score.upsert({
+      where: { reviewerId_criterionId: { reviewerId: ownerSeat.id, criterionId: criterion.id } },
+      create: { tenantId: RG_TENANT, reviewerId: ownerSeat.id, criterionId: criterion.id, score: RG_OWNER_MARK, submittedAt: new Date() },
+      update: { score: RG_OWNER_MARK, submittedAt: new Date() },
+    });
+  }
+  const guestSeat = await prisma.reviewer.upsert({
     where: { evaluationId_userId: { evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.GUEST_PARTNER.id } },
     create: { tenantId: RG_TENANT, evaluationId: RG_PANEL_EVAL_ID, userId: RG_SEATS.GUEST_PARTNER.id },
     update: { status: 'pending' },
   });
+  // A rerun starts with the guest unsubmitted: a save left by the last run would be
+  // part of the average before the test submits anything.
+  await prisma.score.deleteMany({ where: { reviewerId: guestSeat.id } });
   await prisma.relationship.upsert({
     where: { id: RG_REL_ID },
     create: { id: RG_REL_ID, tenantId: RG_TENANT, kind: 'partner', counterpartName: RG_REL_NAME },

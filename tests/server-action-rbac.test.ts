@@ -374,3 +374,36 @@ describe('m6.listPanelScores is a view_proposal read (review R-1)', () => {
     expect(seen.GUEST_PARTNER).toBe('forbidden');
   });
 });
+
+/**
+ * NG-64 review 3 E-1 (K-577556): `saveEvaluation` is open to a guest reviewer
+ * (`contribute_assigned`, own seat), but the `avgScore` it hands back is the
+ * panel-wide average, built from every seated reviewer's marks. The browser
+ * receives the return value whatever the form does with it, so only a role
+ * that reads the panel (`view_proposal`) gets the number; every other role
+ * gets null.
+ */
+describe('m6.saveEvaluation hands the panel average to view_proposal only (review 3 E-1)', () => {
+  const PANEL_AVG = 4.37;
+
+  test('follows rbac.ts for all six roles: the average, or null', async () => {
+    const seen: Record<string, number | null> = {};
+    for (const role of ROLES) {
+      vi.clearAllMocks();
+      // The transaction body is the save itself; here it stands for "the save ran
+      // and the recomputed panel average is 4.37".
+      m.withTenant.mockImplementation(async () => PANEL_AVG);
+      m.session = sessionFor(role);
+      const result = await m6.saveEvaluation({
+        evaluationId: 'eval-1',
+        proposalId: 'prop-1',
+        scores: { Innovation: 3 },
+      });
+      expect(m.withTenant, role).toHaveBeenCalledTimes(1);
+      seen[role] = result.avgScore;
+    }
+    expect(seen).toEqual(Object.fromEntries(ROLES.map((r) => [r, can(r, 'view_proposal') ? PANEL_AVG : null])));
+    expect(seen.GUEST_PARTNER).toBeNull();
+    expect(seen.MEMBER).toBe(PANEL_AVG);
+  });
+});

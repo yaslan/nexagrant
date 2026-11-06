@@ -205,11 +205,16 @@ describe('evaluation panel: the panel-wide scores are view_proposal only (review
     'utf8',
   );
 
+  // Comments stripped (review 3 Öneri-1): a gate named only in a comment, or a second
+  // read outside the guarded branch, must not pass for the real thing.
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
   test('the page asks rbac.ts for view_proposal before it reads the panel scores', () => {
-    const ask = source.indexOf("can(asRole(role), 'view_proposal')");
-    expect(ask).toBeGreaterThan(-1);
-    const read = source.indexOf('listPanelScores(');
-    expect(read).toBeGreaterThan(ask);
+    expect(code).toMatch(/const seesPanel = can\(asRole\(role\), 'view_proposal'\);/);
+    // The one call is the guarded one.
+    expect(code.match(/listPanelScores\(/g)).toHaveLength(1);
+    expect(code).toMatch(/seesPanel \? await listPanelScores\(/);
+    expect(code.indexOf('const seesPanel')).toBeLessThan(code.indexOf('listPanelScores('));
   });
 
   test('GUEST_PARTNER may score but does not hold view_proposal', () => {

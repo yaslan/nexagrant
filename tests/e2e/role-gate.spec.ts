@@ -8,11 +8,13 @@ import {
   RG_OPP_ID,
   RG_OPP_TITLE,
   RG_PANEL_AVG_TEXT,
+  RG_PANEL_EVAL_ID,
   RG_REL_ID,
   RG_REL_NAME,
   RG_SEATS,
   RG_TENANT,
   RG_WORKSPACE,
+  readPanelAverage,
   setupRoleGateTenant,
   teardownRoleGateTenant,
 } from './fixtures/role-gate-tenant';
@@ -76,6 +78,41 @@ async function expectOpen(page: Page, path: string) {
   const res = await page.goto(path);
   expect(res?.status(), path).toBe(200);
   await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), path).toHaveCount(0);
+}
+
+/**
+ * Submit the evaluator form as it stands and return the server action's response
+ * body. The body is taken in a route handler: the form refreshes the page as soon as
+ * the save resolves, after which the browser no longer holds the response.
+ */
+async function submitPanelForm(page: Page): Promise<string> {
+  let body: string | undefined;
+  const isSave = (req: import('@playwright/test').Request) =>
+    req.method() === 'POST' &&
+    req.headers()['next-action'] !== undefined &&
+    // The save, not the other server actions the shell polls (notifications): its
+    // arguments name the seeded evaluation.
+    (req.postData() ?? '').includes(RG_PANEL_EVAL_ID);
+  await page.route('**/*', async (route) => {
+    if (!isSave(route.request())) return route.fallback();
+    const res = await route.fetch();
+    body = await res.text();
+    expect(res.status()).toBe(200);
+    await route.fulfill({ response: res, body });
+  });
+  try {
+    await page.getByTestId('m6-form-submit').click();
+    await expect.poll(() => body !== undefined).toBe(true);
+    await expect(page.getByTestId('m6-form-error')).toHaveCount(0);
+  } finally {
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+  return body as string;
+}
+
+/** The `avgScore` value as serialised in a server action response ('null', '2', …), or undefined. */
+function avgScoreIn(body: string): string | undefined {
+  return /"avgScore":(null|-?\d+(?:\.\d+)?)/.exec(body)?.[1];
 }
 
 test.describe.serial('NG-64 page role gates', () => {
@@ -166,6 +203,31 @@ test.describe.serial('NG-64 page role gates', () => {
     await expect(page.getByTestId('m6-dashboard')).toBeVisible();
     await expect(page.getByTestId('m6-panel-score').first()).toHaveText(RG_PANEL_AVG_TEXT);
     await expect(page.getByTestId('m6-not-seated')).toBeVisible();
+  });
+
+  test('evaluation panel save (review 3 E-1, K-577556): the guest\'s save answers without the panel average; the owner\'s carries it', async ({ page }) => {
+    const panel = `${ws}/opportunities/${RG_OPP_ID}/evaluations/panel`;
+
+    await signIn(page, 'GUEST_PARTNER');
+    await expectOpen(page, panel);
+    const guestBody = await submitPanelForm(page);
+    // The save landed and recomputed the panel average from the owner's 1s and the
+    // guest's 3s: the number exists, and it is not the guest's own mark.
+    const afterGuest = await readPanelAverage();
+    expect(afterGuest).not.toBeNull();
+    expect(afterGuest).not.toBe(3);
+    // The server action's answer — what the browser receives, whatever the form shows.
+    expect(avgScoreIn(guestBody)).toBe('null');
+    expect(guestBody).not.toContain(`"avgScore":${afterGuest}`);
+
+    // TENANT_OWNER (view_proposal, also seated) is the control: the same save answers
+    // with the recomputed average, so the probe above reads the field that carries it.
+    await signIn(page, 'TENANT_OWNER');
+    await expectOpen(page, panel);
+    const ownerBody = await submitPanelForm(page);
+    const afterOwner = await readPanelAverage();
+    expect(afterOwner).not.toBeNull();
+    expect(avgScoreIn(ownerBody)).toBe(String(afterOwner));
   });
 
   test('GUEST_PARTNER keeps the pages that have no tenant read behind a role', async ({ page }) => {
