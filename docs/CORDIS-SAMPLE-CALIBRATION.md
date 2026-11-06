@@ -185,10 +185,10 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 3. Eşik 70, `minAlignment`, taban oran ≥ %8 ve ülke uygunluğu değişmedi. 75 paydası ve dolu koltuk
    kuralı yalnız ortak (`partner`) rolüne uygulanır; boş koltuk her rolde puan vermez, bu yüzden
    koordinatör ve rolü boş kayıtların puanı da yalnız boş koltuk yüzünden düşer. CORDIS verisi yoksa
-   kural uygulanmaz: PIC yok **ve** CORDIS tablosu boşsa `cordis = null`. PIC yok ama tablo doluysa
-   kural uygulanır (PIC'siz ortak CORDIS'te kayıt bulamaz). **Bu paragraf 2026-11-05 PIC kuralıyla
-   değişti:** PIC boşsa kural uygulanmaz (aşağıdaki "FO-382 PIC kuralı" bölümü). Kapsam dışı olan yalnız
-   boş tablodur.
+   kural uygulanmaz: PIC yoksa veya CORDIS tablosu boşsa `cordis = null` ve standart puanlama kalır.
+   PIC varsa ve tablo doluysa kural, PIC için CORDIS'te kayıt olmadığında uygulanır; FO-396'dan beri ek
+   şart: AB kayıt sitesi bu PIC için `FOUND` demiş olmalı (`NOT_FOUND`, `UNKNOWN` veya hiç bakılmamış
+   PIC'te kural uygulanmaz). PIC boşsa kural uygulanmaz (aşağıdaki "FO-382 PIC kuralı" bölümü).
    Boş koltuk (`OPEN`, `DECLINED`) hiçbir rolde puan vermez (K-576987 = A).
 
 **Koltuk varsayımı.** Örneklerde koltuk bilgisi yok. Bu yüzden her örnek iki ayrı varsayımla koşuldu:
