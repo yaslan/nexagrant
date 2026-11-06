@@ -46,11 +46,16 @@ fail() { log "FAIL: $*" >&2; exit 1; }
 # FO-339: aynı tree için yeşil kayıt (önbellek) ya da yalnız belge farkı varsa konteyner/DB kurmadan
 # `pnpm gate` koşulur; karar ve satır scripts/gate-lock.mjs'te verilir. Komut verilmişse atlanmaz.
 # NG-72: FONBRIDGE_GATE_NO_CACHE=1 iken gate-cache.mjs skippable 1 döner, yani kısa yol hiç denenmez.
+# NG-72 (fail-closed): kısa yol YALNIZ pozitif mesajla alınır (önbellek: / belge-yalnız:). Boş çıktı + rc=0
+# (örn. gate-cache.mjs CLI koruması eşleşmediğinde) ya da başka her çıktı izole tam gate'e düşer.
 if [ $# -eq 0 ]; then
-  if skip_msg="$(node scripts/gate-cache.mjs skippable)"; then
-    log "kısa yol: $skip_msg; izole DB kurulmadan pnpm gate"
-    exec pnpm gate
-  fi
+  skip_msg="$(node scripts/gate-cache.mjs skippable || true)"
+  case "$skip_msg" in
+    önbellek:*|belge-yalnız:*)
+      log "kısa yol: $skip_msg; izole DB kurulmadan pnpm gate"
+      exec pnpm gate
+      ;;
+  esac
 fi
 
 command -v docker >/dev/null 2>&1 || fail "docker not found on PATH"

@@ -1,6 +1,6 @@
 import { execFileSync, spawn, spawnSync } from 'child_process';
 import crypto from 'crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -406,5 +406,21 @@ describe('FONBRIDGE_GATE_NO_CACHE=1 kısa yolu kapatır (NG-72)', () => {
     expect(r.stdout).toContain('belge-yalnız');
     expect(read(pnpmLog)).toContain('pnpm gate');
     expect(read(dockerLog)).toBe('');
+  });
+
+  // NG-72 regresyonu (crw2 bulgu 1): scripts/ sembolik bağlantıysa ve Node ana modülü symlink'i çözmüyorsa
+  // gate-cache.mjs main() koşmaz, boş çıktıyla 0 döner. Bu "kısa yol" sayılmamalı: izole yol koşmalı (fail-closed).
+  it('regresyon: scripts/ sembolik bağlantı + --preserve-symlinks-main: boş skippable çıktısı kısa yol sayılmaz, izole yol koşar', () => {
+    const real = path.join(repo, 'real-scripts');
+    renameSync(path.join(repo, 'scripts'), real);
+    symlinkSync(real, path.join(repo, 'scripts'));
+    const nodeOpts = '--preserve-symlinks-main';
+    const sk = spawnSync(process.execPath, [path.join(repo, 'scripts', 'gate-cache.mjs'), 'skippable'], { cwd: repo, encoding: 'utf8', env: env({ NODE_OPTIONS: nodeOpts }) });
+    expect(sk.stdout).toBe(''); // kanıt: CLI koruması eşleşmedi, çıktı yok
+    const r = isolated({ NODE_OPTIONS: nodeOpts });
+    expect(r.stdout).not.toContain('kısa yol');
+    expect(r.stdout).toContain('starting');
+    expect(read(dockerLog)).toContain('docker run');
+    expect(read(pnpmLog)).toBe('');
   });
 });

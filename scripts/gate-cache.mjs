@@ -145,8 +145,9 @@ function main() {
   process.exit(2)
 }
 
-// NG-72: argv[1] sembolik bağlantı üzerinden gelebilir (macOS: /var → /private/var). import.meta.url her zaman
-// gerçek yoldur; karşılaştırma realpath ile yapılmazsa main() hiç koşmaz ve betik sessizce 0 döner (skippable = "atla").
+// NG-72: argv[1] sembolik bağlantı üzerinden gelebilir (macOS: /var → /private/var). import.meta.url varsayılan
+// ayarlarda gerçek yoldur (--preserve-symlinks-main altında değildir); karşılaştırma realpath ile yapılmazsa main()
+// hiç koşmaz ve betik sessizce 0 döner (skippable = "atla"). Bu yüzden gate-isolated.sh kısa yolu yalnız pozitif mesajla alır.
 const invokedDirectly = (() => {
   try {
     return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href
