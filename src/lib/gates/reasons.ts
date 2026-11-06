@@ -12,6 +12,7 @@ export type GateReason =
   | { code: 'G0_ALIGNMENT_BELOW'; values: { value: number; min: number } }
   | { code: 'G0_BASE_RATE_BELOW'; values: { value: number; min: number } }
   | { code: 'G0_COUNTRY_NOT_ELIGIBLE' }
+  | { code: 'G0_NO_HISTORY_NO_FILLED_SEAT' }
   | { code: 'G1_G0_NOT_DECIDED' }
   | { code: 'G1_G0_LAST_FAILED' }
   | { code: 'G1_NO_CRITICAL_SEAT' }

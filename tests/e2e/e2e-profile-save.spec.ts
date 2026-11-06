@@ -28,7 +28,7 @@ function profileForm(page: Page) {
   return {
     saveButton,
     capabilities: form.locator('textarea'),
-    keywords: form.locator('input[type="text"]'),
+    keywords: form.locator('input[name="keywords"]'),
     trlMin: form.locator('input[type="number"]').nth(0),
     trlMax: form.locator('input[type="number"]').nth(1),
   };
@@ -76,7 +76,10 @@ test.describe('Y-4 — Kurumsal Profil kaydı sunucuya gidiyor', () => {
     const before = await readStoredProfile();
 
     // Bypass the browser's `required` check so the server's validation answers.
-    await f.capabilities.evaluate((el) => el.removeAttribute('required'));
+    // (`required` now follows the edit, FO-387, so the switch is on the form, not on the field.)
+    await f.capabilities.evaluate((el: HTMLTextAreaElement) => {
+      if (el.form) el.form.noValidate = true;
+    });
     await f.capabilities.fill('');
     await f.saveButton.click();
 

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
 import { requireTenantPage } from '@/lib/tenant';
@@ -51,6 +52,8 @@ export default async function ConceptNotesListPage({
     ];
   }
 
+  const t = await getTranslations({ locale, namespace: 'ConceptNote' });
+
   const statusColors: Record<string, string> = {
     draft: 'bg-surface-hover text-ink-2',
     review: 'bg-yellow-100 text-yellow-800',
@@ -61,16 +64,16 @@ export default async function ConceptNotesListPage({
     <div className="max-w-5xl mx-auto py-8 sm:px-4">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold font-heading">Concept Notes</h1>
+          <h1 className="text-3xl font-bold font-heading">{t('title')}</h1>
           <p className="text-muted mt-1">
-            Draft and manage AI-assisted concept notes for your opportunities.
+            {t('list.subtitle')}
           </p>
         </div>
       </div>
 
       {/* Template Showcase */}
       <div className="mb-10">
-        <h2 className="text-lg font-semibold mb-3 text-ink-2">Available Templates</h2>
+        <h2 className="text-lg font-semibold mb-3 text-ink-2">{t('list.templates')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           {templates.map((t) => (
             <div
@@ -86,7 +89,7 @@ export default async function ConceptNotesListPage({
       </div>
 
       {/* Notes List */}
-      <h2 className="text-lg font-semibold mb-3 text-ink-2">Your Notes</h2>
+      <h2 className="text-lg font-semibold mb-3 text-ink-2">{t('list.yourNotes')}</h2>
       <div className="space-y-4">
         {notes.map((note) => (
           <Link
@@ -97,20 +100,20 @@ export default async function ConceptNotesListPage({
             <div className="border rounded-lg p-5 bg-surface hover:border-blue-400 transition-colors flex justify-between items-center">
               <div>
                 <div className="font-bold text-lg mb-1">
-                  Concept Note v{note.version}
+                  {t('list.noteVersion', { version: note.version })}
                 </div>
                 <div className="text-sm text-muted font-mono">
-                  Opportunity: {note.opportunityId}
+                  {t('list.opportunity', { id: note.opportunityId })}
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <span
                   className={`text-xs font-semibold uppercase px-3 py-1 rounded ${statusColors[note.status] || 'bg-surface-hover'}`}
                 >
-                  {note.status}
+                  {t.has(`status.${note.status}`) ? t(`status.${note.status}`) : note.status}
                 </span>
                 <span className="text-xs text-muted">
-                  {new Date(note.updatedAt).toLocaleDateString()}
+                  {new Date(note.updatedAt).toLocaleDateString(locale)}
                 </span>
               </div>
             </div>
@@ -118,7 +121,7 @@ export default async function ConceptNotesListPage({
         ))}
         {notes.length === 0 && (
           <div className="text-center text-muted py-12 border-2 border-dashed rounded-lg">
-            No concept notes yet. Create one from an opportunity in your pipeline.
+            {t('list.empty')}
           </div>
         )}
       </div>

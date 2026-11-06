@@ -47,3 +47,76 @@ describe.each(Object.entries(themes))('--muted contrast (%s)', (_, tokens) => {
     expect(contrast(fg, ground)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+/**
+ * NG-2 — the green/yellow/red status language has to be readable as text. `--ok`, `--amber` and
+ * `--bad` are fine as accents in the dark theme, but in the light one they measure 3.77, 3.19 and
+ * 4.83 on white and fall further on --ground and on their own tint, so text uses the `-ink` step
+ * (the same split as --accent / --accent-ink). `-strong` carries white text (--accent-strong).
+ */
+function hexToRgb(hex: string): [number, number, number] {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+/** The solid colour a `bg-x/15` utility paints over `under`. */
+function tint(hex: string, under: string, alpha: number): string {
+  const [f, u] = [hexToRgb(hex), hexToRgb(under)];
+  return `#${f.map((c, i) => Math.round(c * alpha + (u[i] as number) * (1 - alpha)).toString(16).padStart(2, '0')).join('')}`;
+}
+
+describe.each(Object.entries(themes))('status language contrast (%s)', (_, tokens) => {
+  const need = (name: string): string => {
+    const value = tokens[name];
+    if (!value) throw new Error(`--${name} missing from globals.css`);
+    return value;
+  };
+
+  describe.each(['ok', 'amber', 'bad'])('--%s-ink', (status) => {
+    test.each(['ground', 'surface', 'surface-hover'])('on --%s is at least 4.5:1', (bg) => {
+      expect(contrast(need(`${status}-ink`), need(bg))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test.each(['ground', 'surface'])('on its own tint over --%s is at least 4.5:1', (bg) => {
+      expect(contrast(need(`${status}-ink`), tint(need(status), need(bg), 0.15))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  test.each(['accent-strong', 'bad-strong'])('white on --%s is at least 4.5:1', (fill) => {
+    expect(contrast('#ffffff', need(fill))).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+/**
+ * NG-2 (K-576956) — the accent moved to the logo blues. `text-accent` and `text-accent-ink` both paint
+ * --accent-ink (--text-color-accent in globals.css), `bg-accent` and `bg-accent-strong` carry white
+ * text, and a border or ring only needs the 3:1 of WCAG 1.4.11.
+ */
+describe.each(Object.entries(themes))('accent contrast (%s)', (_, tokens) => {
+  const need = (name: string): string => {
+    const value = tokens[name];
+    if (!value) throw new Error(`--${name} missing from globals.css`);
+    return value;
+  };
+
+  test.each(['ground', 'surface', 'surface-hover'])('--accent-ink on --%s is at least 4.5:1', (bg) => {
+    expect(contrast(need('accent-ink'), need(bg))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  describe.each(['ground', 'surface'])('over --%s', (bg) => {
+    test.each([0.1, 0.12, 0.15, 0.2])('--accent-ink on the %s tint of --accent is at least 4.5:1', (alpha) => {
+      expect(contrast(need('accent-ink'), tint(need('accent'), need(bg), alpha))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  test('white on --accent is at least 4.5:1, since 69 bg-accent call sites carry white text', () => {
+    expect(contrast('#ffffff', need('accent'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test.each(['ground', 'surface', 'surface-hover'])('--accent as a border on --%s is at least 3:1', (bg) => {
+    expect(contrast(need('accent'), need(bg))).toBeGreaterThanOrEqual(3);
+  });
+});
+
+test('text-accent reads the text step, so the fill can stay under white text', () => {
+  expect(css).toMatch(/--text-color-accent:\s*var\(--accent-ink\)/);
+});

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
+import { isForbiddenRole } from '@/lib/forbidden-role';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
@@ -305,6 +306,128 @@ describe('M8 confirmSeatAssignment', () => {
     expect(await outcome(() => m8.confirmSeatAssignment(s, a.opp))).toMatch(/^threw: Conflict: /);
     expect(await seat(s)).toBe(`INVITED|${ORG_2}`);
     expect(await seat(a.siblingSeat)).toBe(`CONFIRMED|${ORG_2}`);
+  });
+});
+
+describe('confirmSeatAssignment on the topic reference a user-made opportunity holds', () => {
+  test('the same-call conflict is refused when both opportunities carry the portal identifier', async () => {
+    const [, , s] = a.seats as [string, string, string];
+    await setSeat(s, 'INVITED', ORG_2);
+    state.scope.role = 'PIPELINE_MANAGER';
+    await admin!.opportunity.updateMany({ where: { id: { in: [a.opp, a.sibling] } }, data: { topicId: `${RUN}-T1` } });
+    try {
+      expect(await outcome(() => m8.confirmSeatAssignment(s, a.opp))).toMatch(/^threw: Conflict: /);
+      expect(await seat(s)).toBe(`INVITED|${ORG_2}`);
+    } finally {
+      await admin!.opportunity.updateMany({ where: { id: { in: [a.opp, a.sibling] } }, data: { topicId } });
+    }
+  });
+});
+
+describe('consortium page confirmation button (confirmSeat)', () => {
+  /** Runs `body` with both opportunities holding what the board form writes: the portal identifier. */
+  async function onIdentifier(body: () => Promise<void>, ids: string[] = [a.opp, a.sibling]) {
+    await admin!.opportunity.updateMany({ where: { id: { in: presentIds(ids) } }, data: { topicId: `${RUN}-T1` } });
+    try {
+      await body();
+    } finally {
+      await admin!.opportunity.updateMany({ where: { id: { in: presentIds(ids) } }, data: { topicId } });
+    }
+  }
+
+  test('confirms the organisation on screen and answers ok', async () => {
+    const [s] = a.seats as [string];
+    await setSeat(s, 'INVITED', ORG);
+    state.scope.role = 'PIPELINE_MANAGER';
+    expect(await consortium.confirmSeat(s, a.opp, ORG)).toEqual({ ok: true });
+    expect(await seat(s)).toBe(`CONFIRMED|${ORG}`);
+  });
+
+  test.each(['MEMBER', 'WRITER', 'GUEST_PARTNER', 'NOT_A_ROLE'])('%s leaves with the role refusal, and the seat stays INVITED', async (role) => {
+    const [s] = a.seats as [string];
+    await setSeat(s, 'INVITED', ORG);
+    state.scope.role = role;
+    const err = await consortium.confirmSeat(s, a.opp, ORG).catch((e: unknown) => e);
+    expect(isForbiddenRole(err)).toBe(true);
+    expect(await seat(s)).toBe(`INVITED|${ORG}`);
+  });
+
+  test.each([
+    ['never invited', 'OPEN', null],
+    ['declined', 'DECLINED', ORG],
+    ['already confirmed', 'CONFIRMED', ORG],
+  ] as const)('a seat %s writes nothing and is no success', async (_label, status, org) => {
+    const [s] = a.seats as [string];
+    await setSeat(s, status, org);
+    state.scope.role = 'PIPELINE_MANAGER';
+    expect(await consortium.confirmSeat(s, a.opp, ORG)).toEqual({ ok: false, code: 'seatNotConfirmable' });
+    expect(await seat(s)).toBe(`${status}|${org}`);
+  });
+
+  test('a seat re-invited to another organisation is not confirmed for the one on screen', async () => {
+    const [s] = a.seats as [string];
+    await setSeat(s, 'INVITED', ORG);
+    state.scope.role = 'PIPELINE_MANAGER';
+    expect(await consortium.confirmSeat(s, a.opp, ORG_FORGED)).toEqual({ ok: false, code: 'seatNotConfirmable' });
+    expect(await seat(s)).toBe(`INVITED|${ORG}`);
+  });
+
+  test("a seat of another tenant or another opportunity is no success", async () => {
+    await setSeat(a.siblingSeat, 'INVITED', ORG);
+    state.scope.role = 'TENANT_OWNER';
+    expect(await consortium.confirmSeat(a.siblingSeat, a.opp, ORG)).toEqual({ ok: false, code: 'seatNotConfirmable' });
+    expect(await seat(a.siblingSeat)).toBe(`INVITED|${ORG}`);
+    await setSeat(a.siblingSeat, 'CONFIRMED', ORG_2);
+    await admin!.consortiumSeat.update({ where: { id: b.seat }, data: { status: 'INVITED', organizationId: ORG_OTHER_TENANT } });
+    expect(await consortium.confirmSeat(b.seat, a.opp, ORG_OTHER_TENANT)).toEqual({ ok: false, code: 'seatNotConfirmable' });
+    expect(await seat(b.seat)).toBe(`INVITED|${ORG_OTHER_TENANT}`);
+    await setSeat(b.seat, 'OPEN', null);
+  });
+
+  test('a same-call conflict answers a code: the other opportunity stays off the wire', async () => {
+    const [, , s] = a.seats as [string, string, string];
+    await setSeat(s, 'INVITED', ORG_2);
+    state.scope.role = 'PIPELINE_MANAGER';
+    const answer = await consortium.confirmSeat(s, a.opp, ORG_2);
+    expect(answer).toEqual({ ok: false, code: 'seatConfirmConflict' });
+    expect(JSON.stringify(answer)).not.toContain('sibling');
+    expect(await seat(s)).toBe(`INVITED|${ORG_2}`);
+  });
+
+  // The board form and the call page store the portal identifier in `Opportunity.topicId`, not the
+  // Topic's id (src/lib/scoring/g0-compute.ts says so), so looking the topic up by id alone left the
+  // rule asleep on every opportunity a user opens.
+  test('the conflict rule holds when both opportunities carry the portal identifier', async () => {
+    const [, , s] = a.seats as [string, string, string];
+    await setSeat(s, 'INVITED', ORG_2);
+    state.scope.role = 'PIPELINE_MANAGER';
+    await onIdentifier(async () => {
+      expect(await consortium.confirmSeat(s, a.opp, ORG_2)).toEqual({ ok: false, code: 'seatConfirmConflict' });
+    });
+    expect(await seat(s)).toBe(`INVITED|${ORG_2}`);
+  });
+
+  test.each([
+    ['this opportunity on the identifier, the other on the id', () => [a.opp]],
+    ['this opportunity on the id, the other on the identifier', () => [a.sibling]],
+  ])('and with %s', async (_label, ids) => {
+    const [, , s] = a.seats as [string, string, string];
+    await setSeat(s, 'INVITED', ORG_2);
+    state.scope.role = 'PIPELINE_MANAGER';
+    await onIdentifier(async () => {
+      expect(await consortium.confirmSeat(s, a.opp, ORG_2)).toEqual({ ok: false, code: 'seatConfirmConflict' });
+    }, ids());
+    expect(await seat(s)).toBe(`INVITED|${ORG_2}`);
+  });
+
+  test("another tenant's confirmed seat on the same call is no conflict", async () => {
+    const [s] = a.seats as [string];
+    await setSeat(s, 'INVITED', ORG);
+    await setSeat(b.seat, 'CONFIRMED', ORG);
+    state.scope.role = 'PIPELINE_MANAGER';
+    expect(await consortium.confirmSeat(s, a.opp, ORG)).toEqual({ ok: true });
+    expect(await seat(s)).toBe(`CONFIRMED|${ORG}`);
+    await setSeat(b.seat, 'OPEN', null);
   });
 });
 

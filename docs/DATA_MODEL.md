@@ -723,6 +723,24 @@ yazılır (`src/lib/scoring/g0-compute.ts`, `prisma/seed.ts`); fırsat satırı 
 hiçbir şey yazmaz. `Opportunity.g0Score` bir önbellek sütunudur: `persistG0` doldurur, ama tohum
 verisi de yazabildiği için hiçbir ekran onu doğrudan çizmez.
 
+**PIC değişince yeniden hesaplama (FO-384).** Kiracı PIC kaydeder, temizler veya yönetici kaldırırsa
+kiracının **G0 aşamasındaki aktif** fırsatları `rescoreOpportunityG0` ile yeniden puanlanır
+(`src/lib/scoring/g0-rescore-tenant.ts`). "Aktif" şemadan okunur: `stage = G0`, `status = ACTIVE`
+ve `deletedAt` boş (`G0_RESCORE_SCOPE`, `src/lib/scoring/g0-compute.ts`; K-577267 seçenek A). Liste,
+sayfalı devam, kuyruk işi ve yazım aynı filtreyi kullanır. G1–G4 ile `FUNDED`, `WITHDRAWN`,
+`SUBMITTED`, `REJECTED`, `ABOVE_THRESHOLD` ve arşivli satırların `g0Score`, `TopicMatch.g0Score`,
+`updatedAt` ve `GateDecision` kayıtları PIC değişiminde yazılmaz. Liste ile yazım arasında aşaması
+değişen fırsat yazılmaz (`TopicMatch` dahil); bu `failed` değil, `archived` sayılır ve alarm
+üretmez (`G0LeftScopeError`). Kapı yolu (`persistG0`, `scripts/rescore-g0.ts`) bu filtreden etkilenmez.
+Puan değişmediyse `Opportunity` satırına hiç
+yazılmaz; değiştiyse `updatedAt` korunur (pano "son dokunulan" sırasını bozmaz). `TopicMatch`
+kanıt kaydı her koşuda yenilenir. Puan hesaplanamazsa (`coverage === 0`) saklanan değer `null`
+ile değiştirilir. İstek içinde 25 sn'lik bütçe biter ve kalan fırsatlar `g0-rescore-tenant`
+işine (`src/lib/jobs/tasks/g0-rescore-tenant.ts`) bırakılır; iş kiracı ve değişiklik kimliğiyle
+kaldığı imleçten (`afterId`, fırsat kimliği sırası) devam eder. Kuyruğa koyamazsa `SystemAlert`
+(`source: g0-rescore-after-pic`, kiracı kimliği yok) üretilir. Canlı veriye geriye dönük yazma
+bu yoldan yapılmaz; `pnpm jobs:g0-rescore` ayrı bir patron kararıdır.
+
 **Geri doldurma.** `prisma/migrations/topicmatch-per-opportunity/migration.sql` eski konu-başına
 satırları şöyle ayırır: kanıt yükü taşıyan bir satır, o kiracıda o konuda **tek** canlı fırsat
 varsa o fırsata bağlanır (gerçek K1 `fitScore`'u da varsa puan yeni bir fırsat satırına taşınır,
@@ -916,6 +934,51 @@ NULL'dur (alan isteğe bağlı, kaydı durdurmaz).
 - Kurum ayarları (`settings/profile`): sahip/yönetici (`manage_users`) değiştirir; her
   değişiklik `AuditEvent: tenant.province.updated` (`{ from, to }`).
 
+**`Tenant.pic` (FO-383).** Kurumun PIC'i; G0 puanı CORDIS geçmişini bununla okur. Ayarlar →
+Kurumsal Profil'den sahip/yönetici (`manage_users`) girer, değiştirir, temizler; 9 hane
+(`src/lib/pic.ts`). CORDIS'te karşılığı varsa kuruluş adı gösterilip onay istenir (onay sunucuda
+zorunlu), karşılığı yoksa kaydedilir ve geçmiş puanı eklenmeyeceği söylenir. Silinmemiş başka bir
+kiracıda duran PIC reddedilir; benzersizlik indeksi yok, yarışı PIC başına
+`pg_advisory_xact_lock` kapatır. Her değişiklik `AuditEvent: tenant.pic.updated`
+(`{ from, to, cordisName }`). Portaldaki gerçek sahiplik otomatik doğrulanmaz. Red mesajı gerçek
+sahibi destek adresine yönlendirir; platform yöneticisi Admin → Kiracılar → kiracı detayından
+PIC'i kaldırır (K-576942): zorunlu not, yalnız ekranda görülen değer silinir, `AuditEvent:
+tenant.pic.removed` (`{ from, note }`, `actorId` = yönetici, `tenantId` = hedef kiracı). Kaldırma
+yeniden puanlama yapmaz: `Opportunity.g0Score` ve `TopicMatch.g0Score` bir sonraki yeniden
+hesaba kadar eski değerde kalır.
+
+FO-386: "başka hesapta kayıtlı" cevabı evet/hayır olduğundan, yeni bir PIC'i soran her kayıt
+kullanıcı başına sayılır (`PIC_LOOKUPS_PER_HOUR`, `UserWindowLimiter`: süreç içi, N örnek N katı
+izin verir, yeniden başlatma sayacı sıfırlar). Sayım kilitten ve sorgudan önce yapılır; sınır
+aşılınca hiçbir şey sorgulanmaz ve kaydedilmez. Ret `AuditEvent: tenant.pic.refused`
+(`{ pic, reason }`, `reason` = `picTaken` | `rateLimited`, `actorId` = soran, `tenantId` = soranın
+kiracısı) yazar; PIC'i tutan kiracı satırda geçmez, onun kaydına da satır düşmez. `rateLimited`
+kullanıcı başına saatte bir satırdır.
+
+FO-389: sayaç kayan pencerelidir (sabit pencere kenarında 2x burst vermez; reddedilen soru
+sayılmaz). Davetsiz hesap (ajans davet kodundan gelmemiş: `agencyId` boş; canlı abonelik yok
+[`ACTIVE`/`TRIALING`/`PAST_DUE`; pilot de bir `Subscription`'dır], ömür boyu lisans yok) saatte
+`PIC_LOOKUPS_PER_HOUR_UNSOLICITED` (3) soru sorar ve her soru `PicLookupBudget` ortak günlük
+bütçesinden (`PIC_UNSOLICITED_LOOKUPS_PER_DAY`, 2000) harcar. Tavan dolunca davetsiz hesap, hangi
+PIC'i sorarsa sorsun, aynı `picRateLimited` cevabını (sonraki UTC gece yarısına kalan süreyle)
+alır: PIC listede mi, başka kiracıda mı bilgisi verilmez. Davetli, pilot ve ücretli kiracı bütçeyi
+harcamaz, tavandan etkilenmez. `tenant.pic.refused` satırı kiracı başına günde
+`PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY` (50) ile sebep başına (`picTaken` / `rateLimited`) sınırlıdır; ret
+yine de verilir, yalnız satır yazılmaz. Sebep başına sayılır ki bir günlük `picTaken` satırı "sınır aşıldı"
+satırını gizlemesin. Yeni tablo: `PicLookupBudget` (§24, `SYSTEM_WIDE`, politikasız).
+
+FO-389 inceleme düzeltmeleri: bütçe harcaması profil işleminin içinden, uygulama havuzundan ikinci
+bir bağlantı isteyemez (10 eşzamanlı davetsiz soru havuzu kilitliyordu); harcama
+`picBudgetClient()` ile kendi küçük havuzunda (`PIC_BUDGET_POOL_MAX` = 2, bekleme 5 sn,
+`application_name = fonbridge-pic-budget`) ve işlemden bağımsız commit olur. Bütçeye ya da
+veritabanına ulaşılamazsa istek `failed` döner (tavan atlanmaz) ve kullanıcının saatlik hakkı geri
+verilir (`UserWindowLimiter.refund`). Günlük tavan dolup bir soru geri çevrildiğinde UTC günü başına
+tek `SystemAlert` açılır (`source: pic-budget`, `level: warn`, `dedupeKey: pic-budget-spent:<gün>`,
+meta yalnız `{ day, ceiling }`; PIC, kiracı ve kullanıcı kimliği yok). Ret satırı tavanına
+(`PIC_REFUSAL_ROWS_PER_TENANT_PER_DAY`) ulaşılan gün, kiracı ve sebep başına tek özet satırı
+`AuditEvent: tenant.pic.refusal.capped` (`{ reason, cap }`) yazılır; sonraki retler satır
+bırakmaz, tavan kalkmaz. Admin → Kiracılar → kiracı detayında ret listesinde görünür.
+
 **RLS.** `Tenant` sistem geneli bir tablodur (`tenantId` sütunu yok), `tenant_isolation`
 kapsamı dışındadır; `relrowsecurity = false`, politika 0. Yeni politika gerekmez.
 
@@ -1016,7 +1079,7 @@ Verilen son Kurucu Uzman numarası. Tek satır (`id = 1`, `CHECK ("id" = 1)`); `
 
 Funding & Tenders Portal "Partner search" ilanları (keşif: `docs/agent-results/TASK-MVCGPI6V3RM1F-be-fb.md`, plan: `…-leed-fb.md`). Bu kart yalnız şemayı ekler; yazıcı K2 ingestor'dur. Migration: `prisma/migrations/add-partner-search.sql` (geri alma: `add-partner-search.down.sql`, `scripts/apply-migrations.sh --down` ile).
 
-- **Kiracısız referans veri (CORDIS gibi).** `PartnerSearchAnnouncement`, `PartnerProfileSnapshot`, `PartnerSearchIngestionRun`, `UnmatchedOrganization`, `PartnerSearchTopicStat`, `PlatformSetting` → `tenantId` yok, politika yok, `scripts/rls-models.ts` `SYSTEM_WIDE`'da; migration RLS'i açıkça `DISABLE` eder (Supabase `ensure_rls`, CHECK 4c).
+- **Kiracısız referans veri (CORDIS gibi).** `PartnerSearchAnnouncement`, `PartnerProfileSnapshot`, `PartnerSearchIngestionRun`, `UnmatchedOrganization`, `PartnerSearchTopicStat`, `PicLookupBudget`, `PlatformSetting` → `tenantId` yok, politika yok, `scripts/rls-models.ts` `SYSTEM_WIDE`'da; migration RLS'i açıkça `DISABLE` eder (Supabase `ensure_rls`, CHECK 4c).
 - **Kişi verisi yok (GDPR).** Person Profile ilanları satır olarak hiçbir tabloda tutulmaz; `PartnerSearchTopicStat(topicIdentifier → personAnnouncementCount)` yalnız anonim sayıdır. `raw` alanına allowlist'teki alanlar yazılır, `ecasId` asla.
 - **`PartnerSearchAnnouncement`:** `externalId` (portal anahtarı, unique), `topicIdentifier` → `Topic.identifier` (FK, `ON DELETE CASCADE`), `callIdentifier?`, `type` (`EXPERTISE_REQUEST|EXPERTISE_OFFER`), `description VARCHAR(500)`, `publishedAt?`, `lastSeenAt`, `withdrawnAt?`, `organizationPic?` (eşleşince `CordisOrganization.organisationId`), `organizationName`, `organizationType` (`HES|REC|PRC|PUB|OTH`, varsayılan `OTH`) + `isSme`, `country` (ISO2), `city?`, `keywords`/`programmeCodes` (JSON dizi), `source` (`PORTAL_API|TOPIC_HTML`). İndeksler: `topicIdentifier`, `organizationPic`, `country`, `type`, `lastSeenAt`.
 - **`PartnerProfileSnapshot`:** PIC başına son portal profili (her çekimde üzerine yazılır): ad, tip, ülke/şehir, açıklama, anahtar kelimeler, `projectCount`, `announcementCount`, `programmes`, `topCollaborators`, `fetchedAt`. FK yok: profil CORDIS'te olmayan bir kuruma ait olabilir.
@@ -1026,6 +1089,7 @@ Funding & Tenders Portal "Partner search" ilanları (keşif: `docs/agent-results
 - **Partner Search saklama (FO-65 F4):** `partner-search-retention` işi (03:15 UTC, `partner-search` kuyruğu, bayrak kapalıyken no-op) — CLOSED topic'in ilanları `lastSeenAt` + 90 gün, `withdrawnAt` + 30 gün sonra silinir; `source='partner_search'` `RawFetch` satırları CLOSED topic için `fetchedAt` + 90 gün. Kod: `src/modules/m1/server/partner-search/retention.ts`.
 - **Partner Search özet maskesi (FO-65 F3):** `summary` metnindeki e-posta ve telefon, `description`'a ve `RawFetch.payload`'a yazılmadan önce `[email]` / `[phone]` olur. Kural tek yerde: `src/modules/m1/server/partner-search/mask.ts` (`maskContact`).
 - **`PlatformSetting`:** platform geneli anahtar/değer bayrakları (`key` PK, `value` JSONB, `updatedAt`). Kiracısız, politikasız, `SYSTEM_WIDE`; RLS migration'da açıkça `DISABLE` edilir (CHECK 4c). İlk anahtar: `partner_search_ingestion_enabled` (varsayılan `false`; `isPartnerSearchIngestionEnabled()` yalnız `true` değeriyle açık sayar, okuma hatasında kapalı kalır). Migration: `prisma/migrations/add-platform-setting.sql` (`ON CONFLICT DO NOTHING`, operatörün değiştirdiği değeri ezmez). **Yazma (FO-65 F2):** `fabrika_app` tabloda yalnız `SELECT` hakkına sahip ve yazıcı fonksiyonu da **çağıramaz** (`EXECUTE` yalnız sahipte, PR #163 crw-fb B1). Tek yazma yolu `set_platform_setting(key, value, actor)` (SECURITY DEFINER, yalnız bu anahtar ve boolean değer; `actor` boş/NULL ise ya da silinmemiş bir `isPlatformAdmin` kullanıcısı değilse reddeder) — satırı yazar ve aynı çağrıda `AuditEvent` (`type='platform.setting.changed'`, `actorId` = admin `User.id`, `tenantId` NULL, `system_scope` sahip yolu) üretir. Uygulama tarafı: `setPartnerSearchIngestionFlag(ownerDb, enabled, actorId)` — `ownerDb` sahip bağlantısıdır (uygulamanın `prisma`'sı değil), `actorId` oturumdaki adminin id'si. Migration: `prisma/migrations/platform-setting-write-guard.sql` (+ `.down.sql`); `prisma/rls-app-role.sql` yeniden koşunca da `REVOKE`'u tekrarlar.
+- **`PicLookupBudget` (FO-389):** davetsiz hesapların PIC sorguları için günlük **ortak** bütçe sayacı (`day` `'YYYY-MM-DD'` UTC PK, `count`, `updatedAt`). Kiracısız (sayaç tüm davetsiz hesaplar için tek), politikasız, `scripts/rls-models.ts` `SYSTEM_WIDE`'da; migration RLS'i açıkça `DISABLE` eder (CHECK 4c). **Politika gerekçesi:** satırda kiracı ya da kişi verisi yok, yalnız bir gün ve bir sayı; hangi hesabın sorduğu kaydedilmez. Tek yazıcı `src/lib/pic-budget.ts` `spendUnsolicitedPicLookup`: tek atomik `INSERT … ON CONFLICT (day) DO UPDATE … WHERE count < tavan RETURNING` (yarışta tavanı aşamaz, çok süreç/yeniden başlatmada aynı satırı görür). Harcama profil işleminin **dışında**, kendi bağlantısında commit olur (kaydı geri alınan soru da sayılır). Tavan `PIC_UNSOLICITED_LOOKUPS_PER_DAY` (`src/lib/pic.ts`, 2000). `fabrika_app` yalnız `SELECT, INSERT, UPDATE` alır; `DELETE`/`TRUNCATE` geri alınmıştır (`rls-app-role.sql`). Eski günlerin satırları tutulur (günde 1 satır). Migration: `prisma/migrations/add-pic-lookup-budget.sql` (+ `.down.sql`).
 - **`UnmatchedOrganization`:** CORDIS'te karşılığı bulunamayan ilan sahibi kurumlar. Tekil anahtar `matchKey` = `pic:<PIC>` ya da `name:<ÜLKE>:<normalize ad>` (`matchKeyFor`; PIC ve ad ikisi de boşsa anahtar yok, satır yazılmaz); `resolvedPic` eşleşme sonradan bulununca doldurulur (admin konsolunda elle eşleme, audit'li: FO-64). Ingestor `matchPic` yine `unmatched` dönerse ilanın `organizationPic`'ini bu satırın `resolvedPic`'inden yazar; elle eşleme sonraki taramada silinmez ve aynı kurumun yeni ilanları da bağlanır (FO-64 inceleme B1). Otomatik eşleşme (`matched`) her zaman önceliklidir.
 - **PIC eşleme:** `src/modules/m1/server/partner-search/match-pic.ts` `matchPic` (saf): 1) tam PIC, 2) aynı ülkede ad benzerliği (`normalizeOrgName` + aksan temizliği, Levenshtein oranı, eşik varsayılan `0.9`), 3) aksi halde `unmatched`. Ülkesiz kayıt bulanık eşleşmez. Bulanık eşleşme için üç ek koşul (FO-58 D1 / FO-116): **PIC önceliği**: ilanın PIC'i gelmişse ve CORDIS'te yoksa bulanık eşlemeye düşülmez, `unmatched` + `pic:<PIC>` anahtarı döner (PIC tüzel kişinin kimliğidir); **fark payı** `DEFAULT_PIC_MATCH_MARGIN = 0.05`: birinci ile ikinci en iyi aday (aynı `organisationId` rakip sayılmaz) arasındaki fark bunun altındaysa `unmatched` (eşit iki aday dahil); **token koruması**: ortak olmayan kelimeler birebir eşleşen tek-harf yazım hatası çiftleri olmalı (4+ harf; `MADIRD`/`MADRID` kabul, `PAVIA`/`PADOVA` ve `SURREY`/`SUSSEX` red). Ad normalize olunca boş kalırsa (ör. yalnız `GmbH`) `matchKeyFor` ham adı büyük harfle kullanır. Ham ad da boşsa (`''`, yalnız boşluk) ve PIC yoksa `matchKeyFor` `null` döner (`PicMatch.unmatched.matchKey: string | null`): iki adsız kurumu ayıracak bir şey yoktur, ortak `name:<ÜLKE>:` anahtarı onları birleştirirdi; K2 bu durumda `UnmatchedOrganization` satırı yazmaz. Adım 1 (tam PIC) ülkeden bağımsız tüm kurumlara karşı yapılır (K2 PIC ile ülke filtresi olmadan arar); adım 2 (bulanık) yalnız aynı ülkedeki adayları okur.
 - **`CordisOrganization` additive alanlar:** `hasActiveAnnouncements` (varsayılan `false`), `lastAnnouncementAt?`, `portalProfileFetchedAt?`. Sabit varsayılanlı `ADD COLUMN` PG 11+'da yalnız metadata'dır; hiçbir CORDIS değeri değişmez (dev klonunda satır md5'i öncesi/sonrası aynı ölçüldü).

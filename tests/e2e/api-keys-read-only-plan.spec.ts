@@ -25,7 +25,8 @@ const EN_PAGE = `/en/${WS}/settings/api-keys`;
 const CREATE = 'API Key Oluştur (fp_live_...)';
 
 const notice = (page: Page) => page.getByTestId('api-keys-read-only');
-const nameInput = (page: Page) => page.locator('input[placeholder="Örn: SAP ERP Pipeline Senkronu"]');
+const nameInput = (page: Page) => page.locator(`input[placeholder="${trMessages.ApiKeysSettings.page.namePlaceholder}"]`);
+const nameInputEn = (page: Page) => page.locator(`input[placeholder="${enMessages.ApiKeysSettings.page.namePlaceholder}"]`);
 
 async function setPlan(planId: 'free' | 'pro') {
   await prisma.subscription.upsert({
@@ -83,7 +84,7 @@ test.describe('API keys on a read-only M1 plan (FO-157)', () => {
     await expect(notice(page)).toContainText(enMessages.ApiKeysSettings.readOnly.title);
     await expect(notice(page)).toContainText('module read only');
     await expect(page.getByRole('link', { name: enMessages.ApiKeysSettings.readOnly.upgrade })).toBeVisible();
-    await expect(nameInput(page)).toBeDisabled();
+    await expect(nameInputEn(page)).toBeDisabled();
     await page.screenshot({ path: `${SHOTS}/discover-locked-en.png`, fullPage: true });
 
     // 390 px: the notice wraps inside the form column, no sideways scroll.
@@ -102,7 +103,7 @@ test.describe('API keys on a read-only M1 plan (FO-157)', () => {
 
     await page.goto(EN_PAGE);
     await expect(notice(page)).toHaveCount(0);
-    await expect(nameInput(page)).toBeEnabled();
+    await expect(nameInputEn(page)).toBeEnabled();
     await page.screenshot({ path: `${SHOTS}/pro-open-en.png`, fullPage: true });
 
     await page.goto(TR_PAGE);

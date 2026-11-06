@@ -11,10 +11,12 @@ import { FALLBACK_PLAN_ID, grantsFor } from '@/lib/billing/catalog';
 import { INTERNAL_PLAN_CHOICES } from '@/lib/billing/internal-plan';
 import { isInternalPlanSubscription } from '@/lib/billing/subscription-owner';
 import { InternalPlanForm } from './internal-plan-form';
+import { TenantPicPanel } from './tenant-pic-panel';
 
 /**
  * One tenant, for the platform admin: who it is, which plan it is entitled
- * from, and the internal plan assignment (TASK-MVCH26OXNVLKR). Checks the
+ * from, the internal plan assignment (TASK-MVCH26OXNVLKR) and its PIC, which
+ * staff can remove when ownership is disputed (FO-383). Checks the
  * platform-admin session itself rather than leaning on the admin layout.
  */
 export default async function AdminTenantDetailPage({
@@ -39,18 +41,36 @@ export default async function AdminTenantDetailPage({
     createdAt: Date;
     data: { before?: string; after?: string; note?: string } | null;
   }
+  interface PicAuditRow {
+    id: string;
+    type: string;
+    actorId: string | null;
+    createdAt: Date;
+    data: { from?: string | null; to?: string | null; cordisName?: string | null; note?: string } | null;
+  }
+
+  interface PicRefusalRow {
+    id: string;
+    actorId: string | null;
+    createdAt: Date;
+    type: string;
+    data: { pic?: string; reason?: string; cap?: number } | null;
+  }
 
   const tenant = (await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: { id: true, name: true, slug: true, country: true, orgType: true },
-  })) as { id: string; name: string; slug: string; country: string | null; orgType: string } | null;
+    select: { id: true, name: true, slug: true, country: true, orgType: true, pic: true },
+  })) as { id: string; name: string; slug: string; country: string | null; orgType: string; pic: string | null } | null;
   if (!tenant) notFound();
 
   let subscription: SubscriptionRow | null = null;
   let history: AuditRow[] = [];
+  let picHistory: PicAuditRow[] = [];
+  let picRefusals: PicRefusalRow[] = [];
+  let picOrgName: string | null = null;
   let loadError = false;
   try {
-    [subscription, history] = await withTenant(tenantId, async (tx) => [
+    [subscription, history, picHistory, picRefusals, picOrgName] = await withTenant(tenantId, async (tx) => [
       (await tx.subscription.findUnique({
         where: { tenantId },
         select: { planId: true, status: true, provider: true },
@@ -61,6 +81,27 @@ export default async function AdminTenantDetailPage({
         take: 20,
         select: { id: true, type: true, actorId: true, createdAt: true, data: true },
       })) as AuditRow[],
+      (await tx.auditEvent.findMany({
+        // Not `startsWith`: 20 refused questions, an hour's work for the tenant, would push the
+        // changes staff need in a dispute off this list.
+        where: { tenantId, type: { in: ['tenant.pic.updated', 'tenant.pic.removed'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, type: true, actorId: true, createdAt: true, data: true },
+      })) as PicAuditRow[],
+      (await tx.auditEvent.findMany({
+        // FO-389: the summary row that says the day's row cap was reached sits among the refusals.
+        where: { tenantId, type: { in: ['tenant.pic.refused', 'tenant.pic.refusal.capped'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, type: true, actorId: true, createdAt: true, data: true },
+      })) as PicRefusalRow[],
+      tenant.pic
+        ? ((await tx.cordisOrganization.findUnique({
+            where: { organisationId: tenant.pic },
+            select: { name: true },
+          })) as { name: string } | null)?.name ?? null
+        : null,
     ]);
   } catch (e) {
     console.error(`[AdminTenantDetailPage] DB query failed: ${errorMessage(e)}`);
@@ -70,7 +111,9 @@ export default async function AdminTenantDetailPage({
   // Who made each change, by name or e-mail. User is a platform table (no RLS)
   // and the actor is a platform admin, usually of another tenant. Unresolved —
   // a deleted user, a failed read — falls back to a shortened id.
-  const actorIds = [...new Set(history.map((h) => h.actorId).filter((id): id is string => Boolean(id)))];
+  const actorIds = [
+    ...new Set([...history, ...picHistory].map((h) => h.actorId).filter((id): id is string => Boolean(id))),
+  ];
   const actorNames = new Map<string, string>();
   if (actorIds.length > 0) {
     try {
@@ -121,6 +164,59 @@ export default async function AdminTenantDetailPage({
           <p className="text-xs text-muted">{t('detail.provider', { provider: subscription.provider })}</p>
         )}
       </div>
+
+      <section className="bg-surface border rounded-xl p-4 sm:p-5 space-y-3">
+        <h2 className="text-base font-bold text-ink">{t('pic.title')}</h2>
+        <p className="text-xs text-muted">{t('pic.hint')}</p>
+        {loadError ? (
+          <p className="text-sm text-rose-700">{t('loadError')}</p>
+        ) : (
+          <TenantPicPanel tenantId={tenant.id} pic={tenant.pic} cordisName={picOrgName} />
+        )}
+
+        <h3 className="text-sm font-semibold text-ink pt-2">{t('pic.history')}</h3>
+        <ul className="divide-y divide-border border border-border rounded-lg" data-testid="tenant-pic-history">
+          {picHistory.length === 0 && <li className="p-3 text-xs text-muted">{t('pic.historyEmpty')}</li>}
+          {picHistory.map((h) => (
+            <li key={h.id} className="p-3 text-sm space-y-0.5">
+              <div className="flex flex-wrap justify-between gap-2">
+                <span className="font-semibold text-ink break-words font-mono">
+                  {h.type === 'tenant.pic.removed'
+                    ? t('pic.eventRemoved', { pic: h.data?.from ?? '-' })
+                    : t('pic.eventUpdated', { from: h.data?.from ?? '-', to: h.data?.to ?? '-' })}
+                </span>
+                <span className="text-xs text-muted">{dateFmt.format(new Date(h.createdAt))}</span>
+              </div>
+              {h.data?.cordisName && <p className="text-xs text-ink-2 break-words">{h.data.cordisName}</p>}
+              {h.data?.note && <p className="text-xs text-ink-2 break-words">{h.data.note}</p>}
+              <p className="text-xs text-muted break-words">{t('internalPlan.by', { actor: actorLabel(h.actorId) })}</p>
+            </li>
+          ))}
+        </ul>
+
+        {picRefusals.length > 0 && (
+          <>
+            <h3 className="text-sm font-semibold text-ink pt-2">{t('pic.refusals')}</h3>
+            <ul className="divide-y divide-border border border-border rounded-lg" data-testid="tenant-pic-refusals">
+              {picRefusals.map((r) => (
+                <li key={r.id} className="p-3 text-sm space-y-0.5">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className="font-semibold text-ink break-words font-mono">
+                      {r.type === 'tenant.pic.refusal.capped'
+                        ? t('pic.refusalsCapped', { cap: r.data?.cap ?? 0 })
+                        : r.data?.reason === 'rateLimited'
+                          ? t('pic.eventRateLimited', { pic: r.data?.pic ?? '-' })
+                          : t('pic.eventRefused', { pic: r.data?.pic ?? '-' })}
+                    </span>
+                    <span className="text-xs text-muted">{dateFmt.format(new Date(r.createdAt))}</span>
+                  </div>
+                  <p className="text-xs text-muted break-words">{t('internalPlan.by', { actor: actorLabel(r.actorId) })}</p>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
 
       <section className="bg-surface border rounded-xl p-4 sm:p-5 space-y-3">
         <h2 className="text-base font-bold text-ink">{t('internalPlan.title')}</h2>

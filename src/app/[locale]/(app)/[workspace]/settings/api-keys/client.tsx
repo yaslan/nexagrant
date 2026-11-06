@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { isModuleUnavailable } from '@/lib/module-unavailable';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
@@ -26,11 +26,6 @@ export interface ApiKeyRecord {
   lastUsedAt?: string | Date | null;
   createdAt: string | Date;
 }
-
-const ACTION_ERROR_TEXT: Record<ApiKeyActionError, string> = {
-  forbidden: 'API anahtarlarını yalnızca kurum sahibi veya yöneticisi yönetebilir.',
-  invalidName: 'Anahtar adı 1 ile 100 karakter arasında olmalı.',
-};
 
 /**
  * FO-157: set when the plan grants M1 read only (FO-41). The page reads it from
@@ -64,6 +59,10 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
   const errorText = useActionErrorText();
   const t = useTranslations('ApiKeysSettings');
   const tGate = useTranslations('ModuleGate');
+  const format = useFormatter();
+  const actionErrorText = (error: ApiKeyActionError) => t(`page.error.${error}`);
+  const shortDate = (value: string | Date) =>
+    format.dateTime(new Date(value), { day: '2-digit', month: '2-digit', year: 'numeric' });
   const router = useRouter();
 
   const handleGenerateKey = async (e: React.FormEvent) => {
@@ -78,7 +77,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
       });
 
       if ('error' in res) {
-        setActionError(ACTION_ERROR_TEXT[res.error]);
+        setActionError(actionErrorText(res.error));
       } else if (res.rawKey) {
         setNewRawKey(res.rawKey);
         setApiKeys((prev) => [
@@ -105,7 +104,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
   };
 
   const handleRevokeKey = async (id: string, name: string) => {
-    if (confirm(`"${name}" adlı API anahtarını iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) {
+    if (confirm(t('page.revokeConfirm', { name }))) {
       setActionError(null);
       let res: Awaited<ReturnType<typeof revokeApiKey>>;
       try {
@@ -115,7 +114,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
         return;
       }
       if ('error' in res && res.error) {
-        setActionError(ACTION_ERROR_TEXT[res.error]);
+        setActionError(actionErrorText(res.error));
         return;
       }
       setApiKeys((prev) => prev.filter((k) => k.id !== id));
@@ -132,20 +131,20 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-purple-400 font-semibold tracking-wider uppercase mb-1">
               <Key className="w-4 h-4 text-purple-400" />
-              <span>Partner Intelligence REST API</span>
+              <span>{t('page.eyebrow')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              API Anahtarları & B2B Geliştirici Portalı
+              {t('page.heading')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              CORDIS ortak zekası, açık çağrılar ve fırsat pipeline verilerinizi kurum içi ERP/CRM sistemlerinize entegre edin.
+              {t('page.description')}
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs bg-slate-800 border border-slate-700 text-purple-400 px-3.5 py-1.5 rounded-full font-mono font-bold flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-purple-400" />
-              <span>v1 REST API Aktif</span>
+              <span>{t('page.apiActive')}</span>
             </span>
           </div>
         </div>
@@ -153,30 +152,30 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
         {/* Top Summary Info */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs">
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Aktif API Anahtarı</span>
+            <span className="text-muted block text-[11px]">{t('page.activeKeys')}</span>
             <span className="text-xl font-bold text-white font-mono mt-0.5 block">
-              {apiKeys.length} <span className="text-xs text-muted">Anahtar</span>
+              {apiKeys.length} <span className="text-xs text-muted">{t('page.keyUnit', { count: apiKeys.length })}</span>
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Hız Limiti (Rate Limit)</span>
+            <span className="text-muted block text-[11px]">{t('page.rateLimit')}</span>
             <span className="text-xl font-bold text-emerald-400 font-mono mt-0.5 block">
-              {API_KEY_RATE_LIMIT_PER_MINUTE.toLocaleString('en-US')} <span className="text-xs text-muted">istek / dk</span>
+              {format.number(API_KEY_RATE_LIMIT_PER_MINUTE)} <span className="text-xs text-muted">{t('page.perMinute')}</span>
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Protokol & Format</span>
+            <span className="text-muted block text-[11px]">{t('page.protocol')}</span>
             <span className="text-xs font-bold text-blue-300 font-mono mt-1 block">
-              HTTPS REST / JSON
+              {t('page.protocolValue')}
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">Yetkilendirme</span>
+            <span className="text-muted block text-[11px]">{t('page.authorization')}</span>
             <span className="text-xs font-bold text-purple-300 font-mono mt-1 block">
-              x-api-key / Bearer
+              {t('page.authorizationValue')}
             </span>
           </div>
         </div>
@@ -221,12 +220,12 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
               {/* A disabled fieldset disables every control in it: one switch, nothing left typeable. */}
               <fieldset disabled={readOnly !== null} className="space-y-3.5 disabled:opacity-60">
               <div>
-                <label className="font-semibold text-ink-2 block mb-1">Anahtar Adı / Servis Tanımı</label>
+                <label className="font-semibold text-ink-2 block mb-1">{t('page.nameLabel')}</label>
                 <input
                   type="text"
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
-                  placeholder="Örn: SAP ERP Pipeline Senkronu"
+                  placeholder={t('page.namePlaceholder')}
                   required
                   maxLength={100}
                   className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none bg-ground font-semibold"
@@ -236,9 +235,9 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
               <div className="bg-ground p-3 rounded-xl border border-border text-[11px] text-ink-2 space-y-1">
                 <span className="font-bold text-ink flex items-center gap-1">
                   <Lock className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Güvenlik Uyarısı:</span>
+                  <span>{t('page.securityTitle')}</span>
                 </span>
-                <p>Üretilen anahtar yalnızca bir kez tam olarak gösterilir. Lütfen güvenli bir ortamda saklayın.</p>
+                <p>{t('page.securityBody')}</p>
               </div>
 
               {actionError && (
@@ -253,7 +252,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
                 className="w-full bg-purple-600 hover:bg-purple-700 disabled:hover:bg-purple-600 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl transition shadow-xs text-xs flex items-center justify-center gap-2"
               >
                 <Key className="w-3.5 h-3.5" />
-                <span>{isGenerating ? 'Üretiliyor...' : 'API Key Oluştur (fp_live_...)'}</span>
+                <span>{isGenerating ? t('page.generating') : t('page.generate')}</span>
               </button>
               </fieldset>
             </form>
@@ -262,7 +261,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
             {newRawKey && (
               <div className="bg-purple-950 text-purple-100 p-4 rounded-xl border border-purple-800 space-y-2 text-xs animate-in fade-in duration-300">
                 <span className="font-bold text-amber-400 block text-[11px]">
-                  ⚠️ Yeni Üretilen Gizli API Key (Lütfen Kopyalayın):
+                  {t('page.newKeyTitle')}
                 </span>
                 <div className="flex items-center justify-between font-mono bg-black/60 p-2.5 rounded-lg text-[11px] text-purple-300 break-all border border-purple-800/80">
                   <span className="select-all">{newRawKey}</span>
@@ -285,18 +284,18 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
         {/* Right Column: Existing API Keys Table (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           <h3 className="font-bold text-sm text-ink flex items-center justify-between">
-            <span>Kayıtlı API Anahtarları</span>
-            <span className="text-xs font-normal text-muted">{apiKeys.length} Anahtar</span>
+            <span>{t('page.savedKeys')}</span>
+            <span className="text-xs font-normal text-muted">{t('page.keyCount', { count: apiKeys.length })}</span>
           </h3>
 
           <div className="bg-surface border border-border rounded-2xl shadow-2xs overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs min-w-[500px]">
               <thead>
                 <tr className="bg-ground border-b border-border text-ink-2 font-bold uppercase tracking-wider text-[11px]">
-                  <th className="p-3.5">Anahtar Tanımı</th>
-                  <th className="p-3.5">Önek (Prefix)</th>
-                  <th className="p-3.5">Son Kullanım</th>
-                  <th className="p-3.5 text-right">İşlem</th>
+                  <th className="p-3.5">{t('page.colName')}</th>
+                  <th className="p-3.5">{t('page.colPrefix')}</th>
+                  <th className="p-3.5">{t('page.colLastUsed')}</th>
+                  <th className="p-3.5 text-right">{t('page.colAction')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -305,18 +304,18 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
                     <td className="p-3.5">
                       <span className="font-bold text-ink block">{k.name}</span>
                       <span className="text-[10px] text-muted font-mono">
-                        {new Date(k.createdAt).toLocaleDateString('tr-TR')}
+                        {shortDate(k.createdAt)}
                       </span>
                     </td>
                     <td className="p-3.5 font-mono text-ink-2 font-semibold">{k.prefix}...</td>
                     <td className="p-3.5 text-muted font-mono text-[11px]">
-                      {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString('tr-TR') : 'Henüz kullanılmadı'}
+                      {k.lastUsedAt ? shortDate(k.lastUsedAt) : t('revoke.neverUsed')}
                     </td>
                     <td className="p-3.5 text-right">
                       <button
                         onClick={() => handleRevokeKey(k.id, k.name)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition"
-                        title="Anahtarı İptal Et"
+                        title={t('page.revokeTitle')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -335,10 +334,10 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
           <div>
             <h3 className="font-bold text-base text-ink flex items-center gap-2">
               <Code className="w-5 h-5 text-blue-600" />
-              <span>Hızlı Başlangıç & API Entegrasyon Örnekleri</span>
+              <span>{t('page.quickStart')}</span>
             </h3>
             <p className="text-muted text-xs mt-1">
-              Geliştiriciler için cURL, Node.js ve Python ile Partner Intelligence API çağrı şablonları.
+              {t('page.quickStartBody')}
             </p>
           </div>
 
@@ -357,7 +356,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
                 activeCodeTab === 'javascript' ? 'bg-surface text-ink shadow-2xs' : 'text-ink-2 hover:text-ink'
               }`}
             >
-              Node.js / JS
+              {t('page.tabNode')}
             </button>
             <button
               onClick={() => setActiveCodeTab('python')}
@@ -365,7 +364,7 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
                 activeCodeTab === 'python' ? 'bg-surface text-ink shadow-2xs' : 'text-ink-2 hover:text-ink'
               }`}
             >
-              Python
+              {t('page.tabPython')}
             </button>
           </div>
         </div>
@@ -374,15 +373,15 @@ export function ApiKeysClient({ apiKeys: initialKeys, apiBaseUrl, readOnly = nul
         <div className="bg-slate-950 text-slate-100 rounded-xl p-4 font-mono text-xs overflow-x-auto leading-relaxed border border-slate-800">
           {activeCodeTab === 'curl' && (
             <pre className="text-slate-200">
-{`# 1. CORDIS Ortak Arama (Almanya & Türkiye Araştırma Kuruluşları)
+{`# 1. ${t('page.sample.partners')}
 curl -X GET "${apiBaseUrl}/api/v1/partners?country=DE&limit=10" \
   -H "x-api-key: ${sampleKey}"
 
-# 2. Açık Ufuk Avrupa ve TÜBİTAK Çağrılarını Listeleme
+# 2. ${t('page.sample.calls')}
 curl -X GET "${apiBaseUrl}/api/v1/calls?status=OPEN" \
   -H "Authorization: Bearer ${sampleKey}"
 
-# 3. Kiracı Fırsat Pipeline Sorgulama
+# 3. ${t('page.sample.opportunities')}
 curl -X GET "${apiBaseUrl}/api/v1/opportunities" \
   -H "x-api-key: ${sampleKey}"`}
             </pre>
@@ -402,7 +401,7 @@ async function fetchPartners() {
   });
   
   const { data } = await response.json();
-  console.log('Bulunan Kurumlar:', data);
+  console.log('${t('page.sample.found')}', data);
 }
 
 fetchPartners();`}

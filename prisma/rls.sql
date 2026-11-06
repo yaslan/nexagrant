@@ -125,7 +125,7 @@ BEGIN
     'Account','AddOnCatalog','BlogPost','Call','CordisCoParticipation','CordisImportRun',
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
     'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','PartnerProfileSnapshot',
-    'PartnerSearchAnnouncement','PartnerSearchIngestionRun','PartnerSearchTopicStat','PlatformSetting','Programme',
+    'PartnerSearchAnnouncement','PartnerSearchIngestionRun','PartnerSearchTopicStat','PicLookupBudget','PlatformSetting','Programme',
     'PublicLead','RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat',
     'UnmatchedOrganization','User','VerificationToken'
   ] LOOP

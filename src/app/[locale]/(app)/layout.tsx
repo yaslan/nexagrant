@@ -15,6 +15,7 @@ import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-sto
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
 import { can, asRole } from '@/lib/rbac';
+import { hiddenNavKeysFor } from '@/lib/roles/nav-permissions';
 import { listModuleNav, requestSession, type ModuleNavState } from '@/lib/modules/access';
 import { logger } from '@/lib/logger';
 import { ModuleProvider } from '@/lib/modules/hooks';
@@ -93,6 +94,7 @@ export default async function AppLayout({
 
   const canManageModules = can(asRole(roleName), 'manage_modules');
   const canManageUsers = can(asRole(roleName), 'manage_users');
+  const hiddenNavKeys = hiddenNavKeysFor(asRole(roleName));
   // What the sidebar, the opportunity tabs and the cross-links may offer. Same decision
   // as each page's `moduleGate`, read once here; the pages still gate themselves.
   //
@@ -126,6 +128,7 @@ export default async function AppLayout({
         isPlatformAdmin={isPlatformAdmin}
         canManageModules={canManageModules}
         canManageUsers={canManageUsers}
+        hiddenNavKeys={hiddenNavKeys}
         workspaces={workspaces}
         cobrand={cobrand}
       />
@@ -140,7 +143,7 @@ export default async function AppLayout({
           <BrandLogo height={48} className="group-hover:scale-105 transition shrink-0" />
         </Link>
 
-        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} canManageUsers={canManageUsers} />
+        <SidebarNav locale={locale} isPlatformAdmin={isPlatformAdmin} canManageModules={canManageModules} canManageUsers={canManageUsers} hiddenNavKeys={hiddenNavKeys} />
       </aside>
 
       {/* Main Workspace Frame */}
@@ -161,6 +164,7 @@ export default async function AppLayout({
               workspaces={workspaces}
               canManageModules={canManageModules}
               canManageUsers={canManageUsers}
+            hideApiKeys={hiddenNavKeys.includes('apiKeys')}
             />
           </div>
         </header>

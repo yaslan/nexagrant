@@ -401,6 +401,20 @@ Aynı önekle kapatılan iki kart daha var (6'ya dahil değil): **TASK-MTRJSOWFH
    Kanonik kural seti = `DEFAULT_G0_RULES`. `SPEC_LITERAL_G0_RULES` yalnız kalibrasyon karşılaştırması
    için saklanır, kapıda kullanılmaz. Bu karar `/settings/gates` etiketine ve `gates/evaluate.ts`
    çağrısına yansıtılacaktır (bkz. board TASK-MTQ63RR8Z0G8E).
+   **FO-382 (2026-11-04, patron K-576759 = A) — ek kural:** ortak (`intendedRole = partner`) rolünde
+   CORDIS'te hiç katılım kaydı olmayan kuruluşta `coordinatorHistory` (15) ve `networkCentrality` (10)
+   paydadan çıkar; bileşik skor kalan 75 puanla hesaplanır (`scoringBasis = no_history_evidence`).
+   Eşik 70 ve üç sert kural değişmez; 75 paydası ve dolu koltuk kuralı yalnız ortağa uygulanır; boş
+   koltuk her rolde puan vermez (koordinatörde ve rolü boş kayıtta puan yalnız boş koltuk yüzünden düşer);
+   **PIC kuralı (2026-11-05, patron "PIC boşsa kolaylık yok"):** "kayıt yok" = PIC girilmiş ve o PIC için
+   CORDIS satırı yok. PIC boşsa `cordis = null`, ortak standart hesapta (/100) kalır; paydadan çıkarma ve
+   dolu koltuk sert kuralı uygulanmaz. CORDIS tablosu boşsa (içe aktarılmamış) da `cordis = null`: veri
+   yokluğu geçmişsizlik sayılmaz. Gerekçe: birleşik ağaç ölçümü (`docs/agent-results/FO-384-crw2-fb.md`),
+   PIC kaldırınca partner puanı 53,08'den 69,11'e çıkıyordu. Boş (`OPEN`) koltuk artık puan
+   vermez. **Sert kural (2026-11-05, patron):** aynı durumda en az bir dolu koltuk şart; dolu =
+   `CANDIDATE`, `INVITED`, `CONFIRMED` (`FILLED_SEAT_STATUSES`). `OPEN`, `DECLINED` ya da koltuk yoksa G0
+   geçilmez (`G0_NO_HISTORY_NO_FILLED_SEAT`). `G0_SCORING_VERSION` = `2.2` (canlıya çıkmadı, sürüm artırılmadı).
+   Ölçüm ve açık karar notları: `docs/CORDIS-SAMPLE-CALIBRATION.md` "FO-382 PIC kuralı" bölümü.
 9. **[KAPANDI — güncel 29.09] G0 kanonik fonksiyonu üretime ne zaman/nerede bağlanacak?** Cevap koddan: her `gates/evaluate.ts` çağrısında canlı hesaplanıyor ve `pipeline/actions.ts`'te yazılıyor (`g0-compute.ts`, `e816fa9f`; bkz. E5). Aşağısı geçmiş kayıt. — — Ağırlıklar ve eşik kararlaştırıldı (madde 8), ama `scoreG0()`/`decideG0()` bugün hâlâ hiçbir üretim çağrı noktasında kullanılmıyor (ölçüldü 2026-09-07, PROJECT.md:81 dipnotu). Karar bekliyor: çağrı fırsat oluşturma anında mı, günlük bir job'da mı, yoksa her `gates/evaluate.ts` çağrısında canlı mı hesaplanacak? Kanıt: `docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`.
 10. **[KAPANDI — güncel 29.09: TASK-MTQTYE287FERM `done`, rapor `49bc1bd6`] Evaluator Lens "iç ön değerlendirme" etiketi bulgusu çelişkili — kim doğrulayacak?** — Board'da açık **TASK-MTQTYE287FERM** ve `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md` bulgu #1, etiketin `EvaluationDashboard.tsx`'te olmadığını iddia ediyor; kod incelemesi (2026-09-07) etiketi **hem `EvaluatorForm.tsx:94` hem `EvaluationDashboard.tsx:42`'de** buluyor (`internalPreAssessment` anahtarı, tr+en). Kart kapatılmadan önce bu çelişki bir kişi tarafından ekran görüntüsüyle çözülmeli — stale bulgu mu, yoksa görülmeyen bir yüzey mi var?
 11. **Dashboard "Başarı Oranı" case-mismatch — KAPANDI (TASK-MTQTYXC0NUT0B, 2026-09-07).** Düzeltildi (yukarıda E10). Tarama yapıldı: uygulamanın literal ile karşılaştırdığı 9 serbest-string sütunun (`Opportunity.stage/status/intendedRole`, `Proposal.outcome`, `ModuleState.status`, `Evaluation.status/readerType`, `GateDecision.gate`, `Reviewer.status`) canlı değerleri koddaki literallerle tek tek karşılaştırıldı; **kasa uyuşmazlığı yalnızca `Proposal.outcome`'da** çıktı, diğer sekizi yazan ve okuyan tarafta aynı kasada. Yeni soru: aynı sınıftan hatayı sessiz bırakmamak için bu sütunlar Prisma `enum`'una mı taşınmalı, yoksa `proposal-outcome.ts` gibi sözlük modülleri mi yeterli?

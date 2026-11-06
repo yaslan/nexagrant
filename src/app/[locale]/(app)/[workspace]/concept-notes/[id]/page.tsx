@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
@@ -43,6 +44,9 @@ export default async function ConceptNoteDetailPage({
   }
 
   const { note, template, opportunity } = data;
+  const t = await getTranslations({ locale, namespace: 'ConceptNote' });
+  const tCommon = await getTranslations({ locale, namespace: 'Common' });
+  const statusLabel = t.has(`status.${note.status}`) ? t(`status.${note.status}`) : note.status;
 
   return (
     <div className="max-w-[1400px] mx-auto py-6 sm:px-4">
@@ -52,14 +56,14 @@ export default async function ConceptNoteDetailPage({
             href={`/${locale}/${workspace}/concept-notes`}
             className="text-muted hover:text-ink"
           >
-            ← Back
+            ← {tCommon('back')}
           </Link>
           <div>
             <h1 className="text-2xl font-bold font-heading">
-              {template?.name || 'Concept Note'}
+              {template?.name || t('detail.fallbackTitle')}
             </h1>
             <p className="text-sm text-muted">
-              {opportunity?.title || note.opportunityId} — v{note.version} — {note.status}
+              {opportunity?.title || note.opportunityId} — v{note.version} — {statusLabel}
             </p>
           </div>
         </div>
@@ -68,7 +72,7 @@ export default async function ConceptNoteDetailPage({
           target="_blank"
           className="bg-surface hover:bg-surface-hover dark:bg-gray-800 dark:hover:bg-gray-700 text-ink border border-border px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center gap-2"
         >
-          Download DOCX
+          {t('detail.downloadDocx')}
         </a>
       </div>
 
