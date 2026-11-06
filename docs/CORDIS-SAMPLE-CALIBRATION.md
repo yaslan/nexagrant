@@ -168,3 +168,108 @@ Kalan yanlış pozitif eşik meselesi değil: **S19 NETSUPP** (skor 74.90, taban
 > ```bash
 > pnpm beta:esr-preflight
 > ```
+
+
+## FO-382 notu (2026-11-05): CORDIS geçmişi olmayan ortak — yeniden ölçüm
+
+> **Kurgusal örnek seti.** Aşağıdaki sayılar `docs/BETA_DATA/esr-calibration-samples.csv` üzerindedir
+> (kürate fixture, gerçek CORDIS verisi değil). Gerçek bir ortağın koltuk durumu bu sette yoktur;
+> bu yüzden koltuk varsayımı açıkça ayrılmıştır. Gerçek sayı ancak gerçek veriyle üretilir.
+
+**Kural (patron K-576759 = A + ek kural):**
+1. `intendedRole = partner` ve CORDIS'te bu PIC için hiç katılım yok → `coordinatorHistory` (15) ve
+   `networkCentrality` (10) paydadan çıkar; skor `Σ(katkı) / 75`.
+2. Aynı durumda en az bir **dolu** koltuk olmalı. Dolu = `CANDIDATE`, `INVITED` veya `CONFIRMED`
+   (tek kaynak: `FILLED_SEAT_STATUSES`, `src/lib/scoring/g0-features.ts`). `OPEN`, `DECLINED` ve hiç
+   koltuk olmaması dolu sayılmaz → G0 geçilemez (`G0_NO_HISTORY_NO_FILLED_SEAT`).
+3. Eşik 70, `minAlignment`, taban oran ≥ %8 ve ülke uygunluğu değişmedi. 75 paydası ve dolu koltuk
+   kuralı yalnız ortak (`partner`) rolüne uygulanır; boş koltuk her rolde puan vermez, bu yüzden
+   koordinatör ve rolü boş kayıtların puanı da yalnız boş koltuk yüzünden düşer. CORDIS verisi yoksa
+   kural uygulanmaz: PIC yok **ve** CORDIS tablosu boşsa `cordis = null`. PIC yok ama tablo doluysa
+   kural uygulanır (PIC'siz ortak CORDIS'te kayıt bulamaz). **Bu paragraf 2026-11-05 PIC kuralıyla
+   değişti:** PIC boşsa kural uygulanmaz (aşağıdaki "FO-382 PIC kuralı" bölümü). Kapsam dışı olan yalnız
+   boş tablodur.
+   Boş koltuk (`OPEN`, `DECLINED`) hiçbir rolde puan vermez (K-576987 = A).
+
+**Koltuk varsayımı.** Örneklerde koltuk bilgisi yok. Bu yüzden her örnek iki ayrı varsayımla koşuldu:
+- **D — koltuk dolu:** kural 2 sağlanır; yalnız kural 1 (`/75`) etkili olur.
+- **B — koltuk boş:** kural 2 tutmaz; geçmişsiz ortak her örnekte G0'dan geçemez (puan yine hesaplanır).
+- **Taban:** aynı geçmişsiz ortak, eski davranış (`coordinatorHistory = networkCentrality = 0`, `/100`).
+
+Ölçüm: DB'siz, `decideG0` + `DEFAULT_G0_RULES` + `effectiveWeights` (`scripts/esr-calibration.ts`
+ile aynı canonical yol). Geçici betik repo dışında; tekrar üretmek için `docs/BETA_DATA` CSV'si ve
+`decideG0` yeterli.
+
+| Senaryo | Uzman ile uyum (20 örnek) | GO kararı sayısı (20 örnek) | Değişen karar (tabana göre) |
+|---|---:|---:|---|
+| Taban: geçmişsiz, /100 | 8/20 | 0 | — |
+| D: koltuk dolu, /75 | 14/20 | 8 | 8 karar NO_GO→GO: S01 DISTRENOV, S03 AGRISENSE, S05 CLIMANEUT, S06 SMERAD, S08 GRIDFLEX, S11 SOLIDBAT, S12 GEOHEAT, S19 NETSUPP |
+| B: koltuk boş, /75 + kural | 8/20 | 0 | 0 karar: taban zaten NO_GO; kural bu örneklerde GO'yu tümüyle engeller |
+
+**Yorum.** D altında 8 karar değişiyor; bunlardan biri (S19 NETSUPP) uzman etiketine aykırı
+yeni bir yanlış pozitif. B altında kural, geçmişsiz ortağın hiçbir örnekte geçmesine izin vermiyor.
+Yani kuralın etkisi tamamen koltuk durumuna bağlı; gerçek koltuk verisi olmadan eşik seçilmez.
+
+Örnek başına sonuç (puanlar `/100` tabanı ve `/75` yeni hesap; ✅/❌ uzman etiketine göre):
+
+| Örnek | Kısaltma | Gerçek (uzman) | Taban: geçmişsiz, /100 | Varsayım D: koltuk dolu, /75 | Varsayım B: koltuk boş, /75 + kural |
+|---|---|---|---|---|---|
+| S01 | DISTRENOV | GO | 62.00 NO_GO ❌ | 82.67 GO ✅ | 69.87 NO_GO ❌ |
+| S02 | DIGITWIN | GO | 51.25 NO_GO ❌ | 68.33 NO_GO ❌ | 53.93 NO_GO ❌ |
+| S03 | AGRISENSE | GO | 67.30 NO_GO ❌ | 89.73 GO ✅ | 76.13 NO_GO ❌ |
+| S04 | CULTHER | GO | 45.35 NO_GO ❌ | 60.47 NO_GO ❌ | 49.27 NO_GO ❌ |
+| S05 | CLIMANEUT | GO | 68.70 NO_GO ❌ | 91.60 GO ✅ | 76.40 NO_GO ❌ |
+| S06 | SMERAD | GO | 63.50 NO_GO ❌ | 84.67 GO ✅ | 75.07 NO_GO ❌ |
+| S07 | BATTREC | GO | 46.80 NO_GO ❌ | 62.40 NO_GO ❌ | 50.40 NO_GO ❌ |
+| S08 | GRIDFLEX | GO | 64.76 NO_GO ❌ | 86.35 GO ✅ | 72.27 NO_GO ❌ |
+| S09 | DOCNET | GO | 49.60 NO_GO ❌ | 66.13 NO_GO ❌ | 52.53 NO_GO ❌ |
+| S10 | HEALTHEQ | GO | 42.78 NO_GO ❌ | 57.03 NO_GO ❌ | 45.83 NO_GO ❌ |
+| S11 | SOLIDBAT | GO | 60.69 NO_GO ❌ | 80.92 GO ✅ | 67.80 NO_GO ❌ |
+| S12 | GEOHEAT | GO | 63.96 NO_GO ❌ | 85.28 GO ✅ | 72.80 NO_GO ❌ |
+| S13 | VAGUEAI | NO_GO | 30.15 NO_GO ✅ | 40.20 NO_GO ✅ | 33.80 NO_GO ✅ |
+| S14 | HYDROPT | NO_GO | 40.25 NO_GO ✅ | 53.67 NO_GO ✅ | 44.87 NO_GO ✅ |
+| S15 | SOCINN | NO_GO | 40.05 NO_GO ✅ | 53.40 NO_GO ✅ | 43.80 NO_GO ✅ |
+| S16 | QUANTLINK | NO_GO | 62.55 NO_GO ✅ | 83.40 NO_GO ✅ | 70.60 NO_GO ✅ |
+| S17 | SMARTPARK | NO_GO | 36.40 NO_GO ✅ | 48.53 NO_GO ✅ | 40.53 NO_GO ✅ |
+| S18 | SCALEUP | NO_GO | 37.25 NO_GO ✅ | 49.67 NO_GO ✅ | 42.47 NO_GO ✅ |
+| S19 | NETSUPP | NO_GO | 60.40 NO_GO ✅ | 80.53 GO ❌ | 70.13 NO_GO ✅ |
+| S20 | BIOPACK | NO_GO | 40.96 NO_GO ✅ | 54.61 NO_GO ✅ | 45.33 NO_GO ✅ |
+
+*Not:* Önceki FO-382 notu (2026-11-05 öncesi) yalnız D varsayımını gösteriyordu; "8 karar değişiyor"
+doğruydu ama koltuk boşken kural bu geçişi geri alır. Mevcut tablo iki varsayımı ayrı verir.
+
+## FO-382 PIC kuralı (2026-11-05): "PIC boşsa kolaylık yok"
+
+Patron kararı: paydadan çıkarma (75) yalnız PIC girilmiş ve o PIC için CORDIS kaydı çıkmamış ortağa
+uygulanır. PIC boş ortak standart hesapta (/100) kalır. Gerekçe: birleşik ağaçta ölçüm
+(`docs/agent-results/FO-384-crw2-fb.md`), PIC kaldırınca partner puanı 53,08'den 69,11'e çıkıyordu.
+
+**Ölçüm.** Ayrı bir betik (repo dışı, `scratchpad`) `computeG0FromSnapshot` ile koştu; DB yok, saf
+hesap. Kullanılan girdi: `Discover` = uyum 100, taban oran %22, bütçe 6 M EUR, lump-sum ve iki aşamalı;
+`sıradan konu` = uyum 60, taban oran %10, aynı bütçe ve bayraklar. Koltuk "dolu" = iki koltuk `INVITED`
+(araştırma + son kullanıcı), "boş" = iki koltuk `OPEN`.
+
+| Senaryo | Puan | Payda | `scoringBasis` | Hariç özellikler | Kapı nedeni |
+|---|---:|---:|---|---|---|
+| Discover, PIC yok, koltuk dolu | 75 | 100 | standard | — | geçer (≥ 70) |
+| Discover, PIC var kayıt yok, koltuk dolu | 100 | 75 | no_history_evidence | coordinatorHistory, networkCentrality | geçer |
+| Discover, PIC yok, koltuk boş | 63 | 100 | standard | — | `G0_SCORE_BELOW` |
+| Discover, PIC var kayıt yok, koltuk boş | 84 | 75 | no_history_evidence | coordinatorHistory, networkCentrality | `G0_NO_HISTORY_NO_FILLED_SEAT` |
+| Sıradan konu, PIC yok, koltuk dolu | 55,5 | 100 | standard | — | `G0_SCORE_BELOW` |
+| Sıradan konu, PIC var kayıt yok, koltuk dolu | 74 | 75 | no_history_evidence | coordinatorHistory, networkCentrality | `G0_ALIGNMENT_BELOW` |
+
+**Okuma.**
+- PIC kaldırmak puanı yükseltmez: Discover 100 → 75, sıradan konu 74 → 55,5. Patron şartı sağlanır.
+- PIC'siz ortak, iki koltuk dolu ise Discover'da 75 ile **geçer**. Dolu koltuk sert kuralı (K-576980)
+  PIC'siz ortağa uygulanmaz, çünkü kural yalnız geçmişsiz (PIC'li, kaydı yok) ortağa bağlı. Yeni bir kural
+  eklenmedi. Karar lidere: PIC'siz dolu koltuklu ortak geçsin mi?
+- Sıradan konu PIC'siz dolu koltukla 55,5 alır ve geçmez. Bu, eski `/100` tabanındaki 55 ile aynı.
+
+**Tabloya göre sert kuralın PIC'siz ortağa etkisi.** `no_history` sert kuralı (`G0_NO_HISTORY_NO_FILLED_SEAT`)
+PIC'siz ortakta hiç tetiklenmez. Boş koltukta PIC'siz ortak `G0_SCORE_BELOW` ile düşer; kural değil puan
+belirler.
+
+**Açık risk (kod yazılmadı).** Kayıtsız bir PIC numarası yazan ortak kolaylık alır, çünkü PIC beyana dayanır
+ve CORDIS'te olup olmadığı doğrulanmaz. Reddedilen PIC'siz ortağa ekranda ne görüneceği FE işidir (FO-391).
+`scoringBasis` değerleri: `standard` (PIC yok ya da CORDIS dolu ve kayıt var) ve `no_history_evidence`
+(PIC var, kayıt yok).
