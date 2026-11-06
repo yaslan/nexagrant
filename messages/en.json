@@ -359,6 +359,7 @@
     "G0_ALIGNMENT_BELOW": "Strategic alignment is {value}; the minimum is {min}.",
     "G0_BASE_RATE_BELOW": "Base success rate is {value}%; the minimum is {min}%.",
     "G0_COUNTRY_NOT_ELIGIBLE": "The country is not eligible for this call.",
+    "G0_NO_HISTORY_NO_FILLED_SEAT": "A partner with no history needs at least one filled seat (candidate, invited or confirmed).",
     "G1_G0_NOT_DECIDED": "G0 has not been passed: no G0 decision is on file for this opportunity.",
     "G1_G0_LAST_FAILED": "G0 does not count as passed: its latest decision is a refusal. Run the G0 gate again.",
     "G1_NO_CRITICAL_SEAT": "Consortium check failed: no critical role is defined for this opportunity.",

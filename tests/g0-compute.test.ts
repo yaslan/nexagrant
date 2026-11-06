@@ -34,7 +34,7 @@ function snapshotWithEvidence(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
     baseRatePct: 14,
     intendedRole: 'coordinator',
     seats: [{ roleKey: 'research', status: 'CONFIRMED' }],
-    cordis: { coordinationsInTopicFamily: 1, coordinationsOverall: 2, distinctCollaborators: 10 },
+    cordis: { coordinationsInTopicFamily: 1, coordinationsOverall: 2, distinctCollaborators: 10, participationsOverall: 3 },
     ...overrides,
   };
 }
@@ -62,6 +62,8 @@ interface FakeDb {
   collaborators?: { organisationId: string }[];
   opportunities?: { id: string; tenantId: string; topicId: string | null; intendedRole: string | null }[];
   seats?: { roleKey: string; status: string }[];
+  /** `true` simulates a CORDIS table with no rows at all (not imported yet). */
+  cordisTableEmpty?: boolean;
 }
 
 /**
@@ -107,6 +109,7 @@ function fakeClient(db: FakeDb) {
       findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) =>
         'projectId' in where ? (db.collaborators ?? []) : (db.participations ?? []),
       ),
+      findFirst: vi.fn(async () => (db.cordisTableEmpty ? null : { projectId: 'any' })),
     },
     opportunity: {
       findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) =>
@@ -162,6 +165,17 @@ describe('computeG0FromSnapshot()', () => {
     expect(computation.reasons.join(' ')).toContain('no scoring evidence');
   });
 
+  // FO-382 review B2: a seat that is only OPEN or DECLINED is not evidence of anything. With no
+  // topic and no CORDIS record the only thing left is that seat, so the answer is no evidence, not
+  // a measured 0 (which would print a score and count towards coverage).
+  it.each(['OPEN', 'DECLINED'])('gives G0_NO_EVIDENCE when the only seat is %s and nothing else is known', (status) => {
+    const snapshot = { ...emptySnapshot(), intendedRole: 'coordinator', seats: [{ roleKey: 'research', status }] };
+    const c = computeG0FromSnapshot('t1', subject, snapshot);
+    expect(c.coverage).toBe(0);
+    expect(c.score).toBeNull();
+    expect(c.reasonDetails[0]?.code).toBe('G0_NO_EVIDENCE');
+  });
+
   it('honours tenant weights', () => {
     const snapshot = snapshotWithEvidence({ topicFitScore: 100, baseRatePct: 0 });
     const withDefaults = computeG0FromSnapshot('t1', subject, snapshot);
@@ -170,6 +184,47 @@ describe('computeG0FromSnapshot()', () => {
       alignment: 90,
     });
     expect(alignmentHeavy.score!).toBeGreaterThan(withDefaults.score!);
+  });
+
+  it('scores a no-history partner over the 75-point denominator with default weights (FO-382, Ö1)', () => {
+    const snapshot = snapshotWithEvidence({
+      intendedRole: 'partner',
+      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
+      seats: [{ roleKey: 'research', status: 'INVITED' }],
+    });
+    const c = computeG0FromSnapshot('t1', subject, snapshot);
+    expect(c.scoringBasis).toBe('no_history_evidence');
+    expect(c.excludedFeatures).toEqual(['coordinatorHistory', 'networkCentrality']);
+    expect(c.denominator).toBe(75);
+    // (30·90 + 15·70 + 12·50 + 10·100 + 8·100) / 75 = 6150 / 75 = 82
+    expect(c.score).toBeCloseTo(82, 5);
+  });
+
+  it('keeps the same score when every weight doubles: denominator 150, score unchanged (FO-382, Ö1)', () => {
+    const snapshot = snapshotWithEvidence({
+      intendedRole: 'partner',
+      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
+      seats: [{ roleKey: 'research', status: 'INVITED' }],
+    });
+    const doubled = Object.fromEntries(
+      Object.entries(DEFAULT_SCORING_WEIGHTS).map(([k, v]) => [k, v * 2]),
+    ) as typeof DEFAULT_SCORING_WEIGHTS;
+    const c = computeG0FromSnapshot('t1', subject, snapshot, doubled);
+    expect(c.denominator).toBe(150);
+    // (30·90 + 15·70 + 12·50 + 10·100 + 8·100) / 75 = 6150 / 75 = 82
+    expect(c.score).toBeCloseTo(82, 5);
+  });
+
+  it('gives 0 over an empty denominator when only the excluded features carry weight (FO-382, Ö1)', () => {
+    const snapshot = snapshotWithEvidence({
+      intendedRole: 'partner',
+      cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
+      seats: [{ roleKey: 'research', status: 'INVITED' }],
+    });
+    const onlyExcluded = { ...DEFAULT_SCORING_WEIGHTS, alignment: 0, baseRate: 0, researchAndEndUser: 0, budgetRoleEconomy: 0, lumpSumTwoStage: 0 };
+    const c = computeG0FromSnapshot('t1', subject, snapshot, onlyExcluded);
+    expect(c.denominator).toBe(0);
+    expect(c.score).toBe(0);
   });
 
   it('is deterministic across repeated runs', () => {
@@ -342,12 +397,63 @@ describe('loadG0Snapshot()', () => {
     expect(snapshot.baseRatePct).toBe(17);
   });
 
-  it('reports no CORDIS history when the tenant has no PIC, instead of scoring one', async () => {
-    const { client } = fakeClient({ tenant: { country: 'DE', pic: null }, topics: [topicRow] });
+  it('a PIC with no CORDIS row is a measured "no record" for the partner (FO-382)', async () => {
+    const { client } = fakeClient({ tenant: { country: 'DE', pic: 'PIC-NEW' }, topics: [topicRow] });
     const snapshot = await loadG0Snapshot(client, 'tenant-1', {
       opportunityId: 'opp-1',
       topicId: 'topic-1',
-      intendedRole: 'coordinator',
+      intendedRole: 'partner',
+      seats: [],
+    });
+    expect(snapshot.cordis).toEqual({
+      coordinationsInTopicFamily: 0,
+      coordinationsOverall: 0,
+      distinctCollaborators: 0,
+      participationsOverall: 0,
+    });
+  });
+
+  // Patron 05.11: "PIC boşsa kolaylık yok". Without a PIC there is no organisation to look up, so
+  // the record is absent, not empty: every role keeps the standard basis (FO-382 review, PIC rule).
+  it.each([['partner'], ['coordinator'], [null]])(
+    'no PIC stays missing for intendedRole=%s: cordis is null, never a measured "no record"',
+    async (role) => {
+      const { client } = fakeClient({ tenant: { country: 'DE', pic: null }, topics: [topicRow] });
+      const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+        opportunityId: 'opp-1',
+        topicId: 'topic-1',
+        intendedRole: role,
+        seats: [],
+      });
+      expect(snapshot.cordis).toBeNull();
+    },
+  );
+
+  it('a PIC with an empty CORDIS table is missing data, not a measured "no record"', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: 'PIC-NEW' },
+      topics: [topicRow],
+      cordisTableEmpty: true,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1',
+      topicId: 'topic-1',
+      intendedRole: 'partner',
+      seats: [],
+    });
+    expect(snapshot.cordis).toBeNull();
+  });
+
+  it('no PIC and an empty CORDIS table is missing data: cordis stays null, the standard basis holds', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: null },
+      topics: [topicRow],
+      cordisTableEmpty: true,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1',
+      topicId: 'topic-1',
+      intendedRole: 'partner',
       seats: [],
     });
     expect(snapshot.cordis).toBeNull();
@@ -374,6 +480,37 @@ describe('loadG0Snapshot()', () => {
       coordinationsInTopicFamily: 1,
       coordinationsOverall: 2,
       distinctCollaborators: 2,
+      participationsOverall: 3,
+    });
+  });
+
+  it('reports missing CORDIS data (null), not a zero history, when the CORDIS table is empty (FO-382)', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: 'PIC-1' },
+      topics: [topicRow],
+      cordisTableEmpty: true,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1', topicId: 'topic-1', intendedRole: 'partner', seats: [],
+    });
+    expect(snapshot.cordis).toBeNull();
+  });
+
+  it('reports a measured empty history for a PIC with no row while the table has data (FO-382)', async () => {
+    const { client } = fakeClient({
+      tenant: { country: 'DE', pic: 'PIC-NEW' },
+      topics: [topicRow],
+      participations: [],
+      cordisTableEmpty: false,
+    });
+    const snapshot = await loadG0Snapshot(client, 'tenant-1', {
+      opportunityId: 'opp-1', topicId: 'topic-1', intendedRole: 'partner', seats: [],
+    });
+    expect(snapshot.cordis).toEqual({
+      coordinationsInTopicFamily: 0,
+      coordinationsOverall: 0,
+      distinctCollaborators: 0,
+      participationsOverall: 0,
     });
   });
 });
