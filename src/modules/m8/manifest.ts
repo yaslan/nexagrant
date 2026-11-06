@@ -34,7 +34,8 @@ export const m8Manifest: ModuleManifest = {
   tables: ['ConsortiumSeat', 'SeatCandidate', 'TopicMatch'],
   isActive: true,
   category: 'ai',
-  stages: ['G2'], // Patron onayı K-563625 (2026-10-17)
+  // G1's consortium check reads this module's seats (src/lib/gates/evaluate.ts).
+  stages: ['G1', 'G2'], // Patron onayı K-563625 (2026-10-17), G1 eklendi K-577631 (2026-11-06)
   statusBadge: 'ga',
   docsUrl: null,
   quota: null,
