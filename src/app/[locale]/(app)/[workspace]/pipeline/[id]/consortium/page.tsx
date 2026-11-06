@@ -1,5 +1,5 @@
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { canConfirmSeat } from '@/modules/m8/server/seat-transitions';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -55,7 +55,8 @@ interface ConsortiumOpportunity {
  * candidates were never tenant-scoped at all.
  *
  * It now follows the same rule as `./actions.ts`: the tenant comes from
- * `requireTenantPage()` (no fallback — anonymous visitors are redirected) and
+ * `requireTenantPageRole()` (no fallback — anonymous visitors are redirected, a role
+ * without `view_proposal` gets 403) and
  * every query runs inside `withTenant`, matched on `(id, tenantId)`.
  */
 export default async function ConsortiumPage({
@@ -66,7 +67,7 @@ export default async function ConsortiumPage({
   const { id, locale, workspace } = await params;
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
-  const { tenantId, role } = await requireTenantPage(locale);
+  const { tenantId, role } = await requireTenantPageRole(locale, 'view_proposal');
 
   const isTr = locale === 'tr';
 

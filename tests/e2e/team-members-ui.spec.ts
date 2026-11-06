@@ -260,19 +260,20 @@ test.describe('Settings → Members: team management UI', () => {
     expect(await membershipCount()).toBe(before - 1);
   });
 
-  test('MEMBER is refused: no team list, invite is a 403 and writes nothing', async ({ page }) => {
+  test('MEMBER is refused: the page is a 403, invite is a 403 and writes nothing', async ({ page }) => {
     const email = inviteEmail('member');
-    await openMembers(page, MEMBER);
-
-    await expect(page.getByRole('alert').filter({ hasText: 'Ekip listesini yalnızca kurum sahibi veya yöneticisi görebilir' })).toBeVisible();
+    // NG-64: the page itself is behind `manage_users` on the server now, so a
+    // MEMBER gets the 403 screen instead of the form with an in-page refusal.
+    await signInAs(page, claims(MEMBER));
+    const res = await page.goto(PATH);
+    expect(res?.status()).toBe(403);
+    await expect(page.getByRole('heading', { name: 'Bu sayfaya erişiminiz yok' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Yeni Üye Davet Et' })).toHaveCount(0);
     await expect(page.getByRole('list', { name: 'Aktif ekip üyeleri' })).toHaveCount(0);
 
     const apiPost = await page.request.post('/api/invitations', { data: { email, role: 'MEMBER' } });
     expect(apiPost.status()).toBe(403);
     expect((await page.request.get('/api/team')).status()).toBe(403);
-
-    await invite(page, email);
-    await expect(page.getByRole('alert').filter({ hasText: /yetkiniz yok|izniniz yok|permission/i })).toBeVisible();
     expect(await invitationsOf(email)).toHaveLength(0);
     await page.screenshot({ path: `${SHOTS}/06-member-refused.png`, fullPage: true });
   });

@@ -352,3 +352,58 @@ describe('real flows, fake transaction', () => {
     });
   });
 });
+
+/**
+ * NG-64 review R-1 (K-577556): `listPanelScores` is a server action, so a guest
+ * reviewer can call it straight from the browser. Its rows are panel-wide
+ * averages built from every reviewer's marks; a role without `view_proposal`
+ * is refused before any read, whatever the page shows.
+ */
+describe('m6.listPanelScores is a view_proposal read (review R-1)', () => {
+  test('follows rbac.ts for all six roles, refused before the transaction', async () => {
+    const seen: Record<string, 'forbidden' | 'passed'> = {};
+    for (const role of ROLES) {
+      vi.clearAllMocks();
+      m.withTenant.mockImplementation(reached);
+      m.session = sessionFor(role);
+      seen[role] = await gateOutcome(() => m6.listPanelScores('prop-1'));
+      if (seen[role] === 'forbidden') expect(m.withTenant, role).not.toHaveBeenCalled();
+      else expect(m.withTenant, role).toHaveBeenCalledTimes(1);
+    }
+    expect(seen).toEqual(Object.fromEntries(ROLES.map((r) => [r, can(r, 'view_proposal') ? 'passed' : 'forbidden'])));
+    expect(seen.GUEST_PARTNER).toBe('forbidden');
+  });
+});
+
+/**
+ * NG-64 review 3 E-1 (K-577556): `saveEvaluation` is open to a guest reviewer
+ * (`contribute_assigned`, own seat), but the `avgScore` it hands back is the
+ * panel-wide average, built from every seated reviewer's marks. The browser
+ * receives the return value whatever the form does with it, so only a role
+ * that reads the panel (`view_proposal`) gets the number; every other role
+ * gets null.
+ */
+describe('m6.saveEvaluation hands the panel average to view_proposal only (review 3 E-1)', () => {
+  const PANEL_AVG = 4.37;
+
+  test('follows rbac.ts for all six roles: the average, or null', async () => {
+    const seen: Record<string, number | null> = {};
+    for (const role of ROLES) {
+      vi.clearAllMocks();
+      // The transaction body is the save itself; here it stands for "the save ran
+      // and the recomputed panel average is 4.37".
+      m.withTenant.mockImplementation(async () => PANEL_AVG);
+      m.session = sessionFor(role);
+      const result = await m6.saveEvaluation({
+        evaluationId: 'eval-1',
+        proposalId: 'prop-1',
+        scores: { Innovation: 3 },
+      });
+      expect(m.withTenant, role).toHaveBeenCalledTimes(1);
+      seen[role] = result.avgScore;
+    }
+    expect(seen).toEqual(Object.fromEntries(ROLES.map((r) => [r, can(r, 'view_proposal') ? PANEL_AVG : null])));
+    expect(seen.GUEST_PARTNER).toBeNull();
+    expect(seen.MEMBER).toBe(PANEL_AVG);
+  });
+});
