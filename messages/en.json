@@ -1167,6 +1167,28 @@
           "forbiddenRole": "Only an owner or admin can see the team list.",
           "loadFailed": "The team list could not be loaded."
         }
+      },
+      "page": {
+        "title": "Team Members",
+        "inviteHeading": "Invite new member",
+        "emailLabel": "Email Address",
+        "emailPlaceholder": "colleague@example.com",
+        "roleLabel": "Role",
+        "roleMember": "Member",
+        "roleWriter": "Writer",
+        "rolePipelineManager": "Pipeline Manager",
+        "roleTenantAdmin": "Tenant Admin",
+        "roleTenantOwner": "Tenant Owner",
+        "sending": "Sending...",
+        "submit": "Send Invite",
+        "sendFailed": "Failed to send invite",
+        "errorPrefixed": "Error: {message}",
+        "dailyLimitNotSent": "Your organisation's daily invitation email limit is reached, so no email was sent. Share this link yourself",
+        "notSent": "Invitation created but the email could not be sent; share this link yourself",
+        "notSentWithLink": "{notSent}: {link}",
+        "roleChangeBlocked": "The invitation was sent a moment ago; to change the role, invite again in 10 minutes",
+        "recentlySent": "The invitation email was sent a moment ago; the invitee can use the link in that email",
+        "emailSentWithLink": "Invitation email sent. Link: {link}"
       }
     }
   },

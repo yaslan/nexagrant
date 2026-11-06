@@ -1167,6 +1167,28 @@
           "forbiddenRole": "Ekip listesini yalnızca kurum sahibi veya yöneticisi görebilir.",
           "loadFailed": "Ekip listesi yüklenemedi."
         }
+      },
+      "page": {
+        "title": "Ekip Üyeleri & Yetkilendirme",
+        "inviteHeading": "Yeni Üye Davet Et",
+        "emailLabel": "E-posta Adresi",
+        "emailPlaceholder": "meslektas@kurum.com",
+        "roleLabel": "Kullanıcı Rolü & Yetkisi",
+        "roleMember": "Üye (Okuma & Katkı)",
+        "roleWriter": "Teklif Yazarı (Writer)",
+        "rolePipelineManager": "Pipeline Yöneticisi",
+        "roleTenantAdmin": "Kurum Yöneticisi (Admin)",
+        "roleTenantOwner": "Kurum Sahibi (Owner)",
+        "sending": "Gönderiliyor...",
+        "submit": "Davet Gönder",
+        "sendFailed": "Davet gönderilemedi",
+        "errorPrefixed": "Hata: {message}",
+        "dailyLimitNotSent": "Kurumunuzun günlük davet e-postası sınırına ulaşıldı; e-posta gönderilmedi. Bağlantıyı elle iletin",
+        "notSent": "Davet oluşturuldu ancak e-posta gönderilemedi; bağlantıyı elle iletin",
+        "notSentWithLink": "{notSent}: {link}",
+        "roleChangeBlocked": "Davet az önce gönderildi; rolü değiştirmek için 10 dakika sonra yeniden davet edin",
+        "recentlySent": "Davet e-postası az önce gönderildi; davetli e-postadaki bağlantıyı kullanabilir",
+        "emailSentWithLink": "Davet e-postası gönderildi. Bağlantı: {link}"
       }
     }
   },
