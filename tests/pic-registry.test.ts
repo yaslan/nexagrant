@@ -163,6 +163,11 @@ describe('FO-396 fail-closed: no address, no call (fetch spy must see zero calls
     expect(resolvePicRegistryUrl({ url: 'https://evil.example/x', nodeEnv: 'production' })).toBeNull();
   });
 
+  it('FO-396 Ö2: the local-address test flag is refused in production (a stray env flag cannot point the check at 127.0.0.1)', () => {
+    expect(resolvePicRegistryUrl({ url: STUB, allowLocal: true, nodeEnv: 'production' })).toBeNull();
+    expect(resolvePicRegistryUrl({ url: STUB, allowLocal: true, nodeEnv: 'test' })).toBe(STUB);
+  });
+
   it('the four answers the register can give, each from a stub (FOUND, NOT_FOUND, UNKNOWN, and the unchecked null)', async () => {
     const found = (async () => json({ publicOrganizationData: { legalName: 'ACME' } })) as typeof fetch;
     const notFound = (async () => json({ publicOrganizationData: { legalName: null } })) as typeof fetch;

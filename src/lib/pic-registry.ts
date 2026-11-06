@@ -68,7 +68,15 @@ export function resolvePicRegistryUrl(source: PicRegistrySettings = settingsFrom
   if (source.off) return null;
   const candidate = source.url ?? (source.nodeEnv === 'production' ? PIC_REGISTRY_DEFAULT_URL : null);
   if (candidate === null) return null;
-  return isAllowedRegistryUrl(candidate, source.allowLocal === true) ? candidate : null;
+  return isAllowedRegistryUrl(candidate, localAllowed(source)) ? candidate : null;
+}
+
+/**
+ * The local-address test flag (FO-396 Ö2). Never honoured in production: a stray
+ * PIC_REGISTRY_ALLOW_LOCAL=true on the live server would otherwise point the check at 127.0.0.1.
+ */
+function localAllowed(source: PicRegistrySettings): boolean {
+  return source.allowLocal === true && source.nodeEnv !== 'production';
 }
 
 /** Five seconds: the save waits for this, so a slow register must not hold the form. */
@@ -150,7 +158,9 @@ export async function checkPicRegistry(pic: string, deps: PicRegistryDeps = {}):
   if (settings.off) return { status: 'UNKNOWN', reason: 'disabled' };
   const base = deps.baseUrl ?? resolvePicRegistryUrl(settings);
   if (base === null) return { status: 'UNKNOWN', reason: 'disabled' };
-  if (!isAllowedRegistryUrl(base, deps.allowLocal ?? settings.allowLocal === true)) return { status: 'UNKNOWN', reason: 'host_not_allowed' };
+  if (!isAllowedRegistryUrl(base, localAllowed({ ...settings, allowLocal: deps.allowLocal ?? settings.allowLocal }))) {
+    return { status: 'UNKNOWN', reason: 'host_not_allowed' };
+  }
 
   const doFetch = deps.fetch ?? fetch;
   const timeoutMs = deps.timeoutMs ?? PIC_REGISTRY_TIMEOUT_MS;
