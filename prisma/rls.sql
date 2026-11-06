@@ -13,7 +13,8 @@ BEGIN
     'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','Consent',
     'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage',
-    'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark'
+    'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark',
+    'OrgReadiness','InternalApproval','PartnerBudgetShare'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
