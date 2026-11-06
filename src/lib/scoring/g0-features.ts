@@ -68,7 +68,36 @@ export interface G0CordisSnapshot {
   coordinationsOverall: number;
   /** Distinct organisations the tenant has ever shared a project with. */
   distinctCollaborators: number;
+  /**
+   * CORDIS participations of any role. `0` means the PIC has no CORDIS record at all, which is a
+   * measured fact ("no history"), not missing data. Missing data is `G0CordisSnapshot = null`.
+   */
+  participationsOverall: number;
 }
+
+/**
+ * Seat statuses that count as FILLED: a named candidate, invitee or confirmed organisation sits on
+ * the seat. `OPEN` (nobody yet) and `DECLINED` (left) are not filled. This is the one place the set
+ * is written down; the scorer and the no-history gate both derive from it.
+ */
+export const FILLED_SEAT_STATUSES = ['CANDIDATE', 'INVITED', 'CONFIRMED'] as const;
+const FILLED_SEAT_STATUS_SET: ReadonlySet<string> = new Set<string>(FILLED_SEAT_STATUSES);
+
+/**
+ * True when the seat's status says it is taken (see `FILLED_SEAT_STATUSES`). Only the status is
+ * read here: the seat's organisation is not checked.
+ */
+export function isFilledSeat(seat: { status: string }): boolean {
+  return FILLED_SEAT_STATUS_SET.has(seat.status.trim().toUpperCase());
+}
+
+/**
+ * Features dropped from the denominator when a partner has no CORDIS history at all (FO-382,
+ * patron decision K-576759 = A). Both depend only on CORDIS participation, so with no history they
+ * can never be earned by the organisation; leaving them in the denominator would make every new
+ * partner fail the threshold for a reason it cannot change.
+ */
+export const NO_HISTORY_EXCLUDED_FEATURES = ['coordinatorHistory', 'networkCentrality'] as const;
 
 export interface G0Snapshot {
   tenant: G0TenantSnapshot;
@@ -111,6 +140,19 @@ export interface G0Extraction {
    * the fabricated number this task exists to remove, so callers must refuse to store one.
    */
   coverage: number;
+  /**
+   * Features left out of the denominator because the rule for "no CORDIS history on a partner"
+   * applies. Empty on the standard path.
+   */
+  excludedFeatures: (keyof G0Features)[];
+  /**
+   * `standard` — the seven-feature composite as before. `no_history_evidence` — a partner with no
+   * CORDIS record, scored without the two CORDIS-only features. Stored with the score so a reader
+   * can tell which denominator produced it.
+   */
+  scoringBasis: 'standard' | 'no_history_evidence';
+  /** Seats whose status is filled (see `FILLED_SEAT_STATUSES`); the no-history gate reads it. */
+  filledSeats: number;
 }
 
 // ───────────────────────── helpers ─────────────────────────
@@ -277,11 +319,21 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
     record('baseRatePct', 'TopicStat.successRate', 'measured', baseRatePct, `${baseRatePct}% historical success rate`);
   }
 
+  // A partner with no CORDIS record at all: the two CORDIS-only features leave the denominator
+  // (see NO_HISTORY_EXCLUDED_FEATURES). Only a measured "no history" qualifies; missing CORDIS data
+  // (`cordis === null`) keeps the standard scoring, so an outage cannot silently change the basis.
+  const excludedFeatures: (keyof G0Features)[] = isNoHistoryPartner(snapshot)
+    ? [...NO_HISTORY_EXCLUDED_FEATURES]
+    : [];
+  const excluded = (feature: keyof G0Features): boolean => excludedFeatures.includes(feature);
+
   // 3 — coordinator history (weight 15). A coordination inside the same call family is the strong
   // signal; coordinating anything at all is worth at most half marks.
   let coordinatorHistory = 0;
   if (snapshot.cordis === null) {
     record('coordinatorHistory', 'CordisParticipation', 'missing', 0, 'tenant has no PIC, or CORDIS is not imported');
+  } else if (excluded('coordinatorHistory')) {
+    record('coordinatorHistory', 'CordisParticipation', 'measured', 0, 'partner with no CORDIS record: feature excluded from the denominator');
   } else {
     const inFamily = ramp(snapshot.cordis.coordinationsInTopicFamily, 0, 3);
     const overall = ramp(snapshot.cordis.coordinationsOverall, 0, 6) * 0.5;
@@ -295,20 +347,32 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
     );
   }
 
-  // 4 — research + end user (weight 12). Read off the consortium seats that are actually being
-  // pursued; a DECLINED seat is not a partner.
+  // 4 — research + end user (weight 12). Read off the consortium seats that have a named
+  // organisation on them. An OPEN seat has no partner yet and a DECLINED one has left; neither
+  // scores (FO-382: an open seat used to earn the full 12 points).
+  // No filled seat (none defined, or only OPEN / DECLINED ones) is missing evidence, not a measured
+  // zero: it leaves the coverage, so a snapshot with nothing else on it reads as no evidence
+  // (FO-382 review, B2). The score is 0 in both cases.
   let researchAndEndUser = 0;
-  const liveSeats = snapshot.seats.filter((s) => s.status.toUpperCase() !== 'DECLINED');
-  if (liveSeats.length === 0) {
-    record('researchAndEndUser', 'ConsortiumSeat.roleKey', 'missing', 0, 'no consortium seats defined yet');
+  const scoring = snapshot.seats.filter(isFilledSeat);
+  if (scoring.length === 0) {
+    record(
+      'researchAndEndUser',
+      'ConsortiumSeat.roleKey (status CANDIDATE/INVITED/CONFIRMED)',
+      'missing',
+      0,
+      snapshot.seats.length === 0
+        ? 'no consortium seats defined yet'
+        : 'no seat has a named organisation yet (OPEN and DECLINED do not count)',
+    );
   } else {
-    const roles = new Set(liveSeats.map((s) => s.roleKey.trim().toLowerCase()));
+    const roles = new Set(scoring.map((s) => s.roleKey.trim().toLowerCase()));
     const hasResearch = roles.has('research');
     const hasEndUser = roles.has('end_user');
     researchAndEndUser = (hasResearch ? 50 : 0) + (hasEndUser ? 50 : 0);
     record(
       'researchAndEndUser',
-      'ConsortiumSeat.roleKey',
+      'ConsortiumSeat.roleKey (status CANDIDATE/INVITED/CONFIRMED)',
       'measured',
       researchAndEndUser,
       `research seat: ${hasResearch}, end-user seat: ${hasEndUser}`,
@@ -320,6 +384,8 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
   let networkCentrality = 0;
   if (snapshot.cordis === null) {
     record('networkCentrality', 'CordisParticipation', 'missing', 0, 'tenant has no PIC, or CORDIS is not imported');
+  } else if (excluded('networkCentrality')) {
+    record('networkCentrality', 'CordisParticipation co-participants', 'measured', 0, 'partner with no CORDIS record: feature excluded from the denominator');
   } else {
     networkCentrality = ramp(snapshot.cordis.distinctCollaborators, 0, 25);
     record(
@@ -386,13 +452,51 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
     lumpSumTwoStage,
   };
 
-  const totalWeight = FEATURE_KEYS.reduce((sum, key) => sum + (DEFAULT_SCORING_WEIGHTS[key] ?? 0), 0);
-  const measuredWeight = [...measured].reduce((sum, key) => sum + (DEFAULT_SCORING_WEIGHTS[key] ?? 0), 0);
+  // Coverage is over the features that are actually scored: an excluded feature is neither
+  // measured nor missing, it is not part of the question.
+  const scoredKeys = FEATURE_KEYS.filter((key) => !excluded(key));
+  const totalWeight = scoredKeys.reduce((sum, key) => sum + (DEFAULT_SCORING_WEIGHTS[key] ?? 0), 0);
+  const measuredWeight = [...measured]
+    .filter((key) => !excluded(key))
+    .reduce((sum, key) => sum + (DEFAULT_SCORING_WEIGHTS[key] ?? 0), 0);
+
+  // Hard rule (FO-382, patron): a partner with no CORDIS history must have at least one FILLED seat.
+  // Only the no-history basis triggers it; the standard and coordinator paths never see it.
+  const filledSeats = snapshot.seats.filter(isFilledSeat).length;
+  const scoringBasis: G0Extraction['scoringBasis'] = excludedFeatures.length > 0 ? 'no_history_evidence' : 'standard';
 
   return {
     features,
-    facts: { baseRatePct: baseRatePct ?? 0, countryEligible: eligibility.eligible },
+    facts: {
+      baseRatePct: baseRatePct ?? 0,
+      countryEligible: eligibility.eligible,
+      noHistoryWithoutFilledSeat: scoringBasis === 'no_history_evidence' && filledSeats === 0,
+    },
     sources,
     coverage: totalWeight > 0 ? round2(measuredWeight / totalWeight) : 0,
+    excludedFeatures,
+    scoringBasis,
+    filledSeats,
   };
+}
+
+/**
+ * The rule's condition, kept apart so it can be read and tested on its own: the intended role is
+ * "partner" (`ortak`), the snapshot came from a real CORDIS lookup, and that lookup found no
+ * participation of any role. An unset role (`null`) and the coordinator role never qualify.
+ *
+ * "A real lookup" means the tenant entered a PIC and CORDIS is loaded: `loadCordisSnapshot` returns
+ * `null` for a missing PIC or an empty table (FO-382, patron 05.11: "PIC boşsa kolaylık yok"), so a
+ * non-null `cordis` here always implies a PIC.
+ */
+export function isNoHistoryPartner(snapshot: Pick<G0Snapshot, 'intendedRole' | 'cordis'>): boolean {
+  return isPartnerRole(snapshot.intendedRole) && snapshot.cordis !== null && snapshot.cordis.participationsOverall === 0;
+}
+
+/**
+ * The one place that decides whether an intended role is the partner ("ortak") role. Case and
+ * surrounding spaces are ignored; anything else, including an unset role, is not a partner.
+ */
+export function isPartnerRole(intendedRole: string | null): boolean {
+  return (intendedRole ?? '').trim().toLowerCase() === 'partner';
 }

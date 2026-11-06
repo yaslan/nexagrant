@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Gate } from '@prisma/client';
 
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { computeG0ForOpportunity } from '@/lib/scoring/g0-compute';
 import type { G0Computation } from '@/lib/scoring/g0-compute';
 import { DEFAULT_GATE_RULES } from '@/lib/scoring/defaults';
@@ -60,7 +60,7 @@ export default async function OpportunityDetailPage({
   const { locale, workspace, id } = await params;
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
-  const { tenantId, userId, role } = await requireTenantPage(locale);
+  const { tenantId, userId, role } = await requireTenantPageRole(locale, 'view_proposal');
 
   const loaded = await withTenant<{
     opp: OpportunityRow | null;

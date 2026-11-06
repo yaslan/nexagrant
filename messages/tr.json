@@ -359,6 +359,7 @@
     "G0_ALIGNMENT_BELOW": "Stratejik uyum {value}; asgari eşik {min}.",
     "G0_BASE_RATE_BELOW": "Başarı taban oranı %{value}; asgari eşik %{min}.",
     "G0_COUNTRY_NOT_ELIGIBLE": "Ülke bu çağrı için uygun değil.",
+    "G0_NO_HISTORY_NO_FILLED_SEAT": "Geçmişi olmayan ortakta en az bir koltuk dolu olmalı (aday, davetli ya da onaylı).",
     "G1_G0_NOT_DECIDED": "G0 kapısı henüz geçilmedi: bu fırsat için kayıtlı G0 kararı yok.",
     "G1_G0_LAST_FAILED": "G0 kapısı geçilmiş sayılmıyor: son kararı olumsuz. G0 kapısını yeniden çalıştırın.",
     "G1_NO_CRITICAL_SEAT": "Konsorsiyum denetimi geçilemedi: bu fırsat için tanımlı kritik rol yok.",
@@ -3121,7 +3122,7 @@
   },
   "Forbidden": {
     "title": "Bu sayfaya erişiminiz yok",
-    "description": "Bu sayfa yalnız kalkınma ajansı hesaplarının üyelerine açıktır. Erişim gerektiğini düşünüyorsanız kurum yöneticinize başvurun.",
+    "description": "Hesabınızın rolü ya da hesap türü bu sayfayı açmaya izin vermiyor. Erişim gerektiğini düşünüyorsanız kurum yöneticinize başvurun.",
     "backHome": "Ana Sayfaya Dön"
   },
   "agency": {
@@ -3755,6 +3756,7 @@
     "trlMaxLabel": "Maksimum TRL (Teknoloji Hazırlık Seviyesi)",
     "trlMaxDescription": "Çağrı filtrelerinde hedeflenen tavan seviye",
     "successMessage": "Kurumsal profil başarıyla güncellendi.",
+    "noChangesMessage": "Değişiklik yok, kaydedilecek bir şey bulunmadı. Alanlar kayıtlı son profili gösteriyor.",
     "picLabel": "PIC (Katılımcı Kimlik Kodu)",
     "picPlaceholder": "ör. 999999999",
     "picHelper": "İsteğe bağlı. Kurumunuzun 9 haneli AB kodu; <register>Katılımcı Kaydı</register>'nda kurum adınızla aratarak bulabilirsiniz. CORDIS'teki proje geçmişiniz G0 puanının koordinatörlük ve ağ ölçütlerinde bu kodla okunur.",
@@ -3770,7 +3772,8 @@
     "picClearedNotice": "PIC kaldırıldı. G0 puanında koordinatörlük ve ağ geçmişi artık kullanılmaz.",
     "errorForbidden": "Bu işlem için yetkiniz yok",
     "errorInvalid": "Lütfen tüm alanları doğru şekilde doldurun",
-    "errorTrlConflict": "Kaydedilmedi. Başka biri TRL aralığını {min}–{max} olarak değiştirdi; girdiğiniz {typedMin}–{typedMax} bununla çelişiyor. TRL alanları güncel değere döndü, yazdığınız diğer bilgiler duruyor. Kontrol edip yeniden kaydedin.",
+    "errorTrlConflict": "Kaydedilmedi. Başka biri TRL aralığını {min}–{max} olarak değiştirdi; girdiğiniz {end, select, min {en düşük TRL değeri {typed}} other {en yüksek TRL değeri {typed}}} bununla çelişiyor. TRL alanları güncel değere döndü, yazdığınız diğer bilgiler duruyor. Kontrol edip yeniden kaydedin.",
+    "errorTrlOrder": "Kaydedilmedi. En düşük TRL ({min}) en yüksek TRL değerinden ({max}) büyük olamaz.",
     "errorFailed": "Profil kaydedilemedi",
     "errorPilotExpired": "Pilot süresi doldu",
     "errorGeneric": "Bir hata oluştu",

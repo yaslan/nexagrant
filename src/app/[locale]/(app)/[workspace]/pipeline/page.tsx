@@ -1,5 +1,5 @@
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import KanbanBoard from './board';
 import { getInMemoryOpportunities, type OpportunityItem } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
@@ -75,7 +75,7 @@ export default async function PipelinePage({
   // No `findFirst()` tenant fallback: an empty `where` on Opportunity returns
   // every tenant's pipeline, and `findFirst()` on Tenant hands the session an
   // arbitrary one.
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let dbOpportunities: OpportunityItem[] = [];
   try {
