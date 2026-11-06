@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { requireActionId } from '@/lib/required-id';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { checkPicRegistry, type PicRegistryDeps, type PicRegistryReason, type PicRegistryResult } from '@/lib/pic-registry';
 
@@ -51,15 +52,18 @@ export async function refreshTenantPicRegistry(
   deps: PicRegistryDeps = {},
   retry?: PicRegistryRetryContext,
 ): Promise<PicRegistryRefresh | null> {
+  // An id that is missing would drop out of the `where` below and match every tenant (see required-id.ts).
+  const tenantKey = requireActionId(tenantId, 'tenantId');
   if (pic === null) {
-    await prisma.tenant.update({ where: { id: tenantId }, data: { picRegistryStatus: null, picRegistryCheckedAt: null } });
+    await prisma.tenant.update({ where: { id: tenantKey }, data: { picRegistryStatus: null, picRegistryCheckedAt: null } });
     return null;
   }
+  const askedPic = requireActionId(pic, 'pic');
 
-  const result = await checkPicRegistry(pic, deps);
+  const result = await checkPicRegistry(askedPic, deps);
   // Conditional on the PIC asked about (FO-396 Ö-A): a PIC saved while the lookup waited is not overwritten.
   const { count } = await prisma.tenant.updateMany({
-    where: { id: tenantId, pic },
+    where: { id: tenantKey, pic: askedPic },
     data: { picRegistryStatus: result.status, picRegistryCheckedAt: new Date() },
   });
   if (count === 0) return { ...result, stored: false };
