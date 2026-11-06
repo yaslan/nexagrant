@@ -70,9 +70,12 @@ const moduleBoundaryBlocks = moduleNames.map((own) => {
       // sits (`../m1/../m9/x`). It also sees dynamic import() and require().
       // In this plugin `target` is the restricted importer (this module) and
       // `from` is the directory it may not import (every other module).
+      // basePath pins zone resolution to this config file, so the guard holds
+      // when eslint runs from a subdirectory (process.cwd() would shift it).
       "import/no-restricted-paths": [
         "error",
         {
+          basePath: import.meta.dirname,
           zones: [
             {
               target: `./src/modules/${own}`,
