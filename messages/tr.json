@@ -360,6 +360,7 @@
     "G0_ALIGNMENT_BELOW": "Stratejik uyum {value}; asgari eşik {min}.",
     "G0_BASE_RATE_BELOW": "Başarı taban oranı %{value}; asgari eşik %{min}.",
     "G0_COUNTRY_NOT_ELIGIBLE": "Ülke bu çağrı için uygun değil.",
+    "G0_NO_HISTORY_NO_FILLED_SEAT": "Geçmişi olmayan ortakta en az bir koltuk dolu olmalı (aday, davetli ya da onaylı).",
     "G1_G0_NOT_DECIDED": "G0 kapısı henüz geçilmedi: bu fırsat için kayıtlı G0 kararı yok.",
     "G1_G0_LAST_FAILED": "G0 kapısı geçilmiş sayılmıyor: son kararı olumsuz. G0 kapısını yeniden çalıştırın.",
     "G1_NO_CRITICAL_SEAT": "Konsorsiyum denetimi geçilemedi: bu fırsat için tanımlı kritik rol yok.",
