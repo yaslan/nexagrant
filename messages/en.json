@@ -3144,7 +3144,7 @@
       "unmeasured": "Not measured yet",
       "smallHint": "Fewer than 5 organisations: the number is hidden so that no organisation can be identified.",
       "smallSr": "fewer than 5; number hidden",
-      "privacyNote": "Numbers shown are rounded to a multiple of 5; each is rounded on its own, so the parts may not add up to the total. <5: this group has fewer than 5 organisations, or the number could be worked out together with other numbers (a total, another type, another province or another step). The value is hidden so that no organisation can be identified.",
+      "privacyNote": "Numbers shown are rounded to a multiple of 10 (a shown 10 is really 5 to 14); each is rounded on its own, so the parts may not add up to the total. <5: this group has fewer than 5 organisations, or the number could be worked out together with other numbers (a total, another type, another province or another step). The value is hidden so that no organisation can be identified.",
       "steps": {
         "registered": {
           "title": "Registered with a code",

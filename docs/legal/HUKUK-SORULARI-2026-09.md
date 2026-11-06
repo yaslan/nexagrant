@@ -71,7 +71,7 @@ Ajansın gerçekte gördüğü bundan geniştir. Metinde şunlar **yok**:
 
 - karne sonucunu hesabına ekleyen kurum sayısı, kayıtlı arama oluşturan ve konsept not üreten kurum sayısı, başvurusu kabul ya da red alan kurum sayısı;
 - sayıların **kurum türüne** ya da **tek bir ile** göre kırılımı;
-- sayıların 5'in katına yuvarlanması;
+- sayıların 10'un katına yuvarlanması (FO-398; önceden 5'in katı);
 - aylık raporun **indirilebilir dosya** olarak ajansta kalması.
 
 "Ajans neyi görmez?" kısmı ise doğrudur (ad, e-posta, kurum adı, karne cevapları, konsept notlar, belgeler, fatura bilgileri gitmez). Bu fark HUKUK-10 sorusunun konusudur (§4.5).
@@ -113,9 +113,9 @@ _Kanıt:_ `messages/tr.json` → `legal` altında "ajans", "kalkınma", "karne",
 3. **Küçük grup hiçbir şey göstermez.** Kayıtlı kurum sayısı gizlenen bir grupta (bir il ya da bir tür) hiçbir adımın sayısı gösterilmez.
 4. **İlini vermeyen kurumlar** ayrı bir grup olarak hiç gösterilmez.
 5. **Tek kırılım.** Ajans bir seferde ya tek bir ilin sayısını ya da kurum türlerine göre dağılımı görür. "Samsun'daki belediyeler" gibi il × tür çapraz tablosu hiç üretilmez.
-6. **5'e yuvarlama.** Gösterilen her sayı en yakın 5'in katına yuvarlanır ("5", gerçekte 5, 6 ya da 7 demektir). Bu yüzden parçaların toplamı toplamı tutmayabilir.
+6. **10'a yuvarlama (FO-398, K-577804; önceden 5).** Gösterilen her sayı en yakın 10'un katına yuvarlanır ("10", gerçekte 5 ile 14 arası demektir). Bu yüzden parçaların toplamı toplamı tutmayabilir.
 7. **Tek, birikimli dönem.** Sayılar, ajansın kodlarıyla bugüne kadar kayıt olmuş bütün kurumları kapsar. "Son 30 gün / son 90 gün" gibi dönem seçimi **yoktur**. Çünkü iki dönemin farkı, arada kayıt olan tek bir kurumu gösterebiliyordu.
-8. **Davet kodu başına kullanım sayısı gösterilmez.** Yeni kodların kullanım sınırı gizlidir (FO-392, K-577268): her kodun gerçek sınırı 500 ile 524 arasında rastgele bir sayıdır, panel yalnız "en az 500" ve "Sınıra ulaştı" der. Sabit bir sınır, sınırına ulaşan kodun tam kullanım sayısını ele veriyordu. Eski kodların sınırı yoktur. **Kalan risk:** sapma yalnız kod dolmadan önce korur. Kodu kendisi ~500 kez kullanan (yeni kod açıp kendisi kayıt yapan) ajans, durum "Sınıra ulaştı"ya dönerken sınırı tam öğrenir; doldurduğu kodların kullanımını kesin bildiği için başka bir kodun kullanımını yuvarlama adımı (yaklaşık ±2) içinde hesaplar. Simülasyonda (birden çok il, hiç kurum silinmedi) 900 tablonun 57 ile 84'ünde (%6,3 ile %9,3; beş koşuda ortalama yaklaşık %8, her koşuda sınırlar rastgele çekildiği için tek bir oran yok) gizli bir 1-4 grubu geri okundu; öteki üç durumda 0/900. Bedeli ~500 gerçek kayıttır ve platformda görünür. Patron bu davranışı olduğu gibi bıraktı (karar A); soru 5e hukukçuya sorar. (R-1 risk kabulü kapatılmadı: hukukçu yeniden görecek.)
+8. **Davet kodu başına kullanım sayısı gösterilmez.** Yeni kodların kullanım sınırı gizlidir (FO-392, K-577268): her kodun gerçek sınırı 500 ile 524 arasında rastgele bir sayıdır, panel yalnız "en az 500" ve "Sınıra ulaştı" der. Sabit bir sınır, sınırına ulaşan kodun tam kullanım sayısını ele veriyordu. Eski kodların sınırı yoktur. **Kalan risk (FO-398 ile yeniden ölçüldü):** sapma yalnız kod dolmadan önce korur; üstelik ajans sınıra hiç ihtiyaç duymadan, yeni bir kodu kendi açtığı 5-30 kurumla kullanıp sayısını kesin bilebilir. Sayısını bildiği kodları başka bir kodun kullanımından çıkararak (yuvarlanmış toplamla) kısıtlı koşullarda (birden çok il, hiç kurum silinmemiş) gizli bir 1-4 grubunu okur. Simülasyonda (900 tablo) yuvarlama adımı 5 iken 500 kayıtlık doldurma 74, 5-30 kayıtlık ucuz doldurma 60 tabloda sızdırdı. Gösterilen sayılar bu yüzden 10'un katına yuvarlandı (K-577804, varsayılanla): kalan 6 ve 4 tablo (%0,7 ve %0,4). Ayrıca kod dışı bir yol var: maskeli bir ile 1-4 kendi kurumunu eklemek o ilin gizli sayısını ele veriyor (maskeli 27 il sayısından 6'sı). Soru 5e hukukçuya sorar. (R-1 risk kabulü kapatılmadı: hukukçu yeniden görecek.)
 9. **Hesaplama sunucuda yapılır.** Tarayıcıya 5'ten küçük ya da kesin (yuvarlanmamış) bir sayı hiç gitmez.
 10. **Otomatik "saldırgan" testi.** Her kod değişikliğinde bir test, bütün görünümleri birleştirip gizli bir 1-4 grubunu geri hesaplamaya çalışır. Hesaplayabilirse test kırmızı olur ve değişiklik kabul edilmez. 29.09.2026'da test geçti (4 test dosyası, 64 test).
 11. **Aylık rapor (yeni, §2.1).** Rapor, panonun aynı kurallardan geçmiş sayılarının aylık bir kopyasıdır. Bütün sayıları 5'ten gizlenmiş bir il, rapora hiç yazılmaz. Böylece hangi illerde birkaç kurum olduğu da anlaşılmaz.
@@ -134,7 +134,7 @@ _Kanıt:_ `messages/tr.json` → `legal` altında "ajans", "kalkınma", "karne",
 >
 > **5d.** Aylık raporun **indirilebilir dosya** olması (ajansta süresiz kalması, paylaşılabilmesi) anonimlik değerlendirmenizi değiştirir mi?
 >
-> **5e.** (FO-392, R-1 ile birlikte değerlendirilsin.) Ajans kodunu kendisi ~500 kez kullanırsa sınırı tam öğrenebilir; böylece başka bir kodun kullanımını yaklaşık ±2 içinde hesaplayabilir ve kısıtlı koşullarda (birden çok il, hiç kurum silinmemiş) gizli bir 1-4 grubunu okuyabilir (simülasyonda 900 tablonun 57-84'ü, ortalama yaklaşık %8). Bunun bedeli ~500 gerçek, platformda görünen kayıttır. Bu kalan risk pilotta **kabul edilebilir mi**?
+> **5e.** (FO-392, FO-398; R-1 ile birlikte değerlendirilsin.) Ajans, kendi açtığı birkaç kurumla (5-30 kayıt) bir kodun kullanımını kesin bilir; böylece başka bir kodun kullanımını yaklaşık ±5 içinde hesaplayabilir ve kısıtlı koşullarda (birden çok il, hiç kurum silinmemiş) gizli bir 1-4 grubunu okuyabilir. Sayılar 10'un katına yuvarlandıktan sonra simülasyonda 900 tablonun 4-6'sı (%0,4-0,7; yuvarlama 5 iken 60-74). Ayrıca maskeli bir ile 1-4 kendi kurumunu ekleyen ajans o ilin gizli sayısını okuyabilir (davet kodundan bağımsız). Bu kalan risk pilotta **kabul edilebilir mi**?
 
 **Cevaba göre ne değişir.**
 
