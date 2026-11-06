@@ -4,6 +4,7 @@ import type { Role } from '@prisma/client';
 
 import { prisma } from '../../../src/lib/db';
 import { DEFAULT_CRITERIA } from '../../../src/modules/m6/types';
+import { requireId } from '../../helpers/teardown-guard';
 
 /**
  * The tenant `tests/e2e/role-gate.spec.ts` runs in (NG-64): one seat per code
@@ -149,7 +150,7 @@ export async function setupRoleGateTenant() {
   });
   // A rerun starts with the guest unsubmitted: a save left by the last run would be
   // part of the average before the test submits anything.
-  await prisma.score.deleteMany({ where: { reviewerId: guestSeat.id } });
+  await prisma.score.deleteMany({ where: { reviewerId: requireId(guestSeat.id, 'guest seat') } });
   await prisma.relationship.upsert({
     where: { id: RG_REL_ID },
     create: { id: RG_REL_ID, tenantId: RG_TENANT, kind: 'partner', counterpartName: RG_REL_NAME },
