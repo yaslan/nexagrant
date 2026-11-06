@@ -71,6 +71,15 @@ const WEB_SERVER_NODE_OPTIONS = [
   .filter(Boolean)
   .join(' ');
 
+/**
+ * FO-396. The loopback stand-in for the EU participant register (src/lib/pic-registry.ts). Its port
+ * follows the web server's, so two isolated gates on different ports do not share a stub. Workers
+ * inherit the runner's environment, so the spec reads the same port.
+ */
+const PIC_REGISTRY_STUB_PORT = Number(process.env.E2E_PIC_REGISTRY_STUB_PORT ?? PORT + 20_000);
+process.env.E2E_PIC_REGISTRY_STUB_PORT = String(PIC_REGISTRY_STUB_PORT);
+const PIC_REGISTRY_STUB_URL = `http://127.0.0.1:${PIC_REGISTRY_STUB_PORT}/orgProfile/data.json`;
+
 // Set E2E_DATABASE_URL to process.env.DATABASE_URL so both runner and webServer see it
 if (process.env.E2E_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
@@ -136,8 +145,11 @@ export default defineConfig({
       NODE_OPTIONS: WEB_SERVER_NODE_OPTIONS,
       E2E_RUNNER_PID: String(process.pid),
       E2E_PORT: String(PORT),
-      // FO-396: the e2e run never asks the EU register (no network). Stored answers are set in the DB by the spec.
-      PIC_REGISTRY_OFF: 'true',
+      // FO-396: the e2e run never asks the real EU register (no network). The register check goes to a
+      // loopback stub that only tests/e2e/profile-pic-registry.spec.ts starts; with no stub listening the
+      // call is refused at once and the answer is UNKNOWN, the same as the check switched off.
+      PIC_REGISTRY_URL: PIC_REGISTRY_STUB_URL,
+      PIC_REGISTRY_ALLOW_LOCAL: 'true',
       // Blank LLM keys in dev E2E so tests use template fallback, not real API calls
       // (matches CI behavior; reduces cost, ensures deterministic failures like CI).
       // Opt-in live tests (e.g. E2E_LIVE_EMBED=1) can override OPENAI_API_KEY if needed.

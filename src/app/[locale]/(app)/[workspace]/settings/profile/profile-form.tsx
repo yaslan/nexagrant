@@ -3,10 +3,11 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Building, Sparkles, Key, CheckCircle, AlertCircle, Fingerprint } from 'lucide-react';
+import { Building, Sparkles, Key, CheckCircle, AlertCircle, AlertTriangle, Clock, Fingerprint } from 'lucide-react';
 import Link from 'next/link';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { updateTenantProfile, type PicCordisMatch } from './actions';
+import type { PicRegistryStatus } from '@/lib/pic-registry';
 import { DEFAULT_TRL_RANGE, parseKeywords } from './profile-fields';
 
 const PARTICIPANT_REGISTER_URL =
@@ -42,11 +43,14 @@ export default function TenantProfileForm({
   initial,
   initialPic = null,
   initialPicMatch = null,
+  initialPicRegistryStatus = null,
   supportEmail,
 }: {
   initial: StoredTenantProfile | null;
   initialPic?: string | null;
   initialPicMatch?: PicCordisMatch | null;
+  /** FO-396. The EU register's stored answer for `initialPic`; null = never checked. Read by page.tsx. */
+  initialPicRegistryStatus?: PicRegistryStatus | null;
   /** Where the real owner of a PIC held by another account can write (K-576942). */
   supportEmail: string;
 }) {
@@ -209,6 +213,9 @@ export default function TenantProfileForm({
   };
 
   const picIsSaved = pic !== '' && pic === savedPic;
+  // FO-396. The register answer the page read belongs to the page's PIC only. The save re-reads the
+  // page, so after a PIC change the new answer arrives with it; until then nothing is claimed.
+  const registryStatus = savedPic === loadedPic ? initialPicRegistryStatus : null;
 
   return (
     <div className="max-w-4xl mx-auto py-8 sm:px-4">
@@ -372,7 +379,31 @@ export default function TenantProfileForm({
               </p>
             )}
             {!picError && !pendingMatch && picIsSaved && !savedPicMatch && (
-              <p role="status" className="text-ink-2">{t('picUnmatchedNotice')}</p>
+              <div role="status" className="space-y-1.5">
+                <p className="text-ink-2">{t('picUnmatchedNotice')}</p>
+                {/* FO-396 (FO-394 §3 b/c/d). The register answer decides the new-organisation
+                    allowance; the save is never refused for it. Not checked yet reads as (d). */}
+                {registryStatus === 'FOUND' ? (
+                  <p data-testid="tenant-pic-registry" data-status="FOUND" className="font-semibold text-ok-ink flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 shrink-0 text-ok" aria-hidden="true" />
+                    <span>{t('picRegistryFound')}</span>
+                  </p>
+                ) : registryStatus === 'NOT_FOUND' ? (
+                  <p data-testid="tenant-pic-registry" data-status="NOT_FOUND" className="font-semibold text-amber-ink flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber" aria-hidden="true" />
+                    <span>{t('picRegistryNotFound')}</span>
+                  </p>
+                ) : (
+                  <p
+                    data-testid="tenant-pic-registry"
+                    data-status={registryStatus ?? 'UNCHECKED'}
+                    className="text-ink-2 flex items-start gap-2"
+                  >
+                    <Clock className="w-4 h-4 shrink-0 text-muted" aria-hidden="true" />
+                    <span>{t('picRegistryUnknown')}</span>
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
