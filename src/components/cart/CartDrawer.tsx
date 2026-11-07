@@ -135,12 +135,12 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
       {itemCount > 0 && (
         <button
           onClick={toggleCart}
-          className="fixed bottom-6 right-6 z-40 bg-[#22d3ee] hover:bg-[#67e8f9] text-[#080d1a] px-4 py-3.5 rounded-full shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:shadow-[0_0_35px_rgba(34,211,238,0.8)] transition-all transform hover:scale-105 flex items-center gap-2.5 font-black text-xs cursor-pointer border border-cyan-300/40 animate-in fade-in zoom-in-95 duration-200"
+          className="fixed bottom-6 right-6 z-40 bg-accent-strong hover:opacity-90 text-white px-4 py-3.5 rounded-full shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:shadow-[0_0_35px_rgba(34,211,238,0.8)] transition-all transform hover:scale-105 flex items-center gap-2.5 font-black text-xs cursor-pointer border border-accent/40 animate-in fade-in zoom-in-95 duration-200"
           aria-label={t('open')}
         >
-          <ShoppingBag className="w-5 h-5 text-[#080d1a]" />
-          <span className="font-sans font-extrabold tracking-tight text-[#080d1a]">{t('myCart')}</span>
-          <span className="bg-[#080d1a] text-[#22d3ee] text-[11px] font-mono font-black px-2 py-0.5 rounded-full border border-cyan-400">
+          <ShoppingBag className="w-5 h-5 text-white" />
+          <span className="font-sans font-extrabold tracking-tight text-white">{t('myCart')}</span>
+          <span className="bg-surface text-accent text-[11px] font-mono font-black px-2 py-0.5 rounded-full border border-accent">
             {itemCount}
           </span>
         </button>
@@ -298,7 +298,7 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                       <span>{t('totalDue')}</span>
                       <span
                         data-testid="cart-total"
-                        className="text-accent dark:text-cyan-300 font-mono font-black text-xl tracking-tight"
+                        className="text-accent font-mono font-black text-xl tracking-tight"
                       >
                         {measured ? money(totalMinor) : '—'}
                       </span>
@@ -308,15 +308,15 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                   <button
                     onClick={handleCheckout}
                     disabled={isSubmitting || !measured}
-                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm bg-[#22d3ee] hover:bg-[#67e8f9] text-[#080d1a] shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:shadow-[0_0_35px_rgba(34,211,238,0.8)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide border border-cyan-300/60"
+                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm bg-accent-strong hover:opacity-90 text-white shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:shadow-[0_0_35px_rgba(34,211,238,0.8)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide border border-accent/60"
                   >
                     {isSubmitting ? (
-                      <span className="animate-pulse text-[#080d1a] font-black">{t('connecting')}</span>
+                      <span className="animate-pulse text-white font-black">{t('connecting')}</span>
                     ) : (
                       <>
-                        <CreditCard className="w-4 h-4 text-[#080d1a] shrink-0" />
-                        <span className="text-[#080d1a] font-black">{t('proceed')}</span>
-                        <ArrowRight className="w-4 h-4 text-[#080d1a] shrink-0" />
+                        <CreditCard className="w-4 h-4 text-white shrink-0" />
+                        <span className="text-white font-black">{t('proceed')}</span>
+                        <ArrowRight className="w-4 h-4 text-white shrink-0" />
                       </>
                     )}
                   </button>
@@ -389,9 +389,9 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                   closeCart();
                   router.push(`/${locale}/${workspace}/settings/billing?success=true`);
                 }}
-                className="w-full py-3.5 rounded-xl font-black text-xs bg-[#22d3ee] hover:bg-[#67e8f9] text-[#080d1a] transition flex items-center justify-center gap-2 cursor-pointer shadow-lg font-mono"
+                className="w-full py-3.5 rounded-xl font-black text-xs bg-accent-strong hover:opacity-90 text-white transition flex items-center justify-center gap-2 cursor-pointer shadow-lg font-mono"
               >
-                <span className="text-[#080d1a] font-black">✓ {t('completeDemo')}</span>
+                <span className="text-white font-black">✓ {t('completeDemo')}</span>
               </button>
             </div>
           </div>

@@ -57,7 +57,7 @@ export default async function HomePage({
         {/* ─── HERO SECTION ─── */}
         <section className="relative overflow-hidden bg-gradient-to-b from-surface via-ground/40 to-ground/80 pt-16 pb-24 lg:pt-24 lg:pb-32 border-b border-border">
           {/* Subtle background glow effect */}
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-tr from-accent/10 via-teal-500/10 to-accent-ink/10 blur-3xl pointer-events-none -z-10 rounded-full"></div>
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-tr from-accent/10 via-accent-ink/10 to-accent-ink/10 blur-3xl pointer-events-none -z-10 rounded-full"></div>
 
           <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto space-y-6">
@@ -76,14 +76,14 @@ export default async function HomePage({
                 {isTr ? (
                   <>
                     AB Projelerinizi Fikirden Fonlamaya,{' '}
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-teal-400 to-accent-ink">
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-accent-ink to-accent-ink">
                       Baştan Sona Yönetin
                     </span>
                   </>
                 ) : (
                   <>
                     From Concept to Grant Agreement:{' '}
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-teal-400 to-accent-ink">
+                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-accent-ink to-accent-ink">
                       Master Your EU Projects
                     </span>
                   </>
@@ -102,7 +102,6 @@ export default async function HomePage({
                 <Link
                   href={getPublicRoute('register', locale)}
                   className="w-full sm:w-auto bg-accent hover:opacity-90 text-white font-bold text-xs sm:text-sm px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
-                  style={{ backgroundColor: '#003D5C' }}
                 >
                   <span>{isTr ? 'Ücretsiz Çalışma Alanı Başlatın' : 'Launch Free Workspace'}</span>
                   <span>→</span>
@@ -635,7 +634,7 @@ export default async function HomePage({
         <BlogSection locale={locale} />
 
         {/* ─── FINAL CALL TO ACTION ─── */}
-        <section className="py-20 lg:py-24 bg-gradient-to-br from-accent/90 via-accent-ink to-slate-950 text-white relative overflow-hidden">
+        <section className="py-20 lg:py-24 bg-gradient-to-br from-accent/90 via-accent-strong to-slate-950 text-white relative overflow-hidden">
           <div className="max-w-5xl mx-auto px-edge sm:px-4 text-center space-y-6 relative z-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-heading tracking-tight">
               {isTr

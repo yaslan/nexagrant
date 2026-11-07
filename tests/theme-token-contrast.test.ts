@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, test, expect } from 'vitest';
 
 /**
@@ -119,4 +119,24 @@ describe.each(Object.entries(themes))('accent contrast (%s)', (_, tokens) => {
 
 test('text-accent reads the text step, so the fill can stay under white text', () => {
   expect(css).toMatch(/--text-color-accent:\s*var\(--accent-ink\)/);
+});
+
+/**
+ * NG-63 — the accent colours that were still hard-coded after NG-2 (`#003D5C` on the sign-in and
+ * home buttons, `#0369A1` in the survey e-mail, the cyan `#22d3ee` of the cart and pricing pages)
+ * are now the token classes. This guard keeps them from coming back in the source.
+ */
+describe('no hard-coded accent left in src (NG-63)', () => {
+  const retired = /003D5C|0369A1|22d3ee|67e8f9/i;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) return walk(full);
+      return /\.(ts|tsx)$/.test(e.name) ? [full] : [];
+    });
+
+  test('the retired hex values appear in no source file', () => {
+    const hits = walk(resolve(__dirname, '../src')).filter((f) => retired.test(readFileSync(f, 'utf8')));
+    expect(hits.map((f) => f.replace(/.*\/src\//, 'src/'))).toEqual([]);
+  });
 });
