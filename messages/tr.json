@@ -5064,6 +5064,7 @@
     "orgName": "Kurum Adı",
     "orgNamePlaceholder": "Ar-Ge Ltd. Şti.",
     "workEmail": "Kurumsal E-posta Adresi",
+    "workEmailPlaceholder": "ad.soyad@kurum.com",
     "password": "Şifre",
     "passwordOptional": "Demo için serbest",
     "processing": "İşlem Yapılıyor...",

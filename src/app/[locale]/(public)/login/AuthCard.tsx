@@ -566,7 +566,7 @@ export default function AuthCard({
       {demoLoginEnabled && (
       <div className="relative flex items-center justify-center">
         <div className="border-t border-border w-full"></div>
-        <span className="bg-surface px-3 text-[11px] text-muted uppercase font-mono">
+        <span className="bg-surface px-3 text-[11px] text-muted uppercase font-mono whitespace-nowrap">
           {tCard('orWithEmail')}
         </span>
       </div>
@@ -613,7 +613,7 @@ export default function AuthCard({
           <input
             type="email"
             required
-            placeholder="ad.soyad@kurum.com"
+            placeholder={tCard('workEmailPlaceholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full text-xs bg-ground border border-border rounded-xl p-2.5 text-ink placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-accent"

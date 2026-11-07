@@ -49,9 +49,13 @@ const readCode = (rel: string) => codeOf(read(rel));
 const readLandingCopy = () =>
   [
     readCode('src/app/[locale]/(public)/page.tsx'),
-    // Only the HomePage namespace: the rest of the catalogue is other pages' copy.
-    JSON.stringify(JSON.parse(read('messages/tr.json')).HomePage),
-    JSON.stringify(JSON.parse(read('messages/en.json')).HomePage),
+    // The page reads three namespaces: `HomePage`, `landing` (its own copy,
+    // including `landing.heroMock` and `landing.cordisProjects`, which the page
+    // renders via CordisProjectsSection). Nothing else in the catalogue.
+    ...['tr', 'en'].map((locale) => {
+      const catalogue = JSON.parse(read(`messages/${locale}.json`));
+      return JSON.stringify([catalogue.HomePage, catalogue.landing]);
+    }),
   ].join('\n');
 
 /** Every figure removed from a public surface, as it was actually written. */

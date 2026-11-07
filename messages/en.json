@@ -5064,6 +5064,7 @@
     "orgName": "Org Name",
     "orgNamePlaceholder": "Ar-Ge Ltd. Şti.",
     "workEmail": "Work Email Address",
+    "workEmailPlaceholder": "name.surname@organisation.com",
     "password": "Password",
     "passwordOptional": "Optional for demo",
     "processing": "Processing...",
