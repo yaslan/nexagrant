@@ -19,6 +19,7 @@ import {
 } from '@/lib/email/invitation-mail-policy';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { appUrl } from '@/lib/app-url';
+import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
 
 /**
  * Invites a user into the caller's own tenant.
@@ -40,6 +41,20 @@ const INVITABLE_ROLES = new Set([
   'GUEST_PARTNER',
 ]);
 
+/**
+ * The language-free `code` every refusal carries (NG-89). The members page
+ * turns it into a sentence from `settings.members.page.errors`; `error` keeps
+ * the Turkish sentence for callers written before the code existed.
+ * FORBIDDEN_ROLE is the shared role-refusal code (src/lib/forbidden-role.ts),
+ * which `useActionErrorText` already says in every locale.
+ */
+const INVITATION_ERROR = {
+  FORBIDDEN_ROLE: FORBIDDEN_ROLE_DIGEST,
+  INVALID_EMAIL: 'INVALID_EMAIL',
+  ALREADY_MEMBER: 'ALREADY_MEMBER',
+  SEAT_LIMIT_REACHED: 'SEAT_LIMIT_REACHED',
+} as const;
+
 /** Roles allowed to invite into a tenant. */
 const CAN_INVITE = new Set(['TENANT_OWNER', 'TENANT_ADMIN']);
 
@@ -52,7 +67,10 @@ export async function POST(req: Request) {
 
     if (!CAN_INVITE.has(callerRole)) {
       return NextResponse.json(
-        { error: 'Bu işlem için yetkiniz yok. Yalnızca kurum sahibi veya yöneticisi davet gönderebilir.' },
+        {
+          error: 'Bu işlem için yetkiniz yok. Yalnızca kurum sahibi veya yöneticisi davet gönderebilir.',
+          code: INVITATION_ERROR.FORBIDDEN_ROLE,
+        },
         { status: 403 }
       );
     }
@@ -62,7 +80,10 @@ export async function POST(req: Request) {
     const requestedRole = typeof body?.role === 'string' ? body.role : 'MEMBER';
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Geçerli bir e-posta adresi zorunludur.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Geçerli bir e-posta adresi zorunludur.', code: INVITATION_ERROR.INVALID_EMAIL },
+        { status: 400 }
+      );
     }
 
     // An invite must never grant more than the roles this endpoint offers; in
@@ -166,7 +187,7 @@ export async function POST(req: Request) {
 
     if (result.conflict) {
       return NextResponse.json(
-        { error: 'Bu e-posta adresi zaten bu kurumun üyesidir.' },
+        { error: 'Bu e-posta adresi zaten bu kurumun üyesidir.', code: INVITATION_ERROR.ALREADY_MEMBER },
         { status: 400 }
       );
     }
@@ -178,7 +199,7 @@ export async function POST(req: Request) {
           error:
             `Planınızın koltuk sınırına ulaşıldı (${limit} koltuk: ${members} üye, ` +
             `${pendingInvitations} bekleyen davet). Yeni davet için koltuk ekleyin ya da planınızı yükseltin.`,
-          code: 'SEAT_LIMIT_REACHED',
+          code: INVITATION_ERROR.SEAT_LIMIT_REACHED,
           seats: { limit, members, pendingInvitations },
         },
         { status: 403 }
@@ -231,7 +252,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Error creating invitation:', error);
-    return internalError({ error: 'İç Sunucu Hatası' });
+    return internalError({ error: 'İç Sunucu Hatası', code: 'INTERNAL_ERROR' });
   }
 }
 

@@ -1188,7 +1188,14 @@
         "notSentWithLink": "{notSent}: {link}",
         "roleChangeBlocked": "Davet az önce gönderildi; rolü değiştirmek için 10 dakika sonra yeniden davet edin",
         "recentlySent": "Davet e-postası az önce gönderildi; davetli e-postadaki bağlantıyı kullanabilir",
-        "emailSentWithLink": "Davet e-postası gönderildi. Bağlantı: {link}"
+        "emailSentWithLink": "Davet e-postası gönderildi. Bağlantı: {link}",
+        "errors": {
+          "ALREADY_MEMBER": "Bu e-posta adresi zaten bu kurumun üyesidir.",
+          "INVALID_EMAIL": "Geçerli bir e-posta adresi zorunludur.",
+          "SEAT_LIMIT_REACHED": "Planınızın koltuk sınırına ulaşıldı ({limit} koltuk: {members} üye, {pendingInvitations} bekleyen davet). Yeni davet için koltuk ekleyin ya da planınızı yükseltin.",
+          "SEAT_LIMIT_REACHED_NO_COUNT": "Planınızın koltuk sınırına ulaşıldı. Yeni davet için koltuk ekleyin ya da planınızı yükseltin.",
+          "INTERNAL_ERROR": "Sunucu hatası nedeniyle davet gönderilemedi. Lütfen biraz sonra tekrar deneyin."
+        }
       }
     }
   },

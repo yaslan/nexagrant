@@ -1188,7 +1188,14 @@
         "notSentWithLink": "{notSent}: {link}",
         "roleChangeBlocked": "The invitation was sent a moment ago; to change the role, invite again in 10 minutes",
         "recentlySent": "The invitation email was sent a moment ago; the invitee can use the link in that email",
-        "emailSentWithLink": "Invitation email sent. Link: {link}"
+        "emailSentWithLink": "Invitation email sent. Link: {link}",
+        "errors": {
+          "ALREADY_MEMBER": "This email address is already a member of this organisation.",
+          "INVALID_EMAIL": "Please enter a valid email address.",
+          "SEAT_LIMIT_REACHED": "Your plan's seat limit is reached ({limit} seats: {members} members, {pendingInvitations} pending invitations). Add seats or upgrade your plan to send a new invitation.",
+          "SEAT_LIMIT_REACHED_NO_COUNT": "Your plan's seat limit is reached. Add seats or upgrade your plan to send a new invitation.",
+          "INTERNAL_ERROR": "The invitation could not be sent because of a server error. Please try again in a moment."
+        }
       }
     }
   },
