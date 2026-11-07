@@ -69,9 +69,9 @@ export default function AuthCard({
     inviteCode || searchParams.get('mode') === 'register' ? 'register' : defaultMode;
   
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
-  const isTr = locale === 'tr';
   const tDemo = useTranslations('DemoSignIn');
   const tAuthCard = useTranslations('Auth');
+  const tCard = useTranslations('LoginCard');
 
   // Same-origin paths only: this value ends up in `window.location.href` (safe-callback-url.ts).
   const rawCallbackUrl = safeCallbackUrl(searchParams.get('callbackUrl'), `/${locale}/default/dashboard`);
@@ -212,7 +212,7 @@ export default function AuthCard({
       if (isNextRedirectError(err)) {
         return;
       }
-      setErrorMessage(toErrorMessage(err, (isTr ? 'Giriş işlemi başlatılamadı.' : 'Login could not be initiated.')));
+      setErrorMessage(toErrorMessage(err, tCard('errLoginInitiate')));
       setIsLoading(false);
     }
   };
@@ -257,7 +257,7 @@ export default function AuthCard({
         window.location.href = rawCallbackUrl;
         return;
       }
-      setErrorMessage(toErrorMessage(err, (isTr ? 'Bir hata oluştu.' : 'An error occurred.')));
+      setErrorMessage(toErrorMessage(err, tCard('errGeneric')));
       setIsLoading(false);
     }
   };
@@ -281,7 +281,7 @@ export default function AuthCard({
         window.location.href = rawCallbackUrl;
         return;
       }
-      setErrorMessage(toErrorMessage(err, (isTr ? 'Demo girişi başarısız.' : 'Demo login failed.')));
+      setErrorMessage(toErrorMessage(err, tCard('errDemoLogin')));
       setIsLoading(false);
     }
   };
@@ -306,7 +306,7 @@ export default function AuthCard({
           }`}
         >
           <span>🔑</span>
-          <span>{isTr ? 'Giriş Yap' : 'Sign In'}</span>
+          <span>{tCard('tabSignIn')}</span>
         </button>
         <button
           type="button"
@@ -321,7 +321,7 @@ export default function AuthCard({
           }`}
         >
           <span>🚀</span>
-          <span>{isTr ? 'Ücretsiz Kayıt Ol' : 'Create Workspace'}</span>
+          <span>{tCard('tabRegister')}</span>
         </button>
       </div>
 
@@ -333,16 +333,12 @@ export default function AuthCard({
         <h1 className="text-2xl font-bold font-heading text-ink tracking-tight">
           {mode === 'login'
             ? tAuthCard('signInTitle', { brand: PRODUCT_NAME })
-            : (isTr ? 'Ücretsiz Çalışma Alanı Açın' : 'Create Free Workspace')}
+            : tCard('registerTitle')}
         </h1>
         <p className="text-xs text-muted max-w-xs mx-auto">
           {mode === 'login'
-            ? (isTr
-                ? 'Horizon Europe, Digital Europe ve Eurostars projelerinizi tek merkezden yönetin.'
-                : 'Access your proposal pipeline, CORDIS network graph, and AI modules.')
-            : (isTr
-                ? '1 dakika içinde kuruluşunuzu kaydedin ve AI proje araçlarını deneyimleyin.'
-                : 'Start in seconds with Google.')}
+            ? tCard('signInSubtitle')
+            : tCard('registerSubtitle')}
         </p>
       </div>
 
@@ -353,7 +349,7 @@ export default function AuthCard({
           <button
             type="button"
             onClick={() => setErrorMessage(null)}
-            aria-label={isTr ? 'Kapat' : 'Close'}
+            aria-label={tCard('close')}
             className="font-bold text-bad ml-2"
           >
             ✕
@@ -401,13 +397,11 @@ export default function AuthCard({
         >
           <p className="font-bold">
             {agencyRegistration
-              ? (isTr ? 'Davet koduyla kayıt bu ortamda şu an kapalı.' : 'Registering with an invite code is not available in this environment.')
-              : (isTr ? 'Giriş yapılandırılmamış.' : 'Sign-in is not configured.')}
+              ? tCard('inviteBlockedTitle')
+              : tCard('notConfiguredTitle')}
           </p>
           <p className="text-muted">
-            {isTr
-              ? 'Bu ortamda etkin bir giriş yöntemi yok. Lütfen yöneticinize başvurun.'
-              : 'No sign-in method is enabled in this environment. Please contact your administrator.'}
+            {tCard('notConfiguredBody')}
           </p>
         </div>
       )}
@@ -564,7 +558,7 @@ export default function AuthCard({
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span>{isTr ? 'Google ile Devam Et' : 'Continue with Google'}</span>
+          <span>{tCard('continueGoogle')}</span>
         </button>
       </div>
 
@@ -573,7 +567,7 @@ export default function AuthCard({
       <div className="relative flex items-center justify-center">
         <div className="border-t border-border w-full"></div>
         <span className="bg-surface px-3 text-[11px] text-muted uppercase font-mono">
-          {isTr ? 'veya e-posta ile' : 'or with email'}
+          {tCard('orWithEmail')}
         </span>
       </div>
       )}
@@ -587,11 +581,11 @@ export default function AuthCard({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-200">
             <div>
               <label className="block text-xs font-bold text-ink mb-1">
-                {isTr ? 'Ad Soyad' : 'Full Name'}
+                {tCard('fullName')}
               </label>
               <input
                 type="text"
-                placeholder="Dr. Ahmet Yılmaz"
+                placeholder={tCard('fullNamePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full text-xs bg-ground border border-border rounded-xl p-2.5 text-ink placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-accent"
@@ -599,11 +593,11 @@ export default function AuthCard({
             </div>
             <div>
               <label className="block text-xs font-bold text-ink mb-1">
-                {isTr ? 'Kurum Adı' : 'Org Name'}
+                {tCard('orgName')}
               </label>
               <input
                 type="text"
-                placeholder="Ar-Ge Ltd. Şti."
+                placeholder={tCard('orgNamePlaceholder')}
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
                 className="w-full text-xs bg-ground border border-border rounded-xl p-2.5 text-ink placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-accent"
@@ -614,7 +608,7 @@ export default function AuthCard({
 
         <div>
           <label className="block text-xs font-bold text-ink mb-1">
-            {isTr ? 'Kurumsal E-posta Adresi' : 'Work Email Address'}
+            {tCard('workEmail')}
           </label>
           <input
             type="email"
@@ -629,10 +623,10 @@ export default function AuthCard({
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-xs font-bold text-ink">
-              {isTr ? 'Şifre' : 'Password'}
+              {tCard('password')}
             </label>
             <span className="text-[10px] text-muted">
-              {isTr ? 'Demo için serbest' : 'Optional for demo'}
+              {tCard('passwordOptional')}
             </span>
           </div>
           <input
@@ -654,13 +648,13 @@ export default function AuthCard({
           {isLoading ? (
             <>
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>{isTr ? 'İşlem Yapılıyor...' : 'Processing...'}</span>
+              <span>{tCard('processing')}</span>
             </>
           ) : (
             <span>
               {mode === 'login'
-                ? (isTr ? 'E-posta ile Giriş Yap →' : 'Sign In with Email →')
-                : (isTr ? 'Çalışma Alanı Oluştur →' : 'Create Workspace →')}
+                ? tCard('submitSignIn')
+                : tCard('submitRegister')}
             </span>
           )}
         </button>
@@ -683,8 +677,8 @@ export default function AuthCard({
       {demoLoginEnabled && (
       <div className="pt-3 border-t border-border space-y-2">
         <div className="text-[11px] font-bold text-muted uppercase tracking-wider flex items-center justify-between">
-          <span>{isTr ? '⚡ Hızlı Demo Giriş Rolleri' : '⚡ One-Click Demo Profiles'}</span>
-          <span className="text-[10px] font-mono text-accent">Şifresiz Oturum</span>
+          <span>{tCard('demoHeading')}</span>
+          <span className="text-[10px] font-mono text-accent">{tCard('passwordless')}</span>
         </div>
 
         <div className="grid grid-cols-1 gap-1.5">
@@ -700,7 +694,7 @@ export default function AuthCard({
                 <div className="text-[10px] text-muted font-mono">{DEMO_SEATS.platformAdmin}</div>
               </div>
             </div>
-            <span className="text-xs font-bold text-accent group-hover:translate-x-0.5 transition-transform">Giriş →</span>
+            <span className="text-xs font-bold text-accent group-hover:translate-x-0.5 transition-transform">{tCard('demoSignInArrow')}</span>
           </button>
 
           <div className="grid grid-cols-2 gap-1.5">
