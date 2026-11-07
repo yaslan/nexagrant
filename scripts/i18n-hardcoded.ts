@@ -40,7 +40,10 @@ export interface Violation {
   /** Repo-relative, POSIX separators — the key shape used in i18n-baseline.json. */
   file: string;
   line: number;
-  kind: 'jsx-text' | 'attr:title' | 'attr:label' | 'attr:placeholder' | 'attr:aria-label';
+  kind:
+    | 'jsx-text'
+    | 'attr:title' | 'attr:label' | 'attr:placeholder' | 'attr:aria-label'
+    | 'ternary' | 'call:confirm' | 'call:alert' | 'call:toast';
   text: string;
 }
 
@@ -83,7 +86,7 @@ export function stripComments(source: string): string {
 
 /** Tailwind-shaped token: optional variants, then a utility with a dash or bracket part. */
 const TAILWIND_TOKEN =
-  /^-?(?:[a-z][a-z0-9]*:)*(?:[a-z][a-z0-9]*)(?:[-/][a-z0-9.[\]%()#-]+)+$|^-?(?:[a-z][a-z0-9]*:)+[a-z][a-z0-9]*$/;
+  /^-?(?:[a-z][a-z0-9]*:)*(?:[a-z][a-z0-9]*)(?:[-/][a-z0-9.[\]%()#,_-]+)+$|^-?(?:[a-z][a-z0-9]*:)+[a-z][a-z0-9]*$/;
 /** Bare Tailwind utilities that carry no dash and would otherwise read as an English word. */
 const TAILWIND_BARE = new Set([
   'flex', 'grid', 'block', 'inline', 'hidden', 'table', 'contents', 'absolute', 'relative',
@@ -122,6 +125,7 @@ export function looksTechnical(text: string): boolean {
   if (/^[A-Z][a-z0-9]*(?:[A-Z][a-z0-9]*)+$/.test(t)) return true; // PascalCase
   if (/^[\w@./-]+(?:\/[\w@./-]+)+$/.test(t)) return true;        // path / mime / package specifier
   if (/^[\d\s.,:/+-]+(?:px|rem|em|vh|vw|%|ms|s)?$/.test(t)) return true; // numbers, dates, sizes
+  if (/^[a-z]{2,3}[-_][A-Za-z]{2,4}$/.test(t)) return true;      // locale code — "tr-TR", "en_US"
   if (isTailwindClassList(t)) return true;
   return false;
 }
@@ -163,6 +167,64 @@ function jsxTextNodes(raw: string): { line: number; text: string }[] {
   return out;
 }
 
+/** Peels parentheses and type assertions so `(isTr ? 'a' : 'b')` reads as the ternary. */
+function unwrapExpression(node: ts.Expression): ts.Expression {
+  let current = node;
+  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) {
+    current = current.expression;
+  }
+  return current;
+}
+
+/**
+ * The static text of a string-ish expression: a plain literal, a template without
+ * interpolation, or the leading text of a template with holes. Anything else is `undefined`
+ * (an identifier, a `t('key')` call, a member access): those are not literals to report.
+ */
+function staticText(node: ts.Expression): string | undefined {
+  const e = unwrapExpression(node);
+  if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) return e.text;
+  if (ts.isTemplateExpression(e)) return e.head.text;
+  return undefined;
+}
+
+/** `confirm(...)`, `alert(...)`, `toast(...)`, `toast.success(...)`: the message is the argument. */
+const PROSE_CALLEE = /^(?:window\.)?(confirm|alert)$|^(?:toast|showToast)(?:\.[A-Za-z]+)?$/;
+
+/**
+ * Prose reached through an EXPRESSION, which the JSX-text and attribute-literal passes never
+ * see: a ternary branch (`{isTr ? 'Sil' : 'Delete'}`, `title={isTr ? ...}`, `confirm(isTr ? ...)`)
+ * or a literal handed to confirm / alert / toast. Each reported text goes through the same
+ * prose test as JSX text, so `'tr-TR' : 'en-US'`, Tailwind class ternaries and slug-valued
+ * ternaries stay out.
+ */
+function expressionProse(raw: string): { line: number; text: string; kind: Violation['kind'] }[] {
+  const sf = ts.createSourceFile('scan.tsx', raw, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const out: { line: number; text: string; kind: Violation['kind'] }[] = [];
+  const report = (node: ts.Node, text: string | undefined, kind: Violation['kind']) => {
+    if (text === undefined || !isJsxProse(text.replace(/\s+/g, ' ').trim())) return;
+    const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+    out.push({ line, text: text.replace(/\s+/g, ' ').trim(), kind });
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isConditionalExpression(node)) {
+      report(node.whenTrue, staticText(node.whenTrue), 'ternary');
+      report(node.whenFalse, staticText(node.whenFalse), 'ternary');
+    } else if (ts.isCallExpression(node)) {
+      const callee = node.expression.getText(sf);
+      const match = PROSE_CALLEE.exec(callee);
+      if (match) {
+        const kind: Violation['kind'] =
+          match[1] === 'confirm' ? 'call:confirm' : match[1] === 'alert' ? 'call:alert' : 'call:toast';
+        for (const arg of node.arguments) report(arg, staticText(arg), kind);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
 export function scanSource(relPath: string, raw: string): Violation[] {
   const src = stripComments(raw);
   const lineOf = (index: number) => src.slice(0, index).split('\n').length;
@@ -171,6 +233,10 @@ export function scanSource(relPath: string, raw: string): Violation[] {
   for (const { line, text } of jsxTextNodes(raw)) {
     if (!isJsxProse(text)) continue;
     found.push({ file: relPath, line, kind: 'jsx-text', text });
+  }
+
+  for (const { line, text, kind } of expressionProse(raw)) {
+    found.push({ file: relPath, line, kind, text });
   }
 
   for (const prop of TEXT_PROPS) {
