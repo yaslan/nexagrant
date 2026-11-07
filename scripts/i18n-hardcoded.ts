@@ -42,8 +42,10 @@ export interface Violation {
   line: number;
   kind:
     | 'jsx-text'
+    | 'jsx-literal'
     | 'attr:title' | 'attr:label' | 'attr:placeholder' | 'attr:aria-label'
-    | 'ternary' | 'call:confirm' | 'call:alert' | 'call:toast';
+    | 'ternary' | 'call:confirm' | 'call:alert' | 'call:toast'
+    | 'call:setter' | 'call:toast.promise' | 'throw';
   text: string;
 }
 
@@ -191,6 +193,34 @@ function staticText(node: ts.Expression): string | undefined {
 /** `confirm(...)`, `alert(...)`, `toast(...)`, `toast.success(...)`: the message is the argument. */
 const PROSE_CALLEE = /^(?:window\.)?(confirm|alert)$|^(?:toast|showToast)(?:\.[A-Za-z]+)?$/;
 
+/** React state setters — `setMessage('…')`, `setError('…')`. Machine values are filtered by isJsxProse. */
+const SETTER_CALLEE = /^set[A-Z]\w*$/;
+
+/** The three message slots of `toast.promise(promise, { loading, success, error })`. */
+const TOAST_PROMISE_SLOTS = new Set(['loading', 'success', 'error']);
+
+/** A file whose first statement is the `'use client'` directive — its code runs in the browser. */
+function isClientModule(sf: ts.SourceFile): boolean {
+  const first = sf.statements[0];
+  return first !== undefined && ts.isExpressionStatement(first) &&
+    ts.isStringLiteral(first.expression) && first.expression.text === 'use client';
+}
+
+/**
+ * The Error message of a `throw` argument: `new Error('…')` or `Object.assign(new Error('…'), …)`.
+ * Returns undefined for anything else (a variable, a call, a non-Error value).
+ */
+function thrownMessage(node: ts.Expression): ts.Expression | undefined {
+  const e = unwrapExpression(node);
+  if (ts.isCallExpression(e) && e.expression.getText() === 'Object.assign' && e.arguments[0]) {
+    return thrownMessage(e.arguments[0]);
+  }
+  if (ts.isNewExpression(e) && /Error$/.test(e.expression.getText()) && e.arguments?.[0]) {
+    return e.arguments[0];
+  }
+  return undefined;
+}
+
 /**
  * Prose reached through an EXPRESSION, which the JSX-text and attribute-literal passes never
  * see: a ternary branch (`{isTr ? 'Sil' : 'Delete'}`, `title={isTr ? ...}`, `confirm(isTr ? ...)`)
@@ -206,6 +236,7 @@ function expressionProse(raw: string): { line: number; text: string; kind: Viola
     const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
     out.push({ line, text: text.replace(/\s+/g, ' ').trim(), kind });
   };
+  const client = isClientModule(sf);
   const visit = (node: ts.Node) => {
     if (ts.isConditionalExpression(node)) {
       report(node.whenTrue, staticText(node.whenTrue), 'ternary');
@@ -217,6 +248,38 @@ function expressionProse(raw: string): { line: number; text: string; kind: Viola
         const kind: Violation['kind'] =
           match[1] === 'confirm' ? 'call:confirm' : match[1] === 'alert' ? 'call:alert' : 'call:toast';
         for (const arg of node.arguments) report(arg, staticText(arg), kind);
+      }
+      if (ts.isIdentifier(node.expression) && SETTER_CALLEE.test(callee) && node.arguments[0]) {
+        report(node.arguments[0], staticText(node.arguments[0]), 'call:setter');
+      }
+      if (callee === 'toast.promise' && node.arguments[1]) {
+        const options = unwrapExpression(node.arguments[1]);
+        if (ts.isObjectLiteralExpression(options)) {
+          for (const prop of options.properties) {
+            if (!ts.isPropertyAssignment(prop) || !TOAST_PROMISE_SLOTS.has(prop.name.getText(sf))) continue;
+            // `success: () => '…'` — the message is what the callback returns.
+            const value = unwrapExpression(prop.initializer);
+            const message = ts.isArrowFunction(value) && !ts.isBlock(value.body) ? value.body : value;
+            report(prop, staticText(message), 'call:toast.promise');
+          }
+        }
+      }
+    } else if (ts.isThrowStatement(node) && node.expression && client) {
+      const message = thrownMessage(node.expression);
+      if (message) report(message, staticText(message), 'throw');
+    } else if (ts.isJsxExpression(node) && node.expression) {
+      const literal = staticText(node.expression);
+      const parent = node.parent;
+      if (ts.isJsxAttribute(parent)) {
+        // `placeholder={'…'}` — the same props the string form checks, with the same prose test.
+        const prop = parent.name.getText(sf);
+        if (TEXT_PROPS.includes(prop as (typeof TEXT_PROPS)[number]) && literal !== undefined && isUserFacing(literal)) {
+          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+          out.push({ line, text: literal.trim(), kind: `attr:${prop}` as Violation['kind'] });
+        }
+      } else if (literal !== undefined && isJsxProse(literal.replace(/\s+/g, ' ').trim())) {
+        // `<option>{'…'}</option>`, `<span>{'…'}</span>` — a literal child is JSX text in disguise.
+        report(node, literal, 'jsx-literal');
       }
     }
     ts.forEachChild(node, visit);

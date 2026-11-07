@@ -67,3 +67,99 @@ describe('i18n-hardcoded: arbitrary-value Tailwind classes stay out (NG-70)', ()
     expect(texts(src)).toEqual([]);
   });
 });
+
+/** Violation kinds with texts, for tests that must pin WHICH pattern caught the literal. */
+function hits(source: string, file = 'src/app/fixture.tsx'): string[] {
+  return scanSource(file, source).map(v => `${v.kind} ${v.text}`).sort();
+}
+
+describe('i18n-hardcoded: setter arguments (NG-91)', () => {
+  it('flags a Turkish literal passed to a React state setter', () => {
+    const src = `setMessage('Kaydedilemedi, tekrar deneyin');`;
+    expect(hits(src)).toEqual(['call:setter Kaydedilemedi, tekrar deneyin']);
+  });
+
+  it('flags a two-word English literal passed to any set* call', () => {
+    const src = `setError('Something went wrong');`;
+    expect(hits(src)).toEqual(['call:setter Something went wrong']);
+  });
+
+  it('ignores setters whose literal is a machine value, not prose', () => {
+    const src = `setTab('pipeline'); setStatus('ACTIVE'); setWidth('w-full'); setOpen(true);`;
+    expect(hits(src)).toEqual([]);
+  });
+});
+
+describe('i18n-hardcoded: thrown Error messages (NG-91)', () => {
+  // A throw in a client module is caught by client code and shown to the user (toast,
+  // setMessage). A throw in a server module is a log line; it is never rendered, so it is
+  // out of scope. The directive is the only signal that separates the two in a .tsx file.
+  it('flags a user-visible Error message in a client module', () => {
+    const src = `'use client';\nexport function A() { throw new Error('Yetkiniz yok, yöneticinizle iletişime geçin'); }`;
+    expect(hits(src)).toEqual(['throw Yetkiniz yok, yöneticinizle iletişime geçin']);
+  });
+
+  it('flags an Error wrapped in Object.assign in a client module', () => {
+    const src = `'use client';\nthrow Object.assign(new Error('Davet gönderilemedi'), { code: 'X' });`;
+    expect(hits(src)).toEqual(['throw Davet gönderilemedi']);
+  });
+
+  it('does not flag a server-side throw — that message is a log line, not UI text', () => {
+    const src = `export async function load() { throw new Error('Kullanıcı kaydı bulunamadı'); }`;
+    expect(hits(src)).toEqual([]);
+  });
+
+  it('does not flag a client throw whose message is a machine code', () => {
+    const src = `'use client';\nthrow new Error('ERR_INVITE_EXPIRED');`;
+    expect(hits(src)).toEqual([]);
+  });
+});
+
+describe('i18n-hardcoded: toast.promise messages (NG-91)', () => {
+  it('flags loading, success and error strings of toast.promise', () => {
+    const src = `toast.promise(save(), { loading: 'Kaydediliyor…', success: 'Kaydedildi', error: 'Kaydedilemedi' });`;
+    expect(hits(src)).toEqual([
+      'call:toast.promise Kaydedildi',
+      'call:toast.promise Kaydedilemedi',
+      'call:toast.promise Kaydediliyor…',
+    ]);
+  });
+
+  it('flags the string a success callback returns', () => {
+    const src = `toast.promise(p, { loading: 'Yükleniyor', success: () => 'Kayıt eklendi' });`;
+    expect(hits(src)).toEqual(['call:toast.promise Kayıt eklendi', 'call:toast.promise Yükleniyor']);
+  });
+
+  it('ignores a toast.promise whose messages are t() calls', () => {
+    const src = `toast.promise(p, { loading: t('saving'), success: t('saved'), error: t('failed') });`;
+    expect(hits(src)).toEqual([]);
+  });
+});
+
+describe('i18n-hardcoded: literal inside a JSX expression (NG-91)', () => {
+  it('flags {"…"} as a JSX child', () => {
+    expect(hits(`<span>{'Kanıt Kategorisi Seçin'}</span>`)).toEqual(['jsx-literal Kanıt Kategorisi Seçin']);
+  });
+
+  it('flags a literal option child — <option>{"…"}</option>', () => {
+    expect(hits(`<select><option>{'Kanıt Kategorisi Seçin'}</option></select>`)).toEqual([
+      'jsx-literal Kanıt Kategorisi Seçin',
+    ]);
+  });
+
+  it('flags a literal passed through a text-carrying attribute expression', () => {
+    expect(hits(`<input placeholder={'Belge adı ara'} />`)).toEqual(['attr:placeholder Belge adı ara']);
+  });
+
+  it('ignores a single ASCII word in an attribute expression, like the string form', () => {
+    expect(hits(`<input placeholder={'Search'} />`)).toEqual([]);
+  });
+
+  it('ignores a non-prose literal child such as a unit or a machine value', () => {
+    expect(hits(`<span>{'px'}</span><option value={'tr-TR'}>{'tr-TR'}</option>`)).toEqual([]);
+  });
+
+  it('ignores t() calls in expressions — the shape we want', () => {
+    expect(hits(`<option>{t('kategori.sec')}</option><input placeholder={t('belge.ara')} />`)).toEqual([]);
+  });
+});
