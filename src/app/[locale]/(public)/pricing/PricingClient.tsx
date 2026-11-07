@@ -331,7 +331,7 @@ export default function PricingClient({
                       {t('vatExclusiveNote')}
                     </div>
 
-                    <div className="mt-2 text-[10px] font-mono text-accent-ink bg-accent/60 border border-accent/30 rounded-lg p-2 flex items-center justify-between">
+                    <div className="mt-2 text-[10px] font-mono text-accent-ink bg-accent/40 border border-accent/30 rounded-lg p-2 flex items-center justify-between">
                       <span>{t('couponLabel', { code: charged.campaignCode })}</span>
                       <span>{t('renewalRate', { percent: charged.percentOff })}</span>
                     </div>
@@ -476,7 +476,7 @@ export default function PricingClient({
                     <span className="text-xs text-slate-400 font-mono">{t('oneTime')}</span>
                   </div>
 
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-accent-ink bg-accent/80 border border-accent/30 px-2.5 py-1 rounded-lg mb-6">
+                  <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-accent-ink bg-accent/40 border border-accent/30 px-2.5 py-1 rounded-lg mb-6">
                     <span>{lifetime.campaignCode}</span>
                     <span>·</span>
                     <span>{t('lifetimeCouponNote', { percent: lifetime.percentOff })}</span>
