@@ -135,7 +135,7 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
       {itemCount > 0 && (
         <button
           onClick={toggleCart}
-          className="fixed bottom-6 right-6 z-40 bg-accent-strong hover:opacity-90 text-white px-4 py-3.5 rounded-full shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:shadow-[0_0_35px_rgba(34,211,238,0.8)] transition-all transform hover:scale-105 flex items-center gap-2.5 font-black text-xs cursor-pointer border border-accent/40 animate-in fade-in zoom-in-95 duration-200"
+          className="fixed bottom-6 right-6 z-40 bg-accent-strong hover:opacity-90 text-white px-4 py-3.5 rounded-full shadow-[0_0_25px_color-mix(in_srgb,var(--accent)_50%,transparent)] hover:shadow-[0_0_35px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-all transform hover:scale-105 flex items-center gap-2.5 font-black text-xs cursor-pointer border border-accent/40 animate-in fade-in zoom-in-95 duration-200"
           aria-label={t('open')}
         >
           <ShoppingBag className="w-5 h-5 text-white" />
@@ -308,7 +308,7 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
                   <button
                     onClick={handleCheckout}
                     disabled={isSubmitting || !measured}
-                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm bg-accent-strong hover:opacity-90 text-white shadow-[0_0_25px_rgba(34,211,238,0.5)] hover:shadow-[0_0_35px_rgba(34,211,238,0.8)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide border border-accent/60"
+                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm bg-accent-strong hover:opacity-90 text-white shadow-[0_0_25px_color-mix(in_srgb,var(--accent)_50%,transparent)] hover:shadow-[0_0_35px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 font-mono tracking-wide border border-accent/60"
                   >
                     {isSubmitting ? (
                       <span className="animate-pulse text-white font-black">{t('connecting')}</span>
@@ -339,7 +339,7 @@ export function CartDrawer({ locale = 'tr', workspace = 'default' }: CartDrawerP
       {/* ─── DEMO STRIPE CHECKOUT MODAL — renders the SERVER's amounts ─── */}
       {quote && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-surface border-2 border-accent rounded-2xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(34,211,238,0.3)] text-ink font-sans space-y-5">
+          <div className="bg-surface border-2 border-accent rounded-2xl p-6 max-w-md w-full shadow-[0_0_50px_color-mix(in_srgb,var(--accent)_30%,transparent)] text-ink font-sans space-y-5">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-2 text-xs font-bold text-accent font-mono">
                 <CreditCard className="w-4 h-4 text-accent" />
