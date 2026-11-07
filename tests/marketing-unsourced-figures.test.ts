@@ -41,6 +41,23 @@ function codeOf(source: string): string {
 
 const readCode = (rel: string) => codeOf(read(rel));
 
+/**
+ * The landing page's copy moved into the message catalogues (NG-92): the page
+ * file holds keys, not text. A guard on the page must read the copy too, or it
+ * would pass vacuously and miss a figure that returns in tr.json / en.json.
+ */
+const readLandingCopy = () =>
+  [
+    readCode('src/app/[locale]/(public)/page.tsx'),
+    // The page reads three namespaces: `HomePage`, `landing` (its own copy,
+    // including `landing.heroMock` and `landing.cordisProjects`, which the page
+    // renders via CordisProjectsSection). Nothing else in the catalogue.
+    ...['tr', 'en'].map((locale) => {
+      const catalogue = JSON.parse(read(`messages/${locale}.json`));
+      return JSON.stringify([catalogue.HomePage, catalogue.landing]);
+    }),
+  ].join('\n');
+
 /** Every figure removed from a public surface, as it was actually written. */
 const REMOVED_LITERALS = [
   '150.000+',
@@ -56,7 +73,7 @@ const REMOVED_LITERALS = [
 ] as const;
 
 describe('landing page — the CORDIS scale and budget figures are gone', () => {
-  const source = readCode('src/app/[locale]/(public)/page.tsx');
+  const source = readLandingCopy();
 
   test.each(REMOVED_LITERALS)('does not print %s', (literal) => {
     expect(source).not.toContain(literal);
@@ -80,7 +97,7 @@ describe('landing page — the CORDIS scale and budget figures are gone', () => 
 });
 
 describe('landing page — the M1 mock quotes no real institution and no uplift', () => {
-  const source = readCode('src/app/[locale]/(public)/page.tsx');
+  const source = readLandingCopy();
 
   test.each([
     'Fraunhofer',

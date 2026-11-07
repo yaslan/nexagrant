@@ -45,9 +45,9 @@ export default async function HomePage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const isTr = locale === 'tr';
   const t = await getTranslations({ locale, namespace: 'landing.heroMock' });
   const tLanding = await getTranslations({ locale, namespace: 'landing' });
+  const tHome = await getTranslations({ locale, namespace: 'HomePage' });
   const tModuleCount = await getTranslations({ locale, namespace: 'moduleCount' });
   const moduleCounts = getModuleCounts();
 
@@ -64,37 +64,23 @@ export default async function HomePage({
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent-ink text-xs font-semibold shadow-2xs">
                 <span className="flex h-2 w-2 rounded-full bg-accent animate-pulse"></span>
-                <span>
-                  {isTr
-                    ? 'Horizon Europe • Digital Europe • Eurostars İçin Uçtan Uca Platform'
-                    : 'End-to-End Operating System for EU Funding Programmes'}
-                </span>
+                <span>{tHome('eyebrow')}</span>
               </div>
 
               {/* Main Headline */}
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold font-heading text-ink tracking-tight leading-[1.15]">
-                {isTr ? (
-                  <>
-                    AB Projelerinizi Fikirden Fonlamaya,{' '}
+                {tHome.rich('heroTitle', {
+                  accent: (chunks) => (
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-accent-ink to-accent-ink">
-                      Baştan Sona Yönetin
+                      {chunks}
                     </span>
-                  </>
-                ) : (
-                  <>
-                    From Concept to Grant Agreement:{' '}
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-accent-ink to-accent-ink">
-                      Master Your EU Projects
-                    </span>
-                  </>
-                )}
+                  ),
+                })}
               </h1>
 
               {/* Subtitle */}
               <p className="text-sm sm:text-base text-muted leading-relaxed">
-                {isTr
-                  ? 'Çağrı keşfinden CORDIS ortak istihbaratına, yapay zeka destekli konsept notu üretiminden AB hakem simülasyonu ve konsorsiyum masasına kadar tüm aşama-kapı (Stage-Gate) süreçlerini tek platformda birleştirin.'
-                  : 'Combine open call discovery, CORDIS network intelligence, AI-assisted concept drafting, evaluator scoring simulation, and consortium seat matching in one integrated platform.'}
+                {tHome('heroSubtitle')}
               </p>
 
               {/* CTA Action Buttons */}
@@ -103,7 +89,7 @@ export default async function HomePage({
                   href={getPublicRoute('register', locale)}
                   className="w-full sm:w-auto bg-accent hover:opacity-90 text-white font-bold text-xs sm:text-sm px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
                 >
-                  <span>{isTr ? 'Ücretsiz Çalışma Alanı Başlatın' : 'Launch Free Workspace'}</span>
+                  <span>{tHome('launchFree')}</span>
                   <span>→</span>
                 </Link>
 
@@ -112,7 +98,7 @@ export default async function HomePage({
                   className="w-full sm:w-auto bg-surface hover:bg-surface-hover text-ink font-bold text-xs sm:text-sm px-6 py-4 rounded-xl border border-border shadow-xs transition flex items-center justify-center gap-2"
                 >
                   <span>🔍</span>
-                  <span>{isTr ? 'Açık Çağrıları İncele' : 'Explore Open Calls'}</span>
+                  <span>{tHome('exploreOpenCalls')}</span>
                 </Link>
               </div>
 
@@ -120,7 +106,7 @@ export default async function HomePage({
               <div className="pt-8 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-semibold text-muted">
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
-                  <span>{isTr ? 'CORDIS Ortak İstihbaratı' : 'CORDIS Partner Intelligence'}</span>
+                  <span>{tHome('trustCordis')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
@@ -128,7 +114,7 @@ export default async function HomePage({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
-                  <span>{isTr ? 'AB Hakem Puanlama Simülatörü' : 'Evaluator Lens Simulation'}</span>
+                  <span>{tHome('trustEvaluator')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-ok font-bold text-sm">✓</span>
@@ -171,7 +157,7 @@ export default async function HomePage({
                         <span className="text-ok-ink font-bold font-mono">⭐ 94/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
-                        FLEX-GRID: Decarbonised Smart Grid Flexibility
+                        {tHome('mockProject1')}
                       </div>
                       <div className="text-[10px] text-muted font-mono bg-ground border border-border px-1.5 py-0.5 rounded truncate">
                         HORIZON-CL5-2024-D3-01
@@ -191,7 +177,7 @@ export default async function HomePage({
                         <span className="text-ok-ink font-bold font-mono">⭐ 88/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
-                        TWIN-HYDRO: AI Digital Twins for Hydrogen
+                        {tHome('mockProject2')}
                       </div>
                       <div className="text-[10px] text-muted font-mono bg-ground border border-border px-1.5 py-0.5 rounded truncate">
                         HORIZON-CL4-2024-TWIN
@@ -211,7 +197,7 @@ export default async function HomePage({
                         <span className="text-ok-ink font-bold font-mono">⭐ 91/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
-                        CIRC-PACK: Circular Bio Polymers for Packaging
+                        {tHome('mockProject3')}
                       </div>
                       <div className="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded font-semibold">
                         {t('partnersApproved')}
@@ -231,7 +217,7 @@ export default async function HomePage({
                         <span className="text-ok-ink font-bold font-mono">14.5 / 15.0</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
-                        CLEAN-PORT: Zero-Emission Coastal Freight
+                        {tHome('mockProject4')}
                       </div>
                       <div className="text-[10px] text-ok-ink bg-ok/10 border border-ok/20 px-1.5 py-0.5 rounded font-semibold">
                         {t('partBApproved')}
@@ -249,17 +235,13 @@ export default async function HomePage({
           <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
               <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3 py-1 rounded-full">
-                {isTr ? 'Metodoloji' : 'Methodology'}
+                {tHome('methodologyLabel')}
               </span>
               <h2 className="text-3xl sm:text-4xl font-extrabold font-heading text-ink">
-                {isTr
-                  ? 'Fikirden Hibe İmzasına: 5 Aşamalı Kapı Modeli'
-                  : '5-Stage Gate Proposal Pipeline Architecture'}
+                {tHome('methodologyTitle')}
               </h2>
               <p className="text-xs sm:text-sm text-muted">
-                {isTr
-                  ? 'Başarısız başvurulara boşa harcanan adam-gün eforunu sonlandırın. Her aşamada matematiksel eşikler ve yapay zeka puanlamasıyla ilerleyin.'
-                  : 'Eliminate wasted person-days on doomed proposals. Progress systematically with mathematical gate filters and AI evaluations.'}
+                {tHome('methodologySubtitle')}
               </p>
             </div>
 
@@ -267,42 +249,32 @@ export default async function HomePage({
               {[
                 {
                   gate: 'G0',
-                  title: isTr ? 'Triage & Filtre' : 'Triage & Feasibility',
-                  desc: isTr
-                    ? 'Hedef çağrıya uyum skoru, TRL aralığı ve geçmiş başarı oranına (Base Rate) göre stratejik eleme.'
-                    : 'Strategic alignment scoring, TRL verification, and historical baseline win-rate triage.',
+                  title: tHome('gates.g0Title'),
+                  desc: tHome('gates.g0Desc'),
                   color: 'bg-blue-600',
                 },
                 {
                   gate: 'G1',
-                  title: isTr ? 'Konsept Notu' : 'Concept Note (M2)',
-                  desc: isTr
-                    ? 'Mükemmeliyet (Excellence), Etki (Impact) ve Uygulama mimarisi AB standartlarında yapılandırılır.'
-                    : 'Draft Excellence, Impact, and Implementation sections with EU policy alignment.',
+                  title: tHome('gates.g1Title'),
+                  desc: tHome('gates.g1Desc'),
                   color: 'bg-teal-700',
                 },
                 {
                   gate: 'G2',
-                  title: isTr ? 'Konsorsiyum' : 'Consortium Desk (M8)',
-                  desc: isTr
-                    ? 'CORDIS profillerinden eksik yetkinlik koltukları, koordinatör ve partnerler eşleştirilir.'
-                    : 'Match optimal coordinators and partners from CORDIS profiles by centrality and topic history.',
+                  title: tHome('gates.g2Title'),
+                  desc: tHome('gates.g2Desc'),
                   color: 'bg-purple-700',
                 },
                 {
                   gate: 'G3',
-                  title: isTr ? 'Hakem Simülasyonu' : 'Evaluator Lens (M6)',
-                  desc: isTr
-                    ? 'Teklif metni, bağımsız AB hakemi perspektifiyle 15 puan üzerinden taranır ve zayıf noktalar raporlanır.'
-                    : 'Deep AI evaluator simulation grading against official 15-point criteria with actionable fixes.',
+                  title: tHome('gates.g3Title'),
+                  desc: tHome('gates.g3Desc'),
                   color: 'bg-amber-700',
                 },
                 {
                   gate: 'G4',
-                  title: isTr ? 'Nihai Teslim' : 'Final Submission',
-                  desc: isTr
-                    ? 'Bütçe tabloları, PIC doğrulamaları ve Part A/B dosyaları AB Funding Portal formatında teslimata hazır hale gelir.'
-                    : 'Final budget verification, PIC validations, and complete application submission readiness.',
+                  title: tHome('gates.g4Title'),
+                  desc: tHome('gates.g4Desc'),
                   color: 'bg-emerald-700',
                 },
               ].map((step, idx) => (
@@ -331,15 +303,13 @@ export default async function HomePage({
           <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
               <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3 py-1 rounded-full">
-                {isTr ? 'Entegre Modül Mimarisi' : 'Modular Powerhouse'}
+                {tHome('modulesLabel')}
               </span>
               <h2 className="text-3xl sm:text-4xl font-extrabold font-heading text-ink">
                 {tLanding('modulesTitle', moduleCounts)}
               </h2>
               <p className="text-xs sm:text-sm text-muted">
-                {isTr
-                  ? 'Teklif yazımından ortak istihbaratına kadar her ihtiyaca özel tasarlanmış modüler araç seti.'
-                  : 'A purpose-built suite of tools designed for every phase of EU research and innovation lifecycle.'}
+                {tHome('modulesSubtitle')}
               </p>
             </div>
 
@@ -347,82 +317,64 @@ export default async function HomePage({
               {[
                 {
                   id: 'M1',
-                  name: isTr ? 'CORDIS Ortak İstihbaratı' : 'Partner Intelligence',
-                  desc: isTr
-                    ? 'Avrupalı kurumların geçmiş projeleri, aldığı AB hibesi (€) ve ağ merkezilik puanı.'
-                    : 'CORDIS graph analytics, past projects, coordinator track record, and eigenvector centrality.',
+                  name: tHome('modules.m1Name'),
+                  desc: tHome('modules.m1Desc'),
                   icon: '🌐',
                   tier: 'Team / Business',
                 },
                 {
                   id: 'M2',
-                  name: isTr ? 'Konsept Notu Mimarisi' : 'Concept Note Architectures',
-                  desc: isTr
-                    ? 'Horizon Europe, Eurostars ve ikili çağrılar için kör değerlendirme ve şablonlu konsept üretici.'
-                    : 'Template-driven and AI-assisted concept drafting tailored to EU work programmes.',
+                  name: tHome('modules.m2Name'),
+                  desc: tHome('modules.m2Desc'),
                   icon: '📝',
                   tier: 'Starter+',
                 },
                 {
                   id: 'M3',
-                  name: isTr ? 'Kanıt Paketi Deposu' : 'Evidence Pack Vault',
-                  desc: isTr
-                    ? 'AB politika hedefleri (Green Deal, Digital Decade), etki verileri ve istatistik deposu.'
-                    : 'EU policy references, impact data points, and structured evidence bank for proposals.',
+                  name: tHome('modules.m3Name'),
+                  desc: tHome('modules.m3Desc'),
                   icon: '📊',
                   tier: 'Starter+',
                 },
                 {
                   id: 'M4',
-                  name: isTr ? 'Focal Point CRM' : 'Focal Point CRM',
-                  desc: isTr
-                    ? 'Konsorsiyum ortakları, irtibat kişileri ve 60 günlük soğuma uyarıları ile kurumsal hafıza.'
-                    : 'Partner relationship management with 60-day stale alerts and interaction timeline.',
+                  name: tHome('modules.m4Name'),
+                  desc: tHome('modules.m4Desc'),
                   icon: '👥',
                   tier: 'Team+',
                 },
                 {
                   id: 'M5',
-                  name: isTr ? 'Aşama-Kapı Boru Hattı' : 'Proposal Workflows',
-                  desc: isTr
-                    ? 'G0-G4 Kanban panosu, adam-gün takip aracı ve görev dağıtım takvimi.'
-                    : 'Stage-gate Kanban, T-6 deadline schedules, and person-day effort tracking.',
+                  name: tHome('modules.m5Name'),
+                  desc: tHome('modules.m5Desc'),
                   icon: '🚦',
                   tier: 'Discover+',
                 },
                 {
                   id: 'M6',
-                  name: isTr ? 'Evaluator Lens (Hakem Simülatörü)' : 'Evaluator Lens AI',
-                  desc: isTr
-                    ? 'Resmi AB hakem kriterleriyle Mükemmeliyet, Etki ve Uygulama bölümlerine yapay zeka denetimi.'
-                    : 'Rigorous 15-point scoring simulation mimicking official EU expert evaluators.',
+                  name: tHome('modules.m6Name'),
+                  desc: tHome('modules.m6Desc'),
                   icon: '🔬',
                   tier: 'Business / Add-on',
                 },
                 {
                   id: 'M7',
-                  name: isTr ? 'TTO Hızlandırıcısı' : 'TTO Accelerator',
-                  desc: isTr
-                    ? 'Üniversite ve araştırma merkezlerinin patent portföyünü AB çağrılarıyla otomatik eşleştirir.'
-                    : 'Maps university patent & technology portfolios directly to matching Horizon Europe calls.',
+                  name: tHome('modules.m7Name'),
+                  desc: tHome('modules.m7Desc'),
                   icon: '🚀',
                   tier: 'Enterprise',
                 },
                 {
                   id: 'M8',
-                  name: isTr ? 'Konsorsiyum Eşleştirme' : 'Consortium Seat Matching',
-                  desc: isTr
-                    ? 'Coğrafi dağılım, bütçe kısıtları ve rol yetkinliklerine göre en uygun ortak önerileri.'
-                    : 'Calculates optimal consortia balance factoring in geography, role history, and topic expertise.',
+                  name: tHome('modules.m8Name'),
+                  desc: tHome('modules.m8Desc'),
                   icon: '🎯',
                   tier: 'Team+',
                 },
                 {
                   id: 'M11',
-                  name: isTr ? 'Tam Başvuru Üreticisi' : 'Full Application Production',
-                  desc: isTr
-                    ? 'Part A ve Part B başvuru dosyalarını resmi AB formatında tam metin olarak üreten motor.'
-                    : 'Generates complete compliant Part A & Part B draft documents with work packages and deliverables.',
+                  name: tHome('modules.m11Name'),
+                  desc: tHome('modules.m11Desc'),
                   icon: '⚡',
                   tier: 'Enterprise / Add-on',
                 },
@@ -442,7 +394,7 @@ export default async function HomePage({
                     <p className="text-xs text-ink-2 leading-relaxed">{mod.desc}</p>
                   </div>
                   <div className="pt-4 mt-4 border-t border-border flex justify-between items-center text-[11px] text-muted">
-                    <span>Erişim:</span>
+                    <span>{tHome('access')}</span>
                     <span className="font-semibold text-ink">{mod.tier}</span>
                   </div>
                 </div>
@@ -454,7 +406,7 @@ export default async function HomePage({
                 href={getPublicRoute('modules', locale)}
                 className="inline-flex items-center gap-2 text-xs font-bold text-accent hover:underline bg-surface border border-border px-5 py-2.5 rounded-xl shadow-2xs hover:bg-surface-hover transition"
               >
-                <span>{isTr ? 'Tüm Modül ve Eklenti Detaylarını İncele' : 'View Complete Module Manifest'}</span>
+                <span>{tHome('moduleManifestCta')}</span>
                 <span>→</span>
               </Link>
             </div>
@@ -467,25 +419,15 @@ export default async function HomePage({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">
                 <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3 py-1 rounded-full">
-                  {isTr ? 'Ağ & Ortak İstihbaratı' : 'Network Graph Analytics'}
+                  {tHome('cordisLabel')}
                 </span>
                 <h2 className="text-3xl sm:text-4xl font-extrabold font-heading text-ink leading-tight">
-                  {isTr ? (
-                    <>
-                      CORDIS Ağ Verisiyle{' '}
-                      <span className="text-accent">En Güçlü Konsorsiyumu</span> Kurun
-                    </>
-                  ) : (
-                    <>
-                      Build Winning Consortia on{' '}
-                      <span className="text-accent">CORDIS Network Data</span>
-                    </>
-                  )}
+                  {tHome.rich('cordisHeading', {
+                    accent: (chunks) => <span className="text-accent">{chunks}</span>,
+                  })}
                 </h2>
                 <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  {isTr
-                    ? 'Avrupa Komisyonu geçmiş fonlama verileri üzerinde çalışan ağ analitiğimiz, hangi kurumların çağrılarda en yüksek koordinasyon ve kazanma oranına sahip olduğunu gösterir. PIC kodları, eigenvector merkeziliği ve ülke dağılımını tek tıkla analiz edin.'
-                    : 'Our network graph analytics over official European Commission funding data surfaces top coordinators and partners. Evaluate PIC codes, eigenvector centrality, and geographic consortium balances instantly.'}
+                  {tHome('cordisBody')}
                 </p>
 
                 {/*
@@ -506,7 +448,7 @@ export default async function HomePage({
                     href={getWorkspaceRoute('partners', locale, 'default')}
                     className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold px-6 py-3.5 rounded-xl shadow-2xs transition"
                   >
-                    <span>{isTr ? 'Ortak Arama Motorunu Dene' : 'Open Partner Search'}</span>
+                    <span>{tHome('openPartnerSearch')}</span>
                     <span>→</span>
                   </Link>
                 </div>
@@ -515,9 +457,9 @@ export default async function HomePage({
               {/* Visual Card Mockup */}
               <div className="bg-ground/90 rounded-2xl p-6 text-ink shadow-2xl space-y-4 border border-border font-sans">
                 <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-xs font-mono text-muted">CORDIS Node Analytics</span>
+                  <span className="text-xs font-mono text-muted">{tHome('sampleCardTitle')}</span>
                   <span className="text-[10px] bg-ground text-muted border border-border px-2 py-0.5 rounded font-mono font-bold uppercase tracking-wider">
-                    {isTr ? 'Örnek Görünüm' : 'Sample View'}
+                    {tHome('sampleBadge')}
                   </span>
                 </div>
 
@@ -525,25 +467,25 @@ export default async function HomePage({
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-bold text-base text-ink">
-                        {isTr ? 'Örnek Araştırma Merkezi' : 'Sample Research Centre'}
+                        {tHome('sampleOrgName')}
                       </h3>
                       <p className="text-xs text-muted">
-                        {isTr ? 'PIC · Ülke · Kurum tipi' : 'PIC · Country · Organisation type'}
+                        {tHome('sampleOrgMeta')}
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
                     <div className="bg-surface p-2.5 rounded-lg border border-border">
-                      <div className="text-[10px] text-muted">{isTr ? 'Koordinatörlük' : 'Coordinator roles'}</div>
+                      <div className="text-[10px] text-muted">{tHome('sampleStatCoordinator')}</div>
                       <div className="text-base font-bold text-muted mt-0.5 font-mono">—</div>
                     </div>
                     <div className="bg-surface p-2.5 rounded-lg border border-border">
-                      <div className="text-[10px] text-muted">{isTr ? 'Toplam Katılım' : 'Total participations'}</div>
+                      <div className="text-[10px] text-muted">{tHome('sampleStatParticipations')}</div>
                       <div className="text-base font-bold text-muted mt-0.5 font-mono">—</div>
                     </div>
                     <div className="bg-surface p-2.5 rounded-lg border border-border">
-                      <div className="text-[10px] text-muted">{isTr ? 'Alınan Fon' : 'EU contribution'}</div>
+                      <div className="text-[10px] text-muted">{tHome('sampleStatFunding')}</div>
                       <div className="text-base font-bold text-muted mt-0.5 font-mono">—</div>
                     </div>
                   </div>
@@ -561,9 +503,7 @@ export default async function HomePage({
                     now shows its own shape with the values struck out.
                   */}
                   <div className="p-3 bg-surface rounded-lg border border-border text-xs text-ink-2">
-                    {isTr
-                      ? 'M1, her kurum için koordinatörlük geçmişini, AB katkısını ve ağ merkezilik puanını CORDIS kayıtlarından hesaplar. Değerler çalışma alanınızda gerçek veriyle dolar.'
-                      : 'M1 computes coordinator history, EU contribution and network centrality per organisation from CORDIS records. Values fill with real data inside your workspace.'}
+                    {tHome('sampleExplainer')}
                   </div>
                 </div>
               </div>
@@ -579,7 +519,7 @@ export default async function HomePage({
           <div className="max-w-7xl mx-auto px-edge sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
               <h2 className="text-3xl sm:text-4xl font-extrabold font-heading text-ink">
-                {isTr ? 'Tüm Ekosistem Paydaşları İçin Tek Çözüm' : 'Built for the Entire Innovation Ecosystem'}
+                {tHome('audienceHeading')}
               </h2>
               <p className="text-xs sm:text-sm text-muted">
                 {tLanding('ecosystemSubtitle', { brand: PRODUCT_NAME })}
@@ -589,31 +529,23 @@ export default async function HomePage({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
                 {
-                  title: isTr ? 'KOBİ’ler & Startuplar' : 'SMEs & Deep Tech',
-                  desc: isTr
-                    ? 'Eurostars, EIC Accelerator ve Horizon çağrılarına düşük adam-gün maliyeti ve yüksek puanla başvurun.'
-                    : 'Accelerate EIC and Eurostars applications with minimal overhead and high evaluation scores.',
+                  title: tHome('audiences.smeTitle'),
+                  desc: tHome('audiences.smeDesc'),
                   icon: '🚀',
                 },
                 {
-                  title: isTr ? 'Üniversiteler & TTO’lar' : 'Universities & TTOs',
-                  desc: isTr
-                    ? 'Akademik buluş ve patent portföyünüzü Horizon Europe Cluster çağrılarıyla otomatik eşleştirin.'
-                    : 'Match research IP and patent databases automatically with open EU call topics.',
+                  title: tHome('audiences.uniTitle'),
+                  desc: tHome('audiences.uniDesc'),
                   icon: '🎓',
                 },
                 {
-                  title: isTr ? 'AB Proje Danışmanları' : 'EU Grant Consultancies',
-                  desc: isTr
-                    ? 'Çoklu müşteri çalışma alanlarını (Multi-tenant) tek panelden yönetin, teklif yazımını hızlandırın.'
-                    : 'Manage multi-client workspaces with isolated tenants, stage-gates, and fast proposal generation.',
+                  title: tHome('audiences.consultTitle'),
+                  desc: tHome('audiences.consultDesc'),
                   icon: '💼',
                 },
                 {
-                  title: isTr ? 'Konsorsiyum Liderleri' : 'Consortia Coordinators',
-                  desc: isTr
-                    ? 'Çok ortaklı bütçe dağılımı, toplantı tutanakları (MoM) ve teslim takvimini eksiksiz yürütün.'
-                    : 'Coordinate multi-partner work packages, budgets, agendas, and meeting minutes effortlessly.',
+                  title: tHome('audiences.coordTitle'),
+                  desc: tHome('audiences.coordDesc'),
                   icon: '🌐',
                 },
               ].map((item) => (
@@ -637,9 +569,7 @@ export default async function HomePage({
         <section className="py-20 lg:py-24 bg-gradient-to-br from-accent/90 via-accent-strong to-slate-950 text-white relative overflow-hidden">
           <div className="max-w-5xl mx-auto px-edge sm:px-4 text-center space-y-6 relative z-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-heading tracking-tight">
-              {isTr
-                ? 'Bir Sonraki Horizon Europe Projenizi Bugün Başlatın'
-                : 'Start Your Next Horizon Europe Winner Today'}
+              {tHome('finalCtaHeading')}
             </h2>
             <p className="text-xs sm:text-base text-white/80 max-w-2xl mx-auto leading-relaxed">
               {tLanding('closingSubtitle', { brand: PRODUCT_NAME })}
@@ -649,13 +579,13 @@ export default async function HomePage({
                 href={getPublicRoute('register', locale)}
                 className="w-full sm:w-auto bg-surface text-ink hover:bg-surface-hover text-xs sm:text-sm font-bold px-8 py-4 rounded-xl shadow-xl transition-all transform hover:-translate-y-0.5"
               >
-                {isTr ? 'Hemen Ücretsiz Başlayın →' : 'Launch Workspace Now →'}
+                {tHome('finalCtaRegister')}
               </Link>
               <Link
                 href={getPublicRoute('pricing', locale)}
                 className="w-full sm:w-auto bg-transparent hover:bg-surface/10 text-white text-xs sm:text-sm font-bold px-6 py-4 rounded-xl border border-white/20 transition"
               >
-                {isTr ? 'Fiyatlandırmayı İncele' : 'Explore Pricing'}
+                {tHome('finalCtaPricing')}
               </Link>
             </div>
           </div>
