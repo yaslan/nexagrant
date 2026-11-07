@@ -44,11 +44,16 @@ vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: vi.fn() }));
 const { POST } = await import('@/app/api/invitations/route');
 
 async function invite(body: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+  return inviteRaw(JSON.stringify(body));
+}
+
+/** Sends `raw` as the request body as-is, so a body that is not JSON can be tried. */
+async function inviteRaw(raw: string): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await POST(
     new Request('http://localhost/api/invitations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      body: raw,
     })
   );
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
@@ -93,6 +98,26 @@ describe('POST /api/invitations — refusal codes (NG-89)', () => {
     expect(res.body.code).toBe('SEAT_LIMIT_REACHED');
     expect(res.body.seats).toEqual({ limit: 2, members: 1, pendingInvitations: 1 });
     expect(res.body.error).toMatch(/koltuk sınırına/);
+  });
+
+  test('a body that is not JSON: 400 INVALID_JSON, not a 500 (NG-94)', async () => {
+    const res = await inviteRaw('{"email": "a@example.test",');
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_JSON');
+    expect(res.body.error).toBe('İstek gövdesi geçerli bir JSON değil.');
+  });
+
+  test('a bad body from a role that may not invite still gets 403 FORBIDDEN_ROLE (NG-94)', async () => {
+    state.role = 'WRITER';
+    const res = await inviteRaw('not json');
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  test('an empty body: 400 INVALID_JSON (NG-94)', async () => {
+    const res = await inviteRaw('');
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_JSON');
   });
 
   test('an unexpected failure: 500 INTERNAL_ERROR, nothing from the thrown error in the body', async () => {

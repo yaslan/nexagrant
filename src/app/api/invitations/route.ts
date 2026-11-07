@@ -50,10 +50,14 @@ const INVITABLE_ROLES = new Set([
  */
 const INVITATION_ERROR = {
   FORBIDDEN_ROLE: FORBIDDEN_ROLE_DIGEST,
+  INVALID_JSON: 'INVALID_JSON',
   INVALID_EMAIL: 'INVALID_EMAIL',
   ALREADY_MEMBER: 'ALREADY_MEMBER',
   SEAT_LIMIT_REACHED: 'SEAT_LIMIT_REACHED',
 } as const;
+
+/** What `req.json()` yields here when the request body is not JSON. */
+const UNPARSABLE_BODY = Symbol('unparsable-body');
 
 /** Roles allowed to invite into a tenant. */
 const CAN_INVITE = new Set(['TENANT_OWNER', 'TENANT_ADMIN']);
@@ -75,7 +79,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
+    // A body that does not parse is the caller's mistake, not ours: answer 400
+    // rather than letting it fall into the catch-all 500 below (NG-94).
+    // (A sentinel, not `null`: the JSON text `null` parses fine and is left to
+    // the e-mail check, as before.)
+    const body = await req.json().catch(() => UNPARSABLE_BODY);
+    if (body === UNPARSABLE_BODY) {
+      return NextResponse.json(
+        { error: 'İstek gövdesi geçerli bir JSON değil.', code: INVITATION_ERROR.INVALID_JSON },
+        { status: 400 }
+      );
+    }
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
     const requestedRole = typeof body?.role === 'string' ? body.role : 'MEMBER';
 
