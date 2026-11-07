@@ -7,6 +7,21 @@ import { errorMessage } from '@/lib/errors';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import TeamList from './team-list';
 
+/**
+ * Refusal codes of POST /api/invitations that have a sentence in
+ * `settings.members.page.errors` (NG-89). FORBIDDEN_ROLE and PILOT_EXPIRED are
+ * said by `useActionErrorText` from `Common`; a body without a code listed
+ * here keeps the old "Error: <body text>" line.
+ */
+const INVITE_ERROR_CODES = ['ALREADY_MEMBER', 'INVALID_EMAIL', 'SEAT_LIMIT_REACHED', 'INTERNAL_ERROR'] as const;
+type InviteErrorCode = (typeof INVITE_ERROR_CODES)[number];
+type Seats = { limit: number; members: number; pendingInvitations: number };
+
+function inviteErrorCode(error: unknown): InviteErrorCode | null {
+  const code = (error as { code?: unknown } | null)?.code;
+  return INVITE_ERROR_CODES.find((c) => c === code) ?? null;
+}
+
 export default function MembersSettingsClient() {
   const params = useParams();
   const locale = (params?.locale as string) || 'tr';
@@ -35,10 +50,13 @@ export default function MembersSettingsClient() {
       });
       const data = await res.json();
       if (!res.ok) {
-        // `code` carries a 403 PILOT_EXPIRED through to `errorText` below (İNCELEME-24 B-2):
-        // the body's `error` is a Turkish sentence, shown as is in every locale before.
+        // `code` carries the refusal to the catch below: PILOT_EXPIRED and
+        // FORBIDDEN_ROLE through `errorText` (İNCELEME-24 B-2), the invite's own
+        // codes through `settings.members.page.errors` (NG-89). The body's
+        // `error` is a Turkish sentence, kept only for a body without a code.
         throw Object.assign(new Error(data.error || t('sendFailed')), {
           code: data.code,
+          seats: data.seats as Seats | undefined,
         });
       }
       // `reason` (POST /api/invitations): recently_sent = this address was
@@ -64,7 +82,17 @@ export default function MembersSettingsClient() {
       // The invitation holds a seat now: re-read the list from the server.
       setListVersion((v) => v + 1);
     } catch (error) {
-      setMessage(errorText(error, () => t('errorPrefixed', { message: errorMessage(error) })));
+      setMessage(
+        errorText(error, () => {
+          const code = inviteErrorCode(error);
+          if (code === 'SEAT_LIMIT_REACHED') {
+            const seats = (error as { seats?: Seats }).seats;
+            return seats ? t('errors.SEAT_LIMIT_REACHED', seats) : t('errors.SEAT_LIMIT_REACHED_NO_COUNT');
+          }
+          if (code) return t(`errors.${code}`);
+          return t('errorPrefixed', { message: errorMessage(error) });
+        })
+      );
       setMessageIsError(true);
     } finally {
       setLoading(false);
