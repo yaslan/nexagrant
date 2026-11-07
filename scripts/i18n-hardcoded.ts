@@ -231,8 +231,13 @@ function thrownMessage(node: ts.Expression): ts.Expression | undefined {
 function expressionProse(raw: string): { line: number; text: string; kind: Violation['kind'] }[] {
   const sf = ts.createSourceFile('scan.tsx', raw, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const out: { line: number; text: string; kind: Violation['kind'] }[] = [];
-  const report = (node: ts.Node, text: string | undefined, kind: Violation['kind']) => {
-    if (text === undefined || !isJsxProse(text.replace(/\s+/g, ' ').trim())) return;
+  const report = (
+    node: ts.Node,
+    text: string | undefined,
+    kind: Violation['kind'],
+    isProse: (t: string) => boolean = isJsxProse,
+  ) => {
+    if (text === undefined || !isProse(text.replace(/\s+/g, ' ').trim())) return;
     const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
     out.push({ line, text: text.replace(/\s+/g, ' ').trim(), kind });
   };
@@ -250,13 +255,17 @@ function expressionProse(raw: string): { line: number; text: string; kind: Viola
         for (const arg of node.arguments) report(arg, staticText(arg), kind);
       }
       if (ts.isIdentifier(node.expression) && SETTER_CALLEE.test(callee) && node.arguments[0]) {
-        report(node.arguments[0], staticText(node.arguments[0]), 'call:setter');
+        // A setter argument is never a lone label, so the single-capitalised-word rule does not apply.
+        report(node.arguments[0], staticText(node.arguments[0]), 'call:setter', isUserFacing);
       }
       if (callee === 'toast.promise' && node.arguments[1]) {
         const options = unwrapExpression(node.arguments[1]);
         if (ts.isObjectLiteralExpression(options)) {
           for (const prop of options.properties) {
-            if (!ts.isPropertyAssignment(prop) || !TOAST_PROMISE_SLOTS.has(prop.name.getText(sf))) continue;
+            // `loading:` and `'loading':` are the same key; read the name's value, not its source text.
+            if (!ts.isPropertyAssignment(prop)) continue;
+            const key = ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name) ? prop.name.text : undefined;
+            if (key === undefined || !TOAST_PROMISE_SLOTS.has(key)) continue;
             // `success: () => '…'` — the message is what the callback returns.
             const value = unwrapExpression(prop.initializer);
             const message = ts.isArrowFunction(value) && !ts.isBlock(value.body) ? value.body : value;
@@ -266,7 +275,10 @@ function expressionProse(raw: string): { line: number; text: string; kind: Viola
       }
     } else if (ts.isThrowStatement(node) && node.expression && client) {
       const message = thrownMessage(node.expression);
-      if (message) report(message, staticText(message), 'throw');
+      // Narrowed (NG-91 review): only Turkish text counts as a user-facing throw. An English
+      // invariant ("Missing query client context") is a developer message, not UI text.
+      // Known limit: an English message the user does see is not caught here.
+      if (message) report(message, staticText(message), 'throw', t => TURKISH.test(t) && isUserFacing(t));
     } else if (ts.isJsxExpression(node) && node.expression) {
       const literal = staticText(node.expression);
       const parent = node.parent;

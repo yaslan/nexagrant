@@ -163,3 +163,33 @@ describe('i18n-hardcoded: literal inside a JSX expression (NG-91)', () => {
     expect(hits(`<option>{t('kategori.sec')}</option><input placeholder={t('belge.ara')} />`)).toEqual([]);
   });
 });
+
+describe('i18n-hardcoded: NG-91 crw-gnd review fixes', () => {
+  // Bulgu 1 — throw: an English developer invariant in a client module is not UI text.
+  it('does not flag an English invariant thrown in a client module', () => {
+    const src = `'use client';\nthrow new Error('Missing query client context');`;
+    expect(hits(src)).toEqual([]);
+  });
+
+  it('still flags a Turkish user-facing message thrown in a client module', () => {
+    const src = `'use client';\nthrow new Error('Oturum süresi doldu, yeniden giriş yapın');`;
+    expect(hits(src)).toEqual(['throw Oturum süresi doldu, yeniden giriş yapın']);
+  });
+
+  // Bulgu 2 — toast.promise: quoted property keys are the same key as bare ones.
+  it('flags toast.promise messages under quoted keys', () => {
+    const src = `toast.promise(save(), { 'loading': 'Kaydediliyor…', "success": 'Kaydedildi' });`;
+    expect(hits(src)).toEqual(['call:toast.promise Kaydedildi', 'call:toast.promise Kaydediliyor…']);
+  });
+
+  // Bulgu 3 — setter: a lone PascalCase token is a machine value, not prose.
+  it('ignores a setter whose literal is a single PascalCase machine value', () => {
+    const src = `setStatus('Active');`;
+    expect(hits(src)).toEqual([]);
+  });
+
+  it('still flags a Turkish single-word setter literal', () => {
+    const src = `setMessage('Başarısız');`;
+    expect(hits(src)).toEqual(['call:setter Başarısız']);
+  });
+});
