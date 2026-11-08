@@ -239,6 +239,7 @@ function detail(active: ModuleId[], locale: 'tr' | 'en' = 'tr') {
     <OpportunityDetailClient
       opportunity={OPPORTUNITY}
       g0={G0}
+      savedG0={null}
       efforts={[]}
       canArchive={false}
       backHref={`/${locale}/main/pipeline`}

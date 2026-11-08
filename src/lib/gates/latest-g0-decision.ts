@@ -16,3 +16,23 @@ export function latestG0PassedByOpportunity(
   }
   return latest;
 }
+
+/** The latest saved G0 decision for one opportunity, as the detail page reads it. */
+export type SavedG0Decision = { passed: boolean; decidedAt: Date };
+
+/**
+ * What the detail page's G0 box shows (NG-69, K-579051).
+ *
+ * At G0 the box is a live computation. Once the opportunity has left G0, the gate acted on the
+ * saved decision, so the box shows that decision with its date and never the live number.
+ */
+export type G0BoxMode =
+  | { kind: 'live' }
+  | { kind: 'saved'; passed: boolean; decidedAt: Date }
+  | { kind: 'none' };
+
+export function g0BoxMode(stage: string, saved: SavedG0Decision | null): G0BoxMode {
+  if (stage === 'G0') return { kind: 'live' };
+  if (!saved) return { kind: 'none' };
+  return { kind: 'saved', passed: saved.passed, decidedAt: saved.decidedAt };
+}

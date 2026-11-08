@@ -16,6 +16,7 @@ import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { useGateReasonText } from '@/lib/hooks/use-gate-reason-text';
 import type { GateReason } from '@/lib/gates/reasons';
 import { nextStageOf } from '@/lib/gates/transition';
+import { g0BoxMode, type SavedG0Decision } from '@/lib/gates/latest-g0-decision';
 import { errorMessage } from '@/lib/errors';
 import { EffortTracker, type EffortEntry } from './effort';
 
@@ -68,9 +69,12 @@ export function OpportunityDetailClient({
   backHref,
   locale,
   workspace,
+  savedG0,
 }: {
   opportunity: OpportunityView;
   g0: G0Display;
+  /** Latest saved G0 decision; the G0 box shows it once the opportunity has left G0 (NG-69). */
+  savedG0: SavedG0Decision | null;
   /** Rows from the `Effort` table for this opportunity — empty is a real answer, not an error. */
   efforts: EffortEntry[];
   /** Whether this session may archive. The server action re-checks; this only hides the control. */
@@ -190,6 +194,8 @@ export function OpportunityDetailClient({
   const scoreKnown = g0.score !== null;
   // The first reason the scorer gave for refusing: shown on the score card, the full list is below.
   const refusalReason = g0.decision === 'NO_GO' ? g0.reasons[0] : undefined;
+  // Past G0 the box shows the saved decision and its date, never the live computation (NG-69).
+  const boxMode = g0BoxMode(opportunity.stage, savedG0);
 
   return (
     <div className="max-w-5xl mx-auto py-4 sm:px-4 md:p-8">
@@ -411,7 +417,31 @@ export function OpportunityDetailClient({
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
                     {t('detail.g0Score')}
                   </h3>
-                  {scoreKnown ? (
+                  {boxMode.kind === 'saved' ? (
+                    <>
+                      <p
+                        className={`text-2xl font-bold ${boxMode.passed ? 'text-ok' : 'text-rose-800'}`}
+                        data-testid="pipeline-g0-saved"
+                      >
+                        {boxMode.passed ? t('detail.savedG0Passed') : t('detail.savedG0Refused')}
+                      </p>
+                      <p className="text-xs text-muted mt-1" data-testid="pipeline-g0-saved-date">
+                        {t('detail.savedG0Date', {
+                          date: boxMode.decidedAt.toLocaleDateString(locale, {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          }),
+                        })}
+                      </p>
+                    </>
+                  ) : boxMode.kind === 'none' ? (
+                    <>
+                      <p className="text-lg font-bold text-amber" data-testid="pipeline-g0-saved-none">
+                        {t('detail.savedG0None')}
+                      </p>
+                    </>
+                  ) : scoreKnown ? (
                     <>
                       {g0.scoringBasis === 'no_history_evidence' ? (
                         // Not "/100": the score is an average over the criteria that were measured,
@@ -455,7 +485,9 @@ export function OpportunityDetailClient({
                       <p className="text-xs text-muted mt-1">{t('detail.g0NotComputedHint')}</p>
                     </>
                   )}
-                  <p className="text-[11px] text-muted mt-2 italic">{t('detail.internalPreAssessment')}</p>
+                  {boxMode.kind === 'live' && (
+                    <p className="text-[11px] text-muted mt-2 italic">{t('detail.internalPreAssessment')}</p>
+                  )}
                 </div>
                 <div className="bg-ground border border-border p-4 rounded-xl">
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
