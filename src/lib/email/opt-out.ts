@@ -42,7 +42,7 @@ interface WireBody {
   t: string;
 }
 
-/** Separates this token's key from every other use of AUTH_SECRET. */
+/** Separates this token's key from every other use of the same secret. */
 const KEY_LABEL = 'fonbridge:email-opt-out:v1';
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 /** An HMAC-SHA256 digest is 32 bytes = 43 base64url characters. */
@@ -53,10 +53,15 @@ const SOURCES: readonly OptOutSource[] = ['invitation', 'beta-invite'];
 /**
  * SHA-256 of the normalised address, as `AuditEvent.target`. Keyless on
  * purpose: a keyed hash would make every recorded opt-out unreachable the day
- * AUTH_SECRET rotates, and an opt-out has to outlive a key.
+ * the key rotates, and an opt-out has to outlive a key.
+ *
+ * Takes a bare address or a `Name <address>` recipient and hashes the address
+ * either way, so the token in a mail and the suppression check before it
+ * cannot disagree over how `to` was written.
  */
-export function emailOptOutHash(email: string): string {
-  return createHash('sha256').update(`${KEY_LABEL}:${email.trim().toLowerCase()}`, 'utf8').digest('hex');
+export function emailOptOutHash(recipient: string): string {
+  const address = /<([^<>]+)>\s*$/.exec(recipient)?.[1] ?? recipient;
+  return createHash('sha256').update(`${KEY_LABEL}:${address.trim().toLowerCase()}`, 'utf8').digest('hex');
 }
 
 function mac(body: string, secret: string): Buffer {

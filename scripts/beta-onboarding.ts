@@ -421,9 +421,9 @@ async function main(): Promise<void> {
       // and is not sent to an address that has already used one.
       const { isEmailOptedOut } = await import('../src/lib/email/opt-out-store');
       const { withOptOut } = await import('../src/lib/email/opt-out');
-      const { authSecret } = await import('../src/lib/env');
-      const secret = authSecret();
-      if (!secret) throw new Error('--send requires AUTH_SECRET in the environment');
+      const { emailOptOutSecret } = await import('../src/lib/env');
+      const secret = emailOptOutSecret();
+      if (!secret) throw new Error('--send requires EMAIL_OPTOUT_SECRET or AUTH_SECRET in the environment');
       if (await isEmailOptedOut(partner.contactEmail, tenantId)) {
         log('mail', `${partner.slug}: opted out — not sent`);
         summary.push({ slug: partner.slug, org: partner.orgName, email: partner.contactEmail, locale: partner.locale, tenantId, modulesPilot, delivery: 'opted-out' });

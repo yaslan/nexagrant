@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { CircleAlert, CircleCheck } from 'lucide-react';
-import { authSecret } from '@/lib/env';
+import { emailOptOutSecret } from '@/lib/env';
 import { verifyOptOutToken, type OptOutKind } from '@/lib/email/opt-out';
 
 type PageProps = {
@@ -28,7 +28,7 @@ export default async function EmailOptOutPage({ params, searchParams }: PageProp
 
   const doneKind: OptOutKind | null =
     query.status === 'done' ? (query.k === 'decline' ? 'decline' : 'unsubscribe') : null;
-  const secret = authSecret();
+  const secret = emailOptOutSecret();
   const token = typeof query.t === 'string' ? query.t : '';
   const payload = !doneKind && secret ? verifyOptOutToken(token, secret) : null;
   const invalid = !doneKind && !payload;

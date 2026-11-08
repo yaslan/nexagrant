@@ -20,7 +20,7 @@ import {
 } from '@/lib/email/invitation-mail-policy';
 import { withOptOut } from '@/lib/email/opt-out';
 import { isEmailOptedOut } from '@/lib/email/opt-out-store';
-import { authSecret } from '@/lib/env';
+import { emailOptOutSecret } from '@/lib/env';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { appUrl } from '@/lib/app-url';
 import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
@@ -334,7 +334,7 @@ async function deliverInvitationEmail(params: {
   if (params.skip) return { sent: false, reason: params.skip };
 
   try {
-    const secret = authSecret();
+    const secret = emailOptOutSecret();
     if (!secret) throw new Error('auth_secret_unset');
     const receipt = await mailer(
       withOptOut(renderInvitationEmail(params.message), {

@@ -51,7 +51,7 @@ vi.mock('@/lib/env', async (importOriginal) => {
   const override: Record<string, unknown> = { NODE_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://app.example.invalid' };
   return {
     ...actual,
-    authSecret: () => SECRET,
+    emailOptOutSecret: () => SECRET,
     env: new Proxy(actual.env, { get: (t, k) => (typeof k === 'string' && k in override ? override[k] : Reflect.get(t, k)) }),
   };
 });
