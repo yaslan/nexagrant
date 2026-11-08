@@ -4,7 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/llm';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
@@ -57,7 +57,7 @@ export async function generateMeetingBrief({
     if (!opp) throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
   }
   const locale = await promptLocale();
-  const prompt = renderPrompt('m9/meeting-brief', { partnerName, callTopic }, locale);
+  const request = separatedPrompt('m9/meeting-brief', {}, { partner_name: partnerName, call_topic: callTopic }, locale);
 
   // `aiGenerated` decides two things below: whether an AI credit is debited, and
   // whether the brief is stored as a template draft. A brief the model never
@@ -70,8 +70,7 @@ export async function generateMeetingBrief({
       userId,
       module: 'M9',
       purpose: 'meeting_brief',
-      prompt,
-      system: renderPrompt('m9/meeting-brief-system', {}, locale),
+      ...request,
     });
   } catch (e) {
     console.warn('[M9 generateMeetingBrief] LLM call fallback:', errorMessage(e));

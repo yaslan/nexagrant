@@ -8,8 +8,12 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
  * snapshots exactly what reaches `@/lib/llm` — `prompt`, `system`, or the
  * `messages` array. The snapshot file was written by this test against the code
  * *before* the move (the inline literals) and then left untouched; after the move
- * the same test, unchanged, must still match it. `rag.ts`'s `formatRagPrompt` is
+ * the same test, unchanged, must still match it. `rag.ts`'s `formatRagContext` is
  * pure and is called directly.
+ *
+ * NG-40 changed the non-M17 texts on purpose (instructions and data apart), and
+ * their snapshots with them; tests/ai-instruction-data-separation.test.ts is what
+ * pins that separation. M17's snapshots were not touched.
  *
  * Every LLM mock records its argument and then throws: nothing after the model
  * call matters here, and each call site's own tests cover that half.
@@ -61,12 +65,11 @@ vi.mock('@/lib/rag', async (importOriginal) => {
       { text: 'Prior pilot on 40 farms.', score: 0.9, documentId: 'd1' },
       { text: 'Sensor patent EP123.', score: 0.8, documentId: 'd2' },
     ]),
-    buildRagPrompt: vi.fn(async (q: string) =>
-      real.formatRagPrompt(q, [{ text: 'Prior pilot on 40 farms.', score: 0.91 }])
-    ),
+    buildRagContext: vi.fn(async () => real.formatRagContext([{ text: 'Prior pilot on 40 farms.', score: 0.91 }])),
   };
 });
-vi.mock('@/modules/m2/server/templates', () => ({
+vi.mock('@/modules/m2/server/templates', async (importOriginal) => ({
+  sectionsWithWordLimit: (await importOriginal<typeof import('@/modules/m2/server/templates')>()).sectionsWithWordLimit,
   findAccessibleTemplate: vi.fn(async () => ({ id: 'tpl-1', schema: [] })),
   templateSections: vi.fn(() => [
     { key: 'objectives', label: 'Objectives', promptKey: 'Describe the objectives.', maxWords: 250 },
@@ -155,16 +158,15 @@ describe('prompt text is byte-identical to the pre-move inline literals', () => 
     expect(promptOf(arg)).toMatchSnapshot();
   });
 
-  test('RAG context wrapper (formatRagPrompt)', async () => {
-    const { formatRagPrompt } = await import('@/lib/rag');
+  test('RAG context (formatRagContext)', async () => {
+    const { formatRagContext } = await import('@/lib/rag');
     expect(
-      formatRagPrompt('What did the pilot measure?', [
+      formatRagContext([
         { text: 'Pilot on 40 farms.', score: 0.912 },
         { text: 'Yield +12%.', score: 0.5 },
       ])
     ).toMatchSnapshot();
-    // No context → the question passes through untouched.
-    expect(formatRagPrompt('Bare question', [])).toBe('Bare question');
+    expect(formatRagContext([])).toBe('');
   });
 });
 

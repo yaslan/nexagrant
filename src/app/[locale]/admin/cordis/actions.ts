@@ -6,7 +6,7 @@ import { cordisImportFailureCode } from '@/lib/k2-cordis/failure-codes';
 import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
 import { syncCordisBigData, aggregateCordisMetrics } from '@/lib/cordis-sync';
 import { fetchLiveCordisDelta, getCordisLiveStreamLogs } from '@/lib/cordis-delta';
-import { retrieveChunks, formatRagPrompt } from '@/lib/rag';
+import { retrieveChunks, formatRagContext } from '@/lib/rag';
 import { requirePlatformAdmin } from '@/lib/tenant';
 
 /**
@@ -99,6 +99,6 @@ export async function handleTestRagQuery(query: string, topK: number = 3) {
   // so the embedding call is logged under PLATFORM_SCOPE_TENANT_ID rather than
   // against a tenant. See `embedText` in src/lib/llm.ts.
   const chunks = await retrieveChunks(query, topK);
-  const ragPrompt = formatRagPrompt(query, chunks);
+  const ragPrompt = formatRagContext(chunks);
   return { chunks, ragPrompt };
 }

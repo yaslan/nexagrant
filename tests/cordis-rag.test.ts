@@ -27,7 +27,7 @@ vi.mock('../src/lib/llm', async () => {
 });
 
 const { syncCordisBigData, aggregateCordisMetrics } = await import('../src/lib/cordis-sync');
-const { retrieveChunks, buildRagPrompt, splitText } = await import('../src/lib/rag');
+const { retrieveChunks, buildRagContext, splitText } = await import('../src/lib/rag');
 
 beforeEach(() => {
   embedTextMock.mockReset().mockImplementation(async (text: string) => fakeEmbedding(text));
@@ -195,9 +195,9 @@ describe('RAG helpers', () => {
     expect(chunks[0]?.score).toBeGreaterThan(0.5);
   });
 
-  test('buildRagPrompt formats retrieved chunks into LLM prompt', async () => {
-    const prompt = await buildRagPrompt('Zero-emission battery', undefined, 2);
-    expect(prompt).toContain('RETRIEVED CONTEXT');
-    expect(prompt).toContain('Question: Zero-emission battery');
+  test('buildRagContext labels the retrieved chunks and carries no instruction', async () => {
+    const context = await buildRagContext('Zero-emission battery', undefined, 2);
+    expect(context).toContain('[Source 1 | Score:');
+    expect(context).not.toContain('Question:');
   });
 });
