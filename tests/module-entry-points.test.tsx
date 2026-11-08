@@ -222,7 +222,16 @@ const OPPORTUNITY = {
   status: 'ACTIVE',
   intendedRole: null,
 };
-const G0 = { score: null, decision: null, measuredSources: 0, totalSources: 0, reasons: [], minScore: 70 };
+const G0 = {
+  score: null,
+  decision: null,
+  measuredSources: 0,
+  totalSources: 0,
+  reasons: [],
+  minScore: 70,
+  scoringBasis: 'standard' as const,
+  denominator: null,
+};
 
 function detail(active: ModuleId[], locale: 'tr' | 'en' = 'tr') {
   return shell(

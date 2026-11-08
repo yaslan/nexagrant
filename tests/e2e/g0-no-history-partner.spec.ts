@@ -338,6 +338,23 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(evidenceOf(openRun).filledSeats).toBe(0);
     expect(evidenceOf(openRun).noHistoryWithoutFilledSeat).toBe(true);
 
+    // NG-69: the verdict as the user reads it. The refused partner's score is 84, above the 80 line
+    // the old board painted green. The card must say "84" without a fixed "/100", give the real
+    // basis (denominator 75) and the refusal reason; the board badge must not be green.
+    const refusedDetail = await openDetail(page, opp.id);
+    await expect(refusedDetail.getByTestId('pipeline-g0-value')).toHaveText('84');
+    await expect(refusedDetail.getByTestId('pipeline-g0-basis')).toContainText('75');
+    await expect(refusedDetail.getByTestId('pipeline-g0-refusal')).toBeVisible();
+    await shot(page, '04-detay-red-gerekcesi');
+    await refusedDetail.getByRole('link', { name: "Pipeline'a Geri Dön" }).click();
+    await expect(page.getByTestId('pipeline-board')).toBeVisible({ timeout: 30_000 });
+    const refusedBadge = page.getByTestId(`pipeline-card-g0-${opp.id}`);
+    await expect(refusedBadge).toContainText('84');
+    // The painted colour, not an attribute derived from the same rule: amber text, never the green one.
+    await expect(refusedBadge).toHaveClass(/text-amber/);
+    await expect(refusedBadge).not.toHaveClass(/text-ok/);
+    await shot(page, '05-pano-rozet-red');
+
     // ── 2. Both seats invited from the candidate search. Now the seats name organisations.
     await page.goto(`/tr/${SLUG}/pipeline/${opp.id}/consortium`);
     await expectHydrated(page.getByRole('button', { name: `+ ${CONSORTIUM_ROLES.research}` }));
@@ -357,6 +374,19 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(ev.researchAndEndUser).toBe(50 + 50);
     expect(ev.score).toBe(100);
     expect(invitedRun.passed).toBe(true);
+
+    // NG-69: a passed partner keeps the green badge. The opportunity has moved on to G1 by now, so
+    // the detail page's score card is the live recomputation shown beside a G1 stage (see the
+    // report's note on G1+ visibility).
+    const passedDetail = await openDetail(page, opp.id);
+    await expect(passedDetail.getByTestId('pipeline-g0-value')).toHaveText('100');
+    await expect(passedDetail.getByTestId('pipeline-g0-refusal')).toHaveCount(0);
+    await passedDetail.getByRole('link', { name: "Pipeline'a Geri Dön" }).click();
+    await expect(page.getByTestId('pipeline-board')).toBeVisible({ timeout: 30_000 });
+    const passedBadge = page.getByTestId(`pipeline-card-g0-${opp.id}`);
+    await expect(passedBadge).toContainText('100');
+    await expect(passedBadge).toHaveClass(/text-ok/);
+    await shot(page, '06-pano-rozet-gecti');
 
     // ── 3. The PIC is removed (fixture). The same two invited seats now score on the standard basis.
     // "PIC boşsa kolaylık yok": the 75-point denominator must not apply, and removing the PIC must not

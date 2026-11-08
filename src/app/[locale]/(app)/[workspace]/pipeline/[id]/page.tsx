@@ -123,6 +123,8 @@ export default async function OpportunityDetailPage({
     totalSources: loaded.g0?.sources.length ?? 0,
     reasons: loaded.g0?.reasonDetails ?? [],
     minScore: DEFAULT_GATE_RULES.G0.minScore,
+    scoringBasis: loaded.g0?.scoringBasis ?? 'standard',
+    denominator: loaded.g0?.denominator ?? null,
   };
 
   const opportunity: OpportunityView = {

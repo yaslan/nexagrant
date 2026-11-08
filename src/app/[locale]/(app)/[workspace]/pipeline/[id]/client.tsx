@@ -37,6 +37,14 @@ export interface G0Display {
   reasons: GateReason[];
   /** `DEFAULT_GATE_RULES.G0.minScore`, so the screen names the threshold it is judged against. */
   minScore: number;
+  /**
+   * `no_history_evidence`: a partner with no CORDIS history was scored without the history
+   * criteria. The score is then the average over the criteria that were measured, and
+   * `denominator` is the weight those criteria add up to (not 100).
+   */
+  scoringBasis: 'standard' | 'no_history_evidence';
+  /** Sum of the weights the score was normalised by; `null` when nothing was scored. */
+  denominator: number | null;
 }
 
 export interface OpportunityView {
@@ -180,6 +188,8 @@ export function OpportunityDetailClient({
   const isDecided = opportunity.status === 'FUNDED' || opportunity.status === 'REJECTED';
 
   const scoreKnown = g0.score !== null;
+  // The first reason the scorer gave for refusing: shown on the score card, the full list is below.
+  const refusalReason = g0.decision === 'NO_GO' ? g0.reasons[0] : undefined;
 
   return (
     <div className="max-w-5xl mx-auto py-4 sm:px-4 md:p-8">
@@ -403,7 +413,22 @@ export function OpportunityDetailClient({
                   </h3>
                   {scoreKnown ? (
                     <>
-                      <p className="text-2xl font-bold text-ink">{g0.score}/100</p>
+                      {g0.scoringBasis === 'no_history_evidence' ? (
+                        // Not "/100": the score is an average over the criteria that were measured,
+                        // so the scale is not a fixed 100 here (NG-69).
+                        <>
+                          <p className="text-2xl font-bold text-ink" data-testid="pipeline-g0-value">
+                            {g0.score}
+                          </p>
+                          <p className="text-xs text-muted mt-1" data-testid="pipeline-g0-basis">
+                            {t('detail.noHistoryBasis', { denominator: g0.denominator ?? 0 })}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-2xl font-bold text-ink" data-testid="pipeline-g0-value">
+                          {g0.score}/100
+                        </p>
+                      )}
                       <p className="text-xs text-muted mt-1">
                         {t('detail.threshold', { min: g0.minScore })} ·{' '}
                         {t('detail.evidenceCoverage', {
@@ -414,6 +439,11 @@ export function OpportunityDetailClient({
                       {g0.decision && (
                         <p className="text-xs font-semibold mt-1">
                           {g0.decision === 'GO' ? t('detail.decisionGo') : t('detail.decisionNoGo')}
+                        </p>
+                      )}
+                      {refusalReason && (
+                        <p className="text-xs text-rose-800 mt-1" data-testid="pipeline-g0-refusal">
+                          {t('detail.refusedBecause', { reason: reasonText(refusalReason) })}
                         </p>
                       )}
                     </>
