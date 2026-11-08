@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { requireId } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 /**
  * NG-42 — the opt-out link and the delivery record. The route handlers run for
@@ -135,7 +135,7 @@ beforeEach(async (ctx) => {
 
 afterAll(async () => {
   if (admin && tenantId) {
-    await admin.auditEvent.deleteMany({ where: { tenantId: null, type: EMAIL_UNSUBSCRIBED, target: { in: Array.from({ length: seq }, (_, i) => emailOptOutHash(`${RUN}-${i + 1}@example.invalid`)) } } });
+    await admin.auditEvent.deleteMany({ where: { tenantId: null, type: requireId(EMAIL_UNSUBSCRIBED, 'type'), target: { in: presentIds(Array.from({ length: seq }, (_, i) => emailOptOutHash(`${RUN}-${i + 1}@example.invalid`))) } } });
     await admin.tenant.deleteMany({ where: { id: { in: [requireId(tenantId, 'tenantId'), requireId(otherTenantId, 'otherTenantId')] } } });
   }
   await state.rls?.$disconnect();
