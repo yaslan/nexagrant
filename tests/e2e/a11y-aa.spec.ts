@@ -74,6 +74,58 @@ test.describe('WCAG A/AA — signed in, main layout', () => {
   }
 });
 
+/**
+ * NG-90 — genişletme. Yalnız KEŞİFTE (ham axe) ihlalsiz ve 200 dönen adresler buraya girer.
+ * Eklenmeyenler (ihlalli, ayrı borç kartında raporlanır): /tr/fiyatlandirma, /en/pricing (color-contrast),
+ * /tr/kayit, /en/register (color-contrast), /tr/main/ayarlar (color-contrast), /tr/main/ayarlar/uyeler
+ * ve /en/main/settings/members (select-name), /tr/main/firsatlar ve /en/main/pipeline (color-contrast +
+ * select-name). Hiçbir axe kuralı kapatılmadı, hiçbir bölüm exclude edilmedi.
+ */
+test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
+  for (const url of ['/tr/blog', '/en/blog', '/tr/gizlilik-politikasi', '/en/privacy', '/tr/kullanim-kosullari', '/en/terms']) {
+    test(`${url} has no A/AA violations`, async ({ page }) => {
+      await acceptCookies(page);
+      const response = await page.goto(url);
+      expect(response?.status(), url).toBe(200);
+      await expect(page.locator('main')).toBeVisible();
+      expect(await scan(page), url).toEqual([]);
+    });
+  }
+
+  for (const locale of ['tr', 'en']) {
+    test(`/${locale}/blog/<ilk yazı> has no A/AA violations`, async ({ page }) => {
+      await acceptCookies(page);
+      await page.goto(`/${locale}/blog`);
+      const href = await page.locator(`a[href^="/${locale}/blog/"]`).first().getAttribute('href');
+      expect(href, 'blog listesinde yazı bağlantısı').toBeTruthy();
+      const response = await page.goto(href!);
+      expect(response?.status(), href!).toBe(200);
+      await expect(page.locator('main')).toBeVisible();
+      expect(await scan(page), href!).toEqual([]);
+    });
+  }
+});
+
+test.describe('WCAG A/AA — NG-90 signed in, settings (tr + en)', () => {
+  test.beforeAll(async () => {
+    await seedIdentity({ ...OWNER, workspaceIds: [] });
+  });
+  test.afterAll(async () => {
+    await cleanupIdentity([OWNER.userId]);
+  });
+
+  for (const url of ['/tr/main/ayarlar/profil', '/tr/main/ayarlar/gizlilik', '/en/main/settings/profile', '/en/main/settings/privacy']) {
+    test(`${url} has no A/AA violations`, async ({ page }) => {
+      await acceptCookies(page);
+      await signInAs(page, { id: OWNER.userId, email: OWNER.email, tenantId: OWNER.tenantId, role: OWNER.role });
+      const response = await page.goto(url);
+      expect(response?.status(), url).toBe(200);
+      await expect(page.locator('main')).toBeVisible();
+      expect(await scan(page), url).toEqual([]);
+    });
+  }
+});
+
 test('the scanner is live: a nameless button is reported', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/giris');
