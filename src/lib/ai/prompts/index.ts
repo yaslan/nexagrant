@@ -122,12 +122,34 @@ type SeparatedPromptId = Exclude<PromptId, `m17/${string}` | 'shared/untrusted-d
 const DATA_TAG = 'user_data';
 const DATA_FIELD_RE = /^[a-z_]+$/;
 
+/** Characters that take no visible space: marks, separators, controls, format and default-ignorable ones. */
+const INVISIBLE = String.raw`[\p{M}\p{Z}\p{C}\p{DI}]*`;
+/** Between the two words of the name: the invisible ones and any punctuation or symbol. */
+const NAME_SEPARATOR = String.raw`[\p{M}\p{P}\p{S}\p{Z}\p{C}\p{DI}]*`;
+
+/** The word, letter by letter: each is itself or a visible letter of another script standing in for it. */
+function tagWord(word: string): string {
+  return [...word].map((letter) => String.raw`(?:${letter}|(?![\p{Script=Latin}\p{DI}])\p{L})`).join(INVISIBLE);
+}
+
 /**
  * The `<` of anything that reads as our tag: either case, with or without a slash,
- * spaced, or with invisible characters or a separator slipped in. `\W` covers those
- * inside the name; the class before it covers the characters around the slash.
+ * any invisible or format character around the `<`, the slash and the letters, any
+ * separator between the two words, and letters of another script for Latin ones
+ * (Cyrillic `а`, `е`).
+ *
+ * Not covered: HTML entities, and Latin-script look-alikes such as full-width or
+ * accented letters. Those stay in the user message, which the system prompt declares
+ * to be data. A `<` before a non-Latin word of the same shape also becomes `＜`,
+ * which costs one glyph and no content.
+ *
+ * The optional slash is its own group, and `tagWord` keeps invisible letters out of
+ * its alternatives, so a long invisible run cannot make this backtrack.
  */
-const DATA_TAG_RE = /<(?=[\s​-‍⁠﻿]*\/?[\s​-‍⁠﻿]*user[\W_]*data(?![\w-]))/gi;
+const DATA_TAG_RE = new RegExp(
+  String.raw`<(?=(?:${INVISIBLE}/)?${INVISIBLE}${tagWord('user')}${NAME_SEPARATOR}${tagWord('data')}(?![\p{L}\p{N}_-]))`,
+  'giu'
+);
 
 /**
  * A value that writes `</user_data>` would close its block early and what follows
@@ -148,14 +170,22 @@ function fenceData(data: Record<string, string | number>): string {
     .join('\n');
 }
 
+/** Well above the longest section a seeded template allows (5000 words). */
+const MAX_INSTRUCTION_COUNT = 20_000;
+
+/** A number that makes sense in a prompt's instructions: a positive whole count, within the ceiling. */
+export function isInstructionCount(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0 && (value as number) <= MAX_INSTRUCTION_COUNT;
+}
+
 /**
  * One model request with its instructions and its data apart (NG-40): the `system`
  * and `prompt` of `generateText` / `generateCompletion`.
  *
- * `instructions` fill the template, so only finite numbers are accepted, at run
- * time too: a server action is a public POST endpoint and its TypeScript signature
- * does not bind the caller. Text belongs in `data`, keyed by the field name the
- * template refers to.
+ * `instructions` fill the template, so only a count {@link isInstructionCount}
+ * accepts gets through, at run time too: a server action is a public POST endpoint
+ * and its TypeScript signature does not bind the caller. Text belongs in `data`,
+ * keyed by the field name the template refers to.
  */
 export function separatedPrompt<I extends SeparatedPromptId>(
   id: I,
@@ -164,8 +194,10 @@ export function separatedPrompt<I extends SeparatedPromptId>(
   locale?: string
 ): { system: string; prompt: string } {
   for (const [name, value] of Object.entries(instructions)) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      throw new PromptTemplateError(`Prompt ${id}: instruction variable "${name}" must be a finite number`);
+    if (!isInstructionCount(value)) {
+      throw new PromptTemplateError(
+        `Prompt ${id}: instruction variable "${name}" must be a whole number from 1 to ${MAX_INSTRUCTION_COUNT}`
+      );
     }
   }
   const body = renderPrompt(id, instructions as unknown as PromptVars<I>, locale);

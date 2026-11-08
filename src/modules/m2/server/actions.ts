@@ -10,7 +10,7 @@ import { assertModuleAccess } from '@/lib/modules/access';
 import { retrieveChunks } from '@/lib/rag';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
 import { PRODUCT_NAME } from '@/lib/brand';
-import { findAccessibleTemplate, templateSections } from './templates';
+import { findAccessibleTemplate, sectionsWithWordLimit, templateSections } from './templates';
 
 /**
  * M2 concept notes.
@@ -93,10 +93,12 @@ export async function generateConceptNoteDraft(
 
   if (!template) throw new Error('Template not found');
 
+  // Every section's word limit is checked before the first RAG or model call.
+  const schema = sectionsWithWordLimit(templateSections(template.schema));
+
   // 3. For each section, search RAG for context and generate text
   const locale = await promptLocale();
   const content: Record<string, string> = {};
-  const schema = templateSections(template.schema);
 
   for (const section of schema) {
     // Basic RAG search
@@ -110,11 +112,10 @@ export async function generateConceptNoteDraft(
 
     // `String(...)` keeps what the template literal printed for a missing topic or
     // promptKey ("undefined"). `section` comes from a template a tenant can own, so
-    // `promptKey` is data like the rest, and `Number` is what stands between a text
-    // `maxWords` and the instructions.
+    // `promptKey` is data like the rest; `maxWords` was checked above.
     const request = separatedPrompt(
       'm2/concept-note-section',
-      { maxWords: Number(section.maxWords) },
+      { maxWords: section.maxWords },
       {
         topic_title: String(topic?.title),
         topic_identifier: String(topic?.identifier),

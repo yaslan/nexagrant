@@ -490,7 +490,8 @@
       "sectionLabel": "{label} (en fazla {max} kelime)",
       "placeholder": "{label} bölümünü yazın...",
       "words": "Kelime: {count} / {max}",
-      "noTemplate": "Sistemde konsept notu şablonu bulunamadı. Seed verisini yükleyin."
+      "noTemplate": "Sistemde konsept notu şablonu bulunamadı. Seed verisini yükleyin.",
+      "invalidSection": "Taslak üretilemedi: şablondaki \"{section}\" bölümünün kelime sınırı geçersiz. Şablonu düzeltip yeniden deneyin. Kredi harcanmadı."
     },
     "status": {
       "draft": "Taslak",
@@ -3771,6 +3772,9 @@
     "importErrors": {
       "SKIP_LIMIT_EXCEEDED": "İçe aktarım hatası: CORDIS dökümünde okunamayan kayıt sayısı sınırı aştı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında.",
       "IMPORT_FAILED": "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında."
+    },
+    "ragPreview": {
+      "noMatches": "Bu aramayla eşleşen parça bulunamadı."
     }
   },
   "adminInterreg": {

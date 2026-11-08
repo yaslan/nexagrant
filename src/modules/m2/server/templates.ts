@@ -1,6 +1,8 @@
 import type { ConceptTemplate, Prisma, PrismaClient } from '@prisma/client';
 
 import { assertTenantScope, prisma } from '@/lib/db';
+import { isInstructionCount } from '@/lib/ai/prompts';
+import { InvalidTemplateSectionError } from '@/modules/m2/invalid-section';
 import type { ConceptTemplateSection } from '@/modules/m2/types';
 
 /**
@@ -100,6 +102,22 @@ export function templateSections(schema: unknown): ConceptTemplateSection[] {
     raw = (schema as { sections: unknown[] }).sections;
   }
   return raw.filter(isSection).map(withLabel);
+}
+
+/**
+ * The sections with their word limits as numbers, for drafting (NG-40). The limit
+ * goes into the model's instructions and the column is tenant-owned Json, so each
+ * section is checked here, before the first paid call: one bad section halfway
+ * through would otherwise have billed the ones before it. A limit stored as digits
+ * still works. `templateSections` stays lenient because the export needs no limit.
+ */
+export function sectionsWithWordLimit(sections: ConceptTemplateSection[]): ConceptTemplateSection[] {
+  return sections.map((section) => {
+    const stored: unknown = section.maxWords;
+    const maxWords = typeof stored === 'string' && /^\d+$/.test(stored) ? Number(stored) : stored;
+    if (!isInstructionCount(maxWords)) throw new InvalidTemplateSectionError(section.key);
+    return { ...section, maxWords };
+  });
 }
 
 /**

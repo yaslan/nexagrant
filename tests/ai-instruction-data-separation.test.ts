@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
+import ts from 'typescript';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 
 /**
@@ -57,7 +58,8 @@ vi.mock('@/lib/db', () => ({
     },
   },
 }));
-vi.mock('@/modules/m2/server/templates', () => ({
+vi.mock('@/modules/m2/server/templates', async (importOriginal) => ({
+  sectionsWithWordLimit: (await importOriginal<typeof import('@/modules/m2/server/templates')>()).sectionsWithWordLimit,
   findAccessibleTemplate: vi.fn(async () => ({ id: 'tpl-1', schema: [] })),
   templateSections: vi.fn(() => [
     { key: 'objectives', labelKey: 'Objectives', promptKey: h.state.payload, maxWords: 250 },
@@ -192,19 +194,63 @@ describe('the rule holds for the call sites of tomorrow', () => {
     }
   });
 
-  test('every file that calls the model outside M17 builds its request with separatedPrompt', () => {
-    const repo = resolve(__dirname, '..');
-    const walk = (dir: string): string[] =>
-      readdirSync(dir).flatMap((name) => {
-        const path = join(dir, name);
-        return statSync(path).isDirectory() ? walk(path) : [path];
-      });
-    const callers = walk(join(repo, 'src'))
+  // The syntax tree, not a text search: a comment or a string naming a function must
+  // not count as a use of it, and `return`, `void` or `.then` must not hide one.
+  function codeOf(file: string, text: string): { identifiers: Set<string>; calls: Set<string> } {
+    const identifiers = new Set<string>();
+    const calls = new Set<string>();
+    const visit = (node: ts.Node): void => {
+      if (ts.isIdentifier(node)) identifiers.add(node.text);
+      if (ts.isCallExpression(node)) {
+        const callee = node.expression;
+        if (ts.isIdentifier(callee)) calls.add(callee.text);
+        else if (ts.isPropertyAccessExpression(callee)) calls.add(callee.name.text);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX));
+    return { identifiers, calls };
+  }
+
+  const repo = resolve(__dirname, '..');
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      return statSync(path).isDirectory() ? walk(path) : [path];
+    });
+  const sources = () =>
+    walk(join(repo, 'src'))
       .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
-      .map((f) => [relative(repo, f), readFileSync(f, 'utf8')] as const)
-      .filter(([f, text]) => /await generate(Text|Completion)\(/.test(text) && f !== 'src/lib/llm.ts' && !f.startsWith('src/modules/m17/'));
+      .map((f) => {
+        const file = relative(repo, f).split(sep).join('/');
+        return [file, codeOf(file, readFileSync(f, 'utf8'))] as const;
+      });
+
+  test('every file that calls the model outside M17 builds its request with separatedPrompt', () => {
+    const callers = sources().filter(
+      ([f, code]) =>
+        (code.identifiers.has('generateText') || code.identifiers.has('generateCompletion')) &&
+        f !== 'src/lib/llm.ts' &&
+        !f.startsWith('src/modules/m17/')
+    );
 
     expect(callers.length).toBeGreaterThanOrEqual(7);
-    for (const [file, text] of callers) expect(text, file).toContain('separatedPrompt(');
+    for (const [file, code] of callers) expect(code.calls.has('separatedPrompt'), file).toBe(true);
+  });
+
+  test('outside M17 and the prompt module, no file uses renderPrompt', () => {
+    const users = sources()
+      .filter(([f, code]) => code.identifiers.has('renderPrompt') && !f.startsWith('src/modules/m17/') && !f.startsWith('src/lib/ai/prompts/'))
+      .map(([f]) => f);
+    expect(users).toEqual([]);
+  });
+
+  test('the check above reads code, not comments, and sees every way of calling', () => {
+    const inComment = codeOf('a.ts', "// separatedPrompt(x)\nconst s = 'separatedPrompt(y)';\nawait generateText(q);");
+    expect(inComment.calls.has('separatedPrompt')).toBe(false);
+    for (const call of ['return generateText(q)', 'void generateText(q)', 'generateText(q).then(f)', 'const p = generateText(q)']) {
+      expect(codeOf('a.ts', `function f() { ${call}; }`).identifiers.has('generateText'), call).toBe(true);
+    }
+    expect(codeOf('a.ts', "import { renderPrompt as r } from 'x'; r('a');").identifiers.has('renderPrompt')).toBe(true);
   });
 });

@@ -68,7 +68,8 @@ vi.mock('@/lib/rag', async (importOriginal) => {
     buildRagContext: vi.fn(async () => real.formatRagContext([{ text: 'Prior pilot on 40 farms.', score: 0.91 }])),
   };
 });
-vi.mock('@/modules/m2/server/templates', () => ({
+vi.mock('@/modules/m2/server/templates', async (importOriginal) => ({
+  sectionsWithWordLimit: (await importOriginal<typeof import('@/modules/m2/server/templates')>()).sectionsWithWordLimit,
   findAccessibleTemplate: vi.fn(async () => ({ id: 'tpl-1', schema: [] })),
   templateSections: vi.fn(() => [
     { key: 'objectives', label: 'Objectives', promptKey: 'Describe the objectives.', maxWords: 250 },

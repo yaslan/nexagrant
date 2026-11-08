@@ -59,6 +59,7 @@ vi.mock('@/lib/rag', () => ({
 import { generateConceptNoteDraft, exportToDocx } from './actions';
 import { prisma } from '@/lib/db';
 import { retrieveChunks } from '@/lib/rag';
+import { generateText } from '@/lib/llm';
 
 describe('m2 actions — phantom relation regression', () => {
   beforeEach(() => {
@@ -141,6 +142,62 @@ describe('m2 actions — phantom relation regression', () => {
       vi.mocked(prisma.opportunity.findFirst).mockResolvedValue(null);
 
       await expect(generateConceptNoteDraft('missing', 'tpl_1', {})).rejects.toThrow('Opportunity not found');
+    });
+  });
+
+  // NG-40 (PR #304 review, P2-3): the column is tenant-owned Json, so a word limit
+  // can be anything. Every section is checked before the first paid call.
+  describe('generateConceptNoteDraft — a section without a usable word limit', () => {
+    const useSchema = (schema: unknown[]) => {
+      vi.mocked(prisma.opportunity.findFirst).mockResolvedValue(
+        partialRow<Opportunity>({ id: 'opp_1', title: 'T', topicId: null })
+      );
+      vi.mocked(prisma.conceptTemplate.findFirst).mockResolvedValue(
+        partialRow<ConceptTemplate>({ id: 'tpl_1', schema: schema as ConceptTemplate['schema'] })
+      );
+      vi.mocked(prisma.conceptNote.create).mockResolvedValue(partialRow<ConceptNote>({ id: 'note_1' }));
+    };
+
+    it.each([
+      ['missing', undefined],
+      ['null', null],
+      ['empty text', ''],
+      ['zero', 0],
+      ['negative', -5],
+      ['too large', 1e21],
+      ['text', 'many'],
+      ['hex', '0x10'],
+      ['boolean', true],
+      ['array', [7]],
+    ])('refuses %s before any model call or credit', async (_label, maxWords) => {
+      useSchema([{ key: 'summary', labelKey: 'Summary', promptKey: 'p', maxWords }]);
+
+      const error = await generateConceptNoteDraft('opp_1', 'tpl_1', {}).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain('"summary"');
+      expect((error as Error & { digest?: string }).digest).toBe('INVALID_TEMPLATE_SECTION:summary');
+      expect(generateText).not.toHaveBeenCalled();
+      expect(retrieveChunks).not.toHaveBeenCalled();
+      expect(prisma.conceptNote.create).not.toHaveBeenCalled();
+    });
+
+    it('a bad section after a good one still costs nothing', async () => {
+      useSchema([
+        { key: 'first', labelKey: 'F', promptKey: 'p', maxWords: 100 },
+        { key: 'second', labelKey: 'S', promptKey: 'p' },
+      ]);
+
+      await expect(generateConceptNoteDraft('opp_1', 'tpl_1', {})).rejects.toThrow('"second"');
+      expect(generateText).not.toHaveBeenCalled();
+      expect(retrieveChunks).not.toHaveBeenCalled();
+    });
+
+    it('a word limit stored as digits keeps working', async () => {
+      useSchema([{ key: 'summary', labelKey: 'S', promptKey: 'p', maxWords: '250' }]);
+
+      await expect(generateConceptNoteDraft('opp_1', 'tpl_1', {})).resolves.toBe('note_1');
+      expect(vi.mocked(generateText).mock.calls[0]?.[0].system).toContain('250');
     });
   });
 

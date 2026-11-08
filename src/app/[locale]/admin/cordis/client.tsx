@@ -121,6 +121,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
   const [topK, setTopK] = useState(3);
   const [isSearching, setIsSearching] = useState(false);
   const [retrievedChunks, setRetrievedChunks] = useState<RetrievedChunk[]>([]);
+  // null: no search yet. '': the search ran and matched nothing.
   const [ragPrompt, setRagPrompt] = useState<string | null>(null);
 
   const handleRunK2Import = async () => {
@@ -174,7 +175,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
     try {
       const res = await handleTestRagQuery(searchQuery.trim(), topK);
       setRetrievedChunks(res.chunks || []);
-      setRagPrompt(res.ragPrompt || null);
+      setRagPrompt(res.ragPrompt);
     } catch (err) {
       console.error('Error testing RAG query:', err);
     } finally {
@@ -657,6 +658,8 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                 <pre className="whitespace-pre-wrap leading-relaxed text-slate-300 max-h-[500px] overflow-y-auto">
                   {ragPrompt}
                 </pre>
+              ) : ragPrompt === '' ? (
+                <p className="text-muted text-xs italic">{t('ragPreview.noMatches')}</p>
               ) : (
                 <p className="text-muted text-xs italic">
                   Sol taraftan arama yaptığınızda LLM modeline gönderilen RAG bağlam metni burada görüntülenecektir.
