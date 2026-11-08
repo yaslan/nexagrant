@@ -89,7 +89,7 @@ describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', 
 
   afterAll(async () => {
     await withTenant(TENANT, async (tx) => {
-      await tx.applicationPart.deleteMany({ where: { id: PROBE + '_part_b' } });
+      await tx.applicationPart.deleteMany({ where: { tenantId: TENANT, id: { startsWith: PROBE } } });
       await tx.evaluation.deleteMany({ where: { opportunityId: 'demo-opp-1' } });
       await tx.meetingBrief.deleteMany({ where: { tenantId: TENANT, interactionId: { startsWith: PROBE } } });
       await tx.followupDoc.deleteMany({ where: { tenantId: TENANT, opportunityId: 'demo-opp-1' } });
