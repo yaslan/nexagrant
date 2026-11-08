@@ -26,7 +26,13 @@ const h = vi.hoisted(() => {
     captured.push(arg);
     throw new Stop('captured');
   };
-  const opportunity = { id: 'opp-1', title: 'Soil sensing for smart farms', topicId: 'topic-1' };
+  const opportunity = {
+    id: 'opp-1',
+    title: 'Soil sensing for smart farms',
+    topicId: 'topic-1',
+    // M6 reads Part B through the same stubbed findFirst (NG-98).
+    content: { sections: [{ title: '1.1 Objectives', content: 'Validate soil sensors on 40 farms.' }] },
+  };
   const tx = new Proxy(
     {},
     {

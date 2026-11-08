@@ -89,6 +89,7 @@ describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', 
 
   afterAll(async () => {
     await withTenant(TENANT, async (tx) => {
+      await tx.applicationPart.deleteMany({ where: { id: PROBE + '_part_b' } });
       await tx.evaluation.deleteMany({ where: { opportunityId: 'demo-opp-1' } });
       await tx.meetingBrief.deleteMany({ where: { tenantId: TENANT, interactionId: { startsWith: PROBE } } });
       await tx.followupDoc.deleteMany({ where: { tenantId: TENANT, opportunityId: 'demo-opp-1' } });
@@ -134,6 +135,19 @@ describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', 
     const t0 = new Date();
     await new Promise((r) => setTimeout(r, 20));
     const before = await balance();
+
+    // M6 refuses, uncharged, when there is no proposal text to read (NG-98).
+    await withTenant(TENANT, (tx) =>
+      tx.applicationPart.create({
+        data: {
+          id: PROBE + '_part_b',
+          tenantId: TENANT,
+          opportunityId: 'demo-opp-1',
+          part: 'PART_B',
+          content: { sections: [{ title: '1.1 Objectives', content: 'Validate soil sensors on 40 farms.' }] },
+        },
+      })
+    );
 
     await generateAiEvaluation('demo-opp-1');
 
