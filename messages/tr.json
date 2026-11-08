@@ -635,6 +635,7 @@
     "dimensionOutOf": "{score} / {max}",
     "dimensionRange": "{score} (aralık {min}…{max})",
     "breakdownNote": "Boyutlar ham puandır, her biri kendi aralığında; toplam 100 üzerinden.",
+    "legacyScoringNote": "Bu aday önceki ölçütlerle puanlandı. Yeni ölçütler için \"Aday Bul\"a yeniden basın.",
     "stageLine": "{title} — Aşama {stage}"
   },
   "Auth": {
