@@ -119,6 +119,8 @@ describe('planSeatRescore', () => {
     { id: 'b2', seatId: 'B', score: -10, rank: 2, breakdown: { topicExperience: 0, geographicBalance: 0, collabHistory: 0, relationshipWarmth: 0, centrality: 0, rivalRisk: -10 } },
     // Seat C: a breakdown neither scorer wrote.
     { id: 'c1', seatId: 'C', score: 7, rank: 1, breakdown: { something: 'else' } },
+    // Seat D: written by the current matcher (four keys, out of 100), already on the scale.
+    { id: 'd1', seatId: 'D', score: 64, rank: 1, breakdown: { topicExperience: 20, geographicBalance: 33, collabHistory: 11, rivalRisk: 0 } },
   ];
 
   it('re-derives every scale onto 0–100 and keeps the matcher order', () => {
@@ -129,6 +131,9 @@ describe('planSeatRescore', () => {
     expect(byId.get('a1')?.breakdown.total).toBe(byId.get('a1')?.after.score);
     expect(byId.get('b1')?.after).toEqual({ score: 50.22, rank: 1 });
     expect(byId.get('b2')?.after).toEqual({ score: 0, rank: 2 });
+    // Divided by 100, not by the old 90 (which would give 71.11), so nothing to rewrite.
+    expect(byId.get('d1')?.after).toEqual({ score: 64, rank: 1 });
+    expect(byId.get('d1')?.changed).toBe(false);
     for (const r of plan.rows) {
       expect(r.after.score).toBeGreaterThanOrEqual(0);
       expect(r.after.score).toBeLessThanOrEqual(100);

@@ -26,7 +26,6 @@ import { SeatNotFoundError } from './errors';
  *                                            organisation at query time.
  *   Collab         → CordisCoParticipation   `sharedProjectCount` is the same
  *                                            edge weight the old `projects` was.
- *   degree         → CordisCoParticipation   the number of edges the org sits on.
  *
  * The CORDIS tables are platform-shared reference data (scripts/rls-models.ts
  * lists them as SYSTEM_WIDE), so no new table, migration or RLS policy is
@@ -96,9 +95,9 @@ export function scoreCandidate(signals: CandidateSignals): MatchBreakdown {
       MATCH_DIMENSION_SCALE.topicExperience.max,
       signals.participationCount * POINTS_PER_PARTICIPATION + signals.coordinatorCount * POINTS_PER_COORDINATION
     ),
-    // 2. Country balance (0 or 33) — a country already on the consortium adds none.
+    // 2. Country balance (0 or 33) — only a recorded country not yet on the consortium earns it.
     geographicBalance:
-      signals.country && signals.takenCountries.has(signals.country) ? 0 : MATCH_DIMENSION_SCALE.geographicBalance.max,
+      signals.country && !signals.takenCountries.has(signals.country) ? MATCH_DIMENSION_SCALE.geographicBalance.max : 0,
     // 3. Collaboration history with the confirmed partners (0–33)
     collabHistory: Math.min(MATCH_DIMENSION_SCALE.collabHistory.max, signals.sharedProjects * POINTS_PER_SHARED_PROJECT),
     // Rival risk (-10), a penalty on top of the three criteria.

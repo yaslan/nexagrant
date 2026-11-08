@@ -61,6 +61,18 @@ describe('scoreCandidate (K-578751: experience 34, country balance 33, collabora
     expect(scoreCandidate({ ...base, country: 'TR', takenCountries: taken }).geographicBalance).toBe(33);
   });
 
+  it.each([
+    ['null', null],
+    ['empty', ''],
+  ])('country balance: a candidate whose country is %s earns 0, whether or not there are partners', (_label, country) => {
+    expect(scoreCandidate({ ...base, country, takenCountries: NO_COUNTRIES }).geographicBalance).toBe(0);
+    expect(scoreCandidate({ ...base, country, takenCountries: new Set(['FR']) }).geographicBalance).toBe(0);
+  });
+
+  it('country balance: a recorded country earns 33 when there are no partners yet', () => {
+    expect(scoreCandidate({ ...base, country: 'TR', takenCountries: NO_COUNTRIES }).geographicBalance).toBe(33);
+  });
+
   it('collaboration: 11 per shared project, saturating at 33 on the third', () => {
     expect(scoreCandidate({ ...base, sharedProjects: 0 }).collabHistory).toBe(0);
     expect(scoreCandidate({ ...base, sharedProjects: 1 }).collabHistory).toBe(11);

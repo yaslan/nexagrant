@@ -3,9 +3,10 @@
  *
  * Rows already in the table carry three scales: the consortium builder's
  * pre-FO-63 0–10 sum, its 0–100 weighted total, and the seat matcher's raw
- * −10…90 points (six keys; −10…100 and four keys since K-578751). Every row keeps the per-dimension breakdown it was scored from,
- * so the score is recomputed from that breakdown through the scorer that wrote
- * it — not rescaled by a factor guessed here:
+ * −10…90 points (six keys; −10…100 and four keys since K-578751). Every row
+ * keeps the per-dimension breakdown it was scored from, so the score is
+ * recomputed from that breakdown through the scorer that wrote it — not
+ * rescaled by a factor guessed here:
  *
  *   matcher breakdown    (geographicBalance, collabHistory, …) → matchSeatScore
  *   old matcher breakdown (the same + relationshipWarmth, centrality) → legacyMatchSeatScore
