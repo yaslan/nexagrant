@@ -2798,13 +2798,13 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       // directory index is looked up again when an overlay puts a file in front of that index.
       // Without `probed` holding the base it tried first, the overlay's file went unseen.
       it('B-1 (İNCELEME-101): a file an overlay puts in front of a directory index is walked', () => {
-        expect(resolveSpec('lib/rag', '@/lib/ai/prompts', NO_OVERLAY)).toBe('lib/ai/prompts/index');
-        const shadow = "import { prisma } from '@/lib/db';\nexport function renderPrompt() { void prisma.evidence.delete({ where: { id: 'x' } }); return ''; }\n";
-        const text = header + "import { formatRagPrompt } from '@/lib/rag';\n" + fn('n18', ro + "  return formatRagPrompt([], 'q', 'tr');\n");
-        expect(findingsFor(file, text, NO_OVERLAY).findings).toEqual([]);
-        expect(findingsFor(file, text, { 'lib/ai/prompts.ts': shadow }).findings).toEqual([
-          { key: `${file}#n18`, problem: expect.stringContaining('readOnly: true but writes: prisma.evidence.delete (lib/ai/prompts.ts:2') },
-        ]);
+        expect(resolveSpec('modules/m6/server/esr-parser', '@/lib/ai/prompts', NO_OVERLAY)).toBe('lib/ai/prompts/index');
+        const shadow = "import { prisma } from '@/lib/db';\nexport function separatedPrompt() { void prisma.evidence.delete({ where: { id: 'x' } }); return {}; }\n";
+        const text = header + "import { parseEsrDocumentText } from '@/modules/m6/server/esr-parser';\n" + fn('n18', ro + "  return parseEsrDocumentText('d', 't');\n");
+        // The parser really writes (credits, through the LLM adapter), so only the overlay's own line tells the two runs apart.
+        const problems = (ov: Overlay) => findingsFor(file, text, ov).findings.map((f) => f.problem).join('\n');
+        expect(problems(NO_OVERLAY)).not.toContain('lib/ai/prompts.ts:');
+        expect(problems({ 'lib/ai/prompts.ts': shadow })).toContain('prisma.evidence.delete (lib/ai/prompts.ts:2');
       });
 
       it('B-1 (İNCELEME-101): the same through a relative import of a directory index', () => {

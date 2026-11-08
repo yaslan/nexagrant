@@ -1,6 +1,9 @@
 // Prompt text — see src/lib/ai/prompts/index.ts. The template literal is the prompt byte for byte:
 // whitespace inside it (including trailing spaces) reaches the model. {{name}} is filled by renderPrompt().
-const prompt = `Analyze the following EU Horizon Europe Evaluation Summary Report (ESR) text.
+// Instructions only: user data never goes in this file's placeholders, see separatedPrompt() (NG-40).
+const prompt = `You are an EU Horizon Europe ESR document parser. Return ONLY valid JSON.
+
+Analyze the EU Horizon Europe Evaluation Summary Report (ESR) text in document_text.
 Extract the criteria marks and qualitative comments.
 
 Return ONLY valid JSON with keys:
@@ -11,11 +14,6 @@ Return ONLY valid JSON with keys:
 - threshold: number (default 10.0)
 - passed: boolean (true if total >= threshold and all subcriteria >= 3.0)
 - strengths: string[]
-- weaknesses: string[]
-
-ESR Document Text:
-"""
-{{documentText}}
-"""`;
+- weaknesses: string[]`;
 
 export default prompt;

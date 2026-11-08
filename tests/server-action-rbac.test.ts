@@ -45,7 +45,7 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/lib/modules/access', () => ({ assertModuleAccess: vi.fn(async () => undefined) }));
 vi.mock('@/lib/llm', () => ({ generateText: vi.fn(reached), generateCompletion: vi.fn(reached) }));
-vi.mock('@/lib/rag', () => ({ buildRagPrompt: vi.fn(reached), retrieveChunks: vi.fn(reached) }));
+vi.mock('@/lib/rag', () => ({ buildRagContext: vi.fn(reached), retrieveChunks: vi.fn(reached) }));
 vi.mock('@/lib/storage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/storage')>();
   return {

@@ -7,7 +7,7 @@ import { requireTenantAction } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/llm';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 
 import {
@@ -83,8 +83,7 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
     userId,
     module: 'M6',
     purpose: 'evaluation',
-    prompt: renderPrompt('m6/evaluation', { opportunityId: oppId }, locale),
-    system: renderPrompt('m6/evaluation-system', {}, locale),
+    ...separatedPrompt('m6/evaluation', {}, { opportunity_id: oppId }, locale),
   });
 
   let raw: unknown;

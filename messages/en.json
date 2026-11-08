@@ -490,7 +490,8 @@
       "sectionLabel": "{label} (max {max} words)",
       "placeholder": "Write the {label} section...",
       "words": "Words: {count} / {max}",
-      "noTemplate": "No concept note template found in the system. Run the seed."
+      "noTemplate": "No concept note template found in the system. Run the seed.",
+      "invalidSection": "The draft could not be generated: section \"{section}\" of the template has an invalid word limit. Fix the template and try again. No credits were used."
     },
     "status": {
       "draft": "Draft",
@@ -3772,6 +3773,9 @@
     "importErrors": {
       "SKIP_LIMIT_EXCEEDED": "Import failed: the CORDIS dump has more unreadable records than the limit allows. Details are in the run record and in system alerts.",
       "IMPORT_FAILED": "Import failed: the import could not finish. Details are in the run record and in system alerts."
+    },
+    "ragPreview": {
+      "noMatches": "No chunks matched this search."
     }
   },
   "adminInterreg": {
