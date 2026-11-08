@@ -44,6 +44,16 @@ async function scan(page: Page) {
   }));
 }
 
+/**
+ * Redirect-proof check (NG-90 review). A redirect to sign-in or no-workspace ends on a 200 page that has
+ * a `main`, so status and `main` alone cannot tell it from the page under test. The browser must still
+ * stand on the requested path, and that page's own `h1` must be visible.
+ */
+async function expectOwnPage(page: Page, path: string) {
+  await expect.poll(() => new URL(page.url()).pathname, `${path} nihai adres`).toBe(path);
+  await expect(page.locator('h1').first(), `${path} sayfa başlığı`).toBeVisible();
+}
+
 test.describe('WCAG A/AA — public pages', () => {
   for (const url of ['/tr', '/en', '/tr/giris', '/en/login']) {
     test(`${url} has no A/AA violations`, async ({ page }) => {
@@ -87,6 +97,7 @@ test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
       await acceptCookies(page);
       const response = await page.goto(url);
       expect(response?.status(), url).toBe(200);
+      await expectOwnPage(page, url);
       await expect(page.locator('main')).toBeVisible();
       expect(await scan(page), url).toEqual([]);
     });
@@ -96,10 +107,14 @@ test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
     test(`/${locale}/blog/<ilk yazı> has no A/AA violations`, async ({ page }) => {
       await acceptCookies(page);
       await page.goto(`/${locale}/blog`);
-      const href = await page.locator(`a[href^="/${locale}/blog/"]`).first().getAttribute('href');
-      expect(href, 'blog listesinde yazı bağlantısı').toBeTruthy();
+      // Post links only, inside <main>: the header menu and category labels are not candidates.
+      const link = page.locator(`main a[href^="/${locale}/blog/"]`).first();
+      await expect(link, 'blog listesinde yazı bağlantısı (main içinde)').toBeVisible();
+      const href = await link.getAttribute('href');
+      expect(href, 'bağlantı yazı sayfasına gidiyor').toMatch(new RegExp(`^/${locale}/blog/[^/?#]+$`));
       const response = await page.goto(href!);
       expect(response?.status(), href!).toBe(200);
+      await expectOwnPage(page, href!);
       await expect(page.locator('main')).toBeVisible();
       expect(await scan(page), href!).toEqual([]);
     });
@@ -107,19 +122,22 @@ test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
 });
 
 test.describe('WCAG A/AA — NG-90 signed in, settings (tr + en)', () => {
+  // Own user, so this describe's seed/cleanup does not share a userId with the panel describe above (review bulgu 3).
+  const SETTINGS_OWNER = { ...OWNER, userId: 'e2e-a11y-settings-owner', email: 'a11y-settings-owner@e2e.fabrika.test' };
   test.beforeAll(async () => {
-    await seedIdentity({ ...OWNER, workspaceIds: [] });
+    await seedIdentity({ ...SETTINGS_OWNER, workspaceIds: [] });
   });
   test.afterAll(async () => {
-    await cleanupIdentity([OWNER.userId]);
+    await cleanupIdentity([SETTINGS_OWNER.userId]);
   });
 
   for (const url of ['/tr/main/ayarlar/profil', '/tr/main/ayarlar/gizlilik', '/en/main/settings/profile', '/en/main/settings/privacy']) {
     test(`${url} has no A/AA violations`, async ({ page }) => {
       await acceptCookies(page);
-      await signInAs(page, { id: OWNER.userId, email: OWNER.email, tenantId: OWNER.tenantId, role: OWNER.role });
+      await signInAs(page, { id: SETTINGS_OWNER.userId, email: SETTINGS_OWNER.email, tenantId: SETTINGS_OWNER.tenantId, role: SETTINGS_OWNER.role });
       const response = await page.goto(url);
       expect(response?.status(), url).toBe(200);
+      await expectOwnPage(page, url);
       await expect(page.locator('main')).toBeVisible();
       expect(await scan(page), url).toEqual([]);
     });
