@@ -1166,7 +1166,33 @@
           "sessionOrMembership": "You are no longer a member of this organisation, or your session has ended. Please sign in again.",
           "forbiddenRole": "Only an owner or admin can see the team list.",
           "loadFailed": "The team list could not be loaded."
-        }
+        },
+        "errorGeneric": "The action could not be completed. Please try again.",
+        "memberRemoved": "Member removed; the seat is free again.",
+        "invitationCancelled": "Invitation cancelled; the seat is free again.",
+        "activeHeading": "Active Members",
+        "activeListLabel": "Active members",
+        "loading": "Loading…",
+        "you": "you",
+        "joined": "Joined",
+        "remove": "Remove",
+        "removeAria": "Remove {label}",
+        "pendingHeading": "Pending Invitations",
+        "pendingHint": "Each pending invitation holds one seat.",
+        "pendingEmpty": "No pending invitations.",
+        "pendingListLabel": "Pending invitations",
+        "sent": "Sent",
+        "expires": "Expires",
+        "cancel": "Cancel",
+        "cancelInvitationAria": "Cancel invitation for {email}",
+        "confirmRemoveTitle": "Remove this member?",
+        "confirmCancelTitle": "Cancel this invitation?",
+        "confirmRemoveBody": "{label} loses access to this organisation at once. The seat becomes free.",
+        "confirmCancelBody": "The invitation link sent to {label} stops working. The seat becomes free.",
+        "keep": "Keep",
+        "working": "Working…",
+        "yesRemove": "Yes, remove",
+        "yesCancel": "Yes, cancel it"
       },
       "page": {
         "title": "Team Members",
@@ -3802,7 +3828,13 @@
   "blog": {
     "meta_title": "EU Grant Management & Insights Blog",
     "meta_description": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.",
-    "readMinutes": "{min} min read"
+    "readMinutes": "{min} min read",
+    "indexEyebrow": "Knowledge & Insights",
+    "indexTitle": "EU Grant Management & Insights Blog",
+    "indexSubtitle": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.",
+    "readArticle": "Read Article",
+    "backToBlog": "Back to Blog",
+    "relatedArticles": "Related Articles"
   },
   "blog_detail": {
     "meta_description": "Blog post"
@@ -5105,5 +5137,17 @@
         "body": "First-contact emails will no longer be sent to this address."
       }
     }
+  },
+  "PersonDaysReport": {
+    "title": "Person-Days Report",
+    "subtitle": "Track effort investment across all opportunities in your pipeline.",
+    "queryFailed": "Effort records could not be read. The failure has been recorded; please try again shortly.",
+    "byOpportunity": "By Opportunity",
+    "totalSummary": "Total: {hours} hours ({days} PDs)",
+    "opportunity": "Opportunity",
+    "totalHours": "Total Hours",
+    "personDays": "Person-Days",
+    "emptyTitle": "No effort has been logged yet.",
+    "emptyHint": "Hours logged on an opportunity’s effort tab appear here."
   }
 }

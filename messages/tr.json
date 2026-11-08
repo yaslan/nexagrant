@@ -1166,7 +1166,33 @@
           "sessionOrMembership": "Bu kurumda artık üyeliğiniz yok ya da oturumunuz sona erdi. Lütfen yeniden giriş yapın.",
           "forbiddenRole": "Ekip listesini yalnızca kurum sahibi veya yöneticisi görebilir.",
           "loadFailed": "Ekip listesi yüklenemedi."
-        }
+        },
+        "errorGeneric": "İşlem tamamlanamadı. Lütfen tekrar deneyin.",
+        "memberRemoved": "Üye ekipten çıkarıldı; koltuğu boşaldı.",
+        "invitationCancelled": "Davet iptal edildi; koltuğu boşaldı.",
+        "activeHeading": "Aktif Ekip Üyeleri",
+        "activeListLabel": "Aktif ekip üyeleri",
+        "loading": "Yükleniyor…",
+        "you": "siz",
+        "joined": "Katılım",
+        "remove": "Çıkar",
+        "removeAria": "{label} üyesini çıkar",
+        "pendingHeading": "Bekleyen Davetler",
+        "pendingHint": "Bekleyen her davet bir koltuk tutar.",
+        "pendingEmpty": "Bekleyen davet yok.",
+        "pendingListLabel": "Bekleyen davetler",
+        "sent": "Gönderim",
+        "expires": "Son tarih",
+        "cancel": "İptal",
+        "cancelInvitationAria": "{email} davetini iptal et",
+        "confirmRemoveTitle": "Üyeyi ekipten çıkar?",
+        "confirmCancelTitle": "Daveti iptal et?",
+        "confirmRemoveBody": "{label} bu kuruma erişimini hemen kaybeder. Koltuğu boşalır.",
+        "confirmCancelBody": "{label} adresine giden davet bağlantısı çalışmaz olur. Koltuğu boşalır.",
+        "keep": "Vazgeç",
+        "working": "İşleniyor…",
+        "yesRemove": "Evet, çıkar",
+        "yesCancel": "Evet, iptal et"
       },
       "page": {
         "title": "Ekip Üyeleri & Yetkilendirme",
@@ -3802,7 +3828,13 @@
   "blog": {
     "meta_title": "AB Proje Yönetimi & Hibe Blogu",
     "meta_description": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.",
-    "readMinutes": "{min} dk okuma"
+    "readMinutes": "{min} dk okuma",
+    "indexEyebrow": "Bilgi & Rehber Portalı",
+    "indexTitle": "AB Proje Yönetimi & Hibe Blogu",
+    "indexSubtitle": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.",
+    "readArticle": "Devamını Oku",
+    "backToBlog": "Tüm Blog Yazılarına Dön",
+    "relatedArticles": "İlginizi Çekebilecek Diğer Yazılar"
   },
   "blog_detail": {
     "meta_description": "Blog yazısı"
@@ -5105,5 +5137,17 @@
         "body": "Bu adrese artık ilk iletişim e-postası gönderilmeyecek."
       }
     }
+  },
+  "PersonDaysReport": {
+    "title": "Adam-Gün Raporu",
+    "subtitle": "Pipeline’ınızdaki tüm fırsatlara harcanan eforu takip edin.",
+    "queryFailed": "Efor kayıtları okunamadı. Sorun kaydedildi; lütfen birazdan tekrar deneyin.",
+    "byOpportunity": "Fırsata Göre",
+    "totalSummary": "Toplam: {hours} saat ({days} AG)",
+    "opportunity": "Fırsat",
+    "totalHours": "Toplam Saat",
+    "personDays": "Adam-Gün",
+    "emptyTitle": "Henüz efor kaydı yok.",
+    "emptyHint": "Bir fırsatın efor sekmesinden saat girdiğinizde burada görünür."
   }
 }
