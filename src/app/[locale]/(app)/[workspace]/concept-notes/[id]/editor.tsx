@@ -85,7 +85,7 @@ export default function ConceptNoteEditor({
       const invalidSection = invalidTemplateSectionKey(err);
       alert(
         invalidSection !== null
-          ? tDraft('invalidSection', { section: invalidSection })
+          ? tDraft('invalidSection', { section: section.labelKey })
           : errorText(err, () => errorMessage(err) || t('aiFailed'))
       );
     } finally {

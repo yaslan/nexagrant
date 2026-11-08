@@ -66,7 +66,7 @@ test.describe.serial('concept note AI draft — invalid word limit', () => {
     await alert.accept();
 
     expect(message).toBe(
-      'Taslak üretilemedi: şablondaki "ozet" bölümünün kelime sınırı geçersiz. Şablonu düzeltip yeniden deneyin. Kredi harcanmadı.'
+      'Taslak üretilemedi: şablondaki "Özet" bölümünün kelime sınırı geçersiz. Şablonu düzeltip yeniden deneyin. Kredi harcanmadı.'
     );
 
     // A native alert is not part of a page screenshot, so its text is drawn on the page for the shot.
