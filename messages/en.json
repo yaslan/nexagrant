@@ -634,6 +634,7 @@
     "dimensionOutOf": "{score} / {max}",
     "dimensionRange": "{score} (range {min}…{max})",
     "breakdownNote": "Dimensions are raw points, each on its own range; the total is out of 100.",
+    "legacyScoringNote": "This candidate was scored with the previous criteria. Press \"Find Candidates\" again to apply the new ones.",
     "stageLine": "{title} — Stage {stage}"
   },
   "Auth": {

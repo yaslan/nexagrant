@@ -30,11 +30,12 @@ vi.mock('@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions', () 
 import {
   CONSORTIUM_DIMENSION_MAX,
   MATCH_DIMENSION_SCALE,
+  MATCH_LEGACY_DIMENSION_SCALE,
   seatBreakdownWriter,
   seatScoreDimensionScale,
 } from '@/lib/scoring/seat-dimension-scale';
 import { consortiumSeatScore, consortiumWeights, type ScoringBreakdown } from '@/lib/scoring/consortium';
-import { MATCH_MAX_TOTAL, scoreCandidate, type CandidateSignals } from '@/modules/m8/server/matching';
+import { MATCH_LEGACY_MAX_TOTAL, MATCH_MAX_TOTAL, scoreCandidate, type CandidateSignals } from '@/modules/m8/server/matching';
 import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 import { findCandidates } from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions';
 import ConsortiumManager from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager';
@@ -47,8 +48,6 @@ const NONE: CandidateSignals = {
   country: 'FR',
   takenCountries: new Set(['FR']),
   sharedProjects: 0,
-  warmth: null,
-  degree: 0,
   isRival: true,
 };
 const BEST: CandidateSignals = {
@@ -57,8 +56,6 @@ const BEST: CandidateSignals = {
   coordinatorCount: 5,
   takenCountries: new Set(),
   sharedProjects: 10,
-  warmth: 'hot',
-  degree: 1_000,
   isRival: false,
 };
 
@@ -82,6 +79,21 @@ describe('seatScoreDimensionScale', () => {
     // The positive caps add up to the total the 0–100 score divides by.
     const positive = Object.values(MATCH_DIMENSION_SCALE).reduce((sum, s) => sum + s.max, 0);
     expect(positive).toBe(MATCH_MAX_TOTAL);
+  });
+
+  it('a row from the old matcher keeps its old ranges, and they add up to the old 90', () => {
+    expect(MATCH_LEGACY_DIMENSION_SCALE).toEqual({
+      topicExperience: { min: 0, max: 35 },
+      geographicBalance: { min: 0, max: 15 },
+      collabHistory: { min: 0, max: 15 },
+      relationshipWarmth: { min: 0, max: 15 },
+      centrality: { min: 0, max: 10 },
+      rivalRisk: { min: -10, max: 0 },
+    });
+    const positive = Object.values(MATCH_LEGACY_DIMENSION_SCALE).reduce((sum, s) => sum + s.max, 0);
+    expect(positive).toBe(MATCH_LEGACY_MAX_TOTAL);
+    expect(seatScoreDimensionScale('match-legacy', 'topicExperience')).toEqual({ min: 0, max: 35 });
+    expect(seatScoreDimensionScale('match', 'relationshipWarmth')).toBeNull();
   });
 
   it('the matcher: rival risk is a penalty range, −10…0', () => {
@@ -118,6 +130,7 @@ describe('seatBreakdownWriter', () => {
     expect(
       seatBreakdownWriter({ ...CONSORTIUM_DIMENSION_MAX, liveDemandSignal: 0.4, liveDemandReason: null, total: 80 })
     ).toBe('consortium');
+    expect(seatBreakdownWriter({ ...scoreCandidate(BEST), relationshipWarmth: 15, centrality: 10 })).toBe('match-legacy');
     // Both key sets present: the matcher wins, as in the rescore (seat-rescore.ts).
     expect(seatBreakdownWriter({ ...CONSORTIUM_DIMENSION_MAX, ...scoreCandidate(BEST) })).toBe('match');
     // Pre-FO-63 consortium rows have no liveDemandSignal.
@@ -139,8 +152,8 @@ describe('dimensionValueText', () => {
   const enNumber = createFormatter({ locale: 'en' }).number;
 
   it.each([
-    ['tr', tr, trNumber, '3,0 / 35', '-10,0 (aralık -10…0)', '1,5 / 1,5'],
-    ['en', en, enNumber, '3.0 / 35', '-10.0 (range -10…0)', '1.5 / 1.5'],
+    ['tr', tr, trNumber, '3,0 / 34', '-10,0 (aralık -10…0)', '1,5 / 1,5'],
+    ['en', en, enNumber, '3.0 / 34', '-10.0 (range -10…0)', '1.5 / 1.5'],
   ] as const)('%s: "x / max", and a penalty with its range, in the locale', (_locale, t, num, outOf, penalty, fractionalMax) => {
     expect(dimensionValueText(t, num, seatScoreDimensionScale('match', 'topicExperience'), 3)).toBe(outOf);
     expect(dimensionValueText(t, num, seatScoreDimensionScale('match', 'rivalRisk'), -10)).toBe(penalty);

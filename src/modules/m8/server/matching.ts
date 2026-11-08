@@ -1,5 +1,6 @@
 import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
+import { MATCH_DIMENSION_SCALE } from '@/lib/scoring/seat-dimension-scale';
 import { normalizeSeatScore } from '@/lib/scoring/seat-score';
 import { SeatNotFoundError } from './errors';
 
@@ -44,10 +45,18 @@ export type MatchBreakdown = {
   topicExperience: number;
   geographicBalance: number;
   collabHistory: number;
-  relationshipWarmth: number;
-  centrality: number;
   rivalRisk: number;
 }
+
+/**
+ * A `SeatCandidate.breakdown` written before K-578751, when warmth and centrality
+ * were criteria too. Rows like this stay in the table until the seat is matched
+ * again, so they are still read — never written.
+ */
+export type LegacyMatchBreakdown = MatchBreakdown & {
+  relationshipWarmth: number;
+  centrality: number;
+};
 
 export interface MatchCandidate {
   organizationId: string;
@@ -65,50 +74,47 @@ export interface CandidateSignals {
   takenCountries: ReadonlySet<string>;
   /** Shared CORDIS projects between this org and the confirmed partners. */
   sharedProjects: number;
-  /** `Relationship.warmth` for this org in the current tenant, if any. */
-  warmth: string | null;
-  /** Co-participation edges the org sits on — its degree in the partner graph. */
-  degree: number;
   /** The org is seated on another live opportunity under the same call. */
   isRival: boolean;
 }
 
+/** Points per past participation and per coordination under the topic prefix. */
+const POINTS_PER_PARTICIPATION = 5;
+const POINTS_PER_COORDINATION = 10;
+/** Points per shared project: full marks on the third, where the old 5-of-15 scale also capped. */
+const POINTS_PER_SHARED_PROJECT = 11;
+
 /**
  * The scoring rule, as a pure function so it can be tested without a database.
- * Weights are unchanged from the original implementation.
+ * Three criteria and a separate penalty (K-578751, specification §6); each cap is
+ * read from {@link MATCH_DIMENSION_SCALE}, which the UI shows it against.
  */
 export function scoreCandidate(signals: CandidateSignals): MatchBreakdown {
-  const warmthScore =
-    signals.warmth === 'active' || signals.warmth === 'hot'
-      ? 15
-      : signals.warmth === 'warm'
-        ? 10
-        : signals.warmth === 'cold'
-          ? 5
-          : 0;
-
   return {
-    // 1. Topic experience (35 max)
-    topicExperience: Math.min(35, signals.participationCount * 5 + signals.coordinatorCount * 10),
-    // 2. Geographic balance (15 max) — a country already on the consortium adds none.
-    geographicBalance: signals.country && signals.takenCountries.has(signals.country) ? 0 : 15,
-    // 3. Collaboration history with the confirmed partners (15 max)
-    collabHistory: Math.min(15, signals.sharedProjects * 5),
-    // 4. Relationship warmth (15 max)
-    relationshipWarmth: warmthScore,
-    // 5. Centrality in the co-participation graph (10 max)
-    centrality: Math.min(10, signals.degree / 10),
-    // 6. Rival risk (-10)
-    rivalRisk: signals.isRival ? -10 : 0,
+    // 1. Past experience (0–34)
+    topicExperience: Math.min(
+      MATCH_DIMENSION_SCALE.topicExperience.max,
+      signals.participationCount * POINTS_PER_PARTICIPATION + signals.coordinatorCount * POINTS_PER_COORDINATION
+    ),
+    // 2. Country balance (0 or 33) — a country already on the consortium adds none.
+    geographicBalance:
+      signals.country && signals.takenCountries.has(signals.country) ? 0 : MATCH_DIMENSION_SCALE.geographicBalance.max,
+    // 3. Collaboration history with the confirmed partners (0–33)
+    collabHistory: Math.min(MATCH_DIMENSION_SCALE.collabHistory.max, signals.sharedProjects * POINTS_PER_SHARED_PROJECT),
+    // Rival risk (-10), a penalty on top of the three criteria.
+    rivalRisk: signals.isRival ? MATCH_DIMENSION_SCALE.rivalRisk.min : 0,
   };
 }
 
-export function totalScore(breakdown: MatchBreakdown): number {
+export function totalScore(breakdown: MatchBreakdown | LegacyMatchBreakdown): number {
   return Object.values(breakdown).reduce((sum, value) => sum + value, 0);
 }
 
-/** Highest raw total {@link scoreCandidate} can give: 35 + 15 + 15 + 15 + 10 with no rival penalty. */
-export const MATCH_MAX_TOTAL = 90;
+/** Highest raw total {@link scoreCandidate} can give: 34 + 33 + 33 with no rival penalty. */
+export const MATCH_MAX_TOTAL = 100;
+
+/** Highest raw total the pre-K-578751 scorer could give: 35 + 15 + 15 + 15 + 10. */
+export const MATCH_LEGACY_MAX_TOTAL = 90;
 
 /**
  * The matcher's raw total on the 0–100 `SeatCandidate.score` scale shared with
@@ -117,6 +123,14 @@ export const MATCH_MAX_TOTAL = 90;
  */
 export function matchSeatScore(breakdown: MatchBreakdown): number {
   return normalizeSeatScore(totalScore(breakdown) / MATCH_MAX_TOTAL);
+}
+
+/**
+ * The same, for a row the old scorer wrote: its points were earned against a
+ * maximum of 90, so dividing them by 100 would lower the score of every stored row.
+ */
+export function legacyMatchSeatScore(breakdown: LegacyMatchBreakdown): number {
+  return normalizeSeatScore(totalScore(breakdown) / MATCH_LEGACY_MAX_TOTAL);
 }
 
 /**
@@ -247,43 +261,33 @@ export async function runSeatMatch(
     confirmedOrgs.map((o) => o.country).filter((c): c is string => Boolean(c))
   );
 
-  // ── Co-participation edges, in one query, for both collaboration history and
-  // degree. The importer stores each edge once under `orgA < orgB`
+  // ── Co-participation edges with the confirmed partners, for collaboration
+  // history. The importer stores each edge once under `orgA < orgB`
   // (src/lib/k2-cordis/partnerProfileJob.ts), so both sides have to be examined.
-  const edges: { orgA: string; orgB: string; sharedProjectCount: number }[] = poolIds.length
+  const edges: { orgA: string; orgB: string; sharedProjectCount: number }[] = poolIds.length && confirmedOrgIds.length
     ? await tx.cordisCoParticipation.findMany({
-        where: { OR: [{ orgA: { in: poolIds } }, { orgB: { in: poolIds } }] },
+        where: {
+          OR: [
+            { orgA: { in: poolIds }, orgB: { in: confirmedOrgIds } },
+            { orgB: { in: poolIds }, orgA: { in: confirmedOrgIds } },
+          ],
+        },
         select: { orgA: true, orgB: true, sharedProjectCount: true },
         take: EDGE_LIMIT,
       })
     : [];
 
-  const degreeOf = new Map<string, number>();
   const sharedProjectsOf = new Map<string, number>();
   for (const edge of edges) {
     for (const [side, other] of [
       [edge.orgA, edge.orgB],
       [edge.orgB, edge.orgA],
     ] as const) {
-      if (!poolSet.has(side)) continue;
-      degreeOf.set(side, (degreeOf.get(side) ?? 0) + 1);
-      if (confirmed.has(other)) {
+      if (poolSet.has(side) && confirmed.has(other)) {
         sharedProjectsOf.set(side, (sharedProjectsOf.get(side) ?? 0) + edge.sharedProjectCount);
       }
     }
   }
-
-  // ── Relationship warmth, from this tenant's own CRM.
-  const relationships: { organizationId: string | null; warmth: string }[] =
-    await tx.relationship.findMany({
-      where: { tenantId },
-      select: { organizationId: true, warmth: true },
-    });
-  const warmthOf = new Map(
-    relationships
-      .filter((r) => r.organizationId)
-      .map((r) => [r.organizationId as string, r.warmth])
-  );
 
   // ── Rival risk: seated on another live opportunity under the same call. The
   // call is reached through `Opportunity.topicId`, since the row has no callId.
@@ -314,8 +318,6 @@ export async function runSeatMatch(
       country: countryOf.get(organizationId) ?? null,
       takenCountries,
       sharedProjects: sharedProjectsOf.get(organizationId) ?? 0,
-      warmth: warmthOf.get(organizationId) ?? null,
-      degree: degreeOf.get(organizationId) ?? 0,
       isRival: rivals.has(organizationId),
     });
     return { organizationId, score: matchSeatScore(breakdown), breakdown };
