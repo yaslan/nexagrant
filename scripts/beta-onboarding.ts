@@ -417,12 +417,30 @@ async function main(): Promise<void> {
       const { smtpConfigFromEnv, createSmtpTransport, sendMail } = await import('../src/lib/email/mailer');
       const smtp = smtpConfigFromEnv();
       if (!smtp) throw new Error('--send requires SMTP_HOST in the environment');
+      // NG-42: this is the partner's first message from us, so it carries the opt-out
+      // and is not sent to an address that has already used one.
+      const { isEmailOptedOut } = await import('../src/lib/email/opt-out-store');
+      const { withOptOut } = await import('../src/lib/email/opt-out');
+      const { authSecret } = await import('../src/lib/env');
+      const secret = authSecret();
+      if (!secret) throw new Error('--send requires AUTH_SECRET in the environment');
+      if (await isEmailOptedOut(partner.contactEmail, tenantId)) {
+        log('mail', `${partner.slug}: opted out — not sent`);
+        summary.push({ slug: partner.slug, org: partner.orgName, email: partner.contactEmail, locale: partner.locale, tenantId, modulesPilot, delivery: 'opted-out' });
+        continue;
+      }
+      const outgoing = withOptOut(
+        {
+          from: process.env.SMTP_FROM || `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
+          to: partner.contactEmail,
+          subject: email.subject,
+          html: email.html,
+          text: email.text,
+        },
+        { baseUrl: BETA_APP_URL, secret, source: 'beta-invite', tenantId }
+      );
       await sendMail(createSmtpTransport(smtp), smtp, {
-        from: process.env.SMTP_FROM || `Fabrika Beta <${BETA_SUPPORT_EMAIL}>`,
-        to: partner.contactEmail,
-        subject: email.subject,
-        html: email.html,
-        text: email.text,
+        ...outgoing,
         attachments: [
           {
             filename: 'nexagrant-beta-checkins.ics',

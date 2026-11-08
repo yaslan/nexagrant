@@ -1184,6 +1184,7 @@
         "sendFailed": "Failed to send invite",
         "errorPrefixed": "Error: {message}",
         "dailyLimitNotSent": "Your organisation's daily invitation email limit is reached, so no email was sent. Share this link yourself",
+        "optedOutNotSent": "This address has opted out of invitation emails, so no email was sent. You can pass the link on by hand",
         "notSent": "Invitation created but the email could not be sent; share this link yourself",
         "notSentWithLink": "{notSent}: {link}",
         "roleChangeBlocked": "The invitation was sent a moment ago; to change the role, invite again in 10 minutes",
@@ -5073,5 +5074,36 @@
     "demoHeading": "⚡ One-Click Demo Profiles",
     "passwordless": "Passwordless session",
     "demoSignInArrow": "Sign in →"
+  },
+  "EmailOptOut": {
+    "title": "Email preference",
+    "invalidHeading": "This link is not valid",
+    "invalidBody": "The link may be damaged or incompletely copied. Open the link in the email again.",
+    "footer": {
+      "decline": "Decline this invitation",
+      "unsubscribe": "Stop emailing me"
+    },
+    "confirm": {
+      "decline": {
+        "heading": "Decline this organisation's invitation",
+        "body": "This organisation will not be able to email you again. Invitations from other organisations are not affected.",
+        "button": "Decline invitation"
+      },
+      "unsubscribe": {
+        "heading": "Leave the email list",
+        "body": "No organisation on the platform will be able to send a first-contact email to this address.",
+        "button": "Unsubscribe"
+      }
+    },
+    "done": {
+      "decline": {
+        "heading": "Your decline was recorded",
+        "body": "This organisation will not be able to email you again."
+      },
+      "unsubscribe": {
+        "heading": "You are unsubscribed",
+        "body": "First-contact emails will no longer be sent to this address."
+      }
+    }
   }
 }

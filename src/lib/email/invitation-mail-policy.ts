@@ -46,6 +46,12 @@ export const INVITATION_MAIL_DAILY_LIMIT = 50;
 export const INVITATION_MAIL_SENT = 'invitation.email_sent';
 export const INVITATION_MAIL_FAILED = 'invitation.email_failed';
 /**
+ * The SMTP server took the message (NG-42). `data.messageId` is the only thing
+ * it tells us: this is acceptance, not delivery to a mailbox, and a later bounce
+ * does not reach this table. The limits do not count it.
+ */
+export const INVITATION_MAIL_ACCEPTED = 'invitation.email_accepted';
+/**
  * A re-invite within the cooldown that asked for a different role (İNCELEME-32
  * Ö-1). The mailed link keeps the role it was sent with; this row records who
  * tried to change it (actorId), on which invitation (target) and from/to which
@@ -53,7 +59,8 @@ export const INVITATION_MAIL_FAILED = 'invitation.email_failed';
  */
 export const INVITATION_ROLE_CHANGE_BLOCKED = 'invitation.role_change_blocked';
 
-export type InvitationMailSkip = 'recently_sent' | 'daily_limit';
+/** `opted_out`: the recipient used the link in an earlier mail (./opt-out-store.ts, NG-42). */
+export type InvitationMailSkip = 'recently_sent' | 'daily_limit' | 'opted_out';
 
 /**
  * Serialises invitation mail decisions per tenant for the rest of the
