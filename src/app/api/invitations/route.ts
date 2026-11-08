@@ -5,9 +5,10 @@ import { requireTenantApi } from '@/lib/tenant';
 import { issueSecretToken } from '@/lib/secret-token';
 import type { InvitationRow } from '@/types/db-rows';
 import { assertSeatAvailable, SeatLimitReachedError, type SeatUsage } from '@/lib/billing/seat-limit';
-import { reportMailNotConfigured, smtpMailer, type Mailer } from '@/lib/email/mailer';
+import { mailFailureCode, reportMailNotConfigured, smtpMailer, type Mailer } from '@/lib/email/mailer';
 import { renderInvitationEmail } from '@/lib/email/invitation-email';
 import {
+  INVITATION_MAIL_ACCEPTED,
   INVITATION_MAIL_DAILY_LIMIT,
   INVITATION_MAIL_FAILED,
   INVITATION_MAIL_SENT,
@@ -17,6 +18,9 @@ import {
   lockInvitationMail,
   type InvitationMailSkip,
 } from '@/lib/email/invitation-mail-policy';
+import { withOptOut } from '@/lib/email/opt-out';
+import { isEmailOptedOut } from '@/lib/email/opt-out-store';
+import { emailOptOutSecret } from '@/lib/env';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { appUrl } from '@/lib/app-url';
 import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
@@ -114,6 +118,9 @@ export async function POST(req: Request) {
     // (src/lib/email/invitation-mail-policy.ts).
     const mailer = smtpMailer();
     const mailBaseUrl = invitationMailBaseUrl();
+    // Read outside the tenant transaction: an unsubscribe is a NULL-tenant row
+    // that a tenant session cannot see (src/lib/email/opt-out-store.ts).
+    const optedOut = mailer && mailBaseUrl ? await isEmailOptedOut(email, tenantId) : false;
 
     const result = await withTenant<{
       conflict: boolean;
@@ -152,7 +159,7 @@ export async function POST(req: Request) {
           where: { email_tenantId: { email, tenantId } },
           select: { id: true, email: true, tenantId: true, role: true, expires: true },
         });
-        mailSkip = await invitationMailSkipReason(tx, tenantId, existing?.id ?? null);
+        mailSkip = optedOut ? 'opted_out' : await invitationMailSkipReason(tx, tenantId, existing?.id ?? null);
 
         // The mail that just went out names a role; within the cooldown no new
         // mail can say otherwise, so the link keeps it (İNCELEME-32 Ö-1). The
@@ -327,11 +334,22 @@ async function deliverInvitationEmail(params: {
   if (params.skip) return { sent: false, reason: params.skip };
 
   try {
-    await mailer(renderInvitationEmail(params.message));
+    const secret = emailOptOutSecret();
+    if (!secret) throw new Error('auth_secret_unset');
+    const receipt = await mailer(
+      withOptOut(renderInvitationEmail(params.message), {
+        baseUrl: params.mailBaseUrl,
+        secret,
+        source: 'invitation',
+        tenantId,
+      })
+    );
+    await recordMailAccepted(tenantId, invitationId, receipt?.messageId ?? null);
     return { sent: true };
   } catch (error) {
     // MailSendError's message is the SMTP codes only (see mailer.ts).
     const reason = error instanceof Error ? error.message : 'unknown_error';
+    const failureCode = mailFailureCode(error);
     console.error(`[Invitations] invitation email failed: ${reason}`);
     await recordAlert({
       level: 'warn',
@@ -342,7 +360,15 @@ async function deliverInvitationEmail(params: {
     if (invitationId) {
       try {
         await withTenant(tenantId, (tx) =>
-          tx.auditEvent.create({ data: { tenantId, type: INVITATION_MAIL_FAILED, target: invitationId } })
+          tx.auditEvent.create({
+            data: {
+              tenantId,
+              type: INVITATION_MAIL_FAILED,
+              target: invitationId,
+              // Codes only (mailer.ts): the server's reply text can echo the address.
+              ...(failureCode ? { data: { code: failureCode } } : {}),
+            },
+          })
         );
       } catch {
         // Without the row the cooldown simply runs its 10 minutes. Nothing from
@@ -351,5 +377,22 @@ async function deliverInvitationEmail(params: {
       }
     }
     return { sent: false, reason: 'send_failed' };
+  }
+}
+
+/**
+ * The SMTP acceptance row (NG-42). The mail has already gone out, so a row that
+ * cannot be written must not make the request say otherwise.
+ */
+async function recordMailAccepted(tenantId: string, invitationId: string | null, messageId: string | null): Promise<void> {
+  if (!invitationId) return;
+  try {
+    await withTenant(tenantId, (tx) =>
+      tx.auditEvent.create({
+        data: { tenantId, type: INVITATION_MAIL_ACCEPTED, target: invitationId, data: { messageId } },
+      })
+    );
+  } catch {
+    console.error('[Invitations] could not record the accepted send');
   }
 }

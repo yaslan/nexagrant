@@ -124,6 +124,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/email/opt-out-store.ts",
+      "subject": "system-scope:subject-scoped",
+      "count": 2,
+      "kind": "system-scope",
+      "class": "subject-scoped",
+      "reason": "NG-42 e-mail opt-out. The recipient of a first message has no account and no session, so there is no tenant to bind. (1) recordOptOut writes the choice: an unsubscribe is a NULL-tenant AuditEvent row because it binds every tenant, and a tenant session can neither read nor write NULL-tenant rows under tenant_isolation. (2) isEmailOptedOut reads that same row before a send: under withTenant it returns nothing and an unsubscribed address would keep receiving mail. The query is keyed by the hash of one address (the data subject's own choice, not a user id), returns only an id, and the authority for the write is the signed token verified in the route."
+    },
+    {
+      "check": "D",
       "file": "src/lib/jobs/tasks/users-scheduled-deletion.ts",
       "subject": "system-scope:subject-scoped",
       "count": 3,
