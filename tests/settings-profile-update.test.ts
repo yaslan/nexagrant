@@ -359,13 +359,15 @@ describe('updateTenantProfile action', () => {
       });
 
       it('a TRL conflict takes the text and the PIC down with it, and asks CORDIS nothing', async () => {
+        // NG-96: a PIC is unique across tenants and the database is shared by every run: draw a fresh one.
+        const pic = String(100_000_000 + Math.floor(Math.random() * 899_999_999));
         const before = await row();
         const picRows = () =>
           prisma.auditEvent.count({ where: { tenantId, type: { in: ['tenant.pic.updated', 'tenant.pic.refused'] } } });
         const spend = vi.mocked(spendUnsolicitedPicLookup);
         spend.mockClear();
 
-        expect(await updateTenantProfile({ keywords: 'draft', trlMax: 3, pic: '987654322' })).toEqual({
+        expect(await updateTenantProfile({ keywords: 'draft', trlMax: 3, pic })).toEqual({
           ok: false,
           error: 'trlRangeConflict',
           trlRange: [4, 7],
@@ -377,9 +379,9 @@ describe('updateTenantProfile action', () => {
         // The refusal comes before the PIC plan: no lookup quota and no daily budget spent on it.
         expect(spend).not.toHaveBeenCalled();
         // The form sends no TRL on the next try: that one goes through.
-        expect(await updateTenantProfile({ keywords: 'draft', pic: '987654322' })).toMatchObject({ ok: true });
+        expect(await updateTenantProfile({ keywords: 'draft', pic })).toMatchObject({ ok: true });
         expect(await row()).toMatchObject({ keywords: ['draft'], trlRange: [4, 7] });
-        expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })).pic).toBe('987654322');
+        expect((await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })).pic).toBe(pic);
       });
 
       it('a refused PIC keeps the changed field out too', async () => {
@@ -667,6 +669,22 @@ describe('updateTenantProfile action', () => {
 
     // ── FO-389: accounts anyone can open ──────────────────────────────────────
     describe('unsolicited accounts: lower limit and one shared daily budget', () => {
+      // NG-96: the budget is one row per UTC day in a table that every process on this database
+      // shares. Two runs on one database (each with its own budget tests) wrote the same day's row
+      // and broke the assertions below (15 failures a run with three copies). Each run takes one
+      // random base day, once, and every budget test here counts on days from it; only Date is faked,
+      // so timers and the database keep the real clock.
+      const RUN_BASE = Date.UTC(2030, 0, 1) + Math.floor(Math.random() * 36_000) * 86_400_000;
+      const runDayAt = (offset: number, time: string) =>
+        `${new Date(RUN_BASE + offset * 86_400_000).toISOString().slice(0, 10)}T${time}`;
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(runDayAt(10, '12:00:00.000Z')));
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
       const budgetRow = (day = budgetDay(new Date())) => prisma.picLookupBudget.findUnique({ where: { day } });
       const setBudget = (count: number) =>
         prisma.picLookupBudget.upsert({
@@ -868,41 +886,52 @@ describe('updateTenantProfile action', () => {
       });
 
       describe('the day does not reset on a request, only at UTC midnight', () => {
+        // NG-96: the days come from this run's base (see above), so no run writes another run's rows.
+        // The times inside a day and the midnight edge stay as written: only the calendar day moves.
+        const dayAt = runDayAt;
+        const dayOf = (offset: number) => runDayAt(offset, '').slice(0, 10);
         const days: string[] = [];
         afterEach(async () => {
-          await prisma.picLookupBudget.deleteMany({ where: { day: { in: presentIds(days.splice(0)) } } });
+          const done = days.splice(0);
+          await prisma.picLookupBudget.deleteMany({ where: { day: { in: presentIds(done) } } });
+          // The refusals above also raised this day's alert. Left open, that row makes the alert
+          // dedupe of the next test (which scans the newest few open rows) miss its own row.
+          resetPicBudgetAlertMemo();
+          const mine = await prisma.systemAlert.findMany({ where: { source: 'pic-budget' }, select: { id: true, meta: true } });
+          const ids = mine.filter((a) => done.includes(String((a.meta as { day?: unknown } | null)?.day))).map((a) => a.id);
+          await prisma.systemAlert.deleteMany({ where: { id: { in: presentIds(ids) } } });
         });
 
         it('counts per UTC day and tells how long until the next', async () => {
           const { spendUnsolicitedPicLookup } = await import('@/lib/pic-budget');
-          const d1 = new Date('2099-03-04T23:59:30.500Z');
-          const d2 = new Date('2099-03-05T00:00:00.000Z');
-          days.push('2099-03-04', '2099-03-05');
+          const d1 = new Date(dayAt(0, '23:59:30.500Z'));
+          const d2 = new Date(dayAt(1, '00:00:00.000Z'));
+          days.push(dayOf(0), dayOf(1));
           expect(await spendUnsolicitedPicLookup(d1, 2)).toBeNull();
           expect(await spendUnsolicitedPicLookup(d1, 2)).toBeNull();
           expect(await spendUnsolicitedPicLookup(d1, 2)).toBe(30); // 29.5 s, rounded up
           // a request at the start of the same day sees the same spent day, a whole day from renewal
-          expect(await spendUnsolicitedPicLookup(new Date('2099-03-04T00:00:00.000Z'), 2)).toBe(86_400);
+          expect(await spendUnsolicitedPicLookup(new Date(dayAt(0, '00:00:00.000Z')), 2)).toBe(86_400);
           expect(await spendUnsolicitedPicLookup(d2, 2)).toBeNull(); // a new day, a new count
-          expect((await budgetRow('2099-03-04'))?.count).toBe(2);
-          expect((await budgetRow('2099-03-05'))?.count).toBe(1);
+          expect((await budgetRow(dayOf(0)))?.count).toBe(2);
+          expect((await budgetRow(dayOf(1)))?.count).toBe(1);
         });
 
         it('never lets more through than the ceiling when many ask at once, across separate connections', async () => {
           const { spendUnsolicitedPicLookup } = await import('@/lib/pic-budget');
-          const at = new Date('2099-06-07T12:00:00.000Z');
-          days.push('2099-06-07');
+          const at = new Date(dayAt(2, '12:00:00.000Z'));
+          days.push(dayOf(2));
           const ceiling = 10;
           const results = await Promise.all(Array.from({ length: 60 }, () => spendUnsolicitedPicLookup(at, ceiling)));
           expect(results.filter((r) => r === null)).toHaveLength(ceiling);
-          expect((await budgetRow('2099-06-07'))?.count).toBe(ceiling);
+          expect((await budgetRow(dayOf(2)))?.count).toBe(ceiling);
         });
 
         it('spends nothing against a ceiling of nothing', async () => {
           const { spendUnsolicitedPicLookup } = await import('@/lib/pic-budget');
-          days.push('2099-07-08');
-          expect(await spendUnsolicitedPicLookup(new Date('2099-07-08T00:00:00.000Z'), 0)).toBe(86_400);
-          expect(await budgetRow('2099-07-08')).toBeNull();
+          days.push(dayOf(3));
+          expect(await spendUnsolicitedPicLookup(new Date(dayAt(3, '00:00:00.000Z')), 0)).toBe(86_400);
+          expect(await budgetRow(dayOf(3))).toBeNull();
         });
       });
 
@@ -1044,10 +1073,14 @@ describe('updateTenantProfile action', () => {
       });
 
       describe('a spent day tells the operator once (review Ö-3)', () => {
-        const alerts = () => prisma.systemAlert.findMany({ where: { source: 'pic-budget' }, orderBy: { createdAt: 'asc' } });
+        // NG-96: only this run's day. The alert table is shared, so another run's spent day must not be
+        // counted or deleted here.
+        const alerts = () => prisma.systemAlert.findMany({ where: { source: 'pic-budget', meta: { path: ['day'], equals: budgetDay(new Date()) } }, orderBy: { createdAt: 'asc' } });
         const clearAlerts = async () => {
           resetPicBudgetAlertMemo();
-          await prisma.systemAlert.deleteMany({ where: { id: { in: presentIds((await alerts()).map((a) => a.id)) } } });
+          await prisma.systemAlert.deleteMany({
+            where: { source: 'pic-budget', meta: { path: ['day'], equals: requireId(budgetDay(new Date()), 'day') } },
+          });
         };
         beforeEach(clearAlerts);
         afterEach(clearAlerts);
