@@ -7,6 +7,7 @@ import type { Editor } from '@tiptap/react';
 import { EvidenceDrawer } from '@/components/evidence/EvidenceDrawer';
 import { useTranslations } from 'next-intl';
 import { errorMessage } from '@/lib/errors';
+import { invalidTemplateSectionKey } from '@/modules/m2/invalid-section';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 
 interface Section {
@@ -41,6 +42,7 @@ export default function ConceptNoteEditor({
   const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
   const errorText = useActionErrorText();
   const t = useTranslations('ConceptNote.workspaceEditor');
+  const tDraft = useTranslations('ConceptNote.editor');
   const tStatus = useTranslations('ConceptNote.status');
 
   /** An ended pilot is said as such; any other error goes on to the error boundary, as before. */
@@ -79,7 +81,13 @@ export default function ConceptNoteEditor({
         outputTokens: result.outputTokens,
       });
     } catch (err) {
-      alert(errorText(err, () => errorMessage(err) || t('aiFailed')));
+      // Production withholds a thrown action's message; the digest carries the section.
+      const invalidSection = invalidTemplateSectionKey(err);
+      alert(
+        invalidSection !== null
+          ? tDraft('invalidSection', { section: invalidSection })
+          : errorText(err, () => errorMessage(err) || t('aiFailed'))
+      );
     } finally {
       setAiLoading(null);
     }

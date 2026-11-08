@@ -6,10 +6,11 @@ import { isPresentId } from '@/lib/required-id';
 import { generateCompletion } from '@/lib/llm';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { buildRagContext } from '@/lib/rag';
-import { separatedPrompt } from '@/lib/ai/prompts';
+import { isInstructionCount, separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { revalidatePath } from 'next/cache';
 import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
+import { InvalidTemplateSectionError } from '@/modules/m2/invalid-section';
 
 /**
  * `tenantId` was read as `session.tenantId` with no null check. Prisma
@@ -101,15 +102,20 @@ export async function generateSectionDraft(
   await assertModuleAccess('M2');
   const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
+  // `Number`: an action is a public POST, so `maxWords` can arrive as any text.
+  // Checked before the RAG lookup and the model; `editorSections` shows a section
+  // whose limit is a fraction or over the ceiling, so its button does reach here.
+  const wordLimit = Number(maxWords);
+  if (!isInstructionCount(wordLimit)) throw new InvalidTemplateSectionError(sectionKey);
+
   // Build RAG-augmented context
   const ragQuery = `${opportunityTitle} — section: ${sectionLabel}`;
   const locale = await promptLocale();
   const retrievedContext = await buildRagContext(ragQuery, tenantId, undefined, { userId });
 
-  // `Number`: an action is a public POST, so `maxWords` can arrive as any text.
   const request = separatedPrompt(
     'm2/section-draft',
-    { maxWords: Number(maxWords) },
+    { maxWords: wordLimit },
     { section_label: sectionLabel, opportunity_title: opportunityTitle, retrieved_context: retrievedContext },
     locale
   );
