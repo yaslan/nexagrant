@@ -64,9 +64,14 @@ export default function MembersSettingsClient() {
       // back — the token was kept and the link in that mail still works;
       // daily_limit = the tenant's daily invitation email limit is used up, and
       // the link below is the one to pass on by hand; role_change_blocked =
-      // recently_sent with another role, which the mailed link keeps.
+      // recently_sent with another role, which the mailed link keeps;
+      // opted_out = the recipient used the opt-out link of an earlier mail.
       const notSent =
-        data.reason === 'daily_limit' ? t('dailyLimitNotSent') : t('notSent');
+        data.reason === 'daily_limit'
+          ? t('dailyLimitNotSent')
+          : data.reason === 'opted_out'
+            ? t('optedOutNotSent')
+            : t('notSent');
       setMessage(
         data.reason === 'role_change_blocked'
           ? t('roleChangeBlocked')

@@ -1210,6 +1210,7 @@
         "sendFailed": "Davet gönderilemedi",
         "errorPrefixed": "Hata: {message}",
         "dailyLimitNotSent": "Kurumunuzun günlük davet e-postası sınırına ulaşıldı; e-posta gönderilmedi. Bağlantıyı elle iletin",
+        "optedOutNotSent": "Bu adres davet e-postalarını reddetti; e-posta gönderilmedi. Bağlantıyı elle iletebilirsiniz",
         "notSent": "Davet oluşturuldu ancak e-posta gönderilemedi; bağlantıyı elle iletin",
         "notSentWithLink": "{notSent}: {link}",
         "roleChangeBlocked": "Davet az önce gönderildi; rolü değiştirmek için 10 dakika sonra yeniden davet edin",
@@ -5105,6 +5106,37 @@
     "demoHeading": "⚡ Hızlı Demo Giriş Rolleri",
     "passwordless": "Şifresiz Oturum",
     "demoSignInArrow": "Giriş →"
+  },
+  "EmailOptOut": {
+    "title": "E-posta tercihi",
+    "invalidHeading": "Bu bağlantı geçersiz",
+    "invalidBody": "Bağlantı bozulmuş ya da eksik kopyalanmış olabilir. E-postadaki bağlantıyı yeniden açın.",
+    "footer": {
+      "decline": "Bu daveti reddediyorum",
+      "unsubscribe": "Bir daha e-posta almak istemiyorum"
+    },
+    "confirm": {
+      "decline": {
+        "heading": "Bu kurumun davetini reddedin",
+        "body": "Bu kurum size bir daha e-posta gönderemez. Başka kurumların davetleri bundan etkilenmez.",
+        "button": "Daveti reddet"
+      },
+      "unsubscribe": {
+        "heading": "E-posta listesinden çıkın",
+        "body": "Platformdaki hiçbir kurum bu adrese ilk iletişim e-postası gönderemez.",
+        "button": "Abonelikten çık"
+      }
+    },
+    "done": {
+      "decline": {
+        "heading": "Ret kaydedildi",
+        "body": "Bu kurum size bir daha e-posta gönderemez."
+      },
+      "unsubscribe": {
+        "heading": "Abonelikten çıktınız",
+        "body": "Bu adrese artık ilk iletişim e-postası gönderilmeyecek."
+      }
+    }
   },
   "PersonDaysReport": {
     "title": "Adam-Gün Raporu",
