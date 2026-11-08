@@ -4,7 +4,7 @@ import { prisma, withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
 import { generateText } from '@/lib/llm';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { retrieveChunks } from '@/lib/rag';
@@ -109,17 +109,19 @@ export async function generateConceptNoteDraft(
     }
 
     // `String(...)` keeps what the template literal printed for a missing topic or
-    // promptKey ("undefined") — the move is byte-for-byte, not a fix.
-    const prompt = renderPrompt(
+    // promptKey ("undefined"). `section` comes from a template a tenant can own, so
+    // `promptKey` is data like the rest, and `Number` is what stands between a text
+    // `maxWords` and the instructions.
+    const request = separatedPrompt(
       'm2/concept-note-section',
+      { maxWords: Number(section.maxWords) },
       {
-        topicTitle: String(topic?.title),
-        topicIdentifier: String(topic?.identifier),
-        opportunityTitle: opp.title,
-        inputsJson: JSON.stringify(inputs),
-        context: contextStr,
-        task: String(section.promptKey),
-        maxWords: section.maxWords,
+        topic_title: String(topic?.title),
+        topic_identifier: String(topic?.identifier),
+        opportunity_title: opp.title,
+        additional_inputs: JSON.stringify(inputs),
+        background_context: contextStr,
+        section_task: String(section.promptKey),
       },
       locale
     );
@@ -131,7 +133,7 @@ export async function generateConceptNoteDraft(
       purpose: `Drafting section: ${section.key}`,
       proposalId: opportunityId,
       section: section.key,
-      prompt
+      ...request
     });
     
     content[section.key] = generatedText;

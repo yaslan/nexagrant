@@ -1,5 +1,4 @@
 import m10StandardDocEn from './m10/standard-doc.en';
-import m10StandardDocSystemEn from './m10/standard-doc-system.en';
 import m17CallContextEn from './m17/call-context.en';
 import m17CallContextTr from './m17/call-context.tr';
 import m17EvaluateEn from './m17/evaluate.en';
@@ -7,17 +6,12 @@ import m17EvaluateTr from './m17/evaluate.tr';
 import m17EvaluateRetryEn from './m17/evaluate-retry.en';
 import m17EvaluateRetryTr from './m17/evaluate-retry.tr';
 import m2ConceptNoteSectionEn from './m2/concept-note-section.en';
-import m2SectionDraftSystemEn from './m2/section-draft-system.en';
-import m2SectionDraftUserEn from './m2/section-draft-user.en';
+import m2SectionDraftEn from './m2/section-draft.en';
 import m6EsrParseEn from './m6/esr-parse.en';
-import m6EsrParseSystemEn from './m6/esr-parse-system.en';
 import m6EvaluationEn from './m6/evaluation.en';
-import m6EvaluationSystemEn from './m6/evaluation-system.en';
 import m7IpChecklistEn from './m7/ip-checklist.en';
-import m7IpChecklistSystemEn from './m7/ip-checklist-system.en';
 import m9MeetingBriefEn from './m9/meeting-brief.en';
-import m9MeetingBriefSystemEn from './m9/meeting-brief-system.en';
-import ragRetrievedContextEn from './rag/retrieved-context.en';
+import sharedUntrustedDataRuleEn from './shared/untrusted-data-rule.en';
 
 /**
  * The one place prompt text is loaded from (CLAUDE.md rule 5, ROADMAP open
@@ -41,6 +35,11 @@ import ragRetrievedContextEn from './rag/retrieved-context.en';
  * locale until a `<name>.tr.ts` is added and registered here. Adding one is a
  * behaviour change and is reviewed as such. M17 (FO-188) was written with both,
  * and tests/prompt-snapshots.test.ts pins both.
+ *
+ * Instructions and data travel apart outside M17 (NG-40, spec §18.3): the
+ * template holds only instructions and goes in `system`, and whatever a user, an
+ * uploaded document or a tenant-owned template supplied goes, fenced, in the user
+ * message. {@link separatedPrompt} is the way to build such a request.
  */
 
 /**
@@ -62,30 +61,18 @@ interface PromptDef {
 }
 
 const PROMPTS = {
-  'm6/esr-parse': { vars: ['documentText'], text: { en: m6EsrParseEn } },
-  'm6/esr-parse-system': { vars: [], text: { en: m6EsrParseSystemEn } },
-  'm6/evaluation': { vars: ['opportunityId'], text: { en: m6EvaluationEn } },
-  'm6/evaluation-system': { vars: [], text: { en: m6EvaluationSystemEn } },
-  'm7/ip-checklist': { vars: ['title', 'trl', 'patentStatus'], text: { en: m7IpChecklistEn } },
-  'm7/ip-checklist-system': { vars: [], text: { en: m7IpChecklistSystemEn } },
-  'm9/meeting-brief': { vars: ['partnerName', 'callTopic'], text: { en: m9MeetingBriefEn } },
-  'm9/meeting-brief-system': { vars: [], text: { en: m9MeetingBriefSystemEn } },
-  'm10/standard-doc': { vars: ['kind', 'opportunityTitle'], text: { en: m10StandardDocEn } },
-  'm10/standard-doc-system': { vars: [], text: { en: m10StandardDocSystemEn } },
+  'm6/esr-parse': { vars: [], text: { en: m6EsrParseEn } },
+  'm6/evaluation': { vars: [], text: { en: m6EvaluationEn } },
+  'm7/ip-checklist': { vars: [], text: { en: m7IpChecklistEn } },
+  'm9/meeting-brief': { vars: [], text: { en: m9MeetingBriefEn } },
+  'm10/standard-doc': { vars: [], text: { en: m10StandardDocEn } },
   // M17 Interreg pre-assessment (FO-188): stage 1 = call guide as system context, stage 2 = project vs grid.
   'm17/call-context': { vars: ['call_context'], text: { en: m17CallContextEn, tr: m17CallContextTr } },
   'm17/evaluate': { vars: ['rubric', 'project_context'], text: { en: m17EvaluateEn, tr: m17EvaluateTr } },
   'm17/evaluate-retry': { vars: ['problems'], text: { en: m17EvaluateRetryEn, tr: m17EvaluateRetryTr } },
-  'm2/concept-note-section': {
-    vars: ['topicTitle', 'topicIdentifier', 'opportunityTitle', 'inputsJson', 'context', 'task', 'maxWords'],
-    text: { en: m2ConceptNoteSectionEn },
-  },
-  'm2/section-draft-system': { vars: ['maxWords'], text: { en: m2SectionDraftSystemEn } },
-  'm2/section-draft-user': {
-    vars: ['sectionLabel', 'opportunityTitle', 'ragPrompt', 'maxWords'],
-    text: { en: m2SectionDraftUserEn },
-  },
-  'rag/retrieved-context': { vars: ['context', 'question'], text: { en: ragRetrievedContextEn } },
+  'm2/concept-note-section': { vars: ['maxWords'], text: { en: m2ConceptNoteSectionEn } },
+  'm2/section-draft': { vars: ['maxWords'], text: { en: m2SectionDraftEn } },
+  'shared/untrusted-data-rule': { vars: [], text: { en: sharedUntrustedDataRuleEn } },
 } as const satisfies Record<string, PromptDef>;
 
 export type PromptId = keyof typeof PROMPTS;
@@ -127,4 +114,61 @@ export function renderPrompt<I extends PromptId>(id: I, vars: PromptVars<I>, loc
     if (!declared.has(name)) throw new PromptTemplateError(`Prompt ${id}: placeholder "{{${name}}}" is not declared`);
     return String(given[name]);
   });
+}
+
+/** A prompt whose template is instructions only (M17 fences its own documents). */
+type SeparatedPromptId = Exclude<PromptId, `m17/${string}` | 'shared/untrusted-data-rule'>;
+
+const DATA_TAG = 'user_data';
+const DATA_FIELD_RE = /^[a-z_]+$/;
+
+/**
+ * The `<` of anything that reads as our tag: either case, with or without a slash,
+ * spaced, or with invisible characters or a separator slipped in. `\W` covers those
+ * inside the name; the class before it covers the characters around the slash.
+ */
+const DATA_TAG_RE = /<(?=[\s​-‍⁠﻿]*\/?[\s​-‍⁠﻿]*user[\W_]*data(?![\w-]))/gi;
+
+/**
+ * A value that writes `</user_data>` would close its block early and what follows
+ * would read as the prompt's own text. Same cure as M17's `neutralizeFenceTags`: the
+ * `<` becomes the full-width `＜`, one character for one.
+ */
+function neutralizeDataTags(text: string): string {
+  return text.replace(DATA_TAG_RE, '＜');
+}
+
+function fenceData(data: Record<string, string | number>): string {
+  return Object.entries(data)
+    .map(([field, value]) => {
+      if (!DATA_FIELD_RE.test(field)) throw new PromptTemplateError(`Data field "${field}" is not a valid name`);
+      if (value === undefined) throw new PromptTemplateError(`Data field "${field}" was not passed`);
+      return `<${DATA_TAG} field="${field}">\n${neutralizeDataTags(String(value))}\n</${DATA_TAG}>`;
+    })
+    .join('\n');
+}
+
+/**
+ * One model request with its instructions and its data apart (NG-40): the `system`
+ * and `prompt` of `generateText` / `generateCompletion`.
+ *
+ * `instructions` fill the template, so only finite numbers are accepted, at run
+ * time too: a server action is a public POST endpoint and its TypeScript signature
+ * does not bind the caller. Text belongs in `data`, keyed by the field name the
+ * template refers to.
+ */
+export function separatedPrompt<I extends SeparatedPromptId>(
+  id: I,
+  instructions: Record<(typeof PROMPTS)[I]['vars'][number], number>,
+  data: Record<string, string | number>,
+  locale?: string
+): { system: string; prompt: string } {
+  for (const [name, value] of Object.entries(instructions)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new PromptTemplateError(`Prompt ${id}: instruction variable "${name}" must be a finite number`);
+    }
+  }
+  const body = renderPrompt(id, instructions as unknown as PromptVars<I>, locale);
+  const rule = renderPrompt('shared/untrusted-data-rule', {}, locale);
+  return { system: `${body}\n\n${rule}`, prompt: fenceData(data) };
 }
