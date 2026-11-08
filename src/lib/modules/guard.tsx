@@ -1,10 +1,26 @@
 import React from 'react';
+import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import type { Role } from '@prisma/client';
 
-import { checkModuleAccess } from '@/lib/modules/access';
+import { checkModuleAccess, requestSession } from '@/lib/modules/access';
 import { getManifest } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
 import { PRODUCT_NAME } from '@/lib/brand';
+import { can } from '@/lib/rbac';
+import { getWorkspaceRoute } from '@/lib/routes';
+import { tenantScopeOf } from '@/lib/tenant';
+import { WORKSPACE_ALIAS } from '@/lib/workspaces';
+
+/**
+ * Whether the signed-in viewer may open Settings → Modules, decided on the server
+ * by the same `can(role, 'manage_modules')` the settings page itself checks. The
+ * client never receives a flag to trust; this only chooses which hint the lock shows.
+ */
+async function viewerCanManageModules(): Promise<boolean> {
+  const scope = tenantScopeOf(await requestSession());
+  return can(scope?.role as Role | undefined, 'manage_modules');
+}
 
 /**
  * Page-side module gate.
@@ -57,6 +73,12 @@ export async function moduleGate(
     );
   }
 
+  // A module that is simply switched off is one the owner can switch on from Settings →
+  // Modules, so that screen is offered instead of "ask your administrator". Other reasons
+  // (plan, pilot, development) are not fixed there, so they keep the old sentence.
+  const offerModulesLink =
+    access.reason === 'MODULE_OFF' && (await viewerCanManageModules());
+
   return (
     // A <section>, not a <main>: the workspace layout already renders one, and a
     // nested <main> is invalid HTML and gives screen readers two landmarks.
@@ -83,7 +105,18 @@ export async function moduleGate(
           brand: PRODUCT_NAME,
         })}
       </p>
-      <p className="mt-6 text-sm text-slate-500 dark:text-slate-500">{t('askAdmin', { brand: PRODUCT_NAME })}</p>
+      {offerModulesLink ? (
+        <p className="mt-6">
+          <Link
+            href={getWorkspaceRoute('settingsModules', locale, WORKSPACE_ALIAS)}
+            className="font-medium text-blue-700 underline underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+          >
+            {t('openModules')}
+          </Link>
+        </p>
+      ) : (
+        <p className="mt-6 text-sm text-slate-500 dark:text-slate-500">{t('askAdmin', { brand: PRODUCT_NAME })}</p>
+      )}
     </section>
   );
 }

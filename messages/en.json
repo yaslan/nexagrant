@@ -2078,6 +2078,7 @@
   "ModuleGate": {
     "title": "This module is not available",
     "askAdmin": "If you need access, talk to your workspace administrator or the {brand} team.",
+    "openModules": "Turn the module on under Settings → Modules",
     "comingSoon": "{brand} is preparing this module. Once it is released you can enable it from Module Management.",
     "reason": {
       "MODULE_OFF": "The {module} module is turned off for your workspace.",
