@@ -10,6 +10,8 @@ import { generateText } from '@/lib/llm';
 import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 
+import { ProposalTextMissingError } from '../proposal-text-missing';
+import { readProposalText } from './proposal-text';
 import {
   getPanelScoresForProposal,
   updateEvaluationScore,
@@ -69,6 +71,10 @@ function revalidateQuietly(path: string) {
  * database and shown to the user as an assessment of their proposal. CLAUDE.md §7 says
  * every number on screen traces to a record; a fabricated one cannot. A failed call now
  * fails, and the caller reports it.
+ *
+ * The same rule covers the input. The model used to receive only the opportunity id, so
+ * every mark was invented without the proposal being read (NG-98). With no text to read
+ * there is no call and no charge.
  */
 export async function generateAiEvaluation(opportunityId: string): Promise<AiEvaluationResult> {
   const oppId = parseOrThrow(idSchema, opportunityId);
@@ -78,12 +84,30 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
   const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
   const locale = await promptLocale();
 
+  // Everything that can refuse runs before the model: `generateText` is what writes
+  // AiUsageLog and debits CreditLedger. No transaction stays open across the call.
+  const proposal = await withTenant(tenantId, async (tx) => {
+    // The opportunity must belong to the session tenant; its id is guessable.
+    const opp = await tx.opportunity.findFirst({
+      where: { id: oppId, tenantId },
+      select: { id: true },
+    });
+    if (!opp) throw new EvaluationNotFoundError(`Opportunity ${oppId} not found in this workspace.`);
+    return readProposalText(tx, tenantId, oppId);
+  });
+  if (!proposal) throw new ProposalTextMissingError(oppId);
+
   const resultStr = await generateText({
     tenantId,
     userId,
     module: 'M6',
     purpose: 'evaluation',
-    ...separatedPrompt('m6/evaluation', {}, { opportunity_id: oppId }, locale),
+    ...separatedPrompt(
+      'm6/evaluation',
+      {},
+      { proposal_source: proposal.source, proposal_text: proposal.text },
+      locale
+    ),
   });
 
   let raw: unknown;
@@ -95,15 +119,8 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
 
   const parsed = parseOrThrow(aiEvaluationSchema, raw);
 
-  await withTenant(tenantId, async (tx) => {
-    // The opportunity must belong to the session tenant; its id is guessable.
-    const opp = await tx.opportunity.findFirst({
-      where: { id: oppId, tenantId },
-      select: { id: true },
-    });
-    if (!opp) throw new EvaluationNotFoundError(`Opportunity ${oppId} not found in this workspace.`);
-
-    await tx.evaluation.create({
+  await withTenant(tenantId, (tx) =>
+    tx.evaluation.create({
       data: {
         tenantId,
         opportunityId: oppId,
@@ -117,10 +134,13 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
           strengths: parsed.strengths,
           weaknesses: parsed.weaknesses,
           recommendations: parsed.recommendations,
+          // Which text these marks rest on. Rows from before NG-98 have no such key:
+          // that is how a score produced without reading anything is told apart.
+          proposalSource: proposal.source,
         },
       },
-    });
-  });
+    })
+  );
 
   revalidateQuietly(EVALUATION_PATH);
   return parsed;

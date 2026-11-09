@@ -1833,6 +1833,7 @@
     },
     "errors": {
       "aiFailed": "YZ ön değerlendirmesi tamamlanamadı; hiçbir puan kaydedilmedi.",
+      "noProposalText": "Değerlendirilecek teklif metni yok. Önce kavram notunu veya Part B bölümlerini yazın; kredi düşülmedi, puan kaydedilmedi.",
       "saveFailed": "Değerlendirme kaydedilemedi. Lütfen tekrar deneyin.",
       "calibrationFailed": "ESR kalibrasyonu kaydedilemedi."
     },
