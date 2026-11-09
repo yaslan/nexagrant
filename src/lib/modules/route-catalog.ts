@@ -48,6 +48,7 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'relationships',
   'relationships/[id]',
   'reports/person-days',
+  'settings',
   'settings/api-keys',
   'settings/billing',
   'settings/calendar',
