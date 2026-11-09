@@ -16,7 +16,7 @@ import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { useGateReasonText } from '@/lib/hooks/use-gate-reason-text';
 import type { GateReason } from '@/lib/gates/reasons';
 import { nextStageOf } from '@/lib/gates/transition';
-import { g0BoxMode, type SavedG0Decision } from '@/lib/gates/latest-g0-decision';
+import { g0BoxMode, g0ReasonsVisible, type SavedG0Decision } from '@/lib/gates/latest-g0-decision';
 import { errorMessage } from '@/lib/errors';
 import { EffortTracker, type EffortEntry } from './effort';
 
@@ -560,7 +560,7 @@ export function OpportunityDetailClient({
                 )}
               </section>
 
-              {g0.reasons.length > 0 && (
+              {g0ReasonsVisible(boxMode) && g0.reasons.length > 0 && (
                 <div className="bg-ground border border-border p-4 rounded-xl">
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
                     {t('detail.scoreReasons')}

@@ -36,3 +36,11 @@ export function g0BoxMode(stage: string, saved: SavedG0Decision | null): G0BoxMo
   if (!saved) return { kind: 'none' };
   return { kind: 'saved', passed: saved.passed, decidedAt: saved.decidedAt };
 }
+
+/**
+ * The live "Puan Gerekçeleri" list is the live computation's output, so it is shown only while
+ * the box is live (at G0). After G1 the reasons would contradict the saved decision (NG-69).
+ */
+export function g0ReasonsVisible(mode: G0BoxMode): boolean {
+  return mode.kind === 'live';
+}

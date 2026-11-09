@@ -375,9 +375,8 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(ev.score).toBe(100);
     expect(invitedRun.passed).toBe(true);
 
-    // NG-69: a passed partner keeps the green badge. The opportunity has moved on to G1 by now, so
-    // the detail page's score card is the live recomputation shown beside a G1 stage (see the
-    // report's note on G1+ visibility).
+    // NG-69: a passed partner keeps the green badge. Re-evaluating the G0 gate is a same-stage
+    // move (G0→G0), so the opportunity stays at G0 and the detail box is still the live computation.
     const passedDetail = await openDetail(page, opp.id);
     await expect(passedDetail.getByTestId('pipeline-g0-value')).toHaveText('100');
     await expect(passedDetail.getByTestId('pipeline-g0-refusal')).toHaveCount(0);

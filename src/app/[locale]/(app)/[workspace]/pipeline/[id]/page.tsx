@@ -126,7 +126,9 @@ export default async function OpportunityDetailPage({
       userName: nameById.get(r.userId) ?? null,
     }));
 
-    return { opp, g0: await computeG0ForOpportunity(tx, tenantId, id), efforts, savedG0 };
+    // The live score is only computed at G0; past G0 the box shows the saved decision (NG-69).
+    const g0 = opp.stage === 'G0' ? await computeG0ForOpportunity(tx, tenantId, id) : null;
+    return { opp, g0, efforts, savedG0 };
   });
 
   if (!loaded.opp) notFound();

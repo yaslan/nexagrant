@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { g0BoxMode } from '@/lib/gates/latest-g0-decision';
+import { g0BoxMode, g0ReasonsVisible } from '@/lib/gates/latest-g0-decision';
 
 /**
  * NG-69 (K-579051) — the detail page's G0 box after the opportunity has left G0.
@@ -33,5 +33,12 @@ describe('g0BoxMode — what the G0 box shows', () => {
   it('shows an explicit empty state after G1 when no G0 decision is on file', () => {
     expect(g0BoxMode('G1', null)).toEqual({ kind: 'none' });
     expect(g0BoxMode('G2', null)).toEqual({ kind: 'none' });
+  });
+
+  it('shows the live reasons list only while the opportunity is at G0 (no live reasons after G1)', () => {
+    expect(g0ReasonsVisible(g0BoxMode('G0', null))).toBe(true);
+    expect(g0ReasonsVisible(g0BoxMode('G1', passed))).toBe(false);
+    expect(g0ReasonsVisible(g0BoxMode('G1', refused))).toBe(false);
+    expect(g0ReasonsVisible(g0BoxMode('G2', null))).toBe(false);
   });
 });
