@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { SEDIA_RESULT_WINDOW, lastReachablePage } from '@/lib/calls-paging';
@@ -40,6 +41,37 @@ const FRAMEWORK_PROGRAMMES = [
   { id: '43353744', labelKey: 'edf' },
   { id: '43353724', labelKey: 'cef' },
 ] as const;
+
+const DEFAULT_STATUSES = ['OPEN', 'FORTHCOMING'];
+const STATUS_VALUES = ['OPEN', 'FORTHCOMING', 'CLOSED'];
+
+/**
+ * Filter state lives in the URL (NG-12): `q`, `framework`, `status`, `type`, `page`. A param that
+ * is missing or not a known value falls back to the default, so a hand-edited URL cannot break
+ * the page. `status=` (empty) is a real choice: no status box ticked.
+ */
+function parseFilters(params: URLSearchParams) {
+  const frameworkRaw = params.get('framework');
+  const statusRaw = params.get('status');
+  const pageRaw = Number.parseInt(params.get('page') ?? '', 10);
+  return {
+    search: params.get('q') ?? '',
+    framework: FRAMEWORK_PROGRAMMES.some((p) => p.id === frameworkRaw) ? (frameworkRaw as string) : 'ALL',
+    statuses:
+      statusRaw === null
+        ? DEFAULT_STATUSES
+        : [
+            ...new Set(
+              statusRaw
+                .split(',')
+                .map((s) => s.trim().toUpperCase())
+                .filter((s) => STATUS_VALUES.includes(s)),
+            ),
+          ],
+    callType: (params.get('type') === '2' ? '2' : '1') as '1' | '2',
+    page: Number.isFinite(pageRaw) && pageRaw >= 1 ? pageRaw : 1,
+  };
+}
 
 /**
  * Longest the list waits for `/api/cagrilar`. The route gives up on its own after
@@ -91,12 +123,17 @@ export default function CallsPage({
   const isTr = locale === 'tr';
   const t = useTranslations('callsPage');
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [framework, setFramework] = useState('ALL');
-  const [statuses, setStatuses] = useState<string[]>(['OPEN', 'FORTHCOMING']);
-  const [callType, setCallType] = useState<'1' | '2'>('1'); // 1 = Grant, 2 = Tender
-  const [page, setPage] = useState(1);
+  // Initial filters come from the URL once; after that the state is the source and the URL follows it.
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const [initial] = useState(() => parseFilters(new URLSearchParams(searchParams.toString())));
+
+  const [search, setSearch] = useState(initial.search);
+  const [debouncedSearch, setDebouncedSearch] = useState(initial.search);
+  const [framework, setFramework] = useState(initial.framework);
+  const [statuses, setStatuses] = useState<string[]>(initial.statuses);
+  const [callType, setCallType] = useState<'1' | '2'>(initial.callType); // 1 = Grant, 2 = Tender
+  const [page, setPage] = useState(initial.page);
   const [limit, setLimit] = useState(20);
 
   const [topics, setTopics] = useState<SediaTopic[]>([]);
@@ -173,14 +210,30 @@ export default function CallsPage({
     );
   };
 
-  // Debounce search input
+  // Debounce search input. A new search goes back to page 1; the value the page started with
+  // from the URL does not, so a `?page=` link keeps its page.
+  const lastSearchRef = useRef(initial.search);
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
-      setPage(1);
+      if (search.trim() !== lastSearchRef.current.trim()) setPage(1);
+      lastSearchRef.current = search;
     }, 400);
     return () => clearTimeout(handler);
   }, [search]);
+
+  // Mirror the filters into the URL, so a reload or a shared link shows the same list.
+  // replaceState, not router.push: a filter change must not add history entries or re-render the route.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch.trim()) params.set('q', debouncedSearch.trim());
+    if (framework !== 'ALL') params.set('framework', framework);
+    if (statuses.join(',') !== DEFAULT_STATUSES.join(',')) params.set('status', statuses.join(','));
+    if (callType !== '1') params.set('type', callType);
+    if (page > 1) params.set('page', String(page));
+    const qs = params.toString();
+    window.history.replaceState(window.history.state, '', qs ? `${pathname}?${qs}` : pathname);
+  }, [debouncedSearch, framework, statuses, callType, page, pathname]);
 
   // The query string doubles as the identity of the request the list is currently showing.
   const query = useMemo(() => {
@@ -455,6 +508,7 @@ export default function CallsPage({
           <button
             key={prog.id}
             onClick={() => { setFramework(prog.id); setPage(1); }}
+            aria-pressed={framework === prog.id}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition border shrink-0 ${
               framework === prog.id
                 ? 'bg-accent text-white border-accent shadow-xs'
