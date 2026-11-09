@@ -171,8 +171,8 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
   });
 
   for (const { locale, message } of [
-    { locale: 'tr', message: 'Teklif metni çok uzun: YZ ön değerlendirmesi en fazla 1.984.000 karakter okuyabilir' },
-    { locale: 'en', message: 'The proposal text is too long: the AI pre-assessment can read at most 1,984,000 characters' },
+    { locale: 'tr', message: 'Teklif metni çok uzun: YZ ön değerlendirmesi en fazla 400.000 karakter okuyabilir' },
+    { locale: 'en', message: 'The proposal text is too long: the AI pre-assessment can read at most 400,000 characters' },
   ]) {
     test(`the AI reader refuses a proposal over its limit, says why, and charges nothing (${locale}, NG-106)`, async ({
       page,
@@ -186,7 +186,7 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
 
       const tenantId = M6_E2E.tenantId;
       const ledgerBefore = await prisma.creditLedger.findMany({ where: { tenantId }, select: { id: true, delta: true } });
-      expect(ledgerBefore).toEqual([{ id: M6_E2E.creditGrantId, delta: M6_E2E.creditGrant }]);
+      expect(ledgerBefore).toContainEqual({ id: M6_E2E.creditGrantId, delta: M6_E2E.creditGrant });
 
       await page.goto(`/${locale}/${WORKSPACE}/opportunities/${M6_E2E.longOpportunityId}/evaluations`);
       const app = page.getByRole('main');

@@ -10,18 +10,17 @@
  */
 export const PROPOSAL_TOO_LONG_DIGEST = 'M6_PROPOSAL_TOO_LONG';
 
-/** Context window of the model M6 evaluation runs on, `claude-opus-5` (src/lib/llm.ts MODEL_OVERRIDES). */
-const MODEL_CONTEXT_TOKENS = 1_000_000;
-/** The call's output ceiling (4096, `maxTokensFor('M6', 'evaluation')`) plus the instructions and the data fence. */
-const REQUEST_OVERHEAD_TOKENS = 8_000;
 /**
- * Anthropic's published average is about 2.5 characters per token. Turkish suffixes and
- * the numbers in budget tables tokenize worse than prose, so the limit assumes 2.
+ * The longest proposal text sent to the model, counted on the joined text that is sent.
+ *
+ * The model is `claude-opus-5` (src/lib/llm.ts MODEL_OVERRIDES), with a 1M-token context
+ * window. Published density is about 2.5 characters a token, so this is roughly 160 000
+ * tokens, and even at one token per character (digits, non-Latin partner text) the
+ * request fits. An 80-page application is about 250 000 characters and the M11 Part B
+ * template tops out near 180 000, the same reasoning as M17's document cap
+ * (src/modules/m17/limits.ts). Recheck this if M6 evaluation moves to a smaller model.
  */
-const CHARS_PER_TOKEN_FLOOR = 2;
-
-/** The longest proposal text sent to the model, counted on the joined text that is sent. */
-export const MAX_PROPOSAL_TEXT_CHARS = (MODEL_CONTEXT_TOKENS - REQUEST_OVERHEAD_TOKENS) * CHARS_PER_TOKEN_FLOOR;
+export const MAX_PROPOSAL_TEXT_CHARS = 400_000;
 
 export class ProposalTooLongError extends Error {
   readonly digest = PROPOSAL_TOO_LONG_DIGEST;

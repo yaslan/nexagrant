@@ -162,7 +162,8 @@ export async function seed() {
       id: M6_E2E.creditGrantId,
       tenantId: M6_E2E.tenantId,
       delta: M6_E2E.creditGrant,
-      reason: 'monthly_grant',
+      // Not 'monthly_grant': a kept fixture row must not read as a scheduled grant.
+      reason: 'purchase',
     },
   });
 
