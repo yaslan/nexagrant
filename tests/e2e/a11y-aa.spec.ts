@@ -35,6 +35,19 @@ async function acceptCookies(page: Page) {
   });
 }
 
+/**
+ * Waits until React has hydrated `main`. Until then the page is server HTML only; a node injected
+ * into that HTML makes hydration fail, and React rebuilds the tree from scratch, removing the node.
+ * `main` is visible before hydration, so visibility alone does not prove the injection will survive.
+ */
+async function waitForHydration(page: Page) {
+  await page.waitForFunction(
+    () => Object.keys(document.querySelector('main') ?? {}).some((k) => k.startsWith('__reactFiber')),
+    null,
+    { timeout: 60_000 },
+  );
+}
+
 async function scan(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   return results.violations.map((v) => ({
@@ -148,6 +161,7 @@ test('the scanner is live: a nameless button is reported', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/giris');
   await expect(page.locator('main')).toBeVisible();
+  await waitForHydration(page);
   await page.evaluate(() => {
     const b = document.createElement('button');
     b.id = 'a11y-selftest';
@@ -161,6 +175,7 @@ test('label-content-name-mismatch (WCAG 2.5.3) is live: a link whose name drops 
   await acceptCookies(page);
   await page.goto('/tr/giris');
   await expect(page.locator('main')).toBeVisible();
+  await waitForHydration(page);
   await page.evaluate(() => {
     const a = document.createElement('a');
     a.id = 'a11y-selftest-label';
