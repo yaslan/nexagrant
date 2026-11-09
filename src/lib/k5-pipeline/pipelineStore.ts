@@ -25,6 +25,11 @@ export interface OpportunityItem {
    * non-null type is what pushed callers into inventing a placeholder number to satisfy it.
    */
   g0Score: number | null;
+  /**
+   * Outcome of the latest G0 gate decision on file: `true` passed, `false` refused, `null` none.
+   * The board colours the score badge from this, never from the number alone (NG-69).
+   */
+  g0Passed?: boolean | null;
   notes?: string | null;
   notesList?: NoteEntry[];
   createdAt: Date;
