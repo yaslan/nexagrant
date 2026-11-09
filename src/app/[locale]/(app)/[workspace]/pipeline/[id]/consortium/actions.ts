@@ -3,8 +3,8 @@
 import { withTenant } from '@/lib/db';
 import { ForbiddenRoleError, requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
-import { scoreCandidatesForSeat, detectConflicts } from '@/lib/scoring/consortium';
-import { checkModuleAccess } from '@/lib/modules/access';
+import { detectConflicts } from '@/lib/scoring/consortium';
+import { generateSeatCandidates } from '@/modules/m8/server/matching';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import { CONFIRM_SEAT_PERMISSION, canConfirmSeat, inviteSeatCandidate } from '@/modules/m8/server/seat-transitions';
@@ -103,29 +103,21 @@ export async function findCandidates(seatId: string) {
 
   if (!seat) return [];
 
-  const opp = await withTenant<{ topicId: string | null } | null>(tenantId, (tx) =>
-    tx.opportunity.findFirst({
-      where: { id: seat.opportunityId, tenantId },
-      select: { topicId: true },
-    })
-  );
-
-  // `Opportunity.topicId` is a `Topic` cuid; the scorer resolves it to the topic
-  // identifier itself, so it is passed through as an id rather than a code.
-  // The live-demand reason line is shown only while M8 is on for the viewer; the
-  // signal itself is always computed and stored with the candidate.
-  const m8 = await checkModuleAccess('M8');
-  const candidates = await scoreCandidatesForSeat(
-    tenantId,
-    seatId,
-    seat.opportunityId,
-    opp?.topicId || null,
-    5,
-    { liveDemandVisible: m8.allowed }
-  );
+  // K-579560=A: the button runs the M8 matcher, the same rule and the same
+  // SeatCandidate writes as the M8 "Aday Bul" (matching.ts `runSeatMatch`), so one
+  // seat gets the same candidates, scores and order on both screens.
+  const created = await generateSeatCandidates(seat.opportunityId, seatId, tenantId, 5);
 
   revalidatePath(PIPELINE_PATH, 'page');
-  return candidates;
+  return created.map((row) => ({
+    id: row.id,
+    seatId: row.seatId,
+    // The matcher only writes rows with an organisation (runSeatMatch takes them from CORDIS).
+    organizationId: row.organizationId as string,
+    rank: row.rank,
+    score: row.score,
+    breakdown: row.breakdown as Record<string, unknown>,
+  }));
 }
 
 export async function assignSeat(seatId: string, organizationId: string) {

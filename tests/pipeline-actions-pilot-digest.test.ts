@@ -34,12 +34,10 @@ vi.mock('@/modules/m8/server/matching', () => ({
     throw new Error('the matcher must not run for a refused write');
   }),
 }));
-// TASK-MUN3W76B4XEJE: the consortium scorer deletes and rewrites a seat's
-// candidates too, so reaching it on an expired pilot is the same bug.
+// TASK-MUN3W76B4XEJE: the consortium "Aday Bul" deletes and rewrites a seat's
+// candidates too. K-579560=A made it the M8 matcher (generateSeatCandidates, mocked
+// above), so the pilot refusal is asserted on that path.
 vi.mock('@/lib/scoring/consortium', () => ({
-  scoreCandidatesForSeat: vi.fn(async () => {
-    throw new Error('the scorer must not run for a refused write');
-  }),
   detectConflicts: vi.fn(async () => []),
 }));
 vi.mock('@/lib/db', () => {
@@ -73,8 +71,6 @@ import {
   assignSeat,
   findCandidates,
 } from '@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions';
-import { scoreCandidatesForSeat } from '@/lib/scoring/consortium';
-
 beforeEach(() => {
   session.current = { user: { id: 'u-1' }, tenantId: 't-1', role: 'TENANT_OWNER' };
 });
@@ -155,6 +151,6 @@ describe('consortium write actions: an expired pilot is refused before anything 
     );
     expect(err).toBeInstanceOf(PilotExpiredError);
     expect((err as { digest?: string }).digest).toBe(PILOT_EXPIRED_DIGEST);
-    expect(vi.mocked(scoreCandidatesForSeat)).not.toHaveBeenCalled();
+    expect(vi.mocked(generateSeatCandidates)).not.toHaveBeenCalled();
   });
 });

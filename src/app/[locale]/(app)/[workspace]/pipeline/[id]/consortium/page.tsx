@@ -8,6 +8,7 @@ import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidat
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 
 /** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
 interface CordisOrgRow {
@@ -76,6 +77,7 @@ export default async function ConsortiumPage({
   let seats: ConsortiumSeat[] = [];
   let candidates: SeatCandidate[] = [];
   let orgs: OrgInfo[] = [];
+  let liveDemandOrgIds: string[] = [];
 
   try {
     opportunity = await withTenant<ConsortiumOpportunity | null>(tenantId, (tx) =>
@@ -101,7 +103,33 @@ export default async function ConsortiumPage({
             orderBy: { rank: 'asc' },
           })
         );
-        candidates = rawCandidates as unknown as SeatCandidate[];
+        // K-579560=A: only the M8 matcher's rows are shown (see seat-candidate-view.ts).
+        candidates = visibleSeatCandidates(rawCandidates as unknown as SeatCandidate[]);
+      }
+
+      // Informational only, never part of a score (K-579560=A): which candidates
+      // have an open partner-search request on this topic.
+      if (opportunity.topicId && candidates.length > 0) {
+        const topicId = opportunity.topicId;
+        const topic = await withTenant<{ identifier: string } | null>(tenantId, (tx) =>
+          tx.topic.findUnique({ where: { id: topicId }, select: { identifier: true } })
+        );
+        if (topic) {
+          const requests = await withTenant(tenantId, (tx) =>
+            tx.partnerSearchAnnouncement.findMany({
+              where: {
+                topicIdentifier: topic.identifier,
+                type: 'EXPERTISE_REQUEST',
+                withdrawnAt: null,
+                organizationPic: { in: candidates.map((c) => c.organizationId) },
+              },
+              select: { organizationPic: true },
+            })
+          );
+          liveDemandOrgIds = [
+            ...new Set(requests.map((r) => r.organizationPic).filter((p): p is string => Boolean(p))),
+          ];
+        }
       }
 
       const orgIds = [
@@ -196,6 +224,7 @@ export default async function ConsortiumPage({
         seats={seats}
         candidates={candidates}
         orgMap={orgMap}
+        liveDemandOrgIds={liveDemandOrgIds}
       />
     </div>
   );

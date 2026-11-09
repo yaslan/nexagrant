@@ -4,7 +4,6 @@ import React, { useState, useTransition } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { addSeat, findCandidates, assignSeat, confirmSeat, getConflicts } from './actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
-import type { ScoringBreakdown } from '@/lib/scoring/consortium';
 import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
 import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 
@@ -13,19 +12,16 @@ import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dim
 export type ConsortiumSeat = { id: string; tenantId: string; opportunityId: string; role: string | null; roleKey?: string; required?: boolean; organizationId: string | null; status: string; notes: string | null; invitedAt: Date | null; confirmedAt: Date | null };
 
 /**
- * A ranked candidate for a seat.
- *
- * `score` is the total on a persisted SeatCandidate row and the whole
- * breakdown on one the scorer just produced client-side, which is why the
- * display reads `.total` when it is not a number.
+ * A ranked candidate for a seat: the M8 matcher's row (SeatCandidate), on the 0–100 seat scale.
+ * `breakdown` is the stored per-dimension record; its writer is read by seatBreakdownWriter.
  */
 export type SeatCandidate = {
   id: string;
   seatId: string;
   organizationId: string;
   rank: number;
-  score: number | ScoringBreakdown;
-  breakdown?: ScoringBreakdown;
+  score: number;
+  breakdown?: Record<string, unknown>;
 };
 
 export interface OrgInfo {
@@ -36,21 +32,16 @@ export interface OrgInfo {
   isSme: boolean;
 }
 
-/** The consortium scorer's dimensions, in the order the breakdown is rendered. */
-const BUILDER_DIMENSIONS = [
-  'topicExperience',
-  'networkCentrality',
-  'countryDiversity',
-  'smeBonus',
-  'warmthBonus',
-  'liveDemandSignal',
-] as const satisfies readonly (keyof ScoringBreakdown)[];
+/** The M8 matcher's dimensions, in the order the breakdown is rendered (K-579560=A). */
+const MATCH_DIMENSIONS = ['topicExperience', 'geographicBalance', 'collabHistory', 'rivalRisk'] as const;
 
 interface Props {
   opportunityId: string;
   seats: ConsortiumSeat[];
   candidates: SeatCandidate[];
   orgMap: Record<string, OrgInfo>;
+  /** Organisations with an open partner-search request on this topic. Informational; not in the score. */
+  liveDemandOrgIds?: string[];
   /** The viewer's role may confirm seats, decided on the server. The action checks it again. */
   canConfirm?: boolean;
 }
@@ -85,7 +76,8 @@ const ROLE_LABEL_KEYS: Record<string, string> = {
   dissemination: 'role.dissemination',
 };
 
-export default function ConsortiumManager({ opportunityId, seats: initSeats, candidates: initCandidates, orgMap, canConfirm = false }: Props) {
+export default function ConsortiumManager({ opportunityId, seats: initSeats, candidates: initCandidates, orgMap, canConfirm = false, liveDemandOrgIds = [] }: Props) {
+  const liveDemand = new Set(liveDemandOrgIds);
   const t = useTranslations('Consortium');
   const format = useFormatter();
   const [seats, setSeats] = useState(initSeats);
@@ -143,15 +135,12 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
       setCandidateMap(prev => ({
         ...prev,
         [seatId]: results.map((r) => ({
-          id: r.organizationId,
+          id: r.id,
           seatId,
           organizationId: r.organizationId,
-          score: r.score.total,
-          breakdown: r.score,
+          score: r.score,
+          breakdown: r.breakdown,
           rank: r.rank,
-          tenantId: '',
-          partnerOrgId: null,
-          computedAt: new Date(),
         })),
       }));
 
@@ -293,8 +282,9 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                             <span className="font-semibold text-ink text-xs">{cOrg?.shortName || cOrg?.name || c.organizationId}</span>
                             <span className="text-muted text-xs ml-2">{cOrg?.country}</span>
                             {cOrg?.isSme && <span className="ml-2 text-[10px] bg-accent/15 text-accent-ink px-1.5 py-0.5 rounded font-bold">SME</span>}
-                            {bd?.liveDemandReason && (
-                              <p className="mt-1 text-xs text-muted">{t('liveDemandReason', { days: bd.liveDemandReason.days })}</p>
+                            {liveDemand.has(c.organizationId) && (
+                              // Informational badge, not part of the score (K-579560=A).
+                              <p className="mt-1 text-xs text-muted" data-testid="live-demand-badge">{t('liveDemandBadge')}</p>
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -304,24 +294,29 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                               <details className="text-xs text-muted basis-full sm:basis-auto">
                                 <summary className="cursor-pointer min-h-11 flex items-center">{t('breakdown')}</summary>
                                 <dl className="mt-1 space-y-0.5">
-                                  {BUILDER_DIMENSIONS.map((key) => (
+                                  {MATCH_DIMENSIONS.map((key) => (
                                     <div key={key} className="flex gap-2 justify-between">
                                       <dt>{t(`dimension.${key}`)}</dt>
                                       <dd className="tabular-nums whitespace-nowrap" data-testid={`m8-builder-dimension-${key}`}>
                                         {dimensionValueText(
                                           t,
                                           format.number,
-                                          seatBreakdownWriter(bd) === 'consortium' ? seatScoreDimensionScale('consortium', key) : null,
-                                          typeof bd[key] === 'number' ? bd[key] : 0
+                                          // A breakdown no scorer wrote has no known range: bare numbers.
+                                          (() => {
+                                            const writer = seatBreakdownWriter(bd);
+                                            return writer ? seatScoreDimensionScale(writer, key) : null;
+                                          })(),
+                                          typeof bd[key] === 'number' ? (bd[key] as number) : 0
                                         )}
                                       </dd>
                                     </div>
                                   ))}
                                 </dl>
                                 <p className="mt-1">{t('breakdownNote')}</p>
+                                {seatBreakdownWriter(bd) === 'match-legacy' && <p className="mt-1">{t('legacyScoringNote')}</p>}
                               </details>
                             )}
-                            <span className="font-bold text-ok text-xs font-mono">{t('scoreOutOf', { score: scoreNumberText(format.number, typeof c.score === 'number' ? c.score : c.score?.total || 0) })}</span>
+                            <span className="font-bold text-ok text-xs font-mono">{t('scoreOutOf', { score: scoreNumberText(format.number, c.score) })}</span>
                             <button
                               onClick={() => handleAssign(seat.id, c.organizationId)}
                               disabled={isPending}
