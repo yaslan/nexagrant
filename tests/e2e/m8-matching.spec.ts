@@ -291,8 +291,14 @@ test.describe('M8 consortium matching', () => {
     await expect(details).toContainText('Konu deneyimi');
     // Each dimension against its own range, not a bare number next to "/ 100" (FO-155),
     // in the Turkish number format (FO-162).
-    await expect(details.getByTestId('m8-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 35$/);
+    await expect(details.getByTestId('m8-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 34$/);
     await expect(details.getByTestId('m8-dimension-rivalRisk')).toHaveText(/^-?\d+,\d \(aralık -10…0\)$/);
+    // Three criteria and the rival penalty, nothing else (K-578751).
+    await expect(details.getByTestId('m8-dimension-geographicBalance')).toHaveText(/^\d+,\d \/ 33$/);
+    await expect(details.getByTestId('m8-dimension-collabHistory')).toHaveText(/^\d+,\d \/ 33$/);
+    await expect(details.locator('dd')).toHaveCount(4);
+    await expect(details).not.toContainText('İlişki sıcaklığı');
+    await expect(details).not.toContainText('Ağ merkeziliği');
     await page.screenshot({ path: `${SHOTS}/04-breakdown-expanded.png`, fullPage: true });
 
     // The same ranked seat in English carries the same scale label.
@@ -302,7 +308,7 @@ test.describe('M8 consortium matching', () => {
     });
     const detailsEn = page.getByTestId('m8-seat-research').locator('tbody tr').first().locator('details');
     await detailsEn.locator('summary').click();
-    await expect(detailsEn.getByTestId('m8-dimension-geographicBalance')).toHaveText(/^\d+\.\d \/ 15$/);
+    await expect(detailsEn.getByTestId('m8-dimension-geographicBalance')).toHaveText(/^\d+\.\d \/ 33$/);
     await expect(detailsEn.getByTestId('m8-dimension-rivalRisk')).toHaveText(/^-?\d+\.\d \(range -10…0\)$/);
     await page.screenshot({ path: `${SHOTS}/04c-breakdown-expanded-en.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/04b-candidates-en.png`, fullPage: true });
@@ -321,10 +327,8 @@ test.describe('M8 consortium matching', () => {
     // Every dimension is persisted, so the UI can show reasoning rather than a
     // bare number (CLAUDE.md §7 — a shown statistic is backed by a record).
     expect(Object.keys(written[0]?.breakdown as object).sort()).toEqual([
-      'centrality',
       'collabHistory',
       'geographicBalance',
-      'relationshipWarmth',
       'rivalRisk',
       'topicExperience',
     ]);
@@ -332,6 +336,34 @@ test.describe('M8 consortium matching', () => {
       expect(row.score).toBeGreaterThanOrEqual(0);
       expect(row.score).toBeLessThanOrEqual(100);
     }
+
+    // 6. A row scored before K-578751 keeps the dimensions and ranges it was scored
+    // on and says so; matching the seat again replaces it with the new criteria.
+    await prisma.seatCandidate.updateMany({
+      where: { seatId: OPEN_SEAT, rank: 1 },
+      data: {
+        score: 88.89,
+        breakdown: { topicExperience: 35, geographicBalance: 15, collabHistory: 15, relationshipWarmth: 15, centrality: 10, rivalRisk: -10 },
+      },
+    });
+    await page.goto(URL);
+    const legacyCard = page.getByTestId('m8-seat-research');
+    const legacyRow = legacyCard.locator('tbody tr').first();
+    await expect(legacyRow).toContainText('88,9 / 100');
+    const legacyDetails = legacyRow.locator('details');
+    await legacyDetails.locator('summary').click();
+    await expect(legacyDetails.locator('dd')).toHaveCount(6);
+    await expect(legacyDetails.getByTestId('m8-dimension-topicExperience')).toHaveText('35,0 / 35');
+    await expect(legacyDetails).toContainText('önceki ölçütlerle');
+    await page.screenshot({ path: `${SHOTS}/06-legacy-row.png`, fullPage: true });
+
+    const findAgain = legacyCard.getByRole('button', { name: 'Aday Bul' });
+    await expectHydrated(findAgain);
+    await findAgain.click();
+    await expect(legacyCard).not.toContainText('88,9 / 100', { timeout: 30_000 });
+    const rewritten = await prisma.seatCandidate.findMany({ where: { seatId: OPEN_SEAT }, select: { breakdown: true } });
+    expect(rewritten.length).toBe(3);
+    for (const row of rewritten) expect(row.breakdown).not.toHaveProperty('relationshipWarmth');
 
     expect(serverErrors, `server errors during the run:\n${serverErrors.join('\n')}`).toEqual([]);
   });

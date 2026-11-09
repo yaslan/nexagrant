@@ -65,7 +65,7 @@ vi.mock('@/lib/llm', () => ({
 
 vi.mock('@/lib/rag', () => ({
   retrieveChunks: async () => [],
-  buildRagPrompt: async () => '',
+  buildRagContext: async () => '',
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));

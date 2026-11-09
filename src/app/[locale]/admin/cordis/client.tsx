@@ -121,6 +121,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
   const [topK, setTopK] = useState(3);
   const [isSearching, setIsSearching] = useState(false);
   const [retrievedChunks, setRetrievedChunks] = useState<RetrievedChunk[]>([]);
+  // null: no search yet. '': the search ran and matched nothing.
   const [ragPrompt, setRagPrompt] = useState<string | null>(null);
 
   const handleRunK2Import = async () => {
@@ -174,7 +175,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
     try {
       const res = await handleTestRagQuery(searchQuery.trim(), topK);
       setRetrievedChunks(res.chunks || []);
-      setRagPrompt(res.ragPrompt || null);
+      setRagPrompt(res.ragPrompt);
     } catch (err) {
       console.error('Error testing RAG query:', err);
     } finally {
@@ -190,20 +191,20 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-semibold tracking-wider uppercase mb-1">
               <Database className="w-4 h-4 text-cyan-400" />
-              <span>K2 CORDIS Ingestion & M1 Partner Intelligence Console</span>
+              <span>{t('header.kicker')}</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight font-heading text-white">
-              K2 CORDIS Katmanı Yönetim Paneli
+              {t('header.title')}
             </h1>
             <p className="text-muted text-xs md:text-sm mt-1 max-w-2xl">
-              Horizon Europe ve H2020 fonlanmış proje/ortaklık sonuç verilerini çeker, M1 Partner Intelligence modülünü besler.
+              {t('header.description')}
             </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs bg-slate-800 border border-slate-700 text-cyan-300 px-3.5 py-1.5 rounded-full font-mono font-bold flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-cyan-400" />
-              <span>CORDIS CC BY 4.0</span>
+              <span>{t('header.license')}</span>
             </span>
           </div>
         </div>
@@ -211,28 +212,28 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
         {/* Metric Cards Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs">
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">K2 Proje Satırı</span>
+            <span className="text-muted block text-[11px]">{t('header.k2Projects')}</span>
             <span className="text-xl font-bold text-white font-mono mt-0.5 block">
               {k2Status?.rowCounts?.projects?.toLocaleString() || '0'}
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">K2 Kuruluş Satırı</span>
+            <span className="text-muted block text-[11px]">{t('header.k2Organizations')}</span>
             <span className="text-xl font-bold text-cyan-300 font-mono mt-0.5 block">
               {k2Status?.rowCounts?.organizations?.toLocaleString() || '0'}
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">K2 Katılım Satırı</span>
+            <span className="text-muted block text-[11px]">{t('header.k2Participations')}</span>
             <span className="text-xl font-bold text-emerald-400 font-mono mt-0.5 block">
               {k2Status?.rowCounts?.participations?.toLocaleString() || '0'}
             </span>
           </div>
 
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5">
-            <span className="text-muted block text-[11px]">M1 Partner Profili</span>
+            <span className="text-muted block text-[11px]">{t('header.m1Profiles')}</span>
             <span className="text-xl font-bold text-purple-300 font-mono mt-0.5 block">
               {k2Status?.rowCounts?.profiles?.toLocaleString() || '0'}
             </span>
@@ -258,7 +259,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
           }`}
         >
           <FolderGit2 className="w-4 h-4" />
-          <span>K2 Ingestion & Durum Kartı</span>
+          <span>{t('tabs.k2Ingestion')}</span>
         </button>
 
         <button
@@ -270,7 +271,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
           }`}
         >
           <Database className="w-4 h-4" />
-          <span>OLAP & Hibe Dağılımı</span>
+          <span>{t('tabs.sync')}</span>
         </button>
 
         <button
@@ -282,7 +283,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
           }`}
         >
           <Radio className="w-4 h-4 text-purple-600 animate-pulse" />
-          <span>Canlı CORDIS Delta API</span>
+          <span>{t('tabs.delta')}</span>
         </button>
 
         <button
@@ -294,7 +295,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
           }`}
         >
           <Search className="w-4 h-4" />
-          <span>Vector RAG Lab</span>
+          <span>{t('tabs.workbench')}</span>
         </button>
       </div>
 
@@ -307,10 +308,10 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
               <div>
                 <h3 className="font-bold text-sm text-ink flex items-center gap-2">
                   <FileCheck className="w-4.5 h-4.5 text-blue-600" />
-                  <span>K2 CORDIS Katman Durumu & Son İçe Aktarım</span>
+                  <span>{t('k2.statusTitle')}</span>
                 </h3>
                 <p className="text-muted text-xs mt-0.5">
-                  Aylık güncellenen resmi Avrupa Komisyonu dökümlerinden (Horizon Europe & H2020) veri aktarımı.
+                  {t('k2.statusBody')}
                 </p>
               </div>
 
@@ -324,11 +325,11 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                       : 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
                   }`}
                 >
-                  Son Çalıştırma: {k2Status.lastRun.status} ({k2Status.lastRun.dataset})
+                  {t('k2.lastRunBadge', { status: k2Status.lastRun.status, dataset: k2Status.lastRun.dataset })}
                 </span>
               ) : (
                 <span className="text-xs text-muted font-mono bg-ground px-3 py-1 rounded-full border border-border">
-                  Henüz içe aktarım yapılmadı
+                  {t('k2.noRunYet')}
                 </span>
               )}
             </div>
@@ -336,23 +337,26 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
             {k2Status?.lastRun && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono bg-ground p-4 rounded-xl border border-border">
                 <div>
-                  <span className="text-muted block text-[11px]">Son Başlatma:</span>
+                  <span className="text-muted block text-[11px]">{t('k2.lastStarted')}</span>
                   <span className="font-bold text-ink">
                     {new Date(k2Status.lastRun.startedAt).toLocaleString('tr-TR')}
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-muted block text-[11px]">Dosya Hash (SHA-256):</span>
+                  <span className="text-muted block text-[11px]">{t('k2.fileHash')}</span>
                   <span className="font-bold text-ink truncate block">
                     {k2Status.lastRun.fileHash ? k2Status.lastRun.fileHash.slice(0, 16) + '...' : 'N/A'}
                   </span>
                 </div>
 
                 <div>
-                  <span className="text-muted block text-[11px]">Son Aktarılan Satırlar:</span>
+                  <span className="text-muted block text-[11px]">{t('k2.lastRows')}</span>
                   <span className="font-bold text-ink">
-                    {(k2Status.lastRun.rowCounts as K2RowCounts | null)?.projects || 0} proje / {(k2Status.lastRun.rowCounts as K2RowCounts | null)?.organizations || 0} org
+                    {t('k2.lastRowsValue', {
+                      projects: (k2Status.lastRun.rowCounts as K2RowCounts | null)?.projects || 0,
+                      organizations: (k2Status.lastRun.rowCounts as K2RowCounts | null)?.organizations || 0,
+                    })}
                   </span>
                 </div>
               </div>
@@ -362,24 +366,24 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
             <div className="pt-2 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-border">
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div>
-                  <label className="text-xs font-bold text-ink-2 block mb-1">Veri Kümesi (Dataset)</label>
+                  <label className="text-xs font-bold text-ink-2 block mb-1">{t('k2.dataset')}</label>
                   <select
                     value={selectedDataset}
                     onChange={(e) => setSelectedDataset(e.target.value as 'HORIZON' | 'H2020')}
                     className="border border-border rounded-xl px-3 py-2 text-xs font-semibold bg-ground text-ink"
                   >
-                    <option value="HORIZON">Horizon Europe (2021-2027)</option>
-                    <option value="H2020">H2020 (2014-2020)</option>
+                    <option value="HORIZON">{t('k2.datasetHorizon')}</option>
+                    <option value="H2020">{t('k2.datasetH2020')}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-ink-2 block mb-1">Satır Sınırı (Limit)</label>
+                  <label className="text-xs font-bold text-ink-2 block mb-1">{t('k2.rowLimit')}</label>
                   <input
                     type="number"
                     value={limitInput}
                     onChange={(e) => setLimitInput(e.target.value)}
-                    placeholder="Örn: 5000"
+                    placeholder={t('k2.rowLimitPlaceholder')}
                     className="border border-border rounded-xl px-3 py-2 text-xs font-semibold bg-ground text-ink w-28"
                   />
                 </div>
@@ -391,7 +395,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl transition text-xs shadow-md flex items-center gap-2 w-full md:w-auto justify-center"
               >
                 <Play className={`w-4 h-4 ${isImporting ? 'animate-spin' : ''}`} />
-                <span>{isImporting ? 'İçe Aktarılıyor ve Profil Üretiliyor...' : 'Şimdi Çalıştır (Ingest & M1 Profiles)'}</span>
+                <span>{isImporting ? t('k2.runImportBusy') : t('k2.runImport')}</span>
               </button>
             </div>
 
@@ -407,7 +411,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                   {importResult.success ? (
                     <>
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>İçe Aktarım ve M1 Profilleri Başarıyla Güncellendi!</span>
+                      <span>{t('k2.importSuccess')}</span>
                     </>
                   ) : (
                     <>
@@ -420,10 +424,15 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                 {importResult.success && (
                   <div className="font-mono text-[11px] pt-1">
                     {importResult.skipped ? (
-                      <p>ℹ️ Veri kümesi zaten güncel (File hash eşleşti, aktarım atlandı).</p>
+                      <p>{t('k2.importSkipped')}</p>
                     ) : (
                       <p>
-                        İşlenen: {importResult.rowCounts?.projects} Proje, {importResult.rowCounts?.organizations} Kuruluş, {importResult.rowCounts?.participations} Katılım. Süre: {importResult.importDurationMs}ms.
+                        {t('k2.importCounts', {
+                          projects: importResult.rowCounts?.projects ?? 0,
+                          organizations: importResult.rowCounts?.organizations ?? 0,
+                          participations: importResult.rowCounts?.participations ?? 0,
+                          durationMs: importResult.importDurationMs ?? 0,
+                        })}
                       </p>
                     )}
                   </div>
@@ -436,9 +445,11 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
           <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl text-xs flex items-start gap-3">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block">M1 Partner Intelligence Modülü Bağımlılığı</span>
+              <span className="font-bold block">{t('k2.m1DependencyTitle')}</span>
               <p className="mt-0.5 text-amber-800">
-                M1 &quot;Ortak Arama&quot; ekranları doğrudan K2 CORDIS katmanının türettiği <code className="font-mono font-bold bg-amber-100 px-1 rounded">cordis_partner_profile</code> tablosunu kullanır. K2 verisi aktarılmadığında M1 modülü &quot;K2 bağımlılığı kapalı&quot; uyarısı verir.
+                {t.rich('k2.m1DependencyBody', {
+                  code: (chunks) => <code className="font-mono font-bold bg-amber-100 px-1 rounded">{chunks}</code>,
+                })}
               </p>
             </div>
           </div>
@@ -452,10 +463,10 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
             <div>
               <h3 className="font-bold text-sm text-ink flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 text-blue-600" />
-                <span>Resmî CORDIS Veri Kümesi Senkronizasyonu</span>
+                <span>{t('sync.title')}</span>
               </h3>
               <p className="text-muted text-xs mt-1">
-                Ufuk Avrupa 2021-2027 çağrı sonuçları, ortaklık haritaları ve hibe rakamlarını güncellemek için senkronizasyonu başlatın.
+                {t('sync.body')}
               </p>
             </div>
 
@@ -465,29 +476,32 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
               className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl transition text-xs shadow-md shrink-0 flex items-center gap-2"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Veriler İşleniyor...' : 'CORDIS Senkronizasyonunu Başlat'}</span>
+              <span>{isSyncing ? t('sync.busy') : t('sync.run')}</span>
             </button>
           </div>
 
           {syncResult && (
             <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 p-4 rounded-xl text-xs space-y-1">
-              <span className="font-bold block">✓ CORDIS Veri Senkronizasyonu Başarıyla Tamamlandı!</span>
+              <span className="font-bold block">{t('sync.done')}</span>
               <p className="font-mono text-[11px]">
-                İşlenen Proje Sayısı: {syncResult.syncedProjectsCount} — Toplam Hibe: €{syncResult.totalEcContributionEUR?.toLocaleString()}
+                {t('sync.totals', {
+                  count: syncResult.syncedProjectsCount,
+                  total: syncResult.totalEcContributionEUR?.toLocaleString() ?? '',
+                })}
               </p>
             </div>
           )}
 
           <div className="space-y-3">
-            <h3 className="font-bold text-sm text-ink">Ülke Bazlı Hibe & Proje Dağılımı (OLAP Aggregation)</h3>
+            <h3 className="font-bold text-sm text-ink">{t('sync.olapTitle')}</h3>
             <div className="bg-surface border border-border rounded-2xl shadow-2xs overflow-hidden">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-ground border-b border-border text-ink-2 font-bold uppercase tracking-wider text-[11px]">
-                    <th className="p-3.5">Ülke</th>
-                    <th className="p-3.5">Proje Sayısı</th>
-                    <th className="p-3.5">Toplam Desteği (€)</th>
-                    <th className="p-3.5 text-right">Proje Başı Ort. (€)</th>
+                    <th className="p-3.5">{t('sync.colCountry')}</th>
+                    <th className="p-3.5">{t('sync.colProjects')}</th>
+                    <th className="p-3.5">{t('sync.colTotalFunding')}</th>
+                    <th className="p-3.5 text-right">{t('sync.colAverage')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -520,10 +534,10 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
             <div>
               <h3 className="font-bold text-sm text-ink flex items-center gap-2">
                 <Radio className="w-4 h-4 text-purple-600 animate-pulse" />
-                <span>Canlı CORDIS Delta API Çekimi (EU Funding Portal)</span>
+                <span>{t('delta.title')}</span>
               </h3>
               <p className="text-muted text-xs mt-1">
-                AB Komisyonu portalından son 7 günde eklenen veya güncellenen yeni Ufuk Avrupa projelerini canlı olarak çekin.
+                {t('delta.body')}
               </p>
             </div>
 
@@ -533,7 +547,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
               className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-2.5 rounded-xl transition text-xs shadow-md shrink-0 flex items-center gap-2"
             >
               <Radio className={`w-4 h-4 ${isDeltaSyncing ? 'animate-spin' : ''}`} />
-              <span>{isDeltaSyncing ? 'Delta Çekiliyor...' : 'Canlı Delta API Çekimini Başlat (7 Gün)'}</span>
+              <span>{isDeltaSyncing ? t('delta.busy') : t('delta.run')}</span>
             </button>
           </div>
 
@@ -542,10 +556,10 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
               <div className="flex items-center justify-between">
                 <span className="font-bold text-sm text-purple-900 flex items-center gap-2">
                   <CheckCircle2 className="w-4.5 h-4.5 text-purple-700" />
-                  Canlı Delta API Çekimi Başarıyla Tamamlandı!
+                  {t('delta.done')}
                 </span>
                 <span className="font-mono text-[11px] text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full font-bold">
-                  {deltaResult.deltaCount} Yeni Delta Projesi İndekslendi
+                  {t('delta.indexed', { count: deltaResult.deltaCount })}
                 </span>
               </div>
 
@@ -558,7 +572,12 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                     </div>
                     <p className="text-xs text-ink-2 font-semibold">{p.title}</p>
                     <div className="flex items-center justify-between text-[11px] text-muted font-mono pt-1">
-                      <span>Koordinatör: {p.coordinatorName} ({p.coordinatorCountry})</span>
+                      <span>
+                        {t('delta.coordinator', {
+                          name: p.coordinatorName ?? '',
+                          country: p.coordinatorCountry ?? '',
+                        })}
+                      </span>
                       <span className="bg-surface-hover px-1.5 py-0.5 rounded text-[10px] font-bold text-ink-2">{p.topicCode}</span>
                     </div>
                   </div>
@@ -576,17 +595,17 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
             <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm space-y-4">
               <h3 className="font-bold text-sm text-ink flex items-center gap-2 border-b pb-3">
                 <Search className="w-4 h-4 text-blue-600" />
-                <span>Vector RAG Arama Testi (Cosine Similarity)</span>
+                <span>{t('rag.title')}</span>
               </h3>
 
               <form onSubmit={handleExecuteRagSearch} className="space-y-3 text-xs">
                 <div>
-                  <label className="font-semibold text-ink-2 block mb-1">Arama Sorgusu / Proje İhtiyacı</label>
+                  <label className="font-semibold text-ink-2 block mb-1">{t('rag.queryLabel')}</label>
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Örn: Zero-emission battery thermal management"
+                    placeholder={t('rag.queryPlaceholder')}
                     required
                     className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-ground font-semibold"
                   />
@@ -594,15 +613,15 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <label className="font-semibold text-ink-2">Top-K Çıktı Sayısı:</label>
+                    <label className="font-semibold text-ink-2">{t('rag.topKLabel')}</label>
                     <select
                       value={topK}
                       onChange={(e) => setTopK(parseInt(e.target.value, 10))}
                       className="border border-border rounded-lg p-1.5 text-xs font-mono font-bold bg-ground"
                     >
-                      <option value={3}>Top-3 Parça</option>
-                      <option value={5}>Top-5 Parça</option>
-                      <option value={10}>Top-10 Parça</option>
+                      <option value={3}>{t('rag.topK', { count: 3 })}</option>
+                      <option value={5}>{t('rag.topK', { count: 5 })}</option>
+                      <option value={10}>{t('rag.topK', { count: 10 })}</option>
                     </select>
                   </div>
 
@@ -612,7 +631,7 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                     className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl transition text-xs shadow-xs flex items-center gap-1.5"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>{isSearching ? 'Aranıyor...' : 'Vektör Araması Yap'}</span>
+                    <span>{isSearching ? t('rag.searching') : t('rag.search')}</span>
                   </button>
                 </div>
               </form>
@@ -620,17 +639,17 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
 
             <div className="space-y-4">
               <h4 className="font-bold text-xs text-ink-2 uppercase tracking-wider">
-                Vektör Benzerlik Sonuçları ({retrievedChunks.length})
+                {t('rag.resultsHeading', { count: retrievedChunks.length })}
               </h4>
 
               {retrievedChunks.map((chunk, idx) => (
                 <div key={idx} className="bg-surface border border-border rounded-2xl p-5 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between border-b border-border pb-2">
                     <span className="font-mono font-bold text-xs text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
-                      [Kaynak #{idx + 1}] {chunk.documentId}
+                      {t('rag.sourceLabel', { index: idx + 1, documentId: chunk.documentId })}
                     </span>
                     <span className="font-mono font-bold text-xs text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      Uyum: %{(chunk.score * 100).toFixed(1)}
+                      {t('rag.scoreLabel', { score: (chunk.score * 100).toFixed(1) })}
                     </span>
                   </div>
 
@@ -645,21 +664,23 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
           <div className="lg:col-span-5 space-y-4">
             <h3 className="font-bold text-sm text-ink flex items-center gap-2">
               <Code2 className="w-4 h-4 text-purple-600" />
-              <span>LLM Fine-Tuning RAG Prompt Önizleme</span>
+              <span>{t('rag.promptTitle')}</span>
             </h3>
 
             <div className="bg-slate-950 text-slate-200 p-4 rounded-2xl border border-slate-800 shadow-sm space-y-3 font-mono text-[11px]">
               <span className="text-purple-400 font-bold block text-xs border-b border-slate-800 pb-2">
-                {'// Formatted LLM Context Payload'}
+                {t('rag.payloadComment')}
               </span>
 
               {ragPrompt ? (
                 <pre className="whitespace-pre-wrap leading-relaxed text-slate-300 max-h-[500px] overflow-y-auto">
                   {ragPrompt}
                 </pre>
+              ) : ragPrompt === '' ? (
+                <p className="text-muted text-xs italic">{t('ragPreview.noMatches')}</p>
               ) : (
                 <p className="text-muted text-xs italic">
-                  Sol taraftan arama yaptığınızda LLM modeline gönderilen RAG bağlam metni burada görüntülenecektir.
+                  {t('ragPreview.idle')}
                 </p>
               )}
             </div>

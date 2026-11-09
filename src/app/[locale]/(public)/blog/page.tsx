@@ -49,7 +49,6 @@ export default async function BlogIndexPage({
   const { locale } = await params;
   const posts = await getBlogPosts();
   const t = await getTranslations({ locale, namespace: 'blog' });
-  const isTr = locale === 'tr';
 
   return (
     <div className="flex-1 flex flex-col bg-background text-ink selection:bg-accent selection:text-white">
@@ -58,17 +57,13 @@ export default async function BlogIndexPage({
           {/* Page Header */}
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3.5 py-1.5 rounded-full">
-              {isTr ? 'Bilgi & Rehber Portalı' : 'Knowledge & Insights'}
+              {t('indexEyebrow')}
             </span>
             <h1 className="text-4xl sm:text-5xl font-extrabold font-heading text-ink tracking-tight">
-              {isTr
-                ? 'AB Proje Yönetimi & Hibe Blogu'
-                : 'EU Grant Management & Insights Blog'}
+              {t('indexTitle')}
             </h1>
             <p className="text-sm sm:text-base text-muted leading-relaxed">
-              {isTr
-                ? 'Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.'
-                : 'Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.'}
+              {t('indexSubtitle')}
             </p>
           </div>
 
@@ -140,7 +135,7 @@ export default async function BlogIndexPage({
                       href={getPublicRoute('blogDetail', locale, post.slug)}
                       className="shrink-0 text-xs font-bold text-accent hover:underline flex items-center gap-1"
                     >
-                      <span>{isTr ? 'Devamını Oku' : 'Read Article'}</span>
+                      <span>{t('readArticle')}</span>
                       <span>→</span>
                     </Link>
                   </div>

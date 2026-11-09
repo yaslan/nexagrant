@@ -444,7 +444,7 @@ export function BillingClient({
               <span>{t('cycleYearly')}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
-                  billingCycle === 'yearly' ? 'bg-white/20 text-white' : 'bg-accent/15 text-accent font-mono'
+                  billingCycle === 'yearly' ? 'bg-surface text-accent' : 'bg-accent/15 text-accent font-mono'
                 }`}
               >
                 {t('yearlyBadge')}

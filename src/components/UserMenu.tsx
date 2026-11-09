@@ -289,7 +289,6 @@ export default function UserMenu({
       <Link
         href={getPublicRoute('login', locale)}
         className="text-xs font-bold bg-accent hover:opacity-90 text-white px-4 py-2 rounded-xl shadow-xs transition-all transform hover:-translate-y-0.5 flex items-center gap-1.5 cursor-pointer"
-        style={{ backgroundColor: '#003D5C' }}
         aria-label={isTr ? 'Giriş / Kayıt Ol' : 'Sign In / Register'}
       >
         <span>{isTr ? 'Giriş / Kayıt Ol' : 'Sign In / Register'}</span>

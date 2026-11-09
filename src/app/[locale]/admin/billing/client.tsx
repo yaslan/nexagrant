@@ -109,7 +109,7 @@ export function BillingClient({
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={handleStripePortal}
-              className="bg-[#22d3ee] hover:bg-[#67e8f9] text-[#080d1a] px-4 py-2.5 rounded-xl font-extrabold text-xs shadow-md transition flex items-center gap-2 cursor-pointer font-mono"
+              className="bg-accent-strong hover:opacity-90 text-white px-4 py-2.5 rounded-xl font-extrabold text-xs shadow-md transition flex items-center gap-2 cursor-pointer font-mono"
             >
               <CreditCard className="w-4 h-4 text-[#080d1a]" />
               <span>{t('portalCta')}</span>

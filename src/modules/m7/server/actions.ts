@@ -4,7 +4,7 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
 import { isLlmUnusableOutcome } from '@/lib/llm-outcome';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { revalidatePath } from 'next/cache';
@@ -97,7 +97,13 @@ export async function generateIpChecklist({
   const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
   const locale = await promptLocale();
-  const prompt = renderPrompt('m7/ip-checklist', { title, trl, patentStatus }, locale);
+
+  const request = separatedPrompt(
+    'm7/ip-checklist',
+    {},
+    { technology_title: title, current_trl: trl, patent_status: patentStatus },
+    locale
+  );
 
   let content = '';
   try {
@@ -106,8 +112,7 @@ export async function generateIpChecklist({
       userId,
       module: 'M7',
       purpose: 'tto_ip_checklist',
-      prompt,
-      system: renderPrompt('m7/ip-checklist-system', {}, locale),
+      ...request,
     });
   } catch (e) {
     // A cut-off or declined answer must reach the screen as such, not be

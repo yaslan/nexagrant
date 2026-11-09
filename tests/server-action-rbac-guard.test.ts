@@ -2003,20 +2003,42 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       only(evidence, mutant, 'peekEvidenceG8', 'client.evidence.deleteMany');
     });
 
+    // NG-96: this check line and the revalidatePath line also sit in updateTenantProvince, so an
+    // edit must stay inside updateTenantProfile's own body. A bare replace takes the first match
+    // anywhere in the file, which after a removal is updateTenantProvince's line.
+    const profileCheck = "    if (!can(asRole(scope.role), 'manage_users')) return { ok: false, error: 'forbidden' };\n";
+    const profileAfter = "      revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');";
+    const inProfileAction = (text: string, edit: (body: string) => string): string => {
+      const start = text.indexOf('export async function updateTenantProfile(');
+      expect(start).toBeGreaterThanOrEqual(0);
+      const next = text.indexOf('\nexport async function ', start + 1);
+      const end = next < 0 ? text.length : next + 1;
+      return text.slice(0, start) + edit(text.slice(start, end)) + text.slice(end);
+    };
+    const movedCheck = (text: string) =>
+      inProfileAction(text, (body) =>
+        body.replace(profileCheck, '').replace(
+          profileAfter,
+          "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
+            profileAfter,
+        ),
+      );
+
+    it('NG-96: dropping only updateTenantProfile\'s check flags that action alone', () => {
+      const profile = 'app/[locale]/(app)/[workspace]/settings/profile/actions.ts';
+      const profileSource = fs.readFileSync(path.join(SRC, profile), 'utf8');
+      const dropped = inProfileAction(profileSource, (body) => body.replace(profileCheck, ''));
+      const keys = findingsFor(profile, movedCheck(dropped)).findings.map((f) => f.key);
+      expect(keys).toContain(`${profile}#updateTenantProfile`);
+      expect(keys).not.toContain(`${profile}#updateTenantProvince`);
+    });
+
     it('G6: the role check moved after the write', () => {
       const profile = 'app/[locale]/(app)/[workspace]/settings/profile/actions.ts';
       const profileSource = fs.readFileSync(path.join(SRC, profile), 'utf8');
-      const check = "    if (!can(asRole(scope.role), 'manage_users')) return { ok: false, error: 'forbidden' };\n";
-      const after = "      revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');";
-      expect(profileSource).toContain(check);
-      expect(profileSource).toContain(after);
-      const mutant = profileSource
-        .replace(check, '')
-        .replace(
-          after,
-          "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
-            after,
-        );
+      expect(profileSource).toContain(profileCheck);
+      expect(profileSource).toContain(profileAfter);
+      const mutant = movedCheck(profileSource);
       only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: client.$queryRaw (writing SQL) (lib/pic-budget.ts:43, via spendUnsolicitedPicLookup (lib/pic-budget)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert)); tx.$executeRaw (line 197, via planPicChange); tx.auditEvent.create (line 244, via recordPicRefusal); tx.auditEvent.create (line 261, via recordPicRefusal); tx.auditEvent.create (line 244, via recordPicRefusal); tx.auditEvent.create (line 261, via recordPicRefusal); tx.tenantProfile.update (line 350); tx.tenantProfile.create (line 359); tx.auditEvent.create (line 372); tx.tenant.update (line 383); tx.auditEvent.create (line 384); client.$executeRaw (lib/scoring/g0-compute.ts:498, via limitLockWait (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:530, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:545, via writeOpportunityScore (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:635, via clearStoredG0 (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:530, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:545, via writeOpportunityScore (lib/scoring/g0-compute)); computation.score (model handed to writeOpportunityScore) (lib/scoring/g0-compute.ts:578, via persistG0 (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:589, via persistG0 (lib/scoring/g0-compute)); client.$executeRaw (lib/scoring/g0-compute.ts:498, via limitLockWait (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:530, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:545, via writeOpportunityScore (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:635, via clearStoredG0 (lib/scoring/g0-compute)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert))');
     });
 
@@ -2798,13 +2820,13 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       // directory index is looked up again when an overlay puts a file in front of that index.
       // Without `probed` holding the base it tried first, the overlay's file went unseen.
       it('B-1 (İNCELEME-101): a file an overlay puts in front of a directory index is walked', () => {
-        expect(resolveSpec('lib/rag', '@/lib/ai/prompts', NO_OVERLAY)).toBe('lib/ai/prompts/index');
-        const shadow = "import { prisma } from '@/lib/db';\nexport function renderPrompt() { void prisma.evidence.delete({ where: { id: 'x' } }); return ''; }\n";
-        const text = header + "import { formatRagPrompt } from '@/lib/rag';\n" + fn('n18', ro + "  return formatRagPrompt([], 'q', 'tr');\n");
-        expect(findingsFor(file, text, NO_OVERLAY).findings).toEqual([]);
-        expect(findingsFor(file, text, { 'lib/ai/prompts.ts': shadow }).findings).toEqual([
-          { key: `${file}#n18`, problem: expect.stringContaining('readOnly: true but writes: prisma.evidence.delete (lib/ai/prompts.ts:2') },
-        ]);
+        expect(resolveSpec('modules/m6/server/esr-parser', '@/lib/ai/prompts', NO_OVERLAY)).toBe('lib/ai/prompts/index');
+        const shadow = "import { prisma } from '@/lib/db';\nexport function separatedPrompt() { void prisma.evidence.delete({ where: { id: 'x' } }); return {}; }\n";
+        const text = header + "import { parseEsrDocumentText } from '@/modules/m6/server/esr-parser';\n" + fn('n18', ro + "  return parseEsrDocumentText('d', 't');\n");
+        // The parser really writes (credits, through the LLM adapter), so only the overlay's own line tells the two runs apart.
+        const problems = (ov: Overlay) => findingsFor(file, text, ov).findings.map((f) => f.problem).join('\n');
+        expect(problems(NO_OVERLAY)).not.toContain('lib/ai/prompts.ts:');
+        expect(problems({ 'lib/ai/prompts.ts': shadow })).toContain('prisma.evidence.delete (lib/ai/prompts.ts:2');
       });
 
       it('B-1 (İNCELEME-101): the same through a relative import of a directory index', () => {

@@ -115,11 +115,11 @@ export default function PricingClient({
   const cycleLabel = billingCycle === 'yearly' ? t('cycleYearly') : t('cycleMonthly');
 
   return (
-    <div className="flex-1 flex flex-col bg-[#080d1a] text-slate-100 font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="flex-1 flex flex-col dark bg-[#080d1a] text-slate-100 font-sans selection:bg-accent/30 selection:text-accent-ink">
       <main className="flex-1 max-w-6xl mx-auto py-12 px-edge sm:px-6 w-full">
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-10 space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold uppercase tracking-wider shadow-[0_0_15px_rgba(34,211,238,0.15)]">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent-ink text-xs font-semibold uppercase tracking-wider shadow-[0_0_15px_color-mix(in_srgb,var(--accent)_15%,transparent)]">
             <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
             <span>{t('policyBadge')}</span>
           </div>
@@ -143,17 +143,17 @@ export default function PricingClient({
         </div>
 
         {/* ─── TIER SCHEDULE (read-only: the live tier comes from the server) ─── */}
-        <div className="bg-[#0e1628]/90 border border-cyan-500/30 rounded-2xl p-6 shadow-xl mb-10 relative overflow-hidden backdrop-blur-md">
+        <div className="bg-[#0e1628]/90 border border-accent/30 rounded-2xl p-6 shadow-xl mb-10 relative overflow-hidden backdrop-blur-md">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-5">
             <div>
-              <div className="text-[11px] font-bold text-cyan-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <div className="text-[11px] font-bold text-accent-ink font-mono uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-accent-ink" />
                 <span>{t('tierScheduleKicker')}</span>
               </div>
               <h2 className="text-lg font-bold text-white mt-0.5">{t('tierScheduleTitle')}</h2>
             </div>
 
-            <div className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold text-cyan-300 flex items-center gap-2 self-start sm:self-auto">
+            <div className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold text-accent-ink flex items-center gap-2 self-start sm:self-auto">
               <span>{t('activeCode')}</span>
               <span className="text-amber-300 font-extrabold" data-testid="active-tier-code">
                 {activeTier.code}
@@ -178,7 +178,7 @@ export default function PricingClient({
                   key={tier.code}
                   className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                     isActive
-                      ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-[0_0_15px_rgba(34,211,238,0.25)] ring-1 ring-cyan-400'
+                      ? 'bg-accent/15 border-accent text-white shadow-[0_0_15px_color-mix(in_srgb,var(--accent)_25%,transparent)] ring-1 ring-accent'
                       : 'bg-slate-900/80 border-slate-800 text-slate-400'
                   } ${tier.rank < activeTier.rank ? 'opacity-50' : ''}`}
                 >
@@ -191,7 +191,7 @@ export default function PricingClient({
                     <div className="text-[10px] font-bold font-mono text-slate-400">
                       {t(`tiers.${tier.code}`)}
                     </div>
-                    <div className="text-lg font-extrabold text-cyan-300 font-heading mt-0.5">
+                    <div className={`text-lg font-extrabold font-heading mt-0.5 ${tier.rank < activeTier.rank ? "text-white" : "text-accent-ink"}`}>
                       -{tier.percentOff}%
                     </div>
                   </div>
@@ -206,7 +206,7 @@ export default function PricingClient({
               <span className="text-amber-400 font-bold">▶ {t(`tiers.${activeTier.code}`)}:</span>{' '}
               <span>{t('tierApplied', { percent: activeTier.percentOff, code: activeTier.code })}</span>
             </div>
-            <div className="text-cyan-400 text-[11px] font-bold">{t('tierServerNote')}</div>
+            <div className="text-accent-ink text-[11px] font-bold">{t('tierServerNote')}</div>
           </div>
         </div>
 
@@ -217,7 +217,7 @@ export default function PricingClient({
               onClick={() => setBillingCycle('monthly')}
               className={`px-6 py-2 rounded-full text-xs font-bold transition-all duration-200 relative z-10 ${
                 billingCycle === 'monthly'
-                  ? 'bg-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.4)]'
+                  ? 'bg-accent-strong text-white shadow-[0_0_20px_color-mix(in_srgb,var(--accent)_40%,transparent)]'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -227,14 +227,14 @@ export default function PricingClient({
               onClick={() => setBillingCycle('yearly')}
               className={`px-6 py-2 rounded-full text-xs font-bold transition-all duration-200 relative z-10 flex items-center gap-1.5 ${
                 billingCycle === 'yearly'
-                  ? 'bg-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.4)]'
+                  ? 'bg-accent-strong text-white shadow-[0_0_20px_color-mix(in_srgb,var(--accent)_40%,transparent)]'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <span>{t('cycleYearly')}</span>
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold tracking-tight ${
-                  billingCycle === 'yearly' ? 'bg-slate-950 text-cyan-300' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                  billingCycle === 'yearly' ? 'bg-slate-950 text-accent-ink' : 'bg-accent/20 text-accent-ink border border-accent/30'
                 }`}
               >
                 {t('yearlyBadge')}
@@ -279,12 +279,12 @@ export default function PricingClient({
                 data-testid={`plan-card-${entry.planId}`}
                 className={`rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative transition-all duration-300 ${
                   recommended
-                    ? 'bg-[#0f192e] border-2 border-cyan-400 shadow-[0_0_35px_rgba(34,211,238,0.2)] ring-1 ring-cyan-400/50'
+                    ? 'bg-[#0f192e] border-2 border-accent shadow-[0_0_35px_color-mix(in_srgb,var(--accent)_20%,transparent)] ring-1 ring-accent/50'
                     : 'bg-[#0b1324] border border-slate-800 hover:border-slate-700 shadow-xl'
                 }`}
               >
                 {recommended && (
-                  <div className="absolute -top-3.5 right-6 bg-cyan-400 text-slate-950 text-[10px] font-black uppercase tracking-wider py-1 px-3 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.5)]">
+                  <div className="absolute -top-3.5 right-6 bg-accent-strong text-white text-[10px] font-black uppercase tracking-wider py-1 px-3 rounded-full shadow-[0_0_15px_color-mix(in_srgb,var(--accent)_50%,transparent)]">
                     {t('recommended')}
                   </div>
                 )}
@@ -305,7 +305,7 @@ export default function PricingClient({
                       <span className="text-lg text-slate-500 line-through font-semibold">
                         {money(list.monthlyEquivalentMinor, list.currency)}
                       </span>
-                      <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-extrabold px-2 py-0.5 rounded font-mono">
+                      <span className="bg-accent/20 text-accent-ink border border-accent/30 text-[11px] font-extrabold px-2 py-0.5 rounded font-mono">
                         -{charged.percentOff}%
                       </span>
                       <span className="text-slate-400 text-xs">{t('perMonth')}</span>
@@ -331,7 +331,7 @@ export default function PricingClient({
                       {t('vatExclusiveNote')}
                     </div>
 
-                    <div className="mt-2 text-[10px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 rounded-lg p-2 flex items-center justify-between">
+                    <div className="mt-2 text-[10px] font-mono text-accent-ink bg-accent/40 border border-accent/30 rounded-lg p-2 flex items-center justify-between">
                       <span>{t('couponLabel', { code: charged.campaignCode })}</span>
                       <span>{t('renewalRate', { percent: charged.percentOff })}</span>
                     </div>
@@ -342,13 +342,13 @@ export default function PricingClient({
                     <div className="mb-6 bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs font-mono">
                       <span className="text-slate-300">{t('lifetimeInline')}</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-cyan-300">
+                        <span className="font-bold text-accent-ink">
                           {money(lifetime.amountMinor, lifetime.currency)}
                         </span>
                         <span className="line-through text-slate-500 text-[10px]">
                           {money(lifetime.listAmountMinor, lifetime.currency)}
                         </span>
-                        <span className="bg-cyan-500/20 text-cyan-300 text-[9px] px-1 rounded">
+                        <span className="bg-accent/20 text-accent-ink text-[9px] px-1 rounded">
                           -{lifetime.percentOff}%
                         </span>
                       </div>
@@ -370,7 +370,7 @@ export default function PricingClient({
                       }
                       className={`w-full py-3.5 rounded-xl font-extrabold text-xs transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
                         recommended
-                          ? 'bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_25px_rgba(34,211,238,0.4)] hover:shadow-[0_0_35px_rgba(34,211,238,0.6)]'
+                          ? 'bg-accent-strong hover:opacity-90 text-white shadow-[0_0_25px_color-mix(in_srgb,var(--accent)_40%,transparent)] hover:shadow-[0_0_35px_color-mix(in_srgb,var(--accent)_60%,transparent)]'
                           : 'bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 hover:border-slate-600'
                       }`}
                     >
@@ -384,7 +384,7 @@ export default function PricingClient({
                   <div className="space-y-3 pt-4 border-t border-slate-800/80">
                     {copy.bullets.map(({ key, text }) => (
                       <div key={key} className="flex items-start gap-2.5 text-xs text-slate-300 leading-snug">
-                        <Check className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                        <Check className="w-4 h-4 text-accent-ink shrink-0 mt-0.5" />
                         <span>{text}</span>
                       </div>
                     ))}
@@ -397,10 +397,10 @@ export default function PricingClient({
 
         {/* ─── LIFETIME OFFER BANNER ─── */}
         {lifetime && ultraYearly && ultraYearlyList && (
-          <div className="bg-[#0b1426] border-2 border-cyan-400/80 rounded-3xl p-6 sm:p-8 shadow-[0_0_40px_rgba(34,211,238,0.2)] mb-12 relative overflow-hidden backdrop-blur-xl">
+          <div className="bg-[#0b1426] border-2 border-accent/80 rounded-3xl p-6 sm:p-8 shadow-[0_0_40px_color-mix(in_srgb,var(--accent)_20%,transparent)] mb-12 relative overflow-hidden backdrop-blur-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800 font-mono">
-              <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 tracking-widest uppercase">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+              <div className="flex items-center gap-2 text-xs font-bold text-accent-ink tracking-widest uppercase">
+                <span className="w-2.5 h-2.5 rounded-full bg-accent-strong animate-ping" />
                 <span>{t('lifetimeKicker')}</span>
               </div>
               {/*
@@ -416,13 +416,13 @@ export default function PricingClient({
                 className="bg-slate-900 border border-slate-700 px-3.5 py-1.5 rounded-full text-xs text-slate-300 font-bold flex items-center gap-2 self-start sm:self-auto shadow-inner"
               >
                 {lifetimeScarcity.kind === 'unknown' && (
-                  <span className="text-cyan-300">{t('lifetimeCapOnly', { cap: lifetimeScarcity.cap })}</span>
+                  <span className="text-accent-ink">{t('lifetimeCapOnly', { cap: lifetimeScarcity.cap })}</span>
                 )}
                 {lifetimeScarcity.kind === 'none' && (
                   <>
                     <span className="text-amber-400 font-extrabold">{t('lifetimeOwnersNone')}</span>
                     <span>·</span>
-                    <span className="text-cyan-300">
+                    <span className="text-accent-ink">
                       {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
                     </span>
                   </>
@@ -433,7 +433,7 @@ export default function PricingClient({
                       {t('lifetimeOwnersCount', { count: lifetimeScarcity.owners })}
                     </span>
                     <span>·</span>
-                    <span className="text-cyan-300">
+                    <span className="text-accent-ink">
                       {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
                     </span>
                   </>
@@ -455,7 +455,7 @@ export default function PricingClient({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
               {/* Purchase card */}
-              <div className="lg:col-span-5 bg-[#0e182e] border border-cyan-400/50 rounded-2xl p-6 flex flex-col justify-between shadow-xl relative">
+              <div className="lg:col-span-5 bg-[#0e182e] border border-accent/50 rounded-2xl p-6 flex flex-col justify-between shadow-xl relative">
                 <div>
                   <div className="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider mb-1">
                     {lifetime.name}
@@ -470,13 +470,13 @@ export default function PricingClient({
                     <span className="text-lg text-slate-500 line-through font-semibold">
                       {money(lifetime.listAmountMinor, lifetime.currency)}
                     </span>
-                    <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-extrabold px-2.5 py-0.5 rounded font-mono">
+                    <span className="bg-accent/20 text-accent-ink border border-accent/30 text-xs font-extrabold px-2.5 py-0.5 rounded font-mono">
                       -{lifetime.percentOff}%
                     </span>
                     <span className="text-xs text-slate-400 font-mono">{t('oneTime')}</span>
                   </div>
 
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-cyan-300 bg-cyan-950/80 border border-cyan-500/30 px-2.5 py-1 rounded-lg mb-6">
+                  <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-accent-ink bg-accent/40 border border-accent/30 px-2.5 py-1 rounded-lg mb-6">
                     <span>{lifetime.campaignCode}</span>
                     <span>·</span>
                     <span>{t('lifetimeCouponNote', { percent: lifetime.percentOff })}</span>
@@ -495,7 +495,7 @@ export default function PricingClient({
                         quantity: 1,
                       })
                     }
-                    className="w-full py-3.5 rounded-xl font-extrabold text-xs bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-[0_0_25px_rgba(34,211,238,0.4)] hover:shadow-[0_0_35px_rgba(34,211,238,0.6)] transition-all flex items-center justify-center gap-2 cursor-pointer mb-3"
+                    className="w-full py-3.5 rounded-xl font-extrabold text-xs bg-accent-strong hover:opacity-90 text-white shadow-[0_0_25px_color-mix(in_srgb,var(--accent)_40%,transparent)] hover:shadow-[0_0_35px_color-mix(in_srgb,var(--accent)_60%,transparent)] transition-all flex items-center justify-center gap-2 cursor-pointer mb-3"
                   >
                     <ShoppingBag className="w-4 h-4" />
                     <span>{t('lifetimeCta')}</span>
@@ -517,7 +517,7 @@ export default function PricingClient({
                         <span className="text-slate-400">
                           {t('compareYearlyTag')} {money(ultraYearly.amountMinor, ultraYearly.currency)}
                         </span>
-                        <span className="font-bold text-cyan-300">
+                        <span className="font-bold text-accent-ink">
                           {t('compareLifetimeTag')} {money(lifetime.amountMinor, lifetime.currency)}
                         </span>
                       </div>
@@ -539,14 +539,14 @@ export default function PricingClient({
                         <span className="text-slate-400 line-through">
                           {money(ultraThreeYearMinor, ultraYearly.currency)}
                         </span>
-                        <span className="text-cyan-300 text-sm">
+                        <span className="text-accent-ink text-sm">
                           {money(lifetime.amountMinor, lifetime.currency)}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-5 bg-cyan-950/40 border border-cyan-500/30 rounded-xl p-3 text-cyan-300 text-xs font-semibold leading-relaxed">
+                  <div className="mt-5 bg-accent/40 border border-accent/30 rounded-xl p-3 text-accent-ink text-xs font-semibold leading-relaxed">
                     {t('compareSaving', { amount: money(lifetimeSavingMinor, lifetime.currency) })}
                   </div>
                 </div>
@@ -567,7 +567,7 @@ export default function PricingClient({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse font-mono">
               <thead>
-                <tr className="bg-slate-900 text-cyan-400 border-b border-slate-800">
+                <tr className="bg-slate-900 text-accent-ink border-b border-slate-800">
                   <th className="p-3 font-bold">{t('colTier')}</th>
                   <th className="p-3 font-bold">{t('colRate')}</th>
                   <th className="p-3 font-bold">{t('colCode')}</th>
@@ -586,10 +586,10 @@ export default function PricingClient({
                   return (
                     <tr
                       key={tier.code}
-                      className={`hover:bg-slate-900/50 transition ${isActive ? 'bg-cyan-950/40 text-white font-bold' : ''}`}
+                      className={`hover:bg-slate-900/50 transition ${isActive ? 'bg-accent/40 text-white font-bold' : ''}`}
                     >
                       <td className="p-3">{t(`tiers.${tier.code}`)}</td>
-                      <td className="p-3 text-cyan-300 font-extrabold">-{tier.percentOff}%</td>
+                      <td className="p-3 text-accent-ink font-extrabold">-{tier.percentOff}%</td>
                       <td className="p-3 font-bold text-amber-300">{tier.code}</td>
                       {(row?.cells ?? []).map((cell) => (
                         <td
@@ -623,15 +623,15 @@ export default function PricingClient({
           <p>{t('footerNote')}</p>
           <div className="flex justify-center items-center gap-6 text-[11px] text-slate-400 pt-2">
             <span className="flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-cyan-400" />
+              <Shield className="w-3.5 h-3.5 text-accent-ink" />
               {t('guaranteeRefund')}
             </span>
             <span className="flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
+              <Zap className="w-3.5 h-3.5 text-accent-ink" />
               {t('guaranteeCancel')}
             </span>
             <span className="flex items-center gap-1.5">
-              <Gift className="w-3.5 h-3.5 text-cyan-400" />
+              <Gift className="w-3.5 h-3.5 text-accent-ink" />
               {t('guaranteeInvoice')}
             </span>
           </div>

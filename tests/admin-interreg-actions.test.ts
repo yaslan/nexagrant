@@ -5,7 +5,7 @@ const m = vi.hoisted(() => ({
   syncKeepEuData: vi.fn(),
   aggregateKeepEuMetrics: vi.fn(),
   retrieveChunks: vi.fn(),
-  formatRagPrompt: vi.fn(),
+  formatRagContext: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ auth: m.auth }));
@@ -15,7 +15,7 @@ vi.mock('@/lib/keep-eu-sync', () => ({
 }));
 vi.mock('@/lib/rag', () => ({
   retrieveChunks: m.retrieveChunks,
-  formatRagPrompt: m.formatRagPrompt,
+  formatRagContext: m.formatRagContext,
 }));
 
 const interreg = await import('@/app/[locale]/admin/interreg/actions');
@@ -59,7 +59,7 @@ beforeEach(() => {
   m.syncKeepEuData.mockResolvedValue({ success: true, syncedProjectsCount: 1 });
   m.aggregateKeepEuMetrics.mockResolvedValue({ totalProjectsCount: 1 });
   m.retrieveChunks.mockResolvedValue([]);
-  m.formatRagPrompt.mockReturnValue('formatted prompt');
+  m.formatRagContext.mockReturnValue('formatted prompt');
 });
 
 describe.each(ACTIONS)('$name', ({ call, effects }) => {

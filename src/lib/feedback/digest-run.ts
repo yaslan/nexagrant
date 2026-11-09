@@ -33,7 +33,7 @@ export interface DigestRunOptions {
   /** false renders the email but does not send it. Default true. */
   send?: boolean;
   /** Injected in tests; defaults to the SMTP mailer built from env. */
-  sender?: (message: { to: string; subject: string; html: string }) => Promise<void>;
+  sender?: (message: { to: string; subject: string; html: string }) => Promise<unknown>;
 }
 
 export interface DigestRunResult {

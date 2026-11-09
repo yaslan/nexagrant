@@ -5,6 +5,7 @@ import {
   saveEvaluation,
   saveHumanEvaluation,
 } from '../../src/modules/m6/server/actions';
+import { isProposalTextMissing, PROPOSAL_TEXT_MISSING_DIGEST } from '../../src/modules/m6/proposal-text-missing';
 
 /**
  * `tenantId`/`userId` are no longer arguments — the actions read them from the
@@ -43,6 +44,8 @@ const h = vi.hoisted(() => {
     ModuleAccessError,
     state: { currentScope: scope as typeof scope | null, moduleOpen: true },
     opportunityFindFirst: vi.fn(),
+    applicationPartFindFirst: vi.fn(),
+    conceptNoteFindMany: vi.fn(),
     creditLedgerCreate: vi.fn(),
     evaluationCreate: vi.fn(),
     evaluationFindFirst: vi.fn(),
@@ -83,6 +86,8 @@ vi.mock('../../src/lib/db', () => ({
   withTenant: vi.fn(async <T,>(_tenantId: string, cb: (t: never) => Promise<T>) =>
     cb({
       opportunity: { findFirst: h.opportunityFindFirst },
+      applicationPart: { findFirst: h.applicationPartFindFirst },
+      conceptNote: { findMany: h.conceptNoteFindMany },
       creditLedger: { create: h.creditLedgerCreate },
       evaluation: {
         create: h.evaluationCreate,
@@ -106,12 +111,19 @@ const AI_JSON = JSON.stringify({
   recommendations: ['Detail quantifiable KPIs'],
 });
 
+const PART_B_BODY = 'We validate soil sensors on 40 farms over 36 months.';
+const CONCEPT_NOTE_BODY = 'A short concept for low-cost soil sensing.';
+
 describe('M6 Evaluator Lens Module', () => {
   beforeEach(() => {
     h.state.currentScope = h.scope;
     h.state.moduleOpen = true;
     vi.clearAllMocks();
     h.opportunityFindFirst.mockResolvedValue({ id: 'opp-1' });
+    h.applicationPartFindFirst.mockResolvedValue({
+      content: { sections: [{ title: '1.1 Objectives and Ambition', content: PART_B_BODY }, { title: '2.1 Impact', content: '  ' }] },
+    });
+    h.conceptNoteFindMany.mockResolvedValue([]);
     h.creditLedgerCreate.mockResolvedValue({ id: 'ledger-1' });
     h.evaluationCreate.mockResolvedValue({
       id: 'ev-1',
@@ -144,6 +156,83 @@ describe('M6 Evaluator Lens Module', () => {
     expect(result.implementation).toBe(3.8);
     expect(result.strengths.length).toBeGreaterThan(0);
     expect(result.weaknesses.length).toBeGreaterThan(0);
+  });
+
+  describe('generateAiEvaluation reads the proposal before scoring it (NG-98)', () => {
+    const requestSentToModel = () => h.generateText.mock.calls[0]![0] as { system: string; prompt: string };
+
+    test('sends the Part B text to the model, as fenced user data and not as instructions', async () => {
+      await generateAiEvaluation('opp-1');
+
+      const { system, prompt } = requestSentToModel();
+      expect(prompt).toContain(`<user_data field="proposal_text">`);
+      expect(prompt).toContain('1.1 Objectives and Ambition');
+      expect(prompt).toContain(PART_B_BODY);
+      expect(prompt).toContain('full_application');
+      expect(system).not.toContain(PART_B_BODY);
+      // An unwritten section is not sent as an empty heading the model could mark down.
+      expect(prompt).not.toContain('2.1 Impact');
+    });
+
+    test('reads only the session tenant, for this opportunity', async () => {
+      await generateAiEvaluation('opp-1');
+
+      expect(h.applicationPartFindFirst.mock.calls[0]![0].where).toEqual({
+        tenantId: 'tenant-1',
+        opportunityId: 'opp-1',
+        part: 'PART_B',
+      });
+    });
+
+    test('falls back to the newest concept note that has text when Part B is unwritten', async () => {
+      h.applicationPartFindFirst.mockResolvedValue({
+        content: { sections: [{ title: '1.1 Objectives and Ambition', content: '' }] },
+      });
+      h.conceptNoteFindMany.mockResolvedValue([
+        { content: { objectives: '   ' } },
+        { content: { objectives: CONCEPT_NOTE_BODY } },
+      ]);
+
+      await generateAiEvaluation('opp-1');
+
+      const { prompt } = requestSentToModel();
+      expect(prompt).toContain(CONCEPT_NOTE_BODY);
+      expect(prompt).toContain('concept_note');
+      expect(h.conceptNoteFindMany.mock.calls[0]![0].where).toEqual({ tenantId: 'tenant-1', opportunityId: 'opp-1' });
+    });
+
+    test.each([
+      ['no Part B row and no concept note', null, []],
+      ['blank Part B and blank concept note', { content: { sections: [{ title: 'x', content: ' \n ' }] } }, [{ content: { a: '' } }]],
+      ['malformed content columns', { content: 'not-an-object' }, [{ content: null }, { content: { a: 7 } }]],
+    ])('%s: the model is not called, nothing is recorded, and the browser can tell why', async (_name, part, notes) => {
+      h.applicationPartFindFirst.mockResolvedValue(part);
+      h.conceptNoteFindMany.mockResolvedValue(notes);
+
+      const error = await generateAiEvaluation('opp-1').catch((e: unknown) => e);
+
+      // `generateText` is the only path to AiUsageLog and CreditLedger: not called, not charged.
+      expect(h.generateText).not.toHaveBeenCalled();
+      expect(h.creditLedgerCreate).not.toHaveBeenCalled();
+      expect(h.evaluationCreate).not.toHaveBeenCalled();
+      expect(isProposalTextMissing(error)).toBe(true);
+      // In production the digest is all a thrown action leaves the browser.
+      expect((error as { digest?: unknown }).digest).toBe(PROPOSAL_TEXT_MISSING_DIGEST);
+    });
+
+    test('an opportunity outside the tenant is refused before the model is called', async () => {
+      h.opportunityFindFirst.mockResolvedValue(null);
+
+      await expect(generateAiEvaluation('opp-from-other-tenant')).rejects.toThrow(/not found/i);
+
+      expect(h.generateText).not.toHaveBeenCalled();
+    });
+
+    test('the record says which text was read', async () => {
+      await generateAiEvaluation('opp-1');
+
+      expect(h.evaluationCreate.mock.calls[0]![0].data.weaknesses.proposalSource).toBe('full_application');
+    });
   });
 
   test('generateAiEvaluation operates on the session tenant only', async () => {

@@ -79,6 +79,22 @@ describe('ConceptNoteEditor — result band instead of alert()', () => {
     expect(alertSpy).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['tr', trMessages.ConceptNote.editor.generate],
+    ['en', enMessages.ConceptNote.editor.generate],
+  ] as const)('a template section without a word limit is named in the band (%s)', async (locale, button) => {
+    // In production the digest is all the browser receives: the message is withheld.
+    actions.generateConceptNoteDraft.mockRejectedValue(
+      Object.assign(new Error('withheld'), { digest: 'INVALID_TEMPLATE_SECTION:summary' })
+    );
+    renderEditor(locale);
+    fireEvent.click(screen.getByRole('button', { name: button }));
+
+    const band = await screen.findByRole('alert');
+    expect(band.textContent).toContain('"Executive Summary"');
+    expect(band.textContent).not.toContain('withheld');
+  });
+
   test('saving an existing note shows a status band, no dialog', async () => {
     actions.saveConceptNoteDraft.mockResolvedValue(undefined);
     renderEditor('en', 'note-1');

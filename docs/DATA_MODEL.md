@@ -1123,7 +1123,8 @@ Rakip cezası skoru 0'ın altına düşüremez; sıra ham toplamdan kurulur, kı
 |---|---|---|---|
 | Aday Bul (FO-63 sonrası) | `topicExperience, networkCentrality, countryDiversity, smeBonus, warmthBonus, liveDemandSignal, liveDemandReason, total` | 0–1 ağırlıklı | `consortiumSeatScore` |
 | Aday Bul (FO-63 öncesi, eski satır) | aynı, `liveDemandSignal` yok, `total` 0–10 | 0–10 | `consortiumSeatScore`, sinyal 0 |
-| Eşleştirici | `topicExperience, geographicBalance, collabHistory, relationshipWarmth, centrality, rivalRisk` (ham puan) | −10…90 | `matchSeatScore` = toplam / 90 |
+| Eşleştirici (K-578751 sonrası) | `topicExperience, geographicBalance, collabHistory, rivalRisk` (ham puan; 34 + 33 + 33, ceza −10) | −10…100 | `matchSeatScore` = toplam / 100 |
+| Eşleştirici (K-578751 öncesi, eski satır) | yukarıdakiler + `relationshipWarmth, centrality` | −10…90 | `legacyMatchSeatScore` = toplam / 90 |
 
 **Şema değişikliği yok.** Ölçek sürümü kolonu (ör. `scoreScale`) eklenmedi: her satır kendi
 `breakdown`'ını taşıdığı için skor ondan yeniden türetilebilir; ölçek bilgisi breakdown'un biçiminden

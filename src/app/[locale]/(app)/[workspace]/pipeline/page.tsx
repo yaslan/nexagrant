@@ -4,6 +4,7 @@ import KanbanBoard from './board';
 import { getInMemoryOpportunities, type OpportunityItem } from '@/lib/k5-pipeline/pipelineStore';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { latestG0PassedByOpportunity } from '@/lib/gates/latest-g0-decision';
 
 /**
  * Replaces each card's `g0Score` with the score that has a record behind it.
@@ -50,16 +51,27 @@ async function withEvidenceBackedScores(
           .map((m) => [m.opportunityId, m.g0Score ?? null]),
       );
 
+      // The badge's colour follows the last G0 decision, not the number: a refused opportunity
+      // can carry a score above the triage line (NG-69). The latest decision counts, as in
+      // `gates/evaluate.ts`; an erased row is no decision.
+      const decisions: { opportunityId: string; passed: boolean }[] = await tx.gateDecision.findMany({
+        where: { tenantId, opportunityId: { in: ids }, gate: 'G0', deletedAt: null },
+        orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+        select: { opportunityId: true, passed: true },
+      });
+      const lastG0PassedByOpportunityId = latestG0PassedByOpportunity(decisions);
+
       return opportunities.map((o) => ({
         ...o,
         g0Score: scoreByOpportunityId.get(o.id) ?? null,
+        g0Passed: lastG0PassedByOpportunityId.get(o.id) ?? null,
       }));
     });
   } catch (e) {
     // A failed lookup must not invent scores: the badge disappears, it does not fall back to
     // the column this function exists to stop trusting.
     console.warn(`[Pipeline] G0 evidence lookup bypassed: ${errorMessage(e)}`);
-    return opportunities.map((o) => ({ ...o, g0Score: null }));
+    return opportunities.map((o) => ({ ...o, g0Score: null, g0Passed: null }));
   }
 }
 
