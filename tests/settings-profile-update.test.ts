@@ -1002,8 +1002,9 @@ describe('updateTenantProfile action', () => {
             return ask(newPic());
           });
           // Somebody else's query while every one of those transactions is open.
-          const started = Date.now();
-          const bystander = prisma.$queryRaw<{ one: number }[]>`SELECT 1 AS one`.then((rows) => ({ rows, ms: Date.now() - started }));
+          // performance.now(), not Date.now(): this describe fakes Date, which froze the clock and made ms always 0.
+          const started = performance.now();
+          const bystander = prisma.$queryRaw<{ one: number }[]>`SELECT 1 AS one`.then((rows) => ({ rows, ms: performance.now() - started }));
           const answers = await Promise.all(asks);
           const seen = await bystander;
           expect(answers.filter((a) => a.ok)).toHaveLength(n);

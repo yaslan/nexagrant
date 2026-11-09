@@ -2029,6 +2029,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       const profileSource = fs.readFileSync(path.join(SRC, profile), 'utf8');
       const dropped = inProfileAction(profileSource, (body) => body.replace(profileCheck, ''));
       const keys = findingsFor(profile, movedCheck(dropped)).findings.map((f) => f.key);
+      expect(keys).toContain(`${profile}#updateTenantProfile`);
       expect(keys).not.toContain(`${profile}#updateTenantProvince`);
     });
 
