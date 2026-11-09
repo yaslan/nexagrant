@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import enMessages from '../../messages/en.json';
+import trMessages from '../../messages/tr.json';
 import { prisma } from '../../src/lib/db';
 import { signInAs } from './fixtures/session';
 import {
@@ -53,13 +54,34 @@ test.describe('module gate — Settings → Modules link on a switched-off modul
     await expect(gate).not.toContainText(ASK_ADMIN_LEAD);
     await gate.screenshot({ path: 'test-results/ng65/owner-lock-en.png' });
 
-    // Keyboard: the link is reachable by Tab from the page and activates with Enter.
-    await link.focus();
+    // Keyboard: move focus with real Tab presses (bounded) until the link has it, then Enter.
+    for (let i = 0; i < 40; i++) {
+      if (await link.evaluate((el) => el === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
     await expect(link).toBeFocused();
     await page.keyboard.press('Enter');
 
     await expect(page).toHaveURL(/\/en\/[^/]+\/settings\/modules$/);
     await expect(page.getByRole('main')).not.toContainText(enMessages.settings.modules.forbiddenTitle);
+  });
+
+  test('the owner on a Turkish page clicks the link and lands on Ayarlar → Modüller', async ({
+    page,
+  }) => {
+    await setRole('TENANT_OWNER');
+    await signInAsModuleGateUser(page, `/tr/${MG_WORKSPACE}/kanitlar`);
+
+    const gate = page.locator('section[role="alert"]');
+    await expect(gate).toBeVisible();
+    const link = gate.getByRole('link', { name: trMessages.ModuleGate.openModules });
+    await expect(link).toHaveAttribute('href', `/tr/default/ayarlar/moduller`);
+    await gate.screenshot({ path: 'test-results/ng65/owner-lock-tr.png' });
+
+    await link.click();
+    await expect(page).toHaveURL(/\/tr\/[^/]+\/ayarlar\/moduller$/);
+    await expect(page.getByRole('main')).not.toContainText(trMessages.settings.modules.forbiddenTitle);
+    await page.screenshot({ path: 'test-results/ng65/owner-modules-tr.png' });
   });
 
   test('a TENANT_ADMIN and a MEMBER get no link, only the admin sentence', async ({ page }) => {

@@ -108,6 +108,8 @@ export async function moduleGate(
       {offerModulesLink ? (
         <p className="mt-6">
           <Link
+            // WORKSPACE_ALIAS: the workspace layout accepts `default` for any tenant, so the
+            // link works without this page knowing the tenant's real workspace slug.
             href={getWorkspaceRoute('settingsModules', locale, WORKSPACE_ALIAS)}
             className="font-medium text-blue-700 underline underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
           >
