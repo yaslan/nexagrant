@@ -91,7 +91,7 @@ describe('ConceptNoteEditor — result band instead of alert()', () => {
     fireEvent.click(screen.getByRole('button', { name: button }));
 
     const band = await screen.findByRole('alert');
-    expect(band.textContent).toContain('summary');
+    expect(band.textContent).toContain('"Executive Summary"');
     expect(band.textContent).not.toContain('withheld');
   });
 

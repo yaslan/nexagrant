@@ -58,7 +58,7 @@ export default function ConceptNoteEditor({
         kind: 'error',
         text:
           section !== null
-            ? t('invalidSection', { section })
+            ? t('invalidSection', { section: schema.find((item) => item.key === section)?.labelKey ?? section })
             : errorText(err, () => t('failed', { message: errorMessage(err) })),
       });
     } finally {
