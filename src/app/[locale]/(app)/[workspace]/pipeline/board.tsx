@@ -444,6 +444,7 @@ export default function KanbanBoard({
           <select
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
+            aria-label={t('board.ownerFilterLabel')}
             className="w-40 truncate text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t('board.allUsers')}</option>
@@ -458,6 +459,7 @@ export default function KanbanBoard({
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+            aria-label={t('board.roleFilterLabel')}
             className="text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t('board.allRoles')}</option>
