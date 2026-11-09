@@ -12,6 +12,7 @@ import 'dotenv/config';
 
 import { prisma } from '../src/lib/db';
 import { DEFAULT_CRITERIA } from '../src/modules/m6/types';
+import { MAX_PROPOSAL_TEXT_CHARS } from '../src/modules/m6/proposal-too-long';
 
 export const M6_E2E = {
   email: 'm6-e2e@fabrika.test',
@@ -22,6 +23,11 @@ export const M6_E2E = {
   proposalId: 'm6-e2e-proposal',
   evaluationId: 'm6-e2e-evaluation',
   reviewerId: 'm6-e2e-reviewer',
+  /** An opportunity whose Part B is one character over what the AI reader accepts (NG-106). */
+  longOpportunityId: 'm6-e2e-opportunity-long',
+  longPartBId: 'm6-e2e-part-b-long',
+  creditGrantId: 'm6-e2e-credit-grant',
+  creditGrant: 10,
   /** Official ESR total out of 15; the dashboard shows it on the 1–5 panel scale. */
   esrTotal: 12.5,
 } as const;
@@ -148,6 +154,48 @@ export async function seed() {
   // Clear any marks left by an earlier run so the test starts from "nothing submitted".
   const deleted = await prisma.score.deleteMany({ where: { reviewerId: M6_E2E.reviewerId } });
 
+  // A balance, so a refusal that left the credits alone can be told from one that had none.
+  await prisma.creditLedger.upsert({
+    where: { id: M6_E2E.creditGrantId },
+    update: { delta: M6_E2E.creditGrant },
+    create: {
+      id: M6_E2E.creditGrantId,
+      tenantId: M6_E2E.tenantId,
+      delta: M6_E2E.creditGrant,
+      reason: 'monthly_grant',
+    },
+  });
+
+  await prisma.opportunity.upsert({
+    where: { id: M6_E2E.longOpportunityId },
+    update: {},
+    create: {
+      id: M6_E2E.longOpportunityId,
+      tenantId: M6_E2E.tenantId,
+      workspaceId: M6_E2E.workspaceId,
+      title: 'M6 E2E — proposal over the AI reader limit',
+      stage: 'G2',
+      status: 'ACTIVE',
+      intendedRole: 'coordinator',
+    },
+  });
+
+  const heading = '## T\n';
+  const longContent = {
+    sections: [{ title: 'T', content: 'x'.repeat(MAX_PROPOSAL_TEXT_CHARS + 1 - heading.length) }],
+  };
+  await prisma.applicationPart.upsert({
+    where: { id: M6_E2E.longPartBId },
+    update: { content: longContent },
+    create: {
+      id: M6_E2E.longPartBId,
+      tenantId: M6_E2E.tenantId,
+      opportunityId: M6_E2E.longOpportunityId,
+      part: 'PART_B',
+      content: longContent,
+    },
+  });
+
   console.log(
     `[seed-m6-e2e] ready — tenant=${M6_E2E.tenantId} proposal=${M6_E2E.proposalId} ` +
       `evaluation=${M6_E2E.evaluationId} criteria=${DEFAULT_CRITERIA.length} clearedScores=${deleted.count}`,
@@ -155,6 +203,9 @@ export async function seed() {
 }
 
 export async function rollback() {
+  await prisma.applicationPart.deleteMany({ where: { id: M6_E2E.longPartBId } });
+  await prisma.opportunity.deleteMany({ where: { id: M6_E2E.longOpportunityId } });
+  await prisma.creditLedger.deleteMany({ where: { id: M6_E2E.creditGrantId } });
   await prisma.score.deleteMany({ where: { reviewerId: M6_E2E.reviewerId } });
   await prisma.criterion.deleteMany({ where: { evaluationId: M6_E2E.evaluationId } });
   await prisma.reviewer.deleteMany({ where: { id: M6_E2E.reviewerId } });
