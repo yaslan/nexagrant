@@ -20,6 +20,7 @@ import {
 import { generateAiEvaluation, saveHumanEvaluation, calibrateESR } from '@/modules/m6/server/actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { notesObject, type EvaluationNotes } from '@/modules/m6/types';
+import { isProposalTextMissing } from '@/modules/m6/proposal-text-missing';
 import {
   averageLensTotal,
   lensTotal,
@@ -124,7 +125,11 @@ export function EvaluationsClient({
       };
       setEvaluations((prev) => [newEval, ...prev]);
     } catch (e) {
-      setActionError(errorText(e, () => (e instanceof Error ? e.message : t('errors.aiFailed'))));
+      setActionError(
+        isProposalTextMissing(e)
+          ? t('errors.noProposalText')
+          : errorText(e, () => (e instanceof Error ? e.message : t('errors.aiFailed')))
+      );
     } finally {
       setIsAiLoading(false);
     }
@@ -402,6 +407,7 @@ export function EvaluationsClient({
               </div>
 
               <button
+                data-testid="m6-run-ai-evaluation"
                 onClick={handleRunAiEvaluation}
                 disabled={isAiLoading}
                 className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-xs disabled:opacity-50"

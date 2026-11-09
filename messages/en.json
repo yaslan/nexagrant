@@ -1833,6 +1833,7 @@
     },
     "errors": {
       "aiFailed": "The AI pre-assessment did not complete; no score was recorded.",
+      "noProposalText": "There is no proposal text to evaluate. Write the concept note or the Part B sections first; no credits were used and no score was recorded.",
       "saveFailed": "The evaluation could not be saved. Please try again.",
       "calibrationFailed": "The ESR calibration could not be saved."
     },
@@ -3633,6 +3634,54 @@
         }
       },
       "linkFallback": "Link"
+    },
+    "confirmDelete": "Are you sure you want to delete this blog post?",
+    "header": {
+      "kicker": "Platform Admin Workbench",
+      "title": "Blog Content Management (CRUD)",
+      "description": "Manage the guides, news and the featured three-card blog section on the public site in real time.",
+      "newPost": "Add new blog post"
+    },
+    "kpi": {
+      "total": "Total blog posts",
+      "featuredOnHome": "Featured on the homepage",
+      "categories": "Categories"
+    },
+    "filter": {
+      "searchPlaceholder": "Search by title, content or author...",
+      "allCategories": "All categories"
+    },
+    "table": {
+      "cover": "Cover",
+      "titleSlug": "Title & slug",
+      "category": "Category",
+      "author": "Author",
+      "published": "Published",
+      "featured": "Featured (homepage)",
+      "actions": "Actions",
+      "empty": "No blog posts found.",
+      "featuredOn": "Shown on the homepage (featured)",
+      "featuredOff": "Add to homepage",
+      "preview": "Preview",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "modal": {
+      "editTitle": "Edit blog post",
+      "createTitle": "Create new blog post",
+      "titleLabel": "Article title *",
+      "titlePlaceholder": "e.g. Horizon Europe consortium building guide",
+      "categoryLabel": "Category *",
+      "categoryPlaceholder": "e.g. Horizon Europe",
+      "excerptLabel": "Excerpt *",
+      "excerptPlaceholder": "Short description shown on the card...",
+      "authorName": "Author name",
+      "authorRole": "Author title",
+      "featuredCheckbox": "Show in the three-card Featured blog section on the homepage",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "saveChanges": "Save changes",
+      "publish": "Publish"
     }
   },
   "adminDocuments": {
@@ -3776,7 +3825,82 @@
       "IMPORT_FAILED": "Import failed: the import could not finish. Details are in the run record and in system alerts."
     },
     "ragPreview": {
-      "noMatches": "No chunks matched this search."
+      "noMatches": "No chunks matched this search.",
+      "idle": "After you run a search on the left, the RAG context text sent to the LLM model is shown here."
+    },
+    "header": {
+      "kicker": "K2 CORDIS Ingestion & M1 Partner Intelligence Console",
+      "title": "K2 CORDIS Layer Admin Panel",
+      "description": "Pulls Horizon Europe and H2020 funded project and partnership result data and feeds the M1 Partner Intelligence module.",
+      "license": "CORDIS CC BY 4.0",
+      "k2Projects": "K2 project rows",
+      "k2Organizations": "K2 organization rows",
+      "k2Participations": "K2 participation rows",
+      "m1Profiles": "M1 partner profiles"
+    },
+    "tabs": {
+      "k2Ingestion": "K2 Ingestion & Status",
+      "sync": "OLAP & Grant Breakdown",
+      "delta": "Live CORDIS Delta API",
+      "workbench": "Vector RAG Lab"
+    },
+    "k2": {
+      "statusTitle": "K2 CORDIS layer status & last import",
+      "statusBody": "Data import from the official European Commission dumps (Horizon Europe & H2020), updated monthly.",
+      "lastRunBadge": "Last run: {status} ({dataset})",
+      "noRunYet": "No import has run yet",
+      "lastStarted": "Last started:",
+      "fileHash": "File hash (SHA-256):",
+      "lastRows": "Last imported rows:",
+      "lastRowsValue": "{projects} projects / {organizations} orgs",
+      "dataset": "Dataset",
+      "datasetHorizon": "Horizon Europe (2021-2027)",
+      "datasetH2020": "H2020 (2014-2020)",
+      "rowLimit": "Row limit (Limit)",
+      "rowLimitPlaceholder": "e.g. 5000",
+      "runImport": "Run now (Ingest & M1 Profiles)",
+      "runImportBusy": "Importing and building profiles...",
+      "importSuccess": "Import and M1 profiles updated successfully!",
+      "importSkipped": "ℹ️ Dataset is already up to date (file hash matched, import skipped).",
+      "importCounts": "Processed: {projects} projects, {organizations} organizations, {participations} participations. Duration: {durationMs}ms.",
+      "m1DependencyTitle": "M1 Partner Intelligence module dependency",
+      "m1DependencyBody": "The M1 \"Joint Search\" screens use the <code>cordis_partner_profile</code> table that the K2 CORDIS layer derives. When K2 data has not been imported, the M1 module shows a \"K2 dependency off\" warning."
+    },
+    "sync": {
+      "title": "Official CORDIS dataset synchronization",
+      "body": "Start the synchronization to update Horizon Europe 2021-2027 call results, partnership maps and grant figures.",
+      "run": "Start CORDIS synchronization",
+      "busy": "Processing data...",
+      "done": "✓ CORDIS data synchronization completed successfully!",
+      "totals": "Projects processed: {count} — Total grant: €{total}",
+      "olapTitle": "Grant & project distribution by country (OLAP aggregation)",
+      "colCountry": "Country",
+      "colProjects": "Project count",
+      "colTotalFunding": "Total funding (€)",
+      "colAverage": "Average per project (€)"
+    },
+    "delta": {
+      "title": "Live CORDIS Delta API fetch (EU Funding Portal)",
+      "body": "Live-fetch the new Horizon Europe projects added or updated in the last 7 days from the European Commission portal.",
+      "run": "Start live Delta API fetch (7 days)",
+      "busy": "Fetching delta...",
+      "done": "Live Delta API fetch completed successfully!",
+      "indexed": "{count} new Delta projects indexed",
+      "coordinator": "Coordinator: {name} ({country})"
+    },
+    "rag": {
+      "title": "Vector RAG search test (cosine similarity)",
+      "queryLabel": "Search query / project need",
+      "queryPlaceholder": "e.g. Zero-emission battery thermal management",
+      "topKLabel": "Top-K results:",
+      "topK": "Top-{count} chunks",
+      "searching": "Searching...",
+      "search": "Run vector search",
+      "resultsHeading": "Vector similarity results ({count})",
+      "sourceLabel": "[Source #{index}] {documentId}",
+      "scoreLabel": "Match: {score}%",
+      "promptTitle": "LLM fine-tuning RAG prompt preview",
+      "payloadComment": "// Formatted LLM Context Payload"
     }
   },
   "adminInterreg": {

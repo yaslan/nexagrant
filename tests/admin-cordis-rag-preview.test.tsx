@@ -42,7 +42,13 @@ function openWorkbench(locale: 'tr' | 'en' = 'tr') {
   fireEvent.click(screen.getByRole('button', { name: /Vector RAG Lab/ }));
 }
 
-const search = () => fireEvent.click(screen.getByRole('button', { name: /Vektör Araması Yap/ }));
+// The button is named in the locale under test: its label is a catalog string.
+const search = (locale: 'tr' | 'en' = 'tr') =>
+  fireEvent.click(
+    screen.getByRole('button', {
+      name: new RegExp(locale === 'tr' ? trMessages.adminCordis.rag.search : enMessages.adminCordis.rag.search),
+    })
+  );
 
 afterEach(() => {
   cleanup();
@@ -62,7 +68,7 @@ describe('CordisRagAdminClient — RAG preview', () => {
   ] as const)('a search that matched nothing says so (%s)', async (locale, text) => {
     vi.mocked(handleTestRagQuery).mockResolvedValueOnce({ chunks: [], ragPrompt: '' });
     openWorkbench(locale);
-    search();
+    search(locale);
     expect(await screen.findByText(text)).toBeTruthy();
     expect(screen.queryByText(NOT_SEARCHED)).toBeNull();
   });

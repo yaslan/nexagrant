@@ -1833,6 +1833,7 @@
     },
     "errors": {
       "aiFailed": "YZ ön değerlendirmesi tamamlanamadı; hiçbir puan kaydedilmedi.",
+      "noProposalText": "Değerlendirilecek teklif metni yok. Önce kavram notunu veya Part B bölümlerini yazın; kredi düşülmedi, puan kaydedilmedi.",
       "saveFailed": "Değerlendirme kaydedilemedi. Lütfen tekrar deneyin.",
       "calibrationFailed": "ESR kalibrasyonu kaydedilemedi."
     },
@@ -3633,6 +3634,54 @@
         }
       },
       "linkFallback": "Bağlantı"
+    },
+    "confirmDelete": "Bu blog yazısını silmek istediğinize emin misiniz?",
+    "header": {
+      "kicker": "Platform Yönetici Çalışma Alanı",
+      "title": "Blog İçerik Yönetimi (CRUD)",
+      "description": "Site ön yüzündeki rehberler, haberler ve öne çıkan 3'lü blog kartlarını anlık yönetin.",
+      "newPost": "Yeni Blog Yazısı Ekle"
+    },
+    "kpi": {
+      "total": "Toplam Blog Yazısı",
+      "featuredOnHome": "Ana Sayfada Öne Çıkanlar",
+      "categories": "Kategoriler"
+    },
+    "filter": {
+      "searchPlaceholder": "Başlık, içerik veya yazar ara...",
+      "allCategories": "Tüm Kategoriler"
+    },
+    "table": {
+      "cover": "Kapak",
+      "titleSlug": "Başlık & Slug",
+      "category": "Kategori",
+      "author": "Yazar",
+      "published": "Yayın Tarihi",
+      "featured": "Öne Çıkan (Ana Sayfa)",
+      "actions": "İşlemler",
+      "empty": "Herhangi bir blog yazısı bulunamadı.",
+      "featuredOn": "Ana sayfada gösteriliyor (Öne çıkan)",
+      "featuredOff": "Ana sayfaya ekle",
+      "preview": "Ön izle",
+      "edit": "Düzenle",
+      "delete": "Sil"
+    },
+    "modal": {
+      "editTitle": "Blog Yazısını Düzenle",
+      "createTitle": "Yeni Blog Yazısı Oluştur",
+      "titleLabel": "Makale Başlığı *",
+      "titlePlaceholder": "örn: Horizon Europe Konsorsiyum Kurma Rehberi",
+      "categoryLabel": "Kategori *",
+      "categoryPlaceholder": "örn: Horizon Europe",
+      "excerptLabel": "Özet (Excerpt) *",
+      "excerptPlaceholder": "Kartta görünecek kısa açıklama metni...",
+      "authorName": "Yazar Adı",
+      "authorRole": "Yazar Unvanı",
+      "featuredCheckbox": "Ana sayfadaki 3'lü Öne Çıkan Blog Alanında Göster (Featured)",
+      "cancel": "İptal",
+      "saving": "Kaydediliyor...",
+      "saveChanges": "Değişiklikleri Kaydet",
+      "publish": "Yayınla"
     }
   },
   "adminDocuments": {
@@ -3776,7 +3825,82 @@
       "IMPORT_FAILED": "İçe aktarım hatası: içe aktarım tamamlanamadı. Ayrıntı son çalıştırma kaydında ve sistem uyarılarında."
     },
     "ragPreview": {
-      "noMatches": "Bu aramayla eşleşen parça bulunamadı."
+      "noMatches": "Bu aramayla eşleşen parça bulunamadı.",
+      "idle": "Sol taraftan arama yaptığınızda LLM modeline gönderilen RAG bağlam metni burada görüntülenecektir."
+    },
+    "header": {
+      "kicker": "K2 CORDIS Ingestion & M1 Partner Intelligence Console",
+      "title": "K2 CORDIS Katmanı Yönetim Paneli",
+      "description": "Horizon Europe ve H2020 fonlanmış proje/ortaklık sonuç verilerini çeker, M1 Partner Intelligence modülünü besler.",
+      "license": "CORDIS CC BY 4.0",
+      "k2Projects": "K2 Proje Satırı",
+      "k2Organizations": "K2 Kuruluş Satırı",
+      "k2Participations": "K2 Katılım Satırı",
+      "m1Profiles": "M1 Partner Profili"
+    },
+    "tabs": {
+      "k2Ingestion": "K2 Ingestion & Durum Kartı",
+      "sync": "OLAP & Hibe Dağılımı",
+      "delta": "Canlı CORDIS Delta API",
+      "workbench": "Vector RAG Lab"
+    },
+    "k2": {
+      "statusTitle": "K2 CORDIS Katman Durumu & Son İçe Aktarım",
+      "statusBody": "Aylık güncellenen resmi Avrupa Komisyonu dökümlerinden (Horizon Europe & H2020) veri aktarımı.",
+      "lastRunBadge": "Son Çalıştırma: {status} ({dataset})",
+      "noRunYet": "Henüz içe aktarım yapılmadı",
+      "lastStarted": "Son Başlatma:",
+      "fileHash": "Dosya Hash (SHA-256):",
+      "lastRows": "Son Aktarılan Satırlar:",
+      "lastRowsValue": "{projects} proje / {organizations} org",
+      "dataset": "Veri Kümesi (Dataset)",
+      "datasetHorizon": "Horizon Europe (2021-2027)",
+      "datasetH2020": "H2020 (2014-2020)",
+      "rowLimit": "Satır Sınırı (Limit)",
+      "rowLimitPlaceholder": "Örn: 5000",
+      "runImport": "Şimdi Çalıştır (Ingest & M1 Profiles)",
+      "runImportBusy": "İçe Aktarılıyor ve Profil Üretiliyor...",
+      "importSuccess": "İçe Aktarım ve M1 Profilleri Başarıyla Güncellendi!",
+      "importSkipped": "ℹ️ Veri kümesi zaten güncel (File hash eşleşti, aktarım atlandı).",
+      "importCounts": "İşlenen: {projects} Proje, {organizations} Kuruluş, {participations} Katılım. Süre: {durationMs}ms.",
+      "m1DependencyTitle": "M1 Partner Intelligence Modülü Bağımlılığı",
+      "m1DependencyBody": "M1 \"Ortak Arama\" ekranları doğrudan K2 CORDIS katmanının türettiği <code>cordis_partner_profile</code> tablosunu kullanır. K2 verisi aktarılmadığında M1 modülü \"K2 bağımlılığı kapalı\" uyarısı verir."
+    },
+    "sync": {
+      "title": "Resmî CORDIS Veri Kümesi Senkronizasyonu",
+      "body": "Ufuk Avrupa 2021-2027 çağrı sonuçları, ortaklık haritaları ve hibe rakamlarını güncellemek için senkronizasyonu başlatın.",
+      "run": "CORDIS Senkronizasyonunu Başlat",
+      "busy": "Veriler İşleniyor...",
+      "done": "✓ CORDIS Veri Senkronizasyonu Başarıyla Tamamlandı!",
+      "totals": "İşlenen Proje Sayısı: {count} — Toplam Hibe: €{total}",
+      "olapTitle": "Ülke Bazlı Hibe & Proje Dağılımı (OLAP Aggregation)",
+      "colCountry": "Ülke",
+      "colProjects": "Proje Sayısı",
+      "colTotalFunding": "Toplam Desteği (€)",
+      "colAverage": "Proje Başı Ort. (€)"
+    },
+    "delta": {
+      "title": "Canlı CORDIS Delta API Çekimi (EU Funding Portal)",
+      "body": "AB Komisyonu portalından son 7 günde eklenen veya güncellenen yeni Ufuk Avrupa projelerini canlı olarak çekin.",
+      "run": "Canlı Delta API Çekimini Başlat (7 Gün)",
+      "busy": "Delta Çekiliyor...",
+      "done": "Canlı Delta API Çekimi Başarıyla Tamamlandı!",
+      "indexed": "{count} Yeni Delta Projesi İndekslendi",
+      "coordinator": "Koordinatör: {name} ({country})"
+    },
+    "rag": {
+      "title": "Vector RAG Arama Testi (Cosine Similarity)",
+      "queryLabel": "Arama Sorgusu / Proje İhtiyacı",
+      "queryPlaceholder": "Örn: Zero-emission battery thermal management",
+      "topKLabel": "Top-K Çıktı Sayısı:",
+      "topK": "Top-{count} Parça",
+      "searching": "Aranıyor...",
+      "search": "Vektör Araması Yap",
+      "resultsHeading": "Vektör Benzerlik Sonuçları ({count})",
+      "sourceLabel": "[Kaynak #{index}] {documentId}",
+      "scoreLabel": "Uyum: %{score}",
+      "promptTitle": "LLM Fine-Tuning RAG Prompt Önizleme",
+      "payloadComment": "// Biçimlendirilmiş LLM Bağlam Yükü"
     }
   },
   "adminInterreg": {

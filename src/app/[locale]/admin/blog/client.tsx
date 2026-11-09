@@ -241,7 +241,7 @@ export default function AdminBlogClient({
   };
 
   const handleDelete = async (slug: string) => {
-    if (!confirm('Bu blog yazısını silmek istediğinize emin misiniz?')) return;
+    if (!confirm(t('confirmDelete'))) return;
     try {
       const res = await deleteBlogPostAction(slug);
       if (!res.ok) {
@@ -279,11 +279,11 @@ export default function AdminBlogClient({
         <div>
           <div className="flex items-center space-x-2 text-xs font-semibold text-accent uppercase tracking-wider mb-1">
             <BookOpen className="w-4 h-4" />
-            <span>Platform Admin Workbench</span>
+            <span>{t('header.kicker')}</span>
           </div>
-          <h1 className="text-2xl font-bold font-heading text-ink">Blog İçerik Yönetimi (CRUD)</h1>
+          <h1 className="text-2xl font-bold font-heading text-ink">{t('header.title')}</h1>
           <p className="text-xs text-muted mt-1">
-            Site ön yüzündeki rehberler, haberler ve öne çıkan 3&apos;lü blog kartlarını anlık yönetin.
+            {t('header.description')}
           </p>
         </div>
 
@@ -293,7 +293,7 @@ export default function AdminBlogClient({
           className="bg-accent hover:opacity-90 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-2xs hover:shadow-md transition flex items-center justify-center space-x-2 shrink-0"
         >
           <Plus className="w-4 h-4" />
-          <span>Yeni Blog Yazısı Ekle</span>
+          <span>{t('header.newPost')}</span>
         </button>
       </div>
 
@@ -319,7 +319,7 @@ export default function AdminBlogClient({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-surface border border-border p-5 rounded-xl shadow-2xs">
           <div className="text-xs font-semibold text-muted mb-1 flex justify-between items-center">
-            <span>Toplam Blog Yazısı</span>
+            <span>{t('kpi.total')}</span>
             <FileText className="w-4 h-4 text-blue-500" />
           </div>
           <div className="text-3xl font-extrabold text-ink">{posts.length}</div>
@@ -327,7 +327,7 @@ export default function AdminBlogClient({
 
         <div className="bg-surface border border-border p-5 rounded-xl shadow-2xs">
           <div className="text-xs font-semibold text-muted mb-1 flex justify-between items-center">
-            <span>Ana Sayfada Öne Çıkanlar</span>
+            <span>{t('kpi.featuredOnHome')}</span>
             <Star className="w-4 h-4 text-amber" />
           </div>
           <div className="text-3xl font-extrabold text-amber">{posts.filter((p) => p.featured).length}</div>
@@ -335,7 +335,7 @@ export default function AdminBlogClient({
 
         <div className="bg-surface border border-border p-5 rounded-xl shadow-2xs">
           <div className="text-xs font-semibold text-muted mb-1 flex justify-between items-center">
-            <span>Kategoriler</span>
+            <span>{t('kpi.categories')}</span>
             <Tag className="w-4 h-4 text-teal-500" />
           </div>
           <div className="text-3xl font-extrabold text-ink">{categories.length}</div>
@@ -348,7 +348,7 @@ export default function AdminBlogClient({
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            placeholder="Başlık, içerik veya yazar ara..."
+            placeholder={t('filter.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
@@ -364,7 +364,7 @@ export default function AdminBlogClient({
                 : 'bg-ground border border-border text-ink-2 hover:bg-surface-hover'
             }`}
           >
-            Tüm Kategoriler
+            {t('filter.allCategories')}
           </button>
           {categories.map((cat) => (
             <button
@@ -388,13 +388,13 @@ export default function AdminBlogClient({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-ground/70 border-b border-border text-muted uppercase font-mono tracking-wider">
-                <th className="p-4">Kapak</th>
-                <th className="p-4">Başlık & Slug</th>
-                <th className="p-4">Kategori</th>
-                <th className="p-4">Yazar</th>
-                <th className="p-4">Yayın Tarihi</th>
-                <th className="p-4 text-center">Öne Çıkan (Ana Sayfa)</th>
-                <th className="p-4 text-right">İşlemler</th>
+                <th className="p-4">{t('table.cover')}</th>
+                <th className="p-4">{t('table.titleSlug')}</th>
+                <th className="p-4">{t('table.category')}</th>
+                <th className="p-4">{t('table.author')}</th>
+                <th className="p-4">{t('table.published')}</th>
+                <th className="p-4 text-center">{t('table.featured')}</th>
+                <th className="p-4 text-right">{t('table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -444,7 +444,7 @@ export default function AdminBlogClient({
                           ? 'bg-amber/15 text-amber border-amber/30'
                           : 'bg-ground text-muted border-border hover:bg-surface-hover'
                       }`}
-                      title={post.featured ? 'Ana sayfada gösteriliyor (Öne çıkan)' : 'Ana sayfaya ekle'}
+                      title={post.featured ? t('table.featuredOn') : t('table.featuredOff')}
                     >
                       <Star className={`w-4 h-4 ${post.featured ? 'fill-amber' : ''}`} />
                     </button>
@@ -455,14 +455,14 @@ export default function AdminBlogClient({
                         href={`/${locale}/blog/${post.slug}`}
                         target="_blank"
                         className="p-1.5 rounded-lg border border-border text-muted hover:text-ink hover:bg-surface-hover transition"
-                        title="Ön izle"
+                        title={t('table.preview')}
                       >
                         <Eye className="w-4 h-4" />
                       </Link>
                       <button
                         onClick={() => handleOpenEditModal(post)}
                         className="p-1.5 rounded-lg border border-border text-blue-600 hover:bg-blue-50 transition"
-                        title="Düzenle"
+                        title={t('table.edit')}
                       >
                         <Edit className="w-4 h-4" />
                       </button>
@@ -470,7 +470,7 @@ export default function AdminBlogClient({
                         onClick={() => handleDelete(post.slug)}
                         data-testid={`blog-delete-${post.slug}`}
                         className="p-1.5 rounded-lg border border-border text-bad hover:bg-bad/10 transition"
-                        title="Sil"
+                        title={t('table.delete')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -482,7 +482,7 @@ export default function AdminBlogClient({
               {filteredPosts.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-muted">
-                    Herhangi bir blog yazısı bulunamadı.
+                    {t('table.empty')}
                   </td>
                 </tr>
               )}
@@ -499,7 +499,7 @@ export default function AdminBlogClient({
             <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-ground/50">
               <h2 className="font-bold text-base text-ink flex items-center space-x-2">
                 <Sparkles className="w-4 h-4 text-accent" />
-                <span>{editingSlug ? 'Blog Yazısını Düzenle' : 'Yeni Blog Yazısı Oluştur'}</span>
+                <span>{editingSlug ? t('modal.editTitle') : t('modal.createTitle')}</span>
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -523,28 +523,28 @@ export default function AdminBlogClient({
                 </div>
               )}
               <div>
-                <label htmlFor="blog-title" className="block text-xs font-bold text-ink mb-1">Makale Başlığı *</label>
+                <label htmlFor="blog-title" className="block text-xs font-bold text-ink mb-1">{t('modal.titleLabel')}</label>
                 <input
                   id="blog-title"
                   type="text"
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="örn: Horizon Europe Konsorsiyum Kurma Rehberi"
+                  placeholder={t('modal.titlePlaceholder')}
                   className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="blog-category" className="block text-xs font-bold text-ink mb-1">Kategori *</label>
+                  <label htmlFor="blog-category" className="block text-xs font-bold text-ink mb-1">{t('modal.categoryLabel')}</label>
                   <input
                   id="blog-category"
                     type="text"
                     required
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="örn: Horizon Europe"
+                    placeholder={t('modal.categoryPlaceholder')}
                     className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
                   />
                 </div>
@@ -577,14 +577,14 @@ export default function AdminBlogClient({
               </div>
 
               <div>
-                <label htmlFor="blog-excerpt" className="block text-xs font-bold text-ink mb-1">Özet (Excerpt) *</label>
+                <label htmlFor="blog-excerpt" className="block text-xs font-bold text-ink mb-1">{t('modal.excerptLabel')}</label>
                 <textarea
                   id="blog-excerpt"
                   rows={2}
                   required
                   value={formData.excerpt}
                   onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                  placeholder="Kartta görünecek kısa açıklama metni..."
+                  placeholder={t('modal.excerptPlaceholder')}
                   className="w-full px-3 py-2 bg-ground border border-border rounded-lg text-xs text-ink focus:outline-hidden focus:border-accent"
                 />
               </div>
@@ -615,7 +615,7 @@ export default function AdminBlogClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1">Yazar Adı</label>
+                  <label className="block text-xs font-bold text-ink mb-1">{t('modal.authorName')}</label>
                   <input
                     type="text"
                     value={formData.authorName}
@@ -625,7 +625,7 @@ export default function AdminBlogClient({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-ink mb-1">Yazar Unvanı</label>
+                  <label className="block text-xs font-bold text-ink mb-1">{t('modal.authorRole')}</label>
                   <input
                     type="text"
                     value={formData.authorRole}
@@ -701,7 +701,7 @@ export default function AdminBlogClient({
                   className="w-4 h-4 accent-accent rounded"
                 />
                 <label htmlFor="featured" className="text-xs font-semibold text-ink cursor-pointer">
-                  Ana sayfadaki 3&apos;lü Öne Çıkan Blog Alanında Göster (Featured)
+                  {t('modal.featuredCheckbox')}
                 </label>
               </div>
 
@@ -712,7 +712,7 @@ export default function AdminBlogClient({
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-ink-2 hover:bg-surface-hover transition"
                 >
-                  İptal
+                  {t('modal.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -720,7 +720,7 @@ export default function AdminBlogClient({
                   disabled={isSubmitting || isUploading}
                   className="bg-accent hover:opacity-90 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-2xs transition disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Kaydediliyor...' : editingSlug ? 'Değişiklikleri Kaydet' : 'Yayınla'}
+                  {isSubmitting ? t('modal.saving') : editingSlug ? t('modal.saveChanges') : t('modal.publish')}
                 </button>
               </div>
             </form>
