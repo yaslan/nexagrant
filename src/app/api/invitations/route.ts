@@ -19,6 +19,7 @@ import {
   type InvitationMailSkip,
 } from '@/lib/email/invitation-mail-policy';
 import { withOptOut } from '@/lib/email/opt-out';
+import { OPT_OUT_SECRET_UNSET } from '@/lib/email/opt-out-secret';
 import { isEmailOptedOut } from '@/lib/email/opt-out-store';
 import { emailOptOutSecret } from '@/lib/env';
 import { recordAlert } from '@/lib/observability/system-alert';
@@ -335,7 +336,7 @@ async function deliverInvitationEmail(params: {
 
   try {
     const secret = emailOptOutSecret();
-    if (!secret) throw new Error('auth_secret_unset');
+    if (!secret) throw new Error(OPT_OUT_SECRET_UNSET);
     const receipt = await mailer(
       withOptOut(renderInvitationEmail(params.message), {
         baseUrl: params.mailBaseUrl,
