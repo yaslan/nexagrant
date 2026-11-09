@@ -23,8 +23,14 @@ import { logger } from '@/lib/logger';
  * The token is checked first, before the body is read, so a request without a
  * valid one costs one HMAC and spends none of the limit below: forged tokens
  * cannot use up the budget of real unsubscribes. A valid token then faces the
- * csp-report limits (20 a minute per client, 300 per process, IPv6 by /64),
- * because replaying one opens a database transaction each time.
+ * csp-report limits (20 a minute, 300 per process), because replaying one opens
+ * a database transaction each time.
+ *
+ * The 20 a minute is per client, and the client depends on the caller. One-click
+ * POSTs come from the mail provider's few addresses for every recipient, so an
+ * address limit would refuse real unsubscribes (NG-104 Ö-1): they are counted
+ * per recipient token instead. The confirmation form comes from one browser, so
+ * it stays per address (IPv6 by /64). The 300 per process still applies to both.
  */
 
 /** `List-Unsubscribe=One-Click` or `confirm=1&locale=tr`; nothing near this long. */
@@ -63,17 +69,18 @@ export async function POST(req: NextRequest) {
     const declared = Number(req.headers.get('content-length') ?? '0');
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return bodyTooLarge();
 
-    const ip = clientIpFrom(req.headers);
-    if (!limiter.take(ip ? ipBucket(ip) : null)) {
-      return NextResponse.json({ error: 'too_many_requests', code: 'OPT_OUT_RATE_LIMITED' }, { status: 429, headers: { 'Retry-After': '60' } });
-    }
-
     const text = await readCapped(req.body, MAX_BODY_BYTES);
     if (text === null) return bodyTooLarge();
     const body = new URLSearchParams(text);
     const oneClick = body.get('List-Unsubscribe') === 'One-Click';
     const confirmed = body.get('confirm') === '1';
     if (!oneClick && !confirmed) return invalidRequest();
+
+    const ip = clientIpFrom(req.headers);
+    const client = oneClick ? `token:${payload.hash}` : ip ? ipBucket(ip) : null;
+    if (!limiter.take(client)) {
+      return NextResponse.json({ error: 'too_many_requests', code: 'OPT_OUT_RATE_LIMITED' }, { status: 429, headers: { 'Retry-After': '60' } });
+    }
 
     await recordOptOut(payload);
     if (oneClick) return NextResponse.json({ ok: true });
