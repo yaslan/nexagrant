@@ -20,6 +20,9 @@ const RUNID = `ng40aud${Date.now().toString(36)}`;
 const TENANT = `${RUNID}-t`;
 const USER_ERASED = `${RUNID}-u1`;
 const USER_ACTIVE = `${RUNID}-u2`;
+const USER_FRESH = `${RUNID}-u3`; // asked for erasure yesterday: still inside the 30-day grace period
+const EVENT_FRESH = `${RUNID}-e3`;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const EVENT_ERASED = `${RUNID}-e1`;
 const EVENT_ACTIVE = `${RUNID}-e2`;
 
@@ -39,10 +42,10 @@ async function withApp<T>(fn: (app: pg.Client) => Promise<T>): Promise<T> {
 }
 
 async function cleanup() {
-  await prisma.auditEvent.deleteMany({ where: { id: { in: [EVENT_ERASED, EVENT_ACTIVE] } } });
+  await prisma.auditEvent.deleteMany({ where: { id: { in: [EVENT_ERASED, EVENT_ACTIVE, EVENT_FRESH] } } });
   await prisma.auditEvent.deleteMany({ where: { tenantId: TENANT } });
   await prisma.tenant.deleteMany({ where: { id: TENANT } });
-  await prisma.user.deleteMany({ where: { id: { in: [USER_ERASED, USER_ACTIVE] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [USER_ERASED, USER_ACTIVE, USER_FRESH] } } });
 }
 
 describe.skipIf(!RUN)('AuditEvent is append-only for the app role (live database)', () => {
@@ -50,11 +53,17 @@ describe.skipIf(!RUN)('AuditEvent is append-only for the app role (live database
     await cleanup();
     await prisma.tenant.create({ data: { id: TENANT, name: RUNID, slug: RUNID, country: 'TR' } });
     await prisma.user.create({
-      data: { id: USER_ERASED, email: `${RUNID}-1@example.test`, deletionRequestedAt: new Date() },
+      data: { id: USER_ERASED, email: `${RUNID}-1@example.test`, deletionRequestedAt: new Date(Date.now() - 31 * DAY_MS) },
+    });
+    await prisma.user.create({
+      data: { id: USER_FRESH, email: `${RUNID}-3@example.test`, deletionRequestedAt: new Date(Date.now() - 1 * DAY_MS) },
     });
     await prisma.user.create({ data: { id: USER_ACTIVE, email: `${RUNID}-2@example.test` } });
     await prisma.auditEvent.create({
       data: { id: EVENT_ERASED, tenantId: TENANT, actorId: USER_ERASED, type: 'ng40.test', target: 'keep-me' },
+    });
+    await prisma.auditEvent.create({
+      data: { id: EVENT_FRESH, tenantId: TENANT, actorId: USER_FRESH, type: 'ng40.test', target: 'keep-me' },
     });
     await prisma.auditEvent.create({
       data: { id: EVENT_ACTIVE, tenantId: TENANT, actorId: USER_ACTIVE, type: 'ng40.test', target: 'keep-me' },
@@ -126,6 +135,16 @@ describe.skipIf(!RUN)('AuditEvent is append-only for the app role (live database
     });
     const row = await prisma.auditEvent.findUniqueOrThrow({ where: { id: EVENT_ACTIVE } });
     expect(row.actorId).toBe(USER_ACTIVE);
+  });
+
+  it('audit_detach_actor refuses a user still inside the 30-day grace period (42501, F5)', async () => {
+    await withApp(async (app) => {
+      await expect(app.query(`SELECT public.audit_detach_actor($1)`, [USER_FRESH])).rejects.toMatchObject({
+        code: '42501',
+      });
+    });
+    const row = await prisma.auditEvent.findUniqueOrThrow({ where: { id: EVENT_FRESH } });
+    expect(row.actorId).toBe(USER_FRESH);
   });
 
   it('a tenant hard delete (FK cascade) still removes its audit rows', async () => {

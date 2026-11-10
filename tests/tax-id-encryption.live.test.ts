@@ -106,6 +106,24 @@ describe.skipIf(!RUN)('buyerVknTckn is encrypted at rest (live database)', () =>
     expect((await prisma.invoice.findMany({ where: { tenantId: T1 } }))[0]?.buyerVknTckn).toBe(VKN);
   });
 
+  it('a nested write or include through another model is refused, nothing is stored (F1)', async () => {
+    await expect(
+      prisma.tenant.update({
+        where: { id: T2 },
+        data: { billingIdentity: { create: { buyerName: 'x', buyerVknTckn: VKN, buyerTaxOffice: 'v', buyerAddress: 'a', buyerCity: 'c' } } },
+      })
+    ).rejects.toThrow(/reaches the encrypted tax number/);
+    expect(await rawIdentity(T2)).toBeUndefined();
+    await expect(prisma.tenant.findUnique({ where: { id: T1 }, include: { billingIdentity: true } })).rejects.toThrow(
+      /reaches the encrypted tax number/
+    );
+    await expect(prisma.tenant.findUnique({ where: { id: T1 }, include: { invoices: true } })).rejects.toThrow(
+      /reaches the encrypted tax number/
+    );
+    // a plain tenant read and a count are untouched
+    expect((await prisma.tenant.findUniqueOrThrow({ where: { id: T1 } })).id).toBe(T1);
+  });
+
   it('a legacy plaintext row is still readable, and the migration script converts it both ways', async () => {
     await prisma.$executeRaw`INSERT INTO "TenantBillingIdentity" ("tenantId","buyerName","buyerVknTckn","buyerTaxOffice","buyerAddress","buyerCity","buyerCountry","createdAt","updatedAt")
       VALUES (${T2}, 'Legacy', ${VKN}, 'V.D.', 'Adres', 'Ankara', 'Türkiye', now(), now())`;

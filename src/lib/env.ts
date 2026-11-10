@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { assertTaxIdKeyIsNotFixture } from '@/lib/billing/tax-id-crypto';
 
 /**
  * Optional URL setting. A variable that is present but blank
@@ -336,6 +337,9 @@ if (!_env.success) {
   console.error('❌ Invalid environment variables:', details);
   throw new Error(`Invalid environment variables — ${details}`);
 }
+
+// NG-40 sec F2: the published test key must never protect real tax numbers.
+assertTaxIdKeyIsNotFixture(_env.data.NODE_ENV, _env.data.TAX_ID_ENCRYPTION_KEY);
 
 export const env = _env.data;
 

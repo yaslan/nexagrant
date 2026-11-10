@@ -10,9 +10,10 @@
 -- The one legitimate rewrite is KVKK erasure: users-scheduled-deletion.ts used
 -- to `updateMany({ actorId: userId } -> null)`. That now goes through
 -- audit_detach_actor(), a SECURITY DEFINER function that can do exactly one
--- thing: set "actorId" to NULL on rows naming a user who has requested
--- deletion. It cannot change type/target/data/createdAt, cannot touch another
--- user's rows, and cannot delete.
+-- thing: set "actorId" to NULL on rows naming a user whose erasure request is
+-- at least 30 days old (the grace period, enforced here as well as in the job).
+-- It cannot change type/target/data/createdAt, cannot touch another user's
+-- rows, and cannot delete.
 --
 -- Tenant hard-delete keeps working: the "AuditEvent_tenantId_fkey" ON DELETE
 -- CASCADE action runs with the privileges of the table owner, not fabrika_app.
@@ -39,9 +40,17 @@ BEGIN
   IF p_user IS NULL OR btrim(p_user) = '' THEN
     RAISE EXCEPTION 'audit_detach_actor: user is required' USING ERRCODE = '22004';
   END IF;
-  -- Only a person who has asked to be erased can be detached.
-  IF NOT EXISTS (SELECT 1 FROM "User" WHERE "id" = p_user AND "deletionRequestedAt" IS NOT NULL) THEN
-    RAISE EXCEPTION 'audit_detach_actor: user % has no pending erasure', p_user USING ERRCODE = '42501';
+  -- Only a person whose erasure grace period (30 days, the same as
+  -- DEFAULT_GRACE_PERIOD_DAYS in users-scheduled-deletion.ts) has run out can be
+  -- detached (NG-40 sec F5). The floor is enforced here, not only in the job: a
+  -- caller holding the app connection cannot cut attributions early.
+  IF NOT EXISTS (
+    SELECT 1 FROM "User"
+     WHERE "id" = p_user
+       AND "deletionRequestedAt" IS NOT NULL
+       AND "deletionRequestedAt" <= now() - interval '30 days'
+  ) THEN
+    RAISE EXCEPTION 'audit_detach_actor: user % has no erasure whose 30-day grace period has ended', p_user USING ERRCODE = '42501';
   END IF;
 
   PERFORM set_config('app.system_scope', 'on', true);

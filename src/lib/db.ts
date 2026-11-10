@@ -3,7 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { assertEnvelopedOrNull } from '@/lib/calendar/token-envelope';
 import { dbConnectTimeoutMs, env } from '@/lib/env';
-import { decryptResult, encryptWriteData } from '@/lib/billing/tax-id-crypto';
+import { decryptResult, encryptWriteData, findNestedTaxIdAccess } from '@/lib/billing/tax-id-crypto';
 
 /**
  * FO-141: no built-in fallback URL. A process without DATABASE_URL used to
@@ -113,7 +113,23 @@ function withTaxIdEncryption(client: PrismaClient): PrismaClient {
   };
   return client.$extends({
     name: 'tax-id-field-encryption',
-    query: { tenantBillingIdentity: handlers, invoice: handlers },
+    query: {
+      tenantBillingIdentity: handlers,
+      invoice: handlers,
+      // F1: any other model must not reach the field through a nested write / include.
+      $allModels: {
+        async $allOperations({ model, operation, args, query }: { model: string; operation: string; args: unknown; query: (args: never) => Promise<unknown> }) {
+          // The two covered models are handled above (the model-specific handler also runs).
+          const via = model === 'TenantBillingIdentity' || model === 'Invoice' ? null : findNestedTaxIdAccess(args);
+          if (via) {
+            throw new Error(
+              `${model}.${operation} reaches the encrypted tax number through "${via}"; query TenantBillingIdentity / Invoice directly (NG-40)`
+            );
+          }
+          return query(args as never);
+        },
+      },
+    },
   }) as unknown as PrismaClient;
 }
 

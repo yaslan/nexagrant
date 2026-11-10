@@ -44,16 +44,47 @@ export function resolveTaxIdKey(raw: string | undefined | null = process.env.TAX
   const value = raw?.trim();
   if (!value) return null;
   if (/^[0-9a-fA-F]{64}$/.test(value)) return Buffer.from(value, 'hex');
+  // Strict base64 (NG-40 sec F4): Buffer.from(…, 'base64') skips junk characters and
+  // ignores stray trailing bits, so an irregular 43-character text decoded to 32
+  // bytes and was taken as a key. Accept only the canonical 44-character text of
+  // exactly 32 bytes (`openssl rand -base64 32`).
+  if (!/^[A-Za-z0-9+/]{43}=$/.test(value)) return null;
   const b64 = Buffer.from(value, 'base64');
-  return b64.length === 32 ? b64 : null;
+  return b64.length === 32 && b64.toString('base64') === value ? b64 : null;
+}
+
+/**
+ * SHA-256 of the 32 key bytes of the throwaway key that the test and gate
+ * configs (vitest.config.mts, playwright.config.ts, scripts/gate-isolated.sh)
+ * publish. Kept as a hash so the value is not repeated in code that ships.
+ */
+const FIXTURE_KEY_SHA256 = '4884fdaafea47c29fea7159d0daddd9c085d6200e1359e85bb81736af6b7c837';
+
+/**
+ * NG-40 sec F2: with the published fixture key every tax number "encrypted" in
+ * production could be read by anyone. Refuse it at start-up when NODE_ENV is
+ * production. Names the variable only, never a value.
+ */
+export function assertTaxIdKeyIsNotFixture(nodeEnv: string | undefined, raw: string | undefined | null): void {
+  if (nodeEnv !== 'production') return;
+  const key = resolveTaxIdKey(raw);
+  if (key && crypto.createHash('sha256').update(key).digest('hex') === FIXTURE_KEY_SHA256) {
+    throw new Error('TAX_ID_ENCRYPTION_KEY is the public test fixture key; set a real key in production');
+  }
 }
 
 export function isEncryptedTaxId(value: string): boolean {
   return value.startsWith(TAX_ID_PREFIX) && value.length > TAX_ID_PREFIX.length;
 }
 
+/** A complete `fktax1:<iv 12B>:<tag 16B>:<cipher>` envelope, as encryptTaxId writes it. */
+const ENVELOPE_RE = /^fktax1:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
+
 export function encryptTaxId(plain: string, keyOverride?: string | null): string {
-  if (isEncryptedTaxId(plain)) return plain; // idempotent: never double-wrap
+  if (ENVELOPE_RE.test(plain)) return plain; // idempotent: never double-wrap a real envelope
+  // NG-40 sec F3: a value that only starts like an envelope would be stored as
+  // "ciphertext" that no read can open. Refuse it instead of passing it through.
+  if (plain.startsWith(TAX_ID_PREFIX)) throw new Error('Tax id value starts with the envelope prefix but is malformed');
   const key = resolveTaxIdKey(keyOverride === undefined ? process.env.TAX_ID_ENCRYPTION_KEY : keyOverride);
   if (!key) throw new TaxIdEncryptionKeyError();
   const iv = crypto.randomBytes(IV_LENGTH);
@@ -104,4 +135,52 @@ export function encryptWriteData(data: unknown): void {
 export function decryptResult(result: unknown): void {
   if (Array.isArray(result)) result.forEach((r) => mapField(r, (v) => decryptTaxId(v)));
   else mapField(result, (v) => decryptTaxId(v));
+}
+
+const NESTED_WRITE_KEYS = ['data', 'create', 'update'] as const;
+const NESTED_READ_KEYS = ['include', 'select'] as const;
+const TAX_ID_RELATIONS = new Set(['billingIdentity', 'invoices', 'invoice']);
+
+function walkForTaxId(node: unknown, relations: boolean): string | null {
+  if (!node || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const hit = walkForTaxId(item, relations);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  for (const [key, value] of Object.entries(node)) {
+    if (key === FIELD) return key;
+    if (relations && TAX_ID_RELATIONS.has(key)) return key;
+    if (key === '_count') continue; // a count never returns the field
+    const hit = walkForTaxId(value, relations);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * NG-40 sec F1: the Prisma extension encrypts/decrypts `buyerVknTckn` only for
+ * operations ON `TenantBillingIdentity` and `Invoice`. The same field reached
+ * through another model — `tenant.update({ data: { billingIdentity: { create } } })`
+ * or `tenant.findMany({ include: { invoices: true } })` — would store clear text
+ * or hand back an undecrypted envelope, silently. This returns the first key
+ * that reaches the field (the field itself, or the relations `billingIdentity` /
+ * `invoices` / `invoice`) inside a write payload or an include/select; null when
+ * the call is clean. `where` and `_count` are ignored: they never move the value.
+ * src/lib/db.ts throws on a hit for every model but the two covered ones.
+ */
+export function findNestedTaxIdAccess(args: unknown): string | null {
+  if (!args || typeof args !== 'object') return null;
+  const a = args as Record<string, unknown>;
+  for (const k of NESTED_WRITE_KEYS) {
+    const hit = walkForTaxId(a[k], true);
+    if (hit) return hit;
+  }
+  for (const k of NESTED_READ_KEYS) {
+    const hit = walkForTaxId(a[k], true);
+    if (hit) return hit;
+  }
+  return null;
 }

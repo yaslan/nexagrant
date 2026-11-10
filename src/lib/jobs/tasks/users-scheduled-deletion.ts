@@ -297,6 +297,8 @@ export const usersScheduledDeletionTask = defineJob(
   'users-scheduled-deletion',
   async ({ payload }): Promise<UsersScheduledDeletionOutput> => {
     // A job added by hand may shorten the grace period (tests only); the cron never does.
+    // NG-40: audit_detach_actor() enforces the 30-day floor in SQL, so a shorter value
+    // cannot reach a real database; it only works with the function mocked.
     const { gracePeriodDays } = UsersScheduledDeletionEventSchema.parse(payload);
     return purgeDueUsers(gracePeriodDays ?? DEFAULT_GRACE_PERIOD_DAYS);
   }
