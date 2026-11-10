@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { OppStatus } from '@prisma/client';
 
-import { WithdrawalInputSchema, withdrawalRefusal } from '@/lib/k5-pipeline/withdrawal';
+import { WithdrawalInputSchema, withdrawOpportunity, withdrawalRefusal } from '@/lib/k5-pipeline/withdrawal';
 import { ProjectIdeaInputSchema } from '@/lib/project-ideas/records';
 
 /**
@@ -67,5 +67,22 @@ describe('project idea input', () => {
 
   test('status is not set through the input', () => {
     expect(ProjectIdeaInputSchema.safeParse({ ...ok, status: 'APPLIED' }).success).toBe(false);
+  });
+});
+
+describe('withdrawal opportunity id', () => {
+  // A server action's id can arrive as undefined, null or "": Prisma would drop it from the
+  // `where` and the conditional update would cover the whole tenant. It is refused before
+  // any query (no database here, so a query would fail the test).
+  const scope = { tenantId: 't-1', userId: 'u-1' };
+  test.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['empty', ''],
+    ['blank', '  '],
+  ])('an %s id answers NOT_FOUND without a query', async (_label, id) => {
+    await expect(
+      withdrawOpportunity(scope, id as unknown as string, { reason: 'Ortak bulunamadı' }),
+    ).resolves.toEqual({ refused: 'NOT_FOUND' });
   });
 });

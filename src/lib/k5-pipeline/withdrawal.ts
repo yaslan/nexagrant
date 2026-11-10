@@ -18,6 +18,7 @@ import type { DecisionKind, OppStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { withTenant } from '@/lib/db';
+import { isPresentId } from '@/lib/required-id';
 
 type Scope = { tenantId: string; userId: string };
 
@@ -65,6 +66,9 @@ export async function withdrawOpportunity(
   opportunityId: string,
   input: WithdrawalInput,
 ): Promise<{ decision: DecisionView } | { refused: WithdrawalRefusal }> {
+  // An id from a server action can arrive missing; Prisma would drop it from the `where` and
+  // the conditional update below would cover every withdrawable row of the tenant.
+  if (!isPresentId(opportunityId)) return { refused: 'NOT_FOUND' };
   const parsed = WithdrawalInputSchema.safeParse(input);
   if (!parsed.success) return { refused: 'REASON_REQUIRED' };
   const { reason } = parsed.data;
