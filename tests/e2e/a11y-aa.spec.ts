@@ -99,14 +99,12 @@ test.describe('WCAG A/AA — signed in, main layout', () => {
 
 /**
  * NG-90 — genişletme. Yalnız KEŞİFTE (ham axe) ihlalsiz ve 200 dönen adresler buraya girer.
- * Eklenmeyenler (ihlalli, ayrı borç kartında raporlanır): /tr/fiyatlandirma, /en/pricing (color-contrast),
- * /tr/kayit, /en/register (color-contrast), /tr/main/ayarlar (color-contrast), /tr/main/firsatlar ve
- * /en/main/pipeline (color-contrast; select-name NG-102 ile kapandı, kontrast kartı kapanınca eklenecek).
- * /tr/main/ayarlar/uyeler ve /en/main/settings/members NG-102 ile (select-name düzeltildi) eklendi.
- * Hiçbir axe kuralı kapatılmadı, hiçbir bölüm exclude edilmedi.
+ * NG-101 ile renk kontrastı düzeltildi (gerçek renk, kural kapatılmadı): /tr/fiyatlandirma, /en/pricing,
+ * /tr/kayit, /en/register, /tr/main/ayarlar. /tr/main/ayarlar/uyeler ve /en/main/settings/members NG-102 ile
+ * (select-name düzeltildi) eklendi. Hiçbir axe kuralı kapatılmadı, hiçbir bölüm exclude edilmedi.
  */
 test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
-  for (const url of ['/tr/blog', '/en/blog', '/tr/gizlilik-politikasi', '/en/privacy', '/tr/kullanim-kosullari', '/en/terms']) {
+  for (const url of ['/tr/blog', '/en/blog', '/tr/gizlilik-politikasi', '/en/privacy', '/tr/kullanim-kosullari', '/en/terms', '/tr/fiyatlandirma', '/en/pricing', '/tr/kayit', '/en/register']) {
     test(`${url} has no A/AA violations`, async ({ page }) => {
       await acceptCookies(page);
       const response = await page.goto(url);
@@ -149,6 +147,29 @@ test.describe('WCAG A/AA — NG-90 signed in, settings (tr + en)', () => {
     test(`${url} has no A/AA violations`, async ({ page }) => {
       await acceptCookies(page);
       await signInAs(page, { id: SETTINGS_OWNER.userId, email: SETTINGS_OWNER.email, tenantId: SETTINGS_OWNER.tenantId, role: SETTINGS_OWNER.role });
+      const response = await page.goto(url);
+      expect(response?.status(), url).toBe(200);
+      await expectOwnPage(page, url);
+      await expect(page.locator('main')).toBeVisible();
+      expect(await scan(page), url).toEqual([]);
+    });
+  }
+});
+
+test.describe('WCAG A/AA — NG-101 signed in, pipeline (tr + en)', () => {
+  // Kontrast düzeltildi (NG-101): kart kapsamlı taramada da 0 ihlal; tam A/AA tarama temiz.
+  const PIPELINE_OWNER = { ...OWNER, userId: 'e2e-a11y-pipeline-owner', email: 'a11y-pipeline-owner@e2e.fabrika.test' };
+  test.beforeAll(async () => {
+    await seedIdentity({ ...PIPELINE_OWNER, workspaceIds: [] });
+  });
+  test.afterAll(async () => {
+    await cleanupIdentity([PIPELINE_OWNER.userId]);
+  });
+
+  for (const url of ['/tr/main/ayarlar', '/tr/main/firsatlar', '/en/main/pipeline']) {
+    test(`${url} has no A/AA violations`, async ({ page }) => {
+      await acceptCookies(page);
+      await signInAs(page, { id: PIPELINE_OWNER.userId, email: PIPELINE_OWNER.email, tenantId: PIPELINE_OWNER.tenantId, role: PIPELINE_OWNER.role });
       const response = await page.goto(url);
       expect(response?.status(), url).toBe(200);
       await expectOwnPage(page, url);

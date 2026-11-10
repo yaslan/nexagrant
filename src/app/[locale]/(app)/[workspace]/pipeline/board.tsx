@@ -390,7 +390,7 @@ export default function KanbanBoard({
           <div
             className={`px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold flex items-center gap-2 ${
               toast.type === 'success'
-                ? 'bg-ok/15 text-ok border-ok/30'
+                ? 'bg-ok/15 text-ok-ink border-ok/30'
                 : toast.type === 'error'
                 ? 'bg-bad/15 text-bad border-bad/30'
                 : 'bg-surface text-ink border-border shadow-xl'
@@ -546,7 +546,7 @@ export default function KanbanBoard({
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 ${
                               isCoord
-                                ? 'bg-purple-500/15 text-purple-400 border border-purple-500/20'
+                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/20'
                                 : 'bg-accent/15 text-accent-ink border border-accent/20'
                             }`}
                           >
@@ -584,7 +584,7 @@ export default function KanbanBoard({
                               data-g0-tone={g0BadgeTone(opp.g0Passed)}
                               className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
                                 g0BadgeTone(opp.g0Passed) === 'ok'
-                                  ? 'bg-ok/15 text-ok border border-ok/30'
+                                  ? 'bg-ok/15 text-ok-ink border border-ok/30'
                                   : 'bg-amber/15 text-amber border border-amber/30'
                               }`}
                               title={
