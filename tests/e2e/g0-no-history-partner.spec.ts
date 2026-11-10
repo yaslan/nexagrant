@@ -145,6 +145,8 @@ async function seed() {
   await prisma.cordisProject.create({
     data: { id: OTHER_PROJECT, framework: 'HORIZON', title: 'FO-382 other project', masterCall: 'HORIZON-FO382E2E-2026' },
   });
+  // M8's candidate pool reads `cordisProjectTopic` (K-579560=A); the topic prefix must match it.
+  await prisma.cordisProjectTopic.create({ data: { projectId: OTHER_PROJECT, topicCode: 'HORIZON-FO382E2E-2026' } });
   await prisma.cordisParticipation.create({
     data: { projectId: OTHER_PROJECT, organisationId: OTHER_PIC, role: 'coordinator' },
   });

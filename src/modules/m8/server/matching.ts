@@ -188,10 +188,13 @@ export async function runSeatMatch(
   if (!seat) throw new SeatNotFoundError(`Seat ${seatId} not found in this workspace.`);
 
   // `Opportunity` has no `topic` relation and no `callId` column, so the topic is
-  // resolved by its id rather than included.
+  // resolved here rather than included. `Opportunity.topicId` is written by the pipeline
+  // form as the topic's IDENTIFIER (the board shows it as "Topic Identifier"), while older
+  // rows may hold a Topic cuid; resolving by either keeps "Aday Bul" from finding no
+  // topic, and so no candidates, for a form-created opportunity (NG-100).
   const topic = opp.topicId
-    ? await tx.topic.findUnique({
-        where: { id: opp.topicId },
+    ? await tx.topic.findFirst({
+        where: { OR: [{ id: opp.topicId }, { identifier: opp.topicId }] },
         select: { identifier: true, callId: true },
       })
     : null;

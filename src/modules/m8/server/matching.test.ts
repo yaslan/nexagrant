@@ -137,7 +137,7 @@ function fakeTx(overrides: Record<string, unknown> = {}) {
     },
     'consortiumSeat.findFirst': { id: 'seat-1', roleKey: 'research' },
     'consortiumSeat.findMany': [],
-    'topic.findUnique': { identifier: 'HORIZON-CL5-2026-D4-01', callId: 'call-1' },
+    'topic.findFirst': { identifier: 'HORIZON-CL5-2026-D4-01', callId: 'call-1' },
     'topic.findMany': [{ id: 'topic-1' }, { id: 'topic-2' }],
     'cordisProjectTopic.findMany': [{ projectId: 'p1' }, { projectId: 'p2' }],
     'cordisParticipation.findMany': [
@@ -257,6 +257,19 @@ describe('runSeatMatch', () => {
     const topicQuery = calls.find((c) => c.delegate === 'cordisProjectTopic');
     expect((topicQuery?.args as { where: { topicCode: { startsWith: string } } }).where.topicCode.startsWith)
       .toBe('HORIZON-CL5-2026');
+  });
+
+  it('resolves a form-created opportunity whose topicId is the topic identifier', async () => {
+    const { tx, calls } = fakeTx({
+      'opportunity.findFirst': { id: 'opp-1', topicId: 'HORIZON-CL5-2026-D4-01', seats: [] },
+    });
+    await runSeatMatch(tx, params);
+
+    const topicQuery = calls.find((c) => c.delegate === 'topic');
+    expect(topicQuery?.args).toEqual({
+      where: { OR: [{ id: 'HORIZON-CL5-2026-D4-01' }, { identifier: 'HORIZON-CL5-2026-D4-01' }] },
+      select: { identifier: true, callId: true },
+    });
   });
 
   it('produces nothing — rather than everything — when the opportunity has no topic', async () => {

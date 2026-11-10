@@ -410,9 +410,10 @@ test.describe('M8 consortium matching', () => {
     await expect(builderSeat).toContainText(/\d+,\d \/ 100/);
     const builderDetails = builderSeat.locator('details').first();
     await builderDetails.locator('summary').click();
-    await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 3$/);
-    await expect(builderDetails.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+,\d \/ 1,5$/);
-    await expect(builderDetails.getByTestId('m8-builder-dimension-liveDemandSignal')).toHaveText(/^\d+,\d \/ 1$/);
+    // K-579560=A: the button runs the M8 matcher, so its dimensions are the M8 ranges
+    // (topic 0–34, geographic 0–33), not the retired consortium scale.
+    await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 34$/);
+    await expect(builderDetails.getByTestId('m8-builder-dimension-geographicBalance')).toHaveText(/^\d+,\d \/ 33$/);
     // FO-277: the candidate button was a hard-coded English "Invite" on the Turkish page.
     await expect(builderSeat.getByRole('button', { name: 'Davet Et' }).first()).toBeEnabled({ timeout: 30_000 });
     await expect(builderSeat.getByRole('button', { name: 'Invite' })).toHaveCount(0);
@@ -420,8 +421,7 @@ test.describe('M8 consortium matching', () => {
     await page.screenshot({ path: `${SHOTS}/05c-builder-breakdown.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05-consortium-builder.png`, fullPage: true });
 
-    // This surface's own scorer ran: its breakdown keys are not the matching
-    // page's, so the rows cannot have come from the earlier test.
+    // The button wrote the matcher's rows for this seat (the rule both screens share).
     await expect
       .poll(async () => (await prisma.seatCandidate.count({ where: { seatId: BUILDER_SEAT } })), {
         timeout: 30_000,
@@ -437,17 +437,13 @@ test.describe('M8 consortium matching', () => {
       expect(row.tenantId).toBe(TENANT);
       expect(row.score).toBeGreaterThanOrEqual(0);
       expect(row.score).toBeLessThanOrEqual(100);
-      expect((row.breakdown as { total?: number }).total).toBe(row.score);
     }
+    // The M8 matcher's four dimensions; live demand is not stored in the breakdown (K-579560=A).
     expect(Object.keys(written[0]?.breakdown as object).sort()).toEqual([
-      'countryDiversity',
-      'liveDemandReason',
-      'liveDemandSignal',
-      'networkCentrality',
-      'smeBonus',
+      'collabHistory',
+      'geographicBalance',
+      'rivalRisk',
       'topicExperience',
-      'total',
-      'warmthBonus',
     ]);
 
     // The builder lists candidates after its button is pressed, so press it in English too.
@@ -459,8 +455,8 @@ test.describe('M8 consortium matching', () => {
     await expect(builderSeatEn).toContainText(/\d+\.\d \/ 100/, { timeout: 30_000 });
     const builderDetailsEn = builderSeatEn.locator('details').first();
     await builderDetailsEn.locator('summary').click();
-    await expect(builderDetailsEn).toContainText('Country diversity');
-    await expect(builderDetailsEn.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+\.\d \/ 1\.5$/);
+    await expect(builderDetailsEn).toContainText('Geographic balance');
+    await expect(builderDetailsEn.getByTestId('m8-builder-dimension-geographicBalance')).toHaveText(/^\d+\.\d \/ 33$/);
     await expect(builderSeatEn.getByRole('button', { name: 'Invite' }).first()).toBeEnabled({ timeout: 30_000 });
     await builderSeatEn.screenshot({ path: `${FO277_SHOTS}/en-consortium-invite.png` });
     await page.screenshot({ path: `${SHOTS}/05d-builder-breakdown-en.png`, fullPage: true });
