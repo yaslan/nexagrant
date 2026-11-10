@@ -1939,7 +1939,7 @@
     "meta_title": "{region} Çağrıları",
     "meta_description": "{region} bölgesine uygun AB hibe çağrıları",
     "meta_not_found_title": "Sayfa Bulunamadı — {product}",
-    "meta_open_description": "{region}’deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi."
+    "meta_open_description": "{region}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi."
   },
   "applicationPartA": {
     "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin.",
