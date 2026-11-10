@@ -13,7 +13,7 @@ const { checkModuleAccess, ApiKeysClient } = vi.hoisted(() => ({
 
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
 vi.mock('@/lib/modules/access', () => ({ checkModuleAccess }));
-vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't1', role: 'OWNER' }) }));
+vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't1', role: 'TENANT_OWNER' }) }));
 vi.mock('@/lib/db', () => ({ withTenant: async () => [] }));
 vi.mock('@/lib/app-url', () => ({ appUrl: () => 'https://example.test' }));
 vi.mock('@/app/[locale]/(app)/[workspace]/settings/api-keys/client', () => ({ ApiKeysClient }));

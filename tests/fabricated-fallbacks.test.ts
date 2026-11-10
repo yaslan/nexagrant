@@ -362,7 +362,7 @@ describe('M10 generateStandardDoc — a failed generation is an error, not a doc
  *
  * A page that invents a row shows a wrong number to one user on one screen. A
  * library that invents a row feeds it to every caller — here, straight into an
- * LLM prompt via `formatRagPrompt`, labelled `[Source 1 | Score: 94.0%]`, and
+ * LLM prompt via `formatRagContext`, labelled `[Source 1 | Score: 94.0%]`, and
  * back out as a concept note citing projects that do not exist. The blast
  * radius is larger, so the guard is now wider than the pages.
  */

@@ -97,7 +97,10 @@ import { logger } from '@/lib/logger';
 export const SYSTEM_SCOPE_PURPOSES = [
   /** The tenant is what the query LOOKS UP; nothing exists to scope to yet. */
   'tenant-discovery',
-  /** Scoped by userId across every tenant a data subject belongs to (GDPR). */
+  /**
+   * Scoped to one data subject across every tenant (GDPR): by userId, or for a
+   * subject with no account, by the hash of their address (email opt-out, NG-42).
+   */
   'subject-scoped',
   /** A platform-admin console, behind requirePlatformAdmin(). */
   'platform-admin',

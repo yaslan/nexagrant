@@ -237,7 +237,6 @@ export default async function BlogDetailPage({
   }
 
   const t = await getTranslations({ locale, namespace: 'blog' });
-  const isTr = locale === 'tr';
   const relatedPosts = (await getBlogPosts()).filter((p) => p.slug !== slug).slice(0, 2);
 
   return (
@@ -251,7 +250,7 @@ export default async function BlogDetailPage({
               className="inline-flex items-center gap-2 text-xs font-bold text-accent hover:underline bg-surface border border-border px-3 py-1.5 rounded-lg shadow-2xs"
             >
               <span>←</span>
-              <span>{isTr ? 'Tüm Blog Yazılarına Dön' : 'Back to Blog'}</span>
+              <span>{t('backToBlog')}</span>
             </Link>
           </div>
 
@@ -306,7 +305,7 @@ export default async function BlogDetailPage({
           {/* Related Articles */}
           <div className="pt-12 border-t border-border space-y-6">
             <h3 className="text-xl font-bold text-ink font-heading">
-              {isTr ? 'İlginizi Çekebilecek Diğer Yazılar' : 'Related Articles'}
+              {t('relatedArticles')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {relatedPosts.map((rel) => (

@@ -4,6 +4,7 @@ import type { ExportLocale } from '@/lib/document-exporter';
 import { DEFAULT_PART_B_SECTIONS } from '@/modules/m11/types';
 import { withTenant } from '@/lib/db';
 import { requireTenantApi } from '@/lib/tenant';
+import { asRole, can } from '@/lib/rbac';
 import type { PartBSectionItem, PartContent } from '@/modules/m11/types';
 import type { Prisma } from '@prisma/client';
 
@@ -35,7 +36,12 @@ function storedSections(content: Prisma.JsonValue | PartContent | null): PartBSe
 export async function GET(req: Request) {
   const auth = await requireTenantApi();
   if (!auth.ok) return auth.response;
-  const { tenantId } = auth.scope;
+  const { tenantId, role } = auth.scope;
+  // Role door (NG-64): the application and documents pages that link here need
+  // `view_proposal`; the download of the same rows needs it too.
+  if (!can(asRole(role), 'view_proposal')) {
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN_ROLE' }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get('type') || 'NDA';

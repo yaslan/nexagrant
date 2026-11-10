@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *   - `retrieveChunks` answered a failed or empty search with three hard-coded
  *     "CORDIS projects" (ZERO-EMISSION-EV / €4,500,000, HYDROGEN-CATALYST /
  *     €3,200,000, RECYCLED-COMPOSITE / €5,800,000) at fixed scores of
- *     0.94 / 0.88 / 0.81. `formatRagPrompt` labels whatever it is handed
+ *     0.94 / 0.88 / 0.81. `formatRagContext` labels whatever it is handed
  *     `[Source N | Score: 94.0%]`, so those went into the LLM prompt behind
  *     `generateSectionDraft` as retrieved evidence, and out again as a concept
  *     note grounded in projects that do not exist (CLAUDE.md rule 7).
@@ -51,7 +51,7 @@ vi.mock('@/lib/llm', async () => {
   return { ...actual, embedText: embedTextMock };
 });
 
-import { getEmbedding, ingestDocument, retrieveChunks, buildRagPrompt } from './rag';
+import { getEmbedding, ingestDocument, retrieveChunks, buildRagContext } from './rag';
 import { AiUsageLogWriteError } from './llm';
 
 const attribution = { tenantId: 'tenant_1', module: 'K6', purpose: 'rag_search_embedding' };
@@ -173,7 +173,7 @@ describe('getEmbedding — the fallback may not hide an unlogged call', () => {
 
 /**
  * TASK-MTUH5L8MJ6S8E — the retrieval half. These run the real `retrieveChunks`
- * and `buildRagPrompt` against a stubbed `Chunk` query, so they measure what
+ * and `buildRagContext` against a stubbed `Chunk` query, so they measure what
  * the function returns rather than what the file contains.
  */
 describe('retrieveChunks — a failed or empty search may not become evidence', () => {
@@ -227,22 +227,18 @@ describe('retrieveChunks — a failed or empty search may not become evidence', 
   });
 });
 
-describe('buildRagPrompt — an unaugmented prompt says so by carrying no context', () => {
+describe('buildRagContext — no match means no context', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     embedTextMock.mockResolvedValue(new Array(1536).fill(0.5));
   });
 
-  it('sends the bare question through when the corpus matched nothing', async () => {
+  it('is empty when the corpus matched nothing', async () => {
     mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
-
-    const prompt = await buildRagPrompt('How do we manage battery heat?', 'tenant_1', 5);
 
     // No fabricated context, and no `[Source N | Score: …%]` header claiming
     // evidence that does not exist.
-    expect(prompt).toBe('How do we manage battery heat?');
-    expect(prompt).not.toContain('RETRIEVED CONTEXT');
-    expect(prompt).not.toContain('Score:');
+    expect(await buildRagContext('How do we manage battery heat?', 'tenant_1', 5)).toBe('');
   });
 
   it('does not reach the model at all when retrieval fails', async () => {
@@ -251,7 +247,7 @@ describe('buildRagPrompt — an unaugmented prompt says so by carrying no contex
     // written on top of nothing.
     mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error('connection refused'));
 
-    await expect(buildRagPrompt('How do we manage battery heat?', 'tenant_1', 5)).rejects.toThrow(
+    await expect(buildRagContext('How do we manage battery heat?', 'tenant_1', 5)).rejects.toThrow(
       /connection refused/
     );
   });
@@ -261,9 +257,9 @@ describe('buildRagPrompt — an unaugmented prompt says so by carrying no contex
       { text: 'a real ingested chunk', documentId: 'doc_real', score: 0.71 },
     ]);
 
-    const prompt = await buildRagPrompt('battery', 'tenant_1', 5);
+    const context = await buildRagContext('battery', 'tenant_1', 5);
 
-    expect(prompt).toContain('[Source 1 | Score: 71.0%]');
-    expect(prompt).toContain('a real ingested chunk');
+    expect(context).toContain('[Source 1 | Score: 71.0%]');
+    expect(context).toContain('a real ingested chunk');
   });
 });

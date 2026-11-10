@@ -1,6 +1,6 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { TtoAcceleratorClient } from './client';
 import { errorMessage } from '@/lib/errors';
 import type { TtoItem } from './client';
@@ -14,7 +14,7 @@ export default async function TtoAcceleratorPage({
   const { locale } = await params;
   const locked = await moduleGate('M7', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let items: TtoItem[] = [];
   try {

@@ -114,6 +114,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const healthResult: HealthScoreResult = calculateEvidenceHealthScore(items);
 
   const isTr = locale === 'tr';
+  const dateLocale = isTr ? 'tr-TR' : 'en-US';
   const t = useTranslations('Evidence');
   const errorText = useActionErrorText();
 
@@ -250,7 +251,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       setUploadValidUntil('');
       setUploadAuthority('');
     } catch (err) {
-      setUploadError(errorText(err, () => (isTr ? `Yükleme hatası: ${errorMessage(err)}` : `Upload error: ${errorMessage(err)}`)));
+      setUploadError(errorText(err, () => t('ui.uploadError', { message: errorMessage(err) })));
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -258,7 +259,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(isTr ? 'Bu belgeyi silmek istediğinize emin misiniz?' : 'Are you sure you want to delete this document?')) return;
+    if (!confirm(t('ui.confirmDelete'))) return;
     
     try {
       await deleteEvidence(id);
@@ -302,7 +303,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-extrabold font-heading tracking-tight text-white">
-              {isTr ? 'Evidence Pack Kurumsal Hazırlık Skoru' : 'Evidence Pack Health Score'}
+              {t('ui.healthScoreTitle')}
             </h2>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
@@ -312,7 +313,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             {healthResult.missingCoreDocs.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <span className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">
-                  {isTr ? '⚠️ Eksik Zorunlu Belgeler:' : '⚠️ Missing Core Docs:'}
+                  {t('ui.missingCoreDocs')}
                 </span>
                 {healthResult.missingCoreDocs.map((doc, idx) => (
                   <span key={idx} className="text-[11px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-medium">
@@ -330,7 +331,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                 {healthResult.score}<span className="text-sm text-slate-400">/100</span>
               </div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
-                {isTr ? 'Sağlık Skoru' : 'Health Rating'}
+                {t('ui.healthRating')}
               </div>
             </div>
 
@@ -339,15 +340,15 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             <div className="space-y-1 text-xs text-slate-300 font-medium">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>{healthResult.validCount} {isTr ? 'Geçerli Belge' : 'Valid Docs'}</span>
+                <span>{healthResult.validCount} {t('ui.validDoc')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                <span>{healthResult.expiringCount} {isTr ? 'Süresi Yaklaşan' : 'Expiring Soon'}</span>
+                <span>{healthResult.expiringCount} {t('ui.expiringSoonDoc')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-400"></span>
-                <span>{healthResult.expiredCount} {isTr ? 'Süresi Dolmuş' : 'Expired Docs'}</span>
+                <span>{healthResult.expiredCount} {t('ui.expiredDoc')}</span>
               </div>
             </div>
           </div>
@@ -359,9 +360,9 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
         <div className="flex items-center justify-between">
           <h3 className="font-bold font-heading text-ink text-sm sm:text-base tracking-tight flex items-center gap-2">
             <span>🗂️</span>
-            <span>{isTr ? 'Kanıt Taksonomisi (8 Kategori Kütüphanesi)' : 'Evidence Taxonomy (8 Categories)'}</span>
+            <span>{t('ui.taxonomyTitle')}</span>
           </h3>
-          <span className="text-xs text-muted font-mono">{items.length} {isTr ? 'Kayıtlı Belge' : 'Total Items'}</span>
+          <span className="text-xs text-muted font-mono">{items.length} {t('ui.totalItems')}</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
@@ -403,7 +404,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
           <div className="relative flex-1 sm:w-64">
             <input
               type="text"
-              placeholder={isTr ? "Belge adı, kurum veya etiket ara..." : "Search title, authority, tag..."}
+              placeholder={t('ui.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-ground border border-border rounded-xl pl-9 pr-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
@@ -417,10 +418,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             onChange={(e) => setSelectedStatus(e.target.value)}
             className="bg-ground border border-border rounded-xl px-3 py-2 text-xs font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
           >
-            <option value="ALL">{isTr ? 'Tüm Durumlar' : 'All Statuses'}</option>
-            <option value="VALID">{isTr ? 'Geçerli Belgeler' : 'Valid Docs'}</option>
-            <option value="EXPIRING_SOON">{isTr ? 'Süresi Yaklaşanlar' : 'Expiring Soon'}</option>
-            <option value="EXPIRED">{isTr ? 'Süresi Dolmuşlar' : 'Expired Docs'}</option>
+            <option value="ALL">{t('ui.allStatuses')}</option>
+            <option value="VALID">{t('ui.statusValid')}</option>
+            <option value="EXPIRING_SOON">{t('ui.statusExpiringSoon')}</option>
+            <option value="EXPIRED">{t('ui.statusExpired')}</option>
           </select>
         </div>
 
@@ -430,7 +431,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             className="bg-ground hover:bg-surface-hover text-ink font-semibold text-xs py-2 px-3.5 rounded-xl border border-border shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{isTr ? 'CSV Dışa Aktar' : 'Export CSV'}</span>
+            <span>{t('ui.exportCsv')}</span>
           </button>
 
           <button
@@ -441,7 +442,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             className="bg-accent hover:opacity-90 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
           >
             <Upload className="w-4 h-4" />
-            <span>{isTr ? 'Yeni Belge Yükle (R2)' : 'Upload Evidence (R2)'}</span>
+            <span>{t('ui.uploadNewR2')}</span>
           </button>
         </div>
       </div>
@@ -452,12 +453,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
           <div className="text-center py-16 bg-surface border border-border rounded-3xl p-8 space-y-3">
             <div className="text-4xl">📄</div>
             <h4 className="font-bold text-ink text-base">
-              {isTr ? 'Kayıtlı Kanıt Belgesi Bulunamadı' : 'No Evidence Documents Found'}
+              {t('ui.emptyTitle')}
             </h4>
             <p className="text-xs text-muted max-w-sm mx-auto">
-              {isTr
-                ? 'Seçili filtrelere uygun belge bulunmuyor. Cloudflare R2 üzerine direkt belge yüklemek için yukarıdaki yükle butonunu kullanın.'
-                : 'No evidence matches your filters. Upload new documents to Cloudflare R2 repository.'}
+              {t('ui.emptyBody')}
             </p>
             <button
               onClick={() => {
@@ -466,7 +465,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
               }}
               className="bg-accent text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm hover:opacity-90 transition"
             >
-              + {isTr ? 'Belge Yükle' : 'Upload Document'}
+              + {t('ui.uploadDocument')}
             </button>
           </div>
         ) : (
@@ -516,7 +515,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                       {doc.validUntil && (
                         <span className="bg-ground border border-border px-2 py-0.5 rounded font-mono flex items-center gap-1">
                           <Calendar className="w-3 h-3 text-muted" />
-                          <span>{new Date(doc.validUntil).toLocaleDateString(isTr ? 'tr-TR' : 'en-US')}</span>
+                          <span>{new Date(doc.validUntil).toLocaleDateString(dateLocale)}</span>
                         </span>
                       )}
                       <span className="bg-ground border border-border px-2 py-0.5 rounded font-mono uppercase">
@@ -533,7 +532,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                       className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>{isTr ? 'İncele & İddialar' : 'Inspect & Claims'}</span>
+                      <span>{t('ui.inspectClaims')}</span>
                     </button>
 
                     <div className="flex items-center gap-1.5">
@@ -543,7 +542,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                           target="_blank"
                           rel="noreferrer"
                           className="p-1.5 text-muted hover:text-ink bg-ground hover:bg-surface border border-border rounded-lg transition"
-                          title={isTr ? "Belgeyi Aç / İndir" : "Open Document"}
+                          title={t('ui.openOrDownload')}
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
@@ -552,7 +551,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                         type="button"
                         onClick={() => handleDelete(doc.id)}
                         className="p-1.5 text-bad/70 hover:text-bad bg-bad/10 hover:bg-bad/20 rounded-lg transition cursor-pointer"
-                        title={isTr ? "Sil" : "Delete"}
+                        title={t('ui.delete')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -576,7 +575,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                 </div>
                 <div>
                   <h3 className="font-bold font-heading text-ink text-base">
-                    {isTr ? 'Cloudflare R2 Kanıt Yükleme' : 'Upload Evidence to R2'}
+                    {t('ui.r2UploadTitle')}
                   </h3>
                   <p className="text-[11px] text-muted">{t('uploadCompliance')}</p>
                 </div>
@@ -612,7 +611,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  {isTr ? 'Kanıt Kategorisi (Taksonomi)' : 'Category Taxonomy'}
+                  {t('ui.categoryTaxonomy')}
                 </label>
                 <select
                   value={uploadCategory}
@@ -629,12 +628,12 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
               <div>
                 <label className="block text-xs font-bold text-ink mb-1">
-                  {isTr ? 'Belge Başlığı / Açıklama' : 'Document Title'}
+                  {t('ui.documentTitle')}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder={isTr ? "Örn: ISO 27001 Bilgi Güvenliği Belgesi" : "e.g. ISO 27001 Certificate"}
+                  placeholder={t('ui.titlePlaceholder')}
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
                   className="w-full bg-ground border border-border rounded-xl p-2.5 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
@@ -644,7 +643,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-ink mb-1">
-                    {isTr ? 'Veren Kurum / Şirket' : 'Issuing Authority'}
+                    {t('ui.issuingAuthority')}
                   </label>
                   <input
                     type="text"
@@ -657,7 +656,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
                 <div>
                   <label className="block text-xs font-bold text-ink mb-1">
-                    {isTr ? 'Son Geçerlilik Tarihi' : 'Expiry Date'}
+                    {t('ui.expiryDate')}
                   </label>
                   <input
                     type="date"
@@ -681,7 +680,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
               {isUploading && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-[11px] font-bold text-accent">
-                    <span>{isTr ? 'Yükleniyor & YZ OCR İşleniyor...' : 'Uploading & AI OCR Processing...'}</span>
+                    <span>{t('ui.uploadingOcr')}</span>
                     <span>{uploadProgress}%</span>
                   </div>
                   <div className="w-full bg-ground border border-border h-2 rounded-full overflow-hidden">
@@ -697,7 +696,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   disabled={isUploading}
                   className="px-4 py-2.5 rounded-xl border border-border text-xs font-semibold text-ink hover:bg-surface-hover transition"
                 >
-                  {isTr ? 'İptal' : 'Cancel'}
+                  {t('ui.cancel')}
                 </button>
 
                 <button
@@ -708,10 +707,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   {isUploading ? (
                     <>
                       <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      <span>{isTr ? 'Yükleniyor...' : 'Uploading...'}</span>
+                      <span>{t('ui.uploading')}</span>
                     </>
                   ) : (
-                    <span>{isTr ? 'Cloudflare R2’ye Yükle →' : 'Upload to Cloudflare R2 →'}</span>
+                    <span>{t('ui.uploadToR2')}</span>
                   )}
                 </button>
               </div>
@@ -744,7 +743,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             <div className="space-y-4">
               <div className="bg-ground border border-border rounded-2xl p-4 space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-muted">{isTr ? 'Veren Kurum:' : 'Issuing Authority:'}</span>
+                  <span className="text-muted">{t('ui.issuingAuthorityLabel')}</span>
                   {selectedDoc.issuingAuthority ? (
                     <span className="font-semibold text-ink">{selectedDoc.issuingAuthority}</span>
                   ) : (
@@ -752,7 +751,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   )}
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted">{isTr ? 'Belge No:' : 'Document No:'}</span>
+                  <span className="text-muted">{t('ui.documentNoLabel')}</span>
                   {selectedDoc.documentNumber ? (
                     <span className="font-mono text-ink font-semibold">{selectedDoc.documentNumber}</span>
                   ) : (
@@ -760,13 +759,13 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   )}
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted">{isTr ? 'Son Geçerlilik:' : 'Valid Until:'}</span>
+                  <span className="text-muted">{t('ui.validUntilLabel')}</span>
                   <span className="font-mono text-ink">
-                    {selectedDoc.validUntil ? new Date(selectedDoc.validUntil).toLocaleDateString(isTr ? 'tr-TR' : 'en-US') : t('noExpiry')}
+                    {selectedDoc.validUntil ? new Date(selectedDoc.validUntil).toLocaleDateString(dateLocale) : t('noExpiry')}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted">{isTr ? 'Gizlilik Seviyesi:' : 'Confidentiality:'}</span>
+                  <span className="text-muted">{t('ui.confidentialityLabel')}</span>
                   <span className="font-mono text-xs text-accent font-bold">{selectedDoc.confidentiality || 'INTERNAL'}</span>
                 </div>
               </div>
@@ -791,7 +790,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
               <div>
                 <h4 className="font-bold text-xs text-ink mb-1.5">
-                  {isTr ? 'Bağlı Kurumsal İddialar (Claim Links)' : 'Linked Corporate Claims'}
+                  {t('ui.linkedClaims')}
                 </h4>
                 {linkedClaims.length > 0 ? (
                   <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 text-xs text-accent-ink space-y-2">
@@ -822,7 +821,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                   className="bg-accent text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs hover:opacity-90 transition flex items-center gap-2"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  <span>{isTr ? 'R2 Üzerinden Orijinal Belgeyi Aç' : 'Open R2 Original File'}</span>
+                  <span>{t('ui.openR2Original')}</span>
                 </a>
               )}
 
@@ -830,7 +829,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                 onClick={() => handleDelete(selectedDoc.id)}
                 className="text-bad hover:bg-bad/10 border border-bad/30 font-bold text-xs py-2.5 px-4 rounded-xl transition"
               >
-                {isTr ? 'Belgeyi Sil' : 'Delete Document'}
+                {t('ui.deleteDocument')}
               </button>
             </div>
           </div>

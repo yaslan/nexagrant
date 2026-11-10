@@ -89,6 +89,13 @@ const envSchema = z.object({
    * apply; the route logs that once. Set it to a random string of 32+ characters.
    */
   EXPERT_PREREG_IP_SALT: blankToUndefined(z.string().min(32).optional()),
+  /**
+   * Signs the opt-out link of a first message (NG-42, src/lib/email/opt-out.ts).
+   * The links do not expire and sit in mail already delivered, so this key must
+   * NEVER rotate: changing it breaks every one of them. Unset or blank = AUTH_SECRET,
+   * and then rotating AUTH_SECRET breaks them. 32+ random characters; not AUTH_SECRET.
+   */
+  EMAIL_OPTOUT_SECRET: blankToUndefined(z.string().min(32).optional()),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
@@ -332,6 +339,11 @@ export const declaredNodeEnv: 'development' | 'test' | 'production' | undefined 
  */
 export function authSecret(): string | null {
   return env.AUTH_SECRET ?? env.NEXTAUTH_SECRET ?? null;
+}
+
+/** The key of the opt-out links: its own when set, otherwise the session key. */
+export function emailOptOutSecret(): string | null {
+  return env.EMAIL_OPTOUT_SECRET ?? authSecret();
 }
 
 /**

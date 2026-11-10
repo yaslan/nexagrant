@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { runSeatMatch, scoreCandidate, topicPrefix, totalScore } from './matching';
+import { MATCH_MAX_TOTAL, matchSeatScore, runSeatMatch, scoreCandidate, topicPrefix, totalScore } from './matching';
 import { SeatNotFoundError } from './errors';
 import type { TenantTx } from '@/lib/db';
 
@@ -36,51 +36,87 @@ describe('topicPrefix', () => {
   });
 });
 
-describe('scoreCandidate', () => {
+describe('scoreCandidate (K-578751: experience 34, country balance 33, collaboration 33, rival -10)', () => {
   const base = {
     participationCount: 0,
     coordinatorCount: 0,
     country: null,
     takenCountries: NO_COUNTRIES,
     sharedProjects: 0,
-    warmth: null,
-    degree: 0,
     isRival: false,
   };
+  const noCountryPoints = { ...base, country: 'FR', takenCountries: new Set(['FR']) };
 
-  it('caps topic experience at 35', () => {
-    // 5 participations (25) + 2 coordinations (20) = 45, capped.
-    expect(scoreCandidate({ ...base, participationCount: 5, coordinatorCount: 2 }).topicExperience).toBe(35);
+  it('experience: 5 per participation, 10 per coordination, saturating at 34', () => {
+    expect(scoreCandidate({ ...base, participationCount: 2, coordinatorCount: 1 }).topicExperience).toBe(20);
+    expect(scoreCandidate({ ...base, participationCount: 6 }).topicExperience).toBe(30);
+    // The seventh participation is where the old 35 cap was reached too.
+    expect(scoreCandidate({ ...base, participationCount: 7 }).topicExperience).toBe(34);
+    expect(scoreCandidate({ ...base, participationCount: 5, coordinatorCount: 2 }).topicExperience).toBe(34);
   });
 
-  it('gives no geographic bonus for a country already on the consortium', () => {
+  it('country balance: 33 for a country not on the consortium, otherwise 0', () => {
     const taken = new Set(['FR']);
     expect(scoreCandidate({ ...base, country: 'FR', takenCountries: taken }).geographicBalance).toBe(0);
-    expect(scoreCandidate({ ...base, country: 'TR', takenCountries: taken }).geographicBalance).toBe(15);
+    expect(scoreCandidate({ ...base, country: 'TR', takenCountries: taken }).geographicBalance).toBe(33);
   });
 
-  it('scores warmth by relationship stage and caps collaboration history', () => {
-    expect(scoreCandidate({ ...base, warmth: 'hot' }).relationshipWarmth).toBe(15);
-    expect(scoreCandidate({ ...base, warmth: 'warm' }).relationshipWarmth).toBe(10);
-    expect(scoreCandidate({ ...base, warmth: 'cold' }).relationshipWarmth).toBe(5);
-    expect(scoreCandidate({ ...base, warmth: null }).relationshipWarmth).toBe(0);
-    expect(scoreCandidate({ ...base, sharedProjects: 9 }).collabHistory).toBe(15);
+  it.each([
+    ['null', null],
+    ['empty', ''],
+  ])('country balance: a candidate whose country is %s earns 0, whether or not there are partners', (_label, country) => {
+    expect(scoreCandidate({ ...base, country, takenCountries: NO_COUNTRIES }).geographicBalance).toBe(0);
+    expect(scoreCandidate({ ...base, country, takenCountries: new Set(['FR']) }).geographicBalance).toBe(0);
   });
 
-  it('penalises an organisation seated on a rival opportunity', () => {
-    expect(scoreCandidate({ ...base, isRival: true }).rivalRisk).toBe(-10);
+  it('country balance: a recorded country earns 33 when there are no partners yet', () => {
+    expect(scoreCandidate({ ...base, country: 'TR', takenCountries: NO_COUNTRIES }).geographicBalance).toBe(33);
   });
 
-  it('reproduces the reference total the old suite asserted', () => {
-    // 5 participations + 2 coordinations (35) + free country (15) + degree 50 (5).
-    const breakdown = scoreCandidate({
-      ...base,
-      participationCount: 5,
-      coordinatorCount: 2,
-      country: 'FR',
-      degree: 50,
-    });
-    expect(totalScore(breakdown)).toBe(55);
+  it('collaboration: 11 per shared project, saturating at 33 on the third', () => {
+    expect(scoreCandidate({ ...base, sharedProjects: 0 }).collabHistory).toBe(0);
+    expect(scoreCandidate({ ...base, sharedProjects: 1 }).collabHistory).toBe(11);
+    expect(scoreCandidate({ ...base, sharedProjects: 2 }).collabHistory).toBe(22);
+    expect(scoreCandidate({ ...base, sharedProjects: 3 }).collabHistory).toBe(33);
+    expect(scoreCandidate({ ...base, sharedProjects: 9 }).collabHistory).toBe(33);
+  });
+
+  it('rival penalty: -10 for a rival, and it moves no other criterion', () => {
+    const rival = scoreCandidate({ ...base, country: 'TR', participationCount: 2, sharedProjects: 1, isRival: true });
+    const clean = scoreCandidate({ ...base, country: 'TR', participationCount: 2, sharedProjects: 1, isRival: false });
+    expect(rival.rivalRisk).toBe(-10);
+    expect(clean.rivalRisk).toBe(0);
+    expect({ ...rival, rivalRisk: 0 }).toEqual(clean);
+    expect(totalScore(rival)).toBe(totalScore(clean) - 10);
+  });
+
+  it('writes exactly the three criteria and the penalty', () => {
+    expect(Object.keys(scoreCandidate(base)).sort()).toEqual([
+      'collabHistory',
+      'geographicBalance',
+      'rivalRisk',
+      'topicExperience',
+    ]);
+  });
+
+  it('the total tops out at 100, and that is the seat score of 100', () => {
+    const best = scoreCandidate({ ...base, country: 'TR', participationCount: 10, coordinatorCount: 5, sharedProjects: 10 });
+    expect(best).toEqual({ topicExperience: 34, geographicBalance: 33, collabHistory: 33, rivalRisk: 0 });
+    expect(MATCH_MAX_TOTAL).toBe(100);
+    expect(totalScore(best)).toBe(100);
+    expect(matchSeatScore(best)).toBe(100);
+  });
+
+  it('a candidate at every cap who is also a rival scores 90', () => {
+    const rival = scoreCandidate({ ...base, country: 'TR', participationCount: 10, sharedProjects: 10, isRival: true });
+    expect(totalScore(rival)).toBe(90);
+    expect(matchSeatScore(rival)).toBe(90);
+  });
+
+  it('a penalty below zero is clamped to a seat score of 0', () => {
+    const rival = scoreCandidate({ ...noCountryPoints, isRival: true });
+    expect(totalScore(rival)).toBe(-10);
+    expect(matchSeatScore(rival)).toBe(0);
   });
 });
 
@@ -122,7 +158,6 @@ function fakeTx(overrides: Record<string, unknown> = {}) {
       { orgA: 'org-a', orgB: 'org-confirmed', sharedProjectCount: 2 },
       { orgA: 'org-a', orgB: 'org-z', sharedProjectCount: 1 },
     ],
-    'relationship.findMany': [{ organizationId: 'org-b', warmth: 'hot' }],
     'seatCandidate.deleteMany': { count: 0 },
     ...overrides,
   };
@@ -163,12 +198,44 @@ describe('runSeatMatch', () => {
     expect(result).toHaveLength(2);
 
     // org-a: 2 participations of which 1 a coordination (20) + free country FR
-    // (15) + 2 shared projects with the confirmed partner (10) + degree 2 (0.2)
-    // = 45.2 raw points of 90, stored on the 0–100 seat scale (FO-147).
-    expect(created[0]?.score).toBe(50.22);
-    // org-b: 1 participation (5) + free country TR (15) + hot warmth (15) = 35 of 90.
-    expect(created[1]?.score).toBe(38.89);
+    // (33) + 2 shared projects with the confirmed partner (22) = 75 of 100.
+    expect(created[0]?.score).toBe(75);
+    // org-b: 1 participation (5) + free country TR (33) = 38 of 100.
+    expect(created[1]?.score).toBe(38);
     expect(created.map((c) => c.rank)).toEqual([1, 2]);
+  });
+
+  it('persists the three criteria and the penalty, and no longer reads relationships', async () => {
+    const { tx, calls, created } = fakeTx();
+    await runSeatMatch(tx, params);
+    expect(created[0]?.breakdown).toEqual({
+      topicExperience: 20,
+      geographicBalance: 33,
+      collabHistory: 22,
+      rivalRisk: 0,
+    });
+    expect(calls.some((c) => c.delegate === 'relationship')).toBe(false);
+  });
+
+  it('asks only for the edges between the pool and the confirmed partners', async () => {
+    const { tx, calls } = fakeTx();
+    await runSeatMatch(tx, params);
+    const edges = calls.find((c) => c.delegate === 'cordisCoParticipation');
+    expect((edges?.args as { where: unknown }).where).toEqual({
+      OR: [
+        { orgA: { in: ['org-a', 'org-b'] }, orgB: { in: ['org-confirmed'] } },
+        { orgB: { in: ['org-a', 'org-b'] }, orgA: { in: ['org-confirmed'] } },
+      ],
+    });
+  });
+
+  it('skips the edge query when no partner is confirmed yet', async () => {
+    const { tx, calls, created } = fakeTx({
+      'opportunity.findFirst': { id: 'opp-1', topicId: 'topic-1', seats: [] },
+    });
+    await runSeatMatch(tx, params);
+    expect(calls.some((c) => c.delegate === 'cordisCoParticipation')).toBe(false);
+    expect(created.length).toBeGreaterThan(0);
   });
 
   it('carries the tenant into every write', async () => {

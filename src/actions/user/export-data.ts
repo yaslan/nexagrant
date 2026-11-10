@@ -64,6 +64,8 @@ export async function exportUserData(): Promise<ExportResult> {
       interregAnalyses,
       interregResults,
       interregMarks,
+      internalApprovals,
+      budgetShares,
     ] = await withSystemScope('subject-scoped', 'gdpr-export.subjectRows', (tx) =>
       Promise.all([
         tx.user.findUnique({
@@ -220,6 +222,18 @@ export async function exportUserData(): Promise<ExportResult> {
           },
           orderBy: { createdAt: 'asc' },
         }),
+        // NG-34 (ADR-0010 Ek A 80-81): what ties these rows to the subject is the act of
+        // approving or agreeing. The amounts are the tenant's figures, not personal data.
+        tx.internalApproval.findMany({
+          where: { approvedById: userId },
+          select: { id: true, tenantId: true, opportunityId: true, approvedAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        tx.partnerBudgetShare.findMany({
+          where: { agreedById: userId },
+          select: { id: true, tenantId: true, seatId: true, agreedAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
       ])
     );
 
@@ -261,6 +275,8 @@ export async function exportUserData(): Promise<ExportResult> {
       InterregAnalysis: interregAnalyses,
       InterregAnalysisResult: interregResults,
       InterregCriterionMark: interregMarks,
+      InternalApproval: internalApprovals,
+      PartnerBudgetShare: budgetShares,
     };
 
     await recordAccessAudit(userId, tenantId, tables);
