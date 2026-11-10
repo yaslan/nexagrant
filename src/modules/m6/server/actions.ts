@@ -11,6 +11,7 @@ import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 
 import { ProposalTextMissingError } from '../proposal-text-missing';
+import { MAX_PROPOSAL_TEXT_CHARS, ProposalTooLongError } from '../proposal-too-long';
 import { readProposalText } from './proposal-text';
 import {
   getPanelScoresForProposal,
@@ -96,6 +97,9 @@ export async function generateAiEvaluation(opportunityId: string): Promise<AiEva
     return readProposalText(tx, tenantId, oppId);
   });
   if (!proposal) throw new ProposalTextMissingError(oppId);
+  if (proposal.text.length > MAX_PROPOSAL_TEXT_CHARS) {
+    throw new ProposalTooLongError(oppId, proposal.text.length);
+  }
 
   const resultStr = await generateText({
     tenantId,

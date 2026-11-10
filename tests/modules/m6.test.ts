@@ -6,6 +6,11 @@ import {
   saveHumanEvaluation,
 } from '../../src/modules/m6/server/actions';
 import { isProposalTextMissing, PROPOSAL_TEXT_MISSING_DIGEST } from '../../src/modules/m6/proposal-text-missing';
+import {
+  isProposalTooLong,
+  MAX_PROPOSAL_TEXT_CHARS,
+  PROPOSAL_TOO_LONG_DIGEST,
+} from '../../src/modules/m6/proposal-too-long';
 
 /**
  * `tenantId`/`userId` are no longer arguments — the actions read them from the
@@ -218,6 +223,51 @@ describe('M6 Evaluator Lens Module', () => {
       expect(isProposalTextMissing(error)).toBe(true);
       // In production the digest is all a thrown action leaves the browser.
       expect((error as { digest?: unknown }).digest).toBe(PROPOSAL_TEXT_MISSING_DIGEST);
+    });
+
+    describe('a proposal longer than the model can read (NG-106)', () => {
+      const HEADING = '## T\n';
+      /** Part B whose joined text, heading included, is exactly `length` characters. */
+      const partBOfLength = (length: number) => ({
+        content: { sections: [{ title: 'T', content: 'x'.repeat(length - HEADING.length) }] },
+      });
+
+      test('at the limit the whole text reaches the model, uncut', async () => {
+        h.applicationPartFindFirst.mockResolvedValue(partBOfLength(MAX_PROPOSAL_TEXT_CHARS));
+
+        await generateAiEvaluation('opp-1');
+
+        expect(h.generateText).toHaveBeenCalledTimes(1);
+        const body = 'x'.repeat(MAX_PROPOSAL_TEXT_CHARS - HEADING.length);
+        expect(requestSentToModel().prompt.includes(body)).toBe(true);
+        expect(h.evaluationCreate).toHaveBeenCalledTimes(1);
+      });
+
+      test.each([
+        ['Part B', partBOfLength(MAX_PROPOSAL_TEXT_CHARS + 1), []],
+        [
+          'a concept note',
+          null,
+          [{ content: { T: 'x'.repeat(MAX_PROPOSAL_TEXT_CHARS + 1 - HEADING.length) } }],
+        ],
+        // An older, shorter draft is a different text; scoring it would answer another question.
+        ['Part B, with a short concept note on file', partBOfLength(MAX_PROPOSAL_TEXT_CHARS + 1), [{ content: { a: 'short' } }]],
+      ])('one character over in %s: no model call, no credit, no record', async (_name, part, notes) => {
+        h.applicationPartFindFirst.mockResolvedValue(part);
+        h.conceptNoteFindMany.mockResolvedValue(notes);
+
+        const error = await generateAiEvaluation('opp-1').catch((e: unknown) => e);
+
+        expect(h.generateText).not.toHaveBeenCalled();
+        expect(h.creditLedgerCreate).not.toHaveBeenCalled();
+        expect(h.evaluationCreate).not.toHaveBeenCalled();
+        expect(isProposalTooLong(error)).toBe(true);
+        expect(isProposalTextMissing(error)).toBe(false);
+        // In production the digest is all a thrown action leaves the browser.
+        expect((error as { digest?: unknown }).digest).toBe(PROPOSAL_TOO_LONG_DIGEST);
+        // The refusal is logged by the framework; the proposal itself must not be in it.
+        expect((error as Error).message).not.toContain('xxxx');
+      });
     });
 
     test('an opportunity outside the tenant is refused before the model is called', async () => {

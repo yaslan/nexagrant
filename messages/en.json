@@ -1844,6 +1844,7 @@
     "errors": {
       "aiFailed": "The AI pre-assessment did not complete; no score was recorded.",
       "noProposalText": "There is no proposal text to evaluate. Write the concept note or the Part B sections first; no credits were used and no score was recorded.",
+      "proposalTooLong": "The proposal text is too long: the AI pre-assessment can read at most {limit, number} characters. Shorten the Part B sections or the concept note and try again; no credits were used and no score was recorded.",
       "saveFailed": "The evaluation could not be saved. Please try again.",
       "calibrationFailed": "The ESR calibration could not be saved."
     },

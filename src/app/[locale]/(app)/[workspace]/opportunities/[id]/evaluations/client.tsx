@@ -21,6 +21,7 @@ import { generateAiEvaluation, saveHumanEvaluation, calibrateESR } from '@/modul
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { notesObject, type EvaluationNotes } from '@/modules/m6/types';
 import { isProposalTextMissing } from '@/modules/m6/proposal-text-missing';
+import { isProposalTooLong, MAX_PROPOSAL_TEXT_CHARS } from '@/modules/m6/proposal-too-long';
 import {
   averageLensTotal,
   lensTotal,
@@ -128,7 +129,9 @@ export function EvaluationsClient({
       setActionError(
         isProposalTextMissing(e)
           ? t('errors.noProposalText')
-          : errorText(e, () => (e instanceof Error ? e.message : t('errors.aiFailed')))
+          : isProposalTooLong(e)
+            ? t('errors.proposalTooLong', { limit: MAX_PROPOSAL_TEXT_CHARS })
+            : errorText(e, () => (e instanceof Error ? e.message : t('errors.aiFailed')))
       );
     } finally {
       setIsAiLoading(false);
