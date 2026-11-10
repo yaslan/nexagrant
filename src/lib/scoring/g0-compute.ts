@@ -654,7 +654,9 @@ export async function clearStoredG0(
       select: { id: true },
     });
     if (existing) {
-      await client.topicMatch.update({ where: { id: existing.id }, data: { g0Score: null, breakdown } });
+      // updateMany, scoped by tenant: the row can vanish between the lookup and this write, and a
+      // by-id update would throw P2025 and turn a gate click into an error. 0 rows matched is fine.
+      await client.topicMatch.updateMany({ where: { id: existing.id, tenantId: computation.tenantId }, data: { g0Score: null, breakdown } });
     }
   }
 

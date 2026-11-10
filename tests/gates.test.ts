@@ -746,9 +746,23 @@ describe('clearStoredG0 — TopicMatch branch (NG-59)', () => {
     expect(tx.topicMatch.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { tenantId: 'tenant-2', topicId: 'topic-1', opportunityId: 'opp-1' } }),
     );
-    expect(tx.topicMatch.update).toHaveBeenCalledWith({
-      where: { id: 'tm-1' },
+    // One tenant-scoped updateMany (NG-120): never a by-id `update`, which throws when the row is gone.
+    expect(tx.topicMatch.update).not.toHaveBeenCalled();
+    expect(tx.topicMatch.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.topicMatch.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tm-1', tenantId: 'tenant-2' },
       data: expect.objectContaining({ g0Score: null }),
     });
+  });
+
+  test('NG-120: the row is deleted between the lookup and the write: no error, the gate still clears', async () => {
+    const tx = fakeTx({ id: 'tm-1' });
+    // What the real client does: a by-id update of a vanished row throws P2025; updateMany matches 0 rows.
+    tx.topicMatch.update.mockRejectedValue(
+      Object.assign(new Error('An operation failed because it depends on one or more records that were required but not found.'), { code: 'P2025' }),
+    );
+    tx.topicMatch.updateMany.mockResolvedValue({ count: 0 });
+    await expect(clearStoredG0(tx as never, noEvidenceWithTopic())).resolves.toBe(true);
+    expect(tx.opportunity.updateMany).toHaveBeenCalled();
   });
 });
