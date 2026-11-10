@@ -13,6 +13,8 @@ const alertMock = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('@/lib/db', () => ({ prisma: { tenant: tenantMock } }));
 vi.mock('@/lib/pic-registry', () => ({ checkPicRegistry: checkMock }));
 vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: alertMock }));
+const enqueueMock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => ({ added: true })));
+vi.mock('@/lib/jobs/enqueue', () => ({ enqueueJob: enqueueMock }));
 
 import { refreshTenantPicRegistry } from '@/lib/pic-registry-refresh';
 
@@ -24,6 +26,8 @@ describe('FO-396 refreshTenantPicRegistry (B1 conditional write)', () => {
     checkMock.mockReset();
     checkMock.mockResolvedValue({ status: 'FOUND', reason: 'found' });
     alertMock.mockClear();
+    enqueueMock.mockReset();
+    enqueueMock.mockResolvedValue({ added: true });
   });
 
   it('writes only where the tenant still holds the asked PIC', async () => {
@@ -68,6 +72,27 @@ describe('FO-396 refreshTenantPicRegistry (B1 conditional write)', () => {
     expect(alertMock).toHaveBeenCalledTimes(1);
     const alert = (alertMock.mock.calls[0] as unknown[])[0] as { meta?: Record<string, unknown>; message: string };
     expect(alert.meta).toEqual({ reason: 'schema_changed' });
+    expect(JSON.stringify(alert)).not.toContain('t1');
+  });
+
+  it('NG-85 F1: the retry_exhausted alert carries no tenant id', async () => {
+    checkMock.mockResolvedValue({ status: 'UNKNOWN', reason: 'network' });
+    await refreshTenantPicRegistry('t1', '999999999', {}, { auditEventId: 'a1', attempt: 3 });
+    expect(enqueueMock).not.toHaveBeenCalled();
+    expect(alertMock).toHaveBeenCalledTimes(1);
+    const alert = (alertMock.mock.calls[0] as unknown[])[0] as { meta?: Record<string, unknown> };
+    expect(alert.meta).toEqual({ reason: 'retry_exhausted', attempts: 4 });
+    expect(JSON.stringify(alert)).not.toContain('t1');
+  });
+
+  it('NG-85 F1: the retry_not_queued alert carries no tenant id', async () => {
+    checkMock.mockResolvedValue({ status: 'UNKNOWN', reason: 'timeout' });
+    enqueueMock.mockRejectedValue(new Error('queue down'));
+    await refreshTenantPicRegistry('t1', '999999999', {}, { auditEventId: 'a1', attempt: 0 });
+    expect(enqueueMock).toHaveBeenCalledTimes(1);
+    expect(alertMock).toHaveBeenCalledTimes(1);
+    const alert = (alertMock.mock.calls[0] as unknown[])[0] as { meta?: Record<string, unknown> };
+    expect(alert.meta).toEqual({ reason: 'retry_not_queued' });
     expect(JSON.stringify(alert)).not.toContain('t1');
   });
 });

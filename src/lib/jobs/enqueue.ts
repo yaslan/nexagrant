@@ -29,7 +29,7 @@ export interface EnqueueResult {
 export async function enqueueJob(
   id: JobId,
   payload: Record<string, unknown> = {},
-  opts: { force?: boolean; connectionString?: string } = {}
+  opts: { force?: boolean; connectionString?: string; runAt?: Date } = {}
 ): Promise<EnqueueResult> {
   let key = `${id}:manual`;
   if (id === 'agency-monthly-report') {
@@ -45,6 +45,12 @@ export async function enqueueJob(
     }
     const cursor = typeof payload.afterId === 'string' && payload.afterId !== '' ? payload.afterId : 'start';
     key = `g0-rescore-tenant:${String(payload.auditEventId)}:${cursor}`;
+  } else if (id === 'pic-registry-retry') {
+    // FO-396: one key per PIC change and attempt, so a repeated queue request adds nothing.
+    if (!isPresentId(payload.tenantId) || !isPresentId(payload.auditEventId) || typeof payload.attempt !== 'number') {
+      throw new Error('pic-registry-retry: tenantId, auditEventId and attempt are required');
+    }
+    key = `pic-registry-retry:${String(payload.auditEventId)}:${payload.attempt}`;
   } else if (id === 'k1-embeddings' && payload.tenantId !== undefined) {
     // One key per tenant: saving a profile five times queues one embedding.
     if (!isPresentId(payload.tenantId)) throw new Error('k1-embeddings: tenantId must be a non-empty string');
@@ -68,6 +74,7 @@ export async function enqueueJob(
       jobKeyMode: 'unsafe_dedupe',
       maxAttempts,
       ...(queueName ? { queueName } : {}),
+      ...(opts.runAt ? { runAt: opts.runAt } : {}),
     });
     return { job, added: existing.rows.length === 0 };
   } finally {

@@ -367,8 +367,8 @@ describe('FO-382 normalisation: status and role spelling', () => {
     expect(ex.scoringBasis).not.toBe('no_history_evidence');
   });
 
-  // FO-382 review B4: the compute path (`g0-compute.ts`, record lookup) and the scorer share this one
-  // helper, so a spelling that breaks one breaks both and is caught here.
+  // FO-382 review B4: the role check lives in the scorer only (`isPartnerRole`, g0-features.ts). The
+  // compute path passes the raw role through, so a spelling accepted here is what the scorer sees.
   it.each([' Partner ', 'PARTNER', 'partner'])('isPartnerRole accepts %j', (role) => {
     expect(isPartnerRole(role)).toBe(true);
   });

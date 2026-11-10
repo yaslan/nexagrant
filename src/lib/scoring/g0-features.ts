@@ -334,7 +334,8 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
 
   // A partner with no CORDIS record at all: the two CORDIS-only features leave the denominator
   // (see NO_HISTORY_EXCLUDED_FEATURES). Only a measured "no history" qualifies; missing CORDIS data
-  // (`cordis === null`) keeps the standard scoring, so an outage cannot silently change the basis.
+  // (`cordis === null`) keeps the standard scoring. A failed CORDIS query throws instead of returning
+  // `null` (FO-382 review B4), so the outage reaches the caller and the basis cannot change silently.
   const excludedFeatures: (keyof G0Features)[] = isNoHistoryPartner(snapshot)
     ? [...NO_HISTORY_EXCLUDED_FEATURES]
     : [];
