@@ -5,8 +5,9 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
 import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
 import { moduleGate } from '@/lib/modules/guard';
-import type { LegacyMatchBreakdown, MatchBreakdown } from '@/modules/m8/server/matching';
-import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
+import type { MatchBreakdown } from '@/modules/m8/server/matching';
+import { seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
+import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 
 /**
@@ -49,21 +50,11 @@ const DIMENSIONS: (keyof MatchBreakdown)[] = [
   'rivalRisk',
 ];
 
-/** A row scored before K-578751 is shown with the dimensions its score was built from. */
-const LEGACY_DIMENSIONS: (keyof LegacyMatchBreakdown)[] = [
-  'topicExperience',
-  'geographicBalance',
-  'collabHistory',
-  'relationshipWarmth',
-  'centrality',
-  'rivalRisk',
-];
-
-function readBreakdown(value: unknown): Partial<Record<keyof LegacyMatchBreakdown, number>> {
+function readBreakdown(value: unknown): Partial<Record<keyof MatchBreakdown, number>> {
   if (!value || typeof value !== 'object') return {};
   const source = value as Record<string, unknown>;
-  const out: Partial<Record<keyof LegacyMatchBreakdown, number>> = {};
-  for (const key of LEGACY_DIMENSIONS) {
+  const out: Partial<Record<keyof MatchBreakdown, number>> = {};
+  for (const key of DIMENSIONS) {
     if (typeof source[key] === 'number') out[key] = source[key] as number;
   }
   return out;
@@ -104,13 +95,17 @@ export default async function MatchingPage({
   // used to repeat that check itself, which could only ever be dead code.
 
   const seatIds = opp.seats.map((s) => s.id);
+  // NG-100 B-2: the same visibility rule as the consortium page and the gate. Rows of the
+  // retired scorers stay in the table and are not shown here.
   const candidates = seatIds.length
-    ? await withTenant<CandidateRow[]>(tenantId, (tx) =>
-        tx.seatCandidate.findMany({
-          where: { seatId: { in: seatIds }, tenantId },
-          orderBy: { rank: 'asc' },
-          select: { id: true, seatId: true, rank: true, score: true, breakdown: true, organizationId: true },
-        })
+    ? visibleSeatCandidates(
+        await withTenant<CandidateRow[]>(tenantId, (tx) =>
+          tx.seatCandidate.findMany({
+            where: { seatId: { in: seatIds }, tenantId },
+            orderBy: { rank: 'asc' },
+            select: { id: true, seatId: true, rank: true, score: true, breakdown: true, organizationId: true },
+          })
+        )
       )
     : [];
 
@@ -202,10 +197,6 @@ export default async function MatchingPage({
                       {seatCandidates.map((c) => {
                         const org = c.organizationId ? orgById.get(c.organizationId) : null;
                         const breakdown = readBreakdown(c.breakdown);
-                        // A row the consortium builder wrote shares the seat; its
-                        // topicExperience is 0–3, not 0–34, so no range is shown for it.
-                        const writer = seatBreakdownWriter(c.breakdown);
-                        const isLegacy = writer === 'match-legacy';
                         return (
                           <tr key={c.id} className="border-b border-border align-top">
                             <td className="py-2 px-4 font-medium text-ink">#{c.rank}</td>
@@ -224,14 +215,14 @@ export default async function MatchingPage({
                                   {t('breakdown')}
                                 </summary>
                                 <dl className="mt-1 space-y-0.5">
-                                  {(isLegacy ? LEGACY_DIMENSIONS : DIMENSIONS).map((key) => (
+                                  {DIMENSIONS.map((key) => (
                                     <div key={key} className="flex gap-2 justify-between">
                                       <dt>{t(`dimension.${key}` as 'dimension.centrality')}</dt>
                                       <dd className="tabular-nums whitespace-nowrap" data-testid={`m8-dimension-${key}`}>
                                         {dimensionValueText(
                                           t,
                                           format.number,
-                                          writer === 'match' || isLegacy ? seatScoreDimensionScale(writer, key) : null,
+                                          seatScoreDimensionScale('match', key),
                                           breakdown[key] ?? 0
                                         )}
                                       </dd>
@@ -239,7 +230,6 @@ export default async function MatchingPage({
                                   ))}
                                 </dl>
                                 <p className="mt-1">{t('breakdownNote')}</p>
-                                {isLegacy && <p className="mt-1">{t('legacyScoringNote')}</p>}
                               </details>
                             </td>
                             <td className="py-2 px-4">

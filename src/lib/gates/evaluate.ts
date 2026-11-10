@@ -4,6 +4,7 @@ import { isPresentId } from '../required-id';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { clearStoredG0, computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 import type { GateReason } from './reasons';
+import { visibleSeatCandidates } from '../scoring/seat-candidate-view';
 
 export type GateEvaluationResult = {
   passed: boolean;
@@ -21,7 +22,12 @@ type G1Seat = {
   organizationId: string | null;
   partnerOrgId: string | null;
 };
-type SeatCandidateRef = { seatId: string; organizationId: string | null; partnerOrgId: string | null };
+type SeatCandidateRef = {
+  seatId: string;
+  organizationId: string | null;
+  partnerOrgId: string | null;
+  breakdown: unknown;
+};
 
 /** A CONFIRMED seat with no organisation confirms nobody (src/modules/m8/server/seat-transitions.ts). */
 function isSeatFilled(seat: G1Seat): boolean {
@@ -241,10 +247,14 @@ async function runGate(
       }
 
       if (rules.requireBackupForCriticalSeats) {
-        const candidates: SeatCandidateRef[] = await tx.seatCandidate.findMany({
-          where: { tenantId, seatId: { in: criticalSeats.map((s: G1Seat) => s.id) } },
-          select: { seatId: true, organizationId: true, partnerOrgId: true },
-        });
+        // NG-100 B-1: a backup is a row the screens show (visibleSeatCandidates), so the
+        // gate and the consortium page cannot disagree about who is a backup.
+        const candidates: SeatCandidateRef[] = visibleSeatCandidates(
+          await tx.seatCandidate.findMany({
+            where: { tenantId, seatId: { in: criticalSeats.map((s: G1Seat) => s.id) } },
+            select: { seatId: true, organizationId: true, partnerOrgId: true, breakdown: true },
+          }),
+        );
         const withoutBackup = criticalSeats.filter(
           (s: G1Seat) => !candidates.some((c) => c.seatId === s.id && isBackupFor(c, s)),
         );

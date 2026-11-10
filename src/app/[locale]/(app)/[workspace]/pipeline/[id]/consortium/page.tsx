@@ -9,6 +9,7 @@ import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
+import { findOpportunityTopic } from '@/modules/m8/server/matching';
 
 /** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
 interface CordisOrgRow {
@@ -111,9 +112,8 @@ export default async function ConsortiumPage({
       // have an open partner-search request on this topic.
       if (opportunity.topicId && candidates.length > 0) {
         const topicId = opportunity.topicId;
-        const topic = await withTenant<{ identifier: string } | null>(tenantId, (tx) =>
-          tx.topic.findUnique({ where: { id: topicId }, select: { identifier: true } })
-        );
+        // NG-100 B-4: the form stores the topic identifier, so resolve it as the matcher does.
+        const topic = await withTenant(tenantId, (tx) => findOpportunityTopic(tx, topicId));
         if (topic) {
           const requests = await withTenant(tenantId, (tx) =>
             tx.partnerSearchAnnouncement.findMany({

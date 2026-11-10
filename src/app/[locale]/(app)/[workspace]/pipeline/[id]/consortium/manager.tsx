@@ -267,8 +267,10 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                 </div>
               </div>
 
-              {/* Candidate Results Drawer */}
-              {isExpanded && seatCandidates.length > 0 && (
+              {/* Candidate Results Drawer. NG-100 (qa Bulgu 1): a seat that already holds
+                  candidates shows them on load, so a reload does not look like the list was
+                  lost; the rows are the ones the last "Aday Bul" wrote. */}
+              {(isExpanded || seatCandidates.length > 0) && seatCandidates.length > 0 && (
                 <div className="border-t border-border bg-ground/50 p-4">
                   <h4 className="text-xs font-bold text-muted tracking-wider mb-3">{t('topCandidates')}</h4>
                   <div className="space-y-2">

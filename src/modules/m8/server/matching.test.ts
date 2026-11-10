@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { MATCH_MAX_TOTAL, matchSeatScore, runSeatMatch, scoreCandidate, topicPrefix, totalScore } from './matching';
+import { MATCH_MAX_TOTAL, findOpportunityTopic, matchSeatScore, runSeatMatch, scoreCandidate, topicPrefix, totalScore } from './matching';
 import { SeatNotFoundError } from './errors';
 import type { TenantTx } from '@/lib/db';
 
@@ -272,6 +272,17 @@ describe('runSeatMatch', () => {
     });
   });
 
+  it('the topic lookup takes the identifier or the cuid, the same for the matcher and the consortium page (NG-100 B-4)', async () => {
+    const { tx, calls } = fakeTx({ 'topic.findFirst': { identifier: 'HORIZON-CL5-2026-D4-01', callId: null } });
+    const topic = await findOpportunityTopic(tx, 'HORIZON-CL5-2026-D4-01');
+    expect(topic).toEqual({ identifier: 'HORIZON-CL5-2026-D4-01', callId: null });
+    expect(calls.find((c) => c.delegate === 'topic')?.args).toEqual({
+      where: { OR: [{ id: 'HORIZON-CL5-2026-D4-01' }, { identifier: 'HORIZON-CL5-2026-D4-01' }] },
+      select: { identifier: true, callId: true },
+    });
+    expect(await findOpportunityTopic(tx, null)).toBeNull();
+  });
+
   it('produces nothing — rather than everything — when the opportunity has no topic', async () => {
     const { tx, calls, created } = fakeTx({
       'opportunity.findFirst': { id: 'opp-1', topicId: null, seats: [] },
@@ -281,8 +292,22 @@ describe('runSeatMatch', () => {
     expect(created).toHaveLength(0);
     // An empty prefix would have matched every project ever imported.
     expect(calls.some((c) => c.delegate === 'cordisProjectTopic')).toBe(false);
-    // The stale candidates are still cleared.
-    expect(calls.some((c) => c.delegate === 'seatCandidate' && c.method === 'deleteMany')).toBe(true);
+    // NG-100 B-3: an empty result must not clear the rows already on the seat (a G1 backup,
+    // an invited candidate). Only a run that writes a new ranking replaces the old one.
+    expect(calls.some((c) => c.delegate === 'seatCandidate' && c.method === 'deleteMany')).toBe(false);
+  });
+
+  it('keeps the candidates already on the seat when the pool is empty (NG-100 B-3)', async () => {
+    const { tx, calls, created } = fakeTx({
+      'opportunity.findFirst': { id: 'opp-1', topicId: 'HORIZON-CL5-2026-D4-01', seats: [] },
+      // No CORDIS organisation worked under this prefix: the pool is empty.
+      'cordisProjectTopic.findMany': [],
+    });
+    const result = await runSeatMatch(tx, params);
+
+    expect(result).toEqual([]);
+    expect(created).toHaveLength(0);
+    expect(calls.some((c) => c.delegate === 'seatCandidate' && c.method === 'deleteMany')).toBe(false);
   });
 
   it('offers only past coordinators for a coordinator seat', async () => {

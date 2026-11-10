@@ -1,6 +1,7 @@
 import type { TenantTx } from '@/lib/db';
 import { asRole, can } from '@/lib/rbac';
 import { isPresentId } from '@/lib/required-id';
+import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 
 /**
  * Which consortium-seat writes the server allows, and to whom.
@@ -52,11 +53,14 @@ export async function inviteSeatCandidate(
     if (!inOpportunity) return 0;
   }
 
-  const candidate = await tx.seatCandidate.findFirst({
-    where: { tenantId, seatId, organizationId },
-    select: { id: true },
-  });
-  if (!candidate) return 0;
+  // NG-100 B-1: only a row the screens show can be offered (visibleSeatCandidates).
+  const candidates = visibleSeatCandidates(
+    await tx.seatCandidate.findMany({
+      where: { tenantId, seatId, organizationId },
+      select: { id: true, breakdown: true },
+    }),
+  );
+  if (candidates.length === 0) return 0;
 
   // `updateMany` so the tenant — and the status rule — stay in the WHERE clause.
   const result = await tx.consortiumSeat.updateMany({

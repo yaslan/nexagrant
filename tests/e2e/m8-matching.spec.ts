@@ -379,6 +379,36 @@ test.describe('M8 consortium matching', () => {
    * its own breakdown), so sharing a seat would mean this test asserted on
    * whichever button was pressed last.
    */
+  // NG-100 Bulgu 1 (qa-gnd): the rows survive a reload, so the list must too. Before the
+  // fix the seat opened closed after a reload and the candidates showed only after one more
+  // click on "Aday Bul".
+  test('the consortium builder keeps the candidate list after a reload, with no click (NG-100)', async ({ page }) => {
+    const consortiumUrl = `/tr/${WORKSPACE}/pipeline/${OPP}/consortium`;
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'fabrika_cookie_consent',
+        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
+      );
+    });
+    await signInAs(page, SEAT);
+    await page.goto(consortiumUrl);
+    await page.waitForURL(`**${consortiumUrl}`, { timeout: 30_000 });
+
+    const builderSeat = page.getByTestId('m8-builder-seat-widening');
+    const findCandidates = builderSeat.getByRole('button', { name: 'Aday Bul' });
+    await expectHydrated(findCandidates);
+    await findCandidates.click();
+    await expect(builderSeat.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
+
+    await page.reload();
+    await page.waitForURL(`**${consortiumUrl}`, { timeout: 30_000 });
+
+    // Visible straight after the reload: no "Aday Bul" click in between.
+    const reloadedSeat = page.getByTestId('m8-builder-seat-widening');
+    await expect(reloadedSeat.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
+    await expect(reloadedSeat).toContainText(/\d+,\d \/ 100/);
+  });
+
   test('the pipeline consortium builder finds candidates too', async ({ page }) => {
     const consortiumUrl = `/tr/${WORKSPACE}/pipeline/${OPP}/consortium`;
     const serverErrors: string[] = [];

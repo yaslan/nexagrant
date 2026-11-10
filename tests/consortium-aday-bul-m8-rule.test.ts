@@ -75,8 +75,8 @@ describe('consortium Aday Bul = M8 Aday Bul (K-579560=A)', () => {
   });
 });
 
-describe('the consortium page shows only matcher rows (stale consortium rows stay in the table, unshown)', () => {
-  it('drops rows written by the retired consortium scorer and keeps matcher rows, legacy included', async () => {
+describe('every screen shows only current matcher rows (stale rows stay in the table, unshown)', () => {
+  it('drops the retired consortium scorer rows and the pre-K-578751 matcher rows (K-579560=A: one rule)', async () => {
     const { visibleSeatCandidates } = await import('@/lib/scoring/seat-candidate-view');
     const rows = [
       { id: 'm', breakdown: { topicExperience: 25, geographicBalance: 33, collabHistory: 22, rivalRisk: 0 } },
@@ -93,6 +93,6 @@ describe('the consortium page shows only matcher rows (stale consortium rows sta
       },
       { id: 'consortium', breakdown: { topicExperience: 3, networkCentrality: 2, countryDiversity: 1.5, smeBonus: 1, warmthBonus: 0, liveDemandSignal: 0.4 } },
     ];
-    expect(visibleSeatCandidates(rows).map((r) => r.id)).toEqual(['m', 'legacy']);
+    expect(visibleSeatCandidates(rows).map((r) => r.id)).toEqual(['m']);
   });
 });

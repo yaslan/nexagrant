@@ -162,6 +162,23 @@ interface SeatRow {
  * with a real transaction (or a hand-built double) without having to replace the
  * `@/lib/db` module — replacing that module is exactly what hid this bug.
  */
+/**
+ * The topic an opportunity points at, by either key the pipeline has written: the Topic
+ * cuid (older rows) or the topic IDENTIFIER (the form). NG-100 B-4: this is the one lookup
+ * for the matcher and for the consortium page's live-demand badge, so they resolve a topic
+ * the same way.
+ */
+export async function findOpportunityTopic(
+  tx: Pick<TenantTx, 'topic'>,
+  topicId: string | null | undefined
+): Promise<{ identifier: string; callId: string | null } | null> {
+  if (!topicId) return null;
+  return tx.topic.findFirst({
+    where: { OR: [{ id: topicId }, { identifier: topicId }] },
+    select: { identifier: true, callId: true },
+  });
+}
+
 export async function runSeatMatch(
   tx: TenantTx,
   params: { opportunityId: string; seatId: string; tenantId: string; limit: number }
@@ -192,12 +209,7 @@ export async function runSeatMatch(
   // form as the topic's IDENTIFIER (the board shows it as "Topic Identifier"), while older
   // rows may hold a Topic cuid; resolving by either keeps "Aday Bul" from finding no
   // topic, and so no candidates, for a form-created opportunity (NG-100).
-  const topic = opp.topicId
-    ? await tx.topic.findFirst({
-        where: { OR: [{ id: opp.topicId }, { identifier: opp.topicId }] },
-        select: { identifier: true, callId: true },
-      })
-    : null;
+  const topic = await findOpportunityTopic(tx, opp.topicId);
 
   const prefix = topicPrefix(topic?.identifier);
 
@@ -330,6 +342,10 @@ export async function runSeatMatch(
   const sorted = scored
     .sort((a, b) => totalScore(b.breakdown) - totalScore(a.breakdown))
     .slice(0, limit);
+
+  // NG-100 B-3: an empty result (no topic, or an empty pool) writes nothing and clears
+  // nothing: the rows already on the seat (a G1 backup, an invited candidate) stay.
+  if (sorted.length === 0) return [];
 
   // The caller already holds a transaction (`withTenant`), so the clear and the
   // rewrite are atomic without opening a second one.
