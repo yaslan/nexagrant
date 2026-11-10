@@ -1,0 +1,1926 @@
+// Fabrika — Prisma schema (MVP scope + v1.1 tables marked)
+// Conventions: PascalCase singular models, camelCase fields, tenantId on every tenant-scoped table.
+// Money: Int minor units + currency. Timestamps UTC.
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../../node_modules/.prisma/client-mysql-view"
+  previewFeatures = ["driverAdapters"]
+  binaryTargets   = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ───────────────────────── Tenancy & identity ─────────────────────────
+
+model Tenant {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  name          String @db.LongText
+  slug          String @db.VarChar(191)   @unique
+  country       String @db.LongText   // ISO-3166-1 alpha-2
+  // TASK-MULV3JXS1AW5X — Turkish province, spelled as TR_PROVINCES
+  // (src/lib/readiness/provinces.ts), the dictionary the scorecard and the
+  // public-sector catalogue use. NULL = not given / not in Türkiye. A CHECK in
+  // add-tenant-province.sql holds the same 81 names. Organisation data.
+  province      String? @db.LongText
+  orgType       OrgType  @default(SME)
+  pic           String? @db.LongText  // EU Participant Identification Code
+  locale        String @db.LongText   @default("tr")
+  timezone      String @db.LongText   @default("Europe/Istanbul")
+  settings      Json     @default("{}") // scoringWeights, gateRules, aiRegion...
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String? @db.LongText
+
+  users         Membership[]
+  workspaces    Workspace[]
+  profile       TenantProfile?
+  subscription  Subscription?
+  moduleStates  ModuleState[]
+  creditLedger  CreditLedger[]
+  lifetimeLicences LifetimeLicence[]
+  auditEvents   AuditEvent[]
+  invitations   Invitation[]
+  approvalRequests ApprovalRequest[]
+  invoices      Invoice[]
+  billingIdentity TenantBillingIdentity?
+  planAssignments PlanAssignment[]
+  stripeEvents  StripeEventLog[]
+  notifications Notification[]
+  partnerSearchQuota PartnerSearchQuotaUsage[]
+  interregAnalyses InterregAnalysis[]
+  // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
+  // tenant opened with its invite code carries its id in agencyId, written once
+  // at registration. The link grants the agency no read on this tenant's rows —
+  // no RLS policy consults agencyId. Migration: add-agency-invite-code.sql.
+  kind          TenantKind @default(ORGANIZATION)
+  agencyId      String? @db.VarChar(128)
+  agency        Tenant?  @relation("AgencyMembers", fields: [agencyId], references: [id], onDelete: SetNull)
+  agencyMembers Tenant[] @relation("AgencyMembers")
+  agencyInviteCodes AgencyInviteCode[]
+  @@index([deletedAt])
+  @@index([agencyId])
+  @@map("v_Tenant")
+}
+
+enum TenantKind {
+  ORGANIZATION
+  AGENCY
+}
+
+/// A multi-use code an agency tenant hands out (FB KAMU B1, TASK-MULRQJQYM0NAM).
+/// `tenantId` is the AGENCY — named so tenant_isolation covers it unchanged.
+/// The code itself is never stored: only its SHA-256 (src/lib/agency/invite-code.ts).
+/// Used only through public.redeem_agency_invite(), which increments usedCount
+/// atomically and returns the agency id or NULL.
+/// No use limit (TASK-MUM4WVYLSH9IT, leed-fb 29.09): a code is governed by
+/// expiresAt and revokedAt only. maxUses is a retired column: nullable, never
+/// written by new codes, never read. usedCount is an internal counter nobody is shown.
+model AgencyInviteCode {
+  id        String @db.VarChar(128)    @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  codeHash  String @db.VarChar(64)    @unique
+  codeHint  String @db.LongText
+  label     String? @db.LongText
+  maxUses   Int?
+  usedCount Int       @default(0)
+  expiresAt DateTime
+  revokedAt DateTime?
+  revokedBy String? @db.LongText
+  createdBy String @db.LongText
+  createdAt DateTime  @default(now())
+  agency    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("v_AgencyInviteCode")
+}
+
+enum OrgType {
+  SME
+  LARGE
+  UNIVERSITY
+  RESEARCH
+  PUBLIC
+  NGO
+  CONSULTANCY
+  CLUSTER
+  MUNICIPALITY
+}
+
+model User {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  email         String @db.VarChar(254)   @unique
+  emailVerified DateTime?
+  image         String? @db.LongText
+  name          String? @db.LongText
+  locale        String @db.LongText   @default("tr")
+  isPlatformAdmin Boolean @default(false)
+  // KVKK md.7/md.11 · GDPR art.17 — erasure grace period. See prisma/migrations/add-soft-delete.sql
+  deletionRequestedAt DateTime?  // set when the subject asks for erasure; purge job scans this
+  deletedAt     DateTime?        // soft-delete marker: hidden from the product, still restorable
+  deletionReason String? @db.LongText         // subject_request | policy | tenant_cascade
+  /// UTC day the `m4-stale-relationships` digest for this user was claimed,
+  /// set BEFORE the mail goes (compare-and-set) so no second run can send a
+  /// second digest the same day. m4-stale-digest-user-claim.sql
+  staleDigestOn DateTime? @db.Date
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  memberships   Membership[]
+  evaluations   Evaluation[]
+  reviewerSeats Reviewer[]
+  requestedApprovals ApprovalRequest[] @relation("Requester")
+  approvedApprovals  ApprovalRequest[] @relation("Approver")
+  interregAnalyses   InterregAnalysis[]
+  @@index([deletionRequestedAt])
+  @@index([deletedAt])
+  @@map("v_User")
+}
+
+model Membership {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  userId    String @db.VarChar(128)
+  role      Role     @default(MEMBER)
+  workspaceIds Json // empty = all workspaces of tenant
+  createdAt DateTime @default(now())
+  /// No longer written: the digest's claim moved to `User.staleDigestOn`
+  /// (m4-stale-digest-user-claim.sql). Kept for the previous release, which
+  /// still claims here; read only so that such a claim made on the deploy day
+  /// holds (stale-reminder.ts `legacyClaims`). Dropped in a later file.
+  /// m4-stale-reminder-idempotency.sql
+  staleDigestOn DateTime? @db.Date
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("v_Membership")
+}
+
+enum Role {
+  TENANT_OWNER
+  TENANT_ADMIN
+  PIPELINE_MANAGER
+  WRITER
+  MEMBER
+  GUEST_PARTNER
+}
+
+model Workspace {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  name      String @db.LongText   // e.g. client name for consultancies
+  slug      String @db.VarChar(191)
+  createdAt DateTime @default(now())
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String? @db.LongText
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  opportunities Opportunity[]
+  @@unique([tenantId, slug])
+  @@index([deletedAt])
+  @@map("v_Workspace")
+}
+
+model TenantProfile {
+  tenantId      String @db.VarChar(128)   @id
+  capabilities  String @db.LongText   // free text, used for embedding
+  keywords      Json
+  naceCodes     Json
+  trlRange      Json    // [min,max]
+  preferredRoles Json // coordinator, tech_provider, pilot_site, dissemination...
+  priorProjects Json     @default("[]")
+  embedding     Json?
+  embeddingHash String? @db.LongText  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
+  updatedAt     DateTime @updatedAt
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@map("v_TenantProfile")
+}
+
+// ───────────────────────── Modules & entitlements ─────────────────────────
+
+enum ModuleStatus {
+  OFF
+  DEV
+  PILOT
+  ON
+}
+
+model ModuleState {
+  id        String @db.VarChar(128)       @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  moduleId  String @db.VarChar(64)
+  status    ModuleStatus @default(OFF)
+  settings  Json         @default("{}")
+  changedBy String? @db.LongText
+  changedAt DateTime     @default(now())
+  // FO-41: keeps the module entitled whatever the plan (M3 for pre-FO-41
+  // Discover tenants). Set by migrations only; a trigger refuses fabrika_app.
+  // Migration: module-state-grandfathered.sql.
+  grandfathered Boolean  @default(false)
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, moduleId])
+  @@map("v_ModuleState")
+}
+
+model Plan {                    // projection of src/lib/billing/catalog.ts; seeded: free, basic, pro, ultra
+  id            String @db.VarChar(64)  @id    // "pro"
+  name          String @db.LongText
+  monthlyCents  Int            // list price, minor units — the campaign discount lives at checkout
+  yearlyCents   Int
+  currency      String @db.LongText  @default("USD")
+  seats         Int
+  workspaces    Int
+  aiCreditsMonthly Int
+  modules       Json       // default ON modules
+  stripePriceMonthly String? @db.LongText
+  stripePriceYearly  String? @db.LongText
+  visibility    String @db.LongText  @default("public") // public | private | archived
+  versions      PlanVersion[]
+  assignments   PlanAssignment[]
+  @@map("v_Plan")
+}
+
+// Plan* and Subscription.planVersion FKs: onUpdate NoAction mirrors
+// add-plan-versioning/migration.sql, which declares no ON UPDATE clause.
+model PlanVersion {
+  id            String @db.VarChar(128)  @id    @default(cuid())
+  planId        String @db.VarChar(64)
+  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  version       Int             // semantic version: 1, 2, 3, ...
+  status        String @db.LongText  @default("draft") // draft | published | archived
+  monthlyCents  Int
+  yearlyCents   Int
+  currency      String @db.LongText  @default("USD")
+  seats         Int
+  workspaces    Int
+  aiCreditsMonthly Int
+  modules       Json @default("[]") // modules granted by this version
+  features      PlanFeature[]
+  publishedBy   String? @db.LongText        // user id who published this version
+  publishedAt   DateTime?      // when this version was published (immutable after)
+  subscriptions Subscription[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([planId, version])
+  @@map("v_PlanVersion")
+}
+
+model PlanFeature {
+  id            String @db.VarChar(128)  @id    @default(cuid())
+  planVersionId String @db.VarChar(128)
+  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  order         Int             // display order (1, 2, 3, ...)
+  kind          String @db.LongText          // module | limit | text
+  moduleId      String? @db.LongText         // if kind='module': module identifier (M1, M8, etc)
+  limitKey      String? @db.LongText         // if kind='limit': limit identifier (e.g. "seats", "credits")
+  textTr        String? @db.LongText         // if kind='text': Turkish label or description
+  textEn        String? @db.LongText         // if kind='text': English label or description
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([planVersionId, order])
+  @@map("v_PlanFeature")
+}
+
+model PlanAssignment {
+  id            String @db.VarChar(128)  @id    @default(cuid())
+  planId        String @db.VarChar(64)
+  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  tenantId      String @db.VarChar(128)
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assignedBy    String? @db.LongText        // user id who made the assignment
+  assignedAt    DateTime @default(now())
+  note          String? @db.LongText        // reason or memo
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([planId, tenantId])
+  @@map("v_PlanAssignment")
+}
+
+model Subscription {
+  tenantId          String @db.VarChar(128)   @id
+  planId            String @db.LongText
+  status            SubStatus @default(TRIALING)
+  billingInterval   String @db.LongText   @default("month") // month|year
+  provider          String @db.LongText   @default("stripe") // stripe|iyzico
+  providerCustomerId String? @db.LongText
+  providerSubId     String? @db.LongText
+  currentPeriodEnd  DateTime?
+  seatsExtra        Int      @default(0)
+  workspacesExtra   Int      @default(0)
+  trialEndsAt       DateTime?
+  // The joined price, kept (TASK-MTR882HVZ8BG7). The pricing page promises the
+  // rate a tenant joins at stays theirs; nothing here recorded it, so every
+  // quote came from the campaign running now. Written once on activation and on
+  // a re-activation after cancellation, never in between — the rule and the
+  // reasoning live in src/lib/billing/price-lock.ts. All five are nullable
+  // together: a row with none of them is a subscription sold before the lock
+  // existed and is priced at the shopfront tier, as it was.
+  lockedTierCode    String? @db.LongText   // campaign the rate came from, e.g. ILK5 (provenance)
+  lockedPercentOff  Int?      // the rate honoured on renewal, whole percent
+  lockedAmountMinor Int?      // what one period cost at that rate, minor units (rule 9)
+  lockedCurrency    String? @db.LongText   // currency of lockedAmountMinor
+  priceLockedAt     DateTime? // when the rate was locked
+  planVersionId     String? @db.VarChar(128)  // current plan version (ADIM 2: checkout writes this)
+  planVersion       PlanVersion? @relation(fields: [planVersionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  addOns            AddOn[]
+  @@map("v_Subscription")
+}
+
+enum SubStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
+model AddOn {
+  id             String @db.VarChar(128)   @id @default(cuid())
+  tenantId       String @db.VarChar(128)
+  sku            String @db.VarChar(191)
+  quantity       Int      @default(1)
+  providerItemId String? @db.LongText
+  startedAt      DateTime @default(now())
+  endedAt        DateTime?
+  subscription   Subscription @relation(fields: [tenantId], references: [tenantId], onDelete: Cascade)
+  @@index([tenantId, sku])
+  @@map("v_AddOn")
+}
+
+model LifetimeLicence {          // one-time "first 20 companies" purchase; the pricing page counts these rows
+  id                String @db.VarChar(128)   @id @default(cuid())
+  tenantId          String @db.VarChar(128)
+  seq               Int      @unique   // which licence of the limited run this is: 1, 2, 3…
+  sku               String @db.LongText   @default("lifetime-ultra")
+  amountMinor       Int                // what was actually charged, minor units
+  currency          String @db.LongText   @default("USD")
+  provider          String @db.LongText   @default("stripe")
+  providerEventId   String @db.VarChar(191)   @unique   // idempotency: one webhook event writes at most one licence
+  providerSessionId String? @db.VarChar(191)  @unique   // idempotency: one checkout session writes at most one licence
+  purchasedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, purchasedAt])
+  @@map("v_LifetimeLicence")
+}
+
+model Invoice {                 // an invoice actually issued to a tenant; TASK-MTRD9QBJ2G32E
+  id            String @db.VarChar(128)   @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  number        String @db.VarChar(32)              // what the customer sees and cites, e.g. "FB-2026-000001"
+  issuedAt      DateTime            // UTC, like every other timestamp (CLAUDE.md rule 10)
+  currency      String @db.LongText   @default("TRY")
+  // VUK 215/280/385 (ADR-0002, option (b)): an invoice denominated in a foreign
+  // currency is only valid while it also states the TCMB *buying* rate of its
+  // issue date and the Turkish lira equivalent. Those two facts are stored on
+  // the row and not merely computed into the XML, so an already-issued document
+  // can be reproduced and audited later (CLAUDE.md rule 7).
+  //
+  // NULL on a TRY invoice: there is nothing to convert. On any other currency a
+  // CHECK constraint (`Invoice_fx_required_for_foreign_currency`) refuses the
+  // row outright — an invented rate would be an invented figure on a fiscal
+  // document, so the invoice is not issued at all rather than issued wrong.
+  fxRate             Decimal?  @db.Decimal(18, 6) // TCMB döviz alış kuru: 1 `currency` → TRY
+  fxRateDate         DateTime? @db.Date           // publication date of the rate actually used; may precede `issuedAt` across a weekend or public holiday
+  fxRateSource       String? @db.LongText                      // where the rate came from, e.g. "TCMB"; never a guess
+  grandTotalTryMinor Int?                         // TL karşılığı of the payable grand total, minor units (CLAUDE.md rule 9)
+  // The buyer's fiscal identity, frozen at issue time. An invoice must keep
+  // saying who it was issued to even after the tenant renames itself or moves,
+  // so these are a snapshot on the row and never a join to Tenant.
+  buyerName      String @db.LongText
+  buyerVknTckn   String @db.LongText             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
+  buyerTaxOffice String @db.LongText
+  buyerAddress   String @db.LongText
+  buyerCity      String @db.LongText
+  buyerCountry   String @db.LongText  @default("Türkiye")
+  lines         Json                // InvoiceLine[]; unit prices are minor units (CLAUDE.md rule 9)
+  profileId     String @db.LongText   @default("TICARIFATURA")  // TICARIFATURA | TEMELFATURA | EARSIVFATURA
+  invoiceType   String @db.LongText   @default("SATIS")         // SATIS | ISTISNA | TEVKIFAT
+  ettn          String @db.VarChar(36)   @unique    // the document's own UUID, assigned when the row is written
+  // Set only once GİB has actually accepted the filing through an integrator.
+  // NULL means the document was never filed: the exporter marks it as carrying
+  // no fiscal value rather than claiming a fiscal seal it does not have.
+  gibEnvelopeId String? @db.LongText
+  // The provider payment this invoice was issued for. Unique per tenant, so a
+  // redelivered webhook cannot issue a second invoice for one payment; NULL on
+  // rows written before the write path existed (TASK-MTSWL8ADKZKDM).
+  paymentRef    String? @db.VarChar(191)
+  createdAt     DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, number])
+  @@unique([tenantId, paymentRef])
+  @@index([tenantId, issuedAt])
+  @@map("v_Invoice")
+}
+
+/// The buyer's *current* fiscal identity, as the tenant supplied it.
+///
+/// Nothing else in the schema held this: `Tenant` carries a display name and an
+/// ISO country code, and the billing panel used to read the buyer identity back
+/// off the newest invoice, which only ever echoes what an earlier invoice
+/// already claimed. Without a store, filling `Invoice.buyer*` would mean
+/// inventing a taxpayer (TASK-MTSWL8ADKZKDM).
+///
+/// This row is mutable; `Invoice.buyer*` is the snapshot frozen at issue time.
+/// Correcting a typo here never rewrites a document already sent to a customer.
+/// A tenant with no row here is not invoiced at all — a SystemAlert names the
+/// missing fields instead.
+model TenantBillingIdentity {
+  tenantId       String @db.VarChar(128)   @id
+  buyerName      String @db.LongText
+  buyerVknTckn   String @db.LongText             // 10-digit VKN or 11-digit TCKN, as supplied by the buyer
+  buyerTaxOffice String @db.LongText
+  buyerAddress   String @db.LongText
+  buyerCity      String @db.LongText
+  buyerCountry   String @db.LongText   @default("Türkiye")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@map("v_TenantBillingIdentity")
+}
+
+model CreditLedger {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  delta     Int      // + grant, - usage
+  reason    String @db.LongText   // monthly_grant | purchase | usage:M2 | refund
+  refId     String? @db.LongText
+  /// `YYYY-MM` of the scheduled monthly grant (credits-monthly-grant job) and
+  /// NULL on every other row. The unique key makes that job one grant per
+  /// tenant per month however often it runs (ADR-0008 §6.2, TASK-MUMT3PGX5OK8P).
+  grantPeriod String? @db.VarChar(191)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, createdAt])
+  @@unique([tenantId, grantPeriod])
+  @@map("v_CreditLedger")
+}
+
+// ───────────────────────── K1 Calls (shared, not tenant-scoped) ─────────────────────────
+
+// FO-60 (TASK-MVCH2J271U5VY): platform-wide switches, one row per key. Global,
+// like Programme; no tenantId. See prisma/migrations/add-platform-setting.sql.
+model Topic {
+  id             String @db.VarChar(128)   @id @default(cuid())
+  callId         String @db.VarChar(128)
+  identifier     String @db.VarChar(191)   @unique // HORIZON-CL5-2026-09-D4-01
+  title          String @db.LongText
+  status         TopicStatus @default(FORTHCOMING)
+  typeOfAction   String? @db.LongText   // RIA IA CSA ...
+  isLumpSum      Boolean  @default(false)
+  isTwoStage     Boolean  @default(false)
+  budgetPerProjectCents BigInt?
+  numProjects    Int?
+  deadlines      Json     // [{stage:1, at:"2026-09-15T17:00:00Z", tz:"Europe/Brussels"}]
+  nextDeadlineAt DateTime?
+  eligibility    Json     @default("{}") // { restricted: "EU_EEA_CH_ONLY" | null, countriesExcluded: [] , notes }
+  destination    String? @db.LongText
+  keywords       Json
+  description    String? @db.LongText  // expected outcomes + scope (from topicDetails)
+  sourceUrl      String? @db.LongText
+  rawHash        String? @db.LongText
+  embedding      Json?
+  embeddingHash  String? @db.LongText  // sha256 of the text `embedding` was made from (src/lib/scoring/embeddings.ts)
+  fetchedAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  matches        TopicMatch[]
+  partnerAnnouncements PartnerSearchAnnouncement[]
+  @@index([nextDeadlineAt])
+  @@index([status])
+  @@map("v_Topic")
+}
+
+enum TopicStatus {
+  FORTHCOMING
+  OPEN
+  CLOSED
+}
+
+model SystemAlert {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  level     String @db.LongText   // info|warn|error
+  source    String @db.VarChar(191)
+  message   String @db.LongText
+  meta      Json?
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+  @@index([createdAt])
+  @@index([source, createdAt])
+  @@index([resolvedAt, createdAt])
+  @@map("v_SystemAlert")
+}
+
+/// AKTAR-MURBCJ0A-1 — a post on the public blog (/tr/blog, landing BlogSection).
+/// Platform content, not tenant data: no tenantId, listed in scripts/rls-models.ts
+/// SYSTEM_WIDE. Read by the public pages through src/lib/blog.ts, written only by
+/// the /admin/blog actions behind requirePlatformAdmin(). Before this table the
+/// posts lived in a module-level array, so an admin's post vanished on restart and
+/// every server instance showed different content.
+///
+/// The byline is optional on purpose (TASK-MTRNQHC3IV2BE): `authorName` NULL means
+/// "no recorded author" and the public pages render no byline — never a default.
+/// `createdById` is the admin who created the row; no FK, so erasing that user
+/// never blocks on or deletes published content. prisma/migrations/add-blog-post.sql.
+model TopicMatch {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  topicId   String @db.VarChar(128)
+  /// The opportunity this G0 evidence belongs to; NULL on a topic-level K1 match row.
+  opportunityId String? @db.VarChar(128)
+  fitScore  Float    // 0..100
+  g0Score   Float?   // weighted total
+  breakdown Json     // per-criterion
+  computedAt DateTime @default(now())
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, topicId, opportunityId])
+  @@index([tenantId, g0Score])
+  @@index([tenantId, opportunityId])
+  @@map("v_TopicMatch")
+}
+
+model SavedSearch {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  userId    String @db.LongText
+  name      String @db.LongText
+  filters   Json
+  notify    Boolean  @default(true)
+  lastRunAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([tenantId])
+  @@map("v_SavedSearch")
+}
+
+// ───────────────────────── K2 CORDIS & M1 Derived Tables (shared) ─────────────────────────
+
+model CordisProject {
+  id                 String @db.VarChar(64)     @id // CORDIS project id (PK)
+  rcn                String? @db.LongText
+  acronym            String? @db.LongText
+  title              String @db.LongText
+  objective          String?    @db.LongText
+  status             String? @db.LongText
+  framework          String @db.VarChar(16)     // HORIZON | H2020
+  masterCall         String? @db.VarChar(191)
+  subCall            String? @db.LongText
+  fundingScheme      String? @db.LongText
+  legalBasis         String? @db.LongText
+  startDate          DateTime?
+  endDate            DateTime?
+  ecSignatureDate    DateTime?
+  totalCost          BigInt?
+  ecMaxContribution  BigInt?
+  grantDoi           String? @db.LongText
+  contentUpdateDate  DateTime?
+  rawJson            Json?
+  importedAt         DateTime   @default(now())
+
+  participations     CordisParticipation[]
+  topics             CordisProjectTopic[]
+
+  @@index([startDate])
+  @@index([masterCall])
+  @@index([framework])
+  @@map("v_CordisProject")
+}
+
+model CordisOrganization {
+  organisationId     String @db.VarChar(40)     @id // CORDIS organisationID (PIC)
+  name               String @db.LongText
+  nameNormalized     String? @db.VarChar(191)
+  shortName          String? @db.LongText
+  vatNumber          String? @db.LongText
+  activityType       String? @db.VarChar(16)    // HES | REC | PRC | PUB | OTH
+  sme                Boolean    @default(false)
+  country            String? @db.VarChar(8)
+  city               String? @db.LongText
+  postCode           String? @db.LongText
+  nutsCode           String? @db.LongText
+  geolocation        String? @db.LongText
+  url                String? @db.LongText
+  isTurkish          Boolean    @default(false)
+  rawJson            Json?
+  updatedAt          DateTime   @updatedAt
+  // FO-58 Partner Search (additive; written by the partner-search ingestor only)
+  hasActiveAnnouncements Boolean   @default(false)
+  lastAnnouncementAt     DateTime?
+  portalProfileFetchedAt DateTime?
+
+  participations     CordisParticipation[]
+  profile            CordisPartnerProfile?
+
+  @@index([country])
+  @@index([activityType])
+  @@index([nameNormalized])
+  @@index([isTurkish])
+  @@map("v_CordisOrganization")
+}
+
+model CordisParticipation {
+  projectId          String @db.VarChar(64)
+  organisationId     String @db.VarChar(40)
+  role               String @db.VarChar(32)     // coordinator | participant | thirdParty...
+  order              Int?
+  ecContribution     BigInt?
+  netEcContribution  BigInt?
+  totalCost          BigInt?
+  endOfParticipation Boolean?   @default(false)
+  active             Boolean?   @default(true)
+
+  project            CordisProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization       CordisOrganization @relation(fields: [organisationId], references: [organisationId], onDelete: Cascade)
+
+  @@id([projectId, organisationId])
+  @@index([organisationId])
+  @@index([projectId])
+  @@index([role])
+  @@map("v_CordisParticipation")
+}
+
+model CordisProjectTopic {
+  projectId          String @db.VarChar(64)
+  topicCode          String @db.VarChar(191)
+  topicTitle         String? @db.LongText
+
+  project            CordisProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, topicCode])
+  @@index([topicCode])
+  @@map("v_CordisProjectTopic")
+}
+
+model CordisPartnerProfile {
+  organisationId        String @db.VarChar(40)     @id
+  name                  String @db.LongText
+  nameNormalized        String? @db.LongText
+  country               String? @db.VarChar(8)
+  activityType          String? @db.VarChar(16)
+  sme                   Boolean    @default(false)
+  isTurkish             Boolean    @default(false)
+  
+  totalProjects         Int        @default(0)
+  horizonProjects       Int        @default(0)
+  h2020Projects         Int        @default(0)
+  coordinatorProjects   Int        @default(0)
+  activeProjects        Int        @default(0)
+  totalEcContribution   BigInt     @default(0)
+  lastProjectDate       DateTime?
+
+  topTopics             Json       @default("[]") // top 20 [{code, title, count}]
+  topCountries          Json       @default("[]") // top 20 [{country, count}]
+  topPartners           Json       @default("[]") // top 20 [{organisationId, name, country, count}]
+
+  updatedAt             DateTime   @updatedAt
+  organization          CordisOrganization @relation(fields: [organisationId], references: [organisationId], onDelete: Cascade)
+
+  @@index([country, activityType])
+  @@index([totalProjects])
+  @@index([coordinatorProjects])
+  @@index([isTurkish])
+  @@map("v_CordisPartnerProfile")
+}
+
+model CordisCoParticipation {
+  orgA                  String @db.VarChar(40)
+  orgB                  String @db.VarChar(40)
+  sharedProjectCount    Int        @default(0)
+  lastSharedYear        Int?
+
+  @@id([orgA, orgB])
+  @@index([orgA])
+  @@index([orgB])
+  @@map("v_CordisCoParticipation")
+}
+
+// ───────────────────── Partner Search (FO-58, global + one tenant counter) ─────────────────────
+// Funding & Tenders Portal partner-search announcements (docs/agent-results/TASK-MVCGPI6V3RM1F-*).
+// Global reference data like CORDIS: no tenantId, SYSTEM_WIDE in scripts/rls-models.ts.
+// Person announcements are NEVER stored as rows; only PartnerSearchTopicStat counts them.
+// Migration: prisma/migrations/add-partner-search.sql
+
+enum PartnerSearchAnnouncementType {
+  EXPERTISE_REQUEST
+  EXPERTISE_OFFER
+}
+
+enum PartnerSearchOrgType {
+  HES
+  REC
+  PRC
+  PUB
+  OTH
+}
+
+enum PartnerSearchSource {
+  PORTAL_API
+  TOPIC_HTML
+}
+
+enum PartnerSearchRunTrigger {
+  FULL
+  INCREMENTAL
+  MANUAL
+}
+
+enum PartnerSearchRunStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+model PartnerSearchAnnouncement {
+  id               String @db.VarChar(128)                        @id @default(cuid())
+  externalId       String @db.VarChar(191)                        @unique // portal announcement key
+  topicIdentifier  String @db.VarChar(128)                        // Topic.identifier
+  callIdentifier   String? @db.LongText
+  type             PartnerSearchAnnouncementType
+  description      String?                       @db.VarChar(500)
+  publishedAt      DateTime?
+  lastSeenAt       DateTime
+  withdrawnAt      DateTime?
+  missedScans      Int                           @default(0) // consecutive scans without this row; 2 → withdrawn
+  missedScanAt     DateTime?                     // UTC day of the last counted miss: one miss per day (FO-60 review 2)
+  organizationPic  String? @db.VarChar(40)                       // CordisOrganization.organisationId when matched
+  organizationName String @db.LongText
+  organizationType PartnerSearchOrgType          @default(OTH)
+  isSme            Boolean                       @default(false)
+  country          String? @db.VarChar(8)                       // ISO-3166-1 alpha-2
+  city             String? @db.LongText
+  keywords         Json                          @default("[]") // string[]
+  programmeCodes   Json                          @default("[]") // string[]
+  source           PartnerSearchSource
+  raw              Json?                         // allowlisted fields only; ecasId NEVER
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+  topic            Topic                         @relation(fields: [topicIdentifier], references: [identifier], onDelete: Cascade)
+
+  @@index([topicIdentifier])
+  @@index([organizationPic])
+  @@index([country])
+  @@index([type])
+  @@index([lastSeenAt])
+  @@map("v_PartnerSearchAnnouncement")
+}
+
+// Latest portal organisation profile per PIC (overwritten on each fetch).
+model PartnerSearchQuotaUsage {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  month     String @db.VarChar(7)   // 'YYYY-MM' (UTC)
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, month])
+  @@map("v_PartnerSearchQuotaUsage")
+}
+
+// ───────────────────────── K5 Pipeline (tenant-scoped) ─────────────────────────
+
+model Opportunity {
+  id           String @db.VarChar(128)   @id @default(cuid())
+  tenantId     String @db.VarChar(128)
+  workspaceId  String @db.VarChar(128)
+  topicId      String? @db.LongText
+  title        String @db.LongText
+  stage        Gate     @default(G0)
+  status       OppStatus @default(ACTIVE)
+  intendedRole String? @db.LongText  // coordinator | partner
+  ownerId      String? @db.LongText
+  g0Score      Float?
+  notes        String? @db.LongText
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String? @db.LongText
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  proposal     Proposal?
+  gateDecisions GateDecision[]
+  seats        ConsortiumSeat[]
+  efforts      Effort[]
+  topicMatches TopicMatch[]
+  @@index([tenantId, workspaceId, stage])
+  followupDocs FollowupDoc[]
+  applicationParts ApplicationPart[]
+  evaluations Evaluation[]
+  meetingBriefs MeetingBrief[]
+  @@index([deletedAt])
+  @@map("v_Opportunity")
+}
+
+enum Gate {
+  G0
+  G1
+  G2
+  G3
+  G4
+}
+enum OppStatus {
+  ACTIVE
+  WITHDRAWN
+  SUBMITTED
+  FUNDED
+  REJECTED
+  ABOVE_THRESHOLD
+}
+
+model GateDecision {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  opportunityId String @db.VarChar(128)
+  gate          Gate
+  passed        Boolean
+  inputs        Json     // values evaluated
+  ruleVersion   String @db.LongText
+  decidedBy     String @db.LongText
+  decidedAt     DateTime @default(now())
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String? @db.LongText
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@index([tenantId, opportunityId])
+  @@index([deletedAt])
+  @@map("v_GateDecision")
+}
+
+model ConsortiumSeat {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  opportunityId String @db.VarChar(128)
+  roleKey       String @db.LongText   // coordinator | research | industry | end_user | widening | dissemination | custom
+  required      Boolean  @default(true)
+  organizationId String? @db.LongText // filled seat (CORDIS PIC) or
+  partnerOrgId  String? @db.LongText  // tenant-private partner record
+  status        SeatStatus @default(OPEN)
+  budgetCents   BigInt?
+  personMonths  Float?
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@index([tenantId, opportunityId])
+  @@map("v_ConsortiumSeat")
+}
+
+enum SeatStatus {
+  OPEN
+  CANDIDATE
+  INVITED
+  CONFIRMED
+  DECLINED
+}
+
+model PartnerOrg {                 // tenant-private orgs not in CORDIS
+  id        String @db.VarChar(128)  @id @default(cuid())
+  tenantId  String @db.VarChar(128)
+  name      String @db.LongText
+  country   String? @db.LongText
+  orgType   String? @db.LongText
+  pic       String? @db.LongText
+  website   String? @db.LongText
+  createdAt DateTime @default(now())
+  @@index([tenantId])
+  @@map("v_PartnerOrg")
+}
+
+model Proposal {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  opportunityId String @db.VarChar(128)   @unique
+  acronym       String? @db.LongText
+  submittedAt   DateTime?
+  esrScores     Json?    // {excellence, impact, implementation, total, threshold}
+  esrFileUrl    String? @db.LongText
+  outcome       String? @db.LongText  // funded | reserve | above_threshold | below
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String? @db.LongText
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  evaluations   Evaluation[]
+  @@index([deletedAt])
+  @@map("v_Proposal")
+}
+
+model Effort {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  opportunityId String @db.VarChar(128)
+  userId        String @db.LongText
+  date          DateTime
+  hours         Float
+  note          String? @db.LongText
+  deletedAt      DateTime?  // soft-delete marker (KVKK/GDPR erasure)
+  deletionReason String? @db.LongText
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  @@index([tenantId, opportunityId])
+  @@index([deletedAt])
+  @@map("v_Effort")
+}
+
+// ───────────────────────── M3 Evidence Pack ─────────────────────────
+
+model Evidence {
+  id                 String @db.VarChar(128)               @id @default(cuid())
+  tenantId           String @db.VarChar(128)
+  kind               String @db.VarChar(32)               // corporate | financial | certificate | infrastructure | performance | ethics | partner | personnel
+  category           String @db.VarChar(16)               @default("certificate") // CAT-01 .. CAT-08
+  title              String @db.LongText
+  body               String               @db.LongText
+  description        String?              @db.LongText
+  language           String @db.LongText               @default("tr") // tr | en | bilingual
+  issuingAuthority   String? @db.LongText              // TSE, İTO, TÜRKAK, Audit Firm
+  documentNumber     String? @db.LongText              // Certificate / Doc No
+  issuedAt           DateTime?
+  validFrom          DateTime?
+  validUntil         DateTime?
+  confidentiality    String @db.LongText               @default("INTERNAL") // PUBLIC | CONSORTIUM | INTERNAL | RESTRICTED
+  status             String @db.VarChar(32)               @default("VALID") // UNVERIFIED | VALID | EXPIRING_SOON | EXPIRED | REJECTED
+  version            Int                  @default(1)
+  
+  // Cloudflare R2 Depolama Bilgileri
+  r2ObjectKey        String?              // tenantId/orgId/cat/hash.ext
+  fileBucket         String @db.LongText               @default("fonbridge-evidence")
+  fileName           String? @db.LongText
+  fileSizeBytes      Int?
+  mimeType           String? @db.LongText
+  checksumSha256     String? @db.LongText
+  fileUrl            String? @db.LongText
+  sourceUrl          String? @db.LongText
+  sourceDate         DateTime?
+
+  // YZ & OCR Metadata
+  ocrText            String?              @db.LongText
+  extractedFields    Json                 @default("{}")
+  tags               Json
+  lastUsedIn         String? @db.LongText              // proposalId
+  createdBy          String @db.LongText               @default("system")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  claimLinks         ClaimEvidenceLink[]
+  proposalUsages     ProposalUsage[]
+
+  // One row per stored object (D-3, TASK-MUNTTZ94LJWBC): confirming the same
+  // key twice made two rows, and deleting either removed the other's file.
+  // prisma/migrations/evidence-unique-object-key.sql
+  @@unique([tenantId, r2ObjectKey])
+  @@index([tenantId, kind])
+  @@index([tenantId, category])
+  @@index([tenantId, status])
+  @@index([validUntil])
+  @@map("v_Evidence")
+}
+
+model Claim {
+  id                 String @db.VarChar(128)               @id @default(cuid())
+  tenantId           String @db.VarChar(128)
+  statement          String               @db.LongText
+  statementEn        String?              @db.LongText
+  confidenceScore    Float                @default(1.0)
+  tags               Json
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  evidenceLinks      ClaimEvidenceLink[]
+
+  @@index([tenantId])
+  @@map("v_Claim")
+}
+
+// Every row is a join between one tenant's Claim and that same tenant's
+// Evidence, so it is tenant data even though it looks like a pure link table.
+// `tenantId` is carried on the row itself: RLS reads a column, it does not
+// follow a foreign key (TASK-MTU6HUB8FUHMG B-1).
+model ClaimEvidenceLink {
+  id                 String @db.VarChar(128)               @id @default(cuid())
+  tenantId           String @db.VarChar(128)
+  claimId            String @db.VarChar(128)
+  evidenceId         String @db.VarChar(128)
+  isPrimary          Boolean              @default(true)
+  notes              String? @db.LongText
+
+  claim              Claim                @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@unique([claimId, evidenceId])
+  @@index([tenantId])
+  @@map("v_ClaimEvidenceLink")
+}
+
+model ProposalUsage {
+  id                 String @db.VarChar(128)               @id @default(cuid())
+  tenantId           String @db.VarChar(128)
+  opportunityId      String @db.VarChar(128)
+  evidenceId         String @db.VarChar(128)
+  sectionKey         String @db.LongText               // "PartB_Sec3_2", "Annex_4", "ConceptNote_G0"
+  usedAt             DateTime             @default(now())
+  usedByUserId       String? @db.LongText
+
+  evidence           Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, opportunityId])
+  @@map("v_ProposalUsage")
+}
+
+// ───────────────────────── M2 Concept Note ─────────────────────────
+
+model ConceptTemplate {             // platform + tenant templates
+  id        String @db.VarChar(128)  @id @default(cuid())
+  tenantId  String? @db.VarChar(128) // null = platform
+  key       String @db.LongText  // cetp_pre, dut_pre, eurostars_summary, he_stage1_blind, eic_step1, hopon
+  name      String @db.LongText
+  schema    Json    // sections[] {key,labelKey,maxWords,promptKey}
+  version   String @db.LongText
+  @@map("v_ConceptTemplate")
+}
+
+model ConceptNote {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  opportunityId String @db.VarChar(128)
+  templateId    String @db.LongText
+  content       Json     // {sectionKey: markdown}
+  status        String @db.LongText   @default("draft") // draft | review | approved
+  version       Int      @default(1)
+  createdBy     String @db.LongText
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId, opportunityId])
+  @@map("v_ConceptNote")
+}
+
+// ───────────────────────── M4 Focal Point ─────────────────────────
+
+/// `ownerUserId` is a work assignment, not a record: it names the internal
+/// focal point who currently owns this relationship. No integrity rule depends
+/// on it and the external party is held separately in `counterpartName` /
+/// `counterpartEmail`, so there is no legal basis to keep it once that person
+/// is erased. It is therefore nullable and the erasure purge detaches it
+/// (`users-scheduled-deletion`); NULL means "unassigned — needs a new focal
+/// point", which is also the state a relationship lands in after an erasure.
+/// Decided 2026-09-08, A4 option C: the sibling case `DualApprovalStep.actorUserId`
+/// went the other way and is retained, because there an approval is a signature.
+model Relationship {
+  id             String @db.VarChar(128)   @id @default(cuid())
+  tenantId       String @db.VarChar(128)
+  organizationId String? @db.LongText  // CORDIS PIC
+  partnerOrgId   String? @db.LongText
+  kind           String @db.LongText   // partner | ncp | city | cluster | consultant | tto
+  ownerUserId    String? @db.VarChar(128)  // internal focal point; NULL = unassigned (or erased)
+  counterpartName String? @db.LongText
+  counterpartEmail String? @db.LongText
+  warmth         String @db.LongText   @default("cold") // cold | warm | hot | active
+  lastContactAt  DateTime?
+  nextStep       String? @db.LongText
+  nextStepDue    DateTime?
+  notes          String? @db.LongText
+  /// When the `m4-stale-relationships` job last put this relationship in its owner's
+  /// "no contact for 60 days" digest. relationship-stale-reminded-at.sql
+  staleRemindedAt DateTime?
+  /// The `lastContactAt` that digest was about. A reminder is due again once
+  /// `lastContactAt` differs from it (any new or re-dated contact, earlier or
+  /// later) and has gone stale in turn. m4-stale-reminder-idempotency.sql
+  staleRemindedContactAt DateTime?
+  updatedAt      DateTime @updatedAt
+  @@index([tenantId, ownerUserId])
+  @@index([tenantId, lastContactAt])
+  @@map("v_Relationship")
+}
+
+model Interaction {
+  id             String @db.VarChar(128)   @id @default(cuid())
+  tenantId       String @db.VarChar(128)
+  relationshipId String @db.VarChar(128)
+  kind           String @db.LongText   // meeting | email | call | event
+  at             DateTime
+  summary        String? @db.LongText
+  briefId        String? @db.LongText   // M9
+  createdBy      String @db.LongText
+  @@index([tenantId, relationshipId])
+  @@map("v_Interaction")
+}
+
+// ───────────────────────── M8 Consortium Matching ─────────────────────────
+
+model SeatCandidate {
+  id             String @db.VarChar(128) @id @default(cuid())
+  tenantId       String @db.VarChar(128)
+  seatId         String @db.VarChar(128)
+  organizationId String? @db.LongText
+  partnerOrgId   String? @db.LongText
+  score          Float
+  breakdown      Json
+  rank           Int
+  computedAt     DateTime @default(now())
+  @@index([tenantId, seatId, rank])
+  @@map("v_SeatCandidate")
+}
+
+// ───────────────────────── K6 AI ─────────────────────────
+
+model AiUsageLog {
+  id          String @db.VarChar(128)   @id @default(cuid())
+  tenantId    String @db.VarChar(128)
+  userId      String? @db.LongText
+  module      String @db.LongText
+  purpose     String @db.LongText
+  provider    String @db.LongText
+  model       String @db.LongText
+  promptHash  String @db.LongText
+  inputTokens Int
+  outputTokens Int
+  credits     Int
+  proposalId  String? @db.VarChar(128)
+  section     String? @db.LongText
+  createdAt   DateTime @default(now())
+  @@index([tenantId, createdAt])
+  @@index([tenantId, proposalId])
+  @@map("v_AiUsageLog")
+}
+
+model Document {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String? @db.VarChar(128)  // null = shared public (work programmes)
+  kind      String @db.LongText   // work_programme | topic | cordis_summary | tenant_upload
+  title     String @db.LongText
+  sourceUrl String? @db.LongText
+  fileUrl   String? @db.LongText
+  createdAt DateTime @default(now())
+  chunks    Chunk[]
+  @@map("v_Document")
+}
+
+model Chunk {
+  id         String @db.VarChar(128) @id @default(cuid())
+  documentId String @db.VarChar(128)
+  tenantId   String? @db.VarChar(128)
+  ordinal    Int
+  text       String @db.LongText
+  embedding  Json?
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@index([documentId])
+  @@map("v_Chunk")
+}
+
+// ───────────────────────── Audit ─────────────────────────
+
+// `tenantId` is nullable on purpose: a KVKK/GDPR erasure request from a user
+// who belongs to no tenant still has to leave a trail
+// (src/actions/user/request-deletion.ts). So this table takes the
+// `tenant_or_shared` policy, not `tenant_isolation` — under strict isolation
+// `NULL = 'x'` is not true and that row could be neither written nor read
+// (TASK-MTU6HUB8FUHMG C-2).
+model AuditEvent {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  tenantId  String? @db.VarChar(128)
+  actorId   String? @db.LongText
+  type      String @db.LongText   // module.state.changed | gate.decided | subscription.updated | ...
+  target    String? @db.LongText
+  data      Json?
+  createdAt DateTime @default(now())
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, createdAt])
+  @@map("v_AuditEvent")
+}
+
+// The idempotency key of a payment-provider webhook delivery (ADR-0003).
+//
+// This used to be an `AuditEvent` row, found by `data->>'stripeEventId'`. That
+// worked only because the app connects as a BYPASSRLS role: `AuditEvent` carries
+// the `tenant_or_shared` policy, so under `fabrika_app` the key could neither be
+// written nor read outside a tenant transaction — and it was written last, after
+// the money. A webhook therefore granted credits, failed to record the key, and
+// Stripe's redelivery re-ran the whole handler (TASK-MTVSBEO7VX6Y4, measured).
+//
+// Three things changed here, and each one is the reason a column exists:
+//   • `tenantId` is NOT NULL, so this table takes the plain `tenant_isolation`
+//     policy and lives inside `withTenant` with the money it guards.
+//   • `stripeEventId` is UNIQUE, so a *second* concurrent delivery of the same
+//     event is refused by Postgres rather than by a read-then-write guard that
+//     both deliveries pass. That race was the open gap the old guard's own
+//     docstring admitted to.
+//   • the lock is no longer the audit trail. `AuditEvent` rows are still written
+//     for every event; deleting one no longer unlocks a replay.
+//
+// `handler` names which webhook wrote it, so a replay can be attributed without
+// joining back to the audit trail.
+model StripeEventLog {
+  id            String @db.VarChar(128)   @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  stripeEventId String @db.VarChar(191)   @unique
+  handler       String @db.LongText   // subscription.sync | subscription.cancel | invoice.payment
+  processedAt   DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, processedAt])
+  @@map("v_StripeEventLog")
+}
+
+// ADR-0011 (TASK-MUVR24EHWI2RA). One row per recipient: `readAt` is that
+// user's read state, so there is no per-workspace or browser-side copy of it
+// (K-1 a, K-2 a). Tenant isolation is RLS (`tenant_isolation`, prisma/rls.sql);
+// user isolation is the `userId` filter every read and write in
+// src/lib/notifications/store.ts carries (K-5 a). `payload` holds ids and
+// counts only; the text is rendered from `type` + `payload` with next-intl.
+// Deleted after NOTIFICATION_RETENTION_DAYS (90, K-3 a) by
+// `notifications-retention`, with the user (users-scheduled-deletion) and with
+// the tenant (cascade). Migration: add-notification.sql.
+model Notification {
+  id          String @db.VarChar(128)           @id @default(cuid())
+  tenantId    String @db.VarChar(128)
+  userId      String @db.VarChar(128)           // recipient; User.id, no FK (SavedSearch.userId pattern)
+  workspaceId String? @db.LongText          // NULL = tenant-wide (both MVP producers)
+  type        NotificationType
+  payload     Json             @default("{}")
+  dedupeKey   String? @db.VarChar(191)          // same event twice -> one row (@@unique below)
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?        // NULL = unread
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, dedupeKey])
+  @@index([tenantId, userId, readAt, createdAt])
+  @@index([createdAt])
+  @@map("v_Notification")
+}
+
+enum NotificationType {
+  SAVED_SEARCH_MATCH   // payload: { searchId, searchName, matchCount, since }
+  CREDIT_GRANTED       // payload: { amount, period?, source } (no producer yet)
+  CREDIT_EXHAUSTED     // payload: { module } (no producer yet)
+  EVIDENCE_EXPIRING    // payload: { evidenceId, validUntil } (evidence-expiring job)
+}
+
+// ───────────────────────── v1.1+ (M6, M9, M10, M11, M7) ─────────────────────────
+
+
+// M6 Evaluator Lens.
+// Two shapes share this table, distinguished by `readerType`:
+//   HUMAN | AI    — single-reader lens on an Opportunity (v1.0, excellence/impact/implementation)
+//   PANEL         — multi-reviewer panel on a Proposal (v1.1, reviewers + criteria + scores)
+// The v1.1 columns are all nullable or defaulted, so existing v1.0 rows and callers are unaffected.
+model Evaluation {
+  id             String @db.VarChar(128)      @id @default(cuid())
+  tenantId       String @db.VarChar(128)
+  opportunityId  String @db.VarChar(128)
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  proposalId     String? @db.VarChar(128)     // v1.1 — set for PANEL evaluations
+  proposal       Proposal?   @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  userId         String? @db.VarChar(128)     // owning evaluator / creator
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  readerType     String @db.LongText      @default("HUMAN") // "HUMAN" | "AI" | "PANEL"
+  status         String @db.LongText      @default("draft") // draft | in-progress | completed
+  avgScore       Float?      // weighted 1-5 panel average; null until reviewers submit
+  excellence     Float       @default(0)
+  impact         Float       @default(0)
+  implementation Float       @default(0)
+  weaknesses     Json?
+  calibration    Float?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
+  reviewers      Reviewer[]
+  criteria       Criterion[]
+  @@index([tenantId, proposalId])
+  @@index([tenantId, opportunityId])
+  @@map("v_Evaluation")
+}
+
+// One assigned reviewer on a PANEL evaluation. A user may sit on an evaluation once.
+model Reviewer {
+  id           String @db.VarChar(128)     @id @default(cuid())
+  tenantId     String @db.VarChar(128)
+  evaluationId String @db.VarChar(128)
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  userId       String @db.VarChar(128)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         String @db.LongText     @default("evaluator") // evaluator | coordinator
+  status       String @db.VarChar(16)     @default("pending")   // pending | completed
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
+  scores       Score[]
+  @@unique([evaluationId, userId])
+  @@index([evaluationId, status])
+  @@index([tenantId])
+  @@map("v_Reviewer")
+}
+
+// A weighted scoring axis of a PANEL evaluation. Weights are 0..1 and should sum to 1 per evaluation.
+model Criterion {
+  id           String @db.VarChar(128)     @id @default(cuid())
+  tenantId     String @db.VarChar(128)
+  evaluationId String @db.VarChar(128)
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  name         String @db.VarChar(200)     // Innovation | Feasibility | Impact | Communication
+  weight       Float      @default(0)
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now())
+  scores       Score[]
+  @@unique([evaluationId, name])
+  @@index([tenantId, evaluationId])
+  @@map("v_Criterion")
+}
+
+// One reviewer's mark on one criterion. score is 1..5 (DB CHECK in the M6 migration).
+// submittedAt stays null while the reviewer is still drafting.
+model Score {
+  id          String @db.VarChar(128)    @id @default(cuid())
+  tenantId    String @db.VarChar(128)
+  reviewerId  String @db.VarChar(128)
+  reviewer    Reviewer  @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  criterionId String @db.VarChar(128)
+  criterion   Criterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  score       Int
+  comment     String?   @db.LongText
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  @@unique([reviewerId, criterionId])
+  @@index([criterionId])
+  @@index([tenantId])
+  @@map("v_Score")
+}
+
+model MeetingBrief {
+  id                  String @db.VarChar(128)      @id @default(cuid())
+  tenantId            String @db.VarChar(128)
+  interactionId       String @db.VarChar(128)      @unique
+  partnerName         String? @db.LongText
+  content             String @db.LongText
+  meetingScheduledAt  DateTime?   // UTC meeting time
+  meetingScheduledTz  String @db.LongText      @default("Europe/Brussels")
+  createdAt           DateTime    @default(now())
+  // The opportunity the brief was prepared for (add-meeting-brief-opportunity.sql).
+  // NULL = "not linked to an opportunity": every brief written before the column
+  // existed. SetNull, not Cascade: a brief is the user's own text and outlives
+  // a hard-deleted opportunity. The FK does not check tenants (constraint checks
+  // bypass RLS), so generateMeetingBrief refuses an id outside the session tenant.
+  opportunityId       String? @db.VarChar(128)
+  opportunity         Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId], map: "MeetingBrief_tenantId") // add-m9-meeting-schedule/migration.sql
+  @@index([tenantId, opportunityId])
+  @@map("v_MeetingBrief")
+}
+
+model CalendarConnection {
+  id                String @db.VarChar(128)    @id @default(cuid())
+  tenantId          String @db.VarChar(128)
+  userId            String @db.VarChar(128)
+  provider          String @db.VarChar(16)    // 'google' | 'outlook' | 'ics'
+  externalId        String? @db.LongText   // Google: calendar ID, Outlook: mailbox address
+  accessToken       String? @db.LongText   // Plaintext. Column is unpopulated today — no OAuth writer exists yet
+                               // (google/outlook `connectCalendar` refuses with CALENDAR_OAUTH_NOT_CONFIGURED,
+                               // `/api/calendar/callback` does not exist). Must be encrypted before that
+                               // OAuth flow ships — see docs/ROADMAP.md open decision #12, TASK-MTSHP3BMTAD3Y.
+  refreshToken      String? @db.LongText   // Same as accessToken above.
+  tokenExpiresAt    DateTime?
+  isConnected       Boolean   @default(true)
+  lastSyncAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([tenantId, userId, provider])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("v_CalendarConnection")
+}
+
+model FollowupDoc {
+  id             String @db.VarChar(128)      @id @default(cuid())
+  tenantId       String @db.VarChar(128)
+  opportunityId  String @db.VarChar(128)
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  kind           String @db.LongText      // NDA, LOI, COMMITMENT, ESR_DEBRIEF, AWARD_PACK
+  version        Int         @default(1)
+  contentUrl     String? @db.LongText
+  signedAt       DateTime?
+  createdAt      DateTime    @default(now())
+
+  // M10 dual approval — the submission that opens the flow (TASK-MTSAIWF4ENUSL).
+  // The two department sign-offs live in DualApprovalStep; the final signature is
+  // `signedAt` above. `approvalSubmittedByName` is a snapshot of the display name
+  // as the session carried it, so the record stays readable after a rename.
+  approvalSubmittedAt     DateTime?
+  approvalSubmittedById   String? @db.LongText
+  approvalSubmittedByName String? @db.LongText
+
+  approvalSteps  DualApprovalStep[]
+  @@map("v_FollowupDoc")
+}
+
+/// One department sign-off in the M10 dual approval flow (FINANCE or LEGAL).
+///
+/// The two four-eyes rules are unique indexes, not app-level checks:
+///   @@unique([followupDocId, department])  — a department signs a document once
+///   @@unique([followupDocId, actorUserId]) — a person signs at most one department
+/// `actorUserId` is deliberately not a foreign key: an approval is a signature, and
+/// the record must outlive a change to the user row that made it.
+model DualApprovalStep {
+  id            String @db.VarChar(128)      @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  followupDocId String @db.VarChar(128)
+  followupDoc   FollowupDoc @relation(fields: [followupDocId], references: [id], onDelete: Cascade)
+  department    String @db.VarChar(16)      // FINANCE | LEGAL
+  actorUserId   String @db.VarChar(128)
+  actorName     String @db.LongText
+  note          String? @db.LongText
+  decidedAt     DateTime    @default(now())
+
+  @@unique([followupDocId, department])
+  @@unique([followupDocId, actorUserId])
+  @@index([tenantId, followupDocId])
+  @@map("v_DualApprovalStep")
+}
+
+model ApplicationPart {
+  id             String @db.VarChar(128)      @id @default(cuid())
+  tenantId       String @db.VarChar(128)
+  opportunityId  String @db.VarChar(128)
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  part           String @db.LongText      // PART_A, PART_B
+  content        Json?       // Section tree, budget tables, etc.
+  // SHA-256 (hex) of the partner portal token; the raw token is shown once and
+  // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
+  magicTokenHash String? @db.VarChar(64)     @unique
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  @@map("v_ApplicationPart")
+}
+
+model TtoPortfolioItem {
+  id           String @db.VarChar(128)   @id @default(cuid())
+  tenantId     String @db.VarChar(128)
+  title        String @db.LongText
+  trl          Int      @default(5)
+  patentStatus String @db.LongText   // pending | granted | licensed
+  summary      String @db.LongText
+  keywords     Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([tenantId])
+  @@map("v_TtoPortfolioItem")
+}
+
+model ApiKey {
+  id          String @db.VarChar(128)    @id @default(cuid())
+  tenantId    String @db.VarChar(128)
+  name        String @db.LongText
+  keyHash     String @db.VarChar(64)    @unique
+  prefix      String @db.LongText
+  lastUsedAt  DateTime?
+  /// Per-key rate limit window (src/lib/api-auth.ts): when the current one-minute window began.
+  rateWindowStartedAt DateTime?
+  /// Requests counted in the window that began at rateWindowStartedAt.
+  rateWindowCount     Int       @default(0)
+  createdAt   DateTime  @default(now())
+  @@index([tenantId])
+  @@map("v_ApiKey")
+}
+
+model Invitation {
+  id        String @db.VarChar(128)   @id @default(cuid())
+  email     String @db.VarChar(254)
+  tenantId  String @db.VarChar(128)
+  role      Role     @default(MEMBER)
+  // SHA-256 (hex) of the invite link token; the raw token is shown once and
+  // never stored (src/lib/secret-token.ts, TASK-MULQLL2T8ZJX4).
+  tokenHash String @db.VarChar(64)   @unique
+  expires   DateTime
+  // Set when the link is accepted (single use, TASK-MUN2793A57Z9I); NULL while
+  // pending. A re-invite of the same address clears it with the new token.
+  acceptedAt DateTime?
+  createdAt DateTime @default(now())
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@unique([email, tenantId])
+  @@map("v_Invitation")
+}
+
+model ApprovalRequest {
+  id              String @db.VarChar(128)         @id @default(cuid())
+  tenantId        String @db.VarChar(128)
+  workspaceId     String? @db.LongText
+  actionType      String @db.LongText         // GATE_G4_SUBMISSION | BUDGET_ALLOCATION | LEGAL_COMMITMENT | MEMBER_ROLE_ELEVATION | SENSITIVE_SETTINGS_CHANGE
+  title           String @db.LongText
+  description     String? @db.LongText
+  payload         Json
+  status          ApprovalStatus @default(PENDING)
+  requiredRole    Role           @default(TENANT_ADMIN)
+  requesterId     String @db.VarChar(128)
+  approverId      String? @db.VarChar(128)
+  rejectionReason String? @db.LongText
+  auditHash       String? @db.LongText
+  expiresAt       DateTime
+  executedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requester       User           @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  approver        User?          @relation("Approver", fields: [approverId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([requesterId])
+  @@map("v_ApprovalRequest")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+
+// ───────────────────────── E11 Beta · feedback & triage ─────────────────────────
+
+/// In-product feedback from beta design partners. Written first and always: the
+/// SystemAlert write is best-effort, so a failure on the observability side must
+/// never lose a partner's report. `autoPriority` keeps what the rule engine
+/// decided even after a human overrides `priority` — that gap is how the rules
+/// get calibrated during the beta.
+model Feedback {
+  id            String @db.VarChar(128)            @id @default(cuid())
+  tenantId      String @db.VarChar(128)
+  userId        String? @db.LongText
+  workspaceSlug String? @db.LongText
+  category      FeedbackCategory
+  impact        FeedbackImpact    @default(MINOR)
+  priority      FeedbackPriority  @default(P3)
+  autoPriority  FeedbackPriority  @default(P3)
+  status        FeedbackStatus    @default(NEW)
+  title         String @db.LongText
+  body          String @db.LongText
+  triageReason  String? @db.LongText           // which rule fired, for auditability
+  pageUrl       String? @db.LongText
+  userAgent     String? @db.LongText
+  appVersion    String? @db.LongText
+  locale        String @db.LongText            @default("tr")
+  screenshotKey String? @db.LongText           // R2 object key; the URL is signed on demand
+  alertId       String? @db.LongText           // SystemAlert.id raised for this report
+  alertStatus   String? @db.LongText           // recorded | failed ('legacy' = predates the SystemAlert channel)
+  triageNote    String? @db.LongText
+  triagedById   String? @db.LongText
+  triagedAt     DateTime?
+  resolvedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status, priority])
+  @@index([priority, status])
+  @@index([createdAt])
+  @@map("v_Feedback")
+}
+
+enum FeedbackCategory {
+  BUG
+  FEATURE_REQUEST
+  UX
+  PERFORMANCE
+  DATA_QUALITY
+  OTHER
+}
+
+/// What the reporter says the report costs them. Combined with category and a
+/// keyword scan in src/lib/feedback/triage.ts to produce P0–P3.
+enum FeedbackImpact {
+  BLOCKER   // cannot work at all
+  MAJOR     // major function unusable, no workaround
+  MINOR     // annoying, workaround exists
+  IDEA      // nothing is broken
+}
+
+enum FeedbackPriority {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum FeedbackStatus {
+  NEW
+  TRIAGED
+  IN_PROGRESS
+  RESOLVED
+  WONT_FIX
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consent / disclosure record — TASK-MTSWLANXSU0IG (A3)
+//
+// Until this table existed, nothing recorded WHICH legal text a person was
+// shown, WHEN, or at WHICH VERSION. `grep -n "Consent" prisma/schema.prisma`
+// returned nothing on 2026-09-10, so a KVKK md.10 / GDPR art.13 disclosure and
+// a GDPR art.7(1) consent were equally unprovable: the obligation may well have
+// been discharged, but the controller could not demonstrate it, and art.5(2)
+// makes demonstrating it the obligation.
+//
+// SCOPE COMES FROM THE REGISTER, NOT FROM A GUESS.
+// docs/legal/processing-register.md lists 18 processing activities with their
+// legal bases. Exactly ONE of them rests on explicit consent — §11, the
+// Google/Outlook calendar OAuth (KVKK md.5/1 / GDPR art.6(1)(a)) — and that
+// one writes no data yet. Account creation (§1) rests on art.6(1)(b), the
+// contract. So asking a registering user to "consent" to it would be a false
+// statement about the basis we actually rely on, and would imply a right to
+// withdraw that does not exist for contract-basis processing. `kind` is what
+// keeps those three cases apart on the record instead of flattening them into
+// one word.
+//
+// NO `ipAddress` / `userAgent` COLUMN, deliberately.
+// The card offered them "if the retention period is compatible with the
+// register". It is not. The retention that fits a proof-of-compliance record is
+// the one §12 already argues for `DualApprovalStep` — KVKK md.5/2-e /
+// GDPR art.17(3)(e), kept so a right can be exercised or defended, i.e. beyond
+// the account's own life. A permanently retained network identifier is a new
+// undefined-retention item of personal data, which is open gap #1 in the
+// register's own §22. The proof does not need it: who, which document, which
+// version, when — those four columns carry it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Which legal instrument a `Consent` row records. These are not
+/// interchangeable: only EXPLICIT_CONSENT is a legal basis under art.6(1)(a)
+/// and only it is withdrawable.
+enum ConsentKind {
+  /// KVKK md.10 / GDPR art.13 — the notice was presented and acknowledged.
+  /// An information duty, NOT a legal basis, and nothing to withdraw.
+  DISCLOSURE_ACK
+
+  /// Acceptance of the terms of service. This is how the art.6(1)(b) contract
+  /// is formed; it is not consent to processing either.
+  TERMS_ACCEPTANCE
+
+  /// KVKK md.5/1 / GDPR art.6(1)(a) — freely given, specific, informed,
+  /// unambiguous. The only kind `withdrawnAt` is truly meaningful for.
+  EXPLICIT_CONSENT
+}
+
+/// The processing activity a `Consent` row belongs to, keyed to the section
+/// numbers in docs/legal/processing-register.md. Only activities that really
+/// exist appear here — the register's own rule is that no imagined activity is
+/// written down, and the same discipline applies to this enum.
+enum ConsentPurpose {
+  /// §1 — account creation and authentication.
+  ACCOUNT_REGISTRATION
+
+  /// §11 — Google/Outlook calendar OAuth. The one genuinely consent-based
+  /// activity in the register. No row can exist for it yet: the OAuth writer
+  /// flow is not built (`connectCalendar` refuses with
+  /// CALENDAR_OAUTH_NOT_CONFIGURED). It is declared so that the flow, when it
+  /// is built, has a place to record consent rather than inventing one.
+  CALENDAR_OAUTH
+}
+
+model Consent {
+  id       String @db.VarChar(128) @id @default(cuid())
+  /// CLAUDE.md rule 1. The subject gives the disclosure to Fabrika, but the row
+  /// is scoped to the tenant the account was provisioned into, so a tenant
+  /// owner can audit their own members' records and no one else's.
+  tenantId String @db.VarChar(128)
+
+  /// Deliberately NOT a foreign key, and deliberately NOT nulled on erasure —
+  /// the same call, on the same basis, that §12 makes for
+  /// `DualApprovalStep.actorUserId`. Detaching the person from the record would
+  /// destroy the only thing the record exists to prove.
+  /// See src/lib/inngest/jobs/users-scheduled-deletion.ts.
+  userId String @db.VarChar(128)
+
+  kind    ConsentKind
+  purpose ConsentPurpose
+
+  /// Stable identity of the text (e.g. `privacy-notice`), and the version of it
+  /// that was actually on screen. The TEXT ITSELF is not stored: it lives in
+  /// messages/{tr,en}.json behind a `t()` key and is served from
+  /// src/app/[locale]/privacy. Storing a version rather than a copy is the
+  /// whole point — when the text changes, the version changes, and an old row
+  /// then says exactly what it should say: this person agreed to something
+  /// else. A stored copy could not say that; it would just look current.
+  documentId      String @db.LongText
+  documentVersion String @db.VarChar(191)
+
+  /// Which language the person actually read.
+  locale String @db.LongText @default("tr")
+
+  grantedAt   DateTime  @default(now())
+  /// Withdrawal is recorded, never deleted — an erased withdrawal is
+  /// indistinguishable from a withdrawal that never happened.
+  withdrawnAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId, purpose])
+  @@index([tenantId, purpose, documentVersion])
+  @@index([userId, grantedAt])
+  @@map("v_Consent")
+}
+
+// ───────────────────────── M17 Interreg pre-assessment ─────────────────────────
+//
+// FO-186 (TASK-MVRIV9LCDHYKO). One analysis = one call guide + one project file,
+// uploaded by a user and extracted to text on the server. The uploaded bytes are
+// never stored: only the extracted text, and only until each slot's own `…TextExpiresAt`
+// (30 days, owner decision in FO-185). Output is an *internal* pre-assessment,
+// never an official score (CLAUDE.md "Yapma"). Migration: add-interreg-review.sql.
+//
+// The rubric is data, not code (FO-187): InterregRubric + InterregRubricCriterion
+// are platform reference tables (no tenant, read-only for the app role — the
+// platform_read block of prisma/rls.sql), written by prisma/seed-interreg-rubrics.ts
+// from the programme's published assessment grid. Another programme or call is a
+// new InterregRubric row, never a code change. A rubric row is referenced by
+// analyses and marks, so its numbers are not edited in place: a revised grid is a
+// new `id` (e.g. `…call3.regular`).
+
+enum InterregAnalysisStatus {
+  UPLOADING // created; neither document extracted yet (or only the project file)
+  EXTRACTING // reserved for an asynchronous extractor; the F1 route extracts in-request
+  CALL_READY // call guide extracted, project file missing
+  READY // both extracted — the UI enables "check the project"
+  ANALYZING // F2: the LLM run is in progress
+  DONE // F2: InterregAnalysisResult written
+  FAILED // F2: the LLM run failed; documents are kept
+}
+
+enum InterregDocFormat {
+  PDF
+  DOCX
+  MD
+  TXT
+}
+
+/// One assessment grid of one programme call and project type, e.g.
+/// `interreg-next-bsb.call2.regular` (Annex 7 Quality Assessment Grid).
+model InterregRubric {
+  /// Stable, versioned key: `<programme>.<call>.<project type>`.
+  id                String @db.VarChar(64)   @id
+  /// Programme key, e.g. `interreg-next-bsb`; groups the profiles a user picks from.
+  programme         String @db.VarChar(64)
+  /// Display label; carries "internal pre-assessment — not an official score".
+  label             String @db.LongText
+  /// The profile used when a new analysis names none (at most one per programme, by convention).
+  isDefault         Boolean  @default(false)
+  /// Marks a criterion may take, e.g. [1, 1.5, 2, …, 4] (half points, no 0).
+  allowedMarks      Json
+  /// Sum of the criteria's `maxMark` (56 for 14 × 4); checked against them by the seed.
+  maxRaw            Decimal  @db.Decimal(6, 1)
+  /// Total below which the programme rejects (37 of 56); `null` = no total threshold.
+  passRaw           Decimal? @db.Decimal(6, 1)
+  /// Interreg funding range, minor units (cent) + currency (CLAUDE.md §9).
+  budgetMinMinor    Int?
+  budgetMaxMinor    Int?
+  currency          String? @db.LongText
+  maxDurationMonths Int?
+  /// Where the grid comes from: documents, URL, what could not be verified.
+  source            Json
+  /// Ordered tie-break keys (`section:<key>` | `criterion:<key>`).
+  tieBreak          Json     @default("[]")
+  /// Programme rules outside the grid (indicators, partnership, budget, duration).
+  programChecks     Json     @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  criteria InterregRubricCriterion[]
+  analyses InterregAnalysis[]
+
+  @@index([programme])
+  @@map("v_InterregRubric")
+}
+
+model InterregRubricCriterion {
+  id                  String @db.VarChar(128)   @id @default(cuid())
+  rubricId            String @db.VarChar(64)
+  /// Stable key within the rubric, e.g. `relevance_so_fit`.
+  criterionKey        String @db.VarChar(191)
+  /// The programme's own number, e.g. `1.1`.
+  officialRef         String @db.LongText
+  section             String @db.LongText
+  /// `strategic` | `operational` (Annex 7 parts I/II).
+  group               String @db.LongText
+  name                String @db.LongText
+  position            Int
+  maxMark             Decimal  @db.Decimal(4, 1)
+  /// A mark below this rejects the application whatever the total (1.1, 1.2, 5.1 < 3).
+  knockoutBelow       Decimal? @db.Decimal(4, 1)
+  subQuestions        Json     @default("[]")
+  /// Application form sections the evidence is read from.
+  afSections          Json     @default("[]")
+  evidenceExpectation String?  @db.LongText
+
+  rubric InterregRubric          @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  marks  InterregCriterionMark[]
+
+  /// Target of InterregCriterionMark's (criterionId, rubricId) FK.
+  @@unique([id, rubricId])
+  @@unique([rubricId, criterionKey])
+  @@index([rubricId, position])
+  @@map("v_InterregRubricCriterion")
+}
+
+model InterregAnalysis {
+  id       String @db.VarChar(128)                 @id @default(cuid())
+  tenantId String @db.VarChar(128)
+  userId   String @db.VarChar(128)
+  /// The grid this analysis is assessed against, chosen at creation.
+  rubricId String @db.VarChar(64)
+  status   InterregAnalysisStatus @default(UPLOADING)
+
+  callFileName    String? @db.LongText
+  callFormat      InterregDocFormat?
+  callPages       Int? // PDF only
+  callChars       Int?
+  callText        String?            @db.LongText
+  callExtractedAt DateTime?
+  /// The call text is purged at this instant (30 days from THIS slot's upload, FO-195 B5).
+  /// Set exactly when `callText` is (CHECK InterregAnalysis_text_expiry_pair).
+  callTextExpiresAt DateTime?
+
+  projectFileName    String? @db.LongText
+  projectFormat      InterregDocFormat?
+  projectPages       Int?
+  projectChars       Int?
+  projectText        String?            @db.LongText
+  projectExtractedAt DateTime?
+  /// Same for the project text, counted from its own upload.
+  projectTextExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rubric InterregRubric          @relation(fields: [rubricId], references: [id], onDelete: Restrict)
+  result InterregAnalysisResult?
+  marks  InterregCriterionMark[]
+
+  /// Targets of the composite FKs below (se-fb D1 / crw2 Ö5): a result or mark can
+  /// only point at an analysis of its own tenant, and a mark only at that analysis's rubric.
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, rubricId])
+  @@index([tenantId, userId, createdAt])
+  /// Partial indexes (WHERE … IS NOT NULL) are in add-interreg-slot-retention.sql; Prisma cannot express them.
+  @@index([rubricId])
+  @@map("v_InterregAnalysis")
+}
+
+/// The F2 LLM output for one analysis: at most one row, replaced on re-run.
+/// Scores are on the rubric's own scale (`rawScore` of `maxRaw`) plus the
+/// proportional 0..100 view (FO-187 §5.1) — an internal estimate, never official.
+model InterregAnalysisResult {
+  id               String @db.VarChar(128)   @id @default(cuid())
+  tenantId         String @db.VarChar(128)
+  analysisId       String @db.VarChar(128)   @unique
+  rawScore         Decimal  @db.Decimal(6, 1)
+  score100         Decimal  @db.Decimal(4, 1)
+  /// `rawScore` ≥ rubric `passRaw` and no knockout criterion below its floor.
+  passesThresholds Boolean
+  /// criterionKeys whose mark fell below `knockoutBelow`.
+  knockouts        Json     @default("[]")
+  reportMarkdown   String   @db.LongText
+  redFlags         Json     @default("[]")
+  improvements     Json     @default("[]")
+  rewriteSample    Json     @default("{}")
+  /// Programme rules outside the grid: [{ key, status: met|missing|unclear, note }] (FO-188).
+  programChecks    Json     @default("[]")
+  model            String @db.LongText
+  promptHash       String @db.LongText
+  createdAt        DateTime @default(now())
+
+  /// (analysisId, tenantId): the database refuses a result filed under another tenant's analysis.
+  analysis InterregAnalysis @relation(fields: [analysisId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([analysisId, tenantId])
+  @@index([tenantId])
+  @@map("v_InterregAnalysisResult")
+}
+
+/// One rubric criterion's mark for an analysis (F2), on the rubric's scale
+/// (one of `allowedMarks`), with the strengths and weaknesses behind it.
+model InterregCriterionMark {
+  id              String @db.VarChar(128)   @id @default(cuid())
+  tenantId        String @db.VarChar(128)
+  analysisId      String @db.VarChar(128)
+  /// Copy of the analysis's rubricId, so the two FKs below can tie the criterion to it.
+  rubricId        String @db.VarChar(64)
+  criterionId     String @db.VarChar(128)
+  mark            Decimal  @db.Decimal(4, 1)
+  strengths       Json     @default("[]")
+  weaknesses      Json     @default("[]")
+  evidenceQuote   String?  @db.LongText
+  evidenceLocator String? @db.LongText
+  /// Every [{ quote, location }] behind the mark; evidenceQuote/Locator keep the first (FO-188).
+  evidence        Json     @default("[]")
+  createdAt       DateTime @default(now())
+
+  /// Same tenant and same rubric as the analysis; the criterion must belong to that rubric.
+  analysis  InterregAnalysis        @relation(fields: [analysisId, tenantId, rubricId], references: [id, tenantId, rubricId], onDelete: Cascade)
+  criterion InterregRubricCriterion @relation(fields: [criterionId, rubricId], references: [id, rubricId], onDelete: Restrict)
+
+  @@unique([analysisId, criterionId])
+  @@index([tenantId])
+  @@index([criterionId])
+  @@map("v_InterregCriterionMark")
+}
