@@ -137,7 +137,7 @@ export default function PricingClient({
             the promise is exact rather than merely reassuring: it belongs to the
             subscription, and it is a floor, not a ceiling.
           */}
-          <p className="text-slate-500 text-xs leading-relaxed max-w-2xl mx-auto">
+          <p className="text-slate-400 text-xs leading-relaxed max-w-2xl mx-auto">
             {t('priceLockNote')}
           </p>
         </div>
@@ -179,8 +179,8 @@ export default function PricingClient({
                   className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
                     isActive
                       ? 'bg-accent/15 border-accent text-white shadow-[0_0_15px_color-mix(in_srgb,var(--accent)_25%,transparent)] ring-1 ring-accent'
-                      : 'bg-slate-900/80 border-slate-800 text-slate-400'
-                  } ${tier.rank < activeTier.rank ? 'opacity-50' : ''}`}
+                      : 'bg-slate-900/80 border-slate-800 text-slate-300'
+                  } ${tier.rank < activeTier.rank ? 'opacity-75' : ''}`}
                 >
                   {isActive && (
                     <span className="absolute -top-2 left-2 bg-amber-500 text-slate-950 text-[9px] font-black uppercase px-1.5 py-0.2 rounded font-mono">
@@ -188,14 +188,14 @@ export default function PricingClient({
                     </span>
                   )}
                   <div>
-                    <div className="text-[10px] font-bold font-mono text-slate-400">
+                    <div className="text-[10px] font-bold font-mono text-slate-300">
                       {t(`tiers.${tier.code}`)}
                     </div>
                     <div className={`text-lg font-extrabold font-heading mt-0.5 ${tier.rank < activeTier.rank ? "text-white" : "text-accent-ink"}`}>
                       -{tier.percentOff}%
                     </div>
                   </div>
-                  <div className="text-[9px] font-mono text-slate-400 mt-2">{tier.code}</div>
+                  <div className="text-[9px] font-mono text-slate-300 mt-2">{tier.code}</div>
                 </div>
               );
             })}
@@ -302,7 +302,7 @@ export default function PricingClient({
                       >
                         {money(charged.monthlyEquivalentMinor, charged.currency)}
                       </span>
-                      <span className="text-lg text-slate-500 line-through font-semibold">
+                      <span className="text-lg text-slate-400 line-through font-semibold">
                         {money(list.monthlyEquivalentMinor, list.currency)}
                       </span>
                       <span className="bg-accent/20 text-accent-ink border border-accent/30 text-[11px] font-extrabold px-2 py-0.5 rounded font-mono">
@@ -345,7 +345,7 @@ export default function PricingClient({
                         <span className="font-bold text-accent-ink">
                           {money(lifetime.amountMinor, lifetime.currency)}
                         </span>
-                        <span className="line-through text-slate-500 text-[10px]">
+                        <span className="line-through text-slate-400 text-[10px]">
                           {money(lifetime.listAmountMinor, lifetime.currency)}
                         </span>
                         <span className="bg-accent/20 text-accent-ink text-[9px] px-1 rounded">
@@ -467,7 +467,7 @@ export default function PricingClient({
                     >
                       {money(lifetime.amountMinor, lifetime.currency)}
                     </span>
-                    <span className="text-lg text-slate-500 line-through font-semibold">
+                    <span className="text-lg text-slate-400 line-through font-semibold">
                       {money(lifetime.listAmountMinor, lifetime.currency)}
                     </span>
                     <span className="bg-accent/20 text-accent-ink border border-accent/30 text-xs font-extrabold px-2.5 py-0.5 rounded font-mono">
@@ -605,7 +605,7 @@ export default function PricingClient({
                             {t('statusActive')}
                           </span>
                         ) : (
-                          <span className="text-slate-500 text-[10px]">
+                          <span className="text-slate-400 text-[10px]">
                             {tier.rank < activeTier.rank ? t('statusEnded') : t('statusUpcoming')}
                           </span>
                         )}

@@ -316,7 +316,7 @@ export default function AuthCard({
           }}
           className={`flex-1 py-3 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 text-center flex items-center justify-center gap-2 cursor-pointer ${
             mode === 'register'
-              ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/30 scale-[1.02]'
+              ? 'bg-emerald-700 text-white shadow-md ring-2 ring-emerald-500/30 scale-[1.02]'
               : 'text-ink-2 hover:text-ink hover:bg-surface-hover/60 font-semibold'
           }`}
         >
