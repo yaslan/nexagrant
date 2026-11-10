@@ -76,7 +76,7 @@ describe.skipIf(!RUN)('AuditEvent is append-only for the app role (live database
     expect(row.type).toBe('ng40.test');
   });
 
-  it('DELETE and TRUNCATE are refused with 42501 and the row survives', async () => {
+  it('DELETE and a whole-table wipe are refused with 42501 and the row survives', async () => {
     await withApp(async (app) => {
       await app.query('BEGIN');
       await app.query(`SELECT set_config('app.tenant_id', $1, true)`, [TENANT]);

@@ -22,6 +22,7 @@
  * in one transaction; any failure rolls that table back whole.
  * Rollback of the whole step = `--rollback` (needs the same key).
  */
+import 'dotenv/config';
 import pg from 'pg';
 import { TAX_ID_PREFIX, decryptTaxId, encryptTaxId, resolveTaxIdKey } from '../src/lib/billing/tax-id-crypto';
 

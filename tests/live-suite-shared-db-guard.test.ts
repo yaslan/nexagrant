@@ -178,6 +178,12 @@ export function unscopedDeletes(file: string, source: string): string[] {
  * cannot rot into a blanket pass.
  */
 const UNSCOPED_ALLOWED: Record<string, { hit: string; reason: string }> = {
+  'tests/auditevent-immutable.live.test.ts': {
+    hit: 'TRUNCATE: TRUNCATE "AuditEvent"',
+    reason:
+      'run over fabrika_app (assertAppConnection pins the role), which has SELECT and INSERT only on AuditEvent; the test asserts ' +
+      '42501 and that the fixture row survives (NG-40). The statement is the thing under test, never expected to execute.',
+  },
   'tests/m17-interreg-analyses.live.test.ts': {
     hit: 'TRUNCATE: TRUNCATE "InterregRubricCriterion"',
     reason:
