@@ -563,7 +563,7 @@ export function ModulesClient({
                       <span className="text-muted text-[11px]">{t('plansNone')}</span>
                     )}
                     {mod.addOnSku && (
-                      <span className="text-[10px] bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-mono font-semibold break-all">
+                      <span className="text-[10px] bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-mono font-semibold break-all">
                         {t('addOnSku', { sku: mod.addOnSku })}
                       </span>
                     )}

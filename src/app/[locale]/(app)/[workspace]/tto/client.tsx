@@ -151,7 +151,7 @@ export function TtoAcceleratorClient({
   const getPatentBadge = (status: string) => {
     switch (status) {
       case 'granted':
-        return <span className="bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.granted')}</span>;
+        return <span className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-500 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.granted')}</span>;
       case 'pending':
         return <span className="bg-amber-500/15 text-amber-500 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.pending')}</span>;
       case 'licensed':
@@ -290,10 +290,11 @@ export function TtoAcceleratorClient({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="font-semibold text-ink-2">{t('form.trlLabel')}</label>
+                      <label htmlFor="tto-trl" className="font-semibold text-ink-2">{t('form.trlLabel')}</label>
                       <span className="font-mono font-bold text-accent">{t('trlValue', { value: trl })}</span>
                     </div>
                     <input
+                      id="tto-trl"
                       type="range"
                       min="1"
                       max="9"
@@ -304,8 +305,9 @@ export function TtoAcceleratorClient({
                   </div>
 
                   <div>
-                    <label className="font-semibold text-ink-2 block mb-1">{t('form.patentStatusLabel')}</label>
+                    <label htmlFor="tto-patent-status" className="font-semibold text-ink-2 block mb-1">{t('form.patentStatusLabel')}</label>
                     <select
+                      id="tto-patent-status"
                       value={patentStatus}
                       onChange={(e) => setPatentStatus(e.target.value)}
                       className="w-full border border-border rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-accent focus:outline-hidden bg-ground text-ink"
@@ -377,7 +379,7 @@ export function TtoAcceleratorClient({
                         <h4 className="font-bold text-sm text-ink">{item.title}</h4>
                         <div className="flex items-center gap-2 mt-1">
                           {getPatentBadge(item.patentStatus)}
-                          <span className="bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono font-bold px-2 py-0.5 rounded text-[11px]">
+                          <span className="bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/30 font-mono font-bold px-2 py-0.5 rounded text-[11px]">
                             {t('trlValue', { value: item.trl })}
                           </span>
                         </div>
