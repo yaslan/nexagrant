@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { fakeEmbedding } from './helpers/fake-embedding';
-import { skipOrFailInCi } from './helpers/live-db-role';
+import { isGithubActions, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 
 /**
@@ -26,7 +26,9 @@ vi.mock('../src/lib/llm', async () => {
   return { ...actual, embedText: embedTextMock };
 });
 
-const { prisma } = await import('@/lib/db');
+const { createDbClient, prisma } = await import('@/lib/db');
+// Owner connection that builds fixtures, the second argument of usedDatabaseName (same DB as `prisma`).
+const admin = createDbClient(process.env.DATABASE_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const { persistKeepEuRecord, RAG_EXCLUDED_PROJECT_IDS } = await import('@/lib/keep-eu-sync');
 const { syncCordisBigData } = await import('@/lib/cordis-sync');
 
@@ -35,10 +37,27 @@ const keyOf = (id: string) => `KEU:${id}`;
 const orgOf = (id: string) => `KEU:${RUN}-${id}`;
 
 describe.skipIf(!LIVE)(SUITE, () => {
-  const startedAt = new Date();
+  // Set only once this run has written its own rows; afterAll deletes nothing before that.
+  let seeded = false;
 
   beforeAll(async () => {
+    // B1: the teardown deletes by fixed keep.eu ids (KEU:BGTR0300118 …), not by RUN, so refuse to
+    // run on the shared database and refuse to start when those ids already exist: any row found
+    // here is not ours, and the teardown below must never delete it.
+    const dbName = await usedDatabaseName(prisma, admin, SUITE);
+    if (dbName === undefined || (dbName === 'fabrika' && !isGithubActions())) {
+      throw new Error(`${SUITE}: refusing to run on ${dbName ?? 'an unreadable database'}; point DATABASE_URL at a throwaway database`);
+    }
+    const preexisting = await prisma.cordisProject.findMany({
+      where: { id: { in: RAG_EXCLUDED_PROJECT_IDS.map(keyOf) } },
+      select: { id: true },
+    });
+    if (preexisting.length > 0) {
+      throw new Error(`${SUITE}: ${preexisting.length} keep.eu row(s) already exist in this database; refusing to overwrite or delete them`);
+    }
+
     embedTextMock.mockImplementation(async (text: string) => fakeEmbedding(text));
+    seeded = true;
     for (const id of RAG_EXCLUDED_PROJECT_IDS) {
       const ok = await persistKeepEuRecord({
         projectId: id,
@@ -62,18 +81,21 @@ describe.skipIf(!LIVE)(SUITE, () => {
   });
 
   afterAll(async () => {
-    const keys = RAG_EXCLUDED_PROJECT_IDS.map(keyOf);
-    await prisma.cordisParticipation.deleteMany({ where: { projectId: { in: presentIds(keys) } } });
-    await prisma.cordisProjectTopic.deleteMany({ where: { projectId: { in: presentIds(keys) } } });
-    await prisma.cordisProject.deleteMany({ where: { id: { in: presentIds(keys) } } });
-    await prisma.cordisOrganization.deleteMany({
-      where: { organisationId: { in: presentIds(RAG_EXCLUDED_PROJECT_IDS.map(orgOf)) } },
-    });
-    // Documents the re-index wrote during this run (Chunk rows cascade).
-    await prisma.document.deleteMany({
-      where: { tenantId: null, kind: 'CORDIS_PROJECT', createdAt: { gte: startedAt } },
-    });
+    if (seeded) {
+      const keys = RAG_EXCLUDED_PROJECT_IDS.map(keyOf);
+      await prisma.cordisParticipation.deleteMany({ where: { projectId: { in: presentIds(keys) } } });
+      await prisma.cordisProjectTopic.deleteMany({ where: { projectId: { in: presentIds(keys) } } });
+      await prisma.cordisProject.deleteMany({ where: { id: { in: presentIds(keys) } } });
+      await prisma.cordisOrganization.deleteMany({
+        where: { organisationId: { in: presentIds(RAG_EXCLUDED_PROJECT_IDS.map(orgOf)) } },
+      });
+      // Documents the re-index wrote for this run's rows only (Chunk rows cascade). Titles carry RUN.
+      await prisma.document.deleteMany({
+        where: { tenantId: null, kind: 'CORDIS_PROJECT', title: { contains: RUN } },
+      });
+    }
     await prisma.$disconnect();
+    await admin.$disconnect();
   });
 
   test('the CORDIS re-index sends none of the excluded keep.eu projects to the embedding model', async () => {

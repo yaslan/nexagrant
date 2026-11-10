@@ -25,6 +25,8 @@ const USED_CONNECTION = [
   'tests/expert-prereg-retention.live.test.ts',
   'tests/invitation-retention.live.test.ts',
   'tests/k1-embeddings.live.test.ts',
+  'tests/keep-eu-cordis-reindex.live.test.ts',
+  'tests/keep-eu-sync.live.test.ts',
   'tests/m17-interreg-fo191.live.test.ts',
   'tests/m17-stale-runs.live.test.ts',
   'tests/m17-text-retention.live.test.ts',

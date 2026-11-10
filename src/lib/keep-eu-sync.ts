@@ -255,10 +255,12 @@ function trimmed(value?: string | null): string | undefined {
 
 /**
  * Single normalization for keep.eu project ids used by the RAG exclusion. Both the excluded list
- * and every upstream id pass through it, so case or whitespace drift cannot defeat the exclusion.
+ * and every upstream id pass through it. Strips a leading `KEU:` / `KEU-` prefix, then every
+ * non-alphanumeric character (space, dash, colon, tab), then upper-cases, so case, separator and
+ * prefix drift cannot defeat the exclusion (BGTR-0300118, KEU:BGTR0300118, BGTR 0300118 all map to BGTR0300118).
  */
 function normalizeProjectId(id: string): string {
-  return id.trim().toUpperCase();
+  return id.replace(/^\s*KEU\s*[:-]\s*/i, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 }
 
 /** Error text may echo record content (names, titles), so the alert keeps only the class and code. */
@@ -996,7 +998,6 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
       }
     } catch (e) {
       skippedCount++;
-      const err = errorMessage(e);
       const safeLabel = errorClassLabel(e);
       await recordAlert({
         level: 'error',
@@ -1012,7 +1013,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
           total: dataset.length,
           project: record,
           skipped: true,
-          error: err,
+          error: safeLabel,
         });
       }
     }

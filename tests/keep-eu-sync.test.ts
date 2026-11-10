@@ -785,6 +785,41 @@ describe('RAG personal-name exclusion (FO-363, K-575447)', () => {
     expect(res.ragExclusionMissingCount).toBe(2);
   });
 
+  test('keep.eu prefix and separator variants of an excluded id are never embedded (B2)', async () => {
+    const variants = ['BGTR-0300118', 'KEU:BGTR0300121', 'BGTR 0300153'];
+    const records = [...variants.map((id) => projectWithId(id)), projectWithId('BGTR0200037')];
+    const res = await syncKeepEuData({ records });
+
+    expect(res.ragExcludedCount).toBe(3);
+    expect(res.ragEmbeddedCount).toBe(1);
+    const texts = embedTextMock.mock.calls.map((c) => String(c[0]).toUpperCase());
+    for (const id of variants) {
+      expect(texts.some((t) => t.includes(id.toUpperCase()))).toBe(false);
+    }
+    expect(texts.some((t) => t.includes('BGTR0200037'))).toBe(true);
+  });
+
+  test('onProgress reports the error class for a failed record, not the raw error text (B3)', async () => {
+    const rawSecret = 'Jane Example Surname in the progress error';
+    embedTextMock.mockRejectedValueOnce(Object.assign(new Error(rawSecret), { name: 'PrismaClientKnownRequestError', code: 'P2002' }));
+    const progress: Array<{ skipped: boolean; error?: string }> = [];
+    await syncKeepEuData({
+      records: [projectWithId('BGTR0200037')],
+      onProgress: (info) => progress.push({ skipped: info.skipped, error: info.error }),
+    });
+
+    const failed = progress.find((p) => p.skipped);
+    expect(failed?.error).toBe('PrismaClientKnownRequestError:P2002');
+    expect(JSON.stringify(progress)).not.toContain('Jane Example');
+  });
+
+  test('the RAG exclusion cannot be switched off by an option (D1 type guard, F5)', () => {
+    const disable = () =>
+      // @ts-expect-error ragExcludeProjectIds was removed; re-adding it to KeepEuSyncOptions must break this typecheck
+      syncKeepEuData({ records: [], ragExcludeProjectIds: [] });
+    expect(typeof disable).toBe('function');
+  });
+
   test('a failed record writes only the error class and project id to the alert, not the raw message', async () => {
     const rawSecret = 'Jane Example Surname in the error text';
     embedTextMock.mockRejectedValueOnce(Object.assign(new Error(rawSecret), { name: 'PrismaClientKnownRequestError', code: 'P2002' }));
