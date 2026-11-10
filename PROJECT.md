@@ -44,7 +44,7 @@ Dil: arayüz **Türkçe (varsayılan) ve İngilizce**; kod, tablo/alan adları v
 | **K1 Çağrı toplama** | F&T (SEDIA) arama API'si + topicDetails; Eurostars/Eureka çağrı sayfaları; TÜBİTAK duyuru RSS/HTML; normalize `Call`/`Topic` tabloları; günlük cron | `docs/ARCHITECTURE.md §4`, `docs/DATA_MODEL.md` |
 | **K2 CORDIS** | Aylık HE + H2020 CSV indirme → `Organization`, `Project`, `Participation`; graf metrikleri (derece, eigenvector) | `docs/ARCHITECTURE.md §5` |
 | **K3 Taban oranlar** | Horizon Dashboard'dan xlsx yükleme arayüzü (manuel, üç ayda bir) → `TopicStat` | |
-| **K4 Outreach** | Dış araç bağlantıları (Portal partner search, GREENET, Ideal-ist, EEN, LinkedIn) derin link; e-posta şablonları | |
+| **K4 Outreach** | Dış araç bağlantıları (Portal partner search, GREENET, Ideal-ist, EEN) derin link; LinkedIn derin bağlantısı yok (Karar 3 = A, K-579696); e-posta şablonları | |
 | **K5 Pipeline/CRM** | `Opportunity`, `Proposal`, `ConsortiumSeat`, `PartnerOrg`, `Gate`, `Effort` | |
 | **K6 YZ** | Sağlayıcıdan bağımsız LLM adaptörü (Anthropic varsayılan), embedding + pgvector, RAG (çalışma programı PDF + topic JSON + CORDIS özet), **kredi sayacı**, **YZ kullanım günlüğü** (şeffaflık beyanı için) | `docs/ARCHITECTURE.md §6` |
 

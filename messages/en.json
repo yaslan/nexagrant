@@ -3787,10 +3787,6 @@
       "greenet": {
         "name": "GREENET",
         "hint": "Partner search community of the Cluster 5 (climate, energy, mobility) NCP network. Sign-up required."
-      },
-      "linkedin": {
-        "name": "LinkedIn",
-        "hint": "Company page search. LinkedIn sign-in required."
       }
     },
     "emailTitle": "First-contact e-mail templates",
