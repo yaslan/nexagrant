@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { SEDIA_RESULT_WINDOW, lastReachablePage } from '@/lib/calls-paging';
+import { SEDIA_RESULT_WINDOW, CALLS_SEARCH_MAX_LENGTH, clampSearchText, lastReachablePage } from '@/lib/calls-paging';
+
+/** NG-12 (PR #322 bulgu 4): one cap for the search text, read by the page and by the route. */
+describe('clampSearchText', () => {
+  it('is 200 characters', () => {
+    expect(CALLS_SEARCH_MAX_LENGTH).toBe(200);
+  });
+
+  it('keeps a text inside the cap as it is', () => {
+    expect(clampSearchText('enerji')).toBe('enerji');
+    expect(clampSearchText('a'.repeat(200))).toBe('a'.repeat(200));
+  });
+
+  it('cuts a longer text to the cap and keeps its start', () => {
+    const out = clampSearchText('b'.repeat(201));
+    expect(out).toHaveLength(200);
+    expect(out).toBe('b'.repeat(200));
+  });
+
+  it('is empty for an empty text', () => {
+    expect(clampSearchText('')).toBe('');
+  });
+});
 
 /**
  * FO-42 re-review finding 1: the closed-grants filter has 16 651 hits, the pager offered 833

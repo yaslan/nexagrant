@@ -33,6 +33,9 @@ const pilot = vi.hoisted(() => ({ expired: false }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next/navigation', () => ({
   useParams: () => ({ locale: 'en' }),
+  // The calls page reads its filters from the URL (NG-12).
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/en/main/calls',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
   notFound: vi.fn(() => {
     throw new Error('notFound');

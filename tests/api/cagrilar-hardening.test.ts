@@ -38,6 +38,7 @@ vi.mock('@/lib/db', () => ({ prisma: { topic: { upsert: mocks.topicUpsert } } })
 
 import { GET, CAGRILAR_PER_USER_PER_MINUTE } from '@/app/api/cagrilar/route';
 import { cagrilarCache } from '@/lib/cagrilar-cache';
+import { CALLS_SEARCH_MAX_LENGTH } from '@/lib/calls-paging';
 
 // Each case starts with no remembered answers, so one case's search is never another's.
 beforeEach(() => cagrilarCache.clear());
@@ -171,6 +172,13 @@ describe('/api/cagrilar hardening', () => {
     expect(mocks.topicUpsert).not.toHaveBeenCalled();
     const source = readFileSync(resolve(__dirname, '../../src/app/api/cagrilar/route.ts'), 'utf8');
     expect(source).not.toMatch(/from '@\/lib\/db'/);
+  });
+
+  // NG-12 (PR #322 bulgu 4): an uncapped `q` ran one SEDIA search and one translation batch per load.
+  test('a search text longer than the shared cap reaches SEDIA cut to CALLS_SEARCH_MAX_LENGTH', async () => {
+    const res = await get(`?lang=en&q=${'a'.repeat(CALLS_SEARCH_MAX_LENGTH + 50)}`);
+    expect(res.status).toBe(200);
+    expect(mocks.searchSedia.mock.calls[0]![0]).toMatchObject({ text: 'a'.repeat(CALLS_SEARCH_MAX_LENGTH) });
   });
 
   test('a 500 carries a fixed code, never the underlying message', async () => {
