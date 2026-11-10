@@ -73,6 +73,7 @@ const OPPORTUNITIES: Record<string, Record<string, unknown>> = {
     status: 'ACTIVE',
     intendedRole: 'partner',
     g0Score: null,
+    updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     seats: [],
     proposal: null,
     evaluations: [],
@@ -87,6 +88,7 @@ const OPPORTUNITIES: Record<string, Record<string, unknown>> = {
     status: 'ACTIVE',
     intendedRole: 'coordinator',
     g0Score: 63,
+    updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     seats: [],
     proposal: null,
     evaluations: [],
@@ -402,9 +404,10 @@ describe('Gate Evaluation Engine (M5)', () => {
     expect(inputs.g0Score).toBeNull();
     expect(inputs.g0ScoreStored).toBe(63);
     // And the column is emptied, as a rescore does (FO-384), so the board stops drawing the 63.
+    // A rescore is not an edit (FO-384 B1): `updatedAt` stays what it was, guarded on the value read.
     expect(prisma.opportunity.updateMany).toHaveBeenCalledWith({
-      where: { id: 'opp-stale-unscored', tenantId: 'tenant-2' },
-      data: { g0Score: null },
+      where: { id: 'opp-stale-unscored', tenantId: 'tenant-2', updatedAt: new Date('2026-01-02T03:04:05.000Z') },
+      data: { g0Score: null, updatedAt: new Date('2026-01-02T03:04:05.000Z') },
     });
   });
 
@@ -414,6 +417,8 @@ describe('Gate Evaluation Engine (M5)', () => {
     const call = vi.mocked(prisma.gateDecision.create).mock.calls.at(-1) as unknown as [{ data: { inputs: Record<string, unknown> } }];
     expect(call[0].data.inputs.g0Score).toBeNull();
     expect(call[0].data.inputs.g0ScoreStored).toBeNull();
+    // Column already null: nothing to clear, so `@updatedAt` must not move (NG-59 review, finding 1).
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
   });
 
   test('G2 gate fails when seats are still OPEN', async () => {

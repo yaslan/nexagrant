@@ -151,8 +151,10 @@ async function runGate(
         } else {
           // No evidence today: a number left in the column by an earlier run or a seed is not this
           // opportunity's score any more. Empty it as a rescore does (FO-384), or the board keeps
-          // drawing it next to a decision that says "no evidence" (NG-59 item 3).
-          await clearStoredG0(tx, computation);
+          // drawing it next to a decision that says "no evidence" (NG-59 item 3). A rescore is not an
+          // edit (FO-384 B1): `keepUpdatedAt` leaves `Opportunity.updatedAt` alone and writes nothing
+          // when the column is already null (NG-59 review, finding 1).
+          await clearStoredG0(tx, computation, { keepUpdatedAt: true });
         }
       }
 
