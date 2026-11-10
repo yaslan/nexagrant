@@ -38,7 +38,6 @@ const PUBLIC_URLS: Record<'tr' | 'en', string[]> = {
     '/tr/uzman/dogrulandi',
     '/tr/no-workspace',
     '/tr/accept-invite/continue',
-    '/tr/i18n-check',
   ],
   en: [
     '/en',
@@ -59,9 +58,22 @@ const PUBLIC_URLS: Record<'tr' | 'en', string[]> = {
     '/en/experts/verified',
     '/en/no-workspace',
     '/en/accept-invite/continue',
-    '/en/i18n-check',
   ],
 };
+
+/**
+ * NG-117: the i18n-check page lists internal translation keys. A production
+ * build answers 404 for it (src/app/[locale]/(public)/i18n-check/page.tsx), so
+ * under `E2E_WEB_SERVER=start` it moves from the shell list to the 404 list.
+ */
+const TR_I18N_CHECK = '/tr/i18n-check';
+const EN_I18N_CHECK = '/en/i18n-check';
+const PRODUCTION_BUILD = process.env.E2E_WEB_SERVER === 'start';
+
+if (!PRODUCTION_BUILD) {
+  PUBLIC_URLS.tr.push(TR_I18N_CHECK);
+  PUBLIC_URLS.en.push(EN_I18N_CHECK);
+}
 
 /** 404s: an unrouted path, and a `notFound()` thrown from inside the public group. */
 const NOT_FOUND_URLS = [
@@ -69,6 +81,7 @@ const NOT_FOUND_URLS = [
   '/en/no-such-page-fo68',
   '/tr/portal/partner/fo68-no-such-token',
   '/en/blog/fo68-no-such-post',
+  ...(PRODUCTION_BUILD ? [TR_I18N_CHECK, EN_I18N_CHECK] : []),
 ];
 
 async function expectOneShell(page: Page, url: string): Promise<void> {

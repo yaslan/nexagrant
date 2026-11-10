@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getTranslations } from 'next-intl/server';
+import { notFound } from 'next/navigation';
 
 /** A parsed messages file: nested objects down to string leaves. */
 type MessageTree = { [key: string]: MessageTree | string | string[] };
@@ -23,6 +24,10 @@ export default async function I18nCheckPage({
 }: {
   params: Promise<{ locale: string }>;
 }) {
+  // NG-117: the list of missing keys is internal. Production answers 404 for
+  // everyone; development and test keep the page for local work and e2e.
+  if (process.env.NODE_ENV === 'production') notFound();
+
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'i18nCheck' });
   const trPath = path.join(process.cwd(), 'messages/tr.json');
