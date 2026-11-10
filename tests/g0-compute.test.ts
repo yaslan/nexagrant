@@ -19,7 +19,7 @@ import type { G0Snapshot } from '../src/lib/scoring/g0-features';
 
 function snapshotWithEvidence(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
   return {
-    tenant: { country: 'DE', pic: 'PIC-1' },
+    tenant: { country: 'DE', pic: 'PIC-1', picRegistryStatus: 'FOUND' },
     profile: { keywords: ['hydrogen'] },
     topic: {
       id: 'topic-1',
@@ -41,7 +41,7 @@ function snapshotWithEvidence(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
 
 function emptySnapshot(): G0Snapshot {
   return {
-    tenant: { country: null, pic: null },
+    tenant: { country: null, pic: null, picRegistryStatus: null },
     profile: null,
     topic: null,
     topicFitScore: null,
@@ -180,7 +180,7 @@ describe('computeG0FromSnapshot()', () => {
   describe('only CONFIRMED seats score (K-579082)', () => {
     /** Coordinator, no CORDIS data: 30 alignment + 15 base rate + 9 budget + 8 lump sum = 62. */
     const base62 = (seats: G0Snapshot['seats']): G0Snapshot => ({
-      tenant: { country: 'DE', pic: null },
+      tenant: { country: 'DE', pic: null, picRegistryStatus: null },
       profile: null,
       topic: {
         id: 'topic-62',

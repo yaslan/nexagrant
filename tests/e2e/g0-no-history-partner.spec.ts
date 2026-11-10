@@ -182,8 +182,13 @@ async function saveProfile(page: Page) {
       timeout: 30_000,
     })
     .toEqual(KEYWORDS);
-  // FIXTURE: set the PIC after the save, so the profile form cannot clear it.
-  await prisma.tenant.update({ where: { id: TENANT }, data: { pic: NEW_PIC } });
+  // FIXTURE: set the PIC after the save, so the profile form cannot clear it. The EU register is
+  // not called here (no network in e2e): the stored answer is set directly. FOUND is the state a
+  // real save reaches for a registered organisation (FO-396, refreshTenantPicRegistry).
+  await prisma.tenant.update({
+    where: { id: TENANT },
+    data: { pic: NEW_PIC, picRegistryStatus: 'FOUND', picRegistryCheckedAt: new Date() },
+  });
 }
 
 /** "Yeni Fırsat" on the board, role set to "Konsorsiyum Ortağı" (partner). */
@@ -391,11 +396,29 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     await expect(passedBadge).toHaveClass(/text-ok/);
     await shot(page, '06-pano-rozet-gecti');
 
-    // ── 3. The PIC is removed (fixture). The same two invited seats now score on the standard basis.
-    // "PIC boşsa kolaylık yok": the 75-point denominator must not apply, and removing the PIC must not
-    // raise the score. The 63 below is the measured standard score (30 + 15 + 10 + 8; the invited
-    // seats earn nothing, NG-59), reported in the result file. It was 75 before NG-59.
-    await prisma.tenant.update({ where: { id: TENANT }, data: { pic: null } });
+    // ── 3. The register did not confirm the PIC: NOT_FOUND, UNKNOWN, or never checked (null). The same
+    // two invited seats must score on the standard basis (denominator 100) for each of them. Only FOUND
+    // earns the 75-point grant. The 63 is the measured standard score (30 + 15 + 10 + 8; the invited seats
+    // earn nothing, NG-59; it was 75 before NG-59), not an assumed one.
+    for (const status of ['NOT_FOUND', 'UNKNOWN', null] as const) {
+      await prisma.tenant.update({
+        where: { id: TENANT },
+        data: { picRegistryStatus: status, picRegistryCheckedAt: status === null ? null : new Date() },
+      });
+      const run = await runG0(page, opp.id);
+      const unconfirmed = evidenceOf(run);
+      dump(`G0, kayıt durumu ${status ?? 'null'}, koltuklar INVITED`, { passed: run.passed, evidence: unconfirmed });
+      expect(unconfirmed.scoringBasis).toBe('standard');
+      expect(unconfirmed.excludedFeatures).toEqual([]);
+      expect(unconfirmed.denominator).toBe(100);
+      expect(unconfirmed.noHistoryWithoutFilledSeat).toBe(false);
+      expect(unconfirmed.score).toBe(63);
+    }
+
+    // ── 4. The PIC is removed (fixture). Still the standard basis: removing the PIC never raises the score.
+    // "PIC boşsa kolaylık yok": the 75-point denominator must not apply. The 63 below is the measured
+    // standard score (NG-59: invited seats earn nothing; it was 75 before), reported in the result file.
+    await prisma.tenant.update({ where: { id: TENANT }, data: { pic: null, picRegistryStatus: null, picRegistryCheckedAt: null } });
     const picLessRun = await runG0(page, opp.id);
     const picLess = evidenceOf(picLessRun);
     dump('G0, PIC kaldırıldı, koltuklar INVITED', { passed: picLessRun.passed, evidence: picLess });

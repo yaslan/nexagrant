@@ -697,7 +697,7 @@ describe('G1 gate: critical roles and their backups', () => {
 describe('clearStoredG0 — TopicMatch branch (NG-59)', () => {
   const noEvidenceWithTopic = () =>
     computeG0FromSnapshot('tenant-2', { opportunityId: 'opp-1', topicId: 'topic-1' }, {
-      tenant: { country: null, pic: null },
+      tenant: { country: null, pic: null, picRegistryStatus: null },
       profile: null,
       topic: null,
       topicFitScore: null,
