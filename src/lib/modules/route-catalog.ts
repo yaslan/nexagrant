@@ -15,7 +15,6 @@
 /** Canonical (English) workspace page paths, relative to `/[locale]/[workspace]/`. */
 export const WORKSPACE_ROUTE_CATALOG = [
   'approvals',
-  'bildirimler',
   'calls',
   'calls/[id]',
   'concept-notes',
@@ -78,6 +77,7 @@ export const WORKSPACE_ROUTE_ALIASES: Record<string, WorkspaceRoutePath> = {
   iliskiler: 'relationships',
   kanitlar: 'evidence',
   'konsept-notlar': 'concept-notes',
+  bildirimler: 'notifications',
   'onay-merkezi': 'approvals',
   ortaklar: 'partners',
   'ortaklar/kaynaklar': 'partners/resources',
