@@ -54,9 +54,10 @@ interface CallCardProps {
   locale: string;
 }
 
-function CallCard({ call, topic, locale }: CallCardProps) {
+async function CallCard({ call, topic, locale }: CallCardProps) {
+  const t = await getTranslations({ locale, namespace: 'callsIndex' });
   const budget = call.budgetCents ? Number(call.budgetCents) / 100 : 0;
-  const deadline = topic.nextDeadlineAt ? new Date(topic.nextDeadlineAt).toLocaleDateString() : 'TBA';
+  const deadline = topic.nextDeadlineAt ? new Date(topic.nextDeadlineAt).toLocaleDateString() : t('tba');
   const statusColor = topic.status === 'OPEN' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
 
   return (
@@ -68,13 +69,13 @@ function CallCard({ call, topic, locale }: CallCardProps) {
       <p className="text-slate-600 text-sm mb-4">{topic.identifier}</p>
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <p className="text-xs text-slate-500 mb-1">Budget</p>
+          <p className="text-xs text-slate-500 mb-1">{t('budget')}</p>
           <p className="text-lg font-bold text-slate-900">
             {budget.toLocaleString()} {call.currency}
           </p>
         </div>
         <div>
-          <p className="text-xs text-slate-500 mb-1">Deadline</p>
+          <p className="text-xs text-slate-500 mb-1">{t('deadline')}</p>
           <p className="text-lg font-bold text-slate-900">{deadline}</p>
         </div>
       </div>
@@ -82,7 +83,7 @@ function CallCard({ call, topic, locale }: CallCardProps) {
         href={publicCallDetailHref(locale, topic.identifier)}
         className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold text-sm"
       >
-        View Details
+        {t('view_details')}
       </Link>
     </div>
   );
@@ -129,7 +130,7 @@ export default async function CallsPage({ params }: PageProps) {
         <div className="space-y-12">
           {Object.entries(groupedByCountry).map(([country, countryTopics]) => (
             <div key={country}>
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">{country === 'TR' ? '🇹🇷 Turkey' : country}</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-6">{country === 'TR' ? t('country_tr') : country}</h2>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {countryTopics.map((topic) => (
                   <CallCard key={topic.id} call={topic.call} topic={topic} locale={locale} />
