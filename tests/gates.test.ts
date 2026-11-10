@@ -193,16 +193,19 @@ Object.assign(OPPORTUNITIES, {
   ]),
 });
 
+// NG-100 / K-579560=A: a backup counts only when the current M8 matcher wrote the row
+// (visibleSeatCandidates reads `breakdown`), so every fixture row carries a match breakdown.
+const MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 15, collabHistory: 10, rivalRisk: 0 };
 const SEAT_CANDIDATES = [
-  { tenantId: 'tenant-1', seatId: 's-coord', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-research', organizationId: `${SEATED}-s-research`, partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-research', organizationId: null, partnerOrgId: 'partner-backup' },
-  { tenantId: 'tenant-1', seatId: 's-optional-only', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-open', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-invited', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-nobody', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-only-occupant', organizationId: `${SEATED}-s-only-occupant`, partnerOrgId: null },
-  { tenantId: 'tenant-2', seatId: 's-foreign-backup', organizationId: 'org-backup', partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-coord', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-research', organizationId: `${SEATED}-s-research`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-research', organizationId: null, partnerOrgId: 'partner-backup', breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-optional-only', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-open', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-invited', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-nobody', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-only-occupant', organizationId: `${SEATED}-s-only-occupant`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-2', seatId: 's-foreign-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
 ];
 
 const TENANTS: Record<string, { country: string | null; pic: string | null; settings: unknown }> = {
