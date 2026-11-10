@@ -349,7 +349,7 @@ export function BillingClient({
               </span>
             </div>
             <div className="text-[11px] text-muted">
-              <Link href={`/${locale}/${workspace}/settings/members`} className="text-blue-600 hover:underline">
+              <Link href={`/${locale}/${workspace}/settings/members`} className="text-accent-ink hover:underline">
                 {t('metricSeatsLink')}
               </Link>
             </div>
@@ -511,7 +511,7 @@ export function BillingClient({
                       >
                         {money(charged.monthlyEquivalentMinor, charged.currency)}
                       </span>
-                      <span className="text-sm text-slate-400 line-through font-medium">
+                      <span className="text-sm text-muted line-through font-medium">
                         {money(list.monthlyEquivalentMinor, list.currency)}
                       </span>
                       <span className="text-xs bg-accent/15 text-accent font-extrabold px-1.5 py-0.5 rounded font-mono">
