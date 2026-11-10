@@ -148,6 +148,24 @@ describe('syncCordisBigData writes to the real CORDIS tables', () => {
     expect(db.rows('cordisProject')).toHaveLength(1);
     expect(db.rows('document')).toHaveLength(1);
   });
+
+  test('the database re-index leaves keep.eu rows (KEU:) to the keep.eu RAG step (FO-363)', async () => {
+    // A keep.eu project sits in the same table under the KEU: prefix (persistKeepEuRecord).
+    await syncCordisBigData([
+      record(),
+      record({ projectId: 'KEU:BGTR0300118', objectiveText: 'keep.eu text', coordinatorPic: null }),
+    ]);
+    expect(db.rows('cordisProject')).toHaveLength(2);
+    db.clear('document');
+    embedTextMock.mockClear();
+
+    const res = await syncCordisBigData();
+
+    expect(res.syncedProjectsCount).toBe(1);
+    const texts = embedTextMock.mock.calls.map((c) => String(c[0]));
+    expect(texts.some((t) => t.includes('KEU:'))).toBe(false);
+    expect(texts.some((t) => t.includes('keep.eu text'))).toBe(false);
+  });
 });
 
 describe('aggregateCordisMetrics reports measured figures (CLAUDE.md #7)', () => {

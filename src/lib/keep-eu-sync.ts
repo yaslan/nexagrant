@@ -50,8 +50,11 @@ export const KEEP_EU_FETCH_TIMEOUT_MS = 30_000;
 
 export const KEEP_EU_API_BASE_URL = 'https://keep.eu/api/open-data';
 
-/** Namespace prefix for keep.eu-only project and organisation ids (never a CORDIS id). */
-const KEEP_EU_KEY_PREFIX = 'KEU:';
+/**
+ * Namespace prefix for keep.eu-only project and organisation ids (never a CORDIS id).
+ * cordis-sync reads it to keep keep.eu rows out of the CORDIS re-index (FO-363).
+ */
+export const KEEP_EU_KEY_PREFIX = 'KEU:';
 
 /** Maps a stored id back to keep.eu terms: keep.eu-only keys become beneficiary ids, CORDIS PICs stay PICs. */
 function splitKeepEuKey(storedId: string): { pic: string | null; beneficiaryId: string | null } {
@@ -63,6 +66,20 @@ function splitKeepEuKey(storedId: string): { pic: string | null; beneficiaryId: 
 
 /** How many already-imported projects a no-argument sync mirrors into RAG. */
 const DEFAULT_DATABASE_BATCH = 200;
+
+/**
+ * keep.eu projects whose text must not reach OpenAI: each names a real person (K-575447 = C, FO-363).
+ * Auto-detection missed 2 of 5 such cases, so the list is hand-verified and is a code constant on
+ * purpose: the default is always "exclude", so a forgotten flag can never re-enable embedding.
+ * These projects stay in the database; only the RAG embedding step skips them.
+ */
+export const RAG_EXCLUDED_PROJECT_IDS: readonly string[] = [
+  'BGTR0300118',
+  'BGTR0300121',
+  'BGTR0300153',
+  'BGTR0300155',
+  'BGTR0300162',
+];
 
 export interface KeepEuPartnerRecord {
   partnerName: string;
@@ -125,6 +142,10 @@ export interface KeepEuSyncResult {
   ragEmbeddedCount: number;
   /** Projects whose stored RAG chunks already matched the record, so nothing was embedded. */
   ragUnchangedCount: number;
+  /** Synced projects kept out of the RAG step by the personal-name exclusion list. */
+  ragExcludedCount: number;
+  /** Excluded ids that the upstream data did not contain (checked before any --limit cut). */
+  ragExclusionMissingCount: number;
   syncedAt: string;
 }
 
@@ -230,6 +251,27 @@ const KNOWN_KEEP_EU_PROJECT_FIELDS: ReadonlySet<string> = new Set([
 function trimmed(value?: string | null): string | undefined {
   const s = typeof value === 'string' ? value.trim() : '';
   return s.length > 0 ? s : undefined;
+}
+
+/**
+ * Single normalization for keep.eu project ids used by the RAG exclusion. Both the excluded list
+ * and every upstream id pass through it. Strips a leading `KEU:` / `KEU-` prefix, then every
+ * non-alphanumeric character (space, dash, colon, tab), then upper-cases, so case, separator and
+ * prefix drift cannot defeat the exclusion (BGTR-0300118, KEU:BGTR0300118, BGTR 0300118 all map to BGTR0300118).
+ */
+function normalizeProjectId(id: string): string {
+  return id.replace(/^\s*KEU\s*[:-]\s*/i, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+}
+
+/** Error text may echo record content (names, titles), so the alert keeps only the class and code. */
+function errorClassLabel(e: unknown): string {
+  if (e && typeof e === 'object') {
+    const name = (e as { name?: unknown }).name;
+    const code = (e as { code?: unknown }).code;
+    const base = typeof name === 'string' && name.length > 0 ? name : 'Error';
+    return typeof code === 'string' && code.length > 0 ? `${base}:${code}` : base;
+  }
+  return 'UnknownError';
 }
 
 function parseDate(value?: string | null): Date | null {
@@ -865,6 +907,22 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     }
   }
 
+  // The exclusion is not optional: the list is always applied (see RAG_EXCLUDED_PROJECT_IDS).
+  const excludedIds = new Set(RAG_EXCLUDED_PROJECT_IDS.map(normalizeProjectId));
+  const upstreamIds = new Set(dataset.map((r) => normalizeProjectId(r.projectId)));
+  // An upstream outage yields no data at all: that is not evidence that an id is missing.
+  const missingExcluded = upstreamOk && dataset.length > 0 ? [...excludedIds].filter((id) => !upstreamIds.has(id)) : [];
+  // The database source only loads a batch, so a missing id there proves nothing; warn only on full upstream data.
+  if (missingExcluded.length > 0 && source !== 'database' && !options?.limit) {
+    await recordAlert({
+      level: 'warn',
+      source: KEEP_EU_SYNC_ALERT_SOURCE,
+      message: `RAG exclusion: ${missingExcluded.length} listed project id(s) not in upstream data`,
+      meta: { missingCount: missingExcluded.length },
+      dedupeKey: 'keep-eu-sync:rag-exclusion-missing',
+    });
+  }
+
   if (typeof options?.limit === 'number' && options.limit > 0) {
     dataset = dataset.slice(0, options.limit);
   }
@@ -876,6 +934,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
   let totalBudgetEUR = 0;
   let ragEmbeddedCount = 0;
   let ragUnchangedCount = 0;
+  let ragExcludedCount = 0;
 
   for (let i = 0; i < dataset.length; i++) {
     const record = dataset[i]!;
@@ -897,7 +956,9 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
         }
       }
 
-      if (!options?.skipRag) {
+      if (excludedIds.has(normalizeProjectId(record.projectId))) {
+        ragExcludedCount++;
+      } else if (!options?.skipRag) {
         const docTitle = `INTERREG Project: ${record.acronym ?? record.projectId} - ${record.title}`;
         const body = buildKeepEuRagBody(record);
 
@@ -937,12 +998,12 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
       }
     } catch (e) {
       skippedCount++;
-      const err = errorMessage(e);
+      const safeLabel = errorClassLabel(e);
       await recordAlert({
         level: 'error',
         source: KEEP_EU_SYNC_ALERT_SOURCE,
-        message: `keep.eu record failed to sync: ${err}`,
-        meta: { projectId: record.projectId },
+        message: `keep.eu record failed to sync: ${safeLabel} (projectId=${record.projectId})`,
+        meta: { projectId: record.projectId, errorClass: safeLabel },
         dedupeKey: 'keep-eu-sync:record-sync-failed',
       });
 
@@ -952,7 +1013,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
           total: dataset.length,
           project: record,
           skipped: true,
-          error: err,
+          error: safeLabel,
         });
       }
     }
@@ -971,6 +1032,8 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     programmesCount,
     ragEmbeddedCount,
     ragUnchangedCount,
+    ragExcludedCount,
+    ragExclusionMissingCount: missingExcluded.length,
     syncedAt: new Date().toISOString(),
   };
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { prisma } from '@/lib/db';
+import { createDbClient, prisma } from '@/lib/db';
 import { persistKeepEuRecord, type KeepEuProjectRecord } from '@/lib/keep-eu-sync';
-import { skipOrFailInCi } from './helpers/live-db-role';
+import { isGithubActions, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 
 /**
  * TASK-MVIAOEGRE2JJT (FO-113, Y1) — a keep.eu sync must not overwrite the CORDIS
@@ -22,6 +22,8 @@ const SUITE = 'keep-eu-sync.live';
 // Opt-in: vitest loads `.env`, so a bare `pnpm test` would point this file at the
 // shared dev database. Run it with `KEEP_EU_LIVE=1 DATABASE_URL=<throwaway db>`.
 const LIVE = process.env.KEEP_EU_LIVE === '1';
+// Owner connection that builds fixtures, the second argument of usedDatabaseName (same DB as `prisma`).
+const admin = createDbClient(process.env.DATABASE_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const RUN = `y1-${Date.now().toString(36)}`;
 const PIC_KEEP = `${RUN}-keep`; // CORDIS org with fields keep.eu must not change
 const PIC_FILL = `${RUN}-fill`; // CORDIS org with empty country and city
@@ -67,6 +69,11 @@ function record(): KeepEuProjectRecord {
 
 describe.skipIf(!LIVE)(SUITE, () => {
   beforeAll(async () => {
+    // B1: refuse the shared database. Every row here is keyed by RUN, so the teardown stays scoped.
+    const dbName = await usedDatabaseName(prisma, admin, SUITE);
+    if (dbName === undefined || (dbName === 'fabrika' && !isGithubActions())) {
+      throw new Error(`${SUITE}: refusing to run on ${dbName ?? 'an unreadable database'}; point DATABASE_URL at a throwaway database`);
+    }
     await prisma.cordisOrganization.createMany({
       data: [
         {
@@ -94,6 +101,7 @@ describe.skipIf(!LIVE)(SUITE, () => {
     await prisma.cordisProject.deleteMany({ where: { id: { in: [`KEU:${PROJECT_ID}`] } } });
     await prisma.cordisOrganization.deleteMany({ where: { organisationId: { in: [PIC_KEEP, PIC_FILL, PIC_NEW] } } });
     await prisma.$disconnect();
+    await admin.$disconnect();
   });
 
   test('keep.eu leaves an existing CORDIS organisation name, country and city unchanged', async () => {
