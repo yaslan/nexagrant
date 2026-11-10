@@ -151,7 +151,9 @@ export async function purgeDueUsers(
         //     so those rows stay and only the link to the person is dropped —
         //     the same choice already made for `AiUsageLog` above and for the
         //     hashed subject reference in the erasure audit below.
-        await tx.auditEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
+        //     The audit table is append-only for the app role (NG-40): this goes
+        //     through audit_detach_actor(), which can only null "actorId".
+        await tx.$executeRaw`SELECT public.audit_detach_actor(${userId})`;
         //     `member.removed` names the Membership id in `target`, never the user
         //     id. The person link there is cut by the `Membership.user` cascade
         //     below, so `target` needs no rewrite here.

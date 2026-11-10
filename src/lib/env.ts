@@ -221,6 +221,13 @@ const envSchema = z.object({
    */
   CALENDAR_ENCRYPTION_KEY: z.string().optional(),
   /**
+   * 256-bit AES-GCM key for the buyer tax number (`buyerVknTckn`) on
+   * TenantBillingIdentity and Invoice (NG-40, src/lib/billing/tax-id-crypto.ts).
+   * 64 hex characters or `openssl rand -base64 32`. Unset = billing identity
+   * and invoice writes fail closed; the number is never stored in clear.
+   */
+  TAX_ID_ENCRYPTION_KEY: z.string().optional(),
+  /**
    * Where the TCMB daily exchange-rate bulletin is read from
    * (`src/lib/fx/tcmb.ts`). Unset = the real archive,
    * https://www.tcmb.gov.tr/kurlar — TCMB publishes it openly, so unlike every

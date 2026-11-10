@@ -186,6 +186,9 @@ export DATABASE_URL_RLS_TEST="postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:
 # ci.yml Test step. KEEP_EU_LIVE=1 runs keep-eu-sync.live against this throwaway DB.
 export AUTH_SECRET='ci-vitest-auth-secret-fixture-not-for-any-deployment'
 export KEEP_EU_LIVE=1
+# NG-40: buyer tax-number field encryption (src/lib/billing/tax-id-crypto.ts). A throwaway
+# 32-byte key of this gate, the same kind of fixture as AUTH_SECRET above - not for any deployment.
+export TAX_ID_ENCRYPTION_KEY="${TAX_ID_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
 # FO-256: the pool's 1 s connect timeout failed under load (FO-253). Here, and only
 # here, it gets 10 s; prod and dev keep 1000 ms (src/lib/env.ts). Vitest and the
 # Playwright webServer both inherit this environment.

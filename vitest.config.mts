@@ -41,6 +41,11 @@ export default defineConfig({
       // TASK-MULSCEK4JHK8X — tests exercise the demo sign-in path, which is off
       // unless this says otherwise (src/lib/demo-login.ts).
       DEMO_LOGIN_ENABLED: 'true',
+      // NG-40 — the Prisma client encrypts buyerVknTckn and fails closed without a key
+      // (src/lib/billing/tax-id-crypto.ts). A throwaway key of the test run; a real one in the
+      // environment wins. The unit test for the missing-key case unsets it itself.
+      TAX_ID_ENCRYPTION_KEY:
+        process.env.TAX_ID_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     },
     // TASK-MUNSRKW0HJYBV (İNCELEME-63 Ö-C) — vitest's 5 s default is a
     // budget for one test on an idle machine. The property sweeps

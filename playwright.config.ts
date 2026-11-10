@@ -84,6 +84,10 @@ if (process.env.E2E_DATABASE_URL) {
 const E2E_SMTP = { SMTP_HOST: 'localhost', SMTP_PORT: '1025' };
 process.env.E2E_MAILPIT_URL ??= 'http://localhost:8025';
 
+// NG-40: the e2e runner and its web server both write billing identity / invoices through the
+// encrypting Prisma client; a throwaway key of this run (a real one in the environment wins).
+process.env.TAX_ID_ENCRYPTION_KEY ||= '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
   ...E2E_SMTP,
