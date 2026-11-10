@@ -4,11 +4,10 @@
  * Two things live here, both free of I/O so they run the same on the server and in
  * the browser and can be unit tested:
  *
- *   1. External partner-search deep links (F&T Portal, EEN, Ideal-ist, GREENET,
- *      LinkedIn). Each URL was checked against the live site on 30.09.2026:
+ *   1. External partner-search deep links (F&T Portal, EEN, Ideal-ist, GREENET).
+ *      There is deliberately no LinkedIn link (spec D2 l.14). Each URL was checked against the live site on 30.09.2026:
  *        - F&T Portal partner search reads `?keywords=` and pre-fills the search box.
  *        - Ideal-ist `/partner-search` filters on `topic_id` (prefix) and `title`.
- *        - LinkedIn company search reads `?keywords=` (behind LinkedIn's own login).
  *        - EEN partnering opportunities uses a POST facet form and ignores query
  *          strings, and the GREENET tool is a b2match community behind a login, so
  *          both get their plain search page plus a copyable search text.
@@ -21,7 +20,7 @@
  * (and from there into that site's logs and the browser history).
  */
 
-export type PartnerSearchSourceId = 'ft' | 'een' | 'idealist' | 'greenet' | 'linkedin';
+export type PartnerSearchSourceId = 'ft' | 'een' | 'idealist' | 'greenet';
 
 export interface PartnerSearchInput {
   /** Organisation (legal) name, e.g. "Fraunhofer-Gesellschaft". */
@@ -46,7 +45,6 @@ export const PARTNER_SEARCH_BASE_URLS: Readonly<Record<PartnerSearchSourceId, st
   een: 'https://een.ec.europa.eu/partnering-opportunities',
   idealist: 'https://www.ideal-ist.eu/partner-search',
   greenet: 'https://greenet-partner-search-tool.b2match.io/',
-  linkedin: 'https://www.linkedin.com/search/results/companies/',
 };
 
 export const PARTNER_SEARCH_SOURCES: readonly PartnerSearchSourceId[] = [
@@ -54,7 +52,6 @@ export const PARTNER_SEARCH_SOURCES: readonly PartnerSearchSourceId[] = [
   'een',
   'idealist',
   'greenet',
-  'linkedin',
 ];
 
 const EMAIL_RE = /[^\s@]+@[^\s@]+/g;
@@ -93,7 +90,7 @@ function countryName(code: string | null | undefined): string {
   const clean = sanitizeQueryText(code).toUpperCase();
   if (!/^[A-Z]{2}$/.test(clean)) return '';
   try {
-    // English on purpose: all five target sites search in English.
+    // English on purpose: all four target sites search in English.
     return new Intl.DisplayNames(['en'], { type: 'region' }).of(clean) ?? clean;
   } catch {
     return clean;
@@ -101,7 +98,7 @@ function countryName(code: string | null | undefined): string {
 }
 
 /**
- * Builds the five external partner-search links for one organisation.
+ * Builds the four external partner-search links for one organisation.
  * Order follows PARTNER_SEARCH_SOURCES.
  */
 export function buildPartnerSearchLinks(input: PartnerSearchInput): PartnerSearchLink[] {
@@ -140,12 +137,6 @@ export function buildPartnerSearchLinks(input: PartnerSearchInput): PartnerSearc
       url: PARTNER_SEARCH_BASE_URLS.greenet,
       prefilled: false,
       searchText: topicSearchText,
-    },
-    {
-      id: 'linkedin',
-      url: withQuery(PARTNER_SEARCH_BASE_URLS.linkedin, { keywords: orgName }),
-      prefilled: orgName !== '',
-      searchText: orgName,
     },
   ];
 }

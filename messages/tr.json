@@ -3779,10 +3779,6 @@
       "greenet": {
         "name": "GREENET",
         "hint": "Küme 5 (iklim, enerji, ulaşım) NCP ağının ortak arama topluluğu. Üyelik gerekir."
-      },
-      "linkedin": {
-        "name": "LinkedIn",
-        "hint": "Şirket sayfası araması. LinkedIn girişi gerekir."
       }
     },
     "emailTitle": "İlk temas e-posta şablonları",
