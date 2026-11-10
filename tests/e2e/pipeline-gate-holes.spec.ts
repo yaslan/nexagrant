@@ -5,6 +5,10 @@ import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { signInAs } from './fixtures/session';
 
+// NG-100 / K-579560=A: a seat candidate counts only when the M8 matcher wrote its row
+// (visibleSeatCandidates reads the breakdown), so the seeded backup carries a matcher breakdown.
+const MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 15, collabHistory: 10, rivalRisk: 0 };
+
 /**
  * NG-26: the two doors NG-25 left open, measured the way a user (or a tampered client) goes through them.
  *
@@ -96,7 +100,7 @@ async function seed() {
       data: { tenantId: TENANT, opportunityId: id, roleKey: 'research', status: 'CONFIRMED', organizationId: `${id}-org` },
     });
     await prisma.seatCandidate.create({
-      data: { tenantId: TENANT, seatId: seat.id, organizationId: `${id}-backup`, score: 9, breakdown: {}, rank: 1 },
+      data: { tenantId: TENANT, seatId: seat.id, organizationId: `${id}-backup`, score: 9, breakdown: MATCH_BREAKDOWN, rank: 1 },
     });
   }
 }

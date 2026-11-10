@@ -337,8 +337,9 @@ test.describe('M8 consortium matching', () => {
       expect(row.score).toBeLessThanOrEqual(100);
     }
 
-    // 6. A row scored before K-578751 keeps the dimensions and ranges it was scored
-    // on and says so; matching the seat again replaces it with the new criteria.
+    // 6. A row scored before K-578751 is hidden on every screen, not shown with a note
+    // (NG-100 K-579931=A); the seat's other matcher rows stay. Matching the seat again
+    // replaces it with the new criteria.
     await prisma.seatCandidate.updateMany({
       where: { seatId: OPEN_SEAT, rank: 1 },
       data: {
@@ -348,19 +349,16 @@ test.describe('M8 consortium matching', () => {
     });
     await page.goto(URL);
     const legacyCard = page.getByTestId('m8-seat-research');
-    const legacyRow = legacyCard.locator('tbody tr').first();
-    await expect(legacyRow).toContainText('88,9 / 100');
-    const legacyDetails = legacyRow.locator('details');
-    await legacyDetails.locator('summary').click();
-    await expect(legacyDetails.locator('dd')).toHaveCount(6);
-    await expect(legacyDetails.getByTestId('m8-dimension-topicExperience')).toHaveText('35,0 / 35');
-    await expect(legacyDetails).toContainText('önceki ölçütlerle');
-    await page.screenshot({ path: `${SHOTS}/06-legacy-row.png`, fullPage: true });
+    await expect(legacyCard.locator('tbody tr')).toHaveCount(2);
+    await expect(legacyCard).not.toContainText('88,9 / 100');
+    await expect(legacyCard).not.toContainText('önceki ölçütlerle');
+    await page.screenshot({ path: `${SHOTS}/06-legacy-row-hidden.png`, fullPage: true });
 
     const findAgain = legacyCard.getByRole('button', { name: 'Aday Bul' });
     await expectHydrated(findAgain);
     await findAgain.click();
-    await expect(legacyCard).not.toContainText('88,9 / 100', { timeout: 30_000 });
+    await expect(legacyCard.locator('tbody tr')).toHaveCount(3, { timeout: 30_000 });
+    await expect(legacyCard).not.toContainText('88,9 / 100');
     const rewritten = await prisma.seatCandidate.findMany({ where: { seatId: OPEN_SEAT }, select: { breakdown: true } });
     expect(rewritten.length).toBe(3);
     for (const row of rewritten) expect(row.breakdown).not.toHaveProperty('relationshipWarmth');
