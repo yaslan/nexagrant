@@ -100,9 +100,10 @@ test.describe('WCAG A/AA — signed in, main layout', () => {
 /**
  * NG-90 — genişletme. Yalnız KEŞİFTE (ham axe) ihlalsiz ve 200 dönen adresler buraya girer.
  * Eklenmeyenler (ihlalli, ayrı borç kartında raporlanır): /tr/fiyatlandirma, /en/pricing (color-contrast),
- * /tr/kayit, /en/register (color-contrast), /tr/main/ayarlar (color-contrast), /tr/main/ayarlar/uyeler
- * ve /en/main/settings/members (select-name), /tr/main/firsatlar ve /en/main/pipeline (color-contrast +
- * select-name). Hiçbir axe kuralı kapatılmadı, hiçbir bölüm exclude edilmedi.
+ * /tr/kayit, /en/register (color-contrast), /tr/main/ayarlar (color-contrast), /tr/main/firsatlar ve
+ * /en/main/pipeline (color-contrast; select-name NG-102 ile kapandı, kontrast kartı kapanınca eklenecek).
+ * /tr/main/ayarlar/uyeler ve /en/main/settings/members NG-102 ile (select-name düzeltildi) eklendi.
+ * Hiçbir axe kuralı kapatılmadı, hiçbir bölüm exclude edilmedi.
  */
 test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
   for (const url of ['/tr/blog', '/en/blog', '/tr/gizlilik-politikasi', '/en/privacy', '/tr/kullanim-kosullari', '/en/terms']) {
@@ -144,7 +145,7 @@ test.describe('WCAG A/AA — NG-90 signed in, settings (tr + en)', () => {
     await cleanupIdentity([SETTINGS_OWNER.userId]);
   });
 
-  for (const url of ['/tr/main/ayarlar/profil', '/tr/main/ayarlar/gizlilik', '/en/main/settings/profile', '/en/main/settings/privacy']) {
+  for (const url of ['/tr/main/ayarlar/profil', '/tr/main/ayarlar/gizlilik', '/en/main/settings/profile', '/en/main/settings/privacy', '/tr/main/ayarlar/uyeler', '/en/main/settings/members']) {
     test(`${url} has no A/AA violations`, async ({ page }) => {
       await acceptCookies(page);
       await signInAs(page, { id: SETTINGS_OWNER.userId, email: SETTINGS_OWNER.email, tenantId: SETTINGS_OWNER.tenantId, role: SETTINGS_OWNER.role });

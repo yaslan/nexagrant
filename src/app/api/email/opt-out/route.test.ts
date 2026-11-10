@@ -23,6 +23,11 @@ const { emailOptOutHash, signOptOutToken } = await import('@/lib/email/opt-out')
 const payload = { kind: 'unsubscribe', hash: emailOptOutHash('a@example.invalid'), source: 'invitation', tenantId: 't1' } as const;
 const valid = signOptOutToken(payload, SECRET);
 
+/** A distinct recipient (and so a distinct token) per index. */
+function tokenFor(i: number): string {
+  return signOptOutToken({ ...payload, hash: emailOptOutHash(`r${i}@example.invalid`) }, SECRET);
+}
+
 type Handler = typeof import('./route').POST;
 let POST: Handler;
 
@@ -92,19 +97,35 @@ describe('POST /api/email/opt-out', () => {
     expect((await POST(request(valid, body))).status).toBe(200);
   });
 
-  it('stops one client at 20 a minute and leaves the others alone', async () => {
+  it('stops one recipient token at 20 a minute, whatever address sends it', async () => {
     for (let i = 0; i < 20; i += 1) expect((await POST(request(valid))).status).toBe(200);
-    expect((await POST(request(valid))).status).toBe(429);
+    expect((await POST(request(valid, undefined, '198.51.100.8'))).status).toBe(429);
     expect(recordOptOut).toHaveBeenCalledTimes(20);
-    expect((await POST(request(valid, undefined, '198.51.100.8'))).status).toBe(200);
+    expect((await POST(request(tokenFor(999)))).status).toBe(200);
   });
 
-  it('stops the process at 300 a minute however many addresses are used', async () => {
-    for (let i = 0; i < 300; i += 1) {
-      expect((await POST(request(valid, undefined, `10.0.${Math.floor(i / 250)}.${i % 250}`))).status).toBe(200);
+  it('lets a mail provider send 21 one-clicks for 21 recipients from one address', async () => {
+    // The provider posts every one-click from its own few addresses: an IP
+    // limit of 20 would fail the 21st real unsubscribe (NG-104 Ö-1).
+    for (let i = 0; i < 21; i += 1) {
+      expect((await POST(request(tokenFor(i), undefined, '192.0.2.10'))).status).toBe(200);
     }
-    expect((await POST(request(valid, undefined, '203.0.113.200'))).status).toBe(429);
+    expect(recordOptOut).toHaveBeenCalledTimes(21);
+  });
+
+  it('keeps the process ceiling at 300 a minute across many recipients and addresses', async () => {
+    for (let i = 0; i < 300; i += 1) {
+      expect((await POST(request(tokenFor(i), undefined, `10.0.${Math.floor(i / 250)}.${i % 250}`))).status).toBe(200);
+    }
+    expect((await POST(request(tokenFor(300), undefined, '203.0.113.200'))).status).toBe(429);
     expect(recordOptOut).toHaveBeenCalledTimes(300);
+  });
+
+  it('keeps the 20 a minute per address limit on the confirmation form', async () => {
+    const form = 'confirm=1&locale=tr';
+    for (let i = 0; i < 20; i += 1) expect((await POST(request(tokenFor(i), form))).status).toBe(303);
+    expect((await POST(request(tokenFor(20), form))).status).toBe(429);
+    expect((await POST(request(tokenFor(21), form, '198.51.100.8'))).status).toBe(303);
   });
 
   it('does not let forged tokens spend the limit of real unsubscribes', async () => {
