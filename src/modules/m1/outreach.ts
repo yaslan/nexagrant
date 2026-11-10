@@ -5,7 +5,7 @@
  * the browser and can be unit tested:
  *
  *   1. External partner-search deep links (F&T Portal, EEN, Ideal-ist, GREENET).
- *      There is deliberately no LinkedIn link (spec D2 l.14). Each URL was checked against the live site on 30.09.2026:
+ *      Each URL was checked against the live site on 30.09.2026:
  *        - F&T Portal partner search reads `?keywords=` and pre-fills the search box.
  *        - Ideal-ist `/partner-search` filters on `topic_id` (prefix) and `title`.
  *        - EEN partnering opportunities uses a POST facet form and ignores query
