@@ -57,6 +57,8 @@ model Tenant {
   interregAnalyses InterregAnalysis[]
   orgReadiness  OrgReadiness[]
   projectIdeas  ProjectIdea[]
+  notificationPreferences NotificationPreference[]
+  notificationEmailItems  NotificationEmailItem[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -1704,6 +1706,69 @@ enum NotificationType {
   CREDIT_GRANTED       // payload: { amount, period?, source } (no producer yet)
   CREDIT_EXHAUSTED     // payload: { module } (no producer yet)
   EVIDENCE_EXPIRING    // payload: { evidenceId, validUntil } (evidence-expiring job)
+}
+
+// NG-43 — spec §13 notification centre: per-user channel and frequency choice.
+// One row per (user, §13 event, channel); no row = the default in
+// src/lib/notifications/preferences.ts (panel INSTANT, e-mail OFF). The event list is the
+// spec's, not NotificationType: src/lib/notifications/events.ts maps the stored types onto it.
+// userId carries no FK, like Notification.userId; users-scheduled-deletion deletes by userId.
+model NotificationPreference {
+  id        String                @id @default(cuid())
+  tenantId  String
+  userId    String
+  event     NotificationEvent
+  channel   NotificationChannel
+  frequency NotificationFrequency
+  updatedAt DateTime              @updatedAt
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, event, channel])
+}
+
+// NG-43 — e-mail outbox of the notification centre. A dispatched notification whose e-mail
+// preference is INSTANT or WEEKLY lands here; sendNotificationEmails sends INSTANT rows one by
+// one and WEEKLY rows as one digest per user, then deletes what it sent. Text is never stored:
+// type + payload, rendered at send time like the panel (ADR-0011 §3.1).
+model NotificationEmailItem {
+  id        String                @id @default(cuid())
+  tenantId  String
+  userId    String
+  type      NotificationType
+  payload   Json                  @default("{}")
+  frequency NotificationFrequency
+  dedupeKey String?
+  createdAt DateTime              @default(now())
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, dedupeKey])
+  @@index([frequency, createdAt])
+  @@index([tenantId, userId])
+}
+
+/// Spec §13 "Olaylar", in the spec's order.
+enum NotificationEvent {
+  NEW_MATCHING_CALL // yeni uygun çağrı
+  CALL_CHANGED // çağrı değişikliği
+  OUTREACH_REPLY // outreach yanıtı
+  CONTRIBUTION_OVERDUE // katkı gecikmesi
+  APPROVAL_OVERDUE // onay süresi aşımı
+  BUDGET_DEVIATION // bütçe sapması
+  TASK_COLOR_CHANGED // görev rengi değişimi
+  REPORT_DUE // rapor yaklaşması
+  OBLIGATION_REMINDER // yükümlülük hatırlatması
+}
+
+enum NotificationChannel {
+  PANEL
+  EMAIL
+}
+
+/// WEEKLY is e-mail only (the §13 weekly summary); the panel is INSTANT or OFF.
+enum NotificationFrequency {
+  INSTANT
+  WEEKLY
+  OFF
 }
 
 // ───────────────────────── v1.1+ (M6, M9, M10, M11, M7) ─────────────────────────

@@ -86,3 +86,4 @@ add-org-readiness-tables.sql
 tenant-pic-registry-status/migration.sql
 add-project-idea-decision-log.sql
 auditevent-immutable.sql
+add-notification-preferences.sql

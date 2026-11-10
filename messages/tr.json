@@ -74,7 +74,9 @@
     "evidenceExpiringDesc": "Geçerli tarih: {validUntil}",
     "sourceOther": "başka bir kaynak",
     "genericTitle": "Bildirim",
-    "genericDesc": "Yeni bir bildiriminiz var."
+    "genericDesc": "Yeni bir bildiriminiz var.",
+    "emailDigestSubject": "Haftalık bildirim özeti: {count, plural, one {1 bildirim} other {# bildirim}}",
+    "emailDigestIntro": "Bu hafta {count, plural, one {1 bildiriminiz} other {# bildiriminiz}} var. Haftalık özet ayarınız gereği tek e-postada toplandı."
   },
   "Dashboard": {
     "title": "Panel",

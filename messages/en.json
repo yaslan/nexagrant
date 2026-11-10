@@ -74,7 +74,9 @@
     "evidenceExpiringDesc": "Valid until {validUntil}",
     "sourceOther": "another source",
     "genericTitle": "Notification",
-    "genericDesc": "You have a new notification."
+    "genericDesc": "You have a new notification.",
+    "emailDigestSubject": "Weekly notification summary: {count, plural, one {1 notification} other {# notifications}}",
+    "emailDigestIntro": "You have {count, plural, one {1 notification} other {# notifications}} this week, gathered into one e-mail as your weekly summary setting asks."
   },
   "Dashboard": {
     "title": "Dashboard",

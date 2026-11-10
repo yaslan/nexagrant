@@ -145,6 +145,9 @@ export async function purgeDueUsers(
         //     ADR-0011: notifications are addressed to the subject and nobody
         //     else, so they go outright, in every tenant.
         await tx.notification.deleteMany({ where: { userId } });
+        //     NG-43: the subject's channel choices and their queued mails.
+        await tx.notificationPreference.deleteMany({ where: { userId } });
+        await tx.notificationEmailItem.deleteMany({ where: { userId } });
 
         //     The rest are the tenant's records, not the subject's. Erasure must
         //     not delete the tenant's opportunities, bug reports or audit trail,

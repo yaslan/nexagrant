@@ -295,6 +295,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/notifications/email-outbox.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "sendNotificationEmails() (NG-43, spec §13): finds which (tenantId, userId) pairs have NotificationEmailItem rows of the run's frequency (INSTANT or WEEKLY) queued up to now, distinct, then keepLiveTenantRows drops soft-deleted tenants. The tenant set is the query's output, so no single tenant exists to hand withTenant; NotificationEmailItem is FORCE RLS, so an unscoped findMany under fabrika_app would see nothing and no mail would ever go. Reads only the two ids; each pair's items, the recipient's address and the deletes run afterwards in withTenant(tenantId)."
+    },
+    {
+      "check": "D",
       "file": "src/lib/notifications/retention.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,

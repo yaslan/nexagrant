@@ -1190,3 +1190,15 @@ Kayıtsız numara 77,11 GO → 57,83 NO_GO'ya düşer. `G0_SCORING_VERSION` 2.3.
 **Migration:** `prisma/migrations/tenant-pic-registry-status/` — iki `ADD COLUMN IF NOT EXISTS`,
 veri geçişi yok; ikinci çalıştırma no-op (kanıt: FO-396 raporu). Geri alma: `down.sql` (kolonları
 ve kontrol sonuçlarını siler; kolon yoksa kolaylık da yoktur). `Tenant` sistem geneli tablo, RLS yok.
+
+## 30. Bildirim kanalı ve sıklık tercihi: `NotificationPreference`, `NotificationEmailItem` (NG-43 · şartname §13)
+
+Şartname §13: "kanal tercihi kullanıcı bazlı; haftalık özet ve anlık uyarı ayrı ayarlanır". Migration: `prisma/migrations/add-notification-preferences.sql` (geri alma: `.down.sql`). `Notification` tablosu ve `NotificationType` değişmedi.
+
+- **Olay listesi (`NotificationEvent`):** §13'ün dokuz olayı, şartname sırasıyla. Kod: `src/lib/notifications/events.ts`. Saklanan türlerin eşlemesi: `SAVED_SEARCH_MATCH` → `NEW_MATCHING_CALL`, `EVIDENCE_EXPIRING` → `OBLIGATION_REMINDER`; `CREDIT_GRANTED` / `CREDIT_EXHAUSTED` §13 dışıdır (hesap bildirimi): yalnız panel, kapatılamaz.
+- **`NotificationPreference`:** (kiracı, kullanıcı, olay, kanal) başına bir satır, `frequency`. `PANEL`: `INSTANT` | `OFF`. `EMAIL`: `INSTANT` | `WEEKLY` | `OFF`. Satır yoksa varsayılan: panel `INSTANT`, e-posta `OFF` (istenmemiş posta yok). Yazan/okuyan `src/lib/notifications/preferences.ts` (`setPreferenceFor`, Zod; istemciden kullanıcı kimliği alınmaz).
+- **`NotificationEmailItem`:** e-posta kuyruğu. `dispatchNotification` tercihe göre panel satırı (`Notification`) ve/veya kuyruk satırı yazar. `sendNotificationEmails` (`src/lib/notifications/email-outbox.ts`) `INSTANT` satırlarını tek tek, `WEEKLY` satırlarını kullanıcı ve kiracı başına tek özet postasıyla gönderir; SMTP kabul edince satırı siler. Hata olursa satır kalır, sonraki koşuda yeniden denenir. Metin saklanmaz; tür + payload gönderimde alıcının dilinde işlenir.
+- **Kiracı sınırı:** ikisi de RLS (`tenant_isolation`) altında. `userId` FK taşımaz (`Notification.userId` gibi).
+- **Silme:** kişi silinince `users-scheduled-deletion` ikisini de `userId` ile siler. Kiracı silinince CASCADE.
+- **Henüz bağlı değil:** mevcut üreticiler (`alerts-daily`, `evidence-expiring`) hâlâ `recordNotification` çağırır; `dispatchNotification`'a geçişleri ve `sendNotificationEmails` için zamanlanmış iş (`schedule.ts`) ayrı iştir.
+

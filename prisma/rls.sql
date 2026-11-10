@@ -15,7 +15,8 @@ BEGIN
     'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage',
     'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark',
     'OrgReadiness','InternalApproval','PartnerBudgetShare',
-    'ProjectIdea','DecisionLog'
+    'ProjectIdea','DecisionLog',
+    'NotificationPreference','NotificationEmailItem'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
