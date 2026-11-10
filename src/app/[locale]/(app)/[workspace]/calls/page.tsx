@@ -45,31 +45,37 @@ const FRAMEWORK_PROGRAMMES = [
 const DEFAULT_STATUSES = ['OPEN', 'FORTHCOMING'];
 const STATUS_VALUES = ['OPEN', 'FORTHCOMING', 'CLOSED'];
 
+/** Rows per request. The route's default `limit` is 20 too, so the pager and the window agree. */
+const CALLS_PAGE_SIZE = 20;
+/** The last page a request can ask for: one more would be past SEDIA's window (route `page_out_of_window`). */
+const MAX_CALLS_PAGE = Math.floor(SEDIA_RESULT_WINDOW / CALLS_PAGE_SIZE);
+/** The route's own page rule (`PageParamSchema`): plain digits, no leading zero. */
+const PAGE_PARAM = /^[1-9]\d{0,3}$/;
+
 /**
  * Filter state lives in the URL (NG-12): `q`, `framework`, `status`, `type`, `page`. A param that
  * is missing or not a known value falls back to the default, so a hand-edited URL cannot break
- * the page. `status=` (empty) is a real choice: no status box ticked.
+ * the page. An empty status list (`status=`, or only unknown codes) means the default statuses,
+ * because the list cannot be sent with no status at all (the last box cannot be unticked).
  */
 function parseFilters(params: URLSearchParams) {
   const frameworkRaw = params.get('framework');
-  const statusRaw = params.get('status');
-  const pageRaw = Number.parseInt(params.get('page') ?? '', 10);
+  const statusRaw = params.get('status') ?? '';
+  const statusValues = [
+    ...new Set(
+      statusRaw
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter((s) => STATUS_VALUES.includes(s)),
+    ),
+  ];
+  const pageRaw = params.get('page') ?? '';
   return {
     search: params.get('q') ?? '',
     framework: FRAMEWORK_PROGRAMMES.some((p) => p.id === frameworkRaw) ? (frameworkRaw as string) : 'ALL',
-    statuses:
-      statusRaw === null
-        ? DEFAULT_STATUSES
-        : [
-            ...new Set(
-              statusRaw
-                .split(',')
-                .map((s) => s.trim().toUpperCase())
-                .filter((s) => STATUS_VALUES.includes(s)),
-            ),
-          ],
+    statuses: statusValues.length > 0 ? statusValues : DEFAULT_STATUSES,
     callType: (params.get('type') === '2' ? '2' : '1') as '1' | '2',
-    page: Number.isFinite(pageRaw) && pageRaw >= 1 ? pageRaw : 1,
+    page: PAGE_PARAM.test(pageRaw) && Number(pageRaw) <= MAX_CALLS_PAGE ? Number(pageRaw) : 1,
   };
 }
 
@@ -134,7 +140,7 @@ export default function CallsPage({
   const [statuses, setStatuses] = useState<string[]>(initial.statuses);
   const [callType, setCallType] = useState<'1' | '2'>(initial.callType); // 1 = Grant, 2 = Tender
   const [page, setPage] = useState(initial.page);
-  const [limit, setLimit] = useState(20);
+  const [limit, setLimit] = useState(CALLS_PAGE_SIZE);
 
   const [topics, setTopics] = useState<SediaTopic[]>([]);
   const [totalResults, setTotalResults] = useState(0);
@@ -281,6 +287,11 @@ export default function CallsPage({
           setTopics(data.topics || []);
           setTotalResults(data.totalResults || 0);
           setLoadFailure(null);
+          // A page past the last one that has rows (a filter that shrank the list, or a `?page=`
+          // that is inside the window but past the total) moves to the last page. The query for
+          // this answer is still current (a superseded one returned above), so `page` is its page.
+          const lastPage = lastReachablePage(data.totalResults || 0, CALLS_PAGE_SIZE);
+          setPage((p) => Math.min(p, lastPage));
         } else {
           setTopics([]);
           setTotalResults(0);
@@ -305,7 +316,9 @@ export default function CallsPage({
     };
   }, [query]);
 
+  // The last ticked status box stays ticked: an empty list would drop `status` from the request.
   const toggleStatus = (st: string) => {
+    if (statuses.includes(st) && statuses.length === 1) return;
     setPage(1);
     setStatuses((prev) =>
       prev.includes(st) ? prev.filter((s) => s !== st) : [...prev, st]
