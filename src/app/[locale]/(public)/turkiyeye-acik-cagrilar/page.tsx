@@ -57,7 +57,7 @@ export default async function TurkiyeyeAcikCagrilarPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const isTr = locale === 'tr';
+  const t = await getTranslations({ locale, namespace: 'turkiyeye_acik_cagrilar' });
 
   let topics: OpenTopicRow[] = [];
   try {
@@ -132,36 +132,34 @@ export default async function TurkiyeyeAcikCagrilarPage({
       <main className="flex-1 max-w-5xl mx-auto py-12 px-edge sm:px-4 w-full">
         <div className="mb-10 text-center">
           <span className="bg-bad/15 text-bad text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full inline-block mb-3 border border-bad/20">
-            {isTr ? 'Horizon Europe & Asosiye Ülkeler' : 'Horizon Europe Associated Countries'}
+            {t('badge')}
           </span>
           <h1 className="text-3xl md:text-4xl font-extrabold font-heading text-ink mb-3">
-            {isTr ? 'Türkiye’deki Kuruluşlara Açık AB Hibe Çağrıları' : 'EU Funding Calls Open to Turkish Organizations'}
+            {t('heading')}
           </h1>
           <p className="text-muted max-w-2xl mx-auto text-xs sm:text-sm leading-relaxed">
-            {isTr
-              ? 'Türkiye, Horizon Europe anlaşması kapsamında tam asosiye statüsündedir. Türk üniversiteleri, KOBİ’leri ve sanayi kuruluşları bu çağrılara koordinatör veya ortak olarak başvurabilir ve %100 doğrudan hibe alabilir.'
-              : 'Under the Horizon Europe association agreement, Turkish entities are eligible to coordinate or partner in EU consortia and receive direct grant funding.'}
+            {t('intro')}
           </p>
         </div>
 
         <div className="space-y-4 mb-10">
-          {topics.map((t) => (
-            <div key={t.id} className="bg-surface border border-border rounded-xl p-6 hover:border-accent transition shadow-xs flex flex-col md:flex-row justify-between gap-4">
+          {topics.map((topic) => (
+            <div key={topic.id} className="bg-surface border border-border rounded-xl p-6 hover:border-accent transition shadow-xs flex flex-col md:flex-row justify-between gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono bg-accent/15 text-accent-ink border border-accent/20 px-2 py-0.5 rounded font-semibold">{t.identifier}</span>
-                  <span className="text-xs bg-ok/15 text-ok border border-ok/20 px-2 py-0.5 rounded font-semibold">{t.status}</span>
-                  {t.isLumpSum && <span className="text-xs bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-semibold">Lump Sum</span>}
+                  <span className="text-xs font-mono bg-accent/15 text-accent-ink border border-accent/20 px-2 py-0.5 rounded font-semibold">{topic.identifier}</span>
+                  <span className="text-xs bg-ok/15 text-ok border border-ok/20 px-2 py-0.5 rounded font-semibold">{topic.status}</span>
+                  {topic.isLumpSum && <span className="text-xs bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-semibold">{t('lump_sum')}</span>}
                 </div>
-                <h3 className="text-base font-bold text-ink">{t.title}</h3>
-                <p className="text-xs text-muted font-medium">{t.call?.program || 'Horizon Europe'} • {t.typeOfAction || 'RIA / IA'}</p>
+                <h3 className="text-base font-bold text-ink">{topic.title}</h3>
+                <p className="text-xs text-muted font-medium">{topic.call?.program || t('default_program')} • {topic.typeOfAction || t('default_type')}</p>
               </div>
               <div className="flex md:flex-col justify-between items-end md:justify-center gap-2 flex-shrink-0">
                 <Link
                   href={`/${locale}/default/pipeline`}
                   className="bg-accent hover:opacity-90 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-2xs"
                 >
-                  {isTr ? 'Fırsatı Başlat →' : 'Start Proposal →'}
+                  {t('start_proposal')}
                 </Link>
               </div>
             </div>
