@@ -52,6 +52,31 @@ describe('generateSectionDraft word limit', () => {
     expect(h.generateCompletion).not.toHaveBeenCalled();
   });
 
+  // The action is a public POST: `maxWords` can be any type. `Number(true)` is 1 and
+  // `Number("1e3")` is 1000, so only a number or digits-only text may pass.
+  test.each([
+    ['the text "abc"', 'abc'],
+    ['the empty text', ''],
+    ['the boolean true', true],
+    ['the exponent text "1e3"', '1e3'],
+    ['the hex text "0x10"', '0x10'],
+    ['the padded text " 25 "', ' 25 '],
+  ])('%s is refused by section, with no RAG lookup and no model call', async (_name, maxWords) => {
+    const error = await draft(maxWords).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(InvalidTemplateSectionError);
+    expect(invalidTemplateSectionKey(error)).toBe('objectives');
+    expect(h.buildRagContext).not.toHaveBeenCalled();
+    expect(h.generateCompletion).not.toHaveBeenCalled();
+  });
+
+  test('digits-only text "1500" is drafted as 1500 words', async () => {
+    const result = await draft('1500');
+
+    expect(result.text).toBe('draft');
+    expect(h.generateCompletion).toHaveBeenCalledTimes(1);
+  });
+
   test('the ceiling itself, 20000, is drafted', async () => {
     const result = await draft(20000);
 

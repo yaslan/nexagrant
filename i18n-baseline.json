@@ -7,8 +7,6 @@
   "src/app/[locale]/(public)/calls/[region]/page.tsx": 3,
   "src/app/[locale]/(public)/calls/page.tsx": 4,
   "src/app/[locale]/(public)/i18n-check/page.tsx": 11,
-  "src/app/[locale]/(public)/login/page.tsx": 1,
-  "src/app/[locale]/(public)/register/page.tsx": 1,
   "src/app/[locale]/(public)/turkiyeye-acik-cagrilar/page.tsx": 9,
   "src/app/[locale]/admin/audit/page.tsx": 8,
   "src/app/[locale]/admin/layout.tsx": 10,

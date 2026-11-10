@@ -84,3 +84,4 @@ add-interreg-f2-result.sql
 add-pic-lookup-budget.sql
 add-org-readiness-tables.sql
 tenant-pic-registry-status/migration.sql
+add-project-idea-decision-log.sql
