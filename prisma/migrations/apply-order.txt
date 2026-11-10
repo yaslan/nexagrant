@@ -83,3 +83,4 @@ add-interreg-slot-retention.sql
 add-interreg-f2-result.sql
 add-pic-lookup-budget.sql
 add-org-readiness-tables.sql
+add-project-idea-decision-log.sql

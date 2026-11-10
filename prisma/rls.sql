@@ -14,7 +14,8 @@ BEGIN
     'PlanAssignment','ClaimEvidenceLink','Consent',
     'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage',
     'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark',
-    'OrgReadiness','InternalApproval','PartnerBudgetShare'
+    'OrgReadiness','InternalApproval','PartnerBudgetShare',
+    'ProjectIdea','DecisionLog'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);

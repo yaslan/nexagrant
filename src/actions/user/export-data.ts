@@ -66,6 +66,8 @@ export async function exportUserData(): Promise<ExportResult> {
       interregMarks,
       internalApprovals,
       budgetShares,
+      projectIdeas,
+      decisions,
     ] = await withSystemScope('subject-scoped', 'gdpr-export.subjectRows', (tx) =>
       Promise.all([
         tx.user.findUnique({
@@ -234,6 +236,18 @@ export async function exportUserData(): Promise<ExportResult> {
           select: { id: true, tenantId: true, seatId: true, agreedAt: true },
           orderBy: { createdAt: 'asc' },
         }),
+        // NG-38: the subject wrote the idea or took the decision. The idea's text and the
+        // decision's reason are the institution's record, not personal data, as NG-34's amounts.
+        tx.projectIdea.findMany({
+          where: { createdById: userId },
+          select: { id: true, tenantId: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        tx.decisionLog.findMany({
+          where: { decidedById: userId },
+          select: { id: true, tenantId: true, opportunityId: true, kind: true, decidedAt: true },
+          orderBy: { decidedAt: 'asc' },
+        }),
       ])
     );
 
@@ -277,6 +291,8 @@ export async function exportUserData(): Promise<ExportResult> {
       InterregCriterionMark: interregMarks,
       InternalApproval: internalApprovals,
       PartnerBudgetShare: budgetShares,
+      ProjectIdea: projectIdeas,
+      DecisionLog: decisions,
     };
 
     await recordAccessAudit(userId, tenantId, tables);
