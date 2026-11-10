@@ -425,12 +425,13 @@ export async function updateTenantProfile(
         await refreshTenantPicRegistry(scope.tenantId, registryCheck.pic, {}, { auditEventId: registryCheck.auditEventId, attempt: 0 });
       } catch {
         // The PIC is already committed; the stored status stays null, which the scorer reads as no grant.
-        // FO-396 (Ö-C): the failure is recorded, not swallowed. recordAlert never throws, and the alert carries no PIC.
+        // FO-396 (Ö-C): the failure is recorded, not swallowed. recordAlert never throws, and the alert carries
+        // no PIC and no tenant id (NG-85 F1: SystemAlert has no tenantId and no RLS).
         await recordAlert({
           level: 'warn',
           source: 'pic-registry',
           message: 'PIC saved, but the EU register answer could not be stored; PIC stays unverified (no grant)',
-          meta: { tenantId: scope.tenantId, reason: 'refresh_failed' },
+          meta: { reason: 'refresh_failed' },
         });
       }
     }

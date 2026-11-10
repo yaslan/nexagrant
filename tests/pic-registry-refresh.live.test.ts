@@ -35,6 +35,7 @@ vi.mock('@/lib/pic-registry', async (importActual) => {
 });
 
 import { prisma } from '@/lib/db';
+import { lastSeenAtOf } from '@/lib/observability/system-alert';
 import { updateTenantProfile } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
 import { refreshTenantPicRegistry } from '@/lib/pic-registry-refresh';
 import { picRegistryRetryTask } from '@/lib/jobs/tasks/pic-registry-retry';
@@ -64,6 +65,21 @@ const stored = async () =>
 
 const found = async () => ({ status: 'FOUND', reason: 'found' });
 const networkDown = async () => ({ status: 'UNKNOWN', reason: 'network' });
+
+/**
+ * NG-85 F1: the register alerts carry no tenant id (SystemAlert has no tenantId and no RLS), so they
+ * are found by reason and by having been raised (created or folded into) since `since`. Each one
+ * must also hold no tenant id anywhere in its meta.
+ */
+async function alertsRaisedSince(reason: string, since: Date) {
+  const rows = await prisma.systemAlert.findMany({
+    where: { source: 'pic-registry', resolvedAt: null, meta: { path: ['reason'], equals: reason } },
+  });
+  return rows.filter((a) => {
+    const lastSeen = lastSeenAtOf(a.meta);
+    return a.createdAt >= since || (lastSeen !== null && new Date(lastSeen) >= since);
+  });
+}
 
 describe('FO-396 step 2: stored register answer', () => {
   beforeAll(async () => {
@@ -136,11 +152,13 @@ describe('FO-396 step 2: stored register answer', () => {
       h.impl = async () => {
         throw new Error('database unavailable');
       };
+      const since = new Date(Date.now() - 1000);
       const outcome = await updateTenantProfile({ pic: picB });
       expect(outcome).toMatchObject({ ok: true });
       expect(await stored()).toMatchObject({ pic: picB, picRegistryStatus: null, picRegistryCheckedAt: null });
-      const alerts = await prisma.systemAlert.findMany({ where: { source: 'pic-registry', meta: { path: ['tenantId'], equals: tenantId } } });
-      expect(alerts.map((a) => (a.meta as Record<string, unknown>).reason)).toContain('refresh_failed');
+      const alerts = await alertsRaisedSince('refresh_failed', since);
+      expect(alerts.length).toBeGreaterThan(0);
+      for (const a of alerts) expect(JSON.stringify(a.meta)).not.toContain(tenantId);
     });
   });
 
@@ -170,10 +188,12 @@ describe('FO-396 step 2: stored register answer', () => {
 
     it('after the last retry raises retry_exhausted and queues nothing more', async () => {
       h.impl = networkDown;
+      const since = new Date(Date.now() - 1000);
       await refreshTenantPicRegistry(tenantId, picA, {}, { auditEventId, attempt: 3 });
       expect(h.enqueue).not.toHaveBeenCalled();
-      const alerts = await prisma.systemAlert.findMany({ where: { source: 'pic-registry', meta: { path: ['tenantId'], equals: tenantId } } });
-      expect(alerts.map((a) => (a.meta as Record<string, unknown>).reason)).toContain('retry_exhausted');
+      const alerts = await alertsRaisedSince('retry_exhausted', since);
+      expect(alerts.length).toBeGreaterThan(0);
+      for (const a of alerts) expect(JSON.stringify(a.meta)).not.toContain(tenantId);
     });
 
     it('the job skips a PIC the tenant no longer holds, without a lookup', async () => {

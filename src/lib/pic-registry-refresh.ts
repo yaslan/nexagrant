@@ -91,7 +91,10 @@ export async function refreshTenantPicRegistry(
   return { ...result, stored: true };
 }
 
-/** Queues the next attempt, or raises `retry_exhausted` when none is left. Never throws. */
+/**
+ * Queues the next attempt, or raises `retry_exhausted` when none is left. Never throws. The alerts carry
+ * no tenant id (NG-85 F1: SystemAlert has no tenantId and no RLS); the job payload does, it is not an alert.
+ */
 async function scheduleRetry(tenantId: string, pic: string, retry: PicRegistryRetryContext): Promise<void> {
   const wait = PIC_REGISTRY_RETRY_WAITS_MS[retry.attempt];
   if (wait === undefined) {
@@ -99,7 +102,7 @@ async function scheduleRetry(tenantId: string, pic: string, retry: PicRegistryRe
       level: 'warn',
       source: 'pic-registry',
       message: 'EU participant register did not answer after all retries; PIC stays UNKNOWN (no grant)',
-      meta: { tenantId, reason: 'retry_exhausted', attempts: retry.attempt + 1 },
+      meta: { reason: 'retry_exhausted', attempts: retry.attempt + 1 },
     });
     return;
   }
@@ -117,7 +120,7 @@ async function scheduleRetry(tenantId: string, pic: string, retry: PicRegistryRe
       level: 'warn',
       source: 'pic-registry',
       message: 'EU participant register retry could not be queued; PIC stays UNKNOWN (no grant)',
-      meta: { tenantId, reason: 'retry_not_queued' },
+      meta: { reason: 'retry_not_queued' },
     });
   }
 }
