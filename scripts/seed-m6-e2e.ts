@@ -32,7 +32,36 @@ export const M6_E2E = {
   esrTotal: 12.5,
 } as const;
 
+/**
+ * Refuses to write unless the target is a local database and this is not production.
+ * The gate (scripts/gate-isolated.sh) points DATABASE_URL at 127.0.0.1:fabrika_gate, and
+ * the Playwright run uses the same URL, so both pass. Anything else throws before any
+ * Prisma call, so a stray `pnpm tsx scripts/seed-m6-e2e.ts` cannot write fixtures into a
+ * shared or hosted database. The message names the rule, never the URL or credentials.
+ */
+const LOCAL_DB_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+export function assertSeedTarget(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.NODE_ENV === 'production') {
+    throw new Error('[seed-m6-e2e] refused: NODE_ENV=production. Nothing was written.');
+  }
+  if (!env.DATABASE_URL) {
+    throw new Error('[seed-m6-e2e] refused: DATABASE_URL is not set. Nothing was written.');
+  }
+  let host: string;
+  try {
+    host = new URL(env.DATABASE_URL).hostname;
+  } catch {
+    throw new Error('[seed-m6-e2e] refused: DATABASE_URL is not a valid URL. Nothing was written.');
+  }
+  if (!LOCAL_DB_HOSTS.has(host)) {
+    throw new Error('[seed-m6-e2e] refused: DATABASE_URL is not a local database. Nothing was written.');
+  }
+}
+
 export async function seed() {
+  assertSeedTarget();
+
   await prisma.tenant.upsert({
     where: { id: M6_E2E.tenantId },
     update: {},
@@ -204,9 +233,14 @@ export async function seed() {
 }
 
 export async function rollback() {
+  assertSeedTarget();
+
   await prisma.applicationPart.deleteMany({ where: { id: M6_E2E.longPartBId } });
   await prisma.opportunity.deleteMany({ where: { id: M6_E2E.longOpportunityId } });
   await prisma.creditLedger.deleteMany({ where: { id: M6_E2E.creditGrantId } });
+  // Tenant-scoped rows an AI run may have written (NG-106 finding 4). Before the tenant
+  // delete: aiUsageLog holds a tenant FK, so leaving it would make that delete fail.
+  await prisma.aiUsageLog.deleteMany({ where: { tenantId: M6_E2E.tenantId } });
   await prisma.score.deleteMany({ where: { reviewerId: M6_E2E.reviewerId } });
   await prisma.criterion.deleteMany({ where: { evaluationId: M6_E2E.evaluationId } });
   await prisma.reviewer.deleteMany({ where: { id: M6_E2E.reviewerId } });

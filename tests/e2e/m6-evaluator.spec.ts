@@ -185,7 +185,11 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
       });
 
       const tenantId = M6_E2E.tenantId;
-      const ledgerBefore = await prisma.creditLedger.findMany({ where: { tenantId }, select: { id: true, delta: true } });
+      const ledgerBefore = await prisma.creditLedger.findMany({
+        where: { tenantId },
+        select: { id: true, delta: true },
+        orderBy: { id: 'asc' },
+      });
       expect(ledgerBefore).toContainEqual({ id: M6_E2E.creditGrantId, delta: M6_E2E.creditGrant });
 
       await page.goto(`/${locale}/${WORKSPACE}/opportunities/${M6_E2E.longOpportunityId}/evaluations`);
@@ -197,9 +201,13 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
       await expect(app.getByTestId('m6-action-error')).toContainText(message);
       await shot(page, `06-ai-reader-proposal-too-long-${locale}`);
 
-      expect(await prisma.creditLedger.findMany({ where: { tenantId }, select: { id: true, delta: true } })).toEqual(
-        ledgerBefore,
-      );
+      expect(
+        await prisma.creditLedger.findMany({
+          where: { tenantId },
+          select: { id: true, delta: true },
+          orderBy: { id: 'asc' },
+        }),
+      ).toEqual(ledgerBefore);
       expect(await prisma.evaluation.count({ where: { tenantId, readerType: 'AI' } })).toBe(0);
       expect(await prisma.aiUsageLog.count({ where: { tenantId } })).toBe(0);
     });
