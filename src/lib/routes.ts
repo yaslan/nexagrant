@@ -214,7 +214,7 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
     'onay-merkezi': 'approvals', 'approvals': 'approvals',
     'tto-hizlandirici': 'tto', 'tto': 'tto',
     'bildirimler': 'notifications', 'notifications': 'notifications',
-    'ayarlar': 'settingsProfile', 'settings': 'settingsProfile',
+    'ayarlar': 'settingsModules', 'settings': 'settingsModules',
   };
 
   const thirdSegment = segments[2];

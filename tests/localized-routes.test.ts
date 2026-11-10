@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { getPublicRoute, getWorkspaceRoute } from '../src/lib/routes';
+import { getPublicRoute, getWorkspaceRoute, switchLocalePath } from '../src/lib/routes';
 
 describe('SEO-Friendly Localized Multilingual Routing System (TR & EN)', () => {
   describe('Public Marketing SEO Routes', () => {
@@ -59,6 +59,20 @@ describe('SEO-Friendly Localized Multilingual Routing System (TR & EN)', () => {
       expect(getWorkspaceRoute('approvals', 'en', ws)).toBe('/en/itu-tto/approvals');
       expect(getWorkspaceRoute('settingsModules', 'en', ws)).toBe('/en/itu-tto/settings/modules');
       expect(getWorkspaceRoute('settingsPrivacy', 'en', ws)).toBe('/en/itu-tto/settings/privacy');
+    });
+  });
+
+  // NG-110: the settings root renders the modules page in both locales, so the
+  // language switcher must stay on the root instead of dropping into the profile page.
+  describe('Settings root language switch', () => {
+    test('TR settings root → EN modules page (same page the root renders)', () => {
+      expect(switchLocalePath('/tr/itu-tto/ayarlar', 'en')).toBe('/en/itu-tto/settings/modules');
+    });
+    test('EN settings root → TR modules page (same page the root renders)', () => {
+      expect(switchLocalePath('/en/itu-tto/settings', 'tr')).toBe('/tr/itu-tto/ayarlar/moduller');
+    });
+    test('settings sub-pages keep their own mapping', () => {
+      expect(switchLocalePath('/tr/itu-tto/ayarlar/profil', 'en')).toBe('/en/itu-tto/settings/profile');
     });
   });
 });

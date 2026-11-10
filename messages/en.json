@@ -319,6 +319,8 @@
       "searchPlaceholder": "Search opportunities, notes or people...",
       "allUsers": "👥 All users",
       "allRoles": "All roles",
+      "ownerFilterLabel": "Filter by owner",
+      "roleFilterLabel": "Filter by role",
       "roleCoordinator": "👑 Coordinator",
       "rolePartner": "🤝 Partner",
       "addOpportunity": "Add new opportunity",

@@ -304,6 +304,21 @@ async function resolveE2ePort() {
   return undefined
 }
 
+// FO-397: node_modules sembolik bağsa Turbopack `next/package.json`'ı bulamaz; e2e sunucusu her sayfada
+// 500 döner ve 180 sn sonra zaman aşımına uğrar. Bu yüzden önce açık hata, kilit ve kuyruk yok.
+function assertRealNodeModules() {
+  const nm = path.join(import.meta.dirname, '..', 'node_modules')
+  let link = false
+  try {
+    link = fs.lstatSync(nm).isSymbolicLink()
+  } catch {
+    link = false
+  }
+  if (!link) return
+  console.error(`✖ node_modules sembolik bağ (${fs.readlinkSync(nm)}); gerçek kurulum gerekli: pnpm install --frozen-lockfile`)
+  process.exit(1)
+}
+
 function release() {
   const owner = readOwner()
   if (owner && owner.pid === process.pid) {
@@ -343,6 +358,8 @@ async function main() {
 
   let runStart = Date.now()
   let e2ePort
+  // FO-397: sembolik bağlı node_modules ile tam gate kuyruğa girmeden açık hatayla durur (15-60 dk kayıp olmasın).
+  if (isGate) assertRealNodeModules()
   if (!nested) {
     await acquire()
     process.on('exit', release)
