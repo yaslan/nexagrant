@@ -22,7 +22,8 @@
     "preview": {
       "PILOT": "Pilot",
       "DEV": "Dev"
-    }
+    },
+    "homeLink": "Home"
   },
   "Common": {
     "loading": "Loading...",
@@ -1207,7 +1208,22 @@
         "keep": "Keep",
         "working": "Working…",
         "yesRemove": "Yes, remove",
-        "yesCancel": "Yes, cancel it"
+        "yesCancel": "Yes, cancel it",
+        "roles": {
+          "TENANT_OWNER": "Owner",
+          "TENANT_ADMIN": "Admin",
+          "PIPELINE_MANAGER": "Pipeline Manager",
+          "WRITER": "Writer",
+          "MEMBER": "Member",
+          "GUEST_PARTNER": "Guest Partner"
+        },
+        "actionErrors": {
+          "FORBIDDEN_ROLE": "You do not have permission for this.",
+          "CANNOT_REMOVE_SELF": "You cannot remove yourself.",
+          "CANNOT_REMOVE_OWNER": "Only another owner can remove an owner.",
+          "LAST_OWNER": "The last owner cannot be removed.",
+          "NOT_FOUND": "Not found; the list was refreshed."
+        }
       },
       "page": {
         "title": "Team Members",
