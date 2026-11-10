@@ -253,6 +253,25 @@ function trimmed(value?: string | null): string | undefined {
   return s.length > 0 ? s : undefined;
 }
 
+/**
+ * Single normalization for keep.eu project ids used by the RAG exclusion. Both the excluded list
+ * and every upstream id pass through it, so case or whitespace drift cannot defeat the exclusion.
+ */
+function normalizeProjectId(id: string): string {
+  return id.trim().toUpperCase();
+}
+
+/** Error text may echo record content (names, titles), so the alert keeps only the class and code. */
+function errorClassLabel(e: unknown): string {
+  if (e && typeof e === 'object') {
+    const name = (e as { name?: unknown }).name;
+    const code = (e as { code?: unknown }).code;
+    const base = typeof name === 'string' && name.length > 0 ? name : 'Error';
+    return typeof code === 'string' && code.length > 0 ? `${base}:${code}` : base;
+  }
+  return 'UnknownError';
+}
+
 function parseDate(value?: string | null): Date | null {
   const s = trimmed(value);
   if (!s) return null;
@@ -838,11 +857,6 @@ export interface KeepEuSyncOptions {
   /** When the keep.eu request fails, re-index existing DB rows instead of stopping. Reported as `success:false`. */
   allowDatabaseFallback?: boolean;
   skipRag?: boolean;
-  /**
-   * Project ids kept out of RAG embedding. Omit to apply RAG_EXCLUDED_PROJECT_IDS (the default).
-   * Pass an empty array only in tests.
-   */
-  ragExcludeProjectIds?: readonly string[];
   limit?: number;
   onProgress?: (info: {
     current: number;
@@ -891,8 +905,9 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     }
   }
 
-  const excludedIds = new Set(options?.ragExcludeProjectIds ?? RAG_EXCLUDED_PROJECT_IDS);
-  const upstreamIds = new Set(dataset.map((r) => r.projectId));
+  // The exclusion is not optional: the list is always applied (see RAG_EXCLUDED_PROJECT_IDS).
+  const excludedIds = new Set(RAG_EXCLUDED_PROJECT_IDS.map(normalizeProjectId));
+  const upstreamIds = new Set(dataset.map((r) => normalizeProjectId(r.projectId)));
   // An upstream outage yields no data at all: that is not evidence that an id is missing.
   const missingExcluded = upstreamOk && dataset.length > 0 ? [...excludedIds].filter((id) => !upstreamIds.has(id)) : [];
   // The database source only loads a batch, so a missing id there proves nothing; warn only on full upstream data.
@@ -939,7 +954,7 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
         }
       }
 
-      if (excludedIds.has(record.projectId)) {
+      if (excludedIds.has(normalizeProjectId(record.projectId))) {
         ragExcludedCount++;
       } else if (!options?.skipRag) {
         const docTitle = `INTERREG Project: ${record.acronym ?? record.projectId} - ${record.title}`;
@@ -982,11 +997,12 @@ export async function syncKeepEuData(options?: KeepEuSyncOptions): Promise<KeepE
     } catch (e) {
       skippedCount++;
       const err = errorMessage(e);
+      const safeLabel = errorClassLabel(e);
       await recordAlert({
         level: 'error',
         source: KEEP_EU_SYNC_ALERT_SOURCE,
-        message: `keep.eu record failed to sync: ${err}`,
-        meta: { projectId: record.projectId },
+        message: `keep.eu record failed to sync: ${safeLabel} (projectId=${record.projectId})`,
+        meta: { projectId: record.projectId, errorClass: safeLabel },
         dedupeKey: 'keep-eu-sync:record-sync-failed',
       });
 

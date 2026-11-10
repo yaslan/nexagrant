@@ -766,6 +766,37 @@ describe('RAG personal-name exclusion (FO-363, K-575447)', () => {
     expect(texts.some((t) => t.includes('Title BGTR0200037'))).toBe(true);
   });
 
+  test('lowercase and whitespace variants of an excluded id are never embedded (fail-open guard)', async () => {
+    const records = [
+      projectWithId(' BGTR0300118 '),
+      projectWithId('bgtr0300121'),
+      projectWithId('Bgtr0300153\t'),
+      projectWithId('BGTR0200037'),
+    ];
+    const res = await syncKeepEuData({ records });
+
+    expect(res.ragExcludedCount).toBe(3);
+    expect(res.ragEmbeddedCount).toBe(1);
+    const texts = embedTextMock.mock.calls.map((c) => String(c[0]).toUpperCase());
+    for (const id of ['BGTR0300118', 'BGTR0300121', 'BGTR0300153']) {
+      expect(texts.some((t) => t.includes(id))).toBe(false);
+    }
+    // Variant upstream ids count as present: 2 of the 5 listed ids are genuinely absent.
+    expect(res.ragExclusionMissingCount).toBe(2);
+  });
+
+  test('a failed record writes only the error class and project id to the alert, not the raw message', async () => {
+    const rawSecret = 'Jane Example Surname in the error text';
+    embedTextMock.mockRejectedValueOnce(Object.assign(new Error(rawSecret), { name: 'PrismaClientKnownRequestError', code: 'P2002' }));
+    const res = await syncKeepEuData({ records: [projectWithId('BGTR0200037')] });
+
+    expect(res.syncedProjectsCount).toBe(0);
+    const alerts = db.rows('systemAlert').filter((a) => String(a.message).includes('failed to sync'));
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.message).toBe('keep.eu record failed to sync: PrismaClientKnownRequestError:P2002 (projectId=BGTR0200037)');
+    expect(JSON.stringify(db.rows('systemAlert'))).not.toContain('Jane Example');
+  });
+
   test('default excludes all five identified projects: 280 of 285 are embedded', async () => {
     const records = [
       ...EXCLUDED.map((id) => projectWithId(id)),
@@ -777,13 +808,6 @@ describe('RAG personal-name exclusion (FO-363, K-575447)', () => {
     expect(res.ragExcludedCount).toBe(5);
     expect(res.ragEmbeddedCount).toBe(280);
     expect(db.rows('document')).toHaveLength(280);
-  });
-
-  test('an explicit empty list disables the exclusion (test-only escape hatch)', async () => {
-    const res = await syncKeepEuData({ records: [projectWithId('BGTR0300118')], ragExcludeProjectIds: [] });
-
-    expect(res.ragExcludedCount).toBe(0);
-    expect(res.ragEmbeddedCount).toBe(1);
   });
 
   test('an excluded id missing from the upstream data raises an alert and does not fail the run', async () => {
