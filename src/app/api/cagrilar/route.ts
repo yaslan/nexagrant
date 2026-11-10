@@ -6,7 +6,7 @@ import { translateTopicsBatch } from '@/lib/translation';
 import { requireTenantApi } from '@/lib/tenant';
 import { logger } from '@/lib/logger';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
-import { SEDIA_RESULT_WINDOW } from '@/lib/calls-paging';
+import { SEDIA_RESULT_WINDOW, clampSearchText } from '@/lib/calls-paging';
 import { cagrilarCache, searchCacheKey, shareInFlight } from '@/lib/cagrilar-cache';
 
 /**
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const text = searchParams.get('q') || searchParams.get('text') || '***';
+    const text = clampSearchText(searchParams.get('q') || searchParams.get('text') || '***');
     const rawPage = searchParams.get('page');
     const pageParsed = rawPage === null ? { success: true as const, data: 1 } : PageParamSchema.safeParse(rawPage);
     if (!pageParsed.success) {

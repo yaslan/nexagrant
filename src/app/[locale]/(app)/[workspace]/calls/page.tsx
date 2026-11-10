@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
-import { SEDIA_RESULT_WINDOW, lastReachablePage } from '@/lib/calls-paging';
+import { SEDIA_RESULT_WINDOW, CALLS_SEARCH_MAX_LENGTH, clampSearchText, lastReachablePage } from '@/lib/calls-paging';
 
 interface SediaTopic {
   identifier: string;
@@ -71,7 +71,7 @@ function parseFilters(params: URLSearchParams) {
   ];
   const pageRaw = params.get('page') ?? '';
   return {
-    search: params.get('q') ?? '',
+    search: clampSearchText(params.get('q') ?? ''),
     framework: FRAMEWORK_PROGRAMMES.some((p) => p.id === frameworkRaw) ? (frameworkRaw as string) : 'ALL',
     statuses: statusValues.length > 0 ? statusValues : DEFAULT_STATUSES,
     callType: (params.get('type') === '2' ? '2' : '1') as '1' | '2',
@@ -221,9 +221,10 @@ export default function CallsPage({
   const lastSearchRef = useRef(initial.search);
   useEffect(() => {
     const handler = setTimeout(() => {
-      setDebouncedSearch(search);
-      if (search.trim() !== lastSearchRef.current.trim()) setPage(1);
-      lastSearchRef.current = search;
+      const text = clampSearchText(search);
+      setDebouncedSearch(text);
+      if (text.trim() !== lastSearchRef.current.trim()) setPage(1);
+      lastSearchRef.current = text;
     }, 400);
     return () => clearTimeout(handler);
   }, [search]);
@@ -542,6 +543,7 @@ export default function CallsPage({
               placeholder={t('searchPlaceholder')}
               className="w-full pl-3 pr-8 py-2.5 bg-ground border border-border rounded-lg text-ink text-xs sm:text-sm placeholder:text-muted focus:outline-hidden focus:ring-2 focus:ring-accent"
               value={search}
+              maxLength={CALLS_SEARCH_MAX_LENGTH}
               onChange={(e) => setSearch(e.target.value)}
             />
             {search && (

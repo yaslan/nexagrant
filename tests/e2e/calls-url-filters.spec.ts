@@ -9,11 +9,13 @@ import { SEDIA_RESULT_WINDOW } from '../../src/lib/calls-paging';
 /**
  * NG-12 — the calls list is bound to `/api/cagrilar`, and its filters live in the URL.
  *
- * Program tab, status boxes, search, type and page are answered by a stub that reads the
- * query string the page actually sends, so a list that does not follow a filter fails here.
- * The stub applies the route's page window rule (page * size > SEDIA_RESULT_WINDOW → 400
- * page_out_of_window) and nothing else of the route. The real route and SEDIA are not
- * exercised by these tests; the live run against SEDIA is in the report.
+ * The stub reads the query string the page sends and answers from `framework` only: the rows
+ * change with the program tab and nothing else. `status`, `q`, `type` and `page` are checked
+ * on the request (what the page asks for), not on the rows. So these tests fail when a filter
+ * is not sent, and not when the list ignores one. The stub applies the route's page window
+ * rule (page * size > SEDIA_RESULT_WINDOW → 400 page_out_of_window) and nothing else of the
+ * route. The real route and SEDIA are not exercised by these tests; the live run against SEDIA
+ * is in the report.
  */
 
 const SHOTS = shotsDir('NG-12-screenshots');
@@ -27,6 +29,8 @@ const EMPTY_ID = '43152860';
 /** Rows the stub reports as SEDIA's total for any non-empty answer: 10 pages at the default size of 20. */
 const STUB_TOTAL_RESULTS = 200;
 const PAGE_SIZE = 20;
+/** The search box waits this long after the last keystroke, and the page's mount runs the same timer (calls/page.tsx). */
+const SEARCH_DEBOUNCE_MS = 400;
 
 const DEFAULT_FIXTURE = JSON.parse(
   readFileSync(path.join(__dirname, 'fixtures', 'cagrilar-response.json'), 'utf8'),
@@ -111,12 +115,20 @@ test.describe('calls page — filters follow the request and live in the URL', (
     await page.screenshot({ path: `${SHOTS}/11-empty-filter.png` });
   });
 
-  test('q, page and type from the URL are sent to the route', async ({ page }) => {
+  test('q, page and type from the URL are sent to the route and survive the search debounce', async ({ page }) => {
     const seen = await stubByQuery(page);
     await openCallsAt(page, '?q=enerji&page=3&type=2');
 
-    await expect(pagerText(page, `3 / ${STUB_TOTAL_RESULTS / PAGE_SIZE}`)).toBeVisible({ timeout: 30_000 });
+    const lastPage = STUB_TOTAL_RESULTS / PAGE_SIZE;
+    await expect(pagerText(page, `3 / ${lastPage}`)).toBeVisible({ timeout: 30_000 });
     expect(seen.some((p) => p.get('q') === 'enerji' && p.get('page') === '3' && p.get('type') === '2')).toBe(true);
+
+    // The debounce timer from mount runs after the list is already on screen. Wait past it: an
+    // unconditional page reset would only show here, when the request goes out with page=1.
+    await page.waitForTimeout(SEARCH_DEBOUNCE_MS + 200);
+    await expect(pagerText(page, `3 / ${lastPage}`)).toBeVisible();
+    await expect(page).toHaveURL(/page=3/);
+    expect(lastRequest(seen).get('page')).toBe('3');
   });
 });
 
@@ -141,6 +153,28 @@ test.describe('calls page — hand-edited URLs fall back to defaults', () => {
       expect(sent.get('status')).toBe('OPEN,FORTHCOMING');
     });
   }
+
+  // NG-12 (PR #322 bulgu 1): the page cap is the window's last page; a `page` past it is not sent.
+  test('a page number past the cap falls back to page 1 with no error', async ({ page }) => {
+    const seen = await stubByQuery(page);
+    await openCallsAt(page, '?page=9999');
+
+    await expect(page.getByText(DEFAULT_TITLE, { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('calls-load-error')).toHaveCount(0);
+    expect(seen.some((p) => p.get('page') === '9999')).toBe(false);
+    expect(lastRequest(seen).get('page')).toBe('1');
+    await expect.poll(() => new URL(page.url()).searchParams.get('page')).toBeNull();
+  });
+
+  test('a page number at the cap is sent as given with no error', async ({ page }) => {
+    const seen = await stubByQuery(page);
+    await openCallsAt(page, '?page=500');
+
+    const lastPage = STUB_TOTAL_RESULTS / PAGE_SIZE;
+    await expect(pagerText(page, `${lastPage} / ${lastPage}`)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('calls-load-error')).toHaveCount(0);
+    expect(seen.some((p) => p.get('page') === '500')).toBe(true);
+  });
 
   test('a page past the result total is clamped to the last page', async ({ page }) => {
     const seen = await stubByQuery(page);
