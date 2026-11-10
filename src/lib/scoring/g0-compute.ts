@@ -646,24 +646,16 @@ export async function clearStoredG0(
     const breakdown = alignmentCameFromTopicMatch(computation)
       ? evidence
       : { ...evidence, [G0_FIT_SCORE_PLACEHOLDER]: true };
-    await client.topicMatch.upsert({
-      where: {
-        tenantId_topicId_opportunityId: {
-          tenantId: computation.tenantId,
-          topicId: computation.topicId,
-          opportunityId: computation.opportunityId,
-        },
-      },
-      update: { g0Score: null, breakdown },
-      create: {
-        tenantId: computation.tenantId,
-        topicId: computation.topicId,
-        opportunityId: computation.opportunityId,
-        fitScore: 0,
-        g0Score: null,
-        breakdown,
-      },
+    // Only a row that already exists is cleared. An opportunity that was never scored has no
+    // per-opportunity TopicMatch row, and creating one here would add a placeholder record
+    // (fitScore 0) whose only content is "no score" (NG-59, PR #325 review).
+    const existing: { id: string } | null = await client.topicMatch.findFirst({
+      where: { tenantId: computation.tenantId, topicId: computation.topicId, opportunityId: computation.opportunityId },
+      select: { id: true },
     });
+    if (existing) {
+      await client.topicMatch.update({ where: { id: existing.id }, data: { g0Score: null, breakdown } });
+    }
   }
 
   return true;

@@ -23,10 +23,12 @@ import { signInAs } from './fixtures/session';
  *   1. Two seats added as OPEN. G0 is refused: the score is 84 but no seat is filled, so the hard
  *      rule refuses it; the stored evidence gives researchAndEndUser 0.
  *   2. Both seats invited from the candidate search. G0 is run again: scoringBasis
- *      no_history_evidence, denominator 75, two filled seats, score 100, and the gate passes.
+ *      no_history_evidence, denominator 75, two filled seats, and the gate passes (K-576980: the
+ *      no-history rule takes an invitee). The invitations earn no points (NG-59, K-579082 = A: only
+ *      CONFIRMED seats score), so the score stays 84 (it was 100 before NG-59).
  *   3. The PIC is removed (fixture). Same two invited seats: the PIC-less partner is scored on the
  *      standard basis, denominator 100, and the score must not be higher than with the PIC (removing
- *      the PIC never lifts the score). The expected 75 is measured and reported, not assumed.
+ *      the PIC never lifts the score). The expected 63 is measured and reported, not assumed.
  *
  * CANDIDATE, CONFIRMED and DECLINED are covered by the unit tests (tests/g0-features.test.ts), not
  * by clicks here: this spec drives only the invite path the UI exposes.
@@ -375,26 +377,29 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(ev.denominator).toBe(75);
     expect(ev.filledSeats).toBe(2);
     expect(ev.noHistoryWithoutFilledSeat).toBe(false);
-    // Both seats now name an organisation: research + end user earn their 12 points → 75/75.
-    expect(ev.researchAndEndUser).toBe(50 + 50);
-    expect(ev.score).toBe(100);
+    // Both seats now name an organisation, which satisfies the no-history rule (K-576980, unchanged).
+    // Neither is confirmed, so the research / end-user feature stays 0 (NG-59, K-579082 = A): 63/75
+    // = 84, the same as with the OPEN seats, and 84 clears the 70 threshold. Before NG-59: 100.
+    expect(ev.researchAndEndUser).toBe(0);
+    expect(ev.score).toBe(84);
     expect(invitedRun.passed).toBe(true);
 
     // NG-69: a passed partner keeps the green badge. Re-evaluating the G0 gate is a same-stage
     // move (G0→G0), so the opportunity stays at G0 and the detail box is still the live computation.
     const passedDetail = await openDetail(page, opp.id);
-    await expect(passedDetail.getByTestId('pipeline-g0-value')).toHaveText('100');
+    await expect(passedDetail.getByTestId('pipeline-g0-value')).toHaveText('84');
     await expect(passedDetail.getByTestId('pipeline-g0-refusal')).toHaveCount(0);
     await passedDetail.getByRole('link', { name: "Pipeline'a Geri Dön" }).click();
     await expect(page.getByTestId('pipeline-board')).toBeVisible({ timeout: 30_000 });
     const passedBadge = page.getByTestId(`pipeline-card-g0-${opp.id}`);
-    await expect(passedBadge).toContainText('100');
+    await expect(passedBadge).toContainText('84');
     await expect(passedBadge).toHaveClass(/text-ok/);
     await shot(page, '06-pano-rozet-gecti');
 
     // ── 3. The register did not confirm the PIC: NOT_FOUND, UNKNOWN, or never checked (null). The same
     // two invited seats must score on the standard basis (denominator 100) for each of them. Only FOUND
-    // earns the 75-point grant. The 75 is the measured standard score, not an assumed one.
+    // earns the 75-point grant. The 63 is the measured standard score (30 + 15 + 10 + 8; the invited seats
+    // earn nothing, NG-59; it was 75 before NG-59), not an assumed one.
     for (const status of ['NOT_FOUND', 'UNKNOWN', null] as const) {
       await prisma.tenant.update({
         where: { id: TENANT },
@@ -407,12 +412,12 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
       expect(unconfirmed.excludedFeatures).toEqual([]);
       expect(unconfirmed.denominator).toBe(100);
       expect(unconfirmed.noHistoryWithoutFilledSeat).toBe(false);
-      expect(unconfirmed.score).toBe(75);
+      expect(unconfirmed.score).toBe(63);
     }
 
     // ── 4. The PIC is removed (fixture). Still the standard basis: removing the PIC never raises the score.
-    // "PIC boşsa kolaylık yok": the 75-point denominator must not apply. The 75 below is the measured
-    // standard score, reported in the result file.
+    // "PIC boşsa kolaylık yok": the 75-point denominator must not apply. The 63 below is the measured
+    // standard score (NG-59: invited seats earn nothing; it was 75 before), reported in the result file.
     await prisma.tenant.update({ where: { id: TENANT }, data: { pic: null, picRegistryStatus: null, picRegistryCheckedAt: null } });
     const picLessRun = await runG0(page, opp.id);
     const picLess = evidenceOf(picLessRun);
@@ -422,6 +427,6 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(picLess.denominator).toBe(100);
     expect(picLess.noHistoryWithoutFilledSeat).toBe(false);
     expect(picLess.score).toBeLessThanOrEqual(ev.score!);
-    expect(picLess.score).toBe(75);
+    expect(picLess.score).toBe(63);
   });
 });
