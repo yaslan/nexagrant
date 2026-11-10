@@ -1,16 +1,17 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { requireTenantPage } from '@/lib/tenant';
+import { listProjectIdeas } from '@/lib/project-ideas/records';
 import { trlCriterionState } from '@/lib/project-ideas/validate';
 import ProjectIdeaForm from './ProjectIdeaForm';
+import ProjectIdeaList from './ProjectIdeaList';
 
 /**
  * Project idea entry page (NG-14, FE-2.3).
  *
  * The TRL criterion reads "eksik" (missing) until a project idea exists, and points
- * the user at the form below. Reading saved ideas is NG-38's job (BE-05): until that
- * table and its read path land, the idea count is 0 here, so the criterion stays
- * "eksik" — which is the true state, not a placeholder.
+ * the user at the form below. Saved ideas come from NG-38's `listProjectIdeas`
+ * (tenant-scoped); the criterion is met by the real count, not a placeholder.
  */
 export default async function ProjectIdeaPage({
   params,
@@ -19,11 +20,11 @@ export default async function ProjectIdeaPage({
 }) {
   const { locale, workspace } = await params;
   // Redirects anonymous or non-member visitors; never returns without a tenant.
-  await requireTenantPage(locale);
+  const scope = await requireTenantPage(locale);
   const t = await getTranslations('projectIdea');
 
-  const ideaCount = 0; // no read path until NG-38 (BE-05) lands
-  const trlState = trlCriterionState(ideaCount);
+  const ideas = await listProjectIdeas({ tenantId: scope.tenantId });
+  const trlState = trlCriterionState(ideas.length);
 
   return (
     <div className="max-w-3xl mx-auto py-8 sm:px-4 space-y-8">
@@ -55,6 +56,8 @@ export default async function ProjectIdeaPage({
       </section>
 
       <ProjectIdeaForm />
+
+      <ProjectIdeaList ideas={ideas} />
     </div>
   );
 }

@@ -5323,7 +5323,6 @@
     "program_interreg": "Interreg",
     "program_life": "LIFE",
     "submit": "Fikri kaydet",
-    "notSavedYet": "Form geçerli. Kayıt henüz açık değil: proje fikri tablosu hazır olunca kaydedilecek, şimdi hiçbir şey yazılmadı.",
     "errorRequired": "Bu alan zorunlu.",
     "errorTooLong": "Bu alan çok uzun.",
     "errorTrlRequired": "TRL seçin.",
@@ -5331,6 +5330,17 @@
     "errorKeywordsTooMany": "Anahtar kelime sayısı sınırı aşıyor.",
     "errorKeywordTooLong": "Bir anahtar kelime çok uzun.",
     "errorProgramRequired": "En az bir hedef program seçin.",
-    "errorProgramUnknown": "Geçersiz hedef program."
+    "errorProgramUnknown": "Geçersiz hedef program.",
+    "saving": "Kaydediliyor…",
+    "savedMessage": "\"{title}\" kaydedildi.",
+    "saveFailed": "Kayıt yapılamadı. Alanları kontrol edip tekrar deneyin.",
+    "listHeading": "Kayıtlı proje fikirleri",
+    "listEmpty": "Henüz proje fikri yok. TRL kriteri, ilk fikir kaydedilince karşılanır.",
+    "listColTitle": "Başlık",
+    "listColTrl": "TRL",
+    "listColPrograms": "Hedef programlar",
+    "listColCreated": "Kayıt tarihi",
+    "listColScore": "Çağrı puanı",
+    "listScoreUnavailable": "Henüz yok (puanlama bağlanmadı)"
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useId, useRef, useState } from 'react';
+import React, { useId, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   PROJECT_IDEA_LIMITS,
@@ -12,6 +13,7 @@ import {
   type ProjectIdeaErrorCode,
   type ProjectIdeaField,
 } from '@/lib/project-ideas/validate';
+import { saveProjectIdea } from './actions';
 
 const FIELD_ORDER: ProjectIdeaField[] = [
   'institution',
@@ -23,12 +25,13 @@ const FIELD_ORDER: ProjectIdeaField[] = [
 ];
 
 /**
- * Project idea entry (NG-14). Validation is real; saving is not wired yet — the
- * table lands with NG-38 (BE-05). A valid submit therefore shows "not saved" and
- * writes nothing, rather than a fake record.
+ * Project idea entry (NG-14). A valid submit goes to `saveProjectIdea` (NG-38 /
+ * BE-05 `createProjectIdea`); the saved row then appears in the list the page renders.
+ * `institution` is validated here but not stored: NG-38's table has no column for it.
  */
 export default function ProjectIdeaForm() {
   const t = useTranslations('projectIdea');
+  const router = useRouter();
   const uid = useId();
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +43,9 @@ export default function ProjectIdeaForm() {
   const [programs, setPrograms] = useState<string[]>([]);
 
   const [errors, setErrors] = useState<Partial<Record<ProjectIdeaField, ProjectIdeaErrorCode>>>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle');
+  const [savedTitle, setSavedTitle] = useState('');
+  const [saving, startSaving] = useTransition();
 
   const errorText: Record<ProjectIdeaErrorCode, string> = {
     required: t('errorRequired'),
@@ -72,12 +77,36 @@ export default function ProjectIdeaForm() {
       trl: trlNumber,
       targetPrograms: programs,
     });
-    setSubmitted(result.ok);
     setErrors(result.errors);
+    setSaveState('idle');
     if (!result.ok) {
       // Move focus to the summary so a keyboard or screen-reader user hears the errors.
       requestAnimationFrame(() => errorSummaryRef.current?.focus());
+      return;
     }
+    const payload = {
+      title: title.trim(),
+      summary: summary.trim() || null,
+      keywords: parseKeywords(keywordsRaw),
+      trl: trlNumber as number,
+      targetPrograms: programs,
+    };
+    startSaving(async () => {
+      const res = await saveProjectIdea(payload);
+      if (!res.ok) {
+        setSaveState('failed');
+        return;
+      }
+      setSavedTitle(res.idea.title);
+      setSaveState('saved');
+      setInstitution('');
+      setTitle('');
+      setSummary('');
+      setKeywordsRaw('');
+      setTrl('');
+      setPrograms([]);
+      router.refresh();
+    });
   };
 
   const firstErrorFields = FIELD_ORDER.filter((f) => errors[f]);
@@ -285,13 +314,20 @@ export default function ProjectIdeaForm() {
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          className="px-5 py-2 bg-accent text-white rounded-lg text-xs font-semibold hover:opacity-90 transition"
+          disabled={saving}
+          aria-disabled={saving}
+          className="px-5 py-2 bg-accent text-white rounded-lg text-xs font-semibold hover:opacity-90 transition disabled:opacity-60"
         >
-          {t('submit')}
+          {saving ? t('saving') : t('submit')}
         </button>
-        {submitted && (
+        {saveState === 'saved' && (
           <p role="status" className="text-xs text-ink-2">
-            {t('notSavedYet')}
+            {t('savedMessage', { title: savedTitle })}
+          </p>
+        )}
+        {saveState === 'failed' && (
+          <p role="alert" className="text-xs text-danger">
+            {t('saveFailed')}
           </p>
         )}
       </div>

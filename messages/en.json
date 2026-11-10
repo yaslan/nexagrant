@@ -5323,7 +5323,6 @@
     "program_interreg": "Interreg",
     "program_life": "LIFE",
     "submit": "Save idea",
-    "notSavedYet": "The form is valid. Saving is not open yet: it will be stored once the project idea table is ready; nothing was written now.",
     "errorRequired": "This field is required.",
     "errorTooLong": "This field is too long.",
     "errorTrlRequired": "Select a TRL.",
@@ -5331,6 +5330,17 @@
     "errorKeywordsTooMany": "Too many keywords.",
     "errorKeywordTooLong": "One keyword is too long.",
     "errorProgramRequired": "Select at least one target programme.",
-    "errorProgramUnknown": "Unknown target programme."
+    "errorProgramUnknown": "Unknown target programme.",
+    "saving": "Saving…",
+    "savedMessage": "\"{title}\" saved.",
+    "saveFailed": "Could not save. Check the fields and try again.",
+    "listHeading": "Saved project ideas",
+    "listEmpty": "No project idea yet. The TRL criterion is met once the first idea is saved.",
+    "listColTitle": "Title",
+    "listColTrl": "TRL",
+    "listColPrograms": "Target programmes",
+    "listColCreated": "Saved on",
+    "listColScore": "Call score",
+    "listScoreUnavailable": "Not yet (scoring not connected)"
   }
 }

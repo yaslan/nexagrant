@@ -10,8 +10,8 @@ const SHOTS = shotsDir('NG-14-screenshots');
  *
  * Covered: the TRL criterion reads "eksik" with no idea and links to the form;
  * an empty submit reports the required fields and moves focus to the summary;
- * a complete form passes validation and writes nothing (saving waits for NG-38 /
- * BE-05, so the spec does not expect a stored record).
+ * the TRL select offers 1..9; a complete form is saved through NG-38's
+ * `createProjectIdea` and reads back from the list after a reload.
  */
 
 const tenant = evidenceTenant('ng14');
@@ -78,7 +78,7 @@ test.describe('NG-14 project idea entry', () => {
     }
   });
 
-  test('a complete form validates; saving is reported as not open yet', async ({ page }) => {
+  test('a complete form saves, and the idea reads back after a reload', async ({ page }) => {
     await tenant.signIn(page);
     await page.goto(`/tr/${tenant.workspace}/proje-fikri`);
 
@@ -92,7 +92,15 @@ test.describe('NG-14 project idea entry', () => {
     await page.getByRole('button', { name: 'Fikri kaydet' }).click();
 
     await expect(page.locator('form#proje-fikri-form [role="alert"]')).toHaveCount(0);
-    await expect(page.getByRole('status')).toContainText('Kayıt henüz açık değil');
-    await page.screenshot({ path: `${SHOTS}/03-form-valid-not-saved-tr-1280.png`, fullPage: true });
+    await expect(page.getByRole('status')).toContainText('"Akıllı sulama" kaydedildi.');
+    await expect(page.getByRole('region', { name: 'TRL kriteri' })).toContainText('karşılandı');
+
+    // Read back: a fresh load shows the stored row, not the form's state.
+    await page.reload();
+    const row = page.getByRole('row', { name: /Akıllı sulama/ });
+    await expect(row).toContainText('TRL 4');
+    await expect(row).toContainText('Horizon Europe');
+    await expect(row).toContainText('Henüz yok');
+    await page.screenshot({ path: `${SHOTS}/03-form-saved-listed-tr-1280.png`, fullPage: true });
   });
 });
