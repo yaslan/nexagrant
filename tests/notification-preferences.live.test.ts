@@ -4,7 +4,7 @@ import { createTranslator } from 'next-intl';
 import tr from '../messages/tr.json';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { presentIds } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 import type { MailMessage } from '@/lib/email/mailer';
 import type { NotificationTranslator } from '@/lib/notifications/render';
 
@@ -236,7 +236,9 @@ describe('weekly batch', () => {
     if (!ready) return ctx.skip(skipReason);
     await setPref(b, { event: 'NEW_MATCHING_CALL', channel: 'EMAIL', frequency: 'WEEKLY' });
     await dispatch(b, 'left');
-    await admin!.membership.deleteMany({ where: { tenantId: b.tenantId, userId: b.userId } });
+    await admin!.membership.deleteMany({
+      where: { tenantId: requireId(b.tenantId, 'b.tenantId'), userId: requireId(b.userId, 'b.userId') },
+    });
     const box = inbox();
     const result = await run('WEEKLY', box.mailer);
     expect(mine(box.sent, b)).toHaveLength(0);
