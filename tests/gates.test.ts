@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { evaluateGate, GateOpportunityNotFoundError } from '../src/lib/gates/evaluate';
 import { prisma } from '../src/lib/db';
+import { clearStoredG0, computeG0FromSnapshot } from '../src/lib/scoring/g0-compute';
 
 /**
  * G0 gate fixtures.
@@ -684,5 +685,70 @@ describe('G1 gate: critical roles and their backups', () => {
   test('the other gates never read candidates', async () => {
     await evaluateGate('opp-pass', 'G2', 'tenant-1');
     expect(prisma.seatCandidate.findMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * NG-59, PR #325 review finding 1 (TopicMatch half): clearing a stored G0 must not invent a
+ * TopicMatch row just to hold a null. It nulls the per-opportunity row only if one exists.
+ * The gate fixtures above all resolve to a score or to `topicId: null`, so the topic branch of
+ * `clearStoredG0` is exercised here with a no-evidence computation that does carry a topic.
+ */
+describe('clearStoredG0 — TopicMatch branch (NG-59)', () => {
+  const noEvidenceWithTopic = () =>
+    computeG0FromSnapshot('tenant-2', { opportunityId: 'opp-1', topicId: 'topic-1' }, {
+      tenant: { country: null, pic: null },
+      profile: null,
+      topic: null,
+      topicFitScore: null,
+      baseRatePct: null,
+      intendedRole: null,
+      seats: [],
+      cordis: null,
+    });
+
+  const fakeTx = (existing: { id: string } | null) => ({
+    opportunity: {
+      findFirst: vi.fn().mockResolvedValue({ updatedAt: new Date('2026-01-02T03:04:05.000Z'), g0Score: 41 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    topicMatch: {
+      findFirst: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockResolvedValue({}),
+      create: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+  });
+
+  test('the fixture is a topic-bearing computation with no score', () => {
+    const c = noEvidenceWithTopic();
+    expect(c.score).toBeNull();
+    expect(c.topicId).toBe('topic-1');
+  });
+
+  test('no TopicMatch row yet: nothing is created or upserted', async () => {
+    const tx = fakeTx(null);
+    const cleared = await clearStoredG0(tx as never, noEvidenceWithTopic());
+    expect(cleared).toBe(true);
+    expect(tx.opportunity.updateMany).toHaveBeenCalled(); // the column is still emptied
+    expect(tx.topicMatch.upsert).not.toHaveBeenCalled();
+    expect(tx.topicMatch.create).not.toHaveBeenCalled();
+    expect(tx.topicMatch.update).not.toHaveBeenCalled();
+    expect(tx.topicMatch.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('a TopicMatch row exists: its g0Score is set to null, nothing is created', async () => {
+    const tx = fakeTx({ id: 'tm-1' });
+    await clearStoredG0(tx as never, noEvidenceWithTopic());
+    expect(tx.topicMatch.upsert).not.toHaveBeenCalled();
+    expect(tx.topicMatch.create).not.toHaveBeenCalled();
+    expect(tx.topicMatch.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 'tenant-2', topicId: 'topic-1', opportunityId: 'opp-1' } }),
+    );
+    expect(tx.topicMatch.update).toHaveBeenCalledWith({
+      where: { id: 'tm-1' },
+      data: expect.objectContaining({ g0Score: null }),
+    });
   });
 });
