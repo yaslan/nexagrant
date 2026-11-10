@@ -28,6 +28,17 @@ if (!dbReachable) skipOrFailInCi(SUITE, 'Postgres is unreachable (`docker compos
 
 const RUN = `ng14t1-${Date.now().toString(36)}`;
 const tenants: string[] = [];
+const users: string[] = [];
+
+/** createdById is a foreign key to User, so each actor is a real user row. */
+async function newUser(suffix: string): Promise<string> {
+  const u = await admin!.user.create({
+    data: { email: `${RUN}-${suffix}@example.test`, name: `${RUN} ${suffix}` },
+    select: { id: true },
+  });
+  users.push(u.id);
+  return u.id;
+}
 
 async function newTenant(suffix: string): Promise<string> {
   const t = await admin!.tenant.create({
@@ -51,12 +62,16 @@ describe.skipIf(!dbReachable)('NG-14 T1 — project ideas stay inside their tena
   let tenantB = '';
   let ideaA = '';
   let ideaB = '';
+  let userA = '';
+  let userB = '';
 
   beforeAll(async () => {
     tenantA = await newTenant('a');
     tenantB = await newTenant('b');
-    const a = await createProjectIdea({ tenantId: tenantA, userId: 'user-a' }, idea(`${RUN} A fikri`));
-    const b = await createProjectIdea({ tenantId: tenantB, userId: 'user-b' }, idea(`${RUN} B fikri`));
+    userA = await newUser('a');
+    userB = await newUser('b');
+    const a = await createProjectIdea({ tenantId: tenantA, userId: userA }, idea(`${RUN} A fikri`));
+    const b = await createProjectIdea({ tenantId: tenantB, userId: userB }, idea(`${RUN} B fikri`));
     ideaA = a.id;
     ideaB = b.id;
   });
@@ -65,6 +80,9 @@ describe.skipIf(!dbReachable)('NG-14 T1 — project ideas stay inside their tena
     if (admin && tenants.length) {
       // Cascades to ProjectIdea rows of both tenants.
       await admin.tenant.deleteMany({ where: { id: { in: tenants } } }).catch(() => {});
+    }
+    if (admin && users.length) {
+      await admin.user.deleteMany({ where: { id: { in: users } } }).catch(() => {});
     }
     await admin?.$disconnect().catch(() => {});
   });
@@ -87,7 +105,7 @@ describe.skipIf(!dbReachable)('NG-14 T1 — project ideas stay inside their tena
   });
 
   it('a write under tenant A is stored under tenant A only', async () => {
-    const created = await createProjectIdea({ tenantId: tenantA, userId: 'user-a' }, idea(`${RUN} A ikinci`));
+    const created = await createProjectIdea({ tenantId: tenantA, userId: userA }, idea(`${RUN} A ikinci`));
     expect(await getProjectIdea({ tenantId: tenantB }, created.id)).toBeNull();
     const row = await admin!.projectIdea.findUnique({ where: { id: created.id }, select: { tenantId: true } });
     expect(row?.tenantId).toBe(tenantA);
