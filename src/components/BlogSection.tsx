@@ -3,6 +3,8 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { authorByline, formatBlogDate, getFeaturedBlogPosts, type BlogPost } from '@/lib/blog';
+import { blogContentShownIn } from '@/lib/blog-shared';
+import BlogTurkishOnlyNotice from '@/components/blog/BlogTurkishOnlyNotice';
 import { errorMessage } from '@/lib/errors';
 import { getPublicRoute } from '@/lib/routes';
 
@@ -14,6 +16,9 @@ interface BlogSectionProps {
  * The landing page's three featured posts, read from the BlogPost table
  * (AKTAR-MURBCJ0A-1). A failed read hides the section instead of taking the
  * whole landing page down with it; no post is invented to fill the gap.
+ *
+ * NG-121: the posts are written in Turkish only (src/lib/blog-shared.ts), so on
+ * any other locale the cards give way to a short notice linking to /tr/blog.
  */
 export default async function BlogSection({ locale }: BlogSectionProps) {
   let posts: BlogPost[];
@@ -57,82 +62,86 @@ export default async function BlogSection({ locale }: BlogSectionProps) {
           </Link>
         </div>
 
-        {/* 3 Blog Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {posts.map((post) => (
-            <article
-              key={post.slug}
-              className="bg-ground/60 border border-border rounded-2xl overflow-hidden shadow-xs hover:shadow-xl hover:border-accent/40 transition-all flex flex-col group"
-            >
-              {/* Cover Image */}
-              <div className="relative h-48 w-full overflow-hidden bg-muted/20">
-                <Image
-                  src={post.image}
-                  alt={post.title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute top-3 left-3">
-                  <span className="bg-surface/90 backdrop-blur-md border border-border text-ink text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-2xs">
-                    {post.category}
-                  </span>
+        {!blogContentShownIn(locale) ? (
+          <BlogTurkishOnlyNotice locale={locale} />
+        ) : (
+          /* 3 Blog Cards Grid */
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {posts.map((post) => (
+              <article
+                key={post.slug}
+                className="bg-ground/60 border border-border rounded-2xl overflow-hidden shadow-xs hover:shadow-xl hover:border-accent/40 transition-all flex flex-col group"
+              >
+                {/* Cover Image */}
+                <div className="relative h-48 w-full overflow-hidden bg-muted/20">
+                  <Image
+                    src={post.image}
+                    alt={post.title}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute top-3 left-3">
+                    <span className="bg-surface/90 backdrop-blur-md border border-border text-ink text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-2xs">
+                      {post.category}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Card Body */}
-              <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2 text-[11px] text-muted font-medium">
-                    <time dateTime={post.publishedAt.toISOString()}>{formatBlogDate(post.publishedAt, locale)}</time>
-                    <span>•</span>
-                    <span>{t('readMinutes', { min: post.readMinutes })}</span>
+                {/* Card Body */}
+                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 text-[11px] text-muted font-medium">
+                      <time dateTime={post.publishedAt.toISOString()}>{formatBlogDate(post.publishedAt, locale)}</time>
+                      <span>•</span>
+                      <span>{t('readMinutes', { min: post.readMinutes })}</span>
+                    </div>
+
+                    <h3 className="font-bold text-lg text-ink font-heading group-hover:text-accent transition-colors leading-snug">
+                      <Link href={getPublicRoute('blogDetail', locale, post.slug)}>
+                        {post.title}
+                      </Link>
+                    </h3>
+
+                    <p className="text-xs text-ink-2 leading-relaxed line-clamp-3">
+                      {post.excerpt}
+                    </p>
                   </div>
 
-                  <h3 className="font-bold text-lg text-ink font-heading group-hover:text-accent transition-colors leading-snug">
-                    <Link href={getPublicRoute('blogDetail', locale, post.slug)}>
-                      {post.title}
+                  {/* Author Badge & Read More Button */}
+                  <div className="pt-4 border-t border-border/80 flex items-center justify-between">
+                    {/* Byline only when the post records one — see src/lib/blog.ts. */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {post.author ? (
+                        <>
+                          {post.author.avatar && (
+                            <Image
+                              src={post.author.avatar}
+                              alt={authorByline(post.author)}
+                              width={28}
+                              height={28}
+                              className="rounded-full object-cover border border-border"
+                            />
+                          )}
+                          <div className="min-w-0 text-xs font-semibold text-ink leading-none truncate">
+                            {authorByline(post.author)}
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+
+                    <Link
+                      href={getPublicRoute('blogDetail', locale, post.slug)}
+                      className="shrink-0 text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                    >
+                      <span>{isTr ? 'Oku' : 'Read'}</span>
+                      <span>→</span>
                     </Link>
-                  </h3>
-
-                  <p className="text-xs text-ink-2 leading-relaxed line-clamp-3">
-                    {post.excerpt}
-                  </p>
-                </div>
-
-                {/* Author Badge & Read More Button */}
-                <div className="pt-4 border-t border-border/80 flex items-center justify-between">
-                  {/* Byline only when the post records one — see src/lib/blog.ts. */}
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {post.author ? (
-                      <>
-                        {post.author.avatar && (
-                          <Image
-                            src={post.author.avatar}
-                            alt={authorByline(post.author)}
-                            width={28}
-                            height={28}
-                            className="rounded-full object-cover border border-border"
-                          />
-                        )}
-                        <div className="min-w-0 text-xs font-semibold text-ink leading-none truncate">
-                          {authorByline(post.author)}
-                        </div>
-                      </>
-                    ) : null}
                   </div>
-
-                  <Link
-                    href={getPublicRoute('blogDetail', locale, post.slug)}
-                    className="shrink-0 text-xs font-bold text-accent hover:underline flex items-center gap-1"
-                  >
-                    <span>{isTr ? 'Oku' : 'Read'}</span>
-                    <span>→</span>
-                  </Link>
                 </div>
-              </div>
-            </article>
-          ))}
-        </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

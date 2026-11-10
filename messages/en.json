@@ -3977,7 +3977,10 @@
     "indexSubtitle": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.",
     "readArticle": "Read Article",
     "backToBlog": "Back to Blog",
-    "relatedArticles": "Related Articles"
+    "relatedArticles": "Related Articles",
+    "onlyTurkishTitle": "Our blog posts are in Turkish only for now",
+    "onlyTurkishBody": "We have not translated our articles into English yet. You can read them on the Turkish blog.",
+    "onlyTurkishLink": "Read the Turkish blog"
   },
   "blog_detail": {
     "meta_description": "Blog post"

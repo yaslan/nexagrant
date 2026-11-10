@@ -5,8 +5,12 @@ import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MUU76GFV3DWQ — the public blog as a reader meets it, driven by real clicks:
- * /tr/blog list → click a card → the post → back to the list, the same in /en,
- * and a slug that does not exist is a real 404.
+ * /tr/blog list → click a card → the post → back to the list, and a slug that
+ * does not exist is a real 404.
+ *
+ * NG-121 (K-580095 = A): the posts are Turkish only, so /en/blog and the /en
+ * landing page show a "Turkish only" notice linking to /tr/blog instead of the
+ * Turkish titles, and /en/blog/<slug> redirects to /tr/blog/<slug>.
  *
  * Two posts are written straight to the BlogPost table (the admin editor has its
  * own spec, admin-blog-persistence.spec.ts) with a per-run slug, dated in the
@@ -110,24 +114,48 @@ test.describe.serial('blog reader — list → post → back, TR and EN, 404 on 
     await expect(page.getByRole('heading', { level: 1, name: NEWER.title })).toBeVisible();
   });
 
-  test('EN: the list has English chrome and a card opens the post', async ({ page }) => {
+  test('EN: the list has English chrome, no Turkish post, a notice linking to /tr/blog', async ({ page }) => {
     const res = await page.goto('/en/blog');
     expect(res?.status()).toBe(200);
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.getByRole('heading', { level: 1, name: 'EU Grant Management & Insights Blog' })).toBeVisible();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
 
-    const card = page.locator('article').filter({ hasText: NEWER.title });
-    await expect(card.getByText('2 min read', { exact: true })).toBeVisible();
-    await card.getByRole('link', { name: 'Read Article' }).click();
+    await expect(page.getByText(NEWER.title)).toHaveCount(0);
+    await expect(page.getByText(NEWER.excerpt)).toHaveCount(0);
+    await expect(page.locator('main a[href^="/en/blog/"]')).toHaveCount(0);
+    const notice = page.getByTestId('blog-turkish-only');
+    await expect(notice.getByRole('heading', { name: 'Our blog posts are in Turkish only for now' })).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/12-en-blog-turkish-only.png`, fullPage: true });
 
-    await expect(page).toHaveURL((url) => url.pathname === `/en/blog/${NEWER.slug}`);
+    await notice.getByRole('link', { name: 'Read the Turkish blog' }).click();
+    await expect(page).toHaveURL((url) => url.pathname === '/tr/blog');
+    await expect(page.locator('article h2').nth(0)).toHaveText(NEWER.title);
+  });
+
+  test('EN: the landing page blog section shows the notice, not the Turkish cards', async ({ page }) => {
+    await withSystemScope('platform-admin', 'e2e.blog-reader.feature', (tx) =>
+      tx.blogPost.update({ where: { slug: NEWER.slug }, data: { featured: true } })
+    );
+    const res = await page.goto('/en');
+    expect(res?.status()).toBe(200);
+    await expect(page.getByText(NEWER.title)).toHaveCount(0);
+    const notice = page.getByTestId('blog-turkish-only');
+    await expect(notice).toBeVisible();
+    await expect(notice.getByRole('link', { name: 'Read the Turkish blog' })).toHaveAttribute('href', '/tr/blog');
+
+    await page.goto('/tr');
+    await expect(page.getByRole('link', { name: NEWER.title })).toBeVisible();
+    await expect(page.getByTestId('blog-turkish-only')).toHaveCount(0);
+  });
+
+  test('EN: a post address redirects to the Turkish post', async ({ page }) => {
+    const res = await page.goto(`/en/blog/${NEWER.slug}`);
+    expect(res?.status()).toBe(200);
+    expect(res?.request().redirectedFrom()?.url()).toMatch(new RegExp(`/en/blog/${NEWER.slug}$`));
+    await expect(page).toHaveURL((url) => url.pathname === `/tr/blog/${NEWER.slug}`);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'tr');
     await expect(page.getByRole('heading', { level: 1, name: NEWER.title })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Related Articles' })).toBeVisible();
-    await expect(page.getByText('• 2 min read', { exact: true })).toBeVisible();
-    await page.screenshot({ path: `${SHOTS}/12-en-blog-post.png`, fullPage: true });
-
-    await page.getByRole('link', { name: /Back to Blog/ }).click();
-    await expect(page).toHaveURL((url) => url.pathname === '/en/blog');
   });
 
   for (const locale of ['tr', 'en'] as const) {

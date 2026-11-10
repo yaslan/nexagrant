@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next';
 import { prisma } from '@/lib/db';
 import { appUrl } from '@/lib/app-url';
 import { getBlogPosts } from '@/lib/blog';
+import { blogContentShownIn } from '@/lib/blog-shared';
 
 // Hardcoded regions matching src/app/[locale]/(public)/calls/[region]/regions.ts
 const REGIONS: Record<string, { name: string; code: string }> = {
@@ -40,7 +41,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { path: '/dpa', priority: 0.5 },
       { path: '/open-calls', priority: 0.7 },
       { path: '/experts', priority: 0.7 },
-      { path: '/blog', priority: 0.6 },
+      // No '/blog': the posts are Turkish only and /en/blog is a noindex notice (NG-121).
     ],
   };
 
@@ -67,14 +68,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  // 3. Blog posts (all locales)
+  // 3. Blog posts — only on the locale they are written in (NG-121): BlogPost
+  // is single-language Turkish, /en/blog/<slug> redirects to the Turkish page.
   // Query failures are silently skipped to prevent deployment failures when the
   // database is temporarily unavailable. Incomplete sitemap entries are acceptable;
   // search engines will fetch the page anyway if referenced elsewhere.
   try {
     const blogPosts = await getBlogPosts();
     for (const post of blogPosts) {
-      for (const locale of locales) {
+      for (const locale of locales.filter(blogContentShownIn)) {
         entries.push({
           url: `${baseUrl}/${locale}/blog/${post.slug}`,
           lastModified: post.publishedAt,
