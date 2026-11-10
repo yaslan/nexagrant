@@ -1163,7 +1163,6 @@ Yazan/okuyan tek yer `src/lib/gates/readiness-records.ts`. Migration: `prisma/mi
 - **Denetim izi:** `opportunity.withdrawn` (veri: karar kimliği, eski durum), `project_idea.created`. Gerekçe ve fikir metni denetim satırına girmez.
 - **CHECK yok:** TRL aralığı, boş olmayan gerekçe ve metin uzunlukları (başlık 200, özet 2000, gerekçe 2000, etiket 100) yazıcıdadır.
 
-
 ## 29. `Tenant.picRegistryStatus` — AB kayıt sitesi doğrulaması (FO-396)
 
 `Tenant.picRegistryStatus` (`FOUND` | `NOT_FOUND` | `UNKNOWN`, boş = hiç kontrol edilmedi) ve
@@ -1174,6 +1173,19 @@ DB işleminin dışında, 5 sn zaman aşımı ve 256 KB sınırıyla yapılır; 
 **Neden:** Sıfır CORDIS kaydı tek başına "yeni kuruluş" demez. Yanlış ya da kayıtsız bir numara da sıfır
 kayıt verir. Geçmişsiz ortak kolaylığı (`isNoHistoryPartner`, payda 75) yalnızca `FOUND` ise verilir.
 Kayıtsız numara 77,11 GO → 57,83 NO_GO'ya düşer. `G0_SCORING_VERSION` 2.3.
+
+**Durum kuralları (FO-396 adım 2):**
+- PIC formdan değişince ya da kaldırılınca durum `null` olur (eski `FOUND` yeni numaraya taşınmaz). Form
+  kaydı yeni PIC'i sorgularsa sonuç yazılır; sorgu hata verirse durum `null` kalır ve `pic-registry`
+  uyarısı (`reason: refresh_failed`) üretilir.
+- Yazım koşulludur (`updateMany where {id, pic}`): sorgu sürerken PIC değiştiyse sonuç atılır
+  (`stored: false`); yeni PIC kendi sorgusuyla karar verir.
+- Geçici hata (`timeout`, `network`, `http_error`) `UNKNOWN` olarak yazılır ve `pic-registry-retry` işi
+  kuyruğa girer: 10 dk, 40 dk, 2 sa sonra (en fazla 3 yeniden deneme). Sonuç `FOUND`/`NOT_FOUND` olursa
+  veya PIC değişirse iş atlanır. Son deneme de yanıt vermezse `retry_exhausted` uyarısı üretilir; durum
+  `UNKNOWN` kalır (verilmiş kolaylık yoktur). Yanıt şekli değişirse (`schema_changed`) yeniden denenmez.
+- Yeniden deneme anahtarı `pic-registry-retry:<auditEventId>:<attempt>`; tek PIC değişikliği için iş en
+  fazla bir kez kuyruğa girer. Kuyruğa yazılamazsa `retry_not_queued` uyarısı üretilir.
 
 **Migration:** `prisma/migrations/tenant-pic-registry-status/` — iki `ADD COLUMN IF NOT EXISTS`,
 veri geçişi yok; ikinci çalıştırma no-op (kanıt: FO-396 raporu). Geri alma: `down.sql` (kolonları

@@ -43,6 +43,8 @@ export const JOB_IDS = [
   'm17-stale-runs',
   // FO-384 B2: queued by a PIC change, never on a cron. Not in SCHEDULE (no tick, no missed-tick check).
   'g0-rescore-tenant',
+  // FO-396: queued by a PIC lookup that failed to reach the EU register, never on a cron.
+  'pic-registry-retry',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];

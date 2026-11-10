@@ -156,8 +156,8 @@ async function loadCordisSnapshot(
   // "No record" = a PIC was entered and no CORDIS row exists for it (FO-382, patron 05.11: "PIC
   // boşsa kolaylık yok"). It is only a fact about the organisation when CORDIS itself is loaded. An
   // empty table (not imported yet) is missing data, not a history of zero, so it stays null and the
-  // scorer keeps the standard basis. No PIC is never a "no record": the partner keeps the standard
-  // basis, and `cordis: null` is the only way the scorer knows the PIC is absent.
+  // scorer keeps the standard basis. No PIC also gives `null`, and so does an empty table: in both
+  // cases the scorer keeps the standard basis (FO-382 review B4: `null` does not mean "no PIC" only).
   // The partner-only rule is applied in the scorer (`isNoHistoryPartner`), not here.
   const noRecord = async (): Promise<G0CordisSnapshot | null> => {
     const anyRow: { projectId: string } | null = await client.cordisParticipation.findFirst({

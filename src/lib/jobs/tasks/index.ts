@@ -25,6 +25,7 @@ import { evidenceExpiringTask } from './evidence-expiring';
 import { partnerSearchTask } from './partner-search';
 import { partnerSearchRetentionTask } from './partner-search-retention';
 import { g0RescoreTenantTask } from './g0-rescore-tenant';
+import { picRegistryRetryTask } from './pic-registry-retry';
 
 /**
  * Every job the worker serves, keyed by the id used in the crontab
@@ -57,4 +58,5 @@ export const taskList: Record<JobId, Task> = {
   'partner-search': partnerSearchTask,
   'partner-search-retention': partnerSearchRetentionTask,
   'g0-rescore-tenant': g0RescoreTenantTask,
+  'pic-registry-retry': picRegistryRetryTask,
 };
