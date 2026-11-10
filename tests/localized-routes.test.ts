@@ -75,4 +75,14 @@ describe('SEO-Friendly Localized Multilingual Routing System (TR & EN)', () => {
       expect(switchLocalePath('/tr/itu-tto/ayarlar/profil', 'en')).toBe('/en/itu-tto/settings/profile');
     });
   });
+
+  // NG-113: the notifications page is one page; the language switch must stay on it in both directions.
+  describe('Notifications language switch', () => {
+    test('TR bildirimler → EN notifications', () => {
+      expect(switchLocalePath('/tr/itu-tto/bildirimler', 'en')).toBe('/en/itu-tto/notifications');
+    });
+    test('EN notifications → TR bildirimler', () => {
+      expect(switchLocalePath('/en/itu-tto/notifications', 'tr')).toBe('/tr/itu-tto/bildirimler');
+    });
+  });
 });
