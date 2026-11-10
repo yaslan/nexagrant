@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+import { prisma } from '../../src/lib/db';
+import { withSystemScope } from '../../src/lib/system-scope';
 import { seedIdentity, cleanupIdentity, signInAs } from './fixtures/session';
 
 /**
@@ -177,6 +179,65 @@ test.describe('WCAG A/AA — NG-101 signed in, pipeline (tr + en)', () => {
       expect(await scan(page), url).toEqual([]);
     });
   }
+});
+
+/**
+ * NG-119 — TTO portföy rozeti (`text-purple-*` kontrastı). Rozet yalnız portföyde en az bir kayıt varsa
+ * render edilir (tto/client.tsx: items.map içinde); demo tenant'ta kayıt olmadığı için eski tarama bu
+ * rozeti hiç görmüyordu. Burada kendi tenant'ımızda bir kayıt tohumlanır ve sayfa dolu hâlinde taranır.
+ * Hiçbir axe kuralı kapatılmaz.
+ */
+test.describe('WCAG A/AA — NG-119 signed in, TTO portfolio with an item (tr)', () => {
+  const TTO_TENANT = 'e2e-a11y-tto-tenant';
+  const TTO_OWNER = { ...OWNER, userId: 'e2e-a11y-tto-owner', email: 'a11y-tto-owner@e2e.fabrika.test', tenantId: TTO_TENANT };
+  test.beforeAll(async () => {
+    await withSystemScope('platform-admin', 'e2e.a11y.tto.setup', async (tx) => {
+      await tx.tenant.upsert({
+        where: { id: TTO_TENANT },
+        create: { id: TTO_TENANT, name: 'A11y TTO e2e', slug: TTO_TENANT, country: 'TR', orgType: 'SME' },
+        update: {},
+      });
+      await tx.subscription.upsert({
+        where: { tenantId: TTO_TENANT },
+        create: { tenantId: TTO_TENANT, planId: 'ultra', status: 'ACTIVE' },
+        update: { planId: 'ultra', status: 'ACTIVE', planVersionId: null },
+      });
+    });
+    await prisma.moduleState.upsert({
+      where: { tenantId_moduleId: { tenantId: TTO_TENANT, moduleId: 'M7' } },
+      create: { tenantId: TTO_TENANT, moduleId: 'M7', status: 'ON' },
+      update: { status: 'ON' },
+    });
+    await seedIdentity({ ...TTO_OWNER, workspaceIds: [] }, { id: 'e2e-a11y-tto-ws', slug: 'main', name: 'Main' });
+    await prisma.ttoPortfolioItem.deleteMany({ where: { tenantId: TTO_TENANT } });
+    await prisma.ttoPortfolioItem.create({
+      data: {
+        tenantId: TTO_TENANT,
+        title: 'A11y TTO kayıt',
+        trl: 5,
+        patentStatus: 'granted',
+        summary: 'Kontrast taraması için tohumlanmış portföy kaydı.',
+        keywords: ['a11y'],
+      },
+    });
+  });
+  test.afterAll(async () => {
+    await prisma.ttoPortfolioItem.deleteMany({ where: { tenantId: TTO_TENANT } });
+    await cleanupIdentity([TTO_OWNER.userId]);
+    await withSystemScope('platform-admin', 'e2e.a11y.tto.teardown', (tx) =>
+      tx.tenant.deleteMany({ where: { id: TTO_TENANT } }),
+    );
+  });
+
+  test('/tr/main/tto (portföy dolu) has no A/AA violations', async ({ page }) => {
+    await acceptCookies(page);
+    await signInAs(page, { id: TTO_OWNER.userId, email: TTO_OWNER.email, tenantId: TTO_OWNER.tenantId, role: TTO_OWNER.role });
+    const response = await page.goto('/tr/main/tto');
+    expect(response?.status(), '/tr/main/tto').toBe(200);
+    await expectOwnPage(page, '/tr/main/tto');
+    await expect(page.getByRole('heading', { name: 'A11y TTO kayıt' }), 'rozetin bulunduğu kayıt görünür').toBeVisible();
+    expect(await scan(page), '/tr/main/tto').toEqual([]);
+  });
 });
 
 test('the scanner is live: a nameless button is reported', async ({ page }) => {
