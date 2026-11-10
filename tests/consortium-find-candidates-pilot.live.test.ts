@@ -9,10 +9,14 @@ import { requireId } from './helpers/teardown-guard';
  * expired pilot. The M8 twin was İNCELEME-30 B-1 (TASK-MUN39FIAKFY2R).
  *
  * `findCandidates` was marked `readOnly`, but the scorer it calls ends with
- * `seatCandidate.deleteMany` + `create` (src/lib/scoring/consortium.ts). The
- * flag only tells `requireTenantAction` to skip the pilot check; nothing about
- * it stops a write. So an expired pilot's seat candidates were deleted and
- * rewritten.
+ * `seatCandidate.deleteMany` + `create`. The flag only tells
+ * `requireTenantAction` to skip the pilot check; nothing about it stops a write.
+ * So an expired pilot's seat candidates were deleted and rewritten.
+ *
+ * NG-100 / K-579560=A: the button now runs the M8 matcher (`generateSeatCandidates`,
+ * src/modules/m8/server/matching.ts), which clears the seat's rows and writes new
+ * ones the same way; the retired consortium scorer is no longer called. The
+ * pilot rule and these assertions are unchanged.
  *
  * Here nothing about the pilot is mocked: `requireTenantAction` and
  * `assertTenantWritable` are the real ones and read the test tenant's real
