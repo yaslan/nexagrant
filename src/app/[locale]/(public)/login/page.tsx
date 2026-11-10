@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { connection } from 'next/server';
+import { getTranslations } from 'next-intl/server';
 import { configuredOAuthProviders, isDemoLoginEnabled } from '@/lib/demo-login';
 import AuthCard from './AuthCard';
 
@@ -9,6 +10,7 @@ export default async function LoginPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  const tCommon = await getTranslations({ locale, namespace: 'Common' });
   // Read per request, not baked in at build: which sign-in methods exist is a
   // property of the environment the server runs in (TASK-MULSCEK4JHK8X).
   await connection();
@@ -18,7 +20,7 @@ export default async function LoginPage({
   return (
     <div className="flex-1 flex flex-col bg-background selection:bg-accent selection:text-white">
       <main className="flex-1 flex items-start justify-center px-edge sm:px-4 pt-2 pb-12 sm:pt-4 sm:pb-16">
-        <Suspense fallback={<div className="text-center py-12 text-xs text-muted">Yükleniyor...</div>}>
+        <Suspense fallback={<div className="text-center py-12 text-xs text-muted">{tCommon('loading')}</div>}>
           <AuthCard
             locale={locale}
             defaultMode="login"
