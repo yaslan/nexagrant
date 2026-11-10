@@ -155,6 +155,18 @@ describe('FO-396 fail-closed: no address, no call (fetch spy must see zero calls
     expect(isAllowedRegistryUrl('not a url', true)).toBe(false);
   });
 
+  it('NG-85 F7: a production host on any explicit port is refused (only the default https port)', async () => {
+    expect(isAllowedRegistryUrl('https://ec.europa.eu:8443/x', false)).toBe(false);
+    expect(isAllowedRegistryUrl('https://ec.europa.eu:443/x', false)).toBe(true); // URL drops the default port
+    const { calls, fetchImpl } = spy();
+    expect(await checkPicRegistry('123456789', { fetch: fetchImpl, baseUrl: 'https://ec.europa.eu:8443/x' })).toEqual({
+      status: 'UNKNOWN',
+      reason: 'host_not_allowed',
+    });
+    expect(calls).toEqual([]);
+    expect(resolvePicRegistryUrl({ url: 'https://ec.europa.eu:8443/x', nodeEnv: 'production' })).toBeNull();
+  });
+
   it('resolve: off wins; production without a URL uses the public address; other envs without a URL get null', () => {
     expect(resolvePicRegistryUrl({ url: STUB, off: true, allowLocal: true, nodeEnv: 'test' })).toBeNull();
     expect(resolvePicRegistryUrl({ nodeEnv: 'production' })).toBe(PIC_REGISTRY_DEFAULT_URL);

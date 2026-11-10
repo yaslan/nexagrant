@@ -29,7 +29,7 @@ const LOCAL_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost']);
 
 /**
  * True when the address may be called at all: the host is on the allow-list, no credentials are
- * embedded, and production hosts use https. Local hosts are allowed only with `allowLocal`.
+ * embedded, and production hosts use https on the default port. Local hosts are allowed only with `allowLocal`.
  */
 export function isAllowedRegistryUrl(raw: string, allowLocal: boolean): boolean {
   let url: URL;
@@ -39,7 +39,8 @@ export function isAllowedRegistryUrl(raw: string, allowLocal: boolean): boolean 
     return false;
   }
   if (url.username !== '' || url.password !== '') return false;
-  if (PRODUCTION_HOSTS.has(url.hostname)) return url.protocol === 'https:';
+  // NG-85 F7: the default https port only. `new URL` drops an explicit :443, so '' is that port.
+  if (PRODUCTION_HOSTS.has(url.hostname)) return url.protocol === 'https:' && url.port === '';
   if (allowLocal && LOCAL_HOSTS.has(url.hostname)) return url.protocol === 'http:' || url.protocol === 'https:';
   return false;
 }

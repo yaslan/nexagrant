@@ -51,10 +51,23 @@ describe('FO-396 refreshTenantPicRegistry (B1 conditional write)', () => {
     expect(tenantMock.updateMany).not.toHaveBeenCalled();
   });
 
-  it('clears the stored answer with a plain update when pic is null', async () => {
+  it('NG-85 F6: clears the stored answer only while the tenant still has no PIC (a PIC set meanwhile keeps its answer)', async () => {
     const r = await refreshTenantPicRegistry('t1', null);
     expect(r).toBeNull();
-    expect(tenantMock.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 't1' } }));
-    expect(tenantMock.updateMany).not.toHaveBeenCalled();
+    expect(tenantMock.updateMany).toHaveBeenCalledTimes(1);
+    expect(tenantMock.updateMany).toHaveBeenCalledWith({
+      where: { id: 't1', pic: null },
+      data: { picRegistryStatus: null, picRegistryCheckedAt: null },
+    });
+    expect(tenantMock.update).not.toHaveBeenCalled();
+  });
+
+  it('NG-85 F1: the schema_changed alert carries no tenant id (SystemAlert has no tenantId and no RLS)', async () => {
+    checkMock.mockResolvedValue({ status: 'UNKNOWN', reason: 'schema_changed' });
+    await refreshTenantPicRegistry('t1', '999999999');
+    expect(alertMock).toHaveBeenCalledTimes(1);
+    const alert = (alertMock.mock.calls[0] as unknown[])[0] as { meta?: Record<string, unknown>; message: string };
+    expect(alert.meta).toEqual({ reason: 'schema_changed' });
+    expect(JSON.stringify(alert)).not.toContain('t1');
   });
 });

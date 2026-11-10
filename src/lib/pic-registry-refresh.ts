@@ -13,7 +13,8 @@ export type PicRegistryRefresh = PicRegistryResult & {
  *
  * Runs OUTSIDE any DB transaction (it waits on the network, up to the registry timeout). The
  * caller decides what to do with the status; the G0 scorer reads only the stored value and never
- * calls the register itself. A `null` pic clears the stored answer and returns `null`. A failed
+ * calls the register itself. A `null` pic clears the stored answer (only while the tenant still has
+ * no PIC) and returns `null`. A failed
  * lookup is stored as UNKNOWN, and a changed response shape also raises a SystemAlert (the data is
  * fine, our reading of it is not). `checkPicRegistry` never throws, but the database writes here
  * can (a missing tenant, a lost connection), so callers wrap this in try/catch and keep their own
@@ -31,7 +32,12 @@ export async function refreshTenantPicRegistry(
   // An id that is missing would drop out of the `where` below and match every tenant (see required-id.ts).
   const tenantKey = requireActionId(tenantId, 'tenantId');
   if (pic === null) {
-    await prisma.tenant.update({ where: { id: tenantKey }, data: { picRegistryStatus: null, picRegistryCheckedAt: null } });
+    // NG-85 F6: clear only while the tenant still has no PIC. A PIC saved in the meantime keeps the
+    // answer its own lookup stored (same rule as the write below and tenant-pic-removal.ts).
+    await prisma.tenant.updateMany({
+      where: { id: tenantKey, pic: null },
+      data: { picRegistryStatus: null, picRegistryCheckedAt: null },
+    });
     return null;
   }
   const askedPic = requireActionId(pic, 'pic');
@@ -44,12 +50,13 @@ export async function refreshTenantPicRegistry(
   if (count === 0) return { ...result, stored: false };
 
   if (result.reason === 'schema_changed') {
-    // No organisation name in the message or meta: only the tenant id and the reason.
+    // No organisation name and no tenant id in the message or meta (NG-85 F1): SystemAlert has no
+    // tenantId column and no RLS, so a tenant id must not go into it (system-alert.ts). Only the reason.
     await recordAlert({
       level: 'warn',
       source: 'pic-registry',
       message: 'EU participant register answered in a shape we do not recognise; PIC treated as UNKNOWN',
-      meta: { tenantId, reason: result.reason },
+      meta: { reason: result.reason },
     });
   }
   return { ...result, stored: true };
