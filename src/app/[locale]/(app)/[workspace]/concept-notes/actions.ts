@@ -102,10 +102,17 @@ export async function generateSectionDraft(
   await assertModuleAccess('M2');
   const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
-  // `Number`: an action is a public POST, so `maxWords` can arrive as any text.
-  // Checked before the RAG lookup and the model; `editorSections` shows a section
-  // whose limit is a fraction or over the ceiling, so its button does reach here.
-  const wordLimit = Number(maxWords);
+  // An action is a public POST, so `maxWords` can arrive as any type. Only a number
+  // or digits-only text counts: `Number(true)` is 1 and `Number("1e3")` is 1000, so
+  // plain `Number` would let those through. Checked before the RAG lookup and the
+  // model; `editorSections` shows a section whose limit is a fraction or over the
+  // ceiling, so its button does reach here.
+  const wordLimit =
+    typeof maxWords === 'number'
+      ? maxWords
+      : typeof maxWords === 'string' && /^\d+$/.test(maxWords)
+        ? Number(maxWords)
+        : Number.NaN;
   if (!isInstructionCount(wordLimit)) throw new InvalidTemplateSectionError(sectionKey);
 
   // Build RAG-augmented context

@@ -319,6 +319,8 @@
       "searchPlaceholder": "Fırsat, not veya kişi ara...",
       "allUsers": "👥 Tüm Kullanıcılar",
       "allRoles": "Tüm Roller",
+      "ownerFilterLabel": "Sorumluya göre filtrele",
+      "roleFilterLabel": "Role göre filtrele",
       "roleCoordinator": "👑 Koordinatör",
       "rolePartner": "🤝 Ortak",
       "addOpportunity": "Yeni Fırsat Ekle",

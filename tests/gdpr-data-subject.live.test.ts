@@ -222,6 +222,20 @@ async function seed() {
       { tenantId: ids.tenantA, seatId: neighbourSeat.id, minCents: 1n, maxCents: 2n, agreedById: ids.neighbour, agreedAt: new Date() },
     ],
   });
+  // NG-38: one project idea and one withdrawal decision each. Both user links are SET NULL: the
+  // idea's text and the decision's reason are the tenant's record and stay after erasure.
+  await db.projectIdea.createMany({
+    data: [
+      { tenantId: ids.tenantA, title: 'subject-idea', trl: 3, keywords: [], targetPrograms: [], createdById: ids.subject },
+      { tenantId: ids.tenantA, title: 'neighbour-idea', trl: 3, keywords: [], targetPrograms: [], createdById: ids.neighbour },
+    ],
+  });
+  await db.decisionLog.createMany({
+    data: [
+      { tenantId: ids.tenantA, opportunityId: ids.oppSubject, kind: 'WITHDRAW', reason: 'subject-reason', decidedById: ids.subject },
+      { tenantId: ids.tenantA, opportunityId: ids.oppNeighbour, kind: 'WITHDRAW', reason: 'neighbour-reason', decidedById: ids.neighbour },
+    ],
+  });
   // M17 (FO-195): one Interreg analysis each, with extracted text and an F2 result. `userId`
   // is an FK with ON DELETE CASCADE, so erasing the user must take texts and result with it.
   const rubric = await db.interregRubric.findFirstOrThrow({ select: { id: true } });
@@ -341,6 +355,11 @@ describe.skipIf(!HAS_DB)('GDPR export — live', () => {
     expect(tables.InternalApproval?.[0]).not.toHaveProperty('cofinancingCommitmentCents');
     expect(tables.PartnerBudgetShare).toHaveLength(1);
     expect(tables.PartnerBudgetShare?.[0]).not.toHaveProperty('maxCents');
+    expect(tables.ProjectIdea).toHaveLength(1);
+    expect(tables.ProjectIdea?.[0]).not.toHaveProperty('title');
+    expect(tables.DecisionLog).toHaveLength(1);
+    expect(tables.DecisionLog?.[0]).toMatchObject({ opportunityId: ids.oppSubject, kind: 'WITHDRAW' });
+    expect(tables.DecisionLog?.[0]).not.toHaveProperty('reason');
     expect(result.data!.notice.en).toContain('not a referee report');
     expect(tables.Notification).toHaveLength(1);
     expect(tables.Notification?.[0]).toMatchObject({ tenantId: ids.tenantA, type: 'SAVED_SEARCH_MATCH', payload: { matchCount: 3 } });
@@ -614,6 +633,11 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     expect(approval.cofinancingCommitmentCents).toBe(100n);
     expect(await db.partnerBudgetShare.count({ where: { agreedById: ids.subject } })).toBe(0);
     expect(await db.partnerBudgetShare.count({ where: { tenantId: ids.tenantA } })).toBe(2);
+    const decision = await db.decisionLog.findFirstOrThrow({ where: { opportunityId: ids.oppSubject } });
+    expect(decision.decidedById).toBeNull();
+    expect(decision.reason).toBe('subject-reason');
+    expect(await db.projectIdea.count({ where: { createdById: ids.subject } })).toBe(0);
+    expect(await db.projectIdea.count({ where: { tenantId: ids.tenantA } })).toBe(2);
     const opp = await db.opportunity.findUnique({ where: { id: ids.oppSubject } });
     expect(opp).not.toBeNull();
     expect(opp!.ownerId).toBeNull();
@@ -640,6 +664,8 @@ describe.skipIf(!HAS_DB)('GDPR purge — live', () => {
     expect(await db.feedback.count({ where: { userId: ids.neighbour } })).toBe(1);
     expect(await db.internalApproval.count({ where: { approvedById: ids.neighbour } })).toBe(1);
     expect(await db.partnerBudgetShare.count({ where: { agreedById: ids.neighbour } })).toBe(1);
+    expect(await db.projectIdea.count({ where: { createdById: ids.neighbour } })).toBe(1);
+    expect(await db.decisionLog.count({ where: { decidedById: ids.neighbour } })).toBe(1);
     expect(await db.auditEvent.count({ where: { actorId: ids.neighbour } })).toBe(1);
     expect(await db.opportunity.count({ where: { ownerId: ids.neighbour } })).toBe(1);
   });
