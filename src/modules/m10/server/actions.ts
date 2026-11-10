@@ -3,7 +3,7 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { generateText } from '@/lib/llm';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { assertModuleAccess } from '@/lib/modules/access';
 import {
@@ -76,7 +76,7 @@ export async function generateStandardDoc(
   const oppTitle = opp.title || 'Ufuk Avrupa Proje Başvurusu';
 
   const locale = await promptLocale();
-  const prompt = renderPrompt('m10/standard-doc', { kind, opportunityTitle: oppTitle }, locale);
+  const request = separatedPrompt('m10/standard-doc', {}, { document_kind: kind, opportunity_title: oppTitle }, locale);
 
   // TASK-MTQYXISOPUJ53 — fabricated fallbacks.
   //
@@ -101,8 +101,7 @@ export async function generateStandardDoc(
       userId,
       module: 'M10',
       purpose: `document_generation_${kind.toLowerCase()}`,
-      prompt,
-      system: renderPrompt('m10/standard-doc-system', {}, locale)
+      ...request
     });
   } catch (e) {
     console.error(`[m10 generateStandardDoc] generation failed for ${kind}: ${errorMessage(e)}`);

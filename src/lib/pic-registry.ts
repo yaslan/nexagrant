@@ -29,7 +29,7 @@ const LOCAL_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost']);
 
 /**
  * True when the address may be called at all: the host is on the allow-list, no credentials are
- * embedded, and production hosts use https. Local hosts are allowed only with `allowLocal`.
+ * embedded, and production hosts use https on the default port. Local hosts are allowed only with `allowLocal`.
  */
 export function isAllowedRegistryUrl(raw: string, allowLocal: boolean): boolean {
   let url: URL;
@@ -39,7 +39,8 @@ export function isAllowedRegistryUrl(raw: string, allowLocal: boolean): boolean 
     return false;
   }
   if (url.username !== '' || url.password !== '') return false;
-  if (PRODUCTION_HOSTS.has(url.hostname)) return url.protocol === 'https:';
+  // NG-85 F7: the default https port only. `new URL` drops an explicit :443, so '' is that port.
+  if (PRODUCTION_HOSTS.has(url.hostname)) return url.protocol === 'https:' && url.port === '';
   if (allowLocal && LOCAL_HOSTS.has(url.hostname)) return url.protocol === 'http:' || url.protocol === 'https:';
   return false;
 }
@@ -68,7 +69,15 @@ export function resolvePicRegistryUrl(source: PicRegistrySettings = settingsFrom
   if (source.off) return null;
   const candidate = source.url ?? (source.nodeEnv === 'production' ? PIC_REGISTRY_DEFAULT_URL : null);
   if (candidate === null) return null;
-  return isAllowedRegistryUrl(candidate, source.allowLocal === true) ? candidate : null;
+  return isAllowedRegistryUrl(candidate, localAllowed(source)) ? candidate : null;
+}
+
+/**
+ * The local-address test flag (FO-396 Ö2). Never honoured in production: a stray
+ * PIC_REGISTRY_ALLOW_LOCAL=true on the live server would otherwise point the check at 127.0.0.1.
+ */
+function localAllowed(source: PicRegistrySettings): boolean {
+  return source.allowLocal === true && source.nodeEnv !== 'production';
 }
 
 /** Five seconds: the save waits for this, so a slow register must not hold the form. */
@@ -150,7 +159,9 @@ export async function checkPicRegistry(pic: string, deps: PicRegistryDeps = {}):
   if (settings.off) return { status: 'UNKNOWN', reason: 'disabled' };
   const base = deps.baseUrl ?? resolvePicRegistryUrl(settings);
   if (base === null) return { status: 'UNKNOWN', reason: 'disabled' };
-  if (!isAllowedRegistryUrl(base, deps.allowLocal ?? settings.allowLocal === true)) return { status: 'UNKNOWN', reason: 'host_not_allowed' };
+  if (!isAllowedRegistryUrl(base, localAllowed({ ...settings, allowLocal: deps.allowLocal ?? settings.allowLocal }))) {
+    return { status: 'UNKNOWN', reason: 'host_not_allowed' };
+  }
 
   const doFetch = deps.fetch ?? fetch;
   const timeoutMs = deps.timeoutMs ?? PIC_REGISTRY_TIMEOUT_MS;

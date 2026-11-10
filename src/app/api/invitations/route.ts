@@ -5,9 +5,10 @@ import { requireTenantApi } from '@/lib/tenant';
 import { issueSecretToken } from '@/lib/secret-token';
 import type { InvitationRow } from '@/types/db-rows';
 import { assertSeatAvailable, SeatLimitReachedError, type SeatUsage } from '@/lib/billing/seat-limit';
-import { reportMailNotConfigured, smtpMailer, type Mailer } from '@/lib/email/mailer';
+import { mailFailureCode, reportMailNotConfigured, smtpMailer, type Mailer } from '@/lib/email/mailer';
 import { renderInvitationEmail } from '@/lib/email/invitation-email';
 import {
+  INVITATION_MAIL_ACCEPTED,
   INVITATION_MAIL_DAILY_LIMIT,
   INVITATION_MAIL_FAILED,
   INVITATION_MAIL_SENT,
@@ -17,8 +18,13 @@ import {
   lockInvitationMail,
   type InvitationMailSkip,
 } from '@/lib/email/invitation-mail-policy';
+import { withOptOut } from '@/lib/email/opt-out';
+import { OPT_OUT_SECRET_UNSET } from '@/lib/email/opt-out-secret';
+import { isEmailOptedOut } from '@/lib/email/opt-out-store';
+import { emailOptOutSecret } from '@/lib/env';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { appUrl } from '@/lib/app-url';
+import { FORBIDDEN_ROLE_DIGEST } from '@/lib/forbidden-role';
 
 /**
  * Invites a user into the caller's own tenant.
@@ -40,6 +46,24 @@ const INVITABLE_ROLES = new Set([
   'GUEST_PARTNER',
 ]);
 
+/**
+ * The language-free `code` every refusal carries (NG-89). The members page
+ * turns it into a sentence from `settings.members.page.errors`; `error` keeps
+ * the Turkish sentence for callers written before the code existed.
+ * FORBIDDEN_ROLE is the shared role-refusal code (src/lib/forbidden-role.ts),
+ * which `useActionErrorText` already says in every locale.
+ */
+const INVITATION_ERROR = {
+  FORBIDDEN_ROLE: FORBIDDEN_ROLE_DIGEST,
+  INVALID_JSON: 'INVALID_JSON',
+  INVALID_EMAIL: 'INVALID_EMAIL',
+  ALREADY_MEMBER: 'ALREADY_MEMBER',
+  SEAT_LIMIT_REACHED: 'SEAT_LIMIT_REACHED',
+} as const;
+
+/** What `req.json()` yields here when the request body is not JSON. */
+const UNPARSABLE_BODY = Symbol('unparsable-body');
+
 /** Roles allowed to invite into a tenant. */
 const CAN_INVITE = new Set(['TENANT_OWNER', 'TENANT_ADMIN']);
 
@@ -52,17 +76,33 @@ export async function POST(req: Request) {
 
     if (!CAN_INVITE.has(callerRole)) {
       return NextResponse.json(
-        { error: 'Bu işlem için yetkiniz yok. Yalnızca kurum sahibi veya yöneticisi davet gönderebilir.' },
+        {
+          error: 'Bu işlem için yetkiniz yok. Yalnızca kurum sahibi veya yöneticisi davet gönderebilir.',
+          code: INVITATION_ERROR.FORBIDDEN_ROLE,
+        },
         { status: 403 }
       );
     }
 
-    const body = await req.json();
+    // A body that does not parse is the caller's mistake, not ours: answer 400
+    // rather than letting it fall into the catch-all 500 below (NG-94).
+    // (A sentinel, not `null`: the JSON text `null` parses fine and is left to
+    // the e-mail check, as before.)
+    const body = await req.json().catch(() => UNPARSABLE_BODY);
+    if (body === UNPARSABLE_BODY) {
+      return NextResponse.json(
+        { error: 'İstek gövdesi geçerli bir JSON değil.', code: INVITATION_ERROR.INVALID_JSON },
+        { status: 400 }
+      );
+    }
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
     const requestedRole = typeof body?.role === 'string' ? body.role : 'MEMBER';
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Geçerli bir e-posta adresi zorunludur.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Geçerli bir e-posta adresi zorunludur.', code: INVITATION_ERROR.INVALID_EMAIL },
+        { status: 400 }
+      );
     }
 
     // An invite must never grant more than the roles this endpoint offers; in
@@ -79,6 +119,9 @@ export async function POST(req: Request) {
     // (src/lib/email/invitation-mail-policy.ts).
     const mailer = smtpMailer();
     const mailBaseUrl = invitationMailBaseUrl();
+    // Read outside the tenant transaction: an unsubscribe is a NULL-tenant row
+    // that a tenant session cannot see (src/lib/email/opt-out-store.ts).
+    const optedOut = mailer && mailBaseUrl ? await isEmailOptedOut(email, tenantId) : false;
 
     const result = await withTenant<{
       conflict: boolean;
@@ -117,7 +160,7 @@ export async function POST(req: Request) {
           where: { email_tenantId: { email, tenantId } },
           select: { id: true, email: true, tenantId: true, role: true, expires: true },
         });
-        mailSkip = await invitationMailSkipReason(tx, tenantId, existing?.id ?? null);
+        mailSkip = optedOut ? 'opted_out' : await invitationMailSkipReason(tx, tenantId, existing?.id ?? null);
 
         // The mail that just went out names a role; within the cooldown no new
         // mail can say otherwise, so the link keeps it (İNCELEME-32 Ö-1). The
@@ -166,7 +209,7 @@ export async function POST(req: Request) {
 
     if (result.conflict) {
       return NextResponse.json(
-        { error: 'Bu e-posta adresi zaten bu kurumun üyesidir.' },
+        { error: 'Bu e-posta adresi zaten bu kurumun üyesidir.', code: INVITATION_ERROR.ALREADY_MEMBER },
         { status: 400 }
       );
     }
@@ -178,7 +221,7 @@ export async function POST(req: Request) {
           error:
             `Planınızın koltuk sınırına ulaşıldı (${limit} koltuk: ${members} üye, ` +
             `${pendingInvitations} bekleyen davet). Yeni davet için koltuk ekleyin ya da planınızı yükseltin.`,
-          code: 'SEAT_LIMIT_REACHED',
+          code: INVITATION_ERROR.SEAT_LIMIT_REACHED,
           seats: { limit, members, pendingInvitations },
         },
         { status: 403 }
@@ -231,7 +274,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Error creating invitation:', error);
-    return internalError({ error: 'İç Sunucu Hatası' });
+    return internalError({ error: 'İç Sunucu Hatası', code: 'INTERNAL_ERROR' });
   }
 }
 
@@ -292,11 +335,22 @@ async function deliverInvitationEmail(params: {
   if (params.skip) return { sent: false, reason: params.skip };
 
   try {
-    await mailer(renderInvitationEmail(params.message));
+    const secret = emailOptOutSecret();
+    if (!secret) throw new Error(OPT_OUT_SECRET_UNSET);
+    const receipt = await mailer(
+      withOptOut(renderInvitationEmail(params.message), {
+        baseUrl: params.mailBaseUrl,
+        secret,
+        source: 'invitation',
+        tenantId,
+      })
+    );
+    await recordMailAccepted(tenantId, invitationId, receipt?.messageId ?? null);
     return { sent: true };
   } catch (error) {
     // MailSendError's message is the SMTP codes only (see mailer.ts).
     const reason = error instanceof Error ? error.message : 'unknown_error';
+    const failureCode = mailFailureCode(error);
     console.error(`[Invitations] invitation email failed: ${reason}`);
     await recordAlert({
       level: 'warn',
@@ -307,7 +361,15 @@ async function deliverInvitationEmail(params: {
     if (invitationId) {
       try {
         await withTenant(tenantId, (tx) =>
-          tx.auditEvent.create({ data: { tenantId, type: INVITATION_MAIL_FAILED, target: invitationId } })
+          tx.auditEvent.create({
+            data: {
+              tenantId,
+              type: INVITATION_MAIL_FAILED,
+              target: invitationId,
+              // Codes only (mailer.ts): the server's reply text can echo the address.
+              ...(failureCode ? { data: { code: failureCode } } : {}),
+            },
+          })
         );
       } catch {
         // Without the row the cooldown simply runs its 10 minutes. Nothing from
@@ -316,5 +378,22 @@ async function deliverInvitationEmail(params: {
       }
     }
     return { sent: false, reason: 'send_failed' };
+  }
+}
+
+/**
+ * The SMTP acceptance row (NG-42). The mail has already gone out, so a row that
+ * cannot be written must not make the request say otherwise.
+ */
+async function recordMailAccepted(tenantId: string, invitationId: string | null, messageId: string | null): Promise<void> {
+  if (!invitationId) return;
+  try {
+    await withTenant(tenantId, (tx) =>
+      tx.auditEvent.create({
+        data: { tenantId, type: INVITATION_MAIL_ACCEPTED, target: invitationId, data: { messageId } },
+      })
+    );
+  } catch {
+    console.error('[Invitations] could not record the accepted send');
   }
 }

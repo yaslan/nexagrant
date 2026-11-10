@@ -134,7 +134,7 @@ vi.mock('@/lib/env', () => ({
 
 vi.mock('@/lib/rag', () => ({
   retrieveChunks: vi.fn(async () => []),
-  buildRagPrompt: vi.fn(async () => 'RAG context'),
+  buildRagContext: vi.fn(async () => 'RAG context'),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));

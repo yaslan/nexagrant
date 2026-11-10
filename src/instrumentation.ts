@@ -20,4 +20,11 @@ export async function register() {
   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
   await reportAppUrlProblem();
+  // NG-104 Ö-2: a warning only. Opt-out links still work on the session key.
+  const { optOutSecretFallbackWarning } = await import('./lib/email/opt-out-secret');
+  const optOutWarning = optOutSecretFallbackWarning();
+  if (optOutWarning) {
+    const { logger } = await import('./lib/logger');
+    logger.warn(optOutWarning);
+  }
 }

@@ -3,13 +3,14 @@
 import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { isPresentId } from '@/lib/required-id';
-import { generateCompletion, LlmMessage } from '@/lib/llm';
+import { generateCompletion } from '@/lib/llm';
 import { assertModuleAccess } from '@/lib/modules/access';
-import { buildRagPrompt } from '@/lib/rag';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { buildRagContext } from '@/lib/rag';
+import { isInstructionCount, separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { revalidatePath } from 'next/cache';
 import { findAccessibleTemplate, templateSections } from '@/modules/m2/server/templates';
+import { InvalidTemplateSectionError } from '@/modules/m2/invalid-section';
 
 /**
  * `tenantId` was read as `session.tenantId` with no null check. Prisma
@@ -101,26 +102,28 @@ export async function generateSectionDraft(
   await assertModuleAccess('M2');
   const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
 
+  // `Number`: an action is a public POST, so `maxWords` can arrive as any text.
+  // Checked before the RAG lookup and the model; `editorSections` shows a section
+  // whose limit is a fraction or over the ceiling, so its button does reach here.
+  const wordLimit = Number(maxWords);
+  if (!isInstructionCount(wordLimit)) throw new InvalidTemplateSectionError(sectionKey);
+
   // Build RAG-augmented context
   const ragQuery = `${opportunityTitle} — section: ${sectionLabel}`;
   const locale = await promptLocale();
-  const ragPrompt = await buildRagPrompt(ragQuery, tenantId, undefined, { userId }, locale);
+  const retrievedContext = await buildRagContext(ragQuery, tenantId, undefined, { userId });
 
-  const messages: LlmMessage[] = [
-    {
-      role: 'system',
-      content: renderPrompt('m2/section-draft-system', { maxWords }, locale),
-    },
-    {
-      role: 'user',
-      content: renderPrompt('m2/section-draft-user', { sectionLabel, opportunityTitle, ragPrompt, maxWords }, locale),
-    },
-  ];
+  const request = separatedPrompt(
+    'm2/section-draft',
+    { maxWords: wordLimit },
+    { section_label: sectionLabel, opportunity_title: opportunityTitle, retrieved_context: retrievedContext },
+    locale
+  );
 
   const result = await generateCompletion({
     tenantId,
     userId,
-    messages,
+    ...request,
     module: 'M2',
     purpose: 'concept_note_draft',
     proposalId: noteId,

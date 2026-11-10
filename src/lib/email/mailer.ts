@@ -20,13 +20,23 @@ export interface MailMessage {
   /** Overrides SMTP_FROM for this message (the beta scripts' own sender). */
   from?: string;
   attachments?: Array<{ filename: string; content: string | Buffer; contentType?: string }>;
+  /**
+   * https URL for `List-Unsubscribe`, with the RFC 8058 one-click header beside
+   * it. Set by `withOptOut` (./opt-out.ts); nodemailer does the header framing.
+   */
+  listUnsubscribe?: string;
+}
+
+/** What the SMTP server's acceptance gives us; not proof of delivery to a mailbox. */
+export interface MailReceipt {
+  messageId: string;
 }
 
 /**
  * Sends one message or throws. Resolving means the SMTP server accepted it;
  * callers count a send only after this resolves.
  */
-export type Mailer = (message: MailMessage) => Promise<void>;
+export type Mailer = (message: MailMessage) => Promise<MailReceipt | void>;
 
 /**
  * Thrown when the SMTP server refuses the message or cannot be reached.
@@ -122,6 +132,12 @@ export async function sendMail(
       html: message.html,
       ...(message.text ? { text: message.text } : {}),
       ...(message.attachments ? { attachments: message.attachments } : {}),
+      ...(message.listUnsubscribe
+        ? {
+            list: { unsubscribe: message.listUnsubscribe },
+            headers: { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+          }
+        : {}),
     });
   } catch (error) {
     const e = error as { code?: unknown; responseCode?: unknown };
@@ -148,9 +164,7 @@ export function smtpMailer(): Mailer | null {
   if (!config) return null;
   cached ??= { transport: createSmtpTransport(config), config };
   const { transport } = cached;
-  return async (message) => {
-    await sendMail(transport, config, message);
-  };
+  return (message) => sendMail(transport, config, message);
 }
 
 /** SystemAlert source for every "mail cannot go out" alert. */

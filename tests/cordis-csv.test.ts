@@ -153,7 +153,7 @@ vi.mock('@/lib/k2-cordis/partnerProfileJob', () => ({
 }));
 vi.mock('@/lib/cordis-sync', () => ({ syncCordisBigData: vi.fn(), aggregateCordisMetrics: vi.fn() }));
 vi.mock('@/lib/cordis-delta', () => ({ fetchLiveCordisDelta: vi.fn(), getCordisLiveStreamLogs: vi.fn() }));
-vi.mock('@/lib/rag', () => ({ retrieveChunks: vi.fn(), formatRagPrompt: vi.fn() }));
+vi.mock('@/lib/rag', () => ({ retrieveChunks: vi.fn(), formatRagContext: vi.fn() }));
 
 /** A stored (uncompressed) zip — enough for unzipper, no zip dependency needed. */
 function writeZip(files: Record<string, string>): string {

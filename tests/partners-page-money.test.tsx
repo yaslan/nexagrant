@@ -28,7 +28,7 @@ vi.mock('@/lib/db', () => {
 // FO-62: the page reads the tenant's plan to decide the announcement badges.
 vi.mock('@/lib/tenant', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/tenant')>()),
-  requireTenantPage: vi.fn().mockResolvedValue({ tenantId: 'demo-tenant' }),
+  requireTenantPage: vi.fn().mockResolvedValue({ tenantId: 'demo-tenant', role: 'MEMBER' }),
 }));
 vi.mock('@/lib/billing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/billing')>()),

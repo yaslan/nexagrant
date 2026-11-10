@@ -3,11 +3,13 @@
  *
  * Rows already in the table carry three scales: the consortium builder's
  * pre-FO-63 0–10 sum, its 0–100 weighted total, and the seat matcher's raw
- * −10…90 points. Every row keeps the per-dimension breakdown it was scored from,
- * so the score is recomputed from that breakdown through the scorer that wrote
- * it — not rescaled by a factor guessed here:
+ * −10…90 points (six keys; −10…100 and four keys since K-578751). Every row
+ * keeps the per-dimension breakdown it was scored from, so the score is
+ * recomputed from that breakdown through the scorer that wrote it — not
+ * rescaled by a factor guessed here:
  *
  *   matcher breakdown    (geographicBalance, collabHistory, …) → matchSeatScore
+ *   old matcher breakdown (the same + relationshipWarmth, centrality) → legacyMatchSeatScore
  *   consortium breakdown (networkCentrality, countryDiversity, …) → consortiumSeatScore,
  *                        liveDemandSignal 0 when the row predates it
  *
@@ -22,7 +24,12 @@ import type { Prisma } from '@prisma/client';
 import { consortiumSeatScore, type ConsortiumDimensions } from '@/lib/scoring/consortium';
 import type { LiveDemandWeights } from '@/lib/scoring/live-demand';
 import { seatBreakdownWriter } from '@/lib/scoring/seat-dimension-scale';
-import { matchSeatScore, type MatchBreakdown } from '@/modules/m8/server/matching';
+import {
+  legacyMatchSeatScore,
+  matchSeatScore,
+  type LegacyMatchBreakdown,
+  type MatchBreakdown,
+} from '@/modules/m8/server/matching';
 
 export interface StoredSeatCandidate {
   id: string;
@@ -64,6 +71,9 @@ export function rescoreBreakdown(
   const writer = seatBreakdownWriter(breakdown);
   if (writer === 'match') {
     return { score: matchSeatScore(breakdown as MatchBreakdown), breakdown: stored };
+  }
+  if (writer === 'match-legacy') {
+    return { score: legacyMatchSeatScore(breakdown as LegacyMatchBreakdown), breakdown: stored };
   }
   if (writer === 'consortium') {
     const signal = typeof breakdown.liveDemandSignal === 'number' ? breakdown.liveDemandSignal : 0;

@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, test, expect } from 'vitest';
 
 /**
@@ -119,4 +119,56 @@ describe.each(Object.entries(themes))('accent contrast (%s)', (_, tokens) => {
 
 test('text-accent reads the text step, so the fill can stay under white text', () => {
   expect(css).toMatch(/--text-color-accent:\s*var\(--accent-ink\)/);
+});
+
+/**
+ * NG-63 — the accent colours that were still hard-coded after NG-2 (`#003D5C` on the sign-in and
+ * home buttons, `#0369A1` in the survey e-mail, the cyan `#22d3ee` of the cart and pricing pages)
+ * are now the token classes. This guard keeps them from coming back in the source.
+ */
+describe('no hard-coded accent left in src (NG-63)', () => {
+  const retired = /003D5C|0369A1|22d3ee|67e8f9/i;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) return walk(full);
+      return /\.(ts|tsx)$/.test(e.name) ? [full] : [];
+    });
+
+  test('the retired hex values appear in no source file', () => {
+    const hits = walk(resolve(__dirname, '../src')).filter((f) => retired.test(readFileSync(f, 'utf8')));
+    expect(hits.map((f) => f.replace(/.*\/src\//, 'src/'))).toEqual([]);
+  });
+});
+
+/**
+ * NG-63 (review B1/B2) — a `bg-accent/N` tint that carries `text-accent-ink` must keep AA on the dark
+ * card ground. The tint list above stops at /20, so /40–/80 went unchecked and shipped at 2.98–3.94:1.
+ * Every alpha is collected from src, so a new tint on a text-accent-ink line is measured too.
+ */
+describe('accent tint carrying text-accent-ink stays AA on the dark card (NG-63)', () => {
+  const darkCard = '#0e182e';
+  const dark = themes.dark;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) return walk(full);
+      return /\.(ts|tsx)$/.test(e.name) ? [full] : [];
+    });
+  const alphas = new Set<number>();
+  for (const file of walk(resolve(__dirname, '../src'))) {
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (!line.includes('text-accent-ink')) continue;
+      for (const m of line.matchAll(/\bbg-accent\/(\d{1,3})\b/g)) alphas.add(Number(m[1]));
+    }
+  }
+
+  test('the scan finds at least the known call sites', () => {
+    expect(alphas.size).toBeGreaterThan(0);
+  });
+
+  test.each([...alphas])('bg-accent/%i with text-accent-ink is at least 4.5:1 on --card', (pct) => {
+    const bg = tint(dark.accent as string, darkCard, pct / 100);
+    expect(contrast(dark['accent-ink'] as string, bg)).toBeGreaterThanOrEqual(4.5);
+  });
 });
