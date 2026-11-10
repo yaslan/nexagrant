@@ -7,6 +7,7 @@ import Link from 'next/link';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { checkModuleAccess } from '@/lib/modules/access';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 import { findOpportunityTopic } from '@/modules/m8/server/matching';
@@ -109,8 +110,10 @@ export default async function ConsortiumPage({
       }
 
       // Informational only, never part of a score (K-579560=A): which candidates
-      // have an open partner-search request on this topic.
-      if (opportunity.topicId && candidates.length > 0) {
+      // have an open partner-search request on this topic. The badge is part of the
+      // M8 screen (NG-100 Bulgu A): with M8 closed the query does not run at all.
+      const m8 = await checkModuleAccess('M8');
+      if (m8.allowed && opportunity.topicId && candidates.length > 0) {
         const topicId = opportunity.topicId;
         // NG-100 B-4: the form stores the topic identifier, so resolve it as the matcher does.
         const topic = await withTenant(tenantId, (tx) => findOpportunityTopic(tx, topicId));
