@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { fakeEmbedding } from './helpers/fake-embedding';
 import { skipOrFailInCi } from './helpers/live-db-role';
+import { presentIds } from './helpers/teardown-guard';
 
 /**
  * FO-363 (K-575447) — the five keep.eu projects that name a real person must never
@@ -62,11 +63,11 @@ describe.skipIf(!LIVE)(SUITE, () => {
 
   afterAll(async () => {
     const keys = RAG_EXCLUDED_PROJECT_IDS.map(keyOf);
-    await prisma.cordisParticipation.deleteMany({ where: { projectId: { in: keys } } });
-    await prisma.cordisProjectTopic.deleteMany({ where: { projectId: { in: keys } } });
-    await prisma.cordisProject.deleteMany({ where: { id: { in: keys } } });
+    await prisma.cordisParticipation.deleteMany({ where: { projectId: { in: presentIds(keys) } } });
+    await prisma.cordisProjectTopic.deleteMany({ where: { projectId: { in: presentIds(keys) } } });
+    await prisma.cordisProject.deleteMany({ where: { id: { in: presentIds(keys) } } });
     await prisma.cordisOrganization.deleteMany({
-      where: { organisationId: { in: RAG_EXCLUDED_PROJECT_IDS.map(orgOf) } },
+      where: { organisationId: { in: presentIds(RAG_EXCLUDED_PROJECT_IDS.map(orgOf)) } },
     });
     // Documents the re-index wrote during this run (Chunk rows cascade).
     await prisma.document.deleteMany({
