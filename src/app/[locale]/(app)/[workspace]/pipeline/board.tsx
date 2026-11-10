@@ -57,6 +57,17 @@ const GATES: { key: Gate; color: string }[] = [
 export type NoteInput = { text: string; authorId: string };
 
 /**
+ * Colour of the card's G0 score badge, decided by the latest G0 gate decision (NG-69).
+ *
+ * Green only when that decision passed. A refused opportunity keeps its number on the card, but
+ * a green badge next to "GEÇME" on the detail page told the user the opposite of the gate. No
+ * decision on file is not a pass either, so it gets the neutral tone.
+ */
+export function g0BadgeTone(g0Passed: boolean | null | undefined): 'ok' | 'amber' {
+  return g0Passed === true ? 'ok' : 'amber';
+}
+
+/**
  * Clear a card's note text after the note has been posted, without dropping who
  * was writing it.
  *
@@ -433,6 +444,7 @@ export default function KanbanBoard({
           <select
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
+            aria-label={t('board.ownerFilterLabel')}
             className="w-40 truncate text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t('board.allUsers')}</option>
@@ -447,6 +459,7 @@ export default function KanbanBoard({
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+            aria-label={t('board.roleFilterLabel')}
             className="text-xs bg-ground border border-border rounded-xl px-3 py-2.5 font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">{t('board.allRoles')}</option>
@@ -568,12 +581,19 @@ export default function KanbanBoard({
                           {opp.g0Score !== null && opp.g0Score !== undefined && (
                             <span
                               data-testid={`pipeline-card-g0-${opp.id}`}
+                              data-g0-tone={g0BadgeTone(opp.g0Passed)}
                               className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
-                                opp.g0Score >= 80
+                                g0BadgeTone(opp.g0Passed) === 'ok'
                                   ? 'bg-ok/15 text-ok border border-ok/30'
                                   : 'bg-amber/15 text-amber border border-amber/30'
                               }`}
-                              title={t('board.g0ScoreTitle')}
+                              title={
+                                opp.g0Passed === false
+                                  ? t('board.g0RefusedTitle')
+                                  : opp.g0Passed === true
+                                    ? t('board.g0ScoreTitle')
+                                    : t('board.g0NoDecisionTitle')
+                              }
                             >
                               ⭐ {opp.g0Score}
                             </span>

@@ -129,10 +129,11 @@ export default function MembersSettingsClient() {
             />
           </div>
           <div className="w-full md:w-56">
-            <label className="block text-xs font-semibold text-muted mb-1">
+            <label htmlFor="member-invite-role" className="block text-xs font-semibold text-muted mb-1">
               {t('roleLabel')}
             </label>
             <select
+              id="member-invite-role"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="w-full bg-ground border border-border rounded-xl px-3 py-2 text-xs font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"

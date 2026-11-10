@@ -15,7 +15,6 @@
 /** Canonical (English) workspace page paths, relative to `/[locale]/[workspace]/`. */
 export const WORKSPACE_ROUTE_CATALOG = [
   'approvals',
-  'ayarlar',
   'bildirimler',
   'calls',
   'calls/[id]',
@@ -48,6 +47,7 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'relationships',
   'relationships/[id]',
   'reports/person-days',
+  'settings',
   'settings/api-keys',
   'settings/billing',
   'settings/calendar',
@@ -63,6 +63,7 @@ export type WorkspaceRoutePath = (typeof WORKSPACE_ROUTE_CATALOG)[number];
 
 /** Turkish page path → the canonical page it re-exports. */
 export const WORKSPACE_ROUTE_ALIASES: Record<string, WorkspaceRoutePath> = {
+  ayarlar: 'settings',
   'ayarlar/faturalama': 'settings/billing',
   'ayarlar/gizlilik': 'settings/privacy',
   'ayarlar/kapilar': 'settings/gates',

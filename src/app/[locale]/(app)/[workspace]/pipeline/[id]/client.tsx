@@ -16,6 +16,7 @@ import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { useGateReasonText } from '@/lib/hooks/use-gate-reason-text';
 import type { GateReason } from '@/lib/gates/reasons';
 import { nextStageOf } from '@/lib/gates/transition';
+import { g0BoxMode, g0ReasonsVisible, type SavedG0Decision } from '@/lib/gates/latest-g0-decision';
 import { errorMessage } from '@/lib/errors';
 import { EffortTracker, type EffortEntry } from './effort';
 
@@ -37,6 +38,14 @@ export interface G0Display {
   reasons: GateReason[];
   /** `DEFAULT_GATE_RULES.G0.minScore`, so the screen names the threshold it is judged against. */
   minScore: number;
+  /**
+   * `no_history_evidence`: a partner with no CORDIS history was scored without the history
+   * criteria. The score is then the average over the criteria that were measured, and
+   * `denominator` is the weight those criteria add up to (not 100).
+   */
+  scoringBasis: 'standard' | 'no_history_evidence';
+  /** Sum of the weights the score was normalised by; `null` when nothing was scored. */
+  denominator: number | null;
 }
 
 export interface OpportunityView {
@@ -60,9 +69,12 @@ export function OpportunityDetailClient({
   backHref,
   locale,
   workspace,
+  savedG0,
 }: {
   opportunity: OpportunityView;
   g0: G0Display;
+  /** Latest saved G0 decision; the G0 box shows it once the opportunity has left G0 (NG-69). */
+  savedG0: SavedG0Decision | null;
   /** Rows from the `Effort` table for this opportunity — empty is a real answer, not an error. */
   efforts: EffortEntry[];
   /** Whether this session may archive. The server action re-checks; this only hides the control. */
@@ -180,6 +192,10 @@ export function OpportunityDetailClient({
   const isDecided = opportunity.status === 'FUNDED' || opportunity.status === 'REJECTED';
 
   const scoreKnown = g0.score !== null;
+  // The first reason the scorer gave for refusing: shown on the score card, the full list is below.
+  const refusalReason = g0.decision === 'NO_GO' ? g0.reasons[0] : undefined;
+  // Past G0 the box shows the saved decision and its date, never the live computation (NG-69).
+  const boxMode = g0BoxMode(opportunity.stage, savedG0);
 
   return (
     <div className="max-w-5xl mx-auto py-4 sm:px-4 md:p-8">
@@ -401,9 +417,48 @@ export function OpportunityDetailClient({
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
                     {t('detail.g0Score')}
                   </h3>
-                  {scoreKnown ? (
+                  {boxMode.kind === 'saved' ? (
                     <>
-                      <p className="text-2xl font-bold text-ink">{g0.score}/100</p>
+                      <p
+                        className={`text-2xl font-bold ${boxMode.passed ? 'text-ok' : 'text-rose-800'}`}
+                        data-testid="pipeline-g0-saved"
+                      >
+                        {boxMode.passed ? t('detail.savedG0Passed') : t('detail.savedG0Refused')}
+                      </p>
+                      <p className="text-xs text-muted mt-1" data-testid="pipeline-g0-saved-date">
+                        {t('detail.savedG0Date', {
+                          date: boxMode.decidedAt.toLocaleDateString(locale, {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          }),
+                        })}
+                      </p>
+                    </>
+                  ) : boxMode.kind === 'none' ? (
+                    <>
+                      <p className="text-lg font-bold text-amber" data-testid="pipeline-g0-saved-none">
+                        {t('detail.savedG0None')}
+                      </p>
+                    </>
+                  ) : scoreKnown ? (
+                    <>
+                      {g0.scoringBasis === 'no_history_evidence' ? (
+                        // Not "/100": the score is an average over the criteria that were measured,
+                        // so the scale is not a fixed 100 here (NG-69).
+                        <>
+                          <p className="text-2xl font-bold text-ink" data-testid="pipeline-g0-value">
+                            {g0.score}
+                          </p>
+                          <p className="text-xs text-muted mt-1" data-testid="pipeline-g0-basis">
+                            {t('detail.noHistoryBasis', { denominator: g0.denominator ?? 0 })}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-2xl font-bold text-ink" data-testid="pipeline-g0-value">
+                          {g0.score}/100
+                        </p>
+                      )}
                       <p className="text-xs text-muted mt-1">
                         {t('detail.threshold', { min: g0.minScore })} ·{' '}
                         {t('detail.evidenceCoverage', {
@@ -416,6 +471,11 @@ export function OpportunityDetailClient({
                           {g0.decision === 'GO' ? t('detail.decisionGo') : t('detail.decisionNoGo')}
                         </p>
                       )}
+                      {refusalReason && (
+                        <p className="text-xs text-rose-800 mt-1" data-testid="pipeline-g0-refusal">
+                          {t('detail.refusedBecause', { reason: reasonText(refusalReason) })}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <>
@@ -425,7 +485,9 @@ export function OpportunityDetailClient({
                       <p className="text-xs text-muted mt-1">{t('detail.g0NotComputedHint')}</p>
                     </>
                   )}
-                  <p className="text-[11px] text-muted mt-2 italic">{t('detail.internalPreAssessment')}</p>
+                  {boxMode.kind === 'live' && (
+                    <p className="text-[11px] text-muted mt-2 italic">{t('detail.internalPreAssessment')}</p>
+                  )}
                 </div>
                 <div className="bg-ground border border-border p-4 rounded-xl">
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
@@ -498,7 +560,7 @@ export function OpportunityDetailClient({
                 )}
               </section>
 
-              {g0.reasons.length > 0 && (
+              {g0ReasonsVisible(boxMode) && g0.reasons.length > 0 && (
                 <div className="bg-ground border border-border p-4 rounded-xl">
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
                     {t('detail.scoreReasons')}

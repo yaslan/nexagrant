@@ -35,6 +35,19 @@ async function acceptCookies(page: Page) {
   });
 }
 
+/**
+ * Waits until React has hydrated `main`. Until then the page is server HTML only; a node injected
+ * into that HTML makes hydration fail, and React rebuilds the tree from scratch, removing the node.
+ * `main` is visible before hydration, so visibility alone does not prove the injection will survive.
+ */
+async function waitForHydration(page: Page) {
+  await page.waitForFunction(
+    () => Object.keys(document.querySelector('main') ?? {}).some((k) => k.startsWith('__reactFiber')),
+    null,
+    { timeout: 60_000 },
+  );
+}
+
 async function scan(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   return results.violations.map((v) => ({
@@ -87,9 +100,10 @@ test.describe('WCAG A/AA — signed in, main layout', () => {
 /**
  * NG-90 — genişletme. Yalnız KEŞİFTE (ham axe) ihlalsiz ve 200 dönen adresler buraya girer.
  * Eklenmeyenler (ihlalli, ayrı borç kartında raporlanır): /tr/fiyatlandirma, /en/pricing (color-contrast),
- * /tr/kayit, /en/register (color-contrast), /tr/main/ayarlar (color-contrast), /tr/main/ayarlar/uyeler
- * ve /en/main/settings/members (select-name), /tr/main/firsatlar ve /en/main/pipeline (color-contrast +
- * select-name). Hiçbir axe kuralı kapatılmadı, hiçbir bölüm exclude edilmedi.
+ * /tr/kayit, /en/register (color-contrast), /tr/main/ayarlar (color-contrast), /tr/main/firsatlar ve
+ * /en/main/pipeline (color-contrast; select-name NG-102 ile kapandı, kontrast kartı kapanınca eklenecek).
+ * /tr/main/ayarlar/uyeler ve /en/main/settings/members NG-102 ile (select-name düzeltildi) eklendi.
+ * Hiçbir axe kuralı kapatılmadı, hiçbir bölüm exclude edilmedi.
  */
 test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
   for (const url of ['/tr/blog', '/en/blog', '/tr/gizlilik-politikasi', '/en/privacy', '/tr/kullanim-kosullari', '/en/terms']) {
@@ -131,7 +145,7 @@ test.describe('WCAG A/AA — NG-90 signed in, settings (tr + en)', () => {
     await cleanupIdentity([SETTINGS_OWNER.userId]);
   });
 
-  for (const url of ['/tr/main/ayarlar/profil', '/tr/main/ayarlar/gizlilik', '/en/main/settings/profile', '/en/main/settings/privacy']) {
+  for (const url of ['/tr/main/ayarlar/profil', '/tr/main/ayarlar/gizlilik', '/en/main/settings/profile', '/en/main/settings/privacy', '/tr/main/ayarlar/uyeler', '/en/main/settings/members']) {
     test(`${url} has no A/AA violations`, async ({ page }) => {
       await acceptCookies(page);
       await signInAs(page, { id: SETTINGS_OWNER.userId, email: SETTINGS_OWNER.email, tenantId: SETTINGS_OWNER.tenantId, role: SETTINGS_OWNER.role });
@@ -148,6 +162,7 @@ test('the scanner is live: a nameless button is reported', async ({ page }) => {
   await acceptCookies(page);
   await page.goto('/tr/giris');
   await expect(page.locator('main')).toBeVisible();
+  await waitForHydration(page);
   await page.evaluate(() => {
     const b = document.createElement('button');
     b.id = 'a11y-selftest';
@@ -161,6 +176,7 @@ test('label-content-name-mismatch (WCAG 2.5.3) is live: a link whose name drops 
   await acceptCookies(page);
   await page.goto('/tr/giris');
   await expect(page.locator('main')).toBeVisible();
+  await waitForHydration(page);
   await page.evaluate(() => {
     const a = document.createElement('a');
     a.id = 'a11y-selftest-label';
