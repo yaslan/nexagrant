@@ -80,6 +80,19 @@ const RETIRED_BREAKDOWN = {
   warmthBonus: 0,
   liveDemandSignal: 0,
 };
+// The pre-K-578751 matcher's 6-key shape: also a row no reader may use (K-580035=A).
+const LEGACY_MATCH_BREAKDOWN = {
+  topicExperience: 20,
+  geographicBalance: 10,
+  collabHistory: 10,
+  relationshipWarmth: 5,
+  centrality: 5,
+  rivalRisk: 0,
+};
+const OLD_ROWS = [
+  ['retired consortium', RETIRED_BREAKDOWN],
+  ['pre-K-578751 matcher', LEGACY_MATCH_BREAKDOWN],
+] as const;
 async function candidate(
   seatId: string,
   organizationId: string,
@@ -186,11 +199,11 @@ describe('G1 on a real database', () => {
     expect((await evaluateGate(opp, 'G1', tenantId)).passed).toBe(false);
   });
 
-  test('a retired consortium row is not a backup (NG-100 B-1): refused as no backup', async () => {
-    const opp = await opportunity('retired backup');
+  test.each(OLD_ROWS)('the only backup is a %s row (K-580035=A): refused as no backup', async (label, breakdown) => {
+    const opp = await opportunity(`old backup ${label}`);
     const s = await seat(opp);
     await candidate(s, SEATED, 1);
-    await candidate(s, BACKUP, 2, tenantId, RETIRED_BREAKDOWN);
+    await candidate(s, BACKUP, 2, tenantId, { ...breakdown });
     await fillThroughM8(opp, s);
 
     const result = await evaluateGate(opp, 'G1', tenantId);
@@ -201,10 +214,10 @@ describe('G1 on a real database', () => {
     ]);
   });
 
-  test('a retired consortium row cannot be invited (NG-100 B-1)', async () => {
-    const opp = await opportunity('retired invite');
+  test.each(OLD_ROWS)('a %s row cannot be invited (K-580035=A)', async (label, breakdown) => {
+    const opp = await opportunity(`old invite ${label}`);
     const s = await seat(opp);
-    await candidate(s, BACKUP, 1, tenantId, RETIRED_BREAKDOWN);
+    await candidate(s, BACKUP, 1, tenantId, { ...breakdown });
 
     await expect(m8.inviteCandidateToSeat(s, BACKUP, opp)).rejects.toThrow(/cannot be offered/);
     expect(await admin!.consortiumSeat.findUnique({ where: { id: s }, select: { status: true, organizationId: true } })).toMatchObject({

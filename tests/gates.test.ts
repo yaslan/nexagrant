@@ -126,6 +126,8 @@ const G0_DECISIONS: G0DecisionRow[] = [
     'opp-g1-no-backup',
     'opp-g1-only-occupant',
     'opp-g1-foreign-backup',
+    'opp-g1-legacy-backup',
+    'opp-g1-consortium-backup',
     'opp-g1-optional-open',
     'opp-g1-two-faults',
   ].map((id) => g0Row(id, true)),
@@ -183,6 +185,9 @@ Object.assign(OPPORTUNITIES, {
   'opp-g1-no-backup': g1Opportunity('opp-g1-no-backup', [seatRow('s-no-backup')]),
   'opp-g1-only-occupant': g1Opportunity('opp-g1-only-occupant', [seatRow('s-only-occupant')]),
   'opp-g1-foreign-backup': g1Opportunity('opp-g1-foreign-backup', [seatRow('s-foreign-backup')]),
+  // K-580035=A: the only backup of a critical seat is a row an old scorer wrote.
+  'opp-g1-legacy-backup': g1Opportunity('opp-g1-legacy-backup', [seatRow('s-legacy-backup')]),
+  'opp-g1-consortium-backup': g1Opportunity('opp-g1-consortium-backup', [seatRow('s-consortium-backup')]),
   'opp-g1-optional-open': g1Opportunity('opp-g1-optional-open', [
     seatRow('s-research'),
     seatRow('s-optional-open', { required: false, status: 'OPEN', organizationId: null }),
@@ -196,6 +201,9 @@ Object.assign(OPPORTUNITIES, {
 // NG-100 / K-579560=A: a backup counts only when the current M8 matcher wrote the row
 // (visibleSeatCandidates reads `breakdown`), so every fixture row carries a match breakdown.
 const MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 15, collabHistory: 10, rivalRisk: 0 };
+// The pre-K-578751 matcher (6 keys) and the retired consortium scorer: rows no reader may use (K-580035=A).
+const LEGACY_MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 10, collabHistory: 10, relationshipWarmth: 5, centrality: 5, rivalRisk: 0 };
+const CONSORTIUM_BREAKDOWN = { topicExperience: 3, networkCentrality: 2, countryDiversity: 1.5, smeBonus: 1, warmthBonus: 0, liveDemandSignal: 0 };
 const SEAT_CANDIDATES = [
   { tenantId: 'tenant-1', seatId: 's-coord', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
   { tenantId: 'tenant-1', seatId: 's-research', organizationId: `${SEATED}-s-research`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
@@ -206,6 +214,10 @@ const SEAT_CANDIDATES = [
   { tenantId: 'tenant-1', seatId: 's-nobody', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
   { tenantId: 'tenant-1', seatId: 's-only-occupant', organizationId: `${SEATED}-s-only-occupant`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
   { tenantId: 'tenant-2', seatId: 's-foreign-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-legacy-backup', organizationId: `${SEATED}-s-legacy-backup`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-legacy-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: LEGACY_MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-consortium-backup', organizationId: `${SEATED}-s-consortium-backup`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-consortium-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: CONSORTIUM_BREAKDOWN },
 ];
 
 const TENANTS: Record<string, { country: string | null; pic: string | null; settings: unknown }> = {
@@ -627,6 +639,9 @@ describe('G1 gate: critical roles and their backups', () => {
     ['opp-g1-no-backup', /research.*no backup candidate/i],
     ['opp-g1-only-occupant', /research.*no backup candidate/i],
     ['opp-g1-foreign-backup', /research.*no backup candidate/i],
+    // K-580035=A: a backup the old matcher or the retired consortium scorer wrote is not a backup.
+    ['opp-g1-legacy-backup', /research.*no backup candidate/i],
+    ['opp-g1-consortium-backup', /research.*no backup candidate/i],
   ])('%s is refused, files the refusal and does not move the stage', async (id, reason) => {
     const result = await evaluateGate(id, 'G1', 'tenant-1');
 

@@ -156,13 +156,6 @@ interface SeatRow {
 }
 
 /**
- * Runs one matching pass on an already tenant-scoped client.
- *
- * Exported separately from {@link generateSeatCandidates} so a test can drive it
- * with a real transaction (or a hand-built double) without having to replace the
- * `@/lib/db` module — replacing that module is exactly what hid this bug.
- */
-/**
  * The topic an opportunity points at, by either key the pipeline has written: the Topic
  * cuid (older rows) or the topic IDENTIFIER (the form). NG-100 B-4: this is the one lookup
  * for the matcher and for the consortium page's live-demand badge, so they resolve a topic
@@ -179,6 +172,13 @@ export async function findOpportunityTopic(
   });
 }
 
+/**
+ * Runs one matching pass on an already tenant-scoped client.
+ *
+ * Exported separately from {@link generateSeatCandidates} so a test can drive it
+ * with a real transaction (or a hand-built double) without having to replace the
+ * `@/lib/db` module — replacing that module is exactly what hid this bug.
+ */
 export async function runSeatMatch(
   tx: TenantTx,
   params: { opportunityId: string; seatId: string; tenantId: string; limit: number }

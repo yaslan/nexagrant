@@ -16,7 +16,10 @@ import { requireId } from './helpers/teardown-guard';
  * NG-100 / K-579560=A: the button now runs the M8 matcher (`generateSeatCandidates`,
  * src/modules/m8/server/matching.ts), which clears the seat's rows and writes new
  * ones the same way; the retired consortium scorer is no longer called. The
- * pilot rule and these assertions are unchanged.
+ * pilot rule is unchanged. NG-100 inceleme-4 bulgu 3: the fixture carries a topic and a
+ * small CORDIS pool under it, so the running-pilot case drives the matcher's real
+ * clear-and-rewrite on the database (the matcher leaves a seat alone when its pool is
+ * empty, so an empty pool would prove nothing about the write).
  *
  * Here nothing about the pilot is mocked: `requireTenantAction` and
  * `assertTenantWritable` are the real ones and read the test tenant's real
@@ -33,6 +36,14 @@ const SUITE = 'consortium-find-candidates-pilot.live';
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 const ADMIN_URL = envValue('DATABASE_URL');
 const RUN = `cfp-${Date.now().toString(36)}`;
+// The CORDIS pool the matcher reads (global tables, not tenant-scoped): every key carries RUN.
+// topicPrefix() keeps the first three dash-separated parts, so the project topic code
+// below sits under the same prefix as the opportunity's topic.
+const PROGRAMME = `${RUN}-prog`;
+const CALL = `${RUN}-CALL`;
+const TOPIC = `${RUN}-PILOT-01`;
+const PROJECT = `${RUN}-proj`;
+const POOL_ORGS = [`${RUN}-pool-1`, `${RUN}-pool-2`];
 
 const state = vi.hoisted(() => ({
   rls: undefined as PrismaClient | undefined,
@@ -53,6 +64,7 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {}
 const { createDbClient } = await import('@/lib/db');
 const { PilotExpiredError } = await import('@/lib/billing/pilot');
 const { PILOT_EXPIRED_DIGEST } = await import('@/lib/pilot-expired');
+const { seatBreakdownWriter } = await import('@/lib/scoring/seat-dimension-scale');
 const { findCandidates } = await import('@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions');
 
 let admin: PrismaClient | undefined;
@@ -105,7 +117,21 @@ beforeAll(async () => {
   userId = (await admin.user.create({ data: { email: `${RUN}@example.invalid`, name: 'Owner' } })).id;
   state.session = { user: { id: userId }, tenantId, role: 'TENANT_OWNER' };
   const ws = await admin.workspace.create({ data: { tenantId, name: RUN, slug: RUN } });
-  const opp = await admin.opportunity.create({ data: { tenantId, workspaceId: ws.id, title: `${RUN} opp` } });
+  await admin.programme.create({ data: { id: PROGRAMME, name: `${RUN} programme`, sourceKey: 'test' } });
+  const call = await admin.call.create({ data: { programmeId: PROGRAMME, callIdentifier: CALL, title: `${RUN} call` } });
+  await admin.topic.create({ data: { callId: call.id, identifier: TOPIC, title: `${RUN} topic`, deadlines: [] } });
+  await admin.cordisProject.create({ data: { id: PROJECT, title: `${RUN} project`, framework: 'HORIZON' } });
+  await admin.cordisProjectTopic.create({ data: { projectId: PROJECT, topicCode: TOPIC } });
+  for (const [i, organisationId] of POOL_ORGS.entries()) {
+    await admin.cordisOrganization.create({ data: { organisationId, name: `${RUN} pool ${i + 1}`, country: i ? 'FR' : 'DE' } });
+    await admin.cordisParticipation.create({
+      data: { projectId: PROJECT, organisationId, role: i ? 'participant' : 'coordinator' },
+    });
+  }
+  // The pipeline form stores the topic IDENTIFIER on the opportunity (NG-100 B-4).
+  const opp = await admin.opportunity.create({
+    data: { tenantId, workspaceId: ws.id, title: `${RUN} opp`, topicId: TOPIC },
+  });
   // The pilot row as `grantPilot` writes it; `trialEndsAt` is moved per test.
   await admin.subscription.create({
     data: {
@@ -139,6 +165,14 @@ afterAll(async () => {
     await admin.tenant.delete({ where: { id: t } }).catch(() => {});
     await admin.user.deleteMany({ where: { email: `${RUN}@example.invalid` } }).catch(() => {});
   }
+  if (admin) {
+    // Project cascades its topic codes and participations; then the organisations and the call chain.
+    await admin.cordisProject.deleteMany({ where: { id: PROJECT } }).catch(() => {});
+    await admin.cordisOrganization.deleteMany({ where: { organisationId: { in: POOL_ORGS } } }).catch(() => {});
+    await admin.topic.deleteMany({ where: { identifier: TOPIC } }).catch(() => {});
+    await admin.call.deleteMany({ where: { callIdentifier: CALL } }).catch(() => {});
+    await admin.programme.deleteMany({ where: { id: PROGRAMME } }).catch(() => {});
+  }
   await Promise.all([state.rls, admin].map((c) => c?.$disconnect().catch(() => {})));
 });
 
@@ -158,16 +192,26 @@ describe('consortium findCandidates on a pilot tenant', () => {
     expect(await candidates()).toBe(before);
   });
 
-  test('running pilot: the call is not refused and, with no CORDIS pool, the matcher leaves the rows alone', async () => {
-    // NG-100 B-3 (K-579560=A): the button runs the M8 matcher, which clears and rewrites a
-    // seat only when it finds candidates. This fixture has no topic or CORDIS pool, so the
-    // result is empty and nothing is deleted. The rewrite path is the matcher's own; this
-    // test proves the call reaches the database on a running pilot (no PilotExpiredError).
+  test('running pilot: the same call clears the seat and the matcher rewrites it from the CORDIS pool', async () => {
+    // NG-100 B-3 / inceleme-4 bulgu 3: with a pool under the topic, the M8 matcher deletes the
+    // seat's two fixture rows and writes its own. So the unchanged snapshot in the expired case
+    // above is the pilot gate, not a path that never reached the database.
     await setTrialEnd(10 * 24 * 3600_000);
-    const before = await candidates();
+    const before = JSON.parse(await candidates()) as { organizationId: string }[];
+    expect(before.map((r) => r.organizationId).sort()).toEqual([`${RUN}-org-1`, `${RUN}-org-2`]);
 
-    await expect(findCandidates(seatId)).resolves.toBeInstanceOf(Array);
+    const returned = await findCandidates(seatId);
 
-    expect(await candidates()).toBe(before);
+    const after = await admin!.seatCandidate.findMany({
+      where: { tenantId: requireId(tenantId, 'tenantId'), seatId },
+      orderBy: { rank: 'asc' },
+    });
+    // The old rows are gone, the pool's organisations are written, ranked 1..n.
+    expect(after.map((r) => r.organizationId).sort()).toEqual([...POOL_ORGS].sort());
+    expect(after.map((r) => r.rank)).toEqual([1, 2]);
+    // Written by the current matcher, so every reader shows and uses them (K-580035=A).
+    expect(after.every((r) => seatBreakdownWriter(r.breakdown) === 'match')).toBe(true);
+    // The action returns what it wrote.
+    expect(returned.map((r) => r.id).sort()).toEqual(after.map((r) => r.id).sort());
   });
 });
