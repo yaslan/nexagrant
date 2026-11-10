@@ -34,11 +34,12 @@ import {
   type G0SeatSnapshot,
   type G0Snapshot,
   type G0Source,
+  type G0TenantSnapshot,
   type G0TopicSnapshot,
 } from './g0-features';
 
 /** Bumped whenever the feature mapping changes, so a stored breakdown says which rules produced it. */
-export const G0_SCORING_VERSION = '2.2';
+export const G0_SCORING_VERSION = '2.3';
 
 export interface G0Computation {
   tenantId: string;
@@ -118,6 +119,11 @@ export function resolveWeights(settings: unknown): typeof DEFAULT_SCORING_WEIGHT
     if (Number.isFinite(n) && n >= 0) out[key] = n;
   }
   return out;
+}
+
+/** FO-396. A stored value outside the three known answers reads as never checked (no grant). */
+function toRegistryStatus(value: string | null): G0TenantSnapshot['picRegistryStatus'] {
+  return value === 'FOUND' || value === 'NOT_FOUND' || value === 'UNKNOWN' ? value : null;
 }
 
 /** Success rate for the topic, preferring a row measured for the tenant's own country. */
@@ -210,11 +216,15 @@ export async function loadG0Snapshot(
   tenantId: string,
   subject: G0Subject,
 ): Promise<G0Snapshot> {
-  const tenant: { country: string | null; pic: string | null; settings: unknown } | null =
-    await client.tenant.findUnique({
-      where: { id: tenantId },
-      select: { country: true, pic: true, settings: true },
-    });
+  const tenant: {
+    country: string | null;
+    pic: string | null;
+    picRegistryStatus: string | null;
+    settings: unknown;
+  } | null = await client.tenant.findUnique({
+    where: { id: tenantId },
+    select: { country: true, pic: true, picRegistryStatus: true, settings: true },
+  });
 
   const profile: { keywords: unknown } | null = await client.tenantProfile.findUnique({
     where: { tenantId },
@@ -284,7 +294,11 @@ export async function loadG0Snapshot(
   const cordis = await loadCordisSnapshot(client, tenant?.pic ?? null, topic?.identifier ?? null);
 
   return {
-    tenant: { country: tenant?.country ?? null, pic: tenant?.pic ?? null },
+    tenant: {
+      country: tenant?.country ?? null,
+      pic: tenant?.pic ?? null,
+      picRegistryStatus: toRegistryStatus(tenant?.picRegistryStatus ?? null),
+    },
     profile: profile ? { keywords: toStringArray(profile.keywords) } : null,
     topic,
     topicFitScore,

@@ -319,6 +319,8 @@
       "searchPlaceholder": "Search opportunities, notes or people...",
       "allUsers": "👥 All users",
       "allRoles": "All roles",
+      "ownerFilterLabel": "Filter by owner",
+      "roleFilterLabel": "Filter by role",
       "roleCoordinator": "👑 Coordinator",
       "rolePartner": "🤝 Partner",
       "addOpportunity": "Add new opportunity",
@@ -1936,7 +1938,9 @@
     "no_calls": "No open calls for {region} at the moment.",
     "no_calls_hint": "Check other countries or create a saved search from the dashboard.",
     "meta_title": "{region} Calls",
-    "meta_description": "EU funding calls open to {region}"
+    "meta_description": "EU funding calls open to {region}",
+    "meta_not_found_title": "Page Not Found — {product}",
+    "meta_open_description": "Open Horizon calls in {region}. Deadlines, budgets, and eligibility information."
   },
   "applicationPartA": {
     "portalLinkFailed": "The link could not be created. Refresh the page and try again.",
@@ -2774,7 +2778,11 @@
   "callsIndex": {
     "title": "Fund Calls",
     "subtitle": "Browse available fund calls by country",
-    "deadline": "Deadline"
+    "deadline": "Deadline",
+    "budget": "Budget",
+    "view_details": "View Details",
+    "tba": "TBA",
+    "country_tr": "🇹🇷 Turkey"
   },
   "DemoSignIn": {
     "roleSme": "SME R&D coordinator",
@@ -3980,7 +3988,14 @@
   },
   "turkiyeye_acik_cagrilar": {
     "meta_title": "Horizon Calls Open to Turkey",
-    "meta_description": "Open Horizon Europe funding calls for Turkish organizations. Deadlines, budgets, and application links."
+    "meta_description": "Open Horizon Europe funding calls for Turkish organizations. Deadlines, budgets, and application links.",
+    "badge": "Horizon Europe Associated Countries",
+    "heading": "EU Funding Calls Open to Turkish Organizations",
+    "intro": "Under the Horizon Europe association agreement, Turkish entities are eligible to coordinate or partner in EU consortia and receive direct grant funding.",
+    "lump_sum": "Lump Sum",
+    "default_program": "Horizon Europe",
+    "default_type": "RIA / IA",
+    "start_proposal": "Start Proposal →"
   },
   "Profile": {
     "title": "Organization Profile & R&D Capabilities",
@@ -5288,5 +5303,19 @@
     "personDays": "Person-Days",
     "emptyTitle": "No effort has been logged yet.",
     "emptyHint": "Hours logged on an opportunity’s effort tab appear here."
+  },
+  "i18nCheck": {
+    "title": "i18n Audit & Parity Check",
+    "subtitle": "Automatic verification of localization key parity between TR and EN.",
+    "total_unique_keys": "Total Unique Keys",
+    "tr_coverage": "TR Coverage",
+    "en_coverage": "EN Coverage",
+    "keys_count": "{n} keys",
+    "parity_ok_title": "100% Localization Parity Achieved",
+    "parity_ok_desc": "All keys exist in both messages/tr.json and messages/en.json.",
+    "parity_bad_title": "Parity Discrepancies Found",
+    "parity_bad_desc": "Some keys are missing in one of the languages.",
+    "missing_en": "Missing in English (EN):",
+    "missing_tr": "Missing in Turkish (TR):"
   }
 }

@@ -19,7 +19,7 @@ import type { G0Snapshot } from '../src/lib/scoring/g0-features';
 
 function snapshotWithEvidence(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
   return {
-    tenant: { country: 'DE', pic: 'PIC-1' },
+    tenant: { country: 'DE', pic: 'PIC-1', picRegistryStatus: 'FOUND' },
     profile: { keywords: ['hydrogen'] },
     topic: {
       id: 'topic-1',
@@ -41,7 +41,7 @@ function snapshotWithEvidence(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
 
 function emptySnapshot(): G0Snapshot {
   return {
-    tenant: { country: null, pic: null },
+    tenant: { country: null, pic: null, picRegistryStatus: null },
     profile: null,
     topic: null,
     topicFitScore: null,

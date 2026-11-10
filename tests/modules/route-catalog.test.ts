@@ -45,6 +45,20 @@ describe('workspace route catalog', () => {
     expect(stale, 'catalog entries with no page.tsx behind them').toEqual([]);
   });
 
+  // NG-110: `ayarlar` (a re-export of `settings`) was also listed as canonical: two names for one page.
+  it('records the settings root under one canonical name, with the Turkish one as alias', () => {
+    const canonical: string[] = [...WORKSPACE_ROUTE_CATALOG];
+    expect(canonical.filter((p) => p === 'settings' || p === 'ayarlar')).toEqual(['settings']);
+    expect(WORKSPACE_ROUTE_ALIASES['ayarlar']).toBe('settings');
+  });
+
+  // NG-113: `bildirimler` (a re-export of `notifications`) was also listed as canonical: two names for one page.
+  it('records the notifications page under one canonical name, with the Turkish one as alias', () => {
+    const canonical: string[] = [...WORKSPACE_ROUTE_CATALOG];
+    expect(canonical.filter((p) => p === 'notifications' || p === 'bildirimler')).toEqual(['notifications']);
+    expect(WORKSPACE_ROUTE_ALIASES['bildirimler']).toBe('notifications');
+  });
+
   it('resolves every alias to a canonical route', () => {
     const canonical = new Set<string>(WORKSPACE_ROUTE_CATALOG);
     for (const [alias, target] of Object.entries(WORKSPACE_ROUTE_ALIASES)) {

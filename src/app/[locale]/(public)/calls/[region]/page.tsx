@@ -30,16 +30,15 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { region, locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'calls_region' });
   const regionInfo = regionOf(region);
   if (!regionInfo) {
     return {
-      title: locale === 'tr' ? `Sayfa Bulunamadı — ${PRODUCT_NAME}` : `Page Not Found — ${PRODUCT_NAME}`,
+      title: t('meta_not_found_title', { product: PRODUCT_NAME }),
     };
   }
   const regionLabel = regionInfo.name;
-  const description = locale === 'tr'
-    ? `${regionLabel}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi.`
-    : `Open Horizon calls in ${regionLabel}. Deadlines, budgets, and eligibility information.`;
+  const description = t('meta_open_description', { region: regionLabel });
 
   return {
     title: `${regionLabel} — ${PRODUCT_NAME}`,

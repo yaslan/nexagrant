@@ -27,6 +27,9 @@ model Tenant {
   province      String?
   orgType       OrgType  @default(SME)
   pic           String?  // EU Participant Identification Code
+  // FO-396. Result of the EU registry lookup for `pic`: FOUND | NOT_FOUND | UNKNOWN; null = never checked.
+  picRegistryStatus    String?
+  picRegistryCheckedAt DateTime?
   locale        String   @default("tr")
   timezone      String   @default("Europe/Istanbul")
   settings      Json     @default("{}") // scoringWeights, gateRules, aiRegion...
@@ -53,6 +56,7 @@ model Tenant {
   partnerSearchQuota PartnerSearchQuotaUsage[]
   interregAnalyses InterregAnalysis[]
   orgReadiness  OrgReadiness[]
+  projectIdeas  ProjectIdea[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -137,6 +141,8 @@ model User {
   interregAnalyses   InterregAnalysis[]
   internalApprovals  InternalApproval[]
   agreedBudgetShares PartnerBudgetShare[]
+  createdProjectIdeas ProjectIdea[]
+  decisions          DecisionLog[]
   @@index([deletionRequestedAt])
   @@index([deletedAt])
 }
@@ -1165,6 +1171,7 @@ model Opportunity {
   evaluations Evaluation[]
   meetingBriefs MeetingBrief[]
   internalApproval InternalApproval?
+  decisionLog  DecisionLog[]
   @@unique([id, tenantId])
   @@index([deletedAt])
 }
@@ -1277,6 +1284,58 @@ model PartnerBudgetShare {
   @@unique([seatId, tenantId])
   @@index([tenantId])
   @@index([agreedById])
+}
+
+// NG-38 — spec §4 project_idea: an idea the institution may apply with. One tenant's ideas;
+// "kurum" is the tenant. TRL 1-9 and the text limits are the writer's
+// (src/lib/project-ideas/records.ts); no CHECK, see the migration. Not yet linked to an
+// opportunity (spec project.idea_id): that is a column on Opportunity, outside this card.
+model ProjectIdea {
+  id             String            @id @default(cuid())
+  tenantId       String
+  title          String
+  summary        String?
+  keywords       String[]
+  trl            Int
+  targetPrograms String[]
+  status         ProjectIdeaStatus @default(OPEN)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy      User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  @@index([tenantId, status])
+  @@index([createdById])
+}
+
+enum ProjectIdeaStatus {
+  OPEN
+  APPLIED
+  ARCHIVED
+}
+
+// NG-38 — spec §4 decision_log: apply/withdraw decisions with reason, decider and date.
+// Append-only; the one writer of WITHDRAW is src/lib/k5-pipeline/withdrawal.ts, which also sets
+// Opportunity.status = WITHDRAWN in the same transaction. Gate decisions stay in GateDecision.
+// The composite key is the tenant boundary: a foreign key check does not go through RLS.
+model DecisionLog {
+  id            String       @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  kind          DecisionKind
+  reason        String
+  decidedById   String?
+  decidedAt     DateTime     @default(now())
+  opportunity   Opportunity  @relation(fields: [opportunityId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  decidedBy     User?        @relation(fields: [decidedById], references: [id], onDelete: SetNull)
+  @@index([opportunityId, tenantId, decidedAt])
+  @@index([tenantId])
+  @@index([decidedById])
+}
+
+enum DecisionKind {
+  APPLY
+  WITHDRAW
 }
 
 enum SeatStatus {

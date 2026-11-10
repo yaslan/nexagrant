@@ -170,8 +170,12 @@ async function saveProfile(page: Page) {
       timeout: 30_000,
     })
     .toEqual(KEYWORDS);
-  // FIXTURE: the PIC is set after the save, so the profile form cannot clear it.
-  await prisma.tenant.update({ where: { id: TENANT }, data: { pic: NEW_PIC } });
+  // FIXTURE: the PIC is set after the save, so the profile form cannot clear it. The register check
+  // is marked FOUND too: only a PIC found in the EU register counts for the G0 ease (FO-396).
+  await prisma.tenant.update({
+    where: { id: TENANT },
+    data: { pic: NEW_PIC, picRegistryStatus: 'FOUND', picRegistryCheckedAt: new Date() },
+  });
 }
 
 function dumpBox(name: string, html: string) {
