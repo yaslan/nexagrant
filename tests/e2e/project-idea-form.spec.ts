@@ -11,7 +11,8 @@ const SHOTS = shotsDir('NG-14-screenshots');
  * Covered: the TRL criterion reads "eksik" with no idea and links to the form;
  * an empty submit reports the required fields and moves focus to the summary;
  * the TRL select offers 1..9; a complete form is saved through NG-38's
- * `createProjectIdea` and reads back from the list after a reload.
+ * `createProjectIdea` and reads back from the list after a reload. There is no
+ * "Kurum" field (K-579963): the form does not ask for it and the list does not show it.
  */
 
 const tenant = evidenceTenant('ng14');
@@ -49,7 +50,7 @@ test.describe('NG-14 project idea entry', () => {
 
     const summary = page.locator('form#proje-fikri-form [role="alert"]');
     await expect(summary).toContainText('Formda düzeltilmesi gereken alanlar var.');
-    await expect(summary).toContainText('Kurum: Bu alan zorunlu.');
+    await expect(summary).not.toContainText('Kurum');
     await expect(summary).toContainText('Başlık: Bu alan zorunlu.');
     await expect(summary).toContainText('TRL: TRL seçin.');
     await expect(summary).toContainText('Hedef programlar: En az bir hedef program seçin.');
@@ -59,7 +60,7 @@ test.describe('NG-14 project idea entry', () => {
     expect(dialogs).toEqual([]);
 
     // Each field is wired to its message for assistive tech.
-    await expect(page.getByLabel('Kurum')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByLabel('Başlık')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByLabel('Teknoloji hazırlık seviyesi (TRL)')).toHaveAttribute('aria-invalid', 'true');
   });
 
@@ -82,7 +83,6 @@ test.describe('NG-14 project idea entry', () => {
     await tenant.signIn(page);
     await page.goto(`/tr/${tenant.workspace}/proje-fikri`);
 
-    await page.getByLabel('Kurum').fill('Örnek Üniversite');
     await page.getByLabel('Başlık').fill('Akıllı sulama');
     await page.getByLabel('Özet').fill('Toprak nemine göre sulama.');
     await page.getByLabel('Anahtar kelimeler').fill('sulama, IoT, iot');
@@ -93,14 +93,14 @@ test.describe('NG-14 project idea entry', () => {
 
     await expect(page.locator('form#proje-fikri-form [role="alert"]')).toHaveCount(0);
     await expect(page.getByRole('status')).toContainText('"Akıllı sulama" kaydedildi.');
-    await expect(page.getByRole('region', { name: 'TRL kriteri' })).toContainText('karşılandı');
+    await expect(page.getByRole('region', { name: 'TRL kriteri' })).toContainText('TRL değerlendirmesi bekleniyor');
 
     // Read back: a fresh load shows the stored row, not the form's state.
     await page.reload();
     const row = page.getByRole('row', { name: /Akıllı sulama/ });
     await expect(row).toContainText('TRL 4');
     await expect(row).toContainText('Horizon Europe');
-    await expect(row).toContainText('Henüz yok');
+    await expect(row).toContainText('Puanlama bağlı değil');
     await page.screenshot({ path: `${SHOTS}/03-form-saved-listed-tr-1280.png`, fullPage: true });
   });
 });

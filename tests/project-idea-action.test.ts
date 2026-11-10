@@ -80,6 +80,33 @@ describe('saveProjectIdea', () => {
     expect(tx.projectIdea.create).not.toHaveBeenCalled();
   });
 
+  it('refuses a program outside the form list and writes nothing (form rules apply server-side)', async () => {
+    const res = await saveProjectIdea({ ...VALID, targetPrograms: ['nope'] });
+    expect(res).toEqual({ ok: false, code: 'invalid' });
+    expect(tx.projectIdea.create).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('refuses more keywords than the form allows and writes nothing', async () => {
+    const many = Array.from({ length: 11 }, (_, i) => `k${i}`);
+    const res = await saveProjectIdea({ ...VALID, keywords: many });
+    expect(res).toEqual({ ok: false, code: 'invalid' });
+    expect(tx.projectIdea.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a keyword longer than the form allows and writes nothing', async () => {
+    const res = await saveProjectIdea({ ...VALID, keywords: ['x'.repeat(41)] });
+    expect(res).toEqual({ ok: false, code: 'invalid' });
+    expect(tx.projectIdea.create).not.toHaveBeenCalled();
+  });
+
+  it('stores one keyword for a case-insensitive repeat, as the form does', async () => {
+    await saveProjectIdea({ ...VALID, keywords: ['IoT', 'iot', ' IOT '] });
+    expect(tx.projectIdea.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ keywords: ['IoT'] }) }),
+    );
+  });
+
   it('lets a role refusal from requireTenantAction propagate unchanged', async () => {
     const refusal = new Error('FORBIDDEN_ROLE');
     requireTenantAction.mockRejectedValue(refusal);

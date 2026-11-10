@@ -16,7 +16,6 @@ import {
 import { saveProjectIdea } from './actions';
 
 const FIELD_ORDER: ProjectIdeaField[] = [
-  'institution',
   'title',
   'summary',
   'keywords',
@@ -27,7 +26,7 @@ const FIELD_ORDER: ProjectIdeaField[] = [
 /**
  * Project idea entry (NG-14). A valid submit goes to `saveProjectIdea` (NG-38 /
  * BE-05 `createProjectIdea`); the saved row then appears in the list the page renders.
- * `institution` is validated here but not stored: NG-38's table has no column for it.
+ * The form has no "kurum" field: NG-38's table has no column for it (K-579963).
  */
 export default function ProjectIdeaForm() {
   const t = useTranslations('projectIdea');
@@ -35,7 +34,6 @@ export default function ProjectIdeaForm() {
   const uid = useId();
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
-  const [institution, setInstitution] = useState('');
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [keywordsRaw, setKeywordsRaw] = useState('');
@@ -70,7 +68,6 @@ export default function ProjectIdeaForm() {
     e.preventDefault();
     const trlNumber = trl === '' ? null : Number(trl);
     const result = validateProjectIdea({
-      institution,
       title,
       summary,
       keywords: parseKeywords(keywordsRaw),
@@ -99,7 +96,6 @@ export default function ProjectIdeaForm() {
       }
       setSavedTitle(res.idea.title);
       setSaveState('saved');
-      setInstitution('');
       setTitle('');
       setSummary('');
       setKeywordsRaw('');
@@ -151,29 +147,6 @@ export default function ProjectIdeaForm() {
           </ul>
         </div>
       )}
-
-      <div>
-        <label htmlFor={fieldId('institution')} className={labelClass}>
-          {t('fieldInstitution')}
-        </label>
-        <input
-          id={fieldId('institution')}
-          name="institution"
-          type="text"
-          value={institution}
-          maxLength={PROJECT_IDEA_LIMITS.institution + 50}
-          onChange={(e) => setInstitution(e.target.value)}
-          aria-invalid={!!errors.institution}
-          aria-describedby={errors.institution ? errorId('institution') : undefined}
-          className={inputClass}
-          autoComplete="organization"
-        />
-        {errors.institution && (
-          <p id={errorId('institution')} className={errorClass}>
-            {errorText[errors.institution]}
-          </p>
-        )}
-      </div>
 
       <div>
         <label htmlFor={fieldId('title')} className={labelClass}>
@@ -262,7 +235,7 @@ export default function ProjectIdeaForm() {
           <option value="">{t('trlPlaceholder')}</option>
           {Array.from({ length: TRL_MAX - TRL_MIN + 1 }, (_, i) => TRL_MIN + i).map((n) => (
             <option key={n} value={n}>
-              TRL {n}
+              {t('trlOption', { n })}
             </option>
           ))}
         </select>

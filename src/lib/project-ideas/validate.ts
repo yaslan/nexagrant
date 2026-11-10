@@ -1,17 +1,16 @@
 /**
  * Project idea entry — form rules (NG-14).
  *
- * Pure functions, no DB and no React: the form calls them on submit and the unit
- * tests call them directly. The persisted shape is `ProjectIdea` (NG-38, BE-05);
- * nothing here writes it. `institution` is a form field only: the table has no
- * column for it yet, and the schema is not changed by this card.
+ * Pure functions, no DB and no React: the form calls them on submit, the server action
+ * calls them again before any write, and the unit tests call them directly. The persisted
+ * shape is `ProjectIdea` (NG-38, BE-05); nothing here writes it. "Kurum" is not a field of
+ * this form (patron decision K-579963): the table has no column for it.
  */
 
 export const TRL_MIN = 1;
 export const TRL_MAX = 9;
 
 export const PROJECT_IDEA_LIMITS = {
-  institution: 200,
   title: 200,
   summary: 2000,
   keywords: 10,
@@ -29,7 +28,6 @@ export const TARGET_PROGRAMS = [
 export type TargetProgram = (typeof TARGET_PROGRAMS)[number];
 
 export type ProjectIdeaDraft = {
-  institution: string;
   title: string;
   summary: string;
   keywords: string[];
@@ -55,13 +53,13 @@ export type ProjectIdeaValidation =
   | { ok: false; errors: Partial<Record<ProjectIdeaField, ProjectIdeaErrorCode>> };
 
 /**
- * Comma-separated keyword input → clean list: trimmed, empty pieces dropped,
- * case-insensitive duplicates removed (first spelling wins).
+ * Clean keyword list: trimmed, empty entries dropped, case-insensitive duplicates removed
+ * (first spelling wins). Used by the form and by the server action, so both sides agree.
  */
-export function parseKeywords(raw: string): string[] {
+export function dedupeKeywords(list: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const piece of raw.split(',')) {
+  for (const piece of list) {
     const k = piece.trim();
     if (!k) continue;
     // Locale-independent on purpose: under the 'tr' locale "IoT" lowercases to "ıot",
@@ -72,6 +70,11 @@ export function parseKeywords(raw: string): string[] {
     out.push(k);
   }
   return out;
+}
+
+/** Comma-separated keyword input → clean list (see `dedupeKeywords`). */
+export function parseKeywords(raw: string): string[] {
+  return dedupeKeywords(raw.split(','));
 }
 
 /** TRL must be an integer 1..9. Anything else (null, 0, 10, 4.5, NaN) is rejected. */
@@ -86,10 +89,6 @@ export function checkTrl(trl: number | null): ProjectIdeaErrorCode | null {
 
 export function validateProjectIdea(draft: ProjectIdeaDraft): ProjectIdeaValidation {
   const errors: Partial<Record<ProjectIdeaField, ProjectIdeaErrorCode>> = {};
-
-  const institution = draft.institution.trim();
-  if (!institution) errors.institution = 'required';
-  else if (institution.length > PROJECT_IDEA_LIMITS.institution) errors.institution = 'tooLong';
 
   const title = draft.title.trim();
   if (!title) errors.title = 'required';

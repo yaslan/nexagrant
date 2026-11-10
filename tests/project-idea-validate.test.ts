@@ -9,7 +9,6 @@ import {
 } from '@/lib/project-ideas/validate';
 
 const VALID: ProjectIdeaDraft = {
-  institution: 'Örnek Üniversite',
   title: 'Akıllı sulama',
   summary: 'Toprak nemine göre sulama.',
   keywords: ['sulama', 'iot'],
@@ -51,7 +50,6 @@ describe('validateProjectIdea', () => {
 
   it('reports every missing required field at once', () => {
     const r = validateProjectIdea({
-      institution: '   ',
       title: '',
       summary: '',
       keywords: [],
@@ -60,7 +58,6 @@ describe('validateProjectIdea', () => {
     });
     expect(r.ok).toBe(false);
     expect(r.errors).toEqual({
-      institution: 'required',
       title: 'required',
       trl: 'trlRequired',
       targetPrograms: 'programRequired',

@@ -35,7 +35,7 @@ export default async function ProjectIdeaList({ ideas }: { ideas: ProjectIdeaVie
               {ideas.map((idea) => (
                 <tr key={idea.id} className="border-b border-border align-top text-ink-2">
                   <td className="py-2 pr-3 text-ink">{idea.title}</td>
-                  <td className="py-2 pr-3">TRL {idea.trl}</td>
+                  <td className="py-2 pr-3">{t('trlOption', { n: idea.trl })}</td>
                   <td className="py-2 pr-3">
                     {idea.targetPrograms.map((p) => t(`program_${p}`)).join(', ')}
                   </td>
