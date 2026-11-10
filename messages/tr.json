@@ -5467,5 +5467,33 @@
     "notConfiguredError": "SMTP yapılandırılmamış (SMTP_HOST boş); e-posta gönderilemez.",
     "sendFailed": "SMTP gönderimi başarısız: {error}",
     "sendUnexpected": "Test e-postası gönderilemedi."
+  },
+  "evidence": {
+    "addTitle": "Kanıt Ekle",
+    "titleLabel": "Başlık",
+    "titlePlaceholder": "örn. ISO 9001 Sertifikası",
+    "kindLabel": "Tür",
+    "kindStat": "İstatistik",
+    "kindPriorResult": "Önceki Sonuç",
+    "kindTrl": "TRL Doğrulaması",
+    "kindLetter": "Mektup",
+    "kindReference": "Referans",
+    "kindPublication": "Yayın",
+    "kindCertificate": "Sertifika",
+    "validUntilLabel": "Geçerlilik Bitişi (İsteğe bağlı)",
+    "bodyLabel": "Metin / Özet",
+    "bodyPlaceholder": "Kanıtın ana metni...",
+    "tagsLabel": "Etiketler (virgülle ayırın)",
+    "tagsPlaceholder": "örn. yapay zeka, sağlık, kobi",
+    "uploadLabel": "Dosya Yükle",
+    "uploadHint": "Dosya seçmek için tıklayın veya sürükleyip bırakın",
+    "cancel": "İptal",
+    "uploading": "Yükleniyor...",
+    "save": "Kanıtı Kaydet",
+    "pageTitle": "Kanıt & Yetkinlik Deposu (Evidence Pack)",
+    "pageDescription": "Kuruluşunuzun temel yetkinliklerini, sertifikalarını, mali raporlarını ve geçmiş proje başarılarını tek bir merkezde toplayın. Doğrulanmış belgeleri yükleyerek AB teklif yazımında doğrudan kanıt belgesi olarak kullanın."
+  },
+  "pipelineBoard": {
+    "unassigned": "Atanmadı"
   }
 }

@@ -96,6 +96,7 @@ export default function KanbanBoard({
   locale = 'tr',
 }: KanbanBoardProps) {
   const t = useTranslations('pipeline');
+  const tBoard = useTranslations('pipelineBoard');
   const [opps, setOpps] = useState<OpportunityItem[]>(initialOpps);
   const [isPending, startTransition] = useTransition();
   const errorText = useActionErrorText();
@@ -226,7 +227,7 @@ export default function KanbanBoard({
   // Quick Change Owner / Assign Responsible User
   const handleAssignOwner = (oppId: string, memberId: string) => {
     const member = members.find((m) => m.id === memberId);
-    const ownerName = member ? member.name : 'Atanmadı';
+    const ownerName = member ? member.name : tBoard('unassigned');
 
     setOpps((prev) =>
       prev.map((o) => (o.id === oppId ? { ...o, ownerId: memberId, ownerName } : o))
