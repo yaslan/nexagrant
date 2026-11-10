@@ -1937,7 +1937,9 @@
     "no_calls": "Şu anda {region} için açık çağrı yok.",
     "no_calls_hint": "Diğer ülkeleri gözlemleyin ya da panelden kayıtlı arama oluşturun.",
     "meta_title": "{region} Çağrıları",
-    "meta_description": "{region} bölgesine uygun AB hibe çağrıları"
+    "meta_description": "{region} bölgesine uygun AB hibe çağrıları",
+    "meta_not_found_title": "Sayfa Bulunamadı — {product}",
+    "meta_open_description": "{region}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi."
   },
   "applicationPartA": {
     "portalLinkFailed": "Bağlantı oluşturulamadı. Sayfayı yenileyip tekrar deneyin.",
@@ -2775,7 +2777,11 @@
   "callsIndex": {
     "title": "Fon Çağrıları",
     "subtitle": "Ülkeye göre açık fon çağrılarına göz atın",
-    "deadline": "Son başvuru"
+    "deadline": "Son başvuru",
+    "budget": "Bütçe",
+    "view_details": "Detayları Gör",
+    "tba": "Belirlenmedi",
+    "country_tr": "🇹🇷 Türkiye"
   },
   "DemoSignIn": {
     "roleSme": "KOBİ Ar-Ge Koordinatörü",
@@ -3981,7 +3987,14 @@
   },
   "turkiyeye_acik_cagrilar": {
     "meta_title": "Türkiye'ye Açık Horizon Çağrıları",
-    "meta_description": "Türk kuruluşlarının katılabildiği açık Horizon Europe çağrıları. Son başvuru tarihleri, bütçeler ve başvuru bağlantıları."
+    "meta_description": "Türk kuruluşlarının katılabildiği açık Horizon Europe çağrıları. Son başvuru tarihleri, bütçeler ve başvuru bağlantıları.",
+    "badge": "Horizon Europe & Asosiye Ülkeler",
+    "heading": "Türkiye’deki Kuruluşlara Açık AB Hibe Çağrıları",
+    "intro": "Türkiye, Horizon Europe anlaşması kapsamında tam asosiye statüsündedir. Türk üniversiteleri, KOBİ’leri ve sanayi kuruluşları bu çağrılara koordinatör veya ortak olarak başvurabilir ve %100 doğrudan hibe alabilir.",
+    "lump_sum": "Lump Sum",
+    "default_program": "Horizon Europe",
+    "default_type": "RIA / IA",
+    "start_proposal": "Fırsatı Başlat →"
   },
   "Profile": {
     "title": "Kurumsal Profil & Ar-Ge Yetkinlikleri",
@@ -5342,5 +5355,19 @@
     "listColCreated": "Kayıt tarihi",
     "listColScore": "Çağrı puanı",
     "listScoreUnavailable": "Henüz yok (puanlama bağlanmadı)"
+  },
+  "i18nCheck": {
+    "title": "i18n Denetimi ve Parite Kontrolü",
+    "subtitle": "TR ve EN arasında yerelleştirme anahtarı eşleşmesinin otomatik doğrulanması.",
+    "total_unique_keys": "Toplam Benzersiz Anahtar",
+    "tr_coverage": "TR Kapsamı",
+    "en_coverage": "EN Kapsamı",
+    "keys_count": "{n} anahtar",
+    "parity_ok_title": "%100 Yerelleştirme Eşleşmesi Sağlandı",
+    "parity_ok_desc": "Tüm anahtarlar hem messages/tr.json hem messages/en.json içinde mevcut.",
+    "parity_bad_title": "Eşleşme Farkları Bulundu",
+    "parity_bad_desc": "Bazı anahtarlar dillerden birinde eksik.",
+    "missing_en": "İngilizcede (EN) eksik:",
+    "missing_tr": "Türkçede (TR) eksik:"
   }
 }

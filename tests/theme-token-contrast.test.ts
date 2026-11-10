@@ -208,3 +208,31 @@ describe('lifetime card on its dark ground (NG-93)', () => {
     expect(src.match(/cyan-|34,211,238|22d3ee/gi) ?? []).toEqual([]);
   });
 });
+
+/**
+ * NG-114 — the struck-through list price on the Settings → Billing TTO plan card was
+ * `text-slate-400` (#94A3B8): 2.63:1 on the white --surface, axe color-contrast serious. It now
+ * takes the existing `text-muted` token (the secondary-text step NG-93 family already measures at
+ * >= 4.5:1 on surface), so no new colour is introduced. The strike-through line stays as is.
+ */
+describe('TTO plan card struck-through price (NG-114)', () => {
+  const billing = readFileSync(
+    resolve(__dirname, '../src/app/[locale]/(app)/[workspace]/settings/billing/BillingClient.tsx'),
+    'utf8',
+  );
+  const planPrice = billing.match(/className="([^"]*line-through font-medium)"/);
+
+  test('the plan card list price is present in BillingClient', () => {
+    expect(planPrice).not.toBeNull();
+  });
+
+  test('it paints the muted text token, not text-slate-400', () => {
+    const classes = planPrice?.[1] ?? '';
+    expect(classes).toMatch(/\btext-muted\b/);
+    expect(classes).not.toMatch(/\btext-slate-400\b/);
+  });
+
+  test('muted on the plan card surface is at least 4.5:1 in the light theme', () => {
+    expect(contrast(themes.light.muted as string, themes.light.surface as string)).toBeGreaterThanOrEqual(4.5);
+  });
+});
