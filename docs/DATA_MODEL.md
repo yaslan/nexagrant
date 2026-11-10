@@ -1163,3 +1163,18 @@ Yazan/okuyan tek yer `src/lib/gates/readiness-records.ts`. Migration: `prisma/mi
 - **Denetim izi:** `opportunity.withdrawn` (veri: karar kimliği, eski durum), `project_idea.created`. Gerekçe ve fikir metni denetim satırına girmez.
 - **CHECK yok:** TRL aralığı, boş olmayan gerekçe ve metin uzunlukları (başlık 200, özet 2000, gerekçe 2000, etiket 100) yazıcıdadır.
 
+
+## 29. `Tenant.picRegistryStatus` — AB kayıt sitesi doğrulaması (FO-396)
+
+`Tenant.picRegistryStatus` (`FOUND` | `NOT_FOUND` | `UNKNOWN`, boş = hiç kontrol edilmedi) ve
+`Tenant.picRegistryCheckedAt`. AB'nin açık kuruluş profili uç noktası (`src/lib/pic-registry.ts`)
+kuruluş numarasını sorar; sonuç `src/lib/pic-registry-refresh.ts` ile kiracı satırına yazılır. Kontrol
+DB işleminin dışında, 5 sn zaman aşımı ve 256 KB sınırıyla yapılır; hata/zaman aşımı `UNKNOWN`'dur.
+
+**Neden:** Sıfır CORDIS kaydı tek başına "yeni kuruluş" demez. Yanlış ya da kayıtsız bir numara da sıfır
+kayıt verir. Geçmişsiz ortak kolaylığı (`isNoHistoryPartner`, payda 75) yalnızca `FOUND` ise verilir.
+Kayıtsız numara 77,11 GO → 57,83 NO_GO'ya düşer. `G0_SCORING_VERSION` 2.3.
+
+**Migration:** `prisma/migrations/tenant-pic-registry-status/` — iki `ADD COLUMN IF NOT EXISTS`,
+veri geçişi yok; ikinci çalıştırma no-op (kanıt: FO-396 raporu). Geri alma: `down.sql` (kolonları
+ve kontrol sonuçlarını siler; kolon yoksa kolaylık da yoktur). `Tenant` sistem geneli tablo, RLS yok.

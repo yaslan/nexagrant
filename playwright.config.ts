@@ -136,6 +136,8 @@ export default defineConfig({
       NODE_OPTIONS: WEB_SERVER_NODE_OPTIONS,
       E2E_RUNNER_PID: String(process.pid),
       E2E_PORT: String(PORT),
+      // FO-396: the e2e run never asks the EU register (no network). Stored answers are set in the DB by the spec.
+      PIC_REGISTRY_OFF: 'true',
       // Blank LLM keys in dev E2E so tests use template fallback, not real API calls
       // (matches CI behavior; reduces cost, ensures deterministic failures like CI).
       // Opt-in live tests (e.g. E2E_LIVE_EMBED=1) can override OPENAI_API_KEY if needed.
