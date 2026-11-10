@@ -64,6 +64,7 @@ test.describe('module gate — Settings → Modules link on a switched-off modul
 
     await expect(page).toHaveURL(/\/en\/[^/]+\/settings\/modules$/);
     await expect(page.getByRole('main')).not.toContainText(enMessages.settings.modules.forbiddenTitle);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(enMessages.settings.modules.title);
   });
 
   test('the owner on a Turkish page clicks the link and lands on Ayarlar → Modüller', async ({
@@ -81,6 +82,7 @@ test.describe('module gate — Settings → Modules link on a switched-off modul
     await link.click();
     await expect(page).toHaveURL(/\/tr\/[^/]+\/ayarlar\/moduller$/);
     await expect(page.getByRole('main')).not.toContainText(trMessages.settings.modules.forbiddenTitle);
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(trMessages.settings.modules.title);
     await page.screenshot({ path: 'test-results/ng65/owner-modules-tr.png' });
   });
 

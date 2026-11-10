@@ -1151,7 +1151,19 @@ Yazan/okuyan tek yer `src/lib/gates/readiness-records.ts`. Migration: `prisma/mi
 - **CHECK yok:** `prisma db push` ile kurulmuş DB'de `CREATE TABLE IF NOT EXISTS` içindeki CHECK kaybolur; kural yazıcıdadır.
 - **API:** `GET/PUT /api/org-readiness[?seatId=]`, `GET/PUT /api/opportunities/[id]/internal-approval`, `GET/PUT /api/opportunities/[id]/budget-shares`.
 
-## 28. `Tenant.picRegistryStatus` — AB kayıt sitesi doğrulaması (FO-396)
+## 28. Proje fikri ve karar kaydı: `ProjectIdea`, `DecisionLog` (NG-38 · K-577084, K-577269)
+
+Şartname §4'ün `project_idea` ve `decision_log` tabloları. Migration: `prisma/migrations/add-project-idea-decision-log.sql` (geri alma: `.down.sql`).
+
+- **`ProjectIdea`:** kurumun (kiracının) proje fikri: `title`, `summary`, `keywords[]`, `trl` (1–9), `targetPrograms[]`, `status` (`OPEN` | `APPLIED` | `ARCHIVED`). Yazan/okuyan `src/lib/project-ideas/records.ts`; durum girdiden yazılmaz, oluşturulunca `OPEN`. `APPLIED` "başvur" kararıyla (NG-15) gelir. Fırsata bağ (`project.idea_id`) henüz yok: `Opportunity`'ye kolon demektir, bu kartın dışında.
+- **`DecisionLog`:** başvur/vazgeç kararları, yalnız eklenir: `kind` (`APPLY` | `WITHDRAW`), `reason` (zorunlu), `decidedById`, `decidedAt`. Kapı kararları `GateDecision`'da kalır.
+- **`WITHDRAWN` yazan tek yer:** `withdrawOpportunity` (`src/lib/k5-pipeline/withdrawal.ts`). Gerekçe boşsa `REASON_REQUIRED` döner, hiçbir şey yazılmaz. Yalnız `ACTIVE` ve `SUBMITTED` fırsattan vazgeçilir; sonuçlu fırsat (`FUNDED`, `REJECTED`, `ABOVE_THRESHOLD`) `ALREADY_DECIDED`, ikinci vazgeçme `ALREADY_WITHDRAWN`. Durum ve kayıt tek işlemde yazılır; durum koşullu güncellenir, eşzamanlı iki istekten biri kazanır. Boru hattındaki "arşivle" (`archived_by_user`) yumuşak silmedir, vazgeçme değildir; değişmedi.
+- **Kiracı sınırı:** RLS + bileşik FK `(opportunityId, tenantId)` → `Opportunity(id, tenantId)` (indeks §27'den).
+- **Silme:** `ProjectIdea` kiracıyla, `DecisionLog` fırsatıyla CASCADE gider; kullanıcı silinince `createdById`/`decidedById` NULL olur, fikir metni ve gerekçe kalır.
+- **Denetim izi:** `opportunity.withdrawn` (veri: karar kimliği, eski durum), `project_idea.created`. Gerekçe ve fikir metni denetim satırına girmez.
+- **CHECK yok:** TRL aralığı, boş olmayan gerekçe ve metin uzunlukları (başlık 200, özet 2000, gerekçe 2000, etiket 100) yazıcıdadır.
+
+## 29. `Tenant.picRegistryStatus` — AB kayıt sitesi doğrulaması (FO-396)
 
 `Tenant.picRegistryStatus` (`FOUND` | `NOT_FOUND` | `UNKNOWN`, boş = hiç kontrol edilmedi) ve
 `Tenant.picRegistryCheckedAt`. AB'nin açık kuruluş profili uç noktası (`src/lib/pic-registry.ts`)
