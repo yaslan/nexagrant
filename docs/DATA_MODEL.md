@@ -1123,7 +1123,8 @@ Rakip cezası skoru 0'ın altına düşüremez; sıra ham toplamdan kurulur, kı
 |---|---|---|---|
 | Aday Bul (FO-63 sonrası) | `topicExperience, networkCentrality, countryDiversity, smeBonus, warmthBonus, liveDemandSignal, liveDemandReason, total` | 0–1 ağırlıklı | `consortiumSeatScore` |
 | Aday Bul (FO-63 öncesi, eski satır) | aynı, `liveDemandSignal` yok, `total` 0–10 | 0–10 | `consortiumSeatScore`, sinyal 0 |
-| Eşleştirici | `topicExperience, geographicBalance, collabHistory, relationshipWarmth, centrality, rivalRisk` (ham puan) | −10…90 | `matchSeatScore` = toplam / 90 |
+| Eşleştirici (K-578751 sonrası) | `topicExperience, geographicBalance, collabHistory, rivalRisk` (ham puan; 34 + 33 + 33, ceza −10) | −10…100 | `matchSeatScore` = toplam / 100 |
+| Eşleştirici (K-578751 öncesi, eski satır) | yukarıdakiler + `relationshipWarmth, centrality` | −10…90 | `legacyMatchSeatScore` = toplam / 90 |
 
 **Şema değişikliği yok.** Ölçek sürümü kolonu (ör. `scoreScale`) eklenmedi: her satır kendi
 `breakdown`'ını taşıdığı için skor ondan yeniden türetilebilir; ölçek bilgisi breakdown'un biçiminden
@@ -1135,7 +1136,22 @@ Kiracı başına `withTenant` içinde okur/yazar, koltuğun sıralarını yeni s
 `breakdown`'ı iki puanlayıcıdan hiçbirine uymayan koltuğu dokunmadan "SKIPPED" diye raporlar. İkinci
 koşu 0 satır yazar. Canlı ortamda ayrı onayla koşulur.
 
-## 19. `Tenant.picRegistryStatus` — AB kayıt sitesi doğrulaması (FO-396)
+## 27. G1'in okuduğu kayıtlar: `OrgReadiness`, `InternalApproval`, `PartnerBudgetShare` (NG-34 · K-577084)
+
+Şartname §12 ve §17.1'in üç kaydı. Yalnız saklar ve okur; kapı kuralı NG-33'ündür, G0 puanlayıcısı bunları okumaz.
+Yazan/okuyan tek yer `src/lib/gates/readiness-records.ts`. Migration: `prisma/migrations/add-org-readiness-tables.sql` (geri alma: `.down.sql`).
+
+- **`OrgReadiness`:** bir kuruluşun EU Login ve LEAR cevabı. `null` = cevaplanmadı, `false` = hayır; ikisi ayrı. `subject`: `self`, `cordis:<ConsortiumSeat.organizationId>`, `partner:<PartnerOrg.id>`; tekil `(tenantId, subject)`. Aynı kuruluş iki fırsatın koltuğunda bir kayıttır. Kiracı silinince gider.
+- **PIC kolonu yok:** tek kaynak `Tenant.pic` (kendi), `ConsortiumSeat.organizationId` veya `PartnerOrg.pic` (ortak). Okuma yalnız `present`/`missing` döndürür, numarayı döndürmez. Yanıt `subject`'i de taşımaz (CORDIS koltuğunda `subject` PIC'in kendisidir); yalnız `kind: 'self' | 'cordis' | 'partner'` döner. `Tenant.pic` boşsa kayıt `missing: ['pic', …]` der. Girişi ve sahiplik denetimi FO-383'ün profil formundadır.
+- **`InternalApproval`:** fırsat başına bir: `approvedAt`/`approvedById`, `cofinancingCommitmentCents`, `currency`, `councilDecisionRef`, `councilDecisionAt`. Onay taahhüde bağlıdır: tutar veya para birimi değişirse yeni onaydır (yeni tarih, yeni onaylayan); karar referansını düzeltmek onayı değiştirmez.
+- **`PartnerBudgetShare`:** koltuk başına bir: `minCents`, `maxCents`, `currency`, `agreedAt`/`agreedById`. `agreedAt` boş = önerildi, mutabakat yok. Şartname sayısal aralık vermez; yazıcı yalnız `0 ≤ min ≤ max` denetler.
+- **Kiracı sınırı:** RLS satırın kendi `tenantId`'sine bakar, FK denetimi RLS'ten geçmez. Bu yüzden bileşik FK: `(opportunityId, tenantId)` → `Opportunity(id, tenantId)`, `(seatId, tenantId)` → `ConsortiumSeat(id, tenantId)`; iki üst tabloya bu FK'ların istediği tekil indeks eklendi.
+- **Silme:** ikisi üst kayıtla CASCADE gider; kullanıcı silinince `approvedById`/`agreedById` NULL olur.
+- **Denetim izi:** `org_readiness.saved`, `internal_approval.saved`, `partner_budget_share.saved`. Tutar ve karar metni denetim satırına girmez.
+- **CHECK yok:** `prisma db push` ile kurulmuş DB'de `CREATE TABLE IF NOT EXISTS` içindeki CHECK kaybolur; kural yazıcıdadır.
+- **API:** `GET/PUT /api/org-readiness[?seatId=]`, `GET/PUT /api/opportunities/[id]/internal-approval`, `GET/PUT /api/opportunities/[id]/budget-shares`.
+
+## 28. `Tenant.picRegistryStatus` — AB kayıt sitesi doğrulaması (FO-396)
 
 `Tenant.picRegistryStatus` (`FOUND` | `NOT_FOUND` | `UNKNOWN`, boş = hiç kontrol edilmedi) ve
 `Tenant.picRegistryCheckedAt`. AB'nin açık kuruluş profili uç noktası (`src/lib/pic-registry.ts`)

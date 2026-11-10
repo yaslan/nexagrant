@@ -26,7 +26,7 @@ vi.mock('next-intl/server', async () => {
 });
 vi.mock('next/navigation', () => ({ notFound: () => null }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
-vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't-1' }) }));
+vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't-1', role: 'MEMBER' }) }));
 vi.mock('@/modules/m8/components/find-candidates-button', () => ({ default: () => null }));
 vi.mock('@/modules/m8/components/invite-candidate-button', () => ({ default: () => null }));
 vi.mock('@/lib/db', () => ({
@@ -46,9 +46,16 @@ vi.mock('@/lib/db', () => ({
 
 const MATCH = {
   topicExperience: 3,
+  geographicBalance: 33,
+  collabHistory: 11,
+  rivalRisk: -10,
+};
+/** Written before K-578751: six keys, out of 90. */
+const LEGACY_MATCH = {
+  topicExperience: 3,
   geographicBalance: 15,
   collabHistory: 0,
-  relationshipWarmth: 0,
+  relationshipWarmth: 5,
   centrality: 2,
   rivalRisk: -10,
 };
@@ -95,7 +102,12 @@ async function renderRows(
 }
 
 beforeEach(() => {
-  candidates.rows = [row('match', 1, MATCH), row('consortium', 2, CONSORTIUM), row('legacy', 3, { topicExperience: 3 })];
+  candidates.rows = [
+    row('match', 1, MATCH),
+    row('consortium', 2, CONSORTIUM),
+    row('legacy', 3, { topicExperience: 3 }),
+    row('old-match', 4, LEGACY_MATCH),
+  ];
 });
 
 describe('matching page breakdown', () => {
@@ -107,24 +119,46 @@ describe('matching page breakdown', () => {
     const n = (whole: number) => `${whole}${sep}0`;
     const rows = await dimensionsByRow(locale);
 
-    expect(rows['org-match']).toMatchObject({
+    // Exactly the three criteria and the penalty (K-578751).
+    expect(rows['org-match']).toEqual({
+      topicExperience: `${n(3)} / 34`,
+      geographicBalance: `${n(33)} / 33`,
+      collabHistory: `${n(11)} / 33`,
+      rivalRisk: `${n(-10)} ${penalty}`,
+    });
+    // A row the old matcher wrote is shown as it was scored: six dimensions, old ranges.
+    expect(rows['org-old-match']).toEqual({
       topicExperience: `${n(3)} / 35`,
       geographicBalance: `${n(15)} / 15`,
+      collabHistory: `${n(0)} / 15`,
+      relationshipWarmth: `${n(5)} / 15`,
       centrality: `${n(2)} / 10`,
       rivalRisk: `${n(-10)} ${penalty}`,
     });
-    // The consortium builder's 0–3 topicExperience is not "3.0 / 35".
+    // The consortium builder's 0–3 topicExperience is not "3.0 / 34".
     expect(rows['org-consortium']).toEqual({
       topicExperience: n(3),
       geographicBalance: n(0),
       collabHistory: n(0),
-      relationshipWarmth: n(0),
-      centrality: n(0),
       rivalRisk: n(0),
     });
     // Neither scorer wrote it: bare numbers, no throw.
     expect(rows['org-legacy']?.topicExperience).toBe(n(3));
     expect(Object.values(rows['org-legacy'] ?? {}).every((v) => !v.includes('/'))).toBe(true);
+  });
+
+  it.each([
+    ['tr', 'önceki ölçütlerle'],
+    ['en', 'previous criteria'],
+  ] as const)('%s: only a row from the old matcher says it used the previous criteria', async (locale, note) => {
+    const { default: MatchingPage } = await import('@/app/[locale]/(app)/[workspace]/opportunities/[id]/matching/page');
+    const el = await MatchingPage({ params: Promise.resolve({ locale, workspace: 'main', id: 'o-1' }) });
+    const host = document.createElement('div');
+    host.innerHTML = renderToStaticMarkup(el as ReactElement);
+    const noted = [...host.querySelectorAll('tbody tr')]
+      .filter((tr) => tr.textContent?.includes(note))
+      .map((tr) => tr.querySelector('.text-xs.text-muted')!.textContent!.split('|')[1]!.trim());
+    expect(noted).toEqual(['org-old-match']);
   });
 
   it.each([

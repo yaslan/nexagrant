@@ -1,6 +1,100 @@
+import { readdirSync } from "node:fs";
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+
+// NexaGrant module boundary (NG-1). Every directory under src/modules is one
+// module. A file inside module X may not import the internals of module Y,
+// either through the `@/modules/Y/...` alias or through a relative path that
+// climbs out of X into Y (`../Y/...`, `../../Y/...`, any depth). Same-module
+// relative imports are not restricted. Module list is read from disk, so a new
+// src/modules/<m> directory is covered without editing this file.
+const moduleNames = readdirSync(new URL("./src/modules", import.meta.url), {
+  withFileTypes: true,
+})
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const moduleBoundaryMessage =
+  "Modüller arası iç dosya importu yasak (NG-1 sınır kuralı). Başka modülün dosyasını doğrudan import etme (alias da göreli yol da); ortak kod src/lib altında olmalı ya da FONBRIDGE PR akışı (K-573059) ile karar verilmeli.";
+
+const moduleBoundaryBlocks = moduleNames.map((own) => {
+  const others = moduleNames.filter((other) => other !== own);
+  const otherAlt = others.map(escapeRegex).join("|");
+  // Relative path that climbs out of this module into another one:
+  // `../m9/x`, `../../m9/x`, `./../m9/x`, `../../modules/m9/x` all match. The
+  // depth is not fixed and the optional `modules/` segment is allowed. Same
+  // module (`../<own>/x`, `./x`) and names such as `m90` do not match.
+  const relativeIntoOther = `^(?:\\.{1,2}/)*\\.\\./(?:modules/)?(${otherAlt})(/|$)`;
+  // Dynamic import() is an ImportExpression, which no-restricted-imports does
+  // not see, so it is matched with no-restricted-syntax on the literal source.
+  // The regex is the union of the two forms above. Slashes are escaped for the
+  // esquery /regex/ literal.
+  // Alias paths with a `..` segment (`@/modules/m1/../m9/x`) are blocked
+  // outright: the alias cannot be resolved here (no tsconfig-paths resolver),
+  // so the climb cannot be normalized. Legit code never climbs after an alias.
+  const aliasClimb = "^@/modules/.*(?:^|/)\\.\\.(?:/|$)";
+  const dynamicSource = `^(?:@/modules/(?:${otherAlt})(?:/|$)|@/modules/.*(?:^|/)\\.\\.(?:/|$)|(?:\\.{1,2}/)*\\.\\./(?:modules/)?(?:${otherAlt})(?:/|$))`;
+  const dynamicSelector = `ImportExpression > Literal[value=/${dynamicSource.replace(/\//g, "\\/")}/]`;
+  return {
+    files: [`src/modules/${own}/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}`],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              // Bare `@/modules/m9` (module entry) and `@/modules/m9/...`.
+              group: others.flatMap((other) => [
+                `@/modules/${other}`,
+                `@/modules/${other}/**`,
+              ]),
+              message: moduleBoundaryMessage,
+            },
+            {
+              regex: relativeIntoOther,
+              message: moduleBoundaryMessage,
+            },
+            {
+              regex: aliasClimb,
+              message: moduleBoundaryMessage,
+            },
+          ],
+        },
+      ],
+      // import/no-restricted-paths resolves relative paths on disk, so a
+      // `..` climb that lands in another module is caught wherever the `..`
+      // sits (`../m1/../m9/x`). It also sees dynamic import() and require().
+      // In this plugin `target` is the restricted importer (this module) and
+      // `from` is the directory it may not import (every other module).
+      // basePath pins zone resolution to this config file, so the guard holds
+      // when eslint runs from a subdirectory (process.cwd() would shift it).
+      "import/no-restricted-paths": [
+        "error",
+        {
+          basePath: import.meta.dirname,
+          zones: [
+            {
+              target: `./src/modules/${own}`,
+              from: others.map((other) => `./src/modules/${other}`),
+              message: moduleBoundaryMessage,
+            },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: dynamicSelector,
+          message: moduleBoundaryMessage,
+        },
+      ],
+    },
+  };
+});
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -40,6 +134,7 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  ...moduleBoundaryBlocks,
   {
     // TASK-MUM033NPP7UFI — E2E runs against `next dev`, whose HMR websocket keeps
     // the page from ever going network-idle, so a `networkidle` wait is a race that

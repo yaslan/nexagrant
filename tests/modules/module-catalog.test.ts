@@ -230,6 +230,19 @@ describe("pipelineCoverage / categorySummary", () => {
     ]);
   });
 
+  // NG-60 / K-577631: the G1 gate's consortium check reads M8's seats
+  // (src/lib/gates/evaluate.ts), so M8 works in G1 as well as G2.
+  it("M8 declares G1 and G2, so its coverage counts the G1 consortium gate", () => {
+    expect(getAllManifests().find((m) => m.id === "M8")?.stages).toEqual([
+      "G1",
+      "G2",
+    ]);
+    expect(pipelineCoverage(["M8"])).toEqual({
+      covered: ["G1", "G2"],
+      total: 5,
+    });
+  });
+
   it("gives active/total per category", () => {
     expect(categorySummary(["M1", "M6", "M11"])).toEqual({
       core: { active: 1, total: 8 },

@@ -1,6 +1,5 @@
 'use client';
 
-import { useId } from 'react';
 import Link from 'next/link';
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 
@@ -25,8 +24,13 @@ export interface KpiCardProps {
    * stays a plain, unclickable block.
    */
   href?: string;
-  /** Accessible name of the link; the figure and description are read as its description. */
-  ariaLabel?: string;
+  /**
+   * What activating the link does, e.g. "— go to details". It is appended to the link's name
+   * as visually hidden text, so the name is the card's own visible text plus this hint: the
+   * visible label is always inside the accessible name (WCAG 2.5.3 Label in Name) and a
+   * voice user can say what they see.
+   */
+  actionHint?: string;
 }
 
 export function KpiCard({
@@ -39,10 +43,8 @@ export function KpiCard({
   variant = 'default',
   unmeasured = false,
   href,
-  ariaLabel,
+  actionHint,
 }: KpiCardProps) {
-  const bodyId = useId();
-
   const variantClasses = {
     default: 'border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950',
     success: 'border-l-4 border-green-500 bg-green-50 dark:bg-green-950',
@@ -76,12 +78,12 @@ export function KpiCard({
       </div>
 
       {/* Metric */}
-      <div id={href ? bodyId : undefined} className="mb-4">
+      <div className="mb-4">
         <div className="flex items-baseline gap-2">
           <span
             className={
               unmeasured
-                ? 'text-base font-medium text-gray-500 dark:text-gray-400'
+                ? 'text-base font-medium text-gray-600 dark:text-gray-400'
                 : 'text-3xl font-bold text-gray-900 dark:text-white'
             }
           >
@@ -122,10 +124,9 @@ export function KpiCard({
 
       {/* Description */}
       {description && (
-        <p id={href ? `${bodyId}-desc` : undefined} className="text-xs text-gray-600 dark:text-gray-400">
-          {description}
-        </p>
+        <p className="text-xs text-gray-600 dark:text-gray-400">{description}</p>
       )}
+      {href && actionHint && <span className="sr-only">{actionHint}</span>}
     </>
   );
 
@@ -134,8 +135,6 @@ export function KpiCard({
   return (
     <Link
       href={href}
-      aria-label={ariaLabel}
-      aria-describedby={description ? `${bodyId} ${bodyId}-desc` : bodyId}
       className={`block ${frameClasses} transition-shadow hover:shadow-md hover:ring-1 hover:ring-blue-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:hover:ring-blue-500`}
     >
       {body}

@@ -6,7 +6,7 @@ import {
   type KeepEuMetrics,
   type KeepEuSyncResult,
 } from '@/lib/keep-eu-sync';
-import { retrieveChunks, formatRagPrompt } from '@/lib/rag';
+import { retrieveChunks, formatRagContext } from '@/lib/rag';
 import { requirePlatformAdmin } from '@/lib/tenant';
 import { z } from 'zod';
 
@@ -44,6 +44,6 @@ export async function handleTestInterregRagQuery(query: string, topK: number = 3
   const input = ragQuerySchema.parse({ query, topK });
   // Platform scope: searches shared public corpus (Chunk.tenantId IS NULL)
   const chunks = await retrieveChunks(input.query, input.topK, undefined, { userId });
-  const ragPrompt = formatRagPrompt(input.query, chunks);
+  const ragPrompt = formatRagContext(chunks);
   return { chunks, ragPrompt };
 }

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { consortiumWeights } from '@/lib/scoring/consortium';
-import { CONSORTIUM_DIMENSION_MAX, MATCH_DIMENSION_SCALE, seatBreakdownWriter } from '@/lib/scoring/seat-dimension-scale';
+import {
+  CONSORTIUM_DIMENSION_MAX,
+  MATCH_DIMENSION_SCALE,
+  MATCH_LEGACY_DIMENSION_SCALE,
+  seatBreakdownWriter,
+} from '@/lib/scoring/seat-dimension-scale';
 import { rescoreBreakdown } from '@/lib/scoring/seat-rescore';
 
 /**
@@ -35,24 +40,42 @@ function oldWriter(breakdown: unknown): 'match' | 'consortium' | null {
 
 const ALL_KEYS = [...new Set([...OLD_MATCH_KEYS, ...OLD_CONSORTIUM_KEYS])];
 
+/** K-578751: what the matcher writes now. Warmth and centrality are gone from it. */
+const NEW_MATCH_KEYS = ['topicExperience', 'geographicBalance', 'collabHistory', 'rivalRisk'];
+const DROPPED_MATCH_KEYS = ['relationshipWarmth', 'centrality'];
+
+/**
+ * The old rule, with one addition each way: its 'match' is now the legacy matcher, and four
+ * numeric criteria with neither dropped key present are the current matcher.
+ */
+function expectedWriter(breakdown: unknown): 'match' | 'match-legacy' | 'consortium' | null {
+  const old = oldWriter(breakdown);
+  if (old === 'match') return 'match-legacy';
+  if (typeof breakdown !== 'object' || breakdown === null || Array.isArray(breakdown)) return old;
+  const b = breakdown as Record<string, unknown>;
+  if (oldHasNumbers(b, NEW_MATCH_KEYS) && !DROPPED_MATCH_KEYS.some((k) => k in b)) return 'match';
+  return old;
+}
+
 describe('seatBreakdownWriter is the rescore rule (FO-158 equality table)', () => {
   it('the scale key sets are the rule key sets', () => {
-    expect(Object.keys(MATCH_DIMENSION_SCALE).sort()).toEqual([...OLD_MATCH_KEYS].sort());
+    expect(Object.keys(MATCH_LEGACY_DIMENSION_SCALE).sort()).toEqual([...OLD_MATCH_KEYS].sort());
+    expect(Object.keys(MATCH_DIMENSION_SCALE).sort()).toEqual([...NEW_MATCH_KEYS].sort());
     expect(Object.keys(CONSORTIUM_DIMENSION_MAX).sort()).toEqual([...OLD_CONSORTIUM_KEYS].sort());
   });
 
-  it('agrees with the old rule on every subset of the dimension keys, numbers and non-numbers', () => {
+  it('follows the rule on every subset of the dimension keys, numbers and non-numbers', () => {
     const cases = 1 << ALL_KEYS.length;
     for (let mask = 0; mask < cases; mask++) {
       const present = ALL_KEYS.filter((_, i) => mask & (1 << i));
       for (const bad of [null, 'x', Number.NaN, Number.POSITIVE_INFINITY]) {
         const numbers: Record<string, unknown> = Object.fromEntries(present.map((k) => [k, 1.5]));
-        expect(seatBreakdownWriter(numbers), `keys ${present.join(',')}`).toBe(oldWriter(numbers));
+        expect(seatBreakdownWriter(numbers), `keys ${present.join(',')}`).toBe(expectedWriter(numbers));
 
         if (present.length > 0) {
           const withBad = { ...numbers, [present[0] as string]: bad };
           expect(seatBreakdownWriter(withBad), `keys ${present.join(',')} with ${String(bad)}`).toBe(
-            oldWriter(withBad)
+            expectedWriter(withBad)
           );
         }
       }
@@ -61,7 +84,7 @@ describe('seatBreakdownWriter is the rescore rule (FO-158 equality table)', () =
 
   it('agrees on empty, non-object and array input', () => {
     for (const input of [undefined, null, 0, 'breakdown', [], [1, 2], {}, { total: 5 }]) {
-      expect(seatBreakdownWriter(input)).toBe(oldWriter(input));
+      expect(seatBreakdownWriter(input)).toBe(expectedWriter(input));
     }
   });
 });
@@ -75,14 +98,27 @@ describe('rescoreBreakdown leaves a breakdown no scorer wrote alone', () => {
     expect(rescoreBreakdown([1], weights)).toBeNull();
   });
 
-  it('scores a matcher breakdown to its exact 0–100 score, without touching its breakdown', () => {
-    const matcher = { topicExperience: 35, geographicBalance: 15, collabHistory: 15, relationshipWarmth: 15, centrality: 10, rivalRisk: -10 };
+  it('scores a current matcher breakdown out of 100, without touching its breakdown', () => {
+    const matcher = { topicExperience: 34, geographicBalance: 33, collabHistory: 33, rivalRisk: -10 };
     const result = rescoreBreakdown(matcher, weights);
-    expect(result?.score).toBe(88.89);
+    expect(result?.score).toBe(90);
     expect(result?.breakdown).toEqual(matcher);
   });
 
-  it('a breakdown with both scorers\' keys is a matcher, so it is not given a consortium total', () => {
+  it('keeps a pre-K-578751 six-key row on the formula that wrote it, not the new one', () => {
+    const legacy = { topicExperience: 35, geographicBalance: 15, collabHistory: 15, relationshipWarmth: 15, centrality: 10, rivalRisk: -10 };
+    const result = rescoreBreakdown(legacy, weights);
+    // 80 of the old 90. Read as a new row it would be 80 of 100.
+    expect(result?.score).toBe(88.89);
+    expect(result?.breakdown).toEqual(legacy);
+  });
+
+  it('a partly-migrated breakdown is nobody\'s, so its seat is left alone', () => {
+    const partial = { topicExperience: 10, geographicBalance: 33, collabHistory: 0, relationshipWarmth: 5, rivalRisk: 0 };
+    expect(rescoreBreakdown(partial, weights)).toBeNull();
+  });
+
+  it('a breakdown with both scorers\' keys is a (legacy) matcher, so it is not given a consortium total', () => {
     const both = {
       topicExperience: 10,
       geographicBalance: 5,

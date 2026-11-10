@@ -343,6 +343,23 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(evidenceOf(openRun).filledSeats).toBe(0);
     expect(evidenceOf(openRun).noHistoryWithoutFilledSeat).toBe(true);
 
+    // NG-69: the verdict as the user reads it. The refused partner's score is 84, above the 80 line
+    // the old board painted green. The card must say "84" without a fixed "/100", give the real
+    // basis (denominator 75) and the refusal reason; the board badge must not be green.
+    const refusedDetail = await openDetail(page, opp.id);
+    await expect(refusedDetail.getByTestId('pipeline-g0-value')).toHaveText('84');
+    await expect(refusedDetail.getByTestId('pipeline-g0-basis')).toContainText('75');
+    await expect(refusedDetail.getByTestId('pipeline-g0-refusal')).toBeVisible();
+    await shot(page, '04-detay-red-gerekcesi');
+    await refusedDetail.getByRole('link', { name: "Pipeline'a Geri Dön" }).click();
+    await expect(page.getByTestId('pipeline-board')).toBeVisible({ timeout: 30_000 });
+    const refusedBadge = page.getByTestId(`pipeline-card-g0-${opp.id}`);
+    await expect(refusedBadge).toContainText('84');
+    // The painted colour, not an attribute derived from the same rule: amber text, never the green one.
+    await expect(refusedBadge).toHaveClass(/text-amber/);
+    await expect(refusedBadge).not.toHaveClass(/text-ok/);
+    await shot(page, '05-pano-rozet-red');
+
     // ── 2. Both seats invited from the candidate search. Now the seats name organisations.
     await page.goto(`/tr/${SLUG}/pipeline/${opp.id}/consortium`);
     await expectHydrated(page.getByRole('button', { name: `+ ${CONSORTIUM_ROLES.research}` }));
@@ -363,6 +380,18 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     expect(ev.score).toBe(100);
     expect(invitedRun.passed).toBe(true);
 
+    // NG-69: a passed partner keeps the green badge. Re-evaluating the G0 gate is a same-stage
+    // move (G0→G0), so the opportunity stays at G0 and the detail box is still the live computation.
+    const passedDetail = await openDetail(page, opp.id);
+    await expect(passedDetail.getByTestId('pipeline-g0-value')).toHaveText('100');
+    await expect(passedDetail.getByTestId('pipeline-g0-refusal')).toHaveCount(0);
+    await passedDetail.getByRole('link', { name: "Pipeline'a Geri Dön" }).click();
+    await expect(page.getByTestId('pipeline-board')).toBeVisible({ timeout: 30_000 });
+    const passedBadge = page.getByTestId(`pipeline-card-g0-${opp.id}`);
+    await expect(passedBadge).toContainText('100');
+    await expect(passedBadge).toHaveClass(/text-ok/);
+    await shot(page, '06-pano-rozet-gecti');
+
     // ── 3. The register did not confirm the PIC: NOT_FOUND, UNKNOWN, or never checked (null). The same
     // two invited seats must score on the standard basis (denominator 100) for each of them. Only FOUND
     // earns the 75-point grant. The 75 is the measured standard score, not an assumed one.
@@ -382,6 +411,8 @@ test.describe('FO-382 a new partner with no CORDIS record', () => {
     }
 
     // ── 4. The PIC is removed (fixture). Still the standard basis: removing the PIC never raises the score.
+    // "PIC boşsa kolaylık yok": the 75-point denominator must not apply. The 75 below is the measured
+    // standard score, reported in the result file.
     await prisma.tenant.update({ where: { id: TENANT }, data: { pic: null, picRegistryStatus: null, picRegistryCheckedAt: null } });
     const picLessRun = await runG0(page, opp.id);
     const picLess = evidenceOf(picLessRun);

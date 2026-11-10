@@ -66,6 +66,7 @@ beforeEach(() => {
   docx.failureError = null;
   vi.mocked(auth).mockResolvedValue({
     tenantId: 'tenant_1',
+    role: 'MEMBER',
     user: { email: 'user@example.com', name: 'Test User' },
   } as never);
 });

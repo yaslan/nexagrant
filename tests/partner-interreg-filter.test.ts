@@ -192,7 +192,7 @@ vi.mock('../src/modules/m1/server/partner-search/monthly-quota', () => ({ meterP
 // the plan are stubbed; Basic without M1 → no badges, as before.
 vi.mock('../src/lib/tenant', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/lib/tenant')>()),
-  requireTenantPage: vi.fn().mockResolvedValue({ tenantId: 'demo-tenant' }),
+  requireTenantPage: vi.fn().mockResolvedValue({ tenantId: 'demo-tenant', role: 'MEMBER' }),
 }));
 vi.mock('../src/lib/billing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/lib/billing')>()),

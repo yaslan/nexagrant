@@ -2,7 +2,7 @@ import { generateText } from '@/lib/llm';
 import { withTenant, assertTenantScope, type TenantTx } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { z } from 'zod';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 
 export interface ParsedEsrScores {
@@ -55,15 +55,13 @@ export async function parseEsrDocumentText(
   assertTenantScope(tenantId, 'parseEsrDocumentText');
 
   const locale = await promptLocale();
-  const prompt = renderPrompt('m6/esr-parse', { documentText: documentText.slice(0, 8000) }, locale);
 
   const resultStr = await generateText({
     tenantId,
     userId,
     module: 'M6',
     purpose: 'esr-parser',
-    prompt,
-    system: renderPrompt('m6/esr-parse-system', {}, locale),
+    ...separatedPrompt('m6/esr-parse', {}, { document_text: documentText.slice(0, 8000) }, locale),
   });
 
   let raw: unknown;

@@ -30,7 +30,7 @@ const m = vi.hoisted(() => ({
   fetchLiveCordisDelta: vi.fn(),
   getCordisLiveStreamLogs: vi.fn(),
   retrieveChunks: vi.fn(),
-  formatRagPrompt: vi.fn(),
+  formatRagContext: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ auth: m.auth }));
@@ -63,7 +63,7 @@ vi.mock('@/lib/cordis-delta', () => ({
   fetchLiveCordisDelta: m.fetchLiveCordisDelta,
   getCordisLiveStreamLogs: m.getCordisLiveStreamLogs,
 }));
-vi.mock('@/lib/rag', () => ({ retrieveChunks: m.retrieveChunks, formatRagPrompt: m.formatRagPrompt }));
+vi.mock('@/lib/rag', () => ({ retrieveChunks: m.retrieveChunks, formatRagContext: m.formatRagContext }));
 
 const blog = await import('@/app/[locale]/admin/blog/actions');
 const cordis = await import('@/app/[locale]/admin/cordis/actions');
@@ -116,7 +116,7 @@ beforeEach(() => {
   m.fetchLiveCordisDelta.mockResolvedValue({ ok: true });
   m.getCordisLiveStreamLogs.mockResolvedValue([]);
   m.retrieveChunks.mockResolvedValue([]);
-  m.formatRagPrompt.mockReturnValue('prompt');
+  m.formatRagContext.mockReturnValue('prompt');
 });
 
 describe.each(ACTIONS)('$name', ({ call, effects }) => {

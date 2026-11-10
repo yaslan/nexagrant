@@ -100,6 +100,13 @@ const envSchema = z.object({
   PIC_REGISTRY_ALLOW_LOCAL: blankToUndefined(z.enum(['true', 'false']).optional()),
   /** FO-396. Switches the register check off entirely (the e2e web server). Unset = off. */
   PIC_REGISTRY_OFF: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /**
+   * Signs the opt-out link of a first message (NG-42, src/lib/email/opt-out.ts).
+   * The links do not expire and sit in mail already delivered, so this key must
+   * NEVER rotate: changing it breaks every one of them. Unset or blank = AUTH_SECRET,
+   * and then rotating AUTH_SECRET breaks them. 32+ random characters; not AUTH_SECRET.
+   */
+  EMAIL_OPTOUT_SECRET: blankToUndefined(z.string().min(32).optional()),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
@@ -343,6 +350,11 @@ export const declaredNodeEnv: 'development' | 'test' | 'production' | undefined 
  */
 export function authSecret(): string | null {
   return env.AUTH_SECRET ?? env.NEXTAUTH_SECRET ?? null;
+}
+
+/** The key of the opt-out links: its own when set, otherwise the session key. */
+export function emailOptOutSecret(): string | null {
+  return env.EMAIL_OPTOUT_SECRET ?? authSecret();
 }
 
 /**

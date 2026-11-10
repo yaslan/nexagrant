@@ -11,13 +11,18 @@ export const RN_TENANT = 'ng4-role-nav-e2e-tenant';
 export const RN_WORKSPACE_ID = 'ng4-role-nav-e2e-workspace';
 export const RN_WORKSPACE = 'ng4-rol-ws';
 
+/**
+ * Addresses on a domain only this fixture uses (NG-64, NG-4 review N-1): `User.email`
+ * is unique, and a developer database that still holds an older `ng4-…@fabrika.test`
+ * user under another id made the upsert by id fail on the e-mail.
+ */
 export const RN_SEATS: Record<Role, { id: string; email: string }> = {
-  TENANT_OWNER: { id: 'ng4-role-nav-owner', email: 'ng4-owner@fabrika.test' },
-  TENANT_ADMIN: { id: 'ng4-role-nav-admin', email: 'ng4-admin@fabrika.test' },
-  PIPELINE_MANAGER: { id: 'ng4-role-nav-manager', email: 'ng4-manager@fabrika.test' },
-  WRITER: { id: 'ng4-role-nav-writer', email: 'ng4-writer@fabrika.test' },
-  MEMBER: { id: 'ng4-role-nav-member', email: 'ng4-member@fabrika.test' },
-  GUEST_PARTNER: { id: 'ng4-role-nav-guest', email: 'ng4-guest@fabrika.test' },
+  TENANT_OWNER: { id: 'ng4-role-nav-owner', email: 'ng4-owner@role-nav.e2e.fabrika.test' },
+  TENANT_ADMIN: { id: 'ng4-role-nav-admin', email: 'ng4-admin@role-nav.e2e.fabrika.test' },
+  PIPELINE_MANAGER: { id: 'ng4-role-nav-manager', email: 'ng4-manager@role-nav.e2e.fabrika.test' },
+  WRITER: { id: 'ng4-role-nav-writer', email: 'ng4-writer@role-nav.e2e.fabrika.test' },
+  MEMBER: { id: 'ng4-role-nav-member', email: 'ng4-member@role-nav.e2e.fabrika.test' },
+  GUEST_PARTNER: { id: 'ng4-role-nav-guest', email: 'ng4-guest@role-nav.e2e.fabrika.test' },
 };
 
 const MODULES: Record<string, ModuleStatus> = {

@@ -115,7 +115,8 @@ export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-controls={panelId}
-        aria-label={t('dateFilterAria')}
+        // WCAG 2.5.3: the name starts with the range the button shows, then says what it does.
+        aria-label={`${formatDate(from)} — ${formatDate(to)}, ${t('dateFilterAria')}`}
         className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium text-sm flex items-center gap-2"
       >
         <span aria-hidden="true">📅</span>
