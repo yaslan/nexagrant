@@ -4,8 +4,15 @@ import { withSystemScope } from '@/lib/system-scope';
 import { AdminModulesClient } from './client';
 import { ModuleStatus } from '@/lib/modules/types';
 import { errorMessage } from '@/lib/errors';
+import { getTranslations } from 'next-intl/server';
 
-export default async function AdminModulesPage() {
+export default async function AdminModulesPage({
+  params,
+}: {
+  params: Promise<{ locale?: string }>;
+}) {
+  const { locale = 'tr' } = await params;
+  const t = await getTranslations({ locale, namespace: 'adminModules' });
   // The demo fallback here was actively dangerous, not just cosmetic: it put
   // `demo-tenant-1` / `demo-tenant-2` in the picker, and those are real seeded
   // rows — an admin flipping a module on the "preview" was writing ModuleState
@@ -45,7 +52,7 @@ export default async function AdminModulesPage() {
     }
   } catch (error) {
     console.error(`[AdminModulesPage] DB query failed: ${errorMessage(error)}`);
-    loadError = 'Kiracı listesi okunamadı (veritabanına ulaşılamıyor).';
+    loadError = t('loadError');
   }
 
   const initialTenantId = tenants[0]?.id;
@@ -54,9 +61,9 @@ export default async function AdminModulesPage() {
     return (
       <div className="max-w-6xl mx-auto py-6 sm:px-6">
         <div className="bg-surface border rounded-xl p-8 text-center">
-          <h1 className="text-xl font-bold text-ink mb-2">Modül Yönetimi</h1>
+          <h1 className="text-xl font-bold text-ink mb-2">{t('title')}</h1>
           <p className="text-sm text-muted">
-            {loadError || 'Kayıtlı kiracı yok — yönetilecek modül durumu bulunmuyor.'}
+            {loadError || t('noTenants')}
           </p>
         </div>
       </div>

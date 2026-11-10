@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { getAllManifests, getManifest } from '@/lib/modules/registry';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { updateTenantModuleStatus } from './actions';
@@ -20,6 +21,7 @@ interface AdminModulesClientProps {
 }
 
 export function AdminModulesClient({ tenants, initialTenantId, initialStates }: AdminModulesClientProps) {
+  const t = useTranslations('adminModules');
   const manifests = getAllManifests();
   
   const [selectedTenantId, setSelectedTenantId] = useState<string>(initialTenantId || tenants[0]?.id || '');
@@ -79,7 +81,7 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
       try {
         await updateTenantModuleStatus(selectedTenantId, modId, targetStatus);
       } catch (e) {
-        setErrorMessage(toErrorMessage(e) || 'Failed to update module state.');
+        setErrorMessage(toErrorMessage(e) || t('updateFailed'));
         // Revert optimistic update
         setModuleStates(initialStates);
       }
@@ -91,12 +93,12 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
       {/* Header & Tenant Filter */}
       <div className="bg-surface p-6 rounded-2xl border border-border shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-ink">Module State Manager</h1>
-          <p className="text-xs text-muted mt-0.5">Configure module availability (OFF, DEV, PILOT, ON) for tenant accounts.</p>
+          <h1 className="text-2xl font-bold font-heading text-ink">{t('stateTitle')}</h1>
+          <p className="text-xs text-muted mt-0.5">{t('stateDescription')}</p>
         </div>
 
         <div className="flex items-center space-x-3 w-full md:w-auto">
-          <label className="text-xs font-semibold text-ink whitespace-nowrap">Select Tenant:</label>
+          <label className="text-xs font-semibold text-ink whitespace-nowrap">{t('selectTenant')}</label>
           <select
             value={selectedTenantId}
             onChange={(e) => {
@@ -145,7 +147,7 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2 pt-1">
                   <div>
-                    <span className="font-semibold text-muted">Requires: </span>
+                    <span className="font-semibold text-muted">{t('requires')}</span>
                     {mod.requires.length > 0 ? (
                       mod.requires.map(r => (
                         <span key={r} className="inline-block bg-ground border border-border px-1.5 py-0.5 rounded mr-1 font-mono text-[10px]">
@@ -153,11 +155,11 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
                         </span>
                       ))
                     ) : (
-                      <span className="text-muted">None</span>
+                      <span className="text-muted">{t('none')}</span>
                     )}
                   </div>
                   <div>
-                    <span className="font-semibold text-muted">Recommends: </span>
+                    <span className="font-semibold text-muted">{t('recommends')}</span>
                     {mod.recommends.length > 0 ? (
                       mod.recommends.map(r => (
                         <span key={r} className="inline-block bg-ground border border-border px-1.5 py-0.5 rounded mr-1 font-mono text-[10px]">
@@ -165,13 +167,13 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
                         </span>
                       ))
                     ) : (
-                      <span className="text-muted">None</span>
+                      <span className="text-muted">{t('none')}</span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2 text-xs text-muted pt-0.5">
-                  <span className="font-semibold">Plans:</span>
+                  <span className="font-semibold">{t('plans')}</span>
                   {mod.planTiers.map(tier => (
                     <span key={tier} className="uppercase text-[10px] bg-ground border border-border px-1.5 py-0.5 rounded font-mono">
                       {tier}
@@ -223,10 +225,10 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-border">
             <h2 className="text-lg font-bold text-ink flex items-center font-heading">
-              ⚠️ Confirm Cascade Disable
+              {t('cascadeTitle')}
             </h2>
             <p className="text-xs text-ink-2">
-              Disabling <strong className="text-ink">{getManifest(cascadeModal.target)?.name} ({cascadeModal.target})</strong> will automatically disable the following dependent modules:
+              {t('cascadeLeadPrefix')} <strong className="text-ink">{getManifest(cascadeModal.target)?.name} ({cascadeModal.target})</strong> {t('cascadeLeadSuffix')}
             </p>
 
             <div className="bg-amber/10 border border-amber/20 rounded-xl p-3 space-y-1">
@@ -243,13 +245,13 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
                 onClick={() => setCascadeModal(null)}
                 className="px-4 py-2 text-xs font-semibold border border-border rounded-lg hover:bg-surface-hover text-ink-2"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 onClick={() => applyStatusChange(cascadeModal.target, 'OFF')}
                 className="px-4 py-2 text-xs font-semibold bg-bad text-white rounded-lg hover:opacity-90 shadow-2xs"
               >
-                Disable All Dependent Modules
+                {t('disableDependents')}
               </button>
             </div>
           </div>
