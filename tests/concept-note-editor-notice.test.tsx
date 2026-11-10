@@ -26,11 +26,15 @@ import ConceptNoteEditor from '@/modules/m2/ui/ConceptNoteEditor';
 
 const schema = [{ key: 'summary', labelKey: 'Executive Summary', maxWords: 500 }];
 
-function renderEditor(locale: 'tr' | 'en', noteId?: string) {
+function renderEditor(
+  locale: 'tr' | 'en',
+  noteId?: string,
+  editorSchema: { key: string; labelKey: string; maxWords: number }[] = schema
+) {
   const messages = locale === 'tr' ? trMessages : enMessages;
   return render(
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <ConceptNoteEditor opportunityId="opp-1" templateId="tpl-1" schema={schema} noteId={noteId} />
+      <ConceptNoteEditor opportunityId="opp-1" templateId="tpl-1" schema={editorSchema} noteId={noteId} />
     </NextIntlClientProvider>
   );
 }
@@ -93,6 +97,30 @@ describe('ConceptNoteEditor — result band instead of alert()', () => {
     const band = await screen.findByRole('alert');
     expect(band.textContent).toContain('"Executive Summary"');
     expect(band.textContent).not.toContain('withheld');
+  });
+
+  test('a section key missing from the schema is shown raw, and the editor does not crash', async () => {
+    actions.generateConceptNoteDraft.mockRejectedValue(
+      Object.assign(new Error('withheld'), { digest: 'INVALID_TEMPLATE_SECTION:ghostKey' })
+    );
+    renderEditor('en');
+    fireEvent.click(screen.getByRole('button', { name: enMessages.ConceptNote.editor.generate }));
+
+    const band = await screen.findByRole('alert');
+    expect(band.textContent).toContain('"ghostKey"');
+    expect(screen.getByRole('button', { name: enMessages.ConceptNote.editor.generate })).toBeTruthy();
+  });
+
+  test('an empty labelKey falls back to the section key in the band', async () => {
+    actions.generateConceptNoteDraft.mockRejectedValue(
+      Object.assign(new Error('withheld'), { digest: 'INVALID_TEMPLATE_SECTION:summary' })
+    );
+    renderEditor('en', undefined, [{ key: 'summary', labelKey: '', maxWords: 500 }]);
+    fireEvent.click(screen.getByRole('button', { name: enMessages.ConceptNote.editor.generate }));
+
+    const band = await screen.findByRole('alert');
+    expect(band.textContent).toContain('"summary"');
+    expect(band.textContent).not.toContain('""');
   });
 
   test('saving an existing note shows a status band, no dialog', async () => {

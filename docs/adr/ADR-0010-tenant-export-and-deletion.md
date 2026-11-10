@@ -266,8 +266,12 @@ Kısaltmalar:
 | 79 | OrgReadiness (NG-34) | tenantId → Tenant | D (EU Login/LEAR cevabı; kişi verisi yok) | E | C |
 | 80 | InternalApproval (NG-34) | → Opportunity (bileşik FK), tenantId; approvedById → User (SetNull) | D (eş finansman taahhüdü, karar referansı) | E | C |
 | 81 | PartnerBudgetShare (NG-34) | → ConsortiumSeat (bileşik FK), tenantId; agreedById → User (SetNull) | D (ortak bütçe payı aralığı) | E | C |
+| 82 | ProjectIdea (NG-38) | tenantId → Tenant; createdById → User (SetNull) | D (proje fikri metni, TRL, hedef program) | E | C |
+| 83 | DecisionLog (NG-38) | → Opportunity (bileşik FK), tenantId; decidedById → User (SetNull) | D (başvur/vazgeç kararı ve gerekçesi) | E | C |
 
 **NG-34 — dışa aktarma ve silme kapsamı (satırlar 79–81).** Kişi dışa aktarması (`src/actions/user/export-data.ts`) `InternalApproval` ve `PartnerBudgetShare` satırlarından yalnız kişiyi bağlayan onay/mutabakat kaydını verir; tutarlar kurumun verisidir, girmez. Kişi silinince `approvedById` / `agreedById` boşalır, kurumun kaydı kalır. `OrgReadiness` kişiye bağlı değildir. Üçü de kiracı silinince cascade ile gider.
+
+**NG-38 — dışa aktarma ve silme kapsamı (satırlar 82–83).** Kişi dışa aktarması `ProjectIdea` ve `DecisionLog` satırlarından yalnız kişiyi bağlayan kaydı verir (kimlik, kiracı, tarih; kararda fırsat ve tür). Fikir metni ve karar gerekçesi kurumun kaydıdır, girmez. Kişi silinince `createdById` / `decidedById` boşalır, kayıt kalır. İkisi de kiracı silinince cascade ile gider.
 
 **M17 (FO-195, B4) — dışa aktarma ve silme kapsamı.** Ek A sayımına (75) sonradan eklendi (satırlar 76–78; `InterregRubric` / `InterregRubricCriterion` platform katalogudur, kişisel veri yok, dokunulmaz — A.3 gibi).
 
