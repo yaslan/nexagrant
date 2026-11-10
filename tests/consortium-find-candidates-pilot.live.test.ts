@@ -158,18 +158,16 @@ describe('consortium findCandidates on a pilot tenant', () => {
     expect(await candidates()).toBe(before);
   });
 
-  test('running pilot: the same call deletes and rewrites the seat candidates', async () => {
+  test('running pilot: the call is not refused and, with no CORDIS pool, the matcher leaves the rows alone', async () => {
+    // NG-100 B-3 (K-579560=A): the button runs the M8 matcher, which clears and rewrites a
+    // seat only when it finds candidates. This fixture has no topic or CORDIS pool, so the
+    // result is empty and nothing is deleted. The rewrite path is the matcher's own; this
+    // test proves the call reaches the database on a running pilot (no PilotExpiredError).
     await setTrialEnd(10 * 24 * 3600_000);
     const before = await candidates();
 
     await expect(findCandidates(seatId)).resolves.toBeInstanceOf(Array);
 
-    // The rewrite starts with a delete, so none of the seeded rows survive.
-    expect(await candidates()).not.toBe(before);
-    expect(
-      await admin!.seatCandidate.count({
-        where: { tenantId: requireId(tenantId, 'tenantId'), organizationId: { startsWith: RUN } },
-      })
-    ).toBe(0);
+    expect(await candidates()).toBe(before);
   });
 });
