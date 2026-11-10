@@ -176,6 +176,78 @@ describe('computeG0FromSnapshot()', () => {
     expect(c.reasonDetails[0]?.code).toBe('G0_NO_EVIDENCE');
   });
 
+  // NG-59, patron K-579082 = A. The examples from NG-67 §4 and the NG-27 chain, as numbers.
+  describe('only CONFIRMED seats score (K-579082)', () => {
+    /** Coordinator, no CORDIS data: 30 alignment + 15 base rate + 9 budget + 8 lump sum = 62. */
+    const base62 = (seats: G0Snapshot['seats']): G0Snapshot => ({
+      tenant: { country: 'DE', pic: null },
+      profile: null,
+      topic: {
+        id: 'topic-62',
+        identifier: 'HORIZON-CL5-2026-09-D4-01',
+        keywords: ['hydrogen'],
+        isLumpSum: true,
+        isTwoStage: true,
+        // 20 % coordinator slice = €1.12m, 90 % of the way from €400k to €1.2m → 9 of 10.
+        budgetPerProjectCents: 5_600_000_00,
+        eligibility: null,
+      },
+      topicFitScore: 100,
+      baseRatePct: 100,
+      intendedRole: 'coordinator',
+      seats,
+      cordis: null,
+    });
+    const both = (status: string) => [
+      { roleKey: 'research', status },
+      { roleKey: 'end_user', status },
+    ];
+
+    it('a 62-point opportunity stays at 62 with invited research and end-user seats, not 74', () => {
+      expect(computeG0FromSnapshot('t1', subject, base62([])).score).toBeCloseTo(62, 5);
+      const invited = computeG0FromSnapshot('t1', subject, base62(both('INVITED')));
+      expect(invited.score).toBeCloseTo(62, 5);
+      expect(invited.decision).toBe('NO_GO');
+    });
+
+    it.each(['CANDIDATE', 'OPEN', 'DECLINED'])('a %s pair leaves the 62 unchanged too', (status) => {
+      expect(computeG0FromSnapshot('t1', subject, base62(both(status))).score).toBeCloseTo(62, 5);
+    });
+
+    it('confirming the seats raises the score: one +6, both +12', () => {
+      const one = computeG0FromSnapshot('t1', subject, base62([
+        { roleKey: 'research', status: 'CONFIRMED' },
+        { roleKey: 'end_user', status: 'INVITED' },
+      ]));
+      const two = computeG0FromSnapshot('t1', subject, base62(both('CONFIRMED')));
+      expect(one.score).toBeCloseTo(68, 5);
+      expect(two.score).toBeCloseTo(74, 5);
+      expect(two.decision).toBe('GO');
+    });
+
+    it('an opportunity whose only evidence is invited seats has no score (no evidence), not a number', () => {
+      const snapshot = { ...emptySnapshot(), intendedRole: 'coordinator', seats: both('INVITED') };
+      const c = computeG0FromSnapshot('t1', subject, snapshot);
+      expect(c.coverage).toBe(0);
+      expect(c.score).toBeNull();
+      expect(c.reasonDetails[0]?.code).toBe('G0_NO_EVIDENCE');
+    });
+
+    it('a no-history partner with one invited seat still passes the hard rule, scored without the seat', () => {
+      const snapshot = snapshotWithEvidence({
+        intendedRole: 'partner',
+        cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
+        seats: [{ roleKey: 'research', status: 'INVITED' }],
+      });
+      const c = computeG0FromSnapshot('t1', subject, snapshot);
+      expect(c.filledSeats).toBe(1);
+      expect(c.reasonDetails.map((r) => r.code)).not.toContain('G0_NO_HISTORY_NO_FILLED_SEAT');
+      expect(c.features.researchAndEndUser).toBe(0);
+      // (30·90 + 15·70 + 12·0 + 10·100 + 8·100) / 75 = 5550 / 75 = 74
+      expect(c.score).toBeCloseTo(74, 5);
+    });
+  });
+
   it('honours tenant weights', () => {
     const snapshot = snapshotWithEvidence({ topicFitScore: 100, baseRatePct: 0 });
     const withDefaults = computeG0FromSnapshot('t1', subject, snapshot);
@@ -190,7 +262,7 @@ describe('computeG0FromSnapshot()', () => {
     const snapshot = snapshotWithEvidence({
       intendedRole: 'partner',
       cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
-      seats: [{ roleKey: 'research', status: 'INVITED' }],
+      seats: [{ roleKey: 'research', status: 'CONFIRMED' }],
     });
     const c = computeG0FromSnapshot('t1', subject, snapshot);
     expect(c.scoringBasis).toBe('no_history_evidence');
@@ -204,7 +276,7 @@ describe('computeG0FromSnapshot()', () => {
     const snapshot = snapshotWithEvidence({
       intendedRole: 'partner',
       cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
-      seats: [{ roleKey: 'research', status: 'INVITED' }],
+      seats: [{ roleKey: 'research', status: 'CONFIRMED' }],
     });
     const doubled = Object.fromEntries(
       Object.entries(DEFAULT_SCORING_WEIGHTS).map(([k, v]) => [k, v * 2]),
@@ -219,7 +291,7 @@ describe('computeG0FromSnapshot()', () => {
     const snapshot = snapshotWithEvidence({
       intendedRole: 'partner',
       cordis: { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0, participationsOverall: 0 },
-      seats: [{ roleKey: 'research', status: 'INVITED' }],
+      seats: [{ roleKey: 'research', status: 'CONFIRMED' }],
     });
     const onlyExcluded = { ...DEFAULT_SCORING_WEIGHTS, alignment: 0, baseRate: 0, researchAndEndUser: 0, budgetRoleEconomy: 0, lumpSumTwoStage: 0 };
     const c = computeG0FromSnapshot('t1', subject, snapshot, onlyExcluded);

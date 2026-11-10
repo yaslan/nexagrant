@@ -77,6 +77,20 @@ const OPPORTUNITIES: Record<string, Record<string, unknown>> = {
     proposal: null,
     evaluations: [],
   },
+  // NG-59 item 3: no evidence today, but a number left in the column by an earlier run (or a seed).
+  'opp-stale-unscored': {
+    id: 'opp-stale-unscored',
+    tenantId: 'tenant-2',
+    topicId: null,
+    title: 'Scored once, no evidence now',
+    stage: 'G0',
+    status: 'ACTIVE',
+    intendedRole: 'coordinator',
+    g0Score: 63,
+    seats: [],
+    proposal: null,
+    evaluations: [],
+  },
 };
 
 /**
@@ -371,6 +385,35 @@ describe('Gate Evaluation Engine (M5)', () => {
     const result = await evaluateGate('opp-unscored', 'G0', 'tenant-2');
     expect(result.passed).toBe(false);
     expect(result.reasons[0]).toContain('no scoring evidence');
+  });
+
+  test('G0 with no evidence files a record that says so throughout: no score, the old value kept apart (NG-59)', async () => {
+    vi.mocked(prisma.gateDecision.create).mockClear();
+    vi.mocked(prisma.opportunity.updateMany).mockClear();
+    const result = await evaluateGate('opp-stale-unscored', 'G0', 'tenant-2');
+    expect(result.passed).toBe(false);
+    expect(result.reasons[0]).toContain('no scoring evidence');
+
+    const call = vi.mocked(prisma.gateDecision.create).mock.calls.at(-1) as unknown as [{ data: { inputs: Record<string, unknown> } }];
+    const inputs = call[0].data.inputs;
+    expect(inputs.calculatedG0Score).toBeNull();
+    expect((inputs.g0Evidence as Record<string, unknown>).score).toBeNull();
+    // The score the decision shows must agree with "no evidence"; the stale 63 is only the audit trail.
+    expect(inputs.g0Score).toBeNull();
+    expect(inputs.g0ScoreStored).toBe(63);
+    // And the column is emptied, as a rescore does (FO-384), so the board stops drawing the 63.
+    expect(prisma.opportunity.updateMany).toHaveBeenCalledWith({
+      where: { id: 'opp-stale-unscored', tenantId: 'tenant-2' },
+      data: { g0Score: null },
+    });
+  });
+
+  test('G0 with no evidence and nothing stored writes no score at all', async () => {
+    vi.mocked(prisma.opportunity.updateMany).mockClear();
+    await evaluateGate('opp-unscored', 'G0', 'tenant-2');
+    const call = vi.mocked(prisma.gateDecision.create).mock.calls.at(-1) as unknown as [{ data: { inputs: Record<string, unknown> } }];
+    expect(call[0].data.inputs.g0Score).toBeNull();
+    expect(call[0].data.inputs.g0ScoreStored).toBeNull();
   });
 
   test('G2 gate fails when seats are still OPEN', async () => {

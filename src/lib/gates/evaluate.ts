@@ -2,7 +2,7 @@ import type { JsonObject } from '@/types/json';
 import { withTenant, type TenantTx } from '../db';
 import { isPresentId } from '../required-id';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
-import { computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
+import { clearStoredG0, computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 import type { GateReason } from './reasons';
 
 export type GateEvaluationResult = {
@@ -148,16 +148,22 @@ async function runGate(
         inputs.g0Evidence = g0EvidencePayload(computation);
         if (computation.score !== null) {
           await persistG0(tx, computation);
+        } else {
+          // No evidence today: a number left in the column by an earlier run or a seed is not this
+          // opportunity's score any more. Empty it as a rescore does (FO-384), or the board keeps
+          // drawing it next to a decision that says "no evidence" (NG-59 item 3).
+          await clearStoredG0(tx, computation);
         }
       }
 
       const g0Score = computation?.score ?? null;
       inputs.calculatedG0Score = g0Score;
-      // `g0Score` above is the column as it was before this run. Once a fresh score exists, the
-      // decision must show that one: otherwise `inputs.g0Score` and `g0Evidence.score` disagree on
-      // the same record (NG-27 side finding). The old column value is kept for the audit trail.
+      // `g0Score` above is the column as it was before this run. The decision shows the score this
+      // run used, `null` included: otherwise `inputs.g0Score` and `g0Evidence.score` disagree on the
+      // same record (NG-27 side finding; NG-59 for the no-evidence case). The old column value is
+      // kept apart, for the audit trail only.
       inputs.g0ScoreStored = opp.g0Score;
-      if (g0Score !== null) inputs.g0Score = g0Score;
+      inputs.g0Score = g0Score;
 
       if (g0Score === null) {
         // Not a failure on merit: there is no evidence to score this opportunity on. Saying that

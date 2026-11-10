@@ -78,7 +78,8 @@ export interface G0CordisSnapshot {
 /**
  * Seat statuses that count as FILLED: a named candidate, invitee or confirmed organisation sits on
  * the seat. `OPEN` (nobody yet) and `DECLINED` (left) are not filled. This is the one place the set
- * is written down; the scorer and the no-history gate both derive from it.
+ * is written down; the no-history gate derives from it. The general score does NOT: it counts only
+ * `CONFIRMED` seats (see {@link isConfirmedSeat}, NG-59 / K-579082).
  */
 export const FILLED_SEAT_STATUSES = ['CANDIDATE', 'INVITED', 'CONFIRMED'] as const;
 const FILLED_SEAT_STATUS_SET: ReadonlySet<string> = new Set<string>(FILLED_SEAT_STATUSES);
@@ -89,6 +90,16 @@ const FILLED_SEAT_STATUS_SET: ReadonlySet<string> = new Set<string>(FILLED_SEAT_
  */
 export function isFilledSeat(seat: { status: string }): boolean {
   return FILLED_SEAT_STATUS_SET.has(seat.status.trim().toUpperCase());
+}
+
+/**
+ * True when the seat's organisation has confirmed it joins (`CONFIRMED`). Only such a seat earns the
+ * research / end-user points of the general G0 score (NG-59, patron K-579082 = A): a candidate or an
+ * invitee has not agreed to anything yet. The no-history rule still reads {@link isFilledSeat}
+ * (K-576980), so a candidate or invitee lets a new partner through without adding to its score.
+ */
+export function isConfirmedSeat(seat: { status: string }): boolean {
+  return seat.status.trim().toUpperCase() === 'CONFIRMED';
 }
 
 /**
@@ -347,23 +358,23 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
     );
   }
 
-  // 4 — research + end user (weight 12). Read off the consortium seats that have a named
-  // organisation on them. An OPEN seat has no partner yet and a DECLINED one has left; neither
-  // scores (FO-382: an open seat used to earn the full 12 points).
-  // No filled seat (none defined, or only OPEN / DECLINED ones) is missing evidence, not a measured
-  // zero: it leaves the coverage, so a snapshot with nothing else on it reads as no evidence
-  // (FO-382 review, B2). The score is 0 in both cases.
+  // 4 — research + end user (weight 12). Read off the consortium seats whose organisation has
+  // confirmed (NG-59, patron K-579082 = A). An OPEN seat has no partner yet, a DECLINED one has left,
+  // and a CANDIDATE or INVITED one has not agreed yet; none of them scores (FO-382: an open seat used
+  // to earn the full 12 points; before NG-59 an invited one did).
+  // No confirmed seat is missing evidence, not a measured zero: it leaves the coverage, so a snapshot
+  // with nothing else on it reads as no evidence (FO-382 review, B2). The score is 0 in both cases.
   let researchAndEndUser = 0;
-  const scoring = snapshot.seats.filter(isFilledSeat);
+  const scoring = snapshot.seats.filter(isConfirmedSeat);
   if (scoring.length === 0) {
     record(
       'researchAndEndUser',
-      'ConsortiumSeat.roleKey (status CANDIDATE/INVITED/CONFIRMED)',
+      'ConsortiumSeat.roleKey (status CONFIRMED)',
       'missing',
       0,
       snapshot.seats.length === 0
         ? 'no consortium seats defined yet'
-        : 'no seat has a named organisation yet (OPEN and DECLINED do not count)',
+        : 'no seat is confirmed yet (OPEN, DECLINED, CANDIDATE and INVITED do not count)',
     );
   } else {
     const roles = new Set(scoring.map((s) => s.roleKey.trim().toLowerCase()));
@@ -372,7 +383,7 @@ export function extractG0Features(snapshot: G0Snapshot): G0Extraction {
     researchAndEndUser = (hasResearch ? 50 : 0) + (hasEndUser ? 50 : 0);
     record(
       'researchAndEndUser',
-      'ConsortiumSeat.roleKey (status CANDIDATE/INVITED/CONFIRMED)',
+      'ConsortiumSeat.roleKey (status CONFIRMED)',
       'measured',
       researchAndEndUser,
       `research seat: ${hasResearch}, end-user seat: ${hasEndUser}`,

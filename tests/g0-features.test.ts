@@ -34,7 +34,7 @@ function fullSnapshot(overrides: Partial<G0Snapshot> = {}): G0Snapshot {
     intendedRole: 'coordinator',
     seats: [
       { roleKey: 'research', status: 'CONFIRMED' },
-      { roleKey: 'end_user', status: 'INVITED' },
+      { roleKey: 'end_user', status: 'CONFIRMED' },
     ],
     cordis: { coordinationsInTopicFamily: 2, coordinationsOverall: 5, distinctCollaborators: 18, participationsOverall: 9 },
     ...overrides,
@@ -186,11 +186,39 @@ describe('extractG0Features()', () => {
     expect(sources.find((x) => x.feature === 'researchAndEndUser')?.status).toBe('missing');
   });
 
-  it('counts CANDIDATE, INVITED and CONFIRMED seats as having a named partner', () => {
-    for (const status of ['CANDIDATE', 'INVITED', 'CONFIRMED']) {
-      const s = fullSnapshot({ seats: [{ roleKey: 'research', status }] });
-      expect(extractG0Features(s).features.researchAndEndUser, status).toBe(50);
-    }
+  // NG-59, patron K-579082 = A: the general G0 score counts only CONFIRMED seats. A candidate or an
+  // invitee has not agreed to join yet, so it earns nothing (it used to earn the full 6 points).
+  it('scores a CONFIRMED seat', () => {
+    const s = fullSnapshot({ seats: [{ roleKey: 'research', status: 'CONFIRMED' }] });
+    expect(extractG0Features(s).features.researchAndEndUser).toBe(50);
+  });
+
+  it.each(['CANDIDATE', 'INVITED', 'OPEN', 'DECLINED'])('gives no research/end-user marks for a %s seat (K-579082)', (status) => {
+    const s = fullSnapshot({
+      seats: [
+        { roleKey: 'research', status },
+        { roleKey: 'end_user', status },
+      ],
+    });
+    const { features, sources } = extractG0Features(s);
+    expect(features.researchAndEndUser).toBe(0);
+    // No confirmed partner is no evidence on the roles: missing, as for OPEN (FO-382 review, B2).
+    expect(sources.find((x) => x.feature === 'researchAndEndUser')?.status).toBe('missing');
+  });
+
+  it('counts only the confirmed seat when an invited one sits next to it (K-579082)', () => {
+    const s = fullSnapshot({
+      seats: [
+        { roleKey: 'research', status: 'CONFIRMED' },
+        { roleKey: 'end_user', status: 'INVITED' },
+      ],
+    });
+    expect(extractG0Features(s).features.researchAndEndUser).toBe(50);
+  });
+
+  it('reads the seat status case- and space-insensitively, as the no-history gate does', () => {
+    const s = fullSnapshot({ seats: [{ roleKey: 'research', status: ' confirmed ' }] });
+    expect(extractG0Features(s).features.researchAndEndUser).toBe(50);
   });
 
   it('does not count a declined seat as a partner', () => {
@@ -363,6 +391,15 @@ describe('no-history partner needs a filled seat (FO-382 hard rule)', () => {
     const ex = extractG0Features(partner([{ roleKey: 'research', status }]));
     expect(ex.filledSeats).toBe(1);
     expect(ex.facts.noHistoryWithoutFilledSeat).toBe(false);
+  });
+
+  // K-576980 stays as it was: the no-history rule still takes a candidate or an invitee. Only the
+  // general score changed (K-579082), so the same seat lets the partner through and scores nothing.
+  it.each(['CANDIDATE', 'INVITED'])('a %s seat satisfies the no-history rule but earns no score (K-576980 + K-579082)', (status) => {
+    const ex = extractG0Features(partner([{ roleKey: 'research', status }]));
+    expect(ex.filledSeats).toBe(1);
+    expect(ex.facts.noHistoryWithoutFilledSeat).toBe(false);
+    expect(ex.features.researchAndEndUser).toBe(0);
   });
 
   it('counts only filled seats: an OPEN seat next to a DECLINED one is still zero', () => {
