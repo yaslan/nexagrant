@@ -45,6 +45,7 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'pipeline',
   'pipeline/[id]',
   'pipeline/[id]/consortium',
+  'proje-fikri',
   'relationships',
   'relationships/[id]',
   'reports/person-days',
