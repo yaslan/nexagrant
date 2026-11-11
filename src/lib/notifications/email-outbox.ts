@@ -4,6 +4,7 @@ import { withSystemScope, type SystemTx } from '@/lib/system-scope';
 import { keepLiveTenantRows } from '@/lib/tenant-liveness';
 import type { Mailer } from '@/lib/email/mailer';
 import { escapeHtml } from '@/lib/feedback/digest';
+import { requireActionId } from '@/lib/required-id';
 import { renderNotification, type NotificationTranslator } from './render';
 
 /**
@@ -165,6 +166,10 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
       result.itemsSent += batch.length;
       const ids = batch.map((i) => i.id);
       try {
+        // Non-null columns of the rows read above; asserted so the write can
+        // never lose its filter (tests/where-guard-src.test.ts).
+        requireActionId(tenantId, 'tenantId');
+        requireActionId(userId, 'userId');
         await runTenant(tenantId, (tx) =>
           tx.notificationEmailItem.updateMany({
             where: { tenantId, userId, id: { in: ids }, sentAt: null },
