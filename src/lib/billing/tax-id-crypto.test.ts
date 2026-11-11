@@ -62,7 +62,7 @@ describe('tax-id-crypto', () => {
     expect(resolveTaxIdKey(KEY_A)?.length).toBe(32);
     expect(resolveTaxIdKey(KEY_B)?.length).toBe(32);
     expect(resolveTaxIdKey('x'.repeat(32))).toBeNull();
-    expect(resolveTaxIdKey(undefined)).not.toBeUndefined();
+    expect(resolveTaxIdKey(undefined)).toBeNull();
   });
 
   it('write/read helpers cover data, { set }, arrays and results', () => {
