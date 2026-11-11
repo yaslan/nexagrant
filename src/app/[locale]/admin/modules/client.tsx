@@ -147,7 +147,7 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2 pt-1">
                   <div>
-                    <span className="font-semibold text-muted">{t('requires')}</span>
+                    <span className="font-semibold text-muted mr-1">{t('requires')}</span>
                     {mod.requires.length > 0 ? (
                       mod.requires.map(r => (
                         <span key={r} className="inline-block bg-ground border border-border px-1.5 py-0.5 rounded mr-1 font-mono text-[10px]">
@@ -159,7 +159,7 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
                     )}
                   </div>
                   <div>
-                    <span className="font-semibold text-muted">{t('recommends')}</span>
+                    <span className="font-semibold text-muted mr-1">{t('recommends')}</span>
                     {mod.recommends.length > 0 ? (
                       mod.recommends.map(r => (
                         <span key={r} className="inline-block bg-ground border border-border px-1.5 py-0.5 rounded mr-1 font-mono text-[10px]">
@@ -228,7 +228,10 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
               {t('cascadeTitle')}
             </h2>
             <p className="text-xs text-ink-2">
-              {t('cascadeLeadPrefix')} <strong className="text-ink">{getManifest(cascadeModal.target)?.name} ({cascadeModal.target})</strong> {t('cascadeLeadSuffix')}
+              {t.rich('cascadeLead', {
+                module: `${getManifest(cascadeModal.target)?.name} (${cascadeModal.target})`,
+                strong: (chunks) => <strong className="text-ink">{chunks}</strong>,
+              })}
             </p>
 
             <div className="bg-amber/10 border border-amber/20 rounded-xl p-3 space-y-1">
