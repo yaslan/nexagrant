@@ -33,6 +33,9 @@ describe('seedDemoDecision', () => {
     const load = async (NODE_ENV: string | undefined, SEED_DEMO = '') => {
       vi.stubEnv('NODE_ENV', NODE_ENV);
       vi.stubEnv('SEED_DEMO', SEED_DEMO);
+      // NG-40 sec round 3: a process with no NODE_ENV refuses the published fixture key the
+      // test env exports. These cases are about the seed switch, so give them a key of their own.
+      vi.stubEnv('TAX_ID_ENCRYPTION_KEY', 'c'.repeat(64));
       vi.resetModules();
       return import('@/lib/env');
     };
@@ -127,7 +130,8 @@ describe('prisma/seed.ts wiring', () => {
     const setup = readFileSync(resolve(import.meta.dirname, '../scripts/db-setup.sh'), 'utf8');
     const commands = setup.split('\n').filter((l) => !l.trimStart().startsWith('#'));
     const seeds = commands.filter((l) => /\bpnpm db:seed\b/.test(l));
-    expect(seeds).toEqual(['SEED_DEMO=${SEED_DEMO:-true} pnpm db:seed']);
+    // NODE_ENV=${NODE_ENV:-development}: NG-40 sec round 3 (fixture-key refusal without a NODE_ENV).
+    expect(seeds).toEqual(['SEED_DEMO=${SEED_DEMO:-true} NODE_ENV=${NODE_ENV:-development} pnpm db:seed']);
   });
 
   it('runs the demo part only after the switch says so', () => {
