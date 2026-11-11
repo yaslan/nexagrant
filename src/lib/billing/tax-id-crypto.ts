@@ -63,10 +63,13 @@ const FIXTURE_KEY_SHA256 = '4884fdaafea47c29fea7159d0daddd9c085d6200e1359e85bb81
 /**
  * NG-40 sec F2: with the published fixture key every tax number "encrypted" in
  * production could be read by anyone. Refuse it at start-up when NODE_ENV is
- * production. Names the variable only, never a value.
+ * production or when nobody said which environment this is. Names the variable
+ * only, never a value.
  */
 export function assertTaxIdKeyIsNotFixture(nodeEnv: string | undefined, raw: string | undefined | null): void {
-  if (nodeEnv !== 'production') return;
+  // Fail closed (F2 round 3): only an explicit development/test skips the check, so a
+  // process that never set NODE_ENV (unset or blank) is treated like production.
+  if (nodeEnv === 'development' || nodeEnv === 'test') return;
   const key = resolveTaxIdKey(raw);
   if (key && crypto.createHash('sha256').update(key).digest('hex') === FIXTURE_KEY_SHA256) {
     throw new Error('TAX_ID_ENCRYPTION_KEY is the public test fixture key; set a real key in production');
@@ -169,18 +172,30 @@ function walkForTaxId(node: unknown, relations: boolean): string | null {
  * that reaches the field (the field itself, or the relations `billingIdentity` /
  * `invoices` / `invoice`) inside a write payload or an include/select; null when
  * the call is clean. `where` and `_count` are ignored: they never move the value.
- * src/lib/db.ts throws on a hit for every model but the two covered ones.
+ * src/lib/db.ts throws on a hit for every model. For the two covered models the
+ * model's own handler owns the top-level field (`allowTopLevelField`); every nested
+ * path from them (`tenant.update.invoices.create`, `tenant.include.invoices`) is refused too.
  */
-export function findNestedTaxIdAccess(args: unknown): string | null {
+export function findNestedTaxIdAccess(args: unknown, opts: { allowTopLevelField?: boolean } = {}): string | null {
   if (!args || typeof args !== 'object') return null;
   const a = args as Record<string, unknown>;
-  for (const k of NESTED_WRITE_KEYS) {
-    const hit = walkForTaxId(a[k], true);
-    if (hit) return hit;
-  }
-  for (const k of NESTED_READ_KEYS) {
-    const hit = walkForTaxId(a[k], true);
-    if (hit) return hit;
+  for (const k of [...NESTED_WRITE_KEYS, ...NESTED_READ_KEYS]) {
+    const node = a[k];
+    if (!opts.allowTopLevelField) {
+      const hit = walkForTaxId(node, true);
+      if (hit) return hit;
+      continue;
+    }
+    // The model's own handler encrypts/decrypts the TOP-LEVEL field (a data object, each
+    // createMany row, a select flag); skip exactly that key and still walk everything else.
+    for (const item of Array.isArray(node) ? node : [node]) {
+      if (!item || typeof item !== 'object') continue;
+      for (const [key, value] of Object.entries(item)) {
+        if (key === FIELD) continue;
+        const hit = walkForTaxId({ [key]: value }, true);
+        if (hit) return hit;
+      }
+    }
   }
   return null;
 }

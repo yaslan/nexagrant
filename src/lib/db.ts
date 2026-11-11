@@ -119,8 +119,10 @@ function withTaxIdEncryption(client: PrismaClient): PrismaClient {
       // F1: any other model must not reach the field through a nested write / include.
       $allModels: {
         async $allOperations({ model, operation, args, query }: { model: string; operation: string; args: unknown; query: (args: never) => Promise<unknown> }) {
-          // The two covered models are handled above (the model-specific handler also runs).
-          const via = model === 'TenantBillingIdentity' || model === 'Invoice' ? null : findNestedTaxIdAccess(args);
+          // The two covered models' own handler (above, also runs) owns the TOP-LEVEL field;
+          // nested paths from them (via `tenant`) are refused like on any other model.
+          const covered = model === 'TenantBillingIdentity' || model === 'Invoice';
+          const via = findNestedTaxIdAccess(args, { allowTopLevelField: covered });
           if (via) {
             throw new Error(
               `${model}.${operation} reaches the encrypted tax number through "${via}"; query TenantBillingIdentity / Invoice directly (NG-40)`

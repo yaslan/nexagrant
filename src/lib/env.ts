@@ -339,7 +339,8 @@ if (!_env.success) {
 }
 
 // NG-40 sec F2: the published test key must never protect real tax numbers.
-assertTaxIdKeyIsNotFixture(_env.data.NODE_ENV, _env.data.TAX_ID_ENCRYPTION_KEY);
+// The schema defaults NODE_ENV to 'development'; check the value the process really set.
+assertTaxIdKeyIsNotFixture(process.env.NODE_ENV === undefined ? undefined : _env.data.NODE_ENV, _env.data.TAX_ID_ENCRYPTION_KEY);
 
 export const env = _env.data;
 

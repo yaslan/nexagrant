@@ -124,6 +124,75 @@ describe.skipIf(!RUN)('buyerVknTckn is encrypted at rest (live database)', () =>
     expect((await prisma.tenant.findUniqueOrThrow({ where: { id: T1 } })).id).toBe(T1);
   });
 
+  // NG-40 sec round 3 / F1: the same field reached FROM the two covered models, through `tenant`.
+  it('a nested write or include starting at Invoice / TenantBillingIdentity is refused, nothing is stored (F1, round 3)', async () => {
+    const T3 = `${RUNID}-3`;
+    const T4 = `${RUNID}-4`;
+    await prisma.tenant.create({ data: { id: T3, name: T3, slug: T3, country: 'TR' } });
+    try {
+      const invoiceData = (n: string) => ({
+        number: `${RUNID}-${n}`,
+        issuedAt: new Date('2026-09-01T09:00:00.000Z'),
+        currency: 'TRY',
+        buyerName: 'NG40 Test A.Ş.',
+        buyerVknTckn: VKN,
+        buyerTaxOffice: 'Test V.D.',
+        buyerAddress: 'Test Cad. 1',
+        buyerCity: 'Ankara',
+        lines: [{ name: 'x', quantity: 1, unitCode: 'MON', unitPriceMinor: 100, vatRate: 20 }],
+        ettn: randomUUID(),
+      });
+      const refused = /reaches the encrypted tax number/;
+      const invoiceCount = async () => (await prisma.invoice.count({ where: { tenantId: { in: [T1, T3] } } }));
+      const before = await invoiceCount();
+
+      // (a) invoice.create -> tenant -> billingIdentity.create(buyerVknTckn)
+      await expect(
+        prisma.invoice.create({
+          data: {
+            ...invoiceData('A'),
+            tenant: {
+              create: {
+                id: T4,
+                name: T4,
+                slug: T4,
+                country: 'TR',
+                billingIdentity: { create: { buyerName: 'x', buyerVknTckn: VKN, buyerTaxOffice: 'v', buyerAddress: 'a', buyerCity: 'c' } },
+              },
+            },
+          },
+        })
+      ).rejects.toThrow(refused);
+      expect(await rawIdentity(T4)).toBeUndefined();
+      expect(await prisma.tenant.count({ where: { id: T4 } })).toBe(0);
+      expect(await invoiceCount()).toBe(before);
+
+      // (b) tenantBillingIdentity.update -> tenant.update -> invoices.create(buyerVknTckn)
+      await prisma.tenantBillingIdentity.create({ data: identity(T3, VKN) });
+      await expect(
+        prisma.tenantBillingIdentity.update({
+          where: { tenantId: T3 },
+          data: { tenant: { update: { invoices: { create: invoiceData('B') } } } },
+        })
+      ).rejects.toThrow(refused);
+      expect(await invoiceCount()).toBe(before);
+
+      // (c) tenantBillingIdentity.findUnique include tenant.include.invoices
+      await expect(
+        prisma.tenantBillingIdentity.findUnique({ where: { tenantId: T3 }, include: { tenant: { include: { invoices: true } } } })
+      ).rejects.toThrow(refused);
+
+      // the top-level field of the covered model itself still works (encrypted at rest, read as digits)
+      const stored = await rawIdentity(T3);
+      expect(stored?.startsWith(TAX_ID_PREFIX)).toBe(true);
+      expect((await prisma.tenantBillingIdentity.findUniqueOrThrow({ where: { tenantId: T3 }, include: { tenant: true } })).buyerVknTckn).toBe(VKN);
+    } finally {
+      await prisma.invoice.deleteMany({ where: { tenantId: { in: [T3, T4] } } });
+      await prisma.tenantBillingIdentity.deleteMany({ where: { tenantId: { in: [T3, T4] } } });
+      await prisma.tenant.deleteMany({ where: { id: { in: [T3, T4] } } });
+    }
+  });
+
   it('a legacy plaintext row is still readable, and the migration script converts it both ways', async () => {
     await prisma.$executeRaw`INSERT INTO "TenantBillingIdentity" ("tenantId","buyerName","buyerVknTckn","buyerTaxOffice","buyerAddress","buyerCity","buyerCountry","createdAt","updatedAt")
       VALUES (${T2}, 'Legacy', ${VKN}, 'V.D.', 'Adres', 'Ankara', 'Türkiye', now(), now())`;

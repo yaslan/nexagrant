@@ -85,9 +85,9 @@ function run(bin: string, args: string[], env: SeedEnv): Run {
   } else {
     childEnv.NODE_ENV = NODE_ENV;
   }
-  // NG-40 sec F2: a production process refuses the published fixture key the gate exports.
-  // This child is a production seed on a scratch database, so it gets a throwaway key of its own.
-  if (NODE_ENV === 'production') childEnv.TAX_ID_ENCRYPTION_KEY = 'b'.repeat(64);
+  // NG-40 sec F2: a production process (or one with no NODE_ENV, round 3) refuses the published
+  // fixture key the gate exports. These children are seeds on a scratch database, so they get a throwaway key of their own.
+  if (NODE_ENV === 'production' || NODE_ENV === undefined) childEnv.TAX_ID_ENCRYPTION_KEY = 'b'.repeat(64);
   const r = spawnSync(bin, args, { cwd: REPO, env: childEnv as NodeJS.ProcessEnv, encoding: 'utf8', timeout: 300_000 });
   return { status: r.status, output: `${r.stdout}${r.stderr}${r.error ? String(r.error) : ''}` };
 }

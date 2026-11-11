@@ -115,6 +115,10 @@ describe('tax-id-crypto', () => {
     expect(() => assertTaxIdKeyIsNotFixture('production', undefined)).not.toThrow();
     expect(() => assertTaxIdKeyIsNotFixture('test', FIXTURE)).not.toThrow();
     expect(() => assertTaxIdKeyIsNotFixture('development', FIXTURE)).not.toThrow();
+    // round 3: an unset / blank NODE_ENV is not an explicit development, so it is checked too
+    expect(() => assertTaxIdKeyIsNotFixture(undefined, FIXTURE)).toThrow(/test fixture/);
+    expect(() => assertTaxIdKeyIsNotFixture('', FIXTURE)).toThrow(/test fixture/);
+    expect(() => assertTaxIdKeyIsNotFixture(undefined, KEY_A)).not.toThrow();
     try {
       assertTaxIdKeyIsNotFixture('production', FIXTURE);
     } catch (e) {
@@ -133,5 +137,20 @@ describe('tax-id-crypto', () => {
     expect(findNestedTaxIdAccess({ where: { billingIdentity: { isNot: null } }, data: { name: 'x' } })).toBeNull();
     expect(findNestedTaxIdAccess({ select: { _count: { select: { invoices: true } } } })).toBeNull();
     expect(findNestedTaxIdAccess(undefined)).toBeNull();
+  });
+
+  // NG-40 sec round 3 / F1: the two covered models may carry the field at the TOP level
+  // only; every nested path from them is refused.
+  it('for the covered models allows only the top-level field (F1, round 3)', () => {
+    const top = { allowTopLevelField: true };
+    expect(findNestedTaxIdAccess({ data: { buyerVknTckn: VKN, buyerName: 'x' } }, top)).toBeNull();
+    expect(findNestedTaxIdAccess({ data: [{ buyerVknTckn: VKN }, { buyerVknTckn: VKN }] }, top)).toBeNull();
+    expect(findNestedTaxIdAccess({ create: { buyerVknTckn: VKN }, update: { buyerVknTckn: { set: VKN } } }, top)).toBeNull();
+    expect(findNestedTaxIdAccess({ select: { buyerVknTckn: true } }, top)).toBeNull();
+    expect(findNestedTaxIdAccess({ data: { tenant: { update: { billingIdentity: { create: { buyerVknTckn: VKN } } } } } }, top)).toBe('billingIdentity');
+    expect(findNestedTaxIdAccess({ data: { tenant: { update: { invoices: { create: { buyerVknTckn: VKN } } } } } }, top)).toBe('invoices');
+    expect(findNestedTaxIdAccess({ include: { tenant: { include: { invoices: true } } } }, top)).toBe('invoices');
+    expect(findNestedTaxIdAccess({ data: { tenant: { update: { x: { buyerVknTckn: VKN } } } } }, top)).toBe('buyerVknTckn');
+    expect(findNestedTaxIdAccess({ where: { tenantId: 't' }, include: { tenant: true } }, top)).toBeNull();
   });
 });
