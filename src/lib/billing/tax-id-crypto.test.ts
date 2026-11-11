@@ -62,7 +62,17 @@ describe('tax-id-crypto', () => {
     expect(resolveTaxIdKey(KEY_A)?.length).toBe(32);
     expect(resolveTaxIdKey(KEY_B)?.length).toBe(32);
     expect(resolveTaxIdKey('x'.repeat(32))).toBeNull();
-    expect(resolveTaxIdKey(undefined)).toBeNull();
+    expect(resolveTaxIdKey(null)).toBeNull();
+    expect(resolveTaxIdKey('')).toBeNull();
+    // `undefined` falls back to the environment (default parameter): null only when that is unset.
+    const saved = process.env.TAX_ID_ENCRYPTION_KEY;
+    try {
+      delete process.env.TAX_ID_ENCRYPTION_KEY;
+      expect(resolveTaxIdKey(undefined)).toBeNull();
+    } finally {
+      if (saved === undefined) delete process.env.TAX_ID_ENCRYPTION_KEY;
+      else process.env.TAX_ID_ENCRYPTION_KEY = saved;
+    }
   });
 
   it('write/read helpers cover data, { set }, arrays and results', () => {
