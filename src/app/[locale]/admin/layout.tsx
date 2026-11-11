@@ -47,6 +47,7 @@ export default async function AdminLayout({
 
   const user = session?.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });
+  const tLayout = await getTranslations({ locale, namespace: 'adminLayout' });
 
   // Same rule as the workspace frame: never invent who is signed in. The console used to
   // fall back onto a fixed title and onto a real person's e-mail address, so an admin
@@ -74,14 +75,14 @@ export default async function AdminLayout({
       {/* Desktop Header */}
       <header className="hidden md:flex bg-slate-900 text-white border-b border-slate-800 px-6 py-3.5 items-center justify-between sticky top-0 z-40 shadow-md">
         <div className="flex items-center space-x-4">
-          <Link href={`/${locale}`} title={locale === 'tr' ? 'Ana Sayfa' : 'Home'} className="flex items-center space-x-2.5 hover:opacity-90 transition">
+          <Link href={`/${locale}`} title={tLayout('homeLinkTitle')} className="flex items-center space-x-2.5 hover:opacity-90 transition">
             <BrandLogo height={36} tone="dark" />
             <div>
               <span className="font-bold text-base tracking-tight text-white block leading-none">
-                Admin Console
+                {tLayout('consoleTitle')}
               </span>
               <span className="text-[10px] text-slate-400 font-mono">
-                Platform Console v1.1
+                {tLayout('consoleVersion')}
               </span>
             </div>
           </Link>
@@ -109,7 +110,7 @@ export default async function AdminLayout({
           <div className="space-y-4">
             <div className="px-3 py-1">
               <span className="text-[11px] font-bold text-muted uppercase tracking-wider">
-                Yönetim Menüsü
+                {tLayout('menuTitle')}
               </span>
             </div>
 
@@ -126,11 +127,11 @@ export default async function AdminLayout({
       {/* ───────────────────────── ADMIN FOOTER ───────────────────────── */}
       <footer className="bg-surface border-t border-border px-6 py-4 flex flex-col md:flex-row items-center justify-between text-xs text-muted gap-3 z-10">
         <div className="flex items-center space-x-3">
-          <Link href={`/${locale}`} className="font-semibold text-ink-2 hover:text-indigo-600 transition-colors" title="Site Ana Sayfasına Git">
+          <Link href={`/${locale}`} className="font-semibold text-ink-2 hover:text-indigo-600 transition-colors" title={tLayout('siteHomeTitle')}>
             {PRODUCT_NAME}
           </Link>
           <span>•</span>
-          <span>Platform Admin Console v1.1.0</span>
+          <span>{tLayout('footerVersion')}</span>
         </div>
 
         <div className="flex items-center space-x-4">
@@ -140,14 +141,14 @@ export default async function AdminLayout({
             rel="noreferrer"
             className="hover:text-ink transition-colors flex items-center gap-1"
           >
-            <span>Dokümantasyon</span>
+            <span>{tLayout('documentation')}</span>
             <ExternalLink className="w-3 h-3 text-muted" />
           </a>
           <Link href={`/${locale}/privacy`} className="hover:text-ink transition-colors">
-            Gizlilik & DPA
+            {tLayout('privacyDpa')}
           </Link>
           <Link href={`/${locale}/admin/audit`} className="hover:text-ink transition-colors">
-            Denetim İzleri
+            {tLayout('auditTrails')}
           </Link>
         </div>
       </footer>
