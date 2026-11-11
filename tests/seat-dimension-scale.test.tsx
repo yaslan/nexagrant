@@ -171,7 +171,7 @@ describe('dimensionValueText', () => {
   });
 });
 
-describe('consortium builder breakdown', () => {
+describe('consortium builder breakdown (K-579560=A: the M8 matcher rule)', () => {
   const seat = {
     id: 's-1',
     tenantId: 't-1',
@@ -185,21 +185,13 @@ describe('consortium builder breakdown', () => {
     invitedAt: null,
     confirmedAt: null,
   };
-  const scored: ScoringBreakdown = {
-    topicExperience: 3,
-    networkCentrality: 1.2,
-    countryDiversity: 1.5,
-    smeBonus: 0,
-    warmthBonus: 0,
-    liveDemandSignal: 0.4,
-    liveDemandReason: null,
-    total: 61.5,
-  };
+  // The matcher's breakdown: 25 + 33 + 22 − 10 = 70 on the 0–100 seat scale.
+  const matched = { topicExperience: 25, geographicBalance: 33, collabHistory: 22, rivalRisk: -10 };
 
-  async function showBreakdown(locale: 'tr' | 'en', score: unknown) {
+  async function showBreakdown(locale: 'tr' | 'en', breakdown: Record<string, unknown>, score: number) {
     const messages = locale === 'tr' ? trMessages : enMessages;
     vi.mocked(findCandidates).mockResolvedValueOnce([
-      { organizationId: 'org-1', rank: 1, score },
+      { id: 'r-1', seatId: 's-1', organizationId: 'org-1', rank: 1, score, breakdown },
     ] as unknown as Awaited<ReturnType<typeof findCandidates>>);
     render(
       <NextIntlClientProvider locale={locale} messages={messages}>
@@ -212,21 +204,31 @@ describe('consortium builder breakdown', () => {
   }
 
   it.each([
-    ['tr', '3,0 / 3', '1,5 / 1,5', '0,4 / 1', '61,5 / 100'],
-    ['en', '3.0 / 3', '1.5 / 1.5', '0.4 / 1', '61.5 / 100'],
-  ] as const)('%s: each dimension against its own maximum, labelled, in the locale', async (locale, topic, country, demand, total) => {
-    const messages = await showBreakdown(locale, scored);
+    ['tr', '25,0 / 34', '33,0 / 33', '22,0 / 33', '-10,0 (aralık -10…0)', '70,0 / 100'],
+    ['en', '25.0 / 34', '33.0 / 33', '22.0 / 33', '-10.0 (range -10…0)', '70.0 / 100'],
+  ] as const)('%s: each M8 dimension against its own range, labelled, in the locale', async (locale, topic, geo, collab, rival, total) => {
+    const messages = await showBreakdown(locale, matched, 70);
     expect(screen.getByTestId('m8-builder-dimension-topicExperience').textContent).toBe(topic);
-    expect(screen.getByTestId('m8-builder-dimension-countryDiversity').textContent).toBe(country);
-    expect(screen.getByTestId('m8-builder-dimension-liveDemandSignal').textContent).toBe(demand);
-    expect(screen.getByText(messages.Consortium.dimension.networkCentrality)).toBeTruthy();
+    expect(screen.getByTestId('m8-builder-dimension-geographicBalance').textContent).toBe(geo);
+    expect(screen.getByTestId('m8-builder-dimension-collabHistory').textContent).toBe(collab);
+    expect(screen.getByTestId('m8-builder-dimension-rivalRisk').textContent).toBe(rival);
+    expect(screen.getByText(messages.Consortium.dimension.geographicBalance)).toBeTruthy();
     expect(screen.getByText(messages.Consortium.breakdownNote)).toBeTruthy();
     expect(screen.getByText(total)).toBeTruthy();
+    expect(screen.queryByText(messages.Consortium.legacyScoringNote)).toBeNull();
+  });
+
+  it('a row scored before K-578751 says so and keeps its own ranges', async () => {
+    const legacy = { topicExperience: 10, geographicBalance: 15, collabHistory: 0, relationshipWarmth: 0, centrality: 5, rivalRisk: 0 };
+    const messages = await showBreakdown('en', legacy, 30);
+    expect(screen.getByText(messages.Consortium.legacyScoringNote)).toBeTruthy();
+    // The legacy matcher capped geographic balance at 15 (MATCH_LEGACY_DIMENSION_SCALE), not 33.
+    expect(screen.getByTestId('m8-builder-dimension-geographicBalance').textContent).toBe('15.0 / 15');
   });
 
   it('a breakdown no scorer wrote shows bare numbers and does not throw', async () => {
-    await showBreakdown('tr', { topicExperience: 3, total: 3 });
+    await showBreakdown('tr', { topicExperience: 3, total: 3 }, 3);
     expect(screen.getByTestId('m8-builder-dimension-topicExperience').textContent).toBe('3,0');
-    expect(screen.getByTestId('m8-builder-dimension-smeBonus').textContent).toBe('0,0');
+    expect(screen.getByTestId('m8-builder-dimension-geographicBalance').textContent).toBe('0,0');
   });
 });

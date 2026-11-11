@@ -7,7 +7,10 @@ import Link from 'next/link';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { checkModuleAccess } from '@/lib/modules/access';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
+import { findOpportunityTopic } from '@/modules/m8/server/matching';
 
 /** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
 interface CordisOrgRow {
@@ -76,6 +79,7 @@ export default async function ConsortiumPage({
   let seats: ConsortiumSeat[] = [];
   let candidates: SeatCandidate[] = [];
   let orgs: OrgInfo[] = [];
+  let liveDemandOrgIds: string[] = [];
 
   try {
     opportunity = await withTenant<ConsortiumOpportunity | null>(tenantId, (tx) =>
@@ -101,7 +105,34 @@ export default async function ConsortiumPage({
             orderBy: { rank: 'asc' },
           })
         );
-        candidates = rawCandidates as unknown as SeatCandidate[];
+        // K-579560=A: only the M8 matcher's rows are shown (see seat-candidate-view.ts).
+        candidates = visibleSeatCandidates(rawCandidates as unknown as SeatCandidate[]);
+      }
+
+      // Informational only, never part of a score (K-579560=A): which candidates
+      // have an open partner-search request on this topic. The badge is part of the
+      // M8 screen (NG-100 Bulgu A): with M8 closed the query does not run at all.
+      const m8 = await checkModuleAccess('M8');
+      if (m8.allowed && opportunity.topicId && candidates.length > 0) {
+        const topicId = opportunity.topicId;
+        // NG-100 B-4: the form stores the topic identifier, so resolve it as the matcher does.
+        const topic = await withTenant(tenantId, (tx) => findOpportunityTopic(tx, topicId));
+        if (topic) {
+          const requests = await withTenant(tenantId, (tx) =>
+            tx.partnerSearchAnnouncement.findMany({
+              where: {
+                topicIdentifier: topic.identifier,
+                type: 'EXPERTISE_REQUEST',
+                withdrawnAt: null,
+                organizationPic: { in: candidates.map((c) => c.organizationId) },
+              },
+              select: { organizationPic: true },
+            })
+          );
+          liveDemandOrgIds = [
+            ...new Set(requests.map((r) => r.organizationPic).filter((p): p is string => Boolean(p))),
+          ];
+        }
       }
 
       const orgIds = [
@@ -196,6 +227,7 @@ export default async function ConsortiumPage({
         seats={seats}
         candidates={candidates}
         orgMap={orgMap}
+        liveDemandOrgIds={liveDemandOrgIds}
       />
     </div>
   );

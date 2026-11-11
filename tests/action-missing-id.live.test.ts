@@ -4,6 +4,10 @@ import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { requireId } from './helpers/teardown-guard';
 
+// NG-100 / K-579560=A: a seat candidate counts only when the M8 matcher wrote its row
+// (visibleSeatCandidates reads the breakdown), so seeded rows carry a matcher breakdown.
+const MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 15, collabHistory: 10, rivalRisk: 0 };
+
 /**
  * TASK-MUN2KUHP1BP18 (İNCELEME-27 B-1) — a server action handed no id must
  * refuse and leave the tenant's rows as they were.
@@ -192,7 +196,7 @@ beforeAll(async () => {
     const seat = await admin.consortiumSeat.create({ data: { tenantId, opportunityId: opp1, roleKey: `role-${i}` } });
     ids.seat.push(seat.id);
     await admin.seatCandidate.create({
-      data: { tenantId, seatId: seat.id, organizationId: `${RUN}-org-${i}`, score: i, breakdown: {}, rank: 1 },
+      data: { tenantId, seatId: seat.id, organizationId: `${RUN}-org-${i}`, score: i, breakdown: MATCH_BREAKDOWN, rank: 1 },
     });
     const rel = await admin.relationship.create({ data: { tenantId, kind: 'partner', notes: `rel-${i}` } });
     ids.rel.push(rel.id);

@@ -106,6 +106,9 @@ async function rollback() {
 async function seedCordisProject(key: string, masterCall: string, members: [organisationId: string, role: string][]) {
   const id = `g0g1-chain-project-${key}`;
   await prisma.cordisProject.create({ data: { id, title: id, framework: 'HORIZON', masterCall } });
+  // M8's candidate pool reads CORDIS topic rows (matching.ts, `cordisProjectTopic.topicCode`), not
+  // `masterCall`: without this row a project is invisible to "Aday Bul" (K-579560=A).
+  await prisma.cordisProjectTopic.create({ data: { projectId: id, topicCode: masterCall } });
   await prisma.cordisParticipation.createMany({
     data: members.map(([organisationId, role]) => ({ projectId: id, organisationId, role })),
   });

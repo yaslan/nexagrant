@@ -2276,18 +2276,18 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       });
 
       it('N14 / G5: a write in another module, before the check or under readOnly', () => {
-        const scoring = "import { scoreCandidatesForSeat } from '@/lib/scoring/consortium';\n";
+        const scoring = "import { generateSeatCandidates } from '@/modules/m8/server/matching';\n";
         red(
           scoring +
-            "export async function n14(opportunityId: string) {\n  const { tenantId, role } = await requireTenantAction();\n  await scoreCandidatesForSeat(opportunityId, tenantId as never);\n  if (!can(role as never, 'manage_workspaces')) return;\n}\n",
+            "export async function n14(opportunityId: string) {\n  const { tenantId, role } = await requireTenantAction();\n  await generateSeatCandidates(opportunityId, tenantId as never);\n  if (!can(role as never, 'manage_workspaces')) return;\n}\n",
           'n14',
-          'writes before any role check covers them: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'writes before any role check covers them: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
         red(
           scoring +
-            'export async function g5(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ readOnly: true });\n  await scoreCandidatesForSeat(opportunityId, tenantId as never);\n}\n',
+            'export async function g5(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ readOnly: true });\n  await generateSeatCandidates(opportunityId, tenantId as never);\n}\n',
           'g5',
-          'readOnly: true but writes: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'readOnly: true but writes: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
         // After the check, the same call is fine.
         expect(
@@ -2295,7 +2295,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
             file,
             header +
               scoring +
-              "export async function g5ok(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });\n  await scoreCandidatesForSeat(opportunityId, tenantId as never);\n}\n",
+              "export async function g5ok(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });\n  await generateSeatCandidates(opportunityId, tenantId as never);\n}\n",
           ).findings,
         ).toEqual([]);
       });
@@ -2406,18 +2406,18 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
 
       it('D1/D2: a dynamic `import()` of a module of src/', () => {
         red(
-          fn('d1', ro + "  const m = await import('@/lib/scoring/consortium');\n  await m.scoreCandidatesForSeat(id, tenantId as never);\n"),
+          fn('d1', ro + "  const m = await import('@/modules/m8/server/matching');\n  await m.generateSeatCandidates(id, tenantId as never);\n"),
           'd1',
-          'readOnly: true but writes: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'readOnly: true but writes: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
         red(
           fn(
             'd2',
             ctl +
-              "  const { scoreCandidatesForSeat } = await import('@/lib/scoring/consortium');\n  await scoreCandidatesForSeat(id, tenantId as never);\n  if (!can(role, 'manage_workspaces')) return;\n",
+              "  const { generateSeatCandidates } = await import('@/modules/m8/server/matching');\n  await generateSeatCandidates(id, tenantId as never);\n  if (!can(role, 'manage_workspaces')) return;\n",
           ),
           'd2',
-          'writes before any role check covers them: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'writes before any role check covers them: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
       });
 

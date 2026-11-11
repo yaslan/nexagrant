@@ -595,6 +595,7 @@
     "addRoleToConsortium": "KONSORSİYUMA ROL EKLE",
     "topCandidates": "EN İYİ ADAYLAR",
     "liveDemandReason": "Bu kurum bu topic için {days, plural, =0 {bugün} other {# gün önce}} partner arıyor ilanı yayınladı.",
+    "liveDemandBadge": "Canlı talep ilanı var",
     "required": "Zorunlu",
     "status": {
       "OPEN": "AÇIK",

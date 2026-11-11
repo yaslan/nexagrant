@@ -337,8 +337,9 @@ test.describe('M8 consortium matching', () => {
       expect(row.score).toBeLessThanOrEqual(100);
     }
 
-    // 6. A row scored before K-578751 keeps the dimensions and ranges it was scored
-    // on and says so; matching the seat again replaces it with the new criteria.
+    // 6. A row scored before K-578751 is hidden on every screen, not shown with a note
+    // (NG-100 K-579931=A); the seat's other matcher rows stay. Matching the seat again
+    // replaces it with the new criteria.
     await prisma.seatCandidate.updateMany({
       where: { seatId: OPEN_SEAT, rank: 1 },
       data: {
@@ -348,19 +349,16 @@ test.describe('M8 consortium matching', () => {
     });
     await page.goto(URL);
     const legacyCard = page.getByTestId('m8-seat-research');
-    const legacyRow = legacyCard.locator('tbody tr').first();
-    await expect(legacyRow).toContainText('88,9 / 100');
-    const legacyDetails = legacyRow.locator('details');
-    await legacyDetails.locator('summary').click();
-    await expect(legacyDetails.locator('dd')).toHaveCount(6);
-    await expect(legacyDetails.getByTestId('m8-dimension-topicExperience')).toHaveText('35,0 / 35');
-    await expect(legacyDetails).toContainText('önceki ölçütlerle');
-    await page.screenshot({ path: `${SHOTS}/06-legacy-row.png`, fullPage: true });
+    await expect(legacyCard.locator('tbody tr')).toHaveCount(2);
+    await expect(legacyCard).not.toContainText('88,9 / 100');
+    await expect(legacyCard).not.toContainText('önceki ölçütlerle');
+    await page.screenshot({ path: `${SHOTS}/06-legacy-row-hidden.png`, fullPage: true });
 
     const findAgain = legacyCard.getByRole('button', { name: 'Aday Bul' });
     await expectHydrated(findAgain);
     await findAgain.click();
-    await expect(legacyCard).not.toContainText('88,9 / 100', { timeout: 30_000 });
+    await expect(legacyCard.locator('tbody tr')).toHaveCount(3, { timeout: 30_000 });
+    await expect(legacyCard).not.toContainText('88,9 / 100');
     const rewritten = await prisma.seatCandidate.findMany({ where: { seatId: OPEN_SEAT }, select: { breakdown: true } });
     expect(rewritten.length).toBe(3);
     for (const row of rewritten) expect(row.breakdown).not.toHaveProperty('relationshipWarmth');
@@ -379,6 +377,36 @@ test.describe('M8 consortium matching', () => {
    * its own breakdown), so sharing a seat would mean this test asserted on
    * whichever button was pressed last.
    */
+  // NG-100 Bulgu 1 (qa-gnd): the rows survive a reload, so the list must too. Before the
+  // fix the seat opened closed after a reload and the candidates showed only after one more
+  // click on "Aday Bul".
+  test('the consortium builder keeps the candidate list after a reload, with no click (NG-100)', async ({ page }) => {
+    const consortiumUrl = `/tr/${WORKSPACE}/pipeline/${OPP}/consortium`;
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'fabrika_cookie_consent',
+        JSON.stringify({ necessary: true, analytics: true, marketing: true }),
+      );
+    });
+    await signInAs(page, SEAT);
+    await page.goto(consortiumUrl);
+    await page.waitForURL(`**${consortiumUrl}`, { timeout: 30_000 });
+
+    const builderSeat = page.getByTestId('m8-builder-seat-widening');
+    const findCandidates = builderSeat.getByRole('button', { name: 'Aday Bul' });
+    await expectHydrated(findCandidates);
+    await findCandidates.click();
+    await expect(builderSeat.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
+
+    await page.reload();
+    await page.waitForURL(`**${consortiumUrl}`, { timeout: 30_000 });
+
+    // Visible straight after the reload: no "Aday Bul" click in between.
+    const reloadedSeat = page.getByTestId('m8-builder-seat-widening');
+    await expect(reloadedSeat.getByText('M8E2E Institute of Grids').first()).toBeVisible({ timeout: 30_000 });
+    await expect(reloadedSeat).toContainText(/\d+,\d \/ 100/);
+  });
+
   test('the pipeline consortium builder finds candidates too', async ({ page }) => {
     const consortiumUrl = `/tr/${WORKSPACE}/pipeline/${OPP}/consortium`;
     const serverErrors: string[] = [];
@@ -410,9 +438,10 @@ test.describe('M8 consortium matching', () => {
     await expect(builderSeat).toContainText(/\d+,\d \/ 100/);
     const builderDetails = builderSeat.locator('details').first();
     await builderDetails.locator('summary').click();
-    await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 3$/);
-    await expect(builderDetails.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+,\d \/ 1,5$/);
-    await expect(builderDetails.getByTestId('m8-builder-dimension-liveDemandSignal')).toHaveText(/^\d+,\d \/ 1$/);
+    // K-579560=A: the button runs the M8 matcher, so its dimensions are the M8 ranges
+    // (topic 0–34, geographic 0–33), not the retired consortium scale.
+    await expect(builderDetails.getByTestId('m8-builder-dimension-topicExperience')).toHaveText(/^\d+,\d \/ 34$/);
+    await expect(builderDetails.getByTestId('m8-builder-dimension-geographicBalance')).toHaveText(/^\d+,\d \/ 33$/);
     // FO-277: the candidate button was a hard-coded English "Invite" on the Turkish page.
     await expect(builderSeat.getByRole('button', { name: 'Davet Et' }).first()).toBeEnabled({ timeout: 30_000 });
     await expect(builderSeat.getByRole('button', { name: 'Invite' })).toHaveCount(0);
@@ -420,8 +449,7 @@ test.describe('M8 consortium matching', () => {
     await page.screenshot({ path: `${SHOTS}/05c-builder-breakdown.png`, fullPage: true });
     await page.screenshot({ path: `${SHOTS}/05-consortium-builder.png`, fullPage: true });
 
-    // This surface's own scorer ran: its breakdown keys are not the matching
-    // page's, so the rows cannot have come from the earlier test.
+    // The button wrote the matcher's rows for this seat (the rule both screens share).
     await expect
       .poll(async () => (await prisma.seatCandidate.count({ where: { seatId: BUILDER_SEAT } })), {
         timeout: 30_000,
@@ -437,17 +465,13 @@ test.describe('M8 consortium matching', () => {
       expect(row.tenantId).toBe(TENANT);
       expect(row.score).toBeGreaterThanOrEqual(0);
       expect(row.score).toBeLessThanOrEqual(100);
-      expect((row.breakdown as { total?: number }).total).toBe(row.score);
     }
+    // The M8 matcher's four dimensions; live demand is not stored in the breakdown (K-579560=A).
     expect(Object.keys(written[0]?.breakdown as object).sort()).toEqual([
-      'countryDiversity',
-      'liveDemandReason',
-      'liveDemandSignal',
-      'networkCentrality',
-      'smeBonus',
+      'collabHistory',
+      'geographicBalance',
+      'rivalRisk',
       'topicExperience',
-      'total',
-      'warmthBonus',
     ]);
 
     // The builder lists candidates after its button is pressed, so press it in English too.
@@ -459,8 +483,8 @@ test.describe('M8 consortium matching', () => {
     await expect(builderSeatEn).toContainText(/\d+\.\d \/ 100/, { timeout: 30_000 });
     const builderDetailsEn = builderSeatEn.locator('details').first();
     await builderDetailsEn.locator('summary').click();
-    await expect(builderDetailsEn).toContainText('Country diversity');
-    await expect(builderDetailsEn.getByTestId('m8-builder-dimension-countryDiversity')).toHaveText(/^\d+\.\d \/ 1\.5$/);
+    await expect(builderDetailsEn).toContainText('Geographic balance');
+    await expect(builderDetailsEn.getByTestId('m8-builder-dimension-geographicBalance')).toHaveText(/^\d+\.\d \/ 33$/);
     await expect(builderSeatEn.getByRole('button', { name: 'Invite' }).first()).toBeEnabled({ timeout: 30_000 });
     await builderSeatEn.screenshot({ path: `${FO277_SHOTS}/en-consortium-invite.png` });
     await page.screenshot({ path: `${SHOTS}/05d-builder-breakdown-en.png`, fullPage: true });
