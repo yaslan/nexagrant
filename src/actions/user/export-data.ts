@@ -155,7 +155,7 @@ export async function exportUserData(): Promise<ExportResult> {
         }),
         tx.notificationEmailItem.findMany({
           where: { userId },
-          select: { id: true, tenantId: true, type: true, payload: true, frequency: true, createdAt: true },
+          select: { id: true, tenantId: true, type: true, payload: true, frequency: true, createdAt: true, sentAt: true },
           orderBy: { createdAt: 'asc' },
         }),
         // ADR-0011: the subject's notifications in every tenant. `payload`

@@ -7,7 +7,9 @@
 --
 -- DESTRUCTIVE: drops NotificationPreference and NotificationEmailItem with their rows, and the three
 -- enum types. Users fall back to the code default (panel INSTANT, e-mail OFF); e-mails still in the
--- outbox are not sent. No other table loses a row. Revert prisma/schema.prisma, prisma/rls.sql and
+-- outbox are not sent, and the record of sent ones ("sentAt" rows, the e-mail dedupe) goes too: once
+-- re-applied, a producer re-running an old key mails it again. No other table loses a row.
+-- Revert prisma/schema.prisma, prisma/rls.sql and
 -- apply-order.txt in the same step. Export first if it matters:
 --   \copy (SELECT * FROM "NotificationPreference") TO 'notification-preference-backup.csv' CSV HEADER
 --

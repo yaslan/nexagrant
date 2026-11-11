@@ -9,10 +9,10 @@ vi.mock('@/lib/observability/system-alert', () => ({
     alerts.push(a);
   }),
 }));
-const pruneOldNotifications = vi.fn();
+const pruneNotificationStores = vi.fn();
 vi.mock('@/lib/notifications/retention', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/notifications/retention')>()),
-  pruneOldNotifications,
+  pruneNotificationStores,
 }));
 
 const { notificationsRetentionTask } = await import('../notifications-retention');
@@ -27,19 +27,19 @@ function helpersFor(attempts = 1, maxAttempts = 5): JobHelpers {
 
 beforeEach(() => {
   alerts.length = 0;
-  pruneOldNotifications.mockReset();
+  pruneNotificationStores.mockReset();
 });
 
 describe('notifications-retention job', () => {
   it('prunes by the cron tick, and a payload cannot change the window', async () => {
-    pruneOldNotifications.mockResolvedValue(3);
+    pruneNotificationStores.mockResolvedValue({ notifications: 3, sentEmails: 2 });
     await notificationsRetentionTask({ _cron: { ts: '2026-10-01T03:50:00.000Z' }, retentionDays: 0 }, helpersFor());
-    expect(pruneOldNotifications).toHaveBeenCalledWith(new Date('2026-10-01T03:50:00.000Z'));
+    expect(pruneNotificationStores).toHaveBeenCalledWith(new Date('2026-10-01T03:50:00.000Z'));
     expect(alerts).toEqual([]);
   });
 
   it('a failure writes an error SystemAlert at once and rethrows so the queue retries', async () => {
-    pruneOldNotifications.mockRejectedValue(new Error('connection reset'));
+    pruneNotificationStores.mockRejectedValue(new Error('connection reset'));
     await expect(notificationsRetentionTask({}, helpersFor(1))).rejects.toThrow('connection reset');
     expect(alerts).toEqual([
       {

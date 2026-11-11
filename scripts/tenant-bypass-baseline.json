@@ -300,7 +300,7 @@
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "sendNotificationEmails() (NG-43, spec §13): finds which (tenantId, userId) pairs have NotificationEmailItem rows of the run's frequency (INSTANT or WEEKLY) queued up to now, distinct, then keepLiveTenantRows drops soft-deleted tenants. The tenant set is the query's output, so no single tenant exists to hand withTenant; NotificationEmailItem is FORCE RLS, so an unscoped findMany under fabrika_app would see nothing and no mail would ever go. Reads only the two ids; each pair's items, the recipient's address and the deletes run afterwards in withTenant(tenantId)."
+      "reason": "sendNotificationEmails() (NG-43, spec §13): finds which (tenantId, userId) pairs have NotificationEmailItem rows of the run's frequency (INSTANT or WEEKLY) queued up to now, distinct, then keepLiveTenantRows drops soft-deleted tenants. The tenant set is the query's output, so no single tenant exists to hand withTenant; NotificationEmailItem is FORCE RLS, so an unscoped findMany under fabrika_app would see nothing and no mail would ever go. Reads only the two ids; each pair's items, the recipient's address, the sentAt mark and the unsent-drop deletes run afterwards in withTenant(tenantId)."
     },
     {
       "check": "D",
@@ -309,7 +309,7 @@
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "pruneOldNotifications(), run nightly by the notifications-retention cron (ADR-0011 §3.4, TASK-MUVR24EHWI2RA): deletes every tenant's Notification rows whose createdAt is older than NOTIFICATION_RETENTION_DAYS (90). The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; Notification is FORCE RLS, so an unscoped deleteMany under fabrika_app would delete 0 and report success. Only deletes, reads no row content."
+      "reason": "pruneOldNotifications(), run nightly by the notifications-retention cron (ADR-0011 §3.4, TASK-MUVR24EHWI2RA): deletes every tenant's Notification rows whose createdAt is older than NOTIFICATION_RETENTION_DAYS (90), and in the same transaction the NotificationEmailItem rows whose sentAt is older than that window (NG-43: sent outbox rows kept as the e-mail dedupe record; unsent rows never touched). The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; Notification is FORCE RLS, so an unscoped deleteMany under fabrika_app would delete 0 and report success. Only deletes, reads no row content."
     },
     {
       "check": "D",

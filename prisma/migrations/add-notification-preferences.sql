@@ -6,7 +6,10 @@
 --                              or OFF. No row = the code default (panel INSTANT, e-mail OFF).
 --   • NotificationEmailItem  — e-mail outbox: INSTANT rows go out one by one, WEEKLY rows as one
 --                              digest per user (src/lib/notifications/email-outbox.ts), then
---                              they are deleted. type + payload only, no text.
+--                              they are marked "sentAt" and kept, so the (tenant, user, dedupeKey)
+--                              unique index keeps refusing the same notification (NG-43 review
+--                              B-1). notifications-retention deletes a sent row 90 days after
+--                              "sentAt". type + payload only, no text.
 -- Three new enum types; the §13 event list is NotificationEvent. NotificationType is NOT changed
 -- (src/lib/notifications/events.ts maps it onto the §13 list).
 --
@@ -14,7 +17,7 @@
 -- file alone leaves no window without a policy. userId has no FK (Notification.userId pattern);
 -- users-scheduled-deletion deletes both by userId, the tenant's deletion cascades.
 --
--- Idempotency: enum types guarded by duplicate_object, tables/indexes IF NOT EXISTS, FKs guarded by
+-- Idempotency: enum types guarded by duplicate_object, tables/columns/indexes IF NOT EXISTS, FKs guarded by
 -- pg_constraint, policy DROP-then-CREATE. A second run, or a run after `prisma db push`, changes
 -- nothing. Names are Prisma's own. Purely ADDITIVE: no existing table, column or row is touched.
 -- Rollback: prisma/migrations/add-notification-preferences.down.sql
@@ -57,12 +60,18 @@ CREATE TABLE IF NOT EXISTS "NotificationEmailItem" (
   "frequency" "NotificationFrequency" NOT NULL,
   "dedupeKey" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "sentAt"    TIMESTAMP(3),
   CONSTRAINT "NotificationEmailItem_pkey" PRIMARY KEY ("id")
 );
+-- A database that ran the first draft of this file (no "sentAt") gets the column here.
+ALTER TABLE "NotificationEmailItem" ADD COLUMN IF NOT EXISTS "sentAt" TIMESTAMP(3);
 CREATE UNIQUE INDEX IF NOT EXISTS "NotificationEmailItem_tenantId_userId_dedupeKey_key"
   ON "NotificationEmailItem"("tenantId", "userId", "dedupeKey");
-CREATE INDEX IF NOT EXISTS "NotificationEmailItem_frequency_createdAt_idx"
-  ON "NotificationEmailItem"("frequency", "createdAt");
+DROP INDEX IF EXISTS "NotificationEmailItem_frequency_createdAt_idx";
+CREATE INDEX IF NOT EXISTS "NotificationEmailItem_frequency_sentAt_createdAt_idx"
+  ON "NotificationEmailItem"("frequency", "sentAt", "createdAt");
+CREATE INDEX IF NOT EXISTS "NotificationEmailItem_sentAt_idx"
+  ON "NotificationEmailItem"("sentAt");
 CREATE INDEX IF NOT EXISTS "NotificationEmailItem_tenantId_userId_idx"
   ON "NotificationEmailItem"("tenantId", "userId");
 

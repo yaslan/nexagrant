@@ -14,11 +14,17 @@ import { renderNotification, type NotificationTranslator } from './render';
  *   - mode 'INSTANT': one mail per queued item;
  *   - mode 'WEEKLY':  every WEEKLY item of a user in a tenant, in ONE digest
  *                     mail ("haftalık özet"). A user of two tenants gets two.
- * A mail's items are deleted right after the SMTP server accepts it. A failed
- * send leaves its items in place, so the next run sends them again: at least
- * once, never silently dropped. An
- * item whose recipient is no longer a live member of the tenant is deleted
- * unsent (an address of a person who left must not keep getting mail).
+ * A mail's items are marked `sentAt` right after the SMTP server accepts it and
+ * kept: the (tenant, user, dedupeKey) unique index is the e-mail channel's only
+ * dedupe, so deleting the row would let a producer that re-runs the same key
+ * (evidence-expiring, daily) queue and mail it again (NG-43 review B-1).
+ * notifications-retention deletes sent rows after the retention window.
+ * A failed send leaves its items unsent, so the next run sends them again: at
+ * least once, never silently dropped. A failed MARK after an accepted send is
+ * counted in `failures` and the run goes on; that mail goes again next run
+ * (the same at-least-once). An item whose recipient is no longer a live member
+ * of the tenant is deleted unsent (an address of a person who left must not
+ * keep getting mail).
  *
  * The text is rendered here, in the recipient's locale, with the same
  * `renderNotification` the bell uses: the outbox stores type + payload only.
@@ -94,7 +100,7 @@ export interface SendEmailsOptions {
 /** Who has items of this mode waiting: (tenant, user) pairs, live tenants only. */
 async function pendingRecipients(tx: SystemTx, mode: EmailMode, now: Date) {
   const rows = await tx.notificationEmailItem.findMany({
-    where: { frequency: mode, createdAt: { lte: now } },
+    where: { frequency: mode, sentAt: null, createdAt: { lte: now } },
     distinct: ['tenantId', 'userId'],
     select: { tenantId: true, userId: true },
   });
@@ -123,7 +129,7 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     // hold a database transaction open.
     const { items, member } = await runTenant(tenantId, async (tx) => ({
       items: await tx.notificationEmailItem.findMany({
-        where: { tenantId, userId, frequency: options.mode, createdAt: { lte: now } },
+        where: { tenantId, userId, frequency: options.mode, sentAt: null, createdAt: { lte: now } },
         select: { id: true, type: true, payload: true, createdAt: true },
         orderBy: { createdAt: 'asc' },
       }),
@@ -133,11 +139,12 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
       }),
     }));
     if (items.length === 0) continue;
-    const remove = (ids: string[]) =>
-      runTenant(tenantId, (tx) => tx.notificationEmailItem.deleteMany({ where: { tenantId, userId, id: { in: ids } } }));
-
     if (!member) {
-      result.itemsDropped += (await remove(items.map((i) => i.id))).count;
+      const ids = items.map((i) => i.id);
+      const dropped = await runTenant(tenantId, (tx) =>
+        tx.notificationEmailItem.deleteMany({ where: { tenantId, userId, id: { in: ids } } })
+      );
+      result.itemsDropped += dropped.count;
       continue;
     }
     const t = options.translatorFor(member.user.locale);
@@ -154,9 +161,22 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         console.error('[notifications][email-outbox]', options.mode, error instanceof Error ? error.name : 'error');
         continue;
       }
-      await remove(batch.map((i) => i.id));
       result.mailsSent++;
       result.itemsSent += batch.length;
+      const ids = batch.map((i) => i.id);
+      try {
+        await runTenant(tenantId, (tx) =>
+          tx.notificationEmailItem.updateMany({
+            where: { tenantId, userId, id: { in: ids }, sentAt: null },
+            data: { sentAt: new Date() },
+          })
+        );
+      } catch (error) {
+        // The mail went; only the mark failed. Counted, not thrown, so the other
+        // recipients still get theirs; this batch is sent again next run.
+        result.failures++;
+        console.error('[notifications][email-outbox]', options.mode, 'mark', error instanceof Error ? error.name : 'error');
+      }
     }
   }
   return result;

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { createTranslator } from 'next-intl';
 import tr from '../messages/tr.json';
 import en from '../messages/en.json';
@@ -10,7 +10,9 @@ import {
   resolveDelivery,
   type PreferenceRow,
 } from '@/lib/notifications/preferences';
-import { renderDigestMail, renderInstantMail, type OutboxItem } from '@/lib/notifications/email-outbox';
+import { renderDigestMail, renderInstantMail, sendNotificationEmails, type OutboxItem } from '@/lib/notifications/email-outbox';
+import type { SystemTx } from '@/lib/system-scope';
+import type { TenantTx } from '@/lib/db';
 import type { NotificationTranslator } from '@/lib/notifications/render';
 
 /**
@@ -145,5 +147,64 @@ describe('weekly digest mail', () => {
     const mail = renderInstantMail(items[1]!, translator('tr'));
     expect(mail.subject).toBe('Yeni eşleşme bulundu');
     expect(mail.subject).not.toMatch(/[\r\n]/);
+  });
+});
+
+// NG-43 review Ö-2: the mail went but marking it sent failed. Counted in
+// `failures`, not thrown: the next recipient still gets their mail.
+describe('a failed mark after an accepted send', () => {
+  test('is counted in failures and the run goes on to the next recipient', async () => {
+    const item = (id: string): OutboxItem & { tenantId: string } => ({
+      id,
+      tenantId: id === 'i1' ? 't1' : 't2',
+      type: 'SAVED_SEARCH_MATCH',
+      payload: { searchId: 's', searchName: 'X', matchCount: 1 },
+      createdAt: new Date('2026-11-10T09:00:00Z'),
+    });
+    const system = {
+      notificationEmailItem: {
+        findMany: async () => [
+          { tenantId: 't1', userId: 'u1' },
+          { tenantId: 't2', userId: 'u2' },
+        ],
+      },
+      tenant: { findMany: async () => [{ id: 't1' }, { id: 't2' }] },
+    } as unknown as SystemTx;
+    const marked: string[] = [];
+    const tenantTx = (tenantId: string) =>
+      ({
+        notificationEmailItem: {
+          findMany: async () => [item(tenantId === 't1' ? 'i1' : 'i2')],
+          updateMany: async (args: { where: { id: { in: string[] }; sentAt: null } }) => {
+            expect(args.where.sentAt).toBeNull();
+            if (tenantId === 't1') throw new Error('connection reset');
+            marked.push(...args.where.id.in);
+            return { count: args.where.id.in.length };
+          },
+          // The first draft deleted instead of marking; same failure there.
+          deleteMany: async () => {
+            if (tenantId === 't1') throw new Error('connection reset');
+            return { count: 1 };
+          },
+        },
+        membership: {
+          findFirst: async () => ({ user: { email: `${tenantId}@example.com`, locale: 'tr' } }),
+        },
+      }) as unknown as TenantTx;
+    const sent: string[] = [];
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await sendNotificationEmails({
+      mode: 'INSTANT',
+      mailer: async (m) => void sent.push(m.to),
+      translatorFor: () => translator('tr'),
+      systemScope: (cb) => cb(system),
+      runTenant: (tenantId, cb) => cb(tenantTx(tenantId)),
+    });
+    errorLog.mockRestore();
+
+    expect(sent).toEqual(['t1@example.com', 't2@example.com']);
+    expect(marked).toEqual(['i2']);
+    expect(result).toMatchObject({ recipients: 2, mailsSent: 2, itemsSent: 2, failures: 1 });
   });
 });

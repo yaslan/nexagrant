@@ -55,6 +55,8 @@ const tenants: string[] = [];
 const users: string[] = [];
 let a: Scope;
 let b: Scope;
+let c: Scope;
+let d: Scope;
 
 const t = createTranslator({ locale: 'tr', messages: tr, namespace: 'Notifications' }) as unknown as NotificationTranslator;
 
@@ -114,8 +116,11 @@ async function bellRows(s: Scope) {
   return admin!.notification.count({ where: { tenantId: s.tenantId, userId: s.userId } });
 }
 
+/** Items still owed a mail (sentAt null). A sent row stays as the dedupe record. */
 async function queued(s: Scope, frequency?: 'INSTANT' | 'WEEKLY') {
-  return admin!.notificationEmailItem.count({ where: { tenantId: s.tenantId, userId: s.userId, ...(frequency ? { frequency } : {}) } });
+  return admin!.notificationEmailItem.count({
+    where: { tenantId: s.tenantId, userId: s.userId, sentAt: null, ...(frequency ? { frequency } : {}) },
+  });
 }
 
 beforeAll(async () => {
@@ -137,6 +142,8 @@ beforeAll(async () => {
   await assertRlsSubjectRole(state.rls, SUITE);
   a = await makeScope('a');
   b = await makeScope('b');
+  c = await makeScope('c');
+  d = await makeScope('d');
   ready = true;
 });
 
@@ -245,6 +252,45 @@ describe('weekly batch', () => {
     expect(result.itemsDropped).toBeGreaterThanOrEqual(1);
     expect(await queued(b)).toBe(0);
     await admin!.membership.create({ data: { tenantId: b.tenantId, userId: b.userId, role: 'TENANT_OWNER' } });
+  });
+});
+
+// NG-43 review B-1: the producers re-run with the same key (evidence-expiring
+// daily for 30 days, alerts-daily per window). A sent mail must keep its key,
+// or the next run queues and mails the same notification again.
+describe('the dedupeKey still holds after the mail went out', () => {
+  test('INSTANT: dispatch → send → same dispatch → nothing queued, no second mail', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await setPref(c, { event: 'NEW_MATCHING_CALL', channel: 'PANEL', frequency: 'OFF' });
+    await setPref(c, { event: 'NEW_MATCHING_CALL', channel: 'EMAIL', frequency: 'INSTANT' });
+    expect((await dispatch(c, 'again')).email).toBe('INSTANT');
+    const first = inbox();
+    await run('INSTANT', first.mailer);
+    expect(mine(first.sent, c)).toHaveLength(1);
+
+    expect((await dispatch(c, 'again')).email).toBeNull();
+    expect(await queued(c)).toBe(0);
+    const kept = await admin!.notificationEmailItem.findMany({ where: { tenantId: c.tenantId, userId: c.userId } });
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.sentAt).toBeInstanceOf(Date);
+    const second = inbox();
+    await run('INSTANT', second.mailer);
+    expect(mine(second.sent, c)).toHaveLength(0);
+  });
+
+  test('WEEKLY: dispatch → digest → same dispatch → nothing queued, no second digest', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await setPref(d, { event: 'NEW_MATCHING_CALL', channel: 'EMAIL', frequency: 'WEEKLY' });
+    expect((await dispatch(d, 'again')).email).toBe('WEEKLY');
+    const first = inbox();
+    await run('WEEKLY', first.mailer);
+    expect(mine(first.sent, d)).toHaveLength(1);
+
+    expect((await dispatch(d, 'again')).email).toBeNull();
+    expect(await queued(d)).toBe(0);
+    const second = inbox();
+    await run('WEEKLY', second.mailer);
+    expect(mine(second.sent, d)).toHaveLength(0);
   });
 });
 

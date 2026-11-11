@@ -20,9 +20,29 @@ export async function pruneOldNotifications(
   now: Date = new Date(),
   retentionDays: number = NOTIFICATION_RETENTION_DAYS
 ): Promise<number> {
+  return (await pruneNotificationStores(now, retentionDays)).notifications;
+}
+
+export interface PruneResult {
+  notifications: number;
+  /** NotificationEmailItem rows sent (sentAt) before the window. Queued rows are never touched. */
+  sentEmails: number;
+}
+
+/**
+ * pruneOldNotifications plus the e-mail outbox's SENT rows (NG-43): a sent row
+ * is kept only as the e-mail dedupe record, for the same window counted from
+ * `sentAt`. An unsent row stays whatever its age: it is a mail still owed.
+ * One system-scope transaction for both.
+ */
+export async function pruneNotificationStores(
+  now: Date = new Date(),
+  retentionDays: number = NOTIFICATION_RETENTION_DAYS
+): Promise<PruneResult> {
   const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
-  const result = await withSystemScope('cross-tenant-job', 'notifications-retention.prune', (tx) =>
-    tx.notification.deleteMany({ where: { createdAt: { lt: cutoff } } })
-  );
-  return result.count;
+  return withSystemScope('cross-tenant-job', 'notifications-retention.prune', async (tx) => {
+    const notifications = await tx.notification.deleteMany({ where: { createdAt: { lt: cutoff } } });
+    const sentEmails = await tx.notificationEmailItem.deleteMany({ where: { sentAt: { lt: cutoff } } });
+    return { notifications: notifications.count, sentEmails: sentEmails.count };
+  });
 }
