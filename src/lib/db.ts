@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { assertEnvelopedOrNull } from '@/lib/calendar/token-envelope';
 import { dbConnectTimeoutMs, env } from '@/lib/env';
+import { decryptResult, encryptWriteData, findNestedTaxIdAccess } from '@/lib/billing/tax-id-crypto';
 
 /**
  * FO-141: no built-in fallback URL. A process without DATABASE_URL used to
@@ -80,6 +81,61 @@ function withCalendarTokenGate(client: PrismaClient): PrismaClient {
 }
 
 /**
+ * NG-40: `buyerVknTckn` (tax number / TCKN) is stored as an AES-256-GCM envelope
+ * on `TenantBillingIdentity` and `Invoice`. Encrypts every write and decrypts
+ * every row read through this client, so no call site handles ciphertext.
+ * Same placement and reach as {@link withCalendarTokenGate}. See
+ * `src/lib/billing/tax-id-crypto.ts` for the key and the read/write rules.
+ */
+function withTaxIdEncryption(client: PrismaClient): PrismaClient {
+  const handlers = {
+    async $allOperations({ operation, args, query }: { operation: string; args: unknown; query: (args: never) => Promise<unknown> }) {
+      const a = args as { data?: unknown; create?: unknown; update?: unknown } | undefined;
+      switch (operation) {
+        case 'create':
+        case 'createMany':
+        case 'createManyAndReturn':
+        case 'update':
+        case 'updateMany':
+        case 'updateManyAndReturn':
+          encryptWriteData(a?.data);
+          break;
+        case 'upsert':
+          encryptWriteData(a?.create);
+          encryptWriteData(a?.update);
+          break;
+        default:
+      }
+      const result = await query(args as never);
+      decryptResult(result);
+      return result;
+    },
+  };
+  return client.$extends({
+    name: 'tax-id-field-encryption',
+    query: {
+      tenantBillingIdentity: handlers,
+      invoice: handlers,
+      // F1: any other model must not reach the field through a nested write / include.
+      $allModels: {
+        async $allOperations({ model, operation, args, query }: { model: string; operation: string; args: unknown; query: (args: never) => Promise<unknown> }) {
+          // The two covered models' own handler (above, also runs) owns the TOP-LEVEL field;
+          // nested paths from them (via `tenant`) are refused like on any other model.
+          const covered = model === 'TenantBillingIdentity' || model === 'Invoice';
+          const via = findNestedTaxIdAccess(args, { allowTopLevelField: covered });
+          if (via) {
+            throw new Error(
+              `${model}.${operation} reaches the encrypted tax number through "${via}"; query TenantBillingIdentity / Invoice directly (NG-40)`
+            );
+          }
+          return query(args as never);
+        },
+      },
+    },
+  }) as unknown as PrismaClient;
+}
+
+/**
  * Builds a Prisma client over its own pg pool.
  *
  * Almost everything should use the `prisma` singleton below. This exists so a
@@ -97,7 +153,7 @@ export function createDbClient(url: string, poolOptions: DbPoolOptions = {}): Pr
     idleTimeoutMillis: 5000,
     ...poolOptions,
   });
-  return withCalendarTokenGate(new PrismaClient({ adapter: new PrismaPg(pool) }));
+  return withTaxIdEncryption(withCalendarTokenGate(new PrismaClient({ adapter: new PrismaPg(pool) })));
 }
 
 /** The pg pool settings a caller of {@link createDbClient} may change. */

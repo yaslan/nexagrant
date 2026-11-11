@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config as loadDotenv } from 'dotenv';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 // FO-385: the runner and its workers log a received signal too; the server gets it through NODE_OPTIONS below.
@@ -84,6 +85,22 @@ if (process.env.E2E_DATABASE_URL) {
 const E2E_SMTP = { SMTP_HOST: 'localhost', SMTP_PORT: '1025' };
 process.env.E2E_MAILPIT_URL ??= 'http://localhost:8025';
 
+// NG-40: the e2e runner and its web server both write billing identity / invoices through the
+// encrypting Prisma client; a throwaway key of this run (a real one in the environment wins).
+const FIXTURE_TAX_ID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+// `start` opens a production server, which refuses the fixture key by design. The gate wrapper
+// (scripts/gate-isolated.sh) exports that fixture key, so in that mode a missing OR fixture key is
+// replaced by a fresh random key per run; runner and server share it through process.env.
+if (E2E_WEB_SERVER === 'start') {
+  const current = process.env.TAX_ID_ENCRYPTION_KEY;
+  if (!current || current === FIXTURE_TAX_ID_KEY) process.env.TAX_ID_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+} else {
+  process.env.TAX_ID_ENCRYPTION_KEY ||= FIXTURE_TAX_ID_KEY;
+}
+// Round 3 (F2): a process with no NODE_ENV now refuses that fixture key. The runner/workers import
+// src/lib/db.ts, so they say `test`; the web server is given its own value again below.
+(process.env as Record<string, string | undefined>).NODE_ENV ||= 'test'; // typed read-only by Next
+
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
   ...E2E_SMTP,
@@ -133,6 +150,7 @@ export default defineConfig({
     env: {
       ...process.env,
       ...testEnv,
+      NODE_ENV: E2E_WEB_SERVER === 'start' ? 'production' : 'development',
       NODE_OPTIONS: WEB_SERVER_NODE_OPTIONS,
       E2E_RUNNER_PID: String(process.pid),
       E2E_PORT: String(PORT),

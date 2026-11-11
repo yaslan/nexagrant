@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { assertTaxIdKeyIsNotFixture } from '@/lib/billing/tax-id-crypto';
 
 /**
  * Optional URL setting. A variable that is present but blank
@@ -221,6 +222,13 @@ const envSchema = z.object({
    */
   CALENDAR_ENCRYPTION_KEY: z.string().optional(),
   /**
+   * 256-bit AES-GCM key for the buyer tax number (`buyerVknTckn`) on
+   * TenantBillingIdentity and Invoice (NG-40, src/lib/billing/tax-id-crypto.ts).
+   * 64 hex characters or `openssl rand -base64 32`. Unset = billing identity
+   * and invoice writes fail closed; the number is never stored in clear.
+   */
+  TAX_ID_ENCRYPTION_KEY: z.string().optional(),
+  /**
    * Where the TCMB daily exchange-rate bulletin is read from
    * (`src/lib/fx/tcmb.ts`). Unset = the real archive,
    * https://www.tcmb.gov.tr/kurlar — TCMB publishes it openly, so unlike every
@@ -329,6 +337,10 @@ if (!_env.success) {
   console.error('❌ Invalid environment variables:', details);
   throw new Error(`Invalid environment variables — ${details}`);
 }
+
+// NG-40 sec F2: the published test key must never protect real tax numbers.
+// The schema defaults NODE_ENV to 'development'; check the value the process really set.
+assertTaxIdKeyIsNotFixture(process.env.NODE_ENV === undefined ? undefined : _env.data.NODE_ENV, _env.data.TAX_ID_ENCRYPTION_KEY);
 
 export const env = _env.data;
 

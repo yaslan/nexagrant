@@ -97,6 +97,12 @@ BEGIN
     EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "InterregRubricCriterion" FROM %I', app_role);
   END IF;
 
+  -- 3d. The audit trail is append-only for the app (NG-40, auditevent-immutable.sql):
+  --     SELECT and INSERT only. Erasure detaches an actor through audit_detach_actor().
+  IF to_regclass('public."AuditEvent"') IS NOT NULL THEN
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public."AuditEvent" FROM %I', app_role);
+  END IF;
+
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as the owner role (fabrika_owner on the VPS; fabrika locally). Default
   --    privileges are recorded per grantor. Only roles the caller is a member of

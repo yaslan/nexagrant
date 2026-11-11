@@ -35,7 +35,6 @@ const KNOWN: Record<string, string> = {
   'src/lib/billing/subscription-sync.ts id: existing.id': DB_ROW,
   'src/lib/jobs/tasks/users-scheduled-deletion.ts { userId } (shorthand)':
     '`const userId = user.id` over `user.findMany` rows (primary key); cron input, no client',
-  'src/lib/jobs/tasks/users-scheduled-deletion.ts actorId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts usedByUserId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerUserId: userId': 'same `user.id` as above',
