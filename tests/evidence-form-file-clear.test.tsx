@@ -21,6 +21,15 @@ import { EvidenceForm, firstFileOrNull } from '@/app/[locale]/(app)/[workspace]/
  * does on the platforms that fire `change` rather than `cancel`) delivers
  * exactly `files.length === 0`.
  */
+// The form reads its labels from the `evidence` namespace. Resolve them from the
+// real English catalog so the text assertions below still check shipped copy.
+vi.mock('next-intl', async () => {
+  const en = (await import('../messages/en.json')).default as unknown as Record<string, Record<string, string>>;
+  return {
+    useTranslations: (ns: string) => (key: string) => en[ns]?.[key] ?? key,
+  };
+});
+
 afterEach(cleanup);
 
 /**
