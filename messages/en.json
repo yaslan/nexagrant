@@ -594,6 +594,7 @@
     "confirmParticipation": "Organisation confirmed participation",
     "seatConfirmConflict": "This organisation is already confirmed on another active opportunity on the same call, so it cannot be confirmed for this seat. The seat stays invited.",
     "seatNotConfirmable": "The status of this seat has changed, so nothing was confirmed. Refresh the page to see its current state.",
+    "queryFailed": "Consortium data could not be read. The failure has been recorded; please try again shortly.",
     "conflict": "Conflict Warning",
     "addRoleToConsortium": "ADD ROLE TO CONSORTIUM",
     "topCandidates": "TOP CANDIDATES",
