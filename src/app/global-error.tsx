@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 
+import fallbackMessages from '../../messages/global-error-fallback.json';
+
 type Locale = 'tr' | 'en';
 
 interface GlobalErrorMessages {
@@ -12,23 +14,9 @@ interface GlobalErrorMessages {
 }
 
 /**
- * Shown only while the catalog is loading or when it failed to load. Mirrors the
- * `globalError` block of the catalogs, so the screen is never blank.
+ * Shown only while the catalog is loading or when it failed to load. Lives in
+ * `messages/global-error-fallback.json`; a test keeps it equal to the `globalError` block.
  */
-const fallbackMessages: Record<Locale, GlobalErrorMessages> = {
-  tr: {
-    title: 'Bir Hata Oluştu',
-    description: 'Sistemde beklenmeyen bir hata meydana geldi:',
-    unknownError: 'Bilinmeyen Hata',
-    retry: 'Yeniden Dene',
-  },
-  en: {
-    title: 'Something went wrong',
-    description: 'An unexpected error occurred in the system:',
-    unknownError: 'Unknown error',
-    retry: 'Try again',
-  },
-};
 
 /**
  * This page replaces the root layout, so next-intl's provider is not mounted here and
@@ -61,11 +49,15 @@ export default function GlobalError({
 
   useEffect(() => {
     const picked = resolveLocale();
+    // Set right away, so the lang attribute and fallback texts follow the browser even when
+    // the catalog chunk fails to load. One-time sync from the browser (window is not available
+    // during SSR), so the cascade the rule warns about cannot occur.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocale(picked);
     let cancelled = false;
     catalogLoaders[picked]()
       .then((mod) => {
         if (cancelled) return;
-        setLocale(picked);
         setMessages((mod.default as { globalError: GlobalErrorMessages }).globalError);
       })
       .catch(() => {
