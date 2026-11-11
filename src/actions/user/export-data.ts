@@ -60,6 +60,8 @@ export async function exportUserData(): Promise<ExportResult> {
       aiUsage,
       approvals,
       opportunities,
+      notificationPreferences,
+      notificationEmailItems,
       notifications,
       interregAnalyses,
       interregResults,
@@ -143,6 +145,18 @@ export async function exportUserData(): Promise<ExportResult> {
               },
             },
           },
+        }),
+        // NG-43: the subject's own channel and frequency choices, and mails
+        // still queued for them (type + payload, ids and counts only).
+        tx.notificationPreference.findMany({
+          where: { userId },
+          select: { tenantId: true, event: true, channel: true, frequency: true, updatedAt: true },
+          orderBy: [{ tenantId: 'asc' }, { event: 'asc' }, { channel: 'asc' }],
+        }),
+        tx.notificationEmailItem.findMany({
+          where: { userId },
+          select: { id: true, tenantId: true, type: true, payload: true, frequency: true, createdAt: true, sentAt: true },
+          orderBy: { createdAt: 'asc' },
         }),
         // ADR-0011: the subject's notifications in every tenant. `payload`
         // holds ids and counts only; no other person is named in it.
@@ -286,6 +300,8 @@ export async function exportUserData(): Promise<ExportResult> {
       AiUsageLog: aiUsage,
       ApprovalRequest: approvals,
       Notification: notifications,
+      NotificationPreference: notificationPreferences,
+      NotificationEmailItem: notificationEmailItems,
       InterregAnalysis: interregAnalyses,
       InterregAnalysisResult: interregResults,
       InterregCriterionMark: interregMarks,

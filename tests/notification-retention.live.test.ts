@@ -35,7 +35,7 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
 });
 
 import { createDbClient, prisma } from '@/lib/db';
-import { NOTIFICATION_RETENTION_DAYS, pruneOldNotifications } from '@/lib/notifications/retention';
+import { NOTIFICATION_RETENTION_DAYS, pruneNotificationStores, pruneOldNotifications } from '@/lib/notifications/retention';
 import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 
@@ -66,6 +66,7 @@ describe.skipIf(!HAS_DB)('notification retention (live, fabrika_app)', () => {
 
   afterAll(async () => {
     await admin.notification.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
+    await admin.notificationEmailItem.deleteMany({ where: { tenantId: { in: presentIds(TENANTS) } } });
     await admin.tenant.deleteMany({ where: { id: { in: presentIds(TENANTS) } } });
     await admin.$disconnect();
   });
@@ -96,5 +97,31 @@ describe.skipIf(!HAS_DB)('notification retention (live, fabrika_app)', () => {
     // Idempotent: a second run finds none of this file's rows to delete.
     await pruneOldNotifications(NOW);
     expect(await admin.notification.count({ where: { tenantId: { in: TENANTS } } })).toBe(4);
+  });
+
+  // NG-43 review B-1: a sent outbox row is kept as the e-mail dedupe record and
+  // pruned by the same window counted from sentAt; an unsent row is a mail still
+  // owed and stays whatever its age.
+  test('prunes outbox rows SENT before the window, keeps younger sent rows and every unsent one', async () => {
+    const base = { userId: `u-${RUN}`, type: 'SAVED_SEARCH_MATCH' as const, frequency: 'WEEKLY' as const };
+    await admin.notificationEmailItem.createMany({
+      data: TENANTS.flatMap((tenantId) => [
+        { ...base, tenantId, dedupeKey: `${tenantId}:sent-old`, createdAt: ago(130), sentAt: ago(91) },
+        { ...base, tenantId, dedupeKey: `${tenantId}:sent-young`, createdAt: ago(130), sentAt: ago(89) },
+        { ...base, tenantId, dedupeKey: `${tenantId}:unsent-old`, createdAt: ago(200), sentAt: null },
+      ]),
+    });
+
+    const result = await pruneNotificationStores(NOW);
+    expect(result.sentEmails).toBeGreaterThanOrEqual(2);
+
+    const left = await admin.notificationEmailItem.findMany({
+      where: { tenantId: { in: TENANTS } },
+      select: { dedupeKey: true },
+      orderBy: { dedupeKey: 'asc' },
+    });
+    expect(left.map((r) => r.dedupeKey)).toEqual(
+      TENANTS.flatMap((t) => [`${t}:sent-young`, `${t}:unsent-old`]).sort()
+    );
   });
 });
