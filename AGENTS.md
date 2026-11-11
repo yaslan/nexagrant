@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Worktree, Docker ve log temizliği
+- Görev bitince ve PR merge edilince worktree'yi `git worktree remove --force <yol>` ile sil, sonra `git worktree prune` çalıştır.
+- Görevin Docker konteyner/imajlarını `docker compose down --rmi local` ile kaldır (`docker run` ile açılanlar için `docker rm -f` + `docker rmi`).
+- Log dosyalarını worktree klasörüne yazma (geçici loglar `$TMPDIR`, rapor çıktıları `docs/agent-results/`).
+- Aynı anda en fazla 5 worktree açık kalır; yeni açmadan önce `git worktree list` ile say.
