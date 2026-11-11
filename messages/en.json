@@ -5467,5 +5467,33 @@
     "notConfiguredError": "SMTP is not configured (SMTP_HOST is empty); email cannot be sent.",
     "sendFailed": "SMTP send failed: {error}",
     "sendUnexpected": "The test email could not be sent."
+  },
+  "evidence": {
+    "addTitle": "Add Evidence",
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g. ISO 9001 Certificate",
+    "kindLabel": "Kind",
+    "kindStat": "Statistic",
+    "kindPriorResult": "Prior Result",
+    "kindTrl": "TRL Validation",
+    "kindLetter": "Letter",
+    "kindReference": "Reference",
+    "kindPublication": "Publication",
+    "kindCertificate": "Certificate",
+    "validUntilLabel": "Valid Until (Optional)",
+    "bodyLabel": "Body Text / Summary",
+    "bodyPlaceholder": "Main text of the evidence...",
+    "tagsLabel": "Tags (comma separated)",
+    "tagsPlaceholder": "e.g. ai, healthcare, sme",
+    "uploadLabel": "Upload File",
+    "uploadHint": "Click to select a file or drag and drop",
+    "cancel": "Cancel",
+    "uploading": "Uploading...",
+    "save": "Save Evidence",
+    "pageTitle": "Evidence Pack",
+    "pageDescription": "Centralize your organization's core capabilities, certificates, and past results. Upload valid documents (Cloudflare R2) and use them directly when generating proposals."
+  },
+  "pipelineBoard": {
+    "unassigned": "Unassigned"
   }
 }

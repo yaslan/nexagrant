@@ -23,6 +23,10 @@ vi.mock('@/app/[locale]/(app)/[workspace]/evidence/data', () => ({
     return [];
   },
 }));
+vi.mock('next-intl/server', async () => {
+  const en = (await import('../messages/en.json')).default as unknown as Record<string, Record<string, string>>;
+  return { getTranslations: async (ns: string) => (key: string) => en[ns]?.[key] ?? key };
+});
 vi.mock('@/app/[locale]/(app)/[workspace]/evidence/evidence-client', () => ({ default: () => null }));
 
 const { default: EvidencePage } = await import('@/app/[locale]/(app)/[workspace]/evidence/page');
