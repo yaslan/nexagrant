@@ -22,7 +22,8 @@
     "preview": {
       "PILOT": "Pilot",
       "DEV": "Geliştirme"
-    }
+    },
+    "homeLink": "Ana Sayfa"
   },
   "Common": {
     "loading": "Yükleniyor...",
@@ -1207,7 +1208,22 @@
         "keep": "Vazgeç",
         "working": "İşleniyor…",
         "yesRemove": "Evet, çıkar",
-        "yesCancel": "Evet, iptal et"
+        "yesCancel": "Evet, iptal et",
+        "roles": {
+          "TENANT_OWNER": "Kurum Sahibi",
+          "TENANT_ADMIN": "Kurum Yöneticisi",
+          "PIPELINE_MANAGER": "Pipeline Yöneticisi",
+          "WRITER": "Teklif Yazarı",
+          "MEMBER": "Üye",
+          "GUEST_PARTNER": "Konuk Ortak"
+        },
+        "actionErrors": {
+          "FORBIDDEN_ROLE": "Bu işlem için yetkiniz yok.",
+          "CANNOT_REMOVE_SELF": "Kendinizi ekipten çıkaramazsınız.",
+          "CANNOT_REMOVE_OWNER": "Kurum sahibini yalnızca başka bir kurum sahibi çıkarabilir.",
+          "LAST_OWNER": "Kurumun son sahibi çıkarılamaz.",
+          "NOT_FOUND": "Kayıt bulunamadı; liste yenilendi."
+        }
       },
       "page": {
         "title": "Ekip Üyeleri & Yetkilendirme",

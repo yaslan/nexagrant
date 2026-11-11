@@ -63,6 +63,7 @@ export default async function AppLayout({
 
   const user = session.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });
+  const tNav = await getTranslations({ locale, namespace: 'Navigation' });
 
   // Never invent an identity. The name falls back to the e-mail local part and then to a
   // translated "unnamed user" label; the e-mail is shown only if the session carries one.
@@ -137,7 +138,7 @@ export default async function AppLayout({
       <aside className="hidden md:flex w-64 bg-surface border-r border-border flex-col shrink-0">
         <Link
           href={`/${locale}`}
-          title={locale === 'tr' ? 'Ana Sayfa' : 'Home'}
+          title={tNav('homeLink')}
           className="p-4 border-b border-border flex items-center justify-center hover:bg-surface-hover transition-colors group cursor-pointer"
         >
           <BrandLogo height={48} className="group-hover:scale-105 transition shrink-0" />

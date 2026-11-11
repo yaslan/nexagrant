@@ -34,25 +34,10 @@ interface Team {
 }
 type Target = { kind: 'member' | 'invitation'; id: string; label: string };
 
-const ROLE_LABELS: Record<string, [string, string]> = {
-  TENANT_OWNER: ['Kurum Sahibi', 'Owner'],
-  TENANT_ADMIN: ['Kurum Yöneticisi', 'Admin'],
-  PIPELINE_MANAGER: ['Pipeline Yöneticisi', 'Pipeline Manager'],
-  WRITER: ['Teklif Yazarı', 'Writer'],
-  MEMBER: ['Üye', 'Member'],
-  GUEST_PARTNER: ['Konuk Ortak', 'Guest Partner'],
-};
-
-const ERROR_TEXT: Record<string, [string, string]> = {
-  FORBIDDEN_ROLE: ['Bu işlem için yetkiniz yok.', 'You do not have permission for this.'],
-  CANNOT_REMOVE_SELF: ['Kendinizi ekipten çıkaramazsınız.', 'You cannot remove yourself.'],
-  CANNOT_REMOVE_OWNER: [
-    'Kurum sahibini yalnızca başka bir kurum sahibi çıkarabilir.',
-    'Only another owner can remove an owner.',
-  ],
-  LAST_OWNER: ['Kurumun son sahibi çıkarılamaz.', 'The last owner cannot be removed.'],
-  NOT_FOUND: ['Kayıt bulunamadı; liste yenilendi.', 'Not found; the list was refreshed.'],
-};
+// Role names live in `settings.members.teamList.roles.*`; refusal codes of
+// `DELETE /api/team/*` live in `settings.members.teamList.actionErrors.*` (CLAUDE.md rule 8).
+const ROLE_KEYS = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER', 'WRITER', 'MEMBER', 'GUEST_PARTNER'] as const;
+const ACTION_ERROR_CODES = ['FORBIDDEN_ROLE', 'CANNOT_REMOVE_SELF', 'CANNOT_REMOVE_OWNER', 'LAST_OWNER', 'NOT_FOUND'] as const;
 
 export default function TeamList({ isTr, refreshKey }: { isTr: boolean; refreshKey: number }) {
   const errorText = useActionErrorText();
@@ -65,12 +50,12 @@ export default function TeamList({ isTr, refreshKey }: { isTr: boolean; refreshK
   const cancelRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
-  const tx = (pair: [string, string]) => (isTr ? pair[0] : pair[1]);
   const fmt = (iso: string) => new Date(iso).toLocaleDateString(isTr ? 'tr-TR' : 'en-GB');
-  const roleLabel = (role: string) => (ROLE_LABELS[role] ? tx(ROLE_LABELS[role]) : role);
+  const roleLabel = (role: string) =>
+    (ROLE_KEYS as readonly string[]).includes(role) ? t(`roles.${role}`) : role;
   const codeText = (code: unknown): string =>
-    typeof code === 'string' && ERROR_TEXT[code]
-      ? tx(ERROR_TEXT[code])
+    typeof code === 'string' && (ACTION_ERROR_CODES as readonly string[]).includes(code)
+      ? t(`actionErrors.${code}`)
       : t('errorGeneric');
 
   // Bumped after a change, so the list is re-read from the server.
