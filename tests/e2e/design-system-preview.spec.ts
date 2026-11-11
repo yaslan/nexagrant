@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import { e2eAuthSecret } from './fixtures/auth-secret';
+import { expectHydrated } from './fixtures/hydration';
 
 /**
  * NG-2 — the shared primitives on /admin/design-system, driven with real clicks and keys.
@@ -42,7 +43,10 @@ test.describe('design system preview', () => {
     test.beforeEach(async ({ page, baseURL }) => {
       await signInAsPlatformAdmin(page, baseURL as string);
       await page.goto('/tr/admin/design-system');
-      await expect(page.getByTestId('design-system-preview')).toBeVisible();
+      // Hydrated, not only painted: the server-rendered buttons are visible before React attaches
+      // their handlers, and a click in that gap is lost (NG-121: the modal never opened, pagination
+      // stopped at "2 / 3"). Measured on dev: 9 of 10 clicks landed before hydration.
+      await expectHydrated(page.getByTestId('design-system-preview'));
     });
 
     test('shows every component in the brief', async ({ page }) => {
