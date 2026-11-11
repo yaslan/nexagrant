@@ -117,7 +117,9 @@ test.describe('WCAG A/AA — NG-90 public pages (tr + en)', () => {
     });
   }
 
-  for (const locale of ['tr', 'en']) {
+  // NG-121: posts are Turkish only — /en/blog lists none (its notice page is scanned
+  // above) and /en/blog/<slug> redirects to /tr/blog/<slug>, so only TR has a post page.
+  for (const locale of ['tr']) {
     test(`/${locale}/blog/<ilk yazı> has no A/AA violations`, async ({ page }) => {
       await acceptCookies(page);
       await page.goto(`/${locale}/blog`);

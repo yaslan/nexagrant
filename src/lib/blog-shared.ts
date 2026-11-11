@@ -11,6 +11,22 @@ import { BLOG_READ_MINUTES } from './blog-read-time';
 
 export { BLOG_READ_MINUTES };
 
+/**
+ * NG-121 (K-580095 = A) — BlogPost has one title, excerpt and body and no
+ * locale column: every post is written in Turkish. The posts are therefore
+ * shown only on the Turkish routes. /en/blog and the /en landing page show a
+ * "Turkish only" notice with a link to /tr/blog instead of Turkish text,
+ * /en/blog/<slug> sends the reader to the Turkish page, and the sitemap lists
+ * no English blog address. A real multilingual model (a locale column or a
+ * translation table) is a separate decision.
+ */
+export const BLOG_CONTENT_LOCALE = 'tr';
+
+/** Whether the stored posts are shown on this locale's public routes. */
+export function blogContentShownIn(locale: string): boolean {
+  return locale === BLOG_CONTENT_LOCALE;
+}
+
 export interface BlogAuthor {
   name: string;
   role: string;

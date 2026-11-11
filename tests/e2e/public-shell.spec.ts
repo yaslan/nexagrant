@@ -118,6 +118,13 @@ test.describe('public pages share one header and one footer (FO-68)', () => {
 
       // A post: the slug comes from the list, which the seed fills.
       await page.goto(`/${locale}/blog`);
+      if (locale === 'en') {
+        // NG-121: the posts are Turkish only — /en/blog (checked above) is a notice
+        // with no post link, and /en/blog/<slug> redirects to the Turkish page.
+        await expect(page.getByTestId('blog-turkish-only')).toBeVisible();
+        await expect(page.locator('main a[href^="/en/blog/"]')).toHaveCount(0);
+        return;
+      }
       const post = page.locator(`main a[href^="/${locale}/blog/"]`).first();
       const href = await post.getAttribute('href');
       expect(href, `/${locale}/blog lists no post to open`).toBeTruthy();

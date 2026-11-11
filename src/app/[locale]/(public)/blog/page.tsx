@@ -4,6 +4,8 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { authorByline, formatBlogDate, getBlogPosts } from '@/lib/blog';
+import { blogContentShownIn } from '@/lib/blog-shared';
+import BlogTurkishOnlyNotice from '@/components/blog/BlogTurkishOnlyNotice';
 import { getPublicRoute } from '@/lib/routes';
 import { appUrl } from '@/lib/app-url';
 
@@ -19,16 +21,17 @@ export async function generateMetadata({
 
   const baseUrl = appUrl();
   const canonicalUrl = `${baseUrl}/${locale}/blog`;
+  // NG-121: the posts are Turkish only, so the English list is a notice page —
+  // kept out of the index and not offered as the Turkish list's alternate.
+  const shown = blogContentShownIn(locale);
 
   return {
     title,
     description,
+    ...(shown ? {} : { robots: { index: false, follow: true } }),
     alternates: {
       canonical: canonicalUrl,
-      languages: {
-        'tr': `${baseUrl}/tr/blog`,
-        'en': `${baseUrl}/en/blog`,
-      },
+      ...(shown ? { languages: { tr: `${baseUrl}/tr/blog` } } : {}),
     },
     openGraph: {
       title,
@@ -47,7 +50,9 @@ export default async function BlogIndexPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const posts = await getBlogPosts();
+  // NG-121: no Turkish post on a locale it is not written in.
+  const shown = blogContentShownIn(locale);
+  const posts = shown ? await getBlogPosts() : [];
   const t = await getTranslations({ locale, namespace: 'blog' });
 
   return (
@@ -66,6 +71,8 @@ export default async function BlogIndexPage({
               {t('indexSubtitle')}
             </p>
           </div>
+
+          {!shown && <BlogTurkishOnlyNotice locale={locale} />}
 
           {/* Posts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

@@ -3977,7 +3977,10 @@
     "indexSubtitle": "Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.",
     "readArticle": "Devamını Oku",
     "backToBlog": "Tüm Blog Yazılarına Dön",
-    "relatedArticles": "İlginizi Çekebilecek Diğer Yazılar"
+    "relatedArticles": "İlginizi Çekebilecek Diğer Yazılar",
+    "onlyTurkishTitle": "Blog yazılarımız şu an yalnız Türkçe",
+    "onlyTurkishBody": "Yazılarımızı henüz İngilizceye çevirmedik. Türkçe blogdan okuyabilirsiniz.",
+    "onlyTurkishLink": "Türkçe bloğa git"
   },
   "blog_detail": {
     "meta_description": "Blog yazısı"
