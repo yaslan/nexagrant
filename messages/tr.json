@@ -594,6 +594,7 @@
     "confirmParticipation": "Kurum katılımını teyit etti",
     "seatConfirmConflict": "Bu kurum aynı çağrıda başka bir etkin fırsatta zaten onaylı olduğu için bu koltukta onaylanamadı. Koltuk davet durumunda kaldı.",
     "seatNotConfirmable": "Bu koltuğun durumu değişti, onay kaydedilmedi. Güncel durumu görmek için sayfayı yenileyin.",
+    "queryFailed": "Konsorsiyum verisi okunamadı. Sorun kaydedildi; lütfen birazdan tekrar deneyin.",
     "conflict": "Çakışma Uyarısı",
     "addRoleToConsortium": "KONSORSİYUMA ROL EKLE",
     "topCandidates": "EN İYİ ADAYLAR",

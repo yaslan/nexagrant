@@ -72,8 +72,6 @@ export default async function ConsortiumPage({
   if (locked) return locked;
   const { tenantId, role } = await requireTenantPageRole(locale, 'view_proposal');
 
-  const isTr = locale === 'tr';
-
   let queryFailed = false;
   let opportunity: ConsortiumOpportunity | null = null;
   let seats: ConsortiumSeat[] = [];
@@ -182,6 +180,8 @@ export default async function ConsortiumPage({
 
   // "We could not read it" and "this tenant has no such opportunity" are two
   // different answers, and only the second one is a 404.
+  const t = await getTranslations({ locale, namespace: 'Consortium' });
+
   if (queryFailed) {
     return (
       <div className="max-w-5xl mx-auto py-8 sm:px-4">
@@ -189,9 +189,7 @@ export default async function ConsortiumPage({
           role="alert"
           className="border border-amber-200 bg-amber-50 text-amber-900 text-sm rounded-lg p-4"
         >
-          {isTr
-            ? 'Konsorsiyum verisi okunamadı. Sorun kaydedildi; lütfen birazdan tekrar deneyin.'
-            : 'Consortium data could not be read. The failure has been recorded; please try again shortly.'}
+          {t('queryFailed')}
         </div>
       </div>
     );
@@ -200,7 +198,6 @@ export default async function ConsortiumPage({
   if (!opportunity) return notFound();
 
   const orgMap = Object.fromEntries(orgs.map((o) => [o.id, o]));
-  const t = await getTranslations({ locale, namespace: 'Consortium' });
   const tPipeline = await getTranslations({ locale, namespace: 'Pipeline' });
 
   return (
