@@ -242,6 +242,30 @@ export function canAccessStatus(
   }
 }
 
+/**
+ * A `beta` module the catalogue does not sell: `planTiers` is empty and `addOnSku`
+ * is null, so no plan can ever grant it. Such a module is a staff/pilot preview
+ * only (NG-135, patron K-581676): see `isStaffPreviewStatus`.
+ */
+export function isUnsoldBeta(moduleId: ModuleId): boolean {
+  const manifest = getManifest(moduleId);
+  return (
+    manifest?.statusBadge === 'beta' &&
+    manifest.planTiers.length === 0 &&
+    (manifest.addOnSku ?? null) === null
+  );
+}
+
+/**
+ * Whether an unsold beta module is open at this `ModuleState` status, before the
+ * audience check. Only `DEV` (staff) and `PILOT` (the tenant's managers) open it,
+ * so the plan check is skipped for them. `OFF` and `ON` stay closed: there is no
+ * plan to upgrade to, so `decideModuleAccess` answers `MODULE_OFF`, not an upgrade.
+ */
+export function isStaffPreviewStatus(moduleId: ModuleId, status: ModuleStatus): boolean {
+  return isUnsoldBeta(moduleId) && (status === 'DEV' || status === 'PILOT');
+}
+
 // ───────────────────────────── Plan × switch → card status ─────────────────────────────
 
 /**

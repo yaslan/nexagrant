@@ -27,14 +27,15 @@ describe('M18 client-pipeline manifest', () => {
     expect(m18Manifest.key).toBe('client-pipeline');
     expect(m18Manifest.requires).toEqual([]);
     expect(m18Manifest.recommends).toEqual(['M9', 'M16']);
-    expect(m18Manifest.statusBadge).toBe('soon');
+    expect(m18Manifest.statusBadge).toBe('beta');
   });
 
-  it('is "Yakında": never offered as a plan upgrade, not even to a tenant entitled to everything', () => {
-    expect(isComingSoon('M18')).toBe(true);
-    const viewer = { role: Role.TENANT_OWNER, isPlatformAdmin: true };
-    expect(decideModuleAccess('M18', 'ON', [], viewer).reason).toBe('COMING_SOON');
-    expect(decideModuleAccess('M18', 'DEV', ['M18'], viewer).allowed).toBe(false);
+  it('is beta, not "Yakında", and never offered as a plan upgrade', () => {
+    expect(isComingSoon('M18')).toBe(false);
+    const owner = { role: Role.TENANT_OWNER, isPlatformAdmin: false };
+    // A paying tenant with M18 switched off or on sees a closed module, not an upgrade.
+    expect(decideModuleAccess('M18', 'ON', [], owner).reason).toBe('MODULE_OFF');
+    expect(decideModuleAccess('M18', 'OFF', [], owner).reason).toBe('MODULE_OFF');
   });
 
   it('is sold by no plan and no add-on, so plan-based enabling refuses it', () => {
