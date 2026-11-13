@@ -5712,6 +5712,25 @@
       },
       "submit": "İçe aktar ({count})",
       "imported": "İçe aktarıldı: {created} kayıt. Atlanan kopya: {skipped}. Hatalı satır: {invalid}."
+    },
+    "duplicates": {
+      "heading": "Olası kopya kurumlar",
+      "intro": "Benzer isimli kurumlar burada listelenir. Birini seçip diğerini ona birleştirin: ilişkili kişiler, fırsatlar, görevler ve eşleşmeler taşınır. Birleştirilen kayıt silinmez, arşivlenir.",
+      "empty": "Olası kopya bulunmadı.",
+      "reason": {
+        "TAX_NUMBER": "Aynı vergi numarası",
+        "DEDUPE_KEY": "Aynı normalleştirilmiş ad ve il",
+        "SIMILAR_NAME": "Benzer ad"
+      },
+      "strength": {
+        "EXACT": "Kesin eşleşme",
+        "LIKELY": "Muhtemelen aynı",
+        "POSSIBLE": "Olabilir"
+      },
+      "similarity": "Benzerlik %{percent}",
+      "keepLegend": "Tutulacak kayıt",
+      "mergeButton": "Birleştir",
+      "merged": "Birleştirildi: {contacts} kişi ve {deals} fırsat taşındı."
     }
   }
 }

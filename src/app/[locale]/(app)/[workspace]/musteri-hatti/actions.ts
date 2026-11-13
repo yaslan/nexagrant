@@ -8,6 +8,7 @@ import { createLead, type CreateLeadResult } from '@/modules/m18/server/leads-re
 import { createDeal, DealTransitionError, moveDealStage } from '@/modules/m18/server/deals-repo';
 import { createTask, setTaskDone } from '@/modules/m18/server/tasks-repo';
 import { commitImport, previewImport } from '@/modules/m18/server/import-leads';
+import { mergeLeadOrganizations, type MergeResult } from '@/modules/m18/server/merge-leads';
 import {
   IMPORT_MAX_CHARS,
   parseCsvText,
@@ -148,6 +149,19 @@ export async function setTaskDoneAction(input: unknown): Promise<ActionResult> {
       if (!updated) return { ok: false, code: 'NOT_FOUND' } as const;
       revalidatePath('/', 'layout');
       return { ok: true } as const;
+    });
+  } catch (e) {
+    return invalidOrFailed(e);
+  }
+}
+
+export async function mergeLeadsAction(input: unknown): Promise<ActionResult<MergeResult>> {
+  try {
+    return await guarded(async (tenantId) => {
+      const merged = await withTenant(tenantId, (tx) => mergeLeadOrganizations(tx, tenantId, input));
+      if (!merged) return { ok: false, code: 'NOT_FOUND' } as const;
+      revalidatePath('/', 'layout');
+      return { ok: true, data: merged } as const;
     });
   } catch (e) {
     return invalidOrFailed(e);

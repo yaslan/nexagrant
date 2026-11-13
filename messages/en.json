@@ -5712,6 +5712,25 @@
       },
       "submit": "Import ({count})",
       "imported": "Imported {created} organisations. Skipped duplicates: {skipped}. Invalid rows: {invalid}."
+    },
+    "duplicates": {
+      "heading": "Possible duplicate organisations",
+      "intro": "Organisations with similar names are listed here. Pick one to keep and merge the other into it: its contacts, deals, tasks and call matches move across. The merged record is archived, not erased.",
+      "empty": "No possible duplicates found.",
+      "reason": {
+        "TAX_NUMBER": "Same tax number",
+        "DEDUPE_KEY": "Same normalised name and province",
+        "SIMILAR_NAME": "Similar name"
+      },
+      "strength": {
+        "EXACT": "Exact match",
+        "LIKELY": "Probably the same",
+        "POSSIBLE": "Possibly the same"
+      },
+      "similarity": "Similarity {percent}%",
+      "keepLegend": "Record to keep",
+      "mergeButton": "Merge",
+      "merged": "Merged: {contacts} contacts and {deals} deals moved."
     }
   }
 }

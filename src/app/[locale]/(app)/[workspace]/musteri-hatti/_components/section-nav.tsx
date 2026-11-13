@@ -9,14 +9,15 @@ export async function SectionNav({
 }: {
   locale: string;
   workspace: string;
-  active: 'panel' | 'leads' | 'pipeline' | 'tasks' | 'import';
+  active: 'panel' | 'leads' | 'pipeline' | 'tasks' | 'import' | 'duplicates';
 }) {
   const t = await getTranslations({ locale, namespace: 'm18' });
   const base = `/${locale}/${workspace}/musteri-hatti`;
-  const items: { key: 'panel' | 'leads' | 'pipeline' | 'tasks' | 'import'; href: string }[] = [
+  const items: { key: 'panel' | 'leads' | 'pipeline' | 'tasks' | 'import' | 'duplicates'; href: string }[] = [
     { key: 'panel', href: base },
     { key: 'leads', href: `${base}/leads` },
     { key: 'import', href: `${base}/import` },
+    { key: 'duplicates', href: `${base}/duplicates` },
     { key: 'pipeline', href: `${base}/pipeline` },
     { key: 'tasks', href: `${base}/tasks` },
   ];
