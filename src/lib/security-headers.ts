@@ -188,7 +188,7 @@ export const HSTS_VALUE = 'max-age=300';
  * production (`NODE_ENV=production`) and only when the request came in over HTTPS
  * (the caller reads the scheme; behind a proxy that is `x-forwarded-proto`).
  */
-export function hstsHeaderFor(env: NodeJS.ProcessEnv, isHttps: boolean): HeaderEntry | null {
+export function hstsHeaderFor(env: { NODE_ENV?: string }, isHttps: boolean): HeaderEntry | null {
   return env.NODE_ENV === 'production' && isHttps ? { key: 'Strict-Transport-Security', value: HSTS_VALUE } : null;
 }
 
