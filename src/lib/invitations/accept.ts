@@ -28,7 +28,7 @@
  * tenant, so a tenant whose free pilot has ended refuses it like any other
  * write (src/lib/billing/pilot.ts).
  */
-import type { Prisma, PrismaClient, Role, User } from '@prisma/client';
+import type { PrismaClient, Role, User } from '@prisma/client';
 
 import { withTenant, withTenantOn, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';

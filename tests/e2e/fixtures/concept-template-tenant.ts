@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { prisma } from '../../../src/lib/db';
-import { signInAs, E2E_IDENTITIES } from './session';
+import { signInAs } from './session';
 
 /**
  * Two tenants for `tests/e2e/concept-template-tenant-isolation.spec.ts`.
