@@ -20,6 +20,11 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="agencies")
     ap.add_argument("--source", required=True, choices=[s.key for s in open_sources()])
     ap.add_argument("--out", help="write the run summary JSON here")
+    ap.add_argument(
+        "--with-body",
+        action="store_true",
+        help="include the decoded raw body in rawFetch (the app writes it to RawFetch.payload)",
+    )
     args = ap.parse_args(argv)
     source = get(args.source)
     try:
@@ -30,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     result = run_source(source, fetched)
     summary = {
         "source": result.source,
-        "rawFetch": {k: v for k, v in result.raw_fetch.items() if k != "body"},
+        "rawFetch": result.raw_fetch if args.with_body else {k: v for k, v in result.raw_fetch.items() if k != "body"},
         "rows": len(result.rows),
         "calls": result.calls,
         "systemAlert": result.system_alert,

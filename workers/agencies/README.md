@@ -27,8 +27,17 @@ ankaraka, marka, karacadag, worldbank. Gerekçe: `docs/agent-results/NG-144-devo
     .venv/bin/python -m pytest                                     # ağ kapalı (pytest-socket)
     .venv/bin/python -m agencies --source istka --out run.json     # canlı çekim, DB yazmaz
 
+## Uygulama bağlantısı (NG-148)
+
+DB yazımı burada değil: `src/lib/jobs/tasks/tr-agency-calls.ts` çıktıyı
+`RawFetch` (hash ile tekrar yazmaz), `Call` (upsert, `callIdentifier`) ve
+`SystemAlert` (`AGENCY_SCHEMA_CHANGED`) olarak yazar. Tetik: `pnpm jobs:tr-agency`
+(`--dry-run` DB'ye dokunmaz). Python tarafı `--with-body` ile ham gövdeyi verir.
+
 ## Henüz yapılmayanlar
 
-- `RawFetch`, `SystemAlert` ve `Call` yazımı yok. `Call` için FO-266 (F1) merge'ü
-  beklenir (`origin/dev`'de henüz görünmüyor). `normalize.to_call` alan eşlemesini hazır tutar.
-- Graphile job bağlantısı (`src/lib/jobs/tasks/`) bu dalda yok.
+- `Call` modelinde son başvuru tarihi (`deadlineAt`/`deadlineTz`) ve destek tutarı
+  alanı yok; Python bunları üretir ama DB'ye yazılmaz (ham değer `RawFetch` içinde).
+  Alan eklemek şema işi (FO-266 kapsamı).
+- Ulusal Ajans son başvuru detay sayfası adımı yok (adaptör yalnız duyuru bağlantısı çıkarır).
+- Graphile zamanlaması yok: job `schedule.ts` `JobId` tipine girmediği için yalnız elle tetiklenir.
