@@ -212,16 +212,24 @@ test.describe('WCAG A/AA — NG-119 signed in, TTO portfolio with an item (tr)',
     });
     await seedIdentity({ ...TTO_OWNER, workspaceIds: [] }, { id: 'e2e-a11y-tto-ws', slug: 'main', name: 'Main' });
     await prisma.ttoPortfolioItem.deleteMany({ where: { tenantId: TTO_TENANT } });
-    await prisma.ttoPortfolioItem.create({
-      data: {
-        tenantId: TTO_TENANT,
-        title: 'A11y TTO kayıt',
-        trl: 5,
-        patentStatus: 'granted',
-        summary: 'Kontrast taraması için tohumlanmış portföy kaydı.',
-        keywords: ['a11y'],
-      },
-    });
+    // Üç patent durumunun üçü de tohumlanır: granted (yeşil), pending (amber), licensed (accent).
+    // Her rozet yalnız kendi durumunun kaydı varken render edilir (tto/client.tsx getPatentBadge).
+    for (const [title, patentStatus] of [
+      ['A11y TTO kayıt', 'granted'],
+      ['A11y TTO bekleyen kayıt', 'pending'],
+      ['A11y TTO lisanslı kayıt', 'licensed'],
+    ] as const) {
+      await prisma.ttoPortfolioItem.create({
+        data: {
+          tenantId: TTO_TENANT,
+          title,
+          trl: 5,
+          patentStatus,
+          summary: 'Kontrast taraması için tohumlanmış portföy kaydı.',
+          keywords: ['a11y'],
+        },
+      });
+    }
   });
   test.afterAll(async () => {
     await prisma.ttoPortfolioItem.deleteMany({ where: { tenantId: TTO_TENANT } });
@@ -237,7 +245,9 @@ test.describe('WCAG A/AA — NG-119 signed in, TTO portfolio with an item (tr)',
     const response = await page.goto('/tr/main/tto');
     expect(response?.status(), '/tr/main/tto').toBe(200);
     await expectOwnPage(page, '/tr/main/tto');
-    await expect(page.getByRole('heading', { name: 'A11y TTO kayıt' }), 'rozetin bulunduğu kayıt görünür').toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A11y TTO kayıt' }), 'granted rozetinin kaydı görünür').toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A11y TTO bekleyen kayıt' }), 'pending rozetinin kaydı görünür').toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A11y TTO lisanslı kayıt' }), 'licensed rozetinin kaydı görünür').toBeVisible();
     expect(await scan(page), '/tr/main/tto').toEqual([]);
   });
 });
