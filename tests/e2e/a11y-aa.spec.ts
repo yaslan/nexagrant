@@ -235,6 +235,16 @@ test.describe('WCAG A/AA — NG-101 signed in, pipeline (tr + en)', () => {
   }
 });
 
+/** Eşleştirme aksiyonunun gövdesi tek bir portföy kimliği taşıyan JSON dizisidir (ör. ["<id>"]). */
+function isMatchCall(body: string | null, ids: string[]): boolean {
+  try {
+    const args = JSON.parse(body ?? '');
+    return Array.isArray(args) && args.length === 1 && typeof args[0] === 'string' && ids.includes(args[0]);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * NG-119 — TTO portföy rozeti (`text-purple-*` kontrastı). Rozet yalnız portföyde en az bir kayıt varsa
  * render edilir (tto/client.tsx: items.map içinde); demo tenant'ta kayıt olmadığı için eski tarama bu
@@ -328,6 +338,46 @@ test.describe('WCAG A/AA — NG-119 signed in, TTO portfolio with an item (tr)',
 
     await page.getByRole('button', { name: 'IP & Lisanslama Kontrol Listesi' }).click();
     expect(await scan(page), 'kontrol listesi').toEqual([]);
+  });
+
+  test('AB eşleştirici modalı: konu kodu ve uyum rozeti AA (NG-160)', async ({ page }) => {
+    // Eşleştirme sonucu sunucu aksiyonundan gelir ve şu an boş döner (m7/server/actions.ts).
+    // Test, aksiyonun KENDİ yanıt biçimiyle (RSC satırları) sahte bir eşleşme döndürür; ürün kodu
+    // değişmez. Yalnız bu portföy kaydının aksiyon çağrısı yakalanır, diğer POST'lara dokunulmaz.
+    const itemIds = (await prisma.ttoPortfolioItem.findMany({ where: { tenantId: TTO_TENANT }, select: { id: true } })).map((i) => i.id);
+    expect(itemIds.length, 'portföy kayıtları tohumlandı').toBeGreaterThan(0);
+    const matchedTopics = [
+      {
+        topicId: 'HORIZON-E2E-KONU-1',
+        title: 'A11y eşleşme konusu',
+        fitScore: 87,
+        targetTrlRange: '5-7',
+        matchReason: 'Kontrast taraması için tohumlanmış eşleşme gerekçesi.',
+        recommendedRole: 'Koordinatör',
+      },
+    ];
+    await page.route('**/tr/main/tto*', async (route) => {
+      const req = route.request();
+      if (req.method() !== 'POST' || !req.headers()['next-action'] || !isMatchCall(req.postData(), itemIds)) {
+        return route.continue();
+      }
+      const body = `0:{"a":"$@1","q":"","i":true,"b":"development"}\n1:${JSON.stringify({ matchedTopics })}\n`;
+      await route.fulfill({ status: 200, contentType: 'text/x-component', body });
+    });
+    await acceptCookies(page);
+    await signInAs(page, { id: TTO_OWNER.userId, email: TTO_OWNER.email, tenantId: TTO_OWNER.tenantId, role: TTO_OWNER.role });
+    const response = await page.goto('/tr/main/tto');
+    expect(response?.status(), '/tr/main/tto').toBe(200);
+    await expectOwnPage(page, '/tr/main/tto');
+    await page.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).first().click();
+    const topicBadge = page.locator('span').getByText('HORIZON-E2E-KONU-1', { exact: true });
+    const fitBadge = page.locator('span').getByText('Uyum Skoru: %87', { exact: true });
+    await expect(topicBadge, 'konu kodu rozeti görünür').toBeVisible();
+    await expect(fitBadge, 'uyum skoru rozeti görünür').toBeVisible();
+    const topicRatio = await contrastRatio(topicBadge);
+    const fitRatio = await contrastRatio(fitBadge);
+    expect(topicRatio, 'konu kodu kontrast oranı').toBeGreaterThanOrEqual(4.5);
+    expect(fitRatio, 'uyum skoru kontrast oranı').toBeGreaterThanOrEqual(4.5);
   });
 });
 
