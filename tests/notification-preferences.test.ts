@@ -175,7 +175,8 @@ describe('a failed mark after an accepted send', () => {
       ({
         notificationEmailItem: {
           findMany: async () => [item(tenantId === 't1' ? 'i1' : 'i2')],
-          updateMany: async (args: { where: { id: { in: string[] }; sentAt: null } }) => {
+          updateMany: async (args: { where: { id: { in: string[] }; sentAt: null }; data?: { claimToken?: string | null } }) => {
+            if (typeof args.data?.claimToken === 'string') return { count: 1 }; // NG-131: the claim, not the mark
             expect(args.where.sentAt).toBeNull();
             if (tenantId === 't1') throw new Error('connection reset');
             marked.push(...args.where.id.in);
