@@ -1021,7 +1021,7 @@ export default function KanbanBoard({
                                       {notesList.map((note) => (
                                         <div
                                           key={note.id}
-                                          data-testid={`pipeline-modal-note-item-${opp.id}`}
+                                          data-testid={`pipeline-note-item-${opp.id}`}
                                           className="bg-ground/70 border border-border rounded-xl p-3 text-xs space-y-1.5"
                                         >
                                           <div className="flex items-center justify-between text-[11px] text-muted">
