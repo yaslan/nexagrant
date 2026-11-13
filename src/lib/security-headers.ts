@@ -62,9 +62,15 @@
  *   `report-uri` alone arrived at once, while with `report-to` (relative or
  *   absolute `Reporting-Endpoints`) nothing arrived in 70 s. `report-uri` is
  *   deprecated but every current engine still sends it.
- * - No `upgrade-insecure-requests`: HSTS already does it on the real domain, and on
- *   plain-http hosts (local prod build, LAN) it would rewrite same-origin asset URLs
- *   to https and break the page.
+ * - No `upgrade-insecure-requests`: the HSTS header (below) does it on the real domain
+ *   once it is sent, and on plain-http hosts (local prod build, LAN) it would rewrite same-origin
+ *   asset URLs to https and break the page.
+ *
+ * Strict-Transport-Security is NOT in STATIC_SECURITY_HEADERS: the scheme is only
+ * known per request (a plain-http local prod build must not get it). It is built by
+ * `hstsHeaderFor` — production and HTTPS only, `max-age=300` (the first week of the
+ * ramp in docs/RELEASE_CHECKLIST.md §5.4). No `includeSubDomains`, no `preload`:
+ * both are hard to undo. Raising the age is a later, separate decision.
  *
  * Rollback without a code change: `CSP_MODE=report-only` (read at request time by
  * the proxy) sends the same policy as `Content-Security-Policy-Report-Only`, so a
@@ -172,6 +178,18 @@ export function staticFileNotFoundSource(servedFiles: readonly string[]): string
   ];
   const covered = `.*\\.(?:${STATIC_FILE_EXTENSIONS})|_next(?:/.*)?|_vercel(?:/.*)?`;
   return `/:path((?!${skip.join('|')})(?:${covered})$)`;
+}
+
+/** First value of the HSTS ramp (RELEASE_CHECKLIST §5.4). Raise it only by a separate decision. */
+export const HSTS_VALUE = 'max-age=300';
+
+/**
+ * The Strict-Transport-Security header for one response, or null. Sent only in
+ * production (`NODE_ENV=production`) and only when the request came in over HTTPS
+ * (the caller reads the scheme; behind a proxy that is `x-forwarded-proto`).
+ */
+export function hstsHeaderFor(env: { NODE_ENV?: string }, isHttps: boolean): HeaderEntry | null {
+  return env.NODE_ENV === 'production' && isHttps ? { key: 'Strict-Transport-Security', value: HSTS_VALUE } : null;
 }
 
 /** Where the browser POSTs violation reports (src/app/api/csp-report/route.ts). */
