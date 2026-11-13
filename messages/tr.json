@@ -4498,6 +4498,10 @@
       "name": "Interreg Ön Değerlendirme",
       "tagline": "Proje dosyanızı çağrı rehberine göre iç ön değerlendirmeden geçirin — tahmini puan, resmî puan değildir."
     },
+    "client-pipeline": {
+      "name": "Müşteri Satış Hattı",
+      "tagline": "Danışmanlık firmanızın müşteri kurumlarını, satış fırsatlarını, hizmet paketlerini ve tekliflerini tek hatta izleyin."
+    },
     "tr-layer": {
       "name": "Türkiye Ulusal Katmanı",
       "tagline": "AB hattının yanında TÜBİTAK, KOSGEB gibi ulusal programlar."

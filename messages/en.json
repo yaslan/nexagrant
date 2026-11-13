@@ -4498,6 +4498,10 @@
       "name": "Interreg Pre-Assessment",
       "tagline": "Run your project file through an internal pre-assessment against the call guide — an estimated score, not an official one."
     },
+    "client-pipeline": {
+      "name": "Client Pipeline",
+      "tagline": "Track your consultancy's client organisations, deals, service packages and quotes in one pipeline."
+    },
     "tr-layer": {
       "name": "Turkish National Layer",
       "tagline": "Turkish national programmes such as TÜBİTAK and KOSGEB, alongside the EU pipeline."

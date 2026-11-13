@@ -87,3 +87,4 @@ tenant-pic-registry-status/migration.sql
 add-project-idea-decision-log.sql
 auditevent-immutable.sql
 add-notification-preferences.sql
+add-m18-client-pipeline.sql

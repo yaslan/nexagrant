@@ -13,7 +13,11 @@ export type Action =
   | "manage_approvals"
   | "approve_dual_approval"
   /** M1 Partner Search announcements: read and export (FO-61). Not for guest partners. */
-  | "view_partner_search";
+  | "view_partner_search"
+  /** M18 Client Pipeline (NG-143): read = MEMBER+, write = WRITER+, admin = TENANT_ADMIN+. */
+  | "client_pipeline_read"
+  | "client_pipeline_write"
+  | "client_pipeline_admin";
 
 const rolePermissions: Record<Role, Action[]> = {
   TENANT_OWNER: [
@@ -29,6 +33,9 @@ const rolePermissions: Record<Role, Action[]> = {
     "manage_approvals",
     "approve_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
+    "client_pipeline_admin",
   ],
   TENANT_ADMIN: [
     "manage_users",
@@ -41,6 +48,9 @@ const rolePermissions: Record<Role, Action[]> = {
     "manage_approvals",
     "approve_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
+    "client_pipeline_admin",
   ],
   PIPELINE_MANAGER: [
     "manage_workspaces",
@@ -51,6 +61,8 @@ const rolePermissions: Record<Role, Action[]> = {
     "request_dual_approval",
     "manage_approvals",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
   ],
   WRITER: [
     "edit_proposal",
@@ -58,12 +70,15 @@ const rolePermissions: Record<Role, Action[]> = {
     "contribute_assigned",
     "request_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
   ],
   MEMBER: [
     "view_proposal",
     "contribute_assigned",
     "request_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
   ],
   GUEST_PARTNER: [
     "contribute_assigned",
