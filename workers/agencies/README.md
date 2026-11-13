@@ -34,10 +34,13 @@ DB yazımı burada değil: `src/lib/jobs/tasks/tr-agency-calls.ts` çıktıyı
 `SystemAlert` (`AGENCY_SCHEMA_CHANGED`) olarak yazar. Tetik: `pnpm jobs:tr-agency`
 (`--dry-run` DB'ye dokunmaz). Python tarafı `--with-body` ile ham gövdeyi verir.
 
+Son başvuru tarihi ve destek tutarı (NG-158) `Topic` kaydına yazılır: `identifier` =
+`<callIdentifier>#1`, `deadlines` = `[{stage:1, at:<UTC>, tz:"Europe/Istanbul"}]`,
+`nextDeadlineAt`, `budgetPerProjectCents` (azami destek TL × 100; `Topic`'te para birimi
+alanı yok, değer TL kuruşudur). Tarihsiz çağrı `deadlines: []` ile yazılır. Ayrıştırılamayan
+tarih/tutar `SystemAlert` (`agency:unparsed:*`) üretir; çağrı yine yazılır.
+
 ## Henüz yapılmayanlar
 
-- `Call` modelinde son başvuru tarihi (`deadlineAt`/`deadlineTz`) ve destek tutarı
-  alanı yok; Python bunları üretir ama DB'ye yazılmaz (ham değer `RawFetch` içinde).
-  Alan eklemek şema işi (FO-266 kapsamı).
 - Ulusal Ajans son başvuru detay sayfası adımı yok (adaptör yalnız duyuru bağlantısı çıkarır).
 - Graphile zamanlaması yok: job `schedule.ts` `JobId` tipine girmediği için yalnız elle tetiklenir.
