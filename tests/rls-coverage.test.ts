@@ -478,5 +478,10 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
     const trig = readFileSync(resolve(process.cwd(), '.github/ci/supabase-ensure-rls.sql'), 'utf8');
     expect(trig).toContain("EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);");
     expect(trig).toMatch(/CREATE EVENT TRIGGER ensure_rls ON ddl_command_end EXECUTE FUNCTION public\.rls_auto_enable\(\);/);
+    // NG-154: the CI copy must not leave rls_auto_enable() callable through the Data API.
+    expect(trig).toContain('REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC;');
+    expect(trig).toMatch(/rolname IN \('anon', 'authenticated'\)[\s\S]*REVOKE ALL ON FUNCTION public\.rls_auto_enable\(\) FROM %I/);
+    expect(trig.indexOf('FROM PUBLIC;')).toBeGreaterThan(trig.indexOf('CREATE OR REPLACE FUNCTION public.rls_auto_enable()'));
+    expect(trig.indexOf('FROM PUBLIC;')).toBeLessThan(trig.indexOf('CREATE EVENT TRIGGER ensure_rls'));
   });
 });
