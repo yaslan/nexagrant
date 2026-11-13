@@ -24,6 +24,11 @@ const RUN = `im-${Date.now().toString(36)}`;
 
 const state = vi.hoisted(() => ({
   rls: undefined as PrismaClient | undefined,
+  // NG-155: mailer is mocked, but pin the SMTP settings so the suite never depends on the host's SMTP env.
+  // Fake host: no connection is ever opened (smtpMailer is replaced below).
+  SMTP_HOST: 'smtp.example.invalid' as string | undefined,
+  SMTP_PORT: '587' as string | undefined,
+  SMTP_FROM: 'NexaGrant <noreply@example.invalid>' as string | undefined,
   /**
    * When set, every transaction waits before its `invitation.upsert` until
    * `barrier.size` transactions have arrived there (or `barrier.ms` passed).
