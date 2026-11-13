@@ -16,7 +16,9 @@ BEGIN
     'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark',
     'OrgReadiness','InternalApproval','PartnerBudgetShare',
     'ProjectIdea','DecisionLog',
-    'NotificationPreference','NotificationEmailItem'
+    'NotificationPreference','NotificationEmailItem',
+    'LeadOrganization','LeadContact','LeadMatch','Deal','DealActivity','DealTask',
+    'ServicePackage','ServiceQuote','FunderRule'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);

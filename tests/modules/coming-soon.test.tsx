@@ -28,11 +28,12 @@ import { getAllManifests } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
 
 // M17 (FO-186) was `soon` too; it opened as `beta` with its screen (FO-189).
-const SOON: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'];
+// M18 (NG-143): data layer first, screens and price later (F3, K2).
+const SOON: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16', 'M18'];
 const admin = { role: 'TENANT_OWNER', isPlatformAdmin: true };
 
 describe('decideModuleAccess — Yakında modules', () => {
-  it('lists exactly the six FO-40 modules as soon', () => {
+  it('lists exactly the FO-40 modules and M18 as soon', () => {
     expect(getAllManifests().filter((m) => m.statusBadge === 'soon').map((m) => m.id).sort()).toEqual(
       [...SOON].sort(),
     );
@@ -80,7 +81,8 @@ describe('moduleGate — coming-soon page', () => {
 });
 
 describe('placeholder routes', () => {
-  it.each(SOON)('%s owns a modules/<key> page that answers with the gate', async (id) => {
+  // M18 is left out: F1 is the data layer only (routes: []), its first page is F3 (NG-143 card).
+  it.each(SOON.filter((id) => id !== 'M18'))('%s owns a modules/<key> page that answers with the gate', async (id) => {
     const manifest = getAllManifests().find((m) => m.id === id)!;
     expect(manifest.routes).toEqual([{ path: `modules/${manifest.key}` }]);
 

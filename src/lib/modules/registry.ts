@@ -19,6 +19,7 @@ import { m14Manifest } from '../../modules/m14/manifest';
 import { m15Manifest } from '../../modules/m15/manifest';
 import { m16Manifest } from '../../modules/m16/manifest';
 import { m17Manifest } from '../../modules/m17/manifest';
+import { m18Manifest } from '../../modules/m18/manifest';
 
 export const moduleRegistry: Record<ModuleId, ModuleManifest> = {
   M0: m0Manifest,
@@ -39,6 +40,7 @@ export const moduleRegistry: Record<ModuleId, ModuleManifest> = {
   M15: m15Manifest,
   M16: m16Manifest,
   M17: m17Manifest,
+  M18: m18Manifest,
 };
 
 export const getManifest = (id: ModuleId): ModuleManifest => moduleRegistry[id];

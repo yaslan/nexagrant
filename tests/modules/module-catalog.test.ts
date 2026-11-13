@@ -123,7 +123,9 @@ describe("displayPlansForModule — card plan list", () => {
   it("a Yakında module is shown on the cards of its plans, but no plan grants it", () => {
     for (const id of SOON_IDS) {
       expect(plansGrantingModule(id), id).toEqual([]);
-      expect(displayPlansForModule(id), id).not.toEqual([]);
+      // M18 (NG-143) has no price yet (K2), so no plan card previews it either.
+      if (id === "M18") expect(displayPlansForModule(id), id).toEqual([]);
+      else expect(displayPlansForModule(id), id).not.toEqual([]);
     }
     expect(displayPlansForModule("M0")).toEqual(["free", "basic", "pro", "ultra"]);
     expect(displayPlansForModule("M12")).toEqual(["free", "basic", "pro", "ultra"]);
@@ -185,7 +187,7 @@ describe("manifest catalogue fields", () => {
         .map((m) => m.id);
     expect(byCat("core")).toEqual(["M0", "M1", "M2", "M3", "M4", "M5", "M13", "M16"]);
     expect(byCat("ai")).toEqual(["M6", "M8", "M14", "M17"]);
-    expect(byCat("tools")).toEqual(["M7", "M9", "M10", "M11", "M12", "M15"]);
+    expect(byCat("tools")).toEqual(["M7", "M9", "M10", "M11", "M12", "M15", "M18"]);
   });
 
   it("every module names at least one gate and a name + tagline in both locales", () => {
@@ -247,7 +249,7 @@ describe("pipelineCoverage / categorySummary", () => {
     expect(categorySummary(["M1", "M6", "M11"])).toEqual({
       core: { active: 1, total: 8 },
       ai: { active: 1, total: 4 },
-      tools: { active: 1, total: 6 },
+      tools: { active: 1, total: 7 },
     });
   });
 });
@@ -272,7 +274,8 @@ describe("navFeatureModule", () => {
 describe("Yakında modules and programme templates", () => {
   it("declares the six new manifests with the agreed categories, dependencies and badge", () => {
     const byId = Object.fromEntries(getAllManifests().map((m) => [m.id, m]));
-    expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16"]);
+    expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16", "M18"]);
+    // M18 (NG-143) ships its data layer first; screens and price come in F3 (K2).
     // M17 opened with its screen (FO-189).
     expect(byId.M17?.statusBadge).toBe("beta");
     expect(byId.M13?.requires).toEqual(["M5"]);
