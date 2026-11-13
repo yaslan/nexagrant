@@ -37,6 +37,8 @@ const ALERT_SOURCE = 'tr_agency_calls';
 
 /** Python `normalize.to_call` tarihleri bu saat diliminde üretir (UTC'ye çevrilmiş). */
 export const TR_AGENCY_TZ = 'Europe/Istanbul';
+/** Call.currency: TR ajans çağrıları TL'dir (NG-158 lider kararı; şema değişmedi). */
+export const TR_AGENCY_CURRENCY = 'TRY';
 /** Her TR ajans çağrısı tek topic taşır; kimlik: `<callIdentifier>#1`. */
 const TOPIC_SUFFIX = '#1';
 
@@ -169,6 +171,7 @@ export function planAgencyWrites(run: AgencyRunSummary): AgencyWritePlan {
     if (budgetTl !== null && budgetTl !== undefined && !(Number.isSafeInteger(budgetTl) && budgetTl >= 0)) {
       alerts.push(unparsedAlert(run.source, c.callIdentifier, 'budget', 'destek tutarı', String(budgetTl)));
     }
+    // Topic.budgetPerProjectCents = TL × 100 (kuruş), para birimi TRY. Döviz çevrimi yok.
     const budgetPerProjectCents =
       budgetTl !== null && budgetTl !== undefined && Number.isSafeInteger(budgetTl) && budgetTl >= 0
         ? budgetTl * 100
@@ -264,10 +267,11 @@ export async function persistAgencyRun(run: AgencyRunSummary): Promise<PersistRe
     });
     const call = await prisma.call.upsert({
       where: { callIdentifier: c.callIdentifier },
-      update: { title: c.title, ...(c.url ? { url: c.url } : {}) },
+      update: { title: c.title, currency: TR_AGENCY_CURRENCY, ...(c.url ? { url: c.url } : {}) },
       create: {
         callIdentifier: c.callIdentifier,
         title: c.title,
+        currency: TR_AGENCY_CURRENCY,
         programmeId: TR_AGENCY_PROGRAMME_ID,
         ...(c.url ? { url: c.url } : {}),
       },

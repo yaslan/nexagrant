@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { agencyPythonPath, planAgencyWrites, type AgencyRunSummary } from '../tr-agency-calls';
+import { agencyPythonPath, planAgencyWrites, TR_AGENCY_CURRENCY, type AgencyRunSummary } from '../tr-agency-calls';
 
 const FX = path.join(__dirname, 'fixtures', 'tr-agency');
 const load = (name: string): AgencyRunSummary =>
@@ -76,6 +76,12 @@ describe('planAgencyWrites → Topic (NG-158)', () => {
       budgetPerProjectCents: 20_000_000 * 100,
       sourceUrl: 'https://istka.org.tr/acik-destek-programlari',
     });
+  });
+
+  it('para birimi TRY; bütçe TL kuruşu: 20.000.000 TL → 2.000.000.000 kuruş (döviz çevrimi yok)', () => {
+    expect(TR_AGENCY_CURRENCY).toBe('TRY');
+    const [topic] = planAgencyWrites(load('run-istka.json')).topicUpserts;
+    expect(topic?.budgetPerProjectCents).toBe(20_000_000 * 100);
   });
 
   it('tarihsiz çağrı: deadlines [] ve nextDeadlineAt null, uyarı yok', () => {
