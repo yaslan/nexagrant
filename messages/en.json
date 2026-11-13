@@ -5548,5 +5548,137 @@
   },
   "pipelineBoard": {
     "unassigned": "Unassigned"
+  },
+  "m18": {
+    "title": "Client Sales Pipeline",
+    "tabs": {
+      "panel": "Overview",
+      "leads": "Client organisations",
+      "pipeline": "Sales pipeline",
+      "tasks": "Tasks"
+    },
+    "panel": {
+      "heading": "Client Sales Pipeline",
+      "leadsCount": "Organisations",
+      "openDeals": "Open deals",
+      "openTasks": "Open tasks",
+      "goLeads": "Go to organisations",
+      "goPipeline": "Go to pipeline",
+      "goTasks": "Go to tasks"
+    },
+    "leads": {
+      "heading": "Client organisations",
+      "empty": "No organisations yet.",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Organisation name",
+      "lifecycleLabel": "Status",
+      "lifecycleAll": "All",
+      "colName": "Organisation",
+      "colType": "Type",
+      "colProvince": "Province",
+      "colLifecycle": "Status",
+      "colUpdated": "Updated",
+      "newLead": "New organisation",
+      "nameLabel": "Organisation name",
+      "legalNameLabel": "Legal name",
+      "provinceLabel": "Province plate code (e.g. 06)",
+      "websiteLabel": "Website",
+      "sizeLabel": "Size",
+      "submit": "Add organisation",
+      "created": "Organisation added.",
+      "duplicateNotice": "An organisation with this name already exists. You can review it on the duplicates screen.",
+      "openLead": "Open",
+      "limitNote": "At most 50 rows are shown."
+    },
+    "lifecycle": {
+      "LEAD": "Lead",
+      "CLIENT": "Client",
+      "DISQUALIFIED": "Disqualified"
+    },
+    "size": {
+      "MICRO": "Micro",
+      "SMALL": "Small",
+      "MEDIUM": "Medium",
+      "LARGE": "Large"
+    },
+    "lead": {
+      "backToList": "Back to organisations",
+      "notFound": "Organisation not found.",
+      "contactsHeading": "Contacts",
+      "noContacts": "No contacts recorded.",
+      "dealsHeading": "Deals",
+      "noDeals": "No deals for this organisation.",
+      "doNotContact": "Do not contact",
+      "fullName": "Full name",
+      "title": "Title",
+      "email": "Email",
+      "phone": "Phone",
+      "website": "Website",
+      "legalName": "Legal name"
+    },
+    "deal": {
+      "heading": "New deal",
+      "titleLabel": "Deal name",
+      "feeLabel": "Estimated fee",
+      "feeHelp": "Amount with currency (e.g. 1500.00)",
+      "currencyLabel": "Currency",
+      "submit": "Open deal",
+      "created": "Deal opened."
+    },
+    "pipeline": {
+      "heading": "Sales pipeline",
+      "empty": "No deals at this stage.",
+      "moveLabel": "Stage",
+      "lostReasonLabel": "Loss reason",
+      "moved": "Stage updated.",
+      "columnTitle": "{stage} ({count})",
+      "openDeal": "Organisation: {org}",
+      "fee": "Estimated fee"
+    },
+    "stage": {
+      "NEW": "New",
+      "QUALIFIED": "Qualified",
+      "CONTACTED": "Contacted",
+      "DISCOVERY_MEETING": "Discovery meeting",
+      "ELIGIBILITY_ANALYSIS": "Eligibility analysis",
+      "PROPOSAL": "Proposal",
+      "CONTRACT": "Contract",
+      "APPLICATION_PREP": "Application preparation",
+      "SUBMITTED": "Submitted",
+      "WON": "Won",
+      "REJECTED": "Rejected",
+      "LOST": "Lost"
+    },
+    "tasks": {
+      "heading": "Tasks",
+      "empty": "No open tasks.",
+      "colTask": "Task",
+      "colDeal": "Deal",
+      "colDue": "Due",
+      "colStatus": "Status",
+      "open": "Open",
+      "done": "Done",
+      "markDone": "Mark done",
+      "markOpen": "Reopen",
+      "auto": "Automatic",
+      "newTask": "New task",
+      "titleLabel": "Task",
+      "dueLabel": "Due date",
+      "submit": "Add task",
+      "created": "Task added.",
+      "toggled": "Task updated.",
+      "dealLabel": "Deal"
+    },
+    "errors": {
+      "INVALID": "Some input is invalid. Check the fields.",
+      "NOT_FOUND": "Record not found.",
+      "DUPLICATE": "This organisation already exists.",
+      "TRANSITION": "This stage change is not allowed.",
+      "FAILED": "The action could not be completed. Try again."
+    },
+    "common": {
+      "noData": "No data",
+      "required": "Required field"
+    }
   }
 }

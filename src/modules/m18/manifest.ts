@@ -34,7 +34,13 @@ export const m18Manifest: ModuleManifest = {
   recommends: ['M9', 'M16'],
   planTiers: [],
   addOnSku: null,
-  routes: [],
+  routes: [
+    { path: 'musteri-hatti' },
+    { path: 'musteri-hatti/leads' },
+    { path: 'musteri-hatti/leads/[id]' },
+    { path: 'musteri-hatti/pipeline' },
+    { path: 'musteri-hatti/tasks' },
+  ],
   nav: [],
   permissions: [
     { id: 'client-pipeline:read', minRole: Role.MEMBER },

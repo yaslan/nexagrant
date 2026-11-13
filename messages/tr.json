@@ -5548,5 +5548,137 @@
   },
   "pipelineBoard": {
     "unassigned": "Atanmadı"
+  },
+  "m18": {
+    "title": "Müşteri Satış Hattı",
+    "tabs": {
+      "panel": "Genel Bakış",
+      "leads": "Müşteri Kurumlar",
+      "pipeline": "Satış Hattı",
+      "tasks": "Görevler"
+    },
+    "panel": {
+      "heading": "Müşteri Satış Hattı",
+      "leadsCount": "Kurum",
+      "openDeals": "Açık fırsat",
+      "openTasks": "Açık görev",
+      "goLeads": "Kurumlara git",
+      "goPipeline": "Satış hattına git",
+      "goTasks": "Görevlere git"
+    },
+    "leads": {
+      "heading": "Müşteri kurumlar",
+      "empty": "Henüz kurum yok.",
+      "searchLabel": "Ara",
+      "searchPlaceholder": "Kurum adı",
+      "lifecycleLabel": "Durum",
+      "lifecycleAll": "Tümü",
+      "colName": "Kurum",
+      "colType": "Tür",
+      "colProvince": "İl",
+      "colLifecycle": "Durum",
+      "colUpdated": "Güncellendi",
+      "newLead": "Yeni kurum",
+      "nameLabel": "Kurum adı",
+      "legalNameLabel": "Ticaret unvanı",
+      "provinceLabel": "İl plaka kodu (ör. 06)",
+      "websiteLabel": "Web sitesi",
+      "sizeLabel": "Ölçek",
+      "submit": "Kurumu ekle",
+      "created": "Kurum eklendi.",
+      "duplicateNotice": "Bu isimde bir kurum zaten var. Kopya birleştirme ekranından inceleyebilirsiniz.",
+      "openLead": "Aç",
+      "limitNote": "En fazla 50 kayıt gösterilir."
+    },
+    "lifecycle": {
+      "LEAD": "Aday",
+      "CLIENT": "Müşteri",
+      "DISQUALIFIED": "Elendi"
+    },
+    "size": {
+      "MICRO": "Mikro",
+      "SMALL": "Küçük",
+      "MEDIUM": "Orta",
+      "LARGE": "Büyük"
+    },
+    "lead": {
+      "backToList": "Kurumlara dön",
+      "notFound": "Kurum bulunamadı.",
+      "contactsHeading": "İletişim kişileri",
+      "noContacts": "Kayıtlı kişi yok.",
+      "dealsHeading": "Fırsatlar",
+      "noDeals": "Bu kurumda fırsat yok.",
+      "doNotContact": "Aramayın",
+      "fullName": "Ad soyad",
+      "title": "Unvan",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "website": "Web sitesi",
+      "legalName": "Ticaret unvanı"
+    },
+    "deal": {
+      "heading": "Yeni fırsat",
+      "titleLabel": "Fırsat adı",
+      "feeLabel": "Tahmini ücret",
+      "feeHelp": "Tutar, para birimi ile birlikte (ör. 1500,00)",
+      "currencyLabel": "Para birimi",
+      "submit": "Fırsat aç",
+      "created": "Fırsat açıldı."
+    },
+    "pipeline": {
+      "heading": "Satış hattı",
+      "empty": "Bu aşamada fırsat yok.",
+      "moveLabel": "Aşama",
+      "lostReasonLabel": "Kayıp nedeni",
+      "moved": "Aşama güncellendi.",
+      "columnTitle": "{stage} ({count})",
+      "openDeal": "Kurum: {org}",
+      "fee": "Tahmini ücret"
+    },
+    "stage": {
+      "NEW": "Yeni",
+      "QUALIFIED": "Nitelikli",
+      "CONTACTED": "İletişime geçildi",
+      "DISCOVERY_MEETING": "Keşif toplantısı",
+      "ELIGIBILITY_ANALYSIS": "Uygunluk analizi",
+      "PROPOSAL": "Teklif",
+      "CONTRACT": "Sözleşme",
+      "APPLICATION_PREP": "Başvuru hazırlığı",
+      "SUBMITTED": "Gönderildi",
+      "WON": "Kazanıldı",
+      "REJECTED": "Reddedildi",
+      "LOST": "Kayıp"
+    },
+    "tasks": {
+      "heading": "Görevler",
+      "empty": "Açık görev yok.",
+      "colTask": "Görev",
+      "colDeal": "Fırsat",
+      "colDue": "Son tarih",
+      "colStatus": "Durum",
+      "open": "Açık",
+      "done": "Tamamlandı",
+      "markDone": "Tamamla",
+      "markOpen": "Geri al",
+      "auto": "Otomatik",
+      "newTask": "Yeni görev",
+      "titleLabel": "Görev",
+      "dueLabel": "Son tarih",
+      "submit": "Görev ekle",
+      "created": "Görev eklendi.",
+      "toggled": "Görev güncellendi.",
+      "dealLabel": "Fırsat"
+    },
+    "errors": {
+      "INVALID": "Girdiler geçersiz. Alanları kontrol edin.",
+      "NOT_FOUND": "Kayıt bulunamadı.",
+      "DUPLICATE": "Bu kurum zaten var.",
+      "TRANSITION": "Bu aşama geçişine izin verilmiyor.",
+      "FAILED": "İşlem tamamlanamadı. Tekrar deneyin."
+    },
+    "common": {
+      "noData": "Veri yok",
+      "required": "Zorunlu alan"
+    }
   }
 }
