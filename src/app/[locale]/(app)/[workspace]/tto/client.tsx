@@ -153,7 +153,7 @@ export function TtoAcceleratorClient({
       case 'granted':
         return <span className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-500 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.granted')}</span>;
       case 'pending':
-        return <span className="bg-amber-500/15 text-amber-500 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.pending')}</span>;
+        return <span className="bg-amber-500/15 text-amber-800 dark:text-amber-500 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.pending')}</span>;
       case 'licensed':
         return <span className="bg-accent/15 text-accent-ink border border-accent/30 px-2.5 py-0.5 rounded-full font-bold text-[11px]">{t('patentStatus.licensed')}</span>;
       default:
@@ -209,7 +209,7 @@ export function TtoAcceleratorClient({
 
           <div className="bg-ground border border-border rounded-xl p-3.5">
             <span className="text-muted block text-[11px]">{t('stats.grantedLabel')}</span>
-            <span className="text-xl font-bold text-emerald-500 font-mono mt-0.5 block">
+            <span className="text-xl font-bold text-emerald-700 dark:text-emerald-500 font-mono mt-0.5 block">
               {grantedCount} <span className="text-xs text-muted">{t('stats.patentsUnit')}</span>
             </span>
           </div>
@@ -460,7 +460,7 @@ export function TtoAcceleratorClient({
             </div>
 
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-2">
-              <span className="text-xs font-bold font-mono text-emerald-500 bg-emerald-500/20 px-2 py-0.5 rounded">
+              <span className="text-xs font-bold font-mono text-emerald-800 dark:text-emerald-500 bg-emerald-500/20 px-2 py-0.5 rounded">
                 {t('roadmap.marketBadge')}
               </span>
               <h4 className="font-bold text-ink">{t('roadmap.marketTitle')}</h4>
@@ -534,7 +534,7 @@ export function TtoAcceleratorClient({
                         <span className="font-mono font-bold text-xs text-accent bg-accent/15 border border-accent/20 px-2 py-0.5 rounded">
                           {topic.topicId}
                         </span>
-                        <span className="font-mono font-bold text-xs text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                        <span className="font-mono font-bold text-xs text-emerald-800 dark:text-emerald-500 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
                           {t('matcher.fitScore', { score: topic.fitScore })}
                         </span>
                       </div>
