@@ -246,6 +246,20 @@ test.describe('language switcher — TR ↔ EN', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'EU Grant Management & Insights Blog' })).toBeVisible();
   });
 
+  // NG-127: posts are Turkish only, so a TR post switched to EN lands on the EN blog
+  // notice page, not on the same Turkish post.
+  test('NG-127: public navbar, TR blog post → EN lands on /en/blog with the Turkish-only notice', async ({ page }) => {
+    await page.goto('/tr/blog/horizon-europe-basarili-konsorsiyum-rehberi');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'tr');
+    await page.getByRole('link', { name: 'EN', exact: true }).filter({ visible: true }).click();
+    await expect(page).toHaveURL((url) => url.pathname === '/en/blog');
+    await expect(page.getByRole('heading', { level: 2, name: 'Our blog posts are in Turkish only for now' })).toBeVisible();
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('heading', { level: 2, name: 'Our blog posts are in Turkish only for now' })).toBeVisible();
+    await page.screenshot({ path: `${SHOTS}/ng-127-tr-post-to-en-blog-notice.png` });
+  });
+
   test('B-3: public navbar, EN → TR on /en/pricing lands on /tr/fiyatlandirma', async ({ page }) => {
     await page.goto('/en/pricing');
     await page.getByRole('link', { name: 'TR', exact: true }).filter({ visible: true }).click();

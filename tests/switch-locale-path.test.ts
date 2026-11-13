@@ -28,6 +28,16 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/tr/acik-cagrilar', 'en')).toBe('/en/open-calls');
   });
 
+  // NG-127: posts are Turkish only (BLOG_CONTENT_LOCALE). Switching a TR post to EN
+  // lands on the EN blog notice page; the TR→TR path and the 307 for /en/blog/<slug> stay.
+  test('TR blog post switched to EN lands on the EN blog notice page', () => {
+    expect(switchLocalePath('/tr/blog/ornek-yazi', 'en')).toBe('/en/blog');
+  });
+
+  test('blog post switched to TR keeps the slug', () => {
+    expect(switchLocalePath('/en/blog/ornek-yazi', 'tr')).toBe('/tr/blog/ornek-yazi');
+  });
+
   test('home and unknown paths fall back to the locale root', () => {
     expect(switchLocalePath('/tr', 'en')).toBe('/en');
     expect(switchLocalePath('', 'en')).toBe('/en');

@@ -3,6 +3,8 @@
  * Generates canonical, language-aware URLs for both public marketing and in-app workspace pages.
  */
 
+import { blogContentShownIn } from './blog-shared';
+
 export type PublicRouteKey =
   | 'home'
   | 'openCalls'
@@ -198,6 +200,12 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
   if (workspace in publicRoutes) {
     const routeKey = publicRoutes[workspace];
     if (routeKey === 'blog' && segments.length > 2) {
+      // NG-127: posts exist only in the content locale (TR). A target locale
+      // that does not show them lands on its blog notice page, not on the
+      // same Turkish post.
+      if (!blogContentShownIn(targetLocale)) {
+        return getPublicRoute('blog', targetLocale);
+      }
       return getPublicRoute('blogDetail', targetLocale, segments[2]);
     }
     if (routeKey) return getPublicRoute(routeKey, targetLocale);
