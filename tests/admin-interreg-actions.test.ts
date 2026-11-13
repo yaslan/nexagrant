@@ -88,3 +88,21 @@ test('handleTestInterregRagQuery passes the platform admin as the embedding acto
   await interreg.handleTestInterregRagQuery('tourism', 3);
   expect(m.retrieveChunks).toHaveBeenCalledWith('tourism', 3, undefined, { userId: 'user-admin' });
 });
+
+// FO-112 Ö5 (carried over from the local dev line in NG-150): invalid input is refused by zod
+// before any paid embedding or upstream sync starts.
+describe('input validation (FO-112 Ö5)', () => {
+  beforeEach(() => {
+    m.auth.mockResolvedValue(PLATFORM_ADMIN);
+  });
+
+  test('rejects an unbounded topK before any embedding is paid for', async () => {
+    await expect(interreg.handleTestInterregRagQuery('test', 500)).rejects.toThrow();
+    expect(m.retrieveChunks).not.toHaveBeenCalled();
+  });
+
+  test('rejects programme ids that are not comma-separated codes', async () => {
+    await expect(interreg.handleRunKeepEuSyncAction('305; DROP TABLE')).rejects.toThrow();
+    expect(m.syncKeepEuData).not.toHaveBeenCalled();
+  });
+});

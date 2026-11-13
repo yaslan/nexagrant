@@ -1,0 +1,6 @@
+# TR agency collectors (NG-144). Python 3.12 (workers/README.md).
+# Runtime is stdlib + truststore. Test-only: pytest + pytest-socket (network off).
+#
+# Hashes: requirements.lock, generated with:
+#   pip install --require-hashes -r requirements.lock
+truststore==0.10.5
