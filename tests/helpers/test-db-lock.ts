@@ -84,3 +84,10 @@ export async function holdTestDbLock(url: string, name: string): Promise<() => P
  * for their whole file (beforeAll → afterAll), so neither one's purge can take the other's rows.
  */
 export const M17_INTERREG_TEXT_PURGE_LOCK = 'M17:interreg-text-purge';
+
+/**
+ * NG-131: the notification e-mail outbox is cross-tenant: a send run in one file also drains the
+ * rows another file just queued. notification-preferences.live and notification-email-concurrency.live
+ * hold this for their whole file.
+ */
+export const NOTIFICATION_OUTBOX_LOCK = 'NotificationEmailItem:outbox';

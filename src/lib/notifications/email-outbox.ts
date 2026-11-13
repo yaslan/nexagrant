@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { NotificationType } from '@prisma/client';
 import { withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope, type SystemTx } from '@/lib/system-scope';
@@ -27,9 +28,20 @@ import { renderNotification, type NotificationTranslator } from './render';
  * of the tenant is deleted unsent (an address of a person who left must not
  * keep getting mail).
  *
+ * Single run (NG-131, NG-43 review Ö-1): before any SMTP call a run CLAIMS the
+ * recipient's rows with one atomic UPDATE (claimToken + claimedAt, only rows
+ * unclaimed or claimed longer ago than CLAIM_LEASE_MS). A run that starts while
+ * another is mid-send finds them claimed and skips them, so a recipient gets one
+ * mail however many runs overlap (a manual run beside the cron, two workers, a
+ * retry of a slow tick). A failed send releases the claim; a run that died
+ * leaves one that expires after the lease.
+ *
  * The text is rendered here, in the recipient's locale, with the same
  * `renderNotification` the bell uses: the outbox stores type + payload only.
  */
+
+/** A claim older than this is a dead run's; longer than any realistic send of one recipient's batch. */
+export const CLAIM_LEASE_MS = 15 * 60_000;
 
 export type EmailMode = 'INSTANT' | 'WEEKLY';
 
@@ -128,17 +140,36 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     result.recipients++;
     // Read in one transaction, send outside any: an SMTP round trip must not
     // hold a database transaction open.
-    const { items, member } = await runTenant(tenantId, async (tx) => ({
-      items: await tx.notificationEmailItem.findMany({
-        where: { tenantId, userId, frequency: options.mode, sentAt: null, createdAt: { lte: now } },
-        select: { id: true, type: true, payload: true, createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      }),
-      member: await tx.membership.findFirst({
-        where: { tenantId, userId, user: { deletedAt: null, deletionRequestedAt: null } },
-        select: { user: { select: { email: true, locale: true } } },
-      }),
-    }));
+    const token = randomUUID();
+    const { items, member } = await runTenant(tenantId, async (tx) => {
+      // Non-null columns of the rows read above; asserted so the claim can never lose its filter.
+      requireActionId(tenantId, 'tenantId');
+      requireActionId(userId, 'userId');
+      // The claim: ONE statement, so two runs cannot both win a row (the second
+      // waits on the row lock, re-reads the claim and no longer matches).
+      await tx.notificationEmailItem.updateMany({
+        where: {
+          tenantId,
+          userId,
+          frequency: options.mode,
+          sentAt: null,
+          createdAt: { lte: now },
+          OR: [{ claimToken: null }, { claimedAt: { lt: new Date(Date.now() - CLAIM_LEASE_MS) } }],
+        },
+        data: { claimToken: token, claimedAt: new Date() },
+      });
+      return {
+        items: await tx.notificationEmailItem.findMany({
+          where: { tenantId, userId, frequency: options.mode, sentAt: null, claimToken: token },
+          select: { id: true, type: true, payload: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        member: await tx.membership.findFirst({
+          where: { tenantId, userId, user: { deletedAt: null, deletionRequestedAt: null } },
+          select: { user: { select: { email: true, locale: true } } },
+        }),
+      };
+    });
     if (items.length === 0) continue;
     if (!member) {
       const ids = items.map((i) => i.id);
@@ -160,6 +191,16 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         // echo the address (src/lib/email/mailer.ts MailSendError).
         result.failures++;
         console.error('[notifications][email-outbox]', options.mode, error instanceof Error ? error.name : 'error');
+        // Give the batch back so the next run sends it at once, not after the lease.
+        const failedIds = batch.map((i) => i.id);
+        await runTenant(tenantId, (tx) =>
+          tx.notificationEmailItem.updateMany({
+            where: { tenantId, userId, id: { in: failedIds }, sentAt: null, claimToken: token },
+            data: { claimToken: null, claimedAt: null },
+          })
+        ).catch(() => {
+          /* the lease expires it */
+        });
         continue;
       }
       result.mailsSent++;

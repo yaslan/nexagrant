@@ -1762,6 +1762,11 @@ model NotificationEmailItem {
   /// keeps refusing the same notification (NG-43 review B-1); notifications-retention
   /// deletes it NOTIFICATION_RETENTION_DAYS after sentAt. Null = still queued.
   sentAt    DateTime?
+  /// NG-131: one send run's claim on this row (random token + moment). A second run that
+  /// starts while the first is mid-SMTP skips claimed rows, so a recipient is mailed once.
+  /// Released (null) when the send fails; a claim older than the lease is reclaimable.
+  claimToken String?
+  claimedAt  DateTime?
   tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId, dedupeKey])

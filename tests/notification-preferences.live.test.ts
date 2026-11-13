@@ -5,6 +5,7 @@ import tr from '../messages/tr.json';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
+import { holdTestDbLock, NOTIFICATION_OUTBOX_LOCK } from './helpers/test-db-lock';
 import type { MailMessage } from '@/lib/email/mailer';
 import type { NotificationTranslator } from '@/lib/notifications/render';
 
@@ -49,6 +50,7 @@ const outbox = await import('@/lib/notifications/email-outbox');
 type Scope = { tenantId: string; userId: string; email: string };
 
 let admin: PrismaClient | undefined;
+let releaseLock: (() => Promise<void>) | undefined;
 let ready = false;
 let skipReason = '';
 const tenants: string[] = [];
@@ -130,6 +132,7 @@ beforeAll(async () => {
     skipReason = 'DATABASE_URL_RLS_TEST / DATABASE_URL not set. Run `pnpm db:rls-role`.';
     return;
   }
+  releaseLock = await holdTestDbLock(ADMIN_URL, NOTIFICATION_OUTBOX_LOCK);
   state.rls = createDbClient(rlsUrl);
   admin = createDbClient(ADMIN_URL);
   try {
@@ -154,6 +157,7 @@ afterAll(async () => {
     await admin.$disconnect();
   }
   await state.rls?.$disconnect();
+  await releaseLock?.();
 });
 
 describe('a changed preference changes the channel', () => {

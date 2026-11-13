@@ -88,3 +88,4 @@ add-project-idea-decision-log.sql
 auditevent-immutable.sql
 add-notification-preferences.sql
 add-m18-client-pipeline.sql
+add-notification-email-claim.sql
