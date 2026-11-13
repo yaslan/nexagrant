@@ -7,16 +7,20 @@
  *   - normalize çağrı → `Call` (upsert, anahtar `callIdentifier`),
  *   - yapı bozulması → `SystemAlert` (`AGENCY_SCHEMA_CHANGED`), koşu kırılmaz.
  *
+ *   - her çağrı için bir `Topic` (NG-158): `identifier` = `<callIdentifier>#1`, son
+ *     başvuru tarihleri `deadlines` (UTC + `Europe/Istanbul`), `nextDeadlineAt`,
+ *     `budgetPerProjectCents` (TL → kuruş, azami destek) ve `sourceUrl`.
+ *
  * Yazım iki aşamaya ayrılmıştır: `planAgencyWrites` saf fonksiyondur (DB yok, birim
  * test edilir); `persistAgencyRun` planı Prisma'ya uygular. Şemaya dokunulmaz.
  *
- * Bilinen boşluk: `Call` modelinde son başvuru tarihi (`deadlineAt`/`deadlineTz`) ve
- * destek tutarı alanı yok. Bu alanlar Python çıktısında var ama DB'ye yazılmaz;
- * FO-266 sonrası eklenmesi gerekir. Ham değer `RawFetch.payload` içinde kalır.
+ * Para birimi notu: `Topic`'te para birimi alanı yok; `budgetPerProjectCents` TL
+ * kuruşudur (bu modülün kapsamı yalnız TR ajansları). Döviz çevrimi yapılmaz.
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { recordAlert } from '@/lib/observability/system-alert';
 
@@ -30,6 +34,20 @@ const TR_AGENCY_SOURCE_KEY = 'tr-agency';
 /** RawFetch.source ön eki: `tr-agency:istka` gibi. */
 const RAW_SOURCE_PREFIX = 'tr-agency:';
 const ALERT_SOURCE = 'tr_agency_calls';
+
+/** Python `normalize.to_call` tarihleri bu saat diliminde üretir (UTC'ye çevrilmiş). */
+export const TR_AGENCY_TZ = 'Europe/Istanbul';
+/** Call.currency: TR ajans çağrıları TL'dir (NG-158 lider kararı; şema değişmedi). */
+export const TR_AGENCY_CURRENCY = 'TRY';
+/** Her TR ajans çağrısı tek topic taşır; kimlik: `<callIdentifier>#1`. */
+const TOPIC_SUFFIX = '#1';
+
+/** Topic.deadlines öğesi (`[{stage, at, tz}]`); `at` UTC ISO-8601. */
+export interface TopicDeadline {
+  stage: number;
+  at: string;
+  tz: string;
+}
 
 /** Python `normalize.to_call` çıktısının uygulama tarafındaki şekli. */
 export interface AgencyCallRow {
@@ -68,9 +86,23 @@ export interface RawFetchWrite {
   payload: { body: string; finalUrl: string; httpStatus: number; bytes: number };
 }
 
+/** Bir çağrının tek topic'i. Tarihsiz çağrıda `deadlines: []`, `nextDeadlineAt: null`. */
+export interface TopicWrite {
+  identifier: string;
+  callIdentifier: string;
+  title: string;
+  status: 'OPEN';
+  deadlines: TopicDeadline[];
+  nextDeadlineAt: string | null;
+  /** Azami destek (TL) × 100; tutar yoksa null. Sayısal kalır: BigInt dönüşümü persist'te. */
+  budgetPerProjectCents: number | null;
+  sourceUrl: string | null;
+}
+
 export interface AgencyWritePlan {
   rawFetch: RawFetchWrite | null;
   callUpserts: Array<{ callIdentifier: string; title: string; url: string | null }>;
+  topicUpserts: TopicWrite[];
   alerts: Array<{
     level: 'warn' | 'error';
     message: string;
@@ -129,20 +161,73 @@ export function planAgencyWrites(run: AgencyRunSummary): AgencyWritePlan {
     url: c.sourceUrl,
   }));
 
-  return { rawFetch, callUpserts, alerts };
+  const topicUpserts: TopicWrite[] = [];
+  for (const c of byId.values()) {
+    const deadlineIso = parseDeadlineIso(c.deadlineAt);
+    if (c.deadlineAt && deadlineIso === null) {
+      alerts.push(unparsedAlert(run.source, c.callIdentifier, 'deadline', 'son başvuru tarihi', c.deadlineAt));
+    }
+    const budgetTl = c.supportMaxTl ?? c.supportMinTl;
+    if (budgetTl !== null && budgetTl !== undefined && !(Number.isSafeInteger(budgetTl) && budgetTl >= 0)) {
+      alerts.push(unparsedAlert(run.source, c.callIdentifier, 'budget', 'destek tutarı', String(budgetTl)));
+    }
+    // Topic.budgetPerProjectCents = TL × 100 (kuruş), para birimi TRY. Döviz çevrimi yok.
+    const budgetPerProjectCents =
+      budgetTl !== null && budgetTl !== undefined && Number.isSafeInteger(budgetTl) && budgetTl >= 0
+        ? budgetTl * 100
+        : null;
+    topicUpserts.push({
+      identifier: `${c.callIdentifier}${TOPIC_SUFFIX}`,
+      callIdentifier: c.callIdentifier,
+      title: c.title,
+      status: 'OPEN',
+      deadlines: deadlineIso ? [{ stage: 1, at: deadlineIso, tz: TR_AGENCY_TZ }] : [],
+      nextDeadlineAt: deadlineIso,
+      budgetPerProjectCents,
+      sourceUrl: c.sourceUrl,
+    });
+  }
+
+  return { rawFetch, callUpserts, topicUpserts, alerts };
+}
+
+/** UTC ISO-8601 (saniye) ya da null. Boş girdi "tarihsiz" demektir; burada null döner. */
+function parseDeadlineIso(raw: string | null): string | null {
+  if (!raw) return null;
+  const ms = Date.parse(raw);
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString().slice(0, 19) + 'Z';
+}
+
+function unparsedAlert(source: string, callIdentifier: string, field: string, what: string, raw: string) {
+  return {
+    level: 'warn' as const,
+    message: `${source}: ${what} ayrıştırılamadı (${callIdentifier}); çağrı yazıldı, alan boş bırakıldı`,
+    meta: { source, callIdentifier, field, raw },
+    dedupeKey: `agency:unparsed:${field}:${callIdentifier}`,
+  };
 }
 
 export interface PersistResult {
   rawFetchWritten: boolean;
   callsCreated: number;
   callsUpdated: number;
+  topicsCreated: number;
+  topicsUpdated: number;
   alertsRecorded: number;
 }
 
 /** Planı DB'ye uygular. Her adım tekrar koşmaya güvenlidir. */
 export async function persistAgencyRun(run: AgencyRunSummary): Promise<PersistResult> {
   const plan = planAgencyWrites(run);
-  const result: PersistResult = { rawFetchWritten: false, callsCreated: 0, callsUpdated: 0, alertsRecorded: 0 };
+  const result: PersistResult = {
+    rawFetchWritten: false,
+    callsCreated: 0,
+    callsUpdated: 0,
+    topicsCreated: 0,
+    topicsUpdated: 0,
+    alertsRecorded: 0,
+  };
 
   if (plan.rawFetch) {
     // Aynı (kaynak, URL, içerik hash) daha önce yazıldıysa yeni satır yazılmaz. "Son satırla
@@ -180,18 +265,43 @@ export async function persistAgencyRun(run: AgencyRunSummary): Promise<PersistRe
       where: { callIdentifier: c.callIdentifier },
       select: { id: true },
     });
-    await prisma.call.upsert({
+    const call = await prisma.call.upsert({
       where: { callIdentifier: c.callIdentifier },
-      update: { title: c.title, ...(c.url ? { url: c.url } : {}) },
+      update: { title: c.title, currency: TR_AGENCY_CURRENCY, ...(c.url ? { url: c.url } : {}) },
       create: {
         callIdentifier: c.callIdentifier,
         title: c.title,
+        currency: TR_AGENCY_CURRENCY,
         programmeId: TR_AGENCY_PROGRAMME_ID,
         ...(c.url ? { url: c.url } : {}),
       },
+      select: { id: true },
     });
     if (existed) result.callsUpdated += 1;
     else result.callsCreated += 1;
+
+    // Topic: identifier unique → upsert idempotent. Aynı koşu iki kez çalışırsa satır çoğalmaz.
+    const t = plan.topicUpserts.find((x) => x.callIdentifier === c.callIdentifier);
+    if (!t) continue;
+    const topicExisted = await prisma.topic.findUnique({
+      where: { identifier: t.identifier },
+      select: { id: true },
+    });
+    const topicFields = {
+      title: t.title,
+      status: t.status,
+      deadlines: t.deadlines as unknown as Prisma.InputJsonValue,
+      nextDeadlineAt: t.nextDeadlineAt ? new Date(t.nextDeadlineAt) : null,
+      budgetPerProjectCents: t.budgetPerProjectCents === null ? null : BigInt(t.budgetPerProjectCents),
+      sourceUrl: t.sourceUrl,
+    };
+    await prisma.topic.upsert({
+      where: { identifier: t.identifier },
+      update: topicFields,
+      create: { identifier: t.identifier, callId: call.id, ...topicFields },
+    });
+    if (topicExisted) result.topicsUpdated += 1;
+    else result.topicsCreated += 1;
   }
 
   for (const a of plan.alerts) {
@@ -208,12 +318,22 @@ export async function persistAgencyRun(run: AgencyRunSummary): Promise<PersistRe
   return result;
 }
 
+/**
+ * workers/agencies venv'indeki Python yolu. Windows'ta `Scripts\python.exe`,
+ * diğerlerinde `bin/python`. `platform` parametresi test içindir.
+ */
+export function agencyPythonPath(workdir: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32'
+    ? path.join(workdir, '.venv', 'Scripts', 'python.exe')
+    : path.join(workdir, '.venv', 'bin', 'python');
+}
+
 /** Ajans toplayıcısını Python'da çalıştırır ve özeti döndürür (ağ burada, DB'de değil). */
 export async function collectAgencySource(
   sourceKey: string,
   opts: { workdir: string; pythonBin?: string; timeoutMs?: number } = { workdir: '' },
 ): Promise<AgencyRunSummary> {
-  const python = opts.pythonBin ?? path.join(opts.workdir, '.venv', 'bin', 'python');
+  const python = opts.pythonBin ?? agencyPythonPath(opts.workdir);
   try {
     const { stdout } = await execFileAsync(
       python,

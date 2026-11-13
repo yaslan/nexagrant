@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { planAgencyWrites, type AgencyRunSummary } from '../tr-agency-calls';
+import { agencyPythonPath, planAgencyWrites, TR_AGENCY_CURRENCY, type AgencyRunSummary } from '../tr-agency-calls';
 
 const FX = path.join(__dirname, 'fixtures', 'tr-agency');
 const load = (name: string): AgencyRunSummary =>
@@ -60,5 +60,85 @@ describe('planAgencyWrites (NG-148)', () => {
     const plan = planAgencyWrites(dup);
     expect(plan.callUpserts).toHaveLength(1);
     expect(plan.callUpserts[0]?.title).toBe('SON');
+  });
+});
+
+describe('planAgencyWrites → Topic (NG-158)', () => {
+  it('tarihli çağrı: UTC tarih + Europe/Istanbul, TL → kuruş, OPEN, sourceUrl', () => {
+    const [topic] = planAgencyWrites(load('run-istka.json')).topicUpserts;
+    expect(topic).toEqual({
+      identifier: 'ISTKA:İSTKA/2026/YEG#1',
+      callIdentifier: 'ISTKA:İSTKA/2026/YEG',
+      title: 'Yaratıcı Ekonominin Güçlendirilmesi Mali Destek Programı',
+      status: 'OPEN',
+      deadlines: [{ stage: 1, at: '2026-12-04T20:59:00Z', tz: 'Europe/Istanbul' }],
+      nextDeadlineAt: '2026-12-04T20:59:00Z',
+      budgetPerProjectCents: 20_000_000 * 100,
+      sourceUrl: 'https://istka.org.tr/acik-destek-programlari',
+    });
+  });
+
+  it('para birimi TRY; bütçe TL kuruşu: 20.000.000 TL → 2.000.000.000 kuruş (döviz çevrimi yok)', () => {
+    expect(TR_AGENCY_CURRENCY).toBe('TRY');
+    const [topic] = planAgencyWrites(load('run-istka.json')).topicUpserts;
+    expect(topic?.budgetPerProjectCents).toBe(20_000_000 * 100);
+  });
+
+  it('tarihsiz çağrı: deadlines [] ve nextDeadlineAt null, uyarı yok', () => {
+    const plan = planAgencyWrites(load('run-ua.json'));
+    expect(plan.topicUpserts.length).toBeGreaterThan(0);
+    for (const t of plan.topicUpserts) {
+      expect(t.identifier).toBe(`${t.callIdentifier}#1`);
+      expect(t.deadlines).toEqual([]);
+      expect(t.nextDeadlineAt).toBeNull();
+      expect(t.status).toBe('OPEN');
+    }
+    expect(plan.alerts).toHaveLength(0);
+  });
+
+  it('ayrıştırılamayan son başvuru: çağrı ve topic yazılır, tarih boş, uyarı üretilir', () => {
+    const run = load('run-istka.json');
+    const bad: AgencyRunSummary = {
+      ...run,
+      calls: run.calls.map((c) => ({ ...c, deadlineAt: 'yarın öğlen' })),
+    };
+    const plan = planAgencyWrites(bad);
+    expect(plan.callUpserts).toHaveLength(1);
+    expect(plan.topicUpserts[0]).toMatchObject({ deadlines: [], nextDeadlineAt: null });
+    expect(plan.alerts).toEqual([
+      expect.objectContaining({ level: 'warn', dedupeKey: 'agency:unparsed:deadline:ISTKA:İSTKA/2026/YEG' }),
+    ]);
+  });
+
+  it('geçersiz tutar: budgetPerProjectCents null, uyarı üretilir, koşu sürer', () => {
+    const run = load('run-istka.json');
+    const bad: AgencyRunSummary = {
+      ...run,
+      calls: run.calls.map((c) => ({ ...c, supportMaxTl: -5, supportMinTl: null })),
+    };
+    const plan = planAgencyWrites(bad);
+    expect(plan.topicUpserts[0]?.budgetPerProjectCents).toBeNull();
+    expect(plan.alerts).toEqual([expect.objectContaining({ dedupeKey: 'agency:unparsed:budget:ISTKA:İSTKA/2026/YEG' })]);
+  });
+
+  it('ikinci koşu aynı topic kimliklerini üretir (idempotent)', () => {
+    const run = load('run-istka.json');
+    const first = planAgencyWrites(run).topicUpserts.map((t) => t.identifier);
+    const second = planAgencyWrites(run).topicUpserts.map((t) => t.identifier);
+    expect(second).toEqual(first);
+    expect(new Set(second).size).toBe(second.length);
+  });
+});
+
+describe('agencyPythonPath (NG-158)', () => {
+  it('mac/Linux: .venv/bin/python', () => {
+    expect(agencyPythonPath('/w/agencies', 'darwin')).toBe(path.join('/w/agencies', '.venv', 'bin', 'python'));
+    expect(agencyPythonPath('/w/agencies', 'linux')).toBe(path.join('/w/agencies', '.venv', 'bin', 'python'));
+  });
+
+  it('Windows: .venv/Scripts/python.exe', () => {
+    expect(agencyPythonPath('C:\\w\\agencies', 'win32')).toBe(
+      path.join('C:\\w\\agencies', '.venv', 'Scripts', 'python.exe'),
+    );
   });
 });
