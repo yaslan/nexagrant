@@ -5555,7 +5555,9 @@
       "panel": "Genel Bakış",
       "leads": "Müşteri Kurumlar",
       "pipeline": "Satış Hattı",
-      "tasks": "Görevler"
+      "tasks": "Görevler",
+      "import": "İçe aktar",
+      "duplicates": "Kopyalar"
     },
     "panel": {
       "heading": "Müşteri Satış Hattı",
@@ -5679,6 +5681,37 @@
     "common": {
       "noData": "Veri yok",
       "required": "Zorunlu alan"
+    },
+    "import": {
+      "heading": "Kurum içe aktarma",
+      "intro": "CSV dosyası seçin. Sütunlar başlıklardan otomatik eşleşir; eşleşmeyi düzeltip önizlemeden sonra içe aktarın. Aynı isimli ve aynı ilde olan kurumlar atlanır.",
+      "fileLabel": "CSV dosyası",
+      "fileHelp": "Ayırıcı virgül, noktalı virgül veya sekme olabilir. Kurum adı zorunludur. En fazla 5.000 satır.",
+      "mappingHeading": "Sütun eşleşmesi",
+      "notMapped": "— eşleşmesin —",
+      "field": {
+        "name": "Kurum adı",
+        "legalName": "Yasal ad",
+        "provinceCode": "İl kodu (plaka)",
+        "website": "Web sitesi",
+        "sizeBand": "Ölçek"
+      },
+      "countTotal": "{count} satır",
+      "countValid": "{count} içe aktarılacak",
+      "countInvalid": "{count} hatalı",
+      "countDuplicate": "{count} kopya (atlanır)",
+      "invalidHeading": "Hatalı satırlar",
+      "duplicateHeading": "Atlanan kopyalar",
+      "colRow": "Satır",
+      "colName": "Kurum adı",
+      "colFields": "Hatalı alan",
+      "colReason": "Neden",
+      "reason": {
+        "FILE": "Dosyanın içinde aynı kayıt var",
+        "EXISTING": "Zaten kayıtlı"
+      },
+      "submit": "İçe aktar ({count})",
+      "imported": "İçe aktarıldı: {created} kayıt. Atlanan kopya: {skipped}. Hatalı satır: {invalid}."
     }
   }
 }

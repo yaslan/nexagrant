@@ -5555,7 +5555,9 @@
       "panel": "Overview",
       "leads": "Client organisations",
       "pipeline": "Sales pipeline",
-      "tasks": "Tasks"
+      "tasks": "Tasks",
+      "import": "Import",
+      "duplicates": "Duplicates"
     },
     "panel": {
       "heading": "Client Sales Pipeline",
@@ -5679,6 +5681,37 @@
     "common": {
       "noData": "No data",
       "required": "Required field"
+    },
+    "import": {
+      "heading": "Import organisations",
+      "intro": "Choose a CSV file. Columns are matched from the headers; fix any match, check the preview, then import. Organisations with the same name in the same province are skipped.",
+      "fileLabel": "CSV file",
+      "fileHelp": "Separator can be a comma, semicolon or tab. Organisation name is required. At most 5,000 rows.",
+      "mappingHeading": "Column mapping",
+      "notMapped": "— not mapped —",
+      "field": {
+        "name": "Organisation name",
+        "legalName": "Legal name",
+        "provinceCode": "Province code (plate)",
+        "website": "Website",
+        "sizeBand": "Size"
+      },
+      "countTotal": "{count} rows",
+      "countValid": "{count} to import",
+      "countInvalid": "{count} invalid",
+      "countDuplicate": "{count} duplicates (skipped)",
+      "invalidHeading": "Invalid rows",
+      "duplicateHeading": "Skipped duplicates",
+      "colRow": "Row",
+      "colName": "Organisation name",
+      "colFields": "Invalid field",
+      "colReason": "Reason",
+      "reason": {
+        "FILE": "Same record appears earlier in the file",
+        "EXISTING": "Already in the system"
+      },
+      "submit": "Import ({count})",
+      "imported": "Imported {created} organisations. Skipped duplicates: {skipped}. Invalid rows: {invalid}."
     }
   }
 }
