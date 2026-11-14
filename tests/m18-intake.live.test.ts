@@ -40,7 +40,7 @@ const SUITE = 'm18 lead intake test';
 const admin = createDbClient(OWNER_URL ?? 'postgresql://localhost:5432/unset');
 const HAS_DB =
   requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
-  OWNER_URL !== undefined &&
+  Boolean(OWNER_URL) &&
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
 if (RLS_URL && !OWNER_URL) skipOrFailInCi(SUITE, 'DATABASE_URL (owner connection) is not set', 'Provide DATABASE_URL for the fixture/owner connection.');
 else if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
