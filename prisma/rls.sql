@@ -131,7 +131,7 @@ BEGIN
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
     'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','PartnerProfileSnapshot',
     'PartnerSearchAnnouncement','PartnerSearchIngestionRun','PartnerSearchTopicStat','PicLookupBudget','PlatformSetting','Programme',
-    'PublicLead','RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat',
+    'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat',
     'UnmatchedOrganization','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
@@ -221,6 +221,13 @@ END $$;
 -- against a call site that reaches for the wrong table, not against code that
 -- names a purpose on the list. A new purpose that must see an expert goes into
 -- the list in system_scope_open() on purpose.
+--
+-- NG-175 (SEC NG-170 O-1, D-1): the same narrowing for the readiness lead tables.
+-- PublicLead (the anonymous visitor's name, e-mail, organisation and routing
+-- outcome) opens only for 'public-intake' (the form), 'platform-admin' (/admin/leads
+-- and the unmatched worklist) and 'cross-tenant-job' (the forwarder and the nightly
+-- purge); 'public-intake' may reach it in the first place. ProvinceLeadRoute opens
+-- only for 'platform-admin' and 'cross-tenant-job'.
 --
 -- Deploy order: this is applied by `pnpm db:rls`. Code that calls
 -- withSystemScope() reads zero rows until it has run, exactly like every other
@@ -353,18 +360,29 @@ AS $fn$
               AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'public-intake'
                    OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
                                to_regclass('public."ExpertFounderCounter"'),
-                               to_regclass('public."ExpertPreRegAttempt"'))) IS TRUE)
+                               to_regclass('public."ExpertPreRegAttempt"'),
+                               to_regclass('public."PublicLead"'))) IS TRUE)
               -- FO-92: the expert's personal data opens only for the purposes
               -- that handle it. IS NOT TRUE: a missing table (NULL) is simply
               -- not on the list, like above.
               AND ((tbl IN (to_regclass('public."ExpertPreRegistration"'),
                             to_regclass('public."ExpertPreRegAttempt"'))) IS NOT TRUE
                    OR coalesce(current_setting('app.system_scope_purpose', true), '')
-                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))))
+                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))
+              -- NG-175 (SEC NG-170 O-1): the readiness visitor's personal data opens only
+              -- for the form, the platform-admin lists and the forwarder/retention jobs.
+              AND ((tbl = to_regclass('public."PublicLead"')) IS NOT TRUE
+                   OR coalesce(current_setting('app.system_scope_purpose', true), '')
+                        IN ('public-intake', 'platform-admin', 'cross-tenant-job'))
+              -- NG-175 (SEC NG-170 D-1): the province -> consultancy map opens only for the
+              -- platform-admin console and the lead forwarder.
+              AND ((tbl = to_regclass('public."ProvinceLeadRoute"')) IS NOT TRUE
+                   OR coalesce(current_setting('app.system_scope_purpose', true), '')
+                        IN ('platform-admin', 'cross-tenant-job'))))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead (FO-52, FO-26, NG-175); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead only for public-intake, platform-admin and cross-tenant-job; ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -447,6 +465,25 @@ BEGIN
     CREATE POLICY system_scope ON public."ProvinceLeadRoute"
       USING ((SELECT public.system_scope_open('"ProvinceLeadRoute"'::regclass)))
       WITH CHECK ((SELECT public.system_scope_open('"ProvinceLeadRoute"'::regclass)));
+  END IF;
+END $$;
+
+-- PublicLead (NG-175, SEC NG-170 O-1): the contact request of an anonymous readiness visitor
+-- (name, e-mail, organisation, routedTenantId). No tenant; until NG-175 it had no RLS and a
+-- tenant session read every row. RLS ON + FORCE, one policy system_scope: fabrika_app reaches
+-- it only inside withSystemScope ('public-intake' form, 'platform-admin' lists,
+-- 'cross-tenant-job' forwarder and purge). FORCE holds the policy on the owner too (the owner
+-- path of system_scope_open still needs app.system_scope = 'on', which apply-migrations.sh sets).
+-- See prisma/migrations/public-lead-rls.sql. Guarded like the blocks above.
+DO $$
+BEGIN
+  IF to_regclass('public."PublicLead"') IS NOT NULL THEN
+    ALTER TABLE public."PublicLead" ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public."PublicLead" FORCE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."PublicLead";
+    CREATE POLICY system_scope ON public."PublicLead"
+      USING ((SELECT public.system_scope_open('"PublicLead"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"PublicLead"'::regclass)));
   END IF;
 END $$;
 
