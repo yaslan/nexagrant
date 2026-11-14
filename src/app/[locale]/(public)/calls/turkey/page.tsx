@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { Metadata } from 'next';
 import { prisma } from '@/lib/db';
 import { isCountryEligible } from '@/lib/scoring/g0-features';
-import { toDecimalString } from '@/lib/money';
+import { formatMinorWhole } from '@/lib/money';
 import LocalDeadline from './local-deadline';
 
 /** ISO-3166-1 alpha-2 for the country this page is about. */
@@ -62,6 +62,8 @@ interface TurkeyTopicRow {
   call: {
     callIdentifier: string;
     budgetCents: bigint | null;
+    /** `Call.currency`: TRY for TR agency calls. Topic amounts inherit it (NG-163). */
+    currency: string | null;
     url: string | null;
     programme: { name: string } | null;
   } | null;
@@ -102,17 +104,16 @@ function deadlineTimezone(deadlines: unknown, nextDeadlineAt: Date | null): stri
   return typeof tz === 'string' && tz.trim() !== '' ? tz.trim() : DEFAULT_DEADLINE_TZ;
 }
 
-/** Minor units → a localised euro amount, through src/lib/money.ts (rule 9). */
-function formatEur(cents: bigint | null, locale: string): string | null {
+/**
+ * Minor units → a localised amount in the call's own currency, through
+ * src/lib/money.ts (rule 9). `Topic` carries no currency; it inherits
+ * `Call.currency` (TRY for TR agencies), unset meaning the EUR default.
+ */
+function formatBudget(cents: bigint | null, currency: string | null, locale: string): string | null {
   if (cents === null) return null;
   const limit = BigInt(Number.MAX_SAFE_INTEGER);
   if (cents > limit || cents < -limit) return null;
-  const euro = Number(toDecimalString(Number(cents), 'EUR'));
-  return new Intl.NumberFormat(locale === 'tr' ? 'tr-TR' : 'en-GB', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(euro);
+  return formatMinorWhole(cents, currency?.trim() || 'EUR', locale === 'tr' ? 'tr-TR' : 'en-GB');
 }
 
 export default async function TurkeyCalls({
@@ -153,6 +154,7 @@ export default async function TurkeyCalls({
         select: {
           callIdentifier: true,
           budgetCents: true,
+          currency: true,
           url: true,
           programme: { select: { name: true } },
         },
@@ -188,8 +190,8 @@ export default async function TurkeyCalls({
                     timeZone: tz,
                   }).format(new Date(call.nextDeadlineAt))
                 : t('not_recorded');
-              const callBudget = formatEur(call.call?.budgetCents ?? null, locale);
-              const projectBudget = formatEur(call.budgetPerProjectCents, locale);
+              const callBudget = formatBudget(call.call?.budgetCents ?? null, call.call?.currency ?? null, locale);
+              const projectBudget = formatBudget(call.budgetPerProjectCents, call.call?.currency ?? null, locale);
               const href = call.sourceUrl || call.call?.url || null;
 
               return (

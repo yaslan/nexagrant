@@ -4,3 +4,5 @@
 # Hashes: requirements.lock, generated with:
 #   pip install --require-hashes -r requirements.lock
 truststore==0.10.5
+# IANA zone database: Windows ships none, so ZoneInfo("Europe/Istanbul") (istka.py) raises there (NG-163).
+tzdata==2026.6

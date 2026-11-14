@@ -192,8 +192,11 @@ export function planAgencyWrites(run: AgencyRunSummary): AgencyWritePlan {
 }
 
 /** UTC ISO-8601 (saniye) ya da null. Boş girdi "tarihsiz" demektir; burada null döner. */
-function parseDeadlineIso(raw: string | null): string | null {
+export function parseDeadlineIso(raw: string | null): string | null {
   if (!raw) return null;
+  // Without `Z` or an offset `Date.parse` reads the text in the *server's* zone, so the same
+  // string would mean a different instant per host. Refuse it; the caller raises a warning (NG-163).
+  if (!/(Z|[+-]\d{2}:?\d{2})$/.test(raw.trim())) return null;
   const ms = Date.parse(raw);
   if (!Number.isFinite(ms)) return null;
   return new Date(ms).toISOString().slice(0, 19) + 'Z';
@@ -338,7 +341,13 @@ export async function collectAgencySource(
     const { stdout } = await execFileAsync(
       python,
       ['-m', 'agencies', '--source', sourceKey, '--with-body'],
-      { cwd: opts.workdir, timeout: opts.timeoutMs ?? 180_000, maxBuffer: 64 * 1024 * 1024 },
+      {
+        cwd: opts.workdir,
+        timeout: opts.timeoutMs ?? 180_000,
+        maxBuffer: 64 * 1024 * 1024,
+        // Windows pipes default to the ANSI code page; the collector prints UTF-8 JSON (NG-163).
+        env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+      },
     );
     return JSON.parse(stdout) as AgencyRunSummary;
   } catch (error) {

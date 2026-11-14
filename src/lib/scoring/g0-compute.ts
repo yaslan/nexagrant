@@ -24,6 +24,7 @@ import type { JsonObject } from '@/types/json';
 import type { TenantTx } from '../db';
 import { withTenant } from '../db';
 import { isPresentId } from '../required-id';
+import { isEuroCurrency } from '../money';
 import { decideG0, weightsTotal, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
 import { DEFAULT_SCORING_WEIGHTS } from './defaults';
 import type { GateReason } from '../gates/reasons';
@@ -248,6 +249,8 @@ export async function loadG0Snapshot(
       isTwoStage: true,
       budgetPerProjectCents: true,
       eligibility: true,
+      // Topic has no currency column; the amount is in `Call.currency` (TRY for TR agency calls).
+      call: { select: { currency: true } },
     };
     const row =
       (await client.topic.findUnique({ where: { id: subject.topicId }, select: topicSelect })) ??
@@ -260,7 +263,9 @@ export async function loadG0Snapshot(
         keywords: toStringArray(row.keywords),
         isLumpSum: row.isLumpSum === true,
         isTwoStage: row.isTwoStage === true,
-        budgetPerProjectCents: toNumberOrNull(row.budgetPerProjectCents),
+        // The budget rule compares against euro bands. A non-euro amount is "unknown", not converted
+        // (NG-163): the factor reads it as missing evidence instead of scoring lira as euro.
+        budgetPerProjectCents: isEuroCurrency(row.call?.currency) ? toNumberOrNull(row.budgetPerProjectCents) : null,
         eligibility:
           row.eligibility && typeof row.eligibility === 'object'
             ? (row.eligibility as G0TopicSnapshot['eligibility'])
