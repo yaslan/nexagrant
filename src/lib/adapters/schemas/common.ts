@@ -100,7 +100,25 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
 const NUM = '(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)';
 const PARTNER_NOUN = '(?:legal entities|entities|organisations|organizations|partners|participants|applicants|beneficiaries|institutions)';
 const MIN_PARTNERS = new RegExp(`(?:at least|a minimum of|minimum of|minimum)\\s+${NUM}\\s+(?:[a-z-]+\\s+){0,3}?${PARTNER_NOUN}`, 'i');
-const MIN_COUNTRIES = new RegExp(`${NUM}\\s+different\\s+(?:[a-z-]+\\s+){0,3}?(?:countries|member states|states)`, 'i');
+/**
+ * "N different countries". Group 1 is an upper-bound qualifier in front of N ("up to",
+ * "no more than", "at most", "maximum of", "max."…): such a match is a cap, not a
+ * minimum, and is skipped (CRW NG-186 bulgu 2). Global, so a later true minimum in the
+ * same text is still found.
+ */
+const MIN_COUNTRIES = new RegExp(
+  `(?:\\b(up to|no more than|not more than|at most|(?:a\\s+)?maximum(?:\\s+of)?|max\\.?)\\s+(?:\\([^)]{0,20}\\)\\s+)?)?\\b${NUM}\\s+different\\s+(?:[a-z-]+\\s+){0,3}?(?:countries|member states|states)`,
+  'gi'
+);
+
+function readMinCountries(text: string): number | undefined {
+  for (const m of text.matchAll(MIN_COUNTRIES)) {
+    if (m[1]) continue;
+    const n = readNumber(m[2]);
+    if (n) return n;
+  }
+  return undefined;
+}
 const EACH_IN_DIFFERENT = /each\s+(?:[a-z-]+\s+){0,3}?(?:established|located|based)\s+in\s+a\s+different\s+(?:[a-z-]+\s+){0,3}?(?:country|member state|state)/i;
 
 function readNumber(token: string | undefined): number | undefined {
@@ -122,7 +140,7 @@ export function parseMinimumConsortium(text: string): { minPartners?: number; mi
   const out: { minPartners?: number; minCountries?: number } = {};
   const partners = readNumber(MIN_PARTNERS.exec(text)?.[1]);
   if (partners) out.minPartners = partners;
-  const countries = readNumber(MIN_COUNTRIES.exec(text)?.[1]);
+  const countries = readMinCountries(text);
   if (countries) out.minCountries = countries;
   else if (partners && EACH_IN_DIFFERENT.test(text)) out.minCountries = partners;
   return out;

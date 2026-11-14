@@ -14,8 +14,8 @@
  * lacks countries and every remaining open seat must bring a new one, a candidate
  * from a country already held (or with no recorded country) cannot get the
  * proposal to the call minimum, so it is dropped. A seat plan too small to reach
- * the partner count is reported (`partnerShortfall`), not filtered: no single
- * candidate fixes that, it is the G1 check's business.
+ * the partner count is not filtered here: no single candidate fixes that, it is
+ * the G1 check's business.
  */
 
 export interface MinimumPartnerRule {
@@ -33,8 +33,6 @@ export interface MinimumPartnerState {
   openSeats: number;
   /** Countries still missing to reach `minCountries` (0 when unknown or met). */
   countryShortfall: number;
-  /** Partners the seat plan cannot reach even with every open seat filled (0 when unknown or met). */
-  partnerShortfall: number;
   /** Every remaining seat must bring a country the consortium does not hold yet. */
   requiresNewCountry: boolean;
 }
@@ -63,14 +61,12 @@ export function minimumPartnerState(
   // The seat being matched is open by definition, even if a caller's plan omits it.
   const openSeats = Math.max(1, seatStatuses.length - confirmedPartners);
   const countryShortfall = rule.minCountries === null ? 0 : Math.max(0, rule.minCountries - takenCountries.size);
-  const partnerShortfall = rule.minPartners === null ? 0 : Math.max(0, rule.minPartners - (confirmedPartners + openSeats));
   return {
     rule,
     confirmedPartners,
     takenCountries,
     openSeats,
     countryShortfall,
-    partnerShortfall,
     requiresNewCountry: countryShortfall > 0 && countryShortfall >= openSeats,
   };
 }

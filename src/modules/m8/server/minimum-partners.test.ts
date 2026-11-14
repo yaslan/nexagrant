@@ -43,7 +43,7 @@ describe('minimumPartnerState', () => {
     // One confirmed partner in DE, one open seat (the one being matched) + one more:
     // 3 countries needed, 1 held, 2 seats left → both must bring a new country.
     const state = minimumPartnerState(rule, ['CONFIRMED', 'OPEN', 'OPEN'], new Set(['DE']));
-    expect(state).toMatchObject({ countryShortfall: 2, openSeats: 2, requiresNewCountry: true, partnerShortfall: 0 });
+    expect(state).toMatchObject({ countryShortfall: 2, openSeats: 2, requiresNewCountry: true });
   });
 
   it('does not force a new country while there is slack', () => {
@@ -51,10 +51,10 @@ describe('minimumPartnerState', () => {
     expect(state.requiresNewCountry).toBe(false);
   });
 
-  it('reports a seat plan too small to ever reach the call minimum', () => {
+  it('does not filter on a seat plan too small to reach the partner count (that is G1)', () => {
     const state = minimumPartnerState({ minPartners: 4, minCountries: null }, ['CONFIRMED', 'OPEN'], new Set(['DE']));
-    expect(state.partnerShortfall).toBe(2);
     expect(state.requiresNewCountry).toBe(false);
+    expect(passesMinimumPartnerFilter('DE', state)).toBe(true);
   });
 
   it('counts the seat being matched even when the plan lists it as no open seat', () => {
@@ -66,7 +66,7 @@ describe('minimumPartnerState', () => {
   it('is a no-op when the call threshold is unknown', () => {
     const state = minimumPartnerState({ minPartners: null, minCountries: null }, ['CONFIRMED', 'OPEN'], new Set(['DE']));
     expect(state.requiresNewCountry).toBe(false);
-    expect(state.partnerShortfall).toBe(0);
+    expect(state.countryShortfall).toBe(0);
   });
 });
 

@@ -710,6 +710,7 @@
       "programme": "Program",
       "roles": "Roller",
       "none": "Bu koltuk için eşleşen uzman yok.",
+      "noneFiltered": "Programı ve rolü bu koltukla eşleşen {count, plural, other {# uzman}} var, ama hepsi asgari ortak ön filtresine takıldı: çağrının ülke koşulu bu koltuktan konsorsiyumda henüz olmayan bir ülke istiyor.",
       "excluded": "{count, plural, other {# uzman}} asgari ortak ön filtresine takıldı: çağrının ülke koşulu için yeni bir ülke gerekiyor.",
       "unavailable": "Uzman havuzu şu an okunamadı."
     }

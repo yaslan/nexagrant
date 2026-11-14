@@ -1,6 +1,6 @@
 import type { ExpertPoolEntry, ExpertSeatMatch } from '@/core/contracts/expert-pool';
 import type { TenantTx } from '@/lib/db';
-import { findOpportunityTopic } from './matching';
+import { confirmedSeatCountries, findOpportunityTopic } from './matching';
 import {
   minimumPartnerState,
   passesMinimumPartnerFilter,
@@ -109,6 +109,7 @@ interface SeatRow {
   roleKey: string;
   status: string;
   organizationId: string | null;
+  partnerOrgId: string | null;
 }
 
 /**
@@ -117,28 +118,19 @@ interface SeatRow {
  * the caller's `withTenant` transaction; the experts come from the caller.
  */
 export async function expertCandidatesForOpportunity(
-  tx: Pick<TenantTx, 'opportunity' | 'topic' | 'cordisOrganization'>,
+  tx: Pick<TenantTx, 'opportunity' | 'topic' | 'cordisOrganization' | 'partnerOrg'>,
   params: { opportunityId: string; tenantId: string; experts: readonly ExpertPoolEntry[]; limit?: number }
 ): Promise<Map<string, ExpertSeatResult>> {
   const out = new Map<string, ExpertSeatResult>();
   const opp = await tx.opportunity.findFirst({
     where: { id: params.opportunityId, tenantId: params.tenantId },
-    select: { id: true, topicId: true, seats: { select: { id: true, roleKey: true, status: true, organizationId: true } } },
+    select: { id: true, topicId: true, seats: { select: { id: true, roleKey: true, status: true, organizationId: true, partnerOrgId: true } } },
   });
   if (!opp) return out;
 
   const seats = opp.seats as SeatRow[];
   const topic = await findOpportunityTopic(tx, opp.topicId);
-  const confirmedOrgIds = seats
-    .filter((s) => s.status === 'CONFIRMED' && s.organizationId)
-    .map((s) => s.organizationId as string);
-  const confirmedOrgs: { country: string | null }[] = confirmedOrgIds.length
-    ? await tx.cordisOrganization.findMany({
-        where: { organisationId: { in: confirmedOrgIds } },
-        select: { organisationId: true, country: true },
-      })
-    : [];
-  const takenCountries = new Set(confirmedOrgs.map((o) => o.country).filter((c): c is string => Boolean(c)));
+  const takenCountries = await confirmedSeatCountries(tx, seats, params.tenantId);
   const state = minimumPartnerState(
     readMinimumPartnerRule(topic?.eligibility),
     seats.map((s) => s.status),

@@ -675,6 +675,23 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
   },
 ];
 
+/**
+ * NG-52 (ADR-0009 §9, SEC NG-185 F-3): the one named exception to "exactly {system_scope}".
+ * expert_directory on ExpertPreRegistration, SELECT only, gated on the sealed
+ * 'expert-directory' purpose and on verified rows. The same name on another table, with
+ * another command, or with a predicate missing one of `qualMustInclude` is still drift.
+ * prisma/rls.sql's NG-183 block keeps exactly this (table, name, command) and drops the rest.
+ * What the policy shows is measured by probeExpertDirectory.
+ */
+const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string; qualMustInclude: readonly string[] }> = [
+  {
+    table: 'ExpertPreRegistration',
+    policy: 'expert_directory',
+    cmd: 'SELECT',
+    qualMustInclude: ["'expert-directory'", 'system_scope_sealed()', "'verified'", '"visibilityConsentAt" IS NOT NULL'],
+  },
+];
+
 /** The purpose the read probe writes its row under: opens every SYSTEM_SCOPE_TABLES table (rls.sql system_scope_open). */
 const PROBE_ROW_PURPOSE = 'platform-admin';
 
@@ -1040,6 +1057,138 @@ async function probePurposeTables(
   return { failures, checks };
 }
 
+/**
+ * NG-52 (SEC NG-185 F-4): the purpose 'expert-directory' (M8 matching reads the expert pool).
+ * Its one read is the expert_directory policy (SYSTEM_SCOPE_ALLOWED_EXTRA). Inside the sealed
+ * scope the measured role must see exactly the verified + consented ExpertPreRegistration rows
+ * — none pending or disabled — no row of any other system_scope table beyond what it sees
+ * outside, and it must write nothing: UPDATE and DELETE touch 0 rows, INSERT is refused.
+ * Three probe rows (verified, pending, disabled) are written under PROBE_ROW_PURPOSE first,
+ * so an empty table still measures something. One snapshot with the owner connection for the
+ * expected count; everything is rolled back.
+ */
+const EXPERT_DIRECTORY_PURPOSE = 'expert-directory';
+
+async function probeExpertDirectory(
+  m: pg.Client,
+  admin: pg.Client | null
+): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const p = EXPERT_DIRECTORY_PURPOSE;
+  const tables = (
+    await m.query<{ t: string }>(
+      `select tablename as t from pg_policies where schemaname = 'public' and policyname = 'system_scope' order by 1`
+    )
+  ).rows.map((r) => r.t);
+  const countAll = async (): Promise<Map<string, number>> => {
+    const out = new Map<string, number>();
+    for (const t of tables) {
+      out.set(t, Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(t)}`)).rows[0]?.n ?? -1));
+    }
+    return out;
+  };
+  const byStatus = async (c: pg.Client): Promise<Map<string, number>> => {
+    const { rows } = await c.query<{ s: string; n: number }>(
+      `select case when status = 'verified' and "visibilityConsentAt" is not null then 'listed' else status end as s, count(*)::int as n
+         from ${quoteIdent(EXPERT_TABLE)} group by 1`
+    );
+    return new Map(rows.map((r) => [r.s, r.n]));
+  };
+
+  let expectedListed: number | null = null;
+  if (admin) {
+    await admin.query('begin isolation level repeatable read');
+    const snap = (await admin.query<{ s: string }>('select pg_export_snapshot() as s')).rows[0]!.s;
+    await m.query('begin isolation level repeatable read');
+    await m.query(`set transaction snapshot '${snap.replace(/'/g, "''")}'`);
+    expectedListed = (await byStatus(admin)).get('listed') ?? 0;
+  } else {
+    await m.query('begin isolation level repeatable read');
+  }
+  try {
+    const outside = await countAll();
+    const ids = { verified: '', pending: '', disabled: '' };
+    await m.query('select enter_system_scope($1)', [PROBE_ROW_PURPOSE]);
+    for (const status of ['verified', 'pending', 'disabled'] as const) {
+      const id = `rls-verify-${randomBytes(6).toString('hex')}`;
+      ids[status] = id;
+      await m.query(
+        `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+         values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr', $2)`,
+        [id, status]
+      );
+    }
+    if (expectedListed !== null) expectedListed += 1;
+
+    // A plain SET of the purpose is not the seal: nothing opens.
+    await m.query(
+      `select set_config('app.system_scope', 'on', true), set_config('app.system_scope_purpose', $1, true), set_config('app.system_scope_token', '', true)`,
+      [p]
+    );
+    const forged = Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? -1);
+    if (forged !== 0) failures.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} ${forged} satır okunuyor — mühür uygulanmıyor`);
+    else checks.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} 0 satır`);
+
+    await m.query('select enter_system_scope($1)', [p]);
+    const seen = await byStatus(m);
+    const listed = seen.get('listed') ?? 0;
+    const hidden = [...seen].filter(([s]) => s !== 'listed');
+    if (hidden.length > 0) {
+      failures.push(`${p}: doğrulanmamış/rızasız uzman satırı görünüyor (yalnız verified + rıza açılmalı): ${hidden.map(([s, n]) => `${s}=${n}`).join(', ')}`);
+    } else {
+      checks.push(`${p}: ${EXPERT_TABLE} pending/disabled 0 satır`);
+    }
+    const probeSeen = (
+      await m.query<{ id: string }>(`select id from ${quoteIdent(EXPERT_TABLE)} where id = any($1) order by id`, [Object.values(ids)])
+    ).rows.map((r) => r.id);
+    if (probeSeen.length !== 1 || probeSeen[0] !== ids.verified) {
+      failures.push(`${p}: prob satırlarından görünen ${probeSeen.length}/3 (yalnız verified görünmeli)`);
+    }
+    if (expectedListed !== null && listed !== expectedListed) {
+      failures.push(`${p}: ${EXPERT_TABLE} verified + rızalı ${listed}/${expectedListed} satır görüldü — politika yanlış`);
+    } else if (probeSeen.length === 1 && probeSeen[0] === ids.verified) {
+      checks.push(`${p}: ${EXPERT_TABLE} verified + rızalı ${listed}${expectedListed !== null ? `/${expectedListed}` : ''} satır görüldü (prob satırı dahil, geri alındı)`);
+    }
+
+    const inside = await countAll();
+    const opened = tables.filter((t) => t !== EXPERT_TABLE && (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
+    if (opened.length > 0) {
+      failures.push(`${p}: başka tabloyu açıyor (yalnız ${EXPERT_TABLE} okunmalı): ${opened.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
+    } else {
+      checks.push(`${p}: diğer ${tables.filter((t) => t !== EXPERT_TABLE).length} system_scope tablosunda kapsam dışıyla aynı satır sayısı`);
+    }
+
+    const write = async (sql: string, params: unknown[]): Promise<number | 'rls' | string> => {
+      await m.query('savepoint probe_directory');
+      try {
+        return (await m.query(sql, params)).rowCount ?? 0;
+      } catch (e) {
+        return isRlsViolation(e) ? 'rls' : e instanceof Error ? e.message.split('\n')[0]! : String(e);
+      } finally {
+        await m.query('rollback to savepoint probe_directory');
+      }
+    };
+    const upd = await write(`update ${quoteIdent(EXPERT_TABLE)} set "fullName" = 'rls-verify' where id = any($1)`, [Object.values(ids)]);
+    const del = await write(`delete from ${quoteIdent(EXPERT_TABLE)} where id = any($1)`, [Object.values(ids)]);
+    for (const [verb, r] of [['UPDATE', upd], ['DELETE', del]] as const) {
+      if (r === 0) checks.push(`${p}: ${EXPERT_TABLE} ${verb} 0 satır`);
+      else failures.push(`${p}: ${EXPERT_TABLE} ${verb} ${typeof r === 'number' ? `${r} satır değiştirdi` : `beklenmeyen sonuç — ${r}`} (yalnız okuma olmalı)`);
+    }
+    const ins = await write(
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr', 'verified')`,
+      [`rls-verify-${randomBytes(6).toString('hex')}`]
+    );
+    if (ins === 'rls') checks.push(`${p}: ${EXPERT_TABLE} INSERT reddedildi`);
+    else failures.push(`${p}: ${EXPERT_TABLE} INSERT ${typeof ins === 'number' ?'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${ins}`}`);
+  } finally {
+    await m.query('rollback');
+    if (admin) await admin.query('rollback');
+  }
+  return { failures, checks };
+}
+
 async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
@@ -1110,10 +1259,10 @@ async function main() {
     // above could not see it on an empty table. The set must be exactly {system_scope}.
     // The class is SYSTEM_SCOPE_TABLES plus any catalogue table carrying system_scope
     // without a tenant policy (a new one must be added to the list to be probed).
-    const allPolicies = await client.query<{ tablename: string; policyname: string; cmd: string }>(
-      `select tablename, policyname, cmd from pg_policies where schemaname = 'public' order by tablename, policyname`
+    const allPolicies = await client.query<{ tablename: string; policyname: string; cmd: string; qual: string | null }>(
+      `select tablename, policyname, cmd, qual from pg_policies where schemaname = 'public' order by tablename, policyname`
     );
-    const policiesOf = new Map<string, { policyname: string; cmd: string }[]>();
+    const policiesOf = new Map<string, { policyname: string; cmd: string; qual: string | null }[]>();
     for (const r of allPolicies.rows) policiesOf.set(r.tablename, [...(policiesOf.get(r.tablename) ?? []), r]);
     const hasTenantPolicy = (t: string) =>
       (policiesOf.get(t) ?? []).some((p) => p.policyname === 'tenant_isolation' || p.policyname === 'tenant_or_shared');
@@ -1126,11 +1275,19 @@ async function main() {
     const policySetDrift: string[] = [];
     for (const t of systemScopeTables) {
       const pols = policiesOf.get(t) ?? [];
-      const extra = pols.filter((p) => p.policyname !== 'system_scope');
+      const allowed = (p: { policyname: string; cmd: string; qual: string | null }) =>
+        SYSTEM_SCOPE_ALLOWED_EXTRA.some(
+          (a) => a.table === t && a.policy === p.policyname && a.cmd === p.cmd && a.qualMustInclude.every((q) => (p.qual ?? '').includes(q))
+        );
+      const extra = pols.filter((p) => p.policyname !== 'system_scope' && !allowed(p));
       const missing = !pols.some((p) => p.policyname === 'system_scope');
       if (extra.length > 0 || missing) {
         policySetDrift.push(
           `${t}: politika kümesi {${pols.map((p) => p.policyname).join(', ')}}, beklenen tam {system_scope}${
+            SYSTEM_SCOPE_ALLOWED_EXTRA.some((a) => a.table === t)
+              ? ` (+ ${SYSTEM_SCOPE_ALLOWED_EXTRA.filter((a) => a.table === t).map((a) => `${a.policy} (${a.cmd})`).join(', ')})`
+              : ''
+          }${
             missing ? ' — system_scope YOK' : ''
           }${extra.length > 0 ? ` — fazla: ${extra.map((p) => `${p.policyname} (${p.cmd})`).join(', ')}` : ''}`
         );
@@ -1286,6 +1443,9 @@ async function main() {
       const purposes = await probePurposeTables(measurer.client, truth!.client === measurer.client ? null : truth!.client);
       failures.push(...purposes.failures);
       checks.push(...purposes.checks);
+      const directory = await probeExpertDirectory(measurer.client, truth!.client === measurer.client ? null : truth!.client);
+      failures.push(...directory.failures);
+      checks.push(...directory.checks);
     }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);

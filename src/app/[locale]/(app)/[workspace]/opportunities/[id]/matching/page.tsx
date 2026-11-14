@@ -280,10 +280,16 @@ export default async function MatchingPage({
                     if (!expertsBySeat) return <p className="text-sm text-muted">{t('expertPool.unavailable')}</p>;
                     const result = expertsBySeat.get(seat.id);
                     const matches = result?.matches ?? [];
+                    const excluded = result?.excludedByMinimumPartners ?? 0;
                     return (
                       <>
-                        {matches.length === 0 ? (
-                          <p className="text-sm text-muted">{t('expertPool.none')}</p>
+                        {matches.length === 0 && excluded > 0 ? (
+                          // CRW NG-186 bulgu 5: experts do match the seat; the filter left none. Say why.
+                          <p className="text-sm text-amber-800 dark:text-amber-300" data-testid="m8-expert-none-filtered">
+                            {t('expertPool.noneFiltered', { count: excluded })}
+                          </p>
+                        ) : matches.length === 0 ? (
+                          <p className="text-sm text-muted" data-testid="m8-expert-none">{t('expertPool.none')}</p>
                         ) : (
                           <ul className="space-y-2">
                             {matches.map((m) => (
@@ -305,9 +311,9 @@ export default async function MatchingPage({
                             ))}
                           </ul>
                         )}
-                        {result && result.excludedByMinimumPartners > 0 && (
+                        {matches.length > 0 && excluded > 0 && (
                           <p className="text-xs text-amber-800 dark:text-amber-300 mt-2" data-testid="m8-expert-excluded">
-                            {t('expertPool.excluded', { count: result.excludedByMinimumPartners })}
+                            {t('expertPool.excluded', { count: excluded })}
                           </p>
                         )}
                       </>

@@ -155,6 +155,28 @@ describe('expertCandidatesForOpportunity', () => {
     expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(1);
   });
 
+  // CRW NG-186 bulgu 3: a seat confirmed with the tenant's own partner record counts its country.
+  it('counts the country of a seat confirmed with a PartnerOrg (tenant-scoped lookup)', async () => {
+    const { tx, calls } = fakeTx({
+      ...base,
+      'opportunity.findFirst': {
+        id: 'opp-1',
+        topicId: HORIZON,
+        seats: [
+          { id: 'seat-c', roleKey: 'coordinator', status: 'CONFIRMED', organizationId: 'org-de', partnerOrgId: null },
+          { id: 'seat-p', roleKey: 'industry', status: 'CONFIRMED', organizationId: null, partnerOrgId: 'po-1' },
+          { id: 'seat-r', roleKey: 'research', status: 'OPEN', organizationId: null, partnerOrgId: null },
+        ],
+      },
+      // The partner record is Turkish: DE + TR held, 1 country and 1 seat left, so a TR expert cannot close it.
+      'partnerOrg.findMany': [{ country: 'tr ' }],
+    });
+    const bySeat = await expertCandidatesForOpportunity(tx, { opportunityId: 'opp-1', tenantId: 't-1', experts: [expert()] });
+    expect(bySeat.get('seat-r')?.matches).toEqual([]);
+    expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(1);
+    expect((calls.find((c) => c.key === 'partnerOrg.findMany')?.args as { where: unknown }).where).toEqual({ id: { in: ['po-1'] }, tenantId: 't-1' });
+  });
+
   it('is empty for an opportunity outside the tenant', async () => {
     const { tx } = fakeTx({ ...base, 'opportunity.findFirst': null });
     const bySeat = await expertCandidatesForOpportunity(tx, { opportunityId: 'opp-x', tenantId: 't-1', experts: [expert()] });

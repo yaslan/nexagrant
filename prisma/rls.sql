@@ -513,8 +513,13 @@ END $$;
 -- no tenant policy) system_scope is the ONLY policy. Policies are permissive and OR
 -- together, so a stray one — even FOR SELECT USING (true) — would open the personal data
 -- that system_scope keeps shut. The blocks above only replace system_scope itself; this
--- drops every other policy on those tables, so `pnpm db:rls` restores the set to exactly
--- {system_scope}. Tenant tables are not touched. `pnpm rls:verify` fails on the same set.
+-- drops every other policy on those tables, so `pnpm db:rls` restores the set to
+-- {system_scope} (plus the one exception below). Tenant tables are not touched. `pnpm rls:verify` fails on the same set.
+-- One named exception (NG-52, ADR-0009 §9): expert_directory on ExpertPreRegistration,
+-- SELECT only — created above, it opens verified + consented rows to the sealed
+-- 'expert-directory' purpose. Same name on another table, or on this table with another
+-- command, is still dropped. Keep it in step with SYSTEM_SCOPE_ALLOWED_EXTRA
+-- (scripts/check-rls-live.ts).
 DO $$
 DECLARE r record;
 BEGIN
@@ -523,6 +528,7 @@ BEGIN
       FROM pg_policies p
      WHERE p.schemaname = 'public'
        AND p.policyname <> 'system_scope'
+       AND NOT (p.tablename = 'ExpertPreRegistration' AND p.policyname = 'expert_directory' AND p.cmd = 'SELECT')
        AND p.tablename IN (
              SELECT tablename FROM pg_policies WHERE schemaname = 'public' AND policyname = 'system_scope'
              EXCEPT
