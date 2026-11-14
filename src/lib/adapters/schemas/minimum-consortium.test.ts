@@ -155,9 +155,15 @@ describe('parseMinimumConsortium', () => {
     ['2024-3 different countries', {}],
     ['Article 5.3 different countries', {}],
     ['2024/25 different countries', {}],
-    ['temperatures -3 different countries', {}],
-    ['from -2 to 4 different countries', {}],
-    ['4 and 3 different countries', {}],
+    // NG-192 2. tur (lider karari): a dash after a space or at the start is a bullet, not a sign, so
+    // these read as written; a negative country count is out of scope.
+    ['temperatures -3 different countries', { minCountries: 3 }],
+    ['from -2 to 4 different countries', { minCountries: 2 }],
+    ['Art 5/3 different countries', {}],
+    ['5 - 3 different countries', {}],
+    ['Article 5–3 different countries', {}],
+    ['admin.3 different countries', {}],
+    ['max.3 different countries', {}],
     ['COVID-19 ... 3 different countries', { minCountries: 3 }],
     ['at least 12 different countries', { minCountries: 12 }],
     ['Article 5 applies; partners from 3 different countries', { minCountries: 3 }],
@@ -180,5 +186,20 @@ describe('parseMinimumConsortium', () => {
   // number; reading the larger one would drop applicants that meet either reading.
   it('reads the lower number of a bare "N and M different countries" (NG-192)', () => {
     expect(parseMinimumConsortium('3 and 4 different countries')).toEqual({ minCountries: 3 });
+  });
+
+  // NG-192 2. tur (CRW NG-192 B1-B4): a bullet dash and "min." in front of the count still give a
+  // minimum; a worded range read downwards keeps the lower number, a dashed one stays an identifier;
+  // a line break is whitespace.
+  it.each<[string, { minPartners?: number; minCountries?: number }]>([
+    ['-3 different countries', { minCountries: 3 }],
+    ['partners:\n-3 different countries', { minCountries: 3 }],
+    ['min.3 different countries', { minCountries: 3 }],
+    ['MIN.3 different countries', { minCountries: 3 }],
+    ['4 and 3 different countries', { minCountries: 3 }],
+    ['4 to 3 different countries', { minCountries: 3 }],
+    ['COVID-19\n3 different countries', { minCountries: 3 }],
+  ])('keeps a bullet, "min.", a worded downward range and a line break readable (NG-192 B1-B4): %s', (text, expected) => {
+    expect(parseMinimumConsortium(text)).toEqual(expected);
   });
 });
