@@ -1,0 +1,122 @@
+[as-app] DATABASE_URL user=fabrika_app target=127.0.0.1:5620/ng179
+[WebServer] [e2e-server-diag] started supervisor=77543 server=77563 runner=77535 port=3179
+[WebServer] $ next dev --port 3179
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+[WebServer] ⚠ Unsupported metadata themeColor is configured in metadata export in /[locale]. Please move it to viewport export instead.
+[WebServer] Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+[WebServer] [WARN] BILLING_ACTIVE_TIER is unset; selling at list price with no campaign discount {"default":"NONE","hint":"Set BILLING_ACTIVE_TIER to a tier code (e.g. ILK5) to run a campaign.","knownTiers":"ILK5,SONRAKI10,LANSMAN50,KURUCU40,GROWTH30,SCALE20,PROMO10"}
+[e2e-gate] Dev server info: PID=77581
+[e2e-gate] Test data: INVOICE_SUPPLIER_NAME loaded
+
+Running 6 tests using 1 worker
+
+  -  1 [chromium] › tests/e2e/lead-transfer-consent.spec.ts:161:9 › transfer box (NG-179) › flag ON › (a) mapped province + box ticked → consent version and time written, box text in both locales
+  -  2 [chromium] › tests/e2e/lead-transfer-consent.spec.ts:191:9 › transfer box (NG-179) › flag ON › (b) mapped province + box unticked → lead stored, no transfer consent
+  -  3 [chromium] › tests/e2e/lead-transfer-consent.spec.ts:205:9 › transfer box (NG-179) › flag ON › (c) unmapped province → box not in the DOM, no transfer consent
+  -  4 [chromium] › tests/e2e/lead-transfer-consent.spec.ts:223:9 › transfer box (NG-179) › flag ON › (d) box ticked, then province changed to unmapped → box disappears, no transfer consent
+  -  5 [chromium] › tests/e2e/lead-transfer-consent.spec.ts:245:9 › transfer box (NG-179) › flag ON › keyboard: Tab reaches the box, Space ticks it, Tab reaches the details button, Enter/Space toggle aria-expanded
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+[WebServer] ⚠ Unsupported metadata themeColor is configured in metadata export in /[locale]/fon-hazirlik. Please move it to viewport export instead.
+[WebServer] Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+[WebServer] ⚠ Unsupported metadata themeColor is configured in metadata export in /[locale]/fon-hazirlik. Please move it to viewport export instead.
+[WebServer] Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+[WebServer] ⚠ ./src/instrumentation.ts:18:5
+[WebServer] Warning: A Node.js API is used (process.exit at line: 18) which is not supported in the Edge Runtime.
+[WebServer]     Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+[WebServer]   16 |     // with a 500, which a port health check reads as a running server. Exit.
+[WebServer]   17 |     console.error(error instanceof Error ? error.message : error);
+[WebServer] > 18 |     process.exit(1);
+[WebServer]      |     ^^^^^^^^^^^^
+[WebServer]   19 |   }
+[WebServer]   20 |   // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
+[WebServer]   21 |   const { reportAppUrlProblem } = await import('./lib/app-url-alert');
+[WebServer] 
+[WebServer] Ecmascript file had an error
+[WebServer] 
+[WebServer] 
+  ✓  6 [chromium] › tests/e2e/lead-transfer-consent.spec.ts:285:9 › transfer box (NG-179) › flag OFF › (e) mapped province → box absent from the page and no transfer consent is written (1.4s)
+
+  5 skipped
+  1 passed (6.0s)

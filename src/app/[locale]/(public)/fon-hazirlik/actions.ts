@@ -1,7 +1,9 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { z } from 'zod';
 import { clientIpFrom, submitPublicLead, type PublicLeadResult } from '@/lib/leads/public-lead';
+import { transferOrgNameFor } from '@/lib/leads/transfer-org';
 
 /**
  * The readiness result screen's contact form (TASK-MULR765AR5G0C). Anonymous by
@@ -11,4 +13,20 @@ import { clientIpFrom, submitPublicLead, type PublicLeadResult } from '@/lib/lea
 export async function submitReadinessLead(input: unknown): Promise<PublicLeadResult> {
   const ip = clientIpFrom(await headers());
   return submitPublicLead(input, { ip });
+}
+
+const transferOrgInput = z.object({ province: z.string().max(40) });
+
+/**
+ * NG-179 — the organisation NAME under the transfer box for the chosen province; null hides
+ * the box. Returns the name only, never the tenant id. Any failure fails closed (no box).
+ */
+export async function getTransferOrgName(input: unknown): Promise<{ name: string | null }> {
+  const parsed = transferOrgInput.safeParse(input);
+  if (!parsed.success) return { name: null };
+  try {
+    return { name: await transferOrgNameFor(parsed.data.province) };
+  } catch {
+    return { name: null };
+  }
 }
