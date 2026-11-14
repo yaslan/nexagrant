@@ -557,14 +557,17 @@ function gatedDb(base: typeof prisma, mark: 'routed' | 'unmatched') {
         return new Proxy(delegate, {
           get(d, k) {
             if (k !== 'updateMany') return bind(d, k);
-            return async (args: Parameters<typeof prisma.publicLead.updateMany>[0]) => {
-              const data = args.data as { routeStatus?: unknown };
-              if (!parked && data.routeStatus === mark) {
+            // Forwards the code-under-test's own call unchanged (it guards its id with requireActionId);
+            // refused here too if the id is not a string, so this pass-through can never go filterless.
+            const forward = bind(d, k) as (a: unknown) => Promise<unknown>;
+            return async (args: { where?: { id?: unknown }; data?: { routeStatus?: unknown } }) => {
+              if (typeof args.where?.id !== 'string') throw new Error('gatedDb: publicLead.updateMany without a string id');
+              if (!parked && args.data?.routeStatus === mark) {
                 parked = true;
                 signal();
                 await gate;
               }
-              return d.updateMany(args);
+              return forward(args);
             };
           },
         });
