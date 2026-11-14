@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { agencyPythonPath, planAgencyWrites, TR_AGENCY_CURRENCY, type AgencyRunSummary } from '../tr-agency-calls';
+import { agencyPythonPath, parseDeadlineIso, planAgencyWrites, TR_AGENCY_CURRENCY, type AgencyRunSummary } from '../tr-agency-calls';
 
 const FX = path.join(__dirname, 'fixtures', 'tr-agency');
 const load = (name: string): AgencyRunSummary =>
@@ -127,6 +127,27 @@ describe('planAgencyWrites → Topic (NG-158)', () => {
     const second = planAgencyWrites(run).topicUpserts.map((t) => t.identifier);
     expect(second).toEqual(first);
     expect(new Set(second).size).toBe(second.length);
+  });
+});
+
+describe('parseDeadlineIso (NG-163)', () => {
+  it('ofsetsiz girdi null döner: sunucunun saat dilimine göre kayar, kabul edilmez', () => {
+    expect(parseDeadlineIso('2026-12-04T23:59:00')).toBeNull();
+    expect(parseDeadlineIso('2026-12-04')).toBeNull();
+  });
+
+  it('Z ve ofsetli girdi UTC saniyeye çevrilir', () => {
+    expect(parseDeadlineIso('2026-12-04T20:59:00Z')).toBe('2026-12-04T20:59:00Z');
+    expect(parseDeadlineIso('2026-12-04T20:59:00+00:00')).toBe('2026-12-04T20:59:00Z');
+    expect(parseDeadlineIso('2026-12-04T23:59:00+03:00')).toBe('2026-12-04T20:59:00Z');
+    expect(parseDeadlineIso('2026-12-04T23:59:00+0300')).toBe('2026-12-04T20:59:00Z');
+  });
+
+  it('ofsetsiz tarih planda uyarı üretir, çağrı yazılır', () => {
+    const run = load('run-istka.json');
+    const plan = planAgencyWrites({ ...run, calls: run.calls.map((c) => ({ ...c, deadlineAt: '2026-12-04T23:59:00' })) });
+    expect(plan.topicUpserts[0]).toMatchObject({ deadlines: [], nextDeadlineAt: null });
+    expect(plan.alerts).toEqual([expect.objectContaining({ level: 'warn' })]);
   });
 });
 

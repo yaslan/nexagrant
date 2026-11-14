@@ -17,6 +17,11 @@ def main(argv: list[str] | None = None) -> int:
     # ua.gov.tr serves no intermediate certificate; OpenSSL-based Python cannot
     # complete the chain, the OS trust store can. Verification stays ON.
     truststore.inject_into_ssl()
+    # Windows pipes default to the ANSI code page; the app parses stdout as UTF-8 (NG-163).
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(prog="agencies")
     ap.add_argument("--source", required=True, choices=[s.key for s in open_sources()])
     ap.add_argument("--out", help="write the run summary JSON here")
