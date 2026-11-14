@@ -29,8 +29,9 @@
 
 DO $$
 BEGIN
-  IF to_regprocedure('public.system_scope_open(regclass)') IS NOT NULL
-     AND pg_get_functiondef('public.system_scope_open(regclass)'::regprocedure) LIKE '%"PublicLead"%' THEN
+  -- to_regprocedure, not a ::regprocedure cast: plpgsql does not short-circuit AND, and the cast
+  -- raises on a fresh database where rls.sql has not created the function yet (migration-owner-chain).
+  IF coalesce(pg_get_functiondef(to_regprocedure('public.system_scope_open(regclass)')) LIKE '%"PublicLead"%', false) THEN
     ALTER TABLE public."PublicLead" ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public."PublicLead" FORCE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS system_scope ON public."PublicLead";
