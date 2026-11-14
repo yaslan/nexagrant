@@ -104,18 +104,26 @@ const MIN_PARTNERS = new RegExp(`(?:at least|a minimum of|minimum of|minimum)\\s
  * Upper-bound qualifiers in front of a country count ("up to", "no more than", "at most",
  * "maximum of", "max.", "fewer than", "less than", "limited to", "not exceeding", "under",
  * "under the"). A count behind one of these is a cap, not a minimum (CRW NG-186 bulgu 2, B-2).
- * "no fewer than" / "not less than" is the opposite, a minimum: the negative lookbehinds keep
- * "fewer/less than" from counting as a cap there (CRW NG-186 3. tur, bulgu A).
+ * "no fewer than" / "not less than" / "nor fewer than" is the opposite, a minimum: the negative
+ * lookbehind keeps "fewer/less than" from counting as a cap there, whatever whitespace run sits
+ * between the negation and the word (CRW NG-186 3. tur bulgu A, NG-192).
  */
 const COUNTRY_CAP =
-  '(?:up to|no more than|not more than|at most|(?:a\\s+)?maximum(?:\\s+of)?|max\\.?|(?<!\\bno\\s)(?<!\\bnot\\s)(?:fewer|less) than|limited to|not exceeding|under(?:\\s+the)?)';
+  '(?:up to|no more than|not more than|at most|(?:a\\s+)?maximum(?:\\s+of)?|max\\.?|(?<!\\b(?:no|not|nor)\\s+)(?:fewer|less) than|limited to|not exceeding|under(?:\\s+the)?)';
+/**
+ * A count never starts glued to a word character, a dot, a dash or a slash: there it is part of an
+ * identifier ("Article 5-3", "Article 5.3"), a year ("2024-25", "2024/25") or a sign ("-3")
+ * (NG-192). Used as a lookbehind in front of a single N, and tested by hand on a range's lower N.
+ */
+const GLUED_BEFORE = '[\\w.\\-–/]';
+const GLUED_CHAR = new RegExp(`^${GLUED_BEFORE}$`);
 const COUNTRY_NOUN = '\\s+different\\s+(?:[a-z-]+\\s+){0,3}?(?:countries|member states|states)';
 /**
  * "N different countries". Group 1 is an upper-bound qualifier in front of N: such a match
  * is a cap and is skipped. Global, so a later true minimum in the same text is still found.
  */
 const MIN_COUNTRIES = new RegExp(
-  `(?:\\b(${COUNTRY_CAP})\\s+(?:\\([^)]{0,20}\\)\\s+)?)?\\b${NUM}${COUNTRY_NOUN}`,
+  `(?:\\b(${COUNTRY_CAP})\\s+(?:\\([^)]{0,20}\\)\\s+)?)?(?<!${GLUED_BEFORE})${NUM}${COUNTRY_NOUN}`,
   'gi'
 );
 /**
@@ -124,10 +132,13 @@ const MIN_COUNTRIES = new RegExp(
  * States", "from 2 to 4 different countries", "2-3 different countries". Group 1 = lower
  * qualifier, 2 = lower N, 3 = connector ("and"/"to" need spaces around them, a dash does not:
  * CRW NG-186 3. tur, bulgu B), 4 = cap qualifier, 5 = upper N. Read as a minimum of the lower N.
+ * A range whose lower N is glued to what precedes it ("COVID-19 - 3", "-2 to 4") or that runs
+ * downwards ("Article 5-3") is not a count: its whole span yields no minimum (NG-192). The `d`
+ * flag gives the lower N's own start for that check.
  */
 const COUNTRY_RANGE = new RegExp(
   `(?:\\b(at least|a minimum of|minimum of|minimum|min\\.?|between)\\s+)?\\b${NUM}(\\s+(?:and|to)\\s+|\\s*[-–]\\s*)(?:(${COUNTRY_CAP})\\s+)?${NUM}${COUNTRY_NOUN}`,
-  'gi'
+  'dgi'
 );
 
 function readMinCountries(text: string): number | undefined {
@@ -135,11 +146,16 @@ function readMinCountries(text: string): number | undefined {
   const rangeSpans: [number, number][] = [];
   for (const m of text.matchAll(COUNTRY_RANGE)) {
     const start = m.index ?? 0;
-    // "3 and 4 different countries" with neither a lower qualifier nor a cap is not a range.
-    if (m[3]?.trim().toLowerCase() === 'and' && !m[1] && !m[4]) continue;
+    // The span is claimed even when it yields nothing, so its upper N is not read as a minimum.
     rangeSpans.push([start, start + m[0].length]);
-    const n = readNumber(m[2]);
-    if (n) found.push({ index: start, n });
+    const lowerAt = m.indices?.[2]?.[0] ?? start;
+    if (lowerAt > 0 && GLUED_CHAR.test(text.charAt(lowerAt - 1))) continue;
+    const lower = readNumber(m[2]);
+    const upper = readNumber(m[5]);
+    // A bare "3 and 4 different countries" counts too: its lower number is the reading that
+    // drops no applicant who meets either number (NG-192). A downward "5-3" is not a range.
+    if (!lower || !upper || lower > upper) continue;
+    found.push({ index: start, n: lower });
   }
   for (const m of text.matchAll(MIN_COUNTRIES)) {
     const start = m.index ?? 0;
