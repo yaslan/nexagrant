@@ -27,7 +27,7 @@ export default async function DuplicatesPage({
       take: 5000,
     }),
   );
-  const pairs = findCandidatePairs(orgs);
+  const pairs = await findCandidatePairs(orgs);
   const names = new Map(orgs.map((o) => [o.id, o.name]));
 
   return (

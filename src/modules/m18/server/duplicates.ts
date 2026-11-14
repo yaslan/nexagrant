@@ -133,6 +133,50 @@ export interface DuplicateCandidate {
 }
 
 /**
+ * The per-organisation values the rule below reads, computed once. `findCandidatePairs` compares
+ * every organisation of a block with every other one; preparing each side once keeps that from
+ * re-deriving the same keys a million times (NG-197).
+ */
+export interface PreparedSubject {
+  name: string;
+  tax: string | null;
+  /** `dedupeKey(subject)` — what this organisation is looked up by as a candidate. */
+  key: string | null;
+  /** The stored key, else the computed one — what this organisation matches as an existing row. */
+  storedKey: string | null;
+  plate: string | null;
+}
+
+export function prepareSubject(subject: DedupeSubject & { dedupeKey?: string | null }): PreparedSubject {
+  const key = dedupeKey(subject);
+  return {
+    name: subject.name,
+    tax: normaliseTaxNumber(subject.taxNumber),
+    key,
+    storedKey: subject.dedupeKey ?? key,
+    plate: normalisePlateCode(subject.provinceCode),
+  };
+}
+
+/** Whether existing organisation `org` may be `candidate`, and how strongly. The single matching rule. */
+export function classifyPair(
+  candidate: PreparedSubject,
+  org: PreparedSubject,
+): Omit<DuplicateCandidate, 'id'> | null {
+  if (candidate.tax && org.tax === candidate.tax) {
+    return { reason: 'TAX_NUMBER', similarity: 1, strength: 'EXACT' };
+  }
+  if (candidate.key && org.storedKey === candidate.key) {
+    return { reason: 'DEDUPE_KEY', similarity: 1, strength: 'EXACT' };
+  }
+  if (candidate.plate && org.plate && candidate.plate !== org.plate) return null;
+  const similarity = nameSimilarity(candidate.name, org.name);
+  if (similarity >= LIKELY_DUPLICATE_SIMILARITY) return { reason: 'SIMILAR_NAME', similarity, strength: 'LIKELY' };
+  if (similarity >= POSSIBLE_DUPLICATE_SIMILARITY) return { reason: 'SIMILAR_NAME', similarity, strength: 'POSSIBLE' };
+  return null;
+}
+
+/**
  * Existing organisations that may be `candidate`, strongest first. Names are compared only
  * when the provinces agree or one of them is unknown: same name, different province is a
  * different body in Türkiye more often than not.
@@ -141,28 +185,11 @@ export function findDuplicates(
   candidate: DedupeSubject,
   existing: readonly ExistingOrganization[]
 ): DuplicateCandidate[] {
-  const tax = normaliseTaxNumber(candidate.taxNumber);
-  const key = dedupeKey(candidate);
-  const plate = normalisePlateCode(candidate.provinceCode);
+  const subject = prepareSubject({ ...candidate, dedupeKey: null });
   const found: DuplicateCandidate[] = [];
-
   for (const org of existing) {
-    if (tax && normaliseTaxNumber(org.taxNumber) === tax) {
-      found.push({ id: org.id, reason: 'TAX_NUMBER', similarity: 1, strength: 'EXACT' });
-      continue;
-    }
-    if (key && (org.dedupeKey ?? dedupeKey(org)) === key) {
-      found.push({ id: org.id, reason: 'DEDUPE_KEY', similarity: 1, strength: 'EXACT' });
-      continue;
-    }
-    const otherPlate = normalisePlateCode(org.provinceCode);
-    if (plate && otherPlate && plate !== otherPlate) continue;
-    const similarity = nameSimilarity(candidate.name, org.name);
-    if (similarity >= LIKELY_DUPLICATE_SIMILARITY) {
-      found.push({ id: org.id, reason: 'SIMILAR_NAME', similarity, strength: 'LIKELY' });
-    } else if (similarity >= POSSIBLE_DUPLICATE_SIMILARITY) {
-      found.push({ id: org.id, reason: 'SIMILAR_NAME', similarity, strength: 'POSSIBLE' });
-    }
+    const hit = classifyPair(subject, prepareSubject(org));
+    if (hit) found.push({ id: org.id, ...hit });
   }
   return found.sort((x, y) => y.similarity - x.similarity);
 }
