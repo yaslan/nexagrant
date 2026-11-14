@@ -394,8 +394,11 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('D-2: the database refuses inconsistent route columns', async () => {
       const bad = (data: Record<string, unknown>) => mkLead(`chk-${Math.random().toString(36).slice(2, 7)}`, data);
-      // NG-181 D-3: bound to the constraint, so a fixture that fails for any other reason cannot pass.
-      const CHECK = /PublicLead_route_consistency_check|PublicLead_routeStatus/;
+      // NG-181 D-3: each expectation is bound to the ONE constraint that must refuse it, by its full name,
+      // so a fixture that fails for any other reason cannot pass. 'bogus' is refused by the older value
+      // CHECK (add-province-lead-route.sql) before the consistency CHECK is evaluated.
+      const CHECK = /"PublicLead_route_consistency_check"/;
+      const STATUS_CHECK = /"PublicLead_routeStatus_check"/;
       await expect(bad({ routeStatus: 'routed', routedTenantId: null })).rejects.toThrow(CHECK);
       await expect(bad({ routeStatus: 'routed', routedTenantId: T.a, routeReason: 'anything-goes' })).rejects.toThrow(CHECK);
       await expect(bad({ routeStatus: 'unmatched', routeReason: 'anything-goes' })).rejects.toThrow(CHECK);
@@ -403,7 +406,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
       await expect(bad({ routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: T.a })).rejects.toThrow(CHECK);
       await expect(bad({ routeStatus: null, routeReason: 'province_unmapped' })).rejects.toThrow(CHECK);
       await expect(bad({ routeStatus: null, routedTenantId: T.a })).rejects.toThrow(CHECK);
-      await expect(bad({ routeStatus: 'bogus' })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: 'bogus' })).rejects.toThrow(STATUS_CHECK);
       const ok1 = await bad({ routeStatus: 'routed', routedTenantId: T.a, routedAt: NOW });
       const ok2 = await bad({ routeStatus: 'unmatched', routeReason: 'tenant_refused', routedAt: NOW });
       const ok3 = await bad({});
@@ -523,6 +526,31 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
       await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
       const refusingPort = { accept: async () => ({ status: 'refused' as const, reason: 'consent_missing' as const }) };
       expect(await forwardPublicLead(lead.id, refusingPort, prisma)).toEqual({ status: 'refused', reason: 'consent_missing' });
+
+      expect(await routedRow(lead.id)).toMatchObject({
+        routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: null, routedAt: marked.routedAt,
+      });
+      const page = await listUnmatchedLeads({ limit: 200 }, prisma);
+      expect(page.rows.some((r) => r.publicLeadId === lead.id)).toBe(true);
+      expect(await contactsOf(lead.id)).toEqual([]);
+    });
+
+    test('D-2 (review bulgu 2): the mark restored is the one the CLAIM replaced, not the one the first read saw', async () => {
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('d2-race', { province: 'Rize' });
+      const refusingPort = { accept: async () => ({ status: 'refused' as const, reason: 'consent_missing' as const }) };
+      const gate = gatedDb(prisma, 'routed');
+
+      // Call 1 reads (mark NULL, map says A) and is parked right before its claim.
+      const first = forwardPublicLead(lead.id, refusingPort, gate.db);
+      await gate.reached;
+      // The mapping goes away; call 2 marks the lead unmatched (allowed: it is not routed).
+      await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
+      expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'province_unmapped' });
+      const marked = await routedRow(lead.id);
+      // Call 1 claims over that mark, then M18 refuses for a reason unrelated to the tenant.
+      gate.release();
+      expect(await first).toEqual({ status: 'refused', reason: 'consent_missing' });
 
       expect(await routedRow(lead.id)).toMatchObject({
         routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: null, routedAt: marked.routedAt,
