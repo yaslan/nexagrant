@@ -30,6 +30,7 @@ import { createDbClient, prisma } from '@/lib/db';
 import { forwardPublicLead } from '@/lib/leads/public-lead-intake';
 import {
   deactivateProvinceLeadRoute,
+  listIntakeTenantOptions,
   listProvinceLeadRoutes,
   listUnmatchedLeads,
   setProvinceLeadRoute,
@@ -85,6 +86,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
     await admin.auditEvent.deleteMany({ where: { actorId: ACTOR } });
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
+    await admin.user.deleteMany({ where: { email: { endsWith: `-${RUN}@example.test` } } });
     await admin.$disconnect();
     await prisma.$disconnect();
   });
@@ -244,6 +246,48 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
       expect(await admin.publicLead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({ routeStatus: 'routed', routedTenantId: T.b, routeReason: null });
       const after = await listUnmatchedLeads({ limit: 200 }, prisma);
       expect(after.rows.some((r) => r.publicLeadId === lead.id)).toBe(false);
+    });
+  });
+  describe('NG-171: scorecard level, tenant options, admin name', () => {
+    test('the worklist row carries the lead readinessLevel (and null when none)', async () => {
+      const withLevel = await mkLead('level-set', { province: 'Van', readinessLevel: 'L3' });
+      const noLevel = await mkLead('level-none', { province: 'Van' });
+      const unmatched = { routeStatus: 'unmatched', routeReason: 'province_unmapped', routedAt: NOW } as const;
+      await admin.publicLead.updateMany({ where: { id: { in: [withLevel.id, noLevel.id] } }, data: unmatched });
+      const page = await listUnmatchedLeads({ limit: 200 }, prisma);
+      expect(page.rows.find((r) => r.publicLeadId === withLevel.id)?.readinessLevel).toBe('L3');
+      expect(page.rows.find((r) => r.publicLeadId === noLevel.id)?.readinessLevel).toBeNull();
+    });
+
+    test('tenant options: consultancy + agency, no SME, no deleted, sorted by name, ids/names only', async () => {
+      const mk = (key: string, data: { orgType: 'CONSULTANCY' | 'SME'; kind: 'ORGANIZATION' | 'AGENCY'; deletedAt?: Date }) =>
+        admin.tenant.create({ data: { name: `opt-${key}-${RUN}`, slug: `opt-${key}-${RUN}`, country: 'TR', ...data } });
+      const z = await mk('z-consult', { orgType: 'CONSULTANCY', kind: 'ORGANIZATION' });
+      const ag = await mk('b-agency', { orgType: 'SME', kind: 'AGENCY' });
+      await mk('c-sme', { orgType: 'SME', kind: 'ORGANIZATION' });
+      await mk('d-deleted', { orgType: 'CONSULTANCY', kind: 'ORGANIZATION', deletedAt: new Date() });
+      const options = await listIntakeTenantOptions(prisma);
+      const mine = options.filter((o) => o.name.endsWith(`-${RUN}`) && o.name.startsWith('opt-'));
+      expect(mine).toEqual([{ id: ag.id, name: `opt-b-agency-${RUN}` }, { id: z.id, name: `opt-z-consult-${RUN}` }]);
+      expect(options.some((o) => o.id === T.sme)).toBe(false);
+      expect(options.some((o) => o.id === T.a) && options.some((o) => o.id === T.b)).toBe(true);
+      expect(Object.keys(options[0] ?? {}).sort()).toEqual(['id', 'name']);
+    });
+
+    test('route list: updatedByName is the admin display name, null for unknown/nameless actors, never an e-mail', async () => {
+      const named = await admin.user.create({ data: { email: `named-${RUN}@example.test`, name: '  Ayşe Admin ' } });
+      const nameless = await admin.user.create({ data: { email: `nameless-${RUN}@example.test`, name: null } });
+      await setProvinceLeadRoute({ province: 'Bolu', tenantId: T.a }, named.id, prisma);
+      await setProvinceLeadRoute({ province: 'Yalova', tenantId: T.a }, nameless.id, prisma);
+      await setProvinceLeadRoute({ province: 'Sinop', tenantId: T.a }, ACTOR, prisma);
+      const rows = await listProvinceLeadRoutes(prisma);
+      const by = (province: string) => rows.find((r) => r.province === province && r.active);
+      expect(by('Bolu')).toMatchObject({ updatedBy: named.id, updatedByName: 'Ayşe Admin' });
+      expect(by('Yalova')).toMatchObject({ updatedBy: nameless.id, updatedByName: null });
+      expect(by('Sinop')).toMatchObject({ updatedBy: ACTOR, updatedByName: null });
+      expect(JSON.stringify(rows)).not.toContain(`named-${RUN}@example.test`);
+      const moved = await setProvinceLeadRoute({ province: 'Bolu', tenantId: T.b }, named.id, prisma);
+      expect(moved.ok && moved.route.updatedByName).toBe('Ayşe Admin');
     });
   });
 });

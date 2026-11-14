@@ -4,11 +4,13 @@ import { z } from 'zod';
 import { requirePlatformAdmin } from '@/lib/tenant';
 import {
   deactivateProvinceLeadRoute,
+  listIntakeTenantOptions,
   listProvinceLeadRoutes,
   listUnmatchedLeads,
   setProvinceLeadRoute,
 } from '@/lib/leads/province-route';
 import type {
+  IntakeTenantOption,
   ListUnmatchedLeadsInput,
   ProvinceLeadRouteRow,
   ProvinceRouteResult,
@@ -25,6 +27,7 @@ import type {
 
 const setSchema = z.object({ province: z.string().min(1).max(40), tenantId: z.string().min(1).max(64) });
 const deactivateSchema = z.object({ province: z.string().min(1).max(40) });
+const noInputSchema = z.undefined();
 const listSchema = z.object({ limit: z.number().int().optional(), offset: z.number().int().optional() }).optional();
 
 export async function listProvinceLeadRoutesAction(): Promise<ProvinceLeadRouteRow[]> {
@@ -50,4 +53,11 @@ export async function listUnmatchedLeadsAction(input?: ListUnmatchedLeadsInput):
   await requirePlatformAdmin();
   const parsed = listSchema.safeParse(input);
   return listUnmatchedLeads(parsed.success ? parsed.data ?? {} : {});
+}
+
+export async function listIntakeTenantOptionsAction(input?: undefined): Promise<IntakeTenantOption[]> {
+  await requirePlatformAdmin();
+  // No input exists; anything passed is ignored the same way a malformed list input is.
+  noInputSchema.safeParse(input);
+  return listIntakeTenantOptions();
 }
