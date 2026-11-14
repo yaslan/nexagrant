@@ -5715,6 +5715,11 @@
       "submit": "Import ({count})",
       "imported": "Imported {created} organisations. Skipped duplicates: {skipped}. Invalid rows: {invalid}."
     },
+    "intake": {
+      "dealTitle": "{organisation} — Funding Readiness Scorecard",
+      "firstContactTask": "Make the first contact with the person who filled the Funding Readiness Scorecard",
+      "activityNote": "Funding Readiness Scorecard (internal pre-assessment): {total}/100, level {level}"
+    },
     "duplicates": {
       "heading": "Possible duplicate organisations",
       "intro": "Organisations with similar names are listed here. Pick one to keep and merge the other into it: its contacts, deals, tasks and call matches move across. The merged record is archived, not erased.",

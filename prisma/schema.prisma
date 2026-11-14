@@ -2206,6 +2206,12 @@ enum ConsentPurpose {
   /// CALENDAR_OAUTH_NOT_CONFIGURED). It is declared so that the flow, when it
   /// is built, has a place to record consent rather than inventing one.
   CALENDAR_OAUTH
+
+  /// NG-138 (M18-F4) — a readiness-funnel visitor agreed to have their contact request
+  /// passed to a consultancy / agency tenant. Subject is `Consent.userId =
+  /// 'public-lead:<PublicLead.id>'` (no account exists), tenant is the receiving one.
+  /// Migration: add-consent-purpose-lead-intake.sql.
+  LEAD_INTAKE
 }
 
 model Consent {
