@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 
 /**
@@ -42,6 +43,8 @@ import { withSystemScopeOn, type SystemScopePurpose } from '@/lib/system-scope';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 const SUITE = 'public lead RLS test';
+// Salt for the IP hash in the form path; built per run so no key-like literal lives in the repo.
+const IP_HASH_KEY = randomBytes(24).toString('hex');
 // No fallback address: without OWNER_URL the suite skips (loudly) instead of guessing credentials.
 const admin = createDbClient(OWNER_URL ?? 'postgresql://localhost:5432/unset');
 const HAS_DB =
@@ -165,7 +168,7 @@ describe.skipIf(!HAS_DB)('PublicLead row level security (NG-175)', () => {
           readinessCode: 'municipality.111111111111111', consent: true, consentVersion: PUBLIC_LEAD_CONSENT.version,
           source: 'fon-hazirlik', locale: 'tr', website: '',
         },
-        { ip: '192.0.2.175', secret: 'ng-175-test-secret-0123456789abcdef' }
+        { ip: '192.0.2.175', secret: IP_HASH_KEY }
       );
       expect(result).toEqual({ ok: true });
       expect(await admin.publicLead.count({ where: { email } })).toBe(1);
