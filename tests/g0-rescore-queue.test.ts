@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * FO-384 B2 — a tenant whose rescore does not fit in one request's budget is finished by the queue.
  *
@@ -16,7 +17,9 @@ import { requireId } from './helpers/teardown-guard';
 const OPPORTUNITIES = 30;
 const STALE = 1;
 
-describe('FO-384 B2: the rest of a G0 rescore is queued and finished', () => {
+const HAS_DB = await suiteHasDatabase('g0-rescore-queue');
+
+describe.skipIf(!HAS_DB)('FO-384 B2: the rest of a G0 rescore is queued and finished', () => {
   const key = `fo384q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tenantId = `${key}-t`;
   const pic = String(100_000_000 + Math.floor(Math.random() * 899_999_999));

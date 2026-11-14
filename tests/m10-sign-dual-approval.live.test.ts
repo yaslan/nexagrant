@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db';
+import { databaseReachable } from './helpers/database-availability';
 import { DUAL_APPROVAL_DOCUMENT_KINDS } from '@/lib/rbac';
 import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 import { requireId } from './helpers/teardown-guard';
@@ -36,10 +37,7 @@ vi.mock('@/lib/llm', async (orig) => ({ ...(await orig<object>()), generateText:
 
 const m10 = await import('@/modules/m10/server/actions');
 
-const dbReachable = await prisma
-  .$queryRaw`SELECT 1`
-  .then(() => true)
-  .catch(() => false);
+const dbReachable = await databaseReachable();
 
 if (dbReachable) await assertAppOwnerRole(prisma, 'm10 signDocument dual approval live test');
 else skipOrFailInCi('m10 signDocument dual approval live test', 'Postgres is unreachable (`docker compose up -d`)');

@@ -29,6 +29,8 @@ vi.mock('@/lib/env', async (orig) => {
 
 import { prisma, withTenant } from '@/lib/db';
 import { seededOrSkipping } from './helpers/seed';
+import { databaseReachable } from './helpers/database-availability';
+import { skipOrFailInCi } from './helpers/live-db-role';
 
 const balance = () =>
   withTenant(TENANT, (tx) => tx.creditLedger.aggregate({ where: { tenantId: TENANT }, _sum: { delta: true } }))
@@ -44,11 +46,16 @@ const debitsSince = (since: Date) =>
   );
 
 // The suite runs on the seeded demo tenant and its demo opportunity.
-const seeded = seededOrSkipping(
-  'double charge prevention',
-  await prisma.tenant.count({ where: { id: TENANT } }).then((n) => n > 0),
-  `the demo tenant '${TENANT}' is missing`
-);
+// NG-180: without a database this file skips with its own reason (warned locally, thrown in CI).
+const reachable = await databaseReachable();
+if (!reachable) skipOrFailInCi('double charge prevention', 'no database answers (DATABASE_URL is not set, or Postgres is unreachable)');
+const seeded =
+  reachable &&
+  seededOrSkipping(
+    'double charge prevention',
+    await prisma.tenant.count({ where: { id: TENANT } }).then((n) => n > 0),
+    `the demo tenant '${TENANT}' is missing`
+  );
 
 describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', () => {
   beforeAll(async () => {

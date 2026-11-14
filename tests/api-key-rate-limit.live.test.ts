@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * TASK-MUN80XIW5NPV1 (security scan TASK-MUN66T2HM4A4E O-4) — the per-key rate
  * limit against the real database: the counting UPDATE in authenticateApiKey,
@@ -12,7 +13,9 @@ import { requireId } from './helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-describe('API key rate limit (live DB)', () => {
+const HAS_DB = await suiteHasDatabase('api-key-rate-limit.live');
+
+describe.skipIf(!HAS_DB)('API key rate limit (live DB)', () => {
   let tenantId: string;
   let keyId: string;
   let key: string;

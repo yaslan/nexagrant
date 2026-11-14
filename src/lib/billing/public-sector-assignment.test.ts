@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../../../tests/helpers/database-availability';
 /**
  * FB KAMU B11 (TASK-MULRSG6T55LO0) — assigning a public-sector package, against
  * the real database (the same reason as plan-admin.test.ts: a mocked delegate
@@ -21,7 +22,9 @@ import { PUBLIC_SECTOR_PLANS_LOCK, withTestDbLock } from '../../../tests/helpers
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-describe('public-sector package assignment', () => {
+const HAS_DB = await suiteHasDatabase('public-sector-assignment');
+
+describe.skipIf(!HAS_DB)('public-sector package assignment', () => {
   let tenantId: string;
   const userIds: string[] = [];
 

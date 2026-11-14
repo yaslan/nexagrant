@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../../../tests/helpers/database-availability';
 /**
  * TASK-MVCH26OXNVLKR — internal plan assignment, against the real database
  * (as pilot.test.ts: a mocked delegate cannot prove that the row
@@ -28,6 +29,8 @@ import { presentIds, requireId } from '../../../tests/helpers/teardown-guard';
 
 const entitlements = (tenantId: string) => withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const HAS_DB = await suiteHasDatabase('internal-plan');
 
 describe('stripeSyncBlocker — which source owns the row', () => {
   it('Stripe owns no row, a Stripe row, a cancelled internal row and a Stripe trial', () => {
@@ -93,7 +96,7 @@ describe('admin grants — which rows they may not replace', () => {
   });
 });
 
-describe('assignInternalPlan (live DB)', () => {
+describe.skipIf(!HAS_DB)('assignInternalPlan (live DB)', () => {
   let tenantId: string;
 
   beforeAll(async () => {
