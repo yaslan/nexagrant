@@ -241,6 +241,7 @@ export const ALLOWED: Record<string, string> = {
   'lib/actions/auth.ts#loginWithSocialAction': 'sign-in; no session yet',
   'lib/actions/auth.ts#logoutAction': 'signs the caller out of their own session',
   'app/[locale]/(public)/fon-hazirlik/actions.ts#submitReadinessLead': 'public lead form, no session by design',
+  'app/[locale]/(public)/fon-hazirlik/actions.ts#getTransferOrgName': 'public lead form, no session by design; read-only name lookup (NG-179)',
   'app/[locale]/(public)/accept-invite/continue/actions.ts#startInvitationSignInAction':
     'invitation sign-in; the invitation token is the credential',
   'app/[locale]/(public)/accept-invite/continue/actions.ts#acceptInvitationAction':
