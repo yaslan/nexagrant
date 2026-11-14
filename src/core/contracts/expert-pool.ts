@@ -19,7 +19,10 @@ export interface ExpertPoolEntry {
   founderNumber: number | null;
   /** Plate code "01".."81": every pre-registered expert is in Türkiye. */
   province: string;
-  /** ISO country of the expert. The form only accepts Turkish provinces, so "TR". */
+  /**
+   * ISO country of the expert. The form only accepts Turkish provinces, so "TR".
+   * Not used for the call's country rule: experts are not country-filtered (K-581990 = A).
+   */
   country: string;
   isFreelancer: boolean;
   /** Slugs from src/lib/expert-prereg/options.ts. */
