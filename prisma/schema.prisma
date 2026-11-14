@@ -727,6 +727,10 @@ model PublicLead {
   transferConsentAt      DateTime?
   /// NG-167: where the intake forwarder sent it. 'routed' | 'unmatched' (consent given but the
   /// province is empty or has no active ProvinceLeadRoute: NOT forwarded, platform-admin worklist).
+  /// NG-174: a lead is handed to AT MOST ONE tenant. 'routed' => routedTenantId set (claimed before the
+  /// port is called, never overwritten by 'unmatched', kept as the audit trail if the tenant is deleted);
+  /// 'unmatched' => routeReason in UnmatchedReason. Enforced by CHECK PublicLead_route_consistency_check
+  /// (prisma/migrations/add-public-lead-route-consistency.sql, which Prisma cannot express).
   routeStatus    String?
   routeReason    String?
   routedTenantId String?
