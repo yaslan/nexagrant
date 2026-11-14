@@ -609,7 +609,7 @@ export default function KanbanBoard({
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 ${
                               isCoord
-                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/20'
+                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/20'
                                 : 'bg-accent/15 text-accent-ink border border-accent/20'
                             }`}
                           >
