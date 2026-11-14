@@ -2,12 +2,11 @@ import React from 'react';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { errorMessage } from '@/lib/errors';
-import { withSystemScope } from '@/lib/system-scope';
 import { PlatformAdminRequiredError } from '@/lib/tenant';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
-import type { ProvinceLeadRouteRow, UnmatchedLeadRow, UnmatchedReason } from '@/core/contracts/lead-routing';
-import { listProvinceLeadRoutesAction, listUnmatchedLeadsAction } from './actions';
-import LeadRoutesClient, { type ProvinceView, type TenantOption } from './client';
+import type { IntakeTenantOption, ProvinceLeadRouteRow, UnmatchedLeadRow, UnmatchedReason } from '@/core/contracts/lead-routing';
+import { listIntakeTenantOptionsAction, listProvinceLeadRoutesAction, listUnmatchedLeadsAction } from './actions';
+import LeadRoutesClient, { type ProvinceView } from './client';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,12 +37,17 @@ const REASON_KEY = {
 
 /**
  * NG-168 — platform-admin screen: province → consultancy mapping and the unmatched-lead list.
- * Reads and writes go through the NG-167 server actions (`./actions`); the only direct read is the
- * tenant pick-list, the same platform-admin query the tenants page uses.
+ * Every read goes through a NG-167/NG-171 server action (`./actions`): routes (with the last
+ * changer's name in `updatedByName`), the unmatched worklist, and the intake tenant pick-list.
+ * The page holds no business rule and no direct database query.
  */
 export default async function AdminLeadRoutesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'adminLeadRoutes' });
+  const tLevels = await getTranslations({ locale, namespace: 'readiness.levels' });
+  // Readiness level code (`PublicLead.readinessLevel`) → the label the scorecard already shows; null or unknown → "—".
+  const levelLabel = (code: string | null): string =>
+    code === 'baslangic' || code === 'gelisen' || code === 'hazir' ? tLevels(code) : t('none');
 
   let routes: ProvinceLeadRouteRow[] = [];
   let routesError = false;
@@ -60,30 +64,21 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
   try {
     unmatched = await listUnmatchedLeadsAction();
   } catch (e) {
+    if (e instanceof PlatformAdminRequiredError) notFound();
     console.error(`[AdminLeadRoutesPage] unmatched load failed: ${errorMessage(e)}`);
     unmatchedError = true;
   }
 
-  // Tenants a province can be routed to: not deleted, and a consultancy or an agency
-  // (the same rule as `isIntakeTenant` in the M18 module). Read-only; the server re-checks on save.
-  const tenantRows = await withSystemScope('platform-admin', 'admin-lead-routes.tenants', (tx) =>
-    tx.tenant.findMany({
-      where: { deletedAt: null, OR: [{ orgType: 'CONSULTANCY' }, { kind: 'AGENCY' }] },
-      select: { id: true, name: true, slug: true },
-      orderBy: { name: 'asc' },
-    })
-  );
-  const tenants: TenantOption[] = tenantRows.map((x) => ({ id: x.id, name: x.name, slug: x.slug }));
-
-  // Names of the admins who last changed a route (name only, no e-mail).
-  const actorIds = [...new Set(routes.map((r) => r.updatedBy).filter((id): id is string => !!id))];
-  const actors = actorIds.length
-    ? await withSystemScope('platform-admin', 'admin-lead-routes.actors', (tx) =>
-        tx.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
-      )
-    : [];
-  const actorName = new Map(actors.map((a) => [a.id, a.name]));
-
+  // Tenants a province can be routed to (the `isIntakeTenant` rule, applied by the action). The server re-checks on save.
+  let intakeTenants: IntakeTenantOption[] = [];
+  let tenantsError = false;
+  try {
+    intakeTenants = await listIntakeTenantOptionsAction();
+  } catch (e) {
+    if (e instanceof PlatformAdminRequiredError) notFound();
+    console.error(`[AdminLeadRoutesPage] tenant options load failed: ${errorMessage(e)}`);
+    tenantsError = true;
+  }
   const picked = pickRoutes(routes);
   const provinces: ProvinceView[] = TR_PROVINCES.map((province) => {
     const r = picked.get(province);
@@ -93,7 +88,7 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
       status: r.active ? 'active' : 'inactive',
       tenantId: r.active ? r.tenantId : null,
       tenantName: r.tenantName,
-      changedBy: r.updatedBy ? actorName.get(r.updatedBy) || t('unknown_actor') : null,
+      changedBy: r.updatedBy ? r.updatedByName || t('unknown_actor') : null,
       changedAt: formatUtc(r.updatedAt),
     };
   });
@@ -115,7 +110,12 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
         ) : (
           <>
             <p className="text-sm font-semibold text-bad">{t('unmapped_count', { count: unmappedCount })}</p>
-            <LeadRoutesClient provinces={provinces} tenants={tenants} />
+            {tenantsError && (
+              <p role="alert" className="rounded-lg border border-bad bg-surface px-4 py-3 text-sm font-medium text-bad">
+                {t('tenants_load_error')}
+              </p>
+            )}
+            <LeadRoutesClient provinces={provinces} tenants={intakeTenants} />
           </>
         )}
       </section>
@@ -144,6 +144,7 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
                     <th scope="col" className="px-3 py-2">{t('col_contact')}</th>
                     <th scope="col" className="px-3 py-2">{t('col_org')}</th>
                     <th scope="col" className="px-3 py-2">{t('col_location')}</th>
+                    <th scope="col" className="px-3 py-2 whitespace-nowrap">{t('col_readiness')}</th>
                     <th scope="col" className="px-3 py-2">{t('col_reason')}</th>
                   </tr>
                 </thead>
@@ -161,6 +162,7 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
                         </td>
                         <td className="px-3 py-2">{r.organisation}</td>
                         <td className="px-3 py-2">{location || t('none')}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{levelLabel(r.readinessLevel)}</td>
                         <td className="px-3 py-2">{t(REASON_KEY[r.reason])}</td>
                       </tr>
                     );

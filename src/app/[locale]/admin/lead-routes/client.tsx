@@ -21,7 +21,6 @@ export interface ProvinceView {
 export interface TenantOption {
   id: string;
   name: string;
-  slug: string;
 }
 
 const ERROR_KEY = {
@@ -70,6 +69,16 @@ function ProvinceRow({ view, tenants }: { view: ProvinceView; tenants: TenantOpt
   const [selected, setSelected] = useState(view.tenantId ?? '');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // The select follows the server value. When a save, a deactivation or another admin changes the
+  // row (tenantId or changedAt), the local pick is replaced. Done during render, not in an effect,
+  // and without remounting the row, so the feedback message survives `router.refresh()`.
+  const serverKey = `${view.tenantId ?? ''}|${view.changedAt ?? ''}`;
+  const [seenKey, setSeenKey] = useState(serverKey);
+  if (seenKey !== serverKey) {
+    setSeenKey(serverKey);
+    setSelected(view.tenantId ?? '');
+  }
 
   const unmapped = view.status !== 'active';
   const changed = selected !== (view.tenantId ?? '');
