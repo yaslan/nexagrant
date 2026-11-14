@@ -268,7 +268,7 @@ describe('runSeatMatch', () => {
     const topicQuery = calls.find((c) => c.delegate === 'topic');
     expect(topicQuery?.args).toEqual({
       where: { OR: [{ id: 'HORIZON-CL5-2026-D4-01' }, { identifier: 'HORIZON-CL5-2026-D4-01' }] },
-      select: { identifier: true, callId: true },
+      select: { identifier: true, callId: true, eligibility: true },
     });
   });
 
@@ -278,7 +278,7 @@ describe('runSeatMatch', () => {
     expect(topic).toEqual({ identifier: 'HORIZON-CL5-2026-D4-01', callId: null });
     expect(calls.find((c) => c.delegate === 'topic')?.args).toEqual({
       where: { OR: [{ id: 'HORIZON-CL5-2026-D4-01' }, { identifier: 'HORIZON-CL5-2026-D4-01' }] },
-      select: { identifier: true, callId: true },
+      select: { identifier: true, callId: true, eligibility: true },
     });
     expect(await findOpportunityTopic(tx, null)).toBeNull();
   });
@@ -318,6 +318,40 @@ describe('runSeatMatch', () => {
 
     // org-b has never coordinated; org-a has.
     expect(created.map((c) => c.organizationId)).toEqual(['org-a']);
+  });
+
+  // NG-52: the minimum-partner pre-filter reads the call threshold off the topic.
+  it('drops a candidate from a country already held when the call minimum needs a new one', async () => {
+    const { tx, created } = fakeTx({
+      'topic.findFirst': {
+        identifier: 'HORIZON-CL5-2026-D4-01',
+        callId: 'call-1',
+        eligibility: { restricted: null, minPartners: 3, minCountries: 3 },
+      },
+      // org-b now shares the confirmed partner's country (DE).
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          { organisationId: 'org-a', country: 'FR' },
+          { organisationId: 'org-b', country: 'DE' },
+          { organisationId: 'org-confirmed', country: 'DE' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+    });
+    await runSeatMatch(tx, params);
+    // 3 countries needed, DE held, 1 seat left: only FR can still reach the minimum.
+    expect(created.map((c) => c.organizationId)).toEqual(['org-a']);
+  });
+
+  it('keeps every candidate when the call carries no minimum (no guessed number)', async () => {
+    const { tx, created } = fakeTx({
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          { organisationId: 'org-a', country: 'FR' },
+          { organisationId: 'org-b', country: 'DE' },
+          { organisationId: 'org-confirmed', country: 'DE' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+    });
+    await runSeatMatch(tx, params);
+    expect(created.map((c) => c.organizationId)).toEqual(['org-a', 'org-b']);
   });
 
   it('refuses a seat that is not in this tenant', async () => {

@@ -27,6 +27,9 @@ export const EligibilitySchema = z
     eligibleCountries: z.array(z.string()).default([]),
     countriesExcluded: z.array(z.string()).default([]),
     notes: z.string().optional(),
+    /** NG-52: the call's minimum consortium, when its text states one (parseMinimumConsortium). */
+    minPartners: z.number().int().positive().optional(),
+    minCountries: z.number().int().positive().optional(),
   })
   .default({ restricted: null, eligibleCountries: [], countriesExcluded: [] });
 
@@ -89,6 +92,40 @@ export function inferEligibilityFromText(text: string): Eligibility | null {
     countriesExcluded: [],
     notes: 'EU/EEA/CH only — inferred from the call text',
   };
+}
+
+const NUMBER_WORDS: Readonly<Record<string, number>> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+const NUM = '(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)';
+const PARTNER_NOUN = '(?:legal entities|entities|organisations|organizations|partners|participants|applicants|beneficiaries|institutions)';
+const MIN_PARTNERS = new RegExp(`(?:at least|a minimum of|minimum of|minimum)\\s+${NUM}\\s+(?:[a-z-]+\\s+){0,3}?${PARTNER_NOUN}`, 'i');
+const MIN_COUNTRIES = new RegExp(`${NUM}\\s+different\\s+(?:[a-z-]+\\s+){0,3}?(?:countries|member states|states)`, 'i');
+const EACH_IN_DIFFERENT = /each\s+(?:[a-z-]+\s+){0,3}?(?:established|located|based)\s+in\s+a\s+different\s+(?:[a-z-]+\s+){0,3}?(?:country|member state|state)/i;
+
+function readNumber(token: string | undefined): number | undefined {
+  if (!token) return undefined;
+  const n = /^\d+$/.test(token) ? Number(token) : NUMBER_WORDS[token.toLowerCase()];
+  return n && n > 0 ? n : undefined;
+}
+
+/**
+ * NG-52 — the call's minimum consortium as the call text states it
+ * ("at least three independent legal entities, each established in a different
+ * country", "minimum 4 organisations from 3 different eligible countries").
+ * Specification §4 lists "asgari ortak" as a field of the call; this is where it
+ * comes from. Returns only the keys it found: a text that states no threshold
+ * gives `{}`, never a default.
+ */
+export function parseMinimumConsortium(text: string): { minPartners?: number; minCountries?: number } {
+  if (!text) return {};
+  const out: { minPartners?: number; minCountries?: number } = {};
+  const partners = readNumber(MIN_PARTNERS.exec(text)?.[1]);
+  if (partners) out.minPartners = partners;
+  const countries = readNumber(MIN_COUNTRIES.exec(text)?.[1]);
+  if (countries) out.minCountries = countries;
+  else if (partners && EACH_IN_DIFFERENT.test(text)) out.minCountries = partners;
+  return out;
 }
 
 /** Eligibility record for a source that is bound to a single country. */

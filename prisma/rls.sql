@@ -279,7 +279,8 @@ BEGIN
     'platform-admin',
     'platform-aggregate',
     'cross-tenant-job',
-    'public-intake'
+    'public-intake',
+    'expert-directory'
   ) THEN
     RAISE EXCEPTION 'enter_system_scope: unknown purpose %', coalesce(purpose, '<null>')
       USING ERRCODE = 'invalid_parameter_value';
@@ -358,11 +359,15 @@ AS $fn$
               AND ((tbl IN (to_regclass('public."ExpertPreRegistration"'),
                             to_regclass('public."ExpertPreRegAttempt"'))) IS NOT TRUE
                    OR coalesce(current_setting('app.system_scope_purpose', true), '')
-                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))))
+                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))
+              -- NG-52: expert-directory opens no table through this policy. Its
+              -- one read is the expert_directory policy below (SELECT only,
+              -- verified and visibility-consented rows of ExpertPreRegistration).
+              AND coalesce(current_setting('app.system_scope_purpose', true), '') <> 'expert-directory'))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); expert-directory opens nothing here (NG-52, see the expert_directory policy). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -396,6 +401,23 @@ DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
 CREATE POLICY system_scope ON public."ExpertPreRegistration"
   USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
   WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
+
+-- NG-52 (TASK-MW2SU1H9BLCGV): the M8 candidate query reads the expert pool as a
+-- directory. Purpose 'expert-directory' (withSystemScope, src/lib/expert-prereg/
+-- server/directory.ts) gets this one permissive policy and nothing else: SELECT
+-- only (no INSERT/UPDATE/DELETE policy names it, and system_scope_open() is
+-- false for it on every table), and only rows of a verified expert who ticked
+-- the visibility consent. Same seal as system_scope: a plain SET of the purpose
+-- by fabrika_app does not open it. The owner role bypasses RLS, so the code
+-- repeats the same two conditions in its WHERE.
+DROP POLICY IF EXISTS expert_directory ON public."ExpertPreRegistration";
+CREATE POLICY expert_directory ON public."ExpertPreRegistration"
+  FOR SELECT
+  USING ((SELECT coalesce(current_setting('app.system_scope', true) = 'on', false)
+                 AND coalesce(current_setting('app.system_scope_purpose', true), '') = 'expert-directory'
+                 AND public.system_scope_sealed())
+         AND status = 'verified'
+         AND "visibilityConsentAt" IS NOT NULL);
 
 -- ExpertPreRegAttempt (FO-26, TASK-MVBLYRLP9ID93): the per-IP submission counter of the
 -- same pre-registration (HMAC of an IP, pseudonymous personal data). Same standing and

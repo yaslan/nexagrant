@@ -651,7 +651,19 @@
     "dimensionRange": "{score} (range {min}…{max})",
     "breakdownNote": "Dimensions are raw points, each on its own range; the total is out of 100.",
     "legacyScoringNote": "This candidate was scored with the previous criteria. Press \"Find Candidates\" again to apply the new ones.",
-    "stageLine": "{title} — Stage {stage}"
+    "stageLine": "{title} — Stage {stage}",
+    "expertPool": {
+      "title": "Expert pool (free pre-registration)",
+      "note": "Verified pre-registered experts who gave visibility consent, matching the call programme and the seat role. Invitations and contact open in the second phase.",
+      "expert": "Expert #{number}",
+      "expertUnnumbered": "Expert",
+      "province": "Province",
+      "programme": "Programme",
+      "roles": "Roles",
+      "none": "No expert matches this seat.",
+      "excluded": "{count, plural, one {# expert was} other {# experts were}} left out by the minimum-partner pre-filter: the call country rule needs a new country.",
+      "unavailable": "The expert pool could not be read right now."
+    }
   },
   "Auth": {
     "signIn": "Sign In",

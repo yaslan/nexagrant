@@ -3,6 +3,7 @@ import { isPresentId } from '@/lib/required-id';
 import { MATCH_DIMENSION_SCALE } from '@/lib/scoring/seat-dimension-scale';
 import { normalizeSeatScore } from '@/lib/scoring/seat-score';
 import { SeatNotFoundError } from './errors';
+import { minimumPartnerState, passesMinimumPartnerFilter, readMinimumPartnerRule } from './minimum-partners';
 
 /**
  * M8 seat matching — ranked partner candidates for one open consortium seat.
@@ -164,11 +165,12 @@ interface SeatRow {
 export async function findOpportunityTopic(
   tx: Pick<TenantTx, 'topic'>,
   topicId: string | null | undefined
-): Promise<{ identifier: string; callId: string | null } | null> {
+): Promise<{ identifier: string; callId: string | null; eligibility?: unknown } | null> {
   if (!topicId) return null;
+  // `eligibility` carries the call's minimum-partner threshold (NG-52, minimum-partners.ts).
   return tx.topic.findFirst({
     where: { OR: [{ id: topicId }, { identifier: topicId }] },
-    select: { identifier: true, callId: true },
+    select: { identifier: true, callId: true, eligibility: true },
   });
 }
 
@@ -275,6 +277,18 @@ export async function runSeatMatch(
     confirmedOrgs.map((o) => o.country).filter((c): c is string => Boolean(c))
   );
 
+  // NG-52: the minimum-partner pre-filter (specification §6 l.103), threshold from the
+  // call. A candidate that cannot get the consortium to the call's country minimum is
+  // dropped before scoring; with no threshold on the call nothing is dropped.
+  const minimumPartners = minimumPartnerState(
+    readMinimumPartnerRule(topic?.eligibility),
+    (opp.seats as SeatRow[]).map((s) => s.status),
+    takenCountries
+  );
+  const eligibleIds = minimumPartners.requiresNewCountry
+    ? new Set(poolIds.filter((id) => passesMinimumPartnerFilter(countryOf.get(id) ?? null, minimumPartners)))
+    : poolSet;
+
   // ── Co-participation edges with the confirmed partners, for collaboration
   // history. The importer stores each edge once under `orgA < orgB`
   // (src/lib/k2-cordis/partnerProfileJob.ts), so both sides have to be examined.
@@ -325,7 +339,7 @@ export async function runSeatMatch(
     for (const s of rivalSeats) if (s.organizationId) rivals.add(s.organizationId);
   }
 
-  const scored: MatchCandidate[] = pool.map(([organizationId, exp]) => {
+  const scored: MatchCandidate[] = pool.filter(([organizationId]) => eligibleIds.has(organizationId)).map(([organizationId, exp]) => {
     const breakdown = scoreCandidate({
       participationCount: exp.participationCount,
       coordinatorCount: exp.coordinatorCount,

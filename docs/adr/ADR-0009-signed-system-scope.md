@@ -56,3 +56,10 @@ Kısıtlar:
 - `system_scope_open` mühürlü dalda ikinci bir koşul daha uygular: `ExpertPreRegistration` ve `ExpertPreRegAttempt` yalnız `public-intake` (form), `platform-admin` (liste ve CSV), `platform-aggregate` (koltuk sayısı) ve `cross-tenant-job` (saklama temizliği, FO-50) amaçlarında açılır. `tenant-discovery` ve `subject-scoped` bu tablolarda 0 satır görür, yazamaz. `ExpertFounderCounter` kişisel veri taşımadığı için listede yok. Sahip dalı yine amaca bakmaz.
 - Ölçüm (yerel, `fabrika_app` ile): önce `tenant-discovery` 5/5 `ExpertPreRegistration` satırı görüyordu. Sonra 0/5. `pnpm rls:verify` her koşuda iki kapalı amacı ölçer ve INSERT reddini dener.
 - Sınır §5 ile aynı: amaç GUC'si USERSET. Bu koşul yanlış tabloya uzanan bir çağrıya karşıdır, listedeki bir amacı adlandırabilen koda karşı değil. Uzmanı görmesi gereken yeni bir amaç `system_scope_open` listesine bilerek eklenir.
+
+## 7. Ek: `expert-directory` — doğrulanmış uzmanlar M8'e, yalnız okuma (NG-52, K-579696 = A, 14.11.2026)
+
+- Yedinci amaç `expert-directory`. M8 eşleştirme sayfası doğrulanmış uzman ön kayıtlarını koltuk adayı olarak gösterir; havuz hiçbir kiracıya ait değil, bu yüzden kiracı bağlamı onu açamaz.
+- `system_scope_open` bu amaçta **false** döner: genel `system_scope` politikası hiçbir tabloyu açmaz. Açan tek şey `ExpertPreRegistration` üzerindeki `expert_directory` politikasıdır: `FOR SELECT`, mühürlü kapsam + amaç = `expert-directory` + `status = 'verified'` + `"visibilityConsentAt" IS NOT NULL`. Yani bekleyen/devre dışı satır, yazma ve başka tablo kapalı. Ölçüm `tests/system-scope.live.test.ts` ("expert-directory reads verified expert rows and nothing else"): doğrulanmış 1, bekleyen 0, Membership 0, UPDATE 0 satır, INSERT RLS hatası.
+- Kolon sınırı RLS'de değil kodda: `directory.ts` ad/e-posta/kurum/iletişim kolonlarını seçmez. Sınır §5 ile aynı: amaç GUC'si USERSET; bu politika yanlış amaca karşı değil, yanlış tablo ve yanlış satıra karşıdır.
+

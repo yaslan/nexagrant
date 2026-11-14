@@ -651,7 +651,19 @@
     "dimensionRange": "{score} (aralık {min}…{max})",
     "breakdownNote": "Boyutlar ham puandır, her biri kendi aralığında; toplam 100 üzerinden.",
     "legacyScoringNote": "Bu aday önceki ölçütlerle puanlandı. Yeni ölçütler için \"Aday Bul\"a yeniden basın.",
-    "stageLine": "{title} — Aşama {stage}"
+    "stageLine": "{title} — Aşama {stage}",
+    "expertPool": {
+      "title": "Uzman havuzu (ücretsiz ön kayıt)",
+      "note": "Doğrulanmış ve görünürlük rızası vermiş ön kayıtlı uzmanlar; çağrının programı ve koltuğun rolüyle eşleşenler. Davet ve iletişim ikinci aşamada açılır.",
+      "expert": "Uzman #{number}",
+      "expertUnnumbered": "Uzman",
+      "province": "İl",
+      "programme": "Program",
+      "roles": "Roller",
+      "none": "Bu koltuk için eşleşen uzman yok.",
+      "excluded": "{count, plural, other {# uzman}} asgari ortak ön filtresine takıldı: çağrının ülke koşulu için yeni bir ülke gerekiyor.",
+      "unavailable": "Uzman havuzu şu an okunamadı."
+    }
   },
   "Auth": {
     "signIn": "Giriş Yap",
