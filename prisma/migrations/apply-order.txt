@@ -91,3 +91,4 @@ add-m18-client-pipeline.sql
 add-notification-email-claim.sql
 add-consent-purpose-lead-intake.sql
 add-public-lead-transfer-consent.sql
+add-province-lead-route.sql

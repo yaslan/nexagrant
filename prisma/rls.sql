@@ -436,6 +436,20 @@ BEGIN
   END IF;
 END $$;
 
+-- ProvinceLeadRoute (NG-167): province -> consultancy tenant map for readiness leads. Platform data
+-- managed by the platform admin; a tenant (even the target) reads 0 rows. Same policy as above.
+-- See prisma/migrations/add-province-lead-route.sql. Guarded: older databases have no table yet.
+DO $$
+BEGIN
+  IF to_regclass('public."ProvinceLeadRoute"') IS NOT NULL THEN
+    ALTER TABLE public."ProvinceLeadRoute" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."ProvinceLeadRoute";
+    CREATE POLICY system_scope ON public."ProvinceLeadRoute"
+      USING ((SELECT public.system_scope_open('"ProvinceLeadRoute"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"ProvinceLeadRoute"'::regclass)));
+  END IF;
+END $$;
+
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call
 -- system_scope_open/system_scope_sealed as the querying role, and the pricing

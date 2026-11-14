@@ -86,6 +86,9 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
     await mk('agency', 'SME', 'AGENCY');
     await mk('sme', 'SME', 'ORGANIZATION');
     await mk('other', 'CONSULTANCY', 'ORGANIZATION');
+    // NG-167: the producer picks the target from the province map. Samsun is used by this file only
+    // (tests/province-lead-route.live.test.ts takes other provinces); the tenant delete cascades the row.
+    await admin.provinceLeadRoute.create({ data: { province: 'Samsun', targetTenantId: tenants.consultancy, active: true } });
   });
 
   afterAll(async () => {
@@ -192,7 +195,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
       const p = createLeadIntakePort(prisma, bus);
       const lead = await mkLead('yes', { transferConsent: true, transferConsentVersion: 'v-test', transferConsentAt: NOW });
       const before = await counts(tenants.consultancy);
-      const result = await forwardPublicLead(lead.id, tenants.consultancy, p, prisma);
+      const result = await forwardPublicLead(lead.id, p, prisma);
       expect(result.status).toBe('created');
       const after = await counts(tenants.consultancy);
       expect(after.deals - before.deals).toBe(1);
@@ -208,7 +211,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
       expect(JSON.stringify(events[0])).not.toContain('example.test');
 
       // The same lead again: duplicate, no second event.
-      expect((await forwardPublicLead(lead.id, tenants.consultancy, p, prisma)).status).toBe('duplicate');
+      expect((await forwardPublicLead(lead.id, p, prisma)).status).toBe('duplicate');
       expect(events).toHaveLength(1);
     });
 
@@ -219,7 +222,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
       const p = createLeadIntakePort(prisma, bus);
       const lead = await mkLead('no');
       const before = await counts(tenants.agency);
-      expect(await forwardPublicLead(lead.id, tenants.agency, p, prisma)).toEqual({ status: 'skipped', reason: 'transfer_consent_off' });
+      expect(await forwardPublicLead(lead.id, p, prisma)).toEqual({ status: 'skipped', reason: 'transfer_consent_off' });
       expect(await counts(tenants.agency)).toEqual(before);
       expect(events).toHaveLength(0);
     });
@@ -227,7 +230,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
     test('flag true but no recorded version/time: still nothing', async () => {
       const lead = await mkLead('half', { transferConsent: true });
       const before = await counts(tenants.agency);
-      expect((await forwardPublicLead(lead.id, tenants.agency, createLeadIntakePort(prisma, createEventBus()), prisma)).status).toBe('skipped');
+      expect((await forwardPublicLead(lead.id, createLeadIntakePort(prisma, createEventBus()), prisma)).status).toBe('skipped');
       expect(await counts(tenants.agency)).toEqual(before);
     });
   });

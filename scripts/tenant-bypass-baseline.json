@@ -342,10 +342,10 @@
       "check": "D",
       "file": "src/lib/leads/public-lead-intake.ts",
       "subject": "system-scope:cross-tenant-job",
-      "count": 1,
+      "count": 2,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "forwardPublicLead() (NG-138): reads ONE PublicLead row by id (platform data, no tenantId, SYSTEM_WIDE) to build the lead-intake request for a consultancy tenant. Read-only; the write happens afterwards through the M18 LeadIntakePort inside the target tenant's own withTenantOn transaction, and only when the row's transferConsent is true."
+      "reason": "forwardPublicLead() (NG-138, NG-167): reads ONE PublicLead row by id (platform data, no tenantId, SYSTEM_WIDE) plus the ACTIVE ProvinceLeadRoute of its province (platform data, system_scope only) to pick the target tenant, then writes ONE routing mark (routeStatus/routedTenantId) on that same PublicLead row. No tenant row is read or written here: the lead itself lands afterwards through the M18 LeadIntakePort inside the target tenant's own withTenantOn transaction, and only when the row's transferConsent is true and the province is mapped."
     },
     {
       "check": "D",
@@ -400,6 +400,15 @@
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "purgeOldExpertPreRegistrations(), run nightly by the expert-prereg-cleanup cron (FO-50, TASK-MVC91K7JYOWQC): deletes ExpertPreRegistration rows (platform data with personal data, no tenantId, SYSTEM_WIDE) older than EXPERT_PREREG_RETENTION_DAYS by one createdAt < cutoff filter with no exception (K-568932 = A), first raising the one-row ExpertFounderCounter (SYSTEM_WIDE, no personal data) to the highest founderNumber so no number is freed, and writes one expert_prereg.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope, so delete and audit share this one transaction. No tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/province-route.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 4,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "Platform-admin lead routing console (NG-167): list/set/deactivate the province -> consultancy map (ProvinceLeadRoute, SYSTEM_WIDE, RLS system_scope only: a tenant reads 0 rows) and list the unmatched PublicLead worklist. The tenant table is read only to check the target is an eligible consultancy/agency. Set/deactivate write one tenantId-NULL AuditEvent in the same transaction. Every caller passes requirePlatformAdmin() first (src/app/[locale]/admin/lead-routes/actions.ts)."
     }
   ]
 }

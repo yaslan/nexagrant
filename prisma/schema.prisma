@@ -43,6 +43,7 @@ model Tenant {
   profile       TenantProfile?
   subscription  Subscription?
   moduleStates  ModuleState[]
+  provinceLeadRoutes ProvinceLeadRoute[]
   creditLedger  CreditLedger[]
   lifetimeLicences LifetimeLicence[]
   auditEvents   AuditEvent[]
@@ -724,6 +725,12 @@ model PublicLead {
   transferConsent        Boolean   @default(false)
   transferConsentVersion String?
   transferConsentAt      DateTime?
+  /// NG-167: where the intake forwarder sent it. 'routed' | 'unmatched' (consent given but the
+  /// province is empty or has no active ProvinceLeadRoute: NOT forwarded, platform-admin worklist).
+  routeStatus    String?
+  routeReason    String?
+  routedTenantId String?
+  routedAt       DateTime?
   /// Funnel page the request came from, e.g. `fon-hazirlik`.
   source         String
   locale         String
@@ -734,6 +741,26 @@ model PublicLead {
   @@index([createdAt])
   @@index([email, createdAt])
   @@index([ipHash, createdAt])
+  @@index([routeStatus, createdAt])
+}
+
+/// NG-167 (M18): province -> the consultancy tenant that receives the readiness leads of that
+/// province. PLATFORM data managed by the platform admin only; `tenantId` is the TARGET, not an
+/// owner, so the table is SYSTEM_WIDE + SYSTEM_SCOPE_POLICY (RLS on, `system_scope` only: a
+/// tenant reads 0 rows). One ACTIVE row per province (partial unique index in
+/// prisma/migrations/add-province-lead-route.sql, which Prisma cannot express).
+model ProvinceLeadRoute {
+  id        String   @id @default(cuid())
+  /// Spelled as TR_PROVINCES (DB CHECK).
+  province  String
+  targetTenantId String
+  active    Boolean  @default(true)
+  /// User id of the platform admin who last changed it.
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [targetTenantId], references: [id], onDelete: Cascade)
+  @@index([targetTenantId])
 }
 
 /// FO-19 (TASK-MVBIXPP33UK1B): the public expert pre-registration. An expert
