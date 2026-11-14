@@ -8,6 +8,7 @@ import { SYSTEM_SCOPE_PURPOSES, withSystemScopeOn } from '@/lib/system-scope';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
+import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
  * TASK-MTVTPVTEBCF5Z — the sanctioned cross-tenant path, measured where it is
@@ -461,31 +462,34 @@ describe('expert-directory reads verified expert rows and nothing else', () => {
     if (!ready) return ctx.skip(skipReason);
     const verified = `epr-dir-verified-${RUN}`;
     const pending = `epr-dir-pending-${RUN}`;
-    const seen = await asApp(async (c) => {
-      await c.query('BEGIN');
-      try {
-        await c.query(`SELECT enter_system_scope('public-intake')`);
-        await c.query(insert, [verified, 'verified']);
-        await c.query(insert, [pending, 'pending']);
-        await c.query(`SELECT enter_system_scope('expert-directory')`);
-        const rows = (
-          await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = ANY($1) ORDER BY id`, [[verified, pending]])
-        ).rows;
-        const memberships = Number(
-          (await c.query<{ n: number }>(`SELECT count(*)::int AS n FROM "Membership" WHERE "tenantId" = ANY($1)`, [FIXTURE_TENANTS])).rows[0]?.n ?? -1
-        );
-        const updated = (await c.query(`UPDATE "ExpertPreRegistration" SET province = '34' WHERE id = $1`, [verified])).rowCount;
-        await c.query('SAVEPOINT w');
-        const write = await c
-          .query(insert, [`epr-dir-write-${RUN}`, 'verified'])
-          .then(() => 'written')
-          .catch((e: Error) => e.message);
-        await c.query('ROLLBACK TO SAVEPOINT w');
-        return { rows, memberships, updated, write };
-      } finally {
-        await c.query('ROLLBACK');
-      }
-    });
+    // rls-verify-system-scope-policy-set.live swaps expert_directory out under this lock.
+    const seen = await withTestDbLock(ADMIN_URL!, EXPERT_DIRECTORY_POLICY_LOCK, () =>
+      asApp(async (c) => {
+        await c.query('BEGIN');
+        try {
+          await c.query(`SELECT enter_system_scope('public-intake')`);
+          await c.query(insert, [verified, 'verified']);
+          await c.query(insert, [pending, 'pending']);
+          await c.query(`SELECT enter_system_scope('expert-directory')`);
+          const rows = (
+            await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = ANY($1) ORDER BY id`, [[verified, pending]])
+          ).rows;
+          const memberships = Number(
+            (await c.query<{ n: number }>(`SELECT count(*)::int AS n FROM "Membership" WHERE "tenantId" = ANY($1)`, [FIXTURE_TENANTS])).rows[0]?.n ?? -1
+          );
+          const updated = (await c.query(`UPDATE "ExpertPreRegistration" SET province = '34' WHERE id = $1`, [verified])).rowCount;
+          await c.query('SAVEPOINT w');
+          const write = await c
+            .query(insert, [`epr-dir-write-${RUN}`, 'verified'])
+            .then(() => 'written')
+            .catch((e: Error) => e.message);
+          await c.query('ROLLBACK TO SAVEPOINT w');
+          return { rows, memberships, updated, write };
+        } finally {
+          await c.query('ROLLBACK');
+        }
+      })
+    );
     expect(seen.rows).toEqual([{ id: verified }]);
     expect(seen.memberships).toBe(0);
     expect(seen.updated).toBe(0);
