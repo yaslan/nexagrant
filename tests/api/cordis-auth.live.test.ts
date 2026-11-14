@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../helpers/database-availability';
 /**
  * FO-160 — the three /api/cordis/* routes against the real database, through the
  * API-key door: a wrong key is 401, a key on a limited plan (Discover) is 403, a
@@ -42,7 +43,9 @@ function makeKey() {
   return { key, keyHash: crypto.createHash('sha256').update(key).digest('hex'), prefix: key.slice(0, 12) };
 }
 
-describe('/api/cordis/* API-key policy (live DB)', () => {
+const HAS_DB = await suiteHasDatabase('api/cordis-auth.live');
+
+describe.skipIf(!HAS_DB)('/api/cordis/* API-key policy (live DB)', () => {
   let proTenantId: string;
   let discoverTenantId: string;
   let proKey: string;

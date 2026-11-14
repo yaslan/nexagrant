@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * FO-396 (Ö4). The scorer's input is what `loadG0Snapshot` reads from the stored tenant row. A loader
  * that drops or hard-codes `picRegistryStatus` would leave every unit test green, so this one runs
@@ -29,7 +30,9 @@ async function snapshotWith(status: 'FOUND' | 'NOT_FOUND' | 'UNKNOWN' | null) {
   return withTenant(tenantId, (tx) => loadG0Snapshot(tx, tenantId, subject));
 }
 
-describe('FO-396 loadG0Snapshot reads the stored register answer', () => {
+const HAS_DB = await suiteHasDatabase('g0-pic-registry-loader');
+
+describe.skipIf(!HAS_DB)('FO-396 loadG0Snapshot reads the stored register answer', () => {
   beforeAll(async () => {
     await prisma.tenant.create({
       data: { id: tenantId, name: `fo396-loader-${suffix}`, slug: `fo396-loader-${suffix}`, country: 'TR', orgType: 'SME', kind: 'ORGANIZATION', pic },

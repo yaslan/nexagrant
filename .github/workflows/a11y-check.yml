@@ -39,6 +39,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Same order as ci.yml: the Prisma client must exist before `next build`.
+      # Without it, the client bundle fails to resolve `.prisma/client/index-browser`
+      # (src/modules/m18/manifest.ts imports `Role` from `@prisma/client` as a value).
+      # Needs no database and no DATABASE_URL.
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
       # The audited pages are public and server-rendered on demand, so the
       # build needs no database and the server needs no seed.
       - name: Build

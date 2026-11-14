@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../../../tests/helpers/database-availability';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { prisma } from '@/lib/db';
 import {
@@ -8,7 +9,9 @@ import {
 } from './plan-repository';
 import { requireId } from '../../../tests/helpers/teardown-guard';
 
-describe('Plan Repository', () => {
+const HAS_DB = await suiteHasDatabase('plan-repository');
+
+describe.skipIf(!HAS_DB)('Plan Repository', () => {
   let testTenantId: string;
   let testPlanId: string;
 

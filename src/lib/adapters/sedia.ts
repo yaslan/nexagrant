@@ -12,6 +12,7 @@ import {
   errorMessage,
   inferEligibilityFromText,
   OPEN_ELIGIBILITY,
+  parseMinimumConsortium,
   stripHtml,
 } from './schemas/common';
 import {
@@ -245,9 +246,12 @@ export class SediaAdapter {
 
     const isLumpSum = detectLumpSum(title, typeOfAction, firstOf(meta.typeOfMGAs), conditions);
 
-    const eligibility: Eligibility =
-      inferEligibilityFromText(`${title} ${typeOfAction} ${conditions} ${description ?? ''}`) ??
-      OPEN_ELIGIBILITY;
+    const eligibility: Eligibility = {
+      ...(inferEligibilityFromText(`${title} ${typeOfAction} ${conditions} ${description ?? ''}`) ??
+        OPEN_ELIGIBILITY),
+      // NG-52: the call's minimum consortium, read from the conditions text only.
+      ...parseMinimumConsortium(conditions),
+    };
 
     const raw = {
       identifier,

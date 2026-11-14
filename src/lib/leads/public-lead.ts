@@ -8,14 +8,17 @@ import { toReadinessCode } from '@/lib/readiness/account';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
 import { READINESS_ORG_TYPES, scoreReadiness } from '@/lib/readiness/score';
 import { decodeReadinessCode } from '@/lib/readiness/share';
-import { withSystemScope } from '@/lib/system-scope';
+import { withSystemScope, withSystemScopeOn } from '@/lib/system-scope';
 import {
   PUBLIC_LEAD_CONSENT,
   PUBLIC_LEAD_RETENTION_DAYS,
   PUBLIC_LEAD_SOURCES,
+  PUBLIC_LEAD_TRANSFER_CONSENT,
   type PublicLeadField,
   type PublicLeadResult,
 } from './public-lead-policy';
+import { transferOrgNameFor } from './transfer-org';
+import { leadTransferConsentEnabled } from '@/lib/env';
 
 export * from './public-lead-policy';
 
@@ -25,7 +28,8 @@ export * from './public-lead-policy';
  * validation, the bot guards, the write, the admin read and the retention purge.
  *
  * Platform data: the visitor has no account, so the row has no tenant
- * (`PublicLead` is SYSTEM_WIDE in scripts/rls-models.ts). docs/legal/processing-register.md §18d.
+ * (`PublicLead` is SYSTEM_WIDE in scripts/rls-models.ts). RLS is on with the one `system_scope`
+ * policy (NG-175): every read and write below runs inside withSystemScope. docs/legal/processing-register.md §18d.
  *
  * Nothing in this file logs a name, an address, an organisation or an IP.
  */
@@ -62,6 +66,8 @@ export const publicLeadInputSchema = z.object({
   readinessCode: z.unknown().optional().transform((v) => toReadinessCode(v)),
   /** Must be literally true: an unticked box is a refusal, not a default. */
   consent: z.literal(true),
+  /** The optional transfer box (NG-179). Anything but literal true counts as unticked. */
+  transferConsent: z.unknown().optional().transform((v) => v === true),
   /** The version the form displayed; a stale form is refused rather than recorded against new text. */
   consentVersion: z.literal(PUBLIC_LEAD_CONSENT.version),
   source: z.enum(PUBLIC_LEAD_SOURCES),
@@ -214,7 +220,18 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
   const db = options.db ?? prisma;
 
   try {
-    return await db.$transaction(async (tx) => {
+    // The transfer consent is recorded only when the box is ticked AND the province has an
+    // organisation now. A ticked box for an unmapped province writes nothing (no recipient, no consent),
+    // and a failed lookup does not lose the lead: it is stored without the transfer consent.
+    // While the publication gate (LEAD_TRANSFER_CONSENT_ENABLED) is off, the flag is ignored outright.
+    const transferOn =
+      data.transferConsent &&
+      leadTransferConsentEnabled() &&
+      (await transferOrgNameFor(data.province, db).catch(() => null)) !== null;
+
+    // NG-175 (SEC NG-170 O-1): PublicLead is RLS system_scope only. 'public-intake' opens it (and,
+    // among the system_scope tables, only it and the expert form's) for the anonymous form.
+    return await withSystemScopeOn(db, 'public-intake', 'public-lead.submit', async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LEAD_LOCK_KEY})`;
 
       const byEmail = await tx.publicLead.count({
@@ -240,6 +257,9 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
           readinessLevel: scored?.level ?? null,
           consentVersion: PUBLIC_LEAD_CONSENT.version,
           consentAt: now,
+          transferConsent: transferOn,
+          transferConsentVersion: transferOn ? PUBLIC_LEAD_TRANSFER_CONSENT.version : null,
+          transferConsentAt: transferOn ? now : null,
           source: data.source,
           locale: data.locale,
           ipHash,
@@ -275,10 +295,13 @@ export interface PublicLeadRow {
   createdAt: Date;
 }
 
-/** Newest first. The caller must already have checked requirePlatformAdmin(). */
+/**
+ * Newest first. The caller must already have checked requirePlatformAdmin().
+ * NG-175: PublicLead is RLS system_scope only, so the read runs in the 'platform-admin' scope.
+ */
 export async function listPublicLeads(db: PrismaClient = prisma): Promise<{ rows: PublicLeadRow[]; total: number }> {
-  const [rows, total] = await Promise.all([
-    db.publicLead.findMany({
+  const [rows, total] = await withSystemScopeOn(db, 'platform-admin', 'public-lead.admin-list', (tx) => Promise.all([
+    tx.publicLead.findMany({
       orderBy: { createdAt: 'desc' },
       take: PUBLIC_LEAD_ADMIN_PAGE_SIZE,
       select: {
@@ -297,8 +320,8 @@ export async function listPublicLeads(db: PrismaClient = prisma): Promise<{ rows
         createdAt: true,
       },
     }),
-    db.publicLead.count(),
-  ]);
+    tx.publicLead.count(),
+  ]));
   return { rows, total };
 }
 

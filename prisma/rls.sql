@@ -16,7 +16,9 @@ BEGIN
     'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark',
     'OrgReadiness','InternalApproval','PartnerBudgetShare',
     'ProjectIdea','DecisionLog',
-    'NotificationPreference','NotificationEmailItem'
+    'NotificationPreference','NotificationEmailItem',
+    'LeadOrganization','LeadContact','LeadMatch','Deal','DealActivity','DealTask',
+    'ServicePackage','ServiceQuote','FunderRule'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -129,7 +131,7 @@ BEGIN
     'CordisOrganization','CordisParticipation','CordisPartnerProfile','CordisProject',
     'CordisProjectSciVoc','CordisProjectTopic','ModuleCatalog','PartnerProfileSnapshot',
     'PartnerSearchAnnouncement','PartnerSearchIngestionRun','PartnerSearchTopicStat','PicLookupBudget','PlatformSetting','Programme',
-    'PublicLead','RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat',
+    'RawFetch','Session','SystemAlert','Tenant','Topic','TopicStat',
     'UnmatchedOrganization','User','VerificationToken'
   ] LOOP
     IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass(format('public.%I', t)) AND relrowsecurity) THEN
@@ -220,6 +222,13 @@ END $$;
 -- names a purpose on the list. A new purpose that must see an expert goes into
 -- the list in system_scope_open() on purpose.
 --
+-- NG-175 (SEC NG-170 O-1, D-1): the same narrowing for the readiness lead tables.
+-- PublicLead (the anonymous visitor's name, e-mail, organisation and routing
+-- outcome) opens only for 'public-intake' (the form), 'platform-admin' (/admin/leads
+-- and the unmatched worklist) and 'cross-tenant-job' (the forwarder and the nightly
+-- purge); 'public-intake' may reach it in the first place. ProvinceLeadRoute opens
+-- only for 'platform-admin' and 'cross-tenant-job'.
+--
 -- Deploy order: this is applied by `pnpm db:rls`. Code that calls
 -- withSystemScope() reads zero rows until it has run, exactly like every other
 -- policy change in this file. The role that runs it must be allowed to create
@@ -279,7 +288,8 @@ BEGIN
     'platform-admin',
     'platform-aggregate',
     'cross-tenant-job',
-    'public-intake'
+    'public-intake',
+    'expert-directory'
   ) THEN
     RAISE EXCEPTION 'enter_system_scope: unknown purpose %', coalesce(purpose, '<null>')
       USING ERRCODE = 'invalid_parameter_value';
@@ -351,18 +361,33 @@ AS $fn$
               AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'public-intake'
                    OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
                                to_regclass('public."ExpertFounderCounter"'),
-                               to_regclass('public."ExpertPreRegAttempt"'))) IS TRUE)
+                               to_regclass('public."ExpertPreRegAttempt"'),
+                               to_regclass('public."PublicLead"'))) IS TRUE)
               -- FO-92: the expert's personal data opens only for the purposes
               -- that handle it. IS NOT TRUE: a missing table (NULL) is simply
               -- not on the list, like above.
               AND ((tbl IN (to_regclass('public."ExpertPreRegistration"'),
                             to_regclass('public."ExpertPreRegAttempt"'))) IS NOT TRUE
                    OR coalesce(current_setting('app.system_scope_purpose', true), '')
-                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))))
+                        IN ('public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job'))
+              -- NG-175 (SEC NG-170 O-1): the readiness visitor's personal data opens only
+              -- for the form, the platform-admin lists and the forwarder/retention jobs.
+              AND ((tbl = to_regclass('public."PublicLead"')) IS NOT TRUE
+                   OR coalesce(current_setting('app.system_scope_purpose', true), '')
+                        IN ('public-intake', 'platform-admin', 'cross-tenant-job'))
+              -- NG-175 (SEC NG-170 D-1): the province -> consultancy map opens only for the
+              -- platform-admin console and the lead forwarder.
+              AND ((tbl = to_regclass('public."ProvinceLeadRoute"')) IS NOT TRUE
+                   OR coalesce(current_setting('app.system_scope_purpose', true), '')
+                        IN ('platform-admin', 'cross-tenant-job'))
+              -- NG-52: expert-directory opens no table through this policy. Its
+              -- one read is the expert_directory policy below (SELECT only,
+              -- verified and visibility-consented rows of ExpertPreRegistration).
+              AND coalesce(current_setting('app.system_scope_purpose', true), '') <> 'expert-directory'))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt (FO-52, FO-26); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead (FO-52, FO-26, NG-175); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead only for public-intake, platform-admin and cross-tenant-job; ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175); expert-directory opens nothing here (NG-52, see the expert_directory policy). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -396,6 +421,23 @@ DROP POLICY IF EXISTS system_scope ON public."ExpertPreRegistration";
 CREATE POLICY system_scope ON public."ExpertPreRegistration"
   USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
   WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
+
+-- NG-52 (TASK-MW2SU1H9BLCGV): the M8 candidate query reads the expert pool as a
+-- directory. Purpose 'expert-directory' (withSystemScope, src/lib/expert-prereg/
+-- server/directory.ts) gets this one permissive policy and nothing else: SELECT
+-- only (no INSERT/UPDATE/DELETE policy names it, and system_scope_open() is
+-- false for it on every table), and only rows of a verified expert who ticked
+-- the visibility consent. Same seal as system_scope: a plain SET of the purpose
+-- by fabrika_app does not open it. The owner role bypasses RLS, so the code
+-- repeats the same two conditions in its WHERE.
+DROP POLICY IF EXISTS expert_directory ON public."ExpertPreRegistration";
+CREATE POLICY expert_directory ON public."ExpertPreRegistration"
+  FOR SELECT
+  USING ((SELECT coalesce(current_setting('app.system_scope', true) = 'on', false)
+                 AND coalesce(current_setting('app.system_scope_purpose', true), '') = 'expert-directory'
+                 AND public.system_scope_sealed())
+         AND status = 'verified'
+         AND "visibilityConsentAt" IS NOT NULL);
 
 -- ExpertPreRegAttempt (FO-26, TASK-MVBLYRLP9ID93): the per-IP submission counter of the
 -- same pre-registration (HMAC of an IP, pseudonymous personal data). Same standing and
@@ -432,6 +474,70 @@ BEGIN
       REVOKE DELETE, TRUNCATE ON public."ExpertFounderCounter" FROM fabrika_app;
     END IF;
   END IF;
+END $$;
+
+-- ProvinceLeadRoute (NG-167): province -> consultancy tenant map for readiness leads. Platform data
+-- managed by the platform admin; a tenant (even the target) reads 0 rows. Same policy as above.
+-- See prisma/migrations/add-province-lead-route.sql. Guarded: older databases have no table yet.
+DO $$
+BEGIN
+  IF to_regclass('public."ProvinceLeadRoute"') IS NOT NULL THEN
+    ALTER TABLE public."ProvinceLeadRoute" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."ProvinceLeadRoute";
+    CREATE POLICY system_scope ON public."ProvinceLeadRoute"
+      USING ((SELECT public.system_scope_open('"ProvinceLeadRoute"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"ProvinceLeadRoute"'::regclass)));
+  END IF;
+END $$;
+
+-- PublicLead (NG-175, SEC NG-170 O-1): the contact request of an anonymous readiness visitor
+-- (name, e-mail, organisation, routedTenantId). No tenant; until NG-175 it had no RLS and a
+-- tenant session read every row. RLS ON + FORCE, one policy system_scope: fabrika_app reaches
+-- it only inside withSystemScope ('public-intake' form, 'platform-admin' lists,
+-- 'cross-tenant-job' forwarder and purge). FORCE holds the policy on the owner too (the owner
+-- path of system_scope_open still needs app.system_scope = 'on', which apply-migrations.sh sets).
+-- See prisma/migrations/public-lead-rls.sql. Guarded like the blocks above.
+DO $$
+BEGIN
+  IF to_regclass('public."PublicLead"') IS NOT NULL THEN
+    ALTER TABLE public."PublicLead" ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public."PublicLead" FORCE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."PublicLead";
+    CREATE POLICY system_scope ON public."PublicLead"
+      USING ((SELECT public.system_scope_open('"PublicLead"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"PublicLead"'::regclass)));
+  END IF;
+END $$;
+
+-- NG-183 (NG-175 review Düşük-1): on the system_scope tables above (system_scope policy,
+-- no tenant policy) system_scope is the ONLY policy. Policies are permissive and OR
+-- together, so a stray one — even FOR SELECT USING (true) — would open the personal data
+-- that system_scope keeps shut. The blocks above only replace system_scope itself; this
+-- drops every other policy on those tables, so `pnpm db:rls` restores the set to
+-- {system_scope} (plus the one exception below). Tenant tables are not touched. `pnpm rls:verify` fails on the same set.
+-- One named exception (NG-52, ADR-0009 §9): expert_directory on ExpertPreRegistration,
+-- SELECT only — created above, it opens verified + consented rows to the sealed
+-- 'expert-directory' purpose. Same name on another table, or on this table with another
+-- command, is still dropped. Keep it in step with SYSTEM_SCOPE_ALLOWED_EXTRA
+-- (scripts/check-rls-live.ts).
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.tablename, p.policyname
+      FROM pg_policies p
+     WHERE p.schemaname = 'public'
+       AND p.policyname <> 'system_scope'
+       AND NOT (p.tablename = 'ExpertPreRegistration' AND p.policyname = 'expert_directory' AND p.cmd = 'SELECT')
+       AND p.tablename IN (
+             SELECT tablename FROM pg_policies WHERE schemaname = 'public' AND policyname = 'system_scope'
+             EXCEPT
+             SELECT tablename FROM pg_policies
+              WHERE schemaname = 'public' AND policyname IN ('tenant_isolation', 'tenant_or_shared'))
+  LOOP
+    RAISE NOTICE 'db:rls: dropping stray policy % on system_scope table %', r.policyname, r.tablename;
+    EXECUTE format('DROP POLICY %I ON public.%I', r.policyname, r.tablename);
+  END LOOP;
 END $$;
 
 -- No function of this schema is callable through Supabase's Data API roles

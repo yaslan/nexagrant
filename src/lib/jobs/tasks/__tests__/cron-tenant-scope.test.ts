@@ -15,6 +15,7 @@ import { grantCreditsToTenants } from '../credits-monthly-grant';
 import { requireId } from '../../../../../tests/helpers/teardown-guard';
 import { skipUnlessSeeded } from '../../../../../tests/helpers/seed';
 import { skipOrFailInCi } from '../../../../../tests/helpers/live-db-role';
+import { databaseReachable } from '../../../../../tests/helpers/database-availability';
 
 /**
  * TASK-MTVR8KK92G0GA — do the two cron jobs write under the tenant they are
@@ -56,9 +57,9 @@ const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
  * A role that silently bypasses the policies is a false green, and that is the
  * one thing this file exists to refuse.
  */
-const dbReachable =
-  RLS_URL !== undefined &&
-  (await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
+// `databaseReachable()` (not a bare `prisma.$queryRaw`): with no DATABASE_URL the
+// `prisma` proxy throws synchronously on property access, which `.catch` cannot catch.
+const dbReachable = RLS_URL !== undefined && (await databaseReachable());
 
 if (!dbReachable) {
   skipOrFailInCi(

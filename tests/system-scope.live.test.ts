@@ -8,6 +8,7 @@ import { SYSTEM_SCOPE_PURPOSES, withSystemScopeOn } from '@/lib/system-scope';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
+import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
  * TASK-MTVTPVTEBCF5Z — the sanctioned cross-tenant path, measured where it is
@@ -396,6 +397,8 @@ describe('expert pre-registrations open only for the purposes that handle them',
     'platform-aggregate': 1,
     'cross-tenant-job': 1,
     'public-intake': 1,
+    // NG-52: the fixture row is `pending`; expert-directory opens verified rows only.
+    'expert-directory': 0,
   };
 
   test('tenant-discovery and subject-scoped read 0, the handling purposes read the row', async (ctx) => {
@@ -441,5 +444,55 @@ describe('expert pre-registrations open only for the purposes that handle them',
         await c.query('ROLLBACK');
       }
     });
+  });
+});
+
+/**
+ * NG-52 (TASK-MW2SU1H9BLCGV) — purpose 'expert-directory': the verified expert
+ * pre-registrations M8 offers as seat candidates. It opens the expert_directory
+ * SELECT policy and nothing else: a pending row stays shut, no write passes, and
+ * no other system_scope table opens. Fixture rows are written by public-intake in
+ * the same transaction and rolled back.
+ */
+describe('expert-directory reads verified expert rows and nothing else', () => {
+  const insert = `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+     VALUES ($1, 'probe', $1 || '@system-scope.test', '06', true, '{}', '{researcher}', '{horizon-europe-h2020}', '{}', now(), now(), 'tr', $2)`;
+
+  test('a verified row is seen, a pending one is not, and no write or other table opens', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const verified = `epr-dir-verified-${RUN}`;
+    const pending = `epr-dir-pending-${RUN}`;
+    // rls-verify-system-scope-policy-set.live swaps expert_directory out under this lock.
+    const seen = await withTestDbLock(ADMIN_URL!, EXPERT_DIRECTORY_POLICY_LOCK, () =>
+      asApp(async (c) => {
+        await c.query('BEGIN');
+        try {
+          await c.query(`SELECT enter_system_scope('public-intake')`);
+          await c.query(insert, [verified, 'verified']);
+          await c.query(insert, [pending, 'pending']);
+          await c.query(`SELECT enter_system_scope('expert-directory')`);
+          const rows = (
+            await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = ANY($1) ORDER BY id`, [[verified, pending]])
+          ).rows;
+          const memberships = Number(
+            (await c.query<{ n: number }>(`SELECT count(*)::int AS n FROM "Membership" WHERE "tenantId" = ANY($1)`, [FIXTURE_TENANTS])).rows[0]?.n ?? -1
+          );
+          const updated = (await c.query(`UPDATE "ExpertPreRegistration" SET province = '34' WHERE id = $1`, [verified])).rowCount;
+          await c.query('SAVEPOINT w');
+          const write = await c
+            .query(insert, [`epr-dir-write-${RUN}`, 'verified'])
+            .then(() => 'written')
+            .catch((e: Error) => e.message);
+          await c.query('ROLLBACK TO SAVEPOINT w');
+          return { rows, memberships, updated, write };
+        } finally {
+          await c.query('ROLLBACK');
+        }
+      })
+    );
+    expect(seen.rows).toEqual([{ id: verified }]);
+    expect(seen.memberships).toBe(0);
+    expect(seen.updated).toBe(0);
+    expect(seen.write).toMatch(/row-level security/i);
   });
 });

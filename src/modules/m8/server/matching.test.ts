@@ -268,7 +268,7 @@ describe('runSeatMatch', () => {
     const topicQuery = calls.find((c) => c.delegate === 'topic');
     expect(topicQuery?.args).toEqual({
       where: { OR: [{ id: 'HORIZON-CL5-2026-D4-01' }, { identifier: 'HORIZON-CL5-2026-D4-01' }] },
-      select: { identifier: true, callId: true },
+      select: { identifier: true, callId: true, eligibility: true },
     });
   });
 
@@ -278,7 +278,7 @@ describe('runSeatMatch', () => {
     expect(topic).toEqual({ identifier: 'HORIZON-CL5-2026-D4-01', callId: null });
     expect(calls.find((c) => c.delegate === 'topic')?.args).toEqual({
       where: { OR: [{ id: 'HORIZON-CL5-2026-D4-01' }, { identifier: 'HORIZON-CL5-2026-D4-01' }] },
-      select: { identifier: true, callId: true },
+      select: { identifier: true, callId: true, eligibility: true },
     });
     expect(await findOpportunityTopic(tx, null)).toBeNull();
   });
@@ -318,6 +318,136 @@ describe('runSeatMatch', () => {
 
     // org-b has never coordinated; org-a has.
     expect(created.map((c) => c.organizationId)).toEqual(['org-a']);
+  });
+
+  // NG-52: the minimum-partner pre-filter reads the call threshold off the topic.
+  it('drops a candidate from a country already held when the call minimum needs a new one', async () => {
+    const { tx, created } = fakeTx({
+      'topic.findFirst': {
+        identifier: 'HORIZON-CL5-2026-D4-01',
+        callId: 'call-1',
+        eligibility: { restricted: null, minPartners: 3, minCountries: 3 },
+      },
+      // org-b now shares the confirmed partner's country (DE).
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          { organisationId: 'org-a', country: 'FR' },
+          { organisationId: 'org-b', country: 'DE' },
+          { organisationId: 'org-confirmed', country: 'DE' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+    });
+    await runSeatMatch(tx, params);
+    // 3 countries needed, DE held, 1 seat left: only FR can still reach the minimum.
+    expect(created.map((c) => c.organizationId)).toEqual(['org-a']);
+  });
+
+  // CRW NG-186 bulgu 3: a seat confirmed with the tenant's own partner record holds a country too.
+  it('counts the country of a seat confirmed with a PartnerOrg before deciding a new country is required', async () => {
+    const { tx, calls, created } = fakeTx({
+      'opportunity.findFirst': {
+        id: 'opp-1',
+        topicId: 'topic-1',
+        seats: [
+          { status: 'CONFIRMED', organizationId: 'org-confirmed', partnerOrgId: null },
+          { status: 'CONFIRMED', organizationId: null, partnerOrgId: 'po-1' },
+          { status: 'OPEN', organizationId: null, partnerOrgId: null },
+          { status: 'OPEN', organizationId: null, partnerOrgId: null },
+        ],
+      },
+      'topic.findFirst': {
+        identifier: 'HORIZON-CL5-2026-D4-01',
+        callId: 'call-1',
+        eligibility: { restricted: null, minPartners: 3, minCountries: 3 },
+      },
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          { organisationId: 'org-a', country: 'FR' },
+          { organisationId: 'org-b', country: 'DE' },
+          { organisationId: 'org-confirmed', country: 'DE' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+      'partnerOrg.findMany': [{ country: 'IT' }],
+    });
+    await runSeatMatch(tx, params);
+    // DE + IT held, 1 country missing, 2 seats open: no seat is forced to bring a new country.
+    expect(created.map((c) => c.organizationId)).toEqual(['org-a', 'org-b']);
+    expect(calls.find((c) => c.delegate === 'partnerOrg')?.args).toEqual({
+      where: { id: { in: ['po-1'] }, tenantId: 'tenant-1' },
+      select: { country: true },
+    });
+  });
+
+  // CRW NG-186 (2. tur) C-1: a CORDIS country stored in lower case / with spaces is the same
+  // country as the upper-case PartnerOrg and candidate countries.
+  it('normalises CORDIS countries the same way as PartnerOrg countries', async () => {
+    const { tx, created } = fakeTx({
+      'opportunity.findFirst': {
+        id: 'opp-1',
+        topicId: 'topic-1',
+        seats: [
+          { status: 'CONFIRMED', organizationId: 'org-confirmed', partnerOrgId: null },
+          { status: 'CONFIRMED', organizationId: null, partnerOrgId: 'po-1' },
+          { status: 'OPEN', organizationId: null, partnerOrgId: null },
+        ],
+      },
+      'topic.findFirst': {
+        identifier: 'HORIZON-CL5-2026-D4-01',
+        callId: 'call-1',
+        eligibility: { restricted: null, minPartners: 4, minCountries: 3 },
+      },
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          { organisationId: 'org-a', country: 'FR' },
+          { organisationId: 'org-b', country: 'it' },
+          { organisationId: 'org-confirmed', country: ' de ' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+      'partnerOrg.findMany': [{ country: 'IT' }],
+    });
+    await runSeatMatch(tx, params);
+    // DE + IT held (2 countries), 1 missing, 1 seat open: only FR brings a new country;
+    // "it" is Italy, already held through the PartnerOrg.
+    expect(created.map((c) => c.organizationId)).toEqual(['org-a']);
+  });
+
+  // CRW NG-186 bulgu 4: the filter runs before the pool is cut to its 100 best.
+  it('fills the pool with eligible organisations ranked below 100 dropped ones', async () => {
+    // 100 German organisations with 2 participations each outrank one French one with 1.
+    const german = Array.from({ length: 100 }, (_, i) => `org-de-${String(i).padStart(3, '0')}`);
+    const { tx, created } = fakeTx({
+      'topic.findFirst': {
+        identifier: 'HORIZON-CL5-2026-D4-01',
+        callId: 'call-1',
+        eligibility: { restricted: null, minPartners: 3, minCountries: 3 },
+      },
+      'cordisParticipation.findMany': [
+        ...german.flatMap((id) => [
+          { organisationId: id, role: 'participant' },
+          { organisationId: id, role: 'participant' },
+        ]),
+        { organisationId: 'org-fr', role: 'participant' },
+      ],
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          ...german.map((organisationId) => ({ organisationId, country: 'DE' })),
+          { organisationId: 'org-fr', country: 'FR' },
+          { organisationId: 'org-confirmed', country: 'DE' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+    });
+    await runSeatMatch(tx, params);
+    // DE held, 3 countries needed, 1 seat left: every German one is out, the French one is in.
+    expect(created.map((c) => c.organizationId)).toEqual(['org-fr']);
+  });
+
+  it('keeps every candidate when the call carries no minimum (no guessed number)', async () => {
+    const { tx, created } = fakeTx({
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          { organisationId: 'org-a', country: 'FR' },
+          { organisationId: 'org-b', country: 'DE' },
+          { organisationId: 'org-confirmed', country: 'DE' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+    });
+    await runSeatMatch(tx, params);
+    expect(created.map((c) => c.organizationId)).toEqual(['org-a', 'org-b']);
   });
 
   it('refuses a seat that is not in this tenant', async () => {

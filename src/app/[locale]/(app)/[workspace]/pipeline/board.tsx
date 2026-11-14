@@ -145,6 +145,50 @@ export default function KanbanBoard({
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Full-Window Modal State
+  const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const closeModal = () => setSelectedOppId(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedOppId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (selectedOppId) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [selectedOppId]);
+
+  const getMilestonesForStage = (gate: Gate): string[] => {
+    switch (gate) {
+      case 'G0':
+        return [t('modal.milestoneG0_1'), t('modal.milestoneG0_2'), t('modal.milestoneG0_3')];
+      case 'G1':
+        return [t('modal.milestoneG1_1'), t('modal.milestoneG1_2'), t('modal.milestoneG1_3')];
+      case 'G2':
+        return [t('modal.milestoneG2_1'), t('modal.milestoneG2_2'), t('modal.milestoneG2_3')];
+      case 'G3':
+        return [t('modal.milestoneG3_1'), t('modal.milestoneG3_2'), t('modal.milestoneG3_3')];
+      case 'G4':
+        return [t('modal.milestoneG4_1'), t('modal.milestoneG4_2'), t('modal.milestoneG4_3')];
+      default:
+        return [];
+    }
+  };
+
   // New Opportunity Form
   const [formData, setFormData] = useState({
     title: '',
@@ -181,11 +225,8 @@ export default function KanbanBoard({
     e.dataTransfer.setData('oppId', oppId);
   };
 
-  const handleDrop = async (e: React.DragEvent, newStage: Gate) => {
-    e.preventDefault();
-    const oppId = e.dataTransfer.getData('oppId');
-    if (!oppId) return;
-
+  // One move path for drag-and-drop and the modal's stage stepper, so both go through the gate.
+  const moveStage = (oppId: string, newStage: Gate) => {
     const opp = opps.find((o) => o.id === oppId);
     if (!opp || opp.stage === newStage) return;
 
@@ -201,6 +242,8 @@ export default function KanbanBoard({
           return;
         }
         if (!res.passed) {
+          // The refusal panel sits on the board, behind the full-window modal: close the modal.
+          setSelectedOppId(null);
           setMoveRefusal({
             title: opp.title,
             stage: newStage,
@@ -218,6 +261,13 @@ export default function KanbanBoard({
         showToast(errorText(err, t('moveError.STAGE_MOVE_FAILED')), 'error');
       }
     });
+  };
+
+  const handleDrop = (e: React.DragEvent, newStage: Gate) => {
+    e.preventDefault();
+    const oppId = e.dataTransfer.getData('oppId');
+    if (!oppId) return;
+    moveStage(oppId, newStage);
   };
 
   const allowDrop = (e: React.DragEvent) => {
@@ -527,6 +577,7 @@ export default function KanbanBoard({
                     avatar: '👤',
                   };
                   const isExpanded = !!expandedCardIds[opp.id];
+                  const isSelected = selectedOppId === opp.id;
 
                   const notesList: NoteEntry[] = opp.notesList || [];
                   const cardNoteInput = noteInputs[opp.id] || { text: '', authorId: members[0]?.id ?? '' };
@@ -536,18 +587,29 @@ export default function KanbanBoard({
                       key={opp.id}
                       data-testid={`pipeline-card-${opp.id}`}
                       draggable
-                      onDragStart={(e) => handleDragStart(e, opp.id)}
-                      className={`bg-surface rounded-xl shadow-2xs border border-border cursor-grab active:cursor-grabbing hover:border-accent hover:shadow-md transition-all ${
+                      onDragStart={(e) => {
+                        setIsDragging(true);
+                        handleDragStart(e, opp.id);
+                      }}
+                      onDragEnd={() => {
+                        setTimeout(() => setIsDragging(false), 50);
+                      }}
+                      onClick={() => {
+                        if (!isDragging) {
+                          setSelectedOppId(opp.id);
+                        }
+                      }}
+                      className={`bg-surface rounded-xl shadow-2xs border border-border cursor-pointer hover:border-accent hover:shadow-md transition-all ${
                         isPending ? 'opacity-60' : ''
                       } ${isExpanded ? 'p-4 space-y-3' : 'p-3 space-y-2'}`}
                     >
-                      {/* Top Bar / Header of Card (Always Visible & Clickable to Toggle Expand) */}
+                      {/* Top Bar / Header of Card (Always Visible) */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 ${
                               isCoord
-                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/20'
+                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/20'
                                 : 'bg-accent/15 text-accent-ink border border-accent/20'
                             }`}
                           >
@@ -600,6 +662,20 @@ export default function KanbanBoard({
                             </span>
                           )}
 
+                          {/* Open Full Window Modal Button */}
+                          <button
+                            type="button"
+                            data-testid={`pipeline-card-expand-modal-${opp.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOppId(opp.id);
+                            }}
+                            className="text-[10px] bg-ground hover:bg-accent/15 text-muted hover:text-accent-ink border border-border px-1.5 py-0.5 rounded font-bold transition cursor-pointer"
+                            title={t('modal.openModal')}
+                          >
+                            ⛶
+                          </button>
+
                           {/* Toggle Expand Arrow Button */}
                           <button
                             type="button"
@@ -615,9 +691,12 @@ export default function KanbanBoard({
                         </div>
                       </div>
 
-                      {/* Title (Clicking title expands/collapses) */}
+                      {/* Title (Clicking title opens full-window modal) */}
                       <h4
-                        onClick={() => toggleExpand(opp.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedOppId(opp.id);
+                        }}
                         className={`font-bold text-xs text-ink leading-snug cursor-pointer hover:text-accent transition-colors ${
                           isExpanded ? 'line-clamp-none' : 'line-clamp-1'
                         }`}
@@ -626,9 +705,12 @@ export default function KanbanBoard({
                         {opp.title}
                       </h4>
 
-                      {/* ─── EXPANDED DETAILS CONTENT ─── */}
-                      {isExpanded && (
-                        <div className="space-y-3 pt-2 border-t border-border/60 animate-in fade-in duration-150">
+                      {/* ─── EXPANDED DETAILS CONTENT (INLINE) ─── */}
+                      {isExpanded && !isSelected && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="space-y-3 pt-2 border-t border-border/60 animate-in fade-in duration-150"
+                        >
                           {/* Topic Identifier */}
                           {opp.topicId && (
                             <div className="text-[10px] bg-ground border border-border text-muted px-2 py-1 rounded font-mono truncate max-w-full">
@@ -770,6 +852,391 @@ export default function KanbanBoard({
                               <span>👥</span>
                               <span>{t('board.consortium')}</span>
                             </Link>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ─── FULL-WINDOW STAGE-GATE TASK MODAL ─── */}
+                      {isSelected && (
+                        <div
+                          role="dialog"
+                          aria-modal="true"
+                          aria-labelledby={`pipeline-modal-title-${opp.id}`}
+                          data-testid={`pipeline-modal-${opp.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeModal();
+                          }}
+                          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 lg:p-8 animate-in fade-in duration-200 cursor-default text-ink"
+                        >
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-surface border border-border/80 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+                          >
+                            {/* Modal Header */}
+                            <div className="p-5 border-b border-border bg-ground/40 flex items-start justify-between gap-4">
+                              <div className="space-y-1.5 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[11px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20">
+                                    {t('modal.tag')}
+                                  </span>
+                                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-ground border border-border text-ink-2">
+                                    {opp.stage} • {t(`board.gateSubtitle.${opp.stage}`)}
+                                  </span>
+                                  <span
+                                    className={`text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                                      isCoord
+                                        ? 'bg-purple-500/15 text-purple-400 border border-purple-500/20'
+                                        : 'bg-accent/15 text-accent-ink border border-accent/20'
+                                    }`}
+                                  >
+                                    <span>{isCoord ? '👑' : '🤝'}</span>
+                                    <span>{isCoord ? t('modal.coordinator') : t('modal.partner')}</span>
+                                  </span>
+                                  {opp.g0Score !== null && opp.g0Score !== undefined ? (
+                                    <span
+                                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md ${
+                                        opp.g0Score >= 80
+                                          ? 'bg-ok/15 text-ok border border-ok/30'
+                                          : 'bg-amber/15 text-amber border border-amber/30'
+                                      }`}
+                                      title={t('modal.g0Score')}
+                                    >
+                                      ⭐ {opp.g0Score} / 100
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-muted font-medium bg-ground border border-border px-2 py-0.5 rounded-md">
+                                      {t('modal.g0Unscored')}
+                                    </span>
+                                  )}
+                                </div>
+                                <h2
+                                  id={`pipeline-modal-title-${opp.id}`}
+                                  className="text-xl sm:text-2xl font-bold font-heading text-ink leading-snug"
+                                >
+                                  {opp.title}
+                                </h2>
+                                <div className="flex items-center gap-2 text-xs text-muted">
+                                  <span className="font-semibold">{t('modal.topic')}:</span>
+                                  {opp.topicId ? (
+                                    <span className="font-mono bg-ground border border-border px-2 py-0.5 rounded text-ink text-[11px]">
+                                      {opp.topicId}
+                                    </span>
+                                  ) : (
+                                    <span className="italic">{t('modal.noTopic')}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  data-testid={`pipeline-modal-close-${opp.id}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    closeModal();
+                                  }}
+                                  className="w-9 h-9 rounded-xl bg-ground hover:bg-surface border border-border text-muted hover:text-ink flex items-center justify-center text-base font-bold transition cursor-pointer"
+                                  title={t('modal.close')}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Stage-Gate Visual Progress Stepper */}
+                            <div className="px-5 py-3 border-b border-border/70 bg-surface">
+                              <div className="flex items-center justify-between text-xs text-muted font-medium mb-2">
+                                <span>{t('modal.stageSelector')}</span>
+                                <span className="font-semibold text-accent-ink">{opp.stage}</span>
+                              </div>
+                              <div className="grid grid-cols-5 gap-2">
+                                {GATES.map((g, idx) => {
+                                  const isCurrent = opp.stage === g.key;
+                                  const gateIdx = GATES.findIndex((item) => item.key === opp.stage);
+                                  const isPast = idx < gateIdx;
+                                  return (
+                                    <button
+                                      key={g.key}
+                                      type="button"
+                                      onClick={() => moveStage(opp.id, g.key)}
+                                      className={`px-3 py-2 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                                        isCurrent
+                                          ? 'bg-accent/15 border-accent text-accent-ink ring-2 ring-accent/30 font-bold shadow-xs'
+                                          : isPast
+                                          ? 'bg-surface border-border text-ink hover:border-accent/50'
+                                          : 'bg-ground/40 border-border/60 text-muted hover:text-ink hover:border-border'
+                                      }`}
+                                      title={`${g.key}: ${t(`board.gateSubtitle.${g.key}`)}`}
+                                    >
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="font-bold">{g.key}</span>
+                                        <span>{isPast ? '✓' : isCurrent ? '●' : '○'}</span>
+                                      </div>
+                                      <div className="text-[10px] truncate mt-1 opacity-80">{t(`board.gateSubtitle.${g.key}`)}</div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Modal Two-Column Content Body */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-5 sm:p-6 overflow-y-auto flex-1">
+                              {/* Left Column: Tasks & Notes */}
+                              <div className="lg:col-span-7 space-y-5">
+                                {/* Gate Milestones */}
+                                <div className="bg-ground/40 border border-border rounded-xl p-4 space-y-3">
+                                  <div className="flex items-center justify-between text-xs font-bold text-ink">
+                                    <span>{t('modal.tasksTitle')}</span>
+                                    <span className="text-[10px] font-mono text-muted bg-surface border border-border px-1.5 py-0.5 rounded">
+                                      {opp.stage}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {getMilestonesForStage(opp.stage).map((item, mIdx) => (
+                                      <div
+                                        key={mIdx}
+                                        className="flex items-start gap-2.5 bg-surface border border-border/70 rounded-lg p-2.5 text-xs"
+                                      >
+                                        <span className="text-ok font-bold text-sm leading-none mt-0.5">☑</span>
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-ink leading-tight">{item}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Team Notes Stream */}
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between text-xs font-bold text-ink">
+                                    <span>💬 {t('modal.notesTitle')}</span>
+                                    <span className="text-xs text-muted font-medium">
+                                      {t('modal.notesCount', { count: notesList.length })}
+                                    </span>
+                                  </div>
+
+                                  {notesList.length > 0 ? (
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                      {notesList.map((note) => (
+                                        <div
+                                          key={note.id}
+                                          data-testid={`pipeline-note-item-${opp.id}`}
+                                          className="bg-ground/70 border border-border rounded-xl p-3 text-xs space-y-1.5"
+                                        >
+                                          <div className="flex items-center justify-between text-[11px] text-muted">
+                                            <span className="font-bold text-ink flex items-center gap-1.5">
+                                              <span className="text-sm">{note.authorAvatar || '👤'}</span>
+                                              <span>{note.authorName}</span>
+                                            </span>
+                                            <span className="font-mono text-[10px]">{note.createdAt}</span>
+                                          </div>
+                                          <p className="text-ink-2 leading-relaxed">{note.text}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted italic bg-ground/30 border border-border/50 rounded-xl p-3">
+                                      {t('modal.noNotes')}
+                                    </p>
+                                  )}
+
+                                  {/* Add Note Composer in Modal */}
+                                  <div className="bg-ground border border-border rounded-xl p-3 space-y-2.5">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-muted font-semibold">{t('modal.noteAuthor')}:</span>
+                                      <select
+                                        data-testid={`pipeline-note-author-${opp.id}`}
+                                        value={cardNoteInput.authorId}
+                                        onChange={(e) =>
+                                          setNoteInputs((prev) => ({
+                                            ...prev,
+                                            [opp.id]: {
+                                              ...cardNoteInput,
+                                              authorId: e.target.value,
+                                            },
+                                          }))
+                                        }
+                                        className="bg-surface border border-border rounded-lg px-2 py-1 text-xs text-ink font-bold focus:outline-none"
+                                      >
+                                        {members.map((m) => (
+                                          <option key={m.id} value={m.id}>
+                                            {m.avatar} {m.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        data-testid={`pipeline-note-text-${opp.id}`}
+                                        type="text"
+                                        placeholder={t('modal.notePlaceholder')}
+                                        value={cardNoteInput.text}
+                                        onChange={(e) =>
+                                          setNoteInputs((prev) => ({
+                                            ...prev,
+                                            [opp.id]: {
+                                              ...cardNoteInput,
+                                              text: e.target.value,
+                                            },
+                                          }))
+                                        }
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddNote(opp.id);
+                                          }
+                                        }}
+                                        className="w-full text-xs bg-surface border border-border rounded-xl px-3 py-2 text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                                      />
+                                      <button
+                                        data-testid={`pipeline-note-add-${opp.id}`}
+                                        type="button"
+                                        onClick={() => handleAddNote(opp.id)}
+                                        disabled={!cardNoteInput.text.trim()}
+                                        className="bg-accent hover:opacity-90 disabled:opacity-40 text-white font-bold text-xs px-4 py-2 rounded-xl transition shrink-0 cursor-pointer"
+                                      >
+                                        {t('modal.addNote')}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right Column: Member Assignment & Module Links */}
+                              <div className="lg:col-span-5 space-y-5">
+                                {/* Responsible User Card */}
+                                <div className="bg-ground/50 border border-border rounded-xl p-4 space-y-3">
+                                  <div className="text-xs font-bold text-ink">{t('modal.assignedTo')}</div>
+                                  <div className="flex items-center gap-2.5 bg-surface border border-border rounded-xl p-3">
+                                    <span className="text-2xl">{currentMember.avatar}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <select
+                                        value={opp.ownerId || ''}
+                                        onChange={(e) => handleAssignOwner(opp.id, e.target.value)}
+                                        className="w-full bg-transparent font-bold text-ink text-xs focus:outline-none cursor-pointer hover:text-accent truncate"
+                                        title={t('board.changeOwnerTitle')}
+                                      >
+                                        {members.map((m) => (
+                                          <option key={m.id} value={m.id}>
+                                            {m.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Quick Info Box */}
+                                <div className="bg-ground/50 border border-border rounded-xl p-4 space-y-2.5 text-xs">
+                                  <div className="flex items-center justify-between py-1 border-b border-border/50">
+                                    <span className="text-muted">{t('modal.role')}:</span>
+                                    <span className="font-bold text-ink">
+                                      {isCoord ? t('modal.coordinator') : t('modal.partner')}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between py-1 border-b border-border/50">
+                                    <span className="text-muted">{t('modal.stage')}:</span>
+                                    <span className="font-mono font-bold text-accent-ink">{opp.stage}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between py-1">
+                                    <span className="text-muted">{t('modal.g0Score')}:</span>
+                                    <span className="font-mono font-bold text-ink">
+                                      {opp.g0Score !== null && opp.g0Score !== undefined
+                                        ? `${opp.g0Score} / 100`
+                                        : t('modal.g0Unscored')}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Related Modules */}
+                                <div className="bg-ground/50 border border-border rounded-xl p-4 space-y-2.5">
+                                  <div className="text-xs font-bold text-ink">{t('modal.modulesTitle')}</div>
+                                  <div className="grid grid-cols-1 gap-1.5">
+                                    <Link
+                                      href={`/${locale}/${workspace}/pipeline/${opp.id}/concept-note`}
+                                      className="text-xs bg-surface border border-border hover:border-accent hover:text-accent-ink rounded-lg p-2.5 flex items-center justify-between transition font-medium"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span>📝</span>
+                                        <span>{t('modal.conceptNote')}</span>
+                                      </span>
+                                      <span>→</span>
+                                    </Link>
+                                    <Link
+                                      href={`/${locale}/${workspace}/pipeline/${opp.id}/consortium`}
+                                      className="text-xs bg-surface border border-border hover:border-accent hover:text-accent-ink rounded-lg p-2.5 flex items-center justify-between transition font-medium"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span>👥</span>
+                                        <span>{t('modal.consortium')}</span>
+                                      </span>
+                                      <span>→</span>
+                                    </Link>
+                                    <Link
+                                      href={`/${locale}/${workspace}/pipeline/${opp.id}/evaluations`}
+                                      className="text-xs bg-surface border border-border hover:border-accent hover:text-accent-ink rounded-lg p-2.5 flex items-center justify-between transition font-medium"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span>⚖️</span>
+                                        <span>{t('modal.evaluations')}</span>
+                                      </span>
+                                      <span>→</span>
+                                    </Link>
+                                    <Link
+                                      href={`/${locale}/${workspace}/pipeline/${opp.id}/documents`}
+                                      className="text-xs bg-surface border border-border hover:border-accent hover:text-accent-ink rounded-lg p-2.5 flex items-center justify-between transition font-medium"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span>📁</span>
+                                        <span>{t('modal.documents')}</span>
+                                      </span>
+                                      <span>→</span>
+                                    </Link>
+                                    <Link
+                                      href={`/${locale}/${workspace}/pipeline/${opp.id}/application`}
+                                      className="text-xs bg-surface border border-border hover:border-accent hover:text-accent-ink rounded-lg p-2.5 flex items-center justify-between transition font-medium"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span>📑</span>
+                                        <span>{t('modal.application')}</span>
+                                      </span>
+                                      <span>→</span>
+                                    </Link>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-4 border-t border-border bg-ground/50 flex items-center justify-between gap-3 flex-wrap">
+                              <div className="flex items-center gap-3 text-[11px] text-muted">
+                                <span className="bg-surface border border-border px-2 py-0.5 rounded font-mono">
+                                  {t('modal.escHint')}
+                                </span>
+                                <span className="bg-surface border border-border px-2 py-0.5 rounded font-mono">
+                                  {t('modal.enterHint')}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={closeModal}
+                                  className="text-xs px-4 py-2 border border-border rounded-xl hover:bg-surface text-ink-2 font-semibold transition cursor-pointer"
+                                >
+                                  {t('modal.close')}
+                                </button>
+                                <Link
+                                  href={`/${locale}/${workspace}/pipeline/${opp.id}`}
+                                  role="link"
+                                  className="text-xs bg-accent hover:opacity-90 text-white font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-2xs"
+                                >
+                                  <span>{t('modal.openFullPage')}</span>
+                                  <span>→</span>
+                                </Link>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}

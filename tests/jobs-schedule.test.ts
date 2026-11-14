@@ -62,6 +62,8 @@ describe('schedule (ADR-0008 §2)', () => {
       'alerts-ops-digest': '20 * * * *',
       'notifications-retention': '50 3 * * *',
       'evidence-expiring': '20 5 * * *',
+      'notification-email-instant': '*/5 * * * *',
+      'notification-email-weekly': '0 7 * * 1',
     });
   });
 
@@ -81,6 +83,8 @@ describe('schedule (ADR-0008 §2)', () => {
     expect(lines).toContain('55 3 * * * expert-prereg-cleanup ?id=expert-prereg-cleanup&max=5&fill=6h');
     expect(lines).toContain('35 3 * * * m17-text-retention ?id=m17-text-retention&max=5&fill=6h');
     expect(lines).toContain('50 3 * * * notifications-retention ?id=notifications-retention&max=5&fill=6h');
+    expect(lines).toContain('*/5 * * * * notification-email-instant ?id=notification-email-instant&max=3&queue=notification-email');
+    expect(lines).toContain('0 7 * * 1 notification-email-weekly ?id=notification-email-weekly&max=5&fill=1d&queue=notification-email');
     expect(lines).toContain('30 2 * * * k1-topic-match ?id=k1-topic-match&max=5&fill=6h&queue=k1-topic-match');
     expect(lines).toContain('15 2 * * * k1-embeddings ?id=k1-embeddings&max=5&fill=6h&queue=k1-embeddings');
     expect(lines).toContain('0 7 * * * m4-stale-relationships ?id=m4-stale-relationships&max=5&fill=6h&queue=m4-stale-relationships');

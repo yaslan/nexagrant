@@ -1,17 +1,35 @@
 import createMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
 import {routing} from './i18n/routing';
+import {env} from './lib/env';
 import {
   buildContentSecurityPolicy,
   cspHeaderName,
   cordisSandboxPolicy,
   cspOptionsFromEnv,
   generateNonce,
+  hstsHeaderFor,
   isCordisWidgetHostPath,
   isCordisWidgetPath,
 } from './lib/security-headers';
 
 const handleIntl = createMiddleware(routing);
+
+/**
+ * Was this request made over HTTPS? The request URL's scheme first: when Node
+ * itself terminates TLS, that is the truth. Otherwise `x-forwarded-proto`.
+ *
+ * TRUST NOTE (NG-124): on the deployed site the TLS terminates in front of this
+ * process (Hostinger's edge / the VPS Caddy, see deploy/vps/Caddyfile), and that
+ * layer is what sets `x-forwarded-proto`. We trust that header here. Whether
+ * Hostinger's edge sets it on every request is NOT verified yet — it is checked by
+ * the live `curl -sI` run after NG-87. A client can send the header itself, but the
+ * only effect is an HSTS header on a plain-http response, which browsers ignore.
+ */
+function isHttpsRequest(request: NextRequest): boolean {
+  if (request.nextUrl.protocol === 'https:') return true;
+  return request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase() === 'https';
+}
 
 /**
  * A path next-intl must not touch: no locale prefix and a dot in it (`/foo.bar`,
@@ -53,6 +71,8 @@ export function proxy(request: NextRequest) {
     : handleIntl(new NextRequest(request, { headers: requestHeaders }));
   const headerName = cspHeaderName();
   response.headers.set(headerName, csp);
+  const hsts = hstsHeaderFor(env, isHttpsRequest(request));
+  if (hsts) response.headers.set(hsts.key, hsts.value);
   // A report-only `sandbox` is not enforced: the embed also gets an enforced sandbox-only policy.
   if (cordisWidget && headerName !== 'Content-Security-Policy') {
     response.headers.append('Content-Security-Policy', cordisSandboxPolicy());

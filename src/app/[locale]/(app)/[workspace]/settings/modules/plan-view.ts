@@ -2,7 +2,9 @@ import type { TenantTx } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
 import { FALLBACK_PLAN_ID, grantsFor, publicSectorPlan, resolvePlanId } from '@/lib/billing/catalog';
 import { pilotLastDayLabel, pilotStateOf, type PilotSubscriptionRow } from '@/lib/billing/pilot';
-import type { ModuleId } from '@/lib/modules/types';
+import { decideModuleAccess } from '@/lib/modules/tenant-access';
+import { isUnsoldBeta, type ModuleViewer } from '@/lib/modules/state-machine';
+import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
 
 /**
  * What the modules settings page shows and what its action decides on — read
@@ -40,6 +42,11 @@ export interface ModulesPlanView {
   activeModules: ModuleId[];
   /** Switched on in `ModuleState` but outside the plan (left by a downgrade). */
   switchedOnOutsidePlan: ModuleId[];
+  /**
+   * Unsold beta modules (`planTiers: []`, e.g. M18) that `decideModuleAccess` opens
+   * to the viewer at their current status. Empty when no viewer is given.
+   */
+  previewOpen: ModuleId[];
 }
 
 type SubscriptionRow = PilotSubscriptionRow & { planId: string };
@@ -49,7 +56,8 @@ export async function readModulesPlanView(
   tenantId: string,
   tx: TenantTx,
   locale: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  viewer: ModuleViewer | null = null
 ): Promise<ModulesPlanView> {
   // Sequential: the three reads share one interactive transaction.
   const subscription = (await tx.subscription.findUnique({
@@ -59,8 +67,8 @@ export async function readModulesPlanView(
   const entitlements = await getEntitlements(tenantId, tx);
   const states = (await tx.moduleState.findMany({
     where: { tenantId, status: { in: [...SWITCHED_ON_STATUSES] } },
-    select: { moduleId: true },
-  })) as Array<{ moduleId: string }>;
+    select: { moduleId: true, status: true },
+  })) as Array<{ moduleId: string; status: ModuleStatus }>;
 
   // Mirrors getEntitlements' own rule, so the name shown is the plan whose
   // modules are listed.
@@ -86,5 +94,16 @@ export async function readModulesPlanView(
     entitledModules: entitled,
     activeModules: switchedOn.filter((id) => entitled.includes(id)),
     switchedOnOutsidePlan: switchedOn.filter((id) => !entitled.includes(id)),
+    // The same decision the module gate makes (decideModuleAccess), per module the
+    // viewer could open. Only unsold betas can differ from the plan check here.
+    previewOpen: viewer
+      ? states
+          .filter((s) => isUnsoldBeta(s.moduleId as ModuleId))
+          .filter(
+            (s) =>
+              decideModuleAccess(s.moduleId as ModuleId, s.status, entitled, viewer).allowed
+          )
+          .map((s) => s.moduleId as ModuleId)
+      : [],
   };
 }

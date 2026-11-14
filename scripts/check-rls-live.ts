@@ -601,6 +601,10 @@ async function probeIsolation(
  */
 const EXPERT_TABLE = 'ExpertPreRegistration';
 
+/** NG-175: the smallest row the readiness contact form writes (src/lib/leads/public-lead.ts). */
+const PUBLIC_LEAD_INSERT = `insert into ${quoteIdent('PublicLead')} (id, name, email, organisation, "consentVersion", "consentAt", source, locale)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', 'probe', 'probe', now(), 'fon-hazirlik', 'tr')`;
+
 /**
  * FO-45 (TASK-MVC6CTSCLO6LI): ExpertPreRegistration is personal data with no tenant,
  * so the tenant probe above does not reach it. Its contract is the one policy
@@ -608,11 +612,20 @@ const EXPERT_TABLE = 'ExpertPreRegistration';
  * insert; inside `public-intake` every row is visible. Rolled back, nothing is kept.
  * FO-50 (K-568932 = A): ExpertFounderCounter, its founder-number counter, has the
  * same contract and is measured the same way.
+ *
+ * NG-183: this is also THE list of system_scope tables (tables with no tenant whose
+ * one policy is system_scope). main() asks pg_policies that each of them carries
+ * exactly {system_scope}, and fails a catalogue table of that kind missing here.
  */
 const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
   table: string;
   migration: string;
-  insert: (id: string) => [string, unknown[]];
+  /** Null when the row cannot be built (ProvinceLeadRoute with no Tenant to point at). */
+  insert: (id: string, tenantId: string | null) => [string, unknown[]] | null;
+  /** The purpose that must show every row (default 'public-intake'). */
+  purpose?: string;
+  /** The row the read probe adds, when it differs from `insert` (the counter's upsert). */
+  probeRow?: (id: string, tenantId: string | null) => [string, unknown[]] | null;
   /** The measured role must hold no DELETE/TRUNCATE (crw-fb Ö-1: the counter only goes up). */
   noDelete?: boolean;
 }> = [
@@ -626,18 +639,169 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
     ],
   },
   {
+    // NG-175 (SEC NG-170 O-1): the readiness visitor's contact request.
+    table: 'PublicLead',
+    migration: 'public-lead-rls.sql',
+    insert: (id) => [PUBLIC_LEAD_INSERT, [id]],
+  },
+  {
     table: 'ExpertFounderCounter',
     migration: 'add-expert-founder-counter.sql',
     insert: () => [`insert into ${quoteIdent('ExpertFounderCounter')} (id, "lastNumber", "updatedAt") values (1, 0, now())`, []],
+    // One row at most (CHECK id = 1): on a seeded counter the upsert touches updatedAt only.
+    probeRow: () => [
+      `insert into "ExpertFounderCounter" (id, "lastNumber", "updatedAt") values (1, 0, now())
+       on conflict (id) do update set "updatedAt" = excluded."updatedAt"`,
+      [],
+    ],
     noDelete: true,
   },
+  {
+    // FO-26: the per-IP counter of the expert form (pseudonymous personal data).
+    table: 'ExpertPreRegAttempt',
+    migration: 'add-expert-pre-reg-attempt.sql',
+    insert: (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]],
+  },
+  {
+    // NG-167: province -> consultancy map; closed to public-intake (NG-175 D-1).
+    // active = false keeps the probe clear of the one-active-route-per-province index.
+    table: 'ProvinceLeadRoute',
+    migration: 'add-province-lead-route.sql',
+    purpose: 'platform-admin',
+    insert: (id, tenantId) =>
+      tenantId
+        ? [`insert into "ProvinceLeadRoute" (id, province, "targetTenantId", active, "updatedAt") values ($1, 'Bolu', $2, false, now())`, [id, tenantId]]
+        : null,
+  },
 ];
+
+/**
+ * NG-52 (ADR-0009 §9, SEC NG-185 F-3): the one named exception to "exactly {system_scope}".
+ * expert_directory on ExpertPreRegistration, SELECT only, gated on the sealed
+ * 'expert-directory' purpose and on verified rows. The same name on another table, or with
+ * another command, is still drift; and so is any predicate other than the one prisma/rls.sql
+ * writes (SEC NG-185 M3b): the live `qual` must equal, character for character, what
+ * Postgres deparses from rls.sql's own USING expression (`expectedQual`). A substring check
+ * let `… AND ('verified' <> '' OR true) …` through, which keeps every expected fragment and
+ * opens every row. The expected text is compiled by the same server, so the comparison does
+ * not depend on how a Postgres version prints an expression.
+ * prisma/rls.sql's NG-183 block keeps exactly this (table, name, command) and drops the rest.
+ * What the policy shows is measured by probeExpertDirectory.
+ */
+const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string }> = [
+  { table: 'ExpertPreRegistration', policy: 'expert_directory', cmd: 'SELECT' },
+];
+
+/** The USING expression of `CREATE POLICY <policy> ON public."<table>"` in prisma/rls.sql, verbatim. */
+function rlsSqlUsingExpression(sql: string, table: string, policy: string): string | null {
+  const head = `CREATE POLICY ${policy} ON public."${table}"`;
+  const start = sql.indexOf(head);
+  if (start < 0) return null;
+  const end = sql.indexOf(';', start);
+  if (end < 0) return null;
+  const stmt = sql.slice(start + head.length, end);
+  const using = /\bUSING\b/i.exec(stmt);
+  if (!using) return null;
+  return stmt.slice(using.index + using[0].length).trim();
+}
+
+/**
+ * The `qual` Postgres prints for rls.sql's expression, compiled on a temporary copy of the
+ * table (CREATE TEMP TABLE … LIKE) inside a transaction that is rolled back: the real
+ * table is never locked or altered. null (with the reason) when it cannot be compiled.
+ */
+async function expectedQual(
+  client: pg.Client,
+  table: string,
+  policy: string,
+  cmd: string
+): Promise<{ qual: string } | { error: string }> {
+  const expr = rlsSqlUsingExpression(readFileSync(resolve(process.cwd(), 'prisma/rls.sql'), 'utf8'), table, policy);
+  if (!expr) return { error: `prisma/rls.sql içinde ${table}.${policy} USING ifadesi bulunamadı` };
+  const tmp = `rls_verify_expected_${table.toLowerCase()}`;
+  await client.query('begin');
+  try {
+    await client.query(`create temp table ${tmp} (like public."${table}") on commit drop`);
+    await client.query(`create policy ${policy} on pg_temp.${tmp} for ${cmd} using ${expr}`);
+    const r = await client.query<{ qual: string | null }>(
+      `select pg_get_expr(p.polqual, p.polrelid) as qual
+         from pg_policy p
+        where p.polrelid = ('pg_temp.' || $1)::regclass and p.polname = $2`,
+      [tmp, policy]
+    );
+    const qual = r.rows[0]?.qual;
+    return qual ? { qual } : { error: `${table}.${policy}: beklenen qual derlenemedi` };
+  } catch (e) {
+    return { error: `${table}.${policy}: beklenen qual derlenemedi (${e instanceof Error ? e.message.split('\n')[0] : String(e)})` };
+  } finally {
+    await client.query('rollback');
+  }
+}
+
+/** The purpose the read probe writes its row under: opens every SYSTEM_SCOPE_TABLES table (rls.sql system_scope_open). */
+const PROBE_ROW_PURPOSE = 'platform-admin';
+
+/**
+ * NG-183 (NG-175 review Düşük-2): on an empty table "0 rows outside the scope" measured
+ * nothing — a foreign `FOR SELECT USING (true)` policy on an empty PublicLead passed
+ * rls:verify. So before a read is counted, the measured role writes one probe row per
+ * table INSIDE the caller's transaction (under PROBE_ROW_PURPOSE), then closes the scope
+ * again. Its own uncommitted row is visible to it alone, and the caller ROLLS BACK: no
+ * other session ever sees it (the PublicLead forwarder cannot pick it up) and a crashed
+ * run leaves nothing, so live keeps no probe row by construction. `added` = rows the
+ * probe added (0 for a seeded counter, whose upsert only touches updatedAt).
+ */
+async function addProbeRows(
+  m: pg.Client,
+  tables: readonly string[],
+  tenantId: string | null
+): Promise<{ added: Map<string, number>; failures: string[]; checks: string[] }> {
+  const added = new Map<string, number>();
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const count = async (t: string): Promise<number> =>
+    Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(t)}`)).rows[0]?.n ?? -1);
+  await m.query('select enter_system_scope($1)', [PROBE_ROW_PURPOSE]);
+  for (const t of tables) {
+    const spec = SYSTEM_SCOPE_TABLES.find((s) => s.table === t);
+    const row = spec ? (spec.probeRow ?? spec.insert)(`rls-verify-${randomBytes(6).toString('hex')}`, tenantId) : null;
+    if (!spec) {
+      failures.push(`${t}: okuma probu satırı tanımsız (SYSTEM_SCOPE_TABLES) — boş tabloda okuma ölçülemez`);
+      continue;
+    }
+    if (!row) {
+      checks.push(`${t}: okuma probu satırı ATLANDI — veritabanında Tenant yok, satır kurulamıyor`);
+      continue;
+    }
+    const before = await count(t);
+    await m.query('savepoint probe_row');
+    try {
+      await m.query(...row);
+      await m.query('release savepoint probe_row');
+    } catch (e) {
+      await m.query('rollback to savepoint probe_row');
+      failures.push(
+        `${t}: okuma probu satırı ${PROBE_ROW_PURPOSE} kapsamında yazılamadı — ${isRlsViolation(e) ? 'RLS' : e instanceof Error ? e.message.split('\n')[0] : String(e)}`
+      );
+      continue;
+    }
+    const after = await count(t);
+    if (after < 1) failures.push(`${t}: okuma probu satırı yazıldı ama ${PROBE_ROW_PURPOSE} kapsamında görünmüyor`);
+    added.set(t, after - before);
+  }
+  // Close the scope for the rest of the transaction: system_scope_open() needs app.system_scope = 'on'.
+  await m.query(
+    `select set_config('app.system_scope', 'off', true), set_config('app.system_scope_purpose', '', true), set_config('app.system_scope_token', '', true)`
+  );
+  return { added, failures, checks };
+}
 
 async function probeSystemScopeTable(
   m: pg.Client,
   spec: (typeof SYSTEM_SCOPE_TABLES)[number],
   rlsOn: boolean,
-  expectedRows: number
+  expectedRows: number,
+  tenantId: string | null
 ): Promise<{ failures: string[]; checks: string[] }> {
   const failures: string[] = [];
   const checks: string[] = [];
@@ -657,15 +821,20 @@ async function probeSystemScopeTable(
   }
 
   const id = `rls-verify-${randomBytes(6).toString('hex')}`;
-  await m.query('begin');
-  try {
-    await m.query(...spec.insert(id));
-    failures.push(`${table}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
-  } catch (e) {
-    if (isRlsViolation(e)) checks.push(`${table}: sistem kapsamı dışında INSERT reddedildi`);
-    else failures.push(`${table}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
-  } finally {
-    await m.query('rollback');
+  const insert = spec.insert(id, tenantId);
+  if (!insert) {
+    checks.push(`${table}: sistem kapsamı dışında INSERT ölçülmedi — veritabanında Tenant yok`);
+  } else {
+    await m.query('begin');
+    try {
+      await m.query(...insert);
+      failures.push(`${table}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
+    } catch (e) {
+      if (isRlsViolation(e)) checks.push(`${table}: sistem kapsamı dışında INSERT reddedildi`);
+      else failures.push(`${table}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+    } finally {
+      await m.query('rollback');
+    }
   }
 
   if (spec.noDelete) {
@@ -678,14 +847,28 @@ async function probeSystemScopeTable(
     else checks.push(`${table}: ölçüm rolünde DELETE ve TRUNCATE yetkisi yok`);
   }
 
+  // NG-183: the read measured against a real row (addProbeRows), rolled back with the rest.
+  const purpose = spec.purpose ?? 'public-intake';
   await m.query('begin');
   try {
-    await m.query(`select enter_system_scope('public-intake')`);
+    const probe = await addProbeRows(m, [table], tenantId);
+    failures.push(...probe.failures);
+    checks.push(...probe.checks);
+    const n = expectedRows + (probe.added.get(table) ?? 0);
+    const leaked = await count();
+    if (leaked !== 0) {
+      failures.push(
+        `${table}: sistem kapsamı DIŞINDA ${leaked}/${n} satır okunuyor (geri alınan prob satırıyla ölçüldü) — okuma sızıntısı; pg_policies'teki fazla politikaya bak.`
+      );
+    } else if (n > 0) {
+      checks.push(`${table}: okuma probu — sistem kapsamı dışında 0/${n} satır (prob satırı dahil, geri alındı)`);
+    }
+    await m.query('select enter_system_scope($1)', [purpose]);
     const inside = await count();
-    if (inside !== expectedRows) {
-      failures.push(`${table}: sistem kapsamı İÇİNDE ${inside}/${expectedRows} satır görüldü — politika yanlış.`);
+    if (inside !== n) {
+      failures.push(`${table}: sistem kapsamı (${purpose}) İÇİNDE ${inside}/${n} satır görüldü — politika yanlış.`);
     } else {
-      checks.push(`${table}: sistem kapsamı içinde ${inside}/${expectedRows} satır görüldü`);
+      checks.push(`${table}: sistem kapsamı (${purpose}) içinde ${inside}/${n} satır görüldü`);
     }
   } finally {
     await m.query('rollback');
@@ -698,11 +881,11 @@ async function probeSystemScopeTable(
  * opens only PUBLIC_INTAKE_TABLES; every other system_scope table must look
  * exactly as it does outside the scope, and a write there must be refused.
  * The other purposes must still open everything but the expert data they do
- * not handle (FO-92, EXPERT_DATA_PURPOSES). One snapshot for both
+ * not handle (FO-92, NG-175: PURPOSE_NARROWED). One snapshot for both
  * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
  * Everything is rolled back.
  */
-const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt']);
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'PublicLead']);
 
 /**
  * FO-98: one write per PUBLIC_INTAKE_TABLES table, the smallest the form itself
@@ -713,6 +896,8 @@ const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'Exp
  * inside tryInsert's savepoint. A table on the list without a probe here fails.
  */
 const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, params: unknown[]]>([
+  // NG-175: the readiness contact form (src/lib/leads/public-lead.ts submitPublicLead).
+  ['PublicLead', (id) => [PUBLIC_LEAD_INSERT, [id]]],
   [
     EXPERT_TABLE,
     (id) => [
@@ -743,8 +928,18 @@ const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, param
  * for the purposes that handle it; the others read exactly what they read outside
  * the scope (0) and cannot insert there.
  */
-const EXPERT_DATA_TABLES = new Set([EXPERT_TABLE, 'ExpertPreRegAttempt']);
 const EXPERT_DATA_PURPOSES = new Set(['public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']);
+/**
+ * Tables system_scope_open() opens only for some purposes (FO-92; NG-175 for PublicLead = O-1 and
+ * ProvinceLeadRoute = D-1). A purpose off the list reads what it reads outside the scope (0) and
+ * cannot insert (when a write probe exists below).
+ */
+const PURPOSE_NARROWED = new Map<string, ReadonlySet<string>>([
+  [EXPERT_TABLE, EXPERT_DATA_PURPOSES],
+  ['ExpertPreRegAttempt', EXPERT_DATA_PURPOSES],
+  ['PublicLead', new Set(['public-intake', 'platform-admin', 'cross-tenant-job'])],
+  ['ProvinceLeadRoute', new Set(['platform-admin', 'cross-tenant-job'])],
+]);
 
 async function probePurposeTables(
   m: pg.Client,
@@ -796,8 +991,18 @@ async function probePurposeTables(
     await m.query('begin isolation level repeatable read');
   }
   try {
-    const outside = await countAll(m);
     const tenantId = (await m.query<{ id: string }>('select id from "Tenant" order by id limit 1')).rows[0]?.id ?? null;
+    // NG-183: one probe row per system_scope table first, so a closed purpose reads 0 of N
+    // real rows instead of 0 of 0. Visible to this transaction only; rolled back below.
+    const probe = await addProbeRows(
+      m,
+      SYSTEM_SCOPE_TABLES.map((s) => s.table).filter((t) => tables.includes(t)),
+      tenantId
+    );
+    failures.push(...probe.failures);
+    checks.push(...probe.checks);
+    if (truth) for (const [t, n] of probe.added) truth.set(t, (truth.get(t) ?? 0) + n);
+    const outside = await countAll(m);
     const opened = (inside: Map<string, number>) =>
       tables.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
 
@@ -844,21 +1049,38 @@ async function probePurposeTables(
     for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
       await m.query('select enter_system_scope($1)', [purpose]);
       const inside = await countAll(m);
-      const shut = EXPERT_DATA_PURPOSES.has(purpose) ? [] : tables.filter((t) => EXPERT_DATA_TABLES.has(t));
+      const shut = tables.filter((t) => PURPOSE_NARROWED.get(t)?.has(purpose) === false);
       if (shut.length > 0) {
         const seen = shut.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
         if (seen.length > 0) {
-          failures.push(`${purpose}: uzman kişisel verisini görüyor (kapalı olmalı): ${seen.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
+          failures.push(`${purpose}: amacına kapalı tabloyu görüyor (kapalı olmalı): ${seen.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
         } else {
-          checks.push(`${purpose}: ${shut.map((t) => `${t}=${inside.get(t)}${truth ? `/${truth.get(t)}` : ''}`).join(', ')} — uzman verisi kapalı`);
+          checks.push(`${purpose}: ${shut.map((t) => `${t}=${inside.get(t)}${truth ? `/${truth.get(t)}` : ''}`).join(', ')} — amaca kapalı`);
         }
-        const expertWrite = await tryInsert(
-          `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+        const writes: [string, [string, unknown[]]][] = [];
+        const probeId = () => `rls-verify-${randomBytes(6).toString('hex')}`;
+        if (shut.includes(EXPERT_TABLE)) {
+          writes.push([
+            EXPERT_TABLE,
+            [
+              `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
            values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
-          [`rls-verify-${randomBytes(6).toString('hex')}`]
-        );
-        if (expertWrite === 'rls') checks.push(`${purpose}: ${EXPERT_TABLE} INSERT reddedildi`);
-        else failures.push(`${purpose}: ${EXPERT_TABLE} INSERT ${expertWrite === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${expertWrite}`}`);
+              [probeId()],
+            ],
+          ]);
+        }
+        if (shut.includes('PublicLead')) writes.push(['PublicLead', [PUBLIC_LEAD_INSERT, [probeId()]]]);
+        if (shut.includes('ProvinceLeadRoute') && tenantId) {
+          writes.push([
+            'ProvinceLeadRoute',
+            [`insert into "ProvinceLeadRoute" (id, province, "targetTenantId", active, "updatedAt") values ($1, 'Bolu', $2, false, now())`, [probeId(), tenantId]],
+          ]);
+        }
+        for (const [t, [sql, params]] of writes) {
+          const r = await tryInsert(sql, params);
+          if (r === 'rls') checks.push(`${purpose}: ${t} INSERT reddedildi`);
+          else failures.push(`${purpose}: ${t} INSERT ${r === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${r}`}`);
+        }
       }
       const short = (
         truth
@@ -868,12 +1090,144 @@ async function probePurposeTables(
       if (short.length > 0) {
         failures.push(`${purpose}: daraldı, tüm satırları görmüyor: ${short.map((t) => `${t}=${inside.get(t)}`).join(', ')}`);
       } else {
-        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? `, ${shut.length > 0 ? 'uzman verisi dışında ' : ''}her system_scope tablosunda tüm satırlar` : ''}`);
+        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? `, ${shut.length > 0 ? 'amaca kapalı tablolar dışında ' : ''}her system_scope tablosunda tüm satırlar` : ''}`);
       }
     }
     const auditAdmin = await auditInsert(tenantId);
     if (auditAdmin === 'ok') checks.push('cross-tenant-job: AuditEvent INSERT kabul edildi (pozitif kontrol, geri alındı)');
     else failures.push(`cross-tenant-job: AuditEvent INSERT reddedildi — ${auditAdmin === 'rls' ? 'RLS' : auditAdmin}`);
+  } finally {
+    await m.query('rollback');
+    if (admin) await admin.query('rollback');
+  }
+  return { failures, checks };
+}
+
+/**
+ * NG-52 (SEC NG-185 F-4): the purpose 'expert-directory' (M8 matching reads the expert pool).
+ * Its one read is the expert_directory policy (SYSTEM_SCOPE_ALLOWED_EXTRA). Inside the sealed
+ * scope the measured role must see exactly the verified + consented ExpertPreRegistration rows
+ * — none pending or disabled — no row of any other system_scope table beyond what it sees
+ * outside, and it must write nothing: UPDATE and DELETE touch 0 rows, INSERT is refused.
+ * Three probe rows (verified, pending, disabled) are written under PROBE_ROW_PURPOSE first,
+ * so an empty table still measures something. One snapshot with the owner connection for the
+ * expected count; everything is rolled back.
+ */
+const EXPERT_DIRECTORY_PURPOSE = 'expert-directory';
+
+async function probeExpertDirectory(
+  m: pg.Client,
+  admin: pg.Client | null
+): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const p = EXPERT_DIRECTORY_PURPOSE;
+  const tables = (
+    await m.query<{ t: string }>(
+      `select tablename as t from pg_policies where schemaname = 'public' and policyname = 'system_scope' order by 1`
+    )
+  ).rows.map((r) => r.t);
+  const countAll = async (): Promise<Map<string, number>> => {
+    const out = new Map<string, number>();
+    for (const t of tables) {
+      out.set(t, Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(t)}`)).rows[0]?.n ?? -1));
+    }
+    return out;
+  };
+  const byStatus = async (c: pg.Client): Promise<Map<string, number>> => {
+    const { rows } = await c.query<{ s: string; n: number }>(
+      `select case when status = 'verified' and "visibilityConsentAt" is not null then 'listed' else status end as s, count(*)::int as n
+         from ${quoteIdent(EXPERT_TABLE)} group by 1`
+    );
+    return new Map(rows.map((r) => [r.s, r.n]));
+  };
+
+  let expectedListed: number | null = null;
+  if (admin) {
+    await admin.query('begin isolation level repeatable read');
+    const snap = (await admin.query<{ s: string }>('select pg_export_snapshot() as s')).rows[0]!.s;
+    await m.query('begin isolation level repeatable read');
+    await m.query(`set transaction snapshot '${snap.replace(/'/g, "''")}'`);
+    expectedListed = (await byStatus(admin)).get('listed') ?? 0;
+  } else {
+    await m.query('begin isolation level repeatable read');
+  }
+  try {
+    const outside = await countAll();
+    const ids = { verified: '', pending: '', disabled: '' };
+    await m.query('select enter_system_scope($1)', [PROBE_ROW_PURPOSE]);
+    for (const status of ['verified', 'pending', 'disabled'] as const) {
+      const id = `rls-verify-${randomBytes(6).toString('hex')}`;
+      ids[status] = id;
+      await m.query(
+        `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+         values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr', $2)`,
+        [id, status]
+      );
+    }
+    if (expectedListed !== null) expectedListed += 1;
+
+    // A plain SET of the purpose is not the seal: nothing opens.
+    await m.query(
+      `select set_config('app.system_scope', 'on', true), set_config('app.system_scope_purpose', $1, true), set_config('app.system_scope_token', '', true)`,
+      [p]
+    );
+    const forged = Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? -1);
+    if (forged !== 0) failures.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} ${forged} satır okunuyor — mühür uygulanmıyor`);
+    else checks.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} 0 satır`);
+
+    await m.query('select enter_system_scope($1)', [p]);
+    const seen = await byStatus(m);
+    const listed = seen.get('listed') ?? 0;
+    const hidden = [...seen].filter(([s]) => s !== 'listed');
+    if (hidden.length > 0) {
+      failures.push(`${p}: doğrulanmamış/rızasız uzman satırı görünüyor (yalnız verified + rıza açılmalı): ${hidden.map(([s, n]) => `${s}=${n}`).join(', ')}`);
+    } else {
+      checks.push(`${p}: ${EXPERT_TABLE} pending/disabled 0 satır`);
+    }
+    const probeSeen = (
+      await m.query<{ id: string }>(`select id from ${quoteIdent(EXPERT_TABLE)} where id = any($1) order by id`, [Object.values(ids)])
+    ).rows.map((r) => r.id);
+    if (probeSeen.length !== 1 || probeSeen[0] !== ids.verified) {
+      failures.push(`${p}: prob satırlarından görünen ${probeSeen.length}/3 (yalnız verified görünmeli)`);
+    }
+    if (expectedListed !== null && listed !== expectedListed) {
+      failures.push(`${p}: ${EXPERT_TABLE} verified + rızalı ${listed}/${expectedListed} satır görüldü — politika yanlış`);
+    } else if (probeSeen.length === 1 && probeSeen[0] === ids.verified) {
+      checks.push(`${p}: ${EXPERT_TABLE} verified + rızalı ${listed}${expectedListed !== null ? `/${expectedListed}` : ''} satır görüldü (prob satırı dahil, geri alındı)`);
+    }
+
+    const inside = await countAll();
+    const opened = tables.filter((t) => t !== EXPERT_TABLE && (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
+    if (opened.length > 0) {
+      failures.push(`${p}: başka tabloyu açıyor (yalnız ${EXPERT_TABLE} okunmalı): ${opened.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
+    } else {
+      checks.push(`${p}: diğer ${tables.filter((t) => t !== EXPERT_TABLE).length} system_scope tablosunda kapsam dışıyla aynı satır sayısı`);
+    }
+
+    const write = async (sql: string, params: unknown[]): Promise<number | 'rls' | string> => {
+      await m.query('savepoint probe_directory');
+      try {
+        return (await m.query(sql, params)).rowCount ?? 0;
+      } catch (e) {
+        return isRlsViolation(e) ? 'rls' : e instanceof Error ? e.message.split('\n')[0]! : String(e);
+      } finally {
+        await m.query('rollback to savepoint probe_directory');
+      }
+    };
+    const upd = await write(`update ${quoteIdent(EXPERT_TABLE)} set "fullName" = 'rls-verify' where id = any($1)`, [Object.values(ids)]);
+    const del = await write(`delete from ${quoteIdent(EXPERT_TABLE)} where id = any($1)`, [Object.values(ids)]);
+    for (const [verb, r] of [['UPDATE', upd], ['DELETE', del]] as const) {
+      if (r === 0) checks.push(`${p}: ${EXPERT_TABLE} ${verb} 0 satır`);
+      else failures.push(`${p}: ${EXPERT_TABLE} ${verb} ${typeof r === 'number' ? `${r} satır değiştirdi` : `beklenmeyen sonuç — ${r}`} (yalnız okuma olmalı)`);
+    }
+    const ins = await write(
+      `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr', 'verified')`,
+      [`rls-verify-${randomBytes(6).toString('hex')}`]
+    );
+    if (ins === 'rls') checks.push(`${p}: ${EXPERT_TABLE} INSERT reddedildi`);
+    else failures.push(`${p}: ${EXPERT_TABLE} INSERT ${typeof ins === 'number' ?'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${ins}`}`);
   } finally {
     await m.query('rollback');
     if (admin) await admin.query('rollback');
@@ -945,6 +1299,62 @@ async function main() {
       .map((r) => r.tablename)
       .sort();
 
+    // NG-183 (NG-175 review Düşük-1): on a system_scope table the one policy is
+    // system_scope. Policies are permissive and OR together, so any other one — even a
+    // SELECT-only `USING (true)` — opens what system_scope keeps shut, and the probes
+    // above could not see it on an empty table. The set must be exactly {system_scope}.
+    // The class is SYSTEM_SCOPE_TABLES plus any catalogue table carrying system_scope
+    // without a tenant policy (a new one must be added to the list to be probed).
+    const allPolicies = await client.query<{ tablename: string; policyname: string; cmd: string; qual: string | null }>(
+      `select tablename, policyname, cmd, qual from pg_policies where schemaname = 'public' order by tablename, policyname`
+    );
+    const policiesOf = new Map<string, { policyname: string; cmd: string; qual: string | null }[]>();
+    for (const r of allPolicies.rows) policiesOf.set(r.tablename, [...(policiesOf.get(r.tablename) ?? []), r]);
+    const hasTenantPolicy = (t: string) =>
+      (policiesOf.get(t) ?? []).some((p) => p.policyname === 'tenant_isolation' || p.policyname === 'tenant_or_shared');
+    const systemScopeTables = [
+      ...new Set([
+        ...SYSTEM_SCOPE_TABLES.map((s) => s.table).filter((t) => existing.has(t)),
+        ...[...policiesOf.keys()].filter((t) => !hasTenantPolicy(t) && (policiesOf.get(t) ?? []).some((p) => p.policyname === 'system_scope')),
+      ]),
+    ].sort();
+    const policySetDrift: string[] = [];
+    const expectedQuals = new Map<string, string>();
+    for (const a of SYSTEM_SCOPE_ALLOWED_EXTRA) {
+      if (!existing.has(a.table)) continue;
+      const e = await expectedQual(client, a.table, a.policy, a.cmd);
+      if ('qual' in e) expectedQuals.set(`${a.table}.${a.policy}`, e.qual);
+      else policySetDrift.push(e.error);
+    }
+    for (const t of systemScopeTables) {
+      const pols = policiesOf.get(t) ?? [];
+      const allowed = (p: { policyname: string; cmd: string; qual: string | null }) =>
+        SYSTEM_SCOPE_ALLOWED_EXTRA.some(
+          (a) =>
+            a.table === t &&
+            a.policy === p.policyname &&
+            a.cmd === p.cmd &&
+            p.qual !== null &&
+            p.qual === expectedQuals.get(`${a.table}.${a.policy}`)
+        );
+      const extra = pols.filter((p) => p.policyname !== 'system_scope' && !allowed(p));
+      const missing = !pols.some((p) => p.policyname === 'system_scope');
+      if (extra.length > 0 || missing) {
+        policySetDrift.push(
+          `${t}: politika kümesi {${pols.map((p) => p.policyname).join(', ')}}, beklenen tam {system_scope}${
+            SYSTEM_SCOPE_ALLOWED_EXTRA.some((a) => a.table === t)
+              ? ` (+ ${SYSTEM_SCOPE_ALLOWED_EXTRA.filter((a) => a.table === t).map((a) => `${a.policy} (${a.cmd})`).join(', ')})`
+              : ''
+          }${
+            missing ? ' — system_scope YOK' : ''
+          }${extra.length > 0 ? ` — fazla: ${extra.map((p) => `${p.policyname} (${p.cmd})`).join(', ')}` : ''}`
+        );
+      }
+      if (!SYSTEM_SCOPE_TABLES.some((s) => s.table === t)) {
+        policySetDrift.push(`${t}: system_scope tablosu SYSTEM_SCOPE_TABLES listesinde yok — okuma/yazma probu ölçmüyor`);
+      }
+    }
+
     // Supabase's Data API roles (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2): none of
     // the schema owner's functions in public may be callable by them, or
     // /rest/v1/rpc reaches them anonymously. The roles exist only on Supabase;
@@ -1008,6 +1418,9 @@ async function main() {
 
     console.log(`Kiracıya özel model: ${models.length} · RLS açık tablo: ${rlsOn.size} · tenant_isolation politikası: ${hasPolicy.size}`);
     console.log(`RLS açık + 0 politika (deny-all): ${denyAll.rows.length} · RLS kapalı + anon/authenticated erişimi: ${apiOpenTables.length}`);
+    console.log(
+      `system_scope tablosu: ${systemScopeTables.length} (${systemScopeTables.join(', ')}) · politika kümesi {system_scope} olmayan: ${policySetDrift.length}`
+    );
 
     if (missingTable.length > 0) {
       console.log(`\nℹ  Şemada olup veritabanında olmayan tablo (migration bekliyor): ${missingTable.join(', ')}`);
@@ -1071,10 +1484,16 @@ async function main() {
       populated,
       existing.has('AiUsageLog')
     );
+    // The catalogue finding is reported with the behavioural ones, after the probes ran,
+    // so one run shows both the drifted policy set and the read it leaks (NG-183).
+    failures.push(...policySetDrift);
+    const probeTenantId = truth && existing.has('Tenant')
+      ? ((await truth.client.query<{ id: string }>('select id from "Tenant" order by id limit 1')).rows[0]?.id ?? null)
+      : null;
     for (const spec of SYSTEM_SCOPE_TABLES) {
       if (!existing.has(spec.table)) continue;
       const rows = Number((await truth!.client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(spec.table)}`)).rows[0]?.n ?? 0);
-      const probe = await probeSystemScopeTable(measurer.client, spec, rlsOn.has(spec.table), rows);
+      const probe = await probeSystemScopeTable(measurer.client, spec, rlsOn.has(spec.table), rows, probeTenantId);
       failures.push(...probe.failures);
       checks.push(...probe.checks);
     }
@@ -1082,6 +1501,9 @@ async function main() {
       const purposes = await probePurposeTables(measurer.client, truth!.client === measurer.client ? null : truth!.client);
       failures.push(...purposes.failures);
       checks.push(...purposes.checks);
+      const directory = await probeExpertDirectory(measurer.client, truth!.client === measurer.client ? null : truth!.client);
+      failures.push(...directory.failures);
+      checks.push(...directory.checks);
     }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);

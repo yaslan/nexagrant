@@ -37,7 +37,8 @@ beforeEach(({ skip }) => {
 });
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  // NG-180: no database → nothing was connected, so there is nothing to disconnect.
+  if (ready) await prisma.$disconnect();
 });
 
 describe('withTenantLockPool', () => {

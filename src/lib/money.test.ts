@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyPercentDiscount, currencyExponent, formatMoney, formatWholeMoney, lineNetMinor, sameAmount, toDecimalString, toMinorUnits } from './money';
+import { applyPercentDiscount, currencyExponent, formatMinorWhole, formatMoney, formatWholeMoney, isEuroCurrency, lineNetMinor, sameAmount, toDecimalString, toMinorUnits } from './money';
 
 describe('toMinorUnits', () => {
   it('parses provider decimal strings', () => {
@@ -190,5 +190,31 @@ describe('lineNetMinor', () => {
 
   it('refuses a product outside the safe integer range', () => {
     expect(() => lineNetMinor(1e10, Number.MAX_SAFE_INTEGER)).toThrow();
+  });
+});
+
+describe('formatMinorWhole / isEuroCurrency (NG-163)', () => {
+  it('shows a TRY amount with the lira sign and never a euro sign', () => {
+    const tr = formatMinorWhole(2_000_000_000n, 'TRY', 'tr-TR');
+    expect(tr).toContain('₺');
+    expect(tr).not.toContain('€');
+    expect(tr).toContain('20.000.000');
+    const en = formatMinorWhole(2_000_000_000n, 'TRY', 'en-GB');
+    expect(en).toMatch(/₺|TRY/);
+    expect(en).not.toContain('€');
+  });
+
+  it('still renders euro for EUR and rounds half-up to the whole unit', () => {
+    expect(formatMinorWhole(450_000_00n, 'EUR', 'en-GB')).toBe('€450,000');
+    expect(formatMinorWhole(150, 'EUR', 'en-GB')).toBe('€2');
+    expect(formatMinorWhole(149, 'EUR', 'en-GB')).toBe('€1');
+  });
+
+  it('treats unset or blank currency as the historical euro default, nothing else', () => {
+    expect(isEuroCurrency(null)).toBe(true);
+    expect(isEuroCurrency(undefined)).toBe(true);
+    expect(isEuroCurrency(' ')).toBe(true);
+    expect(isEuroCurrency('eur')).toBe(true);
+    expect(isEuroCurrency('TRY')).toBe(false);
   });
 });
