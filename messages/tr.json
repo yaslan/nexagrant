@@ -4048,6 +4048,7 @@
     "picMatchedNotice": "CORDIS kaydı: {name}. Bu kuruluşun geçmişi G0 puanında kullanılır.",
     "picUnmatchedNotice": "PIC kayıtlı, ancak CORDIS'te bu koda ait kayıt bulamadık. Bu kod için geçmiş puanı eklenmez; sahipliği de kontrol edilemedi.",
     "picClearedNotice": "PIC kaldırıldı. G0 puanında koordinatörlük ve ağ geçmişi artık kullanılmaz.",
+    "picMissingNotice": "PIC eksik. G0 puanında koordinatörlük ve ağ geçmişi okunamaz; kurumunuzun 9 haneli PIC kodunu girip kaydedin.",
     "errorForbidden": "Bu işlem için yetkiniz yok",
     "errorInvalid": "Lütfen tüm alanları doğru şekilde doldurun",
     "errorTrlConflict": "Kaydedilmedi. Başka biri TRL aralığını {min}–{max} olarak değiştirdi; girdiğiniz {end, select, min {en düşük TRL değeri {typed}} other {en yüksek TRL değeri {typed}}} bununla çelişiyor. TRL alanları güncel değere döndü, yazdığınız diğer bilgiler duruyor. Kontrol edip yeniden kaydedin.",

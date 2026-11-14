@@ -12,6 +12,7 @@ import { PIC_LOOKUPS_PER_HOUR } from '../../src/lib/pic';
 import { computeG0ForOpportunity, rescoreOpportunityG0 } from '../../src/lib/scoring/g0-compute';
 import { expectHydrated } from './fixtures/hydration';
 import { signInAs } from './fixtures/session';
+import { shotsDir } from './fixtures/shots';
 import {
   PP_ADMIN,
   PP_MEMBER,
@@ -58,6 +59,14 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
   test.afterAll(async () => {
     await teardownProfilePic();
     await prisma.$disconnect();
+  });
+
+  test('an empty PIC shows the missing state', async ({ page }) => {
+    expect(await storedPic(PP_TENANT)).toBeNull();
+    await openProfile(page, PP_OWNER);
+    await expect(input(page)).toHaveValue('');
+    await expect(page.getByTestId('tenant-pic-missing')).toContainText('PIC eksik');
+    await page.getByTestId('tenant-pic-setting').screenshot({ path: `${shotsDir("NG-7-evidence")}/ng-7-pic-missing-state.png` });
   });
 
   test('a malformed PIC is refused and nothing is stored', async ({ page }) => {

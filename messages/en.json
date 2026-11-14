@@ -4048,6 +4048,7 @@
     "picMatchedNotice": "CORDIS record: {name}. This organisation's history is used in the G0 score.",
     "picUnmatchedNotice": "PIC saved, but we found no CORDIS record for this code. No history points are added for it, and its ownership could not be checked.",
     "picClearedNotice": "PIC removed. Coordination and network history is no longer used in the G0 score.",
+    "picMissingNotice": "PIC missing. Coordination and network history cannot be read for the G0 score; enter and save your organisation's 9-digit PIC.",
     "errorForbidden": "You do not have permission to perform this action",
     "errorInvalid": "Please fill all fields correctly",
     "errorTrlConflict": "Not saved. Someone else changed the TRL range to {min}–{max}, which conflicts with the {end, select, min {minimum TRL of {typed}} other {maximum TRL of {typed}}} you entered. The TRL fields now show the current range and everything else you typed is still here. Check it and save again.",
