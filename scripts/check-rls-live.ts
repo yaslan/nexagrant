@@ -601,6 +601,10 @@ async function probeIsolation(
  */
 const EXPERT_TABLE = 'ExpertPreRegistration';
 
+/** NG-175: the smallest row the readiness contact form writes (src/lib/leads/public-lead.ts). */
+const PUBLIC_LEAD_INSERT = `insert into ${quoteIdent('PublicLead')} (id, name, email, organisation, "consentVersion", "consentAt", source, locale)
+       values ($1, 'probe', $1 || '@rls-verify.invalid', 'probe', 'probe', now(), 'fon-hazirlik', 'tr')`;
+
 /**
  * FO-45 (TASK-MVC6CTSCLO6LI): ExpertPreRegistration is personal data with no tenant,
  * so the tenant probe above does not reach it. Its contract is the one policy
@@ -624,6 +628,12 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
        values ($1, 'probe', $2, '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
       [id, `${id}@rls-verify.invalid`],
     ],
+  },
+  {
+    // NG-175 (SEC NG-170 O-1): the readiness visitor's contact request.
+    table: 'PublicLead',
+    migration: 'public-lead-rls.sql',
+    insert: (id) => [PUBLIC_LEAD_INSERT, [id]],
   },
   {
     table: 'ExpertFounderCounter',
@@ -698,11 +708,11 @@ async function probeSystemScopeTable(
  * opens only PUBLIC_INTAKE_TABLES; every other system_scope table must look
  * exactly as it does outside the scope, and a write there must be refused.
  * The other purposes must still open everything but the expert data they do
- * not handle (FO-92, EXPERT_DATA_PURPOSES). One snapshot for both
+ * not handle (FO-92, NG-175: PURPOSE_NARROWED). One snapshot for both
  * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
  * Everything is rolled back.
  */
-const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt']);
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'PublicLead']);
 
 /**
  * FO-98: one write per PUBLIC_INTAKE_TABLES table, the smallest the form itself
@@ -713,6 +723,8 @@ const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'Exp
  * inside tryInsert's savepoint. A table on the list without a probe here fails.
  */
 const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, params: unknown[]]>([
+  // NG-175: the readiness contact form (src/lib/leads/public-lead.ts submitPublicLead).
+  ['PublicLead', (id) => [PUBLIC_LEAD_INSERT, [id]]],
   [
     EXPERT_TABLE,
     (id) => [
@@ -743,8 +755,18 @@ const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, param
  * for the purposes that handle it; the others read exactly what they read outside
  * the scope (0) and cannot insert there.
  */
-const EXPERT_DATA_TABLES = new Set([EXPERT_TABLE, 'ExpertPreRegAttempt']);
 const EXPERT_DATA_PURPOSES = new Set(['public-intake', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']);
+/**
+ * Tables system_scope_open() opens only for some purposes (FO-92; NG-175 for PublicLead = O-1 and
+ * ProvinceLeadRoute = D-1). A purpose off the list reads what it reads outside the scope (0) and
+ * cannot insert (when a write probe exists below).
+ */
+const PURPOSE_NARROWED = new Map<string, ReadonlySet<string>>([
+  [EXPERT_TABLE, EXPERT_DATA_PURPOSES],
+  ['ExpertPreRegAttempt', EXPERT_DATA_PURPOSES],
+  ['PublicLead', new Set(['public-intake', 'platform-admin', 'cross-tenant-job'])],
+  ['ProvinceLeadRoute', new Set(['platform-admin', 'cross-tenant-job'])],
+]);
 
 async function probePurposeTables(
   m: pg.Client,
@@ -844,21 +866,38 @@ async function probePurposeTables(
     for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
       await m.query('select enter_system_scope($1)', [purpose]);
       const inside = await countAll(m);
-      const shut = EXPERT_DATA_PURPOSES.has(purpose) ? [] : tables.filter((t) => EXPERT_DATA_TABLES.has(t));
+      const shut = tables.filter((t) => PURPOSE_NARROWED.get(t)?.has(purpose) === false);
       if (shut.length > 0) {
         const seen = shut.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
         if (seen.length > 0) {
-          failures.push(`${purpose}: uzman kişisel verisini görüyor (kapalı olmalı): ${seen.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
+          failures.push(`${purpose}: amacına kapalı tabloyu görüyor (kapalı olmalı): ${seen.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
         } else {
-          checks.push(`${purpose}: ${shut.map((t) => `${t}=${inside.get(t)}${truth ? `/${truth.get(t)}` : ''}`).join(', ')} — uzman verisi kapalı`);
+          checks.push(`${purpose}: ${shut.map((t) => `${t}=${inside.get(t)}${truth ? `/${truth.get(t)}` : ''}`).join(', ')} — amaca kapalı`);
         }
-        const expertWrite = await tryInsert(
-          `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+        const writes: [string, [string, unknown[]]][] = [];
+        const probeId = () => `rls-verify-${randomBytes(6).toString('hex')}`;
+        if (shut.includes(EXPERT_TABLE)) {
+          writes.push([
+            EXPERT_TABLE,
+            [
+              `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
            values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
-          [`rls-verify-${randomBytes(6).toString('hex')}`]
-        );
-        if (expertWrite === 'rls') checks.push(`${purpose}: ${EXPERT_TABLE} INSERT reddedildi`);
-        else failures.push(`${purpose}: ${EXPERT_TABLE} INSERT ${expertWrite === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${expertWrite}`}`);
+              [probeId()],
+            ],
+          ]);
+        }
+        if (shut.includes('PublicLead')) writes.push(['PublicLead', [PUBLIC_LEAD_INSERT, [probeId()]]]);
+        if (shut.includes('ProvinceLeadRoute') && tenantId) {
+          writes.push([
+            'ProvinceLeadRoute',
+            [`insert into "ProvinceLeadRoute" (id, province, "targetTenantId", active, "updatedAt") values ($1, 'Bolu', $2, false, now())`, [probeId(), tenantId]],
+          ]);
+        }
+        for (const [t, [sql, params]] of writes) {
+          const r = await tryInsert(sql, params);
+          if (r === 'rls') checks.push(`${purpose}: ${t} INSERT reddedildi`);
+          else failures.push(`${purpose}: ${t} INSERT ${r === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${r}`}`);
+        }
       }
       const short = (
         truth
@@ -868,7 +907,7 @@ async function probePurposeTables(
       if (short.length > 0) {
         failures.push(`${purpose}: daraldı, tüm satırları görmüyor: ${short.map((t) => `${t}=${inside.get(t)}`).join(', ')}`);
       } else {
-        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? `, ${shut.length > 0 ? 'uzman verisi dışında ' : ''}her system_scope tablosunda tüm satırlar` : ''}`);
+        checks.push(`${purpose}: ${opened(inside).length} tablo kapsamla açıldı${truth ? `, ${shut.length > 0 ? 'amaca kapalı tablolar dışında ' : ''}her system_scope tablosunda tüm satırlar` : ''}`);
       }
     }
     const auditAdmin = await auditInsert(tenantId);

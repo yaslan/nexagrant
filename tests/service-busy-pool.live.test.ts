@@ -49,7 +49,8 @@ beforeEach(({ skip }) => {
 });
 
 afterAll(async () => {
-  await db.prisma.$disconnect();
+  // NG-180: no database → nothing was connected, so there is nothing to disconnect.
+  if (ready) await db.prisma.$disconnect();
 });
 
 describe('application pool full → SERVICE_BUSY', () => {

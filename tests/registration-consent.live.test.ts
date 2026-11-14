@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 
@@ -31,7 +32,9 @@ const STAMP = Date.now();
 const TENANT_A = `consent-live-a-${STAMP}`;
 const TENANT_B = `consent-live-b-${STAMP}`;
 
-describe('registration disclosure record (live)', () => {
+const HAS_DB = await suiteHasDatabase('registration-consent.live');
+
+describe.skipIf(!HAS_DB)('registration disclosure record (live)', () => {
   let rls: PrismaClient | undefined;
   let ready = false;
   const tenantIds: string[] = [];

@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach, afterAll } from 'vitest';
 
 import { prisma } from '@/lib/db';
+import { databaseReachable } from './helpers/database-availability';
 import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
@@ -36,10 +37,7 @@ vi.mock('@/lib/tenant', () => ({
 
 const { disconnectCalendar } = await import('@/modules/m9/server/calendar-actions');
 
-const dbReachable = await prisma
-  .$queryRaw`SELECT 1`
-  .then(() => true)
-  .catch(() => false);
+const dbReachable = await databaseReachable();
 
 // The ownership check under test is the action's own; over an RLS-subject role
 // the policy would keep the foreign row alive and the test would pass regardless.

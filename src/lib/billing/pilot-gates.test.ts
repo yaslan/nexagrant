@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../../../tests/helpers/database-availability';
 /**
  * TASK-MUMABL78X5JLX — the edges the free pilot runs through, against the real
  * database with only the session faked:
@@ -34,7 +35,9 @@ function memberSession(tenantId: string, extra: Record<string, unknown> = {}) {
   return { user: { id: 'pilot-gate-user', email: 'pilot-gate@example.test' }, tenantId, role: 'TENANT_OWNER', ...extra };
 }
 
-describe('pilot gates', () => {
+const HAS_DB = await suiteHasDatabase('pilot-gates');
+
+describe.skipIf(!HAS_DB)('pilot gates', () => {
   let tenantId: string;
 
   beforeAll(async () => {
