@@ -9,6 +9,11 @@ import type { MatchBreakdown } from '@/modules/m8/server/matching';
 import { seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
 import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
+import { expertCandidatesForOpportunity, type ExpertSeatResult } from '@/modules/m8/server/expert-candidates';
+import { listDirectoryExperts } from '@/lib/expert-prereg/server/directory';
+import { PROVINCES } from '@/lib/expert-prereg/options';
+import { logger } from '@/lib/logger';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * M8 consortium role matrix.
@@ -70,6 +75,7 @@ export default async function MatchingPage({
   if (locked) return locked;
   const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const t = await getTranslations({ locale, namespace: 'Consortium' });
+  const tExpert = await getTranslations({ locale, namespace: 'ExpertPrereg' });
   const format = await getFormatter({ locale });
 
   // Everything below is read inside the session tenant. The page used to load
@@ -138,6 +144,20 @@ export default async function MatchingPage({
   const partnerGraphSize = await withTenant<number>(tenantId, (tx) =>
     tx.cordisOrganization.count()
   );
+
+  // NG-52: the free expert pre-registrations as seat candidates (K-579696 = A). Shown, not
+  // persisted or invitable. A failed read (e.g. prisma/rls.sql not yet applied, so the
+  // database refuses the 'expert-directory' purpose) hides the section, not the page.
+  let expertsBySeat: Map<string, ExpertSeatResult> | null = null;
+  try {
+    const experts = await listDirectoryExperts();
+    expertsBySeat = await withTenant<Map<string, ExpertSeatResult>>(tenantId, (tx) =>
+      expertCandidatesForOpportunity(tx, { opportunityId: opp.id, tenantId, experts })
+    );
+  } catch (e) {
+    logger.error(`[MatchingPage] expert pool read failed: ${errorMessage(e)}`);
+  }
+  const provinceName = new Map<string, string>(PROVINCES.map((p) => [p.value, p.name]));
 
   return (
     <div className="py-6 sm:px-6 max-w-6xl mx-auto space-y-8">
@@ -250,6 +270,56 @@ export default async function MatchingPage({
                     </tbody>
                   </table>
                 </div>
+              )}
+
+              {seat.status !== 'CONFIRMED' && (
+                <section data-testid={`m8-expert-pool-${seat.roleKey}`} className="mt-4 border-t border-border pt-4">
+                  <h3 className="text-sm font-semibold">{t('expertPool.title')}</h3>
+                  <p className="text-xs text-muted mb-2">{t('expertPool.note')}</p>
+                  {(() => {
+                    if (!expertsBySeat) return <p className="text-sm text-muted">{t('expertPool.unavailable')}</p>;
+                    const result = expertsBySeat.get(seat.id);
+                    const matches = result?.matches ?? [];
+                    const excluded = result?.excludedByMinimumPartners ?? 0;
+                    return (
+                      <>
+                        {matches.length === 0 && excluded > 0 ? (
+                          // CRW NG-186 bulgu 5: experts do match the seat; the filter left none. Say why.
+                          <p className="text-sm text-amber-800 dark:text-amber-300" data-testid="m8-expert-none-filtered">
+                            {t('expertPool.noneFiltered', { count: excluded })}
+                          </p>
+                        ) : matches.length === 0 ? (
+                          <p className="text-sm text-muted" data-testid="m8-expert-none">{t('expertPool.none')}</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {matches.map((m) => (
+                              <li key={m.expert.id} data-testid="m8-expert-candidate" className="text-sm border border-border rounded-md px-3 py-2">
+                                <div className="font-semibold">
+                                  {m.expert.founderNumber !== null
+                                    ? t('expertPool.expert', { number: m.expert.founderNumber })
+                                    : t('expertPool.expertUnnumbered')}
+                                </div>
+                                <div className="text-xs text-muted">
+                                  {t('expertPool.province')}: {provinceName.get(m.expert.province) ?? m.expert.province}
+                                  {' | '}
+                                  {t('expertPool.programme')}: {tExpert(`options.programmes.${m.matchedProgramme}` as 'options.programmes.other')}
+                                  {' | '}
+                                  {t('expertPool.roles')}:{' '}
+                                  {m.matchedRoles.map((r) => tExpert(`options.roles.${r}` as 'options.roles.other')).join(', ')}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {matches.length > 0 && excluded > 0 && (
+                          <p className="text-xs text-amber-800 dark:text-amber-300 mt-2" data-testid="m8-expert-excluded">
+                            {t('expertPool.excluded', { count: excluded })}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </section>
               )}
             </div>
           );

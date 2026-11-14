@@ -36,7 +36,7 @@ import { logger } from '@/lib/logger';
  *   await withSystemScope('platform-aggregate', 'plan-repository.countLive',
  *     (tx) => tx.subscription.count({ where: { status: 'ACTIVE' } }))
  *
- * `purpose` is one of five values, matching the classes the baseline already
+ * `purpose` is one of SYSTEM_SCOPE_PURPOSES, matching the classes the baseline already
  * uses. `context` names the call site and travels into the log line, so a
  * cross-tenant read is attributable after the fact rather than anonymous.
  *
@@ -119,6 +119,13 @@ export const SYSTEM_SCOPE_PURPOSES = [
    * 'cross-tenant-job' (NG-175).
    */
   'public-intake',
+  /**
+   * A tenant's M8 candidate query reading the expert pool as a directory (NG-52). The
+   * database opens one thing for it: SELECT on ExpertPreRegistration rows that are verified
+   * and carry the visibility consent (prisma/rls.sql, policy expert_directory). Every other
+   * table reads 0 rows and refuses writes; so does every write to that table.
+   */
+  'expert-directory',
 ] as const;
 
 export type SystemScopePurpose = (typeof SYSTEM_SCOPE_PURPOSES)[number];

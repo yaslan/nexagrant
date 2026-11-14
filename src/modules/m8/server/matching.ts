@@ -3,6 +3,7 @@ import { isPresentId } from '@/lib/required-id';
 import { MATCH_DIMENSION_SCALE } from '@/lib/scoring/seat-dimension-scale';
 import { normalizeSeatScore } from '@/lib/scoring/seat-score';
 import { SeatNotFoundError } from './errors';
+import { minimumPartnerState, passesMinimumPartnerFilter, readMinimumPartnerRule } from './minimum-partners';
 
 /**
  * M8 seat matching — ranked partner candidates for one open consortium seat.
@@ -153,6 +154,38 @@ const CANDIDATE_POOL = 100;
 interface SeatRow {
   status: string;
   organizationId: string | null;
+  partnerOrgId?: string | null;
+}
+
+/**
+ * The countries the consortium already holds: every CONFIRMED seat, whether it is filled
+ * by a CORDIS organisation (`organizationId` → CordisOrganization.country) or by the
+ * tenant's own partner record (`partnerOrgId` → PartnerOrg.country, tenant-scoped).
+ * CRW NG-186 bulgu 3: counting CORDIS seats alone overstated the country shortfall and
+ * dropped candidates the consortium no longer needed to be new. One lookup for the CORDIS
+ * matcher and the expert pool (expert-candidates.ts), so both count the same countries.
+ */
+export async function confirmedSeatCountries(
+  tx: Pick<TenantTx, 'cordisOrganization' | 'partnerOrg'>,
+  seats: readonly SeatRow[],
+  tenantId: string
+): Promise<Set<string>> {
+  const confirmed = seats.filter((s) => s.status === 'CONFIRMED');
+  const orgIds = [...new Set(confirmed.map((s) => s.organizationId).filter((id): id is string => Boolean(id)))];
+  const partnerIds = [
+    ...new Set(confirmed.filter((s) => !s.organizationId).map((s) => s.partnerOrgId).filter((id): id is string => Boolean(id))),
+  ];
+  const cordis: { country: string | null }[] = orgIds.length
+    ? await tx.cordisOrganization.findMany({ where: { organisationId: { in: orgIds } }, select: { country: true } })
+    : [];
+  const partners: { country: string | null }[] = partnerIds.length
+    ? await tx.partnerOrg.findMany({ where: { id: { in: partnerIds }, tenantId }, select: { country: true } })
+    : [];
+  return new Set(
+    [...cordis.map((o) => o.country), ...partners.map((o) => o.country?.trim().toUpperCase() ?? null)].filter(
+      (c): c is string => Boolean(c)
+    )
+  );
 }
 
 /**
@@ -164,11 +197,12 @@ interface SeatRow {
 export async function findOpportunityTopic(
   tx: Pick<TenantTx, 'topic'>,
   topicId: string | null | undefined
-): Promise<{ identifier: string; callId: string | null } | null> {
+): Promise<{ identifier: string; callId: string | null; eligibility?: unknown } | null> {
   if (!topicId) return null;
+  // `eligibility` carries the call's minimum-partner threshold (NG-52, minimum-partners.ts).
   return tx.topic.findFirst({
     where: { OR: [{ id: topicId }, { identifier: topicId }] },
-    select: { identifier: true, callId: true },
+    select: { identifier: true, callId: true, eligibility: true },
   });
 }
 
@@ -193,7 +227,7 @@ export async function runSeatMatch(
     select: {
       id: true,
       topicId: true,
-      seats: { select: { status: true, organizationId: true } },
+      seats: { select: { status: true, organizationId: true, partnerOrgId: true } },
     },
   });
   if (!opp) throw new SeatNotFoundError(`Opportunity ${opportunityId} not found in this workspace.`);
@@ -246,34 +280,47 @@ export async function runSeatMatch(
   }
 
   const confirmed = new Set(confirmedOrgIds);
-  const pool = [...experience.entries()]
+  const ranked = [...experience.entries()]
     // Already on the consortium — not a candidate for another seat.
     .filter(([orgId]) => !confirmed.has(orgId))
     // A coordinator seat needs someone who has coordinated before.
     .filter(([, e]) => seat.roleKey !== 'coordinator' || e.coordinatorCount >= 1)
-    .sort((a, b) => b[1].participationCount - a[1].participationCount)
-    .slice(0, CANDIDATE_POOL);
+    .sort((a, b) => b[1].participationCount - a[1].participationCount);
+
+  const takenCountries = await confirmedSeatCountries(tx, opp.seats as SeatRow[], tenantId);
+
+  // NG-52: the minimum-partner pre-filter (specification §6 l.103), threshold from the
+  // call. A candidate that cannot get the consortium to the call's country minimum is
+  // dropped before scoring; with no threshold on the call nothing is dropped. It runs
+  // BEFORE the pool is cut to CANDIDATE_POOL (CRW NG-186 bulgu 4): cut first, and the
+  // dropped ones were never replaced by the eligible organisations ranked below them.
+  const minimumPartners = minimumPartnerState(
+    readMinimumPartnerRule(topic?.eligibility),
+    (opp.seats as SeatRow[]).map((s) => s.status),
+    takenCountries
+  );
+  const countryOf = new Map<string, string | null>();
+  let eligible = ranked;
+  if (minimumPartners.requiresNewCountry && ranked.length) {
+    const rankedOrgs: { organisationId: string; country: string | null }[] = await tx.cordisOrganization.findMany({
+      where: { organisationId: { in: ranked.map(([orgId]) => orgId) } },
+      select: { organisationId: true, country: true },
+    });
+    for (const o of rankedOrgs) countryOf.set(o.organisationId, o.country);
+    eligible = ranked.filter(([orgId]) => passesMinimumPartnerFilter(countryOf.get(orgId) ?? null, minimumPartners));
+  }
+  const pool = eligible.slice(0, CANDIDATE_POOL);
   const poolIds = pool.map(([orgId]) => orgId);
   const poolSet = new Set(poolIds);
 
-  // ── Countries, for geographic balance.
-  const poolOrgs: { organisationId: string; country: string | null }[] = poolIds.length
-    ? await tx.cordisOrganization.findMany({
-        where: { organisationId: { in: poolIds } },
-        select: { organisationId: true, country: true },
-      })
-    : [];
-  const countryOf = new Map(poolOrgs.map((o) => [o.organisationId, o.country]));
-
-  const confirmedOrgs: { country: string | null }[] = confirmedOrgIds.length
-    ? await tx.cordisOrganization.findMany({
-        where: { organisationId: { in: confirmedOrgIds } },
-        select: { country: true },
-      })
-    : [];
-  const takenCountries = new Set(
-    confirmedOrgs.map((o) => o.country).filter((c): c is string => Boolean(c))
-  );
+  // ── Countries, for geographic balance (already read when the filter ran).
+  if (countryOf.size === 0 && poolIds.length) {
+    const poolOrgs: { organisationId: string; country: string | null }[] = await tx.cordisOrganization.findMany({
+      where: { organisationId: { in: poolIds } },
+      select: { organisationId: true, country: true },
+    });
+    for (const o of poolOrgs) countryOf.set(o.organisationId, o.country);
+  }
 
   // ── Co-participation edges with the confirmed partners, for collaboration
   // history. The importer stores each edge once under `orgA < orgB`

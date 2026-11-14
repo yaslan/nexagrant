@@ -412,6 +412,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/expert-prereg/server/directory.ts",
+      "subject": "system-scope:expert-directory",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "expert-directory",
+      "reason": "NG-52: the verified expert pre-registrations M8 offers as seat candidates (K-579696 = A, free pre-registration). The pool belongs to no tenant. Purpose expert-directory opens only the expert_directory SELECT policy (verified + visibility consent) on ExpertPreRegistration and no other table; the select carries no name, e-mail, organisation or contact column."
+    },
+    {
+      "check": "D",
       "file": "src/lib/expert-prereg/server/retention.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
