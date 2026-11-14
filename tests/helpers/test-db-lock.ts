@@ -91,3 +91,12 @@ export const M17_INTERREG_TEXT_PURGE_LOCK = 'M17:interreg-text-purge';
  * hold this for their whole file.
  */
 export const NOTIFICATION_OUTBOX_LOCK = 'NotificationEmailItem:outbox';
+
+/**
+ * NG-52: rls-verify-system-scope-policy-set.live replaces the expert_directory policy on
+ * "ExpertPreRegistration" for one rls:verify run (`TO pg_monitor`), so fabrika_app reads 0
+ * directory rows on that database meanwhile. system-scope.live's expert-directory read
+ * (`expected [] to deeply equal [{ id }]` when it lands in that window) holds this around its
+ * read, the policy-set test around replace -> restore.
+ */
+export const EXPERT_DIRECTORY_POLICY_LOCK = 'ExpertPreRegistration:expert_directory';

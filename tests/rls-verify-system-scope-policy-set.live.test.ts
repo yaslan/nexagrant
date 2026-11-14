@@ -6,6 +6,7 @@ import pg from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { envValue } from './helpers/dotenv';
 import { isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
  * NG-183 (NG-175 review Düşük-1) — on a system_scope table (system_scope policy, no tenant
@@ -24,7 +25,8 @@ import { isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
  * while they exist, and each test drops its own (named with a RUN id). rls:verify rolls back
  * every probe. The expert_directory test (NG-52) replaces that one policy for the length of one
  * rls:verify run, so M8's expert pool reads 0 rows on that database meanwhile, and restores it
- * from prisma/rls.sql in `finally`. Only the NG-183 block runs, not the whole rls.sql, so no other table's policies
+ * from prisma/rls.sql in `finally`, under EXPERT_DIRECTORY_POLICY_LOCK (system-scope.live's
+ * directory read takes the same lock). Only the NG-183 block runs, not the whole rls.sql, so no other table's policies
  * are rebuilt under a parallel suite. DDL, so local databases only (isLocalDbUrl).
  */
 const SUITE = 'rls:verify system_scope policy set live test';
@@ -113,24 +115,27 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
 
   it('rls:verify --require-db exits 1 when expert_directory keeps its name but loses the verified-row predicate', async () => {
     // NG-52: the exception is the policy as written, not its name. Restored from rls.sql below.
-    try {
-      await admin.query(`drop policy expert_directory on "ExpertPreRegistration"`);
-      await admin.query(`create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (true)`);
-      const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
-        cwd: REPO,
-        env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
-        encoding: 'utf8',
-        timeout: 170_000,
-      });
-      const out = `${run.stdout}${run.stderr}`;
-      expect(run.status, out.slice(-2000)).toBe(1);
-      expect(out).toContain('ExpertPreRegistration: politika kümesi {expert_directory, system_scope}');
-      expect(out).toContain('— fazla: expert_directory (SELECT)');
-      // While it is replaced the real reader sees 0 directory rows; the probe reports that too.
-      expect(out).toContain('expert-directory: ExpertPreRegistration verified + rızalı 0/');
-    } finally {
-      await admin.query(expertDirectoryPolicy());
-    }
+    // Under EXPERT_DIRECTORY_POLICY_LOCK, so system-scope.live's directory read never lands in the window.
+    await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
+      try {
+        await admin.query(`drop policy expert_directory on "ExpertPreRegistration"`);
+        await admin.query(`create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (true)`);
+        const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
+          cwd: REPO,
+          env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
+          encoding: 'utf8',
+          timeout: 170_000,
+        });
+        const out = `${run.stdout}${run.stderr}`;
+        expect(run.status, out.slice(-2000)).toBe(1);
+        expect(out).toContain('ExpertPreRegistration: politika kümesi {expert_directory, system_scope}');
+        expect(out).toContain('— fazla: expert_directory (SELECT)');
+        // While it is replaced the real reader sees 0 directory rows; the probe reports that too.
+        expect(out).toContain('expert-directory: ExpertPreRegistration verified + rızalı 0/');
+      } finally {
+        await admin.query(expertDirectoryPolicy());
+      }
+    });
   }, 180_000);
 
   it('the NG-183 block of prisma/rls.sql drops stray policies on system_scope tables only', async () => {
