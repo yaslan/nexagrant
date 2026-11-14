@@ -29,6 +29,8 @@ export const WORKSPACE_ROUTE_CATALOG = [
   'modules/post-award',
   'modules/tr-layer',
   'musteri-hatti',
+  'musteri-hatti/duplicates',
+  'musteri-hatti/import',
   'musteri-hatti/leads',
   'musteri-hatti/leads/[id]',
   'musteri-hatti/pipeline',

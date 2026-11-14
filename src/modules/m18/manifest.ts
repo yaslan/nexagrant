@@ -33,12 +33,16 @@ export const m18Manifest: ModuleManifest = {
   addOnSku: null,
   routes: [
     { path: 'musteri-hatti' },
+    { path: 'musteri-hatti/duplicates' },
+    { path: 'musteri-hatti/import' },
     { path: 'musteri-hatti/leads' },
     { path: 'musteri-hatti/leads/[id]' },
     { path: 'musteri-hatti/pipeline' },
     { path: 'musteri-hatti/tasks' },
   ],
-  nav: [],
+  // Sidebar entry "Müşteri Satış Hattı". Visibility is still decided by `canAccessStatus`
+  // through `listModuleNav`: at DEV/PILOT only the allowed audience sees it.
+  nav: [{ labelKey: 'clientPipeline', routeKey: 'clientPipeline', order: 55 }],
   permissions: [
     { id: 'client-pipeline:read', minRole: Role.MEMBER },
     { id: 'client-pipeline:write', minRole: Role.WRITER },

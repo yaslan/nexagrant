@@ -40,6 +40,7 @@ export type WorkspaceRouteKey =
   | 'approvals'
   | 'tto'
   | 'interregReview'
+  | 'clientPipeline'
   | 'notifications'
   | 'settingsProfile'
   | 'settingsModules'
@@ -143,6 +144,8 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/tto-hizlandirici` : `/${locale}/${workspace}/tto`;
     case 'interregReview':
       return `/${locale}/${workspace}/modules/interreg-review`;
+    case 'clientPipeline':
+      return `/${locale}/${workspace}/musteri-hatti`;
     case 'notifications':
       return isTr ? `/${locale}/${workspace}/bildirimler` : `/${locale}/${workspace}/notifications`;
     case 'settingsProfile':
@@ -215,6 +218,7 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
     'tto-hizlandirici': 'tto', 'tto': 'tto',
     'bildirimler': 'notifications', 'notifications': 'notifications',
     'ayarlar': 'settingsModules', 'settings': 'settingsModules',
+    'musteri-hatti': 'clientPipeline',
   };
 
   const thirdSegment = segments[2];
