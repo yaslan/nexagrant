@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../helpers/database-availability';
 /**
  * TASK-MUMH6W5I1W9WC — the modules settings page and its action read plan and
  * module state from real entitlements, against the real database with only the
@@ -33,6 +34,8 @@ const view = (tenantId: string) => withTenant(tenantId, (tx) => readModulesPlanV
 const moduleRow = (tenantId: string, moduleId: string) =>
   prisma.moduleState.findUnique({ where: { tenantId_moduleId: { tenantId, moduleId } } });
 
+const HAS_DB = await suiteHasDatabase('modules/settings-modules-plan');
+
 describe('canEnableEntitled', () => {
   it('refuses a module outside the entitlement list and checks dependencies inside it', () => {
     expect(canEnableEntitled('M1', [], ['M3', 'M5'])).toMatchObject({ allowed: false, reason: 'Plan upgrade required.' });
@@ -42,7 +45,7 @@ describe('canEnableEntitled', () => {
   });
 });
 
-describe('modules settings — plan and state from entitlements', () => {
+describe.skipIf(!HAS_DB)('modules settings — plan and state from entitlements', () => {
   let tenantId: string;
 
   beforeAll(async () => {

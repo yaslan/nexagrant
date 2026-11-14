@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@/lib/db';
+import { databaseReachable } from './helpers/database-availability';
 import { RESEND_COOLDOWN_MS, REGISTRATION_IP_LIMIT, VERIFY_TOKEN_TTL_MS } from '@/lib/expert-prereg/server/constants';
 import { hashExpertIp, registerExpertPreRegistration } from '@/lib/expert-prereg/server/register';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
@@ -25,7 +26,7 @@ const RUN = Date.now();
 const T0 = new Date(RUN);
 const T_EXPIRED = new Date(RUN + VERIFY_TOKEN_TTL_MS + 60_000);
 
-const reachable = await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false);
+const reachable = await databaseReachable();
 
 function email(tag: string) {
   return `${PREFIX}${tag}-${RUN}@example.org`;
