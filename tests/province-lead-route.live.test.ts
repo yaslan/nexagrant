@@ -38,11 +38,14 @@ import { createLeadIntakePort } from '@/modules/m18/server/intake-repo';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 const SUITE = 'province lead route test';
-const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
+// No fallback address: without OWNER_URL the suite skips (loudly) instead of guessing credentials.
+const admin = createDbClient(OWNER_URL ?? 'postgresql://localhost:5432/unset');
 const HAS_DB =
   requireRlsTestUrl(RLS_URL, SUITE) !== undefined &&
+  OWNER_URL !== undefined &&
   (await admin.$queryRaw`SELECT 1`.then(() => true).catch(() => false));
-if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
+if (RLS_URL && !OWNER_URL) skipOrFailInCi(SUITE, 'DATABASE_URL (owner connection) is not set', 'Provide DATABASE_URL for the fixture/owner connection.');
+else if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = Math.random().toString(36).slice(2, 10);
