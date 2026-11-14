@@ -23,8 +23,9 @@ import { renderNotification, type NotificationTranslator } from './render';
  * notifications-retention deletes sent rows after the retention window.
  * A failed send leaves its items unsent, so the next run sends them again: at
  * least once, never silently dropped. A failed MARK after an accepted send is
- * counted in `failures` and the run goes on; that mail goes again next run
- * (the same at-least-once). An item whose recipient is no longer a live member
+ * counted in `failures` and the run goes on; that mail goes again once its
+ * claim's lease expires (CLAIM_LEASE_MS, 15 min), not at the next run (the
+ * same at-least-once). An item whose recipient is no longer a live member
  * of the tenant is deleted unsent (an address of a person who left must not
  * keep getting mail).
  *
@@ -34,7 +35,9 @@ import { renderNotification, type NotificationTranslator } from './render';
  * another is mid-send finds them claimed and skips them, so a recipient gets one
  * mail however many runs overlap (a manual run beside the cron, two workers, a
  * retry of a slow tick). A failed send releases the claim; a run that died
- * leaves one that expires after the lease.
+ * leaves one that expires after the lease. Before every batch's SMTP call the
+ * run renews its claim (claimedAt); a batch whose claim is gone (the lease
+ * expired and another run took the rows) is not mailed (`claimLost`).
  *
  * The text is rendered here, in the recipient's locale, with the same
  * `renderNotification` the bell uses: the outbox stores type + payload only.
@@ -96,6 +99,8 @@ export interface SendEmailsResult {
   itemsSent: number;
   itemsDropped: number;
   failures: number;
+  /** Batches not mailed because this run's claim was lost (lease expired, another run took the rows). */
+  claimLost: number;
 }
 
 export interface SendEmailsOptions {
@@ -133,6 +138,7 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     itemsSent: 0,
     itemsDropped: 0,
     failures: 0,
+    claimLost: 0,
   };
 
   const recipients = await systemScope((tx) => pendingRecipients(tx, options.mode, now));
@@ -183,6 +189,20 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     const batches: OutboxItem[][] = options.mode === 'WEEKLY' ? [items] : items.map((i) => [i]);
     for (const batch of batches) {
       const mail = options.mode === 'WEEKLY' ? renderDigestMail(batch, t) : renderInstantMail(batch[0]!, t);
+      const ids = batch.map((i) => i.id);
+      // Renew the lease before the SMTP call: a long run (slow SMTP, many
+      // batches) must not outlive its claim, or another run takes the rows and
+      // mails them again. A short count means the claim was lost: not mailed.
+      const renewed = await runTenant(tenantId, (tx) =>
+        tx.notificationEmailItem.updateMany({
+          where: { tenantId, userId, id: { in: ids }, sentAt: null, claimToken: token },
+          data: { claimedAt: new Date() },
+        })
+      );
+      if (renewed.count !== ids.length) {
+        result.claimLost++;
+        continue;
+      }
       try {
         await options.mailer({ to: member.user.email, ...mail });
       } catch (error) {
@@ -205,7 +225,6 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
       }
       result.mailsSent++;
       result.itemsSent += batch.length;
-      const ids = batch.map((i) => i.id);
       try {
         // Non-null columns of the rows read above; asserted so the write can
         // never lose its filter (tests/where-guard-src.test.ts).
@@ -213,7 +232,7 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         requireActionId(userId, 'userId');
         await runTenant(tenantId, (tx) =>
           tx.notificationEmailItem.updateMany({
-            where: { tenantId, userId, id: { in: ids }, sentAt: null },
+            where: { tenantId, userId, id: { in: ids }, sentAt: null, claimToken: token },
             data: { sentAt: new Date() },
           })
         );

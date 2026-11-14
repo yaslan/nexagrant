@@ -258,4 +258,47 @@ describe('two overlapping runs mail a recipient once (NG-131)', () => {
     expect(mine(box.sent, a)).toHaveLength(0);
     expect(await queued(a)).toBe(1);
   });
+
+  test('a lease lost between two batches: the second batch is not mailed (NG-164)', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const e = await makeScope('e');
+    await queueFor(e, 'INSTANT', 2);
+    const tenantId = requireId(e.tenantId, 'tenantId');
+    const userId = requireId(e.userId, 'userId');
+
+    // Run 1 claims both items, then mails item 1. While its SMTP call is in
+    // flight, run 1's lease on item 2 expires (the clock has moved on past the
+    // lease) and run 2 takes item 2 over and mails it. Run 1 must not mail item 2
+    // a second time: the lease renewal before its second batch finds the claim
+    // gone and skips it.
+    const k1Sent: MailMessage[] = [];
+    const k2 = inbox();
+    let k2Result: Awaited<ReturnType<typeof run>> | undefined;
+    let stolen = false;
+    const k1Mailer = async (m: MailMessage) => {
+      k1Sent.push(m);
+      if (stolen) return;
+      stolen = true;
+      const [second] = await admin!.notificationEmailItem.findMany({
+        where: { tenantId, userId, sentAt: null },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+        skip: 1,
+        take: 1,
+      });
+      await admin!.notificationEmailItem.updateMany({
+        where: { id: requireId(second?.id, 'second item id') },
+        data: { claimedAt: new Date(Date.now() - outbox.CLAIM_LEASE_MS - 60_000) },
+      });
+      k2Result = await run('INSTANT', k2.mailer);
+    };
+
+    const r1 = await run('INSTANT', k1Mailer);
+    console.log('LEASE-LOSS run1', JSON.stringify(r1), 'run2', JSON.stringify(k2Result));
+
+    expect(mine(k1Sent, e)).toHaveLength(1);
+    expect(mine(k2.sent, e)).toHaveLength(1);
+    expect(await queued(e)).toBe(0);
+    expect(r1.claimLost).toBe(1);
+  });
 });
