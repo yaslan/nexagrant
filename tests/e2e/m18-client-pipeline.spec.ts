@@ -28,6 +28,16 @@ const ORG_NAME = `M18 E2E Kurum ${RUN}`;
 const DEAL_TITLE = `M18 E2E Fırsat ${RUN}`;
 const TASK_TITLE = `M18 E2E Görev ${RUN}`;
 const LOST_REASON = `Bütçe yetersiz ${RUN}`;
+const IMPORT_ROWS = 1000;
+const BULK_PREFIX = `M18 E2E Toplu ${RUN}`;
+const MERGE_NAME = `M18 E2E Birleşme ${RUN}`;
+const MERGE_DEAL_TITLE = `M18 E2E Birleşme Fırsatı ${RUN}`;
+/** Fills `{key}` placeholders of a message template. */
+const fmt = (tpl: string, vars: Record<string, number | string>) =>
+  Object.entries(vars).reduce((out, [k, v]) => out.replace(`{${k}}`, String(v)), tpl);
+/** Matches a message template with `{count}` read as any number, e.g. "İçe aktar ({count})". */
+const submitRe = (tpl: string) =>
+  new RegExp(`^${tpl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('\\{count\\}', '\\d+')}$`);
 
 const gate = (page: Page) => page.locator('section[role="alert"]');
 
@@ -44,6 +54,10 @@ async function signIn(page: Page) {
 }
 
 test.describe.configure({ mode: 'serial' });
+
+test.beforeEach(({ page }) => {
+  page.on('pageerror', (err) => console.log(`[NG-135] pageerror: ${err.message}`));
+});
 
 test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
   test.beforeAll(async () => {
@@ -114,8 +128,9 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     await expect(page.getByRole('status')).toContainText(m.tasks.created);
     const row = page.getByRole('row', { name: new RegExp(TASK_TITLE) });
     await row.getByRole('button', { name: m.tasks.markDone }).click();
-    // The outcome is the row's status cell; the notice count is not asserted (the create line lingers).
+    // The outcome is the row's status cell, and the page-level notice must survive the refresh.
     await expect(row).toContainText(m.tasks.done);
+    await expect(page.locator('[aria-live="polite"]').getByText(m.tasks.toggled, { exact: true })).toBeVisible();
     await page.screenshot({ path: path.join(SHOTS, 'm18-tr-04-tasks.png'), fullPage: true });
 
     // 4. Satış hattı: aşama değiştir ve LOST + neden
@@ -127,19 +142,108 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
       .filter({ hasNot: page.locator('li') });
     const stageSelect = card.getByLabel(m.pipeline.moveLabel);
     // Forward moves are one step at a time (pipeline-rules.ts): NEW → QUALIFIED → CONTACTED.
-    // The success line is not asserted: router.refresh() moves the card to another column and
-    // remounts StageSelect, which drops its notice. The outcome is the stage the server stored.
+    // router.refresh() moves the card to another column and remounts StageSelect; the notice is
+    // held by the page-level region (live-notice.tsx), so the success line is asserted here too.
     await stageSelect.selectOption('QUALIFIED');
     await expect(card.getByLabel(m.pipeline.moveLabel)).toHaveValue('QUALIFIED');
+    await expect(page.locator('[aria-live="polite"]').getByText(m.pipeline.moved, { exact: true })).toBeVisible();
     await stageSelect.selectOption('CONTACTED');
     await expect(card.getByLabel(m.pipeline.moveLabel)).toHaveValue('CONTACTED');
     await stageSelect.selectOption('LOST');
     await card.getByLabel(m.pipeline.lostReasonLabel).fill(LOST_REASON);
     await card.getByRole('button', { name: m.pipeline.lostReasonLabel }).click();
     await expect(card.getByLabel(m.pipeline.moveLabel)).toHaveValue('LOST');
+    await expect(page.locator('[aria-live="polite"]').getByText(m.pipeline.moved, { exact: true })).toBeVisible();
     // The board is wider than the viewport; bring the LOST card into the frame for the proof shot.
     await card.scrollIntoViewIfNeeded();
     await page.screenshot({ path: path.join(SHOTS, 'm18-tr-03-pipeline-lost.png'), fullPage: true });
+  });
+
+  test('tr: CSV ile 1.000 satır içe aktar (ham süre ölçülür, 30 sn sınırı)', async ({ page }) => {
+    const m = trMessages.m18;
+    await signIn(page);
+    const base = `/tr/${WS}/musteri-hatti`;
+    await page.goto(`${base}/import`);
+
+    const lines = ['Kurum Adı,İl Kodu,Web Sitesi'];
+    for (let i = 1; i <= IMPORT_ROWS; i += 1) lines.push(`${BULK_PREFIX} ${i},06,https://kurum-${i}.example.test`);
+    await page.locator('#import-file').setInputFiles({
+      name: 'kurumlar-1000.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(lines.join('\n'), 'utf8'),
+    });
+    await expect(page.locator('ul[aria-live="polite"]')).toContainText(fmt(m.import.countValid, { count: IMPORT_ROWS }));
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-05-import-preview.png'), fullPage: true });
+
+    const started = Date.now();
+    await page.getByRole('button', { name: submitRe(m.import.submit) }).click();
+    await expect(page.getByRole('status')).toContainText(
+      fmt(m.import.imported, { created: IMPORT_ROWS, skipped: 0, invalid: 0 }),
+    );
+    const elapsed = Date.now() - started;
+    console.log(`[NG-135] CSV import of ${IMPORT_ROWS} rows: ${elapsed} ms (budget 30000 ms)`);
+    expect(elapsed).toBeLessThan(30_000);
+
+    const written = await prisma.leadOrganization.count({
+      where: { tenantId: TENANT, name: { startsWith: BULK_PREFIX }, deletedAt: null },
+    });
+    expect(written).toBe(IMPORT_ROWS);
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-06-import-done.png'), fullPage: true });
+  });
+
+  test('tr: aynı kurumun kopyasını bul ve birleştir (fırsat taşınır, boş alan dolar)', async ({ page }) => {
+    const m = trMessages.m18;
+    await signIn(page);
+    const base = `/tr/${WS}/musteri-hatti`;
+    // Same name, one row without a province. The exact keys differ, so the import keeps both;
+    // the duplicate review then pairs them, because a blank province is compared, not excluded.
+    await page.goto(`${base}/import`);
+    await page.locator('#import-file').setInputFiles({
+      name: 'birlesme.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(`Kurum Adı,İl Kodu\n${MERGE_NAME},\n${MERGE_NAME},06\n`, 'utf8'),
+    });
+    await expect(page.locator('ul[aria-live="polite"]')).toContainText(fmt(m.import.countValid, { count: 2 }));
+    await page.getByRole('button', { name: submitRe(m.import.submit) }).click();
+    await expect(page.getByRole('status')).toContainText(fmt(m.import.imported, { created: 2, skipped: 0, invalid: 0 }));
+
+    const [keepOrg, dropOrg] = await prisma.leadOrganization.findMany({
+      where: { tenantId: TENANT, name: MERGE_NAME, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!keepOrg || !dropOrg) throw new Error('the two merge rows were not imported');
+    expect(keepOrg.provinceCode).toBeNull();
+    expect(dropOrg.provinceCode).toBe('06');
+    // The deal sits on the organisation that will be dropped; the merge must move it.
+    await prisma.deal.create({
+      data: { tenantId: TENANT, organizationId: dropOrg.id, title: MERGE_DEAL_TITLE },
+    });
+
+    const dupStarted = Date.now();
+    await page.goto(`${base}/duplicates`);
+    const pair = page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('button', { name: m.duplicates.mergeButton }) })
+      .filter({ hasText: MERGE_NAME });
+    await expect(pair).toHaveCount(1);
+    console.log(`[NG-135] /duplicates with ${IMPORT_ROWS} bulk rows loaded: ${Date.now() - dupStarted} ms`);
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-07-duplicates.png'), fullPage: true });
+
+    await pair.locator(`input[type="radio"][value="${keepOrg.id}"]`).check();
+    const mergeStarted = Date.now();
+    await pair.getByRole('button', { name: m.duplicates.mergeButton }).click();
+    await expect(pair).toHaveCount(0);
+    // An error boundary also leaves no pair row behind, so the list alone proves nothing.
+    await expect(page.getByText(/Bir Hata Oluştu|Something went wrong/)).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: m.duplicates.heading })).toBeVisible();
+    console.log(`[NG-135] merge click to refreshed /duplicates list: ${Date.now() - mergeStarted} ms`);
+
+    const kept = await prisma.leadOrganization.findUniqueOrThrow({ where: { id: keepOrg.id } });
+    const dropped = await prisma.leadOrganization.findUniqueOrThrow({ where: { id: dropOrg.id } });
+    expect(dropped.deletedAt).not.toBeNull();
+    expect(kept.provinceCode).toBe('06');
+    expect(await prisma.deal.count({ where: { tenantId: TENANT, organizationId: keepOrg.id, title: MERGE_DEAL_TITLE, deletedAt: null } })).toBe(1);
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-08-merged.png'), fullPage: true });
   });
 
   test('en: the same screens render in English', async ({ page }) => {
@@ -155,6 +259,12 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     await page.goto(`${base}/tasks`);
     await expect(page.getByRole('heading', { name: m.tasks.heading })).toBeVisible();
     await page.screenshot({ path: path.join(SHOTS, 'm18-en-03-tasks.png'), fullPage: true });
+    await page.goto(`${base}/import`);
+    await expect(page.getByRole('heading', { name: m.import.heading })).toBeVisible();
+    await page.screenshot({ path: path.join(SHOTS, 'm18-en-04-import.png'), fullPage: true });
+    await page.goto(`${base}/duplicates`);
+    await expect(page.getByRole('heading', { name: m.duplicates.heading })).toBeVisible();
+    await page.screenshot({ path: path.join(SHOTS, 'm18-en-05-duplicates.png'), fullPage: true });
   });
 
   test('M18 OFF: the routes show the module lock, not the screens', async ({ page }) => {
