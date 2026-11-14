@@ -18,7 +18,8 @@ import {
   Inbox,
   UserCheck,
   Globe,
-  Network
+  Network,
+  Route
 } from 'lucide-react';
 import type { ModuleCounts } from '@/lib/modules/registry';
 
@@ -32,6 +33,7 @@ export default function AdminSidebarNav({ locale, moduleCounts }: AdminSidebarNa
   const pathname = usePathname();
   const tLeads = useTranslations('adminLeads');
   const tExperts = useTranslations('AdminExpertPrereg');
+  const tLeadRoutes = useTranslations('adminLeadRoutes');
   const tInterreg = useTranslations('adminInterreg');
   const tPartnerSearch = useTranslations('adminPartnerSearch');
   const tModuleCount = useTranslations('moduleCount');
@@ -116,6 +118,14 @@ export default function AdminSidebarNav({ locale, moduleCounts }: AdminSidebarNa
       desc: tLeads('nav_desc'),
       icon: Inbox,
       badge: 'Lead',
+    },
+    {
+      key: 'lead-routes',
+      href: `/${locale}/admin/lead-routes`,
+      label: tLeadRoutes('nav_label'),
+      desc: tLeadRoutes('nav_desc'),
+      icon: Route,
+      badge: tLeadRoutes('nav_badge'),
     },
     {
       key: 'uzman-kayitlari',
