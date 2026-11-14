@@ -5397,14 +5397,15 @@
   },
   "adminLayout": {
     "homeLinkTitle": "Ana Sayfa",
-    "consoleTitle": "Admin Console",
-    "consoleVersion": "Platform Console v1.1",
+    "consoleTitle": "Yönetim Konsolu",
+    "consoleVersion": "Platform Konsolu v1.1",
     "menuTitle": "Yönetim Menüsü",
     "siteHomeTitle": "Site Ana Sayfasına Git",
-    "footerVersion": "Platform Admin Console v1.1.0",
     "documentation": "Dokümantasyon",
     "privacyDpa": "Gizlilik & DPA",
-    "auditTrails": "Denetim İzleri"
+    "auditTrails": "Denetim İzleri",
+    "footerProductName": "Platform Yönetim Konsolu",
+    "footerVersionLabel": "v1.1.0"
   },
   "adminAudit": {
     "title": "Denetim Kayıtları",
