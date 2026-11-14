@@ -126,11 +126,13 @@ BEGIN
   -- 5. The functions the RLS policies and the pricing page call as this role.
   --    PUBLIC has no EXECUTE on them (revoke-api-role-function-execute.sql);
   --    granted there and in rls.sql too, here for a role created after both.
+  --    province_transfer_org_name (NG-179, add-province-transfer-org-name.sql): the
+  --    readiness form's transfer box reads the province's organisation NAME through it.
   FOR fn IN
     SELECT p.oid::regprocedure
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open')
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name')
   LOOP
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO %I', fn, app_role);
   END LOOP;

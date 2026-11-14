@@ -35,6 +35,23 @@ export const PUBLIC_LEAD_CONSENT = {
   withdrawKey: 'readiness.lead.consent_withdraw',
 } as const;
 
+/**
+ * The separate, optional box that passes the visitor's request on to the consultancy
+ * organisation of their province (NG-179; text: docs/legal/drafts/transfer-consent-v1.md, §4/§5).
+ * Its own id and version: it is never merged with PUBLIC_LEAD_CONSENT. Unticked by default; the
+ * server writes the version and time only when the box is ticked AND the province has an
+ * organisation (see public-lead.ts). Not in use until the lawyer's written approval (patron, 14.11.2026).
+ */
+export const PUBLIC_LEAD_TRANSFER_CONSENT = {
+  /** Which document the consent is for (never shown to the visitor). */
+  id: 'lead-intake-transfer',
+  version: 'transfer-consent-v1-2026-11',
+  messageKey: 'readiness.lead.transfer_label',
+} as const;
+
+/** Where a visitor withdraws consent; the same address the site footer shows. */
+export const PUBLIC_CONTACT_EMAIL = 'info@nexagrant.com';
+
 /** Funnel pages that may carry the form. */
 export const PUBLIC_LEAD_SOURCES = ['fon-hazirlik'] as const;
 

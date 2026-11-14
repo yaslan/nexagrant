@@ -80,3 +80,7 @@ Kısıtlar:
   - Prob satırı kalıntısı 0.
   - Test: `tests/rls-verify-system-scope-policy-set.live.test.ts`.
 - **Sınır:** Kiracı tablolarında yabancı politika bu kontrolün kapsamı dışında kalır; `tenant_isolation` ve `tenant_or_shared` tablolarının politika kümesi ayrıca doğrulanmaz.
+
+## 9. Ek: NG-179 aktarım kutusu kuruluş adı (NG-179, 14.11.2026)
+
+- karne formunun aktarım kutusu ilin kuruluş ADINA ihtiyaç duyar. `ProvinceLeadRoute`'u `public-intake`'e açmak D-1'i geri alırdı; bunun yerine `public.province_transfer_org_name(text)` (SECURITY DEFINER, sabit `search_path`, girdi tek il, çıktı tek ad, yalnız aktif rota + `isIntakeTenant`, EXECUTE yalnız `fabrika_app`). `system_scope` mekanizmasına dokunmaz: amaç listesi aynı kalır. Ölçüm (`fabrika_app`, izole DB): `public-intake` ve `tenant-discovery` tabloda yine 0 satır; fonksiyon yalnız adı döndürür (`tests/transfer-org-name.live.test.ts`). Ayrıntı: `docs/DATA_MODEL.md` §32.

@@ -117,6 +117,13 @@ const envSchema = z.object({
    * (FO-246). Unset or blank = the job skips and says so once; nothing is mailed.
    */
   ALERTS_OPS_EMAIL: blankToUndefined(z.string().email().optional()),
+  /**
+   * NG-179. Publication gate for the separate "transfer to the province's consultancy" box on the
+   * readiness result form. Off (unset/blank/false) = the box never reaches the page and the server
+   * never writes a transfer consent. Turn on only after the lawyer's written approval of
+   * docs/legal/drafts/transfer-consent-v1.md (patron decision, 14.11.2026). Read via {@link leadTransferConsentEnabled}.
+   */
+  LEAD_TRANSFER_CONSENT_ENABLED: blankToUndefined(z.enum(['true', 'false']).optional()),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
   AUTH_URL: z.string().optional(),
@@ -439,3 +446,11 @@ export const consortiumLiveDemandWeight: number | undefined =
  */
 export const dbConnectTimeoutMs: number =
   env.DB_CONNECT_TIMEOUT_MS === undefined ? 1000 : Number(env.DB_CONNECT_TIMEOUT_MS);
+
+/**
+ * NG-179 publication gate: true only when LEAD_TRANSFER_CONSENT_ENABLED is the literal `true`.
+ * Read by the transfer box's organisation lookup and by the lead write, so both sides close together.
+ */
+export function leadTransferConsentEnabled(source: { LEAD_TRANSFER_CONSENT_ENABLED?: string } = env): boolean {
+  return source.LEAD_TRANSFER_CONSENT_ENABLED === 'true';
+}

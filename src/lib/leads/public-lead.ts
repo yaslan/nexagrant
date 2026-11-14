@@ -13,9 +13,12 @@ import {
   PUBLIC_LEAD_CONSENT,
   PUBLIC_LEAD_RETENTION_DAYS,
   PUBLIC_LEAD_SOURCES,
+  PUBLIC_LEAD_TRANSFER_CONSENT,
   type PublicLeadField,
   type PublicLeadResult,
 } from './public-lead-policy';
+import { transferOrgNameFor } from './transfer-org';
+import { leadTransferConsentEnabled } from '@/lib/env';
 
 export * from './public-lead-policy';
 
@@ -63,6 +66,8 @@ export const publicLeadInputSchema = z.object({
   readinessCode: z.unknown().optional().transform((v) => toReadinessCode(v)),
   /** Must be literally true: an unticked box is a refusal, not a default. */
   consent: z.literal(true),
+  /** The optional transfer box (NG-179). Anything but literal true counts as unticked. */
+  transferConsent: z.unknown().optional().transform((v) => v === true),
   /** The version the form displayed; a stale form is refused rather than recorded against new text. */
   consentVersion: z.literal(PUBLIC_LEAD_CONSENT.version),
   source: z.enum(PUBLIC_LEAD_SOURCES),
@@ -215,6 +220,15 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
   const db = options.db ?? prisma;
 
   try {
+    // The transfer consent is recorded only when the box is ticked AND the province has an
+    // organisation now. A ticked box for an unmapped province writes nothing (no recipient, no consent),
+    // and a failed lookup does not lose the lead: it is stored without the transfer consent.
+    // While the publication gate (LEAD_TRANSFER_CONSENT_ENABLED) is off, the flag is ignored outright.
+    const transferOn =
+      data.transferConsent &&
+      leadTransferConsentEnabled() &&
+      (await transferOrgNameFor(data.province, db).catch(() => null)) !== null;
+
     // NG-175 (SEC NG-170 O-1): PublicLead is RLS system_scope only. 'public-intake' opens it (and,
     // among the system_scope tables, only it and the expert form's) for the anonymous form.
     return await withSystemScopeOn(db, 'public-intake', 'public-lead.submit', async (tx) => {
@@ -243,6 +257,9 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
           readinessLevel: scored?.level ?? null,
           consentVersion: PUBLIC_LEAD_CONSENT.version,
           consentAt: now,
+          transferConsent: transferOn,
+          transferConsentVersion: transferOn ? PUBLIC_LEAD_TRANSFER_CONSENT.version : null,
+          transferConsentAt: transferOn ? now : null,
           source: data.source,
           locale: data.locale,
           ipHash,
