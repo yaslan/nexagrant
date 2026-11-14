@@ -111,19 +111,26 @@ const MIN_PARTNERS = new RegExp(`(?:at least|a minimum of|minimum of|minimum)\\s
 const COUNTRY_CAP =
   '(?:up to|no more than|not more than|at most|(?:a\\s+)?maximum(?:\\s+of)?|max\\.?|(?<!\\b(?:no|not|nor)\\s+)(?:fewer|less) than|limited to|not exceeding|under(?:\\s+the)?)';
 /**
- * A count never starts glued to a word character, a dot, a dash or a slash: there it is part of an
- * identifier ("Article 5-3", "Article 5.3"), a year ("2024-25", "2024/25") or a sign ("-3")
- * (NG-192). Used as a lookbehind in front of a single N, and tested by hand on a range's lower N.
+ * A count never starts glued to what precedes it: a word character or a slash ("2024/25"), a dash
+ * that is itself glued to a word character ("Article 5-3", "2024-25"), or a dot other than the one
+ * of "min." ("Article 5.3", but "min.3" is a minimum). A dash at the start or after whitespace is a
+ * list bullet ("-3 different countries"), so the count behind it is read; a negative sign
+ * ("temperatures -3") is read the same way, a country count is never negative (NG-192, 2. tur).
+ * Used as lookbehinds in front of a single N, and at a range's lower N through NOT_GLUED_AT.
  */
-const GLUED_BEFORE = '[\\w.\\-–/]';
-const GLUED_CHAR = new RegExp(`^${GLUED_BEFORE}$`);
+const NOT_GLUED = '(?<![\\w/])(?<!\\w[-–])(?<!(?<!\\bmin)\\.)';
+const NOT_GLUED_AT = new RegExp(NOT_GLUED, 'iy');
+function gluedAt(text: string, at: number): boolean {
+  NOT_GLUED_AT.lastIndex = at;
+  return !NOT_GLUED_AT.test(text);
+}
 const COUNTRY_NOUN = '\\s+different\\s+(?:[a-z-]+\\s+){0,3}?(?:countries|member states|states)';
 /**
  * "N different countries". Group 1 is an upper-bound qualifier in front of N: such a match
  * is a cap and is skipped. Global, so a later true minimum in the same text is still found.
  */
 const MIN_COUNTRIES = new RegExp(
-  `(?:\\b(${COUNTRY_CAP})\\s+(?:\\([^)]{0,20}\\)\\s+)?)?(?<!${GLUED_BEFORE})${NUM}${COUNTRY_NOUN}`,
+  `(?:\\b(${COUNTRY_CAP})\\s+(?:\\([^)]{0,20}\\)\\s+)?)?${NOT_GLUED}${NUM}${COUNTRY_NOUN}`,
   'gi'
 );
 /**
@@ -132,9 +139,10 @@ const MIN_COUNTRIES = new RegExp(
  * States", "from 2 to 4 different countries", "2-3 different countries". Group 1 = lower
  * qualifier, 2 = lower N, 3 = connector ("and"/"to" need spaces around them, a dash does not:
  * CRW NG-186 3. tur, bulgu B), 4 = cap qualifier, 5 = upper N. Read as a minimum of the lower N.
- * A range whose lower N is glued to what precedes it ("COVID-19 - 3", "-2 to 4") or that runs
- * downwards ("Article 5-3") is not a count: its whole span yields no minimum (NG-192). The `d`
- * flag gives the lower N's own start for that check.
+ * A range whose lower N is glued to what precedes it ("COVID-19 - 3") or that runs downwards with
+ * a dash ("Article 5-3", "5 - 3") is not a count: its whole span yields no minimum. A worded range
+ * that runs downwards ("4 and 3", "4 to 3") still states both numbers and yields the smaller one
+ * (NG-192). The `d` flag gives the lower N's own start for the glued check.
  */
 const COUNTRY_RANGE = new RegExp(
   `(?:\\b(at least|a minimum of|minimum of|minimum|min\\.?|between)\\s+)?\\b${NUM}(\\s+(?:and|to)\\s+|\\s*[-–]\\s*)(?:(${COUNTRY_CAP})\\s+)?${NUM}${COUNTRY_NOUN}`,
@@ -149,13 +157,16 @@ function readMinCountries(text: string): number | undefined {
     // The span is claimed even when it yields nothing, so its upper N is not read as a minimum.
     rangeSpans.push([start, start + m[0].length]);
     const lowerAt = m.indices?.[2]?.[0] ?? start;
-    if (lowerAt > 0 && GLUED_CHAR.test(text.charAt(lowerAt - 1))) continue;
+    if (gluedAt(text, lowerAt)) continue;
     const lower = readNumber(m[2]);
     const upper = readNumber(m[5]);
-    // A bare "3 and 4 different countries" counts too: its lower number is the reading that
-    // drops no applicant who meets either number (NG-192). A downward "5-3" is not a range.
-    if (!lower || !upper || lower > upper) continue;
-    found.push({ index: start, n: lower });
+    if (!lower || !upper) continue;
+    // A bare "3 and 4 different countries" counts too: its smaller number is the reading that
+    // drops no applicant who meets either number, also when written "4 and 3" (NG-192). A dashed
+    // "5-3" that runs downwards is an identifier, not a range.
+    const worded = /^\s+(?:and|to)\s+$/i.test(m[3] ?? '');
+    if (lower > upper && !worded) continue;
+    found.push({ index: start, n: Math.min(lower, upper) });
   }
   for (const m of text.matchAll(MIN_COUNTRIES)) {
     const start = m.index ?? 0;
