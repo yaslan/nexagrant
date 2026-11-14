@@ -5454,10 +5454,11 @@
     "consoleVersion": "Platform Console v1.1",
     "menuTitle": "Management Menu",
     "siteHomeTitle": "Go to site home",
-    "footerVersion": "Platform Admin Console v1.1.0",
     "documentation": "Documentation",
     "privacyDpa": "Privacy & DPA",
-    "auditTrails": "Audit Trails"
+    "auditTrails": "Audit Trails",
+    "footerProductName": "Platform Admin Console",
+    "footerVersionLabel": "v1.1.0"
   },
   "adminAudit": {
     "title": "Audit Logs",
