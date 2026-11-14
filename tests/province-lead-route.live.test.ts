@@ -394,18 +394,231 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('D-2: the database refuses inconsistent route columns', async () => {
       const bad = (data: Record<string, unknown>) => mkLead(`chk-${Math.random().toString(36).slice(2, 7)}`, data);
-      await expect(bad({ routeStatus: 'routed', routedTenantId: null })).rejects.toThrow();
-      await expect(bad({ routeStatus: 'routed', routedTenantId: T.a, routeReason: 'anything-goes' })).rejects.toThrow();
-      await expect(bad({ routeStatus: 'unmatched', routeReason: 'anything-goes' })).rejects.toThrow();
-      await expect(bad({ routeStatus: 'unmatched', routeReason: null })).rejects.toThrow();
-      await expect(bad({ routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: T.a })).rejects.toThrow();
-      await expect(bad({ routeStatus: null, routeReason: 'province_unmapped' })).rejects.toThrow();
-      await expect(bad({ routeStatus: null, routedTenantId: T.a })).rejects.toThrow();
-      await expect(bad({ routeStatus: 'bogus' })).rejects.toThrow();
+      // NG-181 D-3: each expectation is bound to the ONE constraint that must refuse it, by its full name,
+      // so a fixture that fails for any other reason cannot pass. 'bogus' is refused by the older value
+      // CHECK (add-province-lead-route.sql) before the consistency CHECK is evaluated.
+      const CHECK = /"PublicLead_route_consistency_check"/;
+      const STATUS_CHECK = /"PublicLead_routeStatus_check"/;
+      await expect(bad({ routeStatus: 'routed', routedTenantId: null })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: 'routed', routedTenantId: T.a, routeReason: 'anything-goes' })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: 'unmatched', routeReason: 'anything-goes' })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: 'unmatched', routeReason: null })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: T.a })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: null, routeReason: 'province_unmapped' })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: null, routedTenantId: T.a })).rejects.toThrow(CHECK);
+      await expect(bad({ routeStatus: 'bogus' })).rejects.toThrow(STATUS_CHECK);
       const ok1 = await bad({ routeStatus: 'routed', routedTenantId: T.a, routedAt: NOW });
       const ok2 = await bad({ routeStatus: 'unmatched', routeReason: 'tenant_refused', routedAt: NOW });
       const ok3 = await bad({});
       expect([ok1, ok2, ok3].every((r) => r.id)).toBe(true);
     });
   });
+
+  /**
+   * NG-181 (NG-174 review H-1, O-1, D-1, D-2). Every race here is DETERMINISTIC: `gatedDb` parks the call
+   * under test at one exact write (`publicLead.updateMany` with the given mark) until the test lets it go,
+   * so "both calls read before either writes" is arranged, not hoped for.
+   */
+  describe('NG-181: uncertainty falls to "stuck", never to "a second tenant"', () => {
+    const routedRow = (id: string) => admin.publicLead.findUniqueOrThrow({ where: { id } });
+    const contactsOf = (leadId: string) =>
+      admin.leadContact.findMany({ where: { sourceRef: `public-lead:${leadId}` }, select: { tenantId: true } });
+
+    test('H-1: the port throws AFTER M18 committed; the claim is kept, so a moved map cannot copy the lead to B', async () => {
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('h1', { province: 'Rize' });
+      // The CRW-PROBE port: the real write happens, then the answer is lost (commit ack, network, timeout).
+      const writesThenThrows = {
+        accept: async (req: Parameters<typeof port.accept>[0]) => {
+          await port.accept(req);
+          throw new Error('h1: commit acknowledgement lost');
+        },
+      };
+      await expect(forwardPublicLead(lead.id, writesThenThrows, prisma)).rejects.toThrow('h1: commit acknowledgement lost');
+
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.b }, ACTOR, prisma);
+      const b0 = await dealsIn(T.b);
+      const second = await forwardPublicLead(lead.id, port, prisma);
+      const row = await routedRow(lead.id);
+      expect({
+        second,
+        contacts: await contactsOf(lead.id),
+        newDealsInB: (await dealsIn(T.b)) - b0,
+        row: { routeStatus: row.routeStatus, routedTenantId: row.routedTenantId, routeReason: row.routeReason },
+      }).toEqual({
+        second: { status: 'skipped', reason: 'already_routed' },
+        contacts: [{ tenantId: T.a }],
+        newDealsInB: 0,
+        row: { routeStatus: 'routed', routedTenantId: T.a, routeReason: null },
+      });
+    });
+
+    test('H-1 repair path: a throw keeps the lead with its tenant; asking THAT tenant again heals it (created / duplicate)', async () => {
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
+      // (a) thrown BEFORE anything was written: nothing landed, the retry creates it in A
+      const before = await mkLead('h1-before', { province: 'Rize' });
+      const failsFirst = { accept: async () => { throw new Error('h1: connection refused'); } };
+      await expect(forwardPublicLead(before.id, failsFirst, prisma)).rejects.toThrow('h1: connection refused');
+      expect(await routedRow(before.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a });
+      expect(await contactsOf(before.id)).toEqual([]);
+      expect((await forwardPublicLead(before.id, port, prisma)).status).toBe('created');
+      expect(await contactsOf(before.id)).toEqual([{ tenantId: T.a }]);
+
+      // (b) thrown AFTER the write: the retry gets M18's duplicate, still one copy
+      const after = await mkLead('h1-after', { province: 'Rize' });
+      const writesThenThrows = {
+        accept: async (req: Parameters<typeof port.accept>[0]) => {
+          await port.accept(req);
+          throw new Error('h1: timeout');
+        },
+      };
+      await expect(forwardPublicLead(after.id, writesThenThrows, prisma)).rejects.toThrow('h1: timeout');
+      expect((await forwardPublicLead(after.id, port, prisma)).status).toBe('duplicate');
+      expect(await contactsOf(after.id)).toEqual([{ tenantId: T.a }]);
+      expect(await routedRow(after.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a });
+    });
+
+    /**
+     * What this test proves, and what it cannot (NG-181 review tur 2, bulgu 1). The loser is kept out by the
+     * claim UPDATE's WHERE, which carries TWO guards, each sufficient on its own:
+     *   (1) the NG-174 claim condition `routedTenantId: null, OR[routeStatus null | not 'routed']`;
+     *   (2) the compare-and-set pins `AND[routeStatus: null, routeReason: null]` (or the 'unmatched' mark).
+     * A routed lead fails both: (2) needs status NULL/'unmatched', and PublicLead_route_consistency_check
+     * forbids `routedTenantId` set with such a status, so (2) implies (1) on every row the DB accepts.
+     * Hence NO test can turn red when only (1) is removed: (1) is redundant behind (2) + the CHECK. Measured:
+     *   remove (1) only → green · remove (2) only → green (this run is (1) alone holding the line) ·
+     *   remove both = M2 `where: { id }` → RED (call 1 claims with stale A, tenant A gets a copy).
+     * (2) cannot go: the where-guard-src scanner relies on it (NG-181 be-gnd-3). Keep (1) as defence in depth.
+     */
+    test('O-1: both calls read before either claims and see different targets; the claim WHERE (NG-174 condition or CAS pins, either alone suffices) keeps the loser out — M2 (both removed) turns it red', async () => {
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('o1', { province: 'Rize' });
+      const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
+      const gate = gatedDb(prisma, 'routed');
+
+      // Call 1 reads (map says A) and is parked right before its claim; the routed-guard has already passed.
+      const first = forwardPublicLead(lead.id, port, gate.db);
+      await gate.reached;
+      // The map moves; call 2 reads B and claims first.
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.b }, ACTOR, prisma);
+      expect((await forwardPublicLead(lead.id, port, prisma)).status).toBe('created');
+      // Call 1 now claims with a stale A: only the WHERE condition stands between it and tenant A.
+      gate.release();
+      expect(await first).toEqual({ status: 'skipped', reason: 'already_routed' });
+
+      expect(await contactsOf(lead.id)).toEqual([{ tenantId: T.b }]);
+      expect((await dealsIn(T.a)) - a0).toBe(0);
+      expect((await dealsIn(T.b)) - b0).toBe(1);
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.b, routeReason: null });
+    });
+
+    test('D-1: a call that saw no mapping cannot mark a lead unmatched after a concurrent call routed it', async () => {
+      await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
+      const lead = await mkLead('d1', { province: 'Rize' });
+      const gate = gatedDb(prisma, 'unmatched');
+
+      // Call 1 reads (no mapping) and is parked right before markUnmatched.
+      const first = forwardPublicLead(lead.id, port, gate.db);
+      await gate.reached;
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
+      expect((await forwardPublicLead(lead.id, port, prisma)).status).toBe('created');
+      gate.release();
+      await first;
+
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a, routeReason: null });
+      expect(await contactsOf(lead.id)).toEqual([{ tenantId: T.a }]);
+    });
+
+    test('D-2: a refusal unrelated to the tenant puts an unmatched lead back on the worklist (previous mark, not NULL)', async () => {
+      await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
+      const lead = await mkLead('d2', { province: 'Rize' });
+      expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'province_unmapped' });
+      const marked = await routedRow(lead.id);
+
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
+      const refusingPort = { accept: async () => ({ status: 'refused' as const, reason: 'consent_missing' as const }) };
+      expect(await forwardPublicLead(lead.id, refusingPort, prisma)).toEqual({ status: 'refused', reason: 'consent_missing' });
+
+      expect(await routedRow(lead.id)).toMatchObject({
+        routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: null, routedAt: marked.routedAt,
+      });
+      const page = await listUnmatchedLeads({ limit: 200 }, prisma);
+      expect(page.rows.some((r) => r.publicLeadId === lead.id)).toBe(true);
+      expect(await contactsOf(lead.id)).toEqual([]);
+    });
+
+    test('D-2 (review bulgu 2): the mark restored is the one the CLAIM replaced, not the one the first read saw', async () => {
+      await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('d2-race', { province: 'Rize' });
+      const refusingPort = { accept: async () => ({ status: 'refused' as const, reason: 'consent_missing' as const }) };
+      const gate = gatedDb(prisma, 'routed');
+
+      // Call 1 reads (mark NULL, map says A) and is parked right before its claim.
+      const first = forwardPublicLead(lead.id, refusingPort, gate.db);
+      await gate.reached;
+      // The mapping goes away; call 2 marks the lead unmatched (allowed: it is not routed).
+      await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
+      expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'province_unmapped' });
+      const marked = await routedRow(lead.id);
+      // Call 1 claims over that mark, then M18 refuses for a reason unrelated to the tenant.
+      gate.release();
+      expect(await first).toEqual({ status: 'refused', reason: 'consent_missing' });
+
+      expect(await routedRow(lead.id)).toMatchObject({
+        routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: null, routedAt: marked.routedAt,
+      });
+      const page = await listUnmatchedLeads({ limit: 200 }, prisma);
+      expect(page.rows.some((r) => r.publicLeadId === lead.id)).toBe(true);
+      expect(await contactsOf(lead.id)).toEqual([]);
+    });
+  });
 });
+
+/**
+ * A `db` for forwardPublicLead that parks the FIRST `publicLead.updateMany` whose `data.routeStatus` equals
+ * `mark` until `release()` is called. `reached` resolves when it is parked. Only `$transaction` is wrapped:
+ * that is the one door `withSystemScopeOn` uses.
+ */
+function gatedDb(base: typeof prisma, mark: 'routed' | 'unmatched') {
+  let signal!: () => void;
+  let open!: () => void;
+  const reached = new Promise<void>((resolve) => (signal = resolve));
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  let parked = false;
+  const bind = (target: object, key: string | symbol): unknown => {
+    const value: unknown = Reflect.get(target, key);
+    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+  };
+  const wrapTx = (tx: object): object =>
+    new Proxy(tx, {
+      get(target, key) {
+        if (key !== 'publicLead') return bind(target, key);
+        const delegate = Reflect.get(target, key) as typeof prisma.publicLead;
+        return new Proxy(delegate, {
+          get(d, k) {
+            if (k !== 'updateMany') return bind(d, k);
+            // Forwards the code-under-test's own call unchanged (it guards its id with requireActionId);
+            // refused here too if the id is not a string, so this pass-through can never go filterless.
+            const forward = bind(d, k) as (a: unknown) => Promise<unknown>;
+            return async (args: { where?: { id?: unknown }; data?: { routeStatus?: unknown } }) => {
+              if (typeof args.where?.id !== 'string') throw new Error('gatedDb: publicLead.updateMany without a string id');
+              if (!parked && args.data?.routeStatus === mark) {
+                parked = true;
+                signal();
+                await gate;
+              }
+              return forward(args);
+            };
+          },
+        });
+      },
+    });
+  const db = new Proxy(base, {
+    get(target, key) {
+      if (key !== '$transaction') return bind(target, key);
+      return (fn: (tx: object) => Promise<unknown>, options?: unknown) =>
+        (target.$transaction as (f: (tx: object) => Promise<unknown>, o?: unknown) => Promise<unknown>)((tx) => fn(wrapTx(tx)), options);
+    },
+  });
+  return { db, reached, release: () => open() };
+}
