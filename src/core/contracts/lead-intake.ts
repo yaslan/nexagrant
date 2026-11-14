@@ -85,3 +85,24 @@ export type LeadIntakeResult =
 export interface LeadIntakePort {
   accept(request: LeadIntakeRequest): Promise<LeadIntakeResult>;
 }
+
+/** Event name published once per lead that LANDED (not for duplicates or refusals). */
+export const LEAD_INTAKE_CREATED_EVENT = 'm18.lead-intake.created';
+
+/**
+ * Payload of {@link LEAD_INTAKE_CREATED_EVENT}. Ids only: no name, e-mail or organisation,
+ * so a listener that logs it leaks no personal data. `ownerUserId` is always null today:
+ * no advisor-assignment rule exists yet (open product decision), the lead lands unassigned.
+ */
+export interface LeadIntakeCreatedPayload {
+  publicLeadId: string;
+  tenantId: string;
+  ids: LeadIntakeIds;
+  ownerUserId: null;
+}
+
+export interface LeadIntakeCreatedEvent {
+  readonly name: typeof LEAD_INTAKE_CREATED_EVENT;
+  readonly payload: LeadIntakeCreatedPayload;
+  readonly occurredAt: Date;
+}

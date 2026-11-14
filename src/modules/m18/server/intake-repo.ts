@@ -2,12 +2,15 @@ import { createTranslator } from 'next-intl';
 import { Prisma } from '@prisma/client';
 
 import {
+  LEAD_INTAKE_CREATED_EVENT,
   leadIntakeSourceRef,
+  type LeadIntakeCreatedEvent,
   type LeadIntakeIds,
   type LeadIntakePort,
   type LeadIntakeRequest,
   type LeadIntakeResult,
 } from '@/core/contracts/lead-intake';
+import { eventBus, type EventBus } from '@/core/events';
 import { prisma, withTenantOn, type TenantTx } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import enMessages from '../../../../messages/en.json';
@@ -157,13 +160,23 @@ export async function acceptLeadIntake(tx: TenantTx, request: LeadIntakeRequest)
 }
 
 /** The port M18 exposes: one tenant transaction per request, a lost insert race reads back as a duplicate. */
-export function createLeadIntakePort(db: typeof prisma = prisma): LeadIntakePort {
+export function createLeadIntakePort(db: typeof prisma = prisma, bus: EventBus = eventBus): LeadIntakePort {
   return {
     async accept(request) {
       const tenantId = typeof request.targetTenantId === 'string' ? request.targetTenantId : '';
       if (!tenantId) return { status: 'refused', reason: 'invalid' };
       try {
-        return await withTenantOn(db, tenantId, (tx) => acceptLeadIntake(tx, request));
+        const result = await withTenantOn(db, tenantId, (tx) => acceptLeadIntake(tx, request));
+        // After the commit; a failing listener never undoes or fails the intake.
+        if (result.status === 'created') {
+          const event: LeadIntakeCreatedEvent = {
+            name: LEAD_INTAKE_CREATED_EVENT,
+            payload: { publicLeadId: request.publicLeadId, tenantId, ids: result.ids, ownerUserId: null },
+            occurredAt: new Date(),
+          };
+          await bus.publish(event);
+        }
+        return result;
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           const landed = await withTenantOn(db, tenantId, (tx) =>

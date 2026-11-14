@@ -719,6 +719,11 @@ model PublicLead {
   /// Version of the explicit-consent text the visitor ticked (src/lib/leads/public-lead.ts).
   consentVersion String
   consentAt      DateTime
+  /// NG-138: the visitor's SEPARATE consent to pass the request to a consultancy. false until a
+  /// form box (text pending the owner/legal decision) sets it; the intake producer reads only this.
+  transferConsent        Boolean   @default(false)
+  transferConsentVersion String?
+  transferConsentAt      DateTime?
   /// Funnel page the request came from, e.g. `fon-hazirlik`.
   source         String
   locale         String

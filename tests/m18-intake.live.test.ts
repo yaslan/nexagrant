@@ -29,7 +29,9 @@ import {
   leadIntakeSourceRef,
   type LeadIntakeRequest,
 } from '@/core/contracts/lead-intake';
+import { createEventBus, type DomainEvent } from '@/core/events';
 import { createDbClient, prisma } from '@/lib/db';
+import { forwardPublicLead } from '@/lib/leads/public-lead-intake';
 import { createLeadIntakePort, leadIntakeConsentSubject } from '@/modules/m18/server/intake-repo';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
@@ -87,6 +89,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
   });
 
   afterAll(async () => {
+    await admin.publicLead.deleteMany({ where: { email: { endsWith: `-${RUN}@example.test` } } });
     await admin.consent.deleteMany({ where: { userId: { startsWith: `public-lead:pl-${RUN}-` } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
     await admin.$disconnect();
@@ -170,5 +173,62 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
       return tx.deal.count({ where: { sourceRef: { startsWith: `public-lead:pl-${RUN}-` } } });
     });
     expect(seen).toBe(1); // only 'ag'
+  });
+
+  describe('producer: PublicLead -> intake, gated by the transfer-consent field', () => {
+    const mkLead = (key: string, over: Record<string, unknown> = {}) =>
+      admin.publicLead.create({
+        data: {
+          name: 'Ayşe Yılmaz', email: `${key}-${RUN}@example.test`, organisation: `Org ${key}`, province: 'Samsun', district: 'İlkadım',
+          readinessCode: 'municipality.012012012012012', consentVersion: 'v-form', consentAt: NOW, source: 'fon-hazirlik', locale: 'tr',
+          ...over,
+        },
+      });
+
+    test('transferConsent=true: the lead lands, unassigned, and the created event fires once with ids only', async () => {
+      const events: DomainEvent[] = [];
+      const bus = createEventBus();
+      bus.subscribe('m18.lead-intake.created', (e) => void events.push(e));
+      const p = createLeadIntakePort(prisma, bus);
+      const lead = await mkLead('yes', { transferConsent: true, transferConsentVersion: 'v-test', transferConsentAt: NOW });
+      const before = await counts(tenants.consultancy);
+      const result = await forwardPublicLead(lead.id, tenants.consultancy, p, prisma);
+      expect(result.status).toBe('created');
+      const after = await counts(tenants.consultancy);
+      expect(after.deals - before.deals).toBe(1);
+      expect(after.orgs - before.orgs).toBe(1);
+      expect(after.contacts - before.contacts).toBe(1);
+      expect(after.tasks - before.tasks).toBe(1);
+      expect(after.consents - before.consents).toBe(1);
+      if (result.status !== 'created') return;
+      const deal = await admin.deal.findUniqueOrThrow({ where: { id: result.ids.dealId } });
+      expect(deal.ownerUserId).toBeNull();
+      expect(events).toHaveLength(1);
+      expect(events[0]!.payload).toEqual({ publicLeadId: lead.id, tenantId: tenants.consultancy, ids: result.ids, ownerUserId: null });
+      expect(JSON.stringify(events[0])).not.toContain('example.test');
+
+      // The same lead again: duplicate, no second event.
+      expect((await forwardPublicLead(lead.id, tenants.consultancy, p, prisma)).status).toBe('duplicate');
+      expect(events).toHaveLength(1);
+    });
+
+    test('transferConsent=false: nothing is created, no event, even though the form consent is there', async () => {
+      const events: DomainEvent[] = [];
+      const bus = createEventBus();
+      bus.subscribe('m18.lead-intake.created', (e) => void events.push(e));
+      const p = createLeadIntakePort(prisma, bus);
+      const lead = await mkLead('no');
+      const before = await counts(tenants.agency);
+      expect(await forwardPublicLead(lead.id, tenants.agency, p, prisma)).toEqual({ status: 'skipped', reason: 'transfer_consent_off' });
+      expect(await counts(tenants.agency)).toEqual(before);
+      expect(events).toHaveLength(0);
+    });
+
+    test('flag true but no recorded version/time: still nothing', async () => {
+      const lead = await mkLead('half', { transferConsent: true });
+      const before = await counts(tenants.agency);
+      expect((await forwardPublicLead(lead.id, tenants.agency, createLeadIntakePort(prisma, createEventBus()), prisma)).status).toBe('skipped');
+      expect(await counts(tenants.agency)).toEqual(before);
+    });
   });
 });
