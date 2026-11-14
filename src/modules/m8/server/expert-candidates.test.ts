@@ -42,7 +42,7 @@ describe('expertProgrammeForTopic', () => {
 
 describe('matchExpertsToSeat', () => {
   it('matches a verified expert on the topic programme and the seat role', () => {
-    const result = matchExpertsToSeat([expert()], { topicIdentifier: HORIZON, seatRoleKey: 'research', minimumPartners: null });
+    const result = matchExpertsToSeat([expert()], { topicIdentifier: HORIZON, seatRoleKey: 'research' });
     expect(result.matches).toHaveLength(1);
     expect(result.matches[0]).toMatchObject({ matchedProgramme: 'horizon-europe-h2020', matchedRoles: ['researcher'] });
   });
@@ -51,7 +51,6 @@ describe('matchExpertsToSeat', () => {
     const result = matchExpertsToSeat([expert({ programmes: ['erasmus-plus'] })], {
       topicIdentifier: HORIZON,
       seatRoleKey: 'research',
-      minimumPartners: null,
     });
     expect(result.matches).toHaveLength(0);
   });
@@ -60,7 +59,6 @@ describe('matchExpertsToSeat', () => {
     const result = matchExpertsToSeat([expert({ roles: ['trainer'] })], {
       topicIdentifier: HORIZON,
       seatRoleKey: 'coordinator',
-      minimumPartners: null,
     });
     expect(result.matches).toHaveLength(0);
   });
@@ -70,8 +68,7 @@ describe('matchExpertsToSeat', () => {
       const result = matchExpertsToSeat([expert({ roles: ['coordinator', 'researcher'] })], {
         topicIdentifier: HORIZON,
         seatRoleKey,
-        minimumPartners: null,
-      });
+        });
       expect(result.matches, seatRoleKey).toHaveLength(0);
     }
   });
@@ -80,7 +77,7 @@ describe('matchExpertsToSeat', () => {
   // country rule (minimum partners / countries) does not apply to them.
   it('takes no country input: an expert of any country matches on programme and role alone', () => {
     const experts = [expert({ id: 'tr', country: 'TR' }), expert({ id: 'de', country: 'DE' }), expert({ id: 'fr', country: 'FR' })];
-    const result = matchExpertsToSeat(experts, { topicIdentifier: HORIZON, seatRoleKey: 'research', minimumPartners: null });
+    const result = matchExpertsToSeat(experts, { topicIdentifier: HORIZON, seatRoleKey: 'research' });
     expect(result.matches.map((m) => m.expert.id).sort()).toEqual(['de', 'fr', 'tr']);
     expect(result.excludedByMinimumPartners).toBe(0);
   });
@@ -91,7 +88,7 @@ describe('matchExpertsToSeat', () => {
       expert({ id: 'b', founderNumber: null, roles: ['coordinator', 'project-manager'] }),
       expert({ id: 'c', founderNumber: 1, roles: ['project-manager'] }),
     ];
-    const result = matchExpertsToSeat(experts, { topicIdentifier: HORIZON, seatRoleKey: 'coordinator', minimumPartners: null, limit: 2 });
+    const result = matchExpertsToSeat(experts, { topicIdentifier: HORIZON, seatRoleKey: 'coordinator', limit: 2 });
     expect(result.matches.map((m) => m.expert.id)).toEqual(['b', 'c']);
   });
 });

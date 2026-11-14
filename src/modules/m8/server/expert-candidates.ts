@@ -1,12 +1,6 @@
 import type { ExpertPoolEntry, ExpertSeatMatch } from '@/core/contracts/expert-pool';
 import type { TenantTx } from '@/lib/db';
-import { confirmedSeatCountries, findOpportunityTopic } from './matching';
-import {
-  minimumPartnerState,
-  passesMinimumPartnerFilter,
-  readMinimumPartnerRule,
-  type MinimumPartnerState,
-} from './minimum-partners';
+import { findOpportunityTopic } from './matching';
 
 /**
  * NG-52 (TASK-MW2SU1H9BLCGV) — the free expert pre-registrations as M8 seat
@@ -19,6 +13,12 @@ import {
  *
  * The rows are handed in (ExpertPoolEntry, src/core/contracts/expert-pool.ts);
  * this module never reads the expert table itself.
+ *
+ * K-581990 = A: an expert is a person, not a partner organisation, so the call's
+ * country rule (minimum partners / countries, minimum-partners.ts) does not apply:
+ * an expert is a candidate on programme and role alone, whatever their country or
+ * the consortium's. The rule still filters the CORDIS / PartnerOrg candidates
+ * (matching.ts runSeatMatch).
  */
 
 /**
@@ -65,7 +65,11 @@ export function expertProgrammeForTopic(identifier: string | null | undefined): 
 
 export interface ExpertSeatResult {
   matches: ExpertSeatMatch[];
-  /** Experts that matched programme and role but cannot get the proposal to the call minimum. */
+  /**
+   * Always 0 since K-581990 = A (experts are not country-filtered). Kept because the
+   * matching page still reads it (expertPool.noneFiltered / expertPool.excluded);
+   * removing it is the UI follow-up's job.
+   */
   excludedByMinimumPartners: number;
 }
 
@@ -74,7 +78,6 @@ export function matchExpertsToSeat(
   params: {
     topicIdentifier: string | null | undefined;
     seatRoleKey: string;
-    minimumPartners: MinimumPartnerState | null;
     limit?: number;
   }
 ): ExpertSeatResult {
@@ -82,16 +85,11 @@ export function matchExpertsToSeat(
   const wanted = EXPERT_ROLES_BY_SEAT_ROLE[params.seatRoleKey];
   if (!programme || !wanted) return { matches: [], excludedByMinimumPartners: 0 };
 
-  let excludedByMinimumPartners = 0;
   const matches: ExpertSeatMatch[] = [];
   for (const expert of experts) {
     if (!expert.programmes.includes(programme)) continue;
     const matchedRoles = wanted === 'any' ? [...expert.roles] : expert.roles.filter((r) => wanted.includes(r));
     if (matchedRoles.length === 0) continue;
-    if (params.minimumPartners && !passesMinimumPartnerFilter(expert.country, params.minimumPartners)) {
-      excludedByMinimumPartners += 1;
-      continue;
-    }
     matches.push({ expert, matchedProgramme: programme, matchedRoles });
   }
 
@@ -101,41 +99,34 @@ export function matchExpertsToSeat(
       (a.expert.founderNumber ?? Number.MAX_SAFE_INTEGER) - (b.expert.founderNumber ?? Number.MAX_SAFE_INTEGER) ||
       a.expert.id.localeCompare(b.expert.id)
   );
-  return { matches: matches.slice(0, params.limit ?? DEFAULT_LIMIT), excludedByMinimumPartners };
+  return { matches: matches.slice(0, params.limit ?? DEFAULT_LIMIT), excludedByMinimumPartners: 0 };
 }
 
 interface SeatRow {
   id: string;
   roleKey: string;
   status: string;
-  organizationId: string | null;
-  partnerOrgId: string | null;
 }
 
 /**
  * Expert candidates for every seat of one opportunity that is not CONFIRMED,
- * keyed by seat id. Reads only tenant-scoped rows and shared CORDIS data, inside
- * the caller's `withTenant` transaction; the experts come from the caller.
+ * keyed by seat id. Reads only the tenant's opportunity and the shared topic, inside
+ * the caller's `withTenant` transaction; the experts come from the caller. The
+ * confirmed partners' countries are not read (K-581990 = A).
  */
 export async function expertCandidatesForOpportunity(
-  tx: Pick<TenantTx, 'opportunity' | 'topic' | 'cordisOrganization' | 'partnerOrg'>,
+  tx: Pick<TenantTx, 'opportunity' | 'topic'>,
   params: { opportunityId: string; tenantId: string; experts: readonly ExpertPoolEntry[]; limit?: number }
 ): Promise<Map<string, ExpertSeatResult>> {
   const out = new Map<string, ExpertSeatResult>();
   const opp = await tx.opportunity.findFirst({
     where: { id: params.opportunityId, tenantId: params.tenantId },
-    select: { id: true, topicId: true, seats: { select: { id: true, roleKey: true, status: true, organizationId: true, partnerOrgId: true } } },
+    select: { id: true, topicId: true, seats: { select: { id: true, roleKey: true, status: true } } },
   });
   if (!opp) return out;
 
   const seats = opp.seats as SeatRow[];
   const topic = await findOpportunityTopic(tx, opp.topicId);
-  const takenCountries = await confirmedSeatCountries(tx, seats, params.tenantId);
-  const state = minimumPartnerState(
-    readMinimumPartnerRule(topic?.eligibility),
-    seats.map((s) => s.status),
-    takenCountries
-  );
 
   for (const seat of seats) {
     if (seat.status === 'CONFIRMED') continue;
@@ -144,7 +135,6 @@ export async function expertCandidatesForOpportunity(
       matchExpertsToSeat(params.experts, {
         topicIdentifier: topic?.identifier,
         seatRoleKey: seat.roleKey,
-        minimumPartners: state,
         limit: params.limit,
       })
     );
