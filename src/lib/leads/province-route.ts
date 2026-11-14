@@ -6,6 +6,7 @@ import { isIntakeTenant } from '@/modules/m18/server/intake';
 import {
   PROVINCE_ROUTE_AUDIT,
   type DeactivateProvinceLeadRouteInput,
+  type IntakeTenantOption,
   type ListUnmatchedLeadsInput,
   type ProvinceLeadRouteRow,
   type ProvinceRouteResult,
@@ -31,10 +32,20 @@ const routeSelect = {
 
 type RouteRecord = Prisma.ProvinceLeadRouteGetPayload<{ select: typeof routeSelect }>;
 
-function toRow(r: RouteRecord): ProvinceLeadRouteRow {
+type NameById = ReadonlyMap<string, string | null>;
+
+/** Display names (never e-mails) of the admins who last changed the given rows. User is system-wide (no RLS). */
+async function adminNames(tx: SystemTx, rows: readonly RouteRecord[]): Promise<NameById> {
+  const ids = [...new Set(rows.map((r) => r.updatedBy).filter((id): id is string => !!id))];
+  if (ids.length === 0) return new Map();
+  const users = await tx.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
+  return new Map(users.map((u) => [u.id, u.name?.trim() || null]));
+}
+
+function toRow(r: RouteRecord, names: NameById): ProvinceLeadRouteRow {
   return {
     id: r.id, province: r.province, tenantId: r.targetTenantId, tenantName: r.tenant.name, tenantSlug: r.tenant.slug,
-    active: r.active, updatedBy: r.updatedBy, updatedAt: r.updatedAt,
+    active: r.active, updatedBy: r.updatedBy, updatedByName: r.updatedBy ? names.get(r.updatedBy) ?? null : null, updatedAt: r.updatedAt,
   };
 }
 
@@ -56,10 +67,22 @@ export async function resolveLeadRoute(tx: SystemTx, province: string | null): P
 }
 
 export async function listProvinceLeadRoutes(db: typeof prisma = prisma): Promise<ProvinceLeadRouteRow[]> {
-  const rows = await withSystemScopeOn(db, 'platform-admin', 'province-route.list', (tx) =>
-    tx.provinceLeadRoute.findMany({ select: routeSelect, orderBy: [{ province: 'asc' }, { active: 'desc' }, { updatedAt: 'desc' }] })
+  return withSystemScopeOn(db, 'platform-admin', 'province-route.list', async (tx) => {
+    const rows = await tx.provinceLeadRoute.findMany({ select: routeSelect, orderBy: [{ province: 'asc' }, { active: 'desc' }, { updatedAt: 'desc' }] });
+    const names = await adminNames(tx, rows);
+    return rows.map((r) => toRow(r, names));
+  });
+}
+
+/**
+ * Tenants a route may point at. The rule is `isIntakeTenant` itself, applied to every non-deleted tenant
+ * (no second copy of it as a WHERE clause), so `eligibleTenant` and this list cannot drift apart.
+ */
+export async function listIntakeTenantOptions(db: typeof prisma = prisma): Promise<IntakeTenantOption[]> {
+  const tenants = await withSystemScopeOn(db, 'platform-admin', 'province-route.tenant-options', (tx) =>
+    tx.tenant.findMany({ where: { deletedAt: null }, select: { id: true, name: true, orgType: true, kind: true, deletedAt: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] })
   );
-  return rows.map(toRow);
+  return tenants.filter(isIntakeTenant).map((t) => ({ id: t.id, name: t.name }));
 }
 
 async function eligibleTenant(tx: SystemTx, tenantId: string): Promise<'ok' | 'tenant_not_found' | 'tenant_ineligible'> {
@@ -85,7 +108,7 @@ export async function setProvinceLeadRoute(
     const active = await tx.provinceLeadRoute.findFirst({ where: { province, active: true }, select: { id: true, targetTenantId: true } });
     if (active && active.targetTenantId === input.tenantId) {
       const same = await tx.provinceLeadRoute.findUniqueOrThrow({ where: { id: active.id }, select: routeSelect });
-      return { ok: true, route: toRow(same) };
+      return { ok: true, route: toRow(same, await adminNames(tx, [same])) };
     }
     const saved = active
       ? await tx.provinceLeadRoute.update({ where: { id: active.id }, data: { targetTenantId: input.tenantId, updatedBy: actorId }, select: routeSelect })
@@ -99,7 +122,7 @@ export async function setProvinceLeadRoute(
         data: { province, fromTenantId: active?.targetTenantId ?? null, toTenantId: input.tenantId },
       },
     });
-    return { ok: true, route: toRow(saved) };
+    return { ok: true, route: toRow(saved, await adminNames(tx, [saved])) };
   });
 }
 
@@ -123,7 +146,7 @@ export async function deactivateProvinceLeadRoute(
         data: { province, fromTenantId: active.targetTenantId, toTenantId: null },
       },
     });
-    return { ok: true, route: toRow(saved) };
+    return { ok: true, route: toRow(saved, await adminNames(tx, [saved])) };
   });
 }
 
@@ -136,7 +159,7 @@ export async function listUnmatchedLeads(input: ListUnmatchedLeadsInput = {}, db
     Promise.all([
       tx.publicLead.findMany({
         where, orderBy: { createdAt: 'desc' }, take: limit, skip: offset,
-        select: { id: true, name: true, email: true, organisation: true, province: true, district: true, routeReason: true, routedAt: true, createdAt: true },
+        select: { id: true, name: true, email: true, organisation: true, province: true, district: true, readinessLevel: true, routeReason: true, routedAt: true, createdAt: true },
       }),
       tx.publicLead.count({ where }),
     ])
@@ -144,7 +167,7 @@ export async function listUnmatchedLeads(input: ListUnmatchedLeadsInput = {}, db
   return {
     total,
     rows: rows.map((r) => ({
-      publicLeadId: r.id, name: r.name, email: r.email, organisation: r.organisation, province: r.province, district: r.district,
+      publicLeadId: r.id, name: r.name, email: r.email, organisation: r.organisation, province: r.province, district: r.district, readinessLevel: r.readinessLevel,
       reason: (r.routeReason as UnmatchedReason | null) ?? 'province_unmapped', createdAt: r.createdAt, markedAt: r.routedAt,
     })),
   };

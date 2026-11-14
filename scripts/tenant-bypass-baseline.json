@@ -405,10 +405,10 @@
       "check": "D",
       "file": "src/lib/leads/province-route.ts",
       "subject": "system-scope:platform-admin",
-      "count": 4,
+      "count": 5,
       "kind": "system-scope",
       "class": "platform-admin",
-      "reason": "Platform-admin lead routing console (NG-167): list/set/deactivate the province -> consultancy map (ProvinceLeadRoute, SYSTEM_WIDE, RLS system_scope only: a tenant reads 0 rows) and list the unmatched PublicLead worklist. The tenant table is read only to check the target is an eligible consultancy/agency. Set/deactivate write one tenantId-NULL AuditEvent in the same transaction. Every caller passes requirePlatformAdmin() first (src/app/[locale]/admin/lead-routes/actions.ts)."
+      "reason": "Platform-admin lead routing console (NG-167): list/set/deactivate the province -> consultancy map (ProvinceLeadRoute, SYSTEM_WIDE, RLS system_scope only: a tenant reads 0 rows) and list the unmatched PublicLead worklist. The tenant table is read only to check the target is an eligible consultancy/agency. Set/deactivate write one tenantId-NULL AuditEvent in the same transaction. Every caller passes requirePlatformAdmin() first (src/app/[locale]/admin/lead-routes/actions.ts). NG-171 adds the 5th site: province-route.tenant-options, a read-only list of non-deleted Tenant id/name/orgType/kind for the route-target picker (filtered in code by isIntakeTenant, the single eligibility rule); caller listIntakeTenantOptionsAction runs requirePlatformAdmin() first."
     }
   ]
 }

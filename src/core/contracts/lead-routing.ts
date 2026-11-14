@@ -39,6 +39,8 @@ export interface ProvinceLeadRouteRow {
   active: boolean;
   /** User id of the platform admin who last changed it. */
   updatedBy: string | null;
+  /** Display name only (never the e-mail) of that admin; null when unset, unknown or nameless. */
+  updatedByName: string | null;
   updatedAt: Date;
 }
 
@@ -51,10 +53,18 @@ export interface UnmatchedLeadRow {
   province: string | null;
   district: string | null;
   reason: UnmatchedReason;
+  /** Readiness scorecard level the visitor reached (PublicLead.readinessLevel); null when not recorded. */
+  readinessLevel: string | null;
   /** When the lead was left. */
   createdAt: Date;
   /** When it was marked unmatched. */
   markedAt: Date | null;
+}
+
+/** A tenant the platform admin may pick as a route target (see `isIntakeTenant`). */
+export interface IntakeTenantOption {
+  id: string;
+  name: string;
 }
 
 export type ProvinceRouteError =
@@ -93,7 +103,7 @@ export interface UnmatchedLeadPage {
  * their own HTTP entry points, the admin layout is not relied on). Implemented in
  * `src/app/[locale]/admin/lead-routes/actions.ts`, where the exported names carry an `Action`
  * suffix: listProvinceLeadRoutesAction, setProvinceLeadRouteAction, deactivateProvinceLeadRouteAction,
- * listUnmatchedLeadsAction.
+ * listUnmatchedLeadsAction, listIntakeTenantOptionsAction.
  *
  * `setProvinceLeadRoute` is an upsert on the ACTIVE row of the province: no active row → create;
  * an active row for another tenant → move it (the old assignment is replaced, not duplicated);
@@ -104,6 +114,8 @@ export interface LeadRoutingActions {
   setProvinceLeadRoute(input: SetProvinceLeadRouteInput): Promise<ProvinceRouteResult>;
   deactivateProvinceLeadRoute(input: DeactivateProvinceLeadRouteInput): Promise<ProvinceRouteResult>;
   listUnmatchedLeads(input?: ListUnmatchedLeadsInput): Promise<UnmatchedLeadPage>;
+  /** Tenants {@link isIntakeTenant} accepts, by name. Action: listIntakeTenantOptionsAction. */
+  listIntakeTenantOptions(): Promise<IntakeTenantOption[]>;
 }
 
 /** AuditEvent types (tenantId NULL = platform-level; `target` = province, `actorId` = admin user). */
