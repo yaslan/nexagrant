@@ -50,6 +50,12 @@ export interface ModulePermission {
    * Lowest role in the tenant hierarchy that holds this permission.
    * Compared with `canRoleApprove()` from `@/lib/rbac` so the module system
    * does not grow a second, divergent role ladder.
+   *
+   * Manifests write the role as a string literal (`minRole: 'MEMBER'`), not as
+   * `Role.MEMBER`: a value import of `@prisma/client` here would pull the Prisma
+   * browser client into every client bundle that imports the registry (NG-196).
+   * This type-only import keeps the literal checked against the Prisma roles.
+   * tests/module-manifest-no-prisma-runtime.test.ts pins the no-value-import rule.
    */
   minRole: Role;
 }
