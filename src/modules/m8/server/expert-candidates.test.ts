@@ -3,7 +3,6 @@ import { describe, it, expect } from 'vitest';
 import type { ExpertPoolEntry } from '@/core/contracts/expert-pool';
 import type { TenantTx } from '@/lib/db';
 import { expertCandidatesForOpportunity, expertProgrammeForTopic, matchExpertsToSeat } from './expert-candidates';
-import { minimumPartnerState } from './minimum-partners';
 
 /**
  * NG-52 (TASK-MW2SU1H9BLCGV) — the free expert pre-registrations as M8 seat
@@ -77,18 +76,13 @@ describe('matchExpertsToSeat', () => {
     }
   });
 
-  it('drops the experts the minimum-partner filter rules out, and counts them', () => {
-    // 3 countries required, TR already held by a confirmed partner, 1 seat left:
-    // a Turkish expert cannot bring the missing country.
-    const minimumPartners = minimumPartnerState({ minPartners: 3, minCountries: 3 }, ['CONFIRMED', 'CONFIRMED', 'OPEN'], new Set(['TR', 'DE']));
-    const blocked = matchExpertsToSeat([expert()], { topicIdentifier: HORIZON, seatRoleKey: 'research', minimumPartners });
-    expect(blocked.matches).toHaveLength(0);
-    expect(blocked.excludedByMinimumPartners).toBe(1);
-
-    const open = minimumPartnerState({ minPartners: 3, minCountries: 3 }, ['CONFIRMED', 'CONFIRMED', 'OPEN'], new Set(['FR', 'DE']));
-    const passed = matchExpertsToSeat([expert()], { topicIdentifier: HORIZON, seatRoleKey: 'research', minimumPartners: open });
-    expect(passed.matches).toHaveLength(1);
-    expect(passed.excludedByMinimumPartners).toBe(0);
+  // K-581990 = A: an expert is a person, not a partner organisation; the call's
+  // country rule (minimum partners / countries) does not apply to them.
+  it('takes no country input: an expert of any country matches on programme and role alone', () => {
+    const experts = [expert({ id: 'tr', country: 'TR' }), expert({ id: 'de', country: 'DE' }), expert({ id: 'fr', country: 'FR' })];
+    const result = matchExpertsToSeat(experts, { topicIdentifier: HORIZON, seatRoleKey: 'research', minimumPartners: null });
+    expect(result.matches.map((m) => m.expert.id).sort()).toEqual(['de', 'fr', 'tr']);
+    expect(result.excludedByMinimumPartners).toBe(0);
   });
 
   it('ranks more matched roles first, then the founder number, and keeps the limit', () => {
@@ -144,19 +138,24 @@ describe('expertCandidatesForOpportunity', () => {
     expect((calls.find((c) => c.key === 'opportunity.findFirst')?.args as { where: unknown }).where).toEqual({ id: 'opp-1', tenantId: 't-1' });
   });
 
-  it('returns no match when the minimum-partner filter needs a country the expert cannot bring', async () => {
-    const { tx } = fakeTx({
+  // K-581990 = A (was: "returns no match when the minimum-partner filter needs a country
+  // the expert cannot bring"). The call needs 3 countries, the confirmed partner is
+  // Turkish, one seat is left: the Turkish expert is still a candidate.
+  it('keeps a Turkish expert in a Turkish consortium even when the call needs a new country (K-581990)', async () => {
+    const { tx, calls } = fakeTx({
       ...base,
-      // The confirmed partner is Turkish: 3 countries needed, 1 held, 1 seat left.
       'cordisOrganization.findMany': [{ organisationId: 'org-de', country: 'TR' }],
     });
     const bySeat = await expertCandidatesForOpportunity(tx, { opportunityId: 'opp-1', tenantId: 't-1', experts: [expert()] });
-    expect(bySeat.get('seat-r')?.matches).toEqual([]);
-    expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(1);
+    expect(bySeat.get('seat-r')?.matches.map((m) => m.expert.id)).toEqual(['epr-1']);
+    expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(0);
+    // The consortium's countries are not read for experts at all.
+    expect(calls.some((c) => c.key === 'cordisOrganization.findMany')).toBe(false);
   });
 
-  // CRW NG-186 bulgu 3: a seat confirmed with the tenant's own partner record counts its country.
-  it('counts the country of a seat confirmed with a PartnerOrg (tenant-scoped lookup)', async () => {
+  // K-581990 = A (was CRW NG-186 bulgu 3 "counts the country of a seat confirmed with a
+  // PartnerOrg"): that count still drives the CORDIS matcher (matching.test.ts), not experts.
+  it('keeps a Turkish expert when the Turkish partner is a PartnerOrg seat, without reading partner records', async () => {
     const { tx, calls } = fakeTx({
       ...base,
       'opportunity.findFirst': {
@@ -168,13 +167,12 @@ describe('expertCandidatesForOpportunity', () => {
           { id: 'seat-r', roleKey: 'research', status: 'OPEN', organizationId: null, partnerOrgId: null },
         ],
       },
-      // The partner record is Turkish: DE + TR held, 1 country and 1 seat left, so a TR expert cannot close it.
       'partnerOrg.findMany': [{ country: 'tr ' }],
     });
     const bySeat = await expertCandidatesForOpportunity(tx, { opportunityId: 'opp-1', tenantId: 't-1', experts: [expert()] });
-    expect(bySeat.get('seat-r')?.matches).toEqual([]);
-    expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(1);
-    expect((calls.find((c) => c.key === 'partnerOrg.findMany')?.args as { where: unknown }).where).toEqual({ id: { in: ['po-1'] }, tenantId: 't-1' });
+    expect(bySeat.get('seat-r')?.matches.map((m) => m.expert.id)).toEqual(['epr-1']);
+    expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(0);
+    expect(calls.some((c) => c.key === 'partnerOrg.findMany')).toBe(false);
   });
 
   it('is empty for an opportunity outside the tenant', async () => {
