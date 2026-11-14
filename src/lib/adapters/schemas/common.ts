@@ -102,11 +102,13 @@ const PARTNER_NOUN = '(?:legal entities|entities|organisations|organizations|par
 const MIN_PARTNERS = new RegExp(`(?:at least|a minimum of|minimum of|minimum)\\s+${NUM}\\s+(?:[a-z-]+\\s+){0,3}?${PARTNER_NOUN}`, 'i');
 /**
  * Upper-bound qualifiers in front of a country count ("up to", "no more than", "at most",
- * "maximum of", "max.", "fewer than", "less than", "limited to", "not exceeding", "under").
- * A count behind one of these is a cap, not a minimum (CRW NG-186 bulgu 2, B-2).
+ * "maximum of", "max.", "fewer than", "less than", "limited to", "not exceeding", "under",
+ * "under the"). A count behind one of these is a cap, not a minimum (CRW NG-186 bulgu 2, B-2).
+ * "no fewer than" / "not less than" is the opposite, a minimum: the negative lookbehinds keep
+ * "fewer/less than" from counting as a cap there (CRW NG-186 3. tur, bulgu A).
  */
 const COUNTRY_CAP =
-  '(?:up to|no more than|not more than|at most|(?:a\\s+)?maximum(?:\\s+of)?|max\\.?|fewer than|less than|limited to|not exceeding|under)';
+  '(?:up to|no more than|not more than|at most|(?:a\\s+)?maximum(?:\\s+of)?|max\\.?|(?<!\\bno\\s)(?<!\\bnot\\s)(?:fewer|less) than|limited to|not exceeding|under(?:\\s+the)?)';
 const COUNTRY_NOUN = '\\s+different\\s+(?:[a-z-]+\\s+){0,3}?(?:countries|member states|states)';
 /**
  * "N different countries". Group 1 is an upper-bound qualifier in front of N: such a match
@@ -119,11 +121,12 @@ const MIN_COUNTRIES = new RegExp(
 /**
  * A range on countries where the noun follows only the upper bound (CRW NG-186 B-1):
  * "at least 3 and at most 5 different countries", "between 3 and 6 different Member
- * States", "from 2 to 4 different countries". Group 1 = lower qualifier, 2 = lower N,
- * 3 = connector, 4 = cap qualifier, 5 = upper N. Read as a minimum of the lower N.
+ * States", "from 2 to 4 different countries", "2-3 different countries". Group 1 = lower
+ * qualifier, 2 = lower N, 3 = connector ("and"/"to" need spaces around them, a dash does not:
+ * CRW NG-186 3. tur, bulgu B), 4 = cap qualifier, 5 = upper N. Read as a minimum of the lower N.
  */
 const COUNTRY_RANGE = new RegExp(
-  `(?:\\b(at least|a minimum of|minimum of|minimum|min\\.?|between)\\s+)?\\b${NUM}\\s+(and|to|-|–)\\s+(?:(${COUNTRY_CAP})\\s+)?${NUM}${COUNTRY_NOUN}`,
+  `(?:\\b(at least|a minimum of|minimum of|minimum|min\\.?|between)\\s+)?\\b${NUM}(\\s+(?:and|to)\\s+|\\s*[-–]\\s*)(?:(${COUNTRY_CAP})\\s+)?${NUM}${COUNTRY_NOUN}`,
   'gi'
 );
 
@@ -133,7 +136,7 @@ function readMinCountries(text: string): number | undefined {
   for (const m of text.matchAll(COUNTRY_RANGE)) {
     const start = m.index ?? 0;
     // "3 and 4 different countries" with neither a lower qualifier nor a cap is not a range.
-    if (m[3]?.toLowerCase() === 'and' && !m[1] && !m[4]) continue;
+    if (m[3]?.trim().toLowerCase() === 'and' && !m[1] && !m[4]) continue;
     rangeSpans.push([start, start + m[0].length]);
     const n = readNumber(m[2]);
     if (n) found.push({ index: start, n });
