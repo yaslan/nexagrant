@@ -1,4 +1,4 @@
-# Fabrika — Avrupa Proje Fabrikası SaaS
+NexaGrant EU Project Gate SaaS
 
 KOBİ, danışmanlık ve üniversite proje ofisleri için Avrupa fonlarına sürekli başvuru pipeline'ı. Çok kiracılı, modüler (güncel modül listesi ve sayısı `src/lib/modules/registry.ts` → `getModuleCounts()`), yönetici tarafından açılıp kapatılabilen modüller; abonelik + eklenti + hizmet + veri/API gelir modeli (pazar yeri kaldırıldı, ADR-0005).
 
