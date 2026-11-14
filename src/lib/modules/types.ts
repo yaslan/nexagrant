@@ -20,7 +20,8 @@ export type ModuleId =
   | 'M14'
   | 'M15'
   | 'M16'
-  | 'M17';
+  | 'M17'
+  | 'M18';
 
 export type ModuleStatus = 'OFF' | 'DEV' | 'PILOT' | 'ON';
 

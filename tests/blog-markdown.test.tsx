@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { BLOG_SEED_POSTS } from '@/lib/blog-seed';
 import { docToMarkdown, markdownToDoc } from '@/lib/blog-markdown';
 import { blogContentRefusal } from '@/lib/blog-content-policy';
+import { suiteHasDatabase } from './helpers/database-availability';
 import type { BlogPost } from '@/lib/blog-shared';
 
 /**
@@ -84,6 +85,8 @@ const EDGE_CASES: Record<string, string> = {
   'markup attempts in a link': '[x](https://e.org/"onmouseover=alert`1`)\n[<img src=x onerror=alert(1)>](https://e.org)',
 };
 
+const HAS_DB = await suiteHasDatabase('blog-markdown');
+
 describe('blog markdown ↔ editor doc round trip renders the same post', () => {
   test.each(BLOG_SEED_POSTS.map((p) => [p.slug, p.content] as const))('seed post %s', async (_slug, content) => {
     expect(await pageBody(roundTrip(content))).toBe(await pageBody(content));
@@ -93,7 +96,8 @@ describe('blog markdown ↔ editor doc round trip renders the same post', () => 
     expect(await pageBody(roundTrip(content))).toBe(await pageBody(content));
   });
 
-  test('every post in the database', async () => {
+  // NG-180: reads the real blog table, so it needs a database; skipped (warned locally, thrown in CI) when there is none.
+  test.skipIf(!HAS_DB)('every post in the database', async () => {
     const posts = await realBlog.getBlogPosts();
     for (const post of posts) {
       expect(await pageBody(roundTrip(post.content)), post.slug).toBe(await pageBody(post.content));

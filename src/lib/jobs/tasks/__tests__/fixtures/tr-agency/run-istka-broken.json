@@ -1,0 +1,21 @@
+{
+  "source": "istka",
+  "rawFetch": {
+    "source": "istka",
+    "url": "https://istka.org.tr/acik-destek-programlari",
+    "finalUrl": "https://istka.org.tr/acik-destek-programlari",
+    "httpStatus": 200,
+    "fetchedAt": "2026-11-13T22:12:49+00:00",
+    "sha256": "33fde67fc9419a4a55c413759f5792769ba8cdda5e186c021b016ba8f98f1676",
+    "bytes": 58,
+    "body": "<html><body><p>Yeni tasarım, tablo yok.</p></body></html>"
+  },
+  "rows": 0,
+  "calls": [],
+  "systemAlert": {
+    "kind": "AGENCY_SCHEMA_CHANGED",
+    "source": "istka",
+    "message": "istka: program tablosu bulunamadı (yapı değişmiş olabilir)",
+    "rawSha256": "33fde67fc9419a4a55c413759f5792769ba8cdda5e186c021b016ba8f98f1676"
+  }
+}

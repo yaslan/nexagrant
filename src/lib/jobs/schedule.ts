@@ -41,6 +41,8 @@ export const JOB_IDS = [
   'partner-search-retention',
   'm17-text-retention',
   'm17-stale-runs',
+  'notification-email-instant',
+  'notification-email-weekly',
   // FO-384 B2: queued by a PIC change, never on a cron. Not in SCHEDULE (no tick, no missed-tick check).
   'g0-rescore-tenant',
   // FO-396: queued by a PIC lookup that failed to reach the EU register, never on a cron.
@@ -160,6 +162,26 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     maxAttempts: 3,
     queue: 'm17-stale-runs',
     missedTickAlert: false,
+  },
+  // NG-131 (NG-43 Ö-1): the notification e-mail outbox. Both modes share one queue, so a cron
+  // run and a job added by hand never overlap on a worker, and the outbox claims its rows besides
+  // (src/lib/notifications/email-outbox.ts), which also holds across two queues or two databases'
+  // workers. INSTANT every 5 minutes, no missed-tick alert and no backfill: the next tick sends
+  // every row still queued. WEEKLY Mondays 07:00 UTC (10:00 Istanbul), backfilled one day.
+  {
+    id: 'notification-email-instant',
+    cron: '*/5 * * * *',
+    maxAttempts: 3,
+    queue: 'notification-email',
+    missedTickAlert: false,
+  },
+  {
+    id: 'notification-email-weekly',
+    cron: '0 7 * * 1',
+    maxAttempts: 5,
+    fill: '1d',
+    queue: 'notification-email',
+    missedTickAlert: true,
   },
 ];
 

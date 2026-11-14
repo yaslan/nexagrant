@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * FO-396 step 2. The stored EU register answer, on a real database:
  *   • Ö-A: a lookup that finishes after the tenant changed its PIC does not store its answer;
@@ -81,7 +82,9 @@ async function alertsRaisedSince(reason: string, since: Date) {
   });
 }
 
-describe('FO-396 step 2: stored register answer', () => {
+const HAS_DB = await suiteHasDatabase('pic-registry-refresh.live');
+
+describe.skipIf(!HAS_DB)('FO-396 step 2: stored register answer', () => {
   beforeAll(async () => {
     await prisma.tenant.create({
       data: { id: tenantId, name: key, slug: key, country: 'TR', orgType: 'SME', pic: picA, picRegistryStatus: 'FOUND', picRegistryCheckedAt: new Date() },

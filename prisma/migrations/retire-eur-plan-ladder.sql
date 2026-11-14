@@ -72,15 +72,20 @@ WHERE "planId" IN ('starter','team','business','enterprise');
 
 -- 4. Refuse to drop a plan anything still points at. `Subscription.planId` has
 --    no foreign key, so this is the only thing standing between a typo above
---    and a tenant whose plan cannot be resolved.
+--    and a tenant whose plan cannot be resolved. It looks ONLY at the plans
+--    step 5 deletes: a database that already ran later migrations/seeds holds
+--    legitimate subscriptions on plans this file never heard of
+--    (`public-team`, `tto-edition`, ...), and those are not orphans. The old
+--    `NOT IN ('free','basic','pro','ultra')` form counted them and made
+--    `pnpm db:setup` fail on every populated database (NG-153).
 DO $$
 DECLARE orphaned INT;
 BEGIN
   SELECT count(*) INTO orphaned
   FROM "Subscription"
-  WHERE "planId" NOT IN ('free','basic','pro','ultra');
+  WHERE "planId" IN ('starter','team','business','enterprise');
   IF orphaned > 0 THEN
-    RAISE EXCEPTION 'refusing to retire plans: % subscription(s) still on an unmapped plan', orphaned;
+    RAISE EXCEPTION 'refusing to retire plans: % subscription(s) still on a retired plan', orphaned;
   END IF;
 END $$;
 

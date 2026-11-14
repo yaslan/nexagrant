@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/db';
 import { SediaAdapter } from '@/lib/adapters/sedia';
+import { formatMinorWhole } from '@/lib/money';
 import { requireTenantPage } from '@/lib/tenant';
 import { normalizeWorkspaceSlug, resolveScopedWorkspace } from '@/lib/workspaces';
 import { getWorkspaceRoute, publicCallDetailHref } from '@/lib/routes';
@@ -47,6 +48,8 @@ export default async function CallDetailsPage({
     status: string;
     typeOfAction: string;
     budgetPerProjectCents: number;
+    /** ISO-4217 of `budgetPerProjectCents` (Call.currency for a stored topic; SEDIA is always EUR). */
+    currency: string;
     numProjects: number;
     deadlines: Array<{ stage: number; at: string }>;
     description: string;
@@ -66,7 +69,15 @@ export default async function CallDetailsPage({
         programme: dbTopic.call?.programme?.name || 'Horizon Europe',
         status: dbTopic.status,
         typeOfAction: dbTopic.typeOfAction || 'RIA (Research & Innovation Action)',
-        budgetPerProjectCents: 500000000,
+        // The stored amount when the topic has one (TR agency topics are in TRY); the old placeholder
+        // only stands in for a topic that publishes none, and is euro.
+        budgetPerProjectCents:
+          dbTopic.budgetPerProjectCents !== null &&
+          dbTopic.budgetPerProjectCents <= BigInt(Number.MAX_SAFE_INTEGER)
+            ? Number(dbTopic.budgetPerProjectCents)
+            : 500000000,
+        currency:
+          dbTopic.budgetPerProjectCents !== null ? dbTopic.call?.currency?.trim() || 'EUR' : 'EUR',
         numProjects: 3,
         deadlines: (dbTopic.deadlines as Array<{ stage: number; at: string }>) || [],
         description: t('mockDescription'),
@@ -88,6 +99,7 @@ export default async function CallDetailsPage({
           status: matched.status,
           typeOfAction: matched.typeOfAction || 'RIA (Research & Innovation Action)',
           budgetPerProjectCents: matched.budgetPerProjectCents || 500000000,
+          currency: 'EUR',
           numProjects: matched.numProjects || 3,
           deadlines: matched.deadlines?.map((d) => ({ stage: d.stage, at: d.at })) || [],
           description: matched.description || t('mockDescription'),
@@ -150,7 +162,7 @@ export default async function CallDetailsPage({
             </h3>
             <ul className="space-y-2 text-xs sm:text-sm text-ink-2">
               <li>
-                <strong className="text-ink">{t('budgetPerProject')}</strong> €{(call.budgetPerProjectCents / 100).toLocaleString()}
+                <strong className="text-ink">{t('budgetPerProject')}</strong> {formatMinorWhole(call.budgetPerProjectCents, call.currency, locale)}
               </li>
               <li>
                 <strong className="text-ink">{t('expectedProjects')}</strong> {call.numProjects}

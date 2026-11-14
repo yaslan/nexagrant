@@ -55,7 +55,7 @@ function emptySnapshot(): G0Snapshot {
 interface FakeDb {
   tenant?: { country?: string | null; pic?: string | null; settings?: unknown } | null;
   profileKeywords?: string[] | null;
-  topics?: { id: string; identifier: string; keywords?: string[]; isLumpSum?: boolean; isTwoStage?: boolean; budgetPerProjectCents?: number | null; eligibility?: unknown }[];
+  topics?: { id: string; identifier: string; keywords?: string[]; isLumpSum?: boolean; isTwoStage?: boolean; budgetPerProjectCents?: number | null; eligibility?: unknown; call?: { currency: string | null } | null }[];
   topicMatch?: { fitScore: number; breakdown?: unknown } | null;
   topicStats?: { country: string | null; successRate: number | null; topicId: string | null }[];
   participations?: { role: string; projectId: string; project: { masterCall: string | null } | null }[];
@@ -449,6 +449,21 @@ describe('loadG0Snapshot()', () => {
       seats: [],
     });
     expect(snapshot.topic?.id).toBe('topic-1');
+  });
+
+  it('keeps a euro (or unset) call currency budget and drops a TRY one — no FX, no lira scored as euro (NG-163)', async () => {
+    const subject = { opportunityId: 'opp-1', topicId: 'topic-1', intendedRole: 'coordinator', seats: [] };
+    const load = async (call: { currency: string | null } | null | undefined) => {
+      const { client } = fakeClient({
+        tenant: { country: 'TR', pic: null },
+        topics: [{ ...topicRow, call }],
+      });
+      return (await loadG0Snapshot(client, 'tenant-1', subject)).topic?.budgetPerProjectCents;
+    };
+    expect(await load({ currency: 'EUR' })).toBe(4_000_000_00);
+    expect(await load({ currency: null })).toBe(4_000_000_00);
+    expect(await load(undefined)).toBe(4_000_000_00);
+    expect(await load({ currency: 'TRY' })).toBeNull();
   });
 
   it('prefers a success rate measured for the tenant country over the global one', async () => {

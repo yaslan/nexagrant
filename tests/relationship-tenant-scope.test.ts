@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 
@@ -38,7 +39,9 @@ function forbiddenClient(): PrismaClient & { touched: number } {
   return stub as unknown as PrismaClient & { touched: number };
 }
 
-describe('M4 relationship detail — tenant scope', () => {
+const HAS_DB = await suiteHasDatabase('relationship-tenant-scope');
+
+describe.skipIf(!HAS_DB)('M4 relationship detail — tenant scope', () => {
   let ready = false;
 
   // TASK-MULQKN4K7SRN0 — no database, the wrong database answering, or a

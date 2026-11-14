@@ -153,7 +153,7 @@ export default async function HomePage({
                     </div>
                     <div className="bg-surface p-3 rounded-lg border border-border shadow-2xs space-y-2">
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">{t('roleCoordinator')}</span>
+                        <span className="bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">{t('roleCoordinator')}</span>
                         <span className="text-ok-ink font-bold font-mono">⭐ 94/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
@@ -193,13 +193,13 @@ export default async function HomePage({
                     </div>
                     <div className="bg-surface p-3 rounded-lg border border-border shadow-2xs space-y-2">
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">{t('roleCoordinator')}</span>
+                        <span className="bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/20 font-bold px-1.5 py-0.5 rounded">{t('roleCoordinator')}</span>
                         <span className="text-ok-ink font-bold font-mono">⭐ 91/100</span>
                       </div>
                       <div className="font-bold text-xs text-ink leading-tight">
                         {tHome('mockProject3')}
                       </div>
-                      <div className="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded font-semibold">
+                      <div className="text-[10px] text-purple-700 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded font-semibold">
                         {t('partnersApproved')}
                       </div>
                     </div>

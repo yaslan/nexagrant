@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { NotificationType } from '@prisma/client';
 import { withTenant, type TenantTx } from '@/lib/db';
 import { withSystemScope, type SystemTx } from '@/lib/system-scope';
@@ -22,14 +23,28 @@ import { renderNotification, type NotificationTranslator } from './render';
  * notifications-retention deletes sent rows after the retention window.
  * A failed send leaves its items unsent, so the next run sends them again: at
  * least once, never silently dropped. A failed MARK after an accepted send is
- * counted in `failures` and the run goes on; that mail goes again next run
- * (the same at-least-once). An item whose recipient is no longer a live member
+ * counted in `failures` and the run goes on; that mail goes again once its
+ * claim's lease expires (CLAIM_LEASE_MS, 15 min), not at the next run (the
+ * same at-least-once). An item whose recipient is no longer a live member
  * of the tenant is deleted unsent (an address of a person who left must not
  * keep getting mail).
+ *
+ * Single run (NG-131, NG-43 review Ö-1): before any SMTP call a run CLAIMS the
+ * recipient's rows with one atomic UPDATE (claimToken + claimedAt, only rows
+ * unclaimed or claimed longer ago than CLAIM_LEASE_MS). A run that starts while
+ * another is mid-send finds them claimed and skips them, so a recipient gets one
+ * mail however many runs overlap (a manual run beside the cron, two workers, a
+ * retry of a slow tick). A failed send releases the claim; a run that died
+ * leaves one that expires after the lease. Before every batch's SMTP call the
+ * run renews its claim (claimedAt); a batch whose claim is gone (the lease
+ * expired and another run took the rows) is not mailed (`claimLost`).
  *
  * The text is rendered here, in the recipient's locale, with the same
  * `renderNotification` the bell uses: the outbox stores type + payload only.
  */
+
+/** A claim older than this is a dead run's; longer than any realistic send of one recipient's batch. */
+export const CLAIM_LEASE_MS = 15 * 60_000;
 
 export type EmailMode = 'INSTANT' | 'WEEKLY';
 
@@ -84,6 +99,8 @@ export interface SendEmailsResult {
   itemsSent: number;
   itemsDropped: number;
   failures: number;
+  /** Batches not mailed because this run's claim was lost (lease expired, another run took the rows). */
+  claimLost: number;
 }
 
 export interface SendEmailsOptions {
@@ -121,6 +138,7 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     itemsSent: 0,
     itemsDropped: 0,
     failures: 0,
+    claimLost: 0,
   };
 
   const recipients = await systemScope((tx) => pendingRecipients(tx, options.mode, now));
@@ -128,17 +146,36 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     result.recipients++;
     // Read in one transaction, send outside any: an SMTP round trip must not
     // hold a database transaction open.
-    const { items, member } = await runTenant(tenantId, async (tx) => ({
-      items: await tx.notificationEmailItem.findMany({
-        where: { tenantId, userId, frequency: options.mode, sentAt: null, createdAt: { lte: now } },
-        select: { id: true, type: true, payload: true, createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      }),
-      member: await tx.membership.findFirst({
-        where: { tenantId, userId, user: { deletedAt: null, deletionRequestedAt: null } },
-        select: { user: { select: { email: true, locale: true } } },
-      }),
-    }));
+    const token = randomUUID();
+    const { items, member } = await runTenant(tenantId, async (tx) => {
+      // Non-null columns of the rows read above; asserted so the claim can never lose its filter.
+      requireActionId(tenantId, 'tenantId');
+      requireActionId(userId, 'userId');
+      // The claim: ONE statement, so two runs cannot both win a row (the second
+      // waits on the row lock, re-reads the claim and no longer matches).
+      await tx.notificationEmailItem.updateMany({
+        where: {
+          tenantId,
+          userId,
+          frequency: options.mode,
+          sentAt: null,
+          createdAt: { lte: now },
+          OR: [{ claimToken: null }, { claimedAt: { lt: new Date(Date.now() - CLAIM_LEASE_MS) } }],
+        },
+        data: { claimToken: token, claimedAt: new Date() },
+      });
+      return {
+        items: await tx.notificationEmailItem.findMany({
+          where: { tenantId, userId, frequency: options.mode, sentAt: null, claimToken: token },
+          select: { id: true, type: true, payload: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        member: await tx.membership.findFirst({
+          where: { tenantId, userId, user: { deletedAt: null, deletionRequestedAt: null } },
+          select: { user: { select: { email: true, locale: true } } },
+        }),
+      };
+    });
     if (items.length === 0) continue;
     if (!member) {
       const ids = items.map((i) => i.id);
@@ -152,6 +189,20 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     const batches: OutboxItem[][] = options.mode === 'WEEKLY' ? [items] : items.map((i) => [i]);
     for (const batch of batches) {
       const mail = options.mode === 'WEEKLY' ? renderDigestMail(batch, t) : renderInstantMail(batch[0]!, t);
+      const ids = batch.map((i) => i.id);
+      // Renew the lease before the SMTP call: a long run (slow SMTP, many
+      // batches) must not outlive its claim, or another run takes the rows and
+      // mails them again. A short count means the claim was lost: not mailed.
+      const renewed = await runTenant(tenantId, (tx) =>
+        tx.notificationEmailItem.updateMany({
+          where: { tenantId, userId, id: { in: ids }, sentAt: null, claimToken: token },
+          data: { claimedAt: new Date() },
+        })
+      );
+      if (renewed.count !== ids.length) {
+        result.claimLost++;
+        continue;
+      }
       try {
         await options.mailer({ to: member.user.email, ...mail });
       } catch (error) {
@@ -160,11 +211,20 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         // echo the address (src/lib/email/mailer.ts MailSendError).
         result.failures++;
         console.error('[notifications][email-outbox]', options.mode, error instanceof Error ? error.name : 'error');
+        // Give the batch back so the next run sends it at once, not after the lease.
+        const failedIds = batch.map((i) => i.id);
+        await runTenant(tenantId, (tx) =>
+          tx.notificationEmailItem.updateMany({
+            where: { tenantId, userId, id: { in: failedIds }, sentAt: null, claimToken: token },
+            data: { claimToken: null, claimedAt: null },
+          })
+        ).catch(() => {
+          /* the lease expires it */
+        });
         continue;
       }
       result.mailsSent++;
       result.itemsSent += batch.length;
-      const ids = batch.map((i) => i.id);
       try {
         // Non-null columns of the rows read above; asserted so the write can
         // never lose its filter (tests/where-guard-src.test.ts).
@@ -172,7 +232,7 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         requireActionId(userId, 'userId');
         await runTenant(tenantId, (tx) =>
           tx.notificationEmailItem.updateMany({
-            where: { tenantId, userId, id: { in: ids }, sentAt: null },
+            where: { tenantId, userId, id: { in: ids }, sentAt: null, claimToken: token },
             data: { sentAt: new Date() },
           })
         );

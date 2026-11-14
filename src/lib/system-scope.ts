@@ -109,11 +109,14 @@ export const SYSTEM_SCOPE_PURPOSES = [
   /** A cron fan-out whose tenant set is the query's output. */
   'cross-tenant-job',
   /**
-   * An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45).
-   * The database opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt for it (FO-52,
-   * prisma/rls.sql system_scope_open); any other table reads 0 rows and refuses writes.
+   * An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45;
+   * readiness contact request, NG-175).
+   * The database opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead
+   * for it (FO-52, NG-175, prisma/rls.sql system_scope_open); any other table reads 0 rows and refuses writes.
    * In reverse, ExpertPreRegistration and ExpertPreRegAttempt open only for this purpose,
-   * 'platform-admin', 'platform-aggregate' and 'cross-tenant-job' (FO-92).
+   * 'platform-admin', 'platform-aggregate' and 'cross-tenant-job' (FO-92); PublicLead only for this
+   * purpose, 'platform-admin' and 'cross-tenant-job'; ProvinceLeadRoute only for 'platform-admin' and
+   * 'cross-tenant-job' (NG-175).
    */
   'public-intake',
   /**

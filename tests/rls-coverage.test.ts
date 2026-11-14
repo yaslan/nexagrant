@@ -311,7 +311,7 @@ describe('4b — every migration protects the tenant table it creates', () => {
 
 describe('SYSTEM_SCOPE_POLICY — tenant-less tables reachable only inside withSystemScope (FO-45, FO-50)', () => {
   test('each one is SYSTEM_WIDE and gets the system_scope policy, gated by system_scope_open, in prisma/rls.sql', () => {
-    expect([...SYSTEM_SCOPE_POLICY].sort()).toEqual(['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration']);
+    expect([...SYSTEM_SCOPE_POLICY].sort()).toEqual(['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead']);
     for (const t of SYSTEM_SCOPE_POLICY) {
       expect(SYSTEM_WIDE.has(t)).toBe(true);
       expect(rlsSql).toContain(`ALTER TABLE public."${t}" ENABLE ROW LEVEL SECURITY;`);
@@ -478,5 +478,10 @@ describe('Supabase ensure_rls — policy-less tables are DISABLEd explicitly (TA
     const trig = readFileSync(resolve(process.cwd(), '.github/ci/supabase-ensure-rls.sql'), 'utf8');
     expect(trig).toContain("EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);");
     expect(trig).toMatch(/CREATE EVENT TRIGGER ensure_rls ON ddl_command_end EXECUTE FUNCTION public\.rls_auto_enable\(\);/);
+    // NG-154: the CI copy must not leave rls_auto_enable() callable through the Data API.
+    expect(trig).toContain('REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC;');
+    expect(trig).toMatch(/rolname IN \('anon', 'authenticated'\)[\s\S]*REVOKE ALL ON FUNCTION public\.rls_auto_enable\(\) FROM %I/);
+    expect(trig.indexOf('FROM PUBLIC;')).toBeGreaterThan(trig.indexOf('CREATE OR REPLACE FUNCTION public.rls_auto_enable()'));
+    expect(trig.indexOf('FROM PUBLIC;')).toBeLessThan(trig.indexOf('CREATE EVENT TRIGGER ensure_rls'));
   });
 });

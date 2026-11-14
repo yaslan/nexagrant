@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { prisma } from '@/lib/db';
+import { databaseReachable } from './helpers/database-availability';
 import { hashSecretToken } from '@/lib/secret-token';
 import { exportExpertPreRegistrationsCsv } from '@/lib/expert-prereg/server/admin';
 import { FOUNDER_SEAT_LIMIT } from '@/lib/expert-prereg/server/constants';
@@ -25,7 +26,7 @@ const PREFIX = 'expertprereg-live-';
 const COUNT = 20;
 
 // Decided before the suite is collected: skipIf reads it at definition time.
-const reachable = await prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false);
+const reachable = await databaseReachable();
 const tokens = Array.from({ length: COUNT }, () => randomBytes(32).toString('hex'));
 let before = 0;
 

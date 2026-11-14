@@ -309,7 +309,7 @@
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "pruneOldNotifications(), run nightly by the notifications-retention cron (ADR-0011 §3.4, TASK-MUVR24EHWI2RA): deletes every tenant's Notification rows whose createdAt is older than NOTIFICATION_RETENTION_DAYS (90), and in the same transaction the NotificationEmailItem rows whose sentAt is older than that window (NG-43: sent outbox rows kept as the e-mail dedupe record; unsent rows never touched). The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; Notification is FORCE RLS, so an unscoped deleteMany under fabrika_app would delete 0 and report success. Only deletes, reads no row content."
+      "reason": "pruneNotificationStores(), run nightly by the notifications-retention cron (ADR-0011 §3.4, TASK-MUVR24EHWI2RA): deletes every tenant's Notification rows whose createdAt is older than NOTIFICATION_RETENTION_DAYS (90), and in the same transaction the NotificationEmailItem rows whose sentAt is older than that window (NG-43: sent outbox rows kept as the e-mail dedupe record; unsent rows never touched). The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; Notification is FORCE RLS, so an unscoped deleteMany under fabrika_app would delete 0 and report success. Only deletes, reads no row content."
     },
     {
       "check": "D",
@@ -340,12 +340,39 @@
     },
     {
       "check": "D",
+      "file": "src/lib/leads/public-lead-intake.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 5,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "forwardPublicLead() (NG-138, NG-167): reads ONE PublicLead row by id (platform data, no tenantId, SYSTEM_WIDE) plus the ACTIVE ProvinceLeadRoute of its province (platform data, system_scope only) to pick the target tenant, then writes ONE routing mark (routeStatus/routedTenantId) on that same PublicLead row. No tenant row is read or written here: the lead itself lands afterwards through the M18 LeadIntakePort inside the target tenant's own withTenantOn transaction, and only when the row's transferConsent is true and the province is mapped. NG-174 (SEC NG-170 Y-1): the same function now also claims the target on that PublicLead row with one conditional UPDATE before the port is called, re-reads routedTenantId when it loses the claim, and releases/marks the claim afterwards (read, claim, re-read, mark-unmatched, release = 5 sites). All five touch only the PublicLead row of that id (platform data, no tenantId); no tenant row is read or written inside them."
+    },
+    {
+      "check": "D",
       "file": "src/lib/leads/public-lead.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "purgeOldPublicLeads(), run nightly by the public-lead-cleanup cron (TASK-MULR765AR5G0C): deletes PublicLead rows (platform data, no tenantId, SYSTEM_WIDE) older than PUBLIC_LEAD_RETENTION_DAYS by one createdAt < cutoff filter, and writes one public_lead.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope (auditevent-null-system-only.sql), so delete and audit share this one transaction. No tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/public-lead.ts",
+      "subject": "system-scope:public-intake",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "public-intake",
+      "reason": "submitPublicLead() (NG-175, SEC NG-170 O-1): the anonymous readiness contact form. PublicLead (platform data, no tenantId) is RLS system_scope only, so the advisory lock, the two rate-limit counts (by e-mail, by IP hash) and the one INSERT run in this public-intake scope. system_scope_open() lets public-intake reach only PublicLead and the expert form's tables; no tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/public-lead.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "listPublicLeads() (NG-175, SEC NG-170 O-1): /admin/leads, behind requirePlatformAdmin() in src/app/[locale]/admin/leads/page.tsx. Reads the newest PublicLead rows and their count (platform data, no tenantId, RLS system_scope only). No tenant row is read or written."
     },
     {
       "check": "D",
@@ -400,6 +427,15 @@
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "purgeOldExpertPreRegistrations(), run nightly by the expert-prereg-cleanup cron (FO-50, TASK-MVC91K7JYOWQC): deletes ExpertPreRegistration rows (platform data with personal data, no tenantId, SYSTEM_WIDE) older than EXPERT_PREREG_RETENTION_DAYS by one createdAt < cutoff filter with no exception (K-568932 = A), first raising the one-row ExpertFounderCounter (SYSTEM_WIDE, no personal data) to the highest founderNumber so no number is freed, and writes one expert_prereg.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope, so delete and audit share this one transaction. No tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/province-route.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 5,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "Platform-admin lead routing console (NG-167): list/set/deactivate the province -> consultancy map (ProvinceLeadRoute, SYSTEM_WIDE, RLS system_scope only: a tenant reads 0 rows) and list the unmatched PublicLead worklist. The tenant table is read only to check the target is an eligible consultancy/agency. Set/deactivate write one tenantId-NULL AuditEvent in the same transaction. Every caller passes requirePlatformAdmin() first (src/app/[locale]/admin/lead-routes/actions.ts). NG-171 adds the 5th site: province-route.tenant-options, a read-only list of non-deleted Tenant id/name/orgType/kind for the route-target picker (filtered in code by isIntakeTenant, the single eligibility rule); caller listIntakeTenantOptionsAction runs requirePlatformAdmin() first."
     }
   ]
 }

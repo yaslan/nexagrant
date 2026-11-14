@@ -131,7 +131,7 @@ export default async function AdminLayout({
             {PRODUCT_NAME}
           </Link>
           <span>•</span>
-          <span>{tLayout('footerVersion')}</span>
+          <span>{tLayout('footerProductName')} {tLayout('footerVersionLabel')}</span>
         </div>
 
         <div className="flex items-center space-x-4">

@@ -57,9 +57,15 @@ Kısıtlar:
 - Ölçüm (yerel, `fabrika_app` ile): önce `tenant-discovery` 5/5 `ExpertPreRegistration` satırı görüyordu. Sonra 0/5. `pnpm rls:verify` her koşuda iki kapalı amacı ölçer ve INSERT reddini dener.
 - Sınır §5 ile aynı: amaç GUC'si USERSET. Bu koşul yanlış tabloya uzanan bir çağrıya karşıdır, listedeki bir amacı adlandırabilen koda karşı değil. Uzmanı görmesi gereken yeni bir amaç `system_scope_open` listesine bilerek eklenir.
 
-## 7. Ek: `expert-directory` — doğrulanmış uzmanlar M8'e, yalnız okuma (NG-52, K-579696 = A, 14.11.2026)
+## 7. Ek: `PublicLead` ve `ProvinceLeadRoute` amaca göre daraltıldı (NG-175, SEC NG-170 O-1/D-1, 14.11.2026)
+
+- `PublicLead` (karne iletişim talebi; ad, e-posta, kuruluş, `routedTenantId`) artık RLS açık + FORCE, tek politika `system_scope`. Önceden politikasızdı ve kiracı oturumu 6/6 satırı okuyordu (NG-170 S4).
+- `public-intake` listesine `PublicLead` eklendi (form `submitPublicLead`). Ters yönde `PublicLead` yalnız `public-intake`, `platform-admin` (`/admin/leads`, eşleşmeyen listesi) ve `cross-tenant-job` (aktarım, gece silme) amaçlarında açılır.
+- `ProvinceLeadRoute` yalnız `platform-admin` (eşleme yönetimi) ve `cross-tenant-job` (aktarımın hedef seçimi) amaçlarında açılır; NG-170 D-1'de `tenant-discovery`, `subject-scoped` ve `platform-aggregate` 3/3 satır görüyordu.
+- Ölçüm (yerel izole DB, `fabrika_app` ile): kiracı oturumu `PublicLead`'de önce 4/4, sonra 0/4. `pnpm rls:verify` amaca kapalı tabloları `PURPOSE_NARROWED` haritasıyla ölçer ve INSERT reddini dener; daraltma değişirse harita da değişmelidir. Sınır §5–§6 ile aynı.
+
+## 8. Ek: `expert-directory` — doğrulanmış uzmanlar M8'e, yalnız okuma (NG-52, K-579696 = A, 14.11.2026)
 
 - Yedinci amaç `expert-directory`. M8 eşleştirme sayfası doğrulanmış uzman ön kayıtlarını koltuk adayı olarak gösterir; havuz hiçbir kiracıya ait değil, bu yüzden kiracı bağlamı onu açamaz.
 - `system_scope_open` bu amaçta **false** döner: genel `system_scope` politikası hiçbir tabloyu açmaz. Açan tek şey `ExpertPreRegistration` üzerindeki `expert_directory` politikasıdır: `FOR SELECT`, mühürlü kapsam + amaç = `expert-directory` + `status = 'verified'` + `"visibilityConsentAt" IS NOT NULL`. Yani bekleyen/devre dışı satır, yazma ve başka tablo kapalı. Ölçüm `tests/system-scope.live.test.ts` ("expert-directory reads verified expert rows and nothing else"): doğrulanmış 1, bekleyen 0, Membership 0, UPDATE 0 satır, INSERT RLS hatası.
 - Kolon sınırı RLS'de değil kodda: `directory.ts` ad/e-posta/kurum/iletişim kolonlarını seçmez. Sınır §5 ile aynı: amaç GUC'si USERSET; bu politika yanlış amaca karşı değil, yanlış tablo ve yanlış satıra karşıdır.
-
