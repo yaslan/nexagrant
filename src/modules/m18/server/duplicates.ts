@@ -76,14 +76,42 @@ function trigrams(text: string): Set<string> {
   return grams;
 }
 
+/**
+ * The duplicate review compares every organisation of a block with every other one, so the same
+ * name is normalised and tri-grammed thousands of times. These caches keep the result identical and
+ * stop that repeated work from blocking the request (1.000 same-first-word rows took ~8 s uncached).
+ * Bounded: the caches are dropped when they grow past the limit.
+ */
+const CACHE_LIMIT = 20_000;
+const normalisedCache = new Map<string, string>();
+const trigramCache = new Map<string, Set<string>>();
+
+function normalisedCached(name: string): string {
+  const hit = normalisedCache.get(name);
+  if (hit !== undefined) return hit;
+  if (normalisedCache.size >= CACHE_LIMIT) normalisedCache.clear();
+  const value = normaliseOrgName(name);
+  normalisedCache.set(name, value);
+  return value;
+}
+
+function trigramsCached(norm: string): Set<string> {
+  const hit = trigramCache.get(norm);
+  if (hit) return hit;
+  if (trigramCache.size >= CACHE_LIMIT) trigramCache.clear();
+  const grams = trigrams(norm);
+  trigramCache.set(norm, grams);
+  return grams;
+}
+
 /** Jaccard similarity of word trigrams (the pg_trgm measure), 0–1, on normalised names. */
 export function nameSimilarity(a: string, b: string): number {
-  const na = normaliseOrgName(a);
-  const nb = normaliseOrgName(b);
+  const na = normalisedCached(a);
+  const nb = normalisedCached(b);
   if (!na || !nb) return 0;
   if (na === nb) return 1;
-  const ga = trigrams(na);
-  const gb = trigrams(nb);
+  const ga = trigramsCached(na);
+  const gb = trigramsCached(nb);
   let shared = 0;
   for (const g of ga) if (gb.has(g)) shared += 1;
   return shared / (ga.size + gb.size - shared);

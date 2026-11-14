@@ -8,6 +8,7 @@
     "evidence": "Kanıtlar",
     "conceptNotes": "Konsept Notlar",
     "interregReview": "Interreg Ön Değerlendirme",
+    "clientPipeline": "Müşteri Satış Hattı",
     "tto": "TTO Hızlandırıcısı (M7)",
     "approvals": "Onay Merkezi (4-Eyes)",
     "apiKeys": "Partner REST API",
@@ -5548,5 +5549,189 @@
   },
   "pipelineBoard": {
     "unassigned": "Atanmadı"
+  },
+  "m18": {
+    "title": "Müşteri Satış Hattı",
+    "tabs": {
+      "panel": "Genel Bakış",
+      "leads": "Müşteri Kurumlar",
+      "pipeline": "Satış Hattı",
+      "tasks": "Görevler",
+      "import": "İçe aktar",
+      "duplicates": "Kopyalar"
+    },
+    "panel": {
+      "heading": "Müşteri Satış Hattı",
+      "leadsCount": "Kurum",
+      "openDeals": "Açık fırsat",
+      "openTasks": "Açık görev",
+      "goLeads": "Kurumlara git",
+      "goPipeline": "Satış hattına git",
+      "goTasks": "Görevlere git"
+    },
+    "leads": {
+      "heading": "Müşteri kurumlar",
+      "empty": "Henüz kurum yok.",
+      "searchLabel": "Ara",
+      "searchPlaceholder": "Kurum adı",
+      "lifecycleLabel": "Durum",
+      "lifecycleAll": "Tümü",
+      "colName": "Kurum",
+      "colType": "Tür",
+      "colProvince": "İl",
+      "colLifecycle": "Durum",
+      "colUpdated": "Güncellendi",
+      "newLead": "Yeni kurum",
+      "nameLabel": "Kurum adı",
+      "legalNameLabel": "Ticaret unvanı",
+      "provinceLabel": "İl plaka kodu (ör. 06)",
+      "websiteLabel": "Web sitesi",
+      "sizeLabel": "Ölçek",
+      "submit": "Kurumu ekle",
+      "created": "Kurum eklendi.",
+      "duplicateNotice": "Bu isimde bir kurum zaten var. Kopya birleştirme ekranından inceleyebilirsiniz.",
+      "openLead": "Aç",
+      "limitNote": "En fazla 50 kayıt gösterilir."
+    },
+    "lifecycle": {
+      "LEAD": "Aday",
+      "CLIENT": "Müşteri",
+      "DISQUALIFIED": "Elendi"
+    },
+    "size": {
+      "MICRO": "Mikro",
+      "SMALL": "Küçük",
+      "MEDIUM": "Orta",
+      "LARGE": "Büyük"
+    },
+    "lead": {
+      "backToList": "Kurumlara dön",
+      "notFound": "Kurum bulunamadı.",
+      "contactsHeading": "İletişim kişileri",
+      "noContacts": "Kayıtlı kişi yok.",
+      "dealsHeading": "Fırsatlar",
+      "noDeals": "Bu kurumda fırsat yok.",
+      "doNotContact": "Aramayın",
+      "fullName": "Ad soyad",
+      "title": "Unvan",
+      "email": "E-posta",
+      "phone": "Telefon",
+      "website": "Web sitesi",
+      "legalName": "Ticaret unvanı"
+    },
+    "deal": {
+      "heading": "Yeni fırsat",
+      "titleLabel": "Fırsat adı",
+      "feeLabel": "Tahmini ücret",
+      "feeHelp": "Tutar, para birimi ile birlikte (ör. 1500,00)",
+      "currencyLabel": "Para birimi",
+      "submit": "Fırsat aç",
+      "created": "Fırsat açıldı."
+    },
+    "pipeline": {
+      "heading": "Satış hattı",
+      "empty": "Bu aşamada fırsat yok.",
+      "moveLabel": "Aşama",
+      "lostReasonLabel": "Kayıp nedeni",
+      "moved": "Aşama güncellendi.",
+      "columnTitle": "{stage} ({count})",
+      "openDeal": "Kurum: {org}",
+      "fee": "Tahmini ücret"
+    },
+    "stage": {
+      "NEW": "Yeni",
+      "QUALIFIED": "Nitelikli",
+      "CONTACTED": "İletişime geçildi",
+      "DISCOVERY_MEETING": "Keşif toplantısı",
+      "ELIGIBILITY_ANALYSIS": "Uygunluk analizi",
+      "PROPOSAL": "Teklif",
+      "CONTRACT": "Sözleşme",
+      "APPLICATION_PREP": "Başvuru hazırlığı",
+      "SUBMITTED": "Gönderildi",
+      "WON": "Kazanıldı",
+      "REJECTED": "Reddedildi",
+      "LOST": "Kayıp"
+    },
+    "tasks": {
+      "heading": "Görevler",
+      "empty": "Açık görev yok.",
+      "colTask": "Görev",
+      "colDeal": "Fırsat",
+      "colDue": "Son tarih",
+      "colStatus": "Durum",
+      "open": "Açık",
+      "done": "Tamamlandı",
+      "markDone": "Tamamla",
+      "markOpen": "Geri al",
+      "auto": "Otomatik",
+      "newTask": "Yeni görev",
+      "titleLabel": "Görev",
+      "dueLabel": "Son tarih",
+      "submit": "Görev ekle",
+      "created": "Görev eklendi.",
+      "toggled": "Görev güncellendi.",
+      "dealLabel": "Fırsat"
+    },
+    "errors": {
+      "INVALID": "Girdiler geçersiz. Alanları kontrol edin.",
+      "NOT_FOUND": "Kayıt bulunamadı.",
+      "DUPLICATE": "Bu kurum zaten var.",
+      "TRANSITION": "Bu aşama geçişine izin verilmiyor.",
+      "FAILED": "İşlem tamamlanamadı. Tekrar deneyin."
+    },
+    "common": {
+      "noData": "Veri yok",
+      "required": "Zorunlu alan"
+    },
+    "import": {
+      "heading": "Kurum içe aktarma",
+      "intro": "CSV dosyası seçin. Sütunlar başlıklardan otomatik eşleşir; eşleşmeyi düzeltip önizlemeden sonra içe aktarın. Aynı isimli ve aynı ilde olan kurumlar atlanır.",
+      "fileLabel": "CSV dosyası",
+      "fileHelp": "Ayırıcı virgül, noktalı virgül veya sekme olabilir. Kurum adı zorunludur. En fazla 5.000 satır.",
+      "mappingHeading": "Sütun eşleşmesi",
+      "notMapped": "— eşleşmesin —",
+      "field": {
+        "name": "Kurum adı",
+        "legalName": "Yasal ad",
+        "provinceCode": "İl kodu (plaka)",
+        "website": "Web sitesi",
+        "sizeBand": "Ölçek"
+      },
+      "countTotal": "{count} satır",
+      "countValid": "{count} içe aktarılacak",
+      "countInvalid": "{count} hatalı",
+      "countDuplicate": "{count} kopya (atlanır)",
+      "invalidHeading": "Hatalı satırlar",
+      "duplicateHeading": "Atlanan kopyalar",
+      "colRow": "Satır",
+      "colName": "Kurum adı",
+      "colFields": "Hatalı alan",
+      "colReason": "Neden",
+      "reason": {
+        "FILE": "Dosyanın içinde aynı kayıt var",
+        "EXISTING": "Zaten kayıtlı"
+      },
+      "submit": "İçe aktar ({count})",
+      "imported": "İçe aktarıldı: {created} kayıt. Atlanan kopya: {skipped}. Hatalı satır: {invalid}."
+    },
+    "duplicates": {
+      "heading": "Olası kopya kurumlar",
+      "intro": "Benzer isimli kurumlar burada listelenir. Birini seçip diğerini ona birleştirin: ilişkili kişiler, fırsatlar, görevler ve eşleşmeler taşınır. Birleştirilen kayıt silinmez, arşivlenir.",
+      "empty": "Olası kopya bulunmadı.",
+      "reason": {
+        "TAX_NUMBER": "Aynı vergi numarası",
+        "DEDUPE_KEY": "Aynı normalleştirilmiş ad ve il",
+        "SIMILAR_NAME": "Benzer ad"
+      },
+      "strength": {
+        "EXACT": "Kesin eşleşme",
+        "LIKELY": "Muhtemelen aynı",
+        "POSSIBLE": "Olabilir"
+      },
+      "similarity": "Benzerlik %{percent}",
+      "keepLegend": "Tutulacak kayıt",
+      "mergeButton": "Birleştir",
+      "merged": "Birleştirildi: {contacts} kişi ve {deals} fırsat taşındı."
+    }
   }
 }
