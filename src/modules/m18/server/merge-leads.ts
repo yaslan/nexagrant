@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { TenantTx } from '@/lib/db';
+import { requireActionId } from '@/lib/required-id';
 import { blankFieldsFrom, MERGE_FILL_FIELDS } from './duplicate-pairs';
 
 /**
@@ -23,42 +24,50 @@ export interface MergeResult {
   filledFields: string[];
 }
 
-/** Returns null when either organisation is not visible to this tenant (or already deleted). */
+/**
+ * Returns null when either organisation is not visible to this tenant (or already deleted).
+ * Throws MissingIdError when the tenant or either organisation id is blank: every `where` below
+ * runs on ids checked here, so a missing id can never widen a filter to the whole tenant.
+ */
 export async function mergeLeadOrganizations(
   tx: TenantTx,
   tenantId: string,
   rawInput: unknown,
   now = new Date(),
 ): Promise<MergeResult | null> {
+  requireActionId(tenantId, 'tenantId');
   const input = mergeSchema.parse(rawInput);
+  const keepId = requireActionId(input.keepId, 'keepId');
+  const dropId = requireActionId(input.dropId, 'dropId');
   const [keep, drop] = await Promise.all([
-    tx.leadOrganization.findFirst({ where: { id: input.keepId, tenantId, deletedAt: null } }),
-    tx.leadOrganization.findFirst({ where: { id: input.dropId, tenantId, deletedAt: null } }),
+    tx.leadOrganization.findFirst({ where: { id: keepId, tenantId, deletedAt: null } }),
+    tx.leadOrganization.findFirst({ where: { id: dropId, tenantId, deletedAt: null } }),
   ]);
   if (!keep || !drop) return null;
 
   // A call can match only one row per organisation (unique on tenant × org × call). Matches the
   // kept row already has are dropped from the other side instead of moved into a clash.
-  const keptCalls = await tx.leadMatch.findMany({
-    where: { tenantId, organizationId: keep.id },
-    select: { callId: true },
-  });
-  await tx.leadMatch.deleteMany({
-    where: { tenantId, organizationId: drop.id, callId: { in: keptCalls.map((m) => m.callId) } },
-  });
+  const [keptCalls, droppedMatches] = await Promise.all([
+    tx.leadMatch.findMany({ where: { tenantId, organizationId: keepId }, select: { callId: true } }),
+    tx.leadMatch.findMany({ where: { tenantId, organizationId: dropId }, select: { id: true, callId: true } }),
+  ]);
+  const keptCallIds = new Set(keptCalls.map((m) => m.callId));
+  for (const clash of droppedMatches.filter((m) => keptCallIds.has(m.callId))) {
+    await tx.leadMatch.delete({ where: { id: requireActionId(clash.id, 'leadMatchId') } });
+  }
 
   const matches = await tx.leadMatch.updateMany({
-    where: { tenantId, organizationId: drop.id },
-    data: { organizationId: keep.id },
+    where: { tenantId, organizationId: dropId },
+    data: { organizationId: keepId },
   });
   const contacts = await tx.leadContact.updateMany({
-    where: { tenantId, organizationId: drop.id },
-    data: { organizationId: keep.id },
+    where: { tenantId, organizationId: dropId },
+    data: { organizationId: keepId },
   });
   // Deal tasks and activities hang off the deal, so they follow it without a separate move.
   const deals = await tx.deal.updateMany({
-    where: { tenantId, organizationId: drop.id },
-    data: { organizationId: keep.id },
+    where: { tenantId, organizationId: dropId },
+    data: { organizationId: keepId },
   });
 
   const patch = blankFieldsFrom(
