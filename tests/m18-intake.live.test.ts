@@ -87,7 +87,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
   });
 
   afterAll(async () => {
-    await admin.consent.deleteMany({ where: { tenantId: { in: Object.values(tenants) } } });
+    await admin.consent.deleteMany({ where: { userId: { startsWith: `public-lead:pl-${RUN}-` } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
     await admin.$disconnect();
     await prisma.$disconnect();
