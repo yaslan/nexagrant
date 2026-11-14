@@ -5715,6 +5715,11 @@
       "submit": "İçe aktar ({count})",
       "imported": "İçe aktarıldı: {created} kayıt. Atlanan kopya: {skipped}. Hatalı satır: {invalid}."
     },
+    "intake": {
+      "dealTitle": "{organisation} — Fon Hazırlık Karnesi",
+      "firstContactTask": "Fon Hazırlık Karnesi’ni dolduran kişiyle ilk görüşmeyi yap",
+      "activityNote": "Fon Hazırlık Karnesi (iç ön değerlendirme): {total}/100, düzey {level}"
+    },
     "duplicates": {
       "heading": "Olası kopya kurumlar",
       "intro": "Benzer isimli kurumlar burada listelenir. Birini seçip diğerini ona birleştirin: ilişkili kişiler, fırsatlar, görevler ve eşleşmeler taşınır. Birleştirilen kayıt silinmez, arşivlenir.",

@@ -64,6 +64,9 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // FO-389: the daily shared budget of unsolicited PIC lookups. A count per UTC day, no tenant data.
   // See prisma/migrations/add-pic-lookup-budget.sql.
   'PicLookupBudget',
+  // NG-167: province -> consultancy tenant map for readiness leads. Platform data managed by the platform
+  // admin; its tenantId is a TARGET, not an owner. RLS on with system_scope only (SYSTEM_SCOPE_POLICY).
+  'ProvinceLeadRoute',
 ]);
 
 /**
@@ -84,7 +87,7 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set([
  * K-562266 = A). Reachable only through withSystemScope(). tests/rls-coverage.test.ts
  * pins this set to the block in prisma/rls.sql.
  */
-export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt']);
+export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt', 'ProvinceLeadRoute']);
 
 /**
  * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.
