@@ -107,17 +107,37 @@ async function markUnmatched(db: typeof prisma, publicLeadId: string, reason: Un
   );
 }
 
-/** Gives the claim back (M18 refused the tenant, or the call failed), only if THIS target still holds it. */
-async function releaseClaim(db: typeof prisma, publicLeadId: string, tenantId: string, reason: UnmatchedReason | null): Promise<void> {
+/** The route mark a lead carried before this call claimed it (null = never marked). */
+interface PriorMark {
+  routeStatus: string | null;
+  routeReason: string | null;
+  routedAt: Date | null;
+}
+
+/**
+ * Gives the claim back, only if THIS target still holds it. Called ONLY for a `refused` answer: M18 returns
+ * every refusal before it writes, so nothing landed. A thrown port is NOT a refusal (see forwardPublicLead).
+ *  - `tenant_refused` → 'unmatched/tenant_refused' (the tenant is the problem: the admin must re-map);
+ *  - anything else    → the mark the lead had before the claim (NG-181 D-2): an 'unmatched' lead stays on
+ *                       the platform-admin worklist instead of silently dropping to NULL.
+ */
+async function releaseClaim(
+  db: typeof prisma,
+  publicLeadId: string,
+  tenantId: string,
+  outcome: { reason: 'tenant_refused' } | { restore: PriorMark }
+): Promise<void> {
   const leadId = requireActionId(publicLeadId, 'publicLeadId');
   const owner = requireActionId(tenantId, 'tenantId');
+  const prior = 'restore' in outcome ? outcome.restore : null;
+  const data =
+    'reason' in outcome
+      ? { routeStatus: 'unmatched', routeReason: outcome.reason, routedTenantId: null, routedAt: new Date() }
+      : prior && prior.routeStatus === 'unmatched' && prior.routeReason
+        ? { routeStatus: 'unmatched', routeReason: prior.routeReason, routedTenantId: null, routedAt: prior.routedAt ?? new Date() }
+        : { routeStatus: null, routeReason: null, routedTenantId: null, routedAt: null };
   await withSystemScopeOn(db, 'cross-tenant-job', 'public-lead-intake.release', (tx) =>
-    tx.publicLead.updateMany({
-      where: { id: leadId, routeStatus: 'routed', routedTenantId: owner },
-      data: reason
-        ? { routeStatus: 'unmatched', routeReason: reason, routedTenantId: null, routedAt: new Date() }
-        : { routeStatus: null, routeReason: null, routedTenantId: null, routedAt: null },
-    })
+    tx.publicLead.updateMany({ where: { id: leadId, routeStatus: 'routed', routedTenantId: owner }, data })
   );
 }
 
@@ -129,7 +149,9 @@ async function releaseClaim(db: typeof prisma, publicLeadId: string, tenantId: s
  *  - already routed (NG-174)        → never a second tenant: same target → idempotent re-ask of that
  *                                     tenant only; any other target (map moved, mapping gone, tenant
  *                                     deleted) → `skipped/already_routed`, port NOT called, row untouched;
- *  - consent + province mapped      → target claimed atomically, then port.accept(...);
+ *  - consent + province mapped      → target claimed atomically, then port.accept(...); if the port
+ *                                     THROWS the claim is kept (the write may have landed) and the error
+ *                                     propagates; only a `refused` answer gives the claim back;
  *  - consent + province empty/unmapped, or the mapped tenant refuses → port NOT called (or its
  *    refusal kept), lead marked 'unmatched' for the platform-admin worklist. No default tenant.
  * Safe to call again for an unmatched lead after the map changed (M18 answers `duplicate` if it already landed).
@@ -146,7 +168,7 @@ export async function forwardPublicLead(
       select: {
         id: true, name: true, email: true, organisation: true, province: true, district: true,
         readinessCode: true, transferConsent: true, transferConsentVersion: true, transferConsentAt: true,
-        locale: true, createdAt: true, routeStatus: true, routedTenantId: true,
+        locale: true, createdAt: true, routeStatus: true, routeReason: true, routedAt: true, routedTenantId: true,
       },
     });
     if (!found) return { lead: null, decision: null };
@@ -172,17 +194,16 @@ export async function forwardPublicLead(
     );
     return reAskOwner(lead, owner?.routedTenantId ?? null, decision, port);
   }
-  let result: LeadIntakeResult;
-  try {
-    result = await port.accept(request);
-  } catch (err) {
-    await releaseClaim(db, lead.id, decision.tenantId, null);
-    throw err;
-  }
+  // NG-181 (NG-174 review H-1): a throw is NOT released. An exception does not say whether M18 wrote:
+  // the commit may have landed and only its answer was lost. Giving the claim back would let the next call
+  // claim a different tenant and copy the lead there. Kept as 'routed' + this tenant, the worst case is a
+  // lead stuck without a copy; a repeat call re-asks THIS tenant only (reAskOwner) and M18 answers
+  // `created` (nothing had landed) or `duplicate` (it had).
+  const result = await port.accept(request);
   if (result.status === 'refused' && (result.reason === 'tenant_not_found' || result.reason === 'tenant_ineligible')) {
-    await releaseClaim(db, lead.id, decision.tenantId, 'tenant_refused');
+    await releaseClaim(db, lead.id, decision.tenantId, { reason: 'tenant_refused' });
   } else if (result.status === 'refused') {
-    await releaseClaim(db, lead.id, decision.tenantId, null);
+    await releaseClaim(db, lead.id, decision.tenantId, { restore: lead });
   }
   return result;
 }
