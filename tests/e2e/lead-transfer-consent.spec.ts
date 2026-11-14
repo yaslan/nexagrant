@@ -127,7 +127,8 @@ test.describe('transfer box (NG-179)', () => {
   test.setTimeout(180_000);
 
   test.beforeAll(async () => {
-    if (!FLAG_ON) return;
+    // Seeded in BOTH runs: with the flag off Sinop must still be mapped, or (e) could not tell
+    // "gate closed" from "province unmapped".
     await withSystemScope('platform-admin', 'e2e.lead-transfer.setup', async (tx) => {
       // A run that was killed never reaches afterAll: clear its leftovers so the Sinop route is free.
       const stale = await tx.tenant.findMany({ where: { slug: { startsWith: 'e2e-transfer-org-' } }, select: { id: true } });
@@ -142,7 +143,7 @@ test.describe('transfer box (NG-179)', () => {
 
   test.afterAll(async () => {
     // E2E_KEEP_TRANSFER_ROWS=1 leaves the rows and the test organisation in place for a raw psql read.
-    if (!FLAG_ON || process.env.E2E_KEEP_TRANSFER_ROWS === '1') return;
+    if (process.env.E2E_KEEP_TRANSFER_ROWS === '1') return;
     await withSystemScope('platform-admin', 'e2e.lead-transfer.cleanup', async (tx) => {
       await tx.publicLead.deleteMany({ where: { email: { endsWith: `@${DOMAIN}` } } });
       const org = await tx.tenant.findUnique({ where: { slug: ORG_SLUG }, select: { id: true } });

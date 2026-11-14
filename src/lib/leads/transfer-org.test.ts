@@ -17,7 +17,7 @@ const untouchedDb = () => {
   const fail = () => {
     throw new Error('database must not be read while the gate is off');
   };
-  return { $transaction: vi.fn(fail) } as unknown as PrismaClient;
+  return { $transaction: vi.fn(fail), $queryRaw: vi.fn(fail) } as unknown as PrismaClient;
 };
 
 describe('transferOrgNameFor: publication gate (NG-179)', () => {
@@ -30,5 +30,6 @@ describe('transferOrgNameFor: publication gate (NG-179)', () => {
     const db = untouchedDb();
     await expect(transferOrgNameFor('Samsun', db)).resolves.toBeNull();
     expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
   });
 });
