@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * TASK-MUPUHIIKSQAPN — Tenant profile (capabilities, keywords, TRL range) update action
  * tests form validation, authorization, persistence, and error handling.
@@ -37,7 +38,9 @@ import { slack } from './helpers/timing';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-describe('updateTenantProfile action', () => {
+const HAS_DB = await suiteHasDatabase('settings-profile-update');
+
+describe.skipIf(!HAS_DB)('updateTenantProfile action', () => {
   let tenantId: string;
   let userId: string;
 

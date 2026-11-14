@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../../../tests/helpers/database-availability';
 /**
  * The rules the admin plan screen exists to enforce, tested against the real
  * database rather than a mock — the whole reason this task exists is that a
@@ -30,7 +31,9 @@ import { skipUnlessSeeded } from '../../../tests/helpers/seed';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-describe('plan admin write layer', () => {
+const HAS_DB = await suiteHasDatabase('plan-admin');
+
+describe.skipIf(!HAS_DB)('plan admin write layer', () => {
   /** Saving a module bullet checks it against ModuleCatalog, which only `pnpm db:seed` fills. */
   async function needsModuleCatalog(ctx: { skip: (note?: string) => void }) {
     const known = await prisma.moduleCatalog.count({ where: { id: 'M6' } });

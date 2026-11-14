@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * TASK-MULQLL2T8ZJX4 — the partner portal token and the invite token are stored
  * only as SHA-256, against the real database with only the session faked:
@@ -39,7 +40,9 @@ function ownerSession(tenantId: string) {
   return { user: { id: 'token-hash-user', email: 'token-hash@example.test' }, tenantId, role: 'TENANT_OWNER' };
 }
 
-describe('bearer tokens are stored as SHA-256 only (live DB)', () => {
+const HAS_DB = await suiteHasDatabase('bearer-token-hash.live');
+
+describe.skipIf(!HAS_DB)('bearer tokens are stored as SHA-256 only (live DB)', () => {
   let tenantId: string;
 
   beforeEach(async () => {

@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
@@ -47,7 +48,9 @@ type Storefront = {
   PlanNotAvailableError: new (sku: string, reason: 'unknown' | 'not-visible') => Error;
 };
 
-describe('the storefront a tenant sees is the storefront it may buy from', () => {
+const HAS_DB = await suiteHasDatabase('plan-storefront.spec');
+
+describe.skipIf(!HAS_DB)('the storefront a tenant sees is the storefront it may buy from', () => {
   let rls: PrismaClient;
   let tenantA_Id: string;
   let tenantB_Id: string;
