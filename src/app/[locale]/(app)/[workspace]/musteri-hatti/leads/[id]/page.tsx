@@ -8,6 +8,7 @@ import { asRole, can } from '@/lib/rbac';
 import { getLead } from '@/modules/m18/server/leads-repo';
 import { SectionNav } from '../../_components/section-nav';
 import { DealCreateForm, StageSelect } from '../../_components/client-forms';
+import { LiveNoticeProvider } from '../../_components/live-notice';
 
 export default async function LeadDetailPage({
   params,
@@ -34,59 +35,61 @@ export default async function LeadDetailPage({
   }
 
   return (
-    <main className="space-y-6 p-6">
-      <SectionNav locale={locale} workspace={workspace} active="leads" />
-      <Link href={back} className="text-sm text-sky-800 underline">{t('lead.backToList')}</Link>
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">{lead.name}</h1>
-        <p className="text-sm text-slate-600">{t(`lifecycle.${lead.lifecycle}`)}</p>
-        {lead.legalName ? (
-          <p className="text-sm">
-            <span className="text-slate-600">{t('lead.legalName')}</span> {lead.legalName}
-          </p>
-        ) : null}
-        {lead.website ? (
-          <a href={lead.website} rel="noopener noreferrer" className="text-sm text-sky-800 underline">{lead.website}</a>
-        ) : null}
-      </header>
+    <LiveNoticeProvider>
+      <main className="space-y-6 p-6">
+        <SectionNav locale={locale} workspace={workspace} active="leads" />
+        <Link href={back} className="text-sm text-sky-800 underline">{t('lead.backToList')}</Link>
+        <header className="space-y-1">
+          <h1 className="text-2xl font-semibold">{lead.name}</h1>
+          <p className="text-sm text-slate-600">{t(`lifecycle.${lead.lifecycle}`)}</p>
+          {lead.legalName ? (
+            <p className="text-sm">
+              <span className="text-slate-600">{t('lead.legalName')}</span> {lead.legalName}
+            </p>
+          ) : null}
+          {lead.website ? (
+            <a href={lead.website} rel="noopener noreferrer" className="text-sm text-sky-800 underline">{lead.website}</a>
+          ) : null}
+        </header>
 
-      <section aria-labelledby="contacts-heading" className="space-y-2">
-        <h2 id="contacts-heading" className="text-lg font-semibold">{t('lead.contactsHeading')}</h2>
-        {lead.contacts.length === 0 ? (
-          <p className="text-slate-600">{t('lead.noContacts')}</p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {lead.contacts.map((c) => (
-              <li key={c.id}>
-                <span className="font-medium">{c.fullName}</span>{' '}
-                <span className="text-slate-600">{[c.title, c.email].filter(Boolean).join(', ')}</span>
-                {c.doNotContact ? <span className="ml-2 text-red-700">{t('lead.doNotContact')}</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <section aria-labelledby="contacts-heading" className="space-y-2">
+          <h2 id="contacts-heading" className="text-lg font-semibold">{t('lead.contactsHeading')}</h2>
+          {lead.contacts.length === 0 ? (
+            <p className="text-slate-600">{t('lead.noContacts')}</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {lead.contacts.map((c) => (
+                <li key={c.id}>
+                  <span className="font-medium">{c.fullName}</span>{' '}
+                  <span className="text-slate-600">{[c.title, c.email].filter(Boolean).join(', ')}</span>
+                  {c.doNotContact ? <span className="ml-2 text-red-700">{t('lead.doNotContact')}</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <section aria-labelledby="deals-heading" className="space-y-2">
-        <h2 id="deals-heading" className="text-lg font-semibold">{t('lead.dealsHeading')}</h2>
-        {lead.deals.length === 0 ? (
-          <p className="text-slate-600">{t('lead.noDeals')}</p>
-        ) : (
-          <ul className="divide-y divide-slate-200 text-sm">
-            {lead.deals.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-                <span className="font-medium">{d.title}</span>
-                <span className="tabular-nums">
-                  {d.estimatedFeeCents != null ? formatMoney(d.estimatedFeeCents, d.currency, locale) : '—'}
-                </span>
-                {canWrite ? <StageSelect dealId={d.id} stage={d.stage} /> : <span>{t(`stage.${d.stage}`)}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <section aria-labelledby="deals-heading" className="space-y-2">
+          <h2 id="deals-heading" className="text-lg font-semibold">{t('lead.dealsHeading')}</h2>
+          {lead.deals.length === 0 ? (
+            <p className="text-slate-600">{t('lead.noDeals')}</p>
+          ) : (
+            <ul className="divide-y divide-slate-200 text-sm">
+              {lead.deals.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                  <span className="font-medium">{d.title}</span>
+                  <span className="tabular-nums">
+                    {d.estimatedFeeCents != null ? formatMoney(d.estimatedFeeCents, d.currency, locale) : '—'}
+                  </span>
+                  {canWrite ? <StageSelect dealId={d.id} stage={d.stage} /> : <span>{t(`stage.${d.stage}`)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      {canWrite ? <DealCreateForm organizationId={lead.id} /> : null}
-    </main>
+        {canWrite ? <DealCreateForm organizationId={lead.id} /> : null}
+      </main>
+    </LiveNoticeProvider>
   );
 }

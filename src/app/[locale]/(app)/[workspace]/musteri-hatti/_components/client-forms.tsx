@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { toMinorUnits } from '@/lib/money';
+import { useLiveNotice } from './live-notice';
 import {
   createDealAction,
   createLeadAction,
@@ -181,9 +182,10 @@ export function DealCreateForm({ organizationId }: { organizationId: string }) {
  */
 export function StageSelect({ dealId, stage }: { dealId: string; stage: string }) {
   const t = useTranslations('m18');
+  const tErr = useTranslations('m18.errors');
   const router = useRouter();
   const [pending, start] = useTransition();
-  const { notice, report } = useFeedback();
+  const { announce } = useLiveNotice();
   const [lostOpen, setLostOpen] = useState(false);
   const [lostReason, setLostReason] = useState('');
 
@@ -191,7 +193,7 @@ export function StageSelect({ dealId, stage }: { dealId: string; stage: string }
     start(async () => {
       const result = await moveDealStageAction({ dealId, to, lostReason: reason });
       if (result.ok) router.refresh();
-      report(result, t('pipeline.moved'));
+      announce(result.ok ? { kind: 'ok', text: t('pipeline.moved') } : { kind: 'err', text: tErr(result.code) });
     });
 
   const onChange = (to: string) => {
@@ -238,16 +240,16 @@ export function StageSelect({ dealId, stage }: { dealId: string; stage: string }
           </button>
         </div>
       ) : null}
-      <NoticeLine notice={notice} />
     </div>
   );
 }
 
 export function TaskToggle({ taskId, done }: { taskId: string; done: boolean }) {
   const t = useTranslations('m18.tasks');
+  const tErr = useTranslations('m18.errors');
   const router = useRouter();
   const [pending, start] = useTransition();
-  const { notice, report } = useFeedback();
+  const { announce } = useLiveNotice();
   return (
     <div className="space-y-1">
       <button
@@ -257,14 +259,13 @@ export function TaskToggle({ taskId, done }: { taskId: string; done: boolean }) 
           start(async () => {
             const result = await setTaskDoneAction({ taskId, done: !done });
             if (result.ok) router.refresh();
-            report(result, t('toggled'));
+            announce(result.ok ? { kind: 'ok', text: t('toggled') } : { kind: 'err', text: tErr(result.code) });
           })
         }
         className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 disabled:opacity-50"
       >
         {done ? t('markOpen') : t('markDone')}
       </button>
-      <NoticeLine notice={notice} />
     </div>
   );
 }
