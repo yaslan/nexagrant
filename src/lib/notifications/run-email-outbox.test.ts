@@ -11,7 +11,7 @@ vi.mock('@/lib/email/mailer', () => ({ smtpMailer: () => null, reportMailNotConf
 
 const { runNotificationEmailOutbox } = await import('./run-email-outbox');
 
-const ok = { mode: 'INSTANT' as const, recipients: 1, mailsSent: 1, itemsSent: 1, itemsDropped: 0, failures: 0 };
+const ok = { mode: 'INSTANT' as const, recipients: 1, mailsSent: 1, itemsSent: 1, itemsDropped: 0, failures: 0, claimLost: 0 };
 const mailer = async () => {};
 
 beforeEach(() => {
