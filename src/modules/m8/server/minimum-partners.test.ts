@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   minimumPartnerState,
+  normalizeCountry,
   passesMinimumPartnerFilter,
   readMinimumPartnerRule,
 } from './minimum-partners';
@@ -89,5 +90,26 @@ describe('passesMinimumPartnerFilter', () => {
   it('keeps everyone while there is slack', () => {
     expect(passesMinimumPartnerFilter('DE', loose)).toBe(true);
     expect(passesMinimumPartnerFilter(null, loose)).toBe(true);
+  });
+});
+
+// CRW NG-186 (2. tur) C-1: CORDIS and PartnerOrg countries go through one normaliser.
+describe('normalizeCountry', () => {
+  it.each<[string | null | undefined, string | null]>([
+    ['DE', 'DE'],
+    [' de ', 'DE'],
+    ['fr', 'FR'],
+    ['', null],
+    ['   ', null],
+    [null, null],
+    [undefined, null],
+  ])('normalises %j to %j', (input, expected) => {
+    expect(normalizeCountry(input)).toBe(expected);
+  });
+
+  it('drops a lower-case candidate from a country already held', () => {
+    const tight = minimumPartnerState({ minPartners: 3, minCountries: 3 }, ['CONFIRMED', 'OPEN', 'OPEN'], new Set(['DE']));
+    expect(passesMinimumPartnerFilter('de', tight)).toBe(false);
+    expect(passesMinimumPartnerFilter(' fr', tight)).toBe(true);
   });
 });

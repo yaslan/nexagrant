@@ -376,6 +376,38 @@ describe('runSeatMatch', () => {
     });
   });
 
+  // CRW NG-186 (2. tur) C-1: a CORDIS country stored in lower case / with spaces is the same
+  // country as the upper-case PartnerOrg and candidate countries.
+  it('normalises CORDIS countries the same way as PartnerOrg countries', async () => {
+    const { tx, created } = fakeTx({
+      'opportunity.findFirst': {
+        id: 'opp-1',
+        topicId: 'topic-1',
+        seats: [
+          { status: 'CONFIRMED', organizationId: 'org-confirmed', partnerOrgId: null },
+          { status: 'CONFIRMED', organizationId: null, partnerOrgId: 'po-1' },
+          { status: 'OPEN', organizationId: null, partnerOrgId: null },
+        ],
+      },
+      'topic.findFirst': {
+        identifier: 'HORIZON-CL5-2026-D4-01',
+        callId: 'call-1',
+        eligibility: { restricted: null, minPartners: 4, minCountries: 3 },
+      },
+      'cordisOrganization.findMany': (args: { where: { organisationId: { in: string[] } } }) =>
+        [
+          { organisationId: 'org-a', country: 'FR' },
+          { organisationId: 'org-b', country: 'it' },
+          { organisationId: 'org-confirmed', country: ' de ' },
+        ].filter((o) => args.where.organisationId.in.includes(o.organisationId)),
+      'partnerOrg.findMany': [{ country: 'IT' }],
+    });
+    await runSeatMatch(tx, params);
+    // DE + IT held (2 countries), 1 missing, 1 seat open: only FR brings a new country;
+    // "it" is Italy, already held through the PartnerOrg.
+    expect(created.map((c) => c.organizationId)).toEqual(['org-a']);
+  });
+
   // CRW NG-186 bulgu 4: the filter runs before the pool is cut to its 100 best.
   it('fills the pool with eligible organisations ranked below 100 dropped ones', async () => {
     // 100 German organisations with 2 participations each outrank one French one with 1.

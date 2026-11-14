@@ -138,6 +138,37 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     });
   }, 180_000);
 
+  it('rls:verify --require-db exits 1 when expert_directory keeps every expected fragment but ORs the conditions away (SEC NG-185 M3b)', async () => {
+    // Every fragment the old substring check asked for is still in the text ('expert-directory',
+    // system_scope_sealed(), 'verified', "visibilityConsentAt" IS NOT NULL), yet each one is
+    // OR-ed with true: the policy opens every row. The catalogue check must name it, not only
+    // the behaviour probe. TO pg_monitor, so no real session reads through it; restored from
+    // rls.sql in finally, under the same lock as the test above.
+    await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
+      try {
+        await admin.query(`drop policy expert_directory on "ExpertPreRegistration"`);
+        await admin.query(
+          `create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (
+             (coalesce(current_setting('app.system_scope_purpose', true), '') = 'expert-directory' OR public.system_scope_sealed() OR true)
+             AND (status = 'verified' OR ('verified' <> '' OR true))
+             AND ("visibilityConsentAt" IS NOT NULL OR true))`
+        );
+        const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
+          cwd: REPO,
+          env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
+          encoding: 'utf8',
+          timeout: 170_000,
+        });
+        const out = `${run.stdout}${run.stderr}`;
+        expect(run.status, out.slice(-2000)).toBe(1);
+        expect(out).toContain('ExpertPreRegistration: politika kümesi {expert_directory, system_scope}');
+        expect(out).toContain('— fazla: expert_directory (SELECT)');
+      } finally {
+        await admin.query(expertDirectoryPolicy());
+      }
+    });
+  }, 180_000);
+
   it('the NG-183 block of prisma/rls.sql drops stray policies on system_scope tables only', async () => {
     await admin.query(`create policy ${STRAY} on "PublicLead" for select to pg_monitor using (true)`);
     await admin.query(`create policy ${STRAY} on "ProvinceLeadRoute" to pg_monitor using (true) with check (true)`);

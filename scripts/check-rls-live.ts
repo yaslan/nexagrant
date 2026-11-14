@@ -678,19 +678,65 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
 /**
  * NG-52 (ADR-0009 §9, SEC NG-185 F-3): the one named exception to "exactly {system_scope}".
  * expert_directory on ExpertPreRegistration, SELECT only, gated on the sealed
- * 'expert-directory' purpose and on verified rows. The same name on another table, with
- * another command, or with a predicate missing one of `qualMustInclude` is still drift.
+ * 'expert-directory' purpose and on verified rows. The same name on another table, or with
+ * another command, is still drift; and so is any predicate other than the one prisma/rls.sql
+ * writes (SEC NG-185 M3b): the live `qual` must equal, character for character, what
+ * Postgres deparses from rls.sql's own USING expression (`expectedQual`). A substring check
+ * let `… AND ('verified' <> '' OR true) …` through, which keeps every expected fragment and
+ * opens every row. The expected text is compiled by the same server, so the comparison does
+ * not depend on how a Postgres version prints an expression.
  * prisma/rls.sql's NG-183 block keeps exactly this (table, name, command) and drops the rest.
  * What the policy shows is measured by probeExpertDirectory.
  */
-const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string; qualMustInclude: readonly string[] }> = [
-  {
-    table: 'ExpertPreRegistration',
-    policy: 'expert_directory',
-    cmd: 'SELECT',
-    qualMustInclude: ["'expert-directory'", 'system_scope_sealed()', "'verified'", '"visibilityConsentAt" IS NOT NULL'],
-  },
+const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string }> = [
+  { table: 'ExpertPreRegistration', policy: 'expert_directory', cmd: 'SELECT' },
 ];
+
+/** The USING expression of `CREATE POLICY <policy> ON public."<table>"` in prisma/rls.sql, verbatim. */
+function rlsSqlUsingExpression(sql: string, table: string, policy: string): string | null {
+  const head = `CREATE POLICY ${policy} ON public."${table}"`;
+  const start = sql.indexOf(head);
+  if (start < 0) return null;
+  const end = sql.indexOf(';', start);
+  if (end < 0) return null;
+  const stmt = sql.slice(start + head.length, end);
+  const using = /\bUSING\b/i.exec(stmt);
+  if (!using) return null;
+  return stmt.slice(using.index + using[0].length).trim();
+}
+
+/**
+ * The `qual` Postgres prints for rls.sql's expression, compiled on a temporary copy of the
+ * table (CREATE TEMP TABLE … LIKE) inside a transaction that is rolled back: the real
+ * table is never locked or altered. null (with the reason) when it cannot be compiled.
+ */
+async function expectedQual(
+  client: pg.Client,
+  table: string,
+  policy: string,
+  cmd: string
+): Promise<{ qual: string } | { error: string }> {
+  const expr = rlsSqlUsingExpression(readFileSync(resolve(process.cwd(), 'prisma/rls.sql'), 'utf8'), table, policy);
+  if (!expr) return { error: `prisma/rls.sql içinde ${table}.${policy} USING ifadesi bulunamadı` };
+  const tmp = `rls_verify_expected_${table.toLowerCase()}`;
+  await client.query('begin');
+  try {
+    await client.query(`create temp table ${tmp} (like public."${table}") on commit drop`);
+    await client.query(`create policy ${policy} on pg_temp.${tmp} for ${cmd} using ${expr}`);
+    const r = await client.query<{ qual: string | null }>(
+      `select pg_get_expr(p.polqual, p.polrelid) as qual
+         from pg_policy p
+        where p.polrelid = ('pg_temp.' || $1)::regclass and p.polname = $2`,
+      [tmp, policy]
+    );
+    const qual = r.rows[0]?.qual;
+    return qual ? { qual } : { error: `${table}.${policy}: beklenen qual derlenemedi` };
+  } catch (e) {
+    return { error: `${table}.${policy}: beklenen qual derlenemedi (${e instanceof Error ? e.message.split('\n')[0] : String(e)})` };
+  } finally {
+    await client.query('rollback');
+  }
+}
 
 /** The purpose the read probe writes its row under: opens every SYSTEM_SCOPE_TABLES table (rls.sql system_scope_open). */
 const PROBE_ROW_PURPOSE = 'platform-admin';
@@ -1273,11 +1319,23 @@ async function main() {
       ]),
     ].sort();
     const policySetDrift: string[] = [];
+    const expectedQuals = new Map<string, string>();
+    for (const a of SYSTEM_SCOPE_ALLOWED_EXTRA) {
+      if (!existing.has(a.table)) continue;
+      const e = await expectedQual(client, a.table, a.policy, a.cmd);
+      if ('qual' in e) expectedQuals.set(`${a.table}.${a.policy}`, e.qual);
+      else policySetDrift.push(e.error);
+    }
     for (const t of systemScopeTables) {
       const pols = policiesOf.get(t) ?? [];
       const allowed = (p: { policyname: string; cmd: string; qual: string | null }) =>
         SYSTEM_SCOPE_ALLOWED_EXTRA.some(
-          (a) => a.table === t && a.policy === p.policyname && a.cmd === p.cmd && a.qualMustInclude.every((q) => (p.qual ?? '').includes(q))
+          (a) =>
+            a.table === t &&
+            a.policy === p.policyname &&
+            a.cmd === p.cmd &&
+            p.qual !== null &&
+            p.qual === expectedQuals.get(`${a.table}.${a.policy}`)
         );
       const extra = pols.filter((p) => p.policyname !== 'system_scope' && !allowed(p));
       const missing = !pols.some((p) => p.policyname === 'system_scope');
