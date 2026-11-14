@@ -24,7 +24,7 @@
 --     role created later; rls.sql's block revokes anon/authenticated from every owned function).
 --
 -- If isIntakeTenant() changes, change this WHERE in the same PR
--- (src/lib/leads/transfer-org.live.test.ts pins both against the same rows).
+-- (tests/transfer-org-name.live.test.ts pins both against the same rows).
 --
 -- Idempotent: CREATE OR REPLACE + REVOKE/GRANT. Touches no rows. Additive.
 -- Rollback: prisma/migrations/add-province-transfer-org-name.down.sql
