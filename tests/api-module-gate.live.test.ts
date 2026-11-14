@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * TASK-MVDPYNG1JI0S1 (FO-80) — the Partner REST API is gated by M1 against the real
  * database: a key keeps authenticating in the DB, so the module state and the plan
@@ -11,7 +12,9 @@ import { requireId } from './helpers/teardown-guard';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-describe('/api/v1 module gate (live DB)', () => {
+const HAS_DB = await suiteHasDatabase('api-module-gate.live');
+
+describe.skipIf(!HAS_DB)('/api/v1 module gate (live DB)', () => {
   let tenantId: string;
   let key: string;
 

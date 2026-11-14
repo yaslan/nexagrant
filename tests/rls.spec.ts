@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
@@ -17,7 +18,9 @@ import { skipOrFailInCi } from './helpers/live-db-role';
  */
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 
-describe('Row Level Security (RLS)', () => {
+const HAS_DB = await suiteHasDatabase('rls.spec');
+
+describe.skipIf(!HAS_DB)('Row Level Security (RLS)', () => {
   let tenantA_Id: string;
   let tenantB_Id: string;
   let workspaceA_Id: string;
