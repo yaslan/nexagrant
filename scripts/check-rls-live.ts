@@ -612,11 +612,20 @@ const PUBLIC_LEAD_INSERT = `insert into ${quoteIdent('PublicLead')} (id, name, e
  * insert; inside `public-intake` every row is visible. Rolled back, nothing is kept.
  * FO-50 (K-568932 = A): ExpertFounderCounter, its founder-number counter, has the
  * same contract and is measured the same way.
+ *
+ * NG-183: this is also THE list of system_scope tables (tables with no tenant whose
+ * one policy is system_scope). main() asks pg_policies that each of them carries
+ * exactly {system_scope}, and fails a catalogue table of that kind missing here.
  */
 const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
   table: string;
   migration: string;
-  insert: (id: string) => [string, unknown[]];
+  /** Null when the row cannot be built (ProvinceLeadRoute with no Tenant to point at). */
+  insert: (id: string, tenantId: string | null) => [string, unknown[]] | null;
+  /** The purpose that must show every row (default 'public-intake'). */
+  purpose?: string;
+  /** The row the read probe adds, when it differs from `insert` (the counter's upsert). */
+  probeRow?: (id: string, tenantId: string | null) => [string, unknown[]] | null;
   /** The measured role must hold no DELETE/TRUNCATE (crw-fb Ö-1: the counter only goes up). */
   noDelete?: boolean;
 }> = [
@@ -639,15 +648,97 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
     table: 'ExpertFounderCounter',
     migration: 'add-expert-founder-counter.sql',
     insert: () => [`insert into ${quoteIdent('ExpertFounderCounter')} (id, "lastNumber", "updatedAt") values (1, 0, now())`, []],
+    // One row at most (CHECK id = 1): on a seeded counter the upsert touches updatedAt only.
+    probeRow: () => [
+      `insert into "ExpertFounderCounter" (id, "lastNumber", "updatedAt") values (1, 0, now())
+       on conflict (id) do update set "updatedAt" = excluded."updatedAt"`,
+      [],
+    ],
     noDelete: true,
   },
+  {
+    // FO-26: the per-IP counter of the expert form (pseudonymous personal data).
+    table: 'ExpertPreRegAttempt',
+    migration: 'add-expert-pre-reg-attempt.sql',
+    insert: (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]],
+  },
+  {
+    // NG-167: province -> consultancy map; closed to public-intake (NG-175 D-1).
+    // active = false keeps the probe clear of the one-active-route-per-province index.
+    table: 'ProvinceLeadRoute',
+    migration: 'add-province-lead-route.sql',
+    purpose: 'platform-admin',
+    insert: (id, tenantId) =>
+      tenantId
+        ? [`insert into "ProvinceLeadRoute" (id, province, "targetTenantId", active, "updatedAt") values ($1, 'Bolu', $2, false, now())`, [id, tenantId]]
+        : null,
+  },
 ];
+
+/** The purpose the read probe writes its row under: opens every SYSTEM_SCOPE_TABLES table (rls.sql system_scope_open). */
+const PROBE_ROW_PURPOSE = 'platform-admin';
+
+/**
+ * NG-183 (NG-175 review Düşük-2): on an empty table "0 rows outside the scope" measured
+ * nothing — a foreign `FOR SELECT USING (true)` policy on an empty PublicLead passed
+ * rls:verify. So before a read is counted, the measured role writes one probe row per
+ * table INSIDE the caller's transaction (under PROBE_ROW_PURPOSE), then closes the scope
+ * again. Its own uncommitted row is visible to it alone, and the caller ROLLS BACK: no
+ * other session ever sees it (the PublicLead forwarder cannot pick it up) and a crashed
+ * run leaves nothing, so live keeps no probe row by construction. `added` = rows the
+ * probe added (0 for a seeded counter, whose upsert only touches updatedAt).
+ */
+async function addProbeRows(
+  m: pg.Client,
+  tables: readonly string[],
+  tenantId: string | null
+): Promise<{ added: Map<string, number>; failures: string[]; checks: string[] }> {
+  const added = new Map<string, number>();
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const count = async (t: string): Promise<number> =>
+    Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(t)}`)).rows[0]?.n ?? -1);
+  await m.query('select enter_system_scope($1)', [PROBE_ROW_PURPOSE]);
+  for (const t of tables) {
+    const spec = SYSTEM_SCOPE_TABLES.find((s) => s.table === t);
+    const row = spec ? (spec.probeRow ?? spec.insert)(`rls-verify-${randomBytes(6).toString('hex')}`, tenantId) : null;
+    if (!spec) {
+      failures.push(`${t}: okuma probu satırı tanımsız (SYSTEM_SCOPE_TABLES) — boş tabloda okuma ölçülemez`);
+      continue;
+    }
+    if (!row) {
+      checks.push(`${t}: okuma probu satırı ATLANDI — veritabanında Tenant yok, satır kurulamıyor`);
+      continue;
+    }
+    const before = await count(t);
+    await m.query('savepoint probe_row');
+    try {
+      await m.query(...row);
+      await m.query('release savepoint probe_row');
+    } catch (e) {
+      await m.query('rollback to savepoint probe_row');
+      failures.push(
+        `${t}: okuma probu satırı ${PROBE_ROW_PURPOSE} kapsamında yazılamadı — ${isRlsViolation(e) ? 'RLS' : e instanceof Error ? e.message.split('\n')[0] : String(e)}`
+      );
+      continue;
+    }
+    const after = await count(t);
+    if (after < 1) failures.push(`${t}: okuma probu satırı yazıldı ama ${PROBE_ROW_PURPOSE} kapsamında görünmüyor`);
+    added.set(t, after - before);
+  }
+  // Close the scope for the rest of the transaction: system_scope_open() needs app.system_scope = 'on'.
+  await m.query(
+    `select set_config('app.system_scope', 'off', true), set_config('app.system_scope_purpose', '', true), set_config('app.system_scope_token', '', true)`
+  );
+  return { added, failures, checks };
+}
 
 async function probeSystemScopeTable(
   m: pg.Client,
   spec: (typeof SYSTEM_SCOPE_TABLES)[number],
   rlsOn: boolean,
-  expectedRows: number
+  expectedRows: number,
+  tenantId: string | null
 ): Promise<{ failures: string[]; checks: string[] }> {
   const failures: string[] = [];
   const checks: string[] = [];
@@ -667,15 +758,20 @@ async function probeSystemScopeTable(
   }
 
   const id = `rls-verify-${randomBytes(6).toString('hex')}`;
-  await m.query('begin');
-  try {
-    await m.query(...spec.insert(id));
-    failures.push(`${table}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
-  } catch (e) {
-    if (isRlsViolation(e)) checks.push(`${table}: sistem kapsamı dışında INSERT reddedildi`);
-    else failures.push(`${table}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
-  } finally {
-    await m.query('rollback');
+  const insert = spec.insert(id, tenantId);
+  if (!insert) {
+    checks.push(`${table}: sistem kapsamı dışında INSERT ölçülmedi — veritabanında Tenant yok`);
+  } else {
+    await m.query('begin');
+    try {
+      await m.query(...insert);
+      failures.push(`${table}: sistem kapsamı DIŞINDA INSERT kabul edildi.`);
+    } catch (e) {
+      if (isRlsViolation(e)) checks.push(`${table}: sistem kapsamı dışında INSERT reddedildi`);
+      else failures.push(`${table}: INSERT beklenmeyen hatayla düştü — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+    } finally {
+      await m.query('rollback');
+    }
   }
 
   if (spec.noDelete) {
@@ -688,14 +784,28 @@ async function probeSystemScopeTable(
     else checks.push(`${table}: ölçüm rolünde DELETE ve TRUNCATE yetkisi yok`);
   }
 
+  // NG-183: the read measured against a real row (addProbeRows), rolled back with the rest.
+  const purpose = spec.purpose ?? 'public-intake';
   await m.query('begin');
   try {
-    await m.query(`select enter_system_scope('public-intake')`);
+    const probe = await addProbeRows(m, [table], tenantId);
+    failures.push(...probe.failures);
+    checks.push(...probe.checks);
+    const n = expectedRows + (probe.added.get(table) ?? 0);
+    const leaked = await count();
+    if (leaked !== 0) {
+      failures.push(
+        `${table}: sistem kapsamı DIŞINDA ${leaked}/${n} satır okunuyor (geri alınan prob satırıyla ölçüldü) — okuma sızıntısı; pg_policies'teki fazla politikaya bak.`
+      );
+    } else if (n > 0) {
+      checks.push(`${table}: okuma probu — sistem kapsamı dışında 0/${n} satır (prob satırı dahil, geri alındı)`);
+    }
+    await m.query('select enter_system_scope($1)', [purpose]);
     const inside = await count();
-    if (inside !== expectedRows) {
-      failures.push(`${table}: sistem kapsamı İÇİNDE ${inside}/${expectedRows} satır görüldü — politika yanlış.`);
+    if (inside !== n) {
+      failures.push(`${table}: sistem kapsamı (${purpose}) İÇİNDE ${inside}/${n} satır görüldü — politika yanlış.`);
     } else {
-      checks.push(`${table}: sistem kapsamı içinde ${inside}/${expectedRows} satır görüldü`);
+      checks.push(`${table}: sistem kapsamı (${purpose}) içinde ${inside}/${n} satır görüldü`);
     }
   } finally {
     await m.query('rollback');
@@ -818,8 +928,18 @@ async function probePurposeTables(
     await m.query('begin isolation level repeatable read');
   }
   try {
-    const outside = await countAll(m);
     const tenantId = (await m.query<{ id: string }>('select id from "Tenant" order by id limit 1')).rows[0]?.id ?? null;
+    // NG-183: one probe row per system_scope table first, so a closed purpose reads 0 of N
+    // real rows instead of 0 of 0. Visible to this transaction only; rolled back below.
+    const probe = await addProbeRows(
+      m,
+      SYSTEM_SCOPE_TABLES.map((s) => s.table).filter((t) => tables.includes(t)),
+      tenantId
+    );
+    failures.push(...probe.failures);
+    checks.push(...probe.checks);
+    if (truth) for (const [t, n] of probe.added) truth.set(t, (truth.get(t) ?? 0) + n);
+    const outside = await countAll(m);
     const opened = (inside: Map<string, number>) =>
       tables.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
 
@@ -984,6 +1104,42 @@ async function main() {
       .map((r) => r.tablename)
       .sort();
 
+    // NG-183 (NG-175 review Düşük-1): on a system_scope table the one policy is
+    // system_scope. Policies are permissive and OR together, so any other one — even a
+    // SELECT-only `USING (true)` — opens what system_scope keeps shut, and the probes
+    // above could not see it on an empty table. The set must be exactly {system_scope}.
+    // The class is SYSTEM_SCOPE_TABLES plus any catalogue table carrying system_scope
+    // without a tenant policy (a new one must be added to the list to be probed).
+    const allPolicies = await client.query<{ tablename: string; policyname: string; cmd: string }>(
+      `select tablename, policyname, cmd from pg_policies where schemaname = 'public' order by tablename, policyname`
+    );
+    const policiesOf = new Map<string, { policyname: string; cmd: string }[]>();
+    for (const r of allPolicies.rows) policiesOf.set(r.tablename, [...(policiesOf.get(r.tablename) ?? []), r]);
+    const hasTenantPolicy = (t: string) =>
+      (policiesOf.get(t) ?? []).some((p) => p.policyname === 'tenant_isolation' || p.policyname === 'tenant_or_shared');
+    const systemScopeTables = [
+      ...new Set([
+        ...SYSTEM_SCOPE_TABLES.map((s) => s.table).filter((t) => existing.has(t)),
+        ...[...policiesOf.keys()].filter((t) => !hasTenantPolicy(t) && (policiesOf.get(t) ?? []).some((p) => p.policyname === 'system_scope')),
+      ]),
+    ].sort();
+    const policySetDrift: string[] = [];
+    for (const t of systemScopeTables) {
+      const pols = policiesOf.get(t) ?? [];
+      const extra = pols.filter((p) => p.policyname !== 'system_scope');
+      const missing = !pols.some((p) => p.policyname === 'system_scope');
+      if (extra.length > 0 || missing) {
+        policySetDrift.push(
+          `${t}: politika kümesi {${pols.map((p) => p.policyname).join(', ')}}, beklenen tam {system_scope}${
+            missing ? ' — system_scope YOK' : ''
+          }${extra.length > 0 ? ` — fazla: ${extra.map((p) => `${p.policyname} (${p.cmd})`).join(', ')}` : ''}`
+        );
+      }
+      if (!SYSTEM_SCOPE_TABLES.some((s) => s.table === t)) {
+        policySetDrift.push(`${t}: system_scope tablosu SYSTEM_SCOPE_TABLES listesinde yok — okuma/yazma probu ölçmüyor`);
+      }
+    }
+
     // Supabase's Data API roles (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2): none of
     // the schema owner's functions in public may be callable by them, or
     // /rest/v1/rpc reaches them anonymously. The roles exist only on Supabase;
@@ -1047,6 +1203,9 @@ async function main() {
 
     console.log(`Kiracıya özel model: ${models.length} · RLS açık tablo: ${rlsOn.size} · tenant_isolation politikası: ${hasPolicy.size}`);
     console.log(`RLS açık + 0 politika (deny-all): ${denyAll.rows.length} · RLS kapalı + anon/authenticated erişimi: ${apiOpenTables.length}`);
+    console.log(
+      `system_scope tablosu: ${systemScopeTables.length} (${systemScopeTables.join(', ')}) · politika kümesi {system_scope} olmayan: ${policySetDrift.length}`
+    );
 
     if (missingTable.length > 0) {
       console.log(`\nℹ  Şemada olup veritabanında olmayan tablo (migration bekliyor): ${missingTable.join(', ')}`);
@@ -1110,10 +1269,16 @@ async function main() {
       populated,
       existing.has('AiUsageLog')
     );
+    // The catalogue finding is reported with the behavioural ones, after the probes ran,
+    // so one run shows both the drifted policy set and the read it leaks (NG-183).
+    failures.push(...policySetDrift);
+    const probeTenantId = truth && existing.has('Tenant')
+      ? ((await truth.client.query<{ id: string }>('select id from "Tenant" order by id limit 1')).rows[0]?.id ?? null)
+      : null;
     for (const spec of SYSTEM_SCOPE_TABLES) {
       if (!existing.has(spec.table)) continue;
       const rows = Number((await truth!.client.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(spec.table)}`)).rows[0]?.n ?? 0);
-      const probe = await probeSystemScopeTable(measurer.client, spec, rlsOn.has(spec.table), rows);
+      const probe = await probeSystemScopeTable(measurer.client, spec, rlsOn.has(spec.table), rows, probeTenantId);
       failures.push(...probe.failures);
       checks.push(...probe.checks);
     }
