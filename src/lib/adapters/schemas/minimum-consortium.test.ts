@@ -58,4 +58,48 @@ describe('parseMinimumConsortium', () => {
       parseMinimumConsortium('No more than 6 different countries may participate; partners must come from 3 different eligible countries.')
     ).toEqual({ minCountries: 3 });
   });
+  // CRW NG-186 (2. tur) B-1: a lower bound paired with a cap in the same phrase keeps the lower bound.
+  it.each<[string, { minPartners?: number; minCountries?: number }]>([
+    ['at least 3 and at most 5 different countries', { minCountries: 3 }],
+    ['at least 3 legal entities from at least 2 and at most 4 different countries', { minPartners: 3, minCountries: 2 }],
+    ['partners from a minimum of 2 and a maximum of 4 different countries', { minCountries: 2 }],
+    ['between 3 and 6 different Member States', { minCountries: 3 }],
+    ['partners from 2 to 4 different countries', { minCountries: 2 }],
+  ])('keeps the lower bound of a range: %s', (text, expected) => {
+    expect(parseMinimumConsortium(text)).toEqual(expected);
+  });
+
+  // CRW NG-186 (2. tur) B-2: more upper-bound qualifiers.
+  it.each([
+    'fewer than 4 different countries',
+    'less than 4 different countries',
+    'limited to 3 different countries',
+    'not exceeding 3 different countries',
+    'under 4 different countries',
+  ])('reads no country minimum from an upper bound (B-2): %s', (text) => {
+    expect(parseMinimumConsortium(text)).toEqual({});
+  });
+
+  // CRW NG-186 (2. tur) A–Q table, kept whole as a regression net.
+  it.each<[string, string, { minPartners?: number; minCountries?: number }]>([
+    ['A', 'up to 3 different countries', {}],
+    ['B', 'no more than 3 different countries', {}],
+    ['C', 'at most 3 different countries', {}],
+    ['D', 'maximum of 3 different countries', {}],
+    ['E', 'up to a maximum of 3 different countries', {}],
+    ['F', 'fewer than 4 different countries', {}],
+    ['G', 'less than 4 different countries', {}],
+    ['H', 'limited to 3 different countries', {}],
+    ['I', 'at least 3 and at most 5 different countries', { minCountries: 3 }],
+    ['J', 'at least 3 legal entities from at least 2 and at most 4 different countries', { minPartners: 3, minCountries: 2 }],
+    ['K', 'at least 4 organisations, of which at most 2 in the same country and at least 3 different countries', { minPartners: 4, minCountries: 3 }],
+    ['L', 'up to 5 different countries; at least 2 different countries', { minCountries: 2 }],
+    ['M', 'maximum 5 different countries, minimum 3 different countries', { minCountries: 3 }],
+    ['N', 'at least 3 partners, up to 2 different countries', { minPartners: 3 }],
+    ['O', 'at least three legal entities, each established in a different country', { minPartners: 3, minCountries: 3 }],
+    ['P', 'at least 3 entities, up to 3 different countries, each established in a different country', { minPartners: 3, minCountries: 3 }],
+    ['Q', 'at least 2 partners from 3 different countries', { minPartners: 2, minCountries: 3 }],
+  ])('CRW table %s: %s', (_id, text, expected) => {
+    expect(parseMinimumConsortium(text)).toEqual(expected);
+  });
 });

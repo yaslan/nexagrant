@@ -11,9 +11,12 @@ import { withSystemScopeOn } from '@/lib/system-scope';
  * visibility consent ("Profilimin uzman rehberinde yayımlanmasına rıza
  * veriyorum"; mandatory in the form, NOT NULL column). A pending or disabled row
  * is never read. The database says the same thing: purpose 'expert-directory' opens only
- * the `expert_directory` policy of prisma/rls.sql (SELECT, those two conditions),
- * so under fabrika_app the WHERE below is a second copy, not the only guard. The
- * owner role bypasses RLS, which is why the WHERE stays.
+ * the `expert_directory` policy of prisma/rls.sql (SELECT, `status = 'verified'` AND
+ * `visibilityConsentAt IS NOT NULL`). The WHERE below repeats only the status half:
+ * the consent half is the NOT NULL column itself (a row without consent cannot exist,
+ * and Prisma does not accept a null filter on a required field). Under fabrika_app the
+ * WHERE is therefore a second copy of the status check, not the only guard; the owner
+ * role bypasses RLS, which is why the WHERE stays.
  *
  * What leaves this file: no name, e-mail, organisation, ORCID, LinkedIn, project
  * codes, consent dates, IP hash or token. The tenant sees a pseudonymous card;

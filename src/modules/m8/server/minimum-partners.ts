@@ -71,8 +71,23 @@ export function minimumPartnerState(
   };
 }
 
-/** Does a candidate from `country` keep the consortium able to reach the call minimum? */
+/**
+ * One spelling for a country code, whichever table it came from (CORDIS organisation,
+ * the tenant's PartnerOrg, an expert pre-registration): trimmed, upper case, blank → null.
+ * CRW NG-186 (2. tur) C-1: PartnerOrg countries were normalised and CORDIS ones were not,
+ * so "de" and "DE" counted as two countries.
+ */
+export function normalizeCountry(country: string | null | undefined): string | null {
+  const c = country?.trim().toUpperCase();
+  return c ? c : null;
+}
+
+/**
+ * Does a candidate from `country` keep the consortium able to reach the call minimum?
+ * `takenCountries` must already hold normalised codes (see `normalizeCountry`).
+ */
 export function passesMinimumPartnerFilter(country: string | null, state: MinimumPartnerState): boolean {
   if (!state.requiresNewCountry) return true;
-  return country !== null && !state.takenCountries.has(country);
+  const c = normalizeCountry(country);
+  return c !== null && !state.takenCountries.has(c);
 }

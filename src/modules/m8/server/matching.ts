@@ -3,7 +3,7 @@ import { isPresentId } from '@/lib/required-id';
 import { MATCH_DIMENSION_SCALE } from '@/lib/scoring/seat-dimension-scale';
 import { normalizeSeatScore } from '@/lib/scoring/seat-score';
 import { SeatNotFoundError } from './errors';
-import { minimumPartnerState, passesMinimumPartnerFilter, readMinimumPartnerRule } from './minimum-partners';
+import { minimumPartnerState, normalizeCountry, passesMinimumPartnerFilter, readMinimumPartnerRule } from './minimum-partners';
 
 /**
  * M8 seat matching — ranked partner candidates for one open consortium seat.
@@ -182,9 +182,7 @@ export async function confirmedSeatCountries(
     ? await tx.partnerOrg.findMany({ where: { id: { in: partnerIds }, tenantId }, select: { country: true } })
     : [];
   return new Set(
-    [...cordis.map((o) => o.country), ...partners.map((o) => o.country?.trim().toUpperCase() ?? null)].filter(
-      (c): c is string => Boolean(c)
-    )
+    [...cordis, ...partners].map((o) => normalizeCountry(o.country)).filter((c): c is string => c !== null)
   );
 }
 
@@ -306,7 +304,7 @@ export async function runSeatMatch(
       where: { organisationId: { in: ranked.map(([orgId]) => orgId) } },
       select: { organisationId: true, country: true },
     });
-    for (const o of rankedOrgs) countryOf.set(o.organisationId, o.country);
+    for (const o of rankedOrgs) countryOf.set(o.organisationId, normalizeCountry(o.country));
     eligible = ranked.filter(([orgId]) => passesMinimumPartnerFilter(countryOf.get(orgId) ?? null, minimumPartners));
   }
   const pool = eligible.slice(0, CANDIDATE_POOL);
@@ -319,7 +317,7 @@ export async function runSeatMatch(
       where: { organisationId: { in: poolIds } },
       select: { organisationId: true, country: true },
     });
-    for (const o of poolOrgs) countryOf.set(o.organisationId, o.country);
+    for (const o of poolOrgs) countryOf.set(o.organisationId, normalizeCountry(o.country));
   }
 
   // ── Co-participation edges with the confirmed partners, for collaboration
