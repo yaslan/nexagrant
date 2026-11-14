@@ -79,7 +79,6 @@ describe('matchExpertsToSeat', () => {
     const experts = [expert({ id: 'tr', country: 'TR' }), expert({ id: 'de', country: 'DE' }), expert({ id: 'fr', country: 'FR' })];
     const result = matchExpertsToSeat(experts, { topicIdentifier: HORIZON, seatRoleKey: 'research' });
     expect(result.matches.map((m) => m.expert.id).sort()).toEqual(['de', 'fr', 'tr']);
-    expect(result.excludedByMinimumPartners).toBe(0);
   });
 
   it('ranks more matched roles first, then the founder number, and keeps the limit', () => {
@@ -145,7 +144,6 @@ describe('expertCandidatesForOpportunity', () => {
     });
     const bySeat = await expertCandidatesForOpportunity(tx, { opportunityId: 'opp-1', tenantId: 't-1', experts: [expert()] });
     expect(bySeat.get('seat-r')?.matches.map((m) => m.expert.id)).toEqual(['epr-1']);
-    expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(0);
     // The consortium's countries are not read for experts at all.
     expect(calls.some((c) => c.key === 'cordisOrganization.findMany')).toBe(false);
   });
@@ -168,7 +166,6 @@ describe('expertCandidatesForOpportunity', () => {
     });
     const bySeat = await expertCandidatesForOpportunity(tx, { opportunityId: 'opp-1', tenantId: 't-1', experts: [expert()] });
     expect(bySeat.get('seat-r')?.matches.map((m) => m.expert.id)).toEqual(['epr-1']);
-    expect(bySeat.get('seat-r')?.excludedByMinimumPartners).toBe(0);
     expect(calls.some((c) => c.key === 'partnerOrg.findMany')).toBe(false);
   });
 

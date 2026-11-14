@@ -65,12 +65,6 @@ export function expertProgrammeForTopic(identifier: string | null | undefined): 
 
 export interface ExpertSeatResult {
   matches: ExpertSeatMatch[];
-  /**
-   * Always 0 since K-581990 = A (experts are not country-filtered). Kept because the
-   * matching page still reads it (expertPool.noneFiltered / expertPool.excluded);
-   * removing it is the UI follow-up's job.
-   */
-  excludedByMinimumPartners: number;
 }
 
 export function matchExpertsToSeat(
@@ -83,7 +77,7 @@ export function matchExpertsToSeat(
 ): ExpertSeatResult {
   const programme = expertProgrammeForTopic(params.topicIdentifier);
   const wanted = EXPERT_ROLES_BY_SEAT_ROLE[params.seatRoleKey];
-  if (!programme || !wanted) return { matches: [], excludedByMinimumPartners: 0 };
+  if (!programme || !wanted) return { matches: [] };
 
   const matches: ExpertSeatMatch[] = [];
   for (const expert of experts) {
@@ -99,7 +93,7 @@ export function matchExpertsToSeat(
       (a.expert.founderNumber ?? Number.MAX_SAFE_INTEGER) - (b.expert.founderNumber ?? Number.MAX_SAFE_INTEGER) ||
       a.expert.id.localeCompare(b.expert.id)
   );
-  return { matches: matches.slice(0, params.limit ?? DEFAULT_LIMIT), excludedByMinimumPartners: 0 };
+  return { matches: matches.slice(0, params.limit ?? DEFAULT_LIMIT) };
 }
 
 interface SeatRow {

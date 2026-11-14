@@ -146,7 +146,7 @@ test.describe('M8 expert pool (NG-52)', () => {
     expect(serverErrors).toEqual([]);
   });
 
-  test('when the minimum-partner filter leaves no expert, the seat says why instead of "no match"', async ({ page }) => {
+  test('K-581990 = A: a consortium country rule does not filter experts, so the Turkish expert stays a candidate', async ({ page }) => {
     const serverErrors: string[] = [];
     page.on('response', (r) => {
       if (r.status() >= 500) serverErrors.push(`HTTP ${r.status()} ${r.url()}`);
@@ -157,11 +157,12 @@ test.describe('M8 expert pool (NG-52)', () => {
 
     const research = page.getByTestId('m8-expert-pool-research');
     await expect(research).toBeVisible();
-    await expect(research.getByTestId('m8-expert-candidate')).toHaveCount(0);
-    // The held country comes from the PartnerOrg seat (TR), so the Turkish expert is filtered.
-    await expect(research.getByTestId('m8-expert-none-filtered')).toContainText('1 uzman');
-    await expect(research.getByTestId('m8-expert-none-filtered')).toContainText('asgari ortak ön filtresine takıldı');
+    // The held country comes from the PartnerOrg seat (TR). Experts ignore it: the Turkish expert
+    // (Düzce, plate 81) is listed, and no "filtered by the minimum-partner rule" state is shown.
+    await expect(research.getByTestId('m8-expert-candidate').filter({ hasText: 'Düzce' })).toHaveCount(1);
     await expect(research.getByTestId('m8-expert-none')).toHaveCount(0);
+    await expect(research.getByTestId('m8-expert-none-filtered')).toHaveCount(0);
+    await expect(research.getByTestId('m8-expert-excluded')).toHaveCount(0);
 
     await research.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${SHOTS}/ng52-expert-pool-filtered.png`, fullPage: true });
