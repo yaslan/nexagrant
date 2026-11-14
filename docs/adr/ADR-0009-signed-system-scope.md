@@ -64,7 +64,24 @@ Kısıtlar:
 - `ProvinceLeadRoute` yalnız `platform-admin` (eşleme yönetimi) ve `cross-tenant-job` (aktarımın hedef seçimi) amaçlarında açılır; NG-170 D-1'de `tenant-discovery`, `subject-scoped` ve `platform-aggregate` 3/3 satır görüyordu.
 - Ölçüm (yerel izole DB, `fabrika_app` ile): kiracı oturumu `PublicLead`'de önce 4/4, sonra 0/4. `pnpm rls:verify` amaca kapalı tabloları `PURPOSE_NARROWED` haritasıyla ölçer ve INSERT reddini dener; daraltma değişirse harita da değişmelidir. Sınır §5–§6 ile aynı.
 
-## 8. Ek: `expert-directory` — doğrulanmış uzmanlar M8'e, yalnız okuma (NG-52, K-579696 = A, 14.11.2026)
+## 8. Ek: `system_scope` tablolarında politika kümesi ve gerçek satırla okuma ölçümü (NG-183, NG-175 incelemesi Düşük-1/Düşük-2, 14.11.2026)
+
+- **Sorun:** Politikalar permissive'dir ve OR'lanır. Bu yüzden `system_scope` tablosuna eklenen her ikinci politika, `system_scope`'un kapattığını açar; yalnız SELECT'i açan bir `USING (true)` da buna dahildir. Boş `PublicLead`'de yabancı `FOR SELECT USING (true)` politikası varken `pnpm rls:verify --require-db` exit 0 dönüyordu, çünkü okuma probu boş tabloda `0/0` ölçüyordu. `pnpm db:rls` de yalnız `system_scope`'u yeniden kurup yabancı politikayı bırakıyordu.
+- **`system_scope` tablosu:** Kiracı politikası (`tenant_isolation`, `tenant_or_shared`) olmayan ve `system_scope` politikası taşıyan tablo. Bugün `ExpertPreRegistration`, `ExpertPreRegAttempt`, `ExpertFounderCounter`, `ProvinceLeadRoute` ve `PublicLead`. Liste `scripts/check-rls-live.ts` `SYSTEM_SCOPE_TABLES`'tır. Katalogda bu sınıfta olup listede olmayan tablo `rls:verify`'ı kırmızı yapar, çünkü o tablonun probu olmaz.
+- **Politika kümesi (Düşük-1):** `rls:verify` her `system_scope` tablosunda `pg_policies` adlarının tam `{system_scope}` olmasını ister. Fazla ya da eksik politika exit 1 verir; mesajda tablo, politika adı ve komut yer alır. Bulgu davranış problarından sonra raporlanır; böylece aynı koşu sızan okumayı da gösterir.
+- **Okuma probu (Düşük-2):** Ölçüm rolü, okumayı saymadan önce kendi transaction'ında tablo başına bir prob satırı yazar (`platform-admin` kapsamında). Ardından kapsamı kapatır (`app.system_scope = 'off'`) ve sayar; satır sayısı `0/N`, N ≥ 1 olmalıdır. Transaction sonda geri alınır. Satır COMMIT edilmediği için başka hiçbir oturum onu görmez (örneğin `PublicLead` aktarıcısı) ve çöken bir koşu da kalıntı bırakmaz. Kart "sahip bağlantısıyla ekle ve sil" diyordu. Bu yöntemi canlıda kalıcı satır riskini sıfırlamak için seçtim. Amaç ölçümündeki `amaca kapalı` satırları da aynı prob satırıyla `0/N` ölçülür.
+- **`db:rls` temizliği:** `prisma/rls.sql`'in NG-183 bloğu `system_scope` tablolarındaki `system_scope` dışı her politikayı düşürür. Tablo kümesi `rls:verify` ile aynı katalog tanımından gelir. Kiracı tablolarına dokunulmaz.
+- **Ölçüm (yerel izole DB, `fabrika_app` ile):**
+  - Düzeltmeden önce, boş `PublicLead` + `FOR SELECT USING (true)` → exit 0.
+  - Düzeltmeden sonra aynı durum → exit 1: politika kümesi ve `1/1` okuma sızıntısı.
+  - `USING (true) WITH CHECK (true)` → exit 1.
+  - `db:rls` sonrasında küme `{system_scope}`.
+  - Temiz DB → exit 0.
+  - Prob satırı kalıntısı 0.
+  - Test: `tests/rls-verify-system-scope-policy-set.live.test.ts`.
+- **Sınır:** Kiracı tablolarında yabancı politika bu kontrolün kapsamı dışında kalır; `tenant_isolation` ve `tenant_or_shared` tablolarının politika kümesi ayrıca doğrulanmaz.
+
+## 9. Ek: `expert-directory` — doğrulanmış uzmanlar M8'e, yalnız okuma (NG-52, K-579696 = A, 14.11.2026)
 
 - Yedinci amaç `expert-directory`. M8 eşleştirme sayfası doğrulanmış uzman ön kayıtlarını koltuk adayı olarak gösterir; havuz hiçbir kiracıya ait değil, bu yüzden kiracı bağlamı onu açamaz.
 - `system_scope_open` bu amaçta **false** döner: genel `system_scope` politikası hiçbir tabloyu açmaz. Açan tek şey `ExpertPreRegistration` üzerindeki `expert_directory` politikasıdır: `FOR SELECT`, mühürlü kapsam + amaç = `expert-directory` + `status = 'verified'` + `"visibilityConsentAt" IS NOT NULL`. Yani bekleyen/devre dışı satır, yazma ve başka tablo kapalı. Ölçüm `tests/system-scope.live.test.ts` ("expert-directory reads verified expert rows and nothing else"): doğrulanmış 1, bekleyen 0, Membership 0, UPDATE 0 satır, INSERT RLS hatası.

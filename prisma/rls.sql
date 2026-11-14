@@ -509,6 +509,31 @@ BEGIN
   END IF;
 END $$;
 
+-- NG-183 (NG-175 review Düşük-1): on the system_scope tables above (system_scope policy,
+-- no tenant policy) system_scope is the ONLY policy. Policies are permissive and OR
+-- together, so a stray one — even FOR SELECT USING (true) — would open the personal data
+-- that system_scope keeps shut. The blocks above only replace system_scope itself; this
+-- drops every other policy on those tables, so `pnpm db:rls` restores the set to exactly
+-- {system_scope}. Tenant tables are not touched. `pnpm rls:verify` fails on the same set.
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.tablename, p.policyname
+      FROM pg_policies p
+     WHERE p.schemaname = 'public'
+       AND p.policyname <> 'system_scope'
+       AND p.tablename IN (
+             SELECT tablename FROM pg_policies WHERE schemaname = 'public' AND policyname = 'system_scope'
+             EXCEPT
+             SELECT tablename FROM pg_policies
+              WHERE schemaname = 'public' AND policyname IN ('tenant_isolation', 'tenant_or_shared'))
+  LOOP
+    RAISE NOTICE 'db:rls: dropping stray policy % on system_scope table %', r.policyname, r.tablename;
+    EXECUTE format('DROP POLICY %I ON public.%I', r.policyname, r.tablename);
+  END LOOP;
+END $$;
+
 -- No function of this schema is callable through Supabase's Data API roles
 -- (TASK-MUOG51GJ3PUOG R-S2, crw2-fb Ö-2). The policies above call
 -- system_scope_open/system_scope_sealed as the querying role, and the pricing
