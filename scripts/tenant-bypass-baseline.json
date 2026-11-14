@@ -340,6 +340,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/leads/public-lead-intake.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "forwardPublicLead() (NG-138): reads ONE PublicLead row by id (platform data, no tenantId, SYSTEM_WIDE) to build the lead-intake request for a consultancy tenant. Read-only; the write happens afterwards through the M18 LeadIntakePort inside the target tenant's own withTenantOn transaction, and only when the row's transferConsent is true."
+    },
+    {
+      "check": "D",
       "file": "src/lib/leads/public-lead.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
