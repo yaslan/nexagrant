@@ -478,7 +478,19 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
       expect(await routedRow(after.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a });
     });
 
-    test('O-1: both calls read before either claims and see different targets; the claim condition alone keeps the loser out', async () => {
+    /**
+     * What this test proves, and what it cannot (NG-181 review tur 2, bulgu 1). The loser is kept out by the
+     * claim UPDATE's WHERE, which carries TWO guards, each sufficient on its own:
+     *   (1) the NG-174 claim condition `routedTenantId: null, OR[routeStatus null | not 'routed']`;
+     *   (2) the compare-and-set pins `AND[routeStatus: null, routeReason: null]` (or the 'unmatched' mark).
+     * A routed lead fails both: (2) needs status NULL/'unmatched', and PublicLead_route_consistency_check
+     * forbids `routedTenantId` set with such a status, so (2) implies (1) on every row the DB accepts.
+     * Hence NO test can turn red when only (1) is removed: (1) is redundant behind (2) + the CHECK. Measured:
+     *   remove (1) only → green · remove (2) only → green (this run is (1) alone holding the line) ·
+     *   remove both = M2 `where: { id }` → RED (call 1 claims with stale A, tenant A gets a copy).
+     * (2) cannot go: the where-guard-src scanner relies on it (NG-181 be-gnd-3). Keep (1) as defence in depth.
+     */
+    test('O-1: both calls read before either claims and see different targets; the claim WHERE (NG-174 condition or CAS pins, either alone suffices) keeps the loser out — M2 (both removed) turns it red', async () => {
       await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
       const lead = await mkLead('o1', { province: 'Rize' });
       const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
