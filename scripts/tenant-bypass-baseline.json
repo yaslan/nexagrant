@@ -358,6 +358,24 @@
     },
     {
       "check": "D",
+      "file": "src/lib/leads/public-lead.ts",
+      "subject": "system-scope:public-intake",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "public-intake",
+      "reason": "submitPublicLead() (NG-175, SEC NG-170 O-1): the anonymous readiness contact form. PublicLead (platform data, no tenantId) is RLS system_scope only, so the advisory lock, the two rate-limit counts (by e-mail, by IP hash) and the one INSERT run in this public-intake scope. system_scope_open() lets public-intake reach only PublicLead and the expert form's tables; no tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/public-lead.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "listPublicLeads() (NG-175, SEC NG-170 O-1): /admin/leads, behind requirePlatformAdmin() in src/app/[locale]/admin/leads/page.tsx. Reads the newest PublicLead rows and their count (platform data, no tenantId, RLS system_scope only). No tenant row is read or written."
+    },
+    {
+      "check": "D",
       "file": "src/lib/expert-prereg/server/admin.ts",
       "subject": "system-scope:platform-admin",
       "count": 1,

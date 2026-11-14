@@ -56,3 +56,10 @@ Kısıtlar:
 - `system_scope_open` mühürlü dalda ikinci bir koşul daha uygular: `ExpertPreRegistration` ve `ExpertPreRegAttempt` yalnız `public-intake` (form), `platform-admin` (liste ve CSV), `platform-aggregate` (koltuk sayısı) ve `cross-tenant-job` (saklama temizliği, FO-50) amaçlarında açılır. `tenant-discovery` ve `subject-scoped` bu tablolarda 0 satır görür, yazamaz. `ExpertFounderCounter` kişisel veri taşımadığı için listede yok. Sahip dalı yine amaca bakmaz.
 - Ölçüm (yerel, `fabrika_app` ile): önce `tenant-discovery` 5/5 `ExpertPreRegistration` satırı görüyordu. Sonra 0/5. `pnpm rls:verify` her koşuda iki kapalı amacı ölçer ve INSERT reddini dener.
 - Sınır §5 ile aynı: amaç GUC'si USERSET. Bu koşul yanlış tabloya uzanan bir çağrıya karşıdır, listedeki bir amacı adlandırabilen koda karşı değil. Uzmanı görmesi gereken yeni bir amaç `system_scope_open` listesine bilerek eklenir.
+
+## 7. Ek: `PublicLead` ve `ProvinceLeadRoute` amaca göre daraltıldı (NG-175, SEC NG-170 O-1/D-1, 14.11.2026)
+
+- `PublicLead` (karne iletişim talebi; ad, e-posta, kuruluş, `routedTenantId`) artık RLS açık + FORCE, tek politika `system_scope`. Önceden politikasızdı ve kiracı oturumu 6/6 satırı okuyordu (NG-170 S4).
+- `public-intake` listesine `PublicLead` eklendi (form `submitPublicLead`). Ters yönde `PublicLead` yalnız `public-intake`, `platform-admin` (`/admin/leads`, eşleşmeyen listesi) ve `cross-tenant-job` (aktarım, gece silme) amaçlarında açılır.
+- `ProvinceLeadRoute` yalnız `platform-admin` (eşleme yönetimi) ve `cross-tenant-job` (aktarımın hedef seçimi) amaçlarında açılır; NG-170 D-1'de `tenant-discovery`, `subject-scoped` ve `platform-aggregate` 3/3 satır görüyordu.
+- Ölçüm (yerel izole DB, `fabrika_app` ile): kiracı oturumu `PublicLead`'de önce 4/4, sonra 0/4. `pnpm rls:verify` amaca kapalı tabloları `PURPOSE_NARROWED` haritasıyla ölçer ve INSERT reddini dener; daraltma değişirse harita da değişmelidir. Sınır §5–§6 ile aynı.
