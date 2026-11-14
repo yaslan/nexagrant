@@ -169,6 +169,51 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     });
   }, 180_000);
 
+  /**
+   * NG-191 (SEC NG-185 low finding): "as written" covers the role list and the permissive flag
+   * too, not only (table, name, command, qual). The qual below is rls.sql's own, untouched; only
+   * one clause is added. Note `TO public` is NOT a mutation: rls.sql writes no TO clause and
+   * Postgres records that as {public} — so the role mutation is the one that differs from it.
+   * Restored from rls.sql in finally, under EXPERT_DIRECTORY_POLICY_LOCK like the tests above.
+   */
+  async function rlsVerifyWithExpertDirectory(clause: (create: string) => string): Promise<{ status: number | null; out: string }> {
+    return withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
+      try {
+        const create = expertDirectoryPolicy().replace(/^DROP POLICY[^;]*;\s*/, '');
+        const mutated = clause(create);
+        expect(mutated, 'the mutation must change the statement').not.toBe(create);
+        await admin.query(`drop policy expert_directory on "ExpertPreRegistration"`);
+        await admin.query(mutated);
+        const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
+          cwd: REPO,
+          env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
+          encoding: 'utf8',
+          timeout: 170_000,
+        });
+        return { status: run.status, out: `${run.stdout}${run.stderr}` };
+      } finally {
+        await admin.query(expertDirectoryPolicy());
+      }
+    });
+  }
+
+  it('rls:verify --require-db exits 1 when expert_directory keeps its qual but is granted to another role list (NG-191)', async () => {
+    // TO <the measured app role>: the behaviour probe reads as that role, so it still sees the
+    // directory rows — only the catalogue comparison can tell the policy is not rls.sql's.
+    const appRole = new URL(RLS_URL!).username;
+    const { status, out } = await rlsVerifyWithExpertDirectory((c) => c.replace(/\bFOR SELECT\b/, `FOR SELECT TO ${appRole}`));
+    expect(status, out.slice(-2000)).toBe(1);
+    expect(out).toContain('— fazla: expert_directory (SELECT)');
+    expect(out).toContain(`expert_directory sapması: roller {${appRole}}, beklenen {public}`);
+  }, 180_000);
+
+  it('rls:verify --require-db exits 1 when expert_directory keeps its qual but is AS RESTRICTIVE (NG-191)', async () => {
+    const { status, out } = await rlsVerifyWithExpertDirectory((c) => c.replace(/\bFOR SELECT\b/, 'AS RESTRICTIVE FOR SELECT'));
+    expect(status, out.slice(-2000)).toBe(1);
+    expect(out).toContain('— fazla: expert_directory (SELECT)');
+    expect(out).toContain('expert_directory sapması: permissive RESTRICTIVE, beklenen PERMISSIVE');
+  }, 180_000);
+
   it('the NG-183 block of prisma/rls.sql drops stray policies on system_scope tables only', async () => {
     await admin.query(`create policy ${STRAY} on "PublicLead" for select to pg_monitor using (true)`);
     await admin.query(`create policy ${STRAY} on "ProvinceLeadRoute" to pg_monitor using (true) with check (true)`);
