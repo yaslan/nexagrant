@@ -342,10 +342,10 @@
       "check": "D",
       "file": "src/lib/leads/public-lead-intake.ts",
       "subject": "system-scope:cross-tenant-job",
-      "count": 2,
+      "count": 5,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "forwardPublicLead() (NG-138, NG-167): reads ONE PublicLead row by id (platform data, no tenantId, SYSTEM_WIDE) plus the ACTIVE ProvinceLeadRoute of its province (platform data, system_scope only) to pick the target tenant, then writes ONE routing mark (routeStatus/routedTenantId) on that same PublicLead row. No tenant row is read or written here: the lead itself lands afterwards through the M18 LeadIntakePort inside the target tenant's own withTenantOn transaction, and only when the row's transferConsent is true and the province is mapped."
+      "reason": "forwardPublicLead() (NG-138, NG-167): reads ONE PublicLead row by id (platform data, no tenantId, SYSTEM_WIDE) plus the ACTIVE ProvinceLeadRoute of its province (platform data, system_scope only) to pick the target tenant, then writes ONE routing mark (routeStatus/routedTenantId) on that same PublicLead row. No tenant row is read or written here: the lead itself lands afterwards through the M18 LeadIntakePort inside the target tenant's own withTenantOn transaction, and only when the row's transferConsent is true and the province is mapped. NG-174 (SEC NG-170 Y-1): the same function now also claims the target on that PublicLead row with one conditional UPDATE before the port is called, re-reads routedTenantId when it loses the claim, and releases/marks the claim afterwards (read, claim, re-read, mark-unmatched, release = 5 sites). All five touch only the PublicLead row of that id (platform data, no tenantId); no tenant row is read or written inside them."
     },
     {
       "check": "D",

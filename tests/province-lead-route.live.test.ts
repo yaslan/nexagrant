@@ -290,4 +290,122 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
       expect(moved.ok && moved.route.updatedByName).toBe('Ayşe Admin');
     });
   });
+  describe('NG-174: a routed lead goes to at most one tenant (SEC NG-170 Y-1, D-2)', () => {
+    const routedRow = (id: string) => admin.publicLead.findUniqueOrThrow({ where: { id } });
+
+    test('S1: mapping moved A→B after the lead was routed; a second forward adds 0 rows to B and keeps routedTenantId', async () => {
+      await setProvinceLeadRoute({ province: 'Bolu', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('s1', { province: 'Bolu' });
+      expect((await forwardPublicLead(lead.id, port, prisma)).status).toBe('created');
+      await setProvinceLeadRoute({ province: 'Bolu', tenantId: T.b }, ACTOR, prisma);
+      const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
+      const contactsB0 = await admin.leadContact.count({ where: { tenantId: T.b } });
+
+      expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'already_routed' });
+      expect(await dealsIn(T.b)).toBe(b0);
+      expect(await admin.leadContact.count({ where: { tenantId: T.b } })).toBe(contactsB0);
+      expect(await dealsIn(T.a)).toBe(a0);
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a, routeReason: null });
+    });
+
+    test('same target again is idempotent: M18 answers duplicate, nothing new, mark unchanged', async () => {
+      await setProvinceLeadRoute({ province: 'Bolu', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('same', { province: 'Bolu' });
+      expect((await forwardPublicLead(lead.id, port, prisma)).status).toBe('created');
+      const a0 = await dealsIn(T.a);
+      const again = await forwardPublicLead(lead.id, port, prisma);
+      expect(again.status).toBe('duplicate');
+      expect(await dealsIn(T.a)).toBe(a0);
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a });
+    });
+
+    test('S2: parallel calls produce exactly one M18 lead for one tenant', async () => {
+      await setProvinceLeadRoute({ province: 'Yalova', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('s2', { province: 'Yalova' });
+      const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
+      const results = await Promise.all(Array.from({ length: 6 }, () => forwardPublicLead(lead.id, port, prisma)));
+      expect(results.filter((r) => r.status === 'created')).toHaveLength(1);
+      expect(results.every((r) => r.status === 'created' || r.status === 'duplicate')).toBe(true);
+      expect((await dealsIn(T.a)) - a0).toBe(1);
+      expect(await dealsIn(T.b)).toBe(b0);
+      expect(await admin.leadContact.count({ where: { sourceRef: `public-lead:${lead.id}` } })).toBe(1);
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a });
+    });
+
+    test('S2b: the map moves WHILE the first call is inside the port; the concurrent second call must not reach B', async () => {
+      await setProvinceLeadRoute({ province: 'Van', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('s2b', { province: 'Van' });
+      const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
+      let inner: ReturnType<typeof forwardPublicLead> | undefined;
+      const racing = {
+        accept: async (req: Parameters<typeof port.accept>[0]) => {
+          if (!inner) {
+            await setProvinceLeadRoute({ province: 'Van', tenantId: T.b }, ACTOR, prisma);
+            inner = forwardPublicLead(lead.id, port, prisma);
+            await inner;
+          }
+          return port.accept(req);
+        },
+      };
+      const outer = await forwardPublicLead(lead.id, racing, prisma);
+      expect(outer.status).toBe('created');
+      expect(await inner).toEqual({ status: 'skipped', reason: 'already_routed' });
+      expect((await dealsIn(T.a)) - a0).toBe(1);
+      expect(await dealsIn(T.b)).toBe(b0);
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a });
+    });
+
+    test('S3: tenant deleted after routing: reprocessing copies nothing and does not fall back to unmatched', async () => {
+      const mkC = () =>
+        admin.tenant.create({ data: { name: `route-c-${RUN}-${Math.random().toString(36).slice(2, 6)}`, slug: `route-c-${RUN}-${Math.random().toString(36).slice(2, 8)}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
+      // (a) soft delete: the mapping row still points at the tenant, M18 refuses it
+      const soft = await mkC();
+      await admin.provinceLeadRoute.deleteMany({ where: { province: 'Sinop' } });
+      await admin.provinceLeadRoute.create({ data: { province: 'Sinop', targetTenantId: soft.id, active: true } });
+      const leadSoft = await mkLead('s3-soft', { province: 'Sinop' });
+      expect((await forwardPublicLead(leadSoft.id, port, prisma)).status).toBe('created');
+      await admin.tenant.update({ where: { id: soft.id }, data: { deletedAt: new Date() } });
+      const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
+      const r1 = await forwardPublicLead(leadSoft.id, port, prisma);
+      expect(r1.status).toBe('refused');
+      expect(await routedRow(leadSoft.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: soft.id, routeReason: null });
+
+      // (b) hard delete: the mapping row cascades away, no match is left
+      const hard = await mkC();
+      await admin.provinceLeadRoute.deleteMany({ where: { province: 'Sinop' } });
+      await admin.provinceLeadRoute.create({ data: { province: 'Sinop', targetTenantId: hard.id, active: true } });
+      const leadHard = await mkLead('s3-hard', { province: 'Sinop' });
+      expect((await forwardPublicLead(leadHard.id, port, prisma)).status).toBe('created');
+      await admin.tenant.delete({ where: { id: hard.id } });
+      expect(await forwardPublicLead(leadHard.id, port, prisma)).toEqual({ status: 'skipped', reason: 'already_routed' });
+      expect(await routedRow(leadHard.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: hard.id, routeReason: null });
+      expect(await dealsIn(T.a)).toBe(a0);
+      expect(await dealsIn(T.b)).toBe(b0);
+    });
+
+    test('a refusal that is not about the tenant gives the claim back (lead can be retried)', async () => {
+      const refusingPort = { accept: async () => ({ status: 'refused' as const, reason: 'consent_missing' as const }) };
+      await setProvinceLeadRoute({ province: 'Bolu', tenantId: T.a }, ACTOR, prisma);
+      const lead = await mkLead('release', { province: 'Bolu' });
+      expect((await forwardPublicLead(lead.id, refusingPort, prisma)).status).toBe('refused');
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: null, routedTenantId: null });
+      expect((await forwardPublicLead(lead.id, port, prisma)).status).toBe('created');
+    });
+
+    test('D-2: the database refuses inconsistent route columns', async () => {
+      const bad = (data: Record<string, unknown>) => mkLead(`chk-${Math.random().toString(36).slice(2, 7)}`, data);
+      await expect(bad({ routeStatus: 'routed', routedTenantId: null })).rejects.toThrow();
+      await expect(bad({ routeStatus: 'routed', routedTenantId: T.a, routeReason: 'anything-goes' })).rejects.toThrow();
+      await expect(bad({ routeStatus: 'unmatched', routeReason: 'anything-goes' })).rejects.toThrow();
+      await expect(bad({ routeStatus: 'unmatched', routeReason: null })).rejects.toThrow();
+      await expect(bad({ routeStatus: 'unmatched', routeReason: 'province_unmapped', routedTenantId: T.a })).rejects.toThrow();
+      await expect(bad({ routeStatus: null, routeReason: 'province_unmapped' })).rejects.toThrow();
+      await expect(bad({ routeStatus: null, routedTenantId: T.a })).rejects.toThrow();
+      await expect(bad({ routeStatus: 'bogus' })).rejects.toThrow();
+      const ok1 = await bad({ routeStatus: 'routed', routedTenantId: T.a, routedAt: NOW });
+      const ok2 = await bad({ routeStatus: 'unmatched', routeReason: 'tenant_refused', routedAt: NOW });
+      const ok3 = await bad({});
+      expect([ok1, ok2, ok3].every((r) => r.id)).toBe(true);
+    });
+  });
 });
