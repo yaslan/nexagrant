@@ -22,22 +22,18 @@ type CommitData = Awaited<ReturnType<typeof commitImport>>;
 
 /**
  * Server actions for the M18 Müşteri Satış Hattı screens (NG-135 / F3).
+ *
  * Each action: module gate → session + writable + `client_pipeline_write` role → tenant-bound
  * repo call. The tenant comes from the session only; nothing tenant-shaped is read from the form.
+ *
+ * Every action states its own gate and role check inline (`assertModuleAccess` and
+ * `requireTenantAction({ can: '<permission>' })`), so the check is visible where the action is
+ * read and tests/server-action-rbac-guard.test.ts can verify it statically.
  */
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }
   | { ok: false; code: 'INVALID' | 'NOT_FOUND' | 'DUPLICATE' | 'TRANSITION' | 'FAILED' };
-
-async function guarded<T>(
-  fn: (tenantId: string, userId: string | null) => Promise<T>,
-  can: 'client_pipeline_read' | 'client_pipeline_write' = 'client_pipeline_write',
-): Promise<T> {
-  await assertModuleAccess('M18');
-  const scope = await requireTenantAction({ can });
-  return fn(scope.tenantId, scope.userId ?? null);
-}
 
 function invalidOrFailed(e: unknown): { ok: false; code: 'INVALID' | 'FAILED' } {
   // Zod errors come from the repo's parse calls, CSV errors from the import; the rest is infrastructure.
@@ -61,13 +57,13 @@ const importRequestSchema = z.object({
 /** Preview: parse, map and count. Reads only, so it needs the read role. */
 export async function importPreviewAction(input: unknown): Promise<ActionResult<PreviewData>> {
   try {
-    return await guarded(async (tenantId) => {
-      const req = importRequestSchema.parse(input);
-      const csv = parseCsvText(req.csv);
-      const mapping = req.mapping ?? suggestMapping(csv.headers);
-      const result = await withTenant(tenantId, (tx) => previewImport(tx, tenantId, req.csv, mapping));
-      return { ok: true, data: { ...result, mapping } } as const;
-    }, 'client_pipeline_read');
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_read' });
+    const req = importRequestSchema.parse(input);
+    const csv = parseCsvText(req.csv);
+    const mapping = req.mapping ?? suggestMapping(csv.headers);
+    const result = await withTenant(scope.tenantId, (tx) => previewImport(tx, scope.tenantId, req.csv, mapping));
+    return { ok: true, data: { ...result, mapping } } as const;
   } catch (e) {
     return invalidOrFailed(e);
   }
@@ -76,14 +72,16 @@ export async function importPreviewAction(input: unknown): Promise<ActionResult<
 /** Commit: the same plan as the preview, re-computed on the server, then written in one tenant transaction. */
 export async function importCommitAction(input: unknown): Promise<ActionResult<CommitData>> {
   try {
-    return await guarded(async (tenantId, userId) => {
-      const req = importRequestSchema.parse(input);
-      const csv = parseCsvText(req.csv);
-      const mapping = req.mapping ?? suggestMapping(csv.headers);
-      const result = await withTenant(tenantId, (tx) => commitImport(tx, tenantId, req.csv, mapping, userId));
-      revalidatePath('/', 'layout');
-      return { ok: true, data: result } as const;
-    });
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const req = importRequestSchema.parse(input);
+    const csv = parseCsvText(req.csv);
+    const mapping = req.mapping ?? suggestMapping(csv.headers);
+    const result = await withTenant(scope.tenantId, (tx) =>
+      commitImport(tx, scope.tenantId, req.csv, mapping, scope.userId ?? null)
+    );
+    revalidatePath('/', 'layout');
+    return { ok: true, data: result } as const;
   } catch (e) {
     return invalidOrFailed(e);
   }
@@ -91,12 +89,14 @@ export async function importCommitAction(input: unknown): Promise<ActionResult<C
 
 export async function createLeadAction(input: unknown): Promise<ActionResult<CreateLeadResult>> {
   try {
-    return await guarded(async (tenantId, userId) => {
-      const result = await withTenant(tenantId, (tx) => createLead(tx, tenantId, input, userId));
-      if (result.status === 'duplicate') return { ok: false, code: 'DUPLICATE' } as const;
-      revalidatePath('/', 'layout');
-      return { ok: true, data: result } as const;
-    });
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const result = await withTenant(scope.tenantId, (tx) =>
+      createLead(tx, scope.tenantId, input, scope.userId ?? null)
+    );
+    if (result.status === 'duplicate') return { ok: false, code: 'DUPLICATE' } as const;
+    revalidatePath('/', 'layout');
+    return { ok: true, data: result } as const;
   } catch (e) {
     return invalidOrFailed(e);
   }
@@ -104,12 +104,14 @@ export async function createLeadAction(input: unknown): Promise<ActionResult<Cre
 
 export async function createDealAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   try {
-    return await guarded(async (tenantId, userId) => {
-      const created = await withTenant(tenantId, (tx) => createDeal(tx, tenantId, input, userId));
-      if (!created) return { ok: false, code: 'NOT_FOUND' } as const;
-      revalidatePath('/', 'layout');
-      return { ok: true, data: created } as const;
-    });
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const created = await withTenant(scope.tenantId, (tx) =>
+      createDeal(tx, scope.tenantId, input, scope.userId ?? null)
+    );
+    if (!created) return { ok: false, code: 'NOT_FOUND' } as const;
+    revalidatePath('/', 'layout');
+    return { ok: true, data: created } as const;
   } catch (e) {
     return invalidOrFailed(e);
   }
@@ -117,12 +119,14 @@ export async function createDealAction(input: unknown): Promise<ActionResult<{ i
 
 export async function moveDealStageAction(input: unknown): Promise<ActionResult> {
   try {
-    return await guarded(async (tenantId, userId) => {
-      const moved = await withTenant(tenantId, (tx) => moveDealStage(tx, tenantId, input, userId));
-      if (!moved) return { ok: false, code: 'NOT_FOUND' } as const;
-      revalidatePath('/', 'layout');
-      return { ok: true } as const;
-    });
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const moved = await withTenant(scope.tenantId, (tx) =>
+      moveDealStage(tx, scope.tenantId, input, scope.userId ?? null)
+    );
+    if (!moved) return { ok: false, code: 'NOT_FOUND' } as const;
+    revalidatePath('/', 'layout');
+    return { ok: true } as const;
   } catch (e) {
     if (e instanceof DealTransitionError) return { ok: false, code: 'TRANSITION' };
     return invalidOrFailed(e);
@@ -131,12 +135,12 @@ export async function moveDealStageAction(input: unknown): Promise<ActionResult>
 
 export async function createTaskAction(input: unknown): Promise<ActionResult> {
   try {
-    return await guarded(async (tenantId) => {
-      const created = await withTenant(tenantId, (tx) => createTask(tx, tenantId, input));
-      if (!created) return { ok: false, code: 'NOT_FOUND' } as const;
-      revalidatePath('/', 'layout');
-      return { ok: true } as const;
-    });
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const created = await withTenant(scope.tenantId, (tx) => createTask(tx, scope.tenantId, input));
+    if (!created) return { ok: false, code: 'NOT_FOUND' } as const;
+    revalidatePath('/', 'layout');
+    return { ok: true } as const;
   } catch (e) {
     return invalidOrFailed(e);
   }
@@ -144,12 +148,12 @@ export async function createTaskAction(input: unknown): Promise<ActionResult> {
 
 export async function setTaskDoneAction(input: unknown): Promise<ActionResult> {
   try {
-    return await guarded(async (tenantId) => {
-      const updated = await withTenant(tenantId, (tx) => setTaskDone(tx, tenantId, input));
-      if (!updated) return { ok: false, code: 'NOT_FOUND' } as const;
-      revalidatePath('/', 'layout');
-      return { ok: true } as const;
-    });
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const updated = await withTenant(scope.tenantId, (tx) => setTaskDone(tx, scope.tenantId, input));
+    if (!updated) return { ok: false, code: 'NOT_FOUND' } as const;
+    revalidatePath('/', 'layout');
+    return { ok: true } as const;
   } catch (e) {
     return invalidOrFailed(e);
   }
@@ -157,12 +161,12 @@ export async function setTaskDoneAction(input: unknown): Promise<ActionResult> {
 
 export async function mergeLeadsAction(input: unknown): Promise<ActionResult<MergeResult>> {
   try {
-    return await guarded(async (tenantId) => {
-      const merged = await withTenant(tenantId, (tx) => mergeLeadOrganizations(tx, tenantId, input));
-      if (!merged) return { ok: false, code: 'NOT_FOUND' } as const;
-      revalidatePath('/', 'layout');
-      return { ok: true, data: merged } as const;
-    });
+    await assertModuleAccess('M18');
+    const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const merged = await withTenant(scope.tenantId, (tx) => mergeLeadOrganizations(tx, scope.tenantId, input));
+    if (!merged) return { ok: false, code: 'NOT_FOUND' } as const;
+    revalidatePath('/', 'layout');
+    return { ok: true, data: merged } as const;
   } catch (e) {
     return invalidOrFailed(e);
   }

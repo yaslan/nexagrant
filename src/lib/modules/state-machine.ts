@@ -290,12 +290,20 @@ export interface ModuleStatusView {
   entitledModules: readonly ModuleId[];
   activeModules: readonly ModuleId[];
   switchedOnOutsidePlan: readonly ModuleId[];
+  /**
+   * Unsold beta modules this viewer may open (`decideModuleAccess` allowed, computed on
+   * the server). Optional so a plain plan view still works; absent means none.
+   */
+  previewOpen?: readonly ModuleId[];
 }
 
 export function moduleStatus(moduleId: ModuleId, view: ModuleStatusView): ModuleCardStatus {
   const switchedOn =
     view.activeModules.includes(moduleId) || view.switchedOnOutsidePlan.includes(moduleId);
   if (isComingSoon(moduleId)) return switchedOn ? 'ORPHANED' : 'SOON';
+  // A staff/pilot preview of an unsold beta is open without a plan (NG-135, K-581676):
+  // the decision was taken server-side, so the card shows it as usable.
+  if (view.previewOpen?.includes(moduleId)) return 'ACTIVE';
   if (view.entitledModules.includes(moduleId)) return switchedOn ? 'ACTIVE' : 'AVAILABLE';
   return switchedOn ? 'ORPHANED' : 'LOCKED';
 }

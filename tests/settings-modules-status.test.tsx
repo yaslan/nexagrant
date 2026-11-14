@@ -23,6 +23,7 @@ import { ModulesClient } from '@/app/[locale]/(app)/[workspace]/settings/modules
 import type { ModulesPlanView } from '@/app/[locale]/(app)/[workspace]/settings/modules/plan-view';
 import { grantsFor } from '@/lib/billing/catalog';
 import type { ModuleId } from '@/lib/modules/types';
+import { isUnsoldBeta } from '@/lib/modules/state-machine';
 
 afterEach(() => {
   cleanup();
@@ -40,6 +41,7 @@ const discover: ModulesPlanView = {
   entitledModules: grant('free'),
   activeModules: [],
   switchedOnOutsidePlan: [],
+  previewOpen: [],
 };
 const pro: ModulesPlanView = {
   ...discover,
@@ -90,6 +92,13 @@ describe('modules page — four card states', () => {
     for (const c of locked) {
       expect(within(c).getByText(M.status.LOCKED)).toBeTruthy();
       expect(within(c).queryByRole('button', { name: M.disable })).toBeNull();
+      // NG-135 (K-581676 A): an unsold beta (M18, planTiers: []) is never sold, so its LOCKED
+      // card offers no upgrade. Every other LOCKED card still offers the plan upgrade.
+      const id = (c.getAttribute('data-testid') ?? '').replace('module-card-', '') as ModuleId;
+      if (isUnsoldBeta(id)) {
+        expect(within(c).queryByRole('link', { name: M.upgradeCta })).toBeNull();
+        continue;
+      }
       expect(within(c).getByRole('link', { name: M.upgradeCta }).getAttribute('href')).toBe('/tr/default/settings/billing');
     }
   });
