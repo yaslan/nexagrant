@@ -411,6 +411,14 @@ describe('pinned transport (connect-time address check)', () => {
     res.end();
   };
 
+  it('NG-202 B6: the exported createPinnedFetch takes no connect port — the socket goes to the URL\'s own port', async () => {
+    const { port, hits } = await serve((_req, res) => html(res, 'x'));
+    const opts = { resolve: LOCAL, allowed: localOnly, connectPort: port };
+    const fetchImpl = createPinnedFetch(opts);
+    await fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) }).catch(() => null);
+    expect(hits).toEqual([]);
+  });
+
   it('DNS rebinding: the first answer is public, the connection-time answer is private → no request is sent', async () => {
     const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
     // The pre-check (deps.lookup) sees a public address; the socket's own resolution gets 127.0.0.1.
@@ -692,6 +700,17 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
 
   const LOCAL = async () => ['127.0.0.1'];
   const localOnly = (ip: string) => ip === '127.0.0.1';
+
+  it('NG-202 B6: the exported createPinnedFetch takes no CA — a caller cannot swap the system trust store', async () => {
+    const { port, cert, seen } = await serveTls((_req, res) => res.end('x'));
+    // A plain object (not a literal), as a future caller holding an options bag would pass it.
+    const opts = { resolve: LOCAL, allowed: localOnly, ca: cert };
+    const fetchImpl = createPinnedFetch(opts);
+    await expect(fetchImpl(new URL(`https://acme.com.tr:${port}/`), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(
+      /self[- ]signed|certificate/i,
+    );
+    expect(seen).toEqual([]);
+  });
 
   it('reads a site over https: SNI and Host carry the site name, the certificate is checked against it', async () => {
     const { port, cert, seen } = await serveTls((req, res) => {
