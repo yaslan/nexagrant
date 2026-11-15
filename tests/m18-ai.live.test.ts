@@ -216,12 +216,15 @@ describe('M18 AI actions through the real llm.ts (NG-136)', () => {
     expect(seen).toEqual([]);
     expect(await withTenant(other.tenantId, (tx) => eligibility.approveEligibilityReport(tx, other.tenantId, saved.id, other.userId))).toBe(false);
 
-    // A DRAFT does not leave M18.
+    // A DRAFT does not leave M18: the query itself filters it out (not only the port's approvedAt check).
+    const releasable = () => withTenant(owner.tenantId, (tx) => eligibility.releasableReport(tx, owner.tenantId, owner.organizationId, call.id));
+    expect(await releasable()).toBeNull();
     const port = createDealBriefContextPort();
     expect((await port.forDeal(owner.tenantId, deal.id))?.approvedEligibility).toBeNull();
     expect(await port.forDeal(other.tenantId, deal.id)).toBeNull();
 
     expect(await withTenant(owner.tenantId, (tx) => eligibility.approveEligibilityReport(tx, owner.tenantId, saved.id, owner.userId))).toBe(true);
+    expect((await releasable())?.id).toBe(saved.id);
     const ctx = await port.forDeal(owner.tenantId, deal.id);
     expect(ctx?.approvedEligibility?.summary).toContain('Büyük olasılıkla uygun');
     expect(ctx?.call?.callIdentifier).toBe(`${RUN}-CALL`);
