@@ -48,7 +48,13 @@ export const MAX_ROBOTS_PATTERN_CHARS = 256;
 export type LookupFn = (host: string) => Promise<string[]>;
 export type AddressGuard = (ip: string) => boolean;
 /** The one request shape guardedGet makes; the global `fetch` satisfies it (fake sites in tests). */
-export type FetchLike = (url: URL, init: { headers: Record<string, string>; signal: AbortSignal; redirect?: 'manual' }) => Promise<Response>;
+/**
+ * What the reader needs from an answer. A fetch `Response` fits it; the pinned transport builds
+ * one by hand rather than a `Response`, so no `new Response(…)` with an upstream status exists
+ * in src (tests/api/api-error-body-guard.test.ts: only internalError() builds a possible 5xx).
+ */
+export type SiteResponse = { status: number; headers: Headers; body: ReadableStream<Uint8Array> | null };
+export type FetchLike = (url: URL, init: { headers: Record<string, string>; signal: AbortSignal; redirect?: 'manual' }) => Promise<SiteResponse>;
 export type SiteFetchDeps = {
   fetchImpl?: FetchLike;
   lookup?: LookupFn;
@@ -186,7 +192,7 @@ export function createPinnedFetch(opts: { resolve: LookupFn; allowed?: AddressGu
   const allowed = opts.allowed ?? isPublicAddress;
   const lookup = guardedLookup(opts.resolve, allowed);
   return (url, init) =>
-    new Promise<Response>((resolveResponse, reject) => {
+    new Promise<SiteResponse>((resolveResponse, reject) => {
       const literal = url.hostname.replace(/^\[|\]$/g, '');
       // An IP literal never reaches a lookup hook: check it here.
       if (isIP(literal) !== 0 && !allowed(literal)) {
@@ -215,11 +221,11 @@ export function createPinnedFetch(opts: { resolve: LookupFn; allowed?: AddressGu
           try {
             if (NULL_BODY_STATUSES.has(status) || status < 200) {
               res.resume();
-              resolveResponse(new Response(null, { status: status < 200 ? 502 : status, headers }));
+              resolveResponse({ status: status < 200 ? 502 : status, headers, body: null });
               return;
             }
             const body = Readable.toWeb(res) as unknown as ReadableStream<Uint8Array>;
-            resolveResponse(new Response(body, { status, headers }));
+            resolveResponse({ status, headers, body });
           } catch (e) {
             res.destroy();
             reject(e instanceof Error ? e : new Error(String(e)));
@@ -398,7 +404,7 @@ export function pickSubpages(html: string, base: URL, limit = MAX_PAGES - 1): UR
 
 type Hop = { status: number; url: URL; body: string | null; contentType: string };
 
-async function readCapped(response: Response): Promise<string | null> {
+async function readCapped(response: SiteResponse): Promise<string | null> {
   const declared = Number(response.headers.get('content-length') ?? '');
   if (Number.isFinite(declared) && declared > MAX_BYTES) return null;
   if (!response.body) return '';
@@ -432,7 +438,7 @@ async function guardedGet(
     if (hop > 0 && !allowed(url)) return null; // a redirect into a disallowed path is not followed
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
     if (!(await hostIsAllowed(url.hostname, deps.lookup, deps.addressAllowed))) return null;
-    let response: Response;
+    let response: SiteResponse;
     try {
       response = await deps.fetchImpl(url, {
         redirect: 'manual',
