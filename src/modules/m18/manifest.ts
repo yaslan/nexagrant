@@ -58,6 +58,7 @@ export const m18Manifest: ModuleManifest = {
     'ServicePackage',
     'ServiceQuote',
     'FunderRule',
+    'LeadEligibilityReport',
   ],
   isActive: true,
   category: 'tools',

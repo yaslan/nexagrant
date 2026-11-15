@@ -22,14 +22,14 @@ import {
 const REPO = resolve(__dirname, '../../../..');
 
 describe('registry', () => {
-  test('holds the 11 prompts, each in its own file per locale it has', () => {
-    // 7 instruction templates + the shared data rule (NG-40) + 3 M17 (FO-188), the only ones with a `tr` text.
-    expect(PROMPT_IDS).toHaveLength(11);
+  test('holds the 13 prompts, each in its own file per locale it has', () => {
+    // 7 instruction templates + the shared data rule (NG-40) + 3 M17 (FO-188) + 2 M18 (NG-136); M17 and M18 have a `tr` text.
+    expect(PROMPT_IDS).toHaveLength(13);
     const dir = resolve(__dirname);
     const files = readdirSync(dir)
       .filter((d) => statSync(join(dir, d)).isDirectory())
       .flatMap((d) => readdirSync(join(dir, d)).map((f) => `${d}/${f}`));
-    const expected = PROMPT_IDS.flatMap((id) => [`${id}.en.ts`, ...(id.startsWith('m17/') ? [`${id}.tr.ts`] : [])]);
+    const expected = PROMPT_IDS.flatMap((id) => [`${id}.en.ts`, ...(id.startsWith('m17/') || id.startsWith('m18/') ? [`${id}.tr.ts`] : [])]);
     expect(files.sort()).toEqual(expected.sort());
   });
 

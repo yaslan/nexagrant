@@ -18,7 +18,7 @@ BEGIN
     'ProjectIdea','DecisionLog',
     'NotificationPreference','NotificationEmailItem',
     'LeadOrganization','LeadContact','LeadMatch','Deal','DealActivity','DealTask',
-    'ServicePackage','ServiceQuote','FunderRule'
+    'ServicePackage','ServiceQuote','FunderRule','LeadEligibilityReport'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);

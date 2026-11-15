@@ -191,6 +191,8 @@ Bkz. `docs/agent-results/ADR-0002-geli-tirici-2.md` §6.
 | M17 | Interreg ön değerlendirme (kredi, model çağrısından ÖNCE rezerve edilir: kiracı kilidi altında bakiye kontrolü + analiz claim'i + CreditLedger `usage:M17` −3, refId = `<analizKimliği>:<claimMs>`; sonuç yazılamazsa veya koşu ölürse `refund:M17` +3 ile iade edilir; AiUsageLog'daki model çağrı satırları 0 kredi gösterir) | 3 | Bekliyor |
 | M17 | Ön değerlendirme — ilk model çağrısı (ücretsiz; kredi yukarıdaki rezervasyonla düşer) | 0 | Bekliyor |
 | M17 | Ön değerlendirme — biçim hatası sonrası tek yeniden deneme | 0 | Bekliyor |
+| M18 | Kurum zenginleştirme (web sitesinden, en çok 5 sayfa; hiçbir sayfa çekilemezse model çağrılmaz, kredi düşmez) | 1 | Bekliyor (tahmini — patron onayı bekliyor) |
+| M18 | Uygunluk ön raporu (kurum × çağrı; iç ön değerlendirme, resmî puan değildir) | 2 | Bekliyor (tahmini — patron onayı bekliyor) |
 | M9 | Brifing | 1 | Yayımlandı |
 | M10 | Belge | 1 | Yayımlandı |
 | M11 | Bölüm | 2 | Yayımlandı |

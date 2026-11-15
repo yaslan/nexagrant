@@ -68,6 +68,7 @@ model Tenant {
   dealActivities    DealActivity[]
   dealTasks         DealTask[]
   servicePackages   ServicePackage[]
+  leadEligibilityReports LeadEligibilityReport[]
   serviceQuotes     ServiceQuote[]
   funderRules       FunderRule[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
@@ -581,6 +582,7 @@ model Call {
   complexity             String?                 // LOW | MEDIUM | HIGH
   leadMatches            LeadMatch[]
   deals                  Deal[]
+  leadEligibilityReports LeadEligibilityReport[]
 }
 
 model Topic {
@@ -2552,6 +2554,7 @@ model LeadOrganization {
   contacts         LeadContact[]
   matches          LeadMatch[]
   deals            Deal[]
+  eligibilityReports LeadEligibilityReport[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, sourceRef])
@@ -2768,5 +2771,34 @@ model FunderRule {
   @@unique([tenantId, sourceRef])
   @@index([tenantId, funderName])
   @@index([programmeId])
+  @@index([deletedAt])
+}
+
+// M18-F5 (NG-136): the AI eligibility pre-report of one client organisation against one shared
+// call. An INTERNAL pre-assessment ("iç ön değerlendirme"), never an official score: no numeric
+// score is stored. DRAFT until a user approves it; only an APPROVED report may leave the module
+// (src/modules/m18/server/eligibility.ts `releasableReport`, the deal brief contract).
+model LeadEligibilityReport {
+  id               String           @id @default(cuid())
+  tenantId         String
+  organizationId   String
+  callId           String
+  status           String           @default("DRAFT") // DRAFT | APPROVED
+  content          String // the model's Markdown, as generated; never edited in place
+  locale           String           @default("tr") // prompt locale the report was written in
+  model            String? // provider model id, from the AiUsageLog of the call
+  createdByUserId  String? // no FK: a removed user keeps the history
+  approvedByUserId String?
+  approvedAt       DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization     LeadOrganization @relation(fields: [organizationId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  call             Call             @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, organizationId, createdAt])
+  @@index([callId])
   @@index([deletedAt])
 }

@@ -5818,6 +5818,46 @@
       "keepLegend": "Record to keep",
       "mergeButton": "Merge",
       "merged": "Merged: {contacts} contacts and {deals} deals moved."
+    },
+    "ai": {
+      "label": "Internal pre-assessment — not an official score",
+      "enrichHeading": "Enrich from website (AI)",
+      "enrichHint": "Reads at most 5 pages of the organisation's own website (robots.txt is obeyed). Nothing is written to the record until you approve it. {credits, plural, one {# AI credit is} other {# AI credits are}} used when a page could be read.",
+      "enrichNoWebsite": "This organisation has no website on record.",
+      "enrichRun": "Get suggestions",
+      "enrichEmpty": "The pages hold nothing new for the record.",
+      "enrichApply": "Write selected to record",
+      "enrichApplied": "The selected fields were written to the record.",
+      "enrichSources": "Source pages",
+      "enrichNothingSelected": "Select at least one field.",
+      "field": {
+        "legalName": "Legal name",
+        "district": "District",
+        "sizeBand": "Size",
+        "themes": "Themes",
+        "sectorCodes": "NACE codes"
+      },
+      "eligibilityHeading": "Eligibility pre-report (AI)",
+      "eligibilityHint": "An internal pre-assessment draft for organisation × call. A draft does not leave M18 until it is approved. Uses {credits, plural, one {# AI credit} other {# AI credits}}.",
+      "eligibilityNoCalls": "This organisation has no matched call yet; add a match or a deal with a call first.",
+      "callLabel": "Call",
+      "eligibilityRun": "Create pre-report",
+      "eligibilityCreated": "Pre-report draft created.",
+      "reportsHeading": "Pre-reports",
+      "noReports": "No pre-reports yet.",
+      "status": {
+        "DRAFT": "Draft — awaiting approval",
+        "APPROVED": "Approved"
+      },
+      "approve": "Approve",
+      "approved": "Pre-report approved.",
+      "pending": "Working…",
+      "errors": {
+        "NO_WEBSITE": "This organisation has no website on record.",
+        "SITE_UNAVAILABLE": "The website could not be read (invalid address, robots.txt does not allow it, or no answer). No credit was used.",
+        "BAD_ANSWER": "The AI answer could not be read. Try again.",
+        "NO_CREDITS": "Not enough AI credits."
+      }
     }
   }
 }
