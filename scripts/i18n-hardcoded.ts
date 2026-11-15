@@ -49,8 +49,8 @@ export interface Violation {
   text: string;
 }
 
-/** Directories in scope. Everything else (src/components, src/lib) is out of this gate. */
-export const SCAN_ROOTS = ['src/app', 'src/modules'];
+/** Directories in scope. Everything else (src/lib) is out of this gate. */
+export const SCAN_ROOTS = ['src/app', 'src/modules', 'src/components'];
 
 /** Props whose string value is rendered to the user. `className` is pointedly absent. */
 const TEXT_PROPS = ['title', 'label', 'placeholder', 'aria-label'] as const;
