@@ -192,6 +192,9 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     ['many block tags with no >', fill('<p x ')],
     ['many < with no >', fill('< x ')],
     ['</script candidates with no >', `<script>${fill('</script x ')}`],
+    // NG-136 review (round 4, B1): every label window is 2 000 `<` with no `>`; a `<[^>]+>` label
+    // strip rescans the window from each `<` (~1 s over 500 anchors).
+    ['many <a href> each followed by 2000 < with no >', fill(`<a href="/hakkimizda">${'<'.repeat(2000)}`)],
   ];
   it.each(hostile)('%s: htmlToText and pickSubpages finish within the wall-clock budget', (_name, html) => {
     const started = performance.now();

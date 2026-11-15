@@ -575,7 +575,8 @@ export function pickSubpages(html: string, base: URL, limit = MAX_PAGES - 1): UR
     from = tag.end + (labelLength === close ? close + 4 : labelLength);
     if (tag.href === null) continue;
     const href = decodeEntities(tag.href);
-    const label = html.slice(tag.end, tag.end + labelLength).replace(/<[^>]+>/g, ' ');
+    const rawLabel = html.slice(tag.end, tag.end + labelLength);
+    const label = replaceTags(rawLabel, ' ', (_lower, lt, gt) => gt > lt + 1); // `<[^>]+>` in one pass
     let url: URL;
     try {
       url = new URL(href, base);
