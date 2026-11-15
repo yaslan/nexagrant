@@ -11,8 +11,8 @@
  * sprint (audited in TASK-MTU64MMEQC0WV §B-01).
  *
  * ── What counts as a violation ────────────────────────────────────────────────────────
- * Inside src/app/** and src/modules/** `.tsx` files, a string literal that reaches the
- * user as prose:
+ * Inside src/app/**, src/modules/** and src/components/** `.tsx` files, a string literal
+ * that reaches the user as prose:
  *   - a JSX text node            <span>Aktif Hibe Çağrısı</span>
  *   - a text-carrying prop       title= / label= / placeholder= / aria-label=
  * and that is either Turkish (carries ç ğ ı İ ö ş ü) or two or more words. A single
