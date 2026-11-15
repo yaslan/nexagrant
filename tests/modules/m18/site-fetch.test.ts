@@ -178,6 +178,27 @@ describe('htmlToText and pickSubpages', () => {
     expect(htmlToText(html)).toBe('About');
     expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
   });
+  // NG-207 F1: comments and hidden elements are found in ONE left-to-right scan. A `<!--` inside a
+  // <script> is script text and one inside an attribute value is that value — neither opens a comment,
+  // so the visible links and text up to the next `-->` stay.
+  it('NG-207 F1: a "<!--" inside a <script> does not hide the visible link after it', () => {
+    const html = '<script>var s="<!--";</script><a href="/about">About</a><script>var e="-->";</script>';
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
+  it('NG-207 F1: a "<!--" inside an attribute value does not hide the links after it', () => {
+    const html = '<a href="/about" title="<!--">About</a><a href="/iletisim">İletişim</a><!-- end -->';
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about', '/iletisim']);
+  });
+  it('NG-207 F1: the same "<!--" does not hide visible text either', () => {
+    expect(htmlToText('<script>var s="<!--";</script><p>Acme 45 çalışan</p><script>var e="-->";</script>')).toBe('Acme 45 çalışan');
+    expect(htmlToText("<p title='<!--'>Acme</p><p>45 çalışan</p><!-- end -->")).toBe('Acme\n45 çalışan');
+  });
+  it('NG-207 F1: an unclosed comment still hides the links after it; a comment still hides a <script> in it', () => {
+    const base = new URL('https://acme.com.tr/');
+    expect(pickSubpages('<a href="/about">About</a><!-- <a href="/iletisim">İletişim</a>', base).map((u) => u.pathname)).toEqual(['/about']);
+    expect(pickSubpages('<!-- <script> --><a href="/about">About</a>', base).map((u) => u.pathname)).toEqual(['/about']);
+    expect(htmlToText('<!-- <script> --><p>Acme</p>')).toBe('Acme');
+  });
   it('picks only same-site about/contact links, at most four', () => {
     const picked = pickSubpages(HOME_HTML, new URL('https://acme.com.tr/')).map((u) => u.pathname);
     expect(picked).toHaveLength(MAX_PAGES - 1);
