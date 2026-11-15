@@ -354,7 +354,7 @@
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "listStuckRoutedLeads() for alertStuckRoutedLeads(), run every 15 minutes by the public-lead-stuck cron (NG-182): one read-only SELECT of routed PublicLead rows (platform data, no tenantId, system_scope only) older than PUBLIC_LEAD_STUCK_AFTER_MINUTES for which NO LeadContact and NO Deal of the routedTenantId carries sourceRef = public-lead:<id>, plus the Tenant name/deletedAt of that id. The NOT EXISTS probe spans every tenant and the tenant set is the query's output, so no single tenant exists to hand withTenant; under fabrika_app an unscoped probe would see 0 copies and call every routed lead stuck. Nothing is written inside the scope: the alerts go to SystemAlert (no RLS) outside it, carrying the lead id only."
+      "reason": "alertStuckRoutedLeads(), run every 15 minutes by the public-lead-stuck cron (NG-182), through inStuckScope(): read-only SELECTs (one bounded page, oldest first, plus a probe narrowed to the lead ids that already hold an open alert) of routed PublicLead rows (platform data, no tenantId, system_scope only) older than PUBLIC_LEAD_STUCK_AFTER_MINUTES for which NO LeadContact and NO Deal of the routedTenantId carries sourceRef = public-lead:<id>, plus the Tenant name/deletedAt of that id. The NOT EXISTS probe spans every tenant and the tenant set is the query's output, so no single tenant exists to hand withTenant; under fabrika_app an unscoped probe would see 0 copies and call every routed lead stuck. Nothing is written inside the scope: the alerts go to SystemAlert (no RLS) outside it, carrying the lead id only."
     },
     {
       "check": "D",

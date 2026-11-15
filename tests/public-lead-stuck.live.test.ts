@@ -75,8 +75,20 @@ const mkLead = (key: string, over: Record<string, unknown>) =>
     .then((l) => l.id);
 const routed = (tenantId: string, minutesAgo: number) => ({ routeStatus: 'routed', routedTenantId: tenantId, routedAt: ago(minutesAgo) });
 const mine = (ids: string[]) => ids.filter((id) => Object.values(L).includes(id));
+// (f)-(h): more stuck leads than a (lowered) per-lead cap. Older than L.stuck, oldest = index 6.
+const EXTRA: string[] = [];
+const CAP = 3;
 const alertsFor = (leadId: string) =>
   admin.systemAlert.findMany({ where: { source: STUCK_LEAD_ALERT_SOURCE, meta: { path: ['publicLeadId'], equals: leadId } } });
+const openOfSource = () =>
+  admin.systemAlert.findMany({ where: { source: STUCK_LEAD_ALERT_SOURCE, resolvedAt: null }, orderBy: { createdAt: 'asc' } });
+const isSummary = (meta: unknown) => (meta as Record<string, unknown> | null)?.stuckSummary === true;
+const copyOf = async (leadId: string) => {
+  const org = await admin.leadOrganization.create({ data: { tenantId: T.a, name: `Heal Org ${leadId}` } });
+  await admin.leadContact.create({
+    data: { tenantId: T.a, organizationId: org.id, fullName: 'Ayşe Yılmaz', sourceRef: `${LEAD_INTAKE_SOURCE_REF_PREFIX}${leadId}` },
+  });
+};
 
 describe.skipIf(!HAS_DB)('stuck routed leads (live database, fabrika_app)', () => {
   beforeAll(async () => {
@@ -109,11 +121,13 @@ describe.skipIf(!HAS_DB)('stuck routed leads (live database, fabrika_app)', () =
   });
 
   afterAll(async () => {
-    const ids = Object.values(L).filter(Boolean);
+    const ids = [...Object.values(L), ...EXTRA].filter(Boolean);
     for (const id of ids) {
       if (!id) continue;
       await admin.systemAlert.deleteMany({ where: { source: 'public-lead-stuck', meta: { path: ['publicLeadId'], equals: id } } });
     }
+    // The summary alert names no tenant and no run; on this (non-shared) database, the ones opened since this file started are ours.
+    await admin.systemAlert.deleteMany({ where: { source: 'public-lead-stuck', createdAt: { gte: NOW }, meta: { path: ['stuckSummary'], equals: true } } });
     await admin.publicLead.deleteMany({ where: { email: { endsWith: `-${RUN}@example.test` } } });
     // Cascades the LeadOrganization / LeadContact / Deal copies.
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
@@ -147,6 +161,7 @@ describe.skipIf(!HAS_DB)('stuck routed leads (live database, fabrika_app)', () =
 
     const result = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma });
     expect(result.raised).toBeGreaterThanOrEqual(1);
+    expect(result).toMatchObject({ overflow: 0, summary: 'none' }); // default cap (STUCK_LEAD_ALERTS_MAX) is far above this file's leads
     expect(await alertsFor(L.young)).toHaveLength(0);
     expect(await alertsFor(L.withContact)).toHaveLength(0);
     // The stuck one got exactly one alert, and the alert names the lead only: no tenant id or name.
@@ -188,5 +203,68 @@ describe.skipIf(!HAS_DB)('stuck routed leads (live database, fabrika_app)', () =
       return tx.publicLead.count({ where: { id: L.stuck } });
     });
     expect(forged).toBe(0);
+  });
+
+  test('(f) more stuck leads than the cap: per-lead alerts up to the cap, ONE summary for the rest; a second run opens nothing', async () => {
+    for (let i = 0; i < 7; i += 1) EXTRA.push(await mkLead(`extra-${i}`, routed(T.a, MIN * 4 + i)));
+    // L.stuck still holds its open alert from (c)/(d); it counts against the cap.
+    const first = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma, maxLeadAlerts: CAP });
+    expect(first.stuck).toBe(8); // ground truth: L.stuck + 7 extras, nothing foreign on this database
+    expect(first).toMatchObject({ alreadyOpen: 1, raised: CAP - 1, resolved: 0, overflow: 8 - CAP, summary: 'opened' });
+
+    const open = await openOfSource();
+    const perLead = open.filter((a) => !isSummary(a.meta));
+    const summaries = open.filter((a) => isSummary(a.meta));
+    expect(perLead).toHaveLength(CAP);
+    expect(summaries).toHaveLength(1);
+    // Oldest first: the two free slots went to extra-6 and extra-5.
+    expect(new Set(perLead.map((a) => (a.meta as Record<string, unknown>).publicLeadId))).toEqual(new Set([L.stuck, EXTRA[6], EXTRA[5]]));
+    const summary = summaries[0]!;
+    expect(summary).toMatchObject({ level: 'warn', resolvedAt: null });
+    expect(summary.meta).toMatchObject({ count: 5, stuckTotal: 8, cap: CAP, oldestLeadIds: [EXTRA[4], EXTRA[3], EXTRA[2], EXTRA[1], EXTRA[0]] });
+    // Lead ids only: no tenant id or name, no contact data.
+    const blob = JSON.stringify({ message: summary.message, meta: summary.meta });
+    for (const forbidden of [T.a, `stuck-a-${RUN}`, 'Ayşe', '@example.test']) expect(blob).not.toContain(forbidden);
+
+    const second = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma, maxLeadAlerts: CAP });
+    expect(second).toMatchObject({ stuck: 8, alreadyOpen: CAP, raised: 0, resolved: 0, overflow: 5, summary: 'unchanged' });
+    const again = await openOfSource();
+    expect(again.map((a) => a.id)).toEqual(open.map((a) => a.id));
+    expect(again.map((a) => a.meta)).toEqual(open.map((a) => a.meta));
+  });
+
+  test('(g) the summary follows the count in place: same row, new count', async () => {
+    const before = (await openOfSource()).filter((a) => isSummary(a.meta));
+    await copyOf(EXTRA[0]!); // an uncovered lead recovers
+    const r = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma, maxLeadAlerts: CAP });
+    expect(r).toMatchObject({ stuck: 7, raised: 0, resolved: 0, overflow: 4, summary: 'updated' });
+    const after = (await openOfSource()).filter((a) => isSummary(a.meta));
+    expect(after).toHaveLength(1);
+    expect(after[0]!.id).toBe(before[0]!.id);
+    expect(after[0]!.meta).toMatchObject({ count: 4, stuckTotal: 7, oldestLeadIds: [EXTRA[4], EXTRA[3], EXTRA[2], EXTRA[1]] });
+  });
+
+  test('(h) under the cap: recovered leads\' alerts close in one statement, the freed slots fill, the summary closes', async () => {
+    const healedAlerts = [...(await alertsFor(EXTRA[6]!)), ...(await alertsFor(EXTRA[5]!))];
+    expect(healedAlerts).toHaveLength(2);
+    // Two alerted leads and two uncovered ones recover: left stuck = L.stuck, extra-2, extra-1 (= CAP).
+    for (const i of [6, 5, 4, 3]) await copyOf(EXTRA[i]!);
+    const r = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma, maxLeadAlerts: CAP });
+    expect(r).toMatchObject({ stuck: CAP, alreadyOpen: 1, resolved: 2, raised: 2, overflow: 0, summary: 'resolved' });
+
+    const closed = await admin.systemAlert.findMany({ where: { id: { in: healedAlerts.map((a) => a.id) } } });
+    expect(closed).toHaveLength(2);
+    for (const a of closed) expect(a.meta).toMatchObject({ alertResolvedBy: 'producer', publicLeadId: expect.any(String) });
+    // One statement for the batch: one resolvedAt for both rows.
+    expect(closed[0]!.resolvedAt).not.toBeNull();
+    expect(closed[1]!.resolvedAt?.getTime()).toBe(closed[0]!.resolvedAt?.getTime());
+
+    const open = await openOfSource();
+    expect(open.filter((a) => isSummary(a.meta))).toHaveLength(0);
+    expect(new Set(open.map((a) => (a.meta as Record<string, unknown>).publicLeadId))).toEqual(new Set([L.stuck, EXTRA[2], EXTRA[1]]));
+
+    // Steady state: nothing more to do.
+    const again = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma, maxLeadAlerts: CAP });
+    expect(again).toMatchObject({ stuck: CAP, alreadyOpen: CAP, raised: 0, resolved: 0, overflow: 0, summary: 'none' });
   });
 });

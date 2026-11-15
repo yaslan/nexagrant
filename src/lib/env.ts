@@ -319,13 +319,6 @@ const envSchema = z.object({
       .optional()
   ),
   /**
-   * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
-   * blank = 1000, the production value, which fails fast into the fallback path.
-   * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
-   * 10000): on a loaded machine a fresh connection can take longer than 1 s, and
-   * the page answered 500 instead of waiting (FO-253). Capped at 60 s.
-   */
-  /**
    * NG-182: how many minutes a `routed` PublicLead may stay without a copy in its tenant (no
    * LeadContact / Deal with `sourceRef = public-lead:<id>`) before it counts as stuck — listed on
    * /admin/lead-routes and raised as a SystemAlert by the `public-lead-stuck` job
@@ -340,6 +333,13 @@ const envSchema = z.object({
       .refine((value) => Number(value) <= 10_080, 'PUBLIC_LEAD_STUCK_AFTER_MINUTES must be at most 10080 (one week)')
       .default('60')
   ),
+  /**
+   * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
+   * blank = 1000, the production value, which fails fast into the fallback path.
+   * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
+   * 10000): on a loaded machine a fresh connection can take longer than 1 s, and
+   * the page answered 500 instead of waiting (FO-253). Capped at 60 s.
+   */
   DB_CONNECT_TIMEOUT_MS: blankToUndefined(
     z
       .string()

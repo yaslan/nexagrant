@@ -455,3 +455,34 @@ export async function resolveAlerts(
     return { resolved: 0 };
   }
 }
+
+/**
+ * Close open alerts the producer has already read, by id, in ONE statement (NG-182).
+ *
+ * `resolveAlerts` re-reads every open row of its source on each call, so a producer that closes
+ * one alert per recovered item pays O(recovered × open) queries. A producer that has already
+ * read its open alerts (to skip the ones it must not duplicate) hands their ids here instead.
+ * Same marker as `resolveAlerts` (`alertResolvedBy: 'producer'`, merged into an object meta),
+ * one `resolvedAt` for the whole batch, and a row someone resolved in between is left alone.
+ * Same contract: never throws, never logs a secret; a failed write resolves nothing.
+ */
+export async function resolveAlertsById(
+  ids: readonly string[],
+  options: { client?: Pick<typeof prisma, '$executeRaw'> } = {}
+): Promise<{ resolved: number }> {
+  if (ids.length === 0) return { resolved: 0 };
+  const db = options.client ?? prisma;
+  try {
+    const resolved = await db.$executeRaw`
+      UPDATE "SystemAlert"
+         SET "resolvedAt" = ${new Date()},
+             meta = (CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END)
+                    || jsonb_build_object(${ALERT_RESOLVED_BY_KEY}::text, 'producer'::text)
+       WHERE id = ANY(${[...ids]}::text[])
+         AND "resolvedAt" IS NULL`;
+    return { resolved };
+  } catch (error) {
+    console.error(`[resolveAlertsById] could not resolve SystemAlert rows: ${errorMessage(error)}`);
+    return { resolved: 0 };
+  }
+}
