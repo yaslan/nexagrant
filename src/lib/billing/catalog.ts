@@ -878,21 +878,21 @@ export const AI_ACTION_CREDITS: Readonly<Record<string, AiCreditEntry>> = {
       'user pressed one button and pays M17:evaluate only when a result is delivered; a malformed ' +
       'answer is our defect, not a second purchase. The call is still logged in AiUsageLog.',
   },
-  // M18-F5 (NG-136): TAHMİNİ — PATRON ONAYI BEKLİYOR. The figures are the agent's estimate, not a
-  // price anyone agreed to; docs/BILLING.md carries the same two rows with the same mark.
+  // M18-F5 (NG-136): owner-approved prices. The agent proposed 1 / 2; the owner approved them on
+  // 15.11.2026 ("Kredi fiyatı 1 / 2 olsun"). docs/BILLING.md carries the same two rows as "Yayımlandı".
   'M18:enrich-organization': {
     credits: 1,
-    approval: 'pending-owner-approval',
+    approval: 'published',
     note:
-      'Tahmini — patron onayı bekliyor. Client organisation enrichment from its own website ' +
+      'Patron onayı: 15.11.2026. Client organisation enrichment from its own website ' +
       '(≤5 pages). Proposed 1 by parity with M1 (profil özeti): one organisation, one short ' +
       'structured answer. Nothing is charged when no page could be fetched (no model call).',
   },
   'M18:eligibility-pre-report': {
     credits: 2,
-    approval: 'pending-owner-approval',
+    approval: 'published',
     note:
-      'Tahmini — patron onayı bekliyor. Internal eligibility pre-assessment of one client ' +
+      'Patron onayı: 15.11.2026. Internal eligibility pre-assessment of one client ' +
       'organisation against one call. Proposed 2: more than a summary (it reads the call rules), ' +
       'well below the M6/M17 class (3), which read a whole application against an official grid.',
   },

@@ -473,12 +473,19 @@ describe('AI credit catalogue — docs/BILLING.md and the code say one number', 
     }
   });
 
-  it('publishes exactly the seven figures §1 has always sold', () => {
+  it('publishes the seven figures §1 has always sold and the two owner-approved M18 prices', () => {
     const published = Object.entries(AI_ACTION_CREDITS)
       .filter(([, e]) => e.approval === 'published')
       .map(([k]) => k)
       .sort();
-    expect(published).toEqual(['M1', 'M10', 'M11', 'M2', 'M3', 'M6', 'M9']);
+    // M18 (NG-136): the owner approved 1 / 2 on 15.11.2026 ("Kredi fiyatı 1 / 2 olsun").
+    expect(published).toEqual(['M1', 'M10', 'M11', 'M18:eligibility-pre-report', 'M18:enrich-organization', 'M2', 'M3', 'M6', 'M9']);
+    expect(AI_ACTION_CREDITS['M18:enrich-organization']?.credits).toBe(1);
+    expect(AI_ACTION_CREDITS['M18:eligibility-pre-report']?.credits).toBe(2);
+    for (const key of ['M18:enrich-organization', 'M18:eligibility-pre-report']) {
+      expect(AI_ACTION_CREDITS[key]?.note).toContain('Patron onayı: 15.11.2026');
+      expect(AI_ACTION_CREDITS[key]?.note).not.toMatch(/tahmini|onayı bekliyor/i);
+    }
   });
 
   it('marks the figures no customer has been shown, and no others', () => {
@@ -487,15 +494,13 @@ describe('AI credit catalogue — docs/BILLING.md and the code say one number', 
       .map(([k]) => k)
       .sort();
     // M17 (FO-188): the Interreg pre-assessment, its two free model calls, until the owner approves.
-    // M18 (NG-136): enrichment and eligibility pre-report, estimated by the agent, not yet approved,
-    // and their two free model calls (K-582507 = A, the M17 reservation pattern).
+    // M18 (NG-136): the two free model calls (K-582507 = A, the M17 reservation pattern) stay as
+    // their M17 counterparts do; the two prices themselves are published.
     expect(pending).toEqual([
       'M17:evaluate',
       'M17:evaluate-attempt',
       'M17:evaluate-retry',
-      'M18:eligibility-pre-report',
       'M18:eligibility-pre-report-attempt',
-      'M18:enrich-organization',
       'M18:enrich-organization-attempt',
       'M6:esr-parser',
       'M7',
