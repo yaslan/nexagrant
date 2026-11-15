@@ -58,6 +58,8 @@ describe('M18 duplicate review keeps the event loop free (NG-197)', () => {
     const stall = await longestLoopStall(async () => {
       pairs = await findCandidatePairs([...BULK, ...MERGE]);
     });
+    // Logged before the assertion, so the CI log shows the real margin on a pass and on a fail.
+    console.info(`[NG-197] longest event-loop stall: ${stall.toFixed(1)} ms (budget ${STALL_BUDGET_MS} ms)`);
     expect(stall).toBeLessThan(STALL_BUDGET_MS);
     // Same answer as before: the merge pair is found, the list is capped at 100.
     expect(pairs).toHaveLength(100);

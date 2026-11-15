@@ -32,7 +32,11 @@ export interface DuplicatePair {
   strength: 'EXACT' | 'LIKELY' | 'POSSIBLE';
 }
 
-/** About 5 ms of work on a laptop; the loop is never held near the 2 s `maxWait` even on a slow runner. */
+/**
+ * Measured, not guessed (NG-197, Apple M3 Pro, Node 26, the event-loop test's 0 ms timer probe): on the
+ * 1.002-row e2e data a slice holds the loop 1.6 ms median, 8–27 ms at worst; on one 5.002-row block
+ * 31–55 ms at worst (68 ms in review). The spikes are GC/JIT, still far from the 2 s `maxWait`.
+ */
 export const COMPARISONS_PER_SLICE = 5_000;
 
 const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -74,7 +78,7 @@ export async function findCandidatePairs(
   const blocks = new Map<string, Entry[]>();
   const ids = new Set<string>();
   for (const org of orgs) {
-    if (ids.has(org.id)) continue; // each pair once: a row listed twice is the same organisation
+    if (ids.has(org.id)) continue; // first listing of an id wins; NG-135 compared every listing, so a repeat with other fields added pairs
     ids.add(org.id);
     const first = normaliseOrgName(org.name).split(' ')[0] ?? '';
     if (!first) continue;

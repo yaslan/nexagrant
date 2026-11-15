@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { blankFieldsFrom, findCandidatePairs, type DuplicatePair } from '@/modules/m18/server/duplicate-pairs';
-import { findDuplicates, normaliseOrgName, type ExistingOrganization } from '@/modules/m18/server/duplicates';
+import { type ExistingOrganization } from '@/modules/m18/server/duplicates';
 import { mergeSchema } from '@/modules/m18/server/merge-leads';
+
+import { frozenFindCandidatePairs } from './fixtures/m18-ng135-duplicate-pairs.frozen';
 
 /**
  * NG-135 (M18-F3 phase B). Which organisations are offered as a duplicate pair, which fields a
@@ -42,60 +44,84 @@ describe('M18 duplicate pairs and merge rules', () => {
   });
 
   /**
-   * NG-197 rewrote the scan (each pair once, best `limit` kept while scanning, async with yields).
-   * The answer must be the one the NG-135 scan gave: every row run through `findDuplicates`
-   * against its block, first sighting of a pair wins, strongest first.
+   * NG-197 rewrote the scan (each pair once, best `limit` kept while scanning, async with yields)
+   * and moved the rule into `classifyPair`. The reference is a FROZEN copy of the NG-135 code
+   * (`721fd71b`, `fixtures/m18-ng135-duplicate-pairs.frozen.ts`) that imports nothing from the
+   * product, so a change to the rule cannot hide in the yardstick.
+   *
+   * What must match exactly: the set of pairs, each pair's reason, similarity and strength.
+   * Order: NG-135 sorted by similarity (descending), then `aId`, and left pairs equal on both in
+   * the order it first saw them; NG-197 breaks that tie by `bId`. So the order is compared as
+   * "similarity descending, aId, then bId" — the frozen list re-sorted with the `bId` tie-break —
+   * and the rows below include a tie group the frozen scan leaves out of `bId` order.
    */
-  function referencePairs(orgs: readonly ExistingOrganization[]): DuplicatePair[] {
-    const blocks = new Map<string, ExistingOrganization[]>();
-    for (const o of orgs) {
-      const first = normaliseOrgName(o.name).split(' ')[0] ?? '';
-      if (!first) continue;
-      blocks.set(first, [...(blocks.get(first) ?? []), o]);
-    }
-    const seen = new Set<string>();
-    const pairs: DuplicatePair[] = [];
-    for (const block of blocks.values()) {
-      if (block.length < 2) continue;
-      for (const o of block) {
-        for (const hit of findDuplicates(o, block)) {
-          if (hit.id === o.id) continue;
-          const [aId, bId] = o.id < hit.id ? [o.id, hit.id] : [hit.id, o.id];
-          if (seen.has(`${aId}|${bId}`)) continue;
-          seen.add(`${aId}|${bId}`);
-          pairs.push({ aId, bId, reason: hit.reason, similarity: hit.similarity, strength: hit.strength });
-        }
-      }
-    }
-    return pairs.sort(
-      (x, y) => y.similarity - x.similarity || x.aId.localeCompare(y.aId) || x.bId.localeCompare(y.bId),
-    );
-  }
+  const byTieBreak = (x: DuplicatePair, y: DuplicatePair) =>
+    y.similarity - x.similarity || x.aId.localeCompare(y.aId) || x.bId.localeCompare(y.bId);
+  const pairKey = (p: DuplicatePair) => `${p.aId}|${p.bId}|${p.reason}|${p.similarity}|${p.strength}`;
 
-  it('gives the same pairs, reasons and order as running findDuplicates over each block (NG-197)', async () => {
-    const orgs: ExistingOrganization[] = [
-      // Listed first, so it is the candidate; its stored key matches a1's computed key only in the
-      // other direction — the one-sided key test.
-      org('a6', 'Ankara Birlik', '06', 'name:ankara kooperatifi|06'),
-      org('a1', 'Ankara Kooperatifi', '06'),
-      org('a2', 'Ankara Kooperatifi A.Ş.', '06'),
-      org('a3', 'Ankara Kooperatif', null),
-      org('a4', 'Ankara Kooperatifi', '35'),
-      org('a5', 'Ankara Tarım Kooperatifi', '06'),
-      { id: 't1', name: 'Doğa Derneği', provinceCode: '06', taxNumber: '1234567890' },
-      { id: 't2', name: 'Doga Dernegi Sanayi', provinceCode: '35', taxNumber: '123.456.78-90' },
-      org('d3', 'Doğa Derneği', null),
-      org('i1', 'İzmir Ticaret Odası', '35'),
-      org('i2', 'Izmir Ticaret Odasi', '35'),
-      org('x1', '...', '06'),
-      ...Array.from({ length: 40 }, (_, i) => org(`b${String(i).padStart(2, '0')}`, `Bursa Toplu ${i + 1}`, '16')),
-    ];
-    const expected = referencePairs(orgs);
+  const equivalenceRows: ExistingOrganization[] = [
+    // Listed first, so it is the candidate; its stored key matches a1's computed key only in the
+    // other direction — the one-sided key test.
+    org('a6', 'Ankara Birlik', '06', 'name:ankara kooperatifi|06'),
+    org('a1', 'Ankara Kooperatifi', '06'),
+    org('a2', 'Ankara Kooperatifi A.Ş.', '06'),
+    org('a3', 'Ankara Kooperatif', null),
+    org('a4', 'Ankara Kooperatifi', '35'),
+    org('a5', 'Ankara Tarım Kooperatifi', '06'),
+    { id: 't1', name: 'Doğa Derneği', provinceCode: '06', taxNumber: '1234567890' },
+    { id: 't2', name: 'Doga Dernegi Sanayi', provinceCode: '35', taxNumber: '123.456.78-90' },
+    org('d3', 'Doğa Derneği', null),
+    org('i1', 'İzmir Ticaret Odası', '35'),
+    org('i2', 'Izmir Ticaret Odasi', '35'),
+    org('x1', '...', '06'),
+    // Listed out of id order: the frozen scan yields (k1,k3) before (k1,k2), both similarity 1.
+    org('k3', 'Konya Birlik', '42'),
+    org('k1', 'Konya Birlik', '42'),
+    org('k2', 'Konya Birlik', '42'),
+    ...Array.from({ length: 40 }, (_, i) => org(`b${String(i).padStart(2, '0')}`, `Bursa Toplu ${i + 1}`, '16')),
+  ];
+
+  it('gives the same pairs, reasons and similarities as the frozen NG-135 scan, ordered with a bId tie-break (NG-197)', async () => {
+    const frozen = frozenFindCandidatePairs(equivalenceRows, Number.MAX_SAFE_INTEGER);
+    const expected = [...frozen].sort(byTieBreak);
     expect(expected.length).toBeGreaterThan(100);
-    expect(await findCandidatePairs(orgs, Number.MAX_SAFE_INTEGER)).toEqual(expected);
-    expect(await findCandidatePairs(orgs)).toEqual(expected.slice(0, 100));
-    expect(expected.some((p) => p.aId === 'a1' && p.bId === 'a6' && p.reason === 'DEDUPE_KEY')).toBe(true);
-    expect(expected.some((p) => p.aId === 't1' && p.bId === 't2' && p.reason === 'TAX_NUMBER')).toBe(true);
+    // The documented difference is real in this data: equal (similarity, aId), different order.
+    expect(frozen.map(pairKey)).not.toEqual(expected.map(pairKey));
+    expect(frozen.findIndex((p) => p.aId === 'k1' && p.bId === 'k3')).toBeLessThan(
+      frozen.findIndex((p) => p.aId === 'k1' && p.bId === 'k2'),
+    );
+
+    const all = await findCandidatePairs(equivalenceRows, Number.MAX_SAFE_INTEGER);
+    expect(new Set(all.map(pairKey))).toEqual(new Set(frozen.map(pairKey)));
+    expect(all).toEqual(expected);
+    expect(await findCandidatePairs(equivalenceRows)).toEqual(expected.slice(0, 100));
+    expect(frozen.some((p) => p.aId === 'a1' && p.bId === 'a6' && p.reason === 'DEDUPE_KEY')).toBe(true);
+    expect(frozen.some((p) => p.aId === 't1' && p.bId === 't2' && p.reason === 'TAX_NUMBER')).toBe(true);
+  });
+
+  /**
+   * NG-197 drops a repeated id (first listing wins). NG-135 ran every listing: an identical repeat
+   * changed nothing (its pairs were already seen), a repeat with other fields could add pairs.
+   * Ids are primary keys, so the page never sends one twice; this pins the choice.
+   */
+  it('uses only the first listing of a repeated id (NG-197; NG-135 used every listing)', async () => {
+    const identical = [org('a', 'Ankara Kooperatifi'), org('b', 'Ankara Kooperatifi A.Ş.'), org('a', 'Ankara Kooperatifi')];
+    expect(await findCandidatePairs(identical)).toEqual(frozenFindCandidatePairs(identical));
+    expect(await findCandidatePairs(identical)).toEqual([
+      { aId: 'a', bId: 'b', reason: 'DEDUPE_KEY', similarity: 1, strength: 'EXACT' },
+    ]);
+
+    const repeatWithOtherFields = [
+      org('a', 'Ankara Kooperatifi'),
+      org('b', 'Bursa Birlik', '16'),
+      org('c', 'Bursa Birlik', '16'),
+      org('a', 'Bursa Birlik', '16'),
+    ];
+    expect(await findCandidatePairs(repeatWithOtherFields)).toEqual([
+      { aId: 'b', bId: 'c', reason: 'DEDUPE_KEY', similarity: 1, strength: 'EXACT' },
+    ]);
+    // The frozen scan also paired the second listing of `a` with b and c.
+    expect(frozenFindCandidatePairs(repeatWithOtherFields).map((p) => `${p.aId}|${p.bId}`)).toEqual(['a|b', 'a|c', 'b|c']);
   });
 
   it('fills only blank fields on the kept organisation, never overwrites a kept value', () => {
