@@ -22,6 +22,7 @@ const WS = 'm18-e2e';
 const USER_ID = 'm18-e2e-owner';
 const EMAIL = 'm18-e2e-owner@e2e.fabrika.test';
 const SHOTS = shotsDir('NG-135');
+// Every screenshot passes `caret: 'initial'`: Playwright's default `caret: 'hide'` injects an inline caret-color style into inputs before hydration finishes, which causes React hydration mismatch warnings (NG-199).
 // Unique per run so a re-run never collides with the duplicate-name check.
 const RUN = Date.now().toString(36);
 const ORG_NAME = `M18 E2E Kurum ${RUN}`;
@@ -108,7 +109,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     await expect(page.getByRole('status')).toContainText(m.leads.created);
     const orgRow = page.getByRole('row', { name: new RegExp(ORG_NAME) });
     await expect(orgRow).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-01-leads.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-01-leads.png'), fullPage: true, caret: 'initial' });
 
     // 2. Kurumu aç (satırdaki "Aç" bağlantısı), fırsat aç
     await orgRow.getByRole('link', { name: m.leads.openLead }).click();
@@ -118,7 +119,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     await dealForm.getByLabel(m.deal.feeLabel).fill('1500,00');
     await dealForm.getByRole('button', { name: m.deal.submit }).click();
     await expect(page.getByRole('status')).toContainText(m.deal.created);
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-02-lead-detail.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-02-lead-detail.png'), fullPage: true, caret: 'initial' });
 
     // 3. Görev ekle ve tamamla (fırsat hâlâ açık: görev formu yalnız açık fırsatla çıkar)
     await page.goto(`${base}/tasks`);
@@ -131,7 +132,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     // The outcome is the row's status cell, and the page-level notice must survive the refresh.
     await expect(row).toContainText(m.tasks.done);
     await expect(page.locator('[aria-live="polite"]').getByText(m.tasks.toggled, { exact: true })).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-04-tasks.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-04-tasks.png'), fullPage: true, caret: 'initial' });
 
     // 4. Satış hattı: aşama değiştir ve LOST + neden
     await page.goto(`${base}/pipeline`);
@@ -156,7 +157,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     await expect(page.locator('[aria-live="polite"]').getByText(m.pipeline.moved, { exact: true })).toBeVisible();
     // The board is wider than the viewport; bring the LOST card into the frame for the proof shot.
     await card.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-03-pipeline-lost.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-03-pipeline-lost.png'), fullPage: true, caret: 'initial' });
   });
 
   test('tr: CSV ile 1.000 satır içe aktar (ham süre ölçülür, 30 sn sınırı)', async ({ page }) => {
@@ -173,7 +174,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
       buffer: Buffer.from(lines.join('\n'), 'utf8'),
     });
     await expect(page.locator('ul[aria-live="polite"]')).toContainText(fmt(m.import.countValid, { count: IMPORT_ROWS }));
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-05-import-preview.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-05-import-preview.png'), fullPage: true, caret: 'initial' });
 
     const started = Date.now();
     await page.getByRole('button', { name: submitRe(m.import.submit) }).click();
@@ -188,7 +189,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
       where: { tenantId: TENANT, name: { startsWith: BULK_PREFIX }, deletedAt: null },
     });
     expect(written).toBe(IMPORT_ROWS);
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-06-import-done.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-06-import-done.png'), fullPage: true, caret: 'initial' });
   });
 
   test('tr: aynı kurumun kopyasını bul ve birleştir (fırsat taşınır, boş alan dolar)', async ({ page }) => {
@@ -227,7 +228,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
       .filter({ hasText: MERGE_NAME });
     await expect(pair).toHaveCount(1);
     console.log(`[NG-135] /duplicates with ${IMPORT_ROWS} bulk rows loaded: ${Date.now() - dupStarted} ms`);
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-07-duplicates.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-07-duplicates.png'), fullPage: true, caret: 'initial' });
 
     await pair.locator(`input[type="radio"][value="${keepOrg.id}"]`).check();
     const mergeStarted = Date.now();
@@ -243,7 +244,7 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     expect(dropped.deletedAt).not.toBeNull();
     expect(kept.provinceCode).toBe('06');
     expect(await prisma.deal.count({ where: { tenantId: TENANT, organizationId: keepOrg.id, title: MERGE_DEAL_TITLE, deletedAt: null } })).toBe(1);
-    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-08-merged.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-tr-08-merged.png'), fullPage: true, caret: 'initial' });
   });
 
   test('en: the same screens render in English', async ({ page }) => {
@@ -252,19 +253,19 @@ test.describe('M18 Müşteri Satış Hattı — gerçek tıklama', () => {
     const base = `/en/${WS}/musteri-hatti`;
     await page.goto(`${base}/leads`);
     await expect(page.getByRole('heading', { name: m.leads.heading })).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-en-01-leads.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-en-01-leads.png'), fullPage: true, caret: 'initial' });
     await page.goto(`${base}/pipeline`);
     await expect(page.getByRole('heading', { name: m.pipeline.heading })).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-en-02-pipeline.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-en-02-pipeline.png'), fullPage: true, caret: 'initial' });
     await page.goto(`${base}/tasks`);
     await expect(page.getByRole('heading', { name: m.tasks.heading })).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-en-03-tasks.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-en-03-tasks.png'), fullPage: true, caret: 'initial' });
     await page.goto(`${base}/import`);
     await expect(page.getByRole('heading', { name: m.import.heading })).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-en-04-import.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-en-04-import.png'), fullPage: true, caret: 'initial' });
     await page.goto(`${base}/duplicates`);
     await expect(page.getByRole('heading', { name: m.duplicates.heading })).toBeVisible();
-    await page.screenshot({ path: path.join(SHOTS, 'm18-en-05-duplicates.png'), fullPage: true });
+    await page.screenshot({ path: path.join(SHOTS, 'm18-en-05-duplicates.png'), fullPage: true, caret: 'initial' });
   });
 
   test('M18 OFF: the routes show the module lock, not the screens', async ({ page }) => {
