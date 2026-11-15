@@ -214,6 +214,22 @@ describe('M18 AI actions through the real llm.ts (NG-136)', () => {
     expect(await admin!.aiUsageLog.count({ where: { tenantId: owner.tenantId } })).toBe(0);
   }, 30_000);
 
+  test('NG-202 B2: enrichment with a balance below the price is refused before the site is read', async () => {
+    if (!ready) return;
+    const price = aiCreditEntry('M18', 'enrich-organization')!.credits;
+    const owner = await makeTenant('enrich-poor', price - 1);
+    stubProvider();
+    const org = await withTenant(owner.tenantId, (tx) => enrichment.loadEnrichmentSubject(tx, owner.tenantId, owner.organizationId));
+    const fetchSite = vi.fn(async () => ({ ok: true as const, pages: [{ url: 'https://acme.example.com.tr/', text: 'Acme' }], skipped: [] }));
+    await expect(
+      enrichment.proposeEnrichment({ tenantId: owner.tenantId, userId: owner.userId, org: org!, locale: 'tr' }, { fetchSite }),
+    ).rejects.toThrow(/Insufficient AI credits/);
+    expect(fetchSite).not.toHaveBeenCalled();
+    expect(state.requests).toBe(0);
+    expect(await balance(owner.tenantId)).toBe(price - 1);
+    expect(await moves(owner.tenantId)).toEqual([]);
+  }, 30_000);
+
   test('eligibility: AiUsageLog + price, saved as DRAFT, invisible to another tenant, releasable only once APPROVED', async () => {
     if (!ready) return;
     const price = aiCreditEntry('M18', 'eligibility-pre-report')!.credits;
