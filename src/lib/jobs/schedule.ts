@@ -29,6 +29,7 @@ export const JOB_IDS = [
   'agency-monthly-report',
   'invitation-cleanup',
   'public-lead-cleanup',
+  'public-lead-stuck',
   'expert-prereg-cleanup',
   'k1-topic-match',
   'k1-embeddings',
@@ -161,6 +162,17 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     cron: '*/15 * * * *',
     maxAttempts: 3,
     queue: 'm17-stale-runs',
+    missedTickAlert: false,
+  },
+  // NG-182: every 15 minutes, one SystemAlert per routed PublicLead that has no copy in its tenant
+  // after PUBLIC_LEAD_STUCK_AFTER_MINUTES (src/lib/leads/stuck-leads.ts). Read-only on the leads. Own
+  // queue, so a job added by hand waits for the cron's run. No missed-tick alert and no backfill: the
+  // next tick finds every lead still stuck, so a missed tick loses nothing.
+  {
+    id: 'public-lead-stuck',
+    cron: '*/15 * * * *',
+    maxAttempts: 3,
+    queue: 'public-lead-stuck',
     missedTickAlert: false,
   },
   // NG-131 (NG-43 Ö-1): the notification e-mail outbox. Both modes share one queue, so a cron

@@ -54,6 +54,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'm17-stale-runs': '*/15 * * * *',
       'invitation-cleanup': '30 3 * * *',
       'public-lead-cleanup': '45 3 * * *',
+      'public-lead-stuck': '*/15 * * * *',
       'expert-prereg-cleanup': '55 3 * * *',
       'k1-topic-match': '30 2 * * *',
       'k1-embeddings': '15 2 * * *',
@@ -80,6 +81,7 @@ describe('schedule (ADR-0008 §2)', () => {
     expect(lines).toContain('5 * * * * job-queue-health ?id=job-queue-health&max=3');
     expect(lines).toContain('30 3 * * * invitation-cleanup ?id=invitation-cleanup&max=5&fill=6h');
     expect(lines).toContain('45 3 * * * public-lead-cleanup ?id=public-lead-cleanup&max=5&fill=6h');
+    expect(lines).toContain('*/15 * * * * public-lead-stuck ?id=public-lead-stuck&max=3&queue=public-lead-stuck');
     expect(lines).toContain('55 3 * * * expert-prereg-cleanup ?id=expert-prereg-cleanup&max=5&fill=6h');
     expect(lines).toContain('35 3 * * * m17-text-retention ?id=m17-text-retention&max=5&fill=6h');
     expect(lines).toContain('50 3 * * * notifications-retention ?id=notifications-retention&max=5&fill=6h');
