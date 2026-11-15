@@ -22,7 +22,6 @@ async function signInAsPlatformAdmin(page: Page, baseURL: string): Promise<void>
       sub: 'demo-user-superadmin',
       id: 'demo-user-superadmin',
       name: 'Platform Admin',
-      email: 'admin@yasinaslan.com.tr',
       tenantId: 'demo-tenant',
       role: 'SUPER_ADMIN',
       isPlatformAdmin: true,
