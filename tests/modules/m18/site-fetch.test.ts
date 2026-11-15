@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import type { TLSSocket } from 'node:tls';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,7 @@ import {
   parseRobots,
   pickSubpages,
   robotsAllows,
+  testOnlyPinnedTransport,
 } from '@/modules/m18/server/site-fetch';
 
 /**
@@ -422,7 +423,7 @@ describe('pinned transport (connect-time address check)', () => {
   it('DNS rebinding: the first answer is public, the connection-time answer is private → no request is sent', async () => {
     const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
     // The pre-check (deps.lookup) sees a public address; the socket's own resolution gets 127.0.0.1.
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, connectPort: port });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, connectPort: port });
     const res = await fetchOrganizationSite('http://acme.com.tr', { lookup: PUBLIC, fetchImpl });
     expect(res).toEqual({ ok: false, reason: 'robots_unreadable' });
     expect(hits).toEqual([]);
@@ -430,14 +431,14 @@ describe('pinned transport (connect-time address check)', () => {
 
   it('a mixed answer (one public, one private) is refused at connect time', async () => {
     const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
-    const fetchImpl = createPinnedFetch({ resolve: async () => ['93.184.216.34', '127.0.0.1'], connectPort: port });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: async () => ['93.184.216.34', '127.0.0.1'], connectPort: port });
     await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
     expect(hits).toEqual([]);
   });
 
   it('a literal private IP is refused without a lookup', async () => {
     const { port, hits } = await serve((_req, res) => html(res, 'x'));
-    const fetchImpl = createPinnedFetch({ resolve: PUBLIC, connectPort: port });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: PUBLIC, connectPort: port });
     await expect(fetchImpl(new URL('http://127.0.0.1/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
     expect(hits).toEqual([]);
   });
@@ -572,7 +573,7 @@ describe('pinned transport (connect-time address check)', () => {
     }
     vi.stubGlobal('Headers', RefusingHeaders);
     try {
-      const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port });
+      const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, allowed: localOnly, connectPort: port });
       await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/invalid header value/);
     } finally {
       vi.unstubAllGlobals();
@@ -722,7 +723,7 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end(req.url === '/' ? '<title>Acme</title><a href="/hakkimizda">Hakkımızda</a>' : '<p>45 çalışan</p>');
     });
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
     const res = await fetchOrganizationSite('https://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, fetchImpl });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -736,7 +737,7 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
 
   it('DNS rebinding over https: a private connect-time answer is refused before the TLS handshake', async () => {
     const { port, cert, seen, connections } = await serveTls((_req, res) => res.end('internal'));
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, connectPort: port, ca: cert }); // default guard: public only
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, connectPort: port, ca: cert }); // default guard: public only
     await expect(fetchImpl(new URL('https://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
     expect(connections()).toBe(0);
     expect(seen).toEqual([]);
@@ -744,8 +745,24 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
 
   it('a certificate that does not name the site is refused (verification uses the URL host)', async () => {
     const { port, cert, seen } = await serveTls((_req, res) => res.end('x'));
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
     await expect(fetchImpl(new URL('https://other.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/altnames|does not match|Hostname/i);
     expect(seen).toEqual([]);
+  });
+});
+
+describe('NG-202 B6: the test-only transport stays out of src/', () => {
+  it('no source file other than site-fetch.ts uses testOnlyPinnedTransport, and site-fetch.ts does not call it', () => {
+    const root = join(__dirname, '../../../src');
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const full = join(dir, name);
+        return statSync(full).isDirectory() ? walk(full) : /\.tsx?$/.test(name) ? [full] : [];
+      });
+    const users = walk(root).filter((file) => readFileSync(file, 'utf8').includes('testOnlyPinnedTransport'));
+    expect(users.map((f) => f.slice(root.length + 1).split(sep).join('/'))).toEqual(['modules/m18/server/site-fetch.ts']);
+    const own = readFileSync(join(root, 'modules/m18/server/site-fetch.ts'), 'utf8');
+    // Its declaration only: the production paths build the transport without it.
+    expect(own.match(/testOnlyPinnedTransport/g)).toHaveLength(1);
   });
 });

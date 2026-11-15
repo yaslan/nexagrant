@@ -200,13 +200,32 @@ const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
  * (guardedGet follows them by hand); the body arrives as a stream, so readCapped's byte cap and the
  * abort signal (per-request timeout + total budget) apply to it as they did to `fetch`.
  */
-export function createPinnedFetch(opts: {
+export function createPinnedFetch(opts: { resolve: LookupFn; allowed?: AddressGuard }): FetchLike {
+  // NG-202 (B6): built from the two options by name, so an options bag that also carries `ca` or
+  // `connectPort` cannot reach the transport — the system trust store and the URL's port always apply.
+  return pinnedTransport({ resolve: opts.resolve, allowed: opts.allowed });
+}
+
+type PinnedTransportOptions = {
   resolve: LookupFn;
   allowed?: AddressGuard;
+  /** Test seam: the port the socket connects to (a local test server). Default: the URL's own. */
   connectPort?: number;
   /** Test seam: the CA a local https test server's certificate is checked against. Default: the system's. */
   ca?: string;
-}): FetchLike {
+};
+
+/**
+ * TEST SEAM ONLY (NG-202 B6) — the pinned transport pointed at a local test server: `connectPort`
+ * and a custom `ca`. A custom CA replaces the system trust store, so no code under src/ other than
+ * this file may use it (tests/modules/m18/site-fetch.test.ts checks). Production builds the
+ * transport through {@link createPinnedFetch}, or through `fetchOrganizationSite`'s own test seam.
+ */
+export function testOnlyPinnedTransport(opts: PinnedTransportOptions): FetchLike {
+  return pinnedTransport(opts);
+}
+
+function pinnedTransport(opts: PinnedTransportOptions): FetchLike {
   const allowed = opts.allowed ?? isPublicAddress;
   const lookup = guardedLookup(opts.resolve, allowed);
   return (url, init) =>
@@ -690,7 +709,7 @@ export async function fetchOrganizationSite(rawUrl: string, deps: SiteFetchDeps 
   const lookup = deps.lookup ?? defaultLookup;
   const addressAllowed = deps.addressAllowed ?? isPublicAddress;
   const d = {
-    fetchImpl: deps.fetchImpl ?? createPinnedFetch({ resolve: lookup, allowed: addressAllowed, connectPort: deps.connectPort }),
+    fetchImpl: deps.fetchImpl ?? pinnedTransport({ resolve: lookup, allowed: addressAllowed, connectPort: deps.connectPort }),
     lookup,
     addressAllowed,
     timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
