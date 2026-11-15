@@ -3,14 +3,14 @@ import type { TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
 import { separatedPrompt } from '@/lib/ai/prompts';
 import { generateCompletion, type LlmCompletion, type LlmGenerateOptions } from '@/lib/llm';
-import { attemptPurpose, withM18Reservation, type M18CreditDeps } from './ai-credits';
+import { assertM18Balance, attemptPurpose, withM18Reservation, type M18CreditDeps } from './ai-credits';
 import { fetchOrganizationSite, type SiteFetchDeps, type SiteFetchResult } from './site-fetch';
 
 /**
  * M18-F5 (NG-136) — organisation enrichment from its own website.
  *
  * Two steps, and only the second writes:
- *  1. `proposeEnrichment` reads ≤5 pages (site-fetch.ts, robots.txt obeyed), reserves the price of
+ *  1. `proposeEnrichment` checks the balance covers the price (read-only; NG-202 B2), reads ≤5 pages (site-fetch.ts, robots.txt obeyed), reserves the price of
  *     M18:enrich-organization (ai-credits.ts, the M17 pattern), asks the model through `src/lib/llm.ts`
  *     (the free M18:enrich-organization-attempt — AiUsageLog row), and returns a PROPOSAL. Nothing is
  *     stored. No page fetched → no reservation, no model call, no charge. An answer with no usable
@@ -138,6 +138,9 @@ export async function proposeEnrichment(
 ): Promise<ProposeEnrichmentResult> {
   const { org } = input;
   if (!org.website) return { ok: false, code: 'NO_WEBSITE' };
+  // NG-202 (B2): the site is read before the price is reserved (no page → no charge), so a tenant that
+  // cannot pay is turned away here, before any request leaves for the third-party site.
+  await (deps.credits?.precheck ?? assertM18Balance)(input.tenantId, ENRICHMENT_PURPOSE);
   const site = await (deps.fetchSite ?? fetchOrganizationSite)(org.website);
   if (!site.ok) return { ok: false, code: 'SITE_UNAVAILABLE', reason: site.reason };
   if (site.pages.length === 0) return { ok: false, code: 'SITE_UNAVAILABLE', reason: 'no_html' };

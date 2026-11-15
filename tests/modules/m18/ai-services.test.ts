@@ -38,11 +38,12 @@ function completion(text: string): LlmCompletion {
   return { text, inputTokens: 10, outputTokens: 10, credits: 1, provider: 'anthropic', model: 'stub-model', stopReason: 'end_turn' };
 }
 
-/** The credit boundary stubbed: reserve hands out a refId, release records what was given back. */
+/** The credit boundary stubbed: the balance check passes, reserve hands out a refId, release records what was given back. */
 function creditStub(credits = 1) {
+  const precheck = vi.fn(async (_tenantId: string, _purpose: string) => {});
   const reserve = vi.fn(async (_tenantId: string, purpose: string) => ({ refId: `ref:${purpose}`, credits }));
   const release = vi.fn(async (_tenantId: string, _refId: string) => {});
-  return { reserve, release };
+  return { precheck, reserve, release };
 }
 
 const PAGES = { ok: true as const, pages: [{ url: 'https://acme.com.tr/', text: 'Acme Teknoloji A.Ş.' }], skipped: [] };
@@ -158,7 +159,7 @@ describe('proposeEnrichment', () => {
       throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
     });
     await expect(
-      proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite: async () => PAGES, generate, credits: { reserve } }),
+      proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite: async () => PAGES, generate, credits: { precheck: async () => {}, reserve } }),
     ).rejects.toThrow(/Insufficient AI credits/);
     expect(generate).not.toHaveBeenCalled();
   });

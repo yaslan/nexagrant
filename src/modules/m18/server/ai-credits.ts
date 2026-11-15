@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { withTenant } from '@/lib/db';
-import { lockTenantCredits, releaseAiReservation, reserveAiAction, resolveCredits } from '@/lib/llm';
+import { creditBalanceIn, lockTenantCredits, releaseAiReservation, reserveAiAction, resolveCredits } from '@/lib/llm';
 import { recordAlert } from '@/lib/observability/system-alert';
 
 /**
@@ -35,9 +35,24 @@ export class InsufficientAiCreditsError extends Error {
 export type M18Reservation = { refId: string; credits: number };
 
 export type M18CreditDeps = {
+  /** Read-only balance check before work that comes ahead of the reservation (the site read). */
+  precheck?: (tenantId: string, purpose: string) => Promise<void>;
   reserve?: (tenantId: string, purpose: string) => Promise<M18Reservation>;
   release?: (tenantId: string, refId: string) => Promise<void>;
 };
+
+/**
+ * NG-202 (B2) — throws {@link InsufficientAiCreditsError} when the balance is already below the action's
+ * price, writing nothing. For an action that does outside work BEFORE it reserves (enrichment reads up to
+ * five pages of a third-party site first): a tenant that cannot pay is refused before that work starts.
+ * Advisory only — no lock, no ledger row; {@link reserveM18Action} stays the binding check, so a balance
+ * spent between the two is still refused there.
+ */
+export async function assertM18Balance(tenantId: string, purpose: string): Promise<void> {
+  const { credits } = resolveCredits(M18_MODULE, purpose);
+  const balance = await withTenant(tenantId, (tx) => creditBalanceIn(tx, tenantId));
+  if (balance < credits) throw new InsufficientAiCreditsError();
+}
 
 /**
  * Debits the action's price under the tenant lock. Throws {@link InsufficientAiCreditsError}, writing
