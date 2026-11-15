@@ -235,6 +235,10 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     // scanned; it must stay linear.
     ['many bare <a> (no href, no hint)', fill('<a>')],
     ['many ordinary closed links (no hint)', fill('<a href=x>x</a>')],
+    // NG-207 F1: comments and hidden elements are found in one scan that passes each tag whole (its
+    // quoted attribute values included); an unclosed quote must not make it rescan from each later tag.
+    ['one unclosed attribute quote, then many <a', `<a x="${fill('<a href=/about>about ')}`],
+    ['many "<!--" inside attribute values and scripts', fill('<a href="/about" title="<!--">About</a><script>"<!--"</script>')],
   ];
   it.each(hostile)('%s: htmlToText and pickSubpages finish within the wall-clock budget', (_name, html) => {
     const started = performance.now();

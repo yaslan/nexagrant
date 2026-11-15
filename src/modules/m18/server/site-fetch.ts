@@ -430,20 +430,6 @@ function titleOf(html: string, lower: string): string {
   return close < 0 ? '' : html.slice(gt + 1, close);
 }
 
-/** Comments become a space; an unclosed comment hides the rest. */
-function stripComments(s: string): string {
-  let out = '';
-  let i = 0;
-  for (;;) {
-    const open = s.indexOf('<!--', i);
-    if (open < 0) return out + s.slice(i);
-    const close = s.indexOf('-->', open + 4);
-    out += `${s.slice(i, open)} `;
-    if (close < 0) return out;
-    i = close + 3;
-  }
-}
-
 /** The index just past `</name\s*>` at or after `from`, or -1. */
 function closingEnd(s: string, lower: string, name: string, from: number): number {
   const needle = `</${name}`;
@@ -455,32 +441,61 @@ function closingEnd(s: string, lower: string, name: string, from: number): numbe
   return -1;
 }
 
-/** Hidden elements (with their content) become a space. */
-function stripHidden(s: string): string {
+const isAsciiLetter = (s: string, i: number) => {
+  const c = s.charCodeAt(i) | 0x20;
+  return c >= 97 && c <= 122;
+};
+
+/**
+ * Comments and hidden elements (with their content) become a space; an unclosed comment, or an
+ * unclosed <script>/<style>/<noscript>/<template>, hides the rest.
+ *
+ * NG-207 F1: both are found in ONE left-to-right scan, as a browser tokenises. A `<!--` inside a
+ * <script> is script text (the script is skipped to its `</script>` first) and one inside an attribute
+ * value is that value (every other tag is skipped whole, quoted values included) — neither opens a
+ * comment, so the visible links and text up to the next `-->` stay. A `<script>` inside a comment opens
+ * nothing either. Once a tag never ends (an unclosed quote or no `>`), attribute values are no longer
+ * skipped: the rest is scanned `<` by `<` as before, so the scan stays linear.
+ */
+function stripHiddenAndComments(s: string): string {
   const lower = lowerAscii(s);
   const neverClosed = new Set<string>(); // no closing tag after some point → none after any later one
+  let tagsEnd = true;
   let out = '';
-  let i = 0;
-  let from = 0;
+  let i = 0; // start of the input not yet copied to `out`
+  let from = 0; // where the next `<` is looked for
   for (;;) {
     const lt = s.indexOf('<', from);
     if (lt < 0) return out + s.slice(i);
-    const name = tagAt(lower, lt, HIDDEN_ELEMENTS);
-    if (!name || neverClosed.has(name)) {
-      from = lt + 1;
+    if (s.startsWith('<!--', lt)) {
+      const close = s.indexOf('-->', lt + 4);
+      out += `${s.slice(i, lt)} `;
+      if (close < 0) return out;
+      i = close + 3;
+      from = i;
       continue;
     }
-    const end = closingEnd(s, lower, name, lt + 1 + name.length);
-    if (end >= 0) {
-      out += `${s.slice(i, lt)} `;
-      i = end;
-      from = end;
-    } else if (HIDE_TO_END.has(name)) {
-      return `${out}${s.slice(i, lt)} `;
-    } else {
+    const name = tagAt(lower, lt, HIDDEN_ELEMENTS);
+    if (name && !neverClosed.has(name)) {
+      const end = closingEnd(s, lower, name, lt + 1 + name.length);
+      if (end >= 0) {
+        out += `${s.slice(i, lt)} `;
+        i = end;
+        from = end;
+        continue;
+      }
+      if (HIDE_TO_END.has(name)) return `${out}${s.slice(i, lt)} `;
       neverClosed.add(name);
-      from = lt + 1;
     }
+    from = lt + 1;
+    // Any other start or end tag is passed whole, so nothing inside its attribute values is markup.
+    const nameAt = s[lt + 1] === '/' ? lt + 2 : lt + 1;
+    if (!tagsEnd || !isAsciiLetter(s, nameAt)) continue;
+    let k = nameAt;
+    while (k < s.length && !isSpace(s[k]) && s[k] !== '/' && s[k] !== '>') k += 1;
+    const tag = readStartTag(s, lower, k);
+    if (tag) from = tag.end;
+    else tagsEnd = false;
   }
 }
 
@@ -513,7 +528,7 @@ function replaceTags(s: string, replacement: string, isMatch: (lower: string, lt
 /** Visible text of a page, whitespace collapsed, capped. */
 export function htmlToText(html: string, maxChars = MAX_PAGE_CHARS): string {
   const title = titleOf(html, lowerAscii(html));
-  const blocks = replaceTags(stripHidden(stripComments(html)), '\n', (lower, lt) => tagAt(lower, lt, BLOCK_ELEMENTS) !== null);
+  const blocks = replaceTags(stripHiddenAndComments(html), '\n', (lower, lt) => tagAt(lower, lt, BLOCK_ELEMENTS) !== null);
   const body = replaceTags(blocks, ' ', (_lower, lt, gt) => gt > lt + 1);
   const text = decodeEntities(`${title}\n${body}`)
     .split('\n')
@@ -581,8 +596,8 @@ export function pickSubpages(rawHtml: string, base: URL, limit = MAX_PAGES - 1):
   const seen = new Set<string>([base.origin + base.pathname]);
   // NG-202 (B4): links are read from the same markup the text is — comments and hidden elements
   // (<script>, <style>, <template>, <noscript>, …) gone first, so a link a script only writes as a
-  // string, or one inside an unclosed <script>, is no candidate. Both passes are linear (above).
-  const html = stripHidden(stripComments(rawHtml));
+  // string, or one inside an unclosed <script>, is no candidate. One linear scan (above; NG-207 F1).
+  const html = stripHiddenAndComments(rawHtml);
   const lower = lowerAscii(html);
   let from = 0;
   for (let candidates = 0; candidates < MAX_ANCHORS && picked.length < limit; ) {
