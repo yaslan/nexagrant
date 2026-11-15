@@ -96,3 +96,4 @@ add-public-lead-route-consistency.sql
 public-lead-rls.sql
 add-province-transfer-org-name.sql
 add-m18-eligibility-report.sql
+expert-directory-view.sql

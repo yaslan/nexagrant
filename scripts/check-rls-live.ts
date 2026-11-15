@@ -676,21 +676,15 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
 ];
 
 /**
- * NG-52 (ADR-0009 §9, SEC NG-185 F-3): the one named exception to "exactly {system_scope}".
- * expert_directory on ExpertPreRegistration, SELECT only, gated on the sealed
- * 'expert-directory' purpose and on verified rows. The same name on another table, or with
- * another command, is still drift; and so is any predicate other than the one prisma/rls.sql
- * writes (SEC NG-185 M3b): the live `qual` must equal, character for character, what
- * Postgres deparses from rls.sql's own USING expression (`expectedQual`). A substring check
- * let `… AND ('verified' <> '' OR true) …` through, which keeps every expected fragment and
- * opens every row. The expected text is compiled by the same server, so the comparison does
- * not depend on how a Postgres version prints an expression.
- * prisma/rls.sql's NG-183 block keeps exactly this (table, name, command) and drops the rest.
- * What the policy shows is measured by probeExpertDirectory.
+ * Named exceptions to "exactly {system_scope}" on a system_scope table: none since NG-188.
+ * NG-52 had one (expert_directory, SELECT only, on ExpertPreRegistration); SEC NG-185 F-1
+ * measured that it filtered rows, not columns, and NG-188 replaced it with the view
+ * "ExpertDirectoryEntry" (probeExpertDirectory). The mechanism stays, so a future exception
+ * is one line here plus one in prisma/rls.sql's NG-183 block, and it must still match
+ * rls.sql's own USING expression character for character (`expectedQual`, SEC NG-185 M3b:
+ * a substring check let `… AND ('verified' <> '' OR true) …` through).
  */
-const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string }> = [
-  { table: 'ExpertPreRegistration', policy: 'expert_directory', cmd: 'SELECT' },
-];
+const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string }> = [];
 
 /** The USING expression of `CREATE POLICY <policy> ON public."<table>"` in prisma/rls.sql, verbatim. */
 function rlsSqlUsingExpression(sql: string, table: string, policy: string): string | null {
@@ -1104,16 +1098,35 @@ async function probePurposeTables(
 }
 
 /**
- * NG-52 (SEC NG-185 F-4): the purpose 'expert-directory' (M8 matching reads the expert pool).
- * Its one read is the expert_directory policy (SYSTEM_SCOPE_ALLOWED_EXTRA). Inside the sealed
- * scope the measured role must see exactly the verified + consented ExpertPreRegistration rows
- * — none pending or disabled — no row of any other system_scope table beyond what it sees
- * outside, and it must write nothing: UPDATE and DELETE touch 0 rows, INSERT is refused.
- * Three probe rows (verified, pending, disabled) are written under PROBE_ROW_PURPOSE first,
- * so an empty table still measures something. One snapshot with the owner connection for the
- * expected count; everything is rolled back.
+ * NG-52 (SEC NG-185 F-4) + NG-188 (SEC NG-185 F-1b): the purpose 'expert-directory' (M8
+ * matching reads the expert pool). Its one read is the view EXPERT_DIRECTORY_VIEW; the base
+ * table is shut to it. Measured in one rolled-back transaction of the measured role, after
+ * three probe rows (verified, pending, disabled) are written under PROBE_ROW_PURPOSE:
+ *   - the view exists, is security_barrier, is not updatable, and its columns are exactly
+ *     EXPERT_DIRECTORY_COLUMNS (no name, e-mail, ORCID, LinkedIn, IP or token);
+ *   - outside the scope, with a plain SET of the purpose (no seal) and under another sealed
+ *     purpose the view shows 0 rows;
+ *   - inside the sealed scope ExpertPreRegistration shows 0 rows, so its personal-data
+ *     columns cannot be read at all; the view shows exactly the verified + consented rows
+ *     (the owner connection counts them in the same snapshot) and of the probe rows only the
+ *     verified one; no other system_scope table shows more than outside;
+ *   - nothing is written: the base table's UPDATE and DELETE touch 0 rows and INSERT is
+ *     refused by RLS, and INSERT, UPDATE and DELETE on the view fail.
  */
 const EXPERT_DIRECTORY_PURPOSE = 'expert-directory';
+const EXPERT_DIRECTORY_VIEW = 'ExpertDirectoryEntry';
+/** The card M8 may see, plus the row number it is read in (prisma/rls.sql). */
+const EXPERT_DIRECTORY_COLUMNS = [
+  'expertiseAreas',
+  'founderNumber',
+  'id',
+  'isFreelancer',
+  'languages',
+  'listOrder',
+  'programmes',
+  'province',
+  'roles',
+] as const;
 
 async function probeExpertDirectory(
   m: pg.Client,
@@ -1122,6 +1135,42 @@ async function probeExpertDirectory(
   const failures: string[] = [];
   const checks: string[] = [];
   const p = EXPERT_DIRECTORY_PURPOSE;
+  const view = quoteIdent(EXPERT_DIRECTORY_VIEW);
+
+  const shape = (
+    await m.query<{ exists: boolean; barrier: boolean; updatable: string | null; insertable: string | null; cols: string[] | null }>(
+      `select to_regclass($1) is not null as exists,
+              coalesce((select 'security_barrier=true' = any(c.reloptions) from pg_class c where c.oid = to_regclass($1)), false) as barrier,
+              (select v.is_updatable from information_schema.views v where v.table_schema = 'public' and v.table_name = $2) as updatable,
+              (select v.is_insertable_into from information_schema.views v where v.table_schema = 'public' and v.table_name = $2) as insertable,
+              (select array_agg(a.attname::text order by a.attname::text) from pg_attribute a
+                where a.attrelid = to_regclass($1) and a.attnum > 0 and not a.attisdropped) as cols`,
+      [`public.${view}`, EXPERT_DIRECTORY_VIEW]
+    )
+  ).rows[0];
+  if (!shape?.exists) {
+    failures.push(`${p}: ${EXPERT_DIRECTORY_VIEW} görünümü YOK — M8 uzman havuzu okunamaz (pnpm db:rls)`);
+    return { failures, checks };
+  }
+  const cols = [...(shape.cols ?? [])].sort();
+  const expectedCols = [...EXPERT_DIRECTORY_COLUMNS];
+  if (JSON.stringify(cols) !== JSON.stringify(expectedCols)) {
+    const extra = cols.filter((c) => !expectedCols.includes(c as (typeof EXPERT_DIRECTORY_COLUMNS)[number]));
+    const missing = expectedCols.filter((c) => !cols.includes(c));
+    failures.push(
+      `${p}: ${EXPERT_DIRECTORY_VIEW} sütunları {${cols.join(', ')}}${extra.length ? ` — fazla: ${extra.join(', ')}` : ''}${missing.length ? ` — eksik: ${missing.join(', ')}` : ''}`
+    );
+  } else {
+    checks.push(`${p}: ${EXPERT_DIRECTORY_VIEW} yalnız kart sütunları (${cols.length}: ${cols.join(', ')})`);
+  }
+  if (!shape.barrier) failures.push(`${p}: ${EXPERT_DIRECTORY_VIEW} security_barrier değil`);
+  else checks.push(`${p}: ${EXPERT_DIRECTORY_VIEW} security_barrier`);
+  if (shape.updatable !== 'NO' || shape.insertable !== 'NO') {
+    failures.push(`${p}: ${EXPERT_DIRECTORY_VIEW} güncellenebilir (is_updatable=${shape.updatable}, is_insertable_into=${shape.insertable}) — sahip yetkisiyle tabloya yazılabilir`);
+  } else {
+    checks.push(`${p}: ${EXPERT_DIRECTORY_VIEW} güncellenemez`);
+  }
+
   const tables = (
     await m.query<{ t: string }>(
       `select tablename as t from pg_policies where schemaname = 'public' and policyname = 'system_scope' order by 1`
@@ -1134,13 +1183,8 @@ async function probeExpertDirectory(
     }
     return out;
   };
-  const byStatus = async (c: pg.Client): Promise<Map<string, number>> => {
-    const { rows } = await c.query<{ s: string; n: number }>(
-      `select case when status = 'verified' and "visibilityConsentAt" is not null then 'listed' else status end as s, count(*)::int as n
-         from ${quoteIdent(EXPERT_TABLE)} group by 1`
-    );
-    return new Map(rows.map((r) => [r.s, r.n]));
-  };
+  const count = async (rel: string): Promise<number> =>
+    Number((await m.query<{ n: number }>(`select count(*)::int as n from ${rel}`)).rows[0]?.n ?? -1);
 
   let expectedListed: number | null = null;
   if (admin) {
@@ -1148,12 +1192,22 @@ async function probeExpertDirectory(
     const snap = (await admin.query<{ s: string }>('select pg_export_snapshot() as s')).rows[0]!.s;
     await m.query('begin isolation level repeatable read');
     await m.query(`set transaction snapshot '${snap.replace(/'/g, "''")}'`);
-    expectedListed = (await byStatus(admin)).get('listed') ?? 0;
+    expectedListed = Number(
+      (
+        await admin.query<{ n: number }>(
+          `select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)} where status = 'verified' and "visibilityConsentAt" is not null`
+        )
+      ).rows[0]?.n ?? 0
+    );
   } else {
     await m.query('begin isolation level repeatable read');
   }
   try {
     const outside = await countAll();
+    const viewOutside = await count(view);
+    if (viewOutside !== 0) failures.push(`${p}: kapsam dışında ${EXPERT_DIRECTORY_VIEW} ${viewOutside} satır gösteriyor`);
+    else checks.push(`${p}: kapsam dışında ${EXPERT_DIRECTORY_VIEW} 0 satır`);
+
     const ids = { verified: '', pending: '', disabled: '' };
     await m.query('select enter_system_scope($1)', [PROBE_ROW_PURPOSE]);
     for (const status of ['verified', 'pending', 'disabled'] as const) {
@@ -1166,43 +1220,62 @@ async function probeExpertDirectory(
       );
     }
     if (expectedListed !== null) expectedListed += 1;
+    // Another sealed purpose — one that does open the base table — opens nothing in the view.
+    const viewOther = await count(view);
+    if (viewOther !== 0) failures.push(`${p}: '${PROBE_ROW_PURPOSE}' kapsamında ${EXPERT_DIRECTORY_VIEW} ${viewOther} satır gösteriyor (yalnız ${p} açmalı)`);
+    else checks.push(`${p}: '${PROBE_ROW_PURPOSE}' kapsamında ${EXPERT_DIRECTORY_VIEW} 0 satır`);
 
     // A plain SET of the purpose is not the seal: nothing opens.
     await m.query(
       `select set_config('app.system_scope', 'on', true), set_config('app.system_scope_purpose', $1, true), set_config('app.system_scope_token', '', true)`,
       [p]
     );
-    const forged = Number((await m.query<{ n: number }>(`select count(*)::int as n from ${quoteIdent(EXPERT_TABLE)}`)).rows[0]?.n ?? -1);
-    if (forged !== 0) failures.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} ${forged} satır okunuyor — mühür uygulanmıyor`);
-    else checks.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} 0 satır`);
+    const forgedBase = await count(quoteIdent(EXPERT_TABLE));
+    const forgedView = await count(view);
+    if (forgedBase !== 0 || forgedView !== 0) {
+      failures.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} ${forgedBase}, ${EXPERT_DIRECTORY_VIEW} ${forgedView} satır — mühür uygulanmıyor`);
+    } else {
+      checks.push(`${p}: mühürsüz (düz SET) amaçla ${EXPERT_TABLE} ve ${EXPERT_DIRECTORY_VIEW} 0 satır`);
+    }
 
     await m.query('select enter_system_scope($1)', [p]);
-    const seen = await byStatus(m);
-    const listed = seen.get('listed') ?? 0;
-    const hidden = [...seen].filter(([s]) => s !== 'listed');
-    if (hidden.length > 0) {
-      failures.push(`${p}: doğrulanmamış/rızasız uzman satırı görünüyor (yalnız verified + rıza açılmalı): ${hidden.map(([s, n]) => `${s}=${n}`).join(', ')}`);
+    // NG-188: the base table — and with it every personal-data column — is shut to the purpose.
+    const base = await count(quoteIdent(EXPERT_TABLE));
+    const pii = (
+      await m.query(`select "fullName", email, orcid, "linkedinUrl", "ipHash", "verifyTokenHash" from ${quoteIdent(EXPERT_TABLE)} where id = any($1)`, [
+        Object.values(ids),
+      ])
+    ).rowCount;
+    if (base !== 0 || pii !== 0) {
+      failures.push(`${p}: ${EXPERT_TABLE} ${base} satır okunuyor (kişisel veri sütunlarıyla ${pii} prob satırı) — taban tablo bu amaca kapalı olmalı`);
     } else {
-      checks.push(`${p}: ${EXPERT_TABLE} pending/disabled 0 satır`);
+      checks.push(`${p}: ${EXPERT_TABLE} 0 satır — fullName/email/orcid/linkedinUrl/ipHash/verifyTokenHash okunamıyor`);
     }
+
+    const listed = await count(view);
     const probeSeen = (
-      await m.query<{ id: string }>(`select id from ${quoteIdent(EXPERT_TABLE)} where id = any($1) order by id`, [Object.values(ids)])
+      await m.query<{ id: string }>(`select id from ${view} where id = any($1) order by id`, [Object.values(ids)])
     ).rows.map((r) => r.id);
     if (probeSeen.length !== 1 || probeSeen[0] !== ids.verified) {
-      failures.push(`${p}: prob satırlarından görünen ${probeSeen.length}/3 (yalnız verified görünmeli)`);
+      const leaked = (['pending', 'disabled'] as const).filter((s) => probeSeen.includes(ids[s]));
+      failures.push(
+        `${p}: ${EXPERT_DIRECTORY_VIEW} prob satırlarından görünen ${probeSeen.length}/3 (yalnız verified görünmeli)${leaked.length ? ` — doğrulanmamış/rızasız görünüyor: ${leaked.join(', ')}` : ''}`
+      );
+    } else {
+      checks.push(`${p}: ${EXPERT_DIRECTORY_VIEW} pending/disabled prob satırı 0`);
     }
     if (expectedListed !== null && listed !== expectedListed) {
-      failures.push(`${p}: ${EXPERT_TABLE} verified + rızalı ${listed}/${expectedListed} satır görüldü — politika yanlış`);
+      failures.push(`${p}: ${EXPERT_DIRECTORY_VIEW} verified + rızalı ${listed}/${expectedListed} satır görüldü — görünüm koşulu yanlış`);
     } else if (probeSeen.length === 1 && probeSeen[0] === ids.verified) {
-      checks.push(`${p}: ${EXPERT_TABLE} verified + rızalı ${listed}${expectedListed !== null ? `/${expectedListed}` : ''} satır görüldü (prob satırı dahil, geri alındı)`);
+      checks.push(`${p}: ${EXPERT_DIRECTORY_VIEW} verified + rızalı ${listed}${expectedListed !== null ? `/${expectedListed}` : ''} satır görüldü (prob satırı dahil, geri alındı)`);
     }
 
     const inside = await countAll();
-    const opened = tables.filter((t) => t !== EXPERT_TABLE && (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
+    const opened = tables.filter((t) => (inside.get(t) ?? 0) > (outside.get(t) ?? 0));
     if (opened.length > 0) {
-      failures.push(`${p}: başka tabloyu açıyor (yalnız ${EXPERT_TABLE} okunmalı): ${opened.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
+      failures.push(`${p}: system_scope tablosu açıyor (hiçbiri açılmamalı): ${opened.map((t) => `${t}=${inside.get(t)}>${outside.get(t)}`).join(', ')}`);
     } else {
-      checks.push(`${p}: diğer ${tables.filter((t) => t !== EXPERT_TABLE).length} system_scope tablosunda kapsam dışıyla aynı satır sayısı`);
+      checks.push(`${p}: ${tables.length} system_scope tablosunda kapsam dışıyla aynı satır sayısı`);
     }
 
     const write = async (sql: string, params: unknown[]): Promise<number | 'rls' | string> => {
@@ -1228,6 +1301,16 @@ async function probeExpertDirectory(
     );
     if (ins === 'rls') checks.push(`${p}: ${EXPERT_TABLE} INSERT reddedildi`);
     else failures.push(`${p}: ${EXPERT_TABLE} INSERT ${typeof ins === 'number' ?'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${ins}`}`);
+    // Through the view: refused outright (not updatable, and fabrika_app holds SELECT only).
+    for (const [verb, sql, params] of [
+      ['UPDATE', `update ${view} set province = '01' where id = any($1)`, [Object.values(ids)]],
+      ['DELETE', `delete from ${view} where id = any($1)`, [Object.values(ids)]],
+      ['INSERT', `insert into ${view} (id, province, "isFreelancer", roles, programmes, "expertiseAreas", languages) values ($1, '34', false, '{}', '{}', '{}', '{}')`, [`rls-verify-${randomBytes(6).toString('hex')}`]],
+    ] as const) {
+      const r = await write(sql, [...params]);
+      if (typeof r === 'string' && r !== 'rls') checks.push(`${p}: ${EXPERT_DIRECTORY_VIEW} ${verb} reddedildi (${r})`);
+      else failures.push(`${p}: ${EXPERT_DIRECTORY_VIEW} ${verb} ${typeof r === 'number' ? `${r} satır` : r} — görünümden yazma kapalı olmalı`);
+    }
   } finally {
     await m.query('rollback');
     if (admin) await admin.query('rollback');
