@@ -362,7 +362,11 @@ export function robotsAllows(rules: RobotsRule[], pathWithQuery: string): boolea
 const HIDDEN_ELEMENTS = ['script', 'style', 'noscript', 'svg', 'template', 'head'] as const;
 const HIDE_TO_END = new Set<string>(['script', 'style', 'noscript', 'template']);
 const BLOCK_ELEMENTS = ['br', 'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'section', 'article', 'footer', 'header'];
-/** At most this many anchors are looked at, and a label is read from at most this many characters. */
+/**
+ * At most this many CANDIDATE anchors are resolved (an href whose text or label carries an about/contact
+ * hint; NG-202 B5: ordinary menu links no longer use the budget up), and a label is read from at most
+ * this many characters.
+ */
 export const MAX_ANCHORS = 500;
 export const MAX_LABEL_CHARS = 2_000;
 
@@ -562,25 +566,32 @@ export function pickSubpages(rawHtml: string, base: URL, limit = MAX_PAGES - 1):
   const html = stripHidden(stripComments(rawHtml));
   const lower = lowerAscii(html);
   let from = 0;
-  for (let anchors = 0; anchors < MAX_ANCHORS && picked.length < limit; ) {
+  for (let candidates = 0; candidates < MAX_ANCHORS && picked.length < limit; ) {
     const lt = lower.indexOf('<a', from);
     if (lt < 0) break;
     if (isWordChar(lower, lt + 2)) {
       from = lt + 2;
       continue;
     }
-    anchors += 1;
     const tag = readStartTag(html, lower, lt + 2);
     if (!tag) break; // the tag never ends: nothing after it is markup
+    // The label ends at the next `<a`, at `</a>` before it, or after MAX_LABEL_CHARS. `</a>` is looked
+    // for only up to the next `<a`, so each character is scanned a bounded number of times.
     const window = lower.slice(tag.end, tag.end + MAX_LABEL_CHARS);
-    const close = window.indexOf('</a>');
     const nextAnchor = window.search(/<a(?![A-Za-z0-9_])/);
-    const labelLength = [close, nextAnchor].filter((n) => n >= 0).reduce((a, b) => Math.min(a, b), window.length);
+    const span = nextAnchor >= 0 ? nextAnchor : window.length;
+    const close = window.slice(0, span).indexOf('</a>');
+    const labelLength = close >= 0 ? close : span;
     from = tag.end + (labelLength === close ? close + 4 : labelLength);
     if (tag.href === null) continue;
     const href = decodeEntities(tag.href);
     const rawLabel = html.slice(tag.end, tag.end + labelLength);
     const label = replaceTags(rawLabel, ' ', (_lower, lt, gt) => gt > lt + 1); // `<[^>]+>` in one pass
+    // NG-202 (B5): only an anchor that could be picked — a hint in its href or its label — counts
+    // against MAX_ANCHORS. The URL parser drops tabs and newlines, so the href is read without them.
+    const bareHref = href.replace(/[\t\n\r]/g, '');
+    if (!LINK_HINT.test(safeDecodePath(bareHref)) && !LINK_HINT.test(label)) continue;
+    candidates += 1;
     let url: URL;
     try {
       url = new URL(href, base);

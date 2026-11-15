@@ -209,6 +209,10 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     // NG-136 review (round 4, B1): every label window is 2 000 `<` with no `>`; a `<[^>]+>` label
     // strip rescans the window from each `<` (~1 s over 500 anchors).
     ['many <a href> each followed by 2000 < with no >', fill(`<a href="/hakkimizda">${'<'.repeat(2000)}`)],
+    // NG-202 (B5): anchors with no about/contact hint are no longer counted, so the whole page is
+    // scanned; it must stay linear.
+    ['many bare <a> (no href, no hint)', fill('<a>')],
+    ['many ordinary closed links (no hint)', fill('<a href=x>x</a>')],
   ];
   it.each(hostile)('%s: htmlToText and pickSubpages finish within the wall-clock budget', (_name, html) => {
     const started = performance.now();
@@ -232,16 +236,18 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     expect(htmlToText('<p>Logo <svg viewBox="0 0 1 1"/> Acme</p>')).toBe('Logo Acme');
   });
 
-  it('a link label is capped and the number of anchors read is capped', () => {
+  it('a link label is capped and the number of candidate anchors resolved is capped', () => {
     // The label hint is read from a bounded window: a hint 5 000 characters into an unclosed label
     // does not count, one inside the window does.
     const far = `<a href="/x">${'y'.repeat(5000)} about</a>`;
     expect(pickSubpages(far, base)).toEqual([]);
     expect(pickSubpages('<a href="/x">about</a>', base).map((u) => u.pathname)).toEqual(['/x']);
-    // Only the first MAX_ANCHORS anchors are looked at.
-    const many = `${'<a href="/urun">Ürün</a>'.repeat(MAX_ANCHORS)}<a href="/hakkimizda">Hakkımızda</a>`;
+    // Only the first MAX_ANCHORS candidates (an about/contact hint in href or label) are resolved —
+    // here another site's about links, each one resolved and refused (NG-202 B5).
+    const offsiteAbout = '<a href="https://other.example.org/about">About</a>';
+    const many = `${offsiteAbout.repeat(MAX_ANCHORS)}<a href="/hakkimizda">Hakkımızda</a>`;
     expect(pickSubpages(many, base)).toEqual([]);
-    const within = `${'<a href="/urun">Ürün</a>'.repeat(MAX_ANCHORS - 1)}<a href="/hakkimizda">Hakkımızda</a>`;
+    const within = `${offsiteAbout.repeat(MAX_ANCHORS - 1)}<a href="/hakkimizda">Hakkımızda</a>`;
     expect(pickSubpages(within, base).map((u) => u.pathname)).toEqual(['/hakkimizda']);
   });
 
