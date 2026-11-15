@@ -1,14 +1,22 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { TLSSocket } from 'node:tls';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { slack } from '../../helpers/timing';
 import {
   createPinnedFetch,
   fetchOrganizationSite,
+  guardedLookup,
   MAX_ROBOTS_PATTERN_CHARS,
   MAX_ROBOTS_RULES,
   htmlToText,
   isPublicAddress,
+  MAX_ANCHORS,
   MAX_PAGES,
   normaliseSiteUrl,
   parseRobots,
@@ -160,6 +168,101 @@ describe('htmlToText and pickSubpages', () => {
     expect(picked).toHaveLength(MAX_PAGES - 1);
     expect(picked).not.toContain('/urunler');
     expect(picked.every((p) => !p.includes('other'))).toBe(true);
+  });
+});
+
+/**
+ * NG-136 review (round 3): every HTML pass is a single forward scan. The old regular expressions
+ * (`<script…>[\s\S]*?</script>`, `<!--[\s\S]*?-->`, `<title>[\s\S]*?</title>`, `<p\b[^>]*>`,
+ * `<[^>]+>` and the anchor's `([\s\S]*?)</a>`) rescanned to the end from every unclosed opening:
+ * 1 MB of hostile HTML held the event loop for 5–167 s. The read's time budget only stops I/O, not
+ * this CPU work, so the parse itself must be linear.
+ */
+describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () => {
+  const MB = 1_000_000;
+  const fill = (unit: string) => unit.repeat(Math.ceil(MB / unit.length)).slice(0, MB);
+  const base = new URL('https://acme.com.tr/');
+  const hostile: [string, string][] = [
+    ['unclosed <script> many times', fill('<script>x ')],
+    ['unclosed <style> / <svg> / <head> mixed', fill('<style>a <svg>b <head>c ')],
+    ['unclosed comments', fill('<!-- x ')],
+    ['unclosed <title> many times', fill('<title>x ')],
+    ['many <a href> with no </a>', fill('<a href=about>about ')],
+    ['many <a href="… with no closing quote', fill('<a href="/about ')],
+    ['many block tags with no >', fill('<p x ')],
+    ['many < with no >', fill('< x ')],
+    ['</script candidates with no >', `<script>${fill('</script x ')}`],
+  ];
+  it.each(hostile)('%s: htmlToText and pickSubpages finish within the wall-clock budget', (_name, html) => {
+    const started = performance.now();
+    htmlToText(html);
+    const textMs = performance.now() - started;
+    const linkStarted = performance.now();
+    pickSubpages(html, base);
+    const linkMs = performance.now() - linkStarted;
+    expect(textMs).toBeLessThan(slack(400));
+    expect(linkMs).toBeLessThan(slack(400));
+  });
+
+  it('an unclosed <script>/<style>/<noscript>/<template> hides the rest of the page (as a browser does)', () => {
+    expect(htmlToText('<p>Acme</p><script>var a = "secret";<p>after</p>')).toBe('Acme');
+    expect(htmlToText('<p>Acme</p><STYLE>p{} <p>after')).toBe('Acme');
+    expect(htmlToText('<p>Acme</p><!-- never closed <p>after')).toBe('Acme');
+  });
+
+  it('an unclosed <head> or <svg> (end tag optional / self-closing) does not hide the page', () => {
+    expect(htmlToText('<html><head><title>Acme</title><body><p>45 çalışan</p>')).toBe('Acme\nAcme\n45 çalışan');
+    expect(htmlToText('<p>Logo <svg viewBox="0 0 1 1"/> Acme</p>')).toBe('Logo Acme');
+  });
+
+  it('a link label is capped and the number of anchors read is capped', () => {
+    // The label hint is read from a bounded window: a hint 5 000 characters into an unclosed label
+    // does not count, one inside the window does.
+    const far = `<a href="/x">${'y'.repeat(5000)} about</a>`;
+    expect(pickSubpages(far, base)).toEqual([]);
+    expect(pickSubpages('<a href="/x">about</a>', base).map((u) => u.pathname)).toEqual(['/x']);
+    // Only the first MAX_ANCHORS anchors are looked at.
+    const many = `${'<a href="/urun">Ürün</a>'.repeat(MAX_ANCHORS)}<a href="/hakkimizda">Hakkımızda</a>`;
+    expect(pickSubpages(many, base)).toEqual([]);
+    const within = `${'<a href="/urun">Ürün</a>'.repeat(MAX_ANCHORS - 1)}<a href="/hakkimizda">Hakkımızda</a>`;
+    expect(pickSubpages(within, base).map((u) => u.pathname)).toEqual(['/hakkimizda']);
+  });
+});
+
+describe('htmlToText and pickSubpages — same output as before on ordinary HTML', () => {
+  const base = new URL('https://acme.com.tr/');
+  // Expected values were produced by the previous (regular-expression) implementation.
+  it.each([
+    [
+      '<!DOCTYPE html><HTML><HEAD><TITLE>Acme &amp; Co</TITLE><style>p{color:red}</style></HEAD><BODY><H1>Acme</H1><P>Line&nbsp;one<br/>Line two</P><!-- note --><div>a &lt; b &#252; &#x15F;</div></BODY></HTML>',
+      'Acme & Co\nAcme\nLine one\nLine two\na < b ü ş',
+    ],
+    [
+      '<header><nav>Menü</nav></header><section><p>Ar-Ge <b>merkezi</b>, 45 çalışan</p><noscript>JS kapalı</noscript></section><template><p>gizli</p></template><footer>İletişim: info@acme.com.tr</footer>',
+      'Menü\nAr-Ge merkezi , 45 çalışan\nİletişim: info@acme.com.tr',
+    ],
+    [
+      '<pre>kod</pre><track src=x><link rel=x><p class="a>b">metin</p><svg><text>logo</text></svg><script type="x">if (a<b) {}</script ><script>x</scriptx>y</script>son',
+      'kod\nb">metin son',
+    ],
+    ['<p>a</p><>b<p>c', 'a <>b\nc'],
+    ['', ''],
+  ])('htmlToText(%j)', (html, expected) => {
+    expect(htmlToText(html)).toBe(expected);
+  });
+
+  it.each([
+    [
+      '<a href="/hakkimizda">Hakkımızda</a><A HREF=\'/iletisim\'>İletişim</A><a class="x" href=/kurumsal/ekibimiz title="t">Ekibimiz</a><a href="/urunler">Ürünler</a>',
+      ['/hakkimizda', '/iletisim', '/kurumsal/ekibimiz'],
+    ],
+    [
+      '<a href="/x"><span>About</span> us</a><a href="https://www.acme.com.tr/contact#form">c</a><a href="mailto:a@b.c">contact</a><a href="/about.pdf">about</a><abbr href="/about">no</abbr>',
+      ['/x', '/contact'],
+    ],
+    ['<a href="/team?x=1">t</a><a href="/team">t</a><a href = "/profil" >p</a>', ['/team', '/profil']],
+  ])('pickSubpages(%j)', (html, expected) => {
+    expect(pickSubpages(html, base).map((u) => u.pathname)).toEqual(expected);
   });
 });
 
@@ -400,5 +503,197 @@ describe('pinned transport (connect-time address check)', () => {
     ]);
     expect(hits).toEqual(['/robots.txt', '/', '/hakkimizda']);
     expect(elapsed).toBeLessThan(slack(1400));
+  });
+
+  it('a body refused on its declared size is closed at once (the socket does not wait for the timeout)', async () => {
+    let closedAt = 0;
+    const { port } = await serve((req, res) => {
+      if (req.url === '/robots.txt') return notFound(res);
+      res.on('close', () => {
+        closedAt = performance.now();
+      });
+      res.writeHead(200, { 'content-type': 'text/html', 'content-length': String(2_000_000) });
+      res.write('<p>short</p>'); // never ends: only our side can close it before the timeout
+    });
+    const started = performance.now();
+    const res = await fetchOrganizationSite('http://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, connectPort: port, timeoutMs: 5000 });
+    expect(res).toEqual({ ok: false, reason: 'unreachable' });
+    await vi.waitFor(() => expect(closedAt).toBeGreaterThan(0), { timeout: slack(1500), interval: 20 });
+    expect(closedAt - started).toBeLessThan(slack(1500));
+  });
+
+  it('a response header the Headers class refuses rejects the request (nothing throws out of the response callback)', async () => {
+    const { port } = await serve((_req, res) => html(res, 'x'));
+    class RefusingHeaders extends Headers {
+      override append(): void {
+        throw new TypeError('invalid header value');
+      }
+    }
+    vi.stubGlobal('Headers', RefusingHeaders);
+    try {
+      const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port });
+      await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/invalid header value/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('guardedLookup never leaves an unhandled rejection', () => {
+  it('a guard that throws becomes the lookup error', async () => {
+    const lookup = guardedLookup(PUBLIC, () => {
+      throw new Error('guard broke');
+    });
+    const error = await new Promise<Error | null>((r) => lookup('acme.com.tr', {}, (e) => r(e)));
+    expect(error?.message).toBe('guard broke');
+  });
+
+  it('a resolver that throws synchronously becomes the lookup error', async () => {
+    const lookup = guardedLookup(() => {
+      throw new Error('resolver broke');
+    }, isPublicAddress);
+    const error = await new Promise<Error | null>((r) => lookup('acme.com.tr', {}, (e) => r(e)));
+    expect(error?.message).toBe('resolver broke');
+  });
+
+  it('a callback that throws after the answer is called once and leaves no unhandled rejection', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const lookup = guardedLookup(PUBLIC, isPublicAddress);
+      let calls = 0;
+      lookup('acme.com.tr', {}, () => {
+        calls += 1;
+        throw new Error('socket side broke');
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(calls).toBe(1);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+});
+
+/**
+ * IPv4 spellings the WHATWG URL parser rewrites to dotted form (decimal, hex, octal, short forms) and
+ * v4-mapped IPv6: none reaches a socket. No server is contacted: each is refused before a connection.
+ */
+describe('IP address spellings are refused', () => {
+  const spellings = [
+    'http://2130706433/', // 127.0.0.1 in decimal
+    'http://0x7f000001/', // hex
+    'http://0177.0.0.1/', // octal
+    'http://017700000001/', // octal, one number
+    'http://127.1/', // short form
+    'http://0x7f.1/',
+    'http://0/', // 0.0.0.0
+    'http://10.1/', // 10.0.0.1
+    'http://3232235777/', // 192.168.1.1
+    'http://0xa9fea9fe/', // 169.254.169.254 (cloud metadata)
+    'http://[::ffff:127.0.0.1]/',
+    'http://[::ffff:7f00:1]/',
+    'http://[::]/',
+  ];
+  it.each(spellings)('normaliseSiteUrl refuses %s', (raw) => {
+    expect(normaliseSiteUrl(raw)).toBeNull();
+  });
+  it.each(spellings)('the pinned transport refuses %s before connecting', async (raw) => {
+    const resolve = vi.fn(PUBLIC);
+    const fetchImpl = createPinnedFetch({ resolve });
+    await expect(fetchImpl(new URL(raw), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The https path through the pinned transport, against a local server on 127.0.0.1 with a
+ * certificate made for this run (openssl, a temp directory, deleted afterwards). Nothing leaves the
+ * machine. Skipped (with the reason in the name) where no openssl binary exists.
+ */
+const OPENSSL = spawnSync('openssl', ['version'], { encoding: 'utf8' }).status === 0;
+describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server; skipped without openssl)', () => {
+  let tls: { key: string; cert: string } | null = null;
+  let server: HttpsServer | null = null;
+  afterEach(async () => {
+    if (server) {
+      server.closeAllConnections();
+      await new Promise<void>((r) => server!.close(() => r()));
+    }
+    server = null;
+  });
+
+  function certificate(): { key: string; cert: string } {
+    if (tls) return tls;
+    const dir = mkdtempSync(join(tmpdir(), 'm18-tls-'));
+    try {
+      const made = spawnSync(
+        'openssl',
+        ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes', '-days', '1', '-subj', '/CN=acme.com.tr',
+          '-addext', 'subjectAltName=DNS:acme.com.tr,DNS:www.acme.com.tr', '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem')],
+        { encoding: 'utf8' },
+      );
+      if (made.status !== 0) throw new Error(`openssl failed: ${made.stderr}`);
+      tls = { key: readFileSync(join(dir, 'key.pem'), 'utf8'), cert: readFileSync(join(dir, 'cert.pem'), 'utf8') };
+      return tls;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  async function serveTls(handler: (req: IncomingMessage, res: ServerResponse) => void) {
+    const { key, cert } = certificate();
+    const seen: { url: string; host: string; servername: string }[] = [];
+    let connections = 0;
+    server = createHttpsServer({ key, cert }, (req, res) => {
+      seen.push({ url: req.url ?? '', host: req.headers.host ?? '', servername: String((req.socket as TLSSocket).servername) });
+      handler(req, res);
+    });
+    server.on('connection', () => {
+      connections += 1;
+    });
+    await new Promise<void>((r) => server!.listen(0, '127.0.0.1', () => r()));
+    return { port: (server.address() as AddressInfo).port, cert, seen, connections: () => connections };
+  }
+
+  const LOCAL = async () => ['127.0.0.1'];
+  const localOnly = (ip: string) => ip === '127.0.0.1';
+
+  it('reads a site over https: SNI and Host carry the site name, the certificate is checked against it', async () => {
+    const { port, cert, seen } = await serveTls((req, res) => {
+      if (req.url === '/robots.txt') {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end(req.url === '/' ? '<title>Acme</title><a href="/hakkimizda">Hakkımızda</a>' : '<p>45 çalışan</p>');
+    });
+    const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
+    const res = await fetchOrganizationSite('https://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, fetchImpl });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.pages.map((p) => p.url)).toEqual(['https://acme.com.tr/', 'https://acme.com.tr/hakkimizda']);
+    expect(seen.map((s) => s.url)).toEqual(['/robots.txt', '/', '/hakkimizda']);
+    // SNI is the name, never the IP the socket connected to. Host carries the test port because the
+    // socket is pointed at a non-default port (connectPort); without it Host is the bare name.
+    expect(seen.every((s) => s.servername === 'acme.com.tr')).toBe(true);
+    expect(seen.every((s) => s.host === `acme.com.tr:${port}`)).toBe(true);
+  });
+
+  it('DNS rebinding over https: a private connect-time answer is refused before the TLS handshake', async () => {
+    const { port, cert, seen, connections } = await serveTls((_req, res) => res.end('internal'));
+    const fetchImpl = createPinnedFetch({ resolve: LOCAL, connectPort: port, ca: cert }); // default guard: public only
+    await expect(fetchImpl(new URL('https://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
+    expect(connections()).toBe(0);
+    expect(seen).toEqual([]);
+  });
+
+  it('a certificate that does not name the site is refused (verification uses the URL host)', async () => {
+    const { port, cert, seen } = await serveTls((_req, res) => res.end('x'));
+    const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
+    await expect(fetchImpl(new URL('https://other.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/altnames|does not match|Hostname/i);
+    expect(seen).toEqual([]);
   });
 });

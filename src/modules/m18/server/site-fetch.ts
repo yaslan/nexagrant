@@ -16,6 +16,8 @@ import { Readable } from 'node:stream';
  *    "about / contact / corporate" pages.
  *  - text/html only, a byte cap per page, a timeout per request, a total time budget for the whole
  *    read, a character cap on the text.
+ *  - HTML is parsed with single forward scans (indexOf), not regular expressions that rescan from
+ *    every unclosed tag: a hostile 1 MB page costs milliseconds, not the event loop (NG-136 review).
  *  - robots.txt patterns are matched without regular expressions (linear, no backtracking), and a
  *    robots.txt with more than MAX_ROBOTS_RULES rules or a longer pattern than
  *    MAX_ROBOTS_PATTERN_CHARS counts as unreadable (NG-136 review: a remote robots.txt must not be
@@ -158,10 +160,20 @@ class BlockedAddressError extends Error {
  */
 export function guardedLookup(resolve: LookupFn, allowed: AddressGuard): LookupFunction {
   return (hostname, options, callback) => {
-    resolve(hostname).then(
-      (addresses) => {
+    // The socket gets exactly one answer. Whatever throws on the way (the resolver, the guard, or
+    // the callback itself) ends in the catch below, never as an unhandled rejection; before the
+    // answer it becomes the answer (an error), after it there is nobody left to tell.
+    let answered = false;
+    const fail = (error: unknown) => {
+      if (answered) return;
+      answered = true;
+      callback(error instanceof Error ? error : new Error(String(error)), '', 0);
+    };
+    Promise.resolve()
+      .then(() => resolve(hostname))
+      .then((addresses) => {
         if (addresses.length === 0 || !addresses.every(allowed)) {
-          callback(new BlockedAddressError(hostname), '', 0);
+          fail(new BlockedAddressError(hostname));
           return;
         }
         const entries: LookupAddress[] = addresses
@@ -169,14 +181,14 @@ export function guardedLookup(resolve: LookupFn, allowed: AddressGuard): LookupF
           .filter((e) => e.family !== 0 && (!options.family || options.family === e.family));
         const first = entries[0];
         if (!first) {
-          callback(new BlockedAddressError(hostname), '', 0);
+          fail(new BlockedAddressError(hostname));
           return;
         }
+        answered = true;
         if (options.all) callback(null, entries);
         else callback(null, first.address, first.family);
-      },
-      (error: unknown) => callback(error instanceof Error ? error : new Error(String(error)), '', 0),
-    );
+      })
+      .catch(fail);
   };
 }
 
@@ -188,7 +200,13 @@ const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
  * (guardedGet follows them by hand); the body arrives as a stream, so readCapped's byte cap and the
  * abort signal (per-request timeout + total budget) apply to it as they did to `fetch`.
  */
-export function createPinnedFetch(opts: { resolve: LookupFn; allowed?: AddressGuard; connectPort?: number }): FetchLike {
+export function createPinnedFetch(opts: {
+  resolve: LookupFn;
+  allowed?: AddressGuard;
+  connectPort?: number;
+  /** Test seam: the CA a local https test server's certificate is checked against. Default: the system's. */
+  ca?: string;
+}): FetchLike {
   const allowed = opts.allowed ?? isPublicAddress;
   const lookup = guardedLookup(opts.resolve, allowed);
   return (url, init) =>
@@ -213,12 +231,15 @@ export function createPinnedFetch(opts: { resolve: LookupFn; allowed?: AddressGu
           lookup,
           agent: false,
           ...(opts.connectPort ? { port: opts.connectPort } : {}),
+          ...(opts.ca ? { ca: opts.ca } : {}),
         },
         (res) => {
-          const status = res.statusCode ?? 0;
-          const headers = new Headers();
-          for (let i = 0; i + 1 < res.rawHeaders.length; i += 2) headers.append(res.rawHeaders[i]!, res.rawHeaders[i + 1]!);
           try {
+            const status = res.statusCode ?? 0;
+            // Inside the try: a header the Headers class refuses rejects the request instead of
+            // throwing out of node's response callback (the promise would never settle).
+            const headers = new Headers();
+            for (let i = 0; i + 1 < res.rawHeaders.length; i += 2) headers.append(res.rawHeaders[i]!, res.rawHeaders[i + 1]!);
             if (NULL_BODY_STATUSES.has(status) || status < 200) {
               res.resume();
               resolveResponse({ status: status < 200 ? 502 : status, headers, body: null });
@@ -331,6 +352,19 @@ export function robotsAllows(rules: RobotsRule[], pathWithQuery: string): boolea
 }
 
 // ── HTML ─────────────────────────────────────────────────────────────────────
+//
+// Every pass below is a single forward scan with indexOf (NG-136 review, round 3): no regular
+// expression that can rescan from each unclosed opening. The old `[\s\S]*?</script>`-style
+// expressions held the event loop for 5–167 s on 1 MB of HTML with unclosed tags, and the read's
+// time budget does not stop CPU work. Each pass keeps the old expression's result on well-formed HTML.
+
+/** Elements whose content is not page text. The first four hide the rest of the page when never closed (a browser does the same); `<head>` (end tag optional) and `<svg>` (may be self-closing) do not. */
+const HIDDEN_ELEMENTS = ['script', 'style', 'noscript', 'svg', 'template', 'head'] as const;
+const HIDE_TO_END = new Set<string>(['script', 'style', 'noscript', 'template']);
+const BLOCK_ELEMENTS = ['br', 'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'section', 'article', 'footer', 'header'];
+/** At most this many anchors are looked at, and a label is read from at most this many characters. */
+export const MAX_ANCHORS = 500;
+export const MAX_LABEL_CHARS = 2_000;
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
@@ -344,14 +378,120 @@ function decodeEntities(s: string): string {
   });
 }
 
+/** ASCII-only lower case: same length as the input, so an index found in it is an index in the input. */
+function lowerAscii(s: string): string {
+  return s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
+}
+
+/** `\w` of a regular expression: [A-Za-z0-9_]. Past the end counts as a boundary. */
+function isWordChar(s: string, i: number): boolean {
+  const c = s.charCodeAt(i);
+  return (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
+}
+
+/** The tag name from `names` that `lower` has right after the `<` at `lt`, followed by a word boundary. */
+function tagAt(lower: string, lt: number, names: readonly string[]): string | null {
+  for (const name of names) {
+    if (lower.startsWith(name, lt + 1) && !isWordChar(lower, lt + 1 + name.length)) return name;
+  }
+  return null;
+}
+
+/** `<title …>…</title>`: the first title's text, or '' when there is no closed one. */
+function titleOf(html: string, lower: string): string {
+  const open = lower.indexOf('<title');
+  if (open < 0) return '';
+  const gt = lower.indexOf('>', open + 6);
+  if (gt < 0) return '';
+  const close = lower.indexOf('</title>', gt + 1);
+  return close < 0 ? '' : html.slice(gt + 1, close);
+}
+
+/** Comments become a space; an unclosed comment hides the rest. */
+function stripComments(s: string): string {
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const open = s.indexOf('<!--', i);
+    if (open < 0) return out + s.slice(i);
+    const close = s.indexOf('-->', open + 4);
+    out += `${s.slice(i, open)} `;
+    if (close < 0) return out;
+    i = close + 3;
+  }
+}
+
+/** The index just past `</name\s*>` at or after `from`, or -1. */
+function closingEnd(s: string, lower: string, name: string, from: number): number {
+  const needle = `</${name}`;
+  for (let at = lower.indexOf(needle, from); at >= 0; at = lower.indexOf(needle, at + 1)) {
+    let k = at + needle.length;
+    while (k < s.length && /\s/.test(s[k]!)) k += 1;
+    if (s[k] === '>') return k + 1;
+  }
+  return -1;
+}
+
+/** Hidden elements (with their content) become a space. */
+function stripHidden(s: string): string {
+  const lower = lowerAscii(s);
+  const neverClosed = new Set<string>(); // no closing tag after some point → none after any later one
+  let out = '';
+  let i = 0;
+  let from = 0;
+  for (;;) {
+    const lt = s.indexOf('<', from);
+    if (lt < 0) return out + s.slice(i);
+    const name = tagAt(lower, lt, HIDDEN_ELEMENTS);
+    if (!name || neverClosed.has(name)) {
+      from = lt + 1;
+      continue;
+    }
+    const end = closingEnd(s, lower, name, lt + 1 + name.length);
+    if (end >= 0) {
+      out += `${s.slice(i, lt)} `;
+      i = end;
+      from = end;
+    } else if (HIDE_TO_END.has(name)) {
+      return `${out}${s.slice(i, lt)} `;
+    } else {
+      neverClosed.add(name);
+      from = lt + 1;
+    }
+  }
+}
+
+/**
+ * Replaces each `<…>` that `isMatch` accepts with `replacement`. A tag runs from `<` to the next `>`
+ * (as `[^>]*>` did); once no `>` is left, nothing after can be a tag.
+ */
+function replaceTags(s: string, replacement: string, isMatch: (lower: string, lt: number, gt: number) => boolean): string {
+  const lower = lowerAscii(s);
+  let out = '';
+  let i = 0;
+  let from = 0;
+  let gt = -1; // the next `>` after the current `<`; reused while it still lies ahead
+  for (;;) {
+    const lt = s.indexOf('<', from);
+    if (lt < 0) break;
+    if (gt <= lt) gt = s.indexOf('>', lt + 1);
+    if (gt < 0) break;
+    if (isMatch(lower, lt, gt)) {
+      out += s.slice(i, lt) + replacement;
+      i = gt + 1;
+      from = gt + 1;
+    } else {
+      from = lt + 1;
+    }
+  }
+  return out + s.slice(i);
+}
+
 /** Visible text of a page, whitespace collapsed, capped. */
 export function htmlToText(html: string, maxChars = MAX_PAGE_CHARS): string {
-  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '';
-  const body = html
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<(script|style|noscript|svg|template|head)\b[\s\S]*?<\/\1\s*>/gi, ' ')
-    .replace(/<(br|p|div|li|h[1-6]|tr|section|article|footer|header)\b[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ');
+  const title = titleOf(html, lowerAscii(html));
+  const blocks = replaceTags(stripHidden(stripComments(html)), '\n', (lower, lt) => tagAt(lower, lt, BLOCK_ELEMENTS) !== null);
+  const body = replaceTags(blocks, ' ', (_lower, lt, gt) => gt > lt + 1);
   const text = decodeEntities(`${title}\n${body}`)
     .split('\n')
     .map((l) => l.replace(/\s+/g, ' ').trim())
@@ -372,14 +512,70 @@ function safeDecodePath(pathname: string): string {
   }
 }
 
-/** Up to `limit` same-site links whose path or text looks like an about/contact page. */
+const isSpace = (ch: string | undefined) => ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f';
+
+/**
+ * Reads the attributes of a start tag whose name ends at `at`. Returns the first `href` and the index
+ * just past the tag's `>`, or null when the tag never ends (an unclosed quote or no `>`).
+ */
+function readStartTag(s: string, lower: string, at: number): { href: string | null; end: number } | null {
+  let href: string | null = null;
+  let k = at;
+  for (;;) {
+    while (k < s.length && (isSpace(s[k]) || s[k] === '/')) k += 1;
+    if (k >= s.length) return null;
+    if (s[k] === '>') return { href, end: k + 1 };
+    const nameStart = k;
+    while (k < s.length && !isSpace(s[k]) && s[k] !== '/' && s[k] !== '>' && s[k] !== '=') k += 1;
+    const name = lower.slice(nameStart, k);
+    while (k < s.length && isSpace(s[k])) k += 1;
+    if (s[k] !== '=') continue;
+    k += 1;
+    while (k < s.length && isSpace(s[k])) k += 1;
+    let value: string;
+    const quote = s[k];
+    if (quote === '"' || quote === "'") {
+      const close = s.indexOf(quote, k + 1);
+      if (close < 0) return null;
+      value = s.slice(k + 1, close);
+      k = close + 1;
+    } else {
+      const start = k;
+      while (k < s.length && !isSpace(s[k]) && s[k] !== '>') k += 1;
+      value = s.slice(start, k);
+    }
+    if (name === 'href' && href === null) href = value;
+  }
+}
+
+/**
+ * Up to `limit` same-site links whose path or text looks like an about/contact page. One forward
+ * scan: at most MAX_ANCHORS anchors are read, and a label ends at `</a>`, at the next `<a`, or after
+ * MAX_LABEL_CHARS characters, whichever comes first.
+ */
 export function pickSubpages(html: string, base: URL, limit = MAX_PAGES - 1): URL[] {
   const picked: URL[] = [];
   const seen = new Set<string>([base.origin + base.pathname]);
-  const anchor = /<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
-  for (let m = anchor.exec(html); m && picked.length < limit; m = anchor.exec(html)) {
-    const href = decodeEntities(m[1] ?? m[2] ?? m[3] ?? '');
-    const label = m[4]!.replace(/<[^>]+>/g, ' ');
+  const lower = lowerAscii(html);
+  let from = 0;
+  for (let anchors = 0; anchors < MAX_ANCHORS && picked.length < limit; ) {
+    const lt = lower.indexOf('<a', from);
+    if (lt < 0) break;
+    if (isWordChar(lower, lt + 2)) {
+      from = lt + 2;
+      continue;
+    }
+    anchors += 1;
+    const tag = readStartTag(html, lower, lt + 2);
+    if (!tag) break; // the tag never ends: nothing after it is markup
+    const window = lower.slice(tag.end, tag.end + MAX_LABEL_CHARS);
+    const close = window.indexOf('</a>');
+    const nextAnchor = window.search(/<a(?![A-Za-z0-9_])/);
+    const labelLength = [close, nextAnchor].filter((n) => n >= 0).reduce((a, b) => Math.min(a, b), window.length);
+    from = tag.end + (labelLength === close ? close + 4 : labelLength);
+    if (tag.href === null) continue;
+    const href = decodeEntities(tag.href);
+    const label = html.slice(tag.end, tag.end + labelLength).replace(/<[^>]+>/g, ' ');
     let url: URL;
     try {
       url = new URL(href, base);
@@ -406,7 +602,12 @@ type Hop = { status: number; url: URL; body: string | null; contentType: string 
 
 async function readCapped(response: SiteResponse): Promise<string | null> {
   const declared = Number(response.headers.get('content-length') ?? '');
-  if (Number.isFinite(declared) && declared > MAX_BYTES) return null;
+  if (Number.isFinite(declared) && declared > MAX_BYTES) {
+    // Refused on the declared size: close the body now, or the socket stays open until the
+    // per-request timeout.
+    await response.body?.cancel().catch(() => {});
+    return null;
+  }
   if (!response.body) return '';
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
