@@ -244,6 +244,16 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     const within = `${'<a href="/urun">Ürün</a>'.repeat(MAX_ANCHORS - 1)}<a href="/hakkimizda">Hakkımızda</a>`;
     expect(pickSubpages(within, base).map((u) => u.pathname)).toEqual(['/hakkimizda']);
   });
+
+  it('NG-202 B5: an about link after more than MAX_ANCHORS ordinary menu links is still found', () => {
+    // A shop menu: product links (same site, no about/contact hint), links to other sites, anchors with
+    // no href. None of them can ever be picked, so none of them may use up the anchor budget.
+    const products = Array.from({ length: MAX_ANCHORS + 100 }, (_, i) => `<a href="/urun/${i}">Ürün ${i}</a>`).join('');
+    const offsite = Array.from({ length: 50 }, (_, i) => `<a href="https://other${i}.example.org/">Partner</a>`).join('');
+    const bare = '<a name="top">Top</a>'.repeat(50);
+    const html = `${products}${offsite}${bare}<a href="/hakkimizda">Hakkımızda</a><a href="/iletisim">İletişim</a>`;
+    expect(pickSubpages(html, base).map((u) => u.pathname)).toEqual(['/hakkimizda', '/iletisim']);
+  });
 });
 
 describe('htmlToText and pickSubpages — same output as before on ordinary HTML', () => {
