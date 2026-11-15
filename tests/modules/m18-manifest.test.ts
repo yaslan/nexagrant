@@ -55,11 +55,11 @@ describe('M18 client-pipeline manifest', () => {
 
   it('declares every M18 table in the RLS FOREACH list and in the migration policy loop', () => {
     const rls = readFileSync(resolve(process.cwd(), 'prisma/rls.sql'), 'utf8');
-    const migration = readFileSync(
-      resolve(process.cwd(), 'prisma/migrations/add-m18-client-pipeline.sql'),
-      'utf8'
-    );
-    expect(m18Manifest.tables).toHaveLength(9);
+    // F1 opened nine tables in one migration; F5 (NG-136) added LeadEligibilityReport in its own.
+    const migration = ['add-m18-client-pipeline.sql', 'add-m18-eligibility-report.sql']
+      .map((f) => readFileSync(resolve(process.cwd(), 'prisma/migrations', f), 'utf8'))
+      .join('\n');
+    expect(m18Manifest.tables).toHaveLength(10);
     for (const table of m18Manifest.tables) {
       expect(rls, table).toContain(`'${table}'`);
       expect(migration, table).toContain(`'${table}'`);

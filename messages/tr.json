@@ -5839,6 +5839,46 @@
       "keepLegend": "Tutulacak kayıt",
       "mergeButton": "Birleştir",
       "merged": "Birleştirildi: {contacts} kişi ve {deals} fırsat taşındı."
+    },
+    "ai": {
+      "label": "İç ön değerlendirme — resmî puan değildir",
+      "enrichHeading": "Web sitesinden zenginleştirme (YZ)",
+      "enrichHint": "Kurumun kendi web sitesinden en çok 5 sayfa okunur (robots.txt'ye uyulur). Öneriler siz onaylamadan kayda yazılmaz. Bir sayfa okunabildiyse {credits} YZ kredisi düşer.",
+      "enrichNoWebsite": "Bu kurumun kayıtlı bir web sitesi yok.",
+      "enrichRun": "Öneri al",
+      "enrichEmpty": "Sayfalarda kayda eklenecek yeni bir bilgi bulunamadı.",
+      "enrichApply": "Seçilenleri kayda yaz",
+      "enrichApplied": "Seçilen alanlar kayda yazıldı.",
+      "enrichSources": "Kaynak sayfalar",
+      "enrichNothingSelected": "En az bir alan seçin.",
+      "field": {
+        "legalName": "Ticari unvan",
+        "district": "İlçe",
+        "sizeBand": "Ölçek",
+        "themes": "Konu alanları",
+        "sectorCodes": "NACE kodları"
+      },
+      "eligibilityHeading": "Uygunluk ön raporu (YZ)",
+      "eligibilityHint": "Kurum × çağrı için iç ön değerlendirme taslağı. Taslak, onaylanmadan M18 dışına çıkmaz. {credits} YZ kredisi düşer.",
+      "eligibilityNoCalls": "Bu kurum henüz bir çağrıyla eşleşmedi; önce bir eşleşme ya da çağrılı fırsat ekleyin.",
+      "callLabel": "Çağrı",
+      "eligibilityRun": "Ön rapor oluştur",
+      "eligibilityCreated": "Ön rapor taslağı oluşturuldu.",
+      "reportsHeading": "Ön raporlar",
+      "noReports": "Henüz ön rapor yok.",
+      "status": {
+        "DRAFT": "Taslak — onay bekliyor",
+        "APPROVED": "Onaylandı"
+      },
+      "approve": "Onayla",
+      "approved": "Ön rapor onaylandı.",
+      "pending": "Çalışıyor…",
+      "errors": {
+        "NO_WEBSITE": "Bu kurumun kayıtlı bir web sitesi yok.",
+        "SITE_UNAVAILABLE": "Web sitesi okunamadı (adres geçersiz, robots.txt izin vermiyor ya da site yanıt vermedi). Kredi düşmedi.",
+        "BAD_ANSWER": "YZ yanıtı okunamadı. Tekrar deneyin.",
+        "NO_CREDITS": "YZ krediniz yetersiz."
+      }
     }
   }
 }

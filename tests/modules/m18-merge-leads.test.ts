@@ -17,6 +17,7 @@ function fakeTx() {
     leadMatch: { findMany: vi.fn(async () => []), deleteMany: write(), updateMany: write() },
     leadContact: { updateMany: write() },
     deal: { updateMany: write() },
+    leadEligibilityReport: { updateMany: write() },
   };
   return tx;
 }
@@ -27,6 +28,7 @@ function writesOf(tx: ReturnType<typeof fakeTx>) {
     tx.leadMatch.updateMany,
     tx.leadContact.updateMany,
     tx.deal.updateMany,
+    tx.leadEligibilityReport.updateMany,
     tx.leadOrganization.update,
   ];
 }
@@ -71,6 +73,11 @@ describe('mergeLeadOrganizations — blank ids write nothing', () => {
     });
     expect(result?.keepId).toBe('a');
     expect(tx.deal.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: 't1', organizationId: 'b' },
+      data: { organizationId: 'a' },
+    });
+    // NG-136: the eligibility pre-reports follow the organisation they describe.
+    expect(tx.leadEligibilityReport.updateMany).toHaveBeenCalledWith({
       where: { tenantId: 't1', organizationId: 'b' },
       data: { organizationId: 'a' },
     });

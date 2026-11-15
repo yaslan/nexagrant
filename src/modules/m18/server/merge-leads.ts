@@ -5,8 +5,8 @@ import { blankFieldsFrom, MERGE_FILL_FIELDS } from './duplicate-pairs';
 
 /**
  * Merge one client organisation into another (NG-135 / F3 phase B). The kept organisation
- * receives the dropped one's contacts, deals (and so their tasks and activities) and call
- * matches; blank fields on the kept row are filled from the dropped one. The dropped row is
+ * receives the dropped one's contacts, deals (and so their tasks and activities), call
+ * matches and eligibility pre-reports; blank fields on the kept row are filled from the dropped one. The dropped row is
  * soft-deleted, so its id still resolves in history.
  */
 
@@ -20,7 +20,7 @@ export type MergeInput = z.infer<typeof mergeSchema>;
 
 export interface MergeResult {
   keepId: string;
-  moved: { contacts: number; deals: number; matches: number };
+  moved: { contacts: number; deals: number; matches: number; eligibilityReports: number };
   filledFields: string[];
 }
 
@@ -70,6 +70,12 @@ export async function mergeLeadOrganizations(
     data: { organizationId: keepId },
   });
 
+  // M18-F5 (NG-136): the eligibility pre-reports describe the organisation, so they follow it too.
+  const eligibilityReports = await tx.leadEligibilityReport.updateMany({
+    where: { tenantId, organizationId: dropId },
+    data: { organizationId: keepId },
+  });
+
   const patch = blankFieldsFrom(
     Object.fromEntries(MERGE_FILL_FIELDS.map((f) => [f, keep[f]])),
     Object.fromEntries(MERGE_FILL_FIELDS.map((f) => [f, drop[f]])),
@@ -85,7 +91,7 @@ export async function mergeLeadOrganizations(
 
   return {
     keepId: keep.id,
-    moved: { contacts: contacts.count, deals: deals.count, matches: matches.count },
+    moved: { contacts: contacts.count, deals: deals.count, matches: matches.count, eligibilityReports: eligibilityReports.count },
     filledFields: Object.keys(patch),
   };
 }

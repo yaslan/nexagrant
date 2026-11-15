@@ -9,6 +9,9 @@ import { getLead } from '@/modules/m18/server/leads-repo';
 import { SectionNav } from '../../_components/section-nav';
 import { DealCreateForm, StageSelect } from '../../_components/client-forms';
 import { LiveNoticeProvider } from '../../_components/live-notice';
+import { eligibilityCallChoices, listEligibilityReports } from '@/modules/m18/server/eligibility';
+import { aiCreditEntry } from '@/lib/billing/catalog';
+import { ApproveReportButton, EligibilityForm, EnrichmentPanel, PreAssessmentLabel } from '../../_components/ai-panels';
 
 export default async function LeadDetailPage({
   params,
@@ -23,7 +26,14 @@ export default async function LeadDetailPage({
   const t = await getTranslations({ locale, namespace: 'm18' });
   const back = `/${locale}/${workspace}/musteri-hatti/leads`;
 
-  const lead = await withTenant(tenantId, (tx) => getLead(tx, tenantId, id));
+  const [lead, reports, calls] = await withTenant(tenantId, (tx) =>
+    Promise.all([
+      getLead(tx, tenantId, id),
+      listEligibilityReports(tx, tenantId, id),
+      eligibilityCallChoices(tx, tenantId, id),
+    ]),
+  );
+  const tAi = await getTranslations({ locale, namespace: 'm18.ai' });
   if (!lead) {
     return (
       <main className="space-y-4 p-6">
@@ -89,6 +99,49 @@ export default async function LeadDetailPage({
         </section>
 
         {canWrite ? <DealCreateForm organizationId={lead.id} /> : null}
+
+        {canWrite ? (
+          <section aria-labelledby="enrich-heading" className="space-y-2">
+            <h2 id="enrich-heading" className="text-lg font-semibold">{tAi('enrichHeading')}</h2>
+            <EnrichmentPanel
+              organizationId={lead.id}
+              hasWebsite={Boolean(lead.website)}
+              credits={aiCreditEntry('M18', 'enrich-organization')?.credits ?? 0}
+            />
+          </section>
+        ) : null}
+
+        <section aria-labelledby="eligibility-heading" className="space-y-3">
+          <h2 id="eligibility-heading" className="text-lg font-semibold">{tAi('eligibilityHeading')}</h2>
+          <PreAssessmentLabel text={tAi('label')} />
+          {canWrite ? (
+            <>
+              <p className="text-sm text-slate-600">{tAi('eligibilityHint', { credits: aiCreditEntry('M18', 'eligibility-pre-report')?.credits ?? 0 })}</p>
+              <EligibilityForm organizationId={lead.id} calls={calls} />
+            </>
+          ) : null}
+          <h3 className="text-base font-semibold">{tAi('reportsHeading')}</h3>
+          {reports.length === 0 ? (
+            <p className="text-slate-600">{tAi('noReports')}</p>
+          ) : (
+            <ul className="space-y-3">
+              {reports.map((r) => (
+                <li key={r.id} className="space-y-2 rounded border border-slate-200 p-3" data-testid="eligibility-report">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <PreAssessmentLabel text={tAi('label')} />
+                    <span className="font-medium">{r.call.callIdentifier}</span>
+                    <span className="text-slate-600">{new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(r.createdAt)}</span>
+                    <span className={r.status === 'APPROVED' ? 'text-emerald-700' : 'text-amber-800'}>
+                      {tAi(`status.${r.status === 'APPROVED' ? 'APPROVED' : 'DRAFT'}`)}
+                    </span>
+                    {canWrite && r.status !== 'APPROVED' ? <ApproveReportButton reportId={r.id} /> : null}
+                  </div>
+                  <div className="whitespace-pre-wrap text-sm">{r.content}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </main>
     </LiveNoticeProvider>
   );

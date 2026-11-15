@@ -5,6 +5,8 @@ const prompt = `You are an expert EU Horizon Europe coordinator preparing pre-me
 
 Generate a 1-page pre-meeting briefing note for a Horizon Europe consortium discussion with the partner in partner_name, on the topic in call_topic.
 
+deal_context describes the client deal this meeting serves, or says "none". When it describes one, use its facts in sections 2 to 5 and keep its internal eligibility pre-assessment as background only: never present it as an official evaluation or a score.
+
   Include the following structured sections in Markdown:
   ### 1. Partner Background & EU Track Record
   - Partner profile, PIC overview, EU framework programme experience.
