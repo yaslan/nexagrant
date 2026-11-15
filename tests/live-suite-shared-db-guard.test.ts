@@ -32,6 +32,7 @@ const USED_CONNECTION = [
   'tests/m17-text-retention.live.test.ts',
   'tests/notification-retention.live.test.ts',
   'tests/public-lead.live.test.ts',
+  'tests/public-lead-stuck.live.test.ts',
   'tests/stale-relationship-reminder.live.test.ts',
   'tests/stripe-event-retention.live.test.ts',
   'tests/topic-match-nightly.live.test.ts',

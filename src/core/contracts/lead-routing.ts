@@ -61,6 +61,37 @@ export interface UnmatchedLeadRow {
   markedAt: Date | null;
 }
 
+/**
+ * NG-182 — a lead that is `routed` to a tenant but has NO copy there: neither a `LeadContact` nor a
+ * `Deal` of that tenant carries `sourceRef = public-lead:<id>`. NG-181 keeps such a lead with its
+ * tenant on purpose (a port that throws must not let a moved map copy it to a second tenant), so it
+ * sits nowhere until someone looks. Read-only: nothing re-routes, copies or deletes it.
+ */
+export interface StuckRoutedLeadRow {
+  publicLeadId: string;
+  routedTenantId: string;
+  /** Null when the tenant row is gone (hard-deleted). */
+  routedTenantName: string | null;
+  /** True when the tenant row is gone or soft-deleted. */
+  tenantDeleted: boolean;
+  /** When the lead was claimed for that tenant. */
+  routedAt: Date | null;
+  createdAt: Date;
+  organisation: string;
+  province: string | null;
+}
+
+export interface StuckRoutedLeadPage {
+  rows: StuckRoutedLeadRow[];
+  /** Every stuck lead past the threshold, not only the rows returned. */
+  total: number;
+  /** The age a routed lead must reach before it counts as stuck (PUBLIC_LEAD_STUCK_AFTER_MINUTES). */
+  olderThanMinutes: number;
+}
+
+/** SystemAlert source of the `public-lead-stuck` job: one open alert per stuck lead, meta names the lead id only. */
+export const STUCK_LEAD_ALERT_SOURCE = 'public-lead-stuck';
+
 /** A tenant the platform admin may pick as a route target (see `isIntakeTenant`). */
 export interface IntakeTenantOption {
   id: string;
@@ -103,7 +134,7 @@ export interface UnmatchedLeadPage {
  * their own HTTP entry points, the admin layout is not relied on). Implemented in
  * `src/app/[locale]/admin/lead-routes/actions.ts`, where the exported names carry an `Action`
  * suffix: listProvinceLeadRoutesAction, setProvinceLeadRouteAction, deactivateProvinceLeadRouteAction,
- * listUnmatchedLeadsAction, listIntakeTenantOptionsAction.
+ * listUnmatchedLeadsAction, listIntakeTenantOptionsAction, listStuckRoutedLeadsAction.
  *
  * `setProvinceLeadRoute` is an upsert on the ACTIVE row of the province: no active row → create;
  * an active row for another tenant → move it (the old assignment is replaced, not duplicated);
@@ -114,6 +145,8 @@ export interface LeadRoutingActions {
   setProvinceLeadRoute(input: SetProvinceLeadRouteInput): Promise<ProvinceRouteResult>;
   deactivateProvinceLeadRoute(input: DeactivateProvinceLeadRouteInput): Promise<ProvinceRouteResult>;
   listUnmatchedLeads(input?: ListUnmatchedLeadsInput): Promise<UnmatchedLeadPage>;
+  /** NG-182, read-only; no re-send. Action: listStuckRoutedLeadsAction. */
+  listStuckRoutedLeads(): Promise<StuckRoutedLeadPage>;
   /** Tenants {@link isIntakeTenant} accepts, by name. Action: listIntakeTenantOptionsAction. */
   listIntakeTenantOptions(): Promise<IntakeTenantOption[]>;
 }
