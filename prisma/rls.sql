@@ -18,7 +18,7 @@ BEGIN
     'ProjectIdea','DecisionLog',
     'NotificationPreference','NotificationEmailItem',
     'LeadOrganization','LeadContact','LeadMatch','Deal','DealActivity','DealTask',
-    'ServicePackage','ServiceQuote','FunderRule'
+    'ServicePackage','ServiceQuote','FunderRule','LeadEligibilityReport'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -175,8 +175,9 @@ END $$;
 --       2. `app.system_scope_token` carries this transaction's seal, which only
 --          enter_system_scope(purpose) can compute: a SHA-256 over a secret in
 --          fabrika_private.system_scope_key (no role but its owner can read
---          it), the backend pid and transaction_timestamp(). A seal copied out
---          of an earlier transaction does not match the next one.
+--          it), the backend pid, transaction_timestamp() and the purpose. A seal
+--          copied out of an earlier transaction does not match the next one, and
+--          a seal issued for one purpose does not match another (NG-187).
 --
 -- Why the seal: `app.system_scope` is a placeholder parameter, so it is
 -- USERSET and PostgreSQL has no way to stop a role from setting it. Before
@@ -206,10 +207,15 @@ END $$;
 -- counter the same registration writes, FO-26). Every other system_scope table stays shut to
 -- it, reads and writes alike. The other five purposes are not narrowed. The
 -- purpose is read from app.system_scope_purpose, which is USERSET like the
--- flag; the seal is not tied to it. So this guards against a public-intake
--- call site that reaches for the wrong table, not against code that can call
--- enter_system_scope('<another purpose>') — that code could open everything
--- anyway. A new table the form needs goes into the list in system_scope_open()
+-- flag, but the seal binds it (NG-187, SEC NG-185 F-2): enter_system_scope
+-- seals the purpose it was given, and system_scope_sealed() recomputes the
+-- seal over the purpose the GUC holds NOW. A `SET LOCAL app.system_scope_purpose
+-- = 'platform-admin'` after enter_system_scope('expert-directory') no longer
+-- widens the scope; it breaks the seal and every sealed path reads 0 rows and
+-- writes nothing until enter_system_scope is called again. This still guards
+-- against a call site that reaches for the wrong table, not against code that
+-- can call enter_system_scope('<another purpose>') — that code could open
+-- everything anyway. A new table the form needs goes into the list in system_scope_open()
 -- on purpose; until then a write there is an RLS error and a read is 0 rows.
 --
 -- The reverse direction (FO-92, FO-21 O4): the expert's personal data
@@ -251,12 +257,16 @@ INSERT INTO fabrika_private.system_scope_key (secret)
   VALUES (replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''))
   ON CONFLICT (singleton) DO NOTHING;
 
--- This transaction's seal. Callable by nobody but its owner; it is reached
--- only through the two SECURITY DEFINER functions below. The secret comes
--- first and last, so neither a prefix nor an extension of a seal is another
--- valid seal. transaction_timestamp() is the same for every statement of one
--- transaction and different for the next one on the same backend.
-CREATE OR REPLACE FUNCTION fabrika_private.system_scope_seal()
+-- This transaction's seal for one purpose. Callable by nobody but its owner;
+-- it is reached only through the two SECURITY DEFINER functions below. The
+-- secret comes first and last, so neither a prefix nor an extension of a seal
+-- is another valid seal. transaction_timestamp() is the same for every
+-- statement of one transaction and different for the next one on the same
+-- backend. The purpose is the one field the caller chooses, and it is the only
+-- variable-length field between pid/timestamp and the closing secret, so two
+-- different purposes never hash the same input (NG-187). A NULL purpose gives a
+-- NULL seal, which matches nothing.
+CREATE OR REPLACE FUNCTION fabrika_private.system_scope_seal(purpose text)
 RETURNS text
 LANGUAGE sql
 STABLE
@@ -265,11 +275,12 @@ SET search_path = pg_catalog
 AS $fn$
   SELECT encode(sha256(convert_to(
            k.secret || '|' || pg_backend_pid()::text || '|' ||
-           extract(epoch FROM transaction_timestamp())::text || '|' || k.secret,
+           extract(epoch FROM transaction_timestamp())::text || '|' ||
+           purpose || '|' || k.secret,
            'UTF8')), 'hex')
     FROM fabrika_private.system_scope_key k
 $fn$;
-REVOKE ALL ON FUNCTION fabrika_private.system_scope_seal() FROM PUBLIC;
+REVOKE ALL ON FUNCTION fabrika_private.system_scope_seal(text) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION public.enter_system_scope(purpose text)
 RETURNS text
@@ -299,7 +310,7 @@ BEGIN
   -- exit_system_scope() — COMMIT and ROLLBACK are the exit, so a caller cannot
   -- leak the scope by forgetting to close it. The seal is what makes the flag
   -- count for a role that does not own the tables (system_scope_open()).
-  PERFORM set_config('app.system_scope_token', fabrika_private.system_scope_seal(), true);
+  PERFORM set_config('app.system_scope_token', fabrika_private.system_scope_seal(purpose), true);
   PERFORM set_config('app.system_scope', 'on', true);
   PERFORM set_config('app.system_scope_purpose', purpose, true);
   RETURN purpose;
@@ -307,7 +318,7 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.enter_system_scope(text) IS
-  'Opens the system_scope RLS policy for the current transaction only: sets app.system_scope and the transaction seal in app.system_scope_token. Single entry point for the cross-tenant call sites recorded in scripts/tenant-bypass-baseline.json. REVOKE EXECUTE to close it.';
+  'Opens the system_scope RLS policy for the current transaction only: sets app.system_scope, app.system_scope_purpose and the transaction seal over that purpose in app.system_scope_token (NG-187: changing the purpose afterwards breaks the seal). Single entry point for the cross-tenant call sites recorded in scripts/tenant-bypass-baseline.json. REVOKE EXECUTE to close it.';
 
 -- Nobody by default; the app role by name. Guarded because prisma/rls.sql runs
 -- on databases where `pnpm db:rls-role` has not been run yet, and the grant is
@@ -320,9 +331,13 @@ BEGIN
   END IF;
 END $$;
 
--- Does app.system_scope_token hold THIS transaction's seal? SECURITY DEFINER
--- because only the owner can read the secret; it returns a boolean and
--- nothing else, so every role subject to the policy may call it.
+-- Does app.system_scope_token hold THIS transaction's seal for the purpose
+-- app.system_scope_purpose holds NOW? SECURITY DEFINER because only the owner
+-- can read the secret; it returns a boolean and nothing else, so every role
+-- subject to the policy may call it. No argument on purpose: the policies call
+-- it as system_scope_sealed(), and the purpose it checks is the very value the
+-- purpose tests in system_scope_open() and expert_directory read, so the seal
+-- and the narrowing cannot disagree (NG-187).
 CREATE OR REPLACE FUNCTION public.system_scope_sealed()
 RETURNS boolean
 LANGUAGE sql
@@ -332,8 +347,13 @@ SECURITY DEFINER
 SET search_path = pg_catalog
 AS $fn$
   SELECT coalesce(current_setting('app.system_scope_token', true)
-                    = fabrika_private.system_scope_seal(), false)
+                    = fabrika_private.system_scope_seal(current_setting('app.system_scope_purpose', true)), false)
 $fn$;
+
+-- NG-187: the purpose-free seal is gone. Dropped only after both callers above
+-- point at system_scope_seal(text); SQL function bodies are not dependency-
+-- tracked, so nothing else can still name it. Idempotent.
+DROP FUNCTION IF EXISTS fabrika_private.system_scope_seal();
 
 -- The policy predicate. SECURITY INVOKER on purpose: current_user must be the
 -- role running the query (inside a SECURITY DEFINER function that is the

@@ -1,7 +1,3 @@
-// `Role` is imported as a value, not a string literal: src/types/prisma-override.d.ts
-// declares it as a TS enum, so `'MEMBER'` is not assignable to `Role` (TS2322).
-import { Role } from '@prisma/client';
-
 import { plansGrantingModule } from '@/lib/billing/catalog';
 import { ModuleManifest } from '@/lib/modules/types';
 
@@ -31,8 +27,8 @@ export const m17Manifest: ModuleManifest = {
   routes: [{ path: 'modules/interreg-review' }],
   nav: [{ labelKey: 'interregReview', routeKey: 'interregReview', order: 45 }],
   permissions: [
-    { id: 'interreg-review:read', minRole: Role.MEMBER },
-    { id: 'interreg-review:write', minRole: Role.WRITER },
+    { id: 'interreg-review:read', minRole: 'MEMBER' },
+    { id: 'interreg-review:write', minRole: 'WRITER' },
   ],
   // Its own tenant tables; the rubric tables (InterregRubric*) are platform reference data.
   tables: ['InterregAnalysis', 'InterregAnalysisResult', 'InterregCriterionMark'],

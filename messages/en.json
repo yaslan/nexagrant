@@ -710,8 +710,6 @@
       "programme": "Programme",
       "roles": "Roles",
       "none": "No expert matches this seat.",
-      "noneFiltered": "{count, plural, one {# expert matches} other {# experts match}} this seat's programme and role, but the minimum-partner pre-filter left them all out: the call country rule needs this seat to bring a country the consortium does not hold yet.",
-      "excluded": "{count, plural, one {# expert was} other {# experts were}} left out by the minimum-partner pre-filter: the call country rule needs a new country.",
       "unavailable": "The expert pool could not be read right now."
     }
   },
@@ -4035,7 +4033,7 @@
       "run": "Start CORDIS synchronization",
       "busy": "Processing data...",
       "done": "✓ CORDIS data synchronization completed successfully!",
-      "totals": "Projects processed: {count} — Total grant: €{total}",
+      "totals": "Projects processed: {count} — Total grant: {total}",
       "olapTitle": "Grant & project distribution by country (OLAP aggregation)",
       "colCountry": "Country",
       "colProjects": "Project count",
@@ -5540,6 +5538,29 @@
     "footerProductName": "Platform Admin Console",
     "footerVersionLabel": "v1.1.0"
   },
+  "adminNav": {
+    "modulesLabel": "Module State Manager",
+    "modulesDesc": "OFF, DEV, PILOT, ON transitions",
+    "tenantsLabel": "Tenant Accounts",
+    "tenantsDesc": "Organisation and member management",
+    "billingLabel": "Billing & Subscriptions",
+    "billingDesc": "Stripe packages & limits",
+    "feedbackLabel": "Feedback Triage",
+    "feedbackDesc": "Beta sign-ups, P0–P3 prioritisation",
+    "alertsLabel": "System Alerts",
+    "alertsDesc": "Error and feedback alerts, resolved tracking",
+    "topicStatsLabel": "Base Rates (K3)",
+    "topicStatsDesc": "Horizon Dashboard xlsx → TopicStat",
+    "documentsLabel": "Documents (K6 RAG)",
+    "documentsDesc": "Work programme PDF → shared RAG",
+    "interregLabel": "Interreg & keep.eu",
+    "auditLabel": "Audit Log Events",
+    "auditDesc": "System event history",
+    "blogLabel": "Blog Management",
+    "blogDesc": "Content, article and announcement CRUD",
+    "settingsLabel": "Platform Settings",
+    "settingsDesc": "Global configuration"
+  },
   "adminAudit": {
     "title": "Audit Logs",
     "subtitle": "Log history of system module changes, gate decisions and security events.",
@@ -5818,6 +5839,46 @@
       "keepLegend": "Record to keep",
       "mergeButton": "Merge",
       "merged": "Merged: {contacts} contacts and {deals} deals moved."
+    },
+    "ai": {
+      "label": "Internal pre-assessment — not an official score",
+      "enrichHeading": "Enrich from website (AI)",
+      "enrichHint": "Reads at most 5 pages of the organisation's own website (robots.txt is obeyed). Nothing is written to the record until you approve it. {credits, plural, one {# AI credit is} other {# AI credits are}} used when a page could be read.",
+      "enrichNoWebsite": "This organisation has no website on record.",
+      "enrichRun": "Get suggestions",
+      "enrichEmpty": "The pages hold nothing new for the record.",
+      "enrichApply": "Write selected to record",
+      "enrichApplied": "The selected fields were written to the record.",
+      "enrichSources": "Source pages",
+      "enrichNothingSelected": "Select at least one field.",
+      "field": {
+        "legalName": "Legal name",
+        "district": "District",
+        "sizeBand": "Size",
+        "themes": "Themes",
+        "sectorCodes": "NACE codes"
+      },
+      "eligibilityHeading": "Eligibility pre-report (AI)",
+      "eligibilityHint": "An internal pre-assessment draft for organisation × call. A draft does not leave M18 until it is approved. Uses {credits, plural, one {# AI credit} other {# AI credits}}.",
+      "eligibilityNoCalls": "This organisation has no matched call yet; add a match or a deal with a call first.",
+      "callLabel": "Call",
+      "eligibilityRun": "Create pre-report",
+      "eligibilityCreated": "Pre-report draft created.",
+      "reportsHeading": "Pre-reports",
+      "noReports": "No pre-reports yet.",
+      "status": {
+        "DRAFT": "Draft — awaiting approval",
+        "APPROVED": "Approved"
+      },
+      "approve": "Approve",
+      "approved": "Pre-report approved.",
+      "pending": "Working…",
+      "errors": {
+        "NO_WEBSITE": "This organisation has no website on record.",
+        "SITE_UNAVAILABLE": "The website could not be read (invalid address, robots.txt does not allow it, or no answer). No credit was used.",
+        "BAD_ANSWER": "The AI answer could not be read. Try again.",
+        "NO_CREDITS": "Not enough AI credits."
+      }
     }
   }
 }

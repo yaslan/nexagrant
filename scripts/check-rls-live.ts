@@ -1264,6 +1264,132 @@ async function probeExpertDirectory(
   return { failures, checks };
 }
 
+/**
+ * NG-187 (SEC NG-185 F-2): the seal binds the purpose. `app.system_scope_purpose` is USERSET,
+ * so after enter_system_scope('<P>') the app role can still `SET LOCAL` the purpose to another
+ * one. Before NG-187 the seal covered only secret | pid | transaction_timestamp, so the new
+ * purpose took effect: an 'expert-directory' scope read every expert row and updated one.
+ * For every purpose the database itself accepts (the list in enter_system_scope, read from
+ * pg_get_functiondef so this follows the database, not a copy) and every other value
+ * (each other purpose and ''), after enter_system_scope(P) + set_config(purpose, Q):
+ * system_scope_sealed() is false, no probe table shows more than outside the scope, the probe
+ * expert row cannot be updated and an AuditEvent insert is refused. Positive control per P:
+ * right after enter_system_scope(P) the seal holds. Probe rows (addProbeRows plus one
+ * verified + consented expert, which 'expert-directory' may read) are written under
+ * PROBE_ROW_PURPOSE first; everything is rolled back.
+ */
+async function probeSealBindsPurpose(m: pg.Client): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const def = (
+    await m.query<{ d: string | null }>(
+      `select case when to_regprocedure('public.enter_system_scope(text)') is null then null
+                   else pg_get_functiondef('public.enter_system_scope(text)'::regprocedure) end as d`
+    )
+  ).rows[0]?.d;
+  const list = def ? /purpose NOT IN \(([\s\S]*?)\)/.exec(def)?.[1] : undefined;
+  const purposes = list ? [...list.matchAll(/'([a-z-]+)'/g)].map((x) => x[1]!) : [];
+  if (purposes.length < 2) {
+    failures.push(`mühür-amaç: enter_system_scope amaç listesi okunamadı (${purposes.length} amaç) — yoklama koşamadı`);
+    return { failures, checks };
+  }
+  const existingTables = new Set(
+    (
+      await m.query<{ t: string }>(
+        `select tablename as t from pg_policies where schemaname = 'public' and policyname = 'system_scope'`
+      )
+    ).rows.map((r) => r.t)
+  );
+  const tables = [...SYSTEM_SCOPE_TABLES.map((s) => s.table), 'AuditEvent'].filter((t) => existingTables.has(t));
+  // One row per table at most (LIMIT 1): visible or not is the question, and it stays cheap on live.
+  const visible = async (): Promise<string> =>
+    (
+      await m.query<{ v: string }>(
+        `select concat_ws(',', ${tables.map((t) => `(select case when exists (select 1 from ${quoteIdent(t)}) then '${t.replace(/'/g, "''")}' end)`).join(', ')}) as v`
+      )
+    ).rows[0]?.v ?? '';
+  const sealed = async (): Promise<boolean> =>
+    (await m.query<{ s: boolean }>('select public.system_scope_sealed() as s')).rows[0]?.s === true;
+  const attempt = async (sql: string, params: unknown[]): Promise<number | 'rls' | string> => {
+    await m.query('savepoint probe_seal');
+    try {
+      return (await m.query(sql, params)).rowCount ?? 0;
+    } catch (e) {
+      return isRlsViolation(e) ? 'rls' : e instanceof Error ? e.message.split('\n')[0]! : String(e);
+    } finally {
+      await m.query('rollback to savepoint probe_seal');
+    }
+  };
+
+  await m.query('begin');
+  try {
+    const tenantId = (await m.query<{ id: string }>('select id from "Tenant" order by id limit 1')).rows[0]?.id ?? null;
+    const probe = await addProbeRows(m, tables.filter((t) => t !== 'AuditEvent'), tenantId);
+    failures.push(...probe.failures);
+    const expertId = `rls-verify-${randomBytes(6).toString('hex')}`;
+    if (existingTables.has(EXPERT_TABLE)) {
+      await m.query('select enter_system_scope($1)', [PROBE_ROW_PURPOSE]);
+      await m.query(
+        `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+         values ($1, 'probe', $1 || '@rls-verify.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr', 'verified')`,
+        [expertId]
+      );
+      if (existingTables.has('AuditEvent')) {
+        await m.query(`insert into "AuditEvent" (id, "tenantId", type) values ($1, null, 'rls-verify.probe')`, [
+          `rls-verify-${randomBytes(6).toString('hex')}`,
+        ]);
+      }
+      await m.query(
+        `select set_config('app.system_scope', 'off', true), set_config('app.system_scope_purpose', '', true), set_config('app.system_scope_token', '', true)`
+      );
+    }
+    const outside = await visible();
+
+    let pairs = 0;
+    const broken: string[] = [];
+    for (const p of purposes) {
+      await m.query('select enter_system_scope($1)', [p]);
+      if (!(await sealed())) {
+        failures.push(`mühür-amaç: enter_system_scope('${p}') hemen sonra system_scope_sealed() false — meşru yol kapalı`);
+        continue;
+      }
+      for (const q of [...purposes.filter((x) => x !== p), '']) {
+        await m.query('select enter_system_scope($1)', [p]);
+        await m.query(`select set_config('app.system_scope_purpose', $1, true)`, [q]);
+        pairs += 1;
+        const label = `${p} → '${q}'`;
+        if (await sealed()) broken.push(`${label}: system_scope_sealed() hâlâ true`);
+        const seen = await visible();
+        if (seen !== outside) broken.push(`${label}: görünen tablolar {${seen}} (kapsam dışında {${outside}})`);
+        if (existingTables.has(EXPERT_TABLE)) {
+          const upd = await attempt(`update ${quoteIdent(EXPERT_TABLE)} set "fullName" = 'rls-verify' where id = $1`, [expertId]);
+          // 'rls' or no UPDATE grant (a probe role holds SELECT, INSERT only): either way nothing was written.
+          if (upd !== 0 && upd !== 'rls' && !/permission denied/i.test(String(upd))) broken.push(`${label}: ${EXPERT_TABLE} UPDATE ${typeof upd === 'number' ? `${upd} satır` : upd}`);
+        }
+        if (existingTables.has('AuditEvent')) {
+          const ins = await attempt(`insert into "AuditEvent" (id, "tenantId", type) values ($1, $2, 'rls-verify.probe')`, [
+            `rls-verify-${randomBytes(6).toString('hex')}`,
+            tenantId,
+          ]);
+          if (ins !== 'rls') broken.push(`${label}: AuditEvent INSERT ${typeof ins === 'number' ? 'KABUL EDİLDİ' : ins}`);
+        }
+      }
+    }
+    if (broken.length > 0) {
+      failures.push(
+        `mühür-amaç: mühürden sonra amaç değiştirilince kapsam açık kalıyor (mühür amacı bağlamıyor, NG-187) — ${broken.length} bulgu: ${broken.slice(0, 6).join('; ')}${broken.length > 6 ? ' …' : ''}`
+      );
+    } else {
+      checks.push(
+        `mühür-amaç: ${purposes.length} amaç × ${purposes.length} değer = ${pairs} amaç değişikliği — mühür tutmuyor, okuma kapsam dışıyla aynı ({${outside}}), UPDATE 0, INSERT reddedildi`
+      );
+    }
+  } finally {
+    await m.query('rollback');
+  }
+  return { failures, checks };
+}
+
 async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
@@ -1540,6 +1666,11 @@ async function main() {
       const directory = await probeExpertDirectory(measurer.client, truth!.client === measurer.client ? null : truth!.client);
       failures.push(...directory.failures);
       checks.push(...directory.checks);
+    }
+    if (existing.has('AuditEvent') || existing.has(EXPERT_TABLE)) {
+      const seal = await probeSealBindsPurpose(measurer.client);
+      failures.push(...seal.failures);
+      checks.push(...seal.checks);
     }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);

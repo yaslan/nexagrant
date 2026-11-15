@@ -1,7 +1,3 @@
-// `Role` is imported as a value, not a string literal: src/types/prisma-override.d.ts
-// declares it as a TS enum, so `'MEMBER'` is not assignable to `Role` (TS2322).
-import { Role } from '@prisma/client';
-
 import { plansGrantingModule } from '@/lib/billing/catalog';
 import { ModuleManifest } from '@/lib/modules/types';
 
@@ -24,8 +20,8 @@ export const m2Manifest: ModuleManifest = {
   nav: [{ labelKey: 'conceptNotes', routeKey: 'conceptNotes', order: 40 }],
   opportunityTabs: [{ labelKey: 'conceptNote', routeKey: 'opportunityConceptNote', order: 10 }],
   permissions: [
-    { id: 'concept-note:read', minRole: Role.MEMBER },
-    { id: 'concept-note:write', minRole: Role.WRITER },
+    { id: 'concept-note:read', minRole: 'MEMBER' },
+    { id: 'concept-note:write', minRole: 'WRITER' },
   ],
   tables: ['ConceptTemplate', 'ConceptNote'],
   isActive: true,

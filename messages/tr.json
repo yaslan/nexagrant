@@ -710,8 +710,6 @@
       "programme": "Program",
       "roles": "Roller",
       "none": "Bu koltuk için eşleşen uzman yok.",
-      "noneFiltered": "Programı ve rolü bu koltukla eşleşen {count, plural, other {# uzman}} var, ama hepsi asgari ortak ön filtresine takıldı: çağrının ülke koşulu bu koltuktan konsorsiyumda henüz olmayan bir ülke istiyor.",
-      "excluded": "{count, plural, other {# uzman}} asgari ortak ön filtresine takıldı: çağrının ülke koşulu için yeni bir ülke gerekiyor.",
       "unavailable": "Uzman havuzu şu an okunamadı."
     }
   },
@@ -3992,7 +3990,7 @@
       "idle": "Sol taraftan arama yaptığınızda LLM modeline gönderilen RAG bağlam metni burada görüntülenecektir."
     },
     "header": {
-      "kicker": "K2 CORDIS Ingestion & M1 Partner Intelligence Console",
+      "kicker": "K2 CORDIS Veri Alımı ve M1 Partner İstihbarat Konsolu",
       "title": "K2 CORDIS Katmanı Yönetim Paneli",
       "description": "Horizon Europe ve H2020 fonlanmış proje/ortaklık sonuç verilerini çeker, M1 Partner Intelligence modülünü besler.",
       "license": "CORDIS CC BY 4.0",
@@ -4035,7 +4033,7 @@
       "run": "CORDIS Senkronizasyonunu Başlat",
       "busy": "Veriler İşleniyor...",
       "done": "✓ CORDIS Veri Senkronizasyonu Başarıyla Tamamlandı!",
-      "totals": "İşlenen Proje Sayısı: {count} — Toplam Hibe: €{total}",
+      "totals": "İşlenen Proje Sayısı: {count} — Toplam Hibe: {total}",
       "olapTitle": "Ülke Bazlı Hibe & Proje Dağılımı (OLAP Aggregation)",
       "colCountry": "Ülke",
       "colProjects": "Proje Sayısı",
@@ -5540,6 +5538,29 @@
     "footerProductName": "Platform Yönetim Konsolu",
     "footerVersionLabel": "v1.1.0"
   },
+  "adminNav": {
+    "modulesLabel": "Modül Yönetimi",
+    "modulesDesc": "OFF, DEV, PILOT, ON geçişleri",
+    "tenantsLabel": "Kiracı Hesapları",
+    "tenantsDesc": "Kurum ve üye yönetimi",
+    "billingLabel": "Faturalama & Planlar",
+    "billingDesc": "Stripe paketleri & limitler",
+    "feedbackLabel": "Geri Bildirim Triyajı",
+    "feedbackDesc": "Beta kayıtları, P0–P3 önceliklendirme",
+    "alertsLabel": "Sistem Uyarıları",
+    "alertsDesc": "Hata ve geri bildirim uyarıları, çözüldü takibi",
+    "topicStatsLabel": "Taban Oranlar (K3)",
+    "topicStatsDesc": "Horizon Dashboard xlsx → TopicStat",
+    "documentsLabel": "Belgeler (K6 RAG)",
+    "documentsDesc": "Çalışma programı PDF → paylaşılan RAG",
+    "interregLabel": "Interreg & keep.eu",
+    "auditLabel": "Denetim Kayıtları",
+    "auditDesc": "Sistem olay geçmişi",
+    "blogLabel": "Blog Yönetimi",
+    "blogDesc": "İçerik, makale ve duyuru CRUD",
+    "settingsLabel": "Sistem Ayarları",
+    "settingsDesc": "Küresel konfigürasyon"
+  },
   "adminAudit": {
     "title": "Denetim Kayıtları",
     "subtitle": "Sistem modül değişiklikleri, kapı kararları ve güvenlik olayları log geçmişi.",
@@ -5818,6 +5839,46 @@
       "keepLegend": "Tutulacak kayıt",
       "mergeButton": "Birleştir",
       "merged": "Birleştirildi: {contacts} kişi ve {deals} fırsat taşındı."
+    },
+    "ai": {
+      "label": "İç ön değerlendirme — resmî puan değildir",
+      "enrichHeading": "Web sitesinden zenginleştirme (YZ)",
+      "enrichHint": "Kurumun kendi web sitesinden en çok 5 sayfa okunur (robots.txt'ye uyulur). Öneriler siz onaylamadan kayda yazılmaz. Bir sayfa okunabildiyse {credits} YZ kredisi düşer.",
+      "enrichNoWebsite": "Bu kurumun kayıtlı bir web sitesi yok.",
+      "enrichRun": "Öneri al",
+      "enrichEmpty": "Sayfalarda kayda eklenecek yeni bir bilgi bulunamadı.",
+      "enrichApply": "Seçilenleri kayda yaz",
+      "enrichApplied": "Seçilen alanlar kayda yazıldı.",
+      "enrichSources": "Kaynak sayfalar",
+      "enrichNothingSelected": "En az bir alan seçin.",
+      "field": {
+        "legalName": "Ticari unvan",
+        "district": "İlçe",
+        "sizeBand": "Ölçek",
+        "themes": "Konu alanları",
+        "sectorCodes": "NACE kodları"
+      },
+      "eligibilityHeading": "Uygunluk ön raporu (YZ)",
+      "eligibilityHint": "Kurum × çağrı için iç ön değerlendirme taslağı. Taslak, onaylanmadan M18 dışına çıkmaz. {credits} YZ kredisi düşer.",
+      "eligibilityNoCalls": "Bu kurum henüz bir çağrıyla eşleşmedi; önce bir eşleşme ya da çağrılı fırsat ekleyin.",
+      "callLabel": "Çağrı",
+      "eligibilityRun": "Ön rapor oluştur",
+      "eligibilityCreated": "Ön rapor taslağı oluşturuldu.",
+      "reportsHeading": "Ön raporlar",
+      "noReports": "Henüz ön rapor yok.",
+      "status": {
+        "DRAFT": "Taslak — onay bekliyor",
+        "APPROVED": "Onaylandı"
+      },
+      "approve": "Onayla",
+      "approved": "Ön rapor onaylandı.",
+      "pending": "Çalışıyor…",
+      "errors": {
+        "NO_WEBSITE": "Bu kurumun kayıtlı bir web sitesi yok.",
+        "SITE_UNAVAILABLE": "Web sitesi okunamadı (adres geçersiz, robots.txt izin vermiyor ya da site yanıt vermedi). Kredi düşmedi.",
+        "BAD_ANSWER": "YZ yanıtı okunamadı. Tekrar deneyin.",
+        "NO_CREDITS": "YZ krediniz yetersiz."
+      }
     }
   }
 }

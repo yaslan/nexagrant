@@ -5,6 +5,10 @@ import m17EvaluateEn from './m17/evaluate.en';
 import m17EvaluateTr from './m17/evaluate.tr';
 import m17EvaluateRetryEn from './m17/evaluate-retry.en';
 import m17EvaluateRetryTr from './m17/evaluate-retry.tr';
+import m18EligibilityPreReportEn from './m18/eligibility-pre-report.en';
+import m18EligibilityPreReportTr from './m18/eligibility-pre-report.tr';
+import m18EnrichOrganizationEn from './m18/enrich-organization.en';
+import m18EnrichOrganizationTr from './m18/enrich-organization.tr';
 import m2ConceptNoteSectionEn from './m2/concept-note-section.en';
 import m2SectionDraftEn from './m2/section-draft.en';
 import m6EsrParseEn from './m6/esr-parse.en';
@@ -33,8 +37,8 @@ import sharedUntrustedDataRuleEn from './shared/untrusted-data-rule.en';
  * only — the text is the pre-move text byte for byte, including the language
  * instructions baked into some of them — so their output is the same for every
  * locale until a `<name>.tr.ts` is added and registered here. Adding one is a
- * behaviour change and is reviewed as such. M17 (FO-188) was written with both,
- * and tests/prompt-snapshots.test.ts pins both.
+ * behaviour change and is reviewed as such. M17 (FO-188) and M18 (NG-136) were
+ * written with both, and tests/prompt-snapshots.test.ts pins both.
  *
  * Instructions and data travel apart outside M17 (NG-40, spec §18.3): the
  * template holds only instructions and goes in `system`, and whatever a user, an
@@ -70,6 +74,9 @@ const PROMPTS = {
   'm17/call-context': { vars: ['call_context'], text: { en: m17CallContextEn, tr: m17CallContextTr } },
   'm17/evaluate': { vars: ['rubric', 'project_context'], text: { en: m17EvaluateEn, tr: m17EvaluateTr } },
   'm17/evaluate-retry': { vars: ['problems'], text: { en: m17EvaluateRetryEn, tr: m17EvaluateRetryTr } },
+  // M18 client pipeline (NG-136 / M18-F5): both written in tr and en; data travels via separatedPrompt.
+  'm18/enrich-organization': { vars: [], text: { en: m18EnrichOrganizationEn, tr: m18EnrichOrganizationTr } },
+  'm18/eligibility-pre-report': { vars: [], text: { en: m18EligibilityPreReportEn, tr: m18EligibilityPreReportTr } },
   'm2/concept-note-section': { vars: ['maxWords'], text: { en: m2ConceptNoteSectionEn } },
   'm2/section-draft': { vars: ['maxWords'], text: { en: m2SectionDraftEn } },
   'shared/untrusted-data-rule': { vars: [], text: { en: sharedUntrustedDataRuleEn } },

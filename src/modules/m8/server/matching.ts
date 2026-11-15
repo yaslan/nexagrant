@@ -162,8 +162,8 @@ interface SeatRow {
  * by a CORDIS organisation (`organizationId` → CordisOrganization.country) or by the
  * tenant's own partner record (`partnerOrgId` → PartnerOrg.country, tenant-scoped).
  * CRW NG-186 bulgu 3: counting CORDIS seats alone overstated the country shortfall and
- * dropped candidates the consortium no longer needed to be new. One lookup for the CORDIS
- * matcher and the expert pool (expert-candidates.ts), so both count the same countries.
+ * dropped candidates the consortium no longer needed to be new. Used by the CORDIS /
+ * PartnerOrg matcher only: experts are not country-filtered (K-581990 = A).
  */
 export async function confirmedSeatCountries(
   tx: Pick<TenantTx, 'cordisOrganization' | 'partnerOrg'>,

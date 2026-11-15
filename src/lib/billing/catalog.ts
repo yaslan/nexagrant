@@ -878,6 +878,43 @@ export const AI_ACTION_CREDITS: Readonly<Record<string, AiCreditEntry>> = {
       'user pressed one button and pays M17:evaluate only when a result is delivered; a malformed ' +
       'answer is our defect, not a second purchase. The call is still logged in AiUsageLog.',
   },
+  // M18-F5 (NG-136): owner-approved prices. The agent proposed 1 / 2; the owner approved them on
+  // 15.11.2026 ("Kredi fiyatı 1 / 2 olsun"). docs/BILLING.md carries the same two rows as "Yayımlandı".
+  'M18:enrich-organization': {
+    credits: 1,
+    approval: 'published',
+    note:
+      'Patron onayı: 15.11.2026. Client organisation enrichment from its own website ' +
+      '(≤5 pages). Proposed 1 by parity with M1 (profil özeti): one organisation, one short ' +
+      'structured answer. Nothing is charged when no page could be fetched (no model call).',
+  },
+  'M18:eligibility-pre-report': {
+    credits: 2,
+    approval: 'published',
+    note:
+      'Patron onayı: 15.11.2026. Internal eligibility pre-assessment of one client ' +
+      'organisation against one call. Proposed 2: more than a summary (it reads the call rules), ' +
+      'well below the M6/M17 class (3), which read a whole application against an official grid.',
+  },
+  // NG-136 (K-582507 = A): the model calls of the two M18 actions, the M17 pattern. The price above is
+  // reserved before the call (src/modules/m18/server/ai-credits.ts) and refunded when the action
+  // delivers nothing; the call itself is booked here at 0 so it is logged without a second debit.
+  'M18:enrich-organization-attempt': {
+    credits: 0,
+    approval: 'pending-owner-approval',
+    note:
+      'The model call of an M18:enrich-organization run (NG-136). Priced 0: the price is reserved ' +
+      'once, before the call, under M18:enrich-organization and given back when the answer holds no ' +
+      'usable proposal. The call is still logged in AiUsageLog.',
+  },
+  'M18:eligibility-pre-report-attempt': {
+    credits: 0,
+    approval: 'pending-owner-approval',
+    note:
+      'The model call of an M18:eligibility-pre-report run (NG-136). Priced 0: the price is reserved ' +
+      'once, before the call, under M18:eligibility-pre-report and given back when no DRAFT is saved ' +
+      '(empty answer, failed call or failed write). The call is still logged in AiUsageLog.',
+  },
   'M6:esr-parser': {
     credits: 0,
     approval: 'pending-owner-approval',
