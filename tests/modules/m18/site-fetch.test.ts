@@ -163,6 +163,20 @@ describe('htmlToText and pickSubpages', () => {
     const picked = pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname);
     expect(picked).toEqual(['/hakkimizda%E0%A4%A', '/iletisim']);
   });
+  it('NG-202 B4: links inside <script>, <template>, <noscript> or a comment are not candidates', () => {
+    const html =
+      `<script>var nav = '<a href="/hakkimizda">Hakkımızda</a>';</script>` +
+      `<!-- <a href="/iletisim">İletişim</a> -->` +
+      `<template><a href="/kurumsal">Kurumsal</a></template>` +
+      `<noscript><a href="/contact">Contact</a></noscript>` +
+      `<a href="/about">About</a>`;
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
+  it('NG-202 B4: an unclosed <script> hides the links after it, as it hides the text', () => {
+    const html = `<a href="/about">About</a><script>var a = 1; <a href="/iletisim">İletişim</a>`;
+    expect(htmlToText(html)).toBe('About');
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
   it('picks only same-site about/contact links, at most four', () => {
     const picked = pickSubpages(HOME_HTML, new URL('https://acme.com.tr/')).map((u) => u.pathname);
     expect(picked).toHaveLength(MAX_PAGES - 1);
