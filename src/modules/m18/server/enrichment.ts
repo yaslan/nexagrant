@@ -3,15 +3,18 @@ import type { TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
 import { separatedPrompt } from '@/lib/ai/prompts';
 import { generateCompletion, type LlmCompletion, type LlmGenerateOptions } from '@/lib/llm';
+import { attemptPurpose, withM18Reservation, type M18CreditDeps } from './ai-credits';
 import { fetchOrganizationSite, type SiteFetchDeps, type SiteFetchResult } from './site-fetch';
 
 /**
  * M18-F5 (NG-136) — organisation enrichment from its own website.
  *
  * Two steps, and only the second writes:
- *  1. `proposeEnrichment` reads ≤5 pages (site-fetch.ts, robots.txt obeyed), asks the model through
- *     `src/lib/llm.ts` (M18:enrich-organization — AiUsageLog + credit), and returns a PROPOSAL.
- *     Nothing is stored. No page fetched → no model call → no charge.
+ *  1. `proposeEnrichment` reads ≤5 pages (site-fetch.ts, robots.txt obeyed), reserves the price of
+ *     M18:enrich-organization (ai-credits.ts, the M17 pattern), asks the model through `src/lib/llm.ts`
+ *     (the free M18:enrich-organization-attempt — AiUsageLog row), and returns a PROPOSAL. Nothing is
+ *     stored. No page fetched → no reservation, no model call, no charge. An answer with no usable
+ *     JSON (BAD_ANSWER) or a failed model call gives the reservation back (NG-136, K-582507 = A).
  *  2. `applyEnrichment` writes only the fields the user ticked, after reading the proposal on screen.
  */
 
@@ -126,6 +129,7 @@ export function describeSubject(org: EnrichmentSubject): string {
 export type EnrichmentDeps = {
   fetchSite?: (url: string, deps?: SiteFetchDeps) => Promise<SiteFetchResult>;
   generate?: (options: LlmGenerateOptions) => Promise<LlmCompletion>;
+  credits?: M18CreditDeps;
 };
 
 export async function proposeEnrichment(
@@ -148,16 +152,25 @@ export async function proposeEnrichment(
     },
     input.locale,
   );
-  const completion = await (deps.generate ?? generateCompletion)({
-    tenantId: input.tenantId,
-    userId: input.userId,
-    module: ENRICHMENT_MODULE,
-    purpose: ENRICHMENT_PURPOSE,
-    ...request,
-  });
-  const proposal = parseEnrichmentAnswer(completion.text, fetchedUrls);
-  if (!proposal) return { ok: false, code: 'BAD_ANSWER' };
-  return { ok: true, proposal, fetchedUrls, credits: completion.credits };
+  return withM18Reservation<ProposeEnrichmentResult>(
+    input.tenantId,
+    ENRICHMENT_PURPOSE,
+    async ({ credits }) => {
+      const completion = await (deps.generate ?? generateCompletion)({
+        tenantId: input.tenantId,
+        userId: input.userId,
+        module: ENRICHMENT_MODULE,
+        purpose: attemptPurpose(ENRICHMENT_PURPOSE),
+        // The price was reserved above; llm.ts logs this call at 0 credits and debits nothing.
+        creditsReserved: true,
+        ...request,
+      });
+      const proposal = parseEnrichmentAnswer(completion.text, fetchedUrls);
+      if (!proposal) return { keep: false, value: { ok: false, code: 'BAD_ANSWER' } };
+      return { keep: true, value: { ok: true, proposal, fetchedUrls, credits } };
+    },
+    deps.credits,
+  );
 }
 
 /** The user's choice: only the ticked fields arrive, each re-validated as if typed by hand. */

@@ -7,8 +7,11 @@ import { presentIds } from './helpers/teardown-guard';
 /**
  * NG-136 (M18-F5) — the two M18 AI actions on a real database, through the REAL `src/lib/llm.ts`:
  *
- *  - enrichment (M18:enrich-organization) writes one AiUsageLog row and debits its catalogue price;
- *    a site that cannot be read reaches no model and costs nothing;
+ *  - enrichment (M18:enrich-organization) reserves its catalogue price under the tenant credit lock
+ *    BEFORE the model call (one `usage:M18` row), the model call itself is logged as the free
+ *    `enrich-organization-attempt`; a site that cannot be read reaches no model and costs nothing;
+ *  - an answer that is no use (bad JSON, empty pre-report) or a report that cannot be saved gives the
+ *    reservation back (`refund:M18`, same refId) — the M17 pattern (K-582507 = A);
  *  - the eligibility pre-report (M18:eligibility-pre-report) does the same, is saved as a DRAFT under
  *    RLS, is invisible to another tenant, and is releasable (the deal brief contract) only once
  *    APPROVED.
@@ -96,6 +99,36 @@ async function balance(tenantId: string): Promise<number> {
   return r._sum.delta ?? 0;
 }
 
+/** The tenant's ledger without the opening purchase, oldest first. */
+async function moves(tenantId: string) {
+  return admin!.creditLedger.findMany({
+    where: { tenantId, reason: { not: 'purchase' } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { reason: true, delta: true, refId: true },
+  });
+}
+
+/** Exactly one `usage:M18` debit of `price` and one `refund:M18` credit of the same refId. */
+function expectRefundedPair(rows: { reason: string; delta: number; refId: string | null }[], price: number) {
+  expect(rows.map((r) => [r.reason, r.delta])).toEqual([
+    ['usage:M18', -price],
+    ['refund:M18', price],
+  ]);
+  expect(rows[0]!.refId).toBeTruthy();
+  expect(rows[1]!.refId).toBe(rows[0]!.refId);
+}
+
+async function makeCall(key: string, data: { eligibleApplicantTypes?: string[] } = {}) {
+  const programme = await admin!.programme.findFirst({ select: { id: true } });
+  expect(programme, 'seeded Programme').toBeTruthy();
+  const call = await admin!.call.create({
+    data: { programmeId: programme!.id, callIdentifier: `${RUN}-${key}`, title: `Call ${key}`, ...data },
+    select: { id: true },
+  });
+  calls.push(call.id);
+  return call.id;
+}
+
 beforeAll(async () => {
   const rlsUrl = requireRlsTestUrl(RLS_URL, SUITE);
   if (!ADMIN_URL) skipOrFailInCi(SUITE, 'DATABASE_URL is not set');
@@ -148,7 +181,11 @@ describe('M18 AI actions through the real llm.ts (NG-136)', () => {
     expect(state.requests).toBe(1);
     expect(await balance(owner.tenantId)).toBe(10 - price);
     const logs = await admin!.aiUsageLog.findMany({ where: { tenantId: owner.tenantId }, select: { module: true, purpose: true, credits: true, userId: true } });
-    expect(logs).toEqual([{ module: 'M18', purpose: 'enrich-organization', credits: price, userId: owner.userId }]);
+    // The model call is the free attempt; the price is the one reservation, kept on success.
+    expect(logs).toEqual([{ module: 'M18', purpose: 'enrich-organization-attempt', credits: 0, userId: owner.userId }]);
+    const ledger = await moves(owner.tenantId);
+    expect(ledger.map((r) => [r.reason, r.delta])).toEqual([['usage:M18', -price]]);
+    expect(res.ok && res.credits).toBe(price);
     // A proposal, not a write.
     const row = await admin!.leadOrganization.findUnique({ where: { id: owner.organizationId }, select: { legalName: true } });
     expect(row?.legalName).toBeNull();
@@ -198,15 +235,14 @@ describe('M18 AI actions through the real llm.ts (NG-136)', () => {
     state.replies = ['### Özet\nBüyük olasılıkla uygun.\n\n### Kontrol edilen ölçütler\n- SME: karşılanıyor'];
     const subject = await withTenant(owner.tenantId, (tx) => eligibility.loadEligibilitySubject(tx, owner.tenantId, owner.organizationId, call.id));
     expect(subject).not.toBeNull();
-    const draft = await eligibility.draftEligibilityReport({ tenantId: owner.tenantId, userId: owner.userId, subject: subject!, locale: 'tr' });
-    const saved = await withTenant(owner.tenantId, (tx) =>
-      eligibility.saveEligibilityDraft(tx, owner.tenantId, { organizationId: owner.organizationId, callId: call.id, userId: owner.userId, locale: 'tr', draft }),
-    );
+    const saved = await eligibility.createEligibilityReport({ tenantId: owner.tenantId, userId: owner.userId, subject: subject!, locale: 'tr' });
 
     expect(state.requests).toBe(1);
     expect(await balance(owner.tenantId)).toBe(10 - price);
     const logs = await admin!.aiUsageLog.findMany({ where: { tenantId: owner.tenantId }, select: { module: true, purpose: true, credits: true } });
-    expect(logs).toEqual([{ module: 'M18', purpose: 'eligibility-pre-report', credits: price }]);
+    expect(logs).toEqual([{ module: 'M18', purpose: 'eligibility-pre-report-attempt', credits: 0 }]);
+    expect((await moves(owner.tenantId)).map((r) => [r.reason, r.delta])).toEqual([['usage:M18', -price]]);
+    expect(saved.credits).toBe(price);
 
     const row = await admin!.leadEligibilityReport.findUnique({ where: { id: saved.id }, select: { status: true, tenantId: true } });
     expect(row).toEqual({ status: 'DRAFT', tenantId: owner.tenantId });
@@ -242,9 +278,87 @@ describe('M18 AI actions through the real llm.ts (NG-136)', () => {
     calls.push(call.id);
     const subject = await withTenant(owner.tenantId, (tx) => eligibility.loadEligibilitySubject(tx, owner.tenantId, owner.organizationId, call.id));
     await expect(
-      eligibility.draftEligibilityReport({ tenantId: owner.tenantId, userId: owner.userId, subject: subject!, locale: 'en' }),
+      eligibility.createEligibilityReport({ tenantId: owner.tenantId, userId: owner.userId, subject: subject!, locale: 'en' }),
     ).rejects.toThrow(/Insufficient AI credits/);
     expect(state.requests).toBe(0);
     expect(await balance(owner.tenantId)).toBe(1);
+    expect(await moves(owner.tenantId)).toEqual([]);
+  }, 30_000);
+
+  test('enrichment: a malformed JSON answer gives the reservation back (usage:M18 + refund:M18, balance unchanged)', async () => {
+    if (!ready) return;
+    const price = aiCreditEntry('M18', 'enrich-organization')!.credits;
+    const owner = await makeTenant('enrich-bad', 10);
+    stubProvider();
+    state.replies = ['Üzgünüm, {bu bir JSON değil'];
+    const org = await withTenant(owner.tenantId, (tx) => enrichment.loadEnrichmentSubject(tx, owner.tenantId, owner.organizationId));
+    const res = await enrichment.proposeEnrichment(
+      { tenantId: owner.tenantId, userId: owner.userId, org: org!, locale: 'tr' },
+      { fetchSite: async () => ({ ok: true, pages: [{ url: 'https://acme.example.com.tr/', text: 'Acme' }], skipped: [] }) },
+    );
+    expect(res).toEqual({ ok: false, code: 'BAD_ANSWER' });
+    expect(state.requests).toBe(1);
+    expect(await balance(owner.tenantId)).toBe(10);
+    expectRefundedPair(await moves(owner.tenantId), price);
+    // The call reached the provider, so it is on record — at 0 credits.
+    const logs = await admin!.aiUsageLog.findMany({ where: { tenantId: owner.tenantId }, select: { purpose: true, credits: true } });
+    expect(logs).toEqual([{ purpose: 'enrich-organization-attempt', credits: 0 }]);
+  }, 30_000);
+
+  test('eligibility: an empty answer gives the reservation back and saves no DRAFT', async () => {
+    if (!ready) return;
+    const price = aiCreditEntry('M18', 'eligibility-pre-report')!.credits;
+    const owner = await makeTenant('elig-empty', 10);
+    const callId = await makeCall('EMPTY');
+    stubProvider();
+    state.replies = ['   \n  '];
+    const subject = await withTenant(owner.tenantId, (tx) => eligibility.loadEligibilitySubject(tx, owner.tenantId, owner.organizationId, callId));
+    await expect(
+      eligibility.createEligibilityReport({ tenantId: owner.tenantId, userId: owner.userId, subject: subject!, locale: 'tr' }),
+    ).rejects.toBeInstanceOf(eligibility.EmptyEligibilityAnswerError);
+    expect(state.requests).toBe(1);
+    expect(await balance(owner.tenantId)).toBe(10);
+    expectRefundedPair(await moves(owner.tenantId), price);
+    expect(await admin!.leadEligibilityReport.count({ where: { tenantId: owner.tenantId } })).toBe(0);
+  }, 30_000);
+
+  test('eligibility: a report that cannot be saved gives the reservation back', async () => {
+    if (!ready) return;
+    const price = aiCreditEntry('M18', 'eligibility-pre-report')!.credits;
+    const owner = await makeTenant('elig-nosave', 10);
+    const callId = await makeCall('NOSAVE');
+    stubProvider();
+    state.replies = ['### Özet\nBelirsiz.'];
+    const subject = await withTenant(owner.tenantId, (tx) => eligibility.loadEligibilitySubject(tx, owner.tenantId, owner.organizationId, callId));
+    await expect(
+      eligibility.createEligibilityReport(
+        { tenantId: owner.tenantId, userId: owner.userId, subject: subject!, locale: 'tr' },
+        { save: async () => { throw new Error('simulated write failure'); } },
+      ),
+    ).rejects.toThrow(/simulated write failure/);
+    expect(await balance(owner.tenantId)).toBe(10);
+    expectRefundedPair(await moves(owner.tenantId), price);
+    expect(await admin!.leadEligibilityReport.count({ where: { tenantId: owner.tenantId } })).toBe(0);
+  }, 30_000);
+
+  test('eligibility: two concurrent runs on credits for one never take the balance below zero', async () => {
+    if (!ready) return;
+    const price = aiCreditEntry('M18', 'eligibility-pre-report')!.credits;
+    const owner = await makeTenant('elig-race', price + 1);
+    const callId = await makeCall('RACE');
+    stubProvider();
+    state.replies = ['### Özet\nA', '### Özet\nB'];
+    const subject = await withTenant(owner.tenantId, (tx) => eligibility.loadEligibilitySubject(tx, owner.tenantId, owner.organizationId, callId));
+    const run = () => eligibility.createEligibilityReport({ tenantId: owner.tenantId, userId: owner.userId, subject: subject!, locale: 'tr' });
+    const results = await Promise.allSettled([run(), run()]);
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(String(rejected[0]!.reason)).toMatch(/Insufficient AI credits/);
+    expect(state.requests).toBe(1);
+    expect(await balance(owner.tenantId)).toBe(1);
+    expect((await moves(owner.tenantId)).map((r) => [r.reason, r.delta])).toEqual([['usage:M18', -price]]);
+    expect(await admin!.leadEligibilityReport.count({ where: { tenantId: owner.tenantId } })).toBe(1);
   }, 30_000);
 });

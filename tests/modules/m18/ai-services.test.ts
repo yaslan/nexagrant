@@ -9,8 +9,8 @@ import {
 } from '@/modules/m18/server/enrichment';
 import {
   approveEligibilityReport,
+  createEligibilityReport,
   describeCall,
-  draftEligibilityReport,
   releasableReport,
 } from '@/modules/m18/server/eligibility';
 import { formatDealBriefContext } from '@/core/contracts/deal-brief-context';
@@ -36,6 +36,13 @@ const org: EnrichmentSubject = {
 
 function completion(text: string): LlmCompletion {
   return { text, inputTokens: 10, outputTokens: 10, credits: 1, provider: 'anthropic', model: 'stub-model', stopReason: 'end_turn' };
+}
+
+/** The credit boundary stubbed: reserve hands out a refId, release records what was given back. */
+function creditStub(credits = 1) {
+  const reserve = vi.fn(async (_tenantId: string, purpose: string) => ({ refId: `ref:${purpose}`, credits }));
+  const release = vi.fn(async (_tenantId: string, _refId: string) => {});
+  return { reserve, release };
 }
 
 const PAGES = { ok: true as const, pages: [{ url: 'https://acme.com.tr/', text: 'Acme Teknoloji A.Ş.' }], skipped: [] };
@@ -80,23 +87,56 @@ describe('proposeEnrichment', () => {
     expect(fetchSite).not.toHaveBeenCalled();
     expect(generate).not.toHaveBeenCalled();
   });
-  it('site not readable → no model call (no credit used)', async () => {
+  it('site not readable → no reservation, no model call (no credit used)', async () => {
     const generate = vi.fn();
+    const credits = creditStub();
     const res = await proposeEnrichment(
       { tenantId: 't1', userId: 'u1', org, locale: 'tr' },
-      { fetchSite: async () => ({ ok: false, reason: 'robots_disallow' }), generate },
+      { fetchSite: async () => ({ ok: false, reason: 'robots_disallow' }), generate, credits },
     );
     expect(res).toEqual({ ok: false, code: 'SITE_UNAVAILABLE', reason: 'robots_disallow' });
     expect(generate).not.toHaveBeenCalled();
+    expect(credits.reserve).not.toHaveBeenCalled();
   });
-  it('calls llm.ts as M18:enrich-organization, the page text only in the data fence', async () => {
+  it('reserves M18:enrich-organization, then calls llm.ts as the free attempt; the page text only in the data fence', async () => {
     const generate = vi.fn(async (_opts: unknown) => completion('{"legalName":"Acme Teknoloji A.Ş.","sources":["https://acme.com.tr/"]}'));
-    const res = await proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'en' }, { fetchSite: async () => PAGES, generate });
-    expect(res.ok).toBe(true);
+    const credits = creditStub(1);
+    const res = await proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'en' }, { fetchSite: async () => PAGES, generate, credits });
+    expect(res).toMatchObject({ ok: true, credits: 1 });
+    expect(credits.reserve).toHaveBeenCalledWith('t1', 'enrich-organization');
+    expect(credits.reserve.mock.invocationCallOrder[0]!).toBeLessThan(generate.mock.invocationCallOrder[0]!);
+    expect(credits.release).not.toHaveBeenCalled();
     const opts = generate.mock.calls[0]![0] as { module: string; purpose: string; tenantId: string; system: string; prompt: string };
-    expect(opts).toMatchObject({ module: 'M18', purpose: 'enrich-organization', tenantId: 't1' });
+    expect(opts).toMatchObject({ module: 'M18', purpose: 'enrich-organization-attempt', tenantId: 't1', creditsReserved: true });
     expect(opts.system).not.toContain('Acme Teknoloji');
     expect(opts.prompt).toContain('<user_data field="pages">');
+  });
+  it('an answer with no JSON is BAD_ANSWER and gives the reservation back', async () => {
+    const generate = vi.fn(async (_opts: unknown) => completion('sorry'));
+    const credits = creditStub();
+    const res = await proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite: async () => PAGES, generate, credits });
+    expect(res).toEqual({ ok: false, code: 'BAD_ANSWER' });
+    expect(credits.release).toHaveBeenCalledWith('t1', 'ref:enrich-organization');
+  });
+  it('a failed model call rethrows and gives the reservation back', async () => {
+    const generate = vi.fn(async () => {
+      throw new Error('provider down');
+    });
+    const credits = creditStub();
+    await expect(
+      proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite: async () => PAGES, generate, credits }),
+    ).rejects.toThrow(/provider down/);
+    expect(credits.release).toHaveBeenCalledTimes(1);
+  });
+  it('refused credits → no model call', async () => {
+    const generate = vi.fn();
+    const reserve = vi.fn(async () => {
+      throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
+    });
+    await expect(
+      proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite: async () => PAGES, generate, credits: { reserve } }),
+    ).rejects.toThrow(/Insufficient AI credits/);
+    expect(generate).not.toHaveBeenCalled();
   });
 });
 
@@ -140,11 +180,38 @@ describe('eligibility pre-report', () => {
     expect(text).toContain('eligibleApplicantTypes: not recorded');
     expect(text).toContain('cofinancingRate: not recorded');
   });
-  it('calls llm.ts as M18:eligibility-pre-report and keeps the model name', async () => {
+  it('reserves M18:eligibility-pre-report, calls the free attempt and saves the DRAFT with the model name', async () => {
     const generate = vi.fn(async (_opts: unknown) => completion('### Özet\nBelirsiz.'));
-    const draft = await draftEligibilityReport({ tenantId: 't1', userId: 'u1', subject, locale: 'tr' }, { generate });
-    expect(generate.mock.calls[0]![0]).toMatchObject({ module: 'M18', purpose: 'eligibility-pre-report' });
-    expect(draft).toEqual({ content: '### Özet\nBelirsiz.', model: 'stub-model', credits: 1 });
+    const credits = creditStub(2);
+    const save = vi.fn(async (_input: unknown) => ({ id: 'r1' }));
+    const saved = await createEligibilityReport({ tenantId: 't1', userId: 'u1', subject, locale: 'tr' }, { generate, credits, save });
+    expect(credits.reserve).toHaveBeenCalledWith('t1', 'eligibility-pre-report');
+    expect(generate.mock.calls[0]![0]).toMatchObject({ module: 'M18', purpose: 'eligibility-pre-report-attempt', creditsReserved: true });
+    expect(save).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      callId: 'call-1',
+      userId: 'u1',
+      locale: 'tr',
+      draft: { content: '### Özet\nBelirsiz.', model: 'stub-model' },
+    });
+    expect(saved).toEqual({ id: 'r1', credits: 2 });
+    expect(credits.release).not.toHaveBeenCalled();
+  });
+  it('a DRAFT that cannot be saved gives the reservation back', async () => {
+    const credits = creditStub(2);
+    await expect(
+      createEligibilityReport(
+        { tenantId: 't1', userId: 'u1', subject, locale: 'tr' },
+        {
+          generate: async () => completion('x'),
+          credits,
+          save: async () => {
+            throw new Error('write failed');
+          },
+        },
+      ),
+    ).rejects.toThrow(/write failed/);
+    expect(credits.release).toHaveBeenCalledWith('t1', 'ref:eligibility-pre-report');
   });
   it('approval moves DRAFT → APPROVED only, with the approver', async () => {
     const updateMany = vi.fn(async () => ({ count: 1 }));
@@ -154,11 +221,15 @@ describe('eligibility pre-report', () => {
     expect(arg.where).toEqual({ id: 'r1', tenantId: 't1', deletedAt: null, status: 'DRAFT' });
     expect(arg.data).toMatchObject({ status: 'APPROVED', approvedByUserId: 'u9' });
   });
-  it('an empty model answer is not a report: it throws, so no empty DRAFT is saved', async () => {
+  it('an empty model answer is not a report: it throws, no DRAFT is saved, the reservation is given back', async () => {
     const generate = vi.fn(async (_opts: unknown) => completion('   \n  '));
-    await expect(draftEligibilityReport({ tenantId: 't1', userId: 'u1', subject, locale: 'tr' }, { generate })).rejects.toThrow(
+    const credits = creditStub(2);
+    const save = vi.fn();
+    await expect(createEligibilityReport({ tenantId: 't1', userId: 'u1', subject, locale: 'tr' }, { generate, credits, save })).rejects.toThrow(
       /empty eligibility pre-report/,
     );
+    expect(save).not.toHaveBeenCalled();
+    expect(credits.release).toHaveBeenCalledWith('t1', 'ref:eligibility-pre-report');
   });
   it('no call → no releasable report, and the table is not even read (NG-136 review)', async () => {
     const findFirst = vi.fn(async () => ({ id: 'r-other-call', callId: 'call-9', content: 'x', approvedAt: new Date() }));

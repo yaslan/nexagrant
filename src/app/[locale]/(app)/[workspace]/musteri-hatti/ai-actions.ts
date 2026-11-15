@@ -13,12 +13,11 @@ import {
 } from '@/modules/m18/server/enrichment';
 import {
   approveEligibilityReport,
-  draftEligibilityReport,
+  createEligibilityReport,
   EmptyEligibilityAnswerError,
   eligibilityRequestSchema,
   loadEligibilitySubject,
   reportIdSchema,
-  saveEligibilityDraft,
 } from '@/modules/m18/server/eligibility';
 import { z } from 'zod';
 
@@ -27,7 +26,8 @@ import { z } from 'zod';
  * read-only plan grant may look, not spend credits or write; NG-136 review) → session +
  * writable + `client_pipeline_write` (every AI action spends the tenant's credits, so none is a
  * read) → tenant-bound repo call. The model is reached only through src/lib/llm.ts, OUTSIDE the
- * tenant transaction (llm.ts takes its own for the credit lock).
+ * tenant transaction. The price is reserved under the tenant credit lock before the model call and
+ * given back when the action delivers nothing (m18/server/ai-credits.ts, NG-136 K-582507 = A).
  *
  * Nothing the model writes is stored without a person: enrichment returns a proposal and writes
  * only on `applyEnrichmentAction`; the eligibility pre-report is saved as a DRAFT and leaves M18
@@ -49,7 +49,8 @@ function failure(e: unknown): { ok: false; code: AiActionCode } {
   if (name === 'ZodError') return { ok: false, code: 'INVALID' };
   // The model answered with no text: nothing is saved (NG-136 review).
   if (e instanceof EmptyEligibilityAnswerError) return { ok: false, code: 'BAD_ANSWER' };
-  // llm.ts refuses before the provider when the balance cannot cover the price (FO-288).
+  // The reservation (ai-credits.ts, same message as llm.ts) refuses before the provider when the
+  // balance cannot cover the price.
   if (e instanceof Error && /Insufficient AI credits/.test(e.message)) return { ok: false, code: 'NO_CREDITS' };
   return { ok: false, code: 'FAILED' };
 }
@@ -99,10 +100,7 @@ export async function generateEligibilityReportAction(input: unknown): Promise<A
     );
     if (!subject) return { ok: false, code: 'NOT_FOUND' };
     const locale = await promptLocale();
-    const draft = await draftEligibilityReport({ tenantId: scope.tenantId, userId: scope.userId, subject, locale });
-    const saved = await withTenant(scope.tenantId, (tx) =>
-      saveEligibilityDraft(tx, scope.tenantId, { organizationId, callId, userId: scope.userId, locale, draft }),
-    );
+    const saved = await createEligibilityReport({ tenantId: scope.tenantId, userId: scope.userId, subject, locale });
     revalidatePath('/', 'layout');
     return { ok: true, data: { id: saved.id } };
   } catch (e) {

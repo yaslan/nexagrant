@@ -1,20 +1,23 @@
 import { z } from 'zod';
-import type { TenantTx } from '@/lib/db';
+import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
 import { separatedPrompt } from '@/lib/ai/prompts';
 import { generateCompletion, type LlmCompletion, type LlmGenerateOptions } from '@/lib/llm';
+import { attemptPurpose, withM18Reservation, type M18CreditDeps } from './ai-credits';
 
 /**
  * M18-F5 (NG-136) — eligibility pre-report: one LeadOrganization × one Call.
  *
  * An INTERNAL pre-assessment ("iç ön değerlendirme"), never an official score: the prompt forbids
  * scores and every screen that shows it carries the label. The model is reached only through
- * `src/lib/llm.ts` (M18:eligibility-pre-report — AiUsageLog + credit). The text is stored as a DRAFT
- * report; only an APPROVED one may leave M18 (`releasableReport`, the deal-brief contract).
+ * `src/lib/llm.ts`. The text is stored as a DRAFT report; only an APPROVED one may leave M18
+ * (`releasableReport`, the deal-brief contract).
  *
- * The model call runs OUTSIDE any tenant transaction (llm.ts opens its own for the credit lock);
- * the caller loads the subject in one `withTenant`, calls `draftEligibilityReport`, and saves the
- * result in another.
+ * Credit (NG-136, K-582507 = A — the M17 pattern, ai-credits.ts): `createEligibilityReport` reserves the
+ * price of M18:eligibility-pre-report under the tenant lock, the model call is the free
+ * M18:eligibility-pre-report-attempt (AiUsageLog, 0 credits), and the reservation is given back when no
+ * DRAFT is saved — an empty answer, a failed model call, or a failed write. The model call runs OUTSIDE
+ * any tenant transaction; the caller loads the subject in one `withTenant` and passes it in.
  */
 
 export const ELIGIBILITY_MODULE = 'M18';
@@ -130,9 +133,16 @@ export function describeCall(call: EligibilitySubject['call']): string {
   return lines.join('\n');
 }
 
-export type EligibilityDeps = { generate?: (options: LlmGenerateOptions) => Promise<LlmCompletion> };
+export type EligibilityDeps = {
+  generate?: (options: LlmGenerateOptions) => Promise<LlmCompletion>;
+  credits?: M18CreditDeps;
+  /** Writes the DRAFT; defaults to `saveEligibilityDraft` in its own tenant transaction. */
+  save?: (input: SaveDraftInput) => Promise<{ id: string }>;
+};
 
-export type EligibilityDraft = { content: string; model: string; credits: number };
+export type EligibilityDraft = { content: string; model: string };
+
+type SaveDraftInput = { organizationId: string; callId: string; userId: string; locale: string; draft: EligibilityDraft };
 
 /** The model's answer had no text: there is no report to save (NG-136 review — never an empty DRAFT). */
 export class EmptyEligibilityAnswerError extends Error {
@@ -143,12 +153,12 @@ export class EmptyEligibilityAnswerError extends Error {
 }
 
 /**
- * Asks the model for the pre-report. Throws what llm.ts throws (credits, provider, truncation), and
- * {@link EmptyEligibilityAnswerError} when the answer has no text, so no empty DRAFT is ever saved.
+ * The model step alone, inside a reservation the caller holds. Throws what llm.ts throws (provider,
+ * truncation), and {@link EmptyEligibilityAnswerError} when the answer has no text.
  */
-export async function draftEligibilityReport(
+async function draftEligibilityReport(
   input: { tenantId: string; userId: string; subject: EligibilitySubject; locale: string },
-  deps: EligibilityDeps = {},
+  generate: (options: LlmGenerateOptions) => Promise<LlmCompletion>,
 ): Promise<EligibilityDraft> {
   const request = separatedPrompt(
     'm18/eligibility-pre-report',
@@ -156,16 +166,42 @@ export async function draftEligibilityReport(
     { organization: describeOrganization(input.subject.org), call: describeCall(input.subject.call) },
     input.locale,
   );
-  const completion = await (deps.generate ?? generateCompletion)({
+  const completion = await generate({
     tenantId: input.tenantId,
     userId: input.userId,
     module: ELIGIBILITY_MODULE,
-    purpose: ELIGIBILITY_PURPOSE,
+    purpose: attemptPurpose(ELIGIBILITY_PURPOSE),
+    // The price was reserved by createEligibilityReport; llm.ts logs this call at 0 credits.
+    creditsReserved: true,
     ...request,
   });
   const content = completion.text.trim().slice(0, MAX_REPORT_CHARS);
   if (!content) throw new EmptyEligibilityAnswerError();
-  return { content, model: completion.model, credits: completion.credits };
+  return { content, model: completion.model };
+}
+
+/**
+ * Reserve → model → save the DRAFT. Throws {@link InsufficientAiCreditsError} (llm.ts's message) before
+ * any provider is reached when the balance does not cover the price; every later throw refunds the
+ * reservation first. Returns the saved report and the credits it cost.
+ */
+export async function createEligibilityReport(
+  input: { tenantId: string; userId: string; subject: EligibilitySubject; locale: string },
+  deps: EligibilityDeps = {},
+): Promise<{ id: string; credits: number }> {
+  const { tenantId, userId, subject, locale } = input;
+  const save =
+    deps.save ?? ((data: SaveDraftInput) => withTenant(tenantId, (tx) => saveEligibilityDraft(tx, tenantId, data)));
+  return withM18Reservation(
+    tenantId,
+    ELIGIBILITY_PURPOSE,
+    async ({ credits }) => {
+      const draft = await draftEligibilityReport(input, deps.generate ?? generateCompletion);
+      const saved = await save({ organizationId: subject.org.id, callId: subject.call.id, userId, locale, draft });
+      return { keep: true, value: { id: saved.id, credits } };
+    },
+    deps.credits,
+  );
 }
 
 export const REPORT_SELECT = {
@@ -182,7 +218,7 @@ export const REPORT_SELECT = {
 export async function saveEligibilityDraft(
   tx: TenantTx,
   tenantId: string,
-  input: { organizationId: string; callId: string; userId: string; locale: string; draft: EligibilityDraft },
+  input: SaveDraftInput,
 ) {
   return tx.leadEligibilityReport.create({
     data: {

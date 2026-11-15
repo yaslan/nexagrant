@@ -195,7 +195,8 @@ describe('M17 Interreg pre-assessment prompts (tr + en)', () => {
 /**
  * NG-136 (M18-F5) — enrichment and the eligibility pre-report were written with their prompts in
  * place, in both locales. Driven through the real call sites (`proposeEnrichment`,
- * `draftEligibilityReport`) up to `@/lib/llm`; the site fetch is a stub, no network.
+ * `createEligibilityReport`) up to `@/lib/llm`; the site fetch, the credit reservation and the DRAFT
+ * write are stubs, no network, no database.
  */
 describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
   const org = {
@@ -209,6 +210,8 @@ describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
     themes: [],
     sectorCodes: [],
   };
+  // `@/lib/llm` is mocked whole here, so the reservation (ai-credits.ts) is stubbed at its seam.
+  const credits = { reserve: async () => ({ refId: 'ref-1', credits: 1 }), release: async () => {} };
 
   test.each(['en', 'tr'] as const)('enrich-organization — %s', async (locale) => {
     const { proposeEnrichment } = await import('@/modules/m18/server/enrichment');
@@ -221,6 +224,7 @@ describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
             pages: [{ url: 'https://anadolu-sensor.example.com.tr/', text: 'Anadolu Sensör A.Ş. — Ankara, Çankaya. 40 çalışan.' }],
             skipped: [],
           }),
+          credits,
         },
       ),
     );
@@ -228,7 +232,7 @@ describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
   });
 
   test.each(['en', 'tr'] as const)('eligibility-pre-report — %s', async (locale) => {
-    const { draftEligibilityReport } = await import('@/modules/m18/server/eligibility');
+    const { createEligibilityReport } = await import('@/modules/m18/server/eligibility');
     const subject = {
       org: { ...org, orgType: 'SME', nuts2: 'TR51', themes: ['sensors'], sectorCodes: ['C26.5'] },
       call: {
@@ -242,7 +246,9 @@ describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
         topics: [],
       },
     };
-    const arg = await captureFrom(() => draftEligibilityReport({ tenantId: 'tenant-1', userId: 'user-1', subject, locale }));
+    const arg = await captureFrom(() =>
+      createEligibilityReport({ tenantId: 'tenant-1', userId: 'user-1', subject, locale }, { credits, save: async () => ({ id: 'r-1' }) }),
+    );
     expect(promptOf(arg)).toMatchSnapshot();
   });
 });
