@@ -549,13 +549,17 @@ function readStartTag(s: string, lower: string, at: number): { href: string | nu
 }
 
 /**
- * Up to `limit` same-site links whose path or text looks like an about/contact page. One forward
- * scan: at most MAX_ANCHORS anchors are read, and a label ends at `</a>`, at the next `<a`, or after
+ * Up to `limit` same-site links whose path or text looks like an about/contact page, outside comments
+ * and hidden elements. One forward scan: at most MAX_ANCHORS anchors are read, and a label ends at `</a>`, at the next `<a`, or after
  * MAX_LABEL_CHARS characters, whichever comes first.
  */
-export function pickSubpages(html: string, base: URL, limit = MAX_PAGES - 1): URL[] {
+export function pickSubpages(rawHtml: string, base: URL, limit = MAX_PAGES - 1): URL[] {
   const picked: URL[] = [];
   const seen = new Set<string>([base.origin + base.pathname]);
+  // NG-202 (B4): links are read from the same markup the text is — comments and hidden elements
+  // (<script>, <style>, <template>, <noscript>, …) gone first, so a link a script only writes as a
+  // string, or one inside an unclosed <script>, is no candidate. Both passes are linear (above).
+  const html = stripHidden(stripComments(rawHtml));
   const lower = lowerAscii(html);
   let from = 0;
   for (let anchors = 0; anchors < MAX_ANCHORS && picked.length < limit; ) {
