@@ -3990,7 +3990,7 @@
       "idle": "Sol taraftan arama yaptığınızda LLM modeline gönderilen RAG bağlam metni burada görüntülenecektir."
     },
     "header": {
-      "kicker": "K2 CORDIS Ingestion & M1 Partner Intelligence Console",
+      "kicker": "K2 CORDIS Veri Alımı ve M1 Partner İstihbarat Konsolu",
       "title": "K2 CORDIS Katmanı Yönetim Paneli",
       "description": "Horizon Europe ve H2020 fonlanmış proje/ortaklık sonuç verilerini çeker, M1 Partner Intelligence modülünü besler.",
       "license": "CORDIS CC BY 4.0",
@@ -4033,7 +4033,7 @@
       "run": "CORDIS Senkronizasyonunu Başlat",
       "busy": "Veriler İşleniyor...",
       "done": "✓ CORDIS Veri Senkronizasyonu Başarıyla Tamamlandı!",
-      "totals": "İşlenen Proje Sayısı: {count} — Toplam Hibe: €{total}",
+      "totals": "İşlenen Proje Sayısı: {count} — Toplam Hibe: {total}",
       "olapTitle": "Ülke Bazlı Hibe & Proje Dağılımı (OLAP Aggregation)",
       "colCountry": "Ülke",
       "colProjects": "Proje Sayısı",
@@ -5537,6 +5537,29 @@
     "auditTrails": "Denetim İzleri",
     "footerProductName": "Platform Yönetim Konsolu",
     "footerVersionLabel": "v1.1.0"
+  },
+  "adminNav": {
+    "modulesLabel": "Modül Yönetimi",
+    "modulesDesc": "OFF, DEV, PILOT, ON geçişleri",
+    "tenantsLabel": "Kiracı Hesapları",
+    "tenantsDesc": "Kurum ve üye yönetimi",
+    "billingLabel": "Faturalama & Planlar",
+    "billingDesc": "Stripe paketleri & limitler",
+    "feedbackLabel": "Geri Bildirim Triyajı",
+    "feedbackDesc": "Beta kayıtları, P0–P3 önceliklendirme",
+    "alertsLabel": "Sistem Uyarıları",
+    "alertsDesc": "Hata ve geri bildirim uyarıları, çözüldü takibi",
+    "topicStatsLabel": "Taban Oranlar (K3)",
+    "topicStatsDesc": "Horizon Dashboard xlsx → TopicStat",
+    "documentsLabel": "Belgeler (K6 RAG)",
+    "documentsDesc": "Çalışma programı PDF → paylaşılan RAG",
+    "interregLabel": "Interreg & keep.eu",
+    "auditLabel": "Denetim Kayıtları",
+    "auditDesc": "Sistem olay geçmişi",
+    "blogLabel": "Blog Yönetimi",
+    "blogDesc": "İçerik, makale ve duyuru CRUD",
+    "settingsLabel": "Sistem Ayarları",
+    "settingsDesc": "Küresel konfigürasyon"
   },
   "adminAudit": {
     "title": "Denetim Kayıtları",

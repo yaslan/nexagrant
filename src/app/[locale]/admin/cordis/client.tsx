@@ -428,10 +428,10 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                     ) : (
                       <p>
                         {t('k2.importCounts', {
-                          projects: importResult.rowCounts?.projects ?? 0,
-                          organizations: importResult.rowCounts?.organizations ?? 0,
-                          participations: importResult.rowCounts?.participations ?? 0,
-                          durationMs: importResult.importDurationMs ?? 0,
+                          projects: importResult.rowCounts?.projects ?? '—',
+                          organizations: importResult.rowCounts?.organizations ?? '—',
+                          participations: importResult.rowCounts?.participations ?? '—',
+                          durationMs: importResult.importDurationMs ?? '—',
                         })}
                       </p>
                     )}
@@ -486,7 +486,10 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
               <p className="font-mono text-[11px]">
                 {t('sync.totals', {
                   count: syncResult.syncedProjectsCount,
-                  total: syncResult.totalEcContributionEUR?.toLocaleString() ?? '',
+                  total:
+                    syncResult.totalEcContributionEUR == null
+                      ? '—'
+                      : `€${syncResult.totalEcContributionEUR.toLocaleString()}`,
                 })}
               </p>
             </div>
@@ -574,8 +577,8 @@ export function CordisRagAdminClient({ metrics: initialMetrics, initialK2Status 
                     <div className="flex items-center justify-between text-[11px] text-muted font-mono pt-1">
                       <span>
                         {t('delta.coordinator', {
-                          name: p.coordinatorName ?? '',
-                          country: p.coordinatorCountry ?? '',
+                          name: p.coordinatorName ?? '—',
+                          country: p.coordinatorCountry ?? '—',
                         })}
                       </span>
                       <span className="bg-surface-hover px-1.5 py-0.5 rounded text-[10px] font-bold text-ink-2">{p.topicCode}</span>
