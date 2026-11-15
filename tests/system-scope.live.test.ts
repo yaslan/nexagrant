@@ -318,7 +318,7 @@ describe('a forged system scope opens nothing', () => {
     if (!ready) return ctx.skip(skipReason);
     await asApp(async (c) => {
       await expect(c.query('SELECT secret FROM fabrika_private.system_scope_key')).rejects.toThrow(/permission denied/i);
-      await expect(c.query('SELECT fabrika_private.system_scope_seal()')).rejects.toThrow(/permission denied/i);
+      await expect(c.query('SELECT fabrika_private.system_scope_seal(\'platform-admin\')')).rejects.toThrow(/permission denied/i);
     });
   });
 });
@@ -494,5 +494,138 @@ describe('expert-directory reads verified expert rows and nothing else', () => {
     expect(seen.memberships).toBe(0);
     expect(seen.updated).toBe(0);
     expect(seen.write).toMatch(/row-level security/i);
+  });
+});
+
+/**
+ * NG-187 (SEC NG-185 F-2) — the seal binds the purpose. `app.system_scope_purpose` is USERSET,
+ * so the app role can `SET LOCAL` it after enter_system_scope(). Before NG-187 the seal covered
+ * only secret | pid | transaction_timestamp, the new purpose took effect, and an
+ * 'expert-directory' scope read every expert row (pending and disabled too) and updated one.
+ * Now the seal is computed over the purpose: a changed purpose breaks it and the sealed branch
+ * opens nothing. Calling enter_system_scope(<other purpose>) is still the legitimate switch.
+ * Fixture rows are written by public-intake in the same transaction and rolled back.
+ */
+describe('NG-187: the seal binds the purpose, a later purpose change opens nothing', () => {
+  const insert = `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+     VALUES ($1, 'probe', $1 || '@system-scope.test', '06', true, '{}', '{researcher}', '{horizon-europe-h2020}', '{}', now(), now(), 'tr', $2)`;
+  const ids = (tag: string) => ({ verified: `epr-seal-v-${tag}-${RUN}`, pending: `epr-seal-p-${tag}-${RUN}` });
+  const expertRows = async (c: pg.Client, wanted: string[]): Promise<string[]> =>
+    (await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = ANY($1) ORDER BY id`, [wanted])).rows.map((r) => r.id);
+  const sealed = async (c: pg.Client): Promise<boolean> =>
+    (await c.query<{ s: boolean }>('SELECT public.system_scope_sealed() AS s')).rows[0]?.s === true;
+  const tryWrite = async (c: pg.Client, sql: string, params: unknown[]): Promise<number | string> => {
+    await c.query('SAVEPOINT w');
+    try {
+      return (await c.query(sql, params)).rowCount ?? 0;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    } finally {
+      await c.query('ROLLBACK TO SAVEPOINT w');
+    }
+  };
+
+  test("the F-2 reproduction: expert-directory, then SET LOCAL purpose = 'platform-admin' reads 0 and updates 0", async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const { verified, pending } = ids('f2');
+    // rls-verify-system-scope-policy-set.live swaps expert_directory out under this lock.
+    const seen = await withTestDbLock(ADMIN_URL!, EXPERT_DIRECTORY_POLICY_LOCK, () =>
+      asApp(async (c) => {
+        await c.query('BEGIN');
+        try {
+          await c.query(`SELECT enter_system_scope('public-intake')`);
+          await c.query(insert, [verified, 'verified']);
+          await c.query(insert, [pending, 'pending']);
+          await c.query(`SELECT enter_system_scope('expert-directory')`);
+          const before = await expertRows(c, [verified, pending]);
+          await c.query(`SET LOCAL app.system_scope_purpose = 'platform-admin'`);
+          const purpose = (await c.query<{ p: string }>(`SELECT current_setting('app.system_scope_purpose') AS p`)).rows[0]?.p;
+          const after = await expertRows(c, [verified, pending]);
+          const memberships = await fixtureCount(c);
+          const updated = await tryWrite(c, `UPDATE "ExpertPreRegistration" SET "fullName" = 'elevated' WHERE id = ANY($1)`, [[verified, pending]]);
+          const audit = await tryWrite(c, `INSERT INTO "AuditEvent" (id, "tenantId", type) VALUES ($1, NULL, 'ng187.test')`, [`ae-seal-${RUN}`]);
+          return { before, purpose, after, memberships, updated, audit, sealedAfter: await sealed(c) };
+        } finally {
+          await c.query('ROLLBACK');
+        }
+      })
+    );
+    expect(seen.before).toEqual([verified]); // control: the legitimate expert-directory read
+    expect(seen.purpose).toBe('platform-admin'); // the GUC really changed; only the seal refuses it
+    expect(seen.sealedAfter).toBe(false);
+    expect(seen.after).toEqual([]);
+    expect(seen.memberships).toBe(0);
+    expect(seen.updated).toBe(0);
+    expect(seen.audit).toMatch(/row-level security/i);
+  });
+
+  test('for every purpose, changing the purpose after the seal (to any other purpose or empty) opens nothing', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const { verified, pending } = ids('all');
+    const result = await withTestDbLock(ADMIN_URL!, EXPERT_DIRECTORY_POLICY_LOCK, () =>
+      asApp(async (c) => {
+        await c.query('BEGIN');
+        try {
+          await c.query(`SELECT enter_system_scope('public-intake')`);
+          await c.query(insert, [verified, 'verified']);
+          await c.query(insert, [pending, 'pending']);
+          const legit: Record<string, { sealed: boolean; experts: number; memberships: number }> = {};
+          const leaks: string[] = [];
+          for (const p of SYSTEM_SCOPE_PURPOSES) {
+            await c.query('SELECT enter_system_scope($1)', [p]);
+            legit[p] = { sealed: await sealed(c), experts: (await expertRows(c, [verified, pending])).length, memberships: await fixtureCount(c) };
+            for (const q of [...SYSTEM_SCOPE_PURPOSES.filter((x) => x !== p), '']) {
+              await c.query('SELECT enter_system_scope($1)', [p]);
+              await c.query(`SELECT set_config('app.system_scope_purpose', $1, true)`, [q]);
+              const label = `${p} -> '${q}'`;
+              if (await sealed(c)) leaks.push(`${label}: still sealed`);
+              const experts = await expertRows(c, [verified, pending]);
+              if (experts.length > 0) leaks.push(`${label}: ${experts.length} expert rows`);
+              const m = await fixtureCount(c);
+              if (m !== 0) leaks.push(`${label}: ${m} memberships`);
+              const upd = await tryWrite(c, `UPDATE "ExpertPreRegistration" SET "fullName" = 'elevated' WHERE id = ANY($1)`, [[verified, pending]]);
+              if (upd !== 0) leaks.push(`${label}: UPDATE ${upd}`);
+              const ins = await tryWrite(c, `INSERT INTO "AuditEvent" (id, "tenantId", type) VALUES ($1, NULL, 'ng187.test')`, [`ae-seal-${p}-${q}-${RUN}`]);
+              if (typeof ins !== 'string' || !/row-level security/i.test(ins)) leaks.push(`${label}: AuditEvent INSERT ${ins}`);
+            }
+          }
+          return { legit, leaks };
+        } finally {
+          await c.query('ROLLBACK');
+        }
+      })
+    );
+    expect(result.leaks).toEqual([]);
+    // The legitimate paths are untouched: each purpose still opens what it opened before NG-187.
+    const two = FIXTURE_TENANTS.length;
+    expect(result.legit).toEqual({
+      'tenant-discovery': { sealed: true, experts: 0, memberships: two },
+      'subject-scoped': { sealed: true, experts: 0, memberships: two },
+      'platform-admin': { sealed: true, experts: 2, memberships: two },
+      'platform-aggregate': { sealed: true, experts: 2, memberships: two },
+      'cross-tenant-job': { sealed: true, experts: 2, memberships: two },
+      'public-intake': { sealed: true, experts: 2, memberships: 0 },
+      'expert-directory': { sealed: true, experts: 1, memberships: 0 },
+    });
+  });
+
+  test('the seal is for the purpose it was entered with: setting that purpose back, or entering another one, works', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const seen = await asApp(async (c) => {
+      await c.query('BEGIN');
+      try {
+        await c.query(`SELECT enter_system_scope('platform-admin')`);
+        await c.query(`SET LOCAL app.system_scope_purpose = 'tenant-discovery'`);
+        const changed = await fixtureCount(c);
+        await c.query(`SET LOCAL app.system_scope_purpose = 'platform-admin'`);
+        const restored = await fixtureCount(c);
+        await c.query(`SELECT enter_system_scope('tenant-discovery')`);
+        const reentered = await fixtureCount(c);
+        return { changed, restored, reentered };
+      } finally {
+        await c.query('ROLLBACK');
+      }
+    });
+    expect(seen).toEqual({ changed: 0, restored: FIXTURE_TENANTS.length, reentered: FIXTURE_TENANTS.length });
   });
 });
