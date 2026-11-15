@@ -14,6 +14,7 @@ import {
   releasableReport,
 } from '@/modules/m18/server/eligibility';
 import { formatDealBriefContext } from '@/core/contracts/deal-brief-context';
+import { loadDealBriefContext } from '@/modules/m18/server/deal-brief-context';
 
 /**
  * NG-136 (M18-F5) — enrichment and eligibility services. The model boundary (`generate`) is a stub:
@@ -153,6 +154,19 @@ describe('eligibility pre-report', () => {
     expect(arg.where).toEqual({ id: 'r1', tenantId: 't1', deletedAt: null, status: 'DRAFT' });
     expect(arg.data).toMatchObject({ status: 'APPROVED', approvedByUserId: 'u9' });
   });
+  it('an empty model answer is not a report: it throws, so no empty DRAFT is saved', async () => {
+    const generate = vi.fn(async (_opts: unknown) => completion('   \n  '));
+    await expect(draftEligibilityReport({ tenantId: 't1', userId: 'u1', subject, locale: 'tr' }, { generate })).rejects.toThrow(
+      /empty eligibility pre-report/,
+    );
+  });
+  it('no call → no releasable report, and the table is not even read (NG-136 review)', async () => {
+    const findFirst = vi.fn(async () => ({ id: 'r-other-call', callId: 'call-9', content: 'x', approvedAt: new Date() }));
+    const t = { leadEligibilityReport: { findFirst } } as unknown as TenantTx;
+    expect(await releasableReport(t, 't1', 'org-1', null)).toBeNull();
+    expect(await releasableReport(t, 't1', 'org-1', '')).toBeNull();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
   it('only an APPROVED report is releasable', async () => {
     const findFirst = vi.fn(async () => null);
     const t = { leadEligibilityReport: { findFirst } } as unknown as TenantTx;
@@ -163,6 +177,36 @@ describe('eligibility pre-report', () => {
 });
 
 describe('deal brief context contract', () => {
+  function dealTx(callId: string | null) {
+    const findFirst = vi.fn(async () => ({ id: 'r1', callId: 'call-1', content: 'approved text', approvedAt: new Date('2026-11-10T09:00:00Z') }));
+    const tx = {
+      deal: {
+        findFirst: vi.fn(async () => ({
+          title: 'Deal',
+          stage: 'PROPOSAL',
+          callId,
+          organizationId: 'org-1',
+          organization: { name: 'Acme', orgType: 'SME', provinceCode: '06', sizeBand: null, themes: [], deletedAt: null },
+          call: callId ? { callIdentifier: 'DIGITAL-2026-SME-01', title: 'Digital SMEs' } : null,
+        })),
+      },
+      leadEligibilityReport: { findFirst },
+    } as unknown as TenantTx;
+    return { tx, findFirst };
+  }
+  it('a deal without a call gets no approved pre-assessment (not one of another call)', async () => {
+    const { tx, findFirst } = dealTx(null);
+    const ctx = await loadDealBriefContext(tx, 't1', 'deal-1');
+    expect(ctx?.approvedEligibility).toBeNull();
+    expect(findFirst).not.toHaveBeenCalled();
+  });
+  it('a deal with a call gets only that call\'s approved report', async () => {
+    const { tx, findFirst } = dealTx('call-1');
+    const ctx = await loadDealBriefContext(tx, 't1', 'deal-1');
+    expect(ctx?.approvedEligibility?.summary).toBe('approved text');
+    const arg = (findFirst.mock.calls[0] as unknown as [{ where: Record<string, unknown> }])[0];
+    expect(arg.where).toMatchObject({ callId: 'call-1', status: 'APPROVED', tenantId: 't1', organizationId: 'org-1' });
+  });
   it('formats organisation and deal facts, labels the pre-assessment, carries no contact data', () => {
     const text = formatDealBriefContext({
       dealTitle: 'Digital SMEs application',

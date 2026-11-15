@@ -134,7 +134,18 @@ export type EligibilityDeps = { generate?: (options: LlmGenerateOptions) => Prom
 
 export type EligibilityDraft = { content: string; model: string; credits: number };
 
-/** Asks the model for the pre-report. Throws what llm.ts throws (credits, provider, truncation). */
+/** The model's answer had no text: there is no report to save (NG-136 review — never an empty DRAFT). */
+export class EmptyEligibilityAnswerError extends Error {
+  constructor() {
+    super('the model returned an empty eligibility pre-report');
+    this.name = 'EmptyEligibilityAnswerError';
+  }
+}
+
+/**
+ * Asks the model for the pre-report. Throws what llm.ts throws (credits, provider, truncation), and
+ * {@link EmptyEligibilityAnswerError} when the answer has no text, so no empty DRAFT is ever saved.
+ */
 export async function draftEligibilityReport(
   input: { tenantId: string; userId: string; subject: EligibilitySubject; locale: string },
   deps: EligibilityDeps = {},
@@ -152,7 +163,9 @@ export async function draftEligibilityReport(
     purpose: ELIGIBILITY_PURPOSE,
     ...request,
   });
-  return { content: completion.text.trim().slice(0, MAX_REPORT_CHARS), model: completion.model, credits: completion.credits };
+  const content = completion.text.trim().slice(0, MAX_REPORT_CHARS);
+  if (!content) throw new EmptyEligibilityAnswerError();
+  return { content, model: completion.model, credits: completion.credits };
 }
 
 export const REPORT_SELECT = {
@@ -205,10 +218,15 @@ export async function approveEligibilityReport(tx: TenantTx, tenantId: string, r
   return res.count === 1;
 }
 
-/** The newest APPROVED report for an organisation (optionally for one call): the only one that may leave M18. */
-export async function releasableReport(tx: TenantTx, tenantId: string, organizationId: string, callId?: string | null) {
+/**
+ * The newest APPROVED report for an organisation AND one call: the only one that may leave M18.
+ * No call, no report (NG-136 review): a deal without a call must not borrow the pre-assessment of
+ * whichever other call the organisation happens to have one for.
+ */
+export async function releasableReport(tx: TenantTx, tenantId: string, organizationId: string, callId: string | null) {
+  if (!isPresentId(tenantId) || !isPresentId(organizationId) || !callId || !isPresentId(callId)) return null;
   return tx.leadEligibilityReport.findFirst({
-    where: { tenantId, organizationId, deletedAt: null, status: 'APPROVED', ...(callId ? { callId } : {}) },
+    where: { tenantId, organizationId, callId, deletedAt: null, status: 'APPROVED' },
     orderBy: [{ approvedAt: 'desc' }, { id: 'asc' }],
     select: { id: true, callId: true, content: true, approvedAt: true },
   });

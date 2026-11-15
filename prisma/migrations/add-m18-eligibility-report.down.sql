@@ -11,7 +11,7 @@
 -- in the same step. Export first if the rows matter, e.g.:
 --   \copy (SELECT * FROM "LeadEligibilityReport") TO 'm18-eligibility-report-backup.csv' CSV HEADER
 --
--- Idempotent: IF EXISTS, a second run is a no-op (the policy goes with its table).
+-- Idempotent: IF EXISTS, a second run is a no-op (the policy and the status CHECK go with the table).
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS "LeadEligibilityReport";

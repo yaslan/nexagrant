@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { withTenant } from '@/lib/db';
-import { assertModuleAccess } from '@/lib/modules/access';
+import { assertModuleWrite } from '@/lib/modules/access';
 import { requireTenantAction } from '@/lib/tenant';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import {
@@ -14,6 +14,7 @@ import {
 import {
   approveEligibilityReport,
   draftEligibilityReport,
+  EmptyEligibilityAnswerError,
   eligibilityRequestSchema,
   loadEligibilitySubject,
   reportIdSchema,
@@ -22,7 +23,8 @@ import {
 import { z } from 'zod';
 
 /**
- * M18-F5 (NG-136) AI actions on the lead detail screen. Each one: module gate → session +
+ * M18-F5 (NG-136) AI actions on the lead detail screen. Each one: module WRITE gate (FO-41: a
+ * read-only plan grant may look, not spend credits or write; NG-136 review) → session +
  * writable + `client_pipeline_write` (every AI action spends the tenant's credits, so none is a
  * read) → tenant-bound repo call. The model is reached only through src/lib/llm.ts, OUTSIDE the
  * tenant transaction (llm.ts takes its own for the credit lock).
@@ -45,6 +47,8 @@ export type AiActionResult<T = undefined> = { ok: true; data?: T } | { ok: false
 function failure(e: unknown): { ok: false; code: AiActionCode } {
   const name = (e as { name?: string } | null)?.name;
   if (name === 'ZodError') return { ok: false, code: 'INVALID' };
+  // The model answered with no text: nothing is saved (NG-136 review).
+  if (e instanceof EmptyEligibilityAnswerError) return { ok: false, code: 'BAD_ANSWER' };
   // llm.ts refuses before the provider when the balance cannot cover the price (FO-288).
   if (e instanceof Error && /Insufficient AI credits/.test(e.message)) return { ok: false, code: 'NO_CREDITS' };
   return { ok: false, code: 'FAILED' };
@@ -57,7 +61,7 @@ export type EnrichmentProposalData = { proposal: EnrichmentProposal; fetchedUrls
 /** Reads ≤5 pages of the organisation's website and returns a proposal. Writes nothing to the record. */
 export async function proposeEnrichmentAction(input: unknown): Promise<AiActionResult<EnrichmentProposalData>> {
   try {
-    await assertModuleAccess('M18');
+    await assertModuleWrite('M18');
     const scope = await requireTenantAction({ can: 'client_pipeline_write' });
     const { organizationId } = organizationIdSchema.parse(input);
     const org = await withTenant(scope.tenantId, (tx) => loadEnrichmentSubject(tx, scope.tenantId, organizationId));
@@ -73,7 +77,7 @@ export async function proposeEnrichmentAction(input: unknown): Promise<AiActionR
 /** Writes only the proposal fields the user ticked. */
 export async function applyEnrichmentAction(input: unknown): Promise<AiActionResult> {
   try {
-    await assertModuleAccess('M18');
+    await assertModuleWrite('M18');
     const scope = await requireTenantAction({ can: 'client_pipeline_write' });
     const applied = await withTenant(scope.tenantId, (tx) => applyEnrichment(tx, scope.tenantId, input));
     if (!applied) return { ok: false, code: 'NOT_FOUND' };
@@ -87,7 +91,7 @@ export async function applyEnrichmentAction(input: unknown): Promise<AiActionRes
 /** Generates the internal eligibility pre-report and saves it as a DRAFT. */
 export async function generateEligibilityReportAction(input: unknown): Promise<AiActionResult<{ id: string }>> {
   try {
-    await assertModuleAccess('M18');
+    await assertModuleWrite('M18');
     const scope = await requireTenantAction({ can: 'client_pipeline_write' });
     const { organizationId, callId } = eligibilityRequestSchema.parse(input);
     const subject = await withTenant(scope.tenantId, (tx) =>
@@ -109,7 +113,7 @@ export async function generateEligibilityReportAction(input: unknown): Promise<A
 /** DRAFT → APPROVED by the signed-in user: from now on the report may leave M18. */
 export async function approveEligibilityReportAction(input: unknown): Promise<AiActionResult> {
   try {
-    await assertModuleAccess('M18');
+    await assertModuleWrite('M18');
     const scope = await requireTenantAction({ can: 'client_pipeline_write' });
     const { reportId } = reportIdSchema.parse(input);
     const approved = await withTenant(scope.tenantId, (tx) =>

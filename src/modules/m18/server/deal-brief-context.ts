@@ -19,7 +19,8 @@ export async function loadDealBriefContext(tx: TenantTx, tenantId: string, dealI
     },
   });
   if (!deal || deal.organization.deletedAt) return null;
-  const report = await releasableReport(tx, tenantId, deal.organizationId, deal.callId);
+  // A deal with no call gets no pre-assessment: a report is always about one call (NG-136 review).
+  const report = deal.callId ? await releasableReport(tx, tenantId, deal.organizationId, deal.callId) : null;
   const org = deal.organization;
   return {
     dealTitle: deal.title,

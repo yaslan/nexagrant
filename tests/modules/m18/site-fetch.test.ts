@@ -1,6 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { slack } from '../../helpers/timing';
 import {
+  createPinnedFetch,
   fetchOrganizationSite,
+  MAX_ROBOTS_PATTERN_CHARS,
+  MAX_ROBOTS_RULES,
   htmlToText,
   isPublicAddress,
   MAX_PAGES,
@@ -57,6 +63,9 @@ describe('normaliseSiteUrl', () => {
     'http://user:pw@acme.com.tr',
     'http://acme.com.tr:8080',
     'http://router.local',
+    'https://localhost./',
+    'http://intranet./',
+    'http://router.local./',
     'javascript:alert(1)',
     '',
   ])('refuses %s', (raw) => {
@@ -106,6 +115,29 @@ Disallow: /
     expect(robotsAllows(ours, '/')).toBe(true);
     expect(robotsAllows(ours, '/secret/x')).toBe(false);
   });
+  it('* and $ keep their meaning with the linear matcher', () => {
+    const r = parseRobots('User-agent: *\nDisallow: /*/print$\nDisallow: /a*b*c\nAllow: /a*b*c/ok\n');
+    expect(robotsAllows(r, '/x/y/print')).toBe(false);
+    expect(robotsAllows(r, '/x/y/print/more')).toBe(true);
+    expect(robotsAllows(r, '/a-b-c-d')).toBe(false);
+    expect(robotsAllows(r, '/a-c-b')).toBe(true);
+    expect(robotsAllows(r, '/aXbYc/ok/1')).toBe(true);
+    expect(robotsAllows(r, '/acb')).toBe(true);
+    expect(robotsAllows(parseRobots('User-agent: *\nDisallow: /$\n'), '/')).toBe(false);
+    expect(robotsAllows(parseRobots('User-agent: *\nDisallow: /$\n'), '/a')).toBe(true);
+    expect(robotsAllows(parseRobots('User-agent: *\nDisallow: *\n'), '/anything')).toBe(false);
+    expect(robotsAllows(parseRobots('User-agent: *\nDisallow: /a.b(c)+[d]\n'), '/a.b(c)+[d]/x')).toBe(false);
+    expect(robotsAllows(parseRobots('User-agent: *\nDisallow: /a.b\n'), '/aXb')).toBe(true);
+  });
+  it('ReDoS: a hostile pattern (25 stars, 300-char path) finishes within a wall-clock budget', () => {
+    const pattern = `/${'a*'.repeat(25)}b`;
+    const path = `/${'a'.repeat(299)}`;
+    const rules = parseRobots(`User-agent: *\nDisallow: ${pattern}\n`);
+    const started = performance.now();
+    expect(robotsAllows(rules, path)).toBe(true);
+    expect(robotsAllows(rules, `${path}b`)).toBe(false);
+    expect(performance.now() - started).toBeLessThan(slack(250));
+  });
   it('an empty Disallow allows everything', () => {
     expect(robotsAllows(parseRobots('User-agent: *\nDisallow:\n'), '/anything')).toBe(true);
   });
@@ -117,6 +149,11 @@ describe('htmlToText and pickSubpages', () => {
     expect(text).toContain('Acme Teknoloji A.Ş.');
     expect(text).toContain('Ankara & İzmir');
     expect(text).not.toContain('evil');
+  });
+  it('a malformed percent escape in a link does not throw; the raw path is used', () => {
+    const html = '<a href="/%E0%A4%A">x</a><a href="/hakkimizda%E0%A4%A">y</a><a href="/iletisim">z</a>';
+    const picked = pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname);
+    expect(picked).toEqual(['/hakkimizda%E0%A4%A', '/iletisim']);
   });
   it('picks only same-site about/contact links, at most four', () => {
     const picked = pickSubpages(HOME_HTML, new URL('https://acme.com.tr/')).map((u) => u.pathname);
@@ -184,5 +221,184 @@ describe('fetchOrganizationSite', () => {
   it('a non-HTML homepage is refused', async () => {
     const { fetchImpl } = fakeSite({ 'https://acme.com.tr/': { body: '%PDF', type: 'application/pdf' } });
     expect(await fetchOrganizationSite('acme.com.tr', { fetchImpl, lookup: PUBLIC })).toEqual({ ok: false, reason: 'no_html' });
+  });
+});
+
+describe('fetchOrganizationSite — robots.txt size limits', () => {
+  const site = (robots: string) =>
+    fakeSite({ 'https://acme.com.tr/robots.txt': { body: robots, type: 'text/plain' }, 'https://acme.com.tr/': { body: '<p>Hi</p>' } });
+  it('more rules than the cap, or an over-long pattern, is unreadable: nothing is crawled', async () => {
+    const many = site(`User-agent: *\n${Array.from({ length: MAX_ROBOTS_RULES + 1 }, (_, i) => `Disallow: /p${i}`).join('\n')}\n`);
+    expect(await fetchOrganizationSite('acme.com.tr', { fetchImpl: many.fetchImpl, lookup: PUBLIC })).toEqual({ ok: false, reason: 'robots_unreadable' });
+    expect(many.calls).not.toContain('https://acme.com.tr/');
+    const long = site(`User-agent: *\nDisallow: /${'x'.repeat(MAX_ROBOTS_PATTERN_CHARS)}\n`);
+    expect(await fetchOrganizationSite('acme.com.tr', { fetchImpl: long.fetchImpl, lookup: PUBLIC })).toEqual({ ok: false, reason: 'robots_unreadable' });
+    const atCap = site(`User-agent: *\n${Array.from({ length: MAX_ROBOTS_RULES }, (_, i) => `Disallow: /p${i}`).join('\n')}\n`);
+    expect((await fetchOrganizationSite('acme.com.tr', { fetchImpl: atCap.fetchImpl, lookup: PUBLIC })).ok).toBe(true);
+  });
+});
+
+/**
+ * The real transport (node:http with a connect-time address check). The only server is a local one
+ * on 127.0.0.1; no request leaves this machine. `connectPort` points the socket at it, and the tests
+ * that must reach it allow 127.0.0.1 explicitly — the default guard (public addresses only) refuses it.
+ */
+describe('pinned transport (connect-time address check)', () => {
+  let server: Server | null = null;
+  const closeServer = async () => {
+    if (server) {
+      server.closeAllConnections();
+      await new Promise<void>((r) => server!.close(() => r()));
+    }
+    server = null;
+  };
+  afterEach(closeServer);
+
+  async function serve(handler: (req: IncomingMessage, res: ServerResponse) => void): Promise<{ port: number; hits: string[] }> {
+    const hits: string[] = [];
+    server = createServer((req, res) => {
+      hits.push(req.url ?? '');
+      handler(req, res);
+    });
+    await new Promise<void>((r) => server!.listen(0, '127.0.0.1', () => r()));
+    return { port: (server.address() as AddressInfo).port, hits };
+  }
+
+  const LOCAL = async () => ['127.0.0.1'];
+  const localOnly = (ip: string) => ip === '127.0.0.1';
+  const html = (res: ServerResponse, body: string) => {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end(body);
+  };
+  const notFound = (res: ServerResponse) => {
+    res.writeHead(404);
+    res.end();
+  };
+
+  it('DNS rebinding: the first answer is public, the connection-time answer is private → no request is sent', async () => {
+    const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
+    // The pre-check (deps.lookup) sees a public address; the socket's own resolution gets 127.0.0.1.
+    const fetchImpl = createPinnedFetch({ resolve: LOCAL, connectPort: port });
+    const res = await fetchOrganizationSite('http://acme.com.tr', { lookup: PUBLIC, fetchImpl });
+    expect(res).toEqual({ ok: false, reason: 'robots_unreadable' });
+    expect(hits).toEqual([]);
+  });
+
+  it('a mixed answer (one public, one private) is refused at connect time', async () => {
+    const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
+    const fetchImpl = createPinnedFetch({ resolve: async () => ['93.184.216.34', '127.0.0.1'], connectPort: port });
+    await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
+    expect(hits).toEqual([]);
+  });
+
+  it('a literal private IP is refused without a lookup', async () => {
+    const { port, hits } = await serve((_req, res) => html(res, 'x'));
+    const fetchImpl = createPinnedFetch({ resolve: PUBLIC, connectPort: port });
+    await expect(fetchImpl(new URL('http://127.0.0.1/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
+    expect(hits).toEqual([]);
+  });
+
+  it('reads a site through the pinned path when the address is allowed', async () => {
+    const { port, hits } = await serve((req, res) => {
+      if (req.url === '/robots.txt') return notFound(res);
+      if (req.url === '/') return html(res, '<title>Acme</title><a href="/hakkimizda">Hakkımızda</a>');
+      return html(res, '<p>45 çalışan</p>');
+    });
+    const res = await fetchOrganizationSite('http://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, connectPort: port });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.pages.map((p) => p.url)).toEqual(['http://acme.com.tr/', 'http://acme.com.tr/hakkimizda']);
+    expect(hits).toEqual(['/robots.txt', '/', '/hakkimizda']);
+  });
+
+  it('follows at most three redirects on the pinned path', async () => {
+    const chain = (n: number) => (req: IncomingMessage, res: ServerResponse) => {
+      if (req.url === '/robots.txt') return notFound(res);
+      const step = req.url === '/' ? 0 : Number((req.url ?? '').slice(2));
+      if (step < n) {
+        res.writeHead(302, { location: `/r${step + 1}` });
+        res.end();
+        return;
+      }
+      html(res, '<p>end</p>');
+    };
+    const three = await serve(chain(3));
+    const ok = await fetchOrganizationSite('http://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, connectPort: three.port });
+    expect(ok.ok).toBe(true);
+    await closeServer();
+    const four = await serve(chain(4));
+    const res = await fetchOrganizationSite('http://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, connectPort: four.port });
+    expect(res).toEqual({ ok: false, reason: 'unreachable' });
+    expect(four.hits).toEqual(['/robots.txt', '/', '/r1', '/r2', '/r3']);
+  });
+
+  it('a body over 1 MB is cut off on the pinned path (streamed, and when content-length says so)', async () => {
+    const chunk = '<p>' + 'x'.repeat(64 * 1024) + '</p>';
+    const streamed = await serve((req, res) => {
+      if (req.url === '/robots.txt') return notFound(res);
+      res.writeHead(200, { 'content-type': 'text/html' }); // chunked, no content-length
+      for (let i = 0; i < 20; i += 1) res.write(chunk);
+      res.end();
+    });
+    expect(await fetchOrganizationSite('http://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, connectPort: streamed.port })).toEqual({
+      ok: false,
+      reason: 'unreachable',
+    });
+    await closeServer();
+    const declared = await serve((req, res) => {
+      if (req.url === '/robots.txt') return notFound(res);
+      res.writeHead(200, { 'content-type': 'text/html', 'content-length': String(2_000_000) });
+      res.write('<p>short</p>'); // the declared size alone refuses it
+    });
+    expect(await fetchOrganizationSite('http://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, connectPort: declared.port })).toEqual({
+      ok: false,
+      reason: 'unreachable',
+    });
+  });
+
+  it('a request that never finishes times out (per-request limit) on the pinned path', async () => {
+    const { port } = await serve((req, res) => {
+      if (req.url === '/robots.txt') return notFound(res);
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.write('<p>start'); // headers sent, the body never ends
+    });
+    const started = performance.now();
+    const res = await fetchOrganizationSite('http://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, connectPort: port, timeoutMs: 300 });
+    expect(res).toEqual({ ok: false, reason: 'unreachable' });
+    expect(performance.now() - started).toBeLessThan(slack(3000));
+  });
+
+  it('the whole read has a total time budget on top of the per-request limit (an in-flight request is cut)', async () => {
+    const { port, hits } = await serve((req, res) => {
+      if (req.url === '/robots.txt') return notFound(res);
+      if (req.url === '/') {
+        return html(res, ['/hakkimizda', '/iletisim', '/kurumsal', '/about'].map((h) => `<a href="${h}">${h}</a>`).join(''));
+      }
+      // Inside the 3 s per-request limit, but past the 600 ms budget.
+      const timer = setTimeout(() => html(res, `<p>${req.url}</p>`), 1500);
+      res.on('close', () => clearTimeout(timer));
+    });
+    const started = performance.now();
+    const res = await fetchOrganizationSite('http://acme.com.tr', {
+      lookup: LOCAL,
+      addressAllowed: localOnly,
+      connectPort: port,
+      timeoutMs: 3000,
+      budgetMs: 600,
+    });
+    const elapsed = performance.now() - started;
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    // The first sub-page is aborted by the budget mid-request (it would have answered at 1.5 s),
+    // the other three are not even requested.
+    expect(res.pages.map((p) => p.url)).toEqual(['http://acme.com.tr/']);
+    expect(res.skipped).toEqual([
+      { url: 'http://acme.com.tr/hakkimizda', reason: 'time_budget' },
+      { url: 'http://acme.com.tr/iletisim', reason: 'time_budget' },
+      { url: 'http://acme.com.tr/kurumsal', reason: 'time_budget' },
+      { url: 'http://acme.com.tr/about', reason: 'time_budget' },
+    ]);
+    expect(hits).toEqual(['/robots.txt', '/', '/hakkimizda']);
+    expect(elapsed).toBeLessThan(slack(1400));
   });
 });

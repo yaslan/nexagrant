@@ -1,5 +1,9 @@
 import { lookup as dnsLookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import type { LookupAddress } from 'node:dns';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
+import { Readable } from 'node:stream';
 
 /**
  * M18-F5 (NG-136) — reads a client organisation's OWN public website for the enrichment proposal.
@@ -10,16 +14,22 @@ import { isIP } from 'node:net';
  *    cannot tell, we do not crawl.
  *  - at most MAX_PAGES (5) pages: the homepage plus up to four same-site links that look like
  *    "about / contact / corporate" pages.
- *  - text/html only, a byte cap per page, a timeout per request, a character cap on the text.
+ *  - text/html only, a byte cap per page, a timeout per request, a total time budget for the whole
+ *    read, a character cap on the text.
+ *  - robots.txt patterns are matched without regular expressions (linear, no backtracking), and a
+ *    robots.txt with more than MAX_ROBOTS_RULES rules or a longer pattern than
+ *    MAX_ROBOTS_PATTERN_CHARS counts as unreadable (NG-136 review: a remote robots.txt must not be
+ *    able to hold the event loop).
  *
  * SSRF: the address is tenant-typed, and the request leaves our server. Only http(s) on the default
  * port, no credentials in the URL, the host must resolve to public addresses only (loopback,
  * private, link-local, CGNAT, multicast, reserved, ULA … are refused), redirects are followed by
  * hand (≤3) and each hop is checked again and must stay on the same site (host or its www twin).
- * Residual risk: DNS can answer differently between our check and the socket's own lookup
- * (rebinding); closing that needs a pinned-address agent, which is not a dependency here.
+ * DNS rebinding: the request goes through node:http(s) with a `lookup` hook (`createPinnedFetch`),
+ * so the addresses are checked again at connect time, on the very answer the socket connects to; an
+ * answer that changed to a private address after the pre-check is refused before any byte is sent.
  *
- * Every network edge is injectable (`SiteFetchDeps`) so the tests run with no network.
+ * Every network edge is injectable (`SiteFetchDeps`) so the tests run with no outside network.
  */
 
 export const MAX_PAGES = 5;
@@ -28,11 +38,28 @@ const ROBOTS_AGENT = 'fonbridgebot';
 const MAX_BYTES = 1_000_000;
 const MAX_REDIRECTS = 3;
 const TIMEOUT_MS = 8_000;
+/** The whole read (robots.txt, homepage, sub-pages, every redirect hop) ends within this. */
+const BUDGET_MS = 25_000;
 export const MAX_PAGE_CHARS = 6_000;
 export const MAX_TOTAL_CHARS = 20_000;
+export const MAX_ROBOTS_RULES = 200;
+export const MAX_ROBOTS_PATTERN_CHARS = 256;
 
 export type LookupFn = (host: string) => Promise<string[]>;
-export type SiteFetchDeps = { fetchImpl?: typeof fetch; lookup?: LookupFn; timeoutMs?: number };
+export type AddressGuard = (ip: string) => boolean;
+/** The one request shape guardedGet makes; the global `fetch` satisfies it (fake sites in tests). */
+export type FetchLike = (url: URL, init: { headers: Record<string, string>; signal: AbortSignal; redirect?: 'manual' }) => Promise<Response>;
+export type SiteFetchDeps = {
+  fetchImpl?: FetchLike;
+  lookup?: LookupFn;
+  timeoutMs?: number;
+  budgetMs?: number;
+  /** Test seam: which resolved addresses the connect-time check accepts. Default: public only. */
+  addressAllowed?: AddressGuard;
+  /** Test seam: the port the socket connects to (a local test server). Default: the URL's own. */
+  connectPort?: number;
+};
+type ResolvedDeps = { fetchImpl: FetchLike; lookup: LookupFn; timeoutMs: number; budget: AbortSignal };
 
 export type FetchedPage = { url: string; text: string };
 export type SiteFetchResult =
@@ -55,7 +82,10 @@ export function normaliseSiteUrl(raw: string): URL | null {
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
   if (url.username || url.password || url.port) return null;
-  const host = url.hostname.toLowerCase();
+  // A trailing dot ("localhost.", "acme.com.tr.") is the same name; checked without it.
+  const host = url.hostname.toLowerCase().replace(/\.+$/, '');
+  if (!host) return null;
+  url.hostname = host;
   // A bare IP, a single-label name or a reserved-for-local suffix is not a public website.
   if (isIP(host.replace(/^\[|\]$/g, '')) !== 0) return null;
   if (!host.includes('.') || /\.(localhost|local|internal|lan|home|arpa|test|invalid|example)$/.test(host)) return null;
@@ -96,13 +126,109 @@ export function isPublicAddress(ip: string): boolean {
   return (first & 0xe000) === 0x2000; // global unicast 2000::/3 only
 }
 
-async function hostIsPublic(host: string, lookup: LookupFn): Promise<boolean> {
+async function hostIsAllowed(host: string, lookup: LookupFn, allowed: AddressGuard): Promise<boolean> {
   try {
     const addresses = await lookup(host);
-    return addresses.length > 0 && addresses.every(isPublicAddress);
+    return addresses.length > 0 && addresses.every(allowed);
   } catch {
     return false;
   }
+}
+
+// ── Pinned transport: the address check at connect time ─────────────────────
+
+class BlockedAddressError extends Error {
+  readonly code = 'EBLOCKEDADDRESS';
+  constructor(host: string) {
+    super(`blocked address for ${host}`);
+    this.name = 'BlockedAddressError';
+  }
+}
+
+/**
+ * A `net` lookup hook: resolves with `resolve`, refuses unless EVERY address passes `allowed`, and
+ * hands the socket exactly the addresses it checked. node:http calls it for each connection, so the
+ * check runs on the answer the socket really uses (DNS rebinding, NG-136 review).
+ */
+export function guardedLookup(resolve: LookupFn, allowed: AddressGuard): LookupFunction {
+  return (hostname, options, callback) => {
+    resolve(hostname).then(
+      (addresses) => {
+        if (addresses.length === 0 || !addresses.every(allowed)) {
+          callback(new BlockedAddressError(hostname), '', 0);
+          return;
+        }
+        const entries: LookupAddress[] = addresses
+          .map((address) => ({ address, family: isIP(address) }))
+          .filter((e) => e.family !== 0 && (!options.family || options.family === e.family));
+        const first = entries[0];
+        if (!first) {
+          callback(new BlockedAddressError(hostname), '', 0);
+          return;
+        }
+        if (options.all) callback(null, entries);
+        else callback(null, first.address, first.family);
+      },
+      (error: unknown) => callback(error instanceof Error ? error : new Error(String(error)), '', 0),
+    );
+  };
+}
+
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+
+/**
+ * GET over node:http(s) whose every connection goes through {@link guardedLookup}. No connection
+ * pooling (`agent: false`): a pooled socket would skip the lookup. Redirects are never followed here
+ * (guardedGet follows them by hand); the body arrives as a stream, so readCapped's byte cap and the
+ * abort signal (per-request timeout + total budget) apply to it as they did to `fetch`.
+ */
+export function createPinnedFetch(opts: { resolve: LookupFn; allowed?: AddressGuard; connectPort?: number }): FetchLike {
+  const allowed = opts.allowed ?? isPublicAddress;
+  const lookup = guardedLookup(opts.resolve, allowed);
+  return (url, init) =>
+    new Promise<Response>((resolveResponse, reject) => {
+      const literal = url.hostname.replace(/^\[|\]$/g, '');
+      // An IP literal never reaches a lookup hook: check it here.
+      if (isIP(literal) !== 0 && !allowed(literal)) {
+        reject(new BlockedAddressError(literal));
+        return;
+      }
+      const send = url.protocol === 'https:' ? httpsRequest : url.protocol === 'http:' ? httpRequest : null;
+      if (!send) {
+        reject(new Error(`unsupported protocol ${url.protocol}`));
+        return;
+      }
+      const req = send(
+        url,
+        {
+          method: 'GET',
+          headers: init.headers,
+          signal: init.signal,
+          lookup,
+          agent: false,
+          ...(opts.connectPort ? { port: opts.connectPort } : {}),
+        },
+        (res) => {
+          const status = res.statusCode ?? 0;
+          const headers = new Headers();
+          for (let i = 0; i + 1 < res.rawHeaders.length; i += 2) headers.append(res.rawHeaders[i]!, res.rawHeaders[i + 1]!);
+          try {
+            if (NULL_BODY_STATUSES.has(status) || status < 200) {
+              res.resume();
+              resolveResponse(new Response(null, { status: status < 200 ? 502 : status, headers }));
+              return;
+            }
+            const body = Readable.toWeb(res) as unknown as ReadableStream<Uint8Array>;
+            resolveResponse(new Response(body, { status, headers }));
+          } catch (e) {
+            res.destroy();
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
 }
 
 /** Same site: the same host, or the host and its `www.` twin. */
@@ -147,14 +273,43 @@ export function parseRobots(body: string): RobotsRule[] {
   return chosen.flatMap((g) => g.rules);
 }
 
-function patternMatches(pattern: string, path: string): boolean {
+/**
+ * RFC 9309 matching without a regular expression: `*` is any run of characters, a final `$` anchors
+ * the end, everything else is literal; without `$` the pattern is a prefix (an implicit trailing
+ * `*`). Iterative wildcard matching that only ever returns to the LAST star: O(pattern × path) in
+ * the worst case, no exponential backtracking (NG-136 review: 8 stars on a 60-char path held the
+ * regex engine for 73 s).
+ */
+export function patternMatches(pattern: string, path: string): boolean {
   const anchored = pattern.endsWith('$');
-  const body = anchored ? pattern.slice(0, -1) : pattern;
-  const regex = body
-    .split('*')
-    .map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-    .join('.*');
-  return new RegExp(`^${regex}${anchored ? '$' : ''}`).test(path);
+  const p = anchored ? pattern.slice(0, -1) : `${pattern}*`;
+  let pi = 0;
+  let si = 0;
+  let star = -1; // index in p of the last `*` seen
+  let mark = 0; // path index that star is currently standing in for, up to
+  while (si < path.length) {
+    if (pi < p.length && p[pi] !== '*' && p[pi] === path[si]) {
+      pi += 1;
+      si += 1;
+    } else if (pi < p.length && p[pi] === '*') {
+      star = pi;
+      mark = si;
+      pi += 1;
+    } else if (star !== -1) {
+      pi = star + 1;
+      mark += 1;
+      si = mark;
+    } else {
+      return false;
+    }
+  }
+  while (pi < p.length && p[pi] === '*') pi += 1;
+  return pi === p.length;
+}
+
+/** False when a robots.txt is too big to evaluate cheaply; the caller then treats it as unreadable. */
+export function robotsWithinLimits(rules: RobotsRule[]): boolean {
+  return rules.length <= MAX_ROBOTS_RULES && rules.every((r) => r.pattern.length <= MAX_ROBOTS_PATTERN_CHARS);
 }
 
 /** Longest matching rule wins; on a tie Allow wins; no match allows (RFC 9309). */
@@ -202,6 +357,15 @@ export function htmlToText(html: string, maxChars = MAX_PAGE_CHARS): string {
 const LINK_HINT =
   /(about|hakkimizda|hakkinda|hakkımızda|kurumsal|corporate|company|biz-kimiz|kimiz|who-we-are|contact|iletisim|iletişim|team|ekibimiz|profil|profile)/i;
 
+/** The decoded path, or the raw one when its percent escapes are malformed (URIError). */
+function safeDecodePath(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
 /** Up to `limit` same-site links whose path or text looks like an about/contact page. */
 export function pickSubpages(html: string, base: URL, limit = MAX_PAGES - 1): URL[] {
   const picked: URL[] = [];
@@ -219,7 +383,7 @@ export function pickSubpages(html: string, base: URL, limit = MAX_PAGES - 1): UR
     if (url.protocol !== 'http:' && url.protocol !== 'https:') continue;
     if (url.username || url.password || url.port || !sameSite(url, base)) continue;
     if (/\.(pdf|jpe?g|png|gif|zip|docx?|xlsx?|mp4|svg)$/i.test(url.pathname)) continue;
-    if (!LINK_HINT.test(decodeURIComponent(url.pathname)) && !LINK_HINT.test(label)) continue;
+    if (!LINK_HINT.test(safeDecodePath(url.pathname)) && !LINK_HINT.test(label)) continue;
     url.hash = '';
     url.search = '';
     const key = url.origin + url.pathname;
@@ -258,21 +422,24 @@ async function readCapped(response: Response): Promise<string | null> {
 async function guardedGet(
   start: URL,
   origin: URL,
-  deps: Required<SiteFetchDeps>,
+  deps: ResolvedDeps & { addressAllowed: AddressGuard },
   allowed: (u: URL) => boolean = () => true,
 ): Promise<Hop | null> {
   let url = start;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (deps.budget.aborted) return null;
     if (!sameSite(url, origin) || url.username || url.password || url.port) return null;
     if (hop > 0 && !allowed(url)) return null; // a redirect into a disallowed path is not followed
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    if (!(await hostIsPublic(url.hostname, deps.lookup))) return null;
+    if (!(await hostIsAllowed(url.hostname, deps.lookup, deps.addressAllowed))) return null;
     let response: Response;
     try {
       response = await deps.fetchImpl(url, {
         redirect: 'manual',
         headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,text/plain;q=0.9' },
-        signal: AbortSignal.timeout(deps.timeoutMs),
+        // Per-request limit and the read's total budget, whichever ends first; the body read below
+        // runs under the same signal.
+        signal: AbortSignal.any([AbortSignal.timeout(deps.timeoutMs), deps.budget]),
       });
     } catch {
       return null;
@@ -297,19 +464,24 @@ async function guardedGet(
 
 /** Fetches up to MAX_PAGES pages of one organisation's website, obeying its robots.txt. */
 export async function fetchOrganizationSite(rawUrl: string, deps: SiteFetchDeps = {}): Promise<SiteFetchResult> {
-  const d: Required<SiteFetchDeps> = {
-    fetchImpl: deps.fetchImpl ?? fetch,
-    lookup: deps.lookup ?? defaultLookup,
+  const lookup = deps.lookup ?? defaultLookup;
+  const addressAllowed = deps.addressAllowed ?? isPublicAddress;
+  const d = {
+    fetchImpl: deps.fetchImpl ?? createPinnedFetch({ resolve: lookup, allowed: addressAllowed, connectPort: deps.connectPort }),
+    lookup,
+    addressAllowed,
     timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
+    budget: AbortSignal.timeout(deps.budgetMs ?? BUDGET_MS),
   };
   const home = normaliseSiteUrl(rawUrl);
   if (!home) return { ok: false, reason: 'invalid_url' };
-  if (!(await hostIsPublic(home.hostname, d.lookup))) return { ok: false, reason: 'blocked_address' };
+  if (!(await hostIsAllowed(home.hostname, d.lookup, d.addressAllowed))) return { ok: false, reason: 'blocked_address' };
 
   const robots = await guardedGet(new URL('/robots.txt', home), home, d);
   let rules: RobotsRule[] = [];
   if (robots && robots.status >= 200 && robots.status < 300 && robots.body !== null) {
     rules = parseRobots(robots.body);
+    if (!robotsWithinLimits(rules)) return { ok: false, reason: 'robots_unreadable' };
   } else if (!robots || !(robots.status === 404 || robots.status === 410)) {
     return { ok: false, reason: 'robots_unreadable' };
   }
@@ -333,11 +505,19 @@ export async function fetchOrganizationSite(rawUrl: string, deps: SiteFetchDeps 
 
   for (const sub of pickSubpages(first.body, first.url)) {
     if (pages.length >= MAX_PAGES || total >= MAX_TOTAL_CHARS) break;
+    if (d.budget.aborted) {
+      skipped.push({ url: sub.toString(), reason: 'time_budget' });
+      continue;
+    }
     if (!allowed(sub)) {
       skipped.push({ url: sub.toString(), reason: 'robots_disallow' });
       continue;
     }
     const page = await guardedGet(sub, home, d, allowed);
+    if (d.budget.aborted && (!page || page.body === null)) {
+      skipped.push({ url: sub.toString(), reason: 'time_budget' });
+      continue;
+    }
     if (!page || page.status < 200 || page.status >= 300 || page.body === null || !page.contentType.includes('text/html')) {
       skipped.push({ url: sub.toString(), reason: 'unreachable' });
       continue;

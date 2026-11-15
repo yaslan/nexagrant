@@ -12,7 +12,8 @@
 -- Integrity: (organizationId, tenantId) → LeadOrganization(id, tenantId): an FK check does not go
 -- through RLS, so this is what stops a report pointing at another tenant's organisation.
 --
--- Idempotency: table/indexes IF NOT EXISTS, FKs guarded by pg_constraint, policy DROP-then-CREATE.
+-- Idempotency: table/indexes IF NOT EXISTS, FKs and the status CHECK guarded by pg_constraint, policy
+-- DROP-then-CREATE.
 -- A second run, or a run after `prisma db push`, changes nothing. Purely ADDITIVE: no existing
 -- row or column is touched.
 -- Rollback: prisma/migrations/add-m18-eligibility-report.down.sql (drops this table and its rows).
@@ -54,6 +55,12 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'LeadEligibilityReport_callId_fkey') THEN
     ALTER TABLE "LeadEligibilityReport" ADD CONSTRAINT "LeadEligibilityReport_callId_fkey"
       FOREIGN KEY ("callId") REFERENCES "Call"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+  -- NG-136 review: the two statuses are a database rule too, not only an application one. Prisma
+  -- does not model CHECK constraints, so `prisma db push` leaves this one alone.
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'LeadEligibilityReport_status_check') THEN
+    ALTER TABLE "LeadEligibilityReport" ADD CONSTRAINT "LeadEligibilityReport_status_check"
+      CHECK ("status" IN ('DRAFT', 'APPROVED'));
   END IF;
 END $$;
 
