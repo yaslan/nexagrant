@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { isUserFacing, looksTechnical, scanSource } from '../scripts/i18n-hardcoded';
+import { SCAN_ROOTS, isUserFacing, looksTechnical, scanSource } from '../scripts/i18n-hardcoded';
 
 /**
  * These cases pin the shape of the i18n gate's check 4. Loosening the detector to make a
@@ -142,7 +142,7 @@ describe('i18n-baseline.json', () => {
 
   it('maps repo-relative paths to positive integers', () => {
     for (const [file, count] of Object.entries(baseline)) {
-      expect(file.startsWith('src/app/') || file.startsWith('src/modules/')).toBe(true);
+      expect(SCAN_ROOTS.some(root => file.startsWith(root + '/'))).toBe(true);
       expect(Number.isInteger(count)).toBe(true);
       expect(count).toBeGreaterThan(0);
     }
