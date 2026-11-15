@@ -8,6 +8,7 @@ import {
   SMALL_CELL_THRESHOLD,
   type AgencyFunnel,
   type FunnelCell,
+  FUNNEL_ROUND_STEP,
 } from './funnel';
 import type { TrProvince } from '@/lib/readiness/provinces';
 import { inviteCodeRow } from './codes';
@@ -30,7 +31,8 @@ import {
  *
  * The attacker knows:
  *   - every visible number of every view (all views are one request away):
- *     a multiple of 5 that the true count, 5 or more, rounds to (HUKUK-5);
+ *     a multiple of the rounding step (10 since FO-398, 5 before; HUKUK-5) that the true
+ *     count, 5 or more, rounds to;
  *   - that counts are integers ≥ 0 and add up (type × province cells to their
  *     totals, a province's types to the province, …);
  *   - the subset relations between steps (every step ⊆ registered, concept note
@@ -124,16 +126,31 @@ function recordView(out: Published, f: AgencyFunnel['all'], t: string, p: string
  * `for (p of [null, ...provinces]) { f = buildProvinceFunnel(table, p); all + byOrgType }` —
  * and both crw-fb examples below, and 162-171 of each 300 random tables, leaked.
  */
+/**
+ * FO-398: the rounding unit the funnel under test runs with. Default = the shipped one
+ * ({@link FUNNEL_ROUND_STEP}); the positive controls set 5, the unit before FO-398.
+ */
+let activeStep: number = FUNNEL_ROUND_STEP;
+function withStep<T>(step: number, fn: () => T): T {
+  const prev = activeStep;
+  activeStep = step;
+  try {
+    return fn();
+  } finally {
+    activeStep = prev;
+  }
+}
+
 function publish(table: Table): Published {
   const out: Published = new Map();
   const provinces = [...table.keys()].filter((p) => p !== NO_PROVINCE) as TrProvince[];
-  recordView(out, buildAgencyFunnel(table, { dimension: 'none' }).all, ALL, ALL);
-  const byType = buildAgencyFunnel(table, { dimension: 'orgType' });
+  recordView(out, buildAgencyFunnel(table, { dimension: 'none' }, activeStep).all, ALL, ALL);
+  const byType = buildAgencyFunnel(table, { dimension: 'orgType' }, activeStep);
   recordView(out, byType.all, ALL, ALL);
   if (byType.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
   for (const t of ORG_TYPES) recordView(out, byType.breakdown.byOrgType[t], t, ALL);
   for (const p of provinces) {
-    const f = buildAgencyFunnel(table, { dimension: 'province', province: p });
+    const f = buildAgencyFunnel(table, { dimension: 'province', province: p }, activeStep);
     recordView(out, f.all, ALL, ALL);
     if (f.breakdown.dimension !== 'province') throw new Error('no province breakdown');
     recordView(out, f.breakdown.view, ALL, p);
@@ -442,10 +459,13 @@ function attack(
     if (value === null) continue;
     const i = vars.get(key);
     if (i === undefined) continue; // a province nobody gave: every number of it is masked anyway
-    // A shown number is rounded to a multiple of 5 (HUKUK-5) and never under the threshold:
-    // shown 10 is 8..12, shown 5 is 5..7.
-    lo[i] = rounded ? Math.max(SMALL_CELL_THRESHOLD, value - 2) : value;
-    hi[i] = rounded ? value + 2 : value;
+    // A shown number is rounded to a multiple of the step and never under the threshold.
+    // roundForDisplay = Math.round(v / step) * step, so a shown S means v in [S - lowOff, S + highOff]:
+    // step 5 -> -2..+2 (shown 10 is 8..12), step 10 -> -5..+4 (shown 10 is 5..14, 15 rounds up to 20).
+    const lowOff = Math.floor(activeStep / 2);
+    const highOff = activeStep % 2 === 0 ? activeStep / 2 - 1 : (activeStep - 1) / 2;
+    lo[i] = rounded ? Math.max(SMALL_CELL_THRESHOLD, value - lowOff) : value;
+    hi[i] = rounded ? value + highOff : value;
   }
 
   let changed = true;
@@ -598,7 +618,8 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
     test('positive control: under a use limit the form says "refused" ×4, and the fifth code is read back as 2..3', () => {
       const codes = publishCodes(trueCodes, FORM_WITH_LIMIT);
       expect(codes.slice(0, 4).map((c) => [c.lo, c.hi])).toEqual([[6, 6], [6, 6], [6, 6], [6, 6]]);
-      const leaks = attack(t, publish(t), { codes, noneDeleted: true });
+      // The control stands for the attack at the unit it was written for (5, before FO-398).
+      const leaks = withStep(5, () => attack(t, publish(t), { codes, noneDeleted: true }));
       expect(leaks).toContainEqual({ target: 'code#4', truth: 3, lo: 2, hi: 3 });
     });
 
@@ -642,7 +663,8 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
       const know = FIXED_LIMIT(6);
       const codes = publishCodes(small, formUseLimit(know), know);
       expect(codes.slice(0, 4).map((c) => [c.lo, c.hi])).toEqual([[6, 6], [6, 6], [6, 6], [6, 6]]);
-      expect(attack(t, publish(t), { codes, noneDeleted: true })).toContainEqual({ target: 'code#4', truth: 3, lo: 2, hi: 3 });
+      const leaks = withStep(5, () => attack(t, publish(t), { codes, noneDeleted: true }));
+      expect(leaks).toContainEqual({ target: 'code#4', truth: 3, lo: 2, hi: 3 });
     });
 
     test('the shipped limit (hidden, 500..524), same small cohort: nobody reaches it, so nothing is read back', () => {
@@ -957,7 +979,8 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     let leaking = 0;
     let total = 0;
     for (const single of [true, false]) {
-      const r = sweep(5, { single, noneDeleted: true }, CONTROL_TABLES, () => 500, FIXED_LIMIT(500));
+      // At the unit before FO-398 (5): the control stands for the attack, not for the shipped funnel.
+      const r = withStep(5, () => sweep(5, { single, noneDeleted: true }, CONTROL_TABLES, () => 500, FIXED_LIMIT(500)));
       leaking += r.withLeak;
       total += CONTROL_TABLES;
     }
@@ -1012,8 +1035,10 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
       if (shown == null) throw new Error('the grand total of a big cohort must be shown');
       const filled = codes.slice(0, nFull);
       const sExact = filled.reduce((a, c) => a + c.used, 0);
-      const known = [Math.max(0, shown - 2 - sExact), shown + 2 - sExact];
-      const range = [Math.max(0, shown - 2 - nFull * INVITE_CODE_MAX_USE_LIMIT), shown + 2 - nFull * INVITE_CODE_MIN_USE_LIMIT];
+      const lowOff = Math.floor(FUNNEL_ROUND_STEP / 2);
+      const highOff = FUNNEL_ROUND_STEP % 2 === 0 ? FUNNEL_ROUND_STEP / 2 - 1 : (FUNNEL_ROUND_STEP - 1) / 2;
+      const known = [Math.max(0, shown - lowOff - sExact), shown + highOff - sExact];
+      const range = [Math.max(0, shown - lowOff - nFull * INVITE_CODE_MAX_USE_LIMIT), shown + highOff - nFull * INVITE_CODE_MIN_USE_LIMIT];
       expect(r).toBeGreaterThanOrEqual(known[0]!);
       expect(r).toBeLessThanOrEqual(known[1]!);
       widthKnown.push(known[1]! - known[0]! + 1);
@@ -1022,27 +1047,21 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     }
     const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
     measure(`SELFBURN-WINDOW tables=${N} D=0 windowSelfBurnedAvg=${avg(widthKnown).toFixed(2)} max=${Math.max(...widthKnown)} windowPublicRangeAvg=${avg(widthRange).toFixed(2)} min=${Math.min(...widthRange)} windowsInside1to4=${inside14}`);
-    // The agency pins the last code's uses to the rounding step (5 values, i.e. +-2)...
-    expect(Math.max(...widthKnown)).toBeLessThanOrEqual(5);
+    // The agency pins the last code's uses to the rounding step (10 values since FO-398, 5 before)...
+    expect(Math.max(...widthKnown)).toBeLessThanOrEqual(FUNNEL_ROUND_STEP);
     // ...which is a narrower window than the public range alone gives (the spread only helped before the flip)...
     expect(avg(widthKnown)).toBeLessThan(avg(widthRange));
-    // ...and a window of 5 values cannot sit inside 1..4 by itself. The full attack below combines the
-    // grand total with the per-province cells, and that does close onto 1..4 in some tables.
+    // ...and a window of 5 or more values cannot sit inside 1..4 by itself. At the old unit (5) the full
+    // attack below combined the grand total with the per-province cells and did close onto 1..4 in some tables.
     expect(inside14).toBe(0);
   });
 
-  // The gate for the self-burning agency. Measured (seed 31, 900 tables per mode): single province
-  // and every D >= 0 mode leak nothing, but the multi-province D = 0 mode leaks a hidden 1..4 in
-  // 57-84 of 900 tables over five runs with random limits (mean ~8 %, ABOVE the ~5.8 % a FIXED 500
-  // leaks). The residual test below draws the limits from a seeded stream, so it is deterministic
-  // (limitSeed 3101: 10/150 = 6.7 %, 74/900 = 8.2 %). The funnel's complementary suppression is built for a window of
-  // 25 per code; once the filled codes are exact, the rounding step (5) is all that is left, and
-  // across several provinces it sometimes closes onto 1..4. That is the residual risk of patron
-  // decision A (K-577268, crw-fb B-3), which is NOT hidden in the code: the notice addendum says
-  // so and HUKUK-SORULARI-2026-09.md asks the lawyer whether it is acceptable (together with R-1).
-  // It is pinned here, not loosened: the three clean modes stay at 0, and the leaking mode must
-  // stay below a ceiling, so a change that makes it worse - or an accidental fix, which should
-  // update the notice - turns this red.
+  // The gate for the self-burning agency. Measured at the unit before FO-398 (rounding step 5, seed 31,
+  // 900 tables per mode): single province and every D >= 0 mode leak nothing, but the multi-province D = 0
+  // mode leaked a hidden 1..4 in 57-84 of 900 tables over five runs with random limits (mean ~8 %, above
+  // the ~5.8 % a FIXED 500 leaks; limitSeed 3101: 10/150 = 6.7 %, 74/900 = 8.2 %). K-577268 A accepted it;
+  // K-577441 B reopened it, and FO-398 found it cheaper than the 500 records (see the next section) and
+  // cut it with the rounding step: at 10 (K-577804) 6 of 900 tables are left, in the one multi-province D = 0 mode.
   const RESIDUAL_MODE = (m: Mode) => !m.single && m.noneDeleted;
   const RESIDUAL_CEILING = 0.1;
   const RESIDUAL_LIMIT_SEED = 3101;
@@ -1051,24 +1070,134 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     const u = stream(seed);
     return () => INVITE_CODE_MIN_USE_LIMIT + Math.floor(u() * (INVITE_CODE_USE_LIMIT_SPREAD + 1));
   }
+  /** What is left at the shipped rounding step (measured, 900 tables: 6 = 0.7 %; 3x room, seeded so it cannot flake). */
+  const STEP10_CEILING = 0.02;
   for (const mode of MODES) {
     const label = `${mode.single ? 'single' : 'spread'}, ${mode.noneDeleted ? 'D = 0' : 'D >= 0'}`;
-    if (!RESIDUAL_MODE(mode)) {
-      test(`self-burn gate, ${label}: codes the agency filled itself are exact - anyLeak = 0`, () => {
-        const { withLeak, found } = sweep(31, mode, TABLES, newInviteCodeUseLimit, POLICY_KNOWLEDGE, true);
-        measure(`SELFBURN-SWEEP seed=31 ${label} tables=${TABLES} tablesWithLeak=${withLeak}`);
-        expect(found, `${withLeak}/${TABLES} tables leak`).toEqual([]);
-      }, TIMEOUT_MS);
-    } else {
-      test(`self-burn KNOWN RESIDUAL, ${label}: a hidden 1..4 is read back in some tables (accepted risk of K-577268 A, asked to the lawyer), below ${RESIDUAL_CEILING * 100} %`, () => {
-        // Deterministic: the limits come from a seeded stream (same 500..524 law as
-        // newInviteCodeUseLimit(), without the CSPRNG), so this count is the same on every run.
-        const { withLeak, found } = sweep(31, mode, TABLES, seededUseLimit(RESIDUAL_LIMIT_SEED), POLICY_KNOWLEDGE, true);
-        measure(`SELFBURN-SWEEP seed=31 limitSeed=${RESIDUAL_LIMIT_SEED} ${label} tables=${TABLES} tablesWithLeak=${withLeak} (known residual)`);
-        for (const f of found.slice(0, 3)) measure(`  e.g. ${f}`);
-        expect(withLeak, 'the residual is real: if it is gone, update the notice and the lawyer question').toBeGreaterThan(0);
+    test(`self-burn gate, ${label}: codes the agency filled itself are exact - ${RESIDUAL_MODE(mode) ? `below ${STEP10_CEILING * 100} % (rounding step ${FUNNEL_ROUND_STEP})` : 'anyLeak = 0'}`, () => {
+      const { withLeak, found } = sweep(31, mode, TABLES, seededUseLimit(RESIDUAL_LIMIT_SEED), POLICY_KNOWLEDGE, true);
+      measure(`SELFBURN-SWEEP seed=31 limitSeed=${RESIDUAL_LIMIT_SEED} step=${FUNNEL_ROUND_STEP} ${label} tables=${TABLES} tablesWithLeak=${withLeak}`);
+      if (RESIDUAL_MODE(mode)) expect(withLeak / TABLES, found.slice(0, 3).join('; ')).toBeLessThan(STEP10_CEILING);
+      else expect(found, `${withLeak}/${TABLES} tables leak`).toEqual([]);
+    }, TIMEOUT_MS);
+    if (RESIDUAL_MODE(mode)) {
+      test(`positive control, ${label}: at the rounding step before FO-398 (5) the self-burn reads a hidden 1..4 in some tables, below ${RESIDUAL_CEILING * 100} %`, () => {
+        const { withLeak } = withStep(5, () => sweep(31, mode, TABLES, seededUseLimit(RESIDUAL_LIMIT_SEED), POLICY_KNOWLEDGE, true));
+        const now = sweep(31, mode, TABLES, seededUseLimit(RESIDUAL_LIMIT_SEED), POLICY_KNOWLEDGE, true).withLeak;
+        measure(`SELFBURN-SWEEP seed=31 limitSeed=${RESIDUAL_LIMIT_SEED} step=5 ${label} tables=${TABLES} tablesWithLeak=${withLeak} (the old residual; step ${FUNNEL_ROUND_STEP}: ${now})`);
+        expect(withLeak, 'the attack must stay real, or this control proves nothing').toBeGreaterThan(0);
         expect(withLeak / TABLES).toBeLessThan(RESIDUAL_CEILING);
+        expect(now, 'the shipped step must leak less than the old one').toBeLessThan(withLeak);
       }, TIMEOUT_MS);
     }
   }
+
+  // ---------------------------------------------------------------------------------------
+  // FO-398 (K-577441 B): was the 500-record self-burn the weakest link? No. Two cheaper attacks on
+  // the SAME funnel, neither of which involves the use limit.
+  // ---------------------------------------------------------------------------------------
+
+  /**
+   * Same sweep as {@link sweep}, but the agency knows its filled codes because it registered a few
+   * organisations of its own on a fresh code (`ownMax` at most, 5 at least), not because a
+   * limit flipped. No use limit is involved: these are plain codes whose uses the agency counted.
+   */
+  function sweepOwn(seed: number, mode: Mode, tables: number, ownMax: number) {
+    const rand = stream(seed);
+    let withLeak = 0;
+    for (let k = 0; k < tables; k++) {
+      const nFull = 1 + Math.floor(rand() * 2);
+      const r = rand() < 0.8 ? 1 + Math.floor(rand() * 4) : 5 + Math.floor(rand() * 30);
+      const d = mode.noneDeleted ? 0 : Math.floor(rand() * 4);
+      // 5 at least: an own code of 3 or 4 would count as a "leak" of a number the agency made itself.
+      const own = Array.from({ length: nFull }, () => 5 + Math.floor(rand() * (ownMax - 4)));
+      const sum = own.reduce((a, b) => a + b, 0) + r;
+      const t = bigTable(rand, sum - d, mode.single);
+      const codes: CodeKnowledge[] = [
+        ...own.map((m) => ({ truth: m, lo: m, hi: m })),
+        { truth: r, lo: 0, hi: INVITE_CODE_MAX_USE_LIMIT },
+      ];
+      if (attack(t, publish(t), { codes, noneDeleted: mode.noneDeleted }).length) withLeak++;
+    }
+    return withLeak;
+  }
+
+  const CHEAP_MODES: Mode[] = MODES;
+  for (const mode of CHEAP_MODES) {
+    const label = `${mode.single ? 'single' : 'spread'}, ${mode.noneDeleted ? 'D = 0' : 'D >= 0'}`;
+    test(`FO-398 cheap fill gate, ${label}: 5-30 own registrations on a fresh code - ${RESIDUAL_MODE(mode) ? `below ${STEP10_CEILING * 100} %` : 'anyLeak = 0'} (rounding step ${FUNNEL_ROUND_STEP})`, () => {
+      const withLeak = sweepOwn(31, mode, TABLES, 30);
+      measure(`CHEAPFILL seed=31 own=5..30 step=${FUNNEL_ROUND_STEP} ${label} tables=${TABLES} tablesWithLeak=${withLeak}`);
+      if (RESIDUAL_MODE(mode)) expect(withLeak / TABLES).toBeLessThan(STEP10_CEILING);
+      else expect(withLeak, `${withLeak}/${TABLES} tables leak`).toBe(0);
+    }, TIMEOUT_MS);
+  }
+
+  test('FO-398 positive control: at the rounding step before FO-398 (5), 5-30 own registrations (no limit involved) read a hidden 1..4 in some tables (D = 0, spread)', () => {
+    const MODE: Mode = { single: false, noneDeleted: true };
+    const cheap = withStep(5, () => sweepOwn(31, MODE, TABLES, 30));
+    const now = sweepOwn(31, MODE, TABLES, 30);
+    const ref = withStep(5, () => sweep(31, MODE, TABLES, seededUseLimit(RESIDUAL_LIMIT_SEED), POLICY_KNOWLEDGE, true).withLeak);
+    measure(`CHEAPFILL seed=31 own=5..30 step=5 spread D=0 tables=${TABLES} tablesWithLeak=${cheap} (step ${FUNNEL_ROUND_STEP}: ${now}; 500-record self-burn at step 5: ${ref})`);
+    expect(cheap, 'the cheap attack must be real at step 5').toBeGreaterThan(0);
+    expect(now, 'the shipped step must leak less than the old one').toBeLessThan(cheap);
+  }, TIMEOUT_MS);
+
+  /** A copy of `t` with `a` organisations of the attacker's own added to `province` (type SME, registered only). */
+  function withOwnOrgs(t: Table, province: string, a: number): Table {
+    const c: Table = new Map();
+    for (const [p, types] of t) c.set(p, Object.fromEntries(ORG_TYPES.map((ty) => [ty, { ...types[ty] }])) as Record<OrgType, Counts>);
+    c.get(province)!.SME.registered += a;
+    return c;
+  }
+
+  /**
+   * The threshold probe: a province the funnel masks ("<5") is unmasked by registering `a` of the
+   * attacker's own organisations in it; the first `a` that shows a number gives the hidden count
+   * as 5 - a. Returns how many masked province counts of 1..4 it names exactly, and the most own
+   * organisations it needed. Independent of the rounding step: the mask is on the true value.
+   */
+  function unmaskProbe(tables: number, seed: number) {
+    const rand = stream(seed);
+    let targets = 0;
+    let exact = 0;
+    let unmasked = 0;
+    let maxCost = 0;
+    for (let k = 0; k < tables; k++) {
+      const t = bigTable(rand, 60 + Math.floor(rand() * 200), false);
+      const base = publish(t);
+      for (const p of t.keys()) {
+        if (p === NO_PROVINCE) continue;
+        const key = id('registered', ALL, p);
+        const truth = ORG_TYPES.reduce((n, ty) => n + t.get(p)![ty].registered, 0);
+        if (base.get(key) !== null || truth < 1 || truth > 4) continue; // only masked, really 1..4
+        targets++;
+        for (let a = 1; a <= 8; a++) {
+          if (publish(withOwnOrgs(t, p, a)).get(key) == null) continue;
+          unmasked++;
+          if (5 - a === truth) {
+            exact++;
+            maxCost = Math.max(maxCost, a);
+          }
+          break;
+        }
+      }
+    }
+    return { targets, exact, unmasked, maxCost };
+  }
+
+  // KNOWN RESIDUAL, found by FO-398 and NOT closed by it: adding 1-4 organisations of the agency's own to
+  // a masked province unmasks it, and the step it moved at names the hidden count. It is the K-1 "time
+  // channel" of the notice addendum made exact for masked groups, and it does not involve the invite code.
+  // It is pinned, not loosened: if a change closes it (a secret mask margin was measured: 6/27 -> 2/27),
+  // this goes red and the notice must be updated. Reported to the owner and to the lawyer (soru 5e).
+  test('FO-398 KNOWN RESIDUAL threshold probe: 1-4 own organisations unmask a masked province and name its hidden count (not an invite-code channel)', () => {
+    // A fixed sample (3600 tables, ~4 s): the masked 1..4 province counts are rare, 27 of them in this run.
+    const r = unmaskProbe(3600, 41);
+    measure(`UNMASKPROBE seed=41 step=${FUNNEL_ROUND_STEP} maskedProvinceCounts1to4=${r.targets} unmaskedWithin8=${r.unmasked} namedExactly=${r.exact} maxOwnOrgsNeeded=${r.maxCost}`);
+    expect(r.targets).toBeGreaterThan(0);
+    expect(r.exact, 'the residual is real: if it is gone, update the notice and the lawyer question').toBeGreaterThan(0);
+    expect(r.exact / r.targets).toBeLessThan(0.5);
+    expect(r.maxCost).toBeLessThanOrEqual(4);
+  }, TIMEOUT_MS);
 });

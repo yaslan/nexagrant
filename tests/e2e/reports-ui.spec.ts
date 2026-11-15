@@ -462,11 +462,12 @@ const STEPS_TR = [
 /**
  * What agency A's report must say, derived from the seed alone: 5 SME organisations
  * in Kütahya, none with a scorecard, saved search, opportunity, concept note or
- * application. "Registered" is 5 (shown: at the threshold, already a multiple of 5);
- * every other step is 0 and therefore "<5". Every other type is 0 → "<5".
+ * application. "Registered" is 5 and is SHOWN as 10 (rounding unit 10 since FO-398: 5 rounds up
+ * to 10, meaning 5..14); every other step is 0 and therefore "<5". Every other type is 0 → "<5".
  */
+const SHOWN_REGISTERED = '10';
 function expectedCells(registeredLabel: string) {
-  return (step: string) => (step === registeredLabel ? String(LINKED_ORGS) : '<5');
+  return (step: string) => (step === registeredLabel ? SHOWN_REGISTERED : '<5');
 }
 
 /** Minimal RFC 4180 reader (quoted fields, CRLF). */

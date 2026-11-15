@@ -20,18 +20,16 @@
  * {@link INVITE_CODE_MIN_USE_LIMIT}". Before a code is full, a limit that varies
  * over 25 values hides its count behind a window wider than the 1..4 the funnel masks.
  *
- * What the spread does NOT do (crw-fb FO-392-crw-fb-2.md B-3, patron decision A): it
- * protects a code only until it is full. The status turns "Limit reached" (panel)
- * and the form refuses at exactly the limit, so an agency that makes a fresh code
- * and registers on it itself until the flip learns its limit EXACTLY. The price is
- * about that many real records (500..524, visible on the platform). With the
- * filled codes exact, the window for another code's uses shrinks to the funnel's
- * rounding step (+-2), and in the multi-province, no-deletion case a hidden 1..4
- * is read back in 57-84 of 900 simulated tables, about 8 % on average and above
- * the ~5.8 % a FIXED 500 leaks (funnel.attack.test.ts, "self-burn KNOWN RESIDUAL"; the
- * rate moves between runs because the limits are drawn at random). The owner accepted this and kept the behaviour; the notice
- * addendum says so and the lawyer is asked (HUKUK-SORULARI-2026-09.md). Do not
- * claim in code, docs or UI that an agency "cannot learn" the limit.
+ * What the spread does NOT do (crw-fb FO-392-crw-fb-2.md B-3; FO-398): it protects a code only until
+ * it is full, and the limit is not what makes the attack possible. An agency that makes a fresh code and
+ * registers on it itself knows that code's uses EXACTLY: at the flip it learns the limit (cost 500..524
+ * records), but it does not even need the flip - registering 5-30 organisations of its own on a fresh
+ * code gives the same knowledge. With the filled codes exact, another code's uses are read off the
+ * funnel's rounded grand total to within the rounding step. FO-398 measured it (funnel.attack.test.ts,
+ * 900 tables, several provinces, no deletions): at the old step of 5 the 500-record way read a hidden
+ * 1..4 in 74 tables and the 5-30-record way in 60; at the shipped step of 10 (K-577804) 6 and 4. No
+ * setting of this file moves those numbers. Do not claim in code, docs or UI that an agency "cannot
+ * learn" the limit.
  *
  * Where the numbers come from: the 500 is the autopilot default of K-577141
  * (no owner answer); the 0..24 spread is the owner's decision K-577268. Change

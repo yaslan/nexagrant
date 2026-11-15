@@ -3,7 +3,7 @@
  *
  * The report makes no number of its own. It is the dashboard's published,
  * already safe output — `buildAgencyFunnel`: one cumulative cohort,
- * masking under 5 with complementary suppression, every number rounded to 5 —
+ * masking under 5 with complementary suppression, every number rounded to 10 (5 before FO-398) —
  * copied once a month and formatted as a printable page and a CSV.
  *
  *   - One read: {@link readAgencyFunnelRaw}, the dashboard's own query path.
@@ -23,7 +23,7 @@
  * `type = agency.report.generated`, `target = YYYY-MM`, `data` = the snapshot.
  * The printable page and the CSV are rendered from it at download time, so a
  * stored report can hold only what {@link AgencyReportSnapshotSchema} admits:
- * cell states and multiples of 5, no tenant id, no name, no raw count.
+ * cell states and multiples of 5 (10 since FO-398; a report stored before it holds 5s and must still read), no tenant id, no name, no raw count.
  * A real PDF file in R2 is later work (option C, a separate approval).
  */
 import { z } from 'zod';
@@ -53,7 +53,8 @@ const CellSchema = z.discriminatedUnion('state', [
   z
     .object({
       state: z.literal('count'),
-      // What roundToFive gives for a shown count: a multiple of 5, never under 5.
+      // What roundForDisplay gives for a shown count: a multiple of 10 since FO-398, never under 5.
+      // Reports stored earlier hold multiples of 5, so the check stays at 5.
       value: z
         .number()
         .int()

@@ -37,7 +37,8 @@
  * one request away, so no number a reader can combine with another may leave
  * a group of 1..4. src/lib/agency/funnel.attack.test.ts is the gate: an
  * integer attacker joining every view. Every number shown is then rounded to
- * a multiple of 5 ({@link roundToFive}, HUKUK-5). Masking and rounding happen
+ * a multiple of 10 ({@link roundForDisplay}, {@link FUNNEL_ROUND_STEP}; 5 until
+ * FO-398). Masking and rounding happen
  * here, so the browser never receives a count under 5 nor an exact count.
  *
  * Not on any screen yet, and gated if it ever is (TASK-MUM1OTRM75QS2-crw-fb.md
@@ -160,20 +161,31 @@ export class NotAnAgencyError extends Error {
 }
 
 /**
- * HUKUK-5 fallback (TASK-MULZATEX4G92H, leed-fb 29.09 decision 4): every number
- * shown is rounded to the nearest multiple of 5, each on its own (totals are
- * rounded separately, so the parts need not add up to the total). The rule
- * based suppression alone still left a small group readable in about one of
- * a thousand random tables (the wider run in the report); rounding leaves a
- * reader intervals of width 4 instead of exact numbers. The threshold holds:
- * only a number of 5 or more is shown, so a shown 5 is 5..7, never 3.
+ * The unit every shown number is rounded to (FO-398, K-577799). It was 5 (HUKUK-5) until the
+ * attacker of funnel.attack.test.ts showed that a step of 5 is not enough once an agency knows
+ * some of its own codes' uses exactly: with 5-30 organisations it registered itself on a fresh
+ * code it reads another code's hidden 1..4 uses back in 60 of 900 simulated tables (D = 0,
+ * several provinces), 74 of 900 with the 500 records of a limit-filled code. At 10 all three
+ * ways read 0 of 900. The threshold stays 5: a group under 5 is still masked.
+ *
+ * A shown number is within -5..+4 of the truth; a shown 10 means 5..14.
  */
-export function roundToFive(value: number): number {
-  return Math.round(value / SMALL_CELL_THRESHOLD) * SMALL_CELL_THRESHOLD;
+export const FUNNEL_ROUND_STEP = 10;
+
+/**
+ * Every number shown is rounded to the nearest multiple of {@link FUNNEL_ROUND_STEP}, each on its
+ * own (totals are rounded separately, so the parts need not add up to the total). The
+ * rule based suppression alone left a small group readable in about one of a thousand random
+ * tables (TASK-MULZATEX4G92H, leed-fb 29.09 decision 4); rounding leaves a reader an interval
+ * instead of an exact number. The threshold holds: only a number of 5 or more is shown, so a
+ * shown number is never under {@link SMALL_CELL_THRESHOLD}.
+ */
+export function roundForDisplay(value: number, step: number = FUNNEL_ROUND_STEP): number {
+  return Math.round(value / step) * step;
 }
 
-function cell(value: number, masked: boolean): FunnelCell {
-  return masked ? { state: 'small' } : { state: 'count', value: roundToFive(value) };
+function cell(value: number, masked: boolean, step: number): FunnelCell {
+  return masked ? { state: 'small' } : { state: 'count', value: roundForDisplay(value, step) };
 }
 
 function zeroCounts(): RawCounts {
@@ -359,8 +371,12 @@ export function suppressedCells(raw: RawByProvince): Set<string> {
  * breakdown asked for leaves this function, but the masking is the one of
  * every breakdown at once ({@link suppressedCells}).
  */
-export function buildAgencyFunnel(raw: RawByProvince, breakdown: FunnelBreakdown): AgencyFunnel {
-  return maskAgencyFunnel(raw)(breakdown);
+export function buildAgencyFunnel(
+  raw: RawByProvince,
+  breakdown: FunnelBreakdown,
+  roundStep: number = FUNNEL_ROUND_STEP
+): AgencyFunnel {
+  return maskAgencyFunnel(raw, roundStep)(breakdown);
 }
 
 /**
@@ -369,7 +385,10 @@ export function buildAgencyFunnel(raw: RawByProvince, breakdown: FunnelBreakdown
  * that needs several breakdowns of one table (the region report) masks it once
  * instead of once per breakdown (TASK-MUO0U24HHVOJH).
  */
-export function maskAgencyFunnel(raw: RawByProvince): (breakdown: FunnelBreakdown) => AgencyFunnel {
+export function maskAgencyFunnel(
+  raw: RawByProvince,
+  roundStep: number = FUNNEL_ROUND_STEP
+): (breakdown: FunnelBreakdown) => AgencyFunnel {
   const byProvince = normalizeProvinces(raw);
   const hidden = suppressedCells(byProvince);
   const total = sumProvinces(byProvince);
@@ -378,7 +397,7 @@ export function maskAgencyFunnel(raw: RawByProvince): (breakdown: FunnelBreakdow
       FUNNEL_STEPS.map((s) => {
         if (UNMEASURED.has(s)) return [s, { state: 'unmeasured' }];
         const m = s as MeasuredStep;
-        return [s, cell(value(m), !known || hidden.has(cellId(m, t, p)))];
+        return [s, cell(value(m), !known || hidden.has(cellId(m, t, p)), roundStep)];
       })
     ) as FunnelView;
 

@@ -3144,7 +3144,7 @@
       "unmeasured": "Henüz ölçülmüyor",
       "smallHint": "5'ten az kurum: kurumları tanıtmamak için sayı gösterilmez.",
       "smallSr": "5'ten az; sayı gizlendi",
-      "privacyNote": "Gösterilen sayılar 5'in katına yuvarlanır; her sayı ayrı yuvarlandığı için parçaların toplamı toplamı tutmayabilir. <5: Bu grupta 5'ten az kurum var ya da sayı, başka sayılarla birlikte (toplam, başka bir tür, başka bir il ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
+      "privacyNote": "Gösterilen sayılar 10'un katına yuvarlanır (gösterilen \"10\" gerçekte 5 ile 14 arasıdır); her sayı ayrı yuvarlandığı için parçaların toplamı toplamı tutmayabilir. <5: Bu grupta 5'ten az kurum var ya da sayı, başka sayılarla birlikte (toplam, başka bir tür, başka bir il ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
       "steps": {
         "registered": {
           "title": "Davet koduyla kayıt",

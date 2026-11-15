@@ -17,7 +17,7 @@ import {
 /**
  * TASK-MULRR08Y9YI77 (FB KAMU B3) — the region report is the dashboard's
  * published output, copied: no number that the dashboard does not show for the
- * same data, in the same form (masked, rounded to 5).
+ * same data, in the same form (masked, rounded to 10; 5 before FO-398).
  */
 
 type Step = (typeof FUNNEL_STEPS)[number];
@@ -215,7 +215,7 @@ describe('files', () => {
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('PDF olarak kaydet');
-    expect(html).toContain("5'in katına yuvarlanır");
+    expect(html).toContain("10'un katına yuvarlanır");
     expect(html).toContain('<td>30</td>');
   });
 
