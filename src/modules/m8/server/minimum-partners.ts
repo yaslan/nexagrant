@@ -73,7 +73,8 @@ export function minimumPartnerState(
 
 /**
  * One spelling for a country code, whichever table it came from (CORDIS organisation,
- * the tenant's PartnerOrg, an expert pre-registration): trimmed, upper case, blank → null.
+ * the tenant's PartnerOrg): trimmed, upper case, blank → null. (Expert pre-registrations
+ * are no longer compared: K-581990 = A, experts are not country-filtered.)
  * CRW NG-186 (2. tur) C-1: PartnerOrg countries were normalised and CORDIS ones were not,
  * so "de" and "DE" counted as two countries.
  */

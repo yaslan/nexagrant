@@ -1,7 +1,3 @@
-// `Role` is imported as a value, not a string literal: src/types/prisma-override.d.ts
-// declares it as a TS enum, so `'MEMBER'` is not assignable to `Role` (TS2322).
-import { Role } from '@prisma/client';
-
 import { ModuleManifest } from '@/lib/modules/types';
 
 // NG-143 (M18-F1), plan FO-265 option B: HibeLead's client-sales features rebuilt as a FonBridge
@@ -44,9 +40,9 @@ export const m18Manifest: ModuleManifest = {
   // through `listModuleNav`: at DEV/PILOT only the allowed audience sees it.
   nav: [{ labelKey: 'clientPipeline', routeKey: 'clientPipeline', order: 55 }],
   permissions: [
-    { id: 'client-pipeline:read', minRole: Role.MEMBER },
-    { id: 'client-pipeline:write', minRole: Role.WRITER },
-    { id: 'client-pipeline:admin', minRole: Role.TENANT_ADMIN },
+    { id: 'client-pipeline:read', minRole: 'MEMBER' },
+    { id: 'client-pipeline:write', minRole: 'WRITER' },
+    { id: 'client-pipeline:admin', minRole: 'TENANT_ADMIN' },
   ],
   tables: [
     'LeadOrganization',
