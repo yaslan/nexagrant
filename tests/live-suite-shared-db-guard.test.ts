@@ -246,3 +246,68 @@ describe('live suites never delete without a scope, whatever database they name 
     });
   });
 });
+
+/**
+ * NG-206 review tur 4 (B-2): the server-name pin above proves the name is read from the server, not that
+ * the mutation gate uses it. This reads the gate's declarations from the AST: MUTATION_ALLOWED must read
+ * DB_NAME, SHARED_DB and process.env.RLS_MUTATION_DB, and MUTATION_SKIP must be `!MUTATION_ALLOWED`.
+ * Returns the problems found (empty when the gate is as required).
+ */
+export function mutationGateProblems(file: string, source: string): string[] {
+  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const declared = new Map<string, ts.Expression>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) declared.set(node.name.text, node.initializer);
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+
+  const allowed = declared.get('MUTATION_ALLOWED');
+  if (!allowed) return ['MUTATION_ALLOWED is not declared with an initializer'];
+
+  const names = new Set<string>();
+  const collect = (node: ts.Node): void => {
+    if (ts.isIdentifier(node)) names.add(node.text);
+    ts.forEachChild(node, collect);
+  };
+  collect(allowed);
+
+  const problems: string[] = [];
+  for (const required of ['DB_NAME', 'SHARED_DB']) {
+    if (!names.has(required)) problems.push(`MUTATION_ALLOWED does not read ${required}`);
+  }
+  if (!allowed.getText().includes('process.env.RLS_MUTATION_DB')) problems.push('MUTATION_ALLOWED does not read process.env.RLS_MUTATION_DB');
+
+  const skip = declared.get('MUTATION_SKIP');
+  const negatesAllowed =
+    skip !== undefined && ts.isPrefixUnaryExpression(skip) && skip.operator === ts.SyntaxKind.ExclamationToken && ts.isIdentifier(skip.operand) && skip.operand.text === 'MUTATION_ALLOWED';
+  if (!negatesAllowed) problems.push('MUTATION_SKIP is not !MUTATION_ALLOWED');
+  return problems;
+}
+
+describe('the ExpertDirectoryEntry mutation gate, read from the AST (NG-206 review tur 4, B-2)', () => {
+  const GATE_FILE = 'tests/rls-verify-system-scope-policy-set.live.test.ts';
+  const source = readFileSync(path.join(ROOT, GATE_FILE), 'utf8');
+
+  /** The source with one `const NAME = …;` declaration replaced by `const NAME = value;`. */
+  function mutant(name: string, value: string): string {
+    const pattern = new RegExp(`const ${name} = [^\\n]*;`);
+    expect(pattern.test(source), `${name} declaration not found`).toBe(true);
+    return source.replace(pattern, `const ${name} = ${value};`);
+  }
+
+  it('MUTATION_ALLOWED reads DB_NAME, SHARED_DB and RLS_MUTATION_DB; MUTATION_SKIP negates it', () => {
+    expect(mutationGateProblems(GATE_FILE, source)).toEqual([]);
+  });
+
+  it.each([
+    ['MUTATION_ALLOWED = true', mutant('MUTATION_ALLOWED', 'true')],
+    ['MUTATION_ALLOWED = isGithubActions()', mutant('MUTATION_ALLOWED', 'isGithubActions()')],
+    ['MUTATION_ALLOWED ignores SHARED_DB', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME !== undefined && process.env.RLS_MUTATION_DB === DB_NAME)')],
+    ['MUTATION_ALLOWED ignores RLS_MUTATION_DB', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME !== undefined && !SHARED_DB)')],
+    ['MUTATION_SKIP = false', mutant('MUTATION_SKIP', 'false')],
+  ])('a mutant with %s fails the pin', (_label, mutated) => {
+    expect(mutated).not.toBe(source);
+    expect(mutationGateProblems(GATE_FILE, mutated)).not.toEqual([]);
+  });
+});

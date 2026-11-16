@@ -68,7 +68,7 @@ const SHARED_DB = DB_NAME === 'fabrika' && !isGithubActions();
 /**
  * NG-206 (review tur 2): allowlist, not a name denylist. A shared database with any other name
  * (`fabrika_dev`, a quoted `"Fabrika"`) must not run these tests by default. Off GitHub Actions they
- * run only when RLS_MUTATION_DB names exactly the database the owner connection is on, and never on "fabrika".
+ * run only when RLS_MUTATION_DB names exactly the database the owner connection is on, and off GitHub Actions never on "fabrika".
  */
 const MUTATION_ALLOWED = isGithubActions() || (DB_NAME !== undefined && !SHARED_DB && process.env.RLS_MUTATION_DB === DB_NAME);
 const MUTATION_SKIP = !MUTATION_ALLOWED;
