@@ -240,7 +240,10 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
       data.transferConsent && leadTransferConsentEnabled()
         ? await transferRecipientFor(data.province, db).catch(() => null)
         : null;
-    const transferTo = recipient && data.transferOrgName !== null && recipient.name === data.transferOrgName ? recipient : null;
+    // Both names are compared trimmed (NG-213 D-4): the schema trims what the form sends back, Tenant.name
+    // is stored as typed. The stored consent keeps the DB value the visitor was shown.
+    const transferTo =
+      recipient && data.transferOrgName !== null && recipient.name.trim() === data.transferOrgName ? recipient : null;
     const transferOn = transferTo !== null;
 
     // NG-175 (SEC NG-170 O-1): PublicLead is RLS system_scope only. 'public-intake' opens it (and,
