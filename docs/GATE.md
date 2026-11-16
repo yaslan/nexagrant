@@ -118,3 +118,5 @@ Kırmızı yeniden görülürse:
 3. Hata numara çakışması ya da boşluk gösteriyorsa gerçek eşzamanlılık hatasıdır: `verify.ts` kilidini ve unique kısıtı kontrol et, testi gevşetme. Sayaç ile `max(founderNumber)` farkı, kilit dışından yazım olduğunu gösterir.
 4. Kırmızı yalnız bağlantı zaman aşımıysa (`DB_CONNECT_TIMEOUT_MS`) ve koşu paylaşımlı `:5433` DB'ye karşıysa, koşu izole değildi: `pnpm gate:isolated` ile yeniden koş.
 5. Üç koşu da yeşilse kırmızıyı kaydet ve kartı kapatma; ham log olmadan kök neden yazma.
+
+`E2E_SHOTS_ROOT=docs/agent-results` e2e kanıtını (ör. `lead-transfer-consent` → `NG-179-evidence/`) bilerek git'te izlenen klasöre yazar; varsayılan koşu yalnız git-ignored `test-artifacts/` altına yazar (NG-217).
