@@ -275,8 +275,13 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
   // slows both the same way, so the ratio does not move, while a rescanning pass costs 25x or more.
   // Each side is the best of RUNS interleaved runs, which drops the runs a noisy neighbour hit.
   const RUNS = 5;
-  const MAX_RATIO = 12; // linear parses measure 1–5x the reference; the old regular expressions 25x–5000x
-  const reference = fill('< x ');
+  // The reference must NOT be hostile itself: a `<`-dense reference (`< x `) goes down the same path as
+  // the input, so a `<[^>]+>` rescan in htmlToText would slow both and leave the ratio at ~1 (NG-214
+  // review B1). Closed tags are linear for every pass, old regexes included.
+  // Correct code measures 0.05–3.6x this reference; a pickSubpages label rescan 29x, an htmlToText
+  // `<[^>]+>` 150–600x (at 100 KB; at 1 MB it does not finish).
+  const MAX_RATIO = 12;
+  const reference = fill('<p>x </p> ');
   const parseMs = (html: string): number => {
     const started = performance.now();
     htmlToText(html);
