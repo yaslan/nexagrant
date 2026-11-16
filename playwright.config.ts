@@ -85,8 +85,8 @@ if (process.env.E2E_DATABASE_URL) {
 const E2E_SMTP = { SMTP_HOST: 'localhost', SMTP_PORT: '1025' };
 process.env.E2E_MAILPIT_URL ??= 'http://localhost:8025';
 
-// NG-209: the e2e web server answers LLM calls from the fake provider in src/lib/llm.ts and reads an
-// in-process fake website (no model, no outside network). The runner gets the same value, so a spec
+// NG-209: the e2e web server answers the M18 LLM calls (only those) from the fake provider in
+// src/lib/llm.ts and reads an in-process fake website (no model, no outside network). The runner gets the same value, so a spec
 // can refuse to click when the server would reach a real resolver. Only a development or test
 // server may run with it; `start` (a production build) refuses to boot with it
 // (assertFakeAiAllowed), so it is set for `dev` only.

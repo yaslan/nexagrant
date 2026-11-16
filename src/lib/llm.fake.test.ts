@@ -38,7 +38,14 @@ vi.mock('@/lib/env', () => ({
   },
 }));
 
-import { assertFakeAiAllowed, fakeAiEnabled, FakeAiNotAllowedError, generateCompletion } from './llm';
+import {
+  assertFakeAiAllowed,
+  fakeAiEnabled,
+  FakeAiNotAllowedError,
+  generateCompletion,
+  testOnlyAssertFakeAiAllowed,
+  testOnlyFakeAiEnabled,
+} from './llm';
 
 /** llm.ts evaluated afresh with process.env.NODE_ENV = `nodeEnv` at load: the build-time constant. */
 async function loadLlmBuiltWith(nodeEnv: string): Promise<typeof import('./llm')> {
@@ -71,15 +78,15 @@ afterEach(() => {
 
 describe('fakeAiEnabled — default-deny: development or test only (sec F1)', () => {
   it('is on only for the literal `true` with NODE_ENV development or test', () => {
-    expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).toBe(true);
-    expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'test' })).toBe(true);
-    expect(fakeAiEnabled({ E2E_FAKE_AI: 'false', NODE_ENV: 'development' })).toBe(false);
-    expect(fakeAiEnabled({ NODE_ENV: 'development' })).toBe(false);
+    expect(testOnlyFakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).toBe(true);
+    expect(testOnlyFakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'test' })).toBe(true);
+    expect(testOnlyFakeAiEnabled({ E2E_FAKE_AI: 'false', NODE_ENV: 'development' })).toBe(false);
+    expect(testOnlyFakeAiEnabled({ NODE_ENV: 'development' })).toBe(false);
   });
 
   it('is off for every other NODE_ENV: production, staging, preview, blank, unset', () => {
     for (const NODE_ENV of ['production', 'staging', 'preview', '', 'Development', undefined]) {
-      expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toBe(false);
+      expect(testOnlyFakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toBe(false);
     }
   });
 
@@ -97,28 +104,33 @@ describe('the build-time lock — the real module constant, no parameter (sec F2
   it('a module built with NODE_ENV=production keeps the fake off whatever the runtime NODE_ENV says', async () => {
     const built = await loadLlmBuiltWith('production');
     for (const NODE_ENV of ['development', 'test']) {
-      expect(built.fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toBe(false);
-      expect(() => built.assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toThrow(built.FakeAiNotAllowedError);
+      expect(built.testOnlyFakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toBe(false);
+      expect(() => built.testOnlyAssertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toThrow(built.FakeAiNotAllowedError);
     }
-    expect(() => built.assertFakeAiAllowed({ NODE_ENV: 'development' })).not.toThrow();
+    expect(() => built.testOnlyAssertFakeAiAllowed({ NODE_ENV: 'development' })).not.toThrow();
   });
 
   it('a module built with NODE_ENV=test lets the e2e combination through', async () => {
     const built = await loadLlmBuiltWith('test');
-    expect(built.fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).toBe(true);
-    expect(() => built.assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).not.toThrow();
+    expect(built.testOnlyFakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).toBe(true);
+    expect(() => built.testOnlyAssertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).not.toThrow();
   });
 
-  it('takes no build parameter: no caller can pass the lock open (checked by tsc)', () => {
-    expectTypeOf<Parameters<typeof fakeAiEnabled>['length']>().toEqualTypeOf<0 | 1>();
-    expectTypeOf<Parameters<typeof assertFakeAiAllowed>['length']>().toEqualTypeOf<0 | 1>();
+  it('production code passes nothing: the exported checks take no parameter at all (sec F6, checked by tsc)', () => {
+    expectTypeOf<Parameters<typeof fakeAiEnabled>['length']>().toEqualTypeOf<0>();
+    expectTypeOf<Parameters<typeof assertFakeAiAllowed>['length']>().toEqualTypeOf<0>();
+    // The pure evaluation over a given source lives only in the testOnly… helpers.
+    expectTypeOf<Parameters<typeof testOnlyFakeAiEnabled>['length']>().toEqualTypeOf<1>();
+    expectTypeOf<Parameters<typeof testOnlyAssertFakeAiAllowed>['length']>().toEqualTypeOf<1>();
+    expect(fakeAiEnabled.length).toBe(0);
+    expect(assertFakeAiAllowed.length).toBe(0);
   });
 });
 
 describe('assertFakeAiAllowed — a server with the flag on starts only in development or test', () => {
   it('throws for every NODE_ENV other than development and test', () => {
     for (const NODE_ENV of ['production', 'staging', 'preview', '', undefined]) {
-      expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toThrow(FakeAiNotAllowedError);
+      expect(() => testOnlyAssertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toThrow(FakeAiNotAllowedError);
     }
   });
 
@@ -130,15 +142,15 @@ describe('assertFakeAiAllowed — a server with the flag on starts only in devel
   });
 
   it('names the environment it refused in the message', () => {
-    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'staging' })).toThrow(/E2E_FAKE_AI.*NODE_ENV=staging/s);
+    expect(() => testOnlyAssertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'staging' })).toThrow(/E2E_FAKE_AI.*NODE_ENV=staging/s);
   });
 
   it('lets every other combination start', () => {
-    expect(() => assertFakeAiAllowed({ NODE_ENV: 'production' })).not.toThrow();
-    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'false', NODE_ENV: 'staging' })).not.toThrow();
-    expect(() => assertFakeAiAllowed({ NODE_ENV: undefined })).not.toThrow();
-    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).not.toThrow();
-    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'test' })).not.toThrow();
+    expect(() => testOnlyAssertFakeAiAllowed({ NODE_ENV: 'production' })).not.toThrow();
+    expect(() => testOnlyAssertFakeAiAllowed({ E2E_FAKE_AI: 'false', NODE_ENV: 'staging' })).not.toThrow();
+    expect(() => testOnlyAssertFakeAiAllowed({ NODE_ENV: undefined })).not.toThrow();
+    expect(() => testOnlyAssertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).not.toThrow();
+    expect(() => testOnlyAssertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'test' })).not.toThrow();
   });
 });
 
