@@ -46,6 +46,14 @@ const USED_CONNECTION = [
  */
 const URL_BASED = ['tests/partner-search-acceptance.live.test.ts', 'tests/partner-search-ingest.live.test.ts'];
 
+/**
+ * Exception: reads the name with `select current_database()` on the owner connection (`admin`), the
+ * same connection its rls:verify child processes run on. NG-206 (D-B1): the mutation tests commit a
+ * mutated view, so they refuse "fabrika". The URL is not parsed, so a DATABASE_URL that only .env holds
+ * cannot make the name read as something else.
+ */
+const SERVER_NAME = ['tests/rls-verify-system-scope-policy-set.live.test.ts'];
+
 /** Opened by its own ALLOW_SWEEP_ON_SHARED_DB, not by CI or GitHub Actions: ci.yml sets that flag on its Test step. */
 const OPENED_BY_FLAG = ['tests/m17-stale-runs.live.test.ts'];
 
@@ -107,10 +115,10 @@ describe('live suites that refuse the shared "fabrika" database', () => {
   const found = guards();
 
   it('are exactly the known ones: a guard cannot vanish, and a new one gets reviewed here', () => {
-    expect([...new Set(found.map((g) => g.file))].sort()).toEqual([...USED_CONNECTION, ...URL_BASED].sort());
+    expect([...new Set(found.map((g) => g.file))].sort()).toEqual([...USED_CONNECTION, ...URL_BASED, ...SERVER_NAME].sort());
   });
 
-  it.each(found.filter((g) => !URL_BASED.includes(g.file)).map((g) => [g.file, g] as const))(
+  it.each(found.filter((g) => !URL_BASED.includes(g.file) && !SERVER_NAME.includes(g.file)).map((g) => [g.file, g] as const))(
     '%s reads the name with usedDatabaseName(<RLS connection>, admin, SUITE), in that order',
     (_file, guard) => {
       expect(guard.usedCall, `${guard.name} does not come from usedDatabaseName`).toBeDefined();
