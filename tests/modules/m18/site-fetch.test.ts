@@ -505,6 +505,15 @@ describe('pinned transport (connect-time address check)', () => {
     expect(hits).toEqual([]);
   });
 
+  it('the real transport refuses a 10.0.0.1 answer: no socket reaches the server (NG-209 sec F3)', async () => {
+    const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
+    const fetchImpl = testOnlyPinnedTransport({ resolve: async () => ['10.0.0.1'], connectPort: port });
+    await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
+    // Through the reader too: the pre-check saw a public address, the transport's own answer is 10.0.0.1.
+    expect(await fetchOrganizationSite('http://acme.com.tr', { lookup: PUBLIC, fetchImpl })).toEqual({ ok: false, reason: 'robots_unreadable' });
+    expect(hits).toEqual([]);
+  });
+
   it('a mixed answer (one public, one private) is refused at connect time', async () => {
     const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
     const fetchImpl = testOnlyPinnedTransport({ resolve: async () => ['93.184.216.34', '127.0.0.1'], connectPort: port });
