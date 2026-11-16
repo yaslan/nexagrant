@@ -270,21 +270,39 @@ function canonicalExpression(node: ts.Expression): string {
  * NG-206 review tur 4 (B-2): the server-name pin above proves the name is read from the server, not that
  * the mutation gate uses it. This reads the gate from the AST: MUTATION_ALLOWED must be exactly the
  * expected expression (compared structurally, so formatting does not matter) and MUTATION_SKIP must be
- * `!MUTATION_ALLOWED`. The mutation tests must be opened with `it.skipIf(MUTATION_SKIP)` (B-2b): both
- * `it.skipIf(!MUTATION_SKIP)` and a plain `it(` would run them on a shared database.
+ * `!MUTATION_ALLOWED`. Every test whose title contains "mutation" must be opened with `it.skipIf(MUTATION_SKIP)`
+ * (B-2b, F-1): `it.skipIf(!MUTATION_SKIP)`, a plain `it(` / `it.only(` / `test(` would run it on a shared database.
+ * Only top-level declarations count, and a name declared twice in the file fails (F-2): a shadowing block cannot
+ * stand in for the declaration the gate really uses.
+ * F-3: operand order (`DB_NAME !== undefined && …` vs. the reverse) and `process.env["RLS_MUTATION_DB"]` are
+ * deliberately rejected: the comparison is an exact tree match, so a change there also needs EXPECTED_MUTATION_ALLOWED.
+ * F-4, known limit: detection is by title word, so a mutation test whose title has no "mutation" is not seen.
  * Returns the problems found (empty when the gate is as required).
  */
 export function mutationGateProblems(file: string, source: string): string[] {
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const declared = new Map<string, ts.Expression>();
-  const skipIfCalls: Array<{ arg: ts.Expression; title: string }> = [];
+  const declarationCount = new Map<string, number>();
+  const testCalls: Array<{ arg: ts.Expression | undefined; title: string }> = [];
+  const PLAIN_TEST_CALLEES = new Set(['it', 'it.only', 'it.skip', 'test', 'test.only', 'test.skip']);
   const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) declared.set(node.name.text, node.initializer);
-    // `it.skipIf(cond)(title, fn)`: the outer call's callee is the inner `it.skipIf(cond)` call.
-    if (ts.isCallExpression(node) && ts.isCallExpression(node.expression) && node.expression.expression.getText() === 'it.skipIf') {
-      const cond = node.expression.arguments[0];
-      const title = node.arguments[0];
-      if (cond && title && ts.isStringLiteralLike(title)) skipIfCalls.push({ arg: cond, title: title.text });
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      declarationCount.set(node.name.text, (declarationCount.get(node.name.text) ?? 0) + 1);
+      // Top-level only: the parent chain is VariableDeclaration → VariableDeclarationList → VariableStatement → SourceFile.
+      const topLevel = ts.isSourceFile(node.parent.parent.parent);
+      if (topLevel && node.initializer) declared.set(node.name.text, node.initializer);
+    }
+    if (ts.isCallExpression(node)) {
+      // `it.skipIf(cond)(title, fn)`: the outer call's callee is the inner `it.skipIf(cond)` call.
+      if (ts.isCallExpression(node.expression) && ['it.skipIf', 'test.skipIf'].includes(node.expression.expression.getText())) {
+        const cond = node.expression.arguments[0];
+        const title = node.arguments[0];
+        if (title && ts.isStringLiteralLike(title)) testCalls.push({ arg: cond, title: title.text });
+      } else if (PLAIN_TEST_CALLEES.has(node.expression.getText())) {
+        // Plain `it(title, fn)`: no condition, so it can never be `it.skipIf(MUTATION_SKIP)`.
+        const title = node.arguments[0];
+        if (title && ts.isStringLiteralLike(title)) testCalls.push({ arg: undefined, title: title.text });
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -294,6 +312,10 @@ export function mutationGateProblems(file: string, source: string): string[] {
   if (!allowed) return ['MUTATION_ALLOWED is not declared with an initializer'];
 
   const problems: string[] = [];
+  for (const name of ['MUTATION_ALLOWED', 'MUTATION_SKIP']) {
+    const count = declarationCount.get(name) ?? 0;
+    if (count > 1) problems.push(`${name} is declared ${count} times; only one top-level declaration is allowed`);
+  }
   const expected = ts.createSourceFile('expected.ts', `x = ${EXPECTED_MUTATION_ALLOWED};`, ts.ScriptTarget.Latest, true);
   const expectedNode = ((expected.statements[0] as ts.ExpressionStatement).expression as ts.BinaryExpression).right;
   if (canonicalExpression(allowed) !== canonicalExpression(expectedNode)) {
@@ -305,10 +327,12 @@ export function mutationGateProblems(file: string, source: string): string[] {
     skip !== undefined && ts.isPrefixUnaryExpression(skip) && skip.operator === ts.SyntaxKind.ExclamationToken && ts.isIdentifier(skip.operand) && skip.operand.text === 'MUTATION_ALLOWED';
   if (!negatesAllowed) problems.push('MUTATION_SKIP is not !MUTATION_ALLOWED');
 
-  const mutationTests = skipIfCalls.filter((call) => call.title.toLowerCase().includes('mutation'));
-  if (mutationTests.length < 2) problems.push(`fewer than 2 mutation tests opened with it.skipIf (found ${mutationTests.length})`);
+  const mutationTests = testCalls.filter((call) => call.title.toLowerCase().includes('mutation'));
+  if (mutationTests.length < 2) problems.push(`fewer than 2 mutation tests found (found ${mutationTests.length})`);
   for (const call of mutationTests) {
-    if (canonicalExpression(call.arg) !== 'MUTATION_SKIP') problems.push(`mutation test "${call.title}" is not it.skipIf(MUTATION_SKIP)`);
+    if (call.arg === undefined || canonicalExpression(call.arg) !== 'MUTATION_SKIP') {
+      problems.push(`mutation test "${call.title}" is not it.skipIf(MUTATION_SKIP)`);
+    }
   }
   return problems;
 }
@@ -357,6 +381,13 @@ describe('the ExpertDirectoryEntry mutation gate, read from the AST (NG-206 revi
     // NG-206 review tur 4 (B-2b): the skipIf direction was not pinned.
     ['mutation tests skipIf(!MUTATION_SKIP)', skipIfMutant('!MUTATION_SKIP')],
     ['mutation tests with no skipIf at all', source.replaceAll('it.skipIf(MUTATION_SKIP)', 'it')],
+    // NG-206 review tur 5 (F-1, mutant 22): a third, plain `it(` whose title says "mutation" passed the count-only pin.
+    ['an extra plain it() with a "mutation" title', `${source}\nit('extra (NG-188 mutation drop check)', async () => {});\n`],
+    // NG-206 review tur 5 (F-2, mutant 24): a wrong top-level value, with the right one in a shadowing block.
+    [
+      'a wrong top-level MUTATION_ALLOWED shadowed by a correct block',
+      `${mutant('MUTATION_ALLOWED', 'true')}\n{ const MUTATION_ALLOWED = ${EXPECTED_MUTATION_ALLOWED}; }\n`,
+    ],
   ])('a mutant with %s fails the pin', (_label, mutated) => {
     expect(mutated).not.toBe(source);
     expect(mutationGateProblems(GATE_FILE, mutated)).not.toEqual([]);
