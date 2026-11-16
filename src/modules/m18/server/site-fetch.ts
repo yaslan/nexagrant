@@ -813,8 +813,50 @@ export async function fetchOrganizationSite(rawUrl: string, deps: SiteFetchDeps 
   return { ok: true, pages, skipped };
 }
 
-// NG-209 red step: signatures only, no behaviour yet.
-export const FAKE_SITE_ADDRESS = '';
+
+// ── NG-209: the in-process fake site of the e2e web server ────────────────────────────────────────
+
+/**
+ * What the fake DNS answers. It is never connected to — the transport below is in-process — but it
+ * has to pass the unchanged {@link isPublicAddress} guard, so it is a public address (the one the
+ * unit tests already use), not a loopback or documentation one the guard would refuse.
+ */
+export const FAKE_SITE_ADDRESS = '93.184.216.34';
+
+const FAKE_SITE_PAGES: Readonly<Record<string, { type: string; body: string }>> = {
+  '/robots.txt': { type: 'text/plain', body: 'User-agent: *\nDisallow: /gizli\n' },
+  '/': {
+    type: 'text/html; charset=utf-8',
+    body:
+      '<html><head><title>Acme</title></head><body><h1>Acme Teknoloji (E2E_FAKE_AI fake site)</h1>' +
+      '<p>Yazılım geliştirme, Ankara.</p><a href="/hakkimizda">Hakkımızda</a> <a href="/gizli/hakkimizda">Gizli</a></body></html>',
+  },
+  '/hakkimizda': {
+    type: 'text/html; charset=utf-8',
+    body: '<html><body><h1>Hakkımızda</h1><p>Acme Teknoloji A.Ş., Çankaya / Ankara. 25 çalışan.</p></body></html>',
+  },
+};
+
+/** Serves {@link FAKE_SITE_PAGES} for any host, built by hand like the pinned transport's answers. */
+const fakeSiteFetch: FetchLike = async (url) => {
+  const page = FAKE_SITE_PAGES[url.pathname];
+  const status = page ? 200 : 404;
+  const bytes = new TextEncoder().encode(page?.body ?? 'not found');
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+  return { status, headers: new Headers({ 'content-type': page?.type ?? 'text/html' }), body };
+};
+
+/**
+ * The network edges of {@link fetchOrganizationSite} for the e2e web server (`E2E_FAKE_AI=true`,
+ * enrichment.ts): DNS and transport only. No `addressAllowed`, no `connectPort`: the URL check, the
+ * public-address check on the answer, robots.txt, same-site redirects and every limit run as in
+ * production. Nothing leaves the process.
+ */
 export function fakeSiteDeps(): SiteFetchDeps {
-  return {};
+  return { lookup: async () => [FAKE_SITE_ADDRESS], fetchImpl: fakeSiteFetch };
 }

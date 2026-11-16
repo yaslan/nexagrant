@@ -301,6 +301,94 @@ function signalUntil(deadlineAt: number | undefined): AbortSignal | undefined {
   return AbortSignal.timeout(Math.max(1, deadlineAt - Date.now()));
 }
 
+// ── NG-209: the e2e fake provider ──────────────────────────────────────────────────────────────
+
+type FakeAiEnv = { E2E_FAKE_AI?: string; NODE_ENV?: string };
+
+/**
+ * Whether this code was BUILT for production (`next build`). A direct `process.env.NODE_ENV` read
+ * is replaced by a literal at build time, so starting a production build with another NODE_ENV
+ * cannot change it — the same lock src/lib/demo-login.ts uses.
+ */
+const BUILT_FOR_PRODUCTION = process.env.NODE_ENV === 'production';
+
+/**
+ * `E2E_FAKE_AI=true` — the e2e web server (playwright.config.ts) answers every generateCompletion
+ * from {@link fakeProviderAnswer} instead of a provider: no key, no `fetch`, no model. Everything
+ * around the provider request stays real: the price, the reservation, the refund, the AiUsageLog
+ * row (provider `fake`, model `fake-e2e`). The M18 website reader follows the same flag
+ * (enrichment.ts → site-fetch.ts `fakeSiteDeps`).
+ *
+ * Off unless the flag is the literal `true`, and off in a production build or with
+ * NODE_ENV=production whatever the flag says; {@link assertFakeAiAllowed} refuses to start such a
+ * server in the first place (src/instrumentation.ts).
+ *
+ * @param builtForProduction the build-time half; a parameter only so tests can exercise a production build.
+ */
+export function fakeAiEnabled(source: FakeAiEnv = env, builtForProduction: boolean = BUILT_FOR_PRODUCTION): boolean {
+  return source.E2E_FAKE_AI === 'true' && !builtForProduction && source.NODE_ENV !== 'production';
+}
+
+export class FakeAiInProductionError extends Error {
+  constructor() {
+    super(
+      'E2E_FAKE_AI=true is not allowed in a production build or with NODE_ENV=production: every AI answer would come from the e2e fake provider, not a model. Remove it from the production environment; the server will not start with it.'
+    );
+    this.name = 'FakeAiInProductionError';
+  }
+}
+
+/** Run once at server start (src/instrumentation.ts): a production server with the flag on does not start. */
+export function assertFakeAiAllowed(source: FakeAiEnv = env, builtForProduction: boolean = BUILT_FOR_PRODUCTION): void {
+  if (source.E2E_FAKE_AI === 'true' && (builtForProduction || source.NODE_ENV === 'production')) {
+    throw new FakeAiInProductionError();
+  }
+}
+
+const FAKE_MODEL = 'fake-e2e';
+
+/**
+ * Canned answers by `module:purpose`, shaped like what the caller parses. Each one names the flag,
+ * so a fake answer on screen cannot be mistaken for a model's.
+ */
+const FAKE_ANSWERS: Readonly<Record<string, string>> = {
+  'M18:enrich-organization-attempt': JSON.stringify({
+    legalName: 'Acme Teknoloji A.Ş. (E2E_FAKE_AI)',
+    district: 'Çankaya',
+    sizeBand: 'SMALL',
+    themes: ['dijital dönüşüm'],
+    sectorCodes: ['J62.01'],
+    sources: [],
+  }),
+  'M18:eligibility-pre-report-attempt':
+    '### Özet / Summary\nE2E_FAKE_AI: sahte sağlayıcı yanıtı, hiçbir modele gidilmedi. / Fake provider answer; no model was called.',
+};
+const FAKE_DEFAULT_ANSWER = 'E2E_FAKE_AI: fake provider answer; no model was called.';
+
+/** The fake provider: a complete answer, at once, with no request made. */
+function fakeProviderAnswer(
+  module: string,
+  purpose: string,
+  messages: LlmMessage[],
+): ProviderResult & { refusalCategory?: string | null } {
+  // M18 enrichment cites only pages it was given: the first `URL: ` line of the prompt, if any.
+  let text = FAKE_ANSWERS[`${module}:${purpose}`] ?? FAKE_DEFAULT_ANSWER;
+  if (module === 'M18' && purpose === 'enrich-organization-attempt') {
+    const url = messages.map((m) => /^URL: (\S+)$/m.exec(m.content)?.[1]).find(Boolean);
+    if (url) text = JSON.stringify({ ...JSON.parse(text), sources: [url] });
+  }
+  return {
+    text,
+    inputTokens: 0,
+    outputTokens: 0,
+    provider: 'fake',
+    model: FAKE_MODEL,
+    stopReason: 'end_turn',
+    outcome: 'complete',
+    refusalCategory: null,
+  };
+}
+
 async function callProvider(
   messages: LlmMessage[],
   opts: { provider: LlmProvider; model: string; maxTokens: number; signal?: AbortSignal }
@@ -673,7 +761,8 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // we then cannot bill or even log.
   const { credits: price } = resolveCredits(options.module, options.purpose);
 
-  requireApiKey(provider);
+  const fake = fakeAiEnabled();
+  if (!fake) requireApiKey(provider);
 
   // FO-288 — the price is reserved BEFORE the provider is called, under the tenant's credit lock,
   // the same model M17 uses (FO-274). The old check read the balance outside any lock and only then
@@ -685,7 +774,8 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // One signal for the whole request: every attempt gives up at the same instant.
   const signal = signalUntil(options.deadlineAt);
   const { outcome, refusalCategory, ...result } = await withRetry(
-    () => callProvider(messages, { provider, model, maxTokens, signal }),
+    // NG-209: the e2e fake provider replaces the request and nothing else.
+    async () => (fake ? fakeProviderAnswer(options.module, options.purpose, messages) : callProvider(messages, { provider, model, maxTokens, signal })),
     3,
     1000,
     options.deadlineAt,
@@ -945,10 +1035,3 @@ export async function embedText(
   return embedding;
 }
 
-// NG-209 red step: signatures only, no behaviour yet.
-type FakeAiEnv = { E2E_FAKE_AI?: string; NODE_ENV?: string };
-export class FakeAiInProductionError extends Error {}
-export function fakeAiEnabled(_source: FakeAiEnv = env, _builtForProduction = false): boolean {
-  return false;
-}
-export function assertFakeAiAllowed(_source: FakeAiEnv = env, _builtForProduction = false): void {}

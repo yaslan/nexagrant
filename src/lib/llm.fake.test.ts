@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
@@ -61,6 +63,14 @@ describe('fakeAiEnabled — on only where it was asked for and is not production
     for (const NODE_ENV of ['development', 'test', 'production'] as const) {
       expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }, true)).toBe(false);
     }
+  });
+});
+
+describe('the build-time lock', () => {
+  it('is a direct process.env.NODE_ENV read, which Next inlines at build (as in demo-login.ts)', () => {
+    // Read through the parsed `env` object it would be a runtime value again.
+    const source = readFileSync(join(__dirname, 'llm.ts'), 'utf8');
+    expect(source).toMatch(/const BUILT_FOR_PRODUCTION = process\.env\.NODE_ENV === 'production';/);
   });
 });
 

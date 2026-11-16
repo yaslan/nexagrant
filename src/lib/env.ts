@@ -102,6 +102,13 @@ const envSchema = z.object({
   /** FO-396. Switches the register check off entirely (the e2e web server). Unset = off. */
   PIC_REGISTRY_OFF: blankToUndefined(z.enum(['true', 'false']).optional()),
   /**
+   * NG-209. Test-only: the e2e web server answers every LLM call from the fake provider in
+   * src/lib/llm.ts (no key, no network, no model) and the M18 website reader reads an in-process
+   * fake site. Only the literal `true` turns it on; unset = off. A production build or
+   * NODE_ENV=production refuses to start with it (`assertFakeAiAllowed`, src/instrumentation.ts).
+   */
+  E2E_FAKE_AI: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /**
    * Signs the opt-out link of a first message (NG-42, src/lib/email/opt-out.ts).
    * The links do not expire and sit in mail already delivered, so this key must
    * NEVER rotate: changing it breaks every one of them. Unset or blank = AUTH_SECRET,

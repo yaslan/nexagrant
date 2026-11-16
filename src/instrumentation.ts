@@ -11,6 +11,9 @@ export async function register() {
     // and an invalid DEMO_LOGIN_ENABLED has to stop the server the same way.
     const { assertDemoLoginAllowed } = await import('./lib/demo-login');
     assertDemoLoginAllowed();
+    // NG-209: the e2e fake LLM provider never answers in production.
+    const { assertFakeAiAllowed } = await import('./lib/llm');
+    assertFakeAiAllowed();
   } catch (error) {
     // Throwing here only logs: Next keeps listening and answers every request
     // with a 500, which a port health check reads as a running server. Exit.
