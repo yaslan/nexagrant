@@ -26,3 +26,28 @@ export async function transferOrgNameFor(province: string | null | undefined, db
   `;
   return rows[0]?.name ?? null;
 }
+
+/** The organisation a transfer consent is bound to (NG-204). */
+export interface TransferRecipient {
+  tenantId: string;
+  name: string;
+}
+
+/**
+ * NG-204 (SEC NG-203 O-A1) — the id AND name of the organisation that serves `province` now, for the
+ * SUBMIT only: the consent is stored against this tenant, and forwardPublicLead never sends the lead
+ * anywhere else. Server side only; never return the id to the client (the form gets
+ * {@link transferOrgNameFor}). Reads through `public.province_transfer_org(text)`
+ * (prisma/migrations/add-public-lead-transfer-recipient.sql): same narrow SECURITY DEFINER shape and
+ * the same eligibility WHERE as the name function. Null when the gate is off or nothing qualifies.
+ */
+export async function transferRecipientFor(province: string | null | undefined, db: PrismaClient = prisma): Promise<TransferRecipient | null> {
+  if (!leadTransferConsentEnabled()) return null;
+  const name = parseProvince(province ?? null);
+  if (!name) return null;
+  const rows = await db.$queryRaw<Array<{ tenant_id: string | null; org_name: string | null }>>`
+    SELECT tenant_id, org_name FROM public.province_transfer_org(${name})
+  `;
+  const row = rows[0];
+  return row?.tenant_id && row.org_name ? { tenantId: row.tenant_id, name: row.org_name } : null;
+}

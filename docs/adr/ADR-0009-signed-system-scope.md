@@ -94,6 +94,10 @@ Kısıtlar:
 
 - karne formunun aktarım kutusu ilin kuruluş ADINA ihtiyaç duyar. `ProvinceLeadRoute`'u `public-intake`'e açmak D-1'i geri alırdı; bunun yerine `public.province_transfer_org_name(text)` (SECURITY DEFINER, sabit `search_path`, girdi tek il, çıktı tek ad, yalnız aktif rota + `isIntakeTenant`, EXECUTE yalnız `fabrika_app`). `system_scope` mekanizmasına dokunmaz: amaç listesi aynı kalır. Ölçüm (`fabrika_app`, izole DB): `public-intake` ve `tenant-discovery` tabloda yine 0 satır; fonksiyon yalnız adı döndürür (`tests/transfer-org-name.live.test.ts`). Ayrıntı: `docs/DATA_MODEL.md` §32.
 
+## 10a. Ek: aktarım rızasının alıcısı (NG-204, SEC NG-203 O-A1, 16.11.2026)
+
+- Gönderim, rızayı bağlamak için ilin kuruluşunun kiracı id'sine de ihtiyaç duyar. Yine `ProvinceLeadRoute` `public-intake`'e AÇILMADI: `public.province_transfer_org(text)` aynı dar kalıpta (SECURITY DEFINER, sabit `search_path`, tek il → en çok bir satır `(tenant_id, org_name)`, aynı `isIntakeTenant` WHERE'i, EXECUTE yalnız `fabrika_app`). Fark: id döndürür; yalnız `submitPublicLead` (sunucu) çağırır, istemciye giden `getTransferOrgName` yine yalnız adı döndürür. `system_scope` amaç listesi değişmedi.
+
 ## 11. Ek: mühür amacı bağlar (NG-187, SEC NG-185 F-2, 15.11.2026)
 
 - **Sorun:** Mühür yalnız `sır ‖ pid ‖ transaction_timestamp ‖ sır` üzerinden hesaplanıyordu; amaç mühre girmiyordu. `app.system_scope_purpose` USERSET olduğundan `enter_system_scope('expert-directory')` sonrasında `SET LOCAL app.system_scope_purpose = 'platform-admin'` yeni amacı geçerli kılıyordu. Ölçüm (izole DB, `fabrika_app`): `expert-directory` kapsamında 2 verified satır görünüyordu; amaç değiştirilince 4 satır (pending ve disabled dahil) göründü ve `UPDATE 1` geçti. §5, §6 ve §9'daki "dar amaç" sınırı bu yüzden bir veritabanı sınırı değil, kod sözüydü.

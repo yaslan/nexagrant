@@ -33,6 +33,7 @@ const REASON_KEY = {
   province_missing: 'reason_province_missing',
   province_unmapped: 'reason_province_unmapped',
   tenant_refused: 'reason_tenant_refused',
+  consent_recipient_mismatch: 'reason_consent_recipient_mismatch',
 } as const satisfies Record<UnmatchedReason, string>;
 
 /**
