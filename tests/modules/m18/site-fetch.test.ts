@@ -99,6 +99,15 @@ describe('isPublicAddress', () => {
     '2001:db8::1',
     'not-an-ip',
   ])('not public: %s', (ip) => expect(isPublicAddress(ip)).toBe(false));
+  // NG-205 (SEC NG-203 B-A1, defence in depth): Teredo 2001::/32 tunnels an IPv4 inside the address,
+  // and 192.88.99.0/24 is the deprecated 6to4 relay anycast (RFC 7526). Neither is a website.
+  it.each(['2001:0:a00:1::', '2001::1', '2001:0000:4136:e378:8000:63bf:3fff:fdd2', '192.88.99.1'])(
+    'not public (tunnel/relay): %s',
+    (ip) => expect(isPublicAddress(ip)).toBe(false),
+  );
+  it.each(['2001:4860:4860::8888', '2001:200::1', '192.88.98.1'])('public next to those blocks: %s', (ip) =>
+    expect(isPublicAddress(ip)).toBe(true),
+  );
 });
 
 describe('robots.txt', () => {
