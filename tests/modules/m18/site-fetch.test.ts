@@ -243,9 +243,13 @@ describe('htmlToText and pickSubpages', () => {
  * 1 MB of hostile HTML held the event loop for 5–167 s. The read's time budget only stops I/O, not
  * this CPU work, so the parse itself must be linear.
  */
-describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () => {
-  const MB = 1_000_000;
-  const fill = (unit: string) => unit.repeat(Math.ceil(MB / unit.length)).slice(0, MB);
+describe('HTML parsing is linear on hostile input (100 KB, no closing tags)', () => {
+  // NG-214 review 2: 100 KB, not 1 MB. The parse is synchronous, so vitest's timeout cannot cut a
+  // regressed (quadratic) pass short: at 1 MB the `<[^>]+>` mutation ran for 400 s without failing.
+  // At 100 KB it ends in seconds and fails on the ratio (150–600x against the 12x limit), while
+  // correct code still sits far below it.
+  const SIZE = 100_000;
+  const fill = (unit: string) => unit.repeat(Math.ceil(SIZE / unit.length)).slice(0, SIZE);
   const base = new URL('https://acme.com.tr/');
   const hostile: [string, string][] = [
     ['unclosed <script> many times', fill('<script>x ')],
@@ -279,7 +283,7 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
   // the input, so a `<[^>]+>` rescan in htmlToText would slow both and leave the ratio at ~1 (NG-214
   // review B1). Closed tags are linear for every pass, old regexes included.
   // Correct code measures 0.05–3.6x this reference; a pickSubpages label rescan 29x, an htmlToText
-  // `<[^>]+>` 150–600x (at 100 KB; at 1 MB it does not finish).
+  // `<[^>]+>` 150–600x.
   const MAX_RATIO = 12;
   const reference = fill('<p>x </p> ');
   const parseMs = (html: string): number => {
