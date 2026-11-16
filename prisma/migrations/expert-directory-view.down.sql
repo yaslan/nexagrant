@@ -16,6 +16,13 @@
 -- policy on the app.system_scope flag without system_scope_open() is refused by
 -- tests/rls-coverage.test.ts Y-1(a).
 --
+-- D-B2 (NG-203 review, NG-206): a checkout whose prisma/rls.sql still has NG-52's
+-- `expert_directory` policy on "ExpertPreRegistration" (before NG-188), when run with `pnpm db:rls`
+-- or `pnpm db:setup` against a database where this view is already applied, brings that policy
+-- back. The sealed 'expert-directory' scope then reads fullName, email and ORCID again (NG-185
+-- F-1). Old rls.sql re-applied = policy back: that is the expected rollback behaviour here, not a
+-- bug. After merging NG-188 run `pnpm db:rls` on the shared database with the current rls.sql.
+--
 -- Idempotent: DROP VIEW IF EXISTS. No row is touched.
 -- ─────────────────────────────────────────────────────────────────────────────
 

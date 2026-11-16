@@ -118,3 +118,9 @@ Kırmızı yeniden görülürse:
 3. Hata numara çakışması ya da boşluk gösteriyorsa gerçek eşzamanlılık hatasıdır: `verify.ts` kilidini ve unique kısıtı kontrol et, testi gevşetme. Sayaç ile `max(founderNumber)` farkı, kilit dışından yazım olduğunu gösterir.
 4. Kırmızı yalnız bağlantı zaman aşımıysa (`DB_CONNECT_TIMEOUT_MS`) ve koşu paylaşımlı `:5433` DB'ye karşıysa, koşu izole değildi: `pnpm gate:isolated` ile yeniden koş.
 5. Üç koşu da yeşilse kırmızıyı kaydet ve kartı kapatma; ham log olmadan kök neden yazma.
+
+## ExpertDirectoryEntry mutasyon testleri ve eski `rls.sql` (NG-206)
+
+`tests/rls-verify-system-scope-policy-set.live.test.ts` içindeki iki NG-188 mutasyon testi (görünümü bozulmuş haliyle commit edip `finally`'de geri yükler) `fabrika` adlı paylaşılan geliştirme veritabanında **atlanır**; atlama `WARNING ... skipped` satırıyla nedenini yazar. Yalnız izole bir veritabanında (ör. `pnpm gate:isolated` ya da kendi Docker Postgres'in) ya da GitHub Actions'ta koşar. Süreç kesilirse görünüm mutasyonlu kalabildiği için bu ayrım bilerek yapıldı (NG-203 D-B1).
+
+D-B2 uyarısı: eski `prisma/rls.sql` (NG-52'nin `expert_directory` politikasını taşıyan) ile `pnpm db:rls` ya da `pnpm db:setup` koşulursa, NG-188 uygulanmış bir veritabanında politika geri gelir ve sealed `expert-directory` kapsamı `fullName`, `email`, ORCID'i yeniden okuyabilir (NG-185 F-1). Bu, `expert-directory-view.down.sql` geri alımının beklenen davranışıdır. NG-188 birleştirildikten sonra paylaşılan veritabanında güncel `prisma/rls.sql` ile bir kez `pnpm db:rls` koşulmalı; eski tabanlı worktree'ler paylaşılan veritabanına `db:rls` koşmamalı.
