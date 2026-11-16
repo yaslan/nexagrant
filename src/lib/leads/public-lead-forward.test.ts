@@ -1,9 +1,10 @@
 import type { PrismaClient } from '@prisma/client';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PUBLIC_LEAD_CONSENT } from './public-lead-policy';
-import { submitPublicLead } from './public-lead';
+import { PUBLIC_LEAD_FORWARD_TIMEOUT_MS, submitPublicLead } from './public-lead';
 import { transferRecipientFor } from './transfer-org';
 import { leadTransferConsentEnabled } from '@/lib/env';
+import { logger } from '@/lib/logger';
 
 // NG-212 — the form hands a stored lead to the client-pipeline bridge AFTER its write committed, and
 // the bridge never decides the form's answer: a throw or a refusal still returns ok with the lead kept.
@@ -127,5 +128,43 @@ describe('submitPublicLead → client-pipeline bridge (NG-212)', () => {
     expect(await submitPublicLead(valid, { db, now: NOW, secret: null, forwardLead })).toEqual({ ok: false, error: 'rate_limited' });
     expect(create).not.toHaveBeenCalled();
     expect(forwardLead).not.toHaveBeenCalled();
+  });
+
+  describe('a bridge that never settles (NG-212 review, finding 3)', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('the form answers ok once the bridge time limit passes; the lead stays stored; the log names only the lead and "timeout"', async () => {
+      vi.useFakeTimers();
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const { db, create } = fakeDb([]);
+      const forwardLead = vi.fn(() => new Promise<never>(() => undefined));
+      let settled: unknown = 'pending';
+      const pending = submitPublicLead(valid, { db, now: NOW, secret: null, forwardLead }).then((r) => {
+        settled = r;
+        return r;
+      });
+
+      await vi.advanceTimersByTimeAsync(PUBLIC_LEAD_FORWARD_TIMEOUT_MS - 1);
+      expect(forwardLead).toHaveBeenCalledTimes(1);
+      expect(settled).toBe('pending');
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toEqual({ ok: true });
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith('public lead forward failed', { publicLeadId: LEAD_ID, error: 'timeout' });
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(valid.email);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('a bridge that answers in time clears its timer', async () => {
+      vi.useFakeTimers();
+      const { db } = fakeDb([]);
+      const forwardLead = vi.fn(async () => ({ status: 'created' }));
+      expect(await submitPublicLead(valid, { db, now: NOW, secret: null, forwardLead })).toEqual({ ok: true });
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });

@@ -48,6 +48,12 @@ export const PUBLIC_LEAD_PURGED = 'public_lead.purged';
 const LEAD_LOCK_KEY = 7_302_026_093_001n;
 const IP_KEY_LABEL = 'fabrika/public-lead-ip/v1';
 const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * NG-212 review (finding 3): the longest the anonymous form waits for the client-pipeline bridge.
+ * Past it the form answers ok and the lead stays as the bridge leaves it; the stuck-lead alert covers it.
+ */
+export const PUBLIC_LEAD_FORWARD_TIMEOUT_MS = 4_000;
+const FORWARD_TIMED_OUT: unique symbol = Symbol('public-lead-forward-timeout');
 
 const optionalText = (max: number) =>
   z
@@ -306,17 +312,30 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
 
 /**
  * Runs the bridge for one committed lead without letting it decide the form's answer: the visitor's
- * request is stored whatever the bridge does. A throw leaves the lead as the bridge left it (unrouted,
+ * request is stored whatever the bridge does, and the form waits at most PUBLIC_LEAD_FORWARD_TIMEOUT_MS
+ * for it (the bridge is not cancelled, only no longer awaited). A throw or a timeout leaves the lead as the bridge left it (unrouted,
  * or claimed per NG-181); the `public-lead-stuck` job raises an alert for it after the threshold.
  * Logs the lead id and the outcome only, never a name, address or organisation.
  */
 async function forwardBestEffort(publicLeadId: string, forward: (id: string) => Promise<unknown>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<typeof FORWARD_TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(FORWARD_TIMED_OUT), PUBLIC_LEAD_FORWARD_TIMEOUT_MS);
+  });
   try {
-    const outcome = await forward(publicLeadId);
+    const outcome = await Promise.race([forward(publicLeadId), timedOut]);
+    if (outcome === FORWARD_TIMED_OUT) {
+      // The bridge keeps running in the background; whatever it leaves (unrouted, or claimed) the
+      // public-lead-stuck job alerts on after the threshold. The visitor is not held for it.
+      logger.warn('public lead forward failed', { publicLeadId, error: 'timeout' });
+      return;
+    }
     const o = typeof outcome === 'object' && outcome !== null ? (outcome as Record<string, unknown>) : {};
     logger.info('public lead forwarded', { publicLeadId, status: String(o.status ?? 'unknown'), reason: String(o.reason ?? '') });
   } catch (error) {
     logger.warn('public lead forward failed', { publicLeadId, error: error instanceof Error ? error.name : 'unknown' });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
