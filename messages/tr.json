@@ -5860,6 +5860,7 @@
       "enrichApply": "Seçilenleri kayda yaz",
       "enrichApplied": "Seçilen alanlar kayda yazıldı.",
       "enrichSources": "Kaynak sayfalar",
+      "enrichDraftLabel": "YZ taslağı — onaylamadan kayda yazılmaz",
       "enrichNothingSelected": "En az bir alan seçin.",
       "field": {
         "legalName": "Ticari unvan",

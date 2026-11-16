@@ -49,6 +49,8 @@ const h = vi.hoisted(() => {
 vi.mock('@/lib/llm', () => ({
   generateText: vi.fn(async (arg: unknown) => h.capture(arg)),
   generateCompletion: vi.fn(async (arg: unknown) => h.capture(arg)),
+  // NG-209: enrichment asks whether the e2e fake site is on; off here, as it is under vitest.
+  fakeAiEnabled: () => false,
 }));
 vi.mock('@/lib/tenant', () => ({
   requireTenantAction: vi.fn(async () => ({ tenantId: 'tenant-1', userId: 'user-1' })),
