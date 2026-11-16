@@ -944,3 +944,11 @@ export async function embedText(
 
   return embedding;
 }
+
+// NG-209 red step: signatures only, no behaviour yet.
+type FakeAiEnv = { E2E_FAKE_AI?: string; NODE_ENV?: string };
+export class FakeAiInProductionError extends Error {}
+export function fakeAiEnabled(_source: FakeAiEnv = env, _builtForProduction = false): boolean {
+  return false;
+}
+export function assertFakeAiAllowed(_source: FakeAiEnv = env, _builtForProduction = false): void {}

@@ -812,3 +812,9 @@ export async function fetchOrganizationSite(rawUrl: string, deps: SiteFetchDeps 
   }
   return { ok: true, pages, skipped };
 }
+
+// NG-209 red step: signatures only, no behaviour yet.
+export const FAKE_SITE_ADDRESS = '';
+export function fakeSiteDeps(): SiteFetchDeps {
+  return {};
+}
