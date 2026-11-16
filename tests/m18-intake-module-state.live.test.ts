@@ -79,7 +79,7 @@ const written = async (tenantId: string) =>
 
 describe.skipIf(!HAS_DB)('M18 intake needs M18 open to the tenant (NG-205 / D-A2)', () => {
   beforeAll(async () => {
-    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: Object.values(PROVINCE) } } });
+    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: [PROVINCE.closed, PROVINCE.open] } } });
     for (const key of Object.keys(STATES) as Key[]) {
       const t = await admin.tenant.create({
         data: { name: `ng205-m18-${key}-${RUN}`, slug: `ng205-m18-${key}-${RUN}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' },
@@ -91,7 +91,7 @@ describe.skipIf(!HAS_DB)('M18 intake needs M18 open to the tenant (NG-205 / D-A2
   });
 
   afterAll(async () => {
-    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: Object.values(PROVINCE) } } });
+    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: [PROVINCE.closed, PROVINCE.open] } } });
     await admin.auditEvent.deleteMany({ where: { actorId: ACTOR } });
     await admin.consent.deleteMany({ where: { userId: { startsWith: `public-lead:pl-${RUN}-` } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
