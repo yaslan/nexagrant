@@ -447,6 +447,23 @@ const isAsciiLetter = (s: string, i: number) => {
 };
 
 /**
+ * NG-207 F2: the index just past the comment whose body starts at `body` (right after `<!--`), or -1
+ * when it never ends. As a browser: `<!-->` and `<!--->` end at once; otherwise the first `-->` or
+ * `--!>` ends it. `cache` keeps the last found position of each closer (-1: none left; -2: not looked
+ * up yet), reused while it still lies ahead, so many comments cost one pass over the input.
+ */
+function commentEnd(s: string, body: number, cache: { dashes: number; bang: number }): number {
+  if (s[body] === '>') return body + 1;
+  if (s[body] === '-' && s[body + 1] === '>') return body + 2;
+  if (cache.dashes === -2 || (cache.dashes >= 0 && cache.dashes < body)) cache.dashes = s.indexOf('-->', body);
+  if (cache.bang === -2 || (cache.bang >= 0 && cache.bang < body)) cache.bang = s.indexOf('--!>', body);
+  const { dashes, bang } = cache;
+  if (dashes < 0 && bang < 0) return -1;
+  if (bang < 0 || (dashes >= 0 && dashes < bang)) return dashes + 3;
+  return bang + 4;
+}
+
+/**
  * Comments and hidden elements (with their content) become a space; an unclosed comment, or an
  * unclosed <script>/<style>/<noscript>/<template>, hides the rest.
  *
@@ -456,10 +473,13 @@ const isAsciiLetter = (s: string, i: number) => {
  * comment, so the visible links and text up to the next `-->` stay. A `<script>` inside a comment opens
  * nothing either. Once a tag never ends (an unclosed quote or no `>`), attribute values are no longer
  * skipped: the rest is scanned `<` by `<` as before, so the scan stays linear.
+ * A comment ends as a browser ends it (see `commentEnd`), and a `<!` not followed by `--` (doctype, bogus
+ * comment) runs to the next `>`.
  */
 function stripHiddenAndComments(s: string): string {
   const lower = lowerAscii(s);
   const neverClosed = new Set<string>(); // no closing tag after some point → none after any later one
+  const cache = { dashes: -2, bang: -2 };
   let tagsEnd = true;
   let out = '';
   let i = 0; // start of the input not yet copied to `out`
@@ -468,10 +488,19 @@ function stripHiddenAndComments(s: string): string {
     const lt = s.indexOf('<', from);
     if (lt < 0) return out + s.slice(i);
     if (s.startsWith('<!--', lt)) {
-      const close = s.indexOf('-->', lt + 4);
+      const end = commentEnd(s, lt + 4, cache);
       out += `${s.slice(i, lt)} `;
-      if (close < 0) return out;
-      i = close + 3;
+      if (end < 0) return out;
+      i = end;
+      from = end;
+      continue;
+    }
+    if (s[lt + 1] === '!') {
+      // NG-207 F3: a doctype or a bogus comment runs to the next `>`, quotes or not; a `<!--` in it is text.
+      const gt = s.indexOf('>', lt + 2);
+      out += `${s.slice(i, lt)} `;
+      if (gt < 0) return out;
+      i = gt + 1;
       from = i;
       continue;
     }
