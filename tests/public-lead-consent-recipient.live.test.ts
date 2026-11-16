@@ -92,7 +92,12 @@ describe.skipIf(!HAS_DB)('transfer consent is bound to the recipient the visitor
   beforeAll(async () => {
     for (const k of ['a', 'b'] as const) {
       const t = await admin.tenant.create({
-        data: { name: nameOf(k), slug: nameOf(k), country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' },
+        // NG-205: a tenant is an intake target only while its M18 is PILOT; without the row the
+        // control case is refused for M18 (`tenant_ineligible`) instead of testing the consent rule.
+        data: {
+          name: nameOf(k), slug: nameOf(k), country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION',
+          moduleStates: { create: { moduleId: 'M18', status: 'PILOT', changedBy: 'test fixture (NG-205)' } },
+        },
       });
       T[k] = t.id;
     }
