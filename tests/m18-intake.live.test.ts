@@ -47,6 +47,13 @@ else if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = Math.random().toString(36).slice(2, 10);
+
+/**
+ * NG-205 (D-A2): a lead goes only to a tenant whose own people can open M18 (an unsold beta: PILOT).
+ * Every fixture tenant gets that row, so the rules this file tests are not refused for M18 instead.
+ * tests/m18-intake-module-state.live.test.ts covers the closed states.
+ */
+const M18_PILOT = { moduleStates: { create: { moduleId: 'M18', status: 'PILOT' as const, changedBy: 'test fixture (NG-205)' } } };
 const NOW = new Date('2026-11-14T10:00:00Z');
 const port = createLeadIntakePort(prisma);
 const tenants: Record<'consultancy' | 'agency' | 'other' | 'sme', string> = { consultancy: '', agency: '', other: '', sme: '' };
@@ -83,7 +90,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
   beforeAll(async () => {
     const mk = (key: keyof typeof tenants, orgType: 'CONSULTANCY' | 'SME', kind: 'ORGANIZATION' | 'AGENCY') =>
       admin.tenant
-        .create({ data: { name: `intake-${key}-${RUN}`, slug: `intake-${key}-${RUN}`, country: 'TR', orgType, kind } })
+        .create({ data: { ...M18_PILOT, name: `intake-${key}-${RUN}`, slug: `intake-${key}-${RUN}`, country: 'TR', orgType, kind } })
         .then((t) => (tenants[key] = t.id));
     await mk('consultancy', 'CONSULTANCY', 'ORGANIZATION');
     await mk('agency', 'SME', 'AGENCY');

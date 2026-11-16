@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { withSystemScopeOn, type SystemTx } from '@/lib/system-scope';
 import { parseProvince } from '@/lib/readiness/share';
-import { isIntakeTenant } from '@/modules/m18/server/intake';
+import { isIntakeTarget } from '@/modules/m18/server/intake';
 import {
   PROVINCE_ROUTE_AUDIT,
   type DeactivateProvinceLeadRouteInput,
@@ -74,21 +74,28 @@ export async function listProvinceLeadRoutes(db: typeof prisma = prisma): Promis
   });
 }
 
+/** The tenant columns `isIntakeTarget` reads, plus its M18 ModuleState row (none = OFF). */
+const targetSelect = {
+  orgType: true, kind: true, deletedAt: true,
+  moduleStates: { where: { moduleId: 'M18' }, select: { status: true }, take: 1 },
+} satisfies Prisma.TenantSelect;
+
 /**
- * Tenants a route may point at. The rule is `isIntakeTenant` itself, applied to every non-deleted tenant
- * (no second copy of it as a WHERE clause), so `eligibleTenant` and this list cannot drift apart.
+ * Tenants a route may point at. The rule is `isIntakeTarget` itself (tenant row + M18 open to the
+ * tenant, NG-205), applied to every non-deleted tenant (no second copy of it as a WHERE clause), so
+ * `eligibleTenant`, this list and the M18 intake cannot drift apart.
  */
 export async function listIntakeTenantOptions(db: typeof prisma = prisma): Promise<IntakeTenantOption[]> {
   const tenants = await withSystemScopeOn(db, 'platform-admin', 'province-route.tenant-options', (tx) =>
-    tx.tenant.findMany({ where: { deletedAt: null }, select: { id: true, name: true, orgType: true, kind: true, deletedAt: true }, orderBy: [{ name: 'asc' }, { id: 'asc' }] })
+    tx.tenant.findMany({ where: { deletedAt: null }, select: { id: true, name: true, ...targetSelect }, orderBy: [{ name: 'asc' }, { id: 'asc' }] })
   );
-  return tenants.filter(isIntakeTenant).map((t) => ({ id: t.id, name: t.name }));
+  return tenants.filter((t) => isIntakeTarget(t, t.moduleStates[0]?.status)).map((t) => ({ id: t.id, name: t.name }));
 }
 
 async function eligibleTenant(tx: SystemTx, tenantId: string): Promise<'ok' | 'tenant_not_found' | 'tenant_ineligible'> {
-  const t = await tx.tenant.findFirst({ where: { id: tenantId }, select: { orgType: true, kind: true, deletedAt: true } });
+  const t = await tx.tenant.findFirst({ where: { id: tenantId }, select: targetSelect });
   if (!t) return 'tenant_not_found';
-  return isIntakeTenant(t) ? 'ok' : 'tenant_ineligible';
+  return isIntakeTarget(t, t.moduleStates[0]?.status) ? 'ok' : 'tenant_ineligible';
 }
 
 /** Upsert on the ACTIVE row of the province (see LeadRoutingActions). One transaction with its audit row. */

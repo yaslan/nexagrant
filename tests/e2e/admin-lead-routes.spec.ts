@@ -69,8 +69,12 @@ test.describe('province → consultancy mapping (Admin > Lead routing)', () => {
   test.beforeAll(async () => {
     await teardown();
     await withSystemScope('platform-admin', 'e2e.lead-routes.setup', async (tx) => {
+      // NG-205 (D-A2): a route target must be a tenant whose own people can open M18 (unsold beta: PILOT).
       await tx.tenant.create({
-        data: { id: TENANT_ID, name: TENANT_NAME, slug: TENANT_ID, country: 'TR', orgType: 'CONSULTANCY' },
+        data: {
+          id: TENANT_ID, name: TENANT_NAME, slug: TENANT_ID, country: 'TR', orgType: 'CONSULTANCY',
+          moduleStates: { create: { moduleId: 'M18', status: 'PILOT', changedBy: 'e2e admin-lead-routes (NG-205)' } },
+        },
       });
       await tx.publicLead.create({
         data: {

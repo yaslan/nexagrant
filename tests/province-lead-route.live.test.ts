@@ -50,6 +50,13 @@ else if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = Math.random().toString(36).slice(2, 10);
+
+/**
+ * NG-205 (D-A2): a lead goes only to a tenant whose own people can open M18 (an unsold beta: PILOT).
+ * Every fixture tenant gets that row, so the rules this file tests are not refused for M18 instead.
+ * tests/m18-intake-module-state.live.test.ts covers the closed states.
+ */
+const M18_PILOT = { moduleStates: { create: { moduleId: 'M18', status: 'PILOT' as const, changedBy: 'test fixture (NG-205)' } } };
 const NOW = new Date('2026-11-14T10:00:00Z');
 const ACTOR = `admin-${RUN}`;
 // Provinces this file owns (tests/m18-intake.live.test.ts owns Samsun).
@@ -73,7 +80,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
     const mk = (key: keyof typeof T, orgType: 'CONSULTANCY' | 'SME') =>
       admin.tenant
-        .create({ data: { name: `route-${key}-${RUN}`, slug: `route-${key}-${RUN}`, country: 'TR', orgType, kind: 'ORGANIZATION' } })
+        .create({ data: { ...M18_PILOT, name: `route-${key}-${RUN}`, slug: `route-${key}-${RUN}`, country: 'TR', orgType, kind: 'ORGANIZATION' } })
         .then((t) => (T[key] = t.id));
     await mk('a', 'CONSULTANCY');
     await mk('b', 'CONSULTANCY');
@@ -224,7 +231,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
     });
 
     test('target tenant deleted-after-mapping is refused by M18 -> unmatched tenant_refused', async () => {
-      const gone = await admin.tenant.create({ data: { name: `route-gone-${RUN}`, slug: `route-gone-${RUN}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
+      const gone = await admin.tenant.create({ data: { ...M18_PILOT, name: `route-gone-${RUN}`, slug: `route-gone-${RUN}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
       await admin.provinceLeadRoute.create({ data: { province: 'Yalova', targetTenantId: gone.id, active: true } });
       await admin.tenant.update({ where: { id: gone.id }, data: { deletedAt: new Date() } });
       const lead = await mkLead('refused', { province: 'Yalova' });
@@ -261,7 +268,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('tenant options: consultancy + agency, no SME, no deleted, sorted by name, ids/names only', async () => {
       const mk = (key: string, data: { orgType: 'CONSULTANCY' | 'SME'; kind: 'ORGANIZATION' | 'AGENCY'; deletedAt?: Date }) =>
-        admin.tenant.create({ data: { name: `opt-${key}-${RUN}`, slug: `opt-${key}-${RUN}`, country: 'TR', ...data } });
+        admin.tenant.create({ data: { ...M18_PILOT, name: `opt-${key}-${RUN}`, slug: `opt-${key}-${RUN}`, country: 'TR', ...data } });
       const z = await mk('z-consult', { orgType: 'CONSULTANCY', kind: 'ORGANIZATION' });
       const ag = await mk('b-agency', { orgType: 'SME', kind: 'AGENCY' });
       await mk('c-sme', { orgType: 'SME', kind: 'ORGANIZATION' });
@@ -357,7 +364,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('S3: tenant deleted after routing: reprocessing copies nothing and does not fall back to unmatched', async () => {
       const mkC = () =>
-        admin.tenant.create({ data: { name: `route-c-${RUN}-${Math.random().toString(36).slice(2, 6)}`, slug: `route-c-${RUN}-${Math.random().toString(36).slice(2, 8)}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
+        admin.tenant.create({ data: { ...M18_PILOT, name: `route-c-${RUN}-${Math.random().toString(36).slice(2, 6)}`, slug: `route-c-${RUN}-${Math.random().toString(36).slice(2, 8)}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
       // (a) soft delete: the mapping row still points at the tenant, M18 refuses it
       const soft = await mkC();
       await admin.provinceLeadRoute.deleteMany({ where: { province: 'Sinop' } });
