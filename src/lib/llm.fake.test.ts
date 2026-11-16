@@ -152,23 +152,23 @@ describe('generateCompletion with the fake provider', () => {
     system: 'system text',
   };
 
-  it('answers without a provider key and without any network request, and still bills and logs', async () => {
+  it('answers an M18 call without a provider key and without any network request, and still logs it', async () => {
     mockEnv.E2E_FAKE_AI = 'true';
     const fetchMock = vi.fn(async () => {
       throw new Error('network must not be reached');
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await generateCompletion(options);
-
+    // What M18 really sends: the -attempt purpose, its price already reserved by ai-credits.ts.
+    for (const purpose of ['enrich-organization-attempt', 'eligibility-pre-report-attempt']) {
+      vi.clearAllMocks();
+      const result = await generateCompletion({ ...options, purpose, creditsReserved: true });
+      expect(result.provider, purpose).toBe('fake');
+      expect(result.text.length, purpose).toBeGreaterThan(0);
+      expect(mockPrisma.aiUsageLog.create, purpose).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.aiUsageLog.create.mock.calls[0]?.[0]?.data, purpose).toMatchObject({ provider: 'fake', module: 'M18', purpose });
+    }
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(result.provider).toBe('fake');
-    expect(result.text.length).toBeGreaterThan(0);
-    // The real price was reserved (one debit row) and the usage row says "fake".
-    expect(mockPrisma.creditLedger.create).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.creditLedger.create.mock.calls[0]?.[0]?.data).toMatchObject({ tenantId: 'tenant_1', delta: -1, reason: 'usage:M18' });
-    expect(mockPrisma.aiUsageLog.create).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.aiUsageLog.create.mock.calls[0]?.[0]?.data).toMatchObject({ provider: 'fake', module: 'M18', purpose: 'enrich-organization', credits: 1 });
   });
 
   it('gives the M18 enrichment attempt a JSON proposal the parser can read', async () => {
@@ -184,6 +184,46 @@ describe('generateCompletion with the fake provider', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(generateCompletion(options)).rejects.toThrow(/ANTHROPIC_API_KEY not set/);
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
+  });
+
+  // NG-209 sec F4: the fake answers M18 only. Every other call takes today's real path, flag or not.
+  it('does not answer an M17 call with the flag on: no key is still the hard failure, before any charge (sec F4)', async () => {
+    mockEnv.E2E_FAKE_AI = 'true';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      generateCompletion({ ...options, module: 'M17', purpose: 'evaluate-attempt', creditsReserved: true }),
+    ).rejects.toThrow(/ANTHROPIC_API_KEY not set/);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockPrisma.aiUsageLog.create).not.toHaveBeenCalled();
+  });
+
+  it('sends an M17 call to the provider with the flag on when a key is set (sec F4; fetch mocked, no network)', async () => {
+    mockEnv.E2E_FAKE_AI = 'true';
+    mockEnv.ANTHROPIC_API_KEY = 'sk-test-not-a-real-key';
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ content: [{ type: 'text', text: 'provider answer' }], stop_reason: 'end_turn', usage: { input_tokens: 3, output_tokens: 2 } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const result = await generateCompletion({ ...options, module: 'M17', purpose: 'evaluate-attempt', creditsReserved: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(String((fetchMock.mock.calls[0] as unknown[] | undefined)?.[0])).toBe('https://api.anthropic.com/v1/messages');
+      expect(result.provider).toBe('anthropic');
+      expect(result.text).toBe('provider answer');
+    } finally {
+      mockEnv.ANTHROPIC_API_KEY = undefined;
+    }
+  });
+
+  it('does not answer an M18 purpose it has no canned answer for: no catch-all reply (sec F4)', async () => {
+    mockEnv.E2E_FAKE_AI = 'true';
+    vi.stubGlobal('fetch', vi.fn());
+    await expect(generateCompletion(options)).rejects.toThrow(/ANTHROPIC_API_KEY not set/);
     expect(mockPrisma.creditLedger.create).not.toHaveBeenCalled();
   });
 
