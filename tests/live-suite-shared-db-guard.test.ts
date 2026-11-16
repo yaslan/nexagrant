@@ -247,17 +247,45 @@ describe('live suites never delete without a scope, whatever database they name 
   });
 });
 
+/** The gate's required MUTATION_ALLOWED initializer (NG-206 review tur 5, B-2a). */
+const EXPECTED_MUTATION_ALLOWED = 'isGithubActions()||(DB_NAME!==undefined&&!SHARED_DB&&process.env.RLS_MUTATION_DB===DB_NAME)';
+
+/**
+ * A canonical text for an expression: every parenthesis is dropped and each binary/unary/call/property
+ * step is rebuilt from the tree, so line breaks, spacing and redundant parentheses do not change it,
+ * while an operator, operand, argument or operand order does (`|| true`, a comma operator, `=== "x"`).
+ */
+function canonicalExpression(node: ts.Expression): string {
+  if (ts.isParenthesizedExpression(node)) return canonicalExpression(node.expression);
+  if (ts.isBinaryExpression(node)) {
+    return `(${canonicalExpression(node.left)}${node.operatorToken.getText()}${canonicalExpression(node.right)})`;
+  }
+  if (ts.isPrefixUnaryExpression(node)) return `${ts.tokenToString(node.operator)}${canonicalExpression(node.operand)}`;
+  if (ts.isCallExpression(node)) return `${canonicalExpression(node.expression)}(${node.arguments.map(canonicalExpression).join(',')})`;
+  if (ts.isPropertyAccessExpression(node)) return `${canonicalExpression(node.expression)}.${node.name.text}`;
+  return node.getText().replace(/\s+/g, '');
+}
+
 /**
  * NG-206 review tur 4 (B-2): the server-name pin above proves the name is read from the server, not that
- * the mutation gate uses it. This reads the gate's declarations from the AST: MUTATION_ALLOWED must read
- * DB_NAME, SHARED_DB and process.env.RLS_MUTATION_DB, and MUTATION_SKIP must be `!MUTATION_ALLOWED`.
+ * the mutation gate uses it. This reads the gate from the AST: MUTATION_ALLOWED must be exactly the
+ * expected expression (compared structurally, so formatting does not matter) and MUTATION_SKIP must be
+ * `!MUTATION_ALLOWED`. The mutation tests must be opened with `it.skipIf(MUTATION_SKIP)` (B-2b): both
+ * `it.skipIf(!MUTATION_SKIP)` and a plain `it(` would run them on a shared database.
  * Returns the problems found (empty when the gate is as required).
  */
 export function mutationGateProblems(file: string, source: string): string[] {
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const declared = new Map<string, ts.Expression>();
+  const skipIfCalls: Array<{ arg: ts.Expression; title: string }> = [];
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) declared.set(node.name.text, node.initializer);
+    // `it.skipIf(cond)(title, fn)`: the outer call's callee is the inner `it.skipIf(cond)` call.
+    if (ts.isCallExpression(node) && ts.isCallExpression(node.expression) && node.expression.expression.getText() === 'it.skipIf') {
+      const cond = node.expression.arguments[0];
+      const title = node.arguments[0];
+      if (cond && title && ts.isStringLiteralLike(title)) skipIfCalls.push({ arg: cond, title: title.text });
+    }
     ts.forEachChild(node, visit);
   };
   visit(tree);
@@ -265,23 +293,23 @@ export function mutationGateProblems(file: string, source: string): string[] {
   const allowed = declared.get('MUTATION_ALLOWED');
   if (!allowed) return ['MUTATION_ALLOWED is not declared with an initializer'];
 
-  const names = new Set<string>();
-  const collect = (node: ts.Node): void => {
-    if (ts.isIdentifier(node)) names.add(node.text);
-    ts.forEachChild(node, collect);
-  };
-  collect(allowed);
-
   const problems: string[] = [];
-  for (const required of ['DB_NAME', 'SHARED_DB']) {
-    if (!names.has(required)) problems.push(`MUTATION_ALLOWED does not read ${required}`);
+  const expected = ts.createSourceFile('expected.ts', `x = ${EXPECTED_MUTATION_ALLOWED};`, ts.ScriptTarget.Latest, true);
+  const expectedNode = ((expected.statements[0] as ts.ExpressionStatement).expression as ts.BinaryExpression).right;
+  if (canonicalExpression(allowed) !== canonicalExpression(expectedNode)) {
+    problems.push(`MUTATION_ALLOWED is not ${EXPECTED_MUTATION_ALLOWED}`);
   }
-  if (!allowed.getText().includes('process.env.RLS_MUTATION_DB')) problems.push('MUTATION_ALLOWED does not read process.env.RLS_MUTATION_DB');
 
   const skip = declared.get('MUTATION_SKIP');
   const negatesAllowed =
     skip !== undefined && ts.isPrefixUnaryExpression(skip) && skip.operator === ts.SyntaxKind.ExclamationToken && ts.isIdentifier(skip.operand) && skip.operand.text === 'MUTATION_ALLOWED';
   if (!negatesAllowed) problems.push('MUTATION_SKIP is not !MUTATION_ALLOWED');
+
+  const mutationTests = skipIfCalls.filter((call) => call.title.toLowerCase().includes('mutation'));
+  if (mutationTests.length < 2) problems.push(`fewer than 2 mutation tests opened with it.skipIf (found ${mutationTests.length})`);
+  for (const call of mutationTests) {
+    if (canonicalExpression(call.arg) !== 'MUTATION_SKIP') problems.push(`mutation test "${call.title}" is not it.skipIf(MUTATION_SKIP)`);
+  }
   return problems;
 }
 
@@ -289,15 +317,30 @@ describe('the ExpertDirectoryEntry mutation gate, read from the AST (NG-206 revi
   const GATE_FILE = 'tests/rls-verify-system-scope-policy-set.live.test.ts';
   const source = readFileSync(path.join(ROOT, GATE_FILE), 'utf8');
 
-  /** The source with one `const NAME = …;` declaration replaced by `const NAME = value;`. */
+  /** The source with one `const NAME = …;` declaration replaced by `const NAME = value;` (the initializer has no `;`). */
   function mutant(name: string, value: string): string {
-    const pattern = new RegExp(`const ${name} = [^\\n]*;`);
+    const pattern = new RegExp(`const ${name} = [^;]*;`);
     expect(pattern.test(source), `${name} declaration not found`).toBe(true);
     return source.replace(pattern, `const ${name} = ${value};`);
   }
 
-  it('MUTATION_ALLOWED reads DB_NAME, SHARED_DB and RLS_MUTATION_DB; MUTATION_SKIP negates it', () => {
+  /** The source with every `it.skipIf(MUTATION_SKIP)` replaced by `it.skipIf(replacement)`. */
+  function skipIfMutant(replacement: string): string {
+    expect(source.includes('it.skipIf(MUTATION_SKIP)'), 'it.skipIf(MUTATION_SKIP) not found').toBe(true);
+    return source.replaceAll('it.skipIf(MUTATION_SKIP)', `it.skipIf(${replacement})`);
+  }
+
+  it('MUTATION_ALLOWED is the expected expression; MUTATION_SKIP negates it; both mutation tests are skipIf(MUTATION_SKIP)', () => {
     expect(mutationGateProblems(GATE_FILE, source)).toEqual([]);
+  });
+
+  it('a reformatted gate (line breaks, redundant parentheses) still passes the pin (B-2a)', () => {
+    const reformatted = mutant(
+      'MUTATION_ALLOWED',
+      '(\n    isGithubActions() ||\n    ((DB_NAME !== undefined) && !(SHARED_DB) && (process.env.RLS_MUTATION_DB === DB_NAME))\n  )',
+    );
+    expect(reformatted).not.toBe(source);
+    expect(mutationGateProblems(GATE_FILE, reformatted)).toEqual([]);
   });
 
   it.each([
@@ -306,6 +349,14 @@ describe('the ExpertDirectoryEntry mutation gate, read from the AST (NG-206 revi
     ['MUTATION_ALLOWED ignores SHARED_DB', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME !== undefined && process.env.RLS_MUTATION_DB === DB_NAME)')],
     ['MUTATION_ALLOWED ignores RLS_MUTATION_DB', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME !== undefined && !SHARED_DB)')],
     ['MUTATION_SKIP = false', mutant('MUTATION_SKIP', 'false')],
+    // NG-206 review tur 4 (B-2a): these passed the identifier-presence pin.
+    ['MUTATION_ALLOWED with a trailing `|| true`', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME !== undefined && !SHARED_DB && process.env.RLS_MUTATION_DB === DB_NAME) || true')],
+    ['MUTATION_ALLOWED with DB_NAME only named (comma operator)', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME, !SHARED_DB && process.env.RLS_MUTATION_DB === "x")')],
+    ['MUTATION_ALLOWED comparing to a constant', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME !== undefined && !SHARED_DB && process.env.RLS_MUTATION_DB === "fabrika_dev")')],
+    ['MUTATION_ALLOWED reading RLS_MUTATION_DBX', mutant('MUTATION_ALLOWED', 'isGithubActions() || (DB_NAME !== undefined && !SHARED_DB && process.env.RLS_MUTATION_DBX === DB_NAME)')],
+    // NG-206 review tur 4 (B-2b): the skipIf direction was not pinned.
+    ['mutation tests skipIf(!MUTATION_SKIP)', skipIfMutant('!MUTATION_SKIP')],
+    ['mutation tests with no skipIf at all', source.replaceAll('it.skipIf(MUTATION_SKIP)', 'it')],
   ])('a mutant with %s fails the pin', (_label, mutated) => {
     expect(mutated).not.toBe(source);
     expect(mutationGateProblems(GATE_FILE, mutated)).not.toEqual([]);
