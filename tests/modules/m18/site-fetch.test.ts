@@ -199,6 +199,26 @@ describe('htmlToText and pickSubpages', () => {
     expect(pickSubpages('<!-- <script> --><a href="/about">About</a>', base).map((u) => u.pathname)).toEqual(['/about']);
     expect(htmlToText('<!-- <script> --><p>Acme</p>')).toBe('Acme');
   });
+  // NG-207 F2: a comment ends as a browser ends it — `<!-->` and `<!--->` close at once, `--!>` closes
+  // like `-->` — so the visible links after it are not swallowed up to some later `-->`.
+  it('NG-207 F2: "<!-->" and "<!--->" are empty comments, not openers', () => {
+    const base = new URL('https://acme.com.tr/');
+    const paths = (html: string) => pickSubpages(html, base).map((u) => u.pathname);
+    expect(paths('<!--><a href="/about">About</a><!--->')).toEqual(['/about']);
+    expect(paths('<!---><a href="/about">About</a>')).toEqual(['/about']);
+    expect(paths('<!--><a href="/about">About</a><!-- x --><a href="/iletisim">İletişim</a>')).toEqual(['/about', '/iletisim']);
+  });
+  it('NG-207 F2: "--!>" closes a comment', () => {
+    expect(pickSubpages('<!-- a --!><a href="/about">About</a>', new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
+  // NG-207 F3: `<!` not followed by `--` (a doctype or a bogus comment) runs to the next `>`; a quoted
+  // `<!--` inside it opens no comment.
+  it('NG-207 F3: a "<!--" inside a doctype or a "<!x …>" declaration hides nothing', () => {
+    const base = new URL('https://acme.com.tr/');
+    const paths = (html: string) => pickSubpages(html, base).map((u) => u.pathname);
+    expect(paths('<!DOCTYPE html PUBLIC "<!--"><a href="/about">About</a>')).toEqual(['/about']);
+    expect(paths('<!x title="<!--"><a href="/about">About</a><a href="/iletisim">İletişim</a>')).toEqual(['/about', '/iletisim']);
+  });
   it('picks only same-site about/contact links, at most four', () => {
     const picked = pickSubpages(HOME_HTML, new URL('https://acme.com.tr/')).map((u) => u.pathname);
     expect(picked).toHaveLength(MAX_PAGES - 1);
