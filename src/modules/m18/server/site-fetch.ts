@@ -117,6 +117,7 @@ export function isPublicAddress(ip: string): boolean {
     if (a === 172 && b >= 16 && b <= 31) return false;
     if (a === 192 && b === 168) return false;
     if (a === 192 && b === 0) return false; // 192.0.0/24 + 192.0.2/24 (TEST-NET-1)
+    if (a === 192 && b === 88 && v4[2] === 99) return false; // 6to4 relay anycast, deprecated (RFC 7526)
     if (a === 198 && (b === 18 || b === 19 || b === 51)) return false; // benchmarking, TEST-NET-2
     if (a === 203 && b === 0) return false; // TEST-NET-3
     return true;
@@ -126,7 +127,10 @@ export function isPublicAddress(ip: string): boolean {
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
   if (mapped) return isPublicAddress(mapped[1]!);
   if (lower === '::' || lower === '::1') return false;
-  const first = parseInt(lower.split(':')[0] || '0', 16);
+  const groups = lower.split(':');
+  const first = parseInt(groups[0] || '0', 16);
+  // Teredo 2001:0::/32 carries a tunnelled IPv4 (NG-205, SEC NG-203 B-A1). '' = a `::` right after 2001.
+  if (first === 0x2001 && parseInt(groups[1] || '0', 16) === 0) return false;
   if ((first & 0xfe00) === 0xfc00) return false; // ULA fc00::/7
   if ((first & 0xffc0) === 0xfe80) return false; // link-local
   if ((first & 0xff00) === 0xff00) return false; // multicast
