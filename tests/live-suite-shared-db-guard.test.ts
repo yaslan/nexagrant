@@ -137,6 +137,14 @@ describe('live suites that refuse the shared "fabrika" database', () => {
     expect(readFileSync(path.join(ROOT, file), 'utf8')).toContain("new URL(process.env.DATABASE_URL ?? 'postgresql://x/none').pathname");
   });
 
+  // NG-206 review tur 2: the SERVER_NAME exemption skips the usedDatabaseName check above, so pin the
+  // source of the name here: the server's answer on the owner connection, never a parsed URL.
+  it.each(SERVER_NAME)('%s (server-name exception) reads the name with select current_database() on admin', (file) => {
+    const source = readFileSync(path.join(ROOT, file), 'utf8');
+    expect(source).toContain("await admin.query<{ db: string }>('select current_database() as db')");
+    expect(source).not.toMatch(/new URL\(/);
+  });
+
   it.each(found.filter((g) => !OPENED_BY_FLAG.includes(g.file)).map((g) => [g.file, g] as const))(
     '%s opens only on GitHub Actions, and asks isGithubActions() what that means',
     (_file, guard) => {
