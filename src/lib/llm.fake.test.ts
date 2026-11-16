@@ -1,5 +1,3 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
@@ -9,8 +7,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  *  - it lives in src/lib/llm.ts only: the reservation, the AiUsageLog row and the price are the
  *    real ones; only the HTTP request to the provider is replaced;
  *  - no provider key is needed and `fetch` is never called;
- *  - it can never be on in production: `fakeAiEnabled` is false for a production build or
- *    NODE_ENV=production, and `assertFakeAiAllowed` (called at server start) refuses such a server.
+ *  - default-deny (NG-209 sec F1): on only for the literal flag `true`, in a build that is not a
+ *    production build, with NODE_ENV explicitly `development` or `test`. Any other NODE_ENV —
+ *    `production`, `staging`, `preview`, blank, unset — keeps it off, and `assertFakeAiAllowed`
+ *    (server start) refuses such a server when the flag is on.
+ *  - the build-time half is the module's own `process.env.NODE_ENV` constant, not a parameter
+ *    (sec F6): these tests load llm.ts afresh under a given NODE_ENV to exercise it.
  */
 
 const mockPrisma = vi.hoisted(() => ({
@@ -26,14 +28,34 @@ const mockEnv = vi.hoisted(() => ({
   E2E_FAKE_AI: undefined as string | undefined,
   NODE_ENV: 'test' as string,
 }));
-vi.mock('@/lib/env', () => ({ env: mockEnv }));
+// `declaredNodeEnv` is NODE_ENV as the process set it (undefined when unset), while `env.NODE_ENV`
+// carries the schema default 'development'. The mock keeps both, like src/lib/env.ts.
+const declared = vi.hoisted(() => ({ nodeEnv: 'test' as string | undefined }));
+vi.mock('@/lib/env', () => ({
+  env: mockEnv,
+  get declaredNodeEnv() {
+    return declared.nodeEnv;
+  },
+}));
 
 import { assertFakeAiAllowed, fakeAiEnabled, FakeAiInProductionError, generateCompletion } from './llm';
+
+/** llm.ts evaluated afresh with process.env.NODE_ENV = `nodeEnv` at load: the build-time constant. */
+async function loadLlmBuiltWith(nodeEnv: string): Promise<typeof import('./llm')> {
+  vi.resetModules();
+  vi.stubEnv('NODE_ENV', nodeEnv);
+  try {
+    return await import('./llm');
+  } finally {
+    vi.unstubAllEnvs();
+  }
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockEnv.E2E_FAKE_AI = undefined;
   mockEnv.NODE_ENV = 'test';
+  declared.nodeEnv = 'test';
   mockPrisma.creditLedger.aggregate.mockResolvedValue({ _sum: { delta: 10 } });
   mockPrisma.aiUsageLog.create.mockResolvedValue({ id: 'log_1' });
   mockPrisma.creditLedger.create.mockResolvedValue({ id: 'ledger_1' });
@@ -47,48 +69,71 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('fakeAiEnabled — on only where it was asked for and is not production', () => {
-  it('is on only for the literal `true` outside production', () => {
-    expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' }, false)).toBe(true);
-    expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'test' }, false)).toBe(true);
-    expect(fakeAiEnabled({ E2E_FAKE_AI: 'false', NODE_ENV: 'development' }, false)).toBe(false);
-    expect(fakeAiEnabled({ NODE_ENV: 'development' }, false)).toBe(false);
+describe('fakeAiEnabled — default-deny: development or test only (sec F1)', () => {
+  it('is on only for the literal `true` with NODE_ENV development or test', () => {
+    expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).toBe(true);
+    expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'test' })).toBe(true);
+    expect(fakeAiEnabled({ E2E_FAKE_AI: 'false', NODE_ENV: 'development' })).toBe(false);
+    expect(fakeAiEnabled({ NODE_ENV: 'development' })).toBe(false);
   });
 
-  it('is off with NODE_ENV=production, whatever the flag says', () => {
-    expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'production' }, false)).toBe(false);
-  });
-
-  it('is off in a production build started with any NODE_ENV', () => {
-    for (const NODE_ENV of ['development', 'test', 'production'] as const) {
-      expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }, true)).toBe(false);
+  it('is off for every other NODE_ENV: production, staging, preview, blank, unset', () => {
+    for (const NODE_ENV of ['production', 'staging', 'preview', '', 'Development', undefined]) {
+      expect(fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toBe(false);
     }
+  });
+
+  it('reads NODE_ENV as the process declared it: unset is off, not the schema default "development"', () => {
+    mockEnv.E2E_FAKE_AI = 'true';
+    mockEnv.NODE_ENV = 'development'; // what env.ts parses an absent NODE_ENV to
+    declared.nodeEnv = undefined;
+    expect(fakeAiEnabled()).toBe(false);
+    declared.nodeEnv = 'development';
+    expect(fakeAiEnabled()).toBe(true);
   });
 });
 
-describe('the build-time lock', () => {
-  it('is a direct process.env.NODE_ENV read, which Next inlines at build (as in demo-login.ts)', () => {
-    // Read through the parsed `env` object it would be a runtime value again.
-    const source = readFileSync(join(__dirname, 'llm.ts'), 'utf8');
-    expect(source).toMatch(/const BUILT_FOR_PRODUCTION = process\.env\.NODE_ENV === 'production';/);
+describe('the build-time lock — the real module constant, no parameter (sec F2/F6)', () => {
+  it('a module built with NODE_ENV=production keeps the fake off whatever the runtime NODE_ENV says', async () => {
+    const built = await loadLlmBuiltWith('production');
+    for (const NODE_ENV of ['development', 'test']) {
+      expect(built.fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toBe(false);
+      expect(() => built.assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toThrow(built.FakeAiInProductionError);
+    }
+    expect(() => built.assertFakeAiAllowed({ NODE_ENV: 'development' })).not.toThrow();
+  });
+
+  it('a module built with NODE_ENV=test lets the e2e combination through', async () => {
+    const built = await loadLlmBuiltWith('test');
+    expect(built.fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).toBe(true);
+    expect(() => built.assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).not.toThrow();
   });
 });
 
-describe('assertFakeAiAllowed — a production server with the flag on does not start', () => {
-  it('throws with NODE_ENV=production and the flag on', () => {
-    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'production' }, false)).toThrow(FakeAiInProductionError);
+describe('assertFakeAiAllowed — a server with the flag on starts only in development or test', () => {
+  it('throws for every NODE_ENV other than development and test', () => {
+    for (const NODE_ENV of ['production', 'staging', 'preview', '', undefined]) {
+      expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toThrow(FakeAiInProductionError);
+    }
   });
 
-  it('throws in a production build whatever NODE_ENV says', () => {
-    for (const NODE_ENV of ['development', 'test'] as const) {
-      expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }, true)).toThrow(FakeAiInProductionError);
-    }
+  it('throws when NODE_ENV is unset, even though env.NODE_ENV defaults to "development"', () => {
+    mockEnv.E2E_FAKE_AI = 'true';
+    mockEnv.NODE_ENV = 'development';
+    declared.nodeEnv = undefined;
+    expect(() => assertFakeAiAllowed()).toThrow(FakeAiInProductionError);
+  });
+
+  it('names the environment it refused in the message', () => {
+    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'staging' })).toThrow(/E2E_FAKE_AI.*NODE_ENV=staging/s);
   });
 
   it('lets every other combination start', () => {
-    expect(() => assertFakeAiAllowed({ NODE_ENV: 'production' }, true)).not.toThrow();
-    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'false', NODE_ENV: 'production' }, true)).not.toThrow();
-    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' }, false)).not.toThrow();
+    expect(() => assertFakeAiAllowed({ NODE_ENV: 'production' })).not.toThrow();
+    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'false', NODE_ENV: 'staging' })).not.toThrow();
+    expect(() => assertFakeAiAllowed({ NODE_ENV: undefined })).not.toThrow();
+    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).not.toThrow();
+    expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'test' })).not.toThrow();
   });
 });
 
@@ -140,6 +185,15 @@ describe('generateCompletion with the fake provider', () => {
   it('is not used in production even with the flag on', async () => {
     mockEnv.E2E_FAKE_AI = 'true';
     mockEnv.NODE_ENV = 'production';
+    declared.nodeEnv = 'production';
+    await expect(generateCompletion(options)).rejects.toThrow(/ANTHROPIC_API_KEY not set/);
+    expect(mockPrisma.aiUsageLog.create).not.toHaveBeenCalled();
+  });
+
+  it('is not used when NODE_ENV is unset, even with the flag on (sec F1)', async () => {
+    mockEnv.E2E_FAKE_AI = 'true';
+    mockEnv.NODE_ENV = 'development';
+    declared.nodeEnv = undefined;
     await expect(generateCompletion(options)).rejects.toThrow(/ANTHROPIC_API_KEY not set/);
     expect(mockPrisma.aiUsageLog.create).not.toHaveBeenCalled();
   });
