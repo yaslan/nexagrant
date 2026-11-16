@@ -122,7 +122,10 @@ export function EnrichmentPanel({ organizationId, hasWebsite, credits }: { organ
         {pending ? t('pending') : t('enrichRun')}
       </button>
       {data && offered.length > 0 ? (
-        <form onSubmit={apply} className="space-y-2 rounded border border-slate-200 p-3">
+        <form onSubmit={apply} data-testid="enrichment-proposal" className="space-y-2 rounded border border-slate-200 p-3">
+          <span data-testid="ai-draft-label" className="inline-block rounded border border-amber-400 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+            {t('enrichDraftLabel')}
+          </span>
           <ul className="space-y-1 text-sm">
             {offered.map((k) => (
               <li key={k}>
