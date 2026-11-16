@@ -24,10 +24,11 @@ import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
  *   LEAD_TRANSFER_CONSENT_ENABLED=false  → box absent, nothing routed even for a mapped province
  *
  * Three kinds of test, on purpose kept apart:
- *   - "PRODUCT CHAIN": submit only, then wait for the lead to reach the pipeline by itself. Red while
- *     no production code path calls forwardPublicLead (see the NG-208 report for file:line).
- *   - "DOWNSTREAM": same submit, then THIS TEST calls the bridge (forwardPublicLead + the real M18
- *     port) where the product does not. Proves the rest of the chain, not that the product wires it.
+ *   - "PRODUCT CHAIN": submit only, then wait for the lead to reach the pipeline by itself. Was red while
+ *     no production code path called forwardPublicLead (NG-208); NG-212 wires it after the lead write.
+ *   - "DOWNSTREAM": same submit (the product routes the lead), then THIS TEST runs the bridge again
+ *     (forwardPublicLead + the real M18 port): a repeat is idempotent (`duplicate`, same ids, no second
+ *     copy), and the landed rows are checked in Postgres and on the /musteri-hatti screens.
  *   - negative arm: an unmapped province never lands anywhere.
  */
 
@@ -199,7 +200,7 @@ test.describe(`M18 karne → PublicLead → il yönlendirmesi → kurum/fırsat 
     });
 
     for (const locale of ['tr', 'en'] as const) {
-      test(`DOWNSTREAM (${locale}): submit by click, then the test calls forwardPublicLead (the product never does) → org + deal visible on musteri-hatti`, async ({ browser }) => {
+      test(`DOWNSTREAM (${locale}): submit by click → routed by the product; a repeat bridge run is idempotent → org + deal visible on musteri-hatti`, async ({ browser }) => {
         const who = `bridge-${locale}`;
         const { context, page } = await anonymous(browser, `10.30.2.${locale === 'tr' ? 1 : 2}`);
         const visitorOrg = await submitScorecard(page, locale, MAPPED, who, { tickTransfer: true });
@@ -208,10 +209,13 @@ test.describe(`M18 karne → PublicLead → il yönlendirmesi → kurum/fırsat 
         await context.close();
 
         const lead = await leadRow(who);
-        expect(lead).toMatchObject({ province: MAPPED, transferConsent: true, routeStatus: null });
+        expect(lead).toMatchObject({ province: MAPPED, transferConsent: true });
+        // NG-212: the form itself ran the bridge after the write; the lead is already routed and landed.
+        await expect.poll(async () => (await leadRow(who)).routeStatus).toBe('routed');
+        await expect.poll(async () => (await landed(lead.id)).deals.length).toBe(1);
 
         const outcome = await forwardPublicLead(lead.id, createLeadIntakePort(prisma, createEventBus()), prisma);
-        expect(outcome.status).toBe('created');
+        expect(outcome.status).toBe('duplicate');
         const after = await leadRow(who);
         expect(after).toMatchObject({ routeStatus: 'routed', routedTenantId: TENANT });
         const rows = await landed(lead.id);

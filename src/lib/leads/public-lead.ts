@@ -234,6 +234,7 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
   const ipHash = hashClientIp(options.ip ?? null, options.secret === undefined ? authSecret() : options.secret);
   const db = options.db ?? prisma;
 
+  let written: { result: PublicLeadResult; forwardId: string | null };
   try {
     // The transfer consent is recorded only when the box is ticked AND the province has an
     // organisation now AND it is the one the form showed (NG-204, SEC NG-203 O-A1): the consent is
@@ -251,21 +252,22 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
 
     // NG-175 (SEC NG-170 O-1): PublicLead is RLS system_scope only. 'public-intake' opens it (and,
     // among the system_scope tables, only it and the expert form's) for the anonymous form.
-    return await withSystemScopeOn(db, 'public-intake', 'public-lead.submit', async (tx) => {
+    written = await withSystemScopeOn(db, 'public-intake', 'public-lead.submit', async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LEAD_LOCK_KEY})`;
 
       const byEmail = await tx.publicLead.count({
         where: { email: data.email, createdAt: { gte: new Date(now.getTime() - EMAIL_WINDOW_MS) } },
       });
-      if (byEmail >= PUBLIC_LEAD_EMAIL_LIMIT) return { ok: false, error: 'rate_limited' } as const;
+      if (byEmail >= PUBLIC_LEAD_EMAIL_LIMIT) return { result: { ok: false, error: 'rate_limited' }, forwardId: null };
       if (ipHash) {
         const byIp = await tx.publicLead.count({
           where: { ipHash, createdAt: { gte: new Date(now.getTime() - IP_WINDOW_MS) } },
         });
-        if (byIp >= PUBLIC_LEAD_IP_LIMIT) return { ok: false, error: 'rate_limited' } as const;
+        if (byIp >= PUBLIC_LEAD_IP_LIMIT) return { result: { ok: false, error: 'rate_limited' }, forwardId: null };
       }
 
-      await tx.publicLead.create({
+      const lead = await tx.publicLead.create({
+        select: { id: true },
         data: {
           name: data.name,
           email: data.email,
@@ -288,12 +290,33 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
           createdAt: now,
         },
       });
-      return { ok: true } as const;
+      return { result: { ok: true }, forwardId: transferOn ? lead.id : null };
     });
   } catch (error) {
     // The error's name only: a Prisma message can quote the values it failed on.
     logger.error('public lead write failed', { error: error instanceof Error ? error.name : 'unknown' });
     return { ok: false, error: 'server' };
+  }
+
+  // NG-212: the lead is committed; only now is it handed to the client-pipeline bridge, and only when
+  // the transfer consent was recorded (with the publication gate off it never is, so nothing changes).
+  if (written.forwardId !== null && options.forwardLead) await forwardBestEffort(written.forwardId, options.forwardLead);
+  return written.result;
+}
+
+/**
+ * Runs the bridge for one committed lead without letting it decide the form's answer: the visitor's
+ * request is stored whatever the bridge does. A throw leaves the lead as the bridge left it (unrouted,
+ * or claimed per NG-181); the `public-lead-stuck` job raises an alert for it after the threshold.
+ * Logs the lead id and the outcome only, never a name, address or organisation.
+ */
+async function forwardBestEffort(publicLeadId: string, forward: (id: string) => Promise<unknown>): Promise<void> {
+  try {
+    const outcome = await forward(publicLeadId);
+    const o = typeof outcome === 'object' && outcome !== null ? (outcome as Record<string, unknown>) : {};
+    logger.info('public lead forwarded', { publicLeadId, status: String(o.status ?? 'unknown'), reason: String(o.reason ?? '') });
+  } catch (error) {
+    logger.warn('public lead forward failed', { publicLeadId, error: error instanceof Error ? error.name : 'unknown' });
   }
 }
 
