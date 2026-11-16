@@ -242,6 +242,8 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
         : null;
     // Both names are compared trimmed (NG-213 D-4): the schema trims what the form sends back, Tenant.name
     // is stored as typed. The stored consent keeps the DB value the visitor was shown.
+    // Known edge case (NG-213 review F-3): two organisations whose names differ only by leading/trailing
+    // whitespace match each other here, so a map moved between them still records the consent.
     const transferTo =
       recipient && data.transferOrgName !== null && recipient.name.trim() === data.transferOrgName ? recipient : null;
     const transferOn = transferTo !== null;
