@@ -36,7 +36,7 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
 });
 
 import { createDbClient, prisma, withTenant, type TenantTx } from '@/lib/db';
-import { mergeLeadOrganizations as mergeImpl, type MergeResult } from '@/modules/m18/server/merge-leads';
+import { mergeLeadOrganizations, type MergeResult } from '@/modules/m18/server/merge-leads';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 const SUITE = 'm18 merge race test';
@@ -48,9 +48,6 @@ const HAS_DB =
 if (RLS_URL && !OWNER_URL) skipOrFailInCi(SUITE, 'DATABASE_URL (owner connection) is not set', 'Provide DATABASE_URL for the fixture/owner connection.');
 else if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
-
-// RED commit only: the actor argument does not exist yet; the fix commit drops this cast.
-const mergeLeadOrganizations = mergeImpl as (tx: TenantTx, tenantId: string, input: unknown, now?: Date, actorId?: string | null) => Promise<MergeResult | null>;
 
 const RUN = Math.random().toString(36).slice(2, 10);
 const ACTOR = `ng205-actor-${RUN}`;

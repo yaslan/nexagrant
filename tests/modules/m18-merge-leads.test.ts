@@ -10,6 +10,8 @@ import type { TenantTx } from '@/lib/db';
 function fakeTx() {
   const write = () => vi.fn(async () => ({ count: 0 }));
   const tx = {
+    $queryRaw: vi.fn(async () => []),
+    auditEvent: { create: vi.fn(async () => ({})) },
     leadOrganization: {
       findFirst: vi.fn(async () => ({ id: 'org-x', tenantId: 't1', deletedAt: null })),
       update: vi.fn(async () => ({})),
@@ -30,6 +32,7 @@ function writesOf(tx: ReturnType<typeof fakeTx>) {
     tx.deal.updateMany,
     tx.leadEligibilityReport.updateMany,
     tx.leadOrganization.update,
+    tx.auditEvent.create,
   ];
 }
 
@@ -48,6 +51,7 @@ describe('mergeLeadOrganizations — blank ids write nothing', () => {
         mergeLeadOrganizations(tx as unknown as TenantTx, tenantId, input),
       ).rejects.toBeInstanceOf(Error);
       expect(tx.leadOrganization.findFirst).not.toHaveBeenCalled();
+      expect(tx.$queryRaw).not.toHaveBeenCalled();
       for (const w of writesOf(tx)) expect(w).not.toHaveBeenCalled();
     });
   }

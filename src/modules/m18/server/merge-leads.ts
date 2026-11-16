@@ -8,7 +8,15 @@ import { blankFieldsFrom, MERGE_FILL_FIELDS } from './duplicate-pairs';
  * receives the dropped one's contacts, deals (and so their tasks and activities), call
  * matches and eligibility pre-reports; blank fields on the kept row are filled from the dropped one. The dropped row is
  * soft-deleted, so its id still resolves in history.
+ *
+ * NG-205 (SEC NG-203 D-A1): both rows are locked `FOR UPDATE` in id order before they are read, so
+ * two merges of the same pair (A←B and B←A at once) run one after the other; the second re-reads
+ * after the first committed, finds its row deleted and returns null. Without it both deleted their
+ * drop row and the contacts crossed over. Every merge writes one `lead.merged` AuditEvent (ids and
+ * counts only, no names) in the same transaction.
  */
+
+export const LEAD_MERGED_AUDIT = 'lead.merged';
 
 export const mergeSchema = z
   .object({
@@ -34,11 +42,20 @@ export async function mergeLeadOrganizations(
   tenantId: string,
   rawInput: unknown,
   now = new Date(),
+  actorId: string | null = null,
 ): Promise<MergeResult | null> {
   requireActionId(tenantId, 'tenantId');
   const input = mergeSchema.parse(rawInput);
   const keepId = requireActionId(input.keepId, 'keepId');
   const dropId = requireActionId(input.dropId, 'dropId');
+  // Lock both rows in id order (ORDER BY sorts before FOR UPDATE locks): two merges of the same
+  // pair queue on the first lock instead of deadlocking. A row of another tenant is invisible here (RLS + the tenantId filter), so it is
+  // neither locked nor found. The reads below run after the lock, so they see a committed merge.
+  await tx.$queryRaw`
+    SELECT "id" FROM "LeadOrganization"
+     WHERE "tenantId" = ${tenantId} AND "id" IN (${keepId}, ${dropId})
+     ORDER BY "id"
+       FOR UPDATE`;
   const [keep, drop] = await Promise.all([
     tx.leadOrganization.findFirst({ where: { id: keepId, tenantId, deletedAt: null } }),
     tx.leadOrganization.findFirst({ where: { id: dropId, tenantId, deletedAt: null } }),
@@ -89,9 +106,20 @@ export async function mergeLeadOrganizations(
     data: { deletedAt: now, deletionReason: `merged into ${keep.id}`, dedupeKey: null },
   });
 
-  return {
+  const result: MergeResult = {
     keepId: keep.id,
     moved: { contacts: contacts.count, deals: deals.count, matches: matches.count, eligibilityReports: eligibilityReports.count },
     filledFields: Object.keys(patch),
   };
+  // Ids, counts and field NAMES only: never the organisation's name or any filled value.
+  await tx.auditEvent.create({
+    data: {
+      tenantId,
+      actorId,
+      type: LEAD_MERGED_AUDIT,
+      target: keep.id,
+      data: { keepId: keep.id, dropId: drop.id, moved: result.moved, filledFields: result.filledFields },
+    },
+  });
+  return result;
 }

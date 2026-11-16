@@ -163,7 +163,7 @@ export async function mergeLeadsAction(input: unknown): Promise<ActionResult<Mer
   try {
     await assertModuleAccess('M18');
     const scope = await requireTenantAction({ can: 'client_pipeline_write' });
-    const merged = await withTenant(scope.tenantId, (tx) => mergeLeadOrganizations(tx, scope.tenantId, input));
+    const merged = await withTenant(scope.tenantId, (tx) => mergeLeadOrganizations(tx, scope.tenantId, input, new Date(), scope.userId));
     if (!merged) return { ok: false, code: 'NOT_FOUND' } as const;
     revalidatePath('/', 'layout');
     return { ok: true, data: merged } as const;
