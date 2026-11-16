@@ -269,15 +269,28 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     ['one unclosed attribute quote, then many <a', `<a x="${fill('<a href=/about>about ')}`],
     ['many "<!--" inside attribute values and scripts', fill('<a href="/about" title="<!--">About</a><script>"<!--"</script>')],
   ];
-  it.each(hostile)('%s: htmlToText and pickSubpages finish within the wall-clock budget', (_name, html) => {
+  // NG-214: no absolute wall-clock limit. A fixed millisecond bound fails on a loaded machine (the
+  // same code took 460–760 ms against a 400 ms limit while another gate ran). The cost is measured
+  // against a reference parse of the same size done right beside it, in the same process: load
+  // slows both the same way, so the ratio does not move, while a rescanning pass costs 25x or more.
+  // Each side is the best of RUNS interleaved runs, which drops the runs a noisy neighbour hit.
+  const RUNS = 5;
+  const MAX_RATIO = 12; // linear parses measure 1–5x the reference; the old regular expressions 25x–5000x
+  const reference = fill('< x ');
+  const parseMs = (html: string): number => {
     const started = performance.now();
     htmlToText(html);
-    const textMs = performance.now() - started;
-    const linkStarted = performance.now();
     pickSubpages(html, base);
-    const linkMs = performance.now() - linkStarted;
-    expect(textMs).toBeLessThan(slack(400));
-    expect(linkMs).toBeLessThan(slack(400));
+    return performance.now() - started;
+  };
+  it.each(hostile)('%s: htmlToText and pickSubpages cost a bounded multiple of a linear reference parse', (_name, html) => {
+    let best = Infinity;
+    let bestReference = Infinity;
+    for (let run = 0; run < RUNS; run += 1) {
+      bestReference = Math.min(bestReference, parseMs(reference));
+      best = Math.min(best, parseMs(html));
+    }
+    expect(best / Math.max(bestReference, 1)).toBeLessThan(MAX_RATIO);
   });
 
   it('an unclosed <script>/<style>/<noscript>/<template> hides the rest of the page (as a browser does)', () => {
