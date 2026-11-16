@@ -17,7 +17,7 @@ import {
   type PublicLeadField,
   type PublicLeadResult,
 } from './public-lead-policy';
-import { transferOrgNameFor } from './transfer-org';
+import { transferRecipientFor } from './transfer-org';
 import { leadTransferConsentEnabled } from '@/lib/env';
 
 export * from './public-lead-policy';
@@ -68,6 +68,15 @@ export const publicLeadInputSchema = z.object({
   consent: z.literal(true),
   /** The optional transfer box (NG-179). Anything but literal true counts as unticked. */
   transferConsent: z.unknown().optional().transform((v) => v === true),
+  /**
+   * NG-204: the organisation name the form showed under the transfer box. The consent is recorded only
+   * when it is still the province's organisation at submit; a stale or missing name records none.
+   * Never a refusal of the whole request (the contact request itself is still stored).
+   */
+  transferOrgName: z
+    .unknown()
+    .optional()
+    .transform((v) => (typeof v === 'string' && v.trim() !== '' && v.length <= 300 ? v.trim() : null)),
   /** The version the form displayed; a stale form is refused rather than recorded against new text. */
   consentVersion: z.literal(PUBLIC_LEAD_CONSENT.version),
   source: z.enum(PUBLIC_LEAD_SOURCES),
@@ -221,13 +230,18 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
 
   try {
     // The transfer consent is recorded only when the box is ticked AND the province has an
-    // organisation now. A ticked box for an unmapped province writes nothing (no recipient, no consent),
-    // and a failed lookup does not lose the lead: it is stored without the transfer consent.
+    // organisation now AND it is the one the form showed (NG-204, SEC NG-203 O-A1): the consent is
+    // stored against that organisation's id and name, and forwardPublicLead sends the lead nowhere else.
+    // A ticked box for an unmapped province, or under a name that is no longer the province's, writes
+    // nothing (no recipient the visitor saw, no consent), and a failed lookup does not lose the lead:
+    // it is stored without the transfer consent.
     // While the publication gate (LEAD_TRANSFER_CONSENT_ENABLED) is off, the flag is ignored outright.
-    const transferOn =
-      data.transferConsent &&
-      leadTransferConsentEnabled() &&
-      (await transferOrgNameFor(data.province, db).catch(() => null)) !== null;
+    const recipient =
+      data.transferConsent && leadTransferConsentEnabled()
+        ? await transferRecipientFor(data.province, db).catch(() => null)
+        : null;
+    const transferTo = recipient && data.transferOrgName !== null && recipient.name === data.transferOrgName ? recipient : null;
+    const transferOn = transferTo !== null;
 
     // NG-175 (SEC NG-170 O-1): PublicLead is RLS system_scope only. 'public-intake' opens it (and,
     // among the system_scope tables, only it and the expert form's) for the anonymous form.
@@ -260,6 +274,8 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
           transferConsent: transferOn,
           transferConsentVersion: transferOn ? PUBLIC_LEAD_TRANSFER_CONSENT.version : null,
           transferConsentAt: transferOn ? now : null,
+          transferConsentTenantId: transferTo?.tenantId ?? null,
+          transferConsentOrgName: transferTo?.name ?? null,
           source: data.source,
           locale: data.locale,
           ipHash,

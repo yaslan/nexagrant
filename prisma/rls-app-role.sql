@@ -135,11 +135,13 @@ BEGIN
   --    granted there and in rls.sql too, here for a role created after both.
   --    province_transfer_org_name (NG-179, add-province-transfer-org-name.sql): the
   --    readiness form's transfer box reads the province's organisation NAME through it.
+  --    province_transfer_org (NG-204, add-public-lead-transfer-recipient.sql): the submit binds
+  --    the transfer consent to that organisation's id (server side only).
   FOR fn IN
     SELECT p.oid::regprocedure
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name')
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name', 'province_transfer_org')
   LOOP
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO %I', fn, app_role);
   END LOOP;

@@ -16,6 +16,7 @@ const lead = (over: Partial<PublicLeadForIntake> = {}): PublicLeadForIntake => (
   transferConsent: true,
   transferConsentVersion: 'v-test',
   transferConsentAt: T0,
+  transferConsentTenantId: 't_1',
   locale: 'tr',
   createdAt: T0,
   ...over,
@@ -38,6 +39,14 @@ describe('buildIntakeRequest — transfer-consent gate', () => {
     ['no time', { transferConsentAt: null }],
   ])('shut gate (%s) builds nothing', (_n, over) => {
     expect(buildIntakeRequest(lead(over), 't_1')).toBeNull();
+  });
+
+  test('NG-204: a target other than the consented recipient builds nothing', () => {
+    expect(buildIntakeRequest(lead(), 't_2')).toBeNull();
+  });
+
+  test('NG-204: a lead with no recorded recipient builds nothing for any target', () => {
+    expect(buildIntakeRequest(lead({ transferConsentTenantId: null }), 't_1')).toBeNull();
   });
 
   test('a malformed readiness code is dropped, the lead still forwards', () => {

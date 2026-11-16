@@ -58,15 +58,28 @@ const port = createLeadIntakePort(prisma, createEventBus());
 const T: Record<'a' | 'b' | 'sme', string> = { a: '', b: '', sme: '' };
 
 const dealsIn = (tenantId: string) => admin.deal.count({ where: { tenantId } });
-const mkLead = (key: string, over: Record<string, unknown> = {}) =>
-  admin.publicLead.create({
+/**
+ * A consented lead as submitPublicLead writes it. NG-204: the consent names the organisation the province
+ * is mapped to AT CREATION (what the visitor saw), unless `consentTo` says which tenant it was given to
+ * (a lead whose mapping was removed after the submit and is later restored).
+ */
+const mkLead = async (key: string, over: Record<string, unknown> = {}, consentTo?: string) => {
+  const province = 'province' in over ? over.province : 'Rize';
+  const recipient = consentTo
+    ? await admin.tenant.findUniqueOrThrow({ where: { id: consentTo }, select: { id: true, name: true } })
+    : typeof province === 'string'
+      ? (await admin.provinceLeadRoute.findFirst({ where: { province, active: true }, select: { tenant: { select: { id: true, name: true } } } }))?.tenant ?? null
+      : null;
+  return admin.publicLead.create({
     data: {
       name: 'Ayşe Yılmaz', email: `${key}-${RUN}@example.test`, organisation: `Org ${key}`, province: 'Rize', district: null,
       readinessCode: 'municipality.012012012012012', consentVersion: 'v-form', consentAt: NOW, source: 'fon-hazirlik', locale: 'tr',
       transferConsent: true, transferConsentVersion: 'v-test', transferConsentAt: NOW,
+      transferConsentTenantId: recipient?.id ?? null, transferConsentOrgName: recipient?.name ?? null,
       ...over,
     },
   });
+};
 
 describe.skipIf(!HAS_DB)('province lead routing', () => {
   beforeAll(async () => {
@@ -185,7 +198,8 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
     });
 
     test('unmapped province: port not called, 0 deals anywhere, marked unmatched (province_unmapped)', async () => {
-      const lead = await mkLead('unmapped', { province: 'Sinop' });
+      // Consented to B, whose mapping was removed after the submit; restored below (NG-204).
+      const lead = await mkLead('unmapped', { province: 'Sinop' }, T.b);
       const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
       const result = await forwardPublicLead(lead.id, port, prisma);
       expect(result).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'province_unmapped' });
@@ -490,7 +504,12 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
      *   remove both = M2 `where: { id }` → RED (call 1 claims with stale A, tenant A gets a copy).
      * (2) cannot go: the where-guard-src scanner relies on it (NG-181 be-gnd-3). Keep (1) as defence in depth.
      */
-    test('O-1: both calls read before either claims and see different targets; the claim WHERE (NG-174 condition or CAS pins, either alone suffices) keeps the loser out — M2 (both removed) turns it red', async () => {
+    // NG-204 changed this race's outcome on purpose. Before, call 2 (map moved to B) claimed and the lead
+    // landed in B, a tenant the visitor never consented to (SEC NG-203 O-A1); the claim WHERE then kept
+    // call 1 out of A. Now the consent names A, so call 2 is refused BEFORE any claim and only A can receive
+    // it. Two calls with DIFFERENT targets can no longer both reach the claim; the at-most-one-tenant
+    // invariant is asserted exactly as before (one tenant, one deal, no copy in the other).
+    test('O-1: both calls read before either claims and see different targets; the one that is not the consented recipient never claims, the lead lands in the consented tenant only', async () => {
       await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
       const lead = await mkLead('o1', { province: 'Rize' });
       const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
@@ -499,22 +518,23 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
       // Call 1 reads (map says A) and is parked right before its claim; the routed-guard has already passed.
       const first = forwardPublicLead(lead.id, port, gate.db);
       await gate.reached;
-      // The map moves; call 2 reads B and claims first.
+      // The map moves; call 2 reads B, which is not who the visitor consented to: no claim, marked unmatched.
       await setProvinceLeadRoute({ province: 'Rize', tenantId: T.b }, ACTOR, prisma);
-      expect((await forwardPublicLead(lead.id, port, prisma)).status).toBe('created');
-      // Call 1 now claims with a stale A: only the WHERE condition stands between it and tenant A.
+      expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'consent_recipient_mismatch' });
+      expect((await dealsIn(T.b)) - b0).toBe(0);
+      // Call 1 claims over that mark (compare-and-set on the mark it now reads) and hands it to A.
       gate.release();
-      expect(await first).toEqual({ status: 'skipped', reason: 'already_routed' });
+      expect((await first).status).toBe('created');
 
-      expect(await contactsOf(lead.id)).toEqual([{ tenantId: T.b }]);
-      expect((await dealsIn(T.a)) - a0).toBe(0);
-      expect((await dealsIn(T.b)) - b0).toBe(1);
-      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.b, routeReason: null });
+      expect(await contactsOf(lead.id)).toEqual([{ tenantId: T.a }]);
+      expect((await dealsIn(T.a)) - a0).toBe(1);
+      expect((await dealsIn(T.b)) - b0).toBe(0);
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a, routeReason: null });
     });
 
     test('D-1: a call that saw no mapping cannot mark a lead unmatched after a concurrent call routed it', async () => {
       await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
-      const lead = await mkLead('d1', { province: 'Rize' });
+      const lead = await mkLead('d1', { province: 'Rize' }, T.a);
       const gate = gatedDb(prisma, 'unmatched');
 
       // Call 1 reads (no mapping) and is parked right before markUnmatched.
@@ -531,7 +551,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('D-2: a refusal unrelated to the tenant puts an unmatched lead back on the worklist (previous mark, not NULL)', async () => {
       await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
-      const lead = await mkLead('d2', { province: 'Rize' });
+      const lead = await mkLead('d2', { province: 'Rize' }, T.a);
       expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'province_unmapped' });
       const marked = await routedRow(lead.id);
 

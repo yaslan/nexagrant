@@ -3696,6 +3696,7 @@
     "reason_province_missing": "Province empty or invalid",
     "reason_province_unmapped": "Province not mapped to a consultancy",
     "reason_tenant_refused": "The mapped consultancy refused the transfer",
+    "reason_consent_recipient_mismatch": "The mapped consultancy is not the one the visitor consented to",
     "error_invalid_province": "Invalid province. Reload the page and try again.",
     "error_tenant_not_found": "The selected consultancy was not found.",
     "error_tenant_ineligible": "The selected consultancy is not eligible (deleted, or neither a consultancy nor an agency).",

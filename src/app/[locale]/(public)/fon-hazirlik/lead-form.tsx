@@ -140,6 +140,8 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
         consentVersion: PUBLIC_LEAD_CONSENT.version,
         // Sent only while the box is on screen; the server writes the version and time itself.
         transferConsent: transferName !== null && transferConsent,
+        // NG-204: the organisation the visitor saw; the server binds the consent to it only if it still serves the province.
+        transferOrgName: transferName !== null && transferConsent ? transferName : undefined,
         source: 'fon-hazirlik',
         locale: locale === 'en' ? 'en' : 'tr',
         website: honeypotRef.current?.value ?? '',
