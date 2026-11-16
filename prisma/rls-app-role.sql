@@ -103,6 +103,13 @@ BEGIN
     EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public."AuditEvent" FROM %I', app_role);
   END IF;
 
+  -- 3e. The M8 expert directory view is read-only (NG-188, prisma/rls.sql): step 3's
+  --     ALL TABLES covers views too. The view is not updatable anyway; this keeps the
+  --     privilege at SELECT so that does not rest on the view's shape alone.
+  IF to_regclass('public."ExpertDirectoryEntry"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public."ExpertDirectoryEntry" FROM %I', app_role);
+  END IF;
+
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as the owner role (fabrika_owner on the VPS; fabrika locally). Default
   --    privileges are recorded per grantor. Only roles the caller is a member of

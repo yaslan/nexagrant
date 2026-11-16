@@ -121,9 +121,10 @@ export const SYSTEM_SCOPE_PURPOSES = [
   'public-intake',
   /**
    * A tenant's M8 candidate query reading the expert pool as a directory (NG-52). The
-   * database opens one thing for it: SELECT on ExpertPreRegistration rows that are verified
-   * and carry the visibility consent (prisma/rls.sql, policy expert_directory). Every other
-   * table reads 0 rows and refuses writes; so does every write to that table.
+   * database opens one thing for it: the view "ExpertDirectoryEntry" (NG-188, prisma/rls.sql),
+   * the card columns of verified, visibility-consented ExpertPreRegistration rows. The base
+   * table and every other table read 0 rows and refuse writes, so no personal-data column
+   * (name, e-mail, ORCID, LinkedIn, IP or token hash) is reachable under this purpose.
    */
   'expert-directory',
 ] as const;

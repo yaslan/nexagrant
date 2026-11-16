@@ -435,7 +435,7 @@
       "count": 1,
       "kind": "system-scope",
       "class": "expert-directory",
-      "reason": "NG-52: the verified expert pre-registrations M8 offers as seat candidates (K-579696 = A, free pre-registration). The pool belongs to no tenant. Purpose expert-directory opens only the expert_directory SELECT policy (verified + visibility consent) on ExpertPreRegistration and no other table; the select carries no name, e-mail, organisation or contact column."
+      "reason": "NG-52: the verified expert pre-registrations M8 offers as seat candidates (K-579696 = A, free pre-registration). The pool belongs to no tenant. NG-188 (SEC NG-185 F-1b): purpose expert-directory opens no row of any table, ExpertPreRegistration included; its one read is the view ExpertDirectoryEntry (prisma/rls.sql), which carries only the card columns (id, founderNumber, province, isFreelancer, roles, programmes, expertiseAreas, languages, listOrder) of verified + visibility-consented rows, is not updatable and is SELECT-only for fabrika_app. So the column limit is the database's, not this select's: no name, e-mail, organisation, ORCID, LinkedIn, IP or token column can be read under this purpose (rls:verify probeExpertDirectory)."
     },
     {
       "check": "D",
