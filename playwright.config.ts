@@ -85,6 +85,13 @@ if (process.env.E2E_DATABASE_URL) {
 const E2E_SMTP = { SMTP_HOST: 'localhost', SMTP_PORT: '1025' };
 process.env.E2E_MAILPIT_URL ??= 'http://localhost:8025';
 
+// NG-209: the e2e web server answers the M18 LLM calls (only those) from the fake provider in
+// src/lib/llm.ts and reads an in-process fake website (no model, no outside network). The runner gets the same value, so a spec
+// can refuse to click when the server would reach a real resolver. Only a development or test
+// server may run with it; `start` (a production build) refuses to boot with it
+// (assertFakeAiAllowed), so it is set for `dev` only.
+if (E2E_WEB_SERVER === 'dev') process.env.E2E_FAKE_AI = 'true';
+
 // NG-40: the e2e runner and its web server both write billing identity / invoices through the
 // encrypting Prisma client; a throwaway key of this run (a real one in the environment wins).
 const FIXTURE_TAX_ID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -113,6 +120,8 @@ const testEnv = {
   DATABASE_URL: process.env.DATABASE_URL,
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
   ...(E2E_WEB_SERVER === 'dev' ? { DEMO_LOGIN_ENABLED: 'true' } : {}),
+  // NG-209: the fake LLM provider and fake website (see above); dev only, like the demo seats.
+  ...(E2E_WEB_SERVER === 'dev' ? { E2E_FAKE_AI: 'true' } : {}),
   // The Google button renders only with a client id (src/lib/auth.ts), and
   // tests/e2e/auth.spec.ts clicks it. CI's e2e step sets these same placeholders;
   // a worktree built from .env.example has them blank (TASK-MVBFDSUSE5QCY). A

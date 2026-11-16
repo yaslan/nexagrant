@@ -2,9 +2,9 @@ import { z } from 'zod';
 import type { TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
 import { separatedPrompt } from '@/lib/ai/prompts';
-import { generateCompletion, type LlmCompletion, type LlmGenerateOptions } from '@/lib/llm';
+import { fakeAiEnabled, generateCompletion, type LlmCompletion, type LlmGenerateOptions } from '@/lib/llm';
 import { assertM18Balance, attemptPurpose, withM18Reservation, type M18CreditDeps } from './ai-credits';
-import { fetchOrganizationSite, type SiteFetchDeps, type SiteFetchResult } from './site-fetch';
+import { fakeSiteDeps, fetchOrganizationSite, type SiteFetchDeps, type SiteFetchResult } from './site-fetch';
 
 /**
  * M18-F5 (NG-136) — organisation enrichment from its own website.
@@ -141,7 +141,10 @@ export async function proposeEnrichment(
   // NG-202 (B2): the site is read before the price is reserved (no page → no charge), so a tenant that
   // cannot pay is turned away here, before any request leaves for the third-party site.
   await (deps.credits?.precheck ?? assertM18Balance)(input.tenantId, ENRICHMENT_PURPOSE);
-  const site = await (deps.fetchSite ?? fetchOrganizationSite)(org.website);
+  // NG-209: the e2e web server (E2E_FAKE_AI, never in production — llm.ts) reads an in-process fake
+  // site through the same guarded reader; only DNS and transport are replaced.
+  const fetchSite = deps.fetchSite ?? fetchOrganizationSite;
+  const site = await (fakeAiEnabled() ? fetchSite(org.website, fakeSiteDeps()) : fetchSite(org.website));
   if (!site.ok) return { ok: false, code: 'SITE_UNAVAILABLE', reason: site.reason };
   if (site.pages.length === 0) return { ok: false, code: 'SITE_UNAVAILABLE', reason: 'no_html' };
 

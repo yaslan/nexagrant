@@ -5860,6 +5860,7 @@
       "enrichApply": "Write selected to record",
       "enrichApplied": "The selected fields were written to the record.",
       "enrichSources": "Source pages",
+      "enrichDraftLabel": "AI draft — nothing is written to the record until you approve",
       "enrichNothingSelected": "Select at least one field.",
       "field": {
         "legalName": "Legal name",
