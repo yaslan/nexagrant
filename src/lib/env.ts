@@ -104,8 +104,9 @@ const envSchema = z.object({
   /**
    * NG-209. Test-only: the e2e web server answers every LLM call from the fake provider in
    * src/lib/llm.ts (no key, no network, no model) and the M18 website reader reads an in-process
-   * fake site. Only the literal `true` turns it on; unset = off. A production build or
-   * NODE_ENV=production refuses to start with it (`assertFakeAiAllowed`, src/instrumentation.ts).
+   * fake site. Only the literal `true` turns it on; unset = off. Default-deny: it works only in a
+   * non-production build with NODE_ENV explicitly `development` or `test`; any other server
+   * (NODE_ENV unset included) refuses to start with it (`assertFakeAiAllowed`, src/instrumentation.ts).
    */
   E2E_FAKE_AI: blankToUndefined(z.enum(['true', 'false']).optional()),
   /**

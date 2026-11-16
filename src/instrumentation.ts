@@ -11,7 +11,7 @@ export async function register() {
     // and an invalid DEMO_LOGIN_ENABLED has to stop the server the same way.
     const { assertDemoLoginAllowed } = await import('./lib/demo-login');
     assertDemoLoginAllowed();
-    // NG-209: the e2e fake LLM provider never answers in production.
+    // NG-209: the e2e fake LLM provider runs only on a development or test server (default-deny).
     const { assertFakeAiAllowed } = await import('./lib/llm');
     assertFakeAiAllowed();
   } catch (error) {

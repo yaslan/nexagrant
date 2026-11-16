@@ -19,7 +19,7 @@ import { recordAlert } from '@/lib/observability/system-alert';
 import crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
-import { env } from '@/lib/env';
+import { declaredNodeEnv, env } from '@/lib/env';
 import { errorStatus } from '@/lib/errors';
 import { LLM_REFUSED_DIGEST, LLM_TRUNCATED_DIGEST } from '@/lib/llm-outcome';
 
@@ -308,9 +308,26 @@ type FakeAiEnv = { E2E_FAKE_AI?: string; NODE_ENV?: string };
 /**
  * Whether this code was BUILT for production (`next build`). A direct `process.env.NODE_ENV` read
  * is replaced by a literal at build time, so starting a production build with another NODE_ENV
- * cannot change it — the same lock src/lib/demo-login.ts uses.
+ * cannot change it — the same lock src/lib/demo-login.ts uses. Deliberately not a parameter of the
+ * functions below (NG-209 sec F6): no caller can pass it open; tests load this module afresh
+ * under a chosen NODE_ENV instead.
  */
 const BUILT_FOR_PRODUCTION = process.env.NODE_ENV === 'production';
+
+/**
+ * The flag and NODE_ENV as the process declared them. `declaredNodeEnv`, not `env.NODE_ENV`: the
+ * schema defaults an absent NODE_ENV to 'development', which would open the fake where nobody said
+ * which environment this is. Read lazily, only once the flag is on.
+ */
+function currentFakeAiEnv(): FakeAiEnv {
+  if (env.E2E_FAKE_AI !== 'true') return { E2E_FAKE_AI: env.E2E_FAKE_AI };
+  return { E2E_FAKE_AI: env.E2E_FAKE_AI, NODE_ENV: declaredNodeEnv };
+}
+
+/** Default-deny: the only environments the fake may answer in. Anything else, unset included, is not one. */
+function fakeAiEnvironmentAllowed(source: FakeAiEnv): boolean {
+  return !BUILT_FOR_PRODUCTION && (source.NODE_ENV === 'development' || source.NODE_ENV === 'test');
+}
 
 /**
  * `E2E_FAKE_AI=true` — the e2e web server (playwright.config.ts) answers every generateCompletion
@@ -319,29 +336,28 @@ const BUILT_FOR_PRODUCTION = process.env.NODE_ENV === 'production';
  * row (provider `fake`, model `fake-e2e`). The M18 website reader follows the same flag
  * (enrichment.ts → site-fetch.ts `fakeSiteDeps`).
  *
- * Off unless the flag is the literal `true`, and off in a production build or with
- * NODE_ENV=production whatever the flag says; {@link assertFakeAiAllowed} refuses to start such a
- * server in the first place (src/instrumentation.ts).
- *
- * @param builtForProduction the build-time half; a parameter only so tests can exercise a production build.
+ * Default-deny (NG-209 sec F1): on only for the literal flag `true`, in a build that is not a
+ * production build, with NODE_ENV explicitly `development` or `test`. Every other NODE_ENV —
+ * production, staging, preview, blank, unset — keeps it off, and {@link assertFakeAiAllowed}
+ * refuses to start such a server with the flag on (src/instrumentation.ts).
  */
-export function fakeAiEnabled(source: FakeAiEnv = env, builtForProduction: boolean = BUILT_FOR_PRODUCTION): boolean {
-  return source.E2E_FAKE_AI === 'true' && !builtForProduction && source.NODE_ENV !== 'production';
+export function fakeAiEnabled(source: FakeAiEnv = currentFakeAiEnv()): boolean {
+  return source.E2E_FAKE_AI === 'true' && fakeAiEnvironmentAllowed(source);
 }
 
-export class FakeAiInProductionError extends Error {
-  constructor() {
+export class FakeAiNotAllowedError extends Error {
+  constructor(nodeEnv: string | undefined) {
     super(
-      'E2E_FAKE_AI=true is not allowed in a production build or with NODE_ENV=production: every AI answer would come from the e2e fake provider, not a model. Remove it from the production environment; the server will not start with it.'
+      `E2E_FAKE_AI=true is allowed only on a development or test server (NODE_ENV=development or test, not a production build); this one has NODE_ENV=${nodeEnv === undefined ? '(unset)' : nodeEnv === '' ? '(blank)' : nodeEnv}${BUILT_FOR_PRODUCTION ? ' in a production build' : ''}. Every AI answer would come from the e2e fake provider, not a model. Remove the flag; the server will not start with it.`
     );
-    this.name = 'FakeAiInProductionError';
+    this.name = 'FakeAiNotAllowedError';
   }
 }
 
-/** Run once at server start (src/instrumentation.ts): a production server with the flag on does not start. */
-export function assertFakeAiAllowed(source: FakeAiEnv = env, builtForProduction: boolean = BUILT_FOR_PRODUCTION): void {
-  if (source.E2E_FAKE_AI === 'true' && (builtForProduction || source.NODE_ENV === 'production')) {
-    throw new FakeAiInProductionError();
+/** Run once at server start (src/instrumentation.ts): with the flag on, anything but a development or test server does not start. */
+export function assertFakeAiAllowed(source: FakeAiEnv = currentFakeAiEnv()): void {
+  if (source.E2E_FAKE_AI === 'true' && !fakeAiEnvironmentAllowed(source)) {
+    throw new FakeAiNotAllowedError(source.NODE_ENV);
   }
 }
 

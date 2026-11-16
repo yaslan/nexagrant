@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, expectTypeOf, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * NG-209 — the e2e fake provider (`E2E_FAKE_AI=true`), the one seam that lets a browser click reach
@@ -38,7 +38,7 @@ vi.mock('@/lib/env', () => ({
   },
 }));
 
-import { assertFakeAiAllowed, fakeAiEnabled, FakeAiInProductionError, generateCompletion } from './llm';
+import { assertFakeAiAllowed, fakeAiEnabled, FakeAiNotAllowedError, generateCompletion } from './llm';
 
 /** llm.ts evaluated afresh with process.env.NODE_ENV = `nodeEnv` at load: the build-time constant. */
 async function loadLlmBuiltWith(nodeEnv: string): Promise<typeof import('./llm')> {
@@ -98,7 +98,7 @@ describe('the build-time lock — the real module constant, no parameter (sec F2
     const built = await loadLlmBuiltWith('production');
     for (const NODE_ENV of ['development', 'test']) {
       expect(built.fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toBe(false);
-      expect(() => built.assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toThrow(built.FakeAiInProductionError);
+      expect(() => built.assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), NODE_ENV).toThrow(built.FakeAiNotAllowedError);
     }
     expect(() => built.assertFakeAiAllowed({ NODE_ENV: 'development' })).not.toThrow();
   });
@@ -108,12 +108,17 @@ describe('the build-time lock — the real module constant, no parameter (sec F2
     expect(built.fakeAiEnabled({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).toBe(true);
     expect(() => built.assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV: 'development' })).not.toThrow();
   });
+
+  it('takes no build parameter: no caller can pass the lock open (checked by tsc)', () => {
+    expectTypeOf<Parameters<typeof fakeAiEnabled>['length']>().toEqualTypeOf<0 | 1>();
+    expectTypeOf<Parameters<typeof assertFakeAiAllowed>['length']>().toEqualTypeOf<0 | 1>();
+  });
 });
 
 describe('assertFakeAiAllowed — a server with the flag on starts only in development or test', () => {
   it('throws for every NODE_ENV other than development and test', () => {
     for (const NODE_ENV of ['production', 'staging', 'preview', '', undefined]) {
-      expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toThrow(FakeAiInProductionError);
+      expect(() => assertFakeAiAllowed({ E2E_FAKE_AI: 'true', NODE_ENV }), String(NODE_ENV)).toThrow(FakeAiNotAllowedError);
     }
   });
 
@@ -121,7 +126,7 @@ describe('assertFakeAiAllowed — a server with the flag on starts only in devel
     mockEnv.E2E_FAKE_AI = 'true';
     mockEnv.NODE_ENV = 'development';
     declared.nodeEnv = undefined;
-    expect(() => assertFakeAiAllowed()).toThrow(FakeAiInProductionError);
+    expect(() => assertFakeAiAllowed()).toThrow(FakeAiNotAllowedError);
   });
 
   it('names the environment it refused in the message', () => {
