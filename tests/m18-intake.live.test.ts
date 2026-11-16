@@ -203,7 +203,11 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
       const bus = createEventBus();
       bus.subscribe('m18.lead-intake.created', (e) => void events.push(e));
       const p = createLeadIntakePort(prisma, bus);
-      const lead = await mkLead('yes', { transferConsent: true, transferConsentVersion: 'v-test', transferConsentAt: NOW });
+      // NG-204: the consent names the organisation Samsun is mapped to (what the visitor saw).
+      const lead = await mkLead('yes', {
+        transferConsent: true, transferConsentVersion: 'v-test', transferConsentAt: NOW,
+        transferConsentTenantId: tenants.consultancy, transferConsentOrgName: `intake-consultancy-${RUN}`,
+      });
       const before = await counts(tenants.consultancy);
       const result = await forwardPublicLead(lead.id, p, prisma);
       expect(result.status).toBe('created');

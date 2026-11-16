@@ -38,11 +38,12 @@ function completion(text: string): LlmCompletion {
   return { text, inputTokens: 10, outputTokens: 10, credits: 1, provider: 'anthropic', model: 'stub-model', stopReason: 'end_turn' };
 }
 
-/** The credit boundary stubbed: reserve hands out a refId, release records what was given back. */
+/** The credit boundary stubbed: the balance check passes, reserve hands out a refId, release records what was given back. */
 function creditStub(credits = 1) {
+  const precheck = vi.fn(async (_tenantId: string, _purpose: string) => {});
   const reserve = vi.fn(async (_tenantId: string, purpose: string) => ({ refId: `ref:${purpose}`, credits }));
   const release = vi.fn(async (_tenantId: string, _refId: string) => {});
-  return { reserve, release };
+  return { precheck, reserve, release };
 }
 
 const PAGES = { ok: true as const, pages: [{ url: 'https://acme.com.tr/', text: 'Acme Teknoloji A.Ş.' }], skipped: [] };
@@ -128,13 +129,37 @@ describe('proposeEnrichment', () => {
     ).rejects.toThrow(/provider down/);
     expect(credits.release).toHaveBeenCalledTimes(1);
   });
+  it('NG-202 B2: a balance below the price is refused before the site is read (no fetch, no reservation)', async () => {
+    const fetchSite = vi.fn(async () => PAGES);
+    const generate = vi.fn(async (_opts: unknown) => completion('{}'));
+    const precheck = vi.fn(async (_tenantId: string, _purpose: string) => {
+      throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
+    });
+    const credits = { ...creditStub(), precheck };
+    await expect(
+      proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite, generate, credits }),
+    ).rejects.toThrow(/Insufficient AI credits/);
+    expect(precheck).toHaveBeenCalledWith('t1', 'enrich-organization');
+    expect(fetchSite).not.toHaveBeenCalled();
+    expect(credits.reserve).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+  });
+  it('NG-202 B2: the balance check runs before the site read, the reservation after it', async () => {
+    const fetchSite = vi.fn(async () => PAGES);
+    const generate = vi.fn(async (_opts: unknown) => completion('{"legalName":"Acme"}'));
+    const precheck = vi.fn(async (_tenantId: string, _purpose: string) => {});
+    const credits = { ...creditStub(), precheck };
+    await expect(proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite, generate, credits })).resolves.toMatchObject({ ok: true });
+    expect(precheck.mock.invocationCallOrder[0]!).toBeLessThan(fetchSite.mock.invocationCallOrder[0]!);
+    expect(fetchSite.mock.invocationCallOrder[0]!).toBeLessThan(credits.reserve.mock.invocationCallOrder[0]!);
+  });
   it('refused credits → no model call', async () => {
     const generate = vi.fn();
     const reserve = vi.fn(async () => {
       throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
     });
     await expect(
-      proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite: async () => PAGES, generate, credits: { reserve } }),
+      proposeEnrichment({ tenantId: 't1', userId: 'u1', org, locale: 'tr' }, { fetchSite: async () => PAGES, generate, credits: { precheck: async () => {}, reserve } }),
     ).rejects.toThrow(/Insufficient AI credits/);
     expect(generate).not.toHaveBeenCalled();
   });

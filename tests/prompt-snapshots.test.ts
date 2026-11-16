@@ -210,8 +210,9 @@ describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
     themes: [],
     sectorCodes: [],
   };
-  // `@/lib/llm` is mocked whole here, so the reservation (ai-credits.ts) is stubbed at its seam.
-  const credits = { reserve: async () => ({ refId: 'ref-1', credits: 1 }), release: async () => {} };
+  // `@/lib/llm` is mocked whole here, so the balance check and the reservation (ai-credits.ts) are
+  // stubbed at their seam.
+  const credits = { precheck: async () => {}, reserve: async () => ({ refId: 'ref-1', credits: 1 }), release: async () => {} };
 
   test.each(['en', 'tr'] as const)('enrich-organization — %s', async (locale) => {
     const { proposeEnrichment } = await import('@/modules/m18/server/enrichment');

@@ -727,6 +727,12 @@ model PublicLead {
   transferConsent        Boolean   @default(false)
   transferConsentVersion String?
   transferConsentAt      DateTime?
+  /// NG-204 (SEC NG-203 O-A1): WHO the transfer consent names: the tenant whose name the visitor saw
+  /// under the box, and that name. Both or neither (CHECK PublicLead_transfer_recipient_check). No FK
+  /// (proof of consent outlives a deleted tenant). forwardPublicLead forwards only to this tenant;
+  /// a map that moved marks the lead unmatched/consent_recipient_mismatch.
+  transferConsentTenantId String?
+  transferConsentOrgName  String?
   /// NG-167: where the intake forwarder sent it. 'routed' | 'unmatched' (consent given but the
   /// province is empty or has no active ProvinceLeadRoute: NOT forwarded, platform-admin worklist).
   /// NG-174: a lead is handed to AT MOST ONE tenant. 'routed' => routedTenantId set (claimed before the

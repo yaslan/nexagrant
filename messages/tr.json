@@ -3696,6 +3696,7 @@
     "reason_province_missing": "İl boş ya da geçersiz",
     "reason_province_unmapped": "İl bir kuruluşa eşlenmemiş",
     "reason_tenant_refused": "Eşlenen kuruluş aktarımı reddetti",
+    "reason_consent_recipient_mismatch": "Eşlenen kuruluş, ziyaretçinin rıza verdiği kuruluş değil",
     "error_invalid_province": "İl geçersiz. Sayfayı yenileyip tekrar deneyin.",
     "error_tenant_not_found": "Seçilen kuruluş bulunamadı.",
     "error_tenant_ineligible": "Seçilen kuruluş eşleme için uygun değil (silinmiş ya da danışmanlık/ajans değil).",

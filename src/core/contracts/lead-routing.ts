@@ -27,7 +27,12 @@ export type UnmatchedReason =
   /** No ACTIVE ProvinceLeadRoute for the province. */
   | 'province_unmapped'
   /** Mapped, but M18 refused the target (tenant deleted / not a consultancy / agency). */
-  | 'tenant_refused';
+  | 'tenant_refused'
+  /**
+   * NG-204: the map's target is not the organisation the visitor consented to (the map moved after the
+   * consent, or the lead carries no recorded recipient). Never forwarded: a new recipient needs a new consent.
+   */
+  | 'consent_recipient_mismatch';
 
 /** One row of the map. */
 export interface ProvinceLeadRouteRow {

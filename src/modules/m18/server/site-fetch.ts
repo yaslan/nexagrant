@@ -204,13 +204,32 @@ const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
  * (guardedGet follows them by hand); the body arrives as a stream, so readCapped's byte cap and the
  * abort signal (per-request timeout + total budget) apply to it as they did to `fetch`.
  */
-export function createPinnedFetch(opts: {
+export function createPinnedFetch(opts: { resolve: LookupFn; allowed?: AddressGuard }): FetchLike {
+  // NG-202 (B6): built from the two options by name, so an options bag that also carries `ca` or
+  // `connectPort` cannot reach the transport — the system trust store and the URL's port always apply.
+  return pinnedTransport({ resolve: opts.resolve, allowed: opts.allowed });
+}
+
+type PinnedTransportOptions = {
   resolve: LookupFn;
   allowed?: AddressGuard;
+  /** Test seam: the port the socket connects to (a local test server). Default: the URL's own. */
   connectPort?: number;
   /** Test seam: the CA a local https test server's certificate is checked against. Default: the system's. */
   ca?: string;
-}): FetchLike {
+};
+
+/**
+ * TEST SEAM ONLY (NG-202 B6) — the pinned transport pointed at a local test server: `connectPort`
+ * and a custom `ca`. A custom CA replaces the system trust store, so no code under src/ other than
+ * this file may use it (tests/modules/m18/site-fetch.test.ts checks). Production builds the
+ * transport through {@link createPinnedFetch}, or through `fetchOrganizationSite`'s own test seam.
+ */
+export function testOnlyPinnedTransport(opts: PinnedTransportOptions): FetchLike {
+  return pinnedTransport(opts);
+}
+
+function pinnedTransport(opts: PinnedTransportOptions): FetchLike {
   const allowed = opts.allowed ?? isPublicAddress;
   const lookup = guardedLookup(opts.resolve, allowed);
   return (url, init) =>
@@ -366,7 +385,11 @@ export function robotsAllows(rules: RobotsRule[], pathWithQuery: string): boolea
 const HIDDEN_ELEMENTS = ['script', 'style', 'noscript', 'svg', 'template', 'head'] as const;
 const HIDE_TO_END = new Set<string>(['script', 'style', 'noscript', 'template']);
 const BLOCK_ELEMENTS = ['br', 'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'section', 'article', 'footer', 'header'];
-/** At most this many anchors are looked at, and a label is read from at most this many characters. */
+/**
+ * At most this many CANDIDATE anchors are resolved (an href whose text or label carries an about/contact
+ * hint; NG-202 B5: ordinary menu links no longer use the budget up), and a label is read from at most
+ * this many characters.
+ */
 export const MAX_ANCHORS = 500;
 export const MAX_LABEL_CHARS = 2_000;
 
@@ -411,20 +434,6 @@ function titleOf(html: string, lower: string): string {
   return close < 0 ? '' : html.slice(gt + 1, close);
 }
 
-/** Comments become a space; an unclosed comment hides the rest. */
-function stripComments(s: string): string {
-  let out = '';
-  let i = 0;
-  for (;;) {
-    const open = s.indexOf('<!--', i);
-    if (open < 0) return out + s.slice(i);
-    const close = s.indexOf('-->', open + 4);
-    out += `${s.slice(i, open)} `;
-    if (close < 0) return out;
-    i = close + 3;
-  }
-}
-
 /** The index just past `</name\s*>` at or after `from`, or -1. */
 function closingEnd(s: string, lower: string, name: string, from: number): number {
   const needle = `</${name}`;
@@ -436,32 +445,90 @@ function closingEnd(s: string, lower: string, name: string, from: number): numbe
   return -1;
 }
 
-/** Hidden elements (with their content) become a space. */
-function stripHidden(s: string): string {
+const isAsciiLetter = (s: string, i: number) => {
+  const c = s.charCodeAt(i) | 0x20;
+  return c >= 97 && c <= 122;
+};
+
+/**
+ * NG-207 F2: the index just past the comment whose body starts at `body` (right after `<!--`), or -1
+ * when it never ends. As a browser: `<!-->` and `<!--->` end at once; otherwise the first `-->` or
+ * `--!>` ends it. `cache` keeps the last found position of each closer (-1: none left; -2: not looked
+ * up yet), reused while it still lies ahead, so many comments cost one pass over the input.
+ */
+function commentEnd(s: string, body: number, cache: { dashes: number; bang: number }): number {
+  if (s[body] === '>') return body + 1;
+  if (s[body] === '-' && s[body + 1] === '>') return body + 2;
+  if (cache.dashes === -2 || (cache.dashes >= 0 && cache.dashes < body)) cache.dashes = s.indexOf('-->', body);
+  if (cache.bang === -2 || (cache.bang >= 0 && cache.bang < body)) cache.bang = s.indexOf('--!>', body);
+  const { dashes, bang } = cache;
+  if (dashes < 0 && bang < 0) return -1;
+  if (bang < 0 || (dashes >= 0 && dashes < bang)) return dashes + 3;
+  return bang + 4;
+}
+
+/**
+ * Comments and hidden elements (with their content) become a space; an unclosed comment, or an
+ * unclosed <script>/<style>/<noscript>/<template>, hides the rest.
+ *
+ * NG-207 F1: both are found in ONE left-to-right scan, as a browser tokenises. A `<!--` inside a
+ * <script> is script text (the script is skipped to its `</script>` first) and one inside an attribute
+ * value is that value (every other tag is skipped whole, quoted values included) — neither opens a
+ * comment, so the visible links and text up to the next `-->` stay. A `<script>` inside a comment opens
+ * nothing either. Once a tag never ends (an unclosed quote or no `>`), attribute values are no longer
+ * skipped: the rest is scanned `<` by `<` as before, so the scan stays linear.
+ * A comment ends as a browser ends it (see `commentEnd`), and a `<!` not followed by `--` (doctype, bogus
+ * comment) runs to the next `>`.
+ */
+function stripHiddenAndComments(s: string): string {
   const lower = lowerAscii(s);
   const neverClosed = new Set<string>(); // no closing tag after some point → none after any later one
+  const cache = { dashes: -2, bang: -2 };
+  let tagsEnd = true;
   let out = '';
-  let i = 0;
-  let from = 0;
+  let i = 0; // start of the input not yet copied to `out`
+  let from = 0; // where the next `<` is looked for
   for (;;) {
     const lt = s.indexOf('<', from);
     if (lt < 0) return out + s.slice(i);
-    const name = tagAt(lower, lt, HIDDEN_ELEMENTS);
-    if (!name || neverClosed.has(name)) {
-      from = lt + 1;
-      continue;
-    }
-    const end = closingEnd(s, lower, name, lt + 1 + name.length);
-    if (end >= 0) {
+    if (s.startsWith('<!--', lt)) {
+      const end = commentEnd(s, lt + 4, cache);
       out += `${s.slice(i, lt)} `;
+      if (end < 0) return out;
       i = end;
       from = end;
-    } else if (HIDE_TO_END.has(name)) {
-      return `${out}${s.slice(i, lt)} `;
-    } else {
-      neverClosed.add(name);
-      from = lt + 1;
+      continue;
     }
+    if (s[lt + 1] === '!') {
+      // NG-207 F3: a doctype or a bogus comment runs to the next `>`, quotes or not; a `<!--` in it is text.
+      const gt = s.indexOf('>', lt + 2);
+      out += `${s.slice(i, lt)} `;
+      if (gt < 0) return out;
+      i = gt + 1;
+      from = i;
+      continue;
+    }
+    const name = tagAt(lower, lt, HIDDEN_ELEMENTS);
+    if (name && !neverClosed.has(name)) {
+      const end = closingEnd(s, lower, name, lt + 1 + name.length);
+      if (end >= 0) {
+        out += `${s.slice(i, lt)} `;
+        i = end;
+        from = end;
+        continue;
+      }
+      if (HIDE_TO_END.has(name)) return `${out}${s.slice(i, lt)} `;
+      neverClosed.add(name);
+    }
+    from = lt + 1;
+    // Any other start or end tag is passed whole, so nothing inside its attribute values is markup.
+    const nameAt = s[lt + 1] === '/' ? lt + 2 : lt + 1;
+    if (!tagsEnd || !isAsciiLetter(s, nameAt)) continue;
+    let k = nameAt;
+    while (k < s.length && !isSpace(s[k]) && s[k] !== '/' && s[k] !== '>') k += 1;
+    const tag = readStartTag(s, lower, k);
+    if (tag) from = tag.end;
+    else tagsEnd = false;
   }
 }
 
@@ -494,7 +561,7 @@ function replaceTags(s: string, replacement: string, isMatch: (lower: string, lt
 /** Visible text of a page, whitespace collapsed, capped. */
 export function htmlToText(html: string, maxChars = MAX_PAGE_CHARS): string {
   const title = titleOf(html, lowerAscii(html));
-  const blocks = replaceTags(stripHidden(stripComments(html)), '\n', (lower, lt) => tagAt(lower, lt, BLOCK_ELEMENTS) !== null);
+  const blocks = replaceTags(stripHiddenAndComments(html), '\n', (lower, lt) => tagAt(lower, lt, BLOCK_ELEMENTS) !== null);
   const body = replaceTags(blocks, ' ', (_lower, lt, gt) => gt > lt + 1);
   const text = decodeEntities(`${title}\n${body}`)
     .split('\n')
@@ -553,34 +620,45 @@ function readStartTag(s: string, lower: string, at: number): { href: string | nu
 }
 
 /**
- * Up to `limit` same-site links whose path or text looks like an about/contact page. One forward
- * scan: at most MAX_ANCHORS anchors are read, and a label ends at `</a>`, at the next `<a`, or after
+ * Up to `limit` same-site links whose path or text looks like an about/contact page, outside comments
+ * and hidden elements. One forward scan: at most MAX_ANCHORS anchors are read, and a label ends at `</a>`, at the next `<a`, or after
  * MAX_LABEL_CHARS characters, whichever comes first.
  */
-export function pickSubpages(html: string, base: URL, limit = MAX_PAGES - 1): URL[] {
+export function pickSubpages(rawHtml: string, base: URL, limit = MAX_PAGES - 1): URL[] {
   const picked: URL[] = [];
   const seen = new Set<string>([base.origin + base.pathname]);
+  // NG-202 (B4): links are read from the same markup the text is — comments and hidden elements
+  // (<script>, <style>, <template>, <noscript>, …) gone first, so a link a script only writes as a
+  // string, or one inside an unclosed <script>, is no candidate. One linear scan (above; NG-207 F1).
+  const html = stripHiddenAndComments(rawHtml);
   const lower = lowerAscii(html);
   let from = 0;
-  for (let anchors = 0; anchors < MAX_ANCHORS && picked.length < limit; ) {
+  for (let candidates = 0; candidates < MAX_ANCHORS && picked.length < limit; ) {
     const lt = lower.indexOf('<a', from);
     if (lt < 0) break;
     if (isWordChar(lower, lt + 2)) {
       from = lt + 2;
       continue;
     }
-    anchors += 1;
     const tag = readStartTag(html, lower, lt + 2);
     if (!tag) break; // the tag never ends: nothing after it is markup
+    // The label ends at the next `<a`, at `</a>` before it, or after MAX_LABEL_CHARS. `</a>` is looked
+    // for only up to the next `<a`, so each character is scanned a bounded number of times.
     const window = lower.slice(tag.end, tag.end + MAX_LABEL_CHARS);
-    const close = window.indexOf('</a>');
     const nextAnchor = window.search(/<a(?![A-Za-z0-9_])/);
-    const labelLength = [close, nextAnchor].filter((n) => n >= 0).reduce((a, b) => Math.min(a, b), window.length);
+    const span = nextAnchor >= 0 ? nextAnchor : window.length;
+    const close = window.slice(0, span).indexOf('</a>');
+    const labelLength = close >= 0 ? close : span;
     from = tag.end + (labelLength === close ? close + 4 : labelLength);
     if (tag.href === null) continue;
     const href = decodeEntities(tag.href);
     const rawLabel = html.slice(tag.end, tag.end + labelLength);
     const label = replaceTags(rawLabel, ' ', (_lower, lt, gt) => gt > lt + 1); // `<[^>]+>` in one pass
+    // NG-202 (B5): only an anchor that could be picked — a hint in its href or its label — counts
+    // against MAX_ANCHORS. The URL parser drops tabs and newlines, so the href is read without them.
+    const bareHref = href.replace(/[\t\n\r]/g, '');
+    if (!LINK_HINT.test(safeDecodePath(bareHref)) && !LINK_HINT.test(label)) continue;
+    candidates += 1;
     let url: URL;
     try {
       url = new URL(href, base);
@@ -679,7 +757,7 @@ export async function fetchOrganizationSite(rawUrl: string, deps: SiteFetchDeps 
   const lookup = deps.lookup ?? defaultLookup;
   const addressAllowed = deps.addressAllowed ?? isPublicAddress;
   const d = {
-    fetchImpl: deps.fetchImpl ?? createPinnedFetch({ resolve: lookup, allowed: addressAllowed, connectPort: deps.connectPort }),
+    fetchImpl: deps.fetchImpl ?? pinnedTransport({ resolve: lookup, allowed: addressAllowed, connectPort: deps.connectPort }),
     lookup,
     addressAllowed,
     timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,

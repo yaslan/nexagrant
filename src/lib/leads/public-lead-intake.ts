@@ -18,7 +18,9 @@ import { decodeReadinessCode } from '@/lib/readiness/share';
  * the port is not called at all, so no row of any kind is created.
  *
  * Which tenant receives it comes from the platform-admin province map (NG-167, ProvinceLeadRoute):
- * no mapping means no transfer and the lead is marked 'unmatched'. Which advisor owns it is still an
+ * no mapping means no transfer and the lead is marked 'unmatched'. NG-204 (SEC NG-203 O-A1): the map's
+ * target must also be the tenant the consent was given to (`transferConsentTenantId`, stored at submit);
+ * if the map moved, the lead is NOT forwarded and is marked 'unmatched/consent_recipient_mismatch'. Which advisor owns it is still an
  * open product decision: nothing here assigns an owner (the lead lands unassigned).
  * Nothing here logs a name, address or organisation.
  */
@@ -34,6 +36,8 @@ export interface PublicLeadForIntake {
   transferConsent: boolean;
   transferConsentVersion: string | null;
   transferConsentAt: Date | null;
+  /** NG-204: the tenant the transfer consent names (null = no recorded recipient: never forwarded). */
+  transferConsentTenantId: string | null;
   locale: string;
   createdAt: Date;
 }
@@ -41,7 +45,7 @@ export interface PublicLeadForIntake {
 export type PublicLeadForwardResult =
   | LeadIntakeResult
   | { status: 'skipped'; reason: 'transfer_consent_off' | 'not_found' | 'already_routed' }
-  /** Consent given but no target: province empty / unmapped. Marked for the platform-admin worklist. */
+  /** Consent given but no target (province empty / unmapped) or not the consented one (NG-204). Marked for the platform-admin worklist. */
   | { status: 'skipped'; reason: 'unmatched'; unmatchedReason: UnmatchedReason };
 
 /** The consent gate: literally true AND the version and time were recorded. Pure. */
@@ -51,9 +55,15 @@ export function hasTransferConsent(
   return lead.transferConsent === true && Boolean(lead.transferConsentVersion) && Boolean(lead.transferConsentAt);
 }
 
-/** Null when the gate is shut. Pure. */
+/** NG-204: the target is the tenant the visitor consented to. A lead with no recorded recipient matches none. Pure. */
+export function isConsentedRecipient(lead: Pick<PublicLeadForIntake, 'transferConsentTenantId'>, targetTenantId: string): boolean {
+  return Boolean(lead.transferConsentTenantId) && lead.transferConsentTenantId === targetTenantId;
+}
+
+/** Null when the gate is shut, or the target is not the tenant the consent names (NG-204). Pure. */
 export function buildIntakeRequest(lead: PublicLeadForIntake, targetTenantId: string): LeadIntakeRequest | null {
   if (!hasTransferConsent(lead) || !lead.transferConsentVersion || !lead.transferConsentAt) return null;
+  if (!isConsentedRecipient(lead, targetTenantId)) return null;
   const decoded = lead.readinessCode ? decodeReadinessCode(lead.readinessCode, READINESS_ORG_TYPES) : null;
   const score = decoded ? scoreReadiness(decoded.answers, decoded.orgType) : null;
   return {
@@ -189,6 +199,9 @@ async function releaseClaim(
  *                                     propagates; only a `refused` answer gives the claim back;
  *  - consent + province empty/unmapped, or the mapped tenant refuses → port NOT called (or its
  *    refusal kept), lead marked 'unmatched' for the platform-admin worklist. No default tenant.
+ *  - consent + province mapped to a tenant OTHER than the one the consent names (NG-204: the map moved
+ *    after the submit, or no recipient was recorded) → port NOT called, nothing claimed, lead marked
+ *    'unmatched/consent_recipient_mismatch'. Mapping the province back to that tenant lets it forward.
  * Safe to call again for an unmatched lead after the map changed (M18 answers `duplicate` if it already landed).
  * Re-routing a routed lead (new recipient) is deliberately NOT done: it may need a new consent (open product/legal call).
  */
@@ -203,7 +216,7 @@ export async function forwardPublicLead(
       select: {
         id: true, name: true, email: true, organisation: true, province: true, district: true,
         readinessCode: true, transferConsent: true, transferConsentVersion: true, transferConsentAt: true,
-        locale: true, createdAt: true, routeStatus: true, routeReason: true, routedAt: true, routedTenantId: true,
+        transferConsentTenantId: true, locale: true, createdAt: true, routeStatus: true, routeReason: true, routedAt: true, routedTenantId: true,
       },
     });
     if (!found) return { lead: null, decision: null };
@@ -218,6 +231,12 @@ export async function forwardPublicLead(
   if (!decision.match) {
     await markUnmatched(db, lead.id, decision.reason);
     return { status: 'skipped', reason: 'unmatched', unmatchedReason: decision.reason };
+  }
+  // NG-204 (SEC NG-203 O-A1): the visitor consented to ONE organisation. Any other target is refused
+  // before anything is claimed or sent; the platform admin sees it on the worklist.
+  if (!isConsentedRecipient(lead, decision.tenantId)) {
+    await markUnmatched(db, lead.id, 'consent_recipient_mismatch');
+    return { status: 'skipped', reason: 'unmatched', unmatchedReason: 'consent_recipient_mismatch' };
   }
   const request = buildIntakeRequest(lead, decision.tenantId);
   if (!request) return { status: 'skipped', reason: 'transfer_consent_off' };
@@ -252,6 +271,8 @@ async function reAskOwner(
   port: LeadIntakePort
 ): Promise<PublicLeadForwardResult> {
   if (!ownerTenantId || !decision.match || decision.tenantId !== ownerTenantId) return { status: 'skipped', reason: 'already_routed' };
+  // NG-204: an owner that is not the consented recipient is never asked (buildIntakeRequest refuses too).
+  if (!isConsentedRecipient(lead, ownerTenantId)) return { status: 'skipped', reason: 'already_routed' };
   const request = buildIntakeRequest(lead, ownerTenantId);
   if (!request) return { status: 'skipped', reason: 'transfer_consent_off' };
   return port.accept(request);
