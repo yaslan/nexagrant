@@ -213,7 +213,7 @@ describe('generateCompletion with the fake provider', () => {
 
   it('sends an M17 call to the provider with the flag on when a key is set (sec F4; fetch mocked, no network)', async () => {
     mockEnv.E2E_FAKE_AI = 'true';
-    mockEnv.ANTHROPIC_API_KEY = 'sk-test-not-a-real-key';
+    mockEnv.ANTHROPIC_API_KEY = 'test-key';
     const fetchMock = vi.fn(async () =>
       new Response(
         JSON.stringify({ content: [{ type: 'text', text: 'provider answer' }], stop_reason: 'end_turn', usage: { input_tokens: 3, output_tokens: 2 } }),
