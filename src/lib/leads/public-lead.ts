@@ -189,6 +189,12 @@ export interface SubmitPublicLeadOptions {
   /** Test seam: a client on the RLS-subject role. */
   db?: PrismaClient;
   secret?: string | null;
+  /**
+   * NG-212: hands a stored lead whose transfer consent was recorded to the client-pipeline bridge,
+   * AFTER the write committed. Best-effort: a throw or a refusal never changes the form's answer.
+   * Injected by the form action (src/lib/ports/lead-intake.ts) so this file never loads M18.
+   */
+  forwardLead?: (publicLeadId: string) => Promise<unknown>;
 }
 
 /**
