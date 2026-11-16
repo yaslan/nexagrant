@@ -6,6 +6,7 @@ import { createEventBus } from '../../src/core/events';
 import { forwardPublicLead } from '../../src/lib/leads/public-lead-intake';
 import { createLeadIntakePort } from '../../src/modules/m18/server/intake-repo';
 import { withSystemScope } from '../../src/lib/system-scope';
+import { requireId } from '../helpers/teardown-guard';
 import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 
 /**
@@ -136,7 +137,7 @@ test.describe(`M18 karne → PublicLead → il yönlendirmesi → kurum/fırsat 
     mkdirSync(EVIDENCE, { recursive: true });
     await withSystemScope('platform-admin', 'e2e.m18-chain.setup', async (tx) => {
       const stale = await tx.tenant.findMany({ where: { slug: { startsWith: 'e2e-m18-chain-org-' } }, select: { id: true } });
-      for (const t of stale) await tx.provinceLeadRoute.deleteMany({ where: { targetTenantId: t.id } });
+      for (const t of stale) await tx.provinceLeadRoute.deleteMany({ where: { targetTenantId: requireId(t.id, 'stale tenant id') } });
       const org = await tx.tenant.create({
         data: { id: TENANT, name: ORG_NAME, slug: TENANT, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' },
       });
