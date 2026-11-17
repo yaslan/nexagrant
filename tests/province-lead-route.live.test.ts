@@ -506,10 +506,24 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
      *   (2) the compare-and-set pins `AND[routeStatus: null, routeReason: null]` (or the 'unmatched' mark).
      * A routed lead fails both: (2) needs status NULL/'unmatched', and PublicLead_route_consistency_check
      * forbids `routedTenantId` set with such a status, so (2) implies (1) on every row the DB accepts.
-     * Hence NO test can turn red when only (1) is removed: (1) is redundant behind (2) + the CHECK. Measured:
-     *   remove (1) only → green · remove (2) only → green (this run is (1) alone holding the line) ·
-     *   remove both = M2 `where: { id }` → RED (call 1 claims with stale A, tenant A gets a copy).
+     * Hence NO test can turn red when only (1) is removed: (1) is redundant behind (2) + the CHECK.
+     * Since NG-204 this O-1 test no longer measures either guard: call 2 is not the consented recipient and
+     * never reaches the claim, so O-1 stays green with the WHERE reduced to `{ id }`. The red for the claim
+     * WHERE is now the 'D-2 (review bulgu 2)' race test below (call 1 claims over the 'unmatched' mark it
+     * did not read). Measured (NG-213, base fa2f405e, isolated pgvector pg16, this file only; each mutation
+     * in src/lib/leads/public-lead-intake.ts claimRoute, both branches, reverted after the run):
+     *   remove (1) only → 30/30 green ·
+     *   remove (2) only → RED, D-2 race only (row restored to NULL instead of 'unmatched/province_unmapped') ·
+     *   remove both = M2 `where: { id }` → RED, D-2 race only, same diff; O-1 and S1-S3 green.
      * (2) cannot go: the where-guard-src scanner relies on it (NG-181 be-gnd-3). Keep (1) as defence in depth.
+     * KNOWN COVERAGE GAP (NG-213 review F-2), left on purpose: no test pins (1). The same holds for the
+     * read-side early return in claimRoute (`prior.routeStatus === 'routed' || prior.routedTenantId !== null`):
+     * a routed prior falls into the else branch's `routeStatus !== 'unmatched'` return, and the CHECK rules out
+     * status NULL with a tenant. Re-measured in NG-213 review (isolated pg16): WHERE (1) removed in both
+     * branches → this file 30/30 green; that early return cut to `if (!prior)` → this file +
+     * public-lead-consent-recipient + m18-intake 46/46 green. A red test would need a row the CHECK rejects,
+     * i.e. a fabricated state. (2) and PublicLead_route_consistency_check are what protect the claim; if
+     * either is ever relaxed, (1) becomes the only guard and needs its own test in that same change.
      */
     // NG-204 changed this race's outcome on purpose. Before, call 2 (map moved to B) claimed and the lead
     // landed in B, a tenant the visitor never consented to (SEC NG-203 O-A1); the claim WHERE then kept

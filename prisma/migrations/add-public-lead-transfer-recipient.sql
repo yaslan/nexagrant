@@ -69,3 +69,14 @@ BEGIN
     EXECUTE 'GRANT EXECUTE ON FUNCTION public.province_transfer_org(text) TO fabrika_app';
   END IF;
 END $$;
+-- NG-213 D-3: on Supabase the default privileges of the migrating role grant EXECUTE on every NEW
+-- function to the Data API roles `anon` and `authenticated`; REVOKE ... FROM PUBLIC does not touch those
+-- grants. rls.sql's loop removes them too, but it runs AFTER apply-migrations: close the window here.
+-- The roles exist only on Supabase, hence the lookup. Idempotent (REVOKE of an absent grant is a no-op).
+DO $$
+DECLARE r text;
+BEGIN
+  FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated') LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION public.province_transfer_org(text) FROM %I', r);
+  END LOOP;
+END $$;
