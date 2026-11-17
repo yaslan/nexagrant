@@ -267,4 +267,54 @@ describe.skipIf(!HAS_DB)('stuck routed leads (live database, fabrika_app)', () =
     const again = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma, maxLeadAlerts: CAP });
     expect(again).toMatchObject({ stuck: CAP, alreadyOpen: CAP, raised: 0, resolved: 0, overflow: 0, summary: 'none' });
   });
+
+  // NG-212: a lead whose transfer consent was recorded but that was NEVER routed (routeStatus NULL: the
+  // form's bridge did not run, or threw before its claim) is in no tenant and on no worklist. The alarm
+  // finds it too, past the same threshold; without a recorded consent (gate off / box unticked) nothing.
+  test('(i) consented but never routed (routeStatus NULL), older than the threshold → one alert; young / no consent / unmatched → none', async () => {
+    const old = ago(MIN * 2);
+    const NEVER: Record<'old' | 'young' | 'noConsent' | 'noVersion', string> = {
+      old: await mkLead('never-old', { createdAt: old, transferConsentAt: old }),
+      young: await mkLead('never-young', { createdAt: ago(MIN / 2), transferConsentAt: ago(MIN / 2) }),
+      noConsent: await mkLead('never-no-consent', { createdAt: old, transferConsent: false, transferConsentVersion: null, transferConsentAt: null }),
+      noVersion: await mkLead('never-no-version', { createdAt: old, transferConsentVersion: null }),
+    };
+    EXTRA.push(...Object.values(NEVER));
+    // Ground truth: all four are unrouted.
+    expect(await admin.publicLead.count({ where: { id: { in: Object.values(NEVER) }, routeStatus: null, routedTenantId: null } })).toBe(4);
+
+    const r = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma });
+    // Left from (h): L.stuck, extra-2, extra-1 (alerts open) + the one old never-routed lead.
+    expect(r).toMatchObject({ stuck: CAP + 1, alreadyOpen: CAP, raised: 1, resolved: 0, overflow: 0 });
+    const raised = await alertsFor(NEVER.old);
+    expect(raised).toHaveLength(1);
+    expect(raised[0]).toMatchObject({ level: 'warn', resolvedAt: null });
+    expect(raised[0]!.meta).toMatchObject({ publicLeadId: NEVER.old, neverRouted: true, olderThanMinutes: MIN });
+    expect(raised[0]!.message).toContain('never routed');
+    const blob = JSON.stringify({ message: raised[0]!.message, meta: raised[0]!.meta });
+    for (const forbidden of ['Ayşe', '@example.test', 'Stuck Org']) expect(blob).not.toContain(forbidden);
+    for (const id of [NEVER.young, NEVER.noConsent, NEVER.noVersion, L.unmatched]) expect(await alertsFor(id)).toHaveLength(0);
+
+    // Idempotent: a second run opens nothing.
+    const again = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma });
+    expect(again).toMatchObject({ stuck: CAP + 1, alreadyOpen: CAP + 1, raised: 0, resolved: 0 });
+    expect(await alertsFor(NEVER.old)).toHaveLength(1);
+
+    // The admin "Stuck (no copy)" list stays the routed-without-copy list (its rows name a routed tenant).
+    const page = await listStuckRoutedLeads(prisma, { olderThanMinutes: MIN, now: NOW });
+    expect(page.rows.map((r) => r.publicLeadId)).not.toContain(NEVER.old);
+  });
+
+  test('(j) the never-routed lead gets routed and its copy lands → its alert closes', async () => {
+    const id = EXTRA[EXTRA.length - 4]!; // NEVER.old from (i)
+    await admin.publicLead.update({ where: { id }, data: { routeStatus: 'routed', routedTenantId: T.a, routedAt: ago(MIN * 2) } });
+    // Routed but still without a copy: still stuck (now as "no copy"), the same alert stays open.
+    const mid = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma });
+    expect(mid).toMatchObject({ stuck: CAP + 1, alreadyOpen: CAP + 1, raised: 0, resolved: 0 });
+    await copyOf(id);
+    const healed = await alertStuckRoutedLeads({ olderThanMinutes: MIN, now: NOW, db: prisma });
+    expect(healed).toMatchObject({ stuck: CAP, alreadyOpen: CAP, raised: 0, resolved: 1 });
+    const [alert] = await alertsFor(id);
+    expect(alert?.resolvedAt).not.toBeNull();
+  });
 });

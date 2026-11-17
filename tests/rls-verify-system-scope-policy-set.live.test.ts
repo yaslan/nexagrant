@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { envValue } from './helpers/dotenv';
-import { isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { isGithubActions, isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
@@ -23,12 +23,16 @@ import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-
  * Safe on any local database, the shared one included: the stray policies are
  * `TO pg_monitor`, a built-in role nothing here connects as, so no session's reads change
  * while they exist, and each test drops its own (named with a RUN id). rls:verify rolls back
- * every probe. The ExpertDirectoryEntry tests (NG-188) replace that view with a mutated one for
- * the length of one rls:verify run, so M8's expert pool reads the mutation on that database
- * meanwhile, and restore it from prisma/rls.sql in `finally`, under EXPERT_DIRECTORY_POLICY_LOCK
- * (system-scope.live's directory reads take the same lock). Only the NG-183 block or the view
- * block runs, not the whole rls.sql, so no other table's policies are rebuilt under a parallel
- * suite. DDL, so local databases only (isLocalDbUrl).
+ * every probe. Only the NG-183 block or the view block runs, not the whole rls.sql, so no other
+ * table's policies are rebuilt under a parallel suite. DDL, so local databases only (isLocalDbUrl).
+ *
+ * The ExpertDirectoryEntry mutation tests (NG-188) are NOT safe on the shared "fabrika" database
+ * (NG-206, review D-B1): they commit a mutated view, and only the `finally` restores it. A SIGKILL,
+ * an OOM or a closed pane leaves the mutated view behind, so unconsented experts would be listed
+ * or `email` readable for every session on that database. They skip by default (MUTATION_SKIP, with a
+ * WARNING line naming the reason) and run only on an isolated database, e.g. a throwaway Docker Postgres,
+ * opted in with RLS_MUTATION_DB=<that database's name>. "fabrika" is never opted in off GitHub Actions.
+ * In GitHub Actions the CI database is allowed (isGithubActions).
  */
 const SUITE = 'rls:verify system_scope policy set live test';
 const REPO = resolve(import.meta.dirname, '..');
@@ -53,6 +57,27 @@ else if (!REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 const LOCAL = REACHABLE && isLocalDbUrl(OWNER_URL!);
 if (REACHABLE && !LOCAL) skipOrFailInCi(SUITE, 'DATABASE_URL is not a local database; this suite runs DDL');
 const HAS_DB = REACHABLE && LOCAL;
+/**
+ * NG-206 (D-B1): the name the server reports for the owner connection, which the rls:verify child
+ * processes also use (same OWNER_URL). Read from the server, not parsed from the URL, so a
+ * DATABASE_URL that only .env holds cannot slip past the guard.
+ */
+const DB_NAME = LOCAL ? (await admin.query<{ db: string }>('select current_database() as db')).rows[0]?.db : undefined;
+/** The shared dev database is "fabrika" everywhere except ci.yml's service container. */
+const SHARED_DB = DB_NAME === 'fabrika' && !isGithubActions();
+/**
+ * NG-206 (review tur 2): allowlist, not a name denylist. A shared database with any other name
+ * (`fabrika_dev`, a quoted `"Fabrika"`) must not run these tests by default. Off GitHub Actions they
+ * run only when RLS_MUTATION_DB names exactly the database the owner connection is on, and off GitHub Actions never on "fabrika".
+ */
+const MUTATION_ALLOWED = isGithubActions() || (DB_NAME !== undefined && !SHARED_DB && process.env.RLS_MUTATION_DB === DB_NAME);
+const MUTATION_SKIP = !MUTATION_ALLOWED;
+if (HAS_DB && MUTATION_SKIP) {
+  skipOrFailInCi(
+    `${SUITE} (ExpertDirectoryEntry mutation tests)`,
+    `they commit a mutated view and restore it only in \`finally\`; not allowed on "${DB_NAME}" — run on an isolated database and set RLS_MUTATION_DB=<its name>`
+  );
+}
 
 /** The NG-183 cleanup block of prisma/rls.sql, verbatim. */
 function ng183Block(): string {
@@ -151,7 +176,7 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     );
   }, 180_000);
 
-  it('rls:verify --require-db exits 1 when ExpertDirectoryEntry loses its verified + consent condition (NG-188 mutation)', async () => {
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when ExpertDirectoryEntry loses its verified + consent condition (NG-188 mutation)', async () => {
     await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
       try {
         await admin.query(
@@ -166,7 +191,7 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     });
   }, 180_000);
 
-  it('rls:verify --require-db exits 1 when ExpertDirectoryEntry gains a personal-data column (NG-188 mutation)', async () => {
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when ExpertDirectoryEntry gains a personal-data column (NG-188 mutation)', async () => {
     await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
       try {
         await admin.query(mutatedView((v) => v.replace('AS "listOrder"', 'AS "listOrder", e.email')));

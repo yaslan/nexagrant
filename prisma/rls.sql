@@ -471,6 +471,9 @@ CREATE POLICY system_scope ON public."ExpertPreRegistration"
 -- ExpertPreRegistration (system_scope_open() is false for it), so the NG-183 block below
 -- keeps exactly {system_scope} there with no exception. See
 -- prisma/migrations/expert-directory-view.sql; rls:verify probeExpertDirectory measures it.
+-- NG-206 (D-B2): copies of this file from before NG-188 create `expert_directory` on the base table
+-- again; running them with `pnpm db:rls` on a database that has this view brings PII back. Do not
+-- run an old rls.sql on the shared database. See docs/GATE.md.
 DROP POLICY IF EXISTS expert_directory ON public."ExpertPreRegistration";
 -- DROP + CREATE, not CREATE OR REPLACE: a drifted view (an extra column) cannot be
 -- narrowed by OR REPLACE, so `pnpm db:rls` rebuilds it. Nothing depends on it; the

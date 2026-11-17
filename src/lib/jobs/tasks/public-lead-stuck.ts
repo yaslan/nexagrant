@@ -7,7 +7,8 @@ import { alertStuckRoutedLeads } from '@/lib/leads/stuck-leads';
 /**
  * Stuck public lead check — every 15 minutes (NG-182).
  *
- * Finds routed PublicLeads that have no copy in their tenant after PUBLIC_LEAD_STUCK_AFTER_MINUTES
+ * Finds routed PublicLeads that have no copy in their tenant after PUBLIC_LEAD_STUCK_AFTER_MINUTES,
+ * and (NG-212) consented PublicLeads that were never routed after the same threshold,
  * and opens ONE SystemAlert per such lead (a second run opens none); see src/lib/leads/stuck-leads.ts.
  * Read-only on the leads: nothing is re-routed, copied or deleted. The moment is the cron tick, not
  * the payload, so a job added by hand checks exactly what the cron would.
