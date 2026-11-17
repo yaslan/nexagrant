@@ -12,6 +12,7 @@ import { stripeEventCleanupTask } from './stripe-event-cleanup';
 import { agencyMonthlyReportTask } from './agency-monthly-report';
 import { invitationCleanupTask } from './invitation-cleanup';
 import { publicLeadCleanupTask } from './public-lead-cleanup';
+import { publicLeadStuckTask } from './public-lead-stuck';
 import { expertPreRegCleanupTask } from './expert-prereg-cleanup';
 import { k1TopicMatchTask } from './k1-topic-match';
 import { k1EmbeddingsTask } from './k1-embeddings';
@@ -20,6 +21,8 @@ import { jobQueueHealthTask } from './job-queue-health';
 import { alertsOpsDigestTask } from './alerts-ops-digest';
 import { m17TextRetentionTask } from './m17-text-retention';
 import { m17StaleRunsTask } from './m17-stale-runs';
+import { notificationEmailInstantTask } from './notification-email-instant';
+import { notificationEmailWeeklyTask } from './notification-email-weekly';
 import { notificationsRetentionTask } from './notifications-retention';
 import { evidenceExpiringTask } from './evidence-expiring';
 import { partnerSearchTask } from './partner-search';
@@ -45,6 +48,7 @@ export const taskList: Record<JobId, Task> = {
   'agency-monthly-report': agencyMonthlyReportTask,
   'invitation-cleanup': invitationCleanupTask,
   'public-lead-cleanup': publicLeadCleanupTask,
+  'public-lead-stuck': publicLeadStuckTask,
   'expert-prereg-cleanup': expertPreRegCleanupTask,
   'k1-topic-match': k1TopicMatchTask,
   'k1-embeddings': k1EmbeddingsTask,
@@ -53,6 +57,8 @@ export const taskList: Record<JobId, Task> = {
   'alerts-ops-digest': alertsOpsDigestTask,
   'm17-text-retention': m17TextRetentionTask,
   'm17-stale-runs': m17StaleRunsTask,
+  'notification-email-instant': notificationEmailInstantTask,
+  'notification-email-weekly': notificationEmailWeeklyTask,
   'notifications-retention': notificationsRetentionTask,
   'evidence-expiring': evidenceExpiringTask,
   'partner-search': partnerSearchTask,

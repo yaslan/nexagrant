@@ -1,7 +1,14 @@
 import { getEntitlements } from '@/lib/billing';
 import { planNamesGrantingModule, type ModuleLimits } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
-import { canAccessStatus, isComingSoon, type ModuleDenyReason, type ModuleViewer } from '@/lib/modules/state-machine';
+import {
+  canAccessStatus,
+  isComingSoon,
+  isStaffPreviewStatus,
+  isUnsoldBeta,
+  type ModuleDenyReason,
+  type ModuleViewer,
+} from '@/lib/modules/state-machine';
 import type { ModuleId, ModuleStatus } from '@/lib/modules/types';
 
 /**
@@ -100,7 +107,14 @@ export function decideModuleAccess(
     return { allowed: false, status, reason: 'COMING_SOON' };
   }
 
-  if (!allowedModules.includes(moduleId)) {
+  // An unsold beta module has no plan to upgrade to: staff/pilot preview (DEV, PILOT)
+  // skips the plan check, and every other status is closed as MODULE_OFF, never as an
+  // upgrade, so it stays out of `upgradeModules` (state-machine.ts isStaffPreviewStatus).
+  if (isUnsoldBeta(moduleId)) {
+    if (!isStaffPreviewStatus(moduleId, status)) {
+      return { allowed: false, status, reason: 'MODULE_OFF' };
+    }
+  } else if (!allowedModules.includes(moduleId)) {
     return {
       allowed: false,
       status,

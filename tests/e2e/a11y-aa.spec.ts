@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 import { prisma } from '../../src/lib/db';
@@ -57,6 +57,58 @@ async function scan(page: Page) {
     impact: v.impact,
     nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5),
   }));
+}
+
+/**
+ * NG-146 — hesaplanmış renk kontrastı (axe'in kapsamadığı rozetler için).
+ *
+ * Neden: axe-core 4.14 (`@axe-core/playwright` 4.14.0'ın bağımladığı sürüm) `bg-emerald-500/15` ve
+ * `bg-amber-500/15` rozetlerini (lab()/oklab() metin, yarı saydam arka plan) ne ihlal ne incomplete ne
+ * passes listesine koyar: sessizce atlar. `bg-accent/15` ve `bg-purple-500/15` ise ölçülür. Sürüm
+ * yükseltmesi bunu değiştirmez (4.13 ve 4.14 ikisinde de OKLab desteği var), bu yüzden renk tarayıcıdan
+ * okunup WCAG oranı burada hesaplanır: getComputedStyle → canvas ile sRGB → atalar boyunca alfa bileşimi.
+ *
+ * Sınır: gradyan arka plan ölçülemez; sessizce geçmek yerine hata verir. Ata `opacity` değerleri
+ * yalnız öğenin kendi opacity'si hesaba katılır (bu rozetlerde ata opacity yok).
+ */
+async function contrastRatio(locator: Locator): Promise<number> {
+  return locator.evaluate((el) => {
+    const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('canvas 2d bağlamı yok');
+    const toRgba = (css: string): [number, number, number, number] => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = css;
+      ctx.fillRect(0, 0, 1, 1);
+      const d = ctx.getImageData(0, 0, 1, 1).data;
+      return [d[0] ?? 0, d[1] ?? 0, d[2] ?? 0, (d[3] ?? 0) / 255];
+    };
+    // Atalar boyunca, köküten öğeye doğru bileşimle arka plan (kök varsayılan beyaz).
+    const layers: [number, number, number, number][] = [];
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      const cs = getComputedStyle(node);
+      if (cs.backgroundImage !== 'none') {
+        throw new Error(`gradyan arka plan ölçülemez: <${node.tagName.toLowerCase()} class="${node.className}">`);
+      }
+      const bg = toRgba(cs.backgroundColor);
+      if (bg[3] > 0) layers.unshift(bg);
+    }
+    let base: [number, number, number] = [255, 255, 255];
+    for (const [r, g, b, a] of layers) {
+      base = [a * r + (1 - a) * base[0], a * g + (1 - a) * base[1], a * b + (1 - a) * base[2]];
+    }
+    const cs = getComputedStyle(el);
+    const [fr, fg, fb, fa] = toRgba(cs.color);
+    const alpha = fa * Number(cs.opacity);
+    const text: [number, number, number] = [alpha * fr + (1 - alpha) * base[0], alpha * fg + (1 - alpha) * base[1], alpha * fb + (1 - alpha) * base[2]];
+    const linear = (v: number) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (c: [number, number, number]) => 0.2126 * linear(c[0]) + 0.7152 * linear(c[1]) + 0.0722 * linear(c[2]);
+    const l1 = luminance(text);
+    const l2 = luminance(base);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  });
 }
 
 /**
@@ -183,6 +235,16 @@ test.describe('WCAG A/AA — NG-101 signed in, pipeline (tr + en)', () => {
   }
 });
 
+/** Eşleştirme aksiyonunun gövdesi tek bir portföy kimliği taşıyan JSON dizisidir (ör. ["<id>"]). */
+function isMatchCall(body: string | null, ids: string[]): boolean {
+  try {
+    const args = JSON.parse(body ?? '');
+    return Array.isArray(args) && args.length === 1 && typeof args[0] === 'string' && ids.includes(args[0]);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * NG-119 — TTO portföy rozeti (`text-purple-*` kontrastı). Rozet yalnız portföyde en az bir kayıt varsa
  * render edilir (tto/client.tsx: items.map içinde); demo tenant'ta kayıt olmadığı için eski tarama bu
@@ -212,16 +274,24 @@ test.describe('WCAG A/AA — NG-119 signed in, TTO portfolio with an item (tr)',
     });
     await seedIdentity({ ...TTO_OWNER, workspaceIds: [] }, { id: 'e2e-a11y-tto-ws', slug: 'main', name: 'Main' });
     await prisma.ttoPortfolioItem.deleteMany({ where: { tenantId: TTO_TENANT } });
-    await prisma.ttoPortfolioItem.create({
-      data: {
-        tenantId: TTO_TENANT,
-        title: 'A11y TTO kayıt',
-        trl: 5,
-        patentStatus: 'granted',
-        summary: 'Kontrast taraması için tohumlanmış portföy kaydı.',
-        keywords: ['a11y'],
-      },
-    });
+    // Üç patent durumunun üçü de tohumlanır: granted (yeşil), pending (amber), licensed (accent).
+    // Her rozet yalnız kendi durumunun kaydı varken render edilir (tto/client.tsx getPatentBadge).
+    for (const [title, patentStatus] of [
+      ['A11y TTO kayıt', 'granted'],
+      ['A11y TTO bekleyen kayıt', 'pending'],
+      ['A11y TTO lisanslı kayıt', 'licensed'],
+    ] as const) {
+      await prisma.ttoPortfolioItem.create({
+        data: {
+          tenantId: TTO_TENANT,
+          title,
+          trl: 5,
+          patentStatus,
+          summary: 'Kontrast taraması için tohumlanmış portföy kaydı.',
+          keywords: ['a11y'],
+        },
+      });
+    }
   });
   test.afterAll(async () => {
     await prisma.ttoPortfolioItem.deleteMany({ where: { tenantId: TTO_TENANT } });
@@ -237,8 +307,77 @@ test.describe('WCAG A/AA — NG-119 signed in, TTO portfolio with an item (tr)',
     const response = await page.goto('/tr/main/tto');
     expect(response?.status(), '/tr/main/tto').toBe(200);
     await expectOwnPage(page, '/tr/main/tto');
-    await expect(page.getByRole('heading', { name: 'A11y TTO kayıt' }), 'rozetin bulunduğu kayıt görünür').toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A11y TTO kayıt' }), 'granted rozetinin kaydı görünür').toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A11y TTO bekleyen kayıt' }), 'pending rozetinin kaydı görünür').toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A11y TTO lisanslı kayıt' }), 'licensed rozetinin kaydı görünür').toBeVisible();
     expect(await scan(page), '/tr/main/tto').toEqual([]);
+  });
+
+  test('/tr/main/tto rozetleri hesaplanmış renkle AA; yol haritası ve kontrol listesi taranır (NG-146)', async ({ page }) => {
+    await acceptCookies(page);
+    await signInAs(page, { id: TTO_OWNER.userId, email: TTO_OWNER.email, tenantId: TTO_OWNER.tenantId, role: TTO_OWNER.role });
+    const response = await page.goto('/tr/main/tto');
+    expect(response?.status(), '/tr/main/tto').toBe(200);
+    await expectOwnPage(page, '/tr/main/tto');
+
+    // axe bu iki rozeti hiçbir listeye koymaz; oranı burada ölçüyoruz.
+    for (const label of ['Tescilli (Granted)', 'Başvuru Aşamasında (Pending)', 'Lisanslandı (Licensed)']) {
+      const badge = page.locator('span').getByText(label, { exact: true });
+      await expect(badge, `${label} rozeti görünür`).toBeVisible();
+      expect(await contrastRatio(badge), `${label} kontrast oranı`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(await scan(page), 'portföy').toEqual([]);
+
+    await page.getByRole('button', { name: 'TRL Seviye Haritası (TRL 1-9)' }).click();
+    for (const label of ['TRL 1 - 3 (Temel Araştırma)', 'TRL 4 - 6 (Prototip & Doğrulama)', 'TRL 7 - 9 (Ticarileşme & Pazar)']) {
+      const badge = page.locator('span').getByText(label, { exact: true });
+      await expect(badge, `${label} rozeti görünür`).toBeVisible();
+      expect(await contrastRatio(badge), `${label} kontrast oranı`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(await scan(page), 'yol haritası').toEqual([]);
+
+    await page.getByRole('button', { name: 'IP & Lisanslama Kontrol Listesi' }).click();
+    expect(await scan(page), 'kontrol listesi').toEqual([]);
+  });
+
+  test('AB eşleştirici modalı: konu kodu ve uyum rozeti AA (NG-160)', async ({ page }) => {
+    // Eşleştirme sonucu sunucu aksiyonundan gelir ve şu an boş döner (m7/server/actions.ts).
+    // Test, aksiyonun KENDİ yanıt biçimiyle (RSC satırları) sahte bir eşleşme döndürür; ürün kodu
+    // değişmez. Yalnız bu portföy kaydının aksiyon çağrısı yakalanır, diğer POST'lara dokunulmaz.
+    const itemIds = (await prisma.ttoPortfolioItem.findMany({ where: { tenantId: TTO_TENANT }, select: { id: true } })).map((i) => i.id);
+    expect(itemIds.length, 'portföy kayıtları tohumlandı').toBeGreaterThan(0);
+    const matchedTopics = [
+      {
+        topicId: 'HORIZON-E2E-KONU-1',
+        title: 'A11y eşleşme konusu',
+        fitScore: 87,
+        targetTrlRange: '5-7',
+        matchReason: 'Kontrast taraması için tohumlanmış eşleşme gerekçesi.',
+        recommendedRole: 'Koordinatör',
+      },
+    ];
+    await page.route('**/tr/main/tto*', async (route) => {
+      const req = route.request();
+      if (req.method() !== 'POST' || !req.headers()['next-action'] || !isMatchCall(req.postData(), itemIds)) {
+        return route.continue();
+      }
+      const body = `0:{"a":"$@1","q":"","i":true,"b":"development"}\n1:${JSON.stringify({ matchedTopics })}\n`;
+      await route.fulfill({ status: 200, contentType: 'text/x-component', body });
+    });
+    await acceptCookies(page);
+    await signInAs(page, { id: TTO_OWNER.userId, email: TTO_OWNER.email, tenantId: TTO_OWNER.tenantId, role: TTO_OWNER.role });
+    const response = await page.goto('/tr/main/tto');
+    expect(response?.status(), '/tr/main/tto').toBe(200);
+    await expectOwnPage(page, '/tr/main/tto');
+    await page.getByRole('button', { name: 'AB Çağrıları Eşleştir' }).first().click();
+    const topicBadge = page.locator('span').getByText('HORIZON-E2E-KONU-1', { exact: true });
+    const fitBadge = page.locator('span').getByText('Uyum Skoru: %87', { exact: true });
+    await expect(topicBadge, 'konu kodu rozeti görünür').toBeVisible();
+    await expect(fitBadge, 'uyum skoru rozeti görünür').toBeVisible();
+    const topicRatio = await contrastRatio(topicBadge);
+    const fitRatio = await contrastRatio(fitBadge);
+    expect(topicRatio, 'konu kodu kontrast oranı').toBeGreaterThanOrEqual(4.5);
+    expect(fitRatio, 'uyum skoru kontrast oranı').toBeGreaterThanOrEqual(4.5);
   });
 });
 

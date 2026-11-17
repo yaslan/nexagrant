@@ -8,14 +8,17 @@ import { toReadinessCode } from '@/lib/readiness/account';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
 import { READINESS_ORG_TYPES, scoreReadiness } from '@/lib/readiness/score';
 import { decodeReadinessCode } from '@/lib/readiness/share';
-import { withSystemScope } from '@/lib/system-scope';
+import { withSystemScope, withSystemScopeOn } from '@/lib/system-scope';
 import {
   PUBLIC_LEAD_CONSENT,
   PUBLIC_LEAD_RETENTION_DAYS,
   PUBLIC_LEAD_SOURCES,
+  PUBLIC_LEAD_TRANSFER_CONSENT,
   type PublicLeadField,
   type PublicLeadResult,
 } from './public-lead-policy';
+import { transferRecipientFor } from './transfer-org';
+import { leadTransferConsentEnabled } from '@/lib/env';
 
 export * from './public-lead-policy';
 
@@ -25,7 +28,8 @@ export * from './public-lead-policy';
  * validation, the bot guards, the write, the admin read and the retention purge.
  *
  * Platform data: the visitor has no account, so the row has no tenant
- * (`PublicLead` is SYSTEM_WIDE in scripts/rls-models.ts). docs/legal/processing-register.md §18d.
+ * (`PublicLead` is SYSTEM_WIDE in scripts/rls-models.ts). RLS is on with the one `system_scope`
+ * policy (NG-175): every read and write below runs inside withSystemScope. docs/legal/processing-register.md §18d.
  *
  * Nothing in this file logs a name, an address, an organisation or an IP.
  */
@@ -44,6 +48,12 @@ export const PUBLIC_LEAD_PURGED = 'public_lead.purged';
 const LEAD_LOCK_KEY = 7_302_026_093_001n;
 const IP_KEY_LABEL = 'fabrika/public-lead-ip/v1';
 const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * NG-212 review (finding 3): the longest the anonymous form waits for the client-pipeline bridge.
+ * Past it the form answers ok and the lead stays as the bridge leaves it; the stuck-lead alert covers it.
+ */
+export const PUBLIC_LEAD_FORWARD_TIMEOUT_MS = 4_000;
+const FORWARD_TIMED_OUT: unique symbol = Symbol('public-lead-forward-timeout');
 
 const optionalText = (max: number) =>
   z
@@ -62,6 +72,17 @@ export const publicLeadInputSchema = z.object({
   readinessCode: z.unknown().optional().transform((v) => toReadinessCode(v)),
   /** Must be literally true: an unticked box is a refusal, not a default. */
   consent: z.literal(true),
+  /** The optional transfer box (NG-179). Anything but literal true counts as unticked. */
+  transferConsent: z.unknown().optional().transform((v) => v === true),
+  /**
+   * NG-204: the organisation name the form showed under the transfer box. The consent is recorded only
+   * when it is still the province's organisation at submit; a stale or missing name records none.
+   * Never a refusal of the whole request (the contact request itself is still stored).
+   */
+  transferOrgName: z
+    .unknown()
+    .optional()
+    .transform((v) => (typeof v === 'string' && v.trim() !== '' && v.length <= 300 ? v.trim() : null)),
   /** The version the form displayed; a stale form is refused rather than recorded against new text. */
   consentVersion: z.literal(PUBLIC_LEAD_CONSENT.version),
   source: z.enum(PUBLIC_LEAD_SOURCES),
@@ -174,6 +195,12 @@ export interface SubmitPublicLeadOptions {
   /** Test seam: a client on the RLS-subject role. */
   db?: PrismaClient;
   secret?: string | null;
+  /**
+   * NG-212: hands a stored lead whose transfer consent was recorded to the client-pipeline bridge,
+   * AFTER the write committed. Best-effort: a throw or a refusal never changes the form's answer.
+   * Injected by the form action (src/lib/ports/lead-intake.ts) so this file never loads M18.
+   */
+  forwardLead?: (publicLeadId: string) => Promise<unknown>;
 }
 
 /**
@@ -213,22 +240,45 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
   const ipHash = hashClientIp(options.ip ?? null, options.secret === undefined ? authSecret() : options.secret);
   const db = options.db ?? prisma;
 
+  let written: { result: PublicLeadResult; forwardId: string | null };
   try {
-    return await db.$transaction(async (tx) => {
+    // The transfer consent is recorded only when the box is ticked AND the province has an
+    // organisation now AND it is the one the form showed (NG-204, SEC NG-203 O-A1): the consent is
+    // stored against that organisation's id and name, and forwardPublicLead sends the lead nowhere else.
+    // A ticked box for an unmapped province, or under a name that is no longer the province's, writes
+    // nothing (no recipient the visitor saw, no consent), and a failed lookup does not lose the lead:
+    // it is stored without the transfer consent.
+    // While the publication gate (LEAD_TRANSFER_CONSENT_ENABLED) is off, the flag is ignored outright.
+    const recipient =
+      data.transferConsent && leadTransferConsentEnabled()
+        ? await transferRecipientFor(data.province, db).catch(() => null)
+        : null;
+    // Both names are compared trimmed (NG-213 D-4): the schema trims what the form sends back, Tenant.name
+    // is stored as typed. The stored consent keeps the DB value the visitor was shown.
+    // Known edge case (NG-213 review F-3): two organisations whose names differ only by leading/trailing
+    // whitespace match each other here, so a map moved between them still records the consent.
+    const transferTo =
+      recipient && data.transferOrgName !== null && recipient.name.trim() === data.transferOrgName ? recipient : null;
+    const transferOn = transferTo !== null;
+
+    // NG-175 (SEC NG-170 O-1): PublicLead is RLS system_scope only. 'public-intake' opens it (and,
+    // among the system_scope tables, only it and the expert form's) for the anonymous form.
+    written = await withSystemScopeOn(db, 'public-intake', 'public-lead.submit', async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LEAD_LOCK_KEY})`;
 
       const byEmail = await tx.publicLead.count({
         where: { email: data.email, createdAt: { gte: new Date(now.getTime() - EMAIL_WINDOW_MS) } },
       });
-      if (byEmail >= PUBLIC_LEAD_EMAIL_LIMIT) return { ok: false, error: 'rate_limited' } as const;
+      if (byEmail >= PUBLIC_LEAD_EMAIL_LIMIT) return { result: { ok: false, error: 'rate_limited' }, forwardId: null };
       if (ipHash) {
         const byIp = await tx.publicLead.count({
           where: { ipHash, createdAt: { gte: new Date(now.getTime() - IP_WINDOW_MS) } },
         });
-        if (byIp >= PUBLIC_LEAD_IP_LIMIT) return { ok: false, error: 'rate_limited' } as const;
+        if (byIp >= PUBLIC_LEAD_IP_LIMIT) return { result: { ok: false, error: 'rate_limited' }, forwardId: null };
       }
 
-      await tx.publicLead.create({
+      const lead = await tx.publicLead.create({
+        select: { id: true },
         data: {
           name: data.name,
           email: data.email,
@@ -240,18 +290,57 @@ export async function submitPublicLead(raw: unknown, options: SubmitPublicLeadOp
           readinessLevel: scored?.level ?? null,
           consentVersion: PUBLIC_LEAD_CONSENT.version,
           consentAt: now,
+          transferConsent: transferOn,
+          transferConsentVersion: transferOn ? PUBLIC_LEAD_TRANSFER_CONSENT.version : null,
+          transferConsentAt: transferOn ? now : null,
+          transferConsentTenantId: transferTo?.tenantId ?? null,
+          transferConsentOrgName: transferTo?.name ?? null,
           source: data.source,
           locale: data.locale,
           ipHash,
           createdAt: now,
         },
       });
-      return { ok: true } as const;
+      return { result: { ok: true }, forwardId: transferOn ? lead.id : null };
     });
   } catch (error) {
     // The error's name only: a Prisma message can quote the values it failed on.
     logger.error('public lead write failed', { error: error instanceof Error ? error.name : 'unknown' });
     return { ok: false, error: 'server' };
+  }
+
+  // NG-212: the lead is committed; only now is it handed to the client-pipeline bridge, and only when
+  // the transfer consent was recorded (with the publication gate off it never is, so nothing changes).
+  if (written.forwardId !== null && options.forwardLead) await forwardBestEffort(written.forwardId, options.forwardLead);
+  return written.result;
+}
+
+/**
+ * Runs the bridge for one committed lead without letting it decide the form's answer: the visitor's
+ * request is stored whatever the bridge does, and the form waits at most PUBLIC_LEAD_FORWARD_TIMEOUT_MS
+ * for it (the bridge is not cancelled, only no longer awaited). A throw or a timeout leaves the lead as the bridge left it (unrouted,
+ * or claimed per NG-181); the `public-lead-stuck` job raises an alert for it after the threshold.
+ * Logs the lead id and the outcome only, never a name, address or organisation.
+ */
+async function forwardBestEffort(publicLeadId: string, forward: (id: string) => Promise<unknown>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<typeof FORWARD_TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(FORWARD_TIMED_OUT), PUBLIC_LEAD_FORWARD_TIMEOUT_MS);
+  });
+  try {
+    const outcome = await Promise.race([forward(publicLeadId), timedOut]);
+    if (outcome === FORWARD_TIMED_OUT) {
+      // The bridge keeps running in the background; whatever it leaves (unrouted, or claimed) the
+      // public-lead-stuck job alerts on after the threshold. The visitor is not held for it.
+      logger.warn('public lead forward failed', { publicLeadId, error: 'timeout' });
+      return;
+    }
+    const o = typeof outcome === 'object' && outcome !== null ? (outcome as Record<string, unknown>) : {};
+    logger.info('public lead forwarded', { publicLeadId, status: String(o.status ?? 'unknown'), reason: String(o.reason ?? '') });
+  } catch (error) {
+    logger.warn('public lead forward failed', { publicLeadId, error: error instanceof Error ? error.name : 'unknown' });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -275,10 +364,13 @@ export interface PublicLeadRow {
   createdAt: Date;
 }
 
-/** Newest first. The caller must already have checked requirePlatformAdmin(). */
+/**
+ * Newest first. The caller must already have checked requirePlatformAdmin().
+ * NG-175: PublicLead is RLS system_scope only, so the read runs in the 'platform-admin' scope.
+ */
 export async function listPublicLeads(db: PrismaClient = prisma): Promise<{ rows: PublicLeadRow[]; total: number }> {
-  const [rows, total] = await Promise.all([
-    db.publicLead.findMany({
+  const [rows, total] = await withSystemScopeOn(db, 'platform-admin', 'public-lead.admin-list', (tx) => Promise.all([
+    tx.publicLead.findMany({
       orderBy: { createdAt: 'desc' },
       take: PUBLIC_LEAD_ADMIN_PAGE_SIZE,
       select: {
@@ -297,8 +389,8 @@ export async function listPublicLeads(db: PrismaClient = prisma): Promise<{ rows
         createdAt: true,
       },
     }),
-    db.publicLead.count(),
-  ]);
+    tx.publicLead.count(),
+  ]));
   return { rows, total };
 }
 

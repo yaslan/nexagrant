@@ -27,6 +27,9 @@ export const EligibilitySchema = z
     eligibleCountries: z.array(z.string()).default([]),
     countriesExcluded: z.array(z.string()).default([]),
     notes: z.string().optional(),
+    /** NG-52: the call's minimum consortium, when its text states one (parseMinimumConsortium). */
+    minPartners: z.number().int().positive().optional(),
+    minCountries: z.number().int().positive().optional(),
   })
   .default({ restricted: null, eligibleCountries: [], countriesExcluded: [] });
 
@@ -89,6 +92,118 @@ export function inferEligibilityFromText(text: string): Eligibility | null {
     countriesExcluded: [],
     notes: 'EU/EEA/CH only — inferred from the call text',
   };
+}
+
+const NUMBER_WORDS: Readonly<Record<string, number>> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+const NUM = '(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)';
+const PARTNER_NOUN = '(?:legal entities|entities|organisations|organizations|partners|participants|applicants|beneficiaries|institutions)';
+const MIN_PARTNERS = new RegExp(`(?:at least|a minimum of|minimum of|minimum)\\s+${NUM}\\s+(?:[a-z-]+\\s+){0,3}?${PARTNER_NOUN}`, 'i');
+/**
+ * Upper-bound qualifiers in front of a country count ("up to", "no more than", "at most",
+ * "maximum of", "max.", "fewer than", "less than", "limited to", "not exceeding", "under",
+ * "under the"). A count behind one of these is a cap, not a minimum (CRW NG-186 bulgu 2, B-2).
+ * "no fewer than" / "not less than" / "nor fewer than" is the opposite, a minimum: the negative
+ * lookbehind keeps "fewer/less than" from counting as a cap there, whatever whitespace run sits
+ * between the negation and the word (CRW NG-186 3. tur bulgu A, NG-192).
+ */
+const COUNTRY_CAP =
+  '(?:up to|no more than|not more than|at most|(?:a\\s+)?maximum(?:\\s+of)?|max\\.?|(?<!\\b(?:no|not|nor)\\s+)(?:fewer|less) than|limited to|not exceeding|under(?:\\s+the)?)';
+/**
+ * A count never starts glued to what precedes it: a word character or a slash ("2024/25"), a dash
+ * that is itself glued to a word character ("Article 5-3", "2024-25"), or a dot other than the one
+ * of "min." ("Article 5.3", but "min.3" is a minimum). A dash at the start or after whitespace is a
+ * list bullet ("-3 different countries"), so the count behind it is read; a negative sign
+ * ("temperatures -3") is read the same way, a country count is never negative (NG-192, 2. tur).
+ * Used as lookbehinds in front of a single N, and at a range's lower N through NOT_GLUED_AT.
+ */
+const NOT_GLUED = '(?<![\\w/])(?<!\\w[-–])(?<!(?<!\\bmin)\\.)';
+const NOT_GLUED_AT = new RegExp(NOT_GLUED, 'iy');
+function gluedAt(text: string, at: number): boolean {
+  NOT_GLUED_AT.lastIndex = at;
+  return !NOT_GLUED_AT.test(text);
+}
+const COUNTRY_NOUN = '\\s+different\\s+(?:[a-z-]+\\s+){0,3}?(?:countries|member states|states)';
+/**
+ * "N different countries". Group 1 is an upper-bound qualifier in front of N: such a match
+ * is a cap and is skipped. Global, so a later true minimum in the same text is still found.
+ */
+const MIN_COUNTRIES = new RegExp(
+  `(?:\\b(${COUNTRY_CAP})\\s+(?:\\([^)]{0,20}\\)\\s+)?)?${NOT_GLUED}${NUM}${COUNTRY_NOUN}`,
+  'gi'
+);
+/**
+ * A range on countries where the noun follows only the upper bound (CRW NG-186 B-1):
+ * "at least 3 and at most 5 different countries", "between 3 and 6 different Member
+ * States", "from 2 to 4 different countries", "2-3 different countries". Group 1 = lower
+ * qualifier, 2 = lower N, 3 = connector ("and"/"to" need spaces around them, a dash does not:
+ * CRW NG-186 3. tur, bulgu B), 4 = cap qualifier, 5 = upper N. Read as a minimum of the lower N.
+ * A range whose lower N is glued to what precedes it ("COVID-19 - 3") or that runs downwards with
+ * a dash ("Article 5-3", "5 - 3") is not a count: its whole span yields no minimum. A worded range
+ * that runs downwards ("4 and 3", "4 to 3") still states both numbers and yields the smaller one
+ * (NG-192). The `d` flag gives the lower N's own start for the glued check.
+ */
+const COUNTRY_RANGE = new RegExp(
+  `(?:\\b(at least|a minimum of|minimum of|minimum|min\\.?|between)\\s+)?\\b${NUM}(\\s+(?:and|to)\\s+|\\s*[-–]\\s*)(?:(${COUNTRY_CAP})\\s+)?${NUM}${COUNTRY_NOUN}`,
+  'dgi'
+);
+
+function readMinCountries(text: string): number | undefined {
+  const found: { index: number; n: number }[] = [];
+  const rangeSpans: [number, number][] = [];
+  for (const m of text.matchAll(COUNTRY_RANGE)) {
+    const start = m.index ?? 0;
+    // The span is claimed even when it yields nothing, so its upper N is not read as a minimum.
+    rangeSpans.push([start, start + m[0].length]);
+    const lowerAt = m.indices?.[2]?.[0] ?? start;
+    if (gluedAt(text, lowerAt)) continue;
+    const lower = readNumber(m[2]);
+    const upper = readNumber(m[5]);
+    if (!lower || !upper) continue;
+    // A bare "3 and 4 different countries" counts too: its smaller number is the reading that
+    // drops no applicant who meets either number, also when written "4 and 3" (NG-192). A dashed
+    // "5-3" that runs downwards is an identifier, not a range.
+    const worded = /^\s+(?:and|to)\s+$/i.test(m[3] ?? '');
+    if (lower > upper && !worded) continue;
+    found.push({ index: start, n: Math.min(lower, upper) });
+  }
+  for (const m of text.matchAll(MIN_COUNTRIES)) {
+    const start = m.index ?? 0;
+    if (m[1]) continue;
+    // The upper N of a range already read above is not a second minimum.
+    if (rangeSpans.some(([a, b]) => start >= a && start < b)) continue;
+    const n = readNumber(m[2]);
+    if (n) found.push({ index: start, n });
+  }
+  found.sort((a, b) => a.index - b.index);
+  return found[0]?.n;
+}
+const EACH_IN_DIFFERENT = /each\s+(?:[a-z-]+\s+){0,3}?(?:established|located|based)\s+in\s+a\s+different\s+(?:[a-z-]+\s+){0,3}?(?:country|member state|state)/i;
+
+function readNumber(token: string | undefined): number | undefined {
+  if (!token) return undefined;
+  const n = /^\d+$/.test(token) ? Number(token) : NUMBER_WORDS[token.toLowerCase()];
+  return n && n > 0 ? n : undefined;
+}
+
+/**
+ * NG-52 — the call's minimum consortium as the call text states it
+ * ("at least three independent legal entities, each established in a different
+ * country", "minimum 4 organisations from 3 different eligible countries").
+ * Specification §4 lists "asgari ortak" as a field of the call; this is where it
+ * comes from. Returns only the keys it found: a text that states no threshold
+ * gives `{}`, never a default.
+ */
+export function parseMinimumConsortium(text: string): { minPartners?: number; minCountries?: number } {
+  if (!text) return {};
+  const out: { minPartners?: number; minCountries?: number } = {};
+  const partners = readNumber(MIN_PARTNERS.exec(text)?.[1]);
+  if (partners) out.minPartners = partners;
+  const countries = readMinCountries(text);
+  if (countries) out.minCountries = countries;
+  else if (partners && EACH_IN_DIFFERENT.test(text)) out.minCountries = partners;
+  return out;
 }
 
 /** Eligibility record for a source that is bound to a single country. */

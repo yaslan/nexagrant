@@ -29,6 +29,8 @@ import {
   CORDIS_WIDGET_SOURCE,
   CSP_REPORT_PATH,
   generateNonce,
+  hstsHeaderFor,
+  HSTS_VALUE,
   isCordisWidgetHostPath,
   isCordisWidgetPath,
   staticFileNotFoundSource,
@@ -846,5 +848,36 @@ describe('CSP coverage: proxy vs next.config headers (İNCELEME-78 Y-1)', () => 
   it('every static-file extension, on a path with no file, gets a CSP', async () => {
     const exts = ['ico', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'txt', 'xml', 'webmanifest', 'woff', 'woff2', 'ttf', 'css', 'js', 'map'];
     for (const ext of exts) expect(await policyOf(`/yok.${ext}`), ext).toBe('static');
+  });
+});
+
+describe('Strict-Transport-Security (NG-124) — production over HTTPS only, ramp-up value', () => {
+  it('the ramp-up value is max-age=300 with no includeSubDomains and no preload (both irreversible)', () => {
+    expect(HSTS_VALUE).toBe('max-age=300');
+    expect(HSTS_VALUE).not.toMatch(/includeSubDomains|preload/);
+  });
+
+  it('production over HTTPS sends the header', () => {
+    expect(hstsHeaderFor({ NODE_ENV: 'production' }, true)).toEqual({
+      key: 'Strict-Transport-Security',
+      value: 'max-age=300',
+    });
+  });
+
+  it('development over HTTPS sends nothing', () => {
+    expect(hstsHeaderFor({ NODE_ENV: 'development' }, true)).toBeNull();
+  });
+
+  it('production over plain HTTP sends nothing (browsers ignore HSTS over http anyway)', () => {
+    expect(hstsHeaderFor({ NODE_ENV: 'production' }, false)).toBeNull();
+  });
+
+  it('an unset or odd NODE_ENV sends nothing', () => {
+    expect(hstsHeaderFor({} as NodeJS.ProcessEnv, true)).toBeNull();
+    expect(hstsHeaderFor({ NODE_ENV: 'Production' } as unknown as NodeJS.ProcessEnv, true)).toBeNull();
+  });
+
+  it('is not part of the build-time static list (the scheme is only known per request)', () => {
+    expect(STATIC_SECURITY_HEADERS.map((h) => h.key)).not.toContain('Strict-Transport-Security');
   });
 });

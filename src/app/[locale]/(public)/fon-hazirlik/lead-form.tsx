@@ -6,6 +6,7 @@ import { analytics } from '@/lib/analytics';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { PRIVACY_NOTICE } from '@/lib/legal/consent-documents';
 import {
+  PUBLIC_CONTACT_EMAIL,
   PUBLIC_LEAD_CONSENT,
   publicLeadRetentionMonths,
   type PublicLeadField,
@@ -13,7 +14,7 @@ import {
 } from '@/lib/leads/public-lead-policy';
 import type { ReadinessLevel, ReadinessOrgType } from '@/lib/readiness/score';
 import { TR_PROVINCES, type TrProvince } from '@/lib/readiness/provinces';
-import { submitReadinessLead } from './actions';
+import { getTransferOrgName, submitReadinessLead } from './actions';
 
 interface LeadFormProps {
   locale: string;
@@ -45,6 +46,10 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
   const [leadProvince, setLeadProvince] = useState<string>(province ?? '');
   const [district, setDistrict] = useState('');
   const [consent, setConsent] = useState(false);
+  // NG-179: the optional, separate transfer box. Unticked by default.
+  const [transferConsent, setTransferConsent] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferFor, setTransferFor] = useState<{ province: string; name: string | null } | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -66,6 +71,25 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
   useEffect(() => {
     if (sent) successRef.current?.focus();
   }, [sent]);
+
+  // NG-179: the organisation under the transfer box follows the chosen province. A late answer for
+  // a province the visitor already left is dropped; a failed lookup leaves the box hidden (fail closed).
+  useEffect(() => {
+    if (!leadProvince) return;
+    let stale = false;
+    getTransferOrgName({ province: leadProvince })
+      .then((r) => {
+        if (!stale) setTransferFor({ province: leadProvince, name: r.name });
+      })
+      .catch(() => {
+        if (!stale) setTransferFor({ province: leadProvince, name: null });
+      });
+    return () => {
+      stale = true;
+    };
+  }, [leadProvince]);
+  // The box shows only for the province that is selected now, and only when it has an organisation.
+  const transferName = transferFor && transferFor.province === leadProvince ? transferFor.name : null;
 
   const messageFor: Record<PublicLeadField | 'consent', string> = {
     name: t('error_name'),
@@ -114,6 +138,10 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
         readinessCode,
         consent,
         consentVersion: PUBLIC_LEAD_CONSENT.version,
+        // Sent only while the box is on screen; the server writes the version and time itself.
+        transferConsent: transferName !== null && transferConsent,
+        // NG-204: the organisation the visitor saw; the server binds the consent to it only if it still serves the province.
+        transferOrgName: transferName !== null && transferConsent ? transferName : undefined,
         source: 'fon-hazirlik',
         locale: locale === 'en' ? 'en' : 'tr',
         website: honeypotRef.current?.value ?? '',
@@ -356,6 +384,66 @@ export default function LeadForm({ locale, orgType, level, province, readinessCo
           </p>
           <div className="pl-9">{fieldError('consent')}</div>
         </div>
+
+        {transferName !== null ? (
+          <div className="rounded-lg border border-border px-3 py-3">
+            <div className="flex items-start gap-3">
+              <input
+                id="lead-transfer"
+                name="transfer"
+                type="checkbox"
+                checked={transferConsent}
+                onChange={(e) => setTransferConsent(e.target.checked)}
+                aria-describedby="lead-transfer-org"
+                className={`h-6 w-6 shrink-0 accent-[var(--accent-strong)] ${focusRing}`}
+              />
+              <label htmlFor="lead-transfer" className="text-sm leading-relaxed text-ink">
+                {t('transfer_label')}
+              </label>
+            </div>
+            <p id="lead-transfer-org" className="mt-1 pl-9 text-sm text-ink-2">
+              {t('transfer_org_line', { name: transferName })}
+            </p>
+            <button
+              type="button"
+              aria-expanded={transferOpen}
+              aria-controls="lead-transfer-details"
+              onClick={() => setTransferOpen((open) => !open)}
+              className={`mt-2 ml-9 inline-flex min-h-11 items-center text-sm font-semibold text-accent-ink underline underline-offset-2 ${focusRing}`}
+            >
+              {t('transfer_details_toggle')}
+            </button>
+            <div id="lead-transfer-details" hidden={!transferOpen} className="mt-2 space-y-3 pl-9 text-sm text-ink-2">
+              {(
+                [
+                  ['transfer_what_q', 'transfer_what_a', undefined],
+                  ['transfer_to_q', 'transfer_to_a', undefined],
+                  ['transfer_purpose_q', 'transfer_purpose_a', undefined],
+                  ['transfer_retention_q', 'transfer_retention_a', { months }],
+                  ['transfer_withdraw_q', 'transfer_withdraw_a', { email: PUBLIC_CONTACT_EMAIL }],
+                  ['transfer_skip_q', 'transfer_skip_a', undefined],
+                ] as const
+              ).map(([q, a, values]) => (
+                <div key={q}>
+                  <p className="font-semibold text-ink">{t(q)}</p>
+                  <p>{values ? t(a, values) : t(a)}</p>
+                </div>
+              ))}
+              <p>
+                {t('transfer_more_info')}{' '}
+                <a
+                  href={PRIVACY_NOTICE.href(locale)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t('consent_notice_aria')}
+                  className={`inline-flex min-h-6 items-center font-semibold text-accent-ink underline underline-offset-2 ${focusRing}`}
+                >
+                  {t('consent_notice')}
+                </a>
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <p
           role="alert"

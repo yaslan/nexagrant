@@ -41,6 +41,11 @@ const send = vi.hoisted(() => vi.fn(async (_message: { to: string; subject: stri
 const mailMode = vi.hoisted(() => ({ on: true }));
 const envOverride = vi.hoisted(() => ({
   NODE_ENV: 'production',
+  // NG-155: mailer is mocked, but pin the SMTP settings so the suite never depends on the host's SMTP env.
+  // Fake host: no connection is ever opened (smtpMailer is replaced below).
+  SMTP_HOST: 'smtp.example.invalid' as string | undefined,
+  SMTP_PORT: '587' as string | undefined,
+  SMTP_FROM: 'NexaGrant <noreply@example.invalid>' as string | undefined,
   NEXT_PUBLIC_APP_URL: 'https://app.example.invalid' as string | undefined,
 }));
 const recordAlert = vi.hoisted(() => vi.fn(async () => ({ status: 'recorded', id: 'a1' })));

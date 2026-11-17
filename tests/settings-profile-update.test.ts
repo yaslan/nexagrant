@@ -1,8 +1,9 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * TASK-MUPUHIIKSQAPN — Tenant profile (capabilities, keywords, TRL range) update action
  * tests form validation, authorization, persistence, and error handling.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 const tenantScope = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
@@ -20,7 +21,7 @@ vi.mock('@/lib/pic-budget', async (importOriginal) => {
   return { ...actual, spendUnsolicitedPicLookup: vi.fn(actual.spendUnsolicitedPicLookup) };
 });
 
-import { prisma, withTenant } from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { updateTenantProfile, type UpdateProfileInput } from '@/app/[locale]/(app)/[workspace]/settings/profile/actions';
 import {
   PIC_LOOKUPS_PER_HOUR,
@@ -37,7 +38,9 @@ import { slack } from './helpers/timing';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-describe('updateTenantProfile action', () => {
+const HAS_DB = await suiteHasDatabase('settings-profile-update');
+
+describe.skipIf(!HAS_DB)('updateTenantProfile action', () => {
   let tenantId: string;
   let userId: string;
 

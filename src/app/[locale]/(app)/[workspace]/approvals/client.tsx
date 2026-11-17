@@ -331,7 +331,7 @@ export default function ApprovalsClient({
                     </span>
                     {getStatusBadge(req.status)}
                     {isMaker && (
-                      <span className="px-2 py-0.5 rounded text-xs bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/50 dark:text-purple-300">
+                      <span className="px-2 py-0.5 rounded text-xs bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/50 dark:text-purple-400">
                         👤 {t('makerBadge')}
                       </span>
                     )}

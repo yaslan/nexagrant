@@ -34,6 +34,7 @@ const pilotPlan: ModulesPlanView = {
   entitledModules: PRO_GRANT,
   activeModules: [],
   switchedOnOutsidePlan: [],
+  previewOpen: [],
 };
 const proPlan: ModulesPlanView = { ...pilotPlan, planId: 'pro', planName: 'Pro', pilot: null };
 
@@ -91,5 +92,42 @@ describe('modules page — upgrade offer on locked cards', () => {
     renderModules(pilotPlan, 'en');
     expect(screen.getAllByText(enMessages.settings.modules.pilotLocked)).toHaveLength(LOCKED.length);
     expect(enMessages.settings.modules.upgradeCta).toBe('Upgrade Plan');
+  });
+});
+
+/**
+ * NG-135 (patron K-581676, option A): M18 "Müşteri Satış Hattı" is a beta module that is
+ * never sold (`planTiers: []`, no add-on). Two rules follow, and both are decided on the
+ * server (`decideModuleAccess`) or in the shared state machine (`isUnsoldBeta`), never
+ * copied into the page:
+ *   - a pilot manager sees M18 open (`previewOpen`), so its card is not "Pilotta kapalı";
+ *   - an unsold module offers no upgrade to anyone: a closed M18 card has no
+ *     "Planı Yükselt" and no "kurum paketinde açılır" line, pilot or paying.
+ */
+describe('unsold beta M18 — open to pilot managers, never an upgrade offer', () => {
+  const m18Open: ModulesPlanView = {
+    ...pilotPlan,
+    previewOpen: ['M18'] as ModulesPlanView['entitledModules'],
+    switchedOnOutsidePlan: ['M18'] as ModulesPlanView['entitledModules'],
+  };
+
+  test('pilot with M18 open: the card is ACTIVE, says neither "Pilotta kapalı" nor offers a link', () => {
+    renderModules(m18Open);
+    const c = within(card('M18'));
+    expect(c.getByTestId('module-status').textContent).toContain(trMessages.settings.modules.status.ACTIVE);
+    expect(c.queryByText(trMessages.settings.modules.pilotLocked)).toBeNull();
+    expect(c.queryByRole('link')).toBeNull();
+  });
+
+  test('pilot with M18 closed: no upgrade offer and no "kurum paketinde açılır" line', () => {
+    renderModules(pilotPlan);
+    const c = within(card('M18'));
+    expect(c.queryByText(trMessages.settings.modules.pilotLocked)).toBeNull();
+    expect(c.queryByRole('link')).toBeNull();
+  });
+
+  test('paying tenant with M18 closed: no upgrade link on the M18 card', () => {
+    renderModules(proPlan);
+    expect(within(card('M18')).queryByRole('link')).toBeNull();
   });
 });

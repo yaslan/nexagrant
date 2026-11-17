@@ -28,11 +28,12 @@ import { getAllManifests } from '@/lib/modules/registry';
 import type { ModuleId } from '@/lib/modules/types';
 
 // M17 (FO-186) was `soon` too; it opened as `beta` with its screen (FO-189).
+// M18 (NG-135, K-581676 = A): opened as `beta` for dev/pilot tenants only, never sold.
 const SOON: ModuleId[] = ['M0', 'M12', 'M13', 'M14', 'M15', 'M16'];
 const admin = { role: 'TENANT_OWNER', isPlatformAdmin: true };
 
 describe('decideModuleAccess — Yakında modules', () => {
-  it('lists exactly the six FO-40 modules as soon', () => {
+  it('lists exactly the FO-40 modules as soon', () => {
     expect(getAllManifests().filter((m) => m.statusBadge === 'soon').map((m) => m.id).sort()).toEqual(
       [...SOON].sort(),
     );

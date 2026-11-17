@@ -102,6 +102,14 @@ const envSchema = z.object({
   /** FO-396. Switches the register check off entirely (the e2e web server). Unset = off. */
   PIC_REGISTRY_OFF: blankToUndefined(z.enum(['true', 'false']).optional()),
   /**
+   * NG-209. Test-only: on the e2e web server the M18 LLM calls are answered by the fake provider in
+   * src/lib/llm.ts (no key, no network, no model; every other module's calls are untouched) and the
+   * M18 website reader reads an in-process fake site. Only the literal `true` turns it on; unset = off. Default-deny: it works only in a
+   * non-production build with NODE_ENV explicitly `development` or `test`; any other server
+   * (NODE_ENV unset included) refuses to start with it (`assertFakeAiAllowed`, src/instrumentation.ts).
+   */
+  E2E_FAKE_AI: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /**
    * Signs the opt-out link of a first message (NG-42, src/lib/email/opt-out.ts).
    * The links do not expire and sit in mail already delivered, so this key must
    * NEVER rotate: changing it breaks every one of them. Unset or blank = AUTH_SECRET,
@@ -117,6 +125,13 @@ const envSchema = z.object({
    * (FO-246). Unset or blank = the job skips and says so once; nothing is mailed.
    */
   ALERTS_OPS_EMAIL: blankToUndefined(z.string().email().optional()),
+  /**
+   * NG-179. Publication gate for the separate "transfer to the province's consultancy" box on the
+   * readiness result form. Off (unset/blank/false) = the box never reaches the page and the server
+   * never writes a transfer consent. Turn on only after the lawyer's written approval of
+   * docs/legal/drafts/transfer-consent-v1.md (patron decision, 14.11.2026). Read via {@link leadTransferConsentEnabled}.
+   */
+  LEAD_TRANSFER_CONSENT_ENABLED: blankToUndefined(z.enum(['true', 'false']).optional()),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
   AUTH_URL: z.string().optional(),
@@ -312,6 +327,21 @@ const envSchema = z.object({
       .optional()
   ),
   /**
+   * NG-182: how many minutes a `routed` PublicLead may stay without a copy in its tenant (no
+   * LeadContact / Deal with `sourceRef = public-lead:<id>`) before it counts as stuck — listed on
+   * /admin/lead-routes and raised as a SystemAlert by the `public-lead-stuck` job
+   * (src/lib/leads/stuck-leads.ts). A healthy forward writes the copy within the same request, so
+   * the default 60 only has to outlast a slow port call and the job's own 15-minute tick. Positive
+   * integer, at most 10080 (one week); blank = 60. Kept as a string like the settings above.
+   */
+  PUBLIC_LEAD_STUCK_AFTER_MINUTES: blankToUndefined(
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'PUBLIC_LEAD_STUCK_AFTER_MINUTES must be a positive integer (minutes)')
+      .refine((value) => Number(value) <= 10_080, 'PUBLIC_LEAD_STUCK_AFTER_MINUTES must be at most 10080 (one week)')
+      .default('60')
+  ),
+  /**
    * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
    * blank = 1000, the production value, which fails fast into the fallback path.
    * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
@@ -439,3 +469,21 @@ export const consortiumLiveDemandWeight: number | undefined =
  */
 export const dbConnectTimeoutMs: number =
   env.DB_CONNECT_TIMEOUT_MS === undefined ? 1000 : Number(env.DB_CONNECT_TIMEOUT_MS);
+
+/**
+ * The numeric view of `PUBLIC_LEAD_STUCK_AFTER_MINUTES` (NG-182). The schema has already rejected
+ * anything that is not a positive integer, so this cannot be `NaN`. A function, not a `const`: the
+ * server-action leak scan (tests/api/action-leak-scan.ts) treats an export built by a call as a
+ * caught value (fail-closed), and the admin action returns this number.
+ */
+export function publicLeadStuckAfterMinutes(): number {
+  return Number(env.PUBLIC_LEAD_STUCK_AFTER_MINUTES);
+}
+
+/**
+ * NG-179 publication gate: true only when LEAD_TRANSFER_CONSENT_ENABLED is the literal `true`.
+ * Read by the transfer box's organisation lookup and by the lead write, so both sides close together.
+ */
+export function leadTransferConsentEnabled(source: { LEAD_TRANSFER_CONSENT_ENABLED?: string } = env): boolean {
+  return source.LEAD_TRANSFER_CONSENT_ENABLED === 'true';
+}

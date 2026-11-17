@@ -49,6 +49,8 @@ const h = vi.hoisted(() => {
 vi.mock('@/lib/llm', () => ({
   generateText: vi.fn(async (arg: unknown) => h.capture(arg)),
   generateCompletion: vi.fn(async (arg: unknown) => h.capture(arg)),
+  // NG-209: enrichment asks whether the e2e fake site is on; off here, as it is under vitest.
+  fakeAiEnabled: () => false,
 }));
 vi.mock('@/lib/tenant', () => ({
   requireTenantAction: vi.fn(async () => ({ tenantId: 'tenant-1', userId: 'user-1' })),
@@ -189,5 +191,67 @@ describe('M17 Interreg pre-assessment prompts (tr + en)', () => {
       evaluate: renderPrompt('m17/evaluate', { rubric: '{"id":"rubric"}', project_context: 'PROJECT TEXT' }, locale),
       retry: renderPrompt('m17/evaluate-retry', { problems: '- criterionMarks: missing' }, locale),
     }).toMatchSnapshot();
+  });
+});
+
+/**
+ * NG-136 (M18-F5) — enrichment and the eligibility pre-report were written with their prompts in
+ * place, in both locales. Driven through the real call sites (`proposeEnrichment`,
+ * `createEligibilityReport`) up to `@/lib/llm`; the site fetch, the credit reservation and the DRAFT
+ * write are stubs, no network, no database.
+ */
+describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
+  const org = {
+    id: 'org-1',
+    name: 'Anadolu Sensör',
+    legalName: null,
+    district: null,
+    provinceCode: '06',
+    website: 'https://anadolu-sensor.example.com.tr',
+    sizeBand: null,
+    themes: [],
+    sectorCodes: [],
+  };
+  // `@/lib/llm` is mocked whole here, so the balance check and the reservation (ai-credits.ts) are
+  // stubbed at their seam.
+  const credits = { precheck: async () => {}, reserve: async () => ({ refId: 'ref-1', credits: 1 }), release: async () => {} };
+
+  test.each(['en', 'tr'] as const)('enrich-organization — %s', async (locale) => {
+    const { proposeEnrichment } = await import('@/modules/m18/server/enrichment');
+    const arg = await captureFrom(() =>
+      proposeEnrichment(
+        { tenantId: 'tenant-1', userId: 'user-1', org, locale },
+        {
+          fetchSite: async () => ({
+            ok: true,
+            pages: [{ url: 'https://anadolu-sensor.example.com.tr/', text: 'Anadolu Sensör A.Ş. — Ankara, Çankaya. 40 çalışan.' }],
+            skipped: [],
+          }),
+          credits,
+        },
+      ),
+    );
+    expect(promptOf(arg)).toMatchSnapshot();
+  });
+
+  test.each(['en', 'tr'] as const)('eligibility-pre-report — %s', async (locale) => {
+    const { createEligibilityReport } = await import('@/modules/m18/server/eligibility');
+    const subject = {
+      org: { ...org, orgType: 'SME', nuts2: 'TR51', themes: ['sensors'], sectorCodes: ['C26.5'] },
+      call: {
+        id: 'call-1',
+        title: 'Digital SMEs',
+        callIdentifier: 'DIGITAL-2026-SME-01',
+        programme: 'Digital Europe',
+        eligibleApplicantTypes: ['SME'],
+        eligibleRegions: [],
+        cofinancingRateBp: 5000,
+        topics: [],
+      },
+    };
+    const arg = await captureFrom(() =>
+      createEligibilityReport({ tenantId: 'tenant-1', userId: 'user-1', subject, locale }, { credits, save: async () => ({ id: 'r-1' }) }),
+    );
+    expect(promptOf(arg)).toMatchSnapshot();
   });
 });

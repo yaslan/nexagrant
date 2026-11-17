@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * FO-396 B3 — a partner's G0 score follows the PIC through the profile form.
  *
@@ -26,7 +27,9 @@ const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const newPic = () => String(100_000_000 + Math.floor(Math.random() * 899_999_999));
 const profile = { capabilities: 'Grid flexibility pilots', keywords: 'grid flexibility', trlMin: 4, trlMax: 7 };
 
-describe('FO-396 B3: a partner loses the register grant when the PIC is cleared on the form', () => {
+const HAS_DB = await suiteHasDatabase('g0-partner-pic-form');
+
+describe.skipIf(!HAS_DB)('FO-396 B3: a partner loses the register grant when the PIC is cleared on the form', () => {
   let key: string;
   let tenantId: string;
   let userId: string;

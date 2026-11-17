@@ -180,7 +180,7 @@ export function AdminModulesClient({ tenants, initialTenantId, initialStates }: 
                     </span>
                   ))}
                   {mod.addOnSku && (
-                    <span className="text-purple-400 font-semibold bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-[10px]">
+                    <span className="text-purple-700 dark:text-purple-400 font-semibold bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-[10px]">
                       SKU: {mod.addOnSku}
                     </span>
                   )}

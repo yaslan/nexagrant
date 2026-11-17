@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 /**
  * FO-384 — a PIC change moves the G0 score stored for that tenant's opportunities.
  *
@@ -52,7 +53,9 @@ const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const newPic = () => String(100_000_000 + Math.floor(Math.random() * 899_999_999));
 const profile = { capabilities: 'Grid flexibility pilots', keywords: 'grid flexibility', trlMin: 4, trlMax: 7 };
 
-describe('FO-384: stored G0 scores follow a PIC change', () => {
+const HAS_DB = await suiteHasDatabase('g0-rescore-on-pic');
+
+describe.skipIf(!HAS_DB)('FO-384: stored G0 scores follow a PIC change', () => {
   let key: string;
   let tenantId: string;
   let otherTenantId: string;

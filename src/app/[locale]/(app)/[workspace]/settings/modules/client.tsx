@@ -8,6 +8,7 @@ import { getAllManifests, getManifest } from '@/lib/modules/registry';
 import {
   canEnableEntitled,
   getDisableCascade,
+  isUnsoldBeta,
   moduleStatus,
   requirementChain,
   type ModuleCardStatus,
@@ -110,7 +111,10 @@ export function ModulesClient({
     }, 4000);
   };
 
-  const statusView = { entitledModules, activeModules, switchedOnOutsidePlan: outsidePlanOn };
+  // A preview stays open only while ModuleState still switches it on: an off toggle here
+  // closes the card, as it does for any other module.
+  const previewOpen = (plan?.previewOpen ?? []).filter((id) => outsidePlanOn.includes(id));
+  const statusView = { entitledModules, activeModules, switchedOnOutsidePlan: outsidePlanOn, previewOpen };
   const summary = categorySummary(activeModules);
   const coverage = pipelineCoverage(activeModules);
 
@@ -426,8 +430,12 @@ export function ModulesClient({
               ].filter((part): part is string => part !== null)
             : [];
           // A "Yakında" module is not sold yet, so a locked card offers no upgrade (FO-40).
+          // An unsold beta (M18) is not sold either: no plan grants it, so no upgrade and no
+          // "kurum paketinde açılır" line (NG-135, K-581676).
           const upgradeOffer =
-            mod.statusBadge !== 'soon' && (status === 'LOCKED' || status === 'ORPHANED') ? (
+            mod.statusBadge !== 'soon' &&
+            !isUnsoldBeta(mod.id) &&
+            (status === 'LOCKED' || status === 'ORPHANED') ? (
               plan?.pilot ? (
                 // A pilot cannot change plan (billing says so), so no upgrade offer here.
                 <span className="text-xs font-medium text-muted text-right">{t('pilotLocked')}</span>

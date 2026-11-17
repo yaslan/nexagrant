@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from '../../../tests/helpers/database-availability';
 /**
  * TASK-MUMABL78X5JLX — the free 90-day pilot, against the real database (the
  * same reason as public-sector-assignment.test.ts: a mocked delegate cannot
@@ -29,6 +30,8 @@ import { PUBLIC_SECTOR_PLANS_LOCK, withTestDbLock } from '../../../tests/helpers
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const DAY = 86_400_000;
 
+const HAS_DB = await suiteHasDatabase('pilot');
+
 describe('pilotEndsAt — 90 Istanbul calendar days', () => {
   it('counts the Istanbul date, not the UTC one: 1 Oct 00:00 and 23:59 Istanbul end together', () => {
     const early = new Date('2026-09-30T21:00:00Z'); // 1 Oct 00:00 Istanbul (still 30 Sep in UTC)
@@ -56,7 +59,7 @@ describe('pilotEndsAt — 90 Istanbul calendar days', () => {
   });
 });
 
-describe('grantPilot (live DB)', () => {
+describe.skipIf(!HAS_DB)('grantPilot (live DB)', () => {
   let tenantId: string;
 
   beforeAll(async () => {

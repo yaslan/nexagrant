@@ -30,8 +30,9 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   'CordisPartnerProfile', 'CordisCoParticipation',
   'SystemAlert',
   // TASK-MULR765AR5G0C: a contact request from an anonymous visitor of the
-  // readiness scorecard. No account, hence no tenant; read by platform admins
-  // only (/admin/leads), same standing as User. See prisma/migrations/add-public-lead.sql.
+  // readiness scorecard. No account, hence no tenant. NG-175 (SEC NG-170 O-1): RLS on
+  // with system_scope only (SYSTEM_SCOPE_POLICY), like ExpertPreRegistration.
+  // See prisma/migrations/add-public-lead.sql and public-lead-rls.sql.
   'PublicLead',
   // TASK-MVBIXPP33UK1B: a public expert pre-registration. No account, hence no
   // tenant; read and written by the expert-prereg server code and the
@@ -64,6 +65,9 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // FO-389: the daily shared budget of unsolicited PIC lookups. A count per UTC day, no tenant data.
   // See prisma/migrations/add-pic-lookup-budget.sql.
   'PicLookupBudget',
+  // NG-167: province -> consultancy tenant map for readiness leads. Platform data managed by the platform
+  // admin; its tenantId is a TARGET, not an owner. RLS on with system_scope only (SYSTEM_SCOPE_POLICY).
+  'ProvinceLeadRoute',
 ]);
 
 /**
@@ -84,7 +88,7 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set([
  * K-562266 = A). Reachable only through withSystemScope(). tests/rls-coverage.test.ts
  * pins this set to the block in prisma/rls.sql.
  */
-export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt']);
+export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt', 'ProvinceLeadRoute', 'PublicLead']);
 
 /**
  * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.

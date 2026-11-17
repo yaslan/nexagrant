@@ -14,7 +14,7 @@ export default async function ModulesSettingsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  const { tenantId, role } = await requireTenantPage(locale);
+  const { tenantId, role, isPlatformAdmin } = await requireTenantPage(locale);
 
   // If user is logged in with a restricted role, show forbidden banner
   if (!can(role as Role, 'manage_modules')) {
@@ -43,7 +43,10 @@ export default async function ModulesSettingsPage({
     const read = await withTenant(tenantId, async (tx) => {
       const tenant = await tx.tenant.findFirst({ where: { id: tenantId } });
       if (!tenant) return null;
-      return { name: tenant.name as string, plan: await readModulesPlanView(tenantId, tx, locale) };
+      // The viewer is the session member, so an unsold beta's preview shows to the
+      // same people the module gate lets in (decideModuleAccess).
+      const viewer = { role, isPlatformAdmin };
+      return { name: tenant.name as string, plan: await readModulesPlanView(tenantId, tx, locale, new Date(), viewer) };
     });
     if (read) {
       tenantName = read.name;

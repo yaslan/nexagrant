@@ -1,0 +1,21 @@
+             email             | province | locale | consentVersion | transferConsent |   transferConsentVersion    |    transferConsentAt    
+-------------------------------+----------+--------+----------------+-----------------+-----------------------------+-------------------------
+ a-en@e2e-transfer-6i17ex.test | Sinop    | en     | 2026-10-31.1   | t               | transfer-consent-v1-2026-11 | 2026-11-14 09:25:20.717
+ a-en@e2e-transfer-9vzxlb.test | Sinop    | en     | 2026-10-31.1   | t               | transfer-consent-v1-2026-11 | 2026-11-14 10:45:31.627
+ a-tr@e2e-transfer-6i17ex.test | Sinop    | tr     | 2026-10-31.1   | t               | transfer-consent-v1-2026-11 | 2026-11-14 09:25:19.127
+ a-tr@e2e-transfer-9vzxlb.test | Sinop    | tr     | 2026-10-31.1   | t               | transfer-consent-v1-2026-11 | 2026-11-14 10:45:29.856
+ b@e2e-transfer-6i17ex.test    | Sinop    | tr     | 2026-10-31.1   | f               |                             | 
+ b@e2e-transfer-9vzxlb.test    | Sinop    | tr     | 2026-10-31.1   | f               |                             | 
+ c@e2e-transfer-6i17ex.test    | Ardahan  | tr     | 2026-10-31.1   | f               |                             | 
+ c@e2e-transfer-9vzxlb.test    | Ardahan  | tr     | 2026-10-31.1   | f               |                             | 
+ d@e2e-transfer-6i17ex.test    | Ardahan  | tr     | 2026-10-31.1   | f               |                             | 
+ d@e2e-transfer-9vzxlb.test    | Ardahan  | tr     | 2026-10-31.1   | f               |                             | 
+ e@e2e-transfer-f9oeol.test    | Sinop    | tr     | 2026-10-31.1   | f               |                             | 
+ e@e2e-transfer-srvqmc.test    | Sinop    | tr     | 2026-10-31.1   | f               |                             | 
+(12 rows)
+
+ province | active |          name          |          slug           
+----------+--------+------------------------+-------------------------
+ Sinop    | t      | E2E Danışmanlık 9vzxlb | e2e-transfer-org-9vzxlb
+(1 row)
+

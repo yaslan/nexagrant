@@ -1,0 +1,74 @@
+BEGIN
+INSERT 0 5
+INSERT 0 5
+SET
+ current_user 
+--------------
+ fabrika_app
+(1 row)
+
+ province |        org_name         
+----------+-------------------------
+ Ankara   | Ankara Danışmanlık A.Ş.
+ İzmir    | 
+ Bursa    | 
+ Konya    | 
+ Adana    | Ajans (AGENCY)
+ Kars     | 
+ ankara   | 
+          | 
+          | 
+(9 rows)
+
+ return_type 
+-------------
+ text
+(1 row)
+
+ enter_system_scope 
+--------------------
+ public-intake
+(1 row)
+
+     scope     | rows 
+---------------+------
+ public-intake |    0
+(1 row)
+
+ROLLBACK
+BEGIN
+INSERT 0 1
+INSERT 0 1
+SET
+ enter_system_scope 
+--------------------
+ tenant-discovery
+(1 row)
+
+      scope       | rows 
+------------------+------
+ tenant-discovery |    0
+(1 row)
+
+ROLLBACK
+BEGIN
+INSERT 0 1
+INSERT 0 1
+SET
+ enter_system_scope 
+--------------------
+ platform-admin
+(1 row)
+
+                 scope                  | rows 
+----------------------------------------+------
+ platform-admin (control: should see 1) |    1
+(1 row)
+
+ROLLBACK
+BEGIN
+CREATE ROLE
+GRANT
+SET
+ERROR:  permission denied for function province_transfer_org_name
+ROLLBACK

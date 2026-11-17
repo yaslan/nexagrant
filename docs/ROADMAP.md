@@ -386,6 +386,21 @@ Karar: ADR-0007 (patron, 29.09.2026). Pilot sonrası fiyat: `docs/kamu/ILKADIM-P
 
 Aynı önekle kapatılan iki kart daha var (6'ya dahil değil): **TASK-MTRJSOWFH6B45** e-Fatura — **yeniden aç** (ücretli satış kapısı e, ADR-0007); **TASK-MTQ2KL3JO4MK2** ESR kalibrasyonu — gerçek tasarım ortağı listesi gerektiriyor. Kamu önceliği değişmişken **açma**, İlkadım pilotu sonrasına bırak.
 
+## M18 — Müşteri Satış Hattı (HibeLead entegrasyonu · SPRINT-M18)
+
+Patron kararı: HibeLead (`project_leed`) FonBridge içinde **yeni modül** olur. Plan `docs/agent-results/FO-265-be-fb.md` seçenek B: yalnız FonBridge'de olmayan parçalar gelir (müşteri kurumu/kişi, eşleşme, deal hattı, görev, paket/teklif, içe aktarma, ajans toplayıcıları); çağrı, hazırlık testi, brifing, YZ, KVKK ve auth FonBridge'inkiyle çalışır.
+
+- [x] **F1 veri modeli + manifest** — NG-143 (TASK-MVWGOQ9S4LC8B): 9 tablo + `DealStage` + `Call`'a 4 additive kolon, strict RLS, `src/modules/m18/manifest.ts` (`M18`, `client-pipeline`, `soon`/"Yakında", plan/eklenti yok), `can()` izinleri `client_pipeline_read|write|admin`. Ayrıntı `docs/DATA_MODEL.md` §31.
+- [ ] F2 saf mantık (skor, eşleştirme, tekilleştirme, hat kuralları, teklif yuvarlaması)
+- [ ] F3 ekranlar (`requireModule('M18')`, `m18.*` i18n). Burada `statusBadge` `beta`'ya döner; önce erişim cevabı gerekir: `decideModuleAccess` planı durumdan önce sorar, plansız bir `beta` modül her ödeyen kiracıya karşılıksız "Planı Yükselt" olarak görünür ve `DEV` satırı kimseye açmaz (K2 ya da personel için plan kontrolünü atlayan bir DEV yolu).
+- [ ] F4 inbound köprüsü (`PublicLead` / Fon Hazırlık Karnesi → M18 lead, contract)
+- [ ] F5 YZ (zenginleştirme, uygunluk ön raporu; `llm.ts`, `BILLING.md` kredi satırları)
+- [ ] F6 TR ajans toplayıcıları → paylaşımlı `Call`
+- [ ] F7 outreach dizileri + teklif PDF (opsiyonel)
+- [ ] F8 uçtan uca e2e + gate + RLS incelemesi
+
+Açık (FO-265): **K1** hedef kitle (yalnız CONSULTANCY/AGENCY mı), **K2** fiyat (`addon_m18` ya da plan içi — M18 bu yüzden `ALL_MODULE_IDS`/Ultra'ya eklenmedi), **K3** hazırlık testi, **K4** kapsam birimi (F1 kiracı düzeyiyle kuruldu), **K5** outreach MVP'de mi, **K6** `project_leed`'in geleceği (13.11.2026'da klasör diskte yok; yalnız DB volume'u duruyor).
+
 ## Açık kararlar (yanıtlanmadan varsayılmaz)
 
 1. Marka adı ve alan adı (çalışma adı "Fabrika").

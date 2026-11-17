@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma, withTenant } from '@/lib/db';
 import {
@@ -14,7 +15,9 @@ const SAMPLE_PLAINTEXT_TOKEN = 'ya29.super-secret-google-oauth-token-live-probe-
 const SAMPLE_REFRESH_TOKEN = '1//0gRefreshTokenSecretLiveProbe2026';
 const TEST_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
-describe('Calendar token live database encryption verification', () => {
+const HAS_DB = await suiteHasDatabase('calendar-token-db.live');
+
+describe.skipIf(!HAS_DB)('Calendar token live database encryption verification', () => {
   let createdConnectionId: string | null = null;
 
   beforeAll(async () => {

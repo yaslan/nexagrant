@@ -11,7 +11,8 @@
  *   3. DYNAMIC KEYS    every `t(`some.${variable}.key`)` must have at least one catalog
  *      entry matching its shape, in both catalogs (see "Dynamic keys" below).
  *   4. HARD-CODED TEXT no NEW user-facing literal may be written straight into a .tsx
- *      under src/app/** or src/modules/**, measured against i18n-baseline.json.
+ *      under src/app/**, src/modules/** or src/components/**, measured against
+ *      i18n-baseline.json.
  *
  * ── Why check 4 exists ────────────────────────────────────────────────────────────────
  * Checks 1-3 only ask whether the keys that ARE used resolve. A file that never calls
@@ -582,7 +583,7 @@ function displayHardcoded(h: HardcodedReport): void {
   const total = Object.values(h.current).reduce((a, b) => a + b, 0);
   const allowed = Object.values(h.baseline).reduce((a, b) => a + b, 0);
 
-  console.log('Hard-coded user-facing text (src/app, src/modules — *.tsx):');
+  console.log('Hard-coded user-facing text (src/app, src/modules, src/components — *.tsx):');
   console.log(`  Literals found:   ${total} in ${Object.keys(h.current).length} file(s)`);
   console.log(`  Baseline allows:  ${allowed} in ${Object.keys(h.baseline).length} file(s)\n`);
 

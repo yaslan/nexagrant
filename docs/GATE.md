@@ -60,6 +60,7 @@ Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortam�
 | 5 | e2e `EADDRINUSE :3000` | Başka bir `next dev` 3000'de | `E2E_PORT=<boş port>` |
 | 6 | Sonraki koşuda `server-action-rbac-guard` B-1 kırmızı | e2e'nin `next dev`'i `tsconfig.json`'ı yeniden yazdı | `git checkout -- tsconfig.json` |
 | 7 | e2e'nin çoğu (FO-254 koşusunda 342 test) 0 ms'de kırmızı, `browserType.launch: Executable doesn't exist ... chrome-headless-shell` | Playwright chromium binary'si `~/Library/Caches/ms-playwright` altında yok (yeni makine ya da Playwright sürümü değişti); birim testler yeşil kalır | `pnpm exec playwright install chromium`, sonra koşuyu yeniden başlat |
+| 8 | `rls:verify --require-db` → `<Tablo>: politika kümesi {…}, beklenen tam {system_scope} — fazla: <ad> (<komut>)` | Bir `system_scope` tablosunda (`PublicLead`, `ExpertPreRegistration` …) elle ya da başka bir araçla eklenmiş ikinci bir politika var; permissive olduğu için `system_scope`'u deler (NG-183) | `pnpm db:rls` (NG-183 bloğu yabancı politikayı düşürür); bilerek eklendiyse ADR-0009 §8.e bak. İstisna yok (NG-188): NG-52'nin `ExpertPreRegistration` · `expert_directory (SELECT)` politikası `ExpertDirectoryEntry` görünümüyle değişti; geri gelirse bu satır onu da gösterir → `pnpm db:rls` |
 
 Uzun koşular (`pnpm gate` ~10 dk; kilit bekleyen koşu daha uzun sürer) foreground Bash'te 600 sn sınırına takılabilir: `run_in_background` ile koş, logu dosyaya yaz (`… > log 2>&1; echo GATE_EXIT=$? >> log`).
 
@@ -117,3 +118,12 @@ Kırmızı yeniden görülürse:
 3. Hata numara çakışması ya da boşluk gösteriyorsa gerçek eşzamanlılık hatasıdır: `verify.ts` kilidini ve unique kısıtı kontrol et, testi gevşetme. Sayaç ile `max(founderNumber)` farkı, kilit dışından yazım olduğunu gösterir.
 4. Kırmızı yalnız bağlantı zaman aşımıysa (`DB_CONNECT_TIMEOUT_MS`) ve koşu paylaşımlı `:5433` DB'ye karşıysa, koşu izole değildi: `pnpm gate:isolated` ile yeniden koş.
 5. Üç koşu da yeşilse kırmızıyı kaydet ve kartı kapatma; ham log olmadan kök neden yazma.
+
+
+## ExpertDirectoryEntry mutasyon testleri ve eski `rls.sql` (NG-206)
+
+`tests/rls-verify-system-scope-policy-set.live.test.ts` içindeki iki NG-188 mutasyon testi (görünümü bozulmuş haliyle commit edip `finally`'de geri yükler) `fabrika` adlı paylaşılan geliştirme veritabanında **atlanır**; atlama `WARNING ... skipped` satırıyla nedenini yazar. Yalnız izole bir veritabanında (ör. `pnpm gate:isolated` ya da kendi Docker Postgres'in) ya da GitHub Actions'ta koşar. İzole veritabanında koşmak için `RLS_MUTATION_DB` ortam değişkeni o veritabanının adına (`current_database()`) birebir eşit olmalıdır; `pnpm gate:isolated` bunu kendi açtığı veritabanı için (`fabrika_gate`) otomatik ayarlar. GitHub Actions dışında `fabrika` adı `RLS_MUTATION_DB` ile onaylanmaz (NG-206 D-B1); GitHub Actions'ta (`ci.yml` servis konteyneri `fabrika`) testler bu adda koşar. Süreç kesilirse görünüm mutasyonlu kalabildiği için bu ayrım bilerek yapıldı (NG-203 D-B1).
+
+D-B2 uyarısı (NG-206): NG-188 (`e511961d`) zaten `origin/dev`'de. NG-52'nin `expert_directory` politikasını taşıyan eski `prisma/rls.sql` ile (NG-188 öncesi bir dal ya da worktree) `pnpm db:rls` ya da `pnpm db:setup` koşulursa, görünümün uygulandığı bir veritabanında politika geri gelir ve sealed `expert-directory` kapsamı `fullName`, `email`, ORCID'i yeniden okuyabilir (NG-185 F-1). Bu bir hatadır: politikanın geri gelmesi ancak NG-188'i bilerek geri alırken (eski `rls.sql` ile birlikte) kabul edilebilir. Eski tabanlı worktree'ler paylaşılan veritabanına `db:rls` koşmamalı. Paylaşılan veritabanı güncel `prisma/rls.sql` ile en az bir kez `pnpm db:rls` görmediyse bir kez koşulmalı (NG-183 bloğu yabancı `expert_directory` politikasını düşürür).
+
+`E2E_SHOTS_ROOT=docs/agent-results` e2e kanıtını (ör. `lead-transfer-consent` → `NG-179-evidence/`) bilerek git'te izlenen klasöre yazar; varsayılan koşu yalnız git-ignored `test-artifacts/` altına yazar (NG-217).

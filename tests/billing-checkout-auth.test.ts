@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { suiteHasDatabase } from './helpers/database-availability';
 
 /**
  * TASK-MTUI9F5YBHTDC — "the payment route has no session gate".
@@ -42,6 +43,7 @@ vi.mock('@/lib/billing/storefront', async (importOriginal) => ({
 }));
 
 const { POST } = await import('@/app/api/billing/checkout/route');
+const HAS_DB = await suiteHasDatabase('billing-checkout-auth');
 
 const TENANT_SESSION = {
   user: { id: 'user-1', email: 'owner@example.com' },
@@ -121,7 +123,8 @@ describe('POST /api/billing/checkout', () => {
     expect(tierForTenantMock).not.toHaveBeenCalled();
   });
 
-  test('a signed-in tenant still checks out, priced under its own tenant id', async () => {
+  // NG-180: the route reads the tenant (checkoutBlocker, withTenant) before it prices; with no database that read is a 500.
+  test.skipIf(!HAS_DB)('a signed-in tenant still checks out, priced under its own tenant id', async () => {
     authMock.mockResolvedValue(TENANT_SESSION);
 
     const res = await POST(checkoutRequest());

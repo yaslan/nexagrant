@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 
 import { prisma } from '@/lib/db';
+import { databaseReachable } from './helpers/database-availability';
 import { assertAppOwnerRole, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
@@ -31,10 +32,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }
 
 const approvals = await import('@/app/[locale]/(app)/[workspace]/approvals/actions');
 
-const dbReachable = await prisma
-  .$queryRaw`SELECT 1`
-  .then(() => true)
-  .catch(() => false);
+const dbReachable = await databaseReachable();
 
 if (dbReachable) await assertAppOwnerRole(prisma, 'approval requests live test');
 else skipOrFailInCi('approval requests live test', 'Postgres is unreachable (`docker compose up -d`)');

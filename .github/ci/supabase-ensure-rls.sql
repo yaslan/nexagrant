@@ -43,5 +43,24 @@ BEGIN
   END LOOP;
 END;
 $function$;
+-- NG-154: Postgres gives every new function EXECUTE to PUBLIC, so anon and
+-- authenticated (Supabase's Data API roles) could call this SECURITY DEFINER
+-- function at /rest/v1/rpc/rls_auto_enable, and `pnpm rls:verify` went red on
+-- every database this file built. An event trigger fires without the
+-- function's EXECUTE privilege, so the revoke does not touch ensure_rls.
+-- Runs on every db:setup, which also repairs databases built before this fix.
+-- The explicit anon/authenticated revoke covers a database whose default
+-- privileges grant them directly; the roles exist only on Supabase-like
+-- databases, hence the guard. Idempotent. Never apply this to live.
+REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC;
+DO $$
+DECLARE
+  r text;
+BEGIN
+  FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated') LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM %I', r);
+  END LOOP;
+END
+$$;
 DROP EVENT TRIGGER IF EXISTS ensure_rls;
 CREATE EVENT TRIGGER ensure_rls ON ddl_command_end EXECUTE FUNCTION public.rls_auto_enable();

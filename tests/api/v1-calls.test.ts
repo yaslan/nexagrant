@@ -173,6 +173,27 @@ describe('GET /api/v1/calls', () => {
     expect(body.data[0].deadlineTz).toBeNull();
   });
 
+  test('reports a non-euro (TRY) call as null euro figures — never lira as euro (NG-163)', async () => {
+    (await topicFindMany()).mockResolvedValue([
+      {
+        ...TOPIC_ROW,
+        budgetPerProjectCents: BigInt(20_000_000_00),
+        call: { ...TOPIC_ROW.call, currency: 'TRY', budgetCents: BigInt(100_000_000_00) },
+      },
+    ]);
+    const body = await (await getCalls(request())).json();
+    expect(body.data[0].budgetPerProjectEur).toBeNull();
+    expect(body.data[0].budgetTotalEur).toBeNull();
+  });
+
+  test('keeps the euro figure when the call currency is EUR', async () => {
+    (await topicFindMany()).mockResolvedValue([
+      { ...TOPIC_ROW, call: { ...TOPIC_ROW.call, currency: 'EUR' } },
+    ]);
+    const body = await (await getCalls(request())).json();
+    expect(body.data[0].budgetPerProjectEur).toBe(450000);
+  });
+
   test('reports absent budgets as null rather than zero', async () => {
     (await topicFindMany()).mockResolvedValue([
       {

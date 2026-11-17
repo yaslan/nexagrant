@@ -36,7 +36,7 @@ import { logger } from '@/lib/logger';
  *   await withSystemScope('platform-aggregate', 'plan-repository.countLive',
  *     (tx) => tx.subscription.count({ where: { status: 'ACTIVE' } }))
  *
- * `purpose` is one of five values, matching the classes the baseline already
+ * `purpose` is one of SYSTEM_SCOPE_PURPOSES, matching the classes the baseline already
  * uses. `context` names the call site and travels into the log line, so a
  * cross-tenant read is attributable after the fact rather than anonymous.
  *
@@ -109,13 +109,24 @@ export const SYSTEM_SCOPE_PURPOSES = [
   /** A cron fan-out whose tenant set is the query's output. */
   'cross-tenant-job',
   /**
-   * An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45).
-   * The database opens only ExpertPreRegistration, ExpertFounderCounter and ExpertPreRegAttempt for it (FO-52,
-   * prisma/rls.sql system_scope_open); any other table reads 0 rows and refuses writes.
+   * An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45;
+   * readiness contact request, NG-175).
+   * The database opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead
+   * for it (FO-52, NG-175, prisma/rls.sql system_scope_open); any other table reads 0 rows and refuses writes.
    * In reverse, ExpertPreRegistration and ExpertPreRegAttempt open only for this purpose,
-   * 'platform-admin', 'platform-aggregate' and 'cross-tenant-job' (FO-92).
+   * 'platform-admin', 'platform-aggregate' and 'cross-tenant-job' (FO-92); PublicLead only for this
+   * purpose, 'platform-admin' and 'cross-tenant-job'; ProvinceLeadRoute only for 'platform-admin' and
+   * 'cross-tenant-job' (NG-175).
    */
   'public-intake',
+  /**
+   * A tenant's M8 candidate query reading the expert pool as a directory (NG-52). The
+   * database opens one thing for it: the view "ExpertDirectoryEntry" (NG-188, prisma/rls.sql),
+   * the card columns of verified, visibility-consented ExpertPreRegistration rows. The base
+   * table and every other table read 0 rows and refuse writes, so no personal-data column
+   * (name, e-mail, ORCID, LinkedIn, IP or token hash) is reachable under this purpose.
+   */
+  'expert-directory',
 ] as const;
 
 export type SystemScopePurpose = (typeof SYSTEM_SCOPE_PURPOSES)[number];

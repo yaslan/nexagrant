@@ -6,6 +6,7 @@ import {
   canEnableEntitled,
   getDisableCascade,
   isComingSoon,
+  isOpenToTenantMembers,
   type MachineViewer,
 } from '../../src/lib/modules/state-machine';
 import { ModuleId } from '../../src/lib/modules/types';
@@ -170,5 +171,23 @@ describe('Yakında (statusBadge: soon) modules cannot be opened', () => {
     expect(getDisableCascade('M5', ['M5', 'M13', 'M15'])).toEqual(['M13', 'M15']);
     expect(getDisableCascade('M11', ['M1', 'M2', 'M3', 'M5', 'M8', 'M11', 'M14'])).toEqual(['M14']);
     expect(getDisableCascade('M14', ['M11', 'M14'])).toEqual([]);
+  });
+});
+
+describe('isOpenToTenantMembers (NG-205, SEC NG-203 D-A2)', () => {
+  it('a sold module: PILOT and ON are open to the tenant, DEV (staff only) and OFF are not', () => {
+    expect(isOpenToTenantMembers('M5', 'ON')).toBe(true);
+    expect(isOpenToTenantMembers('M5', 'PILOT')).toBe(true);
+    expect(isOpenToTenantMembers('M5', 'DEV')).toBe(false);
+    expect(isOpenToTenantMembers('M5', 'OFF')).toBe(false);
+  });
+
+  it('M18, an unsold beta: PILOT only — ON closes it as MODULE_OFF, the same as the gate', () => {
+    expect(isOpenToTenantMembers('M18', 'PILOT')).toBe(true);
+    for (const status of ['ON', 'DEV', 'OFF'] as const) expect(isOpenToTenantMembers('M18', status), status).toBe(false);
+  });
+
+  it('a "Yakında" module is never open, whatever its switch says', () => {
+    for (const status of ['ON', 'PILOT', 'DEV', 'OFF'] as const) expect(isOpenToTenantMembers('M14', status), status).toBe(false);
   });
 });

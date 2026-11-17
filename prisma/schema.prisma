@@ -43,6 +43,7 @@ model Tenant {
   profile       TenantProfile?
   subscription  Subscription?
   moduleStates  ModuleState[]
+  provinceLeadRoutes ProvinceLeadRoute[]
   creditLedger  CreditLedger[]
   lifetimeLicences LifetimeLicence[]
   auditEvents   AuditEvent[]
@@ -59,6 +60,17 @@ model Tenant {
   projectIdeas  ProjectIdea[]
   notificationPreferences NotificationPreference[]
   notificationEmailItems  NotificationEmailItem[]
+  // M18 Client Pipeline (NG-143). Tenant-level; no workspace scope (lead assumption, K4).
+  leadOrganizations LeadOrganization[]
+  leadContacts      LeadContact[]
+  leadMatches       LeadMatch[]
+  deals             Deal[]
+  dealActivities    DealActivity[]
+  dealTasks         DealTask[]
+  servicePackages   ServicePackage[]
+  leadEligibilityReports LeadEligibilityReport[]
+  serviceQuotes     ServiceQuote[]
+  funderRules       FunderRule[]
   // FB KAMU B1 (TASK-MULRQJQYM0NAM). An agency is a tenant of kind AGENCY; a
   // tenant opened with its invite code carries its id in agencyId, written once
   // at registration. The link grants the agency no read on this tenant's rows —
@@ -548,6 +560,7 @@ model Programme {
   name      String
   sourceKey String             // adapter key
   calls     Call[]
+  funderRules FunderRule[]     // M18 (NG-143): tenant notes about this programme's rules
 }
 
 model Call {
@@ -561,6 +574,15 @@ model Call {
   url          String?
   programme    Programme @relation(fields: [programmeId], references: [id])
   topics       Topic[]
+  // M18 (NG-143): additive, shared with every tenant (no tenantId). The HibeLead call fields
+  // FonBridge did not carry (FO-265 §2); no second call table is opened.
+  eligibleApplicantTypes String[] @default([])   // applicant-type codes, e.g. "SME", "UNIVERSITY"
+  eligibleRegions        String[] @default([])   // NUTS / TR plate codes; empty = no restriction recorded
+  cofinancingRateBp      Int?                    // basis points: 7500 = 75 %
+  complexity             String?                 // LOW | MEDIUM | HIGH
+  leadMatches            LeadMatch[]
+  deals                  Deal[]
+  leadEligibilityReports LeadEligibilityReport[]
 }
 
 model Topic {
@@ -700,6 +722,27 @@ model PublicLead {
   /// Version of the explicit-consent text the visitor ticked (src/lib/leads/public-lead.ts).
   consentVersion String
   consentAt      DateTime
+  /// NG-138: the visitor's SEPARATE consent to pass the request to a consultancy. false until a
+  /// form box (text pending the owner/legal decision) sets it; the intake producer reads only this.
+  transferConsent        Boolean   @default(false)
+  transferConsentVersion String?
+  transferConsentAt      DateTime?
+  /// NG-204 (SEC NG-203 O-A1): WHO the transfer consent names: the tenant whose name the visitor saw
+  /// under the box, and that name. Both or neither (CHECK PublicLead_transfer_recipient_check). No FK
+  /// (proof of consent outlives a deleted tenant). forwardPublicLead forwards only to this tenant;
+  /// a map that moved marks the lead unmatched/consent_recipient_mismatch.
+  transferConsentTenantId String?
+  transferConsentOrgName  String?
+  /// NG-167: where the intake forwarder sent it. 'routed' | 'unmatched' (consent given but the
+  /// province is empty or has no active ProvinceLeadRoute: NOT forwarded, platform-admin worklist).
+  /// NG-174: a lead is handed to AT MOST ONE tenant. 'routed' => routedTenantId set (claimed before the
+  /// port is called, never overwritten by 'unmatched', kept as the audit trail if the tenant is deleted);
+  /// 'unmatched' => routeReason in UnmatchedReason. Enforced by CHECK PublicLead_route_consistency_check
+  /// (prisma/migrations/add-public-lead-route-consistency.sql, which Prisma cannot express).
+  routeStatus    String?
+  routeReason    String?
+  routedTenantId String?
+  routedAt       DateTime?
   /// Funnel page the request came from, e.g. `fon-hazirlik`.
   source         String
   locale         String
@@ -710,6 +753,26 @@ model PublicLead {
   @@index([createdAt])
   @@index([email, createdAt])
   @@index([ipHash, createdAt])
+  @@index([routeStatus, createdAt])
+}
+
+/// NG-167 (M18): province -> the consultancy tenant that receives the readiness leads of that
+/// province. PLATFORM data managed by the platform admin only; `tenantId` is the TARGET, not an
+/// owner, so the table is SYSTEM_WIDE + SYSTEM_SCOPE_POLICY (RLS on, `system_scope` only: a
+/// tenant reads 0 rows). One ACTIVE row per province (partial unique index in
+/// prisma/migrations/add-province-lead-route.sql, which Prisma cannot express).
+model ProvinceLeadRoute {
+  id        String   @id @default(cuid())
+  /// Spelled as TR_PROVINCES (DB CHECK).
+  province  String
+  targetTenantId String
+  active    Boolean  @default(true)
+  /// User id of the platform admin who last changed it.
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [targetTenantId], references: [id], onDelete: Cascade)
+  @@index([targetTenantId])
 }
 
 /// FO-19 (TASK-MVBIXPP33UK1B): the public expert pre-registration. An expert
@@ -1743,6 +1806,11 @@ model NotificationEmailItem {
   /// keeps refusing the same notification (NG-43 review B-1); notifications-retention
   /// deletes it NOTIFICATION_RETENTION_DAYS after sentAt. Null = still queued.
   sentAt    DateTime?
+  /// NG-131: one send run's claim on this row (random token + moment). A second run that
+  /// starts while the first is mid-SMTP skips claimed rows, so a recipient is mailed once.
+  /// Released (null) when the send fails; a claim older than the lease is reclaimable.
+  claimToken String?
+  claimedAt  DateTime?
   tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, userId, dedupeKey])
@@ -2182,6 +2250,12 @@ enum ConsentPurpose {
   /// CALENDAR_OAUTH_NOT_CONFIGURED). It is declared so that the flow, when it
   /// is built, has a place to record consent rather than inventing one.
   CALENDAR_OAUTH
+
+  /// NG-138 (M18-F4) — a readiness-funnel visitor agreed to have their contact request
+  /// passed to a consultancy / agency tenant. Subject is `Consent.userId =
+  /// 'public-lead:<PublicLead.id>'` (no account exists), tenant is the receiving one.
+  /// Migration: add-consent-purpose-lead-intake.sql.
+  LEAD_INTAKE
 }
 
 model Consent {
@@ -2425,4 +2499,312 @@ model InterregCriterionMark {
   @@unique([analysisId, criterionId])
   @@index([tenantId])
   @@index([criterionId])
+}
+
+// ───────────────────────── M18 Client Pipeline / Müşteri Satış Hattı (NG-143) ─────────────────────────
+// A consultancy's sales pipeline over its own clients. Not the applicant's Opportunity (G0–G4),
+// not Relationship (partners), not Proposal (the EU application): different nouns on purpose.
+// Rewritten from the HibeLead Drizzle schema to FonBridge rules (FO-265 §3): cuid ids, tenantId +
+// strict RLS (prisma/rls.sql, prisma/migrations/add-m18-client-pipeline.sql), money as Int cents
+// + currency, soft delete via deletedAt. Tenant-level only, no workspaceId (lead assumption, K4).
+// Every table carries sourceRef + @@unique([tenantId, sourceRef]) so a later import
+// ("hibelead:<uuid>") can be re-run with ON CONFLICT DO NOTHING (FO-265 §5).
+// Child → parent links are composite (parentId, tenantId) → (id, tenantId): a row cannot point at
+// another tenant's parent (RLS checks only the row's own tenantId; FK checks bypass RLS).
+// Optional composite links use NoAction (checked at statement end), never SetNull: SetNull would
+// null tenantId too. Parents are soft-deleted, so the link survives in practice.
+
+// HibeLead deal_stage, in pipeline order: 11 stages NEW → REJECTED, plus LOST as the exit a deal
+// can take from any stage. WON / REJECTED are the grant outcome after SUBMITTED.
+enum DealStage {
+  NEW
+  QUALIFIED
+  CONTACTED
+  DISCOVERY_MEETING
+  ELIGIBILITY_ANALYSIS
+  PROPOSAL
+  CONTRACT
+  APPLICATION_PREP
+  SUBMITTED
+  WON
+  REJECTED
+  LOST
+}
+
+model LeadOrganization {
+  id               String        @id @default(cuid())
+  tenantId         String
+  name             String
+  legalName        String?
+  orgType          String? // HibeLead 18-value taxonomy as text; mapped to OrgType in F2
+  provinceCode     String? // TR plate code, e.g. "06"
+  district         String?
+  nuts2            String?
+  website          String?
+  sectorCodes      String[]      @default([])
+  themes           String[]      @default([])
+  sizeBand         String? // MICRO | SMALL | MEDIUM | LARGE
+  lifecycle        String        @default("LEAD") // LEAD | CLIENT | DISQUALIFIED
+  disqualifyReason String?
+  ownerUserId      String? // no FK: a removed user keeps the history (Deal.ownerUserId too)
+  pic              String? // EU Participant Identification Code, if known
+  cordisPic        String? // optional link to CordisOrganization.organisationId (M1), no FK
+  partnerOrgId     String? // optional link to PartnerOrg (M1 pool), no FK (different module)
+  dedupeKey        String? // normalised name/tax key for duplicate detection (F2)
+  sourceRef        String?
+  deletedAt        DateTime?
+  deletionReason   String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contacts         LeadContact[]
+  matches          LeadMatch[]
+  deals            Deal[]
+  eligibilityReports LeadEligibilityReport[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, sourceRef])
+  @@index([tenantId, name])
+  @@index([tenantId, dedupeKey])
+  @@index([deletedAt])
+}
+
+model LeadContact {
+  id              String           @id @default(cuid())
+  tenantId        String
+  organizationId  String
+  fullName        String
+  title           String?
+  email           String?
+  phone           String?
+  linkedinUrl     String?
+  doNotContact    Boolean          @default(false) // consent itself lives in Consent, not here (FO-265 §2)
+  sourceRef       String?
+  deletedAt       DateTime?
+  deletionReason  String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization    LeadOrganization @relation(fields: [organizationId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  primaryForDeals Deal[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, sourceRef])
+  @@index([tenantId, organizationId])
+  @@index([deletedAt])
+}
+
+// A client organisation × a (shared) call. Not TopicMatch: that one matches the tenant itself.
+model LeadMatch {
+  id             String           @id @default(cuid())
+  tenantId       String
+  organizationId String
+  callId         String
+  fitScore       Int? // 0–100 soft score
+  hardFail       Boolean          @default(false) // an eligibility rule fails outright
+  reasons        Json             @default("[]")
+  status         String           @default("SUGGESTED") // SUGGESTED | ACCEPTED | REJECTED | CONTACTED
+  sourceRef      String?
+  deletedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization   LeadOrganization @relation(fields: [organizationId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  call           Call             @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, organizationId, callId])
+  @@unique([tenantId, sourceRef])
+  @@index([callId])
+  @@index([deletedAt])
+}
+
+model Deal {
+  id                String           @id @default(cuid())
+  tenantId          String
+  organizationId    String
+  primaryContactId  String?
+  callId            String?
+  servicePackageId  String?
+  title             String
+  stage             DealStage        @default(NEW)
+  stageChangedAt    DateTime         @default(now())
+  leadScore         Int? // 0–100 (Fit/Need/Intent/Timing, F2)
+  scoreBreakdown    Json?
+  estimatedFeeCents Int? // minor units, src/lib/money.ts
+  currency          String           @default("EUR")
+  winProbability    Int? // 0–100
+  expectedCloseAt   DateTime?
+  lostReason        String?
+  ownerUserId       String?
+  sourceRef         String?
+  deletedAt         DateTime?
+  deletionReason    String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization      LeadOrganization @relation(fields: [organizationId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  primaryContact    LeadContact?     @relation(fields: [primaryContactId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  servicePackage    ServicePackage?  @relation(fields: [servicePackageId, tenantId], references: [id, tenantId], onDelete: NoAction)
+  call              Call?            @relation(fields: [callId], references: [id], onDelete: SetNull)
+  activities        DealActivity[]
+  tasks             DealTask[]
+  quotes            ServiceQuote[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, sourceRef])
+  @@index([tenantId, stage])
+  @@index([tenantId, organizationId])
+  @@index([callId])
+  @@index([deletedAt])
+}
+
+model DealActivity {
+  id          String    @id @default(cuid())
+  tenantId    String
+  dealId      String
+  kind        String // NOTE | CALL | MEETING | EMAIL_OUT | EMAIL_IN | FORM | STAGE_CHANGE | DOCUMENT …
+  payload     Json      @default("{}")
+  note        String?
+  actorUserId String?
+  occurredAt  DateTime  @default(now())
+  sourceRef   String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal        Deal      @relation(fields: [dealId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, sourceRef])
+  @@index([tenantId, dealId, occurredAt])
+  @@index([deletedAt])
+}
+
+model DealTask {
+  id             String    @id @default(cuid())
+  tenantId       String
+  dealId         String
+  title          String
+  dueAt          DateTime?
+  doneAt         DateTime?
+  assigneeUserId String?
+  autoGenerated  Boolean   @default(false) // created by a pipeline rule (F2)
+  autoRuleKey    String?
+  sourceRef      String?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal           Deal      @relation(fields: [dealId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, sourceRef])
+  @@index([tenantId, dealId])
+  @@index([tenantId, dueAt])
+  @@index([deletedAt])
+}
+
+// The consultancy's own fee. The success fee (başarı primi) is NOT an eligible cost in a grant
+// budget (docs/BILLING.md); FunderRule carries that warning next to a quote.
+model ServicePackage {
+  id                 String         @id @default(cuid())
+  tenantId           String
+  name               String
+  pricingModel       String         @default("FIXED") // FIXED | FIXED_PLUS_SUCCESS | HOURLY | RETAINER
+  baseFeeCents       Int // minor units
+  successFeeBp       Int? // basis points of the awarded grant: 500 = 5 %
+  successFeeCapCents Int? // ceiling of the success fee, minor units
+  currency           String         @default("EUR")
+  deliverables       String[]       @default([])
+  active             Boolean        @default(true)
+  sourceRef          String?
+  deletedAt          DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deals              Deal[]
+  quotes             ServiceQuote[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, sourceRef])
+  @@index([tenantId, active])
+  @@index([deletedAt])
+}
+
+// Named ServiceQuote, not Proposal: `Proposal` is the EU application (M5).
+model ServiceQuote {
+  id         String          @id @default(cuid())
+  tenantId   String
+  dealId     String
+  version    Int             @default(1)
+  packageId  String?
+  lineItems  Json            @default("[]") // [{label, quantity, unitCents}] — minor units
+  totalCents Int // minor units
+  currency   String          @default("EUR")
+  status     String          @default("DRAFT") // DRAFT | SENT | VIEWED | ACCEPTED | REJECTED
+  validUntil DateTime?
+  sourceRef  String?
+  deletedAt  DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deal       Deal            @relation(fields: [dealId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  package    ServicePackage? @relation(fields: [packageId, tenantId], references: [id, tenantId], onDelete: NoAction)
+
+  @@unique([tenantId, dealId, version])
+  @@unique([tenantId, sourceRef])
+  @@index([deletedAt])
+}
+
+// A funder-side rule the consultancy records and shows next to a quote or fee (e.g. "the success
+// fee is not an eligible cost under this programme"). Informational; it blocks nothing by itself.
+model FunderRule {
+  id          String     @id @default(cuid())
+  tenantId    String
+  funderName  String
+  programmeId String? // optional link to the shared Programme
+  title       String
+  body        String
+  severity    String     @default("INFO") // INFO | WARNING | BLOCKER
+  sourceUrl   String?
+  verifiedAt  DateTime?
+  active      Boolean    @default(true)
+  sourceRef   String?
+  deletedAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme   Programme? @relation(fields: [programmeId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, sourceRef])
+  @@index([tenantId, funderName])
+  @@index([programmeId])
+  @@index([deletedAt])
+}
+
+// M18-F5 (NG-136): the AI eligibility pre-report of one client organisation against one shared
+// call. An INTERNAL pre-assessment ("iç ön değerlendirme"), never an official score: no numeric
+// score is stored. DRAFT until a user approves it; only an APPROVED report may leave the module
+// (src/modules/m18/server/eligibility.ts `releasableReport`, the deal brief contract).
+model LeadEligibilityReport {
+  id               String           @id @default(cuid())
+  tenantId         String
+  organizationId   String
+  callId           String
+  status           String           @default("DRAFT") // DRAFT | APPROVED
+  content          String // the model's Markdown, as generated; never edited in place
+  locale           String           @default("tr") // prompt locale the report was written in
+  model            String? // provider model id, from the AiUsageLog of the call
+  createdByUserId  String? // no FK: a removed user keeps the history
+  approvedByUserId String?
+  approvedAt       DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization     LeadOrganization @relation(fields: [organizationId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  call             Call             @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, organizationId, createdAt])
+  @@index([callId])
+  @@index([deletedAt])
 }

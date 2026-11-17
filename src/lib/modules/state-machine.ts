@@ -242,6 +242,49 @@ export function canAccessStatus(
   }
 }
 
+/**
+ * A `beta` module the catalogue does not sell: `planTiers` is empty and `addOnSku`
+ * is null, so no plan can ever grant it. Such a module is a staff/pilot preview
+ * only (NG-135, patron K-581676): see `isStaffPreviewStatus`.
+ */
+export function isUnsoldBeta(moduleId: ModuleId): boolean {
+  const manifest = getManifest(moduleId);
+  return (
+    manifest?.statusBadge === 'beta' &&
+    manifest.planTiers.length === 0 &&
+    (manifest.addOnSku ?? null) === null
+  );
+}
+
+/**
+ * Whether an unsold beta module is open at this `ModuleState` status, before the
+ * audience check. Only `DEV` (staff) and `PILOT` (the tenant's managers) open it,
+ * so the plan check is skipped for them. `OFF` and `ON` stay closed: there is no
+ * plan to upgrade to, so `decideModuleAccess` answers `MODULE_OFF`, not an upgrade.
+ */
+export function isStaffPreviewStatus(moduleId: ModuleId, status: ModuleStatus): boolean {
+  return isUnsoldBeta(moduleId) && (status === 'DEV' || status === 'PILOT');
+}
+
+/** A tenant manager, for `isOpenToTenantMembers`: not staff, not an API key. */
+const TENANT_MANAGER: SessionViewer = { role: 'TENANT_OWNER', isPlatformAdmin: false };
+
+/**
+ * NG-205 (SEC NG-203 D-A2): is `moduleId` at `status` open to the tenant's OWN people (its
+ * managers at least), not only to FonBridge staff? The question a data flow INTO a tenant asks:
+ * a forwarded lead must land where somebody can open it. Built from the gate's own pieces, not
+ * a second copy of them: a "Yakında" module is closed, an unsold beta opens only at its preview
+ * statuses (`isStaffPreviewStatus`), and `canAccessStatus` must let a tenant manager in, so DEV
+ * (staff only) and OFF are closed. M18 today: PILOT only (ON closes an unsold beta, MODULE_OFF).
+ *
+ * Status only: plan entitlement of a sold module stays the job of `decideModuleAccess`.
+ */
+export function isOpenToTenantMembers(moduleId: ModuleId, status: ModuleStatus): boolean {
+  if (isComingSoon(moduleId)) return false;
+  if (isUnsoldBeta(moduleId) && !isStaffPreviewStatus(moduleId, status)) return false;
+  return canAccessStatus(status, TENANT_MANAGER).allowed;
+}
+
 // ───────────────────────────── Plan × switch → card status ─────────────────────────────
 
 /**
@@ -266,12 +309,20 @@ export interface ModuleStatusView {
   entitledModules: readonly ModuleId[];
   activeModules: readonly ModuleId[];
   switchedOnOutsidePlan: readonly ModuleId[];
+  /**
+   * Unsold beta modules this viewer may open (`decideModuleAccess` allowed, computed on
+   * the server). Optional so a plain plan view still works; absent means none.
+   */
+  previewOpen?: readonly ModuleId[];
 }
 
 export function moduleStatus(moduleId: ModuleId, view: ModuleStatusView): ModuleCardStatus {
   const switchedOn =
     view.activeModules.includes(moduleId) || view.switchedOnOutsidePlan.includes(moduleId);
   if (isComingSoon(moduleId)) return switchedOn ? 'ORPHANED' : 'SOON';
+  // A staff/pilot preview of an unsold beta is open without a plan (NG-135, K-581676):
+  // the decision was taken server-side, so the card shows it as usable.
+  if (view.previewOpen?.includes(moduleId)) return 'ACTIVE';
   if (view.entitledModules.includes(moduleId)) return switchedOn ? 'ACTIVE' : 'AVAILABLE';
   return switchedOn ? 'ORPHANED' : 'LOCKED';
 }
