@@ -417,7 +417,7 @@ export default function TenantProfileForm({
               </p>
             )}
             {!picError && picCleared && <p role="status" className="text-ink-2">{t('picClearedNotice')}</p>}
-            {!picError && !picCleared && pic === '' && (
+            {!picError && !picCleared && savedPic === '' && (
               <p role="status" data-testid="tenant-pic-missing" className="text-amber-ink font-semibold">
                 {t('picMissingNotice')}
               </p>
