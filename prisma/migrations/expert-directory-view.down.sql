@@ -16,6 +16,13 @@
 -- policy on the app.system_scope flag without system_scope_open() is refused by
 -- tests/rls-coverage.test.ts Y-1(a).
 --
+-- D-B2 (NG-203 review, NG-206): a checkout with a pre-NG-188 prisma/rls.sql (NG-52's
+-- `expert_directory` policy) that runs `pnpm db:rls` or `pnpm db:setup` re-creates that policy on a
+-- database where this view exists, and the sealed 'expert-directory' scope reads PII again (NG-185 F-1).
+-- Details and recovery: docs/GATE.md, "ExpertDirectoryEntry mutasyon testleri ve eski `rls.sql`".
+-- NG-188 (e511961d) is already in origin/dev, so the shared database needs one `pnpm db:rls` with the
+-- current rls.sql if it has not had one since.
+--
 -- Idempotent: DROP VIEW IF EXISTS. No row is touched.
 -- ─────────────────────────────────────────────────────────────────────────────
 

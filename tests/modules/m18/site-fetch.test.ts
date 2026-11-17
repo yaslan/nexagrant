@@ -243,9 +243,13 @@ describe('htmlToText and pickSubpages', () => {
  * 1 MB of hostile HTML held the event loop for 5–167 s. The read's time budget only stops I/O, not
  * this CPU work, so the parse itself must be linear.
  */
-describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () => {
-  const MB = 1_000_000;
-  const fill = (unit: string) => unit.repeat(Math.ceil(MB / unit.length)).slice(0, MB);
+describe('HTML parsing is linear on hostile input (100 KB, no closing tags)', () => {
+  // NG-214 review 2: 100 KB, not 1 MB. The parse is synchronous, so vitest's timeout cannot cut a
+  // regressed (quadratic) pass short: at 1 MB the `<[^>]+>` mutation ran for 400 s without failing.
+  // At 100 KB it ends in seconds and fails on the ratio (150–600x against the 12x limit), while
+  // correct code still sits far below it.
+  const SIZE = 100_000;
+  const fill = (unit: string) => unit.repeat(Math.ceil(SIZE / unit.length)).slice(0, SIZE);
   const base = new URL('https://acme.com.tr/');
   const hostile: [string, string][] = [
     ['unclosed <script> many times', fill('<script>x ')],
@@ -269,15 +273,33 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     ['one unclosed attribute quote, then many <a', `<a x="${fill('<a href=/about>about ')}`],
     ['many "<!--" inside attribute values and scripts', fill('<a href="/about" title="<!--">About</a><script>"<!--"</script>')],
   ];
-  it.each(hostile)('%s: htmlToText and pickSubpages finish within the wall-clock budget', (_name, html) => {
+  // NG-214: no absolute wall-clock limit. A fixed millisecond bound fails on a loaded machine (the
+  // same code took 460–760 ms against a 400 ms limit while another gate ran). The cost is measured
+  // against a reference parse of the same size done right beside it, in the same process: load
+  // slows both the same way, so the ratio does not move, while a rescanning pass costs 25x or more.
+  // Each side is the best of RUNS interleaved runs, which drops the runs a noisy neighbour hit.
+  const RUNS = 5;
+  // The reference must NOT be hostile itself: a `<`-dense reference (`< x `) goes down the same path as
+  // the input, so a `<[^>]+>` rescan in htmlToText would slow both and leave the ratio at ~1 (NG-214
+  // review B1). Closed tags are linear for every pass, old regexes included.
+  // Correct code measures 0.05–3.6x this reference; a pickSubpages label rescan 29x, an htmlToText
+  // `<[^>]+>` 150–600x.
+  const MAX_RATIO = 12;
+  const reference = fill('<p>x </p> ');
+  const parseMs = (html: string): number => {
     const started = performance.now();
     htmlToText(html);
-    const textMs = performance.now() - started;
-    const linkStarted = performance.now();
     pickSubpages(html, base);
-    const linkMs = performance.now() - linkStarted;
-    expect(textMs).toBeLessThan(slack(400));
-    expect(linkMs).toBeLessThan(slack(400));
+    return performance.now() - started;
+  };
+  it.each(hostile)('%s: htmlToText and pickSubpages cost a bounded multiple of a linear reference parse', (_name, html) => {
+    let best = Infinity;
+    let bestReference = Infinity;
+    for (let run = 0; run < RUNS; run += 1) {
+      bestReference = Math.min(bestReference, parseMs(reference));
+      best = Math.min(best, parseMs(html));
+    }
+    expect(best / Math.max(bestReference, 1)).toBeLessThan(MAX_RATIO);
   });
 
   it('an unclosed <script>/<style>/<noscript>/<template> hides the rest of the page (as a browser does)', () => {

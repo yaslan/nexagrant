@@ -98,6 +98,33 @@ describe('transfer box: server gate (NG-179)', () => {
     expect(create.mock.calls[0]![0].data).toMatchObject({ transferConsent: false, transferConsentTenantId: null, transferConsentOrgName: null });
   });
 
+  // NG-213 D-4 (sec-gnd NG-204 review): the schema trims the name the form sends back, the stored
+  // Tenant.name is not trimmed. A tenant whose name has a leading or trailing space must not lose every
+  // legitimate consent: both sides are compared the same way, and the stored name is the one the
+  // visitor was shown (the DB value, unchanged).
+  it.each([
+    ['trailing space in the stored name', `${ORG.name} `],
+    ['leading space in the stored name', ` ${ORG.name}`],
+    ['spaces on both ends of the stored name', `  ${ORG.name}\t`],
+  ])('NG-213 D-4: %s, the form sends back what it showed → the consent is recorded', async (_label, stored) => {
+    lookup.mockResolvedValue({ tenantId: ORG.tenantId, name: stored });
+    const { db, create } = fakeDb();
+    const result = await submitPublicLead({ ...valid, transferConsent: true, transferOrgName: stored }, { db, now: NOW, secret: null });
+    expect(result).toEqual({ ok: true });
+    expect(create.mock.calls[0]![0].data).toMatchObject({
+      transferConsent: true,
+      transferConsentTenantId: ORG.tenantId,
+      transferConsentOrgName: stored,
+    });
+  });
+
+  it('NG-213 D-4: normalising the ends does not make another name match (inner text still compared exactly)', async () => {
+    lookup.mockResolvedValue({ tenantId: ORG.tenantId, name: ` ${ORG.name} ` });
+    const { db, create } = fakeDb();
+    await submitPublicLead({ ...valid, transferConsent: true, transferOrgName: ORG.name.replace(' ', '  ') }, { db, now: NOW, secret: null });
+    expect(create.mock.calls[0]![0].data).toMatchObject({ transferConsent: false, transferConsentTenantId: null, transferConsentOrgName: null });
+  });
+
   it('a ticked box for an unmapped province is accepted but writes no transfer consent', async () => {
     lookup.mockResolvedValue(null);
     const { db, create } = fakeDb();
