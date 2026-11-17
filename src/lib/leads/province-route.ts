@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/db';
+import { prisma, type TenantTx } from '@/lib/db';
 import { withSystemScopeOn, type SystemTx } from '@/lib/system-scope';
 import { parseProvince } from '@/lib/readiness/share';
 import { isIntakeTarget } from '@/modules/m18/server/intake';
@@ -224,6 +224,42 @@ export async function deactivateRoutesOfClosedTarget(
     });
   }
   return active.map((r) => r.province);
+}
+
+/** Who closed M18 from inside the tenant's own scope: the tenant's user, or billing (no person). */
+export type OwnRouteCloseActor = { kind: 'tenant_user'; userId: string } | { kind: 'billing' };
+
+/**
+ * NG-222 (NG-215 review Bulgu 2, K-583842 = A): the tenant-scoped counterpart of
+ * {@link deactivateRoutesOfClosedTarget}, for the writes that turn M18 off from INSIDE the tenant's
+ * own scope — its settings (`toggleModuleState`), an iyzico downgrade, a Stripe downgrade and a
+ * Stripe cancellation. ProvinceLeadRoute is closed to a tenant scope (NG-175 D-1), so the route
+ * close is the narrow SECURITY DEFINER function `public.close_own_province_routes`
+ * (prisma/migrations/add-close-own-province-routes.sql): it takes no tenant id (it reads
+ * `app.tenant_id`), closes only that tenant's routes and only while its M18 is closed, and writes
+ * the `lead-route.deactivated` audit row. No scope escalation.
+ *
+ * `write` is the caller's ModuleState write, run on the same `tx`, so the module change and the
+ * route change commit or roll back together. When `modulesTurnedOff` (the write's whole OFF list,
+ * cascade included) holds M18:
+ *   1. the tenant row is locked first — the lock order of the route set and the platform-admin
+ *      close (tenant row, then ModuleState), so the two closes cannot deadlock each other;
+ *   2. `write` runs;
+ *   3. the function reads the M18 status `write` left and closes the routes if it is closed.
+ * Otherwise `write` runs alone. Returns what `write` returned.
+ */
+export async function withOwnRouteCloseOnM18Exit<T>(
+  tx: TenantTx,
+  modulesTurnedOff: readonly string[],
+  actor: OwnRouteCloseActor,
+  write: () => Promise<T>
+): Promise<T> {
+  if (!modulesTurnedOff.includes('M18')) return write();
+  await tx.$queryRaw`SELECT "id" FROM "Tenant" WHERE "id" = current_setting('app.tenant_id', true) FOR UPDATE`;
+  const result = await write();
+  const actorId = actor.kind === 'tenant_user' ? actor.userId : null;
+  await tx.$queryRaw`SELECT public.close_own_province_routes(${actor.kind}, ${actorId}::text) AS closed`;
+  return result;
 }
 
 /** Consented leads that could not be forwarded, newest first. */

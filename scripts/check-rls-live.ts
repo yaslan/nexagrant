@@ -1444,6 +1444,80 @@ async function probeSealBindsPurpose(m: pg.Client): Promise<{ failures: string[]
   return { failures, checks };
 }
 
+/**
+ * NG-222 (K-583842): `close_own_province_routes` is the tenant scope's only write door to
+ * ProvinceLeadRoute. Catalogue (on the DATABASE_URL connection): it exists, SECURITY DEFINER,
+ * search_path fixed, EXECUTE not held by PUBLIC / anon / authenticated, held by fabrika_app.
+ * Behaviour (on the measuring role, when it may EXECUTE it): no app.tenant_id → refused; a tenant
+ * id that names no tenant → closes nothing; app.system_scope is not left 'on'. Writes nothing
+ * (the only call that reaches the loop names no tenant); everything is rolled back.
+ */
+async function probeOwnRouteClose(admin: pg.Client, m: pg.Client): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const fn = 'public.close_own_province_routes(text, text)';
+  const cat = (
+    await admin.query<{ present: boolean; definer: boolean | null; config: string[] | null; pub: boolean | null; api: string[] | null; app: boolean | null }>(
+      `select p.oid is not null as present, p.prosecdef as definer, p.proconfig as config,
+              exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where a.grantee = 0 and a.privilege_type = 'EXECUTE') as pub,
+              array(select r.rolname::text from pg_roles r where r.rolname in ('anon', 'authenticated') and has_function_privilege(r.oid, p.oid, 'EXECUTE')) as api,
+              case when exists (select 1 from pg_roles where rolname = 'fabrika_app') then has_function_privilege('fabrika_app', p.oid, 'EXECUTE') end as app
+         from (select to_regprocedure($1) as oid) f left join pg_proc p on p.oid = f.oid`,
+      [fn]
+    )
+  ).rows[0];
+  if (!cat?.present) {
+    failures.push(`kendi-rota-kapanışı: ${fn} yok (prisma/migrations/add-close-own-province-routes.sql uygulanmamış, NG-222)`);
+    return { failures, checks };
+  }
+  const bad: string[] = [];
+  if (!cat.definer) bad.push('SECURITY DEFINER değil');
+  if (!(cat.config ?? []).some((c) => c.startsWith('search_path='))) bad.push('search_path sabit değil');
+  if (cat.pub) bad.push('PUBLIC EXECUTE tutuyor');
+  if ((cat.api ?? []).length > 0) bad.push(`Supabase API rolleri EXECUTE tutuyor: ${(cat.api ?? []).join(', ')}`);
+  if (cat.app === false) bad.push('fabrika_app EXECUTE tutmuyor (kiracının ayarı ve faturalama M18 kapanışında rotayı kapatamaz)');
+  if (bad.length > 0) {
+    failures.push(`kendi-rota-kapanışı: ${bad.join('; ')}`);
+    return { failures, checks };
+  }
+
+  const mayCall = (await m.query<{ ok: boolean }>(`select has_function_privilege(current_user, $1::regprocedure, 'EXECUTE') as ok`, [fn])).rows[0]?.ok === true;
+  if (!mayCall) {
+    checks.push(`kendi-rota-kapanışı: katalog doğru (DEFINER, search_path, yalnız fabrika_app); ölçüm rolü EXECUTE tutmuyor — davranış sondası atlandı`);
+    return { failures, checks };
+  }
+  await m.query('begin');
+  try {
+    await m.query(`select set_config('app.tenant_id', '', true), set_config('app.system_scope', 'off', true)`);
+    await m.query('savepoint probe_own_route');
+    let refused = false;
+    try {
+      await m.query(`select public.close_own_province_routes('billing', null::text)`);
+    } catch {
+      refused = true;
+    }
+    await m.query('rollback to savepoint probe_own_route');
+    if (!refused) failures.push('kendi-rota-kapanışı: app.tenant_id boşken çağrı REDDEDİLMEDİ');
+
+    await m.query(`select set_config('app.tenant_id', $1, true)`, [`rls-verify-${randomBytes(6).toString('hex')}`]);
+    const r = (
+      await m.query<{ closed: string[]; flag: string | null }>(
+        `select public.close_own_province_routes('billing', null::text) as closed, current_setting('app.system_scope', true) as flag`
+      )
+    ).rows[0];
+    if ((r?.closed ?? []).length > 0) failures.push(`kendi-rota-kapanışı: var olmayan kiracı için ${r?.closed.length} rota kapattı`);
+    const flag = (await m.query<{ flag: string | null }>(`select current_setting('app.system_scope', true) as flag`)).rows[0]?.flag;
+    if (flag === 'on') failures.push(`kendi-rota-kapanışı: dönüşte app.system_scope 'on' kaldı`);
+    if (refused && (r?.closed ?? []).length === 0 && flag !== 'on') {
+      checks.push(`kendi-rota-kapanışı: katalog doğru (DEFINER, search_path, yalnız fabrika_app); kiracısız çağrı reddedildi, yabancı kiracı 0 rota, bayrak kapalı`);
+    }
+  } finally {
+    await m.query('rollback');
+  }
+  return { failures, checks };
+}
+
+
 async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
@@ -1718,6 +1792,11 @@ async function main() {
       const seal = await probeSealBindsPurpose(measurer.client);
       failures.push(...seal.failures);
       checks.push(...seal.checks);
+    }
+    if (existing.has('ProvinceLeadRoute')) {
+      const ownRoute = await probeOwnRouteClose(client, measurer.client);
+      failures.push(...ownRoute.failures);
+      checks.push(...ownRoute.checks);
     }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);
