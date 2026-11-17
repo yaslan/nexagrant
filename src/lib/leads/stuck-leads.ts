@@ -18,7 +18,12 @@ import { publicLeadStuckAfterMinutes } from '@/lib/env';
  * `routeStatus = 'routed'` + `routedTenantId = A` while A holds neither a `LeadContact` nor a `Deal`
  * with `sourceRef = public-lead:<id>`: it is on no screen and in no tenant. This file only FINDS such
  * leads (admin list + a SystemAlert per lead). It does not re-route, copy, release or delete anything,
- * and it is not wired to `forwardPublicLead`.
+ * and it does not call `forwardPublicLead`.
+ *
+ * NG-212: the alert job also finds a lead whose transfer consent was recorded but that was NEVER routed
+ * (`routeStatus` NULL, no `routedTenantId`) past the same threshold: the form's bridge did not run, or
+ * threw before its claim, so the lead is in no tenant and on no worklist (the unmatched list holds only
+ * 'unmatched'). The admin "Stuck (no copy)" list stays routed-only: its rows name a routed tenant.
  *
  * Reads run in `withSystemScopeOn`: PublicLead is system_scope only (NG-175) and LeadContact / Deal
  * are tenant tables whose NOT EXISTS probe spans every tenant, so no single tenant exists to hand
@@ -46,15 +51,20 @@ export interface ListStuckRoutedLeadsOptions {
 
 interface StuckSqlRow {
   id: string;
-  routedTenantId: string;
+  /** Null only for a never-routed lead ({@link StuckScope} 'with-unrouted'). */
+  routedTenantId: string | null;
   routedAt: Date | null;
   createdAt: Date;
   organisation: string;
   province: string | null;
   tenantName: string | null;
   tenantDeleted: boolean;
+  neverRouted: boolean;
   total: bigint;
 }
+
+/** 'routed': routed, no copy (admin list). 'with-unrouted': also consented leads never routed (NG-212, the alert job). */
+type StuckScope = 'routed' | 'with-unrouted';
 
 /**
  * The NG-181 report query, oldest first. `(tenantId, sourceRef)` is unique on both tables, so each
@@ -67,23 +77,33 @@ async function queryStuck(
   tx: SystemTx,
   cutoff: Date,
   limit: number | null,
-  onlyIds: readonly string[] | null = null
+  onlyIds: readonly string[] | null = null,
+  scope: StuckScope = 'routed'
 ): Promise<StuckSqlRow[]> {
   const prefix = LEAD_INTAKE_SOURCE_REF_PREFIX;
+  const routedNoCopy = Prisma.sql`(pl."routeStatus" = 'routed'
+       AND pl."routedTenantId" IS NOT NULL
+       AND (pl."routedAt" IS NULL OR pl."routedAt" < ${cutoff})
+       AND NOT EXISTS (SELECT 1 FROM "LeadContact" c WHERE c."tenantId" = pl."routedTenantId" AND c."sourceRef" = ${prefix} || pl.id)
+       AND NOT EXISTS (SELECT 1 FROM "Deal" d WHERE d."tenantId" = pl."routedTenantId" AND d."sourceRef" = ${prefix} || pl.id))`;
+  // The forwardPublicLead consent gate (hasTransferConsent): literally true AND version AND time recorded.
+  const neverRouted = Prisma.sql`(pl."routeStatus" IS NULL
+       AND pl."routedTenantId" IS NULL
+       AND pl."transferConsent" = true
+       AND pl."transferConsentVersion" IS NOT NULL
+       AND pl."transferConsentAt" IS NOT NULL
+       AND pl."createdAt" < ${cutoff})`;
   return tx.$queryRaw<StuckSqlRow[]>`
     SELECT pl.id, pl."routedTenantId", pl."routedAt", pl."createdAt", pl.organisation, pl.province,
            t.name AS "tenantName",
            (t.id IS NULL OR t."deletedAt" IS NOT NULL) AS "tenantDeleted",
+           (pl."routeStatus" IS NULL) AS "neverRouted",
            COUNT(*) OVER () AS total
       FROM "PublicLead" pl
       LEFT JOIN "Tenant" t ON t.id = pl."routedTenantId"
-     WHERE pl."routeStatus" = 'routed'
-       AND pl."routedTenantId" IS NOT NULL
-       AND (pl."routedAt" IS NULL OR pl."routedAt" < ${cutoff})
-       AND NOT EXISTS (SELECT 1 FROM "LeadContact" c WHERE c."tenantId" = pl."routedTenantId" AND c."sourceRef" = ${prefix} || pl.id)
-       AND NOT EXISTS (SELECT 1 FROM "Deal" d WHERE d."tenantId" = pl."routedTenantId" AND d."sourceRef" = ${prefix} || pl.id)
+     WHERE ${scope === 'with-unrouted' ? Prisma.sql`(${routedNoCopy} OR ${neverRouted})` : routedNoCopy}
        ${onlyIds === null ? Prisma.empty : Prisma.sql`AND pl.id = ANY(${[...onlyIds]}::text[])`}
-     ORDER BY pl."routedAt" ASC NULLS FIRST, pl.id ASC
+     ORDER BY (CASE WHEN pl."routeStatus" = 'routed' THEN pl."routedAt" ELSE pl."createdAt" END) ASC NULLS FIRST, pl.id ASC
      ${limit === null ? Prisma.empty : Prisma.sql`LIMIT ${limit}`}`;
 }
 
@@ -115,8 +135,9 @@ export async function listStuckRoutedLeads(
   return {
     total: rows.length === 0 ? 0 : Number(rows[0]!.total),
     olderThanMinutes: minutes,
-    rows: rows.map(
-      (r): StuckRoutedLeadRow => ({
+    // 'routed' scope: the WHERE requires a routed tenant; the filter only narrows the type.
+    rows: rows.flatMap((r): StuckRoutedLeadRow[] =>
+      r.routedTenantId === null ? [] : [{
         publicLeadId: r.id,
         routedTenantId: r.routedTenantId,
         routedTenantName: r.tenantName,
@@ -125,7 +146,7 @@ export async function listStuckRoutedLeads(
         createdAt: r.createdAt,
         organisation: r.organisation,
         province: r.province,
-      })
+      }]
     ),
   };
 }
@@ -216,8 +237,8 @@ export async function alertStuckRoutedLeads(options: {
 
   // 2. The bounded scan, in one system-scope transaction.
   const { page, stillStuck } = await inStuckScope(db, 'cross-tenant-job', async (tx) => ({
-    page: await queryStuck(tx, cutoff, cap + alertedLeadIds.length + STUCK_SUMMARY_SAMPLE),
-    stillStuck: alertedLeadIds.length === 0 ? [] : await queryStuck(tx, cutoff, null, alertedLeadIds),
+    page: await queryStuck(tx, cutoff, cap + alertedLeadIds.length + STUCK_SUMMARY_SAMPLE, null, 'with-unrouted'),
+    stillStuck: alertedLeadIds.length === 0 ? [] : await queryStuck(tx, cutoff, null, alertedLeadIds, 'with-unrouted'),
   }));
   const total = page.length === 0 ? 0 : Number(page[0]!.total);
   const stillStuckIds = new Set(stillStuck.map((r) => r.id));
@@ -237,12 +258,15 @@ export async function alertStuckRoutedLeads(options: {
       {
         level: 'warn',
         source: STUCK_LEAD_ALERT_SOURCE,
-        message: `Routed public lead ${row.id} has no copy in its tenant after ${minutes} min. See Admin > Lead routes > Stuck (no copy).`,
+        message: row.neverRouted
+          ? `Public lead ${row.id} has a recorded transfer consent but was never routed after ${minutes} min (the form's bridge did not run or failed before its claim). See the 'public lead forward' log lines for that id.`
+          : `Routed public lead ${row.id} has no copy in its tenant after ${minutes} min. See Admin > Lead routes > Stuck (no copy).`,
         meta: {
           publicLeadId: row.id,
           olderThanMinutes: minutes,
           routedAt: row.routedAt?.toISOString() ?? null,
-          tenantDeleted: row.tenantDeleted,
+          tenantDeleted: row.neverRouted ? false : row.tenantDeleted,
+          ...(row.neverRouted ? { neverRouted: true } : {}),
         },
         dedupeKey: `${LEAD_INTAKE_SOURCE_REF_PREFIX}${row.id}`,
       },
@@ -262,7 +286,7 @@ export async function alertStuckRoutedLeads(options: {
   const [kept, ...extraSummaries] = summaries;
   if (overflow > 0) {
     const oldestLeadIds = stillUncovered.slice(0, STUCK_SUMMARY_SAMPLE);
-    const message = `${overflow} more routed public leads have no copy in their tenant after ${minutes} min (${total} stuck; per-lead alerts are capped at ${cap}). See Admin > Lead routes > Stuck (no copy).`;
+    const message = `${overflow} more public leads are stuck after ${minutes} min: routed with no copy in their tenant, or consented and never routed (${total} stuck; per-lead alerts are capped at ${cap}). See Admin > Lead routes > Stuck (no copy).`;
     const facts = { [SUMMARY_META_KEY]: true, count: overflow, stuckTotal: total, oldestLeadIds, olderThanMinutes: minutes, cap };
     if (kept) {
       const current = metaObject(kept.meta);
