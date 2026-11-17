@@ -196,6 +196,15 @@
     },
     {
       "check": "D",
+      "file": "src/app/[locale]/admin/modules/actions.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "NG-215 (SEC NG-205 D-1): updateTenantModuleStatus, after requirePlatformAdmin(). Only a write that leaves the tenant's M18 closed to its own people (isOpenToTenantMembers false: OFF, DEV or ON, directly or by an OFF cascade) runs here; every other flip stays plain withTenant. The tenant's ModuleState upserts and module.state.changed AuditEvents (all named by the tenantId argument) and deactivateRoutesOfClosedTarget (src/lib/leads/province-route.ts: that tenant's active ProvinceLeadRoute rows set inactive, one tenantId-NULL lead-route.deactivated AuditEvent each) share one transaction. ProvinceLeadRoute is RLS system_scope only, so a tenant scope reads 0 of its rows; without this the route stayed active and the transfer box kept naming a tenant whose forward is refused."
+    },
+    {
+      "check": "D",
       "file": "src/lib/k3-topic-stats/importer.ts",
       "subject": "system-scope:platform-admin",
       "count": 1,

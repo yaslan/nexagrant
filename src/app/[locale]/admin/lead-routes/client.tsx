@@ -16,6 +16,11 @@ export interface ProvinceView {
   changedBy: string | null;
   /** UTC timestamp of the last change, or null when never changed. */
   changedAt: string | null;
+  /**
+   * NG-215: an ACTIVE route whose target can no longer take leads (`isIntakeTarget` false, e.g. its
+   * M18 left PILOT). The form still names it to the visitor; the forward refuses. Flagged in the row.
+   */
+  targetIneligible: boolean;
 }
 
 export interface TenantOption {
@@ -118,7 +123,7 @@ function ProvinceRow({ view, tenants }: { view: ProvinceView; tenants: TenantOpt
   };
 
   return (
-    <tr className={`align-top ${unmapped ? 'bg-surface-hover' : ''}`}>
+    <tr className={`align-top ${unmapped || view.targetIneligible ? 'bg-surface-hover' : ''}`}>
       <th scope="row" className="px-3 py-2 font-semibold whitespace-nowrap">{view.province}</th>
       <td className="px-3 py-2">
         <select
@@ -136,6 +141,11 @@ function ProvinceRow({ view, tenants }: { view: ProvinceView; tenants: TenantOpt
       </td>
       <td className="px-3 py-2 whitespace-nowrap">
         <span className={unmapped ? 'font-semibold text-bad' : 'font-semibold text-ink'}>{statusLabel}</span>
+        {view.targetIneligible && (
+          <p data-testid="route-target-ineligible" className="mt-1 max-w-56 text-xs font-semibold whitespace-normal text-bad">
+            {t('target_ineligible', { tenant: view.tenantName ?? '' })}
+          </p>
+        )}
       </td>
       <td className="px-3 py-2 text-xs text-ink-2">
         {view.changedAt ? (

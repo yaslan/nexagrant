@@ -47,6 +47,12 @@ export interface ProvinceLeadRouteRow {
   /** Display name only (never the e-mail) of that admin; null when unset, unknown or nameless. */
   updatedByName: string | null;
   updatedAt: Date;
+  /**
+   * NG-215 (SEC NG-205 D-1): whether the target tenant can take a lead NOW (`isIntakeTarget`: still
+   * an eligible consultancy/agency AND its M18 open to its own people). False on an active row means
+   * the province shows a name the forward will refuse; the console flags it.
+   */
+  targetEligible: boolean;
 }
 
 /** One lead waiting in the platform-admin worklist. Contains the visitor's contact data. */

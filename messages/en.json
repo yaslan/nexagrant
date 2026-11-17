@@ -3661,6 +3661,7 @@
     "status_active": "Active",
     "status_inactive": "Inactive",
     "status_unmapped": "Unmapped",
+    "target_ineligible": "Warning: {tenant} can no longer take leads (M18 is not open or the organisation is not eligible). The form keeps showing this name; move the route to another organisation or deactivate it.",
     "select_label": "Consultancy for {province}",
     "select_placeholder": "Choose a consultancy",
     "save": "Save",

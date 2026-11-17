@@ -25,9 +25,15 @@ import {
 export const UNMATCHED_PAGE_DEFAULT = 50;
 export const UNMATCHED_PAGE_MAX = 200;
 
+/** The tenant columns `isIntakeTarget` reads, plus its M18 ModuleState row (none = OFF). */
+const targetSelect = {
+  orgType: true, kind: true, deletedAt: true,
+  moduleStates: { where: { moduleId: 'M18' }, select: { status: true }, take: 1 },
+} satisfies Prisma.TenantSelect;
+
 const routeSelect = {
   id: true, province: true, targetTenantId: true, active: true, updatedBy: true, updatedAt: true,
-  tenant: { select: { name: true, slug: true } },
+  tenant: { select: { name: true, slug: true, ...targetSelect } },
 } satisfies Prisma.ProvinceLeadRouteSelect;
 
 type RouteRecord = Prisma.ProvinceLeadRouteGetPayload<{ select: typeof routeSelect }>;
@@ -46,6 +52,7 @@ function toRow(r: RouteRecord, names: NameById): ProvinceLeadRouteRow {
   return {
     id: r.id, province: r.province, tenantId: r.targetTenantId, tenantName: r.tenant.name, tenantSlug: r.tenant.slug,
     active: r.active, updatedBy: r.updatedBy, updatedByName: r.updatedBy ? names.get(r.updatedBy) ?? null : null, updatedAt: r.updatedAt,
+    targetEligible: isIntakeTarget(r.tenant, r.tenant.moduleStates[0]?.status),
   };
 }
 
@@ -73,12 +80,6 @@ export async function listProvinceLeadRoutes(db: typeof prisma = prisma): Promis
     return rows.map((r) => toRow(r, names));
   });
 }
-
-/** The tenant columns `isIntakeTarget` reads, plus its M18 ModuleState row (none = OFF). */
-const targetSelect = {
-  orgType: true, kind: true, deletedAt: true,
-  moduleStates: { where: { moduleId: 'M18' }, select: { status: true }, take: 1 },
-} satisfies Prisma.TenantSelect;
 
 /**
  * Tenants a route may point at. The rule is `isIntakeTarget` itself (tenant row + M18 open to the
@@ -155,6 +156,40 @@ export async function deactivateProvinceLeadRoute(
     });
     return { ok: true, route: toRow(saved, await adminNames(tx, [saved])) };
   });
+}
+
+/**
+ * NG-215 (SEC NG-205 D-1): the province routes of a tenant that just stopped being an intake target
+ * because its M18 left the statuses open to its own people. Without this the route stayed active:
+ * the transfer box kept naming the tenant (`province_transfer_org_name`), the submit bound the consent
+ * to it (`province_transfer_org`) and the forward was refused. The SQL functions cannot see M18
+ * (ModuleState is FORCE RLS; ADR-0009), so the module write closes the route itself.
+ *
+ * Runs on the CALLER's transaction (the module-state write, under 'platform-admin' system scope), so
+ * the status change and the route change commit or roll back together. One `lead-route.deactivated`
+ * audit row per province, same shape as {@link deactivateProvinceLeadRoute} plus the cause.
+ * Returns the provinces closed (empty when the tenant had no active route).
+ */
+export async function deactivateRoutesOfClosedTarget(
+  tx: SystemTx,
+  tenantId: string,
+  cause: { moduleId: 'M18'; newStatus: string },
+  actorId: string
+): Promise<string[]> {
+  const active = await tx.provinceLeadRoute.findMany({ where: { targetTenantId: tenantId, active: true }, select: { id: true, province: true }, orderBy: { province: 'asc' } });
+  for (const r of active) {
+    await tx.provinceLeadRoute.update({ where: { id: r.id }, data: { active: false, updatedBy: actorId } });
+    await tx.auditEvent.create({
+      data: {
+        tenantId: null,
+        actorId,
+        type: PROVINCE_ROUTE_AUDIT.deactivated,
+        target: r.province,
+        data: { province: r.province, fromTenantId: tenantId, toTenantId: null, reason: 'module_closed', moduleId: cause.moduleId, newStatus: cause.newStatus },
+      },
+    });
+  }
+  return active.map((r) => r.province);
 }
 
 /** Consented leads that could not be forwarded, newest first. */
