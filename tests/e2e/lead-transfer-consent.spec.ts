@@ -5,6 +5,7 @@ import { prisma } from '../../src/lib/db';
 import { PUBLIC_LEAD_CONSENT, PUBLIC_LEAD_TRANSFER_CONSENT } from '../../src/lib/leads/public-lead-policy';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { presentIds, requireId } from '../helpers/teardown-guard';
+import { shotsDir } from './fixtures/shots';
 
 /**
  * TASK-MWG4H1YS5HQHC (NG-179) — the separate "transfer to the province's consultancy" box on the
@@ -15,11 +16,12 @@ import { presentIds, requireId } from '../helpers/teardown-guard';
  *   LEAD_TRANSFER_CONSENT_ENABLED=true   → scenarios a–d and the keyboard check
  *   LEAD_TRANSFER_CONSENT_ENABLED=false  → scenario e (box absent even for a mapped province)
  *
- * Evidence (screenshots + DB rows as JSON) is written to docs/agent-results/NG-179-evidence/.
+ * Evidence (screenshots + DB rows as JSON) is written to test-artifacts/NG-179-evidence/ (git-ignored).
+ * To publish it on purpose: E2E_SHOTS_ROOT=docs/agent-results (see tests/e2e/fixtures/shots.ts).
  */
 
 const FLAG_ON = process.env.LEAD_TRANSFER_CONSENT_ENABLED === 'true';
-const EVIDENCE = join(process.cwd(), 'docs/agent-results/NG-179-evidence');
+const EVIDENCE = shotsDir('NG-179-evidence');
 const RUN = Math.random().toString(36).slice(2, 8);
 const DOMAIN = `e2e-transfer-${RUN}.test`;
 const email = (who: string) => `${who}@${DOMAIN}`;
