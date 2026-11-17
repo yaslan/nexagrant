@@ -5,6 +5,9 @@ import type { TenantTx } from '@/lib/db';
 import { createLead, getLead, listLeads } from '@/modules/m18/server/leads-repo';
 import { createDeal, DealTransitionError, listDealsByStage, moveDealStage } from '@/modules/m18/server/deals-repo';
 import { createTask, listTasks, setTaskDone } from '@/modules/m18/server/tasks-repo';
+import { AUTO_TASK_RULES } from '@/modules/m18/server/pipeline-rules';
+import enMessages from '../../../messages/en.json';
+import trMessages from '../../../messages/tr.json';
 import { leadCreateSchema, leadListQuerySchema, stageMoveSchema, taskCreateSchema } from '@/modules/m18/server/schemas';
 
 const T = 'tenant-a';
@@ -102,6 +105,7 @@ describe('deals-repo', () => {
     const tx = {
       deal: { findFirst: vi.fn().mockResolvedValue({ id: 'd1', stage: 'NEW' }), update },
       dealActivity: { create: activityCreate },
+      dealTask: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn() },
     };
     const result = await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'QUALIFIED' }, 'u1');
     expect(result).toEqual({ id: 'd1', from: 'NEW', to: 'QUALIFIED' });
@@ -160,6 +164,25 @@ describe('deals-repo — auto tasks on entering a stage (NG-216)', () => {
     const tx = fakeTx('ELIGIBILITY_ANALYSIS', [{ autoRuleKey: 'proposal.send-quote' }, { autoRuleKey: null }]);
     await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, 'u1');
     expect(created(tx).map((r) => r.autoRuleKey)).toEqual(['proposal.follow-up']);
+  });
+
+  it('renders the task title in the acting user\'s locale, from m18.autoTasks', async () => {
+    const tr = fakeTx('ELIGIBILITY_ANALYSIS');
+    await moveDealStage(asTx(tr), T, { dealId: 'd1', to: 'PROPOSAL' }, 'u1', 'tr');
+    const en = fakeTx('ELIGIBILITY_ANALYSIS');
+    await moveDealStage(asTx(en), T, { dealId: 'd1', to: 'PROPOSAL' }, 'u1', 'en');
+    expect(created(tr)[0]?.title).toBe(trMessages.m18.autoTasks.proposal['send-quote']);
+    expect(created(en)[0]?.title).toBe(enMessages.m18.autoTasks.proposal['send-quote']);
+  });
+
+  it('every AUTO_TASK_RULES key has a title in both locales', () => {
+    const lookup = (m: Record<string, unknown>, key: string) =>
+      key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], m);
+    for (const rule of Object.values(AUTO_TASK_RULES).flat()) {
+      for (const messages of [trMessages, enMessages]) {
+        expect(typeof lookup(messages.m18.autoTasks, rule.ruleKey), rule.ruleKey).toBe('string');
+      }
+    }
   });
 
   it('writes no task for a refused move', async () => {

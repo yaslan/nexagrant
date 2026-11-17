@@ -5890,6 +5890,42 @@
         "BAD_ANSWER": "YZ yanıtı okunamadı. Tekrar deneyin.",
         "NO_CREDITS": "YZ krediniz yetersiz."
       }
+    },
+    "autoTasks": {
+      "new": {
+        "first-contact": "İlk iletişimi kur"
+      },
+      "qualified": {
+        "contact-decision-maker": "Karar vericiyle iletişime geç"
+      },
+      "contacted": {
+        "book-discovery-meeting": "Keşif toplantısı ayarla"
+      },
+      "discovery": {
+        "send-meeting-notes": "Toplantı notlarını gönder"
+      },
+      "eligibility": {
+        "check-call-rules": "Çağrı kurallarına uygunluğu kontrol et"
+      },
+      "proposal": {
+        "send-quote": "Teklifi gönder",
+        "follow-up": "Teklif için takip et"
+      },
+      "contract": {
+        "collect-signature": "Sözleşme imzasını al"
+      },
+      "application": {
+        "document-checklist": "Başvuru belge listesini hazırla"
+      },
+      "submitted": {
+        "record-reference": "Başvuru referans numarasını kaydet"
+      },
+      "won": {
+        "kickoff": "Başlangıç toplantısını planla"
+      },
+      "lost": {
+        "reengage": "Müşteriyle yeniden iletişime geç"
+      }
     }
   }
 }

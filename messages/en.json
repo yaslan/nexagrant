@@ -5890,6 +5890,42 @@
         "BAD_ANSWER": "The AI answer could not be read. Try again.",
         "NO_CREDITS": "Not enough AI credits."
       }
+    },
+    "autoTasks": {
+      "new": {
+        "first-contact": "Make the first contact"
+      },
+      "qualified": {
+        "contact-decision-maker": "Contact the decision maker"
+      },
+      "contacted": {
+        "book-discovery-meeting": "Book a discovery meeting"
+      },
+      "discovery": {
+        "send-meeting-notes": "Send the meeting notes"
+      },
+      "eligibility": {
+        "check-call-rules": "Check eligibility against the call rules"
+      },
+      "proposal": {
+        "send-quote": "Send the quote",
+        "follow-up": "Follow up on the quote"
+      },
+      "contract": {
+        "collect-signature": "Collect the contract signature"
+      },
+      "application": {
+        "document-checklist": "Prepare the application document checklist"
+      },
+      "submitted": {
+        "record-reference": "Record the application reference number"
+      },
+      "won": {
+        "kickoff": "Plan the kickoff meeting"
+      },
+      "lost": {
+        "reengage": "Re-engage the client"
+      }
     }
   }
 }
