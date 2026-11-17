@@ -131,9 +131,11 @@ export async function updateTenantModuleStatus(
       // rows. The module rows and the route rows must commit together, so this one write runs under
       // the platform-admin scope (requirePlatformAdmin above); every row it touches is named by
       // `tenantId`. Any other flip keeps the plain tenant scope.
+      // Routes first: deactivateRoutesOfClosedTarget locks the tenant row before anything else, the
+      // same first lock a concurrent route set takes (NG-215 SEC re-review, Bulgu 1).
       await withSystemScope('platform-admin', 'admin-modules.close-m18', async (tx) => {
-        await writeStates(tx);
         await deactivateRoutesOfClosedTarget(tx, tenantId, { moduleId: 'M18', newStatus: m18ClosedAt }, userId);
+        await writeStates(tx);
       });
     } else {
       await withTenant(tenantId, writeStates);

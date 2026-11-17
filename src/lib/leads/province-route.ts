@@ -93,6 +93,24 @@ export async function listIntakeTenantOptions(db: typeof prisma = prisma): Promi
   return tenants.filter((t) => isIntakeTarget(t, t.moduleStates[0]?.status)).map((t) => ({ id: t.id, name: t.name }));
 }
 
+/**
+ * NG-215 (SEC re-review, Bulgu 1): row locks on the given tenants, taken in id order. The route set
+ * and the M18 close both take them FIRST in their transaction: without them, under READ COMMITTED,
+ * a set could read M18 as PILOT while a close that had not committed yet wrote OFF, and the close
+ * could list the routes before the set's new route committed — both commit, M18 closed + route
+ * active. With them the later one waits and then reads the other's committed rows.
+ *
+ * The lock is on the Tenant row, not on ModuleState: the set reads M18 with a plain read (there may
+ * be no ModuleState row at all = OFF), and the close's ModuleState write comes after the route
+ * close. One `SELECT … FOR UPDATE` per id, parameterised, in sorted order, so two transactions that
+ * lock overlapping sets cannot wait on each other in a cycle.
+ */
+export async function lockTenantRows(tx: SystemTx, tenantIds: readonly string[]): Promise<void> {
+  for (const id of [...new Set(tenantIds)].sort()) {
+    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${id} FOR UPDATE`;
+  }
+}
+
 async function eligibleTenant(tx: SystemTx, tenantId: string): Promise<'ok' | 'tenant_not_found' | 'tenant_ineligible'> {
   const t = await tx.tenant.findFirst({ where: { id: tenantId }, select: targetSelect });
   if (!t) return 'tenant_not_found';
@@ -110,10 +128,22 @@ export async function setProvinceLeadRoute(
   if (typeof input.tenantId !== 'string' || input.tenantId.length === 0) return { ok: false, error: 'tenant_not_found' };
 
   return withSystemScopeOn(db, 'platform-admin', 'province-route.set', async (tx): Promise<ProvinceRouteResult> => {
+    // Lock the new target and the province's current one before reading either (see lockTenantRows):
+    // a concurrent M18 close of the new target then cannot miss this route, and one of the current
+    // target cannot close the row this set is about to move. The first read only names the tenant
+    // to lock; the row is read again under the locks.
+    const activeRow = () => tx.provinceLeadRoute.findFirst({ where: { province, active: true }, select: { id: true, targetTenantId: true } });
+    const seen = await activeRow();
+    const locked = [input.tenantId, ...(seen ? [seen.targetTenantId] : [])];
+    await lockTenantRows(tx, locked);
+
     const verdict = await eligibleTenant(tx, input.tenantId);
     if (verdict !== 'ok') return { ok: false, error: verdict };
 
-    const active = await tx.provinceLeadRoute.findFirst({ where: { province, active: true }, select: { id: true, targetTenantId: true } });
+    const active = await activeRow();
+    // Another set moved the province in between: lock that target too. It is out of id order, so
+    // in the worst case Postgres reports a deadlock and this transaction fails (nothing half-written).
+    if (active && !locked.includes(active.targetTenantId)) await lockTenantRows(tx, [active.targetTenantId]);
     if (active && active.targetTenantId === input.tenantId) {
       const same = await tx.provinceLeadRoute.findUniqueOrThrow({ where: { id: active.id }, select: routeSelect });
       return { ok: true, route: toRow(same, await adminNames(tx, [same])) };
@@ -166,7 +196,8 @@ export async function deactivateProvinceLeadRoute(
  * (ModuleState is FORCE RLS; ADR-0009), so the module write closes the route itself.
  *
  * Runs on the CALLER's transaction (the module-state write, under 'platform-admin' system scope), so
- * the status change and the route change commit or roll back together. One `lead-route.deactivated`
+ * the status change and the route change commit or roll back together. Call it BEFORE the
+ * ModuleState write: its tenant lock must be the transaction's first lock, as in the route set. One `lead-route.deactivated`
  * audit row per province, same shape as {@link deactivateProvinceLeadRoute} plus the cause.
  * Returns the provinces closed (empty when the tenant had no active route).
  */
@@ -176,6 +207,9 @@ export async function deactivateRoutesOfClosedTarget(
   cause: { moduleId: 'M18'; newStatus: string },
   actorId: string
 ): Promise<string[]> {
+  // First statement of the caller's transaction (see lockTenantRows): a route set for this tenant
+  // either committed before (its row is listed below) or waits and then reads M18 closed.
+  await lockTenantRows(tx, [tenantId]);
   const active = await tx.provinceLeadRoute.findMany({ where: { targetTenantId: tenantId, active: true }, select: { id: true, province: true }, orderBy: { province: 'asc' } });
   for (const r of active) {
     await tx.provinceLeadRoute.update({ where: { id: r.id }, data: { active: false, updatedBy: actorId } });
