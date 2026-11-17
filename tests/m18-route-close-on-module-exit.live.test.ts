@@ -46,7 +46,7 @@ import { createDbClient, prisma } from '@/lib/db';
 import { listProvinceLeadRoutes } from '@/lib/leads/province-route';
 import type { ModuleStatus } from '@/lib/modules/types';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { requireId } from './helpers/teardown-guard';
+import { presentIds, requireId } from './helpers/teardown-guard';
 
 const SUITE = 'm18 route close on module exit test';
 const admin = createDbClient(OWNER_URL ?? 'postgresql://localhost:5432/unset');
@@ -87,7 +87,8 @@ const routeAudits = (province: string) =>
 
 describe.skipIf(!HAS_DB)('M18 leaving PILOT closes the tenant\'s province routes (NG-215 / D-1)', () => {
   beforeAll(async () => {
-    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
+    // Leftovers of an earlier run of THIS file only (its tenants' slugs); a foreign active row fails the test loudly.
+    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES }, tenant: { slug: { startsWith: 'ng215-' } } } });
     const actor = await admin.user.create({ data: { email: `ng215-admin-${RUN}@example.test`, name: 'NG-215 admin', isPlatformAdmin: true } });
     ACTOR = actor.id;
     session.userId = actor.id;
@@ -103,7 +104,7 @@ describe.skipIf(!HAS_DB)('M18 leaving PILOT closes the tenant\'s province routes
 
   afterAll(async () => {
     await admin.auditEvent.deleteMany({ where: { actorId: requireId(ACTOR, 'ACTOR') } });
-    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
+    await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES }, targetTenantId: { in: presentIds([T.off, T.dev, T.on, T.stays, T.other]) } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
     await admin.user.deleteMany({ where: { id: requireId(ACTOR, 'ACTOR') } });
     await admin.$disconnect();
