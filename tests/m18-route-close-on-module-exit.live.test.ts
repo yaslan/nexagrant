@@ -46,6 +46,7 @@ import { createDbClient, prisma } from '@/lib/db';
 import { listProvinceLeadRoutes } from '@/lib/leads/province-route';
 import type { ModuleStatus } from '@/lib/modules/types';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { requireId } from './helpers/teardown-guard';
 
 const SUITE = 'm18 route close on module exit test';
 const admin = createDbClient(OWNER_URL ?? 'postgresql://localhost:5432/unset');
@@ -68,7 +69,8 @@ const CASES = {
   other: { province: 'Siirt', to: null },
 } as const satisfies Record<string, { province: string; to: ModuleStatus | null }>;
 type Case = keyof typeof CASES;
-const PROVINCES = Object.values(CASES).map((c) => c.province);
+/** The same five, as a literal: a teardown `where` must not be computed (tests/teardown-where-guard.test.ts). */
+const PROVINCES = ['Sivas', 'Yozgat', 'Niğde', 'Bitlis', 'Siirt'];
 const T = {} as Record<Case, string>;
 let ACTOR = '';
 
@@ -100,12 +102,16 @@ describe.skipIf(!HAS_DB)('M18 leaving PILOT closes the tenant\'s province routes
   });
 
   afterAll(async () => {
-    await admin.auditEvent.deleteMany({ where: { actorId: ACTOR } });
+    await admin.auditEvent.deleteMany({ where: { actorId: requireId(ACTOR, 'ACTOR') } });
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
-    await admin.user.deleteMany({ where: { id: ACTOR } });
+    await admin.user.deleteMany({ where: { id: requireId(ACTOR, 'ACTOR') } });
     await admin.$disconnect();
     await prisma.$disconnect();
+  });
+
+  test('the teardown list names exactly the provinces of the cases', () => {
+    expect([...PROVINCES].sort()).toEqual(Object.values(CASES).map((c) => c.province).sort());
   });
 
   test('before: every PILOT target is shown to the visitor and bound by the submit', async () => {
