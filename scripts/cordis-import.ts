@@ -4,8 +4,27 @@ import 'dotenv/config';
 import { runCordisImport } from '../src/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '../src/lib/k2-cordis/partnerProfileJob';
 
+const USAGE = `Usage: pnpm exec tsx scripts/cordis-import.ts [options]
+
+  --dataset=HORIZON|H2020  dataset to import (default HORIZON)
+  --local-zip=<path>       read this archive instead of downloading it
+  --limit=<n>              import only the first n projects (smoke run)
+  --dry-run                read and check the archive, write no CORDIS data
+  --help                   show this text
+
+--dry-run still writes one CordisImportRun row (SUCCESS, marked dryRun) and,
+when the archive changed, one RawFetch row; no project, organisation or
+participation. Neither a dry run nor a --limit run makes the next full run
+with the same archive skip as "Zaten güncel": only a full real run does.
+A run that fails keeps the batches it already wrote; rows are upserts, so
+re-running after the fix completes them.`;
+
 function parseArgs() {
   const args = process.argv.slice(2);
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(USAGE);
+    process.exit(0);
+  }
   let dataset: 'HORIZON' | 'H2020' = 'HORIZON';
   let limit: number | undefined;
   let dryRun = false;
@@ -36,7 +55,9 @@ async function main() {
   console.log(`🚀 Starting CORDIS Import Job...`);
   console.log(`   Dataset: ${options.dataset}`);
   console.log(`   Limit: ${options.limit || 'Unlimited'}`);
-  console.log(`   Dry Run: ${options.dryRun}`);
+  console.log(
+    `   Dry Run: ${options.dryRun}${options.dryRun ? ' (no CORDIS data; writes a CordisImportRun row marked dryRun)' : ''}`
+  );
   if (options.localZipPath) console.log(`   Local Zip: ${options.localZipPath}`);
 
   const res = await runCordisImport(options);

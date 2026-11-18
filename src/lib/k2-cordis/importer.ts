@@ -257,6 +257,37 @@ function assertSkipBudget(skips: CordisFileSkips[], maxSkippedRatio: number): vo
 }
 
 /**
+ * How many recent SUCCESS rows the "already imported?" check reads. Past this
+ * many dry or limited runs in a row the check finds no complete import and the
+ * run imports again: rows are upserts, so that costs time, not data.
+ */
+const HASH_CHECK_WINDOW = 20;
+
+/**
+ * The marks a SUCCESS row carries in `rowCounts` when the run did not write the
+ * whole archive: `dryRun: true` (nothing written) or `limit: N` (first N
+ * projects only). A full real run carries neither.
+ */
+function runScope(options: CordisImportOptions): { dryRun?: true; limit?: number } {
+  return {
+    ...(options.dryRun ? { dryRun: true as const } : {}),
+    ...(options.limit ? { limit: options.limit } : {}),
+  };
+}
+
+/**
+ * True when a SUCCESS row's `rowCounts` says the whole archive was written, so
+ * the same file need not be imported again. Rows without the marks (the
+ * worker's, and real runs before NG-224) count as complete; a limited run
+ * from before NG-224 carries no mark and cannot be told apart.
+ */
+export function isCompleteImport(rowCounts: unknown): boolean {
+  if (!rowCounts || typeof rowCounts !== 'object' || Array.isArray(rowCounts)) return true;
+  const marks = rowCounts as { dryRun?: unknown; limit?: unknown };
+  return marks.dryRun !== true && (marks.limit === undefined || marks.limit === null);
+}
+
+/**
  * Main ingestion function for CORDIS bulk ZIP datasets
  */
 export async function runCordisImport(options: CordisImportOptions): Promise<CordisImportResult> {
@@ -304,13 +335,19 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       },
     });
 
-    // Hash check: check if the last successful run used the same zip hash
+    // Hash check: did the last complete import of this dataset read the same
+    // zip? A dry run or a limited run ends as SUCCESS with the hash too, but
+    // wrote none or part of the data, so it must not count (NG-224).
     let latestSuccessRun: { fileHash: string | null } | null = null;
     try {
-      latestSuccessRun = await prisma.cordisImportRun.findFirst({
-        where: { dataset, status: 'SUCCESS' },
-        orderBy: { finishedAt: 'desc' },
-      });
+      const recent: Array<{ fileHash: string | null; rowCounts: unknown }> =
+        await prisma.cordisImportRun.findMany({
+          where: { dataset, status: 'SUCCESS' },
+          orderBy: { finishedAt: 'desc' },
+          take: HASH_CHECK_WINDOW,
+          select: { fileHash: true, rowCounts: true },
+        });
+      latestSuccessRun = recent.find((r) => isCompleteImport(r.rowCounts)) ?? null;
     } catch (_e) {
       // Ignore DB find error in dry-run/offline mode
     }
@@ -323,7 +360,10 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
             status: 'SUCCESS',
             finishedAt: new Date(),
             fileHash,
-            rowCounts: { message: 'Zaten güncel (File hash unchanged)' },
+            rowCounts: {
+              message: 'Zaten güncel (File hash unchanged)',
+              ...runScope(options),
+            },
           },
         });
       }
@@ -422,7 +462,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
                 topics: topics.length,
                 scivocs: scivocs.length,
                 skipped: skippedByFile(skips),
-                dryRun: true,
+                ...runScope(options),
               },
             },
           });
@@ -651,7 +691,7 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
           status: 'SUCCESS',
           finishedAt: new Date(),
           fileHash,
-          rowCounts: { ...rowCounts, skipped: skippedByFile(skips) },
+          rowCounts: { ...rowCounts, skipped: skippedByFile(skips), ...runScope(options) },
         },
       });
     }

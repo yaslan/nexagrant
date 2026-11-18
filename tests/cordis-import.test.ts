@@ -6,7 +6,7 @@ import {
   parseBigIntEur,
   mapOrganizationAndParticipationRow,
 } from '../src/lib/k2-cordis/cordisSchema';
-import { runCordisImport } from '../src/lib/k2-cordis/importer';
+import { isCompleteImport, runCordisImport } from '../src/lib/k2-cordis/importer';
 import { generatePartnerProfiles } from '../src/lib/k2-cordis/partnerProfileJob';
 
 import { recordRawFetch } from '../src/lib/k2-cordis/raw-fetch';
@@ -242,5 +242,16 @@ describe('K2 CORDIS Ingestion & M1 Partner Intelligence Engine', () => {
     const profileRes = await generatePartnerProfiles();
     expect(profileRes.success).toBe(true);
     expect(profileRes.updatedProfiles).toBeGreaterThan(0);
+  });
+});
+
+describe('isCompleteImport — which SUCCESS row the "Zaten güncel" check may trust (NG-224)', () => {
+  test('a full real run counts; a dry run and a limited run do not', () => {
+    expect(isCompleteImport({ projects: 3, skipped: {} })).toBe(true);
+    expect(isCompleteImport({ message: 'Zaten güncel (File hash unchanged)' })).toBe(true);
+    expect(isCompleteImport(null)).toBe(true);
+    expect(isCompleteImport({ projects: 3, dryRun: true })).toBe(false);
+    expect(isCompleteImport({ projects: 1, limit: 1 })).toBe(false);
+    expect(isCompleteImport({ message: 'Zaten güncel (File hash unchanged)', dryRun: true })).toBe(false);
   });
 });
