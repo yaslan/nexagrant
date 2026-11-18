@@ -10,10 +10,14 @@ import { NextResponse } from 'next/server';
 import { requireTenantApi } from '@/lib/tenant';
 import { logoKeyVisibleTo } from '@/lib/agency/cobrand-store';
 import { getObjectBytes } from '@/lib/storage';
+import { can, asRole } from '@/lib/rbac';
 
 export async function GET() {
   const result = await requireTenantApi();
   if (!result.ok) return result.response;
+  // NG-248 (K-584216): the same door as the shell (`view_tenant_branding`). A role without
+  // it gets 404, not 403, so the answer does not say whether the tenant has a logo at all.
+  if (!can(asRole(result.scope.role), 'view_tenant_branding')) return new NextResponse(null, { status: 404 });
 
   const key = await logoKeyVisibleTo(result.scope.tenantId);
   const bytes = key ? await getObjectBytes(key) : null;

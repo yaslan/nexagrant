@@ -94,7 +94,7 @@ rolündedir; ana bağlantının `fabrika_app`'e çevrilmesi ayrı bir iştir ve
 - Auth.js; parola argon2; 2FA (TOTP) faz 2; ~~SSO (SAML/OIDC) Kurumsal~~.
   - **karar 29.09.2026 (patron):** giriş yalnız Google OAuth; şifre ve e-posta bağlantısı yok (ADR-0006). Microsoft girişi kaldırıldı (`acc35b07`). **Kurumsal SSO / SAML tamamen kaldırıldı** — ayar yalnız `Tenant.settings.sso`'ya kaydediliyordu, girişte hiç kullanılmıyordu; kodda kaldırıldı (`0fdbcb8d`; kart TASK-MUML0QZAZ5M80 `done`). M9 takvimde Outlook kaldırıldı, yalnız Google Takvim + `.ics` (`15313bc6`). Yukarıdaki "parola argon2" satırı bu karardan eskidir.
 - Oturum JWT: `userId, tenantId, role, workspaceIds`; kiracı değiştirme yeni oturum.
-- `guest_partner`: yalnızca davet bağlantısı + e-posta doğrulama; kapsam tek `Proposal`.
+- `guest_partner`: yalnızca davet bağlantısı + e-posta doğrulama; kapsam tek `Proposal`. Misafir, bağlı ajansın ad ve logosunu (ajans co-brand'ı) görmez: kabuk ve logo uç noktası `view_tenant_branding` iznine bağlıdır (`src/lib/rbac.ts`, NG-248 / K-584216); beş kurum içi rol görür.
 
 ## 3. Veri koruma (KVKK + GDPR)
 - Veri envanteri (`docs/data-inventory.md` üretilecek): kişisel veri = kullanıcı hesabı, muhatap adı/e-postası (`Relationship`), toplantı notları.

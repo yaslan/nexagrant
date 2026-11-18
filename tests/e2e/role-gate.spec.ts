@@ -155,7 +155,8 @@ test.describe.serial('NG-64 page role gates', () => {
     for (const role of ['MEMBER', 'WRITER', 'PIPELINE_MANAGER', 'TENANT_ADMIN', 'TENANT_OWNER'] as const) {
       await signIn(page, role);
       await expectOpen(page, shell);
-      await expect(page.getByTestId('cobrand-text').first(), role).toHaveText(RG_COBRAND_NAME);
+      // The sentence reads "<ajans> iş birliğiyle": the name is part of it, not all of it.
+      await expect(page.getByTestId('cobrand-text').first(), role).toContainText(RG_COBRAND_NAME);
       expect((await page.request.get('/api/agency/cobrand-logo')).status(), `${role} logo`).toBe(200);
     }
   });
