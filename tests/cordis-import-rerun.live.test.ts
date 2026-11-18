@@ -35,8 +35,10 @@ vi.mock('@/lib/observability/system-alert', () => ({
   }),
 }));
 
-const { prisma } = await import('@/lib/db');
+const { createDbClient, prisma } = await import('@/lib/db');
 const { runCordisImport } = await import('@/lib/k2-cordis/importer');
+// Owner connection that builds fixtures, the second argument of usedDatabaseName (same DB as `prisma`).
+const admin = createDbClient(process.env.DATABASE_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 
 const RUN = `T224${Date.now().toString(36)}`;
 const like = `${RUN}%`;
@@ -139,7 +141,7 @@ beforeAll(async () => {
     skipOrFailInCi(SUITE, `database unreachable: ${(err as Error).message.split('\n')[0]}`);
     return;
   }
-  const dbName = await usedDatabaseName(prisma, prisma, SUITE);
+  const dbName = await usedDatabaseName(prisma, admin, SUITE);
   if (dbName === undefined) return;
   if (dbName === 'fabrika' && !isGithubActions()) {
     throw new Error(`${SUITE}: refusing to run on the shared "fabrika" database; point DATABASE_URL at a throwaway one`);
@@ -149,6 +151,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ready) await cleanup();
+  await admin.$disconnect();
 });
 
 describe(SUITE, () => {
