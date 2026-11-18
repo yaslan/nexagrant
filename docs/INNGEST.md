@@ -1,346 +1,130 @@
-# Inngest Integration — Fabrika Job Orchestration
+# Zamanlanmış işler — Fabrika iş orkestrasyonu (dosya adı eski: INNGEST)
 
-Inngest is the managed job orchestration backbone for Fabrika. It handles all scheduled tasks and background jobs across the MVP.
+> **Bu dosyanın adı tarihsel.** Inngest 29.09.2026'da kaldırıldı (ADR-0008, `5ed2261a`). Zamanlanmış işleri bugün
+> **graphile-worker** koşturur: Postgres üstünde, ayrı bir uzun yaşayan Node süreci (`pnpm jobs:worker`).
+> Kararın gerekçesi, deneme sonuçları ve dağıtım sırası: [`docs/adr/ADR-0008-own-job-queue-graphile-worker.md`](adr/ADR-0008-own-job-queue-graphile-worker.md).
+> Kurulum ve işletim adımları: [`INNGEST_SETUP.md`](INNGEST_SETUP.md).
+> Kaynak doğruluk: işlerin listesi ve takvimi `src/lib/jobs/schedule.ts` içindeki `SCHEDULE` tablosudur; bu belge onu kopyalamaz.
 
-## Setup
+## Nasıl çalışır
 
-### 1. Environment Variables
+- **Takvim:** `src/lib/jobs/schedule.ts` — cron ifadeleri UTC. Worker crontab'ını, görev listesini ve `job-queue-health`
+  kaçırılmış-tik kontrolünü bu tek tablodan türetir.
+- **Görevler:** `src/lib/jobs/tasks/<iş-adı>.ts`; kayıt `src/lib/jobs/tasks/index.ts`. Her görev `defineJob` ile sarılır
+  (`src/lib/jobs/define.ts`).
+- **Süreç:** `pnpm jobs:worker` (`scripts/jobs-worker.ts` → `startJobsWorker`, `src/lib/jobs/worker.ts`). Next.js sürecinden
+  bağımsızdır; HTTP ucu yoktur (`src/app/api/inngest` yok). Aynı veritabanına birden çok worker bağlanabilir: her cron tiki
+  toplamda bir kez alınır (`graphile_worker._private_known_crontabs`), işler `SKIP LOCKED` ile alınır, `queue` tanımlı iş
+  tüm worker'larda sırayla koşar.
+- **Tekrar deneme:** iş hata fırlatırsa kuyruk üstel bekleyle yeniden dener. Cron işlerinde `maxAttempts` çoğunlukla 5,
+  sık koşan bazılarında 3 (`schedule.ts`). Son denemede `defineJob` `source: job-queue` bir `SystemAlert` yazar.
+- **`{ success: false }` dönen iş hata sayılmaz:** `define.ts` bunu `DONE (reported failure)` diye loglar, yeniden
+  denemez. Bu işler kendi `SystemAlert`'lerini yazar (örn. `k2-monthly-cordis`, `alerts-sweep`).
+- **Kaçırılan tik:** `fill` penceresi içinde (iş başına `6h` ya da `1d`) geriye dönük koşturulur; tik zamanı
+  `payload._cron.ts` ile işe gelir, aylık işler "şimdi"nin değil tikin ayını işler (`monthOf`). Pencereyi aşan kesintiyi
+  `job-queue-health` (her saat :05 UTC) `job-queue:<iş>:missed-tick` alarmıyla bildirir. Sınırı ADR-0008 §9.3'te.
+- **Elle tetikleme:** `pnpm jobs:enqueue -- <iş-adı> [--period YYYY-MM] [--month YYYY-MM] [--payload JSON] [--force]`
+  (`scripts/jobs-enqueue.ts`); çalışan bir `pnpm jobs:worker` işi alır. Eski Inngest panosundaki "Run" düğmesinin ve
+  `agency/report.generate` olayının yerini bu alır.
+- **Cron anahtarı:** `JOBS_CRON_ENABLED` üretimde açıkça `true`/`false` olmalı, yoksa worker başlamaz (`src/lib/env.ts`).
 
-Add to `.env` (or `.env.local` for development):
+## İşler
 
-```bash
-INNGEST_API_KEY=           # From Inngest dashboard (https://app.inngest.com)
-INNGEST_SIGNING_KEY=       # For local development and production webhook signing
-SMTP_HOST=                 # Outgoing mail over our own SMTP (nodemailer); blank = no mail
-SMTP_PORT=587              # Full SMTP_* list in .env.example (Resend removed 29.09.2026, fe9fd31c)
-WORKER_URL=http://localhost:8000  # Python worker for CORDIS processing
-WORKER_TOKEN=              # Token for Python worker authentication
+Tam liste ve cron'lar: `SCHEDULE` (`src/lib/jobs/schedule.ts`). Aşağıdakiler bu belgenin eskiden ayrıntılı anlattığı
+işlerdir; takvimleri `schedule.ts`'ten alınmıştır. Her işin ayrıntısı kendi dosyasındadır.
 
-ALERTS_SWEEP_FAILURE_THRESHOLD=3   # Consecutive failed alerts-sweep runs before an error alert
-```
+| İş | Cron (UTC) | Görev dosyası | Not |
+|---|---|---|---|
+| `k1-daily-calls` | `0 2 * * *` | `tasks/k1-daily-calls.ts` | K1 çağrı toplama; elle: `pnpm jobs:k1` |
+| `k2-monthly-cordis` | `0 4 1 * *` | `tasks/k2-monthly-cordis.ts` | Python worker'ı çağırır — aşağıdaki K2 notuna bak; elle: `pnpm jobs:k2 -- --month YYYY-MM` |
+| `alerts-daily` | `0 8 * * *` | `tasks/alerts-daily.ts` | Kayıtlı arama e-postaları (SMTP, `src/lib/email/mailer.ts`) |
+| `credits-monthly-grant` | `0 6 1 * *` | `tasks/credits-monthly-grant.ts` | Aylık kredi; `(tenantId, grantPeriod)` benzersiz, aynı ay ikinci koşu satır eklemez (ADR-0008 §9.1) |
+| `m4-weekly-summary` | `0 9 * * 1` | `tasks/m4-weekly-summary.ts` | |
+| `feedback-weekly-digest` | `0 6 * * 1` | `tasks/feedback-weekly-digest.ts` | Aşağıda |
+| `alerts-sweep` | `15 4 * * *` | `tasks/alerts-sweep.ts` | Aşağıda; elle: `pnpm jobs:alerts-sweep` |
+| `agency-monthly-report` | `0 6 1 * *` | `tasks/agency-monthly-report.ts` | `queue: agency`; elle: `pnpm jobs:enqueue -- agency-monthly-report --period YYYY-MM` |
+| `job-queue-health` | `5 * * * *` | `tasks/job-queue-health.ts` | Kaçırılmış, tükenmiş, takılmış iş alarmı (ADR-0008 §9.3) |
 
-**Getting Inngest Credentials:**
-1. Create an account at https://app.inngest.com
-2. Create a new app "Fabrika" in the dashboard
-3. Copy the API Key and Signing Key
-4. For local development, use the signing key in `.env.local` (optional but recommended)
+### K2 notu (`k2-monthly-cordis`)
 
-### 2. Installation
+Aylık iş yalnız Python worker'ın `POST {WORKER_URL}/jobs/cordis?month=YYYY-MM` ucunu çağırır (`WORKER_URL`,
+`WORKER_TOKEN`). Gerçek CORDIS ZIP'ini indirip yazan kod ise `runCordisImport` (`src/lib/k2-cordis/importer.ts`); o ayrı
+bir yoldur (`scripts/cordis-import.ts`, yönetici eylemi) ve bu aylık işe bağlı **değildir**. `CORDIS_WORKER_ALLOW_MOCK`
+açık değilken worker'da gerçek kaynak olmadığı için koşu hata verir (`workers/cordis/main.py`). Yani aylık işin
+zamanlanmış olması, CORDIS verisinin her ay yenilendiği anlamına gelmez; aylık işi `runCordisImport`'a bağlama işi
+NG-225'tir ve bu belge yazılırken yapılmamıştır.
 
-Inngest is already in `package.json`. Install dependencies:
-
-```bash
-pnpm install
-```
-
-### 3. Verify Setup
-
-Start the dev server and check:
-
-```bash
-pnpm dev
-# Inngest handler should respond at POST http://localhost:3000/api/inngest with 200 OK
-curl -X POST http://localhost:3000/api/inngest -H "Content-Type: application/json" -d '{"test":true}'
-```
-
-Visit [Inngest Dashboard](https://app.inngest.com) → Your App → Functions to see all 5 scheduled jobs registered.
-
-## Job Schemas
-
-All jobs are defined in `src/lib/inngest/jobs/` directory.
-
-### 1. K1 Daily Calls (`k1-daily-calls`)
-
-**Schedule:** Daily at 2 AM UTC  
-**Purpose:** Fetch and normalize new funding calls from SEDIA, Eurostars, and TÜBİTAK
-
-**What it does:**
-- Calls `SediaAdapter`, `EurostarsAdapter`, `TubitakAdapter` to fetch latest calls
-- Normalizes topics into database
-- Returns count of inserted topics
-
-**Expected result:**
-```json
-{
-  "success": true,
-  "totalProcessed": 150,
-  "inserted": 142,
-  "sediaCount": 80,
-  "eurostarsCount": 45,
-  "tubitakCount": 25
-}
-```
-
-### 2. K2 Monthly CORDIS (`k2-monthly-cordis`)
-
-**Schedule:** 1st of each month at 4 AM UTC  
-**Purpose:** Trigger Python worker to fetch and process CORDIS datasets
-
-**What it does:**
-- Makes HTTP POST to Python worker at `WORKER_URL/jobs/cordis`
-- Worker downloads HE + H2020 CSV datasets
-- Processes via DuckDB and Parquet transformations
-- Upserts into `Organization`, `Project`, `Participation` tables
-- Computes graph metrics (degree, eigenvector centrality)
-
-**Expected result:**
-```json
-{
-  "success": true,
-  "message": "CORDIS pipeline triggered successfully",
-  "workerResponse": { ... }
-}
-```
-
-### 3. Alerts Daily (`alerts-daily`)
-
-**Schedule:** Daily at 8 AM UTC  
-**Purpose:** Send saved search email alerts to subscribed users
-
-**What it does:**
-- Fetches all `SavedSearch` records with `notify: true`
-- For each search, finds tenant owner email
-- Sends email over our own SMTP (`src/lib/email/mailer.ts`) with matching opportunities
-- Updates `lastRunAt` timestamp
-
-**Expected result:**
-```json
-{
-  "success": true,
-  "totalSearches": 25,
-  "emailsSent": 20,
-  "emailsFailed": 0
-}
-```
-
-**Note:** User timezone handling is currently at 8 AM UTC. For true user timezone delivery, the application layer should adjust this per tenant.
-
-### 4. Credits Monthly Grant (`credits-monthly-grant`)
-
-**Schedule:** 1st of each month at 6 AM UTC  
-**Purpose:** Grant AI credits to active tenants based on plan entitlements
-
-**What it does:**
-- Fetches all tenants
-- Looks up `aiCreditsMonthly` from plan entitlements via `getEntitlements(tenantId)`
-- Creates `CreditLedger` entry with reason `'monthly_grant'`
-- Logs failures per tenant
-
-**Expected result:**
-```json
-{
-  "success": true,
-  "totalTenants": 50,
-  "grantedCount": 47,
-  "failedCount": 3,
-  "totalCreditsGranted": 2350
-}
-```
-
-### 5. M4 Weekly Summary (`m4-weekly-summary`)
-
-**Schedule:** Monday at 9 AM UTC  
-**Purpose:** Send relationship management summaries and pending actions to focal points
-
-**What it does:**
-- Fetches relationships with `nextStepDue` within the next 7 days
-- Groups by focal point (tenant + user)
-- Counts pending actions per focal point
-- (In production, would send email notification)
-
-**Expected result:**
-```json
-{
-  "success": true,
-  "totalPendingActions": 42,
-  "focalPointsNotified": 18,
-  "groupedCount": 18
-}
-```
-
-### 7. `feedback-weekly-digest` — E11.2 beta feedback digest
+### `feedback-weekly-digest` — E11.2 beta geri bildirim özeti
 
 | | |
 |---|---|
-| **Trigger** | Cron `0 6 * * 1` (Mondays 06:00 UTC) |
-| **Reads** | `Feedback` (last 7 days + everything still open), `Tenant` (names) |
-| **Sends** | One HTML digest to `FEEDBACK_DIGEST_TO` over our own SMTP (`SMTP_*`) |
-| **Output** | `{ newCount, openCount, overdueCount, byPriority, emailStatus }` |
+| **Tetik** | Cron `0 6 * * 1` (pazartesi 06:00 UTC) |
+| **Okur** | `Feedback` (son 7 gün + hâlâ açık olan hepsi), `Tenant` (adlar) |
+| **Gönderir** | `FEEDBACK_DIGEST_TO` adresine tek HTML özet, kendi SMTP'miz (`SMTP_*`) üzerinden |
+| **Çıktı** | `{ newCount, openCount, overdueCount, byPriority, emailStatus }` |
 
-The report covers two windows on purpose: reports filed in the last seven days, **and** every
-still-open report past its response-time budget regardless of age — a P0 that has been sitting
-for three weeks is exactly what a weekly digest is for.
-
-Delivery is best effort. With no recipient the job still runs and still returns the counts,
-reporting `emailStatus: "skipped"` with a named reason, so the numbers are visible in the run
-history before email is wired up. With a recipient but no `SMTP_HOST` the digest is not sent: in
-production that is `emailStatus: "failed"` plus a `SystemAlert` (source `mail`), elsewhere
-`"skipped"` (since `fe9fd31c`, when Resend was replaced by SMTP).
-
-The logic lives in `src/lib/feedback/digest-run.ts`, not in the job — so it can be run by hand:
+Rapor bilerek iki pencereyi kapsar: son yedi günde açılanlar **ve** yaşına bakmadan yanıt süresini aşmış açık olanlar.
+Gönderim en iyi çabadır: alıcı yoksa iş yine koşar ve `emailStatus: "skipped"` döner; alıcı var, `SMTP_HOST` yoksa
+üretimde `emailStatus: "failed"` + `source: mail` bir `SystemAlert`, başka yerde `"skipped"`. Mantık
+`src/lib/feedback/digest-run.ts`'te durur, elle koşulabilir:
 
 ```bash
-pnpm tsx scripts/run-feedback-digest.ts                     # render + print, no send
-pnpm tsx scripts/run-feedback-digest.ts --out digest.html   # render to a file
+pnpm tsx scripts/run-feedback-digest.ts                     # üret + yazdır, gönderme
+pnpm tsx scripts/run-feedback-digest.ts --out digest.html   # dosyaya yaz
 pnpm tsx scripts/run-feedback-digest.ts --send --to ops@example.org
 ```
 
-### 8. Alerts Sweep (`alerts-sweep`) — stale-alert sweeper + its own health
+### `alerts-sweep` — sahipsiz uyarı süpürücüsü ve kendi sağlığı
 
 | | |
 |---|---|
-| **Trigger** | Cron `15 4 * * *` (04:15 UTC — between K2's 04:00 and alerts-daily's 08:00) |
-| **Reads** | `SystemAlert` (open rows older than 1 h), `Tenant` |
-| **Writes** | `resolvedAt` on alerts naming a tenant that no longer exists |
-| **Output** | `{ success, scanned, closed }` |
+| **Tetik** | Cron `15 4 * * *` |
+| **Okur** | `SystemAlert` (1 saatten eski açık satırlar), `Tenant` |
+| **Yazar** | Silinmiş kiracıyı adlandıran uyarılarda `resolvedAt` |
+| **Çıktı** | `{ success, scanned, closed }` |
 
-Closes open alerts whose `meta.tenantId` names a deleted tenant — rows no operator can ever act
-on, which `pnpm alerts:check` treats as invalid by definition. It never deletes a row and never
-touches an alert whose tenant still exists. The one-hour age floor keeps it from closing a leak
-that the gate is supposed to fail on in the same CI run.
+`meta.tenantId`'si silinmiş bir kiracıyı gösteren açık uyarıları kapatır; satır silmez, kiracısı duran uyarıya dokunmaz.
+**Kendi hatası görünür.** İş fırlatmaz, `{ success: false }` döner; kuyruk bunu başarısız saymaz ve yeniden denemez
+(`define.ts`). Bu yüzden sağlığını kendi bakımını yaptığı tabloda tutar; operatör `/admin/alerts` altında
+`alerts-sweep` kaynağında görür:
 
-**Its own failures are visible (TASK-MTVRC1UGA3B6Y).** The job never throws, so Inngest marks
-even a failed run SUCCEEDED; before this it wrote `success: false` to a console line and nothing
-else. It now records its health in the table it maintains, and an operator reads it at
-`/admin/alerts` under source `alerts-sweep`:
-
-| Row | Level | When |
+| Satır | Seviye | Ne zaman |
 |---|---|---|
-| `Orphan-alert sweep did not complete` | `info` | Every failed run. Repeats **fold into this one row**; the `×N` badge is the consecutive-failure count. |
-| `Orphan-alert sweep has failed N or more consecutive runs` | `error` | Once the count reaches `ALERTS_SWEEP_FAILURE_THRESHOLD` (default 3). |
+| `Orphan-alert sweep did not complete` | `info` | Her başarısız koşu. Tekrarlar bu tek satırda birleşir; `×N` ardışık hata sayısıdır. |
+| `Orphan-alert sweep has failed N or more consecutive runs` | `error` | Sayı `ALERTS_SWEEP_FAILURE_THRESHOLD`'a (varsayılan 3) ulaşınca. |
 
-A successful run resolves both, so a single transient failure self-heals and never pages anyone.
-`meta` carries the failing stage (`scan` / `tenant-lookup` / `close`) and the error's *class*
-only — never the driver's message, which can carry the connection string and `SystemAlert` has
-no RLS policy. The full message stays in the job log.
+Başarılı koşu ikisini de çözer. `meta` hatanın aşamasını (`scan` / `tenant-lookup` / `close`) ve hata *sınıfını* taşır,
+sürücü mesajını taşımaz (bağlantı dizesi sızabilir; `SystemAlert`'te RLS yok). Tam mesaj worker logunda kalır.
 
-Run it by hand with `pnpm jobs:alerts-sweep`.
+## Test
 
-## Testing
+`src/lib/jobs/tasks/__tests__/` altında iş başına birim testler var (örn. `cron-tenant-scope.test.ts`,
+`alerts-daily.test.ts`). `pnpm test` hepsini koşar; tek dosya için `pnpm test -- src/lib/jobs`.
 
-### Run Unit Tests
+## Çok kiracılılık
 
-```bash
-pnpm test -- inngest
-# or specifically for job schemas:
-pnpm test -- inngest-jobs
-```
+İşler Fabrika sunucu bağlamında koşar, tek bir kiracı bağlamında değil. Kiracıları açıkça listeleyin ve her sorguda
+`tenantId` kullanın; kiracılar arası okuma gereken yerde `withSystemScope` kullanılır (ADR-0008 §2, `alerts-daily`).
+Ayrıntı için ilgili görev dosyasına ve `src/lib/jobs/tasks/__tests__/cron-tenant-scope.test.ts`'e bakın.
 
-Tests verify:
-- Each job function is properly defined
-- Job IDs are unique
-- Cron triggers match expected schedules
+## İzleme ve hata ayıklama
 
-### Manual Trigger (Dashboard)
+- **Log:** `pnpm jobs:worker` sürecinin çıktısı (`[<iş>] START/DONE/FAIL job=… attempt=…/… tick=…`).
+- **Uyarılar:** `SystemAlert` `source: job-queue` (tükenmiş, kaçırılmış tik, takılmış iş, `cron-disabled`).
+- **Kuyruk tablosu:** `graphile_worker._private_jobs` (başarısız iş `last_error` ile kalır),
+  `graphile_worker._private_known_crontabs` (`last_execution`).
 
-1. Go to [Inngest Dashboard](https://app.inngest.com)
-2. Select your app
-3. Go to Functions
-4. Find the job (e.g., `k1-daily-calls`)
-5. Click "Run" button
-6. Verify result in the function detail view
+| Belirti | Olası neden | Çözüm |
+|---|---|---|
+| Hiçbir cron koşmuyor | Cron'lu worker yok ya da hepsi `JOBS_CRON_ENABLED=false` | Worker'ı `JOBS_CRON_ENABLED=true` ile başlat. Bu durumda `job-queue-health` de koşmadığı için alarm yazılmaz (ADR-0008 §9.3 "Sınır") |
+| Üretim worker'ı başlamıyor | `JOBS_CRON_ENABLED` tanımsız | `true` ya da `false` yaz (`JobsCronUnsetInProductionError`) |
+| K2 çağrısı hata veriyor | Python worker'a ulaşılamıyor ya da gerçek kaynak yok | `WORKER_URL`/`WORKER_TOKEN`'ı kontrol et; K2 notuna bak |
+| Mail gitmiyor (alerts, digest) | `SMTP_HOST` boş ya da sunucu reddediyor | `.env`'de `SMTP_*` doldur (yerelde Mailpit `localhost:1025`); üretimde boşsa `source: mail` uyarısı yazılır |
+| `alerts-sweep` konsolda hata uyarısı | Süpürücü `ALERTS_SWEEP_FAILURE_THRESHOLD` kez art arda başarısız | `info` satırındaki `meta.stage`'e, sonra worker logundaki tam mesaja bak |
+| İş "Run" ile tetiklenmek isteniyor | Pano yok | `pnpm jobs:enqueue -- <iş-adı>` |
 
-### Local Development with Inngest Dev Server
+## Referanslar
 
-(Optional) Run Inngest dev server for local testing:
-
-```bash
-# Install Inngest CLI (one-time)
-npm install -g inngest
-
-# Run dev server in another terminal
-inngest dev --api-key=<your-key>
-
-# Then start your Next.js app
-pnpm dev
-```
-
-The dev server shows real-time job executions in your terminal.
-
-## Job Architecture
-
-### Directory Structure
-
-```
-src/lib/inngest/
-├── client.ts              # Inngest client singleton
-├── jobs/
-│   ├── index.ts          # Exports all jobs
-│   ├── k1-daily-calls.ts
-│   ├── k2-monthly-cordis.ts
-│   ├── alerts-daily.ts
-│   ├── credits-monthly-grant.ts
-│   └── m4-weekly-summary.ts
-src/app/api/inngest/
-└── route.ts              # Next.js handler
-```
-
-### Inngest Handler
-
-The `/api/inngest` route serves as the webhook endpoint:
-- Receives scheduled events from Inngest cloud
-- Routes to appropriate job function
-- Returns structured results
-
-```typescript
-// POST /api/inngest — handles all job executions
-export const { GET, POST, PUT } = serve({
-  client: inngest,
-  functions: [k1DailyCalls, k2MonthlyCordis, alertsDaily, creditsMonthlyGrant, m4WeeklySummary],
-});
-```
-
-### Multi-Tenant Considerations
-
-**Important:** All jobs run in the context of Fabrika server, not individual tenants. When accessing tenant data:
-- Fetch tenants explicitly: `prisma.tenant.findMany()`
-- Don't use `withTenant()` wrapper (that's for request-scoped auth)
-- Always respect RLS by checking `tenantId` in your queries
-- Log tenant ID for traceability
-
-Example:
-```typescript
-const tenants = await prisma.tenant.findMany();
-for (const tenant of tenants) {
-  // Do work per tenant
-  await prisma.creditLedger.create({
-    data: { tenantId: tenant.id, ... }
-  });
-}
-```
-
-## Monitoring & Debugging
-
-### Logs
-
-Job execution logs appear in:
-1. **Inngest Dashboard** → Functions → Job Name → Recent Runs
-2. **Application Console** (dev mode)
-3. **Cloudwatch/Sentry** (production)
-
-### Common Issues
-
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| `Error 401` from Inngest | Missing/invalid `INNGEST_API_KEY` | Check dashboard, regenerate if needed |
-| Job not running | Server offline or not registered | Verify `pnpm dev` running, check dashboard registration |
-| Worker call fails (K2) | Python worker unreachable | Check `WORKER_URL`, ensure worker is running |
-| Mail not sent (Alerts, digest) | `SMTP_HOST` blank, or the SMTP server refuses | Fill `SMTP_*` in `.env` (production: the organisation's mail account, chosen by the owner; locally Mailpit `localhost:1025`). With `SMTP_HOST` blank, production writes a `SystemAlert` with source `mail` |
-| RLS errors in job | Using wrong query context | Ensure queries include explicit `tenantId` |
-| `alerts-sweep` error alert on the console | The sweep has failed `ALERTS_SWEEP_FAILURE_THRESHOLD` runs in a row | Read `meta.stage` on the `info` row, then the job log for the full driver message |
-
-## Roadmap
-
-- **MVP (current):** 5 scheduled jobs, no real K1/K2/email calls (schema only)
-- **E4 (K1 v1):** Real SEDIA/Eurostars/TÜBİTAK calls (add API error handling, SystemAlert on failure)
-- **E6 (K2 v1):** Real CORDIS zip download, DuckDB transform, Postgres upsert
-- **E4 (Alerts v1):** Real saved search diff computation, email sending
-- **Roadmap:** Manual trigger UI in Admin Console, job replay, execution history per tenant
-
-## References
-
-- Inngest Docs: https://inngest.com/docs
-- Inngest Next.js Guide: https://inngest.com/docs/sdk/next
-- Inngest CLI: https://inngest.com/docs/cli
-- Project Architecture: `docs/ARCHITECTURE.md` (K1–K6 layers, modules)
-- Billing & Entitlements: `docs/BILLING.md` (credit grants, plan tiers)
+- ADR-0008 (karar, deneme, dağıtım sırası, kaçırılmış-tik alarmı): `docs/adr/ADR-0008-own-job-queue-graphile-worker.md`
+- Takvim: `src/lib/jobs/schedule.ts` · sarmalayıcı: `src/lib/jobs/define.ts` · worker: `src/lib/jobs/worker.ts`
+- Mimari: `docs/ARCHITECTURE.md` · Faturalama ve kredi: `docs/BILLING.md`

@@ -576,7 +576,7 @@ başına tekillik güvencesini kaldırır — ödeme alan bir ortamda koşulmaz)
 
 `SavedSearch` modeli ve `tenant_isolation` RLS politikası zaten şemadaydı, ama depoda hiçbir
 yazıcısı yoktu: `/calls` sayfasındaki "Aramayı Kaydet" düğmesi `setTimeout(500)` + toast'tı ve
-`src/lib/inngest/jobs/alerts-daily.ts`'in her 08:00 UTC'de okuduğu `notify: true` sorgusu bu
+`src/lib/jobs/tasks/alerts-daily.ts`'in her 08:00 UTC'de okuduğu `notify: true` sorgusu bu
 yüzden üretimde her zaman boş dönüyordu (bkz. `docs/agent-results/TASK-MTRNQN0NNVBYM-blog-yazar.md`).
 Bu görev gerçek yazıcıyı ekledi; tablo/RLS **değişmedi**, migration yok.
 
@@ -1018,8 +1018,8 @@ ve okunur; sorguda ayrıca `tenantId = ajans` koşulu vardır. Başka bir ajans�
 404 döner.
 
 **Tekrar.** Aynı `(tenantId, type, target)` zaten varsa koşu yeni satır yazmaz. Bunu tekil
-indeks değil, uygulama kontrolü sağlar (şema kilidi). Inngest işlevi `concurrency: 1` ile
-çalışır.
+indeks değil, uygulama kontrolü sağlar (şema kilidi). `agency-monthly-report` işi graphile-worker'da `queue: agency` ile tek tek koşar (eski Inngest
+`concurrency: 1`'in karşılığı; `src/lib/jobs/schedule.ts`).
 
 **Saklama.** `AuditEvent` için süre sınırı ve budama kodu yok (§7); satırlar kalıcıdır.
 İleride bir budama işi yazılırsa `agency.report.generated` satırlarını ya dışarıda bırakmalı ya da
