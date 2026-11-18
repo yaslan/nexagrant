@@ -204,6 +204,53 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     });
   }, 180_000);
 
+  /**
+   * NG-191 (SEC NG-185 low finding): the expert_directory policy kept NG-52's qual but changed its
+   * role list (`TO <app role>`) or its permissive flag (`AS RESTRICTIVE`), and rls:verify had to
+   * say so. Since NG-188 there is no named exception left (SYSTEM_SCOPE_ALLOWED_EXTRA is empty and
+   * rls.sql drops the policy), so the same two mutations are drift by name, whatever their roles
+   * or flag. The qual is NG-52's, verbatim from rls.sql before NG-188, so a real reader would see
+   * directory rows through it: committed DDL that opens rows, hence MUTATION_SKIP (NG-206) and
+   * EXPERT_DIRECTORY_POLICY_LOCK like the view mutations above, and dropped in finally.
+   */
+  const NG52_EXPERT_DIRECTORY_QUAL = `(SELECT coalesce(current_setting('app.system_scope', true) = 'on', false)
+                 AND coalesce(current_setting('app.system_scope_purpose', true), '') = 'expert-directory'
+                 AND public.system_scope_sealed())
+         AND status = 'verified'
+         AND "visibilityConsentAt" IS NOT NULL`;
+  const EXPERT_DIRECTORY_BACK =
+    'ExpertPreRegistration: politika kümesi {expert_directory, system_scope}, beklenen tam {system_scope} — fazla: expert_directory (SELECT)';
+
+  async function rlsVerifyWithExpertDirectory(clauses: string): Promise<{ status: number | null; out: string }> {
+    return withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
+      try {
+        await admin.query(`create policy expert_directory on "ExpertPreRegistration" ${clauses} using (${NG52_EXPERT_DIRECTORY_QUAL})`);
+        return rlsVerify();
+      } finally {
+        await admin.query(`drop policy if exists expert_directory on "ExpertPreRegistration"`);
+      }
+    });
+  }
+
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when expert_directory comes back with its qual, granted to the app role (NG-191)', async () => {
+    // TO <the measured app role>: the sealed 'expert-directory' scope reads the base table again,
+    // personal-data columns included — the catalogue check and the behaviour probe both say so.
+    // The app role is read from the server on the RLS connection (select current_user), not parsed from the URL.
+    const appConn = new pg.Client({ connectionString: RLS_URL!, connectionTimeoutMillis: 3000 });
+    await appConn.connect();
+    const appRole = await appConn.query<{ role: string }>('select current_user as role').finally(() => appConn.end()).then((r) => r.rows[0]!.role);
+    const { status, out } = await rlsVerifyWithExpertDirectory(`for select to ${appRole}`);
+    expect(status, out.slice(-2000)).toBe(1);
+    expect(out).toContain(EXPERT_DIRECTORY_BACK);
+    expect(out).toMatch(/expert-directory: ExpertPreRegistration [1-9]\d* satır okunuyor/);
+  }, 180_000);
+
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when expert_directory comes back with its qual, AS RESTRICTIVE (NG-191)', async () => {
+    const { status, out } = await rlsVerifyWithExpertDirectory('as restrictive for select');
+    expect(status, out.slice(-2000)).toBe(1);
+    expect(out).toContain(EXPERT_DIRECTORY_BACK);
+  }, 180_000);
+
   it('the NG-183 block of prisma/rls.sql drops stray policies on system_scope tables only', async () => {
     await admin.query(`create policy ${STRAY} on "PublicLead" for select to pg_monitor using (true)`);
     await admin.query(`create policy ${STRAY} on "ProvinceLeadRoute" to pg_monitor using (true) with check (true)`);
