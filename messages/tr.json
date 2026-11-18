@@ -1045,7 +1045,8 @@
       "contact": "İletişim",
       "residencyBadge": "● GDPR Uyumlu",
       "dataResidency": "🇹🇷 Veritabanı Türkiye'de barındırılır",
-      "moduleCatalog": "Modül Kataloğu"
+      "moduleCatalog": "Modül Kataloğu",
+      "cookiePolicy": "Çerez Politikası"
     },
     "metaTitle": "{brand} — AB Finansman Platformu (Horizon Europe, Eurostars)",
     "metaDescription": "{brand}: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
@@ -1755,13 +1756,49 @@
     },
     "cookieConsent": {
       "title": "Çerez Tercihleri",
-      "description": "Sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. \"Tümünü Kabul Et\" seçerseniz, ürün iyileştirmesi için analitik çerezleri (PostHog) de kullanırız. Üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
+      "description": "Sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. Analitik ve pazarlama çerezleri siz açmadıkça kapalıdır; \"Tercihleri yönet\" ile tek tek seçebilirsiniz. Üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
       "privacyLink": "Gizlilik Bildirimi",
       "acceptAll": "Tümünü Kabul Et",
       "essentialOnly": "Gerekli Çerezler",
       "preferencesLink": "Çerez tercihleri",
-      "currentAll": "Şu anki seçiminiz: tüm çerezler kabul edildi. \"Gerekli Çerezler\" seçerseniz analitik onayınız geri alınır ve analitik verileri bu tarayıcıdan silinir.",
-      "currentEssential": "Şu anki seçiminiz: yalnızca gerekli çerezler."
+      "currentAll": "Şu anki seçiminiz: tüm çerezler kabul edildi. \"Gerekli Çerezler\" seçerseniz onayınız geri alınır ve analitik verileri bu tarayıcıdan silinir.",
+      "currentEssential": "Şu anki seçiminiz: yalnızca gerekli çerezler.",
+      "manage": "Tercihleri yönet",
+      "save": "Seçimimi kaydet",
+      "panelTitle": "Çerez tercihlerini yönet",
+      "panelIntro": "Zorunlu çerezler her zaman açıktır. Diğerleri siz açmadıkça kapalı kalır ve seçiminizi istediğiniz zaman değiştirebilirsiniz.",
+      "cookiePolicyLink": "Çerez Politikası",
+      "alwaysOn": "Her zaman açık",
+      "statusOn": "Açık",
+      "statusOff": "Kapalı",
+      "currentCustom": "Şu anki seçiminiz: kategori bazında özel seçim. Değiştirmek için \"Tercihleri yönet\".",
+      "categories": {
+        "necessary": {
+          "name": "Zorunlu",
+          "description": "Oturum, dil ve tema tercihi, sepet ve bu çerez seçiminin kaydı. Bunlar olmadan site çalışmaz."
+        },
+        "analytics": {
+          "name": "Analitik",
+          "description": "Ürünü iyileştirmek için anonim kullanım ölçümü (PostHog, AB sunucusu). Yalnızca açarsanız yüklenir."
+        },
+        "marketing": {
+          "name": "Pazarlama",
+          "description": "Reklam ve yeniden hedefleme pikselleri. Şu anda hiçbiri kullanılmıyor; eklenirse yalnızca açarsanız yüklenir."
+        }
+      }
+    },
+    "draft": {
+      "badge": "Taslak — hukuk onayı bekliyor",
+      "body": "Bu metin henüz hukuk incelemesinden geçmedi ve değişebilir."
+    },
+    "cookies": {
+      "metaTitle": "Çerez Politikası — {brand}",
+      "metaDescription": "{brand} sitesinde kullanılan çerez kategorileri ve tercihlerinizi nasıl değiştireceğiniz.",
+      "heading": "Çerez Politikası",
+      "placeholder": "Çerez politikasının metni hukuk ekibince hazırlanıyor. Bu sayfa o zamana kadar yalnızca sitenin kullandığı çerez kategorilerini listeler.",
+      "categoriesHeading": "Çerez kategorileri",
+      "changeHeading": "Tercihinizi değiştirme",
+      "changeBody": "Seçiminizi istediğiniz zaman değiştirebilir ya da geri alabilirsiniz. Her değişiklik yeni bir rıza kaydı olarak saklanır."
     }
   },
   "feedback": {

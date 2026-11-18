@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { PRODUCT_NAME } from '@/lib/brand';
+import LegalDraftNotice from '@/components/LegalDraftNotice';
 
 /**
  * Legal pages get shared publicly, so they carry their own title, description
@@ -58,6 +59,7 @@ export default async function TermsPage({
   return (
     <main id="main" className="flex-1">
       <div className="max-w-4xl mx-edge sm:mx-auto py-12 px-4 sm:px-6 bg-surface border rounded-xl my-8">
+        <LegalDraftNotice locale={locale} />
         <h1 className="text-3xl font-bold font-heading mb-6 text-ink">
           {t('heading')}
         </h1>
