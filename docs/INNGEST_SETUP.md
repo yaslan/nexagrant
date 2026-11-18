@@ -40,9 +40,11 @@ pnpm jobs:enqueue -- <iş-adı> --force     # önceki elle eklenen iş kalıcı 
 ## İzleme ve uyarılar
 
 - Worker logu (`[<iş>] START/DONE/FAIL …`).
-- `SystemAlert` `source: job-queue`: tükenmiş iş, kaçırılmış tik, takılmış iş, `JOBS_CRON_ENABLED=false` ile kalkan üretim
-  worker'ı. Bunları `job-queue-health` (her saat :05 UTC) yazar; sınırı: hiçbir cron'lu worker koşmuyorsa o da koşmaz
-  (ADR-0008 §9.3).
+- `SystemAlert` `source: job-queue`, kaynağa göre:
+  - `missed-tick` ve `stuck`: `job-queue-health` yazar (her saat :05 UTC; `src/lib/jobs/tasks/job-queue-health.ts:50,69`).
+  - `exhausted`: önce `defineJob` son denemede yazar (`src/lib/jobs/define.ts:59-68`); `job-queue-health` aynı `dedupeKey` ile yedek olarak yazar (`job-queue-health.ts:60`).
+  - `cron-disabled`: `job-queue-health` DEĞİL, worker kendisi yazar; açılışta bir kez ve yalnız `NODE_ENV=production` iken (`src/lib/jobs/worker.ts:36-47`).
+  - `JOBS_CRON_ENABLED=false` iken crontab boştur (`worker.ts:34`); `job-queue-health` o worker'da hiç koşmaz. Hiçbir cron'lu worker yoksa saatlik kontrol de koşmaz (ADR-0008 §9.3), `cron-disabled` alarmı saatlik beklenmemeli, açılışta yazılır.
 - Dışarıdan kalp atışı kontrolü (`job-queue-health` satırının `last_execution` değeri 70 dakikadan eskiyse alarm) ADR-0008
   §9.3'te önerildi ve o yazıldığı sırada **yoktu**.
 

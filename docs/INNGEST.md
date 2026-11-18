@@ -20,7 +20,7 @@
   sık koşan bazılarında 3 (`schedule.ts`). Son denemede `defineJob` `source: job-queue` bir `SystemAlert` yazar.
 - **`{ success: false }` dönen iş hata sayılmaz:** `define.ts` bunu `DONE (reported failure)` diye loglar, yeniden
   denemez. Bu işler kendi `SystemAlert`'lerini yazar (örn. `k2-monthly-cordis`, `alerts-sweep`).
-- **Kaçırılan tik:** `fill` penceresi içinde (iş başına `6h` ya da `1d`) geriye dönük koşturulur; tik zamanı
+- **Kaçırılan tik:** `fill` penceresi içinde (iş başına `6h` ya da `1d`) geriye dönük koşturulur. `fill`'i olmayan işler (`job-queue-health`, `alerts-ops-digest`, `m17-stale-runs`, `public-lead-stuck`, `notification-email-instant`; `schedule.ts`) kaçan tiki geriye dönük koşmaz; tik zamanı
   `payload._cron.ts` ile işe gelir, aylık işler "şimdi"nin değil tikin ayını işler (`monthOf`). Pencereyi aşan kesintiyi
   `job-queue-health` (her saat :05 UTC) `job-queue:<iş>:missed-tick` alarmıyla bildirir. Sınırı ADR-0008 §9.3'te.
 - **Elle tetikleme:** `pnpm jobs:enqueue -- <iş-adı> [--period YYYY-MM] [--month YYYY-MM] [--payload JSON] [--force]`
@@ -35,11 +35,11 @@ işlerdir; takvimleri `schedule.ts`'ten alınmıştır. Her işin ayrıntısı k
 
 | İş | Cron (UTC) | Görev dosyası | Not |
 |---|---|---|---|
-| `k1-daily-calls` | `0 2 * * *` | `tasks/k1-daily-calls.ts` | K1 çağrı toplama; elle: `pnpm jobs:k1` |
+| `k1-daily-calls` | `0 2 * * *` | `tasks/k1-daily-calls.ts` | K1 çağrı toplama (Sedia, Eurostars, Tübitak adaptörleri); elle: `pnpm jobs:k1` |
 | `k2-monthly-cordis` | `0 4 1 * *` | `tasks/k2-monthly-cordis.ts` | Python worker'ı çağırır — aşağıdaki K2 notuna bak; elle: `pnpm jobs:k2 -- --month YYYY-MM` |
-| `alerts-daily` | `0 8 * * *` | `tasks/alerts-daily.ts` | Kayıtlı arama e-postaları (SMTP, `src/lib/email/mailer.ts`) |
-| `credits-monthly-grant` | `0 6 1 * *` | `tasks/credits-monthly-grant.ts` | Aylık kredi; `(tenantId, grantPeriod)` benzersiz, aynı ay ikinci koşu satır eklemez (ADR-0008 §9.1) |
-| `m4-weekly-summary` | `0 9 * * 1` | `tasks/m4-weekly-summary.ts` | |
+| `alerts-daily` | `0 8 * * *` | `tasks/alerts-daily.ts` | Kayıtlı arama e-postaları (SMTP, `src/lib/email/mailer.ts`); gönderim sabit 08:00 UTC, kiracı/kullanıcı saat dilimine göre değil (`alerts-daily.ts`'te saat dilimi işleme yok) |
+| `credits-monthly-grant` | `0 6 1 * *` | `tasks/credits-monthly-grant.ts` | Aylık kredi (`CreditLedger`, `reason: 'monthly_grant'`); `(tenantId, grantPeriod)` benzersiz, aynı ay ikinci koşu satır eklemez (ADR-0008 §9.1) |
+| `m4-weekly-summary` | `0 9 * * 1` | `tasks/m4-weekly-summary.ts` | `nextStepDue`'u önümüzdeki 7 gün içinde olan ilişkiler (`m4-weekly-summary.ts:87-94`) |
 | `feedback-weekly-digest` | `0 6 * * 1` | `tasks/feedback-weekly-digest.ts` | Aşağıda |
 | `alerts-sweep` | `15 4 * * *` | `tasks/alerts-sweep.ts` | Aşağıda; elle: `pnpm jobs:alerts-sweep` |
 | `agency-monthly-report` | `0 6 1 * *` | `tasks/agency-monthly-report.ts` | `queue: agency`; elle: `pnpm jobs:enqueue -- agency-monthly-report --period YYYY-MM` |
@@ -49,7 +49,7 @@ işlerdir; takvimleri `schedule.ts`'ten alınmıştır. Her işin ayrıntısı k
 
 Aylık iş yalnız Python worker'ın `POST {WORKER_URL}/jobs/cordis?month=YYYY-MM` ucunu çağırır (`WORKER_URL`,
 `WORKER_TOKEN`). Gerçek CORDIS ZIP'ini indirip yazan kod ise `runCordisImport` (`src/lib/k2-cordis/importer.ts`); o ayrı
-bir yoldur (`scripts/cordis-import.ts`, yönetici eylemi) ve bu aylık işe bağlı **değildir**. `CORDIS_WORKER_ALLOW_MOCK`
+bir yoldur (`scripts/cordis-import.ts`, yönetici eylemi, `POST /api/admin/cordis/import` — `src/app/api/admin/cordis/import/route.ts`) ve bu aylık işe bağlı **değildir**. `CORDIS_WORKER_ALLOW_MOCK`
 açık değilken worker'da gerçek kaynak olmadığı için koşu hata verir (`workers/cordis/main.py`). Yani aylık işin
 zamanlanmış olması, CORDIS verisinin her ay yenilendiği anlamına gelmez; aylık işi `runCordisImport`'a bağlama işi
 NG-225'tir ve bu belge yazılırken yapılmamıştır.
@@ -83,8 +83,8 @@ pnpm tsx scripts/run-feedback-digest.ts --send --to ops@example.org
 | **Yazar** | Silinmiş kiracıyı adlandıran uyarılarda `resolvedAt` |
 | **Çıktı** | `{ success, scanned, closed }` |
 
-`meta.tenantId`'si silinmiş bir kiracıyı gösteren açık uyarıları kapatır; satır silmez, kiracısı duran uyarıya dokunmaz.
-**Kendi hatası görünür.** İş fırlatmaz, `{ success: false }` döner; kuyruk bunu başarısız saymaz ve yeniden denemez
+`meta.tenantId`'si silinmiş bir kiracıyı gösteren açık uyarıları kapatır (`SystemAlert`'in `Tenant`'a FK'si yok, `pnpm alerts:check` bunları geçersiz sayar); satır silmez, kiracısı duran uyarıya dokunmaz.
+1 saatlik yaş tabanı bilerek konmuştur: `pnpm alerts:check` `pnpm gate`'in sonunda koşar, aynı koşunun bıraktığı sızıntıyı süpürücü kapatıp kapıya yeşil vermesin (`alerts-sweep.ts`, `MIN_AGE_MS`). **Kendi hatası görünür.** İş fırlatmaz, `{ success: false }` döner; kuyruk bunu başarısız saymaz ve yeniden denemez
 (`define.ts`). Bu yüzden sağlığını kendi bakımını yaptığı tabloda tutar; operatör `/admin/alerts` altında
 `alerts-sweep` kaynağında görür:
 
