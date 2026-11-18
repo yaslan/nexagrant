@@ -9,8 +9,10 @@ import { presentIds, requireId } from '../../helpers/teardown-guard';
  *
  *   none    — no NgSubscription row: the reader falls back to the fallback plan.
  *   running — a real `ng-trial` row, TRIALING, ending in the future.
- *   ended   — a real `ng-trial` row whose end has passed and that was never settled:
- *             the reader must show it ended and on its end plan.
+ *   ended   — a real `ng-trial` row whose end has passed and was settled on a later day
+ *             (trialEndedAt ≠ trialEndsAt), written the way settleTrial writes it: on the end
+ *             plan, ACTIVE. The never-settled path (trialEndedAt null) is covered by
+ *             src/lib/billing/nexagrant/trial.test.ts, not by this e2e.
  *
  * The trial plan and end plan are read from `NgTrialPolicy` (segment `default`), the
  * same data the registration flow uses — not typed here. Rows are created in
@@ -136,11 +138,14 @@ export async function setupNgPlanTenants(now = new Date()): Promise<Record<'runn
       await tx.ngSubscription.deleteMany({ where: { tenantId: requireId(f.tenantId, 'ng11 tenantId') } });
       const row = state === 'running' ? running : state === 'ended' ? ended : null;
       if (row) {
+        // A row with a settle day is what `settleTrial` writes (repository.ts): already on the end
+        // plan, ACTIVE, trialEndedAt set. A row without one is still TRIALING on the trial plan.
+        const settled = row.trialEndedAt !== null;
         await tx.ngSubscription.create({
           data: {
             tenantId: f.tenantId,
-            planId: row.planId,
-            status: 'TRIALING',
+            planId: settled ? row.trialEndPlanId : row.planId,
+            status: settled ? 'ACTIVE' : 'TRIALING',
             provider: 'ng-trial',
             trialSegment: 'default',
             trialStartedAt: row.trialStartedAt,
