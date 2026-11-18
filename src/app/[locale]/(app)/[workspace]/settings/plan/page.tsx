@@ -5,6 +5,8 @@ import { PRODUCT_NAME } from '@/lib/brand';
 import { getPublicRoute } from '@/lib/routes';
 import { getNgCatalogView } from '@/lib/billing/nexagrant/catalog-view';
 import { getNgBillingStateAction } from '@/lib/billing/nexagrant/actions';
+import { NG_PLAN_VIEW_ACTION } from '@/lib/billing/nexagrant/access';
+import { requireTenantPageRole } from '@/lib/page-role';
 import type { NgBillingStateView, NgCatalogView } from '@/lib/billing/nexagrant/view';
 import { loadErrorOf, sortPlans, type NgLoadError } from './plan-view-model';
 import { PlanCatalog } from './PlanCatalog';
@@ -21,7 +23,9 @@ import { PlanLoadError } from './PlanLoadError';
  * their own catalogue (`NgPlan*`, K-584182 = A), and payment, invoices and VAT are not
  * part of this phase.
  *
- * Read-only for every role: the state action is `requireTenantAction({ readOnly: true })`.
+ * Read-only, and closed to every role but TENANT_OWNER (NG_PLAN_VIEW_ACTION, decision
+ * K-584303 = A): the page door refuses other roles with the 403 screen before any read, and the
+ * state action carries the same `can`, so a direct call gets nothing either (NG-11 B1).
  * The trial changes with the clock, so the page is never cached.
  */
 export const dynamic = 'force-dynamic';
@@ -52,6 +56,10 @@ export default async function NgPlanSettingsPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'ngPlan' });
+
+  // Role door (NG-11 B1, K-584303 = A): the trial and the plan are the tenant's commercial data,
+  // so only the role NG_PLAN_VIEW_ACTION names gets past this line; others get the 403 screen.
+  await requireTenantPageRole(locale, NG_PLAN_VIEW_ACTION);
 
   const [catalog, state] = await Promise.all([
     load<NgCatalogView>('catalogue', getNgCatalogView),

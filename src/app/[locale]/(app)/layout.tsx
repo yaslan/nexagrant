@@ -15,6 +15,7 @@ import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-sto
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
 import { can, asRole } from '@/lib/rbac';
+import { NG_PLAN_VIEW_ACTION } from '@/lib/billing/nexagrant/access';
 import { hiddenNavKeysFor } from '@/lib/roles/nav-permissions';
 import { listModuleNav, requestSession, type ModuleNavState } from '@/lib/modules/access';
 import { logger } from '@/lib/logger';
@@ -95,6 +96,8 @@ export default async function AppLayout({
 
   const canManageModules = can(asRole(roleName), 'manage_modules');
   const canManageUsers = can(asRole(roleName), 'manage_users');
+  // NG-11: the plan and trial link, decided by the same permission as the screen (access.ts).
+  const canViewNgPlan = can(asRole(roleName), NG_PLAN_VIEW_ACTION);
   const hiddenNavKeys = hiddenNavKeysFor(asRole(roleName));
   // What the sidebar, the opportunity tabs and the cross-links may offer. Same decision
   // as each page's `moduleGate`, read once here; the pages still gate themselves.
@@ -129,6 +132,7 @@ export default async function AppLayout({
         isPlatformAdmin={isPlatformAdmin}
         canManageModules={canManageModules}
         canManageUsers={canManageUsers}
+        canViewNgPlan={canViewNgPlan}
         hiddenNavKeys={hiddenNavKeys}
         workspaces={workspaces}
         cobrand={cobrand}
@@ -165,6 +169,7 @@ export default async function AppLayout({
               workspaces={workspaces}
               canManageModules={canManageModules}
               canManageUsers={canManageUsers}
+              canViewNgPlan={canViewNgPlan}
             hideApiKeys={hiddenNavKeys.includes('apiKeys')}
             />
           </div>

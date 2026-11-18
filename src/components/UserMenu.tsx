@@ -59,6 +59,8 @@ interface UserMenuProps {
   workspaces?: UserMenuWorkspace[];
   canManageModules?: boolean;
   canManageUsers?: boolean;
+  /** NG_PLAN_VIEW_ACTION (NG-11): the plan and trial link is shown to this role only. Server answer. */
+  canViewNgPlan?: boolean;
   /** The sidebar's `apiKeys` rule, same server answer: `hiddenNavKeysFor`. */
   hideApiKeys?: boolean;
 }
@@ -73,6 +75,7 @@ export default function UserMenu({
   workspaces = [],
   canManageModules = false,
   canManageUsers = false,
+  canViewNgPlan = false,
   hideApiKeys = false,
 }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -466,16 +469,18 @@ export default function UserMenu({
                 </span>
               </Link>
 
-              {/* NG-11: the NexaGrant plan and trial — read-only, every role. */}
-              <Link
-                href={getWorkspaceRoute('settingsPlan', locale, routeWorkspace ?? undefined)}
-                onClick={() => setIsOpen(false)}
-                data-testid="user-menu-plan-link"
-                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
-              >
-                <BadgeCheck className="w-4 h-4 text-muted" />
-                <span>{tNav('planAndTrial')}</span>
-              </Link>
+              {/* NG-11: the NexaGrant plan and trial. Shown only to the role the screen admits (server prop). */}
+              {canViewNgPlan && (
+                <Link
+                  href={getWorkspaceRoute('settingsPlan', locale, routeWorkspace ?? undefined)}
+                  onClick={() => setIsOpen(false)}
+                  data-testid="user-menu-plan-link"
+                  className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+                >
+                  <BadgeCheck className="w-4 h-4 text-muted" />
+                  <span>{tNav('planAndTrial')}</span>
+                </Link>
+              )}
 
               {canManageUsers && (
                 <Link

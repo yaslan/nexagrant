@@ -239,15 +239,10 @@ test.describe('NG-11 plan and trial screen', () => {
 
   test('the plan screen is TENANT_OWNER only: a MEMBER and a GUEST_PARTNER get 403 and no subscription data', async ({ page }) => {
     const row = trials.running;
-    const endTier = catalogue.find((p) => p.id === row.trialEndPlanId)!.tier;
-    // What the owner sees on this tenant: any of it in a refused response is a leak.
-    const secrets = [
-      row.trialEndsAt.toISOString(),
-      localDate(row.trialEndsAt, 'tr'),
-      row.planId,
-      row.trialEndPlanId,
-      tierName('tr', endTier),
-    ];
+    // What the owner sees on this tenant: any of it in a refused response is a leak. Tier names
+    // are left out on purpose: the root layout ships the whole message bundle (static UI text,
+    // "Ücretsiz Kontrol" included) to every page, so a name in the HTML proves nothing.
+    const secrets = [row.trialEndsAt.toISOString(), localDate(row.trialEndsAt, 'tr'), row.planId, row.trialEndPlanId];
     for (const role of Object.keys(NG_PLAN_REFUSED_SEATS) as NgPlanRefusedRole[]) {
       const seat = NG_PLAN_REFUSED_SEATS[role];
       const f = ngPlanFixture('running');
