@@ -167,4 +167,78 @@ test.describe('province → consultancy mapping (Admin > Lead routing)', () => {
     await expect(leadRow(page)).toContainText('Developing');
     await page.screenshot({ path: `${SHOTS}/03-en-after-reload.png`, fullPage: true });
   });
+
+  /** Sets the consultancy's M18 status directly (fixture), as another writer would. */
+  const setM18 = (status: 'OFF' | 'PILOT') =>
+    withSystemScope('platform-admin', 'e2e.lead-routes.m18', (tx) =>
+      tx.moduleState.update({ where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M18' } }, data: { status } })
+    );
+
+  test('NG-215 TR: switching M18 OFF on the module console closes the province route in the same write', async ({ page }) => {
+    await resetSamsunRoute();
+    await withSystemScope('platform-admin', 'e2e.lead-routes.ng215-setup', (tx) =>
+      tx.provinceLeadRoute.create({ data: { province: PROVINCE, targetTenantId: TENANT_ID, active: true, updatedBy: ADMIN.userId } })
+    );
+    try {
+      await signInAdmin(page);
+      await page.goto('/tr/admin/modules');
+      const picker = page.locator('select').first();
+      await expectHydrated(picker);
+      await picker.selectOption({ label: `${TENANT_NAME} (${TENANT_ID})` });
+      const m18Card = page.locator('div').filter({ has: page.getByText('M18', { exact: true }) })
+        .filter({ has: page.getByRole('button', { name: 'OFF', exact: true }) }).last();
+      await m18Card.getByRole('button', { name: 'OFF', exact: true }).click();
+      await expect.poll(async () =>
+        (await withSystemScope('platform-admin', 'e2e.lead-routes.ng215-poll', (tx) =>
+          tx.moduleState.findUnique({ where: { tenantId_moduleId: { tenantId: TENANT_ID, moduleId: 'M18' } }, select: { status: true } })
+        ))?.status
+      ).toBe('OFF');
+
+      const route = await withSystemScope('platform-admin', 'e2e.lead-routes.ng215-check', async (tx) => ({
+        active: await tx.provinceLeadRoute.count({ where: { province: PROVINCE, active: true } }),
+        audit: await tx.auditEvent.count({ where: { type: 'lead-route.deactivated', target: PROVINCE, actorId: ADMIN.userId } }),
+      }));
+      expect(route).toEqual({ active: 0, audit: 1 });
+
+      await page.goto('/tr/admin/lead-routes');
+      await expectHydrated(page.getByLabel(`${PROVINCE} için danışmanlık kuruluşu`));
+      await expect(provinceRow(page)).toContainText('Pasif');
+      await expect(provinceRow(page).getByTestId('route-target-ineligible')).toHaveCount(0);
+      await provinceRow(page).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${SHOTS}/05-tr-ng215-route-closed-by-m18-off.png` });
+    } finally {
+      await setM18('PILOT');
+    }
+  });
+
+  test('NG-215 TR + EN: an active route whose target can no longer take leads is flagged', async ({ page }) => {
+    await resetSamsunRoute();
+    await withSystemScope('platform-admin', 'e2e.lead-routes.ng215-leftover', (tx) =>
+      tx.provinceLeadRoute.create({ data: { province: PROVINCE, targetTenantId: TENANT_ID, active: true, updatedBy: ADMIN.userId } })
+    );
+    // Left behind by a writer other than the admin console (e.g. the tenant's own settings).
+    await setM18('OFF');
+    try {
+      await signInAdmin(page);
+      await page.goto('/tr/admin/lead-routes');
+      await expectHydrated(page.getByLabel(`${PROVINCE} için danışmanlık kuruluşu`));
+      await expect(provinceRow(page)).toContainText('Aktif');
+      await expect(provinceRow(page).getByTestId('route-target-ineligible')).toHaveText(
+        `Uyarı: ${TENANT_NAME} artık aday alamıyor (M18 açık değil ya da kuruluş uygun değil). Form bu adı göstermeye devam eder; rotayı başka kuruluşa taşıyın ya da pasifleştirin.`
+      );
+      await provinceRow(page).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${SHOTS}/06-tr-ng215-target-ineligible-warning.png` });
+
+      await page.goto('/en/admin/lead-routes');
+      await expectHydrated(page.getByLabel(`Consultancy for ${PROVINCE}`));
+      await expect(provinceRow(page).getByTestId('route-target-ineligible')).toHaveText(
+        `Warning: ${TENANT_NAME} can no longer take leads (M18 is not open or the organisation is not eligible). The form keeps showing this name; move the route to another organisation or deactivate it.`
+      );
+      await provinceRow(page).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${SHOTS}/07-en-ng215-target-ineligible-warning.png` });
+    } finally {
+      await setM18('PILOT');
+    }
+  });
 });
+

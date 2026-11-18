@@ -3661,6 +3661,7 @@
     "status_active": "Aktif",
     "status_inactive": "Pasif",
     "status_unmapped": "Eşlenmemiş",
+    "target_ineligible": "Uyarı: {tenant} artık aday alamıyor (M18 açık değil ya da kuruluş uygun değil). Form bu adı göstermeye devam eder; rotayı başka kuruluşa taşıyın ya da pasifleştirin.",
     "select_label": "{province} için danışmanlık kuruluşu",
     "select_placeholder": "Kuruluş seçin",
     "save": "Kaydet",

@@ -1,11 +1,14 @@
 'use server';
 
+import type { Prisma } from '@prisma/client';
 import { withTenant } from '@/lib/db';
+import { withSystemScope } from '@/lib/system-scope';
+import { deactivateRoutesOfClosedTarget } from '@/lib/leads/province-route';
 import { requirePlatformAdmin } from '@/lib/tenant';
 import { getManifest } from '@/lib/modules/registry';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { revalidatePath } from 'next/cache';
-import { adminStatusRefusal, getDisableCascade } from '@/lib/modules/state-machine';
+import { adminStatusRefusal, getDisableCascade, isOpenToTenantMembers } from '@/lib/modules/state-machine';
 import { errorMessage } from '@/lib/errors';
 import type { ModuleStateRow } from '@/types/db-rows';
 
@@ -72,6 +75,13 @@ export async function updateTenantModuleStatus(
     modulesToTurnOff.push(...cascade);
   }
 
+  // NG-215 (SEC NG-205 D-1): the status M18 ends up at, when this write moves it (directly or as
+  // part of an OFF cascade). If M18 is then closed to the tenant's own people the tenant is no longer
+  // an intake target, so its province routes close in the same transaction (see below).
+  const m18NewStatus: ModuleStatus | null =
+    targetStatus === 'OFF' ? (modulesToTurnOff.includes('M18') ? 'OFF' : null) : moduleId === 'M18' ? targetStatus : null;
+  const m18ClosedAt = m18NewStatus !== null && !isOpenToTenantMembers('M18', m18NewStatus) ? m18NewStatus : null;
+
   // Perform database updates
   try {
     // `prisma.$transaction` hands back a transaction with no `app.tenant_id` set
@@ -79,7 +89,7 @@ export async function updateTenantModuleStatus(
     // every upsert and every AuditEvent insert below is REFUSED by the policies'
     // WITH CHECK, so the console would fail on every flip. Invisible to
     // `rls:bypass-check`, whose CHECK A reads the accessor and sees only `tx.`.
-    await withTenant(tenantId, async (tx) => {
+    const writeStates = async (tx: Prisma.TransactionClient) => {
       if (targetStatus === 'OFF') {
         for (const modId of modulesToTurnOff) {
           await tx.moduleState.upsert({
@@ -115,7 +125,21 @@ export async function updateTenantModuleStatus(
           }
         });
       }
-    });
+    };
+    if (m18ClosedAt) {
+      // ProvinceLeadRoute is platform data (RLS system_scope only): a tenant scope reads 0 of its
+      // rows. The module rows and the route rows must commit together, so this one write runs under
+      // the platform-admin scope (requirePlatformAdmin above); every row it touches is named by
+      // `tenantId`. Any other flip keeps the plain tenant scope.
+      // Routes first: deactivateRoutesOfClosedTarget locks the tenant row before anything else, the
+      // same first lock a concurrent route set takes (NG-215 SEC re-review, Bulgu 1).
+      await withSystemScope('platform-admin', 'admin-modules.close-m18', async (tx) => {
+        await deactivateRoutesOfClosedTarget(tx, tenantId, { moduleId: 'M18', newStatus: m18ClosedAt }, userId);
+        await writeStates(tx);
+      });
+    } else {
+      await withTenant(tenantId, writeStates);
+    }
   } catch (e) {
     // A silent no-op here would report success for a change that never
     // happened, and the admin UI would show the new state until reload.
@@ -125,6 +149,7 @@ export async function updateTenantModuleStatus(
 
   try {
     revalidatePath('/[locale]/admin/modules', 'page');
+    if (m18ClosedAt) revalidatePath('/[locale]/admin/lead-routes', 'page');
   } catch {
     // Ignore in non-Next runtime/test environment
   }
