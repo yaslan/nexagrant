@@ -5,6 +5,9 @@ import { recordAlert } from '@/lib/observability/system-alert';
 import { recordRawFetch } from '@/lib/k2-cordis/raw-fetch';
 import { K2MonthlyCordisOutputSchema, type K2MonthlyCordisOutput } from '../events';
 
+/** Heap floor (MB) the in-process import needs; filled in by the NG-225 fix. */
+export const K2_MIN_HEAP_MB = 6144;
+
 /** `YYYY-MM` for the month a run belongs to. */
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);

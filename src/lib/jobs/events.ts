@@ -45,12 +45,30 @@ export const K2MonthlyCordisEventSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/), // YYYY-MM format (optional override)
 }).partial();
 
+// NG-225: the job runs `runCordisImport` in-process; no Python worker answer any more.
 export const K2MonthlyCordisOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  workerResponse: z.any().optional(),
+  /** `YYYY-MM` the run belongs to (the tick's month). */
+  month: z.string().optional(),
+  /** `CordisImportRun.runId` of this run, when one was written. */
+  runId: z.string().optional(),
+  /** True when the dump's hash matched the last full import ("Zaten güncel"). */
+  skipped: z.boolean().optional(),
+  rowCounts: z
+    .object({
+      projects: z.number(),
+      organizations: z.number(),
+      participations: z.number(),
+      topics: z.number(),
+      scivocs: z.number(),
+    })
+    .optional(),
+  profiles: z
+    .object({ updatedProfiles: z.number(), updatedCoParticipations: z.number(), durationMs: z.number() })
+    .optional(),
+  /** A failure code (`IMPORT_FAILED`, `SKIP_LIMIT_EXCEEDED`, `HEAP_TOO_SMALL`, …), never raw SQL. */
   error: z.string().optional(),
-  statusCode: z.number().optional(),
 });
 
 export type K2MonthlyCordisInput = z.infer<typeof K2MonthlyCordisEventSchema>;

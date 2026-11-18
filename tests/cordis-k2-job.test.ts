@@ -1,210 +1,169 @@
 /**
- * `runK2MonthlyCordis` — CLAUDE.md rule 6 on the K2 side.
+ * `k2-monthly-cordis` — the monthly job runs the real CORDIS import (NG-225).
  *
- * The job used to swallow every failure: a worker that was down, or answered
- * 500, returned `success: false` and nothing else. No `SystemAlert`, no record
- * of what the worker actually said. Measured on 2026-09-07, `RawFetch` held
- * zero rows for any CORDIS source.
+ * The job used to POST to a Python worker whose `/jobs/cordis` has no real
+ * source and answers 500, so the scheduled refresh never imported anything;
+ * the import that works (`runCordisImport`, SUCCESS by hand on 2026-11-17)
+ * was reachable only from `scripts/cordis-import.ts`. These tests pin the job
+ * to that import, and CLAUDE.md rule 6 on top: a failure leaves a
+ * `SystemAlert` and a `success: false` result, it never throws.
  *
- * What rule 6 asks for, and what each test here pins:
- *   - the raw answer is kept before it is interpreted;
- *   - schema drift alerts and lets the run stand — it never throws.
+ * The importer itself (RawFetch, hash skip, its own failure alert) is pinned
+ * in tests/cordis-import*.test.ts; here it is a stub.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { JobHelpers } from 'graphile-worker';
 
-interface StubRow {
-  [key: string]: unknown;
-}
-
-const rawFetches: StubRow[] = [];
-const alerts: StubRow[] = [];
-
-vi.mock('@/lib/db', () => ({
-  prisma: {
-    rawFetch: {
-      findFirst: vi.fn(async ({ where }: { where: { source: string; key: string } }) => {
-        const matching = rawFetches.filter((r) => r.source === where.source && r.key === where.key);
-        return matching[matching.length - 1] ?? null;
-      }),
-      create: vi.fn(async ({ data }: { data: StubRow }) => {
-        const row = { id: `raw-${rawFetches.length + 1}`, ...data };
-        rawFetches.push(row);
-        return row;
-      }),
-    },
-    systemAlert: {
-      create: vi.fn(async ({ data }: { data: StubRow }) => {
-        const row = { id: `alert-${alerts.length + 1}`, ...data };
-        alerts.push(row);
-        return row;
-      }),
-    },
-  },
+const alerts: Array<Record<string, unknown>> = [];
+vi.mock('@/lib/observability/system-alert', () => ({
+  recordAlert: vi.fn(async (a: Record<string, unknown>) => {
+    alerts.push(a);
+  }),
 }));
 
-const { runK2MonthlyCordis } = await import('../src/lib/jobs/tasks/k2-monthly-cordis');
+const runCordisImport = vi.fn();
+vi.mock('@/lib/k2-cordis/importer', () => ({ runCordisImport }));
 
-const WORKER = 'http://worker.invalid:8000';
+const generatePartnerProfiles = vi.fn();
+vi.mock('@/lib/k2-cordis/partnerProfileJob', () => ({ generatePartnerProfiles }));
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
+// The heap the job sees. 8 GB unless a test says otherwise, so no test depends
+// on the runner's own --max-old-space-size.
+let heapLimitMb = 8192;
+vi.mock('node:v8', async (orig) => {
+  const real = await orig<typeof import('node:v8')>();
+  const getHeapStatistics = () => ({ ...real.getHeapStatistics(), heap_size_limit: heapLimitMb * 1024 * 1024 });
+  return { ...real, default: { ...real, getHeapStatistics }, getHeapStatistics };
+});
+
+const { runK2MonthlyCordis, k2MonthlyCordisTask, K2_MIN_HEAP_MB } = await import(
+  '../src/lib/jobs/tasks/k2-monthly-cordis'
+);
+
+const ROWS = { projects: 23613, organizations: 36753, participations: 140000, topics: 23613, scivocs: 50000 };
+
+function imported(over: Record<string, unknown> = {}) {
+  return { success: true, runId: 'run-1', fileHash: 'h1', rowCounts: ROWS, durationMs: 10, ...over };
+}
+
+function helpersFor(): JobHelpers {
+  const noop = () => {};
+  return {
+    job: { id: '7', attempts: 1, max_attempts: 5 } as unknown as JobHelpers['job'],
+    logger: { info: noop, warn: noop, error: noop, debug: noop } as unknown as JobHelpers['logger'],
+  } as unknown as JobHelpers;
 }
 
 beforeEach(() => {
-  rawFetches.length = 0;
+  heapLimitMb = 8192;
   alerts.length = 0;
+  runCordisImport.mockReset();
+  generatePartnerProfiles.mockReset();
   vi.restoreAllMocks();
 });
 
+describe('k2-monthly-cordis job', () => {
+  it('runs the real CORDIS import when the cron fires, and calls no worker', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    runCordisImport.mockResolvedValue(imported());
+    generatePartnerProfiles.mockResolvedValue({ success: true, updatedProfiles: 3, updatedCoParticipations: 4, durationMs: 1 });
+
+    await k2MonthlyCordisTask({ _cron: { ts: '2026-12-01T04:00:00.000Z' } }, helpersFor());
+
+    expect(runCordisImport).toHaveBeenCalledTimes(1);
+    expect(runCordisImport.mock.calls[0]![0]).toMatchObject({ dataset: 'HORIZON' });
+    // A full import, never a smoke run: neither mark would let the next month skip.
+    expect(runCordisImport.mock.calls[0]![0]).not.toHaveProperty('dryRun');
+    expect(runCordisImport.mock.calls[0]![0]).not.toHaveProperty('limit');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe('runK2MonthlyCordis', () => {
-  it('passes the requested month to the worker and records the raw answer', async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse({ message: 'CORDIS pipeline triggered' }));
+  it('imports, rebuilds the partner profiles and reports the counts', async () => {
+    runCordisImport.mockResolvedValue(imported());
+    generatePartnerProfiles.mockResolvedValue({ success: true, updatedProfiles: 36753, updatedCoParticipations: 1105839, durationMs: 1 });
 
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
 
     expect(result.success).toBe(true);
-    expect(String(fetchMock.mock.calls[0]![0])).toContain('month=2026-09');
-    expect(rawFetches).toHaveLength(1);
-    expect(rawFetches[0]).toMatchObject({ source: 'cordis_worker', key: '2026-09' });
-    expect((rawFetches[0]!.payload as { status: number }).status).toBe(200);
+    expect(result.month).toBe('2026-12');
+    expect(result.runId).toBe('run-1');
+    expect(result.rowCounts?.projects).toBe(23613);
+    expect(result.profiles?.updatedProfiles).toBe(36753);
+    expect(generatePartnerProfiles).toHaveBeenCalledTimes(1);
     expect(alerts).toHaveLength(0);
   });
 
-  it('records no second RawFetch row when the answer is unchanged', async () => {
-    // A fresh Response per call: a body can only be read once, so reusing one
-    // object would make the second run *look* like a changed answer.
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
-      jsonResponse({ message: 'CORDIS pipeline triggered' })
-    );
+  it('treats an unchanged dump ("Zaten güncel") as success and leaves the profiles alone', async () => {
+    runCordisImport.mockResolvedValue(imported({ skipped: true, rowCounts: { projects: 0, organizations: 0, participations: 0, topics: 0, scivocs: 0 } }));
 
-    await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
-    await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
-
-    expect(rawFetches).toHaveLength(1);
-  });
-
-  it('alerts but does not break when the worker drops a field the job reads', async () => {
-    // The upstream contract changed: `message` is gone, the run still happened.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ status: 'queued' }));
-
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
 
     expect(result.success).toBe(true);
+    expect(result.skipped).toBe(true);
+    expect(generatePartnerProfiles).not.toHaveBeenCalled();
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('reports a failed import as a failure without a second alert (the importer wrote it)', async () => {
+    runCordisImport.mockResolvedValue({ ...imported(), success: false, errorCode: 'SKIP_LIMIT_EXCEEDED' });
+
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('SKIP_LIMIT_EXCEEDED');
+    expect(generatePartnerProfiles).not.toHaveBeenCalled();
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('writes a SystemAlert and does not throw when the import itself throws', async () => {
+    // The importer only throws before it has a run row (the CordisImportRun
+    // insert failed), so its own alert never ran: the job must write one.
+    runCordisImport.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:5432'));
+
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
+
+    expect(result.success).toBe(false);
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.level).toBe('warn');
-    expect((alerts[0]!.meta as { missingFields: string[] }).missingFields).toEqual(['message']);
-    // The body that no longer matches is on record, not lost.
-    expect((rawFetches[0]!.payload as { body: string }).body).toContain('queued');
+    expect(alerts[0]).toMatchObject({ level: 'error', source: 'k2_monthly_cordis' });
+    expect(String(alerts[0]!.message)).toContain('ECONNREFUSED');
   });
 
-  it('alerts and reports failure on a non-2xx, keeping the body', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('<html>gateway timeout</html>', {
-        status: 504,
-        headers: { 'content-type': 'text/html' },
-      })
-    );
+  it('writes a SystemAlert when the partner profiles fail after a good import', async () => {
+    runCordisImport.mockResolvedValue(imported());
+    generatePartnerProfiles.mockRejectedValue(new Error('deadlock detected'));
 
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
 
     expect(result.success).toBe(false);
-    expect(result.statusCode).toBe(504);
-    expect(alerts[0]!.message).toContain('504');
-    expect((rawFetches[0]!.payload as { body: string }).body).toContain('gateway timeout');
-  });
-
-  it('alerts and reports failure when the worker cannot be reached, without throwing', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('fetch failed'));
-
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('fetch failed');
-    expect(alerts[0]!.level).toBe('error');
-    expect(alerts[0]!.message).toContain('unreachable');
-  });
-
-  it('alerts when a 2xx body is not JSON, instead of throwing a parse error', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('not json at all', { status: 200, headers: { 'content-type': 'text/plain' } })
-    );
-
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
-
-    expect(result.success).toBe(false);
-    expect(alerts[0]!.message).toContain('not JSON');
-  });
-
-  it('records a failure when the worker reports the pipeline failed', async () => {
-    // The worker runs the pipeline before it answers, so a 2xx body carries the
-    // outcome. A failed run must not be filed as a green K2 run — that pairing
-    // (success: true, zero rows written) is what this job used to produce.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({
-        success: false,
-        message: 'CORDIS pipeline failed',
-        error: 'relation "CordisProject" does not exist',
-        rowCounts: { projects: 0, organizations: 0, participations: 0, topics: 0 },
-      })
-    );
-
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('CordisProject');
+    // The import landed; the result still says so.
+    expect(result.rowCounts?.projects).toBe(23613);
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.level).toBe('error');
-    expect(alerts[0]!.message).toContain('failed on the worker');
-    // The body that reported the failure is on record either way.
-    expect((rawFetches[0]!.payload as { body: string }).body).toContain('CordisProject');
+    expect(alerts[0]).toMatchObject({ level: 'error', source: 'k2_monthly_cordis' });
   });
 
-  it('carries the row counts a successful run reported', async () => {
-    // "It answered 200" and "it wrote rows" are different claims; the second
-    // one is only answerable if the counts survive into the job result.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({
-        success: true,
-        message: 'CORDIS pipeline finished successfully',
-        runId: 'wrk_abc',
-        rowCounts: { projects: 2, organizations: 3, participations: 4, topics: 2 },
-      })
-    );
+  it('refuses to start with a heap below the floor, with an alert, instead of crashing the worker', async () => {
+    // Node's default on a 64-bit machine is ~4 GB; the 2026-11-17 run peaked at 4.4 GB RSS.
+    heapLimitMb = 4144;
 
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('HEAP_TOO_SMALL');
+    expect(runCordisImport).not.toHaveBeenCalled();
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ level: 'error', source: 'k2_monthly_cordis', dedupeKey: 'k2:heap-too-small' });
+    expect(String(alerts[0]!.message)).toContain('--max-old-space-size');
+  });
+
+  it('runs at exactly the floor', async () => {
+    heapLimitMb = K2_MIN_HEAP_MB;
+    runCordisImport.mockResolvedValue(imported({ skipped: true }));
+
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
 
     expect(result.success).toBe(true);
-    expect((result.workerResponse as { rowCounts: { projects: number } }).rowCounts.projects).toBe(2);
-    expect(alerts).toHaveLength(0);
-  });
-
-  it('still treats a worker that reports no success field as delivered', async () => {
-    // Backwards compatibility: an older worker that only echoes `message` keeps
-    // the drift semantics it had, rather than being read as a failure.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ message: 'CORDIS pipeline triggered' })
-    );
-
-    const result = await runK2MonthlyCordis({ month: '2026-09', workerUrl: WORKER });
-
-    expect(result.success).toBe(true);
-    expect(alerts).toHaveLength(0);
-  });
-
-  it('never puts the worker URL credentials into an alert', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('fetch failed'));
-
-    await runK2MonthlyCordis({
-      month: '2026-09',
-      workerUrl: 'http://user:hunter2@worker.invalid:8000',
-    });
-
-    expect(JSON.stringify(alerts)).not.toContain('hunter2');
-    expect((alerts[0]!.meta as { host: string }).host).toBe('worker.invalid:8000');
+    expect(runCordisImport).toHaveBeenCalledTimes(1);
   });
 });
