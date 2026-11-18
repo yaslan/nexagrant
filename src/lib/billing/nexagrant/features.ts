@@ -2,9 +2,9 @@
  * NexaGrant plan catalogue — the vocabulary (NG-57, design: NG-244 §6.1).
  *
  * NexaGrant sells its own tiers (Ücretsiz Kontrol / Temel / Profesyonel / Kurumsal,
- * `06-Fiyat-Politikasi.md` §1) under its OWN plan ids (K-584182 = A): the Fabrika
+ * `06-Fiyat-Politikasi.md` §1) under its OWN plan ids (K-584182 = A): the platform
  * `Plan` / `Subscription` rows and `src/lib/billing/catalog.ts` are not touched, so a
- * NexaGrant price or seat change can never move a Fabrika customer.
+ * NexaGrant price or seat change can never move a customer of the other (EUR/USD) plan ladder.
  *
  * This file holds names only — feature keys, currencies, intervals. Which plan gets
  * which feature, every limit, every price and every trial length is DATA: the

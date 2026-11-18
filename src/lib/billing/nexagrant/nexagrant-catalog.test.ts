@@ -93,7 +93,7 @@ function cellOf(planId: NgPlanId, feature: NgFeatureKey): Cell {
 }
 
 describe('NG-57 plan catalogue: the plans', () => {
-  it('has exactly the four NexaGrant plan ids, none of them a Fabrika plan id', () => {
+  it('has exactly the four NexaGrant plan ids, none of them an id of the other plan ladder', () => {
     expect(NG_PLANS.map((p) => p.id).sort()).toEqual([...NG_PLAN_IDS].sort());
     for (const p of NG_PLANS) expect(['free', 'basic', 'pro', 'ultra']).not.toContain(p.id);
   });

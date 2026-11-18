@@ -9,6 +9,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
 import { entitlementFor, type NgEntitlement, type NgPlanFeatureRow, type NgPlanPriceRow, type NgPlanRow } from './entitlement';
+import { isPresentId } from '@/lib/required-id';
 import { NG_TRIAL_PROVIDER } from './features';
 import {
   trialEndsAt,
@@ -199,6 +200,7 @@ export async function readNgBillingState(tx: TenantTx, tenantId: string, now?: D
  * already treats the trial as ended — it keeps the stored row honest.
  */
 export async function settleNgTrial(tx: TenantTx, tenantId: string, now?: Date): Promise<boolean> {
+  if (!isPresentId(tenantId)) return false;
   const at = now ?? new Date();
   const expiry = trialExpiryOf(await readSubscription(tx, tenantId), at);
   if (!expiry) return false;

@@ -24,6 +24,10 @@ const REPO_ROOT = path.resolve(__dirname, '..');
  */
 const DB_ROW = 'value read from a non-null column of a row fetched just above, not client input';
 const KNOWN: Record<string, string> = {
+  'src/lib/billing/nexagrant/repository.ts provider: NG_TRIAL_PROVIDER':
+    "a module constant ('ng-trial', src/lib/billing/nexagrant/features.ts), never undefined, never client input (NG-57)",
+  'src/lib/billing/nexagrant/repository.ts lte: at':
+    'the settle instant: `now ?? new Date()` two lines above, a server Date, never undefined or client input (NG-57)',
   'src/modules/m17/server/evaluate.ts updatedAt: claimedAt':
     'the claim instant: `now` that claim() set on the row in the same run (the run\'s own identity, FO-188 B3); a server Date, never client input',
   'src/modules/m17/server/evaluate.ts updatedAt: row.claimedAt': 'same claim instant, read back from the claim() result; server-side, never client input',
