@@ -126,6 +126,8 @@ test.describe('public pages share one header and one footer (FO-68)', () => {
         return;
       }
       const post = page.locator(`main a[href^="/${locale}/blog/"]`).first();
+      // NG-229: a finite wait, so a list that never renders its link fails here, not after the 300 s test budget.
+      await expect(post).toBeVisible({ timeout: 15_000 });
       const href = await post.getAttribute('href');
       expect(href, `/${locale}/blog lists no post to open`).toBeTruthy();
       const response = await page.goto(href!);
