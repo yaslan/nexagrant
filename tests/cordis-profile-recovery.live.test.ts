@@ -49,7 +49,9 @@ vi.mock('@/lib/k2-cordis/importer', async (orig) => {
   };
 });
 
-const { prisma } = await import('@/lib/db');
+const { createDbClient, prisma } = await import('@/lib/db');
+// The owner connection: builds nothing here, only names the database the suite ran on.
+const admin = createDbClient(process.env.DATABASE_URL ?? '');
 const { runK2MonthlyCordis } = await import('@/lib/jobs/tasks/k2-monthly-cordis');
 
 const RUN = `T237${Date.now().toString(36)}`;
@@ -132,7 +134,7 @@ beforeAll(async () => {
     skipOrFailInCi(SUITE, `database unreachable: ${(err as Error).message.split('\n')[0]}`);
     return;
   }
-  const dbName = await usedDatabaseName(prisma, prisma, SUITE);
+  const dbName = await usedDatabaseName(prisma, admin, SUITE);
   if (dbName === undefined) return;
   if (dbName === 'fabrika' && !isGithubActions()) {
     throw new Error(`${SUITE}: refusing to run on the shared "fabrika" database; point DATABASE_URL at a throwaway one`);

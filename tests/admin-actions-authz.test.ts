@@ -39,7 +39,7 @@ vi.mock('@/lib/billing/pilot', () => ({
   assertTenantWritable: vi.fn().mockResolvedValue(undefined),
   PilotExpiredError: class PilotExpiredError extends Error {},
 }));
-vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: vi.fn() }));
+vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: vi.fn(), resolveAlerts: vi.fn(async () => ({ resolved: 0 })) }));
 vi.mock('@/lib/db', () => {
   const model = { count: m.count };
   return {
