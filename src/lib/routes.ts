@@ -14,6 +14,7 @@ export type PublicRouteKey =
   | 'terms'
   | 'privacy'
   | 'dpa'
+  | 'cookies'
   | 'modules'
   | 'blog'
   | 'blogDetail';
@@ -76,6 +77,8 @@ export function getPublicRoute(key: PublicRouteKey, locale: string = 'tr', param
       return isTr ? `/${locale}/gizlilik-politikasi` : `/${locale}/privacy`;
     case 'dpa':
       return isTr ? `/${locale}/veri-isleme-sozlesmesi` : `/${locale}/dpa`;
+    case 'cookies':
+      return isTr ? `/${locale}/cerez-politikasi` : `/${locale}/cookies`;
     case 'modules':
       return isTr ? `/${locale}/default/ayarlar/moduller` : `/${locale}/default/settings/modules`;
     case 'blog':
@@ -201,6 +204,7 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
     'kullanim-kosullari': 'terms', 'terms': 'terms',
     'gizlilik-politikasi': 'privacy', 'privacy': 'privacy',
     'veri-isleme-sozlesmesi': 'dpa', 'dpa': 'dpa',
+    'cerez-politikasi': 'cookies', 'cookies': 'cookies',
   };
 
   if (workspace in publicRoutes) {

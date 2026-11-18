@@ -101,3 +101,4 @@ add-public-lead-transfer-recipient.sql
 add-close-own-province-routes.sql
 add-nexagrant-plan-catalog.sql
 add-evidence-scan-status.sql
+add-cookie-consent-record.sql
