@@ -47,6 +47,7 @@ export type WorkspaceRouteKey =
   | 'settingsProfile'
   | 'settingsModules'
   | 'settingsBilling'
+  | 'settingsPlan'
   | 'settingsApiKeys'
   | 'settingsCalendar'
   | 'settingsGates'
@@ -156,6 +157,8 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/ayarlar/moduller` : `/${locale}/${workspace}/settings/modules`;
     case 'settingsBilling':
       return isTr ? `/${locale}/${workspace}/ayarlar/faturalama` : `/${locale}/${workspace}/settings/billing`;
+    case 'settingsPlan':
+      return isTr ? `/${locale}/${workspace}/ayarlar/plan` : `/${locale}/${workspace}/settings/plan`;
     case 'settingsApiKeys':
       return isTr ? `/${locale}/${workspace}/ayarlar/api-anahtarlari` : `/${locale}/${workspace}/settings/api-keys`;
     case 'settingsCalendar':
@@ -240,6 +243,7 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
         'profil': 'settingsProfile', 'profile': 'settingsProfile',
         'moduller': 'settingsModules', 'modules': 'settingsModules',
         'faturalama': 'settingsBilling', 'billing': 'settingsBilling',
+        'plan': 'settingsPlan',
         'api-anahtarlari': 'settingsApiKeys', 'api-keys': 'settingsApiKeys',
         'takvim': 'settingsCalendar', 'calendar': 'settingsCalendar',
         'kapilar': 'settingsGates', 'gates': 'settingsGates',

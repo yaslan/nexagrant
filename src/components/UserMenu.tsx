@@ -14,6 +14,7 @@ import {
   User, 
   Settings, 
   CreditCard, 
+  BadgeCheck,
   Globe, 
   Key, 
   Users,
@@ -463,6 +464,17 @@ export default function UserMenu({
                 <span className="text-[10px] font-bold bg-accent/15 text-accent-ink px-1.5 py-0.5 rounded font-mono">
                   {creditsBalance} {isTr ? 'Kredi' : 'Credits'}
                 </span>
+              </Link>
+
+              {/* NG-11: the NexaGrant plan and trial — read-only, every role. */}
+              <Link
+                href={getWorkspaceRoute('settingsPlan', locale, routeWorkspace ?? undefined)}
+                onClick={() => setIsOpen(false)}
+                data-testid="user-menu-plan-link"
+                className="flex items-center space-x-2.5 px-4 py-2 text-ink-2 hover:text-ink hover:bg-surface-hover transition-colors"
+              >
+                <BadgeCheck className="w-4 h-4 text-muted" />
+                <span>{tNav('planAndTrial')}</span>
               </Link>
 
               {canManageUsers && (
