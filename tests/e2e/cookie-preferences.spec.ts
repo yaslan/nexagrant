@@ -7,8 +7,9 @@ import { test, expect, type Page } from '@playwright/test';
  * withdraws analytics consent and removes what analytics stored in the browser.
  *
  * Analytics stores one thing, the anonymous id in localStorage
- * (src/lib/analytics.ts); it sets no cookie. The id is seeded here because the
- * e2e server runs without a PostHog key, so nothing would mint it.
+ * (src/lib/analytics.ts); it sets no cookie. The e2e server has a fixture PostHog
+ * key (playwright.config.ts), but the id is seeded here so the spec does not depend
+ * on a consent-accepted analytics event minting it first.
  */
 
 const CONSENT = 'fabrika_cookie_consent';
