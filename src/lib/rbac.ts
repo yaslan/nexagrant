@@ -119,8 +119,10 @@ export function can(
 ): boolean {
   if (!role) return false;
   const permissions = rolePermissions[role];
-  void resource;
-  return permissions ? permissions.includes(action) : false;
+  if (!permissions || !permissions.includes(action)) return false;
+  if (!resource) return true;
+  if (resource.moduleOpen === false) return false;
+  return resource.grantedFeatures.has(resource.feature);
 }
 
 /**

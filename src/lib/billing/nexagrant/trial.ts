@@ -11,7 +11,10 @@
  * (`pilotEndsAt`, 00:00 Istanbul after `days` full days, the start day counted as
  * day 1), so a tenant reads a date, not an hour.
  */
-import type { NgTrialSegment } from './features';
+import { pilotEndsAt } from '@/lib/billing/pilot';
+import { NG_TRIAL_PROVIDER, type NgTrialSegment } from './features';
+
+const DAY_MS = 86_400_000;
 
 /** One `NgTrialPolicy` row. */
 export interface NgTrialPolicyRow {
@@ -36,8 +39,7 @@ export interface NgSubscriptionRow {
 
 /** The trial segment of an organisation type (`Tenant.orgType`). */
 export function trialSegmentFor(orgType: string | null | undefined): NgTrialSegment {
-  void orgType;
-  throw new Error('NG-57: trialSegmentFor not implemented');
+  return orgType === 'MUNICIPALITY' ? 'municipality' : 'default';
 }
 
 /** The policy row of a segment, or null when the catalogue has none (then no trial is started). */
@@ -45,16 +47,15 @@ export function trialPolicyFor(
   policies: readonly NgTrialPolicyRow[],
   segment: NgTrialSegment
 ): NgTrialPolicyRow | null {
-  void policies;
-  void segment;
-  throw new Error('NG-57: trialPolicyFor not implemented');
+  return policies.find((p) => p.segment === segment) ?? null;
 }
 
 /** When a trial that starts at `start` and lasts `days` Istanbul calendar days ends. */
 export function trialEndsAt(start: Date, days: number): Date {
-  void start;
-  void days;
-  throw new Error('NG-57: trialEndsAt not implemented');
+  if (!Number.isInteger(days) || days <= 0) {
+    throw new RangeError(`trial length must be a positive whole number of days, got ${days}`);
+  }
+  return pilotEndsAt(start, days);
 }
 
 export type NgTrialState =
@@ -72,9 +73,18 @@ export type NgTrialState =
 
 /** The trial state of a subscription row at `now`. The end instant itself is already ended. */
 export function trialStateOf(sub: NgSubscriptionRow | null | undefined, now: Date): NgTrialState {
-  void sub;
-  void now;
-  throw new Error('NG-57: trialStateOf not implemented');
+  if (!sub || !sub.trialStartedAt || !sub.trialEndsAt) return { kind: 'none' };
+  const base = { segment: sub.trialSegment, startedAt: sub.trialStartedAt, endsAt: sub.trialEndsAt };
+  const running = sub.trialEndedAt === null && sub.status === 'TRIALING' && now.getTime() < sub.trialEndsAt.getTime();
+  if (running) {
+    return {
+      kind: 'running',
+      ...base,
+      daysLeft: Math.ceil((sub.trialEndsAt.getTime() - now.getTime()) / DAY_MS),
+      endPlanId: sub.trialEndPlanId,
+    };
+  }
+  return { kind: 'ended', ...base, endedAt: sub.trialEndedAt };
 }
 
 /** The write that drops a run-out trial to its end plan, or null when nothing is due. */
@@ -85,7 +95,8 @@ export interface NgTrialExpiry {
 }
 
 export function trialExpiryOf(sub: NgSubscriptionRow | null | undefined, now: Date): NgTrialExpiry | null {
-  void sub;
-  void now;
-  throw new Error('NG-57: trialExpiryOf not implemented');
+  if (!sub || sub.provider !== NG_TRIAL_PROVIDER || sub.status !== 'TRIALING') return null;
+  if (sub.trialEndedAt !== null || !sub.trialEndsAt || !sub.trialEndPlanId) return null;
+  if (now.getTime() < sub.trialEndsAt.getTime()) return null;
+  return { planId: sub.trialEndPlanId, status: 'ACTIVE', trialEndedAt: now };
 }

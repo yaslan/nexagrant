@@ -3,7 +3,13 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import { canUseNgFeature } from '@/lib/billing/nexagrant/authz';
 import { featureLimit } from '@/lib/billing/nexagrant/entitlement';
-import { readNgBillingState, readNgCatalog, startNgTrial } from '@/lib/billing/nexagrant/repository';
+import {
+  readNgBillingState,
+  readNgCatalog,
+  settleNgTrial,
+  startNgTrial,
+  startNgTrialAtRegistration,
+} from '@/lib/billing/nexagrant/repository';
 import { trialEndsAt } from '@/lib/billing/nexagrant/trial';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
@@ -46,6 +52,7 @@ const T = {
   sme: `${RUN}-sme`,
   muni: `${RUN}-muni`,
   bare: `${RUN}-bare`,
+  reg: `${RUN}-reg`,
 };
 // 18.11.2026 13:00 Istanbul.
 const START = new Date('2026-11-18T10:00:00Z');
@@ -73,6 +80,7 @@ describe.skipIf(!reachable)('NG-57 plan catalogue, trial and can() (live)', () =
         { id: T.sme, name: T.sme, slug: T.sme, country: 'TR', orgType: 'SME' },
         { id: T.muni, name: T.muni, slug: T.muni, country: 'TR', orgType: 'MUNICIPALITY' },
         { id: T.bare, name: T.bare, slug: T.bare, country: 'TR', orgType: 'SME' },
+        { id: T.reg, name: T.reg, slug: T.reg, country: 'TR', orgType: 'MUNICIPALITY' },
       ],
     });
   });
@@ -145,6 +153,19 @@ describe.skipIf(!reachable)('NG-57 plan catalogue, trial and can() (live)', () =
     const state = await asTenant(T.sme, (tx) => readNgBillingState(tx, T.sme, end));
     expect(state.plan.id).toBe('ng-free');
     expect(state.trial.kind).toBe('ended');
+    // Reading decides without writing: the stored row still says TRIALING until it is settled.
+    expect((await persisted(T.sme))[0]).toMatchObject({ planId: 'ng-pro', status: 'TRIALING' });
+    // can() refuses already, before the drop is written.
+    expect(
+      await asTenant(T.sme, (tx) =>
+        canUseNgFeature(tx, { tenantId: T.sme, role: 'TENANT_OWNER' }, 'view_partner_search', 'partner_search', end)
+      )
+    ).toBe(false);
+
+    // One millisecond early settles nothing; at the end it writes once; again it is a no-op.
+    expect(await asTenant(T.sme, (tx) => settleNgTrial(tx, T.sme, new Date(end.getTime() - 1)))).toBe(false);
+    expect(await asTenant(T.sme, (tx) => settleNgTrial(tx, T.sme, end))).toBe(true);
+    expect(await asTenant(T.sme, (tx) => settleNgTrial(tx, T.sme, end))).toBe(false);
 
     const [row] = await persisted(T.sme);
     expect(row).toMatchObject({ planId: 'ng-free', status: 'ACTIVE' });
@@ -183,5 +204,21 @@ describe.skipIf(!reachable)('NG-57 plan catalogue, trial and can() (live)', () =
                        VALUES (${T.muni}, 'ng-enterprise', 'ACTIVE', 'manual', now())`
       )
     ).rejects.toThrow();
+  });
+  it('registration: a transaction bound to the new tenant starts its trial; one bound elsewhere is refused', async () => {
+    await expect(
+      rls!.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.tenant_id', ${T.bare}, true)`;
+        return startNgTrialAtRegistration(tx, { tenantId: T.reg, orgType: 'MUNICIPALITY', now: START });
+      })
+    ).rejects.toThrow(/not bound to this tenant/);
+    expect(await persisted(T.reg)).toHaveLength(0);
+
+    const r = await rls!.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${T.reg}, true)`;
+      return startNgTrialAtRegistration(tx, { tenantId: T.reg, orgType: 'MUNICIPALITY', now: START });
+    });
+    expect(r.kind).toBe('started');
+    expect((await persisted(T.reg))[0]).toMatchObject({ planId: 'ng-pro', trialSegment: 'municipality' });
   });
 });

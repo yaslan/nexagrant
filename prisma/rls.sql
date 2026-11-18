@@ -18,7 +18,8 @@ BEGIN
     'ProjectIdea','DecisionLog',
     'NotificationPreference','NotificationEmailItem',
     'LeadOrganization','LeadContact','LeadMatch','Deal','DealActivity','DealTask',
-    'ServicePackage','ServiceQuote','FunderRule','LeadEligibilityReport'
+    'ServicePackage','ServiceQuote','FunderRule','LeadEligibilityReport',
+    'NgSubscription'
   ] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
@@ -82,7 +83,8 @@ AS $fn$ SELECT count(*)::int FROM "LifetimeLicence" $fn$;
 COMMENT ON FUNCTION public.lifetime_licence_count() IS 'Cross-tenant count for the public scarcity badge. Returns a number only — never a row.';
 
 -- Platform tables (Plan, PlanVersion, PlanFeature; M17's assessment grids
--- InterregRubric, InterregRubricCriterion — FO-186): readable by anyone, never
+-- InterregRubric, InterregRubricCriterion — FO-186; the NexaGrant plan catalogue
+-- NgPlan, NgPlanFeature, NgPlanPrice, NgTrialPolicy — NG-57): readable by anyone, never
 -- writable through a tenant connection. A policy names exactly one command, and
 -- an INSERT policy is expressed with WITH CHECK rather than USING, so the three
 -- write commands need three policies. Platform writes run as the owning role
@@ -90,7 +92,8 @@ COMMENT ON FUNCTION public.lifetime_licence_count() IS 'Cross-tenant count for t
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['Plan','PlanVersion','PlanFeature','InterregRubric','InterregRubricCriterion'] LOOP
+  FOREACH t IN ARRAY ARRAY['Plan','PlanVersion','PlanFeature','InterregRubric','InterregRubricCriterion',
+                         'NgPlan','NgPlanFeature','NgPlanPrice','NgTrialPolicy'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS platform_read ON %I', t);
     EXECUTE format('DROP POLICY IF EXISTS platform_write ON %I', t);
@@ -111,6 +114,8 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
     REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public."InterregRubric", public."InterregRubricCriterion" FROM fabrika_app;
+    -- NG-57: the NexaGrant plan catalogue, same reasoning (prices are entered by the platform as owner).
+    REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public."NgPlan", public."NgPlanFeature", public."NgPlanPrice", public."NgTrialPolicy" FROM fabrika_app;
   END IF;
 END $$;
 

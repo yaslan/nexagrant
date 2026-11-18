@@ -65,6 +65,9 @@ export function isNgCurrency(value: string): value is NgCurrency {
 
 export const NG_INTERVALS = ['year', 'month'] as const;
 export type NgInterval = (typeof NG_INTERVALS)[number];
+export function isNgInterval(value: string): value is NgInterval {
+  return (NG_INTERVALS as readonly string[]).includes(value);
+}
 
 /** Trial segments (`06` §4; K-584180 = A). */
 export const NG_TRIAL_SEGMENTS = ['default', 'municipality'] as const;

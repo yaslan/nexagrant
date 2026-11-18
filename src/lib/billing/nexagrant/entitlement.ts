@@ -6,6 +6,7 @@
 import {
   isNgCurrency,
   isNgFeatureKey,
+  isNgInterval,
   type NgCurrency,
   type NgFeatureKey,
   type NgInterval,
@@ -49,24 +50,25 @@ export interface NgEntitlement {
  * fail closed, never a guess).
  */
 export function entitlementFor(planId: string, rows: readonly NgPlanFeatureRow[]): NgEntitlement {
-  void planId;
-  void rows;
-  throw new Error('NG-57: entitlementFor not implemented');
+  const features = new Map<NgFeatureKey, number | null>();
+  for (const row of rows) {
+    if (row.planId !== planId || !isNgFeatureKey(row.featureKey)) continue;
+    features.set(row.featureKey, row.limitValue);
+  }
+  return { planId, features };
 }
 
 /** The set of granted feature keys, the shape `can()` takes. */
 export function grantedFeatures(entitlement: NgEntitlement): ReadonlySet<string> {
-  void entitlement;
-  throw new Error('NG-57: grantedFeatures not implemented');
+  return new Set(entitlement.features.keys());
 }
 
 export type NgFeatureLimit = { granted: false } | { granted: true; limit: number | null };
 
 /** Is `feature` granted, and with which limit (null = unlimited)? */
 export function featureLimit(entitlement: NgEntitlement, feature: NgFeatureKey): NgFeatureLimit {
-  void entitlement;
-  void feature;
-  throw new Error('NG-57: featureLimit not implemented');
+  if (!entitlement.features.has(feature)) return { granted: false };
+  return { granted: true, limit: entitlement.features.get(feature) ?? null };
 }
 
 export interface NgPriceOffer {
@@ -83,11 +85,16 @@ export interface NgPriceOffer {
  * TRY/EUR (K-584156) is dropped, not shown.
  */
 export function priceOffersFor(plan: NgPlanRow, prices: readonly NgPlanPriceRow[]): NgPriceOffer[] {
-  void plan;
-  void prices;
-  throw new Error('NG-57: priceOffersFor not implemented');
+  const offers: NgPriceOffer[] = [];
+  for (const row of prices) {
+    if (row.planId !== plan.id || !isNgCurrency(row.currency) || !isNgInterval(row.interval)) continue;
+    const priced = row.amountMinor !== null && Number.isInteger(row.amountMinor) && row.amountMinor > 0;
+    offers.push({
+      currency: row.currency,
+      interval: row.interval,
+      amountMinor: row.amountMinor,
+      purchasable: plan.sellable && priced,
+    });
+  }
+  return offers;
 }
-
-// Referenced so the imports type-check while the bodies are stubs.
-void isNgCurrency;
-void isNgFeatureKey;
