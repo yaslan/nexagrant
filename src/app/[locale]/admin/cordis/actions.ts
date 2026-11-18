@@ -26,7 +26,8 @@ export async function handleRunCordisImportAction(dataset: 'HORIZON' | 'H2020', 
   }
 
   // Null when the dump is unchanged and no profile failure is owed (NG-237).
-  const profileRes = (await runPartnerProfileStep(importRes.skipped === true)) ?? {
+  // A failed build raises the profile-failure alert and throws, so the operator sees the error.
+  const profileRes = (await runPartnerProfileStep(importRes.skipped === true, { runId: importRes.runId, dataset })) ?? {
     updatedProfiles: 0,
     updatedCoParticipations: 0,
     durationMs: 0,

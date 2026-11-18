@@ -83,7 +83,8 @@ async function main() {
   if (!options.dryRun) {
     // An unchanged dump rebuilds the profiles only when an earlier profile
     // build failed and its alert is still open (NG-237, shared with the job).
-    const profileRes = await runPartnerProfileStep(res.skipped === true);
+    // A failed build raises the profile-failure alert and throws: the CLI exits 1 through main().catch.
+    const profileRes = await runPartnerProfileStep(res.skipped === true, { runId: res.runId, dataset: options.dataset });
     if (profileRes) {
       console.log(`⚙️ Generating M1 Partner Profiles & Network Graph...`);
       console.log(`✅ [M1 Partner Profile Job] Generated ${profileRes.updatedProfiles} org profiles and ${profileRes.updatedCoParticipations} co-participations in ${profileRes.durationMs}ms.`);

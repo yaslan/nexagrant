@@ -4,12 +4,7 @@ import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { runCordisImport, type CordisImportResult } from '@/lib/k2-cordis/importer';
 import type { PartnerProfileJobResult } from '@/lib/k2-cordis/partnerProfileJob';
-import {
-  K2_ALERT_SOURCE,
-  PROFILES_FAILED_KEY,
-  closeK2Alert,
-  runPartnerProfileStep,
-} from '@/lib/k2-cordis/profileStep';
+import { K2_ALERT_SOURCE, closeK2Alert, runPartnerProfileStep } from '@/lib/k2-cordis/profileStep';
 import { K2MonthlyCordisOutputSchema, type K2MonthlyCordisOutput } from '../events';
 
 /**
@@ -137,21 +132,17 @@ export async function runK2MonthlyCordis(
   let profiles: PartnerProfileJobResult | null;
   try {
     // Null when the dump is unchanged and no profile failure is owed (NG-237).
-    profiles = await runPartnerProfileStep(skipped);
-  } catch (error) {
-    const detail = errorMessage(error, String(error));
-    await recordAlert({
-      level: 'error',
-      source: SOURCE,
-      message:
-        `CORDIS ${MONTHLY_DATASET} imported (run ${imported.runId}) but the partner profiles failed: ` +
-        `${detail.slice(0, 500)}. Re-run with \`pnpm exec tsx scripts/cordis-import.ts\`; rows are upserts.`,
-      meta: { month, runId: imported.runId },
-      dedupeKey: PROFILES_FAILED_KEY,
+    // A failed build raises the profile-failure alert inside the step, for every entry point.
+    profiles = await runPartnerProfileStep(skipped, {
+      runId: imported.runId,
+      dataset: MONTHLY_DATASET,
+      meta: { month },
     });
+  } catch {
+    // The import stage succeeded and its alerts were closed above; the profile alert is open now.
     return K2MonthlyCordisOutputSchema.parse({
       success: false,
-      message: 'CORDIS imported; partner profiles failed',
+      message: `CORDIS ${MONTHLY_DATASET} imported (run ${imported.runId}); partner profiles failed — profile alert open, import alerts closed. Run the import again to rebuild them.`,
       month,
       runId: imported.runId,
       rowCounts: imported.rowCounts,

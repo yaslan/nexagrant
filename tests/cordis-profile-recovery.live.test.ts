@@ -53,6 +53,9 @@ const { createDbClient, prisma } = await import('@/lib/db');
 // The owner connection: builds nothing here, only names the database the suite ran on.
 const admin = createDbClient(process.env.DATABASE_URL ?? '');
 const { runK2MonthlyCordis } = await import('@/lib/jobs/tasks/k2-monthly-cordis');
+// The manual path (admin action, admin API route, CLI) is the same two calls: the importer, then the profile step.
+const { runCordisImport } = await import('@/lib/k2-cordis/importer');
+const { runPartnerProfileStep } = await import('@/lib/k2-cordis/profileStep');
 
 const RUN = `T237${Date.now().toString(36)}`;
 const like = `${RUN}%`;
@@ -173,5 +176,32 @@ describe(SUITE, () => {
     expect(third.success).toBe(true);
     expect(third.skipped).toBe(true);
     expect(third.profiles).toBeUndefined();
+  });
+
+  test('manual path: a failed profile build throws to the caller and leaves an alert; the same button again rebuilds the profiles and closes it', async (ctx) => {
+    if (!ready) return ctx.skip();
+    localZip.path = dump('A');
+    profileCalls.failNext = true;
+    const context = { dataset: 'HORIZON' };
+
+    // 1. The admin action's sequence: import lands, the profile step throws. The error reaches the caller.
+    const first = await runCordisImport({ dataset: 'HORIZON' });
+    if (first.runId) runIds.add(first.runId);
+    expect(first.success).toBe(true);
+    expect(first.skipped).toBeFalsy();
+    await expect(runPartnerProfileStep(first.skipped === true, { ...context, runId: first.runId })).rejects.toThrow(
+      'injected: profile build failed'
+    );
+    const afterFail = await openK2Alerts();
+    expect(afterFail.map((a) => (a.meta as Record<string, unknown>)['alertDedupeKey'])).toEqual(['k2:partner-profiles-failed']);
+
+    // 2. The operator presses the same button again: "Zaten güncel", and the owed profiles are rebuilt.
+    const second = await runCordisImport({ dataset: 'HORIZON' });
+    if (second.runId) runIds.add(second.runId);
+    expect(second.success).toBe(true);
+    expect(second.skipped).toBe(true);
+    const profiles = await runPartnerProfileStep(second.skipped === true, { ...context, runId: second.runId });
+    expect(profiles?.updatedProfiles).toBe(3);
+    expect(await openK2Alerts()).toHaveLength(0);
   });
 });

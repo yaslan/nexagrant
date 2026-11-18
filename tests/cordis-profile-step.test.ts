@@ -48,6 +48,7 @@ vi.mock('@/lib/k2-cordis/partnerProfileJob', () => ({ generatePartnerProfiles })
 
 const { runPartnerProfileStep, partnerProfilesOwed } = await import('../src/lib/k2-cordis/profileStep');
 
+const CTX = { runId: 'RUN-1', dataset: 'HORIZON' };
 const PROFILES = { success: true, updatedProfiles: 3, updatedCoParticipations: 4, durationMs: 1 };
 
 beforeEach(() => {
@@ -59,14 +60,14 @@ beforeEach(() => {
 
 describe('runPartnerProfileStep', () => {
   it('builds the profiles after a fresh import', async () => {
-    const result = await runPartnerProfileStep(false);
+    const result = await runPartnerProfileStep(false, CTX);
 
     expect(result).toEqual(PROFILES);
     expect(generatePartnerProfiles).toHaveBeenCalledTimes(1);
   });
 
   it('leaves the profiles alone on an unchanged dump when no profile failure is open', async () => {
-    const result = await runPartnerProfileStep(true);
+    const result = await runPartnerProfileStep(true, CTX);
 
     expect(result).toBeNull();
     expect(generatePartnerProfiles).not.toHaveBeenCalled();
@@ -76,7 +77,7 @@ describe('runPartnerProfileStep', () => {
     alerts.push({ source: 'k2_monthly_cordis', meta: { alertDedupeKey: 'k2:partner-profiles-failed' }, resolvedAt: null });
     expect(await partnerProfilesOwed()).toBe(true);
 
-    const result = await runPartnerProfileStep(true);
+    const result = await runPartnerProfileStep(true, CTX);
 
     expect(result).toEqual(PROFILES);
     expect(generatePartnerProfiles).toHaveBeenCalledTimes(1);
@@ -89,14 +90,14 @@ describe('runPartnerProfileStep', () => {
     alerts.push({ source: 'k2_cordis_import', meta: { alertDedupeKey: 'k2:partner-profiles-failed' }, resolvedAt: null });
 
     expect(await partnerProfilesOwed()).toBe(false);
-    expect(await runPartnerProfileStep(true)).toBeNull();
+    expect(await runPartnerProfileStep(true, CTX)).toBeNull();
   });
 
   it('a profile build failed on the manual path raises the profile-failure alert, rethrows, and the next unchanged run rebuilds', async () => {
     generatePartnerProfiles.mockRejectedValueOnce(new Error('deadlock detected'));
 
     // Admin action / route / CLI: the import succeeded, the profile step throws.
-    await expect(runPartnerProfileStep(false, { runId: 'RUN-1' })).rejects.toThrow('deadlock detected');
+    await expect(runPartnerProfileStep(false, CTX)).rejects.toThrow('deadlock detected');
     expect(recordAlert).toHaveBeenCalledTimes(1);
     expect(recordAlert).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'k2_monthly_cordis', dedupeKey: 'k2:partner-profiles-failed' })
@@ -104,7 +105,7 @@ describe('runPartnerProfileStep', () => {
     expect(await partnerProfilesOwed()).toBe(true);
 
     // The operator presses the same button again: same dump, profiles are rebuilt and the alert closes.
-    const result = await runPartnerProfileStep(true, { runId: 'RUN-2' });
+    const result = await runPartnerProfileStep(true, CTX);
     expect(result).toEqual(PROFILES);
     expect(await partnerProfilesOwed()).toBe(false);
   });
@@ -113,7 +114,7 @@ describe('runPartnerProfileStep', () => {
     alerts.push({ source: 'k2_monthly_cordis', meta: { alertDedupeKey: 'k2:partner-profiles-failed' }, resolvedAt: null });
     generatePartnerProfiles.mockRejectedValue(new Error('deadlock detected'));
 
-    await expect(runPartnerProfileStep(true)).rejects.toThrow('deadlock detected');
+    await expect(runPartnerProfileStep(true, CTX)).rejects.toThrow('deadlock detected');
     expect(alerts[0]!.resolvedAt).toBeNull();
   });
 });

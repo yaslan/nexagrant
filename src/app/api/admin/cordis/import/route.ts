@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Null when the dump is unchanged and no profile failure is owed (NG-237).
-    const profileRes = (await runPartnerProfileStep(importRes.skipped === true)) ?? {
+    // A failed build raises the profile-failure alert and throws to the outer catch (logged, 500).
+    const profileRes = (await runPartnerProfileStep(importRes.skipped === true, { runId: importRes.runId, dataset })) ?? {
       updatedProfiles: 0,
       updatedCoParticipations: 0,
       durationMs: 0,
