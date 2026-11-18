@@ -9,8 +9,9 @@ import type { G0Computation } from '@/lib/scoring/g0-compute';
 import { DEFAULT_GATE_RULES } from '@/lib/scoring/defaults';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
 import type { SavedG0Decision } from '@/lib/gates/latest-g0-decision';
+import { listDecisions } from '@/lib/k5-pipeline/withdrawal';
 
-import { OpportunityDetailClient, type G0Display, type OpportunityView } from './client';
+import { OpportunityDetailClient, type DecisionEntry, type G0Display, type OpportunityView } from './client';
 import type { EffortEntry } from './effort';
 import { moduleGate } from '@/lib/modules/guard';
 
@@ -157,12 +158,23 @@ export default async function OpportunityDetailPage({
   // button is not authorisation — but showing a control that always refuses is its own defect.
   const canArchive = canArchiveOpportunity(role, loaded.opp.ownerId, userId);
 
+  // The decision log (NG-15 / NG-38): written by the withdrawal layer, read back here. Null means
+  // the opportunity is not this tenant's, which the `notFound()` above has already caught.
+  const decisionRows = await listDecisions({ tenantId }, id);
+  const decisions: DecisionEntry[] = (decisionRows ?? []).map((d) => ({
+    id: d.id,
+    kind: d.kind,
+    reason: d.reason,
+    decidedAt: d.decidedAt.toISOString(),
+  }));
+
   return (
     <OpportunityDetailClient
       opportunity={opportunity}
       g0={g0}
       savedG0={loaded.savedG0}
       efforts={loaded.efforts}
+      decisions={decisions}
       canArchive={canArchive}
       backHref={`/${locale}/${workspace}/pipeline`}
       locale={locale}
