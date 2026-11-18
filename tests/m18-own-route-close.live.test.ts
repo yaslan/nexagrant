@@ -335,6 +335,9 @@ describe.skipIf(!HAS_DB)('close_own_province_routes: only the caller\'s own rout
     const result: ProvinceRouteResult = await set;
     const closeError = early === 'pending' ? await close : early;
 
+    // NG-228 (NG-222 SEC B5): the close really waited on the set's tenant lock — without it this
+    // test would pass on an unlocked close too.
+    expect(early, 'the close waited for the set').toBe('pending');
     expect(closeError).toBeUndefined();
     expect(await m18(T.race)).toBe('OFF');
     expect(await activeTargets('Bilecik')).toEqual([]);
@@ -346,16 +349,21 @@ describe.skipIf(!HAS_DB)('close_own_province_routes: only the caller\'s own rout
   /**
    * Extra finding (NG-222 report, M18 writers): can the tenant's settings move M18 from PILOT to ON
    * or DEV? Both would close M18 to the tenant's own people (an unsold beta opens at PILOT only) and
-   * bypass the route close, which this action runs only on its OFF branch. Recorded as it behaves
-   * today; NG-222 does not change the ENABLE branch. The ONLY thing refusing it today is the
-   * entitlement check (no plan lists M18): a plan that ever lists M18 opens this hole (report risk).
+   * bypass the route close, which this action ran only on its OFF branch. Closed by NG-228: the
+   * action takes ON/OFF only and runs the route close on ON too.
    */
   describe('settings ENABLE branch for M18 (NG-222 extra finding)', () => {
-    test.each<[ModuleStatus]>([['ON'], ['DEV']])('PILOT → %s from the tenant\'s settings is refused and M18 stays PILOT', async (target) => {
+    // NG-228: DEV is refused before the plan check (the tenant action takes ON/OFF only); ON is
+    // still refused by entitlement here, and closes the route when a plan grants M18
+    // (tests/m18-settings-on-off-only.live.test.ts).
+    test.each<[ModuleStatus, RegExp]>([
+      ['ON', /Modül etkinleştirilemez: Plan upgrade required/],
+      ['DEV', /Geçersiz modül durumu/],
+    ])('PILOT → %s from the tenant\'s settings is refused and M18 stays PILOT', async (target, refusal) => {
       await setM18(T.enable, 'PILOT');
       session.userId = USER;
       session.tenantId = T.enable;
-      await expect(toggleModuleState('M18', target)).rejects.toThrow(/Modül etkinleştirilemez: Plan upgrade required/);
+      await expect(toggleModuleState('M18', target)).rejects.toThrow(refusal);
       expect(await m18(T.enable)).toBe('PILOT');
     });
   });
