@@ -240,8 +240,9 @@ export type OwnRouteCloseActor = { kind: 'tenant_user'; userId: string } | { kin
  * the `lead-route.deactivated` audit row. No scope escalation.
  *
  * `write` is the caller's ModuleState write, run on the same `tx`, so the module change and the
- * route change commit or roll back together. When `modulesTurnedOff` (the write's whole OFF list,
- * cascade included) holds M18:
+ * route change commit or roll back together. `modulesTurnedOff` is every module the write leaves
+ * closed to the tenant's own people (`isOpenToTenantMembers` false): the whole OFF list, cascade
+ * included, and — NG-228 — an unsold beta switched ON from settings (PILOT → ON). When it holds M18:
  *   1. the tenant row is locked first — the lock order of the route set and the platform-admin
  *      close (tenant row, then ModuleState), so the two closes cannot deadlock each other;
  *   2. `write` runs;

@@ -5,7 +5,8 @@ import { requireTenantAction } from '@/lib/tenant';
 import { can } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { ModuleId, ModuleStatus } from '@/lib/modules/types';
-import { canEnableEntitled, getDisableCascade } from '@/lib/modules/state-machine';
+import { canEnableEntitled, getDisableCascade, isOpenToTenantMembers } from '@/lib/modules/state-machine';
+import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
 import { withOwnRouteCloseOnM18Exit } from '@/lib/leads/province-route';
@@ -23,7 +24,21 @@ import { readModulesPlanView, type ModulesPlanView } from './plan-view';
  *
  * The tenant is the session's and nothing else, and the permission check runs
  * unconditionally.
+ *
+ * NG-228 (NG-222 SEC B4): the tenant switches a module ON or OFF, nothing else. `PILOT` and `DEV`
+ * are staff statuses, set from the admin console (`admin/modules/actions.ts`); accepted here, a
+ * plan that ever lists M18 would let the tenant make itself a province target (PILOT) or close M18
+ * to its own people (PILOT → ON/DEV) past the route close. Every write that leaves a module closed
+ * to the tenant's own people (`isOpenToTenantMembers`) — OFF, and ON for an unsold beta like M18 —
+ * goes through `withOwnRouteCloseOnM18Exit`, so M18 leaving the open set closes the routes too.
  */
+const TenantModuleTarget = z.enum(['ON', 'OFF']);
+
+/** The modules among `moduleIds` that `status` leaves closed to the tenant's own people. */
+function closedToMembersAt(moduleIds: readonly ModuleId[], status: ModuleStatus): ModuleId[] {
+  return moduleIds.filter((id) => !isOpenToTenantMembers(id, status));
+}
+
 export async function toggleModuleState(
   moduleId: ModuleId,
   targetStatus: ModuleStatus
@@ -33,6 +48,12 @@ export async function toggleModuleState(
   if (!can(role as Role, "manage_modules")) {
     throw new Error("Yetkisiz işlem: Modülleri yönetme izniniz bulunmuyor (Sadece Tenant Owner).");
   }
+
+  const parsedTarget = TenantModuleTarget.safeParse(targetStatus);
+  if (!parsedTarget.success) {
+    throw new Error('Geçersiz modül durumu: ayarlardan modül yalnız açılıp kapatılabilir.');
+  }
+  const target = parsedTarget.data;
 
   try {
     // Plan and active modules come from the same read the settings page shows
@@ -46,7 +67,7 @@ export async function toggleModuleState(
     );
     const activeModules = view.activeModules;
 
-    if (targetStatus === 'ON' || targetStatus === 'PILOT' || targetStatus === 'DEV') {
+    if (target === 'ON') {
       // Attempting to enable
       const check = canEnableEntitled(moduleId, activeModules, view.entitledModules);
       if (!check.allowed) {
@@ -54,7 +75,9 @@ export async function toggleModuleState(
       }
       
       try {
-        await withTenant(tenantId, async (tx) => {
+        // NG-228: ON closes an unsold beta (M18) to the tenant's own people, so PILOT → ON is an
+        // exit from the open set: the routes close in this same transaction.
+        await withTenant(tenantId, (tx) => withOwnRouteCloseOnM18Exit(tx, closedToMembersAt([moduleId], target), { kind: 'tenant_user', userId }, async () => {
           await tx.moduleState.upsert({
             where: {
               tenantId_moduleId: {
@@ -63,14 +86,14 @@ export async function toggleModuleState(
               }
             },
             update: {
-              status: targetStatus,
+              status: target,
               changedBy: userId,
               changedAt: new Date()
             },
             create: {
               tenantId,
               moduleId,
-              status: targetStatus,
+              status: target,
               changedBy: userId,
             }
           });
@@ -82,13 +105,13 @@ export async function toggleModuleState(
                 actorId: userId,
                 type: 'module.state.changed',
                 target: moduleId,
-                data: { status: targetStatus }
+                data: { status: target }
               }
             });
           } catch {
             // Audit log optional
           }
-        });
+        }));
       } catch (dbErr) {
         // Reporting success for a state the DB never took means the settings
         // page shows the module enabled until the next reload.
@@ -96,7 +119,7 @@ export async function toggleModuleState(
         throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
       }
       
-    } else if (targetStatus === 'OFF') {
+    } else {
       // Attempting to disable
       const cascade = getDisableCascade(moduleId, activeModules);
       const toDisable = [moduleId, ...cascade];
@@ -104,7 +127,7 @@ export async function toggleModuleState(
       try {
         // NG-222: M18 among them (directly or by cascade) closes the tenant's province routes in
         // this same transaction (withOwnRouteCloseOnM18Exit, no scope escalation).
-        await withTenant(tenantId, (tx) => withOwnRouteCloseOnM18Exit(tx, toDisable, { kind: 'tenant_user', userId }, async () => {
+        await withTenant(tenantId, (tx) => withOwnRouteCloseOnM18Exit(tx, closedToMembersAt(toDisable, 'OFF'), { kind: 'tenant_user', userId }, async () => {
           for (const modId of toDisable) {
             await tx.moduleState.upsert({
               where: {
