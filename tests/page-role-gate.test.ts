@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Role } from '@prisma/client';
 
 import { can, type Action } from '@/lib/rbac';
+import { NG_PLAN_VIEW_ACTION } from '@/lib/billing/nexagrant/access';
 
 /**
  * NG-64 — a tenant page the menu hides for a role is also closed to that role on
@@ -197,6 +198,35 @@ describe('each gated page names its door', () => {
       expect(source).not.toMatch(/from '@\/lib\/auth'/);
     });
   }
+});
+
+/**
+ * Pages whose door names a shared constant from `access.ts` instead of a literal (NG-11
+ * F4). The permission name stays defined in that one file; the page must pass the
+ * constant, and the constant must be the one this table is about.
+ */
+const PAGE_DOOR_CONSTANTS: Record<string, { name: 'NG_PLAN_VIEW_ACTION'; value: Action }> = {
+  'settings/plan/page.tsx': { name: 'NG_PLAN_VIEW_ACTION', value: NG_PLAN_VIEW_ACTION },
+};
+
+describe('each constant-named page takes its door from access.ts (NG-11 F4)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  for (const [file, { name, value }] of Object.entries(PAGE_DOOR_CONSTANTS)) {
+    test(`${file} → ${name} (${value})`, () => {
+      const source = readFileSync(path.join(root, file), 'utf8');
+      expect(source).toContain(`requireTenantPageRole(locale, ${name})`);
+      expect(source).toMatch(new RegExp(`import \\{[^}]*\\b${name}\\b[^}]*\\} from '@/lib/billing/nexagrant/access'`));
+      expect(source).not.toMatch(/\brequireTenantPage\(/);
+      expect(source).not.toMatch(/from '@\/lib\/auth'/);
+    });
+  }
+
+  test('the constant names a permission that rbac.ts defines and that the plan screen gives TENANT_OWNER only', () => {
+    expect(can('TENANT_OWNER', NG_PLAN_VIEW_ACTION)).toBe(true);
+    for (const role of ROLES.filter((r) => r !== 'TENANT_OWNER')) {
+      expect(can(role, NG_PLAN_VIEW_ACTION)).toBe(false);
+    }
+  });
 });
 
 describe('evaluation panel: the panel-wide scores are view_proposal only (review R-1)', () => {
