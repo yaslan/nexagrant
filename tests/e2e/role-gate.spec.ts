@@ -4,11 +4,14 @@ import type { Role } from '@prisma/client';
 import trMessages from '../../messages/tr.json';
 import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 import {
+  RG_IDEA_TITLE,
   RG_INVOICE_NO,
   RG_OPP_ID,
   RG_OPP_TITLE,
   RG_PANEL_AVG_TEXT,
   RG_PANEL_EVAL_ID,
+  RG_PROFILE_TEXT,
+  RG_PROVINCE,
   RG_REL_ID,
   RG_REL_NAME,
   RG_SEATS,
@@ -54,6 +57,10 @@ const GUEST_CLOSED = [
   `${ws}/settings/billing`,
   `${ws}/ayarlar/kapilar`,
   `${ws}/settings/gates`,
+  // NG-240: the tenant's project ideas and company profile (ayarlar/profil is the alias of settings/profile).
+  `${ws}/proje-fikri`,
+  `${ws}/settings/profile`,
+  `${ws}/ayarlar/profil`,
 ];
 
 /** Any CORDIS-shaped PIC: the door is the role, the PIC is never reached. */
@@ -72,6 +79,12 @@ async function expectClosed(page: Page, path: string) {
   expect(html, path).not.toContain(RG_OPP_TITLE);
   expect(html, path).not.toContain(RG_REL_NAME);
   expect(html, path).not.toContain(RG_INVOICE_NO);
+  expect(html, path).not.toContain(RG_IDEA_TITLE);
+  expect(html, path).not.toContain(RG_PROFILE_TEXT);
+  // NG-240 (review E1): the stored province and the card that shows it. The dropdown
+  // lists every province, so only the selected option (value="<il>") proves a leak.
+  expect(html, path).not.toContain(`value="${RG_PROVINCE}"`);
+  expect(html, path).not.toContain('data-testid="tenant-province-setting"');
 }
 
 async function expectOpen(page: Page, path: string) {
@@ -231,9 +244,22 @@ test.describe.serial('NG-64 page role gates', () => {
   });
 
   test('GUEST_PARTNER keeps the pages that have no tenant read behind a role', async ({ page }) => {
+    // cagrilar is the global call catalogue (no tenant data). ayarlar/profil was wrongly
+    // listed here: it reads the tenant's company profile, so it is in GUEST_CLOSED (NG-240).
     await signIn(page, 'GUEST_PARTNER');
     await expectOpen(page, `${ws}/cagrilar`);
-    await expectOpen(page, `${ws}/ayarlar/profil`);
+  });
+
+  test('NG-240 control: MEMBER (view_proposal) and TENANT_OWNER open proje-fikri and settings/profile with the tenant text', async ({ page }) => {
+    test.setTimeout(120_000);
+    for (const role of ['MEMBER', 'TENANT_OWNER'] as const) {
+      await signIn(page, role);
+      await expectOpen(page, `${ws}/proje-fikri`);
+      await expect(page.getByText(RG_IDEA_TITLE).first(), role).toBeVisible();
+      await expectOpen(page, `${ws}/settings/profile`);
+      // The profile text sits in a form field (a textarea value), so read the markup, not visible text.
+      expect(await page.content(), role).toContain(RG_PROFILE_TEXT);
+    }
   });
 
   test('MEMBER reads the opportunity and relationship, keeps API keys, is refused members', async ({ page }) => {
