@@ -4,8 +4,8 @@ import { presentIds, requireId } from '../../helpers/teardown-guard';
 
 /**
  * NG-11 — three tenants, one per trial state of the NG-57 contract, each with its own
- * MEMBER seat (the plan screen is read-only for every role, so the lowest
- * seat proves it):
+ * TENANT_OWNER seat (the only role the plan screen admits; NG_PLAN_REFUSED_SEATS adds a MEMBER
+ * and a GUEST_PARTNER on the running tenant, to prove the refusal):
  *
  *   none    — no NgSubscription row: the reader falls back to the fallback plan.
  *   running — a real `ng-trial` row, TRIALING, ending in the future.
@@ -56,6 +56,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export interface NgTrialRow {
   trialStartedAt: Date;
   trialEndsAt: Date;
+  /** When the server settled the expiry: a different moment from `trialEndsAt` (null while running). */
+  trialEndedAt: Date | null;
   planId: string;
   trialEndPlanId: string;
 }
@@ -71,16 +73,24 @@ export async function setupNgPlanTenants(now = new Date()): Promise<Record<'runn
     const running: NgTrialRow = {
       trialStartedAt: new Date(now.getTime() - 2 * DAY_MS),
       trialEndsAt: new Date(now.getTime() + (policy.days - 2) * DAY_MS - 60 * 60 * 1000),
+      trialEndedAt: null,
       planId: policy.planId,
       trialEndPlanId: policy.endPlanId,
     };
-    // Ended: started policy.days + 1 days ago, ended a day ago, never settled.
+    // Ended: started policy.days + 1 days ago, ended a day ago, settled today (trialEndedAt is
+    // a different day from trialEndsAt, so a screen that shows the settle moment is caught).
     const ended: NgTrialRow = {
       trialStartedAt: new Date(now.getTime() - (policy.days + 1) * DAY_MS),
       trialEndsAt: new Date(now.getTime() - DAY_MS),
+      trialEndedAt: new Date(now.getTime()),
       planId: policy.planId,
       trialEndPlanId: policy.endPlanId,
     };
+
+    // The platform subscription needs a real platform plan. Read it from the seeded catalogue
+    // (the highest-priced one) rather than typing an id that a re-seed could drop.
+    const platformPlan = await tx.plan.findFirst({ orderBy: { monthlyCents: 'desc' }, select: { id: true } });
+    if (!platformPlan) throw new Error('platform Plan catalogue missing: run pnpm db:setup');
 
     for (const state of NG_PLAN_STATES) {
       const f = ngPlanFixture(state);
@@ -91,8 +101,8 @@ export async function setupNgPlanTenants(now = new Date()): Promise<Record<'runn
       });
       await tx.subscription.upsert({
         where: { tenantId: f.tenantId },
-        create: { tenantId: f.tenantId, planId: 'ultra', status: 'ACTIVE' },
-        update: { planId: 'ultra', status: 'ACTIVE', planVersionId: null },
+        create: { tenantId: f.tenantId, planId: platformPlan.id, status: 'ACTIVE' },
+        update: { planId: platformPlan.id, status: 'ACTIVE', planVersionId: null },
       });
       await tx.workspace.upsert({
         where: { id: f.workspaceId },
@@ -135,6 +145,7 @@ export async function setupNgPlanTenants(now = new Date()): Promise<Record<'runn
             trialSegment: 'default',
             trialStartedAt: row.trialStartedAt,
             trialEndsAt: row.trialEndsAt,
+            trialEndedAt: row.trialEndedAt,
             trialEndPlanId: row.trialEndPlanId,
           },
         });

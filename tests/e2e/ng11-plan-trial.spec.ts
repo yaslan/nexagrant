@@ -133,6 +133,12 @@ test.describe('NG-11 plan and trial screen', () => {
     await expect(page.getByRole('radio', { name: m.plans.interval.year })).toBeChecked();
     await page.getByText(m.plans.interval.month, { exact: true }).click();
     await expect(page.getByRole('radio', { name: m.plans.interval.month })).toBeChecked();
+    // Hit area of every currency / interval choice is at least 44 px tall (WCAG 2.5.5; NG-11 B2).
+    // The radio itself is sr-only, so the measured box is the wrapping label the user clicks.
+    for (const name of [m.plans.currency.TRY, m.plans.currency.EUR, m.plans.interval.year, m.plans.interval.month]) {
+      const box = await page.locator('label', { has: page.getByRole('radio', { name }) }).first().boundingBox();
+      expect(box?.height ?? 0, `hit area of "${name}"`).toBeGreaterThanOrEqual(44);
+    }
     // Still nothing priced: switching shows another cell, it never invents an amount.
     for (const plan of catalogue.filter((p) => p.sellable)) {
       await expect(page.getByTestId(`ng-plan-card-${plan.id}`)).toHaveAttribute('data-price-state', 'soon');
@@ -221,6 +227,10 @@ test.describe('NG-11 plan and trial screen', () => {
       await expect(page.getByTestId('ng-trial')).toContainText(MESSAGES[locale].trial.endedBadge);
       await expect(page.getByTestId('ng-trial-days-left')).toHaveCount(0);
       await expect(page.getByTestId('ng-trial-date')).toContainText(localDate(row.trialEndsAt, locale));
+      // The settle moment is a different day and is not what the screen states: only endsAt is shown.
+      expect(row.trialEndedAt, 'fixture: ended row has a settle day').toBeTruthy();
+      expect(localDate(row.trialEndedAt!, locale)).not.toBe(localDate(row.trialEndsAt, locale));
+      await expect(page.getByTestId('ng-trial')).not.toContainText(localDate(row.trialEndedAt!, locale));
       await expect(page.getByTestId('ng-plan-current')).toHaveAttribute('data-plan-id', row.trialEndPlanId);
       const endTier = catalogue.find((p) => p.id === row.trialEndPlanId)!.tier;
       await expect(page.getByTestId('ng-trial-end-plan')).toContainText(tierName(locale, endTier));
