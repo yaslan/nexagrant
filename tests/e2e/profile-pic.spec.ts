@@ -440,6 +440,22 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
       expect(await storedPic(PP_TENANT)).toBeNull();
     });
 
+    // NG-229. The banner hides itself four seconds after a save. The timer of the first save used
+    // to stay armed, so a second save inside those four seconds had its banner taken down early.
+    test('NG-229: the banner of a second save is not taken down by the timer of the first', async ({ page }) => {
+      await setPic(null);
+      await openProfile(page, PP_OWNER);
+      await saveKeywordsOnly(page, 'banner first save');
+
+      // Inside the first banner's four seconds; the waits below are the scenario, not a budget.
+      await page.waitForTimeout(3_000);
+      await saveKeywordsOnly(page, 'banner second save');
+
+      // Past the first save's four seconds, well inside the second's.
+      await page.waitForTimeout(1_500);
+      await expect(page.getByText('başarıyla güncellendi')).toBeVisible();
+    });
+
     test('B6: an old-format PIC does not block a save that leaves it alone, and is refused once edited', async ({ page }) => {
       await setPic('12345');
       await openProfile(page, PP_OWNER);
