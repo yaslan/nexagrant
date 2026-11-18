@@ -11,6 +11,7 @@ import {
   RG_PANEL_AVG_TEXT,
   RG_PANEL_EVAL_ID,
   RG_PROFILE_TEXT,
+  RG_PROVINCE,
   RG_REL_ID,
   RG_REL_NAME,
   RG_SEATS,
@@ -80,6 +81,10 @@ async function expectClosed(page: Page, path: string) {
   expect(html, path).not.toContain(RG_INVOICE_NO);
   expect(html, path).not.toContain(RG_IDEA_TITLE);
   expect(html, path).not.toContain(RG_PROFILE_TEXT);
+  // NG-240 (review E1): the stored province and the card that shows it. The dropdown
+  // lists every province, so only the selected option (value="<il>") proves a leak.
+  expect(html, path).not.toContain(`value="${RG_PROVINCE}"`);
+  expect(html, path).not.toContain('data-testid="tenant-province-setting"');
 }
 
 async function expectOpen(page: Page, path: string) {

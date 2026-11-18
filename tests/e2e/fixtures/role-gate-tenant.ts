@@ -41,6 +41,12 @@ export const RG_OWNER_MARK = 1;
  */
 export const RG_IDEA_TITLE = 'NG240 kiracıya özel proje fikri';
 export const RG_PROFILE_TEXT = 'NG240 kurum yetkinlik metni';
+/**
+ * NG-240 (review E1): the tenant's stored province. The province dropdown lists all 81
+ * names, so the leak test looks for the SELECTED option (`value="<il>"`) and the card's
+ * test id, not for the bare name.
+ */
+export const RG_PROVINCE = 'Samsun';
 
 /** The stored panel average, as the save recomputed it. */
 export async function readPanelAverage(): Promise<number | null> {
@@ -63,8 +69,9 @@ const MODULES = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M
 export async function setupRoleGateTenant() {
   await prisma.tenant.upsert({
     where: { id: RG_TENANT },
-    create: { id: RG_TENANT, name: 'role gate e2e (internal)', slug: RG_TENANT, country: 'TR', orgType: 'SME' },
-    update: {},
+    // NG-240: a TR tenant with a stored province, so the province card has a value to leak.
+    create: { id: RG_TENANT, name: 'role gate e2e (internal)', slug: RG_TENANT, country: 'TR', province: RG_PROVINCE, orgType: 'SME' },
+    update: { country: 'TR', province: RG_PROVINCE },
   });
   await prisma.subscription.upsert({
     where: { tenantId: RG_TENANT },
