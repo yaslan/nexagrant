@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 import { errorMessage } from '@/lib/errors';
 import { PlatformAdminRequiredError } from '@/lib/tenant';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
-import type { IntakeTenantOption, ProvinceLeadRouteRow, UnmatchedLeadRow, UnmatchedReason } from '@/core/contracts/lead-routing';
-import { listIntakeTenantOptionsAction, listProvinceLeadRoutesAction, listUnmatchedLeadsAction } from './actions';
+import type { IntakeTenantOption, ProvinceLeadRouteRow, StuckRoutedLeadPage, UnmatchedLeadRow, UnmatchedReason } from '@/core/contracts/lead-routing';
+import { listIntakeTenantOptionsAction, listProvinceLeadRoutesAction, listStuckRoutedLeadsAction, listUnmatchedLeadsAction } from './actions';
 import LeadRoutesClient, { type ProvinceView } from './client';
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +33,7 @@ const REASON_KEY = {
   province_missing: 'reason_province_missing',
   province_unmapped: 'reason_province_unmapped',
   tenant_refused: 'reason_tenant_refused',
+  consent_recipient_mismatch: 'reason_consent_recipient_mismatch',
 } as const satisfies Record<UnmatchedReason, string>;
 
 /**
@@ -69,6 +70,15 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
     unmatchedError = true;
   }
 
+  // NG-182: routed leads with no copy in their tenant. Read-only; no re-send here.
+  let stuck: StuckRoutedLeadPage | null = null;
+  try {
+    stuck = await listStuckRoutedLeadsAction();
+  } catch (e) {
+    if (e instanceof PlatformAdminRequiredError) notFound();
+    console.error(`[AdminLeadRoutesPage] stuck load failed: ${errorMessage(e)}`);
+  }
+
   // Tenants a province can be routed to (the `isIntakeTenant` rule, applied by the action). The server re-checks on save.
   let intakeTenants: IntakeTenantOption[] = [];
   let tenantsError = false;
@@ -82,7 +92,7 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
   const picked = pickRoutes(routes);
   const provinces: ProvinceView[] = TR_PROVINCES.map((province) => {
     const r = picked.get(province);
-    if (!r) return { province, status: 'unmapped', tenantId: null, tenantName: null, changedBy: null, changedAt: null };
+    if (!r) return { province, status: 'unmapped', tenantId: null, tenantName: null, changedBy: null, changedAt: null, targetIneligible: false };
     return {
       province,
       status: r.active ? 'active' : 'inactive',
@@ -90,6 +100,7 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
       tenantName: r.tenantName,
       changedBy: r.updatedBy ? r.updatedByName || t('unknown_actor') : null,
       changedAt: formatUtc(r.updatedAt),
+      targetIneligible: r.active && !r.targetEligible,
     };
   });
   const unmappedCount = provinces.filter((p) => p.status !== 'active').length;
@@ -167,6 +178,55 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section aria-labelledby="lead-routes-stuck" className="space-y-3" data-testid="lead-routes-stuck">
+        <div>
+          <h2 id="lead-routes-stuck" className="text-lg font-bold text-ink">{t('stuck_title')}</h2>
+          {stuck && <p className="mt-1 max-w-3xl text-sm text-ink-2">{t('stuck_subtitle', { minutes: stuck.olderThanMinutes })}</p>}
+        </div>
+
+        {!stuck ? (
+          <p role="alert" className="rounded-lg border border-bad bg-surface px-4 py-3 text-sm font-medium text-bad">
+            {t('stuck_load_error')}
+          </p>
+        ) : stuck.rows.length === 0 ? (
+          <p className="rounded-lg border border-border bg-surface px-4 py-6 text-sm text-ink-2">{t('stuck_empty')}</p>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-bad">{t('stuck_count', { shown: stuck.rows.length, total: stuck.total })}</p>
+            <div className="overflow-x-auto rounded-xl border border-border bg-surface" tabIndex={0} role="region" aria-label={t('stuck_title')}>
+              <table className="min-w-full text-left text-sm">
+                <caption className="sr-only">{t('stuck_title')}</caption>
+                <thead className="bg-surface-hover text-xs font-semibold uppercase tracking-wide text-ink-2">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 whitespace-nowrap">{t('col_routed_at')}</th>
+                    <th scope="col" className="px-3 py-2">{t('col_routed_tenant')}</th>
+                    <th scope="col" className="px-3 py-2">{t('col_org')}</th>
+                    <th scope="col" className="px-3 py-2">{t('col_location')}</th>
+                    <th scope="col" className="px-3 py-2 whitespace-nowrap">{t('col_created')}</th>
+                    <th scope="col" className="px-3 py-2">{t('col_lead_id')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border text-ink">
+                  {stuck.rows.map((r) => (
+                    <tr key={r.publicLeadId} className="align-top">
+                      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{r.routedAt ? formatUtc(r.routedAt) : t('none')}</td>
+                      <td className="px-3 py-2">
+                        <div>{r.routedTenantName ?? t('none')}</div>
+                        {r.tenantDeleted && <div className="text-xs font-semibold text-bad">{t('tenant_deleted')}</div>}
+                      </td>
+                      <td className="px-3 py-2">{r.organisation}</td>
+                      <td className="px-3 py-2">{r.province ?? t('none')}</td>
+                      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{formatUtc(r.createdAt)}</td>
+                      <td className="px-3 py-2 font-mono text-xs break-all">{r.publicLeadId}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

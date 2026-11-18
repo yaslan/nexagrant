@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import type { TLSSocket } from 'node:tls';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -22,6 +22,7 @@ import {
   parseRobots,
   pickSubpages,
   robotsAllows,
+  testOnlyPinnedTransport,
 } from '@/modules/m18/server/site-fetch';
 
 /**
@@ -99,6 +100,15 @@ describe('isPublicAddress', () => {
     '2001:db8::1',
     'not-an-ip',
   ])('not public: %s', (ip) => expect(isPublicAddress(ip)).toBe(false));
+  // NG-205 (SEC NG-203 B-A1, defence in depth): Teredo 2001::/32 tunnels an IPv4 inside the address,
+  // and 192.88.99.0/24 is the deprecated 6to4 relay anycast (RFC 7526). Neither is a website.
+  it.each(['2001:0:a00:1::', '2001::1', '2001:0000:4136:e378:8000:63bf:3fff:fdd2', '192.88.99.1'])(
+    'not public (tunnel/relay): %s',
+    (ip) => expect(isPublicAddress(ip)).toBe(false),
+  );
+  it.each(['2001:4860:4860::8888', '2001:200::1', '192.88.98.1'])('public next to those blocks: %s', (ip) =>
+    expect(isPublicAddress(ip)).toBe(true),
+  );
 });
 
 describe('robots.txt', () => {
@@ -163,6 +173,61 @@ describe('htmlToText and pickSubpages', () => {
     const picked = pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname);
     expect(picked).toEqual(['/hakkimizda%E0%A4%A', '/iletisim']);
   });
+  it('NG-202 B4: links inside <script>, <template>, <noscript> or a comment are not candidates', () => {
+    const html =
+      `<script>var nav = '<a href="/hakkimizda">Hakkımızda</a>';</script>` +
+      `<!-- <a href="/iletisim">İletişim</a> -->` +
+      `<template><a href="/kurumsal">Kurumsal</a></template>` +
+      `<noscript><a href="/contact">Contact</a></noscript>` +
+      `<a href="/about">About</a>`;
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
+  it('NG-202 B4: an unclosed <script> hides the links after it, as it hides the text', () => {
+    const html = `<a href="/about">About</a><script>var a = 1; <a href="/iletisim">İletişim</a>`;
+    expect(htmlToText(html)).toBe('About');
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
+  // NG-207 F1: comments and hidden elements are found in ONE left-to-right scan. A `<!--` inside a
+  // <script> is script text and one inside an attribute value is that value — neither opens a comment,
+  // so the visible links and text up to the next `-->` stay.
+  it('NG-207 F1: a "<!--" inside a <script> does not hide the visible link after it', () => {
+    const html = '<script>var s="<!--";</script><a href="/about">About</a><script>var e="-->";</script>';
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
+  it('NG-207 F1: a "<!--" inside an attribute value does not hide the links after it', () => {
+    const html = '<a href="/about" title="<!--">About</a><a href="/iletisim">İletişim</a><!-- end -->';
+    expect(pickSubpages(html, new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about', '/iletisim']);
+  });
+  it('NG-207 F1: the same "<!--" does not hide visible text either', () => {
+    expect(htmlToText('<script>var s="<!--";</script><p>Acme 45 çalışan</p><script>var e="-->";</script>')).toBe('Acme 45 çalışan');
+    expect(htmlToText("<p title='<!--'>Acme</p><p>45 çalışan</p><!-- end -->")).toBe('Acme\n45 çalışan');
+  });
+  it('NG-207 F1: an unclosed comment still hides the links after it; a comment still hides a <script> in it', () => {
+    const base = new URL('https://acme.com.tr/');
+    expect(pickSubpages('<a href="/about">About</a><!-- <a href="/iletisim">İletişim</a>', base).map((u) => u.pathname)).toEqual(['/about']);
+    expect(pickSubpages('<!-- <script> --><a href="/about">About</a>', base).map((u) => u.pathname)).toEqual(['/about']);
+    expect(htmlToText('<!-- <script> --><p>Acme</p>')).toBe('Acme');
+  });
+  // NG-207 F2: a comment ends as a browser ends it — `<!-->` and `<!--->` close at once, `--!>` closes
+  // like `-->` — so the visible links after it are not swallowed up to some later `-->`.
+  it('NG-207 F2: "<!-->" and "<!--->" are empty comments, not openers', () => {
+    const base = new URL('https://acme.com.tr/');
+    const paths = (html: string) => pickSubpages(html, base).map((u) => u.pathname);
+    expect(paths('<!--><a href="/about">About</a><!--->')).toEqual(['/about']);
+    expect(paths('<!---><a href="/about">About</a>')).toEqual(['/about']);
+    expect(paths('<!--><a href="/about">About</a><!-- x --><a href="/iletisim">İletişim</a>')).toEqual(['/about', '/iletisim']);
+  });
+  it('NG-207 F2: "--!>" closes a comment', () => {
+    expect(pickSubpages('<!-- a --!><a href="/about">About</a>', new URL('https://acme.com.tr/')).map((u) => u.pathname)).toEqual(['/about']);
+  });
+  // NG-207 F3: `<!` not followed by `--` (a doctype or a bogus comment) runs to the next `>`; a quoted
+  // `<!--` inside it opens no comment.
+  it('NG-207 F3: a "<!--" inside a doctype or a "<!x …>" declaration hides nothing', () => {
+    const base = new URL('https://acme.com.tr/');
+    const paths = (html: string) => pickSubpages(html, base).map((u) => u.pathname);
+    expect(paths('<!DOCTYPE html PUBLIC "<!--"><a href="/about">About</a>')).toEqual(['/about']);
+    expect(paths('<!x title="<!--"><a href="/about">About</a><a href="/iletisim">İletişim</a>')).toEqual(['/about', '/iletisim']);
+  });
   it('picks only same-site about/contact links, at most four', () => {
     const picked = pickSubpages(HOME_HTML, new URL('https://acme.com.tr/')).map((u) => u.pathname);
     expect(picked).toHaveLength(MAX_PAGES - 1);
@@ -178,9 +243,13 @@ describe('htmlToText and pickSubpages', () => {
  * 1 MB of hostile HTML held the event loop for 5–167 s. The read's time budget only stops I/O, not
  * this CPU work, so the parse itself must be linear.
  */
-describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () => {
-  const MB = 1_000_000;
-  const fill = (unit: string) => unit.repeat(Math.ceil(MB / unit.length)).slice(0, MB);
+describe('HTML parsing is linear on hostile input (100 KB, no closing tags)', () => {
+  // NG-214 review 2: 100 KB, not 1 MB. The parse is synchronous, so vitest's timeout cannot cut a
+  // regressed (quadratic) pass short: at 1 MB the `<[^>]+>` mutation ran for 400 s without failing.
+  // At 100 KB it ends in seconds and fails on the ratio (150–600x against the 12x limit), while
+  // correct code still sits far below it.
+  const SIZE = 100_000;
+  const fill = (unit: string) => unit.repeat(Math.ceil(SIZE / unit.length)).slice(0, SIZE);
   const base = new URL('https://acme.com.tr/');
   const hostile: [string, string][] = [
     ['unclosed <script> many times', fill('<script>x ')],
@@ -195,16 +264,42 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     // NG-136 review (round 4, B1): every label window is 2 000 `<` with no `>`; a `<[^>]+>` label
     // strip rescans the window from each `<` (~1 s over 500 anchors).
     ['many <a href> each followed by 2000 < with no >', fill(`<a href="/hakkimizda">${'<'.repeat(2000)}`)],
+    // NG-202 (B5): anchors with no about/contact hint are no longer counted, so the whole page is
+    // scanned; it must stay linear.
+    ['many bare <a> (no href, no hint)', fill('<a>')],
+    ['many ordinary closed links (no hint)', fill('<a href=x>x</a>')],
+    // NG-207 F1: comments and hidden elements are found in one scan that passes each tag whole (its
+    // quoted attribute values included); an unclosed quote must not make it rescan from each later tag.
+    ['one unclosed attribute quote, then many <a', `<a x="${fill('<a href=/about>about ')}`],
+    ['many "<!--" inside attribute values and scripts', fill('<a href="/about" title="<!--">About</a><script>"<!--"</script>')],
   ];
-  it.each(hostile)('%s: htmlToText and pickSubpages finish within the wall-clock budget', (_name, html) => {
+  // NG-214: no absolute wall-clock limit. A fixed millisecond bound fails on a loaded machine (the
+  // same code took 460–760 ms against a 400 ms limit while another gate ran). The cost is measured
+  // against a reference parse of the same size done right beside it, in the same process: load
+  // slows both the same way, so the ratio does not move, while a rescanning pass costs 25x or more.
+  // Each side is the best of RUNS interleaved runs, which drops the runs a noisy neighbour hit.
+  const RUNS = 5;
+  // The reference must NOT be hostile itself: a `<`-dense reference (`< x `) goes down the same path as
+  // the input, so a `<[^>]+>` rescan in htmlToText would slow both and leave the ratio at ~1 (NG-214
+  // review B1). Closed tags are linear for every pass, old regexes included.
+  // Correct code measures 0.05–3.6x this reference; a pickSubpages label rescan 29x, an htmlToText
+  // `<[^>]+>` 150–600x.
+  const MAX_RATIO = 12;
+  const reference = fill('<p>x </p> ');
+  const parseMs = (html: string): number => {
     const started = performance.now();
     htmlToText(html);
-    const textMs = performance.now() - started;
-    const linkStarted = performance.now();
     pickSubpages(html, base);
-    const linkMs = performance.now() - linkStarted;
-    expect(textMs).toBeLessThan(slack(400));
-    expect(linkMs).toBeLessThan(slack(400));
+    return performance.now() - started;
+  };
+  it.each(hostile)('%s: htmlToText and pickSubpages cost a bounded multiple of a linear reference parse', (_name, html) => {
+    let best = Infinity;
+    let bestReference = Infinity;
+    for (let run = 0; run < RUNS; run += 1) {
+      bestReference = Math.min(bestReference, parseMs(reference));
+      best = Math.min(best, parseMs(html));
+    }
+    expect(best / Math.max(bestReference, 1)).toBeLessThan(MAX_RATIO);
   });
 
   it('an unclosed <script>/<style>/<noscript>/<template> hides the rest of the page (as a browser does)', () => {
@@ -218,17 +313,29 @@ describe('HTML parsing is linear on hostile input (1 MB, no closing tags)', () =
     expect(htmlToText('<p>Logo <svg viewBox="0 0 1 1"/> Acme</p>')).toBe('Logo Acme');
   });
 
-  it('a link label is capped and the number of anchors read is capped', () => {
+  it('a link label is capped and the number of candidate anchors resolved is capped', () => {
     // The label hint is read from a bounded window: a hint 5 000 characters into an unclosed label
     // does not count, one inside the window does.
     const far = `<a href="/x">${'y'.repeat(5000)} about</a>`;
     expect(pickSubpages(far, base)).toEqual([]);
     expect(pickSubpages('<a href="/x">about</a>', base).map((u) => u.pathname)).toEqual(['/x']);
-    // Only the first MAX_ANCHORS anchors are looked at.
-    const many = `${'<a href="/urun">Ürün</a>'.repeat(MAX_ANCHORS)}<a href="/hakkimizda">Hakkımızda</a>`;
+    // Only the first MAX_ANCHORS candidates (an about/contact hint in href or label) are resolved —
+    // here another site's about links, each one resolved and refused (NG-202 B5).
+    const offsiteAbout = '<a href="https://other.example.org/about">About</a>';
+    const many = `${offsiteAbout.repeat(MAX_ANCHORS)}<a href="/hakkimizda">Hakkımızda</a>`;
     expect(pickSubpages(many, base)).toEqual([]);
-    const within = `${'<a href="/urun">Ürün</a>'.repeat(MAX_ANCHORS - 1)}<a href="/hakkimizda">Hakkımızda</a>`;
+    const within = `${offsiteAbout.repeat(MAX_ANCHORS - 1)}<a href="/hakkimizda">Hakkımızda</a>`;
     expect(pickSubpages(within, base).map((u) => u.pathname)).toEqual(['/hakkimizda']);
+  });
+
+  it('NG-202 B5: an about link after more than MAX_ANCHORS ordinary menu links is still found', () => {
+    // A shop menu: product links (same site, no about/contact hint), links to other sites, anchors with
+    // no href. None of them can ever be picked, so none of them may use up the anchor budget.
+    const products = Array.from({ length: MAX_ANCHORS + 100 }, (_, i) => `<a href="/urun/${i}">Ürün ${i}</a>`).join('');
+    const offsite = Array.from({ length: 50 }, (_, i) => `<a href="https://other${i}.example.org/">Partner</a>`).join('');
+    const bare = '<a name="top">Top</a>'.repeat(50);
+    const html = `${products}${offsite}${bare}<a href="/hakkimizda">Hakkımızda</a><a href="/iletisim">İletişim</a>`;
+    expect(pickSubpages(html, base).map((u) => u.pathname)).toEqual(['/hakkimizda', '/iletisim']);
   });
 });
 
@@ -381,25 +488,42 @@ describe('pinned transport (connect-time address check)', () => {
     res.end();
   };
 
+  it('NG-202 B6: the exported createPinnedFetch takes no connect port — the socket goes to the URL\'s own port', async () => {
+    const { port, hits } = await serve((_req, res) => html(res, 'x'));
+    const opts = { resolve: LOCAL, allowed: localOnly, connectPort: port };
+    const fetchImpl = createPinnedFetch(opts);
+    await fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) }).catch(() => null);
+    expect(hits).toEqual([]);
+  });
+
   it('DNS rebinding: the first answer is public, the connection-time answer is private → no request is sent', async () => {
     const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
     // The pre-check (deps.lookup) sees a public address; the socket's own resolution gets 127.0.0.1.
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, connectPort: port });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, connectPort: port });
     const res = await fetchOrganizationSite('http://acme.com.tr', { lookup: PUBLIC, fetchImpl });
     expect(res).toEqual({ ok: false, reason: 'robots_unreadable' });
     expect(hits).toEqual([]);
   });
 
+  it('the real transport refuses a 10.0.0.1 answer: no socket reaches the server (NG-209 sec F3)', async () => {
+    const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
+    const fetchImpl = testOnlyPinnedTransport({ resolve: async () => ['10.0.0.1'], connectPort: port });
+    await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
+    // Through the reader too: the pre-check saw a public address, the transport's own answer is 10.0.0.1.
+    expect(await fetchOrganizationSite('http://acme.com.tr', { lookup: PUBLIC, fetchImpl })).toEqual({ ok: false, reason: 'robots_unreadable' });
+    expect(hits).toEqual([]);
+  });
+
   it('a mixed answer (one public, one private) is refused at connect time', async () => {
     const { port, hits } = await serve((_req, res) => html(res, '<p>internal</p>'));
-    const fetchImpl = createPinnedFetch({ resolve: async () => ['93.184.216.34', '127.0.0.1'], connectPort: port });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: async () => ['93.184.216.34', '127.0.0.1'], connectPort: port });
     await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
     expect(hits).toEqual([]);
   });
 
   it('a literal private IP is refused without a lookup', async () => {
     const { port, hits } = await serve((_req, res) => html(res, 'x'));
-    const fetchImpl = createPinnedFetch({ resolve: PUBLIC, connectPort: port });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: PUBLIC, connectPort: port });
     await expect(fetchImpl(new URL('http://127.0.0.1/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
     expect(hits).toEqual([]);
   });
@@ -534,7 +658,7 @@ describe('pinned transport (connect-time address check)', () => {
     }
     vi.stubGlobal('Headers', RefusingHeaders);
     try {
-      const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port });
+      const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, allowed: localOnly, connectPort: port });
       await expect(fetchImpl(new URL('http://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/invalid header value/);
     } finally {
       vi.unstubAllGlobals();
@@ -663,6 +787,17 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
   const LOCAL = async () => ['127.0.0.1'];
   const localOnly = (ip: string) => ip === '127.0.0.1';
 
+  it('NG-202 B6: the exported createPinnedFetch takes no CA — a caller cannot swap the system trust store', async () => {
+    const { port, cert, seen } = await serveTls((_req, res) => res.end('x'));
+    // A plain object (not a literal), as a future caller holding an options bag would pass it.
+    const opts = { resolve: LOCAL, allowed: localOnly, ca: cert };
+    const fetchImpl = createPinnedFetch(opts);
+    await expect(fetchImpl(new URL(`https://acme.com.tr:${port}/`), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(
+      /self[- ]signed|certificate/i,
+    );
+    expect(seen).toEqual([]);
+  });
+
   it('reads a site over https: SNI and Host carry the site name, the certificate is checked against it', async () => {
     const { port, cert, seen } = await serveTls((req, res) => {
       if (req.url === '/robots.txt') {
@@ -673,7 +808,7 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end(req.url === '/' ? '<title>Acme</title><a href="/hakkimizda">Hakkımızda</a>' : '<p>45 çalışan</p>');
     });
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
     const res = await fetchOrganizationSite('https://acme.com.tr', { lookup: LOCAL, addressAllowed: localOnly, fetchImpl });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -687,7 +822,7 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
 
   it('DNS rebinding over https: a private connect-time answer is refused before the TLS handshake', async () => {
     const { port, cert, seen, connections } = await serveTls((_req, res) => res.end('internal'));
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, connectPort: port, ca: cert }); // default guard: public only
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, connectPort: port, ca: cert }); // default guard: public only
     await expect(fetchImpl(new URL('https://acme.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/blocked/);
     expect(connections()).toBe(0);
     expect(seen).toEqual([]);
@@ -695,8 +830,24 @@ describe.skipIf(!OPENSSL)('pinned transport over https (local self-signed server
 
   it('a certificate that does not name the site is refused (verification uses the URL host)', async () => {
     const { port, cert, seen } = await serveTls((_req, res) => res.end('x'));
-    const fetchImpl = createPinnedFetch({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
+    const fetchImpl = testOnlyPinnedTransport({ resolve: LOCAL, allowed: localOnly, connectPort: port, ca: cert });
     await expect(fetchImpl(new URL('https://other.com.tr/'), { headers: {}, signal: AbortSignal.timeout(2000) })).rejects.toThrow(/altnames|does not match|Hostname/i);
     expect(seen).toEqual([]);
+  });
+});
+
+describe('NG-202 B6: the test-only transport stays out of src/', () => {
+  it('no source file other than site-fetch.ts uses testOnlyPinnedTransport, and site-fetch.ts does not call it', () => {
+    const root = join(__dirname, '../../../src');
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const full = join(dir, name);
+        return statSync(full).isDirectory() ? walk(full) : /\.tsx?$/.test(name) ? [full] : [];
+      });
+    const users = walk(root).filter((file) => readFileSync(file, 'utf8').includes('testOnlyPinnedTransport'));
+    expect(users.map((f) => f.slice(root.length + 1).split(sep).join('/'))).toEqual(['modules/m18/server/site-fetch.ts']);
+    const own = readFileSync(join(root, 'modules/m18/server/site-fetch.ts'), 'utf8');
+    // Its declaration only: the production paths build the transport without it.
+    expect(own.match(/testOnlyPinnedTransport/g)).toHaveLength(1);
   });
 });

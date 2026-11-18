@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getLocale } from 'next-intl/server';
 import { withTenant } from '@/lib/db';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { requireTenantAction } from '@/lib/tenant';
@@ -121,8 +122,9 @@ export async function moveDealStageAction(input: unknown): Promise<ActionResult>
   try {
     await assertModuleAccess('M18');
     const scope = await requireTenantAction({ can: 'client_pipeline_write' });
+    const locale = await getLocale();
     const moved = await withTenant(scope.tenantId, (tx) =>
-      moveDealStage(tx, scope.tenantId, input, scope.userId ?? null)
+      moveDealStage(tx, scope.tenantId, input, scope.userId ?? null, locale)
     );
     if (!moved) return { ok: false, code: 'NOT_FOUND' } as const;
     revalidatePath('/', 'layout');
@@ -163,7 +165,7 @@ export async function mergeLeadsAction(input: unknown): Promise<ActionResult<Mer
   try {
     await assertModuleAccess('M18');
     const scope = await requireTenantAction({ can: 'client_pipeline_write' });
-    const merged = await withTenant(scope.tenantId, (tx) => mergeLeadOrganizations(tx, scope.tenantId, input));
+    const merged = await withTenant(scope.tenantId, (tx) => mergeLeadOrganizations(tx, scope.tenantId, input, new Date(), scope.userId));
     if (!merged) return { ok: false, code: 'NOT_FOUND' } as const;
     revalidatePath('/', 'layout');
     return { ok: true, data: merged } as const;

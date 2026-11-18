@@ -183,6 +183,9 @@ done
 # ci.yml job env.
 export DATABASE_URL="postgresql://fabrika:fabrika@127.0.0.1:$pg_port/$db"
 export DATABASE_URL_RLS_TEST="postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:$pg_port/$db"
+# NG-206: the ExpertDirectoryEntry mutation tests run only when this names the database they are on.
+# This throwaway database is the one place they should run locally.
+export RLS_MUTATION_DB="$db"
 # ci.yml Test step. KEEP_EU_LIVE=1 runs keep-eu-sync.live against this throwaway DB.
 export AUTH_SECRET='ci-vitest-auth-secret-fixture-not-for-any-deployment'
 export KEEP_EU_LIVE=1

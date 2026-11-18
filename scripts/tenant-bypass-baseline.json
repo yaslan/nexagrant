@@ -196,6 +196,15 @@
     },
     {
       "check": "D",
+      "file": "src/app/[locale]/admin/modules/actions.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "NG-215 (SEC NG-205 D-1): updateTenantModuleStatus, after requirePlatformAdmin(). Only a write that leaves the tenant's M18 closed to its own people (isOpenToTenantMembers false: OFF, DEV or ON, directly or by an OFF cascade) runs here; every other flip stays plain withTenant. The tenant's ModuleState upserts and module.state.changed AuditEvents (all named by the tenantId argument) and deactivateRoutesOfClosedTarget (src/lib/leads/province-route.ts: that tenant's active ProvinceLeadRoute rows set inactive, one tenantId-NULL lead-route.deactivated AuditEvent each) share one transaction. ProvinceLeadRoute is RLS system_scope only, so a tenant scope reads 0 of its rows; without this the route stayed active and the transfer box kept naming a tenant whose forward is refused."
+    },
+    {
+      "check": "D",
       "file": "src/lib/k3-topic-stats/importer.ts",
       "subject": "system-scope:platform-admin",
       "count": 1,
@@ -349,6 +358,24 @@
     },
     {
       "check": "D",
+      "file": "src/lib/leads/stuck-leads.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "alertStuckRoutedLeads(), run every 15 minutes by the public-lead-stuck cron (NG-182), through inStuckScope(): read-only SELECTs (one bounded page, oldest first, plus a probe narrowed to the lead ids that already hold an open alert) of routed PublicLead rows (platform data, no tenantId, system_scope only) older than PUBLIC_LEAD_STUCK_AFTER_MINUTES for which NO LeadContact and NO Deal of the routedTenantId carries sourceRef = public-lead:<id>, plus the Tenant name/deletedAt of that id. The NOT EXISTS probe spans every tenant and the tenant set is the query's output, so no single tenant exists to hand withTenant; under fabrika_app an unscoped probe would see 0 copies and call every routed lead stuck. Nothing is written inside the scope: the alerts go to SystemAlert (no RLS) outside it, carrying the lead id only."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/stuck-leads.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "listStuckRoutedLeads() for the read-only 'Stuck (no copy)' list on /admin/lead-routes (NG-182), caller listStuckRoutedLeadsAction runs requirePlatformAdmin() first. Same single read-only SELECT as the cross-tenant-job site (routed PublicLead with no LeadContact/Deal copy in its routedTenantId, plus that Tenant's name/deletedAt), capped at STUCK_PAGE_MAX rows. No row is written, re-routed, copied or deleted."
+    },
+    {
+      "check": "D",
       "file": "src/lib/leads/public-lead.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
@@ -417,7 +444,7 @@
       "count": 1,
       "kind": "system-scope",
       "class": "expert-directory",
-      "reason": "NG-52: the verified expert pre-registrations M8 offers as seat candidates (K-579696 = A, free pre-registration). The pool belongs to no tenant. Purpose expert-directory opens only the expert_directory SELECT policy (verified + visibility consent) on ExpertPreRegistration and no other table; the select carries no name, e-mail, organisation or contact column."
+      "reason": "NG-52: the verified expert pre-registrations M8 offers as seat candidates (K-579696 = A, free pre-registration). The pool belongs to no tenant. NG-188 (SEC NG-185 F-1b): purpose expert-directory opens no row of any table, ExpertPreRegistration included; its one read is the view ExpertDirectoryEntry (prisma/rls.sql), which carries only the card columns (id, founderNumber, province, isFreelancer, roles, programmes, expertiseAreas, languages, listOrder) of verified + visibility-consented rows, is not updatable and is SELECT-only for fabrika_app. So the column limit is the database's, not this select's: no name, e-mail, organisation, ORCID, LinkedIn, IP or token column can be read under this purpose (rls:verify probeExpertDirectory)."
     },
     {
       "check": "D",
@@ -435,7 +462,7 @@
       "count": 5,
       "kind": "system-scope",
       "class": "platform-admin",
-      "reason": "Platform-admin lead routing console (NG-167): list/set/deactivate the province -> consultancy map (ProvinceLeadRoute, SYSTEM_WIDE, RLS system_scope only: a tenant reads 0 rows) and list the unmatched PublicLead worklist. The tenant table is read only to check the target is an eligible consultancy/agency. Set/deactivate write one tenantId-NULL AuditEvent in the same transaction. Every caller passes requirePlatformAdmin() first (src/app/[locale]/admin/lead-routes/actions.ts). NG-171 adds the 5th site: province-route.tenant-options, a read-only list of non-deleted Tenant id/name/orgType/kind for the route-target picker (filtered in code by isIntakeTenant, the single eligibility rule); caller listIntakeTenantOptionsAction runs requirePlatformAdmin() first."
+      "reason": "Platform-admin lead routing console (NG-167): list/set/deactivate the province -> consultancy map (ProvinceLeadRoute, SYSTEM_WIDE, RLS system_scope only: a tenant reads 0 rows) and list the unmatched PublicLead worklist. The tenant table is read only to check the target is an eligible consultancy/agency. Set/deactivate write one tenantId-NULL AuditEvent in the same transaction. Every caller passes requirePlatformAdmin() first (src/app/[locale]/admin/lead-routes/actions.ts). NG-171 adds the 5th site: province-route.tenant-options, a read-only list of non-deleted Tenant id/name/orgType/kind for the route-target picker (filtered in code by isIntakeTenant, the single eligibility rule); caller listIntakeTenantOptionsAction runs requirePlatformAdmin() first. NG-205 (SEC NG-203 D-A2): the set and tenant-options sites also read each candidate tenant's M18 ModuleState row (status only) and filter by isIntakeTarget, so a tenant that cannot open M18 is never a route target."
     }
   ]
 }

@@ -50,6 +50,13 @@ else if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
 
 const RUN = Math.random().toString(36).slice(2, 10);
+
+/**
+ * NG-205 (D-A2): a lead goes only to a tenant whose own people can open M18 (an unsold beta: PILOT).
+ * Every fixture tenant gets that row, so the rules this file tests are not refused for M18 instead.
+ * tests/m18-intake-module-state.live.test.ts covers the closed states.
+ */
+const M18_PILOT = { moduleStates: { create: { moduleId: 'M18', status: 'PILOT' as const, changedBy: 'test fixture (NG-205)' } } };
 const NOW = new Date('2026-11-14T10:00:00Z');
 const ACTOR = `admin-${RUN}`;
 // Provinces this file owns (tests/m18-intake.live.test.ts owns Samsun).
@@ -58,22 +65,35 @@ const port = createLeadIntakePort(prisma, createEventBus());
 const T: Record<'a' | 'b' | 'sme', string> = { a: '', b: '', sme: '' };
 
 const dealsIn = (tenantId: string) => admin.deal.count({ where: { tenantId } });
-const mkLead = (key: string, over: Record<string, unknown> = {}) =>
-  admin.publicLead.create({
+/**
+ * A consented lead as submitPublicLead writes it. NG-204: the consent names the organisation the province
+ * is mapped to AT CREATION (what the visitor saw), unless `consentTo` says which tenant it was given to
+ * (a lead whose mapping was removed after the submit and is later restored).
+ */
+const mkLead = async (key: string, over: Record<string, unknown> = {}, consentTo?: string) => {
+  const province = 'province' in over ? over.province : 'Rize';
+  const recipient = consentTo
+    ? await admin.tenant.findUniqueOrThrow({ where: { id: consentTo }, select: { id: true, name: true } })
+    : typeof province === 'string'
+      ? (await admin.provinceLeadRoute.findFirst({ where: { province, active: true }, select: { tenant: { select: { id: true, name: true } } } }))?.tenant ?? null
+      : null;
+  return admin.publicLead.create({
     data: {
       name: 'Ayşe Yılmaz', email: `${key}-${RUN}@example.test`, organisation: `Org ${key}`, province: 'Rize', district: null,
       readinessCode: 'municipality.012012012012012', consentVersion: 'v-form', consentAt: NOW, source: 'fon-hazirlik', locale: 'tr',
       transferConsent: true, transferConsentVersion: 'v-test', transferConsentAt: NOW,
+      transferConsentTenantId: recipient?.id ?? null, transferConsentOrgName: recipient?.name ?? null,
       ...over,
     },
   });
+};
 
 describe.skipIf(!HAS_DB)('province lead routing', () => {
   beforeAll(async () => {
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
     const mk = (key: keyof typeof T, orgType: 'CONSULTANCY' | 'SME') =>
       admin.tenant
-        .create({ data: { name: `route-${key}-${RUN}`, slug: `route-${key}-${RUN}`, country: 'TR', orgType, kind: 'ORGANIZATION' } })
+        .create({ data: { ...M18_PILOT, name: `route-${key}-${RUN}`, slug: `route-${key}-${RUN}`, country: 'TR', orgType, kind: 'ORGANIZATION' } })
         .then((t) => (T[key] = t.id));
     await mk('a', 'CONSULTANCY');
     await mk('b', 'CONSULTANCY');
@@ -185,7 +205,8 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
     });
 
     test('unmapped province: port not called, 0 deals anywhere, marked unmatched (province_unmapped)', async () => {
-      const lead = await mkLead('unmapped', { province: 'Sinop' });
+      // Consented to B, whose mapping was removed after the submit; restored below (NG-204).
+      const lead = await mkLead('unmapped', { province: 'Sinop' }, T.b);
       const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
       const result = await forwardPublicLead(lead.id, port, prisma);
       expect(result).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'province_unmapped' });
@@ -224,7 +245,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
     });
 
     test('target tenant deleted-after-mapping is refused by M18 -> unmatched tenant_refused', async () => {
-      const gone = await admin.tenant.create({ data: { name: `route-gone-${RUN}`, slug: `route-gone-${RUN}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
+      const gone = await admin.tenant.create({ data: { ...M18_PILOT, name: `route-gone-${RUN}`, slug: `route-gone-${RUN}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
       await admin.provinceLeadRoute.create({ data: { province: 'Yalova', targetTenantId: gone.id, active: true } });
       await admin.tenant.update({ where: { id: gone.id }, data: { deletedAt: new Date() } });
       const lead = await mkLead('refused', { province: 'Yalova' });
@@ -261,7 +282,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('tenant options: consultancy + agency, no SME, no deleted, sorted by name, ids/names only', async () => {
       const mk = (key: string, data: { orgType: 'CONSULTANCY' | 'SME'; kind: 'ORGANIZATION' | 'AGENCY'; deletedAt?: Date }) =>
-        admin.tenant.create({ data: { name: `opt-${key}-${RUN}`, slug: `opt-${key}-${RUN}`, country: 'TR', ...data } });
+        admin.tenant.create({ data: { ...M18_PILOT, name: `opt-${key}-${RUN}`, slug: `opt-${key}-${RUN}`, country: 'TR', ...data } });
       const z = await mk('z-consult', { orgType: 'CONSULTANCY', kind: 'ORGANIZATION' });
       const ag = await mk('b-agency', { orgType: 'SME', kind: 'AGENCY' });
       await mk('c-sme', { orgType: 'SME', kind: 'ORGANIZATION' });
@@ -357,7 +378,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('S3: tenant deleted after routing: reprocessing copies nothing and does not fall back to unmatched', async () => {
       const mkC = () =>
-        admin.tenant.create({ data: { name: `route-c-${RUN}-${Math.random().toString(36).slice(2, 6)}`, slug: `route-c-${RUN}-${Math.random().toString(36).slice(2, 8)}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
+        admin.tenant.create({ data: { ...M18_PILOT, name: `route-c-${RUN}-${Math.random().toString(36).slice(2, 6)}`, slug: `route-c-${RUN}-${Math.random().toString(36).slice(2, 8)}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } });
       // (a) soft delete: the mapping row still points at the tenant, M18 refuses it
       const soft = await mkC();
       await admin.provinceLeadRoute.deleteMany({ where: { province: 'Sinop' } });
@@ -485,12 +506,31 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
      *   (2) the compare-and-set pins `AND[routeStatus: null, routeReason: null]` (or the 'unmatched' mark).
      * A routed lead fails both: (2) needs status NULL/'unmatched', and PublicLead_route_consistency_check
      * forbids `routedTenantId` set with such a status, so (2) implies (1) on every row the DB accepts.
-     * Hence NO test can turn red when only (1) is removed: (1) is redundant behind (2) + the CHECK. Measured:
-     *   remove (1) only → green · remove (2) only → green (this run is (1) alone holding the line) ·
-     *   remove both = M2 `where: { id }` → RED (call 1 claims with stale A, tenant A gets a copy).
+     * Hence NO test can turn red when only (1) is removed: (1) is redundant behind (2) + the CHECK.
+     * Since NG-204 this O-1 test no longer measures either guard: call 2 is not the consented recipient and
+     * never reaches the claim, so O-1 stays green with the WHERE reduced to `{ id }`. The red for the claim
+     * WHERE is now the 'D-2 (review bulgu 2)' race test below (call 1 claims over the 'unmatched' mark it
+     * did not read). Measured (NG-213, base fa2f405e, isolated pgvector pg16, this file only; each mutation
+     * in src/lib/leads/public-lead-intake.ts claimRoute, both branches, reverted after the run):
+     *   remove (1) only → 30/30 green ·
+     *   remove (2) only → RED, D-2 race only (row restored to NULL instead of 'unmatched/province_unmapped') ·
+     *   remove both = M2 `where: { id }` → RED, D-2 race only, same diff; O-1 and S1-S3 green.
      * (2) cannot go: the where-guard-src scanner relies on it (NG-181 be-gnd-3). Keep (1) as defence in depth.
+     * KNOWN COVERAGE GAP (NG-213 review F-2), left on purpose: no test pins (1). The same holds for the
+     * read-side early return in claimRoute (`prior.routeStatus === 'routed' || prior.routedTenantId !== null`):
+     * a routed prior falls into the else branch's `routeStatus !== 'unmatched'` return, and the CHECK rules out
+     * status NULL with a tenant. Re-measured in NG-213 review (isolated pg16): WHERE (1) removed in both
+     * branches → this file 30/30 green; that early return cut to `if (!prior)` → this file +
+     * public-lead-consent-recipient + m18-intake 46/46 green. A red test would need a row the CHECK rejects,
+     * i.e. a fabricated state. (2) and PublicLead_route_consistency_check are what protect the claim; if
+     * either is ever relaxed, (1) becomes the only guard and needs its own test in that same change.
      */
-    test('O-1: both calls read before either claims and see different targets; the claim WHERE (NG-174 condition or CAS pins, either alone suffices) keeps the loser out — M2 (both removed) turns it red', async () => {
+    // NG-204 changed this race's outcome on purpose. Before, call 2 (map moved to B) claimed and the lead
+    // landed in B, a tenant the visitor never consented to (SEC NG-203 O-A1); the claim WHERE then kept
+    // call 1 out of A. Now the consent names A, so call 2 is refused BEFORE any claim and only A can receive
+    // it. Two calls with DIFFERENT targets can no longer both reach the claim; the at-most-one-tenant
+    // invariant is asserted exactly as before (one tenant, one deal, no copy in the other).
+    test('O-1: both calls read before either claims and see different targets; the one that is not the consented recipient never claims, the lead lands in the consented tenant only', async () => {
       await setProvinceLeadRoute({ province: 'Rize', tenantId: T.a }, ACTOR, prisma);
       const lead = await mkLead('o1', { province: 'Rize' });
       const [a0, b0] = [await dealsIn(T.a), await dealsIn(T.b)];
@@ -499,22 +539,23 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
       // Call 1 reads (map says A) and is parked right before its claim; the routed-guard has already passed.
       const first = forwardPublicLead(lead.id, port, gate.db);
       await gate.reached;
-      // The map moves; call 2 reads B and claims first.
+      // The map moves; call 2 reads B, which is not who the visitor consented to: no claim, marked unmatched.
       await setProvinceLeadRoute({ province: 'Rize', tenantId: T.b }, ACTOR, prisma);
-      expect((await forwardPublicLead(lead.id, port, prisma)).status).toBe('created');
-      // Call 1 now claims with a stale A: only the WHERE condition stands between it and tenant A.
+      expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'consent_recipient_mismatch' });
+      expect((await dealsIn(T.b)) - b0).toBe(0);
+      // Call 1 claims over that mark (compare-and-set on the mark it now reads) and hands it to A.
       gate.release();
-      expect(await first).toEqual({ status: 'skipped', reason: 'already_routed' });
+      expect((await first).status).toBe('created');
 
-      expect(await contactsOf(lead.id)).toEqual([{ tenantId: T.b }]);
-      expect((await dealsIn(T.a)) - a0).toBe(0);
-      expect((await dealsIn(T.b)) - b0).toBe(1);
-      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.b, routeReason: null });
+      expect(await contactsOf(lead.id)).toEqual([{ tenantId: T.a }]);
+      expect((await dealsIn(T.a)) - a0).toBe(1);
+      expect((await dealsIn(T.b)) - b0).toBe(0);
+      expect(await routedRow(lead.id)).toMatchObject({ routeStatus: 'routed', routedTenantId: T.a, routeReason: null });
     });
 
     test('D-1: a call that saw no mapping cannot mark a lead unmatched after a concurrent call routed it', async () => {
       await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
-      const lead = await mkLead('d1', { province: 'Rize' });
+      const lead = await mkLead('d1', { province: 'Rize' }, T.a);
       const gate = gatedDb(prisma, 'unmatched');
 
       // Call 1 reads (no mapping) and is parked right before markUnmatched.
@@ -531,7 +572,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
 
     test('D-2: a refusal unrelated to the tenant puts an unmatched lead back on the worklist (previous mark, not NULL)', async () => {
       await deactivateProvinceLeadRoute({ province: 'Rize' }, ACTOR, prisma);
-      const lead = await mkLead('d2', { province: 'Rize' });
+      const lead = await mkLead('d2', { province: 'Rize' }, T.a);
       expect(await forwardPublicLead(lead.id, port, prisma)).toEqual({ status: 'skipped', reason: 'unmatched', unmatchedReason: 'province_unmapped' });
       const marked = await routedRow(lead.id);
 

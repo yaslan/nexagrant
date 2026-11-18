@@ -70,6 +70,7 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `CSP_MODE` | | boş | Boş = içerik güvenlik politikası uygulanır. `report-only` yalnız sorun ararken kullanılır. |
 | `K1_EMBEDDING_MAX_USD_PER_RUN` | W | `0.05` | Gece embedding işinin koşu başına dolar tavanı. |
 | `ALERTS_SWEEP_FAILURE_THRESHOLD` | W | boş | Varsayılan yeterli. |
+| `PUBLIC_LEAD_STUCK_AFTER_MINUTES` | W | boş | Varsayılan 60 dk yeterli. Yönlendirilmiş ama kuruluşta kopyası olmayan lead bu süreden sonra takılı sayılır (NG-182). Girilirse A ve B aynı değeri taşımalı: liste (web) ile alarm (worker) aynı eşiği kullanır. |
 
 ## 3. Pilotta BOŞ kalmalı (ADR-0007, ücretsiz pilot)
 

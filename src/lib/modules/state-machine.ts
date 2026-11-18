@@ -266,6 +266,25 @@ export function isStaffPreviewStatus(moduleId: ModuleId, status: ModuleStatus): 
   return isUnsoldBeta(moduleId) && (status === 'DEV' || status === 'PILOT');
 }
 
+/** A tenant manager, for `isOpenToTenantMembers`: not staff, not an API key. */
+const TENANT_MANAGER: SessionViewer = { role: 'TENANT_OWNER', isPlatformAdmin: false };
+
+/**
+ * NG-205 (SEC NG-203 D-A2): is `moduleId` at `status` open to the tenant's OWN people (its
+ * managers at least), not only to FonBridge staff? The question a data flow INTO a tenant asks:
+ * a forwarded lead must land where somebody can open it. Built from the gate's own pieces, not
+ * a second copy of them: a "Yakında" module is closed, an unsold beta opens only at its preview
+ * statuses (`isStaffPreviewStatus`), and `canAccessStatus` must let a tenant manager in, so DEV
+ * (staff only) and OFF are closed. M18 today: PILOT only (ON closes an unsold beta, MODULE_OFF).
+ *
+ * Status only: plan entitlement of a sold module stays the job of `decideModuleAccess`.
+ */
+export function isOpenToTenantMembers(moduleId: ModuleId, status: ModuleStatus): boolean {
+  if (isComingSoon(moduleId)) return false;
+  if (isUnsoldBeta(moduleId) && !isStaffPreviewStatus(moduleId, status)) return false;
+  return canAccessStatus(status, TENANT_MANAGER).allowed;
+}
+
 // ───────────────────────────── Plan × switch → card status ─────────────────────────────
 
 /**

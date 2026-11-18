@@ -16,7 +16,7 @@ import { logger } from '@/lib/logger';
 import enMessages from '../../../../messages/en.json';
 import trMessages from '../../../../messages/tr.json';
 import { dedupeKey } from './duplicates';
-import { checkIntakeConsent, isIntakeTenant, parseIntakeRequest } from './intake';
+import { checkIntakeConsent, isIntakeTarget, isIntakeTenant, parseIntakeRequest } from './intake';
 import { autoTasksForStage } from './pipeline-rules';
 import { plateForProvince } from './taxonomy';
 
@@ -75,6 +75,14 @@ export async function acceptLeadIntake(tx: TenantTx, request: LeadIntakeRequest)
   const sourceRef = leadIntakeSourceRef(data.publicLeadId);
   const landed = await findLanded(tx, tenantId, sourceRef);
   if (landed) return { status: 'duplicate', ids: landed };
+
+  // NG-205 (D-A2): after the duplicate answer on purpose. A copy that landed before the tenant closed
+  // M18 is still reported truthfully; nothing NEW is written into a tenant that cannot open M18.
+  const m18 = await tx.moduleState.findUnique({
+    where: { tenantId_moduleId: { tenantId, moduleId: 'M18' } },
+    select: { status: true },
+  });
+  if (!isIntakeTarget(tenant, m18?.status)) return { status: 'refused', reason: 'tenant_ineligible' };
 
   const t = intakeTranslator(tenant.locale);
   const provinceCode = data.organisation.province ? plateForProvince(data.organisation.province) : null;

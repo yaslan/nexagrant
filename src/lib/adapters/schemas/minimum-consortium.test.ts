@@ -145,4 +145,61 @@ describe('parseMinimumConsortium', () => {
   ])('CRW round-3 table %i: %s', (_id, text, expected) => {
     expect(parseMinimumConsortium(text)).toEqual(expected);
   });
+
+  // NG-192 (CRW NG-186 4. tur, madde 2): a number glued to a word, dot, dash or slash is part of an
+  // identifier, a year or a sign, not a count; a descending "N-M" is not a range.
+  it.each<[string, { minPartners?: number; minCountries?: number }]>([
+    ['Article 5-3 different countries', {}],
+    ['2024-25 different countries', {}],
+    ['COVID-19 - 3 different countries', {}],
+    ['2024-3 different countries', {}],
+    ['Article 5.3 different countries', {}],
+    ['2024/25 different countries', {}],
+    // NG-192 2. tur (lider karari): a dash after a space or at the start is a bullet, not a sign, so
+    // these read as written; a negative country count is out of scope.
+    ['temperatures -3 different countries', { minCountries: 3 }],
+    ['from -2 to 4 different countries', { minCountries: 2 }],
+    ['Art 5/3 different countries', {}],
+    ['5 - 3 different countries', {}],
+    ['Article 5–3 different countries', {}],
+    ['admin.3 different countries', {}],
+    ['max.3 different countries', {}],
+    ['COVID-19 ... 3 different countries', { minCountries: 3 }],
+    ['at least 12 different countries', { minCountries: 12 }],
+    ['Article 5 applies; partners from 3 different countries', { minCountries: 3 }],
+  ])('does not read a count out of an identifier, year or sign (NG-192): %s', (text, expected) => {
+    expect(parseMinimumConsortium(text)).toEqual(expected);
+  });
+
+  // NG-192 (CRW NG-186 4. tur, madde 3): the negated "fewer/less than" stays a minimum with any
+  // whitespace run and with "nor".
+  it.each<[string, { minPartners?: number; minCountries?: number }]>([
+    ['no  fewer than 3 different countries', { minCountries: 3 }],
+    ['not  less than 3 different countries', { minCountries: 3 }],
+    ['nor fewer than 3 different countries', { minCountries: 3 }],
+    ['neither more than 6 nor less than 3 different countries', { minCountries: 3 }],
+  ])('reads a negated "fewer/less than" as a minimum with any spacing or "nor" (NG-192): %s', (text, expected) => {
+    expect(parseMinimumConsortium(text)).toEqual(expected);
+  });
+
+  // NG-192 (CRW NG-186 4. tur, madde 5): a bare "N and M different countries" keeps the smaller
+  // number; reading the larger one would drop applicants that meet either reading.
+  it('reads the lower number of a bare "N and M different countries" (NG-192)', () => {
+    expect(parseMinimumConsortium('3 and 4 different countries')).toEqual({ minCountries: 3 });
+  });
+
+  // NG-192 2. tur (CRW NG-192 B1-B4): a bullet dash and "min." in front of the count still give a
+  // minimum; a worded range read downwards keeps the lower number, a dashed one stays an identifier;
+  // a line break is whitespace.
+  it.each<[string, { minPartners?: number; minCountries?: number }]>([
+    ['-3 different countries', { minCountries: 3 }],
+    ['partners:\n-3 different countries', { minCountries: 3 }],
+    ['min.3 different countries', { minCountries: 3 }],
+    ['MIN.3 different countries', { minCountries: 3 }],
+    ['4 and 3 different countries', { minCountries: 3 }],
+    ['4 to 3 different countries', { minCountries: 3 }],
+    ['COVID-19\n3 different countries', { minCountries: 3 }],
+  ])('keeps a bullet, "min.", a worded downward range and a line break readable (NG-192 B1-B4): %s', (text, expected) => {
+    expect(parseMinimumConsortium(text)).toEqual(expected);
+  });
 });

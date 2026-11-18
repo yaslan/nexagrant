@@ -41,7 +41,8 @@ import { PUBLIC_LEAD_CONSENT, PUBLIC_LEAD_TRANSFER_CONSENT, submitPublicLead } f
 import { transferOrgNameFor } from '@/lib/leads/transfer-org';
 import { withSystemScopeOn } from '@/lib/system-scope';
 import { isIntakeTenant } from '@/modules/m18/server/intake';
-import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { assertRlsSubjectRole, isLocalDbUrl, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { sqlStatements } from './helpers/sql-statements';
 
 const SUITE = 'transfer org name test';
 const IP_HASH_KEY = randomBytes(24).toString('hex');
@@ -53,6 +54,13 @@ const HAS_DB =
 if (RLS_URL && !OWNER_URL) skipOrFailInCi(SUITE, 'DATABASE_URL (owner connection) is not set', 'Provide DATABASE_URL for the fixture/owner connection.');
 else if (RLS_URL && !HAS_DB) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 if (HAS_DB) await assertRlsSubjectRole(prisma, SUITE);
+
+// NG-213 D-3 replays the two function migrations as the owner inside a transaction that is rolled
+// back (it takes an ACCESS EXCLUSIVE lock on "PublicLead" and creates roles): local databases only.
+const DDL_LOCAL = HAS_DB && OWNER_URL !== undefined && isLocalDbUrl(OWNER_URL);
+if (HAS_DB && !DDL_LOCAL) {
+  skipOrFailInCi(`${SUITE} (migration replay)`, 'DATABASE_URL is not a local database (scripts/db-target.sh db_is_local) and the replay runs DDL');
+}
 
 const RUN = Math.random().toString(36).slice(2, 10);
 const MINE = { endsWith: `-${RUN}@example.test` };
@@ -189,32 +197,130 @@ describe.skipIf(!HAS_DB)('province_transfer_org_name (NG-179)', () => {
     });
   });
 
+  describe('province_transfer_org (NG-204): the submit-side twin returns the id of the SAME organisation', () => {
+    test('for every case: same eligibility as the name function; id + name of that tenant, or no row', async () => {
+      for (const c of Object.keys(CASES) as Case[]) {
+        const named = await prisma.$queryRaw<Array<{ name: string | null }>>`SELECT public.province_transfer_org_name(${CASES[c].province}) AS name`;
+        const rows = await prisma.$queryRaw<Array<{ tenant_id: string; org_name: string }>>`SELECT * FROM public.province_transfer_org(${CASES[c].province})`;
+        if (named[0]?.name) expect(rows).toEqual([{ tenant_id: ids[c], org_name: named[0].name }]);
+        else expect(rows).toEqual([]);
+      }
+      expect(await prisma.$queryRaw`SELECT * FROM public.province_transfer_org(${UNMAPPED})`).toEqual([]);
+    });
+
+    test('SECURITY DEFINER, fixed search_path, PUBLIC/anon/authenticated cannot execute it, fabrika_app can', async () => {
+      const [fn] = await admin.$queryRaw<Array<{ definer: boolean; config: string[] | null; pub: boolean; anon: boolean | null; auth: boolean | null; app: boolean }>>`
+        SELECT p.prosecdef AS definer, p.proconfig AS config,
+               EXISTS (SELECT 1 FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS pub,
+               CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN has_function_privilege('anon', p.oid, 'EXECUTE') END AS anon,
+               CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN has_function_privilege('authenticated', p.oid, 'EXECUTE') END AS auth,
+               has_function_privilege('fabrika_app', p.oid, 'EXECUTE') AS app
+          FROM pg_proc p WHERE p.oid = 'public.province_transfer_org(text)'::regprocedure`;
+      expect(fn).toMatchObject({ definer: true, config: ['search_path=public, pg_temp'], pub: false, app: true });
+      expect(fn?.anon).not.toBe(true);
+      expect(fn?.auth).not.toBe(true);
+    });
+  });
+
+  /**
+   * NG-213 D-3 (sec-gnd NG-204 review). On Supabase the default privileges of `postgres` grant EXECUTE on
+   * every NEW function to `anon` and `authenticated`, the Data API roles. `REVOKE ... FROM PUBLIC` does not
+   * touch those grants; until now only rls.sql's loop (it runs AFTER apply-migrations) took them away, so
+   * between a migration and `db:rls` the Data API could call the function (province → tenant id + name).
+   * Each migration must close that itself. Reproduced here: in one transaction, create the two roles if this
+   * cluster has none, give the owner Supabase's default privileges, drop the function, replay the migration
+   * file statement by statement (as apply-migrations.sh does), read the grants, ROLLBACK.
+   */
+  describe.skipIf(!DDL_LOCAL)('NG-213 D-3: a fresh function migration leaves anon/authenticated without EXECUTE', () => {
+    test.each([
+      ['add-province-transfer-org-name.sql', 'public.province_transfer_org_name(text)'],
+      ['add-public-lead-transfer-recipient.sql', 'public.province_transfer_org(text)'],
+    ])('%s → %s: no EXECUTE for anon / authenticated even under Supabase default privileges; fabrika_app keeps it', async (file, fn) => {
+      const { readFileSync } = await import('node:fs');
+      const { resolve } = await import('node:path');
+      const { default: pg } = await import('pg');
+      const statements = sqlStatements(readFileSync(resolve(process.cwd(), 'prisma/migrations', file), 'utf8'));
+      const client = new pg.Client({ connectionString: OWNER_URL });
+      await client.connect();
+      try {
+        await client.query('BEGIN');
+        for (const role of ['anon', 'authenticated']) {
+          const { rowCount } = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role]);
+          if (!rowCount) await client.query(`CREATE ROLE ${role} NOLOGIN`);
+        }
+        await client.query('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated');
+        await client.query(`DROP FUNCTION ${fn}`);
+        for (const statement of statements) await client.query(statement);
+        const { rows } = await client.query<{ anon: boolean; auth: boolean; app: boolean }>(
+          `SELECT has_function_privilege('anon', $1::regprocedure, 'EXECUTE') AS anon,
+                  has_function_privilege('authenticated', $1::regprocedure, 'EXECUTE') AS auth,
+                  has_function_privilege('fabrika_app', $1::regprocedure, 'EXECUTE') AS app`,
+          [fn],
+        );
+        expect(rows[0]).toEqual({ anon: false, auth: false, app: true });
+      } finally {
+        await client.query('ROLLBACK').catch(() => undefined);
+        await client.end();
+      }
+    });
+
+    test('the replay above is a real reproduction: the same default privileges DO grant a fresh function to both roles', async () => {
+      const { default: pg } = await import('pg');
+      const client = new pg.Client({ connectionString: OWNER_URL });
+      await client.connect();
+      try {
+        await client.query('BEGIN');
+        for (const role of ['anon', 'authenticated']) {
+          const { rowCount } = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role]);
+          if (!rowCount) await client.query(`CREATE ROLE ${role} NOLOGIN`);
+        }
+        await client.query('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated');
+        await client.query('CREATE FUNCTION public.ng213_probe() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$');
+        await client.query('REVOKE ALL ON FUNCTION public.ng213_probe() FROM PUBLIC');
+        const { rows } = await client.query<{ anon: boolean; auth: boolean }>(
+          `SELECT has_function_privilege('anon', 'public.ng213_probe()', 'EXECUTE') AS anon,
+                  has_function_privilege('authenticated', 'public.ng213_probe()', 'EXECUTE') AS auth`,
+        );
+        expect(rows[0]).toEqual({ anon: true, auth: true });
+      } finally {
+        await client.query('ROLLBACK').catch(() => undefined);
+        await client.end();
+      }
+    });
+  });
+
   describe('the lead write as fabrika_app', () => {
-    const submit = (who: string, province: string, transferConsent: boolean, ip: string) =>
+    // NG-204: the form sends the organisation name it showed under the box alongside the tick.
+    const submit = (who: string, province: string, transferConsent: boolean, ip: string, transferOrgName?: string) =>
       submitPublicLead(
         {
           name: 'Ayşe Yılmaz', email: `${who}-${RUN}@example.test`, organisation: 'Pertek Belediyesi', province, district: '',
           readinessCode: 'municipality.111111111111111', consent: true, consentVersion: PUBLIC_LEAD_CONSENT.version,
-          transferConsent, source: 'fon-hazirlik', locale: 'tr', website: '',
+          transferConsent, transferOrgName, source: 'fon-hazirlik', locale: 'tr', website: '',
         },
         { ip, secret: IP_HASH_KEY }
       );
     const stored = (who: string) =>
       admin.publicLead.findFirst({
         where: { email: `${who}-${RUN}@example.test` },
-        select: { transferConsent: true, transferConsentVersion: true, transferConsentAt: true },
+        select: { transferConsent: true, transferConsentVersion: true, transferConsentAt: true, transferConsentTenantId: true, transferConsentOrgName: true },
       });
 
     test('mapped province + box ticked → the transfer consent is recorded', async () => {
-      expect(await submit('ticked', CASES.consultancy.province, true, '192.0.2.179')).toEqual({ ok: true });
+      expect(await submit('ticked', CASES.consultancy.province, true, '192.0.2.179', nameOf('consultancy'))).toEqual({ ok: true });
       const row = await stored('ticked');
-      expect(row).toMatchObject({ transferConsent: true, transferConsentVersion: PUBLIC_LEAD_TRANSFER_CONSENT.version });
+      expect(row).toMatchObject({
+        transferConsent: true, transferConsentVersion: PUBLIC_LEAD_TRANSFER_CONSENT.version,
+        transferConsentTenantId: ids.consultancy, transferConsentOrgName: nameOf('consultancy'),
+      });
       expect(row?.transferConsentAt).toBeInstanceOf(Date);
     });
 
     test('ineligible tenant + box ticked → lead stored, no transfer consent', async () => {
-      expect(await submit('ineligible', CASES.deleted.province, true, '192.0.2.180')).toEqual({ ok: true });
-      expect(await stored('ineligible')).toEqual({ transferConsent: false, transferConsentVersion: null, transferConsentAt: null });
+      expect(await submit('ineligible', CASES.deleted.province, true, '192.0.2.180', nameOf('deleted'))).toEqual({ ok: true });
+      expect(await stored('ineligible')).toEqual({
+        transferConsent: false, transferConsentVersion: null, transferConsentAt: null, transferConsentTenantId: null, transferConsentOrgName: null,
+      });
     });
   });
 });

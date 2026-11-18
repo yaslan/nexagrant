@@ -3661,6 +3661,7 @@
     "status_active": "Aktif",
     "status_inactive": "Pasif",
     "status_unmapped": "Eşlenmemiş",
+    "target_ineligible": "Uyarı: {tenant} artık aday alamıyor (M18 açık değil ya da kuruluş uygun değil). Form bu adı göstermeye devam eder; rotayı başka kuruluşa taşıyın ya da pasifleştirin.",
     "select_label": "{province} için danışmanlık kuruluşu",
     "select_placeholder": "Kuruluş seçin",
     "save": "Kaydet",
@@ -3677,6 +3678,15 @@
     "unmatched_empty": "Eşleşmeyen lead yok.",
     "unmatched_load_error": "Eşleşmeyen lead listesi yüklenemedi.",
     "unmatched_count": "{shown} / {total} kayıt gösteriliyor",
+    "stuck_title": "Takılı lead’ler (kopyasız)",
+    "stuck_subtitle": "Bir kuruluşa yönlendirilmiş ama {minutes} dakikadan uzun süredir o kuruluşta kopyası (kişi ya da fırsat kaydı) oluşmamış lead’ler. Liste salt okunurdur; lead başka kuruluşa gönderilmez, kopyalanmaz ve silinmez. Her biri için ayrıca bir sistem uyarısı açılır.",
+    "stuck_empty": "Takılı lead yok.",
+    "stuck_load_error": "Takılı lead listesi yüklenemedi.",
+    "stuck_count": "{shown} / {total} kayıt gösteriliyor",
+    "col_routed_at": "Yönlendirme",
+    "col_routed_tenant": "Yönlendirilen kuruluş",
+    "col_lead_id": "Lead kimliği",
+    "tenant_deleted": "Kuruluş silinmiş",
     "col_created": "Tarih",
     "col_contact": "İletişim",
     "col_org": "Kurum",
@@ -3687,6 +3697,7 @@
     "reason_province_missing": "İl boş ya da geçersiz",
     "reason_province_unmapped": "İl bir kuruluşa eşlenmemiş",
     "reason_tenant_refused": "Eşlenen kuruluş aktarımı reddetti",
+    "reason_consent_recipient_mismatch": "Eşlenen kuruluş, ziyaretçinin rıza verdiği kuruluş değil",
     "error_invalid_province": "İl geçersiz. Sayfayı yenileyip tekrar deneyin.",
     "error_tenant_not_found": "Seçilen kuruluş bulunamadı.",
     "error_tenant_ineligible": "Seçilen kuruluş eşleme için uygun değil (silinmiş ya da danışmanlık/ajans değil).",
@@ -5850,6 +5861,7 @@
       "enrichApply": "Seçilenleri kayda yaz",
       "enrichApplied": "Seçilen alanlar kayda yazıldı.",
       "enrichSources": "Kaynak sayfalar",
+      "enrichDraftLabel": "YZ taslağı — onaylamadan kayda yazılmaz",
       "enrichNothingSelected": "En az bir alan seçin.",
       "field": {
         "legalName": "Ticari unvan",
@@ -5878,6 +5890,42 @@
         "SITE_UNAVAILABLE": "Web sitesi okunamadı (adres geçersiz, robots.txt izin vermiyor ya da site yanıt vermedi). Kredi düşmedi.",
         "BAD_ANSWER": "YZ yanıtı okunamadı. Tekrar deneyin.",
         "NO_CREDITS": "YZ krediniz yetersiz."
+      }
+    },
+    "autoTasks": {
+      "new": {
+        "first-contact": "İlk iletişimi kur"
+      },
+      "qualified": {
+        "contact-decision-maker": "Karar vericiyle iletişime geç"
+      },
+      "contacted": {
+        "book-discovery-meeting": "Keşif toplantısı ayarla"
+      },
+      "discovery": {
+        "send-meeting-notes": "Toplantı notlarını gönder"
+      },
+      "eligibility": {
+        "check-call-rules": "Çağrı kurallarına uygunluğu kontrol et"
+      },
+      "proposal": {
+        "send-quote": "Teklifi gönder",
+        "follow-up": "Teklif için takip et"
+      },
+      "contract": {
+        "collect-signature": "Sözleşme imzasını al"
+      },
+      "application": {
+        "document-checklist": "Başvuru belge listesini hazırla"
+      },
+      "submitted": {
+        "record-reference": "Başvuru referans numarasını kaydet"
+      },
+      "won": {
+        "kickoff": "Başlangıç toplantısını planla"
+      },
+      "lost": {
+        "reengage": "Müşteriyle yeniden iletişime geç"
       }
     }
   }

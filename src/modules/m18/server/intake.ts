@@ -6,6 +6,8 @@ import {
   type LeadIntakeRefusal,
   type LeadIntakeRequest,
 } from '@/core/contracts/lead-intake';
+import { isOpenToTenantMembers } from '@/lib/modules/state-machine';
+import type { ModuleStatus } from '@/lib/modules/types';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
 
 /**
@@ -14,10 +16,27 @@ import { TR_PROVINCES } from '@/lib/readiness/provinces';
  * write is ./intake-repo.ts.
  */
 
-/** The only tenants a readiness lead may be routed to (lead assumption K-NG138). */
+/**
+ * The only tenants a readiness lead may be routed to (lead assumption K-NG138), by the tenant row
+ * alone. public.province_transfer_org_name() mirrors exactly this (add-province-transfer-org-name.sql).
+ * A route target and a forward also need {@link isIntakeTarget}.
+ */
 export function isIntakeTenant(tenant: { orgType: string; kind: string; deletedAt: Date | null }): boolean {
   if (tenant.deletedAt) return false;
   return tenant.orgType === 'CONSULTANCY' || tenant.kind === 'AGENCY';
+}
+
+/**
+ * NG-205 (SEC NG-203 D-A2): an eligible tenant whose M18 its own people can open. Without the
+ * module check a consultancy with M18 switched off could be a province's target, and the visitor's
+ * name and e-mail landed where nobody sees them. `m18Status` is the tenant's M18 `ModuleState`
+ * status; no row (null/undefined) is OFF, as everywhere. The module rule is the state machine's.
+ */
+export function isIntakeTarget(
+  tenant: { orgType: string; kind: string; deletedAt: Date | null },
+  m18Status: ModuleStatus | null | undefined,
+): boolean {
+  return isIntakeTenant(tenant) && isOpenToTenantMembers('M18', m18Status ?? 'OFF');
 }
 
 /**

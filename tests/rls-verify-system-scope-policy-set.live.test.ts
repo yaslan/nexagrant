@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { envValue } from './helpers/dotenv';
-import { isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { isGithubActions, isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
@@ -23,11 +23,16 @@ import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-
  * Safe on any local database, the shared one included: the stray policies are
  * `TO pg_monitor`, a built-in role nothing here connects as, so no session's reads change
  * while they exist, and each test drops its own (named with a RUN id). rls:verify rolls back
- * every probe. The expert_directory test (NG-52) replaces that one policy for the length of one
- * rls:verify run, so M8's expert pool reads 0 rows on that database meanwhile, and restores it
- * from prisma/rls.sql in `finally`, under EXPERT_DIRECTORY_POLICY_LOCK (system-scope.live's
- * directory read takes the same lock). Only the NG-183 block runs, not the whole rls.sql, so no other table's policies
- * are rebuilt under a parallel suite. DDL, so local databases only (isLocalDbUrl).
+ * every probe. Only the NG-183 block or the view block runs, not the whole rls.sql, so no other
+ * table's policies are rebuilt under a parallel suite. DDL, so local databases only (isLocalDbUrl).
+ *
+ * The ExpertDirectoryEntry mutation tests (NG-188) are NOT safe on the shared "fabrika" database
+ * (NG-206, review D-B1): they commit a mutated view, and only the `finally` restores it. A SIGKILL,
+ * an OOM or a closed pane leaves the mutated view behind, so unconsented experts would be listed
+ * or `email` readable for every session on that database. They skip by default (MUTATION_SKIP, with a
+ * WARNING line naming the reason) and run only on an isolated database, e.g. a throwaway Docker Postgres,
+ * opted in with RLS_MUTATION_DB=<that database's name>. "fabrika" is never opted in off GitHub Actions.
+ * In GitHub Actions the CI database is allowed (isGithubActions).
  */
 const SUITE = 'rls:verify system_scope policy set live test';
 const REPO = resolve(import.meta.dirname, '..');
@@ -38,9 +43,11 @@ const RUN = randomBytes(4).toString('hex');
 const STRAY = `ng183_stray_${RUN}`;
 const STRAY_TENANT = `ng183_tenant_${RUN}`;
 const SYSTEM_SCOPE_TABLES = ['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead'];
-/** NG-52 (ADR-0009 §9): the one named exception — expert_directory, SELECT only, on ExpertPreRegistration. */
-const EXPECTED_SET: Record<string, string[]> = { ExpertPreRegistration: ['expert_directory', 'system_scope'] };
-const expectedSet = (t: string) => EXPECTED_SET[t] ?? ['system_scope'];
+/**
+ * No exception since NG-188: NG-52's expert_directory policy on ExpertPreRegistration was
+ * replaced by the view "ExpertDirectoryEntry", so every system_scope table is {system_scope}.
+ */
+const expectedSet = (_t: string) => ['system_scope'];
 const TENANT_TABLE = 'AddOn';
 
 const admin = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://localhost:5432/unset', connectionTimeoutMillis: 3000 });
@@ -50,6 +57,27 @@ else if (!REACHABLE) skipOrFailInCi(SUITE, 'Postgres is unreachable');
 const LOCAL = REACHABLE && isLocalDbUrl(OWNER_URL!);
 if (REACHABLE && !LOCAL) skipOrFailInCi(SUITE, 'DATABASE_URL is not a local database; this suite runs DDL');
 const HAS_DB = REACHABLE && LOCAL;
+/**
+ * NG-206 (D-B1): the name the server reports for the owner connection, which the rls:verify child
+ * processes also use (same OWNER_URL). Read from the server, not parsed from the URL, so a
+ * DATABASE_URL that only .env holds cannot slip past the guard.
+ */
+const DB_NAME = LOCAL ? (await admin.query<{ db: string }>('select current_database() as db')).rows[0]?.db : undefined;
+/** The shared dev database is "fabrika" everywhere except ci.yml's service container. */
+const SHARED_DB = DB_NAME === 'fabrika' && !isGithubActions();
+/**
+ * NG-206 (review tur 2): allowlist, not a name denylist. A shared database with any other name
+ * (`fabrika_dev`, a quoted `"Fabrika"`) must not run these tests by default. Off GitHub Actions they
+ * run only when RLS_MUTATION_DB names exactly the database the owner connection is on, and off GitHub Actions never on "fabrika".
+ */
+const MUTATION_ALLOWED = isGithubActions() || (DB_NAME !== undefined && !SHARED_DB && process.env.RLS_MUTATION_DB === DB_NAME);
+const MUTATION_SKIP = !MUTATION_ALLOWED;
+if (HAS_DB && MUTATION_SKIP) {
+  skipOrFailInCi(
+    `${SUITE} (ExpertDirectoryEntry mutation tests)`,
+    `they commit a mutated view and restore it only in \`finally\`; not allowed on "${DB_NAME}" — run on an isolated database and set RLS_MUTATION_DB=<its name>`
+  );
+}
 
 /** The NG-183 cleanup block of prisma/rls.sql, verbatim. */
 function ng183Block(): string {
@@ -62,13 +90,33 @@ function ng183Block(): string {
   return sql.slice(doAt, end + 'END $$;'.length);
 }
 
-/** The expert_directory policy of prisma/rls.sql (DROP + CREATE), verbatim — restores the real one. */
-function expertDirectoryPolicy(): string {
+/** The ExpertDirectoryEntry block of prisma/rls.sql (DROP VIEW … grants), verbatim — restores the real view. */
+function expertDirectoryView(): string {
   const sql = readFileSync(join(REPO, 'prisma/rls.sql'), 'utf8');
-  const start = sql.indexOf('DROP POLICY IF EXISTS expert_directory ON public."ExpertPreRegistration";');
-  const end = sql.indexOf('"visibilityConsentAt" IS NOT NULL);', start);
-  if (start < 0 || end < 0) throw new Error('prisma/rls.sql: expert_directory policy not found');
-  return sql.slice(start, end + '"visibilityConsentAt" IS NOT NULL);'.length);
+  const start = sql.indexOf('DROP VIEW IF EXISTS public."ExpertDirectoryEntry";');
+  const end = sql.indexOf('END $$;', start);
+  if (start < 0 || end < 0) throw new Error('prisma/rls.sql: ExpertDirectoryEntry view block not found');
+  return sql.slice(start, end + 'END $$;'.length);
+}
+
+/** The view's CREATE statement from prisma/rls.sql, passed through `mutate` (a mutation under test). */
+function mutatedView(mutate: (create: string) => string): string {
+  const block = expertDirectoryView();
+  const start = block.indexOf('CREATE VIEW public."ExpertDirectoryEntry"');
+  const create = block.slice(start, block.indexOf(';', start) + 1);
+  const out = mutate(create);
+  if (out === create) throw new Error('mutation did not change the view');
+  return `DROP VIEW IF EXISTS public."ExpertDirectoryEntry"; ${out} GRANT SELECT ON public."ExpertDirectoryEntry" TO fabrika_app;`;
+}
+
+function rlsVerify(): { status: number | null; out: string } {
+  const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
+    cwd: REPO,
+    env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
+    encoding: 'utf8',
+    timeout: 170_000,
+  });
+  return { status: run.status, out: `${run.stdout}${run.stderr}` };
 }
 
 async function policySets(): Promise<Record<string, string[]>> {
@@ -85,6 +133,7 @@ async function dropStrays(): Promise<void> {
   await admin.query(`drop policy if exists ${STRAY} on "ProvinceLeadRoute"`);
   await admin.query(`drop policy if exists ${STRAY} on "ExpertPreRegistration"`);
   await admin.query(`drop policy if exists expert_directory on "PublicLead"`);
+  await admin.query(`drop policy if exists expert_directory on "ExpertPreRegistration"`);
   await admin.query(`drop policy if exists ${STRAY_TENANT} on "${TENANT_TABLE}"`);
 }
 
@@ -113,115 +162,100 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     expect(out).toContain(`PublicLead: politika kümesi {${STRAY}, system_scope}, beklenen tam {system_scope} — fazla: ${STRAY} (SELECT)`);
   }, 180_000);
 
-  it('rls:verify --require-db exits 1 when expert_directory keeps its name but loses the verified-row predicate', async () => {
-    // NG-52: the exception is the policy as written, not its name. Restored from rls.sql below.
-    // Under EXPERT_DIRECTORY_POLICY_LOCK, so system-scope.live's directory read never lands in the window.
+  it('rls:verify --require-db exits 1 when the NG-52 expert_directory policy comes back on ExpertPreRegistration (NG-188)', async () => {
+    // The policy filtered rows, not columns (SEC NG-185 F-1): with it back, the sealed
+    // 'expert-directory' scope would read fullName, email, ORCID and IP hash again. No longer an
+    // exception, so the catalogue check names it. TO pg_monitor: no real session reads through it.
+    await admin.query(
+      `create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (status = 'verified' and "visibilityConsentAt" is not null)`
+    );
+    const { status, out } = rlsVerify();
+    expect(status, out.slice(-2000)).toBe(1);
+    expect(out).toContain(
+      'ExpertPreRegistration: politika kümesi {expert_directory, system_scope}, beklenen tam {system_scope} — fazla: expert_directory (SELECT)'
+    );
+  }, 180_000);
+
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when ExpertDirectoryEntry loses its verified + consent condition (NG-188 mutation)', async () => {
     await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
       try {
-        await admin.query(`drop policy expert_directory on "ExpertPreRegistration"`);
-        await admin.query(`create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (true)`);
-        const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
-          cwd: REPO,
-          env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
-          encoding: 'utf8',
-          timeout: 170_000,
-        });
-        const out = `${run.stdout}${run.stderr}`;
-        expect(run.status, out.slice(-2000)).toBe(1);
-        expect(out).toContain('ExpertPreRegistration: politika kümesi {expert_directory, system_scope}');
-        expect(out).toContain('— fazla: expert_directory (SELECT)');
-        // While it is replaced the real reader sees 0 directory rows; the probe reports that too.
-        expect(out).toContain('expert-directory: ExpertPreRegistration verified + rızalı 0/');
+        await admin.query(
+          mutatedView((v) => v.replace(`AND e.status = 'verified'\n     AND e."visibilityConsentAt" IS NOT NULL;`, 'AND true;'))
+        );
+        const { status, out } = rlsVerify();
+        expect(status, out.slice(-2000)).toBe(1);
+        expect(out).toContain('expert-directory: ExpertDirectoryEntry prob satırlarından görünen 3/3 (yalnız verified görünmeli) — doğrulanmamış/rızasız görünüyor: pending, disabled');
       } finally {
-        await admin.query(expertDirectoryPolicy());
+        await admin.query(expertDirectoryView());
       }
     });
   }, 180_000);
 
-  it('rls:verify --require-db exits 1 when expert_directory keeps every expected fragment but ORs the conditions away (SEC NG-185 M3b)', async () => {
-    // Every fragment the old substring check asked for is still in the text ('expert-directory',
-    // system_scope_sealed(), 'verified', "visibilityConsentAt" IS NOT NULL), yet each one is
-    // OR-ed with true: the policy opens every row. The catalogue check must name it, not only
-    // the behaviour probe. TO pg_monitor, so no real session reads through it; restored from
-    // rls.sql in finally, under the same lock as the test above.
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when ExpertDirectoryEntry gains a personal-data column (NG-188 mutation)', async () => {
     await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
       try {
-        await admin.query(`drop policy expert_directory on "ExpertPreRegistration"`);
-        await admin.query(
-          `create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (
-             (coalesce(current_setting('app.system_scope_purpose', true), '') = 'expert-directory' OR public.system_scope_sealed() OR true)
-             AND (status = 'verified' OR ('verified' <> '' OR true))
-             AND ("visibilityConsentAt" IS NOT NULL OR true))`
-        );
-        const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
-          cwd: REPO,
-          env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
-          encoding: 'utf8',
-          timeout: 170_000,
-        });
-        const out = `${run.stdout}${run.stderr}`;
-        expect(run.status, out.slice(-2000)).toBe(1);
-        expect(out).toContain('ExpertPreRegistration: politika kümesi {expert_directory, system_scope}');
-        expect(out).toContain('— fazla: expert_directory (SELECT)');
+        await admin.query(mutatedView((v) => v.replace('AS "listOrder"', 'AS "listOrder", e.email')));
+        const { status, out } = rlsVerify();
+        expect(status, out.slice(-2000)).toBe(1);
+        expect(out).toMatch(/expert-directory: ExpertDirectoryEntry sütunları \{[^}]*\} — fazla: email/);
       } finally {
-        await admin.query(expertDirectoryPolicy());
+        await admin.query(expertDirectoryView());
       }
     });
   }, 180_000);
 
   /**
-   * NG-191 (SEC NG-185 low finding): "as written" covers the role list and the permissive flag
-   * too, not only (table, name, command, qual). The qual below is rls.sql's own, untouched; only
-   * one clause is added. Note `TO public` is NOT a mutation: rls.sql writes no TO clause and
-   * Postgres records that as {public} — so the role mutation is the one that differs from it.
-   * Restored from rls.sql in finally, under EXPERT_DIRECTORY_POLICY_LOCK like the tests above.
+   * NG-191 (SEC NG-185 low finding): the expert_directory policy kept NG-52's qual but changed its
+   * role list (`TO <app role>`) or its permissive flag (`AS RESTRICTIVE`), and rls:verify had to
+   * say so. Since NG-188 there is no named exception left (SYSTEM_SCOPE_ALLOWED_EXTRA is empty and
+   * rls.sql drops the policy), so the same two mutations are drift by name, whatever their roles
+   * or flag. The qual is NG-52's, verbatim from rls.sql before NG-188, so a real reader would see
+   * directory rows through it: committed DDL that opens rows, hence MUTATION_SKIP (NG-206) and
+   * EXPERT_DIRECTORY_POLICY_LOCK like the view mutations above, and dropped in finally.
    */
-  async function rlsVerifyWithExpertDirectory(clause: (create: string) => string): Promise<{ status: number | null; out: string }> {
+  const NG52_EXPERT_DIRECTORY_QUAL = `(SELECT coalesce(current_setting('app.system_scope', true) = 'on', false)
+                 AND coalesce(current_setting('app.system_scope_purpose', true), '') = 'expert-directory'
+                 AND public.system_scope_sealed())
+         AND status = 'verified'
+         AND "visibilityConsentAt" IS NOT NULL`;
+  const EXPERT_DIRECTORY_BACK =
+    'ExpertPreRegistration: politika kümesi {expert_directory, system_scope}, beklenen tam {system_scope} — fazla: expert_directory (SELECT)';
+
+  async function rlsVerifyWithExpertDirectory(clauses: string): Promise<{ status: number | null; out: string }> {
     return withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
       try {
-        const create = expertDirectoryPolicy().replace(/^DROP POLICY[^;]*;\s*/, '');
-        const mutated = clause(create);
-        expect(mutated, 'the mutation must change the statement').not.toBe(create);
-        await admin.query(`drop policy expert_directory on "ExpertPreRegistration"`);
-        await admin.query(mutated);
-        const run = spawnSync(TSX, ['scripts/check-rls-live.ts', '--require-db'], {
-          cwd: REPO,
-          env: { ...process.env, DATABASE_URL: OWNER_URL, DATABASE_URL_RLS_TEST: RLS_URL },
-          encoding: 'utf8',
-          timeout: 170_000,
-        });
-        return { status: run.status, out: `${run.stdout}${run.stderr}` };
+        await admin.query(`create policy expert_directory on "ExpertPreRegistration" ${clauses} using (${NG52_EXPERT_DIRECTORY_QUAL})`);
+        return rlsVerify();
       } finally {
-        await admin.query(expertDirectoryPolicy());
+        await admin.query(`drop policy if exists expert_directory on "ExpertPreRegistration"`);
       }
     });
   }
 
-  it('rls:verify --require-db exits 1 when expert_directory keeps its qual but is granted to another role list (NG-191)', async () => {
-    // TO <the measured app role>: the behaviour probe reads as that role, so it still sees the
-    // directory rows — only the catalogue comparison can tell the policy is not rls.sql's.
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when expert_directory comes back with its qual, granted to the app role (NG-191)', async () => {
+    // TO <the measured app role>: the sealed 'expert-directory' scope reads the base table again,
+    // personal-data columns included — the catalogue check and the behaviour probe both say so.
     const appRole = new URL(RLS_URL!).username;
-    const { status, out } = await rlsVerifyWithExpertDirectory((c) => c.replace(/\bFOR SELECT\b/, `FOR SELECT TO ${appRole}`));
+    const { status, out } = await rlsVerifyWithExpertDirectory(`for select to ${appRole}`);
     expect(status, out.slice(-2000)).toBe(1);
-    expect(out).toContain('— fazla: expert_directory (SELECT)');
-    expect(out).toContain(`expert_directory sapması: roller {${appRole}}, beklenen {public}`);
+    expect(out).toContain(EXPERT_DIRECTORY_BACK);
+    expect(out).toMatch(/expert-directory: ExpertPreRegistration [1-9]\d* satır okunuyor/);
   }, 180_000);
 
-  it('rls:verify --require-db exits 1 when expert_directory keeps its qual but is AS RESTRICTIVE (NG-191)', async () => {
-    const { status, out } = await rlsVerifyWithExpertDirectory((c) => c.replace(/\bFOR SELECT\b/, 'AS RESTRICTIVE FOR SELECT'));
+  it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when expert_directory comes back with its qual, AS RESTRICTIVE (NG-191)', async () => {
+    const { status, out } = await rlsVerifyWithExpertDirectory('as restrictive for select');
     expect(status, out.slice(-2000)).toBe(1);
-    expect(out).toContain('— fazla: expert_directory (SELECT)');
-    expect(out).toContain('expert_directory sapması: permissive RESTRICTIVE, beklenen PERMISSIVE');
+    expect(out).toContain(EXPERT_DIRECTORY_BACK);
   }, 180_000);
 
   it('the NG-183 block of prisma/rls.sql drops stray policies on system_scope tables only', async () => {
     await admin.query(`create policy ${STRAY} on "PublicLead" for select to pg_monitor using (true)`);
     await admin.query(`create policy ${STRAY} on "ProvinceLeadRoute" to pg_monitor using (true) with check (true)`);
     await admin.query(`create policy ${STRAY_TENANT} on "${TENANT_TABLE}" for select to pg_monitor using (false)`);
-    // NG-52: the exception is by table + name + command, not "expert_directory anywhere" and
-    // not "anything else on ExpertPreRegistration".
     await admin.query(`create policy ${STRAY} on "ExpertPreRegistration" for select to pg_monitor using (true)`);
     await admin.query(`create policy expert_directory on "PublicLead" for select to pg_monitor using (true)`);
+    // NG-188: the NG-52 exception is gone; the old policy is dropped like any stray one.
+    await admin.query(`create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (true)`);
     expect((await policySets()).PublicLead).toContain(STRAY);
 
     await admin.query(ng183Block());

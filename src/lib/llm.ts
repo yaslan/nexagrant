@@ -19,7 +19,7 @@ import { recordAlert } from '@/lib/observability/system-alert';
 import crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
-import { env } from '@/lib/env';
+import { declaredNodeEnv, env } from '@/lib/env';
 import { errorStatus } from '@/lib/errors';
 import { LLM_REFUSED_DIGEST, LLM_TRUNCATED_DIGEST } from '@/lib/llm-outcome';
 
@@ -299,6 +299,137 @@ function textFromAnthropicContent(content: unknown): string {
 function signalUntil(deadlineAt: number | undefined): AbortSignal | undefined {
   if (deadlineAt === undefined) return undefined;
   return AbortSignal.timeout(Math.max(1, deadlineAt - Date.now()));
+}
+
+// ── NG-209: the e2e fake provider ──────────────────────────────────────────────────────────────
+
+type FakeAiEnv = { E2E_FAKE_AI?: string; NODE_ENV?: string };
+
+/**
+ * Whether this code was BUILT for production (`next build`). A direct `process.env.NODE_ENV` read
+ * is replaced by a literal at build time, so starting a production build with another NODE_ENV
+ * cannot change it — the same lock src/lib/demo-login.ts uses. Deliberately not a parameter of the
+ * functions below (NG-209 sec F6): no caller can pass it open; tests load this module afresh
+ * under a chosen NODE_ENV instead.
+ */
+const BUILT_FOR_PRODUCTION = process.env.NODE_ENV === 'production';
+
+/**
+ * The flag and NODE_ENV as the process declared them. `declaredNodeEnv`, not `env.NODE_ENV`: the
+ * schema defaults an absent NODE_ENV to 'development', which would open the fake where nobody said
+ * which environment this is. Read lazily, only once the flag is on.
+ */
+function currentFakeAiEnv(): FakeAiEnv {
+  if (env.E2E_FAKE_AI !== 'true') return { E2E_FAKE_AI: env.E2E_FAKE_AI };
+  return { E2E_FAKE_AI: env.E2E_FAKE_AI, NODE_ENV: declaredNodeEnv };
+}
+
+/** Default-deny: the only environments the fake may answer in. Anything else, unset included, is not one. */
+function fakeAiEnvironmentAllowed(source: FakeAiEnv): boolean {
+  return !BUILT_FOR_PRODUCTION && (source.NODE_ENV === 'development' || source.NODE_ENV === 'test');
+}
+
+/**
+ * `E2E_FAKE_AI=true` — on the e2e web server (playwright.config.ts) the M18 calls listed in
+ * {@link FAKE_ANSWERS} are answered by {@link fakeProviderAnswer} instead of a provider: no key, no
+ * `fetch`, no model. Every other call — any other module, any other purpose — takes the real path
+ * it takes without the flag (NG-209 sec F4). Everything around the provider request stays real:
+ * the price, the reservation, the refund, the AiUsageLog row (provider `fake`, model `fake-e2e`).
+ * The M18 website reader follows the same flag (enrichment.ts → site-fetch.ts `fakeSiteDeps`).
+ *
+ * Default-deny (NG-209 sec F1): on only for the literal flag `true`, in a build that is not a
+ * production build, with NODE_ENV explicitly `development` or `test`. Every other NODE_ENV —
+ * production, staging, preview, blank, unset — keeps it off, and {@link assertFakeAiAllowed}
+ * refuses to start such a server with the flag on (src/instrumentation.ts).
+ */
+export function fakeAiEnabled(): boolean {
+  return fakeAiEnabledFor(currentFakeAiEnv());
+}
+
+function fakeAiEnabledFor(source: FakeAiEnv): boolean {
+  return source.E2E_FAKE_AI === 'true' && fakeAiEnvironmentAllowed(source);
+}
+
+/**
+ * Tests only: {@link fakeAiEnabled} over a given flag/NODE_ENV pair. The exported checks take no
+ * parameter (NG-209 sec F6), so production code cannot hand them a NODE_ENV of its choosing.
+ */
+export function testOnlyFakeAiEnabled(source: FakeAiEnv): boolean {
+  return fakeAiEnabledFor(source);
+}
+
+export class FakeAiNotAllowedError extends Error {
+  constructor(nodeEnv: string | undefined) {
+    super(
+      `E2E_FAKE_AI=true is allowed only on a development or test server (NODE_ENV=development or test, not a production build); this one has NODE_ENV=${nodeEnv === undefined ? '(unset)' : nodeEnv === '' ? '(blank)' : nodeEnv}${BUILT_FOR_PRODUCTION ? ' in a production build' : ''}. The M18 AI answers would come from the e2e fake provider, not a model. Remove the flag; the server will not start with it.`
+    );
+    this.name = 'FakeAiNotAllowedError';
+  }
+}
+
+/** Run once at server start (src/instrumentation.ts): with the flag on, anything but a development or test server does not start. */
+export function assertFakeAiAllowed(): void {
+  assertFakeAiAllowedFor(currentFakeAiEnv());
+}
+
+function assertFakeAiAllowedFor(source: FakeAiEnv): void {
+  if (source.E2E_FAKE_AI === 'true' && !fakeAiEnvironmentAllowed(source)) {
+    throw new FakeAiNotAllowedError(source.NODE_ENV);
+  }
+}
+
+/** Tests only: {@link assertFakeAiAllowed} over a given flag/NODE_ENV pair (sec F6). */
+export function testOnlyAssertFakeAiAllowed(source: FakeAiEnv): void {
+  assertFakeAiAllowedFor(source);
+}
+
+const FAKE_MODEL = 'fake-e2e';
+
+/**
+ * Canned answers by `module:purpose`, shaped like what the caller parses. Each one names the flag,
+ * so a fake answer on screen cannot be mistaken for a model's. This list IS the scope of the fake
+ * (NG-209 sec F4): M18 only, and only these purposes; there is no answer for anything else.
+ */
+const FAKE_ANSWERS: Readonly<Record<string, string>> = {
+  'M18:enrich-organization-attempt': JSON.stringify({
+    legalName: 'Acme Teknoloji A.Ş. (E2E_FAKE_AI)',
+    district: 'Çankaya',
+    sizeBand: 'SMALL',
+    themes: ['dijital dönüşüm'],
+    sectorCodes: ['J62.01'],
+    sources: [],
+  }),
+  'M18:eligibility-pre-report-attempt':
+    '### Özet / Summary\nE2E_FAKE_AI: sahte sağlayıcı yanıtı, hiçbir modele gidilmedi. / Fake provider answer; no model was called.',
+};
+/** The canned answer for this call, or undefined: the fake answers only what {@link FAKE_ANSWERS} lists. */
+function fakeAnswerFor(module: string, purpose: string): string | undefined {
+  return Object.hasOwn(FAKE_ANSWERS, `${module}:${purpose}`) ? FAKE_ANSWERS[`${module}:${purpose}`] : undefined;
+}
+
+/** The fake provider: a complete answer, at once, with no request made. */
+function fakeProviderAnswer(
+  canned: string,
+  module: string,
+  purpose: string,
+  messages: LlmMessage[],
+): ProviderResult & { refusalCategory?: string | null } {
+  // M18 enrichment cites only pages it was given: the first `URL: ` line of the prompt, if any.
+  let text = canned;
+  if (module === 'M18' && purpose === 'enrich-organization-attempt') {
+    const url = messages.map((m) => /^URL: (\S+)$/m.exec(m.content)?.[1]).find(Boolean);
+    if (url) text = JSON.stringify({ ...JSON.parse(text), sources: [url] });
+  }
+  return {
+    text,
+    inputTokens: 0,
+    outputTokens: 0,
+    provider: 'fake',
+    model: FAKE_MODEL,
+    stopReason: 'end_turn',
+    outcome: 'complete',
+    refusalCategory: null,
+  };
 }
 
 async function callProvider(
@@ -673,7 +804,10 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // we then cannot bill or even log.
   const { credits: price } = resolveCredits(options.module, options.purpose);
 
-  requireApiKey(provider);
+  // NG-209 sec F4: the e2e fake answers only the M18 calls it has a canned answer for; every
+  // other call goes the real way below, flag or not (no key → the usual hard failure).
+  const fakeAnswer = fakeAiEnabled() ? fakeAnswerFor(options.module, options.purpose) : undefined;
+  if (fakeAnswer === undefined) requireApiKey(provider);
 
   // FO-288 — the price is reserved BEFORE the provider is called, under the tenant's credit lock,
   // the same model M17 uses (FO-274). The old check read the balance outside any lock and only then
@@ -685,7 +819,11 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // One signal for the whole request: every attempt gives up at the same instant.
   const signal = signalUntil(options.deadlineAt);
   const { outcome, refusalCategory, ...result } = await withRetry(
-    () => callProvider(messages, { provider, model, maxTokens, signal }),
+    // NG-209: the e2e fake provider replaces the request and nothing else.
+    async () =>
+      fakeAnswer !== undefined
+        ? fakeProviderAnswer(fakeAnswer, options.module, options.purpose, messages)
+        : callProvider(messages, { provider, model, maxTokens, signal }),
     3,
     1000,
     options.deadlineAt,
@@ -944,3 +1082,4 @@ export async function embedText(
 
   return embedding;
 }
+

@@ -10,7 +10,8 @@
 --   * unmatched                   : routeReason IN (UnmatchedReason), routedTenantId NULL
 --
 -- UnmatchedReason = src/core/contracts/lead-routing.ts (province_missing, province_unmapped,
--- tenant_refused); a new reason there needs this list extended in the same PR.
+-- tenant_refused, consent_recipient_mismatch (NG-204)); a new reason there needs this list extended in
+-- the same PR.
 --
 -- "routedTenantId" is deliberately NOT a foreign key: when a tenant is deleted the lead keeps
 -- pointing at it (audit trail of who received it) and forwardPublicLead never moves it elsewhere
@@ -34,7 +35,7 @@ BEGIN
        ("routeStatus" IS NULL AND "routeReason" IS NULL AND "routedTenantId" IS NULL)
     OR ("routeStatus" IS NOT NULL AND "routeStatus" = 'routed' AND "routedTenantId" IS NOT NULL AND "routeReason" IS NULL)
     OR ("routeStatus" IS NOT NULL AND "routeStatus" = 'unmatched' AND "routedTenantId" IS NULL
-        AND "routeReason" IS NOT NULL AND "routeReason" IN ('province_missing', 'province_unmapped', 'tenant_refused'))
+        AND "routeReason" IS NOT NULL AND "routeReason" IN ('province_missing', 'province_unmapped', 'tenant_refused', 'consent_recipient_mismatch'))
   );
   IF bad > 0 THEN
     RAISE EXCEPTION 'add-public-lead-route-consistency: % PublicLead row(s) violate the route consistency rule; fix them by hand first (SELECT id, "routeStatus", "routeReason", "routedTenantId" FROM "PublicLead" ...)', bad;
@@ -46,5 +47,5 @@ ALTER TABLE "PublicLead" ADD CONSTRAINT "PublicLead_route_consistency_check" CHE
      ("routeStatus" IS NULL AND "routeReason" IS NULL AND "routedTenantId" IS NULL)
   OR ("routeStatus" IS NOT NULL AND "routeStatus" = 'routed' AND "routedTenantId" IS NOT NULL AND "routeReason" IS NULL)
   OR ("routeStatus" IS NOT NULL AND "routeStatus" = 'unmatched' AND "routedTenantId" IS NULL
-      AND "routeReason" IS NOT NULL AND "routeReason" IN ('province_missing', 'province_unmapped', 'tenant_refused'))
+      AND "routeReason" IS NOT NULL AND "routeReason" IN ('province_missing', 'province_unmapped', 'tenant_refused', 'consent_recipient_mismatch'))
 );

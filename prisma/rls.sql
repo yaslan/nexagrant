@@ -336,7 +336,7 @@ END $$;
 -- can read the secret; it returns a boolean and nothing else, so every role
 -- subject to the policy may call it. No argument on purpose: the policies call
 -- it as system_scope_sealed(), and the purpose it checks is the very value the
--- purpose tests in system_scope_open() and expert_directory read, so the seal
+-- purpose tests in system_scope_open() and the ExpertDirectoryEntry view read, so the seal
 -- and the narrowing cannot disagree (NG-187).
 CREATE OR REPLACE FUNCTION public.system_scope_sealed()
 RETURNS boolean
@@ -400,14 +400,14 @@ AS $fn$
               AND ((tbl = to_regclass('public."ProvinceLeadRoute"')) IS NOT TRUE
                    OR coalesce(current_setting('app.system_scope_purpose', true), '')
                         IN ('platform-admin', 'cross-tenant-job'))
-              -- NG-52: expert-directory opens no table through this policy. Its
-              -- one read is the expert_directory policy below (SELECT only,
+              -- NG-52/NG-188: expert-directory opens no table through this policy. Its
+              -- one read is the view "ExpertDirectoryEntry" below (card columns of
               -- verified and visibility-consented rows of ExpertPreRegistration).
               AND coalesce(current_setting('app.system_scope_purpose', true), '') <> 'expert-directory'))
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead (FO-52, FO-26, NG-175); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead only for public-intake, platform-admin and cross-tenant-job; ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175); expert-directory opens nothing here (NG-52, see the expert_directory policy). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead (FO-52, FO-26, NG-175); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead only for public-intake, platform-admin and cross-tenant-job; ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175); expert-directory opens nothing here (NG-52; its one read is the view ExpertDirectoryEntry, NG-188). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -442,22 +442,69 @@ CREATE POLICY system_scope ON public."ExpertPreRegistration"
   USING ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)))
   WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegistration"'::regclass)));
 
--- NG-52 (TASK-MW2SU1H9BLCGV): the M8 candidate query reads the expert pool as a
--- directory. Purpose 'expert-directory' (withSystemScope, src/lib/expert-prereg/
--- server/directory.ts) gets this one permissive policy and nothing else: SELECT
--- only (no INSERT/UPDATE/DELETE policy names it, and system_scope_open() is
--- false for it on every table), and only rows of a verified expert who ticked
--- the visibility consent. Same seal as system_scope: a plain SET of the purpose
--- by fabrika_app does not open it. The owner role bypasses RLS, so the code
--- repeats the same two conditions in its WHERE.
+-- NG-52 (TASK-MW2SU1H9BLCGV) + NG-188 (SEC NG-185 F-1b): the M8 candidate query reads
+-- the expert pool as a directory, through the view "ExpertDirectoryEntry" and nothing else.
+-- Until NG-188 it was a SELECT policy `expert_directory` on the base table: it filtered
+-- ROWS, not columns, so inside the sealed 'expert-directory' scope fabrika_app could read
+-- fullName, email, orcid, linkedinUrl, ipHash and verifyTokenHash of every listed expert
+-- (NG-185 measurement). Column GRANTs on the base table are no answer: public-intake reads
+-- and writes those same columns as fabrika_app. So the purpose gets its own read surface:
+--
+--   * the view carries only the card columns (id, founderNumber, province, isFreelancer,
+--     roles, programmes, expertiseAreas, languages) and "listOrder", a row number in the
+--     order M8 reads them (founderNumber, then createdAt, then id) so createdAt itself
+--     never leaves the table;
+--   * its WHERE is the old policy, word for word: sealed scope + purpose = 'expert-directory'
+--     + status = 'verified' + "visibilityConsentAt" IS NOT NULL. It runs with the view
+--     owner's rights (security_invoker off, the default), and the owner bypasses RLS on
+--     ExpertPreRegistration (no FORCE), so this WHERE is the guard, not RLS. Owned by
+--     anyone but the table owner the base read falls under RLS, where 'expert-directory'
+--     opens nothing: 0 rows, fail closed;
+--   * security_barrier: the caller's own predicates (a leaky function in its WHERE) cannot
+--     run on a row before the view's WHERE has removed it;
+--   * the window function makes the view not auto-updatable, so no INSERT, UPDATE or DELETE
+--     can reach the base table through it as the owner, even for a role that holds the
+--     write privilege (`GRANT … ON ALL TABLES` in db:rls-role covers views);
+--   * fabrika_app gets SELECT and nothing else (rls-app-role.sql revokes the rest too).
+--
+-- And the base table no longer has the policy: 'expert-directory' opens no row of
+-- ExpertPreRegistration (system_scope_open() is false for it), so the NG-183 block below
+-- keeps exactly {system_scope} there with no exception. See
+-- prisma/migrations/expert-directory-view.sql; rls:verify probeExpertDirectory measures it.
+-- NG-206 (D-B2): copies of this file from before NG-188 create `expert_directory` on the base table
+-- again; running them with `pnpm db:rls` on a database that has this view brings PII back. Do not
+-- run an old rls.sql on the shared database. See docs/GATE.md.
 DROP POLICY IF EXISTS expert_directory ON public."ExpertPreRegistration";
-CREATE POLICY expert_directory ON public."ExpertPreRegistration"
-  FOR SELECT
-  USING ((SELECT coalesce(current_setting('app.system_scope', true) = 'on', false)
+-- DROP + CREATE, not CREATE OR REPLACE: a drifted view (an extra column) cannot be
+-- narrowed by OR REPLACE, so `pnpm db:rls` rebuilds it. Nothing depends on it; the
+-- grants are re-applied right below.
+DROP VIEW IF EXISTS public."ExpertDirectoryEntry";
+CREATE VIEW public."ExpertDirectoryEntry" WITH (security_barrier = true) AS
+  SELECT e.id,
+         e."founderNumber",
+         e.province,
+         e."isFreelancer",
+         e.roles,
+         e.programmes,
+         e."expertiseAreas",
+         e.languages,
+         row_number() OVER (ORDER BY e."founderNumber" ASC NULLS LAST, e."createdAt" ASC, e.id ASC) AS "listOrder"
+    FROM public."ExpertPreRegistration" e
+   WHERE (SELECT coalesce(current_setting('app.system_scope', true) = 'on', false)
                  AND coalesce(current_setting('app.system_scope_purpose', true), '') = 'expert-directory'
                  AND public.system_scope_sealed())
-         AND status = 'verified'
-         AND "visibilityConsentAt" IS NOT NULL);
+     AND e.status = 'verified'
+     AND e."visibilityConsentAt" IS NOT NULL;
+COMMENT ON VIEW public."ExpertDirectoryEntry" IS
+  'NG-188: the M8 expert directory. Card columns only (no name, e-mail, ORCID, LinkedIn, IP or token), verified + visibility-consented rows only, and only inside a sealed enter_system_scope(''expert-directory''). Not updatable. fabrika_app: SELECT only.';
+REVOKE ALL ON public."ExpertDirectoryEntry" FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fabrika_app') THEN
+    REVOKE ALL ON public."ExpertDirectoryEntry" FROM fabrika_app;
+    GRANT SELECT ON public."ExpertDirectoryEntry" TO fabrika_app;
+  END IF;
+END $$;
 
 -- ExpertPreRegAttempt (FO-26, TASK-MVBLYRLP9ID93): the per-IP submission counter of the
 -- same pre-registration (HMAC of an IP, pseudonymous personal data). Same standing and
@@ -534,12 +581,10 @@ END $$;
 -- together, so a stray one — even FOR SELECT USING (true) — would open the personal data
 -- that system_scope keeps shut. The blocks above only replace system_scope itself; this
 -- drops every other policy on those tables, so `pnpm db:rls` restores the set to
--- {system_scope} (plus the one exception below). Tenant tables are not touched. `pnpm rls:verify` fails on the same set.
--- One named exception (NG-52, ADR-0009 §9): expert_directory on ExpertPreRegistration,
--- SELECT only — created above, it opens verified + consented rows to the sealed
--- 'expert-directory' purpose. Same name on another table, or on this table with another
--- command, is still dropped. Keep it in step with SYSTEM_SCOPE_ALLOWED_EXTRA
--- (scripts/check-rls-live.ts).
+-- {system_scope}. Tenant tables are not touched. `pnpm rls:verify` fails on the same set.
+-- No exception any more: NG-52's expert_directory policy on ExpertPreRegistration was
+-- replaced by the view "ExpertDirectoryEntry" (NG-188), so a policy of that name is now
+-- dropped like any other stray one.
 DO $$
 DECLARE r record;
 BEGIN
@@ -548,7 +593,6 @@ BEGIN
       FROM pg_policies p
      WHERE p.schemaname = 'public'
        AND p.policyname <> 'system_scope'
-       AND NOT (p.tablename = 'ExpertPreRegistration' AND p.policyname = 'expert_directory' AND p.cmd = 'SELECT')
        AND p.tablename IN (
              SELECT tablename FROM pg_policies WHERE schemaname = 'public' AND policyname = 'system_scope'
              EXCEPT

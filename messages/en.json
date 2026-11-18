@@ -3661,6 +3661,7 @@
     "status_active": "Active",
     "status_inactive": "Inactive",
     "status_unmapped": "Unmapped",
+    "target_ineligible": "Warning: {tenant} can no longer take leads (M18 is not open or the organisation is not eligible). The form keeps showing this name; move the route to another organisation or deactivate it.",
     "select_label": "Consultancy for {province}",
     "select_placeholder": "Choose a consultancy",
     "save": "Save",
@@ -3677,6 +3678,15 @@
     "unmatched_empty": "No unmatched leads.",
     "unmatched_load_error": "The unmatched lead list could not be loaded.",
     "unmatched_count": "Showing {shown} of {total}",
+    "stuck_title": "Stuck leads (no copy)",
+    "stuck_subtitle": "Leads routed to a consultancy that have had no copy there (contact or deal record) for more than {minutes} minutes. Read-only: the lead is not sent to another consultancy, copied or deleted. Each one also opens a system alert.",
+    "stuck_empty": "No stuck leads.",
+    "stuck_load_error": "The stuck lead list could not be loaded.",
+    "stuck_count": "Showing {shown} of {total}",
+    "col_routed_at": "Routed",
+    "col_routed_tenant": "Routed to",
+    "col_lead_id": "Lead ID",
+    "tenant_deleted": "Consultancy deleted",
     "col_created": "Date",
     "col_contact": "Contact",
     "col_org": "Organisation",
@@ -3687,6 +3697,7 @@
     "reason_province_missing": "Province empty or invalid",
     "reason_province_unmapped": "Province not mapped to a consultancy",
     "reason_tenant_refused": "The mapped consultancy refused the transfer",
+    "reason_consent_recipient_mismatch": "The mapped consultancy is not the one the visitor consented to",
     "error_invalid_province": "Invalid province. Reload the page and try again.",
     "error_tenant_not_found": "The selected consultancy was not found.",
     "error_tenant_ineligible": "The selected consultancy is not eligible (deleted, or neither a consultancy nor an agency).",
@@ -5850,6 +5861,7 @@
       "enrichApply": "Write selected to record",
       "enrichApplied": "The selected fields were written to the record.",
       "enrichSources": "Source pages",
+      "enrichDraftLabel": "AI draft — nothing is written to the record until you approve",
       "enrichNothingSelected": "Select at least one field.",
       "field": {
         "legalName": "Legal name",
@@ -5878,6 +5890,42 @@
         "SITE_UNAVAILABLE": "The website could not be read (invalid address, robots.txt does not allow it, or no answer). No credit was used.",
         "BAD_ANSWER": "The AI answer could not be read. Try again.",
         "NO_CREDITS": "Not enough AI credits."
+      }
+    },
+    "autoTasks": {
+      "new": {
+        "first-contact": "Make the first contact"
+      },
+      "qualified": {
+        "contact-decision-maker": "Contact the decision maker"
+      },
+      "contacted": {
+        "book-discovery-meeting": "Book a discovery meeting"
+      },
+      "discovery": {
+        "send-meeting-notes": "Send the meeting notes"
+      },
+      "eligibility": {
+        "check-call-rules": "Check eligibility against the call rules"
+      },
+      "proposal": {
+        "send-quote": "Send the quote",
+        "follow-up": "Follow up on the quote"
+      },
+      "contract": {
+        "collect-signature": "Collect the contract signature"
+      },
+      "application": {
+        "document-checklist": "Prepare the application document checklist"
+      },
+      "submitted": {
+        "record-reference": "Record the application reference number"
+      },
+      "won": {
+        "kickoff": "Plan the kickoff meeting"
+      },
+      "lost": {
+        "reengage": "Re-engage the client"
       }
     }
   }

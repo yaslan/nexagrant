@@ -6,7 +6,7 @@ import {
   type LeadIntakeConsent,
   type LeadIntakeRequest,
 } from '@/core/contracts/lead-intake';
-import { checkIntakeConsent, isIntakeTenant, parseIntakeRequest } from '@/modules/m18/server/intake';
+import { checkIntakeConsent, isIntakeTarget, isIntakeTenant, parseIntakeRequest } from '@/modules/m18/server/intake';
 
 const consent = (over: Partial<LeadIntakeConsent> = {}): LeadIntakeConsent => ({
   documentId: LEAD_INTAKE_CONSENT_DOCUMENT_ID,
@@ -37,6 +37,20 @@ describe('isIntakeTenant', () => {
   });
   test('a deleted tenant receives nothing', () => {
     expect(isIntakeTenant({ orgType: 'CONSULTANCY', kind: 'AGENCY', deletedAt: new Date() })).toBe(false);
+  });
+});
+
+describe('isIntakeTarget (NG-205, SEC NG-203 D-A2)', () => {
+  const consultancy = { orgType: 'CONSULTANCY', kind: 'ORGANIZATION', deletedAt: null };
+  test('an eligible tenant with M18 at PILOT receives', () => {
+    expect(isIntakeTarget(consultancy, 'PILOT')).toBe(true);
+  });
+  test('M18 closed to the tenant (no row, OFF, DEV, ON of an unsold beta): nothing is routed there', () => {
+    for (const status of [null, undefined, 'OFF', 'DEV', 'ON'] as const) expect(isIntakeTarget(consultancy, status), String(status)).toBe(false);
+  });
+  test('M18 open does not make an ineligible or deleted tenant eligible', () => {
+    expect(isIntakeTarget({ orgType: 'SME', kind: 'ORGANIZATION', deletedAt: null }, 'PILOT')).toBe(false);
+    expect(isIntakeTarget({ ...consultancy, deletedAt: new Date() }, 'PILOT')).toBe(false);
   });
 });
 

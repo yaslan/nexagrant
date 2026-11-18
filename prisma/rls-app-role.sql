@@ -103,6 +103,13 @@ BEGIN
     EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public."AuditEvent" FROM %I', app_role);
   END IF;
 
+  -- 3e. The M8 expert directory view is read-only (NG-188, prisma/rls.sql): step 3's
+  --     ALL TABLES covers views too. The view is not updatable anyway; this keeps the
+  --     privilege at SELECT so that does not rest on the view's shape alone.
+  IF to_regclass('public."ExpertDirectoryEntry"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public."ExpertDirectoryEntry" FROM %I', app_role);
+  END IF;
+
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as the owner role (fabrika_owner on the VPS; fabrika locally). Default
   --    privileges are recorded per grantor. Only roles the caller is a member of
@@ -128,11 +135,13 @@ BEGIN
   --    granted there and in rls.sql too, here for a role created after both.
   --    province_transfer_org_name (NG-179, add-province-transfer-org-name.sql): the
   --    readiness form's transfer box reads the province's organisation NAME through it.
+  --    province_transfer_org (NG-204, add-public-lead-transfer-recipient.sql): the submit binds
+  --    the transfer consent to that organisation's id (server side only).
   FOR fn IN
     SELECT p.oid::regprocedure
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name')
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name', 'province_transfer_org')
   LOOP
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO %I', fn, app_role);
   END LOOP;

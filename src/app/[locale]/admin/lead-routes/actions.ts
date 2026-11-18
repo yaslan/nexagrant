@@ -9,11 +9,13 @@ import {
   listUnmatchedLeads,
   setProvinceLeadRoute,
 } from '@/lib/leads/province-route';
+import { listStuckRoutedLeads, STUCK_PAGE_MAX } from '@/lib/leads/stuck-leads';
 import type {
   IntakeTenantOption,
   ListUnmatchedLeadsInput,
   ProvinceLeadRouteRow,
   ProvinceRouteResult,
+  StuckRoutedLeadPage,
   UnmatchedLeadPage,
 } from '@/core/contracts/lead-routing';
 
@@ -60,4 +62,15 @@ export async function listIntakeTenantOptionsAction(input?: undefined): Promise<
   // No input exists; anything passed is ignored the same way a malformed list input is.
   noInputSchema.safeParse(input);
   return listIntakeTenantOptions();
+}
+
+/**
+ * NG-182 — routed leads with no copy in their tenant, older than PUBLIC_LEAD_STUCK_AFTER_MINUTES.
+ * Read-only: there is no re-send action. No input: the reader applies the job's threshold
+ * (PUBLIC_LEAD_STUCK_AFTER_MINUTES), not the caller's.
+ */
+export async function listStuckRoutedLeadsAction(input?: undefined): Promise<StuckRoutedLeadPage> {
+  await requirePlatformAdmin();
+  noInputSchema.safeParse(input);
+  return listStuckRoutedLeads(undefined, { purpose: 'platform-admin', limit: STUCK_PAGE_MAX });
 }
