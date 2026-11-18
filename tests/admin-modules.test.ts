@@ -59,10 +59,17 @@ vi.mock('../src/lib/db', () => {
  * moved its query onto `withSystemScope` (TASK-MTVTPVTEBCF5Z). Resolved lazily
  * because `vi.mock` is hoisted above the fixture consts.
  */
+const scope = vi.hoisted(() => ({ purposes: [] as string[] }));
 vi.mock('../src/lib/system-scope', () => ({
-  withSystemScope: async <T,>(_purpose: string, _context: string, cb: (tx: never) => Promise<T> | T) =>
-    cb(dbBox.client as never),
+  withSystemScope: async <T,>(purpose: string, _context: string, cb: (tx: never) => Promise<T> | T) => {
+    scope.purposes.push(purpose);
+    return cb(dbBox.client as never);
+  },
 }));
+
+/** NG-215: the route side is pinned live (tests/m18-route-close-on-module-exit.live.test.ts); here only WHEN it runs. */
+const closeRoutes = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock('../src/lib/leads/province-route', () => ({ deactivateRoutesOfClosedTarget: closeRoutes }));
 
 describe('Admin Module Actions', () => {
   test('Enabling M4 requires M1 to be active', async () => {
@@ -106,5 +113,23 @@ describe('Admin Module Actions', () => {
     await expect(
       updateTenantModuleStatus('tenant-1', 'M4', 'ON')
     ).rejects.toThrow('platform admin required');
+  });
+
+  test('NG-215: M18 leaving the statuses open to the tenant closes its routes under platform-admin scope; other flips do not', async () => {
+    for (const status of ['OFF', 'DEV', 'ON'] as const) {
+      scope.purposes.length = 0;
+      closeRoutes.mockClear();
+      await updateTenantModuleStatus('tenant-1', 'M18', status);
+      expect(scope.purposes, status).toEqual(['platform-admin']);
+      expect(closeRoutes, status).toHaveBeenCalledWith(expect.anything(), 'tenant-1', { moduleId: 'M18', newStatus: status }, 'admin-user-1');
+    }
+
+    for (const [moduleId, status] of [['M18', 'PILOT'], ['M4', 'ON'], ['M1', 'OFF']] as const) {
+      scope.purposes.length = 0;
+      closeRoutes.mockClear();
+      await updateTenantModuleStatus('tenant-1', moduleId, status);
+      expect(scope.purposes, `${moduleId} ${status}`).toEqual([]);
+      expect(closeRoutes, `${moduleId} ${status}`).not.toHaveBeenCalled();
+    }
   });
 });

@@ -3661,6 +3661,7 @@
     "status_active": "Active",
     "status_inactive": "Inactive",
     "status_unmapped": "Unmapped",
+    "target_ineligible": "Warning: {tenant} can no longer take leads (M18 is not open or the organisation is not eligible). The form keeps showing this name; move the route to another organisation or deactivate it.",
     "select_label": "Consultancy for {province}",
     "select_placeholder": "Choose a consultancy",
     "save": "Save",
@@ -5890,6 +5891,42 @@
         "SITE_UNAVAILABLE": "The website could not be read (invalid address, robots.txt does not allow it, or no answer). No credit was used.",
         "BAD_ANSWER": "The AI answer could not be read. Try again.",
         "NO_CREDITS": "Not enough AI credits."
+      }
+    },
+    "autoTasks": {
+      "new": {
+        "first-contact": "Make the first contact"
+      },
+      "qualified": {
+        "contact-decision-maker": "Contact the decision maker"
+      },
+      "contacted": {
+        "book-discovery-meeting": "Book a discovery meeting"
+      },
+      "discovery": {
+        "send-meeting-notes": "Send the meeting notes"
+      },
+      "eligibility": {
+        "check-call-rules": "Check eligibility against the call rules"
+      },
+      "proposal": {
+        "send-quote": "Send the quote",
+        "follow-up": "Follow up on the quote"
+      },
+      "contract": {
+        "collect-signature": "Collect the contract signature"
+      },
+      "application": {
+        "document-checklist": "Prepare the application document checklist"
+      },
+      "submitted": {
+        "record-reference": "Record the application reference number"
+      },
+      "won": {
+        "kickoff": "Plan the kickoff meeting"
+      },
+      "lost": {
+        "reengage": "Re-engage the client"
       }
     }
   }

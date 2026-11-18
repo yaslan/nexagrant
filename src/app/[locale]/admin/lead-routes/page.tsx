@@ -92,7 +92,7 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
   const picked = pickRoutes(routes);
   const provinces: ProvinceView[] = TR_PROVINCES.map((province) => {
     const r = picked.get(province);
-    if (!r) return { province, status: 'unmapped', tenantId: null, tenantName: null, changedBy: null, changedAt: null };
+    if (!r) return { province, status: 'unmapped', tenantId: null, tenantName: null, changedBy: null, changedAt: null, targetIneligible: false };
     return {
       province,
       status: r.active ? 'active' : 'inactive',
@@ -100,6 +100,7 @@ export default async function AdminLeadRoutesPage({ params }: { params: Promise<
       tenantName: r.tenantName,
       changedBy: r.updatedBy ? r.updatedByName || t('unknown_actor') : null,
       changedAt: formatUtc(r.updatedAt),
+      targetIneligible: r.active && !r.targetEligible,
     };
   });
   const unmappedCount = provinces.filter((p) => p.status !== 'active').length;
