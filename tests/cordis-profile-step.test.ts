@@ -13,6 +13,7 @@ interface FakeAlert {
 const alerts: FakeAlert[] = [];
 
 vi.mock('@/lib/observability/system-alert', () => ({
+  recordAlert: (input: { source: string; dedupeKey?: string }) => recordAlert(input),
   resolveAlerts: vi.fn(async (sel: { source: string; meta?: Record<string, unknown> }) => {
     let resolved = 0;
     for (const a of alerts) {
@@ -24,6 +25,11 @@ vi.mock('@/lib/observability/system-alert', () => ({
     return { resolved };
   }),
 }));
+
+const recordAlert = vi.fn(async (input: { source: string; dedupeKey?: string }) => {
+  alerts.push({ source: input.source, meta: { alertDedupeKey: input.dedupeKey }, resolvedAt: null });
+  return {};
+});
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -46,6 +52,7 @@ const PROFILES = { success: true, updatedProfiles: 3, updatedCoParticipations: 4
 
 beforeEach(() => {
   alerts.length = 0;
+  recordAlert.mockClear();
   generatePartnerProfiles.mockReset();
   generatePartnerProfiles.mockResolvedValue(PROFILES);
 });
@@ -83,6 +90,23 @@ describe('runPartnerProfileStep', () => {
 
     expect(await partnerProfilesOwed()).toBe(false);
     expect(await runPartnerProfileStep(true)).toBeNull();
+  });
+
+  it('a profile build failed on the manual path raises the profile-failure alert, rethrows, and the next unchanged run rebuilds', async () => {
+    generatePartnerProfiles.mockRejectedValueOnce(new Error('deadlock detected'));
+
+    // Admin action / route / CLI: the import succeeded, the profile step throws.
+    await expect(runPartnerProfileStep(false, { runId: 'RUN-1' })).rejects.toThrow('deadlock detected');
+    expect(recordAlert).toHaveBeenCalledTimes(1);
+    expect(recordAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'k2_monthly_cordis', dedupeKey: 'k2:partner-profiles-failed' })
+    );
+    expect(await partnerProfilesOwed()).toBe(true);
+
+    // The operator presses the same button again: same dump, profiles are rebuilt and the alert closes.
+    const result = await runPartnerProfileStep(true, { runId: 'RUN-2' });
+    expect(result).toEqual(PROFILES);
+    expect(await partnerProfilesOwed()).toBe(false);
   });
 
   it('does not close the alert when the profile build fails', async () => {

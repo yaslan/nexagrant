@@ -48,7 +48,10 @@ export async function closeK2Alert(dedupeKey: string): Promise<void> {
  * profile build fails; each caller decides how to report that. A successful
  * build closes the profile-failure alert.
  */
-export async function runPartnerProfileStep(importSkipped: boolean): Promise<PartnerProfileJobResult | null> {
+export async function runPartnerProfileStep(
+  importSkipped: boolean,
+  _context?: { runId: string; meta?: Record<string, unknown> }
+): Promise<PartnerProfileJobResult | null> {
   if (importSkipped && !(await partnerProfilesOwed())) return null;
   const profiles = await generatePartnerProfiles();
   await closeK2Alert(PROFILES_FAILED_KEY);
