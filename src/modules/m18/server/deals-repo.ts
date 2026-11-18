@@ -86,16 +86,25 @@ function autoTaskTitle(locale: string, ruleKey: string): string {
  * target stage's auto tasks (AUTO_TASK_RULES, NG-216) in the same transaction, so the history
  * and the task list never disagree with the stage. A rule already on one of the deal's live
  * tasks (done or not) is skipped: moving back and forth does not pile up duplicates.
- * Task titles are rendered in `locale` (the acting user's UI locale) and stored on the row.
+ * Task titles are rendered in `locale` (the acting user's UI locale, required: no silent 'tr'
+ * fallback) and stored on the row.
+ *
+ * NG-220: the deal row is locked `FOR UPDATE` before it is read, so two moves of the same deal
+ * run one after the other. The second one waits for the first to commit, then reads the
+ * committed stage (READ COMMITTED takes a fresh snapshot per statement) and is checked against
+ * it: a move that is no longer legal is refused and writes no activity and no auto task.
+ * Without the lock both saw the old stage and the losing move's tasks stayed on the deal.
  */
 export async function moveDealStage(
   tx: TenantTx,
   tenantId: string,
   rawInput: unknown,
   actorUserId: string | null,
-  locale: string = 'tr',
+  locale: string,
 ) {
   const input: StageMoveInput = stageMoveSchema.parse(rawInput);
+  // A deal of another tenant is invisible here (RLS + the tenantId filter): neither locked nor found.
+  await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "tenantId" = ${tenantId} AND "id" = ${input.dealId} FOR UPDATE`;
   const deal = await tx.deal.findFirst({
     where: { id: input.dealId, tenantId, deletedAt: null },
     select: { id: true, stage: true },

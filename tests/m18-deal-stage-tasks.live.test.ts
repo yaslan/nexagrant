@@ -52,7 +52,7 @@ async function dealAt(stage: DealStage, label: string): Promise<string> {
 }
 
 const move = (dealId: string, to: DealStage, lostReason?: string) =>
-  withTenant(tenantId, (tx) => moveDealStage(tx, tenantId, { dealId, to, lostReason }, null));
+  withTenant(tenantId, (tx) => moveDealStage(tx, tenantId, { dealId, to, lostReason }, null, 'tr'));
 
 const tasksOf = (dealId: string) =>
   admin.dealTask.findMany({ where: { tenantId, dealId }, orderBy: { autoRuleKey: 'asc' } });
