@@ -258,8 +258,9 @@ function assertSkipBudget(skips: CordisFileSkips[], maxSkippedRatio: number): vo
 
 /**
  * How many recent SUCCESS rows the "already imported?" check reads. Past this
- * many dry or limited runs in a row the check finds no complete import and the
- * run imports again: rows are upserts, so that costs time, not data.
+ * many dry, limited or skipped runs in a row the check finds no complete
+ * import and the run imports again: rows are upserts, so that costs time, not
+ * data.
  */
 const HASH_CHECK_WINDOW = 20;
 
@@ -276,15 +277,22 @@ function runScope(options: CordisImportOptions): { dryRun?: true; limit?: number
 }
 
 /**
- * True when a SUCCESS row's `rowCounts` says the whole archive was written, so
- * the same file need not be imported again. Rows without the marks (the
- * worker's, and real runs before NG-224) count as complete; a limited run
- * from before NG-224 carries no mark and cannot be told apart.
+ * True when a SUCCESS row's `rowCounts` says the run wrote the whole archive,
+ * so the same file need not be imported again: it carries the projects count a
+ * writing run records, and neither mark of `runScope`. The worker's rows and
+ * real runs from before NG-224 qualify. A "Zaten güncel" row wrote nothing and
+ * does not: before NG-224 one was written after a dry run too, with no mark,
+ * so trusting it would keep skipping a file that was never imported. A limited
+ * run from before NG-224 carries no mark and cannot be told apart.
  */
 export function isCompleteImport(rowCounts: unknown): boolean {
-  if (!rowCounts || typeof rowCounts !== 'object' || Array.isArray(rowCounts)) return true;
-  const marks = rowCounts as { dryRun?: unknown; limit?: unknown };
-  return marks.dryRun !== true && (marks.limit === undefined || marks.limit === null);
+  if (!rowCounts || typeof rowCounts !== 'object' || Array.isArray(rowCounts)) return false;
+  const c = rowCounts as { projects?: unknown; dryRun?: unknown; limit?: unknown };
+  return (
+    typeof c.projects === 'number' &&
+    c.dryRun !== true &&
+    (c.limit === undefined || c.limit === null)
+  );
 }
 
 /**
@@ -335,9 +343,10 @@ export async function runCordisImport(options: CordisImportOptions): Promise<Cor
       },
     });
 
-    // Hash check: did the last complete import of this dataset read the same
-    // zip? A dry run or a limited run ends as SUCCESS with the hash too, but
-    // wrote none or part of the data, so it must not count (NG-224).
+    // Hash check: did the last run that wrote the whole archive read the same
+    // zip? A dry run, a limited run and a "Zaten güncel" run end as SUCCESS with
+    // the hash too, but wrote none or part of the data, so they do not count
+    // (NG-224).
     let latestSuccessRun: { fileHash: string | null } | null = null;
     try {
       const recent: Array<{ fileHash: string | null; rowCounts: unknown }> =

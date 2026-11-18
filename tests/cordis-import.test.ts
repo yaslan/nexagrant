@@ -246,10 +246,12 @@ describe('K2 CORDIS Ingestion & M1 Partner Intelligence Engine', () => {
 });
 
 describe('isCompleteImport — which SUCCESS row the "Zaten güncel" check may trust (NG-224)', () => {
-  test('a full real run counts; a dry run and a limited run do not', () => {
+  test('a full real run counts; a dry, a limited and a skipped run do not', () => {
     expect(isCompleteImport({ projects: 3, skipped: {} })).toBe(true);
-    expect(isCompleteImport({ message: 'Zaten güncel (File hash unchanged)' })).toBe(true);
-    expect(isCompleteImport(null)).toBe(true);
+    expect(isCompleteImport({ projects: 3, organizations: 6, month: '2026-09' })).toBe(true);
+    // A skip row wrote nothing; the old code also left one after a dry run.
+    expect(isCompleteImport({ message: 'Zaten güncel (File hash unchanged)' })).toBe(false);
+    expect(isCompleteImport(null)).toBe(false);
     expect(isCompleteImport({ projects: 3, dryRun: true })).toBe(false);
     expect(isCompleteImport({ projects: 1, limit: 1 })).toBe(false);
     expect(isCompleteImport({ message: 'Zaten güncel (File hash unchanged)', dryRun: true })).toBe(false);
