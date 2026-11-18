@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { writeZip } from './helpers/stored-zip';
 import { isGithubActions, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
@@ -40,6 +42,7 @@ const RUN = `T224${Date.now().toString(36)}`;
 const like = `${RUN}%`;
 const runIds = new Set<string>();
 const hashes = new Set<string>();
+const zips = new Set<string>();
 let ready = false;
 
 const PROJECT_FIELDS = [
@@ -90,10 +93,12 @@ function dump(tag: string, order = '1'): string {
       })
     )
   );
-  return writeZip({
+  const zip = writeZip({
     'project.csv': [csvLine(PROJECT_FIELDS, Object.fromEntries(PROJECT_FIELDS.map((f) => [f, f]))), ...project, ''].join('\n'),
     'organization.csv': [csvLine(ORG_FIELDS, Object.fromEntries(ORG_FIELDS.map((f) => [f, f]))), ...org, ''].join('\n'),
   });
+  zips.add(zip);
+  return zip;
 }
 
 async function run(zip: string, extra: { dryRun?: boolean; limit?: number } = {}) {
@@ -118,9 +123,13 @@ async function cleanup(): Promise<void> {
   await prisma.$executeRaw`DELETE FROM "CordisProject" WHERE "id" LIKE ${like}`;
   await prisma.$executeRaw`DELETE FROM "CordisOrganization" WHERE "organisationId" LIKE ${like}`;
   if (runIds.size > 0) await prisma.cordisImportRun.deleteMany({ where: { runId: { in: [...runIds] } } });
-  if (hashes.size > 0) {
-    await prisma.rawFetch.deleteMany({ where: { source: 'cordis_bulk', hash: { in: [...hashes] } } });
-  }
+  // A failed run returns no fileHash; its RawFetch row is found by the archive path.
+  await prisma.rawFetch.deleteMany({
+    where: {
+      source: 'cordis_bulk',
+      OR: [{ hash: { in: [...hashes] } }, { storageUrl: { in: [...zips] } }],
+    },
+  });
 }
 
 beforeAll(async () => {
@@ -175,6 +184,29 @@ describe(SUITE, () => {
     expect(full.skipped).toBeFalsy();
     expect(await counts('L')).toEqual({ projects: 3, organizations: 6, participations: 6 });
 
+    expect((await run(zip)).skipped).toBe(true);
+  });
+
+  test('the "Zaten güncel" row the old code left after a dry run does not make the next real run skip', async (ctx) => {
+    if (!ready) return ctx.skip();
+    const zip = dump('O');
+    const fileHash = crypto.createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
+    hashes.add(fileHash);
+    // What d6144b71 wrote for "dry run, then a real run": the dry run's row, then
+    // the real run's skip row — SUCCESS, the same hash, and no mark at all.
+    for (const rowCounts of [
+      { projects: 3, organizations: 6, participations: 6, dryRun: true },
+      { message: 'Zaten güncel (File hash unchanged)' },
+    ]) {
+      const row = await prisma.cordisImportRun.create({
+        data: { dataset: 'HORIZON', status: 'SUCCESS', startedAt: new Date(), finishedAt: new Date(), fileHash, rowCounts },
+      });
+      runIds.add(row.runId);
+    }
+
+    const real = await run(zip);
+    expect(real.skipped).toBeFalsy();
+    expect(await counts('O')).toEqual({ projects: 3, organizations: 6, participations: 6 });
     expect((await run(zip)).skipped).toBe(true);
   });
 
