@@ -235,7 +235,10 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
   it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when expert_directory comes back with its qual, granted to the app role (NG-191)', async () => {
     // TO <the measured app role>: the sealed 'expert-directory' scope reads the base table again,
     // personal-data columns included — the catalogue check and the behaviour probe both say so.
-    const appRole = new URL(RLS_URL!).username;
+    // The app role is read from the server on the RLS connection (select current_user), not parsed from the URL.
+    const appConn = new pg.Client({ connectionString: RLS_URL!, connectionTimeoutMillis: 3000 });
+    await appConn.connect();
+    const appRole = await appConn.query<{ role: string }>('select current_user as role').finally(() => appConn.end()).then((r) => r.rows[0]!.role);
     const { status, out } = await rlsVerifyWithExpertDirectory(`for select to ${appRole}`);
     expect(status, out.slice(-2000)).toBe(1);
     expect(out).toContain(EXPERT_DIRECTORY_BACK);
