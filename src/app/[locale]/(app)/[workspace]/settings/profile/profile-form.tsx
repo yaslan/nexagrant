@@ -147,13 +147,15 @@ export default function TenantProfileForm({
     if (askValidity) formRef.current?.reportValidity();
   }, [askValidity]);
 
-  // NG-229. Nothing is left to fire once the form is gone.
-  useEffect(
-    () => () => {
+  // NG-229. Nothing is left to fire once the form is gone, and a save still in flight arms nothing.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       if (successTimer.current) clearTimeout(successTimer.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   const save = async (confirmedPic?: string) => {
     // FO-393 (N2). Numbers that are wrong as the form shows them are the user's own to fix, whatever
@@ -208,7 +210,7 @@ export default function TenantProfileForm({
         // NG-229. A timer left from the save before this one took this banner down early.
         if (successTimer.current) clearTimeout(successTimer.current);
         setSavedSuccess(true);
-        successTimer.current = setTimeout(() => setSavedSuccess(false), 4000);
+        if (mounted.current) successTimer.current = setTimeout(() => setSavedSuccess(false), 4000);
       }
     } else if (result.error === 'picConfirmationRequired') {
       setPendingMatch(result.match);
