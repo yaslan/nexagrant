@@ -1,6 +1,7 @@
 /**
  * SPIKE (TASK-MUMLFDTNQ53VJ) — graphile-worker instance running the REAL
- * `runK2MonthlyCordis` (the function the Inngest cron runs today).
+ * worker call `runK2MonthlyCordis` made at the time (NG-225 moved the job to the
+ * in-process import; the call is copied below as `callSpikeWorker`).
  *
  *   tsx scripts/spike-jobq/worker.ts <instanceName>
  *
@@ -16,10 +17,27 @@
 import 'dotenv/config';
 
 import { run, type Task } from 'graphile-worker';
-import { runK2MonthlyCordis } from '../../src/lib/jobs/tasks/k2-monthly-cordis';
 import { recordAlert } from '../../src/lib/observability/system-alert';
 
 const instance = process.argv[2] ?? `w-${process.pid}`;
+/**
+ * The spike's stand-in for the job body. The spike (2026-09-29) measured queue
+ * semantics against a fake worker at SPIKE_WORKER_URL; the real job no longer
+ * calls a worker (NG-225), so the spike keeps its own copy of that call.
+ */
+async function callSpikeWorker(month: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`${process.env.SPIKE_WORKER_URL}/jobs/cordis?month=${encodeURIComponent(month)}`, {
+      method: 'POST',
+    });
+    return res.ok
+      ? { success: true, message: 'ok' }
+      : { success: false, message: `Worker responded with status ${res.status}` };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 const schedule = process.env.SPIKE_CRON ?? '* * * * *';
 const log = (msg: string) => console.log(`[${instance}] ${new Date().toISOString()} ${msg}`);
 
@@ -33,7 +51,7 @@ const k2MonthlyCordis: Task = async (raw, helpers) => {
   const month = payload.month ?? (payload._cron?.ts ?? new Date().toISOString()).slice(0, 7);
   log(`START job=${job.id} task=${job.task_identifier} attempt=${job.attempts}/${job.max_attempts} tick=${payload._cron?.ts ?? '-'} month=${month}`);
 
-  const result = await runK2MonthlyCordis({ month, workerUrl: process.env.SPIKE_WORKER_URL });
+  const result = await callSpikeWorker(month);
 
   // Proof row + the monitoring channel ADR criterion 6 asks for: one
   // SystemAlert per run, naming the instance that ran it.
