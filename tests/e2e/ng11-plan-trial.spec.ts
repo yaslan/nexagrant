@@ -263,6 +263,7 @@ test.describe('NG-11 plan and trial screen', () => {
       await expect(page.getByRole('heading', { name: trMessages.Forbidden.title }), role).toBeVisible();
       await expect(page.getByTestId('ng-plan-current'), role).toHaveCount(0);
       await expect(page.getByTestId('ng-trial'), role).toHaveCount(0);
+      await page.screenshot({ path: `${SHOTS}/tr-desktop-refused-${role.toLowerCase()}.png` });
       const html = await page.content();
       // The RSC payload is what a client-side navigation would carry: the same leak test applies.
       const rsc = await page.request.get(url, { headers: { RSC: '1' } });
