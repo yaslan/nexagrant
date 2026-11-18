@@ -1,33 +1,10 @@
 /**
  * Runs once when the server starts (`next dev`, `next start` and the standalone
- * server alike), before any request is served.
+ * server alike), before any request is served. The Node-only checks live in
+ * instrumentation-node.ts so the Edge compile of this file stays clean (NG-230).
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-  const { assertAuthSecretConfigured } = await import('./lib/auth-secret');
-  try {
-    assertAuthSecretConfigured();
-    // Imported inside the try: loading it validates the environment (src/lib/env.ts),
-    // and an invalid DEMO_LOGIN_ENABLED has to stop the server the same way.
-    const { assertDemoLoginAllowed } = await import('./lib/demo-login');
-    assertDemoLoginAllowed();
-    // NG-209: the e2e fake LLM provider runs only on a development or test server (default-deny).
-    const { assertFakeAiAllowed } = await import('./lib/llm');
-    assertFakeAiAllowed();
-  } catch (error) {
-    // Throwing here only logs: Next keeps listening and answers every request
-    // with a 500, which a port health check reads as a running server. Exit.
-    console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
-  }
-  // A warning, not an exit: a wrong NEXT_PUBLIC_APP_URL breaks links, not the app.
-  const { reportAppUrlProblem } = await import('./lib/app-url-alert');
-  await reportAppUrlProblem();
-  // NG-104 Ö-2: a warning only. Opt-out links still work on the session key.
-  const { optOutSecretFallbackWarning } = await import('./lib/email/opt-out-secret');
-  const optOutWarning = optOutSecretFallbackWarning();
-  if (optOutWarning) {
-    const { logger } = await import('./lib/logger');
-    logger.warn(optOutWarning);
-  }
+  const { registerNode } = await import('./instrumentation-node');
+  await registerNode();
 }
