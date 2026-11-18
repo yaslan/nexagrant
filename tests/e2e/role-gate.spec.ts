@@ -239,9 +239,10 @@ test.describe.serial('NG-64 page role gates', () => {
   });
 
   test('GUEST_PARTNER keeps the pages that have no tenant read behind a role', async ({ page }) => {
+    // cagrilar is the global call catalogue (no tenant data). ayarlar/profil was wrongly
+    // listed here: it reads the tenant's company profile, so it is in GUEST_CLOSED (NG-240).
     await signIn(page, 'GUEST_PARTNER');
     await expectOpen(page, `${ws}/cagrilar`);
-    await expectOpen(page, `${ws}/ayarlar/profil`);
   });
 
   test('NG-240 control: MEMBER (view_proposal) and TENANT_OWNER open proje-fikri and settings/profile with the tenant text', async ({ page }) => {
