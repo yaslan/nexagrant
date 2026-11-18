@@ -335,6 +335,9 @@ describe.skipIf(!HAS_DB)('close_own_province_routes: only the caller\'s own rout
     const result: ProvinceRouteResult = await set;
     const closeError = early === 'pending' ? await close : early;
 
+    // NG-228 (NG-222 SEC B5): the close really waited on the set's tenant lock — without it this
+    // test would pass on an unlocked close too.
+    expect(early, 'the close waited for the set').toBe('pending');
     expect(closeError).toBeUndefined();
     expect(await m18(T.race)).toBe('OFF');
     expect(await activeTargets('Bilecik')).toEqual([]);
