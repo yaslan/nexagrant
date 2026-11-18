@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { internalError } from '@/lib/api-error';
 import { runCordisImport } from '@/lib/k2-cordis/importer';
-import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
+import { runPartnerProfileStep } from '@/lib/k2-cordis/profileStep';
 import { logger } from '@/lib/logger';
 import { requirePlatformAdminApi } from '@/lib/tenant';
 
@@ -32,10 +32,12 @@ export async function POST(req: NextRequest) {
       return internalError({ success: false, error: 'import_failed' }, { ids: { runId: importRes.runId } });
     }
 
-    let profileRes = { updatedProfiles: 0, updatedCoParticipations: 0, durationMs: 0 };
-    if (!importRes.skipped) {
-      profileRes = await generatePartnerProfiles();
-    }
+    // Null when the dump is unchanged and no profile failure is owed (NG-237).
+    const profileRes = (await runPartnerProfileStep(importRes.skipped === true)) ?? {
+      updatedProfiles: 0,
+      updatedCoParticipations: 0,
+      durationMs: 0,
+    };
 
     return NextResponse.json({
       success: true,

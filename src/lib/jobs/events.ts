@@ -40,7 +40,7 @@ export type K1SourceResult = z.infer<typeof K1SourceResultSchema>;
 export type K1DailyCallsInput = z.infer<typeof K1DailyCallsEventSchema>;
 export type K1DailyCallsOutput = z.infer<typeof K1DailyCallsOutputSchema>;
 
-// K2: Monthly CORDIS dataset sync via Python worker
+// K2: Monthly CORDIS dataset sync, run in-process (NG-225; no Python worker)
 export const K2MonthlyCordisEventSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/), // YYYY-MM format (optional override)
 }).partial();

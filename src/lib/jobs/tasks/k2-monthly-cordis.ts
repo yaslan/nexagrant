@@ -3,7 +3,13 @@ import { defineJob, monthOf } from '../define';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { runCordisImport, type CordisImportResult } from '@/lib/k2-cordis/importer';
-import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
+import type { PartnerProfileJobResult } from '@/lib/k2-cordis/partnerProfileJob';
+import {
+  K2_ALERT_SOURCE,
+  PROFILES_FAILED_KEY,
+  closeK2Alert,
+  runPartnerProfileStep,
+} from '@/lib/k2-cordis/profileStep';
 import { K2MonthlyCordisOutputSchema, type K2MonthlyCordisOutput } from '../events';
 
 /**
@@ -21,7 +27,10 @@ export const K2_MIN_HEAP_MB = 6144;
 /** The dataset the monthly refresh imports. H2020 is closed; its dump no longer changes. */
 const MONTHLY_DATASET = 'HORIZON' as const;
 
-const SOURCE = 'k2_monthly_cordis';
+const SOURCE = K2_ALERT_SOURCE;
+
+/** Dedupe key of the alert for a worker whose heap is below `K2_MIN_HEAP_MB`. */
+const HEAP_ALERT_KEY = 'k2:heap-too-small';
 
 /** `YYYY-MM` for the month a run belongs to. */
 function currentMonth(): string {
@@ -56,6 +65,11 @@ export interface K2MonthlyCordisOptions {
  * not have written one, and never throws: a reported failure is not retried
  * (ADR-0008 §6.3), and a retry of a 20-minute import that failed on data
  * would fail the same way.
+ *
+ * An unchanged dump skips the import, and the profiles are rebuilt only if an
+ * earlier profile build failed and its alert is still open (NG-237, see
+ * `profileStep.ts`). A successful import closes the job's heap and import-threw
+ * alerts; a successful profile build closes the profile-failure alert.
  */
 export async function runK2MonthlyCordis(
   options: K2MonthlyCordisOptions = {}
@@ -74,7 +88,7 @@ export async function runK2MonthlyCordis(
       meta: { month, heapLimitMb: heapMb, requiredMb: K2_MIN_HEAP_MB },
       // A worker started without the flag stays that way month after month:
       // one row, not one per month.
-      dedupeKey: 'k2:heap-too-small',
+      dedupeKey: HEAP_ALERT_KEY,
     });
     return K2MonthlyCordisOutputSchema.parse({ success: false, message, month, error: 'HEAP_TOO_SMALL' });
   }
@@ -83,8 +97,10 @@ export async function runK2MonthlyCordis(
   try {
     imported = await runCordisImport({ dataset: MONTHLY_DATASET });
   } catch (error) {
-    // The importer throws only when it could not even write its RUNNING row
-    // (database down): no CordisImportRun row and no alert of its own.
+    // The importer throws out only in two cases: it could not write its
+    // RUNNING row (database down; no run row and no alert of its own), or
+    // removing the temp archive threw after a failure (`removeTempZip` runs
+    // once the importer's own failure alert is already written).
     const detail = errorMessage(error, String(error));
     await recordAlert({
       level: 'error',
@@ -113,32 +129,15 @@ export async function runK2MonthlyCordis(
     });
   }
 
-  if (imported.skipped) {
-    // Same dump as the last full import: nothing changed, so the profiles
-    // built from it have not either.
-    return K2MonthlyCordisOutputSchema.parse({
-      success: true,
-      skipped: true,
-      message: `CORDIS ${MONTHLY_DATASET} already up to date (Zaten güncel)`,
-      month,
-      runId: imported.runId,
-    });
-  }
+  // The import stage succeeded: its own open alerts are no longer true.
+  await closeK2Alert(HEAP_ALERT_KEY);
+  await closeK2Alert(`k2:cordis-import-threw:${MONTHLY_DATASET}`);
 
+  const skipped = imported.skipped === true;
+  let profiles: PartnerProfileJobResult | null;
   try {
-    const profiles = await generatePartnerProfiles();
-    return K2MonthlyCordisOutputSchema.parse({
-      success: true,
-      message: `CORDIS ${MONTHLY_DATASET} imported and partner profiles rebuilt`,
-      month,
-      runId: imported.runId,
-      rowCounts: imported.rowCounts,
-      profiles: {
-        updatedProfiles: profiles.updatedProfiles,
-        updatedCoParticipations: profiles.updatedCoParticipations,
-        durationMs: profiles.durationMs,
-      },
-    });
+    // Null when the dump is unchanged and no profile failure is owed (NG-237).
+    profiles = await runPartnerProfileStep(skipped);
   } catch (error) {
     const detail = errorMessage(error, String(error));
     await recordAlert({
@@ -148,7 +147,7 @@ export async function runK2MonthlyCordis(
         `CORDIS ${MONTHLY_DATASET} imported (run ${imported.runId}) but the partner profiles failed: ` +
         `${detail.slice(0, 500)}. Re-run with \`pnpm exec tsx scripts/cordis-import.ts\`; rows are upserts.`,
       meta: { month, runId: imported.runId },
-      dedupeKey: 'k2:partner-profiles-failed',
+      dedupeKey: PROFILES_FAILED_KEY,
     });
     return K2MonthlyCordisOutputSchema.parse({
       success: false,
@@ -159,6 +158,31 @@ export async function runK2MonthlyCordis(
       error: 'PROFILES_FAILED',
     });
   }
+
+  if (profiles === null) {
+    // Same dump as the last full import and its profiles are not owed: nothing changed.
+    return K2MonthlyCordisOutputSchema.parse({
+      success: true,
+      skipped: true,
+      message: `CORDIS ${MONTHLY_DATASET} already up to date (Zaten güncel)`,
+      month,
+      runId: imported.runId,
+    });
+  }
+
+  return K2MonthlyCordisOutputSchema.parse({
+    success: true,
+    ...(skipped ? { skipped: true } : {}),
+    message: `CORDIS ${MONTHLY_DATASET} imported and partner profiles rebuilt`,
+    month,
+    runId: imported.runId,
+    rowCounts: imported.rowCounts,
+    profiles: {
+      updatedProfiles: profiles.updatedProfiles,
+      updatedCoParticipations: profiles.updatedCoParticipations,
+      durationMs: profiles.durationMs,
+    },
+  });
 }
 
 /**

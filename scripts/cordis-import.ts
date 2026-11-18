@@ -2,7 +2,7 @@
 import 'dotenv/config';
 
 import { runCordisImport } from '../src/lib/k2-cordis/importer';
-import { generatePartnerProfiles } from '../src/lib/k2-cordis/partnerProfileJob';
+import { runPartnerProfileStep } from '../src/lib/k2-cordis/profileStep';
 
 const USAGE = `Usage: pnpm exec tsx scripts/cordis-import.ts [options]
 
@@ -62,11 +62,6 @@ async function main() {
 
   const res = await runCordisImport(options);
 
-  if (res.skipped) {
-    console.log(`ℹ️ [CORDIS Import] Zaten güncel (File hash unchanged for ${options.dataset}). Skipped.`);
-    process.exit(0);
-  }
-
   if (!res.success) {
     // The cause is in the importer's `[k2-cordis] import failed` line above
     // and on the CordisImportRun row.
@@ -74,17 +69,27 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`✅ [CORDIS Import] Completed successfully in ${res.durationMs}ms`);
-  console.log(`   Projects: ${res.rowCounts.projects}`);
-  console.log(`   Organizations: ${res.rowCounts.organizations}`);
-  console.log(`   Participations: ${res.rowCounts.participations}`);
-  console.log(`   Topics: ${res.rowCounts.topics}`);
-  console.log(`   SciVocs: ${res.rowCounts.scivocs}`);
+  if (res.skipped) {
+    console.log(`ℹ️ [CORDIS Import] Zaten güncel (File hash unchanged for ${options.dataset}). Skipped.`);
+  } else {
+    console.log(`✅ [CORDIS Import] Completed successfully in ${res.durationMs}ms`);
+    console.log(`   Projects: ${res.rowCounts.projects}`);
+    console.log(`   Organizations: ${res.rowCounts.organizations}`);
+    console.log(`   Participations: ${res.rowCounts.participations}`);
+    console.log(`   Topics: ${res.rowCounts.topics}`);
+    console.log(`   SciVocs: ${res.rowCounts.scivocs}`);
+  }
 
   if (!options.dryRun) {
-    console.log(`⚙️ Generating M1 Partner Profiles & Network Graph...`);
-    const profileRes = await generatePartnerProfiles();
-    console.log(`✅ [M1 Partner Profile Job] Generated ${profileRes.updatedProfiles} org profiles and ${profileRes.updatedCoParticipations} co-participations in ${profileRes.durationMs}ms.`);
+    // An unchanged dump rebuilds the profiles only when an earlier profile
+    // build failed and its alert is still open (NG-237, shared with the job).
+    const profileRes = await runPartnerProfileStep(res.skipped === true);
+    if (profileRes) {
+      console.log(`⚙️ Generating M1 Partner Profiles & Network Graph...`);
+      console.log(`✅ [M1 Partner Profile Job] Generated ${profileRes.updatedProfiles} org profiles and ${profileRes.updatedCoParticipations} co-participations in ${profileRes.durationMs}ms.`);
+    } else {
+      console.log(`ℹ️ [M1 Partner Profile Job] Profiles not rebuilt: the dump is unchanged and no profile failure is open.`);
+    }
   }
 
   process.exit(0);

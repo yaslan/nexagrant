@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/db';
 import { runCordisImport } from '@/lib/k2-cordis/importer';
 import { cordisImportFailureCode } from '@/lib/k2-cordis/failure-codes';
-import { generatePartnerProfiles } from '@/lib/k2-cordis/partnerProfileJob';
+import { runPartnerProfileStep } from '@/lib/k2-cordis/profileStep';
 import { syncCordisBigData, aggregateCordisMetrics } from '@/lib/cordis-sync';
 import { fetchLiveCordisDelta, getCordisLiveStreamLogs } from '@/lib/cordis-delta';
 import { retrieveChunks, formatRagContext } from '@/lib/rag';
@@ -25,10 +25,12 @@ export async function handleRunCordisImportAction(dataset: 'HORIZON' | 'H2020', 
     return { success: false, errorCode: cordisImportFailureCode(importRes.errorCode) };
   }
 
-  let profileRes = { updatedProfiles: 0, updatedCoParticipations: 0, durationMs: 0 };
-  if (!importRes.skipped) {
-    profileRes = await generatePartnerProfiles();
-  }
+  // Null when the dump is unchanged and no profile failure is owed (NG-237).
+  const profileRes = (await runPartnerProfileStep(importRes.skipped === true)) ?? {
+    updatedProfiles: 0,
+    updatedCoParticipations: 0,
+    durationMs: 0,
+  };
 
   return {
     success: true,
