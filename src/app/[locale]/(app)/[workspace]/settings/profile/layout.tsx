@@ -19,6 +19,9 @@ export default async function ProfileSettingsLayout({
 }) {
   const { locale } = await params;
   const scope = await requireTenantPage(locale);
+  // NG-240: the same door as the page (view_proposal). A role without it gets no tenant
+  // read and no province card here; the layout runs before the page's 403 decision.
+  if (!can(asRole(scope.role), 'view_proposal')) return <>{children}</>;
   // Tenant is a system-wide table (no RLS); the id is the session's own.
   const tenant = await prisma.tenant.findUnique({
     where: { id: scope.tenantId },

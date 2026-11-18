@@ -35,6 +35,18 @@ export const RG_PANEL_AVG = 4.37;
 export const RG_PANEL_AVG_TEXT = '4.37';
 /** The owner's submitted mark on every criterion (review 3 E-1). */
 export const RG_OWNER_MARK = 1;
+/**
+ * NG-240: the tenant's own project idea and its company profile text. Seen on
+ * `proje-fikri` or `settings/profile` (and its `ayarlar/profil` alias), the door is open.
+ */
+export const RG_IDEA_TITLE = 'NG240 kiracıya özel proje fikri';
+export const RG_PROFILE_TEXT = 'NG240 kurum yetkinlik metni';
+/**
+ * NG-240 (review E1): the tenant's stored province. The province dropdown lists all 81
+ * names, so the leak test looks for the SELECTED option (`value="<il>"`) and the card's
+ * test id, not for the bare name.
+ */
+export const RG_PROVINCE = 'Samsun';
 
 /** The stored panel average, as the save recomputed it. */
 export async function readPanelAverage(): Promise<number | null> {
@@ -57,8 +69,9 @@ const MODULES = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M
 export async function setupRoleGateTenant() {
   await prisma.tenant.upsert({
     where: { id: RG_TENANT },
-    create: { id: RG_TENANT, name: 'role gate e2e (internal)', slug: RG_TENANT, country: 'TR', orgType: 'SME' },
-    update: {},
+    // NG-240: a TR tenant with a stored province, so the province card has a value to leak.
+    create: { id: RG_TENANT, name: 'role gate e2e (internal)', slug: RG_TENANT, country: 'TR', province: RG_PROVINCE, orgType: 'SME' },
+    update: { country: 'TR', province: RG_PROVINCE },
   });
   await prisma.subscription.upsert({
     where: { tenantId: RG_TENANT },
@@ -156,6 +169,24 @@ export async function setupRoleGateTenant() {
     create: { id: RG_REL_ID, tenantId: RG_TENANT, kind: 'partner', counterpartName: RG_REL_NAME },
     update: { counterpartName: RG_REL_NAME },
   });
+  // NG-240: the two tenant-data pages the guest used to read (proje-fikri, settings/profile).
+  await prisma.projectIdea.deleteMany({ where: { id: 'ng240-role-gate-e2e-idea' } });
+  await prisma.projectIdea.create({
+    data: {
+      id: 'ng240-role-gate-e2e-idea',
+      tenantId: RG_TENANT,
+      title: RG_IDEA_TITLE,
+      summary: 'NG240 özet',
+      keywords: ['ng240'],
+      trl: 4,
+      targetPrograms: [],
+    },
+  });
+  await prisma.tenantProfile.upsert({
+    where: { tenantId: RG_TENANT },
+    create: { tenantId: RG_TENANT, capabilities: RG_PROFILE_TEXT, keywords: ['ng240'], naceCodes: [], trlRange: [3, 8], preferredRoles: [] },
+    update: { capabilities: RG_PROFILE_TEXT },
+  });
   await prisma.invoice.upsert({
     where: { id: RG_INVOICE_ID },
     create: {
@@ -178,6 +209,8 @@ export async function setupRoleGateTenant() {
 
 /** Literal ids only: tests/teardown-where-guard.test.ts. */
 export async function teardownRoleGateTenant() {
+  await prisma.projectIdea.deleteMany({ where: { id: 'ng240-role-gate-e2e-idea' } });
+  await prisma.tenantProfile.deleteMany({ where: { tenantId: 'ng64-role-gate-e2e-tenant' } });
   await prisma.invoice.deleteMany({ where: { id: 'ng64-role-gate-e2e-invoice' } });
   await prisma.relationship.deleteMany({ where: { id: 'ng64-role-gate-e2e-rel' } });
   // Cascades to the PANEL evaluation, its criteria, seats and scores.
