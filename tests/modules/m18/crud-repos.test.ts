@@ -103,28 +103,51 @@ describe('deals-repo', () => {
     const update = vi.fn();
     const activityCreate = vi.fn();
     const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       deal: { findFirst: vi.fn().mockResolvedValue({ id: 'd1', stage: 'NEW' }), update },
       dealActivity: { create: activityCreate },
       dealTask: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn() },
     };
-    const result = await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'QUALIFIED' }, 'u1');
+    const result = await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'QUALIFIED' }, 'u1', 'tr');
     expect(result).toEqual({ id: 'd1', from: 'NEW', to: 'QUALIFIED' });
     expect(update.mock.calls[0]?.[0].data.stage).toBe('QUALIFIED');
     expect(activityCreate.mock.calls[0]?.[0].data).toMatchObject({ kind: 'STAGE_CHANGE', dealId: 'd1' });
   });
 
+  it('locks the deal row FOR UPDATE, scoped to tenant and id, before it reads the stage (NG-220)', async () => {
+    const order: string[] = [];
+    const $queryRaw = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+      order.push('lock');
+      expect(strings.join('?')).toMatch(/FROM "Deal" WHERE "tenantId" = \? AND "id" = \? FOR UPDATE/);
+      expect(values).toEqual([T, 'd1']);
+      return Promise.resolve([]);
+    });
+    const findFirst = vi.fn(() => {
+      order.push('read');
+      return Promise.resolve({ id: 'd1', stage: 'NEW' });
+    });
+    const tx = {
+      $queryRaw,
+      deal: { findFirst, update: vi.fn() },
+      dealActivity: { create: vi.fn() },
+      dealTask: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn() },
+    };
+    await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'QUALIFIED' }, 'u1', 'tr');
+    expect(order).toEqual(['lock', 'read']);
+  });
+
   it('refuses a skipped stage without writing anything', async () => {
     const update = vi.fn();
-    const tx = { deal: { findFirst: vi.fn().mockResolvedValue({ id: 'd1', stage: 'NEW' }), update } };
-    await expect(moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, null)).rejects.toBeInstanceOf(
+    const tx = { $queryRaw: vi.fn().mockResolvedValue([]), deal: { findFirst: vi.fn().mockResolvedValue({ id: 'd1', stage: 'NEW' }), update } };
+    await expect(moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, null, 'tr')).rejects.toBeInstanceOf(
       DealTransitionError,
     );
     expect(update).not.toHaveBeenCalled();
   });
 
   it('requires a reason to move a deal to LOST', async () => {
-    const tx = { deal: { findFirst: vi.fn().mockResolvedValue({ id: 'd1', stage: 'NEW' }), update: vi.fn() } };
-    await expect(moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'LOST' }, null)).rejects.toMatchObject({
+    const tx = { $queryRaw: vi.fn().mockResolvedValue([]), deal: { findFirst: vi.fn().mockResolvedValue({ id: 'd1', stage: 'NEW' }), update: vi.fn() } };
+    await expect(moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'LOST' }, null, 'tr')).rejects.toMatchObject({
       reason: 'LOST_REASON_REQUIRED',
     });
   });
@@ -133,6 +156,7 @@ describe('deals-repo', () => {
 describe('deals-repo — auto tasks on entering a stage (NG-216)', () => {
   function fakeTx(stage: string, existing: Array<{ autoRuleKey: string | null }> = []) {
     return {
+      $queryRaw: vi.fn().mockResolvedValue([]),
       deal: { findFirst: vi.fn().mockResolvedValue({ id: 'd1', stage }), update: vi.fn() },
       dealActivity: { create: vi.fn() },
       dealTask: { findMany: vi.fn().mockResolvedValue(existing), createMany: vi.fn(), create: vi.fn() },
@@ -146,7 +170,7 @@ describe('deals-repo — auto tasks on entering a stage (NG-216)', () => {
 
   it('creates the PROPOSAL tasks (send quote, follow up) when a deal enters PROPOSAL', async () => {
     const tx = fakeTx('ELIGIBILITY_ANALYSIS');
-    await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, 'u1');
+    await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, 'u1', 'tr');
     const rows = created(tx);
     expect(rows.map((r) => r.autoRuleKey)).toEqual(['proposal.send-quote', 'proposal.follow-up']);
     for (const r of rows) {
@@ -162,7 +186,7 @@ describe('deals-repo — auto tasks on entering a stage (NG-216)', () => {
 
   it('does not create a task whose rule already sits on the deal (back-and-forth move)', async () => {
     const tx = fakeTx('ELIGIBILITY_ANALYSIS', [{ autoRuleKey: 'proposal.send-quote' }, { autoRuleKey: null }]);
-    await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, 'u1');
+    await moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, 'u1', 'tr');
     expect(created(tx).map((r) => r.autoRuleKey)).toEqual(['proposal.follow-up']);
   });
 
@@ -187,7 +211,7 @@ describe('deals-repo — auto tasks on entering a stage (NG-216)', () => {
 
   it('writes no task for a refused move', async () => {
     const tx = fakeTx('NEW');
-    await expect(moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, null)).rejects.toBeInstanceOf(
+    await expect(moveDealStage(asTx(tx), T, { dealId: 'd1', to: 'PROPOSAL' }, null, 'tr')).rejects.toBeInstanceOf(
       DealTransitionError,
     );
     expect(created(tx)).toEqual([]);
