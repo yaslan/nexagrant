@@ -14,12 +14,57 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { JobHelpers } from 'graphile-worker';
 
-const alerts: Array<Record<string, unknown>> = [];
+// One in-memory SystemAlert table shared by the recorder, the resolver and the
+// prisma read below, so a test can seed an open alert and see it close (NG-237).
+interface FakeAlert {
+  level: string;
+  source: string;
+  message: string;
+  dedupeKey?: string;
+  meta: Record<string, unknown>;
+  resolvedAt: Date | null;
+}
+const alerts: FakeAlert[] = [];
 vi.mock('@/lib/observability/system-alert', () => ({
   recordAlert: vi.fn(async (a: Record<string, unknown>) => {
-    alerts.push(a);
+    const dedupeKey = a.dedupeKey as string | undefined;
+    alerts.push({
+      level: a.level as string,
+      source: a.source as string,
+      message: a.message as string,
+      dedupeKey,
+      // The real writer stores the dedupe key inside meta; mirror that.
+      meta: { ...((a.meta as Record<string, unknown>) ?? {}), ...(dedupeKey ? { alertDedupeKey: dedupeKey } : {}) },
+      resolvedAt: null,
+    });
+  }),
+  resolveAlerts: vi.fn(async (sel: { source: string; meta?: Record<string, unknown> }) => {
+    let resolved = 0;
+    for (const a of alerts) {
+      if (a.source !== sel.source || a.resolvedAt !== null) continue;
+      if (sel.meta && !Object.entries(sel.meta).every(([k, v]) => a.meta[k] === v)) continue;
+      a.resolvedAt = new Date();
+      resolved++;
+    }
+    return { resolved };
   }),
 }));
+
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    systemAlert: {
+      findMany: vi.fn(async (args: { where: { source: string; resolvedAt: null } }) =>
+        alerts
+          .filter((a) => a.source === args.where.source && a.resolvedAt === null)
+          .map((a) => ({ id: a.message, meta: a.meta }))
+      ),
+    },
+  },
+}));
+
+function openAlert(source: string, dedupeKey: string): void {
+  alerts.push({ level: 'error', source, message: dedupeKey, dedupeKey, meta: { alertDedupeKey: dedupeKey }, resolvedAt: null });
+}
 
 const runCordisImport = vi.fn();
 vi.mock('@/lib/k2-cordis/importer', () => ({ runCordisImport }));
@@ -165,5 +210,35 @@ describe('runK2MonthlyCordis', () => {
 
     expect(result.success).toBe(true);
     expect(runCordisImport).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('k2-monthly-cordis: profiles and alerts after a run (NG-237)', () => {
+  const PROFILES = { success: true, updatedProfiles: 36753, updatedCoParticipations: 1105839, durationMs: 1 };
+
+  it('rebuilds the partner profiles on an unchanged dump when they failed last time (Ö-1)', async () => {
+    // The import landed earlier; the profile step then failed and left its alert open.
+    openAlert('k2_monthly_cordis', 'k2:partner-profiles-failed');
+    runCordisImport.mockResolvedValue(imported({ skipped: true }));
+    generatePartnerProfiles.mockResolvedValue(PROFILES);
+
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
+
+    expect(result.success).toBe(true);
+    expect(generatePartnerProfiles).toHaveBeenCalledTimes(1);
+    expect(alerts[0]!.resolvedAt).not.toBeNull();
+  });
+
+  it('closes its own open k2 alerts on a successful run (Ö-2)', async () => {
+    openAlert('k2_monthly_cordis', 'k2:heap-too-small');
+    openAlert('k2_monthly_cordis', 'k2:partner-profiles-failed');
+    openAlert('k2_monthly_cordis', 'k2:cordis-import-threw:HORIZON');
+    runCordisImport.mockResolvedValue(imported());
+    generatePartnerProfiles.mockResolvedValue(PROFILES);
+
+    const result = await runK2MonthlyCordis({ month: '2026-12' });
+
+    expect(result.success).toBe(true);
+    expect(alerts.filter((a) => a.resolvedAt === null)).toHaveLength(0);
   });
 });
