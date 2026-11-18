@@ -98,6 +98,20 @@ Kısıtlar:
 
 - Gönderim, rızayı bağlamak için ilin kuruluşunun kiracı id'sine de ihtiyaç duyar. Yine `ProvinceLeadRoute` `public-intake`'e AÇILMADI: `public.province_transfer_org(text)` aynı dar kalıpta (SECURITY DEFINER, sabit `search_path`, tek il → en çok bir satır `(tenant_id, org_name)`, aynı `isIntakeTenant` WHERE'i, EXECUTE yalnız `fabrika_app`). Fark: id döndürür; yalnız `submitPublicLead` (sunucu) çağırır, istemciye giden `getTransferOrgName` yine yalnız adı döndürür. `system_scope` amaç listesi değişmedi.
 
+## 10b. Ek: kiracının kendi M18 kapanışı rotasını kapatır (NG-222, NG-215 incelemesi Bulgu 2, K-583842 = A, 18.11.2026)
+
+- **Sorun:** M18'i kiracının kendi kapsamından kapatan dört yazım vardır: ayarlar (`toggleModuleState`), iyzico düşürme, Stripe düşürme ve Stripe iptali. Bunlar rotayı kapatamıyordu, çünkü `ProvinceLeadRoute` yalnız `platform-admin` ve `cross-tenant-job` amaçlarına açıktır (§7). Bu yüzden NG-215'in değişmezi ("M18 kapalı ⇒ kiracıyı adlandıran aktif rota yok") yalnız konsol yolunda tutuyordu.
+- **Karar (A):** §10 kalıbında dar bir kapı açıldı: `public.close_own_province_routes(p_actor text, p_actor_id text)`.
+  - SECURITY DEFINER, sabit `search_path`.
+  - Kiracı argümanı yoktur; kiracı `app.tenant_id`'dir.
+  - Yalnız o kiracının aktif rotalarını kapatır ve yalnız o kiracının M18'i kendi kullanıcılarına kapalıysa kapatır (PILOT dışı; `isOpenToTenantMembers`'ın aynası).
+  - Önce kiracı satırını kilitler (NG-215 kilit sırası).
+  - Her il için bir `lead-route.deactivated` izi yazar. Platform izini yazmak için `app.system_scope`'u yalnız INSERT süresince açar ve geri koyar (agency-invite kalıbı; bayrak tek başına `fabrika_app`'e bir şey açmaz).
+  - Hiçbir amaç girilmez. `enter_system_scope`, `system_scope_open` ve amaç listesi değişmedi.
+  - EXECUTE yalnız `fabrika_app`'e açıktır (PUBLIC, anon ve authenticated'dan geri alındı).
+- **Reddedilenler:** (B) bu dört yolu `platform-admin` ya da `cross-tenant-job` kapsamında koşmak, (C) yeni bir amaç açmak. İkisi de kiracı ya da faturalama kodunun bütün rota tablosunu görmesi demekti.
+- **Ölçüm:** `tests/m18-own-route-close.live.test.ts` (olumsuz durumlar ve yarış), `tests/m18-route-close-other-paths.live.test.ts` (dört yol) ve `scripts/check-rls-live.ts` içindeki `probeOwnRouteClose`. Ayrıntı: `docs/DATA_MODEL.md` §32.
+
 ## 11. Ek: mühür amacı bağlar (NG-187, SEC NG-185 F-2, 15.11.2026)
 
 - **Sorun:** Mühür yalnız `sır ‖ pid ‖ transaction_timestamp ‖ sır` üzerinden hesaplanıyordu; amaç mühre girmiyordu. `app.system_scope_purpose` USERSET olduğundan `enter_system_scope('expert-directory')` sonrasında `SET LOCAL app.system_scope_purpose = 'platform-admin'` yeni amacı geçerli kılıyordu. Ölçüm (izole DB, `fabrika_app`): `expert-directory` kapsamında 2 verified satır görünüyordu; amaç değiştirilince 4 satır (pending ve disabled dahil) göründü ve `UPDATE 1` geçti. §5, §6 ve §9'daki "dar amaç" sınırı bu yüzden bir veritabanı sınırı değil, kod sözüydü.
