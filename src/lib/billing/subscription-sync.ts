@@ -13,6 +13,7 @@ import {
 import { publishedVersionIdFor } from '@/lib/billing/plan-repository';
 import { createInvoiceForPayment } from '@/lib/billing/invoice-writer';
 import { lockPilotRow } from '@/lib/billing/pilot';
+import { withOwnRouteCloseOnM18Exit } from '@/lib/leads/province-route';
 import { stripeSyncBlocker, type StripeSyncBlock } from '@/lib/billing/subscription-owner';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { invoiceLinePeriodFallback } from '@/lib/efatura';
@@ -650,14 +651,17 @@ export async function syncStripeSubscription(
       });
     }
 
-    // Handle downgrade: modules the new plan no longer carries are turned off
-    for (const moduleId of modulesToTurnOff) {
-      await tx.moduleState.upsert({
-        where: { tenantId_moduleId: { tenantId, moduleId } },
-        create: { tenantId, moduleId, status: 'OFF' },
-        update: { status: 'OFF' },
-      });
-    }
+    // Handle downgrade: modules the new plan no longer carries are turned off.
+    // NG-222: M18 among them closes the tenant's province routes in this transaction.
+    await withOwnRouteCloseOnM18Exit(tx, modulesToTurnOff, { kind: 'billing' }, async () => {
+      for (const moduleId of modulesToTurnOff) {
+        await tx.moduleState.upsert({
+          where: { tenantId_moduleId: { tenantId, moduleId } },
+          create: { tenantId, moduleId, status: 'OFF' },
+          update: { status: 'OFF' },
+        });
+      }
+    });
 
     // The audit trail, written here rather than after the commit. It is no
     // longer the idempotency key — `StripeEventLog` is — but it still has to
@@ -828,14 +832,17 @@ export async function handleSubscriptionCancellation(
       data: { endedAt: new Date() },
     });
 
-    // Turn off non-free modules
-    for (const moduleId of modulesToTurnOff) {
-      await tx.moduleState.upsert({
-        where: { tenantId_moduleId: { tenantId, moduleId } },
-        create: { tenantId, moduleId, status: 'OFF' },
-        update: { status: 'OFF' },
-      });
-    }
+    // Turn off non-free modules.
+    // NG-222: M18 among them closes the tenant's province routes in this transaction.
+    await withOwnRouteCloseOnM18Exit(tx, modulesToTurnOff, { kind: 'billing' }, async () => {
+      for (const moduleId of modulesToTurnOff) {
+        await tx.moduleState.upsert({
+          where: { tenantId_moduleId: { tenantId, moduleId } },
+          create: { tenantId, moduleId, status: 'OFF' },
+          update: { status: 'OFF' },
+        });
+      }
+    });
 
     await tx.auditEvent.create({
       data: {

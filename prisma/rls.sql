@@ -620,11 +620,14 @@ DECLARE
   r text;
 BEGIN
   -- 1. The three without a PUBLIC revoke: PUBLIC out, the app role in by name.
+  --    close_own_province_routes (NG-222, add-close-own-province-routes.sql) is re-asserted here
+  --    too: its migration revokes PUBLIC itself, but it is a SECURITY DEFINER writer, so every
+  --    db:rls run puts its grant back to "fabrika_app only" (rls:verify checks it).
   FOR f IN
     SELECT p.oid::regprocedure
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open')
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'close_own_province_routes')
        AND pg_has_role(current_user, p.proowner, 'USAGE')
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);

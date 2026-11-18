@@ -137,11 +137,13 @@ BEGIN
   --    readiness form's transfer box reads the province's organisation NAME through it.
   --    province_transfer_org (NG-204, add-public-lead-transfer-recipient.sql): the submit binds
   --    the transfer consent to that organisation's id (server side only).
+  --    close_own_province_routes (NG-222, add-close-own-province-routes.sql): a tenant's own
+  --    M18 close (settings, billing) deactivates that tenant's province routes.
   FOR fn IN
     SELECT p.oid::regprocedure
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name', 'province_transfer_org')
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name', 'province_transfer_org', 'close_own_province_routes')
   LOOP
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO %I', fn, app_role);
   END LOOP;
