@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { cookies, headers } from 'next/headers';
 import { getLocale } from 'next-intl/server';
 import { appUrl } from '@/lib/app-url';
@@ -25,6 +25,10 @@ export const metadata: Metadata = {
       type: 'image/png',
     },
   },
+};
+
+/** Next 16 expects theme-color under `viewport`, not `metadata` (NG-230). */
+export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#F4F6F8' },
     { media: '(prefers-color-scheme: dark)', color: '#080D1A' },
