@@ -13,6 +13,7 @@ import {
   RG_PROFILE_TEXT,
   RG_PROVINCE,
   RG_REL_ID,
+  RG_COBRAND_NAME,
   RG_REL_NAME,
   RG_SEATS,
   RG_TENANT,
@@ -136,6 +137,27 @@ test.describe.serial('NG-64 page role gates', () => {
     test.setTimeout(240_000);
     await signIn(page, 'GUEST_PARTNER');
     for (const path of GUEST_CLOSED) await expectClosed(page, path);
+  });
+
+  test('agency co-brand (NG-248, K-584216): GUEST_PARTNER sees neither the agency name nor its logo; the five internal roles see both', async ({ page }) => {
+    test.setTimeout(180_000);
+    // cagrilar is open to a guest and renders the app shell, where the co-brand sits.
+    const shell = `${ws}/cagrilar`;
+    await signIn(page, 'GUEST_PARTNER');
+    await expectOpen(page, shell);
+    expect(await page.content(), 'guest 200').not.toContain(RG_COBRAND_NAME);
+    await expect(page.getByTestId('cobrand-badge')).toHaveCount(0);
+    expect((await page.request.get('/api/agency/cobrand-logo')).status(), 'guest logo').toBe(404);
+    // A refused page carries the shell too: the name must not travel in its RSC payload either.
+    await expectClosed(page, `${ws}/firsatlar`);
+    expect(await page.content(), 'guest 403').not.toContain(RG_COBRAND_NAME);
+
+    for (const role of ['MEMBER', 'WRITER', 'PIPELINE_MANAGER', 'TENANT_ADMIN', 'TENANT_OWNER'] as const) {
+      await signIn(page, role);
+      await expectOpen(page, shell);
+      await expect(page.getByTestId('cobrand-text').first(), role).toHaveText(RG_COBRAND_NAME);
+      expect((await page.request.get('/api/agency/cobrand-logo')).status(), `${role} logo`).toBe(200);
+    }
   });
 
   test('GUEST_PARTNER cannot pull the data through the downloads either', async ({ page }) => {
