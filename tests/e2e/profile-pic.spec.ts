@@ -442,18 +442,26 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
 
     // NG-229. The banner hides itself four seconds after a save. The timer of the first save used
     // to stay armed, so a second save inside those four seconds had its banner taken down early.
+    // The page clock is stopped once the form is open, so only runFor() moves it: how long the
+    // second save takes to answer cannot decide whether the old timer would have fired.
     test('NG-229: the banner of a second save is not taken down by the timer of the first', async ({ page }) => {
       await setPic(null);
+      await page.clock.install();
       await openProfile(page, PP_OWNER);
+      await page.clock.pauseAt(new Date(Date.now() + 60_000));
       await saveKeywordsOnly(page, 'banner first save');
 
-      // Inside the first banner's four seconds; the waits below are the scenario, not a budget.
-      await page.waitForTimeout(3_000);
+      // Inside the first banner's four seconds.
+      await page.clock.runFor(3_000);
       await saveKeywordsOnly(page, 'banner second save');
 
-      // Past the first save's four seconds, well inside the second's.
-      await page.waitForTimeout(1_500);
+      // Past the first save's four seconds (4_000 after the first banner), inside the second's.
+      await page.clock.runFor(1_500);
       await expect(page.getByText('başarıyla güncellendi')).toBeVisible();
+
+      // And the second save's own four seconds still end its banner.
+      await page.clock.runFor(3_000);
+      await expect(page.getByText('başarıyla güncellendi')).toBeHidden();
     });
 
     test('B6: an old-format PIC does not block a save that leaves it alone, and is refused once edited', async ({ page }) => {
