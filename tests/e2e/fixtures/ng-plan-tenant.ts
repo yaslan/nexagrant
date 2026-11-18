@@ -20,6 +20,17 @@ import { presentIds, requireId } from '../../helpers/teardown-guard';
 export const NG_PLAN_STATES = ['none', 'running', 'ended'] as const;
 export type NgPlanFixtureState = (typeof NG_PLAN_STATES)[number];
 
+/**
+ * Refused seats on the `running` tenant: the plan screen is `manage_billing` (TENANT_OWNER
+ * only, the same door as Settings → Billing). Each is a real membership row, so the role the
+ * server reads is the one the seat holds.
+ */
+export const NG_PLAN_REFUSED_SEATS = {
+  MEMBER: { userId: 'ng11-e2e-running-member-user', email: 'ng11-e2e-running-member@plan.test', name: 'NG-11 running member' },
+  GUEST_PARTNER: { userId: 'ng11-e2e-running-guest-user', email: 'ng11-e2e-running-guest@plan.test', name: 'NG-11 running guest' },
+} as const;
+export type NgPlanRefusedRole = keyof typeof NG_PLAN_REFUSED_SEATS;
+
 export interface NgPlanFixture {
   state: NgPlanFixtureState;
   tenantId: string;
@@ -95,9 +106,23 @@ export async function setupNgPlanTenants(now = new Date()): Promise<Record<'runn
       });
       await tx.membership.upsert({
         where: { tenantId_userId: { tenantId: f.tenantId, userId: f.userId } },
-        create: { tenantId: f.tenantId, userId: f.userId, role: 'MEMBER', workspaceIds: [f.workspaceId] },
-        update: { role: 'MEMBER', workspaceIds: [f.workspaceId] },
+        create: { tenantId: f.tenantId, userId: f.userId, role: 'TENANT_OWNER', workspaceIds: [f.workspaceId] },
+        update: { role: 'TENANT_OWNER', workspaceIds: [f.workspaceId] },
       });
+      if (state === 'running') {
+        for (const [role, seat] of Object.entries(NG_PLAN_REFUSED_SEATS) as [NgPlanRefusedRole, (typeof NG_PLAN_REFUSED_SEATS)[NgPlanRefusedRole]][]) {
+          await tx.user.upsert({
+            where: { id: seat.userId },
+            create: { id: seat.userId, email: seat.email, name: seat.name, locale: 'tr' },
+            update: { email: seat.email },
+          });
+          await tx.membership.upsert({
+            where: { tenantId_userId: { tenantId: f.tenantId, userId: seat.userId } },
+            create: { tenantId: f.tenantId, userId: seat.userId, role, workspaceIds: [f.workspaceId] },
+            update: { role, workspaceIds: [f.workspaceId] },
+          });
+        }
+      }
       await tx.ngSubscription.deleteMany({ where: { tenantId: requireId(f.tenantId, 'ng11 tenantId') } });
       const row = state === 'running' ? running : state === 'ended' ? ended : null;
       if (row) {
@@ -127,7 +152,8 @@ export async function teardownNgPlanTenants(): Promise<void> {
     await tx.membership.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
     await tx.subscription.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
     await tx.workspace.deleteMany({ where: { tenantId: { in: presentIds(tenantIds) } } });
-    await tx.user.deleteMany({ where: { id: { in: presentIds(fixtures.map((f) => f.userId)) } } });
+    const seatIds = Object.values(NG_PLAN_REFUSED_SEATS).map((s) => s.userId);
+    await tx.user.deleteMany({ where: { id: { in: presentIds([...fixtures.map((f) => f.userId), ...seatIds]) } } });
     await tx.tenant.deleteMany({ where: { id: { in: presentIds(tenantIds) } } });
   });
   await prisma.$disconnect();

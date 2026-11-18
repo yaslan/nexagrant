@@ -8,11 +8,13 @@ import { withSystemScope } from '../../src/lib/system-scope';
 import { shotsDir } from './fixtures/shots';
 import { signInAs } from './fixtures/session';
 import {
+  NG_PLAN_REFUSED_SEATS,
   ngPlanFixture,
   readStoredCatalogue,
   setupNgPlanTenants,
   teardownNgPlanTenants,
   type NgPlanFixtureState,
+  type NgPlanRefusedRole,
   type NgTrialRow,
 } from './fixtures/ng-plan-tenant';
 
@@ -39,7 +41,7 @@ function planUrl(state: NgPlanFixtureState, locale: Locale) {
 
 async function open(page: Page, state: NgPlanFixtureState, locale: Locale) {
   const f = ngPlanFixture(state);
-  await signInAs(page, { id: f.userId, email: f.email, name: `NG-11 ${state}`, tenantId: f.tenantId, role: 'MEMBER' });
+  await signInAs(page, { id: f.userId, email: f.email, name: `NG-11 ${state}`, tenantId: f.tenantId, role: 'TENANT_OWNER' });
   await page.goto(planUrl(state, locale));
   await expect(page.getByRole('heading', { level: 1, name: MESSAGES[locale].title })).toBeVisible({ timeout: 30_000 });
 }
@@ -233,6 +235,52 @@ test.describe('NG-11 plan and trial screen', () => {
     const link = page.getByTestId('user-menu-plan-link');
     await expect(link).toHaveText(enMessages.Navigation.planAndTrial);
     await expect(link).toHaveAttribute('href', planUrl('running', 'en'));
+  });
+
+  test('the plan screen is TENANT_OWNER only: a MEMBER and a GUEST_PARTNER get 403 and no subscription data', async ({ page }) => {
+    const row = trials.running;
+    const endTier = catalogue.find((p) => p.id === row.trialEndPlanId)!.tier;
+    // What the owner sees on this tenant: any of it in a refused response is a leak.
+    const secrets = [
+      row.trialEndsAt.toISOString(),
+      localDate(row.trialEndsAt, 'tr'),
+      row.planId,
+      row.trialEndPlanId,
+      tierName('tr', endTier),
+    ];
+    for (const role of Object.keys(NG_PLAN_REFUSED_SEATS) as NgPlanRefusedRole[]) {
+      const seat = NG_PLAN_REFUSED_SEATS[role];
+      const f = ngPlanFixture('running');
+      await signInAs(page, { id: seat.userId, email: seat.email, name: seat.name, tenantId: f.tenantId, role });
+      const url = planUrl('running', 'tr');
+      const res = await page.goto(url);
+      expect(res?.status(), role).toBe(403);
+      await expect(page.getByRole('heading', { name: trMessages.Forbidden.title }), role).toBeVisible();
+      await expect(page.getByTestId('ng-plan-current'), role).toHaveCount(0);
+      await expect(page.getByTestId('ng-trial'), role).toHaveCount(0);
+      const html = await page.content();
+      // The RSC payload is what a client-side navigation would carry: the same leak test applies.
+      const rsc = await page.request.get(url, { headers: { RSC: '1' } });
+      const payload = await rsc.text();
+      for (const secret of secrets) {
+        expect(html, `${role} html ${secret}`).not.toContain(secret);
+        expect(payload, `${role} rsc ${secret}`).not.toContain(secret);
+      }
+    }
+  });
+
+  test('the user menu shows the plan link only to a role the plan screen admits', async ({ page }) => {
+    const f = ngPlanFixture('running');
+    await page.setViewportSize(DESKTOP);
+    for (const role of Object.keys(NG_PLAN_REFUSED_SEATS) as NgPlanRefusedRole[]) {
+      const seat = NG_PLAN_REFUSED_SEATS[role];
+      await signInAs(page, { id: seat.userId, email: seat.email, name: seat.name, tenantId: f.tenantId, role });
+      await page.goto(`/en/${f.workspace}/dashboard`);
+      await page.getByRole('button', { name: new RegExp(seat.name) }).filter({ visible: true }).first().click();
+      // Positive control: the dropdown is open (its profile header is visible) before we look for the link.
+      await expect(page.getByRole('heading', { level: 4, name: seat.name })).toBeVisible();
+      await expect(page.getByTestId('user-menu-plan-link'), role).toHaveCount(0);
+    }
   });
 
   test('signed out: the login page, never a raw error', async ({ page }) => {
