@@ -64,6 +64,8 @@ export default function TenantProfileForm({
   const [trlMax, setTrlMax] = useState(stored.trlMax);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  // NG-229. The banner's own four seconds: kept, so the next save can call off the one before it.
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // FO-393. A save that sent nothing changed nothing: it says so instead of "updated".
   const [nothingToSave, setNothingToSave] = useState(false);
   const [error, setError] = useState('');
@@ -145,6 +147,16 @@ export default function TenantProfileForm({
     if (askValidity) formRef.current?.reportValidity();
   }, [askValidity]);
 
+  // NG-229. Nothing is left to fire once the form is gone, and a save still in flight arms nothing.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (successTimer.current) clearTimeout(successTimer.current);
+    };
+  }, []);
+
   const save = async (confirmedPic?: string) => {
     // FO-393 (N2). Numbers that are wrong as the form shows them are the user's own to fix, whatever
     // the row holds now: said here, before anything is sent, and never blamed on a colleague.
@@ -195,8 +207,10 @@ export default function TenantProfileForm({
       if (nothingSent) {
         setNothingToSave(true);
       } else {
+        // NG-229. A timer left from the save before this one took this banner down early.
+        if (successTimer.current) clearTimeout(successTimer.current);
         setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 4000);
+        if (mounted.current) successTimer.current = setTimeout(() => setSavedSuccess(false), 4000);
       }
     } else if (result.error === 'picConfirmationRequired') {
       setPendingMatch(result.match);
@@ -417,6 +431,11 @@ export default function TenantProfileForm({
               </p>
             )}
             {!picError && picCleared && <p role="status" className="text-ink-2">{t('picClearedNotice')}</p>}
+            {!picError && !picCleared && savedPic === '' && (
+              <p role="status" data-testid="tenant-pic-missing" className="text-amber-ink font-semibold">
+                {t('picMissingNotice')}
+              </p>
+            )}
             {!picError && !pendingMatch && picIsSaved && savedPicMatch && (
               <p role="status" className="text-ok font-semibold">
                 {t('picMatchedNotice', { name: savedPicMatch.name })}

@@ -126,6 +126,9 @@ test.describe('public pages share one header and one footer (FO-68)', () => {
         return;
       }
       const post = page.locator(`main a[href^="/${locale}/blog/"]`).first();
+      // NG-229: the same wait as before (attached, not visible), now with a limit: the link only has to be
+      // in the page. The aim is a quick failure here instead of the 300 s test budget when the list never renders it.
+      await expect(post).toBeAttached({ timeout: 30_000 });
       const href = await post.getAttribute('href');
       expect(href, `/${locale}/blog lists no post to open`).toBeTruthy();
       const response = await page.goto(href!);

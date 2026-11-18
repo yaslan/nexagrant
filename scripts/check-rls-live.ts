@@ -680,53 +680,89 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
  * NG-52 had one (expert_directory, SELECT only, on ExpertPreRegistration); SEC NG-185 F-1
  * measured that it filtered rows, not columns, and NG-188 replaced it with the view
  * "ExpertDirectoryEntry" (probeExpertDirectory). The mechanism stays, so a future exception
- * is one line here plus one in prisma/rls.sql's NG-183 block, and it must still match
- * rls.sql's own USING expression character for character (`expectedQual`, SEC NG-185 M3b:
- * a substring check let `… AND ('verified' <> '' OR true) …` through).
+ * is one line here plus one in prisma/rls.sql's NG-183 block. The same name on another table,
+ * or with another command, is still drift; and so is any policy other than the one
+ * prisma/rls.sql writes (`expectedPolicy`):
+ *   - SEC NG-185 M3b: the live `qual` must equal, character for character, what Postgres
+ *     deparses from rls.sql's own USING expression. A substring check let
+ *     `… AND ('verified' <> '' OR true) …` through, which keeps every expected fragment and
+ *     opens every row.
+ *   - NG-191 (SEC NG-185 low finding): "as written" is also the role list (`TO …`) and the
+ *     permissive flag (`AS PERMISSIVE|RESTRICTIVE`). The temporary copy is created from
+ *     rls.sql's whole statement, so both sides are read from pg_policies in the same form.
+ *     A statement with no TO clause is recorded as {public}, so a `TO public` copy of it is
+ *     the same policy.
+ * The expected policy is compiled by the same server, so the comparison does not depend on
+ * how a Postgres version prints an expression.
  */
 const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string }> = [];
 
-/** The USING expression of `CREATE POLICY <policy> ON public."<table>"` in prisma/rls.sql, verbatim. */
-function rlsSqlUsingExpression(sql: string, table: string, policy: string): string | null {
+/**
+ * Everything after `CREATE POLICY <policy> ON public."<table>"` in prisma/rls.sql up to its `;`,
+ * verbatim (AS / FOR / TO / USING / WITH CHECK clauses). null when the statement or its USING
+ * clause is missing.
+ */
+function rlsSqlPolicyClauses(sql: string, table: string, policy: string): string | null {
   const head = `CREATE POLICY ${policy} ON public."${table}"`;
   const start = sql.indexOf(head);
   if (start < 0) return null;
   const end = sql.indexOf(';', start);
   if (end < 0) return null;
-  const stmt = sql.slice(start + head.length, end);
-  const using = /\bUSING\b/i.exec(stmt);
-  if (!using) return null;
-  return stmt.slice(using.index + using[0].length).trim();
+  const stmt = sql.slice(start + head.length, end).trim();
+  if (!/\bUSING\b/i.test(stmt)) return null;
+  return stmt;
+}
+
+/** The fields of a policy the expert_directory exception is compared on (as pg_policies prints them). */
+type PolicyShape = { cmd: string; qual: string; roles: string[]; permissive: string };
+
+/** Field-by-field difference of a live policy from the one rls.sql compiles to; [] when equal. */
+function policyShapeDrift(
+  live: { cmd: string; qual: string | null; roles: string[] | null; permissive: string },
+  expected: PolicyShape
+): string[] {
+  const set = (r: readonly string[] | null) => `{${[...(r ?? [])].sort().join(', ')}}`;
+  const out: string[] = [];
+  if (live.cmd !== expected.cmd) out.push(`komut ${live.cmd}, beklenen ${expected.cmd}`);
+  if (live.permissive !== expected.permissive) out.push(`permissive ${live.permissive}, beklenen ${expected.permissive}`);
+  if (set(live.roles) !== set(expected.roles)) out.push(`roller ${set(live.roles)}, beklenen ${set(expected.roles)}`);
+  if (live.qual === null || live.qual !== expected.qual) out.push('qual rls.sql\'deki ifadeden farklı');
+  return out;
 }
 
 /**
- * The `qual` Postgres prints for rls.sql's expression, compiled on a temporary copy of the
- * table (CREATE TEMP TABLE … LIKE) inside a transaction that is rolled back: the real
- * table is never locked or altered. null (with the reason) when it cannot be compiled.
+ * The policy Postgres records for rls.sql's statement (cmd, qual, roles, permissive), compiled
+ * on a temporary copy of the table (CREATE TEMP TABLE … LIKE) inside a transaction that is
+ * rolled back: the real table is never locked or altered. Read back through pg_policies, the
+ * same view the live side is read from. An error (with the reason) when it cannot be compiled,
+ * or when rls.sql's command is not the one the exception allows — both fail closed.
  */
-async function expectedQual(
+async function expectedPolicy(
   client: pg.Client,
   table: string,
   policy: string,
   cmd: string
-): Promise<{ qual: string } | { error: string }> {
-  const expr = rlsSqlUsingExpression(readFileSync(resolve(process.cwd(), 'prisma/rls.sql'), 'utf8'), table, policy);
-  if (!expr) return { error: `prisma/rls.sql içinde ${table}.${policy} USING ifadesi bulunamadı` };
+): Promise<PolicyShape | { error: string }> {
+  const clauses = rlsSqlPolicyClauses(readFileSync(resolve(process.cwd(), 'prisma/rls.sql'), 'utf8'), table, policy);
+  if (!clauses) return { error: `prisma/rls.sql içinde ${table}.${policy} USING ifadesi bulunamadı` };
   const tmp = `rls_verify_expected_${table.toLowerCase()}`;
   await client.query('begin');
   try {
     await client.query(`create temp table ${tmp} (like public."${table}") on commit drop`);
-    await client.query(`create policy ${policy} on pg_temp.${tmp} for ${cmd} using ${expr}`);
-    const r = await client.query<{ qual: string | null }>(
-      `select pg_get_expr(p.polqual, p.polrelid) as qual
-         from pg_policy p
-        where p.polrelid = ('pg_temp.' || $1)::regclass and p.polname = $2`,
+    await client.query(`create policy ${policy} on pg_temp.${tmp} ${clauses}`);
+    const r = await client.query<{ cmd: string; qual: string | null; roles: string[] | null; permissive: string }>(
+      `select cmd, qual, roles::text[] as roles, permissive
+         from pg_policies
+        where schemaname = (select nspname from pg_namespace where oid = pg_my_temp_schema())
+          and tablename = $1 and policyname = $2`,
       [tmp, policy]
     );
-    const qual = r.rows[0]?.qual;
-    return qual ? { qual } : { error: `${table}.${policy}: beklenen qual derlenemedi` };
+    const row = r.rows[0];
+    if (!row?.qual || !row.roles) return { error: `${table}.${policy}: beklenen politika derlenemedi` };
+    if (row.cmd !== cmd) return { error: `${table}.${policy}: prisma/rls.sql komutu ${row.cmd}, istisna yalnız ${cmd}` };
+    return { cmd: row.cmd, qual: row.qual, roles: row.roles, permissive: row.permissive };
   } catch (e) {
-    return { error: `${table}.${policy}: beklenen qual derlenemedi (${e instanceof Error ? e.message.split('\n')[0] : String(e)})` };
+    return { error: `${table}.${policy}: beklenen politika derlenemedi (${e instanceof Error ? e.message.split('\n')[0] : String(e)})` };
   } finally {
     await client.query('rollback');
   }
@@ -1444,6 +1480,80 @@ async function probeSealBindsPurpose(m: pg.Client): Promise<{ failures: string[]
   return { failures, checks };
 }
 
+/**
+ * NG-222 (K-583842): `close_own_province_routes` is the tenant scope's only write door to
+ * ProvinceLeadRoute. Catalogue (on the DATABASE_URL connection): it exists, SECURITY DEFINER,
+ * search_path fixed, EXECUTE not held by PUBLIC / anon / authenticated, held by fabrika_app.
+ * Behaviour (on the measuring role, when it may EXECUTE it): no app.tenant_id → refused; a tenant
+ * id that names no tenant → closes nothing; app.system_scope is not left 'on'. Writes nothing
+ * (the only call that reaches the loop names no tenant); everything is rolled back.
+ */
+async function probeOwnRouteClose(admin: pg.Client, m: pg.Client): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const fn = 'public.close_own_province_routes(text, text)';
+  const cat = (
+    await admin.query<{ present: boolean; definer: boolean | null; config: string[] | null; pub: boolean | null; api: string[] | null; app: boolean | null }>(
+      `select p.oid is not null as present, p.prosecdef as definer, p.proconfig as config,
+              exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where a.grantee = 0 and a.privilege_type = 'EXECUTE') as pub,
+              array(select r.rolname::text from pg_roles r where r.rolname in ('anon', 'authenticated') and has_function_privilege(r.oid, p.oid, 'EXECUTE')) as api,
+              case when exists (select 1 from pg_roles where rolname = 'fabrika_app') then has_function_privilege('fabrika_app', p.oid, 'EXECUTE') end as app
+         from (select to_regprocedure($1) as oid) f left join pg_proc p on p.oid = f.oid`,
+      [fn]
+    )
+  ).rows[0];
+  if (!cat?.present) {
+    failures.push(`kendi-rota-kapanışı: ${fn} yok (prisma/migrations/add-close-own-province-routes.sql uygulanmamış, NG-222)`);
+    return { failures, checks };
+  }
+  const bad: string[] = [];
+  if (!cat.definer) bad.push('SECURITY DEFINER değil');
+  if (!(cat.config ?? []).some((c) => c.startsWith('search_path='))) bad.push('search_path sabit değil');
+  if (cat.pub) bad.push('PUBLIC EXECUTE tutuyor');
+  if ((cat.api ?? []).length > 0) bad.push(`Supabase API rolleri EXECUTE tutuyor: ${(cat.api ?? []).join(', ')}`);
+  if (cat.app === false) bad.push('fabrika_app EXECUTE tutmuyor (kiracının ayarı ve faturalama M18 kapanışında rotayı kapatamaz)');
+  if (bad.length > 0) {
+    failures.push(`kendi-rota-kapanışı: ${bad.join('; ')}`);
+    return { failures, checks };
+  }
+
+  const mayCall = (await m.query<{ ok: boolean }>(`select has_function_privilege(current_user, $1::regprocedure, 'EXECUTE') as ok`, [fn])).rows[0]?.ok === true;
+  if (!mayCall) {
+    checks.push(`kendi-rota-kapanışı: katalog doğru (DEFINER, search_path, yalnız fabrika_app); ölçüm rolü EXECUTE tutmuyor — davranış sondası atlandı`);
+    return { failures, checks };
+  }
+  await m.query('begin');
+  try {
+    await m.query(`select set_config('app.tenant_id', '', true), set_config('app.system_scope', 'off', true)`);
+    await m.query('savepoint probe_own_route');
+    let refused = false;
+    try {
+      await m.query(`select public.close_own_province_routes('billing', null::text)`);
+    } catch {
+      refused = true;
+    }
+    await m.query('rollback to savepoint probe_own_route');
+    if (!refused) failures.push('kendi-rota-kapanışı: app.tenant_id boşken çağrı REDDEDİLMEDİ');
+
+    await m.query(`select set_config('app.tenant_id', $1, true)`, [`rls-verify-${randomBytes(6).toString('hex')}`]);
+    const r = (
+      await m.query<{ closed: string[]; flag: string | null }>(
+        `select public.close_own_province_routes('billing', null::text) as closed, current_setting('app.system_scope', true) as flag`
+      )
+    ).rows[0];
+    if ((r?.closed ?? []).length > 0) failures.push(`kendi-rota-kapanışı: var olmayan kiracı için ${r?.closed.length} rota kapattı`);
+    const flag = (await m.query<{ flag: string | null }>(`select current_setting('app.system_scope', true) as flag`)).rows[0]?.flag;
+    if (flag === 'on') failures.push(`kendi-rota-kapanışı: dönüşte app.system_scope 'on' kaldı`);
+    if (refused && (r?.closed ?? []).length === 0 && flag !== 'on') {
+      checks.push(`kendi-rota-kapanışı: katalog doğru (DEFINER, search_path, yalnız fabrika_app); kiracısız çağrı reddedildi, yabancı kiracı 0 rota, bayrak kapalı`);
+    }
+  } finally {
+    await m.query('rollback');
+  }
+  return { failures, checks };
+}
+
+
 async function main() {
   const dotenv = readDotenv();
   const url = process.env.DATABASE_URL ?? dotenv.DATABASE_URL;
@@ -1514,10 +1624,12 @@ async function main() {
     // above could not see it on an empty table. The set must be exactly {system_scope}.
     // The class is SYSTEM_SCOPE_TABLES plus any catalogue table carrying system_scope
     // without a tenant policy (a new one must be added to the list to be probed).
-    const allPolicies = await client.query<{ tablename: string; policyname: string; cmd: string; qual: string | null }>(
-      `select tablename, policyname, cmd, qual from pg_policies where schemaname = 'public' order by tablename, policyname`
+    type LivePolicy = { tablename: string; policyname: string; cmd: string; qual: string | null; roles: string[] | null; permissive: string };
+    const allPolicies = await client.query<LivePolicy>(
+      `select tablename, policyname, cmd, qual, roles::text[] as roles, permissive
+         from pg_policies where schemaname = 'public' order by tablename, policyname`
     );
-    const policiesOf = new Map<string, { policyname: string; cmd: string; qual: string | null }[]>();
+    const policiesOf = new Map<string, LivePolicy[]>();
     for (const r of allPolicies.rows) policiesOf.set(r.tablename, [...(policiesOf.get(r.tablename) ?? []), r]);
     const hasTenantPolicy = (t: string) =>
       (policiesOf.get(t) ?? []).some((p) => p.policyname === 'tenant_isolation' || p.policyname === 'tenant_or_shared');
@@ -1528,25 +1640,28 @@ async function main() {
       ]),
     ].sort();
     const policySetDrift: string[] = [];
-    const expectedQuals = new Map<string, string>();
+    const expectedPolicies = new Map<string, PolicyShape>();
     for (const a of SYSTEM_SCOPE_ALLOWED_EXTRA) {
       if (!existing.has(a.table)) continue;
-      const e = await expectedQual(client, a.table, a.policy, a.cmd);
-      if ('qual' in e) expectedQuals.set(`${a.table}.${a.policy}`, e.qual);
-      else policySetDrift.push(e.error);
+      const e = await expectedPolicy(client, a.table, a.policy, a.cmd);
+      if ('error' in e) policySetDrift.push(e.error);
+      else expectedPolicies.set(`${a.table}.${a.policy}`, e);
     }
     for (const t of systemScopeTables) {
       const pols = policiesOf.get(t) ?? [];
-      const allowed = (p: { policyname: string; cmd: string; qual: string | null }) =>
-        SYSTEM_SCOPE_ALLOWED_EXTRA.some(
-          (a) =>
-            a.table === t &&
-            a.policy === p.policyname &&
-            a.cmd === p.cmd &&
-            p.qual !== null &&
-            p.qual === expectedQuals.get(`${a.table}.${a.policy}`)
-        );
+      // Why a named exception is not the one rls.sql writes; null = not a named exception here
+      // (or its expected shape could not be compiled, already a failure above).
+      const exceptionDrift = (p: LivePolicy): string[] | null => {
+        const a = SYSTEM_SCOPE_ALLOWED_EXTRA.find((x) => x.table === t && x.policy === p.policyname);
+        const exp = a ? expectedPolicies.get(`${a.table}.${a.policy}`) : undefined;
+        return exp ? policyShapeDrift(p, exp) : null;
+      };
+      const allowed = (p: LivePolicy) => exceptionDrift(p)?.length === 0;
       const extra = pols.filter((p) => p.policyname !== 'system_scope' && !allowed(p));
+      const shapeDrift = extra.flatMap((p) => {
+        const d = exceptionDrift(p);
+        return d && d.length > 0 ? [`${p.policyname} sapması: ${d.join('; ')}`] : [];
+      });
       const missing = !pols.some((p) => p.policyname === 'system_scope');
       if (extra.length > 0 || missing) {
         policySetDrift.push(
@@ -1556,7 +1671,9 @@ async function main() {
               : ''
           }${
             missing ? ' — system_scope YOK' : ''
-          }${extra.length > 0 ? ` — fazla: ${extra.map((p) => `${p.policyname} (${p.cmd})`).join(', ')}` : ''}`
+          }${extra.length > 0 ? ` — fazla: ${extra.map((p) => `${p.policyname} (${p.cmd})`).join(', ')}` : ''}${
+            shapeDrift.length > 0 ? ` — ${shapeDrift.join(' · ')}` : ''
+          }`
         );
       }
       if (!SYSTEM_SCOPE_TABLES.some((s) => s.table === t)) {
@@ -1718,6 +1835,11 @@ async function main() {
       const seal = await probeSealBindsPurpose(measurer.client);
       failures.push(...seal.failures);
       checks.push(...seal.checks);
+    }
+    if (existing.has('ProvinceLeadRoute')) {
+      const ownRoute = await probeOwnRouteClose(client, measurer.client);
+      failures.push(...ownRoute.failures);
+      checks.push(...ownRoute.checks);
     }
 
     console.log(`\nÖlçüm rolü: ${describeCaps(measurer.caps)} — kaynak: ${measurer.source}`);
