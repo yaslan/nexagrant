@@ -8,6 +8,7 @@ import { ModuleId, ModuleStatus } from '@/lib/modules/types';
 import { canEnableEntitled, getDisableCascade } from '@/lib/modules/state-machine';
 import { revalidatePath } from 'next/cache';
 import { errorMessage } from '@/lib/errors';
+import { withOwnRouteCloseOnM18Exit } from '@/lib/leads/province-route';
 import { readModulesPlanView, type ModulesPlanView } from './plan-view';
 
 /**
@@ -101,7 +102,9 @@ export async function toggleModuleState(
       const toDisable = [moduleId, ...cascade];
       
       try {
-        await withTenant(tenantId, async (tx) => {
+        // NG-222: M18 among them (directly or by cascade) closes the tenant's province routes in
+        // this same transaction (withOwnRouteCloseOnM18Exit, no scope escalation).
+        await withTenant(tenantId, (tx) => withOwnRouteCloseOnM18Exit(tx, toDisable, { kind: 'tenant_user', userId }, async () => {
           for (const modId of toDisable) {
             await tx.moduleState.upsert({
               where: {
@@ -134,7 +137,7 @@ export async function toggleModuleState(
           } catch {
             // Audit log optional
           }
-        });
+        }));
       } catch (dbErr) {
         console.error(`[toggleModuleState] Database cascade save error: ${errorMessage(dbErr)}`);
         throw new Error('Modül durumu kaydedilemedi. Lütfen tekrar deneyin.');
