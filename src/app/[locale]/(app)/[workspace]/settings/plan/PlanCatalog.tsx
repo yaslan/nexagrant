@@ -255,7 +255,7 @@ function Segmented({
               onChange={() => onChange(o.value)}
               className="peer sr-only"
             />
-            <span className="block min-h-9 cursor-pointer select-none rounded-full px-4 py-2 text-xs font-bold text-muted transition peer-checked:bg-accent peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2 hover:text-ink peer-checked:hover:text-white">
+            <span className="block min-h-11 cursor-pointer select-none rounded-full px-4 py-2 text-xs font-bold text-muted transition peer-checked:bg-accent peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2 hover:text-ink peer-checked:hover:text-white">
               {o.label}
             </span>
           </label>
