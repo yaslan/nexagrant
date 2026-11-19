@@ -26,6 +26,7 @@ import type { InvitationSignInView } from './invitations/accept';
 import { acknowledgementMatchesCurrent } from './legal/consent-documents';
 import { bindTransactionToTenant, writeRegistrationConsent } from './legal/registration-consent';
 import { readinessSettings } from './readiness/account';
+import { startNgTrialAtRegistration } from './billing/nexagrant/repository';
 
 /** Query values the registration screen turns into one message each. */
 export const OAUTH_SIGNIN_ERROR = {
@@ -281,6 +282,8 @@ export async function bootstrapOAuthTenant(
   // Tenant-scoped writes need the tenant bound, or RLS refuses them off a
   // superuser connection (see bindTransactionToTenant).
   await bindTransactionToTenant(tx, tenant.id);
+  // NG-57: the NexaGrant trial (14 days; a municipality 30) starts with the account.
+  await startNgTrialAtRegistration(tx, { tenantId: tenant.id, orgType: tenant.orgType });
 
   const workspace = await tx.workspace.create({
     data: { tenantId: tenant.id, name: 'Default Workspace', slug: 'default' },

@@ -96,6 +96,10 @@ BEGIN
   IF to_regclass('public."InterregRubricCriterion"') IS NOT NULL THEN
     EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "InterregRubricCriterion" FROM %I', app_role);
   END IF;
+  -- 3c'. NG-57: the NexaGrant plan catalogue, same reasoning as 3c.
+  IF to_regclass('public."NgPlan"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "NgPlan", "NgPlanFeature", "NgPlanPrice", "NgTrialPolicy" FROM %I', app_role);
+  END IF;
 
   -- 3d. The audit trail is append-only for the app (NG-40, auditevent-immutable.sql):
   --     SELECT and INSERT only. Erasure detaches an actor through audit_detach_actor().

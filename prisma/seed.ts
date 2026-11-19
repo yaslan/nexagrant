@@ -22,6 +22,7 @@ import seedProposals from './seed-proposals';
 import seedEfforts from './seed-efforts';
 import seedE11Feedback from './seed-e11-feedback';
 import seedInterregRubrics from './seed-interreg-rubrics';
+import seedNexagrantCatalog from './seed-nexagrant-catalog';
 
 // Module catalog — also used to derive the demo tenant's ModuleState rows.
 const modules = [
@@ -412,6 +413,9 @@ async function seedReferenceData() {
 
   // 6. M17 assessment grids (FO-186) — platform reference data, prisma/seed-data/interreg-rubrics.ts.
   await seedInterregRubrics();
+
+  // 7. NexaGrant plan catalogue (NG-57) — platform reference data, prisma/seed-data/nexagrant-catalog.ts.
+  await seedNexagrantCatalog();
 
   // Public blog launch posts (AKTAR-MURBCJ0A-1). Insert-only: an existing slug,
   // including one an admin edited, is left as it is.
