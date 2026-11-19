@@ -62,6 +62,9 @@ const GUEST_CLOSED = [
   `${ws}/proje-fikri`,
   `${ws}/settings/profile`,
   `${ws}/ayarlar/profil`,
+  // NG-256: the CORDIS coordinator leaders page reads the tenant's M1 plan only; it
+  // sits behind view_partner_search like its sibling `partners` page.
+  `${ws}/partners/leaders`,
 ];
 
 /** Any CORDIS-shaped PIC: the door is the role, the PIC is never reached. */
@@ -295,6 +298,8 @@ test.describe.serial('NG-64 page role gates', () => {
     await expectOpen(page, `${ws}/iliskiler`);
     await expect(page.getByText(RG_REL_NAME).first()).toBeVisible();
     await expectOpen(page, `${ws}/ortaklar/kaynaklar`);
+    // NG-256 control: MEMBER holds view_partner_search, so the leaders page opens.
+    await expectOpen(page, `${ws}/partners/leaders`);
     await expectOpen(page, `${ws}/onay-merkezi`);
     await expectOpen(page, `${ws}/ayarlar/api-anahtarlari`);
     await expectClosed(page, `${ws}/ayarlar/uyeler`);
