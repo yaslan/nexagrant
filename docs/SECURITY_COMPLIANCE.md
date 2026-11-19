@@ -159,6 +159,17 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
   güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da clamd
   servisi yok, gerçek-clamd testleri `NG239_CLAMD_HOST`/`CLAMD_HOST` verilmeden atlanır.
+- ZIP üye denetimi (NG-269, K-584606 = C): `AlertExceedsMax` her durumu yakalamıyor. clamd 1.5.4, MaxFileSize'ı aşan
+  tek bir ZIP üyesini uyarısız kırpıp `OK` diyor, ZIP64 üyeyi hiç açmıyor (NG-265 ölçümü). Bu yüzden ZIP başlıklı her
+  kanıt dosyası (docx, xlsx) clamd'den ÖNCE `src/lib/zip-member-check.ts` ile denetlenir. Denetim her üyeyi akış
+  olarak açar, gerçek baytı sayar ve tavanda durur; başlıkta beyan edilen boyuta güvenmez. Merkezi dizinde olmayan
+  yerel girdilere ve üye içindeki (stored, deflate ya da başka baytlardan sonra gömülü) ZIP'lere de bakar. Tavanlar
+  tek yerde ve clamd varsayılanlarıyla aynı: üye 100 MiB (`MaxFileSize`), toplam açılım 400 MiB (`MaxScanSize`),
+  10 000 girdi (`MaxFiles`), iç içe derinlik 32 (clamd `MaxRecursion` 17'den derin). Tavanı aşan üye ya da dosya,
+  ZIP64, deflate/stored dışında bir yöntem, şifreli ya da açılamayan üye `ERROR` (`limits_exceeded: zip_member_check:
+  <kod>`) olur. Dosya clamd'ye gitmez, silinmez, inmez. Bilinen sınır: sayfası 100 MiB'ı aşan çok büyük bir xlsx veri
+  dökümü (sıkıştırılmış ~17 MB+) reddedilir. clamd'nin bir tavanı düşürülürse aynı değişiklik bu dosyada da yapılmalıdır.
+  Kapsam dışı: PNG/JPG/WebP sonuna eklenen ZIP (polyglot), ayrı bir takip işi.
 - Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
 - Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı.
 - Olay müdahale: 72 saat bildirim prosedürü (GDPR), KVKK Kurulu bildirimi.
