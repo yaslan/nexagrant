@@ -256,6 +256,9 @@ export const ALLOWED: Record<string, string> = {
   // `where { tenantId, userId }` of the session; every role has a bell, and an
   // expired pilot must still be able to clear it, so neither `can` nor the pilot gate.
   'actions/user/notifications.ts#markNotificationsRead': "marks the caller's own notifications read (userId = session user)",
+  // NG-8: the caller's own delivery preference (userId = session user); every role has a bell.
+  'actions/user/notifications.ts#setNotificationPreference': "sets the caller's own notification preference (userId = session user)",
+  'actions/user/notifications.ts#getNotificationPreferences': "reads the caller's own notification preferences",
   // Token-authenticated partner portal: no session, no tenant role. Narrow by
   // construction (Part A budget lines only) and pilot-gated on the token's tenant.
   'modules/m11/server/actions.ts#addBudgetLineByToken': 'partner portal; the magic token is the credential',
