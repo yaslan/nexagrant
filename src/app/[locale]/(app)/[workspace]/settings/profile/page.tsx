@@ -1,6 +1,6 @@
 import { BETA_SUPPORT_EMAIL } from '@/lib/beta/constants';
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import TenantProfileForm from './profile-form';
 
 /**
@@ -11,7 +11,9 @@ import TenantProfileForm from './profile-form';
  */
 export default async function TenantProfilePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const scope = await requireTenantPage(locale);
+  // NG-240: the company profile (PIC, capabilities, keywords, TRL range) is read only by a role
+  // with view_proposal; GUEST_PARTNER gets the 403 screen before the read. Also serves ayarlar/profil.
+  const scope = await requireTenantPageRole(locale, 'view_proposal');
   const { initial, pic, picMatch } = await withTenant(scope.tenantId, async (tx) => {
     const tenant = await tx.tenant.findUnique({ where: { id: scope.tenantId }, select: { pic: true } });
     const storedPic = tenant?.pic ?? null;

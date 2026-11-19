@@ -1,5 +1,10 @@
 import pg from 'pg';
 
+/** The text behind a lock's key (`SELECT pg_advisory_lock(hashtext(<this>))`), for a caller that takes it on its own connection. */
+export function testDbLockKey(name: string): string {
+  return `test:${name}`;
+}
+
 /**
  * TASK-MUN7B4ZIEBJML — serialises test files that share one database object.
  *
@@ -24,7 +29,7 @@ export async function withTestDbLock<T>(url: string, name: string, fn: () => Pro
   const client = new pg.Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query('SELECT pg_advisory_lock(hashtext($1))', [`test:${name}`]);
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', [testDbLockKey(name)]);
     return await fn();
   } finally {
     await client.end().catch(() => {});
@@ -72,7 +77,7 @@ export const PARTNER_SEARCH_INGESTION_LOCK = 'PartnerSearch:ingestion';
 export async function holdTestDbLock(url: string, name: string): Promise<() => Promise<void>> {
   const client = new pg.Client({ connectionString: url });
   await client.connect();
-  await client.query('SELECT pg_advisory_lock(hashtext($1))', [`test:${name}`]);
+  await client.query('SELECT pg_advisory_lock(hashtext($1))', [testDbLockKey(name)]);
   return async () => {
     await client.end().catch(() => {});
   };

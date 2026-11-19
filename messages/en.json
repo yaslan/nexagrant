@@ -24,7 +24,8 @@
       "PILOT": "Pilot",
       "DEV": "Dev"
     },
-    "homeLink": "Home"
+    "homeLink": "Home",
+    "planAndTrial": "Plan and trial"
   },
   "Common": {
     "loading": "Loading...",
@@ -5953,6 +5954,91 @@
       "lost": {
         "reengage": "Re-engage the client"
       }
+    }
+  },
+  "ngPlan": {
+    "metaTitle": "Plan and trial",
+    "title": "Plan and trial",
+    "subtitle": "Your organisation's plan, its trial and a comparison of the {brand} tiers.",
+    "currentPlanLabel": "Your current plan",
+    "currentBadge": "Current plan",
+    "tier": {
+      "free": "Free Check",
+      "basic": "Basic",
+      "professional": "Professional",
+      "enterprise": "Enterprise"
+    },
+    "trial": {
+      "title": "Trial",
+      "noneBody": "No trial is running.",
+      "runningBadge": "Trial running",
+      "endedBadge": "Trial ended",
+      "daysLeft": "{days, plural, one {# day left} other {# days left}}",
+      "endsAt": "Ends",
+      "endedAt": "Ended",
+      "runningEndPlan": "When the trial ends your account moves to the {plan} plan.",
+      "endedPlan": "Your account is now on the {plan} plan.",
+      "localTimeNote": "Times are in your browser's time zone ({tz})."
+    },
+    "plans": {
+      "title": "Compare plans",
+      "body": "Prices and features are read from the catalogue. Purchasing is not open yet.",
+      "currencyLegend": "Currency",
+      "intervalLegend": "Billing period",
+      "currency": {
+        "TRY": "TRY",
+        "EUR": "Euro"
+      },
+      "interval": {
+        "year": "Yearly",
+        "month": "Monthly"
+      },
+      "perInterval": {
+        "year": "/ year",
+        "month": "/ month"
+      },
+      "priceSoon": "Price coming soon",
+      "priceSoonNote": "You will be able to buy here once the price is published.",
+      "free": "Free",
+      "freeNote": "The plan used after a trial ends or when no plan is chosen.",
+      "contact": "Contact us",
+      "contactNote": "This plan is offered by pre-registration; our sales team will talk to you.",
+      "buySoon": "Purchasing soon",
+      "matrixCaption": "Features and limits by plan",
+      "featureColumn": "Feature",
+      "matrixScrollLabel": "Feature table, scrolls horizontally",
+      "included": "Included",
+      "notIncluded": "Not included",
+      "unlimited": "Unlimited",
+      "empty": "The catalogue has no plans to show."
+    },
+    "feature": {
+      "org_profile": "Organisation profile",
+      "eligibility_check": "Eligibility check",
+      "call_search": "Call search and eligibility filter",
+      "trl_score": "TRL fit score",
+      "apply_decision": "Apply / withdraw record",
+      "newsletter": "Matching calls newsletter",
+      "partner_search": "Partner finding",
+      "outreach": "Partner outreach (invite, remind)",
+      "similar_projects": "Similar funded projects",
+      "seats": "Users",
+      "ai_writing_monthly": "AI writing operations"
+    },
+    "limit": {
+      "default": "{count}",
+      "eligibility_check": "{count} per month",
+      "seats": "{count, plural, one {# user} other {# users}}",
+      "ai_writing_monthly": "{count} per month"
+    },
+    "error": {
+      "sessionTitle": "Sign-in required",
+      "sessionBody": "Sign in with an account that belongs to an organisation to see your plan.",
+      "sessionCta": "Sign in",
+      "catalogueTitle": "The plan catalogue is not ready",
+      "catalogueBody": "The plans could not be loaded. This is a setup gap and support has been told. Please try again later.",
+      "unknownTitle": "This section could not be loaded",
+      "unknownBody": "Something went wrong. Refresh the page and try again."
     }
   }
 }

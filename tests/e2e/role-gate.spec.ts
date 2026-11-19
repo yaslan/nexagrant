@@ -4,12 +4,16 @@ import type { Role } from '@prisma/client';
 import trMessages from '../../messages/tr.json';
 import { cleanupIdentity, seedIdentity, signInAs } from './fixtures/session';
 import {
+  RG_IDEA_TITLE,
   RG_INVOICE_NO,
   RG_OPP_ID,
   RG_OPP_TITLE,
   RG_PANEL_AVG_TEXT,
   RG_PANEL_EVAL_ID,
+  RG_PROFILE_TEXT,
+  RG_PROVINCE,
   RG_REL_ID,
+  RG_COBRAND_NAME,
   RG_REL_NAME,
   RG_SEATS,
   RG_TENANT,
@@ -54,6 +58,10 @@ const GUEST_CLOSED = [
   `${ws}/settings/billing`,
   `${ws}/ayarlar/kapilar`,
   `${ws}/settings/gates`,
+  // NG-240: the tenant's project ideas and company profile (ayarlar/profil is the alias of settings/profile).
+  `${ws}/proje-fikri`,
+  `${ws}/settings/profile`,
+  `${ws}/ayarlar/profil`,
 ];
 
 /** Any CORDIS-shaped PIC: the door is the role, the PIC is never reached. */
@@ -72,6 +80,12 @@ async function expectClosed(page: Page, path: string) {
   expect(html, path).not.toContain(RG_OPP_TITLE);
   expect(html, path).not.toContain(RG_REL_NAME);
   expect(html, path).not.toContain(RG_INVOICE_NO);
+  expect(html, path).not.toContain(RG_IDEA_TITLE);
+  expect(html, path).not.toContain(RG_PROFILE_TEXT);
+  // NG-240 (review E1): the stored province and the card that shows it. The dropdown
+  // lists every province, so only the selected option (value="<il>") proves a leak.
+  expect(html, path).not.toContain(`value="${RG_PROVINCE}"`);
+  expect(html, path).not.toContain('data-testid="tenant-province-setting"');
 }
 
 async function expectOpen(page: Page, path: string) {
@@ -123,6 +137,28 @@ test.describe.serial('NG-64 page role gates', () => {
     test.setTimeout(240_000);
     await signIn(page, 'GUEST_PARTNER');
     for (const path of GUEST_CLOSED) await expectClosed(page, path);
+  });
+
+  test('agency co-brand (NG-248, K-584216): GUEST_PARTNER sees neither the agency name nor its logo; the five internal roles see both', async ({ page }) => {
+    test.setTimeout(180_000);
+    // cagrilar is open to a guest and renders the app shell, where the co-brand sits.
+    const shell = `${ws}/cagrilar`;
+    await signIn(page, 'GUEST_PARTNER');
+    await expectOpen(page, shell);
+    expect(await page.content(), 'guest 200').not.toContain(RG_COBRAND_NAME);
+    await expect(page.getByTestId('cobrand-badge')).toHaveCount(0);
+    expect((await page.request.get('/api/agency/cobrand-logo')).status(), 'guest logo').toBe(404);
+    // A refused page carries the shell too: the name must not travel in its RSC payload either.
+    await expectClosed(page, `${ws}/firsatlar`);
+    expect(await page.content(), 'guest 403').not.toContain(RG_COBRAND_NAME);
+
+    for (const role of ['MEMBER', 'WRITER', 'PIPELINE_MANAGER', 'TENANT_ADMIN', 'TENANT_OWNER'] as const) {
+      await signIn(page, role);
+      await expectOpen(page, shell);
+      // The sentence reads "<ajans> iş birliğiyle": the name is part of it, not all of it.
+      await expect(page.getByTestId('cobrand-text').first(), role).toContainText(RG_COBRAND_NAME);
+      expect((await page.request.get('/api/agency/cobrand-logo')).status(), `${role} logo`).toBe(200);
+    }
   });
 
   test('GUEST_PARTNER cannot pull the data through the downloads either', async ({ page }) => {
@@ -231,9 +267,22 @@ test.describe.serial('NG-64 page role gates', () => {
   });
 
   test('GUEST_PARTNER keeps the pages that have no tenant read behind a role', async ({ page }) => {
+    // cagrilar is the global call catalogue (no tenant data). ayarlar/profil was wrongly
+    // listed here: it reads the tenant's company profile, so it is in GUEST_CLOSED (NG-240).
     await signIn(page, 'GUEST_PARTNER');
     await expectOpen(page, `${ws}/cagrilar`);
-    await expectOpen(page, `${ws}/ayarlar/profil`);
+  });
+
+  test('NG-240 control: MEMBER (view_proposal) and TENANT_OWNER open proje-fikri and settings/profile with the tenant text', async ({ page }) => {
+    test.setTimeout(120_000);
+    for (const role of ['MEMBER', 'TENANT_OWNER'] as const) {
+      await signIn(page, role);
+      await expectOpen(page, `${ws}/proje-fikri`);
+      await expect(page.getByText(RG_IDEA_TITLE).first(), role).toBeVisible();
+      await expectOpen(page, `${ws}/settings/profile`);
+      // The profile text sits in a form field (a textarea value), so read the markup, not visible text.
+      expect(await page.content(), role).toContain(RG_PROFILE_TEXT);
+    }
   });
 
   test('MEMBER reads the opportunity and relationship, keeps API keys, is refused members', async ({ page }) => {

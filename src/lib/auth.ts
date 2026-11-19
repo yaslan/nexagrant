@@ -37,6 +37,7 @@ import {
   registerOAuthUserWithInvite,
 } from './oauth-registration';
 import { readParkedInvitation } from './invitations/accept-cookie';
+import { startNgTrialAtRegistration } from './billing/nexagrant/repository';
 import { readInvitationForSignIn, registerInvitedOAuthUser } from './invitations/accept';
 import {
   PLATFORM_ADMIN_DEMO_EMAIL,
@@ -501,6 +502,8 @@ export const authConfig = {
               // `withTenant` and what was silently relying on a superuser
               // connection before this call existed.
               await bindTransactionToTenant(tx, tenant.id);
+              // NG-57: the NexaGrant trial (14 days; a municipality 30) starts with the account.
+              await startNgTrialAtRegistration(tx, { tenantId: tenant.id, orgType: tenant.orgType });
 
               const workspace = await tx.workspace.create({
                 data: {

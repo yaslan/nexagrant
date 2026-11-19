@@ -4,23 +4,17 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { freePort } from './helpers/free-port';
 
 // FO-388 yardımcıları: bir portu dinleyip kapatmadan tutmak ve süreç çıktısını toplamak.
+// NG-260: freePort ortak yardımcıdan; dönen port dört adreste de (127.0.0.1, 0.0.0.0, ::1, ::) boş.
+// Yalnız 127.0.0.1'e bakan eski sürüm, makinede `*:port` dinleyen bir süreç varken 0.0.0.0/:: holdPort'unu
+// ve gate-lock.mjs'in dört adresli yoklamasını EADDRINUSE/"dolu" ile düşürüyordu (NG-255 kök neden 2).
 function holdPort(port: number, host = '127.0.0.1'): Promise<net.Server> {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
     srv.once('error', reject);
     srv.listen(port, host, () => resolve(srv));
-  });
-}
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.once('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
-      const port = (srv.address() as net.AddressInfo).port;
-      srv.close(() => resolve(port));
-    });
   });
 }
 function closeServer(srv: net.Server): Promise<void> {

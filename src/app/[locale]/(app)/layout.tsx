@@ -15,6 +15,7 @@ import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-sto
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
 import { can, asRole } from '@/lib/rbac';
+import { NG_PLAN_VIEW_ACTION } from '@/lib/billing/nexagrant/access';
 import { hiddenNavKeysFor } from '@/lib/roles/nav-permissions';
 import { listModuleNav, requestSession, type ModuleNavState } from '@/lib/modules/access';
 import { logger } from '@/lib/logger';
@@ -83,7 +84,11 @@ export default async function AppLayout({
   // FB KAMU B4 (TASK-MULRRNIHVZM1Z): the agency co-brand, only for a tenant an
   // agency brought in. Unlinked tenants — and the agency itself — get null.
   const tenantId = tenantScopeOf(session)?.tenantId;
-  const cobrand = tenantId ? toShellCoBrand(await getLinkedAgencyCoBrand(tenantId)) : null;
+  // NG-248 (K-584216): the door is the `view_tenant_branding` permission, read in rbac.ts.
+  // A guest partner gets no co-brand: the name and logo never reach its shell or its RSC payload.
+  const cobrand = tenantId && can(asRole(roleName), 'view_tenant_branding')
+    ? toShellCoBrand(await getLinkedAgencyCoBrand(tenantId))
+    : null;
 
   const isPlatformAdmin = Boolean(
     session?.isPlatformAdmin ||
@@ -95,6 +100,8 @@ export default async function AppLayout({
 
   const canManageModules = can(asRole(roleName), 'manage_modules');
   const canManageUsers = can(asRole(roleName), 'manage_users');
+  // NG-11: the plan and trial link, decided by the same permission as the screen (access.ts).
+  const canViewNgPlan = can(asRole(roleName), NG_PLAN_VIEW_ACTION);
   const hiddenNavKeys = hiddenNavKeysFor(asRole(roleName));
   // What the sidebar, the opportunity tabs and the cross-links may offer. Same decision
   // as each page's `moduleGate`, read once here; the pages still gate themselves.
@@ -129,6 +136,7 @@ export default async function AppLayout({
         isPlatformAdmin={isPlatformAdmin}
         canManageModules={canManageModules}
         canManageUsers={canManageUsers}
+        canViewNgPlan={canViewNgPlan}
         hiddenNavKeys={hiddenNavKeys}
         workspaces={workspaces}
         cobrand={cobrand}
@@ -165,6 +173,7 @@ export default async function AppLayout({
               workspaces={workspaces}
               canManageModules={canManageModules}
               canManageUsers={canManageUsers}
+              canViewNgPlan={canViewNgPlan}
             hideApiKeys={hiddenNavKeys.includes('apiKeys')}
             />
           </div>

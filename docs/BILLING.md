@@ -436,3 +436,21 @@ Migration: `prisma/migrations/retire-eur-plan-ladder.sql`
 | `ADDON-USD-1` | Eklenti kataloğu EUR ve eski plan adlarını taşıyor (§1.1) |
 | `BETA-USD-1` | E11 kohortunun GA'da hangi USD planına geçeceği belirsiz (§8) |
 | `PLAN-DEFAULT-1` | ~~Modül ayarları sayfası, aboneliği olmayan kiracıya orta planı (`pro`) varsayıyor~~ — **kapandı (TASK-MUMH6W5I1W9WC, 29.09.2026):** sayfa ve eylem planı/modülleri `getEntitlements` ile okuyor (`settings/modules/plan-view.ts`); aboneliksiz kiracı `free` (Discover) görür |
+
+## 10. NexaGrant planları (NG-57)
+
+NexaGrant'ın kendi plan kataloğu Fabrika merdiveninden (§1) ayrıdır (K-584182 = A). Tablolar ve deneme akışı için bkz. `docs/DATA_MODEL.md` §33; matrisin tek yazıldığı yer `prisma/seed-data/nexagrant-catalog.ts`.
+
+| Plan | id | Satılır mı | Kapsam (S1) |
+|---|---|---|---|
+| Ücretsiz Kontrol | `ng-free` | hayır (fallback) | kurum profili; uygunluk kontrolü ayda 3; 1 koltuk* |
+| Temel | `ng-basic` | evet | + çağrı arama, sınırsız uygunluk, TRL, başvur/vazgeç kararı, bülten; 2 koltuk |
+| Profesyonel | `ng-pro` | evet | + partner arama, outreach, benzer projeler; 5 koltuk; YZ yazım ayda 50 |
+| Kurumsal | `ng-enterprise` | hayır (S2, ön kayıt) | Profesyonel kapsamı; sınırsız koltuk; YZ ayda 300 |
+
+\* Ücretsiz Kontrol'ün koltuk sayısı 06'da yazmıyor; NG-57'de 1 seçildi (açık nokta).
+
+- **Deneme:** 14 gün Profesyonel; kurum tipi `MUNICIPALITY` ise 30 gün. Kart istenmez. Bitince Ücretsiz Kontrol'e düşer (K-584180 = A).
+- **Fiyat:** Hücreler TRY ve EUR, yıllık ve aylık olarak açıldı (K-584156 = A). **Tutar yok:** NG-57 kartı tutar üretmiyor, tutarlar mali müşavir onayını bekliyor. Tutarı NULL olan hücre satın alınamaz.
+- **Kararlaştırılmayanlar:** Para birimi seçim kuralı (NG-244 §3) ve TL ödeme sağlayıcısı (§3.3). Ödeme entegrasyonu NG-57 kapsamında değil.
+- **Başarı primi** bu katalogda yer almaz ve uygun maliyet olarak modellenmez (§5).

@@ -80,6 +80,8 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set([
   // FO-186: M17's assessment grids (Annex 7 as data). Reference rows written by
   // prisma/seed-interreg-rubrics.ts as owner; the app role only reads them.
   'InterregRubric', 'InterregRubricCriterion',
+  // NG-57: the NexaGrant plan catalogue (prisma/migrations/add-nexagrant-plan-catalog.sql).
+  'NgPlan', 'NgPlanFeature', 'NgPlanPrice', 'NgTrialPolicy',
 ]);
 
 /**
