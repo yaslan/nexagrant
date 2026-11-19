@@ -4,6 +4,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { freePort } from './helpers/free-port';
+import { killPidFromFile } from './helpers/kill-owned-pid';
 
 const SUPERVISOR = path.resolve('tests/e2e/support/server-supervisor.mjs');
 const SIGNAL_LOG = path.resolve('tests/e2e/support/server-signal-log.mjs');
@@ -34,16 +36,6 @@ function diagEvents(): Array<Record<string, unknown>> {
 }
 
 const findEvent = (name: string) => () => diagEvents().find((event) => event.event === name);
-
-function freePort(): Promise<number> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.listen(0, () => {
-      const { port } = server.address() as net.AddressInfo;
-      server.close(() => resolve(port));
-    });
-  });
-}
 
 function track(child: ChildProcess) {
   started.push(child);
@@ -98,6 +90,15 @@ afterEach(() => {
   for (const child of started.splice(0)) {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
   }
+  // NG-260 (NG-255 root cause 2): the supervisor's server is its child, not ours, so the loop above
+  // does not reach it. Killing only the supervisor left the `node -e` server running with ppid 1,
+  // listening on `*:port`: two per run of this file, 262 counted on one machine. Every server here
+  // writes its pid to <dir>/server-pid once it listens (serverScript), so that file names it.
+  // The server stays in this process group (no `detached`), so a wrapper that kills the group
+  // still reaches it when the run itself is killed before afterEach.
+  // Review B1: the server may have exited already and its pid gone to another process; the
+  // helper kills only a process whose command line names this test's own <dir>/server-pid.
+  killPidFromFile(path.join(dir, 'server-pid'));
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
