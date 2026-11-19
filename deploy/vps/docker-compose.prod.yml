@@ -1,29 +1,56 @@
-# Canlı yığın — Hostinger KVM 2 (Frankfurt, Ubuntu 24.04, 2 vCPU / 8 GB / 100 GB).
-# Kart: FO-244 (TASK-MVUMVNK4FCPHD). Adım adım kurulum ve geri alma: deploy/vps/RUNBOOK.md.
+# Canlı yığın — Hostinger KVM 4 (191.96.1.252, Ubuntu 24.04, 4 vCPU / 16 GB / 200 GB, CloudPanel).
+# Kart: NG-261 (TASK-MWNJMJSSN63YW). Adım adım kurulum ve geri alma: deploy/vps/RUNBOOK.md.
 #
-# Dışarıya açık tek port Caddy'nin 80/443'üdür. web ve worker yalnız iç ağda konuşur;
-# postgres yalnız 127.0.0.1'e bağlıdır (sunucu üzerindeki yedek ve ops betikleri için).
+# Bu makinede 80/443 CloudPanel'in nginx'indedir ve başka siteler de yayındadır. Bu dosyanın
+# Caddy'si varsayılan olarak KALKMAZ (profile "caddy"): yalnız CloudPanel'siz bir makinede kullanılır.
+# NexaGrant, CloudPanel'de bir Reverse Proxy sitesi olarak `127.0.0.1:${WEB_HOST_PORT:-3000}`
+# adresindeki `web` konteynerine bağlanır (RUNBOOK §5, CloudPanel bölümü).
+#
+# Veritabanı: DB-1 kararı gereği Supabase (EU). Bu yığında postgres varsayılan olarak kalkmaz
+# (profile "db"); web ve worker DATABASE_URL / JOBS_DATABASE_URL ile Supabase'e bağlanır.
+#
+# Dışarıya açık port YOK: web yalnız 127.0.0.1'e yayınlanır; clamav ve worker yalnız compose iç ağında.
 # Redis yok: REDIS_URL hiçbir yerde okunmuyor (FO-243).
-# Python CORDIS servisi bu dosyada YOK: workers/cordis için Dockerfile ve giriş
-# noktası tutarsız (package.json `worker:dev` app:app diyor, dosya main.py). Ayrı kart.
+# Python CORDIS servisi bu dosyada YOK (RUNBOOK §10).
 #
-# Sırlar bu dosyada YOK. İki ayrı dosya (ikisi de git'e girmez, izin 600):
-#   deploy/vps/.env.prod  → uygulama sırları. YALNIZ web ve worker alır.
-#   deploy/vps/.env.db    → süper kullanıcı parolası ve sahip rol (BYPASSRLS) URL'i. YALNIZ postgres alır.
-# Sahip URL'i web/worker konteynerlerinin ortamına HİÇ girmez (FO-301 Y-5): ops.sh onu yalnız tek
-# seferlik `run` konteynerine, host ortamından `-e` ile geçirir.
+# Sırlar bu dosyada YOK. Dosyalar (git'e girmez, izin 600):
+#   deploy/vps/.env.prod  → uygulama sırları. web ve worker alır.
+#   deploy/vps/.env.db    → yalnız profile "db" açıkken postgres ve ops.sh için.
+#
 # Kullanım (depo kökünden). Revision etiketi zorunlu (FO-308 R-1), yoksa ops.sh imajı reddeder:
 #   GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml build web worker
-#   docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build
-#
-# Bellek sınırları 8 GB'a göre: postgres 2g + web 1536m + worker 1g + caddy 128m
-# = ~4.7 GB; kalan ≈3.3 GB işletim sistemi ve Postgres sayfa önbelleği için (FO-250, Y-2).
-# web'in Node heap'i 1024 MB ile sınırlı (NODE_OPTIONS): aşımda kernel öldürmesi yerine JS OOM hatası.
-# CORDIS içe aktarımı bu yığında koşmaz (tek seferlik konteyner, RUNBOOK §5).
+#   docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build clamav web
+#   # clamd healthy olduktan sonra (RUNBOOK §5 sırası):
+#   docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
 name: fonbridge
 
 services:
+  # Dosya tarayıcısı (NG-239). İmza veritabanı ilk açılışta indirilir; sağlık kontrolü bitene kadar
+  # sağlıksız. AlertExceedsMax zorunlu: yoksa sınırı aşan arşive clamd OK der (NG-239 Ö-1).
+  clamav:
+    image: clamav/clamav:stable
+    container_name: fonbridge-clamav
+    restart: unless-stopped
+    environment:
+      CLAMD_CONF_AlertExceedsMax: "yes"
+    # Port yayını YOK: INSTREAM kimlik doğrulamasız ve şifresiz; yalnız web/worker erişir (CLAMD_HOST=clamav).
+    volumes:
+      - clamavdb:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    mem_limit: 3g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
   caddy:
+    profiles: ["caddy"]
     image: caddy:2-alpine
     container_name: fonbridge-caddy
     restart: unless-stopped
@@ -61,14 +88,12 @@ services:
       - PORT=3000
       - HOSTNAME=0.0.0.0
       - NODE_OPTIONS=--max-old-space-size=1024
-    expose:
-      - "3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    # Uygulamanın kendi sayfa kökü: /api/health yok (kontrol edildi). Sayfa 200 dönene dek sağlıksız sayılır.
+    # Yalnız loopback. CloudPanel nginx'i (ya da yerel prova nginx'i) buraya vekillik eder. 0.0.0.0 YOK.
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
+    # GET /api/health: süreç ayakta ve istek karşılıyor (src/app/api/health/route.ts). Veritabanına bakmaz.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 6
@@ -95,8 +120,9 @@ services:
     env_file: ./.env.prod
     environment:
       - NODE_ENV=production
+    # Yayın sırası (NG-239 Ö-4): önce clamd healthy, sonra worker (migrasyon ve süpürme worker'dan sonra).
     depends_on:
-      postgres:
+      clamav:
         condition: service_healthy
     mem_limit: 1g
     logging:
@@ -105,7 +131,9 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  # Yerel prova ya da DB-1 öncesi geçici veritabanı için. Canlıda (Supabase) profile "db" açılmaz.
   postgres:
+    profiles: ["db"]
     image: pgvector/pgvector:pg16
     container_name: fonbridge-postgres
     restart: unless-stopped
@@ -113,7 +141,7 @@ services:
     environment:
       POSTGRES_USER: fabrika
       POSTGRES_DB: fabrika
-    # Yalnız loopback: dış ağdan erişilmez; sunucu üzerindeki yedek ve ops betikleri 127.0.0.1:5432'yi kullanır.
+    # Yalnız loopback: dış ağdan erişilmez.
     ports:
       - "127.0.0.1:${PG_HOST_PORT:-5432}:5432"
     volumes:
@@ -135,6 +163,8 @@ services:
 volumes:
   pgdata:
     name: fonbridge_pgdata
+  clamavdb:
+    name: fonbridge_clamavdb
   caddy_data:
     name: fonbridge_caddy_data
   caddy_config:

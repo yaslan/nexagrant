@@ -1,8 +1,13 @@
-# VPS runbook — Hostinger KVM 2 (FO-244)
+# VPS runbook — Hostinger KVM 4 (NG-261; FO-244 kartının yerini alır)
 
-Kapsam: Hostinger **KVM 2**, Frankfurt, Ubuntu 24.04, 2 vCPU / 8 GB RAM / 100 GB disk.
-Üzerinde Docker ile: Caddy (80/443), web, worker, Postgres 16 + pgvector. Redis yok.
-Alan adı: **nexagrant.com** (FO-233).
+Kapsam: Hostinger **KVM 4** (`srv2164656`, IPv4 **191.96.1.252**, IPv6 2a02:4780:d:a4bb::1), 4 vCPU / 16 GB / 200 GB,
+Ubuntu 24.04 with **CloudPanel**. Patron bu makineyi aldı (15.11.2026); eski "KVM 2 satın al" planı düştü.
+Bu makinede **CloudPanel nginx'i 80/443'ü tutar** ve 16 başka site yayındadır. NexaGrant bunların yanında
+`nexagrant.com` altında çalışır; başka sitelere, CloudPanel'in kendisine ve onların vhost'larına dokunulmaz.
+
+Docker ile: web, worker, clamav (ClamAV, NG-239). Postgres: canlıda **Supabase** (DB-1); yerel prova için profile `db`.
+Caddy: yalnız CloudPanel'siz makine için, profile `caddy` (varsayılan kalkmaz). Redis yok.
+Alan adı: **nexagrant.com** (FO-233). Hostinger Cloud hesabı iptal edilmez (üzerinde başka siteler var).
 
 > **Bu dosya bir hazırlık belgesidir, kurulum değildir.** Sunucu oluşturulmadı, Hostinger'da hiçbir
 > şey değiştirilmedi, DNS'e dokunulmadı. Aşağıdaki her "yap" adımı **patron onayıyla** ve
@@ -13,7 +18,7 @@ Dosyalar (hepsi `deploy/vps/` altında):
 
 | Dosya | İş |
 |---|---|
-| `docker-compose.prod.yml` | canlı yığın (web, worker, postgres, caddy) |
+| `docker-compose.prod.yml` | canlı yığın (web, worker, clamav; postgres profile `db`, caddy profile `caddy`) |
 | `Caddyfile` | nexagrant.com TLS + www → kök 301 |
 | `.env.prod.example` | değişken ADLARI; değer yok. Sunucuda `.env.prod` olarak kopyalanır |
 | `.env.db.example` | veritabanı sır ADLARI (`POSTGRES_PASSWORD`, `OWNER_DATABASE_URL`); değer yok. Sunucuda `.env.db` olarak kopyalanır, yalnız postgres ve `ops.sh` okur |
@@ -26,9 +31,12 @@ Dosyalar (hepsi `deploy/vps/` altında):
 
 ## 0. Önce bilinmesi gerekenler
 
-- **Sağlık kontrolü:** `/api/health` diye bir uç **yok** (repoda route bulunmadı). Compose sağlık
-  kontrolü `GET /` üzerinden yapılır. Ayrı bir health endpoint'i eklemek uygulama kodu değişikliğidir,
-  ayrı bir karttır.
+- **Sağlık kontrolü:** `GET /api/health` vardır (`src/app/api/health/route.ts`, veritabanına ve ortam
+  değerlerine bakmaz). Compose sağlık kontrolü ve izleme bu uçtan yapılır.
+- **Dosya tarayıcısı:** `clamav` servisi `AlertExceedsMax yes` ile koşar. Bu ayar yoksa sınırı aşan arşive
+  clamd `OK` der ve dosya taranmadan indirilir (NG-239 Ö-1). Doğrulama: §5 adım 2a.
+- **Tarayıcı kodu dev'de değil (NG-261 notu):** `CLAMD_HOST` okuyan kod (`src/lib/clamav.ts`, NG-239) şu an
+  `task/ng-239` dalında, `origin/dev`'de yok. Bu yığın o kod birleşene kadar canlıya alınmaz (kart Adım 10 engeli).
 - **Yönetilen veritabanı yok:** Postgres bu sunucuda, konteynerde. Sağlayıcının otomatik yedeği yok;
   yedek §8'deki betikle alınır.
 - **DB bağlantısı TLS'siz ama yalnız iç ağda:** Postgres 127.0.0.1'e yayınlı, web/worker aynı compose
@@ -184,24 +192,56 @@ Notlar:
 
 Sıra §3.3 (ADR-0008 §9.2) ile aynıdır: web önce, worker `JOBS_CRON_ENABLED=false` ile, sonra `true`.
 
+**Yayın sırası (NG-239 Ö-4, değiştirilemez):** clamd healthy → web → worker (cron kapalı) → migrasyon
+(`add-evidence-scan-status`, `ops.sh`) → süpürme → cron açık → CloudPanel vekili (§5.1, DNS'ten sonra).
+
 ```bash
 cd /opt/fonbridge
-# 1. Web (imajı derler)
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --build web
-docker compose -f deploy/vps/docker-compose.prod.yml ps        # web: healthy (GET / 200)
+# 1. Tarayıcı (imza indirmesi birkaç dakika; healthy olana kadar bekle)
+GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml up -d --build clamav
+docker compose -f deploy/vps/docker-compose.prod.yml ps clamav     # clamav: healthy
+# 2a. Doğrulama: sınır ayarı gerçekten yüklü mü (ham çıktıyı rapora koy; sır yok)
+docker exec fonbridge-clamav grep -i '^AlertExceedsMax' /etc/clamav/clamd.conf   # beklenen: AlertExceedsMax yes
 
-# 2. Worker, cron kapalı (şemayı kurar, job-queue:cron-disabled uyarısı beklenir)
+# 2. Web (imajı derler). Sağlık: GET /api/health 200
+docker compose -f deploy/vps/docker-compose.prod.yml up -d --build web
+docker compose -f deploy/vps/docker-compose.prod.yml ps        # web: healthy
+curl -s http://127.0.0.1:3000/api/health                       # {"status":"ok"}
+
+# 3. Worker, cron kapalı (şemayı kurar, job-queue:cron-disabled uyarısı beklenir)
 docker compose -f deploy/vps/docker-compose.prod.yml up -d --build worker
 docker logs fonbridge-worker --tail 50
 
-# 3. Cron'u aç (.env.prod: JOBS_CRON_ENABLED=true), worker'ı yeniden başlat
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --force-recreate worker
+# 4. Migrasyon ve süpürme (§6 adım 4-5, ops.sh; R-1 ön kontrolü dahil)
 
-# 4. Caddy — yalnız §3'teki DNS kontrolü geçtikten sonra
-docker compose -f deploy/vps/docker-compose.prod.yml up -d caddy
-curl -sI https://nexagrant.com | head -n 5
-curl -sI http://www.nexagrant.com | head -n 3         # 301 → https://nexagrant.com
+# 5. Cron'u aç (.env.prod: JOBS_CRON_ENABLED=true), worker'ı yeniden başlat
+docker compose -f deploy/vps/docker-compose.prod.yml up -d --force-recreate worker
 ```
+
+Veritabanı (postgres) bu yığında kalkmaz: canlıda Supabase (DB-1). `profile db` yalnız yerel prova içindir.
+Caddy kalkmaz (`--profile caddy` gerekmez; CloudPanel vekil eder). Bkz. §5.1.
+
+### 5.1 CloudPanel Reverse Proxy (nexagrant.com)
+
+CloudPanel nginx'i 80/443'ü ve TLS'i tutar; NexaGrant bir Reverse Proxy sitesi olarak `web`e vekillik eder.
+Caddy 80/443'e BAĞLANMAZ.
+
+1. CloudPanel → Sites → **Add Site** → Reverse Proxy; domain `nexagrant.com` (+ `www.nexagrant.com` alias).
+   Reverse proxy hedefi: `http://127.0.0.1:3000` (`WEB_HOST_PORT` değiştiyse o port).
+2. SSL: CloudPanel → Let's Encrypt. **Önkoşul:** §3'teki `dig` kontrolü kökün `191.96.1.252`'yi gösterdiğini
+   onaylamalı; yoksa sertifika denemesi Let's Encrypt hız sınırını yer.
+3. Başlıklar (vhost): `Host $host`, `X-Forwarded-Proto $scheme`, `X-Forwarded-For $proxy_add_x_forwarded_for`
+   (`TRUSTED_PROXY_HOPS=1` bu zincire göre; yerel prova ölçümü: son giriş istemci). `X-Real-IP` kullanılmaz.
+4. `client_max_body_size`: uygulamanın kanıt dosyası üst sınırıyla uyumlu olmalı (uygulama sınırından büyük
+   yapma; küçükse yükleme 413 döner). Değer, uygulama sınırından alınır ve rapora yazılır.
+5. `www` → kök tek 301: CloudPanel `www.nexagrant.com` için ayrı bir 301 site ya da vhost yönlendirmesi;
+   iki sıçrama olmasın. Doğrulama: `curl -sI http://www.nexagrant.com` → `301` → `https://nexagrant.com`.
+6. **HSTS tek başlık:** HSTS'i YALNIZ CloudPanel gönderir (uygulama ve Caddy eklemez; NG-124). Patron kararı bekliyor
+   (RELEASE_CHECKLIST §5.4); karar gelene dek kapalı.
+7. Yan etki kontrolü: öteki 16 sitenin vhost'larına, CloudPanel ayarlarına ve `default.conf`'a dokunulmaz. Değişiklik
+   sonrası `nginx -t` ve öteki sitelerin HTTP durumu önce/sonra karşılaştırılır.
+
+Geri alma (vekil): CloudPanel'de NexaGrant Reverse Proxy sitesini sil; DNS kökü geri al (§7). Öteki siteler etkilenmez.
 
 - Caddy'de `Strict-Transport-Security` **kapalı** (Caddyfile'da satır yorumda). Patron kararıyla açılır.
 - **CORDIS içe aktarımı panelden yapılmaz** (`src/app/[locale]/admin/cordis/actions.ts` web sürecinde
