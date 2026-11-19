@@ -124,7 +124,7 @@ rolündedir; ana bağlantının `fabrika_app`'e çevrilmesi ayrı bir iştir ve
 2. `requestAccountDeletion` yalnızca **işaretler**: `User.deletionRequestedAt` ve `User.deletedAt` = şimdi. Hiçbir satır silinmez; üyelikler durur, böylece talep geri alınabilir.
 3. Kullanıcıya bilgilendirme e-postası gider (SMTP sunucumuz `mail.fonbridge.com` — Vulut cPanel e-posta hizmeti, Seçenek A, patron 29.09.2026; gönderici `info@fonbridge.com`, barındırma Vulut, Türkiye; `src/lib/email/mailer.ts` — 29.09.2026'dan önce Resend; gönderim hatası talebi bloke etmez).
 4. Kullanıcı 30 gün içinde aynı ekrandan `cancelAccountDeletion` ile dönebilir.
-5. `users-scheduled-deletion` Inngest işi her gün 03:00 UTC'de süresi dolanları kalıcı siler. Sıra: `AiUsageLog.userId = NULL` → `Effort` sil → `User` sil (cascade: `Account`, `Session`, `Membership`, talep edilen `ApprovalRequest`). R2'ye dokunulmaz: depodaki her nesne kiracınındır, kişiye bağlı önek yoktur (`docs/legal/processing-register.md` §15, TASK-MUPL2D9B8QWAB).
+5. `users-scheduled-deletion` graphile-worker işi (`src/lib/jobs/tasks/users-scheduled-deletion.ts`) her gün 03:00 UTC'de süresi dolanları kalıcı siler. Sıra: `AiUsageLog.userId = NULL` → `Effort` sil → `User` sil (cascade: `Account`, `Session`, `Membership`, talep edilen `ApprovalRequest`). R2'ye dokunulmaz: depodaki her nesne kiracınındır, kişiye bağlı önek yoktur (`docs/legal/processing-register.md` §15, TASK-MUPL2D9B8QWAB).
 
 Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete yapmaz.
 

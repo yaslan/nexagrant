@@ -92,7 +92,7 @@ G0 puanlama ağırlıkları (100): uyum 30, taban oran 15, koordinatör geçmiş
 - **Next.js 15 (App Router) + TypeScript (strict)**, React Server Components; UI: Tailwind + shadcn/ui; formlar: react-hook-form + zod.
 - **PostgreSQL 16** (Neon veya Supabase) + **Prisma** ORM + **pgvector**; RLS politikaları `prisma/rls.sql`.
 - **Auth:** Auth.js (NextAuth v5) — e-posta/şifre + Google + Microsoft; kurumsal SSO (SAML) faz 2.
-- **İşler/cron:** Inngest (veya BullMQ + Redis) — K1 günlük, K2 aylık, uyarı e-postaları, Stripe webhook'ları.
+- **İşler/cron:** graphile-worker (Postgres üstünde, ayrı süreç `pnpm jobs:worker`; ADR-0008, Inngest kaldırıldı) — K1 günlük, K2 aylık tetik, uyarı e-postaları ve temizlik işleri; takvim `src/lib/jobs/schedule.ts`. Stripe webhook'ları iş değil, Route Handler'dır (`src/app/api/webhooks`).
 - **Veri işleme (Python worker):** `workers/` altında Python 3.12 + DuckDB + pandas: CORDIS CSV → Parquet → Postgres; graf metrikleri (networkx). Node'dan HTTP ile tetiklenir.
 - **YZ:** `@anthropic-ai/sdk` varsayılan, OpenAI-uyumlu adaptör; embedding: `text-embedding-3-large` ya da Voyage; RAG: pgvector.
 - **E-posta:** Resend; **dosya:** S3 uyumlu (Cloudflare R2); **PDF:** `@react-pdf/renderer`; **DOCX:** `docx`.

@@ -10,9 +10,9 @@
                    │  src/core/k1..k6 · src/modules/m1..m11      │          ▲
                    └───────┬───────────────┬─────────────────────┘          │
                            │               │                                │
-                    Inngest (jobs)     Python worker (Fly.io)        R2 (dosyalar, ham veri)
-                    K1 günlük, uyarı,  CORDIS CSV→Parquet→DB,        SMTP (e-posta, kendi)
-                    Stripe webhook     graf metrikleri, DuckDB       Stripe / iyzico
+                    graphile-worker (jobs)  Python worker (Fly.io)    R2 (dosyalar, ham veri)
+                    K1 günlük, uyarı,       CORDIS CSV→Parquet→DB,    SMTP (e-posta, kendi)
+                    aylık/haftalık işler    graf metrikleri, DuckDB   Stripe / iyzico
                                                                       Anthropic / OpenAI
 ```
 
@@ -21,7 +21,7 @@
 - **Rota grupları:** `[locale]/(public)` herkese açık sayfaların hepsi (ana sayfa, yasal metinler, fiyatlandırma, çağrılar, blog, giriş/kayıt, davet, partner portalı); ortak `PublicNavbar` + `PublicFooter` yalnız bu grubun `layout.tsx`'inde, sayfalar kendileri eklemez (FO-68). 404 (`src/app/not-found.tsx`) aynı çifti kendisi çizer. `(app)/[workspaceSlug]/...` kiracı uygulaması; `admin` platform yönetimi (`platform_admin`) — ikisinin kendi kabuğu var.
 - **Sunucu tarafı:** Server Components veri okur; yazma Server Actions (zod ile doğrulanmış) ya da `/api/v1/*` Route Handlers (harici API lisansı için de aynı katman).
 - **Alan katmanı:** `src/core/*` (K1–K6) ve `src/modules/*` (kayıtlı modüller: `src/lib/modules/registry.ts`) saf TypeScript; Prisma istemcisi `withTenant()` ile sarılı.
-- **Olay veri yolu:** `src/core/events` — tipli olaylar (`opportunity.created`, `gate.passed`, `module.state.changed`, `ai.used`, `esr.uploaded`). Modüller birbirini import etmez; olay dinler. Inngest bu olayları dayanıklı işlere de bağlar.
+- **Olay veri yolu:** `src/core/events` — tipli olaylar (`opportunity.created`, `gate.passed`, `module.state.changed`, `ai.used`, `esr.uploaded`). Modüller birbirini import etmez; olay dinler. Zamanlanmış ve elle kuyruğa eklenen işler ayrıdır: graphile-worker (`src/lib/jobs`, ADR-0008) ayrı bir süreçte koşar; olay veri yolu işlere bağlı değildir.
 
 ## 3. Modül sistemi
 
@@ -63,7 +63,8 @@ export const manifest: ModuleManifest = {
 
 ## 5. K2 — CORDIS ve M1
 
-- Aylık Inngest cron → Python worker `/jobs/cordis?month=YYYY-MM`: HE ve H2020 CSV zip indir (`cordis-HORIZONprojects-csv.zip` ve `cordis-h2020projects-csv.zip`; ad değişirse `config`), DuckDB'de `project`, `organization`, `topics`, `euroSciVoc` yükle, temizle, Parquet'e yaz, Postgres'e upsert (`Project`, `Organization`, `Participation`).
+- **Bugünkü durum (kodla doğrulandı):** aylık graphile-worker cron'u (`k2-monthly-cordis`, `src/lib/jobs/tasks/k2-monthly-cordis.ts`) yalnız Python worker'ın `POST /jobs/cordis?month=YYYY-MM` ucunu çağırır. Worker'da gerçek bir CORDIS kaynağı (indirme kodu) yoktur: `CORDIS_WORKER_ALLOW_MOCK` kapalıyken `PipelineError` fırlatır, açıkken örnek veri yazar (`workers/cordis/main.py:401-405`). Gerçek CORDIS ZIP'i yalnız `runCordisImport` (`src/lib/k2-cordis/importer.ts`) ile elle içe aktarılır (`scripts/cordis-import.ts`, yönetici eylemi, `POST /api/admin/cordis/import`). Aylık işi `runCordisImport`'a bağlama işi NG-225'tir; yapılmadı.
+- **Hedef tasarım, bugün değil:** aylık iş Python worker'ı çağırır; worker HE ve H2020 CSV zip'ini indirir (`cordis-HORIZONprojects-csv.zip` ve `cordis-h2020projects-csv.zip`; ad değişirse `config`), DuckDB'de `project`, `organization`, `topics`, `euroSciVoc` yükler, temizler, Parquet'e yazar, Postgres'e upsert eder (`Project`, `Organization`, `Participation`). Bu zincir bugün çalışmaz.
 - **Türev metrikler** (worker, networkx): kurum başına `coordinatorCount`, `participationCount`, `ecContributionSum`, konu öneki başına aynı sayılar (`OrgTopicStat`), iş birliği çiftleri (`Collab` — proje sayısı), derece ve eigenvector merkeziliği (`Organization.centrality`).
 - **M1 ortak kartı** = `Organization` + `OrgTopicStat` + kiracıya özel `PartnerNote`/`Relationship` (M4). CORDIS verisi paylaşımlı (tenant-agnostik), notlar kiracıya özel.
 - Sorgu hedefi: "konu öneki için ilk 20 koordinatör" < 2 s → `OrgTopicStat(topicPrefix, coordinatorCount)` indeksi.
