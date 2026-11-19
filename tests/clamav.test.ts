@@ -52,6 +52,18 @@ describe('parseClamdReply', () => {
     ['', { verdict: 'error', reason: 'bad_reply', detail: '' }],
     ['stream: OKAY', { verdict: 'error', reason: 'bad_reply', detail: 'OKAY' }],
     ['FOUND', { verdict: 'error', reason: 'bad_reply', detail: 'FOUND' }],
+    // NG-239 Ö-1: under `AlertExceedsMax yes` a file clamd could not read to the end is not clean,
+    // and not a malware hit either: an error (kept, never downloaded).
+    [
+      'stream: Heuristics.Limits.Exceeded.MaxFileSize FOUND\0',
+      { verdict: 'error', reason: 'limits_exceeded', detail: 'Heuristics.Limits.Exceeded.MaxFileSize' },
+    ],
+    [
+      'stream: Heuristics.Limits.Exceeded.MaxRecursion FOUND',
+      { verdict: 'error', reason: 'limits_exceeded', detail: 'Heuristics.Limits.Exceeded.MaxRecursion' },
+    ],
+    // Only the `Heuristics.Limits.Exceeded` family is a limit; any other name stays a hit.
+    ['stream: Heuristics.Limits.Phish FOUND', { verdict: 'infected', signature: 'Heuristics.Limits.Phish' }],
   ])('%j', (raw, expected) => {
     expect(parseClamdReply(raw)).toEqual(expected);
   });
