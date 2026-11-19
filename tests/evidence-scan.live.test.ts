@@ -3,7 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
-import { DOCX_MIME, cleanDocx, eicarDocx } from './helpers/eicar';
+import { DOCX_MIME, cleanDocx, eicarDocx, overLimitDocx } from './helpers/eicar';
 
 /**
  * NG-239 — virus scan of uploaded evidence (§18.3, K-584154 = A).
@@ -205,6 +205,14 @@ async function queuedScanKeys(evidenceId: string): Promise<string[]> {
   return rows.map((r) => r.key);
 }
 
+/** The scan jobs of one file with the columns that tell a live job from a failed-for-good one. */
+async function scanJobs(evidenceId: string) {
+  return admin!.$queryRawUnsafe<{ id: string; key: string; attempts: number; last_error: string | null }[]>(
+    `select id::text as id, key, attempts, last_error from graphile_worker.jobs where key like $1 order by key`,
+    `evidence-scan:${evidenceId}:%`
+  );
+}
+
 async function dropQueuedScans(evidenceId: string) {
   await admin!
     .$queryRawUnsafe(`select graphile_worker.remove_job(key)::text from graphile_worker.jobs where key like $1`, `evidence-scan:${evidenceId}:%`)
@@ -294,6 +302,25 @@ describe.skipIf(!CLAMD_HOST)(`NG-239 against a real clamd (${CLAMD_HOST || 'not 
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_INFECTED' });
   });
+  // NG-239 Ö-1: clamd must run with `AlertExceedsMax yes` (docker-compose.yml). A file it cannot
+  // read to the end (here 110 MiB unpacked, past MaxFileSize) is not CLEAN and does not download.
+  test('a .docx that unpacks past clamd\'s limits is ERROR (limits_exceeded), kept, and D1 answers 409', async () => {
+    const id = await uploadPresigned('over-limit.docx', overLimitDocx());
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    const out = await scanner.scanEvidence({ tenantId: t.tenant, evidenceId: id, attempt: 0 }, { clamd, enqueue: async () => true });
+    console.log(`[clamd limits] over-limit.docx: ${JSON.stringify(out)}`);
+    expect(out).toMatchObject({ status: 'ERROR', reason: expect.stringMatching(/^limits_exceeded: Heuristics\.Limits\.Exceeded\./) });
+    const row = await rowOf(id);
+    expect(row.scanStatus).toBe('ERROR');
+    expect(row.scanSignature).toBeNull();
+    expect(await storage.statObject(key), 'not malware: the object is kept').not.toBeNull();
+
+    const res = await callDownload(id);
+    console.log(`[clamd limits] D1 status ${res.status}`);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_ERROR' });
+  });
 });
 
 describe('NG-239: clamd down or silent → ERROR, no download, a retry', () => {
@@ -381,6 +408,55 @@ describe('NG-239: clamd down or silent → ERROR, no download, a retry', () => {
     await scanner.sweepUnscannedEvidence({ tenantIds: [t.tenant], now: new Date(updatedAt.getTime() + 10 * 60_000) });
     expect(await queuedScanKeys(id)).toEqual([`evidence-scan:${id}:0`]);
     await dropQueuedScans(id);
+  });
+
+  // NG-239 Ö-2: a scan job that failed for good (the queue used every attempt, e.g. the database
+  // was away) kept its key, and `unsafe_dedupe` let the sweep "queue" into it forever.
+  test('the sweep replaces a scan job that failed for good, and leaves a live one alone', async () => {
+    const id = await uploadPresigned('dead-job.docx', cleanDocx('ölü iş'));
+    const jobKey = `evidence-scan:${id}:0`;
+    expect(await queuedScanKeys(id), 'the upload queued attempt 0').toEqual([jobKey]);
+    await admin!.$executeRawUnsafe(
+      `update graphile_worker._private_jobs set attempts = max_attempts, last_error = 'NG-239 test: failed for good' where key = $1`,
+      jobKey
+    );
+    const updatedAt = (await admin!.evidence.findUniqueOrThrow({ where: { id }, select: { updatedAt: true } })).updatedAt;
+    const sweepAt = new Date(updatedAt.getTime() + scanner.EVIDENCE_SCAN_SWEEP_PENDING_AFTER_MS + 1);
+
+    const r = await scanner.sweepUnscannedEvidence({ tenantIds: [t.tenant], now: sweepAt });
+    expect(r.tenantsFailed).toBe(0);
+    const after = await scanJobs(id);
+    expect(after, 'one live job under the same key').toHaveLength(1);
+    expect(after[0]).toMatchObject({ key: jobKey, attempts: 0, last_error: null });
+
+    // Live (queued, not failed): a second sweep leaves it as it is (same job id).
+    await scanner.sweepUnscannedEvidence({ tenantIds: [t.tenant], now: sweepAt });
+    expect(await scanJobs(id)).toEqual(after);
+    await dropQueuedScans(id);
+  });
+
+  // NG-239 Ö-4: the sweep read one page (100 rows) per tenant per tick; a tenant with more
+  // PENDING files than that waited 15 minutes per hundred.
+  test('the sweep queues every due file of a tenant in one tick, past one page', async () => {
+    const n = scanner.EVIDENCE_SCAN_SWEEP_PAGE + 5;
+    const ids = Array.from({ length: n }, (_, i) => `${RUN}-bulk-${String(i).padStart(4, '0')}`);
+    await admin!.evidence.createMany({
+      data: ids.map((id) => ({
+        id,
+        tenantId: t.tenant,
+        kind: 'certificate',
+        title: `${RUN} bulk`,
+        body: '',
+        category: 'CAT-03',
+        r2ObjectKey: `${t.tenant}/evidence/${id}.docx`,
+      })),
+    });
+    const enqueue = vi.fn(async () => true);
+    const r = await scanner.sweepUnscannedEvidence({ tenantIds: [t.tenant], now: new Date(Date.now() + 60 * 60_000), enqueue });
+    expect(r.tenantsFailed).toBe(0);
+    const swept = new Set(enqueue.mock.calls.map((c) => (c as unknown as [{ evidenceId: string }])[0].evidenceId));
+    for (const id of ids) expect(swept.has(id), id).toBe(true);
+    await admin!.evidence.deleteMany({ where: { tenantId: t.tenant, id: { in: ids } } });
   });
 });
 
