@@ -112,6 +112,14 @@ if [ -L node_modules ]; then
   fail "node_modules sembolik bağ ($(readlink node_modules)); gerçek kurulum gerekli: pnpm install --frozen-lockfile"
 fi
 
+# NG-260: e2e-server-supervisor.test.ts used to leave its `node -e` test servers behind (ppid 1, on
+# `*:port`); such a listener makes a port look free on 127.0.0.1 while 0.0.0.0/:: binds fail (NG-255).
+# A warning only, the gate goes on; the script never kills them (they may be another checkout's).
+orphans="$( { ps -eo ppid=,args= 2>/dev/null || true; } | awk '$1 == 1 && /fo385-/ && /server-pid/' | wc -l | tr -d ' ')"
+if [ "${orphans:-0}" -gt 0 ]; then
+  log "UYARI: $orphans öksüz fo385 süreci (supervisor + sunucu; ppid 1, komutta fo385-) var; port seçimini bozabilir. Listele: ps -eo pid=,ppid=,etime=,args= | awk '\$2 == 1 && /fo385-/'"
+fi
+
 container="fabrika-gate-$(date -u +%Y%m%d%H%M%S)-$$"
 # Not `fabrika`: tests/expert-prereg-retention.live.test.ts skips itself on a
 # database of that name (it takes it for the shared one; CLAUDE.md).
