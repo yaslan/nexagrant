@@ -68,3 +68,45 @@ describe('NG-57 billingStateView', () => {
     expect(JSON.parse(JSON.stringify(v))).toEqual(v);
   });
 });
+
+/**
+ * NG-250 — contract additions (additive, NG-57 crw2 §"NG-11 sunucu sözleşmesi"): who may buy
+ * (`canManageBilling`), what is used against each counted limit (`usage`), and a typed status.
+ */
+describe('NG-250 billingStateView additions', () => {
+  const plan = NG_PLANS.find((p) => p.id === 'ng-pro')!;
+  const state = {
+    tenantId: 't',
+    plan,
+    source: 'subscription' as const,
+    status: 'TRIALING' as const,
+    entitlement: entitlementFor('ng-pro', NG_PLAN_FEATURES),
+    trial: { kind: 'none' as const },
+  };
+  const usage = {
+    seats: { used: 2, limit: 5 },
+    aiWritingMonthly: { used: 7, limit: 50, periodStart: new Date('2026-10-31T21:00:00Z') },
+  };
+
+  it('canManageBilling follows can(role, manage_billing)', () => {
+    expect(billingStateView(state, { role: 'TENANT_OWNER', usage }).canManageBilling).toBe(true);
+    expect(billingStateView(state, { role: 'TENANT_ADMIN', usage }).canManageBilling).toBe(false);
+    expect(billingStateView(state, { role: 'MEMBER', usage }).canManageBilling).toBe(false);
+    expect(billingStateView(state, { role: null, usage }).canManageBilling).toBe(false);
+  });
+
+  it('usage carries used and limit per counter, ISO period start, plain JSON', () => {
+    const v = billingStateView(state, { role: 'TENANT_OWNER', usage });
+    expect(v.usage).toEqual({
+      seats: { used: 2, limit: 5 },
+      aiWritingMonthly: { used: 7, limit: 50, periodStart: '2026-10-31T21:00:00.000Z' },
+    });
+    expect(JSON.parse(JSON.stringify(v))).toEqual(v);
+  });
+
+  it('status is the SubStatus union (a type check: an unknown status does not compile)', () => {
+    const v = billingStateView(state, { role: 'TENANT_OWNER', usage });
+    const s: 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'PAUSED' = v.status;
+    expect(s).toBe('TRIALING');
+  });
+});

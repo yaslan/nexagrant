@@ -6015,5 +6015,11 @@
       "unknownTitle": "This section could not be loaded",
       "unknownBody": "Something went wrong. Refresh the page and try again."
     }
+  },
+  "ngGate": {
+    "NG_FEATURE_NOT_IN_PLAN": "This feature is not in your current plan. Upgrade your plan to use it.",
+    "NG_ROLE_FORBIDDEN": "Your role does not allow this feature. Ask your organisation's administrator.",
+    "NG_MODULE_CLOSED": "The module behind this feature is switched off for your organisation. Your administrator can switch it on.",
+    "NG_PLAN_LIMIT_REACHED": "Your plan's usage limit for this period is reached. Upgrade your plan to raise it."
   }
 }

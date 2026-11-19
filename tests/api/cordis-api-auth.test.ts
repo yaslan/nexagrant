@@ -23,6 +23,8 @@ import { authenticateCordisRequest, CORDIS_SESSION_PER_USER_PER_MINUTE } from '@
 
 const req = (headers: Record<string, string> = {}) => new Request('http://localhost/api/cordis/projects', { headers });
 
+// NG-250: the session door hands the member to the NexaGrant plan gate; an API key does not (line 46).
+const SESSION_OK = { authenticated: true, session: { tenantId: 't1', role: 'MEMBER' } };
 const signedIn = (userId: string) => ({ ok: true, scope: { userId, tenantId: 't1', role: 'MEMBER', isPlatformAdmin: false } });
 const refusedNoSession = () => ({
   ok: false,
@@ -111,14 +113,14 @@ describe('signed-in member', () => {
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-pro'));
     mocks.checkModuleAccess.mockResolvedValue(fullM1);
 
-    expect(await authenticateCordisRequest(req())).toEqual({ authenticated: true });
+    expect(await authenticateCordisRequest(req())).toEqual(SESSION_OK);
   });
 
   test(`past ${CORDIS_SESSION_PER_USER_PER_MINUTE} requests a minute: 429 with Retry-After, and it is per user`, async () => {
     mocks.checkModuleAccess.mockResolvedValue(fullM1);
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-loop'));
     for (let i = 0; i < CORDIS_SESSION_PER_USER_PER_MINUTE; i++) {
-      expect(await authenticateCordisRequest(req())).toEqual({ authenticated: true });
+      expect(await authenticateCordisRequest(req())).toEqual(SESSION_OK);
     }
 
     const res = await authenticateCordisRequest(req());
@@ -130,7 +132,7 @@ describe('signed-in member', () => {
     }
 
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-other'));
-    expect(await authenticateCordisRequest(req())).toEqual({ authenticated: true });
+    expect(await authenticateCordisRequest(req())).toEqual(SESSION_OK);
   });
 
   test('a failing module read is a fixed 500 body; the cause goes to the log, not the response', async () => {

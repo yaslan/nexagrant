@@ -40,6 +40,9 @@ const h = vi.hoisted(() => ({
   calls: { reads: 0, quota: 0, findManyWhere: [] as Record<string, unknown>[] },
 }));
 
+// NG-250: the NexaGrant plan gate has its own tests (gate.test.ts, bindings.test.ts,
+// ng250-plan-gate.live); here it lets every caller on, as before the gate.
+vi.mock('@/lib/billing/nexagrant/route-gate', () => ({ ngGateResponse: async () => null }));
 vi.mock('@/lib/tenant', () => ({
   requireTenantApi: async () => ({
     ok: true,

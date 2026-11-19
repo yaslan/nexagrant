@@ -132,6 +132,12 @@ const envSchema = z.object({
    * docs/legal/drafts/transfer-consent-v1.md (patron decision, 14.11.2026). Read via {@link leadTransferConsentEnabled}.
    */
   LEAD_TRANSFER_CONSENT_ENABLED: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /**
+   * NG-250: refuse an invitation past the NexaGrant plan's seat limit. Unset/blank/false = off
+   * (seats are counted and shown, not enforced) until the seat counts per plan are approved.
+   * Read via `ngSeatEnforcementOn` (src/lib/billing/nexagrant/usage.ts).
+   */
+  NG_SEAT_LIMIT_ENFORCED: blankToUndefined(z.enum(['true', 'false']).optional()),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
   AUTH_URL: z.string().optional(),

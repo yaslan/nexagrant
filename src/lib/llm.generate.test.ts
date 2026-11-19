@@ -29,6 +29,9 @@ const mockPrisma = vi.hoisted(() => ({
  * every mocked test. So the mock has no `prisma` export: reintroduce one and
  * the suite goes red here instead of on the first real deployment.
  */
+// NG-250: the NexaGrant AI allowance has its own tests (usage.test.ts, ng250-plan-gate.live,
+// llm.ng-quota.test.ts); here it is a pass, so this file's fake tx needs no NexaGrant tables.
+vi.mock('@/lib/billing/nexagrant/usage', () => ({ assertNgAiQuota: async () => undefined }));
 vi.mock('@/lib/db', () => ({ withTenant: mockPrisma.withTenant }));
 
 const mockEnv = vi.hoisted(() => ({

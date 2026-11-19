@@ -4,6 +4,7 @@ import { internalError } from '@/lib/api-error';
 import { SediaAdapter, type SediaSearchOptions } from '@/lib/adapters/sedia';
 import { translateTopicsBatch } from '@/lib/translation';
 import { requireTenantApi } from '@/lib/tenant';
+import { ngGateResponse } from '@/lib/billing/nexagrant/route-gate';
 import { logger } from '@/lib/logger';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 import { SEDIA_RESULT_WINDOW, clampSearchText } from '@/lib/calls-paging';
@@ -71,6 +72,10 @@ export async function GET(request: NextRequest) {
   // anonymous caller could otherwise spend SEDIA and translation quota at will.
   const tenant = await requireTenantApi();
   if (!tenant.ok) return tenant.response;
+
+  // NG-250: the NexaGrant plan gate, before SEDIA or translation is spent.
+  const ngRefused = await ngGateResponse(tenant.scope, 'search_calls', 'call_search');
+  if (ngRefused) return ngRefused;
 
   const retryAfter = limiter.take(tenant.scope.userId);
   if (retryAfter !== null) {
