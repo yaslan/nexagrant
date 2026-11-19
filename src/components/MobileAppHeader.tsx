@@ -19,6 +19,8 @@ interface MobileAppHeaderProps {
   isPlatformAdmin?: boolean;
   canManageModules?: boolean;
   canManageUsers?: boolean;
+  /** Forwarded to the user menu: the plan and trial link (NG-11, NG_PLAN_VIEW_ACTION). */
+  canViewNgPlan?: boolean;
   hiddenNavKeys?: readonly string[];
   /** Real workspaces of the session, resolved server-side. See UserMenu. */
   workspaces?: UserMenuWorkspace[];
@@ -35,6 +37,7 @@ export default function MobileAppHeader({
   isPlatformAdmin = false,
   canManageModules = false,
   canManageUsers = false,
+  canViewNgPlan = false,
   hiddenNavKeys = [],
   workspaces = [],
   cobrand = null,
@@ -70,6 +73,7 @@ export default function MobileAppHeader({
             roleName={roleName}
             canManageModules={canManageModules}
             canManageUsers={canManageUsers}
+            canViewNgPlan={canViewNgPlan}
             hideApiKeys={hiddenNavKeys.includes('apiKeys')}
             workspaces={workspaces}
           />

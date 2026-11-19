@@ -24,7 +24,8 @@
       "PILOT": "Pilot",
       "DEV": "Geliştirme"
     },
-    "homeLink": "Ana Sayfa"
+    "homeLink": "Ana Sayfa",
+    "planAndTrial": "Plan ve deneme"
   },
   "Common": {
     "loading": "Yükleniyor...",
@@ -5928,6 +5929,91 @@
       "lost": {
         "reengage": "Müşteriyle yeniden iletişime geç"
       }
+    }
+  },
+  "ngPlan": {
+    "metaTitle": "Plan ve deneme süresi",
+    "title": "Plan ve deneme süresi",
+    "subtitle": "Kurumunuzun planı, deneme süresi ve {brand} katmanlarının karşılaştırması.",
+    "currentPlanLabel": "Mevcut planınız",
+    "currentBadge": "Mevcut plan",
+    "tier": {
+      "free": "Ücretsiz Kontrol",
+      "basic": "Temel",
+      "professional": "Profesyonel",
+      "enterprise": "Kurumsal"
+    },
+    "trial": {
+      "title": "Deneme süresi",
+      "noneBody": "Şu an süren bir deneme yok.",
+      "runningBadge": "Deneme sürüyor",
+      "endedBadge": "Deneme bitti",
+      "daysLeft": "{days, plural, one {# gün kaldı} other {# gün kaldı}}",
+      "endsAt": "Bitiş",
+      "endedAt": "Sona erdi",
+      "runningEndPlan": "Deneme bitince hesabınız {plan} planına geçer.",
+      "endedPlan": "Hesabınız şimdi {plan} planında.",
+      "localTimeNote": "Saatler tarayıcınızın saat diliminde ({tz})."
+    },
+    "plans": {
+      "title": "Planları karşılaştırın",
+      "body": "Fiyatlar ve özellikler katalogdan okunur. Satın alma henüz açık değil.",
+      "currencyLegend": "Para birimi",
+      "intervalLegend": "Ödeme dönemi",
+      "currency": {
+        "TRY": "TL",
+        "EUR": "Avro"
+      },
+      "interval": {
+        "year": "Yıllık",
+        "month": "Aylık"
+      },
+      "perInterval": {
+        "year": "/ yıl",
+        "month": "/ ay"
+      },
+      "priceSoon": "Fiyat yakında",
+      "priceSoonNote": "Fiyat açıklanınca buradan satın alabileceksiniz.",
+      "free": "Ücretsiz",
+      "freeNote": "Deneme bitince ya da plan seçilmezse kullanılan plan.",
+      "contact": "İletişime geçin",
+      "contactNote": "Bu plan ön kayıtla sunulur; satış ekibimiz sizinle görüşür.",
+      "buySoon": "Satın alma yakında",
+      "matrixCaption": "Planlara göre özellikler ve sınırlar",
+      "featureColumn": "Özellik",
+      "matrixScrollLabel": "Özellik tablosu, yatay kaydırılabilir",
+      "included": "Dahil",
+      "notIncluded": "Dahil değil",
+      "unlimited": "Sınırsız",
+      "empty": "Katalogda gösterilecek plan yok."
+    },
+    "feature": {
+      "org_profile": "Kurum profili",
+      "eligibility_check": "Uygunluk kontrolü",
+      "call_search": "Çağrı arama ve uygunluk filtresi",
+      "trl_score": "TRL uyum puanı",
+      "apply_decision": "Başvur / vazgeç kaydı",
+      "newsletter": "Uygun çağrı bülteni",
+      "partner_search": "Ortak bulma",
+      "outreach": "Ortağa ulaşma (davet, hatırlatma)",
+      "similar_projects": "Benzer fonlanmış projeler",
+      "seats": "Kullanıcı sayısı",
+      "ai_writing_monthly": "YZ yazım işlemi"
+    },
+    "limit": {
+      "default": "{count}",
+      "eligibility_check": "Ayda {count}",
+      "seats": "{count} kullanıcı",
+      "ai_writing_monthly": "Ayda {count}"
+    },
+    "error": {
+      "sessionTitle": "Oturum gerekli",
+      "sessionBody": "Planınızı görmek için bir kuruma bağlı hesapla giriş yapın.",
+      "sessionCta": "Giriş yap",
+      "catalogueTitle": "Plan kataloğu şu an hazır değil",
+      "catalogueBody": "Planlar yüklenemedi. Bu bir kurulum eksiği; destek ekibi bilgilendirildi. Lütfen daha sonra tekrar deneyin.",
+      "unknownTitle": "Bu bölüm yüklenemedi",
+      "unknownBody": "Bir sorun oluştu. Sayfayı yenileyip tekrar deneyin."
     }
   }
 }
