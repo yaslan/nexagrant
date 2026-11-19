@@ -25,8 +25,9 @@ export interface EnqueueResult {
  * second copy next to a running one (ADR-0008 §5 D4). To re-run a job whose
  * earlier run failed for good, pass `force`, which removes that job first
  * (only if it is not running). `replaceFailed` is the narrower form: it
- * removes the job with this key only if it failed for good (every attempt
- * used, not running), so a queued or running one is left alone (NG-239 Ö-2).
+ * deletes the job with this key only if it failed for good (every attempt
+ * used, not running), in one statement, so a queued or running one is left
+ * alone even when it replaced the failed one a moment earlier (NG-239 Ö-2).
  */
 export async function enqueueJob(
   id: JobId,
@@ -74,9 +75,14 @@ export async function enqueueJob(
         c.query('select graphile_worker.remove_job($1) from graphile_worker.jobs where key = $1 and locked_at is null', [key])
       );
     } else if (opts.replaceFailed) {
+      // One statement, no fallback (NG-239 Ö-2). `remove_job` runs its own statements after the
+      // row was picked: if another request replaced the failed job meanwhile and a worker locked
+      // the new one, `remove_job` cannot delete it and instead clears its key and uses up its
+      // attempts, so the running job loses its retry and a second copy gets queued. A plain
+      // DELETE re-checks the condition on the row it would delete and leaves it otherwise.
       await utils.withPgClient((c) =>
         c.query(
-          'select graphile_worker.remove_job($1) from graphile_worker.jobs where key = $1 and locked_at is null and attempts >= max_attempts',
+          'delete from graphile_worker._private_jobs where key = $1 and locked_at is null and attempts >= max_attempts',
           [key]
         )
       );
