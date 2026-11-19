@@ -42,6 +42,7 @@ model Tenant {
   workspaces    Workspace[]
   profile       TenantProfile?
   subscription  Subscription?
+  ngSubscription NgSubscription? // NG-57
   moduleStates  ModuleState[]
   provinceLeadRoutes ProvinceLeadRoute[]
   creditLedger  CreditLedger[]
@@ -377,6 +378,89 @@ model AddOnCatalog {
   grantsCredits Int?
   grantsWorkspaces Int?
   stripePriceId String?
+}
+
+// NG-57 — the NexaGrant plan catalogue (NG-244 §6.1, 06-Fiyat-Politikasi). Separate from
+// the Fabrika Plan/Subscription tables on purpose (K-584182 = A): NexaGrant plan ids never
+// reach `getEntitlements`, whose code catalogue throws on an id it does not know.
+// The four catalogue tables are platform data (RLS platform_read, no writes from
+// fabrika_app); rows are seeded from prisma/seed-data/nexagrant-catalog.ts.
+// Migration: add-nexagrant-plan-catalog.sql.
+model NgPlan {
+  id         String   @id // "ng-pro"
+  tier       String // free | basic | professional | enterprise
+  sortOrder  Int
+  sellable   Boolean  @default(false) // meant to be bought (free and enterprise are not)
+  isFallback Boolean  @default(false) // the plan of a tenant with no row or past its trial; one row at most
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  features         NgPlanFeature[]
+  prices           NgPlanPrice[]
+  trialPolicies    NgTrialPolicy[]  @relation("NgTrialPlan")
+  trialEndPolicies NgTrialPolicy[]  @relation("NgTrialEndPlan")
+  subscriptions    NgSubscription[] @relation("NgSubscriptionPlan")
+  trialEndSubs     NgSubscription[] @relation("NgSubscriptionTrialEndPlan")
+}
+
+// One cell of the plan × feature matrix. A missing row = the plan does not grant the feature.
+model NgPlanFeature {
+  planId     String
+  plan       NgPlan   @relation(fields: [planId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  featureKey String // src/lib/billing/nexagrant/features.ts NG_FEATURE_KEYS
+  limitValue Int? // null = unlimited; CHECK >= 0
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@id([planId, featureKey])
+}
+
+// One price cell. amountMinor null = not priced yet: not purchasable. Minor units (kuruş/cent).
+// CHECK: currency IN (TRY, EUR) (K-584156 = A), interval IN (year, month), amountMinor > 0.
+model NgPlanPrice {
+  planId      String
+  plan        NgPlan   @relation(fields: [planId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  currency    String
+  interval    String
+  amountMinor Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@id([planId, currency, interval])
+}
+
+// Trial length per segment (K-584180 = A: default 14, municipality 30). CHECK days > 0.
+model NgTrialPolicy {
+  segment   String   @id // default | municipality
+  days      Int
+  planId    String
+  plan      NgPlan   @relation("NgTrialPlan", fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  endPlanId String
+  endPlan   NgPlan   @relation("NgTrialEndPlan", fields: [endPlanId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// The tenant's NexaGrant plan. Tenant data (tenant_isolation). No row = the fallback plan.
+// The trial columns are copied from NgTrialPolicy when the trial starts, so a later policy
+// change does not move a running trial's end.
+model NgSubscription {
+  tenantId       String    @id
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  planId         String
+  plan           NgPlan    @relation("NgSubscriptionPlan", fields: [planId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  status         SubStatus @default(TRIALING)
+  provider       String    @default("ng-trial") // ng-trial | manual | <payment provider, undecided>
+  trialSegment   String?
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
+  trialEndPlanId String?
+  trialEndPlan   NgPlan?   @relation("NgSubscriptionTrialEndPlan", fields: [trialEndPlanId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  trialEndedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, trialEndsAt])
 }
 
 model Subscription {

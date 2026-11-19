@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { listProjectIdeas } from '@/lib/project-ideas/records';
 import { trlCriterionState } from '@/lib/project-ideas/validate';
 import ProjectIdeaForm from './ProjectIdeaForm';
@@ -19,8 +19,9 @@ export default async function ProjectIdeaPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  // Redirects anonymous or non-member visitors; never returns without a tenant.
-  const scope = await requireTenantPage(locale);
+  // Redirects anonymous or non-member visitors; a role without view_proposal (GUEST_PARTNER,
+  // NG-240) gets the 403 screen before any tenant read. Never returns without a tenant.
+  const scope = await requireTenantPageRole(locale, 'view_proposal');
   const t = await getTranslations('projectIdea');
 
   const ideas = await listProjectIdeas({ tenantId: scope.tenantId });

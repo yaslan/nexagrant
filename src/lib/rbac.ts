@@ -86,15 +86,43 @@ const rolePermissions: Record<Role, Action[]> = {
 };
 
 /**
- * Check if a role has permission to perform a specific action.
+ * The plan half of a decision (CLAUDE.md rule 4: plan + module switch + role). Built by
+ * the caller from the tenant's plan entitlement — for NexaGrant by `canUseNgFeature`
+ * (src/lib/billing/nexagrant/authz.ts) — never typed by hand.
+ */
+export interface PlanFeatureResource {
+  /** The plan feature the action uses, e.g. `partner_search`. */
+  feature: string;
+  /** Every feature the tenant's current plan grants. */
+  grantedFeatures: ReadonlySet<string>;
+  /**
+   * Whether the module behind the feature is open to tenant members
+   * (`isOpenToTenantMembers`). Undefined = no module stands behind the feature.
+   */
+  moduleOpen?: boolean;
+}
+
+/**
+ * Check if a role has permission to perform a specific action — and, when a
+ * `resource` is given, that the tenant's plan grants the feature and the module
+ * behind it is open. A module switched on does not open a feature the plan does not
+ * grant (CLAUDE.md rule 4).
  * @param role The role of the user (e.g. from session)
  * @param action The action the user is trying to perform
+ * @param resource The plan feature the action uses, with the tenant's entitlement
  * @returns boolean
  */
-export function can(role: Role | undefined | null, action: Action): boolean {
+export function can(
+  role: Role | undefined | null,
+  action: Action,
+  resource?: PlanFeatureResource
+): boolean {
   if (!role) return false;
   const permissions = rolePermissions[role];
-  return permissions ? permissions.includes(action) : false;
+  if (!permissions || !permissions.includes(action)) return false;
+  if (!resource) return true;
+  if (resource.moduleOpen === false) return false;
+  return resource.grantedFeatures.has(resource.feature);
 }
 
 /**
