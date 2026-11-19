@@ -1,3 +1,8 @@
+> **YÖNLENDİRME (NG-262, 19.11.2026): bu belgenin yerini alacak belgeler `deploy/vps/RUNBOOK.md` ve `docs/adr/ADR-0012-hosting-hostinger-cloud-to-vps.md`.**
+> Patron barındırmayı Hostinger Cloud'dan VPS'e çevirdi (K-584192 = C, K-584515 = A: Hostinger KVM 2, Frankfurt; veritabanı Supabase'te kalır).
+> **Taşıma YAPILMADI; planlı** (NG-261, adım adım patron onayı bekliyor). Bu belge, taşıma tamamlanana kadar ve taşımadan sonraki 14 günlük geri dönüş süresince geçerlidir. Belge silinmez.
+> Aşağıdaki "Hedef (K-574987 = A)" ve "VPS alınmaz" ifadeleri, ADR-0012 ile yerine geçilen eski karardır.
+
 # NexaGrant → nexagrant.com (Hostinger Cloud hosting): dağıtım belgesi
 
 **Hedef (patron kararı K-574987 = A, 01.11.2026):** NexaGrant, Hostinger'daki **hazır** `nexagrant.com` sitesine

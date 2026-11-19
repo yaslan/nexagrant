@@ -15,6 +15,7 @@ Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (aja
 |---|---|---|
 | Alan adı | `https://fonbridge.com` kanonik; `www` → kök **301** (tek sıçrama) | patron 29.09, `docs/SMTP-SUNUCU.md` §10 |
 | Barındırma | Vulut; cPanel sunucusu `srv.iyisunucu.com.tr` = `77.92.144.187`; DNS `ns1/ns2.iyisunucu.com.tr` | `docs/SMTP-SUNUCU.md` §1.1 |
+| Uygulama barındırma (NexaGrant) | Bugün: Hostinger Cloud Economy (`docs/DEPLOY-NEXAGRANT-HOSTINGER.md`). **Karar 19.11.2026: Hostinger KVM 2 VPS, Frankfurt; DB Supabase'te kalır. Taşıma PLANLI, yapılmadı** (NG-261). K-574987 = A'nın yerini alır | K-584192 = C, K-584515 = A, `docs/adr/ADR-0012-hosting-hostinger-cloud-to-vps.md` |
 | E-posta | Seçenek A: Vulut cPanel/Exim, `mail.fonbridge.com`, gönderici `info@fonbridge.com` | `docs/SMTP-SUNUCU.md` |
 | İş kuyruğu | graphile-worker (Postgres); web ve worker **ayrı imaj/süreç**; `JOBS_CRON_ENABLED` üretimde zorunlu | `docs/adr/ADR-0008-own-job-queue-graphile-worker.md` §9 |
 | Kaldırılanlar | Sentry, Resend, Inngest, Microsoft Entra, Outlook, SAML SSO | patron 29.09 |
@@ -28,7 +29,7 @@ Durum etiketleri: **HAZIR** = repoda var ve kanıtlı · **EKSİK** = bizim (aja
 | # | Madde | Durum | Kanıt (kısa) |
 |---|---|---|---|
 | 1.1 | DNS bölgesi `fonbridge.com` | **PATRON** | `dig +norec SOA fonbridge.com @ns1/ns2.iyisunucu.com.tr` → `REFUSED` (29.09 21:43 UTC); aynı NS'de `usfinbridge.com` → `NOERROR`; `@8.8.8.8` A/AAAA/MX/TXT → `SERVFAIL` |
-| 1.2 | Uygulama sunucusu (web + worker + Postgres 16/pgvector) nerede koşacak | **PATRON** (sunucuyu alır) | Karar: **Hostinger KVM 2, Frankfurt** (K-573894). Paket hazır: `deploy/vps/` (compose, Caddyfile, `.env.prod.example`, yedek, `RUNBOOK.md`, FO-244). `77.92.144.187` cPanel'i artık yalnız posta sunucusu; uygulama oraya kurulmayacak. Sunucu kurulumu ve IP bilgisi patronda |
+| 1.2 | Uygulama sunucusu (web + worker + Postgres 16/pgvector) nerede koşacak | **PATRON** (sunucuyu alır) | Karar: **Hostinger KVM 2, Frankfurt** (K-573894; 01.11'de K-574987 = A ile bırakılmıştı, 19.11.2026'da K-584192 = C ve K-584515 = A ile yeniden kabul edildi, `docs/adr/ADR-0012-hosting-hostinger-cloud-to-vps.md`; **VPS henüz alınmadı, taşıma planlı**, NG-261; `clamav` servisi paketten henüz yok, planlı). Paket hazır: `deploy/vps/` (compose, Caddyfile, `.env.prod.example`, yedek, `RUNBOOK.md`, FO-244). `77.92.144.187` cPanel'i artık yalnız posta sunucusu; uygulama oraya kurulmayacak. Sunucu kurulumu ve IP bilgisi patronda |
 | 1.3 | Ters vekil + TLS + `www`→kök 301 | **HAZIR** (paket) / **PATRON** (DNS + kurulum) | `deploy/vps/Caddyfile` (nexagrant.com; HSTS yorumda). Kurulum için DNS A kaydı ve onay: `deploy/vps/RUNBOOK.md` §3 |
 | 1.4 | SMTP (`mail.fonbridge.com`) | **PATRON** | 1.1'e bağlı; kutular, DKIM, AutoSSL `docs/SMTP-SUNUCU.md` §8 |
 | 2 | Üretim ortam değişkenleri | **EKSİK** (liste hazır, değerler PATRON) | §2 |
@@ -418,7 +419,7 @@ origin  https://github.com/yaslan/fonbridge.git
 
 Sıra bağımlılığa göre; her adım bir öncekini bekler (paralel yapılabilenler aynı numarada harfle).
 
-1. **Uygulama sunucusu:** karar verildi — Hostinger KVM 2, Frankfurt (K-573894). Patron sunucuyu alır; kurulum ve değerler `deploy/vps/RUNBOOK.md` §1–§5'e göre, hiçbir şey onaysız canlıya yazılmaz.
+1. **Uygulama sunucusu:** karar verildi — Hostinger KVM 2, Frankfurt (K-573894; 19.11.2026'da K-584192 = C ve K-584515 = A ile yeniden kabul, ADR-0012). **Planlı, henüz alınmadı** (NG-261); bugün canlı hâlâ Hostinger Cloud'da. Patron sunucuyu alır; kurulum ve değerler `deploy/vps/RUNBOOK.md` §1–§5'e göre, hiçbir şey onaysız canlıya yazılmaz.
 2. **DNS:** `nexagrant.com` ve `www` A kaydı → VPS IPv4 (`deploy/vps/RUNBOOK.md` §3). Eski `fonbridge.com` cPanel DNS adımı bu pakette yok; alan adı tutarlılığı ayrı iş (RUNBOOK §10 K11).
 3. Zone Editor: kök `A` → `<APP_IP>`, `www` → kök, `mail A 77.92.144.187`, MX, SPF, DMARC, DKIM (2048 bit) — tam liste `docs/SMTP-SUNUCU.md` §3.0/§8 madde 3. TTL 300.
 4. Posta kutuları `info@` + `dmarc@`; **S-1 kararı** (uygulama `info@` ile mi, ayrı `bildirim@` ile mi göndersin — öneri ayrı kutu). AutoSSL çalıştır.
