@@ -10,7 +10,8 @@ export default async function NotificationsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
-  const [result, prefs] = await Promise.all([listNotifications(), getNotificationPreferences()]);
+  const result = await listNotifications();
+  const prefs = await getNotificationPreferences();
 
   const notifications: NotificationItem[] = result.ok ? result.notifications : [];
   const unreadCount: number = result.ok ? result.unreadCount : 0;
