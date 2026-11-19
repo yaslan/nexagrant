@@ -86,14 +86,19 @@ test.describe.serial('NG-257 CORDIS API + page role measurement', () => {
         rows.push({ role, target: path, status: res?.status() ?? -1, probe: html.includes(MARKER) });
       }
       const mine = rows.filter((r) => r.role === role);
+      const pic = `${ws}/partners/${PROBE_PIC}`;
       if (role === 'GUEST_PARTNER') {
         // NG-257 acceptance: the partner-search door refuses a guest on the CORDIS API
         // session path and on partners/[pic]; no probe data reaches the body.
-        for (const r of mine.filter((x) => x.target.startsWith('/api/cordis/') || x.target.includes('/partners/'))) {
+        for (const r of mine.filter((x) => x.target.startsWith('/api/cordis/'))) {
           expect(r.status, r.target).toBe(403);
           expect(r.probe, r.target).toBe(false);
         }
+        // The 403 itself is asserted by role-gate.spec GUEST_CLOSED; here only the leak.
+        expect(mine.find((x) => x.target === pic)?.probe, pic).toBe(false);
       } else {
+        // The permitted role reaches the partner detail page (M1 on, role door open).
+        expect(mine.find((x) => x.target === pic)?.status, pic).toBe(200);
         for (const r of mine.filter((x) => x.target.startsWith('/api/cordis/projects'))) {
           expect(r.status, r.target).toBe(200);
         }

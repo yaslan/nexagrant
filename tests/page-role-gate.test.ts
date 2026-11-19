@@ -204,6 +204,29 @@ describe('each gated page names its door', () => {
 });
 
 /**
+ * NG-257: the role door runs before the M1 module gate. A role without the permission
+ * must get the 403 screen, not the M1 "off" screen, so M1 state is not revealed to it.
+ */
+const ROLE_BEFORE_MODULE: ReadonlyArray<readonly [string, string]> = [
+  ['partners/leaders/page.tsx', 'view_partner_search'],
+  ['partners/[pic]/page.tsx', 'view_partner_search'],
+];
+
+describe('role door runs before the M1 module gate (NG-257)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  for (const [file, action] of ROLE_BEFORE_MODULE) {
+    test(`${file}: requireTenantPageRole(${action}) precedes moduleGate('M1')`, () => {
+      const source = readFileSync(path.join(root, file), 'utf8');
+      const role = source.indexOf(`requireTenantPageRole(locale, '${action}')`);
+      const mod = source.indexOf("moduleGate('M1', locale)");
+      expect(role, 'role door call present').toBeGreaterThan(-1);
+      expect(mod, 'M1 gate call present').toBeGreaterThan(-1);
+      expect(role).toBeLessThan(mod);
+    });
+  }
+});
+
+/**
  * Pages whose door names a shared constant from `access.ts` instead of a literal (NG-11
  * F4). The permission name stays defined in that one file; the page must pass the
  * constant, and the constant must be the one this table is about.

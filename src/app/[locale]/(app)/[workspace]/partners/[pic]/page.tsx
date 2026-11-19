@@ -39,10 +39,11 @@ export default async function PartnerDetailPage({
   params: Promise<{ pic: string; locale: string; workspace: string }>
 }) {
   const { pic, workspace, locale } = await params;
+  // NG-257: CORDIS partner detail sits behind the same door as its sibling `partners` page.
+  // The role door runs first so a role without it never learns the M1 module state.
+  await requireTenantPageRole(locale, 'view_partner_search');
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
-  // NG-257: CORDIS partner detail sits behind the same door as its sibling `partners` page.
-  await requireTenantPageRole(locale, 'view_partner_search');
   const t = await getTranslations('PartnerDetail');
 
   let org: OrgDetail | null = null;
