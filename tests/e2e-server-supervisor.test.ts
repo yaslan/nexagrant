@@ -11,6 +11,7 @@ const SIGNAL_LOG = path.resolve('tests/e2e/support/server-signal-log.mjs');
 let dir: string;
 let diagFile: string;
 const started: ChildProcess[] = [];
+const groupLeaders = new WeakSet<ChildProcess>();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -65,9 +66,11 @@ function serverScript(port: number, extra = '') {
 }
 
 function supervise(port: number, code: string, runnerPid: number | undefined) {
-  return track(
+  const child = track(
     spawn(process.execPath, [SUPERVISOR, process.execPath, '-e', code], {
       stdio: 'ignore',
+      // Own process group, so afterEach can end the stand-in server (its child) along with it.
+      detached: process.platform !== 'win32',
       env: {
         ...process.env,
         NODE_OPTIONS: '',
@@ -78,6 +81,8 @@ function supervise(port: number, code: string, runnerPid: number | undefined) {
       },
     }),
   );
+  groupLeaders.add(child);
+  return child;
 }
 
 function pidAlive(pid: number) {
@@ -94,9 +99,26 @@ beforeEach(() => {
   diagFile = path.join(dir, 'diag');
 });
 
+function killQuietly(pid: number) {
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch {
+    // already gone (ESRCH)
+  }
+}
+
 afterEach(() => {
   for (const child of started.splice(0)) {
+    // A detached supervisor leads its own group: kill the group so its server child goes too.
+    if (child.pid && groupLeaders.has(child) && process.platform !== 'win32') killQuietly(-child.pid);
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  }
+  // The stand-in server is the supervisor's child, not ours. Some tests keep it alive on purpose or
+  // SIGKILL the supervisor, which skips its own cleanup; end it here so no run leaves it behind.
+  const serverPidFile = path.join(dir, 'server-pid');
+  if (fs.existsSync(serverPidFile)) {
+    const pid = Number(fs.readFileSync(serverPidFile, 'utf8'));
+    if (pid > 0) killQuietly(pid);
   }
   fs.rmSync(dir, { recursive: true, force: true });
 });
