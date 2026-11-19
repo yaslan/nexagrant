@@ -10,7 +10,7 @@ Paket bu klasördeki araçla üretilir (`build-package.sh` → `app.js` + `app/`
 - Ortam değişkenleri: `ENV-LISTESI.md` (Hostinger yolları).
 - `KURULUM.md`: eski Vulut cPanel ("Setup Node.js App") rehberi; kavramlar (paket içeriği, worker env dosyası,
   migration sırası) geçerli, ekran adları ve yollar Hostinger'da farklıdır.
-- `deploy/vps/` (FO-244; KVM 2 için yazılmıştı): **bu (Cloud) hedef için kullanılmıyor**; dosyalar silinmedi. Yeni hedef KVM 4 + CloudPanel için uyarlanması planlı (NG-261 Faz A).
+- `deploy/vps/` (FO-244; KVM 2 için yazılmıştı): **bu (Cloud) hedef için kullanılmıyor**; dosyalar silinmedi. Yeni hedef KVM 4 + CloudPanel için uyarlanması planlı (NG-261 Faz A). Güncel durum (19.11.2026): VPS KVM 4 (`191.96.1.252`), DNS çevrildi, uygulama orada yayında değil; KVM 2 anıları (FO-244, K-573894) eskidir.
 
-Önceki not (FO-244, K-573894: "uygulama sunucusu KVM 2 VPS") K-574987 ile geçersiz kalmıştı; 19.11.2026'da VPS yönü K-584192 = C ile geri döndü, sunucu KVM 4 oldu (ADR-0012).
+Önceki not (FO-244, K-573894: "uygulama sunucusu KVM 2 VPS") K-574987 ile geçersiz kalmıştı; 19.11.2026'da VPS yönü K-584192 = C ile geri döndü, sunucu KVM 4 oldu (ADR-0012; güncel durum: KVM 4 VPS, DNS yapıldı, taşıma planlı, NG-261).
 Dosya adı, ona bağlantı veren belgeler kırılmasın diye değiştirilmedi.

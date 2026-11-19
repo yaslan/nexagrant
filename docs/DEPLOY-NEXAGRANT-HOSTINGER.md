@@ -1,5 +1,5 @@
 > **YÖNLENDİRME (NG-262, 19.11.2026): bu belgenin yerini alacak belgeler `deploy/vps/RUNBOOK.md` ve `docs/adr/ADR-0012-hosting-hostinger-cloud-to-vps.md`.**
-> Patron barındırmayı Hostinger Cloud'dan VPS'e çevirdi (K-584192 = C, K-584515 = A; veritabanı Supabase'te kalır). Sunucu: patron 19.11.2026 akşam **Hostinger KVM 4** VPS'ini aldı (`191.96.1.252`, Ubuntu 24.04 + **CloudPanel**; ilk seçilen KVM 2 değil). Uygulama CloudPanel'de Reverse Proxy sitesi olarak yayınlanması **planlı**; ölçüm anında `nexagrant.com` kök A kaydı hâlâ Hostinger park sayfasındaydı.
+> Patron barındırmayı Hostinger Cloud'dan VPS'e çevirdi (K-584192 = C, K-584515 = A; veritabanı Supabase'te kalır). Sunucu: patron 19.11.2026 akşam **Hostinger KVM 4** VPS'ini aldı (`191.96.1.252`, Ubuntu 24.04 + **CloudPanel**; ilk seçilen KVM 2 değil). Uygulamanın CloudPanel'de Reverse Proxy sitesi olarak yayınlanması **planlı, yapılmadı**. DNS **YAPILDI**: 19.11.2026 akşam (K-584605 = A) kök `@` A kaydı `2.57.91.91` → `191.96.1.252` çevrildi, TTL 300, `www` köke CNAME; VPS'te `nexagrant.com` sitesi yok, uygulama yayında değil (alan adı boş yanıt verir). **Aşağıdaki Cloud adımları bu yüzden bugün uygulanamaz:** alan adı artık Cloud vhost'una değil VPS'e çözülüyor.
 > **Taşıma YAPILMADI; planlı** (NG-261, adım adım patron onayı bekliyor). Bu belge, taşıma tamamlanana kadar ve taşımadan sonraki 14 günlük geri dönüş süresince geçerlidir. Belge silinmez.
 > Aşağıdaki "Hedef (K-574987 = A)" ve "VPS alınmaz" ifadeleri, ADR-0012 ile yerine geçilen eski karardır.
 
@@ -39,7 +39,7 @@ DMARC `p=none`. Canlı yanıt: `HTTP/2 200`, `server: hcdn`, `x-hcdn-request-id:
 `http://` → 301 `https://`; `www` → 200.
 
 **DNS ile uyum:** Cloud hosting'in Node.js uygulaması aynı vhost'un arkasında çalışır; `@`/`www` zaten bu sitenin
-CDN'ini gösteriyor. **Canlıya almada DNS değişikliği GEREKMEZ** (VPS planındaki A kaydı değişikliği bu hedefte yok).
+CDN'ini gösteriyordu. **Canlıya almada DNS değişikliği GEREKMEZDİ** (bu, 19.11.2026 akşamki A kaydı değişikliğinden ÖNCEKİ durumdur; kök `@` artık `191.96.1.252`'ye çözülüyor, ADR-0012).
 HTML yanıtları CDN'de `DYNAMIC` (önbelleğe alınmıyor); oturumlu sayfalar CDN'den başkasına sızmaz. Statik
 `/_next/static/*` dosyaları değişmez adlı (hash'li) olduğu için CDN önbelleği güvenlidir.
 
@@ -137,7 +137,7 @@ Cron satırı (✋ adım 10):
 | 11 | **fonbridge.com → nexagrant.com 301:** fonbridge.com bu Hostinger hesabında addon site (`/home/u605628300/domains/fonbridge.com/public_html`). Şu an orada **canlı bir WordPress + WooCommerce sitesi ("Fon Bridge") çalışıyor**. DNS Hostinger'da, alan adının kayıt şirketi Squarespace (yalnız kayıt). 301 bu siteyi kapatır: **ayrı patron onayı** + önce site yedeği (dosyalar + WP veritabanı); sonra `hosting_redirects_create-website` (yol korunarak) + Search Console "adres değişikliği" | ✋ | `curl -sI https://fonbridge.com/x` → 301 `https://nexagrant.com/x` | Yönlendirmeyi sil; WP sitesi dosyaları değişmediyse kendiliğinden döner, değiştiyse yedekten |
 | 12 | **İzleme (ilk 48 saat):** dış uptime izleme `GET /api/health` (1 dk), `hosting_get-deployment`/uygulama logu, `SystemAlert` ekranı, `pnpm alerts:check`, Hostinger kaynak metriği (`listOrderResourceUsageMetrics`); HSTS (katman kararı: Hostinger'da uygulama gönderir): `src/proxy.ts` `Strict-Transport-Security: max-age=300` yazar (yalnız `NODE_ENV=production` ve HTTPS isteğinde; `hstsHeaderFor`, `src/lib/security-headers.ts`). HTTPS tespiti: önce istek URL'sinin şeması `https:`, yoksa `x-forwarded-proto: https`. Hostinger'ın kenar katmanının bu vekil başlığını HER istekte gönderdiği DOĞRULANMADI; canlı `curl -sI` (NG-87 sonrası) bunu kanıtlayana kadar başlığın gelmediği bir yanıt olabilir. `includeSubDomains` ve `preload` YOK (geri alınamaz). Yükseltme (`31536000`) ayrı patron kararıdır (RELEASE_CHECKLIST §5.4). VPS'te `deploy/vps/Caddyfile` içindeki HSTS satırı ŞU AN YORUM SATIRI (satır 21); açılırsa Caddy `header` uygulamanın başlığını değiştirir, çift başlık çıkmaz | HSTS ✋ | `curl -sI https://nexagrant.com/ \| grep -i strict-transport` → `max-age=300`; 48 saat 5xx yok, worker log düzenli | HSTS'yi kaldır: `hstsHeaderFor` çağrısını sil ve yeniden derle; adım 6 geri alma |
 
-**Genel geri alma:** DNS hiç değişmediği için geri dönüş, `public_html`'i adım 2 yedeğine döndürmek ve cron işini silmektir
+**Genel geri alma (DNS 19.11.2026 akşam değişmeden önceki duruma göre; geri dönüş için kök A'nın eski değere çevrilmesi ayrı patron onayı ister):** DNS değişmediği varsayımıyla geri dönüş, `public_html`'i adım 2 yedeğine döndürmek ve cron işini silmektir
 (dakikalar). Veritabanı tarafında geri dönüş adım 3'ün `--down` dosyaları ya da yedeğidir; Tokyo projesine hiçbir adım dokunmaz.
 
 ## 5. Posta (SMTP)
