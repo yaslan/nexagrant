@@ -435,6 +435,77 @@ describe('NG-239: clamd down or silent → ERROR, no download, a retry', () => {
     await dropQueuedScans(id);
   });
 
+  // NG-239 Ö-2 (re-review): `replaceFailed` picked the failed job with one statement and removed
+  // it with `remove_job`, which runs its own statements. When another request replaced the failed
+  // job in between and a worker locked the new one, `remove_job` could not delete it and fell back
+  // to clearing its key and using up its attempts: the running scan lost its retry, and this
+  // request then queued a second job for the same attempt. Replayed here without timing luck:
+  // connection A replaces the job and holds the transaction open until this request is waiting on
+  // A's row lock, then commits.
+  test('replacing a failed scan job leaves one that another request queued and a worker locked meanwhile', async () => {
+    const id = await uploadPresigned('race-job.docx', cleanDocx('yarış'));
+    const jobKey = `evidence-scan:${id}:0`;
+    expect(await queuedScanKeys(id), 'the upload queued attempt 0').toEqual([jobKey]);
+    await admin!.$executeRawUnsafe(
+      `update graphile_worker._private_jobs set attempts = max_attempts, last_error = 'NG-239 test: failed for good' where key = $1`,
+      jobKey
+    );
+    const payload = { tenantId: t.tenant, evidenceId: id, attempt: 0 };
+    const jobsOfFile = () =>
+      admin!.$queryRawUnsafe<{ id: string; key: string | null; attempts: number; locked_by: string | null }[]>(
+        `select id::text as id, key, attempts, locked_by from graphile_worker._private_jobs
+          where payload->>'evidenceId' = $1 order by id`,
+        id
+      );
+
+    const { Client } = await import('pg');
+    const { enqueueJob } = await import('@/lib/jobs/enqueue');
+    const a = new Client({ connectionString: ADMIN_URL });
+    await a.connect();
+    try {
+      // A: the other request replaced the failed job, and a worker locked the new one (attempt 1).
+      await a.query('begin');
+      await a.query('delete from graphile_worker._private_jobs where key = $1', [jobKey]);
+      const added = await a.query<{ id: string }>(
+        `select (graphile_worker.add_job('evidence-scan', $2::json, job_key := $1, job_key_mode := 'unsafe_dedupe', max_attempts := 25)).id::text as id`,
+        [jobKey, JSON.stringify(payload)]
+      );
+      const running = added.rows[0]!.id;
+      await a.query(
+        `update graphile_worker._private_jobs set locked_at = now(), locked_by = 'ng239-race-test', attempts = 1 where id = $1`,
+        [running]
+      );
+      const aPid = (await a.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!.pid;
+
+      // B: this request, still seeing the failed job.
+      const b = enqueueJob('evidence-scan', payload, { replaceFailed: true, connectionString: ADMIN_URL });
+      let blocked = false;
+      for (let i = 0; i < 100 && !blocked; i++) {
+        // Asked on another connection: inside A's open transaction pg_stat_activity stays as first read.
+        const w = await admin!.$queryRawUnsafe<{ n: number }[]>(
+          `select count(*)::int as n from pg_stat_activity
+            where pid <> $1 and wait_event_type = 'Lock' and query ~ '(remove_job|_private_jobs)'`,
+          aPid
+        );
+        blocked = (w[0]?.n ?? 0) > 0;
+        if (!blocked) await new Promise((r) => setTimeout(r, 100));
+      }
+      expect(blocked, 'the request waits on the row A is replacing').toBe(true);
+      await a.query('commit');
+      await b;
+
+      expect(await jobsOfFile(), 'the running job keeps its key and its retries; no second job').toEqual([
+        { id: running, key: jobKey, attempts: 1, locked_by: 'ng239-race-test' },
+      ]);
+    } finally {
+      await a.query('rollback').catch(() => {});
+      await a.end().catch(() => {});
+      await admin!
+        .$executeRawUnsafe(`delete from graphile_worker._private_jobs where payload->>'evidenceId' = $1`, id)
+        .catch(() => {});
+    }
+  });
+
   // NG-239 Ö-4: the sweep read one page (100 rows) per tenant per tick; a tenant with more
   // PENDING files than that waited 15 minutes per hundred.
   test('the sweep queues every due file of a tenant in one tick, past one page', async () => {
