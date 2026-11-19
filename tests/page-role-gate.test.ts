@@ -210,6 +210,7 @@ describe('each gated page names its door', () => {
 const ROLE_BEFORE_MODULE: ReadonlyArray<readonly [string, string]> = [
   ['partners/leaders/page.tsx', 'view_partner_search'],
   ['partners/[pic]/page.tsx', 'view_partner_search'],
+  ['partners/page.tsx', 'view_partner_search'],
 ];
 
 describe('role door runs before the M1 module gate (NG-257)', () => {
