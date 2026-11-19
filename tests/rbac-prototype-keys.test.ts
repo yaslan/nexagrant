@@ -1,3 +1,4 @@
+import type { Role } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { asRole, can } from "@/lib/rbac";
 
@@ -57,4 +58,29 @@ describe("asRole rejects prototype keys (NG-259)", () => {
     expect(asRole("")).toBeNull();
     expect(asRole("NOT_A_ROLE")).toBeNull();
   });
+});
+
+// NG-259 review B-1: the cases above all pass through `asRole` first, so the
+// own-property guard inside `can` itself was not pinned — removing it left every
+// test green. These call `can` directly with a prototype key, skipping `asRole`.
+describe("can() guards prototype keys without asRole (NG-259 B-1)", () => {
+  it.each(PROTOTYPE_KEYS)("can(%s as Role, action) denies without throwing (no asRole)", (key) => {
+    const role = key as string as Role;
+    expect(() => can(role, "manage_billing")).not.toThrow();
+    expect(can(role, "manage_billing")).toBe(false);
+  });
+
+  it.each(PROTOTYPE_KEYS)(
+    "can(%s as Role, manage_billing, resource) denies without throwing (no asRole)",
+    (key) => {
+      const role = key as string as Role;
+      const resource = {
+        feature: "billing",
+        grantedFeatures: new Set(["billing"]),
+        moduleOpen: true,
+      };
+      expect(() => can(role, "manage_billing", resource)).not.toThrow();
+      expect(can(role, "manage_billing", resource)).toBe(false);
+    }
+  );
 });
