@@ -65,6 +65,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'evidence-expiring': '20 5 * * *',
       'notification-email-instant': '*/5 * * * *',
       'notification-email-weekly': '0 7 * * 1',
+      'evidence-scan-sweep': '*/15 * * * *',
     });
   });
 

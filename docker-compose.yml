@@ -137,6 +137,27 @@ services:
     volumes:
       - miniodata:/data
 
+  # Virus scanner for uploaded evidence (NG-239, §18.3; K-584192 = C: clamd runs on the same
+  # machine as the app). The app streams each stored file to clamd's TCP INSTREAM
+  # (src/lib/clamav.ts) through CLAMD_HOST/CLAMD_PORT; a file downloads only after clamd said OK.
+  # Behind the `scan` profile: clamd holds its signature database in memory (~1-2 GB), so a
+  # plain `docker compose up -d` does not start it. Start with
+  # `docker compose --profile scan up -d clamav` and set CLAMD_HOST=127.0.0.1 in .env.
+  # Without it no evidence file downloads (fail closed), uploads still work.
+  # clamav/clamav-debian, not clamav/clamav: only the Debian build is published for arm64 too.
+  # First start downloads the signatures (freshclam, a few minutes) before clamd listens;
+  # freshclam keeps them current inside the container. Loopback only: INSTREAM has no
+  # authentication and no encryption.
+  clamav:
+    profiles: ["scan"]
+    image: clamav/clamav-debian:stable
+    container_name: fabrika-clamav
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FABRIKA_CLAMD_PORT:-3310}:3310"
+    volumes:
+      - clamavdb:/var/lib/clamav
+
 volumes:
   # Fixed name so compose reuses the volume the hand-made fabrika-postgres
   # container already writes to, instead of creating an empty one.
@@ -146,3 +167,5 @@ volumes:
     name: fabrika_redisdata
   miniodata:
     name: fabrika_miniodata
+  clamavdb:
+    name: fabrika_clamavdb

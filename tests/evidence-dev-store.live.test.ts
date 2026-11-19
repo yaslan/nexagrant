@@ -225,6 +225,8 @@ describe('mock-upload refuses what a signed R2 PUT would refuse', () => {
     expect(res.success).toBe(true);
     const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
     evidenceIds.push(row.id);
+    // NG-239: only a CLEAN file downloads; the scan itself is tested in evidence-scan.live.test.ts.
+    await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
     expect(row.fileSizeBytes).toBe(storage.EVIDENCE_MAX_BYTES);
   }, 60_000);
 
@@ -246,6 +248,8 @@ describe('the download route serving the dev store', () => {
     expect((await confirm(p.objectKey)).success).toBe(true);
     const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
     evidenceIds.push(row.id);
+    // NG-239: only a CLEAN file downloads; the scan itself is tested in evidence-scan.live.test.ts.
+    await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
 
     const res = await callDownload(row.id);
     expect(res.status).toBe(200);
@@ -272,6 +276,8 @@ describe('the download route serving the dev store', () => {
     expect((await confirm(p.objectKey)).success).toBe(true);
     const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
     evidenceIds.push(row.id);
+    // NG-239: only a CLEAN file downloads; the scan itself is tested in evidence-scan.live.test.ts.
+    await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
 
     const html = Buffer.from('<html>'.padEnd(body.length - 7, 'x') + '</html>');
     expect((await mput(p.objectKey, html, 'application/pdf')).status).toBe(200);
@@ -297,6 +303,8 @@ describe('B-1 on the dev store (TASK-MUO64MVW8TLMX, İNCELEME-82 T-2)', () => {
     expect((await confirm(p.objectKey)).success).toBe(true);
     const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
     evidenceIds.push(row.id);
+    // NG-239: only a CLEAN file downloads; the scan itself is tested in evidence-scan.live.test.ts.
+    await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
     expect(row.fileSizeBytes).toBe(body.length);
     expect((await storage.getObjectBytes(finalOf(p.objectKey)))?.equals(body)).toBe(true);
     expect(await storage.statObject(p.objectKey), 'the staging file goes once the row is saved').toBeNull();

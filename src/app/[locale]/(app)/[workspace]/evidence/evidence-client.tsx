@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { evidenceScanRefusal, isEvidenceDownloadable } from '@/lib/evidence-scan-gate';
 import { PRODUCT_NAME } from '@/lib/brand';
 import {
   getPresignedUploadUrlAction,
@@ -47,6 +48,8 @@ export interface EvidenceItemData {
   fileName?: string | null;
   fileSizeBytes?: number | null;
   mimeType?: string | null;
+  /** NG-239: only CLEAN downloads (src/lib/evidence-scan-gate.ts). */
+  scanStatus?: string | null;
   ocrText?: string | null;
   tags?: string[];
   createdAt?: Date | string;
@@ -62,6 +65,22 @@ export interface EvidenceItemData {
  */
 function evidenceDownloadHref(id: string): string {
   return `/api/evidence/${encodeURIComponent(id)}/download`;
+}
+
+/**
+ * NG-239: where a stored file's virus scan stands, for a file that may not be
+ * downloaded yet (or ever). Null when it may: the caller shows the link then.
+ * The rule is the server's own (evidenceScanRefusal), not a copy.
+ */
+function ScanState({ status, t }: { status: unknown; t: (key: string) => string }) {
+  const refusal = evidenceScanRefusal(status);
+  if (!refusal) return null;
+  const tone = refusal === 'scan_infected' ? 'text-bad bg-bad/10 border-bad/30' : 'text-muted bg-ground border-border';
+  return (
+    <span data-testid="evidence-scan-state" data-scan={refusal} className={`text-[11px] font-semibold px-2 py-1 rounded-lg border ${tone}`}>
+      {t(`scan.${refusal}`)}
+    </span>
+  );
 }
 
 interface EvidenceClientProps {
@@ -536,7 +555,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
                     </button>
 
                     <div className="flex items-center gap-1.5">
-                      {doc.r2ObjectKey && (
+                      {doc.r2ObjectKey && !isEvidenceDownloadable(doc.scanStatus) && (
+                        <ScanState status={doc.scanStatus} t={t} />
+                      )}
+                      {doc.r2ObjectKey && isEvidenceDownloadable(doc.scanStatus) && (
                         <a
                           href={evidenceDownloadHref(doc.id)}
                           target="_blank"
@@ -813,7 +835,10 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             </div>
 
             <div className="pt-4 border-t border-border flex items-center justify-between">
-              {selectedDoc.r2ObjectKey && (
+              {selectedDoc.r2ObjectKey && !isEvidenceDownloadable(selectedDoc.scanStatus) && (
+                <ScanState status={selectedDoc.scanStatus} t={t} />
+              )}
+              {selectedDoc.r2ObjectKey && isEvidenceDownloadable(selectedDoc.scanStatus) && (
                 <a
                   href={evidenceDownloadHref(selectedDoc.id)}
                   target="_blank"
