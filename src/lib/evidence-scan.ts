@@ -85,6 +85,9 @@ export async function enqueueEvidenceScan(run: EvidenceScanRun, runAt?: Date): P
 export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps = {}): Promise<EvidenceScanOutcome> {
   const tenantId = requireActionId(run.tenantId, 'tenantId');
   const evidenceId = requireActionId(run.evidenceId, 'evidenceId');
+  // The attempt pins every write below to the state this run read; a value that is not a
+  // count would make that filter match nothing (or, worse, something else).
+  if (!Number.isInteger(run.attempt) || run.attempt < 0) throw new Error('evidence-scan: attempt must be an integer ≥ 0');
   const runTenant: TenantRunner = deps.runTenant ?? ((id, cb) => withTenant(id, cb));
   const readObject = deps.readObject ?? getObjectBytes;
   const deleteObject = deps.deleteObject ?? deleteObjectBytes;
