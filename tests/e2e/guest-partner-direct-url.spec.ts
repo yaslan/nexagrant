@@ -11,6 +11,7 @@ import {
   RG_INVOICE_NO,
   RG_OPP_TITLE,
   RG_PROFILE_TEXT,
+  RG_PROVINCE,
   RG_REL_NAME,
   RG_SEATS,
   RG_TENANT,
@@ -39,7 +40,7 @@ const ws = `/tr/${RG_WORKSPACE}`;
 
 const MARK_EVIDENCE = 'NG238 kiracıya özel kanıt belgesi';
 const MARK_APIKEY = 'NG238 kiracıya özel API anahtarı';
-const EXTRA_IDS = { evidence: 'ng238-evidence', apiKey: 'ng238-apikey' };
+const EXTRA_IDS = { evidence: 'ng238-evidence', apiKeyRow: 'ng238-apikeyrow' };
 const MARK_TOPIC = 'NG251 kiracı dışı çağrı konusu';
 const MARK_ORG = 'NG251 Ortak Kuruluş';
 const TOPIC_IDENT = 'NG251-TOPIC-01';
@@ -133,8 +134,8 @@ test.describe.serial('NG-238 GUEST_PARTNER direct-URL measurement', () => {
       update: { title: MARK_EVIDENCE },
     });
     await prisma.apiKey.upsert({
-      where: { id: EXTRA_IDS.apiKey },
-      create: { id: EXTRA_IDS.apiKey, tenantId: RG_TENANT, name: MARK_APIKEY, keyHash: 'ng238-not-a-real-hash', prefix: 'ng238' },
+      where: { id: EXTRA_IDS.apiKeyRow },
+      create: { id: EXTRA_IDS.apiKeyRow, tenantId: RG_TENANT, name: MARK_APIKEY, keyHash: 'ng238-not-a-real-hash', prefix: 'ng238' },
       update: { name: MARK_APIKEY },
     });
     // `Call` is the parent: the detail pages read a `Topic`, so seed one of each, plus a
@@ -162,21 +163,23 @@ test.describe.serial('NG-238 GUEST_PARTNER direct-URL measurement', () => {
     await prisma.topic.deleteMany({ where: { identifier: TOPIC_IDENT } });
     await prisma.call.deleteMany({ where: { callIdentifier: 'NG251-CALL' } });
     await prisma.programme.deleteMany({ where: { id: 'NG251' } });
-    await prisma.apiKey.deleteMany({ where: { id: 'ng238-apikey' } });
-    await prisma.evidence.deleteMany({ where: { id: 'ng238-evidence' } });
+    await prisma.apiKey.deleteMany({ where: { id: EXTRA_IDS.apiKeyRow } });
+    await prisma.evidence.deleteMany({ where: { id: EXTRA_IDS.evidence } });
     await teardownRoleGateTenant();
   });
 
   test('regression (NG-240): guest gets 403 on proje-fikri and the profile routes; owner sees them', async ({ page }) => {
     test.setTimeout(120_000);
     mkdirSync(join(OUT, 'shots'), { recursive: true });
-    const closed: Array<[string, string]> = [
-      ['proje-fikri', RG_IDEA_TITLE],
-      ['ayarlar/profil', RG_PROFILE_TEXT],
-      ['settings/profile', RG_PROFILE_TEXT],
+    // Third item: the tenant province, rendered by the profile LAYOUT (its own gate, NG-251
+    // review): the page gate alone leaves it in the guest's RSC payload. Quoted: the bare word also sits in an i18n placeholder ("Örn. Samsun …").
+    const closed: Array<[string, string, string[]]> = [
+      ['proje-fikri', RG_IDEA_TITLE, []],
+      ['ayarlar/profil', RG_PROFILE_TEXT, [`"${RG_PROVINCE}"`]],
+      ['settings/profile', RG_PROFILE_TEXT, [`"${RG_PROVINCE}"`]],
     ];
     await signIn(page, 'GUEST_PARTNER');
-    for (const [route, marker] of closed) {
+    for (const [route, marker, extra] of closed) {
       const row = await visit(page, 'GUEST_PARTNER', route, join(OUT, 'shots'));
       expect(row.status, `guest ${route}`).toBe(403);
       expect(row.forbiddenHeading, `guest ${route} heading`).toBe(true);
@@ -186,14 +189,16 @@ test.describe.serial('NG-238 GUEST_PARTNER direct-URL measurement', () => {
       const flight = await rsc.text();
       writeFileSync(join(OUT, `rsc-guest-${route.replace(/\W+/g, '_')}.txt`), `${rsc.status()}\n${flight.slice(0, 4000)}`);
       expect(flight, `guest ${route} RSC`).not.toContain(marker);
+      for (const e of extra) expect(flight, `guest ${route} RSC leaks ${e}`).not.toContain(e);
       expect(flight, `guest ${route} RSC carries the forbidden view`).toContain(FORBIDDEN_TITLE);
     }
     await signIn(page, 'TENANT_OWNER');
-    for (const [route, marker] of closed) {
+    for (const [route, marker, extra] of closed) {
       const row = await visit(page, 'TENANT_OWNER', route, join(OUT, 'shots'));
       expect(row.status, `owner ${route}`).toBe(200);
       const text = `${await page.content()}\n${await page.evaluate(() => document.body.innerText)}`;
       expect(text, `owner ${route} sees the marker (not blind)`).toContain(marker);
+      for (const e of extra) expect(text, `owner ${route} sees ${e} (not blind)`).toContain(e);
     }
   });
 
