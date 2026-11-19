@@ -7,7 +7,7 @@ import type {
 } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
 import { requireActionId } from '@/lib/required-id';
-import { NOTIFICATION_EVENTS, eventOfType } from './events';
+import { NOTIFICATION_EVENTS, NOTIFICATION_TYPE_EVENT, eventOfType } from './events';
 import { recordNotification, type NewNotification } from './store';
 
 /**
@@ -122,6 +122,17 @@ export async function setPreferenceFor(
     create: { tenantId, userId, event: p.event, channel: p.channel, frequency: p.frequency },
     update: { frequency: p.frequency },
   });
+  // K-584554 (A): switching the e-mail channel OFF drops this user's still-queued
+  // mails for the event. Sent rows (sentAt set) stay: they are history and keep
+  // their dedupeKey. Scoped by tenantId + userId; other members are not touched.
+  if (p.channel === 'EMAIL' && p.frequency === 'OFF') {
+    const types = (Object.keys(NOTIFICATION_TYPE_EVENT) as NotificationType[]).filter(
+      (type) => NOTIFICATION_TYPE_EVENT[type] === p.event
+    );
+    await tx.notificationEmailItem.deleteMany({
+      where: { tenantId, userId, sentAt: null, type: { in: types } },
+    });
+  }
   return p;
 }
 

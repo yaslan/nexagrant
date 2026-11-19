@@ -99,4 +99,32 @@ test.describe('Notification preferences — NG-8', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'Bildirim tercihleri' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Yeni eşleşen çağrı — E-posta' })).toHaveValue('WEEKLY');
   });
+
+  test('e-mail OFF drops the queued mails of that event; sent mails stay (K-584554 A)', async ({ page }) => {
+    const queuedId = `e2e-ng8-q-${RUN}`;
+    const sentId = `e2e-ng8-s-${RUN}`;
+    await withSystemScope('platform-admin', 'e2e.ng8.queue', async (tx) => {
+      await tx.notificationEmailItem.createMany({
+        data: [
+          { id: queuedId, tenantId: OWNER.tenantId, userId: OWNER.userId, type: 'SAVED_SEARCH_MATCH', payload: {}, frequency: 'WEEKLY', sentAt: null },
+          { id: sentId, tenantId: OWNER.tenantId, userId: OWNER.userId, type: 'SAVED_SEARCH_MATCH', payload: {}, frequency: 'WEEKLY', sentAt: new Date() },
+        ],
+      });
+    });
+
+    await signIn(page, OWNER, 'TENANT_OWNER');
+    await page.goto(`/en/${OWNER.ws.slug}/notifications`);
+    await emailSelect(page).selectOption('OFF');
+    await expect(page.getByRole('status')).toHaveText('Preference saved');
+
+    const rows = await withSystemScope('platform-admin', 'e2e.ng8.queue.read', (tx) =>
+      tx.notificationEmailItem.findMany({
+        where: { tenantId: OWNER.tenantId, userId: OWNER.userId },
+        select: { id: true },
+      })
+    );
+    const ids = rows.map((r) => r.id);
+    expect(ids).not.toContain(queuedId);
+    expect(ids).toContain(sentId);
+  });
 });
