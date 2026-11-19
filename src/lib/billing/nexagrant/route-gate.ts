@@ -12,7 +12,7 @@ import { NextResponse } from 'next/server';
 import { withTenant } from '@/lib/db';
 import { asRole, type Action } from '@/lib/rbac';
 import type { NgFeatureKey } from './features';
-import { ngFeatureGate } from './gate';
+import { ngFeatureGate, type NgGateDecision } from './gate';
 
 export interface NgGateCaller {
   tenantId: string;
@@ -20,9 +20,14 @@ export interface NgGateCaller {
   role: string | null | undefined;
 }
 
-export async function ngGateResponse(caller: NgGateCaller, action: Action, feature: NgFeatureKey): Promise<NextResponse | null> {
+/** The gate decision for a signed-in member, in the member's tenant scope. Shared with page-gate.tsx. */
+export function ngCallerDecision(caller: NgGateCaller, action: Action, feature: NgFeatureKey): Promise<NgGateDecision> {
   const role = asRole(caller.role);
-  const decision = await withTenant(caller.tenantId, (tx) => ngFeatureGate(tx, { tenantId: caller.tenantId, role }, action, feature));
+  return withTenant(caller.tenantId, (tx) => ngFeatureGate(tx, { tenantId: caller.tenantId, role }, action, feature));
+}
+
+export async function ngGateResponse(caller: NgGateCaller, action: Action, feature: NgFeatureKey): Promise<NextResponse | null> {
+  const decision = await ngCallerDecision(caller, action, feature);
   if (decision.allowed) return null;
   return NextResponse.json({ error: 'Forbidden', code: decision.code, feature: decision.feature }, { status: 403 });
 }

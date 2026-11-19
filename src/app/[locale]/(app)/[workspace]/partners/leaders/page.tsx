@@ -6,6 +6,7 @@ import { errorMessage } from '@/lib/errors';
 import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { authenticateCordisSession } from '@/lib/cordis-api-auth';
+import { ngPageGate } from '@/lib/billing/nexagrant/page-gate';
 import { cordisTopicPrefixSchema } from '@/lib/k2-cordis/api-query';
 import { coordinatorLeaders, type CoordinatorLeaderRow } from '@/lib/k2-cordis/coordinator-leaders';
 
@@ -41,6 +42,12 @@ export default async function LeadersPage({
         <p className="text-sm text-ink-2">{t(reason)}</p>
       </section>
     );
+  }
+  // NG-250 (review B1): the NexaGrant plan gate, with the member the CORDIS door already read,
+  // before any CORDIS query — the same partner_search /api/cordis/organizations is gated by.
+  if (access.session) {
+    const ngLocked = await ngPageGate(access.session, locale, 'view_partner_search', 'partner_search');
+    if (ngLocked) return ngLocked;
   }
 
   // `?topic=` filters by CORDIS topic-code prefix. Empty means the global list.

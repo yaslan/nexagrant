@@ -13,6 +13,7 @@ import { recordAlert } from '@/lib/observability/system-alert';
 import { getEntitlements } from '@/lib/billing';
 import { partnerSearchGrant } from '@/lib/billing/catalog';
 import { requireTenantPageRole } from '@/lib/page-role';
+import { ngPageGate } from '@/lib/billing/nexagrant/page-gate';
 import { AnnouncementBrowser } from '@/modules/m1/ui/partner-search/AnnouncementBrowser';
 import { ActiveAnnouncementsBadge } from '@/modules/m1/ui/partner-search/ActiveAnnouncementsBadge';
 import { createRelationship } from '../relationships/actions';
@@ -78,7 +79,11 @@ export default async function PartnersPage({
   if (locked) return locked;
   // The role door covers both tabs (NG-64): the live announcements tab reads no
   // tenant row here, but it is the same M1 screen a guest partner may not open.
-  const { tenantId } = await requireTenantPageRole(locale, 'view_partner_search');
+  const { tenantId, role } = await requireTenantPageRole(locale, 'view_partner_search');
+  // NG-250 (review B1): the NexaGrant plan gate, before any CORDIS or quota read. The same
+  // partner_search the /api/cordis/organizations and /api/partner-search routes are gated by.
+  const ngLocked = await ngPageGate({ tenantId, role }, locale, 'view_partner_search', 'partner_search');
+  if (ngLocked) return ngLocked;
 
   const sParams = await searchParams;
   const tLinks = await getTranslations({ locale, namespace: 'PartnersPage.crossLinks' });

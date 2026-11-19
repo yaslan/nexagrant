@@ -6,10 +6,15 @@
  *                          platform seat limit already uses (src/lib/billing/seat-limit.ts).
  *                          Enforced only behind NG_SEAT_LIMIT_ENFORCED: the per-plan seat counts
  *                          wait on approval, so until then the number is shown, not applied.
- *   - ai_writing_monthly — `AiUsageLog` rows of the tenant since 00:00 Istanbul on the 1st of the
- *                          current Istanbul month. Every logged model call is one operation.
- *                          Enforced in `generateCompletion` (src/lib/llm.ts) under the tenant's
- *                          credit lock, before the provider is called.
+ *   - ai_writing_monthly — text generations of the tenant since 00:00 Istanbul on the 1st of the
+ *                          current Istanbul month (K-584612 = A): the `AiUsageLog` rows
+ *                          `generateCompletion` writes, one per generation. Embedding rows
+ *                          (`embedText`: RAG ingest chunks and search queries, credits 0) are
+ *                          not writings and are not counted, so a RAG-backed writing is one
+ *                          operation and a document upload is none. They are told apart by
+ *                          model name (src/lib/llm-embedding-model.ts; the table has no kind
+ *                          column). Enforced in `generateCompletion` (src/lib/llm.ts) under the
+ *                          tenant's credit lock, before the provider is called.
  *   - eligibility_check  — the Ücretsiz Kontrol monthly allowance has no product route yet
  *                          (bindings.ts, NG_UNBOUND_FEATURES); `ngLimitAllows` is the decision it
  *                          will use, nothing counts it today.
@@ -20,6 +25,7 @@
 import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
 import { lockTenantSeats } from '@/lib/billing/seat-limit';
+import { EMBEDDING_MODEL_PREFIX } from '@/lib/llm-embedding-model';
 import { NG_PLAN_LIMIT_REACHED } from './codes';
 import { featureLimit, type NgFeatureLimit } from './entitlement';
 import type { NgFeatureKey } from './features';
@@ -109,7 +115,10 @@ async function countSeats(tx: TenantTx, tenantId: string, at: Date, exceptEmail?
 
 async function countAiThisMonth(tx: TenantTx, tenantId: string, at: Date): Promise<{ used: number; periodStart: Date }> {
   const periodStart = istanbulMonthStart(at);
-  const used = await tx.aiUsageLog.count({ where: { tenantId, createdAt: { gte: periodStart } } });
+  // Generations only: an embedding row (embedText) is not a writing (review B2, K-584612 = A).
+  const used = await tx.aiUsageLog.count({
+    where: { tenantId, createdAt: { gte: periodStart }, NOT: { model: { startsWith: EMBEDDING_MODEL_PREFIX } } },
+  });
   return { used, periodStart };
 }
 

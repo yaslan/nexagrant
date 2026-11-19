@@ -23,6 +23,7 @@ import type { TenantTx } from '@/lib/db';
 import { declaredNodeEnv, env } from '@/lib/env';
 import { errorStatus } from '@/lib/errors';
 import { LLM_REFUSED_DIGEST, LLM_TRUNCATED_DIGEST } from '@/lib/llm-outcome';
+import { DEFAULT_EMBEDDING_MODEL, EMBEDDING_MODEL_PREFIX, isEmbeddingModel } from '@/lib/llm-embedding-model';
 
 export type LlmProvider = 'anthropic' | 'openai';
 
@@ -961,8 +962,6 @@ export async function generateText(options: LlmGenerateOptions): Promise<string>
 // call that actually reaches the provider.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Default embedding model. 1536 dimensions is what `Chunk.embedding` is declared as. */
-const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-large';
 const EMBEDDING_DIMENSIONS = 1536;
 
 /**
@@ -1035,10 +1034,14 @@ export async function embedText(
   attribution: AiCallAttribution,
   opts?: { model?: string; dimensions?: number }
 ): Promise<number[]> {
+  const model = opts?.model || DEFAULT_EMBEDDING_MODEL;
+  // The model name is how the NexaGrant AI writing quota tells this row from a generation's
+  // (src/lib/llm-embedding-model.ts). Refused before the provider: nothing sent, nothing logged.
+  if (!isEmbeddingModel(model)) throw new Error(`embedText: not an embedding model name (${EMBEDDING_MODEL_PREFIX}*): ${model}`);
+
   const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not set');
 
-  const model = opts?.model || DEFAULT_EMBEDDING_MODEL;
   const dimensions = opts?.dimensions ?? EMBEDDING_DIMENSIONS;
 
   const res = await fetch('https://api.openai.com/v1/embeddings', {

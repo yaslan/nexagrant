@@ -25,6 +25,10 @@ vi.mock('@/lib/modules/access', () => ({ checkModuleAccess, requestSession: asyn
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn() } }));
 vi.mock('@/lib/db', () => ({ prisma: { cordisPartnerProfile: { findMany, count } } }));
 vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch }));
+// NG-250 (review B1): the page's NexaGrant plan gate reads the tenant's plan from the database;
+// this test renders the page without one, so the gate lets it through. The gate itself is
+// covered by tests/ng250-plan-gate.live.test.ts and src/lib/billing/nexagrant/page-gate.test.tsx.
+vi.mock('@/lib/billing/nexagrant/page-gate', () => ({ ngPageGate: async () => null }));
 
 const signedIn = { ok: true, scope: { userId: 'u-gate', tenantId: 't1', role: 'MEMBER', isPlatformAdmin: false } };
 const fullM1 = { allowed: true, status: 'ON' };

@@ -52,6 +52,7 @@ const T = {
   bare: `${RUN}-bare`,
   m1off: `${RUN}-m1off`,
   active: `${RUN}-active`,
+  emb: `${RUN}-emb`,
 };
 const NOW = new Date('2026-11-19T09:00:00Z');
 const OWNER = (tenantId: string) => ({ tenantId, role: 'TENANT_OWNER' as const });
@@ -82,6 +83,22 @@ const aiRows = (tenantId: string, n: number, at: Date) =>
     createdAt: at,
   }));
 
+// The row embedText (src/lib/llm.ts) writes for a tenant's RAG ingest chunk or search query:
+// provider openai, an embedding model, no output tokens, no credits.
+const embeddingRows = (tenantId: string, n: number, at: Date, model: string, purpose: string) =>
+  Array.from({ length: n }, () => ({
+    tenantId,
+    module: 'K6',
+    purpose,
+    provider: 'openai',
+    model,
+    promptHash: 'h',
+    inputTokens: 100,
+    outputTokens: 0,
+    credits: 0,
+    createdAt: at,
+  }));
+
 describe.skipIf(!reachable)('NG-250 plan gate, counters and status guard (live)', () => {
   beforeAll(async () => {
     await admin!.tenant.createMany({
@@ -93,6 +110,7 @@ describe.skipIf(!reachable)('NG-250 plan gate, counters and status guard (live)'
         trialRow(T.ended, new Date('2026-11-18T21:00:00Z')),
         trialRow(T.m1off, new Date('2026-11-24T21:00:00Z')),
         { ...trialRow(T.active, new Date('2026-11-01T21:00:00Z')), status: 'ACTIVE' as const },
+        trialRow(T.emb, new Date('2026-11-24T21:00:00Z')),
       ],
     });
     await admin!.moduleState.createMany({
@@ -175,6 +193,24 @@ describe.skipIf(!reachable)('NG-250 plan gate, counters and status guard (live)'
     expect(refused).toBeInstanceOf(NgPlanLimitError);
     expect((refused as NgPlanLimitError).code).toBe('NG_PLAN_LIMIT_REACHED');
     expect((refused as NgPlanLimitError).feature).toBe('ai_writing_monthly');
+  });
+
+  it('B2 (review P1): embedding rows are not AI writing — 10 writings + 40 embedding rows → used 10, not refused', async () => {
+    // K-584612 = A: ai_writing_monthly counts text generation (generateCompletion) only. One
+    // 40-chunk document upload must not spend 40 of the month's writings.
+    await admin!.aiUsageLog.createMany({ data: aiRows(T.emb, 10, NOW) });
+    await admin!.aiUsageLog.createMany({ data: embeddingRows(T.emb, 38, NOW, 'text-embedding-3-large', 'rag_ingest_embedding') });
+    await admin!.aiUsageLog.createMany({ data: embeddingRows(T.emb, 2, NOW, 'text-embedding-3-small', 'rag_search_embedding') });
+    const usage = await asTenant(T.emb, (tx) => readNgUsage(tx, T.emb, NOW));
+    // The plan screen reads this counter (usage.aiWritingMonthly.used): the same number.
+    expect(usage?.aiWritingMonthly).toMatchObject({ used: 10, limit: 50 });
+    await expect(asTenant(T.emb, (tx) => assertNgAiQuota(tx, T.emb, NOW))).resolves.toBeUndefined();
+
+    // Still refused at the limit: 40 more writings → 50/50, embeddings still not counted.
+    await admin!.aiUsageLog.createMany({ data: aiRows(T.emb, 40, NOW) });
+    const refused = await asTenant(T.emb, (tx) => assertNgAiQuota(tx, T.emb, NOW)).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(NgPlanLimitError);
+    expect((refused as NgPlanLimitError).used).toBe(50);
   });
 
   it('AI quota: after the trial (ng-free grants no AI) the first call is refused; no row → not counted', async () => {

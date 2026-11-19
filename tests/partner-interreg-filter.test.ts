@@ -186,6 +186,10 @@ vi.mock('../src/lib/modules/guard', () => ({
 }));
 // M1 in full: no monthly search count (FO-41).
 vi.mock('../src/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch: async () => null }));
+// NG-250 (review B1): the page's NexaGrant plan gate reads the tenant's plan from the database;
+// this test renders the page without one, so the gate lets it through. The gate itself is
+// covered by tests/ng250-plan-gate.live.test.ts and src/lib/billing/nexagrant/page-gate.test.tsx.
+vi.mock('../src/lib/billing/nexagrant/page-gate', () => ({ ngPageGate: async () => null }));
 
 // FO-62 B1: the page reads the tenant's plan to decide whether the (metered)
 // announcement badges render. Rendered outside a request, so the session and

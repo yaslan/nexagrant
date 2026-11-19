@@ -27,6 +27,17 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('next/navigation', () => ({ notFound: () => null }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
+// The page's role door (NG-257) reads the request session via headers(); this
+// test renders the page outside a request, so stub the door to an authorised
+// role. The door itself is covered by tests/page-role-gate.test.ts and
+// tests/e2e/role-gate.spec.ts.
+vi.mock('@/lib/page-role', () => ({
+  requireTenantPageRole: async () => ({ tenantId: 't1', userId: 'u1', role: 'TENANT_OWNER', isPlatformAdmin: false }),
+}));
+// NG-250 (review B1): the page's NexaGrant plan gate reads the tenant's plan from the database;
+// this test renders the page without one, so the gate lets it through. The gate itself is
+// covered by tests/ng250-plan-gate.live.test.ts and src/lib/billing/nexagrant/page-gate.test.tsx.
+vi.mock('@/lib/billing/nexagrant/page-gate', () => ({ ngPageGate: async () => null }));
 vi.mock('@/modules/m1/ui/PartnerOutreach', () => ({ PartnerOutreach: () => null }));
 vi.mock('@/modules/m1/ui/partner-search/OrganizationAnnouncements', () => ({ OrganizationAnnouncements: () => null }));
 vi.mock('@/lib/db', () => ({

@@ -5,11 +5,11 @@
  * a module-backed feature missing from the map is gated by plan and role only, which skips
  * the module switch — CLAUDE.md rule 4).
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { NG_FEATURE_MODULE } from './authz';
-import { NG_ROUTE_BINDINGS, NG_UNBOUND_FEATURES } from './bindings';
+import { NG_DATA_FILE_EXCEPTIONS, NG_ROUTE_BINDINGS, NG_UNBOUND_FEATURES } from './bindings';
 import { NG_FEATURE_KEYS } from './features';
 
 const ROOT = path.resolve(__dirname, '../../../..');
@@ -30,8 +30,14 @@ describe('NG feature → route bindings (NG-250)', () => {
     (_name, b) => {
       expect(existsSync(path.join(ROOT, b.file)), b.file).toBe(true);
       const src = read(b.file);
-      expect(src).toContain(`export async function ${b.method}`);
-      expect(src).toMatch(new RegExp(`ngGateResponse\\([^)]*'${b.action}',\\s*'${b.feature}'`));
+      if (b.kind === 'page') {
+        // A server component page: the gate renders the refusal (page-gate.tsx), it does not return a 403.
+        expect(src).toContain('export default async function');
+        expect(src).toMatch(new RegExp(`ngPageGate\\([^)]*'${b.action}',\\s*'${b.feature}'`));
+      } else {
+        expect(src).toContain(`export async function ${b.method}`);
+        expect(src).toMatch(new RegExp(`ngGateResponse\\([^)]*'${b.action}',\\s*'${b.feature}'`));
+      }
     }
   );
 
@@ -55,5 +61,44 @@ describe('NG feature → route bindings (NG-250)', () => {
   it('the review measurement: partner_search is no longer outside the map', () => {
     expect(NG_FEATURE_MODULE.partner_search).toBe('M1');
     expect(Object.keys(NG_FEATURE_MODULE).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Review B1 (NG-250): the table listed six API routes and the test read only those, so the
+   * partner directory page served the same CORDIS rows with no plan gate. Read the other way
+   * round: every file under src/app that touches partner-search data is bound or excused.
+   */
+  it('reverse coverage: every src/app file reading partner-search data is bound or excused with a reason', () => {
+    const DATA = /\b(cordisPartnerProfile|cordisOrganization|listOrganizationAnnouncements|topicPartnerSignal)\b/;
+    const walk = (dir: string): string[] =>
+      readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
+        const rel = `${dir}/${e.name}`;
+        if (e.isDirectory()) return walk(rel);
+        return /\.(ts|tsx)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [rel] : [];
+      });
+    const readers = walk('src/app').filter((f) => DATA.test(read(f)));
+    expect(readers.length).toBeGreaterThan(0);
+    const bound = new Set(NG_ROUTE_BINDINGS.map((b) => b.file));
+    const unaccounted = readers.filter((f) => !bound.has(f) && !Object.hasOwn(NG_DATA_FILE_EXCEPTIONS, f));
+    expect(unaccounted, 'partner-search data read with no NexaGrant gate and no reason').toEqual([]);
+    // No stale entry: an excused file still exists and still reads the data, and is not also bound.
+    for (const [file, reason] of Object.entries(NG_DATA_FILE_EXCEPTIONS)) {
+      expect(readers, `${file} is excused but does not read partner-search data`).toContain(file);
+      expect(bound.has(file), `${file} is both bound and excused`).toBe(false);
+      expect(reason.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('B1: the partner pages and the two partner-search API routes are bound to partner_search', () => {
+    const want = [
+      ['page', 'src/app/[locale]/(app)/[workspace]/partners/page.tsx'],
+      ['page', 'src/app/[locale]/(app)/[workspace]/partners/[pic]/page.tsx'],
+      ['page', 'src/app/[locale]/(app)/[workspace]/partners/leaders/page.tsx'],
+      ['route', 'src/app/api/organizations/[pic]/announcements/route.ts'],
+      ['route', 'src/app/api/topics/[identifier]/partner-signal/route.ts'],
+    ] as const;
+    for (const [kind, file] of want) {
+      expect(NG_ROUTE_BINDINGS.find((b) => b.file === file), file).toMatchObject({ kind, feature: 'partner_search', module: 'M1' });
+    }
   });
 });
