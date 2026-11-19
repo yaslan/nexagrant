@@ -24,7 +24,9 @@ vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
 vi.mock('@/lib/cordis-api-auth', () => ({ authenticateCordisSession: async () => ({ authenticated: true, session: { tenantId: 't1', role: 'MEMBER' } }) }));
 // NG-250: a member session now always reaches the NexaGrant plan gate (F2), which reads the
 // tenant's plan from the database. These tests pin the data path, so the gate lets them through;
-// the gate is covered by src/lib/billing/nexagrant/page-gate.test.tsx and tests/partners-leaders-gate.test.tsx.
+// the gate's decision is covered by src/lib/billing/nexagrant/page-gate.test.tsx, and that this
+// page returns a refusal before any reader runs by tests/partners-leaders-gate.test.tsx
+// ("NG-250 (review 4, Bulgu A): the plan gate refuses ...").
 vi.mock('@/lib/billing/nexagrant/page-gate', () => ({ ngPageGate: async () => null }));
 vi.mock('@/lib/db', () => ({ prisma: { cordisPartnerProfile: { findMany } } }));
 vi.mock('@/lib/k2-cordis/coordinator-leaders', () => ({ coordinatorLeaders }));

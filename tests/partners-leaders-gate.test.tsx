@@ -26,13 +26,18 @@ vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn() } }));
 vi.mock('@/lib/db', () => ({ prisma: { cordisPartnerProfile: { findMany, count } } }));
 vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch }));
 // NG-250 (review B1): the page's NexaGrant plan gate reads the tenant's plan from the database;
-// this test renders the page without one, so the gate lets it through. The gate itself is
-// covered by tests/ng250-plan-gate.live.test.ts and src/lib/billing/nexagrant/page-gate.test.tsx.
-const { ngPageGate, cordisSessionOverride } = vi.hoisted(() => ({
-  ngPageGate: vi.fn(async () => null),
+// here it is replaced: by default it lets the page through, and the "plan gate refuses" test
+// below makes it return a refusal to prove the page returns it before any reader runs. The
+// gate's own decision is covered by tests/ng250-plan-gate.live.test.ts and
+// src/lib/billing/nexagrant/page-gate.test.tsx.
+const { ngPageGate, cordisSessionOverride, coordinatorLeaders } = vi.hoisted(() => ({
+  ngPageGate: vi.fn(async (..._args: unknown[]): Promise<ReactElement | null> => null),
+  coordinatorLeaders: vi.fn(async () => []),
   cordisSessionOverride: { value: null as null | { authenticated: true; session?: { tenantId: string; role: string } } },
 }));
 vi.mock('@/lib/billing/nexagrant/page-gate', () => ({ ngPageGate }));
+// NG-250 (review 4, Bulgu A): the `?topic=` path's reader, so a refusal can be shown to skip it too.
+vi.mock('@/lib/k2-cordis/coordinator-leaders', () => ({ coordinatorLeaders }));
 // NG-250 review F2: lets one test hand the page an authorised result with no member session.
 vi.mock('@/lib/cordis-api-auth', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/lib/cordis-api-auth')>();
@@ -45,11 +50,11 @@ vi.mock('@/lib/cordis-api-auth', async (importOriginal) => {
 const signedIn = { ok: true, scope: { userId: 'u-gate', tenantId: 't1', role: 'MEMBER', isPlatformAdmin: false } };
 const fullM1 = { allowed: true, status: 'ON' };
 
-async function render(): Promise<string> {
+async function render(searchParams: { topic?: string } = {}): Promise<string> {
   const { default: LeadersPage } = await import('@/app/[locale]/(app)/[workspace]/partners/leaders/page');
   const el = await LeadersPage({
     params: Promise.resolve({ locale: 'en', workspace: 'main' }),
-    searchParams: Promise.resolve({}),
+    searchParams: Promise.resolve(searchParams),
   });
   return renderToStaticMarkup(el as ReactElement);
 }
@@ -66,7 +71,10 @@ beforeEach(() => {
     { organisationId: '999999999', name: 'Example Org', totalProjects: 3, coordinatorProjects: 2, country: 'DE', activityType: 'REC' },
   ]);
   count.mockResolvedValue(0);
-  ngPageGate.mockClear();
+  ngPageGate.mockReset();
+  ngPageGate.mockResolvedValue(null);
+  coordinatorLeaders.mockReset();
+  coordinatorLeaders.mockResolvedValue([]);
   cordisSessionOverride.value = null;
 });
 
@@ -122,6 +130,20 @@ describe('/partners/leaders gate (FO-163)', () => {
     const html = await render();
     expect(ngPageGate).toHaveBeenCalledWith({ tenantId: 't1', role: 'MEMBER' }, 'en', 'view_partner_search', 'partner_search');
     expect(html).toContain('Example Org');
+  });
+
+  it('NG-250 (review 4, Bulgu A): the plan gate refuses — its element is returned, no reader runs', async () => {
+    // The page must hand back whatever the plan gate returns and stop there: neither the global
+    // list (findMany) nor the topic path (coordinatorLeaders) may be read for a refused plan.
+    for (const searchParams of [{}, { topic: 'HORIZON-CL5' }]) {
+      ngPageGate.mockResolvedValueOnce(<section data-testid="ng-plan-gate" />);
+      const html = await render(searchParams);
+      expect(html).toContain('data-testid="ng-plan-gate"');
+      expect(html).not.toContain('Example Org');
+    }
+    expect(ngPageGate).toHaveBeenCalledTimes(2);
+    expect(findMany).not.toHaveBeenCalled();
+    expect(coordinatorLeaders).not.toHaveBeenCalled();
   });
 
   it('normal member: the list renders and no monthly quota is counted', async () => {
