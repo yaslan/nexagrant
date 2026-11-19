@@ -153,6 +153,14 @@ services:
     image: clamav/clamav-debian:stable
     container_name: fabrika-clamav
     restart: unless-stopped
+    environment:
+      # NG-239 Ö-1: the image writes CLAMD_CONF_<Option> into clamd.conf at start. Without this,
+      # clamd stops at MaxScanSize/MaxRecursion/MaxFiles (400 MB unpacked in all, 17 levels deep,
+      # 10000 files) and still answers OK, so a zip bomb inside a 25 MB .docx would pass as clean
+      # (measured on ClamAV 1.5.4: a ZIP nested 20 deep and one unpacking to 450 MB both said OK). With it the answer is `Heuristics.Limits.Exceeded.* FOUND`, which src/lib/clamav.ts
+      # reads as an error: the file stays ERROR and does not download. Any clamd the app talks to
+      # (the VPS one too, NG-261) needs this option.
+      CLAMD_CONF_AlertExceedsMax: "yes"
     ports:
       - "127.0.0.1:${FABRIKA_CLAMD_PORT:-3310}:3310"
     volumes:

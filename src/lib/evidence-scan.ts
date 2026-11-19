@@ -17,8 +17,8 @@ import { requireActionId } from '@/lib/required-id';
  *   FOUND   → INFECTED; the object is deleted from the store, an AuditEvent
  *             (`evidence.scan.infected`) is written in the tenant's scope and an
  *             `error` SystemAlert is raised.
- *   anything else (clamd not configured, refused, timed out, its own ERROR, the
- *   object unreadable) → ERROR, `scanAttempts` + 1, and the next attempt is
+ *   anything else (clamd not configured, refused, timed out, its own ERROR, a
+ *   file past clamd's limits — `limits_exceeded`, NG-239 Ö-1 — or the object unreadable) → ERROR, `scanAttempts` + 1, and the next attempt is
  *   queued after {@link EVIDENCE_SCAN_RETRY_WAITS_MS}. When the waits run out a
  *   `warn` SystemAlert says so; `evidence-scan-sweep` tries again later.
  *
@@ -68,12 +68,18 @@ export type EvidenceScanOutcome =
 /**
  * Queues one scan attempt. Never throws: the upload is committed already, and a
  * row whose job could not be queued stays PENDING (not downloadable) until the
- * sweep queues it. One key per evidence and attempt, so a repeat adds nothing.
+ * sweep queues it. One key per evidence and attempt, so a repeat adds nothing
+ * while that job is queued or running.
+ *
+ * A job under the same key that failed for good (every queue attempt used, e.g.
+ * the database was away for a few minutes) is replaced (`replaceFailed`): with
+ * `unsafe_dedupe` alone it would hold the key forever, the sweep would keep
+ * "queueing" into it and the file would never be scanned (NG-239 Ö-2).
  */
 export async function enqueueEvidenceScan(run: EvidenceScanRun, runAt?: Date): Promise<boolean> {
   try {
     const { enqueueJob } = await import('@/lib/jobs/enqueue');
-    await enqueueJob('evidence-scan', { ...run }, runAt ? { runAt } : {});
+    await enqueueJob('evidence-scan', { ...run }, { replaceFailed: true, ...(runAt ? { runAt } : {}) });
     return true;
   } catch (error) {
     console.warn(`[evidence-scan] could not queue a scan (attempt ${run.attempt}): ${errorMessage(error)}`);
@@ -197,7 +203,8 @@ export interface EvidenceScanSweepResult {
  * was uploaded before NG-239 and became PENDING with the migration) and an
  * ERROR row whose last attempt is older than {@link EVIDENCE_SCAN_SWEEP_ERROR_AFTER_MS}.
  * The job key (evidence + attempt) keeps a run already queued from being added
- * twice. Tenant by tenant under its own scope, as evidence-expiring does.
+ * twice; a job under that key that failed for good is replaced
+ * ({@link enqueueEvidenceScan}). Every due row of a tenant, page by page. Tenant by tenant under its own scope, as evidence-expiring does.
  */
 export async function sweepUnscannedEvidence(
   options: { now?: Date; runTenant?: TenantRunner; enqueue?: EvidenceScanDeps['enqueue']; tenantIds?: readonly string[] } = {}
@@ -221,24 +228,32 @@ export async function sweepUnscannedEvidence(
     for (const { id: tenantId } of tenants) {
       out.tenants++;
       try {
-        const due = await runTenant(tenantId, (tx) =>
-          tx.evidence.findMany({
-            where: {
-              tenantId,
-              r2ObjectKey: { not: null },
-              OR: [
-                { scanStatus: 'PENDING', updatedAt: { lt: pendingBefore } },
-                { scanStatus: 'ERROR', scannedAt: { lt: errorBefore } },
-              ],
-            },
-            select: { id: true, scanAttempts: true },
-            orderBy: { id: 'asc' },
-            take: EVIDENCE_SCAN_SWEEP_PAGE,
-          })
-        );
-        for (const e of due) {
-          if (await enqueue({ tenantId, evidenceId: e.id, attempt: e.scanAttempts })) out.queued++;
-          else out.notQueued++;
+        // Page through the whole tenant (NG-239 Ö-4): one page per tick left a tenant with
+        // thousands of files from before NG-239 undownloadable for hours.
+        let after = '';
+        for (;;) {
+          const due = await runTenant(tenantId, (tx) =>
+            tx.evidence.findMany({
+              where: {
+                tenantId,
+                id: { gt: after },
+                r2ObjectKey: { not: null },
+                OR: [
+                  { scanStatus: 'PENDING', updatedAt: { lt: pendingBefore } },
+                  { scanStatus: 'ERROR', scannedAt: { lt: errorBefore } },
+                ],
+              },
+              select: { id: true, scanAttempts: true },
+              orderBy: { id: 'asc' },
+              take: EVIDENCE_SCAN_SWEEP_PAGE,
+            })
+          );
+          for (const e of due) {
+            if (await enqueue({ tenantId, evidenceId: e.id, attempt: e.scanAttempts })) out.queued++;
+            else out.notQueued++;
+          }
+          if (due.length < EVIDENCE_SCAN_SWEEP_PAGE) break;
+          after = due[due.length - 1]!.id;
         }
       } catch {
         out.tenantsFailed++;

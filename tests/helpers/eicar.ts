@@ -1,4 +1,4 @@
-import { crc32, deflateRawSync } from 'node:zlib';
+import { crc32 } from 'node:zlib';
 
 /**
  * NG-239 — the EICAR anti-virus test file, built at run time.
@@ -59,38 +59,18 @@ export function cleanDocx(text = 'clean evidence'): Buffer {
 }
 
 /**
- * NG-239 Ö-1 — a `.docx`-shaped ZIP of ~110 KB whose one entry unpacks to
- * `unpackedMiB` MiB of zeros (default 110, past clamd's 100 MiB MaxFileSize).
- * Harmless, but clamd cannot read it to the end: with `AlertExceedsMax yes` it
- * answers `Heuristics.Limits.Exceeded.MaxFileSize FOUND`, without it `OK`.
+ * NG-239 Ö-1 — a `.docx`-shaped ZIP nested `depth` levels deep (default 20,
+ * past clamd's MaxRecursion of 17), a few KB, harmless. clamd stops unpacking
+ * at its limit: with `AlertExceedsMax yes` it answers
+ * `Heuristics.Limits.Exceeded.MaxRecursion FOUND`, without it `OK`
+ * (both checked against clamav/clamav-debian:stable, ClamAV 1.5.4).
  */
-export function overLimitDocx(unpackedMiB = 110): Buffer {
-  const name = Buffer.from('big.bin', 'latin1');
-  const raw = Buffer.alloc(unpackedMiB * 1024 * 1024);
-  const packed = deflateRawSync(raw, { level: 9 });
-  const crc = crc32(raw) >>> 0;
-  const local = Buffer.alloc(30);
-  local.writeUInt32LE(0x04034b50, 0);
-  local.writeUInt16LE(20, 4);
-  local.writeUInt16LE(8, 8); // deflate
-  local.writeUInt32LE(crc, 14);
-  local.writeUInt32LE(packed.length, 18);
-  local.writeUInt32LE(raw.length, 22);
-  local.writeUInt16LE(name.length, 26);
-  const central = Buffer.alloc(46);
-  central.writeUInt32LE(0x02014b50, 0);
-  central.writeUInt16LE(20, 4);
-  central.writeUInt16LE(20, 6);
-  central.writeUInt16LE(8, 10); // deflate
-  central.writeUInt32LE(crc, 16);
-  central.writeUInt32LE(packed.length, 20);
-  central.writeUInt32LE(raw.length, 24);
-  central.writeUInt16LE(name.length, 28);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(1, 8);
-  end.writeUInt16LE(1, 10);
-  end.writeUInt32LE(central.length + name.length, 12);
-  end.writeUInt32LE(local.length + name.length + packed.length, 16);
-  return Buffer.concat([local, name, packed, central, name, end]);
+export function nestedDocx(depth = 20): Buffer {
+  let data: Buffer = Buffer.from('nested evidence', 'utf8');
+  let name = 'note.txt';
+  for (let i = 0; i < depth; i++) {
+    data = zipOne(name, data);
+    name = `level-${i}.zip`;
+  }
+  return data;
 }

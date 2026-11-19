@@ -93,9 +93,9 @@ yüzden bir tasarım ortağının hattında ya da KPI panosunda **görünmez**. 
   **Yalnız `CLEAN` iner** — tek kural `src/lib/evidence-scan-gate.ts` (indirme rotası, presigned GET ve ekran aynı
   fonksiyonu çağırır). `INFECTED`: nesne depodan silinir, `AuditEvent` `evidence.scan.infected` (kiracı kapsamında) +
   `SystemAlert` `error` (`source: evidence-scan`, kiracı kimliği ve dosya adı YOK). `ERROR` (clamd yok/kapalı/zaman
-  aşımı/okunamayan nesne): inmez, 1 dk → 5 dk → 30 dk yeniden dener (`evidence-scan:<evidenceId>:<attempt>`), sonra
+  aşımı/okunamayan nesne/clamd sınırı aşıldı `limits_exceeded` — `AlertExceedsMax yes` ile): inmez, 1 dk → 5 dk → 30 dk yeniden dener (`evidence-scan:<evidenceId>:<attempt>`), sonra
   `warn` alarm; `evidence-scan-sweep` (her 15 dk) iş kaybolmuş `PENDING` (>2 dk) ve tükenmiş `ERROR` (>6 sa)
-  satırlarını yeniden kuyruğa koyar. Migration öncesi satırlar da `PENDING` olur ve süpürmeyle taranır (kapalı hata:
+  satırlarını kiracı başına sayfa sayfa yeniden kuyruğa koyar (kalıcı düşmüş iş aynı anahtarla değiştirilir). Migration öncesi satırlar da `PENDING` olur ve süpürmeyle taranır (kapalı hata:
   taranana kadar inmez).
 - `Document/Chunk` RAG deposu; kamusal belgeler paylaşımlı, yüklemeler kiracıya özel. `Chunk.embedding` pgvector(1536).
 - `AiUsageLog` her çağrı; `CreditLedger` bakiye = SUM(delta). Kredi düşümü ve log aynı transaction'da.

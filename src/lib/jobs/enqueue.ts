@@ -24,12 +24,14 @@ export interface EnqueueResult {
  * failed for good adds nothing. The default `replace` mode would start a
  * second copy next to a running one (ADR-0008 §5 D4). To re-run a job whose
  * earlier run failed for good, pass `force`, which removes that job first
- * (only if it is not running).
+ * (only if it is not running). `replaceFailed` is the narrower form: it
+ * removes the job with this key only if it failed for good (every attempt
+ * used, not running), so a queued or running one is left alone (NG-239 Ö-2).
  */
 export async function enqueueJob(
   id: JobId,
   payload: Record<string, unknown> = {},
-  opts: { force?: boolean; connectionString?: string; runAt?: Date } = {}
+  opts: { force?: boolean; replaceFailed?: boolean; connectionString?: string; runAt?: Date } = {}
 ): Promise<EnqueueResult> {
   let key = `${id}:manual`;
   if (id === 'agency-monthly-report') {
@@ -70,6 +72,13 @@ export async function enqueueJob(
     if (opts.force) {
       await utils.withPgClient((c) =>
         c.query('select graphile_worker.remove_job($1) from graphile_worker.jobs where key = $1 and locked_at is null', [key])
+      );
+    } else if (opts.replaceFailed) {
+      await utils.withPgClient((c) =>
+        c.query(
+          'select graphile_worker.remove_job($1) from graphile_worker.jobs where key = $1 and locked_at is null and attempts >= max_attempts',
+          [key]
+        )
       );
     }
     const existing = await utils.withPgClient((c) =>

@@ -150,7 +150,11 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   `docker compose --profile scan up -d clamav`, port yalnız 127.0.0.1). **Yalnız `CLEAN` dosya iner**; tek kapı
   `src/lib/evidence-scan-gate.ts` (indirme rotası 409 `EVIDENCE_SCAN_PENDING|INFECTED|ERROR`, presigned GET
   imzalanmaz, ekranda bağlantı yok). Kapalı hata: clamd tanımsız/kapalı/zaman aşımı → `ERROR`, dosya inmez,
-  1 dk / 5 dk / 30 dk yeniden deneme + 15 dakikalık süpürme. Zararlı bulunursa nesne silinir, `AuditEvent`
+  1 dk / 5 dk / 30 dk yeniden deneme + 15 dakikalık süpürme (kiracının bütün bekleyen dosyaları, sayfa sayfa; kuyrukta
+  kalıcı düşmüş tarama işi yenisiyle değiştirilir). clamd `AlertExceedsMax yes` ile koşmalı (compose
+  `CLAMD_CONF_AlertExceedsMax`; VPS'teki clamd de, NG-261): sınırını aşan dosya (açılınca 100 MB üstü, 17'den derin
+  arşiv vb.) `Heuristics.Limits.Exceeded.*` olur, `ERROR` (`limits_exceeded`) sayılır, silinmez ama inmez. Bu ayar
+  olmadan clamd o kısmı atlayıp `OK` der. Zararlı bulunursa nesne silinir, `AuditEvent`
   `evidence.scan.infected` ve `SystemAlert` (`error`, kiracı kimliği/dosya adı içermez) yazılır. Testler yalnız
   EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
   güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da clamd
