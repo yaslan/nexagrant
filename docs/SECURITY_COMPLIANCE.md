@@ -143,7 +143,7 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
 - Evaluator Lens çıktısı "iç ön değerlendirme"; hakemlik simülasyonu Komisyon değerlendiricileri için değil, başvuranlar için.
 
 ## 5. Uygulama güvenliği
-- OWASP ASVS L2 hedefi; zod ile tüm girişler; CSRF (Server Actions yerleşik); CSP başlıkları; oran sınırlama (Upstash) giriş/AI uç noktaları; dosya yükleme MIME + boyut + virüs taraması.
+- OWASP ASVS L2 hedefi; zod ile tüm girişler; CSRF (Server Actions yerleşik); CSP başlıkları; oran sınırlama (Upstash) giriş/AI uç noktaları; dosya yükleme MIME + boyut + virüs taraması. **ClamAV barındırması (karar 19.11.2026, ADR-0012):** `clamd` kalıcı süreç ister; Cloud Economy'de kalıcı süreç/Docker/root yok. Karar: `clamav` konteyneri patronun aldığı Hostinger KVM 4 VPS'inde (19.11.2026 akşam; ilk seçilen KVM 2 değildi; Ubuntu 24.04 + CloudPanel), yalnız Docker iç ağında (`ports:` yok, INSTREAM makineden çıkmaz). **PLANLI, yapılmadı:** VPS var ama uygulama orada yayında değil (NG-261), `clamav` servisi yok, canlıda tarama koşmuyor.
 - Virüs taraması (NG-239, §18.3 — ClamAV faz 2 tamamlandı): kanıt dosyaları yüklemeden sonra arka planda
   (`evidence-scan` işi, graphile-worker) uygulamayla aynı makinedeki `clamd`'ye TCP INSTREAM ile akıtılır
   (`src/lib/clamav.ts`; `CLAMD_HOST`/`CLAMD_PORT`/`CLAMD_TIMEOUT_MS`, `src/lib/env.ts`; yerelde
@@ -160,7 +160,7 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da clamd
   servisi yok, gerçek-clamd testleri `NG239_CLAMD_HOST`/`CLAMD_HOST` verilmeden atlanır.
 - Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
-- Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı.
+- Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı. **NexaGrant barındırma güncellemesi (19.11.2026, ADR-0012):** DB Supabase'te kalır (yedek Supabase planına bağlı; plan bilinmiyor, NG-246 §4), VPS için Hostinger haftalık yedeği. Taşıma planlı, yapılmadı; bugün canlı Hostinger Cloud'da.
 - Olay müdahale: 72 saat bildirim prosedürü (GDPR), KVKK Kurulu bildirimi.
 
 ## 6. Lisanslar
