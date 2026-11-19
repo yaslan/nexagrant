@@ -83,7 +83,11 @@ export default async function AppLayout({
   // FB KAMU B4 (TASK-MULRRNIHVZM1Z): the agency co-brand, only for a tenant an
   // agency brought in. Unlinked tenants — and the agency itself — get null.
   const tenantId = tenantScopeOf(session)?.tenantId;
-  const cobrand = tenantId ? toShellCoBrand(await getLinkedAgencyCoBrand(tenantId)) : null;
+  // NG-248 (K-584216): the door is the `view_tenant_branding` permission, read in rbac.ts.
+  // A guest partner gets no co-brand: the name and logo never reach its shell or its RSC payload.
+  const cobrand = tenantId && can(asRole(roleName), 'view_tenant_branding')
+    ? toShellCoBrand(await getLinkedAgencyCoBrand(tenantId))
+    : null;
 
   const isPlatformAdmin = Boolean(
     session?.isPlatformAdmin ||

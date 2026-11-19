@@ -17,7 +17,9 @@ export type Action =
   /** M18 Client Pipeline (NG-143): read = MEMBER+, write = WRITER+, admin = TENANT_ADMIN+. */
   | "client_pipeline_read"
   | "client_pipeline_write"
-  | "client_pipeline_admin";
+  | "client_pipeline_admin"
+  /** NG-248 (K-584216): the agency co-brand (name + logo) in the app shell and its logo route. Not for guest partners. */
+  | "view_tenant_branding";
 
 const rolePermissions: Record<Role, Action[]> = {
   TENANT_OWNER: [
@@ -36,6 +38,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "client_pipeline_read",
     "client_pipeline_write",
     "client_pipeline_admin",
+    "view_tenant_branding",
   ],
   TENANT_ADMIN: [
     "manage_users",
@@ -51,6 +54,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "client_pipeline_read",
     "client_pipeline_write",
     "client_pipeline_admin",
+    "view_tenant_branding",
   ],
   PIPELINE_MANAGER: [
     "manage_workspaces",
@@ -63,6 +67,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "view_partner_search",
     "client_pipeline_read",
     "client_pipeline_write",
+    "view_tenant_branding",
   ],
   WRITER: [
     "edit_proposal",
@@ -72,6 +77,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "view_partner_search",
     "client_pipeline_read",
     "client_pipeline_write",
+    "view_tenant_branding",
   ],
   MEMBER: [
     "view_proposal",
@@ -79,6 +85,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "request_dual_approval",
     "view_partner_search",
     "client_pipeline_read",
+    "view_tenant_branding",
   ],
   GUEST_PARTNER: [
     "contribute_assigned",

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Role } from '@prisma/client';
 
 import { prisma } from '../../../src/lib/db';
+import { deleteObjectBytes, putObjectBytes } from '../../../src/lib/storage';
 import { DEFAULT_CRITERIA } from '../../../src/modules/m6/types';
 import { requireId } from '../../helpers/teardown-guard';
 
@@ -47,6 +48,19 @@ export const RG_PROFILE_TEXT = 'NG240 kurum yetkinlik metni';
  * test id, not for the bare name.
  */
 export const RG_PROVINCE = 'Samsun';
+/**
+ * NG-248: the agency that brings RG_TENANT in (agencyId), with a co-brand entry: a
+ * distinctive name and a stored logo. The shell prints the name and serves the logo
+ * only to the roles the co-brand door opens for; a guest must see neither.
+ */
+export const RG_AGENCY = 'ng248-role-gate-agency';
+export const RG_COBRAND_NAME = 'NG248-AJANS-Q7ZK';
+export const RG_COBRAND_LOGO_KEY = `${RG_AGENCY}/agency/cobrand/6f1c0a8e-2b7d-4c3e-9a10-5d8e7f2b4c61.png`;
+/** A 1×1 PNG: the logo route serves stored bytes as-is, so any PNG proves the door. */
+const RG_COBRAND_LOGO_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
 
 /** The stored panel average, as the save recomputed it. */
 export async function readPanelAverage(): Promise<number | null> {
@@ -67,11 +81,21 @@ export const RG_SEATS: Record<Role, { id: string; email: string }> = {
 const MODULES = ['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10', 'M11'];
 
 export async function setupRoleGateTenant() {
+  // NG-248: the agency with its co-brand entry, then the tenant linked to it.
+  const cobrandSettings = { cobrand: { name: RG_COBRAND_NAME, logoKey: RG_COBRAND_LOGO_KEY, updatedAt: '2026-11-18T10:00:00.000Z' } };
+  await prisma.tenant.upsert({
+    where: { id: RG_AGENCY },
+    create: { id: RG_AGENCY, name: 'ng248 role gate agency (e2e)', slug: RG_AGENCY, country: 'TR', orgType: 'SME', kind: 'AGENCY', settings: cobrandSettings },
+    update: { kind: 'AGENCY', deletedAt: null, settings: cobrandSettings },
+  });
+  if (!(await putObjectBytes(RG_COBRAND_LOGO_KEY, RG_COBRAND_LOGO_PNG, 'image/png'))) {
+    throw new Error('ng248 fixture: the co-brand logo could not be stored');
+  }
   await prisma.tenant.upsert({
     where: { id: RG_TENANT },
     // NG-240: a TR tenant with a stored province, so the province card has a value to leak.
-    create: { id: RG_TENANT, name: 'role gate e2e (internal)', slug: RG_TENANT, country: 'TR', province: RG_PROVINCE, orgType: 'SME' },
-    update: { country: 'TR', province: RG_PROVINCE },
+    create: { id: RG_TENANT, name: 'role gate e2e (internal)', slug: RG_TENANT, country: 'TR', province: RG_PROVINCE, orgType: 'SME', agencyId: RG_AGENCY },
+    update: { country: 'TR', province: RG_PROVINCE, agencyId: RG_AGENCY },
   });
   await prisma.subscription.upsert({
     where: { tenantId: RG_TENANT },
@@ -236,5 +260,7 @@ export async function teardownRoleGateTenant() {
     },
   });
   await prisma.tenant.deleteMany({ where: { id: 'ng64-role-gate-e2e-tenant' } });
+  await prisma.tenant.deleteMany({ where: { id: 'ng248-role-gate-agency' } });
+  await deleteObjectBytes('ng248-role-gate-agency/agency/cobrand/6f1c0a8e-2b7d-4c3e-9a10-5d8e7f2b4c61.png');
   await prisma.$disconnect();
 }
