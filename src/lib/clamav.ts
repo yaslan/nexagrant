@@ -8,7 +8,17 @@ import { env } from '@/lib/env';
  * then a zero-length chunk; clamd answers one NUL-terminated line:
  *   `stream: OK`                         → clean
  *   `stream: <Signature> FOUND`          → infected
+ *   `stream: Heuristics.Limits.Exceeded.<Limit> FOUND` → error (`limits_exceeded`)
  *   `... ERROR` (e.g. size limit exceeded) → error
+ *
+ * Limits (NG-239 Ö-1): clamd stops unpacking at its MaxScanSize / MaxRecursion /
+ * MaxFiles and, by default, still answers `OK`. (One archive member larger than
+ * MaxFileSize is cut to that size and scanned, with no alert, on ClamAV 1.5.4.)
+ * clamd must run with `AlertExceedsMax yes` (docker-compose.yml
+ * `CLAMD_CONF_AlertExceedsMax`), so a file it could not read to the end is
+ * reported as `Heuristics.Limits.Exceeded.*`. That is not a signature: the file
+ * was not fully scanned, so it is `error`, never clean and never "infected"
+ * (the object is kept; it just does not download).
  *
  * Never throws. Anything that is not a clear `OK` is not clean: no host
  * configured, connection refused, a timeout, a reply that cut off or that we
@@ -24,7 +34,10 @@ export type ClamdVerdict =
   | { verdict: 'infected'; signature: string }
   | { verdict: 'error'; reason: ClamdErrorReason; detail?: string };
 
-export type ClamdErrorReason = 'not_configured' | 'unreachable' | 'timeout' | 'clamd_error' | 'bad_reply';
+export type ClamdErrorReason = 'not_configured' | 'unreachable' | 'timeout' | 'clamd_error' | 'bad_reply' | 'limits_exceeded';
+
+/** clamd's name for "this file was not scanned to the end" under `AlertExceedsMax yes`. */
+const LIMITS_EXCEEDED = /^Heuristics\.Limits\.Exceeded(\.|$)/;
 
 export interface ClamdOptions {
   host?: string;
@@ -52,7 +65,11 @@ export function parseClamdReply(raw: string): ClamdVerdict {
   const body = line.replace(/^stream:\s*/, '');
   if (body === 'OK') return { verdict: 'clean' };
   const found = /^(.+)\s+FOUND$/.exec(body);
-  if (found && found[1]) return { verdict: 'infected', signature: found[1].trim().slice(0, 200) };
+  if (found && found[1]) {
+    const name = found[1].trim().slice(0, 200);
+    if (LIMITS_EXCEEDED.test(name)) return { verdict: 'error', reason: 'limits_exceeded', detail: name };
+    return { verdict: 'infected', signature: name };
+  }
   if (/ERROR$/.test(body)) return { verdict: 'error', reason: 'clamd_error', detail: body.slice(0, 200) };
   return { verdict: 'error', reason: 'bad_reply', detail: body.slice(0, 200) };
 }

@@ -3,7 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
-import { DOCX_MIME, cleanDocx, eicarDocx, overLimitDocx } from './helpers/eicar';
+import { DOCX_MIME, cleanDocx, eicarDocx, nestedDocx } from './helpers/eicar';
 
 /**
  * NG-239 — virus scan of uploaded evidence (§18.3, K-584154 = A).
@@ -303,9 +303,9 @@ describe.skipIf(!CLAMD_HOST)(`NG-239 against a real clamd (${CLAMD_HOST || 'not 
     expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_INFECTED' });
   });
   // NG-239 Ö-1: clamd must run with `AlertExceedsMax yes` (docker-compose.yml). A file it cannot
-  // read to the end (here 110 MiB unpacked, past MaxFileSize) is not CLEAN and does not download.
+  // read to the end (here a ZIP nested 20 deep, past MaxRecursion 17) is not CLEAN and does not download.
   test('a .docx that unpacks past clamd\'s limits is ERROR (limits_exceeded), kept, and D1 answers 409', async () => {
-    const id = await uploadPresigned('over-limit.docx', overLimitDocx());
+    const id = await uploadPresigned('over-limit.docx', nestedDocx());
     await dropQueuedScans(id);
     const key = (await rowOf(id)).r2ObjectKey!;
     const out = await scanner.scanEvidence({ tenantId: t.tenant, evidenceId: id, attempt: 0 }, { clamd, enqueue: async () => true });
@@ -456,7 +456,7 @@ describe('NG-239: clamd down or silent → ERROR, no download, a retry', () => {
     expect(r.tenantsFailed).toBe(0);
     const swept = new Set(enqueue.mock.calls.map((c) => (c as unknown as [{ evidenceId: string }])[0].evidenceId));
     for (const id of ids) expect(swept.has(id), id).toBe(true);
-    await admin!.evidence.deleteMany({ where: { tenantId: t.tenant, id: { in: ids } } });
+    await admin!.evidence.deleteMany({ where: { tenantId: requireId(t.tenant, 'tenantId'), id: { in: presentIds(ids) } } });
   });
 });
 
