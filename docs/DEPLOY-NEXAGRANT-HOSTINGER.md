@@ -1,5 +1,5 @@
 > **YÖNLENDİRME (NG-262, 19.11.2026): bu belgenin yerini alacak belgeler `deploy/vps/RUNBOOK.md` ve `docs/adr/ADR-0012-hosting-hostinger-cloud-to-vps.md`.**
-> Patron barındırmayı Hostinger Cloud'dan VPS'e çevirdi (K-584192 = C, K-584515 = A: Hostinger KVM 2, Frankfurt; veritabanı Supabase'te kalır).
+> Patron barındırmayı Hostinger Cloud'dan VPS'e çevirdi (K-584192 = C, K-584515 = A; veritabanı Supabase'te kalır). Sunucu: patron 19.11.2026 akşam **Hostinger KVM 4** VPS'ini aldı (`191.96.1.252`, Ubuntu 24.04 + **CloudPanel**; ilk seçilen KVM 2 değil). Uygulama CloudPanel'de Reverse Proxy sitesi olarak yayınlanması **planlı**; ölçüm anında `nexagrant.com` kök A kaydı hâlâ Hostinger park sayfasındaydı.
 > **Taşıma YAPILMADI; planlı** (NG-261, adım adım patron onayı bekliyor). Bu belge, taşıma tamamlanana kadar ve taşımadan sonraki 14 günlük geri dönüş süresince geçerlidir. Belge silinmez.
 > Aşağıdaki "Hedef (K-574987 = A)" ve "VPS alınmaz" ifadeleri, ADR-0012 ile yerine geçilen eski karardır.
 
@@ -8,7 +8,7 @@
 **Hedef (patron kararı K-574987 = A, 01.11.2026):** NexaGrant, Hostinger'daki **hazır** `nexagrant.com` sitesine
 (Cloud Economy, sipariş 1010267304, addon vhost, kullanıcı `u605628300`, kök
 `/home/u605628300/domains/nexagrant.com/public_html`) **Node.js uygulaması** olarak yüklenir.
-**VPS alınmaz**; `deploy/vps/` (FO-244 KVM 2 paketi, `deploy/vps/RUNBOOK.md`) bu hedef için **kullanılmıyor**.
+**VPS alınmaz**; `deploy/vps/` (FO-244 paketi, KVM 2 için yazılmıştı; `deploy/vps/RUNBOOK.md`) bu hedef için **kullanılmıyor**.
 Veritabanı Supabase Postgres + pgvector. Worker (graphile-worker) Hostinger cron + `flock` ile.
 
 Kart: FO-260 (TASK-MVVMJ9T2LKSJ) · Hazırlayan: devop-fb · Ölçüm: 01.11.2026 (salt-okunur).
