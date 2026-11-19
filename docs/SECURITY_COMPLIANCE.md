@@ -167,8 +167,14 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   tek yerde ve clamd varsayılanlarıyla aynı: üye 100 MiB (`MaxFileSize`), toplam açılım 400 MiB (`MaxScanSize`),
   10 000 girdi (`MaxFiles`), iç içe derinlik 32 (clamd `MaxRecursion` 17'den derin). Tavanı aşan üye ya da dosya,
   ZIP64, deflate/stored dışında bir yöntem, şifreli ya da açılamayan üye `ERROR` (`limits_exceeded: zip_member_check:
-  <kod>`) olur. Dosya clamd'ye gitmez, silinmez, inmez. Bilinen sınır: sayfası 100 MiB'ı aşan çok büyük bir xlsx veri
-  dökümü (sıkıştırılmış ~17 MB+) reddedilir. clamd'nin bir tavanı düşürülürse aynı değişiklik bu dosyada da yapılmalıdır.
+  <kod>`) olur. Merkezi dizinde olmayan bir yerel girdinin adı boş ya da kontrol karakterli olsa bile ZIP64 işareti,
+  ZIP belirtiminin tanıdığı bir yöntemde de şifreleme ya da deflate/stored dışı yöntem reddedilir: clamd bu girdileri
+  adına bakmadan okuyor (gizli ZIP64 ve LZMA girdide `OK` ölçüldü). Bir üyenin içinde deflate ile saklanmış iç ZIP, içine
+  bakılabilmesi için bellekte tutulur; tutulan toplam 32 MiB'ı (`ZIP_NESTED_HOLD_MAX_BYTES`, clamd ayarı değil) aşarsa
+  dosya `nested_too_large` koduyla reddedilir. Dosya clamd'ye gitmez, silinmez, inmez. Bilinen sınırlar: sayfası
+  100 MiB'ı aşan çok büyük bir xlsx veri dökümü (sıkıştırılmış ~17 MB+) ve 32 MiB'tan büyük gömülü (deflate edilmiş)
+  bir docx/xlsx içeren dosya reddedilir; ret kalıcıdır ama NG-239'un yeniden deneme yolundan geçer (3 deneme + `warn`
+  uyarısı + süpürme). clamd'nin bir tavanı düşürülürse aynı değişiklik bu dosyada da yapılmalıdır.
   Kapsam dışı: PNG/JPG/WebP sonuna eklenen ZIP (polyglot), ayrı bir takip işi.
 - Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
 - Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı.

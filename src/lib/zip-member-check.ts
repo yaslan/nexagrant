@@ -21,8 +21,11 @@ import { createInflateRaw } from 'node:zlib';
  *      not encrypted, not ZIP64, and unpack cleanly within the caps.
  *   2. Every other local header in the bytes (a hidden entry, or the entries of
  *      a ZIP stored inside a member). One that looks like a real header gets the
- *      same rules; one that does not (four bytes that happen to read `PK\3\4` in
- *      an image) is only refused if it really unpacks past the cap.
+ *      same rules. One that does not (four bytes that happen to read `PK\3\4` in
+ *      an image, or an entry with an empty name) is still refused for ZIP64, and
+ *      for encryption or a method other than stored/deflate when its method is
+ *      one the ZIP specification names; otherwise only if it really unpacks past
+ *      the cap.
  *   3. A deflated member whose output holds a ZIP signature is checked again,
  *      one level down, to {@link ZIP_MAX_DEPTH}.
  *
@@ -76,6 +79,8 @@ const DEFLATE = 8;
 const U16_MAX = 0xffff;
 const U32_MAX = 0xffffffff;
 const ZIP64_EXTRA_ID = 0x0001;
+/** Every compression method the ZIP specification (APPNOTE 4.4.5) names, AES (99) included. */
+const ZIP_METHODS: ReadonlySet<number> = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 19, 20, 93, 94, 95, 96, 97, 98, 99]);
 
 /** A file in a ZIP-based format (docx, xlsx): the leading bytes `storage.ts` checks for them. */
 export function looksLikeZip(bytes: Buffer): boolean {
@@ -188,8 +193,15 @@ async function checkEntry(
   strict: boolean
 ): Promise<void> {
   if (++ctx.entries > ZIP_MAX_ENTRIES) throw new Refused('too_many_entries');
-  if (strict) {
-    if (header.zip64) throw new Refused('zip64');
+  // ZIP64 on every header, plausible or not: an entry with an empty or control-byte name is still
+  // read by clamd, which does not unpack it as ZIP64 and answers OK (NG-269 review B-1). Random
+  // bytes reach this only with a size of 0xFFFFFFFF or a 0x0001 extra record, which is rare enough.
+  if (header.zip64) throw new Refused('zip64');
+  // The same for a header that names a real ZIP method: clamd reads it whatever its name. Encrypted,
+  // or a method other than stored/deflate, is a member clamd does not unpack (LZMA: OK, measured)
+  // or this check does not count (bzip2, deflate64: clamd cuts them at MaxFileSize unseen here).
+  // An unknown method number is what four random bytes give; nothing unpacks that, so it is left.
+  if (strict || ZIP_METHODS.has(e.method)) {
     if (e.flags & 0x1) throw new Refused('encrypted');
     if (e.method !== STORED && e.method !== DEFLATE) throw new Refused('unsupported_method');
   }

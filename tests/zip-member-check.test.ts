@@ -55,6 +55,38 @@ describe('NG-269: refused (the file is ERROR / limits_exceeded and does not down
     expect(await checkZipMembers(m)).toEqual(refused('zip64'));
   });
 
+  // crw-gnd B-1: a local entry left out of the central directory whose name is empty or holds a
+  // control byte is not "plausible", and the ZIP64 refusal used to be asked only of plausible ones.
+  // clamd reads such an entry, does not unpack it as ZIP64 and answered OK: EICAR came out CLEAN.
+  test.each([
+    ['an empty name', ''],
+    ['a name with a control byte', 'a\x01b'],
+  ])('(m) a hidden ZIP64 entry with %s', async (_n, name) => {
+    const file = buildZip([{ ...smallDeflated(name, eicarText()), zip64: true, hidden: true }, smallDeflated('word/document.xml', xml(10))]);
+    expect(await checkZipMembers(file)).toEqual(refused('zip64'));
+  });
+
+  // The same question for encryption and other methods, measured against the real clamd
+  // (NG-269-evidence/probe-before-fix.log): a hidden LZMA entry with an empty name came out OK.
+  test.each([
+    ['encrypted, deflate', { ...smallDeflated('', eicarText()), flags: 0x1 }, 'encrypted'],
+    ['encrypted, stored', { ...storedMember('', eicarText()), flags: 0x1 }, 'encrypted'],
+    ['LZMA (14)', { ...smallDeflated('', eicarText()), method: 14 }, 'unsupported_method'],
+    ['bzip2 (12)', { ...smallDeflated('', eicarText()), method: 12 }, 'unsupported_method'],
+    ['deflate64 (9)', { ...smallDeflated('', eicarText()), method: 9 }, 'unsupported_method'],
+    ['AES (99)', { ...smallDeflated('', eicarText()), method: 99 }, 'unsupported_method'],
+  ])('a hidden entry with an empty name, %s', async (_n, member, failure) => {
+    const file = buildZip([{ ...member, hidden: true }, smallDeflated('word/document.xml', xml(10))]);
+    expect(await checkZipMembers(file)).toEqual(refused(failure));
+  });
+
+  // crw-gnd O-1: only the local header is ZIP64, the central directory entry is a plain one, so the
+  // directory check alone does not see it (the M2a mutant stayed green without this).
+  test('(m) ZIP64 in the local header only, the central directory entry is plain', async () => {
+    const file = buildZip([{ ...deflatedMember('word/document.xml', 3 * MIB, 2 * MIB), zip64: 'local' }]);
+    expect(await checkZipMembers(file)).toEqual(refused('zip64'));
+  });
+
   test.each([
     ['k', 3990 * MIB, 3980 * MIB],
     ['l', 4095 * MIB, 4090 * MIB],
@@ -150,6 +182,10 @@ describe('NG-269: passes on to clamd', () => {
 
   test('an image whose bytes happen to read `PK\\3\\4` (not a real header)', async () => {
     const img = Buffer.concat([randomBytes(64 * 1024), Buffer.from([0x50, 0x4b, 0x03, 0x04]), randomBytes(64 * 1024)]);
+    // Random bytes after the signature, except a method number no ZIP tool writes (0x4242 is
+    // what random bytes give 65512 times in 65536) and no extra field, so the run is deterministic.
+    img.writeUInt16LE(0x4242, 64 * 1024 + 8);
+    img.writeUInt16LE(0, 64 * 1024 + 28);
     const file = buildZip([storedMember('word/media/a.png', img), smallDeflated('word/document.xml', xml(100))]);
     expect(await checkZipMembers(file)).toMatchObject({ ok: true });
   });

@@ -33,8 +33,11 @@ export interface Member {
   size: number;
   /** What the headers say the unpacked size is (default: the real one). */
   declaredSize?: number;
-  /** Write the member the way Python's `force_zip64=True` does: sizes 0xFFFFFFFF + a 0x0001 extra field. */
-  zip64?: boolean;
+  /**
+   * Write the member the way Python's `force_zip64=True` does: sizes 0xFFFFFFFF + a 0x0001 extra field.
+   * `'local'`: only the local header is ZIP64, the central directory entry is a plain one.
+   */
+  zip64?: boolean | 'local';
   /** General purpose flags (bit 0 = encrypted). */
   flags?: number;
   /** Leave the member out of the central directory (a local entry only). */
@@ -90,9 +93,11 @@ export function buildZip(members: Member[]): Buffer {
   for (const m of members) {
     const name = Buffer.from(m.name, 'utf8');
     const declared = m.declaredSize ?? m.size;
-    const z64 = m.zip64 === true;
+    const z64 = m.zip64 === true || m.zip64 === 'local';
+    const z64Central = m.zip64 === true;
     const version = z64 ? 45 : m.method === 8 ? 20 : 10;
     const extra = z64 ? zip64Extra(declared, m.data.length) : Buffer.alloc(0);
+    const centralExtra = z64Central ? extra : Buffer.alloc(0);
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(version, 4);
@@ -121,12 +126,12 @@ export function buildZip(members: Member[]): Buffer {
       c.writeUInt16LE(m.flags ?? 0, 8);
       c.writeUInt16LE(m.method, 10);
       c.writeUInt32LE(m.crc, 16);
-      c.writeUInt32LE(z64 ? 0xffffffff : m.data.length, 20);
-      c.writeUInt32LE(z64 ? 0xffffffff : declared >>> 0, 24);
+      c.writeUInt32LE(z64Central ? 0xffffffff : m.data.length, 20);
+      c.writeUInt32LE(z64Central ? 0xffffffff : declared >>> 0, 24);
       c.writeUInt16LE(name.length, 28);
-      c.writeUInt16LE(extra.length, 30);
+      c.writeUInt16LE(centralExtra.length, 30);
       c.writeUInt32LE(offset, 42);
-      central.push(c, name, extra);
+      central.push(c, name, centralExtra);
       listed++;
     }
     offset += local.length + name.length + extra.length + m.data.length + descriptor.length;
@@ -153,6 +158,19 @@ function zip64Extra(usize: number, csize: number): Buffer {
 /** NG-265 (b): one 150 MiB member, EICAR at 140 MiB. clamd scans the first 100 MiB and answers OK. */
 export function bombDocxB(): Buffer {
   return buildZip([deflatedMember('word/document.xml', 150 * MIB, 140 * MIB)]);
+}
+
+/**
+ * NG-269 review B-1: EICAR in a local entry left out of the central directory, with an empty
+ * name and written as ZIP64, beside a plain `word/document.xml`. clamd answers OK for it.
+ */
+export function hiddenZip64EicarDocx(): Buffer {
+  const eicar = eicarText();
+  const doc = Buffer.from('<w:t>hello</w:t>');
+  return buildZip([
+    { name: '', method: 8, data: deflateRawSync(eicar), crc: crc32(eicar) >>> 0, size: eicar.length, zip64: true, hidden: true },
+    { name: 'word/document.xml', method: 8, data: deflateRawSync(doc), crc: crc32(doc) >>> 0, size: doc.length },
+  ]);
 }
 
 export { MIB };
