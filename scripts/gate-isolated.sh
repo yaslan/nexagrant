@@ -117,7 +117,7 @@ fi
 # A warning only, the gate goes on; the script never kills them (they may be another checkout's).
 orphans="$( { ps -eo ppid=,args= 2>/dev/null || true; } | awk '$1 == 1 && /fo385-/ && /server-pid/' | wc -l | tr -d ' ')"
 if [ "${orphans:-0}" -gt 0 ]; then
-  log "UYARI: $orphans öksüz e2e-server-supervisor test sunucusu var (ppid 1, komutta fo385-); port seçimini bozabilir. Listele: ps -eo pid=,ppid=,etime=,args= | awk '\$2 == 1 && /fo385-/'"
+  log "UYARI: $orphans öksüz fo385 süreci (supervisor + sunucu; ppid 1, komutta fo385-) var; port seçimini bozabilir. Listele: ps -eo pid=,ppid=,etime=,args= | awk '\$2 == 1 && /fo385-/'"
 fi
 
 container="fabrika-gate-$(date -u +%Y%m%d%H%M%S)-$$"

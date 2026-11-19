@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { freePort } from './helpers/free-port';
+import { killPidFromFile } from './helpers/kill-owned-pid';
 
 const SUPERVISOR = path.resolve('tests/e2e/support/server-supervisor.mjs');
 const SIGNAL_LOG = path.resolve('tests/e2e/support/server-signal-log.mjs');
@@ -95,15 +96,9 @@ afterEach(() => {
   // writes its pid to <dir>/server-pid once it listens (serverScript), so that file names it.
   // The server stays in this process group (no `detached`), so a wrapper that kills the group
   // still reaches it when the run itself is killed before afterEach.
-  const pidFile = path.join(dir, 'server-pid');
-  const serverPid = fs.existsSync(pidFile) ? Number(fs.readFileSync(pidFile, 'utf8')) : 0;
-  if (serverPid > 0 && pidAlive(serverPid)) {
-    try {
-      process.kill(serverPid, 'SIGKILL');
-    } catch {
-      // gone between the check and the kill
-    }
-  }
+  // Review B1: the server may have exited already and its pid gone to another process; the
+  // helper kills only a process whose command line names this test's own <dir>/server-pid.
+  killPidFromFile(path.join(dir, 'server-pid'));
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
