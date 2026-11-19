@@ -28,7 +28,19 @@ vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartne
 // NG-250 (review B1): the page's NexaGrant plan gate reads the tenant's plan from the database;
 // this test renders the page without one, so the gate lets it through. The gate itself is
 // covered by tests/ng250-plan-gate.live.test.ts and src/lib/billing/nexagrant/page-gate.test.tsx.
-vi.mock('@/lib/billing/nexagrant/page-gate', () => ({ ngPageGate: async () => null }));
+const { ngPageGate, cordisSessionOverride } = vi.hoisted(() => ({
+  ngPageGate: vi.fn(async () => null),
+  cordisSessionOverride: { value: null as null | { authenticated: true; session?: { tenantId: string; role: string } } },
+}));
+vi.mock('@/lib/billing/nexagrant/page-gate', () => ({ ngPageGate }));
+// NG-250 review F2: lets one test hand the page an authorised result with no member session.
+vi.mock('@/lib/cordis-api-auth', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/cordis-api-auth')>();
+  return {
+    ...real,
+    authenticateCordisSession: async () => cordisSessionOverride.value ?? real.authenticateCordisSession(),
+  };
+});
 
 const signedIn = { ok: true, scope: { userId: 'u-gate', tenantId: 't1', role: 'MEMBER', isPlatformAdmin: false } };
 const fullM1 = { allowed: true, status: 'ON' };
@@ -54,6 +66,8 @@ beforeEach(() => {
     { organisationId: '999999999', name: 'Example Org', totalProjects: 3, coordinatorProjects: 2, country: 'DE', activityType: 'REC' },
   ]);
   count.mockResolvedValue(0);
+  ngPageGate.mockClear();
+  cordisSessionOverride.value = null;
 });
 
 describe('/partners/leaders gate (FO-163)', () => {
@@ -92,6 +106,22 @@ describe('/partners/leaders gate (FO-163)', () => {
     const html = await render();
     expect(html).toContain('rateLimited');
     expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('NG-250 F2: authorised but no member session — fails closed, no lookup runs', async () => {
+    // The CORDIS door type allows `session` to be absent (the API-key branch). The plan gate
+    // needs a member; without one the page must refuse, not skip the gate and read the data.
+    cordisSessionOverride.value = { authenticated: true };
+    const html = await render();
+    expect(html).toContain('signInRequired');
+    expect(ngPageGate).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('NG-250: a member session goes through the NexaGrant plan gate before the lookup', async () => {
+    const html = await render();
+    expect(ngPageGate).toHaveBeenCalledWith({ tenantId: 't1', role: 'MEMBER' }, 'en', 'view_partner_search', 'partner_search');
+    expect(html).toContain('Example Org');
   });
 
   it('normal member: the list renders and no monthly quota is counted', async () => {

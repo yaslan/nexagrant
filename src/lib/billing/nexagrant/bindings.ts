@@ -184,4 +184,6 @@ export const NG_DATA_FILE_EXCEPTIONS: Readonly<Record<string, string>> = {
   'src/app/api/v1/partners/[pic]/route.ts': API_KEY_PATH,
   'src/app/api/v1/organizations/[pic]/announcements/route.ts': API_KEY_PATH,
   'src/app/api/v1/topics/[identifier]/partner-signal/route.ts': API_KEY_PATH,
+  'src/app/api/v1/partner-search/announcements/route.ts': API_KEY_PATH,
+  'src/app/api/v1/partners/leaders/route.ts': API_KEY_PATH,
 };

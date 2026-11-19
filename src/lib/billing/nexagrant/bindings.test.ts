@@ -69,14 +69,24 @@ describe('NG feature → route bindings (NG-250)', () => {
    * round: every file under src/app that touches partner-search data is bound or excused.
    */
   it('reverse coverage: every src/app file reading partner-search data is bound or excused with a reason', () => {
-    const DATA = /\b(cordisPartnerProfile|cordisOrganization|listOrganizationAnnouncements|topicPartnerSignal)\b/;
+    // Two ways in: a direct Prisma read of the partner tables, or an import of a module that
+    // reads them for you. The import check is the one that does not depend on a helper's name
+    // (review F1, NG-250: the v1 routes reading listAnnouncements / coordinatorLeaders read the data
+    // through a helper and the name list missed them).
+    const DATA = /\b(cordisPartnerProfile|cordisOrganization)\b/;
+    const DATA_MODULES = ['@/modules/m1/server/partner-search/http', '@/lib/k2-cordis/coordinator-leaders'];
+    const importsDataModule = (src: string) =>
+      DATA_MODULES.some((m) => new RegExp(`from\\s+['"]${m.replace(/[/.@-]/g, '\\$&')}['"]`).test(src));
     const walk = (dir: string): string[] =>
       readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
         const rel = `${dir}/${e.name}`;
         if (e.isDirectory()) return walk(rel);
         return /\.(ts|tsx)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [rel] : [];
       });
-    const readers = walk('src/app').filter((f) => DATA.test(read(f)));
+    const readers = walk('src/app').filter((f) => {
+      const src = read(f);
+      return DATA.test(src) || importsDataModule(src);
+    });
     expect(readers.length).toBeGreaterThan(0);
     const bound = new Set(NG_ROUTE_BINDINGS.map((b) => b.file));
     const unaccounted = readers.filter((f) => !bound.has(f) && !Object.hasOwn(NG_DATA_FILE_EXCEPTIONS, f));

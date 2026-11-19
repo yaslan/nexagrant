@@ -33,22 +33,23 @@ export default async function LeadersPage({
   const t = await getTranslations('PartnersLeaders');
   // Same door as /api/cordis/*: M1 open in full (a limited plan is refused) and
   // the shared per-user window. No monthly quota is counted here.
+  const refuse = (reason: 'rateLimited' | 'signInRequired' | 'limitedPlan' | 'loadFailed') => (
+    <section role="alert" className="max-w-2xl mx-auto sm:px-4 py-16 text-center">
+      <p className="text-sm text-ink-2">{t(reason)}</p>
+    </section>
+  );
   const access = await authenticateCordisSession();
   if (!access.authenticated) {
     const status = access.errorResponse.status;
-    const reason = status === 429 ? 'rateLimited' : status === 401 ? 'signInRequired' : status === 403 ? 'limitedPlan' : 'loadFailed';
-    return (
-      <section role="alert" className="max-w-2xl mx-auto sm:px-4 py-16 text-center">
-        <p className="text-sm text-ink-2">{t(reason)}</p>
-      </section>
-    );
+    return refuse(status === 429 ? 'rateLimited' : status === 401 ? 'signInRequired' : status === 403 ? 'limitedPlan' : 'loadFailed');
   }
+  // NG-250 (review F2): fail closed. The plan gate asks about a member; an authorised result
+  // without one (the type allows it for the API-key door) is refused, never let through ungated.
+  if (!access.session) return refuse('signInRequired');
   // NG-250 (review B1): the NexaGrant plan gate, with the member the CORDIS door already read,
   // before any CORDIS query — the same partner_search /api/cordis/organizations is gated by.
-  if (access.session) {
-    const ngLocked = await ngPageGate(access.session, locale, 'view_partner_search', 'partner_search');
-    if (ngLocked) return ngLocked;
-  }
+  const ngLocked = await ngPageGate(access.session, locale, 'view_partner_search', 'partner_search');
+  if (ngLocked) return ngLocked;
 
   // `?topic=` filters by CORDIS topic-code prefix. Empty means the global list.
   const topicRaw = topic?.trim() ?? '';
