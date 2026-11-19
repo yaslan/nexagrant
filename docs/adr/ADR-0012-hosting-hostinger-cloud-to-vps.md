@@ -4,8 +4,8 @@
 - **Tarih:** 2026-11-19
 - **Kart:** NG-262 (TASK-MWNJMY7KHK4FR, belge). Plan: NG-246 (Faz 1, bitti). Taşıma: NG-261 (bekliyor).
 - **Hazırlayan:** PM-NG (pm-gnd). Plan ve ölçümler: dev-gnd, `docs/agent-results/NG-246-dev-gnd.md`
-- **Yerini alır:** K-574987 = A ("VPS alınmaz", 01.11.2026). Bu karar K-574987 = A'nın yerini alır.
-- **Kararlar:** K-584192 = C (uygulama VPS'e taşınır), K-584515 = A (Hostinger KVM 2, Frankfurt; veritabanı Supabase'te kalır, 19.11.2026 15:44).
+- **Yerini alır:** K-574987 = A (hazır nexagrant.com Cloud Node.js sitesi; VPS yok, 01.11.2026). Bu karar K-574987 = A'nın yerini alır.
+- **Kararlar:** K-584192 = C (uygulama VPS'e taşınır), K-584515 = A (Hostinger KVM 2, Frankfurt; veritabanı Supabase'te kalır, 19.11.2026 15:44). Önceki karar: K-573894 = B (30.10.2026, KVM 2 Frankfurt, 1 yıl taahhüt, TRY). Satın alma DÖNEMİ bu ADR'de kararlaştırılmadı; NG-261'deki satın alma onayında patrona sorulur.
 
 ## 1. Bağlam
 
@@ -43,7 +43,7 @@ Fiyat kaynakları NG-246 raporu §4'tendir; erişim tarihi tümü için 19.11.20
 
 | Seçenek | Sonuç | Gerekçe |
 |---|---|---|
-| **Hostinger KVM 2 + DB Supabase'te (seçildi)** | KABUL | Belleğe sığar (§3). Veri taşıma yok. Hazır paket var. $8.79/ay, 24 ay peşin $210.96, yenileme $14.99/ay (https://www.hostinger.com/vps-hosting) |
+| **Hostinger KVM 2 + DB Supabase'te (seçildi)** | KABUL | Belleğe sığar (§3). Veri taşıma yok. Hazır paket var. $8.79/ay, 24 ay peşin $210.96 (24 ay peşin seçeneği; dönem kararı verilmedi, K-573894 = B 1 yıl taahhüttü), yenileme $14.99/ay (https://www.hostinger.com/vps-hosting) |
 | Hostinger KVM 4 + Postgres VPS'te | Seçilmedi | Postgres 2 GB ekler; 8 GB yetmediği için KVM 4 (16 GB) gerekir. $12.99/ay, 24 ay peşin $311.76, yenileme $28.99/ay. Veri taşıma, 30–60 dk bakım penceresi ve DB işletimi bizde; asıl risk: VPS'te yeni veri yazıldıktan sonra geri dönüş. Ayrı kart ve ayrı pencere ile yeniden düşünülebilir |
 | Hetzner CPX32 (Nürnberg) | Seçilmedi | 4 / 8 GB / 160 GB, €35.99/ay (KDV hariç, IPv4 dahil; https://www.hetzner.com/cloud/regular-performance/). Giden 25 ve 465 portları varsayılan olarak kapalı (https://docs.hetzner.com/cloud/servers/faq/); bizim SMTP 465 kullanıyor, `SMTP_PORT=587` + STARTTLS gerekirdi |
 | Hetzner CPX22 | Elendi | 2 / 4 GB: ClamAV için yetmez (§3) |
@@ -54,11 +54,11 @@ Supabase faturası sürer. NexaGrant projesinin hangi planda olduğu bilinmiyor 
 
 - **Cloud hesabı iptal edilmez.** Aynı hesapta 14 site daha var; fonbridge.com canlı WordPress + WooCommerce sitesi de bunlardan biri. DNS bölgesi ve posta da Hostinger'da (NG-246 §4.3). Taşıma bitince yalnız `nexagrant.com` vhost'u boşa çıkar.
 - **14 günlük geri dönüş:** geçişten sonra Hostinger vhost'u 14 gün dokunulmadan kalır. DB Supabase'te kaldığı için geri dönüş DNS'i geri almaktır. Vhost'u boşaltma ayrı onaydır.
-- **`TRUSTED_PROXY_HOPS` 2 → 1:** Hostinger'da CDN + web sunucusu için beklenen değer 2 idi (ölçülmedi); VPS'te yalnız Caddy önde olacağı için 1 olur (`deploy/cpanel/ENV-LISTESI.md` §2, NG-246 §6).
-- **Adım adım onay:** satın alma, sır girişi, DNS ve vhost boşaltma ayrı patron onayı ister (NG-246 §5).
+- **`TRUSTED_PROXY_HOPS` 2 → 1:** Hostinger'da CDN + web sunucusu için beklenen değer 2 idi (ölçülmedi); VPS'te yalnız Caddy önde olacağı için 1 olması planlanır; kesin değer canlıya almada X-Forwarded-For zinciri sayılarak doğrulanır (`deploy/cpanel/ENV-LISTESI.md` §2, NG-246 §6).
+- **Adım adım onay:** satın alma (dönem seçimi dahil: 1 yıl mı 24 ay mı, NG-261'de patrona sorulur), sır girişi, DNS ve vhost boşaltma ayrı patron onayı ister (NG-246 §5).
 - `deploy/vps/RUNBOOK.md` asıl canlı belge olacak; güncellemesi NG-261'de. `docs/DEPLOY-NEXAGRANT-HOSTINGER.md` silinmez: 14 günlük paralel dönem ve geri dönüş için gerekir.
 - NG-239 (virüs taraması) bu sayede kalıcı süreç alır; kodu bu karardan bağımsızdır (`CLAMD_HOST`/`CLAMD_PORT`).
-- Yeni sır `TWO_FACTOR_ENCRYPTION_KEY` (NG-39) VPS'e girmeden yayın olmaz (NG-246 §7).
+- Yeni sır `TWO_FACTOR_ENCRYPTION_KEY` (NG-39) VPS'e girmeden yayın olmaz (NG-246 §6, §7).
 
 ## 6. Durum özeti (19.11.2026)
 
@@ -68,5 +68,5 @@ Supabase faturası sürer. NexaGrant projesinin hangi planda olduğu bilinmiyor 
 | Plan ve maliyet (NG-246) | Bitti |
 | VPS satın alma, sunucu hazırlığı, DNS geçişi | **Planlı, yapılmadı** (NG-261) |
 | `clamav` servisi, `/api/health` sağlık kontrolü | **Planlı, yapılmadı** |
-| `TRUSTED_PROXY_HOPS=1` | **Planlı** (bugün canlı eski hedefte) |
+| `TRUSTED_PROXY_HOPS=1` | **Planlı**; kesin değer canlıya almada doğrulanır (bugün canlı eski hedefte) |
 | Hostinger vhost'unu boşaltma | **Planlı**, taşımadan 14 gün sonra, ayrı onay |
