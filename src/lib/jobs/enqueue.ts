@@ -78,8 +78,12 @@ export async function enqueueJob(
       // One statement, no fallback (NG-239 Ö-2). `remove_job` runs its own statements after the
       // row was picked: if another request replaced the failed job meanwhile and a worker locked
       // the new one, `remove_job` cannot delete it and instead clears its key and uses up its
-      // attempts, so the running job loses its retry and a second copy gets queued. A plain
-      // DELETE re-checks the condition on the row it would delete and leaves it otherwise.
+      // attempts, so the running job loses its retry and a second copy gets queued. Measured with
+      // this DELETE: the other request deletes the failed row and inserts a new one (it does not
+      // update the old row). This DELETE waits on the old row's lock; once the other request
+      // commits, that row is gone and the DELETE removes 0 rows. The new row was never among the
+      // rows it targets. A job that is running when the DELETE starts, even on its last attempt
+      // (attempts = max_attempts), is kept only by `locked_at is null`.
       await utils.withPgClient((c) =>
         c.query(
           'delete from graphile_worker._private_jobs where key = $1 and locked_at is null and attempts >= max_attempts',

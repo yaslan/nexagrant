@@ -506,6 +506,48 @@ describe('NG-239: clamd down or silent → ERROR, no download, a retry', () => {
     }
   });
 
+  // NG-239 Ö-2 (3rd review, item 1): a worker holds the job on its last attempt
+  // (attempts = max_attempts while it runs). That job has not failed; only `locked_at is null`
+  // keeps `replaceFailed` from deleting it. The race test above cannot see this, because its
+  // locked job is on attempt 1 of 25.
+  test('replaceFailed leaves a job a worker holds on its last attempt', async () => {
+    const id = await uploadPresigned('last-attempt.docx', cleanDocx('son deneme'));
+    const jobKey = `evidence-scan:${id}:0`;
+    expect(await queuedScanKeys(id), 'the upload queued attempt 0').toEqual([jobKey]);
+    const lockedJobs = () =>
+      admin!.$queryRawUnsafe<
+        { id: string; key: string | null; attempts: number; max_attempts: number; locked_by: string | null; locked: boolean }[]
+      >(
+        `select id::text as id, key, attempts, max_attempts, locked_by, locked_at is not null as locked
+           from graphile_worker._private_jobs where payload->>'evidenceId' = $1 order by id`,
+        id
+      );
+    try {
+      await admin!.$executeRawUnsafe(
+        `update graphile_worker._private_jobs
+            set attempts = max_attempts, locked_at = now(), locked_by = 'ng239-last-attempt-test'
+          where key = $1`,
+        jobKey
+      );
+      const before = await lockedJobs();
+      expect(before, 'one job, locked, on its last attempt').toHaveLength(1);
+      expect(before[0]).toMatchObject({ key: jobKey, locked_by: 'ng239-last-attempt-test', locked: true });
+      expect(before[0]!.attempts).toBe(before[0]!.max_attempts);
+
+      const { enqueueJob } = await import('@/lib/jobs/enqueue');
+      await enqueueJob('evidence-scan', { tenantId: t.tenant, evidenceId: id, attempt: 0 }, {
+        replaceFailed: true,
+        connectionString: ADMIN_URL,
+      });
+
+      expect(await lockedJobs(), 'the running job stays (same id, key and lock); no second job').toEqual(before);
+    } finally {
+      await admin!
+        .$executeRawUnsafe(`delete from graphile_worker._private_jobs where payload->>'evidenceId' = $1`, id)
+        .catch(() => {});
+    }
+  });
+
   // NG-239 Ö-4: the sweep read one page (100 rows) per tenant per tick; a tenant with more
   // PENDING files than that waited 15 minutes per hundred.
   test('the sweep queues every due file of a tenant in one tick, past one page', async () => {
