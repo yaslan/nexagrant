@@ -143,7 +143,18 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
 - Evaluator Lens çıktısı "iç ön değerlendirme"; hakemlik simülasyonu Komisyon değerlendiricileri için değil, başvuranlar için.
 
 ## 5. Uygulama güvenliği
-- OWASP ASVS L2 hedefi; zod ile tüm girişler; CSRF (Server Actions yerleşik); CSP başlıkları; oran sınırlama (Upstash) giriş/AI uç noktaları; dosya yükleme MIME + boyut + virüs taraması (ClamAV faz 2).
+- OWASP ASVS L2 hedefi; zod ile tüm girişler; CSRF (Server Actions yerleşik); CSP başlıkları; oran sınırlama (Upstash) giriş/AI uç noktaları; dosya yükleme MIME + boyut + virüs taraması.
+- Virüs taraması (NG-239, §18.3 — ClamAV faz 2 tamamlandı): kanıt dosyaları yüklemeden sonra arka planda
+  (`evidence-scan` işi, graphile-worker) uygulamayla aynı makinedeki `clamd`'ye TCP INSTREAM ile akıtılır
+  (`src/lib/clamav.ts`; `CLAMD_HOST`/`CLAMD_PORT`/`CLAMD_TIMEOUT_MS`, `src/lib/env.ts`; yerelde
+  `docker compose --profile scan up -d clamav`, port yalnız 127.0.0.1). **Yalnız `CLEAN` dosya iner**; tek kapı
+  `src/lib/evidence-scan-gate.ts` (indirme rotası 409 `EVIDENCE_SCAN_PENDING|INFECTED|ERROR`, presigned GET
+  imzalanmaz, ekranda bağlantı yok). Kapalı hata: clamd tanımsız/kapalı/zaman aşımı → `ERROR`, dosya inmez,
+  1 dk / 5 dk / 30 dk yeniden deneme + 15 dakikalık süpürme. Zararlı bulunursa nesne silinir, `AuditEvent`
+  `evidence.scan.infected` ve `SystemAlert` (`error`, kiracı kimliği/dosya adı içermez) yazılır. Testler yalnız
+  EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
+  güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da clamd
+  servisi yok, gerçek-clamd testleri `NG239_CLAMD_HOST`/`CLAMD_HOST` verilmeden atlanır.
 - Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
 - Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı.
 - Olay müdahale: 72 saat bildirim prosedürü (GDPR), KVKK Kurulu bildirimi.

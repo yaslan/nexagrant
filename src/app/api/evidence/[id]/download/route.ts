@@ -14,6 +14,12 @@
  * five minutes and always downloads (`Content-Disposition: attachment`), so no
  * stored file is ever rendered as a page. Without one (development) the dev
  * store's bytes are served here, with the same attachment rule.
+ *
+ * NG-239: only a file whose virus scan ended CLEAN leaves, on both branches.
+ * PENDING, ERROR (clamd down or timed out — fail closed) and INFECTED answer
+ * 409 with a code, checked by the one rule in src/lib/evidence-scan-gate.ts
+ * after the tenant and role checks (so the 404/403 answers are unchanged and a
+ * scan state reveals nothing about another tenant's ids).
  */
 import { NextResponse } from 'next/server';
 import { withTenant } from '@/lib/db';
@@ -21,6 +27,7 @@ import { requireTenantApi } from '@/lib/tenant';
 import { getObjectBytes, getPresignedDownloadUrl, hasObjectStore, tenantObjectKeyOf } from '@/lib/storage';
 import { isPresentId } from '@/lib/required-id';
 import { canReadEvidence, evidenceReadWhere } from '@/lib/evidence-access';
+import { EVIDENCE_SCAN_REFUSAL_CODE, evidenceScanRefusal } from '@/lib/evidence-scan-gate';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
 const FORBIDDEN = () =>
@@ -38,16 +45,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!isPresentId(id)) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
 
   const row = await withTenant(tenantId, (tx) =>
-    tx.evidence.findFirst({ where: { id, tenantId }, select: { r2ObjectKey: true, fileName: true, confidentiality: true } })
+    tx.evidence.findFirst({ where: { id, tenantId }, select: { r2ObjectKey: true, fileName: true, confidentiality: true, scanStatus: true } })
   );
   const key = row?.r2ObjectKey ? tenantObjectKeyOf(tenantId, row.r2ObjectKey) : null;
   if (!row || !key) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
   if (!canReadEvidence(role, row.confidentiality)) return FORBIDDEN();
 
+  const refusal = evidenceScanRefusal(row.scanStatus);
+  if (refusal) {
+    return NextResponse.json(
+      { error: 'File not available', code: EVIDENCE_SCAN_REFUSAL_CODE[refusal] },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+
   const fileName = row.fileName || key.split('/').pop() || 'evidence';
 
   if (hasObjectStore) {
-    const url = await getPresignedDownloadUrl(key, fileName);
+    const url = await getPresignedDownloadUrl(key, fileName, row.scanStatus);
     if (!url) return NextResponse.json({ error: 'Not found' }, { status: 404, headers: NO_STORE });
     return NextResponse.redirect(url, { status: 302, headers: NO_STORE });
   }

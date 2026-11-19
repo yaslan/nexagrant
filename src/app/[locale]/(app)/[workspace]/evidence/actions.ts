@@ -25,6 +25,7 @@ import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } 
 import { errorCode, errorMessage } from '@/lib/errors';
 import { EVIDENCE_READ_ACTION, evidenceReadWhere } from '@/lib/evidence-access';
 import { isPresentId } from '@/lib/required-id';
+import { enqueueEvidenceScan } from '@/lib/evidence-scan';
 import type { EvidenceItemData } from './evidence-client';
 
 /**
@@ -343,6 +344,11 @@ export async function confirmEvidenceUploadAction(data: {
     console.warn(`[confirmEvidenceUploadAction] staging object left behind: ${objectKey}`);
   }
 
+  // NG-239: the row is PENDING (schema default) and does not download until the
+  // scan says CLEAN. A queue write that fails leaves it PENDING; the sweep
+  // queues it then. Never fails the upload.
+  await enqueueEvidenceScan({ tenantId, evidenceId: evidence.id, attempt: 0 });
+
   revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
   return { success: true, evidence };
 }
@@ -404,6 +410,8 @@ export async function createEvidence(formData: FormData) {
       })
     );
     const evidence = rawEvidence as unknown as EvidenceItemData;
+    // NG-239: same as confirm — PENDING until scanned; only a row with a stored file is scanned.
+    if (objectKey) await enqueueEvidenceScan({ tenantId, evidenceId: evidence.id, attempt: 0 });
 
     revalidatePath('/[locale]/(app)/[workspace]/evidence', 'page');
     return evidence;

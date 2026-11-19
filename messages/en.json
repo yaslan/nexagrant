@@ -529,6 +529,11 @@
       "uploadingOcr": "Uploading & AI OCR Processing...",
       "validDoc": "Valid Docs",
       "validUntilLabel": "Valid Until:"
+    },
+    "scan": {
+      "scan_pending": "Scanning",
+      "scan_infected": "Malware found, removed",
+      "scan_error": "Could not be scanned, will retry"
     }
   },
   "ConceptNote": {

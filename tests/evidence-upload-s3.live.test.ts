@@ -304,6 +304,8 @@ describe('B-2: evidence is read only by a signed-in member of its tenant', () =>
     expect(res.success).toBe(true);
     const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t[tenant], r2ObjectKey: finalOf(objectKey) } });
     evidenceIds.push(row.id);
+    // NG-239: these tests are about who reads, not the scan; the file is marked scanned clean.
+    await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
     return { id: row.id, objectKey: finalOf(objectKey), body };
   }
 
@@ -368,6 +370,8 @@ async function confirmedUpload(name: string, confidentiality = 'INTERNAL') {
   expect(res.success).toBe(true);
   const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
   evidenceIds.push(row.id);
+  // NG-239: scanned clean, so only the rule each test is about decides the download.
+  await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
   return { ...p, finalKey: finalOf(p.objectKey), id: row.id, body };
 }
 

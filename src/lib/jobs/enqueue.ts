@@ -51,6 +51,13 @@ export async function enqueueJob(
       throw new Error('pic-registry-retry: tenantId, auditEventId and attempt are required');
     }
     key = `pic-registry-retry:${String(payload.auditEventId)}:${payload.attempt}`;
+  } else if (id === 'evidence-scan') {
+    // NG-239: one key per evidence file and attempt; an upload, a retry and the sweep asking for
+    // the same attempt add one job.
+    if (!isPresentId(payload.tenantId) || !isPresentId(payload.evidenceId) || typeof payload.attempt !== 'number') {
+      throw new Error('evidence-scan: tenantId, evidenceId and attempt are required');
+    }
+    key = `evidence-scan:${String(payload.evidenceId)}:${payload.attempt}`;
   } else if (id === 'k1-embeddings' && payload.tenantId !== undefined) {
     // One key per tenant: saving a profile five times queues one embedding.
     if (!isPresentId(payload.tenantId)) throw new Error('k1-embeddings: tenantId must be a non-empty string');
