@@ -12,6 +12,7 @@ import type { ReactElement } from 'react';
 
 const { coordinatorLeaders } = vi.hoisted(() => ({ coordinatorLeaders: vi.fn() }));
 
+vi.mock('@/lib/page-role', () => ({ requireTenantPageRole: async () => ({ tenantId: 't1', userId: 'u1', role: 'TENANT_OWNER', isPlatformAdmin: false }) }));
 vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: unknown }) => <a href={href}>{children as never}</a>,

@@ -177,6 +177,8 @@ const PAGE_DOORS: Record<string, Action> = {
   'partners/page.tsx': 'view_partner_search',
   'partners/resources/page.tsx': 'view_partner_search',
   'partners/leaders/page.tsx': 'view_partner_search',
+  // NG-257: CORDIS partner detail (M1 moduleGate alone before this).
+  'partners/[pic]/page.tsx': 'view_partner_search',
   'settings/api-keys/page.tsx': 'view_partner_search',
   'approvals/page.tsx': 'request_dual_approval',
   'settings/members/page.tsx': 'manage_users',

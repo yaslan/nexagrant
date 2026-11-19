@@ -65,6 +65,8 @@ const GUEST_CLOSED = [
   // NG-256: the CORDIS coordinator leaders page reads the tenant's M1 plan only; it
   // sits behind view_partner_search like its sibling `partners` page.
   `${ws}/partners/leaders`,
+  // NG-257: CORDIS partner detail sits behind view_partner_search (checked before the PIC lookup).
+  `${ws}/partners/999999999`,
 ];
 
 /** Any CORDIS-shaped PIC: the door is the role, the PIC is never reached. */
