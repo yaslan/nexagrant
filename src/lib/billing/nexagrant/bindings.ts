@@ -170,6 +170,7 @@ const API_KEY_PATH =
 export const NG_DATA_FILE_EXCEPTIONS: Readonly<Record<string, string>> = {
   'src/app/[locale]/(app)/[workspace]/opportunities/[id]/matching/page.tsx': M8_CONSORTIUM,
   'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx': M8_CONSORTIUM,
+  'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/actions.ts': M8_CONSORTIUM,
   'src/app/[locale]/(app)/[workspace]/settings/profile/page.tsx':
     "The tenant's own organisation profile: one CordisOrganization row by the tenant's own PIC (org_profile, granted on every tier), not a search.",
   'src/app/[locale]/(app)/[workspace]/settings/profile/actions.ts':

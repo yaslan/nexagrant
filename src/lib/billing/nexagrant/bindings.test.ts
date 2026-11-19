@@ -74,7 +74,7 @@ describe('NG feature → route bindings (NG-250)', () => {
     // (review F1, NG-250: the v1 routes reading listAnnouncements / coordinatorLeaders read the data
     // through a helper and the name list missed them).
     const DATA = /\b(cordisPartnerProfile|cordisOrganization)\b/;
-    const DATA_MODULES = ['@/modules/m1/server/partner-search/http', '@/lib/k2-cordis/coordinator-leaders'];
+    const DATA_MODULES = ['@/modules/m1/server/partner-search/http', '@/lib/k2-cordis/coordinator-leaders', '@/modules/m8/server/matching'];
     const importsDataModule = (src: string) =>
       DATA_MODULES.some((m) => new RegExp(`from\\s+['"]${m.replace(/[/.@-]/g, '\\$&')}['"]`).test(src));
     const walk = (dir: string): string[] =>
