@@ -255,7 +255,12 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       if (status) messages.push(t('scan.announce', { title: item.title, status }));
     }
     seenScan.current = after;
-    if (messages.length > 0) setAnnouncement(messages.join('. '));
+    if (messages.length === 0) return;
+    // A live region speaks when its text changes. The same sentence twice in a row (two rows
+    // with one title reaching one state) would leave the DOM as it is and the second result
+    // unsaid, so a repeat gets a trailing no-break space (review Ö-B).
+    const text = messages.join('. ');
+    setAnnouncement((prev) => (prev === text ? `${text}\u00A0` : text));
   }, [items, t]);
 
   // What the drawer may show about the selected document. Both are empty for almost

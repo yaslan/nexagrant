@@ -244,6 +244,42 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
     expect(calls.count()).toBe(settled);
   });
 
+  test('the same sentence twice in a row: the announcer text still changes, so it is said again', async ({ page }) => {
+    test.setTimeout(150_000);
+    // Two stored files with one title, both waiting. Made in the database so the title is the same.
+    const twins = await Promise.all(
+      ['a', 'b'].map((n) =>
+        prisma.evidence.create({
+          data: {
+            tenantId: waiting.tenantId,
+            kind: 'certificate',
+            title: 'ng264-ikiz',
+            body: '',
+            r2ObjectKey: `${waiting.tenantId}/ng264/ikiz-${n}.docx`,
+            fileName: `ng264-ikiz-${n}.docx`,
+            scanStatus: 'PENDING',
+          },
+          select: { id: true },
+        })
+      )
+    );
+    await openEvidence(page, waiting);
+    const announcer = page.locator(ANNOUNCER);
+    await expect(announcer).toHaveText('');
+    const said = 'ng264-ikiz: Taranıp temiz bulundu';
+
+    await prisma.evidence.updateMany({ where: { id: twins[0]!.id }, data: { scanStatus: 'CLEAN', scannedAt: new Date() } });
+    await expect(downloadLinkOf(page, twins[0]!.id)).toHaveCount(1, { timeout: 40_000 });
+    await expect(announcer).toHaveText(said);
+    const first = await announcer.evaluate((el) => el.textContent);
+
+    // The second one reaches the same state in a later poll: same sentence, so the DOM text has to differ.
+    await prisma.evidence.updateMany({ where: { id: twins[1]!.id }, data: { scanStatus: 'CLEAN', scannedAt: new Date() } });
+    await expect(downloadLinkOf(page, twins[1]!.id)).toHaveCount(1, { timeout: 40_000 });
+    await expect.poll(() => announcer.evaluate((el) => el.textContent), { timeout: 10_000 }).not.toBe(first);
+    await expect(announcer).toHaveText(said);
+  });
+
   test('a waiting row deleted on the server leaves the list and the refresh stops', async ({ page }) => {
     test.setTimeout(150_000);
     await openEvidence(page, waiting);

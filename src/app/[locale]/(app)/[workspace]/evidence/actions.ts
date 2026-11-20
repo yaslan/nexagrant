@@ -92,11 +92,14 @@ export async function getEvidenceScanStatusAction(): Promise<
       rows: rows.map((row) => ({
         id: row.id,
         scanStatus: row.scanStatus,
-        // A PENDING row is always waited for. An ERROR row is retried only while the
-        // server has attempts left (evidence-scan.ts); after that the sweep takes it, hours later.
+        // A PENDING row is always waited for. For an ERROR row, scanEvidence (evidence-scan.ts)
+        // writes scanAttempts = k + 1 when attempt k fails and queues attempt k + 1 while
+        // EVIDENCE_SCAN_RETRY_WAITS_MS[k] exists. So scanAttempts 1..WAITS.length each still have
+        // a queued try (the last one is the longest wait); only past WAITS.length are the retries
+        // over, and the sweep takes the row, hours later (NG-264 review E-2).
         retrying:
           row.scanStatus === 'PENDING' ||
-          (row.scanStatus === 'ERROR' && row.scanAttempts < EVIDENCE_SCAN_RETRY_WAITS_MS.length),
+          (row.scanStatus === 'ERROR' && row.scanAttempts <= EVIDENCE_SCAN_RETRY_WAITS_MS.length),
       })),
     };
   } catch (error) {
