@@ -403,14 +403,17 @@ test.describe.serial('NG-276 M1 OFF: the role door runs before the module lock',
     test(`GUEST_PARTNER on ${name}: 403 with the role refusal, no module lock`, async ({ page }) => {
       await signInM1Off(page, 'GUEST_PARTNER');
       const res = await page.goto(path);
-      const html = await page.content();
-      // Assert the lock first: when the order is wrong this names the lock as the cause.
-      expect(html, `${path} lock title`).not.toContain(LOCK_TITLE);
-      expect(html, `${path} lock sentence`).not.toContain(LOCK_OFF_TAIL);
-      expect(html, `${path} lock hint`).not.toContain(LOCK_ASK_ADMIN);
-      expect(html, `${path} lock icon`).not.toContain('🔒');
-      expect(res?.status(), path).toBe(403);
+      // The rendered text, not the markup: the i18n bundle in the page payload carries every
+      // ModuleGate sentence on any page, so a markup search would match a page with no lock.
       await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), path).toBeVisible();
+      const shown = await page.locator('body').innerText();
+      // Assert the lock first: when the order is wrong this names the lock as the cause.
+      expect(shown, `${path} lock title`).not.toContain(LOCK_TITLE);
+      expect(shown, `${path} lock sentence`).not.toContain(LOCK_OFF_TAIL);
+      expect(shown, `${path} lock hint`).not.toContain(LOCK_ASK_ADMIN);
+      expect(shown, `${path} lock icon`).not.toContain('🔒');
+      await expect(page.getByRole('heading', { name: LOCK_TITLE }), path).toHaveCount(0);
+      expect(res?.status(), path).toBe(403);
     });
 
     test(`control: MEMBER and TENANT_OWNER on ${name} see the M1 lock, not the role refusal`, async ({ page }) => {
@@ -418,7 +421,7 @@ test.describe.serial('NG-276 M1 OFF: the role door runs before the module lock',
         await signInM1Off(page, role);
         await page.goto(path);
         await expect(page.getByRole('heading', { name: LOCK_TITLE }), `${role} ${path}`).toBeVisible();
-        expect(await page.content(), `${role} ${path}`).toContain(LOCK_OFF_TAIL);
+        expect(await page.locator('body').innerText(), `${role} ${path}`).toContain(LOCK_OFF_TAIL);
         await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), `${role} ${path}`).toHaveCount(0);
       }
     });
