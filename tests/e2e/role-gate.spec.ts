@@ -22,6 +22,13 @@ import {
   setupRoleGateTenant,
   teardownRoleGateTenant,
 } from './fixtures/role-gate-tenant';
+import {
+  M1OFF_SEATS,
+  M1OFF_TENANT,
+  M1OFF_WORKSPACE,
+  setupM1OffTenant,
+  teardownM1OffTenant,
+} from './fixtures/role-gate-m1-off-tenant';
 
 /**
  * NG-64 — a page the menu hides for a role is closed to that role on the server
@@ -362,4 +369,58 @@ test.describe.serial('NG-64 page role gates on the demo seed', () => {
       expect(await page.content(), path).not.toContain(DEMO_TITLE);
     }
   });
+});
+
+/**
+ * NG-276 (NG-257 extra finding 2, NG-258 suggestion 2): GUEST_CLOSED runs on a tenant
+ * with M1 ON, so it cannot tell whether the role door runs before the module lock. On a
+ * tenant whose M1 is OFF a role without view_partner_search must still get the role
+ * refusal (403, no lock screen); a role that holds it gets the lock. The module lock is
+ * a normal page state, not an error, so it is told apart by its title and its sentence.
+ */
+test.describe.serial('NG-276 M1 OFF: the role door runs before the module lock', () => {
+  const m1ws = `/tr/${M1OFF_WORKSPACE}`;
+  const LOCK_TITLE = trMessages.ModuleGate.title;
+  // The part of the MODULE_OFF sentence after the module name: "modülü kiracınızda kapalı."
+  const LOCK_OFF_TAIL = trMessages.ModuleGate.reason.MODULE_OFF.split('{module}')[1]!.trim();
+  const LOCK_ASK_ADMIN = trMessages.ModuleGate.askAdmin.split('{brand}')[0]!.trim();
+  const PARTNER_PAGES = [
+    { name: 'partners', path: `${m1ws}/partners` },
+    { name: 'partners/[pic]', path: `${m1ws}/partners/${PIC}` },
+    // NG-275: partners/resources still reads the module gate before the role door on dev.
+    { name: 'partners/resources (red until NG-275 reaches dev)', path: `${m1ws}/partners/resources` },
+  ];
+
+  async function signInM1Off(page: Page, role: keyof typeof M1OFF_SEATS) {
+    const seat = M1OFF_SEATS[role]!;
+    await signInAs(page, { id: seat.id, email: seat.email, tenantId: M1OFF_TENANT, role });
+  }
+
+  test.beforeAll(setupM1OffTenant);
+  test.afterAll(teardownM1OffTenant);
+
+  for (const { name, path } of PARTNER_PAGES) {
+    test(`GUEST_PARTNER on ${name}: 403 with the role refusal, no module lock`, async ({ page }) => {
+      await signInM1Off(page, 'GUEST_PARTNER');
+      const res = await page.goto(path);
+      const html = await page.content();
+      // Assert the lock first: when the order is wrong this names the lock as the cause.
+      expect(html, `${path} lock title`).not.toContain(LOCK_TITLE);
+      expect(html, `${path} lock sentence`).not.toContain(LOCK_OFF_TAIL);
+      expect(html, `${path} lock hint`).not.toContain(LOCK_ASK_ADMIN);
+      expect(html, `${path} lock icon`).not.toContain('🔒');
+      expect(res?.status(), path).toBe(403);
+      await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), path).toBeVisible();
+    });
+
+    test(`control: MEMBER and TENANT_OWNER on ${name} see the M1 lock, not the role refusal`, async ({ page }) => {
+      for (const role of ['MEMBER', 'TENANT_OWNER'] as const) {
+        await signInM1Off(page, role);
+        await page.goto(path);
+        await expect(page.getByRole('heading', { name: LOCK_TITLE }), `${role} ${path}`).toBeVisible();
+        expect(await page.content(), `${role} ${path}`).toContain(LOCK_OFF_TAIL);
+        await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), `${role} ${path}`).toHaveCount(0);
+      }
+    });
+  }
 });
