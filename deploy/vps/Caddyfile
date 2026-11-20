@@ -15,10 +15,9 @@
 nexagrant.com {
 	encode zstd gzip
 	reverse_proxy web:3000
-	# HSTS: yalnız Caddy gönderir, uygulama eklemez. Patron kararı bekliyor
-	# (RELEASE_CHECKLIST §5.4): ilk hafta max-age=300, sonra 31536000.
-	# includeSubDomains EKLENMEZ (mail., webmail. ayrı sertifika düzeni).
-	# header Strict-Transport-Security "max-age=300"
+	# HSTS BURADA EKLENMEZ: uygulama kendisi gönderir (src/lib/security-headers.ts hstsHeaderFor; prod + HTTPS;
+	# NG-124). Caddy de eklerse iki Strict-Transport-Security başlığı çıkar. Bu dosya yalnız CloudPanel'siz
+	# makinede kullanılır (RUNBOOK §5.1). Değer/süre patron kararı (K6); uygulamadaki değer geçerlidir.
 }
 
 # www → kök, tek 301. http:// adları açıkça yazılır: Caddy'nin otomatik
