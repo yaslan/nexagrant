@@ -25,7 +25,7 @@ import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } 
 import { errorCode, errorMessage } from '@/lib/errors';
 import { EVIDENCE_READ_ACTION, evidenceReadWhere } from '@/lib/evidence-access';
 import { isPresentId } from '@/lib/required-id';
-import { enqueueEvidenceScan } from '@/lib/evidence-scan';
+import { EVIDENCE_SCAN_RETRY_WAITS_MS, enqueueEvidenceScan } from '@/lib/evidence-scan';
 import type { EvidenceItemData } from './evidence-client';
 
 /**
@@ -62,6 +62,46 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
   } catch (error) {
     console.warn(`[getEvidenceItemsAction] DB error: ${errorMessage(error)}`);
     return [];
+  }
+}
+
+/**
+ * What the evidence screen reads while a scan is open (NG-264 (b)): each row's id and
+ * scan state, and whether the server will still retry a failed scan. Same tenant, role
+ * and read rule as getEvidenceItemsAction, without the claim join.
+ *
+ * `ok: false` is a failed read. An `ok` answer that lacks a row means the row is gone
+ * (NG-264 Ö-2); an empty list is not a failure, so the two are told apart by `ok`.
+ */
+export async function getEvidenceScanStatusAction(): Promise<
+  { ok: true; rows: Array<{ id: string; scanStatus: string; retrying: boolean }> } | { ok: false }
+> {
+  const { tenantId, role } = await requireTenantAction({ readOnly: true, can: EVIDENCE_READ_ACTION });
+  const readable = evidenceReadWhere(role);
+  if (!readable) return { ok: true, rows: [] };
+
+  try {
+    const rows = await withTenant(tenantId, (tx) =>
+      tx.evidence.findMany({
+        where: { tenantId, ...readable },
+        select: { id: true, scanStatus: true, scanAttempts: true },
+      })
+    );
+    return {
+      ok: true,
+      rows: rows.map((row) => ({
+        id: row.id,
+        scanStatus: row.scanStatus,
+        // A PENDING row is always waited for. An ERROR row is retried only while the
+        // server has attempts left (evidence-scan.ts); after that the sweep takes it, hours later.
+        retrying:
+          row.scanStatus === 'PENDING' ||
+          (row.scanStatus === 'ERROR' && row.scanAttempts < EVIDENCE_SCAN_RETRY_WAITS_MS.length),
+      })),
+    };
+  } catch (error) {
+    console.warn(`[getEvidenceScanStatusAction] DB error: ${errorMessage(error)}`);
+    return { ok: false };
   }
 }
 

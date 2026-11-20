@@ -80,7 +80,7 @@ const scanState = (page: Page, kind: string) => page.locator(`[data-testid="evid
 const downloadLinkOf = (page: Page, id: string) => page.locator(`a[href*="/api/evidence/${id}/download"]`);
 
 /**
- * The id Next gives the evidence list action (getEvidenceItemsAction), read from
+ * The id Next gives the evidence refresh action (getEvidenceScanStatusAction), read from
  * the server-action manifest of the running dev or start build. Other server
  * actions (the notification bell polls listNotifications) are not counted.
  */
@@ -90,10 +90,10 @@ function evidenceListActionId(): string {
     if (!fs.existsSync(file)) continue;
     const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as { node?: Record<string, { exportedName?: string; filename?: string }> };
     for (const [id, entry] of Object.entries(manifest.node ?? {})) {
-      if (entry.exportedName === 'getEvidenceItemsAction' && String(entry.filename).endsWith('evidence/actions.ts')) return id;
+      if (entry.exportedName === 'getEvidenceScanStatusAction' && String(entry.filename).endsWith('evidence/actions.ts')) return id;
     }
   }
-  throw new Error('getEvidenceItemsAction is not in the server-action manifest');
+  throw new Error('getEvidenceScanStatusAction is not in the server-action manifest');
 }
 
 /** POSTs of the evidence list action. */
@@ -170,6 +170,66 @@ test.describe('a waiting row refreshes by itself', () => {
     expect(ok.status()).toBe(200);
     const blocked = await page.request.get(`/api/evidence/${eicar.id}/download`);
     expect(blocked.status()).toBe(409);
+  });
+});
+
+/** The announcer: the one polite live region the list keeps in the page (review E-1, Ö-3). */
+const ANNOUNCER = '[data-testid="evidence-scan-announcer"]';
+
+test.describe('the scan result is announced, and the refresh knows when to stop', () => {
+  test('a clean scan: the announcer stays in the page and its text changes', async ({ page }) => {
+    test.skip(!CLAMD_HOST, 'no clamd configured (NG239_CLAMD_HOST / CLAMD_HOST)');
+    const clamd = { host: CLAMD_HOST, port: CLAMD_PORT, timeoutMs: 60_000 };
+    await openEvidence(page, waiting);
+    const announcer = page.locator(ANNOUNCER);
+    await expect(announcer).toHaveCount(1);
+    const row = await uploadThroughScreen(page, 'ng264-anons.docx', cleanDocx('anons'));
+    // Nothing is announced on first load or on the upload itself: the region is empty.
+    await expect(announcer).toHaveText('');
+    await page.evaluate(() => {
+      (window as unknown as { __announcer?: Element }).__announcer = document.querySelector('[data-testid="evidence-scan-announcer"]') ?? undefined;
+    });
+
+    expect(await scanEvidence({ tenantId: waiting.tenantId, evidenceId: row.id, attempt: 0 }, { clamd })).toEqual({ status: 'CLEAN' });
+    await expect(downloadLinkOf(page, row.id)).toHaveCount(1, { timeout: 40_000 });
+
+    // The same element is still in the document (a removed live region announces nothing), and it now says the result.
+    await expect(announcer).toHaveText('ng264-anons: Taranıp temiz bulundu');
+    const sameElement = await page.evaluate(() => {
+      const before = (window as unknown as { __announcer?: Element }).__announcer;
+      return Boolean(before && before.isConnected && before === document.querySelector('[data-testid="evidence-scan-announcer"]'));
+    });
+    expect(sameElement).toBe(true);
+  });
+
+  test('a row whose retries ran out: the refresh stops and does not keep reading the list', async ({ page }) => {
+    test.setTimeout(150_000);
+    await openEvidence(page, waiting);
+    const row = await uploadThroughScreen(page, 'ng264-bitti.docx', cleanDocx('bitti'));
+    // The scan failed for the last time: attempts used up, the sweep has the row from here.
+    await prisma.evidence.updateMany({
+      where: { id: row.id, tenantId: waiting.tenantId },
+      data: { scanStatus: 'ERROR', scanAttempts: 3, scannedAt: new Date() },
+    });
+    await expect(scanState(page, 'scan_error')).toHaveText('Taranamadı, yeniden denenecek', { timeout: 20_000 });
+    const calls = countEvidenceListCalls(page);
+    await page.waitForTimeout(40_000);
+    const settled = calls.count();
+    await page.waitForTimeout(40_000);
+    expect(calls.count()).toBe(settled);
+  });
+
+  test('a waiting row deleted on the server leaves the list and the refresh stops', async ({ page }) => {
+    test.setTimeout(150_000);
+    await openEvidence(page, waiting);
+    const row = await uploadThroughScreen(page, 'ng264-silinen.docx', cleanDocx('silinen'));
+    await prisma.evidence.deleteMany({ where: { id: row.id, tenantId: waiting.tenantId } });
+    await expect(page.getByText('ng264-silinen', { exact: true })).toHaveCount(0, { timeout: 20_000 });
+    const calls = countEvidenceListCalls(page);
+    await page.waitForTimeout(40_000);
+    const settled = calls.count();
+    await page.waitForTimeout(40_000);
+    expect(calls.count()).toBe(settled);
   });
 });
 

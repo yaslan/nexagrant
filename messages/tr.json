@@ -582,7 +582,9 @@
     "scan": {
       "scan_pending": "Taranıyor",
       "scan_infected": "Zararlı bulundu, kaldırıldı",
-      "scan_error": "Taranamadı, yeniden denenecek"
+      "scan_error": "Taranamadı, yeniden denenecek",
+      "scan_clean": "Taranıp temiz bulundu",
+      "announce": "{title}: {status}"
     }
   },
   "ConceptNote": {
