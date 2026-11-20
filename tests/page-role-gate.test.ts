@@ -279,3 +279,70 @@ describe('evaluation panel: the panel-wide scores are view_proposal only (review
     expect(can('GUEST_PARTNER', 'view_proposal')).toBe(false);
   });
 });
+
+/**
+ * NG-258: the role door must run before the first read on the page. The NG-256 review
+ * moved a door behind a tenant read and this file stayed green (the text check only
+ * looks for the call). Scope of the scan: the body from `export default` on, comments
+ * stripped. Helper functions defined above the export are NOT scanned, so a read hidden
+ * in a helper is outside this check (documented limit, see the NG-258 report).
+ */
+const READ_CALL = /\bprisma\.|\bwithTenant\(|\bmoduleGate\(|\bauthenticateCordisSession\(|\bcheckModuleAccess\(/g;
+const TENANT_READ = /\bprisma\.|\bwithTenant\(/;
+
+/**
+ * Pages where `moduleGate` runs before the role door (NG-258 finding). Each one is
+ * accepted on this reason: the only read before the door is the ModuleState lookup, and
+ * the locked screen it returns carries no tenant data. The test below checks both
+ * halves, and fails if an entry stops being module-first (then remove it) or a tenant
+ * read appears before its door. Reveal of the module state to an unauthorised role is
+ * the residual risk (low); the fix is a separate product card, not this one.
+ */
+const MODULE_BEFORE_ROLE_ACCEPTED: Readonly<Record<string, string>> = {
+  'pipeline/page.tsx': 'M5 locked screen before view_proposal door',
+  'pipeline/[id]/page.tsx': 'M5 locked screen before view_proposal door',
+  'pipeline/[id]/consortium/page.tsx': 'M8 locked screen before view_proposal door',
+  'concept-notes/page.tsx': 'M2 locked screen before view_proposal door',
+  'concept-notes/[id]/page.tsx': 'M2 locked screen before view_proposal door',
+  'relationships/page.tsx': 'M4 locked screen before view_proposal door',
+  'relationships/[id]/page.tsx': 'M4 locked screen before view_proposal door',
+  'tto/page.tsx': 'M7 locked screen before view_proposal door',
+  'opportunities/[id]/application/page.tsx': 'M11 locked screen before view_proposal door',
+  'opportunities/[id]/documents/page.tsx': 'M10 locked screen before view_proposal door',
+  'opportunities/[id]/m2/page.tsx': 'M2 locked screen before view_proposal door',
+  'opportunities/[id]/matching/page.tsx': 'M8 locked screen before view_proposal door',
+  'reports/person-days/page.tsx': 'M5 locked screen before view_proposal door',
+  'approvals/page.tsx': 'M5 locked screen before request_dual_approval door',
+  'settings/api-keys/page.tsx': 'M1 locked screen before view_partner_search door (kilit ekranı kapalı dalda; FO-81 withdrawal yolu korunur)',
+  'partners/resources/page.tsx': 'M1 locked screen before view_partner_search door (NG-257 ek bulgu 1; düzeltme kartı önerisi)',
+};
+
+describe('the role door precedes the first read on each gated page (NG-258)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  for (const [file, action] of Object.entries(PAGE_DOORS)) {
+    test(`${file}: requireTenantPageRole(${action}) comes before any read in the page body`, () => {
+      const code = stripComments(readFileSync(path.join(root, file), 'utf8'));
+      const at = code.indexOf('export default');
+      expect(at, 'default export present (scan scope)').toBeGreaterThan(-1);
+      const body = code.slice(at);
+      const door = body.indexOf(`requireTenantPageRole(locale, '${action}')`);
+      expect(door, 'role door call present in body').toBeGreaterThan(-1);
+      const before = body.slice(0, door);
+      const readsBefore = [...before.matchAll(READ_CALL)].map((m) => m[0]);
+
+      if (file in MODULE_BEFORE_ROLE_ACCEPTED) {
+        // Accepted exception: only the ModuleState lookup may precede the door.
+        expect(readsBefore.length, 'accepted page still reads before its door (exception stale?)').toBeGreaterThan(0);
+        expect(readsBefore.every((r) => r === 'moduleGate('), `non-module read before door: ${readsBefore.join(', ')}`).toBe(true);
+        expect(before.search(TENANT_READ), 'tenant read before door').toBe(-1);
+        return;
+      }
+      expect(readsBefore, `read(s) before the door: ${readsBefore.join(', ')}`).toEqual([]);
+    });
+  }
+});
+
+/** Comments stripped the same way the evaluation-panel check does (block + full-line). */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
