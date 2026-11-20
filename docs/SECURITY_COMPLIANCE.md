@@ -157,8 +157,8 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   olmadan clamd o kısmı atlayıp `OK` der. Zararlı bulunursa nesne silinir, `AuditEvent`
   `evidence.scan.infected` ve `SystemAlert` (`error`, kiracı kimliği/dosya adı içermez) yazılır. Testler yalnız
   EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
-  güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da clamd
-  servisi yok, gerçek-clamd testleri `NG239_CLAMD_HOST`/`CLAMD_HOST` verilmeden atlanır.
+  güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da gerçek
+  clamd koşar (`ci.yml`, ClamAV 1.5.4 + `AlertExceedsMax`), gerçek-clamd testleri ve clamd durdurulmuş testi orada atlanmadan koşar.
 - Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
 - Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı. **NexaGrant barındırma güncellemesi (19.11.2026, ADR-0012):** DB Supabase'te kalır (yedek Supabase planına bağlı; plan bilinmiyor, NG-246 §4), VPS için Hostinger haftalık yedeği. Taşıma planlı, yapılmadı; bugün canlı Hostinger Cloud'da.
 - Olay müdahale: 72 saat bildirim prosedürü (GDPR), KVKK Kurulu bildirimi.
