@@ -411,7 +411,7 @@ Açık (FO-265): **K1** hedef kitle (yalnız CONSULTANCY/AGENCY mı), **K2** fiy
 ## Açık kararlar (yanıtlanmadan varsayılmaz)
 
 1. Marka adı ve alan adı (çalışma adı "Fabrika").
-2. Neon mu Supabase mi (RLS ve pgvector ikisinde de var; Supabase Auth kullanılmayacak, Auth.js kalacak).
+2. Neon mu Supabase mi (RLS ve pgvector ikisinde de var; Supabase Auth kullanılmayacak, Auth.js kalacak). ✅ **KAPANDI — K-584515 = A, veritabanı Supabase'te kalır (ADR-0012).**
 3. ✅ **KAPANDI.** Inngest (yönetilen) mi BullMQ+Redis (kendi) mi — MVP'de Inngest önerilirdi. **[KARAR 29.09 — patron]** Kendi iş kuyruğumuza geçildi, Inngest kalktı. **Sonuç:** araç graphile-worker; ADR-0008 "Uygulandı" (TASK-MUMT3PGX5OK8P, §9; Inngest kodu `5ed2261a` ile çıktı); ayrıntı `docs/INNGEST.md`. _Tarihli kayıt, 29.09'daki o günkü plan (artık geçerli değil, "sürüyor" diye okunmasın):_ "Araç seçimi (pg-boss / graphile-worker / cron) ADR + spike ile yapılacak: uygulama TASK-MUMLFDTNQ53VJ'de sürüyor (todo, devop-fb)." Bu kartın bugünkü panodaki durumu burada kontrol edilmedi.
    **Açık kalan (ayrı):** aylık `k2-monthly-cordis` işi gerçek içe aktarıma (`runCordisImport`) bağlı değil — NG-225, yapılmadı (bkz. E6).
 4. Embedding sağlayıcısı (OpenAI text-embedding-3-large 1536 vs Voyage) — şema 1536 varsayıyor. **[KAPANDI 29.09 — patron]** OpenAI'da kalıyor. Anahtar: **TASK-MULQM3LFB4KRA**.

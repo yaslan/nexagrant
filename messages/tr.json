@@ -268,6 +268,31 @@
           "DECLARE_FAILED": "Beyan kaydedilemedi. Tekrar deneyin."
         }
       },
+      "withdraw": {
+        "open": "Vazgeç",
+        "reasonLabel": "Vazgeçme gerekçesi",
+        "reasonHint": "Gerekçe zorunludur. Kayıt karar geçmişine yazılır ve geri alınamaz; gerekçe ekranda kalır.",
+        "submit": "Vazgeç ve gerekçeyi kaydet",
+        "saving": "Kaydediliyor…",
+        "cancel": "Vazgeçme",
+        "withdrawnNotice": "Bu fırsat pasife alındı (vazgeçildi). Karar geçmişinde gerekçesi görünür.",
+        "logTitle": "Karar geçmişi",
+        "kind": {
+          "WITHDRAW": "Vazgeçildi",
+          "APPLY": "Başvuruldu"
+        },
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Yeniden giriş yapın.",
+          "INVALID_INPUT": "Geçersiz istek.",
+          "REASON_TOO_LONG": "Gerekçe en fazla 2000 karakter olabilir.",
+          "REASON_REQUIRED": "Vazgeçmek için bir gerekçe yazmanız gerekir.",
+          "OPPORTUNITY_NOT_FOUND": "Bu fırsat bulunamadı ya da arşivlenmiş.",
+          "WITHDRAW_FORBIDDEN": "Bu işlemi yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
+          "ALREADY_WITHDRAWN": "Bu fırsat zaten pasife alınmış.",
+          "ALREADY_DECIDED": "Sonuç girilmiş bir fırsat vazgeçilemez.",
+          "WITHDRAW_FAILED": "Vazgeçme kaydedilemedi. Tekrar deneyin."
+        }
+      },
       "modules": {
         "label": "Modüller",
         "conceptNote": "Konsept Notu",
