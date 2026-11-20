@@ -202,14 +202,39 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
     expect(sameElement).toBe(true);
   });
 
+  // The server's retry timing (src/lib/evidence-scan.ts): a failed run of attempt k writes
+  // scanAttempts = k + 1 and queues attempt k + 1 while EVIDENCE_SCAN_RETRY_WAITS_MS[k] exists.
+  // With three waits, scanAttempts 1, 2 and 3 each still have a queued try (3 is the 30 min
+  // last one); scanAttempts 4 is the first value with none left (review E-2).
+  test('a row in its last retry window (scanAttempts 3): the refresh goes on and picks up the result', async ({ page }) => {
+    test.setTimeout(150_000);
+    await openEvidence(page, waiting);
+    const row = await uploadThroughScreen(page, 'ng264-son-deneme.docx', cleanDocx('son deneme'));
+    // Third failure: the server has queued the fourth (last) attempt, 30 minutes out.
+    await prisma.evidence.updateMany({
+      where: { id: row.id, tenantId: waiting.tenantId },
+      data: { scanStatus: 'ERROR', scanAttempts: 3, scannedAt: new Date() },
+    });
+    // The answer that brings ERROR also brings the server's retrying flag for the row.
+    await expect(scanState(page, 'scan_error')).toHaveText('Taranamadı, yeniden denenecek', { timeout: 20_000 });
+    await page.waitForTimeout(6_000);
+    // The last attempt comes back clean; no reload, the screen has to see it.
+    await prisma.evidence.updateMany({
+      where: { id: row.id, tenantId: waiting.tenantId },
+      data: { scanStatus: 'CLEAN', scannedAt: new Date() },
+    });
+    await expect(downloadLinkOf(page, row.id)).toHaveCount(1, { timeout: 60_000 });
+    await expect(page.locator(ANNOUNCER)).toHaveText('ng264-son-deneme: Taranıp temiz bulundu');
+  });
+
   test('a row whose retries ran out: the refresh stops and does not keep reading the list', async ({ page }) => {
     test.setTimeout(150_000);
     await openEvidence(page, waiting);
     const row = await uploadThroughScreen(page, 'ng264-bitti.docx', cleanDocx('bitti'));
-    // The scan failed for the last time: attempts used up, the sweep has the row from here.
+    // The fourth (last) attempt failed too: scanAttempts 4 has no wait left, the sweep has the row from here.
     await prisma.evidence.updateMany({
       where: { id: row.id, tenantId: waiting.tenantId },
-      data: { scanStatus: 'ERROR', scanAttempts: 3, scannedAt: new Date() },
+      data: { scanStatus: 'ERROR', scanAttempts: 4, scannedAt: new Date() },
     });
     await expect(scanState(page, 'scan_error')).toHaveText('Taranamadı, yeniden denenecek', { timeout: 20_000 });
     const calls = countEvidenceListCalls(page);
