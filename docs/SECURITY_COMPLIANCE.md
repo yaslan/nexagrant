@@ -159,6 +159,23 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
   güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da gerçek
   clamd koşar (`ci.yml`, ClamAV 1.5.4 + `AlertExceedsMax`), gerçek-clamd testleri ve clamd durdurulmuş testi orada atlanmadan koşar.
+- ZIP üye denetimi (NG-269, K-584606 = C): `AlertExceedsMax` her durumu yakalamıyor. clamd 1.5.4, MaxFileSize'ı aşan
+  tek bir ZIP üyesini uyarısız kırpıp `OK` diyor, ZIP64 üyeyi hiç açmıyor (NG-265 ölçümü). Bu yüzden ZIP başlıklı her
+  kanıt dosyası (docx, xlsx) clamd'den ÖNCE `src/lib/zip-member-check.ts` ile denetlenir. Denetim her üyeyi akış
+  olarak açar, gerçek baytı sayar ve tavanda durur; başlıkta beyan edilen boyuta güvenmez. Merkezi dizinde olmayan
+  yerel girdilere ve üye içindeki (stored, deflate ya da başka baytlardan sonra gömülü) ZIP'lere de bakar. Tavanlar
+  tek yerde ve clamd varsayılanlarıyla aynı: üye 100 MiB (`MaxFileSize`), toplam açılım 400 MiB (`MaxScanSize`),
+  10 000 girdi (`MaxFiles`), iç içe derinlik 32 (clamd `MaxRecursion` 17'den derin). Tavanı aşan üye ya da dosya,
+  ZIP64, deflate/stored dışında bir yöntem, şifreli ya da açılamayan üye `ERROR` (`limits_exceeded: zip_member_check:
+  <kod>`) olur. Merkezi dizinde olmayan bir yerel girdinin adı boş ya da kontrol karakterli olsa bile ZIP64 işareti,
+  ZIP belirtiminin tanıdığı bir yöntemde de şifreleme ya da deflate/stored dışı yöntem reddedilir: clamd bu girdileri
+  adına bakmadan okuyor (gizli ZIP64 ve LZMA girdide `OK` ölçüldü). Bir üyenin içinde deflate ile saklanmış iç ZIP, içine
+  bakılabilmesi için bellekte tutulur; tutulan toplam 32 MiB'ı (`ZIP_NESTED_HOLD_MAX_BYTES`, clamd ayarı değil) aşarsa
+  dosya `nested_too_large` koduyla reddedilir. Dosya clamd'ye gitmez, silinmez, inmez. Bilinen sınırlar: sayfası
+  100 MiB'ı aşan çok büyük bir xlsx veri dökümü (sıkıştırılmış ~17 MB+) ve 32 MiB'tan büyük gömülü (deflate edilmiş)
+  bir docx/xlsx içeren dosya reddedilir; ret kalıcıdır ama NG-239'un yeniden deneme yolundan geçer (3 deneme + `warn`
+  uyarısı + süpürme). clamd'nin bir tavanı düşürülürse aynı değişiklik bu dosyada da yapılmalıdır.
+  Kapsam dışı: PNG/JPG/WebP sonuna eklenen ZIP (polyglot), ayrı bir takip işi.
 - Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
 - Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı. **NexaGrant barındırma güncellemesi (19.11.2026, ADR-0012):** DB Supabase'te kalır (yedek Supabase planına bağlı; plan bilinmiyor, NG-246 §4), VPS için Hostinger haftalık yedeği. Taşıma planlı, yapılmadı; bugün canlı Hostinger Cloud'da.
 - Olay müdahale: 72 saat bildirim prosedürü (GDPR), KVKK Kurulu bildirimi.

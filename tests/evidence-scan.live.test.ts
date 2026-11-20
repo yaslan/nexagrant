@@ -4,6 +4,7 @@ import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 import { DOCX_MIME, cleanDocx, eicarDocx, nestedDocx } from './helpers/eicar';
+import { bombDocxB, hiddenZip64EicarDocx } from './helpers/zip-fixtures';
 
 /**
  * NG-239 — virus scan of uploaded evidence (§18.3, K-584154 = A).
@@ -318,6 +319,43 @@ describe.skipIf(!CLAMD_HOST)(`NG-239 against a real clamd (${CLAMD_HOST || 'not 
 
     const res = await callDownload(id);
     console.log(`[clamd limits] D1 status ${res.status}`);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_ERROR' });
+  });
+
+  // NG-269 (NG-265 (b), K-584606 = C): clamd cuts one ZIP member at MaxFileSize (100 MiB) and
+  // answers OK even with AlertExceedsMax. A 150 KB .docx whose one member unpacks to 150 MiB,
+  // EICAR at 140 MiB, was CLEAN and downloaded. The member check stops it before clamd.
+  test('NG-269 (b): a .docx whose member unpacks past 100 MiB is ERROR (limits_exceeded), kept, and D1 answers 409', async () => {
+    const body = bombDocxB();
+    const id = await uploadPresigned('ng269-b-150M-eicar-at-140M.docx', body);
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    const out = await scanner.scanEvidence({ tenantId: t.tenant, evidenceId: id, attempt: 0 }, { clamd, enqueue: async () => true });
+    const row = await rowOf(id);
+    const res = await callDownload(id);
+    console.log(`[NG-269 b] ${body.length}B | scanEvidence=${JSON.stringify(out)} | row=${JSON.stringify({ scanStatus: row.scanStatus, scanSignature: row.scanSignature, scanAttempts: row.scanAttempts })} | D1 HTTP ${res.status}`);
+    expect(out).toMatchObject({ status: 'ERROR', reason: expect.stringMatching(/^limits_exceeded: zip_member_check: member_too_large/) });
+    expect(row.scanStatus).toBe('ERROR');
+    expect(row.scanSignature).toBeNull();
+    expect(await storage.statObject(key), 'not proven malware: the object is kept').not.toBeNull();
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_ERROR' });
+  });
+
+  // NG-269 review B-1: a local entry left out of the central directory, empty name, written as
+  // ZIP64, EICAR inside. clamd reads it but does not unpack ZIP64 and answers OK; the member check
+  // asked ZIP64 only of entries with a plausible name, so the row was CLEAN and D1 answered 200.
+  test('NG-269 B-1: a .docx with a hidden, nameless ZIP64 entry holding EICAR is ERROR (zip64), and D1 answers 409', async () => {
+    const body = hiddenZip64EicarDocx();
+    const id = await uploadPresigned('ng269-b1-hidden-zip64.docx', body);
+    await dropQueuedScans(id);
+    const out = await scanner.scanEvidence({ tenantId: t.tenant, evidenceId: id, attempt: 0 }, { clamd, enqueue: async () => true });
+    const row = await rowOf(id);
+    const res = await callDownload(id);
+    console.log(`[NG-269 B-1] ${body.length}B | scanEvidence=${JSON.stringify(out)} | row=${JSON.stringify({ scanStatus: row.scanStatus, scanAttempts: row.scanAttempts })} | D1 HTTP ${res.status}`);
+    expect(out).toMatchObject({ status: 'ERROR', reason: 'limits_exceeded: zip_member_check: zip64' });
+    expect(row.scanStatus).toBe('ERROR');
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_ERROR' });
   });

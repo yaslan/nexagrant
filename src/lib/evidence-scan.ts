@@ -4,6 +4,7 @@ import { scanBytes, type ClamdOptions, type ClamdVerdict } from '@/lib/clamav';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { errorMessage } from '@/lib/errors';
 import { requireActionId } from '@/lib/required-id';
+import { checkZipMembers, looksLikeZip } from '@/lib/zip-member-check';
 
 /**
  * NG-239 (§18.3) — virus scan of an uploaded evidence file, run by the
@@ -18,7 +19,7 @@ import { requireActionId } from '@/lib/required-id';
  *             (`evidence.scan.infected`) is written in the tenant's scope and an
  *             `error` SystemAlert is raised.
  *   anything else (clamd not configured, refused, timed out, its own ERROR, a
- *   file past clamd's limits — `limits_exceeded`, NG-239 Ö-1 — or the object unreadable) → ERROR, `scanAttempts` + 1, and the next attempt is
+ *   file past clamd's limits — `limits_exceeded`, NG-239 Ö-1, or past the ZIP member check that runs first, NG-269 — or the object unreadable) → ERROR, `scanAttempts` + 1, and the next attempt is
  *   queued after {@link EVIDENCE_SCAN_RETRY_WAITS_MS}. When the waits run out a
  *   `warn` SystemAlert says so; `evidence-scan-sweep` tries again later.
  *
@@ -116,7 +117,7 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
 
   const bytes = await readObject(key);
   const verdict: ClamdVerdict = bytes
-    ? await scan(bytes)
+    ? ((await zipRefusal(bytes)) ?? (await scan(bytes)))
     : { verdict: 'error', reason: 'bad_reply', detail: 'object_unreadable' };
 
   // Every write below is conditional on the state this run read: a second run
@@ -187,6 +188,20 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
     }).catch((e) => console.error(`[evidence-scan] could not write the scan-error SystemAlert: ${errorMessage(e)}`));
   }
   return { status: 'ERROR', reason, retryQueued };
+}
+
+/**
+ * NG-269 (K-584606 = C): a docx/xlsx is a ZIP, and clamd answers OK for a ZIP
+ * it did not read to the end (one member past MaxFileSize is cut, a ZIP64 member
+ * is not unpacked: NG-265). src/lib/zip-member-check.ts finds those before the
+ * bytes go to clamd; such a file is `limits_exceeded`, the same answer as
+ * clamd's own `Heuristics.Limits.Exceeded.*`: ERROR, kept, never downloadable.
+ * The detail is a failure code only (no member name: names are tenant data).
+ */
+async function zipRefusal(bytes: Buffer): Promise<ClamdVerdict | null> {
+  if (!looksLikeZip(bytes)) return null;
+  const check = await checkZipMembers(bytes);
+  return check.ok ? null : { verdict: 'error', reason: 'limits_exceeded', detail: `zip_member_check: ${check.failure}` };
 }
 
 export interface EvidenceScanSweepResult {
