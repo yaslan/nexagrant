@@ -81,6 +81,17 @@ describe('ngFeatureGate (NG-250)', () => {
     expect(d).toEqual({ allowed: false, code: NG_GATE_CODES.roleForbidden, feature: 'partner_search' });
   });
 
+  it.each([
+    ['GUEST_PARTNER', 'view_partner_search', 'partner_search'],
+    ['GUEST_PARTNER', 'view_partner_search', 'similar_projects'],
+  ] as const)(
+    'r7 K-584603 = A: a tenant without a NexaGrant row is not refused for the role (%s, %s, %s) — the route\'s own door answers (NG-64)',
+    async (role, action, feature) => {
+      const d = await ngFeatureGate(fakeTx(null), { tenantId: 't1', role }, action, feature, NOW);
+      expect(d).toEqual({ allowed: true, enrolled: false });
+    }
+  );
+
   it('no role at all is refused', async () => {
     const d = await ngFeatureGate(fakeTx(null), { tenantId: 't1', role: null }, 'search_calls', 'call_search', NOW);
     expect(d.allowed).toBe(false);
