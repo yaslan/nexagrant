@@ -1,5 +1,7 @@
 # NexaGrant: ortam değişkenleri listesi (Hostinger Cloud hosting · eski cPanel hedefi)
 
+> **ESKİ HEDEF (NG-262, 19.11.2026):** bu liste Hostinger Cloud hedefi içindir ve taşıma bitene kadar (ve 14 günlük geri dönüş süresince) geçerlidir. Yeni hedefin (VPS, planlı, NG-261) değişkenleri: `deploy/vps/.env.prod.example`. Yeni hedef: patronun aldığı Hostinger KVM 4 + CloudPanel (19.11.2026 akşam); `TRUSTED_PROXY_HOPS` orada CloudPanel nginx zincirinde ölçülecek (NG-261 Faz A), bu listedeki `2` yalnız Cloud hedefi içindir. Karar: `docs/adr/ADR-0012-hosting-hostinger-cloud-to-vps.md`.
+
 **Güncel hedef (K-574987 = A, 01.11.2026):** Hostinger Cloud Economy, site `nexagrant.com`, kullanıcı `u605628300`,
 uygulama kökü `/home/u605628300/domains/nexagrant.com/public_html`. Kurulum sırası: `docs/DEPLOY-NEXAGRANT-HOSTINGER.md`.
 Bu listedeki `/home/fonbridge/fonbridge-app` yolları eski Vulut cPanel hedefinden kalır; Hostinger'da yerine
