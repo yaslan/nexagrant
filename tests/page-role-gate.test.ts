@@ -307,12 +307,9 @@ describe('the role door precedes the first read on each gated page (NG-258)', ()
   const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
   for (const [file, action] of Object.entries(PAGE_DOORS)) {
     test(`${file}: requireTenantPageRole(${action}) comes before any read in the page body`, () => {
-      const code = stripComments(readFileSync(path.join(root, file), 'utf8'));
-      const at = code.indexOf('export default');
-      expect(at, 'default export present (scan scope)').toBeGreaterThan(-1);
-      const body = code.slice(at);
-      const door = body.indexOf(`requireTenantPageRole(locale, '${action}')`);
-      expect(door, 'role door call present in body').toBeGreaterThan(-1);
+      const { body, door } = scopeOf(stripComments(readFileSync(path.join(root, file), 'utf8')), action);
+      expect(body, 'default export body present (scan scope)').not.toBe('');
+      expect(door, 'role door is a direct statement of the body').toBeGreaterThan(-1);
       const before = body.slice(0, door);
       const readsBefore = [...before.matchAll(READ_CALL)].map((m) => m[0]);
 
@@ -365,35 +362,108 @@ const ANONYMOUS_PAREN = '(anonymous parenthesised expression or call: name the c
 /** Top-level `await` runs while the module loads (B2); in the body `await params` is fine. */
 const AWAIT_TOKEN = /\bawait\b/g;
 
+function parseTsx(code: string): ts.SourceFile {
+  return ts.createSourceFile('page.tsx', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+
 /**
- * The page body from the default export's opening brace. The parameter list is found by
- * parenthesis balance and the body brace by angle-bracket balance, so a return-type
- * annotation (`}): Promise<X> {`) and a parameter type with braces do not move the start.
- * The body is the first `{` outside `<...>` after the parameter list's closing `)`.
+ * The default export's function declaration, found by the parser. A string or a comment that
+ * spells `export default` cannot stand in for it (NG-277 E4: the old text search could).
  */
-function bodyOf(code: string): string {
-  const at = code.indexOf('export default');
-  if (at === -1) return '';
-  const open = code.indexOf('(', at);
-  if (open === -1) return '';
-  let parens = 0;
-  let close = -1;
-  for (let i = open; i < code.length; i++) {
-    if (code[i] === '(') parens++;
-    else if (code[i] === ')' && --parens === 0) {
-      close = i;
-      break;
+function defaultExportFn(sf: ts.SourceFile): ts.FunctionDeclaration | undefined {
+  return sf.statements.find(
+    (st): st is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(st) && hasModifier(st, ts.SyntaxKind.ExportKeyword) && hasModifier(st, ts.SyntaxKind.DefaultKeyword),
+  );
+}
+
+/** Is `node` the call `requireTenantPageRole(locale, '<action>')`? */
+function isDoorCall(node: ts.Node, action: string): node is ts.CallExpression {
+  if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression)) return false;
+  if (node.expression.text !== 'requireTenantPageRole' || node.arguments.length !== 2) return false;
+  const [first, second] = node.arguments;
+  return first !== undefined && ts.isIdentifier(first) && first.text === 'locale' &&
+    second !== undefined && ts.isStringLiteral(second) && second.text === action;
+}
+
+/**
+ * The default export's body, from its opening brace, and the offset of its role door inside it.
+ * The door must be a DIRECT statement of the body: `await door` as an expression statement, or
+ * the initializer of a single `const`. A door inside `if`, a ternary or an arrow function is
+ * not a door (`door: -1`), so the reads after it are not treated as guarded (NG-277 E5).
+ * Found by the parser, not by text search: a string that spells the door cannot move it.
+ * With `action` '' the door is always -1; only the body is used then.
+ */
+function scopeOf(code: string, action: string): { body: string; door: number } {
+  const sf = parseTsx(code);
+  const fn = defaultExportFn(sf);
+  if (!fn?.body) return { body: '', door: -1 };
+  const start = fn.body.getStart(sf);
+  const body = code.slice(start);
+  for (const st of fn.body.statements) {
+    let init: ts.Expression | undefined;
+    if (ts.isExpressionStatement(st)) init = st.expression;
+    else if (ts.isVariableStatement(st) && st.declarationList.declarations.length === 1) {
+      init = st.declarationList.declarations[0]?.initializer;
     }
+    if (!init) continue;
+    const call = ts.isAwaitExpression(init) ? init.expression : init;
+    if (isDoorCall(call, action)) return { body, door: call.getStart(sf) - start };
   }
-  if (close === -1) return '';
-  let angles = 0;
-  for (let i = close + 1; i < code.length; i++) {
-    const c = code[i];
-    if (c === '<') angles++;
-    else if (c === '>') angles--;
-    else if (c === '{' && angles === 0) return code.slice(i);
-  }
-  return '';
+  return { body, door: -1 };
+}
+
+/** The page body from the default export's opening brace (see scopeOf). */
+function bodyOf(code: string): string {
+  return scopeOf(code, '').body;
+}
+
+/**
+ * Decorators run when the class is defined, with or without parentheses. The text scan only
+ * sees `f(`, so each decorator is found in the parse tree (NG-277 E1).
+ */
+function decoratorsIn(code: string): Array<{ pos: number; text: string }> {
+  const sf = parseTsx(code);
+  const out: Array<{ pos: number; text: string }> = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.canHaveDecorators(node)) {
+      for (const d of ts.getDecorators(node) ?? []) out.push({ pos: d.getStart(sf), text: `decorator:${d.getText(sf)}` });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/**
+ * NG-277 E3: an allowlisted name is trusted only when it is imported from `next-intl/server`
+ * and nothing else in the file declares the same name. Otherwise a page could define a local
+ * `getTranslations` (or import one from a module that reads the database) and call it before
+ * the door.
+ */
+function allowedFor(code: string): ReadonlySet<string> {
+  const sf = parseTsx(code);
+  const imported = new Set<string>();
+  const declared = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) &&
+      node.moduleSpecifier.text === 'next-intl/server' && node.importClause?.namedBindings &&
+      ts.isNamedImports(node.importClause.namedBindings)
+    ) {
+      for (const el of node.importClause.namedBindings.elements) imported.add(el.name.text);
+    }
+    const named =
+      ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node) ||
+      ts.isFunctionExpression(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node) ||
+      ts.isBindingElement(node)
+        ? node.name
+        : undefined;
+    if (named && ts.isIdentifier(named)) declared.add(named.text);
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return new Set([...PRE_DOOR_ALLOWED].filter((name) => imported.has(name) && !declared.has(name)));
 }
 
 function preDoorViolations(body: string, door: number, allowed: ReadonlySet<string> = PRE_DOOR_ALLOWED): string[] {
@@ -403,18 +473,19 @@ function preDoorViolations(body: string, door: number, allowed: ReadonlySet<stri
   const news = [...pre.matchAll(NEW_EXPR)].map((m) => `new:${m[1]}`);
   const calls = named.filter((name) => !allowed.has(name));
   const db = [...pre.matchAll(DB_TOKEN)].map((m) => `token:${m[0]}`);
-  return [...calls, ...tagged, ...news, ...db];
+  const decorators = decoratorsIn(body).filter((d) => d.pos < door).map((d) => d.text);
+  return [...calls, ...tagged, ...news, ...db, ...decorators];
 }
 
 describe('nothing before the role door calls out except allowlisted calls (NG-277)', () => {
   const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
   for (const [file, action] of Object.entries(PAGE_DOORS)) {
     test(`${file}: no call or DB token before requireTenantPageRole(${action})`, () => {
-      const body = bodyOf(stripComments(readFileSync(path.join(root, file), 'utf8')));
+      const code = stripComments(readFileSync(path.join(root, file), 'utf8'));
+      const { body, door } = scopeOf(code, action);
       expect(body, 'default export body present (scan scope)').not.toBe('');
-      const door = body.indexOf(`requireTenantPageRole(locale, '${action}')`);
-      expect(door, 'role door call present in body').toBeGreaterThan(-1);
-      const found = preDoorViolations(body, door);
+      expect(door, 'role door is a direct statement of the body').toBeGreaterThan(-1);
+      const found = preDoorViolations(body, door, allowedFor(code));
       expect(found, `calls before the door: ${found.join(' | ')}`).toEqual([]);
     });
   }
@@ -656,7 +727,164 @@ describe('pre-door scan: call forms and signature shape (NG-277 E1, Ö1)', () =>
   });
 });
 
-/** Comments stripped the same way the evaluation-panel check does (block + full-line). */
+/**
+ * Blank out the REAL comments and keep every other character at its offset, so the text scans
+ * see code. The comment ranges come from the TypeScript parser, not a regex: a string, template,
+ * regex literal or JSX text that spells `/*` or `//` is not a comment and stays scanned
+ * (NG-277 E2). Measured on the 25 pages: leaving comments in turns 8 of them red (JSDoc names
+ * `prisma.` and other calls), so comments are stripped, and exactly.
+ */
 function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const sf = parseTsx(source);
+  const ranges = new Map<number, number>();
+  const visit = (node: ts.Node): void => {
+    // JSX text is text, not trivia: `/*` in it is not a comment, and the trivia lookup below
+    // would otherwise blank everything after it (NG-277 E2, found by the JSX fixture).
+    if (node.kind === ts.SyntaxKind.JsxText || node.kind === ts.SyntaxKind.JsxTextAllWhiteSpaces) return;
+    const children = node.getChildren(sf);
+    if (children.length > 0) {
+      for (const child of children) visit(child);
+      return;
+    }
+    // A leaf token's trivia is exactly [pos, getStart): a comment counts only inside it.
+    const start = node.getStart(sf);
+    const found = [...(ts.getLeadingCommentRanges(source, node.pos) ?? []), ...(ts.getTrailingCommentRanges(source, node.pos) ?? [])];
+    for (const r of found) if (r.end <= start) ranges.set(r.pos, r.end);
+  };
+  visit(sf);
+  let out = '';
+  let last = 0;
+  for (const pos of [...ranges.keys()].sort((a, b) => a - b)) {
+    const end = ranges.get(pos) ?? pos;
+    out += source.slice(last, pos) + source.slice(pos, end).replace(/[^\r\n]/g, ' ');
+    last = end;
+  }
+  return out + source.slice(last);
 }
+
+/**
+ * NG-277 round 4: each fixture is a page or body that the scan must report (E1 decorators,
+ * E2 comment look-alikes, E3 shadowed allowlist, E4 `export default` text, E5 door shape),
+ * and the negative fixtures show that real comments and a decorator after the door pass.
+ */
+describe('round 4 fixtures: decorators, comment look-alikes, shadowed allowlist, door shape (NG-277 E1-E5)', () => {
+  const DOOR = "requireTenantPageRole(locale, 'view_proposal')";
+  const HEAD = 'export default async function P({ params }: { params: Promise<{ locale: string }> }) {';
+  const PAGE_CALL = [HEAD, "  const t = await getTranslations('x');", `  const { tenantId } = await ${DOOR};`, '  return tenantId;', '}'].join('\n');
+
+  test.each([
+    ['E1: a bare decorator on a top-level class', '@leakDec\nclass K {}', ['decorator:@leakDec']],
+    ['E1: a decorator on a class member', 'class K { @leakDec m = 1 }', ['decorator:@leakDec']],
+    ['E1: a class with no decorator runs nothing', 'class K { x = 1 }', []],
+  ] as const)('%s', (_label, line, expected) => {
+    expect(scanOutsideBody(`${line}\n\n${PAGE_CALL}`).moduleLoad).toEqual(expected);
+  });
+
+  test('E1: a decorator in the body before the door is a violation; one after the door is not', () => {
+    const before = `{\n  @leakDec\n  class K {}\n  const x = await ${DOOR};\n}`;
+    expect(preDoorViolations(before, before.indexOf(DOOR))).toEqual(['decorator:@leakDec']);
+    const after = `{\n  const x = await ${DOOR};\n  @leakDec\n  class K {}\n}`;
+    expect(preDoorViolations(after, after.indexOf(DOOR))).toEqual([]);
+  });
+
+  test('E2: `/*` inside a string does not hide a call at module level', () => {
+    expect(scanOutsideBody(`const s = ['/*', leakHelper('t1'), '*/'];\n\n${PAGE_CALL}`).moduleLoad).toEqual(['leakHelper']);
+  });
+
+  test('E2: `/*` inside a string does not hide a call in the body', () => {
+    const body = `{\n  const s = ['/*', leakHelper('t1'), '*/'];\n  const x = await ${DOOR};\n}`;
+    expect(preDoorViolations(stripComments(body), stripComments(body).indexOf(DOOR))).toEqual(['leakHelper']);
+  });
+
+  test('E2: a template literal that spells `*/` and `/*` around a call keeps the call', () => {
+    const body = '{\n  const t = `*/ ${leakHelper(\'t1\')} /*`;\n  const x = await ' + DOOR + ';\n}';
+    expect(stripComments(body)).toContain("leakHelper('t1')");
+  });
+
+  test('E2: a regex literal that spells a comment and JSX text that spells one keep the code after them', () => {
+    expect(stripComments("const r = /\\/\\*/; leakHelper('t1');")).toContain("leakHelper('t1')");
+    expect(stripComments("const el = <p>/* open</p>;\nconst s = leakHelper('t1');")).toContain("leakHelper('t1')");
+  });
+
+  test('E2: real comments (block, JSDoc, trailing) are still removed', () => {
+    const body = `{\n  // leakHelper('t1')\n  /** prisma.opportunity.findMany() */\n  const a = 1; // leakHelper('t2')\n  const x = await ${DOOR};\n}`;
+    const stripped = stripComments(body);
+    expect(stripped).not.toContain('leakHelper');
+    expect(stripped).not.toContain('prisma');
+    expect(preDoorViolations(stripped, stripped.indexOf(DOOR))).toEqual([]);
+  });
+
+  test('E3: a local declaration named like the allowlisted call is a violation', () => {
+    const src = `async function getTranslations() { return prisma.opportunity.findMany(); }\n\n${PAGE_CALL}`;
+    const { body, door } = scopeOf(src, 'view_proposal');
+    expect(preDoorViolations(body, door, allowedFor(src))).toEqual(['getTranslations']);
+  });
+
+  test('E3: a body-level shadow of the allowlisted name is a violation even with the import', () => {
+    const src = [
+      "import { getTranslations } from 'next-intl/server';",
+      HEAD,
+      '  const getTranslations2 = () => prisma.opportunity.findMany();',
+      "  const t = await getTranslations('x');",
+      '  const getTranslations = () => 1;',
+      `  const { tenantId } = await ${DOOR};`,
+      '  return tenantId;',
+      '}',
+    ].join('\n');
+    const { body, door } = scopeOf(src, 'view_proposal');
+    expect(preDoorViolations(body, door, allowedFor(src))).toContain('getTranslations');
+  });
+
+  test('E3: the page own import of getTranslations stays allowed', () => {
+    const src = `import { getTranslations } from 'next-intl/server';\n\n${PAGE_CALL}`;
+    const { body, door } = scopeOf(src, 'view_proposal');
+    expect(preDoorViolations(body, door, allowedFor(src))).toEqual([]);
+  });
+
+  test('E4: an `export default` spelled in a string before the page does not move the scan window', () => {
+    const src = `const label = 'export default';\n\n${HEAD}\n  leakHelper('t1');\n  const { tenantId } = await ${DOOR};\n  return tenantId;\n}`;
+    const { body, door } = scopeOf(src, 'view_proposal');
+    expect(body.startsWith('{\n  leakHelper')).toBe(true);
+    expect(preDoorViolations(body, door)).toEqual(['leakHelper']);
+  });
+
+  test('E4: a door spelled in a string before the real door does not move the door', () => {
+    const src = `${HEAD}\n  const s = "${DOOR}";\n  leakHelper('t1');\n  const { tenantId } = await ${DOOR};\n  return tenantId;\n}`;
+    const { body, door } = scopeOf(src, 'view_proposal');
+    // The string's own text is also reported (fail-closed: it spells `name(`); the point is
+    // that the door found is the real one, after the string and after leakHelper.
+    expect(door).toBeGreaterThan(body.indexOf(DOOR));
+    expect(preDoorViolations(body, door)).toContain('leakHelper');
+  });
+
+  test('E5: a door inside an if block is not a door', () => {
+    const src = `${HEAD}\n  if (flag) {\n    await ${DOOR};\n  }\n  return null;\n}`;
+    expect(scopeOf(src, 'view_proposal').door).toBe(-1);
+  });
+
+  test('E5: a door inside an arrow function is not a door', () => {
+    const src = `${HEAD}\n  const f = () => ${DOOR};\n  leakHelper('t1');\n  return null;\n}`;
+    expect(scopeOf(src, 'view_proposal').door).toBe(-1);
+  });
+
+  test('E3: getTranslations imported from another module (not next-intl/server) is a violation', () => {
+    const src = `import { getTranslations } from '@/lib/tenant-data';\n\n${PAGE_CALL}`;
+    const { body, door } = scopeOf(src, 'view_proposal');
+    expect(preDoorViolations(body, door, allowedFor(src))).toEqual(['getTranslations']);
+  });
+
+  test('round-4 attack set: template, JSX expression, `//` in a string and `/*` in a string keep the call visible', () => {
+    const cases = [
+      "const t = `${leakHelper('t1')}`;",
+      "const el = <p>{leakHelper('t1')}</p>;",
+      "const u = 'http://x'; leakHelper('t1');",
+      'const q = "/*"; leakHelper(\'t1\');',
+      "const r = /\\/\\//; leakHelper('t1');",
+    ];
+    for (const line of cases) {
+      const body = `{\n  ${line}\n  const x = await ${DOOR};\n}`;
+      const stripped = stripComments(body);
+      expect(preDoorViolations(stripped, stripped.indexOf(DOOR)), line).toContain('leakHelper');
+    }
+  });
+});
