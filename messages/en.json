@@ -79,7 +79,31 @@
     "genericTitle": "Notification",
     "genericDesc": "You have a new notification.",
     "emailDigestSubject": "Weekly notification summary: {count, plural, one {1 notification} other {# notifications}}",
-    "emailDigestIntro": "You have {count, plural, one {1 notification} other {# notifications}} this week, gathered into one e-mail as your weekly summary setting asks."
+    "emailDigestIntro": "You have {count, plural, one {1 notification} other {# notifications}} this week, gathered into one e-mail as your weekly summary setting asks.",
+    "preferences": {
+      "title": "Notification preferences",
+      "description": "Choose, for each notification type, whether you get it in the panel or by e-mail, and how often.",
+      "eventColumn": "Notification",
+      "channelPanel": "Panel",
+      "channelEmail": "E-mail",
+      "freqInstant": "Instant",
+      "freqWeekly": "Weekly",
+      "freqOff": "Off",
+      "saved": "Preference saved",
+      "saveFailed": "Could not save the preference. Please try again.",
+      "loadFailed": "Could not load preferences.",
+      "events": {
+        "NEW_MATCHING_CALL": "New matching call",
+        "CALL_CHANGED": "Followed call changed",
+        "OUTREACH_REPLY": "Outreach reply",
+        "CONTRIBUTION_OVERDUE": "Contribution overdue",
+        "APPROVAL_OVERDUE": "Approval overdue",
+        "BUDGET_DEVIATION": "Budget deviation",
+        "TASK_COLOR_CHANGED": "Task status changed",
+        "REPORT_DUE": "Report due",
+        "OBLIGATION_REMINDER": "Obligation reminder"
+      }
+    }
   },
   "Dashboard": {
     "title": "Dashboard",

@@ -11,6 +11,12 @@ import {
   type MarkReadTarget,
   type NotificationList,
 } from '@/lib/notifications/store';
+import {
+  PreferenceInputSchema,
+  getPreferencesFor,
+  setPreferenceFor,
+  type PreferenceView,
+} from '@/lib/notifications/preferences';
 
 /**
  * The bell's and /notifications' server side (ADR-0011 §3.3, TASK-MUVR24EHWI2RA).
@@ -78,5 +84,60 @@ export async function markNotificationsRead(ids: MarkReadTarget): Promise<MarkNo
   } catch (error) {
     console.error('[notifications][markRead]', error);
     return { ok: false, error: 'mark_failed' };
+  }
+}
+
+export type NotificationPreferencesResult =
+  | { ok: true; preferences: PreferenceView[] }
+  | { ok: false; error: 'unauthorized' | 'read_failed' };
+
+export type SetNotificationPreferenceResult =
+  | { ok: true }
+  | { ok: false; error: 'unauthorized' | 'invalid_input' | 'write_failed' };
+
+/**
+ * The signed-in user's channel and frequency choice per §13 event (NG-8).
+ * `userId` comes from the session only; the query is `where { tenantId, userId }`.
+ */
+export async function getNotificationPreferences(): Promise<NotificationPreferencesResult> {
+  let tenantId: string;
+  let userId: string;
+  try {
+    ({ tenantId, userId } = await requireTenantAction({ readOnly: true }));
+  } catch (error) {
+    if (error instanceof TenantScopeError) return { ok: false, error: 'unauthorized' };
+    throw error;
+  }
+  try {
+    const preferences = await withTenant(tenantId, (tx) => getPreferencesFor(tx, tenantId, userId));
+    return { ok: true, preferences };
+  } catch (error) {
+    console.error('[notifications][preferences][read]', error);
+    return { ok: false, error: 'read_failed' };
+  }
+}
+
+/**
+ * Sets one (event, channel) choice of the signed-in user. The input is validated
+ * against the channel's allowed frequencies (PreferenceInputSchema). Another
+ * member's row is never touched: `userId` is the session's, not the client's.
+ */
+export async function setNotificationPreference(input: unknown): Promise<SetNotificationPreferenceResult> {
+  let tenantId: string;
+  let userId: string;
+  try {
+    ({ tenantId, userId } = await requireTenantAction());
+  } catch (error) {
+    if (error instanceof TenantScopeError) return { ok: false, error: 'unauthorized' };
+    throw error;
+  }
+  const parsed = PreferenceInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: 'invalid_input' };
+  try {
+    await withTenant(tenantId, (tx) => setPreferenceFor(tx, tenantId, userId, parsed.data));
+    return { ok: true };
+  } catch (error) {
+    console.error('[notifications][preferences][write]', error);
+    return { ok: false, error: 'write_failed' };
   }
 }

@@ -64,6 +64,8 @@ const KNOWN: Record<string, string> = {
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
   'src/lib/evidence-scan.ts scanAttempts: run.attempt':
     'NG-239: a number, never undefined: scanEvidence throws on a non-integer before any write, and the job payload is zod-checked (int ≥ 0); id + tenantId are pinned in the same where',
+  'src/lib/notifications/preferences.ts in: types':
+    '`types` is the NotificationType list NOTIFICATION_TYPE_EVENT maps to the event; it is a module constant, never client input (the event is zod-validated by PreferenceInputSchema). tenantId and userId in the same where are checked by requireActionId above (K-584554 A, NG-8)',
   'src/lib/notifications/store.ts in: ids':
     '`ids` is parseMarkReadTarget(target) one line above, which throws unless every element passes isPresentId; an empty list returns before the update; tenantId and userId beside it go through requireActionId (TASK-MUVR24EHWI2RA)',
   'src/app/[locale]/admin/partner-search/actions.ts in: ids':
