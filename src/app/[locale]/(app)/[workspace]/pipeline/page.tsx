@@ -81,13 +81,13 @@ export default async function PipelinePage({
   params: Promise<{ locale: string; workspace: string }>
 }) {
   const { locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
 
   // No `findFirst()` tenant fallback: an empty `where` on Opportunity returns
   // every tenant's pipeline, and `findFirst()` on Tenant hands the session an
   // arbitrary one.
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let dbOpportunities: OpportunityItem[] = [];
   try {

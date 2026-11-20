@@ -68,10 +68,10 @@ export default async function PersonDaysReportPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
 
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let groupedData: EffortGroup[] = [];
   let queryFailed = false;
