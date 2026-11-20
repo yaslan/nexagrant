@@ -1,7 +1,8 @@
 /**
  * NG-250 — which product route each NexaGrant plan feature gates, and why the rest gate none.
  * Data, not behaviour: the routes call `ngGateResponse(caller, action, feature)` themselves
- * (route-gate.ts); bindings.test.ts reads each file listed here and fails when the call is
+ * (route-gate.ts), or their handler calls `ngGateResponseInTx` after its own role and module doors
+ * (`gateFile`); bindings.test.ts reads each file listed here and fails when the call is
  * missing, when a feature is neither bound nor explained, or when a module-backed route's
  * feature is missing from NG_FEATURE_MODULE (review U5).
  */
@@ -27,6 +28,11 @@ export interface NgRouteBinding {
   module: ModuleId | null;
   /** Where that module is checked, when not in `file` itself. */
   moduleGuardFile?: string;
+  /**
+   * Where the gate is called, when not in `file` itself (NG-250 r7): a handler whose own role
+   * and module doors run first calls `ngGateResponseInTx` after them; `file` hands off to it.
+   */
+  gateFile?: string;
 }
 
 const PARTNER_SEARCH_GUARD = 'src/modules/m1/server/partner-search/http.ts';
@@ -52,6 +58,7 @@ export const NG_ROUTE_BINDINGS: readonly NgRouteBinding[] = [
     action: 'view_partner_search',
     module: 'M1',
     moduleGuardFile: PARTNER_SEARCH_GUARD,
+    gateFile: PARTNER_SEARCH_GUARD,
   },
   {
     kind: 'route',
@@ -62,6 +69,7 @@ export const NG_ROUTE_BINDINGS: readonly NgRouteBinding[] = [
     action: 'view_partner_search',
     module: 'M1',
     moduleGuardFile: PARTNER_SEARCH_GUARD,
+    gateFile: PARTNER_SEARCH_GUARD,
   },
   {
     kind: 'route',
@@ -92,6 +100,7 @@ export const NG_ROUTE_BINDINGS: readonly NgRouteBinding[] = [
     action: 'view_partner_search',
     module: 'M1',
     moduleGuardFile: PARTNER_SEARCH_GUARD,
+    gateFile: PARTNER_SEARCH_GUARD,
   },
   {
     kind: 'route',
@@ -102,6 +111,7 @@ export const NG_ROUTE_BINDINGS: readonly NgRouteBinding[] = [
     action: 'view_partner_search',
     module: 'M1',
     moduleGuardFile: PARTNER_SEARCH_GUARD,
+    gateFile: PARTNER_SEARCH_GUARD,
   },
   // Review B1: the pages serve the same CORDIS partner rows as the gated API routes above.
   {

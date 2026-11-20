@@ -34,6 +34,15 @@ describe('NG feature → route bindings (NG-250)', () => {
         // A server component page: the gate renders the refusal (page-gate.tsx), it does not return a 403.
         expect(src).toContain('export default async function');
         expect(src).toMatch(new RegExp(`ngPageGate\\([^)]*'${b.action}',\\s*'${b.feature}'`));
+      } else if (b.gateFile) {
+        // NG-250 r7: the route hands off to its handler, which calls the gate after its own role
+        // and module doors (so a refused role keeps the route's NG-64 body).
+        expect(src).toContain(`export async function ${b.method}`);
+        expect(src).toContain(`from '@/${b.gateFile.replace(/^src\//, '').replace(/\.ts$/, '')}'`);
+        const handler = read(b.gateFile);
+        expect(handler).toMatch(new RegExp(`ngGateResponseInTx\\([^)]*'${b.action}',\\s*'${b.feature}'`));
+        // …and after the doors: the gate call sits below the module/role decision in the same helper.
+        expect(handler.indexOf('ngGateResponseInTx(')).toBeGreaterThan(handler.indexOf('await accessOf(tx, caller)'));
       } else {
         expect(src).toContain(`export async function ${b.method}`);
         expect(src).toMatch(new RegExp(`ngGateResponse\\([^)]*'${b.action}',\\s*'${b.feature}'`));
