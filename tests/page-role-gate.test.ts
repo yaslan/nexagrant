@@ -343,23 +343,58 @@ describe('the role door precedes the first read on each gated page (NG-258)', ()
  * awaited property reads, not calls. Add a name only with a reviewed reason.
  */
 const PRE_DOOR_ALLOWED: ReadonlySet<string> = new Set(['getTranslations']);
-const CALL_SITE = /([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\(/g;
+/**
+ * Every `(` that starts a call, in any form: `f(`, `f?.(`, `f!(`, `f<T>(`, `o.f(`, and the
+ * parenthesised callee `(f)(`. The name is optional so that `(f)()` (no identifier right
+ * before the `(`) still matches, with an empty name that is never allowlisted.
+ */
+const CALL_SITE =
+  /(?:([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*)?(?:!\s*)?(?:<[^>\n]*>\s*)?(?:\?\.)?\s*\(/g;
+/** Tagged template `f\`...\`` calls `f` without parentheses. */
+const TAGGED_TEMPLATE = /([A-Za-z_$][\w$]*)\s*`/g;
+/** `new X` runs a constructor with or without parentheses. */
+const NEW_EXPR = /\bnew\s+([A-Za-z_$][\w$]*)/g;
 const DB_TOKEN = /\b(prisma|withTenant|db)\b/g;
 
-/** The page body from the default export's opening brace, so the signature's own `(` is not a call. */
+/**
+ * The page body from the default export's opening brace. The parameter list is found by
+ * parenthesis balance and the body brace by angle-bracket balance, so a return-type
+ * annotation (`}): Promise<X> {`) and a parameter type with braces do not move the start.
+ * The body is the first `{` outside `<...>` after the parameter list's closing `)`.
+ */
 function bodyOf(code: string): string {
   const at = code.indexOf('export default');
   if (at === -1) return '';
-  const rest = code.slice(at);
-  const open = rest.search(/\)\s*\{\s*\n/);
-  return open === -1 ? '' : rest.slice(rest.indexOf('{', open));
+  const open = code.indexOf('(', at);
+  if (open === -1) return '';
+  let parens = 0;
+  let close = -1;
+  for (let i = open; i < code.length; i++) {
+    if (code[i] === '(') parens++;
+    else if (code[i] === ')' && --parens === 0) {
+      close = i;
+      break;
+    }
+  }
+  if (close === -1) return '';
+  let angles = 0;
+  for (let i = close + 1; i < code.length; i++) {
+    const c = code[i];
+    if (c === '<') angles++;
+    else if (c === '>') angles--;
+    else if (c === '{' && angles === 0) return code.slice(i);
+  }
+  return '';
 }
 
 function preDoorViolations(body: string, door: number): string[] {
   const pre = body.slice(0, door);
-  const calls = [...pre.matchAll(CALL_SITE)].map((m) => m[1] ?? '').filter((name) => !PRE_DOOR_ALLOWED.has(name));
+  const named = [...pre.matchAll(CALL_SITE)].map((m) => m[1] ?? '');
+  const tagged = [...pre.matchAll(TAGGED_TEMPLATE)].map((m) => `tagged:${m[1]}`);
+  const news = [...pre.matchAll(NEW_EXPR)].map((m) => `new:${m[1]}`);
+  const calls = named.filter((name) => !PRE_DOOR_ALLOWED.has(name));
   const db = [...pre.matchAll(DB_TOKEN)].map((m) => `token:${m[0]}`);
-  return [...calls, ...db];
+  return [...calls, ...tagged, ...news, ...db];
 }
 
 describe('nothing before the role door calls out except allowlisted calls (NG-277)', () => {
@@ -373,6 +408,49 @@ describe('nothing before the role door calls out except allowlisted calls (NG-27
       expect(preDoorViolations(body, door), 'calls before the door').toEqual([]);
     });
   }
+});
+
+/**
+ * NG-277 E1 / Ö1: the pre-door scan must catch every call form (not only `f(`) and must find
+ * the body of a signature with a return type. Each fixture is a body that calls a helper
+ * before the door; the scan must report it. Only `getTranslations` is allowed.
+ */
+describe('pre-door scan: call forms and signature shape (NG-277 E1, Ö1)', () => {
+  const DOOR = "requireTenantPageRole(locale, 'view_proposal')";
+  const callForms: ReadonlyArray<readonly [string, string]> = [
+    ['plain call', "await leakHelper('t1');"],
+    ['optional call (E1)', "await leakHelper?.('t1');"],
+    ['non-null callee', "await leakHelper!('t1');"],
+    ['non-null member call', 'await helper!.load();'],
+    ['parenthesised callee', "await (leakHelper)('t1');"],
+    ['generic call', "await leakHelper<string>('t1');"],
+    ['constructor with parens', 'const h = new Helper();'],
+    ['constructor without parens', 'const h = new Helper;'],
+    ['tagged template', 'await leakHelper`t1`;'],
+    ['non-awaited prisma read', 'const rows = prisma.opportunity.findMany();'],
+  ];
+
+  test.each(callForms)('%s before the door is a violation', (_label, line) => {
+    const body = `{\n  ${line}\n  const x = await ${DOOR};\n}`;
+    expect(preDoorViolations(body, body.indexOf(DOOR))).not.toEqual([]);
+  });
+
+  test('the allowlisted getTranslations call is not a violation', () => {
+    const body = `{\n  const t = await getTranslations('x');\n  const x = await ${DOOR};\n}`;
+    expect(preDoorViolations(body, body.indexOf(DOOR))).toEqual([]);
+  });
+
+  test('a return-type annotation with braces does not move the body start (Ö1)', () => {
+    const src = [
+      'export default async function P({ params }: { params: Promise<{ locale: string }> }): Promise<{ ok: true }> {',
+      "  await leakHelper('t1');",
+      `  const x = await ${DOOR};`,
+      '}',
+    ].join('\n');
+    const body = bodyOf(src);
+    expect(body.startsWith('{\n  await leakHelper')).toBe(true);
+    expect(preDoorViolations(body, body.indexOf(DOOR))).toEqual(['leakHelper']);
+  });
 });
 
 /** Comments stripped the same way the evaluation-panel check does (block + full-line). */
