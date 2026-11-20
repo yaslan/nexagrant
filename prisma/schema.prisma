@@ -1540,6 +1540,14 @@ model Effort {
 
 // ───────────────────────── M3 Evidence Pack ─────────────────────────
 
+/// NG-239: where an Evidence file's virus scan stands. Only CLEAN downloads.
+enum EvidenceScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  ERROR
+}
+
 model Evidence {
   id                 String               @id @default(cuid())
   tenantId           String
@@ -1569,6 +1577,16 @@ model Evidence {
   sourceUrl          String?
   sourceDate         DateTime?
 
+  // Virus scan of the stored file (NG-239, §18.3). Only CLEAN leaves through a
+  // download (src/lib/evidence-scan-gate.ts). PENDING until the `evidence-scan`
+  // job has asked clamd; ERROR = clamd unreachable / timed out / object
+  // unreadable, retried; INFECTED = the object was deleted.
+  // prisma/migrations/add-evidence-scan-status.sql
+  scanStatus         EvidenceScanStatus   @default(PENDING)
+  scannedAt          DateTime?
+  scanSignature      String?
+  scanAttempts       Int                  @default(0)
+
   // YZ & OCR Metadata
   ocrText            String?              @db.Text
   extractedFields    Json                 @default("{}")
@@ -1585,6 +1603,7 @@ model Evidence {
   // key twice made two rows, and deleting either removed the other's file.
   // prisma/migrations/evidence-unique-object-key.sql
   @@unique([tenantId, r2ObjectKey])
+  @@index([tenantId, scanStatus])
   @@index([tenantId, kind])
   @@index([tenantId, category])
   @@index([tenantId, status])
