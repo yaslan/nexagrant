@@ -15,9 +15,11 @@ import { checkZipMembers, looksLikeZip } from '@/lib/zip-member-check';
  * bytes, streams them to clamd and writes the answer:
  *
  *   OK      → CLEAN; the file downloads from now on.
- *   FOUND   → INFECTED; the object is deleted from the store, an AuditEvent
- *             (`evidence.scan.infected`) is written in the tenant's scope and an
- *             `error` SystemAlert is raised.
+ *   FOUND   → INFECTED; the row and an AuditEvent (`evidence.scan.infected`, tenant
+ *             scope) are written first, then the object is deleted from the store and
+ *             its outcome written as a second AuditEvent (`evidence.scan.object_removed`,
+ *             `objectDeleted`), and an `error` SystemAlert is raised (NG-263: the order
+ *             is this one, so a failure in between cannot lose the verdict).
  *   anything else (clamd not configured, refused, timed out, its own ERROR, a
  *   file past clamd's limits — `limits_exceeded`, NG-239 Ö-1, or past the ZIP member check that runs first, NG-269 — or the object unreadable) → ERROR, `scanAttempts` + 1, and the next attempt is
  *   queued after {@link EVIDENCE_SCAN_RETRY_WAITS_MS}. When the waits run out a
@@ -42,6 +44,8 @@ export const EVIDENCE_SCAN_SWEEP_ERROR_AFTER_MS = 6 * 60 * 60_000;
 export const EVIDENCE_SCAN_SWEEP_PAGE = 100;
 
 export const EVIDENCE_SCAN_AUDIT_INFECTED = 'evidence.scan.infected';
+/** NG-263: the outcome of the object removal, a second event (AuditEvent rows are never updated). */
+export const EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED = 'evidence.scan.object_removed';
 
 export interface EvidenceScanRun {
   tenantId: string;
@@ -105,14 +109,20 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
   const row = await runTenant(tenantId, (tx) =>
     tx.evidence.findFirst({
       where: { id: evidenceId, tenantId },
-      select: { r2ObjectKey: true, scanStatus: true, scanAttempts: true },
+      select: { r2ObjectKey: true, scanStatus: true, scanAttempts: true, scanSignature: true },
     })
   );
   if (!row) return { skipped: 'missing' };
-  if (row.scanStatus === 'CLEAN' || row.scanStatus === 'INFECTED') return { skipped: 'already_final' };
-  if (row.scanAttempts !== run.attempt) return { skipped: 'stale_attempt' };
   // Only a key under the tenant's own prefix is read (and, if infected, deleted).
   const key = row.r2ObjectKey ? tenantObjectKeyOf(tenantId, row.r2ObjectKey) : null;
+  if (row.scanStatus === 'CLEAN') return { skipped: 'already_final' };
+  if (row.scanStatus === 'INFECTED') {
+    // NG-263: the row was written INFECTED and the run stopped before the object was removed
+    // (the job was lost after the commit). Finish that removal here; once its outcome is
+    // recorded there is nothing left to do.
+    return finishInfectedRemoval(run, key, row.scanSignature, runTenant, deleteObject);
+  }
+  if (row.scanAttempts !== run.attempt) return { skipped: 'stale_attempt' };
   if (!key) return { skipped: 'no_file' };
 
   const bytes = await readObject(key);
@@ -132,9 +142,10 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
   }
 
   if (verdict.verdict === 'infected') {
-    // The object goes first: the row already blocks the download, and a row
-    // marked INFECTED over a file still in the store is the worse half-state.
-    const objectDeleted = await deleteObject(key).catch(() => false);
+    // NG-263 (NG-239 Ö-3): the answer is written first, the object is removed after it. A failure
+    // in between (the transaction) makes the job retry with the object still in the store, so the
+    // same verdict comes out again; the reverse order lost the verdict on that retry (object gone →
+    // object_unreadable → ERROR). The row blocks the download from the moment it is INFECTED.
     const n = await runTenant(tenantId, async (tx) => {
       const updated = await tx.evidence.updateMany({
         where: unchanged,
@@ -142,24 +153,13 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
       });
       if (updated.count) {
         await tx.auditEvent.create({
-          data: {
-            tenantId,
-            type: EVIDENCE_SCAN_AUDIT_INFECTED,
-            target: evidenceId,
-            data: { signature: verdict.signature, objectDeleted },
-          },
+          data: { tenantId, type: EVIDENCE_SCAN_AUDIT_INFECTED, target: evidenceId, data: { signature: verdict.signature } },
         });
       }
       return updated.count;
     });
     if (!n) return { skipped: 'changed_meanwhile' };
-    await recordAlert({
-      level: 'error',
-      source: 'evidence-scan',
-      message: `Infected evidence upload removed (${verdict.signature})${objectDeleted ? '' : '; the stored object could NOT be deleted'}`,
-      meta: { evidenceId, signature: verdict.signature, objectDeleted },
-    }).catch((e) => console.error(`[evidence-scan] could not write the infected SystemAlert: ${errorMessage(e)}`));
-    return { status: 'INFECTED', signature: verdict.signature, objectDeleted };
+    return finishInfectedRemoval(run, key, verdict.signature ?? null, runTenant, deleteObject);
   }
 
   // Not clean, not infected: ERROR, and another try.
@@ -169,6 +169,16 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
     tx.evidence.updateMany({ where: unchanged, data: { scanStatus: 'ERROR', scannedAt: now(), scanSignature: null, scanAttempts: next } })
   );
   if (!n.count) return { skipped: 'changed_meanwhile' };
+  // NG-263 (second line): a stored object that cannot be read is its own cause, not a clamd fault.
+  // It is raised at once, as an error, with the reason in its text.
+  if (verdict.detail === 'object_unreadable') {
+    await recordAlert({
+      level: 'error',
+      source: 'evidence-scan',
+      message: 'Evidence scan stopped: the stored object is missing or unreadable (object_unreadable). The file stays ERROR and is not downloadable; if it had been marked INFECTED, the evidence.scan.infected AuditEvent says so',
+      meta: { evidenceId, reason: verdict.reason, detail: verdict.detail, attempts: next },
+    }).catch((e) => console.error(`[evidence-scan] could not write the object_unreadable SystemAlert: ${errorMessage(e)}`));
+  }
 
   const wait = EVIDENCE_SCAN_RETRY_WAITS_MS[run.attempt];
   let retryQueued = false;
@@ -188,6 +198,43 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
     }).catch((e) => console.error(`[evidence-scan] could not write the scan-error SystemAlert: ${errorMessage(e)}`));
   }
   return { status: 'ERROR', reason, retryQueued };
+}
+
+/**
+ * NG-263: the second half of an INFECTED verdict, after its row and AuditEvent are written: the object
+ * is removed, the outcome is written as `evidence.scan.object_removed` (objectDeleted true/false) and
+ * the `error` SystemAlert is raised. Also the resume point of a run that found the row INFECTED (the
+ * job was lost after the write): if the outcome is recorded there is nothing left to do, otherwise the
+ * object is removed now. A failed removal leaves the row INFECTED (the download stays refused) and the
+ * alarm says the object could not be deleted.
+ */
+async function finishInfectedRemoval(
+  run: EvidenceScanRun,
+  key: string | null,
+  signature: string | null,
+  runTenant: TenantRunner,
+  deleteObject: (key: string) => Promise<boolean>
+): Promise<EvidenceScanOutcome> {
+  const { tenantId, evidenceId } = run;
+  if (!key) return { skipped: 'already_final' };
+  const recorded = await runTenant(tenantId, (tx) =>
+    tx.auditEvent.findFirst({ where: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: evidenceId }, select: { id: true } })
+  );
+  if (recorded) return { skipped: 'already_final' };
+
+  const objectDeleted = await deleteObject(key).catch(() => false);
+  await runTenant(tenantId, (tx) =>
+    tx.auditEvent.create({
+      data: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: evidenceId, data: { objectDeleted } },
+    })
+  );
+  await recordAlert({
+    level: 'error',
+    source: 'evidence-scan',
+    message: `Infected evidence upload removed (${signature ?? 'unknown'})${objectDeleted ? '' : '; the stored object could NOT be deleted'}`,
+    meta: { evidenceId, signature, objectDeleted },
+  }).catch((e) => console.error(`[evidence-scan] could not write the infected SystemAlert: ${errorMessage(e)}`));
+  return { status: 'INFECTED', signature: signature ?? undefined, objectDeleted };
 }
 
 /**

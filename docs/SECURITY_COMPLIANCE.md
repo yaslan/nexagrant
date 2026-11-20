@@ -154,8 +154,16 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   kalıcı düşmüş tarama işi yenisiyle değiştirilir). clamd `AlertExceedsMax yes` ile koşmalı (compose
   `CLAMD_CONF_AlertExceedsMax`; VPS'teki clamd de, NG-261): sınırını aşan dosya (açılınca 100 MB üstü, 17'den derin
   arşiv vb.) `Heuristics.Limits.Exceeded.*` olur, `ERROR` (`limits_exceeded`) sayılır, silinmez ama inmez. Bu ayar
-  olmadan clamd o kısmı atlayıp `OK` der. Zararlı bulunursa nesne silinir, `AuditEvent`
-  `evidence.scan.infected` ve `SystemAlert` (`error`, kiracı kimliği/dosya adı içermez) yazılır. Testler yalnız
+  olmadan clamd o kısmı atlayıp `OK` der. Zararlı bulunursa **önce** satır `INFECTED` olur ve `AuditEvent`
+  `evidence.scan.infected` aynı transaction'da yazılır (NG-263: kayıt, nesne silinmeden önce; transaction düşerse
+  iş yeniden denenir, nesne hâlâ depodadır ve aynı karar yeniden çıkar — eski sırada nesne silinmiş olduğu için
+  yeniden deneme `object_unreadable` → `ERROR` diyordu ve "zararlı bulundu" bilgisi kayboluyordu). **Sonra** nesne
+  silinir, sonucu ikinci bir `AuditEvent` `evidence.scan.object_removed` (`data.objectDeleted` true/false) taşır
+  ve `SystemAlert` (`error`, kiracı kimliği/dosya adı içermez) yazılır. `AuditEvent` satırları değişmez; silme
+  sonucu ayrı bir olaydır. Satır `INFECTED` iken ama nesne hâlâ depodayken (silme başarısız ya da iş kesildi)
+  indirme yolları kapalıdır (rota, presigned GET, ekran); iş kesildiyse bir sonraki çalıştırma `INFECTED`
+  satırını görüp silmeyi tamamlar ve `object_removed` olayını yazar. `object_unreadable` ayrı bir `error`
+  alarmıyla bildirilir (ikinci savunma hattı). Testler yalnız
   EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
   güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da gerçek
   clamd koşar (`ci.yml`, ClamAV 1.5.4 + `AlertExceedsMax`), gerçek-clamd testleri ve clamd durdurulmuş testi orada atlanmadan koşar.
