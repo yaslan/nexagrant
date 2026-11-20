@@ -400,6 +400,17 @@ test.describe.serial('NG-276 M1 OFF: the role door runs before the module lock',
   test.afterAll(teardownM1OffTenant);
 
   for (const { name, path } of PARTNER_PAGES) {
+    // The control runs first: in a serial block a red guest test would skip it.
+    test(`control: MEMBER and TENANT_OWNER on ${name} see the M1 lock, not the role refusal`, async ({ page }) => {
+      for (const role of ['MEMBER', 'TENANT_OWNER'] as const) {
+        await signInM1Off(page, role);
+        await page.goto(path);
+        await expect(page.getByRole('heading', { name: LOCK_TITLE }), `${role} ${path}`).toBeVisible();
+        expect(await page.locator('body').innerText(), `${role} ${path}`).toContain(LOCK_OFF_TAIL);
+        await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), `${role} ${path}`).toHaveCount(0);
+      }
+    });
+
     test(`GUEST_PARTNER on ${name}: 403 with the role refusal, no module lock`, async ({ page }) => {
       await signInM1Off(page, 'GUEST_PARTNER');
       const res = await page.goto(path);
@@ -414,16 +425,6 @@ test.describe.serial('NG-276 M1 OFF: the role door runs before the module lock',
       expect(shown, `${path} lock icon`).not.toContain('🔒');
       await expect(page.getByRole('heading', { name: LOCK_TITLE }), path).toHaveCount(0);
       expect(res?.status(), path).toBe(403);
-    });
-
-    test(`control: MEMBER and TENANT_OWNER on ${name} see the M1 lock, not the role refusal`, async ({ page }) => {
-      for (const role of ['MEMBER', 'TENANT_OWNER'] as const) {
-        await signInM1Off(page, role);
-        await page.goto(path);
-        await expect(page.getByRole('heading', { name: LOCK_TITLE }), `${role} ${path}`).toBeVisible();
-        expect(await page.locator('body').innerText(), `${role} ${path}`).toContain(LOCK_OFF_TAIL);
-        await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), `${role} ${path}`).toHaveCount(0);
-      }
     });
   }
 });
