@@ -161,12 +161,14 @@ export default async function OpportunityDetailPage({
   // The decision log (NG-15 / NG-38): written by the withdrawal layer, read back here. Null means
   // the opportunity is not this tenant's, which the `notFound()` above has already caught.
   const decisionRows = await listDecisions({ tenantId }, id);
-  const decisions: DecisionEntry[] = (decisionRows ?? []).map((d) => ({
-    id: d.id,
-    kind: d.kind,
-    reason: d.reason,
-    decidedAt: d.decidedAt.toISOString(),
-  }));
+  // NG-241 Faz 1: REACTIVATE rows exist in the layer, but the detail screen has no label for
+  // them yet (`detail.withdraw.kind.*`, client.tsx). Faz 2 (fe-gnd) adds the label and the
+  // button and drops this filter; until then no UI can write one.
+  const decisions: DecisionEntry[] = (decisionRows ?? []).flatMap((d) =>
+    d.kind === 'REACTIVATE'
+      ? []
+      : [{ id: d.id, kind: d.kind, reason: d.reason, decidedAt: d.decidedAt.toISOString() }],
+  );
 
   return (
     <OpportunityDetailClient
