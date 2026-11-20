@@ -20,7 +20,7 @@
   sık koşan bazılarında 3 (`schedule.ts`). Son denemede `defineJob` `source: job-queue` bir `SystemAlert` yazar.
 - **`{ success: false }` dönen iş hata sayılmaz:** `define.ts` bunu `DONE (reported failure)` diye loglar, yeniden
   denemez. Bu işler kendi `SystemAlert`'lerini yazar (örn. `k2-monthly-cordis`, `alerts-sweep`).
-- **Kaçırılan tik:** `fill` penceresi içinde (iş başına `6h` ya da `1d`) geriye dönük koşturulur. `fill`'i olmayan işler (`job-queue-health`, `alerts-ops-digest`, `m17-stale-runs`, `public-lead-stuck`, `notification-email-instant`; `schedule.ts`) kaçan tiki geriye dönük koşmaz; tik zamanı
+- **Kaçırılan tik:** `fill` penceresi içinde (iş başına `6h` ya da `1d`) geriye dönük koşturulur. `fill`'i olmayan işler (`job-queue-health`, `alerts-ops-digest`, `m17-stale-runs`, `public-lead-stuck`, `notification-email-instant`, `evidence-scan-sweep`; `schedule.ts`) kaçan tiki geriye dönük koşmaz; tik zamanı
   `payload._cron.ts` ile işe gelir, aylık işler "şimdi"nin değil tikin ayını işler (`monthOf`). Pencereyi aşan kesintiyi
   `job-queue-health` (her saat :05 UTC) `job-queue:<iş>:missed-tick` alarmıyla bildirir. Sınırı ADR-0008 §9.3'te.
 - **Elle tetikleme:** `pnpm jobs:enqueue -- <iş-adı> [--period YYYY-MM] [--month YYYY-MM] [--payload JSON] [--force]`
@@ -37,6 +37,7 @@ işlerdir; takvimleri `schedule.ts`'ten alınmıştır. Her işin ayrıntısı k
 |---|---|---|---|
 | `k1-daily-calls` | `0 2 * * *` | `tasks/k1-daily-calls.ts` | K1 çağrı toplama (Sedia, Eurostars, Tübitak adaptörleri); elle: `pnpm jobs:k1` |
 | `k2-monthly-cordis` | `0 4 1 * *` | `tasks/k2-monthly-cordis.ts` | Python worker'ı çağırır — aşağıdaki K2 notuna bak; elle: `pnpm jobs:k2 -- --month YYYY-MM` |
+| `evidence-scan-sweep` | `*/15 * * * *` | `tasks/evidence-scan.ts` | NG-239: taranmamış/`ERROR` kanıt dosyalarına tarama kuyruğa koyar; `evidence-scan` (cron'suz, yüklemede kuyruğa girer) aynı dosyada |
 | `alerts-daily` | `0 8 * * *` | `tasks/alerts-daily.ts` | Kayıtlı arama e-postaları (SMTP, `src/lib/email/mailer.ts`); gönderim sabit 08:00 UTC, kiracı/kullanıcı saat dilimine göre değil (`alerts-daily.ts`'te saat dilimi işleme yok) |
 | `credits-monthly-grant` | `0 6 1 * *` | `tasks/credits-monthly-grant.ts` | Aylık kredi (`CreditLedger`, `reason: 'monthly_grant'`); `(tenantId, grantPeriod)` benzersiz, aynı ay ikinci koşu satır eklemez (ADR-0008 §9.1) |
 | `m4-weekly-summary` | `0 9 * * 1` | `tasks/m4-weekly-summary.ts` | `nextStepDue`'u önümüzdeki 7 gün içinde olan ilişkiler (`m4-weekly-summary.ts:87-94`) |
