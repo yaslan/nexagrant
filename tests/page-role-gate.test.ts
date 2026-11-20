@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import ts from 'typescript';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Role } from '@prisma/client';
 
@@ -346,7 +347,7 @@ const PRE_DOOR_ALLOWED: ReadonlySet<string> = new Set(['getTranslations']);
 /**
  * Every `(` that starts a call, in any form: `f(`, `f?.(`, `f!(`, `f<T>(`, `o.f(`, and the
  * parenthesised callee `(f)(`. The name is optional so that `(f)()` (no identifier right
- * before the `(`) still matches, with an empty name that is never allowlisted.
+ * before the `(`) still matches; such a match is reported as ANONYMOUS_PAREN, never allowlisted.
  */
 const CALL_SITE =
   /(?:([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*)?(?:!\s*)?(?:<[^>\n]*>\s*)?(?:\?\.)?\s*\(/g;
@@ -355,6 +356,14 @@ const TAGGED_TEMPLATE = /([A-Za-z_$][\w$]*)\s*`/g;
 /** `new X` runs a constructor with or without parentheses. */
 const NEW_EXPR = /\bnew\s+([A-Za-z_$][\w$]*)/g;
 const DB_TOKEN = /\b(prisma|withTenant|db)\b/g;
+/**
+ * NG-277 review 2 Ö1: a `(` with no name in front of it. It is either a parenthesised callee
+ * `(f)(...)` or a plain grouping `(1 + 2)`; the text scan cannot tell them apart, so it fails
+ * closed and says so instead of reporting an empty string.
+ */
+const ANONYMOUS_PAREN = '(anonymous parenthesised expression or call: name the callee or move it after the door)';
+/** Top-level `await` runs while the module loads (B2); in the body `await params` is fine. */
+const AWAIT_TOKEN = /\bawait\b/g;
 
 /**
  * The page body from the default export's opening brace. The parameter list is found by
@@ -387,12 +396,12 @@ function bodyOf(code: string): string {
   return '';
 }
 
-function preDoorViolations(body: string, door: number): string[] {
+function preDoorViolations(body: string, door: number, allowed: ReadonlySet<string> = PRE_DOOR_ALLOWED): string[] {
   const pre = body.slice(0, door);
-  const named = [...pre.matchAll(CALL_SITE)].map((m) => m[1] ?? '');
+  const named = [...pre.matchAll(CALL_SITE)].map((m) => m[1] ?? ANONYMOUS_PAREN);
   const tagged = [...pre.matchAll(TAGGED_TEMPLATE)].map((m) => `tagged:${m[1]}`);
   const news = [...pre.matchAll(NEW_EXPR)].map((m) => `new:${m[1]}`);
-  const calls = named.filter((name) => !PRE_DOOR_ALLOWED.has(name));
+  const calls = named.filter((name) => !allowed.has(name));
   const db = [...pre.matchAll(DB_TOKEN)].map((m) => `token:${m[0]}`);
   return [...calls, ...tagged, ...news, ...db];
 }
@@ -405,9 +414,198 @@ describe('nothing before the role door calls out except allowlisted calls (NG-27
       expect(body, 'default export body present (scan scope)').not.toBe('');
       const door = body.indexOf(`requireTenantPageRole(locale, '${action}')`);
       expect(door, 'role door call present in body').toBeGreaterThan(-1);
-      expect(preDoorViolations(body, door), 'calls before the door').toEqual([]);
+      const found = preDoorViolations(body, door);
+      expect(found, `calls before the door: ${found.join(' | ')}`).toEqual([]);
     });
   }
+});
+
+/**
+ * NG-277 review 2, B1 + B2: the body scan above starts at the body's `{`, so two places that
+ * also run before the door were never read:
+ *   B1 — the default export's parameter list: a default value (`{ params, q = load() }`) is
+ *        evaluated when the page is called, before the first body statement;
+ *   B2 — module top level: everything outside a function body runs when the page module
+ *        loads, before any request reaches the door (`const pre = prisma.x.findMany();`).
+ *
+ * Design. A flat text scan from the top of the file would read every helper body and fail
+ * on legitimate definitions, so the file is parsed with the TypeScript compiler (as the
+ * other source-scan tests here do) and only code that RUNS is handed to the same text scan:
+ *   - skipped, because nothing in them executes at load: `import` (the imported module's
+ *     own top level is out of scope, see the report), `export { } [from]`, `type`,
+ *     `interface`, `declare`, function declarations (body and parameter defaults run only
+ *     when called), and a `const`/`let` whose initializer is an arrow or function
+ *     expression (its body is a definition too);
+ *   - scanned, everything else at top level, before AND after the default export: the
+ *     initializer of every other declaration (and a destructuring pattern's defaults), and
+ *     any other statement whole (expression statements, classes, enums, `export default
+ *     <expr>`). A wrapper call such as `cache(async () => ...)` is therefore red even though
+ *     the inner body would not run: fail-closed, the call itself does run;
+ *   - the default export function: each parameter without its type annotation (types do
+ *     not run), so a default value or a destructuring default is scanned.
+ * Module and signature code get NO allowlist (`getTranslations` is allowed only in the
+ * body, where today's pages use it) and top-level `await` is a violation. A page whose
+ * default export is not a function declaration fails: the scan cannot locate its door.
+ */
+interface OutsideBodyScan {
+  /** The default export is an `export default [async] function`. */
+  defaultFunction: boolean;
+  /** Calls/DB tokens/`await` in code that runs when the module loads. */
+  moduleLoad: string[];
+  /** Calls/DB tokens in the default export's parameter list (defaults, destructuring). */
+  signature: string[];
+}
+
+const NO_ALLOWLIST: ReadonlySet<string> = new Set();
+
+function runsOnLoad(text: string): string[] {
+  const code = stripComments(text);
+  const awaits = [...code.matchAll(AWAIT_TOKEN)].map(() => 'token:await');
+  return [...preDoorViolations(code, code.length, NO_ALLOWLIST), ...awaits];
+}
+
+function unwrap(expr: ts.Expression): ts.Expression {
+  let e = expr;
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAsExpression(e) ||
+    ts.isSatisfiesExpression(e) ||
+    ts.isTypeAssertionExpression(e) ||
+    ts.isNonNullExpression(e)
+  ) {
+    e = e.expression;
+  }
+  return e;
+}
+
+function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
+  return ts.canHaveModifiers(node) && (ts.getModifiers(node) ?? []).some((m) => m.kind === kind);
+}
+
+function scanOutsideBody(source: string, fileName = 'page.tsx'): OutsideBodyScan {
+  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const text = (n: ts.Node) => source.slice(n.getStart(sf), n.getEnd());
+  const out: OutsideBodyScan = { defaultFunction: false, moduleLoad: [], signature: [] };
+
+  for (const st of sf.statements) {
+    if (
+      ts.isImportDeclaration(st) ||
+      ts.isImportEqualsDeclaration(st) ||
+      ts.isExportDeclaration(st) ||
+      ts.isTypeAliasDeclaration(st) ||
+      ts.isInterfaceDeclaration(st) ||
+      hasModifier(st, ts.SyntaxKind.DeclareKeyword)
+    ) {
+      continue;
+    }
+    if (ts.isFunctionDeclaration(st)) {
+      if (hasModifier(st, ts.SyntaxKind.ExportKeyword) && hasModifier(st, ts.SyntaxKind.DefaultKeyword)) {
+        out.defaultFunction = true;
+        for (const p of st.parameters) {
+          // `name: Type = init` — scan the name (a destructuring pattern carries defaults)
+          // and the initializer; the type annotation does not run.
+          out.signature.push(...runsOnLoad(text(p.name)));
+          if (p.initializer) out.signature.push(...runsOnLoad(text(p.initializer)));
+        }
+      }
+      continue;
+    }
+    if (ts.isVariableStatement(st)) {
+      for (const d of st.declarationList.declarations) {
+        if (!ts.isIdentifier(d.name)) out.moduleLoad.push(...runsOnLoad(text(d.name)));
+        if (!d.initializer) continue;
+        const init = unwrap(d.initializer);
+        if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) continue;
+        out.moduleLoad.push(...runsOnLoad(text(d.initializer)));
+      }
+      continue;
+    }
+    out.moduleLoad.push(...runsOnLoad(text(st)));
+  }
+  return out;
+}
+
+describe('nothing at module load or in the page signature calls out (NG-277 B1, B2)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  for (const file of Object.keys(PAGE_DOORS)) {
+    test(`${file}: no call, DB token or await at top level or in the default export's parameters`, () => {
+      const scan = scanOutsideBody(readFileSync(path.join(root, file), 'utf8'), file);
+      expect(scan.defaultFunction, 'default export is a function declaration (scan scope)').toBe(true);
+      expect(scan.signature, 'runs in the default export parameter list, before the door').toEqual([]);
+      expect(scan.moduleLoad, 'runs at module load, before the door').toEqual([]);
+    });
+  }
+});
+
+describe('module-load and signature scan: what runs and what is only defined (NG-277 B1, B2)', () => {
+  const PAGE = [
+    'export default async function P({',
+    '  params,',
+    '}: {',
+    '  params: Promise<{ locale: string }>;',
+    '}) {',
+    '  const { locale } = await params;',
+    "  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');",
+    '  return tenantId;',
+    '}',
+  ].join('\n');
+
+  test('B1: a call in a destructuring default of the default export is a violation', () => {
+    const src = PAGE.replace('  params,\n', "  params,\n  q = leakHelper('t1'),\n");
+    expect(scanOutsideBody(src).signature).toEqual(['leakHelper']);
+  });
+
+  test('B1: a default value of a plain parameter is a violation', () => {
+    const src = PAGE.replace('}) {', '}, rows = prisma.opportunity.findMany()) {');
+    expect(scanOutsideBody(src).signature).toEqual(['prisma.opportunity.findMany', 'token:prisma']);
+  });
+
+  test('B1: the parameter type annotation, even with a function type, is not scanned', () => {
+    const src = PAGE.replace('  params: Promise<{ locale: string }>;', '  params: Promise<{ locale: string }>;\n  cb?: (x: string) => void;');
+    expect(scanOutsideBody(src)).toEqual({ defaultFunction: true, moduleLoad: [], signature: [] });
+  });
+
+  test.each([
+    ['B2: non-awaited prisma read', 'const pre = prisma.opportunity.findMany();', ['prisma.opportunity.findMany', 'token:prisma']],
+    ['top-level await', 'const pre = await loaded;', ['token:await']],
+    ['expression statement', "void leakHelper('t1');", ['leakHelper']],
+    ['destructuring default', "const { a = leakHelper('t1') } = {};", ['leakHelper']],
+    ['wrapper call around a definition (fail-closed)', 'const load = cache(async () => 1);', ['cache', 'async']],
+    ['constructor', 'const h = new Helper();', ['Helper', 'new:Helper']],
+    ['getTranslations is not allowlisted at module level', "const t = getTranslations('x');", ['getTranslations']],
+  ] as const)('%s at top level is a violation', (_label, line, expected) => {
+    expect(scanOutsideBody(`${line}\n\n${PAGE}`).moduleLoad).toEqual(expected);
+  });
+
+  test('B2: code after the default export also runs at load and is scanned', () => {
+    expect(scanOutsideBody(`${PAGE}\n\nconst late = leakHelper();\n`).moduleLoad).toEqual(['leakHelper']);
+  });
+
+  test('definitions, imports, types and plain constants at top level are not violations', () => {
+    const src = [
+      "import { withTenant } from '@/lib/db';",
+      "import { prisma } from '@/lib/prisma';",
+      "export { x } from './x';",
+      'type Row = { id: string; load: () => Promise<void> };',
+      'interface Seat { fn(a: string): void }',
+      "export const dynamic = 'force-dynamic';",
+      "const DIMENSIONS: (keyof Row)[] = ['id'];",
+      'const daysSince = (d: Date | null) => { return d ? Math.floor(Date.now() / 864e5) : null; };',
+      'const viaExpr = async function () { return prisma.opportunity.findMany(); };',
+      'async function leakHelper(t: string) { return withTenant(t, (tx) => tx.opportunity.findMany()); }',
+      'export async function generateMetadata({ params }: { params: Promise<{ l: string }> }) { return { title: await t(params) }; }',
+      PAGE,
+      'function Section({ children }: { children: unknown }) { return render(children); }',
+    ].join('\n\n');
+    expect(scanOutsideBody(src)).toEqual({ defaultFunction: true, moduleLoad: [], signature: [] });
+  });
+
+  test('a default export that is not a function declaration fails the scope check', () => {
+    expect(scanOutsideBody('const P = async () => null;\nexport default P;\n').defaultFunction).toBe(false);
+    const wrapped = scanOutsideBody('export default withGate(async function P() { return null; });\n');
+    expect(wrapped.defaultFunction).toBe(false);
+    expect(wrapped.moduleLoad).toContain('withGate');
+  });
 });
 
 /**
@@ -433,6 +631,11 @@ describe('pre-door scan: call forms and signature shape (NG-277 E1, Ö1)', () =>
   test.each(callForms)('%s before the door is a violation', (_label, line) => {
     const body = `{\n  ${line}\n  const x = await ${DOOR};\n}`;
     expect(preDoorViolations(body, body.indexOf(DOOR))).not.toEqual([]);
+  });
+
+  test('an unnamed parenthesised expression says what it is (review 2 Ö1)', () => {
+    const body = `{\n  const n = (1 + 2);\n  const x = await ${DOOR};\n}`;
+    expect(preDoorViolations(body, body.indexOf(DOOR))).toEqual([ANONYMOUS_PAREN]);
   });
 
   test('the allowlisted getTranslations call is not a violation', () => {
