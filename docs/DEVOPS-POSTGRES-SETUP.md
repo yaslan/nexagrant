@@ -66,6 +66,8 @@ psql -h localhost -U fabrika -d fabrika_db -c "SELECT COUNT(*) as calls FROM pub
 
 `DB_CONNECT_TIMEOUT_MS` (`.env`, optional) sets how long the pool waits for a connection; blank = 1000 ms. Raise it only on a loaded test machine; the gate sets 10000 by itself.
 
+`DB_TX_MAX_WAIT_MS` (`.env`, optional) sets how long a tenant transaction (`withTenant`) may wait for a free connection before Prisma gives up with P2028; blank = 2000 ms, the Prisma default. Raise it only on a loaded test machine (CI and the gate set 10000); a caller's explicit `maxWait` is never overridden.
+
 ### 5. Start Dev Server
 ```bash
 pnpm dev

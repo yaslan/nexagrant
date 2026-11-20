@@ -355,6 +355,20 @@ const envSchema = z.object({
       .refine((value) => Number(value) <= 60_000, 'DB_CONNECT_TIMEOUT_MS must be at most 60000')
       .optional()
   ),
+  /**
+   * Prisma's `maxWait` for tenant-scoped transactions (src/lib/db.ts withTenantOn):
+   * how long a transaction may wait for a free connection before it starts.
+   * Unset or blank = 2000 ms, the Prisma default and the live/dev value. CI and the
+   * isolated gate set 10000: on a loaded runner the wait can expire before the
+   * BEGIN answer is read (P2028). A caller's explicit maxWait always wins. Capped at 60 s.
+   */
+  DB_TX_MAX_WAIT_MS: blankToUndefined(
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'DB_TX_MAX_WAIT_MS must be a positive integer (milliseconds)')
+      .refine((value) => Number(value) <= 60_000, 'DB_TX_MAX_WAIT_MS must be at most 60000')
+      .optional()
+  ),
 });
 
 const _env = envSchema.safeParse(process.env);
@@ -469,6 +483,12 @@ export const consortiumLiveDemandWeight: number | undefined =
  */
 export const dbConnectTimeoutMs: number =
   env.DB_CONNECT_TIMEOUT_MS === undefined ? 1000 : Number(env.DB_CONNECT_TIMEOUT_MS);
+
+/**
+ * The numeric view of `DB_TX_MAX_WAIT_MS`; 2000 ms when unset (Prisma's default, live and dev).
+ * Read by {@link withTenantOn} in src/lib/db.ts.
+ */
+export const dbTxMaxWaitMs: number = env.DB_TX_MAX_WAIT_MS === undefined ? 2000 : Number(env.DB_TX_MAX_WAIT_MS);
 
 /**
  * The numeric view of `PUBLIC_LEAD_STUCK_AFTER_MINUTES` (NG-182). The schema has already rejected

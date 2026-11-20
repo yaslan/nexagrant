@@ -2,7 +2,7 @@ import { PrismaClient, type Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { assertEnvelopedOrNull } from '@/lib/calendar/token-envelope';
-import { dbConnectTimeoutMs, env } from '@/lib/env';
+import { dbConnectTimeoutMs, dbTxMaxWaitMs, env } from '@/lib/env';
 import { decryptResult, encryptWriteData, findNestedTaxIdAccess } from '@/lib/billing/tax-id-crypto';
 
 /**
@@ -315,7 +315,12 @@ export async function withTenantOn<T>(
     // tx is a Prisma.TransactionClient; casting to TenantTx mints the nominal brand
     // to prove that app.tenant_id has been set in this transaction.
     return callback(tx as TenantTx);
-  }, options);
+  }, {
+    // maxWait: the env value (DB_TX_MAX_WAIT_MS, default 2000) unless the caller set one.
+    // timeout is left to the caller or Prisma's default (5 s).
+    ...options,
+    maxWait: options?.maxWait ?? dbTxMaxWaitMs,
+  });
 }
 
 /**
