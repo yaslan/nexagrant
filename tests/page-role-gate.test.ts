@@ -286,9 +286,11 @@ describe('evaluation panel: the panel-wide scores are view_proposal only (review
 /**
  * NG-258: the role door must run before the first read on the page. The NG-256 review
  * moved a door behind a tenant read and this file stayed green (the text check only
- * looks for the call). Scope of the scan: the body from `export default` on, comments
- * stripped. Helper functions defined above the export are NOT scanned, so a read hidden
- * in a helper is outside this check (documented limit, see the NG-258 report).
+ * looks for the call). Scope of the scan: the default export's body, from its opening `{`
+ * on, comments stripped. The signature sits before that `{` and is outside this scan; it
+ * has its own checks (NG-277 B1, B2). Helper functions defined above the export are NOT
+ * scanned, so a read hidden in a helper is outside this check (documented limit, see the
+ * NG-258 report).
  */
 const READ_CALL = /\bprisma\.|\bwithTenant\(|\bmoduleGate\(|\bauthenticateCordisSession\(|\bcheckModuleAccess\(/g;
 const TENANT_READ = /\bprisma\.|\bwithTenant\(/;
@@ -335,9 +337,9 @@ describe('the role door precedes the first read on each gated page (NG-258)', ()
  * call site, so its body does not need reading; a `prisma.`/`withTenant(` call is caught
  * with or without `await`; a non-call use of `prisma`/`withTenant`/`db` also fails.
  *
- * The allowlist is derived from today's scan of PAGE_DOORS. Only two calls appear before
- * a door: `getTranslations` (i18n string lookup, no tenant data) in
- * relationships/[id]/page.tsx and settings/plan/page.tsx. `params`/`searchParams` are
+ * The allowlist is derived from today's scan of PAGE_DOORS. The only call that appears before
+ * a door is `getTranslations` (i18n string lookup, no tenant data) in
+ * relationships/[id]/page.tsx (line 31, door at line 32). `params`/`searchParams` are
  * awaited property reads, not calls. Add a name only with a reviewed reason.
  */
 const PRE_DOOR_ALLOWED: ReadonlySet<string> = new Set(['getTranslations']);
