@@ -57,8 +57,10 @@ test.describe.serial('NG-275 role door before module door (module closed)', () =
       const res = await page.goto(path);
       expect(res?.status(), path).toBe(403);
       await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), path).toBeVisible();
-      const html = await page.content();
-      expect(html, path).not.toContain(LOCK_TITLE);
+      // Rendered DOM, not the raw HTML: the lock's sentence also ships inside the i18n
+      // messages payload, so `page.content()` would hit it on the 403 page too.
+      await expect(page.getByRole('heading', { name: LOCK_TITLE }), path).toHaveCount(0);
+      await expect(page.getByText(LOCK_TITLE, { exact: false }), path).toHaveCount(0);
     }
   });
 
