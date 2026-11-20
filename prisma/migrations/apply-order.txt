@@ -100,3 +100,4 @@ expert-directory-view.sql
 add-public-lead-transfer-recipient.sql
 add-close-own-province-routes.sql
 add-nexagrant-plan-catalog.sql
+add-evidence-scan-status.sql

@@ -68,6 +68,21 @@ const envSchema = z.object({
     z.string().regex(/^[1-9][0-9]*$/, 'JOBS_CONCURRENCY must be a positive integer').default('2')
   ),
   /**
+   * Virus scan of uploaded evidence (NG-239, src/lib/clamav.ts). clamd's TCP
+   * INSTREAM endpoint; it runs next to the app (docker-compose service
+   * `clamav`, K-584192 = C). CLAMD_HOST unset or blank = no scanner: every scan
+   * ends ERROR and no evidence file downloads (fail closed), it is never taken
+   * as clean. INSTREAM has no authentication and no encryption, so the host
+   * must be loopback or a private network, never the open internet.
+   * CLAMD_PORT default 3310; CLAMD_TIMEOUT_MS one scan's whole budget
+   * (connect + send + verdict), default 60000.
+   */
+  CLAMD_HOST: blankToUndefined(z.string().optional()),
+  CLAMD_PORT: blankToUndefined(z.string().regex(/^\d{1,5}$/, 'CLAMD_PORT must be a port number').default('3310')),
+  CLAMD_TIMEOUT_MS: blankToUndefined(
+    z.string().regex(/^[1-9][0-9]*$/, 'CLAMD_TIMEOUT_MS must be a positive integer').default('60000')
+  ),
+  /**
    * Outgoing mail over our own SMTP server (src/lib/email/mailer.ts,
    * TASK-MUMLF57HOYFSB). SMTP_HOST unset or blank = no mail is sent; every
    * caller reports that (and in production writes a SystemAlert) instead of

@@ -24,12 +24,15 @@ export interface EnqueueResult {
  * failed for good adds nothing. The default `replace` mode would start a
  * second copy next to a running one (ADR-0008 §5 D4). To re-run a job whose
  * earlier run failed for good, pass `force`, which removes that job first
- * (only if it is not running).
+ * (only if it is not running). `replaceFailed` is the narrower form: it
+ * deletes the job with this key only if it failed for good (every attempt
+ * used, not running), in one statement, so a queued or running one is left
+ * alone even when it replaced the failed one a moment earlier (NG-239 Ö-2).
  */
 export async function enqueueJob(
   id: JobId,
   payload: Record<string, unknown> = {},
-  opts: { force?: boolean; connectionString?: string; runAt?: Date } = {}
+  opts: { force?: boolean; replaceFailed?: boolean; connectionString?: string; runAt?: Date } = {}
 ): Promise<EnqueueResult> {
   let key = `${id}:manual`;
   if (id === 'agency-monthly-report') {
@@ -51,6 +54,13 @@ export async function enqueueJob(
       throw new Error('pic-registry-retry: tenantId, auditEventId and attempt are required');
     }
     key = `pic-registry-retry:${String(payload.auditEventId)}:${payload.attempt}`;
+  } else if (id === 'evidence-scan') {
+    // NG-239: one key per evidence file and attempt; an upload, a retry and the sweep asking for
+    // the same attempt add one job.
+    if (!isPresentId(payload.tenantId) || !isPresentId(payload.evidenceId) || typeof payload.attempt !== 'number') {
+      throw new Error('evidence-scan: tenantId, evidenceId and attempt are required');
+    }
+    key = `evidence-scan:${String(payload.evidenceId)}:${payload.attempt}`;
   } else if (id === 'k1-embeddings' && payload.tenantId !== undefined) {
     // One key per tenant: saving a profile five times queues one embedding.
     if (!isPresentId(payload.tenantId)) throw new Error('k1-embeddings: tenantId must be a non-empty string');
@@ -63,6 +73,22 @@ export async function enqueueJob(
     if (opts.force) {
       await utils.withPgClient((c) =>
         c.query('select graphile_worker.remove_job($1) from graphile_worker.jobs where key = $1 and locked_at is null', [key])
+      );
+    } else if (opts.replaceFailed) {
+      // One statement, no fallback (NG-239 Ö-2). `remove_job` runs its own statements after the
+      // row was picked: if another request replaced the failed job meanwhile and a worker locked
+      // the new one, `remove_job` cannot delete it and instead clears its key and uses up its
+      // attempts, so the running job loses its retry and a second copy gets queued. Measured with
+      // this DELETE: the other request deletes the failed row and inserts a new one (it does not
+      // update the old row). This DELETE waits on the old row's lock; once the other request
+      // commits, that row is gone and the DELETE removes 0 rows. The new row was never among the
+      // rows it targets. A job that is running when the DELETE starts, even on its last attempt
+      // (attempts = max_attempts), is kept only by `locked_at is null`.
+      await utils.withPgClient((c) =>
+        c.query(
+          'delete from graphile_worker._private_jobs where key = $1 and locked_at is null and attempts >= max_attempts',
+          [key]
+        )
       );
     }
     const existing = await utils.withPgClient((c) =>

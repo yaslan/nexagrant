@@ -74,11 +74,13 @@ export default async function PartnersPage({
   }>;
 }) {
   const { workspace, locale } = await params;
-  const locked = await moduleGate('M1', locale);
-  if (locked) return locked;
   // The role door covers both tabs (NG-64): the live announcements tab reads no
   // tenant row here, but it is the same M1 screen a guest partner may not open.
+  // It runs before the M1 module gate (NG-257) so an unauthorized role sees the
+  // role refusal, not the module lock state.
   const { tenantId } = await requireTenantPageRole(locale, 'view_partner_search');
+  const locked = await moduleGate('M1', locale);
+  if (locked) return locked;
 
   const sParams = await searchParams;
   const tLinks = await getTranslations({ locale, namespace: 'PartnersPage.crossLinks' });

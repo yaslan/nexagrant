@@ -176,6 +176,9 @@ const PAGE_DOORS: Record<string, Action> = {
   'reports/person-days/page.tsx': 'view_proposal',
   'partners/page.tsx': 'view_partner_search',
   'partners/resources/page.tsx': 'view_partner_search',
+  'partners/leaders/page.tsx': 'view_partner_search',
+  // NG-257: CORDIS partner detail (M1 moduleGate alone before this).
+  'partners/[pic]/page.tsx': 'view_partner_search',
   'settings/api-keys/page.tsx': 'view_partner_search',
   'approvals/page.tsx': 'request_dual_approval',
   'settings/members/page.tsx': 'manage_users',
@@ -196,6 +199,30 @@ describe('each gated page names its door', () => {
       // No second, ungated tenant lookup left beside the door.
       expect(source).not.toMatch(/\brequireTenantPage\(/);
       expect(source).not.toMatch(/from '@\/lib\/auth'/);
+    });
+  }
+});
+
+/**
+ * NG-257: the role door runs before the M1 module gate. A role without the permission
+ * must get the 403 screen, not the M1 "off" screen, so M1 state is not revealed to it.
+ */
+const ROLE_BEFORE_MODULE: ReadonlyArray<readonly [string, string]> = [
+  ['partners/leaders/page.tsx', 'view_partner_search'],
+  ['partners/[pic]/page.tsx', 'view_partner_search'],
+  ['partners/page.tsx', 'view_partner_search'],
+];
+
+describe('role door runs before the M1 module gate (NG-257)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  for (const [file, action] of ROLE_BEFORE_MODULE) {
+    test(`${file}: requireTenantPageRole(${action}) precedes moduleGate('M1')`, () => {
+      const source = readFileSync(path.join(root, file), 'utf8');
+      const role = source.indexOf(`requireTenantPageRole(locale, '${action}')`);
+      const mod = source.indexOf("moduleGate('M1', locale)");
+      expect(role, 'role door call present').toBeGreaterThan(-1);
+      expect(mod, 'M1 gate call present').toBeGreaterThan(-1);
+      expect(role).toBeLessThan(mod);
     });
   }
 });

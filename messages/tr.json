@@ -79,7 +79,31 @@
     "genericTitle": "Bildirim",
     "genericDesc": "Yeni bir bildiriminiz var.",
     "emailDigestSubject": "Haftalık bildirim özeti: {count, plural, one {1 bildirim} other {# bildirim}}",
-    "emailDigestIntro": "Bu hafta {count, plural, one {1 bildiriminiz} other {# bildiriminiz}} var. Haftalık özet ayarınız gereği tek e-postada toplandı."
+    "emailDigestIntro": "Bu hafta {count, plural, one {1 bildiriminiz} other {# bildiriminiz}} var. Haftalık özet ayarınız gereği tek e-postada toplandı.",
+    "preferences": {
+      "title": "Bildirim tercihleri",
+      "description": "Her bildirim türü için panelde mi, e-postada mı ve ne sıklıkta alacağınızı seçin.",
+      "eventColumn": "Bildirim",
+      "channelPanel": "Panel",
+      "channelEmail": "E-posta",
+      "freqInstant": "Anlık",
+      "freqWeekly": "Haftalık",
+      "freqOff": "Kapalı",
+      "saved": "Tercih kaydedildi",
+      "saveFailed": "Tercih kaydedilemedi. Lütfen tekrar deneyin.",
+      "loadFailed": "Tercihler yüklenemedi.",
+      "events": {
+        "NEW_MATCHING_CALL": "Yeni eşleşen çağrı",
+        "CALL_CHANGED": "Takip edilen çağrı değişti",
+        "OUTREACH_REPLY": "Ulaşım yanıtı",
+        "CONTRIBUTION_OVERDUE": "Katkı payı gecikti",
+        "APPROVAL_OVERDUE": "Onay gecikti",
+        "BUDGET_DEVIATION": "Bütçe sapması",
+        "TASK_COLOR_CHANGED": "Görev durumu değişti",
+        "REPORT_DUE": "Rapor vakti yaklaştı",
+        "OBLIGATION_REMINDER": "Yükümlülük hatırlatması"
+      }
+    }
   },
   "Dashboard": {
     "title": "Panel",
@@ -554,6 +578,11 @@
       "uploadingOcr": "Yükleniyor & YZ OCR İşleniyor...",
       "validDoc": "Geçerli Belge",
       "validUntilLabel": "Son Geçerlilik:"
+    },
+    "scan": {
+      "scan_pending": "Taranıyor",
+      "scan_infected": "Zararlı bulundu, kaldırıldı",
+      "scan_error": "Taranamadı, yeniden denenecek"
     }
   },
   "ConceptNote": {

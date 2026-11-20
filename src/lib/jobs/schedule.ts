@@ -48,6 +48,9 @@ export const JOB_IDS = [
   'g0-rescore-tenant',
   // FO-396: queued by a PIC lookup that failed to reach the EU register, never on a cron.
   'pic-registry-retry',
+  // NG-239: queued by an evidence upload (and by a failed scan, and by the sweep), never on a cron.
+  'evidence-scan',
+  'evidence-scan-sweep',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];
@@ -185,6 +188,17 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     cron: '*/5 * * * *',
     maxAttempts: 3,
     queue: 'notification-email',
+    missedTickAlert: false,
+  },
+  // NG-239: every 15 minutes, queues a virus scan for every stored evidence file that has none in
+  // flight (src/lib/evidence-scan.ts sweepUnscannedEvidence). Own queue. No missed-tick alert and no
+  // backfill: the next tick finds every file still unscanned, so a missed tick loses nothing (and
+  // the files stay undownloadable meanwhile: fail closed).
+  {
+    id: 'evidence-scan-sweep',
+    cron: '*/15 * * * *',
+    maxAttempts: 3,
+    queue: 'evidence-scan-sweep',
     missedTickAlert: false,
   },
   {

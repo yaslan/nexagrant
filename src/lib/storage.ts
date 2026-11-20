@@ -9,6 +9,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { errorMessage } from '@/lib/errors';
 import { env } from '@/lib/env';
+import { evidenceScanRefusal } from '@/lib/evidence-scan-gate';
 
 // R2_ENDPOINT points the client at another S3-compatible store (a MinIO
 // container in the live tests); unset, the account's R2 endpoint is used.
@@ -418,8 +419,17 @@ export async function statObject(
  * as a download. Evidence is never read from a public host any more; the only
  * caller is the authenticated, tenant-checked download route. Null without an
  * object store (the route then serves the dev store's bytes itself).
+ *
+ * NG-239: the row's `scanStatus` is part of the signature, so a caller cannot
+ * sign a URL for a file without saying where its scan stands, and anything but
+ * CLEAN gets no URL (same rule as the route, {@link evidenceScanRefusal}).
  */
-export async function getPresignedDownloadUrl(objectKey: string, fileName: string): Promise<string | null> {
+export async function getPresignedDownloadUrl(
+  objectKey: string,
+  fileName: string,
+  scanStatus: unknown
+): Promise<string | null> {
+  if (evidenceScanRefusal(scanStatus) !== null) return null;
   if (!s3) return null;
   const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
   const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) || 'evidence';
