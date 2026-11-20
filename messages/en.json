@@ -268,6 +268,31 @@
           "DECLARE_FAILED": "The declaration could not be saved. Try again."
         }
       },
+      "withdraw": {
+        "open": "Withdraw",
+        "reasonLabel": "Reason for withdrawing",
+        "reasonHint": "A reason is required. The record is written to the decision log and cannot be undone; the reason stays visible.",
+        "submit": "Withdraw and save the reason",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "withdrawnNotice": "This opportunity has been set to passive (withdrawn). Its reason is visible in the decision log.",
+        "logTitle": "Decision log",
+        "kind": {
+          "WITHDRAW": "Withdrawn",
+          "APPLY": "Applied"
+        },
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Your session is not linked to a workspace. Sign in again.",
+          "INVALID_INPUT": "Invalid request.",
+          "REASON_TOO_LONG": "The reason can be at most 2000 characters.",
+          "REASON_REQUIRED": "You must write a reason to withdraw.",
+          "OPPORTUNITY_NOT_FOUND": "This opportunity was not found or has been archived.",
+          "WITHDRAW_FORBIDDEN": "Only pipeline managers or the opportunity owner can do this.",
+          "ALREADY_WITHDRAWN": "This opportunity is already withdrawn.",
+          "ALREADY_DECIDED": "An opportunity with a result cannot be withdrawn.",
+          "WITHDRAW_FAILED": "The withdrawal could not be saved. Try again."
+        }
+      },
       "modules": {
         "label": "Modules",
         "conceptNote": "Concept note",

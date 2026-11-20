@@ -55,7 +55,15 @@ export const RG_PROVINCE = 'Samsun';
  */
 export const RG_AGENCY = 'ng248-role-gate-agency';
 export const RG_COBRAND_NAME = 'NG248-AJANS-Q7ZK';
-export const RG_COBRAND_LOGO_KEY = `${RG_AGENCY}/agency/cobrand/6f1c0a8e-2b7d-4c3e-9a10-5d8e7f2b4c61.png`;
+/**
+ * One key per worker process (NG-270). The object store is NOT per-gate: every checkout's gate and
+ * every ad-hoc Playwright run on a machine writes to the same MinIO bucket (`test-evidence`), while
+ * the database is per run ONLY under `scripts/gate-isolated.sh`; on a shared DB the fixed agency
+ * row (RG_AGENCY) can still be overwritten or deleted by another run, which this key does not cover. A fixed key let another run's teardown delete this run's logo between
+ * setup and the co-brand test (role-gate.spec.ts:160, MEMBER 404). Setup and teardown run in the same
+ * worker, so both see the same key; the server reads it from the agency's settings row.
+ */
+export const RG_COBRAND_LOGO_KEY = `${RG_AGENCY}/agency/cobrand/${randomUUID()}.png`;
 /** A 1×1 PNG: the logo route serves stored bytes as-is, so any PNG proves the door. */
 const RG_COBRAND_LOGO_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -261,6 +269,6 @@ export async function teardownRoleGateTenant() {
   });
   await prisma.tenant.deleteMany({ where: { id: 'ng64-role-gate-e2e-tenant' } });
   await prisma.tenant.deleteMany({ where: { id: 'ng248-role-gate-agency' } });
-  await deleteObjectBytes('ng248-role-gate-agency/agency/cobrand/6f1c0a8e-2b7d-4c3e-9a10-5d8e7f2b4c61.png');
+  await deleteObjectBytes(RG_COBRAND_LOGO_KEY);
   await prisma.$disconnect();
 }

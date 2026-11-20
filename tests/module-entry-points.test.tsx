@@ -241,6 +241,7 @@ function detail(active: ModuleId[], locale: 'tr' | 'en' = 'tr') {
       g0={G0}
       savedG0={null}
       efforts={[]}
+      decisions={[]}
       canArchive={false}
       backHref={`/${locale}/main/pipeline`}
       locale={locale}
