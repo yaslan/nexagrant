@@ -327,6 +327,54 @@ describe('the role door precedes the first read on each gated page (NG-258)', ()
   }
 });
 
+/**
+ * NG-277 (NG-258 review T1; NG-275 review Ö-5): the check above reads only the page body's
+ * literal calls. A read hidden in a helper that the page calls before its door, or a
+ * `prisma.` call with no `await`, slipped past it.
+ *
+ * Chosen approach (b): an allowlist of the calls a page may make before its door. Every
+ * other call in the body before the door fails, whatever it is. A helper is caught by its
+ * call site, so its body does not need reading; a `prisma.`/`withTenant(` call is caught
+ * with or without `await`; a non-call use of `prisma`/`withTenant`/`db` also fails.
+ *
+ * The allowlist is derived from today's scan of PAGE_DOORS. Only two calls appear before
+ * a door: `getTranslations` (i18n string lookup, no tenant data) in
+ * relationships/[id]/page.tsx and settings/plan/page.tsx. `params`/`searchParams` are
+ * awaited property reads, not calls. Add a name only with a reviewed reason.
+ */
+const PRE_DOOR_ALLOWED: ReadonlySet<string> = new Set(['getTranslations']);
+const CALL_SITE = /([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*\(/g;
+const DB_TOKEN = /\b(prisma|withTenant|db)\b/g;
+
+/** The page body from the default export's opening brace, so the signature's own `(` is not a call. */
+function bodyOf(code: string): string {
+  const at = code.indexOf('export default');
+  if (at === -1) return '';
+  const rest = code.slice(at);
+  const open = rest.search(/\)\s*\{\s*\n/);
+  return open === -1 ? '' : rest.slice(rest.indexOf('{', open));
+}
+
+function preDoorViolations(body: string, door: number): string[] {
+  const pre = body.slice(0, door);
+  const calls = [...pre.matchAll(CALL_SITE)].map((m) => m[1] ?? '').filter((name) => !PRE_DOOR_ALLOWED.has(name));
+  const db = [...pre.matchAll(DB_TOKEN)].map((m) => `token:${m[0]}`);
+  return [...calls, ...db];
+}
+
+describe('nothing before the role door calls out except allowlisted calls (NG-277)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  for (const [file, action] of Object.entries(PAGE_DOORS)) {
+    test(`${file}: no call or DB token before requireTenantPageRole(${action})`, () => {
+      const body = bodyOf(stripComments(readFileSync(path.join(root, file), 'utf8')));
+      expect(body, 'default export body present (scan scope)').not.toBe('');
+      const door = body.indexOf(`requireTenantPageRole(locale, '${action}')`);
+      expect(door, 'role door call present in body').toBeGreaterThan(-1);
+      expect(preDoorViolations(body, door), 'calls before the door').toEqual([]);
+    });
+  }
+});
+
 /** Comments stripped the same way the evaluation-panel check does (block + full-line). */
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
