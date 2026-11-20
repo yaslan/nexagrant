@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
   role: 'TENANT_OWNER',
   m1Status: 'ON' as string | null,
   sub: null as Record<string, unknown> | null,
+  platform: { planId: 'ultra', allowedModules: ['M1', 'M2', 'M3', 'M5'] } as { planId: string; allowedModules: string[] },
   calls: { reads: 0, quota: 0 },
 }));
 
@@ -32,9 +33,11 @@ vi.mock('@/lib/tenant', () => ({
   }),
 }));
 
-// The platform plan: Ultra, so the platform's own grant (and the export) never refuses here.
+// The platform plan: Ultra by default, so the platform's own grant (and the export) never refuses
+// here. Ultra is unmetered (`queriesMonthly: null`), so the review-6 Ö1 block below switches to a
+// metered free-signal plan (FO-41) to make "no quota unit spent" a real check.
 vi.mock('@/lib/billing', () => ({
-  getEntitlements: async () => ({ planId: 'ultra', allowedModules: ['M1', 'M2', 'M3', 'M5'] }),
+  getEntitlements: async () => ({ ...h.platform, allowedModules: [...h.platform.allowedModules] }),
 }));
 
 const PLANS: Record<string, { id: string; tier: string; sortOrder: number; sellable: boolean; isFallback: boolean }> = {
@@ -124,6 +127,7 @@ beforeEach(() => {
   h.role = 'TENANT_OWNER';
   h.m1Status = 'ON';
   h.sub = null;
+  h.platform = { planId: 'ultra', allowedModules: ['M1', 'M2', 'M3', 'M5'] };
   h.calls = { reads: 0, quota: 0 };
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -177,5 +181,45 @@ describe('NG-250 r7: the plan gate answers only the caller both doors let on, be
     const res = await call();
     expect(res.status).toBe(200);
     expect(h.calls.reads).toBeGreaterThan(0);
+  });
+});
+
+// Review 6, Ö1: with Ultra no route ever spends a unit, so `quota: 0` above holds whatever the
+// order. Here the platform plan is a metered free-signal plan (FO-41: `basic`, M1 OFF, a monthly
+// query allowance), so the route's own doors admit the caller WITH a quota — and the plan gate
+// must still refuse before `consumePartnerSearchQuery` runs.
+const METERED_ROUTES = ROUTES.filter(([p]) =>
+  p === '/api/partner-search/announcements' || p === '/api/organizations/[pic]/announcements'
+);
+
+describe('NG-250 Ö1: on a metered plan the NexaGrant refusal still comes before the quota unit', () => {
+  beforeEach(() => {
+    h.platform = { planId: 'basic', allowedModules: ['M2', 'M3', 'M5'] };
+    h.m1Status = 'OFF';
+  });
+
+  it.each(METERED_ROUTES)('%s — not enrolled (control): the read is metered, one unit spent', async (_p, call) => {
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(h.calls.quota).toBe(1);
+    expect(h.calls.reads).toBeGreaterThan(0);
+  });
+
+  it.each(METERED_ROUTES)('%s — enrolled, trial ended: refused by the plan gate, no quota unit, nothing read', async (_p, call) => {
+    h.sub = ENDED;
+    const res = await call();
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Forbidden', code: 'NG_MODULE_CLOSED', feature: 'partner_search' });
+    expect(h.calls.quota).toBe(0);
+    expect(h.calls.reads).toBe(0);
+  });
+
+  it.each(METERED_ROUTES)('%s — enrolled, trial running: refused by the plan gate, no quota unit, nothing read', async (_p, call) => {
+    h.sub = RUNNING;
+    const res = await call();
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Forbidden', code: 'NG_MODULE_CLOSED', feature: 'partner_search' });
+    expect(h.calls.quota).toBe(0);
+    expect(h.calls.reads).toBe(0);
   });
 });
