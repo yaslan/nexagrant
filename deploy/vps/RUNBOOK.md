@@ -86,7 +86,7 @@ nc -vz -w 5 smtp.hostinger.com 465                      # giden SMTP 465 erişil
 - ✋ **`deploy` kullanıcısı:** yoksa oluşturulur, `docker` grubuna eklenir. Root ile günlük iş yapılmaz.
 - Host araçları (yedek ve migrasyon için; yalnız yerel prova ya da DB-1 host psql için): `postgresql-client-16`
   (`pg_dump` sürümü sunucu ile aynı ya da yeni), `awscli` v2, `age`, `perl`. Kurulum ✋.
-- Depo: `/opt/fonbridge` altına dev'in onaylanmış commit'i (`git clone` + `git checkout <commit>`).
+- ✋ Depo: `/opt/fonbridge` altına dev'in onaylanmış commit'i (`git clone` + `git checkout <commit>`).
   Sunucuda geliştirme yapılmaz; güncellemeler `git fetch` + `checkout` ile.
 
 ## 2. Gizli değerler ve yapılandırma dosyaları (sunucuda, repoya yazılmaz)
@@ -95,8 +95,9 @@ Dört dosya, hepsi git'e girmez (`.gitignore`: `.env*`):
 
 - `deploy/vps/.env.prod` (izin 600) — uygulama sırları. **Yalnız web ve worker** konteynerleri alır.
 - `deploy/vps/.env.db` (izin 600) — **DB-1'de (canlı) yalnız tek satır: `OWNER_DATABASE_URL`** (Supabase, sahip rol).
-  `POSTGRES_PASSWORD` ve süper kullanıcı satırları DB-1'de OLMAZ. Yerel provada (profile `db`) postgres konteyneri
-  ve `ops.sh` dosyanın tamamını (süper kullanıcı parolası dahil) okur. Web ve worker'ın ortamına girmez (FO-301 Y-5).
+  `POSTGRES_PASSWORD` ve süper kullanıcı satırları DB-1'de OLMAZ. Yerel provada (profile `db`) yalnız `postgres`
+  konteyneri bu dosyayı `env_file` ile okur (compose `postgres` servisi; `POSTGRES_PASSWORD` dahil). `ops.sh` bu
+  dosyadan yalnız `OWNER_DATABASE_URL` okur (`db_value`); parolayı okumaz. Web ve worker'ın ortamına girmez (FO-301 Y-5).
 - `deploy/vps/.env` (izin 600) — **yalnız compose interpolasyonu**: `WEB_HOST_PORT`, `PG_HOST_PORT`.
   Compose bu dosyayı proje dizininden (`deploy/vps/`) otomatik okur. Container'lara girmez.
 
@@ -106,7 +107,7 @@ Dört dosya, hepsi git'e girmez (`.gitignore`: `.env*`):
 
 ```bash
 cd /opt/fonbridge
-printf 'WEB_HOST_PORT=3000\n' > deploy/vps/.env && chmod 600 deploy/vps/.env
+✋ printf 'WEB_HOST_PORT=3000\n' > deploy/vps/.env && chmod 600 deploy/vps/.env
 docker compose -f deploy/vps/docker-compose.prod.yml config | grep -A3 'fonbridge-web' | grep published
 # beklenen: published: "3000"  (başka port istenirse yalnız .env değişir ve CloudPanel hedefi aynı porta çekilir)
 ```
@@ -115,11 +116,11 @@ Yerel prova için aynı mantıkla `PG_HOST_PORT` de yalnız `deploy/vps/.env` i�
 
 ```bash
 cd /opt/fonbridge
-cp deploy/vps/.env.prod.example deploy/vps/.env.prod
-chmod 600 deploy/vps/.env.prod
-$EDITOR deploy/vps/.env.prod         # uygulama değerleri elle doldur
+✋ cp deploy/vps/.env.prod.example deploy/vps/.env.prod
+✋ chmod 600 deploy/vps/.env.prod
+✋ $EDITOR deploy/vps/.env.prod         # uygulama değerleri elle doldur
 # Yerel prova için ayrıca:
-cp deploy/vps/.env.db.example deploy/vps/.env.db && chmod 600 deploy/vps/.env.db
+✋ cp deploy/vps/.env.db.example deploy/vps/.env.db && chmod 600 deploy/vps/.env.db
 ```
 
 Doldururken:
@@ -189,7 +190,7 @@ Yalnız yerel prova makinesinde. Canlıya uygulanmaz.
 
 ```bash
 cd /opt/fonbridge
-docker compose -f deploy/vps/docker-compose.prod.yml --profile db up -d postgres
+✋ docker compose -f deploy/vps/docker-compose.prod.yml --profile db up -d postgres
 docker compose -f deploy/vps/docker-compose.prod.yml --profile db ps     # postgres: healthy
 ```
 
@@ -197,17 +198,17 @@ Sıra, `docs/RELEASE_CHECKLIST.md` §3.1 ile aynıdır. Rol modeli: süper kulla
 yedekte; şema işleri **sahip rol `fabrika_owner`** ile koşar (`ops.sh` bunu `OWNER_DATABASE_URL`'den yapar);
 uygulama rolü `fabrika_app` yalnız adım 7'de (`verify`) kullanılır.
 
-0. **Roller ve pgvector:** `deploy/vps/ops.sh bootstrap`. Tekrar koşması zararsızdır. Kanıt:
+✋ 0. **Roller ve pgvector:** `deploy/vps/ops.sh bootstrap`. Tekrar koşması zararsızdır. Kanıt:
    `docker compose -f deploy/vps/docker-compose.prod.yml --profile db exec postgres psql -U fabrika -d fabrika -c '\du'`
-1. **Şema (boş veritabanı):** `deploy/vps/ops.sh push` (`prisma db push`). Mevcut veritabanında **önce**
+✋ 1. **Şema (boş veritabanı):** `deploy/vps/ops.sh push` (`prisma db push`). Mevcut veritabanında **önce**
    `deploy/vps/ops.sh diff` (salt okur); çıkış 2 = fark var, dur.
-2. **Uygulama rolü:** `deploy/vps/ops.sh rls-role` (`DATABASE_URL_RLS_TEST` dolu olmalı).
-3. **RLS:** `deploy/vps/ops.sh rls`.
-4. **Migrasyonlar:** `deploy/vps/ops.sh migrate` (`apply-migrations.sh`, `apply-order.txt` sırası).
+✋ 2. **Uygulama rolü:** `deploy/vps/ops.sh rls-role` (`DATABASE_URL_RLS_TEST` dolu olmalı).
+✋ 3. **RLS:** `deploy/vps/ops.sh rls`.
+✋ 4. **Migrasyonlar:** `deploy/vps/ops.sh migrate` (`apply-migrations.sh`, `apply-order.txt` sırası).
    `prisma migrate deploy` **kullanılmaz** (`prisma.config.ts` reddeder).
-5. **RLS (ikinci kez):** `deploy/vps/ops.sh rls`.
-6. **Seed (K3):** `deploy/vps/ops.sh seed` — yalnız referans veri; demo kiracı yok. FO-251 birleşene kadar çalışmaz.
-7. **Doğrulama:** `deploy/vps/ops.sh verify`. Başarısızsa web açılmaz.
+✋ 5. **RLS (ikinci kez):** `deploy/vps/ops.sh rls`.
+✋ 6. **Seed (K3):** `deploy/vps/ops.sh seed` — yalnız referans veri; demo kiracı yok. FO-251 birleşene kadar çalışmaz.
+✋ 7. **Doğrulama:** `deploy/vps/ops.sh verify`. Başarısızsa web açılmaz.
 
 ### 4-C. CANLI (DB-1) güncelleme migrasyonu
 
@@ -227,9 +228,9 @@ deploy/vps/ops.sh diff
 # (c) Go-live ön kontrolü R-1 (salt okur; son satır R1_SONUC | TEMIZ/... değilse dur)
 deploy/vps/ops.sh r1
 # (d) Migrasyon: sahip rolle, host psql; sertifika yolu ops.sh tarafından depo certs/ dizinine çevrilir
-deploy/vps/ops.sh migrate
-deploy/vps/ops.sh rls
-deploy/vps/ops.sh verify          # başarısızsa web'i başlatma
+✋ deploy/vps/ops.sh migrate
+✋ deploy/vps/ops.sh rls
+✋ deploy/vps/ops.sh verify          # başarısızsa web'i başlatma
 ```
 
 - `apply-migrations.sh` idempotenttir: `--list` çıktısındaki tüm dosyalar sırayla koşar, değişmeyenler etkisizdir.
@@ -248,21 +249,22 @@ Sıra §3.3 (ADR-0008 §9.2) ile aynıdır: web önce, worker `JOBS_CRON_ENABLED
 ```bash
 cd /opt/fonbridge
 # 1. Tarayıcı (imza indirmesi birkaç dakika; healthy olana kadar bekle)
-GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml up -d --build clamav
+✋ GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml up -d --build clamav
 docker compose -f deploy/vps/docker-compose.prod.yml ps clamav     # clamav: healthy
 # 2a. Doğrulama: sınır ayarı gerçekten yüklü mü (ham çıktıyı rapora koy; sır yok)
 docker exec fonbridge-clamav grep -i '^AlertExceedsMax' /etc/clamav/clamd.conf   # beklenen: AlertExceedsMax yes
 
 # 2. Web (imajı derler). Sağlık: GET /api/health 200
-GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml up -d --build web
+✋ GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml up -d --build web
 docker compose -f deploy/vps/docker-compose.prod.yml ps        # web: healthy
 WEB_HOST_PORT="$(grep -E '^WEB_HOST_PORT=' deploy/vps/.env 2>/dev/null | cut -d= -f2-)"
 curl -s "http://127.0.0.1:${WEB_HOST_PORT:-3000}/api/health"   # {"status":"ok"}  (port deploy/vps/.env'den; yoksa 3000)
+# Not: deploy/vps/.env içinde satır sonu yorumu KOYMA (`WEB_HOST_PORT=3101 # yorum` URL'yi bozar: `...:3101 # yorum/api/health`).
 
 # ✋ 3. Worker, cron kapalı. ÖN KOŞUL: K13 (DB-1 teyidi) + K14 (yedek kararı) tamam, patron ayrı onayı.
 #    BU ADIM CANLI SUPABASE VERİTABANINA YAZAR: worker ilk açılışta graphile_worker şemasını canlı DB'de kurar
 #    (job-queue:cron-disabled uyarısı beklenir). Önkoşul sağlanmadan bu satır çalıştırılmaz.
-GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml up -d --build worker
+✋ GIT_REVISION=$(git rev-parse HEAD) docker compose -f deploy/vps/docker-compose.prod.yml up -d --build worker
 docker logs fonbridge-worker --tail 50
 
 # 4. BLOKE — migrasyon ve süpürme (NG-239 Ö-4)
@@ -275,7 +277,7 @@ docker logs fonbridge-worker --tail 50
 #    YAYIN BU ADIMDA DURUR. Adım 4 tamamlanmadan adım 5 yapılmaz.
 
 # 5. Cron'u aç (.env.prod: JOBS_CRON_ENABLED=true), worker'ı yeniden başlat (✋ worker devri, §5.1 sonrası)
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --force-recreate worker
+✋ docker compose -f deploy/vps/docker-compose.prod.yml up -d --force-recreate worker
 ```
 
 Kural: `postgres` bu yığında kalkmaz (canlıda Supabase). `caddy` kalkmaz (CloudPanel vekil eder; §5.1).
@@ -285,11 +287,11 @@ Kural: `postgres` bu yığında kalkmaz (canlıda Supabase). `caddy` kalkmaz (Cl
 CloudPanel nginx'i 80/443'ü ve TLS'i tutar; NexaGrant bir Reverse Proxy sitesi olarak `web`e vekillik eder.
 Caddy 80/443'e BAĞLANMAZ. Her vhost değişikliği ✋ ayrı onaylıdır ve `nginx -t` ile biter.
 
-1. CloudPanel → Sites → **Add Site** → Reverse Proxy; domain `nexagrant.com` (+ `www.nexagrant.com` alias).
+✋ 1. CloudPanel → Sites → **Add Site** → Reverse Proxy; domain `nexagrant.com` (+ `www.nexagrant.com` alias).
    Reverse proxy hedefi: `http://127.0.0.1:<WEB_HOST_PORT>` (varsayılan 3000; değer `deploy/vps/.env`'den okunur).
-2. SSL: CloudPanel → Let's Encrypt. **Önkoşul:** §3'teki `dig` kontrolü kökün `191.96.1.252`'yi gösterdiğini
+✋ 2. SSL: CloudPanel → Let's Encrypt. **Önkoşul:** §3'teki `dig` kontrolü kökün `191.96.1.252`'yi gösterdiğini
    onaylamalı; yoksa sertifika denemesi Let's Encrypt hız sınırını yer.
-3. Başlıklar (vhost): `Host $host`, `X-Forwarded-Proto $scheme`, `X-Forwarded-For $proxy_add_x_forwarded_for`.
+✋ 3. Başlıklar (vhost): `Host $host`, `X-Forwarded-Proto $scheme`, `X-Forwarded-For $proxy_add_x_forwarded_for`.
    `X-Real-IP` kullanılmaz.
    - **3a. `TRUSTED_PROXY_HOPS` ölçümü (canlı, DNS ve sertifikadan sonra; salt okur ölçüm):**
      1. Zincirde Varnish var mı: `ss -ltnp | grep -E ':6081\b'` ve `systemctl is-active varnish 2>/dev/null`.
@@ -298,22 +300,25 @@ Caddy 80/443'e BAĞLANMAZ. Her vhost değişikliği ✋ ayrı onaylıdır ve `ng
         dosyasında (`/etc/nginx/sites-enabled/` altında, yalnız okuma) ölçülür.
      2. Sahte başlık testi (yalnız tetikleme): `curl -s -o /dev/null -w '%{http_code}\n' -H 'X-Forwarded-For: 203.0.113.9' https://nexagrant.com/api/health`.
         HTTP kodu KANIT DEĞİLDİR: 200 dönmesi IP'nin güvenilip güvenilmediğini göstermez, her durumda 200 gelir.
-        Birincil kanıt: nginx erişim logunda istek satırının `$remote_addr` değeri ile uygulamanın gördüğü IP
-        eşleşir ve sahte `203.0.113.9` uygulamada görünmez. İkincil kanıt: yerel provada `clientIpFrom`
-        (src/lib/leads/public-lead.ts:129-141) değerinin doğrulanması (Faz A madde 5; ham çıktı rapora).
+        **Birincil kanıt canlıda doğrudan gözlenemez.** Kodda uygulamanın çözdüğü istemci IP'sini
+        (`clientIpFrom`, src/lib/leads/public-lead.ts) yazan bir log alanı YOK: `csp violation` logu yalnız ihlal
+        gövdesini yazar (src/lib/csp-report.ts:178); çözülen IP DB'ye yalnız HMAC özeti olarak girer
+        (`hashClientIp`, src/lib/leads/public-lead.ts). Bu yüzden kanıt yalnız yerel provada alınır: `clientIpFrom`
+        çıktısı (Faz A madde 5; ham çıktı rapora). Beklenen: nginx `$remote_addr` değerini verir, sahte `203.0.113.9`
+        değerini vermez.
      3. Değer, ölçümün sonucuna göre `.env.prod`'a yazılır. Ölçüm yapılmadan canlıda değer değiştirilmez.
    - **Varnish notu:** Varnish eklenirse `TRUSTED_PROXY_HOPS` 1'de kalırsa tüm ziyaretçiler `127.0.0.1` sayılır ve
      IP başına sınır ortak dolar. Varnish kararı patron/lider kararıdır; bu paket Varnish'siz tasarlanmıştır.
-4. **`client_max_body_size 25m;`** (✋ vhost değişikliği). Gerekçe: kanıt dosyası üst sınırı 25 MiB
+✋ 4. **`client_max_body_size 25m;`** (✋ vhost değişikliği). Gerekçe: kanıt dosyası üst sınırı 25 MiB
    (`src/lib/storage.ts` EVIDENCE_MAX_BYTES) üretimde R2'ye presigned PUT ile gider ve nginx'ten geçmez. Nginx'ten
    geçen en büyük yükleme M17/RAG belge yüklemesidir (`/api/admin/documents/upload`, 20 MiB; multipart ek yükü
    için 25 MiB'lık tavan). Değer uygulama sınırından küçük olmamalı (küçükse 413 meşru yüklemeyi keser).
    - Doğrulama (canlı, ✋): `nginx -T 2>/dev/null | grep client_max_body_size` → `25m`.
    - 413 testi: `head -c 26M /dev/zero > <geçici-dosya>` (26 MiB, yerel), ardından
-     `curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary @<geçici-dosya> https://nexagrant.com/api/admin/documents/upload`
+     ✋ `curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/octet-stream' --data-binary @<geçici-dosya> https://nexagrant.com/api/admin/documents/upload`
      → beklenen **413** (nginx reddeder). 21 MiB'lık dosya ile aynı uç noktaya beklenen: **413 dışında** bir kod
      (oturumsuz istek 401/403 dönebilir; önemli olan 413 olmaması). Geçici dosya testten sonra silinir.
-5. `www` → kök tek 301: `www.nexagrant.com` için ayrı bir 301 site ya da vhost yönlendirmesi; iki sıçrama olmasın.
+✋ 5. `www` → kök tek 301: `www.nexagrant.com` için ayrı bir 301 site ya da vhost yönlendirmesi; iki sıçrama olmasın.
    Doğrulama: `curl -sI http://www.nexagrant.com` → `301` ve `Location: https://nexagrant.com/`.
 6. **HSTS tek başlık (NG-124):** HSTS'i **uygulama** gönderir (`src/lib/security-headers.ts` `hstsHeaderFor`,
    production + HTTPS). CloudPanel vhost'una `add_header Strict-Transport-Security` **EKLENMEZ**: iki başlık olur.
@@ -332,15 +337,15 @@ Geri alma (vekil): CloudPanel'de NexaGrant Reverse Proxy sitesini sil; DNS kök�
 - **CORDIS içe aktarımı panelden yapılmaz** (`src/app/[locale]/admin/cordis/actions.ts` web sürecinde
   4,7 GB tepe ölçüldü). Tek seferlik konteyner, worker durdurulmuş, sahip rolle, bellek sınırı 5 GB:
   ```bash
-  docker compose -f deploy/vps/docker-compose.prod.yml stop worker
+✋   docker compose -f deploy/vps/docker-compose.prod.yml stop worker
   # Yalnız sahip URL'i host ortamına alınır (.env.db'nin tamamı ya da POSTGRES_PASSWORD konteynere girmez, FO-308 D-11).
   export OWNER_DATABASE_URL="$(grep -E '^OWNER_DATABASE_URL=' deploy/vps/.env.db | cut -d= -f2-)"
-  docker run --rm --memory 5g --network fonbridge_default \
+✋   docker run --rm --memory 5g --network fonbridge_default \
     --env-file deploy/vps/.env.prod -e OWNER_DATABASE_URL \
     fonbridge-worker:local sh -c \
     'export DATABASE_URL="$OWNER_DATABASE_URL"; exec node_modules/.bin/tsx scripts/cordis-import.ts "$@"' sh <argümanlar>
   unset OWNER_DATABASE_URL
-  docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
+✋   docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
   ```
   Parola komut satırına girmez: `-e OWNER_DATABASE_URL` değeri host ortamından alır (argv'de yalnız ad vardır).
   DB-1'de `OWNER_DATABASE_URL` Supabase URL'idir ve ✋ teyit gerektirir. `fonbridge-worker:local` GÜNCEL revision
@@ -357,44 +362,48 @@ Yeni bir commit için (sıra `docs/RELEASE_CHECKLIST.md` §3.1 ile aynı; 0a ve 
 
 ```bash
 cd /opt/fonbridge
-git fetch --all --prune && git checkout <yeni-commit>
 # ✋ 0. Yedek (§8.1, DB-1 için Supabase yedek teyidi) bu güncellemeden önce alındı mı? Yoksa dur.
+#    0'ın onayı gelmeden aşağıdaki ✋ satırlardan HİÇBİRİ çalıştırılmaz: canlı ağaç ve imaj değişmez.
+# ✋ 0a. Yeni commit'i çek (canlı çalışma ağacı değişir; yalnız 0 onaylandıktan sonra)
+✋ git fetch --all --prune && git checkout <yeni-commit>
+# ✋ 0b. Geri alma için imajı etiketle (canlı imaj deposunu değiştirir; yalnız 0 onaylandıktan sonra)
+✋ docker tag fonbridge-web:local fonbridge-web:prev   2>/dev/null || true
+✋ docker tag fonbridge-worker:local fonbridge-worker:prev 2>/dev/null || true
 # ✋ 1. Eski worker'ı durdur (RELEASE_CHECKLIST §3.1 adım 2a): stop -t 300, sonra kilitli iş sayısı 0
-docker compose -f deploy/vps/docker-compose.prod.yml stop -t 300 worker
-# 2. İmajı yedekle (geri alma için)
-docker tag fonbridge-web:local fonbridge-web:prev   2>/dev/null || true
-docker tag fonbridge-worker:local fonbridge-worker:prev 2>/dev/null || true
+✋ docker compose -f deploy/vps/docker-compose.prod.yml stop -t 300 worker
 # ✋ 3. Yeni imajları ÖNCE derle (FO-301 Y-6). GIT_REVISION (FO-308 R-1) zorunlu.
 #    Derleme sırasında worker durmuş olmalı (Y-2: derleme tepesi 2 vCPU / 8 GB'da worker ile birlikte taşabilir).
-GIT_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/vps/docker-compose.prod.yml build web worker
+✋ GIT_REVISION="$(git rev-parse HEAD)" docker compose -f deploy/vps/docker-compose.prod.yml build web worker
 # ✋ 4. Şema değiştiyse: §4-C adımları (DB-1 ✋). DB-1'de `ops.sh push` YOK.
 # ✋ 5. Başlat (imajlar adım 3'te derlendi; --no-build ile yeniden derlenmez)
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build web
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
+✋ docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build web
+✋ docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build worker
 docker compose -f deploy/vps/docker-compose.prod.yml ps
 ```
 
 Şema değişmediyse §4-C adımları atlanır; yalnız `stop`, `build`, `up -d --no-build` çalışır. Her güncellemeden
 önce §8'deki yedek (en az bir gün önceki) elde olmalı.
 
-## 7. Geri alma (rollback)
+## 7. Geri alma (rollback) (✋ her geri alma ayrı onay)
+
+Her geri alma adımı canlıyı değiştirir; her biri ayrı patron onayı gerektirir. Onay bir geri almayı kapsar.
 
 Uygulama geri alma (şema değişmediyse):
 
 ```bash
 cd /opt/fonbridge
-docker compose -f deploy/vps/docker-compose.prod.yml stop worker
-git checkout <önceki-commit>
-docker tag fonbridge-web:prev fonbridge-web:local
-docker tag fonbridge-worker:prev fonbridge-worker:local
-docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build web worker
+✋ docker compose -f deploy/vps/docker-compose.prod.yml stop worker
+✋ git checkout <önceki-commit>
+✋ docker tag fonbridge-web:prev fonbridge-web:local
+✋ docker tag fonbridge-worker:prev fonbridge-worker:local
+✋ docker compose -f deploy/vps/docker-compose.prod.yml up -d --no-build web worker
 ```
 
 Şema da geri alınacaksa: önce worker durdurulur, sonra migrasyonların `.down.sql` dosyaları **ters
 sırada** uygulanır (DB-1'de ✋ patron onayı; Supabase geri dönüş noktası §4-C önkoşulu):
 
 ```bash
-DATABASE_URL=<url> scripts/apply-migrations.sh --down <dosya>.down.sql
+✋ DATABASE_URL=<url> scripts/apply-migrations.sh --down <dosya>.down.sql
 ```
 
 `docs/RELEASE_CHECKLIST.md` §3.2 ve §3.3 geri dönüş notları (ör. `m4-double.sql`) uygulanmadan geri dönüş yapılmaz.
@@ -414,8 +423,8 @@ DB-1 (Supabase) için uyarlanmadı. Supabase'in yedek politikası ve bu veritaba
 ### 8.1 Günlük yedek (kur; yalnız yerel prova veya uyarlamadan sonra)
 
 ```bash
-sudo install -m 600 /dev/null /etc/fonbridge/backup.env   # sonra değerleri doldur
-sudo install -m 644 /opt/fonbridge/deploy/vps/fonbridge-backup.cron /etc/cron.d/fonbridge-backup
+✋ sudo install -m 600 /dev/null /etc/fonbridge/backup.env   # sonra değerleri doldur
+✋ sudo install -m 644 /opt/fonbridge/deploy/vps/fonbridge-backup.cron /etc/cron.d/fonbridge-backup
 ```
 
 `/etc/fonbridge/backup.env` içinde: `BACKUP_DATABASE_URL` (süper kullanıcı `fabrika`, `127.0.0.1`),
@@ -425,7 +434,7 @@ sudo install -m 644 /opt/fonbridge/deploy/vps/fonbridge-backup.cron /etc/cron.d/
 Elle bir kez koş ve çıktıyı gör:
 
 ```bash
-sudo /opt/fonbridge/deploy/vps/backup-to-r2.sh
+✋ sudo /opt/fonbridge/deploy/vps/backup-to-r2.sh
 # beklenen: "ok: fonbridge-<damga>.dump.age <n> bayt R2'de doğrulandı"
 ```
 
@@ -437,21 +446,21 @@ panelinde tanımlanır; betik bu katmanları kendisi uygulamaz.
 
 ### 8.2 Geri yükleme (provası, ayda bir; yerel)
 
-Önce `fabrika_app` rolü (§4-B adım 2) ve boş bir hedef veritabanı (`createdb -O fabrika fabrika_restored`).
+✋ Önce `fabrika_app` rolü (§4-B adım 2) ve boş bir hedef veritabanı (`createdb -O fabrika fabrika_restored`).
 Şifreli dökümler (`.age`) önce `age -d -i <özel-anahtar>` ile çözülür; özel anahtar sunucuda **bulunmaz**,
 patron kasasından geçici olarak alınır.
 
 ```bash
 # Prova: geçici DB'ye yükler, satır sayılarını karşılaştırır (kendi DB'sini kendisi kurar/siler)
-RESTORE_ADMIN_URL=postgresql://fabrika@127.0.0.1:5432/postgres \
+✋ RESTORE_ADMIN_URL=postgresql://fabrika@127.0.0.1:5432/postgres \
 BACKUP_DATABASE_URL=postgresql://fabrika@127.0.0.1:5432/fabrika \
-  bash scripts/backup/pg-restore-drill.sh <dump>
+✋   bash scripts/backup/pg-restore-drill.sh <dump>
 # (parolalar PGPASSWORD ya da ~/.pgpass ile; URL'lerde yazılmaz.)
 # Gerçek geri yükleme (felaket): YALNIZ boş hedef DB; betik DB oluşturmaz, dolu hedefi reddeder
-RESTORE_DATABASE_URL=postgresql://fabrika@127.0.0.1:5432/fabrika_restored bash scripts/backup/pg-restore.sh <dump>
+✋ RESTORE_DATABASE_URL=postgresql://fabrika@127.0.0.1:5432/fabrika_restored bash scripts/backup/pg-restore.sh <dump>
 ```
 
-Sonra hedef DB'ye karşı `rls` ve `verify` (ops.sh'ın DATABASE_URL'ini o DB'ye çevirerek), uygulamayı yeni DB'ye
+✋ Sonra hedef DB'ye karşı `rls` ve `verify` (ops.sh'ın DATABASE_URL'ini o DB'ye çevirerek), uygulamayı yeni DB'ye
 bağla, giriş yap. Süreyi yaz (RTO ölçümü). `docs/RELEASE_CHECKLIST.md` §4.2 ve §4.4 ayrıntılı adımları verir.
 
 ## 9. İzleme
@@ -462,7 +471,7 @@ bağla, giriş yap. Süreyi yaz (RTO ölçümü). `docs/RELEASE_CHECKLIST.md` §
 - Log dönüşümü: her servis için `json-file` 10 MB × 5 (compose'da tanımlı).
 - Uygulama alarmları: `SystemAlert` yalnız `/[locale]/admin/alerts` ekranında (RELEASE_CHECKLIST §5.1).
   E-posta/push bildirimi ve dış uptime izleyici patron kararı (§5.2).
-- Disk: **200 GB** (KVM 4). Yedek + imajlar + DB-1 dışı veri. `docker image prune` haftalık (manuel, kanıtla).
+- Disk: **200 GB** (KVM 4). Yedek + imajlar + DB-1 dışı veri. ✋ `docker image prune` haftalık (manuel, kanıtla).
 
 ## 10. Açık kararlar (patron)
 
