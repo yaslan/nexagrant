@@ -356,8 +356,10 @@ const envSchema = z.object({
       .optional()
   ),
   /**
-   * Prisma's `maxWait` for tenant-scoped transactions (src/lib/db.ts withTenantOn):
-   * how long a transaction may wait for a free connection before it starts.
+   * Prisma's `maxWait` for tenant-scoped transactions (src/lib/db.ts withTenantOn)
+   * and system-scope transactions (src/lib/system-scope.ts withSystemScopeOn, e.g.
+   * the Auth.jwt membership lookup): how long a transaction may wait for a free
+   * connection before it starts.
    * Unset or blank = 2000 ms, the Prisma default and the live/dev value. CI and the
    * isolated gate set 10000: on a loaded runner the wait can expire before the
    * BEGIN answer is read (P2028). A caller's explicit maxWait always wins. Capped at 60 s.

@@ -106,4 +106,30 @@ describe('DB_TX_MAX_WAIT_MS', () => {
     await withTenantOn(client, 'tenant-1', async () => 'ok');
     expect($transaction.mock.calls[0]?.[1]).not.toHaveProperty('timeout');
   });
+
+  // NG-274: the system-scope path (Auth.jwt membership lookup) is a transaction
+  // too, and it must see the same wait as the tenant path.
+  it('withSystemScope waits the configured maxWait (10000) when set', async () => {
+    await loadEnv('10000');
+    const { withSystemScopeOn } = await import('@/lib/system-scope');
+    const { client, $transaction } = fakeClient();
+    await withSystemScopeOn(client, 'tenant-discovery', 'test', async () => 'ok');
+    expect($transaction.mock.calls[0]?.[1]).toMatchObject({ maxWait: 10000 });
+  });
+
+  it('withSystemScope keeps the 2000 ms default when unset', async () => {
+    await loadEnv(undefined);
+    const { withSystemScopeOn } = await import('@/lib/system-scope');
+    const { client, $transaction } = fakeClient();
+    await withSystemScopeOn(client, 'tenant-discovery', 'test', async () => 'ok');
+    expect($transaction.mock.calls[0]?.[1]).toMatchObject({ maxWait: 2000 });
+  });
+
+  it('withSystemScope leaves timeout at the Prisma default (not set by us)', async () => {
+    await loadEnv('10000');
+    const { withSystemScopeOn } = await import('@/lib/system-scope');
+    const { client, $transaction } = fakeClient();
+    await withSystemScopeOn(client, 'tenant-discovery', 'test', async () => 'ok');
+    expect($transaction.mock.calls[0]?.[1]).not.toHaveProperty('timeout');
+  });
 });
