@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { evidenceScanRefusal, isEvidenceDownloadable } from '@/lib/evidence-scan-gate';
 import { PRODUCT_NAME } from '@/lib/brand';
 import {
+  getEvidenceItemsAction,
   getPresignedUploadUrlAction,
   confirmEvidenceUploadAction,
   deleteEvidence,
@@ -72,12 +73,24 @@ function evidenceDownloadHref(id: string): string {
  * downloaded yet (or ever). Null when it may: the caller shows the link then.
  * The rule is the server's own (evidenceScanRefusal), not a copy.
  */
+/** NG-264 (b): the first refresh of a waiting scan comes after this long, then each wait doubles up to the ceiling. */
+const SCAN_POLL_FIRST_MS = 5_000;
+const SCAN_POLL_MAX_MS = 30_000;
+
+/** A row whose scan has not produced a result yet: PENDING, or ERROR (retried). INFECTED and CLEAN are final. */
+function isWaitingForScan(scanStatus: unknown): boolean {
+  const refusal = evidenceScanRefusal(scanStatus);
+  return refusal === 'scan_pending' || refusal === 'scan_error';
+}
+
 function ScanState({ status, t }: { status: unknown; t: (key: string) => string }) {
   const refusal = evidenceScanRefusal(status);
   if (!refusal) return null;
   const tone = refusal === 'scan_infected' ? 'text-bad bg-bad/10 border-bad/30' : 'text-muted bg-ground border-border';
+  // aria-live: the badge changes in place while a scan runs (pending → result), so a
+  // screen reader hears the new state. Focus is never moved to it.
   return (
-    <span data-testid="evidence-scan-state" data-scan={refusal} className={`text-[11px] font-semibold px-2 py-1 rounded-lg border ${tone}`}>
+    <span data-testid="evidence-scan-state" data-scan={refusal} aria-live="polite" className={`text-[11px] font-semibold px-2 py-1 rounded-lg border ${tone}`}>
       {t(`scan.${refusal}`)}
     </span>
   );
@@ -136,6 +149,57 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const dateLocale = isTr ? 'tr-TR' : 'en-US';
   const t = useTranslations('Evidence');
   const errorText = useActionErrorText();
+
+  // NG-264 (b): while a row waits for its scan, re-read the list so the badge moves on its
+  // own. Only scanStatus is taken from the answer; the rest of the row, the filters and the
+  // open drawer are left as they are. Polling stops when no row waits, when the tab is
+  // hidden, and when the screen unmounts. An empty answer (a failed read) changes nothing.
+  const waitingForScan = items.some((item) => Boolean(item.r2ObjectKey) && isWaitingForScan(item.scanStatus));
+  useEffect(() => {
+    if (!waitingForScan) return;
+    let cancelled = false;
+    let inFlight = false;
+    let delay = SCAN_POLL_FIRST_MS;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const visible = () => document.visibilityState === 'visible';
+
+    const tick = async () => {
+      timer = undefined;
+      if (cancelled || inFlight || !visible()) return;
+      inFlight = true;
+      const latest = await getEvidenceItemsAction().catch(() => null);
+      inFlight = false;
+      if (cancelled) return;
+      if (latest && latest.length > 0) {
+        const statusById = new Map(latest.map((row) => [row.id, row.scanStatus]));
+        setItems((prev) => prev.map((item) => (statusById.has(item.id) ? { ...item, scanStatus: statusById.get(item.id) } : item)));
+        setSelectedDoc((prev) => (prev && statusById.has(prev.id) ? { ...prev, scanStatus: statusById.get(prev.id) } : prev));
+      }
+      if (!visible()) return;
+      delay = Math.min(delay * 2, SCAN_POLL_MAX_MS);
+      timer = setTimeout(tick, delay);
+    };
+
+    const onVisibilityChange = () => {
+      if (cancelled) return;
+      if (visible()) {
+        if (timer !== undefined) clearTimeout(timer);
+        delay = SCAN_POLL_FIRST_MS;
+        void tick();
+      } else if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+    };
+
+    timer = setTimeout(tick, delay);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [waitingForScan]);
 
   // What the drawer may show about the selected document. Both are empty for almost
   // every row today, and an empty state is the correct thing to render: the module has
