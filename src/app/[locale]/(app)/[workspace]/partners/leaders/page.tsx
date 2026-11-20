@@ -7,6 +7,7 @@ import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { authenticateCordisSession } from '@/lib/cordis-api-auth';
 import { ngPageGate } from '@/lib/billing/nexagrant/page-gate';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { cordisTopicPrefixSchema } from '@/lib/k2-cordis/api-query';
 import { coordinatorLeaders, type CoordinatorLeaderRow } from '@/lib/k2-cordis/coordinator-leaders';
 
@@ -28,6 +29,9 @@ export default async function LeadersPage({
 }) {
   const { workspace, locale } = await params;
   const { topic } = await searchParams;
+  // NG-256: the role door first, before any read. A GUEST_PARTNER typing this URL
+  // gets the 403 screen; the menu hiding `partners` was not a closed door.
+  await requireTenantPageRole(locale, 'view_partner_search');
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
   const t = await getTranslations('PartnersLeaders');

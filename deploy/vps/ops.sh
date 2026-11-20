@@ -102,7 +102,7 @@ case "${1:-}" in
     # R-1 (RELEASE_CHECKLIST §3.1 adım 0a): sahip rolle salt okur betik. Parola ne URL'de ne argv'de: PGPASSWORD ortamda.
     raw="$(db_value OWNER_DATABASE_URL)"
     [ -n "$raw" ] || die "OWNER_DATABASE_URL boş ($DB_ENV_FILE)"
-    url="$(printf %s "$raw" | sed -E "s#@postgres:[0-9]+/#@127.0.0.1:${OPS_PG_HOST_PORT}/#; s/([?&])schema=[^&]*&?/\1/; s/[?&]$//; s#^(postgresql://[^:/@]+):[^@]*@#\1@#")"
+    url="$(printf %s "$raw" | sed -E "s#@postgres:[0-9]+/#@127.0.0.1:${OPS_PG_HOST_PORT}/#; s/([?&])schema=[^&]*&?/\1/; s/[?&]$//; s#sslrootcert=/app/certs/#sslrootcert=${PWD}/certs/#; s#^(postgresql://[^:/@]+):[^@]*@#\1@#")"
     out="$(PGPASSWORD="$(pw_from_url "$raw")" psql "$url" -X -v ON_ERROR_STOP=1 -f scripts/golive/r1-topicmatch-check.sql 2>&1)" \
       || { printf '%s\n' "$out" >&2; die "R-1 betiği hata verdi"; }
     printf '%s\n' "$out"
@@ -113,8 +113,10 @@ case "${1:-}" in
   verify)   worker_run app node_modules/.bin/tsx scripts/check-rls-live.ts --require-db ;;
   migrate)
     # Host psql: sahip URL'i (.env.db'deki OWNER_DATABASE_URL) okur; dosyayı source etmez, şifreyi ekrana basmaz.
+    # DB-1 (Supabase): URL'deki sertifika yolu konteyner yoludur (/app/certs/...); host'ta aynı dosya depo
+    # kökündeki certs/ altındadır (Dockerfile bunu /app/certs'e kopyalar). Yol host'a çevrilir.
     url="$(db_value OWNER_DATABASE_URL)"
-    url="$(printf %s "$url" | sed -E "s#@postgres:[0-9]+/#@127.0.0.1:${OPS_PG_HOST_PORT}/#; s/([?&])schema=[^&]*&?/\1/; s/[?&]$//")"
+    url="$(printf %s "$url" | sed -E "s#@postgres:[0-9]+/#@127.0.0.1:${OPS_PG_HOST_PORT}/#; s/([?&])schema=[^&]*&?/\1/; s/[?&]$//; s#sslrootcert=/app/certs/#sslrootcert=${PWD}/certs/#")"
     [ -n "$url" ] || die "OWNER_DATABASE_URL boş ($DB_ENV_FILE)"
     DATABASE_URL="$url" scripts/apply-migrations.sh
     ;;

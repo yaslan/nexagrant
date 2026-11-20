@@ -150,4 +150,20 @@ describe('signed-in member', () => {
     }
     expect(mocks.loggerError).toHaveBeenCalledOnce();
   });
+
+  // NG-257: a signed-in guest holds no view_partner_search; the session door refuses
+  // before M1 is read or the per-user window is spent.
+  test('guest partner session: 403 forbidden, M1 and the window are not reached', async () => {
+    mocks.requireTenantApi.mockResolvedValue({ ok: true, scope: { userId: 'u-guest', tenantId: 't1', role: 'GUEST_PARTNER', isPlatformAdmin: false } });
+    mocks.checkModuleAccess.mockResolvedValue({ allowed: true, limits: null });
+
+    const res = await authenticateCordisRequest(req());
+
+    expect(res.authenticated).toBe(false);
+    if (!res.authenticated) {
+      expect(res.errorResponse.status).toBe(403);
+      expect(await res.errorResponse.json()).toEqual({ success: false, error: 'forbidden' });
+    }
+    expect(mocks.checkModuleAccess).not.toHaveBeenCalled();
+  });
 });

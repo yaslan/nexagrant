@@ -75,13 +75,16 @@ export default async function PartnersPage({
   }>;
 }) {
   const { workspace, locale } = await params;
-  const locked = await moduleGate('M1', locale);
-  if (locked) return locked;
   // The role door covers both tabs (NG-64): the live announcements tab reads no
   // tenant row here, but it is the same M1 screen a guest partner may not open.
+  // It runs before the M1 module gate (NG-257) so an unauthorized role sees the
+  // role refusal, not the module lock state.
   const { tenantId, role } = await requireTenantPageRole(locale, 'view_partner_search');
-  // NG-250 (review B1): the NexaGrant plan gate, before any CORDIS or quota read. The same
-  // partner_search the /api/cordis/organizations and /api/partner-search routes are gated by.
+  const locked = await moduleGate('M1', locale);
+  if (locked) return locked;
+  // NG-250 (review B1): the NexaGrant plan gate, after the role and M1 doors and before any
+  // CORDIS or quota read. The same partner_search the /api/cordis/organizations and
+  // /api/partner-search routes are gated by.
   const ngLocked = await ngPageGate({ tenantId, role }, locale, 'view_partner_search', 'partner_search');
   if (ngLocked) return ngLocked;
 

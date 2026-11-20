@@ -1,7 +1,8 @@
 import React from 'react';
-import { listNotifications } from '@/actions/user/notifications';
+import { getNotificationPreferences, listNotifications } from '@/actions/user/notifications';
 import type { NotificationItem } from '@/lib/notifications/store';
 import NotificationsClient from './client';
+import NotificationPreferences from './preferences-client';
 
 export default async function NotificationsPage({
   params,
@@ -10,16 +11,20 @@ export default async function NotificationsPage({
 }) {
   const { locale, workspace } = await params;
   const result = await listNotifications();
+  const prefs = await getNotificationPreferences();
 
   const notifications: NotificationItem[] = result.ok ? result.notifications : [];
   const unreadCount: number = result.ok ? result.unreadCount : 0;
 
   return (
-    <NotificationsClient
-      notifications={notifications}
-      unreadCount={unreadCount}
-      locale={locale}
-      workspace={workspace}
-    />
+    <div className="max-w-4xl mx-auto space-y-10">
+      <NotificationsClient
+        notifications={notifications}
+        unreadCount={unreadCount}
+        locale={locale}
+        workspace={workspace}
+      />
+      {prefs.ok ? <NotificationPreferences preferences={prefs.preferences} /> : null}
+    </div>
   );
 }

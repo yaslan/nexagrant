@@ -8,6 +8,7 @@ import {
   PreferenceInputSchema,
   deliveryForType,
   resolveDelivery,
+  setPreferenceFor,
   type PreferenceRow,
 } from '@/lib/notifications/preferences';
 import { renderDigestMail, renderInstantMail, sendNotificationEmails, type OutboxItem } from '@/lib/notifications/email-outbox';
@@ -147,6 +148,45 @@ describe('weekly digest mail', () => {
     const mail = renderInstantMail(items[1]!, translator('tr'));
     expect(mail.subject).toBe('Yeni eşleşme bulundu');
     expect(mail.subject).not.toMatch(/[\r\n]/);
+  });
+});
+
+// K-584554 (A): e-mail OFF drops the user's still-queued mails for that event.
+describe('e-mail OFF drops the queued mails of that event (K-584554 A)', () => {
+  const event = NOTIFICATION_EVENTS[0]!;
+  const typesOf = (ev: (typeof NOTIFICATION_EVENTS)[number]) =>
+    (Object.keys(NOTIFICATION_TYPE_EVENT) as (keyof typeof NOTIFICATION_TYPE_EVENT)[]).filter(
+      (t) => NOTIFICATION_TYPE_EVENT[t] === ev
+    );
+  const mockTx = () => {
+    const deleteMany = vi.fn(async () => ({ count: 2 }));
+    const upsert = vi.fn(async () => ({}));
+    const tx = { notificationPreference: { upsert }, notificationEmailItem: { deleteMany } } as unknown as TenantTx;
+    return { tx, deleteMany };
+  };
+
+  test('EMAIL OFF deletes only unsent rows of that user, that event, that tenant', async () => {
+    const { tx, deleteMany } = mockTx();
+    await setPreferenceFor(tx, 't1', 'u1', { event, channel: 'EMAIL', frequency: 'OFF' });
+    expect(typesOf(event).length).toBeGreaterThan(0);
+    expect(deleteMany).toHaveBeenCalledTimes(1);
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { tenantId: 't1', userId: 'u1', sentAt: null, type: { in: typesOf(event) } },
+    });
+  });
+
+  test('EMAIL WEEKLY or INSTANT keeps the queue (switching weekly ↔ instant deletes nothing)', async () => {
+    for (const frequency of ['WEEKLY', 'INSTANT'] as const) {
+      const { tx, deleteMany } = mockTx();
+      await setPreferenceFor(tx, 't1', 'u1', { event, channel: 'EMAIL', frequency });
+      expect(deleteMany).not.toHaveBeenCalled();
+    }
+  });
+
+  test('PANEL OFF does not touch the e-mail queue', async () => {
+    const { tx, deleteMany } = mockTx();
+    await setPreferenceFor(tx, 't1', 'u1', { event, channel: 'PANEL', frequency: 'OFF' });
+    expect(deleteMany).not.toHaveBeenCalled();
   });
 });
 
