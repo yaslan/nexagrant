@@ -45,6 +45,8 @@ pnpm gate:isolated git push -u origin <dal>
 
 Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortamını öncelikli okur); checkout'un kendi `.env`'i karışmaz. Tüm kimlik bilgileri atılabilir yerel değerlerdir (ci.yml'deki ile aynı); sır değildir.
 
+**Tek bir `*.live` testini koşarken (NG-281):** çıplak `pnpm vitest run <dosya>` ile değil, `pnpm gate:isolated pnpm vitest run <dosya>` ile koş. Gerekçe: canlı testler yukarıdaki 4. maddenin ortamını bekler (izole DB, `fabrika_app_ci` parolası, `AUTH_SECRET`). `.env`'siz bir worktree'de çıplak koşuda `AUTH_SECRET` yoktur. `requireTestEnv` kullanan süitler (`oauth-registration`, `invitation-accept`, `auth-jwt-membership-*`) bu durumda yerelde `WARNING ... skipped` yazıp atlar: bu "yeşil" değildir. Kendi anahtarını sabitlemeyen bir süit ise anlamsız kırmızı verir (NG-280: `invitation-mail-limit.live` 13 `emailSent` kırmızısı, `opt_out_secret_unset`; NG-281 bu süitte anahtarı sabitledi). Çıplak koşuda kırmızı ya da atlama görürsen, "tabanda da kırmızı" demeden önce aynı dosyayı `gate:isolated` ile koş.
+
 ## Elle koşarken düşülen 6 tuzak — FO-161
 
 `.env`'li elle tarif (worktree başına kalıcı izole DB): `CLAUDE.md` "Worktree'de gate".
