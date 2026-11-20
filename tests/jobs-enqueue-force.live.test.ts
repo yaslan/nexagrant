@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { makeWorkerUtils, type WorkerUtils } from 'graphile-worker';
 import { Client } from 'pg';
 import { envValue } from './helpers/dotenv';
-import { skipOrFailInCi } from './helpers/live-db-role';
+import { isThrowawayDbName, skipOrFailInCi, usedDatabaseName, type RawQueryable } from './helpers/live-db-role';
 
 /**
  * NG-266 — `enqueueJob(…, { force: true })` (`src/lib/jobs/enqueue.ts`).
@@ -19,7 +19,13 @@ import { skipOrFailInCi } from './helpers/live-db-role';
  * `force` reads the row before the lock commits, then its DELETE waits on the lock.
  *
  * Scope on the database behind `DATABASE_URL` (it may be a shared dev database):
- *  - `beforeEach` deletes only rows whose key is `KEY` — nothing else of the task;
+ *  - the suite writes only on a throwaway database (`isThrowawayDbName`): its name contains
+ *    `test`, or it is the isolated gate's `fabrika_gate`, or CI's `fabrika` on GitHub Actions.
+ *    Any other name stops the suite in `beforeAll`, before migrate or reset;
+ *  - `reset()` deletes only rows whose key is `KEY` or `FOREIGN_KEY` and that are NOT locked
+ *    (`locked_at is null`): a running job of the product key is never removed (NG-266);
+ *  - a row a test locks is unlocked and deleted by that test, on the connection that locked it,
+ *    so no leftover lock reaches the next test;
  *  - assertions read only rows created by the test (id greater than the largest id seen
  *    before it), so a foreign row of the same task is never counted or changed;
  *  - the waiting is confirmed by `pg_blocking_pids` naming the holder's backend, so a
@@ -64,12 +70,25 @@ async function largestJobId(): Promise<number> {
   });
 }
 
-/** Deletes only the rows under the two keys this suite uses; never another key of the task. */
+/**
+ * Deletes only the unlocked rows under the two keys this suite uses; never another key of the
+ * task, and never a locked row (a running job), even one under `KEY`.
+ */
 async function reset(): Promise<void> {
   await utils!.withPgClient((c) =>
-    c.query('delete from graphile_worker._private_jobs where key = any($1::text[])', [[KEY, FOREIGN_KEY]])
+    c.query(
+      'delete from graphile_worker._private_jobs where key = any($1::text[]) and locked_at is null',
+      [[KEY, FOREIGN_KEY]]
+    )
   );
 }
+
+/** Unlocks and deletes a row this test created, on the connection that locked it. */
+async function releaseOwnRow(client: Client, id: string): Promise<void> {
+  await client.query('update graphile_worker._private_jobs set locked_at = null, locked_by = null where id = $1', [id]);
+  await client.query('delete from graphile_worker._private_jobs where id = $1', [id]);
+}
+
 
 async function insertQueued(key = KEY): Promise<string> {
   const job = await utils!.addJob(JOB, {}, { jobKey: key, jobKeyMode: 'unsafe_dedupe', maxAttempts: 5 });
@@ -98,6 +117,32 @@ beforeAll(async () => {
     skipOrFailInCi(SUITE, 'DATABASE_URL is not set');
     return;
   }
+  // Read-only identity check FIRST, on a plain pg connection: makeWorkerUtils creates the
+  // graphile_worker schema on connect (measured, NG-266), so it must come after the refusal.
+  const probe = new Client({ connectionString: DB_URL });
+  try {
+    await probe.connect();
+  } catch (e) {
+    skipOrFailInCi(SUITE, `database unavailable: ${e instanceof Error ? e.message : String(e)}`);
+    return;
+  }
+  let name: string | undefined;
+  try {
+    const identity: RawQueryable = {
+      $queryRawUnsafe: async <T = unknown>(query: string): Promise<T> => (await probe.query(query)).rows as T,
+    };
+    // Unreadable identity is a skip locally and a throw in CI (helper).
+    name = await usedDatabaseName(identity, identity, SUITE);
+  } finally {
+    await probe.end();
+  }
+  if (name === undefined) return;
+  if (!isThrowawayDbName(name)) {
+    throw new Error(
+      `${SUITE}: refusing to write on database "${name}": it is not a test or isolated-gate database ` +
+        '(the shared dev database is "fabrika"). Point DATABASE_URL at a database whose name contains "test".'
+    );
+  }
   try {
     utils = await makeWorkerUtils({ connectionString: DB_URL });
     await utils.migrate();
@@ -114,6 +159,15 @@ afterAll(async () => {
 beforeEach(async () => {
   if (!ready) return;
   await reset();
+  // A locked row under the product key that this suite did not create (a running job) is left in
+  // place by reset(). enqueueJob would then dedupe its own insert into that row, so the suite cannot
+  // tell its rows apart: stop, and leave the row untouched.
+  const locked = await utils!.withPgClient((c) =>
+    c.query<{ n: string }>('select count(*)::text as n from graphile_worker._private_jobs where key = $1 and locked_at is not null', [KEY])
+  );
+  if (Number(locked.rows[0]?.n) > 0) {
+    throw new Error(`${SUITE}: a locked job under "${KEY}" is on this database (not created by this suite); left untouched, suite stopped`);
+  }
   maxIdBefore = await largestJobId();
 });
 
@@ -138,30 +192,62 @@ describe('enqueueJob force (NG-266)', () => {
       await waitForForceBlockedBy(pid);
       await holder.query('commit');
       await forced;
+
+      // Only the running job: still keyed, still locked, first attempt, no second copy.
+      expect(await rowsCreatedByTest()).toEqual([
+        expect.objectContaining({ id, key: KEY, locked: true, attempts: 1, max_attempts: 5 }),
+      ]);
     } finally {
+      await releaseOwnRow(holder, id);
       await holder.end();
     }
-
-    // Only the running job: still keyed, still locked, first attempt, no second copy.
-    expect(await rowsCreatedByTest()).toEqual([
-      expect.objectContaining({ id, key: KEY, locked: true, attempts: 1, max_attempts: 5 }),
-    ]);
   });
 
   test('a job locked before force runs is left alone (kept, not re-queued)', async () => {
     if (!ready) return;
     const { enqueueJob } = await import('@/lib/jobs/enqueue');
     const id = await insertQueued();
-    await utils!.withPgClient((c) =>
-      c.query(`update graphile_worker._private_jobs set locked_at = now(), locked_by = 'ng266-run', attempts = 1 where id = $1`, [id])
-    );
+    const holder = new Client({ connectionString: urlAs(HOLDER_APP) });
+    await holder.connect();
+    try {
+      await holder.query(
+        `update graphile_worker._private_jobs set locked_at = now(), locked_by = 'ng266-run', attempts = 1 where id = $1`,
+        [id]
+      );
 
-    const result = await enqueueJob(JOB, {}, { force: true, connectionString: urlAs(FORCE_APP) });
+      const result = await enqueueJob(JOB, {}, { force: true, connectionString: urlAs(FORCE_APP) });
 
-    expect(result.added).toBe(false);
-    expect(await rowsCreatedByTest()).toEqual([
-      expect.objectContaining({ id, key: KEY, locked: true, attempts: 1, max_attempts: 5 }),
-    ]);
+      expect(result.added).toBe(false);
+      expect(await rowsCreatedByTest()).toEqual([
+        expect.objectContaining({ id, key: KEY, locked: true, attempts: 1, max_attempts: 5 }),
+      ]);
+    } finally {
+      await releaseOwnRow(holder, id);
+      await holder.end();
+    }
+  });
+
+  test('reset() leaves a locked row of the product key in place', async () => {
+    if (!ready) return;
+    const id = await insertQueued();
+    const holder = new Client({ connectionString: urlAs(HOLDER_APP) });
+    await holder.connect();
+    try {
+      await holder.query(
+        `update graphile_worker._private_jobs set locked_at = now(), locked_by = 'ng266-run', attempts = 1 where id = $1`,
+        [id]
+      );
+
+      await reset();
+
+      const left = await utils!.withPgClient((c) =>
+        c.query<{ n: string }>('select count(*)::text as n from graphile_worker._private_jobs where id = $1', [id])
+      );
+      expect(Number(left.rows[0]?.n)).toBe(1);
+    } finally {
+      await releaseOwnRow(holder, id);
+      await holder.end();
+    }
   });
 
   test('an unlocked job is replaced: the old row goes, one fresh row is queued', async () => {

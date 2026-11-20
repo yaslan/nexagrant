@@ -112,6 +112,19 @@ export function requireTestEnv(name: string, suite: string): string | undefined 
 }
 
 /**
+ * Whether a live suite that deletes rows or runs migrations may write to the database called
+ * `name` (NG-266): a name containing `test` (e.g. `fabrika_test`), the isolated gate's
+ * `fabrika_gate` (scripts/gate-isolated.sh), or CI's `fabrika` service container, on GitHub
+ * Actions only. The shared dev database is `fabrika` everywhere else, so it is refused.
+ * The caller reads `name` with `usedDatabaseName` and stops when this returns false.
+ */
+export function isThrowawayDbName(name: string): boolean {
+  if (name === 'fabrika_gate') return true;
+  if (name === 'fabrika') return isGithubActions();
+  return /(^|_)test(_|$)/i.test(name);
+}
+
+/**
  * True only for a URL `scripts/db-target.sh` `db_is_local` accepts — the guard
  * db:setup and the pre-push hook use. Run, not ported, so the two cannot drift;
  * fail closed: no `sh` (or any error) reads as "not local". For a live test
