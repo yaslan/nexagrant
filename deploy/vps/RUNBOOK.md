@@ -14,6 +14,7 @@ Redis yok. Alan adı: **nexagrant.com** (FO-233). Hostinger Cloud hesabı iptal 
 > patronun ya da onun yetkilendirdiği kişinin elinde koşar. Adımın başında **✋** olan her satır, ayrı bir
 > patron onayı gerektirir (`karar_sor`); bir onay yalnız o adımı kapsar, sonrakine taşınmaz. Canlıya geçiş açık
 > onay gerektirir (`docs/RELEASE_CHECKLIST.md` §8 madde 14).
+> `✋` ile başlayan satır onay gelmeden çalıştırılmaz; onaydan sonra `✋ ` öneki silinerek koşulur. Önekle yapıştırılan satır kabukta çalışmaz (bilinçli, kapalı-başarısız).
 
 Dosyalar (hepsi `deploy/vps/` altında):
 
@@ -84,8 +85,8 @@ nc -vz -w 5 smtp.hostinger.com 465                      # giden SMTP 465 erişil
   `/etc/fstab`'a `/swapfile none swap sw 0 0`. Kanıt: `swapon --show`.
 - ✋ **Docker Engine ve Compose eklentisi:** yoksa resmî depodan kurulur; varsa yalnız sürüm kaydedilir.
 - ✋ **`deploy` kullanıcısı:** yoksa oluşturulur, `docker` grubuna eklenir. Root ile günlük iş yapılmaz.
-- Host araçları (yedek ve migrasyon için; yalnız yerel prova ya da DB-1 host psql için): `postgresql-client-16`
-  (`pg_dump` sürümü sunucu ile aynı ya da yeni), `awscli` v2, `age`, `perl`. Kurulum ✋.
+- ✋ Host araçları (yedek ve migrasyon için; yalnız yerel prova ya da DB-1 host psql için): `postgresql-client-16`
+  (`pg_dump` sürümü sunucu ile aynı ya da yeni), `awscli` v2, `age`, `perl`. Kurulum.
 - ✋ Depo: `/opt/fonbridge` altına dev'in onaylanmış commit'i (`git clone` + `git checkout <commit>`).
   Sunucuda geliştirme yapılmaz; güncellemeler `git fetch` + `checkout` ile.
 
@@ -223,7 +224,7 @@ uygulama rolü `fabrika_app` yalnız adım 7'de (`verify`) kullanılır.
 cd /opt/fonbridge
 # (a) Hangi migrasyonlar listede (yalnız yazdırır; hiçbir şey uygulanmaz)
 scripts/apply-migrations.sh --list
-# (b) Şema farkı (salt okur, sahip rol; çıkış 2 = fark var: dur, incele)
+# (b) Şema farkı (DB'ye yazmaz; sunucuda geçici worker konteyneri başlatır (`docker compose run --rm`), sahip rol; çıkış 2 = fark var: dur, incele)
 deploy/vps/ops.sh diff
 # (c) Go-live ön kontrolü R-1 (salt okur; son satır R1_SONUC | TEMIZ/... değilse dur)
 deploy/vps/ops.sh r1
