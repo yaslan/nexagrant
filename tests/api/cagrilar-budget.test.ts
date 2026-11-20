@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   translate: vi.fn(),
 }));
 
+// NG-250: the NexaGrant plan gate has its own tests (gate.test.ts, bindings.test.ts,
+// ng250-plan-gate.live); here it lets every caller on, as before the gate.
+vi.mock('@/lib/billing/nexagrant/route-gate', () => ({ ngGateResponse: async () => null }));
 vi.mock('@/lib/tenant', () => ({
   requireTenantApi: vi.fn(async () => ({
     ok: true,

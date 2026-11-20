@@ -6069,5 +6069,12 @@
       "unknownTitle": "Bu bölüm yüklenemedi",
       "unknownBody": "Bir sorun oluştu. Sayfayı yenileyip tekrar deneyin."
     }
+  },
+  "ngGate": {
+    "NG_FEATURE_NOT_IN_PLAN": "Bu özellik mevcut planınızda yok. Kullanmak için planınızı yükseltin.",
+    "NG_ROLE_FORBIDDEN": "Rolünüz bu özelliği kullanmaya yetmiyor. Kurum yöneticinize başvurun.",
+    "NG_MODULE_CLOSED": "Bu özelliğin bağlı olduğu modül kurumunuzda kapalı. Kurum yöneticiniz açabilir.",
+    "NG_PLAN_LIMIT_REACHED": "Planınızın bu dönemlik kullanım sınırına ulaşıldı. Sınırı artırmak için planınızı yükseltin.",
+    "pageTitle": "Bu özellik şu anda kullanılamıyor"
   }
 }

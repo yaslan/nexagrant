@@ -11,6 +11,7 @@
  * (`pilotEndsAt`, 00:00 Istanbul after `days` full days, the start day counted as
  * day 1), so a tenant reads a date, not an hour.
  */
+import type { SubStatus } from '@prisma/client';
 import { pilotEndsAt } from '@/lib/billing/pilot';
 import { NG_TRIAL_PROVIDER, type NgTrialSegment } from './features';
 
@@ -28,7 +29,7 @@ export interface NgTrialPolicyRow {
 export interface NgSubscriptionRow {
   tenantId: string;
   planId: string;
-  status: string;
+  status: SubStatus;
   provider: string;
   trialSegment: string | null;
   trialStartedAt: Date | null;

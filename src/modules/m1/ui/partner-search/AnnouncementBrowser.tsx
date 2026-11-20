@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
+import type { NgRefusalCode } from '@/lib/billing/nexagrant/codes';
 
 import type { PartnerSearchAnnouncementDto, PartnerSearchQuotaState } from '@/core/contracts/partner-search';
 
@@ -27,7 +28,7 @@ const fieldClass =
   'w-full min-h-9 rounded-lg border border-border bg-ground px-3 py-1.5 text-xs text-ink focus-visible:outline-2 focus-visible:outline-accent';
 const labelClass = 'mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-2';
 
-type Status = 'loading' | 'ready' | 'error' | 'quota' | 'denied';
+type Status = 'loading' | 'ready' | 'error' | 'quota' | 'denied' | 'ngGate';
 
 /**
  * The announcement list with its filters (FO-62): inside a call's Partner
@@ -63,6 +64,8 @@ function Browser({
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<Status>('loading');
+  const [ngCode, setNgCode] = useState<NgRefusalCode | null>(null);
+  const tNg = useTranslations('ngGate');
   const [loadingMore, setLoadingMore] = useState(false);
   const [quota, setQuota] = useState<PartnerSearchQuotaState | undefined>(undefined);
   const abort = useRef<AbortController | null>(null);
@@ -101,6 +104,9 @@ function Browser({
       if (!append) setStatus('quota');
     } else if (result.kind === 'denied') {
       setStatus('denied');
+    } else if (result.kind === 'ngGate') {
+      setNgCode(result.code);
+      setStatus('ngGate');
     } else if (!append) {
       setStatus('error');
     }
@@ -286,6 +292,11 @@ function Browser({
         {status === 'error' && (
           <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
             {t('list.error')}
+          </p>
+        )}
+        {status === 'ngGate' && ngCode && (
+          <p className="rounded-xl border border-border bg-ground p-3 text-xs text-ink-2" data-testid="ps-ng-gate">
+            {tNg(ngCode)} {upsell}
           </p>
         )}
         {status === 'denied' && (
