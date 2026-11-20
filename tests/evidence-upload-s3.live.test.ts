@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, isCi, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
+import { DOCX_MIME, eicarDocx } from './helpers/eicar';
 
 /**
  * TASK-MUNODY0DVDWC5 (B-1/B-2/B-3 of İNCELEME-58) — against a real
@@ -303,6 +304,8 @@ describe('B-2: evidence is read only by a signed-in member of its tenant', () =>
     expect(res.success).toBe(true);
     const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t[tenant], r2ObjectKey: finalOf(objectKey) } });
     evidenceIds.push(row.id);
+    // NG-239: these tests are about who reads, not the scan; the file is marked scanned clean.
+    await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
     return { id: row.id, objectKey: finalOf(objectKey), body };
   }
 
@@ -367,6 +370,8 @@ async function confirmedUpload(name: string, confidentiality = 'INTERNAL') {
   expect(res.success).toBe(true);
   const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
   evidenceIds.push(row.id);
+  // NG-239: scanned clean, so only the rule each test is about decides the download.
+  await admin!.evidence.update({ where: { id: row.id }, data: { scanStatus: 'CLEAN' } });
   return { ...p, finalKey: finalOf(p.objectKey), id: row.id, body };
 }
 
@@ -489,5 +494,21 @@ describe('Y-1 (TASK-MUNTTZ94LJWBC): the role decides who reads evidence', () => 
     state.role = 'OWNER_V0';
     actAs('a');
     expect((await callDownload(open.id)).status).toBe(403);
+  });
+});
+
+describe('NG-239: an upload whose scan has not ended CLEAN gets no signed download', () => {
+  test('EICAR confirmed into the store: D1 answers 409 and hands out no presigned GET', async () => {
+    const body = eicarDocx();
+    const p = await presign('ng239-eicar.docx', DOCX_MIME, body.length);
+    expect((await put(p.uploadUrl, body, DOCX_MIME)).status).toBe(200);
+    const res = await confirm(p.objectKey, { fileName: 'ng239-eicar.docx', mimeType: DOCX_MIME, fileSizeBytes: body.length });
+    expect(res.success).toBe(true);
+    const row = await admin!.evidence.findFirstOrThrow({ where: { tenantId: t.a, r2ObjectKey: finalOf(p.objectKey) } });
+    evidenceIds.push(row.id);
+
+    const dl = await callDownload(row.id);
+    expect(dl.headers.get('location'), 'no signed URL for an unscanned file').toBeNull();
+    expect(dl.status).toBe(409);
   });
 });

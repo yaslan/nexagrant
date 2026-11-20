@@ -578,6 +578,11 @@
       "uploadingOcr": "Yükleniyor & YZ OCR İşleniyor...",
       "validDoc": "Geçerli Belge",
       "validUntilLabel": "Son Geçerlilik:"
+    },
+    "scan": {
+      "scan_pending": "Taranıyor",
+      "scan_infected": "Zararlı bulundu, kaldırıldı",
+      "scan_error": "Taranamadı, yeniden denenecek"
     }
   },
   "ConceptNote": {
