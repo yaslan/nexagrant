@@ -79,7 +79,31 @@
     "genericTitle": "Bildirim",
     "genericDesc": "Yeni bir bildiriminiz var.",
     "emailDigestSubject": "Haftalık bildirim özeti: {count, plural, one {1 bildirim} other {# bildirim}}",
-    "emailDigestIntro": "Bu hafta {count, plural, one {1 bildiriminiz} other {# bildiriminiz}} var. Haftalık özet ayarınız gereği tek e-postada toplandı."
+    "emailDigestIntro": "Bu hafta {count, plural, one {1 bildiriminiz} other {# bildiriminiz}} var. Haftalık özet ayarınız gereği tek e-postada toplandı.",
+    "preferences": {
+      "title": "Bildirim tercihleri",
+      "description": "Her bildirim türü için panelde mi, e-postada mı ve ne sıklıkta alacağınızı seçin.",
+      "eventColumn": "Bildirim",
+      "channelPanel": "Panel",
+      "channelEmail": "E-posta",
+      "freqInstant": "Anlık",
+      "freqWeekly": "Haftalık",
+      "freqOff": "Kapalı",
+      "saved": "Tercih kaydedildi",
+      "saveFailed": "Tercih kaydedilemedi. Lütfen tekrar deneyin.",
+      "loadFailed": "Tercihler yüklenemedi.",
+      "events": {
+        "NEW_MATCHING_CALL": "Yeni eşleşen çağrı",
+        "CALL_CHANGED": "Takip edilen çağrı değişti",
+        "OUTREACH_REPLY": "Ulaşım yanıtı",
+        "CONTRIBUTION_OVERDUE": "Katkı payı gecikti",
+        "APPROVAL_OVERDUE": "Onay gecikti",
+        "BUDGET_DEVIATION": "Bütçe sapması",
+        "TASK_COLOR_CHANGED": "Görev durumu değişti",
+        "REPORT_DUE": "Rapor vakti yaklaştı",
+        "OBLIGATION_REMINDER": "Yükümlülük hatırlatması"
+      }
+    }
   },
   "Dashboard": {
     "title": "Panel",
@@ -266,6 +290,31 @@
           "ALREADY_DECIDED": "Sonuç girilmiş bir başvuru yeniden gönderildi yapılamaz.",
           "WITHDRAWN": "Geri çekilmiş bir fırsat için beyan yapılamaz.",
           "DECLARE_FAILED": "Beyan kaydedilemedi. Tekrar deneyin."
+        }
+      },
+      "withdraw": {
+        "open": "Vazgeç",
+        "reasonLabel": "Vazgeçme gerekçesi",
+        "reasonHint": "Gerekçe zorunludur. Kayıt karar geçmişine yazılır ve geri alınamaz; gerekçe ekranda kalır.",
+        "submit": "Vazgeç ve gerekçeyi kaydet",
+        "saving": "Kaydediliyor…",
+        "cancel": "Vazgeçme",
+        "withdrawnNotice": "Bu fırsat pasife alındı (vazgeçildi). Karar geçmişinde gerekçesi görünür.",
+        "logTitle": "Karar geçmişi",
+        "kind": {
+          "WITHDRAW": "Vazgeçildi",
+          "APPLY": "Başvuruldu"
+        },
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Yeniden giriş yapın.",
+          "INVALID_INPUT": "Geçersiz istek.",
+          "REASON_TOO_LONG": "Gerekçe en fazla 2000 karakter olabilir.",
+          "REASON_REQUIRED": "Vazgeçmek için bir gerekçe yazmanız gerekir.",
+          "OPPORTUNITY_NOT_FOUND": "Bu fırsat bulunamadı ya da arşivlenmiş.",
+          "WITHDRAW_FORBIDDEN": "Bu işlemi yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
+          "ALREADY_WITHDRAWN": "Bu fırsat zaten pasife alınmış.",
+          "ALREADY_DECIDED": "Sonuç girilmiş bir fırsat vazgeçilemez.",
+          "WITHDRAW_FAILED": "Vazgeçme kaydedilemedi. Tekrar deneyin."
         }
       },
       "modules": {

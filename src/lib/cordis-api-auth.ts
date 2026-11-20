@@ -3,6 +3,7 @@ import { authenticateApiKey } from '@/lib/api-auth';
 import { internalError } from '@/lib/api-error';
 import { checkModuleAccess } from '@/lib/modules/access';
 import { logger } from '@/lib/logger';
+import { asRole, can, type Action } from '@/lib/rbac';
 import { requireTenantApi } from '@/lib/tenant';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 
@@ -44,18 +45,28 @@ export async function authenticateCordisRequest(req: Request): Promise<CordisAut
     return keyAuth.authenticated ? { authenticated: true } : keyAuth;
   }
 
-  return authenticateCordisSession();
+  // NG-257: a signed-in session must also hold the permission the partner search
+  // stands behind (view_partner_search). Only this door: the API-key branch above is unchanged.
+  return authenticateCordisSession('view_partner_search');
 }
 
 /**
  * The session door alone, for the pages that show CORDIS data to a signed-in
  * member (`partners/leaders`). Same answers as the session branch above: 401
  * anonymous, 403 when M1 is not open in full, 429 past the shared per-user limit.
+ * With `action`, a role without that permission gets 403 `forbidden` first.
  */
-export async function authenticateCordisSession(): Promise<CordisAuthResult> {
+export async function authenticateCordisSession(action?: Action): Promise<CordisAuthResult> {
   try {
     const tenant = await requireTenantApi();
     if (!tenant.ok) return { authenticated: false, errorResponse: tenant.response };
+
+    if (action && !can(asRole(tenant.scope.role), action)) {
+      return {
+        authenticated: false,
+        errorResponse: NextResponse.json({ success: false, error: 'forbidden' }, { status: 403 }),
+      };
+    }
 
     const access = await checkModuleAccess('M1');
     if (!access.allowed || access.limits) return moduleDenied();

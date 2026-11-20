@@ -11,7 +11,7 @@ import { getWorkspaceRoute } from '@/lib/routes';
 import { useActiveModules } from '@/lib/modules/hooks';
 import { getOpportunityTabs } from '@/lib/modules/registry';
 
-import { archiveOpportunity, declareApplication, evaluateOpportunityGate } from '../actions';
+import { archiveOpportunity, declareApplication, evaluateOpportunityGate, withdrawOpportunityAction } from '../actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { useGateReasonText } from '@/lib/hooks/use-gate-reason-text';
 import type { GateReason } from '@/lib/gates/reasons';
@@ -59,12 +59,21 @@ export interface OpportunityView {
 
 type GateOutcome = { gate: Gate; stageBefore: Gate; passed: boolean; reasons: string[] };
 
+/** One `decision_log` row as the detail page passes it (dates as ISO strings). */
+export interface DecisionEntry {
+  id: string;
+  kind: 'APPLY' | 'WITHDRAW';
+  reason: string;
+  decidedAt: string;
+}
+
 const TASK_TEMPLATE = ['T-6', 'T-5', 'T-4'] as const;
 
 export function OpportunityDetailClient({
   opportunity,
   g0,
   efforts,
+  decisions,
   canArchive,
   backHref,
   locale,
@@ -77,6 +86,8 @@ export function OpportunityDetailClient({
   savedG0: SavedG0Decision | null;
   /** Rows from the `Effort` table for this opportunity — empty is a real answer, not an error. */
   efforts: EffortEntry[];
+  /** The `decision_log` rows for this opportunity, oldest first (NG-15). */
+  decisions: DecisionEntry[];
   /** Whether this session may archive. The server action re-checks; this only hides the control. */
   canArchive: boolean;
   backHref: string;
@@ -187,6 +198,33 @@ export function OpportunityDetailClient({
       }
     });
   };
+
+  /** NG-15: the withdraw form. Refusals (empty reason, wrong status) come back from the server. */
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [isWithdrawing, startWithdrawTransition] = useTransition();
+
+  const handleWithdraw = () => {
+    setWithdrawError(null);
+    startWithdrawTransition(async () => {
+      try {
+        const res = await withdrawOpportunityAction({ opportunityId: opportunity.id, reason: withdrawReason });
+        if (!res.success) {
+          setWithdrawError(t(`detail.withdraw.error.${res.error}`));
+          return;
+        }
+        setWithdrawOpen(false);
+        setWithdrawReason('');
+        router.refresh();
+      } catch (err) {
+        setWithdrawError(errorText(err, () => errorMessage(err, t('detail.withdraw.error.WITHDRAW_FAILED'))));
+      }
+    });
+  };
+
+  const canWithdraw = canArchive && (opportunity.status === 'ACTIVE' || opportunity.status === 'SUBMITTED');
+  const isWithdrawn = opportunity.status === 'WITHDRAWN';
 
   const isSubmitted = ['SUBMITTED', 'FUNDED', 'REJECTED'].includes(opportunity.status);
   const isDecided = opportunity.status === 'FUNDED' || opportunity.status === 'REJECTED';
@@ -514,7 +552,8 @@ export function OpportunityDetailClient({
                   {t(`detail.application.current.${opportunity.status}`)}
                 </p>
                 <p className="text-xs text-muted mt-1">{t('detail.application.hint')}</p>
-                {canArchive && (
+                {/* A withdrawn opportunity takes no application declaration (the server refuses it too). */}
+                {canArchive && !isWithdrawn && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {!isDecided && (
                       <button
@@ -557,6 +596,96 @@ export function OpportunityDetailClient({
                   <p role="alert" data-testid="pipeline-application-error" className="mt-2 text-xs text-rose-800">
                     {declareError}
                   </p>
+                )}
+
+                {isWithdrawn && (
+                  <div
+                    role="status"
+                    data-testid="pipeline-withdrawn-warning"
+                    className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-lg text-xs"
+                  >
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span>{t('detail.withdraw.withdrawnNotice')}</span>
+                  </div>
+                )}
+
+                {canWithdraw && !withdrawOpen && (
+                  <button
+                    onClick={() => {
+                      setWithdrawError(null);
+                      setWithdrawOpen(true);
+                    }}
+                    data-testid="pipeline-withdraw-open"
+                    className="mt-3 border border-rose-300 text-rose-800 hover:bg-rose-50 font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer"
+                  >
+                    {t('detail.withdraw.open')}
+                  </button>
+                )}
+
+                {canWithdraw && withdrawOpen && (
+                  <div className="mt-3 space-y-2" data-testid="pipeline-withdraw-form">
+                    <label htmlFor="withdraw-reason" className="block text-xs font-semibold text-ink">
+                      {t('detail.withdraw.reasonLabel')}
+                    </label>
+                    <p id="withdraw-reason-hint" className="text-xs text-muted">
+                      {t('detail.withdraw.reasonHint')}
+                    </p>
+                    <textarea
+                      id="withdraw-reason"
+                      value={withdrawReason}
+                      onChange={(e) => setWithdrawReason(e.target.value)}
+                      aria-required="true"
+                      aria-describedby="withdraw-reason-hint"
+                      rows={3}
+                      maxLength={2000}
+                      disabled={isWithdrawing}
+                      data-testid="pipeline-withdraw-reason"
+                      className="w-full bg-surface border border-border rounded-lg p-2 text-sm text-ink"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleWithdraw}
+                        disabled={isWithdrawing}
+                        data-testid="pipeline-withdraw-submit"
+                        className="bg-rose-700 hover:opacity-90 text-white font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isWithdrawing ? t('detail.withdraw.saving') : t('detail.withdraw.submit')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setWithdrawOpen(false);
+                          setWithdrawError(null);
+                        }}
+                        disabled={isWithdrawing}
+                        data-testid="pipeline-withdraw-cancel"
+                        className="border border-border text-ink-2 font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {t('detail.withdraw.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {withdrawError && (
+                  <p role="alert" data-testid="pipeline-withdraw-error" className="mt-2 text-xs text-rose-800">
+                    {withdrawError}
+                  </p>
+                )}
+
+                {decisions.length > 0 && (
+                  <div className="mt-4" data-testid="pipeline-decision-log">
+                    <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                      {t('detail.withdraw.logTitle')}
+                    </h4>
+                    <ol className="space-y-2">
+                      {decisions.map((d) => (
+                        <li key={d.id} className="text-xs text-ink-2 border-l-2 border-border pl-3">
+                          <span className="font-semibold text-ink">{t(`detail.withdraw.kind.${d.kind}`)}</span>
+                          <span className="text-muted"> · {new Date(d.decidedAt).toLocaleString(locale)}</span>
+                          <p className="whitespace-pre-line break-words">{d.reason}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 )}
               </section>
 

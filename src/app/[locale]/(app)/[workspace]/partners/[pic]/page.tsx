@@ -5,6 +5,7 @@ import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { getTranslations } from 'next-intl/server';
 import { PartnerOutreach, type PartnerOutreachProps } from '@/modules/m1/ui/PartnerOutreach';
 import { OrganizationAnnouncements } from '@/modules/m1/ui/partner-search/OrganizationAnnouncements';
@@ -38,6 +39,9 @@ export default async function PartnerDetailPage({
   params: Promise<{ pic: string; locale: string; workspace: string }>
 }) {
   const { pic, workspace, locale } = await params;
+  // NG-257: CORDIS partner detail sits behind the same door as its sibling `partners` page.
+  // The role door runs first so a role without it never learns the M1 module state.
+  await requireTenantPageRole(locale, 'view_partner_search');
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
   const t = await getTranslations('PartnerDetail');
