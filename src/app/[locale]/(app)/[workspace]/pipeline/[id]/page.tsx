@@ -60,9 +60,9 @@ export default async function OpportunityDetailPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
+  const { tenantId, userId, role } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
-  const { tenantId, userId, role } = await requireTenantPageRole(locale, 'view_proposal');
 
   const loaded = await withTenant<{
     opp: OpportunityRow | null;
