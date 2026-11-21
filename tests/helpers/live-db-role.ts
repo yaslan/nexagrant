@@ -111,6 +111,41 @@ export function requireTestEnv(name: string, suite: string): string | undefined 
   return undefined;
 }
 
+/** An environment to read, as `process.env` or a plain object in a test. */
+type EnvLike = Readonly<Record<string, string | undefined>>;
+
+/**
+ * True only on a real GitHub Actions runner as far as this repo can tell (NG-283): the runner sets
+ * both `GITHUB_ACTIONS=true` and `CI=true` (seen in the env of the job's containers in the CI log
+ * of run 44874105200). `GITHUB_ACTIONS=true` alone is one hand-typed variable away from opening the
+ * shared `fabrika` database (measured), so a local imitation has to type both. Neither variable
+ * is declared in ci.yml, the runner supplies them.
+ */
+export function isGithubRunner(env: EnvLike = process.env): boolean {
+  return env.GITHUB_ACTIONS === 'true' && env.CI === 'true';
+}
+
+/**
+ * The database names a developer or an agent may create for a live suite: `fabrika_test`, or
+ * `fabrika_test_ng<number>[letter]` for a task (`fabrika_test_ng266`, `fabrika_test_ng266c`).
+ * Anything else that merely contains "test" (`fabrika_test_prod`, `staging_test`, `prod_test_mirror`)
+ * is refused (NG-283).
+ */
+const TEST_DB_NAME = /^fabrika_test(_ng[0-9]+[a-z]?)?$/;
+
+/**
+ * Whether a live suite that deletes rows or runs migrations may write to the database called
+ * `name` (NG-266, NG-283): `fabrika_test[_ng<n>]`, the isolated gate's `fabrika_gate`
+ * (scripts/gate-isolated.sh), or CI's `fabrika` service container, on a GitHub runner only
+ * (`isGithubRunner`). The shared dev database is `fabrika` everywhere else, so it is refused.
+ * The caller reads `name` with `usedDatabaseName` and stops when this returns false.
+ */
+export function isThrowawayDbName(name: string, env: EnvLike = process.env): boolean {
+  if (name === 'fabrika_gate') return true;
+  if (name === 'fabrika') return isGithubRunner(env);
+  return TEST_DB_NAME.test(name);
+}
+
 /**
  * True only for a URL `scripts/db-target.sh` `db_is_local` accepts — the guard
  * db:setup and the pre-push hook use. Run, not ported, so the two cannot drift;

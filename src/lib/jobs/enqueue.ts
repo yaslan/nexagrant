@@ -71,8 +71,12 @@ export async function enqueueJob(
   try {
     await utils.migrate();
     if (opts.force) {
+      // One statement, no fallback (NG-266). `remove_job` deletes in its own statement after the
+      // row was read, and on a lost race it clears the key and uses up the attempts of the job a
+      // worker just locked. This DELETE waits on that row's lock; once the lock commits, the
+      // re-check of `locked_at is null` removes 0 rows and leaves the running job alone.
       await utils.withPgClient((c) =>
-        c.query('select graphile_worker.remove_job($1) from graphile_worker.jobs where key = $1 and locked_at is null', [key])
+        c.query('delete from graphile_worker._private_jobs where key = $1 and locked_at is null', [key])
       );
     } else if (opts.replaceFailed) {
       // One statement, no fallback (NG-239 Ö-2). `remove_job` runs its own statements after the

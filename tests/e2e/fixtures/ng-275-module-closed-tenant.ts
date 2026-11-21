@@ -24,10 +24,13 @@ export const NG275_WORKSPACE = 'ng275-closed-ws';
 /** Modules the five target pages sit behind (M5 pipeline/approvals/person-days, M2 concept notes, M1 partners). */
 const CLOSED_MODULES = ['M1', 'M2', 'M5'] as const;
 
+const NG275_MEMBER_ID = 'ng275-closed-member';
+const NG275_GUEST_ID = 'ng275-closed-guest';
+
 /** Seats are unique to this fixture: `User.email` is unique across the shared database. */
 export const NG275_SEATS: Record<'MEMBER' | 'GUEST_PARTNER', { id: string; email: string }> = {
-  MEMBER: { id: 'ng275-closed-member', email: 'member@ng275-module-closed.e2e.fabrika.test' },
-  GUEST_PARTNER: { id: 'ng275-closed-guest', email: 'guest@ng275-module-closed.e2e.fabrika.test' },
+  MEMBER: { id: NG275_MEMBER_ID, email: 'member@ng275-module-closed.e2e.fabrika.test' },
+  GUEST_PARTNER: { id: NG275_GUEST_ID, email: 'guest@ng275-module-closed.e2e.fabrika.test' },
 };
 
 export async function setupNg275ModuleClosedTenant() {
@@ -74,7 +77,7 @@ export async function teardownNg275ModuleClosedTenant() {
   await prisma.moduleState.deleteMany({ where: { tenantId: NG275_TENANT } });
   await prisma.subscription.deleteMany({ where: { tenantId: NG275_TENANT } });
   await prisma.workspace.deleteMany({ where: { tenantId: NG275_TENANT } });
-  await prisma.user.deleteMany({ where: { id: { in: Object.values(NG275_SEATS).map((s) => s.id) } } });
+  await prisma.user.deleteMany({ where: { id: { in: [NG275_MEMBER_ID, NG275_GUEST_ID] } } });
   await prisma.tenant.deleteMany({ where: { id: NG275_TENANT } });
   await prisma.$disconnect();
 }
