@@ -147,12 +147,19 @@ test('the alert console under a 250-row pile', async ({ page }) => {
     orderBy: { createdAt: 'desc' },
     select: { source: true, message: true, createdAt: true },
   });
-  const topRowSource = await page.locator('table tbody tr').first().locator('td').nth(1).innerText();
-  console.log(`[probe] newest alert in DB : ${newest?.source} @ ${newest?.createdAt.toISOString()}`);
-  console.log(`[probe] top row on screen  : ${topRowSource.trim()}`);
-  console.log(
-    `[probe] -> a brand-new alert lands at row 1: ${topRowSource.trim() === newest?.source ? 'YES, visible without scrolling' : 'NO'}`,
-  );
+  if (!newest) {
+    // Empty database (a fresh shard before any spec writes an alert): the table shows one
+    // "no alerts" placeholder row, not an alert row, so there is no row 1 to compare.
+    // Recorded as not measurable; the rest of the probe still runs.
+    console.log('[probe] newest alert in DB : (none) - empty database, row-1 check not measurable');
+  } else {
+    const topRowSource = await page.locator('table tbody tr').first().locator('td').nth(1).innerText();
+    console.log(`[probe] newest alert in DB : ${newest.source} @ ${newest.createdAt.toISOString()}`);
+    console.log(`[probe] top row on screen  : ${topRowSource.trim()}`);
+    console.log(
+      `[probe] -> a brand-new alert lands at row 1: ${topRowSource.trim() === newest.source ? 'YES, visible without scrolling' : 'NO'}`,
+    );
+  }
 
   // The page must at least be the console we think it is.
   await expect(page.getByRole('heading', { name: 'Sistem Uyarıları' })).toBeVisible();
