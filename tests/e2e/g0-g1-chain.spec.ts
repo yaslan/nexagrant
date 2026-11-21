@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
@@ -40,7 +42,13 @@ const PRO_MEMBER_EMAIL = 'g0g1-chain-pro-member@fabrika.test';
 const FRESH = 'g0g1-chain-fresh-tenant';
 const FRESH_WORKSPACE = 'g0g1-chain-fresh-workspace';
 const FRESH_SLUG = 'g0g1-chain-fresh';
-const FRESH_USER = 'g0g1-chain-fresh-user';
+const FRESH_USER_PREFIX = 'g0g1-chain-fresh-user';
+/**
+ * The PIC question limits count per user id, in the web server's memory (FO-389), so a fixed id carries
+ * the count from one run of this spec to the next on the same server ("58 dakika sonra tekrar deneyin").
+ * Each run signs in as a new user: the limit itself is untouched and each run starts from a full allowance.
+ */
+let FRESH_USER = FRESH_USER_PREFIX;
 const FRESH_EMAIL = 'g0g1-chain-fresh@fabrika.test';
 
 const PROGRAMME = 'g0g1-chain-programme';
@@ -90,7 +98,7 @@ async function rollback() {
   await prisma.subscription.deleteMany({ where: { tenantId: tenants } });
   await prisma.membership.deleteMany({ where: { tenantId: tenants } });
   await prisma.moduleState.deleteMany({ where: { tenantId: tenants } });
-  await prisma.user.deleteMany({ where: { id: { in: [PRO_USER, PRO_MEMBER, FRESH_USER] } } });
+  await prisma.user.deleteMany({ where: { OR: [{ id: { in: [PRO_USER, PRO_MEMBER] } }, { id: { startsWith: FRESH_USER_PREFIX } }] } });
   await prisma.workspace.deleteMany({ where: { tenantId: tenants } });
   await prisma.tenant.deleteMany({ where: { id: tenants } });
   await prisma.topicStat.deleteMany({ where: { source: STAT_SOURCE } });
@@ -124,6 +132,7 @@ async function seedIdentity(tenantId: string, workspaceId: string, slug: string,
 
 async function seed() {
   await rollback();
+  FRESH_USER = `${FRESH_USER_PREFIX}-${randomUUID().slice(0, 8)}`;
 
   await seedIdentity(FRESH, FRESH_WORKSPACE, FRESH_SLUG, FRESH_USER, FRESH_EMAIL);
   await seedIdentity(PRO, PRO_WORKSPACE, PRO_SLUG, PRO_USER, PRO_EMAIL);
@@ -329,16 +338,30 @@ async function addSeat(page: Page, id: string, roleKey: keyof typeof CONSORTIUM_
   return seat;
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 async function findAndInvite(page: Page, seatId: string, roleKey: keyof typeof CONSORTIUM_ROLES, organizationId?: string) {
   const card = page.getByTestId(`m8-builder-seat-${roleKey}`);
   await card.getByRole('button', { name: /Aday Bul/ }).click();
-  // The search revalidates the page: a row shows the PIC, then the organisation's name once the
-  // refresh lands. Which one a slow run sees is a race, so the row is found by either, and the
-  // database below says which organisation the click actually invited.
-  const invite = organizationId
+  // The search is done when the candidate list is on screen: its heading only renders once the
+  // action's rows are in (the seat starts empty), and the button is back to "Aday Bul".
+  await expect(card.getByRole('heading', { name: 'EN İYİ ADAYLAR' })).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByRole('button', { name: /Aday Bul/ })).toBeEnabled({ timeout: 60_000 });
+  // A row names the organisation by its PIC until the page refresh lands, then by its name. The
+  // name comes from the same table the screen reads, never from a guess (NG-287: a name derived from
+  // the PICS list was "Org 0" for a CORDIS history organisation, so the row vanished once the name
+  // arrived). The row is found by either, and the database below says which organisation was invited.
+  const rowLabel = organizationId
+    ? new RegExp(
+        `${escapeRegExp(organizationId)}(?!\\d)|${escapeRegExp(
+          (await prisma.cordisOrganization.findUniqueOrThrow({ where: { organisationId: organizationId }, select: { name: true } })).name,
+        )}(?!\\d)`,
+      )
+    : null;
+  const invite = rowLabel
     ? card
         .locator('div')
-        .filter({ hasText: new RegExp(`${organizationId}(?!\\d)|G0G1 E2E Org ${PICS.indexOf(organizationId) + 1}(?!\\d)`) })
+        .filter({ hasText: rowLabel })
         .filter({ has: page.getByRole('button', { name: 'Davet Et' }) })
         .last()
         .getByRole('button', { name: 'Davet Et' })
