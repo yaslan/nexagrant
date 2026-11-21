@@ -432,14 +432,10 @@ function isPlainRefusalCondition(expression: ts.Expression): boolean {
   );
 }
 
+/** The refusal branch must be exactly one statement and that statement must be `throw` (no nested `return`, no extra code). */
 function throwsDirectly(branch: ts.Statement): boolean {
-  if (ts.isThrowStatement(branch)) return true;
-  if (!ts.isBlock(branch)) return false;
-  for (const statement of branch.statements) {
-    if (ts.isThrowStatement(statement)) return true;
-    if (ts.isReturnStatement(statement) || ts.isBreakOrContinueStatement(statement)) return false;
-  }
-  return false;
+  if (!ts.isBlock(branch)) return ts.isThrowStatement(branch);
+  return branch.statements.length === 1 && ts.isThrowStatement(branch.statements[0]!);
 }
 
 /** Problems with the order of the name refusal and the first graphile-worker connection. */
@@ -480,6 +476,7 @@ describe('live suites that open graphile-worker refuse a non-throwaway database 
     ['the refusal made dead code with `&& false` (NG-292 mutant A)', source.replace('if (!isThrowawayDbName(name)) {', 'if (!isThrowawayDbName(name) && false) {')],
     ['the refusal with an `|| true` term', source.replace('if (!isThrowawayDbName(name)) {', 'if (!isThrowawayDbName(name) || true) {')],
     ['the refusal with a `return` before the throw', source.replace('if (!isThrowawayDbName(name)) {\n    throw', 'if (!isThrowawayDbName(name)) {\n    return;\n    throw')],
+    ['a nested `if` holding a `return`, then the throw (NG-292 E-1)', source.replace('if (!isThrowawayDbName(name)) {\n    throw new Error(', 'if (!isThrowawayDbName(name)) {\n    if (process.env.NG292_X) return;\n    throw new Error(')],
     ['the refusal that throws only inside a nested if', source.replace('if (!isThrowawayDbName(name)) {\n    throw new Error(', 'if (!isThrowawayDbName(name)) {\n    if (name === "never") throw new Error(')],
     ['the refusal that does not throw', source.replace('if (!isThrowawayDbName(name)) {\n    throw new Error(', 'if (!isThrowawayDbName(name)) {\n    console.log(')],
   ])('a mutant with %s is caught', (_label, mutated) => {
