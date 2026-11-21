@@ -127,3 +127,13 @@ Kırmızı yeniden görülürse:
 D-B2 uyarısı (NG-206): NG-188 (`e511961d`) zaten `origin/dev`'de. NG-52'nin `expert_directory` politikasını taşıyan eski `prisma/rls.sql` ile (NG-188 öncesi bir dal ya da worktree) `pnpm db:rls` ya da `pnpm db:setup` koşulursa, görünümün uygulandığı bir veritabanında politika geri gelir ve sealed `expert-directory` kapsamı `fullName`, `email`, ORCID'i yeniden okuyabilir (NG-185 F-1). Bu bir hatadır: politikanın geri gelmesi ancak NG-188'i bilerek geri alırken (eski `rls.sql` ile birlikte) kabul edilebilir. Eski tabanlı worktree'ler paylaşılan veritabanına `db:rls` koşmamalı. Paylaşılan veritabanı güncel `prisma/rls.sql` ile en az bir kez `pnpm db:rls` görmediyse bir kez koşulmalı (NG-183 bloğu yabancı `expert_directory` politikasını düşürür).
 
 `E2E_SHOTS_ROOT=docs/agent-results` e2e kanıtını (ör. `lead-transfer-consent` → `NG-179-evidence/`) bilerek git'te izlenen klasöre yazar; varsayılan koşu yalnız git-ignored `test-artifacts/` altına yazar (NG-217).
+
+## CI e2e: bellek eşiği ve kırmızı artefaktı (NG-288)
+
+Belirti: E2E sırasında `[WebServer] ⚠ Server is approaching the used memory threshold, restarting...`, ardından `ERR_CONNECTION_RESET` ve soğuk derleme zaman aşımları (koşu 44821853657, attempt 1: 12 test düştü). Neden: `next dev` (Next 16.4.5) kendini yeniden başlatır; kontrol `node_modules/next/dist/server/lib/utils.js` `getMemoryRestartStats` — kullanılan heap, heap sınırının %80'ini geçerse. Sınır V8 varsayılanıdır (runner'da ~4 GiB). Kapatma anahtarı `experimental.devMemoryThresholdRestart` (varsayılan `true`) paylaşılan `next.config` içinde; yerel kapı bunu değiştirmez.
+
+CI'da çözüm: e2e adımı `NODE_OPTIONS=--max-old-space-size=6144` ile koşar (`playwright.config.ts` bunu web sunucusuna `WEB_SERVER_NODE_OPTIONS` üzerinden geçirir). Yerel `pnpm gate` ve `pnpm gate:isolated` bu değişkeni kendi koymaz; davranışları aynıdır. Bu bir tampondur, sızıntı düzeltmesi değildir.
+
+Ölçüm: e2e adımı her 60 saniyede web sunucusunun RSS toplamını `[e2e-mem]` önekiyle job logunda basar, ayrıca runner'ın varsayılan heap sınırını. Okuma: `gh run view <id> --log | grep '\[e2e-mem\]'`. RSS sürekli artıyorsa sızıntı şüphesi; düz kalıyorsa eşik yalnız birikmiş derleme önbelleğindendir. `approaching the used memory threshold` satırı 0 olmalı.
+
+Kırmızı artefakt: `Upload E2E traces and report` adımı (`if: failure()`) `test-results/` ve `playwright-report/` dizinlerini `e2e-results-<run_id>-<attempt>` adıyla yükler, 14 gün saklar. Kanıt: kırmızı koşu 44824635892 bu artefaktı taşıyor (8.6 MB; trace'ler `playwright-report/trace` içinde). Artefakt indirmek: `gh run download <run_id> -R yaslan/nexagrant -n e2e-results-<run_id>-<attempt>`.

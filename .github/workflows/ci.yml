@@ -300,11 +300,29 @@ jobs:
     # some (evidence-dev-store.live) need the local stand-in; the S3 live suites
     # read EVIDENCE_S3_TEST_* instead. R2_ACCOUNT_ID only switches the client on;
     # R2_ENDPOINT sends it to MinIO.
+    # NG-288: `next dev` restarts itself once its V8 heap passes 80% of the heap limit
+    # ("Server is approaching the used memory threshold, restarting...", next
+    # dist/server/lib/utils.js getMemoryRestartStats; experimental.devMemoryThresholdRestart).
+    # The limit is V8's default on the runner (~4 GiB), so 700+ tests in one dev server
+    # reached it (run 44821853657). Raise the limit for CI only: NODE_OPTIONS reaches the
+    # web server through playwright.config.ts (WEB_SERVER_NODE_OPTIONS). Local gate unchanged.
+    # The sampler below prints the web server's RSS every 60 s into this job log ([e2e-mem]),
+    # so a growing heap can be told apart from a steady one. It is a measurement, not a fix.
     - name: E2E Test
-      run: pnpm test:e2e
+      run: |
+        echo "[e2e-mem] runner default node heap limit: $(env -u NODE_OPTIONS node -p 'require("v8").getHeapStatistics().heap_size_limit / 1048576') MiB; NODE_OPTIONS=$NODE_OPTIONS"
+        ( while sleep 60; do
+            echo "[e2e-mem] $(date -u +%H:%M:%S) $(ps -eo rss=,args= | awk '/next dev|next start|next\/dist|next-server/ && !/awk/ {s+=$1; n++} END {printf "%d procs, %.0f MiB RSS", n, s/1024}')"
+          done ) &
+        sampler=$!
+        status=0
+        pnpm test:e2e || status=$?
+        kill "$sampler" 2>/dev/null || true
+        exit "$status"
       env:
         CI: 'true'
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
+        NODE_OPTIONS: '--max-old-space-size=6144'
         # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
         DB_CONNECT_TIMEOUT_MS: '10000'
         R2_ACCOUNT_ID: 'ci-minio'
