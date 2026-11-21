@@ -3,7 +3,6 @@ import { prisma } from '../../src/lib/db';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
 import { signInAs } from './fixtures/session';
-import trMessages from '../../messages/tr.json';
 
 /**
  * TASK-MTTUUGKNDGBXK — what the alert console actually shows an operator.
@@ -91,15 +90,7 @@ test('the alert console as the database currently holds it', async ({ page }) =>
   const headerTotal = Number(stats[0]?.match(/\d+/)?.[0] ?? Number.NaN);
   console.log(`[probe] header total=${headerTotal}; DB total read before navigation=${dbTotal}`);
   expect(Number.isNaN(headerTotal), 'the header total tile is readable').toBe(false);
-  // When the page reports a load error (the table shows the loadError message, not a
-  // data or empty state), the header total is not a real count, so the agreement check is
-  // skipped and the reason is logged.
-  const loadErrorShown = (await page.locator('table tbody').innerText()).includes(trMessages.adminAlerts.loadError);
-  if (loadErrorShown) {
-    console.log(`[probe] page shows the load error; skipping the table-vs-header check (header total=${headerTotal})`);
-  } else {
-    expect(dataRows > 0, 'the table shows data rows exactly when the header counts alerts').toBe(headerTotal > 0);
-  }
+  expect(dataRows > 0, 'the table shows data rows exactly when the header counts alerts').toBe(headerTotal > 0);
 
   // --- how much of the screen the one repeated failure occupies ---
   const identityRows = await page
