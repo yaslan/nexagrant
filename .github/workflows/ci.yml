@@ -262,7 +262,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        # NG-289 faz 3: three shards plus one job for the heavy spec. The suite is still
+        # split into 3 shards (E2E_SHARD_TOTAL below); `heavy` runs only
+        # tests/e2e/guest-partner-direct-url.spec.ts on its own fresh dev server, and the
+        # three shards leave that file out with --grep-invert. No test is dropped: the
+        # file runs exactly once, in `heavy`. Why: its "every page" test (:229) is where
+        # shard 2's next-server RSS rose fastest (runs 44874105200, 44880116930,
+        # 44885188503; peak 6661 / 6616 MiB, target <= 6140). See docs/GATE.md "CI e2e".
+        shard: [1, 2, 3, heavy]
     env:
       DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
       DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
@@ -370,7 +377,7 @@ jobs:
     # web server through playwright.config.ts (WEB_SERVER_NODE_OPTIONS). Local gate unchanged.
     # The sampler below prints the web server's RSS every 60 s into this job log ([e2e-mem]),
     # so a growing heap can be told apart from a steady one. It is a measurement, not a fix.
-    - name: E2E Test (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    - name: E2E Test (${{ matrix.shard }})
       run: |
         echo "[e2e-mem] runner: $(nproc) cpu, $(free -m | awk '/Mem:/ {print $2}') MiB RAM; node default heap limit: $(env -u NODE_OPTIONS node -p 'require("v8").getHeapStatistics().heap_size_limit / 1048576') MiB; NODE_OPTIONS=$NODE_OPTIONS"
         ( while sleep 60; do
@@ -381,10 +388,19 @@ jobs:
         # (orphan). Kill that child first; with it gone the loop ends by itself.
         trap 'pkill -P "$sampler" 2>/dev/null || true; kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true' EXIT
         status=0
-        pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }} || status=$?
+        if [ "$E2E_PART" = heavy ]; then
+          pnpm test:e2e "$E2E_HEAVY_SPEC" || status=$?
+        else
+          pnpm test:e2e --shard="$E2E_PART/$E2E_SHARD_TOTAL" --grep-invert "$E2E_HEAVY_SPEC" || status=$?
+        fi
         exit "$status"
       env:
         CI: 'true'
+        E2E_PART: ${{ matrix.shard }}
+        E2E_SHARD_TOTAL: '3'
+        # Matched as a regex against the test file path (positional filter) and against
+        # "project file describe title" (--grep-invert); the name occurs in no other file.
+        E2E_HEAVY_SPEC: 'guest-partner-direct-url\.spec\.ts'
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
         NODE_OPTIONS: '--max-old-space-size=6144'
         # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
