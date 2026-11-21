@@ -411,14 +411,35 @@ function calls(source: ts.SourceFile, name: string): ts.CallExpression[] {
   return found.sort((a, b) => a.getStart() - b.getStart());
 }
 
-function throwsInside(node: ts.Node): boolean {
-  let hit = false;
-  const visit = (n: ts.Node): void => {
-    if (ts.isThrowStatement(n)) hit = true;
-    ts.forEachChild(n, visit);
-  };
-  visit(node);
-  return hit;
+/**
+ * NG-292: the refusal is `if (!isThrowawayDbName(<name>)) { throw ... }` and nothing else. The `if`
+ * condition must be exactly the negated call on one identifier (a second `&&`/`||` term or a
+ * constant such as `&& false` turns the refusal into dead code and the old check still passed), and the
+ * branch must throw as one of its own statements, with no `return`/`break`/`continue` before it.
+ */
+function isPlainRefusalCondition(expression: ts.Expression): boolean {
+  let node = expression;
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  if (!ts.isPrefixUnaryExpression(node) || node.operator !== ts.SyntaxKind.ExclamationToken) return false;
+  let call: ts.Expression = node.operand;
+  while (ts.isParenthesizedExpression(call)) call = call.expression;
+  return (
+    ts.isCallExpression(call) &&
+    ts.isIdentifier(call.expression) &&
+    call.expression.text === 'isThrowawayDbName' &&
+    call.arguments.length === 1 &&
+    ts.isIdentifier(call.arguments[0]!)
+  );
+}
+
+function throwsDirectly(branch: ts.Statement): boolean {
+  if (ts.isThrowStatement(branch)) return true;
+  if (!ts.isBlock(branch)) return false;
+  for (const statement of branch.statements) {
+    if (ts.isThrowStatement(statement)) return true;
+    if (ts.isReturnStatement(statement) || ts.isBreakOrContinueStatement(statement)) return false;
+  }
+  return false;
 }
 
 /** Problems with the order of the name refusal and the first graphile-worker connection. */
@@ -433,9 +454,9 @@ function refusalBeforeWorkerUtilsProblems(file: string, source: string): string[
   if (first.getStart() > connects[0]!.getStart()) problems.push(`${file}: isThrowawayDbName( comes after the first makeWorkerUtils(`);
   let guarded = false;
   for (let n: ts.Node | undefined = first; n; n = n.parent) {
-    if (ts.isIfStatement(n) && n.expression.getStart() <= first.getStart() && first.getEnd() <= n.expression.getEnd() && throwsInside(n.thenStatement)) guarded = true;
+    if (ts.isIfStatement(n) && isPlainRefusalCondition(n.expression) && n.expression.getStart() <= first.getStart() && first.getEnd() <= n.expression.getEnd() && throwsDirectly(n.thenStatement)) guarded = true;
   }
-  if (!guarded) problems.push(`${file}: isThrowawayDbName( is not the condition of an if that throws`);
+  if (!guarded) problems.push(`${file}: isThrowawayDbName( is not the whole condition (!isThrowawayDbName(<name>)) of an if whose branch throws`);
   return problems;
 }
 
@@ -456,9 +477,81 @@ describe('live suites that open graphile-worker refuse a non-throwaway database 
     ['the refusal block deleted', source.replace(block, '\n')],
     ['the refusal only mentioned in a comment', source.replace(block, '\n  // isThrowawayDbName(name)\n')],
     ['the refusal moved after makeWorkerUtils(', source.replace(block, '\n').replace('  try {\n    utils = await makeWorkerUtils', '  try {\n    utils = await makeWorkerUtils') .replace(/(\n  try \{\n    utils = await makeWorkerUtils[\s\S]*?\n  \}\n)/, '$1  if (!isThrowawayDbName(name)) { throw new Error("late"); }\n')],
+    ['the refusal made dead code with `&& false` (NG-292 mutant A)', source.replace('if (!isThrowawayDbName(name)) {', 'if (!isThrowawayDbName(name) && false) {')],
+    ['the refusal with an `|| true` term', source.replace('if (!isThrowawayDbName(name)) {', 'if (!isThrowawayDbName(name) || true) {')],
+    ['the refusal with a `return` before the throw', source.replace('if (!isThrowawayDbName(name)) {\n    throw', 'if (!isThrowawayDbName(name)) {\n    return;\n    throw')],
+    ['the refusal that throws only inside a nested if', source.replace('if (!isThrowawayDbName(name)) {\n    throw new Error(', 'if (!isThrowawayDbName(name)) {\n    if (name === "never") throw new Error(')],
     ['the refusal that does not throw', source.replace('if (!isThrowawayDbName(name)) {\n    throw new Error(', 'if (!isThrowawayDbName(name)) {\n    console.log(')],
   ])('a mutant with %s is caught', (_label, mutated) => {
     expect(mutated).not.toBe(source);
     expect(refusalBeforeWorkerUtilsProblems(WORKER_UTILS_SUITE, mutated)).not.toEqual([]);
+  });
+});
+
+// NG-292 (mutant D): `suites` above only lists files whose text has `makeWorkerUtils(`, so moving the
+// call into a helper left the check green (68/68, measured in NG-283). Chosen: option (b), an allow
+// list over EVERY `tests/**/*.ts`. Option (a), "every file that imports graphile-worker", gives false
+// positives: four unit tests mock the package (`vi.mock('graphile-worker')`, a property named
+// makeWorkerUtils, no call). A real call is what opens the schema, so the call is what is counted.
+const WORKER_UTILS_ALLOWED = [WORKER_UTILS_SUITE];
+
+/** Files' `makeWorkerUtils` calls: a direct call, an aliased import (`import { makeWorkerUtils as open }`), or `ns.makeWorkerUtils(`. */
+export function workerUtilsCalls(file: string, source: string): string[] {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const local = new Set<string>(['makeWorkerUtils']);
+  const namespaces = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier) && node.moduleSpecifier.text === 'graphile-worker') {
+      const bindings = node.importClause?.namedBindings;
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const el of bindings.elements) if ((el.propertyName ?? el.name).text === 'makeWorkerUtils') local.add(el.name.text);
+      } else if (bindings && ts.isNamespaceImport(bindings)) namespaces.add(bindings.name.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  const hits: string[] = [];
+  const find = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      if (ts.isIdentifier(callee) && local.has(callee.text)) hits.push(node.getText().slice(0, 60));
+      if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'makeWorkerUtils' && ts.isIdentifier(callee.expression) && namespaces.has(callee.expression.text)) hits.push(node.getText().slice(0, 60));
+    }
+    ts.forEachChild(node, find);
+  };
+  find(sf);
+  return hits;
+}
+
+describe('only the guarded suite opens graphile-worker, wherever the call sits (NG-292)', () => {
+  const files = readdirSync(path.join(ROOT, 'tests'), { recursive: true, encoding: 'utf8' })
+    .filter((file) => file.endsWith('.ts') || file.endsWith('.tsx'))
+    .map((file) => `tests/${file.split(path.sep).join('/')}`);
+  const found = files.flatMap((file) => workerUtilsCalls(file, readFileSync(path.join(ROOT, file), 'utf8')).map(() => file));
+
+  it('no file under tests/ (helpers included) calls makeWorkerUtils outside the allow list', () => {
+    expect([...new Set(found)].filter((f) => !WORKER_UTILS_ALLOWED.includes(f))).toEqual([]);
+  });
+
+  it('every allowed file still calls it (an entry cannot rot)', () => {
+    for (const file of WORKER_UTILS_ALLOWED) expect(found, `${file} no longer calls makeWorkerUtils; remove the entry`).toContain(file);
+  });
+
+  describe('the scanner itself', () => {
+    it.each([
+      ['a direct call in a helper', "import { makeWorkerUtils } from 'graphile-worker';\nexport const openWorker = (url: string) => makeWorkerUtils({ connectionString: url });"],
+      ['an aliased import', "import { makeWorkerUtils as open } from 'graphile-worker';\nexport const w = (u: string) => open({ connectionString: u });"],
+      ['a namespace import', "import * as gw from 'graphile-worker';\nexport const w = (u: string) => gw.makeWorkerUtils({ connectionString: u });"],
+    ])('flags %s', (_label, text) => {
+      expect(workerUtilsCalls('tests/helpers/x.ts', text)).toHaveLength(1);
+    });
+
+    it.each([
+      ['a vi.mock factory property', "vi.mock('graphile-worker', () => ({ makeWorkerUtils: vi.fn(async () => ({})) }));"],
+      ['a comment and a string', "// makeWorkerUtils(x)\nconst s = 'makeWorkerUtils(x)';"],
+      ['an unrelated function of the same name from elsewhere', "import { other } from './other';\nother();"],
+    ])('passes %s', (_label, text) => {
+      expect(workerUtilsCalls('tests/x.test.ts', text)).toEqual([]);
+    });
   });
 });
