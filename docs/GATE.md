@@ -114,7 +114,7 @@ Eşzamanlılık garantisi kodda: atama `pg_advisory_xact_lock` altında (`src/li
 
 Kırmızı yeniden görülürse:
 1. Gate logunu sakla (`gate-isolated` çıktısının tamamı; `GATE_KEEP=1` ile konteyneri de tut). Yük kaydı (`uptime`) ve koşunun `E2E_PORT` / `GATE_PG_PORT` değerleri logda kalsın.
-2. Hatanın tam süitte mi, tek dosyada mı olduğuna bak. Tek dosyada geçiyorsa yarış değil, koşu sırası (`expert-prereg-reissue.live.test.ts` aynı tabloyu kullanır; `tests/helpers/expert-prereg-live-lock` ile seri tutulur) ya da zaman aşımıdır. `DB_CONNECT_TIMEOUT_MS=10000` gate-isolated'ta ayarlıdır.
+2. Hatanın tam süitte mi, tek dosyada mı olduğuna bak. Tek dosyada geçiyorsa yarış değil, koşu sırası (`expert-prereg-reissue.live.test.ts` aynı tabloyu kullanır; `tests/helpers/expert-prereg-live-lock` ile seri tutulur) ya da zaman aşımıdır. `DB_CONNECT_TIMEOUT_MS=10000` gate-isolated'ta ayarlıdır. `DB_TX_MAX_WAIT_MS=10000` (NG-273; tenant ve sistem kapsamı işlemleri, NG-274) da orada ayarlıdır; `Unable to start a transaction` (P2028) hatası görülürse bu değişkenin koşuda 10000 olduğunu logda doğrula.
 3. Hata numara çakışması ya da boşluk gösteriyorsa gerçek eşzamanlılık hatasıdır: `verify.ts` kilidini ve unique kısıtı kontrol et, testi gevşetme. Sayaç ile `max(founderNumber)` farkı, kilit dışından yazım olduğunu gösterir.
 4. Kırmızı yalnız bağlantı zaman aşımıysa (`DB_CONNECT_TIMEOUT_MS`) ve koşu paylaşımlı `:5433` DB'ye karşıysa, koşu izole değildi: `pnpm gate:isolated` ile yeniden koş.
 5. Üç koşu da yeşilse kırmızıyı kaydet ve kartı kapatma; ham log olmadan kök neden yazma.
