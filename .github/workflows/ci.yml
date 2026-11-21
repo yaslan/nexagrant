@@ -249,10 +249,12 @@ jobs:
         # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
         DB_CONNECT_TIMEOUT_MS: '10000'
 
-  # NG-288 (2. tur): the e2e suite runs as shards, one `next dev` server per shard, so a
-  # single server no longer carries all 727 tests and its heap restart threshold is reached
+  # NG-288 (3. tur): the e2e suite runs as shards, one `next dev` server per shard, so a
+  # single server no longer carries all ~727 tests and its heap restart threshold is reached
   # less. Every shard has its own Postgres, mail catcher, MinIO and database: nothing is shared.
   # Needs build-and-test, so a red unit/lint job still stops the e2e run as before.
+  # The shard count lives only in the matrix below; `e2e-gate` (further down) reads the
+  # aggregate result, so the required check name stays `e2e-gate` whatever the count.
   e2e:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -260,7 +262,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     env:
       DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
       DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
@@ -368,7 +370,12 @@ jobs:
     # web server through playwright.config.ts (WEB_SERVER_NODE_OPTIONS). Local gate unchanged.
     # The sampler below prints the web server's RSS every 60 s into this job log ([e2e-mem]),
     # so a growing heap can be told apart from a steady one. It is a measurement, not a fix.
-    - name: E2E Test (shard ${{ matrix.shard }}/2)
+    # NG-288 (3. tur): `--trace-gc --trace-gc-ignore-scavenger` makes the web server print one
+    # line per full (Mark-Compact) GC: "Mark-Compact … <heap before> (<committed>) -> <heap after> (…) MB".
+    # Scavenges are left out on purpose; they would flood the job log. The heap threshold
+    # (next getMemoryRestartStats) reads heap use, so these lines are the figure that is compared
+    # with the restart limit. Lines come out of the web server's stdout in the Playwright log.
+    - name: E2E Test (shard ${{ matrix.shard }}/${{ strategy.job-total }})
       run: |
         echo "[e2e-mem] runner: $(nproc) cpu, $(free -m | awk '/Mem:/ {print $2}') MiB RAM; node default heap limit: $(env -u NODE_OPTIONS node -p 'require("v8").getHeapStatistics().heap_size_limit / 1048576') MiB; NODE_OPTIONS=$NODE_OPTIONS"
         ( while sleep 60; do
@@ -376,13 +383,13 @@ jobs:
           done ) &
         sampler=$!
         status=0
-        pnpm test:e2e --shard=${{ matrix.shard }}/2 || status=$?
+        pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }} || status=$?
         kill "$sampler" 2>/dev/null || true
         exit "$status"
       env:
         CI: 'true'
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
-        NODE_OPTIONS: '--max-old-space-size=6144'
+        NODE_OPTIONS: '--max-old-space-size=6144 --trace-gc --trace-gc-ignore-scavenger'
         # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
         DB_CONNECT_TIMEOUT_MS: '10000'
         R2_ACCOUNT_ID: 'ci-minio'
@@ -428,6 +435,27 @@ jobs:
           playwright-report/
         if-no-files-found: ignore
         retention-days: 14
+
+  # NG-288 (3. tur): one fixed check name for the whole e2e suite. The matrix shard
+  # jobs are named `e2e (1)`, `e2e (2)`, … and change with the shard count, which
+  # makes them a poor branch-protection context. This job always exists under the
+  # same name. `if: always()` makes it run even when e2e is skipped or cancelled,
+  # and then `needs.e2e.result` is not `success`, so the check goes red.
+  e2e-gate:
+    needs: [e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Every e2e shard must succeed
+      env:
+        E2E_RESULT: ${{ needs.e2e.result }}
+      run: |
+        echo "e2e (all shards) result: $E2E_RESULT"
+        if [ "$E2E_RESULT" != "success" ]; then
+          echo "e2e did not pass on every shard; failing e2e-gate"
+          exit 1
+        fi
 
   # CORDIS worker (Python). Its own job: it needs no Postgres or Node, and a
   # failure here should not hide the app's result. The interpreter comes from
