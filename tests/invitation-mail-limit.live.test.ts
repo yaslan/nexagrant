@@ -97,6 +97,25 @@ const { INVITATION_MAIL_DAILY_LIMIT, INVITATION_MAIL_SENT, INVITATION_ROLE_CHANG
 );
 const { hashSecretToken } = await import('@/lib/secret-token');
 
+/**
+ * NG-281: the route signs the opt-out links in every invitation mail and fails
+ * closed without a key (`emailOptOutSecret()` = EMAIL_OPTOUT_SECRET ?? AUTH_SECRET
+ * ?? NEXTAUTH_SECRET, src/lib/env.ts; reason `opt_out_secret_unset`). Without
+ * the key every test that expects a mail went red with `emailSent: false`, and
+ * the gate passed only because it exports AUTH_SECRET. Pin a test key so the
+ * suite never depends on the host's env (as NG-155 did for SMTP_*).
+ * `envOverride` cannot do it: `emailOptOutSecret()` reads the module's own
+ * parsed `env` object, not the proxy exported above. So the key is set on that
+ * object, which is the one the route really reads, and put back in afterAll.
+ */
+const parsedEnv = (await vi.importActual<typeof import('@/lib/env')>('@/lib/env')).env;
+const OPT_OUT_KEYS = ['EMAIL_OPTOUT_SECRET', 'AUTH_SECRET', 'NEXTAUTH_SECRET'] as const;
+type OptOutKeys = Record<(typeof OPT_OUT_KEYS)[number], string | undefined>;
+const takeOptOutKeys = (): OptOutKeys =>
+  Object.fromEntries(OPT_OUT_KEYS.map((key) => [key, parsedEnv[key]])) as OptOutKeys;
+const hostOptOutKeys = takeOptOutKeys();
+parsedEnv.EMAIL_OPTOUT_SECRET = 'invitation-mail-limit-optout-fixture-not-for-any-deployment';
+
 let admin: PrismaClient | undefined;
 let ready = false;
 let skipReason = '';
@@ -184,6 +203,7 @@ beforeEach(async (ctx) => {
 });
 
 afterAll(async () => {
+  Object.assign(parsedEnv, hostOptOutKeys);
   // Cascades to the tenant's Invitation and AuditEvent rows.
   if (admin && tenantId) await admin.tenant.delete({ where: { id: tenantId } }).catch(() => {});
   await Promise.all([state.rls, admin].map((c) => c?.$disconnect().catch(() => {})));
@@ -363,6 +383,26 @@ describe('POST /api/invitations — mail limits', () => {
     expect(again.body).toMatchObject({ emailSent: false, reason: 'recently_sent' });
     expect(send).toHaveBeenCalledTimes(1);
     expect(await tokenIsCurrent(email, mailedToken(0))).toBe(true);
+  });
+
+  test('without any opt-out key nothing is mailed and the alert names the missing key', async () => {
+    // NG-281: the pinned key above must not hide the route's fail-closed check (NG-104).
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const pinned = takeOptOutKeys();
+    try {
+      for (const key of OPT_OUT_KEYS) parsedEnv[key] = undefined;
+      const res = await invite(nextEmail());
+      expect(res).toMatchObject({ status: 200, body: { success: true, emailSent: false, reason: 'send_failed' } });
+      expect(send).not.toHaveBeenCalled();
+      expect(recordAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ meta: expect.objectContaining({ reason: 'opt_out_secret_unset' }) })
+      );
+    } finally {
+      Object.assign(parsedEnv, pinned);
+    }
+    // With the key back the same route mails again.
+    await admin!.invitation.deleteMany({ where: { tenantId: requireId(tenantId, 'tenantId') } });
+    expect((await invite(nextEmail())).body).toMatchObject({ emailSent: true });
   });
 
   test('a send the SMTP server refused does not start a cooldown', async () => {

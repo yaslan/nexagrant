@@ -211,6 +211,8 @@ const ROLE_BEFORE_MODULE: ReadonlyArray<readonly [string, string]> = [
   ['partners/leaders/page.tsx', 'view_partner_search'],
   ['partners/[pic]/page.tsx', 'view_partner_search'],
   ['partners/page.tsx', 'view_partner_search'],
+  ['partners/resources/page.tsx', 'view_partner_search'],
+  ['settings/api-keys/page.tsx', 'view_partner_search'],
 ];
 
 describe('role door runs before the M1 module gate (NG-257)', () => {
@@ -291,30 +293,13 @@ const READ_CALL = /\bprisma\.|\bwithTenant\(|\bmoduleGate\(|\bauthenticateCordis
 const TENANT_READ = /\bprisma\.|\bwithTenant\(/;
 
 /**
- * Pages where `moduleGate` runs before the role door (NG-258 finding). Each one is
- * accepted on this reason: the only read before the door is the ModuleState lookup, and
- * the locked screen it returns carries no tenant data. The test below checks both
- * halves, and fails if an entry stops being module-first (then remove it) or a tenant
- * read appears before its door. Reveal of the module state to an unauthorised role is
- * the residual risk (low); the fix is a separate product card, not this one.
+ * Pages where `moduleGate` ran before the role door (NG-258 finding, accepted as a
+ * residual risk there). NG-275 moved the role door above `moduleGate` on all 16 pages,
+ * so the map is empty. Keep it as the mechanism: an entry here is an explicit, reviewed
+ * exception, and the test below fails if an entry stops being module-first or a tenant
+ * read appears before its door.
  */
 const MODULE_BEFORE_ROLE_ACCEPTED: Readonly<Record<string, string>> = {
-  'pipeline/page.tsx': 'M5 locked screen before view_proposal door',
-  'pipeline/[id]/page.tsx': 'M5 locked screen before view_proposal door',
-  'pipeline/[id]/consortium/page.tsx': 'M8 locked screen before view_proposal door',
-  'concept-notes/page.tsx': 'M2 locked screen before view_proposal door',
-  'concept-notes/[id]/page.tsx': 'M2 locked screen before view_proposal door',
-  'relationships/page.tsx': 'M4 locked screen before view_proposal door',
-  'relationships/[id]/page.tsx': 'M4 locked screen before view_proposal door',
-  'tto/page.tsx': 'M7 locked screen before view_proposal door',
-  'opportunities/[id]/application/page.tsx': 'M11 locked screen before view_proposal door',
-  'opportunities/[id]/documents/page.tsx': 'M10 locked screen before view_proposal door',
-  'opportunities/[id]/m2/page.tsx': 'M2 locked screen before view_proposal door',
-  'opportunities/[id]/matching/page.tsx': 'M8 locked screen before view_proposal door',
-  'reports/person-days/page.tsx': 'M5 locked screen before view_proposal door',
-  'approvals/page.tsx': 'M5 locked screen before request_dual_approval door',
-  'settings/api-keys/page.tsx': 'M1 locked screen before view_partner_search door (kilit ekranı kapalı dalda; FO-81 withdrawal yolu korunur)',
-  'partners/resources/page.tsx': 'M1 locked screen before view_partner_search door (NG-257 ek bulgu 1; düzeltme kartı önerisi)',
 };
 
 describe('the role door precedes the first read on each gated page (NG-258)', () => {
