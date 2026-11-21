@@ -120,3 +120,10 @@ describe('the download rule (evidence-scan-gate)', () => {
     expect(EVIDENCE_SCAN_REFUSAL_CODE.scan_infected).toBe('EVIDENCE_SCAN_INFECTED');
   });
 });
+
+describe('the presigned download refuses anything but CLEAN before it signs (NG-263)', () => {
+  test.each(['PENDING', 'ERROR', 'INFECTED', null, undefined])('scanStatus %s → no URL', async (status) => {
+    const { getPresignedDownloadUrl } = await import('@/lib/storage');
+    expect(await getPresignedDownloadUrl('tenant/key.docx', 'a.docx', status)).toBeNull();
+  });
+});
