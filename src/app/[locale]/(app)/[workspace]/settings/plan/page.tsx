@@ -8,7 +8,7 @@ import { getNgBillingStateAction } from '@/lib/billing/nexagrant/actions';
 import { NG_PLAN_VIEW_ACTION } from '@/lib/billing/nexagrant/access';
 import { requireTenantPageRole } from '@/lib/page-role';
 import type { NgBillingStateView, NgCatalogView } from '@/lib/billing/nexagrant/view';
-import { loadErrorOf, sortPlans, type NgLoadError } from './plan-view-model';
+import { loadErrorOf, loadFailureLogLine, sortPlans, type NgLoadError } from './plan-view-model';
 import { PlanCatalog } from './PlanCatalog';
 import { TrialPanel } from './TrialPanel';
 import { PlanLoadError } from './PlanLoadError';
@@ -42,10 +42,17 @@ async function load<T>(what: string, run: () => Promise<T>): Promise<Loaded<T>> 
   try {
     return { ok: true, value: await run() };
   } catch (err) {
-    const error = loadErrorOf(err);
-    // A missing session is an expected state, not an incident.
-    if (error !== 'session') console.warn(`[NgPlanSettings] ${what} unavailable: ${error}`);
-    return { ok: false, error };
+    // A missing session is an expected state, not an incident (no line). Anything else
+    // logs the cause's class and driver code only, never its message (NG-290); the
+    // screen still only gets the coarse kind. Logging must never break the page: if
+    // building or writing the line throws, the error block is drawn all the same.
+    try {
+      const line = loadFailureLogLine(what, err);
+      if (line) console.warn(line);
+    } catch {
+      // The log line is best effort; the screen state below is what matters.
+    }
+    return { ok: false, error: loadErrorOf(err) };
   }
 }
 
