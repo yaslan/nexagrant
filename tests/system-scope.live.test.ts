@@ -371,14 +371,18 @@ describe('public-intake opens only the expert form tables', () => {
   test('the form still reads and writes ExpertPreRegistration', async (ctx) => {
     if (!ready) return ctx.skip(skipReason);
     const id = `epr-intake-${RUN}`;
-    const seen = await inScope('public-intake', async (c) => {
-      await c.query(
-        `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
-         VALUES ($1, 'probe', $1 || '@system-scope.test', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
-        [id]
-      );
-      return (await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = $1`, [id])).rows;
-    });
+    // NG-285: a base-table read, so it waits out the policy-set test's committed expert_directory
+    // policy (NG-191 AS RESTRICTIVE closes every SELECT here while it exists). EXPERT_DIRECTORY_POLICY_LOCK.
+    const seen = await withTestDbLock(ADMIN_URL!, EXPERT_DIRECTORY_POLICY_LOCK, () =>
+      inScope('public-intake', async (c) => {
+        await c.query(
+          `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+           VALUES ($1, 'probe', $1 || '@system-scope.test', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+          [id]
+        );
+        return (await c.query<{ id: string }>(`SELECT id FROM "ExpertPreRegistration" WHERE id = $1`, [id])).rows;
+      })
+    );
     expect(seen).toEqual([{ id }]);
   });
 });
@@ -405,26 +409,29 @@ describe('expert pre-registrations open only for the purposes that handle them',
   test('tenant-discovery and subject-scoped read 0, the handling purposes read the row', async (ctx) => {
     if (!ready) return ctx.skip(skipReason);
     const id = `epr-reverse-${RUN}`;
-    const seen = await asApp(async (c) => {
-      await c.query('BEGIN');
-      try {
-        await c.query(`SELECT enter_system_scope('public-intake')`);
-        await c.query(
-          `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
-           VALUES ($1, 'probe', $1 || '@system-scope.test', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
-          [id]
-        );
-        const out: Record<string, number> = {};
-        for (const purpose of SYSTEM_SCOPE_PURPOSES) {
-          await c.query('SELECT enter_system_scope($1)', [purpose]);
-          const sql = `SELECT count(*)::int AS n FROM "ExpertPreRegistration" WHERE id = $1`;
-          out[purpose] = Number((await c.query<{ n: number }>(sql, [id])).rows[0]?.n ?? -1);
+    // NG-285: base-table reads; same lock as the arm above, for the same reason.
+    const seen = await withTestDbLock(ADMIN_URL!, EXPERT_DIRECTORY_POLICY_LOCK, () =>
+      asApp(async (c) => {
+        await c.query('BEGIN');
+        try {
+          await c.query(`SELECT enter_system_scope('public-intake')`);
+          await c.query(
+            `INSERT INTO "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale)
+             VALUES ($1, 'probe', $1 || '@system-scope.test', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr')`,
+            [id]
+          );
+          const out: Record<string, number> = {};
+          for (const purpose of SYSTEM_SCOPE_PURPOSES) {
+            await c.query('SELECT enter_system_scope($1)', [purpose]);
+            const sql = `SELECT count(*)::int AS n FROM "ExpertPreRegistration" WHERE id = $1`;
+            out[purpose] = Number((await c.query<{ n: number }>(sql, [id])).rows[0]?.n ?? -1);
+          }
+          return out;
+        } finally {
+          await c.query('ROLLBACK');
         }
-        return out;
-      } finally {
-        await c.query('ROLLBACK');
-      }
-    });
+      })
+    );
     expect(seen).toEqual(EXPECTED);
   });
 
