@@ -6,6 +6,7 @@ import { test, expect, type Page, type Request } from '@playwright/test';
 import { prisma } from '../../src/lib/db';
 import { scanEvidence } from '../../src/lib/evidence-scan';
 import { cleanDocx, eicarDocx, DOCX_MIME } from '../helpers/eicar';
+import { requireId } from '../helpers/teardown-guard';
 import { evidenceTenant } from './fixtures/evidence-tenant';
 import { shotsDir } from './fixtures/shots';
 import { expectHydrated } from './fixtures/hydration';
@@ -212,7 +213,7 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
     const row = await uploadThroughScreen(page, 'ng264-son-deneme.docx', cleanDocx('son deneme'));
     // Third failure: the server has queued the fourth (last) attempt, 30 minutes out.
     await prisma.evidence.updateMany({
-      where: { id: row.id, tenantId: waiting.tenantId },
+      where: { id: requireId(row.id, 'row.id'), tenantId: requireId(waiting.tenantId, 'waiting.tenantId') },
       data: { scanStatus: 'ERROR', scanAttempts: 3, scannedAt: new Date() },
     });
     // The answer that brings ERROR also brings the server's retrying flag for the row.
@@ -220,7 +221,7 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
     await page.waitForTimeout(6_000);
     // The last attempt comes back clean; no reload, the screen has to see it.
     await prisma.evidence.updateMany({
-      where: { id: row.id, tenantId: waiting.tenantId },
+      where: { id: requireId(row.id, 'row.id'), tenantId: requireId(waiting.tenantId, 'waiting.tenantId') },
       data: { scanStatus: 'CLEAN', scannedAt: new Date() },
     });
     await expect(downloadLinkOf(page, row.id)).toHaveCount(1, { timeout: 60_000 });
@@ -233,7 +234,7 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
     const row = await uploadThroughScreen(page, 'ng264-bitti.docx', cleanDocx('bitti'));
     // The fourth (last) attempt failed too: scanAttempts 4 has no wait left, the sweep has the row from here.
     await prisma.evidence.updateMany({
-      where: { id: row.id, tenantId: waiting.tenantId },
+      where: { id: requireId(row.id, 'row.id'), tenantId: requireId(waiting.tenantId, 'waiting.tenantId') },
       data: { scanStatus: 'ERROR', scanAttempts: 4, scannedAt: new Date() },
     });
     await expect(scanState(page, 'scan_error')).toHaveText('Taranamadı, yeniden denenecek', { timeout: 20_000 });
@@ -268,13 +269,13 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
     await expect(announcer).toHaveText('');
     const said = 'ng264-ikiz: Taranıp temiz bulundu';
 
-    await prisma.evidence.updateMany({ where: { id: twins[0]!.id }, data: { scanStatus: 'CLEAN', scannedAt: new Date() } });
+    await prisma.evidence.updateMany({ where: { id: requireId(twins[0]!.id, 'twins[0].id') }, data: { scanStatus: 'CLEAN', scannedAt: new Date() } });
     await expect(downloadLinkOf(page, twins[0]!.id)).toHaveCount(1, { timeout: 40_000 });
     await expect(announcer).toHaveText(said);
     const first = await announcer.evaluate((el) => el.textContent);
 
     // The second one reaches the same state in a later poll: same sentence, so the DOM text has to differ.
-    await prisma.evidence.updateMany({ where: { id: twins[1]!.id }, data: { scanStatus: 'CLEAN', scannedAt: new Date() } });
+    await prisma.evidence.updateMany({ where: { id: requireId(twins[1]!.id, 'twins[1].id') }, data: { scanStatus: 'CLEAN', scannedAt: new Date() } });
     await expect(downloadLinkOf(page, twins[1]!.id)).toHaveCount(1, { timeout: 40_000 });
     await expect.poll(() => announcer.evaluate((el) => el.textContent), { timeout: 10_000 }).not.toBe(first);
     await expect(announcer).toHaveText(said);
@@ -284,7 +285,7 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
     test.setTimeout(150_000);
     await openEvidence(page, waiting);
     const row = await uploadThroughScreen(page, 'ng264-silinen.docx', cleanDocx('silinen'));
-    await prisma.evidence.deleteMany({ where: { id: row.id, tenantId: waiting.tenantId } });
+    await prisma.evidence.deleteMany({ where: { id: requireId(row.id, 'row.id'), tenantId: requireId(waiting.tenantId, 'waiting.tenantId') } });
     await expect(page.getByText('ng264-silinen', { exact: true })).toHaveCount(0, { timeout: 20_000 });
     const calls = countEvidenceListCalls(page);
     await page.waitForTimeout(40_000);
