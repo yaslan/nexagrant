@@ -127,3 +127,17 @@ Kırmızı yeniden görülürse:
 D-B2 uyarısı (NG-206): NG-188 (`e511961d`) zaten `origin/dev`'de. NG-52'nin `expert_directory` politikasını taşıyan eski `prisma/rls.sql` ile (NG-188 öncesi bir dal ya da worktree) `pnpm db:rls` ya da `pnpm db:setup` koşulursa, görünümün uygulandığı bir veritabanında politika geri gelir ve sealed `expert-directory` kapsamı `fullName`, `email`, ORCID'i yeniden okuyabilir (NG-185 F-1). Bu bir hatadır: politikanın geri gelmesi ancak NG-188'i bilerek geri alırken (eski `rls.sql` ile birlikte) kabul edilebilir. Eski tabanlı worktree'ler paylaşılan veritabanına `db:rls` koşmamalı. Paylaşılan veritabanı güncel `prisma/rls.sql` ile en az bir kez `pnpm db:rls` görmediyse bir kez koşulmalı (NG-183 bloğu yabancı `expert_directory` politikasını düşürür).
 
 `E2E_SHOTS_ROOT=docs/agent-results` e2e kanıtını (ör. `lead-transfer-consent` → `NG-179-evidence/`) bilerek git'te izlenen klasöre yazar; varsayılan koşu yalnız git-ignored `test-artifacts/` altına yazar (NG-217).
+
+## CI e2e: bellek eşiği ve kırmızı artefaktı (NG-288)
+
+Yapı (3. tur, `ci.yml` `e2e` işi): E2E adımı `build-and-test`'ten ayrı bir matrix işi, `shard: [1, 2, 3]`. Her shard kendi `next dev` sunucusunu, kendi Postgres/mailpit/MinIO servislerini ve kendi `pnpm db:setup`'ını alır; hiçbir shard başka shard'ın sunucusunu ya da veritabanını paylaşmaz. Her shard `pnpm test:e2e --shard=<n>/3` ile koşar; tüm testler koşar, hiçbiri atlanmaz. `e2e-gate` işi tüm shard sonuçlarını toplar; shard sayısı değişse de required check adı `e2e-gate` kalır. Shard sayısı yalnız matrix'te (`strategy.matrix.shard`) tutulur.
+
+Heap izi yok: `--trace-gc` bayrağı Node'un `NODE_OPTIONS` içinde kabul ettiği bir bayrak değildir (`node: --trace-gc is not allowed in NODE_OPTIONS`, Node 26.5.0). Bu yüzden CI'da yalnız `NODE_OPTIONS=--max-old-space-size=6144` kullanılır; `playwright.config.ts` bunu web sunucusuna `WEB_SERVER_NODE_OPTIONS` üzerinden geçirir. Bu bir tampondur, sızıntı düzeltmesi değildir. Yerel `pnpm gate` ve `pnpm gate:isolated` bu değişkeni kendi koymaz; davranışları değişmez.
+
+Ölçüm: her shard, 60 saniyede bir her `next` sürecinin RSS'ini (`pid`, `rss`, komut) `[e2e-mem]` önekiyle job logunda basar; başta runner'ın CPU/RAM'i ve Node'un varsayılan heap sınırı basılır. Okuma: `gh run view <id> --job <job-id> --log | grep '\[e2e-mem\]'`. Heap ayrı ölçülmez; RSS sürekli artıyorsa sızıntı ya da önbellek şüphesi, düz kalıyorsa eşik birikmiş derlemeden. Hedef: `approaching the used memory threshold` satırı 0.
+
+Kanıt geçmişi: 1. tur (tek sunucu, koşu 44854901140) eşik yeniden başlatmasını önlemedi. 2. tur (iki shard, koşu 44864261313, head e0b9fe63): 353+361 geçti, 12+1 atlandı (toplam 727), eşik uyarısı 0; shard 1'in `next-server` RSS'i yine doğrusal büyüdü (1.5 → 7.8 GiB, 32 dk). Suite büyürse shard sayısı artırılır.
+
+Kırmızı artefakt: `Upload E2E traces and report` adımı (`if: failure()`) her shard için `e2e-results-<run_id>-<attempt>-shard-<n>` adıyla `test-results/` ve `playwright-report/` yükler, 14 gün saklar. Artefakt indirmek: `gh run download <run_id> -R yaslan/nexagrant -n e2e-results-<run_id>-<attempt>-shard-<n>`. Sır kontrolü: dosya adları, anahtar adları ve `.env|secret|token|DATABASE_URL|password|Bearer|sk-` taraması; değer yazılmaz. Sonuç `docs/agent-results/NG-288-dev-gnd-5.md`.
+
+Zorunlu kontroller: `dev` dal korumasında (NG-288 okuması, 2026-11-21) `required_status_checks` YOK; hiçbir CI işi merge'ü engellemez. Merge öncesi `gh pr checks <pr>` tüm satırlarda `pass` olmalı, `e2e-gate` dahil.
