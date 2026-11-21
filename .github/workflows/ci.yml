@@ -262,7 +262,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        # NG-289: 4 shards (was 3). Shard 2 of 3 peaked at next-server 6661 MiB (target <= 6140).
+        # Measured on run 44874105200; see docs/GATE.md "CI e2e".
+        shard: [1, 2, 3, 4]
     env:
       DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
       DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
@@ -377,9 +379,11 @@ jobs:
             ps -eo pid=,rss=,args= | awk -v ts="$(date -u +%H:%M:%S)" '/next dev|next start|next\/dist|next-server/ && !/awk/ {printf "[e2e-mem] %s pid=%s rss=%.0fMiB %.100s\n", ts, $1, $2/1024, substr($0, index($0, $3)); s += $2; n++} END {printf "[e2e-mem] %s total procs=%d rss=%.0fMiB\n", ts, n, s/1024}'
           done ) &
         sampler=$!
+        # NG-289 (Ö3): killing the subshell alone left its `sleep 60` child running
+        # (orphan). Kill that child first; with it gone the loop ends by itself.
+        trap 'pkill -P "$sampler" 2>/dev/null || true; kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true' EXIT
         status=0
         pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }} || status=$?
-        kill "$sampler" 2>/dev/null || true
         exit "$status"
       env:
         CI: 'true'
