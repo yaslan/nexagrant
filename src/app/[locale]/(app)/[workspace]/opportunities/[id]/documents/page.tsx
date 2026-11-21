@@ -27,9 +27,9 @@ export default async function DocumentsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M10', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
   //

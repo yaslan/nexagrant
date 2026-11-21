@@ -11,9 +11,9 @@ export default async function ApplicationPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M11', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   // findFirst + tenantId, not findUnique by id: an opportunity id is
   // guessable, and findUnique would happily return another tenant's row.

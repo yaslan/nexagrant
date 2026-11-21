@@ -12,9 +12,9 @@ export default async function PartnerResourcesPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { workspace, locale } = await params;
+  await requireTenantPageRole(locale, 'view_partner_search');
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
-  await requireTenantPageRole(locale, 'view_partner_search');
   const t = await getTranslations('PartnerResources');
 
   return (
