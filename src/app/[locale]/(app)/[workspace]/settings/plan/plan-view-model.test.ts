@@ -4,7 +4,9 @@ import { SESSION_REQUIRED_DIGEST } from '@/lib/session-required';
 import {
   defaultCurrency,
   defaultInterval,
+  errorCauseForLog,
   loadErrorOf,
+  loadFailureLogLine,
   matrixRows,
   offeredDimensions,
   priceStateFor,
@@ -113,5 +115,101 @@ describe('loadErrorOf', () => {
     expect(loadErrorOf(Object.assign(new Error('x'), { digest: 'NG_CATALOGUE_MISSING' }))).toBe('catalogue');
     expect(loadErrorOf(new Error('relation "NgPlan" does not exist'))).toBe('unknown');
     expect(loadErrorOf(null)).toBe('unknown');
+  });
+});
+
+/** Stand-in for Prisma's error class: same name and `code`, no client needed. */
+class PrismaClientKnownRequestError extends Error {
+  constructor(message: string, readonly code: string) {
+    super(message);
+    this.name = 'PrismaClientKnownRequestError';
+  }
+}
+
+/** Objects whose property reads throw (NG-290 E1 / Ö5): getters and a Proxy that throws on every `get`. */
+function throwingGetter(prop: string): object {
+  const err = new Error('getter target');
+  Object.defineProperty(err, prop, {
+    get() {
+      throw new Error(`${prop} getter`);
+    },
+  });
+  return err;
+}
+const hostileValues: [string, unknown][] = [
+  ...['name', 'message', 'constructor', 'code', 'digest'].map((p): [string, unknown] => [`${p} getter throws`, throwingGetter(p)]),
+  [
+    'Proxy throws on every get',
+    new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('trap');
+        },
+      },
+    ),
+  ],
+];
+
+describe('loadFailureLogLine (NG-290)', () => {
+  it('an unknown failure logs "unknown" with the class and the Prisma code, nothing else', () => {
+    const err = new PrismaClientKnownRequestError('Transaction API error: Transaction already closed', 'P2028');
+    expect(loadErrorOf(err)).toBe('unknown');
+    expect(loadFailureLogLine('billing state', err)).toBe(
+      '[NgPlanSettings] billing state unavailable: unknown (PrismaClientKnownRequestError P2028)',
+    );
+  });
+
+  it('a missing session is not logged; the catalogue gap is, with its class', () => {
+    expect(loadFailureLogLine('billing state', { digest: SESSION_REQUIRED_DIGEST })).toBeNull();
+    const line = loadFailureLogLine('catalogue', Object.assign(new Error('no catalogue'), { digest: 'NG_CATALOGUE_MISSING' }));
+    expect(line).toBe('[NgPlanSettings] catalogue unavailable: catalogue (Error)');
+  });
+
+  it('carries no part of the message: tenant names, e-mails, customer ids, connection strings stay out', () => {
+    const leaky = new PrismaClientKnownRequestError(
+      'No such customer: cus_NffrFeUfNV2Hib for tenant Belediye Ankara Kültür owner jane.doe@example.com ' +
+        'at postgresql://app:hunter2@db.internal:5432/fabrika Got: 1234',
+      'P2025',
+    );
+    const line = loadFailureLogLine('billing state', leaky);
+    expect(line).toBe('[NgPlanSettings] billing state unavailable: unknown (PrismaClientKnownRequestError P2025)');
+    for (const word of ['No such', 'cus_', 'Nffr', 'Belediye', 'Ankara', 'Kültür', 'jane', 'example.com', 'hunter2', 'db.internal', '1234', ':']) {
+      expect(line!.slice('[NgPlanSettings] billing state unavailable:'.length), word).not.toContain(word);
+    }
+  });
+
+  it('copes with odd thrown values and drops names or codes that are not plain identifiers', () => {
+    expect(errorCauseForLog('plain string')).toBe('string');
+    expect(errorCauseForLog(null)).toBe('object');
+    expect(errorCauseForLog(undefined)).toBe('undefined');
+    expect(errorCauseForLog({ code: 'ECONNREFUSED' })).toBe('Object ECONNREFUSED');
+    expect(errorCauseForLog({ code: 'x y "z"', name: 'bad name!' })).toBe('Error');
+    expect(errorCauseForLog({ code: 'cus_NffrFeUfNV2Hib for tenant Acme', name: 'jane@acme.example' })).toBe('Error');
+    const timeout = Object.assign(new Error('Query read timeout'), { name: 'TimeoutError' });
+    expect(errorCauseForLog(timeout)).toBe('TimeoutError');
+  });
+
+  it.each(hostileValues)('never throws when the thrown value is hostile: %s', (_label, value) => {
+    expect(() => loadErrorOf(value)).not.toThrow();
+    expect(loadErrorOf(value)).toBe('unknown');
+    expect(() => errorCauseForLog(value)).not.toThrow();
+    expect(() => loadFailureLogLine('billing state', value)).not.toThrow();
+    expect(loadFailureLogLine('billing state', value)).toMatch(
+      /^\[NgPlanSettings\] billing state unavailable: unknown \([A-Za-z0-9_$]+\)$/,
+    );
+  });
+
+  it('a throwing name getter falls back to the constructor name; a throwing code getter drops the code', () => {
+    expect(errorCauseForLog(throwingGetter('name'))).toBe('Error');
+    const coded = new PrismaClientKnownRequestError('x', 'P2028');
+    expect(errorCauseForLog(coded)).toBe('PrismaClientKnownRequestError P2028');
+    Object.defineProperty(coded, 'code', {
+      get() {
+        throw new Error('code getter');
+      },
+    });
+    expect(errorCauseForLog(coded)).toBe('PrismaClientKnownRequestError');
+    expect(errorCauseForLog(new Proxy({}, { get() { throw new Error('trap'); } }))).toBe('Object');
   });
 });

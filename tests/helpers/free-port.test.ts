@@ -7,15 +7,17 @@ import { freePort, kernelPort, portFreeEverywhere } from './free-port';
 // succeed next to such a listener, 0.0.0.0 and :: fail with EADDRINUSE.
 const held: net.Server[] = [];
 
-function holdWildcard(port: number): Promise<net.Server> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
+// NG-294: the kernel picks the port and the wildcard listener that got it stays open. The old
+// kernelPort() -> close -> listen(taken) sequence left a gap in which another process could take
+// the port, and the test then failed with EADDRINUSE on a busy machine.
+async function holdWildcardPort(): Promise<number> {
+  const srv = net.createServer();
+  await new Promise<void>((resolve, reject) => {
     srv.once('error', reject);
-    srv.listen(port, '::', () => {
-      held.push(srv);
-      resolve(srv);
-    });
+    srv.listen(0, '::', () => resolve());
   });
+  held.push(srv);
+  return (srv.address() as net.AddressInfo).port;
 }
 
 afterEach(async () => {
@@ -24,8 +26,7 @@ afterEach(async () => {
 
 describe('freePort (NG-260)', () => {
   it('skips a port a wildcard listener holds and returns one free on every address', async () => {
-    const taken = await kernelPort();
-    await holdWildcard(taken);
+    const taken = await holdWildcardPort();
     expect(await portFreeEverywhere(taken)).toBe(false);
 
     const picks = [taken];
@@ -36,8 +37,7 @@ describe('freePort (NG-260)', () => {
   });
 
   it('gives up after a bounded number of busy picks, naming them', async () => {
-    const taken = await kernelPort();
-    await holdWildcard(taken);
+    const taken = await holdWildcardPort();
     await expect(freePort(async () => taken)).rejects.toThrow(`busy: ${taken}`);
   });
 });

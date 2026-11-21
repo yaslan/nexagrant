@@ -20,6 +20,7 @@ export default async function RelationshipsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M4', locale);
   if (locked) return locked;
 
@@ -28,7 +29,6 @@ export default async function RelationshipsPage({
   // it is *no filter*, so a session without a tenant listed every relationship
   // in the database. `requireTenantPage` cannot return without a tenant, so the
   // conditional has nothing left to express and is gone.
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let relationships: RelationshipRow[] = [];
   try {

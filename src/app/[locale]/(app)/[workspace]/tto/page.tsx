@@ -12,9 +12,9 @@ export default async function TtoAcceleratorPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M7', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let items: TtoItem[] = [];
   try {
