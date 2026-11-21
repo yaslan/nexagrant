@@ -894,21 +894,34 @@ yazılır. Ajans silinirse bağ `SET NULL` olur.
 araçları tabloyu olduğu gibi kapsar). Kodun kendisi saklanmaz: yalnız normalize edilmiş halinin
 SHA-256'sı (`codeHash`) ve gösterim için son 4 karakter (`codeHint`). Kod 12 karakter,
 0/O/1/I/L/U içermeyen 30 harflik alfabeden (`src/lib/agency/invite-code.ts`).
-**Kullanım sınırı yok** (TASK-MUM4WVYLSH9IT, leed-fb 29.09): kod yalnız `expiresAt` (≤ 1 yıl) ve
-`revokedAt` ile yönetilir. `usedCount` iç sayaçtır, ajansa gösterilmez; `CHECK (usedCount >= 0)`.
-`maxUses` emekli kolon: nullable, yeni kod yazmaz, hiçbir yer okumaz (eski satırlar değerini korur).
+**Kullanım sınırı** (FO-392; 500 = otopilot varsayılanı K-577141, gizli sapma = patron kararı K-577268):
+`useLimit INTEGER NULL` = kodun ömrü boyunca ulaşabileceği kullanım sayısı. `NULL` = sınırsız: FO-392 öncesi açılmış her kod böyledir ve değişmedi
+(TASK-MUM4WVYLSH9IT sınırı kaldırmıştı; çalışan ajans akışları kırılmasın diye geriye dönük
+doldurma yok). Yeni kodun gerçek sınırı `500 + rastgele 0..24`'tür (kriptografik rastgele, kod başına bir kez, oluştururken
+çekilir; `newInviteCodeUseLimit()`); sayılar yalnız `src/lib/agency/invite-policy.ts`'te durur. Gerçek sınır
+**istemciye gitmez** (liste yanıtı, sayfa/RSC yükü, action yanıtı; denetim kaydı da yazmaz): panel yalnız
+"en az 500" der. Sebep: sabit N, "bu kod tam N kez kullanıldı" bilgisini verir; huni toplamıyla birleşince başka bir
+kodun son 1-4 kullanımı okunuyordu (crw-fb, FO-392 B-1). Sapma yalnız kod dolmadan önce korur: kodu kendisi dolduran ajans (~500 gerçek kayıt) durumun "Sınıra ulaştı"ya döndüğü anda sınırı tam öğrenir (crw-fb FO-392-crw-fb-2 B-3; patron kararı A: davranış aynı kaldı, risk `docs/legal/HUKUK-SORULARI-2026-09.md` soru 5e'de hukukçuya sorulur). CHECK'ler: `AgencyInviteCode_useLimit_positive`
+(`useLimit IS NULL OR useLimit > 0`) ve `AgencyInviteCode_usedCount_within_useLimit`
+(`useLimit IS NULL OR usedCount <= useLimit`). Kod ayrıca `expiresAt` (≤ 1 yıl, panelde varsayılan
+90 gün) ve `revokedAt` ile yönetilir. `usedCount` iç sayaçtır, ajansa gösterilmez;
+`CHECK (usedCount >= 0)`. `maxUses` emekli kolon: nullable, yeni kod yazmaz, hiçbir yer okumaz
+(eski satırlarda `maxUses < usedCount` olabilir; bu yüzden yeniden kullanılmadı).
+Migration: `agency-invite-use-limit.sql` · geri alma: `agency-invite-use-limit.down.sql`.
 
 **Kullanım.** Kayıt olan kişinin kiracısı olmadığı için koda `tenant_isolation` üzerinden
 ulaşamaz. Tek kapı `public.redeem_agency_invite(code_hash)` (SECURITY DEFINER,
 `search_path = public, pg_temp`): tek `UPDATE … SET usedCount = usedCount + 1 WHERE
-revokedAt IS NULL AND expiresAt > now … RETURNING tenantId` (`agency-invite-no-max-uses.sql`).
-Satır kilidi eşzamanlı kullanımları sıraya koyar, hiçbir kullanım kaybolmaz. Sınır olmadığı için
-ret "tükendi" anlamına gelemez; kodunu kayıt formunda deneyen ajans panelde gördüğünden fazlasını
-öğrenmez (TASK-MUM3TMP8HU76G Ö-1). Fonksiyon ajans
+revokedAt IS NULL AND expiresAt > now AND (useLimit IS NULL OR usedCount < useLimit) …
+RETURNING tenantId` (`agency-invite-use-limit.sql`). Satır kilidi eşzamanlı kullanımları sıraya
+koyar ve kilit sonrası WHERE yeniden değerlendirilir (READ COMMITTED): son kullanım için yarışan
+iki kayıttan yalnız biri kazanır, sayaç sınırı aşmaz. Sınırlı kodda ret artık "tükendi"
+anlamına gelebilir; bunu kodu kayıt formunda deneyen ajans zaten öğrenir ("en az 500", kesin sayı değil), panel buna
+`exhausted` ("Sınıra ulaştı") durumunu ekler, sayaç ve gerçek sınır yine gösterilmez (TASK-MUM3TMP8HU76G Ö-1, FO-392). Fonksiyon ajans
 id'si ya da NULL döndürür; kodun var olup olmadığı, süresinin dolup dolmadığı dışarıdan ayırt
 edilemez. `app.system_scope` fonksiyon düzeyinde açılır, çıkışta (hata dahil) geri alınır.
 Reddedilen denemeler `public.note_agency_invite_rejection(code_hash)` ile `AuditEvent`'e
-yalnız sebep olarak yazılır (`agency.invite.rejected`; kod, hash ve kişi yok).
+yalnız sebep olarak yazılır (`agency.invite.rejected`; sebepler: revoked, expired, exhausted, agency_inactive, lost_race; kod, hash ve kişi yok).
 
 **Ajans kurumun içeriğini okuyamaz.** Hiçbir RLS politikası `agencyId`'ye bakmaz. Ajans oturumu
 `app.tenant_id = ajans` ile çalışır; bağlı kurumun satırları 0 döner, yazma 42501 alır

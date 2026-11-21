@@ -3487,11 +3487,15 @@
       "colStatus": "Status",
       "colActions": "Actions",
       "hintSr": "code ending in {hint}",
-      "countsNote": "Codes have no use limit: a code works until its last valid day or until you revoke it. Choose a short end date, and revoke a code if it has reached people it was not meant for. So that no organisation can be identified, how many times a code was used is not shown. The number of registered organisations is in the panel above.",
+      "countsNote": "Each new code has a use limit: it can be used at least {min} times and until its last valid day, whichever comes first; you can revoke it at any time. The exact limit differs from code to code and is not shown; a code that reaches its limit stops working for new registrations. Codes created earlier have no limit. So that no organisation can be identified, how many times a code was used is not shown either. The number of registered organisations is in the panel above.",
+      "colLimit": "Use limit",
+      "limitUnlimited": "Unlimited (older code)",
+      "limitAtLeast": "At least {min} uses",
       "status": {
         "active": "Active",
         "revoked": "Revoked",
-        "expired": "Expired"
+        "expired": "Expired",
+        "exhausted": "Limit reached"
       },
       "revoke": "Revoke",
       "revokeSr": "Revoke the code ending in {hint}",
