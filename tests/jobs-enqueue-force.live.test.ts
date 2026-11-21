@@ -19,13 +19,19 @@ import { isThrowawayDbName, skipOrFailInCi, usedDatabaseName, type RawQueryable 
  * `force` reads the row before the lock commits, then its DELETE waits on the lock.
  *
  * Scope on the database behind `DATABASE_URL` (it may be a shared dev database):
- *  - the suite writes only on a throwaway database (`isThrowawayDbName`): its name contains
- *    `test`, or it is the isolated gate's `fabrika_gate`, or CI's `fabrika` on GitHub Actions.
- *    Any other name stops the suite in `beforeAll`, before migrate or reset;
+ *  - the suite writes only on a throwaway database (`isThrowawayDbName`): `fabrika_test` or
+ *    `fabrika_test_ng<n>`, the isolated gate's `fabrika_gate`, or CI's `fabrika` on a GitHub runner
+ *    (GITHUB_ACTIONS and CI both true). Any other name stops the suite in `beforeAll`, before
+ *    migrate or reset;
  *  - `reset()` deletes only rows whose key is `KEY` or `FOREIGN_KEY` and that are NOT locked
  *    (`locked_at is null`): a running job of the product key is never removed (NG-266);
  *  - a row a test locks is unlocked and deleted by that test, on the connection that locked it,
- *    so no leftover lock reaches the next test;
+ *    so no leftover lock reaches the next test. Two tests lock with an autocommit UPDATE (the
+ *    committed `locked_at` is the state under test, a transaction would change what `force` sees),
+ *    so a process killed before `finally` (SIGKILL) leaves that row locked (NG-283, measured: every
+ *    later run failed). `beforeEach` removes such a row when it carries this suite's `locked_by`
+ *    marker (`ng266-`) and no backend of this suite's holder connection is alive (`removeOwnDeadLock`);
+ *    a locked row of any other kind still stops the suite, with the command to inspect it;
  *  - assertions read only rows created by the test (id greater than the largest id seen
  *    before it), so a foreign row of the same task is never counted or changed;
  *  - the waiting is confirmed by `pg_blocking_pids` naming the holder's backend, so a
@@ -81,6 +87,24 @@ async function reset(): Promise<void> {
       [[KEY, FOREIGN_KEY]]
     )
   );
+}
+
+/**
+ * A suite process killed between its autocommit lock and `finally` leaves a locked row that carries
+ * this suite's `locked_by` marker. It is this suite's own residue, and safe to delete, only when no
+ * holder connection of this suite is alive (a concurrent run's holder is). A row locked by anything
+ * else, such as a real worker, is never touched. Returns how many rows it removed.
+ */
+async function removeOwnDeadLock(): Promise<number> {
+  const r = await utils!.withPgClient((c) =>
+    c.query(
+      `delete from graphile_worker._private_jobs
+       where key = any($1::text[]) and locked_at is not null and locked_by like 'ng266-%'
+         and not exists (select 1 from pg_stat_activity where application_name = $2)`,
+      [[KEY, FOREIGN_KEY], HOLDER_APP]
+    )
+  );
+  return r.rowCount ?? 0;
 }
 
 /** Unlocks and deletes a row this test created, on the connection that locked it. */
@@ -140,7 +164,8 @@ beforeAll(async () => {
   if (!isThrowawayDbName(name)) {
     throw new Error(
       `${SUITE}: refusing to write on database "${name}": it is not a test or isolated-gate database ` +
-        '(the shared dev database is "fabrika"). Point DATABASE_URL at a database whose name contains "test".'
+        '(the shared dev database is "fabrika"). Point DATABASE_URL at `fabrika_test` or `fabrika_test_ng<number>` ' +
+        '(or run `pnpm gate:isolated`, whose database is `fabrika_gate`).'
     );
   }
   try {
@@ -158,6 +183,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   if (!ready) return;
+  await removeOwnDeadLock();
   await reset();
   // A locked row under the product key that this suite did not create (a running job) is left in
   // place by reset(). enqueueJob would then dedupe its own insert into that row, so the suite cannot
@@ -166,7 +192,10 @@ beforeEach(async () => {
     c.query<{ n: string }>('select count(*)::text as n from graphile_worker._private_jobs where key = $1 and locked_at is not null', [KEY])
   );
   if (Number(locked.rows[0]?.n) > 0) {
-    throw new Error(`${SUITE}: a locked job under "${KEY}" is on this database (not created by this suite); left untouched, suite stopped`);
+    throw new Error(`${SUITE}: a locked job under "${KEY}" is on this database (not created by this suite); left untouched, suite stopped. ` +
+        `Inspect: select id, locked_by, locked_at from graphile_worker._private_jobs where key = '${KEY}' and locked_at is not null; ` +
+        `a leftover of this suite has locked_by 'ng266-run' or 'ng266-holder': delete from graphile_worker._private_jobs where id = <id>`
+    );
   }
   maxIdBefore = await largestJobId();
 });

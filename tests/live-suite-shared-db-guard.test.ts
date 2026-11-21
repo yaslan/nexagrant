@@ -393,3 +393,72 @@ describe('the ExpertDirectoryEntry mutation gate, read from the AST (NG-206 revi
     expect(mutationGateProblems(GATE_FILE, mutated)).not.toEqual([]);
   });
 });
+
+// NG-283: the name refusal in tests/jobs-enqueue-force.live.test.ts could be deleted and this file
+// stayed green (62/62, measured). `makeWorkerUtils` creates the graphile_worker schema on connect,
+// so a live suite that calls it must refuse a non-throwaway database first: the call to
+// `isThrowawayDbName(` must come before the first `makeWorkerUtils(` call, and must sit in an `if`
+// whose branch throws. Read from the AST, so a comment or a string that mentions the names does not count.
+const WORKER_UTILS_SUITE = 'tests/jobs-enqueue-force.live.test.ts';
+
+function calls(source: ts.SourceFile, name: string): ts.CallExpression[] {
+  const found: ts.CallExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name) found.push(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found.sort((a, b) => a.getStart() - b.getStart());
+}
+
+function throwsInside(node: ts.Node): boolean {
+  let hit = false;
+  const visit = (n: ts.Node): void => {
+    if (ts.isThrowStatement(n)) hit = true;
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return hit;
+}
+
+/** Problems with the order of the name refusal and the first graphile-worker connection. */
+function refusalBeforeWorkerUtilsProblems(file: string, source: string): string[] {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  const refusals = calls(sf, 'isThrowawayDbName');
+  const connects = calls(sf, 'makeWorkerUtils');
+  if (connects.length === 0) return [];
+  const problems: string[] = [];
+  const first = refusals[0];
+  if (!first) return [`${file}: calls makeWorkerUtils( but never isThrowawayDbName(`];
+  if (first.getStart() > connects[0]!.getStart()) problems.push(`${file}: isThrowawayDbName( comes after the first makeWorkerUtils(`);
+  let guarded = false;
+  for (let n: ts.Node | undefined = first; n; n = n.parent) {
+    if (ts.isIfStatement(n) && n.expression.getStart() <= first.getStart() && first.getEnd() <= n.expression.getEnd() && throwsInside(n.thenStatement)) guarded = true;
+  }
+  if (!guarded) problems.push(`${file}: isThrowawayDbName( is not the condition of an if that throws`);
+  return problems;
+}
+
+describe('live suites that open graphile-worker refuse a non-throwaway database first (NG-283)', () => {
+  const suites = liveSuites().filter((f) => /makeWorkerUtils\(/.test(readFileSync(path.join(ROOT, f), 'utf8')));
+  const source = readFileSync(path.join(ROOT, WORKER_UTILS_SUITE), 'utf8');
+
+  it('the suite that does it is among the ones scanned (a rename cannot empty the scan)', () => {
+    expect(suites).toContain(WORKER_UTILS_SUITE);
+  });
+
+  it.each(suites)('%s calls isThrowawayDbName( in a throwing if before makeWorkerUtils(', (file) => {
+    expect(refusalBeforeWorkerUtilsProblems(file, readFileSync(path.join(ROOT, file), 'utf8'))).toEqual([]);
+  });
+
+  const block = /\n  if \(!isThrowawayDbName\(name\)\) \{[\s\S]*?\n  \}\n/;
+  it.each([
+    ['the refusal block deleted', source.replace(block, '\n')],
+    ['the refusal only mentioned in a comment', source.replace(block, '\n  // isThrowawayDbName(name)\n')],
+    ['the refusal moved after makeWorkerUtils(', source.replace(block, '\n').replace('  try {\n    utils = await makeWorkerUtils', '  try {\n    utils = await makeWorkerUtils') .replace(/(\n  try \{\n    utils = await makeWorkerUtils[\s\S]*?\n  \}\n)/, '$1  if (!isThrowawayDbName(name)) { throw new Error("late"); }\n')],
+    ['the refusal that does not throw', source.replace('if (!isThrowawayDbName(name)) {\n    throw new Error(', 'if (!isThrowawayDbName(name)) {\n    console.log(')],
+  ])('a mutant with %s is caught', (_label, mutated) => {
+    expect(mutated).not.toBe(source);
+    expect(refusalBeforeWorkerUtilsProblems(WORKER_UTILS_SUITE, mutated)).not.toEqual([]);
+  });
+});
