@@ -136,7 +136,6 @@ async function backupAndClearCordis() {
     cordisImportRuns,
   };
 
-  cordisBackupInMemory = backupData;
   // flag 'wx': create only; fails rather than replace a file that appeared since the check above.
   fs.writeFileSync(
     BACKUP_FILE,
@@ -145,6 +144,9 @@ async function backupAndClearCordis() {
     ),
     { flag: 'wx' }
   );
+  // Armed only once the file is on disk. If the write failed (EEXIST), the in-memory copy
+  // must stay empty: rollback would otherwise restore it and delete the real backup (B2).
+  cordisBackupInMemory = backupData;
 
   await prisma.cordisCoParticipation.deleteMany();
   await prisma.cordisPartnerProfile.deleteMany();

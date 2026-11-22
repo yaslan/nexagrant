@@ -126,3 +126,6 @@ service-account*.json
 # carried 5659 third-party files until TASK-MVC68297ZVEMN untracked it.
 .venv/
 venv/
+
+# NG-316: st6 seed CORDIS backup (~1,1 M rows, rawJson included). Never commit it.
+scripts/.st6-cordis-backup.json
