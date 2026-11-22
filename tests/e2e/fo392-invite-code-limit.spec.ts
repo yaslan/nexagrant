@@ -269,12 +269,23 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
   await table.screenshot({ path: `${SHOTS}/03-agency-panel-table.png` });
 
   // A new code from the panel's own form.
-  // The server-action response is awaited on its own (not through the generic listener): a body
-  // still being read when the page navigates is lost, which left it out in the isolated gate run.
-  const actionResponse = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/ajans'));
+  // The body read starts when the response event arrives (inside the predicate): reading it after the
+  // await lost the race with the navigation the create triggers, so the body was gone by then.
+  // A failed read stays a failure: the awaited read below rethrows it.
+  let actionBody: { url: string; text: Promise<string> } | undefined;
+  const actionResponse = page.waitForResponse((r) => {
+    const match = r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/ajans');
+    if (match && !actionBody) {
+      const text = r.text();
+      text.catch(() => undefined); // handled by the awaited read below, not an unhandled rejection
+      actionBody = { url: r.url(), text };
+    }
+    return match;
+  });
   await page.getByRole('button', { name: trMessages.agency.codes.create }).click();
-  const actionRes = await actionResponse;
-  bodies.push({ url: actionRes.url(), kind: 'POST action', text: await actionRes.text() });
+  await actionResponse;
+  if (!actionBody) throw new Error('the create action response was not observed');
+  bodies.push({ url: actionBody.url, kind: 'POST action', text: await actionBody.text });
   await expect(page.getByText(trMessages.agency.codes.createdTitle)).toBeVisible();
   const created = await withSystemScope('platform-admin', 'e2e.fo392.read', (tx) =>
     tx.agencyInviteCode.findFirstOrThrow({
