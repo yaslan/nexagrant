@@ -1018,7 +1018,7 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
 
   test('self-burn: with the filled codes known exactly, the window for the last code (from the grand total alone) shrinks from ~25 per code to the rounding step (5)', () => {
     // The agency filled nFull codes itself (it knows each one's uses exactly) and a last code holds
-    // r uses it did not make. The funnel total is shown rounded to 5 (true value within +-2), D = 0:
+    // r uses it did not make. The funnel total is shown rounded to FUNNEL_ROUND_STEP (10; true value within -5..+4), D = 0:
     //   r in [shown - 2 - S, shown + 2 - S]   with S = sum of the uses of the filled codes.
     // Without the self-burn S is only known to [nFull * MIN, nFull * MAX].
     const rand = stream(77);
