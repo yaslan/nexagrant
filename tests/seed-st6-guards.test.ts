@@ -122,26 +122,27 @@ describe('countMismatches (backup is kept unless every table matches)', () => {
 });
 
 describe('seed / rollback refuse a non-throwaway database before any Prisma call', () => {
-  let savedUrl: string | undefined;
-
   beforeEach(() => {
-    savedUrl = process.env.DATABASE_URL;
+    // Pin the runner env explicitly. On a GitHub Actions runner (CI=true, GITHUB_ACTIONS=true)
+    // plain `fabrika` IS throwaway (the CI Postgres service is named that), so this refusal
+    // only holds off-runner. A CI or dev shell must not be able to change the result.
+    vi.stubEnv('GITHUB_ACTIONS', '');
+    vi.stubEnv('CI', '');
     prismaCalls.count = 0;
   });
 
   afterEach(() => {
-    if (savedUrl === undefined) delete process.env.DATABASE_URL;
-    else process.env.DATABASE_URL = savedUrl;
+    vi.unstubAllEnvs();
   });
 
   test('seed() on the shared fabrika database throws and makes zero DB calls', async () => {
-    process.env.DATABASE_URL = FACTORY;
+    vi.stubEnv('DATABASE_URL', FACTORY);
     await expect(seed()).rejects.toThrow(/refusing to write on database "fabrika"/);
     expect(prismaCalls.count).toBe(0);
   });
 
   test('rollback() on the shared fabrika database throws and makes zero DB calls', async () => {
-    process.env.DATABASE_URL = FACTORY;
+    vi.stubEnv('DATABASE_URL', FACTORY);
     await expect(rollback()).rejects.toThrow(/refusing to write on database "fabrika"/);
     expect(prismaCalls.count).toBe(0);
   });

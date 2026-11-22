@@ -10,6 +10,10 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
  *   - N1a: the connection's own current_database() is checked a second time;
  *   - N1b: the restore keeps the backup when the per-table counts disagree, and a
  *     rollback with no backup is a no-op for the CORDIS tables.
+ *
+ * Every test pins DATABASE_URL, GITHUB_ACTIONS and CI with vi.stubEnv: on a GitHub
+ * Actions runner plain `fabrika` is throwaway, so the result must not depend on the
+ * shell or the runner that runs the suite.
  */
 const h = vi.hoisted(() => ({
   calls: [] as string[],
@@ -65,6 +69,13 @@ import { seed, rollback } from '../scripts/seed-st6-empty-e2e';
 
 const GATE_URL = 'postgresql://u:p@127.0.0.1:55401/fabrika_gate';
 
+/** Runner env pinned off: the shared-fabrika rule must hold on a plain dev shell. */
+function pinNonRunnerEnv(): void {
+  vi.stubEnv('GITHUB_ACTIONS', '');
+  vi.stubEnv('CI', '');
+  vi.stubEnv('DATABASE_URL', GATE_URL);
+}
+
 function backupWithProjects(n: number): string {
   const project = {
     rawJson: null,
@@ -92,11 +103,8 @@ const CORDIS_DELEGATES = ['cordisCoParticipation', 'cordisPartnerProfile', 'cord
 const cordisDeletes = () => h.calls.filter((c) => c.endsWith('.deleteMany') && CORDIS_DELEGATES.some((d) => c.startsWith(`${d}.`)));
 
 describe('NG-316 B2 — a failed backup write does not arm the in-memory backup', () => {
-  let savedUrl: string | undefined;
-
   beforeEach(() => {
-    savedUrl = process.env.DATABASE_URL;
-    process.env.DATABASE_URL = GATE_URL;
+    pinNonRunnerEnv();
     h.calls.length = 0;
     h.currentDb = 'fabrika_gate';
     vi.clearAllMocks();
@@ -104,8 +112,7 @@ describe('NG-316 B2 — a failed backup write does not arm the in-memory backup'
   });
 
   afterEach(() => {
-    if (savedUrl === undefined) delete process.env.DATABASE_URL;
-    else process.env.DATABASE_URL = savedUrl;
+    vi.unstubAllEnvs();
   });
 
   test('EEXIST on the backup write: no CORDIS delete happens and rollback keeps the real backup', async () => {
@@ -127,22 +134,18 @@ describe('NG-316 B2 — a failed backup write does not arm the in-memory backup'
 });
 
 describe('NG-316 N1a — second current_database() guard', () => {
-  let savedUrl: string | undefined;
-
   beforeEach(() => {
-    savedUrl = process.env.DATABASE_URL;
+    pinNonRunnerEnv();
     h.calls.length = 0;
     vi.clearAllMocks();
     h.fsMock.existsSync.mockReturnValue(false);
   });
 
   afterEach(() => {
-    if (savedUrl === undefined) delete process.env.DATABASE_URL;
-    else process.env.DATABASE_URL = savedUrl;
+    vi.unstubAllEnvs();
   });
 
   test('URL says fabrika_gate but the connection answers fabrika: refused before any backup or delete', async () => {
-    process.env.DATABASE_URL = GATE_URL;
     h.currentDb = 'fabrika';
 
     await expect(seed()).rejects.toThrow(/refusing to write on database "fabrika"/);
@@ -152,19 +155,15 @@ describe('NG-316 N1a — second current_database() guard', () => {
 });
 
 describe('NG-316 N1b — chunked restore keeps the backup and handles a missing backup', () => {
-  let savedUrl: string | undefined;
-
   beforeEach(() => {
-    savedUrl = process.env.DATABASE_URL;
-    process.env.DATABASE_URL = GATE_URL;
+    pinNonRunnerEnv();
     h.calls.length = 0;
     h.currentDb = 'fabrika_gate';
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    if (savedUrl === undefined) delete process.env.DATABASE_URL;
-    else process.env.DATABASE_URL = savedUrl;
+    vi.unstubAllEnvs();
   });
 
   test('count mismatch after the chunked insert: the backup file is kept', async () => {
