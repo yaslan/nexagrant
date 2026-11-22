@@ -319,7 +319,7 @@ konulacaksa QA Y-3 (üye listesi) çözülmeden konmaz.
 
 > Merhaba [Ad],
 >
-> FonBridge'e yalnız **Google hesabıyla** girilir. Giriş ekranında "Google ile Devam Et" düğmesine
+> NexaGrant'e yalnız **Google hesabıyla** girilir. Giriş ekranında "Google ile Devam Et" düğmesine
 > basın. Şifre ya da e-posta bağlantısıyla giriş yok; Microsoft ile giriş de kaldırıldı.
 >
 > Lütfen şunları kontrol edin:
@@ -334,7 +334,7 @@ konulacaksa QA Y-3 (üye listesi) çözülmeden konmaz.
 
 > Hello [Name],
 >
-> You can sign in to FonBridge only with a **Google account**. Click "Continue with Google". There is
+> You can sign in to NexaGrant only with a **Google account**. Click "Continue with Google". There is
 > no password or e-mail link sign-in, and Microsoft sign-in was removed.
 >
 > Please check:

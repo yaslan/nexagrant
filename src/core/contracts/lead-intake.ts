@@ -1,7 +1,7 @@
 /**
  * Lead intake contract (NG-138 / M18-F4).
  *
- * What the FonBridge readiness funnel (a visitor who filled the Fon Hazırlık Karnesi and
+ * What the NexaGrant readiness funnel (a visitor who filled the Fon Hazırlık Karnesi and
  * left a contact request, `PublicLead`) hands to a consultancy / agency tenant's client
  * pipeline (M18). The producer builds a {@link LeadIntakeRequest}; M18 consumes it and
  * answers with a {@link LeadIntakeResult}. Neither side imports the other: they only

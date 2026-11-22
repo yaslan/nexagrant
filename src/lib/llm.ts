@@ -1,5 +1,5 @@
 /**
- * LLM adapter — the ONE entry point every FonBridge LLM call goes through
+ * LLM adapter — the ONE entry point every NexaGrant LLM call goes through
  * (CLAUDE.md rule 5).
  *
  * Until TASK-MTSXGXBCJ007W there were two: this file and `src/lib/ai/llm.ts`.

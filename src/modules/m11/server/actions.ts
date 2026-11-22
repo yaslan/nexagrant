@@ -573,7 +573,7 @@ export async function addWorkPackage(
 /**
  * Consortium partner portal entry point.
  *
- * The partner has no FonBridge session: the 32-byte magic token in the URL *is*
+ * The partner has no NexaGrant session: the 32-byte magic token in the URL *is*
  * the credential, and the tenant is whatever the matching row says. This is the
  * only place an ApplicationPart is resolved without a session, and it is
  * deliberately narrow — token only, Part A only, budget lines only.

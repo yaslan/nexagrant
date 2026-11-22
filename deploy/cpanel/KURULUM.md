@@ -1,4 +1,4 @@
-# FonBridge cPanel kurulum rehberi (Setup Node.js App)
+# NexaGrant cPanel kurulum rehberi (Setup Node.js App)
 
 **Paket:** `fonbridge-app-3d63de7b.zip` · **Kod:** `dev` @ `3d63de7b` (start-mode E2E 215/0) · **Hedef:** Linux x86_64, cPanel hesabı `/home/fonbridge`, LiteSpeed + Passenger
 **Uygulama kökü:** `/home/fonbridge/fonbridge-app` (patron kararı 03.10.2026)

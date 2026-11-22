@@ -1,5 +1,5 @@
 /**
- * Centralized SEO-Friendly Localized Route Resolver for FonBridge
+ * Centralized SEO-Friendly Localized Route Resolver for NexaGrant
  * Generates canonical, language-aware URLs for both public marketing and in-app workspace pages.
  */
 

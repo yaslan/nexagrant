@@ -3,7 +3,7 @@
 Sen bu depoda çalışan Claude Code'sun. Önce `PROJECT.md`'yi oku; sonra görevle ilgili `docs/` dosyasını. Bu dosya kısa tutulur: kurallar, komutlar, tuzaklar.
 
 ## Proje kimliği
-- Ürün: **Fabrika** — Avrupa fonları için çok kiracılı proje pipeline SaaS'ı (Next.js 15 + TS + Prisma + Postgres/pgvector; Python worker).
+- Ürün: **NexaGrant** — Avrupa fonları için çok kiracılı proje pipeline SaaS'ı (Next.js 15 + TS + Prisma + Postgres/pgvector; Python worker).
 - Diller: UI Türkçe (varsayılan) + İngilizce (`next-intl`). Kod, şema, commit: İngilizce.
 - Tek doğruluk kaynağı: `PROJECT.md` → `docs/*.md`. Çelişki görürsen `docs/ROADMAP.md` "Açık kararlar"a yaz, devam etmeden sor.
 
