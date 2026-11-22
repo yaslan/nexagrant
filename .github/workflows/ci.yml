@@ -262,14 +262,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # NG-289 faz 3: three shards plus one job for the heavy spec. The suite is still
-        # split into 3 shards (E2E_SHARD_TOTAL below); `heavy` runs only
-        # tests/e2e/guest-partner-direct-url.spec.ts on its own fresh dev server, and the
-        # three shards leave that file out with --grep-invert. No test is dropped: the
-        # file runs exactly once, in `heavy`. Why: its "every page" test (:229) is where
-        # shard 2's next-server RSS rose fastest (runs 44874105200, 44880116930,
-        # 44885188503; peak 6661 / 6616 MiB, target <= 6140). See docs/GATE.md "CI e2e".
-        shard: [1, 2, 3, heavy]
+        # NG-289 (faz 3, düzeltme turu): four shards plus one job for the heavy spec. The suite
+        # is split into 4 shards (E2E_SHARD_TOTAL below); `heavy` runs only
+        # tests/e2e/guest-partner-direct-url.spec.ts on its own fresh dev server, and the four
+        # shards leave that file out with --grep-invert. No test is dropped: the file runs
+        # exactly once, in `heavy`. Why 4: next-server RSS grows through a shard (CI run
+        # 44913458118, shard 2 of 3: 2046 MiB at 14:34 -> 6250 MiB at 14:45, every minute),
+        # so the peak follows the number of tests one dev server serves. With 3 shards the
+        # peak was 6250 MiB (shard 2, 245 tests); with 4 shards no shard has more than 200
+        # (see docs/GATE.md "CI e2e" for the measured per-shard counts and RSS).
+        shard: [1, 2, 3, 4, heavy]
     env:
       DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
       DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
@@ -393,11 +395,15 @@ jobs:
         else
           pnpm test:e2e --shard="$E2E_PART/$E2E_SHARD_TOTAL" --grep-invert "$E2E_HEAVY_SPEC" || status=$?
         fi
+        # NG-289 (Ö3) evidence: stop the sampler here, before the step ends, and print how many
+        # `sleep 60` children are still alive. 0 = no orphan. The trap above is the backstop.
+        pkill -P "$sampler" 2>/dev/null || true; kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true
+        echo "[e2e-mem] sampler stopped; orphan 'sleep 60' left: $(ps -eo args= | grep -c '^sleep 60$' || true)"
         exit "$status"
       env:
         CI: 'true'
         E2E_PART: ${{ matrix.shard }}
-        E2E_SHARD_TOTAL: '3'
+        E2E_SHARD_TOTAL: '4'
         # Matched as a regex against the test file path (positional filter) and against
         # "project file describe title" (--grep-invert); the name occurs in no other file.
         E2E_HEAVY_SPEC: 'guest-partner-direct-url\.spec\.ts'
