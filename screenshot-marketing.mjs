@@ -1,9 +1,11 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 const BASE_URL = 'http://localhost:3000';
-const OUTPUT_DIR = '/Users/macbook/AgentSpace/fabrika/docs/agent-results/TASK-MTQ602Y8V5QOK-screenshots';
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+const OUTPUT_DIR = path.join(REPO_ROOT, 'docs/agent-results/TASK-MTQ602Y8V5QOK-screenshots');
 
 // Create output directory
 if (!fs.existsSync(OUTPUT_DIR)) {

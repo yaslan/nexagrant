@@ -22,7 +22,7 @@ basıp `exit 1` ile ölür:
 ⨯ Another next dev server is already running.
 - Local:        http://localhost:3000
 - PID:          50803
-- Dir:          /Users/macbook/AgentSpace/fabrika
+- Dir:          <repo-kökü>
 You can access the existing server at http://localhost:3000,
 or run kill 50803 to stop it and start a new one.
 ```
