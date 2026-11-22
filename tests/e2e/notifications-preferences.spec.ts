@@ -128,3 +128,54 @@ test.describe('Notification preferences — NG-8', () => {
     expect(ids).toContain(sentId);
   });
 });
+
+/**
+ * NG-330 (B-2). A failed read of the preferences must show a warning, not a
+ * silent gap. The failure is real: the preference table is renamed for the
+ * length of one page load (the app connects as the table owner, so a REVOKE
+ * would not stop it), and renamed back in `finally`. Only this test's window
+ * sees the missing table; the notification bell reads other tables.
+ */
+test.describe('Notification preferences — read failure warning (NG-330 B-2)', () => {
+  const TABLE = 'NotificationPreference';
+  const HIDDEN = 'NotificationPreference_ng330_hidden';
+
+  async function withPreferenceTableHidden<T>(run: () => Promise<T>): Promise<T> {
+    await withSystemScope('platform-admin', 'e2e.ng330.hide', (tx) =>
+      tx.$executeRawUnsafe(`ALTER TABLE "${TABLE}" RENAME TO "${HIDDEN}"`)
+    );
+    try {
+      return await run();
+    } finally {
+      await withSystemScope('platform-admin', 'e2e.ng330.show', (tx) =>
+        tx.$executeRawUnsafe(`ALTER TABLE "${HIDDEN}" RENAME TO "${TABLE}"`)
+      );
+    }
+  }
+
+  test('EN: a failed preference read shows the warning and no preference form', async ({ page }) => {
+    await signIn(page, OWNER, 'TENANT_OWNER');
+    await withPreferenceTableHidden(async () => {
+      await page.goto(`/en/${OWNER.ws.slug}/notifications`);
+      await expect(page.getByTestId('notification-preferences-load-failed')).toHaveText('Could not load preferences.');
+      await expect(page.getByRole('heading', { level: 2, name: 'Notification preferences' })).toHaveCount(0);
+      await page.screenshot({ path: `${SHOTS}/load-failed-en.png`, fullPage: true });
+    });
+  });
+
+  test('TR: a failed preference read shows the Turkish warning', async ({ page }) => {
+    await signIn(page, OWNER, 'TENANT_OWNER');
+    await withPreferenceTableHidden(async () => {
+      await page.goto(`/tr/${OWNER.ws.slug}/bildirimler`);
+      await expect(page.getByTestId('notification-preferences-load-failed')).toHaveText('Tercihler yüklenemedi.');
+      await page.screenshot({ path: `${SHOTS}/load-failed-tr.png`, fullPage: true });
+    });
+  });
+
+  test('after the table is back, the form returns', async ({ page }) => {
+    await signIn(page, OWNER, 'TENANT_OWNER');
+    await page.goto(`/en/${OWNER.ws.slug}/notifications`);
+    await expect(page.getByTestId('notification-preferences-load-failed')).toHaveCount(0);
+    await expect(emailSelect(page)).toBeVisible();
+  });
+});

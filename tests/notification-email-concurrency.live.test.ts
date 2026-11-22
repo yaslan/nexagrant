@@ -301,4 +301,42 @@ describe('two overlapping runs mail a recipient once (NG-131)', () => {
     expect(await queued(e)).toBe(0);
     expect(r1.claimLost).toBe(1);
   });
+
+  // NG-330 (B-1). Interleaving: the run claims and renews the batch; the user
+  // switches the e-mail choice OFF; the run reaches its SMTP call. The OFF is
+  // written as a preference row only (no delete of the queued items), so only the
+  // re-read before the send can stop the mail. Remove stillWanted() in
+  // email-outbox.ts and this test goes red (the mailer runs with the items).
+  test('e-mail switched OFF after the claim: the queued mail is not sent (NG-330 B-1)', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const f = await makeScope('f');
+    await queueFor(f, 'INSTANT', 2);
+    const tenantId = requireId(f.tenantId, 'tenantId');
+    const userId = requireId(f.userId, 'userId');
+    const box = inbox();
+
+    const r = await outbox.sendNotificationEmails({
+      mode: 'INSTANT',
+      mailer: box.mailer,
+      now: new Date(),
+      translatorFor: () => t,
+      systemScope: (cb) => withSystemScopeOn(state.rls!, 'cross-tenant-job', 'test.ng330', cb),
+      runTenant: (tid, cb) => withTenantOn(state.rls!, tid, cb),
+      afterClaim: async () => {
+        await admin!.notificationPreference.upsert({
+          where: {
+            tenantId_userId_event_channel: { tenantId, userId, event: 'NEW_MATCHING_CALL', channel: 'EMAIL' },
+          },
+          create: { tenantId, userId, event: 'NEW_MATCHING_CALL', channel: 'EMAIL', frequency: 'OFF' },
+          update: { frequency: 'OFF' },
+        });
+      },
+    });
+    console.log('OFF-AFTER-CLAIM', JSON.stringify(r));
+
+    expect(mine(box.sent, f)).toHaveLength(0);
+    expect(r.mailsSent).toBe(0);
+    expect(r.itemsDropped).toBe(2);
+    expect(await queued(f)).toBe(0);
+  });
 });
