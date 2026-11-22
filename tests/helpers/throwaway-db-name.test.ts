@@ -31,6 +31,9 @@ describe('isThrowawayDbName', () => {
     'fabrika_test_',
     'fabrika_test_ng',
     'fabrika_test_ng266_prod',
+    // NG-292: the per-agent form `fabrika_test_<agent>` seen once in an old docker listing
+    // (docs/agent-results/TASK-MVDZHA5FQTZ84-sec-gnd.md:45). No script, .env example or suite uses it.
+    'fabrika_test_fe_fb',
     'FABRIKA_TEST',
     'fabrika_latest',
     'prod',
