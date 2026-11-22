@@ -92,15 +92,63 @@ export function defaultInterval(offered: readonly NgInterval[]): NgInterval | nu
 export type NgLoadError = 'session' | 'catalogue' | 'unknown';
 
 /**
+ * Reads one property path of a thrown value. A getter that throws or a Proxy trap
+ * that throws reads as `undefined`: classifying or logging a failure must never
+ * become a second failure (NG-290 E1).
+ */
+function safeRead(read: () => unknown): unknown {
+  try {
+    return read();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Maps a thrown error to a screen state by its `digest` / `code`
- * (SESSION_REQUIRED, NG_CATALOGUE_MISSING — the NG-57 contract).
+ * (SESSION_REQUIRED, NG_CATALOGUE_MISSING — the NG-57 contract). Never throws:
+ * a value whose getters throw is `unknown`.
  */
 export function loadErrorOf(err: unknown): NgLoadError {
   if (err && typeof err === 'object') {
     const e = err as { digest?: unknown; code?: unknown };
-    const tag = typeof e.digest === 'string' ? e.digest : typeof e.code === 'string' ? e.code : '';
+    const digest = safeRead(() => e.digest);
+    const code = typeof digest === 'string' ? undefined : safeRead(() => e.code);
+    const tag = typeof digest === 'string' ? digest : typeof code === 'string' ? code : '';
     if (tag === SESSION_REQUIRED_DIGEST) return 'session';
     if (tag === NG_CATALOGUE_MISSING) return 'catalogue';
   }
   return 'unknown';
+}
+
+/**
+ * The cause of a thrown value in a form safe for the server log (NG-290): class
+ * name and driver `code` (Prisma `P2028`, pg `57014`, Node `ECONNREFUSED`), e.g.
+ * `PrismaClientKnownRequestError P2028`. The message is never read: it is free text
+ * that can carry tenant names, e-mail addresses, ids or query values, and no
+ * scrubber can be shown complete. Both parts pass a format allowlist, so a class
+ * name or code that is not a plain identifier is dropped. Never throws: a getter or
+ * Proxy trap that throws reads as missing.
+ */
+export function errorCauseForLog(err: unknown): string {
+  if (!err || typeof err !== 'object') return typeof err;
+  const e = err as { name?: unknown; code?: unknown; constructor?: { name?: unknown } };
+  const ownName = safeRead(() => e.name);
+  const ctor = safeRead(() => e.constructor?.name);
+  // `name` first: some drivers throw a plain Error renamed (`TimeoutError`, `AbortError`).
+  const rawName = typeof ownName === 'string' && ownName ? ownName : typeof ctor === 'string' ? ctor : 'Object';
+  const name = /^[A-Za-z0-9_$]{1,64}$/.test(rawName) ? rawName : 'Error';
+  const rawCode = safeRead(() => e.code);
+  const code = typeof rawCode === 'string' && /^[A-Za-z0-9_.-]{1,32}$/.test(rawCode) ? rawCode : null;
+  return `${name}${code ? ` ${code}` : ''}`;
+}
+
+/**
+ * The server log line for a part of the screen that failed to load, or null when
+ * the failure is an expected state (no session) and is not logged.
+ */
+export function loadFailureLogLine(what: string, err: unknown): string | null {
+  const error = loadErrorOf(err);
+  if (error === 'session') return null;
+  return `[NgPlanSettings] ${what} unavailable: ${error} (${errorCauseForLog(err)})`;
 }

@@ -22,12 +22,12 @@ export default async function ConceptNotesListPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M2', locale);
   if (locked) return locked;
 
   // Redirects an anonymous visitor to login and a signed-in user with no
   // membership to /no-workspace. It cannot hand back a null or empty tenant.
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
 
   let notes: ConceptNoteRow[] = [];
   let templates: ConceptTemplateRow[] = [];

@@ -68,9 +68,9 @@ export default async function ConsortiumPage({
   params: Promise<{ id: string; locale: string; workspace: string }>;
 }) {
   const { id, locale, workspace } = await params;
+  const { tenantId, role } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
-  const { tenantId, role } = await requireTenantPageRole(locale, 'view_proposal');
 
   let queryFailed = false;
   let opportunity: ConsortiumOpportunity | null = null;

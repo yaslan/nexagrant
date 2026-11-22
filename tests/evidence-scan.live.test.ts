@@ -4,6 +4,7 @@ import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 import { DOCX_MIME, cleanDocx, eicarDocx, nestedDocx } from './helpers/eicar';
+import { bombDocxB, hiddenZip64EicarDocx } from './helpers/zip-fixtures';
 
 /**
  * NG-239 — virus scan of uploaded evidence (§18.3, K-584154 = A).
@@ -53,7 +54,7 @@ vi.mock('@/lib/db', async (importOriginal) => {
 });
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
 
-const { createDbClient } = await import('@/lib/db');
+const { createDbClient, withTenant } = await import('@/lib/db');
 const evidence = await import('@/app/[locale]/(app)/[workspace]/evidence/actions');
 const download = await import('@/app/api/evidence/[id]/download/route');
 const mock = await import('@/app/api/evidence/mock-upload/route');
@@ -288,7 +289,13 @@ describe.skipIf(!CLAMD_HOST)(`NG-239 against a real clamd (${CLAMD_HOST || 'not 
 
     const audit = await admin!.auditEvent.findMany({ where: { tenantId: t.tenant, type: 'evidence.scan.infected', target: id } });
     expect(audit).toHaveLength(1);
-    expect(audit[0]!.data).toMatchObject({ objectDeleted: true });
+    // NG-263: the infected event is written before the removal, so it carries no objectDeleted;
+    // the removal's outcome is the second event.
+    expect(audit[0]!.data).toMatchObject({ signature: expect.stringMatching(/Eicar/i) });
+    expect(audit[0]!.data).not.toHaveProperty('objectDeleted');
+    const removed = await admin!.auditEvent.findMany({ where: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: id } });
+    expect(removed).toHaveLength(1);
+    expect(removed[0]!.data).toMatchObject({ objectDeleted: true });
 
     const alerts = await admin!.systemAlert.findMany({ where: { source: 'evidence-scan', level: 'error', createdAt: { gte: since } } });
     const mine = alerts.filter((a) => (a.meta as { evidenceId?: string } | null)?.evidenceId === id);
@@ -318,6 +325,43 @@ describe.skipIf(!CLAMD_HOST)(`NG-239 against a real clamd (${CLAMD_HOST || 'not 
 
     const res = await callDownload(id);
     console.log(`[clamd limits] D1 status ${res.status}`);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_ERROR' });
+  });
+
+  // NG-269 (NG-265 (b), K-584606 = C): clamd cuts one ZIP member at MaxFileSize (100 MiB) and
+  // answers OK even with AlertExceedsMax. A 150 KB .docx whose one member unpacks to 150 MiB,
+  // EICAR at 140 MiB, was CLEAN and downloaded. The member check stops it before clamd.
+  test('NG-269 (b): a .docx whose member unpacks past 100 MiB is ERROR (limits_exceeded), kept, and D1 answers 409', async () => {
+    const body = bombDocxB();
+    const id = await uploadPresigned('ng269-b-150M-eicar-at-140M.docx', body);
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    const out = await scanner.scanEvidence({ tenantId: t.tenant, evidenceId: id, attempt: 0 }, { clamd, enqueue: async () => true });
+    const row = await rowOf(id);
+    const res = await callDownload(id);
+    console.log(`[NG-269 b] ${body.length}B | scanEvidence=${JSON.stringify(out)} | row=${JSON.stringify({ scanStatus: row.scanStatus, scanSignature: row.scanSignature, scanAttempts: row.scanAttempts })} | D1 HTTP ${res.status}`);
+    expect(out).toMatchObject({ status: 'ERROR', reason: expect.stringMatching(/^limits_exceeded: zip_member_check: member_too_large/) });
+    expect(row.scanStatus).toBe('ERROR');
+    expect(row.scanSignature).toBeNull();
+    expect(await storage.statObject(key), 'not proven malware: the object is kept').not.toBeNull();
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_ERROR' });
+  });
+
+  // NG-269 review B-1: a local entry left out of the central directory, empty name, written as
+  // ZIP64, EICAR inside. clamd reads it but does not unpack ZIP64 and answers OK; the member check
+  // asked ZIP64 only of entries with a plausible name, so the row was CLEAN and D1 answered 200.
+  test('NG-269 B-1: a .docx with a hidden, nameless ZIP64 entry holding EICAR is ERROR (zip64), and D1 answers 409', async () => {
+    const body = hiddenZip64EicarDocx();
+    const id = await uploadPresigned('ng269-b1-hidden-zip64.docx', body);
+    await dropQueuedScans(id);
+    const out = await scanner.scanEvidence({ tenantId: t.tenant, evidenceId: id, attempt: 0 }, { clamd, enqueue: async () => true });
+    const row = await rowOf(id);
+    const res = await callDownload(id);
+    console.log(`[NG-269 B-1] ${body.length}B | scanEvidence=${JSON.stringify(out)} | row=${JSON.stringify({ scanStatus: row.scanStatus, scanAttempts: row.scanAttempts })} | D1 HTTP ${res.status}`);
+    expect(out).toMatchObject({ status: 'ERROR', reason: 'limits_exceeded: zip_member_check: zip64' });
+    expect(row.scanStatus).toBe('ERROR');
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_ERROR' });
   });
@@ -594,5 +638,131 @@ describe.runIf(process.env.NG239_CLAMD_STOPPED === '1' && CLAMD_HOST)('NG-239 wi
       expect(res.status).toBe(409);
       expect(Buffer.from(await res.arrayBuffer()).includes(Buffer.from('EICAR-STANDARD'))).toBe(false);
     }
+  });
+});
+
+/**
+ * NG-263 (NG-239 Ö-3): the INFECTED write is the first thing that happens after a FOUND
+ * verdict, the object is deleted after it. A failure in between must not lose the answer:
+ * the job retries, reads the object again (it is still there) and reaches the same verdict.
+ */
+describe.skipIf(!CLAMD_HOST)('NG-263: an INFECTED verdict survives a failed write, and the object is removed', () => {
+  const clamd = { host: CLAMD_HOST, port: CLAMD_PORT, timeoutMs: 60_000 };
+  const run = (id: string) => ({ tenantId: t.tenant, evidenceId: id, attempt: 0 });
+
+  /**
+   * The first auditEvent call that `match` picks throws once, inside its transaction (the row write
+   * rolls back with it). Every other call goes to the database as usual.
+   */
+  function failAuditCallOnce(match: (method: string, args: { where?: { type?: string }; data?: { type?: string } }) => boolean) {
+    let failed = false;
+    const runTenant: NonNullable<import('@/lib/evidence-scan').EvidenceScanDeps['runTenant']> = (tenantId, cb) =>
+      withTenant(tenantId, (tx) =>
+        cb(
+          new Proxy(tx, {
+            get(target, prop) {
+              if (prop !== 'auditEvent' || failed) return Reflect.get(target, prop);
+              return new Proxy(target.auditEvent, {
+                get(model, method) {
+                  const fn = Reflect.get(model, method);
+                  if (typeof fn !== 'function') return fn;
+                  return (args: { where?: { type?: string }; data?: { type?: string } }) => {
+                    if (!failed && match(String(method), args)) {
+                      failed = true;
+                      throw new Error('injected: audit call failed');
+                    }
+                    return fn.call(model, args);
+                  };
+                },
+              });
+            },
+          })
+        )
+      );
+    return { runTenant, didFail: () => failed };
+  }
+
+  test.each([
+    ['U1+U4+U2', uploadPresigned],
+    ['U3', uploadFormData],
+  ])('%s: the first INFECTED transaction fails, the retry still ends INFECTED with an AuditEvent, an alarm and no object', async (name, upload) => {
+    const since = new Date();
+    const id = await upload(`ng263-retry-${name.slice(0, 2)}.docx`, eicarDocx());
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    const inject = failAuditCallOnce((method, args) => method === 'create' && args.data?.type === 'evidence.scan.infected');
+
+    await expect(scanner.scanEvidence(run(id), { clamd, enqueue: async () => true, runTenant: inject.runTenant })).rejects.toThrow('injected');
+    expect(inject.didFail()).toBe(true);
+    expect((await rowOf(id)).scanStatus, 'the failed transaction rolled back').toBe('PENDING');
+
+    // The job retry: same attempt, the object is still in the store, so the same verdict comes out.
+    const out = await scanner.scanEvidence(run(id), { clamd, enqueue: async () => true, runTenant: inject.runTenant });
+    expect(out).toMatchObject({ status: 'INFECTED' });
+    expect((await rowOf(id)).scanStatus).toBe('INFECTED');
+    expect(await storage.statObject(key), 'the infected object is removed').toBeNull();
+
+    const audit = await admin!.auditEvent.findMany({ where: { tenantId: t.tenant, type: 'evidence.scan.infected', target: id } });
+    expect(audit, 'exactly one infected AuditEvent').toHaveLength(1);
+    const removed = await admin!.auditEvent.findMany({ where: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: id } });
+    expect(removed).toHaveLength(1);
+    expect(removed[0]!.data).toMatchObject({ objectDeleted: true });
+
+    const alerts = await admin!.systemAlert.findMany({ where: { source: 'evidence-scan', level: 'error', createdAt: { gte: since } } });
+    const mine = alerts.filter((a) => (a.meta as { evidenceId?: string } | null)?.evidenceId === id);
+    expect(mine, 'one SystemAlert for this file').toHaveLength(1);
+    alertIds.push(...mine.map((a) => a.id));
+
+    const res = await callDownload(id);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'EVIDENCE_SCAN_INFECTED' });
+  });
+
+  test('the object delete fails: INFECTED, the object stays, the alarm says so, the download is still refused', async () => {
+    const since = new Date();
+    const id = await uploadPresigned('ng263-delete-fails.docx', eicarDocx());
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    const out = await scanner.scanEvidence(run(id), {
+      clamd,
+      enqueue: async () => true,
+      deleteObject: async () => {
+        throw new Error('injected: delete failed');
+      },
+    });
+    expect(out).toMatchObject({ status: 'INFECTED', objectDeleted: false });
+    expect((await rowOf(id)).scanStatus).toBe('INFECTED');
+    expect(await storage.statObject(key)).not.toBeNull();
+    const removed = await admin!.auditEvent.findMany({ where: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: id } });
+    expect(removed[0]?.data).toMatchObject({ objectDeleted: false });
+    const alerts = await admin!.systemAlert.findMany({ where: { source: 'evidence-scan', level: 'error', createdAt: { gte: since } } });
+    const mine = alerts.filter((a) => (a.meta as { evidenceId?: string } | null)?.evidenceId === id);
+    expect(mine[0]?.message).toMatch(/could NOT be deleted/);
+    alertIds.push(...mine.map((a) => a.id));
+    const res = await callDownload(id);
+    expect(res.status).toBe(409);
+    expect(Buffer.from(await res.arrayBuffer()).includes(Buffer.from('EICAR-STANDARD'))).toBe(false);
+  });
+
+  test('a run that finds the row INFECTED with the object still there (crash after the write) removes it and records the outcome', async () => {
+    const id = await uploadPresigned('ng263-resume.docx', eicarDocx());
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    // First run: the INFECTED write commits, then the run is lost before the removal starts
+    // (its check for a recorded outcome throws: the job fails, the object is still in the store).
+    const inject = failAuditCallOnce((method, args) => method === 'findFirst' && args.where?.type === 'evidence.scan.object_removed');
+    await expect(scanner.scanEvidence(run(id), { clamd, enqueue: async () => true, runTenant: inject.runTenant })).rejects.toThrow('injected');
+    expect(inject.didFail()).toBe(true);
+    expect((await rowOf(id)).scanStatus).toBe('INFECTED');
+    expect(await storage.statObject(key)).not.toBeNull();
+    // The retry of that job finds INFECTED and finishes the job instead of skipping it.
+    const out = await scanner.scanEvidence(run(id), { clamd, enqueue: async () => true });
+    expect(out).toMatchObject({ status: 'INFECTED', objectDeleted: true });
+    expect(await storage.statObject(key)).toBeNull();
+    const removed = await admin!.auditEvent.findMany({ where: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: id } });
+    expect(removed).toHaveLength(1);
+    expect(removed[0]!.data).toMatchObject({ objectDeleted: true });
+    // Nothing left to do: a further run changes nothing.
+    expect(await scanner.scanEvidence(run(id), { clamd })).toEqual({ skipped: 'already_final' });
   });
 });

@@ -103,5 +103,12 @@ export const NOTIFICATION_OUTBOX_LOCK = 'NotificationEmailItem:outbox';
  * reads on that database see the mutation meanwhile. system-scope.live's expert-directory reads
  * hold this around their read, the policy-set test around replace -> restore. (The name is the
  * NG-52 one, when the directory was the expert_directory policy.)
+ *
+ * NG-285: the same file's NG-191 arms also commit an expert_directory policy on the base table
+ * "ExpertPreRegistration". The AS RESTRICTIVE one has no TO clause, so for every role and every
+ * purpose but 'expert-directory' each SELECT there returns 0 rows until it is dropped (INSERT
+ * still passes). Every live read of that base table through fabrika_app holds this lock: the
+ * expert-prereg files for the whole file (acquireExpertPreRegLiveLock), system-scope.live around
+ * each read.
  */
 export const EXPERT_DIRECTORY_POLICY_LOCK = 'ExpertPreRegistration:expert_directory';

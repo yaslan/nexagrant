@@ -211,6 +211,8 @@ const ROLE_BEFORE_MODULE: ReadonlyArray<readonly [string, string]> = [
   ['partners/leaders/page.tsx', 'view_partner_search'],
   ['partners/[pic]/page.tsx', 'view_partner_search'],
   ['partners/page.tsx', 'view_partner_search'],
+  ['partners/resources/page.tsx', 'view_partner_search'],
+  ['settings/api-keys/page.tsx', 'view_partner_search'],
 ];
 
 describe('role door runs before the M1 module gate (NG-257)', () => {
@@ -279,3 +281,53 @@ describe('evaluation panel: the panel-wide scores are view_proposal only (review
     expect(can('GUEST_PARTNER', 'view_proposal')).toBe(false);
   });
 });
+
+/**
+ * NG-258: the role door must run before the first read on the page. The NG-256 review
+ * moved a door behind a tenant read and this file stayed green (the text check only
+ * looks for the call). Scope of the scan: the body from `export default` on, comments
+ * stripped. Helper functions defined above the export are NOT scanned, so a read hidden
+ * in a helper is outside this check (documented limit, see the NG-258 report).
+ */
+const READ_CALL = /\bprisma\.|\bwithTenant\(|\bmoduleGate\(|\bauthenticateCordisSession\(|\bcheckModuleAccess\(/g;
+const TENANT_READ = /\bprisma\.|\bwithTenant\(/;
+
+/**
+ * Pages where `moduleGate` ran before the role door (NG-258 finding, accepted as a
+ * residual risk there). NG-275 moved the role door above `moduleGate` on all 16 pages,
+ * so the map is empty. Keep it as the mechanism: an entry here is an explicit, reviewed
+ * exception, and the test below fails if an entry stops being module-first or a tenant
+ * read appears before its door.
+ */
+const MODULE_BEFORE_ROLE_ACCEPTED: Readonly<Record<string, string>> = {
+};
+
+describe('the role door precedes the first read on each gated page (NG-258)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  for (const [file, action] of Object.entries(PAGE_DOORS)) {
+    test(`${file}: requireTenantPageRole(${action}) comes before any read in the page body`, () => {
+      const code = stripComments(readFileSync(path.join(root, file), 'utf8'));
+      const at = code.indexOf('export default');
+      expect(at, 'default export present (scan scope)').toBeGreaterThan(-1);
+      const body = code.slice(at);
+      const door = body.indexOf(`requireTenantPageRole(locale, '${action}')`);
+      expect(door, 'role door call present in body').toBeGreaterThan(-1);
+      const before = body.slice(0, door);
+      const readsBefore = [...before.matchAll(READ_CALL)].map((m) => m[0]);
+
+      if (file in MODULE_BEFORE_ROLE_ACCEPTED) {
+        // Accepted exception: only the ModuleState lookup may precede the door.
+        expect(readsBefore.length, 'accepted page still reads before its door (exception stale?)').toBeGreaterThan(0);
+        expect(readsBefore.every((r) => r === 'moduleGate('), `non-module read before door: ${readsBefore.join(', ')}`).toBe(true);
+        expect(before.search(TENANT_READ), 'tenant read before door').toBe(-1);
+        return;
+      }
+      expect(readsBefore, `read(s) before the door: ${readsBefore.join(', ')}`).toEqual([]);
+    });
+  }
+});
+
+/** Comments stripped the same way the evaluation-panel check does (block + full-line). */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}

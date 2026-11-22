@@ -71,9 +71,9 @@ export default async function MatchingPage({
   params: Promise<{ locale: string; workspace: string; id: string }>
 }) {
   const { locale, workspace, id } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const t = await getTranslations({ locale, namespace: 'Consortium' });
   const tExpert = await getTranslations({ locale, namespace: 'ExpertPrereg' });
   const format = await getFormatter({ locale });

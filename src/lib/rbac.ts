@@ -136,7 +136,9 @@ export function can(
   action: Action,
   resource?: PlanFeatureResource
 ): boolean {
-  if (!role) return false;
+  // Own-property check: a bare lookup would hand back Object.prototype members
+  // ('constructor', 'toString', ...) and `.includes` would then throw (NG-259).
+  if (!role || !Object.hasOwn(rolePermissions, role)) return false;
   const permissions = rolePermissions[role];
   if (!permissions || !permissions.includes(action)) return false;
   // Only an absent resource is "no plan question" (NG-250 Ö1): a null one, which only a cast can
@@ -157,7 +159,11 @@ export function can(
  * entry to look up.
  */
 export function asRole(role: string | undefined | null): Role | null {
-  return role !== null && role !== undefined && role in rolePermissions ? (role as Role) : null;
+  // Own-property check, not `in`: `in` also walks the prototype chain, so
+  // 'constructor' or '__proto__' would be taken for roles (NG-259).
+  return role !== null && role !== undefined && Object.hasOwn(rolePermissions, role)
+    ? (role as Role)
+    : null;
 }
 
 export type DualApprovalActionType =

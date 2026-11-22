@@ -91,8 +91,11 @@ yüzden bir tasarım ortağının hattında ya da KPI panosunda **görünmez**. 
   (başarısız tarama sayısı; kuyruktaki işin hangi denemeye ait olduğunu da belirler). İndeks `(tenantId, scanStatus)`
   süpürme için. Yükleme (U2 confirm, U3 FormData) satırı `PENDING` yazar ve `evidence-scan` işini kuyruğa koyar.
   **Yalnız `CLEAN` iner** — tek kural `src/lib/evidence-scan-gate.ts` (indirme rotası, presigned GET ve ekran aynı
-  fonksiyonu çağırır). `INFECTED`: nesne depodan silinir, `AuditEvent` `evidence.scan.infected` (kiracı kapsamında) +
-  `SystemAlert` `error` (`source: evidence-scan`, kiracı kimliği ve dosya adı YOK). `ERROR` (clamd yok/kapalı/zaman
+  fonksiyonu çağırır). `INFECTED` (NG-263 sırası): önce satır `INFECTED` + `AuditEvent` `evidence.scan.infected`
+  (`data`: `{ signature }`, kiracı kapsamında, aynı transaction); sonra nesne depodan silinir ve sonucu ikinci
+  `AuditEvent` `evidence.scan.object_removed` (`data`: `{ objectDeleted: boolean }`) + `SystemAlert` `error`
+  (`source: evidence-scan`, kiracı kimliği ve dosya adı YOK). `AuditEvent` satırları güncellenmez; silme sonucu
+  yeni bir satırdır. Yarım kalan silme bir sonraki çalıştırmada `object_removed` yoksa tamamlanır. `ERROR` (clamd yok/kapalı/zaman
   aşımı/okunamayan nesne/clamd sınırı aşıldı `limits_exceeded` — `AlertExceedsMax yes` ile): inmez, 1 dk → 5 dk → 30 dk yeniden dener (`evidence-scan:<evidenceId>:<attempt>`), sonra
   `warn` alarm; `evidence-scan-sweep` (her 15 dk) iş kaybolmuş `PENDING` (>2 dk) ve tükenmiş `ERROR` (>6 sa)
   satırlarını kiracı başına sayfa sayfa yeniden kuyruğa koyar (kalıcı düşmüş iş aynı anahtarla değiştirilir). Migration öncesi satırlar da `PENDING` olur ve süpürmeyle taranır (kapalı hata:
