@@ -25,6 +25,18 @@ Bilinen kalan risk (FO-348 K6): kayıt yazımı yalnız koşu sonunda tree'yi ka
 
 `pnpm gate:isolated` (argümansız) aynı kararı önce verir; önbellek ya da belge-yalnız ise konteyner kurmadan doğrudan `pnpm gate`'e geçer.
 
+## Çıkış kodu ve pre-push kancası (NG-331)
+
+Kapının çıkış kodu **gerçek alt süreçten** gelir: `scripts/gate-lock.mjs` alt sürecin kodunu aynen yayar (kırmızı 3 → 3), sinyalle ölürse `128+n` (SIGKILL → 137). Kodda sabit `GATE_EXIT:0` yoktur. Yeşil bir kapıyı kırmızı gösteren üç bilinen yol vardı, üçü de kapatıldı ya da belgelendi:
+
+1. **Boru ile `tee` (kabuk tuzağı, koddan değil kullanımdan gelir).** `pnpm gate | tee log; echo GATE_EXIT=$?` yazdırdığı kod `tee`'nin kodudur: kırmızı koşuda bile `0`. Doğrulandı: `sh -c "exit 3" | tee log; echo $?` → `0`; `set -o pipefail` ile aynı komut → `3`. Kural: log için **yönlendirme** kullan (`pnpm gate > log 2>&1; echo GATE_EXIT=$?`), ya da boru varsa `set -o pipefail`. Kodu bir kez alıp sakla: `rc=$?` boruyla hemen ardından değil, komuttan hemen sonra okunur.
+2. **Kanca kurulu değilse push hiç kapılanmaz.** `githooks/pre-push` yalnız `core.hooksPath=githooks` ayarlıyken çalışır. Ayar yoksa git `.git/hooks/` (boş) arar ve push sessizce geçer. Her klonda bir kez: `pnpm hooks:install` (`git config core.hooksPath githooks`; ortak `.git/config` üzerinden tüm worktree'lere etki eder). Kontrol: `git config --get core.hooksPath` → `githooks`.
+3. **Sonuç önbelleği (FO-339) `önbellek: …` basıp 0 döner.** Aynı tree + aynı `pnpm-lock.yaml` için yeşil kayıt varsa tam gate koşmaz; bu kasıtlı, kaydı yalnız yeşil ve temiz ağaçta yazılır. Yeni bir kod değişikliğinde tree değişeceği için kayıt geçersizdir. Kanıt olarak "gerçek koşu" istenirse `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`.
+
+**Pre-push kancası:** `githooks/pre-push` tam kapıyı (`pnpm gate`) koşar; kapı kırmızıysa push durur, hook `KAPI KIRMIZI (çıkış <n>)` yazıp o kodla çıkar. Hiçbir ortam değişkeni hook'taki kapıyı atlatmaz (`FONBRIDGE_GATE_LOCK_HELD` yalnız kilidi atlar, kapıyı değil). Tek atlatma yolu git'in `--no-verify`'ıdır; **kullanma**.
+
+Doğrulama (NG-331): `tests/gate-exit-code.test.ts` (yeşil 0, kırmızı 3, SIGKILL 137, kilit bırakma) ve `tests/pre-push-hook.test.ts` (kırmızı pnpm → hook 4 ile çıkar ve `KAPI KIRMIZI` yazar; yeşil → 0). Düzeltme geri alınınca bu testlerin kırmızıya döndüğü kanıtlandı.
+
 ## Kısa yol: `pnpm gate:isolated` (önerilen)
 
 ```bash

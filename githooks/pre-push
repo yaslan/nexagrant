@@ -28,7 +28,13 @@ node scripts/db-loopback-check.mjs || exit 1
 # FO-339: aynı tree için yeşil kayıt varsa gate-lock "önbellek: <tree> <tarih>" basıp döner;
 # yalnız belge farkıysa lint + i18n:check. Kod dokunulmuşsa tam gate koşar (kısaltma yok).
 echo "→ pnpm gate (önbellek / belge-yalnız / tam gate: gate-lock karar verir)"
-pnpm gate
+# NG-331: kapı kırmızıysa push durur; çıkış kodu gerçek kapıdan gelir (sabit 0 değil). set -e de durdurur,
+# bu satır nedeni açıkça yazar. Atlatma yolu yok: pnpm gate dışında hiçbir ortam değişkeni bu adımı kapatmaz.
+pnpm gate || {
+  rc=$?
+  echo "pre-push: KAPI KIRMIZI (çıkış $rc); push durduruldu. Ayrıntı yukarıda; --no-verify kullanma." >&2
+  exit "$rc"
+}
 # FO-114: core.bare'i kimin yazdığı kanıtlanmadı; gate (GIT_DIR sızıntısı + git init) muhtemel
 # yazıcı, doğrulanmadı (docs/RELEASE_CHECKLIST.md §9.1).
 # Gate yeşil olsa bile ana checkout'u bozduysa push etme.

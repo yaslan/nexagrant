@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
@@ -51,5 +51,37 @@ describe('githooks/pre-push', () => {
       'args=gate',
       ...HOOK_GIT_VARS.map((v) => `${v}=<unset>`),
     ]);
+  });
+
+  // NG-331: kapı kırmızıysa push durmalı ve hook kapının gerçek çıkış kodunu yaymalı (sabit 0 değil).
+  function runHookWithStubGate(exitCode: number) {
+    const bin = mkdtempSync(join(tmpdir(), 'pre-push-red-'));
+    dirs.push(bin);
+    const pnpm = join(bin, 'pnpm');
+    writeFileSync(pnpm, `#!/bin/sh\nexit ${exitCode}\n`);
+    chmodSync(pnpm, 0o755);
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
+      DATABASE_URL: 'postgresql://hook:hook@localhost:1/hook',
+    };
+    for (const v of HOOK_GIT_VARS) delete env[v];
+    return spawnSync('sh', [HOOK, 'origin', 'git@example.invalid:repo.git'], {
+      cwd: ROOT,
+      env,
+      input: '',
+      encoding: 'utf8',
+    });
+  }
+
+  test('kırmızı kapıda (pnpm gate → 4) push durur ve çıkış kodu 4 olur', () => {
+    const r = runHookWithStubGate(4);
+    expect(r.status).toBe(4);
+    expect(r.stderr).toContain('KAPI KIRMIZI');
+  });
+
+  test('yeşil kapıda (pnpm gate → 0) hook 0 ile çıkar', () => {
+    const r = runHookWithStubGate(0);
+    expect(r.status).toBe(0);
   });
 });

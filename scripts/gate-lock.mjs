@@ -400,7 +400,9 @@ async function main() {
     process.on(sig, () => child.kill(sig))
   }
   child.on('exit', (code, signal) => {
-    const exitCode = signal ? 1 : (code ?? 1)
+    // NG-331: alt sürecin GERÇEK çıkış kodu yayılır. Sinyalle ölümde kabuk konvansiyonu 128+n (SIGKILL → 137).
+    // Eskiden her sinyal 1'e indirilirdi; kod hiçbir zaman sabit 0 olmaz, ama sinyal kanıtı kaybolurdu.
+    const exitCode = signal ? 128 + (os.constants.signals[signal] ?? 1) : (code ?? 1)
     if (!nested) recordRun(Date.now() - runStart, exitCode === 0)
     // Yalnız temiz ve koşu boyunca değişmemiş tree'nin yeşili kayda girer.
     if (isGate && exitCode === 0 && tree0 && cleanTree() && treeHash() === tree0) {
