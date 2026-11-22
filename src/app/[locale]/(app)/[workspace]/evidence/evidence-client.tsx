@@ -51,6 +51,8 @@ export interface EvidenceItemData {
   mimeType?: string | null;
   /** NG-239: only CLEAN downloads (src/lib/evidence-scan-gate.ts). */
   scanStatus?: string | null;
+  /** NG-264 (a): the infected object was really removed (evidence.scan.object_removed, objectDeleted true). */
+  scanObjectRemoved?: boolean;
   ocrText?: string | null;
   tags?: string[];
   createdAt?: Date | string;
@@ -89,7 +91,7 @@ function isWaitingRow(item: EvidenceItemData, retrying: Record<string, boolean>)
  * downloaded yet (or ever). Null when it may: the caller shows the link then.
  * The rule is the server's own (evidenceScanRefusal), not a copy.
  */
-function ScanState({ status, t }: { status: unknown; t: (key: string) => string }) {
+function ScanState({ status, removed, t }: { status: unknown; removed?: boolean; t: (key: string) => string }) {
   const refusal = evidenceScanRefusal(status);
   if (!refusal) return null;
   const tone = refusal === 'scan_infected' ? 'text-bad bg-bad/10 border-bad/30' : 'text-muted bg-ground border-border';
@@ -97,19 +99,41 @@ function ScanState({ status, t }: { status: unknown; t: (key: string) => string 
   // not by this badge: a badge that leaves the page takes its live region with it.
   return (
     <span data-testid="evidence-scan-state" data-scan={refusal} className={`text-[11px] font-semibold px-2 py-1 rounded-lg border ${tone}`}>
-      {t(`scan.${refusal}`)}
+      {t(scanTextKey(refusal, removed))}
     </span>
   );
+}
+
+/** NG-264: takes a poll's scan answer for one row; returns the row itself when nothing changed. */
+function withScanRow<T extends { scanStatus?: string | null; scanObjectRemoved?: boolean }>(
+  item: T,
+  row: { scanStatus: string; scanObjectRemoved: boolean },
+): T {
+  if (item.scanStatus === row.scanStatus && !!item.scanObjectRemoved === row.scanObjectRemoved) return item;
+  return { ...item, scanStatus: row.scanStatus, scanObjectRemoved: row.scanObjectRemoved };
+}
+
+/**
+ * NG-264 (a): the message key for a refusal. "Kaldırıldı" only when the infected object was
+ * really removed; otherwise the download is refused and the file is still stored.
+ */
+function scanTextKey(refusal: string, removed: boolean | undefined): string {
+  if (refusal === 'scan_infected') return removed ? 'scan.scan_infected_removed' : 'scan.scan_infected';
+  return `scan.${refusal}`;
 }
 
 /**
  * What a screen reader says when a row's scan reaches a result (NG-264 E-1). Pending is
  * not said: the badge was shown already. Null = nothing to say.
  */
-function scanAnnouncement(scanStatus: unknown, t: (key: string, values?: Record<string, string>) => string): string | null {
+function scanAnnouncement(
+  scanStatus: unknown,
+  removed: boolean | undefined,
+  t: (key: string, values?: Record<string, string>) => string,
+): string | null {
   const refusal = evidenceScanRefusal(scanStatus);
   if (refusal === 'scan_pending') return null;
-  return t(refusal === null ? 'scan.scan_clean' : `scan.${refusal}`);
+  return t(refusal === null ? 'scan.scan_clean' : scanTextKey(refusal, removed));
 }
 
 interface EvidenceClientProps {
@@ -202,14 +226,14 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
             .filter((item) => !gone.has(item.id))
             .map((item) => {
               const row = byId.get(item.id);
-              return row && row.scanStatus !== item.scanStatus ? { ...item, scanStatus: row.scanStatus } : item;
+              return row ? withScanRow(item, row) : item;
             })
         );
         setSelectedDoc((prev) => {
           if (!prev) return prev;
           if (gone.has(prev.id)) return null;
           const row = byId.get(prev.id);
-          return row && row.scanStatus !== prev.scanStatus ? { ...prev, scanStatus: row.scanStatus } : prev;
+          return row ? withScanRow(prev, row) : prev;
         });
         setRetrying((prev) => ({ ...prev, ...Object.fromEntries(answer.rows.map((row) => [row.id, row.retrying])) }));
       }
@@ -251,7 +275,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
     for (const item of items) {
       after.set(item.id, item.scanStatus);
       if (!before.has(item.id) || before.get(item.id) === item.scanStatus) continue;
-      const status = scanAnnouncement(item.scanStatus, t);
+      const status = scanAnnouncement(item.scanStatus, item.scanObjectRemoved, t);
       if (status) messages.push(t('scan.announce', { title: item.title, status }));
     }
     seenScan.current = after;
@@ -688,7 +712,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
                     <div className="flex items-center gap-1.5">
                       {doc.r2ObjectKey && !isEvidenceDownloadable(doc.scanStatus) && (
-                        <ScanState status={doc.scanStatus} t={t} />
+                        <ScanState status={doc.scanStatus} removed={doc.scanObjectRemoved} t={t} />
                       )}
                       {doc.r2ObjectKey && isEvidenceDownloadable(doc.scanStatus) && (
                         <a
@@ -968,7 +992,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
             <div className="pt-4 border-t border-border flex items-center justify-between">
               {selectedDoc.r2ObjectKey && !isEvidenceDownloadable(selectedDoc.scanStatus) && (
-                <ScanState status={selectedDoc.scanStatus} t={t} />
+                <ScanState status={selectedDoc.scanStatus} removed={selectedDoc.scanObjectRemoved} t={t} />
               )}
               {selectedDoc.r2ObjectKey && isEvidenceDownloadable(selectedDoc.scanStatus) && (
                 <a

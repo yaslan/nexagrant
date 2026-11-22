@@ -295,6 +295,45 @@ test.describe('the scan result is announced, and the refresh knows when to stop'
   });
 });
 
+test.describe('an infected file says whether its object was removed (NG-264 a)', () => {
+  // The verdict (scanStatus INFECTED) is on the row; "kaldırıldı" only when the removal event says
+  // objectDeleted true (NG-263). The two texts are set here by the data, not by a real scan.
+  test('no removal record: "Zararlı bulundu, indirme engellendi", never "kaldırıldı"', async ({ page }) => {
+    test.setTimeout(120_000);
+    await openEvidence(page, waiting);
+    const row = await uploadThroughScreen(page, 'ng264-engel.docx', cleanDocx('engel'));
+    await prisma.evidence.updateMany({
+      where: { id: requireId(row.id, 'row.id'), tenantId: requireId(waiting.tenantId, 'waiting.tenantId') },
+      data: { scanStatus: 'INFECTED', scannedAt: new Date() },
+    });
+    await openEvidence(page, waiting);
+    await expect(scanState(page, 'scan_infected')).toHaveText('Zararlı bulundu, indirme engellendi', { timeout: 20_000 });
+    await expect(downloadLinkOf(page, row.id)).toHaveCount(0);
+    await scanState(page, 'scan_infected').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/refresh-06-tr-indirme-engellendi.png` });
+
+    await page.goto(waiting.evidenceUrl.replace('/tr/', '/en/'));
+    await expectHydrated(page.getByRole('button', { name: /Upload|Belge Yükle/ }).first());
+    await expect(scanState(page, 'scan_infected')).toHaveText('Malware found, download blocked', { timeout: 20_000 });
+    await scanState(page, 'scan_infected').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/refresh-07-en-download-blocked.png` });
+  });
+
+  test('removal recorded with objectDeleted true: "Zararlı bulundu, kaldırıldı"', async ({ page }) => {
+    test.setTimeout(120_000);
+    await openEvidence(page, waiting);
+    const row = await uploadThroughScreen(page, 'ng264-silindi.docx', cleanDocx('silindi'));
+    const tenantId = requireId(waiting.tenantId, 'waiting.tenantId');
+    const evidenceId = requireId(row.id, 'row.id');
+    await prisma.evidence.updateMany({ where: { id: evidenceId, tenantId }, data: { scanStatus: 'INFECTED', scannedAt: new Date() } });
+    await prisma.auditEvent.create({
+      data: { tenantId, type: 'evidence.scan.object_removed', target: evidenceId, data: { objectDeleted: true } },
+    });
+    await openEvidence(page, waiting);
+    await expect(scanState(page, 'scan_infected')).toHaveText('Zararlı bulundu, kaldırıldı', { timeout: 20_000 });
+  });
+});
+
 test.describe('nothing waiting, or tab hidden: no polling', () => {
   test('with no waiting row the screen sends no refresh request', async ({ page }) => {
     await openEvidence(page, idle);
