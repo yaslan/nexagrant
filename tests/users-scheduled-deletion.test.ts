@@ -20,7 +20,9 @@ const auditCreate = vi.fn().mockResolvedValue({});
 const calendarDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const savedSearchDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const notificationDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
-const auditUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+const notificationPreferenceDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const notificationEmailItemDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const auditDetachActor = vi.fn().mockResolvedValue(0);
 const opportunityUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const feedbackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const proposalUsageUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
@@ -51,11 +53,14 @@ vi.mock('../src/lib/db', () => {
     aiUsageLog: { updateMany: (...args: unknown[]) => aiUsageUpdateMany(...args) },
     auditEvent: {
       create: (...args: unknown[]) => auditCreate(...args),
-      updateMany: (...args: unknown[]) => auditUpdateMany(...args),
     },
+    // NG-40: the audit table is append-only for the app role; the actor link is cut by audit_detach_actor().
+    $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) => auditDetachActor(strings.join('?'), ...values),
     calendarConnection: { deleteMany: (...args: unknown[]) => calendarDeleteMany(...args) },
     savedSearch: { deleteMany: (...args: unknown[]) => savedSearchDeleteMany(...args) },
     notification: { deleteMany: (...args: unknown[]) => notificationDeleteMany(...args) },
+    notificationPreference: { deleteMany: (...args: unknown[]) => notificationPreferenceDeleteMany(...args) },
+    notificationEmailItem: { deleteMany: (...args: unknown[]) => notificationEmailItemDeleteMany(...args) },
     opportunity: { updateMany: (...args: unknown[]) => opportunityUpdateMany(...args) },
     feedback: { updateMany: (...args: unknown[]) => feedbackUpdateMany(...args) },
     proposalUsage: { updateMany: (...args: unknown[]) => proposalUsageUpdateMany(...args) },
@@ -163,6 +168,8 @@ describe('purgeDueUsers — grace period', () => {
     expect(calendarDeleteMany).not.toHaveBeenCalled();
     expect(savedSearchDeleteMany).not.toHaveBeenCalled();
     expect(notificationDeleteMany).not.toHaveBeenCalled();
+    expect(notificationPreferenceDeleteMany).not.toHaveBeenCalled();
+    expect(notificationEmailItemDeleteMany).not.toHaveBeenCalled();
     expect(relationshipUpdateMany).not.toHaveBeenCalled();
   });
 
@@ -178,7 +185,9 @@ describe('purgeDueUsers — grace period', () => {
     expect(calendarDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
     expect(savedSearchDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
     expect(notificationDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
-    expect(auditUpdateMany).toHaveBeenCalledWith({ where: { actorId: 'due' }, data: { actorId: null } });
+    expect(notificationPreferenceDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
+    expect(notificationEmailItemDeleteMany).toHaveBeenCalledWith({ where: { userId: 'due' } });
+    expect(auditDetachActor).toHaveBeenCalledWith('SELECT public.audit_detach_actor(?)', 'due');
     expect(opportunityUpdateMany).toHaveBeenCalledWith({ where: { ownerId: 'due' }, data: { ownerId: null } });
     expect(feedbackUpdateMany).toHaveBeenCalledWith({ where: { userId: 'due' }, data: { userId: null } });
     expect(proposalUsageUpdateMany).toHaveBeenCalledWith({

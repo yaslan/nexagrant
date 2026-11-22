@@ -1,23 +1,21 @@
 import m10StandardDocEn from './m10/standard-doc.en';
-import m10StandardDocSystemEn from './m10/standard-doc-system.en';
 import m17CallContextEn from './m17/call-context.en';
 import m17CallContextTr from './m17/call-context.tr';
 import m17EvaluateEn from './m17/evaluate.en';
 import m17EvaluateTr from './m17/evaluate.tr';
 import m17EvaluateRetryEn from './m17/evaluate-retry.en';
 import m17EvaluateRetryTr from './m17/evaluate-retry.tr';
+import m18EligibilityPreReportEn from './m18/eligibility-pre-report.en';
+import m18EligibilityPreReportTr from './m18/eligibility-pre-report.tr';
+import m18EnrichOrganizationEn from './m18/enrich-organization.en';
+import m18EnrichOrganizationTr from './m18/enrich-organization.tr';
 import m2ConceptNoteSectionEn from './m2/concept-note-section.en';
-import m2SectionDraftSystemEn from './m2/section-draft-system.en';
-import m2SectionDraftUserEn from './m2/section-draft-user.en';
+import m2SectionDraftEn from './m2/section-draft.en';
 import m6EsrParseEn from './m6/esr-parse.en';
-import m6EsrParseSystemEn from './m6/esr-parse-system.en';
 import m6EvaluationEn from './m6/evaluation.en';
-import m6EvaluationSystemEn from './m6/evaluation-system.en';
 import m7IpChecklistEn from './m7/ip-checklist.en';
-import m7IpChecklistSystemEn from './m7/ip-checklist-system.en';
 import m9MeetingBriefEn from './m9/meeting-brief.en';
-import m9MeetingBriefSystemEn from './m9/meeting-brief-system.en';
-import ragRetrievedContextEn from './rag/retrieved-context.en';
+import sharedUntrustedDataRuleEn from './shared/untrusted-data-rule.en';
 
 /**
  * The one place prompt text is loaded from (CLAUDE.md rule 5, ROADMAP open
@@ -39,8 +37,13 @@ import ragRetrievedContextEn from './rag/retrieved-context.en';
  * only — the text is the pre-move text byte for byte, including the language
  * instructions baked into some of them — so their output is the same for every
  * locale until a `<name>.tr.ts` is added and registered here. Adding one is a
- * behaviour change and is reviewed as such. M17 (FO-188) was written with both,
- * and tests/prompt-snapshots.test.ts pins both.
+ * behaviour change and is reviewed as such. M17 (FO-188) and M18 (NG-136) were
+ * written with both, and tests/prompt-snapshots.test.ts pins both.
+ *
+ * Instructions and data travel apart outside M17 (NG-40, spec §18.3): the
+ * template holds only instructions and goes in `system`, and whatever a user, an
+ * uploaded document or a tenant-owned template supplied goes, fenced, in the user
+ * message. {@link separatedPrompt} is the way to build such a request.
  */
 
 /**
@@ -62,30 +65,21 @@ interface PromptDef {
 }
 
 const PROMPTS = {
-  'm6/esr-parse': { vars: ['documentText'], text: { en: m6EsrParseEn } },
-  'm6/esr-parse-system': { vars: [], text: { en: m6EsrParseSystemEn } },
-  'm6/evaluation': { vars: ['opportunityId'], text: { en: m6EvaluationEn } },
-  'm6/evaluation-system': { vars: [], text: { en: m6EvaluationSystemEn } },
-  'm7/ip-checklist': { vars: ['title', 'trl', 'patentStatus'], text: { en: m7IpChecklistEn } },
-  'm7/ip-checklist-system': { vars: [], text: { en: m7IpChecklistSystemEn } },
-  'm9/meeting-brief': { vars: ['partnerName', 'callTopic'], text: { en: m9MeetingBriefEn } },
-  'm9/meeting-brief-system': { vars: [], text: { en: m9MeetingBriefSystemEn } },
-  'm10/standard-doc': { vars: ['kind', 'opportunityTitle'], text: { en: m10StandardDocEn } },
-  'm10/standard-doc-system': { vars: [], text: { en: m10StandardDocSystemEn } },
+  'm6/esr-parse': { vars: [], text: { en: m6EsrParseEn } },
+  'm6/evaluation': { vars: [], text: { en: m6EvaluationEn } },
+  'm7/ip-checklist': { vars: [], text: { en: m7IpChecklistEn } },
+  'm9/meeting-brief': { vars: [], text: { en: m9MeetingBriefEn } },
+  'm10/standard-doc': { vars: [], text: { en: m10StandardDocEn } },
   // M17 Interreg pre-assessment (FO-188): stage 1 = call guide as system context, stage 2 = project vs grid.
   'm17/call-context': { vars: ['call_context'], text: { en: m17CallContextEn, tr: m17CallContextTr } },
   'm17/evaluate': { vars: ['rubric', 'project_context'], text: { en: m17EvaluateEn, tr: m17EvaluateTr } },
   'm17/evaluate-retry': { vars: ['problems'], text: { en: m17EvaluateRetryEn, tr: m17EvaluateRetryTr } },
-  'm2/concept-note-section': {
-    vars: ['topicTitle', 'topicIdentifier', 'opportunityTitle', 'inputsJson', 'context', 'task', 'maxWords'],
-    text: { en: m2ConceptNoteSectionEn },
-  },
-  'm2/section-draft-system': { vars: ['maxWords'], text: { en: m2SectionDraftSystemEn } },
-  'm2/section-draft-user': {
-    vars: ['sectionLabel', 'opportunityTitle', 'ragPrompt', 'maxWords'],
-    text: { en: m2SectionDraftUserEn },
-  },
-  'rag/retrieved-context': { vars: ['context', 'question'], text: { en: ragRetrievedContextEn } },
+  // M18 client pipeline (NG-136 / M18-F5): both written in tr and en; data travels via separatedPrompt.
+  'm18/enrich-organization': { vars: [], text: { en: m18EnrichOrganizationEn, tr: m18EnrichOrganizationTr } },
+  'm18/eligibility-pre-report': { vars: [], text: { en: m18EligibilityPreReportEn, tr: m18EligibilityPreReportTr } },
+  'm2/concept-note-section': { vars: ['maxWords'], text: { en: m2ConceptNoteSectionEn } },
+  'm2/section-draft': { vars: ['maxWords'], text: { en: m2SectionDraftEn } },
+  'shared/untrusted-data-rule': { vars: [], text: { en: sharedUntrustedDataRuleEn } },
 } as const satisfies Record<string, PromptDef>;
 
 export type PromptId = keyof typeof PROMPTS;
@@ -127,4 +121,93 @@ export function renderPrompt<I extends PromptId>(id: I, vars: PromptVars<I>, loc
     if (!declared.has(name)) throw new PromptTemplateError(`Prompt ${id}: placeholder "{{${name}}}" is not declared`);
     return String(given[name]);
   });
+}
+
+/** A prompt whose template is instructions only (M17 fences its own documents). */
+type SeparatedPromptId = Exclude<PromptId, `m17/${string}` | 'shared/untrusted-data-rule'>;
+
+const DATA_TAG = 'user_data';
+const DATA_FIELD_RE = /^[a-z_]+$/;
+
+/** Characters that take no visible space: marks, separators, controls, format and default-ignorable ones. */
+const INVISIBLE = String.raw`[\p{M}\p{Z}\p{C}\p{DI}]*`;
+/** Between the two words of the name: the invisible ones and any punctuation or symbol. */
+const NAME_SEPARATOR = String.raw`[\p{M}\p{P}\p{S}\p{Z}\p{C}\p{DI}]*`;
+
+/** The word, letter by letter: each is itself or a visible letter of another script standing in for it. */
+function tagWord(word: string): string {
+  return [...word].map((letter) => String.raw`(?:${letter}|(?![\p{Script=Latin}\p{DI}])\p{L})`).join(INVISIBLE);
+}
+
+/**
+ * The `<` of anything that reads as our tag: either case, with or without a slash,
+ * any invisible or format character around the `<`, the slash and the letters, any
+ * separator between the two words, and letters of another script for Latin ones
+ * (Cyrillic `а`, `е`).
+ *
+ * Not covered: HTML entities, and Latin-script look-alikes such as full-width or
+ * accented letters. Those stay in the user message, which the system prompt declares
+ * to be data. A `<` before a non-Latin word of the same shape also becomes `＜`,
+ * which costs one glyph and no content.
+ *
+ * The optional slash is its own group, and `tagWord` keeps invisible letters out of
+ * its alternatives, so a long invisible run cannot make this backtrack.
+ */
+const DATA_TAG_RE = new RegExp(
+  String.raw`<(?=(?:${INVISIBLE}/)?${INVISIBLE}${tagWord('user')}${NAME_SEPARATOR}${tagWord('data')}(?![\p{L}\p{N}_-]))`,
+  'giu'
+);
+
+/**
+ * A value that writes `</user_data>` would close its block early and what follows
+ * would read as the prompt's own text. Same cure as M17's `neutralizeFenceTags`: the
+ * `<` becomes the full-width `＜`, one character for one.
+ */
+function neutralizeDataTags(text: string): string {
+  return text.replace(DATA_TAG_RE, '＜');
+}
+
+function fenceData(data: Record<string, string | number>): string {
+  return Object.entries(data)
+    .map(([field, value]) => {
+      if (!DATA_FIELD_RE.test(field)) throw new PromptTemplateError(`Data field "${field}" is not a valid name`);
+      if (value === undefined) throw new PromptTemplateError(`Data field "${field}" was not passed`);
+      return `<${DATA_TAG} field="${field}">\n${neutralizeDataTags(String(value))}\n</${DATA_TAG}>`;
+    })
+    .join('\n');
+}
+
+/** Well above the longest section a seeded template allows (5000 words). */
+const MAX_INSTRUCTION_COUNT = 20_000;
+
+/** A number that makes sense in a prompt's instructions: a positive whole count, within the ceiling. */
+export function isInstructionCount(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0 && (value as number) <= MAX_INSTRUCTION_COUNT;
+}
+
+/**
+ * One model request with its instructions and its data apart (NG-40): the `system`
+ * and `prompt` of `generateText` / `generateCompletion`.
+ *
+ * `instructions` fill the template, so only a count {@link isInstructionCount}
+ * accepts gets through, at run time too: a server action is a public POST endpoint
+ * and its TypeScript signature does not bind the caller. Text belongs in `data`,
+ * keyed by the field name the template refers to.
+ */
+export function separatedPrompt<I extends SeparatedPromptId>(
+  id: I,
+  instructions: Record<(typeof PROMPTS)[I]['vars'][number], number>,
+  data: Record<string, string | number>,
+  locale?: string
+): { system: string; prompt: string } {
+  for (const [name, value] of Object.entries(instructions)) {
+    if (!isInstructionCount(value)) {
+      throw new PromptTemplateError(
+        `Prompt ${id}: instruction variable "${name}" must be a whole number from 1 to ${MAX_INSTRUCTION_COUNT}`
+      );
+    }
+  }
+  const body = renderPrompt(id, instructions as unknown as PromptVars<I>, locale);
+  const rule = renderPrompt('shared/untrusted-data-rule', {}, locale);
+  return { system: `${body}\n\n${rule}`, prompt: fenceData(data) };
 }

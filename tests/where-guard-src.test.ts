@@ -24,6 +24,10 @@ const REPO_ROOT = path.resolve(__dirname, '..');
  */
 const DB_ROW = 'value read from a non-null column of a row fetched just above, not client input';
 const KNOWN: Record<string, string> = {
+  'src/lib/billing/nexagrant/repository.ts provider: NG_TRIAL_PROVIDER':
+    "a module constant ('ng-trial', src/lib/billing/nexagrant/features.ts), never undefined, never client input (NG-57)",
+  'src/lib/billing/nexagrant/repository.ts lte: at':
+    'the settle instant: `now ?? new Date()` two lines above, a server Date, never undefined or client input (NG-57)',
   'src/modules/m17/server/evaluate.ts updatedAt: claimedAt':
     'the claim instant: `now` that claim() set on the row in the same run (the run\'s own identity, FO-188 B3); a server Date, never client input',
   'src/modules/m17/server/evaluate.ts updatedAt: row.claimedAt': 'same claim instant, read back from the claim() result; server-side, never client input',
@@ -35,7 +39,6 @@ const KNOWN: Record<string, string> = {
   'src/lib/billing/subscription-sync.ts id: existing.id': DB_ROW,
   'src/lib/jobs/tasks/users-scheduled-deletion.ts { userId } (shorthand)':
     '`const userId = user.id` over `user.findMany` rows (primary key); cron input, no client',
-  'src/lib/jobs/tasks/users-scheduled-deletion.ts actorId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts usedByUserId: userId': 'same `user.id` as above',
   'src/lib/jobs/tasks/users-scheduled-deletion.ts ownerUserId: userId': 'same `user.id` as above',
@@ -59,6 +62,10 @@ const KNOWN: Record<string, string> = {
     '`due` comes from purgeablePublicLeadWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client (TASK-MULR765AR5G0C)',
   'src/lib/relationships/stale-reminder.ts lastContactAt: r.lastContactAt':
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
+  'src/lib/evidence-scan.ts scanAttempts: run.attempt':
+    'NG-239: a number, never undefined: scanEvidence throws on a non-integer before any write, and the job payload is zod-checked (int ≥ 0); id + tenantId are pinned in the same where',
+  'src/lib/notifications/preferences.ts in: types':
+    '`types` is the NotificationType list NOTIFICATION_TYPE_EVENT maps to the event; it is a module constant, never client input (the event is zod-validated by PreferenceInputSchema). tenantId and userId in the same where are checked by requireActionId above (K-584554 A, NG-8)',
   'src/lib/notifications/store.ts in: ids':
     '`ids` is parseMarkReadTarget(target) one line above, which throws unless every element passes isPresentId; an empty list returns before the update; tenantId and userId beside it go through requireActionId (TASK-MUVR24EHWI2RA)',
   'src/app/[locale]/admin/partner-search/actions.ts in: ids':

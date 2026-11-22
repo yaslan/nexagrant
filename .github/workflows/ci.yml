@@ -56,7 +56,23 @@ jobs:
           - 8025:8025
     steps:
     - uses: actions/checkout@v4
-    
+
+    # Real clamd for the NG-239 scan suites (tests/evidence-scan.live.test.ts):
+    # without it their six real-clamd tests skip and the live-skip gate in the
+    # Test step fails the job. Started first, because the first start downloads
+    # the signatures (freshclam) before clamd listens; "Wait for clamd" below
+    # waits for it right before the Test step. The image and option match
+    # docker-compose.yml's `clamav` service (ClamAV 1.5.4, the version the
+    # tests were measured on); AlertExceedsMax=yes is what makes the over-limit
+    # test answer `Heuristics.Limits.Exceeded` instead of OK (NG-239 Ö-1).
+    # Loopback only, like compose: INSTREAM has no authentication.
+    # clamav/clamav-debian:1.5.4, pinned by its index digest.
+    - name: Start clamd (test virus scanner)
+      run: |
+        docker run -d --name clamd -p 127.0.0.1:3310:3310 \
+          -e CLAMD_CONF_AlertExceedsMax=yes \
+          clamav/clamav-debian@sha256:6982509b9e1415bf23cb49d0c55872fdd57fd2b92be33fa26d487da42d322076
+
     # No `version:` here: action-setup reads `packageManager` from package.json,
     # so CI runs the same pnpm as a developer. A pinned `version: 9` could not
     # parse pnpm-workspace.yaml (no `packages:` field) and failed the cache step.
@@ -159,6 +175,22 @@ jobs:
     - name: Typecheck
       run: pnpm typecheck
       
+    # Waits for the clamd started after checkout (see "Start clamd"). Red, not
+    # skipped, if it never answers: the Test step would otherwise skip its tests.
+    - name: Wait for clamd
+      run: |
+        for i in $(seq 1 120); do
+          [ "$(docker inspect -f '{{.State.Running}}' clamd)" = true ] || { docker logs clamd; echo "clamd exited"; exit 1; }
+          if [ "$(printf 'zPING\0' | nc -w 5 127.0.0.1 3310 | tr -d '\0')" = PONG ]; then
+            echo "clamd up after ~$((i * 5))s: $(printf 'zVERSION\0' | nc -w 5 127.0.0.1 3310 | tr -d '\0')"
+            exit 0
+          fi
+          sleep 5
+        done
+        docker logs clamd
+        echo "clamd did not answer PING within 10 min"
+        exit 1
+
     # AUTH_SECRET: the live suites that drive the real Auth.js callback
     # (oauth-registration, invitation-accept) sign and verify cookies with it.
     # Without it they skipped themselves and the step went green having run
@@ -172,9 +204,34 @@ jobs:
     # came about (scripts/live-skip-gate.ts). `vitest run` directly, not
     # `pnpm test --reporter=…`: pnpm would take `--reporter` as its own flag.
     # Pinned by tests/live-skip-gate.test.ts.
+    #
+    # NG-239: the first run has clamd up (NG239_CLAMD_HOST), so the real-clamd
+    # tests run; "with the configured clamd stopped" needs that same clamd
+    # down and is skipped there. So clamd is stopped and that one test runs
+    # on its own. Its verdict replaces the skipped entry of the same file and
+    # name in vitest-report.json, nothing else: a test skipped in both runs
+    # stays skipped and the gate still fails on it. The first run's report is
+    # kept as vitest-report.main.json. A failure in either run fails the step.
     - name: Test
       run: |
         pnpm exec vitest run --passWithNoTests --reporter=default --reporter=json --outputFile.json=vitest-report.json
+        cp vitest-report.json vitest-report.main.json
+        docker stop clamd
+        NG239_CLAMD_STOPPED=1 pnpm exec vitest run tests/evidence-scan.live.test.ts -t 'NG-239 with the configured clamd stopped' --reporter=default --reporter=json --outputFile.json=vitest-report.stopped.json
+        jq --slurpfile b vitest-report.stopped.json '
+          ([$b[0].testResults[] | .name as $f | .assertionResults[]
+            | select(.status == "passed" or .status == "failed")
+            | {key: ($f + " :: " + .fullName), value: .status}] | from_entries) as $ran
+          | .testResults |= map(.name as $f | .assertionResults |= map(
+              if (.status != "passed" and .status != "failed") and ($ran[$f + " :: " + .fullName] != null)
+              then .status = $ran[$f + " :: " + .fullName] else . end))
+        ' vitest-report.main.json > vitest-report.json
+        echo "taken from the clamd-stopped run:"
+        jq -r --slurpfile m vitest-report.main.json '
+          [$m[0].testResults[] | .name as $f | .assertionResults[] | {k: ($f + " :: " + .fullName), s: .status}] as $old
+          | [.testResults[] | .name as $f | .assertionResults[] | {k: ($f + " :: " + .fullName), s: .status}] as $new
+          | range(0; $new | length) | select($new[.].s != $old[.].s) | "  \($new[.].k): \($old[.].s) -> \($new[.].s)"
+        ' vitest-report.json
         pnpm exec tsx scripts/check-live-skips.ts vitest-report.json
       env:
         AUTH_SECRET: 'ci-vitest-auth-secret-fixture-not-for-any-deployment'
@@ -184,6 +241,75 @@ jobs:
         # m17-stale-runs.live refuses a database named `fabrika` unless told it is a
         # throwaway one (FO-343). This job's `fabrika` is the service container above.
         ALLOW_SWEEP_ON_SHARED_DB: '1'
+        # The clamd started above, read by tests/evidence-scan.live.test.ts.
+        # NG239_*, not CLAMD_HOST: CLAMD_HOST is also the app's own setting
+        # (src/lib/env.ts) and would change what the other suites see.
+        NG239_CLAMD_HOST: '127.0.0.1'
+        NG239_CLAMD_PORT: '3310'
+        # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
+        DB_CONNECT_TIMEOUT_MS: '10000'
+
+  # NG-288 (3. tur): the e2e suite runs as shards, one `next dev` server per shard, so a
+  # single server no longer carries all ~727 tests and its heap restart threshold is reached
+  # less. Every shard has its own Postgres, mail catcher, MinIO and database: nothing is shared.
+  # Needs build-and-test, so a red unit/lint job still stops the e2e run as before.
+  # The shard count lives only in the matrix below; `e2e-gate` (further down) reads the
+  # aggregate result, so the required check name stays `e2e-gate` whatever the count.
+  e2e:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      DATABASE_URL: postgresql://fabrika:fabrika@localhost:5432/fabrika
+      DATABASE_URL_RLS_TEST: postgresql://fabrika_app:fabrika_app_ci@localhost:5432/fabrika
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: fabrika
+          POSTGRES_USER: fabrika
+          POSTGRES_PASSWORD: fabrika
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      # Same mail catcher as build-and-test (see the comment there): the e2e invite specs need it.
+      mailpit:
+        image: axllent/mailpit@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Generate Prisma client
+      run: pnpm db:generate
+
+    # Each shard builds its own database from empty (see build-and-test, "Prepare database").
+    # Once, not twice: the idempotency check already runs in build-and-test.
+    - name: Prepare database
+      run: |
+        psql --version
+        pnpm db:setup
 
     # Same reason: the browsers must match the pinned @playwright/test.
     - name: Install Playwright browsers
@@ -236,11 +362,31 @@ jobs:
     # some (evidence-dev-store.live) need the local stand-in; the S3 live suites
     # read EVIDENCE_S3_TEST_* instead. R2_ACCOUNT_ID only switches the client on;
     # R2_ENDPOINT sends it to MinIO.
-    - name: E2E Test
-      run: pnpm test:e2e
+    # NG-288: `next dev` restarts itself once its V8 heap passes 80% of the heap limit
+    # ("Server is approaching the used memory threshold, restarting...", next
+    # dist/server/lib/utils.js getMemoryRestartStats; experimental.devMemoryThresholdRestart).
+    # The limit is V8's default on the runner (~4 GiB), so 700+ tests in one dev server
+    # reached it (run 44821853657). Raise the limit for CI only: NODE_OPTIONS reaches the
+    # web server through playwright.config.ts (WEB_SERVER_NODE_OPTIONS). Local gate unchanged.
+    # The sampler below prints the web server's RSS every 60 s into this job log ([e2e-mem]),
+    # so a growing heap can be told apart from a steady one. It is a measurement, not a fix.
+    - name: E2E Test (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+      run: |
+        echo "[e2e-mem] runner: $(nproc) cpu, $(free -m | awk '/Mem:/ {print $2}') MiB RAM; node default heap limit: $(env -u NODE_OPTIONS node -p 'require("v8").getHeapStatistics().heap_size_limit / 1048576') MiB; NODE_OPTIONS=$NODE_OPTIONS"
+        ( while sleep 60; do
+            ps -eo pid=,rss=,args= | awk -v ts="$(date -u +%H:%M:%S)" '/next dev|next start|next\/dist|next-server/ && !/awk/ {printf "[e2e-mem] %s pid=%s rss=%.0fMiB %.100s\n", ts, $1, $2/1024, substr($0, index($0, $3)); s += $2; n++} END {printf "[e2e-mem] %s total procs=%d rss=%.0fMiB\n", ts, n, s/1024}'
+          done ) &
+        sampler=$!
+        status=0
+        pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }} || status=$?
+        kill "$sampler" 2>/dev/null || true
+        exit "$status"
       env:
         CI: 'true'
         E2E_WEB_SERVER: ${{ inputs.e2e_server || 'dev' }}
+        NODE_OPTIONS: '--max-old-space-size=6144'
+        # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
+        DB_CONNECT_TIMEOUT_MS: '10000'
         R2_ACCOUNT_ID: 'ci-minio'
         R2_ENDPOINT: 'http://localhost:9000'
         R2_ACCESS_KEY_ID: 'minioadmin'
@@ -278,12 +424,33 @@ jobs:
       if: ${{ failure() }}
       uses: actions/upload-artifact@v4
       with:
-        name: e2e-results-${{ github.run_id }}-${{ github.run_attempt }}
+        name: e2e-results-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
         path: |
           test-results/
           playwright-report/
         if-no-files-found: ignore
         retention-days: 14
+
+  # NG-288 (3. tur): one fixed check name for the whole e2e suite. The matrix shard
+  # jobs are named `e2e (1)`, `e2e (2)`, … and change with the shard count, which
+  # makes them a poor branch-protection context. This job always exists under the
+  # same name. `if: always()` makes it run even when e2e is skipped or cancelled,
+  # and then `needs.e2e.result` is not `success`, so the check goes red.
+  e2e-gate:
+    needs: [e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Every e2e shard must succeed
+      env:
+        E2E_RESULT: ${{ needs.e2e.result }}
+      run: |
+        echo "e2e (all shards) result: $E2E_RESULT"
+        if [ "$E2E_RESULT" != "success" ]; then
+          echo "e2e did not pass on every shard; failing e2e-gate"
+          exit 1
+        fi
 
   # CORDIS worker (Python). Its own job: it needs no Postgres or Node, and a
   # failure here should not hide the app's result. The interpreter comes from

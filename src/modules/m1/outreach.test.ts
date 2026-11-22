@@ -21,17 +21,22 @@ describe('buildPartnerSearchLinks', () => {
     }),
   );
 
-  it('returns all five sources in the declared order', () => {
+  it('has no LinkedIn deep link in any source, URL or search text (spec D2 l.14)', () => {
+    const list = buildPartnerSearchLinks({ orgName: 'Acme', country: 'DE', topic: { code: 'X1', title: 'T' } });
+    expect(list.map((l) => l.id)).not.toContain('linkedin');
+    expect(PARTNER_SEARCH_SOURCES).not.toContain('linkedin');
+    expect(Object.keys(PARTNER_SEARCH_BASE_URLS)).not.toContain('linkedin');
+    for (const link of list) expect(`${link.url} ${link.searchText}`.toLowerCase()).not.toContain('linkedin');
+  });
+
+  it('returns all four sources in the declared order', () => {
     const list = buildPartnerSearchLinks({ orgName: 'X' });
     expect(list.map((l) => l.id)).toEqual([...PARTNER_SEARCH_SOURCES]);
   });
 
-  it('pre-fills F&T Portal and LinkedIn with the encoded organisation name', () => {
+  it('pre-fills F&T Portal with the encoded organisation name', () => {
     expect(links.ft!.url).toBe(
       `${PARTNER_SEARCH_BASE_URLS.ft}?keywords=Fraunhofer%20Gesellschaft%20%26%20Co`,
-    );
-    expect(links.linkedin!.url).toBe(
-      `${PARTNER_SEARCH_BASE_URLS.linkedin}?keywords=Fraunhofer%20Gesellschaft%20%26%20Co`,
     );
     expect(links.ft!.prefilled).toBe(true);
   });

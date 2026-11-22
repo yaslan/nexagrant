@@ -12,6 +12,7 @@ import 'dotenv/config';
 
 import { prisma } from '../src/lib/db';
 import { DEFAULT_CRITERIA } from '../src/modules/m6/types';
+import { MAX_PROPOSAL_TEXT_CHARS } from '../src/modules/m6/proposal-too-long';
 
 export const M6_E2E = {
   email: 'm6-e2e@fabrika.test',
@@ -22,11 +23,45 @@ export const M6_E2E = {
   proposalId: 'm6-e2e-proposal',
   evaluationId: 'm6-e2e-evaluation',
   reviewerId: 'm6-e2e-reviewer',
+  /** An opportunity whose Part B is one character over what the AI reader accepts (NG-106). */
+  longOpportunityId: 'm6-e2e-opportunity-long',
+  longPartBId: 'm6-e2e-part-b-long',
+  creditGrantId: 'm6-e2e-credit-grant',
+  creditGrant: 10,
   /** Official ESR total out of 15; the dashboard shows it on the 1–5 panel scale. */
   esrTotal: 12.5,
 } as const;
 
+/**
+ * Refuses to write unless the target is a local database and this is not production.
+ * The gate (scripts/gate-isolated.sh) points DATABASE_URL at 127.0.0.1:fabrika_gate, and
+ * the Playwright run uses the same URL, so both pass. Anything else throws before any
+ * Prisma call, so a stray `pnpm tsx scripts/seed-m6-e2e.ts` cannot write fixtures into a
+ * shared or hosted database. The message names the rule, never the URL or credentials.
+ */
+const LOCAL_DB_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+export function assertSeedTarget(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.NODE_ENV === 'production') {
+    throw new Error('[seed-m6-e2e] refused: NODE_ENV=production. Nothing was written.');
+  }
+  if (!env.DATABASE_URL) {
+    throw new Error('[seed-m6-e2e] refused: DATABASE_URL is not set. Nothing was written.');
+  }
+  let host: string;
+  try {
+    host = new URL(env.DATABASE_URL).hostname;
+  } catch {
+    throw new Error('[seed-m6-e2e] refused: DATABASE_URL is not a valid URL. Nothing was written.');
+  }
+  if (!LOCAL_DB_HOSTS.has(host)) {
+    throw new Error('[seed-m6-e2e] refused: DATABASE_URL is not a local database. Nothing was written.');
+  }
+}
+
 export async function seed() {
+  assertSeedTarget();
+
   await prisma.tenant.upsert({
     where: { id: M6_E2E.tenantId },
     update: {},
@@ -148,6 +183,49 @@ export async function seed() {
   // Clear any marks left by an earlier run so the test starts from "nothing submitted".
   const deleted = await prisma.score.deleteMany({ where: { reviewerId: M6_E2E.reviewerId } });
 
+  // A balance, so a refusal that left the credits alone can be told from one that had none.
+  await prisma.creditLedger.upsert({
+    where: { id: M6_E2E.creditGrantId },
+    update: { delta: M6_E2E.creditGrant },
+    create: {
+      id: M6_E2E.creditGrantId,
+      tenantId: M6_E2E.tenantId,
+      delta: M6_E2E.creditGrant,
+      // Not 'monthly_grant': a kept fixture row must not read as a scheduled grant.
+      reason: 'purchase',
+    },
+  });
+
+  await prisma.opportunity.upsert({
+    where: { id: M6_E2E.longOpportunityId },
+    update: {},
+    create: {
+      id: M6_E2E.longOpportunityId,
+      tenantId: M6_E2E.tenantId,
+      workspaceId: M6_E2E.workspaceId,
+      title: 'M6 E2E — proposal over the AI reader limit',
+      stage: 'G2',
+      status: 'ACTIVE',
+      intendedRole: 'coordinator',
+    },
+  });
+
+  const heading = '## T\n';
+  const longContent = {
+    sections: [{ title: 'T', content: 'x'.repeat(MAX_PROPOSAL_TEXT_CHARS + 1 - heading.length) }],
+  };
+  await prisma.applicationPart.upsert({
+    where: { id: M6_E2E.longPartBId },
+    update: { content: longContent },
+    create: {
+      id: M6_E2E.longPartBId,
+      tenantId: M6_E2E.tenantId,
+      opportunityId: M6_E2E.longOpportunityId,
+      part: 'PART_B',
+      content: longContent,
+    },
+  });
+
   console.log(
     `[seed-m6-e2e] ready — tenant=${M6_E2E.tenantId} proposal=${M6_E2E.proposalId} ` +
       `evaluation=${M6_E2E.evaluationId} criteria=${DEFAULT_CRITERIA.length} clearedScores=${deleted.count}`,
@@ -155,6 +233,14 @@ export async function seed() {
 }
 
 export async function rollback() {
+  assertSeedTarget();
+
+  await prisma.applicationPart.deleteMany({ where: { id: M6_E2E.longPartBId } });
+  await prisma.opportunity.deleteMany({ where: { id: M6_E2E.longOpportunityId } });
+  await prisma.creditLedger.deleteMany({ where: { id: M6_E2E.creditGrantId } });
+  // Tenant-scoped rows an AI run may have written (NG-106 finding 4). Before the tenant
+  // delete: aiUsageLog holds a tenant FK, so leaving it would make that delete fail.
+  await prisma.aiUsageLog.deleteMany({ where: { tenantId: M6_E2E.tenantId } });
   await prisma.score.deleteMany({ where: { reviewerId: M6_E2E.reviewerId } });
   await prisma.criterion.deleteMany({ where: { evaluationId: M6_E2E.evaluationId } });
   await prisma.reviewer.deleteMany({ where: { id: M6_E2E.reviewerId } });

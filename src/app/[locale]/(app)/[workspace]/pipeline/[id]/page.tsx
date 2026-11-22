@@ -3,13 +3,15 @@ import { notFound } from 'next/navigation';
 import type { Gate } from '@prisma/client';
 
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { computeG0ForOpportunity } from '@/lib/scoring/g0-compute';
 import type { G0Computation } from '@/lib/scoring/g0-compute';
 import { DEFAULT_GATE_RULES } from '@/lib/scoring/defaults';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
+import type { SavedG0Decision } from '@/lib/gates/latest-g0-decision';
+import { listDecisions } from '@/lib/k5-pipeline/withdrawal';
 
-import { OpportunityDetailClient, type G0Display, type OpportunityView } from './client';
+import { OpportunityDetailClient, type DecisionEntry, type G0Display, type OpportunityView } from './client';
 import type { EffortEntry } from './effort';
 import { moduleGate } from '@/lib/modules/guard';
 
@@ -58,14 +60,15 @@ export default async function OpportunityDetailPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, workspace, id } = await params;
+  const { tenantId, userId, role } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
-  const { tenantId, userId, role } = await requireTenantPage(locale);
 
   const loaded = await withTenant<{
     opp: OpportunityRow | null;
     g0: G0Computation | null;
     efforts: EffortEntry[];
+    savedG0: SavedG0Decision | null;
   }>(tenantId, async (tx) => {
     // findFirst + tenantId, never findUnique on a guessable id, and `deletedAt: null` so a
     // soft-deleted (KVKK/GDPR erasure) or archived opportunity 404s instead of staying readable.
@@ -81,7 +84,20 @@ export default async function OpportunityDetailPage({
         ownerId: true,
       },
     });
-    if (!opp) return { opp: null, g0: null, efforts: [] };
+    if (!opp) return { opp: null, g0: null, efforts: [], savedG0: null };
+
+    // Past G0 the box shows the saved decision, not the live number (NG-69). Same ordering as
+    // gates/evaluate.ts: newest first, erased rows are no decision.
+    const savedRow = opp.stage === 'G0'
+      ? null
+      : await tx.gateDecision.findFirst({
+          where: { tenantId, opportunityId: id, gate: 'G0', deletedAt: null },
+          orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+          select: { passed: true, decidedAt: true },
+        });
+    const savedG0: SavedG0Decision | null = savedRow
+      ? { passed: savedRow.passed, decidedAt: savedRow.decidedAt }
+      : null;
 
     // The effort tab used to render a two-row `MOCK_EFFORTS` constant. These are the rows the
     // `Effort` table actually holds for this opportunity; when there are none the tab says so.
@@ -111,7 +127,9 @@ export default async function OpportunityDetailPage({
       userName: nameById.get(r.userId) ?? null,
     }));
 
-    return { opp, g0: await computeG0ForOpportunity(tx, tenantId, id), efforts };
+    // The live score is only computed at G0; past G0 the box shows the saved decision (NG-69).
+    const g0 = opp.stage === 'G0' ? await computeG0ForOpportunity(tx, tenantId, id) : null;
+    return { opp, g0, efforts, savedG0 };
   });
 
   if (!loaded.opp) notFound();
@@ -123,6 +141,8 @@ export default async function OpportunityDetailPage({
     totalSources: loaded.g0?.sources.length ?? 0,
     reasons: loaded.g0?.reasonDetails ?? [],
     minScore: DEFAULT_GATE_RULES.G0.minScore,
+    scoringBasis: loaded.g0?.scoringBasis ?? 'standard',
+    denominator: loaded.g0?.denominator ?? null,
   };
 
   const opportunity: OpportunityView = {
@@ -138,11 +158,23 @@ export default async function OpportunityDetailPage({
   // button is not authorisation — but showing a control that always refuses is its own defect.
   const canArchive = canArchiveOpportunity(role, loaded.opp.ownerId, userId);
 
+  // The decision log (NG-15 / NG-38): written by the withdrawal layer, read back here. Null means
+  // the opportunity is not this tenant's, which the `notFound()` above has already caught.
+  const decisionRows = await listDecisions({ tenantId }, id);
+  const decisions: DecisionEntry[] = (decisionRows ?? []).map((d) => ({
+    id: d.id,
+    kind: d.kind,
+    reason: d.reason,
+    decidedAt: d.decidedAt.toISOString(),
+  }));
+
   return (
     <OpportunityDetailClient
       opportunity={opportunity}
       g0={g0}
+      savedG0={loaded.savedG0}
       efforts={loaded.efforts}
+      decisions={decisions}
       canArchive={canArchive}
       backHref={`/${locale}/${workspace}/pipeline`}
       locale={locale}

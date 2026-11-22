@@ -191,6 +191,10 @@ Bkz. `docs/agent-results/ADR-0002-geli-tirici-2.md` §6.
 | M17 | Interreg ön değerlendirme (kredi, model çağrısından ÖNCE rezerve edilir: kiracı kilidi altında bakiye kontrolü + analiz claim'i + CreditLedger `usage:M17` −3, refId = `<analizKimliği>:<claimMs>`; sonuç yazılamazsa veya koşu ölürse `refund:M17` +3 ile iade edilir; AiUsageLog'daki model çağrı satırları 0 kredi gösterir) | 3 | Bekliyor |
 | M17 | Ön değerlendirme — ilk model çağrısı (ücretsiz; kredi yukarıdaki rezervasyonla düşer) | 0 | Bekliyor |
 | M17 | Ön değerlendirme — biçim hatası sonrası tek yeniden deneme | 0 | Bekliyor |
+| M18 | Kurum zenginleştirme (web sitesinden, en çok 5 sayfa; hiçbir sayfa çekilemezse model çağrılmaz, kredi düşmez; kredi model çağrısından ÖNCE kiracı kilidi altında rezerve edilir: CreditLedger `usage:M18` −1; yanıtta kullanılabilir öneri yoksa ya da çağrı başarısızsa aynı refId ile `refund:M18` +1) | 1 | Yayımlandı (patron onayı: 15.11.2026) |
+| M18 | Kurum zenginleştirme — model çağrısı (ücretsiz; kredi yukarıdaki rezervasyonla düşer, AiUsageLog satırı 0 kredi gösterir) | 0 | Bekliyor |
+| M18 | Uygunluk ön raporu (kurum × çağrı; iç ön değerlendirme, resmî puan değildir; kredi model çağrısından ÖNCE rezerve edilir: `usage:M18` −2; yanıt boşsa, çağrı başarısızsa ya da TASLAK kaydedilemezse `refund:M18` +2) | 2 | Yayımlandı (patron onayı: 15.11.2026) |
+| M18 | Uygunluk ön raporu — model çağrısı (ücretsiz; kredi yukarıdaki rezervasyonla düşer, AiUsageLog satırı 0 kredi gösterir) | 0 | Bekliyor |
 | M9 | Brifing | 1 | Yayımlandı |
 | M10 | Belge | 1 | Yayımlandı |
 | M11 | Bölüm | 2 | Yayımlandı |
@@ -432,3 +436,21 @@ Migration: `prisma/migrations/retire-eur-plan-ladder.sql`
 | `ADDON-USD-1` | Eklenti kataloğu EUR ve eski plan adlarını taşıyor (§1.1) |
 | `BETA-USD-1` | E11 kohortunun GA'da hangi USD planına geçeceği belirsiz (§8) |
 | `PLAN-DEFAULT-1` | ~~Modül ayarları sayfası, aboneliği olmayan kiracıya orta planı (`pro`) varsayıyor~~ — **kapandı (TASK-MUMH6W5I1W9WC, 29.09.2026):** sayfa ve eylem planı/modülleri `getEntitlements` ile okuyor (`settings/modules/plan-view.ts`); aboneliksiz kiracı `free` (Discover) görür |
+
+## 10. NexaGrant planları (NG-57)
+
+NexaGrant'ın kendi plan kataloğu Fabrika merdiveninden (§1) ayrıdır (K-584182 = A). Tablolar ve deneme akışı için bkz. `docs/DATA_MODEL.md` §33; matrisin tek yazıldığı yer `prisma/seed-data/nexagrant-catalog.ts`.
+
+| Plan | id | Satılır mı | Kapsam (S1) |
+|---|---|---|---|
+| Ücretsiz Kontrol | `ng-free` | hayır (fallback) | kurum profili; uygunluk kontrolü ayda 3; 1 koltuk* |
+| Temel | `ng-basic` | evet | + çağrı arama, sınırsız uygunluk, TRL, başvur/vazgeç kararı, bülten; 2 koltuk |
+| Profesyonel | `ng-pro` | evet | + partner arama, outreach, benzer projeler; 5 koltuk; YZ yazım ayda 50 |
+| Kurumsal | `ng-enterprise` | hayır (S2, ön kayıt) | Profesyonel kapsamı; sınırsız koltuk; YZ ayda 300 |
+
+\* Ücretsiz Kontrol'ün koltuk sayısı 06'da yazmıyor; NG-57'de 1 seçildi (açık nokta).
+
+- **Deneme:** 14 gün Profesyonel; kurum tipi `MUNICIPALITY` ise 30 gün. Kart istenmez. Bitince Ücretsiz Kontrol'e düşer (K-584180 = A).
+- **Fiyat:** Hücreler TRY ve EUR, yıllık ve aylık olarak açıldı (K-584156 = A). **Tutar yok:** NG-57 kartı tutar üretmiyor, tutarlar mali müşavir onayını bekliyor. Tutarı NULL olan hücre satın alınamaz.
+- **Kararlaştırılmayanlar:** Para birimi seçim kuralı (NG-244 §3) ve TL ödeme sağlayıcısı (§3.3). Ödeme entegrasyonu NG-57 kapsamında değil.
+- **Başarı primi** bu katalogda yer almaz ve uygun maliyet olarak modellenmez (§5).

@@ -13,7 +13,13 @@ export type Action =
   | "manage_approvals"
   | "approve_dual_approval"
   /** M1 Partner Search announcements: read and export (FO-61). Not for guest partners. */
-  | "view_partner_search";
+  | "view_partner_search"
+  /** M18 Client Pipeline (NG-143): read = MEMBER+, write = WRITER+, admin = TENANT_ADMIN+. */
+  | "client_pipeline_read"
+  | "client_pipeline_write"
+  | "client_pipeline_admin"
+  /** NG-248 (K-584216): the agency co-brand (name + logo) in the app shell and its logo route. Not for guest partners. */
+  | "view_tenant_branding";
 
 const rolePermissions: Record<Role, Action[]> = {
   TENANT_OWNER: [
@@ -29,6 +35,10 @@ const rolePermissions: Record<Role, Action[]> = {
     "manage_approvals",
     "approve_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
+    "client_pipeline_admin",
+    "view_tenant_branding",
   ],
   TENANT_ADMIN: [
     "manage_users",
@@ -41,6 +51,10 @@ const rolePermissions: Record<Role, Action[]> = {
     "manage_approvals",
     "approve_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
+    "client_pipeline_admin",
+    "view_tenant_branding",
   ],
   PIPELINE_MANAGER: [
     "manage_workspaces",
@@ -51,6 +65,9 @@ const rolePermissions: Record<Role, Action[]> = {
     "request_dual_approval",
     "manage_approvals",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
+    "view_tenant_branding",
   ],
   WRITER: [
     "edit_proposal",
@@ -58,12 +75,17 @@ const rolePermissions: Record<Role, Action[]> = {
     "contribute_assigned",
     "request_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
+    "client_pipeline_write",
+    "view_tenant_branding",
   ],
   MEMBER: [
     "view_proposal",
     "contribute_assigned",
     "request_dual_approval",
     "view_partner_search",
+    "client_pipeline_read",
+    "view_tenant_branding",
   ],
   GUEST_PARTNER: [
     "contribute_assigned",
@@ -71,15 +93,44 @@ const rolePermissions: Record<Role, Action[]> = {
 };
 
 /**
- * Check if a role has permission to perform a specific action.
+ * The plan half of a decision (CLAUDE.md rule 4: plan + module switch + role). Built by
+ * the caller from the tenant's plan entitlement — for NexaGrant by `canUseNgFeature`
+ * (src/lib/billing/nexagrant/authz.ts) — never typed by hand.
+ */
+export interface PlanFeatureResource {
+  /** The plan feature the action uses, e.g. `partner_search`. */
+  feature: string;
+  /** Every feature the tenant's current plan grants. */
+  grantedFeatures: ReadonlySet<string>;
+  /**
+   * Whether the module behind the feature is open to tenant members
+   * (`isOpenToTenantMembers`). Undefined = no module stands behind the feature.
+   */
+  moduleOpen?: boolean;
+}
+
+/**
+ * Check if a role has permission to perform a specific action — and, when a
+ * `resource` is given, that the tenant's plan grants the feature and the module
+ * behind it is open. A module switched on does not open a feature the plan does not
+ * grant (CLAUDE.md rule 4).
  * @param role The role of the user (e.g. from session)
  * @param action The action the user is trying to perform
+ * @param resource The plan feature the action uses, with the tenant's entitlement
  * @returns boolean
  */
-export function can(role: Role | undefined | null, action: Action): boolean {
-  if (!role) return false;
-  const permissions = rolePermissions[role];
-  return permissions ? permissions.includes(action) : false;
+export function can(
+  role: Role | undefined | null,
+  action: Action,
+  resource?: PlanFeatureResource
+): boolean {
+  // Own-property check: a bare lookup would hand back Object.prototype members
+  // ('constructor', 'toString', ...) and `.includes` would then throw (NG-259).
+  if (!role || !Object.hasOwn(rolePermissions, role)) return false;
+  if (!rolePermissions[role].includes(action)) return false;
+  if (!resource) return true;
+  if (resource.moduleOpen === false) return false;
+  return resource.grantedFeatures.has(resource.feature);
 }
 
 /**
@@ -92,7 +143,11 @@ export function can(role: Role | undefined | null, action: Action): boolean {
  * entry to look up.
  */
 export function asRole(role: string | undefined | null): Role | null {
-  return role !== null && role !== undefined && role in rolePermissions ? (role as Role) : null;
+  // Own-property check, not `in`: `in` also walks the prototype chain, so
+  // 'constructor' or '__proto__' would be taken for roles (NG-259).
+  return role !== null && role !== undefined && Object.hasOwn(rolePermissions, role)
+    ? (role as Role)
+    : null;
 }
 
 export type DualApprovalActionType =

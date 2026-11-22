@@ -8,6 +8,18 @@
 export const SEDIA_RESULT_WINDOW = 10_000;
 
 /**
+ * Longest search text the calls page sends or the route forwards to SEDIA. Both read this one
+ * constant, so the URL, the request and the cache key carry the same text. An uncapped `q` made
+ * every reload of a long link run one SEDIA search and one translation batch for nothing.
+ */
+export const CALLS_SEARCH_MAX_LENGTH = 200;
+
+/** Cuts a search text to `CALLS_SEARCH_MAX_LENGTH` characters; shorter text is returned as it is. */
+export function clampSearchText(text: string): string {
+  return text.slice(0, CALLS_SEARCH_MAX_LENGTH);
+}
+
+/**
  * The last page the calls page can open. `totalResults` stays SEDIA's real
  * total (16 651 for closed grants), but only the pages inside the window can be
  * read, so the pager ends at the last of them. Never below 1, so "1 / 1" shows

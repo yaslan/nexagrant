@@ -12,6 +12,7 @@ import { PIC_LOOKUPS_PER_HOUR } from '../../src/lib/pic';
 import { computeG0ForOpportunity, rescoreOpportunityG0 } from '../../src/lib/scoring/g0-compute';
 import { expectHydrated } from './fixtures/hydration';
 import { signInAs } from './fixtures/session';
+import { shotsDir } from './fixtures/shots';
 import {
   PP_ADMIN,
   PP_MEMBER,
@@ -60,6 +61,14 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
     await prisma.$disconnect();
   });
 
+  test('an empty PIC shows the missing state', async ({ page }) => {
+    expect(await storedPic(PP_TENANT)).toBeNull();
+    await openProfile(page, PP_OWNER);
+    await expect(input(page)).toHaveValue('');
+    await expect(page.getByTestId('tenant-pic-missing')).toContainText('PIC eksik');
+    await page.getByTestId('tenant-pic-setting').screenshot({ path: `${shotsDir("NG-7-evidence")}/ng-7-pic-missing-state.png` });
+  });
+
   test('a malformed PIC is refused and nothing is stored', async ({ page }) => {
     await openProfile(page, PP_OWNER);
     await input(page).fill('12345');
@@ -85,11 +94,14 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
     await expect(feedback(page)).toContainText("CORDIS'te bu koda ait kayıt bulamadık");
     await expect(page.getByTestId('tenant-pic-confirm')).toHaveCount(0);
     expect(await storedPic(PP_TENANT)).toBe(PP_PIC_UNMATCHED);
+    // NG-7 B-2: a saved PIC is not reported as missing, before or after a reload.
+    await expect(page.getByTestId('tenant-pic-missing')).toHaveCount(0);
 
     await page.reload();
     await expectHydrated(input(page));
     await expect(input(page)).toHaveValue(PP_PIC_UNMATCHED);
     await expect(feedback(page)).toContainText("CORDIS'te bu koda ait kayıt bulamadık");
+    await expect(page.getByTestId('tenant-pic-missing')).toHaveCount(0);
   });
 
   test('clearing the field removes the PIC', async ({ page }) => {
@@ -98,6 +110,7 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
     await input(page).fill('');
     await save(page);
     await expect(feedback(page)).toContainText('PIC kaldırıldı');
+    await expect(page.getByTestId('tenant-pic-missing')).toHaveCount(0);
     expect(await storedPic(PP_TENANT)).toBeNull();
     // FO-384 H4: the stored score follows the cleared PIC, on both records.
     const cleared = await g0Score();
@@ -106,6 +119,8 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
     await page.reload();
     await expectHydrated(input(page));
     await expect(input(page)).toHaveValue('');
+    // Nothing is stored any more, so the line is back.
+    await expect(page.getByTestId('tenant-pic-missing')).toHaveCount(1);
   });
 
   test('a CORDIS match is shown and needs a yes; the G0 score of the same opportunity then rises', async ({ page }) => {
@@ -440,6 +455,30 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
       expect(await storedPic(PP_TENANT)).toBeNull();
     });
 
+    // NG-229. The banner hides itself four seconds after a save. The timer of the first save used
+    // to stay armed, so a second save inside those four seconds had its banner taken down early.
+    // The page clock is stopped once the form is open, so only runFor() moves it: how long the
+    // second save takes to answer cannot decide whether the old timer would have fired.
+    test('NG-229: the banner of a second save is not taken down by the timer of the first', async ({ page }) => {
+      await setPic(null);
+      await page.clock.install();
+      await openProfile(page, PP_OWNER);
+      await page.clock.pauseAt(new Date(Date.now() + 60_000));
+      await saveKeywordsOnly(page, 'banner first save');
+
+      // Inside the first banner's four seconds.
+      await page.clock.runFor(3_000);
+      await saveKeywordsOnly(page, 'banner second save');
+
+      // Past the first save's four seconds (4_000 after the first banner), inside the second's.
+      await page.clock.runFor(1_500);
+      await expect(page.getByText('başarıyla güncellendi')).toBeVisible();
+
+      // And the second save's own four seconds still end its banner.
+      await page.clock.runFor(3_000);
+      await expect(page.getByText('başarıyla güncellendi')).toBeHidden();
+    });
+
     test('B6: an old-format PIC does not block a save that leaves it alone, and is refused once edited', async ({ page }) => {
       await setPic('12345');
       await openProfile(page, PP_OWNER);
@@ -454,6 +493,31 @@ test.describe('FO-383 — PIC on Kurumsal Profil', () => {
       await expect(feedback(page).getByRole('alert')).toContainText('9 rakam');
       expect(await storedPic(PP_TENANT)).toBe('12345');
       await setPic(null);
+    });
+  });
+
+  // ── NG-7 B-2: the "missing" line describes the saved PIC, not what is typed in the box ──
+  test.describe('the missing-PIC line follows the saved value', () => {
+    const missing = (page: Page) => page.getByTestId('tenant-pic-missing');
+    const setStoredPic = (pic: string | null) => prisma.tenant.update({ where: { id: PP_TENANT }, data: { pic } });
+
+    test('a stored PIC cleared in the box but not saved is not reported as missing', async ({ page }) => {
+      await setStoredPic(PP_PIC_UNMATCHED);
+      await openProfile(page, PP_OWNER);
+      await expect(missing(page)).toHaveCount(0);
+      await input(page).fill('');
+      await expect(missing(page)).toHaveCount(0);
+      expect(await storedPic(PP_TENANT)).toBe(PP_PIC_UNMATCHED);
+      await setStoredPic(null);
+    });
+
+    test('an empty stored PIC stays reported as missing while an unsaved value is typed', async ({ page }) => {
+      await setStoredPic(null);
+      await openProfile(page, PP_OWNER);
+      await expect(missing(page)).toHaveCount(1);
+      await input(page).fill('123456789');
+      await expect(missing(page)).toHaveCount(1);
+      expect(await storedPic(PP_TENANT)).toBeNull();
     });
   });
 });

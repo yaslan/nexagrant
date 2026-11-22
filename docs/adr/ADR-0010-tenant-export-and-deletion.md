@@ -263,6 +263,19 @@ Kısaltmalar:
 | 76 | InterregAnalysis (M17) | tenantId → Tenant, userId → User | **Y** (kullanıcının yüklediği çağrı/proje belgesinin çıkarılmış metni: `callText`, `projectText`, dosya adları; üçüncü kişi adı içerebilir) | E — metin **yalnız tutulduğu sürece** (yuva başına ≤ 30 gün) | C (+ kullanıcı silinince `User` cascade'i) |
 | 77 | InterregAnalysisResult (M17) | → InterregAnalysis (bileşik FK), tenantId | D (belgeden türeyen rapor metni, `reportMarkdown`) | E | C |
 | 78 | InterregCriterionMark (M17) | → InterregAnalysis (bileşik FK), tenantId | Y (`evidenceQuote`: belgeden alıntı) | E | C |
+| 79 | OrgReadiness (NG-34) | tenantId → Tenant | D (EU Login/LEAR cevabı; kişi verisi yok) | E | C |
+| 80 | InternalApproval (NG-34) | → Opportunity (bileşik FK), tenantId; approvedById → User (SetNull) | D (eş finansman taahhüdü, karar referansı) | E | C |
+| 81 | PartnerBudgetShare (NG-34) | → ConsortiumSeat (bileşik FK), tenantId; agreedById → User (SetNull) | D (ortak bütçe payı aralığı) | E | C |
+| 82 | ProjectIdea (NG-38) | tenantId → Tenant; createdById → User (SetNull) | D (proje fikri metni, TRL, hedef program) | E | C |
+| 83 | DecisionLog (NG-38) | → Opportunity (bileşik FK), tenantId; decidedById → User (SetNull) | D (başvur/vazgeç kararı ve gerekçesi) | E | C |
+| 84 | NotificationPreference (NG-43) | tenantId → Tenant; `userId` (FK yok) | D (kişinin olay başına kanal/sıklık seçimi) | E | C |
+| 85 | NotificationEmailItem (NG-43) | tenantId → Tenant; `userId` (FK yok) | D (`userId`, alıcı; `payload` yalnız kimlik/sayı; `sentAt`: gönderilmiş satır tekrar önleme kaydı olarak 90 gün kalır) | E | C |
+
+**NG-34 — dışa aktarma ve silme kapsamı (satırlar 79–81).** Kişi dışa aktarması (`src/actions/user/export-data.ts`) `InternalApproval` ve `PartnerBudgetShare` satırlarından yalnız kişiyi bağlayan onay/mutabakat kaydını verir; tutarlar kurumun verisidir, girmez. Kişi silinince `approvedById` / `agreedById` boşalır, kurumun kaydı kalır. `OrgReadiness` kişiye bağlı değildir. Üçü de kiracı silinince cascade ile gider.
+
+**NG-38 — dışa aktarma ve silme kapsamı (satırlar 82–83).** Kişi dışa aktarması `ProjectIdea` ve `DecisionLog` satırlarından yalnız kişiyi bağlayan kaydı verir (kimlik, kiracı, tarih; kararda fırsat ve tür). Fikir metni ve karar gerekçesi kurumun kaydıdır, girmez. Kişi silinince `createdById` / `decidedById` boşalır, kayıt kalır. İkisi de kiracı silinince cascade ile gider.
+
+**NG-43 — dışa aktarma ve silme kapsamı (satırlar 84–85).** İkisi de kişinin kendi verisidir: kişi dışa aktarması (`export-data.ts`) tercih satırlarını ve kuyrukta bekleyen e-postaları (tür, payload, sıklık) verir; kişi silinince `users-scheduled-deletion` ikisini de `userId` ile siler (`Notification` gibi). Kuyruk satırı gönderilince silinmez, `sentAt` ile işaretlenir: (kiracı, kullanıcı, `dedupeKey`) tekil indeksi e-posta kanalının tek tekrar önleyicisidir; satır silinseydi her gün aynı anahtarla koşan üretici (ör. `evidence-expiring`) aynı postayı yeniden gönderirdi (NG-43 inceleme B-1). Gönderilmiş satırlar `notifications-retention` işiyle, `sentAt`'ten itibaren `Notification` ile aynı pencere (90 gün) dolunca silinir; gönderilmemiş satır yaşına bakılmadan kalır. Kişi dışa aktarması `sentAt`'i de verir. Üye olmayan (kiracıdan ayrılmış ya da silme talebi olan) alıcının satırı gönderilmeden silinir. Kiracı silinince cascade ile gider.
 
 **M17 (FO-195, B4) — dışa aktarma ve silme kapsamı.** Ek A sayımına (75) sonradan eklendi (satırlar 76–78; `InterregRubric` / `InterregRubricCriterion` platform katalogudur, kişisel veri yok, dokunulmaz — A.3 gibi).
 

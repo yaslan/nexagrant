@@ -8,6 +8,7 @@
     "evidence": "Evidence",
     "conceptNotes": "Concept Notes",
     "interregReview": "Interreg Pre-Assessment",
+    "clientPipeline": "Client Sales Pipeline",
     "tto": "TTO Accelerator (M7)",
     "approvals": "Approvals (4-Eyes)",
     "apiKeys": "Partner REST API",
@@ -22,7 +23,9 @@
     "preview": {
       "PILOT": "Pilot",
       "DEV": "Dev"
-    }
+    },
+    "homeLink": "Home",
+    "planAndTrial": "Plan and trial"
   },
   "Common": {
     "loading": "Loading...",
@@ -74,7 +77,33 @@
     "evidenceExpiringDesc": "Valid until {validUntil}",
     "sourceOther": "another source",
     "genericTitle": "Notification",
-    "genericDesc": "You have a new notification."
+    "genericDesc": "You have a new notification.",
+    "emailDigestSubject": "Weekly notification summary: {count, plural, one {1 notification} other {# notifications}}",
+    "emailDigestIntro": "You have {count, plural, one {1 notification} other {# notifications}} this week, gathered into one e-mail as your weekly summary setting asks.",
+    "preferences": {
+      "title": "Notification preferences",
+      "description": "Choose, for each notification type, whether you get it in the panel or by e-mail, and how often.",
+      "eventColumn": "Notification",
+      "channelPanel": "Panel",
+      "channelEmail": "E-mail",
+      "freqInstant": "Instant",
+      "freqWeekly": "Weekly",
+      "freqOff": "Off",
+      "saved": "Preference saved",
+      "saveFailed": "Could not save the preference. Please try again.",
+      "loadFailed": "Could not load preferences.",
+      "events": {
+        "NEW_MATCHING_CALL": "New matching call",
+        "CALL_CHANGED": "Followed call changed",
+        "OUTREACH_REPLY": "Outreach reply",
+        "CONTRIBUTION_OVERDUE": "Contribution overdue",
+        "APPROVAL_OVERDUE": "Approval overdue",
+        "BUDGET_DEVIATION": "Budget deviation",
+        "TASK_COLOR_CHANGED": "Task status changed",
+        "REPORT_DUE": "Report due",
+        "OBLIGATION_REMINDER": "Obligation reminder"
+      }
+    }
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -143,7 +172,8 @@
     "readinessMoreGaps": "{count} more gaps; see the full result for all of them.",
     "readinessViewResult": "View the full result",
     "readinessRetake": "Retake the scorecard",
-    "cardLinkAria": "{title} — go to details"
+    "cardLinkAria": "{title} — go to details",
+    "cardLinkAction": "— go to details"
   },
   "Pipeline": {
     "title": "Opportunity Pipeline",
@@ -167,6 +197,12 @@
       "evidenceCoverage": "Evidence: {measured}/{total} criteria measured",
       "decisionGo": "Pre-assessment: GO",
       "decisionNoGo": "Pre-assessment: NO_GO",
+      "savedG0Passed": "Latest G0 decision: PASSED",
+      "savedG0Refused": "Latest G0 decision: NOT PASSED",
+      "savedG0Date": "Decided on {date} · saved decision, not a live calculation",
+      "savedG0None": "No saved G0 decision for this opportunity",
+      "noHistoryBasis": "Partner with no institutional history: history-based criteria were left out. The score is the weighted average of the criteria that were measured (weight total {denominator}, not 100).",
+      "refusedBecause": "Not passed: {reason}",
       "internalPreAssessment": "Internal pre-assessment — not an official score.",
       "scoreReasons": "Score Reasons",
       "intendedRole": "Intended Role",
@@ -256,6 +292,31 @@
           "DECLARE_FAILED": "The declaration could not be saved. Try again."
         }
       },
+      "withdraw": {
+        "open": "Withdraw",
+        "reasonLabel": "Reason for withdrawing",
+        "reasonHint": "A reason is required. The record is written to the decision log and cannot be undone; the reason stays visible.",
+        "submit": "Withdraw and save the reason",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "withdrawnNotice": "This opportunity has been set to passive (withdrawn). Its reason is visible in the decision log.",
+        "logTitle": "Decision log",
+        "kind": {
+          "WITHDRAW": "Withdrawn",
+          "APPLY": "Applied"
+        },
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Your session is not linked to a workspace. Sign in again.",
+          "INVALID_INPUT": "Invalid request.",
+          "REASON_TOO_LONG": "The reason can be at most 2000 characters.",
+          "REASON_REQUIRED": "You must write a reason to withdraw.",
+          "OPPORTUNITY_NOT_FOUND": "This opportunity was not found or has been archived.",
+          "WITHDRAW_FORBIDDEN": "Only pipeline managers or the opportunity owner can do this.",
+          "ALREADY_WITHDRAWN": "This opportunity is already withdrawn.",
+          "ALREADY_DECIDED": "An opportunity with a result cannot be withdrawn.",
+          "WITHDRAW_FAILED": "The withdrawal could not be saved. Try again."
+        }
+      },
       "modules": {
         "label": "Modules",
         "conceptNote": "Concept note",
@@ -312,10 +373,14 @@
       "searchPlaceholder": "Search opportunities, notes or people...",
       "allUsers": "👥 All users",
       "allRoles": "All roles",
+      "ownerFilterLabel": "Filter by owner",
+      "roleFilterLabel": "Filter by role",
       "roleCoordinator": "👑 Coordinator",
       "rolePartner": "🤝 Partner",
       "addOpportunity": "Add new opportunity",
       "g0ScoreTitle": "AI gate fit score",
+      "g0RefusedTitle": "Latest G0 decision: NOT PASSED. The score is a pre-assessment only.",
+      "g0NoDecisionTitle": "No G0 decision yet. The score is a pre-assessment only.",
       "assignee": "Assigned to:",
       "changeOwnerTitle": "Change the responsible user",
       "notesHeading": "💬 Notes & updates",
@@ -351,6 +416,54 @@
       "partnerBadge": "Partner",
       "collapseCard": "Collapse card",
       "expandCard": "Expand for details"
+    },
+    "modal": {
+      "tag": "Stage-Gate Task Detail",
+      "close": "Close",
+      "openFullPage": "View Full Details",
+      "stage": "Stage",
+      "role": "Target Role",
+      "coordinator": "Coordinator",
+      "partner": "Partner",
+      "assignedTo": "Assigned Member",
+      "g0Score": "AI Gate Fit Score",
+      "g0Unscored": "Score Not Computed Yet",
+      "topic": "Topic Identifier",
+      "noTopic": "No associated call topic",
+      "notesTitle": "Notes & Updates",
+      "notesCount": "{count} Notes",
+      "noNotes": "No notes have been added to this task yet.",
+      "noteAuthor": "Author",
+      "notePlaceholder": "Write a note or update...",
+      "addNote": "Add",
+      "tasksTitle": "Gate Checklist & Tasks",
+      "modulesTitle": "Linked Modules",
+      "consortium": "Consortium Builder",
+      "conceptNote": "Concept Note",
+      "evaluations": "Reviewer Simulation",
+      "documents": "Tracking Documents",
+      "application": "Application Part A & B",
+      "moveStage": "Move Stage",
+      "escHint": "[Esc] Close",
+      "enterHint": "[Enter] Add Note",
+      "step": "Stage {step}",
+      "openModal": "Open in Full Window",
+      "stageSelector": "Directly Update Stage",
+      "milestoneG0_1": "T-6: Strategic Fit & Objectives Analysis",
+      "milestoneG0_2": "T-6: AI Gate Feasibility Assessment",
+      "milestoneG0_3": "T-6: Working Group Triage Decision",
+      "milestoneG1_1": "T-5: Concept Note Draft (M2 Module)",
+      "milestoneG1_2": "T-5: Architecture Work Packages & Methodology",
+      "milestoneG1_3": "T-5: Core Team & Capabilities",
+      "milestoneG2_1": "T-4: Partner Search & Matching (M8 Module)",
+      "milestoneG2_2": "T-4: Budget Allocation & Person-Months",
+      "milestoneG2_3": "T-4: Consortium Agreement / MoU",
+      "milestoneG3_1": "T-2: Part A Administrative Forms Completion",
+      "milestoneG3_2": "T-2: Part B Technical Proposal Writing (M11)",
+      "milestoneG3_3": "T-2: AI Reviewer Simulation & Red Flags (M6)",
+      "milestoneG4_1": "T-0: Funding & Tenders Portal Upload & Verification",
+      "milestoneG4_2": "T-0: Consortium Partners Final Approvals",
+      "milestoneG4_3": "T-0: Final Proposal Submission & Receipt"
     }
   },
   "GateReason": {
@@ -359,6 +472,7 @@
     "G0_ALIGNMENT_BELOW": "Strategic alignment is {value}; the minimum is {min}.",
     "G0_BASE_RATE_BELOW": "Base success rate is {value}%; the minimum is {min}%.",
     "G0_COUNTRY_NOT_ELIGIBLE": "The country is not eligible for this call.",
+    "G0_NO_HISTORY_NO_FILLED_SEAT": "A partner with no history needs at least one filled seat (candidate, invited or confirmed).",
     "G1_G0_NOT_DECIDED": "G0 has not been passed: no G0 decision is on file for this opportunity.",
     "G1_G0_LAST_FAILED": "G0 does not count as passed: its latest decision is a refusal. Run the G0 gate again.",
     "G1_NO_CRITICAL_SEAT": "Consortium check failed: no critical role is defined for this opportunity.",
@@ -422,7 +536,54 @@
     "freeStorage": "1 GB Free Storage",
     "uploadCompliance": "Compliant with contract and EU evaluator standards",
     "authorityPlaceholder": "TÜRKAK / İTO / BSI",
-    "noExpiry": "No expiry"
+    "noExpiry": "No expiry",
+    "ui": {
+      "allStatuses": "All Statuses",
+      "cancel": "Cancel",
+      "categoryTaxonomy": "Category Taxonomy",
+      "confidentialityLabel": "Confidentiality:",
+      "confirmDelete": "Are you sure you want to delete this document?",
+      "delete": "Delete",
+      "deleteDocument": "Delete Document",
+      "documentNoLabel": "Document No:",
+      "documentTitle": "Document Title",
+      "emptyBody": "No evidence matches your filters. Upload new documents to Cloudflare R2 repository.",
+      "emptyTitle": "No Evidence Documents Found",
+      "expiredDoc": "Expired Docs",
+      "expiringSoonDoc": "Expiring Soon",
+      "expiryDate": "Expiry Date",
+      "exportCsv": "Export CSV",
+      "healthRating": "Health Rating",
+      "healthScoreTitle": "Evidence Pack Health Score",
+      "inspectClaims": "Inspect & Claims",
+      "issuingAuthority": "Issuing Authority",
+      "issuingAuthorityLabel": "Issuing Authority:",
+      "linkedClaims": "Linked Corporate Claims",
+      "missingCoreDocs": "⚠️ Missing Core Docs:",
+      "openOrDownload": "Open Document",
+      "openR2Original": "Open R2 Original File",
+      "r2UploadTitle": "Upload Evidence to R2",
+      "searchPlaceholder": "Search title, authority, tag...",
+      "statusExpired": "Expired Docs",
+      "statusExpiringSoon": "Expiring Soon",
+      "statusValid": "Valid Docs",
+      "taxonomyTitle": "Evidence Taxonomy (8 Categories)",
+      "titlePlaceholder": "e.g. ISO 27001 Certificate",
+      "totalItems": "Total Items",
+      "uploadDocument": "Upload Document",
+      "uploadError": "Upload error: {message}",
+      "uploadNewR2": "Upload Evidence (R2)",
+      "uploadToR2": "Upload to Cloudflare R2 →",
+      "uploading": "Uploading...",
+      "uploadingOcr": "Uploading & AI OCR Processing...",
+      "validDoc": "Valid Docs",
+      "validUntilLabel": "Valid Until:"
+    },
+    "scan": {
+      "scan_pending": "Scanning",
+      "scan_infected": "Malware found, removed",
+      "scan_error": "Could not be scanned, will retry"
+    }
   },
   "ConceptNote": {
     "title": "Concept Notes",
@@ -446,7 +607,8 @@
       "sectionLabel": "{label} (max {max} words)",
       "placeholder": "Write the {label} section...",
       "words": "Words: {count} / {max}",
-      "noTemplate": "No concept note template found in the system. Run the seed."
+      "noTemplate": "No concept note template found in the system. Run the seed.",
+      "invalidSection": "The draft could not be generated: section \"{section}\" of the template has an invalid word limit. Fix the template and try again. No credits were used."
     },
     "status": {
       "draft": "Draft",
@@ -536,10 +698,12 @@
     "confirmParticipation": "Organisation confirmed participation",
     "seatConfirmConflict": "This organisation is already confirmed on another active opportunity on the same call, so it cannot be confirmed for this seat. The seat stays invited.",
     "seatNotConfirmable": "The status of this seat has changed, so nothing was confirmed. Refresh the page to see its current state.",
+    "queryFailed": "Consortium data could not be read. The failure has been recorded; please try again shortly.",
     "conflict": "Conflict Warning",
     "addRoleToConsortium": "ADD ROLE TO CONSORTIUM",
     "topCandidates": "TOP CANDIDATES",
     "liveDemandReason": "This organisation published a partner-search request for this topic {days, plural, =0 {today} one {# day ago} other {# days ago}}.",
+    "liveDemandBadge": "Live partner request",
     "required": "Required",
     "status": {
       "OPEN": "OPEN",
@@ -590,7 +754,19 @@
     "dimensionOutOf": "{score} / {max}",
     "dimensionRange": "{score} (range {min}…{max})",
     "breakdownNote": "Dimensions are raw points, each on its own range; the total is out of 100.",
-    "stageLine": "{title} — Stage {stage}"
+    "legacyScoringNote": "This candidate was scored with the previous criteria. Press \"Find Candidates\" again to apply the new ones.",
+    "stageLine": "{title} — Stage {stage}",
+    "expertPool": {
+      "title": "Expert pool (free pre-registration)",
+      "note": "Verified pre-registered experts who gave visibility consent, matching the call programme and the seat role. Invitations and contact open in the second phase.",
+      "expert": "Expert #{number}",
+      "expertUnnumbered": "Expert",
+      "province": "Province",
+      "programme": "Programme",
+      "roles": "Roles",
+      "none": "No expert matches this seat.",
+      "unavailable": "The expert pool could not be read right now."
+    }
   },
   "Auth": {
     "signIn": "Sign In",
@@ -1122,6 +1298,77 @@
           "sessionOrMembership": "You are no longer a member of this organisation, or your session has ended. Please sign in again.",
           "forbiddenRole": "Only an owner or admin can see the team list.",
           "loadFailed": "The team list could not be loaded."
+        },
+        "errorGeneric": "The action could not be completed. Please try again.",
+        "memberRemoved": "Member removed; the seat is free again.",
+        "invitationCancelled": "Invitation cancelled; the seat is free again.",
+        "activeHeading": "Active Members",
+        "activeListLabel": "Active members",
+        "loading": "Loading…",
+        "you": "you",
+        "joined": "Joined",
+        "remove": "Remove",
+        "removeAria": "Remove {label}",
+        "pendingHeading": "Pending Invitations",
+        "pendingHint": "Each pending invitation holds one seat.",
+        "pendingEmpty": "No pending invitations.",
+        "pendingListLabel": "Pending invitations",
+        "sent": "Sent",
+        "expires": "Expires",
+        "cancel": "Cancel",
+        "cancelInvitationAria": "Cancel invitation for {email}",
+        "confirmRemoveTitle": "Remove this member?",
+        "confirmCancelTitle": "Cancel this invitation?",
+        "confirmRemoveBody": "{label} loses access to this organisation at once. The seat becomes free.",
+        "confirmCancelBody": "The invitation link sent to {label} stops working. The seat becomes free.",
+        "keep": "Keep",
+        "working": "Working…",
+        "yesRemove": "Yes, remove",
+        "yesCancel": "Yes, cancel it",
+        "roles": {
+          "TENANT_OWNER": "Owner",
+          "TENANT_ADMIN": "Admin",
+          "PIPELINE_MANAGER": "Pipeline Manager",
+          "WRITER": "Writer",
+          "MEMBER": "Member",
+          "GUEST_PARTNER": "Guest Partner"
+        },
+        "actionErrors": {
+          "FORBIDDEN_ROLE": "You do not have permission for this.",
+          "CANNOT_REMOVE_SELF": "You cannot remove yourself.",
+          "CANNOT_REMOVE_OWNER": "Only another owner can remove an owner.",
+          "LAST_OWNER": "The last owner cannot be removed.",
+          "NOT_FOUND": "Not found; the list was refreshed."
+        }
+      },
+      "page": {
+        "title": "Team Members",
+        "inviteHeading": "Invite new member",
+        "emailLabel": "Email Address",
+        "emailPlaceholder": "colleague@example.com",
+        "roleLabel": "Role",
+        "roleMember": "Member",
+        "roleWriter": "Writer",
+        "rolePipelineManager": "Pipeline Manager",
+        "roleTenantAdmin": "Tenant Admin",
+        "roleTenantOwner": "Tenant Owner",
+        "sending": "Sending...",
+        "submit": "Send Invite",
+        "sendFailed": "Failed to send invite",
+        "errorPrefixed": "Error: {message}",
+        "dailyLimitNotSent": "Your organisation's daily invitation email limit is reached, so no email was sent. Share this link yourself",
+        "optedOutNotSent": "This address has opted out of invitation emails, so no email was sent. You can pass the link on by hand",
+        "notSent": "Invitation created but the email could not be sent; share this link yourself",
+        "notSentWithLink": "{notSent}: {link}",
+        "roleChangeBlocked": "The invitation was sent a moment ago; to change the role, invite again in 10 minutes",
+        "recentlySent": "The invitation email was sent a moment ago; the invitee can use the link in that email",
+        "emailSentWithLink": "Invitation email sent. Link: {link}",
+        "errors": {
+          "ALREADY_MEMBER": "This email address is already a member of this organisation.",
+          "INVALID_EMAIL": "Please enter a valid email address.",
+          "SEAT_LIMIT_REACHED": "Your plan's seat limit is reached ({limit} seats: {members} members, {pendingInvitations} pending invitations). Add seats or upgrade your plan to send a new invitation.",
+          "SEAT_LIMIT_REACHED_NO_COUNT": "Your plan's seat limit is reached. Add seats or upgrade your plan to send a new invitation.",
+          "INTERNAL_ERROR": "The invitation could not be sent because of a server error. Please try again in a moment."
         }
       }
     }
@@ -1731,6 +1978,8 @@
     },
     "errors": {
       "aiFailed": "The AI pre-assessment did not complete; no score was recorded.",
+      "noProposalText": "There is no proposal text to evaluate. Write the concept note or the Part B sections first; no credits were used and no score was recorded.",
+      "proposalTooLong": "The proposal text is too long: the AI pre-assessment can read at most {limit, number} characters. Shorten the Part B sections or the concept note and try again; no credits were used and no score was recorded.",
       "saveFailed": "The evaluation could not be saved. Please try again.",
       "calibrationFailed": "The ESR calibration could not be saved."
     },
@@ -1824,7 +2073,9 @@
     "no_calls": "No open calls for {region} at the moment.",
     "no_calls_hint": "Check other countries or create a saved search from the dashboard.",
     "meta_title": "{region} Calls",
-    "meta_description": "EU funding calls open to {region}"
+    "meta_description": "EU funding calls open to {region}",
+    "meta_not_found_title": "Page Not Found — {product}",
+    "meta_open_description": "Open Horizon calls in {region}. Deadlines, budgets, and eligibility information."
   },
   "applicationPartA": {
     "portalLinkFailed": "The link could not be created. Refresh the page and try again.",
@@ -1976,6 +2227,7 @@
   "ModuleGate": {
     "title": "This module is not available",
     "askAdmin": "If you need access, talk to your workspace administrator or the {brand} team.",
+    "openModules": "Turn the module on under Settings → Modules",
     "comingSoon": "{brand} is preparing this module. Once it is released you can enable it from Module Management.",
     "reason": {
       "MODULE_OFF": "The {module} module is turned off for your workspace.",
@@ -2661,7 +2913,11 @@
   "callsIndex": {
     "title": "Fund Calls",
     "subtitle": "Browse available fund calls by country",
-    "deadline": "Deadline"
+    "deadline": "Deadline",
+    "budget": "Budget",
+    "view_details": "View Details",
+    "tba": "TBA",
+    "country_tr": "🇹🇷 Turkey"
   },
   "DemoSignIn": {
     "roleSme": "SME R&D coordinator",
@@ -3024,6 +3280,22 @@
       "consent_notice": "Privacy notice",
       "consent_notice_aria": "Privacy notice (opens in a new tab)",
       "consent_withdraw": "You can withdraw your consent at any time. If you do not tick this box the form is not sent; your scorecard result stays with you either way.",
+      "transfer_label": "I give my explicit consent for my name, e-mail address, organisation, province and district and my scorecard result (score, level and scorecard code) to be passed on to the consultancy organisation for my province, so that I can receive support preparing for EU funding.",
+      "transfer_org_line": "For your province, your information will be passed on to: {name}",
+      "transfer_details_toggle": "Details about this transfer",
+      "transfer_what_q": "What is passed on?",
+      "transfer_what_a": "Your name and surname, e-mail address, organisation name, province and district if given, your Readiness Scorecard result (score, level and scorecard code), and the date and version of this consent.",
+      "transfer_to_q": "To whom?",
+      "transfer_to_a": "The consultancy organisation serving the province you select. The organisation's name is shown below this box once you choose your province. If no organisation serves your province, nothing is passed on.",
+      "transfer_purpose_q": "For what purpose?",
+      "transfer_purpose_a": "To assess your organisation's readiness for EU funding and contact you about support that suits you.",
+      "transfer_retention_q": "How long is it kept?",
+      "transfer_retention_a": "{months} months from the date you give this consent.",
+      "transfer_withdraw_q": "How do I withdraw my consent?",
+      "transfer_withdraw_a": "You can withdraw your consent at any time by writing to {email}. Withdrawal does not affect processing carried out before it.",
+      "transfer_skip_q": "What if I do not tick this box?",
+      "transfer_skip_a": "Your scorecard result stays with you and your form is still sent. Nothing is passed on to the consultancy organisation.",
+      "transfer_more_info": "More information:",
       "honeypot_label": "Leave this field empty",
       "submit": "Send",
       "sending": "Sending…",
@@ -3121,7 +3393,7 @@
   },
   "Forbidden": {
     "title": "You do not have access to this page",
-    "description": "This page is open only to members of a development agency account. If you think you need access, contact your organisation's administrator.",
+    "description": "Your role or account type does not allow this page. If you think you need access, contact your organisation's administrator.",
     "backHome": "Back to Home"
   },
   "agency": {
@@ -3429,6 +3701,68 @@
     "result_value": "{total}/100 · {level}",
     "none": "—"
   },
+  "adminLeadRoutes": {
+    "title": "Lead routing: province → consultancy",
+    "map_title": "Province mappings",
+    "subtitle": "Set which consultancy receives readiness-scorecard leads for each province. Leads from unmapped provinces are not forwarded and appear in the list below.",
+    "nav_label": "Lead Routing",
+    "nav_desc": "Province → consultancy mapping and unmatched leads",
+    "nav_badge": "M18",
+    "load_error": "The routing table could not be loaded. Reload the page and try again.",
+    "tenants_load_error": "The consultancy list could not be loaded, so mappings cannot be changed. Reload the page and try again.",
+    "unmapped_count": "{count} provinces unmapped",
+    "col_province": "Province",
+    "col_tenant": "Consultancy",
+    "col_status": "Status",
+    "col_updated": "Last changed by and when",
+    "col_actions": "Action",
+    "table_caption": "Province and consultancy mappings",
+    "status_active": "Active",
+    "status_inactive": "Inactive",
+    "status_unmapped": "Unmapped",
+    "target_ineligible": "Warning: {tenant} can no longer take leads (M18 is not open or the organisation is not eligible). The form keeps showing this name; move the route to another organisation or deactivate it.",
+    "select_label": "Consultancy for {province}",
+    "select_placeholder": "Choose a consultancy",
+    "save": "Save",
+    "saving": "Saving…",
+    "deactivate": "Deactivate",
+    "deactivating": "Deactivating…",
+    "saved": "{province} → {tenant} saved.",
+    "deactivated": "{province} deactivated.",
+    "unknown_actor": "Unknown user",
+    "not_changed": "Not changed yet",
+    "empty_tenants": "There is no consultancy eligible for routing.",
+    "unmatched_title": "Unmatched leads",
+    "unmatched_subtitle": "Leads with transfer consent that could not be sent to a consultancy because their province is not mapped. They can be sent again once the province is mapped.",
+    "unmatched_empty": "No unmatched leads.",
+    "unmatched_load_error": "The unmatched lead list could not be loaded.",
+    "unmatched_count": "Showing {shown} of {total}",
+    "stuck_title": "Stuck leads (no copy)",
+    "stuck_subtitle": "Leads routed to a consultancy that have had no copy there (contact or deal record) for more than {minutes} minutes. Read-only: the lead is not sent to another consultancy, copied or deleted. Each one also opens a system alert.",
+    "stuck_empty": "No stuck leads.",
+    "stuck_load_error": "The stuck lead list could not be loaded.",
+    "stuck_count": "Showing {shown} of {total}",
+    "col_routed_at": "Routed",
+    "col_routed_tenant": "Routed to",
+    "col_lead_id": "Lead ID",
+    "tenant_deleted": "Consultancy deleted",
+    "col_created": "Date",
+    "col_contact": "Contact",
+    "col_org": "Organisation",
+    "col_location": "Province / district",
+    "col_readiness": "Readiness level",
+    "col_reason": "Reason",
+    "none": "—",
+    "reason_province_missing": "Province empty or invalid",
+    "reason_province_unmapped": "Province not mapped to a consultancy",
+    "reason_tenant_refused": "The mapped consultancy refused the transfer",
+    "reason_consent_recipient_mismatch": "The mapped consultancy is not the one the visitor consented to",
+    "error_invalid_province": "Invalid province. Reload the page and try again.",
+    "error_tenant_not_found": "The selected consultancy was not found.",
+    "error_tenant_ineligible": "The selected consultancy is not eligible (deleted, or neither a consultancy nor an agency).",
+    "error_route_not_found": "There is no active mapping for this province.",
+    "error_generic": "The action could not be completed. Try again."
+  },
   "adminBlog": {
     "authorRolePlaceholder": "Dr., Prof. Dr., Expert",
     "saved": "Blog post saved.",
@@ -3535,6 +3869,54 @@
         }
       },
       "linkFallback": "Link"
+    },
+    "confirmDelete": "Are you sure you want to delete this blog post?",
+    "header": {
+      "kicker": "Platform Admin Workbench",
+      "title": "Blog Content Management (CRUD)",
+      "description": "Manage the guides, news and the featured three-card blog section on the public site in real time.",
+      "newPost": "Add new blog post"
+    },
+    "kpi": {
+      "total": "Total blog posts",
+      "featuredOnHome": "Featured on the homepage",
+      "categories": "Categories"
+    },
+    "filter": {
+      "searchPlaceholder": "Search by title, content or author...",
+      "allCategories": "All categories"
+    },
+    "table": {
+      "cover": "Cover",
+      "titleSlug": "Title & slug",
+      "category": "Category",
+      "author": "Author",
+      "published": "Published",
+      "featured": "Featured (homepage)",
+      "actions": "Actions",
+      "empty": "No blog posts found.",
+      "featuredOn": "Shown on the homepage (featured)",
+      "featuredOff": "Add to homepage",
+      "preview": "Preview",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "modal": {
+      "editTitle": "Edit blog post",
+      "createTitle": "Create new blog post",
+      "titleLabel": "Article title *",
+      "titlePlaceholder": "e.g. Horizon Europe consortium building guide",
+      "categoryLabel": "Category *",
+      "categoryPlaceholder": "e.g. Horizon Europe",
+      "excerptLabel": "Excerpt *",
+      "excerptPlaceholder": "Short description shown on the card...",
+      "authorName": "Author name",
+      "authorRole": "Author title",
+      "featuredCheckbox": "Show in the three-card Featured blog section on the homepage",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "saveChanges": "Save changes",
+      "publish": "Publish"
     }
   },
   "adminDocuments": {
@@ -3623,10 +4005,6 @@
       "greenet": {
         "name": "GREENET",
         "hint": "Partner search community of the Cluster 5 (climate, energy, mobility) NCP network. Sign-up required."
-      },
-      "linkedin": {
-        "name": "LinkedIn",
-        "hint": "Company page search. LinkedIn sign-in required."
       }
     },
     "emailTitle": "First-contact e-mail templates",
@@ -3676,6 +4054,84 @@
     "importErrors": {
       "SKIP_LIMIT_EXCEEDED": "Import failed: the CORDIS dump has more unreadable records than the limit allows. Details are in the run record and in system alerts.",
       "IMPORT_FAILED": "Import failed: the import could not finish. Details are in the run record and in system alerts."
+    },
+    "ragPreview": {
+      "noMatches": "No chunks matched this search.",
+      "idle": "After you run a search on the left, the RAG context text sent to the LLM model is shown here."
+    },
+    "header": {
+      "kicker": "K2 CORDIS Ingestion & M1 Partner Intelligence Console",
+      "title": "K2 CORDIS Layer Admin Panel",
+      "description": "Pulls Horizon Europe and H2020 funded project and partnership result data and feeds the M1 Partner Intelligence module.",
+      "license": "CORDIS CC BY 4.0",
+      "k2Projects": "K2 project rows",
+      "k2Organizations": "K2 organization rows",
+      "k2Participations": "K2 participation rows",
+      "m1Profiles": "M1 partner profiles"
+    },
+    "tabs": {
+      "k2Ingestion": "K2 Ingestion & Status",
+      "sync": "OLAP & Grant Breakdown",
+      "delta": "Live CORDIS Delta API",
+      "workbench": "Vector RAG Lab"
+    },
+    "k2": {
+      "statusTitle": "K2 CORDIS layer status & last import",
+      "statusBody": "Data import from the official European Commission dumps (Horizon Europe & H2020), updated monthly.",
+      "lastRunBadge": "Last run: {status} ({dataset})",
+      "noRunYet": "No import has run yet",
+      "lastStarted": "Last started:",
+      "fileHash": "File hash (SHA-256):",
+      "lastRows": "Last imported rows:",
+      "lastRowsValue": "{projects} projects / {organizations} orgs",
+      "dataset": "Dataset",
+      "datasetHorizon": "Horizon Europe (2021-2027)",
+      "datasetH2020": "H2020 (2014-2020)",
+      "rowLimit": "Row limit (Limit)",
+      "rowLimitPlaceholder": "e.g. 5000",
+      "runImport": "Run now (Ingest & M1 Profiles)",
+      "runImportBusy": "Importing and building profiles...",
+      "importSuccess": "Import and M1 profiles updated successfully!",
+      "importSkipped": "ℹ️ Dataset is already up to date (file hash matched, import skipped).",
+      "importCounts": "Processed: {projects} projects, {organizations} organizations, {participations} participations. Duration: {durationMs}ms.",
+      "m1DependencyTitle": "M1 Partner Intelligence module dependency",
+      "m1DependencyBody": "The M1 \"Joint Search\" screens use the <code>cordis_partner_profile</code> table that the K2 CORDIS layer derives. When K2 data has not been imported, the M1 module shows a \"K2 dependency off\" warning."
+    },
+    "sync": {
+      "title": "Official CORDIS dataset synchronization",
+      "body": "Start the synchronization to update Horizon Europe 2021-2027 call results, partnership maps and grant figures.",
+      "run": "Start CORDIS synchronization",
+      "busy": "Processing data...",
+      "done": "✓ CORDIS data synchronization completed successfully!",
+      "totals": "Projects processed: {count} — Total grant: {total}",
+      "olapTitle": "Grant & project distribution by country (OLAP aggregation)",
+      "colCountry": "Country",
+      "colProjects": "Project count",
+      "colTotalFunding": "Total funding (€)",
+      "colAverage": "Average per project (€)"
+    },
+    "delta": {
+      "title": "Live CORDIS Delta API fetch (EU Funding Portal)",
+      "body": "Live-fetch the new Horizon Europe projects added or updated in the last 7 days from the European Commission portal.",
+      "run": "Start live Delta API fetch (7 days)",
+      "busy": "Fetching delta...",
+      "done": "Live Delta API fetch completed successfully!",
+      "indexed": "{count} new Delta projects indexed",
+      "coordinator": "Coordinator: {name} ({country})"
+    },
+    "rag": {
+      "title": "Vector RAG search test (cosine similarity)",
+      "queryLabel": "Search query / project need",
+      "queryPlaceholder": "e.g. Zero-emission battery thermal management",
+      "topKLabel": "Top-K results:",
+      "topK": "Top-{count} chunks",
+      "searching": "Searching...",
+      "search": "Run vector search",
+      "resultsHeading": "Vector similarity results ({count})",
+      "sourceLabel": "[Source #{index}] {documentId}",
+      "scoreLabel": "Match: {score}%",
+      "promptTitle": "LLM fine-tuning RAG prompt preview",
+      "payloadComment": "// Formatted LLM Context Payload"
     }
   },
   "adminInterreg": {
@@ -3732,14 +4188,30 @@
   "blog": {
     "meta_title": "EU Grant Management & Insights Blog",
     "meta_description": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.",
-    "readMinutes": "{min} min read"
+    "readMinutes": "{min} min read",
+    "indexEyebrow": "Knowledge & Insights",
+    "indexTitle": "EU Grant Management & Insights Blog",
+    "indexSubtitle": "Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.",
+    "readArticle": "Read Article",
+    "backToBlog": "Back to Blog",
+    "relatedArticles": "Related Articles",
+    "onlyTurkishTitle": "Our blog posts are in Turkish only for now",
+    "onlyTurkishBody": "We have not translated our articles into English yet. You can read them on the Turkish blog.",
+    "onlyTurkishLink": "Read the Turkish blog"
   },
   "blog_detail": {
     "meta_description": "Blog post"
   },
   "turkiyeye_acik_cagrilar": {
     "meta_title": "Horizon Calls Open to Turkey",
-    "meta_description": "Open Horizon Europe funding calls for Turkish organizations. Deadlines, budgets, and application links."
+    "meta_description": "Open Horizon Europe funding calls for Turkish organizations. Deadlines, budgets, and application links.",
+    "badge": "Horizon Europe Associated Countries",
+    "heading": "EU Funding Calls Open to Turkish Organizations",
+    "intro": "Under the Horizon Europe association agreement, Turkish entities are eligible to coordinate or partner in EU consortia and receive direct grant funding.",
+    "lump_sum": "Lump Sum",
+    "default_program": "Horizon Europe",
+    "default_type": "RIA / IA",
+    "start_proposal": "Start Proposal →"
   },
   "Profile": {
     "title": "Organization Profile & R&D Capabilities",
@@ -3759,6 +4231,7 @@
     "trlMaxLabel": "Maximum TRL (Technology Readiness Level)",
     "trlMaxDescription": "Target ceiling level for call filters",
     "successMessage": "Organization profile successfully updated.",
+    "noChangesMessage": "Nothing changed, so there was nothing to save. The fields show the latest saved profile.",
     "picLabel": "PIC (Participant Identification Code)",
     "picPlaceholder": "e.g. 999999999",
     "picHelper": "Optional. Your organisation's 9-digit EU code; search your organisation's name in the <register>Participant Register</register> to find it. Your project history in CORDIS is read with this code for the coordination and network criteria of the G0 score.",
@@ -3772,9 +4245,11 @@
     "picMatchedNotice": "CORDIS record: {name}. This organisation's history is used in the G0 score.",
     "picUnmatchedNotice": "PIC saved, but we found no CORDIS record for this code. No history points are added for it, and its ownership could not be checked.",
     "picClearedNotice": "PIC removed. Coordination and network history is no longer used in the G0 score.",
+    "picMissingNotice": "PIC missing. Coordination and network history cannot be read for the G0 score; enter and save your organisation's 9-digit PIC.",
     "errorForbidden": "You do not have permission to perform this action",
     "errorInvalid": "Please fill all fields correctly",
-    "errorTrlConflict": "Not saved. Someone else changed the TRL range to {min}–{max}, which conflicts with the {typedMin}–{typedMax} you entered. The TRL fields now show the current range and everything else you typed is still here. Check it and save again.",
+    "errorTrlConflict": "Not saved. Someone else changed the TRL range to {min}–{max}, which conflicts with the {end, select, min {minimum TRL of {typed}} other {maximum TRL of {typed}}} you entered. The TRL fields now show the current range and everything else you typed is still here. Check it and save again.",
+    "errorTrlOrder": "Not saved. The minimum TRL ({min}) cannot be higher than the maximum TRL ({max}).",
     "errorFailed": "Failed to save profile",
     "errorPilotExpired": "Pilot period has ended",
     "errorGeneric": "An error occurred",
@@ -4220,6 +4695,10 @@
     "interreg-review": {
       "name": "Interreg Pre-Assessment",
       "tagline": "Run your project file through an internal pre-assessment against the call guide — an estimated score, not an official one."
+    },
+    "client-pipeline": {
+      "name": "Client Pipeline",
+      "tagline": "Track your consultancy's client organisations, deals, service packages and quotes in one pipeline."
     },
     "tr-layer": {
       "name": "Turkish National Layer",
@@ -4894,5 +5373,705 @@
     "pagination": "Pagination",
     "previous": "Previous",
     "next": "Next"
+  },
+  "HomePage": {
+    "eyebrow": "End-to-End Operating System for EU Funding Programmes",
+    "heroTitle": "From Concept to Grant Agreement: <accent>Master Your EU Projects</accent>",
+    "heroSubtitle": "Combine open call discovery, CORDIS network intelligence, AI-assisted concept drafting, evaluator scoring simulation, and consortium seat matching in one integrated platform.",
+    "launchFree": "Launch Free Workspace",
+    "exploreOpenCalls": "Explore Open Calls",
+    "trustCordis": "CORDIS Partner Intelligence",
+    "trustEvaluator": "Evaluator Lens Simulation",
+    "mockProject1": "FLEX-GRID: Decarbonised Smart Grid Flexibility",
+    "mockProject2": "TWIN-HYDRO: AI Digital Twins for Hydrogen",
+    "mockProject3": "CIRC-PACK: Circular Bio Polymers for Packaging",
+    "mockProject4": "CLEAN-PORT: Zero-Emission Coastal Freight",
+    "methodologyLabel": "Methodology",
+    "methodologyTitle": "5-Stage Gate Proposal Pipeline Architecture",
+    "methodologySubtitle": "Eliminate wasted person-days on doomed proposals. Progress systematically with mathematical gate filters and AI evaluations.",
+    "gates": {
+      "g0Title": "Triage & Feasibility",
+      "g0Desc": "Strategic alignment scoring, TRL verification, and historical baseline win-rate triage.",
+      "g1Title": "Concept Note (M2)",
+      "g1Desc": "Draft Excellence, Impact, and Implementation sections with EU policy alignment.",
+      "g2Title": "Consortium Desk (M8)",
+      "g2Desc": "Match optimal coordinators and partners from CORDIS profiles by centrality and topic history.",
+      "g3Title": "Evaluator Lens (M6)",
+      "g3Desc": "Deep AI evaluator simulation grading against official 15-point criteria with actionable fixes.",
+      "g4Title": "Final Submission",
+      "g4Desc": "Final budget verification, PIC validations, and complete application submission readiness."
+    },
+    "modulesLabel": "Modular Powerhouse",
+    "modulesSubtitle": "A purpose-built suite of tools designed for every phase of EU research and innovation lifecycle.",
+    "modules": {
+      "m1Name": "Partner Intelligence",
+      "m1Desc": "CORDIS graph analytics, past projects, coordinator track record, and eigenvector centrality.",
+      "m2Name": "Concept Note Architectures",
+      "m2Desc": "Template-driven and AI-assisted concept drafting tailored to EU work programmes.",
+      "m3Name": "Evidence Pack Vault",
+      "m3Desc": "EU policy references, impact data points, and structured evidence bank for proposals.",
+      "m4Name": "Focal Point CRM",
+      "m4Desc": "Partner relationship management with 60-day stale alerts and interaction timeline.",
+      "m5Name": "Proposal Workflows",
+      "m5Desc": "Stage-gate Kanban, T-6 deadline schedules, and person-day effort tracking.",
+      "m6Name": "Evaluator Lens AI",
+      "m6Desc": "Rigorous 15-point scoring simulation mimicking official EU expert evaluators.",
+      "m7Name": "TTO Accelerator",
+      "m7Desc": "Maps university patent & technology portfolios directly to matching Horizon Europe calls.",
+      "m8Name": "Consortium Seat Matching",
+      "m8Desc": "Calculates optimal consortia balance factoring in geography, role history, and topic expertise.",
+      "m11Name": "Full Application Production",
+      "m11Desc": "Generates complete compliant Part A & Part B draft documents with work packages and deliverables."
+    },
+    "access": "Access:",
+    "moduleManifestCta": "View Complete Module Manifest",
+    "cordisLabel": "Network Graph Analytics",
+    "cordisHeading": "Build Winning Consortia on <accent>CORDIS Network Data</accent>",
+    "cordisBody": "Our network graph analytics over official European Commission funding data surfaces top coordinators and partners. Evaluate PIC codes, eigenvector centrality, and geographic consortium balances instantly.",
+    "openPartnerSearch": "Open Partner Search",
+    "sampleCardTitle": "CORDIS Node Analytics",
+    "sampleBadge": "Sample View",
+    "sampleOrgName": "Sample Research Centre",
+    "sampleOrgMeta": "PIC · Country · Organisation type",
+    "sampleStatCoordinator": "Coordinator roles",
+    "sampleStatParticipations": "Total participations",
+    "sampleStatFunding": "EU contribution",
+    "sampleExplainer": "M1 computes coordinator history, EU contribution and network centrality per organisation from CORDIS records. Values fill with real data inside your workspace.",
+    "audienceHeading": "Built for the Entire Innovation Ecosystem",
+    "audiences": {
+      "smeTitle": "SMEs & Deep Tech",
+      "smeDesc": "Accelerate EIC and Eurostars applications with minimal overhead and high evaluation scores.",
+      "uniTitle": "Universities & TTOs",
+      "uniDesc": "Match research IP and patent databases automatically with open EU call topics.",
+      "consultTitle": "EU Grant Consultancies",
+      "consultDesc": "Manage multi-client workspaces with isolated tenants, stage-gates, and fast proposal generation.",
+      "coordTitle": "Consortia Coordinators",
+      "coordDesc": "Coordinate multi-partner work packages, budgets, agendas, and meeting minutes effortlessly."
+    },
+    "finalCtaHeading": "Start Your Next Horizon Europe Winner Today",
+    "finalCtaRegister": "Launch Workspace Now →",
+    "finalCtaPricing": "Explore Pricing"
+  },
+  "LoginCard": {
+    "errLoginInitiate": "Login could not be initiated.",
+    "errGeneric": "An error occurred.",
+    "errDemoLogin": "Demo login failed.",
+    "tabSignIn": "Sign In",
+    "tabRegister": "Create Workspace",
+    "registerTitle": "Create Free Workspace",
+    "signInSubtitle": "Access your proposal pipeline, CORDIS network graph, and AI modules.",
+    "registerSubtitle": "Register your organisation in a minute and try the AI project tools.",
+    "close": "Close",
+    "inviteBlockedTitle": "Registering with an invite code is not available in this environment.",
+    "notConfiguredTitle": "Sign-in is not configured.",
+    "notConfiguredBody": "No sign-in method is enabled in this environment. Please contact your administrator.",
+    "continueGoogle": "Continue with Google",
+    "orWithEmail": "or with email",
+    "fullName": "Full Name",
+    "fullNamePlaceholder": "Dr. Ahmet Yılmaz",
+    "orgName": "Org Name",
+    "orgNamePlaceholder": "Ar-Ge Ltd. Şti.",
+    "workEmail": "Work Email Address",
+    "workEmailPlaceholder": "name.surname@organisation.com",
+    "password": "Password",
+    "passwordOptional": "Optional for demo",
+    "processing": "Processing...",
+    "submitSignIn": "Sign In with Email →",
+    "submitRegister": "Create Workspace →",
+    "demoHeading": "⚡ One-Click Demo Profiles",
+    "passwordless": "Passwordless session",
+    "demoSignInArrow": "Sign in →"
+  },
+  "EmailOptOut": {
+    "title": "Email preference",
+    "invalidHeading": "This link is not valid",
+    "invalidBody": "The link may be damaged or incompletely copied. Open the link in the email again.",
+    "footer": {
+      "decline": "Decline this invitation",
+      "unsubscribe": "Stop emailing me"
+    },
+    "confirm": {
+      "decline": {
+        "heading": "Decline this organisation's invitation",
+        "body": "This organisation will not be able to email you again. Invitations from other organisations are not affected.",
+        "button": "Decline invitation"
+      },
+      "unsubscribe": {
+        "heading": "Leave the email list",
+        "body": "No organisation on the platform will be able to send a first-contact email to this address.",
+        "button": "Unsubscribe"
+      }
+    },
+    "done": {
+      "decline": {
+        "heading": "Your decline was recorded",
+        "body": "This organisation will not be able to email you again."
+      },
+      "unsubscribe": {
+        "heading": "You are unsubscribed",
+        "body": "First-contact emails will no longer be sent to this address."
+      }
+    }
+  },
+  "PersonDaysReport": {
+    "title": "Person-Days Report",
+    "subtitle": "Track effort investment across all opportunities in your pipeline.",
+    "queryFailed": "Effort records could not be read. The failure has been recorded; please try again shortly.",
+    "byOpportunity": "By Opportunity",
+    "totalSummary": "Total: {hours} hours ({days} PDs)",
+    "opportunity": "Opportunity",
+    "totalHours": "Total Hours",
+    "personDays": "Person-Days",
+    "emptyTitle": "No effort has been logged yet.",
+    "emptyHint": "Hours logged on an opportunity’s effort tab appear here."
+  },
+  "projectIdea": {
+    "pageTitle": "Project idea entry",
+    "pageIntro": "Record a project idea with its summary, keywords, TRL and target programmes.",
+    "trlCriterionHeading": "TRL criterion",
+    "trlCriterionMissing": "Missing.",
+    "trlCriterionMissingHint": "At least one project idea is needed for the TRL assessment.",
+    "trlCriterionGoToForm": "Go to project idea entry",
+    "trlCriterionPresent": "A project idea is saved; the TRL assessment is pending.",
+    "formHeading": "New project idea",
+    "errorSummaryTitle": "Some fields need fixing.",
+    "field_title": "Title",
+    "field_summary": "Summary",
+    "field_keywords": "Keywords",
+    "field_trl": "TRL",
+    "field_targetPrograms": "Target programmes",
+    "fieldTitle": "Title",
+    "fieldSummary": "Summary",
+    "hintCount": "{count} / {max} characters",
+    "fieldKeywords": "Keywords",
+    "keywordsPlaceholder": "e.g. artificial intelligence, health, SMEs",
+    "keywordsHint": "Separate with commas, at most {max} keywords.",
+    "fieldTrl": "Technology Readiness Level (TRL)",
+    "trlPlaceholder": "Select",
+    "trlHint": "From 1 (basic principles observed) to 9 (system proven in operation).",
+    "trlOption": "TRL {n}",
+    "fieldTargetPrograms": "Target programmes",
+    "program_horizonEurope": "Horizon Europe",
+    "program_digitalEurope": "Digital Europe",
+    "program_eurostars": "Eurostars",
+    "program_interreg": "Interreg",
+    "program_life": "LIFE",
+    "submit": "Save idea",
+    "errorRequired": "This field is required.",
+    "errorTooLong": "This field is too long.",
+    "errorTrlRequired": "Select a TRL.",
+    "errorTrlRange": "TRL must be a whole number from 1 to 9.",
+    "errorKeywordsTooMany": "Too many keywords.",
+    "errorKeywordTooLong": "One keyword is too long.",
+    "errorProgramRequired": "Select at least one target programme.",
+    "errorProgramUnknown": "Unknown target programme.",
+    "saving": "Saving…",
+    "savedMessage": "\"{title}\" saved.",
+    "saveFailed": "Could not save. Check the fields and try again.",
+    "listHeading": "Saved project ideas",
+    "listEmpty": "No project idea yet. The TRL criterion is met once the first idea is saved.",
+    "listColTitle": "Title",
+    "listColTrl": "TRL",
+    "listColPrograms": "Target programmes",
+    "listColCreated": "Saved on",
+    "listColScore": "Call score",
+    "listScoreUnavailable": "Scoring not connected"
+  },
+  "i18nCheck": {
+    "title": "i18n Audit & Parity Check",
+    "subtitle": "Automatic verification of localization key parity between TR and EN.",
+    "total_unique_keys": "Total Unique Keys",
+    "tr_coverage": "TR Coverage",
+    "en_coverage": "EN Coverage",
+    "keys_count": "{n} keys",
+    "parity_ok_title": "100% Localization Parity Achieved",
+    "parity_ok_desc": "All keys exist in both messages/tr.json and messages/en.json.",
+    "parity_bad_title": "Parity Discrepancies Found",
+    "parity_bad_desc": "Some keys are missing in one of the languages.",
+    "missing_en": "Missing in English (EN):",
+    "missing_tr": "Missing in Turkish (TR):"
+  },
+  "globalError": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred in the system:",
+    "unknownError": "Unknown error",
+    "retry": "Try again"
+  },
+  "adminLayout": {
+    "homeLinkTitle": "Home",
+    "consoleTitle": "Admin Console",
+    "consoleVersion": "Platform Console v1.1",
+    "menuTitle": "Management Menu",
+    "siteHomeTitle": "Go to site home",
+    "documentation": "Documentation",
+    "privacyDpa": "Privacy & DPA",
+    "auditTrails": "Audit Trails",
+    "footerProductName": "Platform Admin Console",
+    "footerVersionLabel": "v1.1.0"
+  },
+  "adminNav": {
+    "modulesLabel": "Module State Manager",
+    "modulesDesc": "OFF, DEV, PILOT, ON transitions",
+    "tenantsLabel": "Tenant Accounts",
+    "tenantsDesc": "Organisation and member management",
+    "billingLabel": "Billing & Subscriptions",
+    "billingDesc": "Stripe packages & limits",
+    "feedbackLabel": "Feedback Triage",
+    "feedbackDesc": "Beta sign-ups, P0–P3 prioritisation",
+    "alertsLabel": "System Alerts",
+    "alertsDesc": "Error and feedback alerts, resolved tracking",
+    "topicStatsLabel": "Base Rates (K3)",
+    "topicStatsDesc": "Horizon Dashboard xlsx → TopicStat",
+    "documentsLabel": "Documents (K6 RAG)",
+    "documentsDesc": "Work programme PDF → shared RAG",
+    "interregLabel": "Interreg & keep.eu",
+    "auditLabel": "Audit Log Events",
+    "auditDesc": "System event history",
+    "blogLabel": "Blog Management",
+    "blogDesc": "Content, article and announcement CRUD",
+    "settingsLabel": "Platform Settings",
+    "settingsDesc": "Global configuration"
+  },
+  "adminAudit": {
+    "title": "Audit Logs",
+    "subtitle": "Log history of system module changes, gate decisions and security events.",
+    "eventCount": "{count, plural, one {# recorded event} other {# recorded events}}",
+    "colEventType": "Event Type",
+    "colTarget": "Target",
+    "colTenantId": "Tenant ID",
+    "colActor": "Actor",
+    "colTimestamp": "Timestamp",
+    "actorSystem": "system",
+    "loadError": "Audit records could not be read (database unreachable).",
+    "empty": "No audit records yet."
+  },
+  "adminModules": {
+    "title": "Module Management",
+    "loadError": "Tenant list could not be read (database unreachable).",
+    "noTenants": "No tenants registered — there is no module state to manage.",
+    "stateTitle": "Module State Manager",
+    "stateDescription": "Configure module availability (OFF, DEV, PILOT, ON) for tenant accounts.",
+    "selectTenant": "Select Tenant:",
+    "requires": "Requires:",
+    "recommends": "Recommends:",
+    "none": "None",
+    "plans": "Plans:",
+    "updateFailed": "Failed to update module state.",
+    "cascadeTitle": "⚠️ Confirm Cascade Disable",
+    "cascadeLead": "Disabling <strong>{module}</strong> will automatically disable the following dependent modules:",
+    "cancel": "Cancel",
+    "disableDependents": "Disable All Dependent Modules"
+  },
+  "adminSettingsPage": {
+    "title": "System & Global Configuration",
+    "subtitle": "Platform-wide SMTP mail server, AI model providers and database RLS policies.",
+    "dbSectionTitle": "Database & RLS Security",
+    "driverAdapterLabel": "Driver Adapter:",
+    "vectorExtensionLabel": "Vector Extension:",
+    "vectorValue": "pgvector 1536d",
+    "aiSectionTitle": "AI Model Configuration"
+  },
+  "adminSmtp": {
+    "cardTitle": "SMTP Mail Server",
+    "cardDescription": "Team invitations and system notifications are sent through this SMTP server. Settings are read from server environment variables (SMTP_*) and cannot be changed here.",
+    "statusConfigured": "Configured",
+    "statusNotConfigured": "Not configured",
+    "rowHost": "SMTP Server (SMTP_HOST)",
+    "rowPort": "Port (SMTP_PORT)",
+    "rowSecure": "Connection (SMTP_SECURE)",
+    "rowUser": "User (SMTP_USER)",
+    "rowFrom": "Sender (SMTP_FROM)",
+    "secureTls": "SSL / TLS",
+    "secureStarttls": "STARTTLS",
+    "noAuth": "no authentication",
+    "notConfiguredWarning": "SMTP_HOST is not set: no email is being sent. In production every send attempt opens a SystemAlert record.",
+    "testAddressLabel": "Test email address",
+    "testAddressPlaceholder": "Test email address (e.g. test@domain.com)",
+    "sending": "Sending...",
+    "testButton": "Test SMTP",
+    "testSent": "Test email was accepted by the SMTP server: {email}",
+    "invalidAddress": "Please enter a valid test email address.",
+    "notConfiguredError": "SMTP is not configured (SMTP_HOST is empty); email cannot be sent.",
+    "sendFailed": "SMTP send failed: {error}",
+    "sendUnexpected": "The test email could not be sent."
+  },
+  "evidence": {
+    "addTitle": "Add Evidence",
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g. ISO 9001 Certificate",
+    "kindLabel": "Kind",
+    "kindStat": "Statistic",
+    "kindPriorResult": "Prior Result",
+    "kindTrl": "TRL Validation",
+    "kindLetter": "Letter",
+    "kindReference": "Reference",
+    "kindPublication": "Publication",
+    "kindCertificate": "Certificate",
+    "validUntilLabel": "Valid Until (Optional)",
+    "bodyLabel": "Body Text / Summary",
+    "bodyPlaceholder": "Main text of the evidence...",
+    "tagsLabel": "Tags (comma separated)",
+    "tagsPlaceholder": "e.g. ai, healthcare, sme",
+    "uploadLabel": "Upload File",
+    "uploadHint": "Click to select a file or drag and drop",
+    "cancel": "Cancel",
+    "uploading": "Uploading...",
+    "save": "Save Evidence",
+    "pageTitle": "Evidence Pack",
+    "pageDescription": "Centralize your organization's core capabilities, certificates, and past results. Upload valid documents (Cloudflare R2) and use them directly when generating proposals."
+  },
+  "pipelineBoard": {
+    "unassigned": "Unassigned"
+  },
+  "m18": {
+    "title": "Client Sales Pipeline",
+    "tabs": {
+      "panel": "Overview",
+      "leads": "Client organisations",
+      "pipeline": "Sales pipeline",
+      "tasks": "Tasks",
+      "import": "Import",
+      "duplicates": "Duplicates"
+    },
+    "panel": {
+      "heading": "Client Sales Pipeline",
+      "leadsCount": "Organisations",
+      "openDeals": "Open deals",
+      "openTasks": "Open tasks",
+      "goLeads": "Go to organisations",
+      "goPipeline": "Go to pipeline",
+      "goTasks": "Go to tasks"
+    },
+    "leads": {
+      "heading": "Client organisations",
+      "empty": "No organisations yet.",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Organisation name",
+      "lifecycleLabel": "Status",
+      "lifecycleAll": "All",
+      "colName": "Organisation",
+      "colType": "Type",
+      "colProvince": "Province",
+      "colLifecycle": "Status",
+      "colUpdated": "Updated",
+      "newLead": "New organisation",
+      "nameLabel": "Organisation name",
+      "legalNameLabel": "Legal name",
+      "provinceLabel": "Province plate code (e.g. 06)",
+      "websiteLabel": "Website",
+      "sizeLabel": "Size",
+      "submit": "Add organisation",
+      "created": "Organisation added.",
+      "duplicateNotice": "An organisation with this name already exists. You can review it on the duplicates screen.",
+      "openLead": "Open",
+      "limitNote": "At most 50 rows are shown."
+    },
+    "lifecycle": {
+      "LEAD": "Lead",
+      "CLIENT": "Client",
+      "DISQUALIFIED": "Disqualified"
+    },
+    "size": {
+      "MICRO": "Micro",
+      "SMALL": "Small",
+      "MEDIUM": "Medium",
+      "LARGE": "Large"
+    },
+    "lead": {
+      "backToList": "Back to organisations",
+      "notFound": "Organisation not found.",
+      "contactsHeading": "Contacts",
+      "noContacts": "No contacts recorded.",
+      "dealsHeading": "Deals",
+      "noDeals": "No deals for this organisation.",
+      "doNotContact": "Do not contact",
+      "fullName": "Full name",
+      "title": "Title",
+      "email": "Email",
+      "phone": "Phone",
+      "website": "Website",
+      "legalName": "Legal name"
+    },
+    "deal": {
+      "heading": "New deal",
+      "titleLabel": "Deal name",
+      "feeLabel": "Estimated fee",
+      "feeHelp": "Amount with currency (e.g. 1500.00)",
+      "currencyLabel": "Currency",
+      "submit": "Open deal",
+      "created": "Deal opened."
+    },
+    "pipeline": {
+      "heading": "Sales pipeline",
+      "empty": "No deals at this stage.",
+      "moveLabel": "Stage",
+      "lostReasonLabel": "Loss reason",
+      "moved": "Stage updated.",
+      "columnTitle": "{stage} ({count})",
+      "openDeal": "Organisation: {org}",
+      "fee": "Estimated fee"
+    },
+    "stage": {
+      "NEW": "New",
+      "QUALIFIED": "Qualified",
+      "CONTACTED": "Contacted",
+      "DISCOVERY_MEETING": "Discovery meeting",
+      "ELIGIBILITY_ANALYSIS": "Eligibility analysis",
+      "PROPOSAL": "Proposal",
+      "CONTRACT": "Contract",
+      "APPLICATION_PREP": "Application preparation",
+      "SUBMITTED": "Submitted",
+      "WON": "Won",
+      "REJECTED": "Rejected",
+      "LOST": "Lost"
+    },
+    "tasks": {
+      "heading": "Tasks",
+      "empty": "No open tasks.",
+      "colTask": "Task",
+      "colDeal": "Deal",
+      "colDue": "Due",
+      "colStatus": "Status",
+      "open": "Open",
+      "done": "Done",
+      "markDone": "Mark done",
+      "markOpen": "Reopen",
+      "auto": "Automatic",
+      "newTask": "New task",
+      "titleLabel": "Task",
+      "dueLabel": "Due date",
+      "submit": "Add task",
+      "created": "Task added.",
+      "toggled": "Task updated.",
+      "dealLabel": "Deal"
+    },
+    "errors": {
+      "INVALID": "Some input is invalid. Check the fields.",
+      "NOT_FOUND": "Record not found.",
+      "DUPLICATE": "This organisation already exists.",
+      "TRANSITION": "This stage change is not allowed.",
+      "FAILED": "The action could not be completed. Try again."
+    },
+    "common": {
+      "noData": "No data",
+      "required": "Required field"
+    },
+    "import": {
+      "heading": "Import organisations",
+      "intro": "Choose a CSV file. Columns are matched from the headers; fix any match, check the preview, then import. Organisations with the same name in the same province are skipped.",
+      "fileLabel": "CSV file",
+      "fileHelp": "Separator can be a comma, semicolon or tab. Organisation name is required. At most 5,000 rows.",
+      "mappingHeading": "Column mapping",
+      "notMapped": "— not mapped —",
+      "field": {
+        "name": "Organisation name",
+        "legalName": "Legal name",
+        "provinceCode": "Province code (plate)",
+        "website": "Website",
+        "sizeBand": "Size"
+      },
+      "countTotal": "{count} rows",
+      "countValid": "{count} to import",
+      "countInvalid": "{count} invalid",
+      "countDuplicate": "{count} duplicates (skipped)",
+      "invalidHeading": "Invalid rows",
+      "duplicateHeading": "Skipped duplicates",
+      "colRow": "Row",
+      "colName": "Organisation name",
+      "colFields": "Invalid field",
+      "colReason": "Reason",
+      "reason": {
+        "FILE": "Same record appears earlier in the file",
+        "EXISTING": "Already in the system"
+      },
+      "submit": "Import ({count})",
+      "imported": "Imported {created} organisations. Skipped duplicates: {skipped}. Invalid rows: {invalid}."
+    },
+    "intake": {
+      "dealTitle": "{organisation} — Funding Readiness Scorecard",
+      "firstContactTask": "Make the first contact with the person who filled the Funding Readiness Scorecard",
+      "activityNote": "Funding Readiness Scorecard (internal pre-assessment): {total}/100, level {level}"
+    },
+    "duplicates": {
+      "heading": "Possible duplicate organisations",
+      "intro": "Organisations with similar names are listed here. Pick one to keep and merge the other into it: its contacts, deals, tasks and call matches move across. The merged record is archived, not erased.",
+      "empty": "No possible duplicates found.",
+      "reason": {
+        "TAX_NUMBER": "Same tax number",
+        "DEDUPE_KEY": "Same normalised name and province",
+        "SIMILAR_NAME": "Similar name"
+      },
+      "strength": {
+        "EXACT": "Exact match",
+        "LIKELY": "Probably the same",
+        "POSSIBLE": "Possibly the same"
+      },
+      "similarity": "Similarity {percent}%",
+      "keepLegend": "Record to keep",
+      "mergeButton": "Merge",
+      "merged": "Merged: {contacts} contacts and {deals} deals moved."
+    },
+    "ai": {
+      "label": "Internal pre-assessment — not an official score",
+      "enrichHeading": "Enrich from website (AI)",
+      "enrichHint": "Reads at most 5 pages of the organisation's own website (robots.txt is obeyed). Nothing is written to the record until you approve it. {credits, plural, one {# AI credit is} other {# AI credits are}} used when a page could be read.",
+      "enrichNoWebsite": "This organisation has no website on record.",
+      "enrichRun": "Get suggestions",
+      "enrichEmpty": "The pages hold nothing new for the record.",
+      "enrichApply": "Write selected to record",
+      "enrichApplied": "The selected fields were written to the record.",
+      "enrichSources": "Source pages",
+      "enrichDraftLabel": "AI draft — nothing is written to the record until you approve",
+      "enrichNothingSelected": "Select at least one field.",
+      "field": {
+        "legalName": "Legal name",
+        "district": "District",
+        "sizeBand": "Size",
+        "themes": "Themes",
+        "sectorCodes": "NACE codes"
+      },
+      "eligibilityHeading": "Eligibility pre-report (AI)",
+      "eligibilityHint": "An internal pre-assessment draft for organisation × call. A draft does not leave M18 until it is approved. Uses {credits, plural, one {# AI credit} other {# AI credits}}.",
+      "eligibilityNoCalls": "This organisation has no matched call yet; add a match or a deal with a call first.",
+      "callLabel": "Call",
+      "eligibilityRun": "Create pre-report",
+      "eligibilityCreated": "Pre-report draft created.",
+      "reportsHeading": "Pre-reports",
+      "noReports": "No pre-reports yet.",
+      "status": {
+        "DRAFT": "Draft — awaiting approval",
+        "APPROVED": "Approved"
+      },
+      "approve": "Approve",
+      "approved": "Pre-report approved.",
+      "pending": "Working…",
+      "errors": {
+        "NO_WEBSITE": "This organisation has no website on record.",
+        "SITE_UNAVAILABLE": "The website could not be read (invalid address, robots.txt does not allow it, or no answer). No credit was used.",
+        "BAD_ANSWER": "The AI answer could not be read. Try again.",
+        "NO_CREDITS": "Not enough AI credits."
+      }
+    },
+    "autoTasks": {
+      "new": {
+        "first-contact": "Make the first contact"
+      },
+      "qualified": {
+        "contact-decision-maker": "Contact the decision maker"
+      },
+      "contacted": {
+        "book-discovery-meeting": "Book a discovery meeting"
+      },
+      "discovery": {
+        "send-meeting-notes": "Send the meeting notes"
+      },
+      "eligibility": {
+        "check-call-rules": "Check eligibility against the call rules"
+      },
+      "proposal": {
+        "send-quote": "Send the quote",
+        "follow-up": "Follow up on the quote"
+      },
+      "contract": {
+        "collect-signature": "Collect the contract signature"
+      },
+      "application": {
+        "document-checklist": "Prepare the application document checklist"
+      },
+      "submitted": {
+        "record-reference": "Record the application reference number"
+      },
+      "won": {
+        "kickoff": "Plan the kickoff meeting"
+      },
+      "lost": {
+        "reengage": "Re-engage the client"
+      }
+    }
+  },
+  "ngPlan": {
+    "metaTitle": "Plan and trial",
+    "title": "Plan and trial",
+    "subtitle": "Your organisation's plan, its trial and a comparison of the {brand} tiers.",
+    "currentPlanLabel": "Your current plan",
+    "currentBadge": "Current plan",
+    "tier": {
+      "free": "Free Check",
+      "basic": "Basic",
+      "professional": "Professional",
+      "enterprise": "Enterprise"
+    },
+    "trial": {
+      "title": "Trial",
+      "noneBody": "No trial is running.",
+      "runningBadge": "Trial running",
+      "endedBadge": "Trial ended",
+      "daysLeft": "{days, plural, one {# day left} other {# days left}}",
+      "endsAt": "Ends",
+      "endedAt": "Ended",
+      "runningEndPlan": "When the trial ends your account moves to the {plan} plan.",
+      "endedPlan": "Your account is now on the {plan} plan.",
+      "localTimeNote": "Times are in your browser's time zone ({tz})."
+    },
+    "plans": {
+      "title": "Compare plans",
+      "body": "Prices and features are read from the catalogue. Purchasing is not open yet.",
+      "currencyLegend": "Currency",
+      "intervalLegend": "Billing period",
+      "currency": {
+        "TRY": "TRY",
+        "EUR": "Euro"
+      },
+      "interval": {
+        "year": "Yearly",
+        "month": "Monthly"
+      },
+      "perInterval": {
+        "year": "/ year",
+        "month": "/ month"
+      },
+      "priceSoon": "Price coming soon",
+      "priceSoonNote": "You will be able to buy here once the price is published.",
+      "free": "Free",
+      "freeNote": "The plan used after a trial ends or when no plan is chosen.",
+      "contact": "Contact us",
+      "contactNote": "This plan is offered by pre-registration; our sales team will talk to you.",
+      "buySoon": "Purchasing soon",
+      "matrixCaption": "Features and limits by plan",
+      "featureColumn": "Feature",
+      "matrixScrollLabel": "Feature table, scrolls horizontally",
+      "included": "Included",
+      "notIncluded": "Not included",
+      "unlimited": "Unlimited",
+      "empty": "The catalogue has no plans to show."
+    },
+    "feature": {
+      "org_profile": "Organisation profile",
+      "eligibility_check": "Eligibility check",
+      "call_search": "Call search and eligibility filter",
+      "trl_score": "TRL fit score",
+      "apply_decision": "Apply / withdraw record",
+      "newsletter": "Matching calls newsletter",
+      "partner_search": "Partner finding",
+      "outreach": "Partner outreach (invite, remind)",
+      "similar_projects": "Similar funded projects",
+      "seats": "Users",
+      "ai_writing_monthly": "AI writing operations"
+    },
+    "limit": {
+      "default": "{count}",
+      "eligibility_check": "{count} per month",
+      "seats": "{count, plural, one {# user} other {# users}}",
+      "ai_writing_monthly": "{count} per month"
+    },
+    "error": {
+      "sessionTitle": "Sign-in required",
+      "sessionBody": "Sign in with an account that belongs to an organisation to see your plan.",
+      "sessionCta": "Sign in",
+      "catalogueTitle": "The plan catalogue is not ready",
+      "catalogueBody": "The plans could not be loaded. This is a setup gap and support has been told. Please try again later.",
+      "unknownTitle": "This section could not be loaded",
+      "unknownBody": "Something went wrong. Refresh the page and try again."
+    }
   }
 }

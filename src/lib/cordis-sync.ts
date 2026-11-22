@@ -28,6 +28,7 @@ import { prisma } from './db';
 import { ingestDocument } from './rag';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { KEEP_EU_KEY_PREFIX } from '@/lib/keep-eu-sync';
 import type { Prisma } from '@prisma/client';
 
 /** Stable `SystemAlert.source` for everything this module reports. */
@@ -312,9 +313,17 @@ interface CordisProjectRowWithCoordinator {
   }>;
 }
 
-/** Already-imported projects, shaped as records, newest import first. */
+/**
+ * Already-imported CORDIS projects, shaped as records, newest import first.
+ *
+ * keep.eu projects share the `CordisProject` table under the `KEU:` prefix. They are
+ * left out here: keep.eu has its own RAG step (`syncKeepEuData`), which applies the
+ * personal-name exclusion list (K-575447, FO-363). Re-indexing them here sent the
+ * excluded projects, lead partner name included, to the embedding model.
+ */
 async function loadRecordsFromDatabase(take: number): Promise<CordisProjectRecord[]> {
   const rows: CordisProjectRowWithCoordinator[] = await prisma.cordisProject.findMany({
+    where: { NOT: { id: { startsWith: KEEP_EU_KEY_PREFIX } } },
     take,
     orderBy: { importedAt: 'desc' },
     include: {

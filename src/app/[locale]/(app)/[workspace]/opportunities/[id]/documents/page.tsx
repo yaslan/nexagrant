@@ -1,6 +1,6 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { DocumentsClient, type DocItem } from './client';
 import { deriveDualApprovalState, type DualApprovalState } from '@/lib/dual-approval';
 import { moduleGate } from '@/lib/modules/guard';
@@ -27,9 +27,9 @@ export default async function DocumentsPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M10', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPage(locale);
 
   // Tenant-scoped lookup: findUnique by a guessable id would cross tenants.
   //

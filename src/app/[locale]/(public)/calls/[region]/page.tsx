@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { Metadata } from 'next';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { publicCallDetailHref } from '@/lib/routes';
+import { isEuroCurrency, formatMinorWhole } from '@/lib/money';
 import { regionOf } from './regions';
 
 interface PageProps {
@@ -30,16 +31,15 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { region, locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'calls_region' });
   const regionInfo = regionOf(region);
   if (!regionInfo) {
     return {
-      title: locale === 'tr' ? `Sayfa Bulunamadı — ${PRODUCT_NAME}` : `Page Not Found — ${PRODUCT_NAME}`,
+      title: t('meta_not_found_title', { product: PRODUCT_NAME }),
     };
   }
   const regionLabel = regionInfo.name;
-  const description = locale === 'tr'
-    ? `${regionLabel}'deki açık Horizon çağrıları. Deadline, bütçe ve uygunluk bilgisi.`
-    : `Open Horizon calls in ${regionLabel}. Deadlines, budgets, and eligibility information.`;
+  const description = t('meta_open_description', { region: regionLabel });
 
   return {
     title: `${regionLabel} — ${PRODUCT_NAME}`,
@@ -61,7 +61,7 @@ type TopicRow = {
   title: string;
   nextDeadlineAt: Date | null;
   budgetPerProjectCents: bigint | null;
-  call: { id: string; title: string };
+  call: { id: string; title: string; currency: string | null };
 };
 
 export default async function CallsPage({ params }: PageProps) {
@@ -88,12 +88,18 @@ export default async function CallsPage({ params }: PageProps) {
       nextDeadlineAt: true,
       budgetPerProjectCents: true,
       call: {
-        select: { id: true, title: true },
+        select: { id: true, title: true, currency: true },
       },
     },
   })) as TopicRow[];
 
-  const totalBudget = calls.reduce((sum: bigint, c: TopicRow) => sum + (c.budgetPerProjectCents ?? 0n), 0n);
+  // Topic amounts inherit Call.currency (NG-163). Only euro rows are summed under the € sign; a TRY
+  // amount is never added to euros and never rendered with a euro symbol (no FX conversion).
+  const totalBudget = calls.reduce(
+    (sum: bigint, c: TopicRow) =>
+      isEuroCurrency(c.call?.currency) ? sum + (c.budgetPerProjectCents ?? 0n) : sum,
+    0n,
+  );
   const totalBudgetEur = Number(totalBudget) / 100;
 
   return (
@@ -118,7 +124,7 @@ export default async function CallsPage({ params }: PageProps) {
                 ? new Date(call.nextDeadlineAt).toLocaleDateString(locale)
                 : '—';
               const budget = call.budgetPerProjectCents
-                ? `€${(Number(call.budgetPerProjectCents) / 100).toLocaleString(locale)}`
+                ? formatMinorWhole(call.budgetPerProjectCents, call.call?.currency?.trim() || 'EUR', locale)
                 : '—';
 
               return (

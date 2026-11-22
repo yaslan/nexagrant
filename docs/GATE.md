@@ -21,7 +21,7 @@ Kilit sırası: bekleyenler `~/.cache/fonbridge-gate.lock.queue/` altında bilet
 
 Bilinen kalan risk (FO-348 K6): kayıt yazımı yalnız koşu sonunda tree'yi karşılaştırır; koşu sırasında bir dosya değiştirilip geri alınırsa bu yakalanmaz. Tam kapama için koşunun tree'sinin ayrı bir worktree'de koşması gerekir (yapılmadı).
 
-Önbelleği bilerek atlamak: `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`. Önbelleği temizlemek: `~/.cache/fonbridge-gate-pass/` dizinini silmek güvenlidir.
+Önbelleği bilerek atlamak: `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`. Aynı değişken `pnpm gate:isolated` (argümansız) için de geçerlidir: önbellek ve belge-yalnız kısa yolu kapanır, izole DB'li tam gate koşar. Önbelleği temizlemek: `~/.cache/fonbridge-gate-pass/` dizinini silmek güvenlidir.
 
 `pnpm gate:isolated` (argümansız) aynı kararı önce verir; önbellek ya da belge-yalnız ise konteyner kurmadan doğrudan `pnpm gate`'e geçer.
 
@@ -45,6 +45,8 @@ pnpm gate:isolated git push -u origin <dal>
 
 Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortamını öncelikli okur); checkout'un kendi `.env`'i karışmaz. Tüm kimlik bilgileri atılabilir yerel değerlerdir (ci.yml'deki ile aynı); sır değildir.
 
+**Tek bir `*.live` testini koşarken (NG-281):** çıplak `pnpm vitest run <dosya>` ile değil, `pnpm gate:isolated pnpm vitest run <dosya>` ile koş. Gerekçe: canlı testler yukarıdaki 4. maddenin ortamını bekler (izole DB, `fabrika_app_ci` parolası, `AUTH_SECRET`). `.env`'siz bir worktree'de çıplak koşuda `AUTH_SECRET` yoktur. `requireTestEnv` kullanan süitler (`oauth-registration`, `invitation-accept`, `auth-jwt-membership-*`) bu durumda yerelde `WARNING ... skipped` yazıp atlar: bu "yeşil" değildir. Kendi anahtarını sabitlemeyen bir süit ise anlamsız kırmızı verir (NG-280: `invitation-mail-limit.live` 13 `emailSent` kırmızısı, `opt_out_secret_unset`; NG-281 bu süitte anahtarı sabitledi). Çıplak koşuda kırmızı ya da atlama görürsen, "tabanda da kırmızı" demeden önce aynı dosyayı `gate:isolated` ile koş.
+
 ## Elle koşarken düşülen 6 tuzak — FO-161
 
 `.env`'li elle tarif (worktree başına kalıcı izole DB): `CLAUDE.md` "Worktree'de gate".
@@ -60,6 +62,7 @@ Buradaki değerler `./.env`'den önce gelir (vitest ve playwright süreç ortam�
 | 5 | e2e `EADDRINUSE :3000` | Başka bir `next dev` 3000'de | `E2E_PORT=<boş port>` |
 | 6 | Sonraki koşuda `server-action-rbac-guard` B-1 kırmızı | e2e'nin `next dev`'i `tsconfig.json`'ı yeniden yazdı | `git checkout -- tsconfig.json` |
 | 7 | e2e'nin çoğu (FO-254 koşusunda 342 test) 0 ms'de kırmızı, `browserType.launch: Executable doesn't exist ... chrome-headless-shell` | Playwright chromium binary'si `~/Library/Caches/ms-playwright` altında yok (yeni makine ya da Playwright sürümü değişti); birim testler yeşil kalır | `pnpm exec playwright install chromium`, sonra koşuyu yeniden başlat |
+| 8 | `rls:verify --require-db` → `<Tablo>: politika kümesi {…}, beklenen tam {system_scope} — fazla: <ad> (<komut>)` | Bir `system_scope` tablosunda (`PublicLead`, `ExpertPreRegistration` …) elle ya da başka bir araçla eklenmiş ikinci bir politika var; permissive olduğu için `system_scope`'u deler (NG-183) | `pnpm db:rls` (NG-183 bloğu yabancı politikayı düşürür); bilerek eklendiyse ADR-0009 §8.e bak. İstisna yok (NG-188): NG-52'nin `ExpertPreRegistration` · `expert_directory (SELECT)` politikası `ExpertDirectoryEntry` görünümüyle değişti; geri gelirse bu satır onu da gösterir → `pnpm db:rls` |
 
 Uzun koşular (`pnpm gate` ~10 dk; kilit bekleyen koşu daha uzun sürer) foreground Bash'te 600 sn sınırına takılabilir: `run_in_background` ile koş, logu dosyaya yaz (`… > log 2>&1; echo GATE_EXIT=$? >> log`).
 
@@ -117,3 +120,26 @@ Kırmızı yeniden görülürse:
 3. Hata numara çakışması ya da boşluk gösteriyorsa gerçek eşzamanlılık hatasıdır: `verify.ts` kilidini ve unique kısıtı kontrol et, testi gevşetme. Sayaç ile `max(founderNumber)` farkı, kilit dışından yazım olduğunu gösterir.
 4. Kırmızı yalnız bağlantı zaman aşımıysa (`DB_CONNECT_TIMEOUT_MS`) ve koşu paylaşımlı `:5433` DB'ye karşıysa, koşu izole değildi: `pnpm gate:isolated` ile yeniden koş.
 5. Üç koşu da yeşilse kırmızıyı kaydet ve kartı kapatma; ham log olmadan kök neden yazma.
+
+
+## ExpertDirectoryEntry mutasyon testleri ve eski `rls.sql` (NG-206)
+
+`tests/rls-verify-system-scope-policy-set.live.test.ts` içindeki iki NG-188 mutasyon testi (görünümü bozulmuş haliyle commit edip `finally`'de geri yükler) `fabrika` adlı paylaşılan geliştirme veritabanında **atlanır**; atlama `WARNING ... skipped` satırıyla nedenini yazar. Yalnız izole bir veritabanında (ör. `pnpm gate:isolated` ya da kendi Docker Postgres'in) ya da GitHub Actions'ta koşar. İzole veritabanında koşmak için `RLS_MUTATION_DB` ortam değişkeni o veritabanının adına (`current_database()`) birebir eşit olmalıdır; `pnpm gate:isolated` bunu kendi açtığı veritabanı için (`fabrika_gate`) otomatik ayarlar. GitHub Actions dışında `fabrika` adı `RLS_MUTATION_DB` ile onaylanmaz (NG-206 D-B1); GitHub Actions'ta (`ci.yml` servis konteyneri `fabrika`) testler bu adda koşar. Süreç kesilirse görünüm mutasyonlu kalabildiği için bu ayrım bilerek yapıldı (NG-203 D-B1).
+
+D-B2 uyarısı (NG-206): NG-188 (`e511961d`) zaten `origin/dev`'de. NG-52'nin `expert_directory` politikasını taşıyan eski `prisma/rls.sql` ile (NG-188 öncesi bir dal ya da worktree) `pnpm db:rls` ya da `pnpm db:setup` koşulursa, görünümün uygulandığı bir veritabanında politika geri gelir ve sealed `expert-directory` kapsamı `fullName`, `email`, ORCID'i yeniden okuyabilir (NG-185 F-1). Bu bir hatadır: politikanın geri gelmesi ancak NG-188'i bilerek geri alırken (eski `rls.sql` ile birlikte) kabul edilebilir. Eski tabanlı worktree'ler paylaşılan veritabanına `db:rls` koşmamalı. Paylaşılan veritabanı güncel `prisma/rls.sql` ile en az bir kez `pnpm db:rls` görmediyse bir kez koşulmalı (NG-183 bloğu yabancı `expert_directory` politikasını düşürür).
+
+`E2E_SHOTS_ROOT=docs/agent-results` e2e kanıtını (ör. `lead-transfer-consent` → `NG-179-evidence/`) bilerek git'te izlenen klasöre yazar; varsayılan koşu yalnız git-ignored `test-artifacts/` altına yazar (NG-217).
+
+## CI e2e: bellek eşiği ve kırmızı artefaktı (NG-288)
+
+Yapı (3. tur, `ci.yml` `e2e` işi): E2E adımı `build-and-test`'ten ayrı bir matrix işi, `shard: [1, 2, 3]`. Her shard kendi `next dev` sunucusunu, kendi Postgres/mailpit/MinIO servislerini ve kendi `pnpm db:setup`'ını alır; hiçbir shard başka shard'ın sunucusunu ya da veritabanını paylaşmaz. Her shard `pnpm test:e2e --shard=<n>/3` ile koşar; tüm testler koşar, hiçbiri atlanmaz. `e2e-gate` işi tüm shard sonuçlarını toplar; shard sayısı değişse de required check adı `e2e-gate` kalır. Shard sayısı yalnız matrix'te (`strategy.matrix.shard`) tutulur.
+
+Heap izi yok: `--trace-gc` bayrağı Node'un `NODE_OPTIONS` içinde kabul ettiği bir bayrak değildir (`node: --trace-gc is not allowed in NODE_OPTIONS`, Node 26.5.0). Bu yüzden CI'da yalnız `NODE_OPTIONS=--max-old-space-size=6144` kullanılır; `playwright.config.ts` bunu web sunucusuna `WEB_SERVER_NODE_OPTIONS` üzerinden geçirir. Bu bir tampondur, sızıntı düzeltmesi değildir. Yerel `pnpm gate` ve `pnpm gate:isolated` bu değişkeni kendi koymaz; davranışları değişmez.
+
+Ölçüm: her shard, 60 saniyede bir her `next` sürecinin RSS'ini (`pid`, `rss`, komut) `[e2e-mem]` önekiyle job logunda basar; başta runner'ın CPU/RAM'i ve Node'un varsayılan heap sınırı basılır. Okuma: `gh run view <id> --job <job-id> --log | grep '\[e2e-mem\]'`. Heap ayrı ölçülmez; RSS sürekli artıyorsa sızıntı ya da önbellek şüphesi, düz kalıyorsa eşik birikmiş derlemeden. Hedef: `approaching the used memory threshold` satırı 0.
+
+Kanıt geçmişi: 1. tur (tek sunucu, koşu 44854901140) eşik yeniden başlatmasını önlemedi. 2. tur (iki shard, koşu 44864261313, head e0b9fe63): 353+361 geçti, 12+1 atlandı (toplam 727), eşik uyarısı 0; shard 1'in `next-server` RSS'i yine doğrusal büyüdü (1.5 → 7.8 GiB, 32 dk). Suite büyürse shard sayısı artırılır.
+
+Kırmızı artefakt: `Upload E2E traces and report` adımı (`if: failure()`) her shard için `e2e-results-<run_id>-<attempt>-shard-<n>` adıyla `test-results/` ve `playwright-report/` yükler, 14 gün saklar. Artefakt indirmek: `gh run download <run_id> -R yaslan/nexagrant -n e2e-results-<run_id>-<attempt>-shard-<n>`. Sır kontrolü: dosya adları, anahtar adları ve `.env|secret|token|DATABASE_URL|password|Bearer|sk-` taraması; değer yazılmaz. Sonuç `docs/agent-results/NG-288-dev-gnd-5.md`.
+
+Zorunlu kontroller: `dev` dal korumasında (NG-288 okuması, 2026-11-21) `required_status_checks` YOK; hiçbir CI işi merge'ü engellemez. Merge öncesi `gh pr checks <pr>` tüm satırlarda `pass` olmalı, `e2e-gate` dahil.

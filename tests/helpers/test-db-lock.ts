@@ -1,5 +1,10 @@
 import pg from 'pg';
 
+/** The text behind a lock's key (`SELECT pg_advisory_lock(hashtext(<this>))`), for a caller that takes it on its own connection. */
+export function testDbLockKey(name: string): string {
+  return `test:${name}`;
+}
+
 /**
  * TASK-MUN7B4ZIEBJML — serialises test files that share one database object.
  *
@@ -24,7 +29,7 @@ export async function withTestDbLock<T>(url: string, name: string, fn: () => Pro
   const client = new pg.Client({ connectionString: url });
   await client.connect();
   try {
-    await client.query('SELECT pg_advisory_lock(hashtext($1))', [`test:${name}`]);
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', [testDbLockKey(name)]);
     return await fn();
   } finally {
     await client.end().catch(() => {});
@@ -72,7 +77,7 @@ export const PARTNER_SEARCH_INGESTION_LOCK = 'PartnerSearch:ingestion';
 export async function holdTestDbLock(url: string, name: string): Promise<() => Promise<void>> {
   const client = new pg.Client({ connectionString: url });
   await client.connect();
-  await client.query('SELECT pg_advisory_lock(hashtext($1))', [`test:${name}`]);
+  await client.query('SELECT pg_advisory_lock(hashtext($1))', [testDbLockKey(name)]);
   return async () => {
     await client.end().catch(() => {});
   };
@@ -84,3 +89,26 @@ export async function holdTestDbLock(url: string, name: string): Promise<() => P
  * for their whole file (beforeAll → afterAll), so neither one's purge can take the other's rows.
  */
 export const M17_INTERREG_TEXT_PURGE_LOCK = 'M17:interreg-text-purge';
+
+/**
+ * NG-131: the notification e-mail outbox is cross-tenant: a send run in one file also drains the
+ * rows another file just queued. notification-preferences.live and notification-email-concurrency.live
+ * hold this for their whole file.
+ */
+export const NOTIFICATION_OUTBOX_LOCK = 'NotificationEmailItem:outbox';
+
+/**
+ * NG-52 / NG-188: rls-verify-system-scope-policy-set.live replaces the "ExpertDirectoryEntry"
+ * view (prisma/rls.sql) with a mutated one for one rls:verify run, so fabrika_app's directory
+ * reads on that database see the mutation meanwhile. system-scope.live's expert-directory reads
+ * hold this around their read, the policy-set test around replace -> restore. (The name is the
+ * NG-52 one, when the directory was the expert_directory policy.)
+ *
+ * NG-285: the same file's NG-191 arms also commit an expert_directory policy on the base table
+ * "ExpertPreRegistration". The AS RESTRICTIVE one has no TO clause, so for every role and every
+ * purpose but 'expert-directory' each SELECT there returns 0 rows until it is dropped (INSERT
+ * still passes). Every live read of that base table through fabrika_app holds this lock: the
+ * expert-prereg files for the whole file (acquireExpertPreRegLiveLock), system-scope.live around
+ * each read.
+ */
+export const EXPERT_DIRECTORY_POLICY_LOCK = 'ExpertPreRegistration:expert_directory';

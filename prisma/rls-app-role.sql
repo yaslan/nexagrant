@@ -96,6 +96,23 @@ BEGIN
   IF to_regclass('public."InterregRubricCriterion"') IS NOT NULL THEN
     EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "InterregRubricCriterion" FROM %I', app_role);
   END IF;
+  -- 3c'. NG-57: the NexaGrant plan catalogue, same reasoning as 3c.
+  IF to_regclass('public."NgPlan"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON "NgPlan", "NgPlanFeature", "NgPlanPrice", "NgTrialPolicy" FROM %I', app_role);
+  END IF;
+
+  -- 3d. The audit trail is append-only for the app (NG-40, auditevent-immutable.sql):
+  --     SELECT and INSERT only. Erasure detaches an actor through audit_detach_actor().
+  IF to_regclass('public."AuditEvent"') IS NOT NULL THEN
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public."AuditEvent" FROM %I', app_role);
+  END IF;
+
+  -- 3e. The M8 expert directory view is read-only (NG-188, prisma/rls.sql): step 3's
+  --     ALL TABLES covers views too. The view is not updatable anyway; this keeps the
+  --     privilege at SELECT so that does not rest on the view's shape alone.
+  IF to_regclass('public."ExpertDirectoryEntry"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public."ExpertDirectoryEntry" FROM %I', app_role);
+  END IF;
 
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as the owner role (fabrika_owner on the VPS; fabrika locally). Default
@@ -120,11 +137,17 @@ BEGIN
   -- 5. The functions the RLS policies and the pricing page call as this role.
   --    PUBLIC has no EXECUTE on them (revoke-api-role-function-execute.sql);
   --    granted there and in rls.sql too, here for a role created after both.
+  --    province_transfer_org_name (NG-179, add-province-transfer-org-name.sql): the
+  --    readiness form's transfer box reads the province's organisation NAME through it.
+  --    province_transfer_org (NG-204, add-public-lead-transfer-recipient.sql): the submit binds
+  --    the transfer consent to that organisation's id (server side only).
+  --    close_own_province_routes (NG-222, add-close-own-province-routes.sql): a tenant's own
+  --    M18 close (settings, billing) deactivates that tenant's province routes.
   FOR fn IN
     SELECT p.oid::regprocedure
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open')
+       AND p.proname IN ('lifetime_licence_count', 'system_scope_sealed', 'system_scope_open', 'province_transfer_org_name', 'province_transfer_org', 'close_own_province_routes')
   LOOP
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO %I', fn, app_role);
   END LOOP;

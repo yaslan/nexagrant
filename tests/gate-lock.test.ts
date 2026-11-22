@@ -1,26 +1,20 @@
 import { execFileSync, spawn, spawnSync } from 'child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import net from 'net';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { freePort } from './helpers/free-port';
 
 // FO-388 yardımcıları: bir portu dinleyip kapatmadan tutmak ve süreç çıktısını toplamak.
+// NG-260: freePort ortak yardımcıdan; dönen port dört adreste de (127.0.0.1, 0.0.0.0, ::1, ::) boş.
+// Yalnız 127.0.0.1'e bakan eski sürüm, makinede `*:port` dinleyen bir süreç varken 0.0.0.0/:: holdPort'unu
+// ve gate-lock.mjs'in dört adresli yoklamasını EADDRINUSE/"dolu" ile düşürüyordu (NG-255 kök neden 2).
 function holdPort(port: number, host = '127.0.0.1'): Promise<net.Server> {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
     srv.once('error', reject);
     srv.listen(port, host, () => resolve(srv));
-  });
-}
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.once('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
-      const port = (srv.address() as net.AddressInfo).port;
-      srv.close(() => resolve(port));
-    });
   });
 }
 function closeServer(srv: net.Server): Promise<void> {
@@ -43,7 +37,12 @@ const script = path.join(import.meta.dirname, '..', 'scripts', 'gate-lock.mjs');
 // Bu test bir gate'in içinde koşabilir; miras gelen HELD=1 kilidi atlatır ve testi boşa çıkarır.
 // FO-388: gate-isolated.sh FONBRIDGE_E2E_PORT_AUTO=1 dışa aktarır; miras gelirse elle verilen
 // E2E_PORT yok sayılır ve "dolu port" testi hata üretmez. Her testin kendi bayrağı açıkça verilir.
-const baseEnv = { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '', FONBRIDGE_E2E_PORT_AUTO: '' };
+// FO-397: gate-lock.mjs dış koşunun seçtiği E2E_PORT'u (ve ön seçim işaretini) çocuk sürece aktarır.
+// Bu test o değeri miras alırsa, dış koşunun portu o an doluysa her senaryo "E2E_PORT dolu" ile
+// kırılır (FO-392 GATE_EXIT=1, 4 test). Port bu testlerde yalnız kendi senaryosu açıkça verirse kullanılır.
+const baseEnv: NodeJS.ProcessEnv = { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '', FONBRIDGE_E2E_PORT_AUTO: '' };
+delete baseEnv.E2E_PORT;
+delete baseEnv.FONBRIDGE_E2E_PORT_PREPICK;
 
 describe('gate-lock (FO-55)', () => {
   let root: string;
@@ -283,4 +282,30 @@ describe('gate-lock (FO-55)', () => {
     expect(chosen).not.toBe(base);
     expect(chosen).toBeGreaterThan(base);
   }, 60_000);
+
+  // FO-397: node_modules sembolik bağsa tam gate kuyruğa girmeden, kilit almadan açık hatayla durur.
+  // Betik kendi kökünden (import.meta) node_modules'a baktığı için geçici bir kök kurulur.
+  it('FO-397: node_modules sembolik bağsa gate kilit almadan açık hatayla durur', () => {
+    const fakeRoot = mkdtempSync(path.join(os.tmpdir(), 'gate-root-'));
+    const lockDir = path.join(root, 'lock');
+    try {
+      mkdirSync(path.join(fakeRoot, 'scripts'));
+      for (const f of ['gate-lock.mjs', 'gate-cache.mjs']) {
+        writeFileSync(path.join(fakeRoot, 'scripts', f), readFileSync(path.join(import.meta.dirname, '..', 'scripts', f)));
+      }
+      const realModules = path.join(root, 'real-node_modules');
+      mkdirSync(realModules);
+      symlinkSync(realModules, path.join(fakeRoot, 'node_modules'));
+      const res = spawnSync(process.execPath, [path.join(fakeRoot, 'scripts', 'gate-lock.mjs'), 'pnpm', 'run', 'gate:core'], {
+        encoding: 'utf8',
+        env: { ...baseEnv, FONBRIDGE_GATE_LOCK_DIR: lockDir, FONBRIDGE_GATE_NO_CACHE: '1' },
+      });
+      expect(res.status).toBe(1);
+      expect(res.stderr).toContain('node_modules sembolik bağ');
+      expect(res.stderr).toContain('pnpm install --frozen-lockfile');
+      expect(existsSync(lockDir)).toBe(false);
+    } finally {
+      rmSync(fakeRoot, { recursive: true, force: true });
+    }
+  });
 });

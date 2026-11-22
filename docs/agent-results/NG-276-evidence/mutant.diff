@@ -1,0 +1,15 @@
+diff --git a/src/app/[locale]/(app)/[workspace]/partners/page.tsx b/src/app/[locale]/(app)/[workspace]/partners/page.tsx
+index 964a4eca..c0229ff8 100644
+--- a/src/app/[locale]/(app)/[workspace]/partners/page.tsx
++++ b/src/app/[locale]/(app)/[workspace]/partners/page.tsx
+@@ -78,9 +78,9 @@ export default async function PartnersPage({
+   // tenant row here, but it is the same M1 screen a guest partner may not open.
+   // It runs before the M1 module gate (NG-257) so an unauthorized role sees the
+   // role refusal, not the module lock state.
+-  const { tenantId } = await requireTenantPageRole(locale, 'view_partner_search');
+   const locked = await moduleGate('M1', locale);
+   if (locked) return locked;
++  const { tenantId } = await requireTenantPageRole(locale, 'view_partner_search');
+ 
+   const sParams = await searchParams;
+   const tLinks = await getTranslations({ locale, namespace: 'PartnersPage.crossLinks' });

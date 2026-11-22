@@ -38,7 +38,6 @@ const PUBLIC_URLS: Record<'tr' | 'en', string[]> = {
     '/tr/uzman/dogrulandi',
     '/tr/no-workspace',
     '/tr/accept-invite/continue',
-    '/tr/i18n-check',
   ],
   en: [
     '/en',
@@ -59,9 +58,22 @@ const PUBLIC_URLS: Record<'tr' | 'en', string[]> = {
     '/en/experts/verified',
     '/en/no-workspace',
     '/en/accept-invite/continue',
-    '/en/i18n-check',
   ],
 };
+
+/**
+ * NG-117: the i18n-check page lists internal translation keys. A production
+ * build answers 404 for it (src/app/[locale]/(public)/i18n-check/page.tsx), so
+ * under `E2E_WEB_SERVER=start` it moves from the shell list to the 404 list.
+ */
+const TR_I18N_CHECK = '/tr/i18n-check';
+const EN_I18N_CHECK = '/en/i18n-check';
+const PRODUCTION_BUILD = process.env.E2E_WEB_SERVER === 'start';
+
+if (!PRODUCTION_BUILD) {
+  PUBLIC_URLS.tr.push(TR_I18N_CHECK);
+  PUBLIC_URLS.en.push(EN_I18N_CHECK);
+}
 
 /** 404s: an unrouted path, and a `notFound()` thrown from inside the public group. */
 const NOT_FOUND_URLS = [
@@ -69,6 +81,7 @@ const NOT_FOUND_URLS = [
   '/en/no-such-page-fo68',
   '/tr/portal/partner/fo68-no-such-token',
   '/en/blog/fo68-no-such-post',
+  ...(PRODUCTION_BUILD ? [TR_I18N_CHECK, EN_I18N_CHECK] : []),
 ];
 
 async function expectOneShell(page: Page, url: string): Promise<void> {
@@ -105,7 +118,17 @@ test.describe('public pages share one header and one footer (FO-68)', () => {
 
       // A post: the slug comes from the list, which the seed fills.
       await page.goto(`/${locale}/blog`);
+      if (locale === 'en') {
+        // NG-121: the posts are Turkish only — /en/blog (checked above) is a notice
+        // with no post link, and /en/blog/<slug> redirects to the Turkish page.
+        await expect(page.getByTestId('blog-turkish-only')).toBeVisible();
+        await expect(page.locator('main a[href^="/en/blog/"]')).toHaveCount(0);
+        return;
+      }
       const post = page.locator(`main a[href^="/${locale}/blog/"]`).first();
+      // NG-229: the same wait as before (attached, not visible), now with a limit: the link only has to be
+      // in the page. The aim is a quick failure here instead of the 300 s test budget when the list never renders it.
+      await expect(post).toBeAttached({ timeout: 30_000 });
       const href = await post.getAttribute('href');
       expect(href, `/${locale}/blog lists no post to open`).toBeTruthy();
       const response = await page.goto(href!);

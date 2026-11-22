@@ -5,6 +5,10 @@ import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
+// NG-100 / K-579560=A: a seat candidate counts only when the M8 matcher wrote its row
+// (visibleSeatCandidates reads the breakdown), so seeded rows carry a matcher breakdown.
+const MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 15, collabHistory: 10, rivalRisk: 0 };
+
 /**
  * TASK-MUN509G2ICKWI (İNCELEME-36 Y-1) — who may put which organisation on a
  * consortium seat, and in which status.
@@ -147,12 +151,12 @@ beforeAll(async () => {
         a.seats.push(s.id);
         for (const [rank, org] of [ORG, ORG_2].entries()) {
           await admin.seatCandidate.create({
-            data: { tenantId: t.id, seatId: s.id, organizationId: org, score: 2 - rank, breakdown: {}, rank: rank + 1 },
+            data: { tenantId: t.id, seatId: s.id, organizationId: org, score: 2 - rank, breakdown: MATCH_BREAKDOWN, rank: rank + 1 },
           });
         }
       }
       await admin.seatCandidate.create({
-        data: { tenantId: t.id, seatId: a.seats[2]!, organizationId: ORG_OTHER_SEAT, score: 0, breakdown: {}, rank: 3 },
+        data: { tenantId: t.id, seatId: a.seats[2]!, organizationId: ORG_OTHER_SEAT, score: 0, breakdown: MATCH_BREAKDOWN, rank: 3 },
       });
       const sib = await admin.opportunity.create({
         data: { tenantId: t.id, workspaceId: ws.id, title: `${RUN} sibling`, topicId },
@@ -167,7 +171,7 @@ beforeAll(async () => {
       b.tenantId = t.id;
       b.seat = (await admin.consortiumSeat.create({ data: { tenantId: t.id, opportunityId: opp.id, roleKey: 'research' } })).id;
       await admin.seatCandidate.create({
-        data: { tenantId: t.id, seatId: b.seat, organizationId: ORG_OTHER_TENANT, score: 1, breakdown: {}, rank: 1 },
+        data: { tenantId: t.id, seatId: b.seat, organizationId: ORG_OTHER_TENANT, score: 1, breakdown: MATCH_BREAKDOWN, rank: 1 },
       });
     }
   }
@@ -226,7 +230,7 @@ describe('M8 "Davet Et" (inviteCandidateToSeat)', () => {
 
   test("a seat of another opportunity is not invited through this opportunity's id", async () => {
     await admin!.seatCandidate.create({
-      data: { tenantId: a.tenantId, seatId: a.siblingSeat, organizationId: ORG, score: 1, breakdown: {}, rank: 1 },
+      data: { tenantId: a.tenantId, seatId: a.siblingSeat, organizationId: ORG, score: 1, breakdown: MATCH_BREAKDOWN, rank: 1 },
     });
     await setSeat(a.siblingSeat, 'OPEN', null);
     expect(await outcome(() => m8.inviteCandidateToSeat(a.siblingSeat, ORG, a.opp))).toMatch(/^threw: /);

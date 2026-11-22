@@ -68,9 +68,40 @@ async function seat(opportunityId: string): Promise<string> {
   const s = await admin!.consortiumSeat.create({ data: { tenantId, opportunityId, roleKey: 'research' } });
   return s.id;
 }
-async function candidate(seatId: string, organizationId: string, rank: number, owner = tenantId) {
+// The matcher's breakdown shape (seat-dimension-scale.ts MATCH_DIMENSION_SCALE): only rows
+// written in this shape are candidates for the gate, the invite and the screens (K-579560=A).
+const MATCH_BREAKDOWN = { topicExperience: 10, geographicBalance: 20, collabHistory: 5, rivalRisk: 0 };
+// The retired consortium scorer's shape (NG-100): a row in the table that no reader may use.
+const RETIRED_BREAKDOWN = {
+  topicExperience: 3,
+  networkCentrality: 2,
+  countryDiversity: 1.5,
+  smeBonus: 1,
+  warmthBonus: 0,
+  liveDemandSignal: 0,
+};
+// The pre-K-578751 matcher's 6-key shape: also a row no reader may use (K-580035=A).
+const LEGACY_MATCH_BREAKDOWN = {
+  topicExperience: 20,
+  geographicBalance: 10,
+  collabHistory: 10,
+  relationshipWarmth: 5,
+  centrality: 5,
+  rivalRisk: 0,
+};
+const OLD_ROWS = [
+  ['retired consortium', RETIRED_BREAKDOWN],
+  ['pre-K-578751 matcher', LEGACY_MATCH_BREAKDOWN],
+] as const;
+async function candidate(
+  seatId: string,
+  organizationId: string,
+  rank: number,
+  owner = tenantId,
+  breakdown: Record<string, number> = MATCH_BREAKDOWN,
+) {
   await admin!.seatCandidate.create({
-    data: { tenantId: owner, seatId, organizationId, score: 10 - rank, breakdown: {}, rank },
+    data: { tenantId: owner, seatId, organizationId, score: 10 - rank, breakdown, rank },
   });
 }
 async function fillThroughM8(opportunityId: string, seatId: string) {
@@ -166,6 +197,33 @@ describe('G1 on a real database', () => {
     await fillThroughM8(opp, s);
 
     expect((await evaluateGate(opp, 'G1', tenantId)).passed).toBe(false);
+  });
+
+  test.each(OLD_ROWS)('the only backup is a %s row (K-580035=A): refused as no backup', async (label, breakdown) => {
+    const opp = await opportunity(`old backup ${label}`);
+    const s = await seat(opp);
+    await candidate(s, SEATED, 1);
+    await candidate(s, BACKUP, 2, tenantId, { ...breakdown });
+    await fillThroughM8(opp, s);
+
+    const result = await evaluateGate(opp, 'G1', tenantId);
+
+    expect(result.reasons).toEqual(['Critical role research has no backup candidate']);
+    expect(await decisions(opp)).toMatchObject([
+      { passed: false, inputs: { criticalRolesWithoutBackup: ['research'] } },
+    ]);
+  });
+
+  test.each(OLD_ROWS)('a %s row cannot be invited (K-580035=A)', async (label, breakdown) => {
+    const opp = await opportunity(`old invite ${label}`);
+    const s = await seat(opp);
+    await candidate(s, BACKUP, 1, tenantId, { ...breakdown });
+
+    await expect(m8.inviteCandidateToSeat(s, BACKUP, opp)).rejects.toThrow(/cannot be offered/);
+    expect(await admin!.consortiumSeat.findUnique({ where: { id: s }, select: { status: true, organizationId: true } })).toMatchObject({
+      status: 'OPEN',
+      organizationId: null,
+    });
   });
 
   test('filled through M8 with a backup: passes and the stage moves to G1', async () => {

@@ -2,8 +2,9 @@ import type { JsonObject } from '@/types/json';
 import { withTenant, type TenantTx } from '../db';
 import { isPresentId } from '../required-id';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
-import { computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
+import { clearStoredG0, computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 import type { GateReason } from './reasons';
+import { visibleSeatCandidates } from '../scoring/seat-candidate-view';
 
 export type GateEvaluationResult = {
   passed: boolean;
@@ -21,7 +22,12 @@ type G1Seat = {
   organizationId: string | null;
   partnerOrgId: string | null;
 };
-type SeatCandidateRef = { seatId: string; organizationId: string | null; partnerOrgId: string | null };
+type SeatCandidateRef = {
+  seatId: string;
+  organizationId: string | null;
+  partnerOrgId: string | null;
+  breakdown: unknown;
+};
 
 /** A CONFIRMED seat with no organisation confirms nobody (src/modules/m8/server/seat-transitions.ts). */
 function isSeatFilled(seat: G1Seat): boolean {
@@ -148,11 +154,24 @@ async function runGate(
         inputs.g0Evidence = g0EvidencePayload(computation);
         if (computation.score !== null) {
           await persistG0(tx, computation);
+        } else {
+          // No evidence today: a number left in the column by an earlier run or a seed is not this
+          // opportunity's score any more. Empty it as a rescore does (FO-384), or the board keeps
+          // drawing it next to a decision that says "no evidence" (NG-59 item 3). A rescore is not an
+          // edit (FO-384 B1): `keepUpdatedAt` leaves `Opportunity.updatedAt` alone and writes nothing
+          // when the column is already null (NG-59 review, finding 1).
+          await clearStoredG0(tx, computation, { keepUpdatedAt: true });
         }
       }
 
       const g0Score = computation?.score ?? null;
       inputs.calculatedG0Score = g0Score;
+      // `g0Score` above is the column as it was before this run. The decision shows the score this
+      // run used, `null` included: otherwise `inputs.g0Score` and `g0Evidence.score` disagree on the
+      // same record (NG-27 side finding; NG-59 for the no-evidence case). The old column value is
+      // kept apart, for the audit trail only.
+      inputs.g0ScoreStored = opp.g0Score;
+      inputs.g0Score = g0Score;
 
       if (g0Score === null) {
         // Not a failure on merit: there is no evidence to score this opportunity on. Saying that
@@ -228,10 +247,14 @@ async function runGate(
       }
 
       if (rules.requireBackupForCriticalSeats) {
-        const candidates: SeatCandidateRef[] = await tx.seatCandidate.findMany({
-          where: { tenantId, seatId: { in: criticalSeats.map((s: G1Seat) => s.id) } },
-          select: { seatId: true, organizationId: true, partnerOrgId: true },
-        });
+        // NG-100 B-1: a backup is a row the screens show (visibleSeatCandidates), so the
+        // gate and the consortium page cannot disagree about who is a backup.
+        const candidates: SeatCandidateRef[] = visibleSeatCandidates(
+          await tx.seatCandidate.findMany({
+            where: { tenantId, seatId: { in: criticalSeats.map((s: G1Seat) => s.id) } },
+            select: { seatId: true, organizationId: true, partnerOrgId: true, breakdown: true },
+          }),
+        );
         const withoutBackup = criticalSeats.filter(
           (s: G1Seat) => !candidates.some((c) => c.seatId === s.id && isBackupFor(c, s)),
         );

@@ -4,12 +4,12 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { 
-  Puzzle, 
-  Building2, 
-  CreditCard, 
-  ScrollText, 
-  Sliders, 
+import {
+  Puzzle,
+  Building2,
+  CreditCard,
+  ScrollText,
+  Sliders,
   Newspaper,
   MessageSquareWarning,
   ShieldAlert,
@@ -18,7 +18,8 @@ import {
   Inbox,
   UserCheck,
   Globe,
-  Network
+  Network,
+  Route
 } from 'lucide-react';
 import type { ModuleCounts } from '@/lib/modules/registry';
 
@@ -30,8 +31,10 @@ interface AdminSidebarNavProps {
 
 export default function AdminSidebarNav({ locale, moduleCounts }: AdminSidebarNavProps) {
   const pathname = usePathname();
+  const t = useTranslations('adminNav');
   const tLeads = useTranslations('adminLeads');
   const tExperts = useTranslations('AdminExpertPrereg');
+  const tLeadRoutes = useTranslations('adminLeadRoutes');
   const tInterreg = useTranslations('adminInterreg');
   const tPartnerSearch = useTranslations('adminPartnerSearch');
   const tModuleCount = useTranslations('moduleCount');
@@ -40,63 +43,63 @@ export default function AdminSidebarNav({ locale, moduleCounts }: AdminSidebarNa
     {
       key: 'modules',
       href: `/${locale}/admin/modules`,
-      label: locale === 'tr' ? 'Modül Yönetimi' : 'Module State Manager',
-      desc: 'OFF, DEV, PILOT, ON geçişleri',
+      label: t('modulesLabel'),
+      desc: t('modulesDesc'),
       icon: Puzzle,
       badge: tModuleCount('badge', moduleCounts),
     },
     {
       key: 'tenants',
       href: `/${locale}/admin/tenants`,
-      label: locale === 'tr' ? 'Kiracı Hesapları' : 'Tenant Accounts',
-      desc: 'Kurum ve üye yönetimi',
+      label: t('tenantsLabel'),
+      desc: t('tenantsDesc'),
       icon: Building2,
       badge: 'Tenant',
     },
     {
       key: 'billing',
       href: `/${locale}/admin/billing`,
-      label: locale === 'tr' ? 'Faturalama & Planlar' : 'Billing & Subscriptions',
-      desc: 'Stripe paketleri & limitler',
+      label: t('billingLabel'),
+      desc: t('billingDesc'),
       icon: CreditCard,
       badge: 'Stripe',
     },
     {
       key: 'feedback',
       href: `/${locale}/admin/feedback`,
-      label: locale === 'tr' ? 'Geri Bildirim Triyajı' : 'Feedback Triage',
-      desc: 'Beta kayıtları, P0–P3 önceliklendirme',
+      label: t('feedbackLabel'),
+      desc: t('feedbackDesc'),
       icon: MessageSquareWarning,
       badge: 'Beta',
     },
     {
       key: 'alerts',
       href: `/${locale}/admin/alerts`,
-      label: locale === 'tr' ? 'Sistem Uyarıları' : 'System Alerts',
-      desc: 'Hata ve geri bildirim uyarıları, çözüldü takibi',
+      label: t('alertsLabel'),
+      desc: t('alertsDesc'),
       icon: ShieldAlert,
       badge: 'Alerts',
     },
     {
       key: 'topic-stats',
       href: `/${locale}/admin/topic-stats`,
-      label: locale === 'tr' ? 'Taban Oranlar (K3)' : 'Base Rates (K3)',
-      desc: 'Horizon Dashboard xlsx → TopicStat',
+      label: t('topicStatsLabel'),
+      desc: t('topicStatsDesc'),
       icon: Percent,
       badge: 'K3',
     },
     {
       key: 'documents',
       href: `/${locale}/admin/documents`,
-      label: locale === 'tr' ? 'Belgeler (K6 RAG)' : 'Documents (K6 RAG)',
-      desc: locale === 'tr' ? 'Çalışma programı PDF → paylaşılan RAG' : 'Work programme PDF → shared RAG',
+      label: t('documentsLabel'),
+      desc: t('documentsDesc'),
       icon: FileText,
       badge: 'K6',
     },
     {
       key: 'interreg',
       href: `/${locale}/admin/interreg`,
-      label: 'Interreg & keep.eu',
+      label: t('interregLabel'),
       desc: tInterreg('navDesc'),
       icon: Globe,
       badge: 'Interreg',
@@ -118,6 +121,14 @@ export default function AdminSidebarNav({ locale, moduleCounts }: AdminSidebarNa
       badge: 'Lead',
     },
     {
+      key: 'lead-routes',
+      href: `/${locale}/admin/lead-routes`,
+      label: tLeadRoutes('nav_label'),
+      desc: tLeadRoutes('nav_desc'),
+      icon: Route,
+      badge: tLeadRoutes('nav_badge'),
+    },
+    {
       key: 'uzman-kayitlari',
       href: `/${locale}/admin/uzman-kayitlari`,
       label: tExperts('nav_label'),
@@ -128,24 +139,24 @@ export default function AdminSidebarNav({ locale, moduleCounts }: AdminSidebarNa
     {
       key: 'audit',
       href: `/${locale}/admin/audit`,
-      label: locale === 'tr' ? 'Denetim Kayıtları' : 'Audit Log Events',
-      desc: 'Sistem olay geçmişi',
+      label: t('auditLabel'),
+      desc: t('auditDesc'),
       icon: ScrollText,
       badge: 'Audit',
     },
     {
       key: 'blog',
       href: `/${locale}/admin/blog`,
-      label: locale === 'tr' ? 'Blog Yönetimi' : 'Blog Management',
-      desc: 'İçerik, makale ve duyuru CRUD',
+      label: t('blogLabel'),
+      desc: t('blogDesc'),
       icon: Newspaper,
       badge: 'Blog CRUD',
     },
     {
       key: 'settings',
       href: `/${locale}/admin/settings`,
-      label: locale === 'tr' ? 'Sistem Ayarları' : 'Platform Settings',
-      desc: 'Küresel konfigürasyon',
+      label: t('settingsLabel'),
+      desc: t('settingsDesc'),
       icon: Sliders,
       badge: 'Config',
     },

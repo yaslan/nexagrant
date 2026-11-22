@@ -64,6 +64,10 @@ export default function TenantProfileForm({
   const [trlMax, setTrlMax] = useState(stored.trlMax);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  // NG-229. The banner's own four seconds: kept, so the next save can call off the one before it.
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // FO-393. A save that sent nothing changed nothing: it says so instead of "updated".
+  const [nothingToSave, setNothingToSave] = useState(false);
   const [error, setError] = useState('');
   // Beside the TRL fields, next to the button: the banner above the form can be off screen here.
   const [trlError, setTrlError] = useState('');
@@ -90,9 +94,12 @@ export default function TenantProfileForm({
 
   // FO-387. Same rule as the PIC below, for the other fields: a re-read page brings the row into
   // whatever the user has not edited and leaves the rest alone.
-  const [seenLoaded, setSeenLoaded] = useState(loaded);
-  if (JSON.stringify(loaded) !== JSON.stringify(seenLoaded)) {
-    setSeenLoaded(loaded);
+  // FO-393 (N1). A re-read is a new `initial` object, not a different value: after a refusal taught
+  // `stored` a range, the row can go back to the very value this page opened with, and that read
+  // has to land too. Between reads the prop keeps its identity, so this runs once per read.
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (initial !== seenInitial) {
+    setSeenInitial(initial);
     setStored(loaded);
     if (sameCapabilities(capabilities, stored.capabilities)) setCapabilities(loaded.capabilities);
     if (sameKeywords(keywords, stored.keywords)) setKeywords(loaded.keywords);
@@ -106,8 +113,14 @@ export default function TenantProfileForm({
   // A tenant with no profile may save only a PIC; the first thing it writes into the profile needs
   // both texts. With a row, a text is required once the user has emptied it.
   const profileEdited = capabilitiesEdited || keywordsEdited || trlMinEdited || trlMaxEdited;
-  const capabilitiesRequired = initial ? capabilitiesEdited : profileEdited;
-  const keywordsRequired = initial ? keywordsEdited : profileEdited;
+  // FO-393 (B3). Without a row, the form cannot know whether a colleague has made one since it
+  // opened, so the server decides: the browser only holds the save once the server has said there is
+  // still no row (`noRowSaid`), and until the page is re-read.
+  const [noRowSaid, setNoRowSaid] = useState(false);
+  const capabilitiesRequired = initial ? capabilitiesEdited : noRowSaid && profileEdited;
+  const keywordsRequired = initial ? keywordsEdited : noRowSaid && profileEdited;
+  const formRef = useRef<HTMLFormElement>(null);
+  const [askValidity, setAskValidity] = useState(0);
 
   // A save re-reads the page (revalidatePath), so a form left open learns what someone else did to
   // the PIC meanwhile. What the user is in the middle of typing stays theirs.
@@ -129,17 +142,33 @@ export default function TenantProfileForm({
   useEffect(() => {
     if (trlError) trlErrorRef.current?.focus();
   }, [trlError]);
+  // After `required` is on the fields: the browser points at the missing one, as it would have.
+  useEffect(() => {
+    if (askValidity) formRef.current?.reportValidity();
+  }, [askValidity]);
+
+  // NG-229. Nothing is left to fire once the form is gone, and a save still in flight arms nothing.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (successTimer.current) clearTimeout(successTimer.current);
+    };
+  }, []);
 
   const save = async (confirmedPic?: string) => {
-    setSaving(true);
-    setSavedSuccess(false);
-    setError('');
-    setTrlError('');
-    setPicError(null);
-    setPicCleared(false);
-
-    const result = await updateTenantProfile({
-      // Only what the user changed, for the reason given under `pic`.
+    // FO-393 (N2). Numbers that are wrong as the form shows them are the user's own to fix, whatever
+    // the row holds now: said here, before anything is sent, and never blamed on a colleague.
+    if (trlMin > trlMax) {
+      setSavedSuccess(false);
+      setNothingToSave(false);
+      setError('');
+      setTrlError(t('errorTrlOrder', { min: trlMin, max: trlMax }));
+      return;
+    }
+    // Only what the user changed, for the reason given under `pic`.
+    const sent = {
       capabilities: capabilitiesEdited ? capabilities : undefined,
       keywords: keywordsEdited ? keywords : undefined,
       trlMin: trlMinEdited ? trlMin : undefined,
@@ -147,8 +176,19 @@ export default function TenantProfileForm({
       // Only a PIC the user changed: sending the one this form opened with would undo whatever
       // staff or a colleague did to it since, on a save that was about the keywords.
       pic: pic === savedPic ? undefined : pic,
-      confirmedPic,
-    });
+    };
+    const nothingSent = confirmedPic === undefined && Object.values(sent).every((value) => value === undefined);
+
+    setSaving(true);
+    setSavedSuccess(false);
+    setNothingToSave(false);
+    setError('');
+    setTrlError('');
+    setPicError(null);
+    setPicCleared(false);
+
+    // Sent even when empty: the save re-reads the page, which is how the form learns the row.
+    const result = await updateTenantProfile({ ...sent, confirmedPic });
 
     setSaving(false);
 
@@ -164,8 +204,14 @@ export default function TenantProfileForm({
         setSavedPic(result.pic.value);
         setSavedPicMatch(result.pic.status === 'matched' ? result.pic.match : null);
       }
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 4000);
+      if (nothingSent) {
+        setNothingToSave(true);
+      } else {
+        // NG-229. A timer left from the save before this one took this banner down early.
+        if (successTimer.current) clearTimeout(successTimer.current);
+        setSavedSuccess(true);
+        if (mounted.current) successTimer.current = setTimeout(() => setSavedSuccess(false), 4000);
+      }
     } else if (result.error === 'picConfirmationRequired') {
       setPendingMatch(result.match);
     } else if (result.error === 'picRateLimited') {
@@ -186,11 +232,30 @@ export default function TenantProfileForm({
       } else {
         // The fields go back to the row, or the same refusal would hold up the next save and any PIC
         // in it. The message keeps the range the user typed; every other draft stays in its field.
-        setTrlError(t('errorTrlConflict', { min: rowMin, max: rowMax, typedMin: trlMin, typedMax: trlMax }));
+        // FO-393 (N3). The row refuses one end only (the action says so); that end is the one the
+        // user typed, the other was never theirs.
+        setTrlError(
+          t('errorTrlConflict', {
+            min: rowMin,
+            max: rowMax,
+            end: sent.trlMin !== undefined ? 'min' : 'max',
+            typed: sent.trlMin ?? sent.trlMax ?? trlMax,
+          }),
+        );
         setStored((known) => ({ ...known, trlMin: rowMin, trlMax: rowMax }));
         setTrlMin(rowMin);
         setTrlMax(rowMax);
       }
+    } else if (
+      result.error === 'invalid' &&
+      !initial &&
+      (capabilities === '' || keywords === '')
+    ) {
+      // B3. The server found no row to add to: the first profile needs both texts. Only an empty
+      // field, the one `required` points at; anything else gets the message below.
+      setPendingMatch(null);
+      setNoRowSaid(true);
+      setAskValidity((n) => n + 1);
     } else {
       setPendingMatch(null);
       const errorMessages: Record<string, string> = {
@@ -265,7 +330,7 @@ export default function TenantProfileForm({
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-6 bg-surface p-6 md:p-8 rounded-2xl border border-border shadow-xs">
+      <form ref={formRef} onSubmit={handleSave} className="space-y-6 bg-surface p-6 md:p-8 rounded-2xl border border-border shadow-xs">
         <div>
           <label htmlFor={capabilitiesId} className="block text-xs font-bold uppercase tracking-wider text-ink mb-1.5 flex items-center gap-2">
             <Building className="w-3.5 h-3.5 text-accent" />
@@ -366,6 +431,11 @@ export default function TenantProfileForm({
               </p>
             )}
             {!picError && picCleared && <p role="status" className="text-ink-2">{t('picClearedNotice')}</p>}
+            {!picError && !picCleared && savedPic === '' && (
+              <p role="status" data-testid="tenant-pic-missing" className="text-amber-ink font-semibold">
+                {t('picMissingNotice')}
+              </p>
+            )}
             {!picError && !pendingMatch && picIsSaved && savedPicMatch && (
               <p role="status" className="text-ok font-semibold">
                 {t('picMatchedNotice', { name: savedPicMatch.name })}
@@ -429,7 +499,11 @@ export default function TenantProfileForm({
               min="1"
               max="9"
               value={trlMin}
-              onChange={(e) => setTrlMin(Number(e.target.value))}
+              onChange={(e) => {
+                setTrlMin(Number(e.target.value));
+                // FO-393 (N3). The message was about the numbers that are being rewritten now.
+                setTrlError('');
+              }}
               className="w-full bg-surface border border-border p-2.5 rounded-lg text-xs text-ink focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
             />
             <p className="text-[10px] text-muted mt-1">
@@ -447,7 +521,11 @@ export default function TenantProfileForm({
               min="1"
               max="9"
               value={trlMax}
-              onChange={(e) => setTrlMax(Number(e.target.value))}
+              onChange={(e) => {
+                setTrlMax(Number(e.target.value));
+                // FO-393 (N3). The message was about the numbers that are being rewritten now.
+                setTrlError('');
+              }}
               className="w-full bg-surface border border-border p-2.5 rounded-lg text-xs text-ink focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
             />
             <p className="text-[10px] text-muted mt-1">
@@ -466,6 +544,18 @@ export default function TenantProfileForm({
           >
             <AlertCircle className="w-4 h-4 text-bad shrink-0" aria-hidden="true" />
             <span>{trlError}</span>
+          </p>
+        )}
+
+        {/* Beside the button, like the TRL message: the banner above the form can be off screen here. */}
+        {nothingToSave && (
+          <p
+            role="status"
+            data-testid="tenant-profile-no-changes"
+            className="p-4 rounded-xl bg-ground border border-border text-ink-2 flex items-start gap-3 text-xs font-semibold"
+          >
+            <CheckCircle className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
+            <span>{t('noChangesMessage')}</span>
           </p>
         )}
 

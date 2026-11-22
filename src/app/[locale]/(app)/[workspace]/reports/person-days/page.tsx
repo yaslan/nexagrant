@@ -1,11 +1,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { moduleGate } from '@/lib/modules/guard';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { withTenant } from '@/lib/db';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { errorMessage } from '@/lib/errors';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { getTranslations } from 'next-intl/server';
 
 /**
  * TASK-MTQYXISOPUJ53 — fabricated fallbacks.
@@ -67,10 +68,10 @@ export default async function PersonDaysReportPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M5', locale);
   if (locked) return locked;
 
-  const { tenantId } = await requireTenantPage(locale);
 
   let groupedData: EffortGroup[] = [];
   let queryFailed = false;
@@ -103,17 +104,15 @@ export default async function PersonDaysReportPage({
   }
 
   const totalHours = groupedData.reduce((sum, item) => sum + item.hours, 0);
-  const isTr = locale === 'tr';
+  const t = await getTranslations({ locale, namespace: 'PersonDaysReport' });
 
   return (
     <div className="max-w-4xl mx-auto py-8 sm:px-8">
       <h1 className="text-3xl font-bold mb-2">
-        {isTr ? 'Adam-Gün Raporu' : 'Person-Days Report'}
+        {t('title')}
       </h1>
       <p className="text-ink-2 mb-8">
-        {isTr
-          ? 'Pipeline’ınızdaki tüm fırsatlara harcanan eforu takip edin.'
-          : 'Track effort investment across all opportunities in your pipeline.'}
+        {t('subtitle')}
       </p>
 
       {queryFailed && (
@@ -121,9 +120,7 @@ export default async function PersonDaysReportPage({
           role="alert"
           className="mb-6 border border-amber-200 bg-amber-50 text-amber-900 text-sm rounded-lg p-4"
         >
-          {isTr
-            ? 'Efor kayıtları okunamadı. Sorun kaydedildi; lütfen birazdan tekrar deneyin.'
-            : 'Effort records could not be read. The failure has been recorded; please try again shortly.'}
+          {t('queryFailed')}
         </div>
       )}
 
@@ -131,12 +128,11 @@ export default async function PersonDaysReportPage({
         <div className="p-3 sm:p-4 bg-ground border-b border-border flex flex-wrap gap-3 justify-between items-center sm:items-center">
           <div className="flex gap-2">
             <span className="px-4 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white">
-              {isTr ? 'Fırsata Göre' : 'By Opportunity'}
+              {t('byOpportunity')}
             </span>
           </div>
           <div className="text-xs sm:text-sm font-medium text-ink-2 whitespace-nowrap">
-            {isTr ? 'Toplam' : 'Total'}: {totalHours} {isTr ? 'saat' : 'hours'} (
-            {toPersonDays(totalHours).toFixed(1)} {isTr ? 'AG' : 'PDs'})
+            {t('totalSummary', { hours: String(totalHours), days: toPersonDays(totalHours).toFixed(1) })}
           </div>
         </div>
 
@@ -144,12 +140,12 @@ export default async function PersonDaysReportPage({
           <table className="w-full text-left text-sm">
             <thead className="bg-surface border-b border-border text-muted uppercase tracking-wider text-xs">
               <tr>
-                <th className="px-3 sm:px-6 py-3 font-semibold">{isTr ? 'Fırsat' : 'Opportunity'}</th>
+                <th className="px-3 sm:px-6 py-3 font-semibold">{t('opportunity')}</th>
                 <th className="px-3 sm:px-6 py-3 font-semibold text-right whitespace-nowrap">
-                  {isTr ? 'Toplam Saat' : 'Total Hours'}
+                  {t('totalHours')}
                 </th>
                 <th className="px-3 sm:px-6 py-3 font-semibold text-right whitespace-nowrap">
-                  {isTr ? 'Adam-Gün' : 'Person-Days'}
+                  {t('personDays')}
                 </th>
               </tr>
             </thead>
@@ -178,12 +174,10 @@ export default async function PersonDaysReportPage({
         {!queryFailed && groupedData.length === 0 && (
           <div className="p-12 text-center text-sm text-muted space-y-1">
             <p className="font-semibold text-ink">
-              {isTr ? 'Henüz efor kaydı yok.' : 'No effort has been logged yet.'}
+              {t('emptyTitle')}
             </p>
             <p>
-              {isTr
-                ? 'Bir fırsatın efor sekmesinden saat girdiğinizde burada görünür.'
-                : 'Hours logged on an opportunity’s effort tab appear here.'}
+              {t('emptyHint')}
             </p>
           </div>
         )}

@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
+import { asRole, can } from '@/lib/rbac';
 import { moduleGate } from '@/lib/modules/guard';
 
 import { listPanelScores } from '@/modules/m6/server/actions';
@@ -28,7 +29,10 @@ export default async function EvaluationPanelPage({
   params: Promise<{ locale: string; workspace: string; id: string }>;
 }) {
   const { locale, id } = await params;
-  const { tenantId, userId } = await requireTenantPage(locale);
+  // NG-64 review R-1 (K-577556): the door is `contribute_assigned`, so a guest
+  // reviewer seated on the panel can still score. The panel-wide table below is a
+  // separate, stricter question.
+  const { tenantId, userId, role } = await requireTenantPageRole(locale, 'contribute_assigned');
 
   // Module gate (M6). A tenant whose ModuleState says OFF/DEV/PILOT must not
   // reach this page just because it can guess the URL.
@@ -94,17 +98,24 @@ export default async function EvaluationPanelPage({
 
   const seated = proposal.evaluations.find((e) => e.reviewers.length > 0);
 
+  // The dashboard rows are panel-wide averages built from every reviewer's marks, so
+  // they are for roles that may view the proposal (K-577556): a guest reviewer sees
+  // their own seat (the form) and nothing of the other reviewers. Asked before the
+  // read, and `listPanelScores` refuses the same roles on its own (it is a server
+  // action a browser can call directly).
+  const seesPanel = can(asRole(role), 'view_proposal');
+
   // Read here rather than in the client: `listPanelScores` resolves the tenant from the
   // session and runs inside `withTenant`, and a server read means the dashboard has no
   // loading state to get wrong.
-  const rows = await listPanelScores(proposal.id);
+  const rows = seesPanel ? await listPanelScores(proposal.id) : null;
 
   return (
     <div className="max-w-4xl mx-auto py-6 sm:px-6 space-y-6">
       <PanelClient
         proposalId={proposal.id}
         seatedEvaluationId={seated?.id ?? null}
-        dashboard={<EvaluationDashboard rows={rows} />}
+        dashboard={rows ? <EvaluationDashboard rows={rows} /> : null}
       />
     </div>
   );

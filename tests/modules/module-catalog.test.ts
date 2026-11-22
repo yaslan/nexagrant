@@ -185,7 +185,7 @@ describe("manifest catalogue fields", () => {
         .map((m) => m.id);
     expect(byCat("core")).toEqual(["M0", "M1", "M2", "M3", "M4", "M5", "M13", "M16"]);
     expect(byCat("ai")).toEqual(["M6", "M8", "M14", "M17"]);
-    expect(byCat("tools")).toEqual(["M7", "M9", "M10", "M11", "M12", "M15"]);
+    expect(byCat("tools")).toEqual(["M7", "M9", "M10", "M11", "M12", "M15", "M18"]);
   });
 
   it("every module names at least one gate and a name + tagline in both locales", () => {
@@ -230,11 +230,24 @@ describe("pipelineCoverage / categorySummary", () => {
     ]);
   });
 
+  // NG-60 / K-577631: the G1 gate's consortium check reads M8's seats
+  // (src/lib/gates/evaluate.ts), so M8 works in G1 as well as G2.
+  it("M8 declares G1 and G2, so its coverage counts the G1 consortium gate", () => {
+    expect(getAllManifests().find((m) => m.id === "M8")?.stages).toEqual([
+      "G1",
+      "G2",
+    ]);
+    expect(pipelineCoverage(["M8"])).toEqual({
+      covered: ["G1", "G2"],
+      total: 5,
+    });
+  });
+
   it("gives active/total per category", () => {
     expect(categorySummary(["M1", "M6", "M11"])).toEqual({
       core: { active: 1, total: 8 },
       ai: { active: 1, total: 4 },
-      tools: { active: 1, total: 6 },
+      tools: { active: 1, total: 7 },
     });
   });
 });
@@ -259,7 +272,11 @@ describe("navFeatureModule", () => {
 describe("Yakında modules and programme templates", () => {
   it("declares the six new manifests with the agreed categories, dependencies and badge", () => {
     const byId = Object.fromEntries(getAllManifests().map((m) => [m.id, m]));
+    // M18 left "Yakında" for "beta" under K-581676 = A (NG-135): open to DEV/PILOT tenants only,
+    // never sold. It is therefore not in this list; see tests/modules/m18-manifest.test.ts.
     expect(SOON_IDS.sort()).toEqual(["M0", "M12", "M13", "M14", "M15", "M16"]);
+    expect(byId.M18?.statusBadge).toBe("beta");
+    expect(byId.M18?.planTiers).toEqual([]);
     // M17 opened with its screen (FO-189).
     expect(byId.M17?.statusBadge).toBe("beta");
     expect(byId.M13?.requires).toEqual(["M5"]);

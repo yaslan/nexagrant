@@ -29,6 +29,8 @@ vi.mock('@/lib/env', async (orig) => {
 
 import { prisma, withTenant } from '@/lib/db';
 import { seededOrSkipping } from './helpers/seed';
+import { databaseReachable } from './helpers/database-availability';
+import { skipOrFailInCi } from './helpers/live-db-role';
 
 const balance = () =>
   withTenant(TENANT, (tx) => tx.creditLedger.aggregate({ where: { tenantId: TENANT }, _sum: { delta: true } }))
@@ -44,11 +46,16 @@ const debitsSince = (since: Date) =>
   );
 
 // The suite runs on the seeded demo tenant and its demo opportunity.
-const seeded = seededOrSkipping(
-  'double charge prevention',
-  await prisma.tenant.count({ where: { id: TENANT } }).then((n) => n > 0),
-  `the demo tenant '${TENANT}' is missing`
-);
+// NG-180: without a database this file skips with its own reason (warned locally, thrown in CI).
+const reachable = await databaseReachable();
+if (!reachable) skipOrFailInCi('double charge prevention', 'no database answers (DATABASE_URL is not set, or Postgres is unreachable)');
+const seeded =
+  reachable &&
+  seededOrSkipping(
+    'double charge prevention',
+    await prisma.tenant.count({ where: { id: TENANT } }).then((n) => n > 0),
+    `the demo tenant '${TENANT}' is missing`
+  );
 
 describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', () => {
   beforeAll(async () => {
@@ -89,6 +96,7 @@ describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', 
 
   afterAll(async () => {
     await withTenant(TENANT, async (tx) => {
+      await tx.applicationPart.deleteMany({ where: { tenantId: TENANT, id: { startsWith: PROBE } } });
       await tx.evaluation.deleteMany({ where: { opportunityId: 'demo-opp-1' } });
       await tx.meetingBrief.deleteMany({ where: { tenantId: TENANT, interactionId: { startsWith: PROBE } } });
       await tx.followupDoc.deleteMany({ where: { tenantId: TENANT, opportunityId: 'demo-opp-1' } });
@@ -134,6 +142,19 @@ describe.skipIf(!seeded)('Double Charge Prevention & Single Debit Enforcement', 
     const t0 = new Date();
     await new Promise((r) => setTimeout(r, 20));
     const before = await balance();
+
+    // M6 refuses, uncharged, when there is no proposal text to read (NG-98).
+    await withTenant(TENANT, (tx) =>
+      tx.applicationPart.create({
+        data: {
+          id: PROBE + '_part_b',
+          tenantId: TENANT,
+          opportunityId: 'demo-opp-1',
+          part: 'PART_B',
+          content: { sections: [{ title: '1.1 Objectives', content: 'Validate soil sensors on 40 farms.' }] },
+        },
+      })
+    );
 
     await generateAiEvaluation('demo-opp-1');
 

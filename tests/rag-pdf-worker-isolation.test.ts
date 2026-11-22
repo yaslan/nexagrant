@@ -164,13 +164,40 @@ describe('decompression bomb: inflated stream bytes are capped before pdf.js sta
     expect(e).toMatchObject({ code: 'parse_too_heavy' });
   });
 
-  test('a 128 MB-inflating stream (~130 KB file) is refused at the real limits, fast', async () => {
+  test('a 128 MB-inflating stream (~130 KB file) is refused at the real limits', async () => {
     const pdf = flatePdf({ content: Buffer.alloc(128 * 1024 * 1024, 0x20) });
-    const { result, ms, worstGapMs } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
-    expect(result).toMatchObject({ code: 'parse_too_heavy' });
-    expect(ms).toBeLessThan(slack(3_000));
+    const { result, worstGapMs } = await withPings(() => extractPdfText(pdf, MAX_CHARS));
+    expect(result).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: limits.actual.maxStreamInflatedMb } });
     expect(worstGapMs).toBeLessThan(slack(500));
   }, slack(60_000));
+
+  // NG-214: "fast" is no longer a fixed 3 s. That bound failed on a loaded machine (3.9 s measured)
+  // while the code was fine. What the limit promises is that the counter stops the decode at the cap,
+  // so the work done does not depend on how far the stream would have inflated. The same refusal is
+  // timed for a stream just over the cap and for one four times the cap, back to back in this
+  // process: load slows both alike, so the ratio holds. Counted at the cap, the ratio is about 1; with
+  // the counter missing, the big stream is inflated and parsed in full, 4x or more.
+  test('refusing a stream costs the same whether it inflates to 1.03x or 4x the stream cap', async () => {
+    const capMb = limits.actual.maxStreamInflatedMb!;
+    const MB = 1024 * 1024;
+    const small = flatePdf({ content: Buffer.alloc(Math.ceil(capMb * 1.03) * MB, 0x20) });
+    const large = flatePdf({ content: Buffer.alloc(capMb * 4 * MB, 0x20) });
+    const refusedMs = async (pdf: Buffer): Promise<number> => {
+      const started = performance.now();
+      const e = await extractPdfText(pdf, MAX_CHARS).catch((err: unknown) => err);
+      const ms = performance.now() - started;
+      expect(e).toMatchObject({ code: 'parse_too_heavy', detail: { maxStreamInflatedMb: capMb } });
+      return ms;
+    };
+    await refusedMs(small); // warm-up: worker start, module load, JIT
+    let bestSmall = Infinity;
+    let bestLarge = Infinity;
+    for (let run = 0; run < 3; run += 1) {
+      bestSmall = Math.min(bestSmall, await refusedMs(small));
+      bestLarge = Math.min(bestLarge, await refusedMs(large));
+    }
+    expect(bestLarge / bestSmall).toBeLessThan(2);
+  }, slack(120_000));
 });
 
 /**

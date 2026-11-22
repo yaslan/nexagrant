@@ -23,6 +23,8 @@ import { toTenantProvince, provinceAppliesTo } from '@/lib/province';
 import { asRole, can } from '@/lib/rbac';
 import { requireTenantAction } from '@/lib/tenant';
 import { failureCode, type PilotExpiredCode } from '@/lib/pilot-expired';
+import { recordAlert } from '@/lib/observability/system-alert';
+import { refreshTenantPicRegistry } from '@/lib/pic-registry-refresh';
 import { rescoreTenantG0AfterPicChange, type PicChangeTrigger } from '@/lib/scoring/g0-rescore-tenant';
 import { UserWindowLimiter } from '@/lib/user-rate-limit';
 import { DEFAULT_TRL_RANGE, parseKeywords } from './profile-fields';
@@ -296,6 +298,8 @@ export async function updateTenantProfile(
 
     // FO-384: set by the PIC write below; the rescore runs after that transaction has committed.
     let picChange: { trigger: PicChangeTrigger; auditEventId: string } | null = null;
+    // FO-396: the new PIC to ask the EU register about, set only when the PIC really changed to a value.
+    let picToCheck: { pic: string; auditEventId: string } | null = null;
 
     const outcome = await withTenant(scope.tenantId, async (tx) => {
       const existing = await tx.tenantProfile.findUnique({
@@ -381,7 +385,12 @@ export async function updateTenantProfile(
       }
 
       if (picPlan.kind === 'write') {
-        await tx.tenant.update({ where: { id: scope.tenantId }, data: { pic: picPlan.to } });
+        // FO-396 (B3): the stored register answer belongs to the PIC it was asked about. A new PIC starts
+        // unverified, so the previous FOUND never carries over to the new number.
+        await tx.tenant.update({
+          where: { id: scope.tenantId },
+          data: { pic: picPlan.to, picRegistryStatus: null, picRegistryCheckedAt: null },
+        });
         const audit = await tx.auditEvent.create({
           data: {
             tenantId: scope.tenantId,
@@ -391,6 +400,7 @@ export async function updateTenantProfile(
           },
         });
         picChange = { trigger: picPlan.to === null ? 'tenant_cleared' : 'tenant_saved', auditEventId: String(audit.id) };
+        if (picPlan.to !== null) picToCheck = { pic: picPlan.to, auditEventId: String(audit.id) };
       }
 
       revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');
@@ -406,6 +416,25 @@ export async function updateTenantProfile(
 
     // FO-384: the stored G0 scores follow the PIC. Never rejects; a failure is an alert, not a
     // refused save, because the PIC is already committed.
+    // FO-396 (B1): ask the register once the new PIC is committed, before the rescore reads it. Only when the
+    // PIC changed (the write plan); a failure leaves the PIC saved and the status null (no grant).
+    // The cast: the flag is set inside the transaction callback, which TypeScript does not follow.
+    const registryCheck = picToCheck as { pic: string; auditEventId: string } | null;
+    if (registryCheck !== null) {
+      try {
+        await refreshTenantPicRegistry(scope.tenantId, registryCheck.pic, {}, { auditEventId: registryCheck.auditEventId, attempt: 0 });
+      } catch {
+        // The PIC is already committed; the stored status stays null, which the scorer reads as no grant.
+        // FO-396 (Ö-C): the failure is recorded, not swallowed. recordAlert never throws, and the alert carries
+        // no PIC and no tenant id (NG-85 F1: SystemAlert has no tenantId and no RLS).
+        await recordAlert({
+          level: 'warn',
+          source: 'pic-registry',
+          message: 'PIC saved, but the EU register answer could not be stored; PIC stays unverified (no grant)',
+          meta: { reason: 'refresh_failed' },
+        });
+      }
+    }
     if (picChange) await rescoreTenantG0AfterPicChange(scope.tenantId, picChange);
     return outcome;
   } catch (error) {

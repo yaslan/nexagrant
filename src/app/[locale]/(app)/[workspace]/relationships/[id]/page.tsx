@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { moduleGate } from '@/lib/modules/guard';
 import { asRole, can } from '@/lib/rbac';
 import { getWorkspaceMembers } from '@/lib/k5-pipeline/pipelineStore';
@@ -29,12 +29,12 @@ export default async function RelationshipDetailPage({
 }) {
   const { id, locale, workspace } = await params;
   const t = await getTranslations({ locale, namespace: 'Relationships' });
+  const { tenantId, role } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M4', locale);
   if (locked) return locked;
 
   // Redirects an anonymous visitor to login and a signed-in user with no
   // membership to /no-workspace. It cannot hand back a null or empty tenant.
-  const { tenantId, role } = await requireTenantPage(locale);
 
   const data = await loadRelationshipDetail(tenantId, id);
   // Another tenant's id and a non-existent id give the same 404 on purpose.

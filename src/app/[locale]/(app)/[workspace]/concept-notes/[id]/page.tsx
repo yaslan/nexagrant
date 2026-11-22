@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import ConceptNoteEditor from './editor';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { editorSections, loadConceptNoteDetail, type ConceptNoteDetailData } from './data';
 
 /**
@@ -23,11 +23,11 @@ export default async function ConceptNoteDetailPage({
   params: Promise<{ id: string; locale: string; workspace: string }>;
 }) {
   const { id, locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M2', locale);
   if (locked) return locked;
   // Redirects an anonymous visitor to login and a signed-in user with no
   // membership to /no-workspace. It cannot hand back a null or empty tenant.
-  const { tenantId } = await requireTenantPage(locale);
 
   let data: ConceptNoteDetailData | null = null;
   try {

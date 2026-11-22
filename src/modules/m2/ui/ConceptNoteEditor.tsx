@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { generateConceptNoteDraft, saveConceptNoteDraft, exportToDocx } from '../server/actions';
 import { errorMessage } from '@/lib/errors';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
+import { invalidTemplateSectionKey } from '../invalid-section';
 
 // We'll use standard HTML elements if UI components are missing for brevity, but let's assume they exist
 // from shadcn or base-ui per package.json. If they don't, standard works.
@@ -52,7 +53,14 @@ export default function ConceptNoteEditor({
       setCurrentNoteId(newNoteId);
       setNotice({ kind: 'ok', text: t('generated') });
     } catch (err) {
-      setNotice({ kind: 'error', text: errorText(err, () => t('failed', { message: errorMessage(err) })) });
+      const section = invalidTemplateSectionKey(err);
+      setNotice({
+        kind: 'error',
+        text:
+          section !== null
+            ? t('invalidSection', { section: schema.find((item) => item.key === section)?.labelKey || section })
+            : errorText(err, () => t('failed', { message: errorMessage(err) })),
+      });
     } finally {
       setIsGenerating(false);
     }

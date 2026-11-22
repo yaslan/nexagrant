@@ -157,6 +157,31 @@ export function formatWholeMoney(amountWhole: bigint | number, currency: string,
 }
 
 /**
+ * True when a stored currency code means euro. `null`/`undefined`/blank count as
+ * euro: `Topic` has no currency column of its own, the amount inherits
+ * `Call.currency`, and an unset one is the historical EUR default (NG-163).
+ * Every place that shows or scores a per-project budget asks this first, so a
+ * TRY amount (TR agency calls) is never printed with a euro sign or compared
+ * against euro thresholds. No exchange-rate conversion happens anywhere.
+ */
+export function isEuroCurrency(currency: string | null | undefined): boolean {
+  return currency === null || currency === undefined || currency.trim() === '' || currency.trim().toUpperCase() === 'EUR';
+}
+
+/**
+ * Renders a *minor-unit* amount as whole major units (no fraction digits) in
+ * the amount's own currency. `bigint` safe: `Topic.budgetPerProjectCents` is a
+ * BigInt column. Rounds half-up to the whole unit with integer arithmetic.
+ */
+export function formatMinorWhole(amountMinor: bigint | number, currency: string, locale: string): string {
+  const minor = typeof amountMinor === 'bigint' ? amountMinor : BigInt(Math.trunc(amountMinor));
+  const divisor = 10n ** BigInt(currencyExponent(currency));
+  const abs = minor < 0n ? -minor : minor;
+  const whole = (abs + divisor / 2n) / divisor;
+  return formatWholeMoney(minor < 0n ? -whole : whole, currency, locale);
+}
+
+/**
  * Converts an integer minor-unit amount to an integer minor-unit amount
  * in target currency using a record-provided exchange rate.
  * Integer arithmetic with half-up rounding (0.5 rounds up).

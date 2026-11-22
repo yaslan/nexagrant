@@ -27,7 +27,7 @@ vi.mock('../src/lib/llm', async () => {
 });
 
 const { syncCordisBigData, aggregateCordisMetrics } = await import('../src/lib/cordis-sync');
-const { retrieveChunks, buildRagPrompt, splitText } = await import('../src/lib/rag');
+const { retrieveChunks, buildRagContext, splitText } = await import('../src/lib/rag');
 
 beforeEach(() => {
   embedTextMock.mockReset().mockImplementation(async (text: string) => fakeEmbedding(text));
@@ -148,6 +148,24 @@ describe('syncCordisBigData writes to the real CORDIS tables', () => {
     expect(db.rows('cordisProject')).toHaveLength(1);
     expect(db.rows('document')).toHaveLength(1);
   });
+
+  test('the database re-index leaves keep.eu rows (KEU:) to the keep.eu RAG step (FO-363)', async () => {
+    // A keep.eu project sits in the same table under the KEU: prefix (persistKeepEuRecord).
+    await syncCordisBigData([
+      record(),
+      record({ projectId: 'KEU:BGTR0300118', objectiveText: 'keep.eu text', coordinatorPic: null }),
+    ]);
+    expect(db.rows('cordisProject')).toHaveLength(2);
+    db.clear('document');
+    embedTextMock.mockClear();
+
+    const res = await syncCordisBigData();
+
+    expect(res.syncedProjectsCount).toBe(1);
+    const texts = embedTextMock.mock.calls.map((c) => String(c[0]));
+    expect(texts.some((t) => t.includes('KEU:'))).toBe(false);
+    expect(texts.some((t) => t.includes('keep.eu text'))).toBe(false);
+  });
 });
 
 describe('aggregateCordisMetrics reports measured figures (CLAUDE.md #7)', () => {
@@ -195,9 +213,9 @@ describe('RAG helpers', () => {
     expect(chunks[0]?.score).toBeGreaterThan(0.5);
   });
 
-  test('buildRagPrompt formats retrieved chunks into LLM prompt', async () => {
-    const prompt = await buildRagPrompt('Zero-emission battery', undefined, 2);
-    expect(prompt).toContain('RETRIEVED CONTEXT');
-    expect(prompt).toContain('Question: Zero-emission battery');
+  test('buildRagContext labels the retrieved chunks and carries no instruction', async () => {
+    const context = await buildRagContext('Zero-emission battery', undefined, 2);
+    expect(context).toContain('[Source 1 | Score:');
+    expect(context).not.toContain('Question:');
   });
 });

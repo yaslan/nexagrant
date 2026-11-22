@@ -94,7 +94,7 @@ rolündedir; ana bağlantının `fabrika_app`'e çevrilmesi ayrı bir iştir ve
 - Auth.js; parola argon2; 2FA (TOTP) faz 2; ~~SSO (SAML/OIDC) Kurumsal~~.
   - **karar 29.09.2026 (patron):** giriş yalnız Google OAuth; şifre ve e-posta bağlantısı yok (ADR-0006). Microsoft girişi kaldırıldı (`acc35b07`). **Kurumsal SSO / SAML tamamen kaldırıldı** — ayar yalnız `Tenant.settings.sso`'ya kaydediliyordu, girişte hiç kullanılmıyordu; kodda kaldırıldı (`0fdbcb8d`; kart TASK-MUML0QZAZ5M80 `done`). M9 takvimde Outlook kaldırıldı, yalnız Google Takvim + `.ics` (`15313bc6`). Yukarıdaki "parola argon2" satırı bu karardan eskidir.
 - Oturum JWT: `userId, tenantId, role, workspaceIds`; kiracı değiştirme yeni oturum.
-- `guest_partner`: yalnızca davet bağlantısı + e-posta doğrulama; kapsam tek `Proposal`.
+- `guest_partner`: yalnızca davet bağlantısı + e-posta doğrulama; kapsam tek `Proposal`. Misafir, bağlı ajansın ad ve logosunu (ajans co-brand'ı) görmez: kabuk ve logo uç noktası `view_tenant_branding` iznine bağlıdır (`src/lib/rbac.ts`, NG-248 / K-584216); beş kurum içi rol görür.
 
 ## 3. Veri koruma (KVKK + GDPR)
 - Veri envanteri (`docs/data-inventory.md` üretilecek): kişisel veri = kullanıcı hesabı, muhatap adı/e-postası (`Relationship`), toplantı notları.
@@ -124,7 +124,7 @@ rolündedir; ana bağlantının `fabrika_app`'e çevrilmesi ayrı bir iştir ve
 2. `requestAccountDeletion` yalnızca **işaretler**: `User.deletionRequestedAt` ve `User.deletedAt` = şimdi. Hiçbir satır silinmez; üyelikler durur, böylece talep geri alınabilir.
 3. Kullanıcıya bilgilendirme e-postası gider (SMTP sunucumuz `mail.fonbridge.com` — Vulut cPanel e-posta hizmeti, Seçenek A, patron 29.09.2026; gönderici `info@fonbridge.com`, barındırma Vulut, Türkiye; `src/lib/email/mailer.ts` — 29.09.2026'dan önce Resend; gönderim hatası talebi bloke etmez).
 4. Kullanıcı 30 gün içinde aynı ekrandan `cancelAccountDeletion` ile dönebilir.
-5. `users-scheduled-deletion` Inngest işi her gün 03:00 UTC'de süresi dolanları kalıcı siler. Sıra: `AiUsageLog.userId = NULL` → `Effort` sil → `User` sil (cascade: `Account`, `Session`, `Membership`, talep edilen `ApprovalRequest`). R2'ye dokunulmaz: depodaki her nesne kiracınındır, kişiye bağlı önek yoktur (`docs/legal/processing-register.md` §15, TASK-MUPL2D9B8QWAB).
+5. `users-scheduled-deletion` graphile-worker işi (`src/lib/jobs/tasks/users-scheduled-deletion.ts`) her gün 03:00 UTC'de süresi dolanları kalıcı siler. Sıra: `AiUsageLog.userId = NULL` → `Effort` sil → `User` sil (cascade: `Account`, `Session`, `Membership`, talep edilen `ApprovalRequest`). R2'ye dokunulmaz: depodaki her nesne kiracınındır, kişiye bağlı önek yoktur (`docs/legal/processing-register.md` §15, TASK-MUPL2D9B8QWAB).
 
 Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete yapmaz.
 
@@ -143,9 +143,49 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
 - Evaluator Lens çıktısı "iç ön değerlendirme"; hakemlik simülasyonu Komisyon değerlendiricileri için değil, başvuranlar için.
 
 ## 5. Uygulama güvenliği
-- OWASP ASVS L2 hedefi; zod ile tüm girişler; CSRF (Server Actions yerleşik); CSP başlıkları; oran sınırlama (Upstash) giriş/AI uç noktaları; dosya yükleme MIME + boyut + virüs taraması (ClamAV faz 2).
+- OWASP ASVS L2 hedefi; zod ile tüm girişler; CSRF (Server Actions yerleşik); CSP başlıkları; oran sınırlama (Upstash) giriş/AI uç noktaları; dosya yükleme MIME + boyut + virüs taraması. **ClamAV barındırması (karar 19.11.2026, ADR-0012):** `clamd` kalıcı süreç ister; Cloud Economy'de kalıcı süreç/Docker/root yok. Karar: `clamav` konteyneri patronun aldığı Hostinger KVM 4 VPS'inde (19.11.2026 akşam; ilk seçilen KVM 2 değildi; Ubuntu 24.04 + CloudPanel), yalnız Docker iç ağında (`ports:` yok, INSTREAM makineden çıkmaz). **PLANLI, yapılmadı:** VPS var ama uygulama orada yayında değil (NG-261), `clamav` servisi yok, canlıda tarama koşmuyor.
+- Virüs taraması (NG-239, §18.3 — ClamAV faz 2 tamamlandı): kanıt dosyaları yüklemeden sonra arka planda
+  (`evidence-scan` işi, graphile-worker) uygulamayla aynı makinedeki `clamd`'ye TCP INSTREAM ile akıtılır
+  (`src/lib/clamav.ts`; `CLAMD_HOST`/`CLAMD_PORT`/`CLAMD_TIMEOUT_MS`, `src/lib/env.ts`; yerelde
+  `docker compose --profile scan up -d clamav`, port yalnız 127.0.0.1). **Yalnız `CLEAN` dosya iner**; tek kapı
+  `src/lib/evidence-scan-gate.ts` (indirme rotası 409 `EVIDENCE_SCAN_PENDING|INFECTED|ERROR`, presigned GET
+  imzalanmaz, ekranda bağlantı yok). Kapalı hata: clamd tanımsız/kapalı/zaman aşımı → `ERROR`, dosya inmez,
+  1 dk / 5 dk / 30 dk yeniden deneme + 15 dakikalık süpürme (kiracının bütün bekleyen dosyaları, sayfa sayfa; kuyrukta
+  kalıcı düşmüş tarama işi yenisiyle değiştirilir). clamd `AlertExceedsMax yes` ile koşmalı (compose
+  `CLAMD_CONF_AlertExceedsMax`; VPS'teki clamd de, NG-261): sınırını aşan dosya (açılınca 100 MB üstü, 17'den derin
+  arşiv vb.) `Heuristics.Limits.Exceeded.*` olur, `ERROR` (`limits_exceeded`) sayılır, silinmez ama inmez. Bu ayar
+  olmadan clamd o kısmı atlayıp `OK` der. Zararlı bulunursa **önce** satır `INFECTED` olur ve `AuditEvent`
+  `evidence.scan.infected` aynı transaction'da yazılır (NG-263: kayıt, nesne silinmeden önce; transaction düşerse
+  iş yeniden denenir, nesne hâlâ depodadır ve aynı karar yeniden çıkar — eski sırada nesne silinmiş olduğu için
+  yeniden deneme `object_unreadable` → `ERROR` diyordu ve "zararlı bulundu" bilgisi kayboluyordu). **Sonra** nesne
+  silinir, sonucu ikinci bir `AuditEvent` `evidence.scan.object_removed` (`data.objectDeleted` true/false) taşır
+  ve `SystemAlert` (`error`, kiracı kimliği/dosya adı içermez) yazılır. `AuditEvent` satırları değişmez; silme
+  sonucu ayrı bir olaydır. Satır `INFECTED` iken ama nesne hâlâ depodayken (silme başarısız ya da iş kesildi)
+  indirme yolları kapalıdır (rota, presigned GET, ekran); iş kesildiyse bir sonraki çalıştırma `INFECTED`
+  satırını görüp silmeyi tamamlar ve `object_removed` olayını yazar. `object_unreadable` ayrı bir `error`
+  alarmıyla bildirilir (ikinci savunma hattı). Testler yalnız
+  EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
+  güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da gerçek
+  clamd koşar (`ci.yml`, ClamAV 1.5.4 + `AlertExceedsMax`), gerçek-clamd testleri ve clamd durdurulmuş testi orada atlanmadan koşar.
+- ZIP üye denetimi (NG-269, K-584606 = C): `AlertExceedsMax` her durumu yakalamıyor. clamd 1.5.4, MaxFileSize'ı aşan
+  tek bir ZIP üyesini uyarısız kırpıp `OK` diyor, ZIP64 üyeyi hiç açmıyor (NG-265 ölçümü). Bu yüzden ZIP başlıklı her
+  kanıt dosyası (docx, xlsx) clamd'den ÖNCE `src/lib/zip-member-check.ts` ile denetlenir. Denetim her üyeyi akış
+  olarak açar, gerçek baytı sayar ve tavanda durur; başlıkta beyan edilen boyuta güvenmez. Merkezi dizinde olmayan
+  yerel girdilere ve üye içindeki (stored, deflate ya da başka baytlardan sonra gömülü) ZIP'lere de bakar. Tavanlar
+  tek yerde ve clamd varsayılanlarıyla aynı: üye 100 MiB (`MaxFileSize`), toplam açılım 400 MiB (`MaxScanSize`),
+  10 000 girdi (`MaxFiles`), iç içe derinlik 32 (clamd `MaxRecursion` 17'den derin). Tavanı aşan üye ya da dosya,
+  ZIP64, deflate/stored dışında bir yöntem, şifreli ya da açılamayan üye `ERROR` (`limits_exceeded: zip_member_check:
+  <kod>`) olur. Merkezi dizinde olmayan bir yerel girdinin adı boş ya da kontrol karakterli olsa bile ZIP64 işareti,
+  ZIP belirtiminin tanıdığı bir yöntemde de şifreleme ya da deflate/stored dışı yöntem reddedilir: clamd bu girdileri
+  adına bakmadan okuyor (gizli ZIP64 ve LZMA girdide `OK` ölçüldü). Bir üyenin içinde deflate ile saklanmış iç ZIP, içine
+  bakılabilmesi için bellekte tutulur; tutulan toplam 32 MiB'ı (`ZIP_NESTED_HOLD_MAX_BYTES`, clamd ayarı değil) aşarsa
+  dosya `nested_too_large` koduyla reddedilir. Dosya clamd'ye gitmez, silinmez, inmez. Bilinen sınırlar: sayfası
+  100 MiB'ı aşan çok büyük bir xlsx veri dökümü (sıkıştırılmış ~17 MB+) ve 32 MiB'tan büyük gömülü (deflate edilmiş)
+  bir docx/xlsx içeren dosya reddedilir; ret kalıcıdır ama NG-239'un yeniden deneme yolundan geçer (3 deneme + `warn`
+  uyarısı + süpürme). clamd'nin bir tavanı düşürülürse aynı değişiklik bu dosyada da yapılmalıdır.
+  Kapsam dışı: PNG/JPG/WebP sonuna eklenen ZIP (polyglot), ayrı bir takip işi.
 - Sırlar: env; log'da PII maskeleme. **Sentry KULLANILMIYOR** (bilinçli mimari karar, 2026-09-07 — veri dışarı çıkmasın; bkz. §3 ve `docs/legal/processing-register.md` §19), bu yüzden "Sentry PII kapalı" iddiası da geçersizdi ve kaldırıldı.
-- Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı.
+- Yedekleme: ~~Neon PITR 7 gün~~ (Neon seçilmedi; barındırma Vulut, 29.09.2026 — Postgres yedekleme ve geri yükleme süresi Vulut kurulumunda yeniden yazılacak, bugün belgelenmiş değil); R2 sürümleme; aylık geri yükleme tatbikatı. **NexaGrant barındırma güncellemesi (19.11.2026, ADR-0012):** DB Supabase'te kalır (yedek Supabase planına bağlı; plan bilinmiyor, NG-246 §4), VPS için Hostinger haftalık yedeği. Taşıma planlı, yapılmadı; bugün canlı Hostinger Cloud'da.
 - Olay müdahale: 72 saat bildirim prosedürü (GDPR), KVKK Kurulu bildirimi.
 
 ## 6. Lisanslar

@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { ExternalLink } from 'lucide-react';
 import { getWorkspaceRoute } from '@/lib/routes';
 import { moduleGate } from '@/lib/modules/guard';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { PARTNER_RESOURCES } from './resources';
 
 export default async function PartnerResourcesPage({
@@ -11,6 +12,7 @@ export default async function PartnerResourcesPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { workspace, locale } = await params;
+  await requireTenantPageRole(locale, 'view_partner_search');
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
   const t = await getTranslations('PartnerResources');

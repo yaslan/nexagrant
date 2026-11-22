@@ -25,6 +25,7 @@ import { evaluateGate } from '@/lib/gates/evaluate';
 import type { GateReason } from '@/lib/gates/reasons';
 import { classifyStageMove, isStage, nextStageOf } from '@/lib/gates/transition';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
+import { WITHDRAWAL_REASON_MAX, withdrawOpportunity } from '@/lib/k5-pipeline/withdrawal';
 import {
   APPLICATION_DECLARATIONS,
   nextApplicationStatus,
@@ -883,5 +884,88 @@ export async function declareApplication({
   } catch (err) {
     console.warn(`[declareApplication] failed: ${errorMessage(err)}`);
     return { success: false, error: 'DECLARE_FAILED' };
+  }
+}
+
+/**
+ * Withdraw ("vazgeç") with a reason — NG-15 calls the BE-05 layer (NG-38) and nothing else.
+ *
+ * The rule (reason required, withdrawable statuses) lives in `withdrawOpportunity`; this action
+ * does not repeat it. The form may send an empty reason: the refusal is returned here and shown.
+ * Who may withdraw is the same rule as archiving and declaring (`canArchiveOpportunity`).
+ */
+const WithdrawOpportunityInput = z.object({
+  opportunityId: z.string().min(1),
+  reason: z.string().max(WITHDRAWAL_REASON_MAX),
+});
+
+export async function withdrawOpportunityAction({
+  opportunityId,
+  reason,
+}: {
+  opportunityId: string;
+  reason: string;
+}): Promise<
+  | { success: true }
+  | {
+      success: false;
+      error:
+        | 'TENANT_SCOPE_REQUIRED'
+        | 'INVALID_INPUT'
+        | 'REASON_TOO_LONG'
+        | 'REASON_REQUIRED'
+        | 'OPPORTUNITY_NOT_FOUND'
+        | 'WITHDRAW_FORBIDDEN'
+        | 'ALREADY_WITHDRAWN'
+        | 'ALREADY_DECIDED'
+        | 'WITHDRAW_FAILED';
+    }
+> {
+  const parsed = WithdrawOpportunityInput.safeParse({ opportunityId, reason });
+  if (!parsed.success) {
+    const reasonTooLong = parsed.error.issues.some((i) => i.path[0] === 'reason');
+    return { success: false, error: reasonTooLong ? 'REASON_TOO_LONG' : 'INVALID_INPUT' };
+  }
+
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  await assertTenantActionWritable(scope.tenantId);
+  const { tenantId, userId, role } = scope;
+
+  try {
+    const owner = await withTenant(tenantId, (tx) =>
+      tx.opportunity.findFirst({
+        where: { id: parsed.data.opportunityId, tenantId, deletedAt: null },
+        select: { ownerId: true },
+      }),
+    );
+    if (!owner) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
+    if (!canArchiveOpportunity(role, owner.ownerId, userId)) {
+      return { success: false, error: 'WITHDRAW_FORBIDDEN' };
+    }
+
+    const result = await withdrawOpportunity({ tenantId, userId }, parsed.data.opportunityId, {
+      reason: parsed.data.reason,
+    });
+    if ('refused' in result) {
+      const map = {
+        REASON_REQUIRED: 'REASON_REQUIRED',
+        NOT_FOUND: 'OPPORTUNITY_NOT_FOUND',
+        ALREADY_WITHDRAWN: 'ALREADY_WITHDRAWN',
+        ALREADY_DECIDED: 'ALREADY_DECIDED',
+      } as const;
+      return { success: false, error: map[result.refused] };
+    }
+
+    try {
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/dashboard', 'page');
+    } catch {}
+
+    return { success: true };
+  } catch (err) {
+    console.warn(`[withdrawOpportunityAction] failed: ${errorMessage(err)}`);
+    return { success: false, error: 'WITHDRAW_FAILED' };
   }
 }

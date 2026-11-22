@@ -29,6 +29,7 @@ export const JOB_IDS = [
   'agency-monthly-report',
   'invitation-cleanup',
   'public-lead-cleanup',
+  'public-lead-stuck',
   'expert-prereg-cleanup',
   'k1-topic-match',
   'k1-embeddings',
@@ -41,8 +42,15 @@ export const JOB_IDS = [
   'partner-search-retention',
   'm17-text-retention',
   'm17-stale-runs',
+  'notification-email-instant',
+  'notification-email-weekly',
   // FO-384 B2: queued by a PIC change, never on a cron. Not in SCHEDULE (no tick, no missed-tick check).
   'g0-rescore-tenant',
+  // FO-396: queued by a PIC lookup that failed to reach the EU register, never on a cron.
+  'pic-registry-retry',
+  // NG-239: queued by an evidence upload (and by a failed scan, and by the sweep), never on a cron.
+  'evidence-scan',
+  'evidence-scan-sweep',
 ] as const;
 
 export type JobId = (typeof JOB_IDS)[number];
@@ -158,6 +166,48 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     maxAttempts: 3,
     queue: 'm17-stale-runs',
     missedTickAlert: false,
+  },
+  // NG-182: every 15 minutes, one SystemAlert per routed PublicLead that has no copy in its tenant
+  // after PUBLIC_LEAD_STUCK_AFTER_MINUTES (src/lib/leads/stuck-leads.ts). Read-only on the leads. Own
+  // queue, so a job added by hand waits for the cron's run. No missed-tick alert and no backfill: the
+  // next tick finds every lead still stuck, so a missed tick loses nothing.
+  {
+    id: 'public-lead-stuck',
+    cron: '*/15 * * * *',
+    maxAttempts: 3,
+    queue: 'public-lead-stuck',
+    missedTickAlert: false,
+  },
+  // NG-131 (NG-43 Ö-1): the notification e-mail outbox. Both modes share one queue, so a cron
+  // run and a job added by hand never overlap on a worker, and the outbox claims its rows besides
+  // (src/lib/notifications/email-outbox.ts), which also holds across two queues or two databases'
+  // workers. INSTANT every 5 minutes, no missed-tick alert and no backfill: the next tick sends
+  // every row still queued. WEEKLY Mondays 07:00 UTC (10:00 Istanbul), backfilled one day.
+  {
+    id: 'notification-email-instant',
+    cron: '*/5 * * * *',
+    maxAttempts: 3,
+    queue: 'notification-email',
+    missedTickAlert: false,
+  },
+  // NG-239: every 15 minutes, queues a virus scan for every stored evidence file that has none in
+  // flight (src/lib/evidence-scan.ts sweepUnscannedEvidence). Own queue. No missed-tick alert and no
+  // backfill: the next tick finds every file still unscanned, so a missed tick loses nothing (and
+  // the files stay undownloadable meanwhile: fail closed).
+  {
+    id: 'evidence-scan-sweep',
+    cron: '*/15 * * * *',
+    maxAttempts: 3,
+    queue: 'evidence-scan-sweep',
+    missedTickAlert: false,
+  },
+  {
+    id: 'notification-email-weekly',
+    cron: '0 7 * * 1',
+    maxAttempts: 5,
+    fill: '1d',
+    queue: 'notification-email',
+    missedTickAlert: true,
   },
 ];
 

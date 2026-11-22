@@ -60,10 +60,16 @@ export async function exportUserData(): Promise<ExportResult> {
       aiUsage,
       approvals,
       opportunities,
+      notificationPreferences,
+      notificationEmailItems,
       notifications,
       interregAnalyses,
       interregResults,
       interregMarks,
+      internalApprovals,
+      budgetShares,
+      projectIdeas,
+      decisions,
     ] = await withSystemScope('subject-scoped', 'gdpr-export.subjectRows', (tx) =>
       Promise.all([
         tx.user.findUnique({
@@ -139,6 +145,18 @@ export async function exportUserData(): Promise<ExportResult> {
               },
             },
           },
+        }),
+        // NG-43: the subject's own channel and frequency choices, and mails
+        // still queued for them (type + payload, ids and counts only).
+        tx.notificationPreference.findMany({
+          where: { userId },
+          select: { tenantId: true, event: true, channel: true, frequency: true, updatedAt: true },
+          orderBy: [{ tenantId: 'asc' }, { event: 'asc' }, { channel: 'asc' }],
+        }),
+        tx.notificationEmailItem.findMany({
+          where: { userId },
+          select: { id: true, tenantId: true, type: true, payload: true, frequency: true, createdAt: true, sentAt: true },
+          orderBy: { createdAt: 'asc' },
         }),
         // ADR-0011: the subject's notifications in every tenant. `payload`
         // holds ids and counts only; no other person is named in it.
@@ -220,6 +238,30 @@ export async function exportUserData(): Promise<ExportResult> {
           },
           orderBy: { createdAt: 'asc' },
         }),
+        // NG-34 (ADR-0010 Ek A 80-81): what ties these rows to the subject is the act of
+        // approving or agreeing. The amounts are the tenant's figures, not personal data.
+        tx.internalApproval.findMany({
+          where: { approvedById: userId },
+          select: { id: true, tenantId: true, opportunityId: true, approvedAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        tx.partnerBudgetShare.findMany({
+          where: { agreedById: userId },
+          select: { id: true, tenantId: true, seatId: true, agreedAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        // NG-38: the subject wrote the idea or took the decision. The idea's text and the
+        // decision's reason are the institution's record, not personal data, as NG-34's amounts.
+        tx.projectIdea.findMany({
+          where: { createdById: userId },
+          select: { id: true, tenantId: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        }),
+        tx.decisionLog.findMany({
+          where: { decidedById: userId },
+          select: { id: true, tenantId: true, opportunityId: true, kind: true, decidedAt: true },
+          orderBy: { decidedAt: 'asc' },
+        }),
       ])
     );
 
@@ -258,9 +300,15 @@ export async function exportUserData(): Promise<ExportResult> {
       AiUsageLog: aiUsage,
       ApprovalRequest: approvals,
       Notification: notifications,
+      NotificationPreference: notificationPreferences,
+      NotificationEmailItem: notificationEmailItems,
       InterregAnalysis: interregAnalyses,
       InterregAnalysisResult: interregResults,
       InterregCriterionMark: interregMarks,
+      InternalApproval: internalApprovals,
+      PartnerBudgetShare: budgetShares,
+      ProjectIdea: projectIdeas,
+      DecisionLog: decisions,
     };
 
     await recordAccessAudit(userId, tenantId, tables);

@@ -124,6 +124,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/email/opt-out-store.ts",
+      "subject": "system-scope:subject-scoped",
+      "count": 2,
+      "kind": "system-scope",
+      "class": "subject-scoped",
+      "reason": "NG-42 e-mail opt-out. The recipient of a first message has no account and no session, so there is no tenant to bind. (1) recordOptOut writes the choice: an unsubscribe is a NULL-tenant AuditEvent row because it binds every tenant, and a tenant session can neither read nor write NULL-tenant rows under tenant_isolation. (2) isEmailOptedOut reads that same row before a send: under withTenant it returns nothing and an unsubscribed address would keep receiving mail. The query is keyed by the hash of one address (the data subject's own choice, not a user id), returns only an id, and the authority for the write is the signed token verified in the route."
+    },
+    {
+      "check": "D",
       "file": "src/lib/jobs/tasks/users-scheduled-deletion.ts",
       "subject": "system-scope:subject-scoped",
       "count": 3,
@@ -184,6 +193,15 @@
       "kind": "system-scope",
       "class": "platform-admin",
       "reason": "The module console renders a tenant x module grid; the read is unfiltered on purpose and the page groups by s.tenantId afterwards. Under fabrika_app it returns nothing and every cell renders as 'off' — a wrong grid, not an empty one. Its former sibling in admin/modules/actions.ts turned out to be a different question (one named tenant) and is now plain withTenant, closing the proposed card K-2."
+    },
+    {
+      "check": "D",
+      "file": "src/app/[locale]/admin/modules/actions.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "NG-215 (SEC NG-205 D-1): updateTenantModuleStatus, after requirePlatformAdmin(). Only a write that leaves the tenant's M18 closed to its own people (isOpenToTenantMembers false: OFF, DEV or ON, directly or by an OFF cascade) runs here; every other flip stays plain withTenant. The tenant's ModuleState upserts and module.state.changed AuditEvents (all named by the tenantId argument) and deactivateRoutesOfClosedTarget (src/lib/leads/province-route.ts: that tenant's active ProvinceLeadRoute rows set inactive, one tenantId-NULL lead-route.deactivated AuditEvent each) share one transaction. ProvinceLeadRoute is RLS system_scope only, so a tenant scope reads 0 of its rows; without this the route stayed active and the transfer box kept naming a tenant whose forward is refused."
     },
     {
       "check": "D",
@@ -286,12 +304,21 @@
     },
     {
       "check": "D",
+      "file": "src/lib/notifications/email-outbox.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "sendNotificationEmails() (NG-43, spec §13): finds which (tenantId, userId) pairs have NotificationEmailItem rows of the run's frequency (INSTANT or WEEKLY) queued up to now, distinct, then keepLiveTenantRows drops soft-deleted tenants. The tenant set is the query's output, so no single tenant exists to hand withTenant; NotificationEmailItem is FORCE RLS, so an unscoped findMany under fabrika_app would see nothing and no mail would ever go. Reads only the two ids; each pair's items, the recipient's address, the sentAt mark and the unsent-drop deletes run afterwards in withTenant(tenantId)."
+    },
+    {
+      "check": "D",
       "file": "src/lib/notifications/retention.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
-      "reason": "pruneOldNotifications(), run nightly by the notifications-retention cron (ADR-0011 §3.4, TASK-MUVR24EHWI2RA): deletes every tenant's Notification rows whose createdAt is older than NOTIFICATION_RETENTION_DAYS (90). The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; Notification is FORCE RLS, so an unscoped deleteMany under fabrika_app would delete 0 and report success. Only deletes, reads no row content."
+      "reason": "pruneNotificationStores(), run nightly by the notifications-retention cron (ADR-0011 §3.4, TASK-MUVR24EHWI2RA): deletes every tenant's Notification rows whose createdAt is older than NOTIFICATION_RETENTION_DAYS (90), and in the same transaction the NotificationEmailItem rows whose sentAt is older than that window (NG-43: sent outbox rows kept as the e-mail dedupe record; unsent rows never touched). The WHERE clause is a date and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; Notification is FORCE RLS, so an unscoped deleteMany under fabrika_app would delete 0 and report success. Only deletes, reads no row content."
     },
     {
       "check": "D",
@@ -322,12 +349,57 @@
     },
     {
       "check": "D",
+      "file": "src/lib/leads/public-lead-intake.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 5,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "forwardPublicLead() (NG-138, NG-167): reads ONE PublicLead row by id (platform data, no tenantId, SYSTEM_WIDE) plus the ACTIVE ProvinceLeadRoute of its province (platform data, system_scope only) to pick the target tenant, then writes ONE routing mark (routeStatus/routedTenantId) on that same PublicLead row. No tenant row is read or written here: the lead itself lands afterwards through the M18 LeadIntakePort inside the target tenant's own withTenantOn transaction, and only when the row's transferConsent is true and the province is mapped. NG-174 (SEC NG-170 Y-1): the same function now also claims the target on that PublicLead row with one conditional UPDATE before the port is called, re-reads routedTenantId when it loses the claim, and releases/marks the claim afterwards (read, claim, re-read, mark-unmatched, release = 5 sites). All five touch only the PublicLead row of that id (platform data, no tenantId); no tenant row is read or written inside them."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/stuck-leads.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "alertStuckRoutedLeads(), run every 15 minutes by the public-lead-stuck cron (NG-182), through inStuckScope(): read-only SELECTs (one bounded page, oldest first, plus a probe narrowed to the lead ids that already hold an open alert) of routed PublicLead rows (platform data, no tenantId, system_scope only) older than PUBLIC_LEAD_STUCK_AFTER_MINUTES for which NO LeadContact and NO Deal of the routedTenantId carries sourceRef = public-lead:<id>, plus the Tenant name/deletedAt of that id. The NOT EXISTS probe spans every tenant and the tenant set is the query's output, so no single tenant exists to hand withTenant; under fabrika_app an unscoped probe would see 0 copies and call every routed lead stuck. Nothing is written inside the scope: the alerts go to SystemAlert (no RLS) outside it, carrying the lead id only."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/stuck-leads.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "listStuckRoutedLeads() for the read-only 'Stuck (no copy)' list on /admin/lead-routes (NG-182), caller listStuckRoutedLeadsAction runs requirePlatformAdmin() first. Same single read-only SELECT as the cross-tenant-job site (routed PublicLead with no LeadContact/Deal copy in its routedTenantId, plus that Tenant's name/deletedAt), capped at STUCK_PAGE_MAX rows. No row is written, re-routed, copied or deleted."
+    },
+    {
+      "check": "D",
       "file": "src/lib/leads/public-lead.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "purgeOldPublicLeads(), run nightly by the public-lead-cleanup cron (TASK-MULR765AR5G0C): deletes PublicLead rows (platform data, no tenantId, SYSTEM_WIDE) older than PUBLIC_LEAD_RETENTION_DAYS by one createdAt < cutoff filter, and writes one public_lead.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope (auditevent-null-system-only.sql), so delete and audit share this one transaction. No tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/public-lead.ts",
+      "subject": "system-scope:public-intake",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "public-intake",
+      "reason": "submitPublicLead() (NG-175, SEC NG-170 O-1): the anonymous readiness contact form. PublicLead (platform data, no tenantId) is RLS system_scope only, so the advisory lock, the two rate-limit counts (by e-mail, by IP hash) and the one INSERT run in this public-intake scope. system_scope_open() lets public-intake reach only PublicLead and the expert form's tables; no tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/public-lead.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "listPublicLeads() (NG-175, SEC NG-170 O-1): /admin/leads, behind requirePlatformAdmin() in src/app/[locale]/admin/leads/page.tsx. Reads the newest PublicLead rows and their count (platform data, no tenantId, RLS system_scope only). No tenant row is read or written."
     },
     {
       "check": "D",
@@ -367,12 +439,30 @@
     },
     {
       "check": "D",
+      "file": "src/lib/expert-prereg/server/directory.ts",
+      "subject": "system-scope:expert-directory",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "expert-directory",
+      "reason": "NG-52: the verified expert pre-registrations M8 offers as seat candidates (K-579696 = A, free pre-registration). The pool belongs to no tenant. NG-188 (SEC NG-185 F-1b): purpose expert-directory opens no row of any table, ExpertPreRegistration included; its one read is the view ExpertDirectoryEntry (prisma/rls.sql), which carries only the card columns (id, founderNumber, province, isFreelancer, roles, programmes, expertiseAreas, languages, listOrder) of verified + visibility-consented rows, is not updatable and is SELECT-only for fabrika_app. So the column limit is the database's, not this select's: no name, e-mail, organisation, ORCID, LinkedIn, IP or token column can be read under this purpose (rls:verify probeExpertDirectory)."
+    },
+    {
+      "check": "D",
       "file": "src/lib/expert-prereg/server/retention.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
       "kind": "system-scope",
       "class": "cross-tenant-job",
       "reason": "purgeOldExpertPreRegistrations(), run nightly by the expert-prereg-cleanup cron (FO-50, TASK-MVC91K7JYOWQC): deletes ExpertPreRegistration rows (platform data with personal data, no tenantId, SYSTEM_WIDE) older than EXPERT_PREREG_RETENTION_DAYS by one createdAt < cutoff filter with no exception (K-568932 = A), first raising the one-row ExpertFounderCounter (SYSTEM_WIDE, no personal data) to the highest founderNumber so no number is freed, and writes one expert_prereg.purged AuditEvent with tenantId NULL and the count only. A NULL-tenant AuditEvent is writable only under system_scope, so delete and audit share this one transaction. No tenant row is read or written."
+    },
+    {
+      "check": "D",
+      "file": "src/lib/leads/province-route.ts",
+      "subject": "system-scope:platform-admin",
+      "count": 5,
+      "kind": "system-scope",
+      "class": "platform-admin",
+      "reason": "Platform-admin lead routing console (NG-167): list/set/deactivate the province -> consultancy map (ProvinceLeadRoute, SYSTEM_WIDE, RLS system_scope only: a tenant reads 0 rows) and list the unmatched PublicLead worklist. The tenant table is read only to check the target is an eligible consultancy/agency. Set/deactivate write one tenantId-NULL AuditEvent in the same transaction. Every caller passes requirePlatformAdmin() first (src/app/[locale]/admin/lead-routes/actions.ts). NG-171 adds the 5th site: province-route.tenant-options, a read-only list of non-deleted Tenant id/name/orgType/kind for the route-target picker (filtered in code by isIntakeTenant, the single eligibility rule); caller listIntakeTenantOptionsAction runs requirePlatformAdmin() first. NG-205 (SEC NG-203 D-A2): the set and tenant-options sites also read each candidate tenant's M18 ModuleState row (status only) and filter by isIntakeTarget, so a tenant that cannot open M18 is never a route target."
     }
   ]
 }

@@ -4,11 +4,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 
 /**
- * FO-155 Ö-1 — the matching page shows the matcher's ranges ("3.0 / 35") only on
- * rows the matcher wrote. The consortium builder writes `SeatCandidate` rows for
- * the same seats with a 0–3 topicExperience; shown against the matcher's 35 that
- * row would read "3.0 / 35". Such a row, and one neither scorer wrote, gets bare
- * numbers. Rendered through the page itself so the writer check there is covered.
+ * FO-155 Ö-1 + NG-100 / K-579931=A — the matching page shows only the rows the current
+ * M8 matcher wrote (`visibleSeatCandidates`), with the matcher's ranges ("3.0 / 34").
+ * Rows left by the pre-K-578751 matcher (six keys) and by the retired consortium scorer
+ * are hidden on every screen, not shown with a note: they stay in the table and reappear
+ * when their seat is matched again. Rendered through the page itself so the filter there
+ * is covered; if the filter is removed, these assertions fail.
  */
 
 const { candidates } = vi.hoisted(() => ({ candidates: { rows: [] as unknown[] } }));
@@ -26,7 +27,7 @@ vi.mock('next-intl/server', async () => {
 });
 vi.mock('next/navigation', () => ({ notFound: () => null }));
 vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
-vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't-1' }) }));
+vi.mock('@/lib/tenant', () => ({ requireTenantPage: async () => ({ tenantId: 't-1', role: 'MEMBER' }) }));
 vi.mock('@/modules/m8/components/find-candidates-button', () => ({ default: () => null }));
 vi.mock('@/modules/m8/components/invite-candidate-button', () => ({ default: () => null }));
 vi.mock('@/lib/db', () => ({
@@ -44,14 +45,23 @@ vi.mock('@/lib/db', () => ({
     }),
 }));
 
+/** The current matcher (six-to-four keys, out of 34 / 33 / 33 / penalty −10…0). */
 const MATCH = {
+  topicExperience: 3,
+  geographicBalance: 33,
+  collabHistory: 11,
+  rivalRisk: -10,
+};
+/** Written before K-578751: six keys, out of 35 / 15 / 15 / 15 / 10. Hidden now. */
+const LEGACY_MATCH = {
   topicExperience: 3,
   geographicBalance: 15,
   collabHistory: 0,
-  relationshipWarmth: 0,
+  relationshipWarmth: 5,
   centrality: 2,
   rivalRisk: -10,
 };
+/** Written by the retired consortium scorer (K-579560=A). Hidden now. */
 const CONSORTIUM = {
   topicExperience: 3,
   networkCentrality: 1.2,
@@ -63,23 +73,19 @@ const CONSORTIUM = {
   total: 61.5,
 };
 
-function row(id: string, rank: number, breakdown: unknown) {
-  return { id, seatId: 's-1', rank, score: 50, breakdown, organizationId: `org-${id}` };
+function row(id: string, rank: number, breakdown: unknown, score = 50) {
+  return { id, seatId: 's-1', rank, score, breakdown, organizationId: `org-${id}` };
 }
 
-/** Each candidate row's dimension texts, keyed by the organisation id it shows. */
-async function dimensionsByRow(locale: 'tr' | 'en'): Promise<Record<string, Record<string, string>>> {
-  return (await renderRows(locale)).dimensions;
-}
-
-/** Each candidate row's total ("50,0 / 100") and dimension texts, keyed by organisation id. */
+/** Rendered rows of the page, keyed by the organisation id each row shows. */
 async function renderRows(
   locale: 'tr' | 'en'
-): Promise<{ totals: Record<string, string>; dimensions: Record<string, Record<string, string>> }> {
+): Promise<{ html: string; totals: Record<string, string>; dimensions: Record<string, Record<string, string>> }> {
   const { default: MatchingPage } = await import('@/app/[locale]/(app)/[workspace]/opportunities/[id]/matching/page');
   const el = await MatchingPage({ params: Promise.resolve({ locale, workspace: 'main', id: 'o-1' }) });
+  const html = renderToStaticMarkup(el as ReactElement);
   const host = document.createElement('div');
-  host.innerHTML = renderToStaticMarkup(el as ReactElement);
+  host.innerHTML = html;
   const dimensions: Record<string, Record<string, string>> = {};
   const totals: Record<string, string> = {};
   for (const tr of host.querySelectorAll('tbody tr')) {
@@ -91,49 +97,55 @@ async function renderRows(
     dimensions[org] = cells;
     totals[org] = tr.querySelector('.font-bold.tabular-nums')?.textContent ?? '';
   }
-  return { totals, dimensions };
+  return { html, totals, dimensions };
 }
 
 beforeEach(() => {
-  candidates.rows = [row('match', 1, MATCH), row('consortium', 2, CONSORTIUM), row('legacy', 3, { topicExperience: 3 })];
+  candidates.rows = [
+    row('match', 1, MATCH),
+    row('consortium', 2, CONSORTIUM, 61.5),
+    row('legacy', 3, { topicExperience: 3 }),
+    row('old-match', 4, LEGACY_MATCH),
+  ];
 });
 
 describe('matching page breakdown', () => {
-  // Numbers follow the locale (FO-162): Turkish "3,0 / 35", English "3.0 / 35".
+  // Numbers follow the locale (FO-162): Turkish "3,0 / 34", English "3.0 / 34".
   it.each([
     ['tr', ',', '(aralık -10…0)'],
     ['en', '.', '(range -10…0)'],
-  ] as const)('%s: the matcher\'s ranges on its own rows only', async (locale, sep, penalty) => {
+  ] as const)('%s: only the current matcher\'s rows are shown, with its ranges', async (locale, sep, penalty) => {
     const n = (whole: number) => `${whole}${sep}0`;
-    const rows = await dimensionsByRow(locale);
+    const { dimensions } = await renderRows(locale);
 
-    expect(rows['org-match']).toMatchObject({
-      topicExperience: `${n(3)} / 35`,
-      geographicBalance: `${n(15)} / 15`,
-      centrality: `${n(2)} / 10`,
+    // Only the current matcher's row is shown (K-579931=A): the other three are hidden.
+    expect(Object.keys(dimensions)).toEqual(['org-match']);
+    expect(dimensions['org-match']).toEqual({
+      topicExperience: `${n(3)} / 34`,
+      geographicBalance: `${n(33)} / 33`,
+      collabHistory: `${n(11)} / 33`,
       rivalRisk: `${n(-10)} ${penalty}`,
     });
-    // The consortium builder's 0–3 topicExperience is not "3.0 / 35".
-    expect(rows['org-consortium']).toEqual({
-      topicExperience: n(3),
-      geographicBalance: n(0),
-      collabHistory: n(0),
-      relationshipWarmth: n(0),
-      centrality: n(0),
-      rivalRisk: n(0),
-    });
-    // Neither scorer wrote it: bare numbers, no throw.
-    expect(rows['org-legacy']?.topicExperience).toBe(n(3));
-    expect(Object.values(rows['org-legacy'] ?? {}).every((v) => !v.includes('/'))).toBe(true);
+  });
+
+  it.each([
+    ['tr', 'önceki ölçütlerle'],
+    ['en', 'previous criteria'],
+  ] as const)('%s: a row from the old matcher is hidden, not shown with a note', async (locale, note) => {
+    const { html } = await renderRows(locale);
+    expect(html).not.toContain(note);
+    expect(html).not.toContain('org-old-match');
+    expect(html).not.toContain('org-consortium');
+    expect(html).not.toContain('org-legacy');
   });
 
   it.each([
     ['tr', '61,5 / 100', '50,0 / 100'],
     ['en', '61.5 / 100', '50.0 / 100'],
   ] as const)('%s: the total uses the same number format as the dimensions', async (locale, fractional, whole) => {
-    candidates.rows = [{ ...row('match', 1, MATCH), score: 61.5 }, row('legacy', 2, { topicExperience: 3 })];
+    candidates.rows = [row('match', 1, MATCH, 61.5), row('match-2', 2, MATCH, 50)];
     const { totals } = await renderRows(locale);
     expect(totals['org-match']).toBe(fractional);
-    expect(totals['org-legacy']).toBe(whole);
+    expect(totals['org-match-2']).toBe(whole);
   });
 });

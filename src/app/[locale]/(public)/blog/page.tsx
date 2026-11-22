@@ -4,6 +4,8 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { authorByline, formatBlogDate, getBlogPosts } from '@/lib/blog';
+import { blogContentShownIn } from '@/lib/blog-shared';
+import BlogTurkishOnlyNotice from '@/components/blog/BlogTurkishOnlyNotice';
 import { getPublicRoute } from '@/lib/routes';
 import { appUrl } from '@/lib/app-url';
 
@@ -19,16 +21,17 @@ export async function generateMetadata({
 
   const baseUrl = appUrl();
   const canonicalUrl = `${baseUrl}/${locale}/blog`;
+  // NG-121: the posts are Turkish only, so the English list is a notice page —
+  // kept out of the index and not offered as the Turkish list's alternate.
+  const shown = blogContentShownIn(locale);
 
   return {
     title,
     description,
+    ...(shown ? {} : { robots: { index: false, follow: true } }),
     alternates: {
       canonical: canonicalUrl,
-      languages: {
-        'tr': `${baseUrl}/tr/blog`,
-        'en': `${baseUrl}/en/blog`,
-      },
+      ...(shown ? { languages: { tr: `${baseUrl}/tr/blog` } } : {}),
     },
     openGraph: {
       title,
@@ -47,9 +50,10 @@ export default async function BlogIndexPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const posts = await getBlogPosts();
+  // NG-121: no Turkish post on a locale it is not written in.
+  const shown = blogContentShownIn(locale);
+  const posts = shown ? await getBlogPosts() : [];
   const t = await getTranslations({ locale, namespace: 'blog' });
-  const isTr = locale === 'tr';
 
   return (
     <div className="flex-1 flex flex-col bg-background text-ink selection:bg-accent selection:text-white">
@@ -58,19 +62,17 @@ export default async function BlogIndexPage({
           {/* Page Header */}
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="text-xs font-bold text-accent uppercase tracking-widest bg-accent/10 border border-accent/20 px-3.5 py-1.5 rounded-full">
-              {isTr ? 'Bilgi & Rehber Portalı' : 'Knowledge & Insights'}
+              {t('indexEyebrow')}
             </span>
             <h1 className="text-4xl sm:text-5xl font-extrabold font-heading text-ink tracking-tight">
-              {isTr
-                ? 'AB Proje Yönetimi & Hibe Blogu'
-                : 'EU Grant Management & Insights Blog'}
+              {t('indexTitle')}
             </h1>
             <p className="text-sm sm:text-base text-muted leading-relaxed">
-              {isTr
-                ? 'Horizon Europe, CORDIS analitiği, AB hakem değerlendirme kriterleri ve yapay zeka destekli teklif hazırlama rehberleri.'
-                : 'Expert articles, Horizon Europe methodologies, CORDIS network graph analysis, and AI proposal writing tips.'}
+              {t('indexSubtitle')}
             </p>
           </div>
+
+          {!shown && <BlogTurkishOnlyNotice locale={locale} />}
 
           {/* Posts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -140,7 +142,7 @@ export default async function BlogIndexPage({
                       href={getPublicRoute('blogDetail', locale, post.slug)}
                       className="shrink-0 text-xs font-bold text-accent hover:underline flex items-center gap-1"
                     >
-                      <span>{isTr ? 'Devamını Oku' : 'Read Article'}</span>
+                      <span>{t('readArticle')}</span>
                       <span>→</span>
                     </Link>
                   </div>

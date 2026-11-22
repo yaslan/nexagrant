@@ -145,13 +145,18 @@ export async function purgeDueUsers(
         //     ADR-0011: notifications are addressed to the subject and nobody
         //     else, so they go outright, in every tenant.
         await tx.notification.deleteMany({ where: { userId } });
+        //     NG-43: the subject's channel choices and their queued mails.
+        await tx.notificationPreference.deleteMany({ where: { userId } });
+        await tx.notificationEmailItem.deleteMany({ where: { userId } });
 
         //     The rest are the tenant's records, not the subject's. Erasure must
         //     not delete the tenant's opportunities, bug reports or audit trail,
         //     so those rows stay and only the link to the person is dropped —
         //     the same choice already made for `AiUsageLog` above and for the
         //     hashed subject reference in the erasure audit below.
-        await tx.auditEvent.updateMany({ where: { actorId: userId }, data: { actorId: null } });
+        //     The audit table is append-only for the app role (NG-40): this goes
+        //     through audit_detach_actor(), which can only null "actorId".
+        await tx.$executeRaw`SELECT public.audit_detach_actor(${userId})`;
         //     `member.removed` names the Membership id in `target`, never the user
         //     id. The person link there is cut by the `Membership.user` cascade
         //     below, so `target` needs no rewrite here.
@@ -295,6 +300,8 @@ export const usersScheduledDeletionTask = defineJob(
   'users-scheduled-deletion',
   async ({ payload }): Promise<UsersScheduledDeletionOutput> => {
     // A job added by hand may shorten the grace period (tests only); the cron never does.
+    // NG-40: audit_detach_actor() enforces the 30-day floor in SQL, so a shorter value
+    // cannot reach a real database; it only works with the function mocked.
     const { gracePeriodDays } = UsersScheduledDeletionEventSchema.parse(payload);
     return purgeDueUsers(gracePeriodDays ?? DEFAULT_GRACE_PERIOD_DAYS);
   }

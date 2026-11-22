@@ -3,17 +3,16 @@
  *
  * The stored total is on the 0–100 seat scale (src/lib/scoring/seat-score.ts), but
  * the breakdown keeps each scorer's raw points: the matcher's topic experience is
- * 0–35, the consortium builder's is 0–3. The UI shows every dimension against its
+ * 0–34, the consortium builder's is 0–3. The UI shows every dimension against its
  * own range, read from here, so a "3" is never taken for 3 out of 100.
  *
  * No server imports: the consortium builder is a client component. The consortium
- * scorer reads its maxima from {@link CONSORTIUM_DIMENSION_MAX}; the matcher's
- * inline caps in `scoreCandidate` are pinned to {@link MATCH_DIMENSION_SCALE} by
- * tests/seat-dimension-scale.test.ts.
+ * scorer reads its maxima from {@link CONSORTIUM_DIMENSION_MAX}, the matcher
+ * (`scoreCandidate`) from {@link MATCH_DIMENSION_SCALE}.
  */
 
 /** Which scorer wrote a breakdown. */
-export type SeatScoreWriter = 'match' | 'consortium';
+export type SeatScoreWriter = 'match' | 'match-legacy' | 'consortium';
 
 /** Lowest and highest raw points a dimension can take. */
 export interface DimensionScale {
@@ -23,6 +22,17 @@ export interface DimensionScale {
 
 /** The seat matcher (src/modules/m8/server/matching.ts `scoreCandidate`). Rival risk is a penalty. */
 export const MATCH_DIMENSION_SCALE = {
+  topicExperience: { min: 0, max: 34 },
+  geographicBalance: { min: 0, max: 33 },
+  collabHistory: { min: 0, max: 33 },
+  rivalRisk: { min: -10, max: 0 },
+} as const satisfies Record<string, DimensionScale>;
+
+/**
+ * The matcher before K-578751. Stored rows keep these raw points until their seat
+ * is matched again, so each has to be read against the ranges it was scored on.
+ */
+export const MATCH_LEGACY_DIMENSION_SCALE = {
   topicExperience: { min: 0, max: 35 },
   geographicBalance: { min: 0, max: 15 },
   collabHistory: { min: 0, max: 15 },
@@ -48,6 +58,7 @@ const CONSORTIUM_DIMENSION_SCALE: Record<string, DimensionScale> = {
 
 const SCALES: Record<SeatScoreWriter, Record<string, DimensionScale>> = {
   match: MATCH_DIMENSION_SCALE,
+  'match-legacy': MATCH_LEGACY_DIMENSION_SCALE,
   consortium: CONSORTIUM_DIMENSION_SCALE,
 };
 
@@ -63,12 +74,16 @@ function hasNumbers(b: Record<string, unknown>, keys: readonly string[]): boolea
 /**
  * The scorer a stored breakdown came from, by its keys — the same test the
  * rescore applies (src/lib/scoring/seat-rescore.ts). The matcher is checked first:
- * `topicExperience` is shared, the rest is not. Null when neither wrote it.
+ * `topicExperience` is shared, the rest is not. The old matcher's six keys contain
+ * the current four, so it is checked before the current one, and a breakdown with
+ * only one of the two dropped keys is neither. Null when no scorer wrote it.
  */
 export function seatBreakdownWriter(breakdown: unknown): SeatScoreWriter | null {
   if (typeof breakdown !== 'object' || breakdown === null || Array.isArray(breakdown)) return null;
   const b = breakdown as Record<string, unknown>;
-  if (hasNumbers(b, Object.keys(MATCH_DIMENSION_SCALE))) return 'match';
+  if (hasNumbers(b, Object.keys(MATCH_LEGACY_DIMENSION_SCALE))) return 'match-legacy';
+  const hasDroppedKey = Object.hasOwn(b, 'relationshipWarmth') || Object.hasOwn(b, 'centrality');
+  if (!hasDroppedKey && hasNumbers(b, Object.keys(MATCH_DIMENSION_SCALE))) return 'match';
   if (hasNumbers(b, Object.keys(CONSORTIUM_DIMENSION_MAX))) return 'consortium';
   return null;
 }

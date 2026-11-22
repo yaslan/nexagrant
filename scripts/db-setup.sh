@@ -78,5 +78,8 @@ step 7 "db:seed"
 # runs without one (CI, gate:isolated, a laptop). It is local/CI-only (non-local
 # hosts are refused above), so it asks for the demo tenant explicitly; a caller
 # that exports SEED_DEMO=false still gets reference data only.
-SEED_DEMO=${SEED_DEMO:-true} pnpm db:seed
+# NG-40 sec round 3: a process with no NODE_ENV now also refuses the published fixture
+# TAX_ID_ENCRYPTION_KEY the gate exports; this script is local/CI-only, so say so (NODE_ENV
+# already set by the caller wins).
+SEED_DEMO=${SEED_DEMO:-true} NODE_ENV=${NODE_ENV:-development} pnpm db:seed
 echo "db-setup: done ($target)"

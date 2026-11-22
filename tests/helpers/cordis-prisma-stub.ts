@@ -90,8 +90,14 @@ export function createCordisPrismaStub(): CordisPrismaStub {
         return sorted[0] ?? null;
       },
 
-      findMany: async (args: { take?: number } = {}): Promise<Row[]> => {
-        const projects = [...rows('cordisProject')].sort(byImportedAtDesc);
+      findMany: async (
+        args: { take?: number; where?: { NOT?: { id?: { startsWith?: string } } } } = {}
+      ): Promise<Row[]> => {
+        // Mirrors `where: { NOT: { id: { startsWith } } }`, the only filter the code passes.
+        const excludedPrefix = args.where?.NOT?.id?.startsWith;
+        const projects = [...rows('cordisProject')]
+          .filter((r) => !excludedPrefix || !asString(r.id).startsWith(excludedPrefix))
+          .sort(byImportedAtDesc);
         const limited = args.take ? projects.slice(0, args.take) : projects;
 
         // Mirrors `include: { topics: take 1, participations: where coordinator, take 1, include organization }`.

@@ -40,14 +40,23 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# FO-339: aynı tree için yeşil kayıt (önbellek) ya da yalnız belge farkı varsa konteyner/DB kurmadan
-# `pnpm gate` koşulur; karar ve satır scripts/gate-lock.mjs'te verilir. Komut verilmişse atlanmaz.
-if [ $# -eq 0 ] && node scripts/gate-cache.mjs skippable >/dev/null; then
-  exec pnpm gate
-fi
-
 log() { printf '%s [gate-isolated] %s\n' "$(date -u +%FT%TZ)" "$*"; }
 fail() { log "FAIL: $*" >&2; exit 1; }
+
+# FO-339: aynı tree için yeşil kayıt (önbellek) ya da yalnız belge farkı varsa konteyner/DB kurmadan
+# `pnpm gate` koşulur; karar ve satır scripts/gate-lock.mjs'te verilir. Komut verilmişse atlanmaz.
+# NG-72: FONBRIDGE_GATE_NO_CACHE=1 iken gate-cache.mjs skippable 1 döner, yani kısa yol hiç denenmez.
+# NG-72 (fail-closed): kısa yol YALNIZ pozitif mesajla alınır (önbellek: / belge-yalnız:). Boş çıktı + rc=0
+# (örn. gate-cache.mjs CLI koruması eşleşmediğinde) ya da başka her çıktı izole tam gate'e düşer.
+if [ $# -eq 0 ]; then
+  skip_msg="$(node scripts/gate-cache.mjs skippable || true)"
+  case "$skip_msg" in
+    önbellek:*|belge-yalnız:*)
+      log "kısa yol: $skip_msg; izole DB kurulmadan pnpm gate"
+      exec pnpm gate
+      ;;
+  esac
+fi
 
 command -v docker >/dev/null 2>&1 || fail "docker not found on PATH"
 command -v pnpm >/dev/null 2>&1 || fail "pnpm not found on PATH"
@@ -59,8 +68,17 @@ first_free() {
   printf '%s\n' "$p"
 }
 
-pg_port=${GATE_PG_PORT:-$(first_free 55400)}
-port_free "$pg_port" || fail "GATE_PG_PORT $pg_port is in use"
+# FO-397: önceki sürüm boş portu burada seçip `docker run -p` ile bağlıyordu; iki koşu aynı boş portu
+# görüp ikisi de bağlamaya çalışınca "port is already allocated" (GATE_EXIT=125). Artık varsayılan yol
+# Docker'ın portu atomik olarak seçmesi (`-p 127.0.0.1::5432`), gerçek port `docker port` ile okunur.
+# GATE_PG_PORT verilirse o port elle istenmiştir ve kontrol edilir (yarış penceresi kabul edilmiş).
+pg_port=""
+if [ -n "${GATE_PG_PORT:-}" ]; then
+  port_free "$GATE_PG_PORT" || fail "GATE_PG_PORT $GATE_PG_PORT is in use"
+  pg_publish="127.0.0.1:$GATE_PG_PORT:5432"
+else
+  pg_publish="127.0.0.1::5432"
+fi
 # FO-388: the e2e port is NOT picked here. scripts/gate-lock.mjs picks it after the gate lock is
 # taken, before any test step: a port picked here sat unused through the whole queue wait, and
 # another run took it. An explicit E2E_PORT is checked now and again after the lock.
@@ -88,6 +106,20 @@ if [ "${GATE_ISOLATED_DRY_RUN:-0}" = 1 ]; then
   exit 0
 fi
 
+# FO-397: node_modules sembolik bağ ise Turbopack `next/package.json`'ı bulamaz, her sayfa 500 döner ve
+# e2e web sunucusu 180 sn sonra zaman aşımına uğrar. Konteyner kurulmadan önce açık hatayla dur.
+if [ -L node_modules ]; then
+  fail "node_modules sembolik bağ ($(readlink node_modules)); gerçek kurulum gerekli: pnpm install --frozen-lockfile"
+fi
+
+# NG-260: e2e-server-supervisor.test.ts used to leave its `node -e` test servers behind (ppid 1, on
+# `*:port`); such a listener makes a port look free on 127.0.0.1 while 0.0.0.0/:: binds fail (NG-255).
+# A warning only, the gate goes on; the script never kills them (they may be another checkout's).
+orphans="$( { ps -eo ppid=,args= 2>/dev/null || true; } | awk '$1 == 1 && /fo385-/ && /server-pid/' | wc -l | tr -d ' ')"
+if [ "${orphans:-0}" -gt 0 ]; then
+  log "UYARI: $orphans öksüz fo385 süreci (supervisor + sunucu; ppid 1, komutta fo385-) var; port seçimini bozabilir. Listele: ps -eo pid=,ppid=,etime=,args= | awk '\$2 == 1 && /fo385-/'"
+fi
+
 container="fabrika-gate-$(date -u +%Y%m%d%H%M%S)-$$"
 # Not `fabrika`: tests/expert-prereg-retention.live.test.ts skips itself on a
 # database of that name (it takes it for the shared one; CLAUDE.md).
@@ -100,6 +132,19 @@ git diff --quiet -- tsconfig.json 2>/dev/null && tsconfig_was_clean=1
 diag_file="$(mktemp -t fabrika-e2e-server-diag.XXXXXX)"
 export E2E_SERVER_DIAG_FILE="$diag_file"
 
+# FO-397 teşhis: DB'ye ulaşılamadığında (e2e ortasında "Can't reach database server") konteynerin neden
+# durduğunu tek satırda yaz. Çalışıyorsa "düşmedi" kanıtıdır; durmuşsa çıkış kodu ve OOM bilgisi verir.
+db_diag() {
+  docker inspect "$container" >/dev/null 2>&1 || { log "db teşhis: $container yok (kaldırılmış ya da hiç başlamadı)"; return 0; }
+  local st
+  st="$(docker inspect -f 'status={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} restarts={{.RestartCount}} finished={{.State.FinishedAt}} error={{.State.Error}}' "$container")"
+  if docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then
+    log "db teşhis: $container ÇALIŞIYOR ($st) — konteyner düşmedi; bağlantı hatası ağ/yük tarafında"
+  else
+    log "db teşhis: $container DURMUŞ ($st) — neden: exit kodu ve oom alanına bak"
+  fi
+}
+
 cleanup() {
   local rc=$?
   if grep -q '\] {' "$diag_file" 2>/dev/null; then
@@ -110,6 +155,7 @@ cleanup() {
   if [ "$tsconfig_was_clean" = 1 ] && ! git diff --quiet -- tsconfig.json 2>/dev/null; then
     git checkout -- tsconfig.json && log "tsconfig.json restored (next dev rewrote it)"
   fi
+  if [ "$rc" -ne 0 ] && [ -n "$pg_port" ]; then db_diag; fi
   if [ "${GATE_KEEP:-0}" = 1 ]; then
     log "kept container $container (port $pg_port); remove: docker rm -f $container"
   else
@@ -119,10 +165,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-log "starting $container on 127.0.0.1:$pg_port"
-docker run -d --name "$container" -p "127.0.0.1:$pg_port:5432" \
+log "starting $container (publish $pg_publish)"
+docker run -d --name "$container" -p "$pg_publish" \
   -e POSTGRES_DB="$db" -e POSTGRES_USER=fabrika -e POSTGRES_PASSWORD=fabrika \
   pgvector/pgvector:pg16 >/dev/null
+if [ -n "${GATE_PG_PORT:-}" ]; then
+  pg_port="$GATE_PG_PORT"
+else
+  pg_port="$(docker port "$container" 5432 | head -1 | sed 's/.*://')"
+fi
+[ -n "$pg_port" ] || fail "no host port for $container"
+log "$container listens on 127.0.0.1:$pg_port"
 for i in $(seq 1 60); do
   docker exec "$container" pg_isready -U fabrika -d "$db" >/dev/null 2>&1 && break
   [ "$i" = 60 ] && fail "postgres did not become ready"
@@ -138,9 +191,15 @@ done
 # ci.yml job env.
 export DATABASE_URL="postgresql://fabrika:fabrika@127.0.0.1:$pg_port/$db"
 export DATABASE_URL_RLS_TEST="postgresql://fabrika_app:fabrika_app_ci@127.0.0.1:$pg_port/$db"
+# NG-206: the ExpertDirectoryEntry mutation tests run only when this names the database they are on.
+# This throwaway database is the one place they should run locally.
+export RLS_MUTATION_DB="$db"
 # ci.yml Test step. KEEP_EU_LIVE=1 runs keep-eu-sync.live against this throwaway DB.
 export AUTH_SECRET='ci-vitest-auth-secret-fixture-not-for-any-deployment'
 export KEEP_EU_LIVE=1
+# NG-40: buyer tax-number field encryption (src/lib/billing/tax-id-crypto.ts). A throwaway
+# 32-byte key of this gate, the same kind of fixture as AUTH_SECRET above - not for any deployment.
+export TAX_ID_ENCRYPTION_KEY="${TAX_ID_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
 # FO-256: the pool's 1 s connect timeout failed under load (FO-253). Here, and only
 # here, it gets 10 s; prod and dev keep 1000 ms (src/lib/env.ts). Vitest and the
 # Playwright webServer both inherit this environment.

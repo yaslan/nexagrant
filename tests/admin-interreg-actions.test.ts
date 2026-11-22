@@ -5,7 +5,7 @@ const m = vi.hoisted(() => ({
   syncKeepEuData: vi.fn(),
   aggregateKeepEuMetrics: vi.fn(),
   retrieveChunks: vi.fn(),
-  formatRagPrompt: vi.fn(),
+  formatRagContext: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ auth: m.auth }));
@@ -15,7 +15,7 @@ vi.mock('@/lib/keep-eu-sync', () => ({
 }));
 vi.mock('@/lib/rag', () => ({
   retrieveChunks: m.retrieveChunks,
-  formatRagPrompt: m.formatRagPrompt,
+  formatRagContext: m.formatRagContext,
 }));
 
 const interreg = await import('@/app/[locale]/admin/interreg/actions');
@@ -59,7 +59,7 @@ beforeEach(() => {
   m.syncKeepEuData.mockResolvedValue({ success: true, syncedProjectsCount: 1 });
   m.aggregateKeepEuMetrics.mockResolvedValue({ totalProjectsCount: 1 });
   m.retrieveChunks.mockResolvedValue([]);
-  m.formatRagPrompt.mockReturnValue('formatted prompt');
+  m.formatRagContext.mockReturnValue('formatted prompt');
 });
 
 describe.each(ACTIONS)('$name', ({ call, effects }) => {
@@ -87,4 +87,22 @@ test('handleTestInterregRagQuery passes the platform admin as the embedding acto
   m.auth.mockResolvedValue(PLATFORM_ADMIN);
   await interreg.handleTestInterregRagQuery('tourism', 3);
   expect(m.retrieveChunks).toHaveBeenCalledWith('tourism', 3, undefined, { userId: 'user-admin' });
+});
+
+// FO-112 Ö5 (carried over from the local dev line in NG-150): invalid input is refused by zod
+// before any paid embedding or upstream sync starts.
+describe('input validation (FO-112 Ö5)', () => {
+  beforeEach(() => {
+    m.auth.mockResolvedValue(PLATFORM_ADMIN);
+  });
+
+  test('rejects an unbounded topK before any embedding is paid for', async () => {
+    await expect(interreg.handleTestInterregRagQuery('test', 500)).rejects.toThrow();
+    expect(m.retrieveChunks).not.toHaveBeenCalled();
+  });
+
+  test('rejects programme ids that are not comma-separated codes', async () => {
+    await expect(interreg.handleRunKeepEuSyncAction('305; DROP TABLE')).rejects.toThrow();
+    expect(m.syncKeepEuData).not.toHaveBeenCalled();
+  });
 });

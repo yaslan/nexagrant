@@ -2,6 +2,7 @@ import EvidenceClient, { type EvidenceItemData } from './evidence-client';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
 import { requireTenantPage } from '@/lib/tenant';
+import { getTranslations } from 'next-intl/server';
 import { loadEvidenceItems } from './data';
 
 /**
@@ -36,18 +37,16 @@ export default async function EvidencePage({
     console.warn(`[Evidence] DB query bypassed: ${errorMessage(e)}`);
   }
 
-  const isTr = locale === 'tr';
+  const t = await getTranslations('evidence');
 
   return (
     <div className="max-w-5xl mx-auto py-8 sm:px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-heading text-ink">
-          {isTr ? 'Kanıt & Yetkinlik Deposu (Evidence Pack)' : 'Evidence Pack'}
+          {t('pageTitle')}
         </h1>
         <p className="text-muted text-xs sm:text-sm mt-2 max-w-3xl leading-relaxed">
-          {isTr
-            ? "Kuruluşunuzun temel yetkinliklerini, sertifikalarını, mali raporlarını ve geçmiş proje başarılarını tek bir merkezde toplayın. Doğrulanmış belgeleri yükleyerek AB teklif yazımında doğrudan kanıt belgesi olarak kullanın."
-            : "Centralize your organization's core capabilities, certificates, and past results. Upload valid documents (Cloudflare R2) and use them directly when generating proposals."}
+          {t('pageDescription')}
         </p>
       </div>
 

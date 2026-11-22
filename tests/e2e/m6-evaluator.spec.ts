@@ -149,6 +149,70 @@ test.describe('M6 Evaluator Lens — panel scoring', () => {
     expect(reviewer.status).toBe('completed');
   });
 
+  test('the AI reader refuses an opportunity with no proposal text, and says why (NG-98)', async ({ page }) => {
+    await signInAs(page, {
+      id: M6_E2E.userId,
+      email: M6_E2E.email,
+      tenantId: M6_E2E.tenantId,
+      role: 'PIPELINE_MANAGER',
+    });
+
+    await page.goto(EVALUATIONS_URL);
+    const app = page.getByRole('main');
+    const run = app.getByTestId('m6-run-ai-evaluation');
+    await expectHydrated(run);
+    await run.click();
+
+    await expect(app.getByTestId('m6-action-error')).toContainText('Değerlendirilecek teklif metni yok');
+    await shot(page, '05-ai-reader-no-proposal-text');
+
+    expect(await prisma.evaluation.count({ where: { tenantId: M6_E2E.tenantId, readerType: 'AI' } })).toBe(0);
+    expect(await prisma.aiUsageLog.count({ where: { tenantId: M6_E2E.tenantId } })).toBe(0);
+  });
+
+  for (const { locale, message } of [
+    { locale: 'tr', message: 'Teklif metni çok uzun: YZ ön değerlendirmesi en fazla 400.000 karakter okuyabilir' },
+    { locale: 'en', message: 'The proposal text is too long: the AI pre-assessment can read at most 400,000 characters' },
+  ]) {
+    test(`the AI reader refuses a proposal over its limit, says why, and charges nothing (${locale}, NG-106)`, async ({
+      page,
+    }) => {
+      await signInAs(page, {
+        id: M6_E2E.userId,
+        email: M6_E2E.email,
+        tenantId: M6_E2E.tenantId,
+        role: 'PIPELINE_MANAGER',
+      });
+
+      const tenantId = M6_E2E.tenantId;
+      const ledgerBefore = await prisma.creditLedger.findMany({
+        where: { tenantId },
+        select: { id: true, delta: true },
+        orderBy: { id: 'asc' },
+      });
+      expect(ledgerBefore).toContainEqual({ id: M6_E2E.creditGrantId, delta: M6_E2E.creditGrant });
+
+      await page.goto(`/${locale}/${WORKSPACE}/opportunities/${M6_E2E.longOpportunityId}/evaluations`);
+      const app = page.getByRole('main');
+      const run = app.getByTestId('m6-run-ai-evaluation');
+      await expectHydrated(run);
+      await run.click();
+
+      await expect(app.getByTestId('m6-action-error')).toContainText(message);
+      await shot(page, `06-ai-reader-proposal-too-long-${locale}`);
+
+      expect(
+        await prisma.creditLedger.findMany({
+          where: { tenantId },
+          select: { id: true, delta: true },
+          orderBy: { id: 'asc' },
+        }),
+      ).toEqual(ledgerBefore);
+      expect(await prisma.evaluation.count({ where: { tenantId, readerType: 'AI' } })).toBe(0);
+      expect(await prisma.aiUsageLog.count({ where: { tenantId } })).toBe(0);
+    });
+  }
+
   test('the English locale renders the English M6 copy', async ({ page }) => {
     const enUrl = PANEL_URL.replace('/tr/', '/en/');
     await signInAs(page, {

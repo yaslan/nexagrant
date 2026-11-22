@@ -15,6 +15,7 @@ import { getLinkedAgencyCoBrand, toShellCoBrand } from '@/lib/agency/cobrand-sto
 import CoBrandBadge from '@/components/CoBrandBadge';
 import PilotBanner from '@/components/PilotBanner';
 import { can, asRole } from '@/lib/rbac';
+import { NG_PLAN_VIEW_ACTION } from '@/lib/billing/nexagrant/access';
 import { hiddenNavKeysFor } from '@/lib/roles/nav-permissions';
 import { listModuleNav, requestSession, type ModuleNavState } from '@/lib/modules/access';
 import { logger } from '@/lib/logger';
@@ -63,6 +64,7 @@ export default async function AppLayout({
 
   const user = session.user;
   const t = await getTranslations({ locale, namespace: 'UserIdentity' });
+  const tNav = await getTranslations({ locale, namespace: 'Navigation' });
 
   // Never invent an identity. The name falls back to the e-mail local part and then to a
   // translated "unnamed user" label; the e-mail is shown only if the session carries one.
@@ -82,7 +84,11 @@ export default async function AppLayout({
   // FB KAMU B4 (TASK-MULRRNIHVZM1Z): the agency co-brand, only for a tenant an
   // agency brought in. Unlinked tenants — and the agency itself — get null.
   const tenantId = tenantScopeOf(session)?.tenantId;
-  const cobrand = tenantId ? toShellCoBrand(await getLinkedAgencyCoBrand(tenantId)) : null;
+  // NG-248 (K-584216): the door is the `view_tenant_branding` permission, read in rbac.ts.
+  // A guest partner gets no co-brand: the name and logo never reach its shell or its RSC payload.
+  const cobrand = tenantId && can(asRole(roleName), 'view_tenant_branding')
+    ? toShellCoBrand(await getLinkedAgencyCoBrand(tenantId))
+    : null;
 
   const isPlatformAdmin = Boolean(
     session?.isPlatformAdmin ||
@@ -94,6 +100,8 @@ export default async function AppLayout({
 
   const canManageModules = can(asRole(roleName), 'manage_modules');
   const canManageUsers = can(asRole(roleName), 'manage_users');
+  // NG-11: the plan and trial link, decided by the same permission as the screen (access.ts).
+  const canViewNgPlan = can(asRole(roleName), NG_PLAN_VIEW_ACTION);
   const hiddenNavKeys = hiddenNavKeysFor(asRole(roleName));
   // What the sidebar, the opportunity tabs and the cross-links may offer. Same decision
   // as each page's `moduleGate`, read once here; the pages still gate themselves.
@@ -128,6 +136,7 @@ export default async function AppLayout({
         isPlatformAdmin={isPlatformAdmin}
         canManageModules={canManageModules}
         canManageUsers={canManageUsers}
+        canViewNgPlan={canViewNgPlan}
         hiddenNavKeys={hiddenNavKeys}
         workspaces={workspaces}
         cobrand={cobrand}
@@ -137,7 +146,7 @@ export default async function AppLayout({
       <aside className="hidden md:flex w-64 bg-surface border-r border-border flex-col shrink-0">
         <Link
           href={`/${locale}`}
-          title={locale === 'tr' ? 'Ana Sayfa' : 'Home'}
+          title={tNav('homeLink')}
           className="p-4 border-b border-border flex items-center justify-center hover:bg-surface-hover transition-colors group cursor-pointer"
         >
           <BrandLogo height={48} className="group-hover:scale-105 transition shrink-0" />
@@ -164,6 +173,7 @@ export default async function AppLayout({
               workspaces={workspaces}
               canManageModules={canManageModules}
               canManageUsers={canManageUsers}
+              canViewNgPlan={canViewNgPlan}
             hideApiKeys={hiddenNavKeys.includes('apiKeys')}
             />
           </div>

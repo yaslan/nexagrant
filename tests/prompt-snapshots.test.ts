@@ -8,8 +8,12 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
  * snapshots exactly what reaches `@/lib/llm` — `prompt`, `system`, or the
  * `messages` array. The snapshot file was written by this test against the code
  * *before* the move (the inline literals) and then left untouched; after the move
- * the same test, unchanged, must still match it. `rag.ts`'s `formatRagPrompt` is
+ * the same test, unchanged, must still match it. `rag.ts`'s `formatRagContext` is
  * pure and is called directly.
+ *
+ * NG-40 changed the non-M17 texts on purpose (instructions and data apart), and
+ * their snapshots with them; tests/ai-instruction-data-separation.test.ts is what
+ * pins that separation. M17's snapshots were not touched.
  *
  * Every LLM mock records its argument and then throws: nothing after the model
  * call matters here, and each call site's own tests cover that half.
@@ -22,7 +26,13 @@ const h = vi.hoisted(() => {
     captured.push(arg);
     throw new Stop('captured');
   };
-  const opportunity = { id: 'opp-1', title: 'Soil sensing for smart farms', topicId: 'topic-1' };
+  const opportunity = {
+    id: 'opp-1',
+    title: 'Soil sensing for smart farms',
+    topicId: 'topic-1',
+    // M6 reads Part B through the same stubbed findFirst (NG-98).
+    content: { sections: [{ title: '1.1 Objectives', content: 'Validate soil sensors on 40 farms.' }] },
+  };
   const tx = new Proxy(
     {},
     {
@@ -39,6 +49,8 @@ const h = vi.hoisted(() => {
 vi.mock('@/lib/llm', () => ({
   generateText: vi.fn(async (arg: unknown) => h.capture(arg)),
   generateCompletion: vi.fn(async (arg: unknown) => h.capture(arg)),
+  // NG-209: enrichment asks whether the e2e fake site is on; off here, as it is under vitest.
+  fakeAiEnabled: () => false,
 }));
 vi.mock('@/lib/tenant', () => ({
   requireTenantAction: vi.fn(async () => ({ tenantId: 'tenant-1', userId: 'user-1' })),
@@ -61,12 +73,11 @@ vi.mock('@/lib/rag', async (importOriginal) => {
       { text: 'Prior pilot on 40 farms.', score: 0.9, documentId: 'd1' },
       { text: 'Sensor patent EP123.', score: 0.8, documentId: 'd2' },
     ]),
-    buildRagPrompt: vi.fn(async (q: string) =>
-      real.formatRagPrompt(q, [{ text: 'Prior pilot on 40 farms.', score: 0.91 }])
-    ),
+    buildRagContext: vi.fn(async () => real.formatRagContext([{ text: 'Prior pilot on 40 farms.', score: 0.91 }])),
   };
 });
-vi.mock('@/modules/m2/server/templates', () => ({
+vi.mock('@/modules/m2/server/templates', async (importOriginal) => ({
+  sectionsWithWordLimit: (await importOriginal<typeof import('@/modules/m2/server/templates')>()).sectionsWithWordLimit,
   findAccessibleTemplate: vi.fn(async () => ({ id: 'tpl-1', schema: [] })),
   templateSections: vi.fn(() => [
     { key: 'objectives', label: 'Objectives', promptKey: 'Describe the objectives.', maxWords: 250 },
@@ -155,16 +166,15 @@ describe('prompt text is byte-identical to the pre-move inline literals', () => 
     expect(promptOf(arg)).toMatchSnapshot();
   });
 
-  test('RAG context wrapper (formatRagPrompt)', async () => {
-    const { formatRagPrompt } = await import('@/lib/rag');
+  test('RAG context (formatRagContext)', async () => {
+    const { formatRagContext } = await import('@/lib/rag');
     expect(
-      formatRagPrompt('What did the pilot measure?', [
+      formatRagContext([
         { text: 'Pilot on 40 farms.', score: 0.912 },
         { text: 'Yield +12%.', score: 0.5 },
       ])
     ).toMatchSnapshot();
-    // No context → the question passes through untouched.
-    expect(formatRagPrompt('Bare question', [])).toBe('Bare question');
+    expect(formatRagContext([])).toBe('');
   });
 });
 
@@ -181,5 +191,67 @@ describe('M17 Interreg pre-assessment prompts (tr + en)', () => {
       evaluate: renderPrompt('m17/evaluate', { rubric: '{"id":"rubric"}', project_context: 'PROJECT TEXT' }, locale),
       retry: renderPrompt('m17/evaluate-retry', { problems: '- criterionMarks: missing' }, locale),
     }).toMatchSnapshot();
+  });
+});
+
+/**
+ * NG-136 (M18-F5) — enrichment and the eligibility pre-report were written with their prompts in
+ * place, in both locales. Driven through the real call sites (`proposeEnrichment`,
+ * `createEligibilityReport`) up to `@/lib/llm`; the site fetch, the credit reservation and the DRAFT
+ * write are stubs, no network, no database.
+ */
+describe('M18 enrichment and eligibility pre-report prompts (tr + en)', () => {
+  const org = {
+    id: 'org-1',
+    name: 'Anadolu Sensör',
+    legalName: null,
+    district: null,
+    provinceCode: '06',
+    website: 'https://anadolu-sensor.example.com.tr',
+    sizeBand: null,
+    themes: [],
+    sectorCodes: [],
+  };
+  // `@/lib/llm` is mocked whole here, so the balance check and the reservation (ai-credits.ts) are
+  // stubbed at their seam.
+  const credits = { precheck: async () => {}, reserve: async () => ({ refId: 'ref-1', credits: 1 }), release: async () => {} };
+
+  test.each(['en', 'tr'] as const)('enrich-organization — %s', async (locale) => {
+    const { proposeEnrichment } = await import('@/modules/m18/server/enrichment');
+    const arg = await captureFrom(() =>
+      proposeEnrichment(
+        { tenantId: 'tenant-1', userId: 'user-1', org, locale },
+        {
+          fetchSite: async () => ({
+            ok: true,
+            pages: [{ url: 'https://anadolu-sensor.example.com.tr/', text: 'Anadolu Sensör A.Ş. — Ankara, Çankaya. 40 çalışan.' }],
+            skipped: [],
+          }),
+          credits,
+        },
+      ),
+    );
+    expect(promptOf(arg)).toMatchSnapshot();
+  });
+
+  test.each(['en', 'tr'] as const)('eligibility-pre-report — %s', async (locale) => {
+    const { createEligibilityReport } = await import('@/modules/m18/server/eligibility');
+    const subject = {
+      org: { ...org, orgType: 'SME', nuts2: 'TR51', themes: ['sensors'], sectorCodes: ['C26.5'] },
+      call: {
+        id: 'call-1',
+        title: 'Digital SMEs',
+        callIdentifier: 'DIGITAL-2026-SME-01',
+        programme: 'Digital Europe',
+        eligibleApplicantTypes: ['SME'],
+        eligibleRegions: [],
+        cofinancingRateBp: 5000,
+        topics: [],
+      },
+    };
+    const arg = await captureFrom(() =>
+      createEligibilityReport({ tenantId: 'tenant-1', userId: 'user-1', subject, locale }, { credits, save: async () => ({ id: 'r-1' }) }),
+    );
+    expect(promptOf(arg)).toMatchSnapshot();
   });
 });

@@ -24,7 +24,8 @@ import type { JsonObject } from '@/types/json';
 import type { TenantTx } from '../db';
 import { withTenant } from '../db';
 import { isPresentId } from '../required-id';
-import { decideG0, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
+import { isEuroCurrency } from '../money';
+import { decideG0, weightsTotal, type G0Decision, type G0Features, type G0Result } from './g0-canonical';
 import { DEFAULT_SCORING_WEIGHTS } from './defaults';
 import type { GateReason } from '../gates/reasons';
 import {
@@ -34,11 +35,12 @@ import {
   type G0SeatSnapshot,
   type G0Snapshot,
   type G0Source,
+  type G0TenantSnapshot,
   type G0TopicSnapshot,
 } from './g0-features';
 
 /** Bumped whenever the feature mapping changes, so a stored breakdown says which rules produced it. */
-export const G0_SCORING_VERSION = '2.0';
+export const G0_SCORING_VERSION = '2.3';
 
 export interface G0Computation {
   tenantId: string;
@@ -54,6 +56,29 @@ export interface G0Computation {
   sources: G0Source[];
   coverage: number;
   scoringVersion: string;
+  /** Which denominator produced `score` — see `G0Extraction.scoringBasis`. */
+  scoringBasis: 'standard' | 'no_history_evidence';
+  /** Features left out of the denominator (empty on the standard path). */
+  excludedFeatures: (keyof G0Features)[];
+  /** Sum of the weights actually scored; `score` is normalised by this. */
+  denominator: number;
+  /** Seats whose status is a filled one (FILLED_SEAT_STATUSES); only the status is read, not the organisation column. The no-history rule needs at least one. */
+  filledSeats: number;
+}
+
+/**
+ * The weights the composite is computed with: the tenant's (or default) weights with the excluded
+ * features set to 0. `scoreG0` and `g0Contributions` already normalise by the weight total, so the
+ * formula itself is unchanged — only the denominator moves.
+ */
+export function effectiveWeights(
+  weights: typeof DEFAULT_SCORING_WEIGHTS,
+  excluded: readonly (keyof G0Features)[],
+): typeof DEFAULT_SCORING_WEIGHTS {
+  if (excluded.length === 0) return weights;
+  const out = { ...weights };
+  for (const key of excluded) out[key] = 0;
+  return out;
 }
 
 /** What the score is computed *about* — an existing opportunity or one about to be created. */
@@ -97,6 +122,11 @@ export function resolveWeights(settings: unknown): typeof DEFAULT_SCORING_WEIGHT
   return out;
 }
 
+/** FO-396. A stored value outside the three known answers reads as never checked (no grant). */
+function toRegistryStatus(value: string | null): G0TenantSnapshot['picRegistryStatus'] {
+  return value === 'FOUND' || value === 'NOT_FOUND' || value === 'UNKNOWN' ? value : null;
+}
+
 /** Success rate for the topic, preferring a row measured for the tenant's own country. */
 function pickBaseRatePct(
   stats: { country: string | null; successRate: number | null; topicId: string | null }[],
@@ -124,6 +154,25 @@ async function loadCordisSnapshot(
   pic: string | null,
   topicIdentifier: string | null,
 ): Promise<G0CordisSnapshot | null> {
+  // "No record" = a PIC was entered and no CORDIS row exists for it (FO-382, patron 05.11: "PIC
+  // boşsa kolaylık yok"). It is only a fact about the organisation when CORDIS itself is loaded. An
+  // empty table (not imported yet) is missing data, not a history of zero, so it stays null and the
+  // scorer keeps the standard basis. No PIC also gives `null`, and so does an empty table: in both
+  // cases the scorer keeps the standard basis (FO-382 review B4: `null` does not mean "no PIC" only).
+  // The partner-only rule is applied in the scorer (`isNoHistoryPartner`), not here.
+  const noRecord = async (): Promise<G0CordisSnapshot | null> => {
+    const anyRow: { projectId: string } | null = await client.cordisParticipation.findFirst({
+      select: { projectId: true },
+    });
+    if (!anyRow) return null;
+    return {
+      coordinationsInTopicFamily: 0,
+      coordinationsOverall: 0,
+      distinctCollaborators: 0,
+      participationsOverall: 0,
+    };
+  };
+
   if (!pic) return null;
 
   const participations: { role: string; projectId: string; project: { masterCall: string | null } | null }[] =
@@ -132,9 +181,7 @@ async function loadCordisSnapshot(
       select: { role: true, projectId: true, project: { select: { masterCall: true } } },
       take: 500,
     });
-  if (participations.length === 0) {
-    return { coordinationsInTopicFamily: 0, coordinationsOverall: 0, distinctCollaborators: 0 };
-  }
+  if (participations.length === 0) return noRecord();
 
   const family = topicIdentifier ? topicPrefixOf(topicIdentifier) : null;
   const coordinations = participations.filter((p) => p.role.trim().toLowerCase() === 'coordinator');
@@ -154,6 +201,7 @@ async function loadCordisSnapshot(
     coordinationsInTopicFamily,
     coordinationsOverall: coordinations.length,
     distinctCollaborators: collaborators.length,
+    participationsOverall: participations.length,
   };
 }
 
@@ -169,11 +217,15 @@ export async function loadG0Snapshot(
   tenantId: string,
   subject: G0Subject,
 ): Promise<G0Snapshot> {
-  const tenant: { country: string | null; pic: string | null; settings: unknown } | null =
-    await client.tenant.findUnique({
-      where: { id: tenantId },
-      select: { country: true, pic: true, settings: true },
-    });
+  const tenant: {
+    country: string | null;
+    pic: string | null;
+    picRegistryStatus: string | null;
+    settings: unknown;
+  } | null = await client.tenant.findUnique({
+    where: { id: tenantId },
+    select: { country: true, pic: true, picRegistryStatus: true, settings: true },
+  });
 
   const profile: { keywords: unknown } | null = await client.tenantProfile.findUnique({
     where: { tenantId },
@@ -197,6 +249,8 @@ export async function loadG0Snapshot(
       isTwoStage: true,
       budgetPerProjectCents: true,
       eligibility: true,
+      // Topic has no currency column; the amount is in `Call.currency` (TRY for TR agency calls).
+      call: { select: { currency: true } },
     };
     const row =
       (await client.topic.findUnique({ where: { id: subject.topicId }, select: topicSelect })) ??
@@ -209,7 +263,9 @@ export async function loadG0Snapshot(
         keywords: toStringArray(row.keywords),
         isLumpSum: row.isLumpSum === true,
         isTwoStage: row.isTwoStage === true,
-        budgetPerProjectCents: toNumberOrNull(row.budgetPerProjectCents),
+        // The budget rule compares against euro bands. A non-euro amount is "unknown", not converted
+        // (NG-163): the factor reads it as missing evidence instead of scoring lira as euro.
+        budgetPerProjectCents: isEuroCurrency(row.call?.currency) ? toNumberOrNull(row.budgetPerProjectCents) : null,
         eligibility:
           row.eligibility && typeof row.eligibility === 'object'
             ? (row.eligibility as G0TopicSnapshot['eligibility'])
@@ -243,7 +299,11 @@ export async function loadG0Snapshot(
   const cordis = await loadCordisSnapshot(client, tenant?.pic ?? null, topic?.identifier ?? null);
 
   return {
-    tenant: { country: tenant?.country ?? null, pic: tenant?.pic ?? null },
+    tenant: {
+      country: tenant?.country ?? null,
+      pic: tenant?.pic ?? null,
+      picRegistryStatus: toRegistryStatus(tenant?.picRegistryStatus ?? null),
+    },
     profile: profile ? { keywords: toStringArray(profile.keywords) } : null,
     topic,
     topicFitScore,
@@ -266,7 +326,9 @@ export function computeG0FromSnapshot(
   snapshot: G0Snapshot,
   weights: typeof DEFAULT_SCORING_WEIGHTS = DEFAULT_SCORING_WEIGHTS,
 ): G0Computation {
-  const { features, facts, sources, coverage } = extractG0Features(snapshot);
+  const { features, facts, sources, coverage, excludedFeatures, scoringBasis, filledSeats } = extractG0Features(snapshot);
+  const scoredWeights = effectiveWeights(weights, excludedFeatures);
+  const denominator = weightsTotal(scoredWeights);
 
   // No evidence at all → no score. Storing a 0 here would be a fabricated figure wearing a
   // different mask, and `gates/evaluate.ts` already has an honest branch for "not scored yet".
@@ -284,10 +346,14 @@ export function computeG0FromSnapshot(
       sources,
       coverage,
       scoringVersion: G0_SCORING_VERSION,
+      scoringBasis,
+      excludedFeatures,
+      denominator,
+      filledSeats,
     };
   }
 
-  const result: G0Result = decideG0(features, facts, undefined, weights);
+  const result: G0Result = decideG0(features, facts, undefined, scoredWeights);
   return {
     tenantId,
     opportunityId: subject.opportunityId,
@@ -301,6 +367,10 @@ export function computeG0FromSnapshot(
     sources,
     coverage,
     scoringVersion: G0_SCORING_VERSION,
+    scoringBasis,
+    excludedFeatures,
+    denominator,
+    filledSeats,
   };
 }
 
@@ -397,6 +467,11 @@ export function g0EvidencePayload(computation: G0Computation): JsonObject {
     score: computation.score,
     decision: computation.decision,
     coverage: computation.coverage,
+    scoringBasis: computation.scoringBasis,
+    excludedFeatures: computation.excludedFeatures,
+    denominator: computation.denominator,
+    filledSeats: computation.filledSeats,
+    noHistoryWithoutFilledSeat: computation.reasonDetails.some((r) => r.code === 'G0_NO_HISTORY_NO_FILLED_SEAT'),
     features: computation.features,
     contributions: computation.contributions,
     reasons: computation.reasons,
@@ -576,24 +651,16 @@ export async function clearStoredG0(
     const breakdown = alignmentCameFromTopicMatch(computation)
       ? evidence
       : { ...evidence, [G0_FIT_SCORE_PLACEHOLDER]: true };
-    await client.topicMatch.upsert({
-      where: {
-        tenantId_topicId_opportunityId: {
-          tenantId: computation.tenantId,
-          topicId: computation.topicId,
-          opportunityId: computation.opportunityId,
-        },
-      },
-      update: { g0Score: null, breakdown },
-      create: {
-        tenantId: computation.tenantId,
-        topicId: computation.topicId,
-        opportunityId: computation.opportunityId,
-        fitScore: 0,
-        g0Score: null,
-        breakdown,
-      },
+    // Only a row that already exists is cleared. An opportunity that was never scored has no
+    // per-opportunity TopicMatch row, and creating one here would add a placeholder record
+    // (fitScore 0) whose only content is "no score" (NG-59, PR #325 review).
+    const existing: { id: string } | null = await client.topicMatch.findFirst({
+      where: { tenantId: computation.tenantId, topicId: computation.topicId, opportunityId: computation.opportunityId },
+      select: { id: true },
     });
+    if (existing) {
+      await client.topicMatch.update({ where: { id: existing.id }, data: { g0Score: null, breakdown } });
+    }
   }
 
   return true;

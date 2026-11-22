@@ -9,12 +9,18 @@ import { signInAs } from './fixtures/session';
  *
  * READ-ONLY. This spec creates nothing, resolves nothing and deletes nothing:
  * it opens /tr/admin/alerts against whatever the database already holds and
- * measures what a platform admin can see and do. Every assertion below is a
- * measurement written to the console log, not a gate — the point is evidence,
- * so a number that has changed since the last run should be read, not "fixed".
+ * measures what a platform admin can see and do. The measurements are written
+ * to the console log, so a number that has changed since the last run should be
+ * read, not "fixed". The data is NOT assumed: an empty database (no SystemAlert
+ * rows, e.g. a shard that runs without the tests that create them) measures the
+ * empty state, and the only hard checks are that the table agrees with the
+ * header total on the same page and that nothing was changed.
+ * (NG-293: the spec used to assume at least one row and waited 60 s on a
+ * cell that only exists in a data row.)
  */
 
 const SHOTS = shotsDir('TASK-MTTUUGKNDGBXK-screenshots');
+const DATA_ROW = 'table tbody tr:has(td:nth-child(2))';
 const ADMIN_EMAIL = 'admin@yasinaslan.com.tr';
 // The seeded platform-admin seat behind ADMIN_EMAIL (prisma/seed-tenant-workspace.ts,
 // `isPlatformAdmin: true`). The demo sign-in form that used to resolve the address to
@@ -35,7 +41,7 @@ test.beforeAll(async () => {
   }
 });
 
-test('the alert console under a 250-row pile', async ({ page }) => {
+test('the alert console as the database currently holds it', async ({ page }) => {
   test.skip(skipReason !== '', skipReason);
 
   // The open rows that exist before the probe runs are the ones it must leave alone. Other specs
@@ -68,15 +74,30 @@ test('the alert console under a 250-row pile', async ({ page }) => {
   const stats = await page.locator('dl div').allInnerTexts();
   console.log(`[probe] header tiles: ${JSON.stringify(stats)}`);
 
-  const renderedRows = await page.locator('table tbody tr').count();
-  console.log(`[probe] <tr> in tbody (incl. no expanded detail rows): ${renderedRows}`);
+  // A data row has a second cell (the source). The empty state is ONE <tr> with a single
+  // colSpan cell, and an expanded detail row is also a single cell, so counting the rows
+  // that have a source cell is what separates "no alerts" from "some alerts".
+  const dataRows = await page.locator(DATA_ROW).count();
+  const tbodyRows = await page.locator('table tbody tr').count();
+  console.log(`[probe] <tr> in tbody: ${tbodyRows}; data rows (with a source cell): ${dataRows}`);
+  if (dataRows === 0) {
+    console.log(`[probe] table is empty on screen (empty-state row only); DB total=${dbTotal}`);
+  }
+  // The header total and the table are two reads on the server (findMany, then count), not one
+  // snapshot. Another spec that writes or deletes an alert between those two reads can make them
+  // disagree, so this check can fail red on a rare race with concurrent writers. The DB count above
+  // was read before navigation and is only a measurement; comparing it to the screen would race too.
+  const headerTotal = Number(stats[0]?.match(/\d+/)?.[0] ?? Number.NaN);
+  console.log(`[probe] header total=${headerTotal}; DB total read before navigation=${dbTotal}`);
+  expect(Number.isNaN(headerTotal), 'the header total tile is readable').toBe(false);
+  expect(dataRows > 0, 'the table shows data rows exactly when the header counts alerts').toBe(headerTotal > 0);
 
   // --- how much of the screen the one repeated failure occupies ---
   const identityRows = await page
     .locator('table tbody tr td:nth-child(2)', { hasText: 'invoice_buyer_identity_missing' })
     .count();
   console.log(`[probe] rows whose source cell is invoice_buyer_identity_missing: ${identityRows}`);
-  console.log(`[probe] share of the visible table: ${((identityRows / Math.max(1, renderedRows)) * 100).toFixed(1)}%`);
+  console.log(`[probe] share of the visible table: ${((identityRows / Math.max(1, dataRows)) * 100).toFixed(1)}%`);
 
   // --- can an operator find the one-off alert in the pile? ---
   const rare = page.locator('table tbody tr', { hasText: 'm10_document_generation_failed' }).first();
@@ -96,10 +117,10 @@ test('the alert console under a 250-row pile', async ({ page }) => {
   }
 
   // --- the only triage control: "unresolved only" ---
-  const before = await page.locator('table tbody tr').count();
+  const before = await page.locator(DATA_ROW).count();
   await page.getByRole('checkbox').first().check();
   await page.waitForTimeout(300);
-  const after = await page.locator('table tbody tr').count();
+  const after = await page.locator(DATA_ROW).count();
   console.log(`[probe] "Yalniz cozulmemisler" checkbox: ${before} rows -> ${after} rows (filtered out ${before - after})`);
   await page.screenshot({ path: `${SHOTS}/02-unresolved-only.png`, fullPage: true });
   await page.getByRole('checkbox').first().uncheck();
@@ -143,16 +164,19 @@ test('the alert console under a 250-row pile', async ({ page }) => {
   // The console orders createdAt desc, so the newest row should be table row 1.
   // Comparing the top rendered row against the newest row in the database
   // answers the question without writing an alert to find out.
-  const newest = await prisma.systemAlert.findFirst({
-    orderBy: { createdAt: 'desc' },
-    select: { source: true, message: true, createdAt: true },
-  });
-  const topRowSource = await page.locator('table tbody tr').first().locator('td').nth(1).innerText();
-  console.log(`[probe] newest alert in DB : ${newest?.source} @ ${newest?.createdAt.toISOString()}`);
-  console.log(`[probe] top row on screen  : ${topRowSource.trim()}`);
-  console.log(
-    `[probe] -> a brand-new alert lands at row 1: ${topRowSource.trim() === newest?.source ? 'YES, visible without scrolling' : 'NO'}`,
-  );
+  // Only meaningful when there is a row to compare; on an empty database there is no row 1.
+  if (dataRows > 0) {
+    const newest = await prisma.systemAlert.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { source: true, message: true, createdAt: true },
+    });
+    const topRowSource = await page.locator(DATA_ROW).first().locator('td').nth(1).innerText();
+    console.log(`[probe] newest alert in DB : ${newest?.source} @ ${newest?.createdAt.toISOString()}`);
+    console.log(`[probe] top row on screen  : ${topRowSource.trim()}`);
+    console.log(
+      `[probe] -> a brand-new alert lands at row 1: ${topRowSource.trim() === newest?.source ? 'YES, visible without scrolling' : 'NO'}`,
+    );
+  }
 
   // The page must at least be the console we think it is.
   await expect(page.getByRole('heading', { name: 'Sistem Uyarıları' })).toBeVisible();

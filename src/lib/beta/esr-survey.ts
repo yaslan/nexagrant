@@ -246,7 +246,7 @@ export function renderEsrSurveyEmail(params: EsrSurveyEmailParams): RenderedEmai
     </table>
     <p style="margin-top:24px;">
       <a href="${escapeHtml(params.surveyUrl)}"
-         style="display:inline-block;background:#0369A1;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">
+         style="display:inline-block;background:#012C9C;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">
         ${escapeHtml(c.ctaOpen)}
       </a>
     </p>

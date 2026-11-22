@@ -349,7 +349,7 @@ export function BillingClient({
               </span>
             </div>
             <div className="text-[11px] text-muted">
-              <Link href={`/${locale}/${workspace}/settings/members`} className="text-blue-600 hover:underline">
+              <Link href={`/${locale}/${workspace}/settings/members`} className="text-accent-ink hover:underline">
                 {t('metricSeatsLink')}
               </Link>
             </div>
@@ -444,7 +444,7 @@ export function BillingClient({
               <span>{t('cycleYearly')}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
-                  billingCycle === 'yearly' ? 'bg-white/20 text-white' : 'bg-accent/15 text-accent font-mono'
+                  billingCycle === 'yearly' ? 'bg-surface text-accent' : 'bg-accent/15 text-accent font-mono'
                 }`}
               >
                 {t('yearlyBadge')}
@@ -511,7 +511,7 @@ export function BillingClient({
                       >
                         {money(charged.monthlyEquivalentMinor, charged.currency)}
                       </span>
-                      <span className="text-sm text-slate-400 line-through font-medium">
+                      <span className="text-sm text-muted line-through font-medium">
                         {money(list.monthlyEquivalentMinor, list.currency)}
                       </span>
                       <span className="text-xs bg-accent/15 text-accent font-extrabold px-1.5 py-0.5 rounded font-mono">
@@ -584,10 +584,10 @@ export function BillingClient({
 
       {/* ─── LIFETIME OFFER BANNER ─── */}
       {lifetime && !pilot && (
-        <div className="bg-[#0b1426] text-white border-2 border-cyan-400/80 rounded-2xl p-6 shadow-lg space-y-4 font-sans relative overflow-hidden">
+        <div className="dark bg-[#0b1426] text-white border-2 border-accent/80 rounded-2xl p-6 shadow-lg space-y-4 font-sans relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3 font-mono text-xs">
-            <div className="flex items-center gap-2 font-bold text-cyan-400 uppercase tracking-widest">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            <div className="flex items-center gap-2 font-bold text-accent-ink uppercase tracking-widest">
+              <span className="w-2 h-2 rounded-full bg-accent-strong animate-ping" />
               <span>{t('lifetimeKicker')}</span>
             </div>
             {/*
@@ -603,13 +603,13 @@ export function BillingClient({
               className="bg-slate-900 border border-slate-700 px-3 py-1 rounded-full text-[11px] text-slate-300 font-bold flex items-center gap-1.5 self-start sm:self-auto"
             >
               {lifetimeScarcity.kind === 'unknown' && (
-                <span className="text-cyan-300">{t('lifetimeCapOnly', { cap: lifetimeScarcity.cap })}</span>
+                <span className="text-accent-ink">{t('lifetimeCapOnly', { cap: lifetimeScarcity.cap })}</span>
               )}
               {lifetimeScarcity.kind === 'none' && (
                 <>
                   <span className="text-amber-400 font-extrabold">{t('lifetimeOwnersNone')}</span>
                   <span>·</span>
-                  <span className="text-cyan-300">
+                  <span className="text-accent-ink">
                     {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
                   </span>
                 </>
@@ -620,7 +620,7 @@ export function BillingClient({
                     {t('lifetimeOwnersCount', { count: lifetimeScarcity.owners })}
                   </span>
                   <span>·</span>
-                  <span className="text-cyan-300">
+                  <span className="text-accent-ink">
                     {t('lifetimeNextSeq', { next: lifetimeScarcity.next, cap: lifetimeScarcity.cap })}
                   </span>
                 </>
@@ -649,7 +649,7 @@ export function BillingClient({
                 <span className="text-slate-400 line-through text-sm">
                   {money(lifetime.listAmountMinor, lifetime.currency)}
                 </span>
-                <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">
+                <span className="bg-accent/20 text-accent-ink border border-accent/30 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">
                   {t('lifetimeOneTimeOff', { percent: lifetime.percentOff })}
                 </span>
               </div>
@@ -664,7 +664,7 @@ export function BillingClient({
                     quantity: 1,
                   })
                 }
-                className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.4)] transition flex items-center gap-1.5 cursor-pointer"
+                className="bg-accent-strong hover:opacity-90 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl shadow-[0_0_20px_color-mix(in_srgb,var(--accent)_40%,transparent)] transition flex items-center gap-1.5 cursor-pointer"
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
                 <span>{t('lifetimeCta')}</span>

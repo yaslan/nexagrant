@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenant } from '../src/lib/db';
@@ -33,6 +34,8 @@ import { requireId } from './helpers/teardown-guard';
  * refuses the row (memory: fabrika-local-app-role-bypasses-rls).
  */
 const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
+// NG-180: no database → both suites skip (warned locally, thrown in CI); see tests/helpers/database-availability.ts.
+const HAS_DB = await suiteHasDatabase('plan-entitlement-version.spec');
 
 const PLAN_ID = 'entitlement-version-fixture';
 /** Figures no plan in PLAN_GRANTS carries, in any combination. */
@@ -76,6 +79,7 @@ async function makeTenant(slug: string) {
 }
 
 beforeAll(async () => {
+  if (!HAS_DB) return;
   await prisma.$connect();
   await seedPlanFixture();
   const stamp = Date.now();
@@ -107,10 +111,10 @@ afterAll(async () => {
     await prisma.$executeRawUnsafe(`DELETE FROM "Plan" WHERE "id" = $1`, PLAN_ID);
     await prisma.$executeRawUnsafe(`DELETE FROM "AuditEvent" WHERE target LIKE $1`, `${PLAN_ID}%`);
   }
-  await prisma.$disconnect();
+  if (HAS_DB) await prisma.$disconnect();
 });
 
-describe('entitlements come from the plan version the subscription is on', () => {
+describe.skipIf(!HAS_DB)('entitlements come from the plan version the subscription is on', () => {
   test('the version answers, and the catalogue could not have', async () => {
     // `entitlement-version-fixture` is in no catalogue. Before this task this
     // call threw; the figures below exist only in the database.
@@ -231,7 +235,7 @@ describe('entitlements come from the plan version the subscription is on', () =>
   });
 });
 
-describe('the new join is readable by the role production runs as', () => {
+describe.skipIf(!HAS_DB)('the new join is readable by the role production runs as', () => {
   let rls: PrismaClient | null = null;
 
   afterAll(async () => {

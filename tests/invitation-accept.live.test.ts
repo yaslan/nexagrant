@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { PrismaClient, Role } from '@prisma/client';
+import { appUrl } from '@/lib/app-url';
 
 import { skipOrFailInCi, assertRlsSubjectRole, requireRlsTestUrl, requireTestEnv } from './helpers/live-db-role';
 
@@ -38,6 +39,10 @@ vi.mock('next/headers', () => ({
   }),
   headers: async () => new Headers(),
 }));
+
+// The app's own origin, as the routes build their redirects (src/lib/env.ts via
+// app-url). Never a literal port: a worktree may serve on E2E_PORT.
+const APP_ORIGIN = appUrl();
 
 const SUITE = 'invitation-accept.live';
 const RUN = `inv-${Date.now().toString(36)}`;
@@ -141,7 +146,7 @@ function fakeGoogle() {
 async function callback(claims: Claims) {
   nextClaims = claims;
   const { handlers } = NextAuthFn!({ ...authConfig!, providers: [fakeGoogle()] } as never);
-  const res = await handlers.GET(new NextRequestCtor!('http://localhost:3000/api/auth/callback/google?code=fake-code'));
+  const res = await handlers.GET(new NextRequestCtor!(`${APP_ORIGIN}/api/auth/callback/google?code=fake-code`));
   const setCookie = res.headers.getSetCookie?.() ?? [];
   return {
     status: res.status,
@@ -249,11 +254,11 @@ afterAll(async () => {
 describe('GET /[locale]/accept-invite (the e-mail link)', () => {
   test('moves the token into an httpOnly cookie and redirects to a URL without it', async () => {
     const { raw } = lib.token.issueSecretToken();
-    const res = await lib.route.GET(new NextRequestCtor!(`http://localhost:3000/en/accept-invite?token=${raw}`), {
+    const res = await lib.route.GET(new NextRequestCtor!(`${APP_ORIGIN}/en/accept-invite?token=${raw}`), {
       params: Promise.resolve({ locale: 'en' }),
     });
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('http://localhost:3000/en/accept-invite/continue');
+    expect(res.headers.get('location')).toBe(`${APP_ORIGIN}/en/accept-invite/continue`);
     expect(res.headers.get('location')).not.toContain(raw);
     expect(res.headers.get('referrer-policy')).toBe('no-referrer');
     expect(res.headers.get('cache-control')).toBe('no-store');
@@ -265,7 +270,7 @@ describe('GET /[locale]/accept-invite (the e-mail link)', () => {
   });
 
   test('a malformed token clears an earlier cookie instead of keeping it', async () => {
-    const res = await lib.route.GET(new NextRequestCtor!('http://localhost:3000/tr/accept-invite?token=nope'), {
+    const res = await lib.route.GET(new NextRequestCtor!(`${APP_ORIGIN}/tr/accept-invite?token=nope`), {
       params: Promise.resolve({ locale: 'tr' }),
     });
     expect(res.status).toBe(303);

@@ -1,0 +1,14 @@
+{
+  "tr": {
+    "title": "Bir Hata Oluştu",
+    "description": "Sistemde beklenmeyen bir hata meydana geldi:",
+    "unknownError": "Bilinmeyen Hata",
+    "retry": "Yeniden Dene"
+  },
+  "en": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred in the system:",
+    "unknownError": "Unknown error",
+    "retry": "Try again"
+  }
+}

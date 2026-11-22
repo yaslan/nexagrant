@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { prisma, withTenant } from './db';
+import { withOwnRouteCloseOnM18Exit } from './leads/province-route';
 import { env } from './env';
 import { toDecimalString, toMinorUnits } from './money';
 import { resolvePlanId } from './billing/catalog';
@@ -764,18 +765,19 @@ export async function handleIyzicoWebhook(
       const oldPlan = await tx.plan.findUnique({ where: { id: existing.planId } });
       if (oldPlan) {
         const newModules = new Set(plan.modules);
-        for (const moduleId of oldPlan.modules) {
-          if (!newModules.has(moduleId)) {
-            disabledModules.push(moduleId);
-            await tx.moduleState.upsert({
-              where: { tenantId_moduleId: { tenantId, moduleId } },
-              create: { tenantId, moduleId, status: 'OFF' },
-              update: { status: 'OFF' },
-            });
-          }
-        }
+        disabledModules.push(...oldPlan.modules.filter((moduleId) => !newModules.has(moduleId)));
       }
     }
+    // NG-222: M18 among them closes the tenant's province routes in this transaction.
+    await withOwnRouteCloseOnM18Exit(tx, disabledModules, { kind: 'billing' }, async () => {
+      for (const moduleId of disabledModules) {
+        await tx.moduleState.upsert({
+          where: { tenantId_moduleId: { tenantId, moduleId } },
+          create: { tenantId, moduleId, status: 'OFF' },
+          update: { status: 'OFF' },
+        });
+      }
+    });
 
     await tx.auditEvent.create({
       data: {

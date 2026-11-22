@@ -1,9 +1,9 @@
 // Prompt text — see src/lib/ai/prompts/index.ts. The template literal is the prompt byte for byte:
 // whitespace inside it (including trailing spaces) reaches the model. {{name}} is filled by renderPrompt().
-const prompt = `Generate a university Tech Transfer Office (TTO) IP & Licensing Checklist for:
-  Technology Title: {{title}}
-  Current TRL: TRL {{trl}}
-  Patent Status: {{patentStatus}}
+// Instructions only: user data never goes in this file's placeholders, see separatedPrompt() (NG-40).
+const prompt = `You are an expert University Technology Transfer Office (TTO) IP legal specialist for EU Horizon Europe.
+
+Generate a university Tech Transfer Office (TTO) IP & Licensing Checklist for the technology in the data: technology_title, current_trl (a TRL level) and patent_status.
 
   Include 4 structured checklist categories in Turkish:
   1. Arka Plan Fikri Mülkiyet (Background IP) Beyanı

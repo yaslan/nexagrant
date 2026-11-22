@@ -73,7 +73,6 @@ const EXPECTED_HOSTS: Record<string, string> = {
   een: 'een.ec.europa.eu',
   idealist: 'www.ideal-ist.eu',
   greenet: 'greenet-partner-search-tool.b2match.io',
-  linkedin: 'www.linkedin.com',
 };
 
 test.describe('M1 partner card — K4 outreach', () => {
@@ -99,7 +98,6 @@ test.describe('M1 partner card — K4 outreach', () => {
       await context.route('https://een.ec.europa.eu/**', route => route.fulfill(mockFulfill));
       await context.route('https://www.ideal-ist.eu/**', route => route.fulfill(mockFulfill));
       await context.route('https://greenet-partner-search-tool.b2match.io/**', route => route.fulfill(mockFulfill));
-      await context.route('https://www.linkedin.com/**', route => route.fulfill(mockFulfill));
 
       await signIn(page, locale);
 
@@ -116,6 +114,9 @@ test.describe('M1 partner card — K4 outreach', () => {
         expect(new URL(href).host).toBe(host);
         expect(decodeURIComponent(href)).not.toContain('@');
       }
+      // Spec D2 l.14: no LinkedIn link on the card.
+      await expect(page.getByTestId('outreach-link-linkedin')).toHaveCount(0);
+      await expect(search.locator('a[href*="linkedin"]')).toHaveCount(0);
       await expect(page.getByTestId('outreach-link-ft').locator('a')).toHaveAttribute(
         'href',
         /partner-search\?keywords=K4%20Test%20Hydrogen%20Institute$/,

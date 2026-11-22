@@ -1,5 +1,7 @@
 # NexaGrant: ortam değişkenleri listesi (Hostinger Cloud hosting · eski cPanel hedefi)
 
+> **ESKİ HEDEF (NG-262, 19.11.2026):** bu liste Hostinger Cloud hedefi içindir ve taşıma bitene kadar (ve 14 günlük geri dönüş süresince) geçerlidir. Yeni hedefin (VPS, planlı, NG-261) değişkenleri: `deploy/vps/.env.prod.example`. Yeni hedef: patronun aldığı Hostinger KVM 4 + CloudPanel (19.11.2026 akşam); `TRUSTED_PROXY_HOPS` orada CloudPanel nginx zincirinde ölçülecek (NG-261 Faz A), bu listedeki `2` yalnız Cloud hedefi içindir. Karar: `docs/adr/ADR-0012-hosting-hostinger-cloud-to-vps.md`.
+
 **Güncel hedef (K-574987 = A, 01.11.2026):** Hostinger Cloud Economy, site `nexagrant.com`, kullanıcı `u605628300`,
 uygulama kökü `/home/u605628300/domains/nexagrant.com/public_html`. Kurulum sırası: `docs/DEPLOY-NEXAGRANT-HOSTINGER.md`.
 Bu listedeki `/home/fonbridge/fonbridge-app` yolları eski Vulut cPanel hedefinden kalır; Hostinger'da yerine
@@ -30,6 +32,7 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `DATABASE_URL` | ✓ | `postgresql://fabrika_app.<proje-ref>:<şifre>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=/home/u605628300/domains/nexagrant.com/public_html/certs/supabase-prod-ca-2021.crt` (pooler adresindeki bölge Supabase projesinin bölgesidir; NexaGrant prod projesi henüz yok, bkz. deploy belgesi §2.2) | **Web için rol `fabrika_app` olmalı** (BYPASSRLS yok). Sahip rolünü ya da `postgres`'i kullanmayın. Sondaki `sslmode=verify-full&sslrootcert=...` kısmı **aynen** yazılır; CA dosyası pakettedir (`certs/`). `sslmode=require` tek başına kullanılmaz (bağlanmaz). `rejectUnauthorized`/`uselibpqcompat` eklenmez. |
 | `AUTH_URL` | | `https://nexagrant.com` | **Zorunlu.** Sitenin dışarıdan görünen adresi. Sonunda `/` olmaz. Passenger, isteğin `Host` bilgisini `localhost:3000` yapar. Bu değişken yoksa Auth.js girişten sonra `https://localhost:3000/...` adresine yönlendirir ve oturum açılmaz. Davet ve hata yönlendirmeleri de bu değeri kullanır (`src/lib/public-url.ts`, PR #29). TASK-MUTP1R1C13GE3. |
 | `AUTH_SECRET` | | 44 karakterlik rastgele dize (`openssl rand -base64 32` çıktısı) | Oturum imza anahtarı. En az 32 karakter. Eksik, kısa ya da eski (git geçmişinde yayımlanmış) anahtar → **uygulama başlamaz** (`src/instrumentation.ts`). Bir kez üretin, değiştirirseniz herkesin oturumu düşer. |
+| `EMAIL_OPTOUT_SECRET` | | 44 karakterlik rastgele dize (`openssl rand -base64 32` çıktısı), `AUTH_SECRET`'tan farklı | E-postadaki çıkış bağlantılarının imza anahtarı (NG-42). **İlk e-posta gönderilmeden önce girin ve bir daha değiştirmeyin:** bağlantıların süresi yoktur, anahtar değişince gönderilmiş tüm bağlantılar geçersiz olur. Boşsa `AUTH_SECRET` kullanılır; o zaman `AUTH_SECRET` değişince bağlantılar kırılır, sonradan girmek de o ana kadarki bağlantıları geçersiz kılar. |
 | `NEXT_PUBLIC_APP_URL` | ✓ | `https://nexagrant.com` | Sonunda `/` olmaz. Yanlışsa davet ve e-posta bağlantıları bozulur. Uygulama açılır, log'a uyarı düşer. Paket bu değerle derlendi. |
 | `AUTH_GOOGLE_ID` | | `<istemci-no>.apps.googleusercontent.com` | Google ile giriş. **Yeni `fonbridges` GCP istemcisi.** Google Console'da izinli yönlendirme adresi: `https://nexagrant.com/api/auth/callback/google` |
 | `AUTH_GOOGLE_SECRET` | | `GOCSPX-<...>` | Aynı istemcinin gizli anahtarı. |
@@ -63,11 +66,13 @@ Biçim örneklerinde `<...>` yazan yerler sizin değerinizdir. Örnekler gerçek
 | `BETA_SUPPORT_EMAIL`, `BETA_FEEDBACK_EMAIL` | ✓ | boş (varsayılan `info@nexagrant.com`) | |
 | `BETA_MEETING_URL` | ✓ | `https://meet.google.com/<...>` | Beta davetindeki toplantı bağlantısı. |
 | `CALENDAR_ENCRYPTION_KEY` | ✓ | `openssl rand -base64 32` | Takvim bağlantısı özelliği. **Boş değer YAZMAYIN.** Kullanılmayacaksa değişkeni hiç eklemeyin. Değiştirilirse kullanıcılar takvimi yeniden bağlar. |
+| `TAX_ID_ENCRYPTION_KEY` | ✓ | `openssl rand -base64 32` | Fatura kimliğindeki VKN/TCKN alanını (`buyerVknTckn`) AES-256-GCM ile şifreler (NG-40). **Boş değer YAZMAYIN; anahtarı yedekleyin** — kaybolursa kayıtlı vergi numaraları okunamaz. Anahtar yoksa faturalama kimliği ve fatura yazımı kapalı kalır (düz metin saklanmaz). Mevcut düz metin satırlar için `scripts/encrypt-tax-ids.ts`. |
 | `TRUSTED_PROXY_HOPS` | | **ölçülecek** (beklenen `2`) | Önünüzdeki ters vekil sayısı. Hostinger ölçümü (01.11.2026, `curl -sI https://nexagrant.com`): `server: hcdn`, `x-hcdn-request-id: …-fra-edge6` → önde **Hostinger CDN**, arkasında barındırmanın kendi web sunucusu var. 17.10.2026'daki `1` değeri eski Vulut sunucusu içindi, **kullanmayın**. Kesin değer canlıya almada `X-Forwarded-For` zinciri sayılarak bulunur (deploy belgesi runbook adım 7). Bir fazla ya da eksik olursa ziyaretçi formunun IP sınırı sahte başlıkla aşılır. |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | | boş | Analitik kapalı (zararsız). **Not:** tarayıcı tarafı bu anahtarı **derleme anında** okur. Bu paket anahtarsız derlendi. Panele girmek analitiği açmaz; açmak için yeniden derleme gerekir. |
 | `CSP_MODE` | | boş | Boş = içerik güvenlik politikası uygulanır. `report-only` yalnız sorun ararken kullanılır. |
 | `K1_EMBEDDING_MAX_USD_PER_RUN` | W | `0.05` | Gece embedding işinin koşu başına dolar tavanı. |
 | `ALERTS_SWEEP_FAILURE_THRESHOLD` | W | boş | Varsayılan yeterli. |
+| `PUBLIC_LEAD_STUCK_AFTER_MINUTES` | W | boş | Varsayılan 60 dk yeterli. Yönlendirilmiş ama kuruluşta kopyası olmayan lead bu süreden sonra takılı sayılır (NG-182). Girilirse A ve B aynı değeri taşımalı: liste (web) ile alarm (worker) aynı eşiği kullanır. |
 
 ## 3. Pilotta BOŞ kalmalı (ADR-0007, ücretsiz pilot)
 

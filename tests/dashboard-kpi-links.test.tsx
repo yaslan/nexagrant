@@ -12,6 +12,10 @@ import enMessages from '../messages/en.json';
  * worked on; the active-modules card links only for a reader who may manage modules, and a
  * card with no measurement yet still links (that page is where the data comes from).
  * Targets are spelled out, not built with getWorkspaceRoute.
+ *
+ * NG-5 (WCAG 2.5.3 Label in Name): a card link's accessible name is its own visible text — title,
+ * figure, unit, description — plus the hidden action hint. The names below are written out in
+ * full for the fixed metrics, so the test states them instead of agreeing with the component.
  */
 
 const pathname = vi.hoisted(() => ({ value: '/tr/main/panel' }));
@@ -54,25 +58,41 @@ function renderPanel(locale: 'tr' | 'en', opts: { canManageModules?: boolean; me
 
 const hrefOf = (name: string) => screen.getByRole('link', { name }).getAttribute('href');
 
+// jsdom lays out no flex boxes, so the figure and its unit read "4proje" here; in a browser the
+// two are separate blocks and read "4 proje" (dashboard-kpi-links.spec.ts asserts that name).
+const TR = {
+  total: 'Toplam Teklif 4proje Bu dönemdeki aktif fırsatlar — ayrıntıya git',
+  hit: 'İsabet Oranı 25,0% G0 puanı alan fırsatlar içinde gönderilen teklif oranı — ayrıntıya git',
+  threshold: 'Eşik Üstü Oranı 50,0% Gönderilen teklifler içinde eşik üstü puanlandırılanların oranı — ayrıntıya git',
+  score: 'Ortalama Puan 3,5/5 Ortalama değerlendirme puanı (iç ön değerlendirme) — ayrıntıya git',
+  personDays: 'Kişi-Gün / Teklif 2,0gün Teklif başına toplam efor — ayrıntıya git',
+  g2: 'Ort. G2 Süresi (gün) 12,0gün Ortalama kapı ilerleme süresi — ayrıntıya git',
+  modules: 'Açık Modüller 6modül Açık platform modülleri — ayrıntıya git',
+};
+
 describe('panel KPI card links', () => {
   test('tr: every card opens its page, the owner also gets Settings › Modules', () => {
     renderPanel('tr', { canManageModules: true });
-    const go = ' — ayrıntıya git';
-    expect(hrefOf(`Toplam Teklif${go}`)).toBe('/tr/main/firsatlar');
-    expect(hrefOf(`İsabet Oranı${go}`)).toBe('/tr/main/firsatlar');
-    expect(hrefOf(`Eşik Üstü Oranı${go}`)).toBe('/tr/main/firsatlar');
-    expect(hrefOf(`Ortalama Puan${go}`)).toBe('/tr/main/firsatlar');
-    expect(hrefOf(`Kişi-Gün / Teklif${go}`)).toBe('/tr/main/reports/person-days');
-    expect(hrefOf(`Ort. G2 Süresi (gün)${go}`)).toBe('/tr/main/firsatlar');
-    expect(hrefOf(`Açık Modüller${go}`)).toBe('/tr/main/ayarlar/moduller');
+    expect(hrefOf(TR.total)).toBe('/tr/main/firsatlar');
+    expect(hrefOf(TR.hit)).toBe('/tr/main/firsatlar');
+    expect(hrefOf(TR.threshold)).toBe('/tr/main/firsatlar');
+    expect(hrefOf(TR.personDays)).toBe('/tr/main/reports/person-days');
+    expect(hrefOf(TR.g2)).toBe('/tr/main/firsatlar');
+    expect(hrefOf(TR.modules)).toBe('/tr/main/ayarlar/moduller');
+    expect(hrefOf(TR.score)).toBe('/tr/main/firsatlar');
   });
 
   test('en: the same mapping on the English routes', () => {
     renderPanel('en', { canManageModules: true });
-    const go = ' — go to details';
-    expect(hrefOf(`Total Proposals${go}`)).toBe('/en/main/pipeline');
-    expect(hrefOf(`Person-Days / Proposal${go}`)).toBe('/en/main/reports/person-days');
-    expect(hrefOf(`Active Modules${go}`)).toBe('/en/main/settings/modules');
+    expect(hrefOf('Total Proposals 4projects Active opportunities in this period — go to details')).toBe(
+      '/en/main/pipeline',
+    );
+    expect(hrefOf('Person-Days / Proposal 2.0days Total effort per proposal — go to details')).toBe(
+      '/en/main/reports/person-days',
+    );
+    expect(hrefOf('Active Modules 6modules Enabled platform modules — go to details')).toBe(
+      '/en/main/settings/modules',
+    );
   });
 
   test('without manage_modules the active-modules card is a plain block, not a link', () => {
@@ -85,18 +105,26 @@ describe('panel KPI card links', () => {
 
   test('an unmeasured card still links to where its data is produced', () => {
     renderPanel('tr', { metrics: metrics({ personDays: { measured: false } }) });
-    const card = screen.getByRole('link', { name: 'Kişi-Gün / Teklif — ayrıntıya git' });
+    const card = screen.getByRole('link', {
+      name: 'Kişi-Gün / Teklif Henüz veri yok Henüz teklif yok; teklif başına efor hesaplanamıyor. — ayrıntıya git',
+    });
     expect(card.getAttribute('href')).toBe('/tr/main/reports/person-days');
     expect(card.textContent).toContain('Henüz veri yok');
   });
 
-  test('the figure and description are the link description, and no link is nested', () => {
+  test('the name is the visible text plus the hint, and no link is nested', () => {
     renderPanel('tr');
-    const card = screen.getByRole('link', { name: 'Toplam Teklif — ayrıntıya git' });
-    const describedBy = (card.getAttribute('aria-describedby') ?? '').split(' ');
-    const described = describedBy.map((id) => document.getElementById(id)?.textContent).join(' ');
-    expect(described).toContain('4');
-    expect(described).toContain('Bu dönemdeki aktif fırsatlar');
+    const card = screen.getByRole('link', { name: TR.total });
+    // Label in Name: the visible text (everything but the hidden hint) sits inside the name.
+    const visible = Array.from(card.children)
+      .filter((c) => !c.querySelector('.sr-only') && !c.classList.contains('sr-only'))
+      .map((c) => c.textContent)
+      .join(' ');
+    expect(visible).toContain('Toplam Teklif');
+    expect(visible).toContain('4');
+    expect(visible).toContain('Bu dönemdeki aktif fırsatlar');
+    expect(card.querySelector('.sr-only')?.textContent).toBe('— ayrıntıya git');
+    expect(card.getAttribute('aria-label')).toBeNull();
     expect(card.querySelector('a')).toBeNull();
   });
 });

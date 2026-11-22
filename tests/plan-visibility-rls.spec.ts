@@ -1,3 +1,4 @@
+import { suiteHasDatabase } from './helpers/database-availability';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, prisma, withTenantOn } from '../src/lib/db';
@@ -26,7 +27,9 @@ const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 const PLAN_ID = 'rls-private-plan-fixture';
 const VERSION_ID = 'pv_rls_private_fixture_1';
 
-describe('private plan visibility under the role that enforces RLS', () => {
+const HAS_DB = await suiteHasDatabase('plan-visibility-rls.spec');
+
+describe.skipIf(!HAS_DB)('private plan visibility under the role that enforces RLS', () => {
   let rls: PrismaClient;
   let tenantA_Id: string;
   let tenantB_Id: string;

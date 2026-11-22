@@ -4,13 +4,14 @@ import { withTenant } from '@/lib/db';
 import { requireTenantAction } from '@/lib/tenant';
 import { assertModuleAccess } from '@/lib/modules/access';
 import { generateText } from '@/lib/llm';
-import { renderPrompt } from '@/lib/ai/prompts';
+import { separatedPrompt } from '@/lib/ai/prompts';
 import { promptLocale } from '@/lib/ai/prompts/locale';
 import { revalidatePath } from 'next/cache';
 import { syncMeetingBriefToCalendar } from '@/lib/calendar/sync';
 import { errorMessage } from '@/lib/errors';
 import type { MeetingBriefRow } from '@/types/db-rows';
 import { templateBrief } from '@/modules/m9/brief-template';
+import { dealBriefContextText } from '@/lib/ports/deal-brief-context';
 
 /**
  * M9 meeting briefs.
@@ -29,6 +30,7 @@ export async function generateMeetingBrief({
   meetingScheduledAt,
   meetingScheduledTz = 'Europe/Brussels',
   opportunityId,
+  dealId,
 }: {
   interactionId: string;
   partnerName: string;
@@ -41,11 +43,18 @@ export async function generateMeetingBrief({
    * what every brief written before the column existed is.
    */
   opportunityId?: string;
+  /**
+   * NG-136 / M18-F5: a client-pipeline deal the meeting is about. Its context (organisation, call,
+   * an APPROVED eligibility pre-report only) reaches the prompt through the deal brief context
+   * contract (src/core/contracts/deal-brief-context.ts) — M9 does not import M18.
+   */
+  dealId?: string;
 }) {
   // Module gate: refuse before any side effect — an LLM call writes AiUsageLog
   // and debits CreditLedger, so a closed module checked later still costs credits.
   await assertModuleAccess('M9');
-  const { tenantId, userId } = await requireTenantAction({ can: 'edit_proposal' });
+  const scope = await requireTenantAction({ can: 'edit_proposal' });
+  const { tenantId, userId } = scope;
 
   // The FK only checks that the opportunity exists, not whose it is (constraint
   // checks run without RLS), and the id comes from the client. Refused here,
@@ -57,7 +66,19 @@ export async function generateMeetingBrief({
     if (!opp) throw new Error(`Opportunity ${opportunityId} not found in this workspace.`);
   }
   const locale = await promptLocale();
-  const prompt = renderPrompt('m9/meeting-brief', { partnerName, callTopic }, locale);
+  // Refused (module closed, role without client_pipeline_read, deal not this tenant's) before the
+  // model is paid for, like the opportunity check above.
+  let dealContext: string | null = null;
+  if (dealId !== undefined) {
+    dealContext = await dealBriefContextText(scope, dealId);
+    if (dealContext === null) throw new Error(`Deal ${dealId} not found in this workspace.`);
+  }
+  const request = separatedPrompt(
+    'm9/meeting-brief',
+    {},
+    { partner_name: partnerName, call_topic: callTopic, deal_context: dealContext ?? 'none' },
+    locale,
+  );
 
   // `aiGenerated` decides two things below: whether an AI credit is debited, and
   // whether the brief is stored as a template draft. A brief the model never
@@ -70,8 +91,7 @@ export async function generateMeetingBrief({
       userId,
       module: 'M9',
       purpose: 'meeting_brief',
-      prompt,
-      system: renderPrompt('m9/meeting-brief-system', {}, locale),
+      ...request,
     });
   } catch (e) {
     console.warn('[M9 generateMeetingBrief] LLM call fallback:', errorMessage(e));

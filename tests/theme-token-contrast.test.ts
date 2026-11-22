@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, test, expect } from 'vitest';
 
 /**
@@ -119,4 +119,120 @@ describe.each(Object.entries(themes))('accent contrast (%s)', (_, tokens) => {
 
 test('text-accent reads the text step, so the fill can stay under white text', () => {
   expect(css).toMatch(/--text-color-accent:\s*var\(--accent-ink\)/);
+});
+
+/**
+ * NG-63 — the accent colours that were still hard-coded after NG-2 (`#003D5C` on the sign-in and
+ * home buttons, `#0369A1` in the survey e-mail, the cyan `#22d3ee` of the cart and pricing pages)
+ * are now the token classes. This guard keeps them from coming back in the source.
+ */
+describe('no hard-coded accent left in src (NG-63)', () => {
+  const retired = /003D5C|0369A1|22d3ee|67e8f9/i;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) return walk(full);
+      return /\.(ts|tsx)$/.test(e.name) ? [full] : [];
+    });
+
+  test('the retired hex values appear in no source file', () => {
+    const hits = walk(resolve(__dirname, '../src')).filter((f) => retired.test(readFileSync(f, 'utf8')));
+    expect(hits.map((f) => f.replace(/.*\/src\//, 'src/'))).toEqual([]);
+  });
+});
+
+/**
+ * NG-63 (review B1/B2) — a `bg-accent/N` tint that carries `text-accent-ink` must keep AA on the dark
+ * card ground. The tint list above stops at /20, so /40–/80 went unchecked and shipped at 2.98–3.94:1.
+ * Every alpha is collected from src, so a new tint on a text-accent-ink line is measured too.
+ */
+describe('accent tint carrying text-accent-ink stays AA on the dark card (NG-63)', () => {
+  const darkCard = '#0e182e';
+  const dark = themes.dark;
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) return walk(full);
+      return /\.(ts|tsx)$/.test(e.name) ? [full] : [];
+    });
+  const alphas = new Set<number>();
+  for (const file of walk(resolve(__dirname, '../src'))) {
+    for (const line of readFileSync(file, 'utf8').split('\n')) {
+      if (!line.includes('text-accent-ink')) continue;
+      for (const m of line.matchAll(/\bbg-accent\/(\d{1,3})\b/g)) alphas.add(Number(m[1]));
+    }
+  }
+
+  test('the scan finds at least the known call sites', () => {
+    expect(alphas.size).toBeGreaterThan(0);
+  });
+
+  test.each([...alphas])('bg-accent/%i with text-accent-ink is at least 4.5:1 on --card', (pct) => {
+    const bg = tint(dark.accent as string, darkCard, pct / 100);
+    expect(contrast(dark['accent-ink'] as string, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+/**
+ * NG-93 — the Settings → Billing "lifetime" card keeps a hard-coded dark ground (#0b1426) in both
+ * themes, the same card PricingClient draws. It carries the `dark` class so `text-accent-ink`
+ * resolves to the dark step (#8FB0FF); these pairs are measured on that ground, not on the light
+ * token. The turquoise it replaces (cyan-400/300, #22d3ee) must not come back in BillingClient.
+ */
+describe('lifetime card on its dark ground (NG-93)', () => {
+  const lifetimeGround = '#0b1426';
+  const pill = '#0f172a'; // bg-slate-900 scarcity pill
+  const need = (name: string): string => {
+    const value = themes.dark[name];
+    if (!value) throw new Error(`--${name} missing from the dark theme`);
+    return value;
+  };
+
+  test.each([lifetimeGround, pill])('text-accent-ink on %s is at least 4.5:1', (bg) => {
+    expect(contrast(need('accent-ink'), bg)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test.each([0.2, 0.3])('text-accent-ink on bg-accent/%s of the card is at least 4.5:1', (alpha) => {
+    expect(contrast(need('accent-ink'), tint(need('accent'), lifetimeGround, alpha))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('white on the CTA fill bg-accent-strong is at least 4.5:1', () => {
+    expect(contrast('#ffffff', need('accent-strong'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('BillingClient carries no cyan/turquoise class or hex', () => {
+    const src = readFileSync(
+      resolve(__dirname, '../src/app/[locale]/(app)/[workspace]/settings/billing/BillingClient.tsx'),
+      'utf8',
+    );
+    expect(src.match(/cyan-|34,211,238|22d3ee/gi) ?? []).toEqual([]);
+  });
+});
+
+/**
+ * NG-114 — the struck-through list price on the Settings → Billing TTO plan card was
+ * `text-slate-400` (#94A3B8): 2.63:1 on the white --surface, axe color-contrast serious. It now
+ * takes the existing `text-muted` token (the secondary-text step NG-93 family already measures at
+ * >= 4.5:1 on surface), so no new colour is introduced. The strike-through line stays as is.
+ */
+describe('TTO plan card struck-through price (NG-114)', () => {
+  const billing = readFileSync(
+    resolve(__dirname, '../src/app/[locale]/(app)/[workspace]/settings/billing/BillingClient.tsx'),
+    'utf8',
+  );
+  const planPrice = billing.match(/className="([^"]*line-through font-medium)"/);
+
+  test('the plan card list price is present in BillingClient', () => {
+    expect(planPrice).not.toBeNull();
+  });
+
+  test('it paints the muted text token, not text-slate-400', () => {
+    const classes = planPrice?.[1] ?? '';
+    expect(classes).toMatch(/\btext-muted\b/);
+    expect(classes).not.toMatch(/\btext-slate-400\b/);
+  });
+
+  test('muted on the plan card surface is at least 4.5:1 in the light theme', () => {
+    expect(contrast(themes.light.muted as string, themes.light.surface as string)).toBeGreaterThanOrEqual(4.5);
+  });
 });

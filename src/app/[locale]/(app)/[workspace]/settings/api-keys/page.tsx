@@ -1,6 +1,6 @@
 import React from 'react';
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { ApiKeysClient, type ApiKeyRecord } from './client';
 import { RevokeApiKeysPanel } from './revoke-panel';
 import { errorMessage } from '@/lib/errors';
@@ -60,13 +60,15 @@ export default async function ApiKeysSettingsPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  // Role door first: a role without view_partner_search gets the 403 screen before the
+  // M1 module state is read, so a closed module is not revealed to it.
+  const scope = await requireTenantPageRole(locale, 'view_partner_search');
   // Partner API keys are an M1 feature (docs/MODULES.md): the sidebar lock alone
   // left the page open to anyone who typed the URL.
   const locked = await moduleGate('M1', locale);
   if (locked) {
     // Closed module: the gate stays, and under it only the withdrawal path shows
     // (FO-81). Real rows only: the demo placeholders below are for the open page.
-    const scope = await requireTenantPage(locale);
     const activeKeys = (await loadApiKeys(scope.tenantId)) ?? [];
     return (
       <div className="max-w-6xl mx-auto py-6 sm:px-6 space-y-6">
@@ -81,7 +83,7 @@ export default async function ApiKeysSettingsPage({
     );
   }
 
-  const { tenantId } = await requireTenantPage(locale);
+  const { tenantId } = await requireTenantPageRole(locale, 'view_partner_search');
 
   // FO-157: a plan that grants M1 read only (FO-41) may look at its keys but not
   // mint one; `generateApiKey` refuses with READ_ONLY_PLAN. The flag is the

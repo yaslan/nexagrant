@@ -347,9 +347,9 @@ const CATALOGUE_REASONS: Record<string, string> = {
   PublicLead:
     'contact request an anonymous visitor leaves on the readiness result screen (TASK-MULR765AR5G0C). ' +
     'The visitor has no account, so the row belongs to no tenant and has no tenantId; it is in ' +
-    'SYSTEM_WIDE like User. Written only by src/lib/leads/public-lead.ts (public form), read only ' +
-    'by /admin/leads behind requirePlatformAdmin(), deleted by the nightly public-lead-cleanup job. ' +
-    'No tenant code path touches it.',
+    'SYSTEM_WIDE. NG-175: RLS on with system_scope only, so every access goes through withSystemScope ' +
+    "('public-intake' form, 'platform-admin' lists, 'cross-tenant-job' forwarder and purge) and is " +
+    'counted under check D. No tenant code path touches it.',
   Document: 'tenantId is String?; in NULLABLE_TENANT.',
   Chunk: 'tenantId is String?; in NULLABLE_TENANT.',
 };
@@ -490,6 +490,7 @@ const KNOWN_PURPOSES: ReadonlySet<string> = new Set([
   'platform-aggregate',
   'cross-tenant-job',
   'public-intake',
+  'expert-directory',
 ]);
 /** Where the path is defined; its own internal delegation is not a call site. */
 const SYSTEM_SCOPE_HOME = 'src/lib/system-scope.ts';

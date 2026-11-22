@@ -3,6 +3,8 @@
  * Generates canonical, language-aware URLs for both public marketing and in-app workspace pages.
  */
 
+import { blogContentShownIn } from './blog-shared';
+
 export type PublicRouteKey =
   | 'home'
   | 'openCalls'
@@ -40,10 +42,12 @@ export type WorkspaceRouteKey =
   | 'approvals'
   | 'tto'
   | 'interregReview'
+  | 'clientPipeline'
   | 'notifications'
   | 'settingsProfile'
   | 'settingsModules'
   | 'settingsBilling'
+  | 'settingsPlan'
   | 'settingsApiKeys'
   | 'settingsCalendar'
   | 'settingsGates'
@@ -143,6 +147,8 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/tto-hizlandirici` : `/${locale}/${workspace}/tto`;
     case 'interregReview':
       return `/${locale}/${workspace}/modules/interreg-review`;
+    case 'clientPipeline':
+      return `/${locale}/${workspace}/musteri-hatti`;
     case 'notifications':
       return isTr ? `/${locale}/${workspace}/bildirimler` : `/${locale}/${workspace}/notifications`;
     case 'settingsProfile':
@@ -151,6 +157,8 @@ export function getWorkspaceRoute(
       return isTr ? `/${locale}/${workspace}/ayarlar/moduller` : `/${locale}/${workspace}/settings/modules`;
     case 'settingsBilling':
       return isTr ? `/${locale}/${workspace}/ayarlar/faturalama` : `/${locale}/${workspace}/settings/billing`;
+    case 'settingsPlan':
+      return isTr ? `/${locale}/${workspace}/ayarlar/plan` : `/${locale}/${workspace}/settings/plan`;
     case 'settingsApiKeys':
       return isTr ? `/${locale}/${workspace}/ayarlar/api-anahtarlari` : `/${locale}/${workspace}/settings/api-keys`;
     case 'settingsCalendar':
@@ -198,6 +206,12 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
   if (workspace in publicRoutes) {
     const routeKey = publicRoutes[workspace];
     if (routeKey === 'blog' && segments.length > 2) {
+      // NG-127: posts exist only in the content locale (TR). A target locale
+      // that does not show them lands on its blog notice page, not on the
+      // same Turkish post.
+      if (!blogContentShownIn(targetLocale)) {
+        return getPublicRoute('blog', targetLocale);
+      }
       return getPublicRoute('blogDetail', targetLocale, segments[2]);
     }
     if (routeKey) return getPublicRoute(routeKey, targetLocale);
@@ -214,7 +228,8 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
     'onay-merkezi': 'approvals', 'approvals': 'approvals',
     'tto-hizlandirici': 'tto', 'tto': 'tto',
     'bildirimler': 'notifications', 'notifications': 'notifications',
-    'ayarlar': 'settingsProfile', 'settings': 'settingsProfile',
+    'ayarlar': 'settingsModules', 'settings': 'settingsModules',
+    'musteri-hatti': 'clientPipeline',
   };
 
   const thirdSegment = segments[2];
@@ -228,6 +243,7 @@ export function switchLocalePath(pathname: string, targetLocale: string): string
         'profil': 'settingsProfile', 'profile': 'settingsProfile',
         'moduller': 'settingsModules', 'modules': 'settingsModules',
         'faturalama': 'settingsBilling', 'billing': 'settingsBilling',
+        'plan': 'settingsPlan',
         'api-anahtarlari': 'settingsApiKeys', 'api-keys': 'settingsApiKeys',
         'takvim': 'settingsCalendar', 'calendar': 'settingsCalendar',
         'kapilar': 'settingsGates', 'gates': 'settingsGates',

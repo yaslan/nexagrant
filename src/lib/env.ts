@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { assertTaxIdKeyIsNotFixture } from '@/lib/billing/tax-id-crypto';
 
 /**
  * Optional URL setting. A variable that is present but blank
@@ -67,6 +68,21 @@ const envSchema = z.object({
     z.string().regex(/^[1-9][0-9]*$/, 'JOBS_CONCURRENCY must be a positive integer').default('2')
   ),
   /**
+   * Virus scan of uploaded evidence (NG-239, src/lib/clamav.ts). clamd's TCP
+   * INSTREAM endpoint; it runs next to the app (docker-compose service
+   * `clamav`, K-584192 = C). CLAMD_HOST unset or blank = no scanner: every scan
+   * ends ERROR and no evidence file downloads (fail closed), it is never taken
+   * as clean. INSTREAM has no authentication and no encryption, so the host
+   * must be loopback or a private network, never the open internet.
+   * CLAMD_PORT default 3310; CLAMD_TIMEOUT_MS one scan's whole budget
+   * (connect + send + verdict), default 60000.
+   */
+  CLAMD_HOST: blankToUndefined(z.string().optional()),
+  CLAMD_PORT: blankToUndefined(z.string().regex(/^\d{1,5}$/, 'CLAMD_PORT must be a port number').default('3310')),
+  CLAMD_TIMEOUT_MS: blankToUndefined(
+    z.string().regex(/^[1-9][0-9]*$/, 'CLAMD_TIMEOUT_MS must be a positive integer').default('60000')
+  ),
+  /**
    * Outgoing mail over our own SMTP server (src/lib/email/mailer.ts,
    * TASK-MUMLF57HOYFSB). SMTP_HOST unset or blank = no mail is sent; every
    * caller reports that (and in production writes a SystemAlert) instead of
@@ -89,6 +105,32 @@ const envSchema = z.object({
    * apply; the route logs that once. Set it to a random string of 32+ characters.
    */
   EXPERT_PREREG_IP_SALT: blankToUndefined(z.string().min(32).optional()),
+  /**
+   * FO-396. The EU participant register's organisation-profile address (src/lib/pic-registry.ts).
+   * Unset with NODE_ENV=production = the production address; unset anywhere else = no call at all
+   * (fail-closed, the answer is UNKNOWN). Only `ec.europa.eu` is called, unless the test flag below
+   * is on.
+   */
+  PIC_REGISTRY_URL: optionalUrl,
+  /** FO-396. Test-only: lets the register check reach 127.0.0.1 / localhost (a local stub). Unset = off. */
+  PIC_REGISTRY_ALLOW_LOCAL: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /** FO-396. Switches the register check off entirely (the e2e web server). Unset = off. */
+  PIC_REGISTRY_OFF: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /**
+   * NG-209. Test-only: on the e2e web server the M18 LLM calls are answered by the fake provider in
+   * src/lib/llm.ts (no key, no network, no model; every other module's calls are untouched) and the
+   * M18 website reader reads an in-process fake site. Only the literal `true` turns it on; unset = off. Default-deny: it works only in a
+   * non-production build with NODE_ENV explicitly `development` or `test`; any other server
+   * (NODE_ENV unset included) refuses to start with it (`assertFakeAiAllowed`, src/instrumentation.ts).
+   */
+  E2E_FAKE_AI: blankToUndefined(z.enum(['true', 'false']).optional()),
+  /**
+   * Signs the opt-out link of a first message (NG-42, src/lib/email/opt-out.ts).
+   * The links do not expire and sit in mail already delivered, so this key must
+   * NEVER rotate: changing it breaks every one of them. Unset or blank = AUTH_SECRET,
+   * and then rotating AUTH_SECRET breaks them. 32+ random characters; not AUTH_SECRET.
+   */
+  EMAIL_OPTOUT_SECRET: blankToUndefined(z.string().min(32).optional()),
   WORKER_URL: z.string().optional(),
   WORKER_TOKEN: z.string().optional(),
   /** Where the weekly beta feedback digest goes. Unset = digest computes but does not send. */
@@ -98,6 +140,13 @@ const envSchema = z.object({
    * (FO-246). Unset or blank = the job skips and says so once; nothing is mailed.
    */
   ALERTS_OPS_EMAIL: blankToUndefined(z.string().email().optional()),
+  /**
+   * NG-179. Publication gate for the separate "transfer to the province's consultancy" box on the
+   * readiness result form. Off (unset/blank/false) = the box never reaches the page and the server
+   * never writes a transfer consent. Turn on only after the lawyer's written approval of
+   * docs/legal/drafts/transfer-consent-v1.md (patron decision, 14.11.2026). Read via {@link leadTransferConsentEnabled}.
+   */
+  LEAD_TRANSFER_CONSENT_ENABLED: blankToUndefined(z.enum(['true', 'false']).optional()),
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   /** NextAuth.js standard for proxy environments (e.g., Passenger). Provides the public origin when req.url is rewritten to localhost. */
   AUTH_URL: z.string().optional(),
@@ -203,6 +252,13 @@ const envSchema = z.object({
    */
   CALENDAR_ENCRYPTION_KEY: z.string().optional(),
   /**
+   * 256-bit AES-GCM key for the buyer tax number (`buyerVknTckn`) on
+   * TenantBillingIdentity and Invoice (NG-40, src/lib/billing/tax-id-crypto.ts).
+   * 64 hex characters or `openssl rand -base64 32`. Unset = billing identity
+   * and invoice writes fail closed; the number is never stored in clear.
+   */
+  TAX_ID_ENCRYPTION_KEY: z.string().optional(),
+  /**
    * Where the TCMB daily exchange-rate bulletin is read from
    * (`src/lib/fx/tcmb.ts`). Unset = the real archive,
    * https://www.tcmb.gov.tr/kurlar — TCMB publishes it openly, so unlike every
@@ -286,6 +342,21 @@ const envSchema = z.object({
       .optional()
   ),
   /**
+   * NG-182: how many minutes a `routed` PublicLead may stay without a copy in its tenant (no
+   * LeadContact / Deal with `sourceRef = public-lead:<id>`) before it counts as stuck — listed on
+   * /admin/lead-routes and raised as a SystemAlert by the `public-lead-stuck` job
+   * (src/lib/leads/stuck-leads.ts). A healthy forward writes the copy within the same request, so
+   * the default 60 only has to outlast a slow port call and the job's own 15-minute tick. Positive
+   * integer, at most 10080 (one week); blank = 60. Kept as a string like the settings above.
+   */
+  PUBLIC_LEAD_STUCK_AFTER_MINUTES: blankToUndefined(
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'PUBLIC_LEAD_STUCK_AFTER_MINUTES must be a positive integer (minutes)')
+      .refine((value) => Number(value) <= 10_080, 'PUBLIC_LEAD_STUCK_AFTER_MINUTES must be at most 10080 (one week)')
+      .default('60')
+  ),
+  /**
    * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
    * blank = 1000, the production value, which fails fast into the fallback path.
    * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
@@ -312,6 +383,10 @@ if (!_env.success) {
   throw new Error(`Invalid environment variables — ${details}`);
 }
 
+// NG-40 sec F2: the published test key must never protect real tax numbers.
+// The schema defaults NODE_ENV to 'development'; check the value the process really set.
+assertTaxIdKeyIsNotFixture(process.env.NODE_ENV === undefined ? undefined : _env.data.NODE_ENV, _env.data.TAX_ID_ENCRYPTION_KEY);
+
 export const env = _env.data;
 
 /**
@@ -332,6 +407,11 @@ export const declaredNodeEnv: 'development' | 'test' | 'production' | undefined 
  */
 export function authSecret(): string | null {
   return env.AUTH_SECRET ?? env.NEXTAUTH_SECRET ?? null;
+}
+
+/** The key of the opt-out links: its own when set, otherwise the session key. */
+export function emailOptOutSecret(): string | null {
+  return env.EMAIL_OPTOUT_SECRET ?? authSecret();
 }
 
 /**
@@ -404,3 +484,21 @@ export const consortiumLiveDemandWeight: number | undefined =
  */
 export const dbConnectTimeoutMs: number =
   env.DB_CONNECT_TIMEOUT_MS === undefined ? 1000 : Number(env.DB_CONNECT_TIMEOUT_MS);
+
+/**
+ * The numeric view of `PUBLIC_LEAD_STUCK_AFTER_MINUTES` (NG-182). The schema has already rejected
+ * anything that is not a positive integer, so this cannot be `NaN`. A function, not a `const`: the
+ * server-action leak scan (tests/api/action-leak-scan.ts) treats an export built by a call as a
+ * caught value (fail-closed), and the admin action returns this number.
+ */
+export function publicLeadStuckAfterMinutes(): number {
+  return Number(env.PUBLIC_LEAD_STUCK_AFTER_MINUTES);
+}
+
+/**
+ * NG-179 publication gate: true only when LEAD_TRANSFER_CONSENT_ENABLED is the literal `true`.
+ * Read by the transfer box's organisation lookup and by the lead write, so both sides close together.
+ */
+export function leadTransferConsentEnabled(source: { LEAD_TRANSFER_CONSENT_ENABLED?: string } = env): boolean {
+  return source.LEAD_TRANSFER_CONSENT_ENABLED === 'true';
+}

@@ -8,6 +8,7 @@ import { getAllManifests, getManifest } from '@/lib/modules/registry';
 import {
   canEnableEntitled,
   getDisableCascade,
+  isUnsoldBeta,
   moduleStatus,
   requirementChain,
   type ModuleCardStatus,
@@ -38,13 +39,13 @@ interface ToastMessage {
 
 const PLAN_BADGES: Record<PlanTier, string> = {
   basic: 'bg-accent/15 text-accent-ink border border-accent/20',
-  pro: 'bg-ok/15 text-ok border border-ok/20',
+  pro: 'bg-ok/15 text-ok-ink border border-ok/20',
   ultra: 'bg-amber/15 text-amber border border-amber/20',
 };
 
 /** Badge colour per card status — one distinct colour each. */
 const STATUS_STYLES: Record<ModuleCardStatus | 'UNKNOWN', { badge: string; icon: string }> = {
-  ACTIVE: { badge: 'bg-ok/15 text-ok border border-ok/30', icon: '●' },
+  ACTIVE: { badge: 'bg-ok/15 text-ok-ink border border-ok/30', icon: '●' },
   AVAILABLE: { badge: 'bg-accent/15 text-accent-ink border border-accent/30', icon: '○' },
   LOCKED: { badge: 'bg-ground text-muted border border-border', icon: '🔒' },
   ORPHANED: { badge: 'bg-bad/15 text-bad border border-bad/30', icon: '⚠' },
@@ -53,7 +54,7 @@ const STATUS_STYLES: Record<ModuleCardStatus | 'UNKNOWN', { badge: string; icon:
 };
 
 const MODULE_BADGE_STYLES: Record<string, string> = {
-  ga: 'bg-ok/10 text-ok border-ok/20',
+  ga: 'bg-ok/10 text-ok-ink border-ok/20',
   beta: 'bg-amber/10 text-amber border-amber/20',
   soon: 'bg-ground text-muted border-border',
 };
@@ -110,7 +111,10 @@ export function ModulesClient({
     }, 4000);
   };
 
-  const statusView = { entitledModules, activeModules, switchedOnOutsidePlan: outsidePlanOn };
+  // A preview stays open only while ModuleState still switches it on: an off toggle here
+  // closes the card, as it does for any other module.
+  const previewOpen = (plan?.previewOpen ?? []).filter((id) => outsidePlanOn.includes(id));
+  const statusView = { entitledModules, activeModules, switchedOnOutsidePlan: outsidePlanOn, previewOpen };
   const summary = categorySummary(activeModules);
   const coverage = pipelineCoverage(activeModules);
 
@@ -232,7 +236,7 @@ export function ModulesClient({
             key={toast.id}
             className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold flex items-center gap-2 transition-all transform animate-in slide-in-from-top-2 ${
               toast.type === 'success'
-                ? 'bg-ok/15 text-ok border-ok/30'
+                ? 'bg-ok/15 text-ok-ink border-ok/30'
                 : toast.type === 'error'
                 ? 'bg-bad/15 text-bad border-bad/30'
                 : 'bg-surface text-ink border-border shadow-xl'
@@ -426,8 +430,12 @@ export function ModulesClient({
               ].filter((part): part is string => part !== null)
             : [];
           // A "Yakında" module is not sold yet, so a locked card offers no upgrade (FO-40).
+          // An unsold beta (M18) is not sold either: no plan grants it, so no upgrade and no
+          // "kurum paketinde açılır" line (NG-135, K-581676).
           const upgradeOffer =
-            mod.statusBadge !== 'soon' && (status === 'LOCKED' || status === 'ORPHANED') ? (
+            mod.statusBadge !== 'soon' &&
+            !isUnsoldBeta(mod.id) &&
+            (status === 'LOCKED' || status === 'ORPHANED') ? (
               plan?.pilot ? (
                 // A pilot cannot change plan (billing says so), so no upgrade offer here.
                 <span className="text-xs font-medium text-muted text-right">{t('pilotLocked')}</span>
@@ -510,7 +518,7 @@ export function ModulesClient({
                             )}
                             <span
                               className={`font-mono text-[11px] px-2 py-0.5 rounded border font-semibold flex items-center gap-1 ${
-                                isReqActive ? 'bg-ok/15 border-ok/30 text-ok' : 'bg-bad/15 border-bad/30 text-bad'
+                                isReqActive ? 'bg-ok/15 border-ok/30 text-ok-ink' : 'bg-bad/15 border-bad/30 text-bad'
                               }`}
                               title={isReqActive ? t('chainActive', { id: reqId }) : t('chainMissing', { id: reqId })}
                             >
@@ -563,7 +571,7 @@ export function ModulesClient({
                       <span className="text-muted text-[11px]">{t('plansNone')}</span>
                     )}
                     {mod.addOnSku && (
-                      <span className="text-[10px] bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-mono font-semibold break-all">
+                      <span className="text-[10px] bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-mono font-semibold break-all">
                         {t('addOnSku', { sku: mod.addOnSku })}
                       </span>
                     )}

@@ -16,12 +16,13 @@ const { requireTenantApi, checkModuleAccess, findMany, count, meterPartnerSearch
   meterPartnerSearch: vi.fn(),
 }));
 
+vi.mock('@/lib/page-role', () => ({ requireTenantPageRole: async () => ({ tenantId: 't1', userId: 'u1', role: 'TENANT_OWNER', isPlatformAdmin: false }) }));
 vi.mock('next-intl/server', () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: unknown }) => <a href={href}>{children as never}</a>,
 }));
-vi.mock('@/lib/tenant', () => ({ requireTenantApi }));
-vi.mock('@/lib/modules/access', () => ({ checkModuleAccess }));
+vi.mock('@/lib/tenant', () => ({ requireTenantApi, tenantScopeOf: () => null }));
+vi.mock('@/lib/modules/access', () => ({ checkModuleAccess, requestSession: async () => null }));
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn() } }));
 vi.mock('@/lib/db', () => ({ prisma: { cordisPartnerProfile: { findMany, count } } }));
 vi.mock('@/modules/m1/server/partner-search/monthly-quota', () => ({ meterPartnerSearch }));

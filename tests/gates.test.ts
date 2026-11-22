@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { evaluateGate, GateOpportunityNotFoundError } from '../src/lib/gates/evaluate';
 import { prisma } from '../src/lib/db';
+import { clearStoredG0, computeG0FromSnapshot } from '../src/lib/scoring/g0-compute';
 
 /**
  * G0 gate fixtures.
@@ -73,6 +74,22 @@ const OPPORTUNITIES: Record<string, Record<string, unknown>> = {
     status: 'ACTIVE',
     intendedRole: 'partner',
     g0Score: null,
+    updatedAt: new Date('2026-01-02T03:04:05.000Z'),
+    seats: [],
+    proposal: null,
+    evaluations: [],
+  },
+  // NG-59 item 3: no evidence today, but a number left in the column by an earlier run (or a seed).
+  'opp-stale-unscored': {
+    id: 'opp-stale-unscored',
+    tenantId: 'tenant-2',
+    topicId: null,
+    title: 'Scored once, no evidence now',
+    stage: 'G0',
+    status: 'ACTIVE',
+    intendedRole: 'coordinator',
+    g0Score: 63,
+    updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     seats: [],
     proposal: null,
     evaluations: [],
@@ -109,6 +126,8 @@ const G0_DECISIONS: G0DecisionRow[] = [
     'opp-g1-no-backup',
     'opp-g1-only-occupant',
     'opp-g1-foreign-backup',
+    'opp-g1-legacy-backup',
+    'opp-g1-consortium-backup',
     'opp-g1-optional-open',
     'opp-g1-two-faults',
   ].map((id) => g0Row(id, true)),
@@ -166,6 +185,9 @@ Object.assign(OPPORTUNITIES, {
   'opp-g1-no-backup': g1Opportunity('opp-g1-no-backup', [seatRow('s-no-backup')]),
   'opp-g1-only-occupant': g1Opportunity('opp-g1-only-occupant', [seatRow('s-only-occupant')]),
   'opp-g1-foreign-backup': g1Opportunity('opp-g1-foreign-backup', [seatRow('s-foreign-backup')]),
+  // K-580035=A: the only backup of a critical seat is a row an old scorer wrote.
+  'opp-g1-legacy-backup': g1Opportunity('opp-g1-legacy-backup', [seatRow('s-legacy-backup')]),
+  'opp-g1-consortium-backup': g1Opportunity('opp-g1-consortium-backup', [seatRow('s-consortium-backup')]),
   'opp-g1-optional-open': g1Opportunity('opp-g1-optional-open', [
     seatRow('s-research'),
     seatRow('s-optional-open', { required: false, status: 'OPEN', organizationId: null }),
@@ -176,16 +198,26 @@ Object.assign(OPPORTUNITIES, {
   ]),
 });
 
+// NG-100 / K-579560=A: a backup counts only when the current M8 matcher wrote the row
+// (visibleSeatCandidates reads `breakdown`), so every fixture row carries a match breakdown.
+const MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 15, collabHistory: 10, rivalRisk: 0 };
+// The pre-K-578751 matcher (6 keys) and the retired consortium scorer: rows no reader may use (K-580035=A).
+const LEGACY_MATCH_BREAKDOWN = { topicExperience: 20, geographicBalance: 10, collabHistory: 10, relationshipWarmth: 5, centrality: 5, rivalRisk: 0 };
+const CONSORTIUM_BREAKDOWN = { topicExperience: 3, networkCentrality: 2, countryDiversity: 1.5, smeBonus: 1, warmthBonus: 0, liveDemandSignal: 0 };
 const SEAT_CANDIDATES = [
-  { tenantId: 'tenant-1', seatId: 's-coord', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-research', organizationId: `${SEATED}-s-research`, partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-research', organizationId: null, partnerOrgId: 'partner-backup' },
-  { tenantId: 'tenant-1', seatId: 's-optional-only', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-open', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-invited', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-nobody', organizationId: 'org-backup', partnerOrgId: null },
-  { tenantId: 'tenant-1', seatId: 's-only-occupant', organizationId: `${SEATED}-s-only-occupant`, partnerOrgId: null },
-  { tenantId: 'tenant-2', seatId: 's-foreign-backup', organizationId: 'org-backup', partnerOrgId: null },
+  { tenantId: 'tenant-1', seatId: 's-coord', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-research', organizationId: `${SEATED}-s-research`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-research', organizationId: null, partnerOrgId: 'partner-backup', breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-optional-only', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-open', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-invited', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-nobody', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-only-occupant', organizationId: `${SEATED}-s-only-occupant`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-2', seatId: 's-foreign-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-legacy-backup', organizationId: `${SEATED}-s-legacy-backup`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-legacy-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: LEGACY_MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-consortium-backup', organizationId: `${SEATED}-s-consortium-backup`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
+  { tenantId: 'tenant-1', seatId: 's-consortium-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: CONSORTIUM_BREAKDOWN },
 ];
 
 const TENANTS: Record<string, { country: string | null; pic: string | null; settings: unknown }> = {
@@ -259,6 +291,8 @@ vi.mock('../src/lib/db', () => {
             })),
           );
         }),
+        // CORDIS is loaded (a row exists), so "no PIC" is a measured "no record" (FO-382).
+        findFirst: vi.fn(() => Promise.resolve({ projectId: 'p0' })),
       },
       consortiumSeat: {
         findMany: vi.fn(({ where }: { where: { opportunityId: string } }) =>
@@ -336,7 +370,10 @@ describe('Gate Evaluation Engine (M5)', () => {
     const decisions = createCalls.map((call) => call[0]!.data.inputs);
     const passInputs = decisions.find((i: Record<string, unknown>) => i.opportunityId === 'opp-pass')!;
     expect(passInputs.calculatedG0Score).toBe(93);
-    expect(passInputs.g0Score).toBe(12); // the stale column, recorded but not used
+    // FO-382: `g0Score` now carries the score the gate used, so it cannot disagree with the
+    // evidence on the same record. The stale column value is kept under `g0ScoreStored`.
+    expect(passInputs.g0Score).toBe(93);
+    expect(passInputs.g0ScoreStored).toBe(12);
   });
 
   test('G0 gate writes the score breakdown into the decision record', async () => {
@@ -366,6 +403,38 @@ describe('Gate Evaluation Engine (M5)', () => {
     const result = await evaluateGate('opp-unscored', 'G0', 'tenant-2');
     expect(result.passed).toBe(false);
     expect(result.reasons[0]).toContain('no scoring evidence');
+  });
+
+  test('G0 with no evidence files a record that says so throughout: no score, the old value kept apart (NG-59)', async () => {
+    vi.mocked(prisma.gateDecision.create).mockClear();
+    vi.mocked(prisma.opportunity.updateMany).mockClear();
+    const result = await evaluateGate('opp-stale-unscored', 'G0', 'tenant-2');
+    expect(result.passed).toBe(false);
+    expect(result.reasons[0]).toContain('no scoring evidence');
+
+    const call = vi.mocked(prisma.gateDecision.create).mock.calls.at(-1) as unknown as [{ data: { inputs: Record<string, unknown> } }];
+    const inputs = call[0].data.inputs;
+    expect(inputs.calculatedG0Score).toBeNull();
+    expect((inputs.g0Evidence as Record<string, unknown>).score).toBeNull();
+    // The score the decision shows must agree with "no evidence"; the stale 63 is only the audit trail.
+    expect(inputs.g0Score).toBeNull();
+    expect(inputs.g0ScoreStored).toBe(63);
+    // And the column is emptied, as a rescore does (FO-384), so the board stops drawing the 63.
+    // A rescore is not an edit (FO-384 B1): `updatedAt` stays what it was, guarded on the value read.
+    expect(prisma.opportunity.updateMany).toHaveBeenCalledWith({
+      where: { id: 'opp-stale-unscored', tenantId: 'tenant-2', updatedAt: new Date('2026-01-02T03:04:05.000Z') },
+      data: { g0Score: null, updatedAt: new Date('2026-01-02T03:04:05.000Z') },
+    });
+  });
+
+  test('G0 with no evidence and nothing stored writes no score at all', async () => {
+    vi.mocked(prisma.opportunity.updateMany).mockClear();
+    await evaluateGate('opp-unscored', 'G0', 'tenant-2');
+    const call = vi.mocked(prisma.gateDecision.create).mock.calls.at(-1) as unknown as [{ data: { inputs: Record<string, unknown> } }];
+    expect(call[0].data.inputs.g0Score).toBeNull();
+    expect(call[0].data.inputs.g0ScoreStored).toBeNull();
+    // Column already null: nothing to clear, so `@updatedAt` must not move (NG-59 review, finding 1).
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
   });
 
   test('G2 gate fails when seats are still OPEN', async () => {
@@ -570,6 +639,9 @@ describe('G1 gate: critical roles and their backups', () => {
     ['opp-g1-no-backup', /research.*no backup candidate/i],
     ['opp-g1-only-occupant', /research.*no backup candidate/i],
     ['opp-g1-foreign-backup', /research.*no backup candidate/i],
+    // K-580035=A: a backup the old matcher or the retired consortium scorer wrote is not a backup.
+    ['opp-g1-legacy-backup', /research.*no backup candidate/i],
+    ['opp-g1-consortium-backup', /research.*no backup candidate/i],
   ])('%s is refused, files the refusal and does not move the stage', async (id, reason) => {
     const result = await evaluateGate(id, 'G1', 'tenant-1');
 
@@ -631,5 +703,70 @@ describe('G1 gate: critical roles and their backups', () => {
   test('the other gates never read candidates', async () => {
     await evaluateGate('opp-pass', 'G2', 'tenant-1');
     expect(prisma.seatCandidate.findMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * NG-59, PR #325 review finding 1 (TopicMatch half): clearing a stored G0 must not invent a
+ * TopicMatch row just to hold a null. It nulls the per-opportunity row only if one exists.
+ * The gate fixtures above all resolve to a score or to `topicId: null`, so the topic branch of
+ * `clearStoredG0` is exercised here with a no-evidence computation that does carry a topic.
+ */
+describe('clearStoredG0 — TopicMatch branch (NG-59)', () => {
+  const noEvidenceWithTopic = () =>
+    computeG0FromSnapshot('tenant-2', { opportunityId: 'opp-1', topicId: 'topic-1' }, {
+      tenant: { country: null, pic: null, picRegistryStatus: null },
+      profile: null,
+      topic: null,
+      topicFitScore: null,
+      baseRatePct: null,
+      intendedRole: null,
+      seats: [],
+      cordis: null,
+    });
+
+  const fakeTx = (existing: { id: string } | null) => ({
+    opportunity: {
+      findFirst: vi.fn().mockResolvedValue({ updatedAt: new Date('2026-01-02T03:04:05.000Z'), g0Score: 41 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    topicMatch: {
+      findFirst: vi.fn().mockResolvedValue(existing),
+      upsert: vi.fn().mockResolvedValue({}),
+      create: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+  });
+
+  test('the fixture is a topic-bearing computation with no score', () => {
+    const c = noEvidenceWithTopic();
+    expect(c.score).toBeNull();
+    expect(c.topicId).toBe('topic-1');
+  });
+
+  test('no TopicMatch row yet: nothing is created or upserted', async () => {
+    const tx = fakeTx(null);
+    const cleared = await clearStoredG0(tx as never, noEvidenceWithTopic());
+    expect(cleared).toBe(true);
+    expect(tx.opportunity.updateMany).toHaveBeenCalled(); // the column is still emptied
+    expect(tx.topicMatch.upsert).not.toHaveBeenCalled();
+    expect(tx.topicMatch.create).not.toHaveBeenCalled();
+    expect(tx.topicMatch.update).not.toHaveBeenCalled();
+    expect(tx.topicMatch.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('a TopicMatch row exists: its g0Score is set to null, nothing is created', async () => {
+    const tx = fakeTx({ id: 'tm-1' });
+    await clearStoredG0(tx as never, noEvidenceWithTopic());
+    expect(tx.topicMatch.upsert).not.toHaveBeenCalled();
+    expect(tx.topicMatch.create).not.toHaveBeenCalled();
+    expect(tx.topicMatch.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: 'tenant-2', topicId: 'topic-1', opportunityId: 'opp-1' } }),
+    );
+    expect(tx.topicMatch.update).toHaveBeenCalledWith({
+      where: { id: 'tm-1' },
+      data: expect.objectContaining({ g0Score: null }),
+    });
   });
 });

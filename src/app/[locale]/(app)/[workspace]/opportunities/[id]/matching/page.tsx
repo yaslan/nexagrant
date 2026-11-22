@@ -1,13 +1,19 @@
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import FindCandidatesButton from '@/modules/m8/components/find-candidates-button';
 import InviteCandidateButton from '@/modules/m8/components/invite-candidate-button';
 import { moduleGate } from '@/lib/modules/guard';
 import type { MatchBreakdown } from '@/modules/m8/server/matching';
-import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
+import { seatScoreDimensionScale } from '@/lib/scoring/seat-dimension-scale';
+import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
+import { expertCandidatesForOpportunity, type ExpertSeatResult } from '@/modules/m8/server/expert-candidates';
+import { listDirectoryExperts } from '@/lib/expert-prereg/server/directory';
+import { PROVINCES } from '@/lib/expert-prereg/options';
+import { logger } from '@/lib/logger';
+import { errorMessage } from '@/lib/errors';
 
 /**
  * M8 consortium role matrix.
@@ -41,13 +47,11 @@ interface OrgRow {
   country: string | null;
 }
 
-/** The six scoring dimensions, in the order the breakdown is rendered. */
+/** The three criteria and the rival penalty, in the order the breakdown is rendered. */
 const DIMENSIONS: (keyof MatchBreakdown)[] = [
   'topicExperience',
   'geographicBalance',
   'collabHistory',
-  'relationshipWarmth',
-  'centrality',
   'rivalRisk',
 ];
 
@@ -67,10 +71,11 @@ export default async function MatchingPage({
   params: Promise<{ locale: string; workspace: string; id: string }>
 }) {
   const { locale, workspace, id } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPage(locale);
   const t = await getTranslations({ locale, namespace: 'Consortium' });
+  const tExpert = await getTranslations({ locale, namespace: 'ExpertPrereg' });
   const format = await getFormatter({ locale });
 
   // Everything below is read inside the session tenant. The page used to load
@@ -96,13 +101,17 @@ export default async function MatchingPage({
   // used to repeat that check itself, which could only ever be dead code.
 
   const seatIds = opp.seats.map((s) => s.id);
+  // NG-100 B-2: the same visibility rule as the consortium page and the gate. Rows of the
+  // retired scorers stay in the table and are not shown here.
   const candidates = seatIds.length
-    ? await withTenant<CandidateRow[]>(tenantId, (tx) =>
-        tx.seatCandidate.findMany({
-          where: { seatId: { in: seatIds }, tenantId },
-          orderBy: { rank: 'asc' },
-          select: { id: true, seatId: true, rank: true, score: true, breakdown: true, organizationId: true },
-        })
+    ? visibleSeatCandidates(
+        await withTenant<CandidateRow[]>(tenantId, (tx) =>
+          tx.seatCandidate.findMany({
+            where: { seatId: { in: seatIds }, tenantId },
+            orderBy: { rank: 'asc' },
+            select: { id: true, seatId: true, rank: true, score: true, breakdown: true, organizationId: true },
+          })
+        )
       )
     : [];
 
@@ -135,6 +144,20 @@ export default async function MatchingPage({
   const partnerGraphSize = await withTenant<number>(tenantId, (tx) =>
     tx.cordisOrganization.count()
   );
+
+  // NG-52: the free expert pre-registrations as seat candidates (K-579696 = A). Shown, not
+  // persisted or invitable. A failed read (e.g. prisma/rls.sql not yet applied, so the
+  // database refuses the 'expert-directory' purpose) hides the section, not the page.
+  let expertsBySeat: Map<string, ExpertSeatResult> | null = null;
+  try {
+    const experts = await listDirectoryExperts();
+    expertsBySeat = await withTenant<Map<string, ExpertSeatResult>>(tenantId, (tx) =>
+      expertCandidatesForOpportunity(tx, { opportunityId: opp.id, tenantId, experts })
+    );
+  } catch (e) {
+    logger.error(`[MatchingPage] expert pool read failed: ${errorMessage(e)}`);
+  }
+  const provinceName = new Map<string, string>(PROVINCES.map((p) => [p.value, p.name]));
 
   return (
     <div className="py-6 sm:px-6 max-w-6xl mx-auto space-y-8">
@@ -194,9 +217,6 @@ export default async function MatchingPage({
                       {seatCandidates.map((c) => {
                         const org = c.organizationId ? orgById.get(c.organizationId) : null;
                         const breakdown = readBreakdown(c.breakdown);
-                        // A row the consortium builder wrote shares the seat; its
-                        // topicExperience is 0–3, not 0–35, so no range is shown for it.
-                        const writer = seatBreakdownWriter(c.breakdown);
                         return (
                           <tr key={c.id} className="border-b border-border align-top">
                             <td className="py-2 px-4 font-medium text-ink">#{c.rank}</td>
@@ -222,7 +242,7 @@ export default async function MatchingPage({
                                         {dimensionValueText(
                                           t,
                                           format.number,
-                                          writer === 'match' ? seatScoreDimensionScale('match', key) : null,
+                                          seatScoreDimensionScale('match', key),
                                           breakdown[key] ?? 0
                                         )}
                                       </dd>
@@ -250,6 +270,45 @@ export default async function MatchingPage({
                     </tbody>
                   </table>
                 </div>
+              )}
+
+              {seat.status !== 'CONFIRMED' && (
+                <section data-testid={`m8-expert-pool-${seat.roleKey}`} className="mt-4 border-t border-border pt-4">
+                  <h3 className="text-sm font-semibold">{t('expertPool.title')}</h3>
+                  <p className="text-xs text-muted mb-2">{t('expertPool.note')}</p>
+                  {(() => {
+                    if (!expertsBySeat) return <p className="text-sm text-muted">{t('expertPool.unavailable')}</p>;
+                    const result = expertsBySeat.get(seat.id);
+                    const matches = result?.matches ?? [];
+                    return (
+                      <>
+                        {matches.length === 0 ? (
+                          <p className="text-sm text-muted" data-testid="m8-expert-none">{t('expertPool.none')}</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {matches.map((m) => (
+                              <li key={m.expert.id} data-testid="m8-expert-candidate" className="text-sm border border-border rounded-md px-3 py-2">
+                                <div className="font-semibold">
+                                  {m.expert.founderNumber !== null
+                                    ? t('expertPool.expert', { number: m.expert.founderNumber })
+                                    : t('expertPool.expertUnnumbered')}
+                                </div>
+                                <div className="text-xs text-muted">
+                                  {t('expertPool.province')}: {provinceName.get(m.expert.province) ?? m.expert.province}
+                                  {' | '}
+                                  {t('expertPool.programme')}: {tExpert(`options.programmes.${m.matchedProgramme}` as 'options.programmes.other')}
+                                  {' | '}
+                                  {t('expertPool.roles')}:{' '}
+                                  {m.matchedRoles.map((r) => tExpert(`options.roles.${r}` as 'options.roles.other')).join(', ')}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    );
+                  })()}
+                </section>
               )}
             </div>
           );

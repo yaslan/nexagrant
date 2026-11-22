@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { authenticateApiKey } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
-import { toDecimalString } from '@/lib/money';
+import { isEuroCurrency, toDecimalString } from '@/lib/money';
 
 /**
  * One row of GET /api/v1/calls.
@@ -34,9 +34,13 @@ interface CallApiRow {
   deadlineAt: string | null;
   /** The IANA zone the deadline is published in, read out of `Topic.deadlines`. */
   deadlineTz: string | null;
-  /** `Call.budgetCents` in euro — the whole call's budget. */
+  /** `Call.budgetCents` in euro — the whole call's budget. `null` when `Call.currency` is not euro (NG-163). */
   budgetTotalEur: number | null;
-  /** `Topic.budgetPerProjectCents` in euro — the indicative grant per project. */
+  /**
+   * `Topic.budgetPerProjectCents` in euro — the indicative grant per project. `null` when the
+   * topic's call is not in euro (`Call.currency`, e.g. TRY for TR agency calls): the amount is
+   * never reported as euro and never converted (NG-163).
+   */
   budgetPerProjectEur: number | null;
   /**
    * No column in prisma/schema.prisma carries a grant *range*; only the demo
@@ -64,6 +68,7 @@ interface TopicWithCall {
   call: {
     callIdentifier: string;
     budgetCents: bigint | null;
+    currency: string | null;
     programme: { name: string } | null;
   } | null;
 }
@@ -118,8 +123,8 @@ function toApiRow(topic: TopicWithCall): CallApiRow {
     // published cut-off is quoted on.
     deadlineAt: topic.nextDeadlineAt ? new Date(topic.nextDeadlineAt).toISOString() : null,
     deadlineTz: deadlineTimezone(topic.deadlines, topic.nextDeadlineAt),
-    budgetTotalEur: centsToEur(topic.call?.budgetCents ?? null),
-    budgetPerProjectEur: centsToEur(topic.budgetPerProjectCents),
+    budgetTotalEur: isEuroCurrency(topic.call?.currency) ? centsToEur(topic.call?.budgetCents ?? null) : null,
+    budgetPerProjectEur: isEuroCurrency(topic.call?.currency) ? centsToEur(topic.budgetPerProjectCents) : null,
     expectedGrantRangeEur: null,
     fundingType: topic.typeOfAction,
     status: topic.status,
@@ -187,6 +192,7 @@ export async function GET(req: Request) {
           select: {
             callIdentifier: true,
             budgetCents: true,
+            currency: true,
             programme: { select: { name: true } },
           },
         },

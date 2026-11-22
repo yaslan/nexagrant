@@ -17,11 +17,12 @@ const root = import.meta.dirname || __dirname;
  * - The switches that open a live suite's guard on the shared `fabrika` database,
  *   `CI` and `ALLOW_SWEEP_ON_SHARED_DB`, are never taken from `.env` either. A file
  *   stays behind and opens the guard for every later run; these must be said by the
- *   one command they apply to (FO-357).
+ *   one command they apply to (FO-357). `RLS_MUTATION_DB` is the same kind of switch
+ *   for the ExpertDirectoryEntry mutation tests (NG-206 review tur 4, B-1).
  * - `util.parseEnv` (Node >= 21.7) instead of vite's `loadEnv`: `vite` is not a
  *   direct dependency, so pnpm does not let this file import it.
  */
-const NEVER_FROM_DOTENV = new Set(['NODE_ENV', 'CI', 'ALLOW_SWEEP_ON_SHARED_DB']);
+const NEVER_FROM_DOTENV = new Set(['NODE_ENV', 'CI', 'ALLOW_SWEEP_ON_SHARED_DB', 'RLS_MUTATION_DB']);
 
 export function dotenvForTests(file = path.join(root, '.env')): Record<string, string> {
   if (!existsSync(file)) return {};
@@ -41,6 +42,11 @@ export default defineConfig({
       // TASK-MULSCEK4JHK8X — tests exercise the demo sign-in path, which is off
       // unless this says otherwise (src/lib/demo-login.ts).
       DEMO_LOGIN_ENABLED: 'true',
+      // NG-40 — the Prisma client encrypts buyerVknTckn and fails closed without a key
+      // (src/lib/billing/tax-id-crypto.ts). A throwaway key of the test run; a real one in the
+      // environment wins. The unit test for the missing-key case unsets it itself.
+      TAX_ID_ENCRYPTION_KEY:
+        process.env.TAX_ID_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     },
     // TASK-MUNSRKW0HJYBV (İNCELEME-63 Ö-C) — vitest's 5 s default is a
     // budget for one test on an idle machine. The property sweeps

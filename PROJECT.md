@@ -44,7 +44,7 @@ Dil: arayüz **Türkçe (varsayılan) ve İngilizce**; kod, tablo/alan adları v
 | **K1 Çağrı toplama** | F&T (SEDIA) arama API'si + topicDetails; Eurostars/Eureka çağrı sayfaları; TÜBİTAK duyuru RSS/HTML; normalize `Call`/`Topic` tabloları; günlük cron | `docs/ARCHITECTURE.md §4`, `docs/DATA_MODEL.md` |
 | **K2 CORDIS** | Aylık HE + H2020 CSV indirme → `Organization`, `Project`, `Participation`; graf metrikleri (derece, eigenvector) | `docs/ARCHITECTURE.md §5` |
 | **K3 Taban oranlar** | Horizon Dashboard'dan xlsx yükleme arayüzü (manuel, üç ayda bir) → `TopicStat` | |
-| **K4 Outreach** | Dış araç bağlantıları (Portal partner search, GREENET, Ideal-ist, EEN, LinkedIn) derin link; e-posta şablonları | |
+| **K4 Outreach** | Dış araç bağlantıları (Portal partner search, GREENET, Ideal-ist, EEN) derin link; LinkedIn derin bağlantısı yok (Karar 3 = A, K-579696); e-posta şablonları | |
 | **K5 Pipeline/CRM** | `Opportunity`, `Proposal`, `ConsortiumSeat`, `PartnerOrg`, `Gate`, `Effort` | |
 | **K6 YZ** | Sağlayıcıdan bağımsız LLM adaptörü (Anthropic varsayılan), embedding + pgvector, RAG (çalışma programı PDF + topic JSON + CORDIS özet), **kredi sayacı**, **YZ kullanım günlüğü** (şeffaflık beyanı için) | `docs/ARCHITECTURE.md §6` |
 
@@ -73,13 +73,13 @@ Her modülün işlevsel spesifikasyonu `docs/MODULES.md`'de; her modül `src/mod
 
 | Kapı | Kural |
 |---|---|
-| G0 Konu triyajı | uyum ≥ 70/100 **ve** taban oran ≥ %8 **ve** ülke uygun |
+| G0 Konu triyajı | uyum ≥ 70/100 **ve** taban oran ≥ %8 **ve** ülke uygun **ve** (geçmişsiz ortakta) en az bir dolu koltuk |
 | G1 Rol kararı | koordinasyon için erişilebilir koordinatörde ≥1 önceki FP koordinasyonu; yoksa "ortak" |
 | G2 Konsorsiyum kilidi | son tarihe ≥14 hafta kala tüm koltuklar dolu + bütçe onayı; G0→G2 ≤ 8 hafta |
 | G3 Sahte değerlendirme | her kriter ≥ 4,0 ve toplam ≥ 12/15 (M6 yoksa manuel puan girişi) |
 | G4 Gönderim | son tarihten ≥24 saat önce "gönderildi" işareti; ESR yüklenince puanlar kaydedilir |
 
-G0 puanlama ağırlıkları (100): uyum 30, taban oran 15, koordinatör geçmişi 15, araştırma+son kullanıcı 12, ağ merkeziliği 10, bütçe/rol ekonomisi 10, lump-sum/iki aşamalı 8. Ağırlıklar `TenantSettings.scoringWeights` JSON'unda; varsayılanlar `src/lib/scoring/defaults.ts`.
+G0 puanlama ağırlıkları (100): uyum 30, taban oran 15, koordinatör geçmişi 15, araştırma+son kullanıcı 12, ağ merkeziliği 10, bütçe/rol ekonomisi 10, lump-sum/iki aşamalı 8. Ağırlıklar `TenantSettings.scoringWeights` JSON'unda; varsayılanlar `src/lib/scoring/defaults.ts`. **FO-382 (2026-11-05):** ortak rolünde, PIC girilmiş ve o PIC için CORDIS kaydı çıkmamış kuruluşta koordinatör geçmişi ve ağ merkeziliği paydadan çıkar (kalan 75 puan üzerinden) **ve** en az bir dolu koltuk (`CANDIDATE`, `INVITED`, `CONFIRMED`) şarttır; `OPEN`, `DECLINED` ya da hiç koltuk yoksa G0 geçilemez. **PIC boşsa kolaylık yok** (patron, 2026-11-05): PIC'siz ortak standart hesapta (/100) kalır, paydadan çıkarma ve geçmişsiz sert kural ona uygulanmaz. Eşik ve üç sert kural değişmedi.
 
 > **⚠️ Doküman/kod farkı (ölçüldü 2026-09-07):** Yukarıdaki kural (satır 75) ve ağırlıklar (bu satır) kanonik `scoreG0()`/`decideG0()` fonksiyonlarında (`src/lib/scoring/g0-canonical.ts`) doğru tanımlı, ama üretim kodunda **hiçbir yerden çağrılmıyor**. `Opportunity.g0Score` bugün ya `prisma/seed-opportunities.ts`'teki sabit değerlerden (75, 82, 85, 88, 92) ya da demo pipeline'daki `Math.random() * 15 + 80`'den geliyor; `src/lib/gates/evaluate.ts` kapı kararını bu üretilmemiş sayıyla veriyor. Yani kullanıcıya gösterilen G0 puanı şu an bu sayfadaki formülün ürünü değil. Kanıt: `docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`, `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md`. Kapatma işi board'da **TASK-MTQ63RR8Z0G8E** (henüz açık — kanonik fonksiyonu üretime bağlamak kaldı).
 
@@ -92,7 +92,7 @@ G0 puanlama ağırlıkları (100): uyum 30, taban oran 15, koordinatör geçmiş
 - **Next.js 15 (App Router) + TypeScript (strict)**, React Server Components; UI: Tailwind + shadcn/ui; formlar: react-hook-form + zod.
 - **PostgreSQL 16** (Neon veya Supabase) + **Prisma** ORM + **pgvector**; RLS politikaları `prisma/rls.sql`.
 - **Auth:** Auth.js (NextAuth v5) — e-posta/şifre + Google + Microsoft; kurumsal SSO (SAML) faz 2.
-- **İşler/cron:** Inngest (veya BullMQ + Redis) — K1 günlük, K2 aylık, uyarı e-postaları, Stripe webhook'ları.
+- **İşler/cron:** graphile-worker (Postgres üstünde, ayrı süreç `pnpm jobs:worker`; ADR-0008, Inngest kaldırıldı) — K1 günlük, K2 aylık tetik, uyarı e-postaları ve temizlik işleri; takvim `src/lib/jobs/schedule.ts`. Stripe webhook'ları iş değil, Route Handler'dır (`src/app/api/webhooks`).
 - **Veri işleme (Python worker):** `workers/` altında Python 3.12 + DuckDB + pandas: CORDIS CSV → Parquet → Postgres; graf metrikleri (networkx). Node'dan HTTP ile tetiklenir.
 - **YZ:** `@anthropic-ai/sdk` varsayılan, OpenAI-uyumlu adaptör; embedding: `text-embedding-3-large` ya da Voyage; RAG: pgvector.
 - **E-posta:** Resend; **dosya:** S3 uyumlu (Cloudflare R2); **PDF:** `@react-pdf/renderer`; **DOCX:** `docx`.

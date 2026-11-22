@@ -162,7 +162,7 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 ### E2 · Faturalama ve yetkilendirme (S2–S3)
 
 - [x] `Plan`, `AddOnCatalog` seed; Stripe ürün/fiyat script'i (`scripts/stripe-sync.ts`).
-- [x] Checkout, webhook'lar (`src/app/api/webhooks/stripe`), Customer Portal, `entitlements()`, kredi defteri (aylık grant cron — `src/lib/inngest/jobs/credits-monthly-grant.ts`).
+- [x] Checkout, webhook'lar (`src/app/api/webhooks/stripe`), Customer Portal, `entitlements()`, kredi defteri (aylık grant cron — `src/lib/jobs/tasks/credits-monthly-grant.ts`; Inngest'ten graphile-worker'a taşındı, ADR-0008).
 - [x] `/settings/billing`.
 - Kabul: test modunda plan satın alma → yetkiler; eklenti satın alma → modül ON.
   **güncel 29.09:** kabul testi gerçek Stripe test anahtarıyla **doğrulanmadı**, çünkü `.env`'de Stripe anahtarları boş: **TASK-MULQM3LFB4KRA** (patron). Kamu TL paketleri (Belediye Başlangıç 90.000 / Ekip 240.000 / Kurum 480.000 TL + KDV, yıllık) sözleşmeli plan olarak tanımlandı, davetlerde koltuk sınırı var (`2c35e535`, TASK-MULRSG6T55LO0). Faturalama RLS bypass kapısı yeşile döndü (`2e932ca0`, TASK-MULQKFER4MF0Y).
@@ -176,14 +176,14 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 
 ### E4 · K1 çağrı toplama, kayıtlı arama, uyarı (S3–S4)
 
-- [x] `adapters/sedia.ts` (arama; zod sözleşmeleri `adapters/schemas/`; ham kayıt; SystemAlert), `adapters/eurostars.ts`, `adapters/tubitak.ts`; Inngest günlük iş (`k1-daily-calls.ts`, `0 2 * * *`); normalize; elle tetikleme `pnpm jobs:k1`.
+- [x] `adapters/sedia.ts` (arama; zod sözleşmeleri `adapters/schemas/`; ham kayıt; SystemAlert), `adapters/eurostars.ts`, `adapters/tubitak.ts`; graphile-worker günlük iş (`src/lib/jobs/tasks/k1-daily-calls.ts`, `0 2 * * *`, `src/lib/jobs/schedule.ts`); normalize; elle tetikleme `pnpm jobs:k1`.
 - [x] Uygunluk çıkarımı (`eligibility.eligibleCountries`, "EU/EEA/CH only" → `['EU','EEA','CH']`), lump-sum/iki aşamalı bayrakları, `ageInDays`.
       doğrulandı 2026-09-06 (`pnpm jobs:k1 -- --dry-run`): SEDIA 1214 konu / 12 sn · lumpSum 453 · twoStage 592 · EU-EEA-CH-only 25 · ageInDays 1214/1214. Eurostars 2 çağrı, TÜBİTAK 54 program. Birim testler: `tests/k1-adapters.test.ts` (16 test, ağsız fixture).
 - [ ] `TenantProfile` formu + embedding; `TopicMatch` gece hesaplama; `/calls` listesi (filtre: program, son tarih, uygunluk, uyum), `/calls/[id]`.
       kısmi: `TenantProfile` formu (`settings/profile`) ve `embedding vector(1536)` alanları var; `/calls` listesi + filtre + `/calls/[id]` var. **`TopicMatch` gece hesaplama işi (cron) yok** — model şemada duruyor ama `TopicMatch` yalnız bir yorum satırında (`src/lib/scoring/g0-canonical.ts:29`) geçiyor, onu dolduran bir job bulunamadı.
-      **güncel 29.09 — hâlâ açık:** `src/lib/inngest/jobs/` altında TopicMatch job'u yok (koddan doğrulandı). Kart: **TASK-MULQL2NYKRGJX** (backlog; M4 60 gün hatırlatmasıyla birlikte). Embedding için OpenAI anahtarı: **TASK-MULQM3LFB4KRA**.
+      **güncel 29.09 — hâlâ açık:** (29.09 notu; dizin Inngest'ten graphile-worker'a taşındı, bugünkü yer `src/lib/jobs/tasks/`, orada `k1-topic-match.ts` ve `k1-embeddings.ts` var) `src/lib/inngest/jobs/` altında TopicMatch job'u yoktu (o günkü koddan doğrulandı). Kart: **TASK-MULQL2NYKRGJX** (backlog; M4 60 gün hatırlatmasıyla birlikte). Embedding için OpenAI anahtarı: **TASK-MULQM3LFB4KRA**.
       **karar 29.09:** embedding sağlayıcısı OpenAI'da kalıyor (Açık karar #4 kapandı); şema 1536 boyutla değişmez.
-- [x] `SavedSearch` + günlük diff e-postası (Resend, tr/en) (`SavedSearch` modeli, `src/lib/inngest/jobs/alerts-daily.ts`, Resend kullanımı `src/actions`/`src/lib/feedback` içinde doğrulandı).
+- [x] `SavedSearch` + günlük diff e-postası (Resend, tr/en) (`SavedSearch` modeli, `src/lib/jobs/tasks/alerts-daily.ts`, Resend kullanımı `src/actions`/`src/lib/feedback` içinde doğrulandı).
       **karar 29.09 — Resend kaldırılıyor:** e-posta kendi SMTP'mizden (nodemailer) gidecek; `RESEND_API_KEY` patron kartından çıktı. Bugün (`e46d9798`) gönderim hâlâ `src/lib/email/resend-mailer.ts` üzerinden. Uygulama **TASK-MUMLF57HOYFSB**'de sürüyor (be-fb). Posta sağlayıcısı yoksa arama başarısız sayılır kuralı (`f108eaaa`) yeni gönderici için de geçerli kalmalı.
       **güncel 29.09 — kodda kaldırıldı:** `fe9fd31c` ile gönderim `src/lib/email/mailer.ts` (SMTP, nodemailer); `resend-mailer.ts` ve `RESEND_API_KEY` yok. `SMTP_HOST` boşsa gönderim yapılmaz, üretimde `SystemAlert`. Kart **TASK-MUMLF57HOYFSB** `review`. SMTP sağlayıcısı: kurumsal e-posta hesabı, patron belirleyecek.
 - Kabul: ≥500 konu **(karşılandı: 1214)**; uyarı 24 saat içinde; API şeması değişince alarm **(zarf zod doğrulaması → `SystemAlert`; testle kanıtlandı)**.
@@ -202,11 +202,18 @@ Sprint = 2 hafta. MVP = 8 sprint (16 hafta). Ekip: 1 full-stack + 1 backend/veri
 
 ### E6 · K2/M1 CORDIS ve ortak kartları (S5–S6)
 
-- [x] Python worker (FastAPI, `workers/cordis/main.py`): indir, temizle, upsert; Inngest aylık tetik (`k2-monthly-cordis.ts`, `0 4 1 * *`).
+- [x] Python worker (FastAPI, `workers/cordis/main.py`): indir, temizle, upsert; graphile-worker aylık tetik (`src/lib/jobs/tasks/k2-monthly-cordis.ts`, `0 4 1 * *`; Inngest ADR-0008 ile kalktı). **Bayat anlatımın düzeltmesi:** aylık iş yalnız Python worker'ın `/jobs/cordis` ucunu çağırır; gerçek CORDIS ZIP'ini yazan `runCordisImport` (`src/lib/k2-cordis/importer.ts`) aylık işe bağlı değildir, yalnız elle çalışır. Aylık işi buna bağlama: NG-225 (bu satır yazılırken yapılmadı).
       doğrulanmadı: DuckDB/Parquet/`COPY` ve networkx türev metrikleri worker kodunda satır satır taranmadı — dosyanın varlığı ve aylık job doğrulandı, iç uygulama detayı teyit edilmedi.
 - [x] `/partners`, `/partners/[pic]`, `/partners/leaders`; graf bileşeni (`src/app/api/v1/partners`, workspace `partners` sayfaları).
 - Kabul: aylık iş < 30 dk; liderler < 2 s.
   **güncel 29.09 gece — K2 gerçek döküm:** MVP ölçümünde (TASK-MULQMFVLJYZ5V) gerçek HORIZON dökümü 535 sn sonra FAILED olmuştu, 23.613 projeden 22'si yazılmıştı. Düzeltme: CORDIS'e uygun CSV okuyucu, atlanan kayıt koşuyu FAILED yapar (`b7a4992e`), 1.000 satırlık upsert'lerde açık zaman aşımı (`7feb745e`). Sonuç: 23.613 proje, **SUCCESS 272 sn** (`0ce53b6a`); inceleme ONAY, bağımsız koşu 255 sn (`eb845ddf`). TASK-MUMH7CVD8P2J0 `done`. **Açık:** M1 ortak profil işi gerçek hacimde 4 GB'ta bellek taşıyor — **TASK-MUMJ7W0GUI6N1** (in_progress, devop-fb). Liderler < 2 s: **ölçüldü (FO-5, TASK-MVBBPXU1ZW0F5, commit `abb3e669`)** — konu önekine göre koordinatör listesi `GET /api/v1/partners/leaders` ve `/partners/leaders?topic=` ile geldi; gerçek HORIZON dökümü (23.954 proje, izole DB) üzerinde HORIZON-CL5-/CL4-/HLTH- için 18–34 ms; ham SQL ile birebir eşleşti. **Ölçüm sınırı:** yerel tek makine, `next dev` (üretim derlemesi `next start` ve uzak/üretim DB'si ölçülmedi); import hemen öncesinde koştuğu için Postgres sayfa önbelleği sıcaktı; "soğuk" = route'un o önekle ilk çağrısı, soğuk DB önbelleği değil. Sonuç: `docs/agent-results/TASK-MVBBPXU1ZW0F5-be-fb.md`.
+  **DÜZELTME 18.11.2026 (NG-226, ölçümle çelişki) — yukarıdaki "29.09 SUCCESS 272 sn" satırı tarihli kayıttır, silinmedi; bu makinenin yerel geliştirme veritabanında (`fabrika`, Docker `fabrika-postgres`) ölçülen durumla uyuşmaz.** Kaynak: `docs/agent-results/NG-211-de-gnd.md` ve `NG-211-de-gnd-2.md` (de-gnd; salt okuma SELECT + bir elle koşu).
+  - **Ölçülen ortam: yalnız yerel geliştirme DB'si. Canlı (Supabase) DB ÖLÇÜLMEDİ** (NG-211 "Ölçemediklerim"; NG-211-2 Riskler: "Bu koşu yalnız yerel geliştirme DB'sini doldurdu").
+  - **Önce (NG-211, §1 tablo ve §4 ham çıktı):** `CordisImportRun` 30 satır, **30'u FAILED, SUCCESS 0**; son koşu 2026-10-20 20:38 UTC. Hata kökleri (§2): 18 koşu indirme (`ECONNREFUSED`), 12 koşu format reddi ("skipped records over the 0.1% limit"). `CordisProject` 280 satır, hepsi INTERREG, HORIZON 0 (§1 not).
+  - **29.09 kaydının karşılığı:** "SUCCESS 272 sn" satırı o yerel DB'de yok; NG-211 §Özet bunu başka (izole) bir veritabanında yapılmış olarak okudu. Hangi DB olduğu burada doğrulanmadı.
+  - **İlk SUCCESS: 17.11.2026, elle koşu** (NG-211-2 §Özet ve §2: `scripts/cordis-import.ts --dataset=HORIZON`, origin/dev `2de4fbef`, 20:49 UTC). Yerel DB'de HORIZON 0 → **24.419** proje (NG-211-2 §Özet tablo, §4); süre: içe aktarım 416 sn, profil üretimi 39 sn; toplam duvar saati 457 sn (§2); atlanan kayıt yok (§Özet hüküm).
+  - **Zamanlayıcı:** aynı yerel DB'de aylık `k2-monthly-cordis` için graphile-worker iş kaydı ve cron kaydı yoktu (NG-211 §1 tablo, §4). Aylık iş zaten `runCordisImport`'a bağlı değil: NG-225, **yapılmadı**. Yani bu SUCCESS aylık işin değil, elle koşunun sonucudur.
+  - **Sınır:** "aylık iş < 30 dk" kabulü aylık iş üzerinde ölçülmedi; ölçülen 457 sn elle koşudur (aynı dökümle tekrar koşu "Zaten güncel" döner, NG-211-2 Riskler).
 
 ### E7 · M3 Evidence Pack (S6)
 
@@ -272,7 +279,7 @@ Durum (S9–S10 dalgası, ölçüldü 2026-09-07 — kartların çoğu **`review
     - **`TASK-MTPZL5YDY9TAW` ve `TASK-MTPZLC9PI5VEH`'in `review`→`done` geçişi bu bulgular kapanmadan yapılmamalı** (PM kararı, `docs/agent-results/TASK-MTQTZNLS2CO2L-blockzincir-pm.md`); ikisi de hâlâ `in_progress`.
 - [x] **iyzico ödeme + entitlement akışı** — `docs/agent-results/TASK-MTPZL9GK4TFS1-geli-tirici.md`, commit `5bd921a`. Webhook imza doğrulaması (`x-iyz-signature-v3`, HMAC-SHA256), sonucun yalnız sağlayıcı `.../detail` çağrısından okunması, `pg_advisory_xact_lock` ile aynı olayın iki kez işlenmesinin engellenmesi, tutarların `Int` kuruş + `currency` (`src/lib/money.ts`) olması doğrulandı. Ortamda iyzico sandbox anahtarı olmadığı için gerçek sağlayıcıya değil yerel mock sunucuya karşı test edildi (Fabrika tarafı kod gerçek çalıştı).
       **Yan bulgu (Stripe tarafında, bu kartın kapsamı dışı, ayrı teknik borç):** Stripe webhook idempotency sorgusu (`auditEvent.findFirst({ where: { data: { equals: {...} } } })`) Prisma JSON `equals` semantiği yüzünden **hiçbir zaman eşleşmiyor** — Stripe'ın çift-işlem koruması fiilen kapalı. Ayrı bir düzeltme görevi açılmalı.
-      **güncel 29.09 — kapandı:** idempotency anahtarı `AuditEvent`'ten çıkıp para transaction'ının içindeki ayrı `StripeEventLog` tablosuna (UNIQUE `stripeEventId`) taşındı: `0a136fbf` (TASK-MTVSBEO7VX6Y4), karar ADR-0003 Seçenek C. Budama işi `stripe-event-cleanup` Inngest'e kayıtlı (`e40b5c72`), canlı testi `a97b863e` (TASK-MTVU6SDYSFIXU). Kiracı kapsamı: `2e932ca0`.
+      **güncel 29.09 — kapandı:** idempotency anahtarı `AuditEvent`'ten çıkıp para transaction'ının içindeki ayrı `StripeEventLog` tablosuna (UNIQUE `stripeEventId`) taşındı: `0a136fbf` (TASK-MTVSBEO7VX6Y4), karar ADR-0003 Seçenek C. Budama işi `stripe-event-cleanup` o gün Inngest'e kayıtlıydı (`e40b5c72`); bugün graphile-worker görevi (`src/lib/jobs/tasks/stripe-event-cleanup.ts`, ADR-0008), canlı testi `a97b863e` (TASK-MTVU6SDYSFIXU). Kiracı kapsamı: `2e932ca0`.
 - [x] ~~SSO (kurumsal SAML)~~ — **karar 29.09: kaldırıldı, yapılmayacak.** Ayar yalnız `Tenant.settings.sso`'ya kaydediliyordu, girişte hiç kullanılmıyordu; giriş yalnız Google (ADR-0006). Ayar ekranı, `src/lib/sso.ts` ve admin action kodda kaldırıldı (`0fdbcb8d`); kart TASK-MUML0QZAZ5M80 inceleme bekliyor (be-fb).
 
 **CI/kalite kapısı riski (bu fazı etkiler):** Lint kapısı kırmızı — 777 sorun / 561 hata (ölçüldü 2026-09-06, board TASK-MTQ60SGW45T0X, todo). CI kapısı henüz bunu kırmıyor; sıfırlanana kadar yeni PR'larda regresyon sessizce birikebilir.
@@ -386,11 +393,27 @@ Karar: ADR-0007 (patron, 29.09.2026). Pilot sonrası fiyat: `docs/kamu/ILKADIM-P
 
 Aynı önekle kapatılan iki kart daha var (6'ya dahil değil): **TASK-MTRJSOWFH6B45** e-Fatura — **yeniden aç** (ücretli satış kapısı e, ADR-0007); **TASK-MTQ2KL3JO4MK2** ESR kalibrasyonu — gerçek tasarım ortağı listesi gerektiriyor. Kamu önceliği değişmişken **açma**, İlkadım pilotu sonrasına bırak.
 
+## M18 — Müşteri Satış Hattı (HibeLead entegrasyonu · SPRINT-M18)
+
+Patron kararı: HibeLead (`project_leed`) FonBridge içinde **yeni modül** olur. Plan `docs/agent-results/FO-265-be-fb.md` seçenek B: yalnız FonBridge'de olmayan parçalar gelir (müşteri kurumu/kişi, eşleşme, deal hattı, görev, paket/teklif, içe aktarma, ajans toplayıcıları); çağrı, hazırlık testi, brifing, YZ, KVKK ve auth FonBridge'inkiyle çalışır.
+
+- [x] **F1 veri modeli + manifest** — NG-143 (TASK-MVWGOQ9S4LC8B): 9 tablo + `DealStage` + `Call`'a 4 additive kolon, strict RLS, `src/modules/m18/manifest.ts` (`M18`, `client-pipeline`, `soon`/"Yakında", plan/eklenti yok), `can()` izinleri `client_pipeline_read|write|admin`. Ayrıntı `docs/DATA_MODEL.md` §31.
+- [ ] F2 saf mantık (skor, eşleştirme, tekilleştirme, hat kuralları, teklif yuvarlaması)
+- [ ] F3 ekranlar (`requireModule('M18')`, `m18.*` i18n). Burada `statusBadge` `beta`'ya döner; önce erişim cevabı gerekir: `decideModuleAccess` planı durumdan önce sorar, plansız bir `beta` modül her ödeyen kiracıya karşılıksız "Planı Yükselt" olarak görünür ve `DEV` satırı kimseye açmaz (K2 ya da personel için plan kontrolünü atlayan bir DEV yolu).
+- [ ] F4 inbound köprüsü (`PublicLead` / Fon Hazırlık Karnesi → M18 lead, contract)
+- [ ] F5 YZ (zenginleştirme, uygunluk ön raporu; `llm.ts`, `BILLING.md` kredi satırları)
+- [ ] F6 TR ajans toplayıcıları → paylaşımlı `Call`
+- [ ] F7 outreach dizileri + teklif PDF (opsiyonel)
+- [ ] F8 uçtan uca e2e + gate + RLS incelemesi
+
+Açık (FO-265): **K1** hedef kitle (yalnız CONSULTANCY/AGENCY mı), **K2** fiyat (`addon_m18` ya da plan içi — M18 bu yüzden `ALL_MODULE_IDS`/Ultra'ya eklenmedi), **K3** hazırlık testi, **K4** kapsam birimi (F1 kiracı düzeyiyle kuruldu), **K5** outreach MVP'de mi, **K6** `project_leed`'in geleceği (13.11.2026'da klasör diskte yok; yalnız DB volume'u duruyor).
+
 ## Açık kararlar (yanıtlanmadan varsayılmaz)
 
 1. Marka adı ve alan adı (çalışma adı "Fabrika").
-2. Neon mu Supabase mi (RLS ve pgvector ikisinde de var; Supabase Auth kullanılmayacak, Auth.js kalacak).
-3. Inngest (yönetilen) mi BullMQ+Redis (kendi) mi — MVP'de Inngest önerilir. **[KARAR 29.09 — patron]** Kendi iş kuyruğumuza geçiliyor, Inngest kalkıyor. Araç seçimi (pg-boss / graphile-worker / cron) ADR + spike ile yapılacak: uygulama **TASK-MUMLFDTNQ53VJ**'de sürüyor (todo, devop-fb).
+2. Neon mu Supabase mi (RLS ve pgvector ikisinde de var; Supabase Auth kullanılmayacak, Auth.js kalacak). ✅ **KAPANDI — K-584515 = A, veritabanı Supabase'te kalır (ADR-0012).**
+3. ✅ **KAPANDI.** Inngest (yönetilen) mi BullMQ+Redis (kendi) mi — MVP'de Inngest önerilirdi. **[KARAR 29.09 — patron]** Kendi iş kuyruğumuza geçildi, Inngest kalktı. **Sonuç:** araç graphile-worker; ADR-0008 "Uygulandı" (TASK-MUMT3PGX5OK8P, §9; Inngest kodu `5ed2261a` ile çıktı); ayrıntı `docs/INNGEST.md`. _Tarihli kayıt, 29.09'daki o günkü plan (artık geçerli değil, "sürüyor" diye okunmasın):_ "Araç seçimi (pg-boss / graphile-worker / cron) ADR + spike ile yapılacak: uygulama TASK-MUMLFDTNQ53VJ'de sürüyor (todo, devop-fb)." Bu kartın bugünkü panodaki durumu burada kontrol edilmedi.
+   **Açık kalan (ayrı):** aylık `k2-monthly-cordis` işi gerçek içe aktarıma (`runCordisImport`) bağlı değil — NG-225, yapılmadı (bkz. E6).
 4. Embedding sağlayıcısı (OpenAI text-embedding-3-large 1536 vs Voyage) — şema 1536 varsayıyor. **[KAPANDI 29.09 — patron]** OpenAI'da kalıyor. Anahtar: **TASK-MULQM3LFB4KRA**.
 5. Ücretsiz plan kredisi (10) ve deneme süresi (14 gün) — beta sonrası gözden geçirilir.
 6. Başarı primi sunulacak mı, yoksa yalnızca sabit ücret + bonus mu (hukuki görüş).
@@ -401,6 +424,20 @@ Aynı önekle kapatılan iki kart daha var (6'ya dahil değil): **TASK-MTRJSOWFH
    Kanonik kural seti = `DEFAULT_G0_RULES`. `SPEC_LITERAL_G0_RULES` yalnız kalibrasyon karşılaştırması
    için saklanır, kapıda kullanılmaz. Bu karar `/settings/gates` etiketine ve `gates/evaluate.ts`
    çağrısına yansıtılacaktır (bkz. board TASK-MTQ63RR8Z0G8E).
+   **FO-382 (2026-11-04, patron K-576759 = A) — ek kural:** ortak (`intendedRole = partner`) rolünde
+   CORDIS'te hiç katılım kaydı olmayan kuruluşta `coordinatorHistory` (15) ve `networkCentrality` (10)
+   paydadan çıkar; bileşik skor kalan 75 puanla hesaplanır (`scoringBasis = no_history_evidence`).
+   Eşik 70 ve üç sert kural değişmez; 75 paydası ve dolu koltuk kuralı yalnız ortağa uygulanır; boş
+   koltuk her rolde puan vermez (koordinatörde ve rolü boş kayıtta puan yalnız boş koltuk yüzünden düşer);
+   **PIC kuralı (2026-11-05, patron "PIC boşsa kolaylık yok"):** "kayıt yok" = PIC girilmiş ve o PIC için
+   CORDIS satırı yok. PIC boşsa `cordis = null`, ortak standart hesapta (/100) kalır; paydadan çıkarma ve
+   dolu koltuk sert kuralı uygulanmaz. CORDIS tablosu boşsa (içe aktarılmamış) da `cordis = null`: veri
+   yokluğu geçmişsizlik sayılmaz. Gerekçe: birleşik ağaç ölçümü (`docs/agent-results/FO-384-crw2-fb.md`),
+   PIC kaldırınca partner puanı 53,08'den 69,11'e çıkıyordu. Boş (`OPEN`) koltuk artık puan
+   vermez. **Sert kural (2026-11-05, patron):** aynı durumda en az bir dolu koltuk şart; dolu =
+   `CANDIDATE`, `INVITED`, `CONFIRMED` (`FILLED_SEAT_STATUSES`). `OPEN`, `DECLINED` ya da koltuk yoksa G0
+   geçilmez (`G0_NO_HISTORY_NO_FILLED_SEAT`). `G0_SCORING_VERSION` = `2.2` (canlıya çıkmadı, sürüm artırılmadı).
+   Ölçüm ve açık karar notları: `docs/CORDIS-SAMPLE-CALIBRATION.md` "FO-382 PIC kuralı" bölümü.
 9. **[KAPANDI — güncel 29.09] G0 kanonik fonksiyonu üretime ne zaman/nerede bağlanacak?** Cevap koddan: her `gates/evaluate.ts` çağrısında canlı hesaplanıyor ve `pipeline/actions.ts`'te yazılıyor (`g0-compute.ts`, `e816fa9f`; bkz. E5). Aşağısı geçmiş kayıt. — — Ağırlıklar ve eşik kararlaştırıldı (madde 8), ama `scoreG0()`/`decideG0()` bugün hâlâ hiçbir üretim çağrı noktasında kullanılmıyor (ölçüldü 2026-09-07, PROJECT.md:81 dipnotu). Karar bekliyor: çağrı fırsat oluşturma anında mı, günlük bir job'da mı, yoksa her `gates/evaluate.ts` çağrısında canlı mı hesaplanacak? Kanıt: `docs/agent-results/TASK-MTQ63RR8Z0G8E-blok-zincir-dse.md`.
 10. **[KAPANDI — güncel 29.09: TASK-MTQTYE287FERM `done`, rapor `49bc1bd6`] Evaluator Lens "iç ön değerlendirme" etiketi bulgusu çelişkili — kim doğrulayacak?** — Board'da açık **TASK-MTQTYE287FERM** ve `docs/agent-results/TASK-MTQ63RR8Z0G8E-ui-audit-customer-support.md` bulgu #1, etiketin `EvaluationDashboard.tsx`'te olmadığını iddia ediyor; kod incelemesi (2026-09-07) etiketi **hem `EvaluatorForm.tsx:94` hem `EvaluationDashboard.tsx:42`'de** buluyor (`internalPreAssessment` anahtarı, tr+en). Kart kapatılmadan önce bu çelişki bir kişi tarafından ekran görüntüsüyle çözülmeli — stale bulgu mu, yoksa görülmeyen bir yüzey mi var?
 11. **Dashboard "Başarı Oranı" case-mismatch — KAPANDI (TASK-MTQTYXC0NUT0B, 2026-09-07).** Düzeltildi (yukarıda E10). Tarama yapıldı: uygulamanın literal ile karşılaştırdığı 9 serbest-string sütunun (`Opportunity.stage/status/intendedRole`, `Proposal.outcome`, `ModuleState.status`, `Evaluation.status/readerType`, `GateDecision.gate`, `Reviewer.status`) canlı değerleri koddaki literallerle tek tek karşılaştırıldı; **kasa uyuşmazlığı yalnızca `Proposal.outcome`'da** çıktı, diğer sekizi yazan ve okuyan tarafta aynı kasada. Yeni soru: aynı sınıftan hatayı sessiz bırakmamak için bu sütunlar Prisma `enum`'una mı taşınmalı, yoksa `proposal-outcome.ts` gibi sözlük modülleri mi yeterli?

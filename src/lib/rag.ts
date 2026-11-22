@@ -23,7 +23,7 @@
  *     tenant's own documents. There is now one search function, and it is
  *     tenant-scoped.
  *   - the error path: `retrieveChunks` answered a failed retrieval with three
- *     hardcoded CORDIS projects, grants and all, which `formatRagPrompt` then
+ *     hardcoded CORDIS projects, grants and all, which `formatRagContext` then
  *     labelled `[Source 1 | Score: 94.0%]` and fed to the model. That is
  *     invented evidence (CLAUDE.md rule 7) and it is gone; a failed retrieval
  *     is now an error, and an empty corpus is an empty list.
@@ -32,7 +32,6 @@
  *     now two arguments to one chunker instead of two constants in two files.
  */
 
-import { renderPrompt } from '@/lib/ai/prompts';
 import { withTenant } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
 import { embedText, PLATFORM_SCOPE_TENANT_ID, type AiCallAttribution } from '@/lib/llm';
@@ -471,12 +470,11 @@ async function discardPartialDocument(
  * (`src/modules/m2/server/actions.ts`) now comes here.
  *
  * A failed retrieval throws. It used to return three hardcoded CORDIS projects
- * — named coordinators, €4,500,000 grants — which `formatRagPrompt` then
+ * — named coordinators, €4,500,000 grants — which `formatRagContext` then
  * presented to the model as `[Source 1 | Score: 94.0%]`, so a database outage
  * turned into a concept note citing projects that do not exist. CLAUDE.md rule
  * 7 has no demo-mode exception (TASK-MTU6KE36HAFJR). An empty corpus returns an
- * empty list, which `formatRagPrompt` already handles by sending the question
- * through unaugmented.
+ * empty list, which `formatRagContext` turns into an empty context.
  */
 export async function retrieveChunks(
   query: string,
@@ -523,30 +521,20 @@ export async function retrieveChunks(
   }));
 }
 
-export function formatRagPrompt(
-  userQuery: string,
-  chunks: { text: string; score: number }[],
-  locale?: string
-): string {
-  if (chunks.length === 0) {
-    return userQuery;
-  }
-
-  const context = chunks.map((c, i) => `[Source ${i + 1} | Score: ${(c.score * 100).toFixed(1)}%]\n${c.text}`).join('\n\n');
-
-  return renderPrompt('rag/retrieved-context', { context, question: userQuery }, locale);
+/** The retrieved chunks as text for a data field; empty when nothing matched. */
+export function formatRagContext(chunks: { text: string; score: number }[]): string {
+  return chunks.map((c, i) => `[Source ${i + 1} | Score: ${(c.score * 100).toFixed(1)}%]\n${c.text}`).join('\n\n');
 }
 
 /**
- * Build a RAG-augmented prompt by prepending relevant context chunks.
+ * The context retrieved for a query. Data only: it holds no instruction, so the
+ * caller can send it as data (NG-40).
  */
-export async function buildRagPrompt(
+export async function buildRagContext(
   userQuery: string,
   tenantId?: string,
   topK: number = 5,
-  actor?: RagActor,
-  locale?: string
+  actor?: RagActor
 ): Promise<string> {
-  const chunks = await retrieveChunks(userQuery, topK, tenantId, actor);
-  return formatRagPrompt(userQuery, chunks, locale);
+  return formatRagContext(await retrieveChunks(userQuery, topK, tenantId, actor));
 }

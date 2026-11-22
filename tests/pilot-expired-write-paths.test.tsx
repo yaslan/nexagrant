@@ -33,6 +33,9 @@ const pilot = vi.hoisted(() => ({ expired: false }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next/navigation', () => ({
   useParams: () => ({ locale: 'en' }),
+  // The calls page reads its filters from the URL (NG-12).
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/en/main/calls',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
   notFound: vi.fn(() => {
     throw new Error('notFound');
@@ -90,7 +93,7 @@ import { PILOT_EXPIRED_DIGEST } from '@/lib/pilot-expired';
 import { acquireSectionLock, addBudgetLine, addWorkPackage, updateSectionContent } from '@/modules/m11/server/actions';
 import { ApplicationClient } from '@/app/[locale]/(app)/[workspace]/opportunities/[id]/application/client';
 import { PartBCollaborativeEditor } from '@/modules/m11/ui/PartBCollaborativeEditor';
-import MembersSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/members/page';
+import MembersSettingsPage from '@/app/[locale]/(app)/[workspace]/settings/members/members-client';
 import CallsPage from '@/app/[locale]/(app)/[workspace]/calls/page';
 import PartnerPortalPage from '@/app/[locale]/(public)/portal/partner/[token]/page';
 import { computeSeatCandidatesForm, inviteCandidateToSeat } from '@/modules/m8/server/actions';

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { config as loadDotenv } from 'dotenv';
+import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 // FO-385: the runner and its workers log a received signal too; the server gets it through NODE_OPTIONS below.
@@ -84,6 +85,29 @@ if (process.env.E2E_DATABASE_URL) {
 const E2E_SMTP = { SMTP_HOST: 'localhost', SMTP_PORT: '1025' };
 process.env.E2E_MAILPIT_URL ??= 'http://localhost:8025';
 
+// NG-209: the e2e web server answers the M18 LLM calls (only those) from the fake provider in
+// src/lib/llm.ts and reads an in-process fake website (no model, no outside network). The runner gets the same value, so a spec
+// can refuse to click when the server would reach a real resolver. Only a development or test
+// server may run with it; `start` (a production build) refuses to boot with it
+// (assertFakeAiAllowed), so it is set for `dev` only.
+if (E2E_WEB_SERVER === 'dev') process.env.E2E_FAKE_AI = 'true';
+
+// NG-40: the e2e runner and its web server both write billing identity / invoices through the
+// encrypting Prisma client; a throwaway key of this run (a real one in the environment wins).
+const FIXTURE_TAX_ID_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+// `start` opens a production server, which refuses the fixture key by design. The gate wrapper
+// (scripts/gate-isolated.sh) exports that fixture key, so in that mode a missing OR fixture key is
+// replaced by a fresh random key per run; runner and server share it through process.env.
+if (E2E_WEB_SERVER === 'start') {
+  const current = process.env.TAX_ID_ENCRYPTION_KEY;
+  if (!current || current === FIXTURE_TAX_ID_KEY) process.env.TAX_ID_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+} else {
+  process.env.TAX_ID_ENCRYPTION_KEY ||= FIXTURE_TAX_ID_KEY;
+}
+// Round 3 (F2): a process with no NODE_ENV now refuses that fixture key. The runner/workers import
+// src/lib/db.ts, so they say `test`; the web server is given its own value again below.
+(process.env as Record<string, string | undefined>).NODE_ENV ||= 'test'; // typed read-only by Next
+
 const testEnv = {
   AUTH_SECRET: E2E_AUTH_SECRET,
   ...E2E_SMTP,
@@ -96,6 +120,8 @@ const testEnv = {
   DATABASE_URL: process.env.DATABASE_URL,
   // The specs sign in through the demo seats; off by default (TASK-MULSCEK4JHK8X).
   ...(E2E_WEB_SERVER === 'dev' ? { DEMO_LOGIN_ENABLED: 'true' } : {}),
+  // NG-209: the fake LLM provider and fake website (see above); dev only, like the demo seats.
+  ...(E2E_WEB_SERVER === 'dev' ? { E2E_FAKE_AI: 'true' } : {}),
   // The Google button renders only with a client id (src/lib/auth.ts), and
   // tests/e2e/auth.spec.ts clicks it. CI's e2e step sets these same placeholders;
   // a worktree built from .env.example has them blank (TASK-MVBFDSUSE5QCY). A
@@ -133,9 +159,12 @@ export default defineConfig({
     env: {
       ...process.env,
       ...testEnv,
+      NODE_ENV: E2E_WEB_SERVER === 'start' ? 'production' : 'development',
       NODE_OPTIONS: WEB_SERVER_NODE_OPTIONS,
       E2E_RUNNER_PID: String(process.pid),
       E2E_PORT: String(PORT),
+      // FO-396: the e2e run never asks the EU register (no network). Stored answers are set in the DB by the spec.
+      PIC_REGISTRY_OFF: 'true',
       // Blank LLM keys in dev E2E so tests use template fallback, not real API calls
       // (matches CI behavior; reduces cost, ensures deterministic failures like CI).
       // Opt-in live tests (e.g. E2E_LIVE_EMBED=1) can override OPENAI_API_KEY if needed.

@@ -30,13 +30,14 @@ export default async function AdminSettingsPage({
 }) {
   const { locale = 'tr' } = await params;
   const t = await getTranslations({ locale, namespace: 'adminSettings' });
+  const tPage = await getTranslations({ locale, namespace: 'adminSettingsPage' });
   const defaultPlan = PLAN_GRANTS.find((p) => p.planId === 'free');
 
   return (
     <div className="space-y-6">
       <div className="bg-surface p-4 sm:p-6 rounded-2xl border border-border shadow-2xs">
-        <h1 className="text-xl sm:text-2xl font-bold text-ink">Sistem & Küresel Konfigürasyon</h1>
-        <p className="text-xs sm:text-sm text-muted mt-0.5">Platform geneli SMTP e-posta sunucusu, AI model sağlayıcıları ve veritabanı RLS politikaları.</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-ink">{tPage('title')}</h1>
+        <p className="text-xs sm:text-sm text-muted mt-0.5">{tPage('subtitle')}</p>
       </div>
 
       {/* SMTP E-posta Sunucu Ayarları */}
@@ -46,16 +47,16 @@ export default async function AdminSettingsPage({
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
           <h3 className="font-bold text-ink flex items-center gap-2">
             <Database className="w-4 h-4 text-indigo-400" />
-            <span>Veritabanı & RLS Güvenliği</span>
+            <span>{tPage('dbSectionTitle')}</span>
           </h3>
           <div className="space-y-2 text-xs text-ink-2">
             <div className="flex justify-between p-2 bg-ground rounded-xl border border-border">
-              <span>Driver Adapter:</span>
+              <span>{tPage('driverAdapterLabel')}</span>
               <strong className="text-ink font-mono">@prisma/adapter-pg (Prisma 7)</strong>
             </div>
             <div className="flex justify-between p-2 bg-ground rounded-xl border border-border">
-              <span>Vector Extension:</span>
-              <strong className="text-ink font-mono">pgvector 1536d</strong>
+              <span>{tPage('vectorExtensionLabel')}</span>
+              <strong className="text-ink font-mono">{tPage('vectorValue')}</strong>
             </div>
           </div>
         </div>
@@ -63,7 +64,7 @@ export default async function AdminSettingsPage({
         <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xs space-y-4">
           <h3 className="font-bold text-ink flex items-center gap-2">
             <Key className="w-4 h-4 text-purple-400" />
-            <span>YZ (AI) Model Yapılandırması</span>
+            <span>{tPage('aiSectionTitle')}</span>
           </h3>
           <div className="space-y-2 text-xs text-ink-2">
             <div className="flex justify-between p-2 bg-ground rounded-xl border border-border">

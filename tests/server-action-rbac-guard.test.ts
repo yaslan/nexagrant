@@ -241,6 +241,7 @@ export const ALLOWED: Record<string, string> = {
   'lib/actions/auth.ts#loginWithSocialAction': 'sign-in; no session yet',
   'lib/actions/auth.ts#logoutAction': 'signs the caller out of their own session',
   'app/[locale]/(public)/fon-hazirlik/actions.ts#submitReadinessLead': 'public lead form, no session by design',
+  'app/[locale]/(public)/fon-hazirlik/actions.ts#getTransferOrgName': 'public lead form, no session by design; read-only name lookup (NG-179)',
   'app/[locale]/(public)/accept-invite/continue/actions.ts#startInvitationSignInAction':
     'invitation sign-in; the invitation token is the credential',
   'app/[locale]/(public)/accept-invite/continue/actions.ts#acceptInvitationAction':
@@ -255,6 +256,9 @@ export const ALLOWED: Record<string, string> = {
   // `where { tenantId, userId }` of the session; every role has a bell, and an
   // expired pilot must still be able to clear it, so neither `can` nor the pilot gate.
   'actions/user/notifications.ts#markNotificationsRead': "marks the caller's own notifications read (userId = session user)",
+  // NG-8: the caller's own delivery preference (userId = session user); every role has a bell.
+  'actions/user/notifications.ts#setNotificationPreference': "sets the caller's own notification preference (userId = session user)",
+  'actions/user/notifications.ts#getNotificationPreferences': "reads the caller's own notification preferences",
   // Token-authenticated partner portal: no session, no tenant role. Narrow by
   // construction (Part A budget lines only) and pilot-gated on the token's tenant.
   'modules/m11/server/actions.ts#addBudgetLineByToken': 'partner portal; the magic token is the credential',
@@ -2003,21 +2007,43 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       only(evidence, mutant, 'peekEvidenceG8', 'client.evidence.deleteMany');
     });
 
+    // NG-96: this check line and the revalidatePath line also sit in updateTenantProvince, so an
+    // edit must stay inside updateTenantProfile's own body. A bare replace takes the first match
+    // anywhere in the file, which after a removal is updateTenantProvince's line.
+    const profileCheck = "    if (!can(asRole(scope.role), 'manage_users')) return { ok: false, error: 'forbidden' };\n";
+    const profileAfter = "      revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');";
+    const inProfileAction = (text: string, edit: (body: string) => string): string => {
+      const start = text.indexOf('export async function updateTenantProfile(');
+      expect(start).toBeGreaterThanOrEqual(0);
+      const next = text.indexOf('\nexport async function ', start + 1);
+      const end = next < 0 ? text.length : next + 1;
+      return text.slice(0, start) + edit(text.slice(start, end)) + text.slice(end);
+    };
+    const movedCheck = (text: string) =>
+      inProfileAction(text, (body) =>
+        body.replace(profileCheck, '').replace(
+          profileAfter,
+          "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
+            profileAfter,
+        ),
+      );
+
+    it('NG-96: dropping only updateTenantProfile\'s check flags that action alone', () => {
+      const profile = 'app/[locale]/(app)/[workspace]/settings/profile/actions.ts';
+      const profileSource = fs.readFileSync(path.join(SRC, profile), 'utf8');
+      const dropped = inProfileAction(profileSource, (body) => body.replace(profileCheck, ''));
+      const keys = findingsFor(profile, movedCheck(dropped)).findings.map((f) => f.key);
+      expect(keys).toContain(`${profile}#updateTenantProfile`);
+      expect(keys).not.toContain(`${profile}#updateTenantProvince`);
+    });
+
     it('G6: the role check moved after the write', () => {
       const profile = 'app/[locale]/(app)/[workspace]/settings/profile/actions.ts';
       const profileSource = fs.readFileSync(path.join(SRC, profile), 'utf8');
-      const check = "    if (!can(asRole(scope.role), 'manage_users')) return { ok: false, error: 'forbidden' };\n";
-      const after = "      revalidatePath('/[locale]/(app)/[workspace]/settings/profile', 'layout');";
-      expect(profileSource).toContain(check);
-      expect(profileSource).toContain(after);
-      const mutant = profileSource
-        .replace(check, '')
-        .replace(
-          after,
-          "      if (!can(asRole(scope.role), 'manage_users')) return { ok: false as const, error: 'forbidden' as const };\n" +
-            after,
-        );
-      only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: client.$queryRaw (writing SQL) (lib/pic-budget.ts:43, via spendUnsolicitedPicLookup (lib/pic-budget)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert)); tx.$executeRaw (line 197, via planPicChange); tx.auditEvent.create (line 244, via recordPicRefusal); tx.auditEvent.create (line 261, via recordPicRefusal); tx.auditEvent.create (line 244, via recordPicRefusal); tx.auditEvent.create (line 261, via recordPicRefusal); tx.tenantProfile.update (line 350); tx.tenantProfile.create (line 359); tx.auditEvent.create (line 372); tx.tenant.update (line 383); tx.auditEvent.create (line 384); client.$executeRaw (lib/scoring/g0-compute.ts:442, via limitLockWait (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:474, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:489, via writeOpportunityScore (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:579, via clearStoredG0 (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:474, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:489, via writeOpportunityScore (lib/scoring/g0-compute)); computation.score (model handed to writeOpportunityScore) (lib/scoring/g0-compute.ts:522, via persistG0 (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:533, via persistG0 (lib/scoring/g0-compute)); client.$executeRaw (lib/scoring/g0-compute.ts:442, via limitLockWait (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:474, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:489, via writeOpportunityScore (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:579, via clearStoredG0 (lib/scoring/g0-compute)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert))');
+      expect(profileSource).toContain(profileCheck);
+      expect(profileSource).toContain(profileAfter);
+      const mutant = movedCheck(profileSource);
+      only(profile, mutant, 'updateTenantProfile', 'writes before any role check covers them: client.$queryRaw (writing SQL) (lib/pic-budget.ts:43, via spendUnsolicitedPicLookup (lib/pic-budget)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert)); tx.$executeRaw (line 199, via planPicChange); tx.auditEvent.create (line 246, via recordPicRefusal); tx.auditEvent.create (line 263, via recordPicRefusal); tx.auditEvent.create (line 246, via recordPicRefusal); tx.auditEvent.create (line 263, via recordPicRefusal); tx.tenantProfile.update (line 354); tx.tenantProfile.create (line 363); tx.auditEvent.create (line 376); tx.tenant.update (line 389); tx.auditEvent.create (line 393); prisma.tenant.updateMany (lib/pic-registry-refresh.ts:61, via refreshTenantPicRegistry (lib/pic-registry-refresh)); prisma.tenant.updateMany (lib/pic-registry-refresh.ts:71, via refreshTenantPicRegistry (lib/pic-registry-refresh)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert)); client.$executeRaw (lib/scoring/g0-compute.ts:517, via limitLockWait (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:549, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:564, via writeOpportunityScore (lib/scoring/g0-compute)); client.topicMatch.update (lib/scoring/g0-compute.ts:662, via clearStoredG0 (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:549, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:564, via writeOpportunityScore (lib/scoring/g0-compute)); computation.score (model handed to writeOpportunityScore) (lib/scoring/g0-compute.ts:597, via persistG0 (lib/scoring/g0-compute)); client.topicMatch.upsert (lib/scoring/g0-compute.ts:608, via persistG0 (lib/scoring/g0-compute)); client.$executeRaw (lib/scoring/g0-compute.ts:517, via limitLockWait (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:549, via writeOpportunityScore (lib/scoring/g0-compute)); client.opportunity.updateMany (lib/scoring/g0-compute.ts:564, via writeOpportunityScore (lib/scoring/g0-compute)); client.topicMatch.update (lib/scoring/g0-compute.ts:662, via clearStoredG0 (lib/scoring/g0-compute)); db.systemAlert.update (taken as a value) (lib/observability/system-alert.ts:327, via recordAlert (lib/observability/system-alert)); db.systemAlert.update (lib/observability/system-alert.ts:329, via recordAlert (lib/observability/system-alert)); db.systemAlert.create (lib/observability/system-alert.ts:342, via recordAlert (lib/observability/system-alert))');
     });
 
     it('G7: an action exported through `export { … }`', () => {
@@ -2254,18 +2280,18 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       });
 
       it('N14 / G5: a write in another module, before the check or under readOnly', () => {
-        const scoring = "import { scoreCandidatesForSeat } from '@/lib/scoring/consortium';\n";
+        const scoring = "import { generateSeatCandidates } from '@/modules/m8/server/matching';\n";
         red(
           scoring +
-            "export async function n14(opportunityId: string) {\n  const { tenantId, role } = await requireTenantAction();\n  await scoreCandidatesForSeat(opportunityId, tenantId as never);\n  if (!can(role as never, 'manage_workspaces')) return;\n}\n",
+            "export async function n14(opportunityId: string) {\n  const { tenantId, role } = await requireTenantAction();\n  await generateSeatCandidates(opportunityId, tenantId as never);\n  if (!can(role as never, 'manage_workspaces')) return;\n}\n",
           'n14',
-          'writes before any role check covers them: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'writes before any role check covers them: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
         red(
           scoring +
-            'export async function g5(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ readOnly: true });\n  await scoreCandidatesForSeat(opportunityId, tenantId as never);\n}\n',
+            'export async function g5(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ readOnly: true });\n  await generateSeatCandidates(opportunityId, tenantId as never);\n}\n',
           'g5',
-          'readOnly: true but writes: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'readOnly: true but writes: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
         // After the check, the same call is fine.
         expect(
@@ -2273,7 +2299,7 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
             file,
             header +
               scoring +
-              "export async function g5ok(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });\n  await scoreCandidatesForSeat(opportunityId, tenantId as never);\n}\n",
+              "export async function g5ok(opportunityId: string) {\n  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });\n  await generateSeatCandidates(opportunityId, tenantId as never);\n}\n",
           ).findings,
         ).toEqual([]);
       });
@@ -2384,18 +2410,18 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
 
       it('D1/D2: a dynamic `import()` of a module of src/', () => {
         red(
-          fn('d1', ro + "  const m = await import('@/lib/scoring/consortium');\n  await m.scoreCandidatesForSeat(id, tenantId as never);\n"),
+          fn('d1', ro + "  const m = await import('@/modules/m8/server/matching');\n  await m.generateSeatCandidates(id, tenantId as never);\n"),
           'd1',
-          'readOnly: true but writes: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'readOnly: true but writes: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
         red(
           fn(
             'd2',
             ctl +
-              "  const { scoreCandidatesForSeat } = await import('@/lib/scoring/consortium');\n  await scoreCandidatesForSeat(id, tenantId as never);\n  if (!can(role, 'manage_workspaces')) return;\n",
+              "  const { generateSeatCandidates } = await import('@/modules/m8/server/matching');\n  await generateSeatCandidates(id, tenantId as never);\n  if (!can(role, 'manage_workspaces')) return;\n",
           ),
           'd2',
-          'writes before any role check covers them: tx.seatCandidate.deleteMany (lib/scoring/consortium.ts:',
+          'writes before any role check covers them: tx.seatCandidate.deleteMany (modules/m8/server/matching.ts:',
         );
       });
 
@@ -2798,13 +2824,13 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
       // directory index is looked up again when an overlay puts a file in front of that index.
       // Without `probed` holding the base it tried first, the overlay's file went unseen.
       it('B-1 (İNCELEME-101): a file an overlay puts in front of a directory index is walked', () => {
-        expect(resolveSpec('lib/rag', '@/lib/ai/prompts', NO_OVERLAY)).toBe('lib/ai/prompts/index');
-        const shadow = "import { prisma } from '@/lib/db';\nexport function renderPrompt() { void prisma.evidence.delete({ where: { id: 'x' } }); return ''; }\n";
-        const text = header + "import { formatRagPrompt } from '@/lib/rag';\n" + fn('n18', ro + "  return formatRagPrompt([], 'q', 'tr');\n");
-        expect(findingsFor(file, text, NO_OVERLAY).findings).toEqual([]);
-        expect(findingsFor(file, text, { 'lib/ai/prompts.ts': shadow }).findings).toEqual([
-          { key: `${file}#n18`, problem: expect.stringContaining('readOnly: true but writes: prisma.evidence.delete (lib/ai/prompts.ts:2') },
-        ]);
+        expect(resolveSpec('modules/m6/server/esr-parser', '@/lib/ai/prompts', NO_OVERLAY)).toBe('lib/ai/prompts/index');
+        const shadow = "import { prisma } from '@/lib/db';\nexport function separatedPrompt() { void prisma.evidence.delete({ where: { id: 'x' } }); return {}; }\n";
+        const text = header + "import { parseEsrDocumentText } from '@/modules/m6/server/esr-parser';\n" + fn('n18', ro + "  return parseEsrDocumentText('d', 't');\n");
+        // The parser really writes (credits, through the LLM adapter), so only the overlay's own line tells the two runs apart.
+        const problems = (ov: Overlay) => findingsFor(file, text, ov).findings.map((f) => f.problem).join('\n');
+        expect(problems(NO_OVERLAY)).not.toContain('lib/ai/prompts.ts:');
+        expect(problems({ 'lib/ai/prompts.ts': shadow })).toContain('prisma.evidence.delete (lib/ai/prompts.ts:2');
       });
 
       it('B-1 (İNCELEME-101): the same through a relative import of a directory index', () => {

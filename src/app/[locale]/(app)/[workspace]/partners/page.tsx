@@ -12,7 +12,7 @@ import { meterPartnerSearch } from '@/modules/m1/server/partner-search/monthly-q
 import { recordAlert } from '@/lib/observability/system-alert';
 import { getEntitlements } from '@/lib/billing';
 import { partnerSearchGrant } from '@/lib/billing/catalog';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { AnnouncementBrowser } from '@/modules/m1/ui/partner-search/AnnouncementBrowser';
 import { ActiveAnnouncementsBadge } from '@/modules/m1/ui/partner-search/ActiveAnnouncementsBadge';
 import { createRelationship } from '../relationships/actions';
@@ -74,6 +74,11 @@ export default async function PartnersPage({
   }>;
 }) {
   const { workspace, locale } = await params;
+  // The role door covers both tabs (NG-64): the live announcements tab reads no
+  // tenant row here, but it is the same M1 screen a guest partner may not open.
+  // It runs before the M1 module gate (NG-257) so an unauthorized role sees the
+  // role refusal, not the module lock state.
+  const { tenantId } = await requireTenantPageRole(locale, 'view_partner_search');
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
 
@@ -93,7 +98,6 @@ export default async function PartnersPage({
   // be read they stay off, nothing is spent on a guess.
   let showAnnouncementBadges = false;
   if (!liveTab) {
-    const { tenantId } = await requireTenantPage(locale);
     try {
       const entitlements = await withTenant(tenantId, (tx) => getEntitlements(tenantId, tx));
       showAnnouncementBadges =

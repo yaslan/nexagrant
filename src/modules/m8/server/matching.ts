@@ -1,7 +1,9 @@
 import { withTenant, type TenantTx } from '@/lib/db';
 import { isPresentId } from '@/lib/required-id';
+import { MATCH_DIMENSION_SCALE } from '@/lib/scoring/seat-dimension-scale';
 import { normalizeSeatScore } from '@/lib/scoring/seat-score';
 import { SeatNotFoundError } from './errors';
+import { minimumPartnerState, normalizeCountry, passesMinimumPartnerFilter, readMinimumPartnerRule } from './minimum-partners';
 
 /**
  * M8 seat matching — ranked partner candidates for one open consortium seat.
@@ -25,7 +27,6 @@ import { SeatNotFoundError } from './errors';
  *                                            organisation at query time.
  *   Collab         → CordisCoParticipation   `sharedProjectCount` is the same
  *                                            edge weight the old `projects` was.
- *   degree         → CordisCoParticipation   the number of edges the org sits on.
  *
  * The CORDIS tables are platform-shared reference data (scripts/rls-models.ts
  * lists them as SYSTEM_WIDE), so no new table, migration or RLS policy is
@@ -44,10 +45,18 @@ export type MatchBreakdown = {
   topicExperience: number;
   geographicBalance: number;
   collabHistory: number;
-  relationshipWarmth: number;
-  centrality: number;
   rivalRisk: number;
 }
+
+/**
+ * A `SeatCandidate.breakdown` written before K-578751, when warmth and centrality
+ * were criteria too. Rows like this stay in the table until the seat is matched
+ * again, so they are still read — never written.
+ */
+export type LegacyMatchBreakdown = MatchBreakdown & {
+  relationshipWarmth: number;
+  centrality: number;
+};
 
 export interface MatchCandidate {
   organizationId: string;
@@ -65,50 +74,47 @@ export interface CandidateSignals {
   takenCountries: ReadonlySet<string>;
   /** Shared CORDIS projects between this org and the confirmed partners. */
   sharedProjects: number;
-  /** `Relationship.warmth` for this org in the current tenant, if any. */
-  warmth: string | null;
-  /** Co-participation edges the org sits on — its degree in the partner graph. */
-  degree: number;
   /** The org is seated on another live opportunity under the same call. */
   isRival: boolean;
 }
 
+/** Points per past participation and per coordination under the topic prefix. */
+const POINTS_PER_PARTICIPATION = 5;
+const POINTS_PER_COORDINATION = 10;
+/** Points per shared project: full marks on the third, where the old 5-of-15 scale also capped. */
+const POINTS_PER_SHARED_PROJECT = 11;
+
 /**
  * The scoring rule, as a pure function so it can be tested without a database.
- * Weights are unchanged from the original implementation.
+ * Three criteria and a separate penalty (K-578751, specification §6); each cap is
+ * read from {@link MATCH_DIMENSION_SCALE}, which the UI shows it against.
  */
 export function scoreCandidate(signals: CandidateSignals): MatchBreakdown {
-  const warmthScore =
-    signals.warmth === 'active' || signals.warmth === 'hot'
-      ? 15
-      : signals.warmth === 'warm'
-        ? 10
-        : signals.warmth === 'cold'
-          ? 5
-          : 0;
-
   return {
-    // 1. Topic experience (35 max)
-    topicExperience: Math.min(35, signals.participationCount * 5 + signals.coordinatorCount * 10),
-    // 2. Geographic balance (15 max) — a country already on the consortium adds none.
-    geographicBalance: signals.country && signals.takenCountries.has(signals.country) ? 0 : 15,
-    // 3. Collaboration history with the confirmed partners (15 max)
-    collabHistory: Math.min(15, signals.sharedProjects * 5),
-    // 4. Relationship warmth (15 max)
-    relationshipWarmth: warmthScore,
-    // 5. Centrality in the co-participation graph (10 max)
-    centrality: Math.min(10, signals.degree / 10),
-    // 6. Rival risk (-10)
-    rivalRisk: signals.isRival ? -10 : 0,
+    // 1. Past experience (0–34)
+    topicExperience: Math.min(
+      MATCH_DIMENSION_SCALE.topicExperience.max,
+      signals.participationCount * POINTS_PER_PARTICIPATION + signals.coordinatorCount * POINTS_PER_COORDINATION
+    ),
+    // 2. Country balance (0 or 33) — only a recorded country not yet on the consortium earns it.
+    geographicBalance:
+      signals.country && !signals.takenCountries.has(signals.country) ? MATCH_DIMENSION_SCALE.geographicBalance.max : 0,
+    // 3. Collaboration history with the confirmed partners (0–33)
+    collabHistory: Math.min(MATCH_DIMENSION_SCALE.collabHistory.max, signals.sharedProjects * POINTS_PER_SHARED_PROJECT),
+    // Rival risk (-10), a penalty on top of the three criteria.
+    rivalRisk: signals.isRival ? MATCH_DIMENSION_SCALE.rivalRisk.min : 0,
   };
 }
 
-export function totalScore(breakdown: MatchBreakdown): number {
+export function totalScore(breakdown: MatchBreakdown | LegacyMatchBreakdown): number {
   return Object.values(breakdown).reduce((sum, value) => sum + value, 0);
 }
 
-/** Highest raw total {@link scoreCandidate} can give: 35 + 15 + 15 + 15 + 10 with no rival penalty. */
-export const MATCH_MAX_TOTAL = 90;
+/** Highest raw total {@link scoreCandidate} can give: 34 + 33 + 33 with no rival penalty. */
+export const MATCH_MAX_TOTAL = 100;
+
+/** Highest raw total the pre-K-578751 scorer could give: 35 + 15 + 15 + 15 + 10. */
+export const MATCH_LEGACY_MAX_TOTAL = 90;
 
 /**
  * The matcher's raw total on the 0–100 `SeatCandidate.score` scale shared with
@@ -117,6 +123,14 @@ export const MATCH_MAX_TOTAL = 90;
  */
 export function matchSeatScore(breakdown: MatchBreakdown): number {
   return normalizeSeatScore(totalScore(breakdown) / MATCH_MAX_TOTAL);
+}
+
+/**
+ * The same, for a row the old scorer wrote: its points were earned against a
+ * maximum of 90, so dividing them by 100 would lower the score of every stored row.
+ */
+export function legacyMatchSeatScore(breakdown: LegacyMatchBreakdown): number {
+  return normalizeSeatScore(totalScore(breakdown) / MATCH_LEGACY_MAX_TOTAL);
 }
 
 /**
@@ -140,6 +154,54 @@ const CANDIDATE_POOL = 100;
 interface SeatRow {
   status: string;
   organizationId: string | null;
+  partnerOrgId?: string | null;
+}
+
+/**
+ * The countries the consortium already holds: every CONFIRMED seat, whether it is filled
+ * by a CORDIS organisation (`organizationId` → CordisOrganization.country) or by the
+ * tenant's own partner record (`partnerOrgId` → PartnerOrg.country, tenant-scoped).
+ * CRW NG-186 bulgu 3: counting CORDIS seats alone overstated the country shortfall and
+ * dropped candidates the consortium no longer needed to be new. Used by the CORDIS /
+ * PartnerOrg matcher only: experts are not country-filtered (K-581990 = A).
+ */
+export async function confirmedSeatCountries(
+  tx: Pick<TenantTx, 'cordisOrganization' | 'partnerOrg'>,
+  seats: readonly SeatRow[],
+  tenantId: string
+): Promise<Set<string>> {
+  const confirmed = seats.filter((s) => s.status === 'CONFIRMED');
+  const orgIds = [...new Set(confirmed.map((s) => s.organizationId).filter((id): id is string => Boolean(id)))];
+  const partnerIds = [
+    ...new Set(confirmed.filter((s) => !s.organizationId).map((s) => s.partnerOrgId).filter((id): id is string => Boolean(id))),
+  ];
+  const cordis: { country: string | null }[] = orgIds.length
+    ? await tx.cordisOrganization.findMany({ where: { organisationId: { in: orgIds } }, select: { country: true } })
+    : [];
+  const partners: { country: string | null }[] = partnerIds.length
+    ? await tx.partnerOrg.findMany({ where: { id: { in: partnerIds }, tenantId }, select: { country: true } })
+    : [];
+  return new Set(
+    [...cordis, ...partners].map((o) => normalizeCountry(o.country)).filter((c): c is string => c !== null)
+  );
+}
+
+/**
+ * The topic an opportunity points at, by either key the pipeline has written: the Topic
+ * cuid (older rows) or the topic IDENTIFIER (the form). NG-100 B-4: this is the one lookup
+ * for the matcher and for the consortium page's live-demand badge, so they resolve a topic
+ * the same way.
+ */
+export async function findOpportunityTopic(
+  tx: Pick<TenantTx, 'topic'>,
+  topicId: string | null | undefined
+): Promise<{ identifier: string; callId: string | null; eligibility?: unknown } | null> {
+  if (!topicId) return null;
+  // `eligibility` carries the call's minimum-partner threshold (NG-52, minimum-partners.ts).
+  return tx.topic.findFirst({
+    where: { OR: [{ id: topicId }, { identifier: topicId }] },
+    select: { identifier: true, callId: true, eligibility: true },
+  });
 }
 
 /**
@@ -163,7 +225,7 @@ export async function runSeatMatch(
     select: {
       id: true,
       topicId: true,
-      seats: { select: { status: true, organizationId: true } },
+      seats: { select: { status: true, organizationId: true, partnerOrgId: true } },
     },
   });
   if (!opp) throw new SeatNotFoundError(`Opportunity ${opportunityId} not found in this workspace.`);
@@ -175,13 +237,11 @@ export async function runSeatMatch(
   if (!seat) throw new SeatNotFoundError(`Seat ${seatId} not found in this workspace.`);
 
   // `Opportunity` has no `topic` relation and no `callId` column, so the topic is
-  // resolved by its id rather than included.
-  const topic = opp.topicId
-    ? await tx.topic.findUnique({
-        where: { id: opp.topicId },
-        select: { identifier: true, callId: true },
-      })
-    : null;
+  // resolved here rather than included. `Opportunity.topicId` is written by the pipeline
+  // form as the topic's IDENTIFIER (the board shows it as "Topic Identifier"), while older
+  // rows may hold a Topic cuid; resolving by either keeps "Aday Bul" from finding no
+  // topic, and so no candidates, for a form-created opportunity (NG-100).
+  const topic = await findOpportunityTopic(tx, opp.topicId);
 
   const prefix = topicPrefix(topic?.identifier);
 
@@ -218,72 +278,75 @@ export async function runSeatMatch(
   }
 
   const confirmed = new Set(confirmedOrgIds);
-  const pool = [...experience.entries()]
+  const ranked = [...experience.entries()]
     // Already on the consortium — not a candidate for another seat.
     .filter(([orgId]) => !confirmed.has(orgId))
     // A coordinator seat needs someone who has coordinated before.
     .filter(([, e]) => seat.roleKey !== 'coordinator' || e.coordinatorCount >= 1)
-    .sort((a, b) => b[1].participationCount - a[1].participationCount)
-    .slice(0, CANDIDATE_POOL);
+    .sort((a, b) => b[1].participationCount - a[1].participationCount);
+
+  const takenCountries = await confirmedSeatCountries(tx, opp.seats as SeatRow[], tenantId);
+
+  // NG-52: the minimum-partner pre-filter (specification §6 l.103), threshold from the
+  // call. A candidate that cannot get the consortium to the call's country minimum is
+  // dropped before scoring; with no threshold on the call nothing is dropped. It runs
+  // BEFORE the pool is cut to CANDIDATE_POOL (CRW NG-186 bulgu 4): cut first, and the
+  // dropped ones were never replaced by the eligible organisations ranked below them.
+  const minimumPartners = minimumPartnerState(
+    readMinimumPartnerRule(topic?.eligibility),
+    (opp.seats as SeatRow[]).map((s) => s.status),
+    takenCountries
+  );
+  const countryOf = new Map<string, string | null>();
+  let eligible = ranked;
+  if (minimumPartners.requiresNewCountry && ranked.length) {
+    const rankedOrgs: { organisationId: string; country: string | null }[] = await tx.cordisOrganization.findMany({
+      where: { organisationId: { in: ranked.map(([orgId]) => orgId) } },
+      select: { organisationId: true, country: true },
+    });
+    for (const o of rankedOrgs) countryOf.set(o.organisationId, normalizeCountry(o.country));
+    eligible = ranked.filter(([orgId]) => passesMinimumPartnerFilter(countryOf.get(orgId) ?? null, minimumPartners));
+  }
+  const pool = eligible.slice(0, CANDIDATE_POOL);
   const poolIds = pool.map(([orgId]) => orgId);
   const poolSet = new Set(poolIds);
 
-  // ── Countries, for geographic balance.
-  const poolOrgs: { organisationId: string; country: string | null }[] = poolIds.length
-    ? await tx.cordisOrganization.findMany({
-        where: { organisationId: { in: poolIds } },
-        select: { organisationId: true, country: true },
-      })
-    : [];
-  const countryOf = new Map(poolOrgs.map((o) => [o.organisationId, o.country]));
+  // ── Countries, for geographic balance (already read when the filter ran).
+  if (countryOf.size === 0 && poolIds.length) {
+    const poolOrgs: { organisationId: string; country: string | null }[] = await tx.cordisOrganization.findMany({
+      where: { organisationId: { in: poolIds } },
+      select: { organisationId: true, country: true },
+    });
+    for (const o of poolOrgs) countryOf.set(o.organisationId, normalizeCountry(o.country));
+  }
 
-  const confirmedOrgs: { country: string | null }[] = confirmedOrgIds.length
-    ? await tx.cordisOrganization.findMany({
-        where: { organisationId: { in: confirmedOrgIds } },
-        select: { country: true },
-      })
-    : [];
-  const takenCountries = new Set(
-    confirmedOrgs.map((o) => o.country).filter((c): c is string => Boolean(c))
-  );
-
-  // ── Co-participation edges, in one query, for both collaboration history and
-  // degree. The importer stores each edge once under `orgA < orgB`
+  // ── Co-participation edges with the confirmed partners, for collaboration
+  // history. The importer stores each edge once under `orgA < orgB`
   // (src/lib/k2-cordis/partnerProfileJob.ts), so both sides have to be examined.
-  const edges: { orgA: string; orgB: string; sharedProjectCount: number }[] = poolIds.length
+  const edges: { orgA: string; orgB: string; sharedProjectCount: number }[] = poolIds.length && confirmedOrgIds.length
     ? await tx.cordisCoParticipation.findMany({
-        where: { OR: [{ orgA: { in: poolIds } }, { orgB: { in: poolIds } }] },
+        where: {
+          OR: [
+            { orgA: { in: poolIds }, orgB: { in: confirmedOrgIds } },
+            { orgB: { in: poolIds }, orgA: { in: confirmedOrgIds } },
+          ],
+        },
         select: { orgA: true, orgB: true, sharedProjectCount: true },
         take: EDGE_LIMIT,
       })
     : [];
 
-  const degreeOf = new Map<string, number>();
   const sharedProjectsOf = new Map<string, number>();
   for (const edge of edges) {
     for (const [side, other] of [
       [edge.orgA, edge.orgB],
       [edge.orgB, edge.orgA],
     ] as const) {
-      if (!poolSet.has(side)) continue;
-      degreeOf.set(side, (degreeOf.get(side) ?? 0) + 1);
-      if (confirmed.has(other)) {
+      if (poolSet.has(side) && confirmed.has(other)) {
         sharedProjectsOf.set(side, (sharedProjectsOf.get(side) ?? 0) + edge.sharedProjectCount);
       }
     }
   }
-
-  // ── Relationship warmth, from this tenant's own CRM.
-  const relationships: { organizationId: string | null; warmth: string }[] =
-    await tx.relationship.findMany({
-      where: { tenantId },
-      select: { organizationId: true, warmth: true },
-    });
-  const warmthOf = new Map(
-    relationships
-      .filter((r) => r.organizationId)
-      .map((r) => [r.organizationId as string, r.warmth])
-  );
 
   // ── Rival risk: seated on another live opportunity under the same call. The
   // call is reached through `Opportunity.topicId`, since the row has no callId.
@@ -314,8 +377,6 @@ export async function runSeatMatch(
       country: countryOf.get(organizationId) ?? null,
       takenCountries,
       sharedProjects: sharedProjectsOf.get(organizationId) ?? 0,
-      warmth: warmthOf.get(organizationId) ?? null,
-      degree: degreeOf.get(organizationId) ?? 0,
       isRival: rivals.has(organizationId),
     });
     return { organizationId, score: matchSeatScore(breakdown), breakdown };
@@ -326,6 +387,10 @@ export async function runSeatMatch(
   const sorted = scored
     .sort((a, b) => totalScore(b.breakdown) - totalScore(a.breakdown))
     .slice(0, limit);
+
+  // NG-100 B-3: an empty result (no topic, or an empty pool) writes nothing and clears
+  // nothing: the rows already on the seat (a G1 backup, an invited candidate) stay.
+  if (sorted.length === 0) return [];
 
   // The caller already holds a transaction (`withTenant`), so the clear and the
   // rewrite are atomic without opening a second one.

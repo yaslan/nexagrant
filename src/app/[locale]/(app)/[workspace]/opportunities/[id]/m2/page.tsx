@@ -1,7 +1,7 @@
 import { withTenant } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import ConceptNoteEditor from '@/modules/m2/ui/ConceptNoteEditor';
 import { moduleGate } from '@/lib/modules/guard';
 import {
@@ -19,13 +19,13 @@ export default async function OpportunityM2Page({
   // The gate is the only module-state check: it already refuses a missing or
   // OFF `ModuleState` row, so the page's own "module closed" block below it
   // could never render and is gone (FO-11).
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M2', locale);
   if (locked) return locked;
 
   // This page used to call a local `getAuth()` stub that returned a fixed
   // `mock-user-id` and then loaded the opportunity by `(id, workspace slug)`
   // with no tenant, so any visitor could open any tenant's concept note.
-  const { tenantId } = await requireTenantPage(locale);
 
   // Find the opportunity
   const opp = await withTenant<{ id: string; title: string } | null>(tenantId, (tx) =>

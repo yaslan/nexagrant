@@ -1,5 +1,5 @@
 import { withTenant } from '@/lib/db';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import { canConfirmSeat } from '@/modules/m8/server/seat-transitions';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -7,7 +7,10 @@ import Link from 'next/link';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
+import { checkModuleAccess } from '@/lib/modules/access';
 import { recordAlert } from '@/lib/observability/system-alert';
+import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
+import { findOpportunityTopic } from '@/modules/m8/server/matching';
 
 /** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
 interface CordisOrgRow {
@@ -55,7 +58,8 @@ interface ConsortiumOpportunity {
  * candidates were never tenant-scoped at all.
  *
  * It now follows the same rule as `./actions.ts`: the tenant comes from
- * `requireTenantPage()` (no fallback — anonymous visitors are redirected) and
+ * `requireTenantPageRole()` (no fallback — anonymous visitors are redirected, a role
+ * without `view_proposal` gets 403) and
  * every query runs inside `withTenant`, matched on `(id, tenantId)`.
  */
 export default async function ConsortiumPage({
@@ -64,17 +68,16 @@ export default async function ConsortiumPage({
   params: Promise<{ id: string; locale: string; workspace: string }>;
 }) {
   const { id, locale, workspace } = await params;
+  const { tenantId, role } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M8', locale);
   if (locked) return locked;
-  const { tenantId, role } = await requireTenantPage(locale);
-
-  const isTr = locale === 'tr';
 
   let queryFailed = false;
   let opportunity: ConsortiumOpportunity | null = null;
   let seats: ConsortiumSeat[] = [];
   let candidates: SeatCandidate[] = [];
   let orgs: OrgInfo[] = [];
+  let liveDemandOrgIds: string[] = [];
 
   try {
     opportunity = await withTenant<ConsortiumOpportunity | null>(tenantId, (tx) =>
@@ -100,7 +103,34 @@ export default async function ConsortiumPage({
             orderBy: { rank: 'asc' },
           })
         );
-        candidates = rawCandidates as unknown as SeatCandidate[];
+        // K-579560=A: only the M8 matcher's rows are shown (see seat-candidate-view.ts).
+        candidates = visibleSeatCandidates(rawCandidates as unknown as SeatCandidate[]);
+      }
+
+      // Informational only, never part of a score (K-579560=A): which candidates
+      // have an open partner-search request on this topic. The badge is part of the
+      // M8 screen (NG-100 Bulgu A): with M8 closed the query does not run at all.
+      const m8 = await checkModuleAccess('M8');
+      if (m8.allowed && opportunity.topicId && candidates.length > 0) {
+        const topicId = opportunity.topicId;
+        // NG-100 B-4: the form stores the topic identifier, so resolve it as the matcher does.
+        const topic = await withTenant(tenantId, (tx) => findOpportunityTopic(tx, topicId));
+        if (topic) {
+          const requests = await withTenant(tenantId, (tx) =>
+            tx.partnerSearchAnnouncement.findMany({
+              where: {
+                topicIdentifier: topic.identifier,
+                type: 'EXPERTISE_REQUEST',
+                withdrawnAt: null,
+                organizationPic: { in: candidates.map((c) => c.organizationId) },
+              },
+              select: { organizationPic: true },
+            })
+          );
+          liveDemandOrgIds = [
+            ...new Set(requests.map((r) => r.organizationPic).filter((p): p is string => Boolean(p))),
+          ];
+        }
       }
 
       const orgIds = [
@@ -150,6 +180,8 @@ export default async function ConsortiumPage({
 
   // "We could not read it" and "this tenant has no such opportunity" are two
   // different answers, and only the second one is a 404.
+  const t = await getTranslations({ locale, namespace: 'Consortium' });
+
   if (queryFailed) {
     return (
       <div className="max-w-5xl mx-auto py-8 sm:px-4">
@@ -157,9 +189,7 @@ export default async function ConsortiumPage({
           role="alert"
           className="border border-amber-200 bg-amber-50 text-amber-900 text-sm rounded-lg p-4"
         >
-          {isTr
-            ? 'Konsorsiyum verisi okunamadı. Sorun kaydedildi; lütfen birazdan tekrar deneyin.'
-            : 'Consortium data could not be read. The failure has been recorded; please try again shortly.'}
+          {t('queryFailed')}
         </div>
       </div>
     );
@@ -168,7 +198,6 @@ export default async function ConsortiumPage({
   if (!opportunity) return notFound();
 
   const orgMap = Object.fromEntries(orgs.map((o) => [o.id, o]));
-  const t = await getTranslations({ locale, namespace: 'Consortium' });
   const tPipeline = await getTranslations({ locale, namespace: 'Pipeline' });
 
   return (
@@ -195,6 +224,7 @@ export default async function ConsortiumPage({
         seats={seats}
         candidates={candidates}
         orgMap={orgMap}
+        liveDemandOrgIds={liveDemandOrgIds}
       />
     </div>
   );

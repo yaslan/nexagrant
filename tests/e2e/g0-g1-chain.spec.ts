@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { test, expect, type Page } from '@playwright/test';
 
 import { prisma } from '../../src/lib/db';
@@ -40,7 +42,13 @@ const PRO_MEMBER_EMAIL = 'g0g1-chain-pro-member@fabrika.test';
 const FRESH = 'g0g1-chain-fresh-tenant';
 const FRESH_WORKSPACE = 'g0g1-chain-fresh-workspace';
 const FRESH_SLUG = 'g0g1-chain-fresh';
-const FRESH_USER = 'g0g1-chain-fresh-user';
+const FRESH_USER_PREFIX = 'g0g1-chain-fresh-user';
+/**
+ * The PIC question limits count per user id, in the web server's memory (FO-389), so a fixed id carries
+ * the count from one run of this spec to the next on the same server ("58 dakika sonra tekrar deneyin").
+ * Each run signs in as a new user: the limit itself is untouched and each run starts from a full allowance.
+ */
+let FRESH_USER = FRESH_USER_PREFIX;
 const FRESH_EMAIL = 'g0g1-chain-fresh@fabrika.test';
 
 const PROGRAMME = 'g0g1-chain-programme';
@@ -90,7 +98,7 @@ async function rollback() {
   await prisma.subscription.deleteMany({ where: { tenantId: tenants } });
   await prisma.membership.deleteMany({ where: { tenantId: tenants } });
   await prisma.moduleState.deleteMany({ where: { tenantId: tenants } });
-  await prisma.user.deleteMany({ where: { id: { in: [PRO_USER, PRO_MEMBER, FRESH_USER] } } });
+  await prisma.user.deleteMany({ where: { OR: [{ id: { in: [PRO_USER, PRO_MEMBER] } }, { id: { startsWith: FRESH_USER_PREFIX } }] } });
   await prisma.workspace.deleteMany({ where: { tenantId: tenants } });
   await prisma.tenant.deleteMany({ where: { id: tenants } });
   await prisma.topicStat.deleteMany({ where: { source: STAT_SOURCE } });
@@ -106,6 +114,9 @@ async function rollback() {
 async function seedCordisProject(key: string, masterCall: string, members: [organisationId: string, role: string][]) {
   const id = `g0g1-chain-project-${key}`;
   await prisma.cordisProject.create({ data: { id, title: id, framework: 'HORIZON', masterCall } });
+  // M8's candidate pool reads CORDIS topic rows (matching.ts, `cordisProjectTopic.topicCode`), not
+  // `masterCall`: without this row a project is invisible to "Aday Bul" (K-579560=A).
+  await prisma.cordisProjectTopic.create({ data: { projectId: id, topicCode: masterCall } });
   await prisma.cordisParticipation.createMany({
     data: members.map(([organisationId, role]) => ({ projectId: id, organisationId, role })),
   });
@@ -121,6 +132,7 @@ async function seedIdentity(tenantId: string, workspaceId: string, slug: string,
 
 async function seed() {
   await rollback();
+  FRESH_USER = `${FRESH_USER_PREFIX}-${randomUUID().slice(0, 8)}`;
 
   await seedIdentity(FRESH, FRESH_WORKSPACE, FRESH_SLUG, FRESH_USER, FRESH_EMAIL);
   await seedIdentity(PRO, PRO_WORKSPACE, PRO_SLUG, PRO_USER, PRO_EMAIL);
@@ -326,16 +338,30 @@ async function addSeat(page: Page, id: string, roleKey: keyof typeof CONSORTIUM_
   return seat;
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 async function findAndInvite(page: Page, seatId: string, roleKey: keyof typeof CONSORTIUM_ROLES, organizationId?: string) {
   const card = page.getByTestId(`m8-builder-seat-${roleKey}`);
   await card.getByRole('button', { name: /Aday Bul/ }).click();
-  // The search revalidates the page: a row shows the PIC, then the organisation's name once the
-  // refresh lands. Which one a slow run sees is a race, so the row is found by either, and the
-  // database below says which organisation the click actually invited.
-  const invite = organizationId
+  // The search is done when the candidate list is on screen: its heading only renders once the
+  // action's rows are in (the seat starts empty), and the button is back to "Aday Bul".
+  await expect(card.getByRole('heading', { name: 'EN İYİ ADAYLAR' })).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByRole('button', { name: /Aday Bul/ })).toBeEnabled({ timeout: 60_000 });
+  // A row names the organisation by its PIC until the page refresh lands, then by its name. The
+  // name comes from the same table the screen reads, never from a guess (NG-287: a name derived from
+  // the PICS list was "Org 0" for a CORDIS history organisation, so the row vanished once the name
+  // arrived). The row is found by either, and the database below says which organisation was invited.
+  const rowLabel = organizationId
+    ? new RegExp(
+        `${escapeRegExp(organizationId)}(?!\\d)|${escapeRegExp(
+          (await prisma.cordisOrganization.findUniqueOrThrow({ where: { organisationId: organizationId }, select: { name: true } })).name,
+        )}(?!\\d)`,
+      )
+    : null;
+  const invite = rowLabel
     ? card
         .locator('div')
-        .filter({ hasText: new RegExp(`${organizationId}(?!\\d)|G0G1 E2E Org ${PICS.indexOf(organizationId) + 1}(?!\\d)`) })
+        .filter({ hasText: rowLabel })
         .filter({ has: page.getByRole('button', { name: 'Davet Et' }) })
         .last()
         .getByRole('button', { name: 'Davet Et' })
@@ -432,35 +458,47 @@ test.describe('NG-27 the chain on one opportunity', () => {
       rank: c.rank,
     })));
 
-    // ── 5. G0 again, now with both roles on the seat plan. This click is what passes the gate.
-    const passedG0 = await runG0(page, PRO_SLUG, opp.id);
-    dump('G0 tıklandı, koltuklu', passedG0);
-    await shot(page, '05-g0-gecti');
-    expect(passedG0.passed).toBe(true);
-    expect(passedG0.decidedBy).toBe(PRO_USER);
-    const afterG0 = await prisma.opportunity.findUniqueOrThrow({
-      where: { id: opp.id },
-      select: { stage: true, g0Score: true },
-    });
-    dump('G0 sonrası fırsat', afterG0);
-    expect(afterG0).toEqual({ stage: 'G0', g0Score: 75 });
+    // ── 5. G0 again, both roles on the seat plan but only INVITED. NG-59 (patron K-579082 = A): the
+    //    general score counts only CONFIRMED seats, so the invitations add nothing: 63 stays 63 and
+    //    the gate refuses. Before NG-59 this click gave 75 and passed.
+    const invitedG0 = await runG0(page, PRO_SLUG, opp.id);
+    dump('G0 tıklandı, koltuklar INVITED', invitedG0);
+    await shot(page, '05-g0-davetli-koltuk-63-red');
+    expect(invitedG0.passed).toBe(false);
+    expect(storedScore(invitedG0.inputs)).toBe(63);
+    // One score on the record: the score shown is the one the evidence gives (NG-27 side finding).
+    const invitedInputs = invitedG0.inputs as { g0Score?: number | null; g0ScoreStored?: number | null; g0Evidence?: { score?: number; filledSeats?: number; features?: { researchAndEndUser?: number } } };
+    expect(invitedInputs.g0Score).toBe(63);
+    expect(invitedInputs.g0Evidence?.score).toBe(63);
+    expect(invitedInputs.g0ScoreStored).toBe(63);
+    expect(invitedInputs.g0Evidence?.features?.researchAndEndUser).toBe(0);
+    expect(invitedInputs.g0Evidence?.filledSeats).toBe(2);
+    expect((await prisma.opportunity.findUniqueOrThrow({ where: { id: opp.id } })).g0Score).toBe(63);
 
-    // ── 6. G1 from the screen alone: refused, the seats are only invited.
+    // ── 6. G1 from the screen alone: refused, G0 has not been passed (NG-26).
     let main = await openDetail(page, PRO_SLUG, opp.id);
     await main.getByTestId('pipeline-evaluate-gate').click();
     await expect(main.getByTestId('pipeline-gate-result')).toBeVisible({ timeout: 30_000 });
     await expect(main.getByTestId('pipeline-evaluate-gate')).toBeEnabled({ timeout: 30_000 });
-    await shot(page, '06-g1-koltuk-onaysiz-red');
+    await shot(page, '06-g1-g0-gecilmeden-red');
     const refusedG1 = (await decisions(opp.id)).at(-1)!;
-    dump('G1 tıklandı, koltuklar INVITED', refusedG1);
+    dump('G1 tıklandı, G0 geçilmedi', refusedG1);
     expect(refusedG1.gate).toBe('G1');
     expect(refusedG1.passed).toBe(false);
-    expect((refusedG1.inputs as { unfilledCriticalRoles?: string[] }).unfilledCriticalRoles?.sort()).toEqual(['end_user', 'research']);
+    expect(refusedG1.inputs as { latestG0Passed?: boolean | null }).toMatchObject({ latestG0Passed: false });
 
     // ── 7. The seats' move to CONFIRMED, by the button on the consortium page. Nothing is written
-    //    from this file: the status comes from `confirmSeatAssignment`.
+    //    from this file: the status comes from `confirmSeatAssignment`. Each confirmation raises the
+    //    score by its 6 points: one confirmed seat 69 (still refused), both 75 (passes).
     await openConsortium(page, PRO_SLUG, opp.id);
     await confirmByClick(page, research.id, 'research');
+    const oneConfirmedG0 = await runG0(page, PRO_SLUG, opp.id);
+    dump('G0 tıklandı, araştırma CONFIRMED, son kullanıcı INVITED', oneConfirmedG0);
+    await shot(page, '06a-g0-bir-onayli-69-red');
+    expect(oneConfirmedG0.passed).toBe(false);
+    expect(storedScore(oneConfirmedG0.inputs)).toBe(69);
+
+    await openConsortium(page, PRO_SLUG, opp.id);
     await confirmByClick(page, endUser.id, 'end_user');
     await shot(page, '06b-koltuklar-dugmeyle-onaylandi');
     dump('koltuklar düğmeyle onaylandı', await prisma.consortiumSeat.findMany({
@@ -468,6 +506,18 @@ test.describe('NG-27 the chain on one opportunity', () => {
       select: { roleKey: true, status: true, organizationId: true, required: true },
       orderBy: { roleKey: 'asc' },
     }));
+    const passedG0 = await runG0(page, PRO_SLUG, opp.id);
+    dump('G0 tıklandı, iki koltuk CONFIRMED', passedG0);
+    await shot(page, '06c-g0-onayli-75-gecti');
+    expect(passedG0.passed).toBe(true);
+    expect(passedG0.decidedBy).toBe(PRO_USER);
+    expect(storedScore(passedG0.inputs)).toBe(75);
+    const afterG0 = await prisma.opportunity.findUniqueOrThrow({
+      where: { id: opp.id },
+      select: { stage: true, g0Score: true },
+    });
+    dump('G0 sonrası fırsat', afterG0);
+    expect(afterG0).toEqual({ stage: 'G0', g0Score: 75 });
 
     // ── 8. G1 by the detail button.
     main = await openDetail(page, PRO_SLUG, opp.id);
@@ -485,8 +535,10 @@ test.describe('NG-27 the chain on one opportunity', () => {
     expect(final.stage).toBe('G1');
     expect(all.map((d) => [d.gate, d.passed])).toEqual([
       ['G0', false],
-      ['G0', true],
+      ['G0', false],
       ['G1', false],
+      ['G0', false],
+      ['G0', true],
       ['G1', true],
     ]);
     expect(new Set(all.map((d) => d.decidedBy))).toEqual(new Set([PRO_USER]));
@@ -727,17 +779,18 @@ test.describe('NG-27 where a new user stops', () => {
     await signInPro(page);
     await saveProfile(page, PRO_SLUG, PRO);
 
-    // ── Every UI-reachable point without a history, on a topic with neither flag: 30 + 15 + 12 + 10 = 67.
+    // ── Every UI-reachable point without a history, on a topic with neither flag. The seats are OPEN, and an OPEN
+    //    seat scores nothing (FO-382), so the research and end-user 12 is gone: 30 + 15 + 10 = 55.
     const plain = await createFromForm(page, PRO_SLUG, PRO, 'NG-27 sıradan konu', PLAIN_TOPIC.identifier);
     await openConsortium(page, PRO_SLUG, plain.id);
     await addSeat(page, plain.id, 'research');
     await addSeat(page, plain.id, 'end_user');
     const plainG0 = await runG0(page, PRO_SLUG, plain.id);
     dump('G0 tıklandı, sıradan konu, koltuklu', plainG0);
-    await shot(page, '15-siradan-konu-67-red');
+    await shot(page, '15-siradan-konu-55-red');
     expect(plainG0.passed).toBe(false);
-    expect(storedScore(plainG0.inputs)).toBe(67);
-    expect((await prisma.opportunity.findUniqueOrThrow({ where: { id: plain.id } })).g0Score).toBe(67);
+    expect(storedScore(plainG0.inputs)).toBe(55);
+    expect((await prisma.opportunity.findUniqueOrThrow({ where: { id: plain.id } })).g0Score).toBe(55);
 
     // ── The same user on a topic the platform has imported no base rate for.
     const noStat = await createFromForm(page, PRO_SLUG, PRO, 'NG-27 oransız konu', NO_STAT_TOPIC.identifier);
@@ -748,8 +801,9 @@ test.describe('NG-27 where a new user stops', () => {
     dump('G0 tıklandı, başarı oranı içe aktarılmamış konu, koltuklu', noStatG0);
     await shot(page, '16-oransiz-konu-red');
     expect(noStatG0.passed).toBe(false);
-    // Only the base-rate rule and the composite stand in the way: 30 + 12 + 10 + 8 = 60.
-    expect(storedScore(noStatG0.inputs)).toBe(60);
+    // Only the base-rate rule and the composite stand in the way. The OPEN seats score nothing (FO-382),
+    // so the research and end-user 12 is gone: 30 + 10 + 8 = 48.
+    expect(storedScore(noStatG0.inputs)).toBe(48);
     expect(noStatG0.banner).toContain('Başarı taban oranı %0; asgari eşik %8');
   });
 });

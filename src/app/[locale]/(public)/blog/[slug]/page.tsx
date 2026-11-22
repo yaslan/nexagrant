@@ -3,8 +3,9 @@ import { getTranslations } from 'next-intl/server';
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { authorByline, formatBlogDate, getBlogPostBySlug, getBlogPosts } from '@/lib/blog';
+import { BLOG_CONTENT_LOCALE, blogContentShownIn } from '@/lib/blog-shared';
 import { getPublicRoute } from '@/lib/routes';
 import { appUrl } from '@/lib/app-url';
 import { BLOG_LINK_SPLIT, blogImage, blogLink } from '@/lib/blog-content-policy';
@@ -22,6 +23,15 @@ export async function generateMetadata({
     return { title: 'Not found' };
   }
 
+  // NG-121: the page itself redirects to the Turkish post; should this address
+  // ever be rendered, it stays out of the index and names the Turkish page.
+  if (!blogContentShownIn(locale)) {
+    return {
+      robots: { index: false, follow: true },
+      alternates: { canonical: `${appUrl()}/${BLOG_CONTENT_LOCALE}/blog/${slug}` },
+    };
+  }
+
   const baseUrl = appUrl();
   const canonicalUrl = `${baseUrl}/${locale}/blog/${slug}`;
   const publishedDate = post.publishedAt;
@@ -31,10 +41,7 @@ export async function generateMetadata({
     description: post.excerpt,
     alternates: {
       canonical: canonicalUrl,
-      languages: {
-        'tr': `${baseUrl}/tr/blog/${slug}`,
-        'en': `${baseUrl}/en/blog/${slug}`,
-      },
+      languages: { tr: `${baseUrl}/tr/blog/${slug}` },
     },
     openGraph: {
       title: post.title,
@@ -236,8 +243,15 @@ export default async function BlogDetailPage({
     notFound();
   }
 
+  // NG-121: the post is written in Turkish only. A reader (or a search engine)
+  // holding an old /en/blog/<slug> link is sent to the Turkish page rather than
+  // shown a dead end; temporary (307) so an English version can take the
+  // address back later.
+  if (!blogContentShownIn(locale)) {
+    redirect(getPublicRoute('blogDetail', BLOG_CONTENT_LOCALE, slug));
+  }
+
   const t = await getTranslations({ locale, namespace: 'blog' });
-  const isTr = locale === 'tr';
   const relatedPosts = (await getBlogPosts()).filter((p) => p.slug !== slug).slice(0, 2);
 
   return (
@@ -251,7 +265,7 @@ export default async function BlogDetailPage({
               className="inline-flex items-center gap-2 text-xs font-bold text-accent hover:underline bg-surface border border-border px-3 py-1.5 rounded-lg shadow-2xs"
             >
               <span>←</span>
-              <span>{isTr ? 'Tüm Blog Yazılarına Dön' : 'Back to Blog'}</span>
+              <span>{t('backToBlog')}</span>
             </Link>
           </div>
 
@@ -306,7 +320,7 @@ export default async function BlogDetailPage({
           {/* Related Articles */}
           <div className="pt-12 border-t border-border space-y-6">
             <h3 className="text-xl font-bold text-ink font-heading">
-              {isTr ? 'İlginizi Çekebilecek Diğer Yazılar' : 'Related Articles'}
+              {t('relatedArticles')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {relatedPosts.map((rel) => (

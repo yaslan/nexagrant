@@ -162,6 +162,23 @@ test.describe('expert pre-registration (FO-20)', () => {
     await page.screenshot({ path: `${SHOTS}/e2e-01-empty-submit.png`, fullPage: true });
   });
 
+  // NG-7 (madde 4): the pre-registration is free. The form carries no price, fee, card or payment field,
+  // and its text has no amount; the registration itself is covered by the `register → verify mail → Founding Expert number` test below.
+  test('NG-7: the free pre-registration form asks for no payment, fee or price', async ({ page }) => {
+    await page.goto('/tr/uzman');
+    const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Ön kaydı gönder' }) });
+    await expect(form).toHaveCount(1);
+    const paymentField = /price|fee|card|iban|payment|amount|fiyat|ucret|ücret|odeme|ödeme|kart|tutar/i;
+    const fieldNames = await form.locator('input, select, textarea').evaluateAll((els) =>
+      els.map((el) => `${el.getAttribute('name') ?? ''} ${el.id} ${el.getAttribute('autocomplete') ?? ''}`)
+    );
+    expect(fieldNames.length).toBeGreaterThan(0);
+    expect(fieldNames.filter((name) => paymentField.test(name))).toEqual([]);
+    const formText = (await form.innerText()).toLowerCase();
+    expect(formText).not.toMatch(/₺|€|\$|ücret|ödeme|kredi kart|fiyat|abonelik/);
+    await page.screenshot({ path: `${shotsDir('NG-7-evidence')}/ng-7-expert-prereg-no-fee.png`, fullPage: true });
+  });
+
   // FO-25 (K-516717): Kurum is required on its own; leaving it blank keeps the form here.
   test('no organisation: field error on Kurum, focus there, nothing is posted', async ({ page }) => {
     let posts = 0;

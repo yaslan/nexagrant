@@ -1,0 +1,158 @@
+import type { DealStage } from '@prisma/client';
+import { createTranslator } from 'next-intl';
+import type { TenantTx } from '@/lib/db';
+import enMessages from '../../../../messages/en.json';
+import trMessages from '../../../../messages/tr.json';
+import {
+  autoTasksForStage,
+  checkStageTransition,
+  STAGE_ORDER,
+  TERMINAL_STAGES,
+  type TransitionRefusal,
+} from './pipeline-rules';
+import { dealCreateSchema, stageMoveSchema, type DealCreateInput, type StageMoveInput } from './schemas';
+
+/**
+ * Deal (sales pipeline) CRUD and stage moves (NG-135 / F3). Stage rules are NOT repeated here:
+ * `checkStageTransition` in pipeline-rules.ts is the only rule table; this file only asks it.
+ */
+
+export class DealTransitionError extends Error {
+  constructor(public readonly reason: TransitionRefusal) {
+    super(`Deal stage transition refused: ${reason}`);
+    this.name = 'DealTransitionError';
+  }
+}
+
+export const DEAL_BOARD_STAGES: readonly DealStage[] = [...STAGE_ORDER, ...TERMINAL_STAGES] as DealStage[];
+
+export const DEAL_BOARD_SELECT = {
+  id: true,
+  title: true,
+  stage: true,
+  stageChangedAt: true,
+  estimatedFeeCents: true,
+  currency: true,
+  organizationId: true,
+  organization: { select: { name: true } },
+} as const;
+
+/** All open deals, grouped by stage in board order. Empty stages are kept so the board shows them. */
+export async function listDealsByStage(tx: TenantTx, tenantId: string, take = 500) {
+  const deals = await tx.deal.findMany({
+    where: { tenantId, deletedAt: null },
+    orderBy: [{ stageChangedAt: 'desc' }, { id: 'asc' }],
+    take,
+    select: DEAL_BOARD_SELECT,
+  });
+  const byStage = new Map<DealStage, typeof deals>();
+  for (const stage of DEAL_BOARD_STAGES) byStage.set(stage, []);
+  for (const deal of deals) byStage.get(deal.stage)?.push(deal);
+  return DEAL_BOARD_STAGES.map((stage) => ({ stage, deals: byStage.get(stage) ?? [] }));
+}
+
+export async function createDeal(tx: TenantTx, tenantId: string, rawInput: unknown, ownerUserId: string | null) {
+  const input: DealCreateInput = dealCreateSchema.parse(rawInput);
+  const org = await tx.leadOrganization.findFirst({
+    where: { id: input.organizationId, tenantId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!org) return null;
+  return tx.deal.create({
+    data: {
+      tenantId,
+      organizationId: org.id,
+      title: input.title,
+      stage: 'NEW',
+      estimatedFeeCents: input.estimatedFeeCents,
+      currency: input.currency,
+      ownerUserId,
+    },
+    select: { id: true },
+  });
+}
+
+const AUTO_TASK_MESSAGES = { tr: trMessages, en: enMessages } as const;
+
+/** `m18.autoTasks.<ruleKey>` in `locale` (tr unless en). The rule key's dot is the JSON nesting. */
+function autoTaskTitle(locale: string, ruleKey: string): string {
+  const l = locale === 'en' ? 'en' : 'tr';
+  const t = createTranslator({ locale: l, messages: AUTO_TASK_MESSAGES[l], namespace: 'm18.autoTasks' });
+  return t(ruleKey as Parameters<typeof t>[0]);
+}
+
+/**
+ * Moves a deal to `to` if the rule table allows it. Writes a STAGE_CHANGE activity and the
+ * target stage's auto tasks (AUTO_TASK_RULES, NG-216) in the same transaction, so the history
+ * and the task list never disagree with the stage. A rule already on one of the deal's live
+ * tasks (done or not) is skipped: moving back and forth does not pile up duplicates.
+ * Task titles are rendered in `locale` (the acting user's UI locale, required: no silent 'tr'
+ * fallback) and stored on the row.
+ *
+ * NG-220: the deal row is locked `FOR UPDATE` before it is read, so two moves of the same deal
+ * run one after the other. The second one waits for the first to commit, then reads the
+ * committed stage (READ COMMITTED takes a fresh snapshot per statement) and is checked against
+ * it: a move that is no longer legal is refused and writes no activity and no auto task.
+ * Without the lock both saw the old stage and the losing move's tasks stayed on the deal.
+ */
+export async function moveDealStage(
+  tx: TenantTx,
+  tenantId: string,
+  rawInput: unknown,
+  actorUserId: string | null,
+  locale: string,
+) {
+  const input: StageMoveInput = stageMoveSchema.parse(rawInput);
+  // A deal of another tenant is invisible here (RLS + the tenantId filter): neither locked nor found.
+  await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "tenantId" = ${tenantId} AND "id" = ${input.dealId} FOR UPDATE`;
+  const deal = await tx.deal.findFirst({
+    where: { id: input.dealId, tenantId, deletedAt: null },
+    select: { id: true, stage: true },
+  });
+  if (!deal) return null;
+
+  const check = checkStageTransition({ from: deal.stage, to: input.to, lostReason: input.lostReason });
+  if (!check.ok) throw new DealTransitionError(check.reason);
+
+  const now = new Date();
+  await tx.deal.update({
+    where: { id: deal.id },
+    data: {
+      stage: input.to,
+      stageChangedAt: now,
+      ...(input.to === 'LOST' ? { lostReason: input.lostReason ?? null } : {}),
+    },
+  });
+  await tx.dealActivity.create({
+    data: {
+      tenantId,
+      dealId: deal.id,
+      kind: 'STAGE_CHANGE',
+      payload: { from: deal.stage, to: input.to },
+      actorUserId,
+      occurredAt: now,
+    },
+  });
+  const existing = await tx.dealTask.findMany({
+    where: { tenantId, dealId: deal.id, deletedAt: null, autoRuleKey: { not: null } },
+    select: { autoRuleKey: true },
+  });
+  const planned = autoTasksForStage(
+    input.to,
+    now,
+    existing.map((task) => task.autoRuleKey),
+  );
+  if (planned.length > 0) {
+    await tx.dealTask.createMany({
+      data: planned.map((task) => ({
+        tenantId,
+        dealId: deal.id,
+        title: autoTaskTitle(locale, task.autoRuleKey),
+        dueAt: task.dueAt,
+        autoGenerated: true,
+        autoRuleKey: task.autoRuleKey,
+      })),
+    });
+  }
+  return { id: deal.id, from: deal.stage, to: input.to };
+}

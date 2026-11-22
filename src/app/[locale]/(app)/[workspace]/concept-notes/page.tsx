@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
-import { requireTenantPage } from '@/lib/tenant';
+import { requireTenantPageRole } from '@/lib/page-role';
 import type { ConceptNoteRow, ConceptTemplateRow } from '@/modules/m2/types';
 import { loadConceptNotesIndex } from './data';
 
@@ -22,12 +22,12 @@ export default async function ConceptNotesListPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'view_proposal');
   const locked = await moduleGate('M2', locale);
   if (locked) return locked;
 
   // Redirects an anonymous visitor to login and a signed-in user with no
   // membership to /no-workspace. It cannot hand back a null or empty tenant.
-  const { tenantId } = await requireTenantPage(locale);
 
   let notes: ConceptNoteRow[] = [];
   let templates: ConceptTemplateRow[] = [];
