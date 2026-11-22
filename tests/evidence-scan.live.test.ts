@@ -765,4 +765,51 @@ describe.skipIf(!CLAMD_HOST)('NG-263: an INFECTED verdict survives a failed writ
     // Nothing left to do: a further run changes nothing.
     expect(await scanner.scanEvidence(run(id), { clamd })).toEqual({ skipped: 'already_final' });
   });
+
+  /**
+   * NG-278 (NG-263 Ö-1): two runs that both reach `finishInfectedRemoval` for one INFECTED row.
+   * Run A (real clamd: FOUND) writes INFECTED, checks for a recorded outcome, then stops inside
+   * the object delete. Run B starts only then: it finds the row INFECTED, sees no outcome yet
+   * (A has not written it) and removes the object too. Each run then writes its own
+   * `evidence.scan.object_removed` and its own `error` alarm, unless the check and the write
+   * are one locked step.
+   */
+  test('NG-278: two runs that both finish the removal of one INFECTED file record one object_removed and one alarm', async () => {
+    const id = await uploadPresigned('ng278-race.docx', eicarDocx());
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+
+    let reachedDelete!: () => void;
+    const aInDelete = new Promise<void>((resolve) => (reachedDelete = resolve));
+    let releaseDelete!: () => void;
+    const aMayDelete = new Promise<void>((resolve) => (releaseDelete = resolve));
+    let deleteCalls = 0;
+    const deleteObject = async (k: string): Promise<boolean> => {
+      deleteCalls += 1;
+      if (deleteCalls === 1) {
+        reachedDelete();
+        await aMayDelete;
+      }
+      return storage.deleteObjectBytes(k);
+    };
+
+    const runA = scanner.scanEvidence(run(id), { clamd, enqueue: async () => true, deleteObject });
+    await aInDelete;
+    // Run B: the row is INFECTED, A's check has passed, A has not written its outcome yet.
+    const runB = scanner.scanEvidence(run(id), { clamd, enqueue: async () => true, deleteObject });
+    // Give B time to finish on its own (a fixed window, not a sleep for correctness: with the
+    // fix B waits for A's lock and the counts below hold either way).
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    releaseDelete();
+    const [outA, outB] = await Promise.all([runA, runB]);
+    console.log(`[NG-278 race] A=${JSON.stringify(outA)} B=${JSON.stringify(outB)} deleteCalls=${deleteCalls}`);
+
+    expect(await storage.statObject(key), 'the infected object is removed').toBeNull();
+    const removed = await admin!.auditEvent.findMany({ where: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: id } });
+    expect(removed, 'exactly one object_removed AuditEvent').toHaveLength(1);
+    const alerts = await admin!.systemAlert.findMany({ where: { source: 'evidence-scan', level: 'error' } });
+    const mine = alerts.filter((a) => (a.meta as { evidenceId?: string } | null)?.evidenceId === id);
+    expect(mine, 'exactly one error alarm for this file').toHaveLength(1);
+    alertIds.push(...mine.map((a) => a.id));
+  });
 });

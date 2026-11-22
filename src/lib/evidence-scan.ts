@@ -1,4 +1,4 @@
-import { prisma, withTenant, type TenantTx } from '@/lib/db';
+import { prisma, withTenant, type TenantTx, type TenantTxOptions } from '@/lib/db';
 import { deleteObjectBytes, getObjectBytes, tenantObjectKeyOf } from '@/lib/storage';
 import { scanBytes, type ClamdOptions, type ClamdVerdict } from '@/lib/clamav';
 import { recordAlert } from '@/lib/observability/system-alert';
@@ -54,7 +54,13 @@ export interface EvidenceScanRun {
   attempt: number;
 }
 
-type TenantRunner = <T>(tenantId: string, callback: (tx: TenantTx) => Promise<T>) => Promise<T>;
+type TenantRunner = <T>(tenantId: string, callback: (tx: TenantTx) => Promise<T>, options?: TenantTxOptions) => Promise<T>;
+
+/**
+ * NG-278: the transaction that removes an infected object holds the evidence row's lock across the
+ * object delete (an R2 call). Prisma's 5 s default is too short for that; this is the bound.
+ */
+const OBJECT_REMOVAL_TX_TIMEOUT_MS = 30_000;
 
 export interface EvidenceScanDeps {
   scan?: (bytes: Buffer) => Promise<ClamdVerdict>;
@@ -99,7 +105,7 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
   // The attempt pins every write below to the state this run read; a value that is not a
   // count would make that filter match nothing (or, worse, something else).
   if (!Number.isInteger(run.attempt) || run.attempt < 0) throw new Error('evidence-scan: attempt must be an integer ≥ 0');
-  const runTenant: TenantRunner = deps.runTenant ?? ((id, cb) => withTenant(id, cb));
+  const runTenant: TenantRunner = deps.runTenant ?? ((id, cb, opts) => withTenant(id, cb, opts));
   const readObject = deps.readObject ?? getObjectBytes;
   const deleteObject = deps.deleteObject ?? deleteObjectBytes;
   const scan = deps.scan ?? ((bytes: Buffer) => scanBytes(bytes, deps.clamd));
@@ -217,17 +223,31 @@ async function finishInfectedRemoval(
 ): Promise<EvidenceScanOutcome> {
   const { tenantId, evidenceId } = run;
   if (!key) return { skipped: 'already_final' };
-  const recorded = await runTenant(tenantId, (tx) =>
-    tx.auditEvent.findFirst({ where: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: evidenceId }, select: { id: true } })
+  // NG-278: the check for a recorded outcome, the object delete and the outcome write are one
+  // transaction, and the evidence row is locked (FOR UPDATE) before the check. Two runs for one row
+  // run one after the other: the second sees the outcome the first wrote and removes nothing. Without
+  // the lock both checks could pass before either one wrote (the delete is the slow step), so each run
+  // wrote its own object_removed and its own error alarm (measured on Postgres: NG-278 race test).
+  // The lock is held across the R2 delete, hence the longer transaction timeout.
+  const removal = await runTenant(
+    tenantId,
+    async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Evidence" WHERE "tenantId" = ${tenantId} AND "id" = ${evidenceId} FOR UPDATE`;
+      const recorded = await tx.auditEvent.findFirst({
+        where: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: evidenceId },
+        select: { id: true },
+      });
+      if (recorded) return null;
+      const objectDeleted = await deleteObject(key).catch(() => false);
+      await tx.auditEvent.create({
+        data: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: evidenceId, data: { objectDeleted } },
+      });
+      return { objectDeleted };
+    },
+    { timeout: OBJECT_REMOVAL_TX_TIMEOUT_MS }
   );
-  if (recorded) return { skipped: 'already_final' };
-
-  const objectDeleted = await deleteObject(key).catch(() => false);
-  await runTenant(tenantId, (tx) =>
-    tx.auditEvent.create({
-      data: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: evidenceId, data: { objectDeleted } },
-    })
-  );
+  if (!removal) return { skipped: 'already_final' };
+  const { objectDeleted } = removal;
   await recordAlert({
     level: 'error',
     source: 'evidence-scan',
