@@ -5,7 +5,6 @@ import { asRole, can } from '@/lib/rbac';
 import { withTenant } from '@/lib/db';
 import { getAgencyFunnel, isAgencyTenant, type FunnelBreakdown } from '@/lib/agency/funnel';
 import { lastExpiryDay, listInviteCodesIn } from '@/lib/agency/codes';
-import { parseProvince } from '@/lib/readiness/share';
 import FunnelPanel from './funnel-panel';
 import InviteCodesPanel from './invite-codes-panel';
 import ReportsPanel from './reports-panel';
@@ -16,13 +15,11 @@ import { COBRAND_NAME_MAX } from '@/lib/agency/cobrand';
 
 /**
  * TASK-MULZATEX4G92H — one breakdown per request: `?kirilim=tur` (organisation
- * types, every province) or `?kirilim=<province>` (one province, every type).
- * An old `?il=` link still opens that province. Anything else is no breakdown.
+ * types, every province). The province breakdown is not offered since NG-339
+ * (HUKUK-5 5e): old `?kirilim=<il>` and `?il=` links show the totals.
  */
-function parseBreakdown(kirilim: string | undefined, il: string | undefined): FunnelBreakdown {
-  if (kirilim === 'tur') return { dimension: 'orgType' };
-  const province = parseProvince(kirilim ?? il);
-  return province ? { dimension: 'province', province } : { dimension: 'none' };
+function parseBreakdown(kirilim: string | undefined): FunnelBreakdown {
+  return kirilim === 'tur' ? { dimension: 'orgType' } : { dimension: 'none' };
 }
 
 /** Once per request, on the server; the client computes nothing from its own clock. */
@@ -42,15 +39,15 @@ export default async function AgencyPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ il?: string; kirilim?: string }>;
+  searchParams: Promise<{ kirilim?: string }>;
 }) {
   const { locale } = await params;
-  const { il, kirilim } = await searchParams;
+  const { kirilim } = await searchParams;
   const scope = await requireTenantPage(locale);
   if (!(await isAgencyTenant(scope.tenantId))) forbidden();
 
   const t = await getTranslations({ locale, namespace: 'agency' });
-  const breakdown = parseBreakdown(kirilim, il);
+  const breakdown = parseBreakdown(kirilim);
 
   const renderedAt = requestTime();
   const [funnel, codes, reports, cobrand] = await Promise.all([

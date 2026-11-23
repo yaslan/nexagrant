@@ -229,9 +229,8 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
     const f = await getAgencyFunnel(ids.agencyA, { breakdown: { dimension: 'orgType' } });
     if (f.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
-    // 8 organisations (shown rounded: 10): 6 SMEs + 2 municipalities. Municipalities are a
-    // group of 2 → "<5", and the total would give them away, so SME is suppressed as well.
-    expect(f.all.registered).toEqual({ state: 'count', value: 10 });
+    // 8 organisations, below SMALL_CELL_THRESHOLD (10): the total is masked too. 6 SMEs + 2 municipalities.
+    expect(f.all.registered).toEqual({ state: 'small' });
     expect(f.breakdown.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
     expect(f.breakdown.byOrgType.SME.registered).toEqual({ state: 'small' });
     // TASK-MULXF0AVMD8MN: 6 of 8 would give away "2 organisations with no saved search /
@@ -244,9 +243,9 @@ describe('getAgencyFunnel (fabrika_app, with B7 outcomes)', () => {
     expect(f.all.submitted).toEqual({ state: 'small' });
     expect(f.all.accepted).toEqual({ state: 'small' });
     expect(f.all.rejected).toEqual({ state: 'small' });
-    // B6 (TASK-MULRR8P7HIII4): all 8 of A's organisations stored a result (shown rounded: 10);
-    // 8 − 8 = 0 without one, so nothing is given away. B's result is not in it.
-    expect(f.all.readiness).toEqual({ state: 'count', value: 10 });
+    // B6 (TASK-MULRR8P7HIII4): all 8 of A's organisations stored a result; 8 is below the threshold, so masked.
+    // B's result is not in it.
+    expect(f.all.readiness).toEqual({ state: 'small' });
     expect(f.breakdown.byOrgType.SME.readiness).toEqual({ state: 'small' });
     const text = JSON.stringify(f);
     expect(text).not.toContain('secret');
@@ -310,8 +309,8 @@ describe('one cohort, no date window (TASK-MULXF0AVMD8MN, fabrika_app)', () => {
           return { submitted: 0, accepted: 0, rejected: 0 };
         },
       });
-      // Steps 1, 3-5 (SQL, since = NULL) and the B7 cohort (Prisma) both still hold it (8, shown 10).
-      expect(f.all.registered).toEqual({ state: 'count', value: 10 });
+      // Steps 1, 3-5 (SQL, since = NULL) and the B7 cohort (Prisma) both still hold it (8, below the threshold: masked).
+      expect(f.all.registered).toEqual({ state: 'small' });
       expect(seen).toContain(old);
     } finally {
       await admin!.tenant.update({ where: { id: old }, data: { createdAt: before.createdAt } });
@@ -337,14 +336,14 @@ describe('province (TASK-MULV3JXS1AW5X, fabrika_app)', () => {
     expect(await byProvinceAs(linkedA[0]!)).toEqual([]);
   });
 
-  test('getAgencyFunnel with a province: that province over every type, masked; an empty one is all "<5"', async () => {
+  test('getAgencyFunnel with a province: that province over every type, masked; an empty one is all masked', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
     const samsun = await getAgencyFunnel(ids.agencyA, { breakdown: { dimension: 'province', province: 'Samsun' } });
     if (samsun.breakdown.dimension !== 'province') throw new Error('no province breakdown');
     expect(samsun.breakdown.province).toBe('Samsun');
-    // All 8 gave Samsun: nothing is hidden behind the province line, so Samsun shows (rounded).
-    expect(samsun.breakdown.view.registered).toEqual({ state: 'count', value: 10 });
-    expect(samsun.all.registered).toEqual({ state: 'count', value: 10 });
+    // All 8 gave Samsun, but 8 is below SMALL_CELL_THRESHOLD (10): masked, not shown.
+    expect(samsun.breakdown.view.registered).toEqual({ state: 'small' });
+    expect(samsun.all.registered).toEqual({ state: 'small' });
     // TASK-MULZATEX4G92H: one breakdown per response — no type inside the province view.
     expect(JSON.stringify(samsun)).not.toMatch(/byOrgType|MUNICIPALITY|SME/);
     const tokat = await getAgencyFunnel(ids.agencyA, { breakdown: { dimension: 'province', province: 'Tokat' } });

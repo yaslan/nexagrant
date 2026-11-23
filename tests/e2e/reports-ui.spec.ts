@@ -7,6 +7,7 @@ import { encode } from 'next-auth/jwt';
 import { prisma, withTenant } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { createInviteCodeIn, redeemInviteCode } from '../../src/lib/agency/codes';
+import { SMALL_CELL_THRESHOLD } from '../../src/lib/agency/small-cell';
 import { generateAgencyReports, reportPeriod } from '../../src/lib/agency/report';
 import { presentIds, requireId } from '../helpers/teardown-guard';
 import { shotsDir } from './fixtures/shots';
@@ -462,13 +463,11 @@ const STEPS_TR = [
 /**
  * What agency A's report must say, derived from the seed alone: 5 SME organisations
  * in Kütahya, none with a scorecard, saved search, opportunity, concept note or
- * application. "Registered" is 5 and is SHOWN as 10 (rounding unit 10 since FO-398: 5 rounds up
- * to 10, meaning 5..14); every other step is 0 and therefore "<5". Every other type is 0 → "<5".
+ * application. Every count is below SMALL_CELL_THRESHOLD (NG-339: 10, was 5), so every cell
+ * is masked as "<threshold"; no number is shown for Kütahya or for the SME type.
  */
-const SHOWN_REGISTERED = '10';
-function expectedCells(registeredLabel: string) {
-  return (step: string) => (step === registeredLabel ? SHOWN_REGISTERED : '<5');
-}
+const MASKED_CELL = `<${SMALL_CELL_THRESHOLD}`;
+const expectedCell = (): string => MASKED_CELL;
 
 /** Minimal RFC 4180 reader (quoted fields, CRLF). */
 function parseCsv(text: string): string[][] {
@@ -537,8 +536,8 @@ test.describe('agency region report — view and download', () => {
     const printText = await print.locator('body').innerText();
     expect(printText).toContain(agencyA.name);
     expect(printText).toContain(period);
-    expect(printText).toContain('Kütahya');
-    for (const forbidden of [agencyB.name, 'Bartın', ...orgNames]) expect(printText).not.toContain(forbidden);
+    // NG-339 (5e): the report has no province breakdown, so no province name appears at all.
+    for (const forbidden of [agencyB.name, 'Kütahya', 'Bartın', ...orgNames]) expect(printText).not.toContain(forbidden);
     // Totals table row: "Tüm kurumlar" + 8 step cells, as computed from the seed. The group
     // label is the row's <th scope="row">; the step values are its <td>s.
     const rowCells = async (label: string) => {
@@ -546,9 +545,8 @@ test.describe('agency region report — view and download', () => {
       await expect(row).toHaveCount(1);
       return (await row.locator('th, td').allInnerTexts()).map((s) => s.trim());
     };
-    expect(await rowCells('Tüm kurumlar')).toEqual(['Tüm kurumlar', ...STEPS_TR.map(expectedCells(STEPS_TR[0]!))]);
-    expect(await rowCells('Kütahya')).toEqual(['Kütahya', ...STEPS_TR.map(expectedCells(STEPS_TR[0]!))]);
-    expect(await rowCells('KOBİ')).toEqual(['KOBİ', ...STEPS_TR.map(expectedCells(STEPS_TR[0]!))]);
+    expect(await rowCells('Tüm kurumlar')).toEqual(['Tüm kurumlar', ...STEPS_TR.map(() => expectedCell())]);
+    expect(await rowCells('KOBİ')).toEqual(['KOBİ', ...STEPS_TR.map(() => expectedCell())]);
     await print.screenshot({ path: `${SHOTS}/b2-agency-print-tr.png`, fullPage: true });
     await print.close();
 
@@ -564,17 +562,15 @@ test.describe('agency region report — view and download', () => {
     expect(table[0]).toEqual(['Dönem', 'Tablo', 'Grup', 'Adım', 'Değer']);
     const body = table.slice(1);
     expect(body.every((r) => r[0] === period)).toBe(true);
-    // Province rows: Kütahya only, never the other agency's Bartın.
+    // NG-339 (5e): no province rows, for this agency or the other one.
     const groups = new Set(body.map((r) => r[2]));
-    expect(groups.has('Kütahya')).toBe(true);
+    expect(groups.has('Kütahya')).toBe(false);
     expect(groups.has('Bartın')).toBe(false);
-    const kutahya = body.filter((r) => r[2] === 'Kütahya').map((r) => [r[3], r[4]]);
-    expect(kutahya).toEqual(STEPS_TR.map((s) => [s, expectedCells(STEPS_TR[0]!)(s)]));
     const sme = body.filter((r) => r[2] === 'KOBİ').map((r) => r[4]);
-    expect(sme).toEqual(STEPS_TR.map(expectedCells(STEPS_TR[0]!)));
-    // Every other organisation type is 0 → "<5" on every step.
-    for (const r of body.filter((r) => !['KOBİ', 'Kütahya'].includes(r[2]!) && r[1] !== body[0]![1])) {
-      expect(r[4], `${r[2]} / ${r[3]}`).toBe('<5');
+    expect(sme).toEqual(STEPS_TR.map(() => expectedCell()));
+    // Every other organisation type is 0 → masked on every step.
+    for (const r of body.filter((r) => !['KOBİ'].includes(r[2]!) && r[1] !== body[0]![1])) {
+      expect(r[4], `${r[2]} / ${r[3]}`).toBe(MASKED_CELL);
     }
     for (const forbidden of [agencyB.name, ...orgNames, agencyA.id, ...f!.orgIds]) expect(csv).not.toContain(forbidden);
 
@@ -622,11 +618,11 @@ test.describe('agency region report — view and download', () => {
     expect(await r2.text()).not.toContain('Kütahya');
     const unknown = await bCtx.request.get(path(`nonexistent-${randomUUID()}`));
     expect(unknown.status()).toBe(404);
-    // Its own report still works, and holds its own province only.
+    // Its own report still works, and carries no province (NG-339 5e) and none of agency A's.
     const own = await bCtx.request.get(path(reportB));
     expect(own.status()).toBe(200);
     const ownCsv = await own.text();
-    expect(ownCsv).toContain('Bartın');
+    expect(ownCsv).not.toContain('Bartın');
     expect(ownCsv).not.toContain('Kütahya');
     await bCtx.close();
   });
@@ -654,7 +650,7 @@ test.describe('agency region report — view and download', () => {
     const table = parseCsv(readFileSync((await download.path())!, 'utf8').slice(1));
     expect(table[0]).toEqual(['Period', 'Table', 'Group', 'Step', 'Value']);
     const totals = table.filter((r) => r[1] === 'All organisations').map((r) => [r[3], r[4]]);
-    expect(totals).toEqual(STEPS_EN.map((s) => [s, expectedCells(STEPS_EN[0]!)(s)]));
+    expect(totals).toEqual(STEPS_EN.map((s) => [s, expectedCell()]));
 
     const [print] = await Promise.all([context.waitForEvent('page'), printLink.click()]);
     await print.setViewportSize({ width: 390, height: 844 });
@@ -662,7 +658,8 @@ test.describe('agency region report — view and download', () => {
     const text = await print.locator('body').innerText();
     expect(text).toContain('Regional application funnel report');
     expect(text).toContain(agencyA.name);
-    expect(text).toContain('Kütahya');
+    // NG-339 (5e): no province in the printable report.
+    expect(text).not.toContain('Kütahya');
     expect(text).not.toContain('Bartın');
     await print.screenshot({ path: `${SHOTS}/d3-agency-print-en-390.png`, fullPage: true });
     await print.close();
