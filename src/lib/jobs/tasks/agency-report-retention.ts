@@ -6,6 +6,7 @@ import {
   agencyReportRetentionRunId,
   purgeExpiredAgencyReports,
   pruneExpiredDeletionLogs,
+  pruneOrphanedDeletionLogs,
   type AgencyReportPurgeResult,
 } from '@/lib/agency/retention';
 
@@ -19,7 +20,9 @@ import {
  *
  * The same run then prunes the deletion records older than 3 years (NG-345). That step is
  * independent of the report purge: a failure in one does not stop the other, and both are
- * idempotent, so a retry repeats neither damage nor work.
+ * idempotent, so a retry repeats neither damage nor work. After the per-agency prune, ONE call
+ * prunes the 3-year-old records of agencies hard-deleted from `Tenant`, which that loop cannot
+ * reach (NG-349, pruneOrphanedDeletionLogs); it is independent and idempotent too.
  *
  * The moment is the cron tick, not the payload, so a retried or backfilled tick deletes exactly
  * what the tick would have and reuses its run id. A run added by hand
@@ -40,12 +43,13 @@ export const agencyReportRetentionTask = defineJob('agency-report-retention', as
   const now = new Date();
   const r = await runAgencyReportRetention(tick, now);
   const log = await pruneExpiredDeletionLogs(tick ?? now);
-  if (r.failed > 0 || log.failed > 0) {
+  const orphans = await pruneOrphanedDeletionLogs(tick ?? now);
+  if (r.failed > 0 || log.failed > 0 || orphans.error !== null) {
     await recordAlert({
       level: 'error',
       source: 'agency-report-retention',
       dedupeKey: r.runId,
-      message: `Agency report retention failed for ${r.failed} of ${r.agencies} agencies; deletion-record prune failed for ${log.failed}`,
+      message: `Agency report retention failed for ${r.failed} of ${r.agencies} agencies; deletion-record prune failed for ${log.failed}${orphans.error !== null ? '; hard-deleted agencies prune failed' : ''}`,
       meta: {
         runId: r.runId,
         cutoff: r.cutoff,
@@ -54,11 +58,13 @@ export const agencyReportRetentionTask = defineJob('agency-report-retention', as
         deletionLogCutoff: log.cutoff,
         deletionLogRetentionYears: AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS,
         deletionLogPruned: log.deleted,
+        deletionLogOrphansPruned: orphans.deleted,
       },
     });
     throw new Error(
       `agency-report-retention: ${r.failed} agencies failed (${r.errors.map((e) => e.message).join('; ')}); ` +
-        `deletion-record prune: ${log.failed} agencies failed (${log.errors.map((e) => e.message).join('; ')})`
+        `deletion-record prune: ${log.failed} agencies failed (${log.errors.map((e) => e.message).join('; ')})` +
+        (orphans.error !== null ? `; hard-deleted agencies prune failed (${orphans.error})` : '')
     );
   }
   return {
@@ -66,6 +72,7 @@ export const agencyReportRetentionTask = defineJob('agency-report-retention', as
     ...r,
     retentionMonths: AGENCY_REPORT_RETENTION_MONTHS,
     deletionLogPruned: log.deleted,
+    deletionLogOrphansPruned: orphans.deleted,
     deletionLogCutoff: log.cutoff,
     deletionLogRetentionYears: AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS,
   };

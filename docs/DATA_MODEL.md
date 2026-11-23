@@ -1097,9 +1097,13 @@ işi budar: `public.agency_report_deletion_log_prune(tenant, cutoff)`, kiracı b
 sınırıyla (`prisma/migrations/add-agency-report-deletion-log-no-cascade.sql`; geri alma:
 `.down.sql`, FK geri gelir ve yetim kayıt varken başarısız olur). Migration'lar: FK'yi düşüren
 `add-agency-report-deletion-log-no-cascade.sql` (NG-345) ve ilk şema.
-**Bilinen açık:** kiracı `Tenant` tablosundan kalıcı silinirse, kayıtları budama döngüsü (ajans
-listesi `Tenant`'tan okunur) ona ulaşamaz; kayıt 3 yıldan sonra da kalır. Karar bekleyen soru:
-ayrı bir platform rolü (BYPASSRLS) ya da silinmiş ajansların listesi.
+**Kalıcı silinen ajans (NG-349):** kiracı `Tenant` tablosundan kalıcı silinirse kiracı döngüsü (ajans
+listesi `Tenant`'tan okunur) onun kayıtlarına ulaşamaz. Aynı iş döngüden sonra bir kez
+`public.agency_report_deletion_log_prune_orphans(cutoff)` çağırır: yalnız `tenantId`'si `Tenant`'ta
+olmayan **ve** 3 yıldan eski kayıtları siler, 3 yıldan kısa kesimi ve kiracı oturumunu reddeder; yeni
+rol yok, BYPASSRLS yok (SECURITY DEFINER, `app.system_scope` yalnız DELETE için açılır ve geri
+kapanır; EXECUTE yalnız `fabrika_app`). Var olan ajansın kaydına dokunmaz.
+(`prisma/migrations/add-agency-report-deletion-log-prune-orphans.sql`; geri alma: `.down.sql`.)
 Canlı test: `tests/agency-report-retention.live.test.ts`, e2e: `tests/e2e/agency-report-retention.spec.ts`.
 
 **İleride (C seçeneği, ayrı onay):** ayrı bir `AgencyReport` tablosu (tekil `(agencyId, period)`).

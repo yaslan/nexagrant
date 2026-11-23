@@ -123,7 +123,8 @@ model AgencyInviteCode {
 /// NG-341 (HUKUK-5 5d): one row per (destruction run, agency) that deleted at least one
 /// monthly report (AuditEvent 'agency.report.generated') past the 12-month retention.
 /// Counts and metadata only, never report content or personal data. Kept at least 3 years,
-/// then pruned by public.agency_report_deletion_log_prune().
+/// then pruned by public.agency_report_deletion_log_prune() (and, for an agency hard-deleted from
+/// Tenant, by public.agency_report_deletion_log_prune_orphans(), NG-349).
 /// Written only by public.agency_report_purge() (SECURITY DEFINER); fabrika_app may SELECT only.
 /// Migrations: add-agency-report-deletion-log.sql, add-agency-report-deletion-log-no-cascade.sql.
 /// NO foreign key to Tenant on purpose (decision K-585864, NG-345): the record must outlive the
