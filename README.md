@@ -126,3 +126,34 @@ Geri alma: `docker compose stop postgres-vector && docker compose rm -f postgres
 iki yolda da aynıdır. Devir doğrulandıktan sonra `fabrika-postgres-manual` konteyneri (volume değil)
 `docker rm` ile kaldırılabilir. Redis ve mailpit yeni; `docker compose up -d redis mailpit` ile ayrıca
 başlatılabilir.
+
+### İkinci yerel veritabanı: `fabrika_head`
+
+Bu makinede iki geliştirme veritabanı var (NG-337):
+
+| | `fabrika` | `fabrika_head` |
+|---|---|---|
+| Konteyner / volume | `fabrika-postgres` / `fabrika_pgdata` | `fabrika-head-pg` / `fabrika_head_pgdata` |
+| URL | `127.0.0.1:5433/fabrika` | `127.0.0.1:5590/fabrika_head` |
+| İçerik | Paylaşılan, uzun ömürlü veri (CORDIS dahil) | `origin/dev` + `pnpm db:setup` (seed verisi) |
+
+- **`fabrika`**: ana checkout ve günlük geliştirme. Birçok çalışan aynı anda kullanır. Bu
+  veritabanında `db push`, migration veya toplu silme yalnız onaylı bir kartla yapılır.
+- **`fabrika_head`**: dalın şeması paylaşılan `fabrika`'dan farklıysa, ya da yazan bir canlı test
+  paylaşılan veriye dokunmamalıysa. Atılabilir bir veritabanıdır; `pnpm db:setup` onu sıfırdan kurar
+  ve tekrar koşulabilir. Gate koşusu için yine `pnpm gate:isolated` ya da kendi konteynerin
+  ("Worktree'de gate", `CLAUDE.md`) kullanılır.
+
+`fabrika_head`'i yalnız kendi worktree'nin `.env`'inde kullan; ana checkout'un `.env`'i `fabrika`'da kalır:
+
+```bash
+cp .env.example .env
+perl -pi -e 's#\@localhost:5433/fabrika#\@127.0.0.1:5590/fabrika_head#g' .env
+perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env
+pnpm db:setup        # db:rls-role, DATABASE_URL_RLS_TEST'i 127.0.0.1:5590 ile bu .env'e ekler
+```
+
+Konteyner yoksa: `docker volume create fabrika_head_pgdata && docker run -d --name fabrika-head-pg
+--restart unless-stopped -e POSTGRES_DB=fabrika_head -e POSTGRES_USER=fabrika -e POSTGRES_PASSWORD=fabrika
+-v fabrika_head_pgdata:/var/lib/postgresql/data -p 127.0.0.1:5590:5432 pgvector/pgvector:pg16`.
+Host her yerde `127.0.0.1` (FO-203). `localhost` yazma: `-p` yalnız IPv4'ü yayımlar.
