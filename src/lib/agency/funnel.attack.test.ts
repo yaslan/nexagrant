@@ -131,26 +131,47 @@ function recordView(out: Published, f: AgencyFunnel['all'], t: string, p: string
  * ({@link FUNNEL_ROUND_STEP}); the positive controls set 5, the unit before FO-398.
  */
 let activeStep: number = FUNNEL_ROUND_STEP;
+/**
+ * NG-339 (K-585957 = A): the grand total is withheld. The shipped configuration withholds it;
+ * the positive controls run the configuration before it (unit 5 and the total published), so
+ * they still show that the attacker finds a leak when one is there. Without this the controls
+ * would only prove that the total was hidden.
+ */
+let activeWithhold = true;
 function withStep<T>(step: number, fn: () => T): T {
   const prev = activeStep;
+  const prevWithhold = activeWithhold;
   activeStep = step;
+  activeWithhold = step === FUNNEL_ROUND_STEP;
   try {
     return fn();
   } finally {
     activeStep = prev;
+    activeWithhold = prevWithhold;
+  }
+}
+
+/** A control that needs the grand total published (the configuration before NG-339 decision A). */
+function withTotalPublished<T>(fn: () => T): T {
+  const prev = activeWithhold;
+  activeWithhold = false;
+  try {
+    return fn();
+  } finally {
+    activeWithhold = prev;
   }
 }
 
 function publish(table: Table): Published {
   const out: Published = new Map();
   const provinces = [...table.keys()].filter((p) => p !== NO_PROVINCE) as TrProvince[];
-  recordView(out, buildAgencyFunnel(table, { dimension: 'none' }, activeStep).all, ALL, ALL);
-  const byType = buildAgencyFunnel(table, { dimension: 'orgType' }, activeStep);
+  recordView(out, buildAgencyFunnel(table, { dimension: 'none' }, activeStep, activeWithhold).all, ALL, ALL);
+  const byType = buildAgencyFunnel(table, { dimension: 'orgType' }, activeStep, activeWithhold);
   recordView(out, byType.all, ALL, ALL);
   if (byType.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
   for (const t of ORG_TYPES) recordView(out, byType.breakdown.byOrgType[t], t, ALL);
   for (const p of provinces) {
-    const f = buildAgencyFunnel(table, { dimension: 'province', province: p }, activeStep);
+    const f = buildAgencyFunnel(table, { dimension: 'province', province: p }, activeStep, activeWithhold);
     recordView(out, f.all, ALL, ALL);
     if (f.breakdown.dimension !== 'province') throw new Error('no province breakdown');
     recordView(out, f.breakdown.view, ALL, p);
@@ -1016,7 +1037,7 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     expect(learned.length).toBe(INVITE_CODE_USE_LIMIT_SPREAD + 1);
   });
 
-  test('self-burn: with the filled codes known exactly, the window for the last code (from the grand total alone) shrinks from ~25 per code to the rounding step (5)', () => {
+  test('control, grand total published (before NG-339 decision A): with the filled codes known exactly, the window for the last code (from the grand total alone) shrinks from ~25 per code to the rounding step (5)', () => {
     // The agency filled nFull codes itself (it knows each one's uses exactly) and a last code holds
     // r uses it did not make. The funnel total is shown rounded to FUNNEL_ROUND_STEP (10; true value within -5..+4), D = 0:
     //   r in [shown - 2 - S, shown + 2 - S]   with S = sum of the uses of the filled codes.
@@ -1031,7 +1052,7 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
       const r = 1 + Math.floor(rand() * 4);
       const { codes, R } = saturatedCodes(newInviteCodeUseLimit, nFull, r, 0);
       const t = bigTable(rand, R, false);
-      const shown = publish(t).get(id('registered', ALL, ALL));
+      const shown = withTotalPublished(() => publish(t)).get(id('registered', ALL, ALL));
       if (shown == null) throw new Error('the grand total of a big cohort must be shown');
       const filled = codes.slice(0, nFull);
       const sExact = filled.reduce((a, c) => a + c.used, 0);
@@ -1235,7 +1256,7 @@ describe('NG-339: threshold 10, and no province breakdown on the dashboard', () 
     if (f.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
     expect(f.breakdown.byOrgType.SME.registered).toEqual({ state: 'small' });
     expect(f.breakdown.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
-    expect(f.all.registered).toEqual({ state: 'count', value: 30 }); // 32 rounded to the step
+    expect(f.all.registered).toEqual({ state: 'withheld' }); // the grand total is never published (K-585957 = A)
   });
 
   test('the type view names no province: the dashboard publishes totals and types only', () => {

@@ -468,6 +468,8 @@ const STEPS_TR = [
  */
 const MASKED_CELL = `<${SMALL_CELL_THRESHOLD}`;
 const expectedCell = (): string => MASKED_CELL;
+// NG-339 (K-585957 = A): the grand total's cell text (messages/tr.json reports.doc.withheld).
+const WITHHELD_CELL = 'Gizlendi: toplam yayımlanmaz, kırılımlardan geri hesaplanamaz';
 
 test.describe('agency region report — on screen only (NG-341: no file)', () => {
   let f: AgencyFixture | undefined;
@@ -522,14 +524,15 @@ test.describe('agency region report — on screen only (NG-341: no file)', () =>
     expect(text).not.toMatch(/PDF|Yazdır/);
     await expect(tab.getByRole('button')).toHaveCount(0);
     for (const forbidden of [agencyB.name, 'Kütahya', 'Bartın', ...orgNames]) expect(text).not.toContain(forbidden);
-    // Totals table row: "Tüm kurumlar" + 8 step cells, as computed from the seed. The group
-    // label is the row's <th scope="row">; the step values are its <td>s.
+    // Totals table row: "Tüm kurumlar" + 8 step cells. NG-339 (K-585957 = A): the grand total is
+    // withheld in every cell, never a number. The group label is the row's <th scope="row">; the
+    // step values are its <td>s.
     const rowCells = async (label: string) => {
       const row = tab.locator('tr').filter({ has: tab.locator('th[scope="row"]', { hasText: new RegExp(`^${label}$`) }) });
       await expect(row).toHaveCount(1);
       return (await row.locator('th, td').allInnerTexts()).map((s) => s.trim());
     };
-    expect(await rowCells('Tüm kurumlar')).toEqual(['Tüm kurumlar', ...STEPS_TR.map(() => expectedCell())]);
+    expect(await rowCells('Tüm kurumlar')).toEqual(['Tüm kurumlar', ...STEPS_TR.map(() => WITHHELD_CELL)]);
     expect(await rowCells('KOBİ')).toEqual(['KOBİ', ...STEPS_TR.map(() => expectedCell())]);
     await tab.screenshot({ path: `${SHOTS}/b2-agency-view-tr.png`, fullPage: true });
     await tab.close();

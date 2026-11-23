@@ -3414,6 +3414,8 @@
       "unmeasured": "Henüz ölçülmüyor",
       "smallHint": "{threshold} kurumdan az: kurumları tanıtmamak için sayı gösterilmez.",
       "smallSr": "{threshold} kurumdan az; sayı gizlendi",
+      "withheld": "Gizlendi",
+      "withheldHint": "Kayıtlı tüm kurumların toplamı ne burada ne raporda yayımlanır: kırılımlardan geri hesaplanabildiği için tamamen gizlenir.",
       "privacyNote": "Gösterilen sayılar {step} birimine yuvarlanır (gösterilen \"{step}\" gerçekte {low} ile {high} arasıdır); her sayı ayrı yuvarlandığı için parçaların toplamı toplamı tutmayabilir. <{threshold}: Bu grupta {threshold} kurumdan az var ya da sayı, başka sayılarla birlikte (toplam, başka bir tür ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
       "steps": {
         "registered": {
@@ -3525,6 +3527,7 @@
         "orgTypeTable": "Kurum türüne göre (tüm iller)",
         "groupColumn": "Grup",
         "small": "<{threshold}",
+        "withheld": "Gizlendi: toplam yayımlanmaz, kırılımlardan geri hesaplanamaz",
         "unmeasured": "Henüz ölçülmüyor",
         "footer": "{brand} — ajans bölge raporu. Toplulaştırılmış kurum sayıları; kişisel veri içermez."
       }

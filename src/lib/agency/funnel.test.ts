@@ -53,6 +53,16 @@ function table(v: Record<string, Partial<Record<OrgType, number | Partial<Counts
   return new Map(Object.entries(v).map(([p, t]) => [p, types(t)]));
 }
 
+/**
+ * The display rules (rounding, threshold, the nested and type lines) with the grand total
+ * published. Decision A (K-585957) withholds the total; that changes which parts are masked
+ * (every part visible would sum to the total), so its effect is tested on its own below.
+ */
+const openFunnel = (raw: Record<OrgType, Counts>) =>
+  buildAgencyFunnel(new Map([[NO_PROVINCE, raw]]), { dimension: 'orgType' }, FUNNEL_ROUND_STEP, false);
+const openBy = (t: Map<string, Record<OrgType, Counts>>, breakdown: Parameters<typeof buildAgencyFunnel>[1]) =>
+  buildAgencyFunnel(t, breakdown, FUNNEL_ROUND_STEP, false);
+
 const byType = (f: AgencyFunnel): Record<OrgType, FunnelView> => {
   if (f.breakdown.dimension !== 'orgType') throw new Error('not a type breakdown');
   return f.breakdown.byOrgType;
@@ -68,24 +78,24 @@ describe('display', () => {
 
   test('readiness is a measured step since B6 (TASK-MULRR8P7HIII4): counted, rounded and masked like the others', () => {
     // Each type's readiness equals its registered (nothing hidden between them): 25 + 19 = 44.
-    const f = buildFunnel(types({ SME: { registered: 25, readiness: 25 }, MUNICIPALITY: { registered: 19, readiness: 19 } }));
+    const f = openFunnel(types({ SME: { registered: 25, readiness: 25 }, MUNICIPALITY: { registered: 19, readiness: 19 } }));
     expect(f.all.readiness).toEqual({ state: 'count', value: 40 }); // 44
     expect(byType(f).SME.readiness).toEqual({ state: 'count', value: 30 }); // 25
     expect(byType(f).MUNICIPALITY.readiness).toEqual({ state: 'count', value: 20 }); // 19
-    const small = buildFunnel(types({ SME: { registered: 12, readiness: 3 } }));
-    expect(small.all.readiness).toEqual({ state: 'small' });
+    const small = openFunnel(types({ SME: { registered: 12, readiness: 3 } }));
+    expect(byType(small).SME.readiness).toEqual({ state: 'small' });
   });
 
   test('readiness: registered − readiness of 1..9 masks readiness (nested line)', () => {
     // 12 registered, 10 with a result: showing both would give away the 2 without one.
-    const f = buildFunnel(types({ SME: { registered: 12, readiness: 10 } }));
-    expect(f.all.registered).toEqual({ state: 'count', value: 10 });
-    expect(f.all.readiness).toEqual({ state: 'small' });
+    const f = openFunnel(types({ SME: { registered: 12, readiness: 10 } }));
+    expect(byType(f).SME.registered).toEqual({ state: 'count', value: 10 });
+    expect(byType(f).SME.readiness).toEqual({ state: 'small' });
   });
 
   test('numbers of 10 and more come through, rounded; under 10 (0 included) are "<10"', () => {
-    const f = buildFunnel(types({ SME: 25, MUNICIPALITY: 13 }));
-    expect(f.all.registered).toEqual({ state: 'count', value: 40 }); // 38
+    const f = openFunnel(types({ SME: 25, MUNICIPALITY: 13 }));
+    expect(f.all.registered).toEqual({ state: 'count', value: 40 }); // 38 (the total is withheld in the shipped mode, see below)
     expect(byType(f).SME.registered).toEqual({ state: 'count', value: 30 }); // 25
     expect(byType(f).MUNICIPALITY.registered).toEqual({ state: 'count', value: 10 }); // 13, a shown 10 is 10..14
     expect(byType(f).NGO.registered).toEqual({ state: 'small' }); // 0 is masked too
@@ -93,7 +103,7 @@ describe('display', () => {
 
   test('a visible type beside a lone hidden one is masked too: the total would give the hidden one away', () => {
     // SME 7 is hidden on its own; total 20 − MUNICIPALITY 13 would give SME 7 exactly, so MUNICIPALITY goes too.
-    const f = buildFunnel(types({ SME: 7, MUNICIPALITY: 13 }));
+    const f = openFunnel(types({ SME: 7, MUNICIPALITY: 13 }));
     expect(f.all.registered).toEqual({ state: 'count', value: 20 });
     expect(byType(f).SME.registered).toEqual({ state: 'small' });
     expect(byType(f).MUNICIPALITY.registered).toEqual({ state: 'small' });
@@ -101,7 +111,10 @@ describe('display', () => {
 
   test('an agency with fewer than 10 organisations sees no number at all', () => {
     const f = buildFunnel(types({ SME: { registered: 4, savedSearch: 4, submitted: 4 } }));
-    for (const s of STEPS) expect(f.all[s]).toEqual({ state: 'small' });
+    for (const s of STEPS) {
+      expect(byType(f).SME[s]).toEqual({ state: 'small' });
+      expect(f.all[s]).toEqual({ state: 'withheld' });
+    }
   });
 
   test('the serialised funnel carries no id or name, only states and numbers', () => {
@@ -117,11 +130,11 @@ describe('one breakdown per response (TASK-MULZATEX4G92H)', () => {
   test('none: the totals only', () => {
     const f = buildAgencyFunnel(t, { dimension: 'none' });
     expect(f.breakdown).toEqual({ dimension: 'none' });
-    expect(f.all.registered).toEqual({ state: 'count', value: 70 });
+    expect(f.all.registered).toEqual({ state: 'withheld' }); // 70 in the table, never published (K-585957 = A)
   });
 
   test('province: that province over every type, and no type at all', () => {
-    const f = buildAgencyFunnel(t, { dimension: 'province', province: 'Samsun' });
+    const f = openBy(t, { dimension: 'province', province: 'Samsun' });
     if (f.breakdown.dimension !== 'province') throw new Error('no province');
     expect(f.breakdown.province).toBe('Samsun');
     expect(f.breakdown.view.registered).toEqual({ state: 'count', value: 40 }); // 18 + 17 = 35 rounds up
@@ -129,7 +142,7 @@ describe('one breakdown per response (TASK-MULZATEX4G92H)', () => {
   });
 
   test('type: every type over every province, and no province at all', () => {
-    const f = buildAgencyFunnel(t, { dimension: 'orgType' });
+    const f = openBy(t, { dimension: 'orgType' });
     expect(byType(f).SME.registered).toEqual({ state: 'count', value: 30 }); // 18 + 16 = 34
     expect(byType(f).MUNICIPALITY.registered).toEqual({ state: 'count', value: 40 }); // 17 + 19 = 36
     expect(JSON.stringify(f)).not.toMatch(/Samsun|Tokat/);
@@ -162,13 +175,17 @@ describe('K-2 (crw-fb): a key outside TR_PROVINCES', () => {
     // 2 are a lone hidden part and Samsun is masked with them.
     const hidden = suppressedCells(t);
     expect(hidden.has(cellId('registered', ALL, 'Samsun'))).toBe(true);
-    expect(hidden.has(cellId('registered', ALL, ALL))).toBe(false);
+    expect(hidden.has(cellId('registered', ALL, ALL))).toBe(true); // the total is withheld (K-585957 = A)
   });
 });
 
-/** Raw, unrounded: the value of a published id, or null when {@link suppressedCells} masks it. */
-function exact(t: ReturnType<typeof table>) {
-  const hidden = suppressedCells(t);
+/**
+ * Raw, unrounded: the value of a published id, or null when {@link suppressedCells} masks it.
+ * `withholdTotal` defaults to false: these rules are the complementary suppression with the grand
+ * total published (the rules before NG-339 decision A). The shipped mode is tested in its own block.
+ */
+function exact(t: ReturnType<typeof table>, withholdTotal = false) {
+  const hidden = suppressedCells(t, withholdTotal);
   const all = new Map<string, number>();
   for (const [p, tab] of normalizeProvinces(t)) {
     for (const ty of ORG_TYPES) {
@@ -266,5 +283,45 @@ describe('rules, on raw numbers', () => {
       })
     );
     for (const s of STEPS) expect(v(s, 'NGO', ALL)).toBeNull();
+  });
+});
+
+describe('NG-339 decision A (K-585957 = A): the grand total is withheld', () => {
+  test('on raw numbers: the grand total of every step is masked, and so are the parts that would sum to it', () => {
+    // Every type visible (25 + 30) would add up to the total, so the total is withheld in vain
+    // unless two parts above 0 are hidden with a sum of at least 10. The rule masks the smallest
+    // visible parts until that holds, so nothing is summed back.
+    const v = exact(table({ Samsun: { SME: 25 }, Tokat: { MUNICIPALITY: 30 } }), true);
+    for (const s of STEPS) expect(v(s, ALL, ALL)).toBeNull();
+    expect(v('registered', 'SME', ALL)).toBeNull();
+    expect(v('registered', 'MUNICIPALITY', ALL)).toBeNull();
+  });
+
+  test('on raw numbers: with enough hidden cover the parts stay visible and the total is still withheld', () => {
+    // 30 + 25 visible; the 12 + 14 hidden together (26 ≥ 10) make the total unrecoverable from the parts.
+    const v = exact(
+      table({ [NO_PROVINCE]: { SME: 30, MUNICIPALITY: 25, NGO: 12, UNIVERSITY: 14 } }),
+      true
+    );
+    expect(v('registered', ALL, ALL)).toBeNull();
+    expect(v('registered', 'SME', ALL)).toBe(30);
+    expect(v('registered', 'MUNICIPALITY', ALL)).toBe(25);
+    expect(v('registered', 'NGO', ALL)).toBeNull();
+  });
+
+  test('the shipped funnel publishes no grand total, in any breakdown and for any step', () => {
+    const t = table({ Samsun: { SME: 25, MUNICIPALITY: 13 }, Tokat: { SME: 40 } });
+    const views = [
+      buildAgencyFunnel(t, { dimension: 'none' }),
+      buildAgencyFunnel(t, { dimension: 'orgType' }),
+      buildAgencyFunnel(t, { dimension: 'province', province: 'Samsun' }),
+    ];
+    for (const f of views) for (const s of STEPS) expect(f.all[s]).toEqual({ state: 'withheld' });
+  });
+
+  test('a province is masked when the other provinces would sum to it, the total being withheld', () => {
+    const f = buildAgencyFunnel(table({ Samsun: { SME: 25 }, Tokat: { SME: 40 } }), { dimension: 'province', province: 'Samsun' });
+    expect(f.all.registered).toEqual({ state: 'withheld' });
+    expect(f.breakdown.dimension === 'province' && f.breakdown.view.registered).toEqual({ state: 'small' });
   });
 });

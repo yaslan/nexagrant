@@ -68,6 +68,8 @@ const CellSchema = z.discriminatedUnion('state', [
     })
     .strict(),
   z.object({ state: z.literal('small') }).strict(),
+  // The grand total of a step (NG-339, K-585957 = A). Stored reports before it never carry it.
+  z.object({ state: z.literal('withheld') }).strict(),
   z.object({ state: z.literal('unmeasured') }).strict(),
 ]);
 
@@ -265,6 +267,7 @@ function fill(text: string): string {
 
 function cellText(c: FunnelView[keyof FunnelView], A: Catalog): string {
   if (c.state === 'count') return String(c.value);
+  if (c.state === 'withheld') return fill(A.reports.doc.withheld);
   return c.state === 'small' ? fill(A.reports.doc.small) : A.reports.doc.unmeasured;
 }
 

@@ -3414,6 +3414,8 @@
       "unmeasured": "Not measured yet",
       "smallHint": "Fewer than {threshold} organisations: the number is hidden so that no organisation can be identified.",
       "smallSr": "fewer than {threshold}; number hidden",
+      "withheld": "Withheld",
+      "withheldHint": "The total of all registered organisations is never published, here or in the report: it could be worked out from the breakdowns, so it is withheld in full.",
       "privacyNote": "Numbers shown are rounded to a multiple of {step} (a shown {step} is really {low} to {high}); each is rounded on its own, so the parts may not add up to the total. <{threshold}: this group has fewer than {threshold} organisations, or the number could be worked out together with other numbers (a total, another type or another step). The value is hidden so that no organisation can be identified.",
       "steps": {
         "registered": {
@@ -3525,6 +3527,7 @@
         "orgTypeTable": "By organisation type (all provinces)",
         "groupColumn": "Group",
         "small": "<{threshold}",
+        "withheld": "Withheld: the total is not published, so it cannot be worked out from the breakdowns",
         "unmeasured": "Not measured yet",
         "footer": "{brand} — agency region report. Aggregated organisation counts; no personal data."
       }

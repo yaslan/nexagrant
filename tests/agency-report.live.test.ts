@@ -141,7 +141,7 @@ describe('monthly agency report (fabrika_app)', () => {
     // NG-339 (5e): no province view is stored or shown; the report has no province table.
     expect(snap!.byProvince ?? []).toEqual([]);
     // Fixture total is below SMALL_CELL_THRESHOLD, so the total is masked; 4 SMEs and 2 municipalities are masked too.
-    expect(snap!.all.registered).toEqual({ state: 'small' });
+    expect(snap!.all.registered).toEqual({ state: 'withheld' }); // NG-339 (K-585957 = A)
     expect(snap!.byOrgType.SME.registered).toEqual({ state: 'small' });
     expect(snap!.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
   });

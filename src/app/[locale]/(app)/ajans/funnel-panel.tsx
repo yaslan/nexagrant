@@ -33,6 +33,13 @@ function CellValue({ cell }: { cell: FunnelCell }) {
       </span>
     );
   }
+  if (cell.state === 'withheld') {
+    return (
+      <span className="max-w-[16rem] text-xs font-medium text-ink-2" title={t('withheldHint')}>
+        {t('withheld')}
+      </span>
+    );
+  }
   return <span className="text-sm font-medium text-muted">{t('unmeasured')}</span>;
 }
 

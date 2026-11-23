@@ -102,6 +102,8 @@ const UNMEASURED: ReadonlySet<FunnelStep> = new Set<FunnelStep>();
 export type FunnelCell =
   | { state: 'count'; value: number }
   | { state: 'small' }
+  /** The grand total ("all organisations") of a step: never published (NG-339, K-585957 = A). */
+  | { state: 'withheld' }
   | { state: 'unmeasured' };
 
 export type FunnelView = Record<FunnelStep, FunnelCell>;
@@ -259,6 +261,10 @@ interface Line {
  *   - primary: a number under {@link SMALL_CELL_THRESHOLD} (0 included, so "<10"
  *     does not tell "none" from "a few") is masked;
  *   - organisations without a province are always hidden;
+ *   - the grand total of every step is always withheld (NG-339, K-585957 = A):
+ *     it is never published, here or in the report, so nothing can be summed back
+ *     to it. `withholdTotal = false` exists only for the positive controls, which
+ *     check that the rules above still bite when the total is published;
  *   - across provinces and types (TASK-MULZATEX4G92H): what a visible total
  *     leaves hidden is either nothing, or at least TWO hidden parts above 0
  *     that sum to {@link SMALL_CELL_THRESHOLD} or more. A zero is no cover — a reader can prove it from
@@ -273,7 +279,7 @@ interface Line {
  * Returns the masked {@link cellId}s. A province nobody gave has no id here;
  * all of it is masked.
  */
-export function suppressedCells(raw: RawByProvince): Set<string> {
+export function suppressedCells(raw: RawByProvince, withholdTotal = true): Set<string> {
   const byProvince = normalizeProvinces(raw);
   // A province with no organisation is 0 everywhere and hidden everywhere: it
   // adds nothing to any sum, so only provinces that occur are walked.
@@ -298,6 +304,10 @@ export function suppressedCells(raw: RawByProvince): Set<string> {
       value.set(cellId(s, ALL, p), table ? ORG_TYPES.reduce((n, t) => n + table[t][s], 0) : 0);
     }
     hidden.add(cellId(s, ALL, NO_PROVINCE));
+    // NG-339 (K-585957 = A): the grand total of every step is never published. Its own
+    // sum is the one a reader would subtract from, so it is hidden as a whole, not rounded.
+    // `withholdTotal = false` is the mutant the positive controls run on (the total published, as before).
+    if (withholdTotal) hidden.add(cellId(s, ALL, ALL));
   }
 
   const lines: Line[] = [];
@@ -366,9 +376,10 @@ export function suppressedCells(raw: RawByProvince): Set<string> {
 export function buildAgencyFunnel(
   raw: RawByProvince,
   breakdown: FunnelBreakdown,
-  roundStep: number = FUNNEL_ROUND_STEP
+  roundStep: number = FUNNEL_ROUND_STEP,
+  withholdTotal = true
 ): AgencyFunnel {
-  return maskAgencyFunnel(raw, roundStep)(breakdown);
+  return maskAgencyFunnel(raw, roundStep, withholdTotal)(breakdown);
 }
 
 /**
@@ -379,16 +390,18 @@ export function buildAgencyFunnel(
  */
 export function maskAgencyFunnel(
   raw: RawByProvince,
-  roundStep: number = FUNNEL_ROUND_STEP
+  roundStep: number = FUNNEL_ROUND_STEP,
+  withholdTotal = true
 ): (breakdown: FunnelBreakdown) => AgencyFunnel {
   const byProvince = normalizeProvinces(raw);
-  const hidden = suppressedCells(byProvince);
+  const hidden = suppressedCells(byProvince, withholdTotal);
   const total = sumProvinces(byProvince);
   const view = (value: (s: MeasuredStep) => number, t: OrgType | typeof ALL, p: string, known = true): FunnelView =>
     Object.fromEntries(
       FUNNEL_STEPS.map((s) => {
         if (UNMEASURED.has(s)) return [s, { state: 'unmeasured' }];
         const m = s as MeasuredStep;
+        if (t === ALL && p === ALL && withholdTotal) return [s, { state: 'withheld' }];
         return [s, cell(value(m), !known || hidden.has(cellId(m, t, p)), roundStep)];
       })
     ) as FunnelView;

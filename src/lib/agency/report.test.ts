@@ -86,8 +86,8 @@ describe('report numbers == dashboard response', () => {
     });
     const r = buildAgencyReport(raw, '2026-09', AT);
     expectSameAsDashboard(r, raw);
-    // Rounded: 13 + 9 + 7 + 3 = 32 → 30; masked: 3 LARGE (under the threshold of 10).
-    expect(r.all.registered).toEqual({ state: 'count', value: 30 });
+    // The grand total (13 + 9 + 7 + 3 = 32) is withheld, not rounded (K-585957 = A); masked: 3 LARGE (under 10).
+    expect(r.all.registered).toEqual({ state: 'withheld' });
     expect(r.byOrgType.LARGE.registered).toEqual({ state: 'small' });
     for (const t of ORG_TYPES)
       for (const s of FUNNEL_STEPS) {
@@ -131,10 +131,11 @@ describe('report numbers == dashboard response', () => {
 });
 
 describe('edge cases', () => {
-  test('empty month: no organisation — every cell "<10", no province anywhere, the view still renders', () => {
+  test('empty month: no organisation — the total is withheld, every type cell "<10", no province anywhere, the view still renders', () => {
     const r = buildAgencyReport(new Map(), '2026-09', AT);
     expectSameAsDashboard(r, new Map());
-    expect(Object.values(r.all).every((c) => c.state === 'small')).toBe(true);
+    expect(Object.values(r.all).every((c) => c.state === 'withheld')).toBe(true);
+    expect(Object.values(r.byOrgType.SME).every((c) => c.state === 'small')).toBe(true);
     expect(JSON.stringify(r)).not.toContain('byProvince');
     expect(agencyReportHtml(r, 'OKA')).toContain(`&lt;${SMALL_CELL_THRESHOLD}`);
   });
@@ -143,7 +144,7 @@ describe('edge cases', () => {
     const raw = table({ Samsun: { MUNICIPALITY: 6, SME: 6 } });
     const r = buildAgencyReport(raw, '2026-09', AT);
     expectSameAsDashboard(r, raw);
-    expect(r.all.registered).toEqual({ state: 'count', value: 10 });
+    expect(r.all.registered).toEqual({ state: 'withheld' });
     expect(agencyReportHtml(r, 'OKA')).not.toContain('Samsun');
   });
 
@@ -203,7 +204,9 @@ describe('on-screen view (NG-341: no file)', () => {
     expect(agencyReportHtml(r, 'OKA', 'en')).toContain('kept for 12 months');
     expect(html).toContain(`Gösterilen sayılar ${FUNNEL_ROUND_STEP} birimine yuvarlanır`);
     expect(html).toContain('İl kırılımı bu raporda yoktur.');
-    expect(html).toContain('<td>30</td>');
+    // The grand total is withheld in the report too: the explanation sits in the cell, no number (K-585957 = A).
+    expect(html).not.toContain('<td>30</td>');
+    expect(html).toContain('<td>Gizlendi: toplam yayımlanmaz, kırılımlardan geri hesaplanamaz</td>');
   });
 
   test('reportPeriod: always the last closed month, never the open one', () => {
