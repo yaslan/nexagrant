@@ -94,11 +94,11 @@ async function seed(): Promise<Fixture> {
 async function cleanup(f: Fixture | undefined) {
   if (!f) return;
   await withSystemScope('platform-admin', 'e2e.agency-report-retention.cleanup', async (tx) => {
-    await tx.membership.deleteMany({ where: { tenantId: f.agencyId } });
+    await tx.membership.deleteMany({ where: { tenantId: requireId(f.agencyId, 'agencyId') } });
     await tx.user.deleteMany({ where: { id: { startsWith: requireId(f.stamp, 'stamp') } } });
-    await tx.auditEvent.deleteMany({ where: { tenantId: f.agencyId } });
+    await tx.auditEvent.deleteMany({ where: { tenantId: requireId(f.agencyId, 'agencyId') } });
     // The deletion records go with the tenant (FK ON DELETE CASCADE).
-    await tx.tenant.deleteMany({ where: { id: f.agencyId } });
+    await tx.tenant.deleteMany({ where: { id: requireId(f.agencyId, 'agencyId') } });
   });
 }
 
