@@ -331,7 +331,8 @@ function runSteps(steps) {
   for (const step of steps) {
     console.log(`→ ${step.join(' ')}`)
     const res = spawnSync(step[0], step.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
-    if (res.status !== 0) return res.status ?? 1
+    // NG-331 (O2): sinyalle ölen adım da kabuk konvansiyonuyla 128+n döner (tam gate yolundakiyle aynı).
+    if (res.status !== 0) return res.status ?? 128 + (os.constants.signals[res.signal] ?? 1)
   }
   return 0
 }

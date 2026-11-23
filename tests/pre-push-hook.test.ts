@@ -84,4 +84,48 @@ describe('githooks/pre-push', () => {
     const r = runHookWithStubGate(0);
     expect(r.status).toBe(0);
   });
+
+  // NG-331 (B1): kapı HEAD'i sınar. Push edilen commit HEAD değilse yeşil HEAD kırmızı bir commit'i geçirmemeli:
+  // kanca stdin'deki ref satırlarını okur ve fail-closed durur. Silme push'u (yerel sha 0…0) muaf.
+  function runHookWithPush(pushLines: string, exitCode: number) {
+    const bin = mkdtempSync(join(tmpdir(), 'pre-push-ref-'));
+    dirs.push(bin);
+    const pnpm = join(bin, 'pnpm');
+    writeFileSync(pnpm, `#!/bin/sh\necho "STUB-PNPM $*"\nexit ${exitCode}\n`);
+    chmodSync(pnpm, 0o755);
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
+      DATABASE_URL: 'postgresql://hook:hook@localhost:1/hook',
+    };
+    for (const v of HOOK_GIT_VARS) delete env[v];
+    return spawnSync('sh', [HOOK, 'origin', 'git@example.invalid:repo.git'], {
+      cwd: ROOT,
+      env,
+      input: pushLines,
+      encoding: 'utf8',
+    });
+  }
+  const HEAD_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+  const OTHER_SHA = 'a'.repeat(40);
+  const ZERO_SHA = '0'.repeat(40);
+
+  test('push edilen commit HEAD değilse kapı koşmadan fail-closed durur', () => {
+    const r = runHookWithPush(`refs/heads/x ${OTHER_SHA} refs/heads/x ${ZERO_SHA}\n`, 0);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toContain('HEAD değil');
+    expect(r.stdout).not.toContain('STUB-PNPM');
+  });
+
+  test('silme push\'u (yerel sha 0…0) muaf: kapı koşar ve 0 döner', () => {
+    const r = runHookWithPush(`(delete) ${ZERO_SHA} refs/heads/x ${OTHER_SHA}\n`, 0);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('STUB-PNPM gate');
+  });
+
+  test('push edilen commit HEAD ise kapı normal koşar (kırmızı → 4)', () => {
+    const r = runHookWithPush(`refs/heads/x ${HEAD_SHA} refs/heads/x ${OTHER_SHA}\n`, 4);
+    expect(r.status).toBe(4);
+    expect(r.stdout).toContain('STUB-PNPM gate');
+  });
 });

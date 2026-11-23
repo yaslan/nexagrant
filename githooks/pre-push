@@ -6,6 +6,23 @@ set -e
 # repo kuran testler) BU reponun indeksini okur ve ona `git add` yazar (FO-111).
 # Kancanın cwd'si checkout kökü; git repoyu buradan kendisi bulur.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX
+# NG-331 (B1): git push edilen ref'leri stdin'den verir: "<yerel-ref> <yerel-sha> <uzak-ref> <uzak-sha>".
+# Kapı HEAD'i sınar; push edilen commit HEAD değilse yeşil kapı yanlış kanıt olur (HEAD yeşil, push edilen kırmızı).
+# Bu yüzden her silme-olmayan satırda yerel-sha == HEAD şart. Silme push'u (yerel-sha tümü 0) kod taşımaz: muaf
+# (lider kararı; docs/GATE.md). stdin pnpm gate'e kalmasın diye en başta okunur.
+refs=$(cat)
+head_sha=$(git rev-parse HEAD)
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "$local_ref" ] || continue
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+  if [ "$local_sha" != "$head_sha" ]; then
+    echo "pre-push: push edilen commit HEAD değil ($local_ref = $local_sha, HEAD = $head_sha); push durduruldu." >&2
+    echo "  Kapı yalnız HEAD'i sınar. Önce o commit'i checkout edin, sonra push edin." >&2
+    exit 1
+  fi
+done <<EOF
+$refs
+EOF
 # Paylaşılan .git/config'te core.bare=true ise dur; ayarı kendimiz düzeltmeyiz (FO-114).
 . scripts/git-core-bare.sh
 core_bare_guard pre-push || exit 1
