@@ -3516,7 +3516,7 @@
       "generatedAt": "Hazırlandı",
       "view": "Raporu görüntüle",
       "viewLabel": "Raporu görüntüle: {period} (yeni sekmede açılır)",
-      "retentionNote": "Bu rapor 12 ay saklanır; süresi dolanlar 6 ayda bir toplu silinir.",
+      "retentionNote": "Bu rapor {months} ay saklanır; süresi dolanlar {interval} ayda bir toplu silinir.",
       "doc": {
         "title": "Bölge başvuru hunisi raporu",
         "periodLabel": "Dönem",

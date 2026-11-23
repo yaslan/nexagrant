@@ -3516,7 +3516,7 @@
       "generatedAt": "Prepared",
       "view": "View report",
       "viewLabel": "View report: {period} (opens in a new tab)",
-      "retentionNote": "This report is kept for 12 months; expired reports are deleted together every 6 months.",
+      "retentionNote": "This report is kept for {months} months; expired reports are deleted together every {interval} months.",
       "doc": {
         "title": "Regional application funnel report",
         "periodLabel": "Period",
