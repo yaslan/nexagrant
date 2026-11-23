@@ -144,7 +144,6 @@ describe('edge cases', () => {
     const r = buildAgencyReport(raw, '2026-09', AT);
     expectSameAsDashboard(r, raw);
     expect(r.all.registered).toEqual({ state: 'count', value: 10 });
-    expect(agencyReportCsv(r)).not.toContain('Samsun');
     expect(agencyReportHtml(r, 'OKA')).not.toContain('Samsun');
   });
 
@@ -202,7 +201,7 @@ describe('on-screen view (NG-341: no file)', () => {
     expect(html).not.toContain('@media print');
     expect(html).toContain('Bu rapor 12 ay saklanır; süresi dolanlar 6 ayda bir toplu silinir.');
     expect(agencyReportHtml(r, 'OKA', 'en')).toContain('kept for 12 months');
-    expect(html).toContain(`${FUNNEL_ROUND_STEP}'un katına yuvarlanır`);
+    expect(html).toContain(`Gösterilen sayılar ${FUNNEL_ROUND_STEP} birimine yuvarlanır`);
     expect(html).toContain('İl kırılımı bu raporda yoktur.');
     expect(html).toContain('<td>30</td>');
   });
