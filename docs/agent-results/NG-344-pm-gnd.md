@@ -60,6 +60,15 @@ Biçim kontrolü: `git diff --check` temiz (`CHECK_OK`). Tablo satırlarında ye
 3. NG-342 ek metin önerileri (§6 "anonim/<5/indirilebilir" ifadeleri): lider onayı bekleniyor.
 4. `SECURITY_COMPLIANCE.md` tablosunda (satır 110-119) ajans raporu için saklama satırı yok. Kart yalnız `docs/legal/**` dediği için dokunulmadı.
 
+## Gate, push ve PR (son durum)
+
+- Push: `task/ng-344` uzak depoya çıktı (WSL'den). Pre-push kancası çalıştırılabilir izinle gelmediği için git onu atladı; gate otomatik koşmadı.
+- Elle `pnpm gate` (izole DB `pmgndng344`, WSL): **kırmızı**. Vitest: 64 dosya / 264 test hatalı (billing `plan-repository`, `rls-coverage`, alerts). Hatalar çoğunlukla DB ile ilgili (`DATABASE_URL_RLS_TEST is not set`, P2011/P2039, `ECONNREFUSED`). Log: `/home/aslan/ng344-gate.clean.log` (WSL). Bu değişiklik yalnız docs; kodla ilişkisi kurulmadı, temel dal (`task/ng-342`) üzerinde aynı sonuç verip vermediği doğrulanmadı.
+- Draft PR: #424 (base `task/ng-342`), CI sonucu bekleniyor.
+- Not: `pnpm gate` çıkış kodunu 0 gösterdi ama vitest `exit 1` verdi; sarmalayıcının çıkış kodu güvenilir değil.
+
+Sonuç: NG-344 belge işi tamam, ama gate ve CI yeşil değil; kart `review`'a alınmadı.
+
 ## Platform beyanı
 
 Yalnız belge; kod yolu yok. Platform bağımlı bir davranış değişmedi. Koşulamadığım bir platform yok.
