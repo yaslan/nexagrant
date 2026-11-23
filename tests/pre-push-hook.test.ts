@@ -87,7 +87,7 @@ describe('githooks/pre-push', () => {
 
   // NG-331 (B1): kapı HEAD'i sınar. Push edilen commit HEAD değilse yeşil HEAD kırmızı bir commit'i geçirmemeli:
   // kanca stdin'deki ref satırlarını okur ve fail-closed durur. Silme push'u (yerel sha 0…0) muaf.
-  function runHookWithPush(pushLines: string, exitCode: number) {
+  function runHookWithPush(pushLines: string, exitCode: number, dbUrl = 'postgresql://hook:hook@localhost:1/hook') {
     const bin = mkdtempSync(join(tmpdir(), 'pre-push-ref-'));
     dirs.push(bin);
     const pnpm = join(bin, 'pnpm');
@@ -96,7 +96,7 @@ describe('githooks/pre-push', () => {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
-      DATABASE_URL: 'postgresql://hook:hook@localhost:1/hook',
+      DATABASE_URL: dbUrl,
     };
     for (const v of HOOK_GIT_VARS) delete env[v];
     return spawnSync('sh', [HOOK, 'origin', 'git@example.invalid:repo.git'], {
@@ -126,6 +126,29 @@ describe('githooks/pre-push', () => {
   test('push edilen commit HEAD ise kapı normal koşar (kırmızı → 4)', () => {
     const r = runHookWithPush(`refs/heads/x ${HEAD_SHA} refs/heads/x ${OTHER_SHA}\n`, 4);
     expect(r.status).toBe(4);
+    expect(r.stdout).toContain('STUB-PNPM gate');
+  });
+
+  // K-585866 (NG-331 A): DB adı tam olarak `fabrika` (paylaşılan DB) iken kod taşıyan push kapıyı koşmadan durur.
+  const FABRIKA_URL = 'postgresql://fabrika:fabrika@127.0.0.1:5433/fabrika';
+  const CODE_PUSH = `refs/heads/x ${HEAD_SHA} refs/heads/x ${OTHER_SHA}\n`;
+
+  test('DB adı fabrika ise kod push\'u kapı koşmadan 1 ile durur', () => {
+    const r = runHookWithPush(CODE_PUSH, 0, FABRIKA_URL);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('paylaşılan fabrika DB');
+    expect(r.stdout).not.toContain('STUB-PNPM');
+  });
+
+  test('DB adı fabrika_test_x (izole) ise kapı koşar', () => {
+    const r = runHookWithPush(CODE_PUSH, 0, 'postgresql://fabrika:fabrika@127.0.0.1:5572/fabrika_test_ng331');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('STUB-PNPM gate');
+  });
+
+  test('silme push\'u DB adı fabrika iken de muaf: kapı koşar', () => {
+    const r = runHookWithPush(`(delete) ${ZERO_SHA} refs/heads/x ${OTHER_SHA}\n`, 0, FABRIKA_URL);
+    expect(r.status).toBe(0);
     expect(r.stdout).toContain('STUB-PNPM gate');
   });
 });

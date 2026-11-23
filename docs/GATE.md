@@ -37,7 +37,7 @@ Kapının çıkış kodu **gerçek alt süreçten** gelir: `scripts/gate-lock.mj
 
 **Push edilen ref kontrolü (NG-331 B1).** Kapı `HEAD`'i sınar. Kanca git'in stdin satırlarını (`<yerel-ref> <yerel-sha> <uzak-ref> <uzak-sha>`) okur; silme-olmayan her satırda `yerel-sha` ≠ `git rev-parse HEAD` ise kapı koşmadan fail-closed çıkar (`push edilen commit HEAD değil`). Yoksa yeşil `HEAD` kırmızı bir commit'in push'unu geçirirdi. Düzeltme: önce ilgili commit'i checkout edin, sonra push edin.
 **Silme muafiyeti (lider kararı):** `yerel-sha` tümü `0` olan (uzak dal silme) push'u kod taşımadığı için kapı kontrolüne girmez.
-**Ölçülen davranış (açık soru 1):** kanca `DATABASE_URL`'in paylaşılan `fabrika` DB'sine (`127.0.0.1:5433/fabrika`) işaret etmesini engellemez; yalnız `→ veritabanı: …` satırıyla hedefi yazar ve kapıyı koşar. Yani worktree `.env`'i paylaşılan DB gösteriyorsa kapı ortak DB'ye karşı koşar. Değişiklik önerisi karar bekliyor (kanca uyarsın ya da dursun); bugünkü kod uyarmaz.
+**Paylaşılan DB reddi (K-585866 = A, NG-331):** DB adı tam olarak `fabrika` ise (`127.0.0.1:5433/fabrika` gibi; paylaşılan DB) ve push kod taşıyorsa kanca kapıyı koşmadan `exit 1` verir: `pre-push: bu checkout'un DATABASE_URL'i paylaşılan fabrika DB'si gösteriyor; push durduruldu.` Ad eşleşmesi tam addır: `fabrika_test_ng331` gibi izole adlar geçer. Silme push'u (yerel-sha 0…0) kod taşımadığı için muaftır. Worktree'de izole DB kur (CLAUDE.md "Worktree'de gate").
 
 **Test koşu çıkış kodları (NG-331 O1/O2).** Belge-yalnız dalındaki `lint` + `i18n:check` adımının çıkış kodu da gerçek alt süreçten gelir: kırmızı 3 → 3, sinyalle ölüm → `128+n` (O2 öncesinde 1'e iniyordu). Önbellek isabeti 0 döner ve pnpm çağrılmaz.
 

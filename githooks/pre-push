@@ -12,9 +12,11 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX
 # (lider kararı; docs/GATE.md). stdin pnpm gate'e kalmasın diye en başta okunur.
 refs=$(cat)
 head_sha=$(git rev-parse HEAD)
+code_push=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "$local_ref" ] || continue
   case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+  code_push=1
   if [ "$local_sha" != "$head_sha" ]; then
     echo "pre-push: push edilen commit HEAD değil ($local_ref = $local_sha, HEAD = $head_sha); push durduruldu." >&2
     echo "  Kapı yalnız HEAD'i sınar. Önce o commit'i checkout edin, sonra push edin." >&2
@@ -38,7 +40,17 @@ fi
 # Yalnız host:port/db yazılır; parola ve girdinin kendisi hiçbir zaman basılmaz (scripts/db-target.sh).
 . scripts/db-target.sh
 db=${DATABASE_URL:-$(db_env_value .env)}
-echo "→ veritabanı: $(db_target "$db")"
+db_shown=$(db_target "$db")
+echo "→ veritabanı: $db_shown"
+# K-585866 (NG-331 A): `fabrika` paylaşılan DB'nin adıdır (CLAUDE.md "Worktree'de gate"). Kod taşıyan bir push'un
+# kapısı onda koşarsa paylaşılan veriye karşı yazılır ve ortak koşularla çakışır. Tam ad eşleşmesi (önek değil):
+# fabrika_test_ng331 gibi izole adlar geçer. Silme push'u (yerel-sha 0…0) kod taşımadığı için muaf.
+db_name=${db_shown##*/}
+if [ "$code_push" = 1 ] && [ "$db_name" = "fabrika" ]; then
+  echo "pre-push: bu checkout'un DATABASE_URL'i paylaşılan fabrika DB'si gösteriyor; push durduruldu." >&2
+  echo "  İzole DB kullan (CLAUDE.md \"Worktree'de gate\": ad fabrika OLMASIN, örn. fabrika_test_ng<n>)." >&2
+  exit 1
+fi
 # FO-203: localhost URL'si Postgres'i yalnız 127.0.0.1'de buluyorsa ::1 tarafı sahipsizdir;
 # başka bir süreç o portu alınca psql kırılır ve gate rastgele kırmızı verir. Gate'ten önce dur.
 node scripts/db-loopback-check.mjs || exit 1
