@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 
 /**
  * TASK-MULRR08Y9YI77 (FB KAMU B3) — the monthly region report, run on
@@ -81,7 +82,7 @@ beforeAll(async () => {
     SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'agency_funnel_counts_by_province'`;
   if (fn[0]?.n !== 1) {
     skipReason = 'add-agency-funnel-province.sql is not applied (scripts/apply-migrations.sh)';
-    skipOrFailInCi(SUITE, skipReason);
+    skipOrFailOnMissingDbObject(SUITE, skipReason);
     return;
   }
   ids.agencyA = await newTenant('AGENCY', null, 'SME', null);

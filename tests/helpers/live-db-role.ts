@@ -42,7 +42,7 @@ export interface RoleFacts {
 }
 
 /** True when `CI` is set to anything but an explicit off value. */
-export function isCi(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isCi(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
   const v = env.CI;
   return (
     v !== undefined && !["", "0", "false"].includes(v.trim().toLowerCase())

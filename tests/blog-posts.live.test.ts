@@ -49,6 +49,7 @@ import {
   updateBlogPostAction,
 } from '@/app/[locale]/admin/blog/actions';
 import { assertRlsSubjectRole, isLocalDbUrl, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 import { sqlStatements } from './helpers/sql-statements';
 
 const OWNER = OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
@@ -66,7 +67,7 @@ const HAS_TABLE = REACHABLE
   ? ((await admin.$queryRaw<Array<{ t: string | null }>>`SELECT to_regclass('public."BlogPost"')::text AS t`)[0]?.t ?? null) !== null
   : false;
 if (REACHABLE && !HAS_TABLE) {
-  skipOrFailInCi(SUITE, 'table "BlogPost" is missing — apply prisma/migrations/add-blog-post.sql (scripts/apply-migrations.sh)');
+  skipOrFailOnMissingDbObject(SUITE, 'table "BlogPost" is missing — apply prisma/migrations/add-blog-post.sql (scripts/apply-migrations.sh)');
 }
 const HAS_DB = REACHABLE && HAS_TABLE;
 
@@ -85,7 +86,7 @@ const HAS_READ_TIME =
   (await admin.$queryRaw<Array<{ n: bigint }>>`SELECT count(*) AS n FROM information_schema.columns
      WHERE table_schema = current_schema() AND table_name = 'BlogPost' AND column_name = 'readTime'`)[0]?.n === 1n;
 if (HAS_READ_TIME) {
-  skipOrFailInCi(`${SUITE} (FO-87 migration test)`, '"BlogPost"."readTime" still exists — apply prisma/migrations/drop-blog-read-time.sql (scripts/apply-migrations.sh)');
+  skipOrFailOnMissingDbObject(`${SUITE} (FO-87 migration test)`, '"BlogPost"."readTime" still exists — apply prisma/migrations/drop-blog-read-time.sql (scripts/apply-migrations.sh)');
 }
 
 const RUN = Math.random().toString(36).slice(2, 10);
