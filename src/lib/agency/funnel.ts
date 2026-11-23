@@ -28,18 +28,21 @@
  * in crw-fb's example (TASK-MULWCLZHRTRK5-crw-fb.md Ö-1).
  *
  * One breakdown at a time (TASK-MULZATEX4G92H, leed-fb 29.09): a response
- * carries the totals plus either one province (every type) or every type
- * (every province), never a type × province cell. Every step counts
- * organisations — steps 6-7 too — so one threshold means one unit.
+ * carries the totals plus every organisation type (every province). The
+ * province breakdown is NOT published since NG-339 (HUKUK-5 5e, 23.11.2026):
+ * an agency can register its own organisations under a second account, so no
+ * rule can take them out of a province count (see report.ts and the dashboard
+ * for the decision). The masking below still counts provinces, so the
+ * numbers shown never depend on whether a province view is published.
+ * Every step counts organisations — steps 6-7 too — so one threshold means one unit.
  *
  * Every number then goes through the small-cell rule (§3.1) with complementary
  * suppression over every breakdown at once ({@link suppressedCells}): each is
  * one request away, so no number a reader can combine with another may leave
- * a group of 1..4. src/lib/agency/funnel.attack.test.ts is the gate: an
+ * a group of 1..{@link SMALL_CELL_THRESHOLD} - 1. src/lib/agency/funnel.attack.test.ts is the gate: an
  * integer attacker joining every view. Every number shown is then rounded to
- * a multiple of 10 ({@link roundForDisplay}, {@link FUNNEL_ROUND_STEP}; 5 until
- * FO-398). Masking and rounding happen
- * here, so the browser never receives a count under 5 nor an exact count.
+ * a multiple of {@link FUNNEL_ROUND_STEP} (10). Masking and rounding happen
+ * here, so the browser never receives a count under {@link SMALL_CELL_THRESHOLD} nor an exact count.
  *
  * Not on any screen yet, and gated if it ever is (TASK-MUM1OTRM75QS2-crw-fb.md
  * Ö-2): the refused-code audit rows, `agency.invite.rejected` with `reason` and
@@ -61,8 +64,9 @@ import { countApplicationOutcomes } from '@/lib/k5-pipeline/applicationOutcome';
 import { TR_PROVINCES, type TrProvince } from '@/lib/readiness/provinces';
 import { readTenantReadiness } from '@/lib/readiness/account';
 
-/** docs/legal/agency-channel-notice-addendum.md §3.1 (HUKUK-5): one threshold for B2 and B3. */
-export const SMALL_CELL_THRESHOLD = 5;
+// The threshold and the rounding unit live in small-cell.ts (no server imports: the client reads them too).
+import { FUNNEL_ROUND_STEP, SMALL_CELL_THRESHOLD } from './small-cell';
+export { FUNNEL_ROUND_STEP, SMALL_CELL_THRESHOLD, shownRange } from './small-cell';
 
 export const ORG_TYPES: readonly OrgType[] = [
   'MUNICIPALITY',
@@ -161,24 +165,12 @@ export class NotAnAgencyError extends Error {
 }
 
 /**
- * The unit every shown number is rounded to (FO-398, K-577799). It was 5 (HUKUK-5) until the
- * attacker of funnel.attack.test.ts showed that a step of 5 is not enough once an agency knows
- * some of its own codes' uses exactly: with 5-30 organisations it registered itself on a fresh
- * code it reads another code's hidden 1..4 uses back in 60 of 900 simulated tables (D = 0,
- * several provinces), 74 of 900 with the 500 records of a limit-filled code. At 10 all three
- * ways read 0 of 900. The threshold stays 5: a group under 5 is still masked.
- *
- * A shown number is within -5..+4 of the truth; a shown 10 means 5..14.
- */
-export const FUNNEL_ROUND_STEP = 10;
-
-/**
  * Every number shown is rounded to the nearest multiple of {@link FUNNEL_ROUND_STEP}, each on its
  * own (totals are rounded separately, so the parts need not add up to the total). The
  * rule based suppression alone left a small group readable in about one of a thousand random
  * tables (TASK-MULZATEX4G92H, leed-fb 29.09 decision 4); rounding leaves a reader an interval
- * instead of an exact number. The threshold holds: only a number of 5 or more is shown, so a
- * shown number is never under {@link SMALL_CELL_THRESHOLD}.
+ * instead of an exact number. The threshold holds: only a number of {@link SMALL_CELL_THRESHOLD}
+ * or more is shown, so a shown number is never under it.
  */
 export function roundForDisplay(value: number, step: number = FUNNEL_ROUND_STEP): number {
   return Math.round(value / step) * step;
@@ -264,17 +256,17 @@ interface Line {
  *   - across steps: a step minus a step that counts a subset of it
  *     ({@link NESTED_STEPS}).
  * So, until nothing changes:
- *   - primary: a number under 5 (0 included, so "<5" does not tell "none" from
- *     "a few") is masked;
+ *   - primary: a number under {@link SMALL_CELL_THRESHOLD} (0 included, so "<10"
+ *     does not tell "none" from "a few") is masked;
  *   - organisations without a province are always hidden;
  *   - across provinces and types (TASK-MULZATEX4G92H): what a visible total
  *     leaves hidden is either nothing, or at least TWO hidden parts above 0
- *     that sum to 5 or more. A zero is no cover — a reader can prove it from
+ *     that sum to {@link SMALL_CELL_THRESHOLD} or more. A zero is no cover — a reader can prove it from
  *     another line (22 = 13 + 9 proves every other type empty) — and a single
  *     hidden part is its total minus the visible ones. Otherwise the smallest
  *     visible part is masked too. Where the total is itself hidden, the same
  *     holds for the parts, so it cannot be summed back;
- *   - across steps: `parent − child` is 0 or at least 5, else the child is
+ *   - across steps: `parent − child` is 0 or at least {@link SMALL_CELL_THRESHOLD}, else the child is
  *     masked;
  *   - a group whose `registered` is masked shows no step at all.
  *
@@ -406,7 +398,7 @@ export function maskAgencyFunnel(
     if (breakdown.dimension === 'province') {
       const { province } = breakdown;
       const table = byProvince.get(province);
-      // A province nobody gave is not in the table at all: all of it is "<5".
+      // A province nobody gave is not in the table at all: all of it is masked (below SMALL_CELL_THRESHOLD).
       const v = view((s) => (table ? ORG_TYPES.reduce((n, t) => n + table[t][s], 0) : 0), ALL, province, !!table);
       return { all, breakdown: { dimension: 'province', province, view: v } };
     }

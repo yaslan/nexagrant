@@ -124,7 +124,7 @@ describe('monthly agency report (fabrika_app)', () => {
     expect(new Set(rows.map((x) => x.target))).toEqual(new Set(['2026-09']));
   });
 
-  test('the stored numbers are the dashboard’s: none, by type and each province, cell for cell', async () => {
+  test('the stored numbers are the dashboard’s: totals and by type, cell for cell (no province, NG-339 5e)', async () => {
     const { getAgencyFunnel } = await import('@/lib/agency/funnel');
     const { listAgencyReportsIn, readAgencyReportIn } = await import('@/lib/agency/report');
     const { withTenant } = await import('@/lib/db');
@@ -138,23 +138,17 @@ describe('monthly agency report (fabrika_app)', () => {
     if (byType.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
     expect(snap!.all).toEqual(none.all);
     expect(snap!.byOrgType).toEqual(byType.breakdown.byOrgType);
-    for (const province of ['Samsun', 'Tokat'] as const) {
-      const f = await getAgencyFunnel(ids.agencyA, { breakdown: { dimension: 'province', province } });
-      if (f.breakdown.dimension !== 'province') throw new Error('no province breakdown');
-      const row = snap!.byProvince.find((p) => p.province === province);
-      const shows = Object.values(f.breakdown.view).some((c) => c.state === 'count');
-      // Listed exactly when the dashboard shows a number for it, and then equal.
-      expect(Boolean(row)).toBe(shows);
-      if (row) expect(row.view).toEqual(f.breakdown.view);
-    }
-    // 6 organisations → shown rounded: 10 (unit 10 since FO-398; was 5). 4 SMEs and 2 municipalities are each under 5: masked.
-    expect(snap!.all.registered).toEqual({ state: 'count', value: 10 });
+    // NG-339 (5e): no province view is stored or shown; the report has no province table.
+    expect(snap!.byProvince ?? []).toEqual([]);
+    // Fixture total is below SMALL_CELL_THRESHOLD, so the total is masked; 4 SMEs and 2 municipalities are masked too.
+    expect(snap!.all.registered).toEqual({ state: 'small' });
     expect(snap!.byOrgType.SME.registered).toEqual({ state: 'small' });
     expect(snap!.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
   });
 
   test('the stored row carries no organisation id or name, and no raw count', async () => {
     const { AGENCY_REPORT_EVENT } = await import('@/lib/agency/report');
+    const { FUNNEL_ROUND_STEP } = await import('@/lib/agency/funnel');
     const row = await admin!.auditEvent.findFirstOrThrow({
       where: { type: AGENCY_REPORT_EVENT, tenantId: ids.agencyA },
       select: { data: true },
@@ -163,7 +157,7 @@ describe('monthly agency report (fabrika_app)', () => {
     expect(json).not.toContain('secret');
     expect(json).not.toContain(RUN);
     for (const t of [...orgs, ids.agencyA, ids.agencyB]) expect(json).not.toContain(t);
-    for (const m of json.matchAll(/"value":(\d+)/g)) expect(Number(m[1]) % 5).toBe(0);
+    for (const m of json.matchAll(/"value":(\d+)/g)) expect(Number(m[1]) % FUNNEL_ROUND_STEP).toBe(0);
   });
 
   test('a second run for the same month adds nothing', async () => {

@@ -39,7 +39,7 @@ import {
  *     ⊆ pipeline, accepted / rejected ⊆ submitted — organisations, not
  *     applications);
  *   - which provinces hold organisations at all (stronger than the page tells:
- *     a province nobody gave is shown as "<5" like any other).
+ *     a province nobody gave is shown masked like any other).
  *
  *   - (TASK-MUM17YBJVAHRR, crw-fb Ö-1) the invite-code panel of the same page,
  *     exactly as `inviteCodeRow` sends it, and how codes relate to the funnel:
@@ -121,7 +121,7 @@ function recordView(out: Published, f: AgencyFunnel['all'], t: string, p: string
 
 /**
  * Every view the dashboard offers: no breakdown, by type, and each province
- * that occurs (any other province is all "<5"). Before TASK-MULZATEX4G92H
+ * that occurs (any other province is all masked). Before TASK-MULZATEX4G92H
  * this was every province × every type —
  * `for (p of [null, ...provinces]) { f = buildProvinceFunnel(table, p); all + byOrgType }` —
  * and both crw-fb examples below, and 162-171 of each 300 random tables, leaked.
@@ -362,7 +362,7 @@ function publishCodes(
     if (typeof row.useLimit === 'number') hi = Math.min(hi, row.useLimit);
     else if (row.limited === true) hi = Math.min(hi, know.max); // the range is public
     if (typeof row.usedCount === 'number') lo = hi = row.usedCount;
-    else if (row.usedCount === null) hi = Math.min(hi, SMALL_CELL_THRESHOLD - 1); // "<5"
+    else if (row.usedCount === null) hi = Math.min(hi, SMALL_CELL_THRESHOLD - 1); // masked: below the threshold
     const status =
       (row.status as string | undefined) ??
       (row.revokedAt ? 'revoked' : Date.parse(row.expiresAt as string) <= NOW ? 'expired' : row.exhausted ? 'exhausted' : 'active');
@@ -570,8 +570,8 @@ describe('crw-fb examples (TASK-MULYGTXCZNCOP-crw-fb.md Kart 1 B-1)', () => {
 });
 
 describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', () => {
-  test('A = 7, B = "<5", funnel total "10" (R 8..12): B is not read back as 1..4', () => {
-    // Before TASK-MUM17YBJVAHRR the panel sent A's 7: B ≥ 8 − 7 = 1 and "<5" says B ≤ 4.
+  test('A = 7, B masked, funnel total "10" (R 8..12): B is not read back as 1..4', () => {
+    // Before TASK-MUM17YBJVAHRR the panel sent A's 7: B ≥ 8 − 7 = 1, and a masked B says B < SMALL_CELL_THRESHOLD.
     const t = tableOf({ Samsun: { SME: [10, 10, 10, 10, 0, 0, 0] } });
     const codes = publishCodes([{ used: 7 }, { used: 3 }], FORM_NOW);
     expect(attack(t, publish(t), { codes })).toEqual([]);
@@ -1152,10 +1152,12 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
   }
 
   /**
-   * The threshold probe: a province the funnel masks ("<5") is unmasked by registering `a` of the
-   * attacker's own organisations in it; the first `a` that shows a number gives the hidden count
-   * as 5 - a. Returns how many masked province counts of 1..4 it names exactly, and the most own
-   * organisations it needed. Independent of the rounding step: the mask is on the true value.
+   * The threshold probe (NG-339, threshold 10): a province the funnel masks ("<10") is unmasked by
+   * registering `a` of the attacker's own organisations in it (a = 1..4, the budget of the card); the
+   * first `a` that shows a number gives the hidden count as threshold − a, exactly when the true count
+   * is in threshold − a (a masked count T: T + a − 1 < 10 ≤ T + a forces T = 10 − a). Returns how many
+   * masked province counts 1..9 it names exactly within the budget. Independent of the rounding step:
+   * the mask is on the true value.
    */
   function unmaskProbe(tables: number, seed: number) {
     const rand = stream(seed);
@@ -1170,12 +1172,12 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
         if (p === NO_PROVINCE) continue;
         const key = id('registered', ALL, p);
         const truth = ORG_TYPES.reduce((n, ty) => n + t.get(p)![ty].registered, 0);
-        if (base.get(key) !== null || truth < 1 || truth > 4) continue; // only masked, really 1..4
+        if (base.get(key) !== null || truth < 1 || truth >= SMALL_CELL_THRESHOLD) continue; // only masked, really 1..9
         targets++;
-        for (let a = 1; a <= 8; a++) {
+        for (let a = 1; a <= 4; a++) {
           if (publish(withOwnOrgs(t, p, a)).get(key) == null) continue;
           unmasked++;
-          if (5 - a === truth) {
+          if (SMALL_CELL_THRESHOLD - a === truth) {
             exact++;
             maxCost = Math.max(maxCost, a);
           }
@@ -1186,18 +1188,54 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     return { targets, exact, unmasked, maxCost };
   }
 
-  // KNOWN RESIDUAL, found by FO-398 and NOT closed by it: adding 1-4 organisations of the agency's own to
-  // a masked province unmasks it, and the step it moved at names the hidden count. It is the K-1 "time
-  // channel" of the notice addendum made exact for masked groups, and it does not involve the invite code.
-  // It is pinned, not loosened: if a change closes it (a secret mask margin was measured: 6/27 -> 2/27),
-  // this goes red and the notice must be updated. Reported to the owner and to the lawyer (soru 5e).
-  test('FO-398 KNOWN RESIDUAL threshold probe: 1-4 own organisations unmask a masked province and name its hidden count (not an invite-code channel)', () => {
-    // A fixed sample (3600 tables, ~4 s): the masked 1..4 province counts are rare, 27 of them in this run.
+  // NG-339 (HUKUK-5 5e): the province breakdown is no longer offered by the dashboard or the report, so
+  // this probe measures the library function only. It is pinned: if it reads 0 the channel is closed and
+  // the test goes red so the notice and the lawyer question are updated.
+  test('NG-339 threshold probe: 1-4 own organisations unmask a masked province and name its hidden count', () => {
+    // A fixed sample (3600 tables): the masked 1..9 province counts are rare.
     const r = unmaskProbe(3600, 41);
-    measure(`UNMASKPROBE seed=41 step=${FUNNEL_ROUND_STEP} maskedProvinceCounts1to4=${r.targets} unmaskedWithin8=${r.unmasked} namedExactly=${r.exact} maxOwnOrgsNeeded=${r.maxCost}`);
+    measure(`UNMASKPROBE seed=41 threshold=${SMALL_CELL_THRESHOLD} maskedProvinceCounts1to9=${r.targets} unmaskedWithin4=${r.unmasked} namedExactly=${r.exact} maxOwnOrgsNeeded=${r.maxCost}`);
     expect(r.targets).toBeGreaterThan(0);
-    expect(r.exact, 'the residual is real: if it is gone, update the notice and the lawyer question').toBeGreaterThan(0);
+    expect(r.exact).toBeGreaterThan(0);
     expect(r.exact / r.targets).toBeLessThan(0.5);
     expect(r.maxCost).toBeLessThanOrEqual(4);
   }, TIMEOUT_MS);
+});
+
+/**
+ * NG-339 (HUKUK-5 5c, 5e). The threshold is 10 (was 5) and the dashboard and the region report no
+ * longer publish a province breakdown: the agency cannot tell its own additions from others'
+ * (auth.ts and oauth-registration.ts open a fresh user and tenant per code sign-up), so the rule
+ * that depended on it is withdrawn. These rules fail on a regression to 5 or a return of the
+ * province view. Mutant evidence: with SMALL_CELL_THRESHOLD = 5 the first two fail (see the
+ * sonuç dosyası NG-339-sec-gnd.md).
+ */
+describe('NG-339: threshold 10, and no province breakdown on the dashboard', () => {
+  type Raw = Parameters<typeof buildAgencyFunnel>[0];
+  const STEP_KEYS = ['registered', 'readiness', 'savedSearch', 'pipeline', 'conceptNote', 'submitted', 'accepted', 'rejected'] as const;
+  const counts = (n: number) => Object.fromEntries(STEP_KEYS.map((s) => [s, n])) as Record<(typeof STEP_KEYS)[number], number>;
+  const raw = (p: string, byType: Partial<Record<OrgType, number>>): Raw =>
+    new Map([
+      [p, Object.fromEntries(ORG_TYPES.map((t) => [t, counts(byType[t] ?? 0)])) as Record<OrgType, ReturnType<typeof counts>>],
+    ]);
+
+  test('the threshold is 10 and a shown number is a multiple of 10', () => {
+    expect(SMALL_CELL_THRESHOLD).toBe(10);
+    expect(FUNNEL_ROUND_STEP).toBe(10);
+  });
+
+  test('a type of 5..9 organisations is masked on the type view, and so is the one visible beside it', () => {
+    // SME 7 alone is hidden; total 32 − MUNICIPALITY 25 would give 7 exactly, so MUNICIPALITY is masked too.
+    const f = buildAgencyFunnel(raw('Samsun', { SME: 7, MUNICIPALITY: 25 }), { dimension: 'orgType' });
+    if (f.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
+    expect(f.breakdown.byOrgType.SME.registered).toEqual({ state: 'small' });
+    expect(f.breakdown.byOrgType.MUNICIPALITY.registered).toEqual({ state: 'small' });
+    expect(f.all.registered).toEqual({ state: 'count', value: 30 }); // 32 rounded to the step
+  });
+
+  test('the type view names no province: the dashboard publishes totals and types only', () => {
+    const f = buildAgencyFunnel(raw('Samsun', { SME: 25, MUNICIPALITY: 25 }), { dimension: 'orgType' });
+    expect(JSON.stringify(f)).not.toMatch(/Samsun|Tokat|Amasya/);
+    expect(f.breakdown.dimension).toBe('orgType');
+  });
 });

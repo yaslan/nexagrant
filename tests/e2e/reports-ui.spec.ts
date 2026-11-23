@@ -6,6 +6,7 @@ import { encode } from 'next-auth/jwt';
 import { prisma, withTenant } from '../../src/lib/db';
 import { withSystemScope } from '../../src/lib/system-scope';
 import { createInviteCodeIn, redeemInviteCode } from '../../src/lib/agency/codes';
+import { SMALL_CELL_THRESHOLD } from '../../src/lib/agency/small-cell';
 import { generateAgencyReports, reportPeriod } from '../../src/lib/agency/report';
 import { presentIds, requireId } from '../helpers/teardown-guard';
 import { shotsDir } from './fixtures/shots';
@@ -462,13 +463,11 @@ const STEPS_TR = [
 /**
  * What agency A's report must say, derived from the seed alone: 5 SME organisations
  * in Kütahya, none with a scorecard, saved search, opportunity, concept note or
- * application. "Registered" is 5 and is SHOWN as 10 (rounding unit 10 since FO-398: 5 rounds up
- * to 10, meaning 5..14); every other step is 0 and therefore "<5". Every other type is 0 → "<5".
+ * application. Every count is below SMALL_CELL_THRESHOLD (NG-339: 10, was 5), so every cell
+ * is masked as "<threshold"; no number is shown for Kütahya or for the SME type.
  */
-const SHOWN_REGISTERED = '10';
-function expectedCells(registeredLabel: string) {
-  return (step: string) => (step === registeredLabel ? SHOWN_REGISTERED : '<5');
-}
+const MASKED_CELL = `<${SMALL_CELL_THRESHOLD}`;
+const expectedCell = (): string => MASKED_CELL;
 
 test.describe('agency region report — on screen only (NG-341: no file)', () => {
   let f: AgencyFixture | undefined;
@@ -517,11 +516,12 @@ test.describe('agency region report — on screen only (NG-341: no file)', () =>
     const text = await tab.locator('body').innerText();
     expect(text).toContain(agencyA.name);
     expect(text).toContain(period);
-    expect(text).toContain('Kütahya');
+    // NG-339 (5e): the report has no province breakdown, so no province name appears at all.
+    expect(text).not.toContain('Kütahya');
     expect(text).toContain('Bu rapor 12 ay saklanır');
     expect(text).not.toMatch(/PDF|Yazdır/);
     await expect(tab.getByRole('button')).toHaveCount(0);
-    for (const forbidden of [agencyB.name, 'Bartın', ...orgNames]) expect(text).not.toContain(forbidden);
+    for (const forbidden of [agencyB.name, 'Kütahya', 'Bartın', ...orgNames]) expect(text).not.toContain(forbidden);
     // Totals table row: "Tüm kurumlar" + 8 step cells, as computed from the seed. The group
     // label is the row's <th scope="row">; the step values are its <td>s.
     const rowCells = async (label: string) => {
@@ -529,9 +529,8 @@ test.describe('agency region report — on screen only (NG-341: no file)', () =>
       await expect(row).toHaveCount(1);
       return (await row.locator('th, td').allInnerTexts()).map((s) => s.trim());
     };
-    expect(await rowCells('Tüm kurumlar')).toEqual(['Tüm kurumlar', ...STEPS_TR.map(expectedCells(STEPS_TR[0]!))]);
-    expect(await rowCells('Kütahya')).toEqual(['Kütahya', ...STEPS_TR.map(expectedCells(STEPS_TR[0]!))]);
-    expect(await rowCells('KOBİ')).toEqual(['KOBİ', ...STEPS_TR.map(expectedCells(STEPS_TR[0]!))]);
+    expect(await rowCells('Tüm kurumlar')).toEqual(['Tüm kurumlar', ...STEPS_TR.map(() => expectedCell())]);
+    expect(await rowCells('KOBİ')).toEqual(['KOBİ', ...STEPS_TR.map(() => expectedCell())]);
     await tab.screenshot({ path: `${SHOTS}/b2-agency-view-tr.png`, fullPage: true });
     await tab.close();
     expect(downloaded).toBe(false);
@@ -593,7 +592,8 @@ test.describe('agency region report — on screen only (NG-341: no file)', () =>
     const own = await bCtx.request.get(path(reportB));
     expect(own.status()).toBe(200);
     const ownHtml = await own.text();
-    expect(ownHtml).toContain('Bartın');
+    // NG-339 (5e): no province in its own report either.
+    expect(ownHtml).not.toContain('Bartın');
     expect(ownHtml).not.toContain('Kütahya');
     await bCtx.close();
   });
@@ -630,7 +630,7 @@ test.describe('agency region report — on screen only (NG-341: no file)', () =>
     const text = await view.locator('body').innerText();
     expect(text).toContain('Regional application funnel report');
     expect(text).toContain(agencyA.name);
-    expect(text).toContain('Kütahya');
+    expect(text).not.toContain('Kütahya');
     expect(text).toContain('kept for 12 months');
     for (const step of STEPS_EN) expect(text).toContain(step);
     expect(text).not.toContain('Bartın');

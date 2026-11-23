@@ -67,7 +67,7 @@ export interface CreatedInviteCode {
 
 /**
  * B-1 (TASK-MUM0M211WDIW5-crw-fb, leed-fb 29.09): what the agency is told of a
- * code is its status, never a use count. A count — even "<5" beside the others —
+ * code is its status, never a use count. A count — even a masked cell beside the others —
  * joined with the funnel's rounded total (every organisation of the cohort used
  * one code: R ≤ Σ used) read a code's 1..4 uses back; with a single code it was
  * the exact registration total. src/lib/agency/funnel.attack.test.ts joins
