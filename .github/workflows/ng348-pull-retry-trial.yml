@@ -1,0 +1,22 @@
+# NG-348 trial only: lives on ci-trial/ng-348-bad-ref, never on task/ng-348.
+# Proves scripts/ci/docker-pull-retry.sh retries N times and then fails with a
+# clear message when the MinIO digest is deliberately broken (last hex digit changed).
+name: NG-348 pull-retry trial
+
+on:
+  push:
+    branches: [ "ci-trial/ng-348-bad-ref" ]
+
+jobs:
+  broken-minio-ref:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - name: Start MinIO (test object store) — broken digest on purpose
+      env:
+        # Real digest ends in ...0034; this one ends in ...0035 and does not exist.
+        MINIO_IMAGE: cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0035
+      run: |
+        bash scripts/ci/docker-pull-retry.sh MinIO "$MINIO_IMAGE"
+        docker run -d --name minio -p 9000:9000 "$MINIO_IMAGE" server /data
