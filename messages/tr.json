@@ -3401,7 +3401,11 @@
     "intro": "Davet kodunuzla kayıt olan kurumların ilerleyişini toplu sayılarla izleyin ve davet kodlarınızı yönetin. Kurumların adı, içeriği ve kişisel verileri bu panoda gösterilmez.",
     "funnel": {
       "title": "Bölge başvuru hunisi",
-      "description": "Kodunuzla bugüne kadar kayıt olan tüm kurumlar ve bu kurumların ulaştığı adımlar. Sayılar kümülatiftir; dönem seçilmez. Tüm adımlarda kurum sayısı gösterilir, başvuru sayısı gösterilmez.",
+      "description": "Kodunuzla kayıt olan tüm kurumlar ve bu kurumların ulaştığı adımlar, son kapanan ayın sonundaki durumuyla. Sayılar kümülatiftir; dönem seçilmez. Tüm adımlarda kurum sayısı gösterilir, başvuru sayısı gösterilmez.",
+      "lastUpdated": "Son güncelleme: {month}",
+      "noSnapshotYet": "Son güncelleme: henüz yok",
+      "monthEndNote": "Sayılar ayda bir, her ayın başında bir önceki ayın sonundaki durumla güncellenir. Ay içinde yeni bir kayıt ya da adım panoyu değiştirmez.",
+      "noSnapshotBody": "İlk aylık güncelleme henüz yapılmadı. Sayılar, ayın ilk günü bir önceki ayın sonundaki durumla burada görünecek.",
       "breakdownLabel": "Kırılım",
       "breakdownNone": "Kırılım yok (yalnız toplam)",
       "breakdownOrgType": "Kurum türüne göre (tüm iller)",
