@@ -269,23 +269,39 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
   await table.screenshot({ path: `${SHOTS}/03-agency-panel-table.png` });
 
   // A new code from the panel's own form.
-  // The body read starts when the response event arrives (inside the predicate): reading it after the
-  // await lost the race with the navigation the create triggers, so the body was gone by then.
-  // A failed read stays a failure: the awaited read below rethrows it.
-  let actionBody: { url: string; text: Promise<string> } | undefined;
-  const actionResponse = page.waitForResponse((r) => {
-    const match = r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/ajans');
-    if (match && !actionBody) {
-      const text = r.text();
-      text.catch(() => undefined); // handled by the awaited read below, not an unhandled rejection
-      actionBody = { url: r.url(), text };
-    }
-    return match;
+  // The create action's body is read on the Node side, not through the browser. The create navigates
+  // the page away, and Chromium then drops the response body ("No data found for resource", NG-347),
+  // so response.text() from the browser races the navigation. Here page.route fetches the one POST to
+  // .../ajans (no redirects followed), keeps its body, and hands the same response to the browser.
+  let markAction!: (b: { url: string; text: string }) => void;
+  let failAction!: (e: unknown) => void;
+  const actionBodyP = new Promise<{ url: string; text: string }>((resolve, reject) => {
+    markAction = resolve;
+    failAction = reject;
   });
+  // The panel also polls notifications with a POST to the same URL (under load it can come first).
+  // Those responses carry "notifications" and are passed through untouched; the first other POST is the create.
+  let seenAction = false;
+  await page.route(
+    (url) => url.pathname.endsWith('/ajans'),
+    async (route) => {
+      if (route.request().method() !== 'POST' || seenAction) return route.continue();
+      try {
+        const res = await route.fetch({ maxRedirects: 0 });
+        const text = (await res.body()).toString('utf8');
+        await route.fulfill({ response: res });
+        if (text.includes('"notifications"')) return;
+        seenAction = true;
+        markAction({ url: route.request().url(), text });
+      } catch (err) {
+        failAction(err);
+        await route.abort().catch(() => undefined);
+      }
+    },
+  );
   await page.getByRole('button', { name: trMessages.agency.codes.create }).click();
-  await actionResponse;
-  if (!actionBody) throw new Error('the create action response was not observed');
-  bodies.push({ url: actionBody.url, kind: 'POST action', text: await actionBody.text });
+  const action = await actionBodyP;
+  bodies.push({ url: action.url, kind: 'POST action', text: action.text });
   await expect(page.getByText(trMessages.agency.codes.createdTitle)).toBeVisible();
   const created = await withSystemScope('platform-admin', 'e2e.fo392.read', (tx) =>
     tx.agencyInviteCode.findFirstOrThrow({
