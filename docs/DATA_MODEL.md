@@ -159,7 +159,7 @@ sütunları düşürmek her abonenin katılım oranını siler ve geri hesaplana
 ## 7. Silme ve saklama
 
 - Kiracı silme: `Tenant` cascade; paylaşımlı veriye dokunmaz. O kiracının `AuditEvent` satırları da cascade ile silinir (`AuditEvent.tenant` `onDelete: Cascade`); `tenantId` boş satırlar kalır.
-- `AuditEvent` saklaması: süre sınırı ve budama işi **yok**, satırlar kalıcıdır. Hesap silindiğinde `docs/legal/processing-register.md` §13'teki mekanizma uygulanır: `purgeDueUsers` `actorId`'yi NULL'lar, `user.erased` satırı kimlik yerine tek yönlü özet (`subjectRefOf`, `src/lib/legal/subject-ref.ts`) taşır; serbest `data` JSON'u değiştirilmez. Süreli saklama/budama istenirse ayrı karar ve iş gerekir.
+- `AuditEvent` saklaması: genel bir süre sınırı ve budama işi **yok**, satırlar kalıcıdır. **Tek istisna:** `agency.report.generated` (ajans aylık raporu, §20) 12 ay saklanır ve 6 ayda bir toplu silinir (NG-341, `AgencyReportDeletionLog`). Hesap silindiğinde `docs/legal/processing-register.md` §13'teki mekanizma uygulanır: `purgeDueUsers` `actorId`'yi NULL'lar, `user.erased` satırı kimlik yerine tek yönlü özet (`subjectRefOf`, `src/lib/legal/subject-ref.ts`) taşır; serbest `data` JSON'u değiştirilmez. Süreli saklama/budama istenirse ayrı karar ve iş gerekir.
 - `RawFetch` 90 gün; `AiUsageLog` 24 ay (şeffaflık beyanı için).
 - `RawFetch` yalnızca **içerik değiştiğinde** yazılır (`hash` karşılaştırması). Aynı yükü her gece yeniden saklamak tabloyu günde ~1200 satır büyütür, denetim değeri katmaz.
 - `Topic.eligibility` (Json) şekli: `{ restricted: "EU_EEA_CH_ONLY" | "TR" | null, eligibleCountries: string[], countriesExcluded: string[], notes?: string, minPartners?: number, minCountries?: number }`. `eligibleCountries` boş dizi = tespit edilmiş kısıt yok. **NG-52:** `minPartners`/`minCountries` çağrının asgari konsorsiyumudur (şartname §4 "asgari ortak"); SEDIA bağdaştırıcısı `conditions` metninden `parseMinimumConsortium` ile okur, metin söylemiyorsa anahtar **yazılmaz** (varsayılan sayı yok). M8 asgari ortak ön filtresi (`src/modules/m8/server/minimum-partners.ts`, şartname §6) bu iki anahtarı okur. Additive JSON anahtarı: migration yok; eski satırlarda anahtar yok = eşik bilinmiyor = filtre yok.
@@ -1038,8 +1038,13 @@ bildirilmemiş kurumlar hiçbir il görünümünde yoktur ve her zaman gizli kü
 işe yarıyor, çünkü saklanan şey bir dosya değil, panonun **yayımladığı** güvenli çıktının
 (`buildAgencyFunnel`: maskeli ve 5'e yuvarlanmış) kopyasıdır. Şema katıdır (`.strict()`):
 kiracı id'si, kurum adı, ham sayı ya da il × tür hücresi taşıyan bir `data` doğrulamadan
-geçmez. İndirme anında (`/api/agency/reports/[id]`) yazdırılabilir HTML (PDF'e tarayıcı
-kaydeder) ve CSV (UTF-8 BOM) bu anlık görüntüden üretilir. R2'ye dosya yazılmaz.
+geçmez. **Yalnız ekranda (NG-341, HUKUK-5 5d, veri sorumlusu kararı 23.11.2026):** rapor dosya
+olarak verilmez. `/api/agency/reports/[id]` bu anlık görüntüden ekranda okunan bir HTML sayfa
+üretir (`Content-Disposition: inline`, `Cache-Control: private, no-store`); yazdır düğmesi,
+yazdırma stili ve "PDF olarak kaydet" yönlendirmesi yoktur. `format` yok, `view` ya da
+`print` olursa aynı görünüm döner; `csv`, `pdf`, `xlsx` ve başka her değer 404'tür. CSV
+üretici kaldırıldı; panelde indirme bağlantısı yoktur. Kopyalamayı engellemek kapsam dışıdır.
+R2'ye dosya yazılmaz.
 
 **RLS.** `AuditEvent` `tenant_or_shared` kullanır. Satır `withTenant(ajans)` içinde yazılır
 ve okunur; sorguda ayrıca `tenantId = ajans` koşulu vardır. Başka bir ajansın rapor id'si
@@ -1049,12 +1054,50 @@ ve okunur; sorguda ayrıca `tenantId = ajans` koşulu vardır. Başka bir ajans�
 indeks değil, uygulama kontrolü sağlar (şema kilidi). `agency-monthly-report` işi graphile-worker'da `queue: agency` ile tek tek koşar (eski Inngest
 `concurrency: 1`'in karşılığı; `src/lib/jobs/schedule.ts`).
 
-**Saklama.** `AuditEvent` için süre sınırı ve budama kodu yok (§7); satırlar kalıcıdır.
-İleride bir budama işi yazılırsa `agency.report.generated` satırlarını ya dışarıda bırakmalı ya da
-rapor geçmişinin o süreyle sınırlı olduğunu ajansa söylemelidir.
+**Saklama (NG-341, karar; varsayım değil).** Rapor **12 ay** saklanır
+(`AGENCY_REPORT_RETENTION_MONTHS`, `src/lib/agency/retention.ts`). Süresi dolanlar **6 ayda bir**
+toplu silinir: `agency-report-retention` işi, 1 Ocak ve 1 Temmuz 05:00 UTC (`0 5 1 1,7 *`,
+`queue: agency`); elle `pnpm jobs:agency-report-retention`. Kesim, koşu anından 12 takvim ayı
+öncesidir; `createdAt` bundan eski satırlar silinir (1 Ekim 2026'da üretilen `2026-09` raporu
+Temmuz 2027 koşusunda kalır, Ocak 2028 koşusunda gider). Ekranda i18n metni:
+"Bu rapor 12 ay saklanır; süresi dolanlar 6 ayda bir toplu silinir." `fabrika_app` `AuditEvent`
+silemez (NG-40); silme yalnız `public.agency_report_purge(tenant, run, cutoff)` üzerinden olur
+(SECURITY DEFINER): yalnız bu olay türü, yalnız oturumun kendi kiracısı (`app.tenant_id`), yalnız
+en az 12 ay geride bir kesimden eski satırlar. 12 aylık taban DB'de zorlanır. Her silme
+`AgencyReportDeletionLog`'a aynı transaction'da yazılır (aşağıda). İş idempotenttir: ikinci koşu
+silecek satır bulmaz ve kayıt yazmaz. Bir ajansta hata olursa öteki ajanslar sürer; iş `SystemAlert`
+(`error`) yazar ve yeniden denenir. Kaçırılan tik denetimi (`missedTickAlert`) 32 günlük
+geriye bakışla sınırlıdır: bu iş için yalnız tikten sonraki ~1 ay içinde görülür. Ödeme ya da
+komisyon kaydı bu raporlara bağlı değildir; imha yalnız rapor satırlarını kapsar.
 
-**İleride (C seçeneği, ayrı onay):** gerçek PDF (yeni bağımlılık), R2'de saklanan dosya ve
-ayrı bir `AgencyReport` tablosu (tekil `(agencyId, period)`).
+### 20a. `AgencyReportDeletionLog` — ajans raporu imha kaydı (NG-341)
+
+Bir imha koşusunda en az bir rapor silinen her ajans için bir satır. **Yalnız sayı ve meta veri:**
+rapor içeriği, kişisel veri ya da işlemi yapan kişi yazılmaz.
+
+| Alan | Anlam |
+| --- | --- |
+| `id` | Birincil anahtar |
+| `runId` | Koşu: `cron:<tik ISO>` ya da `manual:<ISO>` |
+| `tenantId` | Ajans kiracısı (FK `Tenant`, `ON DELETE CASCADE`) |
+| `deletedAt` | Silme anı (UTC) |
+| `reportCount` | Silinen rapor sayısı |
+| `periodFrom` / `periodTo` | Silinen en eski ve en yeni dönem (`YYYY-MM`) |
+| `basis` | `retention-12m` |
+| `cutoffAt` | Bu andan (UTC) önce üretilen raporlar silindi |
+
+Tekil `(runId, tenantId)` (aynı koşu bir ajansa ikinci satır yazmaz), indeks
+`(tenantId, deletedAt)`. RLS: katı `tenant_isolation` (`prisma/rls.sql`). `fabrika_app` yalnız
+`SELECT` yapabilir; `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` kaldırılmıştır
+(`prisma/rls-app-role.sql` adım 3f). Yazma yalnız `agency_report_purge` üzerinden olur. Migration:
+`prisma/migrations/add-agency-report-deletion-log.sql` (geri alma: `.down.sql`, tablo ve fonksiyon
+düşer). **Saklama:** kayıtlar en az **3 yıl** tutulur
+(`AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS`). Bu kayıtları budayan iş henüz yoktur (ayrı iş).
+Risk: kiracı kalıcı silinirse (`Tenant` cascade) kayıtları da gider. Canlı test:
+`tests/agency-report-retention.live.test.ts`, e2e: `tests/e2e/agency-report-retention.spec.ts`.
+
+**İleride (C seçeneği, ayrı onay):** ayrı bir `AgencyReport` tablosu (tekil `(agencyId, period)`).
+Dosya (PDF/CSV) verme NG-341 kararıyla kapalıdır.
 
 ## 21. `PublicLead` — karne sonuç ekranı iletişim talebi (TASK-MULR765AR5G0C · FB KAMU)
 

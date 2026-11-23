@@ -47,6 +47,7 @@
     "m17:calibrate": "tsx scripts/m17-calibrate.ts",
     "jobs:seat-rescore": "tsx scripts/rescore-seat-candidates.ts",
     "jobs:alerts-sweep": "tsx scripts/run-alerts-sweep.ts",
+    "jobs:agency-report-retention": "tsx scripts/run-agency-report-retention.ts",
     "jobs:partner-search": "tsx scripts/run-partner-search.ts",
     "db:backfill-plan-version": "tsx scripts/backfill-subscription-plan-version.ts",
     "db:seed-public-sector-plans": "tsx scripts/seed-public-sector-plans.ts",

@@ -4,7 +4,7 @@
  * The report makes no number of its own. It is the dashboard's published,
  * already safe output — `buildAgencyFunnel`: one cumulative cohort,
  * masking under 5 with complementary suppression, every number rounded to 10 (5 before FO-398) —
- * copied once a month and formatted as a printable page and a CSV.
+ * copied once a month and shown on screen (NG-341: never as a file — no CSV, no PDF).
  *
  *   - One read: {@link readAgencyFunnelRaw}, the dashboard's own query path.
  *   - Three views, each a response the dashboard gives for one breakdown:
@@ -21,16 +21,17 @@
  * Storage (leed-fb 29.09, option A): no report table exists and the schema is
  * locked, so the snapshot is an `AuditEvent` of the agency's own tenant —
  * `type = agency.report.generated`, `target = YYYY-MM`, `data` = the snapshot.
- * The printable page and the CSV are rendered from it at download time, so a
+ * The on-screen page is rendered from it when it is opened, so a
  * stored report can hold only what {@link AgencyReportSnapshotSchema} admits:
  * cell states and multiples of 5 (10 since FO-398; a report stored before it holds 5s and must still read), no tenant id, no name, no raw count.
- * A real PDF file in R2 is later work (option C, a separate approval).
+ * Retention (NG-341): 12 months, destroyed every 6 months with a deletion record — see
+ * ./retention.ts. Payment or commission records are not stored here and are not purged.
  */
 import { z } from 'zod';
 import type { OrgType } from '@prisma/client';
 import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withBrand } from '@/lib/brand';
-import { generateTableReportHtml, toCsv, type ExportLocale } from '@/lib/document-exporter';
+import { generateTableReportHtml, type ExportLocale } from '@/lib/document-exporter';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
 import { AGENCY_REPORT_GENERATE_EVENT, AgencyReportGenerateEventSchema } from '@/lib/jobs/events';
 import {
@@ -284,7 +285,7 @@ function dateText(iso: string, locale?: ExportLocale): string {
   return new Date(iso).toLocaleDateString(locale === 'en' ? 'en-GB' : 'tr-TR', { timeZone: 'Europe/Istanbul' });
 }
 
-/** Printable page (the browser's print dialog saves it as PDF). */
+/** The on-screen page of a report (NG-341: no print button, no file). */
 export function agencyReportHtml(s: AgencyReportSnapshot, agencyName: string, locale?: ExportLocale): string {
   const A = catalog(locale);
   const D = A.reports.doc;
@@ -297,7 +298,7 @@ export function agencyReportHtml(s: AgencyReportSnapshot, agencyName: string, lo
       { label: D.periodLabel, value: s.period },
       { label: D.generatedAtLabel, value: dateText(s.generatedAt, locale) },
     ],
-    notes: [D.cohortNote, D.separateNote, A.funnel.privacyNote, D.printHint],
+    notes: [D.cohortNote, D.separateNote, A.funnel.privacyNote, A.reports.retentionNote],
     tables: tables(s, A).map((t) => ({
       caption: t.caption,
       note:
@@ -307,20 +308,4 @@ export function agencyReportHtml(s: AgencyReportSnapshot, agencyName: string, lo
     })),
     footer: withBrand(D.footer),
   });
-}
-
-/** CSV, one row per (table, group, step): the same cells as the printable page. */
-export function agencyReportCsv(s: AgencyReportSnapshot, locale?: ExportLocale): string {
-  const A = catalog(locale);
-  const D = A.reports.doc;
-  const rows: (string | number)[][] = [[D.csvPeriod, D.csvTable, D.csvGroup, D.csvStep, D.csvValue]];
-  for (const t of tables(s, A)) {
-    for (const [label, view] of t.groups) {
-      for (const st of FUNNEL_STEPS) {
-        const c = view[st];
-        rows.push([s.period, t.caption, label, A.funnel.steps[st].title, c.state === 'count' ? c.value : cellText(c, A)]);
-      }
-    }
-  }
-  return toCsv(rows);
 }

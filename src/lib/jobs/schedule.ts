@@ -27,6 +27,7 @@ export const JOB_IDS = [
   'alerts-sweep',
   'stripe-event-cleanup',
   'agency-monthly-report',
+  'agency-report-retention',
   'invitation-cleanup',
   'public-lead-cleanup',
   'public-lead-stuck',
@@ -79,6 +80,18 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   {
     id: 'agency-monthly-report',
     cron: '0 6 1 * *',
+    maxAttempts: 5,
+    fill: '1d',
+    queue: 'agency',
+    missedTickAlert: true,
+  },
+  // NG-341 (HUKUK-5 5d): periodic destruction of agency reports older than 12 months, every
+  // 6 months (1 January and 1 July, 05:00 UTC), not nightly. Same `agency` queue as the monthly
+  // report (06:00), so the two never overlap. A missed tick is reported only within
+  // LOOKBACK_MINUTES (32 days) of it; the next run still deletes everything past the cutoff.
+  {
+    id: 'agency-report-retention',
+    cron: '0 5 1 1,7 *',
     maxAttempts: 5,
     fill: '1d',
     queue: 'agency',

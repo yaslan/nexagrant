@@ -3509,13 +3509,14 @@
     },
     "reports": {
       "title": "Reports",
-      "description": "The region report is prepared on the 1st of each month. It is a copy of the dashboard's safe numbers on that day: the same masking (<5) and the same rounding to 5. It holds no personal data. It is not sent by e-mail; you download it here.",
+      "description": "The region report is prepared on the 1st of each month. It is a copy of the dashboard's safe numbers on that day: the same masking (<5) and the same rounding to 10. It contains no personal data. It is not e-mailed and cannot be downloaded as a file; it is shown on screen only.",
       "empty": "No report yet. The first report is prepared on the 1st of the month.",
       "listLabel": "Prepared reports",
       "period": "Period",
       "generatedAt": "Prepared",
-      "downloadCsv": "Download CSV",
-      "downloadPrint": "Printable report (save as PDF)",
+      "view": "View report",
+      "viewLabel": "View report: {period} (opens in a new tab)",
+      "retentionNote": "This report is kept for 12 months; expired reports are deleted together every 6 months.",
       "doc": {
         "title": "Regional application funnel report",
         "periodLabel": "Period",
@@ -3530,13 +3531,7 @@
         "groupColumn": "Group",
         "small": "<5",
         "unmeasured": "Not measured yet",
-        "printHint": "For a PDF, choose \"Save as PDF\" in your browser's print dialog.",
-        "footer": "{brand} — agency region report. Aggregated organisation counts; no personal data.",
-        "csvPeriod": "Period",
-        "csvTable": "Table",
-        "csvGroup": "Group",
-        "csvStep": "Step",
-        "csvValue": "Value"
+        "footer": "{brand} — agency region report. Aggregated organisation counts; no personal data."
       }
     },
     "cobrand": {

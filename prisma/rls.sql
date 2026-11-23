@@ -12,7 +12,7 @@ BEGIN
     'Evaluation','Reviewer','Criterion','Score','MeetingBrief','FollowupDoc','DualApprovalStep','ApplicationPart','Invitation',
     'TtoPortfolioItem','ApiKey','ApprovalRequest','Claim','ProposalUsage','Feedback','CalendarConnection',
     'PlanAssignment','ClaimEvidenceLink','Consent',
-    'StripeEventLog','AgencyInviteCode','AuditEvent','Notification','PartnerSearchQuotaUsage',
+    'StripeEventLog','AgencyInviteCode','AgencyReportDeletionLog','AuditEvent','Notification','PartnerSearchQuotaUsage',
     'InterregAnalysis','InterregAnalysisResult','InterregCriterionMark',
     'OrgReadiness','InternalApproval','PartnerBudgetShare',
     'ProjectIdea','DecisionLog',
