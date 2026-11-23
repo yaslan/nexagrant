@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
+import { requireId } from './helpers/teardown-guard';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
@@ -237,7 +238,7 @@ describe('deletion records: no cascade, pruned after 3 years (fabrika_app)', () 
     const r = await purgeExpiredAgencyReports(NOW, `manual:${RUN}-gone`, { agencies: async () => [{ id: gone }] });
     expect(r).toMatchObject({ deleted: 1, failed: 0 });
 
-    await admin!.auditEvent.deleteMany({ where: { tenantId: gone } });
+    await admin!.auditEvent.deleteMany({ where: { tenantId: requireId(gone, 'gone') } });
     await admin!.tenant.delete({ where: { id: gone } });
 
     const kept = await admin!.agencyReportDeletionLog.findMany({ where: { tenantId: gone } });
