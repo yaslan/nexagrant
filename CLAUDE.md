@@ -86,3 +86,8 @@ E2E postası: `playwright.config.ts` e2e sunucusuna `SMTP_HOST=localhost`, `SMTP
 
 ## Yardımcı komutlar
 `.claude/commands/` altında: `/new-module`, `/add-table`, `/review-rls`, `/gate-rule`, `/i18n-check`.
+
+## Git ortamı (WSL)
+- Git işlemleri yalnız WSL içinden: `wsl.exe -d Ubuntu-24.04 -- git …` (ya da WSL shell'i). Windows git'i (`\wsl.localhost\…`) bu repoda commit/checkout/stash yapmaz.
+- Neden: Windows git'i symlink ve exec bit'i yanlış okur (sahte ~122 değişiklik: 45 symlink + 77 exec) ve sistem `autocrlf=true` ile `.sh` / hook dosyalarını CRLF'ye çevirip kapıları sessizce bozar.
+- Satır sonu politikası `.gitattributes` ile zorunlu: metin LF, `*.sh` ve `githooks/*` LF, ikili türler `binary`. Yeni CRLF taşıyan dosya eklemeden önce `.gitattributes`'a bakın.
