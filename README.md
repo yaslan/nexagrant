@@ -139,16 +139,21 @@ Bu makinede iki geliştirme veritabanı var (NG-337):
 
 - **`fabrika`**: ana checkout ve günlük geliştirme. Birçok çalışan aynı anda kullanır. Bu
   veritabanında `db push`, migration veya toplu silme yalnız onaylı bir kartla yapılır.
-- **`fabrika_head`**: dalın şeması paylaşılan `fabrika`'dan farklıysa, ya da yazan bir canlı test
-  paylaşılan veriye dokunmamalıysa. Atılabilir bir veritabanıdır; `pnpm db:setup` onu sıfırdan kurar
-  ve tekrar koşulabilir. Gate koşusu için yine `pnpm gate:isolated` ya da kendi konteynerin
-  ("Worktree'de gate", `CLAUDE.md`) kullanılır.
+- **`fabrika_head`** (konteyner içindeki HEAD şemalı kaynak kopya): dalın şeması paylaşılan `fabrika`'dan
+  farklıysa kullanılır. Canlı testler (`jobs-enqueue-force.live` vb.) yazma yapacaksa veritabanı adı
+  throwaway kuralına uymalıdır: `fabrika_gate`, `fabrika_test` ya da `fabrika_test_ng<n>` (kural:
+  `tests/helpers/live-db-role.ts` `isThrowawayDbName`). `fabrika_head` adı bu kuralda YOK; onunla
+  pre-push gate'i "refusing to write on database" hatasıyla düşer.
+- Gate ve canlı testler için: aynı konteynerde kurallı adla bir kopya aç (paylaşılan `fabrika`'ya dokunmaz):
+  `docker exec fabrika-head-pg psql -U fabrika -d postgres -c "CREATE DATABASE fabrika_test_ng<n> TEMPLATE fabrika_head OWNER fabrika"`.
+  Atılabilir: `pnpm db:setup` her zaman sıfırdan kurar ve tekrar koşulabilir. Gate için yine
+  `pnpm gate:isolated` ya da kendi konteynerin ("Worktree'de gate", `CLAUDE.md`) kullanılır.
 
-`fabrika_head`'i yalnız kendi worktree'nin `.env`'inde kullan; ana checkout'un `.env`'i `fabrika`'da kalır:
+`fabrika_test_ng<n>`'i yalnız kendi worktree'nin `.env`'inde kullan; ana checkout'un `.env`'i `fabrika`'da kalır:
 
 ```bash
 cp .env.example .env
-perl -pi -e 's#\@localhost:5433/fabrika#\@127.0.0.1:5590/fabrika_head#g' .env
+perl -pi -e 's#\@localhost:5433/fabrika#\@127.0.0.1:5590/fabrika_test_ng<n>#g' .env
 perl -pi -e "s|^AUTH_SECRET=\$|AUTH_SECRET=$(openssl rand -base64 32)|" .env
 pnpm db:setup        # db:rls-role, DATABASE_URL_RLS_TEST'i 127.0.0.1:5590 ile bu .env'e ekler
 ```
