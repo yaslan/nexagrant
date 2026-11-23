@@ -140,6 +140,10 @@ test.describe('agency report retention (NG-341)', () => {
     const at = new Date();
     const runId = `manual:e2e-${f!.stamp}`;
     const r = await purgeExpiredAgencyReports(at, runId, { agencies: async () => [{ id: agencyId }] });
+    // A failed agency is reported as `errors` (the run goes on for the others). Assert on them first,
+    // so a failure names the cause (e.g. the purge function missing from a stale test database)
+    // instead of only showing the counts.
+    expect(r.errors, 'purge errors').toEqual([]);
     expect(r).toMatchObject({ deleted: 1, failed: 0, purged: [{ tenantId: agencyId, deleted: 1, periodFrom: oldPeriod, periodTo: oldPeriod }] });
 
     // After: the old one is gone, the new one stays, one record.
