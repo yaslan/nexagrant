@@ -1070,14 +1070,19 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
     const u = stream(seed);
     return () => INVITE_CODE_MIN_USE_LIMIT + Math.floor(u() * (INVITE_CODE_USE_LIMIT_SPREAD + 1));
   }
-  /** What is left at the shipped rounding step (measured, 900 tables: 6 = 0.7 %; 3x room, seeded so it cannot flake). */
-  const STEP10_CEILING = 0.02;
+  /**
+   * The target (HUKUK-5, card TASK-MWSWIQ87TQIIA DoD: 0/900). It was 0.02 (2 %) while the residual
+   * was 6/900 and 4/900 and the gate was green on it; at 0 the gate measures the target itself. Open:
+   * the residual is not closed by complementary suppression of funnel cells (see the NG-339 result file).
+   */
+  const STEP10_CEILING = 0;
   for (const mode of MODES) {
     const label = `${mode.single ? 'single' : 'spread'}, ${mode.noneDeleted ? 'D = 0' : 'D >= 0'}`;
-    test(`self-burn gate, ${label}: codes the agency filled itself are exact - ${RESIDUAL_MODE(mode) ? `below ${STEP10_CEILING * 100} % (rounding step ${FUNNEL_ROUND_STEP})` : 'anyLeak = 0'}`, () => {
+    test(`self-burn gate, ${label}: codes the agency filled itself are exact - ${RESIDUAL_MODE(mode) ? `at most ${STEP10_CEILING * 100} % (rounding step ${FUNNEL_ROUND_STEP})` : 'anyLeak = 0'}`, () => {
       const { withLeak, found } = sweep(31, mode, TABLES, seededUseLimit(RESIDUAL_LIMIT_SEED), POLICY_KNOWLEDGE, true);
       measure(`SELFBURN-SWEEP seed=31 limitSeed=${RESIDUAL_LIMIT_SEED} step=${FUNNEL_ROUND_STEP} ${label} tables=${TABLES} tablesWithLeak=${withLeak}`);
-      if (RESIDUAL_MODE(mode)) expect(withLeak / TABLES, found.slice(0, 3).join('; ')).toBeLessThan(STEP10_CEILING);
+      for (const f of found) measure(`LEAKDETAIL ${label} ${f}`);
+      if (RESIDUAL_MODE(mode)) expect(withLeak / TABLES, found.slice(0, 3).join('; ')).toBeLessThanOrEqual(STEP10_CEILING);
       else expect(found, `${withLeak}/${TABLES} tables leak`).toEqual([]);
     }, TIMEOUT_MS);
     if (RESIDUAL_MODE(mode)) {
@@ -1125,10 +1130,10 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
   const CHEAP_MODES: Mode[] = MODES;
   for (const mode of CHEAP_MODES) {
     const label = `${mode.single ? 'single' : 'spread'}, ${mode.noneDeleted ? 'D = 0' : 'D >= 0'}`;
-    test(`FO-398 cheap fill gate, ${label}: 5-30 own registrations on a fresh code - ${RESIDUAL_MODE(mode) ? `below ${STEP10_CEILING * 100} %` : 'anyLeak = 0'} (rounding step ${FUNNEL_ROUND_STEP})`, () => {
+    test(`FO-398 cheap fill gate, ${label}: 5-30 own registrations on a fresh code - ${RESIDUAL_MODE(mode) ? `at most ${STEP10_CEILING * 100} %` : 'anyLeak = 0'} (rounding step ${FUNNEL_ROUND_STEP})`, () => {
       const withLeak = sweepOwn(31, mode, TABLES, 30);
       measure(`CHEAPFILL seed=31 own=5..30 step=${FUNNEL_ROUND_STEP} ${label} tables=${TABLES} tablesWithLeak=${withLeak}`);
-      if (RESIDUAL_MODE(mode)) expect(withLeak / TABLES).toBeLessThan(STEP10_CEILING);
+      if (RESIDUAL_MODE(mode)) expect(withLeak / TABLES).toBeLessThanOrEqual(STEP10_CEILING);
       else expect(withLeak, `${withLeak}/${TABLES} tables leak`).toBe(0);
     }, TIMEOUT_MS);
   }
