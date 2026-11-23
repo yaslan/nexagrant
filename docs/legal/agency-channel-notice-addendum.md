@@ -183,7 +183,7 @@ Fon hazırlık karnesinden gelip kayıt formundaki "Karne sonucumu hesabıma ekl
 Hesabınız için işlenen diğer veriler (ad, e-posta vb.) ana aydınlatma metninde yazılıdır.
 
 **4. Amaç**
-Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, davet ettiği kurumların NexaGrant'ı nasıl kullandığını **toplu sayılarla** göstermek.
+Kurumunuzu, sizi davet eden ajansın kanalına bağlamak ve ajansa, davet ettiği kurumların NexaGrant'ı nasıl kullandığını **toplu sayılarla** göstermek. Ayrıca bu sayılardan oluşan aylık toplu raporu ajansa ekranda göstermek (indirilebilir değil) ve yıllık kıyaslama yapılmasını sağlamak. `[HUKUK-5: veri sorumlusu kararı 23.11.2026, hukukçu görüşü değil]`
 
 **5. Hukuki sebep**
 `<<HUKUK-3: md.5/2-f meşru menfaat mi, md.5/2-c sözleşmenin ifası mı; dengeleme testi gerekiyor mu>>`
@@ -198,7 +198,7 @@ Kurumunuzun adı ajansa gösterilmez. Ajans ayrıca adınızı, e-postanızı, k
 Bu ek yeni bir yurt dışı aktarım getirmez. Ajans sayıları NexaGrant içindeki panosunda görür. Hesabınızla ilgili yurt dışı aktarımlar ana aydınlatma metninde yazılıdır. `<<HUKUK-6: rapor ileride e-postayla gönderilirse (B3) bu madde yeniden yazılır>>`
 
 **9. Saklama süresi**
-Ajans bağı, kurum hesabınız açık kaldığı sürece saklanır. Kurum hesabınız silinirse kurumunuz ajansın sayılarına girmez. Bağ kaldırılırsa (madde 10) bağ kaydının ne kadar tutulacağı: `<<HUKUK-7: süre>>`. Ajansın daha önce gördüğü sayılar anonim olduğu için geri çekilemez.
+Ajans bağı, kurum hesabınız açık kaldığı sürece saklanır. Kurum hesabınız silinirse kurumunuz ajansın sayılarına girmez. Bağ kaldırılırsa (madde 10) bağ kaydının ne kadar tutulacağı: `<<HUKUK-7: süre>>`. Ajansın daha önce gördüğü sayılar anonim olduğu için geri çekilemez. Ajansın gördüğü aylık toplu rapor 12 ay saklanır; 12 ayı dolan raporlar 1 Ocak ve 1 Temmuz tarihlerinde toplu olarak silinir. Her silme kaydı (yalnız sayı, kişi yok) en az 3 yıl tutulur. `[HUKUK-5: veri sorumlusu kararı 23.11.2026, hukukçu görüşü değil]`
 
 **10. Haklarınız ve ajans bağını kaldırma**
 KVKK md.11 kapsamındaki haklarınız ana aydınlatma metninde yazılıdır. Ajans bağını bugün ürün içinden kaldıramazsınız. Kurumunuzun yöneticisi madde 11'deki kanaldan talep ederse NexaGrant bağı elle kaldırır. Bağ kaldırıldıktan sonra kurumunuz ajansın sayılarına **girmez**. Ürün içinden kaldırma özelliği planlanıyor. `<<ürün kararı A3: elle kaldırma süreci ve yanıt süresi>>` `<<HUKUK-8: bağı kaldırma bir md.11 hakkı mı, sözleşmesel bir seçenek mi>>`
