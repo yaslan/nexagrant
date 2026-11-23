@@ -131,7 +131,6 @@ beforeEach((ctx) => {
 afterAll(async () => {
   if (admin && tenants.length) {
     await admin.auditEvent.deleteMany({ where: { tenantId: { in: tenants } } }).catch(() => {});
-    await admin.tenant.deleteMany({ where: { agencyId: agency } }).catch(() => {});
     await admin.tenant.deleteMany({ where: { id: { in: tenants } } }).catch(() => {});
   }
   await Promise.all([rls, admin].map((c) => c?.$disconnect().catch(() => {})));
