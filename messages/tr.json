@@ -3509,13 +3509,14 @@
     },
     "reports": {
       "title": "Raporlar",
-      "description": "Bölge raporu her ayın 1'inde hazırlanır. Rapor, panodaki güvenli sayıların o günkü kopyasıdır: aynı maskeleme (<5) ve aynı 5'e yuvarlama. Kişisel veri içermez. E-postayla gönderilmez; yalnız buradan indirilir.",
+      "description": "Bölge raporu her ayın 1'inde hazırlanır. Rapor, panodaki güvenli sayıların o günkü kopyasıdır: aynı maskeleme (<5) ve aynı 10'a yuvarlama. Kişisel veri içermez. E-postayla gönderilmez ve dosya olarak indirilmez; yalnız ekranda görüntülenir.",
       "empty": "Henüz rapor yok. İlk rapor ayın 1'inde hazırlanır.",
       "listLabel": "Hazırlanmış raporlar",
       "period": "Dönem",
       "generatedAt": "Hazırlandı",
-      "downloadCsv": "CSV indir",
-      "downloadPrint": "Yazdırılabilir rapor (PDF olarak kaydedin)",
+      "view": "Raporu görüntüle",
+      "viewLabel": "Raporu görüntüle: {period} (yeni sekmede açılır)",
+      "retentionNote": "Bu rapor 12 ay saklanır; süresi dolanlar 6 ayda bir toplu silinir.",
       "doc": {
         "title": "Bölge başvuru hunisi raporu",
         "periodLabel": "Dönem",
@@ -3530,13 +3531,7 @@
         "groupColumn": "Grup",
         "small": "<5",
         "unmeasured": "Henüz ölçülmüyor",
-        "printHint": "PDF için tarayıcınızın yazdırma penceresinde \"PDF olarak kaydet\"i seçin.",
-        "footer": "{brand} — ajans bölge raporu. Toplulaştırılmış kurum sayıları; kişisel veri içermez.",
-        "csvPeriod": "Dönem",
-        "csvTable": "Tablo",
-        "csvGroup": "Grup",
-        "csvStep": "Adım",
-        "csvValue": "Değer"
+        "footer": "{brand} — ajans bölge raporu. Toplulaştırılmış kurum sayıları; kişisel veri içermez."
       }
     },
     "cobrand": {

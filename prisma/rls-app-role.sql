@@ -114,6 +114,16 @@ BEGIN
     EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public."ExpertDirectoryEntry" FROM %I', app_role);
   END IF;
 
+  -- 3f. The record of an agency report destruction is not rewritable by the app (NG-341,
+  --     add-agency-report-deletion-log.sql): SELECT only. Rows are written by
+  --     agency_report_purge() (SECURITY DEFINER), which also deletes the reports.
+  IF to_regclass('public."AgencyReportDeletionLog"') IS NOT NULL THEN
+    EXECUTE format('REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public."AgencyReportDeletionLog" FROM %I', app_role);
+  END IF;
+  IF to_regprocedure('public.agency_report_purge(text, text, timestamptz)') IS NOT NULL THEN
+    EXECUTE format('GRANT EXECUTE ON FUNCTION public.agency_report_purge(text, text, timestamptz) TO %I', app_role);
+  END IF;
+
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as the owner role (fabrika_owner on the VPS; fabrika locally). Default
   --    privileges are recorded per grantor. Only roles the caller is a member of

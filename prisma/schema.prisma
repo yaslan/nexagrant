@@ -81,6 +81,7 @@ model Tenant {
   agency        Tenant?  @relation("AgencyMembers", fields: [agencyId], references: [id], onDelete: SetNull)
   agencyMembers Tenant[] @relation("AgencyMembers")
   agencyInviteCodes AgencyInviteCode[]
+  agencyReportDeletionLogs AgencyReportDeletionLog[]
   @@index([deletedAt])
   @@index([agencyId])
 }
@@ -118,6 +119,27 @@ model AgencyInviteCode {
   agency    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt])
+}
+
+/// NG-341 (HUKUK-5 5d): one row per (destruction run, agency) that deleted at least one
+/// monthly report (AuditEvent 'agency.report.generated') past the 12-month retention.
+/// Counts and metadata only, never report content or personal data. Kept at least 3 years.
+/// Written only by public.agency_report_purge() (SECURITY DEFINER); fabrika_app may SELECT only.
+/// Migration: add-agency-report-deletion-log.sql.
+model AgencyReportDeletionLog {
+  id          String   @id @default(cuid())
+  runId       String
+  tenantId    String
+  deletedAt   DateTime @default(now())
+  reportCount Int
+  periodFrom  String?
+  periodTo    String?
+  basis       String
+  cutoffAt    DateTime
+  agency      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, tenantId])
+  @@index([tenantId, deletedAt])
 }
 
 enum OrgType {

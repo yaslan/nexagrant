@@ -445,12 +445,11 @@ export interface TableReportData {
 }
 
 /**
- * Print-HTML of a {@link TableReportData}, the same "browser print / save as PDF"
- * route {@link generatePdfHtml} takes: no PDF library, the browser's print
- * dialog writes the PDF. Landscape, because a funnel row is nine columns wide.
+ * On-screen HTML of a {@link TableReportData}. NG-341 (HUKUK-5 5d): the agency report is
+ * shown on screen only and is not given as a file, so unlike {@link generatePdfHtml} this
+ * page has no print button, no print stylesheet and no "save as PDF" hint.
  */
 export function generateTableReportHtml(data: TableReportData): string {
-  const L = labels(data.locale);
   const tablesHtml = data.tables
     .map(
       (t) => `
@@ -475,7 +474,6 @@ export function generateTableReportHtml(data: TableReportData): string {
   <meta charset="UTF-8">
   <title>${escapeHtml(data.title)}</title>
   <style>
-    @page { size: A4 landscape; margin: 15mm; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; font-size: 10pt; line-height: 1.5; }
     .header { border-bottom: 2px solid #1d4ed8; padding-bottom: 10px; margin-bottom: 16px; }
     .logo-badge { font-weight: bold; font-size: 14pt; color: #1d4ed8; }
@@ -489,15 +487,9 @@ export function generateTableReportHtml(data: TableReportData): string {
     table.data thead th { background: #f1f5f9; font-size: 8.5pt; text-align: center; }
     table.data tbody th { text-align: left; font-weight: 600; }
     .footer { margin-top: 24px; font-size: 8pt; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 5px; }
-    @media print { .no-print { display: none; } body { margin: 0; } }
   </style>
 </head>
 <body>
-  <div class="no-print" style="background:#f1f5f9; padding:10px; margin-bottom:16px; text-align:right;">
-    <button onclick="window.print()" style="background:#1d4ed8; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">
-      ${escapeHtml(L.printButton)}
-    </button>
-  </div>
   <div class="header"><div class="logo-badge">${escapeHtml(data.orgName)}</div></div>
   <h1>${escapeHtml(data.title)}</h1>
   <table class="meta">${data.meta
