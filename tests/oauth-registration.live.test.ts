@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import type { PrismaClient } from '@prisma/client';
 
 import { skipOrFailInCi, assertRlsSubjectRole, requireRlsTestUrl, requireTestEnv } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 import { AGENCY_INVITE_CODE_DDL_LOCK, UNKNOWN_INVITE_COUNTER_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
@@ -179,18 +180,21 @@ beforeAll(async () => {
     readiness: await import('../src/lib/registration-readiness-cookie'),
   };
   admin = lib.db.createDbClient(env.admin);
+  let fnCount: number | undefined;
   try {
     await admin.$connect();
     const fn = await admin.$queryRaw<Array<{ n: number }>>`
       SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'redeem_agency_invite'`;
-    if (fn[0]?.n !== 1) {
-      skipReason = 'add-agency-invite-code.sql is not applied';
-      skipOrFailInCi(SUITE, skipReason);
-      return;
-    }
+    fnCount = fn[0]?.n;
   } catch (e) {
     skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
     skipOrFailInCi(SUITE, skipReason);
+    return;
+  }
+  // Outside the try: inside it the gate's throw would be caught and turned into a skip (NG-350).
+  if (fnCount !== 1) {
+    skipReason = 'add-agency-invite-code.sql is not applied';
+    skipOrFailOnMissingDbObject(SUITE, skipReason);
     return;
   }
 
