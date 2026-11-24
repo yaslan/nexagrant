@@ -38,6 +38,7 @@ import { createDbClient, prisma } from '@/lib/db';
 import { listIntakeTenantOptions, setProvinceLeadRoute } from '@/lib/leads/province-route';
 import { createLeadIntakePort } from '@/modules/m18/server/intake-repo';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const SUITE = 'm18 intake module state test';
 const admin = createDbClient(OWNER_URL ?? 'postgresql://localhost:5432/unset');
@@ -78,7 +79,12 @@ const written = async (tenantId: string) =>
   (await admin.leadOrganization.count({ where: { tenantId } })) + (await admin.leadContact.count({ where: { tenantId } }));
 
 describe.skipIf(!HAS_DB)('M18 intake needs M18 open to the tenant (NG-205 / D-A2)', () => {
+  // NG-354: the forwarding cases route PublicLead-shaped leads through the intake port while other live files
+  // count PublicLead table-wide (public-lead-stuck); hold the shared lock for the whole file.
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
+
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: [PROVINCE.closed, PROVINCE.open] } } });
     for (const key of Object.keys(STATES) as Key[]) {
       const t = await admin.tenant.create({
@@ -95,6 +101,7 @@ describe.skipIf(!HAS_DB)('M18 intake needs M18 open to the tenant (NG-205 / D-A2
     await admin.auditEvent.deleteMany({ where: { actorId: ACTOR } });
     await admin.consent.deleteMany({ where: { userId: { startsWith: `public-lead:pl-${RUN}-` } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
+    await releasePublicLeadLock?.();
     await admin.$disconnect();
     await prisma.$disconnect();
   });

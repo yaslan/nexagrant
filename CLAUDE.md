@@ -26,6 +26,8 @@ pnpm gate                # db:generate + lint + typecheck + test + i18n:check + 
                          # İkinci gate "Gate kilidi meşgul — bekliyor" yazar ve birincinin bitişini bekler; sahibin pid'i ölmüşse kilit bayat sayılıp kendiliğinden temizlenir.
                          # Canlı bir sahip takılı kalırsa `kill <pid>` ile durdur (kilit dizinini elle silme: çakışan iki gate aynı DB'yi kullanır).
                          # FONBRIDGE_GATE_LOCK_HELD=1 kilidi atlar (gate içinden gate); elle set etme.
+                         # NG-350: canlı testin beklediği DB nesnesi (migration, fonksiyon, kolon, seed satırı) yoksa gate KIRMIZIDIR:
+                         # gate-lock FONBRIDGE_GATE_RUN=1 verir, tests/helpers/require-db-object.ts atar. Gate dışında tek dosya koşusu eskisi gibi uyarıp atlar.
 pnpm rls:verify          # DB gercekten kiraci izolasyonu uyguluyor mu (canli olcum)
 pnpm alerts:check        # acik SystemAlert satirlari silinmis kiracilari mi gosteriyor (oksuz alarm kapisi)
 pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)
