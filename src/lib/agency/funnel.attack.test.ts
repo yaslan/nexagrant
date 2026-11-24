@@ -64,10 +64,12 @@ import {
  *     request and a waiting period, so in a pilot's first months it is the usual
  *     case, and the agency, which invited every one of them, can know it.
  *
- * It must not learn, for any hidden count whose true value is 1..4 — a masked
- * number, a type × province cell that is never published, the organisations
- * with no province, a difference between two steps, or the uses of one code —
- * that it lies in 1..4 (its exact value included).
+ * It must not learn, for any hidden count whose true value is 1..(threshold − 1)
+ * (1..9 since NG-339, the threshold being 10) — a masked number, a type × province
+ * cell that is never published, the organisations with no province, a difference
+ * between two steps, or the uses of one code — that it lies in 1..9 (its exact
+ * value included). A code the agency filled itself is exact to it already and
+ * is not counted.
  */
 
 // `readiness` last (B6, TASK-MULRR8P7HIII4), so the positional rows of the fixed
@@ -515,11 +517,16 @@ function attack(
     }
   }
 
+  // The hidden groups that must not be pinned down: 1..(threshold − 1), i.e. 1..9 since NG-339 (was 1..4).
+  const LEAK_MAX = SMALL_CELL_THRESHOLD - 1;
   const leaks: Leak[] = [];
   for (const [key, i] of vars) {
-    if (published.get(key) != null) continue; // visible: shown as ≥ 5 by the primary rule
+    if (published.get(key) != null) continue; // visible: shown as ≥ threshold by the primary rule
+    // A code the agency filled itself is known to it exactly (lo === hi): that is its own knowledge, not a leak.
+    const ck = key.startsWith('code#') ? codes?.[Number(key.slice(5))] : undefined;
+    if (ck && ck.lo === ck.hi) continue;
     const t = truth[i]!;
-    if (t >= 1 && t <= 4 && lo[i]! >= 1 && hi[i]! <= 4) leaks.push({ target: key, truth: t, lo: lo[i]!, hi: hi[i]! });
+    if (t >= 1 && t <= LEAK_MAX && lo[i]! >= 1 && hi[i]! <= LEAK_MAX) leaks.push({ target: key, truth: t, lo: lo[i]!, hi: hi[i]! });
   }
   return leaks;
 }
@@ -735,7 +742,7 @@ describe('invite-code panel (TASK-MUM0M211WDIW5-crw-fb.md Kart 1 B-1, Ö-1)', ()
   });
 });
 
-describe('property: no hidden group of 1..4 is ever read back (TASK-MULZATEX4G92H gate)', () => {
+describe(`property: no hidden group of 1..${SMALL_CELL_THRESHOLD - 1} is ever read back (TASK-MULZATEX4G92H gate, NG-351)`, () => {
   const PROVINCES = ['Samsun', 'Tokat', 'Amasya', 'Çorum'];
 
   const ri2 = (r: () => number, a: number, b: number) => a + Math.floor(r() * (b - a + 1));
@@ -1084,7 +1091,14 @@ describe('FO-392: saturated cohort - codes really filled to their (hidden) limit
   // K-577441 B reopened it, and FO-398 found it cheaper than the 500 records (see the next section) and
   // cut it with the rounding step: at 10 (K-577804) 6 of 900 tables are left, in the one multi-province D = 0 mode.
   const RESIDUAL_MODE = (m: Mode) => !m.single && m.noneDeleted;
-  const RESIDUAL_CEILING = 0.1;
+  /**
+   * Upper bound of the step-5 positive control (NG-351). With the leak criterion at 1..9 the control
+   * reads 421/900 = 46.8 % (FO392_TABLES=900) and 62/150 = 41.3 % (default 150 tables), both measured
+   * on this seed. The old 10 % was set for the 1..4 criterion (74/900 = 8.2 %). 50 % is the first
+   * round value above the largest measured rate. The control's job is that the leak is real
+   * (`> 0`) and that the shipped step leaks less; the ceiling only guards against a runaway measure.
+   */
+  const RESIDUAL_CEILING = 0.5;
   const RESIDUAL_LIMIT_SEED = 3101;
   /** Limits for the residual gate: same uniform law as newInviteCodeUseLimit(), seeded, so no flake. */
   function seededUseLimit(seed: number): () => number {

@@ -12,6 +12,7 @@ import {
 import { envValue } from './helpers/dotenv';
 import { requireId } from './helpers/teardown-guard';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 import { AGENCY_INVITE_CODE_DDL_LOCK, UNKNOWN_INVITE_COUNTER_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
@@ -141,7 +142,7 @@ beforeAll(async () => {
   // Outside the try, so that in CI the throw reaches vitest under its own message.
   if (fnCount !== 1) {
     skipReason = 'add-agency-invite-code.sql is not applied (scripts/apply-migrations.sh)';
-    skipOrFailInCi(SUITE, skipReason);
+    skipOrFailOnMissingDbObject(SUITE, skipReason);
     return;
   }
   try {
