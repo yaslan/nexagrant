@@ -26,6 +26,7 @@ import {
   M1OFF_SEATS,
   M1OFF_TENANT,
   M1OFF_WORKSPACE,
+  setModuleStatus,
   setupM1OffTenant,
   teardownM1OffTenant,
 } from './fixtures/role-gate-m1-off-tenant';
@@ -427,4 +428,91 @@ test.describe.serial('NG-276 M1 OFF: the role door runs before the module lock',
       expect(res?.status(), path).toBe(403);
     });
   }
+});
+
+/**
+ * NG-286: the seven `musteri-hatti` pages take the role door ahead of the M18 module lock, the
+ * same order as the partner pages above (NG-275). Run on the M1-OFF tenant with M18 switched
+ * OFF: a role without client_pipeline_read gets the role refusal and no lock; a role that holds
+ * it gets the lock. With M18 ON the holder reads the panel and the guest is still refused.
+ */
+test.describe.serial('NG-286 M18 OFF: the role door runs before the musteri-hatti module lock', () => {
+  const m18ws = `/tr/${M1OFF_WORKSPACE}`;
+  const LOCK_TITLE = trMessages.ModuleGate.title;
+  const LOCK_OFF_TAIL = trMessages.ModuleGate.reason.MODULE_OFF.split('{module}')[1]!.trim();
+  const LOCK_ASK_ADMIN = trMessages.ModuleGate.askAdmin.split('{brand}')[0]!.trim();
+  // The seven pages with `requireTenantPageRole(locale, 'client_pipeline_read')` (tests/page-role-gate.test.ts).
+  // The lead page takes a made-up id: both doors run before any lead lookup.
+  const PIPELINE_PAGES = [
+    `${m18ws}/musteri-hatti`,
+    `${m18ws}/musteri-hatti/leads`,
+    `${m18ws}/musteri-hatti/leads/ng286-none`,
+    `${m18ws}/musteri-hatti/pipeline`,
+    `${m18ws}/musteri-hatti/tasks`,
+    `${m18ws}/musteri-hatti/import`,
+    `${m18ws}/musteri-hatti/duplicates`,
+  ];
+
+  async function signInM1Off(page: Page, role: keyof typeof M1OFF_SEATS) {
+    const seat = M1OFF_SEATS[role]!;
+    await signInAs(page, { id: seat.id, email: seat.email, tenantId: M1OFF_TENANT, role });
+  }
+
+  test.beforeAll(async () => {
+    await setupM1OffTenant();
+    await setModuleStatus('M18', 'OFF');
+  });
+  test.afterAll(teardownM1OffTenant);
+
+  // The control runs first: in a serial block a red guest test would skip it.
+  test('control: MEMBER and TENANT_OWNER see the M18 lock, not the role refusal, on every musteri-hatti page', async ({ page }) => {
+    test.setTimeout(180_000);
+    for (const role of ['MEMBER', 'TENANT_OWNER'] as const) {
+      await signInM1Off(page, role);
+      for (const path of PIPELINE_PAGES) {
+        await page.goto(path);
+        await expect(page.getByRole('heading', { name: LOCK_TITLE }), `${role} ${path}`).toBeVisible();
+        expect(await page.locator('body').innerText(), `${role} ${path}`).toContain(LOCK_OFF_TAIL);
+        await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), `${role} ${path}`).toHaveCount(0);
+      }
+    }
+  });
+
+  test('GUEST_PARTNER: 403 with the role refusal and no M18 lock, on every musteri-hatti page', async ({ page }) => {
+    test.setTimeout(180_000);
+    await signInM1Off(page, 'GUEST_PARTNER');
+    for (const path of PIPELINE_PAGES) {
+      const res = await page.goto(path);
+      // Rendered text, not markup: the i18n bundle carries every ModuleGate sentence on any page.
+      await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), path).toBeVisible();
+      // Assert the lock first: when the order is wrong this names the lock as the cause.
+      const shown = await page.locator('body').innerText();
+      expect(shown, `${path} lock title`).not.toContain(LOCK_TITLE);
+      expect(shown, `${path} lock sentence`).not.toContain(LOCK_OFF_TAIL);
+      expect(shown, `${path} lock hint`).not.toContain(LOCK_ASK_ADMIN);
+      expect(shown, `${path} lock icon`).not.toContain('🔒');
+      expect(res?.status(), path).toBe(403);
+    }
+  });
+
+  // M18 is an unsold beta: its only open status is PILOT (ON closes it as MODULE_OFF, see
+  // state-machine.ts isUnsoldBeta / isStaffPreviewStatus). PILOT opens it to PILOT_ROLES only.
+  test('M18 PILOT: TENANT_OWNER opens the pipeline pages, MEMBER stays locked, GUEST_PARTNER is still refused', async ({ page }) => {
+    test.setTimeout(180_000);
+    await setModuleStatus('M18', 'PILOT');
+    await signInM1Off(page, 'TENANT_OWNER');
+    for (const path of PIPELINE_PAGES) {
+      const res = await page.goto(path);
+      expect(res?.status(), path).toBe(200);
+      await expect(page.getByRole('heading', { name: LOCK_TITLE }), path).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), path).toHaveCount(0);
+    }
+    await signInM1Off(page, 'MEMBER');
+    await page.goto(`${m18ws}/musteri-hatti`);
+    await expect(page.getByRole('heading', { name: LOCK_TITLE }), 'member M18 PILOT').toBeVisible();
+    await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), 'member M18 PILOT').toHaveCount(0);
+    await signInM1Off(page, 'GUEST_PARTNER');
+    expect((await page.goto(`${m18ws}/musteri-hatti`))?.status(), 'guest M18 PILOT').toBe(403);
+    await expect(page.getByRole('heading', { name: FORBIDDEN_TITLE }), 'guest M18 PILOT').toBeVisible();
+  });
 });
