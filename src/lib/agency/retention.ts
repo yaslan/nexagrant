@@ -10,7 +10,8 @@
  *   - every destruction is recorded in `AgencyReportDeletionLog` (counts and metadata only). Those
  *     records are kept {@link AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS} years (İmha Yönetmeliği
  *     md.7/3: at least three years) and pruned by the same job, once they are older than that;
- *   - the record has no foreign key to the agency (K-585864): deleting an agency keeps its records.
+ *   - the record has no foreign key to the agency (K-585864): deleting an agency keeps its records;
+ *     once older than 3 years, the records of a hard-deleted agency are pruned too (NG-349).
  *
  * The rows themselves are `AuditEvent`s (`agency.report.generated`, src/lib/agency/report.ts),
  * which the app role may not delete (NG-40, auditevent-immutable.sql). The delete therefore runs
@@ -167,7 +168,8 @@ export async function purgeExpiredAgencyReports(at: Date, runId: string, deps: D
  * Remove the deletion records older than {@link agencyReportDeletionLogCutoff}(at), agency by
  * agency, under each agency's own tenant (RLS), through `public.agency_report_deletion_log_prune()`.
  * Idempotent: a second run removes nothing. A record whose agency has been hard-deleted from
- * `Tenant` is not reached by this loop (no session can name it); see the open question in NG-345.
+ * `Tenant` is not reached by this loop (no session can name it): {@link pruneOrphanedDeletionLogs}
+ * removes those (NG-349).
  */
 export async function pruneExpiredDeletionLogs(at: Date, deps: Deps = {}): Promise<AgencyReportDeletionLogPruneResult> {
   const cutoff = agencyReportDeletionLogCutoff(at);
@@ -186,4 +188,33 @@ export async function pruneExpiredDeletionLogs(at: Date, deps: Deps = {}): Promi
     }
   }
   return out;
+}
+
+export interface AgencyReportDeletionLogOrphanPruneResult {
+  cutoff: string;
+  /** Records of agencies no longer in `Tenant`, removed. */
+  deleted: number;
+  /** The error, when the step failed; `null` when it ran. */
+  error: string | null;
+}
+
+/**
+ * Remove the deletion records of agencies hard-deleted from `Tenant`, older than
+ * {@link agencyReportDeletionLogCutoff}(at) (NG-349). {@link pruneExpiredDeletionLogs} cannot reach
+ * them: its agency list is read from `Tenant`, and no session can name an agency that is gone.
+ * One call, outside any tenant session, to `public.agency_report_deletion_log_prune_orphans()`
+ * (add-agency-report-deletion-log-prune-orphans.sql): it deletes only rows whose agency is not in
+ * `Tenant`, refuses a cutoff less than 3 years back, and refuses a tenant session. Records of an
+ * agency that still exists are never touched here. Idempotent: a second run removes nothing.
+ * A failure is returned, not thrown, so the job reports it next to the other steps.
+ */
+export async function pruneOrphanedDeletionLogs(at: Date): Promise<AgencyReportDeletionLogOrphanPruneResult> {
+  const cutoff = agencyReportDeletionLogCutoff(at);
+  try {
+    const rows = await prisma.$queryRaw<{ deleted: number }[]>`
+      SELECT public.agency_report_deletion_log_prune_orphans(${cutoff.toISOString()}::timestamptz) AS deleted`;
+    return { cutoff: cutoff.toISOString(), deleted: Number(rows[0]?.deleted ?? 0), error: null };
+  } catch (e) {
+    return { cutoff: cutoff.toISOString(), deleted: 0, error: e instanceof Error ? e.message : String(e) };
+  }
 }

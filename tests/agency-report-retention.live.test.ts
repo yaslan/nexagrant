@@ -285,3 +285,88 @@ describe('deletion records: no cascade, pruned after 3 years (fabrika_app)', () 
     ).rejects.toThrow(/not the session tenant/);
   });
 });
+
+/**
+ * NG-349: the records of an agency hard-deleted from `Tenant` are out of reach of the per-agency
+ * prune (its list is read from `Tenant`). public.agency_report_deletion_log_prune_orphans removes
+ * them once older than 3 years, in ONE call outside any tenant session, as fabrika_app — and
+ * touches no record of an agency that still exists, however old.
+ */
+describe('deletion records of a hard-deleted agency: pruned after 3 years (fabrika_app)', () => {
+  const DAY = 86_400_000;
+  const yearsAgo = (n: number, extraMs = 0) => {
+    const d = new Date(NOW);
+    d.setUTCFullYear(d.getUTCFullYear() - n);
+    return new Date(d.getTime() - extraMs);
+  };
+  const runIds = { expired: `orphan-expired-${RUN}`, recent: `orphan-recent-${RUN}`, live: `live-expired-${RUN}` };
+  let gone = '';
+
+  test('setup: a real destruction record for an agency, then the agency is hard-deleted', async () => {
+    const { purgeExpiredAgencyReports } = await import('@/lib/agency/retention');
+    gone = await newAgency(4);
+    await seed(gone, EVENT, '2001-07', monthsAgo(15));
+    const r = await purgeExpiredAgencyReports(NOW, runIds.expired, { agencies: async () => [{ id: gone }] });
+    expect(r).toMatchObject({ deleted: 1, failed: 0 });
+    // "Three years and a day later": the record is moved back in time (the database's own clock
+    // sets the 3-year floor, so the clock cannot be moved forward instead).
+    const expiredAt = yearsAgo(3, DAY);
+    await admin!.agencyReportDeletionLog.updateMany({
+      where: { tenantId: requireId(gone, 'gone'), runId: runIds.expired },
+      data: { deletedAt: expiredAt, cutoffAt: expiredAt },
+    });
+    const recentAt = yearsAgo(3, -DAY); // a day short of 3 years: must stay
+    const liveAt = yearsAgo(3, DAY); // as old, but its agency still exists: must stay here
+    await admin!.agencyReportDeletionLog.createMany({
+      data: [
+        { runId: runIds.recent, tenantId: gone, reportCount: 1, basis: 'retention-12m', cutoffAt: recentAt, deletedAt: recentAt },
+        { runId: runIds.live, tenantId: ids.agencyA, reportCount: 1, basis: 'retention-12m', cutoffAt: liveAt, deletedAt: liveAt },
+      ],
+    });
+    await admin!.auditEvent.deleteMany({ where: { tenantId: requireId(gone, 'gone') } });
+    await admin!.tenant.delete({ where: { id: gone } });
+    expect((await logs(gone)).map((l) => l.runId).sort()).toEqual([runIds.expired, runIds.recent].sort());
+  });
+
+  test('the per-agency prune cannot reach them (the gap NG-349 closes)', async () => {
+    const { pruneExpiredDeletionLogs } = await import('@/lib/agency/retention');
+    await pruneExpiredDeletionLogs(NOW, { agencies: async () => [{ id: ids.agencyB }] });
+    expect(await logs(gone)).toHaveLength(2);
+  });
+
+  test('one call removes the expired record of the deleted agency; the recent one and the live agency’s stay', async () => {
+    const { pruneOrphanedDeletionLogs } = await import('@/lib/agency/retention');
+    const r = await pruneOrphanedDeletionLogs(NOW);
+    expect(r.error).toBeNull();
+    expect(r.deleted).toBeGreaterThanOrEqual(1);
+    expect((await logs(gone)).map((l) => l.runId)).toEqual([runIds.recent]);
+    expect((await logs(ids.agencyA)).map((l) => l.runId)).toContain(runIds.live);
+  });
+
+  test('a second run removes nothing', async () => {
+    const { pruneOrphanedDeletionLogs } = await import('@/lib/agency/retention');
+    const r = await pruneOrphanedDeletionLogs(NOW);
+    expect(r).toMatchObject({ deleted: 0, error: null });
+    expect(await logs(gone)).toHaveLength(1);
+    expect((await logs(ids.agencyA)).map((l) => l.runId)).toContain(runIds.live);
+  });
+
+  test('the database refuses a cutoff under 3 years and a tenant session, and leaves the scope flag off', async () => {
+    const { withTenant } = await import('@/lib/db');
+    const tooRecent = yearsAgo(2).toISOString();
+    await expect(
+      rls!.$queryRaw`SELECT public.agency_report_deletion_log_prune_orphans(${tooRecent}::timestamptz)`
+    ).rejects.toThrow(/less than 3 years/);
+    const ok = yearsAgo(4).toISOString();
+    await expect(
+      withTenant(ids.agencyA, (tx) => tx.$queryRaw`SELECT public.agency_report_deletion_log_prune_orphans(${ok}::timestamptz)`)
+    ).rejects.toThrow(/not callable inside a tenant session/);
+    const flag = await rls!.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT public.agency_report_deletion_log_prune_orphans(${ok}::timestamptz)`;
+      return tx.$queryRaw<{ flag: string | null }[]>`SELECT current_setting('app.system_scope', true) AS flag`;
+    });
+    expect(flag[0]?.flag).not.toBe('on');
+    // fabrika_app still cannot see a deleted agency's records directly.
+    expect(await rls!.agencyReportDeletionLog.count({ where: { tenantId: gone } })).toBe(0);
+  });
+});

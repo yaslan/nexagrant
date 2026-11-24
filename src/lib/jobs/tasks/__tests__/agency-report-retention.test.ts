@@ -11,10 +11,12 @@ vi.mock('@/lib/observability/system-alert', () => ({
 }));
 const purgeExpiredAgencyReports = vi.fn();
 const pruneExpiredDeletionLogs = vi.fn();
+const pruneOrphanedDeletionLogs = vi.fn();
 vi.mock('@/lib/agency/retention', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/agency/retention')>()),
   purgeExpiredAgencyReports,
   pruneExpiredDeletionLogs,
+  pruneOrphanedDeletionLogs,
 }));
 
 const { agencyReportRetentionTask } = await import('../agency-report-retention');
@@ -38,11 +40,14 @@ const TICK = '2027-01-01T05:00:00.000Z';
 const RUN = `cron:${TICK}`;
 const okPurge = { runId: RUN, cutoff: '2026-01-01T04:59:00.000Z', agencies: 2, deleted: 0, purged: [], failed: 0, errors: [] };
 const okPrune = { cutoff: '2024-01-01T04:59:00.000Z', agencies: 2, deleted: 0, failed: 0, errors: [] };
+const okOrphans = { cutoff: '2024-01-01T04:59:00.000Z', deleted: 0, error: null };
 
 beforeEach(() => {
   alerts.length = 0;
   purgeExpiredAgencyReports.mockReset();
   pruneExpiredDeletionLogs.mockReset();
+  pruneOrphanedDeletionLogs.mockReset();
+  pruneOrphanedDeletionLogs.mockResolvedValue(okOrphans);
 });
 
 describe('agency-report-retention job (NG-345)', () => {
@@ -52,12 +57,15 @@ describe('agency-report-retention job (NG-345)', () => {
     await agencyReportRetentionTask({ _cron: { ts: TICK } }, helpersFor());
     expect(purgeExpiredAgencyReports).toHaveBeenCalledWith(new Date(TICK), RUN);
     expect(pruneExpiredDeletionLogs).toHaveBeenCalledWith(new Date(TICK));
+    expect(pruneOrphanedDeletionLogs).toHaveBeenCalledTimes(1);
+    expect(pruneOrphanedDeletionLogs).toHaveBeenCalledWith(new Date(TICK));
     expect(alerts).toEqual([]);
   });
 
   it('reports the prune count next to the purge result, and writes no alert when all is well', async () => {
     purgeExpiredAgencyReports.mockResolvedValue({ ...okPurge, deleted: 3 });
     pruneExpiredDeletionLogs.mockResolvedValue({ ...okPrune, deleted: 1 });
+    pruneOrphanedDeletionLogs.mockResolvedValue({ ...okOrphans, deleted: 4 });
     infoLines.length = 0;
     await agencyReportRetentionTask({ _cron: { ts: TICK } }, helpersFor());
     const done = infoLines.find((l) => l.includes('DONE'));
@@ -66,6 +74,7 @@ describe('agency-report-retention job (NG-345)', () => {
       success: true,
       deleted: 3,
       deletionLogPruned: 1,
+      deletionLogOrphansPruned: 4,
       retentionMonths: 12,
       deletionLogRetentionYears: 3,
     });
@@ -95,5 +104,18 @@ describe('agency-report-retention job (NG-345)', () => {
     expect(purgeExpiredAgencyReports).toHaveBeenCalledTimes(1);
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toMatchObject({ dedupeKey: RUN });
+  });
+
+  it('a failed hard-deleted-agency prune alone also alerts and rethrows, after both other steps ran (NG-349)', async () => {
+    purgeExpiredAgencyReports.mockResolvedValue(okPurge);
+    pruneExpiredDeletionLogs.mockResolvedValue(okPrune);
+    pruneOrphanedDeletionLogs.mockResolvedValue({ ...okOrphans, error: 'function missing' });
+    await expect(agencyReportRetentionTask({ _cron: { ts: TICK } }, helpersFor())).rejects.toThrow(
+      /hard-deleted agencies prune failed \(function missing\)/
+    );
+    expect(purgeExpiredAgencyReports).toHaveBeenCalledTimes(1);
+    expect(pruneExpiredDeletionLogs).toHaveBeenCalledTimes(1);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ level: 'error', dedupeKey: RUN, meta: { deletionLogOrphansPruned: 0 } });
   });
 });
