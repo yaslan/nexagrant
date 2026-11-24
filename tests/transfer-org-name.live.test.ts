@@ -43,6 +43,7 @@ import { withSystemScopeOn } from '@/lib/system-scope';
 import { isIntakeTenant } from '@/modules/m18/server/intake';
 import { assertRlsSubjectRole, isLocalDbUrl, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { sqlStatements } from './helpers/sql-statements';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const SUITE = 'transfer org name test';
 const IP_HASH_KEY = randomBytes(24).toString('hex');
@@ -87,7 +88,13 @@ const asTenant = <R>(tenantId: string, fn: (tx: Parameters<Parameters<typeof pri
   });
 
 describe.skipIf(!HAS_DB)('province_transfer_org_name (NG-179)', () => {
+  // NG-354: this file writes PublicLead rows (submitPublicLead) and replays add-public-lead-transfer-recipient.sql,
+  // whose ALTER TABLE "PublicLead" takes ACCESS EXCLUSIVE. public-lead-stuck counts PublicLead table-wide, so hold
+  // the shared lock for the whole file (same pattern as m18-intake.live).
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
+
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
     for (const [key, c] of Object.entries(CASES) as [Case, (typeof CASES)[Case]][]) {
       const t = await admin.tenant.create({
@@ -105,6 +112,7 @@ describe.skipIf(!HAS_DB)('province_transfer_org_name (NG-179)', () => {
     await admin.publicLead.deleteMany({ where: { email: MINE } });
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
+    await releasePublicLeadLock?.();
     await admin.$disconnect();
     await prisma.$disconnect();
   });
