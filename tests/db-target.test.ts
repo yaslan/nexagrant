@@ -56,4 +56,28 @@ describe('scripts/db-target.sh', () => {
     expect(local).toBe(false);
     expect(target).toBe('<ayrıştırılamadı>');
   });
+
+  // NG-331 #fix4: libpq lets ?dbname= (or a ?service= entry) replace the path's
+  // database name, so the name db_target prints is not the one the gate uses.
+  function overridable(url: string): boolean {
+    const script = '. scripts/db-target.sh\nif db_name_overridable "$1"; then echo yes; else echo no; fi';
+    return execFileSync('sh', ['-c', script, 'probe', url], { encoding: 'utf8' }).trim() === 'yes';
+  }
+  it.each([
+    'postgresql://u:pw@localhost:5479/fabrika_test_x?dbname=fabrika',
+    'postgresql://u:pw@localhost:5479/fabrika_test_x?schema=public&dbname=fabrika',
+    'postgresql://u:pw@localhost:5479/fabrika_test_x?DbName=fabrika',
+    'postgresql://u:pw@localhost:5479/fabrika_test_x?service=shared',
+    'postgresql://u:pw@localhost:5479/fabrika_test_x?db%6eame=fabrika',
+  ])('flags a query that can replace the database name: %s', (url) => {
+    expect(overridable(url)).toBe(true);
+  });
+  it.each([
+    'postgresql://u:pw@localhost:5479/fabrika_test_x',
+    'postgresql://u:pw@localhost:5479/fabrika_test_x?schema=public&sslmode=disable',
+    // dbname= inside a value is not a key.
+    'postgresql://u:pw@localhost:5479/fabrika_test_x?application_name=xdbname=fabrika',
+  ])('leaves a query without a database-name key alone: %s', (url) => {
+    expect(overridable(url)).toBe(false);
+  });
 });

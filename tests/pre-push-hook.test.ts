@@ -146,6 +146,28 @@ describe('githooks/pre-push', () => {
     expect(r.stdout).toContain('STUB-PNPM gate');
   });
 
+  // NG-331 #fix4 (crw-gnd-3 Bulgu 1): libpq sorgudaki dbname=/service= değerini path'teki adın üstüne yazar.
+  // db_target sorguyu atar; kanca izole adı görürken kapı fabrika'ya bağlanabilirdi. Kod push'u fail-closed durur.
+  const ISO = 'postgresql://fabrika:fabrika@127.0.0.1:5572/fabrika_test_ng331';
+  test.each([
+    ['?dbname=fabrika', `${ISO}?dbname=fabrika`],
+    ['&dbname=fabrika', `${ISO}?sslmode=disable&dbname=fabrika`],
+    ['büyük harf DBNAME=', `${ISO}?DBNAME=fabrika`],
+    ['service=', `${ISO}?service=shared`],
+    ['yüzde kodlu anahtar', `${ISO}?db%6eame=fabrika`],
+  ])('sorguda DB adını değiştiren parametre (%s) varsa kod push\'u kapı koşmadan 1 ile durur', (_label, url) => {
+    const r = runHookWithPush(CODE_PUSH, 0, url);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('DB adını değiştirebilir');
+    expect(r.stdout).not.toContain('STUB-PNPM');
+  });
+
+  test('sorguda DB adını değiştirmeyen parametre (schema=) varsa kapı koşar', () => {
+    const r = runHookWithPush(CODE_PUSH, 0, `${ISO}?schema=public&sslmode=disable`);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('STUB-PNPM gate');
+  });
+
   test('silme push\'u DB adı fabrika iken de muaf: kapı koşar', () => {
     const r = runHookWithPush(`(delete) ${ZERO_SHA} refs/heads/x ${OTHER_SHA}\n`, 0, FABRIKA_URL);
     expect(r.status).toBe(0);

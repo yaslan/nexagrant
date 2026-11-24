@@ -51,6 +51,13 @@ if [ "$code_push" = 1 ] && [ "$db_name" = "fabrika" ]; then
   echo "  İzole DB kullan (CLAUDE.md \"Worktree'de gate\": ad fabrika OLMASIN, örn. fabrika_test_ng<n>)." >&2
   exit 1
 fi
+# NG-331 #fix4: yukarıdaki ad path'ten gelir; libpq sorgudaki dbname=/service= ile onu değiştirir
+# (…/fabrika_test_x?dbname=fabrika kapıyı fabrika'ya bağlar). Kod push'unda böyle bir URL fail-closed durur.
+if [ "$code_push" = 1 ] && db_name_overridable "$db"; then
+  echo "pre-push: DATABASE_URL'in sorgu kısmı (dbname=, service= ya da % kodlu anahtar) DB adını değiştirebilir; push durduruldu." >&2
+  echo "  DB adını yalnız path'te yaz (…/fabrika_test_ng<n>); sorguda dbname/service kullanma." >&2
+  exit 1
+fi
 # FO-203: localhost URL'si Postgres'i yalnız 127.0.0.1'de buluyorsa ::1 tarafı sahipsizdir;
 # başka bir süreç o portu alınca psql kırılır ve gate rastgele kırmızı verir. Gate'ten önce dur.
 node scripts/db-loopback-check.mjs || exit 1
