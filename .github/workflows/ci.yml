@@ -3,8 +3,13 @@ name: CI
 on:
   push:
     branches: [ "main", "dev" ]
+  # PR bases: main/dev, plus the stacked bases in use (NG-353, measured on the
+  # open PRs: task/ng-*, se-fb/*, be-fb/*). A PR whose base is one of these
+  # runs the full build-and-test and e2e, not just the path-filtered jobs.
+  # `push` stays main/dev only, so a commit to a task branch runs CI once, on
+  # its PR, never twice.
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main", "dev", "task/**", "se-fb/**", "be-fb/**" ]
   # Manual runs, to measure the e2e suite against another server without a commit
   # (TASK-MULXYMNTUELIK). Pushes and PRs always use `dev`.
   workflow_dispatch:

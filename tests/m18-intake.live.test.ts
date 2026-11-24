@@ -34,6 +34,7 @@ import { createDbClient, prisma } from '@/lib/db';
 import { forwardPublicLead } from '@/lib/leads/public-lead-intake';
 import { createLeadIntakePort, leadIntakeConsentSubject } from '@/modules/m18/server/intake-repo';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const SUITE = 'm18 lead intake test';
 // No fallback address: without OWNER_URL the suite skips (loudly) instead of guessing credentials.
@@ -87,7 +88,12 @@ async function counts(tenantId: string) {
 const ZERO = { orgs: 0, contacts: 0, deals: 0, tasks: 0, activities: 0, consents: 0 };
 
 describe.skipIf(!HAS_DB)('M18 lead intake', () => {
+  // NG-346: forwardPublicLead() reads and routes PublicLead rows that other live files count table-wide;
+  // hold the shared PublicLead lock for the whole file.
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
+
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     const mk = (key: keyof typeof tenants, orgType: 'CONSULTANCY' | 'SME', kind: 'ORGANIZATION' | 'AGENCY') =>
       admin.tenant
         .create({ data: { ...M18_PILOT, name: `intake-${key}-${RUN}`, slug: `intake-${key}-${RUN}`, country: 'TR', orgType, kind } })
@@ -107,6 +113,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
     await admin.$disconnect();
     await prisma.$disconnect();
+    await releasePublicLeadLock?.();
   });
 
   test('consent given: organisation, contact, deal, task, activity and the Consent row land in the tenant', async () => {

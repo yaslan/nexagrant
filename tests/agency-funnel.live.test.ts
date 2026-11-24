@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 import { readinessSettings } from '@/lib/readiness/account';
 
 /** TASK-MULRR8P7HIII4 (B6): a valid scorecard result code. */
@@ -127,7 +128,7 @@ beforeAll(async () => {
      WHERE proname IN ('agency_funnel_counts', 'agency_funnel_counts_by_province')`;
   if (fn[0]?.n !== 2) {
     skipReason = 'add-agency-funnel.sql / add-agency-funnel-province.sql is not applied (scripts/apply-migrations.sh)';
-    skipOrFailInCi(SUITE, skipReason);
+    skipOrFailOnMissingDbObject(SUITE, skipReason);
     return;
   }
 

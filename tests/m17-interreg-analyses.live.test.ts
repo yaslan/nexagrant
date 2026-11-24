@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 import { presentIds } from './helpers/teardown-guard';
 import { INTERREG_UPLOAD_LIMITS } from '@/modules/m17/limits';
 
@@ -104,7 +105,7 @@ beforeAll(async () => {
   const seeded = await admin.interregRubricCriterion.findFirst({ where: { rubricId: SEEDED_RUBRIC }, select: { id: true } });
   if (!seeded) {
     skipReason = `rubric ${SEEDED_RUBRIC} is not seeded. Run \`pnpm db:seed\`.`;
-    skipOrFailInCi(SUITE, skipReason);
+    skipOrFailOnMissingDbObject(SUITE, skipReason);
     return;
   }
   seededCriterion = seeded.id;

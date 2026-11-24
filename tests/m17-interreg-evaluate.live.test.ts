@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 import { presentIds } from './helpers/teardown-guard';
 import type { TenantTx } from '@/lib/db';
 import type { LlmCompletion, LlmGenerateOptions } from '@/lib/llm';
@@ -195,7 +196,7 @@ beforeAll(async () => {
   const rubric = await admin.interregRubric.findUnique({ where: { id: SEEDED_RUBRIC }, select: { programChecks: true, criteria: { select: { criterionKey: true } } } });
   if (!rubric) {
     skipReason = `rubric ${SEEDED_RUBRIC} is not seeded. Run \`pnpm db:seed\`.`;
-    skipOrFailInCi(SUITE, skipReason);
+    skipOrFailOnMissingDbObject(SUITE, skipReason);
     return;
   }
   criterionKeys = rubric.criteria.map((c) => c.criterionKey);
