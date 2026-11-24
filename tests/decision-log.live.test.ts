@@ -369,7 +369,73 @@ describe('reactivation (NG-241)', () => {
     expect(await withdrawal.withdrawOpportunity(member, own, { reason: 'vazgeçtim' })).toHaveProperty('decision');
     expect(await reactivate(member, own, 'döndüm')).toMatchObject({ status: 'ACTIVE' });
   });
+
+  // The `where` half of the role rule (ownedByScope): the owner changes after the write's read
+  // and before its conditional update. Another transaction holds the row with a new owner; the
+  // write reads the old (committed) owner, passes canArchiveOpportunity, then its update waits on
+  // the row lock. Once the owner change commits, the update re-checks its `where` against the new
+  // owner and moves nothing. Without the `where` half it would move the row for a non-owner.
+  test('an owner changed between the read and the write: neither withdrawal nor reactivation moves the row', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const member = await memberOf(a, 'member-4');
+
+    const withdrawable = await newOpportunity(a, 'ACTIVE', member.userId);
+    const withdrawn = await ownerChangedMidWrite(withdrawable, a.userId, () =>
+      withdrawal.withdrawOpportunity(member, withdrawable, { reason: 'benimdi' }),
+    );
+    expect(withdrawn).toEqual({ refused: 'ALREADY_WITHDRAWN' });
+    expect(await statusOf(withdrawable)).toBe('ACTIVE');
+    expect(await decisionCount(withdrawable)).toBe(0);
+
+    const reactivatable = await newOpportunity(a, 'WITHDRAWN', member.userId);
+    const reactivated = await ownerChangedMidWrite(reactivatable, a.userId, () =>
+      reactivate(member, reactivatable, 'benimdi'),
+    );
+    expect(reactivated).toEqual({ refused: 'NOT_WITHDRAWN' });
+    expect(await statusOf(reactivatable)).toBe('WITHDRAWN');
+    expect(await decisionCount(reactivatable)).toBe(0);
+  });
 });
+
+/**
+ * Runs `write` while another transaction holds the opportunity's row with `ownerId` changed, and
+ * commits that change only once `write`'s update is waiting on the row lock (seen in
+ * pg_stat_activity, so the order is fixed, not timed).
+ */
+async function ownerChangedMidWrite<T>(opportunityId: string, newOwnerId: string, write: () => Promise<T>): Promise<T> {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let held!: () => void;
+  const lockHeld = new Promise<void>((resolve) => (held = resolve));
+  const handover = admin!.$transaction(
+    async (tx) => {
+      await tx.opportunity.update({ where: { id: requireId(opportunityId, 'opp') }, data: { ownerId: newOwnerId } });
+      held();
+      await released;
+    },
+    { timeout: 20_000 },
+  );
+  try {
+    await lockHeld;
+    const pending = write();
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const waiting = await admin!.$queryRaw<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'
+          AND query ILIKE 'UPDATE%"Opportunity"%'`;
+      if ((waiting[0]?.n ?? 0) > 0) break;
+      if (Date.now() > deadline) throw new Error('the write never waited on the row lock');
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    release();
+    await handover;
+    return await pending;
+  } finally {
+    release();
+    await handover.catch(() => undefined);
+  }
+}
 
 describe('withdraw / reactivate server actions (NG-241, inceleme Ö-1)', () => {
   const as = (s: Scope) => {
