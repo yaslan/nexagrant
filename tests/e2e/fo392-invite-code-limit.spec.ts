@@ -279,20 +279,24 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
     markAction = resolve;
     failAction = reject;
   });
-  // The panel also polls notifications with a POST to the same URL (under load it can come first).
-  // Those responses carry "notifications" and are passed through untouched; the first other POST is the create.
+  // The panel also POSTs to the same URL: the notification poll, and the list refresh after a create (under
+  // load they can come first). Pick the create by its REQUEST: createInviteCode is called with { expiresOn, label },
+  // and only that POST carries "expiresOn". Classifying by the response was wrong (NG-356): the create response is
+  // the whole revalidated page, which also carries a "notifications" key, so it was passed through as a poll and the
+  // list refresh that follows was taken for the create.
   let seenAction = false;
   await page.route(
     (url) => url.pathname.endsWith('/ajans'),
     async (route) => {
-      if (route.request().method() !== 'POST' || seenAction) return route.continue();
+      const req = route.request();
+      const isCreate = req.method() === 'POST' && (req.postData() ?? '').includes('"expiresOn"');
+      if (!isCreate || seenAction) return route.continue();
       try {
         const res = await route.fetch({ maxRedirects: 0 });
         const text = (await res.body()).toString('utf8');
         await route.fulfill({ response: res });
-        if (text.includes('"notifications"')) return;
         seenAction = true;
-        markAction({ url: route.request().url(), text });
+        markAction({ url: req.url(), text });
       } catch (err) {
         failAction(err);
         await route.abort().catch(() => undefined);
@@ -328,12 +332,16 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
     expect(b.text, `${b.kind} ${b.url} carries useLimit`).not.toMatch(/useLimit/);
     expect(b.text, `${b.kind} ${b.url} carries usedCount`).not.toMatch(/usedCount/);
   }
-  // Server-action responses are small: the code's exact limit must not be among them.
+  // The create's own result is the one JSON line the server action returns: {"ok":true,"code":...,"hint":...,"expiresAt":...}.
+  // The rest of an action response is the revalidated page (RSC text with unrelated numbers, e.g. "(503 Service
+  // Unavailable" in a calendar error), so the exact-limit scan runs on that result line. The whole response is still
+  // checked for the key names above, and the visible page text is checked below.
   const actions = bodies.filter((b) => b.kind.startsWith('POST'));
   expect(actions.length).toBeGreaterThan(0);
-  expect(actions.some((b) => b.text.includes('code'))).toBe(true); // it really is the create response
+  const result = action.text.split('\n').find((l) => l.startsWith('1:{"ok":')) ?? '';
+  expect(result, 'the marked POST is the create response (its result object)').toMatch(/^1:\{"ok":true,"code":"/);
   if (exact !== INVITE_CODE_MIN_USE_LIMIT) {
-    for (const b of actions) expect(b.text, `${b.url} carries the exact limit ${exact}`).not.toMatch(new RegExp(`(?<![0-9A-Za-z])${exact}(?![0-9A-Za-z])`));
+    expect(result, `the create result carries the exact limit ${exact}`).not.toMatch(new RegExp(`(?<![0-9A-Za-z])${exact}(?![0-9A-Za-z])`));
     const visible = await page.locator('main').innerText();
     expect(visible).not.toMatch(new RegExp(`(?<![0-9])${exact}(?![0-9])`));
   }
