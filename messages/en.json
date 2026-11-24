@@ -3401,7 +3401,11 @@
     "intro": "Follow the progress of the organisations that registered with your invite codes, as aggregated numbers, and manage your invite codes. Organisation names, content and personal data are not shown here.",
     "funnel": {
       "title": "Regional application funnel",
-      "description": "Every organisation that has registered with your codes so far, and the steps they reached. Numbers are cumulative; there is no period to choose. Every step counts organisations, not applications.",
+      "description": "Every organisation registered with your codes and the steps they reached, as at the end of the last closed month. The numbers are cumulative; there is no period to choose. Every step counts organisations, never applications.",
+      "lastUpdated": "Last updated: {month}",
+      "noSnapshotYet": "Last updated: not yet",
+      "monthEndNote": "The numbers are updated once a month, at the start of each month, with the state at the end of the month before. A registration or step during the month does not change the dashboard.",
+      "noSnapshotBody": "The first monthly update has not run yet. On the first day of the month the numbers will appear here, as at the end of the month before.",
       "breakdownLabel": "Breakdown",
       "breakdownNone": "No breakdown (totals only)",
       "breakdownOrgType": "By organisation type (all provinces)",

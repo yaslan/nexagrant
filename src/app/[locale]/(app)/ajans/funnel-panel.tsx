@@ -43,12 +43,21 @@ function CellValue({ cell }: { cell: FunnelCell }) {
   return <span className="text-sm font-medium text-muted">{t('unmeasured')}</span>;
 }
 
+/**
+ * NG-340 (HUKUK-5 5b): `funnel` is the last closed month's stored snapshot, never a live count;
+ * `lastUpdated` names that month. Both are null until the first month-end run has made one.
+ */
 export default function FunnelPanel({
   locale,
   funnel,
+  lastUpdated,
+  kirilim,
 }: {
   locale: string;
-  funnel: AgencyFunnel;
+  funnel: AgencyFunnel | null;
+  lastUpdated: string | null;
+  /** The breakdown asked for (`tur` or ''), so the form keeps it while there is no snapshot. */
+  kirilim: string;
 }) {
   const t = useTranslations('agency.funnel');
   const tType = useTranslations('agency.orgType');
@@ -57,17 +66,17 @@ export default function FunnelPanel({
   const breakdownNoteId = useId();
   const groupId = useId();
   const path = locale === 'tr' ? `/${locale}/ajans` : `/${locale}/agency`;
-  const { breakdown } = funnel;
+  const breakdown = funnel?.breakdown ?? { dimension: 'none' as const };
 
   /** The groups this response carries: the totals, then the organisation types (the one breakdown offered). */
-  const groups: { key: string; label: string; view: FunnelView }[] = [
-    { key: 'ALL', label: breakdown.dimension === 'orgType' ? t('allTypes') : t('allOrganisations'), view: funnel.all },
-  ];
+  const groups: { key: string; label: string; view: FunnelView }[] = funnel
+    ? [{ key: 'ALL', label: breakdown.dimension === 'orgType' ? t('allTypes') : t('allOrganisations'), view: funnel.all }]
+    : [];
   if (breakdown.dimension === 'orgType') {
     for (const [ot, view] of Object.entries(breakdown.byOrgType)) groups.push({ key: ot, label: tType(ot), view });
   }
-  const shown = groups.find((g) => g.key === group) ?? groups[0]!;
-  const selected = breakdown.dimension === 'orgType' ? 'tur' : '';
+  const shown = groups.find((g) => g.key === group) ?? groups[0];
+  const selected = funnel ? (breakdown.dimension === 'orgType' ? 'tur' : '') : kirilim;
 
   return (
     <section aria-labelledby="agency-funnel-title" className="space-y-4">
@@ -77,6 +86,10 @@ export default function FunnelPanel({
             {t('title')}
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description')}</p>
+          <p className="mt-1 text-sm font-semibold text-ink" data-testid="agency-funnel-updated">
+            {lastUpdated ? t('lastUpdated', { month: lastUpdated }) : t('noSnapshotYet')}
+          </p>
+          <p className="mt-0.5 max-w-2xl text-xs text-ink-2">{t('monthEndNote')}</p>
         </div>
 
         <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
@@ -116,7 +129,7 @@ export default function FunnelPanel({
             </span>
           </form>
 
-          {groups.length > 1 ? (
+          {shown && groups.length > 1 ? (
             <div className="flex flex-col gap-1">
               <label htmlFor={groupId} className="text-xs font-semibold text-ink-2">
                 {t('groupLabel')}
@@ -139,6 +152,7 @@ export default function FunnelPanel({
         </div>
       </div>
 
+      {shown ? (
       <ol
         aria-label={shown.label}
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
@@ -160,6 +174,11 @@ export default function FunnelPanel({
           </li>
         ))}
       </ol>
+      ) : (
+        <p className="rounded-xl border border-border bg-surface p-4 text-sm text-ink-2" data-testid="agency-funnel-empty">
+          {t('noSnapshotBody')}
+        </p>
+      )}
 
       <p className="text-xs text-ink-2">{t('privacyNote', { threshold: SMALL_CELL_THRESHOLD, ...shownRange() })}</p>
     </section>

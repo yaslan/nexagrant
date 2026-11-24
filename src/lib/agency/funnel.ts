@@ -449,6 +449,10 @@ interface FunnelRow {
  * (no date window, see the file comment). `breakdown` picks the one breakdown
  * the response carries (default: none).
  * `outcomes` is injectable for tests; production uses be-fb's B7 function.
+ *
+ * NG-340 (HUKUK-5 5b): a LIVE count — server-internal only. No response to an
+ * agency may carry it: the dashboard reads the month-end snapshot
+ * (./dashboard-snapshot.ts), guarded by tests/agency-dashboard-no-live-read.test.ts.
  */
 export async function getAgencyFunnel(
   agencyTenantId: string,

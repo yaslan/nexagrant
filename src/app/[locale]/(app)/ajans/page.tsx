@@ -3,7 +3,8 @@ import { getTranslations } from 'next-intl/server';
 import { requireTenantPage } from '@/lib/tenant';
 import { asRole, can } from '@/lib/rbac';
 import { withTenant } from '@/lib/db';
-import { getAgencyFunnel, isAgencyTenant, type FunnelBreakdown } from '@/lib/agency/funnel';
+import { isAgencyTenant, type FunnelBreakdown } from '@/lib/agency/funnel';
+import { getAgencyDashboardFunnelIn } from '@/lib/agency/dashboard-snapshot';
 import { lastExpiryDay, listInviteCodesIn } from '@/lib/agency/codes';
 import FunnelPanel from './funnel-panel';
 import InviteCodesPanel from './invite-codes-panel';
@@ -22,6 +23,16 @@ function parseBreakdown(kirilim: string | undefined): FunnelBreakdown {
   return kirilim === 'tur' ? { dimension: 'orgType' } : { dimension: 'none' };
 }
 
+/** `YYYY-MM` as "Ekim 2026" / "October 2026", on the server (UTC, so the month never slides). */
+function periodLabel(period: string, locale: string): string {
+  const [y, m] = period.split('-').map(Number);
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'tr-TR', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(y!, m! - 1, 1)));
+}
+
 /** Once per request, on the server; the client computes nothing from its own clock. */
 function requestTime(): number {
   return Date.now();
@@ -33,6 +44,8 @@ function requestTime(): number {
  * Only members of an AGENCY tenant get past the gate; everyone else gets 403.
  * The funnel arrives already aggregated and masked (src/lib/agency/funnel.ts):
  * no organisation name, id or content is ever passed to the client.
+ * NG-340 (HUKUK-5 5b): it is the last closed month's stored snapshot, never a
+ * live count (src/lib/agency/dashboard-snapshot.ts), so it changes only once a month.
  */
 export default async function AgencyPage({
   params,
@@ -52,7 +65,8 @@ export default async function AgencyPage({
   const renderedAt = requestTime();
   const [funnel, codes, reports, cobrand] = await Promise.all([
     // TASK-MULXF0AVMD8MN — one cohort, no date window: an old `?gun=` link is ignored.
-    getAgencyFunnel(scope.tenantId, { breakdown }),
+    // NG-340 (HUKUK-5 5b): the last closed month's snapshot, never a live count.
+    withTenant(scope.tenantId, (tx) => getAgencyDashboardFunnelIn(tx, scope.tenantId, breakdown)),
     // B-1 (TASK-MUM17YBJVAHRR): status per code, no use count.
     withTenant(scope.tenantId, (tx) => listInviteCodesIn(tx, scope.tenantId, renderedAt)),
     // B3 (TASK-MULRR08Y9YI77): the monthly region reports, newest first.
@@ -68,7 +82,12 @@ export default async function AgencyPage({
         <p className="mt-2 max-w-3xl text-ink-2">{t('intro')}</p>
       </header>
 
-      <FunnelPanel locale={locale} funnel={funnel} />
+      <FunnelPanel
+        locale={locale}
+        funnel={funnel?.funnel ?? null}
+        lastUpdated={funnel ? periodLabel(funnel.period, locale) : null}
+        kirilim={breakdown.dimension === 'orgType' ? 'tur' : ''}
+      />
 
       <ReportsPanel locale={locale} reports={reports} />
 
