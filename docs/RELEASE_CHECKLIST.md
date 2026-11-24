@@ -404,6 +404,7 @@ origin  https://github.com/yaslan/fonbridge.git
 - **EKSİK — yerel pre-push kapısı devre dışı:** `git config core.hooksPath` → `/Users/macbook/AgentSpace/fabrika/githooks` — bu dizin **yok** (`ls` → No such file or directory). Repodaki `githooks/pre-push` (`pnpm gate`) bu yüzden push'ta **koşmaz**. Düzeltme (yerel, geri alınabilir): `git config core.hooksPath githooks` — geri alma: eski değeri geri yaz. Push'u yapan makinede ayarlanmalı; bu kart ayarı değiştirmedi (paylaşımlı ağaç, diğer ajanların commit'lerini etkiler — patron/lider onayı).
 - Push öncesi öneri (PATRON ya da lider): temiz bir worktree'de `pnpm gate` bir kez (fe-fb 30.09 ölçümü: install/tsc/lint/i18n/rls/build 0; vitest 2814/2822, 2 bilinen kararsız test — `docs/agent-results/TASK-MUN66PFFWT9MA-fe-fb.md`).
 - İlk push'ta CI kırmızı çıkarsa: `docs/agent-results/` altındaki son kapı ölçümleriyle karşılaştır; kararsız testi yeniden koş (rerun), gerçek kırmızıyı düzelt.
+- **Yığılı PR (NG-353):** taban `task/**`, `se-fb/**` ya da `be-fb/**` olan PR'larda da tam `build-and-test` ve e2e otomatik koşar (`ci.yml` `pull_request.branches`). `push` tetikleyicisi yalnız `main`/`dev`: görev dalına commit atmak CI'ı ikinci kez koşturmaz.
 
 ---
 

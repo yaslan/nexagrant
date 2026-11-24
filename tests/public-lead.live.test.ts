@@ -51,6 +51,7 @@ import {
 import { publicLeadCleanupTask } from '@/lib/jobs/tasks/public-lead-cleanup';
 import type { JobHelpers } from 'graphile-worker';
 import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
 const SUITE = 'public lead test';
@@ -138,8 +139,13 @@ async function cleanRows(): Promise<void> {
   await admin.auditEvent.deleteMany({ where: { type: 'public_lead.purged', createdAt: { gte: STARTED } } });
 }
 
+// NG-346: this file writes never-routed consented PublicLead rows dated 1–500 days back. Other live
+// files count PublicLead across the whole table (alertStuckRoutedLeads), so hold the shared lock for the file.
+let releasePublicLeadLock: (() => Promise<void>) | undefined;
+
 beforeAll(async () => {
   if (!HAS_DB) return;
+  releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
   await cleanRows();
 });
 
@@ -151,6 +157,7 @@ afterEach(async () => {
 afterAll(async () => {
   if (!HAS_DB) return;
   await admin.$disconnect();
+  await releasePublicLeadLock?.();
 });
 
 describe.skipIf(!HAS_DB)('public lead form (live database, fabrika_app)', () => {
