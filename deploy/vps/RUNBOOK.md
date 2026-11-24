@@ -461,6 +461,18 @@ BACKUP_DATABASE_URL=postgresql://fabrika@127.0.0.1:5432/fabrika \
 ✋ RESTORE_DATABASE_URL=postgresql://fabrika@127.0.0.1:5432/fabrika_restored bash scripts/backup/pg-restore.sh <dump>
 ```
 
+Prova iki şeyi karşılaştırır: tablo başına satır sayısı ve örnek kayıt (tablo başına satır metnine göre sıralı
+ilk `DRILL_SAMPLE_ROWS` satırın md5'i, varsayılan 5; `0` kapatır). Sayı eşit, içerik farklıysa da düşer.
+Her koşu, geçse de düşse de `RESTORE_DRILL_LOG` dosyasına (varsayılan `$BACKUP_DIR/restore-drill.log`) bir
+satır ekler: başlangıç ve bitiş (UTC), süre (sn), `ok|fail`, döküm adı, tablo sayısı, düşme nedeni. Bağlantı
+dizesi ve parola bu dosyaya yazılmaz. Aylık kayıt bu dosyadır; satırı ay sonunda rapora koy.
+
+**Takvim:** her ayın 1'i 10:00 UTC, elle (✋). Otomatik cron önerilmez: provanın şifreli dökümü çözmesi
+için `age` özel anahtarı gerekir ve bu anahtar sunucuda bulunmaz (§8.1). Hatırlatma için bir takvim girdisi
+yeterli. Anahtar ileride ayrı bir prova makinesinde tutulursa o makinede şu satır kullanılabilir:
+`0 10 1 * * root <çöz-ve-prova-betiği> >> /var/log/fonbridge-restore-drill.log 2>&1` (her ayın 1'i).
+Bu satır bu pakette kurulu değil.
+
 ✋ Sonra hedef DB'ye karşı `rls` ve `verify` (ops.sh'ın DATABASE_URL'ini o DB'ye çevirerek), uygulamayı yeni DB'ye
 bağla, giriş yap. Süreyi yaz (RTO ölçümü). `docs/RELEASE_CHECKLIST.md` §4.2 ve §4.4 ayrıntılı adımları verir.
 
