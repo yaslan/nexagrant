@@ -112,3 +112,15 @@ export const NOTIFICATION_OUTBOX_LOCK = 'NotificationEmailItem:outbox';
  * each read.
  */
 export const EXPERT_DIRECTORY_POLICY_LOCK = 'ExpertPreRegistration:expert_directory';
+
+/**
+ * NG-346: rls-verify-system-scope-policy-set.live runs the NG-183 DO block of prisma/rls.sql on the
+ * shared database: it DROPs every stray policy on every system_scope table (ACCESS EXCLUSIVE on
+ * "PublicLead" and "ProvinceLeadRoute") and its dropStrays() drops expert_directory. Run next to
+ * the public-lead and province-route live files it produced a real deadlock (Postgres log, 23.11.2026:
+ * the DROP POLICY on PublicLead waited on ProvinceLeadRoute while a province SELECT held AccessShare
+ * there and waited on PublicLead). The province-route and public-lead-stuck live files hold this lock for
+ * their whole file (beforeAll → afterAll), and so does the policy-set file: the DDL never runs while
+ * one of them reads or writes. Other PublicLead files do not take it yet.
+ */
+export const PUBLIC_LEAD_TABLE_LOCK = 'PublicLead:ddl';
