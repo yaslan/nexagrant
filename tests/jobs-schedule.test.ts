@@ -48,6 +48,7 @@ describe('schedule (ADR-0008 §2)', () => {
       'alerts-sweep': '15 4 * * *',
       'stripe-event-cleanup': '0 2 * * *',
       'agency-monthly-report': '0 6 1 * *',
+      'agency-report-retention': '0 5 1 1,7 *',
       'partner-search': '0 3 * * *',
       'partner-search-retention': '15 3 * * *',
       'm17-text-retention': '35 3 * * *',
@@ -78,6 +79,7 @@ describe('schedule (ADR-0008 §2)', () => {
     const lines = crontab().trim().split('\n');
     expect(lines).toHaveLength(SCHEDULE.length);
     expect(lines).toContain('0 6 1 * * agency-monthly-report ?id=agency-monthly-report&max=5&fill=1d&queue=agency');
+    expect(lines).toContain('0 5 1 1,7 * agency-report-retention ?id=agency-report-retention&max=5&fill=1d&queue=agency');
     expect(lines).toContain('0 2 * * * k1-daily-calls ?id=k1-daily-calls&max=5&fill=6h');
     expect(lines).toContain('5 * * * * job-queue-health ?id=job-queue-health&max=3');
     expect(lines).toContain('30 3 * * * invitation-cleanup ?id=invitation-cleanup&max=5&fill=6h');

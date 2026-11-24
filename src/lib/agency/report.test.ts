@@ -3,7 +3,6 @@ import type { OrgType } from '@prisma/client';
 import { buildAgencyFunnel, FUNNEL_STEPS, maskAgencyFunnel, NO_PROVINCE, ORG_TYPES, type FunnelBreakdown, type FunnelView } from './funnel';
 import { TR_PROVINCES, type TrProvince } from '@/lib/readiness/provinces';
 import {
-  agencyReportCsv,
   agencyReportHtml,
   AgencyReportSnapshotSchema,
   AgencyReportPeriodError,
@@ -17,7 +16,7 @@ import {
 /**
  * TASK-MULRR08Y9YI77 (FB KAMU B3) — the region report is the dashboard's
  * published output, copied: no number that the dashboard does not show for the
- * same data, in the same form (masked, rounded to 5).
+ * same data, in the same form (masked, rounded to 10; 5 before FO-398).
  */
 
 type Step = (typeof FUNNEL_STEPS)[number];
@@ -142,15 +141,12 @@ describe('report numbers == dashboard response', () => {
 });
 
 describe('edge cases', () => {
-  test('empty month: no organisation — every cell "<5", no province row, both files still render', () => {
+  test('empty month: no organisation — every cell "<5", no province row, the view still renders', () => {
     const r = buildAgencyReport(new Map(), '2026-09', AT);
     expectSameAsDashboard(r, new Map());
     expect(Object.values(r.all).every((c) => c.state === 'small')).toBe(true);
     expect(r.byProvince).toEqual([]);
     expect(agencyReportHtml(r, 'OKA')).toContain('Hiçbir il için gösterilebilir sayı yok');
-    const csv = agencyReportCsv(r);
-    // header + 8 steps × (1 total + 9 types), no province rows
-    expect(csv.trim().split('\r\n')).toHaveLength(1 + 8 * 10);
   });
 
   test('one province: its row is the dashboard’s province view; the other 80 are not listed', () => {
@@ -166,7 +162,7 @@ describe('edge cases', () => {
     const r = buildAgencyReport(raw, '2026-09', AT);
     expectSameAsDashboard(r, raw);
     expect(r.byProvince.map((p) => p.province)).not.toContain('Tokat');
-    expect(agencyReportCsv(r)).not.toContain('Tokat');
+    expect(agencyReportHtml(r, 'OKA')).not.toContain('Tokat');
   });
 });
 
@@ -194,28 +190,20 @@ describe('the stored snapshot holds only published values', () => {
   });
 });
 
-describe('files', () => {
+describe('on-screen view (NG-341: no file)', () => {
   const raw = table({ Samsun: { MUNICIPALITY: 13, PUBLIC: 9 }, Tokat: { SME: 7 } });
   const r = buildAgencyReport(raw, '2026-09', AT);
 
-  test('CSV: UTF-8 BOM, CRLF, one row per (table, group, step), cells as the printable page', () => {
-    const csv = agencyReportCsv(r);
-    expect(csv.startsWith('﻿')).toBe(true);
-    const lines = csv.slice(1).trimEnd().split('\r\n');
-    expect(lines[0]).toBe('Dönem,Tablo,Grup,Adım,Değer');
-    expect(lines).toHaveLength(1 + 8 * (1 + 9 + r.byProvince.length));
-    expect(lines).toContain('2026-09,Tüm kurumlar,Tüm kurumlar,Davet koduyla kayıt,30');
-    // Every value is a shown number or a label — never a count the dashboard hid.
-    for (const l of lines.slice(1)) expect(l.split(',').at(-1)).toMatch(/^(\d*[05]|<5|Henüz ölçülmüyor)$/);
-    expect(agencyReportCsv(r, 'en').slice(1).split('\r\n')[0]).toBe('Period,Table,Group,Step,Value');
-  });
-
-  test('printable page: escapes the agency name, says it is a print-to-PDF page, carries the privacy note', () => {
+  test('view: escapes the agency name, carries the privacy and retention notes, offers no print or PDF', () => {
     const html = agencyReportHtml(r, '<img src=x onerror=alert(1)>');
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
-    expect(html).toContain('PDF olarak kaydet');
-    expect(html).toContain("5'in katına yuvarlanır");
+    expect(html).not.toContain('PDF');
+    expect(html).not.toContain('window.print');
+    expect(html).not.toContain('@media print');
+    expect(html).toContain('Bu rapor 12 ay saklanır; süresi dolanlar 6 ayda bir toplu silinir.');
+    expect(agencyReportHtml(r, 'OKA', 'en')).toContain('kept for 12 months');
+    expect(html).toContain("10'un katına yuvarlanır");
     expect(html).toContain('<td>30</td>');
   });
 

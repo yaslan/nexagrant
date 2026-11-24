@@ -71,7 +71,7 @@ Ajansın gerçekte gördüğü bundan geniştir. Metinde şunlar **yok**:
 
 - karne sonucunu hesabına ekleyen kurum sayısı, kayıtlı arama oluşturan ve konsept not üreten kurum sayısı, başvurusu kabul ya da red alan kurum sayısı;
 - sayıların **kurum türüne** ya da **tek bir ile** göre kırılımı;
-- sayıların 5'in katına yuvarlanması;
+- sayıların 10'un katına yuvarlanması (FO-398; önceden 5'in katı);
 - aylık raporun **indirilebilir dosya** olarak ajansta kalması.
 
 "Ajans neyi görmez?" kısmı ise doğrudur (ad, e-posta, kurum adı, karne cevapları, konsept notlar, belgeler, fatura bilgileri gitmez). Bu fark HUKUK-10 sorusunun konusudur (§4.5).
@@ -113,9 +113,9 @@ _Kanıt:_ `messages/tr.json` → `legal` altında "ajans", "kalkınma", "karne",
 3. **Küçük grup hiçbir şey göstermez.** Kayıtlı kurum sayısı gizlenen bir grupta (bir il ya da bir tür) hiçbir adımın sayısı gösterilmez.
 4. **İlini vermeyen kurumlar** ayrı bir grup olarak hiç gösterilmez.
 5. **Tek kırılım.** Ajans bir seferde ya tek bir ilin sayısını ya da kurum türlerine göre dağılımı görür. "Samsun'daki belediyeler" gibi il × tür çapraz tablosu hiç üretilmez.
-6. **5'e yuvarlama.** Gösterilen her sayı en yakın 5'in katına yuvarlanır ("5", gerçekte 5, 6 ya da 7 demektir). Bu yüzden parçaların toplamı toplamı tutmayabilir.
+6. **10'a yuvarlama (FO-398, K-577804; önceden 5).** Gösterilen her sayı en yakın 10'un katına yuvarlanır ("10", gerçekte 5 ile 14 arası demektir). Bu yüzden parçaların toplamı toplamı tutmayabilir.
 7. **Tek, birikimli dönem.** Sayılar, ajansın kodlarıyla bugüne kadar kayıt olmuş bütün kurumları kapsar. "Son 30 gün / son 90 gün" gibi dönem seçimi **yoktur**. Çünkü iki dönemin farkı, arada kayıt olan tek bir kurumu gösterebiliyordu.
-8. **Davet kodu başına kullanım sayısı gösterilmez.** Kodların kullanım sınırı da kaldırıldı. Bir kodun "tükendi" diye görünmesi, kaç kez kullanıldığını ele veriyordu.
+8. **Davet kodu başına kullanım sayısı gösterilmez.** Yeni kodların kullanım sınırı gizlidir (FO-392, K-577268): her kodun gerçek sınırı 500 ile 524 arasında rastgele bir sayıdır, panel yalnız "en az 500" ve "Sınıra ulaştı" der. Sabit bir sınır, sınırına ulaşan kodun tam kullanım sayısını ele veriyordu. Eski kodların sınırı yoktur. **Kalan risk (FO-398 ile yeniden ölçüldü):** sapma yalnız kod dolmadan önce korur; üstelik ajans sınıra hiç ihtiyaç duymadan, yeni bir kodu kendi açtığı 5-30 kurumla kullanıp sayısını kesin bilebilir. Sayısını bildiği kodları başka bir kodun kullanımından çıkararak (yuvarlanmış toplamla) kısıtlı koşullarda (birden çok il, hiç kurum silinmemiş) gizli bir 1-4 grubunu okur. Simülasyonda (900 tablo) yuvarlama adımı 5 iken 500 kayıtlık doldurma 74, 5-30 kayıtlık ucuz doldurma 60 tabloda sızdırdı. Gösterilen sayılar bu yüzden 10'un katına yuvarlandı (K-577804, varsayılanla): kalan 6 ve 4 tablo (%0,7 ve %0,4). Ayrıca kod dışı bir yol var: maskeli bir ile 1-4 kendi kurumunu eklemek o ilin gizli sayısını ele veriyor (maskeli 27 il sayısından 6'sı). Soru 5e hukukçuya sorar. (R-1 risk kabulü kapatılmadı: hukukçu yeniden görecek.)
 9. **Hesaplama sunucuda yapılır.** Tarayıcıya 5'ten küçük ya da kesin (yuvarlanmamış) bir sayı hiç gitmez.
 10. **Otomatik "saldırgan" testi.** Her kod değişikliğinde bir test, bütün görünümleri birleştirip gizli bir 1-4 grubunu geri hesaplamaya çalışır. Hesaplayabilirse test kırmızı olur ve değişiklik kabul edilmez. 29.09.2026'da test geçti (4 test dosyası, 64 test).
 11. **Aylık rapor (yeni, §2.1).** Rapor, panonun aynı kurallardan geçmiş sayılarının aylık bir kopyasıdır. Bütün sayıları 5'ten gizlenmiş bir il, rapora hiç yazılmaz. Böylece hangi illerde birkaç kurum olduğu da anlaşılmaz.
@@ -133,6 +133,8 @@ _Kanıt:_ `messages/tr.json` → `legal` altında "ajans", "kalkınma", "karne",
 > **5c.** Eşik 5 yeterli mi, daha yüksek mi olmalı (ör. 10)? Şahıs şirketi KOBİ'ler için ayrı bir eşik gerekir mi?
 >
 > **5d.** Aylık raporun **indirilebilir dosya** olması (ajansta süresiz kalması, paylaşılabilmesi) anonimlik değerlendirmenizi değiştirir mi?
+>
+> **5e.** (FO-392, FO-398; R-1 ile birlikte değerlendirilsin.) Ajans, kendi açtığı birkaç kurumla (5-30 kayıt) bir kodun kullanımını kesin bilir; böylece başka bir kodun kullanımını yaklaşık ±5 içinde hesaplayabilir ve kısıtlı koşullarda (birden çok il, hiç kurum silinmemiş) gizli bir 1-4 grubunu okuyabilir. Sayılar 10'un katına yuvarlandıktan sonra simülasyonda 900 tablonun 4-6'sı (%0,4-0,7; yuvarlama 5 iken 60-74). Ayrıca maskeli bir ile 1-4 kendi kurumunu ekleyen ajans o ilin gizli sayısını okuyabilir (davet kodundan bağımsız). Bu kalan risk pilotta **kabul edilebilir mi**?
 
 **Cevaba göre ne değişir.**
 
@@ -142,6 +144,7 @@ _Kanıt:_ `messages/tr.json` → `legal` altında "ajans", "kalkınma", "karne",
 | **Yeterli ama zaman kanalı kapatılmalı** (5b hayır) | Pilottan önce kod işi: pano sayıları gecikmeli ya da yalnız ay sonunda güncellenir (ör. panoda yalnız son kapanmış ayın raporu gösterilir). Ürün ekibi bunu ayrı kart olarak açar. Pilot bu iş bitince başlar.                                                                                                           |
 | **Eşik yükselmeli** (5c)                            | Tek sabit değişir (`SMALL_CELL_THRESHOLD`); yuvarlama da yeni eşiğin katına döner. Pano ve rapor aynı anda değişir. Küçük pilotta çoğu sayı "<10" görünür, bu da ajansın panodan alacağı faydayı azaltır; ürün sahibine bildirilir. Ek ve kayıt ekranı metnindeki "5" sayıları güncellenir, ek sürümü artar.             |
 | **Yetersiz, veri kişisel sayılır** (5a hayır)       | HUKUK-2 varsayımı düşer: ajans kişisel veri **alıcısı** olur. Ajansa aktarım için KVKK md.8 dayanağı, ekte "aktarım" bölümü ve belki ajansla bir veri paylaşım sözleşmesi gerekir. Bu değişiklikler bitene kadar ajans panosu ve raporu pilotta **kapalı** tutulur (kod ile kapatılabilir). Pilotun ajans ayağı gecikir. |
+| **Kalan risk kabul edilemez** (5e hayır) | Ürün ekibi ayrı kart açar. Değerlendirilecek olasılıklar (karar hukukçu cevabından sonra ürün sahibinindir): sapmayı genişletmek, kodun "Sınıra ulaştı" durumunu ayrı göstermemek, ya da yeni kodlarda sınırı yeniden kaldırıp yalnız son tarih ve iptalle yönetmek (sızan kod riski geri gelir). Bu cevaba kadar davranış değişmez. |
 | **Dosya olarak rapor sorunlu** (5d)                 | Rapor indirme kapatılır ya da rapor yalnız ekranda gösterilir. Saklama süresi konur (bugün süresiz). Ekte raporun dosya olarak verildiği açıkça yazılır.                                                                                                                                                                 |
 
 _Kanıt:_ `src/lib/agency/funnel.ts:61` (`SMALL_CELL_THRESHOLD = 5`), `:168` (`roundToFive`), `:185` (`NO_PROVINCE`, hiç gösterilmez), `:269-356` (`suppressedCells`: tamamlayıcı gizleme, küçük grup kuralı), `:359` (`buildAgencyFunnel`: tek kırılım), `:453` (dönem yok: `agency_funnel_counts_by_province(NULL)`); `src/lib/agency/funnel.attack.test.ts` (saldırgan testi, CI'da `pnpm test`: `.github/workflows/ci.yml:116`); `src/lib/agency/report.ts:15-19` (bütün sayıları gizli il rapora yazılmaz); kod kullanım sınırı kaldırıldı: `prisma/migrations/agency-invite-no-max-uses.sql`. Test çıktısı: `docs/agent-results/TASK-MUMH7OISNJ5OV-cs-fb.md` §2. Ayrıntılı tarihçe: `agency-channel-notice-addendum.md` §3.1 ve "HUKUK-5 notu" paragrafları.

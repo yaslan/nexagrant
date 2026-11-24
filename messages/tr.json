@@ -3416,7 +3416,7 @@
       "unmeasured": "Henüz ölçülmüyor",
       "smallHint": "5'ten az kurum: kurumları tanıtmamak için sayı gösterilmez.",
       "smallSr": "5'ten az; sayı gizlendi",
-      "privacyNote": "Gösterilen sayılar 5'in katına yuvarlanır; her sayı ayrı yuvarlandığı için parçaların toplamı toplamı tutmayabilir. <5: Bu grupta 5'ten az kurum var ya da sayı, başka sayılarla birlikte (toplam, başka bir tür, başka bir il ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
+      "privacyNote": "Gösterilen sayılar 10'un katına yuvarlanır (gösterilen \"10\" gerçekte 5 ile 14 arasıdır); her sayı ayrı yuvarlandığı için parçaların toplamı toplamı tutmayabilir. <5: Bu grupta 5'ten az kurum var ya da sayı, başka sayılarla birlikte (toplam, başka bir tür, başka bir il ya da başka bir adım) geri hesaplanabiliyor. Kurumları tanıtmamak için değer gizlenir.",
       "steps": {
         "registered": {
           "title": "Davet koduyla kayıt",
@@ -3487,11 +3487,15 @@
       "colStatus": "Durum",
       "colActions": "İşlemler",
       "hintSr": "{hint} ile biten kod",
-      "countsNote": "Kodların kullanım sınırı yoktur: kod, son geçerlilik gününe kadar ya da siz iptal edene kadar kullanılabilir. Kısa bir son tarih seçin; kod beklenmedik yerlere ulaştıysa iptal edin. Kurumlar tanınmasın diye bir kodun kaç kez kullanıldığı gösterilmez. Kayıtlı kurum sayısı yukarıdaki panelde.",
+      "countsNote": "Yeni her kodun bir kullanım sınırı vardır: en az {min} kez ve son geçerlilik gününe kadar (hangisi önce gelirse) kullanılabilir; dilediğiniz an iptal edebilirsiniz. Sınırın kesin değeri her kodda farklıdır ve gösterilmez; sınırına ulaşan kod yeni kayıtlar için çalışmaz. Daha önce oluşturulan kodların sınırı yoktur. Kurumlar tanınmasın diye bir kodun kaç kez kullanıldığı da gösterilmez. Kayıtlı kurum sayısı yukarıdaki panelde.",
+      "colLimit": "Kullanım sınırı",
+      "limitUnlimited": "Sınırsız (eski kod)",
+      "limitAtLeast": "En az {min} kullanım",
       "status": {
         "active": "Etkin",
         "revoked": "İptal edildi",
-        "expired": "Süresi doldu"
+        "expired": "Süresi doldu",
+        "exhausted": "Sınıra ulaştı"
       },
       "revoke": "İptal et",
       "revokeSr": "{hint} ile biten kodu iptal et",
@@ -3505,13 +3509,14 @@
     },
     "reports": {
       "title": "Raporlar",
-      "description": "Bölge raporu her ayın 1'inde hazırlanır. Rapor, panodaki güvenli sayıların o günkü kopyasıdır: aynı maskeleme (<5) ve aynı 5'e yuvarlama. Kişisel veri içermez. E-postayla gönderilmez; yalnız buradan indirilir.",
+      "description": "Bölge raporu her ayın 1'inde hazırlanır. Rapor, panodaki güvenli sayıların o günkü kopyasıdır: aynı maskeleme (<5) ve aynı 10'a yuvarlama. Kişisel veri içermez. E-postayla gönderilmez ve dosya olarak indirilmez; yalnız ekranda görüntülenir.",
       "empty": "Henüz rapor yok. İlk rapor ayın 1'inde hazırlanır.",
       "listLabel": "Hazırlanmış raporlar",
       "period": "Dönem",
       "generatedAt": "Hazırlandı",
-      "downloadCsv": "CSV indir",
-      "downloadPrint": "Yazdırılabilir rapor (PDF olarak kaydedin)",
+      "view": "Raporu görüntüle",
+      "viewLabel": "Raporu görüntüle: {period} (yeni sekmede açılır)",
+      "retentionNote": "Bu rapor 12 ay saklanır; süresi dolanlar 6 ayda bir toplu silinir.",
       "doc": {
         "title": "Bölge başvuru hunisi raporu",
         "periodLabel": "Dönem",
@@ -3526,13 +3531,7 @@
         "groupColumn": "Grup",
         "small": "<5",
         "unmeasured": "Henüz ölçülmüyor",
-        "printHint": "PDF için tarayıcınızın yazdırma penceresinde \"PDF olarak kaydet\"i seçin.",
-        "footer": "{brand} — ajans bölge raporu. Toplulaştırılmış kurum sayıları; kişisel veri içermez.",
-        "csvPeriod": "Dönem",
-        "csvTable": "Tablo",
-        "csvGroup": "Grup",
-        "csvStep": "Adım",
-        "csvValue": "Değer"
+        "footer": "{brand} — ajans bölge raporu. Toplulaştırılmış kurum sayıları; kişisel veri içermez."
       }
     },
     "cobrand": {

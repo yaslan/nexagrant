@@ -8,7 +8,8 @@ import { AgencyMonthlyReportOutputSchema, type AgencyMonthlyReportOutput } from 
  *
  * One masked snapshot per live agency for the month that just closed, put in
  * the "Reports" list of the agency dashboard (src/lib/agency/report.ts). No
- * e-mail: the agency downloads it.
+ * e-mail and no file: the agency views it on screen (NG-341). Reports older than 12
+ * months are destroyed by agency-report-retention.
  *
  * Two ways in, one body:
  *  - the cron: the month before the tick's month (a retried or backfilled run

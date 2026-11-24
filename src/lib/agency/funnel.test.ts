@@ -8,7 +8,8 @@ import {
   NO_PROVINCE,
   normalizeProvinces,
   ORG_TYPES,
-  roundToFive,
+  FUNNEL_ROUND_STEP,
+  roundForDisplay,
   SMALL_CELL_THRESHOLD,
   suppressedCells,
   type AgencyFunnel,
@@ -58,15 +59,18 @@ const byType = (f: AgencyFunnel): Record<OrgType, FunnelView> => {
 };
 
 describe('display', () => {
-  test('threshold is 5, and shown numbers are multiples of 5 (HUKUK-5)', () => {
+  test('threshold is 5, and shown numbers are multiples of 10 (FO-398; 5 before)', () => {
     expect(SMALL_CELL_THRESHOLD).toBe(5);
-    expect([5, 6, 7, 8, 12, 13, 22].map(roundToFive)).toEqual([5, 5, 5, 10, 10, 15, 20]);
+    expect(FUNNEL_ROUND_STEP).toBe(10);
+    // A shown 10 is 5..14, a shown 20 is 15..24: -5..+4, and never under the threshold.
+    expect([5, 6, 7, 8, 12, 13, 14, 15, 22].map((v) => roundForDisplay(v))).toEqual([10, 10, 10, 10, 10, 10, 10, 20, 20]);
+    expect([5, 6, 7, 8, 12, 13, 22].map((v) => roundForDisplay(v, 5))).toEqual([5, 5, 5, 10, 10, 15, 20]);
   });
 
   test('readiness is a measured step since B6 (TASK-MULRR8P7HIII4): counted, rounded and masked like the others', () => {
     const f = buildFunnel(types({ SME: { registered: 12, readiness: 7 }, MUNICIPALITY: { registered: 9, readiness: 9 } }));
-    expect(f.all.readiness).toEqual({ state: 'count', value: 15 });
-    expect(byType(f).SME.readiness).toEqual({ state: 'count', value: 5 });
+    expect(f.all.readiness).toEqual({ state: 'count', value: 20 }); // 7 + 9 = 16
+    expect(byType(f).SME.readiness).toEqual({ state: 'count', value: 10 }); // 7
     // 9 − 9 = 0 without a result: nothing to hide.
     expect(byType(f).MUNICIPALITY.readiness).toEqual({ state: 'count', value: 10 });
     const small = buildFunnel(types({ SME: { registered: 12, readiness: 3 } }));
@@ -83,8 +87,8 @@ describe('display', () => {
   test('numbers of 5 and more come through, rounded; under 5 (0 included) are "<5"', () => {
     const f = buildFunnel(types({ SME: 7, MUNICIPALITY: 13 }));
     expect(f.all.registered).toEqual({ state: 'count', value: 20 });
-    expect(byType(f).SME.registered).toEqual({ state: 'count', value: 5 });
-    expect(byType(f).MUNICIPALITY.registered).toEqual({ state: 'count', value: 15 });
+    expect(byType(f).SME.registered).toEqual({ state: 'count', value: 10 }); // 7, a shown 10 is 5..14
+    expect(byType(f).MUNICIPALITY.registered).toEqual({ state: 'count', value: 10 }); // 13
     expect(byType(f).NGO.registered).toEqual({ state: 'small' });
   });
 
@@ -113,14 +117,14 @@ describe('one breakdown per response (TASK-MULZATEX4G92H)', () => {
     const f = buildAgencyFunnel(t, { dimension: 'province', province: 'Samsun' });
     if (f.breakdown.dimension !== 'province') throw new Error('no province');
     expect(f.breakdown.province).toBe('Samsun');
-    expect(f.breakdown.view.registered).toEqual({ state: 'count', value: 15 });
+    expect(f.breakdown.view.registered).toEqual({ state: 'count', value: 20 }); // 8 + 7 = 15 rounds up
     expect(JSON.stringify(f)).not.toMatch(/byOrgType|SME|MUNICIPALITY/);
   });
 
   test('type: every type over every province, and no province at all', () => {
     const f = buildAgencyFunnel(t, { dimension: 'orgType' });
-    expect(byType(f).SME.registered).toEqual({ state: 'count', value: 15 });
-    expect(byType(f).MUNICIPALITY.registered).toEqual({ state: 'count', value: 15 });
+    expect(byType(f).SME.registered).toEqual({ state: 'count', value: 10 }); // 8 + 6 = 14
+    expect(byType(f).MUNICIPALITY.registered).toEqual({ state: 'count', value: 20 }); // 7 + 9 = 16
     expect(JSON.stringify(f)).not.toMatch(/Samsun|Tokat/);
   });
 

@@ -7,8 +7,9 @@ const link = `inline-flex min-h-11 items-center rounded-lg border border-border 
 
 /**
  * The agency's monthly region reports (FB KAMU B3, TASK-MULRR08Y9YI77). Each is a
- * stored copy of the dashboard's masked numbers; downloads only, no e-mail.
- * "PDF" is the browser's print dialog, and the link says so.
+ * stored copy of the dashboard's masked numbers, shown on screen only: no download,
+ * no e-mail (NG-341, HUKUK-5 5d). Kept 12 months, destroyed every 6 months
+ * (src/lib/agency/retention.ts); the panel says so.
  */
 export default async function ReportsPanel({ locale, reports }: { locale: string; reports: AgencyReportListItem[] }) {
   const t = await getTranslations({ locale, namespace: 'agency.reports' });
@@ -22,6 +23,9 @@ export default async function ReportsPanel({ locale, reports }: { locale: string
           {t('title')}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description')}</p>
+        <p className="mt-1 max-w-2xl text-sm text-ink-2" data-testid="agency-report-retention">
+          {t('retentionNote')}
+        </p>
       </div>
       {reports.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink-2">{t('empty')}</p>
@@ -38,11 +42,14 @@ export default async function ReportsPanel({ locale, reports }: { locale: string
                   {r.generatedAt.toLocaleDateString(dateLocale, { timeZone: 'Europe/Istanbul' })}
                 </p>
               </div>
-              <a className={link} href={`/api/agency/reports/${r.id}?format=print&locale=${lang}`} target="_blank" rel="noopener">
-                {t('downloadPrint')}
-              </a>
-              <a className={link} href={`/api/agency/reports/${r.id}?format=csv&locale=${lang}`} download>
-                {t('downloadCsv')}
+              <a
+                className={link}
+                href={`/api/agency/reports/${r.id}?locale=${lang}`}
+                target="_blank"
+                rel="noopener"
+                aria-label={t('viewLabel', { period: r.period })}
+              >
+                {t('view')}
               </a>
             </li>
           ))}

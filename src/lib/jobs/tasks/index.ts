@@ -10,6 +10,7 @@ import { feedbackWeeklyDigestTask } from './feedback-weekly-digest';
 import { alertsSweepTask } from './alerts-sweep';
 import { stripeEventCleanupTask } from './stripe-event-cleanup';
 import { agencyMonthlyReportTask } from './agency-monthly-report';
+import { agencyReportRetentionTask } from './agency-report-retention';
 import { invitationCleanupTask } from './invitation-cleanup';
 import { publicLeadCleanupTask } from './public-lead-cleanup';
 import { publicLeadStuckTask } from './public-lead-stuck';
@@ -47,6 +48,7 @@ export const taskList: Record<JobId, Task> = {
   'alerts-sweep': alertsSweepTask,
   'stripe-event-cleanup': stripeEventCleanupTask,
   'agency-monthly-report': agencyMonthlyReportTask,
+  'agency-report-retention': agencyReportRetentionTask,
   'invitation-cleanup': invitationCleanupTask,
   'public-lead-cleanup': publicLeadCleanupTask,
   'public-lead-stuck': publicLeadStuckTask,
