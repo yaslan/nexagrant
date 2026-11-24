@@ -94,7 +94,7 @@ describe.skipIf(!HAS_DB)('M18 lead intake', () => {
 
   beforeAll(async () => {
     releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
-    const mk =(key: keyof typeof tenants, orgType: 'CONSULTANCY' | 'SME', kind: 'ORGANIZATION' | 'AGENCY') =>
+    const mk = (key: keyof typeof tenants, orgType: 'CONSULTANCY' | 'SME', kind: 'ORGANIZATION' | 'AGENCY') =>
       admin.tenant
         .create({ data: { ...M18_PILOT, name: `intake-${key}-${RUN}`, slug: `intake-${key}-${RUN}`, country: 'TR', orgType, kind } })
         .then((t) => (tenants[key] = t.id));
