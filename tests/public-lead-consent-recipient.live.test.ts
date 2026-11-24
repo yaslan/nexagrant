@@ -38,6 +38,7 @@ import { PUBLIC_LEAD_CONSENT, submitPublicLead } from '@/lib/leads/public-lead';
 import { forwardPublicLead } from '@/lib/leads/public-lead-intake';
 import { createLeadIntakePort } from '@/modules/m18/server/intake-repo';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const SUITE = 'public lead consent recipient test';
 const admin = createDbClient(OWNER_URL ?? 'postgresql://localhost:5432/unset');
@@ -89,7 +90,10 @@ const recipientOf = async (id: string) =>
   )[0];
 
 describe.skipIf(!HAS_DB)('transfer consent is bound to the recipient the visitor saw (NG-204)', () => {
+  // NG-346: forwardPublicLead writes routed PublicLead rows here; hold the shared DDL lock for the file.
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     for (const k of ['a', 'b'] as const) {
       const t = await admin.tenant.create({
         // NG-205: a tenant is an intake target only while its M18 is PILOT; without the row the
@@ -110,6 +114,7 @@ describe.skipIf(!HAS_DB)('transfer consent is bound to the recipient the visitor
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
     await admin.$disconnect();
     await prisma.$disconnect();
+    await releasePublicLeadLock?.();
   });
 
   test('submit stores the id and name of the organisation the consent was given to', async () => {

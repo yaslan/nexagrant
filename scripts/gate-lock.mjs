@@ -392,9 +392,16 @@ async function main() {
     }
   }
 
+  // NG-350: FONBRIDGE_GATE_RUN=1 tells the live suites they are inside the gate, where a missing
+  // migration/function/seed row fails the file instead of skipping it (tests/helpers/require-db-object.ts).
   const child = spawn(argv[0], argv.slice(1), {
     stdio: 'inherit',
-    env: { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '1', ...(e2ePort !== undefined ? { E2E_PORT: String(e2ePort) } : {}) },
+    env: {
+      ...process.env,
+      FONBRIDGE_GATE_LOCK_HELD: '1',
+      ...(IS_GATE ? { FONBRIDGE_GATE_RUN: '1' } : {}),
+      ...(e2ePort !== undefined ? { E2E_PORT: String(e2ePort) } : {}),
+    },
     shell: process.platform === 'win32',
   })
   for (const sig of ['SIGINT', 'SIGTERM']) {

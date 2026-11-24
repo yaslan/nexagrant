@@ -37,6 +37,7 @@ import {
 } from '@/lib/leads/province-route';
 import { createLeadIntakePort } from '@/modules/m18/server/intake-repo';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const SUITE = 'province lead route test';
 // No fallback address: without OWNER_URL the suite skips (loudly) instead of guessing credentials.
@@ -89,7 +90,11 @@ const mkLead = async (key: string, over: Record<string, unknown> = {}, consentTo
 };
 
 describe.skipIf(!HAS_DB)('province lead routing', () => {
+  // NG-346: the NG-183 DO block (rls-verify-system-scope-policy-set.live) takes ACCESS EXCLUSIVE on
+  // ProvinceLeadRoute and PublicLead; hold the shared DDL lock for this whole file so the two never interleave.
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     await admin.provinceLeadRoute.deleteMany({ where: { province: { in: PROVINCES } } });
     const mk = (key: keyof typeof T, orgType: 'CONSULTANCY' | 'SME') =>
       admin.tenant
@@ -109,6 +114,7 @@ describe.skipIf(!HAS_DB)('province lead routing', () => {
     await admin.user.deleteMany({ where: { email: { endsWith: `-${RUN}@example.test` } } });
     await admin.$disconnect();
     await prisma.$disconnect();
+    await releasePublicLeadLock?.();
   });
 
   describe('RLS: tenants cannot read the map', () => {
