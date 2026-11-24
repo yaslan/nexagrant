@@ -5,6 +5,7 @@ import type { PrismaClient, Role } from '@prisma/client';
 import { appUrl } from '@/lib/app-url';
 
 import { skipOrFailInCi, assertRlsSubjectRole, requireRlsTestUrl, requireTestEnv } from './helpers/live-db-role';
+import { skipOrFailOnMissingDbObject } from './helpers/require-db-object';
 
 /**
  * TASK-MUN2793A57Z9I — accepting a tenant invitation, against the database
@@ -199,19 +200,22 @@ beforeAll(async () => {
     route: await import('../src/app/[locale]/(public)/accept-invite/route'),
   };
   admin = lib.db.createDbClient(env.admin);
+  let colCount: number | undefined;
   try {
     await admin.$connect();
     const col = await admin.$queryRaw<Array<{ n: number }>>`
       SELECT count(*)::int AS n FROM information_schema.columns
        WHERE table_name = 'Invitation' AND column_name = 'acceptedAt'`;
-    if (col[0]?.n !== 1) {
-      skipReason = 'invitation-accepted-at.sql is not applied';
-      skipOrFailInCi(SUITE, skipReason);
-      return;
-    }
+    colCount = col[0]?.n;
   } catch (e) {
     skipReason = `database unavailable: ${e instanceof Error ? e.message : String(e)}`;
     skipOrFailInCi(SUITE, skipReason);
+    return;
+  }
+  // Outside the try: inside it the gate's throw would be caught and turned into a skip (NG-350).
+  if (colCount !== 1) {
+    skipReason = 'invitation-accepted-at.sql is not applied';
+    skipOrFailOnMissingDbObject(SUITE, skipReason);
     return;
   }
   await assertRlsSubjectRole(lib.db.prisma, SUITE);
