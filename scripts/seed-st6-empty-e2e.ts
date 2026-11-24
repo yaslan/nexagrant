@@ -98,7 +98,22 @@ function toJsonInput(val: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNu
 }
 
 let cordisBackupInMemory: CordisBackup | null = null;
+/**
+ * True when this run's seed did not write the backup (the file already existed, or the
+ * write failed with EEXIST). The backup then belongs to another run, so this run's rollback
+ * must neither restore nor delete it (NG-320 N-a).
+ */
+let seedBackupRefused = false;
 const BACKUP_FILE = path.join(__dirname, '.st6-cordis-backup.json');
+
+/**
+ * Clears this module's state (NG-320 N-c). Tests call it before every case so that no case
+ * depends on what an earlier one armed in memory. Not used by the CLI.
+ */
+export function resetSt6SeedStateForTests(): void {
+  cordisBackupInMemory = null;
+  seedBackupRefused = false;
+}
 
 /** Refuses to run on anything but a throwaway database, before any read, write or delete (NG-316). */
 async function assertThrowawayTarget() {
@@ -111,6 +126,7 @@ async function assertThrowawayTarget() {
 async function backupAndClearCordis() {
   // Never overwrite an existing backup: it may hold the only copy of the real CORDIS data.
   if (cordisBackupInMemory !== null || fs.existsSync(BACKUP_FILE)) {
+    seedBackupRefused = true;
     throw new Error(
       `[seed-st6-empty-e2e] a CORDIS backup already exists (${BACKUP_FILE}); run --rollback first. ` +
         'Overwriting it would lose the original data.',
@@ -137,13 +153,22 @@ async function backupAndClearCordis() {
   };
 
   // flag 'wx': create only; fails rather than replace a file that appeared since the check above.
-  fs.writeFileSync(
-    BACKUP_FILE,
-    JSON.stringify(backupData, (_key, value) =>
-      typeof value === 'bigint' ? { __bigint: value.toString() } : value
-    ),
-    { flag: 'wx' }
-  );
+  try {
+    fs.writeFileSync(
+      BACKUP_FILE,
+      JSON.stringify(backupData, (_key, value) =>
+        typeof value === 'bigint' ? { __bigint: value.toString() } : value
+      ),
+      { flag: 'wx' }
+    );
+  } catch (e) {
+    seedBackupRefused = true;
+    console.warn(
+      `[seed-st6-empty-e2e] WARNING: the CORDIS backup was not written by this run (${(e as Error).message}). ` +
+        'The CORDIS tables are untouched; rollback of this run will leave them and the backup file alone.',
+    );
+    throw e;
+  }
   // Armed only once the file is on disk. If the write failed (EEXIST), the in-memory copy
   // must stay empty: rollback would otherwise restore it and delete the real backup (B2).
   cordisBackupInMemory = backupData;
@@ -399,6 +424,15 @@ export async function seed() {
 
 export async function rollback() {
   await assertThrowawayTarget();
+  // This run never cleared the CORDIS tables and did not write the backup, so it has nothing
+  // of its own to undo. The fixture rows may belong to another run too: leave them alone (NG-320 N-a).
+  if (seedBackupRefused) {
+    console.warn(
+      '[seed-st6-empty-e2e] WARNING: this run did not write the CORDIS backup; nothing to roll back. ' +
+        'The database and the backup file were not changed.',
+    );
+    return;
+  }
   await prisma.apiKey.deleteMany({ where: { id: ST6.bare.apiKeyId } });
   await prisma.applicationPart.deleteMany({ where: { opportunityId: ST6.app.opportunityId } });
   await prisma.opportunity.deleteMany({ where: { id: ST6.app.opportunityId } });
