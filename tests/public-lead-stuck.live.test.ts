@@ -35,6 +35,7 @@ import { createDbClient, prisma } from '@/lib/db';
 import { publicLeadStuckAfterMinutes } from '@/lib/env';
 import { alertStuckRoutedLeads, listStuckRoutedLeads } from '@/lib/leads/stuck-leads';
 import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const SUITE = 'public lead stuck test';
 // No fallback address: without OWNER_URL the suite skips (loudly) instead of guessing credentials.
@@ -91,7 +92,11 @@ const copyOf = async (leadId: string) => {
 };
 
 describe.skipIf(!HAS_DB)('stuck routed leads (live database, fabrika_app)', () => {
+  // NG-346: the NG-183 DO block (rls-verify-system-scope-policy-set.live) takes ACCESS EXCLUSIVE on
+  // PublicLead; hold the shared DDL lock for this whole file so its alert scan never sees a half-altered table.
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     for (const key of ['a', 'b'] as const) {
       T[key] = (
         await admin.tenant.create({ data: { name: `stuck-${key}-${RUN}`, slug: `stuck-${key}-${RUN}`, country: 'TR', orgType: 'CONSULTANCY', kind: 'ORGANIZATION' } })
@@ -133,6 +138,7 @@ describe.skipIf(!HAS_DB)('stuck routed leads (live database, fabrika_app)', () =
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
     await admin.$disconnect();
     await prisma.$disconnect();
+    await releasePublicLeadLock?.();
   });
 
   test('(a) a routed lead whose tenant holds a copy (LeadContact or Deal) is NOT listed', async () => {
