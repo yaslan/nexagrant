@@ -289,6 +289,7 @@
           "NOT_SUBMITTED": "Mark the application as submitted before recording a result.",
           "ALREADY_DECIDED": "An application with a recorded result cannot be marked as submitted again.",
           "WITHDRAWN": "A withdrawn opportunity cannot take a declaration.",
+          "DECLARE_CONFLICT": "The opportunity changed while the declaration was being saved. Refresh the page and try again.",
           "DECLARE_FAILED": "The declaration could not be saved. Try again."
         }
       },
@@ -315,6 +316,7 @@
           "WITHDRAW_FORBIDDEN": "Only pipeline managers or the opportunity owner can do this.",
           "ALREADY_WITHDRAWN": "This opportunity is already withdrawn.",
           "ALREADY_DECIDED": "An opportunity with a result cannot be withdrawn.",
+          "WITHDRAW_CONFLICT": "The opportunity changed while the withdrawal was being saved. Refresh the page and try again.",
           "WITHDRAW_FAILED": "The withdrawal could not be saved. Try again."
         }
       },
@@ -333,6 +335,7 @@
           "OPPORTUNITY_NOT_FOUND": "This opportunity was not found or has been archived.",
           "REACTIVATE_FORBIDDEN": "Only pipeline managers or the opportunity owner can do this.",
           "NOT_WITHDRAWN": "This opportunity is no longer withdrawn. Its status may have changed; refresh the page.",
+          "REACTIVATE_CONFLICT": "The opportunity changed while the reactivation was being saved. Refresh the page and try again.",
           "REACTIVATE_FAILED": "The reactivation could not be saved. Try again."
         }
       },
