@@ -289,6 +289,7 @@
           "NOT_SUBMITTED": "Sonuç girmeden önce başvuruyu gönderildi olarak işaretleyin.",
           "ALREADY_DECIDED": "Sonuç girilmiş bir başvuru yeniden gönderildi yapılamaz.",
           "WITHDRAWN": "Geri çekilmiş bir fırsat için beyan yapılamaz.",
+          "DECLARE_CONFLICT": "Beyan kaydedilirken fırsat değişti. Sayfayı yenileyip tekrar deneyin.",
           "DECLARE_FAILED": "Beyan kaydedilemedi. Tekrar deneyin."
         }
       },
@@ -315,6 +316,7 @@
           "WITHDRAW_FORBIDDEN": "Bu işlemi yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
           "ALREADY_WITHDRAWN": "Bu fırsat zaten pasife alınmış.",
           "ALREADY_DECIDED": "Sonuç girilmiş bir fırsat vazgeçilemez.",
+          "WITHDRAW_CONFLICT": "Vazgeçme kaydedilirken fırsat değişti. Sayfayı yenileyip tekrar deneyin.",
           "WITHDRAW_FAILED": "Vazgeçme kaydedilemedi. Tekrar deneyin."
         }
       },
@@ -333,6 +335,7 @@
           "OPPORTUNITY_NOT_FOUND": "Bu fırsat bulunamadı ya da arşivlenmiş.",
           "REACTIVATE_FORBIDDEN": "Bu işlemi yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
           "NOT_WITHDRAWN": "Fırsat artık vazgeçilmiş durumda değil. Durum değişmiş olabilir; sayfayı yenileyin.",
+          "REACTIVATE_CONFLICT": "Yeniden etkinleştirme kaydedilirken fırsat değişti. Sayfayı yenileyip tekrar deneyin.",
           "REACTIVATE_FAILED": "Yeniden etkinleştirme kaydedilemedi. Tekrar deneyin."
         }
       },
