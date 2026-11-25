@@ -932,6 +932,29 @@ model ExpertPreRegAttempt {
   @@index([ipHash, createdAt])
 }
 
+/// NG-9 (FE-1.5): one row per cookie choice a visitor saves (banner or preference panel).
+/// The proof of consent KVKK / GDPR art. 7(1) asks for, kept in our own database. No
+/// account and no tenant: `visitorId` is a random UUID minted in the browser when the
+/// choice is saved (localStorage `fabrika_consent_id`), never derived from anything; no
+/// IP, no user agent, no user id. A changed choice writes a new row; old rows stay.
+/// SYSTEM_WIDE, RLS on with `system_scope` only (SYSTEM_SCOPE_POLICY); written in
+/// withSystemScope('public-intake') by src/lib/cookie-consent-record.ts.
+/// Migration: prisma/migrations/add-cookie-consent-record.sql.
+model CookieConsentRecord {
+  id            String   @id @default(cuid())
+  visitorId     String
+  /// 'accept_all' | 'reject_all' | 'custom' (the panel's "save my choice").
+  choice        String
+  analytics     Boolean
+  marketing     Boolean
+  /// COOKIE_POLICY_VERSION the visitor saw (src/lib/cookie-consent.ts).
+  policyVersion String
+  locale        String
+  createdAt     DateTime @default(now())
+  @@index([visitorId, createdAt])
+  @@index([createdAt])
+}
+
 /// The founder numbers handed out so far (FO-50, K-568932 = A). One row, `id` 1.
 /// `lastNumber` only goes up: the next number is `lastNumber + 1`, so a pre-registration
 /// purged after one year never frees its number, and the seat count is `100 − lastNumber`.

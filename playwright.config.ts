@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 // FO-385: the runner and its workers log a received signal too; the server gets it through NODE_OPTIONS below.
 import './tests/e2e/support/server-signal-log.mjs';
+import { E2E_POSTHOG_HOST, E2E_POSTHOG_KEY } from './tests/e2e/fixtures/analytics';
 
 // The runner reads the same .env that `next dev` reads. Without it, the runner's
 // own DB clients fall back to src/lib/db.ts's CI default (port 5432), which is not
@@ -128,6 +129,11 @@ const testEnv = {
   // real pair in .env still wins.
   AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID || 'ci-placeholder-id.apps.googleusercontent.com',
   AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET || 'ci-placeholder-google-secret',
+  // NG-9: a fixture PostHog key and an unresolvable host, so the cookie-consent gate
+  // (src/lib/analytics.ts) is what holds an event back, not a missing key. Specs that
+  // count requests fulfil the host with page.route (tests/e2e/cookie-consent-gate.spec.ts).
+  NEXT_PUBLIC_POSTHOG_KEY: E2E_POSTHOG_KEY,
+  NEXT_PUBLIC_POSTHOG_HOST: E2E_POSTHOG_HOST,
   INVOICE_SUPPLIER_NAME: 'TEST E2E Tedarikçi A.Ş.',
   INVOICE_SUPPLIER_VKN: '1000000000',
   INVOICE_SUPPLIER_TAX_OFFICE: 'TEST VD',

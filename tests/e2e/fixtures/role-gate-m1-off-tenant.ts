@@ -1,4 +1,4 @@
-import type { Role } from '@prisma/client';
+import type { ModuleStatus, Role } from '@prisma/client';
 
 import { prisma } from '../../../src/lib/db';
 
@@ -57,6 +57,19 @@ export async function setupM1OffTenant() {
       update: { role, workspaceIds: [M1OFF_WORKSPACE_ID] },
     });
   }
+}
+
+/**
+ * NG-286: switch one module of the M1-OFF tenant (the client pipeline, M18, is the module the
+ * `musteri-hatti` pages lock behind). The tenant's own ModuleState rows are the only thing that
+ * changes; the plan and the seats stay as set up above.
+ */
+export async function setModuleStatus(moduleId: string, status: ModuleStatus) {
+  await prisma.moduleState.upsert({
+    where: { tenantId_moduleId: { tenantId: M1OFF_TENANT, moduleId } },
+    create: { tenantId: M1OFF_TENANT, moduleId, status, changedBy: 'ng286 musteri-hatti e2e fixture' },
+    update: { status },
+  });
 }
 
 /** Literal ids only: tests/teardown-where-guard.test.ts. */

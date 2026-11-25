@@ -33,6 +33,8 @@ const KNOWN: Record<string, string> = {
   'src/modules/m17/server/evaluate.ts updatedAt: row.claimedAt': 'same claim instant, read back from the claim() result; server-side, never client input',
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.proposal.id': DB_ROW,
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.id': DB_ROW,
+  'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts status: opp.status':
+    "NG-282: declareApplication's optimistic guard — the non-null `status` column of the opportunity `findFirst` read in the same transaction just above; `id` and `tenantId` beside it are the read row's and the scope's",
   'src/lib/k5-pipeline/withdrawal.ts status: opp.status':
     "NG-241: the non-null `status` column of the opportunity `findFirst` read in the same transaction just above; id and tenantId in the same where are checked by isPresentId / the scope",
   'src/lib/k5-pipeline/withdrawal.ts ...ownedByScope(scope)':
