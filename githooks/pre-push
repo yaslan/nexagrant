@@ -46,6 +46,13 @@ echo "→ veritabanı: $db_shown"
 # kapısı onda koşarsa paylaşılan veriye karşı yazılır ve ortak koşularla çakışır. Tam ad eşleşmesi (önek değil):
 # fabrika_test_ng331 gibi izole adlar geçer. Silme push'u (yerel-sha 0…0) kod taşımadığı için muaf.
 db_name=${db_shown##*/}
+# NG-365 B-1: DB adı okunamıyorsa (<ayrıştırılamadı>) ya da boşsa (path yok, yalnız /) kanca hangi DB'ye gidileceğini
+# kanıtlayamaz. libpq ad yoksa kullanıcı adını DB seçer (fabrika); bu yüzden kod push'u fail-closed durur.
+if [ "$code_push" = 1 ] && { [ -z "$db_name" ] || [ "$db_shown" = "<ayrıştırılamadı>" ]; }; then
+  echo "pre-push: DATABASE_URL'in DB adı okunamadı ya da boş ($db_shown); kapı hangi veritabanına gideceğini kanıtlayamıyor; push durduruldu." >&2
+  echo "  DB adını path'te, yalnız harf/rakam/._- karakterleriyle yaz (…/fabrika_test_ng<n>)." >&2
+  exit 1
+fi
 if [ "$code_push" = 1 ] && [ "$db_name" = "fabrika" ]; then
   echo "pre-push: bu checkout'un DATABASE_URL'i paylaşılan fabrika DB'si gösteriyor; push durduruldu." >&2
   echo "  İzole DB kullan (CLAUDE.md \"Worktree'de gate\": ad fabrika OLMASIN, örn. fabrika_test_ng<n>)." >&2

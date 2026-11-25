@@ -173,4 +173,23 @@ describe('githooks/pre-push', () => {
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('STUB-PNPM gate');
   });
+
+  // NG-365 B-1: DB adı okunamayan ya da boş olan URL'de kanca fabrika kontrolünü atlıyordu; libpq ad yoksa
+  // kullanıcı adını (fabrika) DB olarak alır ve kapı paylaşılan DB'ye koşardı. Kod push'u fail-closed durur.
+  test.each([
+    ['yüzde kodlu path (fabrik%61)', 'postgresql://fabrika:fabrika@127.0.0.1:5365/fabrik%61'],
+    ['path yok (:5365)', 'postgresql://fabrika:fabrika@127.0.0.1:5365'],
+    ['path yalnız / (:5365/)', 'postgresql://fabrika:fabrika@127.0.0.1:5365/'],
+  ])('DB adı okunamıyor/boş (%s) ise kod push\'u kapı koşmadan 1 ile durur', (_label, url) => {
+    const r = runHookWithPush(CODE_PUSH, 0, url);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('DB adı okunamadı');
+    expect(r.stdout).not.toContain('STUB-PNPM');
+  });
+
+  test('DB adı okunamıyorken silme push\'u muaf: kapı koşar', () => {
+    const r = runHookWithPush(`(delete) ${ZERO_SHA} refs/heads/x ${OTHER_SHA}\n`, 0, 'postgresql://fabrika:fabrika@127.0.0.1:5365/');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('STUB-PNPM gate');
+  });
 });
