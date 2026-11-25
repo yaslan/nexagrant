@@ -95,7 +95,9 @@ yüzden bir tasarım ortağının hattında ya da KPI panosunda **görünmez**. 
   (`data`: `{ signature }`, kiracı kapsamında, aynı transaction); sonra nesne depodan silinir ve sonucu ikinci
   `AuditEvent` `evidence.scan.object_removed` (`data`: `{ objectDeleted: boolean }`) + `SystemAlert` `error`
   (`source: evidence-scan`, kiracı kimliği ve dosya adı YOK). `AuditEvent` satırları güncellenmez; silme sonucu
-  yeni bir satırdır. Yarım kalan silme bir sonraki çalıştırmada `object_removed` yoksa tamamlanır. `ERROR` (clamd yok/kapalı/zaman
+  yeni bir satırdır. Yarım kalan silme bir sonraki çalıştırmada `object_removed` yoksa tamamlanır. Başarısız silme
+  (`objectDeleted:false`) süpürmeyle bekleme sonrası yeniden denenir (NG-279; şema değişikliği yok: durum
+  `object_removed` olaylarının sırasından okunur, her deneme yeni olay ve `createdAt` denemenin anı). `ERROR` (clamd yok/kapalı/zaman
   aşımı/okunamayan nesne/clamd sınırı aşıldı `limits_exceeded` — `AlertExceedsMax yes` ile): inmez, 1 dk → 5 dk → 30 dk yeniden dener (`evidence-scan:<evidenceId>:<attempt>`), sonra
   `warn` alarm; `evidence-scan-sweep` (her 15 dk) iş kaybolmuş `PENDING` (>2 dk) ve tükenmiş `ERROR` (>6 sa)
   satırlarını kiracı başına sayfa sayfa yeniden kuyruğa koyar (kalıcı düşmüş iş aynı anahtarla değiştirilir). Migration öncesi satırlar da `PENDING` olur ve süpürmeyle taranır (kapalı hata:
