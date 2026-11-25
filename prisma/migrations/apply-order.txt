@@ -102,3 +102,4 @@ add-close-own-province-routes.sql
 add-nexagrant-plan-catalog.sql
 add-evidence-scan-status.sql
 add-decision-log-reactivate.sql
+add-consortium-seat-member-stage.sql

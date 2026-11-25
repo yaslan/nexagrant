@@ -1369,6 +1369,14 @@ model ConsortiumSeat {
   status        SeatStatus @default(OPEN)
   budgetCents   BigInt?
   personMonths  Float?
+  // NG-364 (K-586296 = B): where the seated member stands, and its letter of intent (spec §12 G1).
+  // Moved only through src/modules/m8/server/member-stage.ts; null = no stage recorded. `status`
+  // stays the seat's lifecycle: stage CONFIRMED only on a CONFIRMED seat. Cleared when an invite
+  // puts another organisation on the seat, so a former member's letter never counts.
+  memberStage    MemberStage?
+  memberStageAt  DateTime?
+  loiReceivedAt  DateTime?
+  loiDocumentUrl String?
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   budgetShare   PartnerBudgetShare?
   @@unique([id, tenantId])
@@ -1498,6 +1506,14 @@ enum SeatStatus {
   INVITED
   CONFIRMED
   DECLINED
+}
+
+// NG-364: the four member stages of the consortium screen (NG-20 F1), in order.
+enum MemberStage {
+  INTERESTED
+  MET
+  LOI
+  CONFIRMED
 }
 
 model PartnerOrg {                 // tenant-private orgs not in CORDIS

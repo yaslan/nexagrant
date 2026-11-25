@@ -97,7 +97,8 @@ async function seed() {
   // Every other G1 condition is met, so G0 is the only thing these can be refused for.
   for (const id of WITH_SEATS) {
     const seat = await prisma.consortiumSeat.create({
-      data: { tenantId: TENANT, opportunityId: id, roleKey: 'research', status: 'CONFIRMED', organizationId: `${id}-org` },
+      // NG-364: with its letter of intent, so the letter is not a second reason.
+      data: { tenantId: TENANT, opportunityId: id, roleKey: 'research', status: 'CONFIRMED', organizationId: `${id}-org`, memberStage: 'CONFIRMED',loiReceivedAt: new Date('2026-11-01T00:00:00Z') },
     });
     await prisma.seatCandidate.create({
       data: { tenantId: TENANT, seatId: seat.id, organizationId: `${id}-backup`, score: 9, breakdown: MATCH_BREAKDOWN, rank: 1 },

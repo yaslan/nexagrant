@@ -104,9 +104,12 @@ async function candidate(
     data: { tenantId: owner, seatId, organizationId, score: 10 - rank, breakdown, rank },
   });
 }
+/** Invite, confirm and record the letter of intent (NG-364), each through the real M8 action. */
 async function fillThroughM8(opportunityId: string, seatId: string) {
   await m8.inviteCandidateToSeat(seatId, SEATED, opportunityId);
   await m8.confirmSeatAssignment(seatId, opportunityId);
+  const letter = await m8.setSeatMemberStage({ seatId, opportunityId, stage: 'CONFIRMED', loiReceivedAt: '2026-11-01' });
+  expect(letter).toMatchObject({ ok: true });
 }
 const stage = async (id: string) =>
   (await admin!.opportunity.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage;
@@ -232,14 +235,29 @@ describe('G1 on a real database', () => {
     await candidate(s, SEATED, 1);
     await candidate(s, BACKUP, 2);
 
-    // Invited is not filled yet.
+    // Invited is not filled yet, and the member it names has no letter of intent (NG-364).
     await m8.inviteCandidateToSeat(s, SEATED, opp);
     expect((await evaluateGate(opp, 'G1', tenantId)).reasons).toEqual([
       'Critical role research is not filled: seat status is INVITED',
+      'Critical role research has no letter of intent on file',
     ]);
     expect(await stage(opp)).toBe('G0');
 
     await m8.confirmSeatAssignment(s, opp);
+    // NG-364: confirming moves the member stage, but no letter of intent is on file yet.
+    expect(await admin!.consortiumSeat.findUniqueOrThrow({ where: { id: s }, select: { memberStage: true, loiReceivedAt: true } })).toEqual({
+      memberStage: 'CONFIRMED',
+      loiReceivedAt: null,
+    });
+    expect((await evaluateGate(opp, 'G1', tenantId)).reasons).toEqual(['Critical role research has no letter of intent on file']);
+    expect(await stage(opp)).toBe('G0');
+
+    // The letter recorded through the real action.
+    expect(await m8.setSeatMemberStage({ seatId: s, opportunityId: opp, stage: 'CONFIRMED', loiReceivedAt: '2026-11-01' })).toMatchObject({
+      ok: true,
+      memberStage: 'CONFIRMED',
+      loiReceivedAt: '2026-11-01T00:00:00.000Z',
+    });
     expect(await evaluateGate(opp, 'G1', tenantId)).toEqual({ passed: true, reasons: [] });
     expect(await stage(opp)).toBe('G1');
   });

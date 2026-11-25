@@ -38,6 +38,12 @@ const KNOWN: Record<string, string> = {
   'src/lib/k5-pipeline/withdrawal.ts ...ownedByScope(scope)':
     "NG-241 (inceleme Ö-2): `ownedByScope` returns `{}` for ARCHIVE_ROLES or `{ ownerId: scope.userId }` (session user id) — it only narrows; `id` beside it is checked by isPresentId at the top and `tenantId` is the scope's, so the where never covers more than that one row",
   'src/lib/billing/plan-repository.ts planId: draft.planId': DB_ROW,
+  'src/modules/m8/server/member-stage.ts status: seat.status': 'NG-364: optimistic lock. The `seat` row `findFirst` read in the same transaction on `{ id, tenantId, opportunityId }` (ids checked by isPresentId at the top); a nullable column read back is `null`, a value Prisma keeps, never undefined, never client input',
+  'src/modules/m8/server/member-stage.ts organizationId: seat.organizationId': 'same `seat` row as above (NG-364)',
+  'src/modules/m8/server/member-stage.ts partnerOrgId: seat.partnerOrgId': 'same `seat` row as above (NG-364)',
+  'src/modules/m8/server/member-stage.ts memberStage: seat.memberStage': 'same `seat` row as above (NG-364)',
+  'src/modules/m8/server/seat-transitions.ts organizationId: current.organizationId':
+    'NG-364: the `current` row findFirst read just above on `{ id, tenantId }` (both checked by isPresentId); a nullable column, so `null` or a string, never undefined; it only narrows a where that already has id and tenantId',
   'src/lib/billing/public-sector-plans.ts planVersionId: version.id': 'id of the row created one statement above',
   'src/lib/billing/subscription-sync.ts sku: skuStr': 'iterates the SKUs of AddOn rows read from the database',
   'src/lib/billing/subscription-sync.ts id: existing.id': DB_ROW,

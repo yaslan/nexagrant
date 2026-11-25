@@ -45,13 +45,11 @@ export async function inviteSeatCandidate(
   // Client-supplied (the callers pass them through): a missing id would drop
   // out of the `where` below (TASK-MUN2KUHP1BP18).
   if (!isPresentId(tenantId) || !isPresentId(seatId) || !isPresentId(organizationId)) return 0;
-  if (opportunityId !== undefined) {
-    const inOpportunity = await tx.consortiumSeat.findFirst({
-      where: { id: seatId, tenantId, opportunityId },
-      select: { id: true },
-    });
-    if (!inOpportunity) return 0;
-  }
+  const current = await tx.consortiumSeat.findFirst({
+    where: { id: seatId, tenantId, ...(opportunityId !== undefined ? { opportunityId } : {}) },
+    select: { id: true, organizationId: true },
+  });
+  if (!current) return 0;
 
   // NG-100 B-1: only a row the screens show can be offered (visibleSeatCandidates).
   const candidates = visibleSeatCandidates(
@@ -62,16 +60,27 @@ export async function inviteSeatCandidate(
   );
   if (candidates.length === 0) return 0;
 
-  // `updateMany` so the tenant — and the status rule — stay in the WHERE clause.
+  // NG-364: the member stage and the letter of intent belong to the organisation that was on the
+  // seat. Another organisation starts with neither, or G1 would count the former member's letter.
+  const memberChanges = current.organizationId !== organizationId;
+
+  // `updateMany` so the tenant — and the status rule — stay in the WHERE clause. The organisation
+  // read above is in it too: if another invite seats someone else in between, this writes nothing
+  // rather than keep (or clear) a stage that belongs to a third organisation.
   const result = await tx.consortiumSeat.updateMany({
     where: {
       id: seatId,
       tenantId,
+      organizationId: current.organizationId,
       // A CONFIRMED seat with no organisation (seed data has these) confirms
       // nobody, so it may still be offered.
       OR: [{ status: { in: [...INVITABLE_SEAT_STATUSES] } }, { organizationId: null }],
     },
-    data: { organizationId, status: 'INVITED' },
+    data: {
+      organizationId,
+      status: 'INVITED',
+      ...(memberChanges ? { memberStage: null, memberStageAt: null, loiReceivedAt: null, loiDocumentUrl: null } : {}),
+    },
   });
   return result.count;
 }

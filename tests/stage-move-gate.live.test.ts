@@ -90,10 +90,10 @@ async function fileG0(opportunityId: string, passed: boolean, decidedAt = new Da
     data: { tenantId: owner, opportunityId, gate: 'G0', passed, inputs: {}, ruleVersion: '1.0', decidedBy: FIXTURE, decidedAt },
   });
 }
-/** Meets the seat conditions of G1: a filled critical seat and a backup candidate. */
+/** Meets the seat conditions of G1: a filled critical seat with its letter of intent (NG-364) and a backup candidate. */
 async function fillSeatsForG1(opportunityId: string) {
   const seat = await admin!.consortiumSeat.create({
-    data: { tenantId, opportunityId, roleKey: 'research', status: 'CONFIRMED', organizationId: `${RUN}-org-seated` },
+    data: { tenantId, opportunityId, roleKey: 'research', status: 'CONFIRMED', organizationId: `${RUN}-org-seated`, memberStage: 'CONFIRMED',loiReceivedAt: new Date('2026-11-01T00:00:00Z') },
   });
   await admin!.seatCandidate.create({
     data: { tenantId, seatId: seat.id, organizationId: `${RUN}-org-backup`, score: 9, breakdown: MATCH_BREAKDOWN, rank: 1 },

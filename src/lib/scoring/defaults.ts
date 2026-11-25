@@ -19,6 +19,8 @@ export const DEFAULT_GATE_RULES = {
     requireCoordinatorHistoryIfCoordinator: true,
     requireCriticalSeatsFilled: true,
     requireBackupForCriticalSeats: true,
+    // Spec §12: "niyet mektupları toplandı" (NG-364). A letter per seated critical member.
+    requireLetterOfIntentForCriticalSeats: true,
     // Minimum partners and countries are per-call and no call record carries them as a number yet,
     // so they are deliberately absent here rather than filled with a guess.
   },
