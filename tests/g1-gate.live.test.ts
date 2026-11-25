@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
+import { withLetterOfIntentRule } from './helpers/gate-rules';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 
@@ -166,6 +167,8 @@ afterAll(async () => {
 });
 
 describe('G1 on a real database', () => {
+  // The letter-of-intent rule ships off (NG-364, owner decision 25.11.2026); these expectations are for it on.
+  withLetterOfIntentRule(true);
   test('no seats: refused, filed, stage stays', async () => {
     const opp = await opportunity('no seats');
 

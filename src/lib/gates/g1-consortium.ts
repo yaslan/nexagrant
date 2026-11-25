@@ -1,5 +1,6 @@
 import type { TenantTx } from '../db';
 import { isPresentId } from '../required-id';
+import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { visibleSeatCandidates } from '../scoring/seat-candidate-view';
 
 /**
@@ -116,6 +117,11 @@ export type G1ConsortiumInputs = {
   unfilledCriticalRoles: string[];
   criticalRolesWithoutBackup: string[];
   criticalRolesWithoutLoi: string[];
+  /**
+   * Whether G1 refuses on `criticalRolesWithoutLoi` (`requireLetterOfIntentForCriticalSeats`). Off by
+   * default (NG-364, owner decision 25.11.2026): the screen shows a missing letter, not a blocker.
+   */
+  letterOfIntentRequired: boolean;
   seats: G1ConsortiumSeatView[];
 };
 
@@ -158,6 +164,7 @@ export async function loadG1ConsortiumInputs(
     unfilledCriticalRoles: facts.unfilled.map((s) => s.roleKey),
     criticalRolesWithoutBackup: withoutBackup.map((s) => s.roleKey),
     criticalRolesWithoutLoi: facts.withoutLetter.map((s) => s.roleKey),
+    letterOfIntentRequired: DEFAULT_GATE_RULES.G1.requireLetterOfIntentForCriticalSeats,
     seats: seats.map((s) => ({
       seatId: s.id,
       roleKey: s.roleKey,

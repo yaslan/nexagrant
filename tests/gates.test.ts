@@ -2,6 +2,10 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { evaluateGate, GateOpportunityNotFoundError } from '../src/lib/gates/evaluate';
 import { prisma } from '../src/lib/db';
 import { clearStoredG0, computeG0FromSnapshot } from '../src/lib/scoring/g0-compute';
+import { DEFAULT_GATE_RULES } from '../src/lib/scoring/defaults';
+import { setLetterOfIntentRule, withLetterOfIntentRule } from './helpers/gate-rules';
+import { loadG1ConsortiumInputs } from '../src/lib/gates/g1-consortium';
+import type { TenantTx } from '../src/lib/db';
 
 /**
  * G0 gate fixtures.
@@ -603,6 +607,8 @@ describe('Gate Evaluation Engine — G3 evaluation scores', () => {
 });
 
 describe('G1 gate: G0 has to be passed first (NG-26)', () => {
+  // Ships off (NG-364, owner decision 25.11.2026); these expectations are for the rule switched on.
+  withLetterOfIntentRule(true);
   beforeEach(() => vi.clearAllMocks());
 
   test('no G0 decision: refused, filed, the stage stays, and the other faults are still reported', async () => {
@@ -651,6 +657,8 @@ describe('G1 gate: G0 has to be passed first (NG-26)', () => {
 });
 
 describe('G1 gate: critical roles and their backups', () => {
+  // Ships off (NG-364, owner decision 25.11.2026); these expectations are for the rule switched on.
+  withLetterOfIntentRule(true);
   beforeEach(() => vi.clearAllMocks());
 
   const filed = () =>
@@ -734,6 +742,8 @@ describe('G1 gate: critical roles and their backups', () => {
 });
 
 describe('G1 gate: a letter of intent from every critical member (NG-364, spec §12)', () => {
+  // Ships off (NG-364, owner decision 25.11.2026); these expectations are for the rule switched on.
+  withLetterOfIntentRule(true);
   beforeEach(() => vi.clearAllMocks());
 
   type Filed = { passed: boolean; ruleVersion: string; inputs: Record<string, unknown> };
@@ -775,6 +785,57 @@ describe('G1 gate: a letter of intent from every critical member (NG-364, spec �
   test('the other gates keep rule version 1.0', async () => {
     await evaluateGate('opp-pass', 'G2', 'tenant-1');
     expect(filed().ruleVersion).toBe('1.0');
+  });
+});
+
+describe('G1 gate: the letter-of-intent rule ships off (NG-364, owner decision 25.11.2026)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // Seats from before the migration carry no member stage, so a rule that started on would stop every
+  // opportunity with a critical role at G1 until the NG-20 Phase 2 screen lets people enter letters.
+  test('the shipped default does not require a letter', () => {
+    expect(DEFAULT_GATE_RULES.G1.requireLetterOfIntentForCriticalSeats).toBe(false);
+  });
+
+  test.each(['opp-g1-no-loi', 'opp-g1-no-stage'])('%s: no letter on a critical seat passes G1 with the shipped default', async (id) => {
+    expect(await evaluateGate(id, 'G1', 'tenant-1')).toEqual({ passed: true, reasons: [] });
+    expect(prisma.opportunity.updateMany).toHaveBeenCalled();
+  });
+
+  test.each(['opp-g1-no-loi', 'opp-g1-no-stage'])('%s: the same seat is refused with G1_NO_LOI once the rule is on', async (id) => {
+    const restore = setLetterOfIntentRule(true);
+    try {
+      expect(await evaluateGate(id, 'G1', 'tenant-1')).toEqual({
+        passed: false,
+        reasons: ['Critical role research has no letter of intent on file'],
+        reasonDetails: [{ code: 'G1_NO_LOI', values: { role: 'research' } }],
+      });
+      expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  // The screen reads the same switch, so it shows a missing letter without calling it a blocker.
+  test('the consortium screen input says whether the letter is required', async () => {
+    const seat = { id: 's-1', roleKey: 'research', required: true, status: 'CONFIRMED', organizationId: 'org-1', partnerOrgId: null,
+      memberStage: null, memberStageAt: null, loiReceivedAt: null, loiDocumentUrl: null };
+    const tx = {
+      opportunity: { findFirst: async () => ({ id: 'opp-1' }) },
+      consortiumSeat: { findMany: async () => [seat] },
+      seatCandidate: { findMany: async () => [] },
+    } as unknown as TenantTx;
+
+    expect(await loadG1ConsortiumInputs(tx, 'tenant-1', 'opp-1')).toMatchObject({
+      criticalRolesWithoutLoi: ['research'],
+      letterOfIntentRequired: false,
+    });
+    const restore = setLetterOfIntentRule(true);
+    try {
+      expect(await loadG1ConsortiumInputs(tx, 'tenant-1', 'opp-1')).toMatchObject({ letterOfIntentRequired: true });
+    } finally {
+      restore();
+    }
   });
 });
 

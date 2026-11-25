@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Gate, PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
+import { withLetterOfIntentRule } from './helpers/gate-rules';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds, requireId } from './helpers/teardown-guard';
 
@@ -165,6 +166,10 @@ afterAll(async () => {
   }
   await Promise.all([state.rls, admin].map((c) => c?.$disconnect().catch(() => {})));
 });
+
+// The letter-of-intent rule ships off (NG-364, owner decision 25.11.2026); the seats below carry a
+// letter so G1 can pass, and the rule stays on for every test of this file.
+withLetterOfIntentRule(true);
 
 describe('moveOpportunityStage', () => {
   test('next stage, conditions not met: refused with the reasons, stage stays, decision filed', async () => {
