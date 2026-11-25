@@ -4,6 +4,7 @@ import { canConfirmSeat } from '@/modules/m8/server/seat-transitions';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
+import { partnerOrgKey } from './seat-view';
 import ConsortiumManager, { type ConsortiumSeat, type OrgInfo, type SeatCandidate } from './manager';
 import { errorMessage } from '@/lib/errors';
 import { moduleGate } from '@/lib/modules/guard';
@@ -11,6 +12,8 @@ import { checkModuleAccess } from '@/lib/modules/access';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 import { findOpportunityTopic } from '@/modules/m8/server/matching';
+import { listBudgetShares, type BudgetShareView } from '@/lib/gates/readiness-records';
+import { g1ConsortiumSummary, type G1ConsortiumSummary } from './g1-summary';
 
 /** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
 interface CordisOrgRow {
@@ -76,8 +79,11 @@ export default async function ConsortiumPage({
   let opportunity: ConsortiumOpportunity | null = null;
   let seats: ConsortiumSeat[] = [];
   let candidates: SeatCandidate[] = [];
-  let orgs: OrgInfo[] = [];
+  const orgs: OrgInfo[] = [];
   let liveDemandOrgIds: string[] = [];
+  let g1: G1ConsortiumSummary | null = null;
+  let budgetShares: BudgetShareView[] = [];
+  let budgetSharesFailed = false;
 
   try {
     opportunity = await withTenant<ConsortiumOpportunity | null>(tenantId, (tx) =>
@@ -133,6 +139,47 @@ export default async function ConsortiumPage({
         }
       }
 
+      // NG-20 (F5/F6): the gap and backup lists are the G1 gate's own, read from its latest
+      // decision rather than worked out again here. Same ordering as gates/evaluate.ts.
+      const g1Row = await withTenant(tenantId, (tx) =>
+        tx.gateDecision.findFirst({
+          where: { tenantId, opportunityId: id, gate: 'G1', deletedAt: null },
+          orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+          select: { decidedAt: true, passed: true, inputs: true },
+        })
+      );
+      g1 = g1ConsortiumSummary(g1Row);
+
+      // NG-34 budget share ranges (F7). A failed read empties only that column.
+      try {
+        budgetShares = await listBudgetShares({ tenantId }, id);
+      } catch (e) {
+        console.error(`[ConsortiumPage] budget shares failed for ${id}: ${errorMessage(e)}`);
+        budgetSharesFailed = true;
+      }
+
+      // F8: a seat can hold a tenant-private partner instead of a CORDIS organisation.
+      const partnerOrgIds = [
+        ...new Set(seats.map((s) => s.partnerOrgId).filter((p): p is string => Boolean(p))),
+      ];
+      if (partnerOrgIds.length > 0) {
+        const partnerOrgs = await withTenant(tenantId, (tx) =>
+          tx.partnerOrg.findMany({
+            where: { id: { in: partnerOrgIds }, tenantId },
+            select: { id: true, name: true, country: true },
+          })
+        );
+        orgs.push(
+          ...partnerOrgs.map((p) => ({
+            id: partnerOrgKey(p.id),
+            name: p.name,
+            shortName: null,
+            country: p.country,
+            isSme: false,
+          }))
+        );
+      }
+
       const orgIds = [
         ...seats.map((s) => s.organizationId).filter(Boolean),
         ...candidates.map((c) => c.organizationId).filter(Boolean),
@@ -149,13 +196,15 @@ export default async function ConsortiumPage({
             select: { organisationId: true, name: true, shortName: true, country: true, sme: true },
           })
         );
-        orgs = cordisOrgs.map((o) => ({
-          id: o.organisationId,
-          name: o.name,
-          shortName: o.shortName,
-          country: o.country,
-          isSme: o.sme,
-        }));
+        orgs.push(
+          ...cordisOrgs.map((o) => ({
+            id: o.organisationId,
+            name: o.name,
+            shortName: o.shortName,
+            country: o.country,
+            isSme: o.sme,
+          }))
+        );
       }
     }
   } catch (e) {
@@ -225,6 +274,8 @@ export default async function ConsortiumPage({
         candidates={candidates}
         orgMap={orgMap}
         liveDemandOrgIds={liveDemandOrgIds}
+        g1={g1}
+        budgetShares={budgetSharesFailed ? null : budgetShares}
       />
     </div>
   );

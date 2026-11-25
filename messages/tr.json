@@ -785,6 +785,46 @@
       "roles": "Roller",
       "none": "Bu koltuk için eşleşen uzman yok.",
       "unavailable": "Uzman havuzu şu an okunamadı."
+    },
+    "noCountry": "Ülke yok",
+    "tag": {
+      "critical": "KRİTİK",
+      "optional": "İSTEĞE BAĞLI"
+    },
+    "stage": {
+      "label": "Aşama",
+      "open": "Açık",
+      "candidate": "Aday",
+      "invited": "Davet edildi",
+      "confirmed": "Kesinleşti",
+      "declined": "Reddetti",
+      "unknown": "Bilinmeyen aşama",
+      "openHint": "henüz aday yok",
+      "candidateHint": "{count} aday listede",
+      "invitedHint": "kurumun teyidi bekleniyor",
+      "aria": "Aşama: {label}, {total} adımın {step, select, 0 {0’ı} 1 {1’i} 2 {2’si} 3 {3’ü} other {{step}’i}}"
+    },
+    "backup": {
+      "label": "Yedek aday",
+      "none": "Yedek yok",
+      "notListed": "Listede yedek aday yok",
+      "noHolder": "Koltukta henüz asıl ortak yok"
+    },
+    "budget": {
+      "label": "Bütçe payı",
+      "agreed": "Mutabık",
+      "proposed": "Önerildi",
+      "missing": "Girilmedi",
+      "readFailed": "Bütçe payları okunamadı"
+    },
+    "g1": {
+      "heading": "G1 ön kontrolü: konsorsiyum",
+      "unfilledTitle": "{count} kritik rol henüz kesinleşmedi",
+      "noBackupTitle": "{count} kritik rolün yedek adayı yok",
+      "source": "Kaynak: G1 ön kontrolünün {date} tarihli son kararı. Koltuklar o tarihten sonra değiştiyse G1'i yeniden çalıştırın.",
+      "none": "G1 ön kontrolü bu fırsat için henüz çalışmadı; kritik rol boşlukları ve yedek adaylar G1 çalışınca burada görünür.",
+      "notChecked": "Son G1 kararı konsorsiyum koltuklarını denetlememiş; boşluk listesi yok.",
+      "clear": "Son G1 kararına göre tüm kritik roller kesinleşti ve her birinin yedek adayı var."
     }
   },
   "Auth": {

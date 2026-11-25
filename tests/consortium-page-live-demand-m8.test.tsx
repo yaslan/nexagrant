@@ -18,7 +18,10 @@ const h = vi.hoisted(() => ({
     seatCandidate: { findMany: vi.fn() },
     cordisOrganization: { findMany: vi.fn() },
     partnerSearchAnnouncement: { findMany: vi.fn() },
+    // NG-20: the page also reads the latest G1 decision.
+    gateDecision: { findFirst: vi.fn() },
   },
+  listBudgetShares: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -36,6 +39,7 @@ vi.mock('@/lib/modules/guard', () => ({ moduleGate: h.moduleGate }));
 vi.mock('@/lib/modules/access', () => ({ checkModuleAccess: h.checkModuleAccess }));
 vi.mock('@/lib/observability/system-alert', () => ({ recordAlert: vi.fn() }));
 vi.mock('@/modules/m8/server/matching', () => ({ findOpportunityTopic: h.findOpportunityTopic }));
+vi.mock('@/lib/gates/readiness-records', () => ({ listBudgetShares: h.listBudgetShares }));
 vi.mock('@/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/manager', () => ({
   default: () => null,
 }));
@@ -87,6 +91,8 @@ beforeEach(() => {
   h.tx.cordisOrganization.findMany.mockResolvedValue([]);
   h.tx.partnerSearchAnnouncement.findMany.mockResolvedValue([{ organizationPic: 'org-demand' }]);
   h.findOpportunityTopic.mockResolvedValue({ identifier: 'TOPIC-1' });
+  h.tx.gateDecision.findFirst.mockResolvedValue(null);
+  h.listBudgetShares.mockResolvedValue([]);
 });
 
 describe('consortium page — live-demand badge is behind M8 (NG-100 Bulgu A)', () => {
