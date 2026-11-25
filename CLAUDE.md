@@ -30,7 +30,8 @@ pnpm gate                # db:generate + lint + typecheck + test + i18n:check + 
                          # gate-lock FONBRIDGE_GATE_RUN=1 verir, tests/helpers/require-db-object.ts atar. Gate dışında tek dosya koşusu eskisi gibi uyarıp atlar.
 pnpm rls:verify          # DB gercekten kiraci izolasyonu uyguluyor mu (canli olcum)
 pnpm alerts:check        # acik SystemAlert satirlari silinmis kiracilari mi gosteriyor (oksuz alarm kapisi)
-pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push)
+pnpm hooks:install       # githooks/ dizinini etkinlestir (pre-commit + pre-push). Kurulu değilse push kapılanmaz (NG-331); kontrol: git config --get core.hooksPath → githooks. Kanca push edilen commit HEAD değilse durur (B1); DB adı tam `fabrika` ise kod push'unu kapıdan önce durdurur (K-585866); silme push'u muaf (docs/GATE.md)
+# Kapı çıkış kodu gerçek alt süreçten gelir (NG-331). Log için boru değil yönlendirme: pnpm gate > log 2>&1; echo $?  (`| tee` kodu maskeler; docs/GATE.md)
 pnpm worker:dev          # workers/ (python -m uvicorn app:app --reload)
 pnpm jobs:k1             # K1 çağrı toplama işini elle tetikle
 pnpm jobs:k2 -- --month 2026-09
