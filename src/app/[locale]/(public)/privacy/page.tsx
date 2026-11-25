@@ -10,6 +10,7 @@ import { INVITATION_RETENTION_DAYS } from '@/lib/invitations/retention';
 import { NOTIFICATION_RETENTION_DAYS } from '@/lib/notifications/retention';
 import CookiePreferencesButton from '@/components/CookiePreferencesButton';
 import { PRIVACY_LISTS, PRIVACY_TABLES, type PrivacyTableSection } from './structure';
+import LegalDraftNotice from '@/components/LegalDraftNotice';
 
 /**
  * Legal pages get shared publicly, so they carry their own title, description
@@ -131,6 +132,7 @@ export default async function PrivacyPage({
   return (
     <main id="main" className="flex-1">
       <div className="max-w-4xl mx-edge sm:mx-auto py-12 px-4 sm:px-6 bg-surface border rounded-xl my-8 min-w-0">
+        <LegalDraftNotice locale={locale} />
         <h1 className="text-3xl font-bold font-heading mb-6 text-ink">{t('heading')}</h1>
 
         <div className="text-ink-2 space-y-8 leading-relaxed">

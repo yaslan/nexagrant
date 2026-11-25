@@ -331,7 +331,8 @@ function runSteps(steps) {
   for (const step of steps) {
     console.log(`→ ${step.join(' ')}`)
     const res = spawnSync(step[0], step.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
-    if (res.status !== 0) return res.status ?? 1
+    // NG-331 (O2): sinyalle ölen adım da kabuk konvansiyonuyla 128+n döner (tam gate yolundakiyle aynı).
+    if (res.status !== 0) return res.status ?? 128 + (os.constants.signals[res.signal] ?? 1)
   }
   return 0
 }
@@ -407,7 +408,9 @@ async function main() {
     process.on(sig, () => child.kill(sig))
   }
   child.on('exit', (code, signal) => {
-    const exitCode = signal ? 1 : (code ?? 1)
+    // NG-331: alt sürecin GERÇEK çıkış kodu yayılır. Sinyalle ölümde kabuk konvansiyonu 128+n (SIGKILL → 137).
+    // Eskiden her sinyal 1'e indirilirdi; kod hiçbir zaman sabit 0 olmaz, ama sinyal kanıtı kaybolurdu.
+    const exitCode = signal ? 128 + (os.constants.signals[signal] ?? 1) : (code ?? 1)
     if (!nested) recordRun(Date.now() - runStart, exitCode === 0)
     // Yalnız temiz ve koşu boyunca değişmemiş tree'nin yeşili kayda girer.
     if (isGate && exitCode === 0 && tree0 && cleanTree() && treeHash() === tree0) {

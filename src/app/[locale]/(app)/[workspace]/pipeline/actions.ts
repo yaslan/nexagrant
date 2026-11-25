@@ -813,6 +813,7 @@ export async function declareApplication({
         | 'OPPORTUNITY_NOT_FOUND'
         | 'DECLARE_FORBIDDEN'
         | DeclarationRefusal
+        | 'DECLARE_CONFLICT'
         | 'DECLARE_FAILED';
     }
 > {
@@ -827,7 +828,8 @@ export async function declareApplication({
 
   try {
     const result = await withTenant<
-      { ok: true; status: string } | { ok: false; error: 'OPPORTUNITY_NOT_FOUND' | 'DECLARE_FORBIDDEN' | DeclarationRefusal }
+      | { ok: true; status: string }
+      | { ok: false; error: 'OPPORTUNITY_NOT_FOUND' | 'DECLARE_FORBIDDEN' | DeclarationRefusal | 'DECLARE_CONFLICT' }
     >(tenantId, async (tx) => {
       const opp = await tx.opportunity.findFirst({
         where: { id: parsed.data.opportunityId, tenantId, deletedAt: null },
@@ -838,6 +840,28 @@ export async function declareApplication({
 
       const next = nextApplicationStatus(opp.status, Boolean(opp.proposal?.submittedAt), parsed.data.declaration);
       if ('refused' in next) return { ok: false, error: next.refused };
+
+      if (next.status !== opp.status) {
+        // NG-282: conditional on the status just read, like the withdrawal (withdrawal.ts). A
+        // withdrawal committed in between leaves count 0 here instead of being overwritten —
+        // the decision log's last row WITHDRAW with the status SUBMITTED. It runs before the
+        // proposal write, so a refused declaration writes nothing at all.
+        const moved = await tx.opportunity.updateMany({
+          where: { id: opp.id, tenantId, deletedAt: null, status: opp.status },
+          data: { status: next.status },
+        });
+        if (moved.count === 0) {
+          // Read again in this transaction (READ COMMITTED: it sees the concurrent commit) and
+          // answer the real reason: gone, or the rule's refusal for the status it has now.
+          const now = await tx.opportunity.findFirst({
+            where: { id: opp.id, tenantId, deletedAt: null },
+            select: { status: true, proposal: { select: { submittedAt: true } } },
+          });
+          if (!now) return { ok: false, error: 'OPPORTUNITY_NOT_FOUND' };
+          const again = nextApplicationStatus(now.status, Boolean(now.proposal?.submittedAt), parsed.data.declaration);
+          return { ok: false, error: 'refused' in again ? again.refused : 'DECLARE_CONFLICT' };
+        }
+      }
 
       if (parsed.data.declaration === 'submitted') {
         // The first submission date is the one that counts; declaring again does not move it.
@@ -854,10 +878,6 @@ export async function declareApplication({
       }
 
       if (next.status !== opp.status) {
-        await tx.opportunity.updateMany({
-          where: { id: opp.id, tenantId, deletedAt: null },
-          data: { status: next.status },
-        });
         await tx.auditEvent.create({
           data: {
             tenantId,
@@ -922,6 +942,7 @@ export async function withdrawOpportunityAction({
         | 'WITHDRAW_FORBIDDEN'
         | 'ALREADY_WITHDRAWN'
         | 'ALREADY_DECIDED'
+        | 'WITHDRAW_CONFLICT'
         | 'WITHDRAW_FAILED';
     }
 > {
@@ -958,6 +979,7 @@ export async function withdrawOpportunityAction({
         FORBIDDEN: 'WITHDRAW_FORBIDDEN',
         ALREADY_WITHDRAWN: 'ALREADY_WITHDRAWN',
         ALREADY_DECIDED: 'ALREADY_DECIDED',
+        CONFLICT: 'WITHDRAW_CONFLICT',
       } as const;
       return { success: false, error: map[result.refused] };
     }
@@ -1003,6 +1025,7 @@ export async function reactivateOpportunityAction({
         | 'OPPORTUNITY_NOT_FOUND'
         | 'REACTIVATE_FORBIDDEN'
         | 'NOT_WITHDRAWN'
+        | 'REACTIVATE_CONFLICT'
         | 'REACTIVATE_FAILED';
     }
 > {
@@ -1042,6 +1065,7 @@ export async function reactivateOpportunityAction({
         NOT_FOUND: 'OPPORTUNITY_NOT_FOUND',
         FORBIDDEN: 'REACTIVATE_FORBIDDEN',
         NOT_WITHDRAWN: 'NOT_WITHDRAWN',
+        CONFLICT: 'REACTIVATE_CONFLICT',
       } as const;
       return { success: false, error: map[result.refused] };
     }

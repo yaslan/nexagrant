@@ -387,7 +387,8 @@ AS $fn$
                    OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
                                to_regclass('public."ExpertFounderCounter"'),
                                to_regclass('public."ExpertPreRegAttempt"'),
-                               to_regclass('public."PublicLead"'))) IS TRUE)
+                               to_regclass('public."PublicLead"'),
+                               to_regclass('public."CookieConsentRecord"'))) IS TRUE)
               -- FO-92: the expert's personal data opens only for the purposes
               -- that handle it. IS NOT TRUE: a missing table (NULL) is simply
               -- not on the list, like above.
@@ -398,6 +399,11 @@ AS $fn$
               -- NG-175 (SEC NG-170 O-1): the readiness visitor's personal data opens only
               -- for the form, the platform-admin lists and the forwarder/retention jobs.
               AND ((tbl = to_regclass('public."PublicLead"')) IS NOT TRUE
+                   OR coalesce(current_setting('app.system_scope_purpose', true), '')
+                        IN ('public-intake', 'platform-admin', 'cross-tenant-job'))
+              -- NG-9: the cookie consent records (anonymous visitor id) open only for the banner's
+              -- write, the platform-admin console and a retention job.
+              AND ((tbl = to_regclass('public."CookieConsentRecord"')) IS NOT TRUE
                    OR coalesce(current_setting('app.system_scope_purpose', true), '')
                         IN ('public-intake', 'platform-admin', 'cross-tenant-job'))
               -- NG-175 (SEC NG-170 D-1): the province -> consultancy map opens only for the
@@ -412,7 +418,7 @@ AS $fn$
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead (FO-52, FO-26, NG-175); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead only for public-intake, platform-admin and cross-tenant-job; ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175); expert-directory opens nothing here (NG-52; its one read is the view ExpertDirectoryEntry, NG-188). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt, PublicLead and CookieConsentRecord (FO-52, FO-26, NG-175, NG-9); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead and CookieConsentRecord only for public-intake, platform-admin and cross-tenant-job (NG-9); ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175); expert-directory opens nothing here (NG-52; its one read is the view ExpertDirectoryEntry, NG-188). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -525,6 +531,22 @@ BEGIN
     CREATE POLICY system_scope ON public."ExpertPreRegAttempt"
       USING ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)))
       WITH CHECK ((SELECT public.system_scope_open('"ExpertPreRegAttempt"'::regclass)));
+  END IF;
+END $$;
+
+-- CookieConsentRecord (NG-9): one row per saved cookie choice (anonymous visitor id,
+-- categories, policy version, time). Same standing as ExpertPreRegAttempt: written only
+-- inside withSystemScope('public-intake') (src/lib/cookie-consent-record.ts), which
+-- system_scope_open() opens for it. Skipped on a database whose chain has not created
+-- the table yet; prisma/migrations/add-cookie-consent-record.sql has the same block.
+DO $$
+BEGIN
+  IF to_regclass('public."CookieConsentRecord"') IS NOT NULL THEN
+    ALTER TABLE public."CookieConsentRecord" ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS system_scope ON public."CookieConsentRecord";
+    CREATE POLICY system_scope ON public."CookieConsentRecord"
+      USING ((SELECT public.system_scope_open('"CookieConsentRecord"'::regclass)))
+      WITH CHECK ((SELECT public.system_scope_open('"CookieConsentRecord"'::regclass)));
   END IF;
 END $$;
 
