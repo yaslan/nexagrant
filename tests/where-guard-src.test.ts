@@ -33,6 +33,10 @@ const KNOWN: Record<string, string> = {
   'src/modules/m17/server/evaluate.ts updatedAt: row.claimedAt': 'same claim instant, read back from the claim() result; server-side, never client input',
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.proposal.id': DB_ROW,
   'src/app/[locale]/(app)/[workspace]/pipeline/actions.ts id: opp.id': DB_ROW,
+  'src/lib/k5-pipeline/withdrawal.ts status: opp.status':
+    "NG-241: the non-null `status` column of the opportunity `findFirst` read in the same transaction just above; id and tenantId in the same where are checked by isPresentId / the scope",
+  'src/lib/k5-pipeline/withdrawal.ts ...ownedByScope(scope)':
+    "NG-241 (inceleme Ö-2): `ownedByScope` returns `{}` for ARCHIVE_ROLES or `{ ownerId: scope.userId }` (session user id) — it only narrows; `id` beside it is checked by isPresentId at the top and `tenantId` is the scope's, so the where never covers more than that one row",
   'src/lib/billing/plan-repository.ts planId: draft.planId': DB_ROW,
   'src/lib/billing/public-sector-plans.ts planVersionId: version.id': 'id of the row created one statement above',
   'src/lib/billing/subscription-sync.ts sku: skuStr': 'iterates the SKUs of AddOn rows read from the database',

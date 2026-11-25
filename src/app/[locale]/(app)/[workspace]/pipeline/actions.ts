@@ -25,7 +25,7 @@ import { evaluateGate } from '@/lib/gates/evaluate';
 import type { GateReason } from '@/lib/gates/reasons';
 import { classifyStageMove, isStage, nextStageOf } from '@/lib/gates/transition';
 import { canArchiveOpportunity } from '@/lib/pipeline/archive';
-import { WITHDRAWAL_REASON_MAX, withdrawOpportunity } from '@/lib/k5-pipeline/withdrawal';
+import { WITHDRAWAL_REASON_MAX, reactivateOpportunity, withdrawOpportunity } from '@/lib/k5-pipeline/withdrawal';
 import {
   APPLICATION_DECLARATIONS,
   nextApplicationStatus,
@@ -892,7 +892,11 @@ export async function declareApplication({
  *
  * The rule (reason required, withdrawable statuses) lives in `withdrawOpportunity`; this action
  * does not repeat it. The form may send an empty reason: the refusal is returned here and shown.
- * Who may withdraw is the same rule as archiving and declaring (`canArchiveOpportunity`).
+ * Who may withdraw is the same rule as archiving and declaring (`canArchiveOpportunity`). The
+ * check here answers early and is what tests/server-action-rbac-guard.test.ts reads; the binding
+ * one is in `withdrawOpportunity` (NG-241, inceleme Ö-2): same rule, inside the writing
+ * transaction and in the conditional update's `where`, so an owner change between this read and
+ * the write cannot let the write through.
  */
 const WithdrawOpportunityInput = z.object({
   opportunityId: z.string().min(1),
@@ -944,13 +948,14 @@ export async function withdrawOpportunityAction({
       return { success: false, error: 'WITHDRAW_FORBIDDEN' };
     }
 
-    const result = await withdrawOpportunity({ tenantId, userId }, parsed.data.opportunityId, {
+    const result = await withdrawOpportunity({ tenantId, userId, role }, parsed.data.opportunityId, {
       reason: parsed.data.reason,
     });
     if ('refused' in result) {
       const map = {
         REASON_REQUIRED: 'REASON_REQUIRED',
         NOT_FOUND: 'OPPORTUNITY_NOT_FOUND',
+        FORBIDDEN: 'WITHDRAW_FORBIDDEN',
         ALREADY_WITHDRAWN: 'ALREADY_WITHDRAWN',
         ALREADY_DECIDED: 'ALREADY_DECIDED',
       } as const;
@@ -967,5 +972,91 @@ export async function withdrawOpportunityAction({
   } catch (err) {
     console.warn(`[withdrawOpportunityAction] failed: ${errorMessage(err)}`);
     return { success: false, error: 'WITHDRAW_FAILED' };
+  }
+}
+
+/**
+ * Reactivate ("yeniden etkinleştir") a withdrawn opportunity with a reason — NG-241, K-584158 = A.
+ *
+ * Same order as `withdrawOpportunityAction`: Zod → session → `assertTenantActionWritable` → the
+ * layer. The role rule (`canArchiveOpportunity`) is read here for an early answer and checked
+ * again, binding, by the layer in the transaction that writes (inceleme Ö-2). The
+ * rule (only WITHDRAWN, reason required, back to the status the withdrawal left) lives in
+ * `reactivateOpportunity`; this action maps its refusals and does not repeat them.
+ * `status` on success is where the opportunity went back to (ACTIVE or SUBMITTED).
+ */
+export async function reactivateOpportunityAction({
+  opportunityId,
+  reason,
+}: {
+  opportunityId: string;
+  reason: string;
+}): Promise<
+  | { success: true; status: 'ACTIVE' | 'SUBMITTED' }
+  | {
+      success: false;
+      error:
+        | 'TENANT_SCOPE_REQUIRED'
+        | 'INVALID_INPUT'
+        | 'REASON_TOO_LONG'
+        | 'REASON_REQUIRED'
+        | 'OPPORTUNITY_NOT_FOUND'
+        | 'REACTIVATE_FORBIDDEN'
+        | 'NOT_WITHDRAWN'
+        | 'REACTIVATE_FAILED';
+    }
+> {
+  const parsed = WithdrawOpportunityInput.safeParse({ opportunityId, reason });
+  if (!parsed.success) {
+    const reasonTooLong = parsed.error.issues.some((i) => i.path[0] === 'reason');
+    return { success: false, error: reasonTooLong ? 'REASON_TOO_LONG' : 'INVALID_INPUT' };
+  }
+
+  const scope = await sessionScope();
+  if (!scope) return NO_TENANT;
+  await assertTenantActionWritable(scope.tenantId);
+  const { tenantId, userId, role } = scope;
+
+  try {
+    const owner = await withTenant(tenantId, (tx) =>
+      tx.opportunity.findFirst({
+        where: { id: parsed.data.opportunityId, tenantId, deletedAt: null },
+        select: { ownerId: true },
+      }),
+    );
+    if (!owner) return { success: false, error: 'OPPORTUNITY_NOT_FOUND' };
+    if (!canArchiveOpportunity(role, owner.ownerId, userId)) {
+      return { success: false, error: 'REACTIVATE_FORBIDDEN' };
+    }
+
+    const result = await reactivateOpportunity({
+      tenantId,
+      userId,
+      role,
+      opportunityId: parsed.data.opportunityId,
+      reason: parsed.data.reason,
+    });
+    if ('refused' in result) {
+      const map = {
+        REASON_REQUIRED: 'REASON_REQUIRED',
+        NOT_FOUND: 'OPPORTUNITY_NOT_FOUND',
+        FORBIDDEN: 'REACTIVATE_FORBIDDEN',
+        NOT_WITHDRAWN: 'NOT_WITHDRAWN',
+      } as const;
+      return { success: false, error: map[result.refused] };
+    }
+    // reactivationTarget only ever answers a withdrawable status.
+    const status = result.status === 'SUBMITTED' ? 'SUBMITTED' : 'ACTIVE';
+
+    try {
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/pipeline/[id]', 'page');
+      revalidatePath('/[locale]/(app)/[workspace]/dashboard', 'page');
+    } catch {}
+
+    return { success: true, status };
+  } catch (err) {
+    console.warn(`[reactivateOpportunityAction] failed: ${errorMessage(err)}`);
+    return { success: false, error: 'REACTIVATE_FAILED' };
   }
 }

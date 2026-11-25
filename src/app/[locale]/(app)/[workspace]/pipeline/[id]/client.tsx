@@ -11,7 +11,13 @@ import { getWorkspaceRoute } from '@/lib/routes';
 import { useActiveModules } from '@/lib/modules/hooks';
 import { getOpportunityTabs } from '@/lib/modules/registry';
 
-import { archiveOpportunity, declareApplication, evaluateOpportunityGate, withdrawOpportunityAction } from '../actions';
+import {
+  archiveOpportunity,
+  declareApplication,
+  evaluateOpportunityGate,
+  reactivateOpportunityAction,
+  withdrawOpportunityAction,
+} from '../actions';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { useGateReasonText } from '@/lib/hooks/use-gate-reason-text';
 import type { GateReason } from '@/lib/gates/reasons';
@@ -62,7 +68,7 @@ type GateOutcome = { gate: Gate; stageBefore: Gate; passed: boolean; reasons: st
 /** One `decision_log` row as the detail page passes it (dates as ISO strings). */
 export interface DecisionEntry {
   id: string;
-  kind: 'APPLY' | 'WITHDRAW';
+  kind: 'APPLY' | 'WITHDRAW' | 'REACTIVATE';
   reason: string;
   decidedAt: string;
 }
@@ -223,8 +229,36 @@ export function OpportunityDetailClient({
     });
   };
 
+  /**
+   * NG-241 Faz 2: reactivate a withdrawn opportunity. Same form pattern as the withdraw dialog above;
+   * the server checks the reason, the role and the status again (a refusal comes back as an error code).
+   */
+  const [reactivateOpen, setReactivateOpen] = useState(false);
+  const [reactivateReason, setReactivateReason] = useState('');
+  const [reactivateError, setReactivateError] = useState<string | null>(null);
+  const [isReactivating, startReactivateTransition] = useTransition();
+
+  const handleReactivate = () => {
+    setReactivateError(null);
+    startReactivateTransition(async () => {
+      try {
+        const res = await reactivateOpportunityAction({ opportunityId: opportunity.id, reason: reactivateReason });
+        if (!res.success) {
+          setReactivateError(t(`detail.reactivate.error.${res.error}`));
+          return;
+        }
+        setReactivateOpen(false);
+        setReactivateReason('');
+        router.refresh();
+      } catch (err) {
+        setReactivateError(errorText(err, () => errorMessage(err, t('detail.reactivate.error.REACTIVATE_FAILED'))));
+      }
+    });
+  };
+
   const canWithdraw = canArchive && (opportunity.status === 'ACTIVE' || opportunity.status === 'SUBMITTED');
   const isWithdrawn = opportunity.status === 'WITHDRAWN';
+  const canReactivate = canArchive && isWithdrawn;
 
   const isSubmitted = ['SUBMITTED', 'FUNDED', 'REJECTED'].includes(opportunity.status);
   const isDecided = opportunity.status === 'FUNDED' || opportunity.status === 'REJECTED';
@@ -607,6 +641,68 @@ export function OpportunityDetailClient({
                     <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
                     <span>{t('detail.withdraw.withdrawnNotice')}</span>
                   </div>
+                )}
+
+                {canReactivate && !reactivateOpen && (
+                  <button
+                    onClick={() => {
+                      setReactivateError(null);
+                      setReactivateOpen(true);
+                    }}
+                    data-testid="pipeline-reactivate-open"
+                    className="mt-3 border border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer"
+                  >
+                    {t('detail.reactivate.open')}
+                  </button>
+                )}
+
+                {canReactivate && reactivateOpen && (
+                  <div className="mt-3 space-y-2" data-testid="pipeline-reactivate-form">
+                    <label htmlFor="reactivate-reason" className="block text-xs font-semibold text-ink">
+                      {t('detail.reactivate.reasonLabel')}
+                    </label>
+                    <p id="reactivate-reason-hint" className="text-xs text-muted">
+                      {t('detail.reactivate.reasonHint')}
+                    </p>
+                    <textarea
+                      id="reactivate-reason"
+                      value={reactivateReason}
+                      onChange={(e) => setReactivateReason(e.target.value)}
+                      aria-required="true"
+                      aria-describedby="reactivate-reason-hint"
+                      rows={3}
+                      maxLength={2000}
+                      disabled={isReactivating}
+                      data-testid="pipeline-reactivate-reason"
+                      className="w-full bg-surface border border-border rounded-lg p-2 text-sm text-ink"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleReactivate}
+                        disabled={isReactivating}
+                        data-testid="pipeline-reactivate-submit"
+                        className="bg-emerald-700 hover:opacity-90 text-white font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isReactivating ? t('detail.reactivate.saving') : t('detail.reactivate.submit')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReactivateOpen(false);
+                          setReactivateError(null);
+                        }}
+                        disabled={isReactivating}
+                        data-testid="pipeline-reactivate-cancel"
+                        className="border border-border text-ink-2 font-semibold py-2 px-4 rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {t('detail.reactivate.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {reactivateError && (
+                  <p role="alert" data-testid="pipeline-reactivate-error" className="mt-2 text-xs text-rose-800">
+                    {reactivateError}
+                  </p>
                 )}
 
                 {canWithdraw && !withdrawOpen && (

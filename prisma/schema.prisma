@@ -1473,6 +1473,10 @@ model DecisionLog {
   opportunityId String
   kind          DecisionKind
   reason        String
+  // NG-241: the opportunity's status before and after this decision. A reactivation returns to
+  // the `fromStatus` of the latest WITHDRAW. NULL on rows written before NG-241.
+  fromStatus    OppStatus?
+  toStatus      OppStatus?
   decidedById   String?
   decidedAt     DateTime     @default(now())
   opportunity   Opportunity  @relation(fields: [opportunityId, tenantId], references: [id, tenantId], onDelete: Cascade)
@@ -1485,6 +1489,7 @@ model DecisionLog {
 enum DecisionKind {
   APPLY
   WITHDRAW
+  REACTIVATE
 }
 
 enum SeatStatus {

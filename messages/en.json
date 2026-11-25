@@ -295,7 +295,7 @@
       "withdraw": {
         "open": "Withdraw",
         "reasonLabel": "Reason for withdrawing",
-        "reasonHint": "A reason is required. The record is written to the decision log and cannot be undone; the reason stays visible.",
+        "reasonHint": "A reason is required. The record is written to the decision log; the reason stays visible.",
         "submit": "Withdraw and save the reason",
         "saving": "Saving…",
         "cancel": "Cancel",
@@ -303,6 +303,7 @@
         "logTitle": "Decision log",
         "kind": {
           "WITHDRAW": "Withdrawn",
+          "REACTIVATE": "Reactivated",
           "APPLY": "Applied"
         },
         "error": {
@@ -315,6 +316,24 @@
           "ALREADY_WITHDRAWN": "This opportunity is already withdrawn.",
           "ALREADY_DECIDED": "An opportunity with a result cannot be withdrawn.",
           "WITHDRAW_FAILED": "The withdrawal could not be saved. Try again."
+        }
+      },
+      "reactivate": {
+        "open": "Reactivate",
+        "reasonLabel": "Reason for reactivating",
+        "reasonHint": "A reason is required. The opportunity returns to the status it had before the withdrawal; the record is written to the decision log and the reason stays visible.",
+        "submit": "Reactivate and save the reason",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Your session is not linked to a workspace. Sign in again.",
+          "INVALID_INPUT": "Invalid request.",
+          "REASON_TOO_LONG": "The reason can be at most 2000 characters.",
+          "REASON_REQUIRED": "You must write a reason to reactivate.",
+          "OPPORTUNITY_NOT_FOUND": "This opportunity was not found or has been archived.",
+          "REACTIVATE_FORBIDDEN": "Only pipeline managers or the opportunity owner can do this.",
+          "NOT_WITHDRAWN": "This opportunity is no longer withdrawn. Its status may have changed; refresh the page.",
+          "REACTIVATE_FAILED": "The reactivation could not be saved. Try again."
         }
       },
       "modules": {

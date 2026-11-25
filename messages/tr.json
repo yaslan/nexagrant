@@ -295,7 +295,7 @@
       "withdraw": {
         "open": "Vazgeç",
         "reasonLabel": "Vazgeçme gerekçesi",
-        "reasonHint": "Gerekçe zorunludur. Kayıt karar geçmişine yazılır ve geri alınamaz; gerekçe ekranda kalır.",
+        "reasonHint": "Gerekçe zorunludur. Kayıt karar geçmişine yazılır; gerekçe ekranda kalır.",
         "submit": "Vazgeç ve gerekçeyi kaydet",
         "saving": "Kaydediliyor…",
         "cancel": "Vazgeçme",
@@ -303,6 +303,7 @@
         "logTitle": "Karar geçmişi",
         "kind": {
           "WITHDRAW": "Vazgeçildi",
+          "REACTIVATE": "Yeniden etkinleştirildi",
           "APPLY": "Başvuruldu"
         },
         "error": {
@@ -315,6 +316,24 @@
           "ALREADY_WITHDRAWN": "Bu fırsat zaten pasife alınmış.",
           "ALREADY_DECIDED": "Sonuç girilmiş bir fırsat vazgeçilemez.",
           "WITHDRAW_FAILED": "Vazgeçme kaydedilemedi. Tekrar deneyin."
+        }
+      },
+      "reactivate": {
+        "open": "Yeniden etkinleştir",
+        "reasonLabel": "Yeniden etkinleştirme gerekçesi",
+        "reasonHint": "Gerekçe zorunludur. Fırsat vazgeçilmeden önceki durumuna döner; kayıt karar geçmişine yazılır ve gerekçe ekranda kalır.",
+        "submit": "Yeniden etkinleştir ve gerekçeyi kaydet",
+        "saving": "Kaydediliyor…",
+        "cancel": "Vazgeç",
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Yeniden giriş yapın.",
+          "INVALID_INPUT": "Geçersiz istek.",
+          "REASON_TOO_LONG": "Gerekçe en fazla 2000 karakter olabilir.",
+          "REASON_REQUIRED": "Yeniden etkinleştirmek için bir gerekçe yazmanız gerekir.",
+          "OPPORTUNITY_NOT_FOUND": "Bu fırsat bulunamadı ya da arşivlenmiş.",
+          "REACTIVATE_FORBIDDEN": "Bu işlemi yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
+          "NOT_WITHDRAWN": "Fırsat artık vazgeçilmiş durumda değil. Durum değişmiş olabilir; sayfayı yenileyin.",
+          "REACTIVATE_FAILED": "Yeniden etkinleştirme kaydedilemedi. Tekrar deneyin."
         }
       },
       "modules": {
