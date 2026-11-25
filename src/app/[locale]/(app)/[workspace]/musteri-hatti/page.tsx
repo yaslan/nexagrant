@@ -11,9 +11,9 @@ export default async function ClientPipelinePanel({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const { tenantId } = await requireTenantPageRole(locale, 'client_pipeline_read');
   const locked = await moduleGate('M18', locale);
   if (locked) return locked;
-  const { tenantId } = await requireTenantPageRole(locale, 'client_pipeline_read');
   const t = await getTranslations({ locale, namespace: 'm18' });
   const base = `/${locale}/${workspace}/musteri-hatti`;
 
