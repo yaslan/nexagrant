@@ -127,14 +127,12 @@ async function seed() {
 }
 
 async function rollback() {
-  const seatIds = presentIds([...Object.values(SEAT), SEAT_NO_G1]);
-  const oppIds = presentIds([OPP, OPP_NO_G1]);
-  await prisma.seatCandidate.deleteMany({ where: { seatId: { in: seatIds } } });
-  await prisma.partnerBudgetShare.deleteMany({ where: { seatId: { in: seatIds } } });
+  await prisma.seatCandidate.deleteMany({ where: { seatId: { in: presentIds([...Object.values(SEAT), SEAT_NO_G1]) } } });
+  await prisma.partnerBudgetShare.deleteMany({ where: { seatId: { in: presentIds([...Object.values(SEAT), SEAT_NO_G1]) } } });
   await prisma.gateDecision.deleteMany({ where: { id: requireId(DECISION, 'DECISION') } });
-  await prisma.gateDecision.deleteMany({ where: { opportunityId: { in: oppIds } } });
-  await prisma.consortiumSeat.deleteMany({ where: { opportunityId: { in: oppIds } } });
-  await prisma.opportunity.deleteMany({ where: { id: { in: oppIds } } });
+  await prisma.gateDecision.deleteMany({ where: { opportunityId: { in: presentIds([OPP, OPP_NO_G1]) } } });
+  await prisma.consortiumSeat.deleteMany({ where: { opportunityId: { in: presentIds([OPP, OPP_NO_G1]) } } });
+  await prisma.opportunity.deleteMany({ where: { id: { in: presentIds([OPP, OPP_NO_G1]) } } });
   await prisma.cordisOrganization.deleteMany({ where: { organisationId: { in: presentIds(Object.values(PIC)) } } });
 }
 
