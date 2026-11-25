@@ -32,6 +32,7 @@ const PAGES = [
   { path: 'privacy', namespace: 'legal.privacy' },
   { path: 'terms', namespace: 'legal.terms' },
   { path: 'compliance/dpa', namespace: 'legal.dpa' },
+  { path: 'cookies', namespace: 'legal.cookies' },
 ] as const;
 
 /** A key path as next-intl renders it on failure, e.g. `legal.privacy.controllerBody`. */

@@ -42,7 +42,7 @@ const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 const RUN = randomBytes(4).toString('hex');
 const STRAY = `ng183_stray_${RUN}`;
 const STRAY_TENANT = `ng183_tenant_${RUN}`;
-const SYSTEM_SCOPE_TABLES = ['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead'];
+const SYSTEM_SCOPE_TABLES = ['CookieConsentRecord', 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead'];
 /**
  * No exception since NG-188: NG-52's expert_directory policy on ExpertPreRegistration was
  * replaced by the view "ExpertDirectoryEntry", so every system_scope table is {system_scope}.

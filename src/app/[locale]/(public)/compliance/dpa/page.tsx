@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { PRODUCT_NAME } from '@/lib/brand';
 import { MarkdownView } from './markdown-view';
+import LegalDraftNotice from '@/components/LegalDraftNotice';
 
 /**
  * Legal pages get shared publicly, so this carries its own Open Graph tags.
@@ -57,6 +58,7 @@ export default async function DpaPage({
   return (
     <main id="main" className="flex-1">
       <div className="max-w-4xl mx-edge sm:mx-auto py-12 px-4 sm:px-6 bg-surface border rounded-xl my-8">
+        <LegalDraftNotice locale={locale} />
         <article className="prose prose-slate max-w-none">
           <MarkdownView source={source} />
         </article>

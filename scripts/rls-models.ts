@@ -68,6 +68,10 @@ export const SYSTEM_WIDE: ReadonlySet<string> = new Set([
   // NG-167: province -> consultancy tenant map for readiness leads. Platform data managed by the platform
   // admin; its tenantId is a TARGET, not an owner. RLS on with system_scope only (SYSTEM_SCOPE_POLICY).
   'ProvinceLeadRoute',
+  // NG-9: one row per saved cookie choice of an anonymous visitor (random visitor id, no
+  // account, no tenant). RLS on with system_scope only (SYSTEM_SCOPE_POLICY).
+  // See prisma/migrations/add-cookie-consent-record.sql.
+  'CookieConsentRecord',
 ]);
 
 /**
@@ -90,7 +94,7 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set([
  * K-562266 = A). Reachable only through withSystemScope(). tests/rls-coverage.test.ts
  * pins this set to the block in prisma/rls.sql.
  */
-export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt', 'ProvinceLeadRoute', 'PublicLead']);
+export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['CookieConsentRecord', 'ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt', 'ProvinceLeadRoute', 'PublicLead']);
 
 /**
  * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.

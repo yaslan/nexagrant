@@ -1045,7 +1045,8 @@
       "contact": "Contact",
       "residencyBadge": "● GDPR Compliant",
       "dataResidency": "🇹🇷 Database hosted in Türkiye",
-      "moduleCatalog": "Module Catalog"
+      "moduleCatalog": "Module Catalog",
+      "cookiePolicy": "Cookie Policy"
     },
     "metaTitle": "{brand} — AI-Powered EU Funding Platform for Horizon Europe & Eurostars",
     "metaDescription": "{brand}: End-to-end platform for EU research proposals. Consortium matching, AI evaluator simulation, CORDIS network intelligence. From concept to funding.",
@@ -1755,13 +1756,49 @@
     },
     "cookieConsent": {
       "title": "Cookie Preferences",
-      "description": "We use cookies and browser storage the site needs to work: your session, your language and theme preference, and your cart. If you click 'Accept All', we also use analytics cookies (PostHog) to improve the product. We do not use third-party tracking cookies. For details, see our ",
+      "description": "We use cookies and browser storage the site needs to work: your session, your language and theme preference, and your cart. Analytics and marketing cookies stay off unless you turn them on; use \"Manage preferences\" to choose one by one. We do not use third-party tracking cookies. For details, see our ",
       "privacyLink": "Privacy Policy",
       "acceptAll": "Accept All",
       "essentialOnly": "Essential Only",
       "preferencesLink": "Cookie preferences",
-      "currentAll": "Your current choice: all cookies accepted. Choosing \"Essential Only\" withdraws your analytics consent and removes analytics data from this browser.",
-      "currentEssential": "Your current choice: essential cookies only."
+      "currentAll": "Your current choice: all cookies accepted. Choosing \"Essential Only\" withdraws your consent and removes analytics data from this browser.",
+      "currentEssential": "Your current choice: essential cookies only.",
+      "manage": "Manage preferences",
+      "save": "Save my choice",
+      "panelTitle": "Manage cookie preferences",
+      "panelIntro": "Necessary cookies are always on. The others stay off unless you turn them on, and you can change your choice at any time.",
+      "cookiePolicyLink": "Cookie Policy",
+      "alwaysOn": "Always on",
+      "statusOn": "On",
+      "statusOff": "Off",
+      "currentCustom": "Your current choice: a custom choice per category. Use \"Manage preferences\" to change it.",
+      "categories": {
+        "necessary": {
+          "name": "Necessary",
+          "description": "Session, language and theme preference, cart, and the record of this cookie choice. The site does not work without them."
+        },
+        "analytics": {
+          "name": "Analytics",
+          "description": "Anonymous usage measurement to improve the product (PostHog, EU servers). Loaded only if you turn it on."
+        },
+        "marketing": {
+          "name": "Marketing",
+          "description": "Advertising and retargeting pixels. None are in use today; if one is added, it loads only if you turn it on."
+        }
+      }
+    },
+    "draft": {
+      "badge": "Draft — awaiting legal approval",
+      "body": "This text has not been through legal review yet and may change."
+    },
+    "cookies": {
+      "metaTitle": "Cookie Policy — {brand}",
+      "metaDescription": "The cookie categories used on {brand} and how to change your preferences.",
+      "heading": "Cookie Policy",
+      "placeholder": "The cookie policy text is being prepared by our legal team. Until then, this page only lists the cookie categories the site uses.",
+      "categoriesHeading": "Cookie categories",
+      "changeHeading": "Changing your choice",
+      "changeBody": "You can change or withdraw your choice at any time. Every change is kept as a new consent record."
     }
   },
   "feedback": {
