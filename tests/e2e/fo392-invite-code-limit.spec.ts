@@ -230,6 +230,7 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
   // made - the HTML, the RSC payloads, the server-action response - is collected and searched.
   const bodies: Array<{ url: string; kind: string; text: string }> = [];
   const pending: Array<Promise<void>> = [];
+  let dropped = 0;
   page.on('response', (res) => {
     const type = res.request().resourceType();
     if (!['document', 'fetch', 'xhr'].includes(type)) return;
@@ -237,7 +238,9 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
       res
         .text()
         .then((text) => void bodies.push({ url: res.url(), kind: `${res.request().method()} ${type}`, text }))
-        .catch(() => undefined),
+        .catch(() => {
+          dropped += 1;
+        }),
     );
   });
 
@@ -332,18 +335,23 @@ test('the agency panel: "Sınıra ulaştı" on the full code, "en az N" - never 
     expect(b.text, `${b.kind} ${b.url} carries useLimit`).not.toMatch(/useLimit/);
     expect(b.text, `${b.kind} ${b.url} carries usedCount`).not.toMatch(/usedCount/);
   }
-  // The create's own result is the one JSON line the server action returns: {"ok":true,"code":...,"hint":...,"expiresAt":...}.
-  // The rest of an action response is the revalidated page (RSC text with unrelated numbers, e.g. "(503 Service
-  // Unavailable" in a calendar error), so the exact-limit scan runs on that result line. The whole response is still
-  // checked for the key names above, and the visible page text is checked below.
-  const actions = bodies.filter((b) => b.kind.startsWith('POST'));
-  expect(actions.length).toBeGreaterThan(0);
+  // The create's own result is the one JSON line the server action returns: {"ok":true,"code":...}. It identifies the create.
   const result = action.text.split('\n').find((l) => l.startsWith('1:{"ok":')) ?? '';
   expect(result, 'the marked POST is the create response (its result object)').toMatch(/^1:\{"ok":true,"code":"/);
+  // Exact-limit scan runs over EVERY collected body (create response incl. the revalidated page, list refresh, poll),
+  // not just the result line: a leak in the list or the revalidated page must be caught (NG-356 B1).
+  // Only one known false positive is removed first: the unrelated "(503 Service Unavailable" literal from
+  // messages/tr.json CALENDAR_ENCRYPTION_NOT_CONFIGURED. Nothing else is stripped.
+  const KNOWN_503 = '(503 Service Unavailable';
   if (exact !== INVITE_CODE_MIN_USE_LIMIT) {
-    expect(result, `the create result carries the exact limit ${exact}`).not.toMatch(new RegExp(`(?<![0-9A-Za-z])${exact}(?![0-9A-Za-z])`));
+    const exactRe = new RegExp(`(?<![0-9A-Za-z])${exact}(?![0-9A-Za-z])`);
+    for (const b of bodies) {
+      expect(b.text.replaceAll(KNOWN_503, ''), `${b.kind} ${b.url} carries the exact limit ${exact}`).not.toMatch(exactRe);
+    }
     const visible = await page.locator('main').innerText();
     expect(visible).not.toMatch(new RegExp(`(?<![0-9])${exact}(?![0-9])`));
   }
+  // Ö1: dropped body copies are reported, not silently ignored.
+  console.log(`[fo392] collected bodies=${bodies.length} droppedCopies=${dropped}`);
   await expect(page.getByTestId('invite-codes-limit-note')).toContainText(String(INVITE_CODE_MIN_USE_LIMIT));
 });
