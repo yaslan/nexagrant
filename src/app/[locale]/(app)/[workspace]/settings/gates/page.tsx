@@ -117,6 +117,7 @@ export default async function GateSettingsPage({
           </Row>
           <Row label={t('g1CriticalSeats')}>{G1.requireCriticalSeatsFilled ? t('required') : t('notRequired')}</Row>
           <Row label={t('g1BackupCandidates')}>{G1.requireBackupForCriticalSeats ? t('required') : t('notRequired')}</Row>
+          <Row label={t('g1LettersOfIntent')}>{G1.requireLetterOfIntentForCriticalSeats ? t('required') : t('notRequired')}</Row>
         </Section>
 
         <Section title={t('g2Heading')}>

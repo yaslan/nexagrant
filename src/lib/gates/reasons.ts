@@ -19,6 +19,7 @@ export type GateReason =
   | { code: 'G1_SEAT_NO_ORGANISATION'; values: { role: string } }
   | { code: 'G1_SEAT_NOT_FILLED'; values: { role: string; status: string } }
   | { code: 'G1_NO_BACKUP'; values: { role: string } }
+  | { code: 'G1_NO_LOI'; values: { role: string } }
   | { code: 'G2_OPEN_SEATS'; values: { count: number } }
   | { code: 'G3_CRITERION_BELOW'; values: { score: number; min: number } }
   | { code: 'G3_TOTAL_BELOW'; values: { score: number; min: number } }

@@ -71,13 +71,14 @@ async function seed() {
       data: { id, tenantId: TENANT, workspaceId: WORKSPACE, title: id, stage: STARTING_STAGE[id] ?? 'G0' },
     });
   }
-  // The real G1 conditions: G0 passed, a filled critical seat and a backup candidate.
+  // The real G1 conditions: G0 passed, a filled critical seat with its letter of intent (NG-364)
+  // and a backup candidate.
   for (const id of [OPP.boardReady, OPP.detailReady]) {
     await prisma.gateDecision.create({
       data: { tenantId: TENANT, opportunityId: id, gate: 'G0', passed: true, inputs: {}, ruleVersion: '1.0', decidedBy: FIXTURE },
     });
     const seat = await prisma.consortiumSeat.create({
-      data: { tenantId: TENANT, opportunityId: id, roleKey: 'research', status: 'CONFIRMED', organizationId: `${id}-org` },
+      data: { tenantId: TENANT, opportunityId: id, roleKey: 'research', status: 'CONFIRMED', organizationId: `${id}-org`, memberStage: 'CONFIRMED',loiReceivedAt: new Date('2026-11-01T00:00:00Z') },
     });
     await prisma.seatCandidate.create({
       data: { tenantId: TENANT, seatId: seat.id, organizationId: `${id}-backup`, score: 9, breakdown: MATCH_BREAKDOWN, rank: 1 },
