@@ -151,14 +151,39 @@ D-B2 uyarısı (NG-206): NG-188 (`e511961d`) zaten `origin/dev`'de. NG-52'nin `e
 
 ## CI e2e: bellek eşiği ve kırmızı artefaktı (NG-288)
 
-Yapı (3. tur, `ci.yml` `e2e` işi): E2E adımı `build-and-test`'ten ayrı bir matrix işi, `shard: [1, 2, 3]`. Her shard kendi `next dev` sunucusunu, kendi Postgres/mailpit/MinIO servislerini ve kendi `pnpm db:setup`'ını alır; hiçbir shard başka shard'ın sunucusunu ya da veritabanını paylaşmaz. Her shard `pnpm test:e2e --shard=<n>/3` ile koşar; tüm testler koşar, hiçbiri atlanmaz. `e2e-gate` işi tüm shard sonuçlarını toplar; shard sayısı değişse de required check adı `e2e-gate` kalır. Shard sayısı yalnız matrix'te (`strategy.matrix.shard`) tutulur.
+Yapı (3. tur, `ci.yml` `e2e` işi; parça sayısı bugün 4 + heavy, aşağıya bakın): E2E adımı `build-and-test`'ten ayrı bir matrix işi. Her shard kendi `next dev` sunucusunu, kendi Postgres/mailpit/MinIO servislerini ve kendi `pnpm db:setup`'ını alır; hiçbir shard başka shard'ın sunucusunu ya da veritabanını paylaşmaz. Her shard `pnpm test:e2e --shard=<n>/<toplam>` ile koşar; tüm testler koşar, hiçbiri atlanmaz. `e2e-gate` işi tüm shard sonuçlarını toplar; shard sayısı değişse de required check adı `e2e-gate` kalır. Shard sayısı yalnız matrix'te (`strategy.matrix.shard`) tutulur.
+
+Ağır spec ayrı ve 4 parça (NG-289 düzeltme turu): matrix `shard: [1, 2, 3, 4, heavy]`. Suite 4 parçaya bölünür (`E2E_SHARD_TOTAL: '4'`); 1–4 numaralı işler `pnpm test:e2e --shard=<n>/4 --grep-invert 'guest-partner-direct-url\.spec\.ts'` koşar, `heavy` işi yalnız `tests/e2e/guest-partner-direct-url.spec.ts`'i (4 test, `describe.serial`) kendi taze `next dev` sunucusu ve veritabanıyla koşar. Dosya tam bir kez koşar; hiçbir test düşmez. Sayım (`CI=true playwright test --list`, düzen başına, bu dal): tam suite **735 test / 154 dosya**; 4 parça: 192 + 174 + 200 + 165 = 731, artı `heavy` 4 = **735**. (Önceki 3 parça düzeni: 244 + 245 + 242 + 4 = 735.) Eski "727" ve "729" sayıları eski ağaçtan; 729 → 735 farkı dev'den gelen NG-276 testidir (`role-gate.spec.ts`, `PARTNER_PAGES` döngüsünde 2 tanım × 3 = 6).
+
+Neden 4 parça: `next-server` RSS'i bir shard süresince doğrusal büyür (koşu 44913458118, 3 parçalı düzen, shard 2: 14:34'te 2046 MiB → 14:45'te 6250 MiB, dakikada ~+300–400 MiB). Yani zirve, bir sunucunun kaç testte kaç sayfa derlediğine bağlı; 3 parçalı düzende en çok test (245) düşen shard 2 hedefi (≤6140) aştı. 4 parçada hiçbir parça 200 testi geçmez. Parça başına RSS ölçümü: aşağıdaki "Kanıt" satırı (CI koşusu kimliğiyle).
+
+`heavy` aynı `e2e` matrix işinin bir girişidir, bu yüzden `e2e-gate` onu da bekler; required check adı değişmez. Ağır spec değişirse ya da başka bir dosya ayrılacaksa yalnız `E2E_HEAVY_SPEC` değişir. Yerel `pnpm gate` bu ayrımı yapmaz; tüm suite tek sunucuda koşar.
+
+Örnekleyici (NG-289 Ö3): her shard adımı sonunda örnekleyici durdurulur ve günlüğe `[e2e-mem] sampler stopped; orphan 'sleep 60' left: <n>` yazılır; `<n>` = 0 olmalı. Sayım `pgrep -fxc 'sleep 60'` ile (önceden `ps | grep`; actionlint SC2009 uyarısı bu değişiklikle kalktı). EXIT trap'i yedek olarak kalır.
 
 Heap izi yok: `--trace-gc` bayrağı Node'un `NODE_OPTIONS` içinde kabul ettiği bir bayrak değildir (`node: --trace-gc is not allowed in NODE_OPTIONS`, Node 26.5.0). Bu yüzden CI'da yalnız `NODE_OPTIONS=--max-old-space-size=6144` kullanılır; `playwright.config.ts` bunu web sunucusuna `WEB_SERVER_NODE_OPTIONS` üzerinden geçirir. Bu bir tampondur, sızıntı düzeltmesi değildir. Yerel `pnpm gate` ve `pnpm gate:isolated` bu değişkeni kendi koymaz; davranışları değişmez.
 
 Ölçüm: her shard, 60 saniyede bir her `next` sürecinin RSS'ini (`pid`, `rss`, komut) `[e2e-mem]` önekiyle job logunda basar; başta runner'ın CPU/RAM'i ve Node'un varsayılan heap sınırı basılır. Okuma: `gh run view <id> --job <job-id> --log | grep '\[e2e-mem\]'`. Heap ayrı ölçülmez; RSS sürekli artıyorsa sızıntı ya da önbellek şüphesi, düz kalıyorsa eşik birikmiş derlemeden. Hedef: `approaching the used memory threshold` satırı 0.
 
+Kanıt (NG-289, koşu `45435079166`, PR #409 head `a357ef45`, `e2e-gate` yeşil; job günlükleri `gh run view --job <id> --log` ile okundu): en yüksek `next-server` RSS parça başına — 1: 4350 MiB, 2: 5796 MiB, 3: 5040 MiB, 4: 5457 MiB, heavy: 3202 MiB; hepsi ≤ 6140 MiB (%25 pay). Her parçada `approaching the used memory threshold` = 0 ve `sampler stopped; orphan 'sleep 60' left: 0`. Sonuçlar: 1 = 189 geçti + 3 atlandı (192 koşuldu); 2 = 165 + 9 (174); 3 = 199 + 1 (200); 4 = 165 (165); heavy = 4 (4); toplam koşan 735, geçen 722, atlanan 13. Atlananlar koşulla atlanan testler (LIVE, clamd, bayrağı kapalı). Önceki kanıt (koşu `45056104610`, head `1549458e`, aynı düzen, 3955 / 5995 / 5653 / 5109 / 3228 MiB) geçmiş olarak kalır. Önceki düzende (3 parça) 2. parça 6250 MiB'ye çıkmıştı (koşu `44913458118`).
+
+CI dakika maliyeti (NG-289 Ö2): e2e işleri, `gh run view <id> --json jobs` başlangıç/bitiş zamanlarından; her iş dakikaya yukarı yuvarlanır (GitHub faturalaması iş başına).
+
+| Düzen | İş | İş süresi (dk) | `E2E Test` adımı (dk) | Kurulum ≈ (dk) |
+|---|---|---|---|---|
+| 3 parça + heavy (koşu `44913458118`) | shard 1 / 2 / 3 | 23 / 16 / 19 | 19.9 / 12.5 / 15.7 | ≈ 3.1 / 3.5 / 3.3 |
+| | heavy | 6 | 3.3 | ≈ 2.7 |
+| | **toplam** | **64** (+ `e2e-gate` 1 = 65) | | ≈ 12.6 (4 iş) |
+| 4 parça + heavy (koşu `45435079166`) | shard 1 / 2 / 3 / 4 | 16 / 13 / 15 / 13 | 12.8 / 9.9 / 12.6 / 10.2 | ≈ 3.2 / 3.1 / 2.4 / 2.8 |
+| | heavy | 6 | 3.3 | ≈ 2.7 |
+| | **toplam** | **63** (+ `e2e-gate` 1 = 64) | | ≈ 14.2 (5 iş) |
+
+Fark: toplam faturalanan dakika 65 → 64 (−1); en uzun e2e işi 23 → 16 dk (−7); kurulum yükü 4 → 5 iş ile ≈ +1.6 dk. "Kurulum ≈" = iş süresi − `E2E Test` adımı; dakika yuvarlamasından ±1 dk sapar. Sonuç: dakika maliyeti neredeyse aynı; en uzun e2e işi belirgin kısaldı.
+
 Kanıt geçmişi: 1. tur (tek sunucu, koşu 44854901140) eşik yeniden başlatmasını önlemedi. 2. tur (iki shard, koşu 44864261313, head e0b9fe63): 353+361 geçti, 12+1 atlandı (toplam 727), eşik uyarısı 0; shard 1'in `next-server` RSS'i yine doğrusal büyüdü (1.5 → 7.8 GiB, 32 dk). Suite büyürse shard sayısı artırılır.
 
 Kırmızı artefakt: `Upload E2E traces and report` adımı (`if: failure()`) her shard için `e2e-results-<run_id>-<attempt>-shard-<n>` adıyla `test-results/` ve `playwright-report/` yükler, 14 gün saklar. Artefakt indirmek: `gh run download <run_id> -R yaslan/nexagrant -n e2e-results-<run_id>-<attempt>-shard-<n>`. Sır kontrolü: dosya adları, anahtar adları ve `.env|secret|token|DATABASE_URL|password|Bearer|sk-` taraması; değer yazılmaz. Sonuç `docs/agent-results/NG-288-dev-gnd-5.md`.
+
+Yeni adlı artefaktın kanıtı (NG-289 Ö4, mevcut koşulardan; yeni kırmızı deneme koşusu yapılmadı): `gh api repos/yaslan/nexagrant/actions/artifacts` içinde `e2e-results-45586661024-1-shard-1` (6,6 MB, koşu `45586661024`, 2026-11-25) ve `e2e-results-45494878779-1-shard-3`, `e2e-results-45244385137-1-shard-4` gibi yeni adlı kayıtlar var. Biri (`shard-1`, koşu `45586661024`) taze boş dizine indirildi (`gh run download -n`, 25 dosya). `trace.zip` içindeki ağ kayıtları yalnız `localhost:3000` (e2e sunucusu); çerezler `authjs.session-token` / `authjs.csrf-token` (yerel test oturumu, şifreli JWE, alg `dir`); `sk-…`, `Bearer …`, `AUTH_SECRET`, `DATABASE_URL` eşleşmesi = 0. `password` alanı, test fixture alan adı `kurum.com` (`tests/e2e/team-members-ui.spec.ts`) için gönderilen test hesabı şifresi; değer belgelenmedi. Sonuç: gerçek üretim sırrı bulunmadı; kalan risk, e2e test hesap şifresinin artefakt içinde bulunması (14 gün saklanır). Kapatılamayan kısım: deliberate kırmızı deneme koşusu (NG-289 kartındaki "tek testi bilerek düşüren deneme dalı") yapılmadı; `shard-2` ve `shard-4` yeni-ad artefaktı bu taramada indirilmedi.
 
 Zorunlu kontroller: `dev` dal korumasında (NG-288 okuması, 2026-11-21) `required_status_checks` YOK; hiçbir CI işi merge'ü engellemez. Merge öncesi `gh pr checks <pr>` tüm satırlarda `pass` olmalı, `e2e-gate` dahil.
