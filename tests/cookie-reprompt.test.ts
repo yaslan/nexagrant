@@ -8,9 +8,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  ANALYTICS_ANON_ID_STORAGE_KEY,
   COOKIE_CONSENT_REPROMPT_DAYS,
   COOKIE_POLICY_VERSION,
   CONSENT_STORAGE_KEY,
+  forgetAnalyticsWithoutConsent,
   hasAnalyticsConsent,
   hasMarketingConsent,
   saveConsent,
@@ -103,6 +105,29 @@ describe('cookie answer expiry (NG-371)', () => {
     expect(hasAnalyticsConsent()).toBe(false);
   });
 
+  // Ö-2: a clock that ran ahead when the choice was saved must not stretch the window.
+  it('an answer dated in the future is no answer', () => {
+    store(answerAged(-1));
+    expect(storedConsent()).toBeNull();
+    expect(hasAnalyticsConsent()).toBe(false);
+    expect(hasMarketingConsent()).toBe(false);
+  });
+
+  // Ö-1: an expired answer leaves no anonymous analytics id behind.
+  it('an expired answer: the banner clears the analytics anonymous id', () => {
+    store(answerAged(366));
+    window.localStorage.setItem(ANALYTICS_ANON_ID_STORAGE_KEY, 'anon-from-last-year');
+    forgetAnalyticsWithoutConsent();
+    expect(window.localStorage.getItem(ANALYTICS_ANON_ID_STORAGE_KEY)).toBeNull();
+  });
+
+  it('a current answer keeps the analytics anonymous id', () => {
+    store(answerAged(1));
+    window.localStorage.setItem(ANALYTICS_ANON_ID_STORAGE_KEY, 'anon-current');
+    forgetAnalyticsWithoutConsent();
+    expect(window.localStorage.getItem(ANALYTICS_ANON_ID_STORAGE_KEY)).toBe('anon-current');
+  });
+
   it('a choice saved now is dated and current, so it is not asked again', () => {
     saveConsent({ analytics: true, marketing: false }, 'custom', 'tr');
     const saved = JSON.parse(window.localStorage.getItem(CONSENT_STORAGE_KEY) ?? '{}') as { time?: string };
@@ -128,7 +153,8 @@ describe('e2e consent fixtures carry the current policy version', () => {
   it('every seeded `time: new Date()` fixture names COOKIE_POLICY_VERSION', () => {
     const seeded: { file: string; version: string }[] = [];
     for (const file of specFiles(join(process.cwd(), 'tests', 'e2e'))) {
-      for (const match of readFileSync(file, 'utf8').matchAll(/time: new Date\(\)\.toISOString\(\), version: '([^']+)'/g)) {
+      // Whitespace-tolerant (Ö-5): a fixture written over several lines is still checked.
+      for (const match of readFileSync(file, 'utf8').matchAll(/time:\s*new Date\(\)\.toISOString\(\),\s*version:\s*'([^']+)'/g)) {
         seeded.push({ file, version: match[1] ?? '' });
       }
     }

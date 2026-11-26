@@ -80,7 +80,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function isCurrentAnswer(parsed: Record<string, unknown>, now: number): boolean {
   if (parsed.version !== COOKIE_POLICY_VERSION) return false;
   const decided = typeof parsed.time === 'string' ? Date.parse(parsed.time) : Number.NaN;
-  return Number.isFinite(decided) && now - decided < COOKIE_CONSENT_REPROMPT_DAYS * DAY_MS;
+  // A date ahead of the clock (a skewed clock at save time) is not a current answer either.
+  return Number.isFinite(decided) && decided <= now && now - decided < COOKIE_CONSENT_REPROMPT_DAYS * DAY_MS;
 }
 
 /**
@@ -119,6 +120,15 @@ export function clearAnalyticsStorage(): void {
   } catch {
     // Storage blocked: nothing could have been stored either.
   }
+}
+
+/**
+ * NG-371 (KVKK: withdrawing leaves nothing behind). Called by the banner when it finds no
+ * current answer: an expired, older-policy or unreadable answer must not leave the analytics
+ * anonymous id behind. Analytics only mints that id after a "yes", so a current answer keeps it.
+ */
+export function forgetAnalyticsWithoutConsent(): void {
+  if (storedConsent() === null) clearAnalyticsStorage();
 }
 
 /** True only for an explicit "yes" to analytics. Unanswered, rejected, malformed, server render: no. */
