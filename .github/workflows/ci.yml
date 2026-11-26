@@ -403,7 +403,7 @@ jobs:
         # NG-289 (Ö3) evidence: stop the sampler here, before the step ends, and print how many
         # `sleep 60` children are still alive. 0 = no orphan. The trap above is the backstop.
         pkill -P "$sampler" 2>/dev/null || true; kill "$sampler" 2>/dev/null || true; wait "$sampler" 2>/dev/null || true
-        echo "[e2e-mem] sampler stopped; orphan 'sleep 60' left: $(ps -eo args= | grep -c '^sleep 60$' || true)"
+        echo "[e2e-mem] sampler stopped; orphan 'sleep 60' left: $(pgrep -fxc 'sleep 60' || true)"
         exit "$status"
       env:
         CI: 'true'
