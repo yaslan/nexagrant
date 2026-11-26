@@ -126,6 +126,30 @@ describe.skipIf(!HAS_DB)('cookie consent retention (live database, fabrika_app)'
     expect(await survivingVisitors()).toEqual(['fresh-1094d', 'fresh-today']);
   });
 
+  test('a row exactly 1095 days old stays; one millisecond older goes (sec-gnd B-3)', async () => {
+    // createdAt == cutoff: `createdAt < cutoff` keeps it, an `lte` filter would delete it.
+    await consent('edge-exact-1095d', ago(1095));
+    await consent('edge-1095d-plus-1ms', new Date(ago(1095).getTime() - 1));
+
+    const result = await purgeOldCookieConsents({ now: NOW });
+
+    expect(result.cutoff).toBe(ago(1095).toISOString());
+    expect(await survivingVisitors()).toEqual(['edge-exact-1095d']);
+  });
+
+  test('a future `now` (2099) is clamped to the real clock: rows inside the window survive (sec-gnd B-1)', async () => {
+    await consent('fresh-today', ago(0));
+    await consent('fresh-1000d', ago(1000));
+    await consent('old-1100d', ago(1100));
+
+    const before = Date.now();
+    const result = await purgeOldCookieConsents({ now: new Date('2099-01-01T03:40:00.000Z') });
+
+    expect(new Date(result.cutoff).getTime()).toBeLessThanOrEqual(Date.now() - COOKIE_CONSENT_RETENTION_DAYS * DAY);
+    expect(new Date(result.cutoff).getTime()).toBeGreaterThanOrEqual(before - COOKIE_CONSENT_RETENTION_DAYS * DAY);
+    expect(await survivingVisitors()).toEqual(['fresh-1000d', 'fresh-today']);
+  });
+
   test('is idempotent: a second run the same day deletes nothing', async () => {
     await consent('old-1100d', ago(1100));
     await purgeOldCookieConsents({ now: NOW });

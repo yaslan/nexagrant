@@ -51,12 +51,19 @@ export interface CookieConsentPurgeResult {
  * hand withTenant. The `cross-tenant-job` purpose opens CookieConsentRecord
  * (prisma/rls.sql, system_scope_open). Idempotent: a second run the same day
  * finds nothing.
+ *
+ * `now` may only move the window back (tests pin a fixed past moment). A
+ * future `now` is clamped to the real clock, so no caller can reach rows that
+ * are not yet past the retention window (NG-366 sec-gnd B-1). An invalid date
+ * is passed through and throws in cookieConsentPurgeCutoff.
  */
 export async function purgeOldCookieConsents(
   options: { now?: Date } = {},
 ): Promise<CookieConsentPurgeResult> {
   const retentionDays = COOKIE_CONSENT_RETENTION_DAYS;
-  const cutoff = cookieConsentPurgeCutoff(options.now ?? new Date(), retentionDays);
+  const realNow = new Date();
+  const now = options.now !== undefined && options.now.getTime() > realNow.getTime() ? realNow : (options.now ?? realNow);
+  const cutoff = cookieConsentPurgeCutoff(now, retentionDays);
   const due = purgeableCookieConsentWhere(cutoff);
 
   return withSystemScope('cross-tenant-job', 'cookie-consent-retention.purge', async (tx) => {

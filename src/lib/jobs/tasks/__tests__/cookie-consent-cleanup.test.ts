@@ -31,18 +31,27 @@ beforeEach(() => {
 });
 
 describe('cookie-consent-cleanup job', () => {
-  it('purges by the cron tick, not by the moment the worker got round to it', async () => {
-    purgeOldCookieConsents.mockResolvedValue({ deletedCount: 3, cutoff: 'x', retentionDays: 1095 });
-    await cookieConsentCleanupTask({ _cron: { ts: '2026-11-27T03:40:00.000Z' } }, helpersFor());
-    expect(purgeOldCookieConsents).toHaveBeenCalledWith({ now: new Date('2026-11-27T03:40:00.000Z') });
+  // The moment the purge counts back from, as the job hands it over: an
+  // explicit `now`, or the real clock when none is passed.
+  function purgeMoment(beforeCall: number): number {
+    const arg = purgeOldCookieConsents.mock.calls[0]?.[0] as { now?: Date } | undefined;
+    return arg?.now?.getTime() ?? beforeCall;
+  }
+
+  it('a cron tick in the future (2099) does not move the cutoff past the real clock (sec-gnd B-1)', async () => {
+    purgeOldCookieConsents.mockResolvedValue({ deletedCount: 0, cutoff: 'x', retentionDays: 1095 });
+    const before = Date.now();
+    await cookieConsentCleanupTask({ _cron: { ts: '2099-01-01T03:40:00.000Z' } }, helpersFor());
+    expect(purgeOldCookieConsents).toHaveBeenCalledTimes(1);
+    expect(purgeMoment(before)).toBeLessThanOrEqual(Date.now());
     expect(alerts).toEqual([]);
   });
 
-  it('does not let a hand-added payload widen the window', async () => {
+  it('nothing in the payload reaches the purge: no tick, no retentionDays', async () => {
     purgeOldCookieConsents.mockResolvedValue({ deletedCount: 0, cutoff: 'x', retentionDays: 1095 });
-    await cookieConsentCleanupTask({ retentionDays: 0 }, helpersFor());
+    await cookieConsentCleanupTask({ _cron: { ts: '2026-11-27T03:40:00.000Z' }, retentionDays: 0 }, helpersFor());
     expect(purgeOldCookieConsents).toHaveBeenCalledTimes(1);
-    expect(Object.keys(purgeOldCookieConsents.mock.calls[0]?.[0] ?? {})).toEqual(['now']);
+    expect(purgeOldCookieConsents.mock.calls[0]).toEqual([]);
   });
 
   it('a failure writes an error SystemAlert at once and rethrows so the queue retries', async () => {
