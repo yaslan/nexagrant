@@ -235,6 +235,8 @@ Yalnız `legacyClaims`'i kaldırıp kolonu bırakmak, eski worker kalmışsa tab
 
 **Bilinen pencere (İNCELEME-12 K-6):** zincir koşarken 23. dosya (`add-agency-invite-code.sql`) ile 30. dosya (`agency-invite-no-max-uses.sql`) arasında `redeem_agency_invite()` eski gövdededir: `maxUses = NULL` olan davet kodları reddedilir (ölçüm: 23.–30. dosyalar 1,2 sn). Düşük trafik saatinde koşun; zincir yarıda kalırsa pencere açık kalır. Kontrol: `SELECT prosrc LIKE '%maxUses%' FROM pg_proc WHERE proname = 'redeem_agency_invite';` → `false` olmalı. İlk canlı kurulumda (boş DB, kullanıcı yok) bu pencere etkisizdir.
 
+**Cookie-consent sıra notu (NG-367, SEC NG-367 N-2):** `db:rls` ile uygulama dağıtımı aynı pencerede yapılır: önce migration'lar ve `pnpm db:rls`, sonra uygulama. Yeni kod `enter_system_scope('cookie-consent')` çağırır; `rls.sql` eskiyken bu amaç bilinmez ve `/api/cookie-consent` 500 döner, rıza kaydı yazılmaz (izole DB'de ölçüldü: POST 500, DB'de 0 satır). Ters yönde de bir pencere var: yeni `rls.sql` uygulandıktan sonra eski kod `public-intake` ile yazmayı dener ve `CookieConsentRecord` politikası bunu reddeder (ölçülmedi, politikadan çıkarım). Bu yüzden iki adım arasını kısa tutun. Dağıtımdan sonra `pnpm rls:verify --require-db` exit 0 ve `POST /api/cookie-consent` 201 görülmeden adımı kapatmayın.
+
 ### 3.2 Geri dönüş — HAZIR (2 not)
 
 - Her düz dosyanın yanında `<ad>.down.sql`, klasörlünün yanında `down.sql` vardır; **ters sırayla, her dosya için bir çağrı** uygulanır. Komut (sahip rolüyle, §3.1 adım 3 ile aynı rol):

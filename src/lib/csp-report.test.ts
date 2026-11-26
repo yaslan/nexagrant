@@ -108,6 +108,21 @@ describe('ReportLimiter', () => {
     expect(l.take('a', 1000)).toBe(true); // next window
   });
 
+  it('NG-367 B-1: once the global window is full, new clients are refused without growing the client map', () => {
+    const l = new ReportLimiter(20, 300, 60_000);
+    // 10,000 distinct clients (e.g. rotating IPv6 /64s) inside one window.
+    const admitted = Array.from({ length: 10_000 }, (_, i) => l.take(`c${i}`, 0)).filter(Boolean);
+    expect(admitted).toHaveLength(300);
+    // Only clients that were admitted against the global window are tracked.
+    expect(l.trackedClients).toBe(300);
+    // A tracked client hammering past its own limit adds no entries either.
+    for (let i = 0; i < 100; i++) l.take('c0', 1);
+    expect(l.trackedClients).toBe(300);
+    // The next window starts empty.
+    expect(l.take('fresh', 60_000)).toBe(true);
+    expect(l.trackedClients).toBe(1);
+  });
+
   it('defaults are the documented ones', () => {
     expect([PER_CLIENT_LIMIT, GLOBAL_LIMIT, WINDOW_MS, MAX_REPORT_BYTES]).toEqual([20, 300, 60_000, 8192]);
   });
