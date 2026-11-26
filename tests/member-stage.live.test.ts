@@ -47,18 +47,20 @@ const { setMemberStage } = await import('@/modules/m8/server/member-stage');
 type TenantTx = import('@/lib/db').TenantTx;
 
 /**
- * NG-368: `tx` whose `consortiumSeat.updateMany` reports that the seat has been read and then
- * waits for `gate` before writing. Lets one request read the row, another write it, and the first
- * write afterwards, in that order every run.
+ * NG-368: `tx` whose `consortiumSeat.findFirst` reads the seat, reports it, and then waits for
+ * `gate` before handing the row back, so the write that follows runs only after `gate`. Lets one
+ * request read the row, another write it, and the first write afterwards, in that order every run.
+ * The write itself is the real, unwrapped `updateMany`.
  */
 function pausedBeforeWrite(tx: TenantTx, onRead: () => void, gate: Promise<void>): TenantTx {
   const seats = new Proxy(tx.consortiumSeat, {
     get(target, prop) {
-      if (prop !== 'updateMany') return Reflect.get(target, prop);
-      return async (...args: Parameters<typeof target.updateMany>) => {
+      if (prop !== 'findFirst') return Reflect.get(target, prop);
+      return async (...args: Parameters<typeof target.findFirst>) => {
+        const seat = await target.findFirst(...args);
         onRead();
         await gate;
-        return target.updateMany(...args);
+        return seat;
       };
     },
   });
