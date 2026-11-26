@@ -29,6 +29,7 @@ export const JOB_IDS = [
   'agency-monthly-report',
   'invitation-cleanup',
   'public-lead-cleanup',
+  'cookie-consent-cleanup',
   'public-lead-stuck',
   'expert-prereg-cleanup',
   'k1-topic-match',
@@ -86,6 +87,8 @@ export const SCHEDULE: readonly ScheduledJob[] = [
   },
   { id: 'invitation-cleanup', cron: '30 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   { id: 'public-lead-cleanup', cron: '45 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
+  // NG-366 (NG-363 B-1): CookieConsentRecord rows older than COOKIE_CONSENT_RETENTION_DAYS (1095).
+  { id: 'cookie-consent-cleanup', cron: '40 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // FO-50: pre-registrations older than EXPERT_PREREG_RETENTION_DAYS (365).
   { id: 'expert-prereg-cleanup', cron: '55 3 * * *', maxAttempts: 5, fill: '6h', missedTickAlert: true },
   // ADR-0011 §3.4: notifications older than 90 days.

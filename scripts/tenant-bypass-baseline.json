@@ -385,6 +385,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/cookie-consent-retention.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "purgeOldCookieConsents(), run nightly by the cookie-consent-cleanup cron (NG-366, NG-363 B-1): deletes CookieConsentRecord rows (anonymous visitor id, choice, policy version; platform data, no tenantId, RLS system_scope only) older than COOKIE_CONSENT_RETENTION_DAYS (1095) by one createdAt < cutoff filter. The table has no tenant to bind, and cross-tenant-job is the purpose system_scope_open already opens for CookieConsentRecord (prisma/rls.sql). Returns the count only; no row is read or written outside the delete."
+    },
+    {
+      "check": "D",
       "file": "src/lib/leads/public-lead.ts",
       "subject": "system-scope:public-intake",
       "count": 1,
