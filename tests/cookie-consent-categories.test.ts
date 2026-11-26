@@ -159,6 +159,8 @@ describe('consent record input', () => {
     ['"reject all" with a category on', { ...ok, choice: 'reject_all' }],
     ['an unknown locale', { ...ok, locale: 'de' }],
     ['a free-text policy version', { ...ok, policyVersion: 'Version 1 <script>' }],
+    // NG-367 Ö-2: well-formed but never published — the record must name the text actually shown.
+    ['a policy version the server never published', { ...ok, policyVersion: 'draft-2099-01-01' }],
   ])('rejects %s', (_label, body) => {
     expect(cookieConsentInput.safeParse(body).success).toBe(false);
   });

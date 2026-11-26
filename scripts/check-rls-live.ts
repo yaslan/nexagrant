@@ -666,9 +666,11 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
     insert: (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]],
   },
   {
-    // NG-9: the cookie banner's consent record (anonymous visitor id).
+    // NG-9: the cookie banner's consent record (anonymous visitor id); its own purpose
+    // since NG-367 Ö-3.
     table: 'CookieConsentRecord',
     migration: 'add-cookie-consent-record.sql',
+    purpose: 'cookie-consent',
     insert: (id) => [COOKIE_CONSENT_INSERT, [id]],
   },
   {
@@ -924,7 +926,14 @@ async function probeSystemScopeTable(
  * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
  * Everything is rolled back.
  */
-const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'PublicLead', 'CookieConsentRecord']);
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'PublicLead']);
+
+/**
+ * NG-367 Ö-3 (SEC NG-363): the cookie banner's purpose. It opens this one table; the table is
+ * shut to 'public-intake' (the expert and readiness forms), which opened it until NG-367.
+ */
+const COOKIE_CONSENT_PURPOSE = 'cookie-consent';
+const COOKIE_CONSENT_TABLE = 'CookieConsentRecord';
 
 /**
  * FO-98: one write per PUBLIC_INTAKE_TABLES table, the smallest the form itself
@@ -946,8 +955,6 @@ const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, param
     ],
   ],
   ['ExpertPreRegAttempt', (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]]],
-  // NG-9: the cookie banner (src/lib/cookie-consent-record.ts recordCookieConsent).
-  ['CookieConsentRecord', (id) => [COOKIE_CONSENT_INSERT, [id]]],
   // One-row counter (CHECK id = 1), written by the app with this same upsert
   // (src/lib/expert-prereg/server/founder-counter.ts). Empty table: the INSERT
   // path meets WITH CHECK. Seeded row: the UPDATE path meets USING, and RLS
@@ -979,7 +986,7 @@ const PURPOSE_NARROWED = new Map<string, ReadonlySet<string>>([
   [EXPERT_TABLE, EXPERT_DATA_PURPOSES],
   ['ExpertPreRegAttempt', EXPERT_DATA_PURPOSES],
   ['PublicLead', new Set(['public-intake', 'platform-admin', 'cross-tenant-job'])],
-  ['CookieConsentRecord', new Set(['public-intake', 'platform-admin', 'cross-tenant-job'])],
+  [COOKIE_CONSENT_TABLE, new Set([COOKIE_CONSENT_PURPOSE, 'platform-admin', 'cross-tenant-job'])],
   ['ProvinceLeadRoute', new Set(['platform-admin', 'cross-tenant-job'])],
 ]);
 
@@ -1086,6 +1093,40 @@ async function probePurposeTables(
       else failures.push(`public-intake: ${t} INSERT reddedildi — form yazamaz: ${r === 'rls' ? 'RLS' : r}`);
     }
 
+    // NG-367 Ö-3: the consent record is shut to public-intake and open to cookie-consent only.
+    if (!tables.includes(COOKIE_CONSENT_TABLE)) {
+      checks.push(`${COOKIE_CONSENT_PURPOSE}: ${COOKIE_CONSENT_TABLE} bu veritabanında yok (system_scope politikası yok), ölçülmedi`);
+    } else {
+      const consentId = () => `rls-verify-${randomBytes(6).toString('hex')}`;
+      const outsideWrite = await tryInsert(COOKIE_CONSENT_INSERT, [consentId()]);
+      if (outsideWrite === 'rls') checks.push(`public-intake: ${COOKIE_CONSENT_TABLE} INSERT reddedildi (NG-367: ayrı amaç)`);
+      else failures.push(`public-intake: ${COOKIE_CONSENT_TABLE} INSERT ${outsideWrite === 'ok' ? 'KABUL EDİLDİ — çerez rızası hâlâ public-intake ile yazılabiliyor' : `beklenmeyen hatayla düştü — ${outsideWrite}`}`);
+
+      await m.query('select enter_system_scope($1)', [COOKIE_CONSENT_PURPOSE]);
+      const consent = await countAll(m);
+      const extra = opened(consent).filter((t) => t !== COOKIE_CONSENT_TABLE);
+      if (extra.length > 0) {
+        failures.push(`${COOKIE_CONSENT_PURPOSE}: ${extra.length} tablo kapsam dışından fazlasını gösteriyor (yalnız ${COOKIE_CONSENT_TABLE} açılmalı): ${extra.map((t) => `${t}=${consent.get(t)}>${outside.get(t)}`).join(', ')}`);
+      } else {
+        checks.push(`${COOKIE_CONSENT_PURPOSE}: ${tables.length - 1} system_scope tablosunda kapsam dışıyla aynı satır sayısı (yalnız ${COOKIE_CONSENT_TABLE} açık)`);
+      }
+      if (truth && consent.get(COOKIE_CONSENT_TABLE) !== truth.get(COOKIE_CONSENT_TABLE)) {
+        failures.push(`${COOKIE_CONSENT_PURPOSE}: kendi tablosunu tam göremiyor: ${COOKIE_CONSENT_TABLE}=${consent.get(COOKIE_CONSENT_TABLE)}/${truth.get(COOKIE_CONSENT_TABLE)}`);
+      }
+      const shutWrites: [string, () => Promise<string>][] = [
+        ['AuditEvent', () => auditInsert(tenantId)],
+        ...(tables.includes('PublicLead') ? [['PublicLead', () => tryInsert(PUBLIC_LEAD_INSERT, [consentId()])] as [string, () => Promise<string>]] : []),
+      ];
+      for (const [t, write] of shutWrites) {
+        const r = await write();
+        if (r === 'rls') checks.push(`${COOKIE_CONSENT_PURPOSE}: ${t} INSERT reddedildi`);
+        else failures.push(`${COOKIE_CONSENT_PURPOSE}: ${t} INSERT ${r === 'ok' ? 'KABUL EDİLDİ' : `beklenmeyen hatayla düştü — ${r}`}`);
+      }
+      const own = await tryInsert(COOKIE_CONSENT_INSERT, [consentId()]);
+      if (own === 'ok') checks.push(`${COOKIE_CONSENT_PURPOSE}: ${COOKIE_CONSENT_TABLE} INSERT kabul edildi (pozitif kontrol, geri alındı)`);
+      else failures.push(`${COOKIE_CONSENT_PURPOSE}: ${COOKIE_CONSENT_TABLE} INSERT reddedildi — bant rızayı yazamaz: ${own === 'rls' ? 'RLS' : own}`);
+    }
+
     // The other purposes are not narrowed by public-intake's list: each still
     // opens every row, except the expert data the purpose does not handle (FO-92).
     for (const purpose of ['tenant-discovery', 'subject-scoped', 'platform-admin', 'platform-aggregate', 'cross-tenant-job']) {
@@ -1112,6 +1153,7 @@ async function probePurposeTables(
           ]);
         }
         if (shut.includes('PublicLead')) writes.push(['PublicLead', [PUBLIC_LEAD_INSERT, [probeId()]]]);
+        if (shut.includes(COOKIE_CONSENT_TABLE)) writes.push([COOKIE_CONSENT_TABLE, [COOKIE_CONSENT_INSERT, [probeId()]]]);
         if (shut.includes('ProvinceLeadRoute') && tenantId) {
           writes.push([
             'ProvinceLeadRoute',

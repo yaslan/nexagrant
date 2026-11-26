@@ -123,21 +123,37 @@ export class ReportLimiter {
     private readonly windowMs = WINDOW_MS,
   ) {}
 
-  /** True when this request may be logged; counts it either way. */
+  /** How many clients the current window tracks (bounded by the global limit). */
+  get trackedClients(): number {
+    return this.perClient.size;
+  }
+
+  /**
+   * True when this request may be logged. It always counts against its client; it counts
+   * against the global window only once the client is within its own limit (NG-367 Ö-1,
+   * SEC NG-363): before, the global counter went up first, so one address sending 300
+   * requests a minute filled the window and every other client got 429.
+   *
+   * A client not yet seen in this window is only tracked while the global window has
+   * room (NG-367 B-1): otherwise every new address (rotating IPv6 /64s) added a map entry
+   * that was refused anyway, so the map grew without bound. Each new entry is admitted
+   * against the global window, so the map never holds more than `globalLimit` clients.
+   */
   take(client: string | null, now = Date.now()): boolean {
     if (now - this.windowStart >= this.windowMs) {
       this.windowStart = now;
       this.total = 0;
       this.perClient.clear();
     }
-    this.total += 1;
-    if (this.total > this.globalLimit) return false;
     if (client) {
-      const n = (this.perClient.get(client) ?? 0) + 1;
+      const seen = this.perClient.get(client);
+      if (seen === undefined && this.total >= this.globalLimit) return false;
+      const n = (seen ?? 0) + 1;
       this.perClient.set(client, n);
       if (n > this.perClientLimit) return false;
     }
-    return true;
+    this.total += 1;
+    return this.total <= this.globalLimit;
   }
 }
 
