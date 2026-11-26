@@ -6,6 +6,25 @@ set -e
 # repo kuran testler) BU reponun indeksini okur ve ona `git add` yazar (FO-111).
 # Kancanın cwd'si checkout kökü; git repoyu buradan kendisi bulur.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX
+# NG-331 (B1): git push edilen ref'leri stdin'den verir: "<yerel-ref> <yerel-sha> <uzak-ref> <uzak-sha>".
+# Kapı HEAD'i sınar; push edilen commit HEAD değilse yeşil kapı yanlış kanıt olur (HEAD yeşil, push edilen kırmızı).
+# Bu yüzden her silme-olmayan satırda yerel-sha == HEAD şart. Silme push'u (yerel-sha tümü 0) kod taşımaz: muaf
+# (lider kararı; docs/GATE.md). stdin pnpm gate'e kalmasın diye en başta okunur.
+refs=$(cat)
+head_sha=$(git rev-parse HEAD)
+code_push=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "$local_ref" ] || continue
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+  code_push=1
+  if [ "$local_sha" != "$head_sha" ]; then
+    echo "pre-push: push edilen commit HEAD değil ($local_ref = $local_sha, HEAD = $head_sha); push durduruldu." >&2
+    echo "  Kapı yalnız HEAD'i sınar. Önce o commit'i checkout edin, sonra push edin." >&2
+    exit 1
+  fi
+done <<EOF
+$refs
+EOF
 # Paylaşılan .git/config'te core.bare=true ise dur; ayarı kendimiz düzeltmeyiz (FO-114).
 . scripts/git-core-bare.sh
 core_bare_guard pre-push || exit 1
@@ -21,14 +40,44 @@ fi
 # Yalnız host:port/db yazılır; parola ve girdinin kendisi hiçbir zaman basılmaz (scripts/db-target.sh).
 . scripts/db-target.sh
 db=${DATABASE_URL:-$(db_env_value .env)}
-echo "→ veritabanı: $(db_target "$db")"
+db_shown=$(db_target "$db")
+echo "→ veritabanı: $db_shown"
+# K-585866 (NG-331 A): `fabrika` paylaşılan DB'nin adıdır (CLAUDE.md "Worktree'de gate"). Kod taşıyan bir push'un
+# kapısı onda koşarsa paylaşılan veriye karşı yazılır ve ortak koşularla çakışır. Tam ad eşleşmesi (önek değil):
+# fabrika_test_ng331 gibi izole adlar geçer. Silme push'u (yerel-sha 0…0) kod taşımadığı için muaf.
+db_name=${db_shown##*/}
+# NG-365 B-1: DB adı okunamıyorsa (<ayrıştırılamadı>) ya da boşsa (path yok, yalnız /) kanca hangi DB'ye gidileceğini
+# kanıtlayamaz. libpq ad yoksa kullanıcı adını DB seçer (fabrika); bu yüzden kod push'u fail-closed durur.
+if [ "$code_push" = 1 ] && { [ -z "$db_name" ] || [ "$db_shown" = "<ayrıştırılamadı>" ]; }; then
+  echo "pre-push: DATABASE_URL'in DB adı okunamadı ya da boş ($db_shown); kapı hangi veritabanına gideceğini kanıtlayamıyor; push durduruldu." >&2
+  echo "  DB adını path'te, yalnız harf/rakam/._- karakterleriyle yaz (…/fabrika_test_ng<n>)." >&2
+  exit 1
+fi
+if [ "$code_push" = 1 ] && [ "$db_name" = "fabrika" ]; then
+  echo "pre-push: bu checkout'un DATABASE_URL'i paylaşılan fabrika DB'si gösteriyor; push durduruldu." >&2
+  echo "  İzole DB kullan (CLAUDE.md \"Worktree'de gate\": ad fabrika OLMASIN, örn. fabrika_test_ng<n>)." >&2
+  exit 1
+fi
+# NG-331 #fix4: yukarıdaki ad path'ten gelir; libpq sorgudaki dbname=/service= ile onu değiştirir
+# (…/fabrika_test_x?dbname=fabrika kapıyı fabrika'ya bağlar). Kod push'unda böyle bir URL fail-closed durur.
+if [ "$code_push" = 1 ] && db_name_overridable "$db"; then
+  echo "pre-push: DATABASE_URL'in sorgu kısmı (dbname=, service= ya da % kodlu anahtar) DB adını değiştirebilir; push durduruldu." >&2
+  echo "  DB adını yalnız path'te yaz (…/fabrika_test_ng<n>); sorguda dbname/service kullanma." >&2
+  exit 1
+fi
 # FO-203: localhost URL'si Postgres'i yalnız 127.0.0.1'de buluyorsa ::1 tarafı sahipsizdir;
 # başka bir süreç o portu alınca psql kırılır ve gate rastgele kırmızı verir. Gate'ten önce dur.
 node scripts/db-loopback-check.mjs || exit 1
 # FO-339: aynı tree için yeşil kayıt varsa gate-lock "önbellek: <tree> <tarih>" basıp döner;
 # yalnız belge farkıysa lint + i18n:check. Kod dokunulmuşsa tam gate koşar (kısaltma yok).
 echo "→ pnpm gate (önbellek / belge-yalnız / tam gate: gate-lock karar verir)"
-pnpm gate
+# NG-331: kapı kırmızıysa push durur; çıkış kodu gerçek kapıdan gelir (sabit 0 değil). set -e de durdurur,
+# bu satır nedeni açıkça yazar. Atlatma yolu yok: pnpm gate dışında hiçbir ortam değişkeni bu adımı kapatmaz.
+pnpm gate || {
+  rc=$?
+  echo "pre-push: KAPI KIRMIZI (çıkış $rc); push durduruldu. Ayrıntı yukarıda; --no-verify kullanma." >&2
+  exit "$rc"
+}
 # FO-114: core.bare'i kimin yazdığı kanıtlanmadı; gate (GIT_DIR sızıntısı + git init) muhtemel
 # yazıcı, doğrulanmadı (docs/RELEASE_CHECKLIST.md §9.1).
 # Gate yeşil olsa bile ana checkout'u bozduysa push etme.

@@ -394,6 +394,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/cookie-consent-record.ts",
+      "subject": "system-scope:public-intake",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "public-intake",
+      "reason": "recordCookieConsent() (NG-9, SEC NG-363#sec): the anonymous cookie banner's consent record behind the public POST /api/cookie-consent. CookieConsentRecord (platform data, no tenantId; anonymous browser-minted visitor UUID, choice, two booleans, policy version, locale; no IP, user agent or user id) is RLS system_scope only, so the per-visitor hourly count and the one INSERT run in this public-intake scope on a zod-strict body. system_scope_open() lets public-intake reach only CookieConsentRecord, PublicLead and the expert form's tables; no tenant row is read or written. Volume is bounded in the route (per-address and per-process windows, 1 KB body cap)."
+    },
+    {
+      "check": "D",
       "file": "src/lib/leads/public-lead.ts",
       "subject": "system-scope:platform-admin",
       "count": 1,

@@ -41,6 +41,7 @@ import { listUnmatchedLeads } from '@/lib/leads/province-route';
 import { PUBLIC_LEAD_CONSENT, listPublicLeads, submitPublicLead } from '@/lib/leads/public-lead';
 import { withSystemScopeOn, type SystemScopePurpose } from '@/lib/system-scope';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK } from './helpers/test-db-lock';
 
 const SUITE = 'public lead RLS test';
 // Salt for the IP hash in the form path; built per run so no key-like literal lives in the repo.
@@ -82,8 +83,11 @@ const asTenant = <R>(tenantId: string, fn: (tx: Parameters<Parameters<typeof pri
 
 describe.skipIf(!HAS_DB)('PublicLead row level security (NG-175)', () => {
   let ownRows = 0;
+  // NG-346: writes PublicLead rows (routed + unmatched) and reads them under RLS; hold the shared DDL lock for the file.
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
 
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     await admin.provinceLeadRoute.deleteMany({ where: { province: PROVINCE } });
     for (const key of ['a', 'b'] as const) {
       T[key] = (
@@ -110,6 +114,7 @@ describe.skipIf(!HAS_DB)('PublicLead row level security (NG-175)', () => {
     await admin.tenant.deleteMany({ where: { slug: { endsWith: `-${RUN}` } } });
     await admin.$disconnect();
     await prisma.$disconnect();
+    await releasePublicLeadLock?.();
   });
 
   describe('O-1: a tenant session cannot reach PublicLead', () => {

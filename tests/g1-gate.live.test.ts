@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
+import { withLetterOfIntentRule } from './helpers/gate-rules';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 
@@ -104,9 +105,12 @@ async function candidate(
     data: { tenantId: owner, seatId, organizationId, score: 10 - rank, breakdown, rank },
   });
 }
+/** Invite, confirm and record the letter of intent (NG-364), each through the real M8 action. */
 async function fillThroughM8(opportunityId: string, seatId: string) {
   await m8.inviteCandidateToSeat(seatId, SEATED, opportunityId);
   await m8.confirmSeatAssignment(seatId, opportunityId);
+  const letter = await m8.setSeatMemberStage({ seatId, opportunityId, stage: 'CONFIRMED', loiReceivedAt: '2026-11-01' });
+  expect(letter).toMatchObject({ ok: true });
 }
 const stage = async (id: string) =>
   (await admin!.opportunity.findUniqueOrThrow({ where: { id }, select: { stage: true } })).stage;
@@ -163,6 +167,8 @@ afterAll(async () => {
 });
 
 describe('G1 on a real database', () => {
+  // The letter-of-intent rule ships off (NG-364, owner decision 25.11.2026); these expectations are for it on.
+  withLetterOfIntentRule(true);
   test('no seats: refused, filed, stage stays', async () => {
     const opp = await opportunity('no seats');
 
@@ -232,14 +238,29 @@ describe('G1 on a real database', () => {
     await candidate(s, SEATED, 1);
     await candidate(s, BACKUP, 2);
 
-    // Invited is not filled yet.
+    // Invited is not filled yet, and the member it names has no letter of intent (NG-364).
     await m8.inviteCandidateToSeat(s, SEATED, opp);
     expect((await evaluateGate(opp, 'G1', tenantId)).reasons).toEqual([
       'Critical role research is not filled: seat status is INVITED',
+      'Critical role research has no letter of intent on file',
     ]);
     expect(await stage(opp)).toBe('G0');
 
     await m8.confirmSeatAssignment(s, opp);
+    // NG-364: confirming moves the member stage, but no letter of intent is on file yet.
+    expect(await admin!.consortiumSeat.findUniqueOrThrow({ where: { id: s }, select: { memberStage: true, loiReceivedAt: true } })).toEqual({
+      memberStage: 'CONFIRMED',
+      loiReceivedAt: null,
+    });
+    expect((await evaluateGate(opp, 'G1', tenantId)).reasons).toEqual(['Critical role research has no letter of intent on file']);
+    expect(await stage(opp)).toBe('G0');
+
+    // The letter recorded through the real action.
+    expect(await m8.setSeatMemberStage({ seatId: s, opportunityId: opp, stage: 'CONFIRMED', loiReceivedAt: '2026-11-01' })).toMatchObject({
+      ok: true,
+      memberStage: 'CONFIRMED',
+      loiReceivedAt: '2026-11-01T00:00:00.000Z',
+    });
     expect(await evaluateGate(opp, 'G1', tenantId)).toEqual({ passed: true, reasons: [] });
     expect(await stage(opp)).toBe('G1');
   });

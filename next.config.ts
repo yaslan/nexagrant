@@ -190,6 +190,7 @@ const nextConfig: NextConfig = {
       { source: '/tr/kayit', destination: '/tr/register' },
       { source: '/tr/kullanim-kosullari', destination: '/tr/terms' },
       { source: '/tr/gizlilik-politikasi', destination: '/tr/privacy' },
+      { source: '/tr/cerez-politikasi', destination: '/tr/cookies' },
       // The published DPA lives at /compliance/dpa, which renders
       // docs/legal/dpa-{locale}.md. A second, superseded copy used to sit at
       // /dpa and was what the public footer actually linked to — it named the

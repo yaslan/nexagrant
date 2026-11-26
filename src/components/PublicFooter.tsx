@@ -141,6 +141,11 @@ export default function PublicFooter({ locale }: PublicFooterProps) {
                 </Link>
               </li>
               <li>
+                <Link href={getPublicRoute('cookies', locale)} className="hover:text-ink transition">
+                  {tFooter('cookiePolicy')}
+                </Link>
+              </li>
+              <li>
                 <CookiePreferencesButton className="hover:text-ink transition text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded" />
               </li>
               <li>

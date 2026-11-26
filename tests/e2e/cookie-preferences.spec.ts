@@ -7,8 +7,9 @@ import { test, expect, type Page } from '@playwright/test';
  * withdraws analytics consent and removes what analytics stored in the browser.
  *
  * Analytics stores one thing, the anonymous id in localStorage
- * (src/lib/analytics.ts); it sets no cookie. The id is seeded here because the
- * e2e server runs without a PostHog key, so nothing would mint it.
+ * (src/lib/analytics.ts); it sets no cookie. The e2e server has a fixture PostHog
+ * key (playwright.config.ts), but the id is seeded here so the spec does not depend
+ * on a consent-accepted analytics event minting it first.
  */
 
 const CONSENT = 'fabrika_cookie_consent';
@@ -90,7 +91,7 @@ for (const locale of ['tr', 'en'] as const) {
       await expect(banner(page)).toBeVisible();
       await expect(banner(page).getByRole('button', { name: c.essential })).toBeFocused();
 
-      // Three controls (privacy link, Essential, Accept): eight presses each way go round twice.
+      // Four controls (privacy link, Manage preferences, Essential, Accept — NG-9): eight presses each way go round twice.
       for (let i = 0; i < 8; i += 1) {
         await page.keyboard.press('Tab');
         expect(await focusInBanner(page), `Tab #${i + 1}`).toBe(true);

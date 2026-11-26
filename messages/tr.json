@@ -289,13 +289,14 @@
           "NOT_SUBMITTED": "Sonuç girmeden önce başvuruyu gönderildi olarak işaretleyin.",
           "ALREADY_DECIDED": "Sonuç girilmiş bir başvuru yeniden gönderildi yapılamaz.",
           "WITHDRAWN": "Geri çekilmiş bir fırsat için beyan yapılamaz.",
+          "DECLARE_CONFLICT": "Beyan kaydedilirken fırsat değişti. Sayfayı yenileyip tekrar deneyin.",
           "DECLARE_FAILED": "Beyan kaydedilemedi. Tekrar deneyin."
         }
       },
       "withdraw": {
         "open": "Vazgeç",
         "reasonLabel": "Vazgeçme gerekçesi",
-        "reasonHint": "Gerekçe zorunludur. Kayıt karar geçmişine yazılır ve geri alınamaz; gerekçe ekranda kalır.",
+        "reasonHint": "Gerekçe zorunludur. Kayıt karar geçmişine yazılır; gerekçe ekranda kalır.",
         "submit": "Vazgeç ve gerekçeyi kaydet",
         "saving": "Kaydediliyor…",
         "cancel": "Vazgeçme",
@@ -303,6 +304,7 @@
         "logTitle": "Karar geçmişi",
         "kind": {
           "WITHDRAW": "Vazgeçildi",
+          "REACTIVATE": "Yeniden etkinleştirildi",
           "APPLY": "Başvuruldu"
         },
         "error": {
@@ -314,7 +316,27 @@
           "WITHDRAW_FORBIDDEN": "Bu işlemi yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
           "ALREADY_WITHDRAWN": "Bu fırsat zaten pasife alınmış.",
           "ALREADY_DECIDED": "Sonuç girilmiş bir fırsat vazgeçilemez.",
+          "WITHDRAW_CONFLICT": "Vazgeçme kaydedilirken fırsat değişti. Sayfayı yenileyip tekrar deneyin.",
           "WITHDRAW_FAILED": "Vazgeçme kaydedilemedi. Tekrar deneyin."
+        }
+      },
+      "reactivate": {
+        "open": "Yeniden etkinleştir",
+        "reasonLabel": "Yeniden etkinleştirme gerekçesi",
+        "reasonHint": "Gerekçe zorunludur. Fırsat vazgeçilmeden önceki durumuna döner; kayıt karar geçmişine yazılır ve gerekçe ekranda kalır.",
+        "submit": "Yeniden etkinleştir ve gerekçeyi kaydet",
+        "saving": "Kaydediliyor…",
+        "cancel": "Vazgeç",
+        "error": {
+          "TENANT_SCOPE_REQUIRED": "Oturumunuz bir çalışma alanına bağlı değil. Yeniden giriş yapın.",
+          "INVALID_INPUT": "Geçersiz istek.",
+          "REASON_TOO_LONG": "Gerekçe en fazla 2000 karakter olabilir.",
+          "REASON_REQUIRED": "Yeniden etkinleştirmek için bir gerekçe yazmanız gerekir.",
+          "OPPORTUNITY_NOT_FOUND": "Bu fırsat bulunamadı ya da arşivlenmiş.",
+          "REACTIVATE_FORBIDDEN": "Bu işlemi yalnız pipeline yöneticileri ya da fırsatın sahibi yapabilir.",
+          "NOT_WITHDRAWN": "Fırsat artık vazgeçilmiş durumda değil. Durum değişmiş olabilir; sayfayı yenileyin.",
+          "REACTIVATE_CONFLICT": "Yeniden etkinleştirme kaydedilirken fırsat değişti. Sayfayı yenileyip tekrar deneyin.",
+          "REACTIVATE_FAILED": "Yeniden etkinleştirme kaydedilemedi. Tekrar deneyin."
         }
       },
       "modules": {
@@ -479,6 +501,7 @@
     "G1_SEAT_NO_ORGANISATION": "Kritik rol doldurulmadı ({role}): onaylanan koltukta kuruluş yok.",
     "G1_SEAT_NOT_FILLED": "Kritik rol doldurulmadı ({role}): koltuk durumu {status}.",
     "G1_NO_BACKUP": "Kritik rolün yedek adayı yok ({role}).",
+    "G1_NO_LOI": "Kritik rol için niyet mektubu kayıtlı değil ({role}).",
     "G2_OPEN_SEATS": "Konsorsiyum kilitlenemedi: {count, plural, other {# koltuk}} hâlâ açık.",
     "G3_CRITERION_BELOW": "Kriter puanı {score}; asgari {min} gerekiyor.",
     "G3_TOTAL_BELOW": "Toplam değerlendirme puanı {score}; asgari {min} gerekiyor.",
@@ -1026,7 +1049,8 @@
       "contact": "İletişim",
       "residencyBadge": "● GDPR Uyumlu",
       "dataResidency": "🇹🇷 Veritabanı Türkiye'de barındırılır",
-      "moduleCatalog": "Modül Kataloğu"
+      "moduleCatalog": "Modül Kataloğu",
+      "cookiePolicy": "Çerez Politikası"
     },
     "metaTitle": "{brand} — AB Finansman Platformu (Horizon Europe, Eurostars)",
     "metaDescription": "{brand}: AB proje yönetimi için uçtan uca platform. Konsorsiyum eşleştirme, YZ hakem simülasyonu, CORDIS ağ analitikleri. Fikirden fonlamaya.",
@@ -1270,6 +1294,7 @@
       "g1Recorded": "Kararla birlikte kaydedilir; kapıyı engellemez",
       "g1CriticalSeats": "Her kritik rol dolu",
       "g1BackupCandidates": "Her kritik rol için yedek aday",
+      "g1LettersOfIntent": "Her kritik rol üyesinden niyet mektubu",
       "off": "Kapalı",
       "g2Heading": "G2 · Konsorsiyum kilidi",
       "g2Seats": "Tüm konsorsiyum koltuklarının dolu olması",
@@ -1736,13 +1761,49 @@
     },
     "cookieConsent": {
       "title": "Çerez Tercihleri",
-      "description": "Sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. \"Tümünü Kabul Et\" seçerseniz, ürün iyileştirmesi için analitik çerezleri (PostHog) de kullanırız. Üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
+      "description": "Sitenin çalışması için gereken çerezleri ve tarayıcı depolamasını kullanıyoruz: oturumunuz, dil ve tema tercihiniz, sepetiniz. Analitik ve pazarlama çerezleri siz açmadıkça kapalıdır; \"Tercihleri yönet\" ile tek tek seçebilirsiniz. Üçüncü taraf takip çerezi kullanmıyoruz. Ayrıntılar için bkz. ",
       "privacyLink": "Gizlilik Bildirimi",
       "acceptAll": "Tümünü Kabul Et",
       "essentialOnly": "Gerekli Çerezler",
       "preferencesLink": "Çerez tercihleri",
-      "currentAll": "Şu anki seçiminiz: tüm çerezler kabul edildi. \"Gerekli Çerezler\" seçerseniz analitik onayınız geri alınır ve analitik verileri bu tarayıcıdan silinir.",
-      "currentEssential": "Şu anki seçiminiz: yalnızca gerekli çerezler."
+      "currentAll": "Şu anki seçiminiz: tüm çerezler kabul edildi. \"Gerekli Çerezler\" seçerseniz onayınız geri alınır ve analitik verileri bu tarayıcıdan silinir.",
+      "currentEssential": "Şu anki seçiminiz: yalnızca gerekli çerezler.",
+      "manage": "Tercihleri yönet",
+      "save": "Seçimimi kaydet",
+      "panelTitle": "Çerez tercihlerini yönet",
+      "panelIntro": "Zorunlu çerezler her zaman açıktır. Diğerleri siz açmadıkça kapalı kalır ve seçiminizi istediğiniz zaman değiştirebilirsiniz.",
+      "cookiePolicyLink": "Çerez Politikası",
+      "alwaysOn": "Her zaman açık",
+      "statusOn": "Açık",
+      "statusOff": "Kapalı",
+      "currentCustom": "Şu anki seçiminiz: kategori bazında özel seçim. Değiştirmek için \"Tercihleri yönet\".",
+      "categories": {
+        "necessary": {
+          "name": "Zorunlu",
+          "description": "Oturum, dil ve tema tercihi, sepet ve bu çerez seçiminin kaydı. Bunlar olmadan site çalışmaz."
+        },
+        "analytics": {
+          "name": "Analitik",
+          "description": "Ürünü iyileştirmek için anonim kullanım ölçümü (PostHog, AB sunucusu). Yalnızca açarsanız yüklenir."
+        },
+        "marketing": {
+          "name": "Pazarlama",
+          "description": "Reklam ve yeniden hedefleme pikselleri. Şu anda hiçbiri kullanılmıyor; eklenirse yalnızca açarsanız yüklenir."
+        }
+      }
+    },
+    "draft": {
+      "badge": "Taslak — hukuk onayı bekliyor",
+      "body": "Bu metin henüz hukuk incelemesinden geçmedi ve değişebilir."
+    },
+    "cookies": {
+      "metaTitle": "Çerez Politikası — {brand}",
+      "metaDescription": "{brand} sitesinde kullanılan çerez kategorileri ve tercihlerinizi nasıl değiştireceğiniz.",
+      "heading": "Çerez Politikası",
+      "placeholder": "Çerez politikasının metni hukuk ekibince hazırlanıyor. Bu sayfa o zamana kadar yalnızca sitenin kullandığı çerez kategorilerini listeler.",
+      "categoriesHeading": "Çerez kategorileri",
+      "changeHeading": "Tercihinizi değiştirme",
+      "changeBody": "Seçiminizi istediğiniz zaman değiştirebilir ya da geri alabilirsiniz. Her değişiklik yeni bir rıza kaydı olarak saklanır."
     }
   },
   "feedback": {

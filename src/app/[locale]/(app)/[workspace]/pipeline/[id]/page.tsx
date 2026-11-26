@@ -161,6 +161,7 @@ export default async function OpportunityDetailPage({
   // The decision log (NG-15 / NG-38): written by the withdrawal layer, read back here. Null means
   // the opportunity is not this tenant's, which the `notFound()` above has already caught.
   const decisionRows = await listDecisions({ tenantId }, id);
+  // Every kind is shown, REACTIVATE included (NG-241 Faz 2: its label is `detail.withdraw.kind.*`).
   const decisions: DecisionEntry[] = (decisionRows ?? []).map((d) => ({
     id: d.id,
     kind: d.kind,

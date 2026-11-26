@@ -331,7 +331,8 @@ function runSteps(steps) {
   for (const step of steps) {
     console.log(`→ ${step.join(' ')}`)
     const res = spawnSync(step[0], step.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
-    if (res.status !== 0) return res.status ?? 1
+    // NG-331 (O2): sinyalle ölen adım da kabuk konvansiyonuyla 128+n döner (tam gate yolundakiyle aynı).
+    if (res.status !== 0) return res.status ?? 128 + (os.constants.signals[res.signal] ?? 1)
   }
   return 0
 }
@@ -391,16 +392,25 @@ async function main() {
     }
   }
 
+  // NG-350: FONBRIDGE_GATE_RUN=1 tells the live suites they are inside the gate, where a missing
+  // migration/function/seed row fails the file instead of skipping it (tests/helpers/require-db-object.ts).
   const child = spawn(argv[0], argv.slice(1), {
     stdio: 'inherit',
-    env: { ...process.env, FONBRIDGE_GATE_LOCK_HELD: '1', ...(e2ePort !== undefined ? { E2E_PORT: String(e2ePort) } : {}) },
+    env: {
+      ...process.env,
+      FONBRIDGE_GATE_LOCK_HELD: '1',
+      ...(IS_GATE ? { FONBRIDGE_GATE_RUN: '1' } : {}),
+      ...(e2ePort !== undefined ? { E2E_PORT: String(e2ePort) } : {}),
+    },
     shell: process.platform === 'win32',
   })
   for (const sig of ['SIGINT', 'SIGTERM']) {
     process.on(sig, () => child.kill(sig))
   }
   child.on('exit', (code, signal) => {
-    const exitCode = signal ? 1 : (code ?? 1)
+    // NG-331: alt sürecin GERÇEK çıkış kodu yayılır. Sinyalle ölümde kabuk konvansiyonu 128+n (SIGKILL → 137).
+    // Eskiden her sinyal 1'e indirilirdi; kod hiçbir zaman sabit 0 olmaz, ama sinyal kanıtı kaybolurdu.
+    const exitCode = signal ? 128 + (os.constants.signals[signal] ?? 1) : (code ?? 1)
     if (!nested) recordRun(Date.now() - runStart, exitCode === 0)
     // Yalnız temiz ve koşu boyunca değişmemiş tree'nin yeşili kayda girer.
     if (isGate && exitCode === 0 && tree0 && cleanTree() && treeHash() === tree0) {

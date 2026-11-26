@@ -2,6 +2,10 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { evaluateGate, GateOpportunityNotFoundError } from '../src/lib/gates/evaluate';
 import { prisma } from '../src/lib/db';
 import { clearStoredG0, computeG0FromSnapshot } from '../src/lib/scoring/g0-compute';
+import { DEFAULT_GATE_RULES } from '../src/lib/scoring/defaults';
+import { setLetterOfIntentRule, withLetterOfIntentRule } from './helpers/gate-rules';
+import { loadG1ConsortiumInputs } from '../src/lib/gates/g1-consortium';
+import type { TenantTx } from '../src/lib/db';
 
 /**
  * G0 gate fixtures.
@@ -101,6 +105,7 @@ const OPPORTUNITIES: Record<string, Record<string, unknown>> = {
  * fixture breaks exactly one thing about it, so a failure names the condition that caught it.
  */
 const SEATED = 'org-seated';
+const LOI_DATE = new Date('2026-11-01T00:00:00.000Z');
 /**
  * A G0 decision per G1 fixture: the fixtures below measure the seat conditions, so all of them have
  * passed G0. The `opp-g1-g0-*` ones and `opp-g1-no-g0` break this condition instead.
@@ -130,6 +135,11 @@ const G0_DECISIONS: G0DecisionRow[] = [
     'opp-g1-consortium-backup',
     'opp-g1-optional-open',
     'opp-g1-two-faults',
+    'opp-g1-no-loi',
+    'opp-g1-no-stage',
+    'opp-g1-loi-no-date',
+    'opp-g1-loi-moved-back',
+    'opp-g1-partner-loi',
   ].map((id) => g0Row(id, true)),
   g0Row('opp-g1-g0-failed', false),
   g0Row('opp-g1-g0-pass-then-fail', true, 1),
@@ -146,6 +156,9 @@ const seatRow = (id: string, over: Record<string, unknown> = {}) => ({
   status: 'CONFIRMED',
   organizationId: `${SEATED}-${id}`,
   partnerOrgId: null,
+  // NG-364: a seated member with its letter of intent on file; the G1_NO_LOI fixtures take it away.
+  memberStage: 'CONFIRMED',
+  loiReceivedAt: LOI_DATE,
   ...over,
 });
 const g1Opportunity = (id: string, seats: unknown[], intendedRole = 'partner') => ({
@@ -180,7 +193,7 @@ Object.assign(OPPORTUNITIES, {
   'opp-g1-no-seats': g1Opportunity('opp-g1-no-seats', [], 'coordinator'),
   'opp-g1-no-required': g1Opportunity('opp-g1-no-required', [seatRow('s-optional-only', { required: false })]),
   'opp-g1-open': g1Opportunity('opp-g1-open', [seatRow('s-open', { status: 'OPEN', organizationId: null })]),
-  'opp-g1-invited': g1Opportunity('opp-g1-invited', [seatRow('s-invited', { status: 'INVITED' })]),
+  'opp-g1-invited': g1Opportunity('opp-g1-invited', [seatRow('s-invited', { status: 'INVITED', memberStage: 'LOI' })]),
   'opp-g1-nobody': g1Opportunity('opp-g1-nobody', [seatRow('s-nobody', { organizationId: null })]),
   'opp-g1-no-backup': g1Opportunity('opp-g1-no-backup', [seatRow('s-no-backup')]),
   'opp-g1-only-occupant': g1Opportunity('opp-g1-only-occupant', [seatRow('s-only-occupant')]),
@@ -191,6 +204,17 @@ Object.assign(OPPORTUNITIES, {
   'opp-g1-optional-open': g1Opportunity('opp-g1-optional-open', [
     seatRow('s-research'),
     seatRow('s-optional-open', { required: false, status: 'OPEN', organizationId: null }),
+  ]),
+  // NG-364: letters of intent (spec §12 G1, NG-20 F11). Each is a filled research seat with a
+  // backup; only the letter is broken.
+  'opp-g1-no-loi': g1Opportunity('opp-g1-no-loi', [seatRow('s-no-loi', { memberStage: 'MET', loiReceivedAt: null })]),
+  // A seat from before the migration: no stage, no letter.
+  'opp-g1-no-stage': g1Opportunity('opp-g1-no-stage', [seatRow('s-no-stage', { memberStage: null, loiReceivedAt: null })]),
+  'opp-g1-loi-no-date': g1Opportunity('opp-g1-loi-no-date', [seatRow('s-loi-no-date', { memberStage: 'LOI', loiReceivedAt: null })]),
+  // The letter's date is kept when the stage goes back below LOI, but it no longer counts.
+  'opp-g1-loi-moved-back': g1Opportunity('opp-g1-loi-moved-back', [seatRow('s-loi-moved-back', { memberStage: 'MET' })]),
+  'opp-g1-partner-loi': g1Opportunity('opp-g1-partner-loi', [
+    seatRow('s-partner-loi', { organizationId: null, partnerOrgId: 'partner-seated', memberStage: 'LOI' }),
   ]),
   'opp-g1-two-faults': g1Opportunity('opp-g1-two-faults', [
     seatRow('s-open', { status: 'OPEN', organizationId: null }),
@@ -218,6 +242,13 @@ const SEAT_CANDIDATES = [
   { tenantId: 'tenant-1', seatId: 's-legacy-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: LEGACY_MATCH_BREAKDOWN },
   { tenantId: 'tenant-1', seatId: 's-consortium-backup', organizationId: `${SEATED}-s-consortium-backup`, partnerOrgId: null, breakdown: MATCH_BREAKDOWN },
   { tenantId: 'tenant-1', seatId: 's-consortium-backup', organizationId: 'org-backup', partnerOrgId: null, breakdown: CONSORTIUM_BREAKDOWN },
+  ...['s-no-loi', 's-no-stage', 's-loi-no-date', 's-loi-moved-back', 's-partner-loi'].map((seatId) => ({
+    tenantId: 'tenant-1',
+    seatId,
+    organizationId: 'org-backup',
+    partnerOrgId: null,
+    breakdown: MATCH_BREAKDOWN,
+  })),
 ];
 
 const TENANTS: Record<string, { country: string | null; pic: string | null; settings: unknown }> = {
@@ -576,6 +607,8 @@ describe('Gate Evaluation Engine — G3 evaluation scores', () => {
 });
 
 describe('G1 gate: G0 has to be passed first (NG-26)', () => {
+  // Ships off (NG-364, owner decision 25.11.2026); these expectations are for the rule switched on.
+  withLetterOfIntentRule(true);
   beforeEach(() => vi.clearAllMocks());
 
   test('no G0 decision: refused, filed, the stage stays, and the other faults are still reported', async () => {
@@ -624,6 +657,8 @@ describe('G1 gate: G0 has to be passed first (NG-26)', () => {
 });
 
 describe('G1 gate: critical roles and their backups', () => {
+  // Ships off (NG-364, owner decision 25.11.2026); these expectations are for the rule switched on.
+  withLetterOfIntentRule(true);
   beforeEach(() => vi.clearAllMocks());
 
   const filed = () =>
@@ -703,6 +738,110 @@ describe('G1 gate: critical roles and their backups', () => {
   test('the other gates never read candidates', async () => {
     await evaluateGate('opp-pass', 'G2', 'tenant-1');
     expect(prisma.seatCandidate.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('G1 gate: a letter of intent from every critical member (NG-364, spec §12)', () => {
+  // Ships off (NG-364, owner decision 25.11.2026); these expectations are for the rule switched on.
+  withLetterOfIntentRule(true);
+  beforeEach(() => vi.clearAllMocks());
+
+  type Filed = { passed: boolean; ruleVersion: string; inputs: Record<string, unknown> };
+  const filed = () =>
+    (prisma.gateDecision.create as unknown as { mock: { calls: [{ data: Filed }][] } }).mock.calls[0]![0].data;
+
+  test.each([
+    ['opp-g1-no-loi', 'stage MET, no letter'],
+    ['opp-g1-no-stage', 'a seat from before the migration'],
+    ['opp-g1-loi-no-date', 'stage LOI but no date'],
+    ['opp-g1-loi-moved-back', 'a letter on file but the stage moved back to MET'],
+  ])('%s (%s) is refused with G1_NO_LOI, filed, and the stage stays', async (id) => {
+    const result = await evaluateGate(id, 'G1', 'tenant-1');
+
+    expect(result).toEqual({
+      passed: false,
+      reasons: ['Critical role research has no letter of intent on file'],
+      reasonDetails: [{ code: 'G1_NO_LOI', values: { role: 'research' } }],
+    });
+    expect(filed()).toMatchObject({ passed: false, inputs: { criticalRolesWithoutLoi: ['research'] } });
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('a tenant-private partner with its letter passes', async () => {
+    expect(await evaluateGate('opp-g1-partner-loi', 'G1', 'tenant-1')).toEqual({ passed: true, reasons: [] });
+  });
+
+  test('every critical member with a letter: passes, files an empty list and rule version 1.1', async () => {
+    expect((await evaluateGate('opp-g1-ready', 'G1', 'tenant-1')).passed).toBe(true);
+    expect(filed()).toMatchObject({ ruleVersion: '1.1', inputs: { criticalRolesWithoutLoi: [] } });
+  });
+
+  test('a seat that names nobody is refused once, as not filled, not again for its letter', async () => {
+    const result = await evaluateGate('opp-g1-open', 'G1', 'tenant-1');
+    expect(result.reasonDetails).toEqual([{ code: 'G1_SEAT_NOT_FILLED', values: { role: 'research', status: 'OPEN' } }]);
+    expect(filed().inputs).toMatchObject({ criticalRolesWithoutLoi: [] });
+  });
+
+  test('the other gates keep rule version 1.0', async () => {
+    await evaluateGate('opp-pass', 'G2', 'tenant-1');
+    expect(filed().ruleVersion).toBe('1.0');
+  });
+});
+
+describe('G1 gate: the letter-of-intent rule ships off (NG-364, owner decision 25.11.2026)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // Seats from before the migration carry no member stage, so a rule that started on would stop every
+  // opportunity with a critical role at G1 until the NG-20 Phase 2 screen lets people enter letters.
+  test('the shipped default does not require a letter', () => {
+    expect(DEFAULT_GATE_RULES.G1.requireLetterOfIntentForCriticalSeats).toBe(false);
+  });
+
+  const filedInputs = () =>
+    (prisma.gateDecision.create as unknown as { mock: { calls: [{ data: { inputs: Record<string, unknown> } }][] } }).mock
+      .calls[0]![0].data.inputs;
+
+  test.each(['opp-g1-no-loi', 'opp-g1-no-stage'])('%s: no letter on a critical seat passes G1 with the shipped default', async (id) => {
+    expect(await evaluateGate(id, 'G1', 'tenant-1')).toEqual({ passed: true, reasons: [] });
+    expect(prisma.opportunity.updateMany).toHaveBeenCalled();
+    // NG-368 (Ö-3): with the rule off the decision does not record the letters it did not check.
+    expect(filedInputs()).not.toHaveProperty('criticalRolesWithoutLoi');
+  });
+
+  test.each(['opp-g1-no-loi', 'opp-g1-no-stage'])('%s: the same seat is refused with G1_NO_LOI once the rule is on', async (id) => {
+    const restore = setLetterOfIntentRule(true);
+    try {
+      expect(await evaluateGate(id, 'G1', 'tenant-1')).toEqual({
+        passed: false,
+        reasons: ['Critical role research has no letter of intent on file'],
+        reasonDetails: [{ code: 'G1_NO_LOI', values: { role: 'research' } }],
+      });
+      expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  // The screen reads the same switch, so it shows a missing letter without calling it a blocker.
+  test('the consortium screen input says whether the letter is required', async () => {
+    const seat = { id: 's-1', roleKey: 'research', required: true, status: 'CONFIRMED', organizationId: 'org-1', partnerOrgId: null,
+      memberStage: null, memberStageAt: null, loiReceivedAt: null, loiDocumentUrl: null };
+    const tx = {
+      opportunity: { findFirst: async () => ({ id: 'opp-1' }) },
+      consortiumSeat: { findMany: async () => [seat] },
+      seatCandidate: { findMany: async () => [] },
+    } as unknown as TenantTx;
+
+    expect(await loadG1ConsortiumInputs(tx, 'tenant-1', 'opp-1')).toMatchObject({
+      criticalRolesWithoutLoi: ['research'],
+      letterOfIntentRequired: false,
+    });
+    const restore = setLetterOfIntentRule(true);
+    try {
+      expect(await loadG1ConsortiumInputs(tx, 'tenant-1', 'opp-1')).toMatchObject({ letterOfIntentRequired: true });
+    } finally {
+      restore();
+    }
   });
 });
 

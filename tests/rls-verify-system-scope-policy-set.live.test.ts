@@ -6,7 +6,7 @@ import pg from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { envValue } from './helpers/dotenv';
 import { isGithubActions, isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
-import { EXPERT_DIRECTORY_POLICY_LOCK, withTestDbLock } from './helpers/test-db-lock';
+import { EXPERT_DIRECTORY_POLICY_LOCK, holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK, withTestDbLock } from './helpers/test-db-lock';
 
 /**
  * NG-183 (NG-175 review Düşük-1) — on a system_scope table (system_scope policy, no tenant
@@ -42,7 +42,7 @@ const RLS_URL = envValue('DATABASE_URL_RLS_TEST');
 const RUN = randomBytes(4).toString('hex');
 const STRAY = `ng183_stray_${RUN}`;
 const STRAY_TENANT = `ng183_tenant_${RUN}`;
-const SYSTEM_SCOPE_TABLES = ['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead'];
+const SYSTEM_SCOPE_TABLES = ['CookieConsentRecord', 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead'];
 /**
  * No exception since NG-188: NG-52's expert_directory policy on ExpertPreRegistration was
  * replaced by the view "ExpertDirectoryEntry", so every system_scope table is {system_scope}.
@@ -138,7 +138,11 @@ async function dropStrays(): Promise<void> {
 }
 
 describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scope}', () => {
+  // NG-346: this file's DO block takes ACCESS EXCLUSIVE on PublicLead / ProvinceLeadRoute; hold the
+  // PublicLead DDL lock for the whole file so no province or stuck-lead test reads them meanwhile.
+  let releasePublicLeadLock: (() => Promise<void>) | undefined;
   beforeAll(async () => {
+    releasePublicLeadLock = await holdTestDbLock(OWNER_URL!, PUBLIC_LEAD_TABLE_LOCK);
     // Precondition, so a red below is this suite's mutation and not a dirty database.
     const sets = await policySets();
     for (const t of SYSTEM_SCOPE_TABLES) if (sets[t]) expect(sets[t], t).toEqual(expectedSet(t));
@@ -147,6 +151,7 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
   afterAll(async () => {
     await dropStrays().catch(() => {});
     await admin.end();
+    await releasePublicLeadLock?.();
   });
 
   it('rls:verify --require-db exits 1 on a stray SELECT-only policy on PublicLead', async () => {

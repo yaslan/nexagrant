@@ -36,6 +36,18 @@ db_target() {
   fi
 }
 
+# Exit 0 when the query part can replace the database name db_target prints:
+# libpq reads ?dbname= (and a ?service= entry may set dbname) over the path.
+# Fail closed like db_is_local: a % in the query may hide a key (?db%6eame=).
+db_name_overridable() {
+  _lc=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  case "$_lc" in
+    *[?\&]dbname=*|*[?\&]service=*) return 0 ;;
+    *\?*%*) return 0 ;;
+  esac
+  return 1
+}
+
 # Exit 0 only for a single localhost host with no host-overriding query parameter.
 # Fail closed: any % in the query may hide a key (?h%6fst=), and a comma in the
 # host means a multi-host list (libpq tries the next host when localhost is down).

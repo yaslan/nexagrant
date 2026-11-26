@@ -604,6 +604,9 @@ const EXPERT_TABLE = 'ExpertPreRegistration';
 /** NG-175: the smallest row the readiness contact form writes (src/lib/leads/public-lead.ts). */
 const PUBLIC_LEAD_INSERT = `insert into ${quoteIdent('PublicLead')} (id, name, email, organisation, "consentVersion", "consentAt", source, locale)
        values ($1, 'probe', $1 || '@rls-verify.invalid', 'probe', 'probe', now(), 'fon-hazirlik', 'tr')`;
+/** NG-9: the smallest row the cookie banner writes (src/lib/cookie-consent-record.ts). */
+const COOKIE_CONSENT_INSERT = `insert into ${quoteIdent('CookieConsentRecord')} (id, "visitorId", choice, analytics, marketing, "policyVersion", locale)
+       values ($1, 'rls-verify-probe', 'reject_all', false, false, 'probe', 'tr')`;
 
 /**
  * FO-45 (TASK-MVC6CTSCLO6LI): ExpertPreRegistration is personal data with no tenant,
@@ -661,6 +664,12 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
     table: 'ExpertPreRegAttempt',
     migration: 'add-expert-pre-reg-attempt.sql',
     insert: (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]],
+  },
+  {
+    // NG-9: the cookie banner's consent record (anonymous visitor id).
+    table: 'CookieConsentRecord',
+    migration: 'add-cookie-consent-record.sql',
+    insert: (id) => [COOKIE_CONSENT_INSERT, [id]],
   },
   {
     // NG-167: province -> consultancy map; closed to public-intake (NG-175 D-1).
@@ -915,7 +924,7 @@ async function probeSystemScopeTable(
  * connections (pg_export_snapshot), so concurrent writers cannot skew a count.
  * Everything is rolled back.
  */
-const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'PublicLead']);
+const PUBLIC_INTAKE_TABLES = new Set([EXPERT_TABLE, 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'PublicLead', 'CookieConsentRecord']);
 
 /**
  * FO-98: one write per PUBLIC_INTAKE_TABLES table, the smallest the form itself
@@ -937,6 +946,8 @@ const PUBLIC_INTAKE_PROBES = new Map<string, (id: string) => [sql: string, param
     ],
   ],
   ['ExpertPreRegAttempt', (id) => [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, [id]]],
+  // NG-9: the cookie banner (src/lib/cookie-consent-record.ts recordCookieConsent).
+  ['CookieConsentRecord', (id) => [COOKIE_CONSENT_INSERT, [id]]],
   // One-row counter (CHECK id = 1), written by the app with this same upsert
   // (src/lib/expert-prereg/server/founder-counter.ts). Empty table: the INSERT
   // path meets WITH CHECK. Seeded row: the UPDATE path meets USING, and RLS
@@ -968,6 +979,7 @@ const PURPOSE_NARROWED = new Map<string, ReadonlySet<string>>([
   [EXPERT_TABLE, EXPERT_DATA_PURPOSES],
   ['ExpertPreRegAttempt', EXPERT_DATA_PURPOSES],
   ['PublicLead', new Set(['public-intake', 'platform-admin', 'cross-tenant-job'])],
+  ['CookieConsentRecord', new Set(['public-intake', 'platform-admin', 'cross-tenant-job'])],
   ['ProvinceLeadRoute', new Set(['platform-admin', 'cross-tenant-job'])],
 ]);
 

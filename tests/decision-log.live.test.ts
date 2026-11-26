@@ -13,7 +13,10 @@ import { presentIds, requireId } from './helpers/teardown-guard';
  *  - another tenant can neither withdraw, read the log nor attach a row to the opportunity
  *    (RLS for the rows, the composite foreign key for a row naming the other tenant's
  *    opportunity with its own tenantId);
- *  - a project idea is written and read back, tenant-scoped.
+ *  - a project idea is written and read back, tenant-scoped;
+ *  - NG-241: a withdrawn opportunity is reactivated, with a reason, back to the status it was
+ *    withdrawn from; only WITHDRAWN, never another tenant's, never by a role that may not decide
+ *    on it. The server actions are called too, with `auth` mocked, for the refusal codes.
  *
  * `.live`: needs the docker-compose Postgres, `pnpm db:setup` and `pnpm db:rls-role`.
  */
@@ -24,6 +27,11 @@ const ADMIN_URL = envValue('DATABASE_URL');
 const RUN = `ng38-${Date.now().toString(36)}`;
 
 const state = vi.hoisted(() => ({ rls: undefined as PrismaClient | undefined }));
+const session = vi.hoisted(() => ({ tenantId: '', userId: '', role: 'TENANT_OWNER' }));
+vi.mock('@/lib/auth', () => ({
+  auth: async () => ({ user: { id: session.userId }, tenantId: session.tenantId, role: session.role }),
+}));
+vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));
 
 vi.mock('@/lib/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/db')>();
@@ -37,8 +45,9 @@ vi.mock('@/lib/db', async (importOriginal) => {
 const { createDbClient, withTenantOn } = await import('@/lib/db');
 const withdrawal = await import('@/lib/k5-pipeline/withdrawal');
 const ideas = await import('@/lib/project-ideas/records');
+const actions = await import('@/app/[locale]/(app)/[workspace]/pipeline/actions');
 
-type Scope = { tenantId: string; userId: string };
+type Scope = { tenantId: string; userId: string; role: string };
 type Fixture = Scope & { workspaceId: string; opportunityId: string };
 
 let admin: PrismaClient | undefined;
@@ -66,12 +75,22 @@ async function makeFixture(key: string): Promise<Fixture> {
     data: { tenantId: tenant.id, workspaceId: workspace.id, title: `${RUN} ${key}` },
     select: { id: true },
   });
-  return { tenantId: tenant.id, userId: user.id, workspaceId: workspace.id, opportunityId: opportunity.id };
+  return {
+    tenantId: tenant.id,
+    userId: user.id,
+    role: 'TENANT_OWNER',
+    workspaceId: workspace.id,
+    opportunityId: opportunity.id,
+  };
 }
 
-async function newOpportunity(f: Fixture, status: 'ACTIVE' | 'FUNDED' = 'ACTIVE') {
+async function newOpportunity(
+  f: Fixture,
+  status: 'ACTIVE' | 'SUBMITTED' | 'FUNDED' | 'WITHDRAWN' = 'ACTIVE',
+  ownerId: string | null = null,
+) {
   const opp = await admin!.opportunity.create({
-    data: { tenantId: f.tenantId, workspaceId: f.workspaceId, title: `${RUN} extra`, status },
+    data: { tenantId: f.tenantId, workspaceId: f.workspaceId, title: `${RUN} extra`, status, ownerId },
     select: { id: true },
   });
   return opp.id;
@@ -200,6 +219,414 @@ describe('withdrawal', () => {
   });
 });
 
+/** A MEMBER of tenant a, who may decide only on opportunities they own (canArchiveOpportunity). */
+async function memberOf(f: Fixture, key: string): Promise<Scope> {
+  const user = await admin!.user.create({ data: { email: `${RUN}-${key}@example.com`, name: key } });
+  users.push(user.id);
+  await admin!.membership.create({ data: { tenantId: f.tenantId, userId: user.id, role: 'MEMBER' } });
+  return { tenantId: f.tenantId, userId: user.id, role: 'MEMBER' };
+}
+
+async function statusOf(id: string) {
+  return (await admin!.opportunity.findUniqueOrThrow({ where: { id }, select: { status: true } })).status;
+}
+
+async function decisionCount(id: string) {
+  return admin!.decisionLog.count({ where: { opportunityId: id } });
+}
+
+describe('reactivation (NG-241)', () => {
+  const reactivate = (s: Scope, opportunityId: string, reason: string) =>
+    withdrawal.reactivateOpportunity({ ...s, opportunityId, reason });
+
+  test('without a reason it is refused and nothing is written', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a);
+    await withdrawal.withdrawOpportunity(a, opp, { reason: 'Bütçe yok' });
+    for (const reason of ['', '   ', 'a'.repeat(2001), undefined]) {
+      expect(await reactivate(a, opp, reason as never)).toEqual({ refused: 'REASON_REQUIRED' });
+    }
+    expect(await statusOf(opp)).toBe('WITHDRAWN');
+    expect(await decisionCount(opp)).toBe(1);
+  });
+
+  test('with a reason: back to ACTIVE, a REACTIVATE row, two decisions read back in order', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a);
+    await withdrawal.withdrawOpportunity(a, opp, { reason: 'Ortak bulunamadı' });
+
+    const result = await reactivate(a, opp, '  Ortak bulundu  ');
+    expect(result).toMatchObject({
+      status: 'ACTIVE',
+      decision: {
+        opportunityId: opp,
+        kind: 'REACTIVATE',
+        reason: 'Ortak bulundu',
+        decidedById: a.userId,
+        fromStatus: 'WITHDRAWN',
+        toStatus: 'ACTIVE',
+      },
+    });
+    expect(await statusOf(opp)).toBe('ACTIVE');
+
+    const log = await withdrawal.listDecisions(a, opp);
+    expect(log?.map((d) => [d.kind, d.fromStatus, d.toStatus])).toEqual([
+      ['WITHDRAW', 'ACTIVE', 'WITHDRAWN'],
+      ['REACTIVATE', 'WITHDRAWN', 'ACTIVE'],
+    ]);
+
+    // The audit row names the act and the statuses, not the reason.
+    const audit = await admin!.auditEvent.findMany({ where: { tenantId: a.tenantId, type: 'opportunity.reactivated', target: opp } });
+    expect(audit).toHaveLength(1);
+    expect(audit[0]?.data).toMatchObject({ from: 'WITHDRAWN', to: 'ACTIVE' });
+    expect(JSON.stringify(audit[0])).not.toContain('Ortak bulundu');
+  });
+
+  test('a submitted opportunity comes back as SUBMITTED', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a, 'SUBMITTED');
+    await withdrawal.withdrawOpportunity(a, opp, { reason: 'Portalda geri çektik' });
+    expect(await reactivate(a, opp, 'Yeniden gönderdik')).toMatchObject({ status: 'SUBMITTED' });
+    expect(await statusOf(opp)).toBe('SUBMITTED');
+  });
+
+  test('withdraw → reactivate twice: each return follows the latest withdrawal', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a, 'SUBMITTED');
+    await withdrawal.withdrawOpportunity(a, opp, { reason: '1' });
+    expect(await reactivate(a, opp, '2')).toMatchObject({ status: 'SUBMITTED' });
+    await admin!.opportunity.update({ where: { id: opp }, data: { status: 'ACTIVE' } });
+    await withdrawal.withdrawOpportunity(a, opp, { reason: '3' });
+    expect(await reactivate(a, opp, '4')).toMatchObject({ status: 'ACTIVE' });
+    expect((await withdrawal.listDecisions(a, opp))?.map((d) => d.kind)).toEqual([
+      'WITHDRAW',
+      'REACTIVATE',
+      'WITHDRAW',
+      'REACTIVATE',
+    ]);
+  });
+
+  test('only a withdrawn opportunity is reactivated', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    for (const status of ['ACTIVE', 'SUBMITTED', 'FUNDED'] as const) {
+      const opp = await newOpportunity(a, status);
+      expect(await reactivate(a, opp, 'neden')).toEqual({ refused: 'NOT_WITHDRAWN' });
+      expect(await statusOf(opp)).toBe(status);
+      expect(await decisionCount(opp)).toBe(0);
+    }
+  });
+
+  test('a withdrawal with no recorded status (before NG-241) returns to ACTIVE', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const legacy = await newOpportunity(a, 'WITHDRAWN');
+    await admin!.decisionLog.create({
+      data: { tenantId: a.tenantId, opportunityId: legacy, kind: 'WITHDRAW', reason: 'eski kayıt' },
+    });
+    expect(await reactivate(a, legacy, 'geri')).toMatchObject({ status: 'ACTIVE' });
+    const bare = await newOpportunity(a, 'WITHDRAWN');
+    expect(await reactivate(a, bare, 'geri')).toMatchObject({ status: 'ACTIVE' });
+  });
+
+  test('of two concurrent reactivations one wins and one row is written', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a);
+    await withdrawal.withdrawOpportunity(a, opp, { reason: 'x' });
+    const results = await Promise.all([reactivate(a, opp, 'bir'), reactivate(a, opp, 'iki')]);
+    expect(results.filter((r) => 'decision' in r)).toHaveLength(1);
+    expect(results.filter((r) => 'refused' in r)).toEqual([{ refused: 'NOT_WITHDRAWN' }]);
+    expect(await admin!.decisionLog.count({ where: { opportunityId: opp, kind: 'REACTIVATE' } })).toBe(1);
+  });
+
+  test('another tenant cannot reactivate', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a);
+    await withdrawal.withdrawOpportunity(a, opp, { reason: 'x' });
+    expect(await reactivate(b, opp, 'başkasının')).toEqual({ refused: 'NOT_FOUND' });
+    expect(await statusOf(opp)).toBe('WITHDRAWN');
+    expect(await decisionCount(opp)).toBe(1);
+  });
+
+  test('a MEMBER may neither withdraw nor reactivate an opportunity they do not own', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const member = await memberOf(a, 'member-1');
+    const theirs = await newOpportunity(a, 'ACTIVE', a.userId);
+    expect(await withdrawal.withdrawOpportunity(member, theirs, { reason: 'benim değil' })).toEqual({ refused: 'FORBIDDEN' });
+    expect(await statusOf(theirs)).toBe('ACTIVE');
+    await withdrawal.withdrawOpportunity(a, theirs, { reason: 'sahibi vazgeçti' });
+    expect(await reactivate(member, theirs, 'benim değil')).toEqual({ refused: 'FORBIDDEN' });
+    expect(await statusOf(theirs)).toBe('WITHDRAWN');
+    expect(await decisionCount(theirs)).toBe(1);
+
+    // An unowned opportunity is not "everybody's".
+    const unowned = await newOpportunity(a, 'WITHDRAWN', null);
+    expect(await reactivate(member, unowned, 'sahipsiz')).toEqual({ refused: 'FORBIDDEN' });
+  });
+
+  test('a MEMBER who owns the opportunity may withdraw and reactivate it', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const member = await memberOf(a, 'member-2');
+    const own = await newOpportunity(a, 'ACTIVE', member.userId);
+    expect(await withdrawal.withdrawOpportunity(member, own, { reason: 'vazgeçtim' })).toHaveProperty('decision');
+    expect(await reactivate(member, own, 'döndüm')).toMatchObject({ status: 'ACTIVE' });
+  });
+
+  // The `where` half of the role rule (ownedByScope): the owner changes after the write's read
+  // and before its conditional update. Another transaction holds the row with a new owner; the
+  // write reads the old (committed) owner, passes canArchiveOpportunity, then its update waits on
+  // the row lock. Once the owner change commits, the update re-checks its `where` against the new
+  // owner and moves nothing. Without the `where` half it would move the row for a non-owner.
+  test('an owner changed between the read and the write: neither withdrawal nor reactivation moves the row', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const member = await memberOf(a, 'member-4');
+
+    const withdrawable = await newOpportunity(a, 'ACTIVE', member.userId);
+    const withdrawn = await ownerChangedMidWrite(withdrawable, a.userId, () =>
+      withdrawal.withdrawOpportunity(member, withdrawable, { reason: 'benimdi' }),
+    );
+    // NG-282 (Ö-2): the real reason, read again after the update moved nothing — not ALREADY_WITHDRAWN.
+    expect(withdrawn).toEqual({ refused: 'FORBIDDEN' });
+    expect(await statusOf(withdrawable)).toBe('ACTIVE');
+    expect(await decisionCount(withdrawable)).toBe(0);
+
+    const reactivatable = await newOpportunity(a, 'WITHDRAWN', member.userId);
+    const reactivated = await ownerChangedMidWrite(reactivatable, a.userId, () =>
+      reactivate(member, reactivatable, 'benimdi'),
+    );
+    expect(reactivated).toEqual({ refused: 'FORBIDDEN' });
+    expect(await statusOf(reactivatable)).toBe('WITHDRAWN');
+    expect(await decisionCount(reactivatable)).toBe(0);
+  });
+});
+
+/**
+ * Runs `write` while another transaction holds the opportunity's row with `ownerId` changed, and
+ * commits that change only once `write`'s update is waiting on the row lock (seen in
+ * pg_stat_activity, so the order is fixed, not timed).
+ */
+function ownerChangedMidWrite<T>(opportunityId: string, newOwnerId: string, write: () => Promise<T>): Promise<T> {
+  return rowChangedMidWrite(
+    opportunityId,
+    async (tx) => {
+      await tx.opportunity.update({ where: { id: requireId(opportunityId, 'opp') }, data: { ownerId: newOwnerId } });
+    },
+    write,
+  );
+}
+
+type AdminTx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
+
+/**
+ * NG-282: the same handover for any change — another transaction makes `change` to the
+ * opportunity (holding its row) and commits only once `write`'s update waits on that row.
+ */
+async function rowChangedMidWrite<T>(
+  opportunityId: string,
+  change: (tx: AdminTx) => Promise<void>,
+  write: () => Promise<T>,
+): Promise<T> {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let held!: () => void;
+  const lockHeld = new Promise<void>((resolve) => (held = resolve));
+  const handover = admin!.$transaction(
+    async (tx) => {
+      await change(tx);
+      held();
+      await released;
+    },
+    { timeout: 20_000 },
+  );
+  try {
+    await lockHeld;
+    const pending = write();
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const waiting = await admin!.$queryRaw<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock'
+          AND query ILIKE 'UPDATE%"Opportunity"%'`;
+      if ((waiting[0]?.n ?? 0) > 0) break;
+      if (Date.now() > deadline) throw new Error('the write never waited on the row lock');
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    release();
+    await handover;
+    return await pending;
+  } finally {
+    release();
+    await handover.catch(() => undefined);
+  }
+}
+
+describe('withdraw / reactivate server actions (NG-241, inceleme Ö-1)', () => {
+  const as = (s: Scope) => {
+    session.tenantId = s.tenantId;
+    session.userId = s.userId;
+    session.role = s.role;
+  };
+
+  test('the owner reactivates through the action; the status comes back', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a, 'SUBMITTED');
+    as(a);
+    expect(await actions.withdrawOpportunityAction({ opportunityId: opp, reason: 'vazgeç' })).toEqual({ success: true });
+    expect(await actions.reactivateOpportunityAction({ opportunityId: opp, reason: 'dön' })).toEqual({
+      success: true,
+      status: 'SUBMITTED',
+    });
+    expect(await actions.reactivateOpportunityAction({ opportunityId: opp, reason: 'yine' })).toEqual({
+      success: false,
+      error: 'NOT_WITHDRAWN',
+    });
+  });
+
+  test('reason refusals: blank → REASON_REQUIRED, over 2000 → REASON_TOO_LONG', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a, 'WITHDRAWN');
+    as(a);
+    expect(await actions.reactivateOpportunityAction({ opportunityId: opp, reason: '   ' })).toEqual({
+      success: false,
+      error: 'REASON_REQUIRED',
+    });
+    expect(await actions.reactivateOpportunityAction({ opportunityId: opp, reason: 'a'.repeat(2001) })).toEqual({
+      success: false,
+      error: 'REASON_TOO_LONG',
+    });
+    expect(await actions.reactivateOpportunityAction({ opportunityId: '', reason: 'x' })).toEqual({
+      success: false,
+      error: 'INVALID_INPUT',
+    });
+    expect(await statusOf(opp)).toBe('WITHDRAWN');
+  });
+
+  test('a MEMBER who does not own it: WITHDRAW_FORBIDDEN and REACTIVATE_FORBIDDEN', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const member = await memberOf(a, 'member-3');
+    const active = await newOpportunity(a, 'ACTIVE', a.userId);
+    const withdrawn = await newOpportunity(a, 'WITHDRAWN', a.userId);
+    as(member);
+    expect(await actions.withdrawOpportunityAction({ opportunityId: active, reason: 'x' })).toEqual({
+      success: false,
+      error: 'WITHDRAW_FORBIDDEN',
+    });
+    expect(await actions.reactivateOpportunityAction({ opportunityId: withdrawn, reason: 'x' })).toEqual({
+      success: false,
+      error: 'REACTIVATE_FORBIDDEN',
+    });
+    expect(await statusOf(active)).toBe('ACTIVE');
+    expect(await statusOf(withdrawn)).toBe('WITHDRAWN');
+    expect(await decisionCount(active)).toBe(0);
+    expect(await decisionCount(withdrawn)).toBe(0);
+  });
+
+  test("another tenant's id answers OPPORTUNITY_NOT_FOUND", async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const withdrawn = await newOpportunity(a, 'WITHDRAWN');
+    as(b);
+    expect(await actions.reactivateOpportunityAction({ opportunityId: withdrawn, reason: 'x' })).toEqual({
+      success: false,
+      error: 'OPPORTUNITY_NOT_FOUND',
+    });
+    expect(await statusOf(withdrawn)).toBe('WITHDRAWN');
+  });
+});
+
+describe('declaration and withdrawal racing (NG-282, NG-241 inceleme Ö-4 / Ö-2)', () => {
+  const as = (s: Scope) => {
+    session.tenantId = s.tenantId;
+    session.userId = s.userId;
+    session.role = s.role;
+  };
+  /** A withdrawal as withdrawOpportunity writes it: status and its decision row, one transaction. */
+  const withdrawIn = (opportunityId: string, decidedById: string) => async (tx: AdminTx) => {
+    await tx.opportunity.update({ where: { id: requireId(opportunityId, 'opp') }, data: { status: 'WITHDRAWN' } });
+    await tx.decisionLog.create({
+      data: {
+        tenantId: a.tenantId,
+        opportunityId,
+        kind: 'WITHDRAW',
+        reason: 'eşzamanlı vazgeçme',
+        fromStatus: 'ACTIVE',
+        toStatus: 'WITHDRAWN',
+        decidedById,
+      },
+    });
+  };
+  const lastDecision = (opportunityId: string) =>
+    admin!.decisionLog.findFirst({
+      where: { opportunityId: requireId(opportunityId, 'opp') },
+      orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+      select: { kind: true },
+    });
+  const declaredAudits = (opportunityId: string) =>
+    admin!.auditEvent.count({ where: { target: requireId(opportunityId, 'opp'), type: 'opportunity.application_declared' } });
+
+  test('"submitted" declared while a withdrawal commits: one winner, status and last decision agree', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a, 'ACTIVE');
+    as(a);
+
+    const result = await rowChangedMidWrite(opp, withdrawIn(opp, a.userId), () =>
+      actions.declareApplication({ opportunityId: opp, declaration: 'submitted' }),
+    );
+    const after = {
+      result,
+      status: await statusOf(opp),
+      lastDecision: (await lastDecision(opp))?.kind ?? null,
+      proposals: await admin!.proposal.count({ where: { opportunityId: opp } }),
+      declaredAudits: await declaredAudits(opp),
+    };
+    console.log(`[${SUITE}] declare vs withdraw:`, JSON.stringify(after));
+
+    // The withdrawal won; the declaration wrote nothing and says why.
+    expect(after).toEqual({
+      result: { success: false, error: 'WITHDRAWN' },
+      status: 'WITHDRAWN',
+      lastDecision: 'WITHDRAW',
+      proposals: 0,
+      declaredAudits: 0,
+    });
+
+    // And the reactivation the bug used to block (NOT_WITHDRAWN) works.
+    expect(await actions.reactivateOpportunityAction({ opportunityId: opp, reason: 'geri döndük' })).toEqual({
+      success: true,
+      status: 'ACTIVE',
+    });
+  });
+
+  test('a withdrawal while "submitted" commits: CONFLICT, not ALREADY_WITHDRAWN, and nothing written', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a, 'ACTIVE');
+
+    const result = await rowChangedMidWrite(
+      opp,
+      async (tx) => {
+        await tx.opportunity.update({ where: { id: requireId(opp, 'opp') }, data: { status: 'SUBMITTED' } });
+      },
+      () => withdrawal.withdrawOpportunity(a, opp, { reason: 'vazgeçtik' }),
+    );
+    console.log(`[${SUITE}] withdraw vs declare:`, JSON.stringify(result));
+    expect(result).toEqual({ refused: 'CONFLICT' });
+    expect(await statusOf(opp)).toBe('SUBMITTED');
+    expect(await decisionCount(opp)).toBe(0);
+  });
+
+  test('the action maps it: WITHDRAW_CONFLICT', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    const opp = await newOpportunity(a, 'ACTIVE');
+    as(a);
+    const result = await rowChangedMidWrite(
+      opp,
+      async (tx) => {
+        await tx.opportunity.update({ where: { id: requireId(opp, 'opp') }, data: { status: 'SUBMITTED' } });
+      },
+      () => actions.withdrawOpportunityAction({ opportunityId: opp, reason: 'vazgeçtik' }),
+    );
+    expect(result).toEqual({ success: false, error: 'WITHDRAW_CONFLICT' });
+    expect(await statusOf(opp)).toBe('SUBMITTED');
+  });
+});
+
 describe('project_idea', () => {
   let ideaId = '';
 
@@ -251,7 +678,7 @@ describe('deletion', () => {
     const extra = await admin!.user.create({ data: { email: `${RUN}-x@example.com`, name: 'x' } });
     users.push(extra.id);
     const opp = await newOpportunity(a);
-    await withdrawal.withdrawOpportunity({ tenantId: a.tenantId, userId: extra.id }, opp, { reason: 'silinecek kişi' });
+    await withdrawal.withdrawOpportunity({ tenantId: a.tenantId, userId: extra.id, role: 'TENANT_OWNER' }, opp, { reason: 'silinecek kişi' });
     await admin!.user.delete({ where: { id: extra.id } });
     const row = await admin!.decisionLog.findFirstOrThrow({ where: { opportunityId: opp } });
     expect(row.decidedById).toBeNull();
