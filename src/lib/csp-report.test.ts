@@ -90,6 +90,24 @@ describe('ReportLimiter', () => {
     expect(l.take(null, 1)).toBe(false);
   });
 
+  it('NG-367 Ö-1: a client over its own limit does not use up the global window', () => {
+    const l = new ReportLimiter(3, 10, 1000);
+    // One client hammers far past both limits.
+    const flood = Array.from({ length: 50 }, () => l.take('flood', 0));
+    expect(flood.filter(Boolean)).toHaveLength(3);
+    // Only its 3 admitted requests count: 7 other clients still get in, the 8th does not.
+    const others = Array.from({ length: 8 }, (_, i) => l.take(`other-${i}`, 1));
+    expect(others).toEqual([true, true, true, true, true, true, true, false]);
+  });
+
+  it('NG-367 Ö-1: a request refused by the global window still counts against its client', () => {
+    const l = new ReportLimiter(2, 1, 1000);
+    expect(l.take('a', 0)).toBe(true);
+    expect(l.take('a', 0)).toBe(false); // global full
+    expect(l.take('a', 0)).toBe(false); // client full too: 3 > 2
+    expect(l.take('a', 1000)).toBe(true); // next window
+  });
+
   it('defaults are the documented ones', () => {
     expect([PER_CLIENT_LIMIT, GLOBAL_LIMIT, WINDOW_MS, MAX_REPORT_BYTES]).toEqual([20, 300, 60_000, 8192]);
   });
