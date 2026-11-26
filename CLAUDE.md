@@ -54,6 +54,13 @@ docker rm -f <is>-pg                            # iş bitince
 Ana checkout "must be run in a work tree" veriyorsa `core.bare=true` olmuştur. Belirti, kontrol ve düzeltme için bkz. `docs/RELEASE_CHECKLIST.md` §9.1. `GIT_DIR` set iken başka dizinde `git init` ya da `git config` koşma.
 E2E postası: `playwright.config.ts` e2e sunucusuna `SMTP_HOST=localhost`, `SMTP_PORT=1025` verir (`E2E_SMTP`, `.env`'i ezer) ve posta kutusunu `http://localhost:8025`'ten okur. Bu portlarda bir mailpit gerekir: `docker compose up -d mailpit` (konteyner `fabrika-mailpit`; zaten ayaktaysa dokunma). Yoksa davet ve cooldown e2e'leri düşer. Posta linki `NEXT_PUBLIC_APP_URL`'den kurulur; config bunu e2e sunucusuna `BASE_URL` olarak verir (`.env`'siz worktree'de de). Log hangi ayarın eksik olduğunu söyler: `SMTP is not configured` ya da `NEXT_PUBLIC_APP_URL is not usable` (FO-131/FO-132). `.env`'de `SMTP_*` boş kalır (`.env.example` gibi): vitest `.env`'i okur, orada SMTP açmak no-SMTP canlı testini değiştirir. Mailpit paylaşımlıdır: iki e2e koşusu aynı anda çalışırsa postalar karışır.
 
+## Worktree, Docker ve log temizliği
+Patron kuralı (11.11, NG-132). Worktree'ler `git worktree add` ile ayrı klasörde açılır (`/Users/macbook/alan/FONBRIDGE-worktrees/<ad>`); birikmesi disk ve konteyner şişmesine yol açar.
+1. Görev bittiğinde ve PR merge edildiğinde ilgili worktree silinir: `git worktree remove --force <yol>`, ardından `git worktree prune`. Merge edilmemiş iş olan worktree'yi bu komutla silme.
+2. Görev için açılan Docker konteyner ve imajlar iş bitince kaldırılır: `docker compose down --rmi local`. `docker run` ile açılan izole DB'ler (yukarıdaki `<is>-pg`) için eşdeğeri: `docker rm -f <is>-pg` ve `docker rmi <imaj>`.
+3. Log dosyaları worktree klasörüne yazılmaz. Geçici loglar sistem geçici klasörüne (`$TMPDIR`) yazılır; rapor çıktıları `docs/agent-results/` altına gider.
+4. Aynı anda en fazla 5 worktree açık kalır. Yeni worktree açmadan önce `git worktree list` ile say; 5'i aşacaksa önce bitmiş olanları (merge edilmiş dal ya da temiz ağaç) temizle.
+
 ## Mimari kurallar (ihlal etme)
 1. **Çok kiracılılık:** Her iş tablosunda `tenantId` zorunlu; sorgular `withTenant(prisma, tenantId)` sarmalayıcısından geçer; RLS politikası olmayan tablo PR'ı geçmez.
 2. **Modül sistemi:** Her modül `src/modules/<mX>/manifest.ts` (`id, name, version, requires[], recommends[], planTiers[], addOnSku?, routes[], nav[], permissions[], tables[]`) ile kayıtlıdır. Modül kodu başka modülü doğrudan import etmez; `src/core/events` (olay veri yolu) ve `src/core/contracts` (tipli arayüzler) üzerinden konuşur.
