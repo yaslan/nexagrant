@@ -100,9 +100,9 @@ export type SetMemberStageResult =
 
 /**
  * Moves the member stage of one seat. Run inside `withTenant`; reads and writes carry the tenant
- * and the opportunity. The write is guarded on the status, members and stage it was planned from,
- * so an invite, confirmation or another stage move in between makes it write nothing
- * (`SEAT_CHANGED`) instead of overwriting it.
+ * and the opportunity. The write is guarded on the status, members, stage and letter it was
+ * planned from, so an invite, confirmation, another stage move or a letter edit in between makes
+ * it write nothing (`SEAT_CHANGED`) instead of overwriting it (NG-368).
  */
 export async function setMemberStage(
   tx: TenantTx,
@@ -141,6 +141,10 @@ export async function setMemberStage(
       organizationId: seat.organizationId,
       partnerOrgId: seat.partnerOrgId,
       memberStage: seat.memberStage,
+      // NG-368: the plan keeps the letter fields it read; without these a concurrent letter edit at
+      // the same stage (one request the URL, the other the date) would be overwritten with the old value.
+      loiReceivedAt: seat.loiReceivedAt,
+      loiDocumentUrl: seat.loiDocumentUrl,
     },
     data: plan.data,
   });
