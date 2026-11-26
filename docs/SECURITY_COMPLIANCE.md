@@ -162,7 +162,16 @@ Kalıcı imha **yalnızca** bu iştedir; hiçbir API yolu doğrudan hard-delete 
   ve `SystemAlert` (`error`, kiracı kimliği/dosya adı içermez) yazılır. `AuditEvent` satırları değişmez; silme
   sonucu ayrı bir olaydır. Satır `INFECTED` iken ama nesne hâlâ depodayken (silme başarısız ya da iş kesildi)
   indirme yolları kapalıdır (rota, presigned GET, ekran); iş kesildiyse bir sonraki çalıştırma `INFECTED`
-  satırını görüp silmeyi tamamlar ve `object_removed` olayını yazar. `object_unreadable` ayrı bir `error`
+  satırını görüp silmeyi tamamlar ve `object_removed` olayını yazar. Silme başarısız olduysa (`objectDeleted:false`)
+  iş orada bitmez (NG-279): `evidence-scan-sweep` her turda `INFECTED` olup nesne anahtarı duran ve son
+  `object_removed` olayı yok ya da `objectDeleted:false` olan satırları da bulur; bekleme dolmuşsa
+  (`EVIDENCE_OBJECT_REMOVAL_RETRY_WAITS_MS`: başarısızlıktan sonra 15 dk → 1 sa → 6 sa → 24 sa, sonra günde bir)
+  aynı `evidence-scan` işini kuyruğa koyar; iş satır kilidi altında kararı yeniden verir, silmeyi dener ve her
+  denemeyi **yeni** bir `object_removed` olayı olarak yazar (eski olay değişmez). Silme başarılı olunca satır kümeden
+  çıkar (son olay `objectDeleted:true`) ve bir kez `info` alarm yazılır. 5. başarısızlıkta tek bir `error` alarm
+  ilk başarısızlığın zamanını ve süresini yazar; sonraki denemeler alarm üretmez. Bu sürede satır `INFECTED`
+  kalır, indirme kapalıdır. Kiracı sınırı mevcut süpürmeyle aynı: kiracı başına `withTenant`, yeni RLS atlatması yok.
+  `object_unreadable` ayrı bir `error`
   alarmıyla bildirilir (ikinci savunma hattı). Testler yalnız
   EICAR test dizgisini kullanır (`tests/helpers/eicar.ts`). Sınırlar: imza veritabanı konteynerdeki freshclam ile
   güncellenir (güncelliği ayrıca izlenmiyor); 25 MB üst sınır clamd `StreamMaxLength` (100 MB) altında; CI'da gerçek
