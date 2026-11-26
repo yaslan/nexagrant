@@ -3,7 +3,7 @@
 import { useId, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { AgencyFunnel, FunnelCell, FunnelStep, FunnelView } from '@/lib/agency/funnel';
-import { TR_PROVINCES } from '@/lib/readiness/provinces';
+import { SMALL_CELL_THRESHOLD, shownRange } from '@/lib/agency/small-cell';
 
 const focusRing =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
@@ -27,9 +27,16 @@ function CellValue({ cell }: { cell: FunnelCell }) {
   }
   if (cell.state === 'small') {
     return (
-      <span className="font-heading text-3xl font-semibold text-ink-2" title={t('smallHint')}>
-        <span aria-hidden="true">&lt;5</span>
-        <span className="sr-only">{t('smallSr')}</span>
+      <span className="font-heading text-3xl font-semibold text-ink-2" title={t('smallHint', { threshold: SMALL_CELL_THRESHOLD })}>
+        <span aria-hidden="true">&lt;{SMALL_CELL_THRESHOLD}</span>
+        <span className="sr-only">{t('smallSr', { threshold: SMALL_CELL_THRESHOLD })}</span>
+      </span>
+    );
+  }
+  if (cell.state === 'withheld') {
+    return (
+      <span className="max-w-[16rem] text-xs font-medium text-ink-2" title={t('withheldHint')}>
+        {t('withheld')}
       </span>
     );
   }
@@ -52,27 +59,15 @@ export default function FunnelPanel({
   const path = locale === 'tr' ? `/${locale}/ajans` : `/${locale}/agency`;
   const { breakdown } = funnel;
 
-  /** The groups this response carries: the totals, then the one breakdown's rows. */
+  /** The groups this response carries: the totals, then the organisation types (the one breakdown offered). */
   const groups: { key: string; label: string; view: FunnelView }[] = [
-    {
-      key: 'ALL',
-      label:
-        breakdown.dimension === 'orgType'
-          ? t('allTypes')
-          : breakdown.dimension === 'province'
-            ? t('allProvinces')
-            : t('allOrganisations'),
-      view: funnel.all,
-    },
+    { key: 'ALL', label: breakdown.dimension === 'orgType' ? t('allTypes') : t('allOrganisations'), view: funnel.all },
   ];
-  if (breakdown.dimension === 'province') {
-    groups.push({ key: breakdown.province, label: breakdown.province, view: breakdown.view });
-  } else if (breakdown.dimension === 'orgType') {
+  if (breakdown.dimension === 'orgType') {
     for (const [ot, view] of Object.entries(breakdown.byOrgType)) groups.push({ key: ot, label: tType(ot), view });
   }
   const shown = groups.find((g) => g.key === group) ?? groups[0]!;
-  const selected =
-    breakdown.dimension === 'orgType' ? 'tur' : breakdown.dimension === 'province' ? breakdown.province : '';
+  const selected = breakdown.dimension === 'orgType' ? 'tur' : '';
 
   return (
     <section aria-labelledby="agency-funnel-title" className="space-y-4">
@@ -86,8 +81,8 @@ export default function FunnelPanel({
 
         <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
           {/*
-            TASK-MULZATEX4G92H — one breakdown at a time: a province (every
-            type) or the organisation types (every province), never both.
+            TASK-MULZATEX4G92H — one breakdown at a time. Since NG-339 (HUKUK-5 5e)
+            the only breakdown is the organisation type; no province view.
             Counted and masked on the server, so a GET form: a select that
             navigated on change would reload on each arrow key. Works
             without JavaScript.
@@ -107,13 +102,6 @@ export default function FunnelPanel({
               >
                 <option value="">{t('breakdownNone')}</option>
                 <option value="tur">{t('breakdownOrgType')}</option>
-                <optgroup label={t('breakdownProvince')}>
-                  {TR_PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </optgroup>
               </select>
               <button
                 type="submit"
@@ -173,7 +161,7 @@ export default function FunnelPanel({
         ))}
       </ol>
 
-      <p className="text-xs text-ink-2">{t('privacyNote')}</p>
+      <p className="text-xs text-ink-2">{t('privacyNote', { threshold: SMALL_CELL_THRESHOLD, ...shownRange() })}</p>
     </section>
   );
 }

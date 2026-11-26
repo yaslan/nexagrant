@@ -39,7 +39,7 @@ function record(over: Partial<InviteCodeRecord>): InviteCodeRecord {
 }
 
 describe('inviteCodeRow', () => {
-  test('no use count in any form: not the number, not "<5", not what is left', () => {
+  test('no use count in any form: not the number, not a masked cell, not what is left', () => {
     for (const usedCount of [0, 1, 4, 5, 7, 24, 25]) {
       const row = inviteCodeRow(record({ usedCount, useLimit: 513 }), NOW);
       expect(Object.keys(row).sort()).toEqual(

@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import type { AgencyReportListItem } from '@/lib/agency/report';
+import { SMALL_CELL_THRESHOLD, shownRange } from '@/lib/agency/small-cell';
 
 const focusRing =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
@@ -22,7 +23,7 @@ export default async function ReportsPanel({ locale, reports }: { locale: string
         <h2 id="agency-reports-title" className="font-heading text-xl font-semibold text-ink">
           {t('title')}
         </h2>
-        <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description')}</p>
+        <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description', { threshold: SMALL_CELL_THRESHOLD, ...shownRange() })}</p>
         <p className="mt-1 max-w-2xl text-sm text-ink-2" data-testid="agency-report-retention">
           {t('retentionNote')}
         </p>

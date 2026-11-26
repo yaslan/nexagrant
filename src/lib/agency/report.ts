@@ -3,27 +3,27 @@
  *
  * The report makes no number of its own. It is the dashboard's published,
  * already safe output — `buildAgencyFunnel`: one cumulative cohort,
- * masking under 5 with complementary suppression, every number rounded to 10 (5 before FO-398) —
- * copied once a month and shown on screen (NG-341: never as a file — no CSV, no PDF).
+ * masking under 10 with complementary suppression, every number rounded to 10 (NG-339 threshold 10;
+ * 5 before) — copied once a month and shown on screen (NG-341: never as a file — no CSV, no PDF).
  *
  *   - One read: {@link readAgencyFunnelRaw}, the dashboard's own query path.
- *   - Three views, each a response the dashboard gives for one breakdown:
- *     none, organisation type, one province. They are masked together
- *     (suppressedCells covers every breakdown at once), and the attacker in
- *     funnel.attack.test.ts already joins exactly these views. No
- *     province × type table.
- *   - Provinces: only those where the dashboard shows at least one number.
- *     A province whose every step is "<5" is left out; on the dashboard that
- *     row looks the same whether the province has organisations or none, so
- *     listing it would tell which provinces hold a few (see
- *     {@link buildAgencyReport}).
+ *   - Two views, each a response the dashboard gives for one breakdown: none and
+ *     organisation type. They are masked together with every other breakdown
+ *     (suppressedCells covers them all at once).
+ *   - No province table since NG-339 (HUKUK-5 5e, 23.11.2026). An agency can
+ *     register its own organisations under a second account, which no rule can
+ *     tell apart, so a province count could not be made safe by excluding them.
+ *     The province view stays in the masking (it only ever hides more), but it
+ *     is not written to a report and not printed. A report stored before
+ *     NG-339 still reads: its `byProvince` is accepted and never shown.
  *
  * Storage (leed-fb 29.09, option A): no report table exists and the schema is
  * locked, so the snapshot is an `AuditEvent` of the agency's own tenant —
  * `type = agency.report.generated`, `target = YYYY-MM`, `data` = the snapshot.
  * The on-screen page is rendered from it when it is opened, so a
  * stored report can hold only what {@link AgencyReportSnapshotSchema} admits:
- * cell states and multiples of 5 (10 since FO-398; a report stored before it holds 5s and must still read), no tenant id, no name, no raw count.
+ * cell states and rounded counts (multiples of 10 at least SMALL_CELL_THRESHOLD since NG-339; a
+ * report stored before holds multiples of 5 and must still read), no tenant id, no name, no raw count.
  * Retention (NG-341): 12 months, destroyed every 6 months with a deletion record — see
  * ./retention.ts. Payment or commission records are not stored here and are not purged.
  */
@@ -37,10 +37,10 @@ import { AGENCY_REPORT_GENERATE_EVENT, AgencyReportGenerateEventSchema } from '@
 import {
   FUNNEL_STEPS,
   maskAgencyFunnel,
-  normalizeProvinces,
   ORG_TYPES,
   readAgencyFunnelRaw,
   SMALL_CELL_THRESHOLD,
+  shownRange,
   type FunnelView,
   type RawByProvince,
 } from './funnel';
@@ -50,20 +50,26 @@ import enMessages from '../../../messages/en.json';
 export const AGENCY_REPORT_EVENT = 'agency.report.generated';
 export const AGENCY_REPORT_VERSION = 1;
 
+/** The unit and floor of a shown count before NG-339 (the threshold was 5 then). */
+const LEGACY_SHOWN_STEP = 5;
+
 const CellSchema = z.discriminatedUnion('state', [
   z
     .object({
       state: z.literal('count'),
-      // What roundForDisplay gives for a shown count: a multiple of 10 since FO-398, never under 5.
-      // Reports stored earlier hold multiples of 5, so the check stays at 5.
+      // What roundForDisplay gives for a shown count: a multiple of FUNNEL_ROUND_STEP (10) and at least
+      // SMALL_CELL_THRESHOLD (10) since NG-339. Reports stored before hold multiples of 5 from 5 up, and
+      // must still read, so the check accepts both.
       value: z
         .number()
         .int()
-        .min(SMALL_CELL_THRESHOLD)
-        .refine((v) => v % SMALL_CELL_THRESHOLD === 0),
+        .min(LEGACY_SHOWN_STEP)
+        .refine((v) => v % LEGACY_SHOWN_STEP === 0 && v >= LEGACY_SHOWN_STEP),
     })
     .strict(),
   z.object({ state: z.literal('small') }).strict(),
+  // The grand total of a step (NG-339, K-585957 = A). Stored reports before it never carry it.
+  z.object({ state: z.literal('withheld') }).strict(),
   z.object({ state: z.literal('unmeasured') }).strict(),
 ]);
 
@@ -81,13 +87,12 @@ export const AgencyReportSnapshotSchema = z
     byOrgType: z
       .object(Object.fromEntries(ORG_TYPES.map((t) => [t, ViewSchema])) as Record<OrgType, typeof ViewSchema>)
       .strict(),
-    byProvince: z.array(z.object({ province: z.enum(TR_PROVINCES), view: ViewSchema }).strict()),
+    /** Written before NG-339 only. Read so an old report still validates; never written, never printed. */
+    byProvince: z.array(z.object({ province: z.enum(TR_PROVINCES), view: ViewSchema }).strict()).optional(),
   })
   .strict();
 
 export type AgencyReportSnapshot = z.infer<typeof AgencyReportSnapshotSchema>;
-
-const shows = (v: FunnelView) => Object.values(v).some((c) => c.state === 'count');
 
 /**
  * Pure: the report of one agency's raw counts. Every view is a
@@ -97,23 +102,12 @@ export function buildAgencyReport(raw: RawByProvince, period: string, generatedA
   const funnel = maskAgencyFunnel(raw);
   const byType = funnel({ dimension: 'orgType' });
   if (byType.breakdown.dimension !== 'orgType') throw new Error('no type breakdown');
-  // A province not in the table is all "<5" (buildAgencyFunnel, `known = false`), so walking
-  // only the provinces that occur, in TR_PROVINCES order, finds every province that shows a number.
-  const present = normalizeProvinces(raw);
-  const byProvince: AgencyReportSnapshot['byProvince'] = [];
-  for (const province of TR_PROVINCES) {
-    if (!present.has(province)) continue;
-    const f = funnel({ dimension: 'province', province });
-    if (f.breakdown.dimension !== 'province') throw new Error('no province breakdown');
-    if (shows(f.breakdown.view)) byProvince.push({ province, view: f.breakdown.view });
-  }
   return AgencyReportSnapshotSchema.parse({
     version: AGENCY_REPORT_VERSION,
     period,
     generatedAt: generatedAt.toISOString(),
     all: byType.all,
     byOrgType: byType.breakdown.byOrgType,
-    byProvince,
   });
 }
 
@@ -258,25 +252,33 @@ function catalog(locale?: ExportLocale) {
 
 type Catalog = ReturnType<typeof catalog>;
 
-function cellText(c: FunnelView[keyof FunnelView], A: Catalog): string {
-  if (c.state === 'count') return String(c.value);
-  return c.state === 'small' ? A.reports.doc.small : A.reports.doc.unmeasured;
+/**
+ * The catalogue text carries placeholders, not the numbers: `{threshold}` (the "<10" mark) and
+ * the rounding range `{step}`, `{low}`, `{high}` from shownRange(). Filled from the constants.
+ */
+function fill(text: string): string {
+  const { step, low, high } = shownRange();
+  return text
+    .replaceAll('{threshold}', String(SMALL_CELL_THRESHOLD))
+    .replaceAll('{step}', String(step))
+    .replaceAll('{low}', String(low))
+    .replaceAll('{high}', String(high));
 }
 
-/** The three tables: (caption, [group label, view][]), in the order they are printed. */
+function cellText(c: FunnelView[keyof FunnelView], A: Catalog): string {
+  if (c.state === 'count') return String(c.value);
+  if (c.state === 'withheld') return fill(A.reports.doc.withheld);
+  return c.state === 'small' ? fill(A.reports.doc.small) : A.reports.doc.unmeasured;
+}
+
+/** The two tables: (caption, [group label, view][]), in the order they are printed. */
 function tables(s: AgencyReportSnapshot, A: Catalog) {
   const D = A.reports.doc;
   return [
-    { key: 'all', caption: D.totalsTable, groups: [[D.totalsTable, s.all]] as [string, FunnelView][] },
+    { caption: D.totalsTable, groups: [[D.totalsTable, s.all]] as [string, FunnelView][] },
     {
-      key: 'orgType',
       caption: D.orgTypeTable,
       groups: ORG_TYPES.map((t): [string, FunnelView] => [A.orgType[t], s.byOrgType[t]]),
-    },
-    {
-      key: 'province',
-      caption: D.provinceTable,
-      groups: s.byProvince.map((p): [string, FunnelView] => [p.province, p.view]),
     },
   ];
 }
@@ -298,11 +300,9 @@ export function agencyReportHtml(s: AgencyReportSnapshot, agencyName: string, lo
       { label: D.periodLabel, value: s.period },
       { label: D.generatedAtLabel, value: dateText(s.generatedAt, locale) },
     ],
-    notes: [D.cohortNote, D.separateNote, A.funnel.privacyNote, A.reports.retentionNote],
+    notes: [D.cohortNote, D.separateNote, fill(A.funnel.privacyNote), A.reports.retentionNote],
     tables: tables(s, A).map((t) => ({
       caption: t.caption,
-      note:
-        t.key !== 'province' ? undefined : t.groups.length === 0 ? D.provinceNone : D.provinceOmitted,
       columns: [D.groupColumn, ...steps],
       rows: t.groups.map(([label, view]) => [label, ...FUNNEL_STEPS.map((st) => cellText(view[st], A))]),
     })),

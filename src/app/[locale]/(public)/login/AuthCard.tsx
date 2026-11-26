@@ -15,6 +15,7 @@ import {
 } from '@/lib/legal/consent-documents';
 import type { OAuthProviderAvailability } from '@/lib/demo-login';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
+import { SMALL_CELL_THRESHOLD } from '@/lib/agency/small-cell';
 import { SHARE_PARAM_PROVINCE, SIGNUP_PARAM_READINESS, decodeReadinessCode } from '@/lib/readiness/share';
 import { READINESS_ORG_TYPES, scoreReadiness } from '@/lib/readiness/score';
 import { toTenantProvince } from '@/lib/province';
@@ -380,7 +381,7 @@ export default function AuthCard({
           <p className="text-ink-2">{tAuthCard('agencyInvite.body')}</p>
           <div>
             <p className="font-semibold">{tAuthCard('agencyInvite.seesTitle')}</p>
-            <p className="text-ink-2">{tAuthCard('agencyInvite.sees')}</p>
+            <p className="text-ink-2">{tAuthCard('agencyInvite.sees', { threshold: SMALL_CELL_THRESHOLD })}</p>
           </div>
           <div>
             <p className="font-semibold">{tAuthCard('agencyInvite.notSeesTitle')}</p>
