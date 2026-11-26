@@ -60,7 +60,7 @@ kapı da (statik `pnpm rls:check`, canlı `pnpm rls:verify`) aynı listeyi okur.
 Topic ──(TopicMatch: K1 fitScore, tenant×topic)──▶ Opportunity(stage G0..G4, intendedRole)
    Opportunity ──(TopicMatch: g0Score + breakdown, fırsat başına)──▶ kanıt kaydı
    Opportunity ──▶ GateDecision[] (her kapı; inputs JSON; ruleVersion)
-   Opportunity ──▶ ConsortiumSeat[] (roleKey; organizationId | partnerOrgId; status; memberStage + niyet mektubu, §34)
+   Opportunity ──▶ ConsortiumSeat[] (roleKey; organizationId | partnerOrgId; status; memberStage + niyet mektubu, §35)
                        └─▶ SeatCandidate[] (M8 puanları)
    Opportunity ──▶ ConceptNote[] (M2) ──▶ Proposal (1:1; esrScores; outcome)
    Opportunity ──▶ Effort[] (kişi-saat)
@@ -1303,7 +1303,20 @@ Kaynak: NG-244 §6.1, `06-Fiyat-Politikasi.md` §1/§4/§7; kararlar K-584182 = 
 - **Yetki:** `can(role, action, { feature, grantedFeatures, moduleOpen? })` (`src/lib/rbac.ts`) yetkinin tek yoludur. NexaGrant için çağıran `canUseNgFeature` (`authz.ts`) olur: önce rol izni, sonra planın o özelliği vermesi, sonra (eşlenmişse) modülün açık olması aranır. İki argümanlı `can()` eskisi gibi çalışır.
 - **Dağıtım sırası:** Migration koddan ÖNCE uygulanmalıdır, çünkü kayıt akışı `NgSubscription` tablosuna yazar. Tablo yoksa kayıt düşer.
 
-## 34. Konsorsiyum üye aşaması ve niyet mektubu: `ConsortiumSeat.memberStage`, `memberStageAt`, `loiReceivedAt`, `loiDocumentUrl` (NG-364 · K-586296 = B · NG-20 F11)
+## 34. `CookieConsentRecord` — çerez rıza kaydı (NG-9 · FE-1.5)
+
+Çerez bandı ve tercih panelinde (`src/components/CookieConsent.tsx`) **kaydedilen her seçim** için bir satır. Kayıt kendi veritabanımızdadır; üçüncü taraf rıza platformu yok. Tercih değiştikçe yeni satır düşer, eski satır silinmez ve değişmez (son satır geçerli seçimdir, öncekiler rızanın geçmişidir).
+
+- **Kişisel veri yok.** `tenantId`, kullanıcı id'si, IP, user agent, e-posta tutulmaz; uç nokta bunları okumaz. Ziyaretçi, tarayıcıda ilk seçim anında üretilen rastgele bir UUID ile anılır (`localStorage['fabrika_consent_id']`, `CONSENT_VISITOR_ID_STORAGE_KEY`). Bu id analitik olaylarıyla gitmez; analitik id'si (`fabrika_analytics_anon_id`) ayrıdır ve iki kayıt birleştirilemez. Oturumlu kullanıcıda da aynı anonim id kullanılır (kullanıcıya bağlanmaz).
+- **Alanlar.** `id` (cuid), `visitorId` (UUID), `choice` (`accept_all` | `reject_all` | `custom`; "Seçimimi kaydet" her zaman `custom`), `analytics`, `marketing` (Boolean; zorunlu kategori her zaman açık olduğu için sütunu yok), `policyVersion` (`COOKIE_POLICY_VERSION`, `src/lib/cookie-consent.ts`; hukuk onayına kadar `draft-…`), `locale` (`tr`/`en`), `createdAt` (sunucu saati, UTC).
+- **Yazıcı.** Tek yol: `POST /api/cookie-consent` → `recordCookieConsent` (`src/lib/cookie-consent-record.ts`). Zod şeması `.strict()` (fazla alan → 400) ve seçim ile kategorilerin tutarlılığını ister (`accept_all` ikisi de açık, `reject_all` ikisi de kapalı). Yanıtlar: 201 · 400 `invalid` · 429 `rate_limited` · 500. İstemci isteği beklemez (`keepalive`, hata sessiz); tarayıcıdaki seçim her durumda geçerlidir ve neyin yükleneceğini o belirler.
+- **Sınır.** Ziyaretçi id'si başına 1 saatte en çok 30 kayıt (`COOKIE_CONSENT_HOURLY_LIMIT`). İd istemcide üretildiği için yeni id ile atlatılabilir; tablo kişisel veri taşımadığından risk yalnız hacimdir (bkz. Açık işler).
+- **RLS.** `SYSTEM_WIDE` + `SYSTEM_SCOPE_POLICY` (`scripts/rls-models.ts`); RLS **açık**, tek politika `system_scope`. `system_scope_open()` tabloyu yalnız `public-intake` (yazma), `platform-admin` ve `cross-tenant-job` amaçlarına açar (`prisma/rls.sql`); kiracı oturumu ve diğer amaçlar 0 satır görür, yazamaz. Ölçüm: `rls:verify` (`scripts/check-rls-live.ts`: tablo probu, `PUBLIC_INTAKE_*`, `PURPOSE_NARROWED`).
+- **İndeksler.** `(visitorId, createdAt)` (sınır ve geçmiş), `createdAt` (ileride saklama işi).
+- **Migration.** `prisma/migrations/add-cookie-consent-record.sql` (idempotent; `system_scope_open` yoksa RLS'yi kapalı bırakıp NOTICE yazar, `db:rls` sonra açar). Geri alma: `.down.sql` (tabloyu düşürür; rıza geçmişi kaybolur — önce kod geri alınmalı).
+- **Açık işler.** Saklama süresi ve temizlik işi yok (hukuk kararı bekliyor); `policyVersion` değişince bandın yeniden sorulması henüz yok (yalnız kaydedilir).
+
+## 35. Konsorsiyum üye aşaması ve niyet mektubu: `ConsortiumSeat.memberStage`, `memberStageAt`, `loiReceivedAt`, `loiDocumentUrl` (NG-364 · K-586296 = B · NG-20 F11)
 
 - **Neden ayrı tablo yok:** K-586296 = B. Aşama koltuğa aittir: bir koltukta bir üye olur, aşaması da onunla birlikte durur. `SeatStatus` değişmedi (`OPEN|CANDIDATE|INVITED|CONFIRMED|DECLINED`); aşama onun yanında, üyeyle konuşmanın nerede olduğunu söyler.
 - **Alanlar (hepsi NULL olabilir; migration öncesi koltuklar NULL kalır):**
@@ -1319,15 +1332,3 @@ Kaynak: NG-244 §6.1, `06-Fiyat-Politikasi.md` §1/§4/§7; kararlar K-584182 = 
 - **Ekran girdisi:** `loadG1ConsortiumInputs(tx, tenantId, opportunityId)` yalnız okur ve UI için `unfilledCriticalRoles`, `criticalRolesWithoutBackup`, `criticalRolesWithoutLoi`, `letterOfIntentRequired` ve koltuk başına aşama + mektup durumunu döndürür. Fırsat kiracıda değilse `null`.
 - **RLS:** yeni tablo yok; alanlar `ConsortiumSeat`'in mevcut `tenant_isolation` politikası altındadır.
 - **Migration:** `prisma/migrations/add-consortium-seat-member-stage.sql` (yalnız ekleme; `CREATE TYPE` `duplicate_object` ile, kolonlar `ADD COLUMN IF NOT EXISTS`; iki kez koşmak güvenli). Geri alma: `add-consortium-seat-member-stage.down.sql` (kolonları ve enum'u düşürür; veri kaybı = aşama ve mektup kayıtları).
-## 35. `CookieConsentRecord` — çerez rıza kaydı (NG-9 · FE-1.5)
-
-Çerez bandı ve tercih panelinde (`src/components/CookieConsent.tsx`) **kaydedilen her seçim** için bir satır. Kayıt kendi veritabanımızdadır; üçüncü taraf rıza platformu yok. Tercih değiştikçe yeni satır düşer, eski satır silinmez ve değişmez (son satır geçerli seçimdir, öncekiler rızanın geçmişidir).
-
-- **Kişisel veri yok.** `tenantId`, kullanıcı id'si, IP, user agent, e-posta tutulmaz; uç nokta bunları okumaz. Ziyaretçi, tarayıcıda ilk seçim anında üretilen rastgele bir UUID ile anılır (`localStorage['fabrika_consent_id']`, `CONSENT_VISITOR_ID_STORAGE_KEY`). Bu id analitik olaylarıyla gitmez; analitik id'si (`fabrika_analytics_anon_id`) ayrıdır ve iki kayıt birleştirilemez. Oturumlu kullanıcıda da aynı anonim id kullanılır (kullanıcıya bağlanmaz).
-- **Alanlar.** `id` (cuid), `visitorId` (UUID), `choice` (`accept_all` | `reject_all` | `custom`; "Seçimimi kaydet" her zaman `custom`), `analytics`, `marketing` (Boolean; zorunlu kategori her zaman açık olduğu için sütunu yok), `policyVersion` (`COOKIE_POLICY_VERSION`, `src/lib/cookie-consent.ts`; hukuk onayına kadar `draft-…`), `locale` (`tr`/`en`), `createdAt` (sunucu saati, UTC).
-- **Yazıcı.** Tek yol: `POST /api/cookie-consent` → `recordCookieConsent` (`src/lib/cookie-consent-record.ts`). Zod şeması `.strict()` (fazla alan → 400) ve seçim ile kategorilerin tutarlılığını ister (`accept_all` ikisi de açık, `reject_all` ikisi de kapalı). Yanıtlar: 201 · 400 `invalid` · 429 `rate_limited` · 500. İstemci isteği beklemez (`keepalive`, hata sessiz); tarayıcıdaki seçim her durumda geçerlidir ve neyin yükleneceğini o belirler.
-- **Sınır.** Ziyaretçi id'si başına 1 saatte en çok 30 kayıt (`COOKIE_CONSENT_HOURLY_LIMIT`). İd istemcide üretildiği için yeni id ile atlatılabilir; tablo kişisel veri taşımadığından risk yalnız hacimdir (bkz. Açık işler).
-- **RLS.** `SYSTEM_WIDE` + `SYSTEM_SCOPE_POLICY` (`scripts/rls-models.ts`); RLS **açık**, tek politika `system_scope`. `system_scope_open()` tabloyu yalnız `public-intake` (yazma), `platform-admin` ve `cross-tenant-job` amaçlarına açar (`prisma/rls.sql`); kiracı oturumu ve diğer amaçlar 0 satır görür, yazamaz. Ölçüm: `rls:verify` (`scripts/check-rls-live.ts`: tablo probu, `PUBLIC_INTAKE_*`, `PURPOSE_NARROWED`).
-- **İndeksler.** `(visitorId, createdAt)` (sınır ve geçmiş), `createdAt` (ileride saklama işi).
-- **Migration.** `prisma/migrations/add-cookie-consent-record.sql` (idempotent; `system_scope_open` yoksa RLS'yi kapalı bırakıp NOTICE yazar, `db:rls` sonra açar). Geri alma: `.down.sql` (tabloyu düşürür; rıza geçmişi kaybolur — önce kod geri alınmalı).
-- **Açık işler.** Saklama süresi ve temizlik işi yok (hukuk kararı bekliyor); `policyVersion` değişince bandın yeniden sorulması henüz yok (yalnız kaydedilir).

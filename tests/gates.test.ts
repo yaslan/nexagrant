@@ -797,9 +797,15 @@ describe('G1 gate: the letter-of-intent rule ships off (NG-364, owner decision 2
     expect(DEFAULT_GATE_RULES.G1.requireLetterOfIntentForCriticalSeats).toBe(false);
   });
 
+  const filedInputs = () =>
+    (prisma.gateDecision.create as unknown as { mock: { calls: [{ data: { inputs: Record<string, unknown> } }][] } }).mock
+      .calls[0]![0].data.inputs;
+
   test.each(['opp-g1-no-loi', 'opp-g1-no-stage'])('%s: no letter on a critical seat passes G1 with the shipped default', async (id) => {
     expect(await evaluateGate(id, 'G1', 'tenant-1')).toEqual({ passed: true, reasons: [] });
     expect(prisma.opportunity.updateMany).toHaveBeenCalled();
+    // NG-368 (Ö-3): with the rule off the decision does not record the letters it did not check.
+    expect(filedInputs()).not.toHaveProperty('criticalRolesWithoutLoi');
   });
 
   test.each(['opp-g1-no-loi', 'opp-g1-no-stage'])('%s: the same seat is refused with G1_NO_LOI once the rule is on', async (id) => {

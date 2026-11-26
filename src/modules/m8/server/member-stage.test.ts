@@ -168,6 +168,8 @@ describe('setMemberStage — the write', () => {
         organizationId: 'org-1',
         partnerOrgId: null,
         memberStage: 'INTERESTED',
+        loiReceivedAt: null,
+        loiDocumentUrl: null,
       },
       data: { memberStage: 'MET', memberStageAt: NOW, loiReceivedAt: null, loiDocumentUrl: null },
     });
