@@ -31,6 +31,13 @@ export const CONSENT_VISITOR_ID_STORAGE_KEY = 'fabrika_consent_id';
  */
 export const COOKIE_POLICY_VERSION = 'draft-2026-11-18';
 
+/**
+ * NG-371: an answer older than this is asked again (the browser side of the 12-month
+ * limit the consent-record retention rests on, NG-366). Measured from `time`, the moment
+ * the choice was saved.
+ */
+export const COOKIE_CONSENT_REPROMPT_DAYS = 365;
+
 /** Window event the "Cookie preferences" links fire to reopen the banner (FO-180). */
 export const OPEN_COOKIE_PREFERENCES_EVENT = 'fabrika:open-cookie-preferences';
 
@@ -64,15 +71,27 @@ function readStored(): Record<string, unknown> | null {
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * NG-371: an answer counts only while it is inside the re-ask window and was made against
+ * the current policy text. No date (`time`), an unreadable date, another version: not an answer.
+ */
+function isCurrentAnswer(parsed: Record<string, unknown>, now: number): boolean {
+  if (parsed.version !== COOKIE_POLICY_VERSION) return false;
+  const decided = typeof parsed.time === 'string' ? Date.parse(parsed.time) : Number.NaN;
+  return Number.isFinite(decided) && now - decided < COOKIE_CONSENT_REPROMPT_DAYS * DAY_MS;
+}
+
 /**
  * The categories this browser agreed to, or `null` when it has not answered (or storage
- * is blocked, or the value is unreadable). Every doubt resolves to "off": KVKK /
- * ePrivacy need opt-in.
+ * is blocked, the value is unreadable, or the answer has expired or predates the current
+ * policy: NG-371). Every doubt resolves to "off": KVKK / ePrivacy need opt-in.
  */
 export function storedConsent(): ConsentCategories | null {
   if (typeof window === 'undefined') return null;
   const parsed = readStored();
-  if (!parsed) return null;
+  if (!parsed || !isCurrentAnswer(parsed, Date.now())) return null;
   // `analytics` is the panel's shape (and the e2e fixtures'); `accepted` is the older banner's.
   const analytics = typeof parsed.analytics === 'boolean' ? parsed.analytics : parsed.accepted === true;
   // Marketing never follows an older "accept all": that banner did not offer it.

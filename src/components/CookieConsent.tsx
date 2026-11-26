@@ -7,7 +7,6 @@ import { buttonClass } from '@/components/ui/Button';
 import { getPublicRoute } from '@/lib/routes';
 import { focusRing } from '@/components/expert-prereg/styles';
 import {
-  CONSENT_STORAGE_KEY,
   OPEN_COOKIE_PREFERENCES_EVENT,
   OPTIONAL_COOKIE_CATEGORIES,
   type ConsentCategories,
@@ -18,14 +17,12 @@ import {
   storedConsentLevel,
 } from '@/lib/cookie-consent';
 
-/** Whether this browser has already answered. Client-only: the server cannot see storage. */
+/**
+ * Whether this browser has a current answer. Client-only: the server cannot see storage.
+ * NG-371: an expired or older-policy answer is no answer, so the banner asks again.
+ */
 function hasStoredConsent(): boolean {
-  try {
-    return Boolean(localStorage.getItem(CONSENT_STORAGE_KEY));
-  } catch {
-    // Storage disabled (private mode, blocked site data): treat it as unanswered.
-    return false;
-  }
+  return storedConsent() !== null;
 }
 
 const NONE: ConsentCategories = { analytics: false, marketing: false };

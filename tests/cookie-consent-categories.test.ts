@@ -63,14 +63,14 @@ describe('stored categories', () => {
   });
 
   it('an older "accept all" (no categories) keeps analytics, never turns marketing on', () => {
-    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all' }));
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all', time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
     expect(storedConsent()).toEqual({ analytics: true, marketing: false });
     expect(storedConsentLevel()).toBe('all');
     expect(hasMarketingConsent()).toBe(false);
   });
 
   it('the `analytics` field wins over `accepted` (fixtures write it)', () => {
-    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, analytics: false }));
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, analytics: false, time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
     expect(hasAnalyticsConsent()).toBe(false);
   });
 
