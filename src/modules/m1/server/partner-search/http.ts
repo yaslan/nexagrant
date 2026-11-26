@@ -15,6 +15,7 @@ import type {
 import { API_KEY_VIEWER } from '@/lib/api-auth';
 import { internalError } from '@/lib/api-error';
 import { getEntitlements } from '@/lib/billing';
+import { ngGateResponseInTx } from '@/lib/billing/nexagrant/route-gate';
 import { partnerSearchGrant, planNamesGrantingPartnerSearchExport } from '@/lib/billing/catalog';
 import { withTenant, type TenantTx } from '@/lib/db';
 import { errorMessage } from '@/lib/errors';
@@ -66,6 +67,27 @@ async function accessOf(tx: TenantTx, caller: PartnerSearchCaller): Promise<Part
   return decidePartnerSearchAccess(caller.actor, m1, grant, caller.viewer);
 }
 
+/**
+ * The doors of every Partner Search read, in order (NG-250 r7): the route's own role and module
+ * doors (`accessOf`, NG-64 / FO-61 bodies), then — for a signed-in member — the NexaGrant plan
+ * gate (route-gate.ts), all before the first read or quota unit. A refused role or a closed M1
+ * keeps its MODULE_ACCESS_DENIED body; only a caller both doors admit can meet an NG code. The
+ * API-key door (/api/v1) has no member to ask: follow-up NG-272 (bindings.ts).
+ */
+async function admitted(tx: TenantTx, caller: PartnerSearchCaller): Promise<Extract<PartnerSearchAccess, { allowed: true }>> {
+  const access = await accessOf(tx, caller);
+  if (!access.allowed) throw new Refusal(denied(access));
+  if (caller.actor.kind === 'member') {
+    const ngRefused = await ngGateResponseInTx(
+      tx,
+      { tenantId: caller.tenantId, role: caller.actor.role },
+      'view_partner_search', 'partner_search'
+    );
+    if (ngRefused) throw new Refusal(ngRefused);
+  }
+  return access;
+}
+
 function denied(access: Extract<PartnerSearchAccess, { allowed: false }>): NextResponse {
   const body: PartnerSearchDenied = {
     error: 'MODULE_ACCESS_DENIED',
@@ -107,8 +129,7 @@ async function listed(
 
   try {
     const body = await withTenant(caller.tenantId, async (tx): Promise<PartnerSearchAnnouncementPage> => {
-      const access = await accessOf(tx, caller);
-      if (!access.allowed) throw new Refusal(denied(access));
+      const access = await admitted(tx, caller);
 
       let quota: PartnerSearchAnnouncementPage['meta']['quota'];
       if (access.quota !== null) {
@@ -167,8 +188,7 @@ export async function topicPartnerSignal(caller: PartnerSearchCaller, rawIdentif
 
   try {
     const body = await withTenant(caller.tenantId, async (tx): Promise<PartnerSignalResponse> => {
-      const access = await accessOf(tx, caller);
-      if (!access.allowed) throw new Refusal(denied(access));
+      await admitted(tx, caller);
       return { success: true, topicIdentifier: identifier.data, data: await readPartnerSignal(tx, identifier.data) };
     });
     return NextResponse.json(body);
@@ -195,8 +215,7 @@ export async function exportAnnouncements(caller: PartnerSearchCaller, req: Requ
 
   try {
     const { rows, truncated } = await withTenant(caller.tenantId, async (tx) => {
-      const access = await accessOf(tx, caller);
-      if (!access.allowed) throw new Refusal(denied(access));
+      const access = await admitted(tx, caller);
       if (!access.export) {
         throw new Refusal(
           denied({ allowed: false, reason: 'EXPORT_NOT_IN_PLAN', requiredPlans: planNamesGrantingPartnerSearchExport() })

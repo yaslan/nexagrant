@@ -1302,6 +1302,12 @@ Kaynak: NG-244 §6.1, `06-Fiyat-Politikasi.md` §1/§4/§7; kararlar K-584182 = 
   - **Etki:** Deneme kiracıyı salt-okur yapmaz. Plan düşer ve özellikler daralır; hiçbir veri silinmez.
 - **Yetki:** `can(role, action, { feature, grantedFeatures, moduleOpen? })` (`src/lib/rbac.ts`) yetkinin tek yoludur. NexaGrant için çağıran `canUseNgFeature` (`authz.ts`) olur: önce rol izni, sonra planın o özelliği vermesi, sonra (eşlenmişse) modülün açık olması aranır. İki argümanlı `can()` eskisi gibi çalışır.
 - **Dağıtım sırası:** Migration koddan ÖNCE uygulanmalıdır, çünkü kayıt akışı `NgSubscription` tablosuna yazar. Tablo yoksa kayıt düşer.
+- **NG-250 eklemeleri:**
+  - **CHECK `NgSubscription_trialing_has_end_check`** (`add-ng-subscription-trialing-check.sql`): `status <> 'TRIALING' OR ("trialEndsAt" IS NOT NULL AND "trialEndPlanId" IS NOT NULL)`. Bitişi yazılmamış bir deneme hiç düşmezdi; veritabanı artık böyle bir satırı reddeder. Kuralı bozan eski satır varsa migration sayısını yazıp durur, satırı kendisi düzeltmez. Geri alma: `.down.sql` (yalnız CHECK'i düşürür).
+  - **Status koruması:** Planını yalnız `TRIALING` ve `ACTIVE` satırı taşır. `PAST_DUE`, `CANCELED` ve `PAUSED` satırlar fallback plan olarak okunur; satır ve status olduğu gibi kalır (`NG_PLAN_CARRYING_STATUSES`, `repository.ts`).
+  - **Kapsam (K-584603 = A):** NexaGrant plan kapısı ve sayaçları yalnız `NgSubscription` satırı olan kiracıya uygulanır. Satırı olmayan kiracı (demo, Fabrika, e2e) mevcut Fabrika kapılarıyla devam eder.
+  - **Ürün yolları:** Özellik → yol tablosu `src/lib/billing/nexagrant/bindings.ts`. Modüle bağlı özellikler `NG_FEATURE_MODULE` içinde durur: `partner_search` ve `similar_projects` → M1.
+  - **Sayaçlar** (`usage.ts`): koltuk = üyeler + bekleyen davetler. Uygulanması `NG_SEAT_LIMIT_ENFORCED=true` bayrağına bağlıdır, varsayılan kapalı. YZ kotası = bu İstanbul ayındaki `AiUsageLog` satır sayısı; `generateCompletion` içinde kredi kilidi altında uygulanır. Yeni tablo yok.
 
 ## 34. `CookieConsentRecord` — çerez rıza kaydı (NG-9 · FE-1.5)
 

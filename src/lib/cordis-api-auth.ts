@@ -18,7 +18,11 @@ export const CORDIS_SESSION_PER_USER_PER_MINUTE = 60;
 const sessionLimiter = new UserWindowLimiter(CORDIS_SESSION_PER_USER_PER_MINUTE);
 
 export type CordisAuthResult =
-  | { authenticated: true }
+  /**
+   * `session`: set when the session door let the request in — the member the NexaGrant plan
+   * gate (NG-250) asks about. An API key has no member, so it is not set for one.
+   */
+  | { authenticated: true; session?: { tenantId: string; role: string } }
   | { authenticated: false; errorResponse: NextResponse };
 
 function moduleDenied(): CordisAuthResult {
@@ -82,7 +86,7 @@ export async function authenticateCordisSession(action?: Action): Promise<Cordis
       };
     }
 
-    return { authenticated: true };
+    return { authenticated: true, session: { tenantId: tenant.scope.tenantId, role: tenant.scope.role } };
   } catch (error) {
     logger.error('[cordis-api-auth] session check failed', error);
     return {
