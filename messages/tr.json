@@ -1685,6 +1685,7 @@
             "consent": "Açık rıza"
           }
         },
+        "retention": "Çerez rıza kaydınız, seçiminizi yaptığınız tarihten itibaren 3 yıl saklanır; süre dolunca otomatik olarak silinir. Çerez tercihinizi 12 ayda bir ve çerez politikamız değiştiğinde yeniden soracağız.",
         "withdraw": "Onayınızı, tarayıcınızda bu siteye ait verileri silerek dilediğiniz an geri alabilirsiniz; çerez paneli bir sonraki ziyaretinizde yeniden gösterilir."
       },
       "s8": {

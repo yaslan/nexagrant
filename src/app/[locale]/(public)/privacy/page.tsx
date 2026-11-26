@@ -179,6 +179,7 @@ export default async function PrivacyPage({
           <Section heading={t('s7.heading')}>
             <p>{t('s7.body')}</p>
             <PrivacyTable t={t} section="s7" />
+            <p>{t('s7.retention')}</p>
             <p>{t('s7.withdraw')}</p>
             <p className="mt-2">
               <CookiePreferencesButton className="text-accent underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded" />
