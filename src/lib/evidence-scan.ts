@@ -119,7 +119,7 @@ export function objectRemovalDecision(attempts: readonly ObjectRemovalAttempt[],
 }
 
 /** The outcome stored in an `object_removed` AuditEvent's `data`; anything unreadable counts as not deleted. */
-function attemptOf(row: { data: unknown; createdAt: Date }): ObjectRemovalAttempt {
+export function attemptOf(row: { data: unknown; createdAt: Date }): ObjectRemovalAttempt {
   const data = row.data;
   const deleted = typeof data === 'object' && data !== null && (data as { objectDeleted?: unknown }).objectDeleted === true;
   return { objectDeleted: deleted, at: row.createdAt };
@@ -475,12 +475,12 @@ export async function readInfectedPage(
       AND e."id" > ${after}
       AND e."scanStatus" = 'INFECTED'
       AND e."r2ObjectKey" IS NOT NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM "AuditEvent" a
-        WHERE a."tenantId" = e."tenantId"
+      AND e."id" NOT IN (
+        SELECT a."target" FROM "AuditEvent" a
+        WHERE a."tenantId" = ${tenantId}
           AND a."type" = ${EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED}
-          AND a."target" = e."id"
-          AND a."data"->>'objectDeleted' = 'true'
+          AND a."target" IS NOT NULL
+          AND a."data"->'objectDeleted' = 'true'::jsonb
       )
     ORDER BY e."id" ASC
     LIMIT ${EVIDENCE_SCAN_SWEEP_PAGE}`;

@@ -984,4 +984,43 @@ describe('NG-279: an infected object that could not be deleted is tried again by
     expect(ids, 'the row whose delete failed is still read').toContain(stuck);
     expect(page.events.map((e) => e.target)).not.toContain(gone);
   });
+
+  test('NG-369 (Ö-a): a deleted event of ANOTHER tenant, or a shared one, on the same row does not hide it, on the RLS client or the owner client', async () => {
+    const id = await uploadPresigned('ng369-oa.docx', eicarDocx());
+    await dropQueuedScans(id);
+    await scanner.scanEvidence(run(id), { ...verdictDeps, enqueue: async () => true, deleteObject: failingDelete, now: () => new Date() });
+    const other = await admin!.tenant.create({
+      data: { name: `${RUN} ng369 other`, slug: `${RUN}-ng369-other`, country: 'TR', kind: 'ORGANIZATION' },
+      select: { id: true },
+    });
+    try {
+      await admin!.auditEvent.create({ data: { tenantId: other.id, type: 'evidence.scan.object_removed', target: id, data: { objectDeleted: true }, actorId: 'ng369-oa' } });
+      await admin!.auditEvent.create({ data: { tenantId: null, type: 'evidence.scan.object_removed', target: id, data: { objectDeleted: true }, actorId: 'ng369-oa' } });
+      const viaRls = await withTenant(t.tenant, (tx) => scanner.readInfectedPage(tx, t.tenant, ''));
+      const viaOwner = await admin!.$transaction((tx) => scanner.readInfectedPage(tx as never, t.tenant, ''));
+      expect(viaRls.rows.map((r) => r.id), 'RLS client').toContain(id);
+      expect(viaOwner.rows.map((r) => r.id), 'owner client (BYPASSRLS, only the SQL predicate scopes it)').toContain(id);
+    } finally {
+      await admin!.auditEvent.deleteMany({ where: { actorId: 'ng369-oa' } });
+      await admin!.tenant.delete({ where: { id: other.id } }).catch(() => {});
+    }
+  });
+
+  test('NG-369 (Ö-b): a JSON string "true" is not a deletion, in SQL and in the JS decision alike', async () => {
+    const id = await uploadPresigned('ng369-ob.docx', eicarDocx());
+    await dropQueuedScans(id);
+    await scanner.scanEvidence(run(id), { ...verdictDeps, enqueue: async () => true, deleteObject: failingDelete, now: () => new Date() });
+    await admin!.auditEvent.create({
+      data: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: id, data: { objectDeleted: 'true' }, actorId: 'ng369-ob' },
+    });
+    try {
+      const page = await withTenant(t.tenant, (tx) => scanner.readInfectedPage(tx, t.tenant, ''));
+      const sqlReads = page.rows.some((r) => r.id === id);
+      const attempts = page.events.filter((e) => e.target === id).map(scanner.attemptOf);
+      const decision = scanner.objectRemovalDecision(attempts, new Date(Date.now() + 100 * 3600_000));
+      expect({ sqlReads, jsDue: decision.due }).toEqual({ sqlReads: true, jsDue: true });
+    } finally {
+      await admin!.auditEvent.deleteMany({ where: { actorId: 'ng369-ob' } });
+    }
+  });
 });
