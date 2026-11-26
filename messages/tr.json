@@ -825,10 +825,18 @@
       "heading": "G1 ön kontrolü: konsorsiyum",
       "unfilledTitle": "{count} kritik rol henüz kesinleşmedi",
       "noBackupTitle": "{count} kritik rolün yedek adayı yok",
-      "source": "Kaynak: G1 ön kontrolünün {date} tarihli son kararı. Koltuklar o tarihten sonra değiştiyse G1'i yeniden çalıştırın.",
-      "none": "G1 ön kontrolü bu fırsat için henüz çalışmadı; kritik rol boşlukları ve yedek adaylar G1 çalışınca burada görünür.",
-      "notChecked": "Son G1 kararı konsorsiyum koltuklarını denetlememiş; boşluk listesi yok.",
-      "clear": "Son G1 kararına göre tüm kritik roller kesinleşti ve her birinin yedek adayı var."
+      "loiBlockerTitle": "{count} kritik üyenin niyet mektubu yok",
+      "loiBlockerNote": "G1 her kritik üyeden niyet mektubu istiyor; mektuplar kaydedilene kadar G1 geçmez.",
+      "loiInfoTitle": "Bilgi: {count} kritik üyenin niyet mektubu henüz kayıtlı değil",
+      "loiInfoNote": "G1 şu an niyet mektubunu şart koşmuyor; bu bir engel değil.",
+      "source": "Koltukların şu anki durumuna göre, G1 kurallarıyla hesaplandı. Bu ekran G1 kararı kaydetmez.",
+      "unavailable": "Bu fırsatın G1 konsorsiyum koşulları okunamadı.",
+      "noCriticalSeats": "Bu fırsatta kritik rol tanımlı değil; G1'in konsorsiyum koşullarında denetlenecek koltuk yok.",
+      "clear": "Tüm kritik roller kesinleşti ve her birinin yedek adayı var."
+    },
+    "loi": {
+      "missingBlocker": "Mektup yok: G1 engeli",
+      "missingInfo": "Mektup yok (bilgi)"
     }
   },
   "Auth": {

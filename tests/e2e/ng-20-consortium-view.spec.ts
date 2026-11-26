@@ -5,16 +5,21 @@ import { expectHydrated } from './fixtures/hydration';
 import { shotsDir } from './fixtures/shots';
 import { signInAs } from './fixtures/session';
 import { presentIds, requireId } from '../helpers/teardown-guard';
+import { DEFAULT_GATE_RULES } from '../../src/lib/scoring/defaults';
 
 /**
  * NG-20 Faz 1 — the consortium screen with today's data: role, country, a three-step stage,
  * the critical-role gap warning, the backup candidate and the budget share range.
  *
- * The gap and backup warnings are not worked out on the screen. They are the lists the G1 gate
- * (src/lib/gates/evaluate.ts) stored on its latest decision (`unfilledCriticalRoles`,
- * `criticalRolesWithoutBackup`); the fixture writes that decision as the gate would. A gate run
- * is not a click on this page, so it is a FIXTURE here, like the CORDIS rows and the budget
- * shares (their editor is not part of this card).
+ * The gap, backup and letter-of-intent warnings are not worked out on the screen. They come from
+ * `loadG1ConsortiumInputs` (src/lib/gates/g1-consortium.ts), the G1 gate's own seat rules, read
+ * live from the seats. The fixture also files an OLD G1 decision whose lists disagree with the
+ * seats: the screen must show the seats as they are, not that record.
+ *
+ * A missing letter is a blocker only while G1 requires letters
+ * (`DEFAULT_GATE_RULES.G1.requireLetterOfIntentForCriticalSeats`, off by default). The spec reads
+ * the same constant as the e2e server (same checkout), so only the test for the current setting
+ * runs; the other one is skipped with the reason.
  *
  * NG20_E2E_KEEP=1 leaves the rows in place for inspection after a run.
  */
@@ -23,7 +28,7 @@ const SHOTS = shotsDir('NG-20-fe-gnd');
 const TENANT = 'demo-tenant';
 const WORKSPACE = 'main';
 const OPP = 'ng20-e2e-opp';
-/** A second opportunity with seats but no G1 decision on file. */
+/** A second opportunity with seats but no G1 decision on file: the band still shows its gap. */
 const OPP_NO_G1 = 'ng20-e2e-opp-no-g1';
 const SEAT = {
   coordinator: 'ng20-e2e-seat-coordinator',
@@ -35,6 +40,7 @@ const SEAT = {
 const SEAT_NO_G1 = 'ng20-e2e-seat-no-g1';
 const DECISION = 'ng20-e2e-g1-decision';
 const URL = `/tr/${WORKSPACE}/pipeline/${OPP}/consortium`;
+const LETTER_RULE_ON = DEFAULT_GATE_RULES.G1.requireLetterOfIntentForCriticalSeats;
 const USER = { id: 'demo-user-alice', email: 'alice@fabrika.test', tenantId: TENANT, role: 'PIPELINE_MANAGER' };
 
 const PIC = {
@@ -78,8 +84,12 @@ async function seed() {
 
   await prisma.consortiumSeat.createMany({
     data: [
-      { id: SEAT.coordinator, tenantId: TENANT, opportunityId: OPP, roleKey: 'coordinator', status: 'CONFIRMED', organizationId: PIC.coordinator },
-      { id: SEAT.research, tenantId: TENANT, opportunityId: OPP, roleKey: 'research', status: 'CONFIRMED', organizationId: PIC.research },
+      // The coordinator has sent its letter of intent; research and widening have not.
+      {
+        id: SEAT.coordinator, tenantId: TENANT, opportunityId: OPP, roleKey: 'coordinator', status: 'CONFIRMED', organizationId: PIC.coordinator,
+        memberStage: 'CONFIRMED', memberStageAt: new Date('2026-11-22T10:00:00Z'), loiReceivedAt: new Date('2026-11-21T10:00:00Z'),
+      },
+      { id: SEAT.research, tenantId: TENANT, opportunityId: OPP, roleKey: 'research', status: 'CONFIRMED', organizationId: PIC.research, memberStage: 'MET' },
       { id: SEAT.widening, tenantId: TENANT, opportunityId: OPP, roleKey: 'widening', status: 'INVITED', organizationId: PIC.widening },
       { id: SEAT.endUser, tenantId: TENANT, opportunityId: OPP, roleKey: 'end_user', status: 'OPEN' },
       { id: SEAT.industry, tenantId: TENANT, opportunityId: OPP, roleKey: 'industry', status: 'OPEN', required: false },
@@ -105,7 +115,8 @@ async function seed() {
     ],
   });
 
-  // FIXTURE: what evaluateGate(…, 'G1', …) stores for these seats (src/lib/gates/evaluate.ts).
+  // An OLD G1 decision whose lists no longer match the seats (coordinator "unfilled", research
+  // "without backup"). The screen must not show these lists.
   await prisma.gateDecision.create({
     data: {
       id: DECISION,
@@ -119,8 +130,8 @@ async function seed() {
       inputs: {
         opportunityId: OPP,
         criticalSeatsCount: 4,
-        unfilledCriticalRoles: ['widening', 'end_user'],
-        criticalRolesWithoutBackup: ['coordinator', 'widening', 'end_user'],
+        unfilledCriticalRoles: ['coordinator'],
+        criticalRolesWithoutBackup: ['research'],
       },
     },
   });
@@ -158,26 +169,27 @@ test.describe('NG-20 consortium view (Faz 1)', () => {
     await prisma.$disconnect();
   });
 
-  test('the gap warning and the backup candidate come from the G1 result', async ({ page }) => {
+  test('the gap warning and the backup candidate are the G1 seat rules on the seats as they are', async ({ page }) => {
     const serverErrors: string[] = [];
     page.on('response', (r) => {
       if (r.status() >= 500) serverErrors.push(`HTTP ${r.status()} ${r.url()}`);
     });
     await open(page, URL);
 
-    // 1. Critical roles not filled — the gate's list, in the gate's words, with the decision date.
+    // 1. Critical roles not filled — live from the seats, not the old decision's list.
     const gaps = page.getByTestId('consortium-g1-unfilled');
     await expect(gaps).toBeVisible({ timeout: 30_000 });
     await expect(gaps).toContainText('2 kritik rol henüz kesinleşmedi');
     await expect(gaps).toContainText('Son Kullanıcı');
     await expect(gaps).toContainText('Genişleme Ülkesi');
     await expect(gaps).not.toContainText('Koordinatör');
-    await expect(page.getByTestId('consortium-g1-source')).toContainText('24.11.2026');
+    await expect(page.getByTestId('consortium-g1-source')).toContainText('Koltukların şu anki durumuna göre');
 
     // 2. Critical roles without a backup.
     const noBackup = page.getByTestId('consortium-g1-no-backup');
     await expect(noBackup).toContainText('3 kritik rolün yedek adayı yok');
     await expect(noBackup).toContainText('Koordinatör');
+    await expect(noBackup).not.toContainText('Araştırma Ortağı');
 
     // 3. Rows: role, critical tag, organisation + country, stage, backup, budget share.
     const coordinator = page.getByTestId('m8-builder-seat-coordinator');
@@ -223,10 +235,66 @@ test.describe('NG-20 consortium view (Faz 1)', () => {
     expect(serverErrors, `server errors:\n${serverErrors.join('\n')}`).toEqual([]);
   });
 
-  test('with no G1 decision on file the page says so instead of claiming no gaps', async ({ page }) => {
+  test('with no G1 decision on file the gap is still shown, from the seats', async ({ page }) => {
     await open(page, `/tr/${WORKSPACE}/pipeline/${OPP_NO_G1}/consortium`);
-    await expect(page.getByTestId('consortium-g1-none')).toContainText('G1 ön kontrolü bu fırsat için henüz çalışmadı', { timeout: 30_000 });
-    await expect(page.getByTestId('consortium-g1-unfilled')).toHaveCount(0);
+    const gaps = page.getByTestId('consortium-g1-unfilled');
+    await expect(gaps).toContainText('1 kritik rol henüz kesinleşmedi', { timeout: 30_000 });
+    await expect(gaps).toContainText('Koordinatör');
     await expect(page.getByTestId('consortium-g1-clear')).toHaveCount(0);
+    await expect(page.getByTestId('consortium-g1-none')).toHaveCount(0);
+  });
+
+  test('rule off: a critical member without a letter of intent is information, not a blocker', async ({ page }) => {
+    test.skip(LETTER_RULE_ON, 'G1 requires letters of intent in this checkout; the blocker test covers it');
+    await open(page, URL);
+
+    const info = page.getByTestId('consortium-g1-loi-info');
+    await expect(info).toContainText('Bilgi: 2 kritik üyenin niyet mektubu henüz kayıtlı değil', { timeout: 30_000 });
+    await expect(info).toContainText('Araştırma Ortağı');
+    await expect(info).toContainText('Genişleme Ülkesi');
+    await expect(info).not.toContainText('Koordinatör');
+    await expect(info).toContainText('bu bir engel değil');
+    await expect(page.getByTestId('consortium-g1-loi-blocker')).toHaveCount(0);
+
+    const researchChip = page.getByTestId('m8-builder-seat-research').getByTestId('seat-loi-missing');
+    await expect(researchChip).toHaveText('Mektup yok (bilgi)');
+    await expect(researchChip).toHaveAttribute('data-blocking', 'false');
+    await expect(page.getByTestId('m8-builder-seat-coordinator').getByTestId('seat-loi-missing')).toHaveCount(0);
+    // An empty seat has no member to ask a letter from: it is a gap, not a missing letter.
+    await expect(page.getByTestId('m8-builder-seat-end_user').getByTestId('seat-loi-missing')).toHaveCount(0);
+
+    // A real click on a role in the notice moves focus to that seat's row.
+    const link = info.getByRole('link', { name: 'Araştırma Ortağı' });
+    await expectHydrated(link);
+    await link.click();
+    await expect(page.getByTestId('m8-builder-seat-research')).toBeFocused();
+    await page.screenshot({ path: `${SHOTS}/03-loi-info-rule-off-tr.png`, fullPage: true });
+
+    await page.goto(URL.replace('/tr/', '/en/'));
+    await expect(page.getByTestId('consortium-g1-loi-info')).toContainText(
+      'For information: 2 critical members have no letter of intent on file yet',
+      { timeout: 30_000 },
+    );
+    await expect(page.getByTestId('m8-builder-seat-research').getByTestId('seat-loi-missing')).toHaveText('No letter (info)');
+  });
+
+  test('rule on: a critical member without a letter of intent is a G1 blocker', async ({ page }) => {
+    test.skip(!LETTER_RULE_ON, 'G1 does not require letters of intent (default, NG-364); the information test covers it');
+    await open(page, URL);
+
+    const blocker = page.getByTestId('consortium-g1-loi-blocker');
+    await expect(blocker).toContainText('2 kritik üyenin niyet mektubu yok', { timeout: 30_000 });
+    await expect(blocker).toContainText('Araştırma Ortağı');
+    await expect(blocker).toContainText('Genişleme Ülkesi');
+    await expect(blocker).toContainText('G1 geçmez');
+    await expect(page.getByTestId('consortium-g1-loi-info')).toHaveCount(0);
+
+    const researchChip = page.getByTestId('m8-builder-seat-research').getByTestId('seat-loi-missing');
+    await expect(researchChip).toHaveText('Mektup yok: G1 engeli');
+    await expect(researchChip).toHaveAttribute('data-blocking', 'true');
+    await page.screenshot({ path: `${SHOTS}/04-loi-blocker-rule-on-tr.png`, fullPage: true });
+
+    await page.goto(URL.replace('/tr/', '/en/'));
+    await expect(page.getByTestId('consortium-g1-loi-blocker')).toContainText('2 critical members have no letter of intent', { timeout: 30_000 });
   });
 });

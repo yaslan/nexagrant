@@ -13,7 +13,7 @@ import { recordAlert } from '@/lib/observability/system-alert';
 import { visibleSeatCandidates } from '@/lib/scoring/seat-candidate-view';
 import { findOpportunityTopic } from '@/modules/m8/server/matching';
 import { listBudgetShares, type BudgetShareView } from '@/lib/gates/readiness-records';
-import { g1ConsortiumSummary, type G1ConsortiumSummary } from './g1-summary';
+import { loadG1ConsortiumInputs, type G1ConsortiumInputs } from '@/lib/gates/g1-consortium';
 
 /** `CordisOrganization` columns this page maps onto the manager's `OrgInfo`. */
 interface CordisOrgRow {
@@ -81,7 +81,7 @@ export default async function ConsortiumPage({
   let candidates: SeatCandidate[] = [];
   const orgs: OrgInfo[] = [];
   let liveDemandOrgIds: string[] = [];
-  let g1: G1ConsortiumSummary | null = null;
+  let g1: G1ConsortiumInputs | null = null;
   let budgetShares: BudgetShareView[] = [];
   let budgetSharesFailed = false;
 
@@ -139,16 +139,10 @@ export default async function ConsortiumPage({
         }
       }
 
-      // NG-20 (F5/F6): the gap and backup lists are the G1 gate's own, read from its latest
-      // decision rather than worked out again here. Same ordering as gates/evaluate.ts.
-      const g1Row = await withTenant(tenantId, (tx) =>
-        tx.gateDecision.findFirst({
-          where: { tenantId, opportunityId: id, gate: 'G1', deletedAt: null },
-          orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
-          select: { decidedAt: true, passed: true, inputs: true },
-        })
-      );
-      g1 = g1ConsortiumSummary(g1Row);
+      // NG-20 (F5/F6/F11): the gap, backup and letter-of-intent lists come from the G1 gate's own
+      // seat rules (src/lib/gates/g1-consortium.ts), read live from the seats. Reads only: no
+      // GateDecision is filed by a page view.
+      g1 = await withTenant(tenantId, (tx) => loadG1ConsortiumInputs(tx, tenantId, id));
 
       // NG-34 budget share ranges (F7). A failed read empties only that column.
       try {

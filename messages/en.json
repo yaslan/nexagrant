@@ -825,10 +825,18 @@
       "heading": "G1 pre-check: consortium",
       "unfilledTitle": "{count, plural, one {# critical role is not confirmed yet} other {# critical roles are not confirmed yet}}",
       "noBackupTitle": "{count, plural, one {# critical role has no backup candidate} other {# critical roles have no backup candidate}}",
-      "source": "Source: the latest G1 pre-check decision, dated {date}. If seats changed since then, run G1 again.",
-      "none": "The G1 pre-check has not run for this opportunity yet; critical role gaps and backup candidates appear here once it does.",
-      "notChecked": "The latest G1 decision did not check the consortium seats; there is no gap list.",
-      "clear": "According to the latest G1 decision every critical role is confirmed and has a backup candidate."
+      "loiBlockerTitle": "{count, plural, one {# critical member has no letter of intent} other {# critical members have no letter of intent}}",
+      "loiBlockerNote": "G1 requires a letter of intent from every critical member; it will not pass until the letters are recorded.",
+      "loiInfoTitle": "{count, plural, one {For information: # critical member has no letter of intent on file yet} other {For information: # critical members have no letter of intent on file yet}}",
+      "loiInfoNote": "G1 does not require letters of intent at the moment; this is not a blocker.",
+      "source": "Worked out from the seats as they are now, with the G1 rules. This screen does not record a G1 decision.",
+      "unavailable": "The G1 consortium conditions of this opportunity could not be read.",
+      "noCriticalSeats": "This opportunity has no critical roles; there is no seat for the G1 consortium conditions to check.",
+      "clear": "Every critical role is confirmed and has a backup candidate."
+    },
+    "loi": {
+      "missingBlocker": "No letter: blocks G1",
+      "missingInfo": "No letter (info)"
     }
   },
   "Auth": {

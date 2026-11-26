@@ -8,7 +8,7 @@ import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat
 import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 import { formatMinorWhole } from '@/lib/money';
 import type { BudgetShareView } from '@/lib/gates/readiness-records';
-import type { G1ConsortiumSummary } from './g1-summary';
+import type { G1ConsortiumInputs } from '@/lib/gates/g1-consortium';
 import { partnerOrgKey, seatStage, SEAT_STEP_COUNT, type SeatStage } from './seat-view';
 
 // Local types matching prisma/schema.prisma — the generated client is not
@@ -51,10 +51,10 @@ interface Props {
   /** The viewer's role may confirm seats, decided on the server. The action checks it again. */
   canConfirm?: boolean;
   /**
-   * NG-20: the latest G1 decision's consortium lists (src/lib/gates/evaluate.ts), read on the
-   * server. `null` = no G1 decision on file. The screen never works the lists out itself.
+   * NG-20: the G1 seat conditions for the seats as they are now (`loadG1ConsortiumInputs`), read
+   * on the server. `null` = they could not be read. The screen never works the lists out itself.
    */
-  g1?: G1ConsortiumSummary | null;
+  g1?: G1ConsortiumInputs | null;
   /** NG-34 budget share ranges of this opportunity's seats; `null` = the read failed. */
   budgetShares?: BudgetShareView[] | null;
 }
@@ -185,55 +185,78 @@ function RoleLinks({ roleKeys, roleLabel }: { roleKeys: string[]; roleLabel: (ke
 }
 
 /**
- * NG-20: the G1 gate's consortium answer, shown as the gate gave it. No rule is applied here:
- * the two lists are `inputs.unfilledCriticalRoles` / `inputs.criticalRolesWithoutBackup` of the
- * latest G1 decision, and the decision date says how fresh they are.
+ * NG-20: the G1 gate's consortium conditions for the seats as they are now. No rule is applied
+ * here: the lists come from `loadG1ConsortiumInputs` (src/lib/gates/g1-consortium.ts), the same
+ * seat rules `evaluateGate` uses. A missing letter of intent is a blocker only while the gate
+ * requires letters (`letterOfIntentRequired`); otherwise it is shown as information.
  */
-function G1Band({ g1, roleLabel }: { g1: G1ConsortiumSummary | null; roleLabel: (key: string) => string }) {
+function G1Band({ g1, roleLabel }: { g1: G1ConsortiumInputs | null; roleLabel: (key: string) => string }) {
   const t = useTranslations('Consortium');
-  const format = useFormatter();
-  if (!g1 || !g1.checkedConsortium) {
+  if (!g1) {
     return (
       <p data-testid="consortium-g1-none" className="mb-6 rounded-xl border border-border bg-ground p-4 text-sm text-ink-2">
-        {g1 ? t('g1.notChecked') : t('g1.none')}
+        {t('g1.unavailable')}
       </p>
     );
   }
-  const source = (
-    <p data-testid="consortium-g1-source" className="mt-2 text-xs text-muted">
-      {t('g1.source', {
-        date: format.dateTime(new Date(g1.decidedAt), { day: '2-digit', month: '2-digit', year: 'numeric' }),
-      })}
-    </p>
-  );
-  if (g1.unfilledCriticalRoles.length === 0 && g1.criticalRolesWithoutBackup.length === 0) {
+  if (g1.criticalSeatsCount === 0) {
     return (
-      <div data-testid="consortium-g1-clear" className="mb-6 rounded-xl border border-ok/30 bg-ok/10 p-4 text-sm text-ok-ink">
-        <p className="font-semibold">{t('g1.clear')}</p>
-        {source}
-      </div>
+      <p data-testid="consortium-g1-no-critical" className="mb-6 rounded-xl border border-border bg-ground p-4 text-sm text-ink-2">
+        {t('g1.noCriticalSeats')}
+      </p>
     );
   }
+  const unfilled = g1.unfilledCriticalRoles;
+  const noBackup = g1.criticalRolesWithoutBackup;
+  const noLetter = g1.criticalRolesWithoutLoi;
+  const letterBlocks = g1.letterOfIntentRequired && noLetter.length > 0;
+  const clear = unfilled.length === 0 && noBackup.length === 0 && !letterBlocks;
   return (
     <section aria-labelledby="consortium-g1-heading" className="mb-6 space-y-3">
       <h2 id="consortium-g1-heading" className="sr-only">{t('g1.heading')}</h2>
-      {g1.unfilledCriticalRoles.length > 0 && (
+      {clear && (
+        <div data-testid="consortium-g1-clear" className="rounded-xl border border-ok/30 bg-ok/10 p-4 text-sm text-ok-ink">
+          <p className="font-semibold">{t('g1.clear')}</p>
+        </div>
+      )}
+      {unfilled.length > 0 && (
         <div data-testid="consortium-g1-unfilled" className="rounded-xl border border-bad/30 bg-bad/10 p-4 text-sm text-bad-ink">
           <p className="font-bold">
             <span aria-hidden="true">⚠ </span>
-            {t('g1.unfilledTitle', { count: g1.unfilledCriticalRoles.length })}
+            {t('g1.unfilledTitle', { count: unfilled.length })}
           </p>
-          <RoleLinks roleKeys={g1.unfilledCriticalRoles} roleLabel={roleLabel} />
-          {source}
+          <RoleLinks roleKeys={unfilled} roleLabel={roleLabel} />
         </div>
       )}
-      {g1.criticalRolesWithoutBackup.length > 0 && (
+      {noBackup.length > 0 && (
         <div data-testid="consortium-g1-no-backup" className="rounded-xl border border-amber/30 bg-amber/10 p-4 text-sm text-amber-ink">
-          <p className="font-bold">{t('g1.noBackupTitle', { count: g1.criticalRolesWithoutBackup.length })}</p>
-          <RoleLinks roleKeys={g1.criticalRolesWithoutBackup} roleLabel={roleLabel} />
-          {g1.unfilledCriticalRoles.length === 0 && source}
+          <p className="font-bold">{t('g1.noBackupTitle', { count: noBackup.length })}</p>
+          <RoleLinks roleKeys={noBackup} roleLabel={roleLabel} />
         </div>
       )}
+      {noLetter.length > 0 &&
+        (letterBlocks ? (
+          <div data-testid="consortium-g1-loi-blocker" className="rounded-xl border border-bad/30 bg-bad/10 p-4 text-sm text-bad-ink">
+            <p className="font-bold">
+              <span aria-hidden="true">⚠ </span>
+              {t('g1.loiBlockerTitle', { count: noLetter.length })}
+            </p>
+            <RoleLinks roleKeys={noLetter} roleLabel={roleLabel} />
+            <p className="mt-2 text-xs">{t('g1.loiBlockerNote')}</p>
+          </div>
+        ) : (
+          <div data-testid="consortium-g1-loi-info" className="rounded-xl border border-border bg-ground p-4 text-sm text-ink-2">
+            <p className="font-semibold text-ink">
+              <span aria-hidden="true">ⓘ </span>
+              {t('g1.loiInfoTitle', { count: noLetter.length })}
+            </p>
+            <RoleLinks roleKeys={noLetter} roleLabel={roleLabel} />
+            <p className="mt-2 text-xs text-muted">{t('g1.loiInfoNote')}</p>
+          </div>
+        ))}
+      <p data-testid="consortium-g1-source" className="text-xs text-muted">
+        {t('g1.source')}
+      </p>
     </section>
   );
 }
@@ -249,6 +272,8 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
   };
   const unfilled = new Set(g1?.unfilledCriticalRoles ?? []);
   const noBackup = new Set(g1?.criticalRolesWithoutBackup ?? []);
+  const noLetter = new Set(g1?.criticalRolesWithoutLoi ?? []);
+  const letterRequired = g1?.letterOfIntentRequired === true;
   const shareBySeat = new Map((budgetShares ?? []).map((s) => [s.seatId, s]));
   const [seats, setSeats] = useState(initSeats);
   const [candidateMap, setCandidateMap] = useState<Record<string, SeatCandidate[]>>(() => {
@@ -429,6 +454,15 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusStyle}`}>
                     {statusLabel}
                   </span>
+                  {critical && noLetter.has(rawRoleKey) && (
+                    <span
+                      data-testid="seat-loi-missing"
+                      data-blocking={letterRequired ? 'true' : 'false'}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${letterRequired ? 'border-bad/30 bg-bad/10 text-bad-ink' : 'border-border bg-ground text-ink-2'}`}
+                    >
+                      {letterRequired ? t('loi.missingBlocker') : t('loi.missingInfo')}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">
