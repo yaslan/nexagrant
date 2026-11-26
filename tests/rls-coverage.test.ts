@@ -311,7 +311,7 @@ describe('4b — every migration protects the tenant table it creates', () => {
 
 describe('SYSTEM_SCOPE_POLICY — tenant-less tables reachable only inside withSystemScope (FO-45, FO-50)', () => {
   test('each one is SYSTEM_WIDE and gets the system_scope policy, gated by system_scope_open, in prisma/rls.sql', () => {
-    expect([...SYSTEM_SCOPE_POLICY].sort()).toEqual(['ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead']);
+    expect([...SYSTEM_SCOPE_POLICY].sort()).toEqual(['CookieConsentRecord', 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead']);
     for (const t of SYSTEM_SCOPE_POLICY) {
       expect(SYSTEM_WIDE.has(t)).toBe(true);
       expect(rlsSql).toContain(`ALTER TABLE public."${t}" ENABLE ROW LEVEL SECURITY;`);

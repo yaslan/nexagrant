@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import ts from 'typescript';
@@ -189,6 +189,17 @@ const PAGE_DOORS: Record<string, Action> = {
   // Review R-1 (first round B-1), K-577556: a guest reviewer reaches the panel to
   // score; the panel-wide table stays behind view_proposal (checked below).
   'opportunities/[id]/evaluations/panel/page.tsx': 'contribute_assigned',
+  // NG-286: the nine pages the first round of this table missed. The seven
+  // musteri-hatti pages had moduleGate('M18') ahead of the door (fixed in their files).
+  'settings/profile/page.tsx': 'view_proposal',
+  'proje-fikri/page.tsx': 'view_proposal',
+  'musteri-hatti/page.tsx': 'client_pipeline_read',
+  'musteri-hatti/import/page.tsx': 'client_pipeline_read',
+  'musteri-hatti/duplicates/page.tsx': 'client_pipeline_read',
+  'musteri-hatti/leads/page.tsx': 'client_pipeline_read',
+  'musteri-hatti/leads/[id]/page.tsx': 'client_pipeline_read',
+  'musteri-hatti/pipeline/page.tsx': 'client_pipeline_read',
+  'musteri-hatti/tasks/page.tsx': 'client_pipeline_read',
 };
 
 describe('each gated page names its door', () => {
@@ -257,6 +268,60 @@ describe('each constant-named page takes its door from access.ts (NG-11 F4)', ()
       expect(can(role, NG_PLAN_VIEW_ACTION)).toBe(false);
     }
   });
+});
+
+/**
+ * NG-286: the door tables are the list every order check scans. A page that calls
+ * `requireTenantPageRole(` but is missing from them is checked by nothing (NG-277 review:
+ * nine such pages, seven of them with `moduleGate('M18')` ahead of the door). This walk finds
+ * every `.tsx` file under the workspace segment that makes the call and fails by file name for
+ * any the tables do not name.
+ */
+function filesCalling(dir: string, needle: string, base = dir): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...filesCalling(full, needle, base));
+    else if (entry.name.endsWith('.tsx') && readFileSync(full, 'utf8').includes(needle)) {
+      out.push(path.relative(base, full).split(path.sep).join('/'));
+    }
+  }
+  return out.sort();
+}
+
+describe('every page that calls requireTenantPageRole is in the door tables (NG-286)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  const callers = filesCalling(root, 'requireTenantPageRole(');
+
+  test('the walk finds the gated pages (guards against an empty scan)', () => {
+    expect(callers.length).toBeGreaterThan(30);
+  });
+
+  test('no page calls the door without being listed in PAGE_DOORS or PAGE_DOOR_CONSTANTS', () => {
+    const unlisted = callers.filter((f) => !(f in PAGE_DOORS) && !(f in PAGE_DOOR_CONSTANTS));
+    expect(unlisted, 'pages that call requireTenantPageRole but are not in the door tables').toEqual([]);
+  });
+
+  test('every listed page still makes the call (a stale entry cannot pass for a door)', () => {
+    const stale = [...Object.keys(PAGE_DOORS), ...Object.keys(PAGE_DOOR_CONSTANTS)].filter((f) => !callers.includes(f));
+    expect(stale).toEqual([]);
+  });
+});
+
+/**
+ * NG-286 Ö-3: the door must be the helper imported from `@/lib/page-role`. A page that defines
+ * its own `requireTenantPageRole` would keep the name and drop the `can()` check.
+ */
+describe('the door is the imported page-role helper, never a local copy (NG-286 Ö-3)', () => {
+  const root = path.join(process.cwd(), 'src/app/[locale]/(app)/[workspace]');
+  const files = [...Object.keys(PAGE_DOORS), ...Object.keys(PAGE_DOOR_CONSTANTS)];
+  for (const file of files) {
+    test(`${file}: requireTenantPageRole is imported from '@/lib/page-role' and not redefined`, () => {
+      const source = readFileSync(path.join(root, file), 'utf8');
+      expect(source).toMatch(/import \{[^}]*\brequireTenantPageRole\b[^}]*\} from '@\/lib\/page-role';/);
+      expect(source).not.toMatch(/\b(function|const|let|var)\s+requireTenantPageRole\b/);
+    });
+  }
 });
 
 describe('evaluation panel: the panel-wide scores are view_proposal only (review R-1)', () => {

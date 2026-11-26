@@ -60,7 +60,7 @@ kapı da (statik `pnpm rls:check`, canlı `pnpm rls:verify`) aynı listeyi okur.
 Topic ──(TopicMatch: K1 fitScore, tenant×topic)──▶ Opportunity(stage G0..G4, intendedRole)
    Opportunity ──(TopicMatch: g0Score + breakdown, fırsat başına)──▶ kanıt kaydı
    Opportunity ──▶ GateDecision[] (her kapı; inputs JSON; ruleVersion)
-   Opportunity ──▶ ConsortiumSeat[] (roleKey; organizationId | partnerOrgId; status)
+   Opportunity ──▶ ConsortiumSeat[] (roleKey; organizationId | partnerOrgId; status; memberStage + niyet mektubu, §34)
                        └─▶ SeatCandidate[] (M8 puanları)
    Opportunity ──▶ ConceptNote[] (M2) ──▶ Proposal (1:1; esrScores; outcome)
    Opportunity ──▶ Effort[] (kişi-saat)
@@ -95,7 +95,9 @@ yüzden bir tasarım ortağının hattında ya da KPI panosunda **görünmez**. 
   (`data`: `{ signature }`, kiracı kapsamında, aynı transaction); sonra nesne depodan silinir ve sonucu ikinci
   `AuditEvent` `evidence.scan.object_removed` (`data`: `{ objectDeleted: boolean }`) + `SystemAlert` `error`
   (`source: evidence-scan`, kiracı kimliği ve dosya adı YOK). `AuditEvent` satırları güncellenmez; silme sonucu
-  yeni bir satırdır. Yarım kalan silme bir sonraki çalıştırmada `object_removed` yoksa tamamlanır. `ERROR` (clamd yok/kapalı/zaman
+  yeni bir satırdır. Yarım kalan silme bir sonraki çalıştırmada `object_removed` yoksa tamamlanır. Başarısız silme
+  (`objectDeleted:false`) süpürmeyle bekleme sonrası yeniden denenir (NG-279; şema değişikliği yok: durum
+  `object_removed` olaylarının sırasından okunur, her deneme yeni olay ve `createdAt` denemenin anı). `ERROR` (clamd yok/kapalı/zaman
   aşımı/okunamayan nesne/clamd sınırı aşıldı `limits_exceeded` — `AlertExceedsMax yes` ile): inmez, 1 dk → 5 dk → 30 dk yeniden dener (`evidence-scan:<evidenceId>:<attempt>`), sonra
   `warn` alarm; `evidence-scan-sweep` (her 15 dk) iş kaybolmuş `PENDING` (>2 dk) ve tükenmiş `ERROR` (>6 sa)
   satırlarını kiracı başına sayfa sayfa yeniden kuyruğa koyar (kalıcı düşmüş iş aynı anahtarla değiştirilir). Migration öncesi satırlar da `PENDING` olur ve süpürmeyle taranır (kapalı hata:
@@ -1300,3 +1302,32 @@ Kaynak: NG-244 §6.1, `06-Fiyat-Politikasi.md` §1/§4/§7; kararlar K-584182 = 
   - **Etki:** Deneme kiracıyı salt-okur yapmaz. Plan düşer ve özellikler daralır; hiçbir veri silinmez.
 - **Yetki:** `can(role, action, { feature, grantedFeatures, moduleOpen? })` (`src/lib/rbac.ts`) yetkinin tek yoludur. NexaGrant için çağıran `canUseNgFeature` (`authz.ts`) olur: önce rol izni, sonra planın o özelliği vermesi, sonra (eşlenmişse) modülün açık olması aranır. İki argümanlı `can()` eskisi gibi çalışır.
 - **Dağıtım sırası:** Migration koddan ÖNCE uygulanmalıdır, çünkü kayıt akışı `NgSubscription` tablosuna yazar. Tablo yoksa kayıt düşer.
+
+## 34. Konsorsiyum üye aşaması ve niyet mektubu: `ConsortiumSeat.memberStage`, `memberStageAt`, `loiReceivedAt`, `loiDocumentUrl` (NG-364 · K-586296 = B · NG-20 F11)
+
+- **Neden ayrı tablo yok:** K-586296 = B. Aşama koltuğa aittir: bir koltukta bir üye olur, aşaması da onunla birlikte durur. `SeatStatus` değişmedi (`OPEN|CANDIDATE|INVITED|CONFIRMED|DECLINED`); aşama onun yanında, üyeyle konuşmanın nerede olduğunu söyler.
+- **Alanlar (hepsi NULL olabilir; migration öncesi koltuklar NULL kalır):**
+  - `memberStage MemberStage?`: `INTERESTED → MET → LOI → CONFIRMED` (yeni enum `MemberStage`). NULL = henüz aşama girilmedi.
+  - `memberStageAt DateTime?` (UTC): aşamanın son değiştiği an. Aynı aşamada yalnız mektup bilgisi değişirse korunur.
+  - `loiReceivedAt DateTime?` (UTC): niyet mektubunun alındığı gün. Tarih-only giriş UTC gece yarısı olarak yazılır; gelecek tarih reddedilir.
+  - `loiDocumentUrl String?`: mektubun bağlantısı; yalnız `https` (Zod), en çok 2048 karakter.
+- **Geçiş kuralları (tek yer `src/modules/m8/server/member-stage.ts` `planMemberStageChange`, saf, birim testli):** koltukta üye (`organizationId` veya `partnerOrgId`) yoksa ve koltuk `DECLINED` ise aşama yazılmaz. İleri atlama serbesttir, geri dönüş de serbesttir; geri dönüşte mektup verisi silinmez ama sayılmaz. `CONFIRMED` aşaması yalnız `SeatStatus = CONFIRMED` koltukta olur; `CONFIRMED` bir koltuk başka aşamaya alınamaz. LOI alanları `LOI` öncesi aşamada gönderilemez. Yazım `updateMany` ile okunan durum (`status`, üye, `memberStage`) WHERE'de tutularak yapılır; arada değişen koltuk `SEAT_CHANGED` döner, hiçbir şey yazılmaz.
+- **Senkron:** `confirmSeatAssignment` koltuğu `CONFIRMED` yaparken `memberStage = CONFIRMED`, `memberStageAt = now` yazar (mektup uydurmaz). `inviteSeatCandidate` koltuğa **başka** bir kurum koyarsa dört alanı temizler; eski üyenin mektubu yeni üyeye sayılmaz.
+- **Server action:** `setSeatMemberStage(input)` (`src/modules/m8/server/actions.ts`): `requireTenantAction({ can: 'manage_workspaces' })` → Zod → `withTenant` → `setMemberStage`. Kodlar: `INVALID_INPUT`, `SEAT_NOT_FOUND` (başka kiracının koltuğu RLS altında görünmez), `SEAT_CHANGED`, ve kural kodları `NO_MEMBER|SEAT_DECLINED|SAME_STAGE|SEAT_NOT_CONFIRMED|SEAT_IS_CONFIRMED|LOI_BEFORE_STAGE|LOI_IN_FUTURE`.
+- **G1 kuralı (`requireLetterOfIntentForCriticalSeats`, **varsayılan KAPALI**; G1 `ruleVersion` 1.1):** kural açıkken üyesi olan her kritik (`required`) koltukta mektup kayıtlı olmalı: üye var + `memberStage ∈ {LOI, CONFIRMED}` + `loiReceivedAt` dolu. Eksikse ret kodu `G1_NO_LOI` (`{ role }`), `GateDecision.inputs.criticalRolesWithoutLoi`. Üyesi olmayan koltuk zaten "doldurulmadı" diye reddedilir, ikinci kez mektup için reddedilmez. Hesap `src/lib/gates/g1-consortium.ts` `g1ConsortiumFacts` içindedir; kapı ve ekran aynı fonksiyonu kullanır.
+- **Varsayılan neden kapalı (patron kararı 25.11.2026):** migration öncesi koltuklarda `memberStage` NULL; kural açık başlasaydı kritik rolü olan her fırsat merge sonrası G1'de `G1_NO_LOI` ile takılırdı. Mektubu girecek ekran (NG-20 Faz 2) gelince `src/lib/scoring/defaults.ts` içinde `true` yapılır. Kapalıyken `G1_NO_LOI` hiç üretilmez ve `GateDecision.inputs` `criticalRolesWithoutLoi` taşımaz; ekran girdisi eksik mektupları yine listeler ama `letterOfIntentRequired: false` der (engel değil, bilgi). Ayarlar → Kapılar ekranı satırı "Aranmaz / Not required" gösterir. Kuralın testleri ayarı açıkça `true` verir (`tests/helpers/gate-rules.ts`).
+- **Ekran girdisi:** `loadG1ConsortiumInputs(tx, tenantId, opportunityId)` yalnız okur ve UI için `unfilledCriticalRoles`, `criticalRolesWithoutBackup`, `criticalRolesWithoutLoi`, `letterOfIntentRequired` ve koltuk başına aşama + mektup durumunu döndürür. Fırsat kiracıda değilse `null`.
+- **RLS:** yeni tablo yok; alanlar `ConsortiumSeat`'in mevcut `tenant_isolation` politikası altındadır.
+- **Migration:** `prisma/migrations/add-consortium-seat-member-stage.sql` (yalnız ekleme; `CREATE TYPE` `duplicate_object` ile, kolonlar `ADD COLUMN IF NOT EXISTS`; iki kez koşmak güvenli). Geri alma: `add-consortium-seat-member-stage.down.sql` (kolonları ve enum'u düşürür; veri kaybı = aşama ve mektup kayıtları).
+## 35. `CookieConsentRecord` — çerez rıza kaydı (NG-9 · FE-1.5)
+
+Çerez bandı ve tercih panelinde (`src/components/CookieConsent.tsx`) **kaydedilen her seçim** için bir satır. Kayıt kendi veritabanımızdadır; üçüncü taraf rıza platformu yok. Tercih değiştikçe yeni satır düşer, eski satır silinmez ve değişmez (son satır geçerli seçimdir, öncekiler rızanın geçmişidir).
+
+- **Kişisel veri yok.** `tenantId`, kullanıcı id'si, IP, user agent, e-posta tutulmaz; uç nokta bunları okumaz. Ziyaretçi, tarayıcıda ilk seçim anında üretilen rastgele bir UUID ile anılır (`localStorage['fabrika_consent_id']`, `CONSENT_VISITOR_ID_STORAGE_KEY`). Bu id analitik olaylarıyla gitmez; analitik id'si (`fabrika_analytics_anon_id`) ayrıdır ve iki kayıt birleştirilemez. Oturumlu kullanıcıda da aynı anonim id kullanılır (kullanıcıya bağlanmaz).
+- **Alanlar.** `id` (cuid), `visitorId` (UUID), `choice` (`accept_all` | `reject_all` | `custom`; "Seçimimi kaydet" her zaman `custom`), `analytics`, `marketing` (Boolean; zorunlu kategori her zaman açık olduğu için sütunu yok), `policyVersion` (`COOKIE_POLICY_VERSION`, `src/lib/cookie-consent.ts`; hukuk onayına kadar `draft-…`), `locale` (`tr`/`en`), `createdAt` (sunucu saati, UTC).
+- **Yazıcı.** Tek yol: `POST /api/cookie-consent` → `recordCookieConsent` (`src/lib/cookie-consent-record.ts`). Zod şeması `.strict()` (fazla alan → 400) ve seçim ile kategorilerin tutarlılığını ister (`accept_all` ikisi de açık, `reject_all` ikisi de kapalı). Yanıtlar: 201 · 400 `invalid` · 429 `rate_limited` · 500. İstemci isteği beklemez (`keepalive`, hata sessiz); tarayıcıdaki seçim her durumda geçerlidir ve neyin yükleneceğini o belirler.
+- **Sınır.** Ziyaretçi id'si başına 1 saatte en çok 30 kayıt (`COOKIE_CONSENT_HOURLY_LIMIT`). İd istemcide üretildiği için yeni id ile atlatılabilir; tablo kişisel veri taşımadığından risk yalnız hacimdir (bkz. Açık işler).
+- **RLS.** `SYSTEM_WIDE` + `SYSTEM_SCOPE_POLICY` (`scripts/rls-models.ts`); RLS **açık**, tek politika `system_scope`. `system_scope_open()` tabloyu yalnız `public-intake` (yazma), `platform-admin` ve `cross-tenant-job` amaçlarına açar (`prisma/rls.sql`); kiracı oturumu ve diğer amaçlar 0 satır görür, yazamaz. Ölçüm: `rls:verify` (`scripts/check-rls-live.ts`: tablo probu, `PUBLIC_INTAKE_*`, `PURPOSE_NARROWED`).
+- **İndeksler.** `(visitorId, createdAt)` (sınır ve geçmiş), `createdAt` (ileride saklama işi).
+- **Migration.** `prisma/migrations/add-cookie-consent-record.sql` (idempotent; `system_scope_open` yoksa RLS'yi kapalı bırakıp NOTICE yazar, `db:rls` sonra açar). Geri alma: `.down.sql` (tabloyu düşürür; rıza geçmişi kaybolur — önce kod geri alınmalı).
+- **Açık işler.** Saklama süresi ve temizlik işi yok (hukuk kararı bekliyor); `policyVersion` değişince bandın yeniden sorulması henüz yok (yalnız kaydedilir).

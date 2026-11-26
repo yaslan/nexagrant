@@ -23,6 +23,7 @@ export function useGateReasonText(): (reason: GateReason) => string {
       switch (reason.code) {
         case 'G1_SEAT_NO_ORGANISATION':
         case 'G1_NO_BACKUP':
+        case 'G1_NO_LOI':
           return t(reason.code, { role: roleWord(reason.values.role) });
         case 'G1_SEAT_NOT_FILLED':
           return t(reason.code, { role: roleWord(reason.values.role), status: statusWord(reason.values.status) });

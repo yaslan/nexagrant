@@ -6,6 +6,7 @@ import { prisma } from '../../src/lib/db';
 import { expectHydrated } from './fixtures/hydration';
 import { shotsDir } from './fixtures/shots';
 import { signInAs } from './fixtures/session';
+import { presentIds } from '../helpers/teardown-guard';
 
 /**
  * NG-27: one opportunity, from the "Yeni Fırsat" form through G0 to G1, by real clicks.
@@ -519,7 +520,12 @@ test.describe('NG-27 the chain on one opportunity', () => {
     dump('G0 sonrası fırsat', afterG0);
     expect(afterG0).toEqual({ stage: 'G0', g0Score: 75 });
 
-    // ── 8. G1 by the detail button.
+    // ── 8. G1 by the detail button. NG-364: G1 also wants a letter of intent from every critical
+    // member; the screen that records it is fe-gnd's, so the fixture writes it here.
+    await prisma.consortiumSeat.updateMany({
+      where: { id: { in: presentIds([research.id, endUser.id]) }, tenantId: PRO, status: 'CONFIRMED' },
+      data: { memberStage: 'CONFIRMED',loiReceivedAt: new Date('2026-11-01T00:00:00Z') },
+    });
     main = await openDetail(page, PRO_SLUG, opp.id);
     await main.getByTestId('pipeline-evaluate-gate').click();
     await expect(main.getByTestId('pipeline-gate-result')).toContainText('G1 kapısı geçildi', { timeout: 30_000 });

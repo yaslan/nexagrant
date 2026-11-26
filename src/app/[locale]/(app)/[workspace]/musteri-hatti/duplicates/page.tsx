@@ -14,9 +14,9 @@ export default async function DuplicatesPage({
   params: Promise<{ locale: string; workspace: string }>;
 }) {
   const { locale, workspace } = await params;
+  const { tenantId, role } = await requireTenantPageRole(locale, 'client_pipeline_read');
   const locked = await moduleGate('M18', locale);
   if (locked) return locked;
-  const { tenantId, role } = await requireTenantPageRole(locale, 'client_pipeline_read');
   const canWrite = can(asRole(role), 'client_pipeline_write');
   const t = await getTranslations({ locale, namespace: 'm18' });
 

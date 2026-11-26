@@ -25,6 +25,25 @@ Bilinen kalan risk (FO-348 K6): kayıt yazımı yalnız koşu sonunda tree'yi ka
 
 `pnpm gate:isolated` (argümansız) aynı kararı önce verir; önbellek ya da belge-yalnız ise konteyner kurmadan doğrudan `pnpm gate`'e geçer.
 
+## Çıkış kodu ve pre-push kancası (NG-331)
+
+Kapının çıkış kodu **gerçek alt süreçten** gelir: `scripts/gate-lock.mjs` alt sürecin kodunu aynen yayar (kırmızı 3 → 3), sinyalle ölürse `128+n` (SIGKILL → 137). Kodda sabit `GATE_EXIT:0` yoktur. Yeşil bir kapıyı kırmızı gösteren üç bilinen yol vardı, üçü de kapatıldı ya da belgelendi:
+
+1. **Boru ile `tee` (kabuk tuzağı, koddan değil kullanımdan gelir).** `pnpm gate | tee log; echo GATE_EXIT=$?` yazdırdığı kod `tee`'nin kodudur: kırmızı koşuda bile `0`. Doğrulandı: `sh -c "exit 3" | tee log; echo $?` → `0`; `set -o pipefail` ile aynı komut → `3`. Kural: log için **yönlendirme** kullan (`pnpm gate > log 2>&1; echo GATE_EXIT=$?`), ya da boru varsa `set -o pipefail`. Kodu bir kez alıp sakla: `rc=$?` boruyla hemen ardından değil, komuttan hemen sonra okunur.
+2. **Kanca kurulu değilse push hiç kapılanmaz.** `githooks/pre-push` yalnız `core.hooksPath=githooks` ayarlıyken çalışır. Ayar yoksa git `.git/hooks/` (boş) arar ve push sessizce geçer. Her klonda bir kez: `pnpm hooks:install` (`git config core.hooksPath githooks`; ortak `.git/config` üzerinden tüm worktree'lere etki eder). Kontrol: `git config --get core.hooksPath` → `githooks`.
+3. **Sonuç önbelleği (FO-339) `önbellek: …` basıp 0 döner.** Aynı tree + aynı `pnpm-lock.yaml` için yeşil kayıt varsa tam gate koşmaz; bu kasıtlı, kaydı yalnız yeşil ve temiz ağaçta yazılır. Yeni bir kod değişikliğinde tree değişeceği için kayıt geçersizdir. Kanıt olarak "gerçek koşu" istenirse `FONBRIDGE_GATE_NO_CACHE=1 pnpm gate`.
+
+**Pre-push kancası:** `githooks/pre-push` tam kapıyı (`pnpm gate`) koşar; kapı kırmızıysa push durur, hook `KAPI KIRMIZI (çıkış <n>)` yazıp o kodla çıkar. Hiçbir ortam değişkeni hook'taki kapıyı atlatmaz (`FONBRIDGE_GATE_LOCK_HELD` yalnız kilidi atlar, kapıyı değil). Tek atlatma yolu git'in `--no-verify`'ıdır; **kullanma**.
+
+**Push edilen ref kontrolü (NG-331 B1).** Kapı `HEAD`'i sınar. Kanca git'in stdin satırlarını (`<yerel-ref> <yerel-sha> <uzak-ref> <uzak-sha>`) okur; silme-olmayan her satırda `yerel-sha` ≠ `git rev-parse HEAD` ise kapı koşmadan fail-closed çıkar (`push edilen commit HEAD değil`). Yoksa yeşil `HEAD` kırmızı bir commit'in push'unu geçirirdi. Düzeltme: önce ilgili commit'i checkout edin, sonra push edin.
+**Silme muafiyeti (lider kararı):** `yerel-sha` tümü `0` olan (uzak dal silme) push'u kod taşımadığı için kapı kontrolüne girmez.
+**Paylaşılan DB reddi (K-585866 = A, NG-331):** DB adı tam olarak `fabrika` ise (`127.0.0.1:5433/fabrika` gibi; paylaşılan DB) ve push kod taşıyorsa kanca kapıyı koşmadan `exit 1` verir: `pre-push: bu checkout'un DATABASE_URL'i paylaşılan fabrika DB'si gösteriyor; push durduruldu.` Ad eşleşmesi tam addır: `fabrika_test_ng331` gibi izole adlar geçer. Silme push'u (yerel-sha 0…0) kod taşımadığı için muaftır. Worktree'de izole DB kur (CLAUDE.md "Worktree'de gate").
+**Sorguda DB adı değiştirme reddi (NG-331 #fix4):** Yukarıdaki ad URL'nin path'inden okunur. libpq ise sorgudaki `dbname=` değerini (ya da `service=` kaydındaki dbname'i) path'in üstüne yazar: `…/fabrika_test_ng331?dbname=fabrika` kancaya izole ad gösterir ama kapıyı `fabrika`'ya bağlar. Bu yüzden kod taşıyan push'ta `DATABASE_URL` sorgusunda `dbname=`, `service=` ya da `%` kodlu bir anahtar varsa kanca kapıyı koşmadan `exit 1` verir (`scripts/db-target.sh` `db_name_overridable`; anahtar adı büyük-küçük harf duyarsız). DB adını yalnız path'te yaz. Silme push'u yine muaftır.
+
+**Test koşu çıkış kodları (NG-331 O1/O2).** Belge-yalnız dalındaki `lint` + `i18n:check` adımının çıkış kodu da gerçek alt süreçten gelir: kırmızı 3 → 3, sinyalle ölüm → `128+n` (O2 öncesinde 1'e iniyordu). Önbellek isabeti 0 döner ve pnpm çağrılmaz.
+
+Doğrulama (NG-331): `tests/gate-exit-code.test.ts` (yeşil 0, kırmızı 3, SIGKILL 137, kilit bırakma), `tests/gate-cache-exit-code.test.ts` (belge-yalnız yolu 0/3/137, önbellek 0), `tests/pre-push-hook.test.ts` (kırmızı pnpm → hook 4 ve `KAPI KIRMIZI`; yeşil → 0; HEAD'den farklı push → fail-closed; silme → 0; HEAD push'u → normal kapı). Düzeltmeler (kanca B1 + `gate-lock.mjs` O2) eski sürümle geri alındığında 2 test kırmızıya döndü (B1 fail-closed, O2 137).
+
 ## Kısa yol: `pnpm gate:isolated` (önerilen)
 
 ```bash

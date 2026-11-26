@@ -27,7 +27,7 @@
 import type { DecisionKind, OppStatus } from '@prisma/client';
 import { z } from 'zod';
 
-import { withTenant } from '@/lib/db';
+import { withTenant, type TenantTx } from '@/lib/db';
 import { ARCHIVE_ROLES, canArchiveOpportunity } from '@/lib/pipeline/archive';
 import { isPresentId } from '@/lib/required-id';
 
@@ -41,14 +41,21 @@ export const WithdrawalInputSchema = z
   .strict();
 export type WithdrawalInput = z.input<typeof WithdrawalInputSchema>;
 
+/**
+ * `CONFLICT` (NG-282, inceleme Ö-2): the conditional update moved nothing, and the row read again
+ * in the same transaction shows no other reason — the opportunity changed in between (another
+ * status a withdrawal could still leave, e.g. a concurrent "submitted" declaration). The caller
+ * asks the user to refresh; nothing was written.
+ */
 export type WithdrawalRefusal =
   | 'REASON_REQUIRED'
   | 'NOT_FOUND'
   | 'FORBIDDEN'
   | 'ALREADY_WITHDRAWN'
-  | 'ALREADY_DECIDED';
+  | 'ALREADY_DECIDED'
+  | 'CONFLICT';
 
-export type ReactivationRefusal = 'REASON_REQUIRED' | 'NOT_FOUND' | 'FORBIDDEN' | 'NOT_WITHDRAWN';
+export type ReactivationRefusal = 'REASON_REQUIRED' | 'NOT_FOUND' | 'FORBIDDEN' | 'NOT_WITHDRAWN' | 'CONFLICT';
 
 export type DecisionView = {
   id: string;
@@ -98,6 +105,26 @@ function ownedByScope(scope: Scope): { ownerId?: string } {
   return ARCHIVE_ROLES.has(scope.role) ? {} : { ownerId: scope.userId };
 }
 
+/**
+ * NG-282 (inceleme Ö-2): why a conditional update moved nothing. The row is read again in the same
+ * transaction; under READ COMMITTED that statement sees what the concurrent writer committed, so
+ * the answer names the real reason (gone, owner changed, status changed) instead of guessing from
+ * the status read before the write.
+ */
+async function rereadAfterNoMove(
+  tx: TenantTx,
+  scope: Scope,
+  opportunityId: string,
+): Promise<{ refused: 'NOT_FOUND' | 'FORBIDDEN' } | { status: OppStatus }> {
+  const now = await tx.opportunity.findFirst({
+    where: { id: opportunityId, tenantId: scope.tenantId, deletedAt: null },
+    select: { status: true, ownerId: true },
+  });
+  if (!now) return { refused: 'NOT_FOUND' };
+  if (!canArchiveOpportunity(scope.role, now.ownerId, scope.userId)) return { refused: 'FORBIDDEN' };
+  return { status: now.status };
+}
+
 const DECISION_SELECT = {
   id: true,
   opportunityId: true,
@@ -145,7 +172,11 @@ export async function withdrawOpportunity(
       },
       data: { status: 'WITHDRAWN' },
     });
-    if (moved.count === 0) return { refused: 'ALREADY_WITHDRAWN' as const };
+    if (moved.count === 0) {
+      const now = await rereadAfterNoMove(tx, scope, opportunityId);
+      if ('refused' in now) return now;
+      return { refused: withdrawalRefusal(now.status) ?? ('CONFLICT' as const) };
+    }
 
     const decision = await tx.decisionLog.create({
       data: {
@@ -178,7 +209,7 @@ export type ReactivationInput = Scope & { opportunityId: string; reason: string 
  * WITHDRAWN → the status the latest withdrawal recorded (ACTIVE or SUBMITTED). Reason: the
  * withdrawal's rule (trimmed, 1–2000). Refusals: REASON_REQUIRED, NOT_FOUND (also another
  * tenant's id), FORBIDDEN (the role rule), NOT_WITHDRAWN (any other status, or a concurrent
- * reactivation won).
+ * reactivation won), CONFLICT (still WITHDRAWN but the row changed in between, NG-282).
  */
 export async function reactivateOpportunity(
   input: ReactivationInput,
@@ -218,7 +249,11 @@ export async function reactivateOpportunity(
       },
       data: { status: target },
     });
-    if (moved.count === 0) return { refused: 'NOT_WITHDRAWN' as const };
+    if (moved.count === 0) {
+      const now = await rereadAfterNoMove(tx, scope, opportunityId);
+      if ('refused' in now) return now;
+      return { refused: reactivationRefusal(now.status) ?? ('CONFLICT' as const) };
+    }
 
     const decision = await tx.decisionLog.create({
       data: {

@@ -4,7 +4,7 @@ import { isPresentId } from '../required-id';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { clearStoredG0, computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 import type { GateReason } from './reasons';
-import { visibleSeatCandidates } from '../scoring/seat-candidate-view';
+import { g1ConsortiumFacts, readG1Candidates, type G1Seat } from './g1-consortium';
 
 export type GateEvaluationResult = {
   passed: boolean;
@@ -13,34 +13,6 @@ export type GateEvaluationResult = {
   /** The same refusals as codes, one per line of `reasons`. Absent when there is nothing to explain. */
   reasonDetails?: GateReason[];
 };
-
-type G1Seat = {
-  id: string;
-  roleKey: string;
-  required: boolean;
-  status: string;
-  organizationId: string | null;
-  partnerOrgId: string | null;
-};
-type SeatCandidateRef = {
-  seatId: string;
-  organizationId: string | null;
-  partnerOrgId: string | null;
-  breakdown: unknown;
-};
-
-/** A CONFIRMED seat with no organisation confirms nobody (src/modules/m8/server/seat-transitions.ts). */
-function isSeatFilled(seat: G1Seat): boolean {
-  return seat.status === 'CONFIRMED' && Boolean(seat.organizationId || seat.partnerOrgId);
-}
-
-/** A backup is someone other than whoever holds the seat; the matcher can list the holder too. */
-function isBackupFor(candidate: SeatCandidateRef, seat: G1Seat): boolean {
-  return (
-    (candidate.organizationId !== null && candidate.organizationId !== seat.organizationId) ||
-    (candidate.partnerOrgId !== null && candidate.partnerOrgId !== seat.partnerOrgId)
-  );
-}
 
 /**
  * The opportunity is not visible to this tenant — it does not exist, or it belongs to someone else.
@@ -220,7 +192,15 @@ async function runGate(
         inputs.coordinatorRoleCheck = true;
       }
 
-      const criticalSeats = opp.seats.filter((s: G1Seat) => s.required);
+      // The seat rules live in ./g1-consortium.ts, which the consortium screen reads too (NG-364).
+      const seats: G1Seat[] = opp.seats;
+      const facts = g1ConsortiumFacts(
+        seats,
+        rules.requireBackupForCriticalSeats
+          ? await readG1Candidates(tx, tenantId, seats.filter((s) => s.required).map((s) => s.id))
+          : null,
+      );
+      const criticalSeats = facts.criticalSeats;
       inputs.criticalSeatsCount = criticalSeats.length;
       if (criticalSeats.length === 0) {
         // `required` defaults to true, so this is an opportunity nobody has put a consortium on.
@@ -229,8 +209,8 @@ async function runGate(
       }
 
       if (rules.requireCriticalSeatsFilled) {
-        const unfilled = criticalSeats.filter((s: G1Seat) => !isSeatFilled(s));
-        inputs.unfilledCriticalRoles = unfilled.map((s: G1Seat) => s.roleKey);
+        const unfilled = facts.unfilled;
+        inputs.unfilledCriticalRoles = unfilled.map((s) => s.roleKey);
         for (const seat of unfilled) {
           if (seat.status === 'CONFIRMED') {
             refuse(`Critical role ${seat.roleKey} is not filled: the confirmed seat names no organisation`, {
@@ -247,20 +227,21 @@ async function runGate(
       }
 
       if (rules.requireBackupForCriticalSeats) {
-        // NG-100 B-1: a backup is a row the screens show (visibleSeatCandidates), so the
-        // gate and the consortium page cannot disagree about who is a backup.
-        const candidates: SeatCandidateRef[] = visibleSeatCandidates(
-          await tx.seatCandidate.findMany({
-            where: { tenantId, seatId: { in: criticalSeats.map((s: G1Seat) => s.id) } },
-            select: { seatId: true, organizationId: true, partnerOrgId: true, breakdown: true },
-          }),
-        );
-        const withoutBackup = criticalSeats.filter(
-          (s: G1Seat) => !candidates.some((c) => c.seatId === s.id && isBackupFor(c, s)),
-        );
-        inputs.criticalRolesWithoutBackup = withoutBackup.map((s: G1Seat) => s.roleKey);
+        // NG-100 B-1: a backup is a row the screens show (visibleSeatCandidates, applied in
+        // g1ConsortiumFacts), so the gate and the consortium page cannot disagree about who is a backup.
+        const withoutBackup = facts.withoutBackup ?? [];
+        inputs.criticalRolesWithoutBackup = withoutBackup.map((s) => s.roleKey);
         for (const seat of withoutBackup) {
           refuse(`Critical role ${seat.roleKey} has no backup candidate`, { code: 'G1_NO_BACKUP', values: { role: seat.roleKey } });
+        }
+      }
+
+      if (rules.requireLetterOfIntentForCriticalSeats) {
+        // Spec §12 G1 "niyet mektupları toplandı" (NG-20 F11, NG-364). A seat that names nobody is
+        // already refused above as not filled; there is no member to have sent a letter.
+        inputs.criticalRolesWithoutLoi = facts.withoutLetter.map((s) => s.roleKey);
+        for (const seat of facts.withoutLetter) {
+          refuse(`Critical role ${seat.roleKey} has no letter of intent on file`, { code: 'G1_NO_LOI', values: { role: seat.roleKey } });
         }
       }
       break;
@@ -328,7 +309,8 @@ async function runGate(
       gate: gateId,
       passed,
       inputs,
-      ruleVersion: '1.0',
+      // G1 1.1: letters of intent (NG-364). The other gates are unchanged.
+      ruleVersion: gateId === 'G1' ? '1.1' : '1.0',
       decidedBy,
     }
   });

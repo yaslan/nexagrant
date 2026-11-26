@@ -750,7 +750,7 @@ describe.skipIf(!CLAMD_HOST)('NG-263: an INFECTED verdict survives a failed writ
     const key = (await rowOf(id)).r2ObjectKey!;
     // First run: the INFECTED write commits, then the run is lost before the removal starts
     // (its check for a recorded outcome throws: the job fails, the object is still in the store).
-    const inject = failAuditCallOnce((method, args) => method === 'findFirst' && args.where?.type === 'evidence.scan.object_removed');
+    const inject = failAuditCallOnce((method, args) => method === 'findMany' && args.where?.type === 'evidence.scan.object_removed');
     await expect(scanner.scanEvidence(run(id), { clamd, enqueue: async () => true, runTenant: inject.runTenant })).rejects.toThrow('injected');
     expect(inject.didFail()).toBe(true);
     expect((await rowOf(id)).scanStatus).toBe('INFECTED');
@@ -811,5 +811,149 @@ describe.skipIf(!CLAMD_HOST)('NG-263: an INFECTED verdict survives a failed writ
     const mine = alerts.filter((a) => (a.meta as { evidenceId?: string } | null)?.evidenceId === id);
     expect(mine, 'exactly one error alarm for this file').toHaveLength(1);
     alertIds.push(...mine.map((a) => a.id));
+  });
+});
+
+/**
+ * NG-279 (NG-263 inceleme Ö-2): a removal that failed (`objectDeleted: false`) used to be the end —
+ * the sweep took only PENDING and ERROR rows, so the infected bytes stayed in the store. Each sweep
+ * tick below is run as the worker would: the runs it queues for this file are run at once, at the
+ * tick's clock. The verdict comes from the real clamd when one is configured (NG239_CLAMD_HOST);
+ * without one (CI) the scan answer is injected, the rest is the same.
+ */
+describe('NG-279: an infected object that could not be deleted is tried again by the sweep', () => {
+  type Run = import('@/lib/evidence-scan').EvidenceScanRun;
+  type Deps = import('@/lib/evidence-scan').EvidenceScanDeps;
+  const run = (id: string): Run => ({ tenantId: t.tenant, evidenceId: id, attempt: 0 });
+  const verdictDeps: Deps = CLAMD_HOST
+    ? { clamd: { host: CLAMD_HOST, port: CLAMD_PORT, timeoutMs: 60_000 } }
+    : { scan: async () => ({ verdict: 'infected', signature: 'Eicar-Test-Signature' }) };
+  const failingDelete = async (): Promise<boolean> => {
+    throw new Error('injected: delete failed');
+  };
+  const MIN = 60_000;
+  const HOUR = 60 * MIN;
+
+  /** One sweep tick at `at`; this file's queued runs are run at once with `deleteObject` (default: the real one). */
+  async function tick(id: string, at: Date, deleteObject?: Deps['deleteObject']) {
+    const queued: Run[] = [];
+    const sweep = await scanner.sweepUnscannedEvidence({
+      now: at,
+      tenantIds: [t.tenant],
+      enqueue: async (r) => {
+        queued.push(r);
+        return true;
+      },
+    });
+    const mine = queued.filter((r) => r.evidenceId === id);
+    const outs = [];
+    for (const r of mine) {
+      outs.push(await scanner.scanEvidence(r, { ...verdictDeps, enqueue: async () => true, now: () => at, ...(deleteObject ? { deleteObject } : {}) }));
+    }
+    return { queued: mine.length, outs, sweep };
+  }
+
+  const removedEvents = (id: string) =>
+    admin!.auditEvent.findMany({
+      where: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: id },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, data: true, createdAt: true },
+    });
+  async function alertsFor(id: string) {
+    const rows = await admin!.systemAlert.findMany({ where: { source: 'evidence-scan' }, orderBy: { createdAt: 'asc' } });
+    const mine = rows.filter((a) => (a.meta as { evidenceId?: string } | null)?.evidenceId === id);
+    alertIds.push(...mine.map((a) => a.id));
+    return mine.map((a) => ({ level: a.level, message: a.message }));
+  }
+  async function downloadRefused(id: string) {
+    const res = await callDownload(id);
+    const body = Buffer.from(await res.arrayBuffer());
+    return res.status === 409 && !body.includes(Buffer.from('EICAR-STANDARD'));
+  }
+
+  test('the first delete fails; a later sweep tick deletes the object, as a second object_removed event', async () => {
+    console.log(`[NG-279] verdict source: ${CLAMD_HOST ? `real clamd ${CLAMD_HOST}:${CLAMD_PORT}` : 'injected (no clamd configured)'}`);
+    const id = await uploadPresigned('ng279-retry.docx', eicarDocx());
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    const t0 = new Date();
+
+    const first = await scanner.scanEvidence(run(id), { ...verdictDeps, enqueue: async () => true, deleteObject: failingDelete, now: () => t0 });
+    expect(first).toMatchObject({ status: 'INFECTED', objectDeleted: false });
+    expect(await storage.statObject(key), 'the object stayed').not.toBeNull();
+    expect(await downloadRefused(id)).toBe(true);
+    const firstEvent = (await removedEvents(id))[0]!;
+
+    // Within the first wait: nothing is queued yet.
+    const early = await tick(id, new Date(t0.getTime() + 1 * MIN));
+    // Past it: the run is queued and the removal is tried again (the real delete now works).
+    const later = await tick(id, new Date(t0.getTime() + 16 * MIN));
+    const afterRetry = {
+      earlyQueued: early.queued,
+      laterQueued: later.queued,
+      laterOut: later.outs,
+      objectInStore: (await storage.statObject(key)) !== null,
+      events: (await removedEvents(id)).map((e) => e.data),
+      status: (await rowOf(id)).scanStatus,
+      downloadRefused: await downloadRefused(id),
+    };
+    console.log('[NG-279] retry:', JSON.stringify(afterRetry));
+    expect(afterRetry).toEqual({
+      earlyQueued: 0,
+      laterQueued: 1,
+      laterOut: [expect.objectContaining({ status: 'INFECTED', objectDeleted: true })],
+      objectInStore: false,
+      events: [{ objectDeleted: false }, { objectDeleted: true }],
+      status: 'INFECTED',
+      downloadRefused: true,
+    });
+    // The first event is left as it was (a new event per try, never an update).
+    expect((await removedEvents(id))[0]).toEqual(firstEvent);
+    // Out of the set for good: a tick two days later queues nothing.
+    expect((await tick(id, new Date(t0.getTime() + 48 * HOUR))).queued).toBe(0);
+    // Alarms: the first try's error, one info for the retry that worked.
+    const alerts = await alertsFor(id);
+    expect(alerts.map((a) => a.level)).toEqual(['error', 'info']);
+    expect(alerts[0]!.message).toMatch(/could NOT be deleted/);
+  });
+
+  test('the delete keeps failing: one alarm at the limit, none per try, the download stays refused', async () => {
+    const id = await uploadPresigned('ng279-stuck.docx', eicarDocx());
+    await dropQueuedScans(id);
+    const key = (await rowOf(id)).r2ObjectKey!;
+    const t0 = new Date();
+    await scanner.scanEvidence(run(id), { ...verdictDeps, enqueue: async () => true, deleteObject: failingDelete, now: () => t0 });
+    const firstEvent = (await removedEvents(id))[0]!;
+
+    const rounds: Array<{ hour: number; queued: number; alerts: number; refused: boolean }> = [];
+    let clock = t0.getTime();
+    for (let round = 1; round <= 7; round++) {
+      clock += 25 * HOUR; // past every wait
+      const r = await tick(id, new Date(clock), failingDelete);
+      // A tick 15 minutes later (the sweep's own rhythm): nothing is due, nothing is raised.
+      const quiet = await tick(id, new Date(clock + 15 * MIN), failingDelete);
+      rounds.push({
+        hour: Math.round((clock - t0.getTime()) / HOUR),
+        queued: r.queued + quiet.queued,
+        alerts: (await alertsFor(id)).length,
+        refused: await downloadRefused(id),
+      });
+    }
+    const events = await removedEvents(id);
+    const alerts = await alertsFor(id);
+    console.log('[NG-279] stuck rounds:', JSON.stringify(rounds));
+    console.log('[NG-279] stuck alerts:', JSON.stringify(alerts));
+
+    expect(rounds.map((r) => r.queued)).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    // 1 try at upload + 7 retries = 8 failures; the alarm count only moves at the 5th failure (round 4).
+    expect(rounds.map((r) => r.alerts)).toEqual([1, 1, 1, 2, 2, 2, 2]);
+    expect(rounds.every((r) => r.refused)).toBe(true);
+    expect(events.map((e) => e.data)).toEqual(Array(8).fill({ objectDeleted: false }));
+    expect(events[0]).toEqual(firstEvent);
+    expect(alerts.map((a) => a.level)).toEqual(['error', 'error']);
+    expect(alerts[1]!.message).toContain(`since ${t0.toISOString()}`);
+    expect(alerts[1]!.message).toMatch(/after 5 failed removals/);
+    expect(await storage.statObject(key), 'still there: the delete keeps failing').not.toBeNull();
+    expect((await rowOf(id)).scanStatus).toBe('INFECTED');
   });
 });

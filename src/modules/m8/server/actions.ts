@@ -6,7 +6,9 @@ import { isPresentId } from '@/lib/required-id';
 import { PILOT_EXPIRED_CODE, isPilotExpired, type PilotExpiredCode } from '@/lib/pilot-expired';
 import { FORBIDDEN_ROLE_CODE, isForbiddenRole, type ForbiddenRoleCode } from '@/lib/forbidden-role';
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { generateSeatCandidates } from './matching';
+import { MEMBER_STAGE_ORDER, setMemberStage, type MemberStageRefusal, type MemberStageValue } from './member-stage';
 import { CONFIRM_SEAT_PERMISSION, canConfirmSeat, inviteSeatCandidate } from './seat-transitions';
 import {
   SeatConfirmConflictError,
@@ -158,7 +160,9 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
     // re-invite between the read and this write confirms nothing.
     const result = await tx.consortiumSeat.updateMany({
       where: { id: seatId, opportunityId, tenantId, status: 'INVITED', organizationId },
-      data: { status: 'CONFIRMED' }
+      // NG-364: the member stage follows the seat (member-stage.ts). The letter of intent is not
+      // touched: confirming does not invent one, and G1 still asks for it.
+      data: { status: 'CONFIRMED', memberStage: 'CONFIRMED', memberStageAt: new Date() }
     });
     return result.count;
   });
@@ -166,6 +170,69 @@ export async function confirmSeatAssignment(seatId: string, opportunityId: strin
   if (updated === 0) throw new SeatNotConfirmableError(`Seat ${seatId} has no invited organisation to confirm in this workspace.`);
 
   revalidatePath(MATCHING_PATH, 'page');
+}
+
+const CONSORTIUM_PATH = '/[locale]/(app)/[workspace]/pipeline/[id]/consortium';
+
+/**
+ * NG-364 input of `setSeatMemberStage`. The letter's document must be an https link: the screen
+ * renders it as one, so `javascript:` or `data:` must never reach the row. A date-only value is
+ * read as UTC midnight (CLAUDE.md §10: the database is UTC).
+ */
+const MemberStageInput = z.object({
+  seatId: z.string().trim().min(1).max(64),
+  opportunityId: z.string().trim().min(1).max(64),
+  stage: z.enum(MEMBER_STAGE_ORDER),
+  loiReceivedAt: z.union([z.iso.date(), z.iso.datetime({ offset: true })]).optional(),
+  loiDocumentUrl: z.url({ protocol: /^https$/ }).max(2048).optional(),
+});
+
+export type SetSeatMemberStageResult =
+  | {
+      ok: true;
+      memberStage: MemberStageValue;
+      memberStageAt: string;
+      loiReceivedAt: string | null;
+      loiDocumentUrl: string | null;
+    }
+  | { ok: false; code: 'INVALID_INPUT' | 'SEAT_NOT_FOUND' | 'SEAT_CHANGED' | MemberStageRefusal };
+
+/**
+ * NG-364 (K-586296 = B): moves the member stage of a consortium seat (interested → met → letter
+ * of intent → confirmed) and records the letter. The rules are `planMemberStageChange`'s
+ * (member-stage.ts); this action checks the role, validates the input and answers a code the
+ * screen translates. Same permission as the invite: stage CONFIRMED needs a seat the confirmation
+ * (`manage_approvals`) has already moved, so this action cannot confirm anyone.
+ */
+export async function setSeatMemberStage(input: unknown): Promise<SetSeatMemberStageResult> {
+  const { tenantId } = await requireTenantAction({ can: 'manage_workspaces' });
+  const parsed = MemberStageInput.safeParse(input);
+  if (!parsed.success) return { ok: false, code: 'INVALID_INPUT' };
+  const { seatId, opportunityId, stage, loiReceivedAt, loiDocumentUrl } = parsed.data;
+
+  const result = await withTenant(tenantId, (tx) =>
+    setMemberStage(tx, {
+      tenantId,
+      opportunityId,
+      seatId,
+      request: {
+        to: stage,
+        ...(loiReceivedAt !== undefined ? { loiReceivedAt: new Date(loiReceivedAt) } : {}),
+        ...(loiDocumentUrl !== undefined ? { loiDocumentUrl } : {}),
+      },
+      now: new Date(),
+    }),
+  );
+  if (!result.ok) return result;
+
+  revalidatePath(CONSORTIUM_PATH, 'page');
+  return {
+    ok: true,
+    memberStage: result.data.memberStage,
+    memberStageAt: result.data.memberStageAt.toISOString(),
+    loiReceivedAt: result.data.loiReceivedAt?.toISOString() ?? null,
+    loiDocumentUrl: result.data.loiDocumentUrl,
+  };
 }
 
 /**

@@ -932,6 +932,29 @@ model ExpertPreRegAttempt {
   @@index([ipHash, createdAt])
 }
 
+/// NG-9 (FE-1.5): one row per cookie choice a visitor saves (banner or preference panel).
+/// The proof of consent KVKK / GDPR art. 7(1) asks for, kept in our own database. No
+/// account and no tenant: `visitorId` is a random UUID minted in the browser when the
+/// choice is saved (localStorage `fabrika_consent_id`), never derived from anything; no
+/// IP, no user agent, no user id. A changed choice writes a new row; old rows stay.
+/// SYSTEM_WIDE, RLS on with `system_scope` only (SYSTEM_SCOPE_POLICY); written in
+/// withSystemScope('public-intake') by src/lib/cookie-consent-record.ts.
+/// Migration: prisma/migrations/add-cookie-consent-record.sql.
+model CookieConsentRecord {
+  id            String   @id @default(cuid())
+  visitorId     String
+  /// 'accept_all' | 'reject_all' | 'custom' (the panel's "save my choice").
+  choice        String
+  analytics     Boolean
+  marketing     Boolean
+  /// COOKIE_POLICY_VERSION the visitor saw (src/lib/cookie-consent.ts).
+  policyVersion String
+  locale        String
+  createdAt     DateTime @default(now())
+  @@index([visitorId, createdAt])
+  @@index([createdAt])
+}
+
 /// The founder numbers handed out so far (FO-50, K-568932 = A). One row, `id` 1.
 /// `lastNumber` only goes up: the next number is `lastNumber + 1`, so a pre-registration
 /// purged after one year never frees its number, and the seat count is `100 − lastNumber`.
@@ -1369,6 +1392,14 @@ model ConsortiumSeat {
   status        SeatStatus @default(OPEN)
   budgetCents   BigInt?
   personMonths  Float?
+  // NG-364 (K-586296 = B): where the seated member stands, and its letter of intent (spec §12 G1).
+  // Moved only through src/modules/m8/server/member-stage.ts; null = no stage recorded. `status`
+  // stays the seat's lifecycle: stage CONFIRMED only on a CONFIRMED seat. Cleared when an invite
+  // puts another organisation on the seat, so a former member's letter never counts.
+  memberStage    MemberStage?
+  memberStageAt  DateTime?
+  loiReceivedAt  DateTime?
+  loiDocumentUrl String?
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   budgetShare   PartnerBudgetShare?
   @@unique([id, tenantId])
@@ -1498,6 +1529,14 @@ enum SeatStatus {
   INVITED
   CONFIRMED
   DECLINED
+}
+
+// NG-364: the four member stages of the consortium screen (NG-20 F1), in order.
+enum MemberStage {
+  INTERESTED
+  MET
+  LOI
+  CONFIRMED
 }
 
 model PartnerOrg {                 // tenant-private orgs not in CORDIS
