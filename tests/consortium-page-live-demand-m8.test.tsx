@@ -18,8 +18,6 @@ const h = vi.hoisted(() => ({
     seatCandidate: { findMany: vi.fn() },
     cordisOrganization: { findMany: vi.fn() },
     partnerSearchAnnouncement: { findMany: vi.fn() },
-    // NG-20: the page also reads the latest G1 decision.
-    gateDecision: { findFirst: vi.fn() },
   },
   listBudgetShares: vi.fn(),
 }));
@@ -91,7 +89,6 @@ beforeEach(() => {
   h.tx.cordisOrganization.findMany.mockResolvedValue([]);
   h.tx.partnerSearchAnnouncement.findMany.mockResolvedValue([{ organizationPic: 'org-demand' }]);
   h.findOpportunityTopic.mockResolvedValue({ identifier: 'TOPIC-1' });
-  h.tx.gateDecision.findFirst.mockResolvedValue(null);
   h.listBudgetShares.mockResolvedValue([]);
 });
 

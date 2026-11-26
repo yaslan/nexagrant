@@ -8,7 +8,7 @@ import { seatBreakdownWriter, seatScoreDimensionScale } from '@/lib/scoring/seat
 import { dimensionValueText, scoreNumberText } from '@/modules/m8/components/dimension-value';
 import { formatMinorWhole } from '@/lib/money';
 import type { BudgetShareView } from '@/lib/gates/readiness-records';
-import type { G1ConsortiumInputs } from '@/lib/gates/g1-consortium';
+import { isBackupFor, seatNamesMember, type G1ConsortiumInputs } from '@/lib/gates/g1-consortium';
 import { partnerOrgKey, seatStage, SEAT_STEP_COUNT, type SeatStage } from './seat-view';
 
 // Local types matching prisma/schema.prisma — the generated client is not
@@ -25,6 +25,8 @@ export type SeatCandidate = {
   id: string;
   seatId: string;
   organizationId: string;
+  /** Read for the backup rule (isBackupFor); the matcher writes organisation rows only today. */
+  partnerOrgId?: string | null;
   rank: number;
   score: number;
   breakdown?: Record<string, unknown>;
@@ -52,7 +54,9 @@ interface Props {
   canConfirm?: boolean;
   /**
    * NG-20: the G1 seat conditions for the seats as they are now (`loadG1ConsortiumInputs`), read
-   * on the server. `null` = they could not be read. The screen never works the lists out itself.
+   * on the server. `null` = the opportunity is not this tenant's (the page answers not-found before
+   * it gets here). A failed read does not reach this prop: the page shows its query-failed notice
+   * for the whole screen instead. The screen never works the lists out itself.
    */
   g1?: G1ConsortiumInputs | null;
   /** NG-34 budget share ranges of this opportunity's seats; `null` = the read failed. */
@@ -429,8 +433,10 @@ export default function ConsortiumManager({ opportunityId, seats: initSeats, can
           // Display filter only: the first listed candidate that is not the seat's holder.
           // Whether the seat *has* a backup is the gate's answer (noBackup), not this.
           // A seat with no holder yet has candidates, not a backup: the list below shows them.
-          const backup = seat.organizationId
-            ? seatCandidates.find((c) => c.organizationId && c.organizationId !== seat.organizationId)
+          // The gate's own rule (isBackupFor), so the screen and the G1 decision cannot disagree.
+          // The drawer names organisation rows only, so a partner-only candidate is not shown here.
+          const backup = seatNamesMember(seat)
+            ? seatCandidates.find((c) => c.organizationId && isBackupFor(c, seat))
             : undefined;
           const backupOrg = backup ? orgMap[backup.organizationId] : undefined;
           const share = shareBySeat.get(seat.id);
