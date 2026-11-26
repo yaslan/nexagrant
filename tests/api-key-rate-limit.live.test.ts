@@ -48,7 +48,7 @@ describe.skipIf(!HAS_DB)('API key rate limit (live DB)', () => {
   });
 
   const call = () =>
-    authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { authorization: `Bearer ${key}` } }));
+    authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { authorization: `Bearer ${key}` } }), { action: 'search_calls', feature: 'call_search' });
 
   const setWindow = (count: number, startedAt: Date) =>
     prisma.apiKey.update({ where: { id: keyId }, data: { rateWindowCount: count, rateWindowStartedAt: startedAt } });

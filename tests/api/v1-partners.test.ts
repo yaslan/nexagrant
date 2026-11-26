@@ -95,6 +95,10 @@ vi.mock('../../src/lib/db', () => {
     opportunity: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    // NG-272: no NgSubscription row, so the NexaGrant gate passes (K-584603 = A).
+    ngSubscription: { findUnique: vi.fn().mockResolvedValue(null) },
+    ngPlan: { findFirst: vi.fn().mockResolvedValue({ id: "ng-free" }), findUnique: vi.fn().mockResolvedValue(null) },
+    ngPlanFeature: { findMany: vi.fn().mockResolvedValue([]) },
   };
   dbBox.client = client;
   return {
@@ -117,7 +121,7 @@ vi.mock('../../src/lib/system-scope', () => ({
 describe('Partner Intelligence REST API (v1)', () => {
   test('authenticateApiKey rejects request without API key (401)', async () => {
     const req = new Request('http://localhost:3000/api/v1/partners');
-    const auth = await authenticateApiKey(req);
+    const auth = await authenticateApiKey(req, null);
     expect(auth.authenticated).toBe(false);
   });
 
@@ -127,7 +131,7 @@ describe('Partner Intelligence REST API (v1)', () => {
     const req = new Request('http://localhost:3000/api/v1/partners', {
       headers: { 'x-api-key': 'fp_live_demo_key_987654321' },
     });
-    const auth = await authenticateApiKey(req);
+    const auth = await authenticateApiKey(req, null);
     expect(auth.authenticated).toBe(false);
     if (!auth.authenticated) {
       expect(auth.errorResponse.status).toBe(401);
@@ -138,7 +142,7 @@ describe('Partner Intelligence REST API (v1)', () => {
     const req = new Request('http://localhost:3000/api/v1/partners', {
       headers: { 'x-api-key': TEST_API_KEY },
     });
-    const auth = await authenticateApiKey(req);
+    const auth = await authenticateApiKey(req, null);
     expect(auth.authenticated).toBe(true);
     if (auth.authenticated) {
       expect(auth.data.tenantId).toBe(TEST_API_KEY_ROW.tenantId);

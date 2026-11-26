@@ -16,7 +16,7 @@ import { coordinatorLeaders } from '@/lib/k2-cordis/coordinator-leaders';
  * a prefix can exceed the range where a JSON number stays exact.
  */
 export async function GET(req: Request) {
-  const authRes = await authenticateApiKey(req);
+  const authRes = await authenticateApiKey(req, { action: 'view_partner_search', feature: 'partner_search' });
   if (!authRes.authenticated) {
     return authRes.errorResponse;
   }

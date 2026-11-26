@@ -9,11 +9,25 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { NG_FEATURE_MODULE } from './authz';
-import { NG_DATA_FILE_EXCEPTIONS, NG_ROUTE_BINDINGS, NG_UNBOUND_FEATURES } from './bindings';
+import { NG_DATA_FILE_EXCEPTIONS, NG_KEY_ROUTES, NG_ROUTE_BINDINGS, NG_UNBOUND_FEATURES } from './bindings';
 import { NG_FEATURE_KEYS } from './features';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8');
+
+/** Every route.ts under a directory, repo-relative. */
+const routeFiles = (dir: string): string[] =>
+  readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) return routeFiles(rel);
+    return e.name === 'route.ts' ? [rel] : [];
+  });
+
+/** The NG-272 literal every key route must pass: the feature and action in the table, verbatim. */
+const keyCallLiteral = (k: { feature: string | null; action: string | null }) =>
+  k.feature === null
+    ? 'null'
+    : `{ action: '${k.action}', feature: '${k.feature}' }`;
 
 describe('NG feature → route bindings (NG-250)', () => {
   it('every feature is bound or unbound-with-reason, never both, never neither', () => {
@@ -49,6 +63,41 @@ describe('NG feature → route bindings (NG-250)', () => {
       }
     }
   );
+
+  /**
+   * NG-272: a key route's gate is the literal its file passes to the key door, so it cannot be
+   * dropped or changed without this table changing too. Every /api/v1 handler is listed.
+   */
+  it('NG-272: every /api/v1 route is in NG_KEY_ROUTES, and no listed route is missing', () => {
+    const v1 = routeFiles('src/app/api/v1');
+    expect(v1.length).toBeGreaterThan(0);
+    const listed = new Set(NG_KEY_ROUTES.filter((k) => k.door === 'api').map((k) => k.file));
+    expect(v1.filter((f) => !listed.has(f)), 'v1 route with no key gate entry').toEqual([]);
+    for (const k of NG_KEY_ROUTES.filter((x) => x.door === 'api')) {
+      expect(existsSync(path.join(ROOT, k.file)), k.file).toBe(true);
+    }
+  });
+
+  it.each(NG_KEY_ROUTES.map((k) => [`${k.door} ${k.file}`, k] as const))(
+    '%s passes its NG-272 gate literal to the key door',
+    (_name, k) => {
+      const src = read(k.file);
+      const door = k.door === 'api' ? 'authenticateApiKey' : 'authenticateCordisRequest';
+      const literal = keyCallLiteral(k);
+      expect(src, `${door}(req, ${literal}) missing in ${k.file}`).toContain(`${door}(req, ${literal})`);
+      if (k.feature === null) {
+        expect(k.reason ?? '', `${k.file} has no feature and no reason`).toMatch(/\S.{19,}/);
+      }
+    }
+  );
+
+  it('NG-272: a key route that is bound to a feature is also in NG_KEY_ROUTES with the same feature', () => {
+    for (const b of NG_ROUTE_BINDINGS.filter((x) => x.file.startsWith('src/app/api/cordis/'))) {
+      const key = NG_KEY_ROUTES.find((k) => k.file === b.file);
+      expect(key, `${b.file} has a session gate but no key gate`).toBeDefined();
+      expect(key?.feature).toBe(b.feature);
+    }
+  });
 
   it('a route behind a module names that module in NG_FEATURE_MODULE (U5)', () => {
     for (const b of NG_ROUTE_BINDINGS) {
@@ -97,7 +146,11 @@ describe('NG feature → route bindings (NG-250)', () => {
       return DATA.test(src) || importsDataModule(src);
     });
     expect(readers.length).toBeGreaterThan(0);
-    const bound = new Set(NG_ROUTE_BINDINGS.map((b) => b.file));
+    // A key route with a feature is bound too (NG-272): its gate is the authenticateApiKey call.
+    const bound = new Set([
+      ...NG_ROUTE_BINDINGS.map((b) => b.file),
+      ...NG_KEY_ROUTES.filter((k) => k.feature !== null).map((k) => k.file),
+    ]);
     const unaccounted = readers.filter((f) => !bound.has(f) && !Object.hasOwn(NG_DATA_FILE_EXCEPTIONS, f));
     expect(unaccounted, 'partner-search data read with no NexaGrant gate and no reason').toEqual([]);
     // No stale entry: an excused file still exists and still reads the data, and is not also bound.

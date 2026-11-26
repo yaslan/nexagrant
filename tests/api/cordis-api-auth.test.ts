@@ -21,6 +21,9 @@ vi.mock('@/lib/logger', () => ({ logger: { error: mocks.loggerError } }));
 
 import { authenticateCordisRequest, CORDIS_SESSION_PER_USER_PER_MINUTE } from '@/lib/cordis-api-auth';
 
+// NG-272: these cases test the auth doors, not a route feature, so the plan gate is passed as null.
+const authCordis = (r: Request) => authenticateCordisRequest(r, null);
+
 const req = (headers: Record<string, string> = {}) => new Request('http://localhost/api/cordis/projects', { headers });
 
 // NG-250: the session door hands the member to the NexaGrant plan gate; an API key does not (line 46).
@@ -43,7 +46,7 @@ describe('API key', () => {
   test('a key is handed to authenticateApiKey, and the session is not consulted', async () => {
     mocks.authenticateApiKey.mockResolvedValue({ authenticated: true, data: { tenantId: 't1', apiKeyId: 'k', name: 'pro' } });
 
-    const res = await authenticateCordisRequest(req({ 'x-api-key': 'fp_live_x' }));
+    const res = await authCordis(req({ 'x-api-key': 'fp_live_x' }));
 
     expect(res).toEqual({ authenticated: true });
     expect(mocks.authenticateApiKey).toHaveBeenCalledOnce();
@@ -54,7 +57,7 @@ describe('API key', () => {
     const limited = NextResponse.json({ error: 'MODULE_ACCESS_DENIED', module: 'M1' }, { status: 403 });
     mocks.authenticateApiKey.mockResolvedValue({ authenticated: false, errorResponse: limited });
 
-    const res = await authenticateCordisRequest(req({ authorization: 'Bearer fp_live_x' }));
+    const res = await authCordis(req({ authorization: 'Bearer fp_live_x' }));
 
     expect(res.authenticated).toBe(false);
     if (!res.authenticated) expect(res.errorResponse).toBe(limited);
@@ -66,7 +69,7 @@ describe('API key', () => {
       errorResponse: NextResponse.json({ code: 'AUTH_INVALID_API_KEY' }, { status: 401 }),
     });
 
-    const res = await authenticateCordisRequest(req({ authorization: 'Basic abc' }));
+    const res = await authCordis(req({ authorization: 'Basic abc' }));
 
     expect(res.authenticated).toBe(false);
     if (!res.authenticated) expect(res.errorResponse.status).toBe(401);
@@ -78,7 +81,7 @@ describe('signed-in member', () => {
   test('no session: 401 from requireTenantApi, and M1 is not checked', async () => {
     mocks.requireTenantApi.mockResolvedValue(refusedNoSession());
 
-    const res = await authenticateCordisRequest(req());
+    const res = await authCordis(req());
 
     expect(res.authenticated).toBe(false);
     if (!res.authenticated) expect(res.errorResponse.status).toBe(401);
@@ -89,7 +92,7 @@ describe('signed-in member', () => {
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-denied'));
     mocks.checkModuleAccess.mockResolvedValue({ allowed: false, status: 'ON', reason: 'PLAN_UPGRADE_REQUIRED' });
 
-    const res = await authenticateCordisRequest(req());
+    const res = await authCordis(req());
 
     expect(mocks.checkModuleAccess).toHaveBeenCalledWith('M1');
     expect(res.authenticated).toBe(false);
@@ -103,7 +106,7 @@ describe('signed-in member', () => {
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-limited'));
     mocks.checkModuleAccess.mockResolvedValue({ ...fullM1, limits: { partnerSearchPerMonth: 10 } });
 
-    const res = await authenticateCordisRequest(req());
+    const res = await authCordis(req());
 
     expect(res.authenticated).toBe(false);
     if (!res.authenticated) expect(res.errorResponse.status).toBe(403);
@@ -113,17 +116,17 @@ describe('signed-in member', () => {
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-pro'));
     mocks.checkModuleAccess.mockResolvedValue(fullM1);
 
-    expect(await authenticateCordisRequest(req())).toEqual(SESSION_OK);
+    expect(await authCordis(req())).toEqual(SESSION_OK);
   });
 
   test(`past ${CORDIS_SESSION_PER_USER_PER_MINUTE} requests a minute: 429 with Retry-After, and it is per user`, async () => {
     mocks.checkModuleAccess.mockResolvedValue(fullM1);
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-loop'));
     for (let i = 0; i < CORDIS_SESSION_PER_USER_PER_MINUTE; i++) {
-      expect(await authenticateCordisRequest(req())).toEqual(SESSION_OK);
+      expect(await authCordis(req())).toEqual(SESSION_OK);
     }
 
-    const res = await authenticateCordisRequest(req());
+    const res = await authCordis(req());
     expect(res.authenticated).toBe(false);
     if (!res.authenticated) {
       expect(res.errorResponse.status).toBe(429);
@@ -132,14 +135,14 @@ describe('signed-in member', () => {
     }
 
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-other'));
-    expect(await authenticateCordisRequest(req())).toEqual(SESSION_OK);
+    expect(await authCordis(req())).toEqual(SESSION_OK);
   });
 
   test('a failing module read is a fixed 500 body; the cause goes to the log, not the response', async () => {
     mocks.requireTenantApi.mockResolvedValue(signedIn('u-err'));
     mocks.checkModuleAccess.mockRejectedValue(new Error('connection to db refused on 5433'));
 
-    const res = await authenticateCordisRequest(req());
+    const res = await authCordis(req());
 
     expect(res.authenticated).toBe(false);
     if (!res.authenticated) {
@@ -157,7 +160,7 @@ describe('signed-in member', () => {
     mocks.requireTenantApi.mockResolvedValue({ ok: true, scope: { userId: 'u-guest', tenantId: 't1', role: 'GUEST_PARTNER', isPlatformAdmin: false } });
     mocks.checkModuleAccess.mockResolvedValue({ allowed: true, limits: null });
 
-    const res = await authenticateCordisRequest(req());
+    const res = await authCordis(req());
 
     expect(res.authenticated).toBe(false);
     if (!res.authenticated) {

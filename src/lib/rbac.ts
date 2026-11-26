@@ -1,6 +1,14 @@
 import { Role } from "@prisma/client";
 
-export type Action = 
+/**
+ * NG-272: the server acting for a call with no member behind it (an API key). Not a
+ * membership role and not stored anywhere: `can` takes it for every action, so the
+ * decision left is the plan and module the caller passes as the resource.
+ */
+export const SYSTEM_ROLE = "SYSTEM" as const;
+export type ActingRole = Role | typeof SYSTEM_ROLE;
+
+export type Action =
   | "manage_billing"
   | "manage_modules"
   | "manage_users"
@@ -132,15 +140,20 @@ export interface PlanFeatureResource {
  * @returns boolean
  */
 export function can(
-  role: Role | undefined | null,
+  role: ActingRole | undefined | null,
   action: Action,
   resource?: PlanFeatureResource
 ): boolean {
-  // Own-property check: a bare lookup would hand back Object.prototype members
-  // ('constructor', 'toString', ...) and `.includes` would then throw (NG-259).
-  if (!role || !Object.hasOwn(rolePermissions, role)) return false;
-  const permissions = rolePermissions[role];
-  if (!permissions || !permissions.includes(action)) return false;
+  if (!role) return false;
+  // NG-272: the server acting for an API key. A key has no member, so no role table applies;
+  // the plan and the module the resource names still decide (see the caller's resource).
+  if (role !== SYSTEM_ROLE) {
+    // Own-property check: a bare lookup would hand back Object.prototype members
+    // ('constructor', 'toString', ...) and `.includes` would then throw (NG-259).
+    if (!Object.hasOwn(rolePermissions, role)) return false;
+    const permissions = rolePermissions[role];
+    if (!permissions || !permissions.includes(action)) return false;
+  }
   // Only an absent resource is "no plan question" (NG-250 Ö1): a null one, which only a cast can
   // pass, refuses instead of skipping the plan check.
   if (resource === undefined) return true;

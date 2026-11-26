@@ -24,14 +24,20 @@ vi.mock('@/lib/system-scope', () => ({
 vi.mock('@/lib/db', () => ({
   withTenant: async <T,>(_t: string, cb: (tx: unknown) => Promise<T>) => {
     if (db.down) throw new Error('connection refused');
-    return cb({ $queryRaw: db.queryRaw });
+    // NG-272: no NgSubscription row, so the NexaGrant gate reads the fallback plan and passes.
+    return cb({
+      $queryRaw: db.queryRaw,
+      ngSubscription: { findUnique: async () => null },
+      ngPlan: { findFirst: async () => ({ id: "ng-free" }), findUnique: async () => null },
+      ngPlanFeature: { findMany: async () => [] },
+    });
   },
 }));
 
 import { authenticateApiKey } from '@/lib/api-auth';
 
 function call() {
-  return authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': KEY } }));
+  return authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': KEY } }), { action: 'search_calls', feature: 'call_search' });
 }
 
 beforeEach(() => db.queryRaw.mockReset());

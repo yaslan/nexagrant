@@ -137,7 +137,7 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ pic: string }> }
 ) {
-  const authRes = await authenticateApiKey(req);
+  const authRes = await authenticateApiKey(req, { action: 'view_partner_search', feature: 'partner_search' });
   if (!authRes.authenticated) {
     return authRes.errorResponse;
   }

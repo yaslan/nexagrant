@@ -108,7 +108,7 @@ function toApiRow(org: CordisOrgWithProfile, isInterreg: boolean, totals: OrgTot
 }
 
 export async function GET(req: Request) {
-  const authRes = await authenticateApiKey(req);
+  const authRes = await authenticateApiKey(req, { action: 'view_partner_search', feature: 'partner_search' });
   if (!authRes.authenticated) {
     return authRes.errorResponse;
   }

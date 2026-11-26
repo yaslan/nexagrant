@@ -45,7 +45,7 @@ describe.skipIf(!HAS_DB)('/api/v1 module gate (live DB)', () => {
   });
 
   const call = () =>
-    authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': key } }));
+    authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': key } }), { action: 'search_calls', feature: 'call_search' });
 
   const setM1 = (status: 'ON' | 'OFF' | 'PILOT' | 'DEV') =>
     prisma.moduleState.update({
