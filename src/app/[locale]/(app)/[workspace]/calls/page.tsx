@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { ngRefusalCodeOf, type NgRefusalCode } from '@/lib/billing/nexagrant/codes';
 import { useActionErrorText } from '@/lib/hooks/use-action-error-text';
 import { SEDIA_RESULT_WINDOW, CALLS_SEARCH_MAX_LENGTH, clampSearchText, lastReachablePage } from '@/lib/calls-paging';
 
@@ -96,6 +97,7 @@ type LoadFailure =
   | { kind: 'badRequest' } // 400: the route rejected a parameter (invalid_limit)
   | { kind: 'pageOutOfWindow' } // 400 page_out_of_window: the page is past SEDIA's first 10 000 hits
   | { kind: 'network' } // fetch threw: offline, or no answer within CALLS_CLIENT_TIMEOUT_MS
+  | { kind: 'ngGate'; code: NgRefusalCode } // 403 from the NexaGrant plan gate (NG-250)
   | { kind: 'unexpected' }; // any other status, or a 200 that is not a list
 
 /** Seconds from a Retry-After header; the limiter's one-minute window when it is missing. */
@@ -104,7 +106,7 @@ function retryAfterSeconds(header: string | null): number {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 60;
 }
 
-function failureFromResponse(res: Response, error: unknown): LoadFailure {
+function failureFromResponse(res: Response, error: unknown, body: unknown = null): LoadFailure {
   switch (res.status) {
     case 503:
       return { kind: 'sediaUnavailable' };
@@ -113,6 +115,10 @@ function failureFromResponse(res: Response, error: unknown): LoadFailure {
     case 400:
       // Not a bad filter: the filters are fine, only the page is too deep to read.
       return error === 'page_out_of_window' ? { kind: 'pageOutOfWindow' } : { kind: 'badRequest' };
+    case 403: {
+      const code = ngRefusalCodeOf(body);
+      return code ? { kind: 'ngGate', code } : { kind: 'unexpected' };
+    }
     default:
       return { kind: 'unexpected' };
   }
@@ -128,6 +134,7 @@ export default function CallsPage({
   const workspace = resolvedParams.workspace || 'default';
   const isTr = locale === 'tr';
   const t = useTranslations('callsPage');
+  const tNg = useTranslations('ngGate');
 
   // Initial filters come from the URL once; after that the state is the source and the URL follows it.
   const searchParams = useSearchParams();
@@ -281,7 +288,8 @@ export default function CallsPage({
         const res = await fetch(`/api/cagrilar?${query}`, { signal: controller.signal });
         // The status decides the failure, not the body: a proxy's HTML 502 has no JSON to read.
         // A 400 is ours, and its error code tells a bad filter from a page past the window.
-        const data = res.ok || res.status === 400 ? await res.json().catch(() => null) : null;
+        const data =
+          res.ok || res.status === 400 || res.status === 403 ? await res.json().catch(() => null) : null;
         if (cancelled) return;
 
         if (res.ok && data?.success) {
@@ -296,7 +304,7 @@ export default function CallsPage({
         } else {
           setTopics([]);
           setTotalResults(0);
-          setLoadFailure(res.ok ? { kind: 'unexpected' } : failureFromResponse(res, data?.error));
+          setLoadFailure(res.ok ? { kind: 'unexpected' } : failureFromResponse(res, data?.error, data));
         }
       } catch (err) {
         if (cancelled) return;
@@ -854,7 +862,9 @@ export default function CallsPage({
                     data-testid="calls-load-error"
                     className="px-6 py-12 text-center text-red-600 text-xs sm:text-sm"
                   >
-                    {loadFailure?.kind === 'rateLimited'
+                    {loadFailure?.kind === 'ngGate'
+                      ? tNg(loadFailure.code)
+                      : loadFailure?.kind === 'rateLimited'
                       ? t('loadErrors.rateLimited', { seconds: loadFailure.seconds })
                       : loadFailure?.kind === 'pageOutOfWindow'
                         ? t('loadErrors.pageOutOfWindow', { count: SEDIA_RESULT_WINDOW })

@@ -9,6 +9,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ fetches: [] as { url: string; signal: AbortSignal | undefined }[] }));
 
+// NG-250: the NexaGrant AI allowance has its own tests (usage.test.ts, ng250-plan-gate.live,
+// llm.ng-quota.test.ts); here it is a pass, so this file's fake tx needs no NexaGrant tables.
+vi.mock('@/lib/billing/nexagrant/usage', () => ({ assertNgAiQuota: async () => undefined }));
 vi.mock('@/lib/env', () => ({ env: { ANTHROPIC_API_KEY: 'test-key', OPENAI_API_KEY: undefined } }));
 
 vi.mock('@/lib/db', () => {

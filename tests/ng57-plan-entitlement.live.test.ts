@@ -83,6 +83,9 @@ describe.skipIf(!reachable)('NG-57 plan catalogue, trial and can() (live)', () =
         { id: T.reg, name: T.reg, slug: T.reg, country: 'TR', orgType: 'MUNICIPALITY' },
       ],
     });
+    // NG-250 (U5): partner_search now sits behind M1 (NG_FEATURE_MODULE), so the plan question
+    // below is asked of a tenant whose M1 is open; without the row the module refuses first.
+    await admin!.moduleState.create({ data: { tenantId: T.sme, moduleId: 'M1', status: 'ON' } });
   });
 
   afterAll(async () => {
@@ -91,6 +94,7 @@ describe.skipIf(!reachable)('NG-57 plan catalogue, trial and can() (live)', () =
     if (table[0]?.t && ids.length > 0) {
       await admin!.$executeRaw`DELETE FROM "NgSubscription" WHERE "tenantId" = ANY(${ids})`;
     }
+    if (ids.length > 0) await admin!.moduleState.deleteMany({ where: { tenantId: { in: ids } } });
     await admin!.tenant.deleteMany({ where: { id: { in: ids } } });
     await Promise.all([admin?.$disconnect(), rls?.$disconnect()]);
   });

@@ -251,4 +251,14 @@ describe('NG-57 can(): role + plan feature + module switch', () => {
     expect(can('MEMBER', 'manage_billing')).toBe(false);
     expect(can(null, 'view_proposal')).toBe(false);
   });
+
+  it('NG-250 Ö1: a null resource is not "no resource" — it refuses instead of skipping the plan', () => {
+    expect(can('TENANT_OWNER', 'view_partner_search', null as unknown as undefined)).toBe(false);
+  });
+
+  it('NG-250: search_calls is held by every role (the call list keeps its audience; the plan narrows it)', () => {
+    for (const role of ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER', 'WRITER', 'MEMBER', 'GUEST_PARTNER'] as const) {
+      expect(can(role, 'search_calls'), role).toBe(true);
+    }
+  });
 });

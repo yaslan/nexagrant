@@ -41,8 +41,31 @@ vi.mock('@/lib/db', async (importOriginal) => {
 });
 vi.mock('next/cache', () => ({ revalidatePath: () => {}, revalidateTag: () => {} }));
 
-const { createDbClient } = await import('@/lib/db');
+const { createDbClient, withTenantOn } = await import('@/lib/db');
 const m8 = await import('@/modules/m8/server/actions');
+const { setMemberStage } = await import('@/modules/m8/server/member-stage');
+type TenantTx = import('@/lib/db').TenantTx;
+
+/**
+ * NG-368: `tx` whose `consortiumSeat.findFirst` reads the seat, reports it, and then waits for
+ * `gate` before handing the row back, so the write that follows runs only after `gate`. Lets one
+ * request read the row, another write it, and the first write afterwards, in that order every run.
+ * The write itself is the real, unwrapped `updateMany`.
+ */
+function pausedBeforeWrite(tx: TenantTx, onRead: () => void, gate: Promise<void>): TenantTx {
+  const seats = new Proxy(tx.consortiumSeat, {
+    get(target, prop) {
+      if (prop !== 'findFirst') return Reflect.get(target, prop);
+      return async (...args: Parameters<typeof target.findFirst>) => {
+        const seat = await target.findFirst(...args);
+        onRead();
+        await gate;
+        return seat;
+      };
+    },
+  });
+  return new Proxy(tx, { get: (target, prop) => (prop === 'consortiumSeat' ? seats : Reflect.get(target, prop)) });
+}
 
 let admin: PrismaClient | undefined;
 let ready = false;
@@ -168,6 +191,57 @@ describe('setSeatMemberStage on a real database (NG-364)', () => {
       return tx.consortiumSeat.count({ where: { id: ids.b.seat } });
     });
     expect(seenByA).toBe(0);
+  });
+
+  test('NG-368: two requests read the same letter; the late one gets SEAT_CHANGED and the URL stays', async () => {
+    const tenantId = ids.a.tenant;
+    const opportunityId = ids.a.opp;
+    const firstLetter = new Date('2026-11-01T00:00:00.000Z');
+    const seat = await admin!.consortiumSeat.create({
+      data: {
+        tenantId,
+        opportunityId,
+        roleKey: 'industry',
+        status: 'INVITED',
+        organizationId: `${RUN}-org-race`,
+        memberStage: 'LOI',
+        memberStageAt: firstLetter,
+        loiReceivedAt: firstLetter,
+      },
+      select: { id: true },
+    });
+    const url = 'https://files.example.org/race-loi.pdf';
+    const now = new Date();
+
+    let readDone!: () => void;
+    const read = new Promise<void>((resolve) => (readDone = resolve));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+
+    // Request 1 corrects the date. It reads the row (no URL yet) and pauses before its write.
+    const late = withTenantOn(state.rls!, tenantId, (tx) =>
+      setMemberStage(pausedBeforeWrite(tx, readDone, gate), {
+        tenantId,
+        opportunityId,
+        seatId: seat.id,
+        request: { to: 'LOI', loiReceivedAt: new Date('2026-11-03T00:00:00.000Z') },
+        now,
+      }),
+    );
+    await read;
+
+    // Request 2 read the same row and adds the document; it commits first.
+    const early = await withTenantOn(state.rls!, tenantId, (tx) =>
+      setMemberStage(tx, { tenantId, opportunityId, seatId: seat.id, request: { to: 'LOI', loiDocumentUrl: url }, now }),
+    );
+    expect(early).toMatchObject({ ok: true, data: { loiDocumentUrl: url } });
+
+    release();
+    const lateResult = await late;
+    const after = await row(seat.id);
+    console.log(`[${SUITE}] race: late=${JSON.stringify(lateResult)} row=${JSON.stringify(after)}`);
+    expect(lateResult).toEqual({ ok: false, code: 'SEAT_CHANGED' });
+    expect(after).toMatchObject({ memberStage: 'LOI', loiReceivedAt: firstLetter, loiDocumentUrl: url });
   });
 
   test('a seat of this tenant named with another opportunity is not found', async () => {

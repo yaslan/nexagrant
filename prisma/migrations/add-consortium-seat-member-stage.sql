@@ -11,7 +11,9 @@
 --   loiDocumentUrl  where the letter is kept (https only, checked by the action)
 --
 -- No new table, SeatStatus unchanged. Existing rows: all four columns NULL, i.e. no stage and no
--- letter. G1 therefore refuses a critical seat without a letter until one is recorded (G1_NO_LOI).
+-- letter. G1 therefore refuses a critical seat without a letter until one is recorded (G1_NO_LOI),
+-- but only when `requireLetterOfIntentForCriticalSeats` is on (off by default, owner decision
+-- 25.11.2026); with the shipped default these NULLs stop nothing.
 --
 -- RLS: no new table. ConsortiumSeat already carries tenant_isolation (prisma/rls.sql); the new
 -- columns are covered by it.

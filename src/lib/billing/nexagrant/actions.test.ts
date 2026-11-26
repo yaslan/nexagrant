@@ -28,7 +28,7 @@ const FREE_STATE = {
   tenantId: 't1',
   plan: { id: 'ng-free', tier: 'free', sortOrder: 1, sellable: false, isFallback: true },
   source: 'fallback' as const,
-  status: 'ACTIVE',
+  status: 'ACTIVE' as const,
   entitlement: entitlementFor('ng-free', []),
   trial: { kind: 'none' as const },
 };
