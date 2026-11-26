@@ -6,6 +6,7 @@ import { errorMessage } from '@/lib/errors';
 import { formatWholeMoney } from '@/lib/money';
 import { moduleGate } from '@/lib/modules/guard';
 import { requireTenantPageRole } from '@/lib/page-role';
+import { ngPageGate } from '@/lib/billing/nexagrant/page-gate';
 import { getTranslations } from 'next-intl/server';
 import { PartnerOutreach, type PartnerOutreachProps } from '@/modules/m1/ui/PartnerOutreach';
 import { OrganizationAnnouncements } from '@/modules/m1/ui/partner-search/OrganizationAnnouncements';
@@ -41,9 +42,13 @@ export default async function PartnerDetailPage({
   const { pic, workspace, locale } = await params;
   // NG-257: CORDIS partner detail sits behind the same door as its sibling `partners` page.
   // The role door runs first so a role without it never learns the M1 module state.
-  await requireTenantPageRole(locale, 'view_partner_search');
+  const { tenantId, role } = await requireTenantPageRole(locale, 'view_partner_search');
   const locked = await moduleGate('M1', locale);
   if (locked) return locked;
+  // NG-250 (review B1): the NexaGrant plan gate, before the organisation is read — the same
+  // partner_search /api/cordis/organizations/[id] is gated by, with the scope read above.
+  const ngLocked = await ngPageGate({ tenantId, role }, locale, 'view_partner_search', 'partner_search');
+  if (ngLocked) return ngLocked;
   const t = await getTranslations('PartnerDetail');
 
   let org: OrgDetail | null = null;

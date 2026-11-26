@@ -59,6 +59,9 @@ const h = vi.hoisted(() => {
  * reads the *same* session `@/lib/modules/access` does, so the gate and the
  * action can never disagree about who is calling.
  */
+// NG-250: the NexaGrant AI allowance has its own tests (usage.test.ts, ng250-plan-gate.live,
+// llm.ng-quota.test.ts); here it is a pass, so this file's fake tx needs no NexaGrant tables.
+vi.mock('@/lib/billing/nexagrant/usage', () => ({ assertNgAiQuota: async () => undefined }));
 vi.mock('@/lib/tenant', () => {
   class TenantScopeError extends Error {
     readonly code = 'TENANT_SCOPE_REQUIRED';

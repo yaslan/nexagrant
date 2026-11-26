@@ -19,7 +19,13 @@ export type Action =
   | "client_pipeline_write"
   | "client_pipeline_admin"
   /** NG-248 (K-584216): the agency co-brand (name + logo) in the app shell and its logo route. Not for guest partners. */
-  | "view_tenant_branding";
+  | "view_tenant_branding"
+  /**
+   * NG-250: the call search (`/api/cagrilar`). Every role keeps it, a guest partner too, so the
+   * list keeps the audience it had before the NexaGrant plan gate; the plan narrows it
+   * (`call_search`, src/lib/billing/nexagrant/bindings.ts), never the role.
+   */
+  | "search_calls";
 
 const rolePermissions: Record<Role, Action[]> = {
   TENANT_OWNER: [
@@ -39,6 +45,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "client_pipeline_write",
     "client_pipeline_admin",
     "view_tenant_branding",
+    "search_calls",
   ],
   TENANT_ADMIN: [
     "manage_users",
@@ -55,6 +62,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "client_pipeline_write",
     "client_pipeline_admin",
     "view_tenant_branding",
+    "search_calls",
   ],
   PIPELINE_MANAGER: [
     "manage_workspaces",
@@ -68,6 +76,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "client_pipeline_read",
     "client_pipeline_write",
     "view_tenant_branding",
+    "search_calls",
   ],
   WRITER: [
     "edit_proposal",
@@ -78,6 +87,7 @@ const rolePermissions: Record<Role, Action[]> = {
     "client_pipeline_read",
     "client_pipeline_write",
     "view_tenant_branding",
+    "search_calls",
   ],
   MEMBER: [
     "view_proposal",
@@ -86,9 +96,11 @@ const rolePermissions: Record<Role, Action[]> = {
     "view_partner_search",
     "client_pipeline_read",
     "view_tenant_branding",
+    "search_calls",
   ],
   GUEST_PARTNER: [
     "contribute_assigned",
+    "search_calls",
   ],
 };
 
@@ -127,8 +139,12 @@ export function can(
   // Own-property check: a bare lookup would hand back Object.prototype members
   // ('constructor', 'toString', ...) and `.includes` would then throw (NG-259).
   if (!role || !Object.hasOwn(rolePermissions, role)) return false;
-  if (!rolePermissions[role].includes(action)) return false;
-  if (!resource) return true;
+  const permissions = rolePermissions[role];
+  if (!permissions || !permissions.includes(action)) return false;
+  // Only an absent resource is "no plan question" (NG-250 Ö1): a null one, which only a cast can
+  // pass, refuses instead of skipping the plan check.
+  if (resource === undefined) return true;
+  if (!resource) return false;
   if (resource.moduleOpen === false) return false;
   return resource.grantedFeatures.has(resource.feature);
 }

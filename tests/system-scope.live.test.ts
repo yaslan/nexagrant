@@ -404,6 +404,8 @@ describe('expert pre-registrations open only for the purposes that handle them',
     // NG-188: expert-directory opens no row of the base table at all (its read is the
     // ExpertDirectoryEntry view; the fixture row is `pending` besides).
     'expert-directory': 0,
+    // NG-367 Ö-3: the cookie banner's purpose opens CookieConsentRecord only.
+    'cookie-consent': 0,
   };
 
   test('tenant-discovery and subject-scoped read 0, the handling purposes read the row', async (ctx) => {
@@ -676,6 +678,8 @@ describe('NG-187: the seal binds the purpose, a later purpose change opens nothi
       'public-intake': { sealed: true, experts: 2, directory: 0, memberships: 0 },
       // NG-188: the base table is shut to expert-directory; its one verified row is in the view.
       'expert-directory': { sealed: true, experts: 0, directory: 1, memberships: 0 },
+      // NG-367 Ö-3: CookieConsentRecord only.
+      'cookie-consent': { sealed: true, experts: 0, directory: 0, memberships: 0 },
     });
   });
 

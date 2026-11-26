@@ -404,11 +404,11 @@
     {
       "check": "D",
       "file": "src/lib/cookie-consent-record.ts",
-      "subject": "system-scope:public-intake",
+      "subject": "system-scope:cookie-consent",
       "count": 1,
       "kind": "system-scope",
-      "class": "public-intake",
-      "reason": "recordCookieConsent() (NG-9, SEC NG-363#sec): the anonymous cookie banner's consent record behind the public POST /api/cookie-consent. CookieConsentRecord (platform data, no tenantId; anonymous browser-minted visitor UUID, choice, two booleans, policy version, locale; no IP, user agent or user id) is RLS system_scope only, so the per-visitor hourly count and the one INSERT run in this public-intake scope on a zod-strict body. system_scope_open() lets public-intake reach only CookieConsentRecord, PublicLead and the expert form's tables; no tenant row is read or written. Volume is bounded in the route (per-address and per-process windows, 1 KB body cap)."
+      "class": "cookie-consent",
+      "reason": "recordCookieConsent() (NG-9, SEC NG-363#sec; own purpose since NG-367 Ö-3): the anonymous cookie banner's consent record behind the public POST /api/cookie-consent. CookieConsentRecord (platform data, no tenantId; anonymous browser-minted visitor UUID, choice, two booleans, policy version, locale; no IP, user agent or user id) is RLS system_scope only, so the per-visitor advisory lock, the hourly count and the one INSERT run in this cookie-consent scope on a zod-strict body whose policy version is on a server allowlist. system_scope_open() lets cookie-consent reach only CookieConsentRecord (not PublicLead or the expert form's tables, which public-intake opens); no tenant row is read or written. Volume is bounded in the route (per-address and per-process windows, 1 KB body cap)."
     },
     {
       "check": "D",

@@ -240,6 +240,15 @@ END $$;
 -- purge); 'public-intake' may reach it in the first place. ProvinceLeadRoute opens
 -- only for 'platform-admin' and 'cross-tenant-job'.
 --
+-- NG-367 Ö-3 (SEC NG-363): the cookie banner's consent record has its own purpose.
+-- 'cookie-consent' opens CookieConsentRecord and nothing else; CookieConsentRecord
+-- opens only for 'cookie-consent', 'platform-admin' and 'cross-tenant-job'. Until
+-- NG-367 the write ran under 'public-intake', which also opened PublicLead and the
+-- expert tables inside the same transaction.
+-- Deploy order for that change: the code calls enter_system_scope('cookie-consent'),
+-- which raises "unknown purpose" (the save answers 500) until this file has run, so
+-- `pnpm db:rls` goes before the app restart, as for every change here.
+--
 -- Deploy order: this is applied by `pnpm db:rls`. Code that calls
 -- withSystemScope() reads zero rows until it has run, exactly like every other
 -- policy change in this file. The role that runs it must be allowed to create
@@ -305,7 +314,8 @@ BEGIN
     'platform-aggregate',
     'cross-tenant-job',
     'public-intake',
-    'expert-directory'
+    'expert-directory',
+    'cookie-consent'
   ) THEN
     RAISE EXCEPTION 'enter_system_scope: unknown purpose %', coalesce(purpose, '<null>')
       USING ERRCODE = 'invalid_parameter_value';
@@ -387,8 +397,11 @@ AS $fn$
                    OR (tbl IN (to_regclass('public."ExpertPreRegistration"'),
                                to_regclass('public."ExpertFounderCounter"'),
                                to_regclass('public."ExpertPreRegAttempt"'),
-                               to_regclass('public."PublicLead"'),
-                               to_regclass('public."CookieConsentRecord"'))) IS TRUE)
+                               to_regclass('public."PublicLead"'))) IS TRUE)
+              -- NG-367 Ö-3 (SEC NG-363): cookie-consent opens the banner's consent
+              -- record and nothing else (not the expert or readiness forms' tables).
+              AND (coalesce(current_setting('app.system_scope_purpose', true), '') <> 'cookie-consent'
+                   OR (tbl = to_regclass('public."CookieConsentRecord"')) IS TRUE)
               -- FO-92: the expert's personal data opens only for the purposes
               -- that handle it. IS NOT TRUE: a missing table (NULL) is simply
               -- not on the list, like above.
@@ -402,10 +415,11 @@ AS $fn$
                    OR coalesce(current_setting('app.system_scope_purpose', true), '')
                         IN ('public-intake', 'platform-admin', 'cross-tenant-job'))
               -- NG-9: the cookie consent records (anonymous visitor id) open only for the banner's
-              -- write, the platform-admin console and a retention job.
+              -- write, the platform-admin console and a retention job. NG-367 Ö-3: the write
+              -- has its own purpose; public-intake no longer reaches this table.
               AND ((tbl = to_regclass('public."CookieConsentRecord"')) IS NOT TRUE
                    OR coalesce(current_setting('app.system_scope_purpose', true), '')
-                        IN ('public-intake', 'platform-admin', 'cross-tenant-job'))
+                        IN ('cookie-consent', 'platform-admin', 'cross-tenant-job'))
               -- NG-175 (SEC NG-170 D-1): the province -> consultancy map opens only for the
               -- platform-admin console and the lead forwarder.
               AND ((tbl = to_regclass('public."ProvinceLeadRoute"')) IS NOT TRUE
@@ -418,7 +432,7 @@ AS $fn$
 $fn$;
 
 COMMENT ON FUNCTION public.system_scope_open(regclass) IS
-  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt, PublicLead and CookieConsentRecord (FO-52, FO-26, NG-175, NG-9); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead and CookieConsentRecord only for public-intake, platform-admin and cross-tenant-job (NG-9); ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175); expert-directory opens nothing here (NG-52; its one read is the view ExpertDirectoryEntry, NG-188). TASK-MUOGMQK3JAH4Y.';
+  'system_scope RLS predicate: app.system_scope is on AND (caller holds the table owner''s privileges OR app.system_scope_token is this transaction''s seal from enter_system_scope). Purpose public-intake opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and PublicLead (FO-52, FO-26, NG-175); purpose cookie-consent opens only CookieConsentRecord (NG-367); ExpertPreRegistration and ExpertPreRegAttempt open only for public-intake, platform-admin, platform-aggregate and cross-tenant-job (FO-92); PublicLead only for public-intake, platform-admin and cross-tenant-job (NG-175); CookieConsentRecord only for cookie-consent, platform-admin and cross-tenant-job (NG-9, NG-367); ProvinceLeadRoute only for platform-admin and cross-tenant-job (NG-175); expert-directory opens nothing here (NG-52; its one read is the view ExpertDirectoryEntry, NG-188). TASK-MUOGMQK3JAH4Y.';
 
 -- The policy itself, over every table that already carries one of the two
 -- tenant policies. Derived from pg_policies rather than a third hand-kept table
@@ -536,8 +550,8 @@ END $$;
 
 -- CookieConsentRecord (NG-9): one row per saved cookie choice (anonymous visitor id,
 -- categories, policy version, time). Same standing as ExpertPreRegAttempt: written only
--- inside withSystemScope('public-intake') (src/lib/cookie-consent-record.ts), which
--- system_scope_open() opens for it. Skipped on a database whose chain has not created
+-- inside withSystemScope('cookie-consent') (src/lib/cookie-consent-record.ts; its own
+-- purpose since NG-367 Ö-3, 'public-intake' before), which system_scope_open() opens for it. Skipped on a database whose chain has not created
 -- the table yet; prisma/migrations/add-cookie-consent-record.sql has the same block.
 DO $$
 BEGIN

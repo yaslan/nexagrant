@@ -15,6 +15,7 @@
 
 import { aiCreditEntry } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
+import { assertNgAiQuota } from '@/lib/billing/nexagrant/usage';
 import { recordAlert } from '@/lib/observability/system-alert';
 import crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
@@ -22,6 +23,7 @@ import type { TenantTx } from '@/lib/db';
 import { declaredNodeEnv, env } from '@/lib/env';
 import { errorStatus } from '@/lib/errors';
 import { LLM_REFUSED_DIGEST, LLM_TRUNCATED_DIGEST } from '@/lib/llm-outcome';
+import { DEFAULT_EMBEDDING_MODEL, EMBEDDING_MODEL_PREFIX, isEmbeddingModel } from '@/lib/llm-embedding-model';
 
 export type LlmProvider = 'anthropic' | 'openai';
 
@@ -701,6 +703,10 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
 async function reserveCallCredits(options: LlmGenerateOptions, price: number, refId: string): Promise<void> {
   const refused = await withTenant(options.tenantId, async (tx) => {
     await lockTenantCredits(tx, options.tenantId);
+    // NG-250: the NexaGrant plan's monthly AI allowance, under the same lock, before any credit
+    // moves. Throws NgPlanLimitError (digest NG_PLAN_LIMIT_REACHED); a tenant without a
+    // NexaGrant row is not counted (K-584603 = A).
+    await assertNgAiQuota(tx, options.tenantId);
     if (price > 0) {
       const reserved = await reserveAiAction(tx, { tenantId: options.tenantId, module: options.module, purpose: options.purpose, refId });
       return !reserved;
@@ -708,6 +714,14 @@ async function reserveCallCredits(options: LlmGenerateOptions, price: number, re
     return (await creditBalanceIn(tx, options.tenantId)) <= 0;
   });
   if (refused) throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
+}
+
+/** NG-250: the monthly AI allowance for a caller that reserved its credits itself (M17). */
+async function assertNgAiQuotaLocked(tenantId: string): Promise<void> {
+  await withTenant(tenantId, async (tx) => {
+    await lockTenantCredits(tx, tenantId);
+    await assertNgAiQuota(tx, tenantId);
+  });
 }
 
 /** Gives back a reservation whose call delivered nothing (FO-288). Idempotent, see {@link releaseAiReservation}. */
@@ -815,6 +829,7 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // A caller that reserved already (M17) passes `creditsReserved` and is not reserved twice.
   const reservation = options.creditsReserved ? undefined : `${options.module}:${options.purpose}:${crypto.randomUUID()}`;
   if (reservation) await reserveCallCredits(options, price, reservation);
+  else await assertNgAiQuotaLocked(options.tenantId);
 
   // One signal for the whole request: every attempt gives up at the same instant.
   const signal = signalUntil(options.deadlineAt);
@@ -947,8 +962,6 @@ export async function generateText(options: LlmGenerateOptions): Promise<string>
 // call that actually reaches the provider.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Default embedding model. 1536 dimensions is what `Chunk.embedding` is declared as. */
-const DEFAULT_EMBEDDING_MODEL = 'text-embedding-3-large';
 const EMBEDDING_DIMENSIONS = 1536;
 
 /**
@@ -1021,10 +1034,14 @@ export async function embedText(
   attribution: AiCallAttribution,
   opts?: { model?: string; dimensions?: number }
 ): Promise<number[]> {
+  const model = opts?.model || DEFAULT_EMBEDDING_MODEL;
+  // The model name is how the NexaGrant AI writing quota tells this row from a generation's
+  // (src/lib/llm-embedding-model.ts). Refused before the provider: nothing sent, nothing logged.
+  if (!isEmbeddingModel(model)) throw new Error(`embedText: not an embedding model name (${EMBEDDING_MODEL_PREFIX}*): ${model}`);
+
   const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not set');
 
-  const model = opts?.model || DEFAULT_EMBEDDING_MODEL;
   const dimensions = opts?.dimensions ?? EMBEDDING_DIMENSIONS;
 
   const res = await fetch('https://api.openai.com/v1/embeddings', {

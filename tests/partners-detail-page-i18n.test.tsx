@@ -34,6 +34,10 @@ vi.mock('@/lib/modules/guard', () => ({ moduleGate: async () => null }));
 vi.mock('@/lib/page-role', () => ({
   requireTenantPageRole: async () => ({ tenantId: 't1', userId: 'u1', role: 'TENANT_OWNER', isPlatformAdmin: false }),
 }));
+// NG-250 (review B1): the page's NexaGrant plan gate reads the tenant's plan from the database;
+// this test renders the page without one, so the gate lets it through. The gate itself is
+// covered by tests/ng250-plan-gate.live.test.ts and src/lib/billing/nexagrant/page-gate.test.tsx.
+vi.mock('@/lib/billing/nexagrant/page-gate', () => ({ ngPageGate: async () => null }));
 vi.mock('@/modules/m1/ui/PartnerOutreach', () => ({ PartnerOutreach: () => null }));
 vi.mock('@/modules/m1/ui/partner-search/OrganizationAnnouncements', () => ({ OrganizationAnnouncements: () => null }));
 vi.mock('@/lib/db', () => ({
