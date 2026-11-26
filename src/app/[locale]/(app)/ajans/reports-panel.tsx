@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import type { AgencyReportListItem } from '@/lib/agency/report';
+import { AGENCY_REPORT_PURGE_INTERVAL_MONTHS, AGENCY_REPORT_RETENTION_MONTHS } from '@/lib/agency/retention-policy';
 
 const focusRing =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
@@ -24,7 +25,7 @@ export default async function ReportsPanel({ locale, reports }: { locale: string
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-ink-2">{t('description')}</p>
         <p className="mt-1 max-w-2xl text-sm text-ink-2" data-testid="agency-report-retention">
-          {t('retentionNote')}
+          {t('retentionNote', { months: AGENCY_REPORT_RETENTION_MONTHS, interval: AGENCY_REPORT_PURGE_INTERVAL_MONTHS })}
         </p>
       </div>
       {reports.length === 0 ? (

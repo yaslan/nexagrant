@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import type { PrismaClient } from '@prisma/client';
 import { createDbClient, withTenantOn } from '@/lib/db';
 import { envValue } from './helpers/dotenv';
+import { requireId } from './helpers/teardown-guard';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 
 /**
@@ -214,5 +215,73 @@ describe('agency report retention (fabrika_app)', () => {
     );
     expect(own).toBe(1);
     expect(other).toBe(0);
+  });
+});
+
+/**
+ * NG-345 (decision K-585864): the record of a destruction has no foreign key to the agency, so
+ * deleting an agency keeps its records; and a record older than 3 years is pruned, per agency,
+ * through public.agency_report_deletion_log_prune (the database refuses anything younger).
+ */
+describe('deletion records: no cascade, pruned after 3 years (fabrika_app)', () => {
+  const agencies = async () => [{ id: ids.agencyA }, { id: ids.agencyB }];
+  const yearsAgo = (n: number) => {
+    const d = new Date(NOW);
+    d.setUTCFullYear(d.getUTCFullYear() - n);
+    return d;
+  };
+
+  test('deleting an agency keeps the record that its reports were destroyed', async () => {
+    const { purgeExpiredAgencyReports } = await import('@/lib/agency/retention');
+    const gone = await newAgency(3);
+    await seed(gone, EVENT, '2001-06', monthsAgo(15));
+    const r = await purgeExpiredAgencyReports(NOW, `manual:${RUN}-gone`, { agencies: async () => [{ id: gone }] });
+    expect(r).toMatchObject({ deleted: 1, failed: 0 });
+
+    await admin!.auditEvent.deleteMany({ where: { tenantId: requireId(gone, 'gone') } });
+    await admin!.tenant.delete({ where: { id: gone } });
+
+    const kept = await admin!.agencyReportDeletionLog.findMany({ where: { tenantId: gone } });
+    expect(kept).toHaveLength(1);
+    expect(kept[0]).toMatchObject({ runId: `manual:${RUN}-gone`, reportCount: 1, basis: 'retention-12m' });
+  });
+
+  test('a record older than 3 years is pruned; a newer one stays; a second run changes nothing', async () => {
+    const { pruneExpiredDeletionLogs } = await import('@/lib/agency/retention');
+    const old = yearsAgo(4);
+    const fresh = yearsAgo(1);
+    await admin!.agencyReportDeletionLog.createMany({
+      data: [
+        { runId: `old-${RUN}`, tenantId: ids.agencyA, reportCount: 1, basis: 'retention-12m', cutoffAt: old, deletedAt: old },
+        { runId: `fresh-${RUN}`, tenantId: ids.agencyA, reportCount: 1, basis: 'retention-12m', cutoffAt: fresh, deletedAt: fresh },
+      ],
+    });
+    const before = (await logs(ids.agencyA)).length;
+
+    const r = await pruneExpiredDeletionLogs(NOW, { agencies });
+    expect(r).toMatchObject({ agencies: 2, deleted: 1, failed: 0, errors: [] });
+    const after = (await logs(ids.agencyA)).map((l) => l.runId);
+    expect(after).not.toContain(`old-${RUN}`);
+    expect(after).toContain(`fresh-${RUN}`);
+    expect(after).toHaveLength(before - 1);
+
+    const again = await pruneExpiredDeletionLogs(NOW, { agencies });
+    expect(again).toMatchObject({ deleted: 0, failed: 0 });
+  });
+
+  test('the database refuses a prune under 3 years, and another tenant’s session', async () => {
+    const { withTenant } = await import('@/lib/db');
+    const tooRecent = yearsAgo(2).toISOString();
+    await expect(
+      withTenant(ids.agencyA, (tx) =>
+        tx.$queryRaw`SELECT public.agency_report_deletion_log_prune(${ids.agencyA}, ${tooRecent}::timestamptz)`
+      )
+    ).rejects.toThrow(/less than 3 years/);
+    const ok = yearsAgo(4).toISOString();
+    await expect(
+      withTenant(ids.agencyB, (tx) =>
+        tx.$queryRaw`SELECT public.agency_report_deletion_log_prune(${ids.agencyA}, ${ok}::timestamptz)`
+      )
+    ).rejects.toThrow(/not the session tenant/);
   });
 });

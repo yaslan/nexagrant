@@ -27,7 +27,7 @@
 -- (scripts/rls-migrations.ts). FORCE applies to the owner too, so the function's DELETE and
 -- INSERT pass only because app.tenant_id is the agency's.
 --
--- Idempotency: table/indexes IF NOT EXISTS, FK guarded by pg_constraint, CREATE OR REPLACE,
+-- Idempotency: table/indexes IF NOT EXISTS, CREATE OR REPLACE,
 -- policy DROP-then-CREATE, REVOKE/GRANT. A second run, or a run after `prisma db push`, changes
 -- nothing. Purely ADDITIVE: no existing row or column is touched.
 -- Rollback: prisma/migrations/add-agency-report-deletion-log.down.sql
@@ -50,12 +50,9 @@ CREATE TABLE IF NOT EXISTS "AgencyReportDeletionLog" (
 CREATE UNIQUE INDEX IF NOT EXISTS "AgencyReportDeletionLog_runId_tenantId_key" ON "AgencyReportDeletionLog"("runId", "tenantId");
 CREATE INDEX IF NOT EXISTS "AgencyReportDeletionLog_tenantId_deletedAt_idx" ON "AgencyReportDeletionLog"("tenantId", "deletedAt");
 
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AgencyReportDeletionLog_tenantId_fkey') THEN
-    ALTER TABLE "AgencyReportDeletionLog" ADD CONSTRAINT "AgencyReportDeletionLog_tenantId_fkey"
-      FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-  END IF;
-END $$;
+-- No foreign key to "Tenant" (decision K-585864, NG-345): a deleted agency must not take its
+-- destruction records with it. add-agency-report-deletion-log-no-cascade.sql drops the FK that
+-- an earlier revision of this file added, on databases where it was applied.
 
 -- ── RLS (byte-identical to prisma/rls.sql) ──
 DO $$

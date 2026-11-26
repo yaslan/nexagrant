@@ -1,5 +1,5 @@
 /**
- * Agency monthly report retention (NG-341, HUKUK-5 5d; veri sorumlusu kararı 23.11.2026).
+ * Agency monthly report retention (NG-341, NG-345; HUKUK-5 5d; veri sorumlusu kararı 23.11.2026).
  *
  * The decision, not an assumption:
  *   - an agency report is kept for {@link AGENCY_REPORT_RETENTION_MONTHS} months
@@ -7,9 +7,10 @@
  *   - reports past that age are destroyed together, once every
  *     {@link AGENCY_REPORT_PURGE_INTERVAL_MONTHS} months (periodic destruction, Yönetmelik md.11),
  *     by the `agency-report-retention` job (src/lib/jobs/tasks/agency-report-retention.ts);
- *   - every destruction is recorded in `AgencyReportDeletionLog` (counts and metadata only),
- *     and those records are kept for at least {@link AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS}
- *     years. Removing records older than that is a separate job, not written yet.
+ *   - every destruction is recorded in `AgencyReportDeletionLog` (counts and metadata only). Those
+ *     records are kept {@link AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS} years (İmha Yönetmeliği
+ *     md.7/3: at least three years) and pruned by the same job, once they are older than that;
+ *   - the record has no foreign key to the agency (K-585864): deleting an agency keeps its records.
  *
  * The rows themselves are `AuditEvent`s (`agency.report.generated`, src/lib/agency/report.ts),
  * which the app role may not delete (NG-40, auditevent-immutable.sql). The delete therefore runs
@@ -17,33 +18,57 @@
  * SECURITY DEFINER, it deletes only that event type, only in the caller's own tenant, only rows
  * older than a cutoff that is itself at least 12 months back, and writes the log row in the same
  * statement. A cutoff later than that floor is refused by the database, not only here.
+ * The log records are pruned the same way by `public.agency_report_deletion_log_prune()`
+ * (add-agency-report-deletion-log-no-cascade.sql), with a 3-year floor.
  *
  * Payment or commission records tied to these numbers would fall under commercial retention
  * periods, not this rule. None exist (no payment or commission code reads agency reports), so
  * nothing else is purged here.
  */
 import { prisma, withTenant } from '@/lib/db';
+import {
+  AGENCY_REPORT_CUTOFF_MARGIN_SECONDS,
+  AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS,
+  AGENCY_REPORT_RETENTION_MONTHS,
+} from './retention-policy';
 
-/** Months an agency report is kept. User decision of 23.11.2026; not a default to tune. */
-export const AGENCY_REPORT_RETENTION_MONTHS = 12;
-/** How often the expired reports are destroyed together: 1 January and 1 July, UTC. */
-export const AGENCY_REPORT_PURGE_INTERVAL_MONTHS = 6;
-/** Minimum years a deletion record is kept. Its own pruning is a separate job. */
-export const AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS = 3;
-/** The legal basis written on every deletion record. */
-export const AGENCY_REPORT_RETENTION_BASIS = 'retention-12m';
+export {
+  AGENCY_REPORT_CUTOFF_MARGIN_SECONDS,
+  AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS,
+  AGENCY_REPORT_PURGE_INTERVAL_MONTHS,
+  AGENCY_REPORT_RETENTION_BASIS,
+  AGENCY_REPORT_RETENTION_MONTHS,
+} from './retention-policy';
 
 /**
- * The moment a report must be older than to be destroyed by a run at `at`: the same
- * instant {@link AGENCY_REPORT_RETENTION_MONTHS} calendar months earlier, in UTC. A day
- * the earlier month does not have (31 March → 31 February) becomes that month's last day.
+ * The instant `months` calendar months before `at`, in UTC. A day the earlier month does not have
+ * (31 March → 31 February) becomes that month's last day.
  */
-export function agencyReportRetentionCutoff(at: Date): Date {
+function minusUtcMonths(at: Date, months: number): Date {
   const y = at.getUTCFullYear();
-  const m = at.getUTCMonth() - AGENCY_REPORT_RETENTION_MONTHS;
+  const m = at.getUTCMonth() - months;
   const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
   return new Date(
     Date.UTC(y, m, Math.min(at.getUTCDate(), lastDay), at.getUTCHours(), at.getUTCMinutes(), at.getUTCSeconds(), at.getUTCMilliseconds())
+  );
+}
+
+/**
+ * The moment a report must be older than to be destroyed by a run at `at`: the same instant
+ * {@link AGENCY_REPORT_RETENTION_MONTHS} calendar months earlier, in UTC, moved back by
+ * {@link AGENCY_REPORT_CUTOFF_MARGIN_SECONDS} (see retention-policy.ts).
+ */
+export function agencyReportRetentionCutoff(at: Date): Date {
+  return new Date(minusUtcMonths(at, AGENCY_REPORT_RETENTION_MONTHS).getTime() - AGENCY_REPORT_CUTOFF_MARGIN_SECONDS * 1000);
+}
+
+/**
+ * The moment a deletion record must be older than to be pruned by a run at `at`: the same
+ * instant {@link AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS} years earlier, moved back by the margin.
+ */
+export function agencyReportDeletionLogCutoff(at: Date): Date {
+  return new Date(
+    minusUtcMonths(at, AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS * 12).getTime() - AGENCY_REPORT_CUTOFF_MARGIN_SECONDS * 1000
   );
 }
 
@@ -73,10 +98,31 @@ export interface AgencyReportPurgeResult {
   errors: { tenantId: string; message: string }[];
 }
 
+export interface AgencyReportDeletionLogPruneResult {
+  cutoff: string;
+  agencies: number;
+  /** Deletion records removed, all agencies together. */
+  deleted: number;
+  failed: number;
+  errors: { tenantId: string; message: string }[];
+}
+
 interface PurgeRow {
   deleted: number;
   period_from: string | null;
   period_to: string | null;
+}
+
+interface Deps {
+  agencies?: () => Promise<{ id: string }[]>;
+}
+
+/**
+ * Every agency, soft-deleted ones included (their reports and records expire too). `Tenant` is not
+ * under RLS: which agencies exist is this query's output (as in report.ts).
+ */
+async function listAgencies(deps: Deps): Promise<{ id: string }[]> {
+  return (await deps.agencies?.()) ?? (await prisma.tenant.findMany({ where: { kind: 'AGENCY' }, select: { id: true } }));
 }
 
 /**
@@ -84,15 +130,9 @@ interface PurgeRow {
  * agency, each under its own tenant (RLS). Idempotent: a second run finds nothing older than
  * the cutoff and writes no record. Soft-deleted agencies are included: their reports expire too.
  */
-export async function purgeExpiredAgencyReports(
-  at: Date,
-  runId: string,
-  deps: { agencies?: () => Promise<{ id: string }[]> } = {}
-): Promise<AgencyReportPurgeResult> {
+export async function purgeExpiredAgencyReports(at: Date, runId: string, deps: Deps = {}): Promise<AgencyReportPurgeResult> {
   const cutoff = agencyReportRetentionCutoff(at);
-  // `Tenant` is not under RLS: which agencies exist is this query's output (as in report.ts).
-  const agencies =
-    (await deps.agencies?.()) ?? (await prisma.tenant.findMany({ where: { kind: 'AGENCY' }, select: { id: true } }));
+  const agencies = await listAgencies(deps);
   const out: AgencyReportPurgeResult = {
     runId,
     cutoff: cutoff.toISOString(),
@@ -115,6 +155,31 @@ export async function purgeExpiredAgencyReports(
         out.deleted += deleted;
         out.purged.push({ tenantId, deleted, periodFrom: row?.period_from ?? null, periodTo: row?.period_to ?? null });
       }
+    } catch (e) {
+      out.failed++;
+      out.errors.push({ tenantId, message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return out;
+}
+
+/**
+ * Remove the deletion records older than {@link agencyReportDeletionLogCutoff}(at), agency by
+ * agency, under each agency's own tenant (RLS), through `public.agency_report_deletion_log_prune()`.
+ * Idempotent: a second run removes nothing. A record whose agency has been hard-deleted from
+ * `Tenant` is not reached by this loop (no session can name it); see the open question in NG-345.
+ */
+export async function pruneExpiredDeletionLogs(at: Date, deps: Deps = {}): Promise<AgencyReportDeletionLogPruneResult> {
+  const cutoff = agencyReportDeletionLogCutoff(at);
+  const agencies = await listAgencies(deps);
+  const out: AgencyReportDeletionLogPruneResult = { cutoff: cutoff.toISOString(), agencies: agencies.length, deleted: 0, failed: 0, errors: [] };
+  for (const { id: tenantId } of agencies) {
+    try {
+      const rows = await withTenant(tenantId, (tx) =>
+        tx.$queryRaw<{ deleted: number }[]>`
+          SELECT public.agency_report_deletion_log_prune(${tenantId}, ${cutoff.toISOString()}::timestamptz) AS deleted`
+      );
+      out.deleted += Number(rows[0]?.deleted ?? 0);
     } catch (e) {
       out.failed++;
       out.errors.push({ tenantId, message: e instanceof Error ? e.message : String(e) });

@@ -1079,7 +1079,7 @@ rapor içeriği, kişisel veri ya da işlemi yapan kişi yazılmaz.
 | --- | --- |
 | `id` | Birincil anahtar |
 | `runId` | Koşu: `cron:<tik ISO>` ya da `manual:<ISO>` |
-| `tenantId` | Ajans kiracısı (FK `Tenant`, `ON DELETE CASCADE`) |
+| `tenantId` | Ajans kiracısı. **FK yok** (karar K-585864, NG-345): ajans silinse de kayıt kalır |
 | `deletedAt` | Silme anı (UTC) |
 | `reportCount` | Silinen rapor sayısı |
 | `periodFrom` / `periodTo` | Silinen en eski ve en yeni dönem (`YYYY-MM`) |
@@ -1091,10 +1091,16 @@ Tekil `(runId, tenantId)` (aynı koşu bir ajansa ikinci satır yazmaz), indeks
 `SELECT` yapabilir; `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` kaldırılmıştır
 (`prisma/rls-app-role.sql` adım 3f). Yazma yalnız `agency_report_purge` üzerinden olur. Migration:
 `prisma/migrations/add-agency-report-deletion-log.sql` (geri alma: `.down.sql`, tablo ve fonksiyon
-düşer). **Saklama:** kayıtlar en az **3 yıl** tutulur
-(`AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS`). Bu kayıtları budayan iş henüz yoktur (ayrı iş).
-Risk: kiracı kalıcı silinirse (`Tenant` cascade) kayıtları da gider. Canlı test:
-`tests/agency-report-retention.live.test.ts`, e2e: `tests/e2e/agency-report-retention.spec.ts`.
+düşer). **Saklama:** kayıtlar en az **3 yıl** tutulur (`AGENCY_REPORT_DELETION_LOG_RETENTION_YEARS`,
+`src/lib/agency/retention-policy.ts`). Üç yıldan eski kayıtları aynı `agency-report-retention`
+işi budar: `public.agency_report_deletion_log_prune(tenant, cutoff)`, kiracı başına, 3 yıl alt
+sınırıyla (`prisma/migrations/add-agency-report-deletion-log-no-cascade.sql`; geri alma:
+`.down.sql`, FK geri gelir ve yetim kayıt varken başarısız olur). Migration'lar: FK'yi düşüren
+`add-agency-report-deletion-log-no-cascade.sql` (NG-345) ve ilk şema.
+**Bilinen açık:** kiracı `Tenant` tablosundan kalıcı silinirse, kayıtları budama döngüsü (ajans
+listesi `Tenant`'tan okunur) ona ulaşamaz; kayıt 3 yıldan sonra da kalır. Karar bekleyen soru:
+ayrı bir platform rolü (BYPASSRLS) ya da silinmiş ajansların listesi.
+Canlı test: `tests/agency-report-retention.live.test.ts`, e2e: `tests/e2e/agency-report-retention.spec.ts`.
 
 **İleride (C seçeneği, ayrı onay):** ayrı bir `AgencyReport` tablosu (tekil `(agencyId, period)`).
 Dosya (PDF/CSV) verme NG-341 kararıyla kapalıdır.

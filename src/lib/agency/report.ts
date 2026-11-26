@@ -33,6 +33,7 @@ import { prisma, withTenant, type TenantTx } from '@/lib/db';
 import { withBrand } from '@/lib/brand';
 import { generateTableReportHtml, type ExportLocale } from '@/lib/document-exporter';
 import { TR_PROVINCES } from '@/lib/readiness/provinces';
+import { agencyRetentionNote } from './retention-policy';
 import { AGENCY_REPORT_GENERATE_EVENT, AgencyReportGenerateEventSchema } from '@/lib/jobs/events';
 import {
   FUNNEL_STEPS,
@@ -298,7 +299,7 @@ export function agencyReportHtml(s: AgencyReportSnapshot, agencyName: string, lo
       { label: D.periodLabel, value: s.period },
       { label: D.generatedAtLabel, value: dateText(s.generatedAt, locale) },
     ],
-    notes: [D.cohortNote, D.separateNote, A.funnel.privacyNote, A.reports.retentionNote],
+    notes: [D.cohortNote, D.separateNote, A.funnel.privacyNote, agencyRetentionNote(A.reports.retentionNote)],
     tables: tables(s, A).map((t) => ({
       caption: t.caption,
       note:

@@ -44,7 +44,7 @@ işlerdir; takvimleri `schedule.ts`'ten alınmıştır. Her işin ayrıntısı k
 | `feedback-weekly-digest` | `0 6 * * 1` | `tasks/feedback-weekly-digest.ts` | Aşağıda |
 | `alerts-sweep` | `15 4 * * *` | `tasks/alerts-sweep.ts` | Aşağıda; elle: `pnpm jobs:alerts-sweep` |
 | `agency-monthly-report` | `0 6 1 * *` | `tasks/agency-monthly-report.ts` | `queue: agency`; elle: `pnpm jobs:enqueue -- agency-monthly-report --period YYYY-MM` |
-| `agency-report-retention` | `0 5 1 1,7 *` | `tasks/agency-report-retention.ts` | NG-341: 12 aydan eski ajans raporlarını 6 ayda bir siler, `AgencyReportDeletionLog` yazar; `queue: agency`, `fill: 1d`; elle: `pnpm jobs:agency-report-retention` |
+| `agency-report-retention` | `0 5 1 1,7 *` | `tasks/agency-report-retention.ts` | NG-341: 12 aydan eski ajans raporlarını 6 ayda bir siler, `AgencyReportDeletionLog` yazar; NG-345: aynı koşuda 3 yıldan eski imha kayıtlarını budar; hata tek `SystemAlert` (`dedupeKey` = koşu id); `queue: agency`, `fill: 1d`; elle: `pnpm jobs:agency-report-retention` |
 | `job-queue-health` | `5 * * * *` | `tasks/job-queue-health.ts` | Kaçırılmış, tükenmiş, takılmış iş alarmı (ADR-0008 §9.3) |
 
 ### K2 notu (`k2-monthly-cordis`)

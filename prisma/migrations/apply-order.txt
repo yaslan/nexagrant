@@ -103,3 +103,4 @@ add-close-own-province-routes.sql
 add-nexagrant-plan-catalog.sql
 add-evidence-scan-status.sql
 add-agency-report-deletion-log.sql
+add-agency-report-deletion-log-no-cascade.sql

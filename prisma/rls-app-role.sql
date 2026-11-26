@@ -123,6 +123,10 @@ BEGIN
   IF to_regprocedure('public.agency_report_purge(text, text, timestamptz)') IS NOT NULL THEN
     EXECUTE format('GRANT EXECUTE ON FUNCTION public.agency_report_purge(text, text, timestamptz) TO %I', app_role);
   END IF;
+  -- The 3-year prune of those records (NG-345, add-agency-report-deletion-log-no-cascade.sql).
+  IF to_regprocedure('public.agency_report_deletion_log_prune(text, timestamptz)') IS NOT NULL THEN
+    EXECUTE format('GRANT EXECUTE ON FUNCTION public.agency_report_deletion_log_prune(text, timestamptz) TO %I', app_role);
+  END IF;
 
   -- 4. And on everything created later, per owning role. Prisma migrations run
   --    as the owner role (fabrika_owner on the VPS; fabrika locally). Default
