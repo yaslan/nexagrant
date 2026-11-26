@@ -267,7 +267,8 @@ export async function scanEvidence(run: EvidenceScanRun, deps: EvidenceScanDeps 
  * the removal is tried again, and that try is a new `object_removed` event (the earlier ones are left
  * as they are). Alarms: the first try raises the NG-263 one; later failed tries raise nothing, except
  * the one that reaches {@link EVIDENCE_OBJECT_REMOVAL_ALERT_AFTER_FAILURES}; a later try that succeeds
- * raises one `info` alert so the open error alarm can be closed.
+ * raises one `info` alert. That alert does not close the earlier error alarm: nothing in this file
+ * resolves an open SystemAlert (closing one is a separate decision).
  */
 async function finishInfectedRemoval(
   run: EvidenceScanRun,
@@ -456,9 +457,47 @@ export async function sweepUnscannedEvidence(
 }
 
 /**
+ * NG-369: one page of a tenant's INFECTED rows that still name an object (ids after `after`, in id
+ * order) and the `object_removed` events of those rows. A row whose object is already deleted is left
+ * out in SQL and so is never read again. Safe because a deletion is always the last outcome: after
+ * it {@link objectRemovalDecision} says "removed" and no further try is written, so "some outcome
+ * deleted the object" is the same as "the last one did".
+ */
+export async function readInfectedPage(
+  tx: TenantTx,
+  tenantId: string,
+  after: string
+): Promise<{ rows: Array<{ id: string; scanAttempts: number }>; events: Array<{ target: string | null; data: unknown; createdAt: Date }> }> {
+  const rows = await tx.$queryRaw<Array<{ id: string; scanAttempts: number }>>`
+    SELECT e."id", e."scanAttempts"
+    FROM "Evidence" e
+    WHERE e."tenantId" = ${tenantId}
+      AND e."id" > ${after}
+      AND e."scanStatus" = 'INFECTED'
+      AND e."r2ObjectKey" IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM "AuditEvent" a
+        WHERE a."tenantId" = e."tenantId"
+          AND a."type" = ${EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED}
+          AND a."target" = e."id"
+          AND a."data"->>'objectDeleted' = 'true'
+      )
+    ORDER BY e."id" ASC
+    LIMIT ${EVIDENCE_SCAN_SWEEP_PAGE}`;
+  const events = rows.length
+    ? await tx.auditEvent.findMany({
+        where: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: { in: rows.map((r) => r.id) } },
+        select: { target: true, data: true, createdAt: true },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      })
+    : [];
+  return { rows, events };
+}
+
+/**
  * NG-279: one tenant's INFECTED rows that still name an object, page by page, with their recorded
- * removal outcomes; the run of each one whose removal is due is queued. Infected files are rare, so
- * reading their history here costs little; a row whose last outcome is a deletion is never queued.
+ * removal outcomes; the run of each one whose removal is due is queued. The read is
+ * {@link readInfectedPage}; rows whose object is already deleted are not in it (NG-369).
  */
 async function sweepInfectedRemovals(
   tenantId: string,
@@ -469,22 +508,7 @@ async function sweepInfectedRemovals(
 ): Promise<void> {
   let after = '';
   for (;;) {
-    const page = await runTenant(tenantId, async (tx) => {
-      const rows = await tx.evidence.findMany({
-        where: { tenantId, id: { gt: after }, scanStatus: 'INFECTED', r2ObjectKey: { not: null } },
-        select: { id: true, scanAttempts: true },
-        orderBy: { id: 'asc' },
-        take: EVIDENCE_SCAN_SWEEP_PAGE,
-      });
-      const events = rows.length
-        ? await tx.auditEvent.findMany({
-            where: { tenantId, type: EVIDENCE_SCAN_AUDIT_OBJECT_REMOVED, target: { in: rows.map((r) => r.id) } },
-            select: { target: true, data: true, createdAt: true },
-            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-          })
-        : [];
-      return { rows, events };
-    });
+    const page = await runTenant(tenantId, (tx) => readInfectedPage(tx, tenantId, after));
     for (const row of page.rows) {
       const attempts = page.events.filter((e) => e.target === row.id).map(attemptOf);
       if (!objectRemovalDecision(attempts, now).due) continue;

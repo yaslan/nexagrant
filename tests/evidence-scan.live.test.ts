@@ -863,7 +863,8 @@ describe('NG-279: an infected object that could not be deleted is tried again by
     const rows = await admin!.systemAlert.findMany({ where: { source: 'evidence-scan' }, orderBy: { createdAt: 'asc' } });
     const mine = rows.filter((a) => (a.meta as { evidenceId?: string } | null)?.evidenceId === id);
     alertIds.push(...mine.map((a) => a.id));
-    return mine.map((a) => ({ level: a.level, message: a.message }));
+    const { repeatCountOf } = await import('@/lib/observability/system-alert');
+    return mine.map((a) => ({ level: a.level, message: a.message, repeatCount: repeatCountOf(a.meta) }));
   }
   async function downloadRefused(id: string) {
     const res = await callDownload(id);
@@ -925,17 +926,22 @@ describe('NG-279: an infected object that could not be deleted is tried again by
     await scanner.scanEvidence(run(id), { ...verdictDeps, enqueue: async () => true, deleteObject: failingDelete, now: () => t0 });
     const firstEvent = (await removedEvents(id))[0]!;
 
-    const rounds: Array<{ hour: number; queued: number; alerts: number; refused: boolean }> = [];
+    const rounds: Array<{ hour: number; queued: number; alerts: number; repeats: number[]; refused: boolean }> = [];
     let clock = t0.getTime();
     for (let round = 1; round <= 7; round++) {
       clock += 25 * HOUR; // past every wait
       const r = await tick(id, new Date(clock), failingDelete);
       // A tick 15 minutes later (the sweep's own rhythm): nothing is due, nothing is raised.
       const quiet = await tick(id, new Date(clock + 15 * MIN), failingDelete);
+      const now = await alertsFor(id);
       rounds.push({
         hour: Math.round((clock - t0.getTime()) / HOUR),
         queued: r.queued + quiet.queued,
-        alerts: (await alertsFor(id)).length,
+        alerts: now.length,
+        // NG-369 (Ö3): a failure past the alarm limit must not raise a new alert; it is a repeat of the
+        // one row (same dedupeKey), so its counter moves and the alarm count does not. This is what
+        // catches `===` turned into `>=` at finishInfectedRemoval (mutant M2).
+        repeats: now.map((a) => a.repeatCount),
         refused: await downloadRefused(id),
       });
     }
@@ -947,6 +953,10 @@ describe('NG-279: an infected object that could not be deleted is tried again by
     expect(rounds.map((r) => r.queued)).toEqual([1, 1, 1, 1, 1, 1, 1]);
     // 1 try at upload + 7 retries = 8 failures; the alarm count only moves at the 5th failure (round 4).
     expect(rounds.map((r) => r.alerts)).toEqual([1, 1, 1, 2, 2, 2, 2]);
+    // NG-369 (Ö3): the first alarm is one occurrence. The limit alarm is raised once, and the failures
+    // after it raise nothing, so its counter stays at 1 through rounds 4–7. Under M2 each of those
+    // rounds would repeat it (counter 2, 3, 4).
+    expect(rounds.map((r) => r.repeats)).toEqual([[1], [1], [1], [1, 1], [1, 1], [1, 1], [1, 1]]);
     expect(rounds.every((r) => r.refused)).toBe(true);
     expect(events.map((e) => e.data)).toEqual(Array(8).fill({ objectDeleted: false }));
     expect(events[0]).toEqual(firstEvent);
@@ -955,5 +965,23 @@ describe('NG-279: an infected object that could not be deleted is tried again by
     expect(alerts[1]!.message).toMatch(/after 5 failed removals/);
     expect(await storage.statObject(key), 'still there: the delete keeps failing').not.toBeNull();
     expect((await rowOf(id)).scanStatus).toBe('INFECTED');
+  });
+
+  test('NG-369 (Ö1): a row whose object was deleted is not read by the removal sweep; one still in the store is', async () => {
+    const gone = await uploadPresigned('ng369-gone.docx', eicarDocx());
+    const stuck = await uploadPresigned('ng369-stuck.docx', eicarDocx());
+    await dropQueuedScans(gone);
+    await dropQueuedScans(stuck);
+    const t0 = new Date();
+    await scanner.scanEvidence(run(gone), { ...verdictDeps, enqueue: async () => true, now: () => t0 });
+    await scanner.scanEvidence(run(stuck), { ...verdictDeps, enqueue: async () => true, deleteObject: failingDelete, now: () => t0 });
+    expect((await removedEvents(gone))[0]!.data).toMatchObject({ objectDeleted: true });
+    expect((await removedEvents(stuck))[0]!.data).toMatchObject({ objectDeleted: false });
+
+    const page = await withTenant(t.tenant, (tx) => scanner.readInfectedPage(tx, t.tenant, ''));
+    const ids = page.rows.map((r) => r.id);
+    expect(ids, 'the deleted row is not read').not.toContain(gone);
+    expect(ids, 'the row whose delete failed is still read').toContain(stuck);
+    expect(page.events.map((e) => e.target)).not.toContain(gone);
   });
 });
