@@ -44,6 +44,8 @@ const KNOWN: Record<string, string> = {
   'src/modules/m8/server/member-stage.ts organizationId: seat.organizationId': 'same `seat` row as above (NG-364)',
   'src/modules/m8/server/member-stage.ts partnerOrgId: seat.partnerOrgId': 'same `seat` row as above (NG-364)',
   'src/modules/m8/server/member-stage.ts memberStage: seat.memberStage': 'same `seat` row as above (NG-364)',
+  'src/modules/m8/server/member-stage.ts loiReceivedAt: seat.loiReceivedAt': 'same `seat` row as above; NG-368 lock on the letter date',
+  'src/modules/m8/server/member-stage.ts loiDocumentUrl: seat.loiDocumentUrl': 'same `seat` row as above; NG-368 lock on the letter document',
   'src/modules/m8/server/seat-transitions.ts organizationId: current.organizationId':
     'NG-364: the `current` row findFirst read just above on `{ id, tenantId }` (both checked by isPresentId); a nullable column, so `null` or a string, never undefined; it only narrows a where that already has id and tenantId',
   'src/lib/billing/public-sector-plans.ts planVersionId: version.id': 'id of the row created one statement above',
