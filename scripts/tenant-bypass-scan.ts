@@ -491,6 +491,7 @@ const KNOWN_PURPOSES: ReadonlySet<string> = new Set([
   'cross-tenant-job',
   'public-intake',
   'expert-directory',
+  'cookie-consent',
 ]);
 /** Where the path is defined; its own internal delegation is not a call site. */
 const SYSTEM_SCOPE_HOME = 'src/lib/system-scope.ts';

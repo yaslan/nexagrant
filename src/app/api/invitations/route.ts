@@ -5,6 +5,7 @@ import { requireTenantApi } from '@/lib/tenant';
 import { issueSecretToken } from '@/lib/secret-token';
 import type { InvitationRow } from '@/types/db-rows';
 import { assertSeatAvailable, SeatLimitReachedError, type SeatUsage } from '@/lib/billing/seat-limit';
+import { assertNgSeatAvailable, NG_PLAN_LIMIT_REACHED, NgPlanLimitError } from '@/lib/billing/nexagrant/usage';
 import { mailFailureCode, reportMailNotConfigured, smtpMailer, type Mailer } from '@/lib/email/mailer';
 import { renderInvitationEmail } from '@/lib/email/invitation-email';
 import {
@@ -126,6 +127,7 @@ export async function POST(req: Request) {
     const result = await withTenant<{
       conflict: boolean;
       seatLimit: SeatUsage | null;
+      ngSeatLimit?: { used: number; limit: number | null };
       invitation: InvitationRow | null;
       tenantName: string | null;
       mailSkip: InvitationMailSkip | null;
@@ -149,6 +151,17 @@ export async function POST(req: Request) {
       } catch (error) {
         if (error instanceof SeatLimitReachedError) {
           return { conflict: false, seatLimit: error.usage, invitation: null, tenantName: null, mailSkip: null };
+        }
+        throw error;
+      }
+      // NG-250: the NexaGrant plan's seat limit, for a tenant with a NexaGrant row, only with
+      // NG_SEAT_LIMIT_ENFORCED on (off until the per-plan seat counts are approved).
+      try {
+        await assertNgSeatAvailable(tx, tenantId, email);
+      } catch (error) {
+        if (error instanceof NgPlanLimitError) {
+          const ngSeatLimit = { used: error.used, limit: error.limit };
+          return { conflict: false, seatLimit: null, ngSeatLimit, invitation: null, tenantName: null, mailSkip: null };
         }
         throw error;
       }
@@ -224,6 +237,13 @@ export async function POST(req: Request) {
           code: INVITATION_ERROR.SEAT_LIMIT_REACHED,
           seats: { limit, members, pendingInvitations },
         },
+        { status: 403 }
+      );
+    }
+
+    if (result.ngSeatLimit) {
+      return NextResponse.json(
+        { error: 'Forbidden', code: NG_PLAN_LIMIT_REACHED, feature: 'seats', seats: result.ngSeatLimit },
         { status: 403 }
       );
     }

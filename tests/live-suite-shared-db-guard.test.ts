@@ -22,6 +22,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 
 /** Suites whose name check must read `usedDatabaseName`. Removing one's guard fails below. */
 const USED_CONNECTION = [
+  'tests/cookie-consent-retention.live.test.ts',
   'tests/expert-prereg-retention.live.test.ts',
   'tests/invitation-retention.live.test.ts',
   'tests/k1-embeddings.live.test.ts',

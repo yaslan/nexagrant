@@ -9,10 +9,18 @@
 --
 -- RLS: ON, with the one policy `system_scope` (like ExpertPreRegAttempt). The visitor
 -- id is a pseudonymous identifier, and a tenant session has no business reading it:
--- fabrika_app writes it only inside withSystemScope('public-intake')
+-- fabrika_app writes it only inside withSystemScope('cookie-consent')
 -- (src/lib/cookie-consent-record.ts); prisma/rls.sql system_scope_open() opens it
--- for 'public-intake', 'platform-admin' and 'cross-tenant-job' only. It sits in
+-- for 'cookie-consent', 'platform-admin' and 'cross-tenant-job' only. It sits in
 -- SYSTEM_SCOPE_POLICY in scripts/rls-models.ts; prisma/rls.sql has the same block.
+--
+-- NG-367 Ö-3 (SEC NG-363): until NG-367 the write ran under 'public-intake', which
+-- also opened PublicLead and the expert tables in the same transaction. The purpose
+-- and the table's purpose list live in prisma/rls.sql, not here: this file only
+-- creates the table and the policy, whose predicate is system_scope_open(), so the
+-- file itself did not change behaviour and needs no re-run. The 'cookie-consent'
+-- purpose exists once `pnpm db:rls` has run; deploy order in
+-- docs/RELEASE_CHECKLIST.md §3.1 (cookie-consent note).
 --
 -- The policy needs system_scope_open() from prisma/rls.sql. A database where the chain
 -- runs this file before rls.sql has neither, so RLS is DISABLEd there with a NOTICE

@@ -1,9 +1,9 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { freePort } from './helpers/free-port';
 import { killPidFromFile } from './helpers/kill-owned-pid';
 
@@ -13,6 +13,8 @@ const SIGNAL_LOG = path.resolve('tests/e2e/support/server-signal-log.mjs');
 let dir: string;
 let diagFile: string;
 const started: ChildProcess[] = [];
+/** Every stand-in whose pid file this run wrote, with the pid file its command line must name (NG-380). */
+const standIns: Array<{ pid: number; pidFile: string }> = [];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -98,8 +100,44 @@ afterEach(() => {
   // still reaches it when the run itself is killed before afterEach.
   // Review B1: the server may have exited already and its pid gone to another process; the
   // helper kills only a process whose command line names this test's own <dir>/server-pid.
-  killPidFromFile(path.join(dir, 'server-pid'));
+  const serverPidFile = path.join(dir, 'server-pid');
+  const served = Number(fs.existsSync(serverPidFile) ? fs.readFileSync(serverPidFile, 'utf8').trim() : 0);
+  if (served > 0) standIns.push({ pid: served, pidFile: serverPidFile });
+  killPidFromFile(serverPidFile);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// NG-380 regression guard: the cleanup above must end every stand-in this run started, including the
+// ones whose supervisor was SIGKILLed or whose port closed on purpose. Runs after the last test, so it
+// sees what the cleanup left. `ps` only exists on POSIX; on Windows the cleanup does nothing (see
+// killPidFromFile), so there is nothing to check.
+function commandOf(pid: number): string {
+  try {
+    return execFileSync('ps', ['-ww', '-o', 'command=', '-p', String(pid)], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return '';
+  }
+}
+
+afterAll(async () => {
+  if (process.platform === 'win32') return;
+  // A killed server can take a moment to be reaped; poll briefly before calling it a leak.
+  const leftOver = () =>
+    standIns.filter(({ pid, pidFile }) => pidAlive(pid) && commandOf(pid).includes(pidFile));
+  for (let i = 0; i < 40 && leftOver().length > 0; i++) await sleep(50);
+  const leaked = leftOver();
+  // Stop what leaked so this run does not add to the orphans it reports.
+  for (const { pid } of leaked) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+  expect(leaked.map(({ pid }) => pid)).toEqual([]);
 });
 
 describe('e2e server supervisor (FO-385)', () => {

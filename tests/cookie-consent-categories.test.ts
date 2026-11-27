@@ -63,14 +63,14 @@ describe('stored categories', () => {
   });
 
   it('an older "accept all" (no categories) keeps analytics, never turns marketing on', () => {
-    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all' }));
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all', time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
     expect(storedConsent()).toEqual({ analytics: true, marketing: false });
     expect(storedConsentLevel()).toBe('all');
     expect(hasMarketingConsent()).toBe(false);
   });
 
   it('the `analytics` field wins over `accepted` (fixtures write it)', () => {
-    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, analytics: false }));
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, analytics: false, time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
     expect(hasAnalyticsConsent()).toBe(false);
   });
 
@@ -159,6 +159,8 @@ describe('consent record input', () => {
     ['"reject all" with a category on', { ...ok, choice: 'reject_all' }],
     ['an unknown locale', { ...ok, locale: 'de' }],
     ['a free-text policy version', { ...ok, policyVersion: 'Version 1 <script>' }],
+    // NG-367 Ö-2: well-formed but never published — the record must name the text actually shown.
+    ['a policy version the server never published', { ...ok, policyVersion: 'draft-2099-01-01' }],
   ])('rejects %s', (_label, body) => {
     expect(cookieConsentInput.safeParse(body).success).toBe(false);
   });

@@ -9,6 +9,7 @@ import type {
   CordisParticipationWithProject,
 } from '@/lib/k2-cordis/rows';
 import { authenticateCordisRequest } from '@/lib/cordis-api-auth';
+import { ngGateResponse } from '@/lib/billing/nexagrant/route-gate';
 
 export async function GET(
   req: NextRequest,
@@ -16,6 +17,11 @@ export async function GET(
 ) {
   const authRes = await authenticateCordisRequest(req);
   if (!authRes.authenticated) return authRes.errorResponse;
+  // NG-250: the NexaGrant plan gate for a signed-in member (partner_search, behind M1).
+  if (authRes.session) {
+    const ngRefused = await ngGateResponse(authRes.session, 'view_partner_search', 'partner_search');
+    if (ngRefused) return ngRefused;
+  }
 
   try {
     const idParse = cordisOrganisationIdSchema.safeParse((await params).id);

@@ -74,6 +74,8 @@ const KNOWN: Record<string, string> = {
     '`tenantId` is a `groupBy` key of Invitation rows (non-null column); `due` comes from purgeableInvitationWhere, which throws on an invalid cutoff; cron input, no client',
   'src/lib/leads/public-lead.ts where: due (not a const object literal)':
     '`due` comes from purgeablePublicLeadWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client (TASK-MULR765AR5G0C)',
+  'src/lib/cookie-consent-retention.ts where: due (not a const object literal)':
+    '`due` comes from purgeableCookieConsentWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client; the table has no tenantId (NG-366)',
   'src/lib/relationships/stale-reminder.ts lastContactAt: r.lastContactAt':
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
   'src/lib/evidence-scan.ts scanAttempts: run.attempt':

@@ -110,13 +110,13 @@ export const SYSTEM_SCOPE_PURPOSES = [
   'cross-tenant-job',
   /**
    * An anonymous visitor's form: no account and no tenant (expert pre-registration, FO-45;
-   * readiness contact request, NG-175; cookie consent record, NG-9).
-   * The database opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt, PublicLead and
-   * CookieConsentRecord for it (FO-52, NG-175, NG-9, prisma/rls.sql system_scope_open); any other table
+   * readiness contact request, NG-175).
+   * The database opens only ExpertPreRegistration, ExpertFounderCounter, ExpertPreRegAttempt and
+   * PublicLead for it (FO-52, NG-175, prisma/rls.sql system_scope_open); any other table
    * reads 0 rows and refuses writes.
    * In reverse, ExpertPreRegistration and ExpertPreRegAttempt open only for this purpose,
    * 'platform-admin', 'platform-aggregate' and 'cross-tenant-job' (FO-92); PublicLead only for this
-   * purpose, 'platform-admin' and 'cross-tenant-job' (CookieConsentRecord too, NG-9); ProvinceLeadRoute only for 'platform-admin' and
+   * purpose, 'platform-admin' and 'cross-tenant-job'; ProvinceLeadRoute only for 'platform-admin' and
    * 'cross-tenant-job' (NG-175).
    */
   'public-intake',
@@ -128,6 +128,14 @@ export const SYSTEM_SCOPE_PURPOSES = [
    * (name, e-mail, ORCID, LinkedIn, IP or token hash) is reachable under this purpose.
    */
   'expert-directory',
+  /**
+   * The cookie banner's consent record (NG-9; its own purpose since NG-367 Ö-3, SEC NG-363).
+   * The database opens CookieConsentRecord for it and nothing else: every other table reads 0
+   * rows and refuses writes. In reverse, CookieConsentRecord opens only for this purpose,
+   * 'platform-admin' and 'cross-tenant-job'; 'public-intake' no longer reaches it, and this
+   * purpose does not reach the expert or readiness forms' tables.
+   */
+  'cookie-consent',
 ] as const;
 
 export type SystemScopePurpose = (typeof SYSTEM_SCOPE_PURPOSES)[number];

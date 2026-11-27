@@ -73,6 +73,17 @@ describe('POST /api/cookie-consent — endpoint limits (NG-9 B-1)', () => {
     expect(count).toBeLessThanOrEqual(301);
   });
 
+  it('NG-367 Ö-1: one address flooding past every limit cannot block another visitor', async () => {
+    const POST = await loadPost();
+    const flood: number[] = [];
+    for (let i = 0; i < 400; i++) flood.push((await POST(freshVisitor('203.0.113.66'))).status);
+    expect(flood.filter((s) => s === 201)).toHaveLength(20);
+    expect(flood.slice(20).every((s) => s === 429)).toBe(true);
+    // Before NG-367 the 380 refused requests still filled the 300-per-process window.
+    const other = await POST(freshVisitor('198.51.100.9'));
+    expect(other.status).toBe(201);
+  });
+
   it('answers 413 for a body over about 1 KB and never writes it', async () => {
     const POST = await loadPost();
     const padded = JSON.stringify({ ...VALID, visitorId: crypto.randomUUID(), pad: 'x'.repeat(4096) });

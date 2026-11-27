@@ -15,6 +15,7 @@ import type {
   PartnerSearchQuotaState,
   PartnerSignal,
 } from '@/core/contracts/partner-search';
+import { ngRefusalCodeOf, type NgRefusalCode } from '@/lib/billing/nexagrant/codes';
 
 export const ORG_TYPES = ['HES', 'REC', 'PRC', 'PUB', 'OTH'] as const satisfies readonly PartnerSearchOrgType[];
 export const ANNOUNCEMENT_TYPES = [
@@ -103,6 +104,8 @@ export type ListResult =
   | { kind: 'ok'; page: PartnerSearchAnnouncementPage }
   | { kind: 'quota'; quota: PartnerSearchQuotaState }
   | { kind: 'denied'; reason: PartnerSearchDenyReason; requiredPlans: string[] }
+  /** NG-250: refused by the NexaGrant plan gate; the code is translated (`ngGate.<code>`). */
+  | { kind: 'ngGate'; code: NgRefusalCode }
   | { kind: 'error' };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -205,6 +208,10 @@ export function readListResponse(status: number, body: unknown): ListResult {
   if (status === 429 && isRecord(body)) {
     const quota = readQuota(body.quota);
     if (quota) return { kind: 'quota', quota };
+  }
+  if (status === 403) {
+    const code = ngRefusalCodeOf(body);
+    if (code) return { kind: 'ngGate', code };
   }
   if (status === 403 && isRecord(body) && typeof body.reason === 'string') {
     return { kind: 'denied', reason: body.reason as PartnerSearchDenyReason, requiredPlans: strings(body.requiredPlans) };

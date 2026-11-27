@@ -6,7 +6,7 @@
  * `platform_read` + REVOKE). `NgSubscription` is tenant data under `tenant_isolation`;
  * every function touching it takes a `TenantTx`.
  */
-import type { Prisma, PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient, SubStatus } from '@prisma/client';
 import type { TenantTx } from '@/lib/db';
 import { entitlementFor, type NgEntitlement, type NgPlanFeatureRow, type NgPlanPriceRow, type NgPlanRow } from './entitlement';
 import { isPresentId } from '@/lib/required-id';
@@ -150,12 +150,22 @@ async function startTrialOn(tx: Prisma.TransactionClient, input: StartNgTrialInp
   return count === 1 ? { kind: 'started', subscription: row } : { kind: 'exists', subscription: row };
 }
 
+/**
+ * The statuses whose row carries its plan (NG-250, review U3). Any other status — PAST_DUE,
+ * CANCELED, PAUSED — reads as the fallback plan: a payment write that leaves a lapsed row on
+ * `ng-pro` must not keep Pro features open. The row and its status stay as they are.
+ */
+export const NG_PLAN_CARRYING_STATUSES: readonly SubStatus[] = ['TRIALING', 'ACTIVE'];
+
 export interface NgBillingState {
   tenantId: string;
   plan: NgPlanRow;
-  /** `subscription`: the tenant has a row; `fallback`: it has none, it is on the fallback plan. */
+  /**
+   * `subscription`: the tenant has a row (it is a NexaGrant tenant, K-584603 = A), whatever its
+   * status; `fallback`: it has none, it is on the fallback plan and the plan gate leaves it alone.
+   */
   source: 'subscription' | 'fallback';
-  status: string;
+  status: SubStatus;
   entitlement: NgEntitlement;
   trial: NgTrialState;
 }
@@ -173,10 +183,11 @@ export async function readNgBillingState(tx: TenantTx, tenantId: string, now?: D
       ? { ...stored, planId: expiry.planId, status: expiry.status, trialEndedAt: expiry.trialEndedAt }
       : stored;
 
-  const plan = sub
+  const carriesPlan = sub !== null && NG_PLAN_CARRYING_STATUSES.includes(sub.status);
+  const plan = carriesPlan
     ? await tx.ngPlan.findUnique({ where: { id: sub.planId }, select: PLAN_SELECT })
     : await tx.ngPlan.findFirst({ where: { isFallback: true }, select: PLAN_SELECT });
-  if (!plan) throw new NgCatalogueMissingError(sub ? `plan ${sub.planId}` : 'a fallback plan');
+  if (!plan) throw new NgCatalogueMissingError(carriesPlan ? `plan ${sub.planId}` : 'a fallback plan');
 
   const features = await tx.ngPlanFeature.findMany({
     where: { planId: plan.id },
