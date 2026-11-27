@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { envValue } from './helpers/dotenv';
 import { isGithubActions, isLocalDbUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { EXPERT_DIRECTORY_POLICY_LOCK, holdTestDbLock, PUBLIC_LEAD_TABLE_LOCK, withTestDbLock } from './helpers/test-db-lock';
+import { INTAKE_APPEND_ONLY, INTAKE_APPEND_ONLY_POLICIES } from '../scripts/rls-models';
 
 /**
  * NG-183 (NG-175 review Düşük-1) — on a system_scope table (system_scope policy, no tenant
@@ -44,11 +45,16 @@ const STRAY = `ng183_stray_${RUN}`;
 const STRAY_TENANT = `ng183_tenant_${RUN}`;
 const SYSTEM_SCOPE_TABLES = ['CookieConsentRecord', 'ExpertFounderCounter', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'ProvinceLeadRoute', 'PublicLead'];
 /**
- * No exception since NG-188: NG-52's expert_directory policy on ExpertPreRegistration was
- * replaced by the view "ExpertDirectoryEntry", so every system_scope table is {system_scope}.
+ * No permissive exception since NG-188: NG-52's expert_directory policy on ExpertPreRegistration was
+ * replaced by the view "ExpertDirectoryEntry". NG-243: the four intake tables also carry the
+ * RESTRICTIVE intake_no_update / intake_no_delete (INTAKE_APPEND_ONLY), which only shut rows.
  */
-const expectedSet = (_t: string) => ['system_scope'];
+const INTAKE_EXTRA = [...INTAKE_APPEND_ONLY_POLICIES.map((p) => p.policy)].sort();
+const expectedSet = (t: string) => (INTAKE_APPEND_ONLY.has(t) ? [...INTAKE_EXTRA, 'system_scope'] : ['system_scope']);
+/** The suffix rls:verify prints after "beklenen tam {system_scope}" on an intake table. */
+const INTAKE_SUFFIX = ` (+ ${INTAKE_APPEND_ONLY_POLICIES.map((p) => `${p.policy} (${p.cmd})`).join(', ')})`;
 const TENANT_TABLE = 'AddOn';
+const EXPERT_DIRECTORY_BACK = `ExpertPreRegistration: politika kümesi {expert_directory, intake_no_delete, intake_no_update, system_scope}, beklenen tam {system_scope}${INTAKE_SUFFIX} — fazla: expert_directory (SELECT)`;
 
 const admin = new pg.Client({ connectionString: OWNER_URL ?? 'postgresql://localhost:5432/unset', connectionTimeoutMillis: 3000 });
 const REACHABLE = Boolean(OWNER_URL && RLS_URL) && (await admin.connect().then(() => true).catch(() => false));
@@ -87,6 +93,16 @@ function ng183Block(): string {
   const doAt = sql.indexOf('DO $$', start);
   const end = sql.indexOf('END $$;', doAt);
   if (doAt < 0 || end < 0) throw new Error('prisma/rls.sql: NG-183 DO block not found');
+  return sql.slice(doAt, end + 'END $$;'.length);
+}
+
+/** The NG-243 block of prisma/rls.sql (intake_no_update / intake_no_delete), verbatim — restores the real policies. */
+function intakeBlock(): string {
+  const sql = readFileSync(join(REPO, 'prisma/rls.sql'), 'utf8');
+  const start = sql.indexOf('-- NG-243 (NG-9 review Ö-1)');
+  if (start < 0) throw new Error('prisma/rls.sql: NG-243 block not found');
+  const doAt = sql.indexOf('DO $$', start);
+  const end = sql.indexOf('END $$;', doAt);
   return sql.slice(doAt, end + 'END $$;'.length);
 }
 
@@ -135,6 +151,7 @@ async function dropStrays(): Promise<void> {
   await admin.query(`drop policy if exists expert_directory on "PublicLead"`);
   await admin.query(`drop policy if exists expert_directory on "ExpertPreRegistration"`);
   await admin.query(`drop policy if exists ${STRAY_TENANT} on "${TENANT_TABLE}"`);
+  await admin.query(`drop policy if exists intake_no_update on "ProvinceLeadRoute"`);
 }
 
 describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scope}', () => {
@@ -165,7 +182,9 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     });
     const out = `${run.stdout}${run.stderr}`;
     expect(run.status, out.slice(-2000)).toBe(1);
-    expect(out).toContain(`PublicLead: politika kümesi {${STRAY}, system_scope}, beklenen tam {system_scope} — fazla: ${STRAY} (SELECT)`);
+    expect(out).toContain(
+      `PublicLead: politika kümesi {intake_no_delete, intake_no_update, ${STRAY}, system_scope}, beklenen tam {system_scope}${INTAKE_SUFFIX} — fazla: ${STRAY} (SELECT)`
+    );
   }, 180_000);
 
   it('rls:verify --require-db exits 1 when the NG-52 expert_directory policy comes back on ExpertPreRegistration (NG-188)', async () => {
@@ -180,9 +199,7 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
       );
       const { status, out } = rlsVerify();
       expect(status, out.slice(-2000)).toBe(1);
-      expect(out).toContain(
-        'ExpertPreRegistration: politika kümesi {expert_directory, system_scope}, beklenen tam {system_scope} — fazla: expert_directory (SELECT)'
-      );
+      expect(out).toContain(EXPERT_DIRECTORY_BACK);
     });
   }, 180_000);
 
@@ -228,8 +245,6 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
                  AND public.system_scope_sealed())
          AND status = 'verified'
          AND "visibilityConsentAt" IS NOT NULL`;
-  const EXPERT_DIRECTORY_BACK =
-    'ExpertPreRegistration: politika kümesi {expert_directory, system_scope}, beklenen tam {system_scope} — fazla: expert_directory (SELECT)';
 
   async function rlsVerifyWithExpertDirectory(clauses: string): Promise<{ status: number | null; out: string }> {
     return withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
@@ -261,6 +276,20 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     expect(out).toContain(EXPERT_DIRECTORY_BACK);
   }, 180_000);
 
+  it('rls:verify --require-db exits 1 when an intake append-only policy is not the one rls.sql writes (NG-243)', async () => {
+    // RESTRICTIVE, so it can only shut rows: no reader sees more through it. Restored in finally.
+    try {
+      await admin.query(`drop policy intake_no_delete on "PublicLead"`);
+      await admin.query(`create policy intake_no_delete on "PublicLead" as restrictive for delete using (true)`);
+      const { status, out } = rlsVerify();
+      expect(status, out.slice(-2000)).toBe(1);
+      expect(out).toContain(`PublicLead: politika kümesi {intake_no_delete, intake_no_update, system_scope}, beklenen tam {system_scope}${INTAKE_SUFFIX} — fazla: intake_no_delete (DELETE) — intake_no_delete sapması: qual rls.sql'deki ifadeden farklı`);
+      expect(out).toMatch(/append-only: PublicLead public-intake ile UPDATE 0, DELETE 1 satır \(0 beklenir\)/);
+    } finally {
+      await admin.query(intakeBlock());
+    }
+  }, 180_000);
+
   it('the NG-183 block of prisma/rls.sql drops stray policies on system_scope tables only', async () => {
     // NG-384: the block DROPs policies on ExpertPreRegistration and this test creates expert_directory
     // there; hold the expert lock for the whole test so no expert-prereg read sees the policy.
@@ -272,9 +301,17 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
       await admin.query(`create policy expert_directory on "PublicLead" for select to pg_monitor using (true)`);
       // NG-188: the NG-52 exception is gone; the old policy is dropped like any stray one.
       await admin.query(`create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (true)`);
+      // NG-243: a PERMISSIVE policy under an append-only name would OPEN rows; it is dropped as a
+      // stray (only the RESTRICTIVE ones are kept). A RESTRICTIVE one on another table is dropped too.
+      await admin.query(`drop policy intake_no_update on "CookieConsentRecord"`);
+      await admin.query(`create policy intake_no_update on "CookieConsentRecord" for update to pg_monitor using (true)`);
+      await admin.query(`create policy intake_no_update on "ProvinceLeadRoute" as restrictive for update to pg_monitor using (true)`);
       expect((await policySets()).PublicLead).toContain(STRAY);
 
       await admin.query(ng183Block());
+      const permissiveLeft = await admin.query(`select 1 from pg_policies where tablename = 'CookieConsentRecord' and policyname = 'intake_no_update'`);
+      expect(permissiveLeft.rowCount, 'a permissive intake_no_update must be dropped').toBe(0);
+      await admin.query(intakeBlock());
 
       const sets = await policySets();
       for (const t of SYSTEM_SCOPE_TABLES) if (sets[t]) expect(sets[t], t).toEqual(expectedSet(t));

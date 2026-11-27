@@ -10,6 +10,8 @@ import {
   stripSqlComments,
 } from '../scripts/rls-migrations';
 import {
+  INTAKE_APPEND_ONLY,
+  INTAKE_APPEND_ONLY_POLICIES,
   NULLABLE_TENANT,
   PLATFORM_POLICY,
   SYSTEM_SCOPE_POLICY,
@@ -319,6 +321,53 @@ describe('SYSTEM_SCOPE_POLICY — tenant-less tables reachable only inside withS
       expect(rlsSql).toContain(`USING ((SELECT public.system_scope_open('"${t}"'::regclass)))`);
       expect(rlsSql).toContain(`WITH CHECK ((SELECT public.system_scope_open('"${t}"'::regclass)))`);
     }
+  });
+});
+
+describe('INTAKE_APPEND_ONLY — the anonymous intake tables are append-only for the intake purposes (NG-243)', () => {
+  /** rls.sql's NG-243 DO block, verbatim. */
+  const ng243Block = (): string => {
+    const start = rlsSql.indexOf('-- NG-243 (NG-9 review Ö-1)');
+    expect(start, 'prisma/rls.sql: NG-243 block not found').toBeGreaterThan(-1);
+    const doAt = rlsSql.indexOf('DO $$', start);
+    return rlsSql.slice(doAt, rlsSql.indexOf('END $$;', doAt) + 'END $$;'.length);
+  };
+
+  test('the set is the four tables the anonymous forms write, each a SYSTEM_SCOPE_POLICY table', () => {
+    expect([...INTAKE_APPEND_ONLY].sort()).toEqual(['CookieConsentRecord', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'PublicLead']);
+    for (const t of INTAKE_APPEND_ONLY) expect(SYSTEM_SCOPE_POLICY.has(t), t).toBe(true);
+    expect(INTAKE_APPEND_ONLY_POLICIES).toEqual([
+      { policy: 'intake_no_update', cmd: 'UPDATE' },
+      { policy: 'intake_no_delete', cmd: 'DELETE' },
+    ]);
+  });
+
+  test('rls.sql creates each policy RESTRICTIVE, for its one command, on exactly those tables', () => {
+    const block = ng243Block();
+    const created = [...block.matchAll(/CREATE POLICY (\w+) ON public\."(\w+)" AS (\w+) FOR (\w+)/g)].map((m) => `${m[2]}.${m[1]} ${m[3]} ${m[4]}`);
+    const expected = [...INTAKE_APPEND_ONLY].flatMap((t) => INTAKE_APPEND_ONLY_POLICIES.map(({ policy, cmd }) => `${t}.${policy} RESTRICTIVE ${cmd}`));
+    expect(created.sort()).toEqual(expected.sort());
+    // Every expression names both intake purposes; the UPDATE ones let the new row through.
+    expect([...block.matchAll(/NOT IN \('public-intake', 'cookie-consent'\)/g)]).toHaveLength(expected.length);
+    expect([...block.matchAll(/WITH CHECK \(true\)/g)]).toHaveLength(INTAKE_APPEND_ONLY.size);
+  });
+
+  test('the migration carries the same block, byte for byte', () => {
+    const migration = readFileSync(resolve(process.cwd(), 'prisma/migrations/intake-append-only.sql'), 'utf8');
+    expect(migration).toContain(ng243Block());
+    const order = readFileSync(resolve(process.cwd(), 'prisma/migrations/apply-order.txt'), 'utf8');
+    expect(order.split('\n').map((l) => l.trim())).toContain('intake-append-only.sql');
+  });
+
+  test('the NG-183 cleanup keeps exactly these RESTRICTIVE names on exactly these tables', () => {
+    const start = rlsSql.indexOf('-- NG-183 (NG-175 review Düşük-1)');
+    const doAt = rlsSql.indexOf('DO $$', start);
+    const block = rlsSql.slice(doAt, rlsSql.indexOf('END $$;', doAt));
+    const keep = /AND NOT \(p\.permissive = 'RESTRICTIVE'\s+AND p\.policyname IN \(([^)]*)\)\s+AND p\.tablename IN \(([^)]*)\)\)/.exec(block);
+    expect(keep, 'NG-183 block: the NG-243 exception is missing or reworded').not.toBeNull();
+    const names = (s: string) => [...s.matchAll(/'(\w+)'/g)].map((m) => m[1]).sort();
+    expect(names(keep![1]!)).toEqual(INTAKE_APPEND_ONLY_POLICIES.map((p) => p.policy).sort());
+    expect(names(keep![2]!)).toEqual([...INTAKE_APPEND_ONLY].sort());
   });
 });
 
