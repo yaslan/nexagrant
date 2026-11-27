@@ -43,7 +43,7 @@ async function anonymousPage(
 ): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ viewport, extraHTTPHeaders });
   await context.addInitScript(() => {
-    window.localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false }));
+    window.localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false, time: new Date().toISOString(), version: 'draft-2026-11-18' }));
   });
   return { context, page: await context.newPage() };
 }

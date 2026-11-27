@@ -789,6 +789,54 @@
       "roles": "Roles",
       "none": "No expert matches this seat.",
       "unavailable": "The expert pool could not be read right now."
+    },
+    "noCountry": "No country",
+    "tag": {
+      "critical": "CRITICAL",
+      "optional": "OPTIONAL"
+    },
+    "stage": {
+      "label": "Stage",
+      "open": "Open",
+      "candidate": "Candidate",
+      "invited": "Invited",
+      "confirmed": "Confirmed",
+      "declined": "Declined",
+      "unknown": "Unknown stage",
+      "openHint": "no candidates yet",
+      "candidateHint": "{count, plural, one {# candidate listed} other {# candidates listed}}",
+      "invitedHint": "waiting for the organisation to confirm",
+      "aria": "Stage: {label}, step {step} of {total}"
+    },
+    "backup": {
+      "label": "Backup candidate",
+      "none": "No backup",
+      "notListed": "No backup candidate listed",
+      "noHolder": "No organisation holds this seat yet"
+    },
+    "budget": {
+      "label": "Budget share",
+      "agreed": "Agreed",
+      "proposed": "Proposed",
+      "missing": "Not entered",
+      "readFailed": "Budget shares could not be read"
+    },
+    "g1": {
+      "heading": "G1 pre-check: consortium",
+      "unfilledTitle": "{count, plural, one {# critical role is not confirmed yet} other {# critical roles are not confirmed yet}}",
+      "noBackupTitle": "{count, plural, one {# critical role has no backup candidate} other {# critical roles have no backup candidate}}",
+      "loiBlockerTitle": "{count, plural, one {# critical member has no letter of intent} other {# critical members have no letter of intent}}",
+      "loiBlockerNote": "G1 requires a letter of intent from every critical member; it will not pass until the letters are recorded.",
+      "loiInfoTitle": "{count, plural, one {For information: # critical member has no letter of intent on file yet} other {For information: # critical members have no letter of intent on file yet}}",
+      "loiInfoNote": "G1 does not require letters of intent at the moment; this is not a blocker.",
+      "source": "Worked out from the seats as they are now, with the G1 rules. This screen does not record a G1 decision.",
+      "unavailable": "The G1 consortium conditions of this opportunity could not be read.",
+      "noCriticalSeats": "This opportunity has no critical roles; there is no seat for the G1 consortium conditions to check.",
+      "clear": "Every critical role is confirmed and has a backup candidate."
+    },
+    "loi": {
+      "missingBlocker": "No letter: blocks G1",
+      "missingInfo": "No letter (info)"
     }
   },
   "Auth": {

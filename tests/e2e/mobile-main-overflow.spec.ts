@@ -72,7 +72,7 @@ async function signIn(browser: Browser) {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: false, marketing: false }),
+      JSON.stringify({ necessary: true, analytics: false, marketing: false, time: new Date().toISOString(), version: 'draft-2026-11-18' }),
     );
   });
   // Visiting an admin page is the proof the cookie is a platform admin's, and it is

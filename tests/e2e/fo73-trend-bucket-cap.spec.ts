@@ -64,7 +64,7 @@ test('a year-1000 range sends at most 120 trend points and the chart still draws
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
+      JSON.stringify({ necessary: true, analytics: true, marketing: true, time: new Date().toISOString(), version: 'draft-2026-11-18' }),
     );
   });
   await signInAs(page, { id: F.userId, email: F.email, tenantId: F.tenantId, role: 'TENANT_OWNER' });
