@@ -17,6 +17,16 @@
 #   4. Counts rows of every base table in public + graphile_worker, on both the
 #      source and the restored database, each inside one REPEATABLE READ
 #      transaction. Any difference fails the drill.
+#   5. Compares sample records: per table, an md5 of the first DRILL_SAMPLE_ROWS
+#      rows (default 5) in row-text order, computed in the same snapshot as the
+#      count. A row that restored with different content fails the drill even
+#      when the count matches. Sorting is by the whole row text, so a very large
+#      table costs one sort per side; set DRILL_SAMPLE_ROWS=0 to skip samples.
+#   6. Appends one tab-separated line per run to RESTORE_DRILL_LOG (default
+#      $BACKUP_DIR/restore-drill.log): start and end (UTC), duration in seconds,
+#      ok|fail, dump file name, table count, failure reason. Failures are
+#      recorded too; only a missing or unparsable URL (before the log path is
+#      known) is not. The log holds no connection string or password.
 #
 # Limits, stated plainly: the source is read a few seconds after the dump. If
 # the source takes writes in that window, counts differ and the drill fails; run
@@ -27,7 +37,8 @@
 set -euo pipefail
 
 log() { printf '%s [restore-drill] %s\n' "$(date -u +%FT%TZ)" "$*"; }
-fail() { log "FAIL: $*" >&2; exit 1; }
+fail_reason=""
+fail() { fail_reason="$*"; log "FAIL: $*" >&2; exit 1; }
 
 for bin in pg_restore psql; do
   command -v "$bin" >/dev/null 2>&1 || fail "$bin not found on PATH"
@@ -38,6 +49,26 @@ done
 
 RESTORE_DB="${RESTORE_DB:-fabrika_restore_drill}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
+DRILL_SAMPLE_ROWS="${DRILL_SAMPLE_ROWS:-5}"
+[[ "$DRILL_SAMPLE_ROWS" =~ ^[0-9]+$ ]] || fail "DRILL_SAMPLE_ROWS must be a non-negative integer"
+RESTORE_DRILL_LOG="${RESTORE_DRILL_LOG:-$BACKUP_DIR/restore-drill.log}"
+
+# Drill record (step 6): written on every exit from here on, pass or fail.
+drill_started_at="$(date -u +%FT%TZ)"
+drill_started_s=$(date +%s)
+drill_dump="-"
+drill_tables="-"
+record_drill() {
+  local rc=$? result=ok reason="-"
+  [ "$rc" = 0 ] || { result=fail; reason="${fail_reason:-exit $rc}"; }
+  mkdir -p "$(dirname "$RESTORE_DRILL_LOG")" 2>/dev/null || true
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$drill_started_at" "$(date -u +%FT%TZ)" \
+    "$(( $(date +%s) - drill_started_s ))" "$result" "$drill_dump" "$drill_tables" \
+    "$(printf '%s' "$reason" | tr '\t\n' '  ')" >> "$RESTORE_DRILL_LOG" \
+    || log "WARN: could not append to $RESTORE_DRILL_LOG" >&2
+  return "$rc"
+}
+trap record_drill EXIT
 
 # Split both URLs (pg-url.sh). Passwords travel in PGPASSWORD per call, never in
 # argv; the connection strings handed to psql/pg_restore carry no password.
@@ -68,6 +99,7 @@ fi
 case "$dump" in
   *.age) fail "encrypted backup ($(basename "$dump")) cannot be drilled here; decrypt it with 'age -d' to a .dump first" ;;
 esac
+drill_dump="$(basename "$dump")"
 [ -s "$dump" ] || fail "dump not found or empty: $(basename "$dump")"
 
 # Checksum, when the backup wrote one.
@@ -76,12 +108,21 @@ if [ -f "$dump.sha256" ]; then
   log "checksum ok"
 fi
 
-# Row counts as one SQL statement: every base table, one snapshot per side.
+# Row counts and sample hashes as one SQL statement: every base table, one
+# snapshot per side. The sample is the md5 of the first DRILL_SAMPLE_ROWS row
+# texts in sorted order ('-' when samples are off).
 count_sql() {
-  cat <<'SQL'
+  cat <<SQL
 select string_agg(
-  format('select %L as tbl, count(*)::bigint as n from %I.%I',
-         table_schema || '.' || table_name, table_schema, table_name),
+  format('select %L as tbl, count(*)::bigint as n, '
+         || case when $DRILL_SAMPLE_ROWS > 0 then
+              '(select md5(coalesce(string_agg(r, chr(10) order by r), %L)) from '
+              || '(select t::text as r from %I.%I t order by 1 limit $DRILL_SAMPLE_ROWS) s) as sample'
+            else '%L::text as sample' end
+         || ' from %I.%I',
+         table_schema || '.' || table_name,
+         case when $DRILL_SAMPLE_ROWS > 0 then '' else '-' end,
+         table_schema, table_name, table_schema, table_name),
   ' union all ' order by table_schema, table_name)
 from information_schema.tables
 where table_type = 'BASE TABLE' and table_schema in ('public', 'graphile_worker')
@@ -97,7 +138,7 @@ counts_of() {
   [ -n "$union" ] || fail "no tables found on $label"
   out="$(PGPASSWORD="$pass" psql "$conn" -X -At -v ON_ERROR_STOP=1 \
     -c 'begin isolation level repeatable read' \
-    -c "select tbl || '=' || n from ($union) q order by tbl" \
+    -c "select tbl || '=' || n || ' sample=' || sample from ($union) q order by tbl" \
     -c 'commit')" || fail "row count query failed on $label"
   out="$(printf '%s\n' "$out" | grep '=' || true)"
   [ -n "$out" ] || fail "row count query returned no rows on $label"
@@ -129,19 +170,22 @@ PGPASSWORD="$admin_pass" pg_restore --dbname="$restored_conn" --no-owner --exit-
   || fail "pg_restore failed (see its messages above)"
 restored_s=$(date +%s)
 
-log "comparing row counts (source vs $RESTORE_DB)"
-src_counts="$(counts_of "$src_conn" "$src_pass" source)"
-dst_counts="$(counts_of "$restored_conn" "$admin_pass" restored)"
+log "comparing row counts and sample records (source vs $RESTORE_DB)"
+# counts_of runs in a subshell, so its own fail reason does not reach the
+# record; name the side here instead.
+src_counts="$(counts_of "$src_conn" "$src_pass" source)" || fail "counting rows on source failed"
+dst_counts="$(counts_of "$restored_conn" "$admin_pass" restored)" || fail "counting rows on restored failed"
 tables=$(printf '%s\n' "$src_counts" | grep -c '=' || true)
 [ "$tables" -gt 0 ] || fail "no tables counted on source"
+drill_tables="$tables"
 
 diff_out="$(diff <(printf '%s\n' "$src_counts") <(printf '%s\n' "$dst_counts") || true)"
 if [ -n "$diff_out" ]; then
   printf '%s\n' "$diff_out"
-  fail "row counts differ between source and restored database"
+  fail "row counts or sample records differ between source and restored database ($(printf '%s\n' "$diff_out" | grep -c '^<') tables)"
 fi
 
-log "table row counts (identical on both sides):"
+log "table row counts and sample hashes (identical on both sides):"
 printf '%s\n' "$dst_counts" | sed 's/^/    /'
 log "ok: $tables tables, restore $(( restored_s - started ))s, total $(( $(date +%s) - started ))s"
 

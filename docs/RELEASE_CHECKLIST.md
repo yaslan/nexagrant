@@ -307,7 +307,8 @@ BACKUP_DIR=/var/backups/fonbridge pnpm backup:db
 RESTORE_ADMIN_URL=postgresql://<süper>@<host>:5432/postgres \
 BACKUP_DATABASE_URL=postgresql://<yedek-rolü>@<host>:5432/fabrika \
 BACKUP_DIR=/var/backups/fonbridge pnpm backup:restore-drill
-#   → tablo başına satır sayısı iki tarafta eşit değilse exit 1
+#   → tablo başına satır sayısı ya da örnek kayıt md5'i iki tarafta eşit değilse exit 1
+#   → her koşu $BACKUP_DIR/restore-drill.log'a bir satır ekler (tarih, süre, ok|fail, döküm, neden; NG-36)
 
 # 3) Gerçek geri yükleme (felaket): geri yüklemenin yapıldığı sunucuda, localhost üzerinden
 #    (ssh ile sunucuya gir; uzak host'a karşı çalışmaz — db:rls ve db:rls-role yalnız localhost|127.0.0.1 kabul eder)
