@@ -98,6 +98,15 @@ export const M17_INTERREG_TEXT_PURGE_LOCK = 'M17:interreg-text-purge';
 export const NOTIFICATION_OUTBOX_LOCK = 'NotificationEmailItem:outbox';
 
 /**
+ * NG-384 (NG-382 follow-up): the Stripe webhook files that write the subscription, add-on, credit
+ * and event-log rows of their own tenant and wipe them in afterAll. Held by the file for its whole
+ * run (beforeAll → afterAll) so its wipe cannot queue behind, or interleave with, another run of
+ * the same write path on that database. Taken by stripe-webhook-idempotency-rls.live and by the
+ * internal-plan live suite, which drives the same syncStripeSubscription path.
+ */
+export const STRIPE_WEBHOOK_LIVE_LOCK = 'StripeEventLog:webhook-live';
+
+/**
  * NG-52 / NG-188: rls-verify-system-scope-policy-set.live replaces the "ExpertDirectoryEntry"
  * view (prisma/rls.sql) with a mutated one for one rls:verify run, so fabrika_app's directory
  * reads on that database see the mutation meanwhile. system-scope.live's expert-directory reads

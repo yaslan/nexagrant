@@ -147,7 +147,8 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     const sets = await policySets();
     for (const t of SYSTEM_SCOPE_TABLES) if (sets[t]) expect(sets[t], t).toEqual(expectedSet(t));
   });
-  afterEach(dropStrays);
+  // NG-384: dropStrays() drops expert_directory on ExpertPreRegistration, so it runs under the expert lock too.
+  afterEach(() => withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, dropStrays));
   afterAll(async () => {
     await dropStrays().catch(() => {});
     await admin.end();
@@ -171,14 +172,18 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
     // The policy filtered rows, not columns (SEC NG-185 F-1): with it back, the sealed
     // 'expert-directory' scope would read fullName, email, ORCID and IP hash again. No longer an
     // exception, so the catalogue check names it. TO pg_monitor: no real session reads through it.
-    await admin.query(
-      `create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (status = 'verified' and "visibilityConsentAt" is not null)`
-    );
-    const { status, out } = rlsVerify();
-    expect(status, out.slice(-2000)).toBe(1);
-    expect(out).toContain(
-      'ExpertPreRegistration: politika kümesi {expert_directory, system_scope}, beklenen tam {system_scope} — fazla: expert_directory (SELECT)'
-    );
+    // NG-384: the policy is visible to every fabrika_app read of ExpertPreRegistration until dropStrays,
+    // so the expert-prereg files must not read the table meanwhile: hold their lock for the whole test.
+    await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
+      await admin.query(
+        `create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (status = 'verified' and "visibilityConsentAt" is not null)`
+      );
+      const { status, out } = rlsVerify();
+      expect(status, out.slice(-2000)).toBe(1);
+      expect(out).toContain(
+        'ExpertPreRegistration: politika kümesi {expert_directory, system_scope}, beklenen tam {system_scope} — fazla: expert_directory (SELECT)'
+      );
+    });
   }, 180_000);
 
   it.skipIf(MUTATION_SKIP)('rls:verify --require-db exits 1 when ExpertDirectoryEntry loses its verified + consent condition (NG-188 mutation)', async () => {
@@ -257,20 +262,24 @@ describe.skipIf(!HAS_DB)('NG-183: system_scope tables carry exactly {system_scop
   }, 180_000);
 
   it('the NG-183 block of prisma/rls.sql drops stray policies on system_scope tables only', async () => {
-    await admin.query(`create policy ${STRAY} on "PublicLead" for select to pg_monitor using (true)`);
-    await admin.query(`create policy ${STRAY} on "ProvinceLeadRoute" to pg_monitor using (true) with check (true)`);
-    await admin.query(`create policy ${STRAY_TENANT} on "${TENANT_TABLE}" for select to pg_monitor using (false)`);
-    await admin.query(`create policy ${STRAY} on "ExpertPreRegistration" for select to pg_monitor using (true)`);
-    await admin.query(`create policy expert_directory on "PublicLead" for select to pg_monitor using (true)`);
-    // NG-188: the NG-52 exception is gone; the old policy is dropped like any stray one.
-    await admin.query(`create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (true)`);
-    expect((await policySets()).PublicLead).toContain(STRAY);
+    // NG-384: the block DROPs policies on ExpertPreRegistration and this test creates expert_directory
+    // there; hold the expert lock for the whole test so no expert-prereg read sees the policy.
+    await withTestDbLock(OWNER_URL!, EXPERT_DIRECTORY_POLICY_LOCK, async () => {
+      await admin.query(`create policy ${STRAY} on "PublicLead" for select to pg_monitor using (true)`);
+      await admin.query(`create policy ${STRAY} on "ProvinceLeadRoute" to pg_monitor using (true) with check (true)`);
+      await admin.query(`create policy ${STRAY_TENANT} on "${TENANT_TABLE}" for select to pg_monitor using (false)`);
+      await admin.query(`create policy ${STRAY} on "ExpertPreRegistration" for select to pg_monitor using (true)`);
+      await admin.query(`create policy expert_directory on "PublicLead" for select to pg_monitor using (true)`);
+      // NG-188: the NG-52 exception is gone; the old policy is dropped like any stray one.
+      await admin.query(`create policy expert_directory on "ExpertPreRegistration" for select to pg_monitor using (true)`);
+      expect((await policySets()).PublicLead).toContain(STRAY);
 
-    await admin.query(ng183Block());
+      await admin.query(ng183Block());
 
-    const sets = await policySets();
-    for (const t of SYSTEM_SCOPE_TABLES) if (sets[t]) expect(sets[t], t).toEqual(expectedSet(t));
-    const kept = await admin.query('select 1 from pg_policies where tablename = $1 and policyname = $2', [TENANT_TABLE, STRAY_TENANT]);
-    expect(kept.rowCount, 'tenant table policy must be left alone').toBe(1);
+      const sets = await policySets();
+      for (const t of SYSTEM_SCOPE_TABLES) if (sets[t]) expect(sets[t], t).toEqual(expectedSet(t));
+      const kept = await admin.query('select 1 from pg_policies where tablename = $1 and policyname = $2', [TENANT_TABLE, STRAY_TENANT]);
+      expect(kept.rowCount, 'tenant table policy must be left alone').toBe(1);
+    });
   });
 });
