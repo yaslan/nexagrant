@@ -111,17 +111,32 @@ export function parseCspReports(payload: unknown): CspViolation[] {
   return [];
 }
 
+/**
+ * A limit of 0 or a fraction would silently disable the map bound or refuse everything
+ * (NG-376 Ö-B): reject it at construction instead.
+ */
+function assertPositiveInteger(name: string, value: number): void {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new RangeError(`ReportLimiter ${name} must be an integer >= 1, got ${String(value)}`);
+  }
+}
+
 /** Fixed-window counters. `now` is injectable for tests. */
 export class ReportLimiter {
   private windowStart = 0;
   private total = 0;
+  /** Set once per window when the global window refuses a request (NG-376 Ö-A). */
+  private globalFullWarned = false;
   private perClient = new Map<string, number>();
 
   constructor(
     private readonly perClientLimit = PER_CLIENT_LIMIT,
     private readonly globalLimit = GLOBAL_LIMIT,
     private readonly windowMs = WINDOW_MS,
-  ) {}
+  ) {
+    assertPositiveInteger('perClientLimit', perClientLimit);
+    assertPositiveInteger('globalLimit', globalLimit);
+  }
 
   /** How many clients the current window tracks (bounded by the global limit). */
   get trackedClients(): number {
@@ -143,17 +158,34 @@ export class ReportLimiter {
     if (now - this.windowStart >= this.windowMs) {
       this.windowStart = now;
       this.total = 0;
+      this.globalFullWarned = false;
       this.perClient.clear();
     }
     if (client) {
       const seen = this.perClient.get(client);
-      if (seen === undefined && this.total >= this.globalLimit) return false;
+      if (seen === undefined && this.total >= this.globalLimit) return this.globalFull();
       const n = (seen ?? 0) + 1;
       this.perClient.set(client, n);
       if (n > this.perClientLimit) return false;
     }
     this.total += 1;
-    return this.total <= this.globalLimit;
+    return this.total <= this.globalLimit || this.globalFull();
+  }
+
+  /**
+   * The global window refused a request. One line per window says so (NG-376 Ö-A), so a
+   * flood that starves the consent endpoints shows in the log. Only the configured numbers
+   * are logged: no client address, no request data.
+   */
+  private globalFull(): false {
+    if (!this.globalFullWarned) {
+      this.globalFullWarned = true;
+      logger.warn('[report-limiter] global window full', {
+        globalLimit: this.globalLimit,
+        windowMs: this.windowMs,
+      });
+    }
+    return false;
   }
 }
 
