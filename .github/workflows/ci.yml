@@ -253,6 +253,8 @@ jobs:
         NG239_CLAMD_PORT: '3310'
         # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
         DB_CONNECT_TIMEOUT_MS: '10000'
+        # NG-273: the Prisma maxWait of tenant transactions (P2028 on a loaded runner); same value as scripts/gate-isolated.sh.
+        DB_TX_MAX_WAIT_MS: '10000'
 
   # NG-288 (3. tur): the e2e suite runs as shards, one `next dev` server per shard, so a
   # single server no longer carries all ~727 tests and its heap restart threshold is reached
@@ -416,6 +418,8 @@ jobs:
         NODE_OPTIONS: '--max-old-space-size=6144'
         # FO-256: the pool's 1 s connect timeout fails on a loaded runner (same value as scripts/gate-isolated.sh).
         DB_CONNECT_TIMEOUT_MS: '10000'
+        # NG-273: the Prisma maxWait of tenant transactions (P2028 on a loaded runner); same value as scripts/gate-isolated.sh.
+        DB_TX_MAX_WAIT_MS: '10000'
         R2_ACCOUNT_ID: 'ci-minio'
         R2_ENDPOINT: 'http://localhost:9000'
         R2_ACCESS_KEY_ID: 'minioadmin'

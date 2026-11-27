@@ -204,6 +204,8 @@ export TAX_ID_ENCRYPTION_KEY="${TAX_ID_ENCRYPTION_KEY:-0123456789abcdef012345678
 # here, it gets 10 s; prod and dev keep 1000 ms (src/lib/env.ts). Vitest and the
 # Playwright webServer both inherit this environment.
 export DB_CONNECT_TIMEOUT_MS=10000
+# NG-273: the Prisma maxWait of tenant transactions (P2028 on a loaded machine). 10 s here only; prod and dev keep 2000 ms.
+export DB_TX_MAX_WAIT_MS=10000
 # ci.yml E2E step: R2 -> local MinIO, so admin-blog-image-upload.spec runs
 # instead of skipping. Exported for the whole gate (gate:core is one chain).
 # SMTP, NEXT_PUBLIC_APP_URL and the e2e AUTH_SECRET are NOT set here:

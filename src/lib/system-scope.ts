@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { dbTxMaxWaitMs } from '@/lib/env';
 
 /**
  * The one sanctioned way out of a tenant scope (TASK-MTVTPVTEBCF5Z, slice 6).
@@ -192,6 +193,11 @@ export async function withSystemScopeOn<T>(
     // The brand is minted here and nowhere else — beside the statement that
     // makes the claim true.
     return callback(tx as SystemTx);
+  }, {
+    // Same wait as withTenantOn (DB_TX_MAX_WAIT_MS, default 2000). Without this
+    // the Auth.jwt membership lookup kept Prisma's 2 s default (NG-274).
+    // timeout is left at Prisma's default; the scope itself is unchanged.
+    maxWait: dbTxMaxWaitMs,
   });
 }
 
