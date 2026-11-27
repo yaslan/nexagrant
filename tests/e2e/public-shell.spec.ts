@@ -101,7 +101,7 @@ test.describe('public pages share one header and one footer (FO-68)', () => {
     await page.addInitScript(() => {
       window.localStorage.setItem(
         'fabrika_cookie_consent',
-        JSON.stringify({ necessary: true, analytics: false, marketing: false })
+        JSON.stringify({ necessary: true, analytics: false, marketing: false, time: new Date().toISOString(), version: 'draft-2026-11-18' })
       );
     });
   });

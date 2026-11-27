@@ -45,7 +45,7 @@ async function signInAs(page: Page, baseURL: string, token: Record<string, unkno
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
+      JSON.stringify({ necessary: true, analytics: true, marketing: true, time: new Date().toISOString(), version: 'draft-2026-11-18' }),
     );
   });
 }

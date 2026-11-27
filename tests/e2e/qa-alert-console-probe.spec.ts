@@ -56,7 +56,7 @@ test('the alert console as the database currently holds it', async ({ page }) =>
   await page.addInitScript(() => {
     window.localStorage.setItem(
       'fabrika_cookie_consent',
-      JSON.stringify({ necessary: true, analytics: true, marketing: true }),
+      JSON.stringify({ necessary: true, analytics: true, marketing: true, time: new Date().toISOString(), version: 'draft-2026-11-18' }),
     );
   });
 
