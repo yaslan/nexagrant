@@ -26,6 +26,8 @@ const DB_ROW = 'value read from a non-null column of a row fetched just above, n
 const KNOWN: Record<string, string> = {
   'src/lib/billing/nexagrant/repository.ts provider: NG_TRIAL_PROVIDER':
     "a module constant ('ng-trial', src/lib/billing/nexagrant/features.ts), never undefined, never client input (NG-57)",
+  'src/lib/billing/nexagrant/usage.ts lte: at':
+    'NG-271: the check instant, `now ?? new Date()` at the top of assertNgAiQuota, a server Date, never undefined or client input; `tenantId` beside it is checked by requireActionId',
   'src/lib/billing/nexagrant/repository.ts lte: at':
     'the settle instant: `now ?? new Date()` two lines above, a server Date, never undefined or client input (NG-57)',
   'src/modules/m17/server/evaluate.ts updatedAt: claimedAt':
@@ -68,14 +70,14 @@ const KNOWN: Record<string, string> = {
   'src/lib/k3-topic-stats/importer.ts country: p.country': 'importer row, as above',
   'src/lib/k3-topic-stats/importer.ts orgType: p.orgType': 'importer row, as above',
   'src/lib/invitations/accept.ts gt: now': 'both callers pass `input.now ?? new Date()`; a Date, never undefined',
-  'src/lib/expert-prereg/server/retention.ts where: purgeableExpertPreRegWhere(cutoff) (not an object literal)':
-    '`purgeableExpertPreRegWhere` returns `{ createdAt: { lt: cutoff } }` and throws on an invalid cutoff; cron input, no client (FO-50)',
+  'src/lib/cookie-consent-retention.ts in: ids':
+    'NG-375 B-2: `ids` is the `id` column of the batch `findMany` (take = PURGE_BATCH_SIZE) read just above in deleteInBatches; a primary key, never undefined, never client input; an empty array matches nothing',
+  'src/lib/leads/public-lead.ts in: ids':
+    'NG-375 B-2: `ids` is the `id` column of the batch `findMany` (take = PURGE_BATCH_SIZE) read just above in deleteInBatches; a primary key, never undefined, never client input; an empty array matches nothing',
+  'src/lib/expert-prereg/server/retention.ts in: ids':
+    'NG-375 B-2: `ids` is the `id` column of the batch `findMany` (take = PURGE_BATCH_SIZE) read just above in deleteInBatches; a primary key, never undefined, never client input; an empty array matches nothing',
   'src/lib/invitations/retention.ts AND: [{ tenantId }, due]':
     '`tenantId` is a `groupBy` key of Invitation rows (non-null column); `due` comes from purgeableInvitationWhere, which throws on an invalid cutoff; cron input, no client',
-  'src/lib/leads/public-lead.ts where: due (not a const object literal)':
-    '`due` comes from purgeablePublicLeadWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client (TASK-MULR765AR5G0C)',
-  'src/lib/cookie-consent-retention.ts where: due (not a const object literal)':
-    '`due` comes from purgeableCookieConsentWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client; the table has no tenantId (NG-366)',
   'src/lib/relationships/stale-reminder.ts lastContactAt: r.lastContactAt':
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
   'src/lib/evidence-scan.ts scanAttempts: run.attempt':

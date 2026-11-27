@@ -73,6 +73,7 @@ import {
   handleSubscriptionCancellation,
 } from '@/lib/billing/subscription-sync';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
+import { holdTestDbLock, STRIPE_WEBHOOK_LIVE_LOCK } from './helpers/test-db-lock';
 
 /** Fixtures and counts go through the owning role; only the handlers run as fabrika_app. */
 const PRIV_URL = OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika';
@@ -152,8 +153,12 @@ async function wipe(): Promise<void> {
   await admin.plan.deleteMany({ where: { id: PLAN } });
 }
 
+/** NG-384: held from beforeAll to afterAll (see STRIPE_WEBHOOK_LIVE_LOCK); released after the final wipe. */
+let releaseStripeWebhookLock: (() => Promise<void>) | undefined;
+
 beforeAll(async () => {
   if (!HAS_DB) return;
+  releaseStripeWebhookLock = await holdTestDbLock(PRIV_URL, STRIPE_WEBHOOK_LIVE_LOCK);
   await wipe();
   await admin.plan.create({
     data: {
@@ -194,8 +199,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!HAS_DB) return;
-  await wipe();
-  await admin.$disconnect();
+  try {
+    await wipe();
+    await admin.$disconnect();
+  } finally {
+    await releaseStripeWebhookLock?.();
+  }
 });
 
 describe.skipIf(!HAS_DB)('stripe webhook idempotency under fabrika_app (live database)', () => {

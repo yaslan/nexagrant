@@ -15,11 +15,11 @@ import { purgeOldExpertPreRegistrations } from '@/lib/expert-prereg/server/reten
  *
  * A failure writes an `error` SystemAlert at once and the queue retries it (ADR-0008 §6.3).
  */
-export const expertPreRegCleanupTask = defineJob('expert-prereg-cleanup', async ({ tick }) => {
+// The body never reads the tick (NG-375, NG-366 sec-gnd B-1): the purge counts back
+// from the real clock, so a cron tick in the payload cannot move the cutoff.
+export const expertPreRegCleanupTask = defineJob('expert-prereg-cleanup', async () => {
   try {
-    const result = await purgeOldExpertPreRegistrations({
-      now: tick ?? new Date(),
-    });
+    const result = await purgeOldExpertPreRegistrations();
     return { success: true, ...result };
   } catch (error) {
     await recordAlert({

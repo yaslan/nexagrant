@@ -43,6 +43,7 @@ model Tenant {
   profile       TenantProfile?
   subscription  Subscription?
   ngSubscription NgSubscription? // NG-57
+  ngAiQuotaHolds NgAiQuotaHold[] // NG-271
   moduleStates  ModuleState[]
   provinceLeadRoutes ProvinceLeadRoute[]
   creditLedger  CreditLedger[]
@@ -461,6 +462,21 @@ model NgSubscription {
   updatedAt      DateTime  @updatedAt
 
   @@index([status, trialEndsAt])
+}
+
+// NG-271: one NexaGrant AI call in flight. Taken with the monthly AI allowance check (under the
+// tenant credit lock) and counted with the month's AiUsageLog rows, so concurrent calls cannot all
+// pass on the same count. Removed in the transaction that writes the call's AiUsageLog row, or
+// given back when the call delivers nothing; a hold left by a dead process stops counting at
+// expiresAt. Tenant data (tenant_isolation). Migration: add-ng-ai-quota-hold.sql.
+model NgAiQuotaHold {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([tenantId, expiresAt])
 }
 
 model Subscription {

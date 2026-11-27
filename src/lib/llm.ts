@@ -15,7 +15,7 @@
 
 import { aiCreditEntry } from '@/lib/billing/catalog';
 import { withTenant } from '@/lib/db';
-import { assertNgAiQuota } from '@/lib/billing/nexagrant/usage';
+import { assertNgAiQuota, releaseNgAiHold } from '@/lib/billing/nexagrant/usage';
 import { recordAlert } from '@/lib/observability/system-alert';
 import crypto from 'crypto';
 import type { Prisma } from '@prisma/client';
@@ -706,28 +706,48 @@ export async function getCreditBalance(tenantId: string): Promise<number> {
  * an unpriced call keeps the old rule and is refused only on an empty balance. Two concurrent calls
  * therefore cannot both pass on the same credits.
  */
-async function reserveCallCredits(options: LlmGenerateOptions, price: number, refId: string): Promise<void> {
-  const refused = await withTenant(options.tenantId, async (tx) => {
+async function reserveCallCredits(options: LlmGenerateOptions, price: number, refId: string): Promise<string | undefined> {
+  const { refused, hold } = await withTenant(options.tenantId, async (tx) => {
     await lockTenantCredits(tx, options.tenantId);
     // NG-250: the NexaGrant plan's monthly AI allowance, under the same lock, before any credit
     // moves. Throws NgPlanLimitError (digest NG_PLAN_LIMIT_REACHED); a tenant without a
-    // NexaGrant row is not counted (K-584603 = A).
-    await assertNgAiQuota(tx, options.tenantId);
-    if (price > 0) {
-      const reserved = await reserveAiAction(tx, { tenantId: options.tenantId, module: options.module, purpose: options.purpose, refId });
-      return !reserved;
-    }
-    return (await creditBalanceIn(tx, options.tenantId)) <= 0;
+    // NexaGrant row is not counted (K-584603 = A). NG-271: a passing check holds one place of
+    // the allowance for this call (`hold`) until its usage row is written.
+    const hold = await assertNgAiQuota(tx, options.tenantId);
+    const refused = price > 0
+      ? !(await reserveAiAction(tx, { tenantId: options.tenantId, module: options.module, purpose: options.purpose, refId }))
+      : (await creditBalanceIn(tx, options.tenantId)) <= 0;
+    // A call refused for credit does not run: its place goes back in the same transaction.
+    if (refused && hold) await releaseNgAiHold(tx, options.tenantId, hold);
+    return { refused, hold };
   });
   if (refused) throw new Error('Insufficient AI credits. Please purchase more credits or upgrade your plan.');
+  return hold;
 }
 
-/** NG-250: the monthly AI allowance for a caller that reserved its credits itself (M17). */
-async function assertNgAiQuotaLocked(tenantId: string): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
+/** NG-250: the monthly AI allowance for a caller that reserved its credits itself (M17, M18). Returns the NG-271 hold. */
+async function assertNgAiQuotaLocked(tenantId: string): Promise<string | undefined> {
+  return withTenant(tenantId, async (tx) => {
     await lockTenantCredits(tx, tenantId);
-    await assertNgAiQuota(tx, tenantId);
+    return assertNgAiQuota(tx, tenantId);
   });
+}
+
+/**
+ * NG-271: gives the allowance place of a call that delivered nothing back. Never throws: the
+ * caller's own outcome is what it reports. A hold that cannot be removed expires by itself
+ * (NG_AI_HOLD_TTL_MS), so the worst case is one place held for minutes, not a lost allowance.
+ */
+async function releaseHoldQuietly(options: LlmGenerateOptions, hold: string | undefined): Promise<void> {
+  if (!hold) return;
+  try {
+    await withTenant(options.tenantId, (tx) => releaseNgAiHold(tx, options.tenantId, hold));
+  } catch (e) {
+    console.warn('[generateCompletion] NexaGrant AI quota hold not released; it expires by itself', {
+      module: options.module,
+      purpose: options.purpose,
+    }, e);
+  }
 }
 
 /** Gives back a reservation whose call delivered nothing (FO-288). Idempotent, see {@link releaseAiReservation}. */
@@ -834,8 +854,12 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
   // called the model, so two concurrent calls could both pass it and drive the balance below zero.
   // A caller that reserved already (M17) passes `creditsReserved` and is not reserved twice.
   const reservation = options.creditsReserved ? undefined : `${options.module}:${options.purpose}:${crypto.randomUUID()}`;
-  if (reservation) await reserveCallCredits(options, price, reservation);
-  else await assertNgAiQuotaLocked(options.tenantId);
+  // NG-271: `hold` is this call's place in the NexaGrant monthly AI allowance (undefined when the
+  // tenant is not counted). It is removed with the usage row below, or given back on every path
+  // that writes none.
+  const hold = reservation
+    ? await reserveCallCredits(options, price, reservation)
+    : await assertNgAiQuotaLocked(options.tenantId);
 
   // One signal for the whole request: every attempt gives up at the same instant.
   const signal = signalUntil(options.deadlineAt);
@@ -853,6 +877,7 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
     // No answer came back, so nothing was delivered: give the reservation back before rethrowing.
     // The rethrown error is the provider's, whatever happens to the refund (FO-319 Ö-3).
     if (reservation) await refundOrAlert(options, reservation);
+    await releaseHoldQuietly(options, hold);
     throw e;
   });
 
@@ -900,6 +925,9 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
           refId: outcome === 'complete' ? (options.reservationRefId ?? reservation ?? null) : null,
         },
       });
+      // NG-271: the usage row now counts this call; its hold goes in the same transaction, so the
+      // call is never counted twice nor not at all.
+      if (hold) await releaseNgAiHold(tx, options.tenantId, hold);
       // A reserved call's price is already debited; a delivered answer keeps it. An unreserved caller
       // (M17, `creditsReserved`) is deducted here as before.
       if (!reservation && credits > 0) {
@@ -915,6 +943,9 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
     });
   } catch (e) {
     writeFailures.push(e);
+    // The row (and the hold's removal with it) rolled back: the call is not counted by a row, so
+    // its hold goes too rather than holding a place until it expires.
+    await releaseHoldQuietly(options, hold);
   }
   // FO-319 Y-3: the refund is not a usage-log write. When the row above was written and only the
   // refund failed, the usage row exists — so it must not be reported as "could not be written".

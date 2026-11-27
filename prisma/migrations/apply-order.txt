@@ -106,3 +106,4 @@ add-decision-log-reactivate.sql
 add-consortium-seat-member-stage.sql
 add-cookie-consent-record.sql
 ai-usage-log-ref-id.sql
+add-ng-ai-quota-hold.sql
