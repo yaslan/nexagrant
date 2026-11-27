@@ -789,6 +789,54 @@
       "roles": "Roller",
       "none": "Bu koltuk için eşleşen uzman yok.",
       "unavailable": "Uzman havuzu şu an okunamadı."
+    },
+    "noCountry": "Ülke yok",
+    "tag": {
+      "critical": "KRİTİK",
+      "optional": "İSTEĞE BAĞLI"
+    },
+    "stage": {
+      "label": "Aşama",
+      "open": "Açık",
+      "candidate": "Aday",
+      "invited": "Davet edildi",
+      "confirmed": "Kesinleşti",
+      "declined": "Reddetti",
+      "unknown": "Bilinmeyen aşama",
+      "openHint": "henüz aday yok",
+      "candidateHint": "{count} aday listede",
+      "invitedHint": "kurumun teyidi bekleniyor",
+      "aria": "Aşama: {label}, {total} adımın {step, select, 0 {0’ı} 1 {1’i} 2 {2’si} 3 {3’ü} other {{step}’i}}"
+    },
+    "backup": {
+      "label": "Yedek aday",
+      "none": "Yedek yok",
+      "notListed": "Listede yedek aday yok",
+      "noHolder": "Koltukta henüz asıl ortak yok"
+    },
+    "budget": {
+      "label": "Bütçe payı",
+      "agreed": "Mutabık",
+      "proposed": "Önerildi",
+      "missing": "Girilmedi",
+      "readFailed": "Bütçe payları okunamadı"
+    },
+    "g1": {
+      "heading": "G1 ön kontrolü: konsorsiyum",
+      "unfilledTitle": "{count} kritik rol henüz kesinleşmedi",
+      "noBackupTitle": "{count} kritik rolün yedek adayı yok",
+      "loiBlockerTitle": "{count} kritik üyenin niyet mektubu yok",
+      "loiBlockerNote": "G1 her kritik üyeden niyet mektubu istiyor; mektuplar kaydedilene kadar G1 geçmez.",
+      "loiInfoTitle": "Bilgi: {count} kritik üyenin niyet mektubu henüz kayıtlı değil",
+      "loiInfoNote": "G1 şu an niyet mektubunu şart koşmuyor; bu bir engel değil.",
+      "source": "Koltukların şu anki durumuna göre, G1 kurallarıyla hesaplandı. Bu ekran G1 kararı kaydetmez.",
+      "unavailable": "Bu fırsatın G1 konsorsiyum koşulları okunamadı.",
+      "noCriticalSeats": "Bu fırsatta kritik rol tanımlı değil; G1'in konsorsiyum koşullarında denetlenecek koltuk yok.",
+      "clear": "Tüm kritik roller kesinleşti ve her birinin yedek adayı var."
+    },
+    "loi": {
+      "missingBlocker": "Mektup yok: G1 engeli",
+      "missingInfo": "Mektup yok (bilgi)"
     }
   },
   "Auth": {
