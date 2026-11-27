@@ -1308,6 +1308,16 @@ Kaynak: NG-244 §6.1, `06-Fiyat-Politikasi.md` §1/§4/§7; kararlar K-584182 = 
   - **Kapsam (K-584603 = A):** NexaGrant plan kapısı ve sayaçları yalnız `NgSubscription` satırı olan kiracıya uygulanır. Satırı olmayan kiracı (demo, Fabrika, e2e) mevcut Fabrika kapılarıyla devam eder.
   - **Ürün yolları:** Özellik → yol tablosu `src/lib/billing/nexagrant/bindings.ts`. Modüle bağlı özellikler `NG_FEATURE_MODULE` içinde durur: `partner_search` ve `similar_projects` → M1.
   - **Sayaçlar** (`usage.ts`): koltuk = üyeler + bekleyen davetler. Uygulanması `NG_SEAT_LIMIT_ENFORCED=true` bayrağına bağlıdır, varsayılan kapalı. YZ kotası = bu İstanbul ayındaki `AiUsageLog` satır sayısı; `generateCompletion` içinde kredi kilidi altında uygulanır. Yeni tablo yok.
+- **NG-271 eklemesi — `NgAiQuotaHold` (kiracı verisi, `tenant_isolation`; `add-ng-ai-quota-hold.sql`):** uçuştaki bir NexaGrant YZ çağrısı için bir satır. Alanlar: `id` (cuid), `tenantId` (FK `Tenant`, birlikte silinir), `createdAt`, `expiresAt`; indeks `(tenantId, expiresAt)`.
+  - **Neden:** Kota kontrolünün kredi kilidi, sağlayıcı çağrılmadan önce commit'te bırakılıyordu. `AiUsageLog` satırı ise yanıttan sonra yazılıyordu. Aynı anda başlayan N çağrı aynı sayımı görüyordu (ölçüm: limit 50, başlangıç 49, 12 paralel çağrının 12'si geçti, ay 61'de bitti).
+  - **Akış:** `assertNgAiQuota` kilit altında **`AiUsageLog` satırları + süresi dolmamış hold'ları** sayar. Geçen çağrı için bir hold yazar ve id'sini döner.
+    - Teslim edilen, kesilen ya da reddedilen yanıtta `generateCompletion`, `AiUsageLog` satırını yazdığı transaction'da hold'u siler.
+    - Sağlayıcı hatası, zaman aşımı, kredi reddi ve kullanım satırı yazılamadığında hold geri verilir (`releaseNgAiHold`).
+    - Süreç ölürse hold `expiresAt` anında (`NG_AI_HOLD_TTL_MS` = 15 dk) sayılmaz olur; kiracının bir sonraki kontrolü onu siler. Kiracı kalıcı olarak kilitlenmez.
+  - **Kapsam:** Yalnız `NgSubscription` satırı olan ve YZ limiti sonlu olan kiracıda hold alınır. Sınırsız plan ve NexaGrant dışı kiracı hiç satır yazmaz.
+  - **Plan ekranı:** `readNgUsage` hold'ları göstermez (yalnız satırlar); hold saniyelik bir ara durumdur.
+  - **Kalıcılık:** Satırlar bir çağrı süresince yaşar; tabloda kalıcı veri yoktur. Geri alma: `.down.sql` (tabloyu düşürür; kodla aynı dağıtımda geri alınmalı).
+  - **Dağıtım sırası:** Migration koddan ÖNCE uygulanır, yoksa NexaGrant kiracısının her YZ çağrısı düşer.
 
 ## 34. `CookieConsentRecord` — çerez rıza kaydı (NG-9 · FE-1.5)
 

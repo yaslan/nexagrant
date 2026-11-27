@@ -9,6 +9,7 @@ import {
   istanbulMonthStart,
   NgPlanLimitError,
   readNgUsage,
+  releaseNgAiHold,
 } from '@/lib/billing/nexagrant/usage';
 import { envValue } from './helpers/dotenv';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
@@ -186,8 +187,11 @@ describe.skipIf(!reachable)('NG-250 plan gate, counters and status guard (live)'
     await admin!.aiUsageLog.createMany({ data: aiRows(T.trial, 49, monthStart) });
     const usage = await asTenant(T.trial, (tx) => readNgUsage(tx, T.trial, NOW));
     expect(usage).toMatchObject({ aiWritingMonthly: { used: 49, limit: 50 } });
-    await expect(asTenant(T.trial, (tx) => assertNgAiQuota(tx, T.trial, NOW))).resolves.toBeUndefined();
-
+    // NG-271: a passing check holds one place for the call it lets through (returns the hold id).
+    const hold = await asTenant(T.trial, (tx) => assertNgAiQuota(tx, T.trial, NOW));
+    expect(hold).toEqual(expect.any(String));
+    // That call's usage row replaces its hold (what generateCompletion does in one transaction).
+    await asTenant(T.trial, (tx) => releaseNgAiHold(tx, T.trial, String(hold)));
     await admin!.aiUsageLog.createMany({ data: aiRows(T.trial, 1, NOW) });
     const refused = await asTenant(T.trial, (tx) => assertNgAiQuota(tx, T.trial, NOW)).catch((e: unknown) => e);
     expect(refused).toBeInstanceOf(NgPlanLimitError);
@@ -204,7 +208,9 @@ describe.skipIf(!reachable)('NG-250 plan gate, counters and status guard (live)'
     const usage = await asTenant(T.emb, (tx) => readNgUsage(tx, T.emb, NOW));
     // The plan screen reads this counter (usage.aiWritingMonthly.used): the same number.
     expect(usage?.aiWritingMonthly).toMatchObject({ used: 10, limit: 50 });
-    await expect(asTenant(T.emb, (tx) => assertNgAiQuota(tx, T.emb, NOW))).resolves.toBeUndefined();
+    const hold = await asTenant(T.emb, (tx) => assertNgAiQuota(tx, T.emb, NOW));
+    expect(hold).toEqual(expect.any(String));
+    await asTenant(T.emb, (tx) => releaseNgAiHold(tx, T.emb, String(hold)));
 
     // Still refused at the limit: 40 more writings → 50/50, embeddings still not counted.
     await admin!.aiUsageLog.createMany({ data: aiRows(T.emb, 40, NOW) });

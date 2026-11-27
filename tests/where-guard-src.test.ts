@@ -26,6 +26,8 @@ const DB_ROW = 'value read from a non-null column of a row fetched just above, n
 const KNOWN: Record<string, string> = {
   'src/lib/billing/nexagrant/repository.ts provider: NG_TRIAL_PROVIDER':
     "a module constant ('ng-trial', src/lib/billing/nexagrant/features.ts), never undefined, never client input (NG-57)",
+  'src/lib/billing/nexagrant/usage.ts lte: at':
+    'NG-271: the check instant, `now ?? new Date()` at the top of assertNgAiQuota, a server Date, never undefined or client input; `tenantId` beside it is checked by requireActionId',
   'src/lib/billing/nexagrant/repository.ts lte: at':
     'the settle instant: `now ?? new Date()` two lines above, a server Date, never undefined or client input (NG-57)',
   'src/modules/m17/server/evaluate.ts updatedAt: claimedAt':
