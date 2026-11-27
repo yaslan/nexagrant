@@ -14,6 +14,15 @@ export function setLetterOfIntentRule(on: boolean): () => void {
   };
 }
 
+/** NG-33: the G1 budget-share rule, switched like the letter-of-intent rule. Returns the restore function. */
+export function setAgreedBudgetShareRule(on: boolean): () => void {
+  const before = DEFAULT_GATE_RULES.G1.requireAgreedBudgetShareForCriticalSeats;
+  DEFAULT_GATE_RULES.G1.requireAgreedBudgetShareForCriticalSeats = on;
+  return () => {
+    DEFAULT_GATE_RULES.G1.requireAgreedBudgetShareForCriticalSeats = before;
+  };
+}
+
 /** Turns the rule on for every test of the enclosing `describe` (or file) and restores it after each. */
 export function withLetterOfIntentRule(on: boolean): void {
   let restore: (() => void) | undefined;

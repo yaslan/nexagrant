@@ -502,6 +502,7 @@
     "G1_SEAT_NOT_FILLED": "Critical role not filled ({role}): seat status is {status}.",
     "G1_NO_BACKUP": "Critical role has no backup candidate ({role}).",
     "G1_NO_LOI": "No letter of intent is on file for the critical role ({role}).",
+    "G1_NO_AGREED_BUDGET_SHARE": "No agreed budget share is on file for the critical role ({role}).",
     "G2_OPEN_SEATS": "Consortium lock failed: {count, plural, one {# seat is} other {# seats are}} still open.",
     "G3_CRITERION_BELOW": "Criterion score is {score}; at least {min} is required.",
     "G3_TOTAL_BELOW": "Total evaluation score is {score}; at least {min} is required.",

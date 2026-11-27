@@ -502,6 +502,7 @@
     "G1_SEAT_NOT_FILLED": "Kritik rol doldurulmadı ({role}): koltuk durumu {status}.",
     "G1_NO_BACKUP": "Kritik rolün yedek adayı yok ({role}).",
     "G1_NO_LOI": "Kritik rol için niyet mektubu kayıtlı değil ({role}).",
+    "G1_NO_AGREED_BUDGET_SHARE": "Kritik rol ({role}) için onaylı bir bütçe payı kayıtlı değil.",
     "G2_OPEN_SEATS": "Konsorsiyum kilitlenemedi: {count, plural, other {# koltuk}} hâlâ açık.",
     "G3_CRITERION_BELOW": "Kriter puanı {score}; asgari {min} gerekiyor.",
     "G3_TOTAL_BELOW": "Toplam değerlendirme puanı {score}; asgari {min} gerekiyor.",
