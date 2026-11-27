@@ -44,9 +44,24 @@ export function defineJob(id: JobId, body: (ctx: JobContext) => Promise<unknown>
   return async (rawPayload, helpers) => {
     const { job, logger } = helpers;
     const raw = (rawPayload && typeof rawPayload === 'object' ? rawPayload : {}) as Record<string, unknown>;
-    const { _cron, ...payload } = raw as { _cron?: { ts?: string } } & Record<string, unknown>;
-    const tick = typeof _cron?.ts === 'string' ? new Date(_cron.ts) : null;
+    const { _cron, ...payload } = raw as { _cron?: { ts?: unknown } } & Record<string, unknown>;
+    const tick = parseCronTick(_cron?.ts);
     const where = `job=${job.id} attempt=${job.attempts}/${job.max_attempts} tick=${tick?.toISOString() ?? '-'}`;
+
+    // A bad tick must not drop the run (NG-375 B-4): the body still runs, without a
+    // tick, and the operator is told. Before this, a throw here skipped the body silently.
+    if (_cron?.ts !== undefined && tick === null) {
+      logger.error(`[${id}] unreadable _cron.ts, body runs without a tick: ${where}`);
+      await recordAlert({
+        level: 'warn',
+        source: 'job-queue',
+        message: `${id} got an unreadable cron tick; it ran without one`,
+        meta: { job: id, jobId: String(job.id), rawTick: String(_cron.ts).slice(0, 64) },
+        dedupeKey: `job-queue:${id}:bad-tick`,
+      }).catch((alertError) => {
+        logger.error(`[${id}] could not write the bad-tick SystemAlert: ${errorMessage(alertError)}`);
+      });
+    }
 
     logger.info(`[${id}] START ${where}`);
     try {
@@ -70,6 +85,16 @@ export function defineJob(id: JobId, body: (ctx: JobContext) => Promise<unknown>
       throw error;
     }
   };
+}
+
+/**
+ * Reads `_cron.ts`. A missing tick is null (a job added by hand). A present but
+ * unreadable one is also null, and the caller raises a SystemAlert for it (NG-375 B-4).
+ */
+export function parseCronTick(ts: unknown): Date | null {
+  if (typeof ts !== 'string') return null;
+  const tick = new Date(ts);
+  return Number.isNaN(tick.getTime()) ? null : tick;
 }
 
 /** `YYYY-MM` (UTC) of the tick, or of `now` for a run added by hand. */

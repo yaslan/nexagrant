@@ -68,14 +68,14 @@ const KNOWN: Record<string, string> = {
   'src/lib/k3-topic-stats/importer.ts country: p.country': 'importer row, as above',
   'src/lib/k3-topic-stats/importer.ts orgType: p.orgType': 'importer row, as above',
   'src/lib/invitations/accept.ts gt: now': 'both callers pass `input.now ?? new Date()`; a Date, never undefined',
-  'src/lib/expert-prereg/server/retention.ts where: purgeableExpertPreRegWhere(cutoff) (not an object literal)':
-    '`purgeableExpertPreRegWhere` returns `{ createdAt: { lt: cutoff } }` and throws on an invalid cutoff; cron input, no client (FO-50)',
+  'src/lib/cookie-consent-retention.ts in: ids':
+    'NG-375 B-2: `ids` is the `id` column of the batch `findMany` (take = PURGE_BATCH_SIZE) read just above in deleteInBatches; a primary key, never undefined, never client input; an empty array matches nothing',
+  'src/lib/leads/public-lead.ts in: ids':
+    'NG-375 B-2: `ids` is the `id` column of the batch `findMany` (take = PURGE_BATCH_SIZE) read just above in deleteInBatches; a primary key, never undefined, never client input; an empty array matches nothing',
+  'src/lib/expert-prereg/server/retention.ts in: ids':
+    'NG-375 B-2: `ids` is the `id` column of the batch `findMany` (take = PURGE_BATCH_SIZE) read just above in deleteInBatches; a primary key, never undefined, never client input; an empty array matches nothing',
   'src/lib/invitations/retention.ts AND: [{ tenantId }, due]':
     '`tenantId` is a `groupBy` key of Invitation rows (non-null column); `due` comes from purgeableInvitationWhere, which throws on an invalid cutoff; cron input, no client',
-  'src/lib/leads/public-lead.ts where: due (not a const object literal)':
-    '`due` comes from purgeablePublicLeadWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client (TASK-MULR765AR5G0C)',
-  'src/lib/cookie-consent-retention.ts where: due (not a const object literal)':
-    '`due` comes from purgeableCookieConsentWhere, which throws on an invalid cutoff and returns `{ createdAt: { lt: cutoff } }`; cron input, no client; the table has no tenantId (NG-366)',
   'src/lib/relationships/stale-reminder.ts lastContactAt: r.lastContactAt':
     '`lastContactAt` of a row collectTenant read with `lastContactAt: { not: null }`: a Date, never undefined; `id` beside it is guarded by isPresentId; cron input, no client',
   'src/lib/evidence-scan.ts scanAttempts: run.attempt':
