@@ -5,7 +5,7 @@ import { suiteHasDatabase } from '../../../tests/helpers/database-availability';
  * `getEntitlements` reads was written, or that Stripe left it alone).
  * TASK-MVIB6KITO9U5I: a pilot grant and an unbacked trial cannot replace it.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import type Stripe from 'stripe';
 import { prisma, withTenant } from '@/lib/db';
 import { getEntitlements } from '@/lib/billing';
@@ -23,7 +23,7 @@ import {
 } from './subscription-owner';
 import { grantPilot, PILOT_PROVIDER } from './pilot';
 import { upsertPublicSectorPlans } from './public-sector-plans';
-import { PUBLIC_SECTOR_PLANS_LOCK, withTestDbLock } from '../../../tests/helpers/test-db-lock';
+import { holdTestDbLock, PUBLIC_SECTOR_PLANS_LOCK, STRIPE_WEBHOOK_LIVE_LOCK, withTestDbLock } from '../../../tests/helpers/test-db-lock';
 import { handleSubscriptionCancellation, syncStripeSubscription } from './subscription-sync';
 import { presentIds, requireId } from '../../../tests/helpers/teardown-guard';
 
@@ -98,9 +98,16 @@ describe('admin grants — which rows they may not replace', () => {
 
 describe.skipIf(!HAS_DB)('assignInternalPlan (live DB)', () => {
   let tenantId: string;
+  /** NG-384: the live writes (Subscription, StripeEventLog, AuditEvent) hold the Stripe webhook lock for the whole suite. */
+  let releaseStripeWebhookLock: (() => Promise<void>) | undefined;
 
   beforeAll(async () => {
+    releaseStripeWebhookLock = await holdTestDbLock(process.env.DATABASE_URL!, STRIPE_WEBHOOK_LIVE_LOCK);
     await withTestDbLock(process.env.DATABASE_URL!, PUBLIC_SECTOR_PLANS_LOCK, () => upsertPublicSectorPlans(prisma));
+  });
+
+  afterAll(async () => {
+    await releaseStripeWebhookLock?.();
   });
 
   beforeEach(async () => {
