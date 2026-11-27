@@ -348,4 +348,45 @@ describe('G1 on a real database: an agreed budget share (NG-33)', () => {
     expect(reopened.reasons.join()).toMatch(/not filled/);
     expect(await latestDecision(opp)).toMatchObject({ passed: false });
   });
+
+  // NG-33 B-1 (PR #462 review): the share is keyed to the seat, so the member who agreed it must not
+  // carry it to the next organisation. A's agreement may not satisfy the rule once B sits in the seat.
+  test('B-1: a share agreed by the former member does not agree the next member; refused with G1_NO_AGREED_BUDGET_SHARE', async () => {
+    const opp = await opportunity('member replaced');
+    const s = await seat(opp);
+    await candidate(s, SEATED, 1);
+    await candidate(s, BACKUP, 2);
+    await fillThroughM8(opp, s);
+    await share(s, new Date('2026-11-02T00:00:00.000Z'));
+    expect((await evaluateGate(opp, 'G1', tenantId)).passed).toBe(true);
+
+    // A withdraws: the seat is open again (the same state the reopening test sets).
+    await admin!.consortiumSeat.update({
+      where: { id: s },
+      data: { status: 'OPEN', organizationId: null, memberStage: null, loiReceivedAt: null },
+    });
+
+    // B is invited, confirmed and records the letter of intent, all through the real M8 actions.
+    await m8.inviteCandidateToSeat(s, BACKUP, opp);
+    await m8.confirmSeatAssignment(s, opp);
+    expect(
+      await m8.setSeatMemberStage({ seatId: s, opportunityId: opp, stage: 'CONFIRMED', loiReceivedAt: '2026-11-01' }),
+    ).toMatchObject({ ok: true });
+
+    const result = await evaluateGate(opp, 'G1', tenantId);
+
+    expect(result.passed).toBe(false);
+    expect(result.reasonDetails).toContainEqual({ code: 'G1_NO_AGREED_BUDGET_SHARE', values: { role: 'research' } });
+    expect(await latestDecision(opp)).toMatchObject({
+      passed: false,
+      inputs: { criticalRolesWithoutAgreedBudgetShare: ['research'] },
+    });
+    // The agreement belonged to A: the share row is no longer agreed once B holds the seat.
+    expect(
+      await admin!.partnerBudgetShare.findUniqueOrThrow({
+        where: { seatId_tenantId: { seatId: s, tenantId } },
+        select: { agreedAt: true },
+      }),
+    ).toEqual({ agreedAt: null });
+  });
 });
