@@ -14,7 +14,9 @@
  *                          operation and a document upload is none. They are told apart by
  *                          model name (src/lib/llm-embedding-model.ts; the table has no kind
  *                          column). Enforced in `generateCompletion` (src/lib/llm.ts) under the
- *                          tenant's credit lock, before the provider is called.
+ *                          tenant's credit lock, before the provider is called. A call in flight
+ *                          counts too (NG-271): the check takes an `NgAiQuotaHold`, the call's
+ *                          usage row replaces it, a call that delivers nothing gives it back.
  *   - eligibility_check  — the Ücretsiz Kontrol monthly allowance has no product route yet
  *                          (bindings.ts, NG_UNBOUND_FEATURES); `ngLimitAllows` is the decision it
  *                          will use, nothing counts it today.
@@ -26,6 +28,7 @@ import type { TenantTx } from '@/lib/db';
 import { env } from '@/lib/env';
 import { lockTenantSeats } from '@/lib/billing/seat-limit';
 import { EMBEDDING_MODEL_PREFIX } from '@/lib/llm-embedding-model';
+import { requireActionId } from '@/lib/required-id';
 import { NG_PLAN_LIMIT_REACHED } from './codes';
 import { featureLimit, type NgFeatureLimit } from './entitlement';
 import type { NgFeatureKey } from './features';
@@ -145,17 +148,53 @@ export async function readNgUsage(
 }
 
 /**
+ * How long an in-flight hold counts (NG-271). Longer than any single generateCompletion (its
+ * retries included), so a running call is never uncounted; short enough that a hold leaked by a
+ * dead process (deploy, crash, platform timeout) frees the allowance within minutes, not never.
+ */
+export const NG_AI_HOLD_TTL_MS = 15 * 60_000;
+
+/**
  * Refuses one more model call past the plan's monthly AI allowance. Call with the tenant's
  * credit lock held (`lockTenantCredits`), so concurrent calls count one after another.
+ *
+ * NG-271: the lock is released when the caller's transaction commits, before the provider is
+ * called, and the call's `AiUsageLog` row is written only after the answer. So the count is the
+ * month's usage rows PLUS the calls in flight: a passing check takes an `NgAiQuotaHold` (in the
+ * caller's transaction) and returns its id. The caller removes it with {@link releaseNgAiHold} —
+ * in the transaction that writes the usage row, or when the call delivers nothing. A hold nobody
+ * removed stops counting at `expiresAt` ({@link NG_AI_HOLD_TTL_MS}) and is deleted here.
+ *
+ * Returns undefined, and takes no hold, when nothing is counted: a tenant without a NexaGrant row
+ * or a plan with no AI limit.
  */
-export async function assertNgAiQuota(tx: TenantTx, tenantId: string, now?: Date): Promise<void> {
+export async function assertNgAiQuota(tx: TenantTx, tenantId: string, now?: Date): Promise<string | undefined> {
   const at = now ?? new Date();
   const state = await readNgBillingState(tx, tenantId, at);
-  if (state.source !== 'subscription') return;
+  if (state.source !== 'subscription') return undefined;
   const limit = featureLimit(state.entitlement, 'ai_writing_monthly');
-  if (limit.granted && limit.limit === null) return;
+  if (limit.granted && limit.limit === null) return undefined;
+  // The deleteMany below must never lose its tenant filter.
+  requireActionId(tenantId, 'tenantId');
+  // Sequential: one connection holds this transaction.
+  await tx.ngAiQuotaHold.deleteMany({ where: { tenantId, expiresAt: { lte: at } } });
   const { used } = await countAiThisMonth(tx, tenantId, at);
-  if (!ngLimitAllows(limit, used)) throw new NgPlanLimitError('ai_writing_monthly', used, counterLimit(limit));
+  const inFlight = await tx.ngAiQuotaHold.count({ where: { tenantId, expiresAt: { gt: at } } });
+  if (!ngLimitAllows(limit, used + inFlight)) {
+    throw new NgPlanLimitError('ai_writing_monthly', used + inFlight, counterLimit(limit));
+  }
+  const hold = await tx.ngAiQuotaHold.create({
+    data: { tenantId, expiresAt: new Date(at.getTime() + NG_AI_HOLD_TTL_MS) },
+    select: { id: true },
+  });
+  return hold.id;
+}
+
+/** Removes one in-flight hold taken by {@link assertNgAiQuota}. Idempotent: a missing hold is fine. */
+export async function releaseNgAiHold(tx: TenantTx, tenantId: string, holdId: string): Promise<void> {
+  requireActionId(tenantId, 'tenantId');
+  requireActionId(holdId, 'holdId');
+  await tx.ngAiQuotaHold.deleteMany({ where: { tenantId, id: holdId } });
 }
 
 /**
