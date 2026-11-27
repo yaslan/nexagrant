@@ -55,7 +55,9 @@ BEGIN
     CREATE POLICY intake_no_update ON public."ExpertPreRegistration" AS RESTRICTIVE FOR UPDATE
       USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
              OR (status = 'pending' AND "emailVerifiedAt" IS NULL))
-      WITH CHECK (true);
+      WITH CHECK ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
+             OR (status = 'pending' AND "emailVerifiedAt" IS NULL)
+             OR (status = 'verified' AND "emailVerifiedAt" IS NOT NULL));
     DROP POLICY IF EXISTS intake_no_delete ON public."ExpertPreRegistration";
     CREATE POLICY intake_no_delete ON public."ExpertPreRegistration" AS RESTRICTIVE FOR DELETE
       USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))

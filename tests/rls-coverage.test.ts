@@ -347,9 +347,14 @@ describe('INTAKE_APPEND_ONLY — the anonymous intake tables are append-only for
     const created = [...block.matchAll(/CREATE POLICY (\w+) ON public\."(\w+)" AS (\w+) FOR (\w+)/g)].map((m) => `${m[2]}.${m[1]} ${m[3]} ${m[4]}`);
     const expected = [...INTAKE_APPEND_ONLY].flatMap((t) => INTAKE_APPEND_ONLY_POLICIES.map(({ policy, cmd }) => `${t}.${policy} RESTRICTIVE ${cmd}`));
     expect(created.sort()).toEqual(expected.sort());
-    // Every expression names both intake purposes; the UPDATE ones let the new row through.
-    expect([...block.matchAll(/NOT IN \('public-intake', 'cookie-consent'\)/g)]).toHaveLength(expected.length);
-    expect([...block.matchAll(/WITH CHECK \(true\)/g)]).toHaveLength(INTAKE_APPEND_ONLY.size);
+    // Every expression names both intake purposes. The UPDATE policies' WITH CHECK lets the new row
+    // through: true on the three tables without a state exception; on ExpertPreRegistration it lists
+    // the two states the code writes (pending without a time, verified with one), NG-243 B-2.
+    expect([...block.matchAll(/NOT IN \('public-intake', 'cookie-consent'\)/g)]).toHaveLength(expected.length + 1);
+    expect([...block.matchAll(/WITH CHECK \(true\)/g)]).toHaveLength(INTAKE_APPEND_ONLY.size - 1);
+    expect(block).toContain(
+      `WITH CHECK ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))\n             OR (status = 'pending' AND "emailVerifiedAt" IS NULL)\n             OR (status = 'verified' AND "emailVerifiedAt" IS NOT NULL));`
+    );
   });
 
   test('the migration carries the same block, byte for byte', () => {

@@ -208,3 +208,87 @@ describe('the two exceptions the forms need', () => {
     });
   });
 });
+
+describe('NG-243 B-2: the pending exception on ExpertPreRegistration is bounded by the state it leaves', () => {
+  // sec-gnd (PR #465, live probe): under public-intake a PENDING row of another person could be
+  // set to verified and deleted, because the exception's WITH CHECK was (true). A row may leave
+  // 'pending' only for the two states the code writes: still pending with no verification time,
+  // or verified with one (verify.ts). Anything else is refused.
+
+  /** Runs one statement in a savepoint: its row count, or the error it raised. Always rolled back to the savepoint. */
+  async function outcome(sql: string, params: unknown[]): Promise<{ rows: number } | { error: string }> {
+    await client.query('savepoint ng243b2');
+    try {
+      const r = await client.query(sql, params);
+      return { rows: r.rowCount ?? -1 };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      await client.query('rollback to savepoint ng243b2');
+    }
+  }
+
+  /** Refused: no row changed, or Postgres refused the new row (the WITH CHECK of an UPDATE). */
+  const refused = (r: { rows: number } | { error: string }): boolean =>
+    'rows' in r ? r.rows === 0 : /row-level security/i.test(r.error);
+
+  const insertPending = (rowId: string) =>
+    client.query(
+      `insert into "ExpertPreRegistration" (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages,
+                                            "kvkkAcceptedAt", "visibilityConsentAt", locale, status)
+       values ($1, 'probe', $1 || '@ng243.invalid', '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr', 'pending')`,
+      [rowId]
+    );
+
+  it('(a) public-intake cannot set a pending row to disabled, nor to a state its timestamps do not back', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await rolledBack(async () => {
+      const pending = id();
+      await scope('public-intake');
+      await insertPending(pending);
+
+      const attempts = {
+        'pending -> disabled': await outcome(`update "ExpertPreRegistration" set status = 'disabled' where id = $1`, [pending]),
+        'pending -> verified without emailVerifiedAt': await outcome(
+          `update "ExpertPreRegistration" set status = 'verified' where id = $1`,
+          [pending]
+        ),
+        'pending with emailVerifiedAt set': await outcome(
+          `update "ExpertPreRegistration" set "emailVerifiedAt" = now() where id = $1`,
+          [pending]
+        ),
+      };
+      for (const [name, result] of Object.entries(attempts)) expect(refused(result), name).toBe(true);
+
+      // Nothing changed: the row is still the pending row the expert registered.
+      expect(
+        (await client.query(`select status, "emailVerifiedAt" from "ExpertPreRegistration" where id = $1`, [pending])).rows
+      ).toEqual([{ status: 'pending', emailVerifiedAt: null }]);
+    });
+  });
+
+  it('(b) public-intake still verifies a pending row when it sets the verification time (verify.ts)', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await rolledBack(async () => {
+      const pending = id();
+      await scope('public-intake');
+      await insertPending(pending);
+      expect(
+        await outcome(`update "ExpertPreRegistration" set status = 'verified', "emailVerifiedAt" = now() where id = $1`, [pending])
+      ).toEqual({ rows: 1 });
+    });
+  });
+
+  it('(c) platform-admin may set a pending row to disabled (admin console; the pending exception does not apply)', async (ctx) => {
+    if (!ready) return ctx.skip(skipReason);
+    await rolledBack(async () => {
+      const pending = id();
+      await scope('public-intake');
+      await insertPending(pending);
+      await scope('platform-admin');
+      expect(
+        await outcome(`update "ExpertPreRegistration" set status = 'disabled' where id = $1`, [pending])
+      ).toEqual({ rows: 1 });
+    });
+  });
+});

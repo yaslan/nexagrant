@@ -631,9 +631,11 @@ END $$;
 -- src/lib/leads/public-lead.ts) and apply-migrations.sh keep UPDATE and DELETE.
 -- Two exceptions, each the smallest the forms themselves write (git grep, NG-243 report):
 --   * ExpertPreRegistration: a PENDING row (status 'pending', "emailVerifiedAt" NULL) may still be
---     updated (register.ts re-issues the link and restores it after a failed mail; verify.ts sets
---     it verified: WITH CHECK (true), so the new row may leave 'pending') and deleted (register.ts
---     removes a new row whose mail failed). A verified or disabled expert is out of the intake's reach.
+--     updated and deleted. The new row (WITH CHECK) may only stay pending with no verification
+--     time (register.ts re-issues the link and restores it after a failed mail), or become verified
+--     WITH a verification time (verify.ts). Disabled, or verified without a time, is refused: the
+--     intake cannot disable an expert or fake a verification (sec-gnd B-2, PR #465). Deleted: the
+--     rollback of a new row whose mail failed (register.ts). A verified or disabled row is out of reach.
 --   * ExpertPreRegAttempt: rows older than 24 hours may be deleted. register.ts drops attempts
 --     older than ATTEMPT_RETENTION_MS (src/lib/expert-prereg/server/constants.ts, 24 h) before it
 --     counts; a recent attempt cannot be deleted, so the per-IP window cannot be emptied. If the
@@ -678,7 +680,9 @@ BEGIN
     CREATE POLICY intake_no_update ON public."ExpertPreRegistration" AS RESTRICTIVE FOR UPDATE
       USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
              OR (status = 'pending' AND "emailVerifiedAt" IS NULL))
-      WITH CHECK (true);
+      WITH CHECK ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
+             OR (status = 'pending' AND "emailVerifiedAt" IS NULL)
+             OR (status = 'verified' AND "emailVerifiedAt" IS NOT NULL));
     DROP POLICY IF EXISTS intake_no_delete ON public."ExpertPreRegistration";
     CREATE POLICY intake_no_delete ON public."ExpertPreRegistration" AS RESTRICTIVE FOR DELETE
       USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
