@@ -377,6 +377,23 @@ const envSchema = z.object({
       .default('60')
   ),
   /**
+   * NG-387 (B-1): the sweep cut-off of the `ai-reservation-orphans` job — ISO-8601 UTC, the deploy
+   * moment of NG-387. Only a `usage:M18` row created at or after it can be an orphan; rows before
+   * it predate the delivery marker and may have been delivered, so they are never refunded. Blank =
+   * no cut-off: the job refunds nothing and logs one warning (src/lib/ai/reservation-orphans.ts).
+   * Must end in `Z` (UTC).
+   */
+  ORPHAN_SWEEP_SINCE: blankToUndefined(
+    z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z$/,
+        'ORPHAN_SWEEP_SINCE must be an ISO-8601 UTC timestamp ending in Z, e.g. 2026-12-01T09:00:00Z',
+      )
+      .refine((value) => !Number.isNaN(Date.parse(value)), 'ORPHAN_SWEEP_SINCE is not a valid date')
+      .optional()
+  ),
+  /**
    * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
    * blank = 1000, the production value, which fails fast into the fallback path.
    * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
@@ -521,6 +538,14 @@ export function publicLeadStuckAfterMinutes(): number {
  */
 export function reservationOrphanMinutes(): number {
   return Number(env.RESERVATION_ORPHAN_MINUTES);
+}
+
+/**
+ * The orphan sweep cut-off (NG-387 B-1), or `null` when `ORPHAN_SWEEP_SINCE` is blank: no cut-off,
+ * no refund. The schema has already rejected anything that is not a UTC ISO timestamp.
+ */
+export function orphanSweepSince(): Date | null {
+  return env.ORPHAN_SWEEP_SINCE ? new Date(env.ORPHAN_SWEEP_SINCE) : null;
 }
 
 /**

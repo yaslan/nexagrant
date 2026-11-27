@@ -51,11 +51,15 @@ export interface OrphanReservationSweepResult {
   credits: number;
   /** True when MAX_BATCHES stopped the run with orphans possibly left. */
   more: boolean;
+  /** Set (and nothing swept) when there is no cut-off: ORPHAN_SWEEP_SINCE is blank. */
+  skipped?: 'no-cutoff';
 }
 
 export interface OrphanReservationSweepOptions {
   /** A reservation younger than this may still be running. */
   olderThanMinutes: number;
+  /** The cut-off (ORPHAN_SWEEP_SINCE): only rows created at or after it are candidates. `null` = none. */
+  since: Date | null;
   /** Test seam: the defaults are the production values. */
   batchSize?: number;
   maxBatches?: number;
@@ -89,6 +93,12 @@ export async function releaseOrphanReservations(
   if (![minutes, batchSize, maxBatches].every((n) => Number.isInteger(n) && n > 0)) {
     throw new Error('releaseOrphanReservations: olderThanMinutes, batchSize and maxBatches must be positive integers.');
   }
+  if (options.since !== null && Number.isNaN(options.since.getTime())) {
+    throw new Error('releaseOrphanReservations: `since` must be a valid Date or null.');
+  }
+  // No cut-off, no refund: a missing ORPHAN_SWEEP_SINCE must never fall back to "everything".
+  if (options.since === null) return { released: 0, credits: 0, more: false, skipped: 'no-cutoff' };
+  const since = options.since;
   const cutoff = new Date(now.getTime() - minutes * 60_000);
 
   const result: OrphanReservationSweepResult = { released: 0, credits: 0, more: false };
@@ -97,7 +107,7 @@ export async function releaseOrphanReservations(
     let cursor: string | null = null;
     for (let batch = 0; ; batch++) {
       const step: BatchOutcome = await withSystemScope('cross-tenant-job', 'ai-reservation-orphans.release', (tx) =>
-        sweepBatch(tx, moduleId, cutoff, cursor, batchSize),
+        sweepBatch(tx, moduleId, since, cutoff, cursor, batchSize),
       );
       result.released += step.released;
       result.credits += step.credits;
@@ -123,23 +133,20 @@ interface BatchOutcome {
 function orphans(
   tx: SystemTx,
   module: string,
+  since: Date,
   cutoff: Date,
   cursor: string | null,
   limit: number,
   onlyIds: readonly string[] | null = null,
 ): Promise<Candidate[]> {
   return tx.$queryRaw<Candidate[]>`
-    WITH first_marker AS (
-      SELECT min(u."createdAt") AS at FROM "AiUsageLog" u WHERE u.module = ${module} AND u."refId" IS NOT NULL
-    )
     SELECT c.id, c."tenantId", c."refId", (-c.delta)::int AS credits
-      FROM "CreditLedger" c, first_marker f
+      FROM "CreditLedger" c
      WHERE c.reason = ${`usage:${module}`}
        AND c.delta < 0
        AND c."refId" LIKE ${`${module}:%`}
        AND c."createdAt" < ${cutoff}
-       AND f.at IS NOT NULL
-       AND c."createdAt" >= f.at
+       AND c."createdAt" >= ${since}
        AND NOT EXISTS (SELECT 1 FROM "CreditLedger" r
                         WHERE r."tenantId" = c."tenantId" AND r."refId" = c."refId" AND r.reason = ${`refund:${module}`})
        AND NOT EXISTS (SELECT 1 FROM "AiUsageLog" m WHERE m."tenantId" = c."tenantId" AND m."refId" = c."refId")
@@ -149,8 +156,15 @@ function orphans(
      LIMIT ${limit}`;
 }
 
-async function sweepBatch(tx: SystemTx, module: string, cutoff: Date, cursor: string | null, batchSize: number): Promise<BatchOutcome> {
-  const rows = await orphans(tx, module, cutoff, cursor, batchSize);
+async function sweepBatch(
+  tx: SystemTx,
+  module: string,
+  since: Date,
+  cutoff: Date,
+  cursor: string | null,
+  batchSize: number,
+): Promise<BatchOutcome> {
+  const rows = await orphans(tx, module, since, cutoff, cursor, batchSize);
   const lastId = rows.at(-1)?.id ?? null;
   if (rows.length === 0) return { scanned: 0, lastId, released: 0, credits: 0 };
 
@@ -162,7 +176,7 @@ async function sweepBatch(tx: SystemTx, module: string, cutoff: Date, cursor: st
   // The scan was not locked: read the orphans again under the locks. A refund (the action's own,
   // or another sweep's) that committed meanwhile takes the row out, so every row left here is
   // refunded by the call below (it writes nothing only for an already refunded refId).
-  const still = await orphans(tx, module, cutoff, null, batchSize, rows.map((r) => r.id));
+  const still = await orphans(tx, module, since, cutoff, null, batchSize, rows.map((r) => r.id));
   let released = 0;
   let credits = 0;
   for (const r of still) {

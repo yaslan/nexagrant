@@ -1,14 +1,17 @@
 import { defineJob } from '../define';
 import { recordAlert } from '@/lib/observability/system-alert';
 import { errorMessage } from '@/lib/errors';
-import { reservationOrphanMinutes } from '@/lib/env';
+import { orphanSweepSince, reservationOrphanMinutes } from '@/lib/env';
+import { logger } from '@/lib/logger';
 import { ORPHAN_ALERT_SOURCE, ORPHAN_SWEEP_MODULES, releaseOrphanReservations } from '@/lib/ai/reservation-orphans';
 
 /**
  * Orphaned AI credit reservation sweep — every 15 minutes (NG-387, NG-202 B3).
  *
  * Refunds an M18 reservation that has neither a refund nor a delivery marker after
- * RESERVATION_ORPHAN_MINUTES; see src/lib/ai/reservation-orphans.ts. M17 is not swept here
+ * RESERVATION_ORPHAN_MINUTES and was created at or after ORPHAN_SWEEP_SINCE; see
+ * src/lib/ai/reservation-orphans.ts. ORPHAN_SWEEP_SINCE blank: nothing is refunded, one warning is
+ * logged (the result carries `skipped: 'no-cutoff'`, no alert). M17 is not swept here
  * (m17-stale-runs owns it). The moment is the cron tick, not the payload, so a job added by hand
  * refunds exactly what the cron would.
  *
@@ -19,9 +22,10 @@ import { ORPHAN_ALERT_SOURCE, ORPHAN_SWEEP_MODULES, releaseOrphanReservations } 
  */
 export const aiReservationOrphansTask = defineJob('ai-reservation-orphans', async ({ tick }) => {
   const olderThanMinutes = reservationOrphanMinutes();
+  const since = orphanSweepSince();
   let swept;
   try {
-    swept = await releaseOrphanReservations(tick ?? new Date(), { olderThanMinutes });
+    swept = await releaseOrphanReservations(tick ?? new Date(), { olderThanMinutes, since });
   } catch (error) {
     await recordAlert({
       level: 'error',
@@ -29,6 +33,9 @@ export const aiReservationOrphansTask = defineJob('ai-reservation-orphans', asyn
       message: `AI reservation orphan sweep failed: ${errorMessage(error)}`,
     });
     throw error;
+  }
+  if (swept.skipped === 'no-cutoff') {
+    logger.warn('[ai-reservation-orphans] ORPHAN_SWEEP_SINCE is not set: no orphan refunded. Set it to the NG-387 deploy time (docs/RELEASE_CHECKLIST.md).');
   }
   if (swept.released > 0) {
     await recordAlert({
