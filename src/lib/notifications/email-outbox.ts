@@ -7,6 +7,8 @@ import type { Mailer } from '@/lib/email/mailer';
 import { escapeHtml } from '@/lib/feedback/digest';
 import { requireActionId } from '@/lib/required-id';
 import { renderNotification, type NotificationTranslator } from './render';
+import { eventOfType } from './events';
+import { listPreferenceRows, resolveDelivery } from './preferences';
 
 /**
  * Sends the notification centre's e-mail outbox (spec §13, NG-43).
@@ -113,6 +115,28 @@ export interface SendEmailsOptions {
   /** Seam for the live test: run on the test's own clients. Default withSystemScope / withTenant. */
   systemScope?: <T>(callback: (tx: SystemTx) => Promise<T>) => Promise<T>;
   runTenant?: <T>(tenantId: string, callback: (tx: TenantTx) => Promise<T>) => Promise<T>;
+  /**
+   * Seam for the live test (NG-330 B-1): runs once a batch's claim is renewed and
+   * before the user's e-mail choice is read again. Production leaves it unset.
+   */
+  afterClaim?: (batch: readonly OutboxItem[]) => Promise<void>;
+}
+
+/**
+ * The items the user still wants by e-mail: an item whose event is switched
+ * OFF is dropped. A type outside §13 has no switch and is always kept.
+ */
+export async function stillWanted(
+  tx: TenantTx,
+  tenantId: string,
+  userId: string,
+  batch: readonly OutboxItem[]
+): Promise<OutboxItem[]> {
+  const rows = await listPreferenceRows(tx, tenantId, userId);
+  return batch.filter((item) => {
+    const event = eventOfType(item.type);
+    return !event || resolveDelivery(rows, event).EMAIL !== 'OFF';
+  });
 }
 
 /** Who has items of this mode waiting: (tenant, user) pairs, live tenants only. */
@@ -188,7 +212,6 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
     const t = options.translatorFor(member.user.locale);
     const batches: OutboxItem[][] = options.mode === 'WEEKLY' ? [items] : items.map((i) => [i]);
     for (const batch of batches) {
-      const mail = options.mode === 'WEEKLY' ? renderDigestMail(batch, t) : renderInstantMail(batch[0]!, t);
       const ids = batch.map((i) => i.id);
       // Renew the lease before the SMTP call: a long run (slow SMTP, many
       // batches) must not outlive its claim, or another run takes the rows and
@@ -203,6 +226,25 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         result.claimLost++;
         continue;
       }
+      await options.afterClaim?.(batch);
+      // NG-330 (B-1): the user may have switched e-mail OFF after the claim. That
+      // switch deletes the queued rows, but this batch's SMTP call would still
+      // go out. Read the choice again here, just before the call, and drop what
+      // is no longer wanted (also covers a dispatch that read ON before the switch).
+      const wanted = await runTenant(tenantId, (tx) => stillWanted(tx, tenantId, userId, batch));
+      const keptIds = new Set(wanted.map((i) => i.id));
+      const unwantedIds = ids.filter((id) => !keptIds.has(id));
+      if (unwantedIds.length > 0) {
+        const dropped = await runTenant(tenantId, (tx) =>
+          tx.notificationEmailItem.deleteMany({
+            where: { tenantId, userId, id: { in: unwantedIds }, sentAt: null, claimToken: token },
+          })
+        );
+        result.itemsDropped += dropped.count;
+      }
+      if (wanted.length === 0) continue;
+      const sendIds = wanted.map((i) => i.id);
+      const mail = options.mode === 'WEEKLY' ? renderDigestMail(wanted, t) : renderInstantMail(wanted[0]!, t);
       try {
         await options.mailer({ to: member.user.email, ...mail });
       } catch (error) {
@@ -212,10 +254,9 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         result.failures++;
         console.error('[notifications][email-outbox]', options.mode, error instanceof Error ? error.name : 'error');
         // Give the batch back so the next run sends it at once, not after the lease.
-        const failedIds = batch.map((i) => i.id);
         await runTenant(tenantId, (tx) =>
           tx.notificationEmailItem.updateMany({
-            where: { tenantId, userId, id: { in: failedIds }, sentAt: null, claimToken: token },
+            where: { tenantId, userId, id: { in: sendIds }, sentAt: null, claimToken: token },
             data: { claimToken: null, claimedAt: null },
           })
         ).catch(() => {
@@ -224,7 +265,7 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         continue;
       }
       result.mailsSent++;
-      result.itemsSent += batch.length;
+      result.itemsSent += wanted.length;
       try {
         // Non-null columns of the rows read above; asserted so the write can
         // never lose its filter (tests/where-guard-src.test.ts).
@@ -232,7 +273,7 @@ export async function sendNotificationEmails(options: SendEmailsOptions): Promis
         requireActionId(userId, 'userId');
         await runTenant(tenantId, (tx) =>
           tx.notificationEmailItem.updateMany({
-            where: { tenantId, userId, id: { in: ids }, sentAt: null, claimToken: token },
+            where: { tenantId, userId, id: { in: sendIds }, sentAt: null, claimToken: token },
             data: { sentAt: new Date() },
           })
         );

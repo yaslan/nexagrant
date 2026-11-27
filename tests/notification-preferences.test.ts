@@ -213,6 +213,10 @@ describe('a failed mark after an accepted send', () => {
     const marked: string[] = [];
     const tenantTx = (tenantId: string) =>
       ({
+        // NG-330: the item is sent only while the user's e-mail choice is not OFF.
+        notificationPreference: {
+          findMany: async () => [{ event: 'NEW_MATCHING_CALL', channel: 'EMAIL', frequency: 'INSTANT' }],
+        },
         notificationEmailItem: {
           findMany: async () => [item(tenantId === 't1' ? 'i1' : 'i2')],
           updateMany: async (args: {
@@ -251,5 +255,54 @@ describe('a failed mark after an accepted send', () => {
     expect(sent).toEqual(['t1@example.com', 't2@example.com']);
     expect(marked).toEqual(['i2']);
     expect(result).toMatchObject({ recipients: 2, mailsSent: 2, itemsSent: 2, failures: 1 });
+  });
+});
+
+/**
+ * NG-330 (B-1), pure half: the claim is made and renewed, then the user's e-mail
+ * choice is OFF. The batch must not reach the mailer; its claimed items are dropped.
+ */
+describe('e-mail switched OFF after the claim (NG-330 B-1)', () => {
+  test('the mailer is not called and the claimed item is deleted', async () => {
+    const system = {
+      notificationEmailItem: { findMany: async () => [{ tenantId: 't1', userId: 'u1' }] },
+      tenant: { findMany: async () => [{ id: 't1' }] },
+    } as unknown as SystemTx;
+    const deleted: unknown[] = [];
+    const tenantTx = {
+      notificationEmailItem: {
+        findMany: async () => [
+          {
+            id: 'i1',
+            type: 'SAVED_SEARCH_MATCH',
+            payload: { searchId: 's', searchName: 'X', matchCount: 1 },
+            createdAt: new Date('2026-11-10T09:00:00Z'),
+          },
+        ],
+        // The claim and the lease renewal both match the one item.
+        updateMany: async () => ({ count: 1 }),
+        deleteMany: async (args: unknown) => {
+          deleted.push(args);
+          return { count: 1 };
+        },
+      },
+      notificationPreference: {
+        findMany: async () => [{ event: 'NEW_MATCHING_CALL', channel: 'EMAIL', frequency: 'OFF' }],
+      },
+      membership: { findFirst: async () => ({ user: { email: 'u1@example.com', locale: 'tr' } }) },
+    } as unknown as TenantTx;
+    const sent: string[] = [];
+
+    const result = await sendNotificationEmails({
+      mode: 'INSTANT',
+      mailer: async (m) => void sent.push(m.to),
+      translatorFor: () => translator('tr'),
+      systemScope: (cb) => cb(system),
+      runTenant: (_tenantId, cb) => cb(tenantTx),
+    });
+
+    expect(sent).toEqual([]);
+    expect(deleted).toHaveLength(1);
+    expect(result).toMatchObject({ mailsSent: 0, itemsSent: 0, itemsDropped: 1 });
   });
 });
