@@ -1,5 +1,9 @@
 import type { Prisma } from '@prisma/client';
 import { withSystemScope } from '@/lib/system-scope';
+import { deleteInBatches, purgeClock, tryPurgeLock } from '@/lib/retention/purge-policy';
+
+/** Advisory lock of the consent purge (NG-375 B-2). Its own key: consent writes never take it. */
+export const COOKIE_CONSENT_PURGE_LOCK_KEY = 7_302_026_115_001n;
 
 /**
  * How long one CookieConsentRecord row (anonymous visitor id, choice, policy
@@ -41,6 +45,8 @@ export interface CookieConsentPurgeResult {
   deletedCount: number;
   cutoff: string;
   retentionDays: number;
+  /** Set when another purge held the lock: nothing was deleted by this run. */
+  skipped?: 'locked';
 }
 
 /**
@@ -52,22 +58,25 @@ export interface CookieConsentPurgeResult {
  * (prisma/rls.sql, system_scope_open). Idempotent: a second run the same day
  * finds nothing.
  *
- * `now` may only move the window back (tests pin a fixed past moment). A
- * future `now` is clamped to the real clock, so no caller can reach rows that
- * are not yet past the retention window (NG-366 sec-gnd B-1). An invalid date
- * is passed through and throws in cookieConsentPurgeCutoff.
+ * The moment comes from {@link purgeClock}: a future `now` is clamped to the
+ * real clock (NG-366 sec-gnd B-1). Rows go in batches of PURGE_BATCH_SIZE under a
+ * non-blocking lock (NG-375 B-2): a run that finds the lock held deletes nothing.
  */
 export async function purgeOldCookieConsents(
   options: { now?: Date } = {},
 ): Promise<CookieConsentPurgeResult> {
   const retentionDays = COOKIE_CONSENT_RETENTION_DAYS;
-  const realNow = new Date();
-  const now = options.now !== undefined && options.now.getTime() > realNow.getTime() ? realNow : (options.now ?? realNow);
-  const cutoff = cookieConsentPurgeCutoff(now, retentionDays);
+  const cutoff = cookieConsentPurgeCutoff(purgeClock(options.now), retentionDays);
   const due = purgeableCookieConsentWhere(cutoff);
 
   return withSystemScope('cross-tenant-job', 'cookie-consent-retention.purge', async (tx) => {
-    const { count } = await tx.cookieConsentRecord.deleteMany({ where: due });
-    return { deletedCount: count, cutoff: cutoff.toISOString(), retentionDays };
+    if (!(await tryPurgeLock(tx, COOKIE_CONSENT_PURGE_LOCK_KEY))) {
+      return { deletedCount: 0, cutoff: cutoff.toISOString(), retentionDays, skipped: 'locked' as const };
+    }
+    const deletedCount = await deleteInBatches(
+      (take) => tx.cookieConsentRecord.findMany({ where: due, select: { id: true }, take }),
+      async (ids) => (await tx.cookieConsentRecord.deleteMany({ where: { id: { in: ids } } })).count,
+    );
+    return { deletedCount, cutoff: cutoff.toISOString(), retentionDays };
   });
 }

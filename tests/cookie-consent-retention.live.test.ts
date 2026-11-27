@@ -36,7 +36,11 @@ const { rlsUrl: RLS_URL, ownerUrl: OWNER_URL } = await vi.hoisted(async () => {
 });
 
 import { createDbClient, prisma } from '@/lib/db';
-import { COOKIE_CONSENT_RETENTION_DAYS, purgeOldCookieConsents } from '@/lib/cookie-consent-retention';
+import {
+  COOKIE_CONSENT_PURGE_LOCK_KEY,
+  COOKIE_CONSENT_RETENTION_DAYS,
+  purgeOldCookieConsents,
+} from '@/lib/cookie-consent-retention';
 import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 
 const admin = createDbClient(OWNER_URL ?? 'postgresql://fabrika:fabrika@localhost:5432/fabrika');
@@ -173,5 +177,38 @@ describe.skipIf(!HAS_DB)('cookie consent retention (live database, fabrika_app)'
     });
     expect(left).toHaveLength(1);
     expect(left[0]?.createdAt.getTime()).toBeGreaterThan(NOW.getTime() - 1095 * DAY);
+  });
+
+  test('2500 expired rows are deleted in batches, none left behind (NG-375 B-2)', async () => {
+    await admin.cookieConsentRecord.createMany({
+      data: Array.from({ length: 2500 }, (_, i) => ({
+        visitorId: `${VISITOR_PREFIX}bulk-${i}`,
+        choice: 'accept_all',
+        analytics: true,
+        marketing: false,
+        policyVersion: 'draft-2026-11-18',
+        locale: 'tr',
+        createdAt: ago(1100),
+      })),
+    });
+
+    const result = await purgeOldCookieConsents({ now: NOW });
+
+    expect(result.deletedCount).toBeGreaterThanOrEqual(2500);
+    expect(result.skipped).toBeUndefined();
+    expect(await survivingVisitors()).toEqual([]);
+  });
+
+  test('a run that finds the purge lock held deletes nothing and reports it (NG-375 B-2)', async () => {
+    await consent('locked-old', ago(1100));
+
+    // Another purge holds the lock on its own connection: this run must not wait behind it.
+    const result = await admin.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${COOKIE_CONSENT_PURGE_LOCK_KEY})`;
+      return purgeOldCookieConsents({ now: NOW });
+    });
+
+    expect(result).toMatchObject({ deletedCount: 0, skipped: 'locked' });
+    expect(await survivingVisitors()).toEqual(['locked-old']);
   });
 });
