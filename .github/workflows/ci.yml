@@ -72,11 +72,15 @@ jobs:
     # test answer `Heuristics.Limits.Exceeded` instead of OK (NG-239 Ö-1).
     # Loopback only, like compose: INSTREAM has no authentication.
     # clamav/clamav-debian:1.5.4, pinned by its index digest.
+    # Pulled with the same bounded retry as MinIO (NG-348): same failure class, other registry.
     - name: Start clamd (test virus scanner)
+      env:
+        CLAMD_IMAGE: clamav/clamav-debian@sha256:6982509b9e1415bf23cb49d0c55872fdd57fd2b92be33fa26d487da42d322076
       run: |
+        bash scripts/ci/docker-pull-retry.sh clamd "$CLAMD_IMAGE"
         docker run -d --name clamd -p 127.0.0.1:3310:3310 \
           -e CLAMD_CONF_AlertExceedsMax=yes \
-          clamav/clamav-debian@sha256:6982509b9e1415bf23cb49d0c55872fdd57fd2b92be33fa26d487da42d322076
+          "$CLAMD_IMAGE"
 
     # No `version:` here: action-setup reads `packageManager` from package.json,
     # so CI runs the same pnpm as a developer. A pinned `version: 9` could not
@@ -343,11 +347,15 @@ jobs:
     # (Docker Hub 404, quay.io unauthorized, dl.min.io 410 on 2026-10-03), so
     # this is Chainguard's build, pinned by digest (MinIO RELEASE.2026-09-22).
     # minioadmin/minioadmin is a throwaway credential like the Postgres one.
+    # NG-348: pulled first with a bounded retry (scripts/ci/docker-pull-retry.sh, 3 attempts,
+    # 10 s then 20 s wait): cgr.dev answered "unexpected status" in two of three runs and the
+    # shard died here before any test. Same digest for the pull and the run.
     - name: Start MinIO (test object store)
       run: |
+        bash scripts/ci/docker-pull-retry.sh MinIO "$MINIO_IMAGE"
         docker run -d --name minio -p 9000:9000 \
           -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-          cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034 \
+          "$MINIO_IMAGE" \
           server /data
         for i in $(seq 1 30); do
           curl -sf http://localhost:9000/minio/health/live && { echo "MinIO up after ${i}s"; break; }
@@ -367,6 +375,7 @@ jobs:
           '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::test-public/*"]}]}'
         echo "bucket test-public ready (anonymous read)"
       env:
+        MINIO_IMAGE: cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034
         AWS_ACCESS_KEY_ID: minioadmin
         AWS_SECRET_ACCESS_KEY: minioadmin
         AWS_REGION: us-east-1
