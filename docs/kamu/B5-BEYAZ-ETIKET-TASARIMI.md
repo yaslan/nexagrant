@@ -730,9 +730,9 @@ R2-Y1'deki env kaldırma aynı sürümde) → talep olursa 2 → gerekirse 3.
 
 | # | Soru | Durum |
 |---|---|---|
-| 1 | Beyaz etikette giriş ekranı ve e-posta altbilgisinde küçük "FonBridge altyapısıyla" ibaresi kalsın mı? (KVKK/DPA işleyeni FonBridge diye adlandırmak zorunda) | **AÇIK.** Öneri: evet (hukuk + oltalama önlemi) |
+| 1 | Beyaz etikette giriş ekranı ve e-posta altbilgisinde küçük "NexaGrant altyapısıyla" ibaresi kalsın mı? (KVKK/DPA işleyeni FonBridge diye adlandırmak zorunda) | **AÇIK.** Öneri: evet (hukuk + oltalama önlemi) |
 | 2 | Kök alan mı, alt alan mı? | **KAPANDI — Karar-2 A (patron, 30.09):** yalnız alt alan (`panel.<ajans>`). Kök alan yönlendirmesi ajansın işi. §4.3-1 doğrulaması bunu uygular |
-| 3 | Google onay ekranı "FonBridge" gösterir. Ajans başına ayrı OAuth istemcisi istenir mi? | **AÇIK.** Öneri: hayır (tek istemci, kullanıcıya ipucu da olur) |
+| 3 | Google onay ekranı "NexaGrant" gösterir. Ajans başına ayrı OAuth istemcisi istenir mi? | **AÇIK.** Öneri: hayır (tek istemci, kullanıcıya ipucu da olur) |
 | 4 | E2 (ajansın kendi alanından e-posta, kendi MTA) 2. yıl kapsamına girer mi? | **AÇIK.** Ek bilgi: E1 de DMARC reject önkoşuluna bağlandı (Y-5) |
 | 5 | Görünen adı kim belirler? | **KAPANDI (tasarım kararı, onay bekliyor):** platform yöneticisi, sözleşmedeki resmi ad. Veri modelinde de ajans yazamaz (Y-2) |
 | 6 | B5 OKA lisansına mı dahil, ayrı kalem mi? | **AÇIK** (`OKA-KANAL-ONERISI.md:73-75` lisans tutarı hâlâ açık). Efor artık ≈ 25-36 kişi-gün |

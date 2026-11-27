@@ -1,6 +1,6 @@
 import { ModuleManifest } from '@/lib/modules/types';
 
-// NG-143 (M18-F1), plan FO-265 option B: HibeLead's client-sales features rebuilt as a FonBridge
+// NG-143 (M18-F1), plan FO-265 option B: HibeLead's client-sales features rebuilt as a NexaGrant
 // module, not copied. F1 shipped the data layer; NG-135 (M18-F3) adds the screens.
 //
 // Not sold: `planTiers` is empty and `addOnSku` is null, and M18 is deliberately NOT in the

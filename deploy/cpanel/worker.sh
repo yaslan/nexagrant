@@ -1,5 +1,5 @@
 #!/bin/bash
-# FonBridge scheduled-job worker for cPanel Cron Jobs (TASK-MUST2PP2NHP6L).
+# NexaGrant scheduled-job worker for cPanel Cron Jobs (TASK-MUST2PP2NHP6L).
 #
 # Passenger runs only the web app; the graphile-worker (ADR-0008) is a
 # long-running process of its own. cPanel cannot run a service, so a cron

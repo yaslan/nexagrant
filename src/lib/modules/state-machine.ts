@@ -147,7 +147,7 @@ export function getDisableCascade(
 export interface SessionViewer {
   /** Tenant role, as stored on `Membership.role`. */
   role: string;
-  /** FonBridge staff — the only people a `DEV` module is for. */
+  /** NexaGrant staff — the only people a `DEV` module is for. */
   isPlatformAdmin: boolean;
   isMachine?: never;
 }
@@ -212,7 +212,7 @@ const PILOT_ROLES = ['TENANT_OWNER', 'TENANT_ADMIN', 'PIPELINE_MANAGER'];
  * `docs/adr/ADR-0001-module-state-access-gate.md`.
  *
  *   OFF   → nobody, platform admins included. "This tenant does not have it."
- *   DEV   → FonBridge staff only. Work in progress; the tenant's own owner is *not*
+ *   DEV   → NexaGrant staff only. Work in progress; the tenant's own owner is *not*
  *           an insider, which is exactly the case the previous `role === 'TENANT_OWNER'`
  *           test got wrong: every tenant has an owner, so DEV let everyone in.
  *   PILOT → the tenant's managers, plus staff, plus the tenant's API keys (machine).
@@ -271,7 +271,7 @@ const TENANT_MANAGER: SessionViewer = { role: 'TENANT_OWNER', isPlatformAdmin: f
 
 /**
  * NG-205 (SEC NG-203 D-A2): is `moduleId` at `status` open to the tenant's OWN people (its
- * managers at least), not only to FonBridge staff? The question a data flow INTO a tenant asks:
+ * managers at least), not only to NexaGrant staff? The question a data flow INTO a tenant asks:
  * a forwarded lead must land where somebody can open it. Built from the gate's own pieces, not
  * a second copy of them: a "Yakında" module is closed, an unsold beta opens only at its preview
  * statuses (`isStaffPreviewStatus`), and `canAccessStatus` must let a tenant manager in, so DEV

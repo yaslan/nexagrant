@@ -3,7 +3,7 @@ import type { OrgType } from '@prisma/client';
 import type { TrProvince } from '@/lib/readiness/provinces';
 
 /**
- * NG-137 (M18-F2). HibeLead's organisation taxonomy mapped onto FonBridge's `OrgType`.
+ * NG-137 (M18-F2). HibeLead's organisation taxonomy mapped onto NexaGrant's `OrgType`.
  *
  * The 18 codes are HibeLead's `org_type` enum, recovered from its database on 2026-11-13
  * (the source code is gone; decision K-581471). `LeadOrganization.orgType` keeps the

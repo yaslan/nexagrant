@@ -94,7 +94,7 @@ export function matchCountQuery(filters: unknown, since: Date): { where: TopicMa
  *
  * TASK-MUVRYPO9GTU7D: this used to be the tenant's first TENANT_OWNER, so a
  * MEMBER's search — whose name is free text they chose — was mailed to the
- * owner under FonBridge's name. ADR-0011 K-6 a: the recipient is the searcher.
+ * owner under NexaGrant's name. ADR-0011 K-6 a: the recipient is the searcher.
  */
 export function recipientEmailQuery(tenantId: string, userId: string) {
   return {

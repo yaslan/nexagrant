@@ -466,7 +466,7 @@ yapmadan açılır.
 
 ### E5. Başvuruyu sistem AB portalına gönderir mi?
 
-**Hayır.** Resmî başvuruyu her zaman belediye ekibi, portalda kendi eliyle yapar. FonBridge aracı ve
+**Hayır.** Resmî başvuruyu her zaman belediye ekibi, portalda kendi eliyle yapar. NexaGrant aracı ve
 yöntemi sağlar; başvuruyu belediye ekibi yazar.
 
 - Kaynak: `docs/kamu/ILKADIM-PILOT.md:75`, `docs/BETA_GUIDE.md:77`.
