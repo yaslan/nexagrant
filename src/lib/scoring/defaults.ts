@@ -24,6 +24,11 @@ export const DEFAULT_GATE_RULES = {
     // every opportunity with a critical role at G1 with G1_NO_LOI. It is switched on together with the
     // NG-20 Phase 2 screen that lets people enter the letters.
     requireLetterOfIntentForCriticalSeats: false,
+    // NG-33 (spec §12 G1, budget share): every seated critical member has an agreed budget share
+    // range (PartnerBudgetShare.agreedAt set). Ships off: the schema records that the spec sets no
+    // bound on the range, and no owner decision has switched the rule on yet. Until it is on, the
+    // rule files nothing and refuses nothing.
+    requireAgreedBudgetShareForCriticalSeats: false,
     // Minimum partners and countries are per-call and no call record carries them as a number yet,
     // so they are deliberately absent here rather than filled with a guess.
   },

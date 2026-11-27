@@ -1,9 +1,9 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { evaluateGate, GateOpportunityNotFoundError } from '../src/lib/gates/evaluate';
 import { prisma } from '../src/lib/db';
 import { clearStoredG0, computeG0FromSnapshot } from '../src/lib/scoring/g0-compute';
 import { DEFAULT_GATE_RULES } from '../src/lib/scoring/defaults';
-import { setLetterOfIntentRule, withLetterOfIntentRule } from './helpers/gate-rules';
+import { setAgreedBudgetShareRule, setLetterOfIntentRule, withLetterOfIntentRule } from './helpers/gate-rules';
 import { loadG1ConsortiumInputs } from '../src/lib/gates/g1-consortium';
 import type { TenantTx } from '../src/lib/db';
 
@@ -140,6 +140,10 @@ const G0_DECISIONS: G0DecisionRow[] = [
     'opp-g1-loi-no-date',
     'opp-g1-loi-moved-back',
     'opp-g1-partner-loi',
+    'opp-g1-share-agreed',
+    'opp-g1-share-missing',
+    'opp-g1-share-proposed',
+    'opp-g1-share-leaves',
   ].map((id) => g0Row(id, true)),
   g0Row('opp-g1-g0-failed', false),
   g0Row('opp-g1-g0-pass-then-fail', true, 1),
@@ -220,6 +224,12 @@ Object.assign(OPPORTUNITIES, {
     seatRow('s-open', { status: 'OPEN', organizationId: null }),
     seatRow('s-no-backup', { roleKey: 'end_user' }),
   ]),
+  // NG-33: budget share. Each is a seated research member with a letter and a backup; only the share
+  // differs (see PARTNER_BUDGET_SHARES). `opp-g1-share-leaves` starts as a pass and then loses its member.
+  'opp-g1-share-agreed': g1Opportunity('opp-g1-share-agreed', [seatRow('s-share-agreed')]),
+  'opp-g1-share-missing': g1Opportunity('opp-g1-share-missing', [seatRow('s-share-missing')]),
+  'opp-g1-share-proposed': g1Opportunity('opp-g1-share-proposed', [seatRow('s-share-proposed')]),
+  'opp-g1-share-leaves': g1Opportunity('opp-g1-share-leaves', [seatRow('s-share-leaves')]),
 });
 
 // NG-100 / K-579560=A: a backup counts only when the current M8 matcher wrote the row
@@ -249,6 +259,25 @@ const SEAT_CANDIDATES = [
     partnerOrgId: null,
     breakdown: MATCH_BREAKDOWN,
   })),
+  ...['s-share-agreed', 's-share-missing', 's-share-proposed', 's-share-leaves'].map((seatId) => ({
+    tenantId: 'tenant-1',
+    seatId,
+    organizationId: 'org-backup',
+    partnerOrgId: null,
+    breakdown: MATCH_BREAKDOWN,
+  })),
+];
+
+/**
+ * NG-33: budget share rows. `agreedAt` null = proposed, not agreed. A seat with no row has no share.
+ * The `tenant-2` row sits on a seat of `tenant-1`: it must not agree that seat.
+ */
+const SHARE_AGREED = { tenantId: 'tenant-1', seatId: 's-share-agreed', minCents: 100_000_00n, maxCents: 200_000_00n, agreedAt: LOI_DATE };
+const PARTNER_BUDGET_SHARES = [
+  SHARE_AGREED,
+  { tenantId: 'tenant-1', seatId: 's-share-proposed', minCents: 100_000_00n, maxCents: 200_000_00n, agreedAt: null },
+  { tenantId: 'tenant-1', seatId: 's-share-leaves', minCents: 100_000_00n, maxCents: 200_000_00n, agreedAt: LOI_DATE },
+  { tenantId: 'tenant-2', seatId: 's-share-missing', minCents: 100_000_00n, maxCents: 200_000_00n, agreedAt: LOI_DATE },
 ];
 
 const TENANTS: Record<string, { country: string | null; pic: string | null; settings: unknown }> = {
@@ -344,6 +373,16 @@ vi.mock('../src/lib/db', () => {
           Promise.resolve(
             SEAT_CANDIDATES.filter(
               (c) => (!where.tenantId || c.tenantId === where.tenantId) && where.seatId.in.includes(c.seatId),
+            ),
+          ),
+        ),
+      },
+      partnerBudgetShare: {
+        // Same tenant rule as seatCandidate: a share row of another tenant is not returned.
+        findMany: vi.fn(({ where }: { where: { tenantId?: string; seatId: { in: string[] } } }) =>
+          Promise.resolve(
+            PARTNER_BUDGET_SHARES.filter(
+              (b) => (!where.tenantId || b.tenantId === where.tenantId) && where.seatId.in.includes(b.seatId),
             ),
           ),
         ),
@@ -785,6 +824,85 @@ describe('G1 gate: a letter of intent from every critical member (NG-364, spec ย
   test('the other gates keep rule version 1.0', async () => {
     await evaluateGate('opp-pass', 'G2', 'tenant-1');
     expect(filed().ruleVersion).toBe('1.0');
+  });
+});
+
+describe('G1 gate: an agreed budget share from every critical member (NG-33, spec ยง12 G1)', () => {
+  let restore: (() => void) | undefined;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    restore = setAgreedBudgetShareRule(true);
+  });
+  afterEach(() => {
+    restore?.();
+    restore = undefined;
+  });
+
+  type Filed = { passed: boolean; ruleVersion: string; inputs: Record<string, unknown> };
+  const lastFiled = () =>
+    (prisma.gateDecision.create as unknown as { mock: { calls: [{ data: Filed }][] } }).mock.calls.at(-1)![0].data;
+
+  test('an agreed share: passes, files an empty list', async () => {
+    expect(await evaluateGate('opp-g1-share-agreed', 'G1', 'tenant-1')).toEqual({ passed: true, reasons: [] });
+    expect(lastFiled()).toMatchObject({ passed: true, inputs: { criticalRolesWithoutAgreedBudgetShare: [] } });
+  });
+
+  test.each([
+    ['opp-g1-share-missing', 'no share row (a share of another tenant on the seat does not count)'],
+    ['opp-g1-share-proposed', 'a share that is proposed, not agreed'],
+  ])('%s (%s) is refused with G1_NO_AGREED_BUDGET_SHARE, filed, and the stage stays', async (id) => {
+    const result = await evaluateGate(id, 'G1', 'tenant-1');
+
+    expect(result).toEqual({
+      passed: false,
+      reasons: ['Critical role research has no agreed budget share'],
+      reasonDetails: [{ code: 'G1_NO_AGREED_BUDGET_SHARE', values: { role: 'research' } }],
+    });
+    expect(lastFiled()).toMatchObject({ passed: false, inputs: { criticalRolesWithoutAgreedBudgetShare: ['research'] } });
+    expect(prisma.opportunity.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('reopening: a G1 pass whose member then leaves is refused again and filed as a fresh refusal', async () => {
+    expect((await evaluateGate('opp-g1-share-leaves', 'G1', 'tenant-1')).passed).toBe(true);
+    expect(lastFiled().passed).toBe(true);
+
+    // The member withdraws: the seat goes back to OPEN with no organisation (the state a withdrawal leaves).
+    const seat = (OPPORTUNITIES['opp-g1-share-leaves']!.seats as Record<string, unknown>[])[0]!;
+    const before = { ...seat };
+    Object.assign(seat, { status: 'OPEN', organizationId: null });
+    try {
+      const result = await evaluateGate('opp-g1-share-leaves', 'G1', 'tenant-1');
+      expect(result).toEqual({
+        passed: false,
+        reasons: ['Critical role research is not filled: seat status is OPEN'],
+        reasonDetails: [{ code: 'G1_SEAT_NOT_FILLED', values: { role: 'research', status: 'OPEN' } }],
+      });
+      expect(lastFiled()).toMatchObject({ passed: false });
+    } finally {
+      Object.assign(seat, before);
+    }
+  });
+
+  test('the seat rules are unchanged: a filled seat with no backup is still refused as before', async () => {
+    // This seat has no share either, so the share refusal comes too; the backup refusal must still be there.
+    const result = await evaluateGate('opp-g1-no-backup', 'G1', 'tenant-1');
+    expect(result.passed).toBe(false);
+    expect(result.reasonDetails).toContainEqual({ code: 'G1_NO_BACKUP', values: { role: 'research' } });
+  });
+});
+
+describe('G1 gate: the budget-share rule ships off (NG-33)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('the shipped default does not require an agreed share', () => {
+    expect(DEFAULT_GATE_RULES.G1.requireAgreedBudgetShareForCriticalSeats).toBe(false);
+  });
+
+  test('with the rule off, a seat with no share still passes and files no share refusal', async () => {
+    expect(await evaluateGate('opp-g1-share-missing', 'G1', 'tenant-1')).toEqual({ passed: true, reasons: [] });
+    const call = vi.mocked(prisma.gateDecision.create).mock.calls.at(-1) as unknown as [{ data: { inputs: Record<string, unknown> } }];
+    expect(call[0].data.inputs).not.toHaveProperty('criticalRolesWithoutAgreedBudgetShare');
+    expect(prisma.partnerBudgetShare.findMany).not.toHaveBeenCalled();
   });
 });
 
