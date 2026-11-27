@@ -24,6 +24,7 @@ export function useGateReasonText(): (reason: GateReason) => string {
         case 'G1_SEAT_NO_ORGANISATION':
         case 'G1_NO_BACKUP':
         case 'G1_NO_LOI':
+        case 'G1_NO_AGREED_BUDGET_SHARE':
           return t(reason.code, { role: roleWord(reason.values.role) });
         case 'G1_SEAT_NOT_FILLED':
           return t(reason.code, { role: roleWord(reason.values.role), status: statusWord(reason.values.status) });

@@ -100,6 +100,28 @@ export function g1ConsortiumFacts(seats: readonly G1Seat[], candidates: readonly
   };
 }
 
+/** A PartnerBudgetShare row as G1 reads it: only whether the range was agreed (NG-33). */
+export type G1BudgetShare = { seatId: string; agreedAt: Date | null };
+
+/**
+ * Critical seats whose member has no agreed budget share (spec §12 G1, NG-33). A share that is only
+ * proposed (`agreedAt` null) does not count. A seat that names nobody is not listed: it is already in
+ * `unfilled`, and there is no member to agree a share with.
+ */
+export function g1SeatsWithoutAgreedShare(seats: readonly G1Seat[], shares: readonly G1BudgetShare[]): G1Seat[] {
+  return seats.filter(
+    (s) => s.required && seatNamesMember(s) && !shares.some((b) => b.seatId === s.id && b.agreedAt !== null),
+  );
+}
+
+/** The budget share rows of these seats, inside the tenant. */
+export function readG1BudgetShares(tx: TenantTx, tenantId: string, seatIds: string[]): Promise<G1BudgetShare[]> {
+  return tx.partnerBudgetShare.findMany({
+    where: { tenantId, seatId: { in: seatIds } },
+    select: { seatId: true, agreedAt: true },
+  });
+}
+
 /** The stored candidates of these seats, inside the tenant. */
 export function readG1Candidates(tx: TenantTx, tenantId: string, seatIds: string[]): Promise<G1SeatCandidate[]> {
   return tx.seatCandidate.findMany({

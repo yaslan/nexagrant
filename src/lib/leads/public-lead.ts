@@ -9,6 +9,7 @@ import { TR_PROVINCES } from '@/lib/readiness/provinces';
 import { READINESS_ORG_TYPES, scoreReadiness } from '@/lib/readiness/score';
 import { decodeReadinessCode } from '@/lib/readiness/share';
 import { withSystemScope, withSystemScopeOn } from '@/lib/system-scope';
+import { deleteInBatches, purgeClock, tryPurgeLock } from '@/lib/retention/purge-policy';
 import {
   PUBLIC_LEAD_CONSENT,
   PUBLIC_LEAD_RETENTION_DAYS,
@@ -423,7 +424,12 @@ export interface PublicLeadPurgeResult {
   deletedCount: number;
   cutoff: string;
   retentionDays: number;
+  /** Set when another purge held the lock: nothing was deleted by this run. */
+  skipped?: 'locked';
 }
+
+/** Advisory lock of the lead purge (NG-375 B-2). Separate from LEAD_LOCK_KEY, which registrations take. */
+export const PUBLIC_LEAD_PURGE_LOCK_KEY = 7_302_026_115_002n;
 
 /**
  * Deletes every contact request older than the retention window and, when any
@@ -436,11 +442,18 @@ export interface PublicLeadPurgeResult {
  */
 export async function purgeOldPublicLeads(options: { now?: Date } = {}): Promise<PublicLeadPurgeResult> {
   const retentionDays = PUBLIC_LEAD_RETENTION_DAYS;
-  const cutoff = publicLeadPurgeCutoff(options.now ?? new Date(), retentionDays);
+  // The moment is the real clock, a future `now` clamped to it (NG-375, NG-366 B-1).
+  const cutoff = publicLeadPurgeCutoff(purgeClock(options.now), retentionDays);
   const due = purgeablePublicLeadWhere(cutoff);
 
   return withSystemScope('cross-tenant-job', 'public-lead-retention.purge', async (tx) => {
-    const { count } = await tx.publicLead.deleteMany({ where: due });
+    if (!(await tryPurgeLock(tx, PUBLIC_LEAD_PURGE_LOCK_KEY))) {
+      return { deletedCount: 0, cutoff: cutoff.toISOString(), retentionDays, skipped: 'locked' as const };
+    }
+    const count = await deleteInBatches(
+      (take) => tx.publicLead.findMany({ where: due, select: { id: true }, take }),
+      async (ids) => (await tx.publicLead.deleteMany({ where: { id: { in: ids } } })).count,
+    );
     if (count > 0) {
       await tx.auditEvent.create({
         data: { tenantId: null, type: PUBLIC_LEAD_PURGED, data: { count, retentionDays, cutoff: cutoff.toISOString() } },

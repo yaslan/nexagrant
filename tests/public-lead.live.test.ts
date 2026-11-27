@@ -41,6 +41,7 @@ import {
   PUBLIC_LEAD_CONSENT,
   PUBLIC_LEAD_EMAIL_LIMIT,
   PUBLIC_LEAD_IP_LIMIT,
+  PUBLIC_LEAD_PURGE_LOCK_KEY,
   PUBLIC_LEAD_PURGED,
   PUBLIC_LEAD_RETENTION_DAYS,
   clientIpFrom,
@@ -377,13 +378,27 @@ describe.skipIf(!HAS_DB)('public lead retention (live database, fabrika_app)', (
     expect(await labelsLeft()).toEqual(['keep']);
   });
 
-  test('the nightly job purges by its cron tick', async () => {
+  test('the nightly job ignores its cron tick: the window is the real clock (NG-375 B-1)', async () => {
     await seed('by-tick', ago(366));
     await seed('keep-tick', ago(300));
-    // A tick 100 days in the past: then, "by-tick" was only 266 days old.
+    // A tick 100 days back would have made "by-tick" only 266 days old and kept it;
+    // the real clock deletes it.
     await publicLeadCleanupTask({ _cron: { ts: ago(100).toISOString() } }, helpersFor());
-    expect(await labelsLeft()).toEqual(['by-tick', 'keep-tick']);
-    await publicLeadCleanupTask({ _cron: { ts: NOW.toISOString() } }, helpersFor());
     expect(await labelsLeft()).toEqual(['keep-tick']);
+    // A tick in 2099 must not reach rows written up to 2095: the row 300 days old stays.
+    await seed('future-reach', ago(300));
+    await publicLeadCleanupTask({ _cron: { ts: '2099-01-01T03:45:00.000Z' } }, helpersFor());
+    expect(await labelsLeft()).toEqual(['future-reach', 'keep-tick']);
+  });
+
+  test('a purge that finds the purge lock held deletes nothing and writes no audit (NG-375 B-2)', async () => {
+    await seed('locked-old', ago(366));
+    // Another purge holds the lock on its own connection: this run must not wait behind it.
+    const result = await admin.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${PUBLIC_LEAD_PURGE_LOCK_KEY})`;
+      return purgeOldPublicLeads({ now: NOW });
+    });
+    expect(result).toMatchObject({ deletedCount: 0, skipped: 'locked' });
+    expect(await labelsLeft()).toEqual(['locked-old']);
   });
 });
