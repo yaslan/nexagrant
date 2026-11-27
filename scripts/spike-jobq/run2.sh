@@ -1,8 +1,8 @@
 #!/bin/bash
 # Run 2 (starts after >1 min with no worker up): backfill of missed ticks,
 # jobKey dedupe on the manual path, queue=k2 serialisation across A and B.
-cd /Users/macbook/alan/FONBRIDGE-wt-jobq
-S=/private/tmp/claude-501/-Users-macbook-alan/5250a185-2af2-461f-95d1-f43e03d095c5/scratchpad/jobq
+cd "$(dirname "$0")/../.."
+S="${JOBQ_OUT:-${TMPDIR:-/tmp}/jobq}"; mkdir -p "$S"
 export SPIKE_WORKER_URL=http://127.0.0.1:18077
 MOCK_DELAY_MS=5000 pnpm exec tsx scripts/spike-jobq/mock-cordis-worker.ts > $S/mock2.log 2>&1 &
 M=$!

@@ -22,7 +22,7 @@ docker ps
 
 ### 2. Start Postgres + pgvector
 ```bash
-cd /Users/macbook/AgentSpace/fabrika
+cd <repo-kökü>
 docker-compose up postgres-vector
 # Runs: pgvector/pgvector:pg16 on port 5432
 # User: fabrika | Pass: fabrika_pass | DB: fabrika_db
