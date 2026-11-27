@@ -4,7 +4,7 @@ import { isPresentId } from '../required-id';
 import { DEFAULT_GATE_RULES } from '../scoring/defaults';
 import { clearStoredG0, computeG0ForOpportunity, g0EvidencePayload, persistG0 } from '../scoring/g0-compute';
 import type { GateReason } from './reasons';
-import { g1ConsortiumFacts, readG1Candidates, type G1Seat } from './g1-consortium';
+import { g1ConsortiumFacts, g1SeatsWithoutAgreedShare, readG1BudgetShares, readG1Candidates, type G1Seat } from './g1-consortium';
 
 export type GateEvaluationResult = {
   passed: boolean;
@@ -242,6 +242,20 @@ async function runGate(
         inputs.criticalRolesWithoutLoi = facts.withoutLetter.map((s) => s.roleKey);
         for (const seat of facts.withoutLetter) {
           refuse(`Critical role ${seat.roleKey} has no letter of intent on file`, { code: 'G1_NO_LOI', values: { role: seat.roleKey } });
+        }
+      }
+
+      if (rules.requireAgreedBudgetShareForCriticalSeats) {
+        // NG-33 (spec §12 G1, budget share). Same seats as the LOI rule; the share is read in this
+        // transaction under the tenant, so a share row of another tenant cannot agree a seat here.
+        const shares = await readG1BudgetShares(tx, tenantId, seats.filter((s) => s.required).map((s) => s.id));
+        const withoutShare = g1SeatsWithoutAgreedShare(seats, shares);
+        inputs.criticalRolesWithoutAgreedBudgetShare = withoutShare.map((s) => s.roleKey);
+        for (const seat of withoutShare) {
+          refuse(`Critical role ${seat.roleKey} has no agreed budget share`, {
+            code: 'G1_NO_AGREED_BUDGET_SHARE',
+            values: { role: seat.roleKey },
+          });
         }
       }
       break;

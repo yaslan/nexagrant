@@ -16,11 +16,13 @@ const CONSORTIUM = { topicExperience: 3, networkCentrality: 2, countryDiversity:
 
 function fakeTx(breakdown: unknown, seated: string | null = null) {
   const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+  const shareUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
   const tx = {
     consortiumSeat: { findFirst: vi.fn().mockResolvedValue({ id: 'seat-1', organizationId: seated }), updateMany },
+    partnerBudgetShare: { updateMany: shareUpdateMany },
     seatCandidate: { findMany: vi.fn().mockResolvedValue([{ id: 'c-1', breakdown }]) },
   } as unknown as TenantTx;
-  return { tx, updateMany };
+  return { tx, updateMany, shareUpdateMany };
 }
 
 const args = { tenantId: 'tenant-1', seatId: 'seat-1', organizationId: 'org-1', opportunityId: 'opp-1' };
@@ -58,6 +60,20 @@ describe('inviteSeatCandidate — the member stage belongs to the organisation (
     const { tx, updateMany } = fakeTx(MATCH, null);
     await inviteSeatCandidate(tx, args);
     expect(written(updateMany).data).toMatchObject(CLEARED);
+  });
+
+  // NG-33 B-1: the budget-share agreement belongs to the member who gave it; a new member clears it.
+  it('a new member clears the seat budget-share agreement; the same member keeps it', async () => {
+    const changed = fakeTx(MATCH, 'org-before');
+    await inviteSeatCandidate(changed.tx, args);
+    expect(changed.shareUpdateMany).toHaveBeenCalledWith({
+      where: { seatId: 'seat-1', tenantId: 'tenant-1' },
+      data: { agreedAt: null, agreedById: null },
+    });
+
+    const same = fakeTx(MATCH, 'org-1');
+    await inviteSeatCandidate(same.tx, args);
+    expect(same.shareUpdateMany).not.toHaveBeenCalled();
   });
 
   it('inviting the same organisation again keeps its stage and letter', async () => {

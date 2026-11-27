@@ -82,5 +82,13 @@ export async function inviteSeatCandidate(
       ...(memberChanges ? { memberStage: null, memberStageAt: null, loiReceivedAt: null, loiDocumentUrl: null } : {}),
     },
   });
+  // NG-33 B-1: the budget share is keyed to the seat, not to the member. An agreement the former
+  // member gave does not carry to the next organisation (same rule as the letter of intent above).
+  if (memberChanges && result.count > 0) {
+    await tx.partnerBudgetShare.updateMany({
+      where: { seatId, tenantId },
+      data: { agreedAt: null, agreedById: null },
+    });
+  }
   return result.count;
 }

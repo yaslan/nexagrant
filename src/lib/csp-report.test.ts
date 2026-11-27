@@ -126,6 +126,42 @@ describe('ReportLimiter', () => {
   it('defaults are the documented ones', () => {
     expect([PER_CLIENT_LIMIT, GLOBAL_LIMIT, WINDOW_MS, MAX_REPORT_BYTES]).toEqual([20, 300, 60_000, 8192]);
   });
+
+  it('NG-376 Ö-B: a per-client or global limit that is not an integer >= 1 throws RangeError', () => {
+    const bad = [0, -1, -300, 1.5, Number.NaN, Number.POSITIVE_INFINITY];
+    for (const v of bad) {
+      expect(() => new ReportLimiter(v, 300, 1000)).toThrow(RangeError);
+      expect(() => new ReportLimiter(20, v, 1000)).toThrow(RangeError);
+    }
+  });
+
+  it('NG-376 Ö-B: the smallest valid limits (1) are accepted and enforced', () => {
+    const l = new ReportLimiter(1, 1, 1000);
+    expect(l.take('a', 0)).toBe(true);
+    expect(l.take('a', 0)).toBe(false);
+  });
+
+  it('NG-376 Ö-A: a full global window logs one line per window, with no client data', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const l = new ReportLimiter(100, 2, 1000);
+    expect([l.take('10.0.0.1', 0), l.take('10.0.0.2', 0)]).toEqual([true, true]);
+    expect(warn).not.toHaveBeenCalled();
+    // Refused three times in the same window: still one line.
+    expect([l.take('10.0.0.3', 0), l.take('10.0.0.4', 1), l.take('10.0.0.1', 2)]).toEqual([false, false, false]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('[report-limiter] global window full', { globalLimit: 2, windowMs: 1000 });
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/10\.0\.0\./);
+    // Next window fills again: a second line for that window.
+    expect([l.take('x', 1000), l.take('y', 1000), l.take('z', 1000)]).toEqual([true, true, false]);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it('NG-376 Ö-A: a client refused by its own limit does not count as a full global window', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const l = new ReportLimiter(1, 100, 1000);
+    expect([l.take('a', 0), l.take('a', 0)]).toEqual([true, false]);
+    expect(warn).not.toHaveBeenCalled();
+  });
 });
 
 describe('handleCspReport', () => {
