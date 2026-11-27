@@ -31,7 +31,7 @@ export type G1SeatCandidate = {
 };
 
 /** Someone sits on the seat: a CORDIS organisation or a tenant-private partner. */
-export function seatNamesMember(seat: Pick<G1Seat, 'organizationId' | 'partnerOrgId'>): boolean {
+export function seatNamesMember(seat: SeatMember): boolean {
   return Boolean(seat.organizationId || seat.partnerOrgId);
 }
 
@@ -40,11 +40,19 @@ export function isSeatFilled(seat: G1Seat): boolean {
   return seat.status === 'CONFIRMED' && seatNamesMember(seat);
 }
 
-/** A backup is someone other than whoever holds the seat; the matcher can list the holder too. */
-export function isBackupFor(candidate: G1SeatCandidate, seat: G1Seat): boolean {
+/** The two columns a seat or a candidate names its member by (the screen's rows carry them optionally). */
+export type SeatMember = { organizationId: string | null; partnerOrgId?: string | null };
+
+/**
+ * A backup is someone other than whoever holds the seat; the matcher can list the holder too.
+ * The consortium screen calls this as well (NG-20 Ö5): one rule, not a copy.
+ */
+export function isBackupFor(candidate: SeatMember, seat: SeatMember): boolean {
+  const candidateOrg = candidate.organizationId ?? null;
+  const candidatePartner = candidate.partnerOrgId ?? null;
   return (
-    (candidate.organizationId !== null && candidate.organizationId !== seat.organizationId) ||
-    (candidate.partnerOrgId !== null && candidate.partnerOrgId !== seat.partnerOrgId)
+    (candidateOrg !== null && candidateOrg !== (seat.organizationId ?? null)) ||
+    (candidatePartner !== null && candidatePartner !== (seat.partnerOrgId ?? null))
   );
 }
 
