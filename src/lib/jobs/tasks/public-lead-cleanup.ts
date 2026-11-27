@@ -16,9 +16,11 @@ import { PUBLIC_LEAD_RETENTION_DAYS, purgeOldPublicLeads } from '@/lib/leads/pub
  * silently stops being kept is what this job exists to prevent — and the queue
  * retries it (ADR-0008 §6.3).
  */
-export const publicLeadCleanupTask = defineJob('public-lead-cleanup', async ({ tick }) => {
+// The body never reads the tick (NG-375, NG-366 sec-gnd B-1): the purge counts back
+// from the real clock, so a cron tick in the payload cannot move the cutoff.
+export const publicLeadCleanupTask = defineJob('public-lead-cleanup', async () => {
   try {
-    const result = await purgeOldPublicLeads({ now: tick ?? new Date() });
+    const result = await purgeOldPublicLeads();
     return { success: true, ...result };
   } catch (error) {
     await recordAlert({

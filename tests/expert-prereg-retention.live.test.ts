@@ -46,7 +46,11 @@ import { lastFounderNumberGiven, recordFounderNumberGiven } from '@/lib/expert-p
 import { withSystemScope } from '@/lib/system-scope';
 import { verifyExpertPreRegistration } from '@/lib/expert-prereg/server/verify';
 import { getRemainingFounderSeats } from '@/lib/expert-prereg/server/seats';
-import { EXPERT_PREREG_PURGED, purgeOldExpertPreRegistrations } from '@/lib/expert-prereg/server/retention';
+import {
+  EXPERT_PREREG_PURGE_LOCK_KEY,
+  EXPERT_PREREG_PURGED,
+  purgeOldExpertPreRegistrations,
+} from '@/lib/expert-prereg/server/retention';
 import { assertRlsSubjectRole, isGithubActions, requireRlsTestUrl, skipOrFailInCi, usedDatabaseName } from './helpers/live-db-role';
 import { acquireExpertPreRegLiveLock, holdFounderCounter } from './helpers/expert-prereg-live-lock';
 
@@ -291,5 +295,17 @@ describe.skipIf(!HAS_DB)('expert pre-registration retention (live database, fabr
     expect(await counterRow()).toEqual(counterAfterFirst);
     expect(await purgeAudits()).toHaveLength(1);
     expect(await labelsLeft()).toEqual(['keep']);
+  });
+
+  test('a purge that finds its own lock held deletes nothing and writes no audit (NG-375 B-2)', async () => {
+    await seed('locked-old', ago(370));
+    // Another purge run holds the lock on its own connection: this run must not wait behind it.
+    const result = await admin.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EXPERT_PREREG_PURGE_LOCK_KEY})`;
+      return purgeOldExpertPreRegistrations({ now: NOW });
+    });
+    expect(result).toMatchObject({ deletedCount: 0, skipped: 'locked' });
+    expect(await labelsLeft()).toEqual(['locked-old']);
+    expect(await purgeAudits()).toHaveLength(0);
   });
 });

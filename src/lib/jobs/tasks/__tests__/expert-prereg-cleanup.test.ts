@@ -40,16 +40,15 @@ beforeEach(() => {
 });
 
 describe('expert-prereg-cleanup job', () => {
-  it('purges by the cron tick, not by the moment the worker got round to it', async () => {
+  it('a cron tick in the future (2099) does not move the cutoff: the purge gets no moment (NG-375 B-1)', async () => {
     purgeOldExpertPreRegistrations.mockResolvedValue({
-      deletedCount: 2,
+      deletedCount: 0,
       cutoff: 'x',
       retentionDays: 365,
     });
-    await expertPreRegCleanupTask({ _cron: { ts: '2026-10-01T03:55:00.000Z' } }, helpersFor());
-    expect(purgeOldExpertPreRegistrations).toHaveBeenCalledWith({
-      now: new Date('2026-10-01T03:55:00.000Z'),
-    });
+    await expertPreRegCleanupTask({ _cron: { ts: '2099-01-01T03:55:00.000Z' } }, helpersFor());
+    expect(purgeOldExpertPreRegistrations).toHaveBeenCalledTimes(1);
+    expect(purgeOldExpertPreRegistrations.mock.calls[0]).toEqual([]);
     expect(alerts).toEqual([]);
   });
 
@@ -60,7 +59,15 @@ describe('expert-prereg-cleanup job', () => {
       retentionDays: 365,
     });
     await expertPreRegCleanupTask({ retentionDays: 0 }, helpersFor());
-    expect(Object.keys(purgeOldExpertPreRegistrations.mock.calls[0]?.[0] ?? {})).toEqual(['now']);
+    expect(purgeOldExpertPreRegistrations).toHaveBeenCalledTimes(1);
+    expect(purgeOldExpertPreRegistrations.mock.calls[0]).toEqual([]);
+  });
+
+  it('an unreadable cron tick raises a bad-tick SystemAlert and the purge still runs (NG-375 B-4)', async () => {
+    purgeOldExpertPreRegistrations.mockResolvedValue({ deletedCount: 0, cutoff: 'x', retentionDays: 365 });
+    await expertPreRegCleanupTask({ _cron: { ts: '' } }, helpersFor());
+    expect(purgeOldExpertPreRegistrations).toHaveBeenCalledTimes(1);
+    expect(alerts.map((a) => [a.source, a.dedupeKey ?? null])).toEqual([['job-queue', 'job-queue:expert-prereg-cleanup:bad-tick']]);
   });
 
   it('a failure writes an error SystemAlert at once and rethrows so the queue retries', async () => {
