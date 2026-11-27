@@ -25,8 +25,9 @@ import { calculateEvidenceHealthScore, HealthScoreResult, MinimalEvidenceItem } 
 import { errorCode, errorMessage } from '@/lib/errors';
 import { EVIDENCE_READ_ACTION, evidenceReadWhere } from '@/lib/evidence-access';
 import { isPresentId } from '@/lib/required-id';
-import { enqueueEvidenceScan } from '@/lib/evidence-scan';
+import { EVIDENCE_SCAN_RETRY_WAITS_MS, enqueueEvidenceScan } from '@/lib/evidence-scan';
 import type { EvidenceItemData } from './evidence-client';
+import { scanRemovedIds } from './data';
 
 /**
  * Retrieves all Evidence items for active tenant
@@ -44,8 +45,8 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
       whereClause.category = categoryFilter;
     }
 
-    const items = await withTenant(tenantId, (tx) =>
-      tx.evidence.findMany({
+    const items = await withTenant(tenantId, async (tx) => {
+      const rows = await tx.evidence.findMany({
         where: whereClause,
         include: {
           claimLinks: {
@@ -55,13 +56,67 @@ export async function getEvidenceItemsAction(categoryFilter?: string) {
           },
         },
         orderBy: { updatedAt: 'desc' },
-      })
-    );
+      });
+      const removed = await scanRemovedIds(tx, tenantId, rows.map((row) => row.id));
+      return rows.map((row) => ({ ...row, scanObjectRemoved: removed.has(row.id) }));
+    });
 
     return (items as unknown as EvidenceItemData[]) || [];
   } catch (error) {
     console.warn(`[getEvidenceItemsAction] DB error: ${errorMessage(error)}`);
     return [];
+  }
+}
+
+/**
+ * What the evidence screen reads while a scan is open (NG-264 (b)): each row's id and
+ * scan state, and whether the server will still retry a failed scan. Same tenant, role
+ * and read rule as getEvidenceItemsAction, without the claim join.
+ *
+ * `ok: false` is a failed read. An `ok` answer that lacks a row means the row is gone
+ * (NG-264 Ö-2); an empty list is not a failure, so the two are told apart by `ok`.
+ */
+export async function getEvidenceScanStatusAction(): Promise<
+  | { ok: true; rows: Array<{ id: string; scanStatus: string; scanObjectRemoved: boolean; retrying: boolean }> }
+  | { ok: false }
+> {
+  const { tenantId, role } = await requireTenantAction({ readOnly: true, can: EVIDENCE_READ_ACTION });
+  const readable = evidenceReadWhere(role);
+  if (!readable) return { ok: true, rows: [] };
+
+  try {
+    const rows = await withTenant(tenantId, async (tx) => {
+      const found = await tx.evidence.findMany({
+        where: { tenantId, ...readable },
+        select: { id: true, scanStatus: true, scanAttempts: true },
+      });
+      // Only an INFECTED row can say "removed"; the others need no removal lookup.
+      const removed = await scanRemovedIds(
+        tx,
+        tenantId,
+        found.filter((row) => row.scanStatus === 'INFECTED').map((row) => row.id),
+      );
+      return found.map((row) => ({ ...row, scanObjectRemoved: removed.has(row.id) }));
+    });
+    return {
+      ok: true,
+      rows: rows.map((row) => ({
+        id: row.id,
+        scanStatus: row.scanStatus,
+        scanObjectRemoved: row.scanObjectRemoved,
+        // A PENDING row is always waited for. For an ERROR row, scanEvidence (evidence-scan.ts)
+        // writes scanAttempts = k + 1 when attempt k fails and queues attempt k + 1 while
+        // EVIDENCE_SCAN_RETRY_WAITS_MS[k] exists. So scanAttempts 1..WAITS.length each still have
+        // a queued try (the last one is the longest wait); only past WAITS.length are the retries
+        // over, and the sweep takes the row, hours later (NG-264 review E-2).
+        retrying:
+          row.scanStatus === 'PENDING' ||
+          (row.scanStatus === 'ERROR' && row.scanAttempts <= EVIDENCE_SCAN_RETRY_WAITS_MS.length),
+      })),
+    };
+  } catch (error) {
+    console.warn(`[getEvidenceScanStatusAction] DB error: ${errorMessage(error)}`);
+    return { ok: false };
   }
 }
 

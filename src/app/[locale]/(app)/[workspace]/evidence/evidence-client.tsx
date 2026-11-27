@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { evidenceScanRefusal, isEvidenceDownloadable } from '@/lib/evidence-scan-gate';
 import { PRODUCT_NAME } from '@/lib/brand';
 import {
+  getEvidenceScanStatusAction,
   getPresignedUploadUrlAction,
   confirmEvidenceUploadAction,
   deleteEvidence,
@@ -50,6 +51,8 @@ export interface EvidenceItemData {
   mimeType?: string | null;
   /** NG-239: only CLEAN downloads (src/lib/evidence-scan-gate.ts). */
   scanStatus?: string | null;
+  /** NG-264 (a): the infected object was really removed (evidence.scan.object_removed, objectDeleted true). */
+  scanObjectRemoved?: boolean;
   ocrText?: string | null;
   tags?: string[];
   createdAt?: Date | string;
@@ -67,20 +70,70 @@ function evidenceDownloadHref(id: string): string {
   return `/api/evidence/${encodeURIComponent(id)}/download`;
 }
 
+/** NG-264 (b): the first refresh of a waiting scan comes after this long, then each wait doubles up to the ceiling. */
+const SCAN_POLL_FIRST_MS = 5_000;
+const SCAN_POLL_MAX_MS = 30_000;
+
+/**
+ * A row the refresh waits for: its scan has no result yet (PENDING), or it failed and the
+ * server still retries it. `retrying` is the server's word from the last poll; a row never
+ * polled counts as retrying. INFECTED and CLEAN are final.
+ */
+function isWaitingRow(item: EvidenceItemData, retrying: Record<string, boolean>): boolean {
+  if (!item.r2ObjectKey) return false;
+  const refusal = evidenceScanRefusal(item.scanStatus);
+  if (refusal === 'scan_pending') return true;
+  return refusal === 'scan_error' && retrying[item.id] !== false;
+}
+
 /**
  * NG-239: where a stored file's virus scan stands, for a file that may not be
  * downloaded yet (or ever). Null when it may: the caller shows the link then.
  * The rule is the server's own (evidenceScanRefusal), not a copy.
  */
-function ScanState({ status, t }: { status: unknown; t: (key: string) => string }) {
+function ScanState({ status, removed, t }: { status: unknown; removed?: boolean; t: (key: string) => string }) {
   const refusal = evidenceScanRefusal(status);
   if (!refusal) return null;
   const tone = refusal === 'scan_infected' ? 'text-bad bg-bad/10 border-bad/30' : 'text-muted bg-ground border-border';
+  // The change is announced by the one live region in the list (see announcement below),
+  // not by this badge: a badge that leaves the page takes its live region with it.
   return (
     <span data-testid="evidence-scan-state" data-scan={refusal} className={`text-[11px] font-semibold px-2 py-1 rounded-lg border ${tone}`}>
-      {t(`scan.${refusal}`)}
+      {t(scanTextKey(refusal, removed))}
     </span>
   );
+}
+
+/** NG-264: takes a poll's scan answer for one row; returns the row itself when nothing changed. */
+function withScanRow<T extends { scanStatus?: string | null; scanObjectRemoved?: boolean }>(
+  item: T,
+  row: { scanStatus: string; scanObjectRemoved: boolean },
+): T {
+  if (item.scanStatus === row.scanStatus && !!item.scanObjectRemoved === row.scanObjectRemoved) return item;
+  return { ...item, scanStatus: row.scanStatus, scanObjectRemoved: row.scanObjectRemoved };
+}
+
+/**
+ * NG-264 (a): the message key for a refusal. "Kaldırıldı" only when the infected object was
+ * really removed; otherwise the download is refused and the file is still stored.
+ */
+function scanTextKey(refusal: string, removed: boolean | undefined): string {
+  if (refusal === 'scan_infected') return removed ? 'scan.scan_infected_removed' : 'scan.scan_infected';
+  return `scan.${refusal}`;
+}
+
+/**
+ * What a screen reader says when a row's scan reaches a result (NG-264 E-1). Pending is
+ * not said: the badge was shown already. Null = nothing to say.
+ */
+function scanAnnouncement(
+  scanStatus: unknown,
+  removed: boolean | undefined,
+  t: (key: string, values?: Record<string, string>) => string,
+): string | null {
+  const refusal = evidenceScanRefusal(scanStatus);
+  if (refusal === 'scan_pending') return null;
+  return t(refusal === null ? 'scan.scan_clean' : scanTextKey(refusal, removed));
 }
 
 interface EvidenceClientProps {
@@ -136,6 +189,103 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
   const dateLocale = isTr ? 'tr-TR' : 'en-US';
   const t = useTranslations('Evidence');
   const errorText = useActionErrorText();
+
+  // NG-264 (b): while a row waits for its scan, re-read the scan state of the list so the
+  // badge moves on its own. Only scanStatus is taken from the answer; the rest of the row,
+  // the filters and the open drawer are left as they are. Polling stops when no row waits,
+  // when the tab is hidden, and when the screen unmounts. A failed read changes nothing.
+  // The effect is keyed on WHICH rows wait, so a new upload restarts the 5 s start (NG-264 Ö-5).
+  const [retrying, setRetrying] = useState<Record<string, boolean>>({});
+  const waitingIds = items
+    .filter((item) => isWaitingRow(item, retrying))
+    .map((item) => item.id)
+    .join(',');
+  useEffect(() => {
+    if (!waitingIds) return;
+    // The rows this run watches. One of them missing from an answer that did arrive was
+    // deleted on the server: it leaves the list, and with it the reason to poll (NG-264 Ö-2).
+    const watched = waitingIds.split(',');
+    let cancelled = false;
+    let inFlight = false;
+    let delay = SCAN_POLL_FIRST_MS;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const visible = () => document.visibilityState === 'visible';
+
+    const tick = async () => {
+      timer = undefined;
+      if (cancelled || inFlight || !visible()) return;
+      inFlight = true;
+      const answer = await getEvidenceScanStatusAction().catch(() => null);
+      inFlight = false;
+      if (cancelled) return;
+      if (answer && answer.ok) {
+        const byId = new Map(answer.rows.map((row) => [row.id, row]));
+        const gone = new Set(watched.filter((id) => !byId.has(id)));
+        setItems((prev) =>
+          prev
+            .filter((item) => !gone.has(item.id))
+            .map((item) => {
+              const row = byId.get(item.id);
+              return row ? withScanRow(item, row) : item;
+            })
+        );
+        setSelectedDoc((prev) => {
+          if (!prev) return prev;
+          if (gone.has(prev.id)) return null;
+          const row = byId.get(prev.id);
+          return row ? withScanRow(prev, row) : prev;
+        });
+        setRetrying((prev) => ({ ...prev, ...Object.fromEntries(answer.rows.map((row) => [row.id, row.retrying])) }));
+      }
+      if (!visible()) return;
+      delay = Math.min(delay * 2, SCAN_POLL_MAX_MS);
+      timer = setTimeout(tick, delay);
+    };
+
+    const onVisibilityChange = () => {
+      if (cancelled) return;
+      if (visible()) {
+        if (timer !== undefined) clearTimeout(timer);
+        delay = SCAN_POLL_FIRST_MS;
+        void tick();
+      } else if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+    };
+
+    timer = setTimeout(tick, delay);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [waitingIds]);
+
+  // NG-264 E-1 / Ö-3: one polite live region for the whole list, kept in the page. It says a
+  // row's scan result when that result arrives by a change (poll), not on first load and not
+  // for a row the screen merely shows. Rows are compared by their last seen state.
+  const [announcement, setAnnouncement] = useState<string>('');
+  const seenScan = useRef<Map<string, unknown>>(new Map(initialData.map((item) => [item.id, item.scanStatus])));
+  useEffect(() => {
+    const before = seenScan.current;
+    const after = new Map<string, unknown>();
+    const messages: string[] = [];
+    for (const item of items) {
+      after.set(item.id, item.scanStatus);
+      if (!before.has(item.id) || before.get(item.id) === item.scanStatus) continue;
+      const status = scanAnnouncement(item.scanStatus, item.scanObjectRemoved, t);
+      if (status) messages.push(t('scan.announce', { title: item.title, status }));
+    }
+    seenScan.current = after;
+    if (messages.length === 0) return;
+    // A live region speaks when its text changes. The same sentence twice in a row (two rows
+    // with one title reaching one state) would leave the DOM as it is and the second result
+    // unsaid, so a repeat gets a trailing no-break space (review Ö-B).
+    const text = messages.join('. ');
+    setAnnouncement((prev) => (prev === text ? `${text}\u00A0` : text));
+  }, [items, t]);
 
   // What the drawer may show about the selected document. Both are empty for almost
   // every row today, and an empty state is the correct thing to render: the module has
@@ -261,7 +411,8 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       setUploadProgress(100);
 
       if (res.evidence) {
-        setItems([res.evidence as unknown as EvidenceItemData, ...items]);
+        // Functional update: a poll may have changed a row while the upload was in flight (NG-264 Ö-4).
+        setItems((prev) => [res.evidence as unknown as EvidenceItemData, ...prev]);
       }
 
       setShowUploadModal(false);
@@ -289,7 +440,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
       alert(text);
       return;
     }
-    setItems(items.filter(i => i.id !== id));
+    setItems((prev) => prev.filter((i) => i.id !== id));
     if (selectedDoc?.id === id) setSelectedDoc(null);
   };
 
@@ -307,6 +458,11 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
   return (
     <div className="space-y-8">
+      {/* The list's one live region: always in the page, visually hidden (NG-264 E-1). */}
+      <div role="status" aria-live="polite" aria-atomic="true" data-testid="evidence-scan-announcer" className="sr-only">
+        {announcement}
+      </div>
+
       {/* ─── 1. HEALTH SCORE & SUMMARY BANNER ─── */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
@@ -556,7 +712,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
                     <div className="flex items-center gap-1.5">
                       {doc.r2ObjectKey && !isEvidenceDownloadable(doc.scanStatus) && (
-                        <ScanState status={doc.scanStatus} t={t} />
+                        <ScanState status={doc.scanStatus} removed={doc.scanObjectRemoved} t={t} />
                       )}
                       {doc.r2ObjectKey && isEvidenceDownloadable(doc.scanStatus) && (
                         <a
@@ -836,7 +992,7 @@ export default function EvidenceClient({ initialData, locale = 'tr' }: EvidenceC
 
             <div className="pt-4 border-t border-border flex items-center justify-between">
               {selectedDoc.r2ObjectKey && !isEvidenceDownloadable(selectedDoc.scanStatus) && (
-                <ScanState status={selectedDoc.scanStatus} t={t} />
+                <ScanState status={selectedDoc.scanStatus} removed={selectedDoc.scanObjectRemoved} t={t} />
               )}
               {selectedDoc.r2ObjectKey && isEvidenceDownloadable(selectedDoc.scanStatus) && (
                 <a

@@ -604,8 +604,11 @@
     },
     "scan": {
       "scan_pending": "Taranıyor",
-      "scan_infected": "Zararlı bulundu, kaldırıldı",
-      "scan_error": "Taranamadı, yeniden denenecek"
+      "scan_infected": "Zararlı bulundu, indirme engellendi",
+      "scan_infected_removed": "Zararlı bulundu, kaldırıldı",
+      "scan_error": "Taranamadı, yeniden denenecek",
+      "scan_clean": "Taranıp temiz bulundu",
+      "announce": "{title}: {status}"
     }
   },
   "ConceptNote": {

@@ -1910,8 +1910,8 @@ describe('server action RBAC guard (TASK-MUN80UOUPB2A4 / TASK-MUN4H2RL79D8B)', (
 
     it('when a readOnly action starts writing', () => {
       const mutant = source.replace(
-        'const items = await withTenant(tenantId, (tx) =>\n      tx.evidence.findMany({',
-        'await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { tenantId } }));\n    const items = await withTenant(tenantId, (tx) =>\n      tx.evidence.findMany({',
+        'const items = await withTenant(tenantId, async (tx) => {\n      const rows = await tx.evidence.findMany({',
+        'await withTenant(tenantId, (tx) => tx.evidence.deleteMany({ where: { tenantId } }));\n    const items = await withTenant(tenantId, async (tx) => {\n      const rows = await tx.evidence.findMany({',
       );
       expect(mutant).not.toBe(source);
       expect(findingsFor(evidence, mutant).findings).toEqual([

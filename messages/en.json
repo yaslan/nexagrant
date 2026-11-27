@@ -604,8 +604,11 @@
     },
     "scan": {
       "scan_pending": "Scanning",
-      "scan_infected": "Malware found, removed",
-      "scan_error": "Could not be scanned, will retry"
+      "scan_infected": "Malware found, download blocked",
+      "scan_infected_removed": "Malware found, removed",
+      "scan_error": "Could not be scanned, will retry",
+      "scan_clean": "Scanned, clean",
+      "announce": "{title}: {status}"
     }
   },
   "ConceptNote": {
