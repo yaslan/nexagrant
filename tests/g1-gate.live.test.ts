@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { envValue } from './helpers/dotenv';
-import { withLetterOfIntentRule } from './helpers/gate-rules';
+import { setAgreedBudgetShareRule, withLetterOfIntentRule } from './helpers/gate-rules';
 import { assertRlsSubjectRole, requireRlsTestUrl, skipOrFailInCi } from './helpers/live-db-role';
 import { presentIds } from './helpers/teardown-guard';
 
@@ -263,5 +263,130 @@ describe('G1 on a real database', () => {
     });
     expect(await evaluateGate(opp, 'G1', tenantId)).toEqual({ passed: true, reasons: [] });
     expect(await stage(opp)).toBe('G1');
+  });
+});
+
+/**
+ * NG-33: the agreed budget share (spec §12 G1) on a real database. One `PartnerBudgetShare` per seat;
+ * `agreedAt` null is a proposal, not an agreement. The rule is switched on for this block only.
+ */
+describe('G1 on a real database: an agreed budget share (NG-33)', () => {
+  let restore: (() => void) | undefined;
+  beforeEach(() => {
+    restore = setAgreedBudgetShareRule(true);
+  });
+  afterEach(() => {
+    restore?.();
+    restore = undefined;
+  });
+
+  const share = (seatId: string, agreedAt: Date | null) =>
+    admin!.partnerBudgetShare.create({
+      data: { tenantId, seatId, minCents: BigInt(10_000_000), maxCents: BigInt(20_000_000), agreedAt },
+    });
+  const latestDecision = async (opportunityId: string) =>
+    admin!.gateDecision.findFirst({
+      where: { opportunityId, gate: 'G1' },
+      orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
+      select: { passed: true, inputs: true },
+    });
+
+  test('a seated member with no share: refused with G1_NO_AGREED_BUDGET_SHARE, filed, stage stays', async () => {
+    const opp = await opportunity('no share');
+    const s = await seat(opp);
+    await candidate(s, SEATED, 1);
+    await candidate(s, BACKUP, 2);
+    await fillThroughM8(opp, s);
+
+    const result = await evaluateGate(opp, 'G1', tenantId);
+
+    expect(result.passed).toBe(false);
+    expect(result.reasons).toEqual(['Critical role research has no agreed budget share']);
+    expect(result.reasonDetails).toContainEqual({ code: 'G1_NO_AGREED_BUDGET_SHARE', values: { role: 'research' } });
+    expect(await stage(opp)).toBe('G0');
+    expect(await latestDecision(opp)).toMatchObject({ passed: false, inputs: { criticalRolesWithoutAgreedBudgetShare: ['research'] } });
+  });
+
+  test('a proposed share does not agree the seat; once agreed the gate passes and the stage moves to G1', async () => {
+    const opp = await opportunity('proposed then agreed');
+    const s = await seat(opp);
+    await candidate(s, SEATED, 1);
+    await candidate(s, BACKUP, 2);
+    await fillThroughM8(opp, s);
+    const row = await share(s, null);
+
+    expect((await evaluateGate(opp, 'G1', tenantId)).reasonDetails).toContainEqual({
+      code: 'G1_NO_AGREED_BUDGET_SHARE',
+      values: { role: 'research' },
+    });
+
+    await admin!.partnerBudgetShare.update({ where: { id: row.id }, data: { agreedAt: new Date('2026-11-02T00:00:00.000Z') } });
+
+    expect(await evaluateGate(opp, 'G1', tenantId)).toEqual({ passed: true, reasons: [] });
+    expect(await stage(opp)).toBe('G1');
+  });
+
+  test('reopening: after a pass, the seat is emptied and the next run files a fresh refusal', async () => {
+    const opp = await opportunity('member leaves');
+    const s = await seat(opp);
+    await candidate(s, SEATED, 1);
+    await candidate(s, BACKUP, 2);
+    await fillThroughM8(opp, s);
+    await share(s, new Date('2026-11-02T00:00:00.000Z'));
+
+    expect((await evaluateGate(opp, 'G1', tenantId)).passed).toBe(true);
+    expect(await latestDecision(opp)).toMatchObject({ passed: true });
+
+    // The member leaves: the seat no longer names an organisation, so it is unfilled again.
+    await admin!.consortiumSeat.update({
+      where: { id: s },
+      data: { status: 'OPEN', organizationId: null, memberStage: null, loiReceivedAt: null },
+    });
+
+    const reopened = await evaluateGate(opp, 'G1', tenantId);
+    expect(reopened.passed).toBe(false);
+    expect(reopened.reasons.join()).toMatch(/not filled/);
+    expect(await latestDecision(opp)).toMatchObject({ passed: false });
+  });
+
+  // NG-33 B-1 (PR #462 review): the share is keyed to the seat, so the member who agreed it must not
+  // carry it to the next organisation. A's agreement may not satisfy the rule once B sits in the seat.
+  test('B-1: a share agreed by the former member does not agree the next member; refused with G1_NO_AGREED_BUDGET_SHARE', async () => {
+    const opp = await opportunity('member replaced');
+    const s = await seat(opp);
+    await candidate(s, SEATED, 1);
+    await candidate(s, BACKUP, 2);
+    await fillThroughM8(opp, s);
+    await share(s, new Date('2026-11-02T00:00:00.000Z'));
+    expect((await evaluateGate(opp, 'G1', tenantId)).passed).toBe(true);
+
+    // A withdraws: the seat is open again (the same state the reopening test sets).
+    await admin!.consortiumSeat.update({
+      where: { id: s },
+      data: { status: 'OPEN', organizationId: null, memberStage: null, loiReceivedAt: null },
+    });
+
+    // B is invited, confirmed and records the letter of intent, all through the real M8 actions.
+    await m8.inviteCandidateToSeat(s, BACKUP, opp);
+    await m8.confirmSeatAssignment(s, opp);
+    expect(
+      await m8.setSeatMemberStage({ seatId: s, opportunityId: opp, stage: 'CONFIRMED', loiReceivedAt: '2026-11-01' }),
+    ).toMatchObject({ ok: true });
+
+    const result = await evaluateGate(opp, 'G1', tenantId);
+
+    expect(result.passed).toBe(false);
+    expect(result.reasonDetails).toContainEqual({ code: 'G1_NO_AGREED_BUDGET_SHARE', values: { role: 'research' } });
+    expect(await latestDecision(opp)).toMatchObject({
+      passed: false,
+      inputs: { criticalRolesWithoutAgreedBudgetShare: ['research'] },
+    });
+    // The agreement belonged to A: the share row is no longer agreed once B holds the seat.
+    expect(
+      await admin!.partnerBudgetShare.findUniqueOrThrow({
+        where: { seatId_tenantId: { seatId: s, tenantId } },
+        select: { agreedAt: true },
+      }),
+    ).toEqual({ agreedAt: null });
   });
 });
