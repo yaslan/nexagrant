@@ -363,6 +363,20 @@ const envSchema = z.object({
       .default('60')
   ),
   /**
+   * NG-387: how many minutes an M18 credit reservation (`usage:M18`, src/modules/m18/server/ai-credits.ts)
+   * may stay with neither a `refund:M18` row nor a delivery marker (`AiUsageLog.refId`) before the
+   * `ai-reservation-orphans` job counts it orphaned and refunds it (src/lib/ai/reservation-orphans.ts).
+   * Must outlast the longest M18 action (five site reads plus one model call); blank = 60.
+   * Positive integer, at most 10080 (one week). Kept as a string like the settings above.
+   */
+  RESERVATION_ORPHAN_MINUTES: blankToUndefined(
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'RESERVATION_ORPHAN_MINUTES must be a positive integer (minutes)')
+      .refine((value) => Number(value) <= 10_080, 'RESERVATION_ORPHAN_MINUTES must be at most 10080 (one week)')
+      .default('60')
+  ),
+  /**
    * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
    * blank = 1000, the production value, which fails fast into the fallback path.
    * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
@@ -499,6 +513,14 @@ export const dbConnectTimeoutMs: number =
  */
 export function publicLeadStuckAfterMinutes(): number {
   return Number(env.PUBLIC_LEAD_STUCK_AFTER_MINUTES);
+}
+
+/**
+ * The numeric view of `RESERVATION_ORPHAN_MINUTES` (NG-387). The schema has already rejected
+ * anything that is not a positive integer, so this cannot be `NaN`.
+ */
+export function reservationOrphanMinutes(): number {
+  return Number(env.RESERVATION_ORPHAN_MINUTES);
 }
 
 /**

@@ -43,6 +43,7 @@ export const JOB_IDS = [
   'partner-search-retention',
   'm17-text-retention',
   'm17-stale-runs',
+  'ai-reservation-orphans',
   'notification-email-instant',
   'notification-email-weekly',
   // FO-384 B2: queued by a PIC change, never on a cron. Not in SCHEDULE (no tick, no missed-tick check).
@@ -168,6 +169,17 @@ export const SCHEDULE: readonly ScheduledJob[] = [
     cron: '*/15 * * * *',
     maxAttempts: 3,
     queue: 'm17-stale-runs',
+    missedTickAlert: false,
+  },
+  // NG-387: every 15 minutes, gives back an M18 credit reservation whose action died before it
+  // either delivered (AiUsageLog.refId) or refunded, after RESERVATION_ORPHAN_MINUTES
+  // (src/lib/ai/reservation-orphans.ts). Own queue, so a job added by hand waits for the cron's
+  // run. No missed-tick alert and no backfill: the next tick refunds every orphan still standing.
+  {
+    id: 'ai-reservation-orphans',
+    cron: '*/15 * * * *',
+    maxAttempts: 3,
+    queue: 'ai-reservation-orphans',
     missedTickAlert: false,
   },
   // NG-182: every 15 minutes, one SystemAlert per routed PublicLead that has no copy in its tenant
