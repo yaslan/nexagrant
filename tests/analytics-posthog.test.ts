@@ -8,6 +8,7 @@ import { analytics, buildCaptureBody, sanitizeProperties } from '@/lib/analytics
 import {
   ANALYTICS_ANON_ID_STORAGE_KEY,
   CONSENT_STORAGE_KEY,
+  COOKIE_POLICY_VERSION,
   OPEN_COOKIE_PREFERENCES_EVENT,
   clearAnalyticsStorage,
   hasAnalyticsConsent,
@@ -49,8 +50,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const accept = () => window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all' }));
-const reject = () => window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: false, level: 'essential' }));
+const accept = () => window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all', time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
+const reject = () => window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: false, level: 'essential', time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
 
 describe('consent gate', () => {
   it.each([
@@ -130,9 +131,9 @@ describe('cookie preferences', () => {
 
   it('reads the stored answer, and nothing as "not answered"', () => {
     expect(storedConsentLevel()).toBeNull();
-    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all' }));
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: true, level: 'all', time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
     expect(storedConsentLevel()).toBe('all');
-    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: false, level: 'essential' }));
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ accepted: false, level: 'essential', time: new Date().toISOString(), version: COOKIE_POLICY_VERSION }));
     expect(storedConsentLevel()).toBe('essential');
     window.localStorage.setItem(CONSENT_STORAGE_KEY, '{nope');
     expect(storedConsentLevel()).toBeNull();

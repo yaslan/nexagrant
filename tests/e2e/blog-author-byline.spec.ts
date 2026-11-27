@@ -116,7 +116,7 @@ test.describe.serial('blog author byline — ünvan before name, one line', () =
     test('a long ünvan and name keep the read-more link inside the viewport', async ({ page }) => {
       // Keep the cookie banner off the evidence screenshot (same key signInAs sets).
       await page.addInitScript(() => {
-        window.localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false }));
+        window.localStorage.setItem('fabrika_cookie_consent', JSON.stringify({ necessary: true, analytics: false, marketing: false, time: new Date().toISOString(), version: 'draft-2026-11-18' }));
       });
       for (const [path, label] of [['/tr/blog', /^Devamını Oku/], ['/tr', /^Oku/]] as const) {
         await page.goto(path);

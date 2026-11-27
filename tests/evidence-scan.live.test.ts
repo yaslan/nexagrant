@@ -1023,4 +1023,23 @@ describe('NG-279: an infected object that could not be deleted is tried again by
       await admin!.auditEvent.deleteMany({ where: { actorId: 'ng369-ob' } });
     }
   });
+
+  test('NG-374: a deleted event with target NULL in the same tenant does not empty the sweep page (RLS and owner client)', async () => {
+    // Guards the `a."target" IS NOT NULL` predicate in readInfectedPage: `e.id NOT IN (…, NULL)` is never
+    // true, so without it one NULL-target object_removed event would drop every INFECTED row of the tenant.
+    const id = await uploadPresigned('ng374-null-target.docx', eicarDocx());
+    await dropQueuedScans(id);
+    await scanner.scanEvidence(run(id), { ...verdictDeps, enqueue: async () => true, deleteObject: failingDelete, now: () => new Date() });
+    await admin!.auditEvent.create({
+      data: { tenantId: t.tenant, type: 'evidence.scan.object_removed', target: null, data: { objectDeleted: true }, actorId: 'ng374-null' },
+    });
+    try {
+      const viaRls = await withTenant(t.tenant, (tx) => scanner.readInfectedPage(tx, t.tenant, ''));
+      const viaOwner = await admin!.$transaction((tx) => scanner.readInfectedPage(tx as never, t.tenant, ''));
+      expect(viaRls.rows.map((r) => r.id), 'RLS client: the infected row is still read').toContain(id);
+      expect(viaOwner.rows.map((r) => r.id), 'owner client: the infected row is still read').toContain(id);
+    } finally {
+      await admin!.auditEvent.deleteMany({ where: { actorId: 'ng374-null' } });
+    }
+  });
 });
