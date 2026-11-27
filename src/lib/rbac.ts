@@ -2,10 +2,14 @@ import { Role } from "@prisma/client";
 
 /**
  * NG-272: the server acting for a call with no member behind it (an API key). Not a
- * membership role and not stored anywhere: `can` takes it for every action, so the
+ * membership role and not stored anywhere: `can` skips the role table for it, so the
  * decision left is the plan and module the caller passes as the resource.
+ *
+ * A symbol, not a string (NG-272 review B-1): session roles are plain strings cast to
+ * `Role`, and a string "SYSTEM" in that path would skip the role table too. No string can
+ * equal a symbol, so only code that holds this constant can act as the system.
  */
-export const SYSTEM_ROLE = "SYSTEM" as const;
+export const SYSTEM_ROLE: unique symbol = Symbol("SYSTEM_ROLE");
 export type ActingRole = Role | typeof SYSTEM_ROLE;
 
 export type Action =

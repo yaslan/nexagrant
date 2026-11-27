@@ -37,7 +37,7 @@ const API_KEY_RATE_WINDOW_MS = 60_000;
  * fails a route that does not call it or calls it after reading data. A new route
  * that skips the call is not refused by anything at runtime.
  */
-const PARTNER_API_MODULE: ModuleId = 'M1';
+export const PARTNER_API_MODULE: ModuleId = 'M1';
 
 /**
  * An API key is not a member, so it acts under a role no membership holds. It is a
