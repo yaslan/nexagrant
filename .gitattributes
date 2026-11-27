@@ -1,0 +1,44 @@
+# NG-335 (Taşıma-1): satır sonu politikası.
+# Repo LF tutulur; Windows git'i (autocrlf=true) CRLF'ye çevirip betikleri bozmasın diye.
+# Git işlemleri yalnız WSL içinden yapılır (bkz. CLAUDE.md "Git yalnız WSL içinden").
+
+* text=auto eol=lf
+*.sh text eol=lf
+githooks/* text eol=lf
+
+# İkili dosyalar: asla metin olarak normalize edilmez
+*.png binary
+*.jpg binary
+*.webp binary
+*.pdf binary
+*.dump binary
+*.zip binary
+
+# Mevcut indekste CRLF (veya karışık) satır sonu taşıyan izlenen dosyalar.
+# LF'ye çevrilirse içerik değişir (ör. .ics RFC 5545 gereği CRLF). Bayt-bayt korunur.
+docs/agent-results/TASK-MTQU053U24RYH-screenshots/ics-rfc5545-check.txt -text
+docs/agent-results/TASK-MTQUN8VV6DK8C-screenshots/build.txt -text
+docs/agent-results/TASK-MTQUTBH8Q9VMK-screenshots/brief-download.ics -text
+docs/agent-results/TASK-MTRD9QBJ2G32E-screenshots/after-curl.txt -text
+docs/agent-results/TASK-MTRD9QBJ2G32E-screenshots/before-curl.txt -text
+docs/agent-results/TASK-MULRR08Y9YI77-screenshots/bolge-raporu-2026-09.csv -text
+docs/agent-results/TASK-MUOBO58BREWO7-be-fb-ekler/r304.txt -text
+docs/agent-results/TASK-MUODXN8FCT2PW-crw2-fb-2-ekler/logs/build.log -text
+docs/agent-results/TASK-MUOEPL87MCXJH-fe-fb-2-ekler/build-sonra.log -text
+docs/agent-results/TASK-MUOF809Z8YSVO-cs-fb-ekler/once/mutants-before.csv -text
+docs/agent-results/TASK-MUOF809Z8YSVO-cs-fb-ekler/sonra/build.log -text
+docs/agent-results/TASK-MUOF809Z8YSVO-cs-fb-ekler/sonra/mutants-after.csv -text
+docs/agent-results/TASK-MUOF85BU7BV3X-cs-fb-ekler/09-build-uyari.txt -text
+docs/agent-results/TASK-MUOFCOKBQBUSQ-devop-fb-2-ekler/C1-gates-raw.txt -text
+docs/agent-results/TASK-MUOFCOKBQBUSQ-devop-fb-2-ekler/C2-gates-raw.txt -text
+docs/agent-results/TASK-MUOFCOKBQBUSQ-devop-fb-2-ekler/C2b-gates-raw.txt -text
+docs/agent-results/TASK-MUOGR5FDKLH22-be-fb-2-ekler/15-build.txt -text
+docs/agent-results/TASK-MUOIBQJJDKL28-cs-fb-3-ekler/next-build.txt -text
+docs/agent-results/TASK-MUSBCXP9RKS3D-qae-fb-faz1-2/build.log -text
+docs/agent-results/TASK-MVCH2R3VSLAJN-evidence/curl-export-ultra.txt -text
+docs/agent-results/TASK-MVCH2R3VSLAJN-evidence/curl-quota-export.txt -text
+docs/agent-results/TASK-MVCH2R3VSLAJN-evidence/ultra-export.csv -text
+docs/agent-results/TASK-MVCH99A54WALG-devop-fb-ekler/curl-I.txt -text
+docs/beta/beta-weekly-sync.ics -text
+workers/agencies/tests/fixtures/istka-acik-destek.html -text
+workers/agencies/tests/fixtures/ua-home.html -text
