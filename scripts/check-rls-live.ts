@@ -51,7 +51,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import pg from 'pg';
-import { tenantScopedModels } from './rls-models';
+import { INTAKE_APPEND_ONLY, INTAKE_APPEND_ONLY_POLICIES, tenantScopedModels } from './rls-models';
 
 /** Fixed name so a crashed run leaves one droppable object, never a pile. */
 const PROBE_ROLE = 'rls_verify_probe';
@@ -706,7 +706,12 @@ const SYSTEM_SCOPE_TABLES: ReadonlyArray<{
  * The expected policy is compiled by the same server, so the comparison does not depend on
  * how a Postgres version prints an expression.
  */
-const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string }> = [];
+const SYSTEM_SCOPE_ALLOWED_EXTRA: ReadonlyArray<{ table: string; policy: string; cmd: string }> = [
+  // NG-243: the intake tables' RESTRICTIVE intake_no_update / intake_no_delete (rls-models.ts
+  // INTAKE_APPEND_ONLY). Restrictive, so they only shut rows; still compared with rls.sql field by
+  // field (a PERMISSIVE copy, another command or another expression is drift).
+  ...[...INTAKE_APPEND_ONLY].sort().flatMap((table) => INTAKE_APPEND_ONLY_POLICIES.map(({ policy, cmd }) => ({ table, policy, cmd }))),
+];
 
 /**
  * Everything after `CREATE POLICY <policy> ON public."<table>"` in prisma/rls.sql up to its `;`,
@@ -725,11 +730,11 @@ function rlsSqlPolicyClauses(sql: string, table: string, policy: string): string
 }
 
 /** The fields of a policy the expert_directory exception is compared on (as pg_policies prints them). */
-type PolicyShape = { cmd: string; qual: string; roles: string[]; permissive: string };
+type PolicyShape = { cmd: string; qual: string; roles: string[]; permissive: string; with_check: string | null };
 
 /** Field-by-field difference of a live policy from the one rls.sql compiles to; [] when equal. */
 function policyShapeDrift(
-  live: { cmd: string; qual: string | null; roles: string[] | null; permissive: string },
+  live: { cmd: string; qual: string | null; roles: string[] | null; permissive: string; with_check: string | null },
   expected: PolicyShape
 ): string[] {
   const set = (r: readonly string[] | null) => `{${[...(r ?? [])].sort().join(', ')}}`;
@@ -738,6 +743,8 @@ function policyShapeDrift(
   if (live.permissive !== expected.permissive) out.push(`permissive ${live.permissive}, beklenen ${expected.permissive}`);
   if (set(live.roles) !== set(expected.roles)) out.push(`roller ${set(live.roles)}, beklenen ${set(expected.roles)}`);
   if (live.qual === null || live.qual !== expected.qual) out.push('qual rls.sql\'deki ifadeden farklı');
+  // NG-243: an UPDATE policy's WITH CHECK is part of "as written" too.
+  if ((live.with_check ?? null) !== (expected.with_check ?? null)) out.push('with_check rls.sql\'deki ifadeden farklı');
   return out;
 }
 
@@ -761,8 +768,8 @@ async function expectedPolicy(
   try {
     await client.query(`create temp table ${tmp} (like public."${table}") on commit drop`);
     await client.query(`create policy ${policy} on pg_temp.${tmp} ${clauses}`);
-    const r = await client.query<{ cmd: string; qual: string | null; roles: string[] | null; permissive: string }>(
-      `select cmd, qual, roles::text[] as roles, permissive
+    const r = await client.query<{ cmd: string; qual: string | null; roles: string[] | null; permissive: string; with_check: string | null }>(
+      `select cmd, qual, roles::text[] as roles, permissive, with_check
          from pg_policies
         where schemaname = (select nspname from pg_namespace where oid = pg_my_temp_schema())
           and tablename = $1 and policyname = $2`,
@@ -771,7 +778,7 @@ async function expectedPolicy(
     const row = r.rows[0];
     if (!row?.qual || !row.roles) return { error: `${table}.${policy}: beklenen politika derlenemedi` };
     if (row.cmd !== cmd) return { error: `${table}.${policy}: prisma/rls.sql komutu ${row.cmd}, istisna yalnız ${cmd}` };
-    return { cmd: row.cmd, qual: row.qual, roles: row.roles, permissive: row.permissive };
+    return { cmd: row.cmd, qual: row.qual, roles: row.roles, permissive: row.permissive, with_check: row.with_check };
   } catch (e) {
     return { error: `${table}.${policy}: beklenen politika derlenemedi (${e instanceof Error ? e.message.split('\n')[0] : String(e)})` };
   } finally {
@@ -989,6 +996,90 @@ const PURPOSE_NARROWED = new Map<string, ReadonlySet<string>>([
   [COOKIE_CONSENT_TABLE, new Set([COOKIE_CONSENT_PURPOSE, 'platform-admin', 'cross-tenant-job'])],
   ['ProvinceLeadRoute', new Set(['platform-admin', 'cross-tenant-job'])],
 ]);
+
+/**
+ * NG-243 (NG-9 review Ö-1): the intake tables are append-only for the intake purposes. On one
+ * probe row per INTAKE_APPEND_ONLY table (written under PROBE_ROW_PURPOSE inside this
+ * transaction; ExpertPreRegistration's is a VERIFIED row, a pending one is the form's own
+ * exception), an UPDATE and a DELETE under the table's intake purpose must touch 0 rows, and the
+ * same DELETE under 'cross-tenant-job' (the retention purges) must still touch 1. The catalogue
+ * check alone cannot tell a restrictive policy that shuts from one whose expression is `true`.
+ * Rolled back, nothing is kept.
+ */
+const INTAKE_APPEND_ONLY_PROBES = new Map<string, { purpose: string; insert: [string, (id: string) => unknown[]]; update: string }>([
+  [
+    'CookieConsentRecord',
+    { purpose: COOKIE_CONSENT_PURPOSE, insert: [COOKIE_CONSENT_INSERT, (id) => [id]], update: `update "CookieConsentRecord" set choice = 'accept_all' where id = $1` },
+  ],
+  ['PublicLead', { purpose: 'public-intake', insert: [PUBLIC_LEAD_INSERT, (id) => [id]], update: `update "PublicLead" set email = 'changed@rls-verify.invalid' where id = $1` }],
+  [
+    'ExpertPreRegAttempt',
+    {
+      purpose: 'public-intake',
+      insert: [`insert into "ExpertPreRegAttempt" (id, "ipHash") values ($1, 'rls-verify-probe')`, (id) => [id]],
+      update: `update "ExpertPreRegAttempt" set "ipHash" = 'changed' where id = $1`,
+    },
+  ],
+  [
+    EXPERT_TABLE,
+    {
+      purpose: 'public-intake',
+      insert: [
+        `insert into ${quoteIdent(EXPERT_TABLE)} (id, "fullName", email, province, "isFreelancer", "expertiseAreas", roles, programmes, languages, "kvkkAcceptedAt", "visibilityConsentAt", locale, status, "emailVerifiedAt")
+         values ($1, 'probe', $2, '34', false, '{}', '{}', '{}', '{}', now(), now(), 'tr', 'verified', now())`,
+        (id) => [id, `${id}@rls-verify.invalid`],
+      ],
+      update: `update ${quoteIdent(EXPERT_TABLE)} set "fullName" = 'changed' where id = $1`,
+    },
+  ],
+]);
+
+async function probeIntakeAppendOnly(m: pg.Client, existing: ReadonlySet<string>): Promise<{ failures: string[]; checks: string[] }> {
+  const failures: string[] = [];
+  const checks: string[] = [];
+  const touched = async (sql: string, params: unknown[]): Promise<number | string> => {
+    await m.query('savepoint probe_append_only');
+    try {
+      return (await m.query(sql, params)).rowCount ?? -1;
+    } catch (e) {
+      return e instanceof Error ? e.message.split('\n')[0]! : String(e);
+    } finally {
+      await m.query('rollback to savepoint probe_append_only');
+    }
+  };
+  for (const t of [...INTAKE_APPEND_ONLY].sort()) {
+    if (!existing.has(t)) {
+      checks.push(`append-only: ${t} bu veritabanında yok, ölçülmedi`);
+      continue;
+    }
+    const probe = INTAKE_APPEND_ONLY_PROBES.get(t);
+    if (!probe) {
+      failures.push(`append-only: ${t} için prob yok (INTAKE_APPEND_ONLY_PROBES)`);
+      continue;
+    }
+    const id = `rls-verify-${randomBytes(6).toString('hex')}`;
+    await m.query('begin');
+    try {
+      await m.query('select enter_system_scope($1)', [PROBE_ROW_PURPOSE]);
+      const [sql, params] = probe.insert;
+      await m.query(sql, params(id));
+      await m.query('select enter_system_scope($1)', [probe.purpose]);
+      const upd = await touched(probe.update, [id]);
+      const del = await touched(`delete from ${quoteIdent(t)} where id = $1`, [id]);
+      if (upd === 0 && del === 0) checks.push(`append-only: ${t} ${probe.purpose} ile UPDATE 0, DELETE 0 satır`);
+      else failures.push(`append-only: ${t} ${probe.purpose} ile UPDATE ${upd}, DELETE ${del} satır (0 beklenir)`);
+      await m.query(`select enter_system_scope('cross-tenant-job')`);
+      const purge = await touched(`delete from ${quoteIdent(t)} where id = $1`, [id]);
+      if (purge === 1) checks.push(`append-only: ${t} cross-tenant-job ile DELETE 1 satır (saklama silmesi çalışıyor)`);
+      else failures.push(`append-only: ${t} cross-tenant-job ile DELETE ${purge} (1 beklenir — saklama silmesi bozuldu)`);
+    } catch (e) {
+      failures.push(`append-only: ${t} prob satırı yazılamadı — ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+    } finally {
+      await m.query('rollback');
+    }
+  }
+  return { failures, checks };
+}
 
 async function probePurposeTables(
   m: pg.Client,
@@ -1678,9 +1769,9 @@ async function main() {
     // above could not see it on an empty table. The set must be exactly {system_scope}.
     // The class is SYSTEM_SCOPE_TABLES plus any catalogue table carrying system_scope
     // without a tenant policy (a new one must be added to the list to be probed).
-    type LivePolicy = { tablename: string; policyname: string; cmd: string; qual: string | null; roles: string[] | null; permissive: string };
+    type LivePolicy = { tablename: string; policyname: string; cmd: string; qual: string | null; roles: string[] | null; permissive: string; with_check: string | null };
     const allPolicies = await client.query<LivePolicy>(
-      `select tablename, policyname, cmd, qual, roles::text[] as roles, permissive
+      `select tablename, policyname, cmd, qual, roles::text[] as roles, permissive, with_check
          from pg_policies where schemaname = 'public' order by tablename, policyname`
     );
     const policiesOf = new Map<string, LivePolicy[]>();
@@ -1884,6 +1975,11 @@ async function main() {
       const directory = await probeExpertDirectory(measurer.client, truth!.client === measurer.client ? null : truth!.client);
       failures.push(...directory.failures);
       checks.push(...directory.checks);
+    }
+    if ([...INTAKE_APPEND_ONLY].some((t) => existing.has(t))) {
+      const appendOnly = await probeIntakeAppendOnly(measurer.client, existing);
+      failures.push(...appendOnly.failures);
+      checks.push(...appendOnly.checks);
     }
     if (existing.has('AuditEvent') || existing.has(EXPERT_TABLE)) {
       const seal = await probeSealBindsPurpose(measurer.client);

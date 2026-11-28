@@ -107,3 +107,4 @@ add-consortium-seat-member-stage.sql
 add-cookie-consent-record.sql
 ai-usage-log-ref-id.sql
 add-ng-ai-quota-hold.sql
+intake-append-only.sql

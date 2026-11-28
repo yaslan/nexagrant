@@ -617,6 +617,84 @@ BEGIN
   END IF;
 END $$;
 
+-- NG-243 (NG-9 review Ö-1): the anonymous intake tables are append-only for the purposes the
+-- anonymous visitor's request runs under. CookieConsentRecord ('cookie-consent'), PublicLead,
+-- ExpertPreRegAttempt and ExpertPreRegistration ('public-intake') carry the one policy
+-- system_scope above, which is FOR ALL: until NG-243 a sealed intake scope could also UPDATE
+-- and DELETE their rows (rewrite a consent record, erase a lead, reset the per-IP counter).
+-- Two RESTRICTIVE policies per table close that. Restrictive policies AND with the permissive
+-- system_scope, so they can only shut, never open: under 'public-intake' or 'cookie-consent'
+-- an UPDATE or DELETE touches 0 rows (no error, like any row RLS hides). SELECT and INSERT are
+-- untouched (the forms count and insert). Every other purpose and the owner path have no
+-- intake purpose, so platform-admin (consoles), cross-tenant-job (lead forwarder, the three
+-- retention purges: withSystemScope('cross-tenant-job', ...) in src/lib/*retention*.ts and
+-- src/lib/leads/public-lead.ts) and apply-migrations.sh keep UPDATE and DELETE.
+-- Two exceptions, each the smallest the forms themselves write (git grep, NG-243 report):
+--   * ExpertPreRegistration: a PENDING row (status 'pending', "emailVerifiedAt" NULL) may still be
+--     updated and deleted. The new row (WITH CHECK) may only stay pending with no verification
+--     time (register.ts re-issues the link and restores it after a failed mail), or become verified
+--     WITH a verification time (verify.ts). Disabled, or verified without a time, is refused. Deleted:
+--     the rollback of a new row whose mail failed (register.ts). A verified or disabled row is out of reach.
+--     KNOWN GAP (sec-gnd B-2, PR #465; confirmed by a live probe): the WITH CHECK does not stop an
+--     intake caller that knows the id of a PENDING row from setting it to verified with a verification
+--     time, changing its other fields, or deleting it. The intake scope cannot disable an expert or
+--     write a disabled or inconsistent state, but it can verify a pending row it has the id of.
+--     Closing this means moving verify and rollback writes behind a SECURITY DEFINER function and
+--     dropping this pending exception: tracked as NG-392.
+--   * ExpertPreRegAttempt: rows older than 24 hours may be deleted. register.ts drops attempts
+--     older than ATTEMPT_RETENTION_MS (src/lib/expert-prereg/server/constants.ts, 24 h) before it
+--     counts; a recent attempt cannot be deleted, so the per-IP window cannot be emptied. If the
+--     constant goes below 24 h the cleanup simply leaves the rows between it and 24 h for later.
+-- The purpose test is an InitPlan ((SELECT ...)): evaluated once per statement. The purpose is
+-- bound by the seal (NG-187), so setting the GUC to another purpose does not lift this: it
+-- breaks the seal and system_scope opens nothing. Mirrored in
+-- prisma/migrations/intake-append-only.sql. The NG-183 block below keeps these two names on these
+-- four tables; scripts/check-rls-live.ts (SYSTEM_SCOPE_ALLOWED_EXTRA) compares them with this file.
+DO $$
+BEGIN
+  IF to_regclass('public."CookieConsentRecord"') IS NOT NULL THEN
+    DROP POLICY IF EXISTS intake_no_update ON public."CookieConsentRecord";
+    CREATE POLICY intake_no_update ON public."CookieConsentRecord" AS RESTRICTIVE FOR UPDATE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent')))
+      WITH CHECK (true);
+    DROP POLICY IF EXISTS intake_no_delete ON public."CookieConsentRecord";
+    CREATE POLICY intake_no_delete ON public."CookieConsentRecord" AS RESTRICTIVE FOR DELETE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent')));
+  END IF;
+  IF to_regclass('public."PublicLead"') IS NOT NULL THEN
+    DROP POLICY IF EXISTS intake_no_update ON public."PublicLead";
+    CREATE POLICY intake_no_update ON public."PublicLead" AS RESTRICTIVE FOR UPDATE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent')))
+      WITH CHECK (true);
+    DROP POLICY IF EXISTS intake_no_delete ON public."PublicLead";
+    CREATE POLICY intake_no_delete ON public."PublicLead" AS RESTRICTIVE FOR DELETE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent')));
+  END IF;
+  IF to_regclass('public."ExpertPreRegAttempt"') IS NOT NULL THEN
+    DROP POLICY IF EXISTS intake_no_update ON public."ExpertPreRegAttempt";
+    CREATE POLICY intake_no_update ON public."ExpertPreRegAttempt" AS RESTRICTIVE FOR UPDATE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent')))
+      WITH CHECK (true);
+    DROP POLICY IF EXISTS intake_no_delete ON public."ExpertPreRegAttempt";
+    CREATE POLICY intake_no_delete ON public."ExpertPreRegAttempt" AS RESTRICTIVE FOR DELETE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
+             OR "createdAt" < now() - interval '24 hours');
+  END IF;
+  IF to_regclass('public."ExpertPreRegistration"') IS NOT NULL THEN
+    DROP POLICY IF EXISTS intake_no_update ON public."ExpertPreRegistration";
+    CREATE POLICY intake_no_update ON public."ExpertPreRegistration" AS RESTRICTIVE FOR UPDATE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
+             OR (status = 'pending' AND "emailVerifiedAt" IS NULL))
+      WITH CHECK ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
+             OR (status = 'pending' AND "emailVerifiedAt" IS NULL)
+             OR (status = 'verified' AND "emailVerifiedAt" IS NOT NULL));
+    DROP POLICY IF EXISTS intake_no_delete ON public."ExpertPreRegistration";
+    CREATE POLICY intake_no_delete ON public."ExpertPreRegistration" AS RESTRICTIVE FOR DELETE
+      USING ((SELECT coalesce(current_setting('app.system_scope_purpose', true), '') NOT IN ('public-intake', 'cookie-consent'))
+             OR (status = 'pending' AND "emailVerifiedAt" IS NULL));
+  END IF;
+END $$;
+
 -- NG-183 (NG-175 review Düşük-1): on the system_scope tables above (system_scope policy,
 -- no tenant policy) system_scope is the ONLY policy. Policies are permissive and OR
 -- together, so a stray one — even FOR SELECT USING (true) — would open the personal data
@@ -626,6 +704,10 @@ END $$;
 -- No exception any more: NG-52's expert_directory policy on ExpertPreRegistration was
 -- replaced by the view "ExpertDirectoryEntry" (NG-188), so a policy of that name is now
 -- dropped like any other stray one.
+-- NG-243: the one named exception is the pair of RESTRICTIVE intake_no_update / intake_no_delete
+-- policies on the four intake tables (block above, which has just re-created them). Restrictive
+-- policies AND with system_scope, so they can only shut rows, never open them; a PERMISSIVE policy
+-- of the same name, or the same name on another table, is still dropped as stray.
 DO $$
 DECLARE r record;
 BEGIN
@@ -634,6 +716,9 @@ BEGIN
       FROM pg_policies p
      WHERE p.schemaname = 'public'
        AND p.policyname <> 'system_scope'
+       AND NOT (p.permissive = 'RESTRICTIVE'
+                AND p.policyname IN ('intake_no_update', 'intake_no_delete')
+                AND p.tablename IN ('CookieConsentRecord', 'PublicLead', 'ExpertPreRegAttempt', 'ExpertPreRegistration'))
        AND p.tablename IN (
              SELECT tablename FROM pg_policies WHERE schemaname = 'public' AND policyname = 'system_scope'
              EXCEPT

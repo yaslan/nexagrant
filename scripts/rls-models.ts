@@ -97,6 +97,22 @@ export const PLATFORM_POLICY: ReadonlySet<string> = new Set([
 export const SYSTEM_SCOPE_POLICY: ReadonlySet<string> = new Set(['CookieConsentRecord', 'ExpertFounderCounter', 'ExpertPreRegistration', 'ExpertPreRegAttempt', 'ProvinceLeadRoute', 'PublicLead']);
 
 /**
+ * NG-243 (NG-9 review Ö-1): the SYSTEM_SCOPE_POLICY tables an anonymous visitor writes. For the
+ * intake purposes ('public-intake', 'cookie-consent') they are append-only: prisma/rls.sql adds
+ * the RESTRICTIVE policies in INTAKE_APPEND_ONLY_POLICIES to each, next to system_scope, so an
+ * UPDATE or DELETE under those purposes touches 0 rows (two narrow exceptions, see rls.sql).
+ * scripts/check-rls-live.ts allows exactly these names on exactly these tables and compares them
+ * with rls.sql; tests/rls-coverage.test.ts pins this set to rls.sql's block and its migration.
+ */
+export const INTAKE_APPEND_ONLY: ReadonlySet<string> = new Set(['CookieConsentRecord', 'ExpertPreRegAttempt', 'ExpertPreRegistration', 'PublicLead']);
+
+/** The RESTRICTIVE policies each INTAKE_APPEND_ONLY table carries, with the one command each covers. */
+export const INTAKE_APPEND_ONLY_POLICIES: ReadonlyArray<{ policy: string; cmd: 'UPDATE' | 'DELETE' }> = [
+  { policy: 'intake_no_update', cmd: 'UPDATE' },
+  { policy: 'intake_no_delete', cmd: 'DELETE' },
+];
+
+/**
  * Tables designed with no RLS at all: SYSTEM_WIDE minus PLATFORM_POLICY and SYSTEM_SCOPE_POLICY.
  *
  * TASK-MUWDA86A7U4LK: the live Supabase project has an `ensure_rls` event
