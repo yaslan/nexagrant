@@ -10,6 +10,12 @@
 -- (re-issue, verify, rollback of a failed mail) and ExpertPreRegAttempt rows older than 24 hours
 -- (register.ts's cleanup). platform-admin, cross-tenant-job (forwarder, retention purges) and the
 -- owner path are unchanged. Full reasoning: the NG-243 block of prisma/rls.sql.
+-- KNOWN GAP (sec-gnd B-2, PR #465; confirmed by a live probe): the pending exception is not
+-- closed. Under 'public-intake' a caller that knows the id of a PENDING ExpertPreRegistration can
+-- set it to verified with a verification time, change its other fields, or delete it. The intake
+-- scope cannot disable an expert or write a disabled or inconsistent state. Tracked as NG-392
+-- (verify and rollback behind a SECURITY DEFINER function, exception removed). Same wording as
+-- the NG-243 block of prisma/rls.sql.
 --
 -- Same source: the DO block below is prisma/rls.sql's NG-243 block, byte for byte
 -- (tests/rls-coverage.test.ts compares them). rls.sql re-creates it on every `pnpm db:rls`; this

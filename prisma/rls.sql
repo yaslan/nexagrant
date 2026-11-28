@@ -633,9 +633,14 @@ END $$;
 --   * ExpertPreRegistration: a PENDING row (status 'pending', "emailVerifiedAt" NULL) may still be
 --     updated and deleted. The new row (WITH CHECK) may only stay pending with no verification
 --     time (register.ts re-issues the link and restores it after a failed mail), or become verified
---     WITH a verification time (verify.ts). Disabled, or verified without a time, is refused: the
---     intake cannot disable an expert or fake a verification (sec-gnd B-2, PR #465). Deleted: the
---     rollback of a new row whose mail failed (register.ts). A verified or disabled row is out of reach.
+--     WITH a verification time (verify.ts). Disabled, or verified without a time, is refused. Deleted:
+--     the rollback of a new row whose mail failed (register.ts). A verified or disabled row is out of reach.
+--     KNOWN GAP (sec-gnd B-2, PR #465; confirmed by a live probe): the WITH CHECK does not stop an
+--     intake caller that knows the id of a PENDING row from setting it to verified with a verification
+--     time, changing its other fields, or deleting it. The intake scope cannot disable an expert or
+--     write a disabled or inconsistent state, but it can verify a pending row it has the id of.
+--     Closing this means moving verify and rollback writes behind a SECURITY DEFINER function and
+--     dropping this pending exception: tracked as NG-392.
 --   * ExpertPreRegAttempt: rows older than 24 hours may be deleted. register.ts drops attempts
 --     older than ATTEMPT_RETENTION_MS (src/lib/expert-prereg/server/constants.ts, 24 h) before it
 --     counts; a recent attempt cannot be deleted, so the per-IP window cannot be emptied. If the
