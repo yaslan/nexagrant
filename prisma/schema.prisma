@@ -1823,9 +1823,16 @@ model AiUsageLog {
   credits     Int
   proposalId  String?
   section     String?
+  /// NG-387: the credit reservation (`CreditLedger.refId` of its `usage:<module>` row) this call
+  /// delivered. Written only on a complete answer; NULL for a cut-off or refused answer, for an
+  /// unreserved call and for every row older than NG-387. The ai-reservation-orphans job reads it
+  /// as the delivery marker. See prisma/migrations/ai-usage-log-ref-id.sql.
+  refId       String?
   createdAt   DateTime @default(now())
   @@index([tenantId, createdAt])
   @@index([tenantId, proposalId])
+  @@index([tenantId, refId])
+  @@index([module, createdAt])
 }
 
 model Document {

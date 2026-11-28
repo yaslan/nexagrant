@@ -16,6 +16,27 @@ function blankToUndefined<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? undefined : value), schema);
 }
 
+/**
+ * True only when a UTC ISO timestamp names a real calendar instant. `Date.parse` rolls an
+ * impossible day over (`2026-02-31T00:00:00Z` becomes 3 March), so the parsed instant's fields are
+ * compared with the written ones: any rollover or out-of-range field makes them differ.
+ */
+export function isRealUtcTimestamp(value: string): boolean {
+  const written = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(value);
+  const ms = Date.parse(value);
+  if (!written || Number.isNaN(ms)) return false;
+  const at = new Date(ms);
+  const second = written[6] === undefined ? 0 : Number(written[6]); // seconds are optional (`09:00Z`)
+  return (
+    at.getUTCFullYear() === Number(written[1]) &&
+    at.getUTCMonth() + 1 === Number(written[2]) &&
+    at.getUTCDate() === Number(written[3]) &&
+    at.getUTCHours() === Number(written[4]) &&
+    at.getUTCMinutes() === Number(written[5]) &&
+    at.getUTCSeconds() === second
+  );
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: optionalUrl,
@@ -363,6 +384,37 @@ const envSchema = z.object({
       .default('60')
   ),
   /**
+   * NG-387: how many minutes an M18 credit reservation (`usage:M18`, src/modules/m18/server/ai-credits.ts)
+   * may stay with neither a `refund:M18` row nor a delivery marker (`AiUsageLog.refId`) before the
+   * `ai-reservation-orphans` job counts it orphaned and refunds it (src/lib/ai/reservation-orphans.ts).
+   * Must outlast the longest M18 action (five site reads plus one model call); blank = 60.
+   * Positive integer, at most 10080 (one week). Kept as a string like the settings above.
+   */
+  RESERVATION_ORPHAN_MINUTES: blankToUndefined(
+    z
+      .string()
+      .regex(/^[1-9][0-9]*$/, 'RESERVATION_ORPHAN_MINUTES must be a positive integer (minutes)')
+      .refine((value) => Number(value) <= 10_080, 'RESERVATION_ORPHAN_MINUTES must be at most 10080 (one week)')
+      .default('60')
+  ),
+  /**
+   * NG-387 (B-1): the sweep cut-off of the `ai-reservation-orphans` job — ISO-8601 UTC, the deploy
+   * moment of NG-387. Only a `usage:M18` row created at or after it can be an orphan; rows before
+   * it predate the delivery marker and may have been delivered, so they are never refunded. Blank =
+   * no cut-off: the job refunds nothing and logs one warning (src/lib/ai/reservation-orphans.ts).
+   * Must end in `Z` (UTC).
+   */
+  ORPHAN_SWEEP_SINCE: blankToUndefined(
+    z
+      .string()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z$/,
+        'ORPHAN_SWEEP_SINCE must be an ISO-8601 UTC timestamp ending in Z, e.g. 2026-12-01T09:00:00Z',
+      )
+      .refine(isRealUtcTimestamp, 'ORPHAN_SWEEP_SINCE is not a real UTC date and time (e.g. 2026-02-31 does not exist)')
+      .optional()
+  ),
+  /**
    * Connect timeout of the pg pool, in milliseconds (src/lib/db.ts). Unset or
    * blank = 1000, the production value, which fails fast into the fallback path.
    * Only the test/gate environment raises it (scripts/gate-isolated.sh sets
@@ -499,6 +551,22 @@ export const dbConnectTimeoutMs: number =
  */
 export function publicLeadStuckAfterMinutes(): number {
   return Number(env.PUBLIC_LEAD_STUCK_AFTER_MINUTES);
+}
+
+/**
+ * The numeric view of `RESERVATION_ORPHAN_MINUTES` (NG-387). The schema has already rejected
+ * anything that is not a positive integer, so this cannot be `NaN`.
+ */
+export function reservationOrphanMinutes(): number {
+  return Number(env.RESERVATION_ORPHAN_MINUTES);
+}
+
+/**
+ * The orphan sweep cut-off (NG-387 B-1), or `null` when `ORPHAN_SWEEP_SINCE` is blank: no cut-off,
+ * no refund. The schema has already rejected anything that is not a UTC ISO timestamp.
+ */
+export function orphanSweepSince(): Date | null {
+  return env.ORPHAN_SWEEP_SINCE ? new Date(env.ORPHAN_SWEEP_SINCE) : null;
 }
 
 /**

@@ -161,7 +161,7 @@ export async function proposeEnrichment(
   return withM18Reservation<ProposeEnrichmentResult>(
     input.tenantId,
     ENRICHMENT_PURPOSE,
-    async ({ credits }) => {
+    async ({ refId, credits }) => {
       const completion = await (deps.generate ?? generateCompletion)({
         tenantId: input.tenantId,
         userId: input.userId,
@@ -169,6 +169,8 @@ export async function proposeEnrichment(
         purpose: attemptPurpose(ENRICHMENT_PURPOSE),
         // The price was reserved above; llm.ts logs this call at 0 credits and debits nothing.
         creditsReserved: true,
+        // NG-387: marks the reservation delivered (AiUsageLog.refId) for the orphan sweep.
+        reservationRefId: refId,
         ...request,
       });
       const proposal = parseEnrichmentAnswer(completion.text, fetchedUrls);

@@ -340,6 +340,15 @@
     },
     {
       "check": "D",
+      "file": "src/lib/ai/reservation-orphans.ts",
+      "subject": "system-scope:cross-tenant-job",
+      "count": 1,
+      "kind": "system-scope",
+      "class": "cross-tenant-job",
+      "reason": "releaseOrphanReservations(), run every 15 minutes by the ai-reservation-orphans cron (NG-387, NG-202 B3): finds every tenant's usage:M18 CreditLedger reservation older than RESERVATION_ORPHAN_MINUTES that has neither a refund:M18 row nor a delivery marker (AiUsageLog.refId) and is not older than the module's first marker (an M18 action whose process died before it delivered or refunded), and releases it with releaseAiReservation under that tenant's credit lock. The WHERE clause is a reason, a date and two NOT EXISTS probes and the tenant set is whatever it matches, so no single tenant exists to hand withTenant; CreditLedger and AiUsageLog are FORCE RLS, so an unscoped scan under fabrika_app would match 0 rows and report success while every orphan stayed. It writes only the refund row; it reads no prompt or answer text."
+    },
+    {
+      "check": "D",
       "file": "src/lib/invitations/retention.ts",
       "subject": "system-scope:cross-tenant-job",
       "count": 1,
